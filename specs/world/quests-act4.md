@@ -37,17 +37,17 @@
 |   1. Conventions | 93–159 |
 |   2. Act IV records | 160–181 |
 |   3. A4Q1 The Fallen Angel (chain 22, slot 25) | 182–302 |
-|   4. A4Q3 Hell's Forge (chain 24, slot 27) | 303–450 |
-|   5. A4Q2 Terror's End (chain 23, slot 26) | 451–700 |
-|   6. Act IV gossip records | 701–727 |
-|   7. Multiplayer and party rules | 728–740 |
-|   8. Hooks called from other systems | 741–778 |
-| Constants & data dependencies | 779–799 |
-| Randomness | 800–813 |
-| Edge cases & original bugs | 814–872 |
-| Test vectors | 873–890 |
-| Provenance | 891–928 |
-| Open questions | 929–1018 |
+|   4. A4Q3 Hell's Forge (chain 24, slot 27) | 303–453 |
+|   5. A4Q2 Terror's End (chain 23, slot 26) | 454–703 |
+|   6. Act IV gossip records | 704–730 |
+|   7. Multiplayer and party rules | 731–743 |
+|   8. Hooks called from other systems | 744–781 |
+| Constants & data dependencies | 782–802 |
+| Randomness | 803–816 |
+| Edge cases & original bugs | 817–875 |
+| Test vectors | 876–893 |
+| Provenance | 894–931 |
+| Open questions | 932–1021 |
 <!-- /index -->
 
 ## Summary
@@ -399,7 +399,10 @@ Chat end (event 2, `0x005B6440`): cain4 with +0x02 = 1: status (4 when
    2 → flawless, 1 → standard, anything else → stop the whole call);
    one quest-seed step, code = table[lo' mod 7]; drop code := code;
    `0x00559A30(game, forge, 2, &level, 0, −1, 0)` (normal quality);
-   created → count += 1.
+   created → count += 1. Each item lands at the floor-search spot
+   from the forge's position (`world/objects-2.md` §20.4 rule 5,
+   `sim/path-placement.md` §9: start (x + 2, y + 3), mask 0x3E01), not
+   at the forge's point itself.
 
    | Tier | Table | Codes (index 0–6) |
    |---|---|---|

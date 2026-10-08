@@ -109,7 +109,7 @@ the winning copies only and go in the manifest.
 | `dcc` | `.dcc` animations (21,717, `formats/dcc.md`) | `DccLoader`, `unit_assets` | `P.png` sheet + `P.toml` (§2.2) | C-DCC |
 | `cof` | `.cof` (3,605, `formats/cof.md`) | `CofLoader`, `unit_assets` | `P.toml` (§2.4) | C-STRUCT |
 | `dt1` | `.dt1` tiles (254, `formats/dt1.md`) | `Dt1Loader`, `tile_assets`, server `world_data` | `P.toml` + `P.d/<n>.png` per tile (§2.3) | C-DT1 |
-| `ds1` | `.ds1` presets (2,456, `formats/ds1.md`) | `Ds1Loader`, server `world_data`, DRLG | `P.toml` (§2.3) | C-STRUCT |
+| `ds1` | `.ds1` presets (2,372, `formats/ds1.md`) | `Ds1Loader`, server `world_data`, DRLG | `P.toml` (§2.3) | C-STRUCT |
 | `pal` | `pal.dat` palettes (19, `formats/palette.md`) | `PaletteLoader` (`.dat`), render | `P.pal` JASC-PAL (§2.5) | C-STRUCT |
 | `pl2` | `.pl2` palette transforms (17, `formats/palette.md`) | `Pl2Loader`, `tile_assets`, shading | `P.toml` + `P.png` map rows (§2.5) | C-STRUCT |
 | `tbl` | string tables `data/local/lng/*/*.tbl` (29 copies, `formats/tbl.md`) | `d2-data::strings`, `TblAsset` | `P.tsv` + `P.toml` (§2.6) | C-TBL |

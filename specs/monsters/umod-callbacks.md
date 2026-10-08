@@ -749,7 +749,7 @@ owns the rules, `audio/triggers-2.md` §13.1 links here for the sound.
    | Phase | Wrapper | Site | When |
    |---|---|---|---|
    | 0 | `0x004ADE40` | `0x004B001B` in the monster mode machine `0x004AFF60` (`client/model.md` §8) | a request with a record and code ≠ 0x13, 0x15, 0x16: after the path setup and `0x00620210(U, 0)`, **before** the code switch (U's mode is still the old one) |
-   | 1 | `0x004ADE50` | `0x004B0D81`, the machine's common tail `0x004B0D38` | after every case that ends in the tail (the stat-67 fix-up first); early exits to `0x004B0DB5` (class out of range, the code-8 vine branch `0x004B05F7`) skip it |
+   | 1 | `0x004ADE50` | `0x004B0D81`, the machine's common tail `0x004B0D38` | after every case that ends in the tail (the stat-67 fix-up first); early exits to `0x004B0DB5` (class out of range, the null-monstats exit `0x004B05F7` of code 8) skip it; the vine branch (classes 425–427) reaches the tail (`client/model.md` §19 r5) |
    | 2 | `0x004ADE60` | `0x004B1556` in the monster update `0x004B13A0` (`client/model.md` §5 r2) | every client update of a monster whose mode is < 16 and whose mode record `0x004AF400(U)` exists; a unit with state 1 (`freeze`) runs only when `0x00464820(U)` ≠ 0. After the animation step `0x004AF2E0`, before the path step `0x00648640` |
    | 3 | `0x004ADE70` | `0x004B03ED` (code 6: mode 3 GH), `0x004B0475` (code 0x13: mode 13 KB) | after the new mode is set |
    | 4 | `0x004ADE80(owner, missile)` | `0x004CDB2B`, end of the client missile create `0x004CD540` | owner (record +4) and missile non-null, owner type 1; arg = the missile |

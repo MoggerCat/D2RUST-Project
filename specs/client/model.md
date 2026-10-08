@@ -24,34 +24,35 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 57–74 |
-| Inputs | 75–84 |
-| Outputs / state changes | 85–91 |
-| Rules | 92–93 |
-|   1. Model contents | 94–137 |
-|   2. Unit table | 138–183 |
-|   3. Local player | 184–206 |
-|   4. Receive and the unit message queue | 207–244 |
-|   5. Client update pass | 245–293 |
-|   6. Position check (`0x004804E0`) | 294–334 |
-|   7. Session messages | 335–493 |
-|   8. Mode requests | 494–578 |
-|   9. Room-in-sight messages | 579–613 |
-|   10. Bit reader | 614–628 |
-|   11. Current act and level (join and later) | 629–674 |
-|   12. Client DRLG and the room of a point | 675–716 |
-|   13. Visibility predicate (`0x004DBF20`) | 717–744 |
-|   14. Pet list and the hireling GUID | 745–784 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 785–851 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 852–886 |
-|   17. Model writes made by 1.14d UI code | 887–1004 |
-|   18. Audio driver inputs and the client object functions | 1005–1035 |
-| Constants & data dependencies | 1036–1048 |
-| Randomness | 1049–1060 |
-| Edge cases & original bugs | 1061–1072 |
-| Test vectors | 1073–1120 |
-| Provenance | 1121–1199 |
-| Open questions | 1200–1315 |
+| Summary | 58–75 |
+| Inputs | 76–85 |
+| Outputs / state changes | 86–92 |
+| Rules | 93–94 |
+|   1. Model contents | 95–138 |
+|   2. Unit table | 139–184 |
+|   3. Local player | 185–207 |
+|   4. Receive and the unit message queue | 208–245 |
+|   5. Client update pass | 246–294 |
+|   6. Position check (`0x004804E0`) | 295–335 |
+|   7. Session messages | 336–507 |
+|   8. Mode requests | 508–593 |
+|   9. Room-in-sight messages | 594–628 |
+|   10. Bit reader | 629–643 |
+|   11. Current act and level (join and later) | 644–689 |
+|   12. Client DRLG and the room of a point | 690–731 |
+|   13. Visibility predicate (`0x004DBF20`) | 732–783 |
+|   14. Pet list and the hireling GUID | 784–837 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 838–927 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 928–962 |
+|   17. Model writes made by 1.14d UI code | 963–1109 |
+|   18. Audio driver inputs and the client object functions | 1110–1140 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1141–1361 |
+| Constants & data dependencies | 1362–1374 |
+| Randomness | 1375–1390 |
+| Edge cases & original bugs | 1391–1415 |
+| Test vectors | 1416–1473 |
+| Provenance | 1474–1577 |
+| Open questions | 1578–1698 |
 <!-- /index -->
 
 ## Summary
@@ -141,7 +142,7 @@ position check of the local player.
    of 4-byte list heads (0x200 bytes per type): set **S** at
    `0x007A5E70` (units the server announced) and set **C** at
    `0x007A5270` (client-only units; unit flag +0xC4 bit 0x200000, set by
-   the creator `0x00466730` with 0x600000). Bucket = GUID & 0x7F; the
+   the creator `0x00466730` with 0x600000; GUID counter `[0x00711F30]` of `0x00466730`: `missiles/client.md` §C1). Bucket = GUID & 0x7F; the
    chain link is unit +0xE4.
 2. Every message lookup (`0x00463990(GUID, type)`; `0x00463940` walks
    the bucket) searches set S only. Set C units are never addressed by a
@@ -253,7 +254,7 @@ position check of the local player.
 2. Per unit (`0x00480810`): unless the unit is not the local player
    and has unit flag 0x800000 (rule 5), run the per-type update
    (player `0x00463390`, monster `0x004B13A0`, object `0x004BDFF0`,
-   missile `0x004D2C70`, item `0x004C1AD0`; Phase 6), then look the unit
+   missile `0x004D2C70` (`missiles/client.md` §C6), item `0x004C1AD0`; Phase 6), then look the unit
    up again by (type, GUID) in its own set and, if it still exists,
    drain its queue (§4 rule 5).
    The object update `0x004BDFF0` is the generic object step
@@ -435,11 +436,24 @@ position check of the local player.
    d2rs: the app builds these bytes from its own state: name empty, type
    3, the character's class and name, template 0, the chosen difficulty,
    u16@0x25 = 0, flags 0x00100004 for an expansion character, @0x2B =
-   @0x2C = 0, the language id. PROVISIONAL: a classic character sends
-   0x00000004 (because the server reads only bit 20 for expansion and
-   bits 1–2 for its check, and the builder's default sets bit 2; the
-   menu writer of C +0x209 is UI code not read here); settled by
-   REC-46. Bytes after a
+   @0x2C = 0, the language id. **Flags u32@0x27** (2026-10-08, static,
+   settles REC-46): the front-end writes C +0x209 before the game
+   starts, at every site the same way: := 4; := 0x804 when the
+   character is hardcore; then |= 0x100000 when the character record's
+   status byte +0x1EF has bit 0x20 (expansion). Sites: `0x004365B0`
+   (three: `0x004366EC`–`0x00436717`, `0x0043678F`–`0x004367BA`,
+   `0x004368B7`–`0x004368E2`; hardcore = status +0x1EF bit 0x04) and
+   `0x00434A00` (two: `0x00434AE3`–`0x00434B0D`, `0x00434D19`–
+   `0x00434D3F`; hardcore = bit 0x04 of its flags argument), both on
+   the launcher's record `[0x007795D4]` (same layout as C: name +0xBD,
+   status +0x1EF, flags +0x209); the third writer `0x004456D0`
+   (`0x0044585F` / `0x00445873`, record `[0x0077BBD8]`) ORs 0x800 for
+   status bit 0x04 and 0x100000 for bit 0x20 the same way. So the
+   builder's default (C +0x209 = 0 → 4 | 0x100000) is not reached from
+   the menus, and u32@0x27 is: classic softcore 0x00000004, classic
+   hardcore 0x00000804, expansion softcore 0x00100004, expansion
+   hardcore 0x00100804 (d2s status bits 0x04 / 0x20,
+   `formats/d2s.md`). REC-46 still confirms on live bytes. Bytes after a
    name's NUL: zero (the original's stack contents are not
    reproducible and no reader uses them).
 10. **0xAF** ConnectionInfo and **0xB0** ConnectionTerminated (system
@@ -500,8 +514,9 @@ position check of the local player.
    nothing (returns 1), item `0x004C1B80(record[0], record[1])`.
 2. What a mode machine does with a request (mode, path, animation
    start, the position checks it runs) is client animation behaviour:
-   Phase 6; the dispatch per code is rules 4–6, the monster machine is
-   open question 1.
+   Phase 6; the dispatch per code is rules 4–6, the monster machine,
+   the shared mode set `0x00480E70` and the client monster mode steps
+   are §19.
 3. d2rs: until that spec exists the model stores the request as
    `last_mode_request = {code, record}` on the unit; record entries
    1.14d leaves unset (stack contents) are 0 in the model and marked in
@@ -741,6 +756,30 @@ player is in", the input of `render/composition.md` §3 step 2
    render side implements rules 1–5 from its camera, COF and cel state.
    With no render state (headless) the predicate is absent and §6 rule 6
    is a handler error (unchanged).
+7. Cel context fields (0x48 bytes, zeroed by the caller; writers
+   `0x004DBB50`, `0x004DB7B0`, cache `0x006001F0`):
+
+   | Offset | Field | Written by / read by |
+   |---|---|---|
+   | +0x00 | frame | `0x004DBB50`; frame ≥ the block's frames per direction → no cel (`0x005FEB80`) |
+   | +0x04 | flags byte: 0x02 overlay context, 0x08 the unit is the local player (`0x004DB985`), 0x04 picks the second direction table of `0x00600CB0` (writer not traced) | `0x004DB7B0`; 0x02/0x08 pick the cache key and the direction prefetch (`0x0060ACE0`, `0x006000B0`) |
+   | +0x05 | component | `0x004DBB50` (`render/unit-composite.md` §5) |
+   | +0x08 | unit type 0–5; 6 = overlay (no unit) | `0x004DB7B0` from the unit, 6 when none |
+   | +0x0C | class id (unit +0x04) | `0x004DB7B0`; cache key for types 3, 4 |
+   | +0x10 | mode (argument, −1 → the unit's draw-identity mode) | `0x004DB7B0` |
+   | +0x14 | overlay index (type 6) | caller; `0x004DB7B0` sets +0x2C := overlay row + 2 (its file name; rows 0x84 bytes) |
+   | +0x18 … +0x28 | unit, component, armor class, mode, weapon class tokens | `0x004DB7B0` (`render/unit-composite.md` §5.1); cache key (`0x0060ACE0`) |
+   | +0x30 | frames per direction of the loaded block | `0x005FEC50` |
+   | +0x34 | cel file pointer (0 = DCC through the sprite cache) | caller (`render/sprite-placement.md` §3) |
+   | +0x3C | the cel (0 = none) | `0x006001F0`, cleared on entry |
+   | +0x40 | direction (64 steps) | `0x004DBB50`; requantised to the file's directions by `0x006001F0` (`render/unit-composite.md` §3, §6) |
+   | +0x44 | bit 0: file header read through `0x0060BF20` instead of the direct read | read by `0x005FE990`; 0 for unit draws |
+
+   `0x006001F0(context, probe, async)`: `probe` ≠ 0 only tests whether
+   the block is resident (`0x0040A7F0`), fetching no cel; `async`
+   (1 from the driver `0x00511FB8` and §13 rule 4) makes the
+   neighbour-direction prefetch `0x006000B0` load through `0x005FFFA0`
+   instead of `0x005FFE90`. +0x38 is read by none of these paths.
 
 ### 14. Pet list and the hireling GUID
 
@@ -769,10 +808,24 @@ player is in", the input of `render/composition.md` §3 step 2
    (`0x00466360`, pet type 7) passes the same pair from the record
    (`0x00478E40`): +0x28 low 16 bits and +0x24; `0x004B1090` hands the
    u16 to `0x00663750` / `0x0044DCC0` (hireling row lookup) and the u32
-   to `0x00463DD0` / `0x006637F0`. PROVISIONAL: +0x1C (100 at
-   creation) has no model reader, UI only (because no client reader was
-   traced); settled by REC-50 (reader scan of +0x1C) and REC-10 (0x81
-   bytes of a hireling).
+   to `0x00463DD0` / `0x006637F0`.
+   **+0x1C is a life percent that stays 100** (2026-10-08, scan of
+   every use of `[0x007BB5BC]`: the 19 functions `0x00478A50`–`0x00479230`).
+   Written only at creation (`0x00478B10`, 100; the update of an
+   existing record there leaves it) and by `0x00479010` (+0x1C := pct,
+   +0x10 := u16; a type-7 pet's stat 6 := max life × pct / 100), which
+   has no caller and no pointer to it in 1.14d `Game.exe` (no `call`
+   in `all.asm`, no little-endian 0x00479010 in the file): dead code.
+   Read only by the getter `0x00479080(pet GUID)` (0 for no record),
+   whose three callers are UI draws, none in the model: `0x004525F0`
+   (a monster's hover life bar on a 0–128 scale, `0x00452644`: a
+   monster with a pet record and a result ≥ 1 draws 100 × 128 / 100
+   = 128, full, instead of stat 6 / max life, unless its unit flag 0x4
+   path `0x00465C60` ≠ 0), `0x0048A990` (`0x0048AA74`) and
+   `0x00493A00` (`0x00493A0A`, a 0x2E-pixel bar); the UI owners of
+   those draws take the value 100. The model stores +0x1C = 100 and
+   never changes it. REC-10 (0x81 bytes of a hireling) still confirms
+   the 0x81 field writes.
 4. **Hireling GUID** (`0x00478F20(player, 7, any = 1)`, the call of
    `msg-units.md` §1.2 rule 2 and §2 rule 2): no player → −1; else the
    first record in list order with type 7 and owner GUID = the player's
@@ -822,8 +875,8 @@ record r (`msg-units.md` §4 rows 0x0E, 0x4D).
    +0x00 function, if any, runs with (U, shrine data). `0x004BD4A0`
    (codes 6–15), for each of +0x08 and +0x0C that is not −1:
    `0x0046F0C0(U, 0, id)`, then, when U is null or U's mode (+0x10) is
-   0, `0x00470390(U, id, 3, 0, 0, 0, 0, 0)` (overlay calls; Phase 6
-   effects).
+   0, `0x00470390(U, id, 3, 0, 0, 0, 0, 0)` (overlay remove and create:
+   `render/overlay.md` §3 r9, §2).
 4. **Code 0x15** (`0x004BD5C0`, S→C 0x4D for an object): reads only
    r0 (= u32@6, the operator's GUID in the shrine form). r1 = −1 and
    r2..r4 (u16@11, u16@13, u8@10) are never read; u16@15 is not copied
@@ -834,7 +887,7 @@ record r (`msg-units.md` §4 rows 0x0E, 0x4D).
    2. P := the player unit with GUID r0 (`0x00463990(r0, 0)`). None →
       the request ends; nothing else runs.
    3. 0 < code < 23 and the entry's +0x04 function set → call it with
-      (U, P, D) (codes 16, 19, 21, 22; Phase 6 effects).
+      (U, P, D) (codes 16, 19, 21, 22; rule 6).
    4. `0x004BD550(U, P)`: shrine data of U null → fatal 0x34D; its code
       ≥ 23 → fatal 0x34E; entry +0x10 ≠ 0 → sound request
       `0x004B9A00(id, P, 0, 0, 0)` (request rule: `audio/triggers.md`
@@ -848,6 +901,29 @@ record r (`msg-units.md` §4 rows 0x0E, 0x4D).
    order above, with the captured code, object key, player key and
    overlay or sound ids. The fatal asserts are handler errors
    (`client/bridge.md` §6 rule 4).
+6. **On-use functions** (rule 4 step 3; static read 2026-10-08). The
+   missile ones fill a zeroed 0x5C-byte create record
+   (`missiles/missiles.md` §R2.1 layout) and call the client missile
+   create `0x004CD540` (`missiles/client.md` §C2–§C4) once per missile, in the order given. Common
+   fields: +0x04 owner := P, +0x14/+0x18 := U's position (static path
+   +0x0C/+0x10 for unit types 2, 4, 5, else `0x006488C0` /
+   `0x00648900`), +0x30 level := P's stat 12 (`level`,
+   `0x00625480(P, 12, 0)`) / 5 (integer), clamped to 1…8.
+   - 16 Enirhs (`0x004BD090`): reverses P's name in place in its
+     player data (`0x006221A0(P)` +0x00, `strrev`; the following
+     16-byte `strncpy` onto itself changes nothing). No missile.
+   - 19 Storm (`0x004BD0C0`): 16 missiles, class 62 (`fireball`),
+     flags 3 (position given, target relative), +0x08 origin := none,
+     target offset (+0x1C, +0x20) := (dx, dy) for dx in +5, −10, +15,
+     −20 (outer) and dy in +5, −10, +15, −20 (inner).
+   - 21 Exploding (`0x004BD220`) and 22 Poison (`0x004BD360`): 6
+     missiles, class 45 (`explosivepotion`) / 48 (`chokinggaspoition`),
+     flags 0x520, +0x08 origin := U, +0x24 := 1, absolute target
+     (+0x1C, +0x20) := U's position + (dx, dy) for (−6, +6), (−6, −6),
+     (0, +6), (0, −6), (+6, +6), (+6, −6).
+   No function draws on a seed itself (the missile create's own draws
+   belong to the client missile spec). d2rs: these are the `ShrineFx`
+   effects of rule 5.
 
 ### 16. C→S 0x4B after a teleport (the hireling case)
 
@@ -917,8 +993,8 @@ bit 0x2 is the bit of `client/msg-ui.md` §1 r4 and §16).
       U is always type 1 here), then **the mode set `0x00480E70(U, 1)`:
       flag bit 0x40 := 0, mode := 1 (`0x00624690`)**; when the mode set
       returns non-zero, the client graphics, overlay and mode-sound
-      refresh of U (`0x00470610`, `0x00480D20`, `0x004CC5B0`; effects,
-      open question 1).
+      refresh of U (`0x00470610`, `0x00480D20`, `0x004CC5B0`; §19
+      rules 1–2).
 2. **NPC menu open** `M(U, a)` (`0x004B66B0`, NPC unit in ESI; callers
    the 0x28 branch B6 and `0x004B6A30`). With U absent and a = 0: `E`
    of the interact NPC GUID and `SetUIState(8, off, 0)` (rule 1). Else,
@@ -951,11 +1027,40 @@ bit 0x2 is the bit of `client/msg-ui.md` §1 r4 and §16).
    unchanged). 1.14d runs it in every frame's UI draw (`0x0044C990` →
    `0x00456EE0` → `0x00499450` at `0x0045709E`, unconditional; →
    `0x00496CF0` at `0x004994C4`). **d2rs:** the bridge runs it as the
-   last step of `bridge_frame` (`client/bridge.md` §8 rule 1). Nothing
+   last step of `bridge_frame` (`client/bridge.md` §8 rule 5). Nothing
    writes `ClientWorld` between that point and the UI draw (§10 r6
-   there), so the draw sees the same model as in 1.14d; frames that
-   1.14d draws more or fewer times than it receives are open question
-   17.
+   there), so the draw sees the same model as in 1.14d.
+   **Runs per loop pass** (2026-10-08, static, answers open question
+   17). `0x0044C990` is called only through the pointer `[0x007A0484]`
+   (set at `0x0044E300` in `0x0044E200`; no other reference in
+   `Game.exe`), from two sites of the loop pass `0x0044EFA0`, at most
+   once per pass. In single player (game type 0 / 1):
+   1. `0x004F6070` ≠ 0 → the pass returns at once: no receive, no
+      draw, no fallback.
+   2. Paused (UI state 9 or 11, `0x00453A90(9)` / `(0xB)`, a local
+      player with a room `0x004646A0`): draw at `0x0044F017` and
+      return, **no receive, no tick, no update**; so the fallback runs
+      once per loop pass while paused.
+   3. Otherwise the receive `0x0044C6E0` runs every pass, and the draw
+      (`0x0044F28B`) only when the skip counter `[0x007A0704]` is 0
+      and `in_game` and `0x004646A0` ≠ 0; the counter is incremented
+      at the end of every in-game pass (drawn or not). It is reset to 0
+      in a pass whose server tick ran with elapsed time e < 2 × 40 ms
+      (`[0x0070EF1C]` = 40); with e ≥ 80 ms it becomes (counter < 2)
+      (so a tick pass directly after a drawn tick pass, counter 1, is
+      skipped); and in any pass with e ≥ 40 ms while now <
+      `[0x007A04BC]` (the 10 s hold after an act load,
+      `ui/frontend-loading.md`; `0x0044F0CA`). So, outside that hold
+      and that lag case, the draw runs exactly in the passes where the
+      server ticked, and a receive in a pass without a tick has no
+      fallback after it (`render/camera.md` §9 states the same draw
+      schedule).
+   **d2rs:** run the fallback in `bridge_frame` only in a frame whose
+   pump ran a tick (the drawn pass), and once per frame while the game
+   is paused (rule 2, with no receive); not in a frame without a tick.
+   The two wall-clock cases of 3 (lag skip, act-load hold) depend on
+   real time, which d2rs's tick-stepped frame does not have; they are
+   not reproduced (equal for every pass that does not lag).
 5. **Town exit** (`0x004B3E10`, UI): called by the local player's
    room-change step `0x00460E70` (from the player update `0x00463390`
    at `0x004636D5`, §5) when the town flag `[0x007A5260]` (`0x0061AB00`
@@ -1033,6 +1138,227 @@ bit 0x2 is the bit of `client/msg-ui.md` §1 r4 and §16).
    once per object update and once more for C objects) and the `now`
    input it reads (§5 rule 2).
 
+### 19. Monster mode machine (`0x004AFF60`) and client mode steps
+
+Read 2026-10-08 from the 1.14d disassembly (`all.asm`; the Ghidra
+decompile drops the EDX mode argument of `0x00480E70`). Monster modes:
+0 DT, 1 NU, 2 WL, 3 GH, 4 A1, 5 A2, 6 BL, 7 SC, 8 S1, 9 S2, 10 S3,
+11 S4, 12 DD, 13 KB, 14 SQ, 15 RN. "Flags" = U +0xC4, "flags-ex" =
+U +0xC8, "BaseId" = monstats +0x02 of U's class (`0x00463860`), "class"
+= U +0x04, "row2" = U's monstats2 row (monstats +0x18 `MonStatsEx`),
+r0…r6 = the request record (`msg-units.md` §4; ECX code, EDX U, stack
+record pointer, `ret 4`: the §8 r1 flag is not passed).
+
+1. **Mode set** `0x00480E70(U, m)` (17 callers): `0x004E4020` (an
+   empty function), flags bit 0x40 := 0, `0x00624690(U, m)`
+   (`sim/units.md` §4.1: same mode → no restart, returns 0); when it
+   returns non-zero: graphics refresh `0x00470610(U, 0)`, hit overlays
+   `0x00480D20(U, m)` (rule 2), mode sound `0x004CC5B0(U, m, 0)`
+   (`audio/triggers.md` §4.1). **Quiet mode set** `0x00480EC0(U, m)`:
+   the same with the graphics refresh only.
+2. **Hit overlays** `0x00480D20(U, m)`: only player m ∈ {0, 4, 0x13} or
+   monster m ∈ {0, 3, 0xD}, and only when U +0xB0 (last hit class) has
+   a non-zero low nibble; by its high nibble h, one overlay
+   `0x00470390(U, id, 2, 0, 0, 0, 0, 0)` (kind 2, no draws,
+   `render/overlay.md` §4): h 0x10 → 54 `doubledamage1`, 0x20 → 81
+   `fire_hit`, 0x30 → 36 `ice_explode`, 0x40 → 1 `lightning`, 0x70 →
+   147 `bash`, 0x80 → 21 `hit_thorns`, 0x90 → 113 `sanctuaryknockback`;
+   other h → none.
+3. **Head** (every request, in order): mode = KB → path stop
+   `0x00650590(path)`, `0x00648DC0(path)`. U not dead (`0x00464820`,
+   `msg-units.md` §4 r6) → `0x0064A0E0(U)`; dead and code ∉ {8, 9} →
+   `0x00649FF0(U, 0)`, monster light re-create `0x004AE210(U)`,
+   flags-ex &= ~0x40000 (the dead flag itself stays; code 7 clears it).
+   Then, when the record is non-null and code ∉ {0x13, 0x15, 0x16}
+   (call this a **pathed request**): r3 > 0 → path type := r3
+   (`0x00648CF0`); code 0x14 → `0x00648E70(path, r5 & 0xFF)`,
+   `0x00649070(path, r2 & 0xFF)`; then (also for r3 ≤ 0) current skill
+   := none (`0x00620210(U, 0)`) and umod phase 0 (`0x004ADE40`,
+   `monsters/umod-callbacks.md`). **Class gate**: class outside
+   monstats, or no row2 → return now (no switch, no tail).
+4. **Dispatch** (byte table `0x004B0DF8`, pointers `0x004B0DC0`; codes
+   > 0x1D → "unknown"). "W(f)" = walk flag: flags-ex bit 0x2000 := f and
+   path +0x38 := 0 (`0x006491B0`; fatal 0x9A2 without a path). "F" =
+   the **neutral fallback** `0x004AE1D0`: U a monster with mode 1…15,
+   ≠ 12 → `0x00465BF0(U, 0)`, path stop (`0x00480490`), mode set 1;
+   any other mode → nothing. "NPC busy" = monster data +0x28 bit 0
+   (`0x004AE080(U, 1)`, §17 r1.7). Missing record where a row says
+   "fatal n" → fatal assert n.
+
+   | Code | Body (in order) |
+   |---|---|
+   | 0x00 / 0x18 | fatal 0x6F7; W(1); target := unit (r0 type, r1 GUID; `0x004643F0` looks it up in S, `0x00620C10`); NPC busy → F; path to that unit `0x00480780` (unit absent → 0) = 0 → F; else mode set 2 (0x00) / 0xF (0x18) |
+   | 0x01 / 0x17 | fatal 0x6E2; W(1); NPC busy → F; path to point (r0, r1) `0x004804A0` (target `0x00648AD0`, compute `0x00649970(path, U, flags bit 0x200000)`) = 0 → F; else mode set 2 / 0xF |
+   | point group: 0x04, 0x0B, 0x0C, 0x0E, 0x11, 0x1A, 0x1C | fatal 0x741; W(0); target := none; (r0, r1) ≠ (0, 0) and ≠ U's position → face (r0, r1) (`0x00621C00`); mode set T[code]; row2 move bit of that mode (`A1mv`…`S4mv`, +0x104 bit mode; `0x004AFBC0`) → path to point (r0, r1), result ignored; BaseId 110 `vulture1` → `0x004AFCE0(code)` (collision / flight motion, no mode change) |
+   | unit group: 0x05, 0x0A, 0x0D, 0x0F, 0x10, 0x1B, 0x1D | fatal 0x70F; W(0); BaseId 231 `iceglobe` → stop (no target, no mode change; tail runs); target := unit (r0, r1); BaseId 304 `fingermage1` and code 0x0A → overlay 169 `fingermageflames` on U's target (`0x00464E50(T, 169, 0)`); `0x00465BF0(U, 0)`; BaseId 110 → `0x004AFCE0(code)`; code 0x0D: BaseId 154 `charsi` → direction 0x38, class 405 `jamella` → 0x34, BaseId 155 `warriv1` → 0x34, BaseId 178 `fara` → 4; class 405 and code 0x0F → 0x30 (`0x00648820(path, d)`); mode set T[code]; move bit → path to unit (r0, r1), result ignored |
+   | 0x06 | no record → nothing (tail). Life byte L := r2: monster data +0x16 bit 0x100 := L & 0x80 (`0x004AC840`); L &= 0x7F; L > 1 → L + 1; L ≠ 0: stat 6 >> 8 = L → no spray, else stat 6 := L << 8 (`0x00627260`) and spray; L = 0 → spray. W(0); +0xB0 := r6; path stop; mode set 3; spray → blood spray `0x004AF890(U, 1, 0)` (`client/stat-lists.md` §3 r6.10); `0x00464C90(U)` (U +0x58 := 3); umod phase 3 (`0x004ADE70`) |
+   | 0x07 | W(0); record and r2 ≠ 0 → stat 6 := r2 << 8. flags bit 0x200 set → flags \|= 2, else flags bit 2 := row2 `isSel`; flags bit 0x20 := not row2 `shadow` (`0x00457460`); dead flag cleared (`0x004647D0`). No record → F. Else position check `check(U, r0 & 0xFFFF, r1 & 0xFFFF, 0, 0, 0)` (§6); then \|x − r0\| ≤ 1 and \|y − r1\| ≤ 1 → F; NPC busy → F; path to point (r0, r1) = 0 → F; state 143 `attached` (`0x00639DF0`) → F; class without mode 2 (`0x0046C140(class, 2)` = 0) → F; else mode set 2 |
+   | 0x08 | rule 5 (no record test: a null record faults) |
+   | 0x09 | `msg-units.md` §4 r6.2 (W(0) first; `0x00649F70(U, 0)` unless row2 `deadCol`); then rule 5.5 |
+   | 0x12 | fatal 0x7B0; W(0); path stop; target := unit (r0, r1); `0x00465BF0(U, 0)`; mode set 6 |
+   | 0x13 | fatal 0x781; life byte L := r1 as for 0x06 (no compare: L ≠ 0 → stat 6 := L << 8); +0xB0 := r0; blood spray `0x004AF890(U, 1, 1)`; `0x00464C90(U)`; hit overlays `0x00480D20(U, 0xD)`; mode sound `0x004CC5B0(U, 0xD, 1)`; umod phase 3. **No mode change** (the KB mode comes with 0x14) |
+   | 0x14 | fatal 0x79A; r5 ≠ 0 → stat 6 := r5 << 8; +0xB0 := r6; W(0); path stop; path type 0xB; `0x00648E40(path, r2 & 0xFF)`; target point (r0 & 0xFFFF, r1 & 0xFFFF); compute `0x00649970(path, U, 0)`; mode set 0xD |
+   | 0x15 / 0x16 | fatal 0x924 / 0x911; W(0); 0x15 only: target := none. Assign skill r0 at level r4 (`0x00647280(U, r0, r4, 0)`, `client/msg-skills.md` §2 r2); E := native entry of r0 (`0x006439F0`); current := E; m := E's mode (entry +0x08, `0x00643860`; E none → 0); m = 0xE → `0x004AFB60` (U +0x10 written with each sequence frame's mode, graphics refresh per frame; no mode set); r1 := −1 in the record; mode set m; then the client skill start `0x004C6F40` (0x15) / `0x004C6EB0` (0x16) with the record: rule 7 |
+   | 0x02, 0x03, 0x19, unknown | W(0); F |
+
+   T (table `0x006DA4D8`, {mode, move-test} per code): 0x04, 0x05 → 7
+   SC; 0x0A, 0x0B → 4 A1; 0x0C, 0x0D → 8 S1; 0x0E, 0x0F → 9 S2; 0x10,
+   0x11 → 5 A2; 0x1A, 0x1B → 10 S3; 0x1C, 0x1D → 11 S4 (move test set
+   for all fourteen). Its other entries (0x00/0x01 → 2, 0x06 → 3, 0x07
+   → 1, 0x08 → 0, 0x09 → 0xC, 0x12 → 6, 0x14 → 0xD, 0x15/0x16 → 0xE,
+   0x17/0x18 → 0xF, 0x19 → 8, 0x02/0x03/0x13 → 0x10) are not read: those
+   codes set their modes in the body.
+5. **Death** (code 8, `0x004B053E`): W(0); +0xB0 := r6; U the hover
+   target (`0x00467A10`) → as player code 0x08 (§8 r4); stat 6 := 0;
+   state-mask group at data tables +0xD4 on U (`0x0063A320`; D2MOO
+   1.10f name `hide`, hint) → flags-ex \|= 0x40000, flags := (flags &
+   ~2) \| 0x20; group +0x148 (`0x0063A6F0`; 1.10f `shatter`) → shatter
+   missiles `0x004AFC10` (state 184 `uberminion` without state 1
+   `freeze` → client missiles 427, 426; else 271 + row2 `Height`, then
+   275 `icebreaksmoke`; `0x004CD540`) and +0xB0 := (+0xB0 & 0xF) \| 0xA0;
+   `0x00649F70(U, 0)` unless row2 `deadCol`. Then:
+   1. monstats `SplEndDeath` (+0x1A4) = 1 and `minion1` (+0x26) a valid
+      class (1.14d: `fetishshaman1`–`8`): V := new client-only monster
+      of U's own class at U's position (`0x00466730(class, x, y, 1, 0)`,
+      §2 r1, r6); V flags &= ~2 (skipped when V is null, but V +0xB0 :=
+      U +0xB0 is then written through null: original fault); V mode
+      set 0; U re-initialised as `minion1` (`0x004AEDD0`,
+      `client/stat-lists.md` §3 r6.9). The switch below still uses U's
+      old BaseId.
+   2. By old BaseId (`0x004B0E18` / `0x004B0F4C`; sounds:
+      `audio/triggers-2.md` §13.2). Default **D0**: mode set 0, flags
+      &= ~2, `0x00464930(U)`. Before D0: 127 → overlay 79; 238 → 78;
+      247 → 82; 258, 261 → 157; 118 → 184; 310–312 → 187; 212 → 188
+      then 189; 360, 558 → 185; 417, 418 → 271; 469, 474 → 229; 497 →
+      by class 497 / 499 → 225, 498 → 226 (`0x00464E50(U, id, 0)`);
+      461 → overlay 204 and its sound; 453 → its sound; 356 → client
+      missile 328 `dopplezonexplode` at U (`0x004C5420`); 351–353 →
+      every overlay removed (`0x0046F170`), overlay class − 173 (178–180
+      `hydra_end1`–`3`); 441 → direction := (direction + 0x20) & 0x3F.
+      Instead of D0: 110 → overlay 146, mode set 0, then with a motion
+      record (`0x004DA0F0`) the fall motion (`0x004DA690`,
+      `0x004DA6E0(U, 0)`, `0x004DA200(U, 0, 0, −16, 1)`,
+      `0x004DA2A0(U, 0, 0, 0, 0)`), flags &= ~2, `0x00464930`; 190 `maggotegg1` in
+      mode 0xE → quiet mode set 0, flags &= ~2, U +0x44 := 0xE00 (frame
+      14), `0x00464930`; 190 otherwise → D0; 284 `maggotqueen1` → this
+      machine with code 0x15 and record {216 `QueenDeath`, 0, 0, 0, 1,
+      0, 0} (rule 4, so its mode is QueenDeath's `monanim`), then flags
+      &= ~2, `0x00464930`; 425–427 → client missile 470 at U, mode set
+      0, sound 790, flags &= ~2, `0x00464930`; 570 `baalclone` → client
+      missile 614 at U, then as 559; 559 `baalcrabstairs` →
+      flags-ex \|= 0x40000, flags \|= 0x20, **mode set 12 (DD)**, flags
+      &= ~2, `0x00464930`.
+   3. Code 9 after `msg-units.md` §4 r6.2 (`0x004B0A60`): unless class
+      211 `duriel` or BaseId 497, 417, 418 → every overlay removed;
+      BaseId 435 `barricadetower` → client missile 424 `tower death` at
+      U (`0x004CDB40`), the missile gets the dead flag; BaseId 344, 559,
+      570 → flags-ex \|= 0x40000; flags := (flags & ~2) \| 0x20; the
+      `hide` group → flags-ex \|= 0x40000, flags := (flags & ~4) \| 0x20;
+      `0x00464930(U)`.
+6. **Tail** (`0x004B0D38`, every branch after the class gate): pathed
+   request and r4 ≠ 0 and v := stat 67 `velocitypercent`
+   (`0x00625480(U, 67, 0)`) ≠ r4 → `0x006272E0(U)`, base stat 67 += r4
+   − v (`0x006272B0`), animation rate `0x00623F50(U)` (`sim/units.md`
+   §4.7). Umod phase 1 (`0x004ADE50`). NPC busy: mode ≠ 1 → F; then
+   `0x00648730(path)`.
+7. **Mode part of the client skill start** `0x004C6140(U, S, owner o,
+   level L)` (from codes 0x15 / 0x16 of both machines, after its entry
+   steps of `client/msg-skills.md` §7.3 (a)/(b); an earlier return
+   leaves the mode): (1) U's target T (`0x004648F0`) and S not
+   `TargetAlly` → `0x00464F70(U, T)` ≠ 0 → stop. (2) S not `InTown` and
+   U's room in town (`0x0061AB00`) → current := none; mode request code
+   7 with an all-zero record (`0x00480C10(7, U, R, 0)`, §8); U the
+   local player → event sound 0x18 (`0x004CB9C0`); stop. (3) m := U a
+   player and S = 0 → the **attack pick** `0x004C5710`, else the
+   current entry's mode. Attack pick: c := 7, draw := yes; T a monster
+   with row2 `Height` 2 → c := 8, draw := no; `Height` 1 → draw := no;
+   `0x0064F460(U)` ≠ 0 → c := 7, draw := no; no weapon
+   (`0x0063C9B0(U +0x60, …)` fails) → 7; else draw → one step of U's
+   seed, (lo & 0x3F) < 0x20 → 8 (A2), else 7 (A1); no draw → c.
+   (4) m ≠ 0 → mode set m; m = 0: U has state 12
+   `inferno` and S `repeat` → no change; else U type 0 or 1 → mode set
+   1. (5) `cltstfunc` (skills +0xF2) < `[0x00727A8C]` with a non-null
+   entry in `0x00727A90` → called (ECX U, EDX S, stack L); it returns
+   0 → current := none, U type 0 / 1 → mode set 1. Before the start:
+   both wrappers run `0x004C6DE0(record)` when `0x006235A0(U)` (0x16:
+   not for monsters). 0x16's `0x004C6EB0` looks up the target unit (r3
+   GUID, r2 type): found → target := it, `0x00465BF0(U, 0)`, start;
+   absent → mode request code 7 with a **null** record
+   (`0x00480C10(7, U, 0, 0)`; a monster: F of rule 4) and a log call,
+   no start. 0x15's `0x004C6F40` sets the path target (r2, r3), faces
+   it (a monster with monstats `Code` `PB`, the turrets and
+   `firetower`: then direction := (direction + 0x38) & 0x3F), clears
+   the target, then starts.
+8. **Client mode steps** (monster update `0x004B13A0`, §5 r2; a monster
+   with state 1 `freeze` runs only while dead; mode ≥ 16 nothing):
+   1. Mode record `0x004AF400` {path kind, anim kind, end kind}: class
+      243 `diablo` / 333 in mode 11 → (2, 1, 3); class 543, 544, 570 in
+      mode 10 → (1, 0, 4); mode with its row2 move bit → move table
+      `0x007252E0`[mode]; mode 0 with BaseId 78 `sandleaper1`
+      (`0x0063E8D0`) → move[0]; else `0x00725220`[mode]. No row2 →
+      nothing.
+
+      | Mode | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 |
+      |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+      | normal | 0,2,0 | 0,0,0 | 1,0,1 | 0,1,2 | 2,1,3 | 2,1,3 | 0,1,2 | 0,1,2 | 0,1,2 | 0,1,2 | 0,2,0 | 0,0,0 | 0,2,0 | 1,2,2 | 2,1,2 | 1,0,1 |
+      | move | 1,2,0 | 0,1,2 | 0,1,2 | 0,1,2 | 1,0,4 | 1,0,4 | 2,1,3 | 1,0,4 | 1,0,4 | 1,0,4 | 0,2,0 | 1,2,0 | 0,1,2 | 0,1,2 | 0,1,2 | 0,1,2 |
+
+   2. Skill step `0x004AF4C0`; path kind 1 → path step `0x004807C0`
+      (P := 1 when the path is done).
+   3. **Walk resume**: mode 1, not NPC busy: a path target unit is
+      looked up again (gone → skip); then `0x00649210(U)`: not
+      client-only, flags-ex 0x2000 (W(1) of codes 0/1/0x17/0x18) set,
+      path +0x38 += 1, and > 1 → +0x38 := 0; not arrived
+      (`0x00650540`) and the re-path `0x00650350` succeeds → mode := 2
+      by `0x00624690` directly (no overlays, no sound, no graphics
+      refresh).
+   4. **NPC turn**: monstats `interact`, not row2 `critter`, mode 1,
+      flags bit 0x200 clear, class ∉ 537–539, the local player P within
+      distance < 7 (`0x00641530`) → one roll(100) on U's seed
+      (`0x0045C390`); < 10 → `0x00649EF0(path, P's x, P's y, 0)`.
+   5. Anim step `0x004B1280`: `SplEndDeath` = 1, mode 0 and the
+      animation complete (`0x006217C0`) → this machine with code 9 and
+      an all-zero record. Then by anim kind: 0 → advance
+      (`0x00623E00`); 1 → complete → A := 1, else advance; 2 → complete
+      → U +0x44 := U +0x48 − 0x100, +0x4C := 0 (hold the last frame;
+      mode 0 also sets flags \|= 0x20), else advance; 3 → U +0x44 :=
+      0x100, +0x4C := 0.
+   6. End test by end kind: 1 → P; 2, 3 → A; 4 → P and complete; 0 →
+      never. Then `0x004AF2E0`, umod phase 2, path step `0x00648640`;
+      ended → **mode end** (rule 8.7). (So DT, NU, S3, S4, DD and KB
+      never end here: KB has anim kind 2, which never sets A.)
+   7. **Mode end** `0x004AF6A0`: mode 13 (KB) and BaseId ≠ 78 → path
+      stop, `0x00648750(path, 0)`, `0x00648DC0(path)`, mode set 3; stop.
+      U has a target → `0x00465BF0(U, 0)`. Monstats `SplClientEnd`
+      (+0x1A7) ≠ 0, by mode and BaseId: WL with 231 or 118 → stop; A1
+      with 403 / 404 → mode set 8 and animation restart
+      (`0x00624390`), stop; A1 with 497 → `0x004AE3C0`, `0x004AE400`,
+      then default; A2 or S2 with 403 / 404 → as A1; S1 with 110 →
+      stop, with 403 / 404 → as A1; S3 with 136 `batdemon1` → mode set
+      11 and restart, stop; S4 with 136 → stop; DD with 284 → stop; SQ
+      with 247 → stop. **Default**: client-only → mode set 1 and
+      restart; flags-ex 0x2000 set → no change; else mode set 1 and
+      restart.
+   8. Then (same update): class 528 `evilhut` in mode 0 with flags bit
+      1 → flags bit 1 cleared, client-only object 478 at U
+      (`0x00466730(478, x, y, 2, 0)`); sounds `0x004C72F0` (state group
+      `0x0063A340`), `0x004CB460`, `0x004CAF60` (`audio/`).
+9. **Seed draws** in rules 1–8 (all on client seeds; their values are
+   capture-only, open question 9 and REC-51): blood spray (codes 0x06,
+   0x13, `client/stat-lists.md` §3 r6.10, U's seed); attack pick (rule
+   7, U's seed); NPC turn (rule 8.4, U's seed); re-init and client
+   monster create of rule 5.1 (U's seed; room seed, §2 r6); client
+   missile creates (rules 5, 5.2–5.3; `missiles/client.md`); path
+   computes (`0x00649970`, `sim/pathing.md`); overlay creates
+   (`render/overlay.md` §4); mode sounds (`audio/`); `cltstfunc`
+   bodies; `0x004AF2E0` → `0x004AF1B0`. The machine itself draws
+   nothing else; the codes, modes and fallbacks above are static.
+10. d2rs: the bridge runs rules 3–7 on every monster mode request and
+    rule 8 in the client update pass, with `ClientUnit` fields for the
+    flags it reads (walk flag 0x2000, NPC busy, +0xB0, life stat 6,
+    stat 67); effects outside the model (overlays, missiles, sounds,
+    lights, motion) are outputs to their owners.
+
 ## Constants & data dependencies
 
 | Constant | Value | Source |
@@ -1057,6 +1383,10 @@ bit 0x2 is the bit of `client/msg-ui.md` §1 r4 and §16).
    the step runs on {1, 666}: seed := {0x6AC6935F, 0} (recorded joins
    have (x, y) = (0, 0), so rule 1 does not run). This answers
    `render/camera.md` OQ6 up to later draws (open question 6).
+3. Monster mode machine and client mode steps: the draw sites of §19
+   rule 9 (blood spray, attack pick, NPC turn, re-init and client
+   creates, missiles, paths, overlays, sounds). Static order as stated
+   there; the seed values are capture-only (open question 9, REC-51).
 
 ## Edge cases & original bugs
 
@@ -1069,6 +1399,19 @@ bit 0x2 is the bit of `client/msg-ui.md` §1 r4 and §16).
   `0x0044CDB0` (§7 rule 11), code the `all.asm` export does not cover
   (it is reached by the jump at `0x0045EB00`), which is why open
   question 3 first found no writer.
+- Monster code 0x13 changes no mode (§19 r4): it plays the KB hit
+  overlays and sound on the current mode; a monster code 0x08 without a
+  record faults (no null test), and its `SplEndDeath` branch writes
+  through a null V when the client create fails (§19 r5.1).
+- Unknown monster codes (0x02, 0x03, 0x19, > 0x1D) are not fatal (the
+  player machine's are, §8 r4): they run the neutral fallback, which
+  leaves DT, DD and modes ≥ 16 alone.
+- A monster in KB never leaves it client-side (§19 r8.6): the KB
+  mode-end branch of `0x004AF6A0` is reached only if a KB record could
+  end, which neither table allows.
+- Code 0x15 / 0x16 with a skill id the list cannot hold: no entry, m =
+  0, so the machine sets mode 0 (DT) before the skill start returns
+  early (§19 r4, r7).
 
 ## Test vectors
 
@@ -1117,6 +1460,16 @@ marked synthetic.
 | `E(6)`, (1, 6) absent | player data cleared; `outgoing` += `30 01000000 06000000`; nothing else in the model | synthetic, §17 rule 1 |
 | end of `bridge_frame`, local player left skill = native entry of skill 36 with base 0 and no bonus; skill 0 native entry present | entry 36 unlinked; left = skill 0 entry; right unchanged | synthetic, §17 rule 4 |
 | same, entry 36 base 2 with a −2 bonus (level 0) | entry 36 base 1, kept; left = skill 0 entry | synthetic, §17 rule 4 |
+| monster BaseId 0 (`skeleton1`), mode 1, request 0x10 (A2 to point), record (r0, r1) = U's position, row2 `A2mv` clear | mode 5, no path, target none, flags-ex bit 0x2000 clear | synthetic, §19 r4 |
+| monster mode 4, request 0x19 | mode 1 (fallback) | synthetic, §19 r4 |
+| monster mode 0 (DT), request 0x19 | mode 0 (fallback leaves DT) | synthetic, §19 r4 |
+| monster mode 1, request 0x13, record (0x10, 0x40, …) | mode 1; +0xB0 = 0x10; stat 6 = 0x41 << 8 | synthetic, §19 r4 |
+| monster at (100, 100) mode 3, request 0x07 record (101, 99, 0, …) | dead flag clear; mode 1 (within 1 cell) | synthetic, §19 r4 |
+| monster BaseId 559 `baalcrabstairs`, request 0x08 | mode 12 (DD), not 0 | synthetic, §19 r5.2 |
+| monster BaseId 0, mode 3, animation complete in an update, flags-ex 0x2000 clear | mode 1, animation restarted | synthetic, §19 r8.5–8.7 |
+| same, flags-ex 0x2000 set | mode stays 3 | synthetic, §19 r8.7 |
+| monster BaseId 403 `trappedsoul1`, `SplClientEnd` ≠ 0, mode 4 ends | mode 8 (S1) | synthetic, §19 r8.7 (1.14d `trappedsoul1` `SplClientEnd` = 1) |
+| monster mode 13 (KB), every animation frame complete | mode stays 13 | synthetic, §19 r8.6 |
 
 ## Provenance
 
@@ -1192,6 +1545,31 @@ build `0x004809A2`–`0x00480A34`), `0x004786A0`, `0x004786D0`,
 callees (no call of `0x00478350`). §18 r1–r2 restate
 `audio/triggers-2.md` §19–§21 (PC 2, read there).
 
+§19 (2026-10-08, PC 1 lane D, OQ1 static part; `all.asm` and image
+reads with a section-mapping reader): `0x004AFF60` whole (byte table
+`0x004B0DF8`, pointers `0x004B0DC0`; class tables `0x004B0E50` /
+`0x004B0E18`, `0x004B0F74` / `0x004B0F4C`, `0x004B1008`; mode table
+`0x006DA4D8`), `0x00480E70`, `0x00480EC0`, `0x00480D20`,
+`0x004E4020`, `0x004AE1D0`, `0x004AE080`, `0x004AFBC0`,
+`0x004ADE40`–`0x004ADE70`, `0x004AE210`, `0x00463860`, `0x006491B0`,
+`0x00624690`, `0x00464820`, `0x004647D0`, `0x004643F0`, `0x004804A0`,
+`0x00480780`, `0x00480490`, `0x00465BF0`, `0x004AFC10`, `0x004AFB60`,
+`0x004AFCE0` (calls only), `0x00466730`, `0x00457460`, `0x00451F30`,
+`0x00463720`, `0x004638A0`, `0x0063A130` (state-mask test; group names
+from D2MOO 1.10f `fStateMasks`, hint), `0x00643860`, `0x00620210`,
+`0x00620C10`, `0x004C5420`; skill start `0x004C6140`
+(`0x004C6140`–`0x004C6496`), `0x004C5710`, `0x004C6EB0`, `0x004C6F40`,
+`0x006235A0`; update `0x004B13A0`, `0x004AF400` (tables `0x00725220`,
+`0x007252E0`, read from the image), `0x004B1280` (table `0x004B1388`),
+end table `0x004B15E0`, `0x004AF6A0` (table `0x004AF858`),
+`0x00649210`, `0x00650540`, `0x004807C0`, `0x0063E8D0`, `0x00624390`
+(entry only). Callers of `0x004AFF60`: `0x00480C10`, `0x004B07C7`
+(itself), `0x004B1301`, and six sites in `0x0046C770`–`0x0046CB40`
+(not read). Draw sites from a call-graph search for the seed constant
+`0x6AC690C5` (depth 3–4). Names: patch_d2 `monstats`, `monstats2`,
+`overlay`, `missiles`, `states`, `skills` rows; field offsets
+`data/fields.tsv`.
+
 §7 rule 9 (2026-10-08, asm): `0x00477CA0` (`0x00477CDF` game type),
 its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
 `0x0047AA30`, `0x0047AA20`; the recorded C→S 0x67 is seq 1 of
@@ -1199,22 +1577,20 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
 
 ## Open questions
 
-1. The mode machines: dispatch of the player, object and item machines
-   answered in §8 rules 4–6. Open: the monster machine `0x004AFF60`
-   (3,678 bytes, 10 callers) per code, and the effects of the helpers
-   the tables name (`0x00480E70` mode set, `0x004804A0` / `0x00480780`,
-   `0x00480930` (answered: §8 rule 7), `0x00480EF0`, `0x004BCF60`, `0x004BD5C0`): Phase 6
-   client unit-modes spec. PROVISIONAL: a client monster changes mode
-   only as the S→C messages state (§8), with no client-side mode steps
-   and no client seed draws beyond those the message rules name
-   (because the server stream carries every mode change the recordings
-   show); settled by REC-51 (HIGH-PRIORITY CAPTURE: client seed draws).
-   PROVISIONAL: the client skill start of codes 0x15 / 0x16 (S→C 0x4D /
-   0x4C, `0x004C6F40` / `0x004C6EB0`) sets the unit's mode to the
-   skill's `anim` (player) or `monanim` (monster) mode, record[0] being
-   the skill id; a skill without a row leaves the mode (because the
-   attack art follows `unit.mode` and the start is not read); settled by
-   REC-51.
+1. The mode machines. *Answered (static part, 2026-10-08)*: player,
+   object and item dispatch in §8 rules 4–6; the monster machine
+   `0x004AFF60` per code, the mode set `0x00480E70` / `0x00480EC0`, hit
+   overlays `0x00480D20`, the path helpers `0x004804A0` / `0x00480780`,
+   the client monster mode steps (animation end, walk resume, NPC turn)
+   and the mode part of the client skill start of codes 0x15 / 0x16
+   (player and monster) in §19; `0x00480930` §8 rule 7; `0x004BCF60`,
+   `0x004BD5C0` §15. Open: the player code-7 helper `0x00480EF0` and the
+   player update's mode steps (`0x00463390`, with open question 2).
+   PROVISIONAL: d2rs makes the client seed draws of §19 rule 9 on the
+   client seeds it models (§2 rule 6, Randomness) and treats their
+   results as exact (because every rule and draw site is now read and
+   only the seed values are unread); settled by REC-51 (HIGH-PRIORITY
+   CAPTURE: client seed draws) with open question 9.
 2. Local walk prediction and per-update path stepping of the local
    player (input → path, `0x00463390`): needed for a smooth
    `ViewFeed::player`; Phase 6 movement spec; check against
@@ -1249,6 +1625,8 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    direction, and the `0x006001F0` load arguments (`render/capture.md`
    cel context); a replay of recording A's 0x68 / 0x6B / 0x6C checks
    with a live camera confirms (no C→S 0x5F recorded).
+   *Answered* (static, 2026-10-08): fields and load arguments in §13
+   rule 7. The replay check stays with the recording list.
 8. Which 0x03 fields the act change path (`0x0053ACC0`) sends for a
    game whose client changes act (a waypoint to another act): settle
    from a recording with an act change (expected: same builder, new act
@@ -1258,8 +1636,9 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    DRLG room; check by comparing a monster's client `+0x20` seed after
    0xAC at a non-zero point with the server unit's seed (memory read).
 10. *Answered (2026-10-08)*: the 0x81 writes are §14 rule 3 (+0x24,
-    +0x28, +0x2C and the type-7 unit setup); the reader of +0x1C
-    stays PROVISIONAL there (settled by REC-10, REC-50).
+    +0x28, +0x2C and the type-7 unit setup); +0x1C (2026-10-08,
+    static, settles REC-50): §14 rule 3 (always 100; read by UI draws
+    only).
     Original question: the pet record fields +0x24… written by 0x81 and who
     reads +0x1C: UI (Phase 6); and a recording with a hireling (0x7A /
     0x81 seen) to confirm §14.
@@ -1292,6 +1671,10 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
 15. The on-mode / on-use shrine functions (`0x004BD4A0`, `0x004BD090`,
     `0x004BD0C0`, `0x004BD220`, `0x004BD360`) and the overlay calls
     `0x0046F0C0` / `0x00470390` (§15): Phase 6 effects spec.
+    *Answered* (static, 2026-10-08): on-use functions in §15 rule 6;
+    the on-mode function's overlay calls are `render/overlay.md` §2 and
+    §3 r9 (§15 rule 3). Open: the client missile create `0x004CD540`
+    itself: `missiles/client.md` §C2–§C4.
 16. *Answered (2026-10-08)*: §17 rule 6 (the room-change step that
     reaches the town exit, emitted as `TownExit`, `client/bridge.md` §10
     r11 and table). Original question: §17 rule 5: the town exit runs UI code (greeting re-arm, interaction
@@ -1302,11 +1685,11 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
     (`client/msg-ui.md` open question 10 is answered by
     `client/bridge.md` §10 r10, which covers the model writes; the hand-off
     of the update pass to the UI layer stays open.)
-17. §17 rule 4: whether 1.14d ever runs the in-game UI draw
-    (`0x0044C990` → `0x00456EE0`) a different number of times than
-    the receive per frame (frame skip, minimized window). It matters
-    only when the fallback repeats (a skill-0 entry with level ≤ 0).
-    Settle by reading `0x0044C990`'s callers.
+17. *Answered (2026-10-08)*: §17 rule 4 "Runs per loop pass" (the draw
+    runs in tick passes and in every paused pass, not in other passes;
+    two wall-clock exceptions). Original question: whether 1.14d ever
+    runs the in-game UI draw a different number of times than the
+    receive per frame (frame skip, minimized window).
 18. §7 rule 11.4: how often a 1.14d single-player ping round trip
     (`ping.rtt`) reaches 78 ms, giving the local player's position
     tolerance L = 1 in §6 rule 4 where d2rs uses 0. Settle with a memory

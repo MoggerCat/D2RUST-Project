@@ -27,34 +27,34 @@
 | Inputs | 80–87 |
 | Outputs / state changes | 88–105 |
 | Rules | 106–107 |
-|   1. 0x5D quest status (`0x0045E540` → `0x004A2CB0`) | 108–196 |
-|   2. 0x63 waypoint menu (`0x0045E670` → `0x0049CF90`) | 197–227 |
-|   3. 0x77 UI action (`0x0045E800` → `0x004B8CF0`) | 228–272 |
-|   4. 0x26 chat and overhead text (`0x0045DFC0` → `0x0049F490`) | 273–323 |
-|   5. 0x27 NPC text (`0x0045E0A0` → `0x004A1600`) | 324–353 |
-|   6. 0x4E hire offer and 0x4F hire list reset | 354–366 |
-|   7. 0x50 quest special (`0x0045E370` → `0x004B9210`) | 367–407 |
-|   8. 0x58 UI open (`0x0045E490` → `0x004C0550`) | 408–441 |
-|   9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`) | 442–470 |
-|   10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`) | 471–481 |
-|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 482–494 |
-|   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 495–504 |
-|   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 505–517 |
-|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 518–526 |
-|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 527–537 |
-|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 538–640 |
-|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 641–653 |
-|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 654–664 |
-|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 665–684 |
-|   20. 0x61 act video (`0x0045E660`) | 685–692 |
-|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 693–700 |
-|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 701–710 |
-| Constants & data dependencies | 711–722 |
-| Randomness | 723–727 |
-| Edge cases & original bugs | 728–744 |
-| Test vectors | 745–792 |
-| Provenance | 793–853 |
-| Open questions | 854–973 |
+|   1. 0x5D quest status (`0x0045E540` → `0x004A2CB0`) | 108–282 |
+|   2. 0x63 waypoint menu (`0x0045E670` → `0x0049CF90`) | 283–313 |
+|   3. 0x77 UI action (`0x0045E800` → `0x004B8CF0`) | 314–358 |
+|   4. 0x26 chat and overhead text (`0x0045DFC0` → `0x0049F490`) | 359–440 |
+|   5. 0x27 NPC text (`0x0045E0A0` → `0x004A1600`) | 441–470 |
+|   6. 0x4E hire offer and 0x4F hire list reset | 471–483 |
+|   7. 0x50 quest special (`0x0045E370` → `0x004B9210`) | 484–524 |
+|   8. 0x58 UI open (`0x0045E490` → `0x004C0550`) | 525–558 |
+|   9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`) | 559–587 |
+|   10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`) | 588–598 |
+|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 599–611 |
+|   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 612–621 |
+|   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 622–634 |
+|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 635–643 |
+|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 644–654 |
+|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 655–781 |
+|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 782–794 |
+|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 795–805 |
+|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 806–825 |
+|   20. 0x61 act video (`0x0045E660`) | 826–833 |
+|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 834–841 |
+|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 842–851 |
+| Constants & data dependencies | 852–863 |
+| Randomness | 864–868 |
+| Edge cases & original bugs | 869–885 |
+| Test vectors | 886–933 |
+| Provenance | 934–1001 |
+| Open questions | 1002–1137 |
 <!-- /index -->
 
 Owned ids: 0x26, 0x27, 0x29, 0x4E, 0x4F, 0x50, 0x52, 0x58, 0x5D, 0x5E,
@@ -122,7 +122,7 @@ layer.
    | bit 0 set | 3 | screen message of string 3708 (0xE7C) (`0x0049E3A0(text, 0)`) | output |
    | bit 0 set | 4 | every monster of set S of class 146 (`cain1`): unit flag +0xC4 bit 0x2 cleared (`0x00464990` with `0x004A2C70`) | model (r4) |
    | bit 0 set | 10 | eclipse (`0x0044C820`, `render/lighting.md` §9.2 r3) | model |
-   | bit 0 set | 13 | `0x0046F870(211, 1)` (client effect of monstats row 211; open question 1) | output |
+   | bit 0 set | 13 | `0x0046F870(211, 1)`: preload of monstats row 211's mode graphics (open question 1 answer); no model state, no visible effect | output |
    | bit 0 set | 15 | screen message of string 3710 (0xE7E) | output |
    | bit 0 set | 23 | `exit_requested` := 1 (`0x0044D520` → `[0x007A0620]`, `client/model.md` §1) | model |
    | bit 0 set | 33 | sound 237 | output |
@@ -152,7 +152,61 @@ layer.
    monster update order of `client/model.md` §5 rule 3 (`0x00463C90`
    over the type-1 heads of set S, `0x007A6070`); only units in S at
    receive are changed. The rest of the +0xC4 word is not modelled
-   (open question 2).
+   (open question 2); its writers are rule 4.1.
+   1. **The client unit flag word +0xC4, every client writer**
+      (2026-10-08; answers open question 2; all.asm scan of every
+      `or` / `and` / `mov` to `[reg + 0xC4]` in `0x00440000`–
+      `0x004FFFFF` and in the shared unit code `0x00600000`+; the
+      packed-record copy `0x00450950`, `0x00450AD5`, and the indexed
+      arrays at `0x00690075`–`0x0069E425` are not unit writes). The
+      unit record is zeroed at allocation (`0x00620290`), so every
+      bit starts 0; the kind set-up then writes:
+      - player `0x00460BF0` (`0x00460C7C`–`0x00460C8E`, after mode set
+        5): flags := (flags | 0xE) & ~0x20, with bit 0x1 from the mode
+        set, i.e. 0x0F;
+      - monster `0x004AE8D0` / re-init `0x004AEDD0`
+        (`0x004AEB12`–`0x004AEB6B`): 0x2 := `monstats2` `isSel`, 0x20
+        := not `shadow`, 0x8 set, 0x4 := `isAtt`
+        (`client/msg-units.md` §1 r6);
+      - object `0x004BC720` (via `0x00465FD0` type 2): 0x2 :=
+        `objects` `Selectable[mode]` (+0xC4 + mode, `0x004BC5E0`), 0x4
+        := `IsAttackable0` (+0x128), 0x8 cleared, 0x20 :=
+        `BlocksLight[mode]` = 0 (+0x118 + mode), 0x100000 set when
+        `OrderFlag0` (+0x131) = 1; the object mode changes
+        `0x004BCA90`, `0x004BCBB0`, `0x004BCDE0`, `0x004BCF60` rewrite
+        0x2 / 0x20 by the new mode and set 0x100000 by `OrderFlag0`
+        (`0x004BCF60`) or `OrderFlag2` = 1 in mode 2 (`0x004BCBB0`);
+      - item `0x004C1910` (type 4): 0x2 cleared (`0x004C1981`);
+      - missile `0x004CD0A0` (type 3): nothing;
+      - tile / warp (type 5, `0x00466134`): |= 0x22;
+      - client-only units `0x00466360`, `0x00466730`: |= 0x600000
+        (`client/model.md` §2, constants table).
+      Later writers, by bit: **0x1** set by every mode set (`0x00624690`)
+      and `0x00650350`, cleared by the monster update `0x004B13A0`
+      (class 528 `evilhut`, `client/model.md` §19 r8); **0x2** the
+      targetable bit of r4, §16 and `client/model.md` §17 (`0x00461010`,
+      `0x00461250`, `0x00463390`, `0x004AFF60`, `0x004B1090`,
+      `0x004B3C20`, `0x004B3D10`, `0x004B4FD0`, `0x004B66B0`,
+      `0x004B6DD0`, `0x004A2C70` / `0x004A2C90`); **0x4** cleared by
+      the player death `0x00461010`, re-set by `0x004647D0` (dead
+      clear); **0x2 / 0x4 / 0x8** together by the vulture motion
+      `0x004AFCE0` (code 0x0C → &= ~0xE, code 0x0A → |= 0xE);
+      **0x20** `0x00457460` (from `shadow`), `0x004AFF60` (code 0x07,
+      states), `0x004B1280` (death hold, `client/model.md` §19 r5) and
+      the state functions of `client/stat-lists.md` §3 r6; **0x40**
+      only cleared, by the mode sets `0x00480E30`, `0x00480E70`,
+      `0x00480EC0`; **0x200** `0x004B1090` (hireling, with 0x2);
+      **0x2000** set by the room-list insert `0x0064C040`, cleared by
+      `0x0064C160`, `0x0064C370` (`sim/units.md` "queued"); **0x4000**
+      set by the animation set-up `0x00621260` and the frame advance
+      `0x00623E00` (which first clears it); **0x10000** the dead flag
+      (`client/msg-units.md` §4 r6); **0x800000** set by `0x0061A840`
+      (which also sets +0xC8 bit 0x20 when 0x400000 is clear), cleared
+      by the client unit update `0x00480810`; **0x20000000** set once
+      per room object by `0x00458DC0` (test then set). No client code
+      writes any other bit (0x10, 0x80, 0x100, 0x400, 0x800, 0x1000,
+      0x8000, 0x20000–0x80000, 0x1000000–0x10000000, 0x40000000,
+      0x80000000 stay 0 on client units).
 5. Every row marked output becomes one `QuestUi` output {c, f, s, v};
    the UI layer runs that row (and T or r7) at delivery. The UI layer
    reads its own state (latch, UI flags) then, not at receive. A row
@@ -168,8 +222,18 @@ layer.
    entries are `client/quest-log-table.tsv` (dumped from the 1.14d image:
    +0 u8, +1 u8, +2 slot, +3 act, +4 u32 pointer into the image, read
    by the quest-log draw `0x004A1950`, +8 chain, +0xC u32 = the entry
-   index in every entry; meanings of +0, +1, +4 and +0xC beyond that:
-   open question 3).
+   index in every entry). Their use (2026-10-08, answers open question
+   3): +0 = listed (1 for the 27 quests, 0 for the 14 other entries;
+   the act tab build `0x004A3220` skips 0, `0x004A3310`); +1 = icon
+   index (0–26; the tab build also skips an entry whose +1 ≥ 27 or
+   whose icon cel `[0x007BF2E1 + 4·(+1)]` is not loaded; copied to the
+   row by `0x004A19CF`); +4 = the status text list the draw walks
+   (0 → no status, `0x004A19F7`; list `0x00723D24` has a special case
+   at `0x004A1A43`); +0xC = the quest id: `0x004A1950` finds the entry
+   whose +0xC equals its argument (`0x004A1980`–`0x004A1994`, none →
+   status 2) and passes +0xC as the quest number to every flag test
+   `0x0065C310(record, +0xC, bit)` on the client quest record (§16
+   r7).
    1. Latch `[0x007BF298]` = 0: `SetUIState(17 UI_QUESTLOG, on, 0)`
       (`ui/panels.md` §2; the quest-log alert button). Returned 1 → the
       entry of c, if any, sets the selected slot of its act
@@ -179,6 +243,28 @@ layer.
       of c exists → its status byte (`[0x007BF356 + index]`) := s; and
       when `[0x007BF2B3]` = 0 and the entry's act = `[0x007C0255]`
       (the act tab shown): `[0x007BF2B9]` := the entry's slot.
+   3. **Latch values** (static read 2026-10-08): 0 = no alert and
+      the quest screen closed, 1 = the quest-log alert (ui 17) raised
+      by r6.1, 2 = the quest screen (ui 15) open with its cels loaded.
+      Writers: r6.1 (0 → 1); the quest-log toggle `0x004A3FE0` (Q key
+      `0x00468990`, the alert button `0x004A4110`, the control-panel
+      button `0x0047EC50`): from 0 (only when ≥ 250 ms of
+      `GetTickCount` since the last close `[0x007C0259]`, the local
+      player present and alive (`0x00463DF0` = 0) and `0x00483350` =
+      0) or from 1 (latch := 0 first, no time test) it opens ui 15 and
+      on success sets 2; from 2 it closes (`0x004A26B0`, latch := 0)
+      and stamps `[0x007C0259]`. Resets to 0: the ui 15 close hook
+      `0x004A28D0` (unconditional; `ui/panels.md` §2 r6), the ui 17
+      close hook `0x004A3000` (1 → 0), the alert draw `0x004A2A80`
+      (1 → 0 when the local player is absent or dead, closing ui 17),
+      the quest screen draw `0x004A34F0` (2 → 0 when the local player
+      is absent or dead), and the in-game UI set-up `0x004A3410` (from
+      `0x00456970`, with the other quest-log globals). Every 2 → 0
+      reset also clears `[0x007BF2B0]` and `[0x007BF2B3]`. The
+      counters `[0x007BF2A4]`, `[0x007BF2AC]` and the selected slot
+      `[0x007BF2B9]` are read by the quest-log rows and tab
+      (`world/quests-status.md` §1 r3, §4, §5). UI state: not in the
+      model.
 7. **f bit 5, other c** (the Den of Evil counter path): when the client
    quest flags (`0x004B32D0` → record `[0x007C0D43]`, `world/quests.md`
    §1) have quest 1 bit 0 or quest 1 bit 1 set (`0x0065C310`) →
@@ -296,6 +382,37 @@ layer.
       assert 0xFA8 of `0x00622150`); the text filter object
       (`0x00611560`) tests n (method +8) and the text (method +0x14);
       either non-zero → nothing.
+      1. **The filter object is the persistent ignore list**
+         (2026-10-08 read; answers open question 9). `0x00611560`
+         returns the singleton `[0x0096BC20]`, built on first use by
+         `0x00611200` (source file string `.\Chat\Ignorelist.cpp`,
+         vtable `0x006E62DC`): two string lists, A at +0x04 (names)
+         and B at +0x2C (phrases), a map at +0x54; path +0x80 := the
+         directory of `Game.exe` + `ignorelist` (`0x00406B60`,
+         `0x006E620C`); enabled +0x184 := the registry value
+         `Diablo II` / `Persistent Ignore` (`0x00414F10`, default 1;
+         written back by method +0x24 `0x0060DE00`); then the file is
+         loaded (`0x00611050`). Method +0x20 (`0x0060DDF0`) returns
+         enabled.
+      2. Method +8 (`0x00610380`, name n): n empty or disabled → 0.
+         Else n's two derived forms (`0x0060DE30`, and the account the
+         map gives through method +0x1C, else `0x0060DEA0`) are looked
+         up in list A (`0x0060FD50` → `0x0060F8B0` on +0x04); a hit →
+         non-zero.
+      3. Method +0x14 (`0x0060FC40`, text t): t empty or disabled → 0;
+         t found in list B as a whole (`0x0060F8B0` on +0x2C) → 1;
+         else for each entry e of B in list order (head +0x38, string
+         at node +0x14, next `0x0060EAA0`): lower-case copies of t and
+         e (`0x00414200` = `_strlwr`), e a substring of t
+         (`0x00686900` = `strstr`) → 1; none → 0.
+      4. Method +0x18 (`0x00611320`, from `0x0049E3A0`, not a
+         filter): a line "x(y)…" records y, prefixed with `*`, as the
+         map entry of x (`0x0060F510`, else created by `0x00611170`):
+         the name → account pairs method +8 uses.
+      Both lists are filled only from the `ignorelist` file and the
+      list's own add methods (chat ignore commands, Phase 6 UI); no
+      message writes them. So with no `ignorelist` file and no ignore
+      command (the d2rs single-player case) nothing is filtered.
    3. Text conversion `0x0049E280(text, lang)` fails → nothing:
       languages 6, 7, 9, 12 convert with `MultiByteToWideChar`; when
       lang differs from the client's own language id (`0x00525150`,
@@ -604,13 +721,37 @@ layer.
      run only from `0x00453DE0`, i.e. when the local player is replaced
      or freed (`client/model.md` §2 rule 5, §3 rule 1);
    - **copy** of 0x28's Q (r2 with T = 6, r4 with T ≠ 6 and U present:
-     `0x0065C4D0(record, Q, 0x60, 0)`).
-   Every other reference (`0x004B1680`, `0x004B2AD0`, `0x004B3380`,
-   `0x004B3870`, `0x004B4830`, `0x004B66B0`, `0x004B32D0`) only reads
-   it, through the flag test `0x0065C310`. No other S→C message writes
-   it (0x29 writes `[0x007C0D47]`; 0x52 / 0x5E write quest-log bytes).
+     `0x0065C4D0(record, Q, 0x60, 0)`);
+   - **bit sets through the getter** `0x004B32D0` (returns the pointer)
+     followed by the flag set `0x0065C360(R, quest, bit)` (2026-10-08,
+     scan of every caller of `0x004B32D0` for `0x0065C360`; three
+     functions):
+     - `0x0048A540`, the Horadric cube animation start, reached from the
+       item placement of S→C 0x9C (`0x004C2970` at `0x004C2AB7`, owner
+       the local player, page 3): item code `hst ` → quest 10 bit 11,
+       `qf2 ` → quest 18 bit 11, each set only when clear (test
+       `0x0065C310` first; `0x0048A552`–`0x0048A59B`); the rule and its
+       consequences are `ui/panels-2.md` §20 r7;
+     - `0x004A34F0` (quest-log icon draw, state 0 reaching counter 25,
+       `0x004A3897`–`0x004A38AE`) and `0x004A2760` (every row in state 0
+       at once, `0x004A277A`–`0x004A278F`): quest q (u16 at entry
+       +0x00 of the quest-log row) bit 12 := 1, then C→S 0x58 with q
+       (`0x004785B0`); `world/quests-status.md` §5 r1 ("P.12 := 1").
+   The next 0x28 copy overwrites all of these bits with the server's
+   record. Every other reference reads it: the direct readers
+   `0x004B1680`, `0x004B2AD0`, `0x004B3380`, `0x004B3870`, `0x004B4830`,
+   `0x004B66B0`, and the callers of `0x004B32D0` (`0x00483F80`,
+   `0x004886C0`, `0x0048FFE0`, `0x0049C760`, `0x0049C9C0`,
+   `0x004A1950`, `0x004A2220`, `0x004A2CB0`, `0x004A4180`,
+   `0x004BDC10`, and the tests in `0x0048A540` / `0x004A34F0`), through
+   the flag test `0x0065C310` (`0x004886C0` and `0x0048FFE0` pass it to
+   the item functions `0x0062FE60` / `0x0062FDC0`, whose call trees,
+   followed six deep, reach neither `0x0065C360` nor `0x0065C4D0`). No other S→C message writes it (0x29 writes
+   `[0x007C0D47]`; 0x52 / 0x5E write quest-log bytes).
    d2rs: the UI layer's 96-byte quest record, zeroed at game UI start and
-   on a local-player change, overwritten only by 0x28 as above.
+   on a local-player change, overwritten by 0x28 as above, with the
+   three UI bit sets in between (10.11 / 18.11 on a cube placement,
+   q.12 on a quest-log acknowledgement).
 8. **`[0x007C0C68]` has no writer** (2026-10-08). The byte is the first
    of the 0x160-byte UI-state block cleared by the UI-state init
    `0x004B23E0` (`memset(0x007C0C68, 0, 0x160)` at `0x004B2404`); no
@@ -851,6 +992,13 @@ immediates); `disasm.py fn` on `0x00661400`, `0x00661440`,
 `0x00661510`, `0x00661270`, `0x006616E0`, `0x006615F0`, `0x006615D0`,
 `0x0049F900` (= `[0x007BF250]`).
 
+Gap pass (2026-10-08, PC 1 lane D): §4 r3.2.1–r3.2.4 from
+`0x00611560`, `0x00611200` (strings `0x006E6290`, `0x006E620C`,
+`0x006E6278`, vtable `0x006E62DC` read from the image), `0x0060DDF0`,
+`0x0060DE00`, `0x00610380`, `0x0060FD50`, `0x0060FC40`, `0x00611320`,
+`0x0049F503`–`0x0049F527`; OQ 1 from `0x0046F870`, `0x0046F650`,
+`0x006004E0`.
+
 ## Open questions
 
 1. `0x0046F870(row, 1)` (0x5D f bit 0, c 13; also `render/lighting.md`
@@ -858,7 +1006,16 @@ immediates); `disasm.py fn` on `0x00661400`, `0x00661440`,
    effect spec. *Partly answered* (`client/msg-units.md` §7 r10):
    `0x0046F870(class, f)` loads the class's graphics for each mode its
    monstats2 row marks (15-mode table `0x00712AC4`, `0x0046F650`); open:
-   what the flag f = 1 changes.
+   what the flag f = 1 changes. *Answered (2026-10-08, read of
+   `0x0046F870` / `0x0046F650`)*: f (EDX, passed on as the third
+   argument of `0x0046F650`) changes only how each cel context of the
+   class's mode files is fetched: f ≠ 0 → `0x006001F0(ctx, 1, 1)`, and
+   when that returns 0 the direct load `0x006004E0(ctx)` (`0x0046F784`–
+   `0x0046F7A2`); f = 0 → `0x006001F0(ctx, 0, 0)` (`0x0046F7A9`). It is a
+   graphics preload: no model state, no output, the same cels (the
+   load arguments' meaning stays with `client/model.md` OQ 7 and
+   `render/sprite-placement.md` OQ 5). d2rs loads graphics on demand and
+   treats 0x5D f bit 0, c 13 as having no observable effect.
 2. The full client unit flag word +0xC4 (initial value per kind, other
    writers), so `quest_untargetable` can become a real flag field;
    owner `client/msg-units.md`. *Partly answered (2026-10-08, asm
@@ -873,15 +1030,21 @@ immediates); `disasm.py fn` on `0x00661400`, `0x00661440`,
    `0x004AFF60`). **0x200** is set (with 2: `|= 0x202`) only by the
    client hireling setup `0x004B1090`, called by the 0xAC create when
    the new monster's pet type (`0x00479180`) is 7 and by 0x81 type 7
-   (`client/model.md` §14 r3); no client clear. PROVISIONAL: the
-   per-caller conditions of the 0x10000 writers inside the mode
-   machines follow `client/model.md` OQ 1's provisional (dead modes
-   only: set on entering a death / dead mode, cleared on leaving)
-   (because the 0x15 / death flow is the only one exercised by the
-   recordings); settled by REC-51.
+   (`client/model.md` §14 r3); no client clear. *0x10000 answered
+   (2026-10-08)*: the per-caller conditions are `client/msg-units.md`
+   §4 r6 (player codes 0x08 / 0x09 via `0x00461010`, monster code 0x09
+   and the frame-30 callback with mode 0xC; the rest mark client
+   missiles; cleared only by `0x004647D0`). Still open: the other bits
+   of the word and their initial value per kind. *Answered
+   (2026-10-08)*: §1 rule 4.1 (initial value per kind and every client
+   writer by bit; the field stays owned by `client/msg-units.md`).
 3. Who resets the quest-log latch `[0x007BF298]` and the meaning of
    `[0x007BF2A4]`, `[0x007BF2AC]`, `[0x007BF2B9]` in the quest-log draw
    (Phase 6 quest-log spec).
+   *Answered* (static, 2026-10-08): §1 r6.3 (latch values and every
+   writer); the three values are read as `world/quests-status.md` §1
+   r3, §4 and §5 state. *Answered (2026-10-08)*: the entry fields +0,
+   +1, +4, +0xC of `client/quest-log-table.tsv` are §1 r6.
 4. ~~The client quest flags record `[0x007C0D43]`~~: answered in §16
    r7 (all writers: create / destroy / reset on a local-player change,
    0x28 copies). Original text: which messages write it
@@ -932,7 +1095,8 @@ immediates); `disasm.py fn` on `0x00661400`, `0x00661440`,
    loop does with them after the exit (`0x0044B8A0`, `0x0044DD60`,
    `0x0044E0B0`, `0x0044E200`); owner `client/model.md` §7 if they are
    session state.
-9. The text filter object `0x00611560` (methods +8, +0x14) used by
+9. *Answered (2026-10-08)*: §4 r3.2.1–r3.2.4 (the persistent ignore
+   list; empty without an `ignorelist` file). Original question: the text filter object `0x00611560` (methods +8, +0x14) used by
    §4 r3.2: what it rejects (a squelch / profanity list?); UI spec.
    *Partly answered (2026-10-08):* the same object's method +0x18 also
    receives every screen message of color 4 that wraps to exactly one
@@ -940,7 +1104,7 @@ immediates); `disasm.py fn` on `0x00661400`, `0x00661440`,
    a 256-byte buffer, converts the line with `0x005263E0` (limit 0x100)
    and calls method +0x18 (buffer, 0x100), before the message-log copy
    `0x0049DBC0` (`ui/messages.md` §2 r2 owns the screen-message rule).
-   Open: what +8, +0x14 and +0x18 do with their input.
+   *Answered (2026-10-08)*: +8, +0x14 and +0x18 are §4 r3.2.2–r3.2.4.
 10. Answered (2026-10-08, user decision): the writes go through the
     bridge as UI requests, applied before the next message;
     `client/bridge.md` §10 r6 unchanged, new §10 r10. The question was:

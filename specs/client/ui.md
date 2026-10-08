@@ -27,7 +27,7 @@
 | Edge cases & original bugs | 311–314 |
 | Test vectors | 315–329 |
 | Provenance | 330–341 |
-| Open questions | 342–361 |
+| Open questions | 342–362 |
 <!-- /index -->
 
 ## Summary
@@ -223,7 +223,7 @@ table; "pressed" = the press flag the handler sets before the request.
    | `0x0047D971` | 1 | `0x0047D920` | options menu: up arrow (previous enabled entry) |
    | `0x0047DA69` | 1 | `0x0047D9A0` | options menu: left arrow changed the value |
    | `0x0047DB59` | 1 | `0x0047DA90` | options menu: right arrow changed the value |
-   | `0x0047AC66` | 1 | `0x0047AA60` | IME composition result into the 32-unit text field `[0x007BC850]` that does not fit (cut to 31 units, `[0x007BC88E]` := 0) |
+   | `0x0047AC66` | 1 | `0x0047AA60` | IME composition result into the chat input line `[0x007BC850]` (32 UTF-16 units; UI state 5: set up by `0x0047B090` from the state-5 open hook at `0x004557BE` in `0x00455720`, cleared by `0x0047B2E0` from the close hook at `0x00455B8D`, drawn by `0x0047B720`) that does not fit (cut to 31 units, `[0x007BC88E]` := 0) |
    | `0x0048A74E` | 1 | `0x0048A730` | inventory weapon swap button (`ui/panels.md` §9, swap 0x60) |
    | `0x004A5A1B` | 1 | `0x004A59D0` | configure controls (UI_CONFIG 11): mouse wheel moved the key list |
    | `0x004A5A8F` | 1 | `0x004A5A40` | configure controls: up arrow moved the selected row (separator rows, key code 0x39, skipped) |
@@ -280,7 +280,7 @@ table; "pressed" = the press flag the handler sets before the request.
    | `0x004A67F9` | 4 | `0x004A6790` | new-skills button down (`[0x007C02E8]`) |
    | `0x004A778B` | 4 | `0x004A7720` | character panel: close button down (`[0x007C02F4]`, `ui/panels.md` §8 r3) |
    | `0x004ABAD8` | 4 | `0x004AB7E0` | skill tree: close button down (`ui/panels-2.md` §19) |
-   | `0x004BACB3` | 4 | `0x004BAC70` | `ButtonWrapper` widget (vtable `0x006DA6F4`; made by `0x004BB0F0`, e.g. at (250, 287) in `0x00454440`): down inside it |
+   | `0x004BACB3` | 4 | `0x004BAC70` | `ButtonWrapper` widget (vtable `0x006DA6F4`, set only by its constructor `0x004BAF20`, called only by `0x004BB0F0` at `0x004BB14B`; `0x004BB0F0`'s only calls are `0x00454472` and `0x004544D3` in `0x00454150`: the gold dialog's OK (250, 287) and Cancel (355, 287), `ui/panels-2.md` §21): down inside either button |
    | `0x004A7896` | 5 | `0x004A7720` | character panel: a stat add button down (`[0x00724A50 + …]` := 1) |
    | `0x004ABBF1` | 5 | `0x004AB7E0` | skill tree: a learnable skill icon down (`[0x007C0838 + 4i]` := 3) |
    | `0x00491F7B` | 6 | `0x00491D20` | NPC shop: tab 0 chosen (not the current page) |
@@ -355,6 +355,7 @@ PC 2 `ui/*` specs where they own the handler.
 5. *Answered (2026-10-08).* §B8 UI control → sound site map
    (`audio/triggers.md` OQ12): §B8.1 (77 constant-id sites of
    `0x004B9A00`; the 7 options-menu sites stay owned by
-   `audio/sound-table-2.md` §15 r5). Open: the field `[0x007BC850]` of
-   `0x0047AC66` and the `ButtonWrapper` users of `0x004BACB3` are named
-   only by address; Phase 6 UI specs name them.
+   `audio/sound-table-2.md` §15 r5). The field `[0x007BC850]` of
+   `0x0047AC66` (the chat input line, UI state 5) and the only
+   `ButtonWrapper` users of `0x004BACB3` (the gold dialog's OK and
+   Cancel) are named in the §B8.1 table (2026-10-08, static).

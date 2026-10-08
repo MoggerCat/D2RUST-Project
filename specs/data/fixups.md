@@ -35,14 +35,14 @@
 |   9. monequip | 292–309 |
 |   10. monumod, missiles | 310–318 |
 |   11. levels | 319–338 |
-|   12. Tile paths: lvltypes, lvlprest, lvlsub | 339–361 |
-|   13. objects | 362–374 |
-| Constants & data dependencies | 375–392 |
-| Randomness | 393–396 |
-| Edge cases & original bugs | 397–416 |
-| Test vectors | 417–466 |
-| Provenance | 467–515 |
-| Open questions | 516–549 |
+|   12. Tile paths: lvltypes, lvlprest, lvlsub | 339–362 |
+|   13. objects | 363–375 |
+| Constants & data dependencies | 376–393 |
+| Randomness | 394–397 |
+| Edge cases & original bugs | 398–420 |
+| Test vectors | 421–470 |
+| Provenance | 471–520 |
+| Open questions | 521–584 |
 <!-- /index -->
 
 ## Summary
@@ -342,7 +342,8 @@ Path fix (`0x0061E4A0`), applied to one 60-byte str field in place:
 1. Replace every `/` with `\` up to the string's end.
 2. If the string has more than 1 character, it becomes
    `DATA\GLOBAL\TILES\` + string (formatted with `%s\%s` from the prefix
-   `DATA\GLOBAL\TILES` into a 64-byte buffer, then copied back with its
+   `DATA\GLOBAL\TILES` into a 60-byte stack buffer followed by the
+   security cookie, then copied back with its
    NUL). Bytes after the new NUL keep their old values.
 
 Strings of 0 or 1 characters (1.14d: the 5,321 `0` placeholders) are
@@ -411,8 +412,11 @@ Out-of-range data, where 1.14d reads or writes outside an array. No 1.14d
 row reaches any of them; d2rs reports a load error (`FixupError`) instead:
 8. monstats pass A: BaseId < 0 or ≥ n, or NextInClass ≥ n (§8);
 9. gems: an item index j ≥ item count (§5);
-10. a tile path longer than 41 characters (the result passes the 60-byte
-  field; above 45 it also passes the 64-byte buffer) (§12).
+10. a tile path longer than 41 characters (§12): the result (18 + n + 1
+  bytes) passes both the 60-byte field and the 60-byte buffer, whose
+  next bytes are the stack cookie (`[ebp−4]`), so `__security_check_cookie`
+  (`0x00681A48`) ends the process at the function's return unless the
+  overwritten bytes equal the cookie.
 
 ## Test vectors
 
@@ -505,7 +509,8 @@ register arguments. D2MOO (1.10f) supplied field names only.
 - monumod `0x00655030`; missiles `0x00661B20`; hireling `0x00655720`.
 - levels `0x0061C540` (`0x0061DA70`–`0x0061DB4D`).
 - Tile paths: `0x0061E4A0` (`%s\%s` at `0x006D4124`, prefix `0x006E867C`,
-  64-byte stack buffer, `> 1` length test); callers lvltypes
+  locals 0x40 bytes = 60-byte buffer at `[ebp−0x40]` + cookie at
+  `[ebp−4]`, `> 1` length test); callers lvltypes
   `0x0061EA50` (32 fields), lvlprest `0x0061EFA3` (gate `0x00408F20` or
   +0x20 = 0), lvlsub `0x0061F938`.
 - objects `0x0063F690` (`0x00640E00`–`0x00640E7E`: memset 0x80, copy
@@ -536,6 +541,16 @@ register arguments. D2MOO (1.10f) supplied field names only.
    more character from the end.
 3. Whether anything reads gems +0x2C (always 0); if a reader expects the
    gem name id, the bug's visible effect is unknown.
+   *Answered* (static, 2026-10-08): nothing reads it, so the bug has no
+   visible effect. The gems array (`[0x0096CA94]`, count `[0x0096CA90]`)
+   is read only through `0x006372C0(k)` (k ≥ count or −1 → null; also
+   `0x006372A0`, which only frees it, from `0x00619140`). Its 8 callers
+   read: `0x00486670` +0x20 (`letter`, widened with limit 6); `0x0062C100` +0x2F
+   (`transform`); `0x004C0D20` (2 calls), `0x0055C2C0` (2) and
+   `0x004E6850` (2, via `0x004E67D0`) pass the record to `0x0065FEC0`
+   (type 2 or 5, 3 mods), which reads only the mod blocks +0x30 / +0x60
+   / +0x90 (16-byte entries, `0x0065C730` → `0x0065C6D0`) and hands the
+   record to `0x0065FE10` → `0x0065FD70`, which does not read it.
 4. Whether runtime code checks the set list or +0x2E for a set item that
    was not attached (no 1.14d item is affected).
 5. The texts were checked with the ENG string tables only; other
@@ -546,3 +561,23 @@ register arguments. D2MOO (1.10f) supplied field names only.
    larger than the item count (§5 loop 2 resets items[k]); a tile path
    field with no NUL in its 60 bytes (§12); a missing monmode row 2 or
    15 (§8); a byte ≥ 0x80 in a miss key or a hit text (Open question 1).
+   *Answered* (static, 2026-10-08) except the last (Open question 1);
+   d2rs keeps the `FixupError` for all of them (each 1.14d outcome
+   corrupts memory or crashes):
+   - sets +0x0C = c < 0: the `c < 6` test is signed (`0x006366E3`), so
+     the item attaches: +0x22 := version, +0x2E := low 16 bits of c,
+     the record pointer is written at S + 0x110 + 4·(c's low 16 bits,
+     sign-extended) (`0x006366ED`–`0x006366F8`), i.e. before the slot
+     list (S's own bytes for c ≥ −68, earlier memory below), and
+     c := c + 1.
+   - gem count > item count: loop 2 writes −1 at items + 0x1A8·k + 0xF0
+     for every k < gem count with no bound (`0x00637255`), past the
+     combined array.
+   - tile path field with no NUL: the length scan (`0x0061E4B8`) runs
+     into the following bytes of the record; `/` → `\` rewrites them up
+     to the first 0; the result is longer than 41 characters, so Edge
+     case 10 applies (process ends at the cookie check).
+   - monmode row 2 or 15 missing: the mode accessor `0x0065B500` returns
+     null for a mode ≥ the monmode count (`0x0065B506`), and the
+     composer reads its +0x20 at once (`0x0064F71F`): an access
+     violation at load.

@@ -40,16 +40,16 @@
 |   7. Nearest free point (`0x0064DEA0`) | 417–481 |
 |   8. Coarse free-box search (`0x0064E840`) | 482–514 |
 |   9. Floor drop placement (`0x00555DA0`) | 515–537 |
-|   10. Placing a unit at a point (`0x00554EA0`) | 538–595 |
-|   11. Level spawn point (`0x0061B060`) and game entry | 596–643 |
-|   12. Warp tiles and warp arrival | 644–704 |
-|   13. Where a joining character stands at tick 0 | 705–749 |
-| Constants & data dependencies | 750–768 |
-| Randomness | 769–778 |
-| Edge cases & original bugs | 779–814 |
-| Test vectors | 815–852 |
-| Provenance | 853–887 |
-| Open questions | 888–977 |
+|   10. Placing a unit at a point (`0x00554EA0`) | 538–602 |
+|   11. Level spawn point (`0x0061B060`) and game entry | 603–651 |
+|   12. Warp tiles and warp arrival | 652–712 |
+|   13. Where a joining character stands at tick 0 | 713–774 |
+| Constants & data dependencies | 775–793 |
+| Randomness | 794–803 |
+| Edge cases & original bugs | 804–839 |
+| Test vectors | 840–877 |
+| Provenance | 878–918 |
+| Open questions | 919–1002 |
 <!-- /index -->
 
 ## Summary
@@ -544,11 +544,18 @@ query is a single cell against 0x3E01.
    unit +0x2C goes to the dynamic teleport `0x00650BE0` (rule 4)
    whatever the type (`0x00554ED9`, `0x00554F5C`), so a unit with a
    static path (objects, items, tiles; 0x20 bytes, §2.2) would be read
-   and written as a 0x200-byte dynamic path in 1.14d. PROVISIONAL: no
-   caller passes a static-path unit; d2rs does the static set
-   (`0x00620AE0`) with the footprint removed and stamped again for such
-   a unit (design choice, because a 0x200-byte write over a 0x20-byte
-   path is not a behaviour to copy); settled by REC-90.
+   and written as a 0x200-byte dynamic path in 1.14d. No 1.14d caller
+   passes one (static, all 20 call sites in `all.asm`): players at the
+   level warp `0x0053AF97`, C→S 0x5F `0x0054CC54`, the warp
+   `0x005551BC`, the teleport pad `0x00581B92`, the portals `0x00584B30`
+   / `0x00584E07` (operator, record +0x08); monsters at the Jerhyn
+   helper `0x0059F711` (`world/quests-act2.md`) and the AI bodies
+   `0x005E3D4F`, `0x005E448A`, `0x005EDB65`, `0x005EF7D6`, `0x005F3048`; the caster or its new monster in the
+   skill bodies `0x005C55B1`, `0x005CA3C9`, `0x005CB1DE`, `0x005CCCDF`,
+   `0x005D1B3D`, `0x005D1BB7`, `0x005D60E7` (the sentry monster),
+   `0x005D7928`. The static case is unreachable; an implementation may
+   reject it (d2rs: the collision view's teleport for the unit's own
+   path kind).
 2. Room null: cell lookup with a null hint (always none, dead code), then
    from the unit's current room; none → 0.
 3. Unless `exact`: free point (§7, `0x0064E7B0`, size of the unit, mask
@@ -607,7 +614,8 @@ object code `0x00581B50`, `0x00584870`, `0x00584D00`, monsters
 Callers: game/act entry `0x005394A0` (tile index 0; level = the act's
 start level, act +0x08) and its follower placement (`0x005352C0`),
 level warp `0x0053AEC0` (same act; the tile index from the caller; an
-act change goes to `0x00537340` + `0x0053ACC0`, the act-change spec),
+act change goes to `0x00537340` + `0x0053ACC0`, `world/waypoints.md`
+§11),
 `0x0053ACC0`, `0x0056CF40`, `0x00584870`, `0x00584D00`, `0x0059DFD0`.
 On every 1.14d waypoint level the spawn search of waypoint travel ends at
 the level's waypoint room (`drlg/levels.md` §10 rule 4: the first room
@@ -720,16 +728,33 @@ Owner of the game-entry position; the search itself is §11.
      `0x00530E17`, join `0x0052FA50` at `0x0052FB90`); the global is 0
      except through the setter `0x0052DFA0` (no direct caller) and is
      cleared at shutdown (`0x0052C030`);
-   - from the save (`0x00532690`, the header reader of the save parser
-     `0x00534020`): header byte +0x58 (header: 0x82 bytes, u32
-     0xAA55AA55 at +0x00, u16 0x82 at +0x20), low nibble = act, high
+   - from a `.d2s` of version > 0x5B (every 1.14d save, version 0x60):
+     the header read `0x0056A090` (save dispatch `0x00534330`: u32 @0
+     = 0xAA55AA55, version u32 @4 > 0x5B → `0x0056B180` → `0x0056A090`)
+     at `0x0056A1D4`–`0x0056A1F7`: t := `.d2s` byte +0xA8 + difficulty
+     (game +0x6D; the three town bytes); act := t & 0x7F, or 0 when
+     that is ≥ 5; set through `0x005382E0`. The act does not depend on
+     bit 0x80 (that bit only gates the map-seed copy, `sim/rng.md` OQ
+     2; load rule owner `formats/d2s-load.md` §7);
+   - from a legacy save (version ≤ 0x5B, parser `0x00534020`): the
+     header reader `0x00532690`, header byte +0x58 (header: 0x82 bytes,
+     u32 0xAA55AA55 at +0x00, u16 0x82 at +0x20), low nibble = act, high
      nibble = difficulty. Act ≥ 5 or difficulty ≥ 3 takes the error
      exit (`0x00532BC2`). If that difficulty equals the game's (game
      +0x6D) the act is used, else act 0. When it matches and game +0x6A
      = 3 and game +0x84 = 0, the header's map ID (+0x7E) is also copied
-     into game +0x7C.
-   Which write is last on a single-player load of a saved character is
-   open question 8.
+     into game +0x7C. A 1.14d save never takes this path.
+   Order on a single-player load (static): the 0x67 game creation
+   writes the global's 0 (`0x00530E1F`, `sim/intents-events.md` §8.1
+   step 5); the C→S 0x6B join then loads the save (`0x00530190` →
+   `0x00539760` → `0x005345A0` → `0x005344B0` (file) or `0x00534520`
+   (client buffer, game type 1 / 2 or host callbacks) → `0x00534330`),
+   whose write is the last before game entry (`0x005394A0`) reads the
+   byte. The hosted join `0x0052FA50` is not on this path. The only
+   other writers of client +0x1AC are the setter `0x005382E0`'s callers
+   above and the act change `0x0053AE43` (`world/waypoints.md` §11).
+   So a character saved in Act III of the loaded difficulty enters in
+   Act III's town (level 75).
 3. **Spawn point.** §11 with tile index 0 and size 2: the town has
    `Position` ≠ 0, so the §10 rule 2 class pick of `drlg/levels.md`
    matches spawn-tile records 0–4 and **draws `roll(n)` on the town's
@@ -884,6 +909,12 @@ start level u16 @6, game +0x80 u32 @8): R1 `03 00 1fe86826 0100 …` =
 - Measured: `ExpField.D2` (d2data.mpq via `mpq-tool extract`): size,
   header, byte histogram (8 only at the centre), reachability of the
   centre; charstats / monstats rows quoted from the live patch_d2 tables.
+- §10 rule 1 callers (2026-10-08): the 20 `call 0x554ea0` sites in
+  `all.asm`, each with its owner spec's unit. §13 rule 2 (2026-10-08):
+  save dispatch `0x00534330` (version > 0x5B → `0x0056B180`), act write
+  `0x0056A1D4`–`0x0056A1F7`, writers of client +0x1AC (`0x0052FB97`,
+  setter `0x005382E0` and its callers `0x00530E1F`, `0x00532A51`,
+  `0x0053AE43`, `0x0056A1F7`), load chain `0x005345A0`.
 
 ## Open questions
 
@@ -926,21 +957,15 @@ start level u16 @6, game +0x80 u32 @8): R1 `03 00 1fe86826 0100 …` =
    recorded 0x5F would still confirm it on live data).
 7. Pets following a teleport (`0x005754B0`): owner is the pet /
    mercenary spec (`world/hirelings.md` §6).
-8. §13 rule 2: on a single-player load of a character saved in Act
-   III, which write of client +0x1AC comes last (the global
-   `0x00883D44` or the save header byte +0x58), and who calls the
-   setter `0x0052DFA0`? Watch writes to client +0x1AC and the global
-   during the load; the S→C 0x03 act byte (§Test vectors) shows the
-   result. Also: how the header's +0x58 byte relates to the `.d2s`
-   difficulty bytes (`formats/d2s.md`, not yet written).
-   *Partly answered* (static): the setter's only reference is a jump at
-   `0x0044D5DD` in the `-act N` switch handler `0x0044D5A0`
-   (`tools/original-hooks.md` §5.1), so without `-act` the global stays
-   0 and its two writes of client +0x1AC store act 0. Still open: the
-   order of the join write (`0x0052FB90`, system-message path
-   `0x0053F270`) against the save-header write (`0x00532690`, reached
-   through `0x00534330` from `0x00534475` / `0x005345EC`) on a live
-   load, and the header byte's relation to the `.d2s` bytes.
+8. *Answered* (static, 2026-10-08): §13 rule 2. On a single-player
+   load the last write of client +0x1AC is the `.d2s` header read
+   `0x0056A090` (`0x0056A1F7`: town byte +0xA8 + difficulty, & 0x7F,
+   ≥ 5 → 0), after the game-creation write of the global (0, without
+   `-act`; setter `0x0052DFA0` reached only from the `-act N` handler
+   `0x0044D5DD`). The 0x82-byte header (`0x00532690`, byte +0x58) is the
+   legacy format (version ≤ 0x5B, `0x00534330`) and the hosted join
+   `0x0052FA50` is not on the single-player path. The S→C 0x03 act byte
+   of a recorded Act III load would still confirm it on live data.
 
 Answered handoff questions (`docs/HANDOFF.md` §7):
 

@@ -73,7 +73,9 @@ first encoded row is the **bottom** row (y = height − 1) and rows go up. If
 `flip != 0`, the first row is the top row (y = 0) and rows go down. Begin
 at x = 0 on the first row. (1.14d's drawer tests bit 0 only,
 `render/sprite-placement.md` §4; the two rules agree on the live values
-0 and 1; other values are counted by the C52 game-file check.)
+0 and 1; no other value occurs: 24,287 frames have `flip` 0 and 140 have 1
+of 24,427, measured 2026-10-08 on the 1,633 distinct DC6 names across
+`Patch_D2`, `d2exp`, `d2data`, scratch program on `d2-formats`.)
 
 Read bytes until `length` bytes are consumed:
 - `0x80`: end of row. x = 0, move to the next row.

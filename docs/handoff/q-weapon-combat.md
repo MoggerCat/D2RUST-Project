@@ -15,3 +15,5 @@ Weapon swap slots, requirement/durability effects, dual wield, saved-character r
 
 ## Local check
 `cargo run -p d2-client --release -- play --new barbarian Test`, equip a bought sword in the right hand (`I`): the character panel damage shows its range; kill a monster and compare hit sizes to bare hands. Headless: `cargo nextest run -p d2-sim equip` and `-p d2-client weapons`.
+
+Local check done 2026-10-08 (PC 1 round 2, branch claude/local-pc1-s8): headless part passes: d2-sim `wiring::inventory::tests::equip` and d2-client lib `weapons`; the play check needs a player.

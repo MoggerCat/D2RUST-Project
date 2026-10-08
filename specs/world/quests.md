@@ -44,14 +44,14 @@
 |   6. Status reporting | 501–610 |
 |   7. NPC dialog hooks | 611–643 |
 |   8. Act transitions, warps and portals | 644–731 |
-|   9. Quest items, rewards and helpers | 732–897 |
-|   11. Acts II–V | 898–914 |
-| Constants & data dependencies | 915–929 |
-| Randomness | 930–957 |
-| Edge cases & original bugs | 958–976 |
-| Test vectors | 977–1008 |
-| Provenance | 1009–1037 |
-| Open questions | 1038–1108 |
+|   9. Quest items, rewards and helpers | 732–914 |
+|   11. Acts II–V | 915–931 |
+| Constants & data dependencies | 932–946 |
+| Randomness | 947–974 |
+| Edge cases & original bugs | 975–993 |
+| Test vectors | 994–1025 |
+| Provenance | 1026–1054 |
+| Open questions | 1055–1125 |
 <!-- /index -->
 
 ## Summary
@@ -747,8 +747,25 @@ else free it and return none.
 #### 9.2 Deleting a quest item
 
 `0x00544160(game, player, code)` finds the player's item with the code
-(`0x00558110`, search order `quests-helpers.md` §8) and removes it (`0x005440A0`: by item mode: stored →
-update client and remove; equipped → unequip path; on cursor → remove).
+(`0x00558110`, search order `quests-helpers.md` §8) and removes it
+(`0x005440A0`, EBX game, EDI player, ESI item, stack: the inventory).
+It takes the client (`0x005531C0`, asserted, line 0x534) and builds an
+item-message flag word with bit 0x20 (`0x006287B0`), then by item mode
+(+0x10; read 2026-10-08 for REC-235; the same three branches as
+`formats/d2s-load.md` §6 rule 1):
+
+1. 0 stored: stored page := page (`0x00628250` → `0x00628320`); item
+   message with flag 0x20 (`0x0053D010`); `0x0055DF10(game, player,
+   item, 0)`: unlink, page 0xFF, unit freed.
+2. 1 equipped: `0x00560CD0(game, player, L, 1, &out)`, L := the
+   item's body location (`0x0063C150`): taken off the body (`0x0063D2B0`, §11.5 of
+   `quests-act3-2.md`), flag 0x20, mode 4, detached and not freed; the
+   next unit update sends its removal (details `formats/d2s-load.md`
+   §6 rule 1.2).
+3. 4 cursor: `0x0055EEA0(game, player, item)` (message, cursor
+   cleared, unit freed), then the cursor set to none again
+   (`0x0063C180(inventory, 0)`).
+4. Any other mode (2 belt, 3 ground, …): nothing; the item stays.
 
 #### 9.3 Player GUID lists
 

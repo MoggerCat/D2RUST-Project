@@ -21,18 +21,18 @@
 | Rules | 63–64 |
 |   1. The cel draw path | 65–77 |
 |   2. Placement (orientation bit 0 clear: the normal case) | 78–92 |
-|   3. Where the cel fields come from | 93–118 |
-|   4. Orientation bit set (top-down cels) | 119–129 |
-|   5. Clipping | 130–146 |
-|   6. Transparency | 147–158 |
-|   7. DT1 tiles | 159–174 |
-|   8. d2rs mapping (answers the `place` hooks) | 175–193 |
-| Constants & data dependencies | 194–198 |
-| Randomness | 199–202 |
-| Edge cases & original bugs | 203–226 |
-| Test vectors | 227–241 |
-| Provenance | 242–262 |
-| Open questions | 263–323 |
+|   3. Where the cel fields come from | 93–136 |
+|   4. Orientation bit set (top-down cels) | 137–147 |
+|   5. Clipping | 148–164 |
+|   6. Transparency | 165–176 |
+|   7. DT1 tiles | 177–192 |
+|   8. d2rs mapping (answers the `place` hooks) | 193–211 |
+| Constants & data dependencies | 212–216 |
+| Randomness | 217–220 |
+| Edge cases & original bugs | 221–244 |
+| Test vectors | 245–259 |
+| Provenance | 260–280 |
+| Open questions | 281–350 |
 <!-- /index -->
 
 ## Summary
@@ -108,6 +108,24 @@ only rewrites `+0x18` (`next_block`, not read by the drawer) and ends the
 process with a fatal error (tag `0x58C`, `0x005FEDF4`) on any record
 outside those limits. So a cached
 cel draws exactly like the decoder's cel.
+
+Every unit component takes that cache branch: the composite slot loop
+builds its cel context with a null cel file pointer (`0x0047120A` pushes
+the 0 that `0x004DBB50` stores at `+0x34`). The decoder neither clips
+nor splits a frame: the cel's w, h, xoff, yoff are the frame header
+values unchanged (cel write after the cell loop of `0x0060BFF0`) and
+`0x0060BDB0` encodes all `w × h` pixels. So a DCC frame wider or taller
+than 256 is never drawn through the cache: the getter returns no cel,
+and the one-time pass ends the process (fatal `0x58C`, jump at
+`0x005FEDF9`) for the whole sprite-cache block, i.e. every frame of the
+directions loaded with it (`0x005FF760`). The live frames over 256 are
+listed in `dcc.md` §Frame size limit; only `GTTRLITA1HTH.dcc` and
+`GTTRLITNUHTH.dcc` (monster `gargoyletrap`) are reachable.
+PROVISIONAL: d2rs draws nothing for a DCC frame with w > 256 or h > 256
+and does not abort (because the per-draw getter `0x005FEB80` gives "no
+cel" and 1.14d is not known to abort in the Jail and Catacombs where the
+trap is placed); settled by the capture "gargoyle trap on screen"
+(`dcc.md` §Frame size limit).
 
 For DCC frames with bottom-up = 0 (all of 1.14d, `dcc.md` OQ1) the cel
 covers exactly the `dcc.md` §Boxes frame box: columns `x_min … x_max`,
@@ -295,6 +313,15 @@ the two candidates; 1.14d code picks the second. No capture yet.
    it (the getter would return no cel, the one-time pass a fatal error).
    A Ghidra read of `0x005FE990` / `0x0060ACE0` (cache lookup) plus a
    capture of one of these monsters (`GT`, `THS1`) settles it.
+   *Answered* (static, 2026-10-08): the cache branch is taken for every
+   unit component (slot loop context `+0x34` = 0, `0x0047120A`); the
+   lookup `0x0060ACE0` matches only the context tokens, with no size
+   test. The decoder `0x0060BFF0` copies w/h unchanged and does not
+   clip or split; the survey is right (repo DCC parser, and no override
+   in `d2exp.mpq` or by name in `Patch_D2.mpq`). Of the 37 frames,
+   `THS1LITDTHTH` and `RedemptionGhost Big` are never loaded (§3,
+   `dcc.md` §Frame size limit); the gargoyle-trap frames are reachable
+   and handled by the §3 PROVISIONAL line until the capture runs.
 
 Answers 1–4 (game-file read, 2026-10-07: every `.dt1`, `.dc6` and `.dcc`
 that `d2data.mpq`, `d2exp.mpq` and `d2char.mpq` list, extracted with

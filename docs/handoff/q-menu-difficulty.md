@@ -23,3 +23,5 @@ The `difficulties_open` encoding (1/2/3) is ours; the title text colour 7 is not
 cargo nextest run -p d2-client --test front_end_difficulty
 ```
 All tests pass; no visible change in `play` until the host runs the front end.
+
+Local check done 2026-10-08 (PC 1 round 2, branch claude/local-pc1-s8): headless part passes (`front_end_difficulty` 2).

@@ -40,7 +40,7 @@
 | Edge cases & original bugs | 370–377 |
 | Test vectors | 378–473 |
 | Provenance | 474–485 |
-| Open questions | 486–509 |
+| Open questions | 486–516 |
 <!-- /index -->
 
 ## Summary
@@ -486,13 +486,20 @@ random input; the parser never panics.
 ## Open questions
 
 1. `append` is a default; new rows in engine enumerations (`charstats`,
-   `plrmode`, …) are unexamined.
-2. Mod compiles lack the `monstats`, `monstats2`, `monpreset`, `cubemain`
-   callback bytes (`field-types.md` §8.3) and the #707 `NameStr` policy.
+   `plrmode`, …) are unexamined. d2rs design: 1.14d's loaders check no
+   count for these tables (`loading.md` §8), and what each consumer does
+   with an extra row is that consumer's spec, not one binary fact.
+2. Callback bytes: answered (`callbacks.md`, run by `compile_all`, so
+   mod compiles carry them). The #707 `NameStr` policy is d2rs design
+   (`field-types.md` open question 7).
 3. `treasureclassex` rows after the empty #852 are no TCs, and a name
    equal to an automatic TC (`bow3`) is shadowed (`loading.md` §10.6).
-4. Layers hold single base values: confirm this fits rule 9.
-5. Details the rules leave open, implemented as follows (2026-10-05,
+   d2rs design: the 1.14d rule is fixed (`loading.md` §10.6); whether a
+   layer may add such rows or names is layer policy.
+4. Layers hold single base values: confirm this fits rule 9 (d2rs
+   design).
+5. d2rs design (our format, no 1.14d answer). Details the rules leave
+   open, implemented as follows (2026-10-05,
    `claude/patch-layers`); confirm or restate: (a) the 1,024-byte token
    limit counts a bracket token's content, not its brackets; (b) line 1
    `d2patch <v>` / `d2stack <v>` with `v` ≠ `1` is P03 / S02, any other

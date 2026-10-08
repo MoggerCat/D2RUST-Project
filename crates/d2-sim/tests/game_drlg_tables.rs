@@ -265,7 +265,8 @@ fn lvlmaze_rows_as_stated() {
 }
 
 // Spec: specs/drlg/maze.md §1 (lvlmaze row), §3.3 (pick-shape def), §3.6 + specs/drlg/maze-specials.tsv (special defs), §4–§7 (fixed defs), Constants (lvlprest `Files` +64)
-// Intended claim: specs/drlg/maze.md §1 r1, §3.3 (every def the maze code can name exists in the live lvlprest; the 15 with Files 0 are the live run's list)
+// Covers: specs/drlg/maze.md §1 r1
+// (every def the maze code can name exists in the live lvlprest; the 15 with Files 0 are the live run's list)
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn maze_defs_exist_in_live_lvlprest() {

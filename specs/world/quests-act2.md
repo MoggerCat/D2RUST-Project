@@ -36,15 +36,15 @@
 |   5. A2Q3 Tainted Sun (chain 10, slot 11) | 406–534 |
 |   6. A2Q4 Arcane Sanctuary (chain 11, slot 12) | 535–657 |
 |   7. A2Q5 The Summoner (chain 12, slot 13) | 658–693 |
-|   8. A2Q6 The Seven Tombs (chain 13, slot 14) | 694–868 |
-|   9. Act II gossip and intro records | 869–877 |
-|   10. Hooks called from other systems | 878–894 |
-| Constants & data dependencies | 895–908 |
-| Randomness | 909–923 |
-| Edge cases & original bugs | 924–957 |
-| Test vectors | 958–978 |
-| Provenance | 979–1001 |
-| Open questions | 1002–1089 |
+|   8. A2Q6 The Seven Tombs (chain 13, slot 14) | 694–967 |
+|   9. Act II gossip and intro records | 968–976 |
+|   10. Hooks called from other systems | 977–993 |
+| Constants & data dependencies | 994–1007 |
+| Randomness | 1008–1022 |
+| Edge cases & original bugs | 1023–1056 |
+| Test vectors | 1057–1079 |
+| Provenance | 1080–1111 |
+| Open questions | 1112–1199 |
 <!-- /index -->
 
 ## Summary
@@ -698,8 +698,9 @@ timer phase.
 At DRLG creation for Act II (`0x00642DA0`, DRLG spec): repeat {staff :=
 (DRLG-seed step) lo' mod 7; boss := (next step) lo' mod 7} until staff ≠
 boss; drlg +0x94 := 66 + staff (tomb holding the orifice), +0x484 := 66
-+ boss (tomb holding Duriel's lair entrance; D2MOO names it the boss
-tomb). `0x0061AEB0(act)` reads +0x94 (`0x00642230`; 0 without a DRLG).
++ boss (the boss tomb, D2MOO's name: its maze stamps the `tomb_kaa`
+room with Ancient Kaa, `drlg/maze.md` §6.3; the Lair entrance is not
+there but next to the orifice in the staff tomb, §8.8, §8.12). `0x0061AEB0(act)` reads +0x94 (`0x00642230`; 0 without a DRLG).
 This spec only reads it: lazily into extra +0x34 (§8.4), in 0x50 (§8.10)
 and in the arcane-object list (§8.9).
 
@@ -825,7 +826,10 @@ Its trigger code `trs ` is not an item code in the 1.14d tables
 - Event 11 (`0x0059CB20`):
   - tyrael1 251 msg **302**, not-intro, +0x0F = 0: +0x3C := 1; a portal
     object (class 59) to level 40 at the player's position in the
-    player's room (`0x0056D130`); created → state := 4; for each player
+    player's room (`0x0056D130`, owner the player, exact 0: the pair of
+    `world/objects-2.md` §25, the Lut Gholein half placed by the portal
+    check below because +0x3C is 1 during the call; owner GUID stays
+    −1); created → state := 4; for each player
     from Tyrael: in level 73 without 14.13, 14.3, 14.4 → set 14.13,
     14.3 and character progression for Act II (`0x00538680(client, 2,
     difficulty)`; save spec) (`0x0059C860`); players with 14.13 → their
@@ -864,7 +868,102 @@ Its trigger code `trs ` is not an item code in the 1.14d tables
 - Portal check `quests.md` §8.3 (`0x0059DFD0`): while +0x3C = 1 the
   destination is the Act II spawn location of type 12 in level 40
   (`0x0061B060(act, 40, 12, …, 3)`, `0x0052D0F0`), then a free spot
-  (`0x0064E7E0`, size 3, mask 0xBE11, radius 7).
+  (`0x0064E7E0`, size 3, mask 0xBE11, step 7) whose point is dropped:
+  the partner portal goes to the free point (step 5) nearest the raw
+  tile-12 point (`world/objects-2.md` §25 rules 11–13).
+- Placement in Duriel's Lair (level 73, lvlprest 481 `Act2/Tomb/
+  Duriel.ds1`, one file): no quest rule; the DS1 presets
+  (`drlg/preset.md` §5.3, §7–§9) give tyrael1 (monpreset act II row 57)
+  at DS1 sub-tile (78, 88), duriel (row 19) at (135, 218) and Tyrael's
+  door 153 (object preset act II id 15) at (110, 207), all unfiltered
+  (§7 draws for none of them). Door 153 has `OperateFn` 0 and no
+  `Selectable` mode: only Duriel's death opens it (above; init 38,
+  §8.8). Measured 2026-10-08 on the DS1 of `d2exp.mpq` (46 records;
+  the `d2data.mpq` copy, 40 records, has the same three); whether
+  `Patch_D2.mpq` (no listfile) overrides the file was not checked.
+  **Checked** 2026-10-08 (hash lookup): it does not; layout, arrival
+  point and exits: §8.12.
+
+#### 8.12 Tal Rasha's Chamber, Duriel's Lair and the way out (REC-234, read 2026-10-08)
+
+Layout facts measured on the 1.14d data (DS1 files of `d2data.mpq` /
+`d2exp.mpq`; `Patch_D2.mpq` holds none of the DS1s named here, checked by
+hash lookup); rules read from the binary.
+
+1. **Tal Rasha's Chamber** is a room of the staff tomb (§8.1, drlg
+   +0x94), not a level: the tomb maze stamps the `tomb_talrasha` room
+   only there (`drlg/maze.md` §6.3, `0x00672BE0`; lvlprest 460–463
+   `Act2/Tomb/Tomb{W,E,S,N}Talrasha.ds1`, 17×17 tiles, only in
+   `d2data.mpq`). Its orifice is object preset act II id 126 → object
+   152 (`drlg/preset-tables.tsv`), at DS1 sub-tile W (53, 18), E
+   (43, 43), S (38, 43), N (18, 58). The boss tomb (+0x484) gets the
+   `tomb_kaa` room instead (lvlprest 468–471, Ancient Kaa the Soulless,
+   monpreset act II row 53).
+2. **The way in.** Once the orifice is done, the object timer (§8.8 (b))
+   creates object 100 ("Duriel's Lair", `OperateFn` 43, `InitFn` 0) at
+   (orifice x − 13, orifice y + 3) in the orifice's room. Level 73 has
+   no level link and no warp: `levels.txt` `Vis0`–`Vis7` are 0 and
+   `Warp0`–`Warp7` −1, and `Duriel.ds1` has no warp-marker cell (style
+   ≤ 7 on an orientation 10 / 11 cell). Object 100 is the only way in
+   besides a portal pair whose partner stands there (§25 of
+   `world/objects-2.md`), and the level-73 warp check (§8.8,
+   `quests.md` §8.2) gates it.
+3. **Arrival in the Lair** (operate 43 `0x00584D00`, `quests.md` rule
+   8): spawn request with tile index 0 (push at `0x00584DB1`) in level
+   73 (`Position` ≠ 0, `drlg/levels.md` §10 rule 2). `Duriel.ds1` (lvlprest
+   481, `Scan` 1) has exactly one tile-info cell: DS1 tile (27, 38),
+   orientation 10, style 30, sub 11 → one spawn-tile record of index 11
+   (`drlg/preset.md` §6 step 7). Request 0 matches records 0–4 only, so
+   n = 0: no draw, record 0 is taken anyway. Point := (27·5 + 3, 38·5
+   + 3) = (138, 193) DS1 sub-tiles (relative to the level origin), then
+   the free point of `sim/path-placement.md` §11 rule 3 (mask 0x1C09,
+   the player's size) and operate 43's own free point from there (same
+   mask). Duriel's preset is (135, 218): 3 sub-tiles off in x, 25 in y.
+4. **Population.** lvlprest 481 has `Populate` 0, so every Lair room
+   carries flag 0x800000 (`drlg/preset.md` §5), so its populated level
+   is 0 (`drlg/levels.md` §11.5 rule 1) and room monster population
+   stops (`monsters/population.md` §3.1 rule 3); object population
+   (`0x00552610`, which reads the same level id at `0x005526BD`) is the
+   objects spec's. The DS1's presets appear (`monsters/population.md` §11.1; none is filtered,
+   `drlg/preset.md` §7):
+
+   | DS1 unit | Count | Class | DS1 sub-tile |
+   |---|---|---|---|
+   | monster, monpreset act II row 19 `duriel` (kind 1) | 1 | monstats 211 | (135, 218) |
+   | monster, row 57 `tyrael1` | 1 | monstats 251 | (78, 88) |
+   | object preset 15 | 1 | 153 Tyrael's door (init 38) | (110, 207) |
+   | object preset 6 | 30 (`d2exp.mpq`), 24 (`d2data.mpq`) | 101 brazier | |
+   | object preset 9 | 6 | 103 flies | |
+   | object preset 124 / 125 | 2 / 5 | 352 / 353 hell light source | |
+
+   The two copies differ only in six braziers; the three quest units,
+   the tile-info cell and the size (32×47 tiles) are the same.
+5. **Duriel's AI.** Duriel is a regular preset monster (§11.3 of
+   `monsters/population.md`): no quest code starts or holds his AI.
+   The monster type init installs AI state 0 at creation for every
+   monster (`monsters/init.md` §5 step 5, `0x005B0E00`), and the first
+   think follows `monsters/ai.md` §1.5 (frame + 2 after the creation
+   pair, and again + 2 when the first client enters the room); the body
+   is `monsters/ai-bodies-2.md` §14. The same holds for Tyrael (251)
+   and every other preset monster.
+6. **The way out.** No warp. Tyrael's portal (§8.11, event 11) is an
+   ordinary pair (`world/objects-2.md` §25): object 1 at the free spot
+   nearest the player in the Lair, object 2 in Lut Gholein. The
+   arrival hook (`0x0059DFD0`, +0x3C = 1) asks level 40 for tile index
+   12; neither Lut Gholein file (`Act2/Town/LutW.ds1`, `LutN.ds1`, Def
+   301, `Scan` 1) has a tile-12 record (records in scan order: (33, 9)
+   index 10, (35, 10) 11, (41, 11) 5, `LutN` only (32, 13) 11, (30, 40)
+   0), so n = 0, no draw, record 0: DS1 tile (33, 9), point (168, 48)
+   DS1 sub-tiles, then §11's free point, the dropped step-7 search and
+   the partner's step-5 free point (`world/objects-2.md` §25 rules
+   11–13). Walking into object 1 places the player at the free spot
+   nearest object 2 (`world/objects.md` §12). The pair has a partner
+   from creation: in 1.14d no portal in the Lair is ever partner-less.
+   A town portal cast in the Lair works as anywhere (`world/objects-2.md`
+   §27).
+7. d2rs-own (not in 1.14d): any Lair geometry other than `Duriel.ds1`,
+   warps between the tombs and the Lair, and a free-spot rule for a
+   partner-less portal.
 
 ### 9. Act II gossip and intro records
 
@@ -969,7 +1068,9 @@ their own item seeds. No other Act II quest code draws.
 | quest seed {12345, 666}, chest opened | lo' 22752887 → 7 gold piles | §1.3; seed values as `npc.md` test vectors |
 | quest seed {12345, 666}, darken timer | lo' & 1 = 1 → period 16 (first fires 17 updater ticks later) | §5.3, `quests.md` §5 |
 | quest seed {12345, 666}, Kaelan with palace open | lo' mod 3 = 2 → table state 10 (msg 189) | §6.4 |
-| DRLG seed {12345, 666} | lo' mod 7: 3, 3 (retry), 3, 6 → staff tomb 69, Duriel tomb 72; 0x50 tomb field 3 | §8.1 |
+| DRLG seed {12345, 666} | lo' mod 7: 3, 3 (retry), 3, 6 → staff tomb 69, boss (Kaa) tomb 72; 0x50 tomb field 3 | §8.1 |
+| operate 43 on object 100 (Lair entrance), any player | spawn request tile index 0 in level 73; the Lair's only spawn-tile record is index 11 at DS1 tile (27, 38) → no match, no draw, record 0 → point (138, 193) DS1 sub-tiles, then free point mask 0x1C09 twice; player placed there | §8.12 rule 3 |
+| Tyrael's portal created (+0x3C = 1), Lut Gholein `LutW.ds1` or `LutN.ds1` | tile-12 request: no tile-12 record, no draw, record 0 = DS1 tile (33, 9) (a tile-10 record) → point (168, 48) DS1 sub-tiles before the free searches | §8.12 rule 5 |
 | staff tomb 69, five arcane calls | 313, 312, 308, 311, 309 (index 3 = 310 skipped); 7th call wraps to 313 | §8.9 |
 | live `missiles.txt` row 338 range 440 | orifice timer period 18 | §8.7, game-file test (`#[ignore]`) |
 | altar opened with Act II loaded | Act II clients get `53 02000000 00000000 00`; every player `89 06` after a 0x28 | §5.7 |
@@ -997,6 +1098,15 @@ their own item seeds. No other Act II quest code draws.
   are empty; Duriel's `0x00545990` call is a stub; the Tainted Sun timer
   uses `0x004BC500`; the 1.14d altar init sets state 3; Jerhyn's 430
   calls chain 10's own sequence function.
+- §8.12 (2026-10-08): DS1 cells and units of `Act2/Tomb/Duriel.ds1`
+  (`d2exp.mpq`, `d2data.mpq`), `Act2/Tomb/Tomb{W,E,S,N}Talrasha.ds1`,
+  `Tomb{W,E,S,N}Kaa.ds1` (`d2data.mpq`) and `Act2/Town/LutW.ds1`,
+  `LutN.ds1` (`d2exp.mpq`, `d2data.mpq`), read with `mpq-tool extract`
+  and a scratch DS1 scan of `drlg/preset.md` §5–§6 (v18 layout); absence
+  in `Patch_D2.mpq` by MPQ hash lookup; live `levels.txt` row 73 (`Vis`,
+  `Warp`), `lvlprest.txt` rows 301, 460–471, 481; `objects.txt` rows
+  100, 101, 103, 152, 153, 352, 353; the operate-43 spawn request at
+  `0x00584DB1`.
 - No packet or RNG recording of Act II exists yet.
 
 ## Open questions

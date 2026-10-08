@@ -21,14 +21,14 @@
 | Inputs | 51–60 |
 | Outputs / state changes | 61–65 |
 | Rules | 66–67 |
-|   A. d2rs design (ours) | 68–251 |
-|   B. Original behavior to reproduce (not specified here) | 252–270 |
-| Constants & data dependencies | 271–277 |
-| Randomness | 278–283 |
-| Edge cases & original bugs | 284–289 |
-| Test vectors | 290–305 |
-| Provenance | 306–313 |
-| Open questions | 314–326 |
+|   A. d2rs design (ours) | 68–254 |
+|   B. Original behavior to reproduce (not specified here) | 255–273 |
+| Constants & data dependencies | 274–280 |
+| Randomness | 281–286 |
+| Edge cases & original bugs | 287–292 |
+| Test vectors | 293–308 |
+| Provenance | 309–316 |
+| Open questions | 317–329 |
 <!-- /index -->
 
 ## Summary
@@ -98,6 +98,9 @@ by a deterministic shelf packer (insertion order, no randomness, no hash
 iteration), 1-pixel gutter of index 0. An atlas slot is
 `(page, x, y, w, h)`. The CPU reference reads the same `IndexFrame`
 bytes, never the atlas, so packing errors show up as verify mismatches.
+Every 1.14d frame fits a page: largest DCC frame 345 × 324, DC6 319 × 256,
+DT1 tile image 160 × 864 (measured 2026-10-08, `assets.md` §A5), so no
+"frame larger than a page" case exists.
 
 #### A3. Draw item
 

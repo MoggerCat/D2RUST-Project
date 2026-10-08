@@ -29,13 +29,13 @@
 |   4. Mana cost | 307–346 |
 |   5. To-hit | 347–354 |
 |   6. Learning a skill | 355–412 |
-|   7. Skill stat callbacks | 413–572 |
-| Constants & data dependencies | 573–595 |
-| Randomness | 596–607 |
-| Edge cases & original bugs | 608–630 |
-| Test vectors | 631–682 |
-| Provenance | 683–719 |
-| Open questions | 720–751 |
+|   7. Skill stat callbacks | 413–606 |
+| Constants & data dependencies | 607–629 |
+| Randomness | 630–641 |
+| Edge cases & original bugs | 642–664 |
+| Test vectors | 665–726 |
+| Provenance | 727–767 |
+| Open questions | 768–799 |
 <!-- /index -->
 
 ## Summary
@@ -456,6 +456,40 @@ s = the layer.
    skills.md` §2 rule 2.2: the native entry is removed). No message is
    sent for the removal.
 
+Details (REC-266, read 2026-10-08):
+
+- **When it runs.** At every change of the owner's total of 97 or 107 at
+  one layer: the store comes first, then the notify (`sim/stat-lists.md`
+  §6.3, §7.1), so the handler sees the new total. An item's list
+  reaches the owner by attach / detach (`sim/stat-lists.md` §8.1 step 8,
+  §8.2 step 5, one notify per entry in array order): equip, unequip,
+  the inventory pass switch-on / switch-off (`items/inventory.md` §5.7),
+  and placing the worn items of a loaded character (the join's 0x21,
+  `sim/intents-events.md` §8.2 rule 3.1, recorded `-022633` seq
+  102–112). Items that are not usable are not linked, so they grant no
+  entry.
+- **Per stat, not per skill.** 97 and 107 at the same layer are two
+  separate notifications. When one new total is ≤ 0 the base-0 entry is
+  removed, even when the other stat still gives the skill a level (step
+  4). The entry comes back only at the next change of either total
+  to > 0.
+- **Step 2's 0x21** (`0x0053C4A0`): remove u8@2 = 0, base u8@9 = 0,
+  bonus u8@10 = `0x00644300(unit, s)` = `bonus_level` (§1) of the native
+  entry, read after the store, so it counts the new total (1 for one
+  "+1 to Teleport" item; §1 rule 3.3 caps own-class 97 at 3). It is
+  sent only when no native entry existed, before step 3.
+- **Step 3 runs on every call**: when an entry is added, when it is
+  kept and when it is removed.
+- **Step 5 selection** is `0x005701B0` (`formats/d2s.md` §2.4 rule 6.3).
+  It finds the Attack entry (owner −1). For a player it sends one S→C
+  0x23 (hand, skill 0, owner −1); it sends whenever the entry is found,
+  with no comparison to the old selection. The right hand also turns
+  state 85 off first and, when the old right skill is an aura, turns its
+  `aurastate` off (list freed) and cancels its timers (`0x00540E60`);
+  `0x0056FF10` runs only for an aura as the new skill, so not for
+  Attack. So taking off an oskill item whose skill sits on a mouse
+  button sends 0x23 for that hand, and no 0x21.
+
 #### 7.2 Class and tab bonuses (stats 83, 188)
 
 c = the layer (stat 83) or layer >> 3 (stat 188). Refresh all when the
@@ -676,6 +710,16 @@ Prayer (99) → timer only, no do. 204 on GUID 7 with layer (54 << shift)
 (Teleport, owner 7) base 3, charges 10, has-charges 1; value 0x0F00 →
 entry removed, left / right on it → Attack. A monster owner → no entry.
 
+Synthetic oskills (§7.1; Sorceress, GUID 1, Teleport 54 not learned):
+equip a usable item with 107@54 = 1 → native entry (54, base 0), S→C
+0x21 `21 00 00 01000000 3600 00 01 ??` (@10 = bonus 1, @11 unwritten).
+Then a second item with 97@54 = 1 → no message (entry exists). Take
+the 97 item off with Teleport on the right → 97 total 0, base 0 → right
+:= Attack with S→C 0x23 `23 00 01000000 00 0000 FFFFFFFF`, entry
+removed, no 0x21, although 107 still gives level 1. Take the 107 item
+off next → 107 total 0, no entry: step 2 adds one and sends 0x21 (@10 =
+0), then step 6 removes it.
+
 Mechanical check (M05, to add with the code): `skillcalc.tsv` and
 `misscalc.tsv` index/code columns equal the 1.14d `skillcalc.bin` /
 `misscalc.bin` code order (`data/calc-expressions.md` §5).
@@ -709,6 +753,10 @@ Mechanical check (M05, to add with the code): `skillcalc.tsv` and
   the bit table at `0x006CE268` (bit n at +4n) and `data/fields.tsv`
   (`aura` bit 5, `immediate` bit 15); counts from 1.14d `patch_d2`
   `skills.txt`.
+- §7.1 details read 2026-10-08 (REC-266): `0x0053C4A0` (byte @10 from
+  `0x00644300` → `0x00644180`), `0x005701B0` (0x23 via `0x0053C590` after
+  every found entry; right-hand state 85 and aura teardown), store
+  before notify in `0x00625150` / `0x006250B0` (`sim/stat-lists.md` §6.3).
 - §7 read from `0x0055B800` (jump table decoded from the image),
   `0x0056DFA0`, `0x0056C740`, `0x0056BD90`, `0x00617BB2`–`0x00617C17`;
   §1 cap from `0x00613D30` (strings `experience`, `ExpRatio` in the

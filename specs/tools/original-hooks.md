@@ -4,7 +4,8 @@
   (`tools/ghidra/disasm.py`) or the file image; thread, client id,
   player GUID and message bytes from the existing recordings; the
   injection, seed and start-up procedures are not yet run (Open
-  questions 1–3).
+  questions 1–3); the §7 hook points for the PC 2 recordings are read
+  from the disassembly and not yet run.
 - **Target version:** 1.14d
 - **Crate/module:** `tools/trace-recorder/run_scenario.py` (debugger
   recorder, Python; spec-role tool)
@@ -18,22 +19,23 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 39–51 |
-| Inputs | 52–58 |
-| Outputs / state changes | 59–63 |
-| Rules | 64–65 |
-|   1. Client→server message entry (single player) | 66–130 |
-|   2. Game seed at game creation | 131–174 |
-|   3. Tick boundary | 175–216 |
-|   4. Unit snapshot fields | 217–277 |
-|   6. Server-to-client stream | 278–363 |
-|   5. Starting single player without a human | 364–469 |
-| Constants & data dependencies | 470–482 |
-| Randomness | 483–487 |
-| Edge cases & original bugs | 488–494 |
-| Test vectors | 495–501 |
-| Provenance | 502–526 |
-| Open questions | 527–588 |
+| Summary | 41–53 |
+| Inputs | 54–60 |
+| Outputs / state changes | 61–65 |
+| Rules | 66–67 |
+|   1. Client→server message entry (single player) | 68–132 |
+|   2. Game seed at game creation | 133–176 |
+|   3. Tick boundary | 177–218 |
+|   4. Unit snapshot fields | 219–279 |
+|   6. Server-to-client stream | 280–371 |
+|   5. Starting single player without a human | 372–545 |
+|   7. Hook points for the PC 2 recordings | 546–636 |
+| Constants & data dependencies | 637–649 |
+| Randomness | 650–654 |
+| Edge cases & original bugs | 655–661 |
+| Test vectors | 662–668 |
+| Provenance | 669–702 |
+| Open questions | 703–771 |
 <!-- /index -->
 
 ## Summary
@@ -358,8 +360,14 @@ transport row).
    0x5A, 0x5E, 0x73, 0x89, 0x91) fill their whole buffer.
 3. The forwarders `0x0053DDF0`, `0x0053DE50`, `0x0053DE90`,
    `0x0053DF00`, `0x0053DF50` (party and relation messages, which need a
-   second player) and the unit-add forwarder `0x0053E8D0` were not
-   traced to their callers (Open question 12).
+   second player) were not traced to their callers: no single-player
+   scenario sends them. The forwarder `0x0053E8D0` (ECX client, EDX
+   buffer, [ESP+4] size, `ret 4`; a bare call of `0x0053B280`) has two
+   callers, both fully written: 0xAA from `0x00570E30` (`0x005711AC`:
+   bytes 0 id, 1 unit type, 2–5 GUID, 6 size, then a bit stream from
+   byte 7 through `0x00410EB0`) and 0xA8 from `0x005711D0`
+   (`0x005714DF`: 0 id, 1 type, 2–5 GUID, 6 size, 7 state, bit stream
+   from byte 8); size = bytes entered + 7 or + 8.
 
 ### 5. Starting single player without a human
 
@@ -424,6 +432,22 @@ system message 0x67 → `0x00530BF0` (`intents-events.md` §2.5; layout in
 Recorded: `…-015956-packets.jsonl` sends +0x11 = 3, +0x12 = 4, +0x14 =
 0, name `charactertest`; `…-022633` sends class 1, name `werwer`.
 
+1. **Game flags u32 +0x27.** The menu writes config +0x209 when it
+   starts a game with the chosen character (`0x00434A00` at
+   `0x00434AE3`/`0x00434D19`, `0x004365B0` at `0x004366EC`): 4; 0x804
+   when the character's status byte (config +0x1EF) has bit 0x04
+   (hardcore); then OR 0x100000 when it has bit 0x20 (expansion). Only
+   when config +0x209 is still 0 does the builder use 4 | 0x100000
+   (`0x00477D0C`–`0x00477D24`). The forced start of §5.4 and
+   `autostart.py --auto` skip the menu, so their 0x67 always carries
+   0x100004: an expansion softcore game whatever the save (R-HCFLAG-1
+   must start from the menu; §5.3 rule 4 for what the join then
+   checks).
+2. **Server use of +0x27** (`0x00530BF0`): game +0x70 := 1 when bit
+   0x100000 is set, else 0 (`0x00530D05`–`0x00530D3F`; expansion game);
+   game +0x74 := bit 21 (0x200000); game +0x78 (u16) := 101 with
+   expansion, else 2.
+
 #### 5.3 Save load (single player)
 
 1. Player creation calls `0x005345A0` (caller `0x00539804`): with game
@@ -433,13 +457,61 @@ Recorded: `…-015956-packets.jsonl` sends +0x11 = 3, +0x12 = 4, +0x14 =
 2. `0x005343A0`: path = `sprintf("%s%s.d2s", save dir, name)` (format
    `0x006D4230`); save dir from `0x00407050` (registry values
    `NewSavePath`, then `Save Path`, of the `Diablo II` key, read through
-   `0x00414E50`; the fallback is not traced, Open question 4); `fopen`
+   `0x00414E50`; fallback rule 2a); `fopen`
    mode `rb` at `0x00534410`; reads ≤ 0x2000 bytes; then `0x00534330`:
    needs ≥ 8 bytes and magic 0xAA55AA55 at +0; version (+4) ≤ 0x5B →
    `0x00534020`, else `0x0056B180`.
+   2a. **Save dir** `0x00407050` (ECX = output buffer, EDX = its size;
+   output starts empty). (a) Read `NewSavePath`; if that read fails with
+   `GetLastError` = 2 (value absent), read the old `Save Path`, and when
+   it names an existing directory (`GetFileAttributesA` bit 0x10) either
+   keep it (`0x00406DE0` returns 1) or build the default (b) and store
+   it in `NewSavePath` (`0x00415070`). (b) If the result is empty or not
+   an existing path, the default `0x00406D30`: the Saved Games known
+   folder (`SHGetKnownFolderPath` looked up in `Shell32.dll`, folder id
+   {4C5C32FF-BB9D-43B0-B5B4-2D72E54EAAA4} at `0x006CCA6C`) + `\Diablo
+   II`; without that function, `SHGetFolderPathA` CSIDL 5 (My
+   Documents) + `\Diablo II\Save`; a `\` is appended and the path is
+   stored in `NewSavePath`. On Windows 10 with neither value:
+   `%USERPROFILE%\Saved Games\Diablo II\`.
 3. The v0x60 loader sets the client's act from save byte +0xA8 +
    difficulty (low 7 bits, ≥ 5 → 0; `0x0056A1D8`–`0x0056A1F7`) and the
    map seed of §2.
+4. **Join checks.** The v0x60 header loader `0x0056A090` (fastcall ECX
+   game, EDX client record, [ESP+4] pointer to the save pointer, [ESP+8]
+   end of the save data, [ESP+0xC] out unit; `ret 0xC`; caller
+   `0x0056B1BB`) returns 0
+   or an error code, and on an error no player is made. In order: size
+   < 0x14F or class byte (+0x28) > 7 → 4; checksum (`0x00411130`) ≠
+   +0x0C → 6; length ≠ +0x08 → 5; version not 0x5C–0x60 or name ≠ the
+   client's name (`_stricmp`) → 7; `0x00538830` none → 3; then
+   `0x00569D80` (ECX game, DX = u16 save +0x24: status byte +0x24, low;
+   progression byte +0x25, high; `ret 4`):
+
+   | Test | Code |
+   |---|---|
+   | status 0x20 (expansion) and game +0x70 = 0 | 8 |
+   | status 0x20 clear and game +0x70 ≠ 0 | 9 |
+   | status 0x40 (ladder) checks | 0x19, 0x1A; only with host callbacks (`0x00883D54` ≠ 0), never in single player |
+   | status 0x04 (hardcore) and 0x08 (dead) | 0xA |
+   | hardcore and the game flags (`0x0053FD40`, game +0x1D28 record) lack 0x800 | 0xB |
+   | not hardcore and the game flags have 0x800 | 0xC |
+   | game +0x6D = 1 (Nightmare) and progression & 0x1F < 5 (expansion) / < 4 (classic) | 0xD |
+   | game +0x6D ≥ 2 (Hell) and progression & 0x1F < 10 (expansion) / < 8 (classic) | 0xE |
+
+   So "the save has reached the difficulty" is the progression byte
+   +0x25, not bit 7 of +0xA8 + difficulty: that bit only selects the map
+   seed (§2). The README's "A Diablo II character cannot join…" message
+   under `--auto` is code 9 (classic save, 0x67 with 0x100000).
+5. **Class and act come from the save.** The 0x67 class (+0x12) goes to
+   the new client record (`0x00539A30`, client +0x08 and +0x0C), but the
+   loader overwrites client +0x08 with the save's class (`0x0056A182`,
+   `0x00538620`) and creates the player unit with the save's class
+   (`0x0056A22C`, `0x00555230` with EDX = save +0x28). Likewise `-act N`
+   sets client act from `0x00883D44` at game creation (`0x00530E17`,
+   `0x005382E0`) and the v0x60 loader sets it again from the save
+   (`0x0056A1F7`, same setter), so `-act` has no effect on a v0x60 save
+   (`0x00532A51` does the same for ≤ 0x5B saves).
 
 #### 5.4 Procedure
 
@@ -461,11 +533,106 @@ Recorded: `…-015956-packets.jsonl` sends +0x11 = 3, +0x12 = 4, +0x14 =
    creates the game and loads the save in the next drain; the first tick
    (frame 1) follows.
 6. What must hold: the save exists at the path of §5.3 rule 2, version
-   0x60, for that name; the chosen difficulty is one the save has reached
-   (save byte +0xA8 + difficulty bit 7; Open question 6); client game
+   0x60, for that name; the save is an expansion, softcore, living
+   character and has reached the chosen difficulty (progression byte,
+   §5.3 rule 4; any other save fails the join with codes 8–0xE); client game
    type stays 0 (no `-gametype`); nothing else is needed from a human
    once 0x67 is sent (the hand-played recordings send nothing but system
    messages 0x67, 0x6D, 0x6B before the first game message).
+7. A hardcore save under the forced start: write config +0x209 :=
+   0x100804 at step 3 (§5.2 rule 1; the menu's value). That this sets
+   the game flag 0x800 of §5.3 rule 4 is not traced (Open question 13).
+
+### 7. Hook points for the PC 2 recordings
+
+Hooks the recorders lack for the R-* list (`docs/handoff/pc1-s8.md`
+Lane C). Each is an INT3 on the first byte unless noted; "return"
+means a one-shot INT3 on the return address read at entry. All run on
+the one game thread (§1 rule 1).
+
+#### 7.1 Missile creation (R-MIS-1, R-MIS-2)
+
+1. **Entry** `0x0059FA30` (bytes `55 8B EC 83 EC 28`): fastcall, ECX =
+   game, EDX = parameter record (0x5C bytes, layout
+   `missiles/missiles.md` §R2.1), plain `ret`; EAX = the missile unit or
+   0. Log: return address − 5 (the call site; 82 sites), record +0x00
+   flags, +0x04 owner → type (+0x00) and GUID (+0x0C), +0x10 class,
+   +0x14/+0x18 x, y, +0x28 velocity, +0x2C skill, +0x30 level; the
+   server frame (game +0xA8) and the current tick step (the
+   `record_tick.py` step markers, `tick.md` §3; "between ticks" when
+   the last marker is `tick_end`).
+2. **Return:** EAX = unit (0 = failed). Log GUID (+0x0C) and, when the
+   unit has a path (+0x2C ≠ 0), path +0x7C velocity (16.16 per tick,
+   `missiles.md` §R2.3 step 16) and +0x00/+0x04 precise x, y.
+3. **Per-tick position** (R-MIS-1: expect velocity 2112 on Normal and
+   3456 on Hell for the quill rat): at the snapshot point (§3 rule 3)
+   walk the missile hash list (§4 rule 1, offset 0x800) and log per
+   missile GUID, class, path +0x00/+0x04 (16.16), +0x7C velocity and
+   missile data (+0x14) +0x10 frames left (i16).
+
+#### 7.2 Client loop pass and update clock (R-PAUSE-1)
+
+The single-player client frame `0x0044EFA0` (`ret 4`):
+
+| Address | Meaning | Log |
+|---|---|---|
+| `0x0044EFA0` entry | one loop pass | u32 `[0x007A0490]` (update clock, ms from `GetTickCount`, import `0x006CC260`) |
+| `0x0044EFD4` | early return: `0x004F6070` ≠ 0 | EAX = now, written to the clock |
+| `0x0044F012` | **paused pass**: game type 0/1, ui 9 (Esc menu) or ui 11 open, player in a room (`ui/frontend-options.md` §O1 r6) | EAX = now, written to the clock; the pass then calls `[0x007A0484]` (ECX 0) and `0x00482C20` (draw and sound tick, `ui/frontend-options.md`) and returns |
+| `0x0044F136` | normal pass reached the drain (§3) | — |
+| `0x0052D870` | a server tick ran | frame (game +0xA8 + 1) |
+
+Expect while the menu is open: every pass logs `0x0044F012`, no tick;
+after closing, ticks resume at the normal rate with no burst (the
+clock was moved to now on every paused pass).
+
+#### 7.3 DRLG vis/warp records (R-LVL-1, R-LVL-2)
+
+1. **Where.** Server act a: game +0xBC + 4a → act; act +0x48 → DRLG;
+   DRLG +0x90 → first record (`drlg/levels.md` §1, §7). Client act:
+   `[0x007A0634]` +0x48 → its own DRLG (built separately; not the
+   server's records).
+2. **Record** (0x48 bytes, `0x00642860`, prepended): +0x00 level id
+   (u32), +0x04 vis[8] (i32 level ids, 0 = none), +0x24 warp[8] (i32
+   lvlwarp `Id`, −1 = none), +0x44 next. A level with no record uses
+   leveldefs `Vis0..7` / `Warp0..7` (+0x48 / +0x68; readers
+   `0x0066C040`, `0x0066AEC0`): log "none" for it.
+3. **When.** At a snapshot point (§3 rule 3) of the server act after
+   the player arrives in the act (R-LVL-1: Act III, levels 75–83 with
+   `-seed 644409375`; R-LVL-2: Act V, 109–112). Records are created on
+   demand (`0x00642860`, `0x00642920`), so dump again after each level
+   is entered; also log `0x00642920` entries to see each write
+   (`drlg/levels.md` §7 rule 3; ECX = the record, its level id at +0;
+   EDX = vis V, [ESP+4] = warp W, [ESP+8] = slot, −1 = first free;
+   `ret 8`).
+4. **Warp tiles** (R-LVL-2): tile units of the level's rooms are in the
+   tile list (game +0x1B20, §4 rule 1); class 71/72 are the ones asked.
+
+#### 7.4 Client receive order (R-EXIT-1)
+
+From the client receive `0x0044C6E0` (`sim/intents-events.md` §3.4):
+
+| Hook | Convention | Log |
+|---|---|---|
+| `0x0045C850` entry | ECX = message, EDX = size (−1 = list empty, ignore) | system message 0xAF–0xB4 bytes |
+| `0x0045F7B0` entry | ECX = node buffer, EDX = size (−1 = empty) | the node's bytes; split into messages offline by the S→C size rules |
+
+Both in hit order with the server's `s2c`/`net` records gives the
+order the client handles them; the system list is drained before the
+game list in every pass (§3.4 rule 1).
+
+#### 7.5 Local player's stat list (R-MSG-1)
+
+1. Unit: `[0x007A6A70]` (client local player, `client/model.md`). Its
+   list: unit +0x5C, the same layout as a server list
+   (`client/stat-lists.md` §1–§2): base array pointer +0x24, i16 count
+   +0x28; full array +0x48, count +0x4C; 8-byte entries u16 layer, u16
+   stat, i32 value (§4 rules 3 and 5).
+2. When: on return of the client receive (`0x0044F16C`, after the call
+   at `0x0044F167`) in the pass whose tick ran frame 2 (the
+   `0x0052D870` hook saw frame 2); dump base and full arrays raw.
+   Then every pass up to frame 5 shows whether later messages change
+   it.
 
 ## Constants & data dependencies
 
@@ -523,6 +690,15 @@ of `rng.md` §5.1–§5.2 before the first draw.
   `0x00545100`, `0x00544520`, `0x00546270`, `0x00546040`, `0x00579180`,
   `0x0058E120`, `0x0059D6A0`, `0x005B4A80`, `0x00593CB0`, `0x00410E40`,
   `0x00410EB0`, `0x004135D0`.
+- §5.2 rules 1–2, §5.3 rules 2a, 4–5, §6.2 rule 3, §7 (2026-10-08,
+  static): `0x00407050`, `0x00406D30`, `0x004067D0`, `0x00406B20`
+  (imports and strings read from the file image: `NewSavePath`, `Save
+  Path`, `Diablo II\Save`, the Saved Games folder id); `0x00434A00`,
+  `0x004365B0`, `0x00477CA0`; `0x00530BF0`, `0x00539A30`; `0x0056A090`,
+  `0x00569D80`, `0x00538620`, `0x005382E0` and its callers;
+  `0x0053E8D0`, `0x00570E30`, `0x005711D0`; `0x0059FA30` entry and
+  returns; `0x0044EFA0` and every access of `[0x007A0490]`;
+  `0x00642860`, `0x00642920`, `0x0066C040`; `0x0044C6E0`.
 
 ## Open questions
 
@@ -539,8 +715,8 @@ of `rng.md` §5.1–§5.2 before the first draw.
    after `0x0052C2C6` equal one step of `{T, 666}`, and do two runs give
    identical `record_rng.py` chains? Probe: `record_rng.py --no-inline`
    plus the two overrides, run twice, diff.
-4. Save dir fallback when neither registry value exists: probe a
-   breakpoint at `0x00534410`, read the path string at [ESP].
+4. *Answered* (static, 2026-10-08): §5.3 rule 2a. Original question:
+   save dir fallback when neither registry value exists.
 5. Second caller of `0x0052C320` at `0x00451909` (code outside the
    Ghidra function list, near `0x004518E0`): what triggers it, and can
    it change `0x00731004` during a scenario? Probe: breakpoint on it.
@@ -556,14 +732,15 @@ of `rng.md` §5.1–§5.2 before the first draw.
    reference to the table base was found, so a scenario reaches it only
    through that console; without a `Record.dr1` in the working
    directory nothing is set. Scenarios never type it.
-6. A difficulty the save has not reached (save byte bit 7 clear): does
-   the join fail, or does the game start with the clock-derived +0x7C?
-   Probe: §5.4 with D = 2 on a fresh character.
-7. Does the server use the 0x67 class byte (+0x12) when it loads a save
-   of another class? Probe: start with a mismatched `-<class>`.
-8. `-act N` in single player: the v0x60 load sets the act again
-   (`0x0056A1F7`); does `0x00883D44` have any effect after that? Probe:
-   `-act 2` with an act-1 save.
+6. *Answered* (static, 2026-10-08): §5.3 rule 4. The join fails
+   (`0x00569D80` code 0xD / 0xE, from the progression byte +0x25);
+   bit 7 of +0xA8 + difficulty only picks the map seed, and with it
+   clear the game keeps the scenario's +0x7C. What the client shows on
+   a failed join is not traced (a recording would show it).
+7. *Answered* (static, 2026-10-08): §5.3 rule 5: no; class comes from
+   the save.
+8. *Answered* (static, 2026-10-08): §5.3 rule 5: no effect on a save
+   load.
 9. Does any server path in a scenario call `time_value` (`0x00650DE0`)
    after game creation (unit-seed fallback, `rng.md` §5.3)? Probe:
    breakpoint on `0x00650DE0`, log the caller, over a full scenario.
@@ -580,8 +757,14 @@ of `rng.md` §5.1–§5.2 before the first draw.
 11. Item position for items not on the ground (path null): which fields
     (owner, inventory grid, body location) a snapshot should read; owned
     by the item specs.
-12. §6.2 rule 3: the callers of `0x0053DDF0`, `0x0053DE50`,
-    `0x0053DE90`, `0x0053DF00`, `0x0053DF50` and `0x0053E8D0`
-    (`0x005711AC`, `0x005714DF`) still need the unwritten-byte read. Two
+12. *Partly answered* (static, 2026-10-08): §6.2 rule 3: `0x0053E8D0`'s
+    two callers (0xAA, 0xA8) write every byte. The party forwarders
+    `0x0053DDF0`, `0x0053DE50`, `0x0053DE90`, `0x0053DF00`, `0x0053DF50`
+    need a second player and are out of single-player scenarios. Two
     runs of one scenario with equal seeds, diffed byte by byte over
-    every `s2c` record, would also show any byte §6.2 missed.
+    every `s2c` record, would still show any byte §6.2 missed.
+13. Does config +0x209 = 0x100804 (§5.4 step 7) give the game flag
+    0x800 that `0x00569D80` tests for a hardcore save (`0x0053FD40`
+    reads it from game +0x1D28; the writer is not traced)? Probe: forced
+    start of a hardcore expansion save with and without the write; the
+    join fails with 0xB without it.

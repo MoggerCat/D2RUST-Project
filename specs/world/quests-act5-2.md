@@ -28,17 +28,17 @@
 | Outputs / state changes | 65–73 |
 | Rules | 74–75 |
 |   6. A5Q4 Betrayal of Harrogath (chain 34, slot 38) | 76–178 |
-|   7. A5Q5 Rite of Passage (chain 35, slot 39) | 179–358 |
-|   8. A5Q6 Eve of Destruction (chain 36, slot 40) | 359–488 |
-|   9. Act V intro (chain 40, slot 42) | 489–515 |
-|   10. Hooks called from other systems | 516–538 |
-|   11. NPC services and game completion | 539–552 |
-| Constants & data dependencies | 553–572 |
-| Randomness | 573–584 |
-| Edge cases & original bugs | 585–620 |
-| Test vectors | 621–635 |
-| Provenance | 636–658 |
-| Open questions | 659–732 |
+|   7. A5Q5 Rite of Passage (chain 35, slot 39) | 179–364 |
+|   8. A5Q6 Eve of Destruction (chain 36, slot 40) | 365–494 |
+|   9. Act V intro (chain 40, slot 42) | 495–521 |
+|   10. Hooks called from other systems | 522–544 |
+|   11. NPC services and game completion | 545–558 |
+| Constants & data dependencies | 559–578 |
+| Randomness | 579–590 |
+| Edge cases & original bugs | 591–626 |
+| Test vectors | 627–641 |
+| Provenance | 642–664 |
+| Open questions | 665–738 |
 <!-- /index -->
 
 ## Summary
@@ -237,6 +237,8 @@ Chat end (`0x0058BE80`): qual-kehk with +0x01 = 1 → status 1 to all, +0x01
 
 #### 7.6 The statues and the fight
 
+Where the statues stand (objects 474–476, Arreat Summit preset): `drlg/levels.md` §12.4.
+
 - Arm (`0x0058BF40`): all three statue GUIDs must resolve (else nothing,
   returns 0); clear each statue room's portal flag; each statue mode 3,
   collision freed, object event 7 at frame + 20, stored mode 3; spawned
@@ -309,6 +311,10 @@ stats 13 / 30 are read with the base getter `0x006253B0`, the level with
 `0x00625480`; "A < gap" is unsigned (`0x0058C673`).
 
 #### 7.8 Altar, doors and the invisible Ancient
+
+Where the altar (object 546) and the two doors stand: `drlg/levels.md` §12.4.
+
+Where the altar (object 546) and the doors stand: `drlg/levels.md` §12.4.
 
 - Altar init 72 (`0x0058D240`, object 546): +0x50 := GUID; mode := +0x4C.
 - Altar operate 65 (`0x0058D310`): only in object mode 0. Intro: town

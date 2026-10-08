@@ -11,6 +11,23 @@
   (archive search order), `client/render-pipeline.md` §A2–A3 (frames,
   atlas), `client/audio.md`, `client/ui.md`
 
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 31–38 |
+| Inputs | 39–46 |
+| Outputs / state changes | 47–50 |
+| Rules | 51–52 |
+|   A. d2rs design (ours) | 53–199 |
+|   B. Original behavior to reproduce (not specified here) | 200–207 |
+| Constants & data dependencies | 208–211 |
+| Randomness | 212–215 |
+| Edge cases & original bugs | 216–222 |
+| Test vectors | 223–235 |
+| Provenance | 236–241 |
+| Open questions | 242–253 |
+<!-- /index -->
+
 ## Summary
 
 All game assets are read at runtime from the user's own archives through
@@ -113,9 +130,52 @@ dropped draw). Atlas eviction frees whole pages: the least recently used
 page is cleared and its slots invalidated; atlas packing restarts in
 that page (deterministic shelf order).
 
-The budgets are guesses until measured: the local run queue gets
-"decoded size of every live DCC/DC6/DT1 and of a full town scene" (§Open
-questions 1).
+The defaults were set before measuring and the measurement below keeps
+them (no change to `ClientConfig`).
+
+**Measured set sizes** (1.14d, 2026-10-08: every distinct `.dcc`, `.dc6`,
+`.dt1` name `known_names` lists across `patch_d2`, `d2exp`, `d2data`,
+`d2char`, one copy per name, `Patch_D2` > `d2exp` > `d2data` > `d2char`; parsed by `d2-formats`, pixels counted as
+bytes = Σ width × height; scratch program on the repo crates, no repo
+changes). One FrameSet = one (file, direction).
+
+| Quantity | Measured |
+|---|---|
+| files parsed | 23,595 (DCC 21,717; DC6 1,633; DT1 245); the 6 known-unused DT1 (`mpq-tool formats`, `formats/dt1.md`) fail to parse and are excluded |
+| whole live set, decoded | DCC 2,610,729,000 B (2.43 GiB); DC6 168,604,107 B (161 MiB); DT1 232,942,528 B (222 MiB); about 2.8 GiB: the set cannot be resident, eviction is required |
+| DCC directions per file | 1: 2,768 files; 4: 56; 8: 4,361; 16: 14,483; 32: 49 (271,176 FrameSets) |
+| DCC FrameSet size | mean 9,627 B; median of per-file mean 4,394 B; p90 39,552 B; p99 276,132 B; largest 1,822,696 B (1.74 MiB) |
+| largest whole parsed file | DCC 4,744,474 B (`monsters\th\s1\ths1litdthth.dcc`); DC6 3,190,514 B (`monsters\42\tr\42trlitdthth.dc6`); DT1 6,265,184 B (`tiles\expansion\siege\cliff.dt1`) |
+| DC6 | one direction in all 1,633 files: FrameSet = whole file; median 4,940 B, p90 296,730 B |
+| largest frame (w × h) | DCC 345 × 324 (`monsters\gt\tr\gttrlita1hth.dcc`); DC6 319 × 256 (`ui\logo\logo.dc6`); DT1 tile image 160 × 864 (`tiles\expansion\siege\cliff.dt1`); DT1 block 32 × 15 or 32 × 32 |
+| hero, one mode, all 16 directions, one layer set | 0.4 to 1.6 MiB per mode (sum over layers of the mean layer file, `lit` armor, 7 classes; NU 0.5–0.8, WL 0.5–0.9, TN 0.8–1.6, A1 1.1–1.6) |
+| monster token, whole token (all modes, all directions) | 233 tokens: median 1.17 MiB, p90 8.05 MiB, max 45.3 MiB |
+| monster token, modes NU WL A1 GH DT only | 219 tokens: median 0.93 MiB, p90 5.78 MiB, max 17.0 MiB |
+| act 1 town tile set | 4 DT1 (`fence floor objects trees`) = 4,674,720 B (4.46 MiB) |
+| largest tile directory | `tiles\expansion\siege` 23 DT1 = 30,838,784 B (29.4 MiB); next `expansion\town` 18.2 MB, `act1\outdoors` 12.7 MB |
+| missiles / overlays / objects / UI panel | all 391 missile files 84.1 MiB; all 385 overlay files 41.5 MiB; 1,761 object files 115.8 MiB; `ui\panel` 61 files 2.95 MiB |
+
+**Scenes** (parsed bytes, whole files, an upper bound on the pixels
+actually resident because only the used directions become FrameSets):
+
+| Scene | Estimate |
+|---|---|
+| act 1 town | tiles 4.5 + hero 5 modes about 6 + town NPC tokens 0.01–3.2 each (about 8 for the encampment's) + `ui\panel` 3.0 = about 22 MiB |
+| busy field or dungeon | largest tile directory 29.4 + hero 8 modes about 9 + 8 monster tokens at p90 (8 × 5.8) 46 + missiles/overlays/objects about 20 = about 105 MiB |
+| pessimistic | the same with 20 monster tokens at p90: about 175 MiB |
+
+Rules from the numbers:
+
+- `parsed_files` 128 MiB holds the busy scene (105) and any one file
+  with room to spare; the pessimistic scene overruns it by about 1.4×,
+  which §A5 already handles (logged overrun, never a dropped draw). Keep.
+- `frame_sets` 256 MiB is far above any scene: FrameSets hold one
+  direction (about 1/16 of a DCC file), so the busy scene's FrameSets are
+  under 40 MiB (tiles resident whole, the rest at 1/16).
+  Keep; it may be lowered without a visible effect.
+- Every frame fits an atlas page with large margin (largest 345 × 324,
+  or 160 × 864 for a DT1 tile image, against 2048 × 2048): the packer
+  never needs a "frame larger than a page" case.
 
 #### A6. Writes
 
@@ -181,8 +241,10 @@ original behavior is stated here.
 
 ## Open questions
 
-1. Budgets §A5: measure the decoded size of the live graphics set and of
-   a busy scene (local, `mpq-tool` extension), then set defaults.
+1. ~~Budgets §A5: measure the decoded size of the live graphics set and of
+   a busy scene.~~ Answered 2026-10-08 (§A5 "Measured set sizes"): the whole
+   set is about 2.8 GiB, a busy scene about 105 MiB parsed, the largest
+   frame 345 × 324 (DT1 tile image 160 × 864); the defaults stay.
 2. §B1–§B3.
 3. Whether `d2-data` tables needed by the client (e.g. item graphics
    names) come through the bridge snapshot or a read-only client-side
