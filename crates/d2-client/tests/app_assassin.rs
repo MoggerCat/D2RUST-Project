@@ -18,7 +18,7 @@ use d2_data::bin::BinTable;
 use d2_data::fixup::maps;
 use d2_data::fixup::records::stat_ops;
 use d2_data::tables::{
-    Charstats, Itemstatcost, Missiles, Monstats, Monstats2, Record, Skills, States,
+    Charstats, Itemstatcost, Levels, Missiles, Monstats, Monstats2, Record, Skills, States,
 };
 use d2_formats::animdata::{self, AnimData, AnimRecord};
 use d2_server::seams::{Clock, Pos};
@@ -168,6 +168,13 @@ impl Game {
                 }
                 t.skills.level_cap = d2_sim::skills::LEVEL_CAP_114D;
                 t.skills.stat_count = 359;
+                // levels.txt: every level allows a teleport (Dragon
+                // Flight lands through the level's `Teleport`).
+                let mut lv = vec![Levels::decode(&[0u8; Levels::SIZE]); 3];
+                for l in &mut lv {
+                    l.teleport = 1;
+                }
+                t.levels = lv;
                 let mut m = Missiles::decode(&[0u8; Missiles::SIZE]);
                 m.range = 20;
                 m.vel = 16;
@@ -428,4 +435,16 @@ fn a_finisher_after_a_charge_runs_without_faults() {
         .unwrap();
     g.cast_on(guid);
     assert!(g.errors() == "[]", "no faults: {}", g.errors());
+}
+
+// Covers: specs/skills/bodies-2b.md §7.20
+#[test]
+fn dragon_flight_moves_the_assassin_to_the_monster() {
+    let mut g = Game::joined(vec![(3, row(0, 52))]);
+    let (_, guid) = g.monster(500);
+    let from = g.player_pos();
+    g.cast_on(guid);
+    let to = g.player_pos();
+    let errors = g.errors();
+    assert!(to.x > from.x, "flew east: {from:?} -> {to:?}; {errors}");
 }

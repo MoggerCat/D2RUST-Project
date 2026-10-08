@@ -27,6 +27,12 @@ pub struct ListEntry {
     pub skill: u16,
     /// +0x08.
     pub mode: u32,
+    /// +0x0C entry flags (the Leap / Whirlwind phases,
+    /// `skills/bodies-3.md`).
+    pub flags: u32,
+    /// +0x18, +0x1C, +0x20, +0x24: params 1 to 4 (`skills/bodies-2.md`
+    /// §2: `0x00644560` set, `0x006444A0` get).
+    pub params: [i32; 4],
     /// +0x28 base level.
     pub base: i32,
     /// +0x2C level bonus.

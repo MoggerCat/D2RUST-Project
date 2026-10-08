@@ -61,6 +61,39 @@ impl<X: Pending + UseRest> UseView<'_, X> {
         Some(v != 0)
     }
 
+    /// `0x0064D910(room, x, y, pattern, mask)` ≠ 0 on the rooms' grids,
+    /// with the unit's own collision pattern (`path-placement.md` §4
+    /// rule 5; the unit's path record, pattern 0 without one).
+    // d2rs-own, unverified: that the leap's check reads the unit's path
+    // pattern is read from the call shape, not confirmed on 1.14d.
+    pub(super) fn rooms_pattern_collides(
+        &self,
+        r: RoomId,
+        at: (i32, i32),
+        u: UnitId,
+        mask: u32,
+    ) -> Option<bool> {
+        if !self.on_rooms() {
+            return None;
+        }
+        let pattern = self
+            .cv
+            .v
+            .h
+            .paths
+            .as_ref()
+            .and_then(|p| p.dynamic(u))
+            .map_or(0, |d| d.pattern);
+        Some(crate::path::collision::pattern_collides(
+            &self.cv.v.h.drlg,
+            Some(r),
+            at.0,
+            at.1,
+            pattern,
+            mask as u16,
+        ))
+    }
+
     /// `0x0064E7B0(room, &pt, size, mask, fallback)` on the rooms.
     pub(super) fn rooms_free_point(
         &self,
