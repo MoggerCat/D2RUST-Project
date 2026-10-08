@@ -104,7 +104,13 @@ pub fn check(
     // Rule 3.
     unit.server_point = (x, y);
     let unit = &world.units[&key];
-    let (cx, cy) = unit.cell();
+    // The local player's own position: the preview's prediction when it
+    // has one (`ModelInputs::local_cell`).
+    let own = |k: UnitKey, u: &ClientUnit| match inputs.local_cell {
+        Some(c) if world.local_player == Some(k) => c,
+        _ => u.cell(),
+    };
+    let (cx, cy) = own(key, unit);
     let (xi, yi, cxi, cyi) = (i32::from(x), i32::from(y), i32::from(cx), i32::from(cy));
     // Rule 4.
     let t = tolerance(world, unit, kind);
@@ -112,15 +118,15 @@ pub fn check(
     let mut far = xi.abs_diff(cxi) > t;
     if far || yi.abs_diff(cyi) > t {
         if kind != 0 || tx <= 0 {
-            return Ok(correct(world, key, x, y));
+            return Ok(correct(world, key, x, y, (cx, cy)));
         }
         let d1 = sq(cxi - xi) + sq(cyi - yi);
         if d1 >= 100 {
-            return Ok(correct(world, key, x, y));
+            return Ok(correct(world, key, x, y, (cx, cy)));
         }
         let d2 = sq(cxi - tx) + sq(cyi - ty);
         if d2 >= d1 {
-            return Ok(correct(world, key, x, y));
+            return Ok(correct(world, key, x, y, (cx, cy)));
         }
         far = false;
     }
@@ -139,14 +145,14 @@ pub fn check(
     if visible && !far {
         Ok(Checked::Kept)
     } else {
-        Ok(correct(world, key, x, y))
+        Ok(correct(world, key, x, y, (cx, cy)))
     }
 }
 
 /// Rule 8: room' := the cell lookup from U's room, else the act lookup
 /// (`model.md` §12 rule 2); none → nothing. Without a client DRLG (no
 /// DRLG source) the room is taken as found.
-fn correct(world: &mut ClientWorld, key: UnitKey, x: u16, y: u16) -> Checked {
+fn correct(world: &mut ClientWorld, key: UnitKey, x: u16, y: u16, own: (u16, u16)) -> Checked {
     let mut room = None;
     if world.active_rooms.is_some() {
         let start = world.unit_room(key).copied();
@@ -157,7 +163,7 @@ fn correct(world: &mut ClientWorld, key: UnitKey, x: u16, y: u16) -> Checked {
     }
     if world.local_player == Some(key) {
         // C→S 0x5F with the unit's own position.
-        let (cx, cy) = world.units[&key].cell();
+        let (cx, cy) = own;
         let mut m = vec![0x5F];
         m.extend_from_slice(&cx.to_le_bytes());
         m.extend_from_slice(&cy.to_le_bytes());
