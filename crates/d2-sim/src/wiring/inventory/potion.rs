@@ -22,6 +22,14 @@ use crate::units::UnitId;
 /// States of the potion lists (`stat-lists.md` §10.1, `states.txt`).
 pub const STATE_HEALTHPOT: u32 = 100;
 pub const STATE_MANAPOT: u32 = 106;
+/// The stamina state (the shrine's, `states.txt` 136).
+pub const STATE_STAMINA: u32 = 136;
+/// Stat 28 `staminarecoverybonus`, in percent (`units.md` §6.1 stamina).
+const STAT_STAMINARECOVERYBONUS: u16 = 28;
+/// Frames a stamina potion works, and its bonus (d2rs-own, unverified;
+/// 1000 is the shrine's value and makes stamina regenerate while moving).
+pub const STAMINA_POTION_FRAMES: i32 = 250;
+const STAMINA_POTION_BONUS: i32 = 1000;
 /// Stats: life regeneration per tick (74), mana recovery per tick (26),
 /// life (6), mana (8).
 const STAT_HPREGEN: u16 = 74;
@@ -40,6 +48,8 @@ pub enum Potion {
     Life(i32),
     /// Mana over time, in whole points.
     Mana(i32),
+    /// Stamina recovery for a while (`vps`).
+    Stamina,
     /// Share of life and mana at once, in percent.
     Rejuv(i32),
 }
@@ -51,6 +61,7 @@ pub fn classify(code: [u8; 4]) -> Option<Potion> {
     match (&code[..2], code[2]) {
         (b"hp", b'1'..=b'5') => Some(Potion::Life([45, 90, 150, 270, 480][n])),
         (b"mp", b'1'..=b'5') => Some(Potion::Mana([30, 60, 120, 225, 450][n])),
+        (b"vp", b's') => Some(Potion::Stamina),
         (b"rv", b's') => Some(Potion::Rejuv(35)),
         (b"rv", b'l') => Some(Potion::Rejuv(70)),
         _ => None,
@@ -80,6 +91,23 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         match p {
             Potion::Life(n) => self.attach_potion(u, STATE_HEALTHPOT, STAT_HPREGEN, n, frame),
             Potion::Mana(n) => self.attach_potion(u, STATE_MANAPOT, STAT_MANARECOVERY, n, frame),
+            Potion::Stamina => {
+                let s = &mut *self.econ.stats;
+                let h = &mut *self.econ.hooks;
+                let Some((ty, guid)) = self
+                    .econ
+                    .units
+                    .get(u)
+                    .map(|r| (r.ty.index() as u32, r.guid))
+                else {
+                    return false;
+                };
+                s.free_state_list(h, u, STATE_STAMINA);
+                let l = s.alloc(flag::NEWLENGTH, frame + STAMINA_POTION_FRAMES, ty, guid);
+                s.set_state(l, STATE_STAMINA);
+                s.add(h, l, STAT_STAMINARECOVERYBONUS, STAMINA_POTION_BONUS, 0);
+                s.attach(h, u, l, true);
+            }
             Potion::Rejuv(pct) => {
                 for (stat, max) in [
                     (STAT_LIFE, self.econ.stats.max_life(u)),
@@ -131,5 +159,17 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         let page = self.page(item);
         let _ = self.send_item_page(p, u, REMOVED_FLAG, page);
         self.free_item(item);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_stamina_potion_code_is_classified() {
+        assert_eq!(classify(*b"vps "), Some(Potion::Stamina));
+        assert_eq!(classify(*b"yps "), None);
+        assert_eq!(classify(*b"hp3 "), Some(Potion::Life(150)));
     }
 }

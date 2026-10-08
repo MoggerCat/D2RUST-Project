@@ -5950,6 +5950,11 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Steps: new Amazon in town, take damage, press belt key 1–4; `record_packets.py --seconds 60` plain.
 - Compare: the S→C 0x95 life/mana bytes per tick (and 0x9D removal) against the PROVISIONAL list; fold the real amounts, duration and message order into a new item-use spec.
 
+##### REC-135 [MANUAL] items/inventory-moves.md §7.17 (stamina potion `vps`: item-use spec `0x005BF240` unwritten)
+- Priority 3 (manual play). PROVISIONAL, `claude/q-stamina-run`: a stamina potion attaches a state 136 list with stat 28 (`staminarecoverybonus`) 1000 for 250 frames, the shrine's values (`wiring/inventory/potion.rs`); the client's run prediction walks while the model's stamina (stat 10) is 0 (`bridge/predict.rs`).
+- Steps: new character outside town, run until the bar is empty (the run turns to a walk), drink a `vps` from the belt; `record_packets.py --seconds 60` plain.
+- Compare: S→C 0x96 / 0x95 stamina per tick against the PROVISIONAL list and the tick the run turns into a walk; fold the real amount and duration into the item-use spec.
+
 #### Deferred (not recorded; outside Phases 0–6)
 - IT-1 `formats/d2s.md` OQ1 (legacy loader `0x00534020`, pre-1.09 saves), IT-2 OQ2 (item records of save versions 0x5C–0x5F), `formats/d2s-legacy.md` and `items/bitstream-legacy.md` Pending lines (1.07 / 1.08 / 1.00–1.06 saves): need sample files and are only needed if old saves must load. Record only if the user opens that scope.
 ##### REC-96 [ASSISTED] Level-up stat messages (S→C 0x1D-0x1F, 0x21) around a level-up

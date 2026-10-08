@@ -474,6 +474,16 @@ pub fn enter_game<D: ActionEvents, W>(
             .join("; ");
         return Err(JoinError::Entry(why));
     }
+    // The join step after the player's allocation (`units.md` §6.1,
+    // `path-placement.md` §2): neutral mode start, then the regeneration
+    // event every frame (life, stamina, mana) and the refresh event.
+    let a = s.events.action();
+    let joined = a.sys.with(&mut s.game, |sim, hooks| {
+        d2_sim::units::modes::player_join(sim, hooks, player)
+    });
+    if let Err(e) = joined {
+        return Err(JoinError::Entry(format!("{e:?}")));
+    }
     // Rule 6.
     if let Some(e) = s.game.lists.client_mut(id) {
         e.state = client_state::JOINING;
