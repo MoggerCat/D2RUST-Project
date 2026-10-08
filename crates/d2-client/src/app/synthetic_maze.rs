@@ -13,9 +13,11 @@ use std::sync::Arc;
 use d2_sim::drlg::maze::{Maze, MazeData, MazeRow, Specials};
 use d2_sim::drlg::outdoor::{OutdoorData, SubFileMap};
 use d2_sim::drlg::preset::{Ds1Input, Ds1Source, PresetData, PresetDef, PresetTables};
+use d2_sim::drlg::room::LinkAt;
 use d2_sim::drlg::tiles::cell;
 use d2_sim::drlg::{
     room_flags, Drlg, DrlgData, DrlgError, DrlgRoomId, LevelIdx, LevelTypes, PresetUnit, RoomGrids,
+    RoomKind, TileRect,
 };
 use d2_sim::wiring::worldgen::levels::WorldTypes;
 
@@ -64,7 +66,9 @@ pub fn maze_data() -> MazeData {
         rows: super::synthetic_tower::maze_levels()
             .map(|level| MazeRow {
                 level,
-                rooms: [1; 3],
+                // Tal Rasha's tombs: 6 cells, ×3 / ×2 for the staff / boss
+                // tomb (`maze.md` §5.2).
+                rooms: [super::synthetic_act2::base_rooms(level); 3],
                 size_x: 24,
                 size_y: 24,
                 merge: 0,
@@ -136,6 +140,35 @@ fn room_is_maze(drlg: &Drlg, room: DrlgRoomId) -> bool {
     is_maze(drlg.level(drlg.room(room).level).id)
 }
 
+impl<F: LevelTypes> SyntheticTypes<F> {
+    /// The flat levels; Lut Gholein's room also carries the Act 2 warp
+    /// slots and the Canyon of the Magi is a flat room of its own
+    /// (q-a2-dungeons, d2rs-own, unverified).
+    fn generate_flat(
+        &mut self,
+        drlg: &mut Drlg,
+        data: &DrlgData,
+        l: LevelIdx,
+    ) -> Result<(), DrlgError> {
+        use super::synthetic_act2 as a2;
+        let id = drlg.level(l).id;
+        if id == a2::CANYON {
+            let r = drlg.alloc_room(l, RoomKind::Preset, TileRect::new(16, 8, 8, 8));
+            drlg.room_mut(r).dt1_mask = 1;
+            drlg.room_mut(r).flags |= a2::flat_flags(id);
+            drlg.link_room(r, LinkAt::Tail);
+            return Ok(());
+        }
+        self.flat.generate(drlg, data, l)?;
+        if id == super::single_player::ACT2_TOWN {
+            if let Some(r) = drlg.level_rooms(l).first().copied() {
+                drlg.room_mut(r).flags |= a2::flat_flags(id);
+            }
+        }
+        Ok(())
+    }
+}
+
 impl<F: LevelTypes> LevelTypes for SyntheticTypes<F> {
     fn create_act_levels(&mut self, drlg: &mut Drlg, data: &DrlgData) -> Result<(), DrlgError> {
         self.flat.create_act_levels(drlg, data)
@@ -157,7 +190,7 @@ impl<F: LevelTypes> LevelTypes for SyntheticTypes<F> {
     fn generate(&mut self, drlg: &mut Drlg, data: &DrlgData, l: LevelIdx) -> Result<(), DrlgError> {
         let id = drlg.level(l).id;
         let Some((_, on)) = super::synthetic_tower::maze_links(id) else {
-            return self.flat.generate(drlg, data, l);
+            return self.generate_flat(drlg, data, l);
         };
         self.maze.generate(drlg, data, l)?;
         // The way back (warp slot 0, `rooms.md` §3.3) and, in the Tower
@@ -189,7 +222,19 @@ impl<F: LevelTypes> LevelTypes for SyntheticTypes<F> {
 
     fn preset_units(&self, drlg: &Drlg, room: DrlgRoomId) -> Vec<PresetUnit> {
         if !room_is_maze(drlg, room) {
-            return self.flat.preset_units(drlg, room);
+            let mut units = self.flat.preset_units(drlg, room);
+            // The Act 2 flat levels' tiles (q-a2-dungeons).
+            let id = drlg.level(drlg.room(room).level).id;
+            units.extend((0..8).map_while(|k| {
+                let (_, class, (x, y)) = super::synthetic_act2::flat_slot(id, k)?;
+                Some(PresetUnit {
+                    unit_type: 5,
+                    class,
+                    x,
+                    y,
+                })
+            }));
+            return units;
         }
         let mut units = self.maze.preset_units(drlg, room);
         let level = drlg.room(room).level;

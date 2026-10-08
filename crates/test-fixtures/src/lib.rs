@@ -27,6 +27,8 @@
 
 pub mod act1;
 pub mod act2;
+pub mod act3;
+pub mod act5;
 pub mod animdata;
 pub mod content;
 pub mod drlg;

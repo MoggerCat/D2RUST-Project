@@ -138,7 +138,7 @@ use d2_sim::drlg::preset::{Ds1Input, Ds1Source};
 use super::rest::AppRest;
 use super::server_thread::{ThreadLink, ThreadStopped};
 use super::skill_rest::SkillStore;
-use super::{synthetic_act4, synthetic_burial, synthetic_maze, synthetic_tower};
+use super::{synthetic_act2, synthetic_act4, synthetic_burial, synthetic_maze, synthetic_tower};
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
 use crate::bridge::world::{
@@ -236,6 +236,7 @@ fn synthetic_npc_classes() -> impl Iterator<Item = u16> {
     .into_iter()
     .chain(ACT2_NPCS)
     .chain(synthetic_act4::NPCS)
+    .chain(super::town_npcs::ACT3.iter().map(|&(c, _)| c))
 }
 /// The player's character class (1, sorceress, as in the server tests).
 pub const PLAYER_CLASS: u32 = 1;
@@ -534,6 +535,9 @@ pub struct LocalSeams {
     /// Monster chain links and deaths for the quest control, drained once
     /// per tick (`q-a1-tower`, d2rs-own, unverified).
     pub quest_events: Vec<d2_sim::wiring::action::QuestEvent>,
+    /// The Act II DRLG's staff-tomb level (0 = not yet known), set when
+    /// the acts are created (`q-a2-dungeons`).
+    pub staff_tomb: u32,
 }
 
 impl LocalSeams {
@@ -618,6 +622,33 @@ impl Pending for LocalSeams {
         if let Ok(chain) = u8::try_from(chain) {
             self.quest_events
                 .push(d2_sim::wiring::action::QuestEvent::Link { unit, chain });
+        }
+    }
+    /// d2rs-own, unverified (REC-136): Radament's and the Summoner's AI
+    /// calls reach the quest control at the end of the tick.
+    fn ai_quest_call(
+        &mut self,
+        _: &mut Game,
+        unit: UnitId,
+        call: d2_sim::monsters::ai::QuestCall,
+    ) -> bool {
+        use d2_sim::monsters::ai::QuestCall;
+        use d2_sim::wiring::action::QuestEvent;
+        match call {
+            QuestCall::RadamentActivated => self
+                .quest_events
+                .push(QuestEvent::RadamentActivated { unit }),
+            QuestCall::SummonerActivated => self.quest_events.push(QuestEvent::SummonerActivated),
+            _ => return false,
+        }
+        true
+    }
+    /// `0x0061AEB0`: the Act II staff tomb, the orifice's level.
+    fn object_staff_tomb(&self) -> u32 {
+        if self.staff_tomb == 0 {
+            u32::MAX
+        } else {
+            self.staff_tomb
         }
     }
     fn take_quest_events(&mut self) -> Vec<d2_sim::wiring::action::QuestEvent> {
@@ -1427,6 +1458,7 @@ fn synthetic_drlg_data() -> DrlgData {
             drlg.levels[to].warp[0] = a::back(i) as i32;
         }
     }
+    synthetic_act2::add_levels(&mut drlg);
     let mut ids = vec![
         BLOOD_MOOR_TO_DEN,
         DEN_TO_BLOOD_MOOR,
@@ -1439,6 +1471,7 @@ fn synthetic_drlg_data() -> DrlgData {
         synthetic_burial::BURIAL_TO_BLOOD_MOOR,
     ]);
     ids.extend(synthetic_act4::on(0)..=synthetic_act4::LAST_WARP);
+    ids.extend(synthetic_act2::FIRST_WARP..=synthetic_act2::last_warp());
     drlg.warps = ids
         .iter()
         .map(|&id| WarpDef {
@@ -1942,7 +1975,10 @@ impl GameParts {
                 ..ObjectTables::default()
             },
             monstats: synthetic_monstats(),
-            hire_rows: synthetic_hire_rows(),
+            hire_rows: synthetic_hire_rows()
+                .into_iter()
+                .chain(super::town_npcs::synthetic_hire_rows())
+                .collect(),
             items: ItemTables::default(),
             vendors: VendorTables::default(),
             anim: None,
@@ -2072,6 +2108,27 @@ pub fn build_with_objects(
     character: Character,
     chests: &[(i32, i32)],
     stash: Option<(i32, i32)>,
+) -> Result<LocalGame, BuildError> {
+    build_with_town(
+        data,
+        seed,
+        character,
+        chests,
+        stash,
+        &super::town_npcs::ACT1,
+    )
+}
+
+/// [`build_with_objects`] with the synthetic town's NPCs given as (class,
+/// sub-tile offset from the room origin) pairs (`super::town_npcs`;
+/// synthetic data only, the live town's NPCs come from its presets).
+pub fn build_with_town(
+    data: &GameData,
+    seed: u32,
+    character: Character,
+    chests: &[(i32, i32)],
+    stash: Option<(i32, i32)>,
+    npcs: &[(u16, i32)],
 ) -> Result<LocalGame, BuildError> {
     let mut wp_tables = data.tables();
     if stash.is_some() && matches!(data, GameData::Synthetic) {
@@ -2206,6 +2263,15 @@ pub fn build_with_objects(
             .ok_or_else(|| BuildError::Setup(format!("level {level}: no room streamed")))?;
         rooms.push(r);
     }
+    // The Act II DRLG chose its staff tomb at creation (`levels.md` §3).
+    if let Some(t) = sim
+        .action
+        .hooks()
+        .drlg
+        .with_act(1, &mut game.lists, |d, _| d.staff_tomb)
+    {
+        sim.action.hooks().x.staff_tomb = t;
+    }
     // The waypoint object stands in the town's first room at a fixed
     // sub-tile offset from its origin (subtile = tile × 5, `levels.md`
     // §1), as the server tests stage it.
@@ -2265,14 +2331,10 @@ pub fn build_with_objects(
         .unit(waypoint)
         .ok_or_else(|| BuildError::Setup("waypoint unit missing".into()))?
         .guid;
-    // The synthetic game's town NPC: Akara, a few sub-tiles from the
-    // waypoint (d2rs-own, unverified; the live game's NPCs come from the
-    // town presets).
+    // The synthetic game's town NPCs (d2rs-own, unverified; the live
+    // game's NPCs come from the town presets).
     if matches!(data, GameData::Synthetic) {
-        for (class, x) in [
-            (d2_sim::world::npc::class::AKARA, AKARA_X),
-            (d2_sim::world::npc::class::KASHYA, KASHYA_X),
-        ] {
+        for &(class, dx) in npcs {
             let req = AllocRequest {
                 ty: UnitType::Monster,
                 class: u32::from(class),
@@ -2283,7 +2345,7 @@ pub fn build_with_objects(
                 allied: true,
             };
             sim.action
-                .with(&mut game, |g, v| v.allocate(g, &req, ox + x, oy + UNIT_Y))
+                .with(&mut game, |g, v| v.allocate(g, &req, ox + dx, oy + UNIT_Y))
                 .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
         }
     }
@@ -2639,9 +2701,31 @@ pub fn start_with_objects<C: Clock + Send + 'static>(
     chests: Vec<(i32, i32)>,
     stash: Option<(i32, i32)>,
 ) -> Result<(ThreadLink<Link<C>>, Started), BuildError> {
+    start_with_town(
+        data,
+        seed,
+        character,
+        clock,
+        chests,
+        stash,
+        super::town_npcs::ACT1.to_vec(),
+    )
+}
+
+/// [`start_with_objects`] with the synthetic town's NPCs given
+/// ([`build_with_town`]).
+pub fn start_with_town<C: Clock + Send + 'static>(
+    data: GameData,
+    seed: u32,
+    character: Character,
+    clock: C,
+    chests: Vec<(i32, i32)>,
+    stash: Option<(i32, i32)>,
+    npcs: Vec<(u16, i32)>,
+) -> Result<(ThreadLink<Link<C>>, Started), BuildError> {
     let (tx, rx) = std::sync::mpsc::channel();
     let link = ThreadLink::spawn(move || {
-        let g = build_with_objects(&data, seed, character, &chests, stash)?;
+        let g = build_with_town(&data, seed, character, &chests, stash, &npcs)?;
         let _ = tx.send(Started {
             waypoint: g.waypoint,
             waypoint_guid: g.waypoint_guid,

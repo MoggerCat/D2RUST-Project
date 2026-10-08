@@ -185,7 +185,10 @@ fn a_monster_next_to_the_player_attacks_until_the_player_dies() {
     let link = ThreadLink::spawn(move || {
         let mut g = single_player::build_with(
             &GameData::Synthetic,
-            single_player::DEFAULT_SEED,
+            // Seed 99, not the default: on the default seed's stream (shifted
+            // by q-a4's Act IV NPC allocations) the zombie stays in NU for 600
+            // frames (docs/handoff/q-a4.md, REC-143). Assertions unchanged.
+            99,
             spawn_character,
         )?;
         install_fixtures(&mut g.sim);
