@@ -309,7 +309,9 @@ impl Rig {
             // headless there is no camera, COF or cel state, so this test
             // supplies the input (every point visible). The play window
             // installs none yet (open, docs/handoff/q-smoke-combat.md).
-            b.0.set_visibility(Some(|_, _, _| true));
+            b.0.set_visibility(Some(d2_client::bridge::world::VisibleFn::new(|_, _, _| {
+                true
+            })));
             let mut natives = [0u16; 10];
             natives[0] = start_skill(class);
             let mut all = vec![[0u16; 10]; 7];
