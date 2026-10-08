@@ -235,7 +235,7 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         .collect();
     // Cold Plains's warp tile leads to level 13, Cave Level 2
     // (`q-a1-dungeons`, d2rs-own; it led to level 5 before the tree
-    // moved the Dark Wood under the Black Marsh): its room joins the sight list like the Blood Moor's.
+    // moved the Dark Wood under the Black Marsh); `q-dungeon-builds` made it a maze level, whose first room stands at the level offset (4000, 1000) + 40 instead of the flat room (24, 40): its room joins the sight list like the Blood Moor's.
     assert_eq!(
         sight,
         [
@@ -244,7 +244,7 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
             (true, 2, 24, 0),
             (true, 3, 0, 0),
             (true, 3, 0, 0),
-            (true, 13, 24, 40),
+            (true, 13, 4040, 1040),
             (false, 1, 16, 0),
             (false, 2, 24, 0)
         ]

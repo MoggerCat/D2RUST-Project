@@ -36,6 +36,7 @@ pub mod single_player;
 pub mod skill_rest;
 pub mod sound;
 pub mod strings;
+pub mod synthetic_a1_maze;
 pub mod synthetic_act2;
 pub mod synthetic_act4;
 pub mod synthetic_act5;

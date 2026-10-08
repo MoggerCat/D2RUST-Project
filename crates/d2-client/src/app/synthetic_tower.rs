@@ -76,6 +76,7 @@ pub fn maze_levels() -> impl Iterator<Item = u32> {
     std::iter::once(synthetic_maze::CAVE_LEVEL_1)
         .chain(TOWER_LEVELS)
         .chain(super::synthetic_act2::dungeon_levels())
+        .chain(super::synthetic_a1_maze::LEVELS)
 }
 
 #[cfg(test)]
