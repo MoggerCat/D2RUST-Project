@@ -264,6 +264,14 @@ impl<X: Pending> LevelView<RoomId> for Shared<'_, '_, X> {
             }
         }
     }
+    /// `0x006195A0` ([`super::warp_dest::destination`]).
+    fn warp_destination(
+        &self,
+        tile_room: RoomId,
+        tile_class: u32,
+    ) -> Option<crate::path::place_seams::WarpDestination<RoomId>> {
+        super::warp_dest::destination(&mut self.0.borrow_mut(), tile_room, tile_class)
+    }
     /// Act +0x08, the act's town level id (`drlg/levels.md` §1 table).
     fn act_start_level(&self, act: u8) -> u32 {
         crate::drlg::TOWN_LEVELS

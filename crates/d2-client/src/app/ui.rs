@@ -17,9 +17,10 @@
 
 use std::sync::Arc;
 
+use crate::assets::game_files::GameFiles;
 use bevy::prelude::*;
+use d2_data::bin::TableFiles;
 use d2_data::tables::{decode_all, Inventory};
-use d2_formats::mpq::ArchiveSet;
 
 use crate::assets::path::FileSource;
 use crate::bridge::mirror::{bridge_frame, mirror_units};
@@ -60,16 +61,16 @@ pub struct UiParts {
 impl UiParts {
     /// The parts of a live install: the `inventory` table of the user's
     /// `.bin` set (a load error is an error, not a fallback).
-    pub fn live(archives: Arc<ArchiveSet>) -> Result<Self, String> {
-        let set = d2_data::bin::load(&archives, "eng").map_err(|e| e.to_string())?;
+    pub fn live(archives: Arc<GameFiles>) -> Result<Self, String> {
+        let set = d2_data::bin::load_from(archives.as_ref(), "eng").map_err(|e| e.to_string())?;
         let table = set.table("inventory").ok_or("inventory not loaded")?;
         let rows: Vec<Inventory> = decode_all(table).map_err(|e| e.to_string())?;
-        let expansion_installed = archives.has_archive("d2exp.mpq");
+        let expansion_installed = archives.lod();
         let fonts = FontMeasure::load(archives.as_ref(), &CHARACTER_FONTS)?;
-        let resist_penalties =
-            super::single_player::client_resist_penalties(&archives).map_err(|e| e.to_string())?;
+        let resist_penalties = super::single_player::client_resist_penalties(archives.as_ref())
+            .map_err(|e| e.to_string())?;
         Ok(UiParts {
-            source: archives,
+            source: archives.source(),
             inv_areas: Some(rows.iter().map(inv_area).collect()),
             expansion_installed,
             fonts: Some(fonts),

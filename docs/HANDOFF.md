@@ -5577,7 +5577,7 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Priority P0 (wire byte layout).
 - Settles: `intents-events.md` §7.4 r3 (the 0x4C / 0x4D level byte: base + bonus clamped to a byte, PROVISIONAL); `pathing.md` §10 r2 (which player modes send 0x4C / 0x4D, and whether the attacker's own client receives them; d2rs-own today: every skill mode A1, A2, SC, TH, KK, S1–S4, SQ, own client included).
 - Steps: `record_packets.py --seconds 120` on two clients in one game (TCP/IP) in the Blood Moor: client A attacks a Fallen (left click, Attack), casts a point skill on the ground and a unit skill on a monster; a Fallen Shaman casts at A. Log every S→C 0x4C / 0x4D / 0x0C on both clients with the server tick and the caster's skill level.
-- Output: `rec94-packets.jsonl`.
+- Output: `rec96-packets.jsonl`.
 - Compare: the level byte against the skill level; the player modes that send a skill message and which clients get it; fold into the cited rules and drop their PROVISIONAL lines. Also note, for `stitch-server-core.md` §2, the hostility (`0x00554200`) and melee-range (`0x00622870`) answers seen (who can attack whom, the reach in sub-tiles).
 
 #### Priority 1
@@ -5802,6 +5802,13 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Output: `traces/raw/pc2rec-r94-packets.jsonl` + hook log.
 - Compare: the distance at which the hook first returns 1 and whether S→C 0x63 follows the C→S 0x13. Fold: write the range test into §7.1 r3 and drop its PROVISIONAL line.
 
+##### REC-99 [MANUAL] sim/path-placement.md §12.2 (C→S 0x13 on a warp tile, tile unit creation)
+- Priority P1.
+- Settles: sim/path-placement.md §12.2 callers (`0x00548C32`: what the 0x13 tile case checks before `0x005550B0`), `client/model.md` §8 rule 7 (the interact sender lists no tile case; `ui/controls.md` §6 r9.2 sends 0x13 (T, g) for a tile), and where 1.14d allocates the tile units from the type-5 presets (PROVISIONAL: every active room's type-5 presets become tile units once, `View::spawn_warp_tiles` in `crates/d2-sim/src/wiring/action/warp_tile.rs`; the 0x13 tile case is `View::warp_tile_message`, no range test).
+- Steps: `py tools/trace-recorder/record_packets.py --seconds 120` while clicking the Blood Moor cave entrance (Den of Evil) from 1, 3 and 8 subtiles away, once with the walk interrupted by a second click, plus a hook at `0x00548C32`.
+- Output: `traces/raw/pc2rec-r95-packets.jsonl` + hook log.
+- Compare: the C→S 0x13 (type, GUID) the client sends for a tile and when (on arrival or at once); the S→C 0x09 tile units of the room at join; the result of the warp (S→C 0x07, 0x15, 0x0D). Fold: write the tile case into §12.2 and drop the PROVISIONAL lines.
+
 ##### REC-50 [NO RUN] client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14
 - Priority P2.
 - Settles: client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14 r3 / OQ10 (reader of pet record +0x1C).
@@ -5931,8 +5938,20 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Output: screenshots / `--draws-every 1` trace.
 - Compare: cel draws (order, X, Y, mode) and marker lines vs §10 and §11.
 
+##### REC-102 [MANUAL] items/inventory-moves.md §7.17 (potion use from the belt: item-use spec `0x005BF240` unwritten)
+- Priority 3 (manual play). PROVISIONAL, `claude/q-belt-ui`: a belt healing potion attaches a `healthpot` (state 100) list with stat 74 for 100 frames; a mana potion a `manapot` (106) list with stat 26; `rvs` / `rvl` restore 35 % / 70 % of both at once. Amounts (hp 45/90/150/270/480, mp 30/60/120/225/450) and the duration are d2rs-own, unverified (`d2-sim/src/wiring/inventory/potion.rs`).
+- Steps: new Amazon in town, take damage, press belt key 1–4; `record_packets.py --seconds 60` plain.
+- Compare: the S→C 0x95 life/mana bytes per tick (and 0x9D removal) against the PROVISIONAL list; fold the real amounts, duration and message order into a new item-use spec.
+
 #### Deferred (not recorded; outside Phases 0–6)
 - IT-1 `formats/d2s.md` OQ1 (legacy loader `0x00534020`, pre-1.09 saves), IT-2 OQ2 (item records of save versions 0x5C–0x5F), `formats/d2s-legacy.md` and `items/bitstream-legacy.md` Pending lines (1.07 / 1.08 / 1.00–1.06 saves): need sample files and are only needed if old saves must load. Record only if the user opens that scope.
+##### REC-96 [ASSISTED] Level-up stat messages (S→C 0x1D-0x1F, 0x21) around a level-up
+- Priority 2 (the play preview sends them by a diff at the tick's sync).
+- Settles: PROVISIONAL `combat/vitals.md` §3 step 7 / `wiring::action::vitals_sync::stat_changes` (the original sends a changed stat from the unit's client update from the changed-stat array, `sim/stat-lists.md` §11; the preview sends level, stat points, skill points, attributes, the maxima and next-level experience against a per-client cache at the end of each tick), and PROVISIONAL `skills/levels.md` §6.4 (the message after a spent skill point: 0x21 skill, base level; what 0x3B sends on the validator's codes 2 / 3, OQ5).
+- Steps: a new character at level 1; `record_packets.py --seconds 120` through one kill that levels up (stat points and a skill point appear), then spend one stat point (C→S 0x3A) and one skill point (C→S 0x3B).
+- Output: `rec96-packets.jsonl`.
+- Compare: which S→C stat ids, in which order and in which tick follow the level-up; the stat ids and values after 0x3A; the 0x21 (and any 0x22 / 0x23) after 0x3B against `d2-server` `skills/world.rs` `add_skill_level`. Fold: replace the two PROVISIONAL points.
+
 - **REC-44** legacy saves, cited by the specs as the capture: `formats/d2s-legacy.md` OQ2 (load one 1.07 / 1.08 save, version 0x57 / 0x59, in 1.14d and compare the unit (stats, skills, items, hireling) with the rules), `items/bitstream-legacy.md` OQ1 (the same 1.07 / 1.08 save: every item against §2–§4, affix ids after the offset of §2 rule 3) and OQ2 (a 1.00–1.06 save, version 0x47, holding a stored, equipped, belt, cursor and socketed item, an ear and a corpse with an equipped item: compare with §6–§8 and edge cases 7–9). No such save exists on this PC; record only if the user opens that scope (steps: place the save in `%USERPROFILE%\Saved Games\Diablo II`, `record_packets.py --seconds 60` plain, then `tools/d2s_check.py`).
 
 #### [NO] Not reachable with the current setup (and why)
@@ -5992,5 +6011,7 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 | Two local sessions worked the same PC areas in parallel from different bases (2026-10-08, caught at the staging-6 merge: 8 of 9 PC 2 branches conflicted, "to reconcile" notes) | before writing, a lane diffs its files against every open integration branch (check: the lane start diffs its files against the open integration branches) |
 
 - **REC-QESC-1** Esc game menu art, layout and strings (PROVISIONAL, `ui/esc_menu.rs`, M22): `controls.md` §3 row 56 and `panels.md` §3.1 specify only when the menu opens and closes. Needed for the spec: the ui 9 box art file and frames, the entry rectangles, the strings (Options, Save and Exit Game, Return to Game by id), what Options opens, and what `0x00456300(0, 1)` closes on Esc. Capture: screenshot of the Esc menu at 800 × 600 and the draw calls while it is open. The preview draws a dark box with Font16 English text.
+- **REC-100** Hireling follow and fight (PROVISIONAL, `d2-server` `handlers/world/hireling_drive.rs`, M22): `hirelings-ai.md` §1 points to `ai-bodies-6.md` §7 for the Hireable think, but the live host has no AI target providers (`Pending::good_target_search`, owner link; `stitch-combat.md` §1 row 12) and `AppRest::HirelingRest` has no unit access. The preview runs a per-frame stand-in: hostile monster within 20 sub-tiles, walk to it, swing every 20 frames at mean `mindamage`/`maxdamage`; else walk or run to the owner past 6 sub-tiles. No XP share, drops, get-hit or `hireling.txt` skill pick. Needed for the spec: the target providers' rules (hostility, `0x00552FD0` owner), the swing/skill timing from the AI think. Capture: a merc in the Blood Moor, per-frame mode, position and target.
+- **REC-101** Hire list row text (PROVISIONAL, `app/hire_stats.rs`): the act of the list is not sent; the first act whose rolled row owns the name id is used; Life and Def read 0.
 - **REC-103** Stash grid and the inventory beside it (PROVISIONAL, `ui/panels/stash_items.rs`, `ui/root.rs`, M22): without `inventory.bin` rows the stash grid is the measured record 12 / 28 corner (`panels.md` §Test vectors: 6 × 8, cell 29, left 74 / 154, top 82 / 142); the classic stash (record 8 / 24, 6 × 4) is not measured and uses the same corner. `panels.md` §11 r2 says the right half shows the inventory, but the gate refuses opening ui 1 while the stash is open, so `UiRoot::sync_states` draws the inventory panel whenever ui 0x19 is open. Check: capture of the stash open at 800 × 600 in a classic and an expansion game (grid corner, inventory half), `ui-0001`.
 - **REC-104** Stash contents are not saved (PROVISIONAL, `app/save.rs`, q-stash): a played character's items, the stash included, are not written to the `.d2s` (the sim has no unit→save-record path wired to `write_save`, and `create_items` of a load is unapplied), so items put into the stash in a session are lost at exit and a loaded save's stash is not shown. A loaded save's item bytes pass through unchanged (stitch-save), so nothing is lost for a character that is not played with items. Needs: sim item unit → `StreamItem` → `write_save`, and `create_items` on load (`formats/d2s-load.md` §8.2), then a round-trip test (stash item in, save, load, same page-4 cell).

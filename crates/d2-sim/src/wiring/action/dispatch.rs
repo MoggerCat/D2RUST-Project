@@ -197,6 +197,12 @@ impl<X: Pending> ActionSim<X> {
         self.with(game, |g, v| v.object_message(g, player, guid))
     }
 
+    /// The C→S 0x13 tile case ([`View::warp_tile_message`]). `None`: no
+    /// path provider.
+    pub fn warp_tile_message(&mut self, game: &mut Game, player: UnitId, guid: u32) -> Option<u32> {
+        self.with(game, |g, v| v.warp_tile_message(g, player, guid))
+    }
+
     fn log(&mut self, r: Result<(), WiringError>) {
         if let Err(e) = r {
             self.sys.hooks.errors.push(e);

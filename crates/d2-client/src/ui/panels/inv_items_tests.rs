@@ -107,6 +107,7 @@ fn ui() -> (ItemsUi, UiFiles) {
         art,
         layouts: Some(vec![layout()]),
         frame_sizes: BTreeMap::new(),
+        shift: false,
     };
     let mut files = UiFiles::new(&[]);
     u.register_files(&mut files);
@@ -336,4 +337,80 @@ fn stash_grid_clicks_send_the_page_4_intents() {
     assert!(u
         .press_stash(&w, &files, &stash_grid(), Point::new(5, 5))
         .is_empty());
+}
+
+mod belt {
+    use super::*;
+    use crate::ui::original::hud_belt::{BeltParts, HudBelt};
+    use crate::ui::panels::control::belt::{BeltBox, BeltRecord};
+
+    fn parts() -> BeltParts {
+        // Four boxes in the strip (y 562..590, x 430 + 31 i), record
+        // 0 · 7 + type 2.
+        let boxes = (0..4)
+            .map(|i| BeltBox {
+                left: 430 + 31 * i,
+                right: 458 + 31 * i,
+                top: 562,
+                bottom: 590,
+            })
+            .collect();
+        let mut records = vec![BeltRecord { boxes: vec![] }; 2];
+        records.push(BeltRecord { boxes });
+        BeltParts {
+            records,
+            types: BTreeMap::new(),
+        }
+    }
+
+    // Covers: specs/ui/control-panel.md §5 r4
+    #[test]
+    fn a_belt_item_draws_in_its_box() {
+        let (u, files) = ui();
+        let w = world(&[(7, mode::BELT, (0, 1, 0, 0), b"hp1 ")], None);
+        let mut b = HudBelt {
+            parts: parts(),
+            ..Default::default()
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        b.draw(&w, &u, &files, (800, 600), false, (0, 0), true, &mut out);
+        let f = files.id("*items\\invhp1").unwrap();
+        // Box 1: left 461, top 562; cel at top + 29.
+        assert_eq!(images(&out), vec![(f, 0, 461, 591)]);
+    }
+
+    #[test]
+    fn clicking_the_belt_takes_and_puts_potions() {
+        let b = HudBelt {
+            parts: parts(),
+            ..Default::default()
+        };
+        // No cursor item: 0x24 [guid] on the occupied box 1.
+        let w = world(&[(7, mode::BELT, (0, 1, 0, 0), b"hp1 ")], None);
+        let sent: Vec<Vec<u8>> = b
+            .click(&w, false, (475, 570))
+            .into_iter()
+            .map(|i| i.0)
+            .collect();
+        assert_eq!(sent, vec![vec![0x24, 7, 0, 0, 0]]);
+        // A potion on the cursor and an empty box 2: 0x23 [guid][slot].
+        let w = world(&[(9, mode::CURSOR, (0, 0, 0, 0), b"hp1 ")], Some(9));
+        let sent: Vec<Vec<u8>> = b
+            .click(&w, false, (506, 570))
+            .into_iter()
+            .map(|i| i.0)
+            .collect();
+        assert_eq!(sent, vec![vec![0x23, 9, 0, 0, 0, 2, 0, 0, 0]]);
+        // Outside the boxes: nothing.
+        assert!(b.click(&w, false, (10, 10)).is_empty());
+    }
+
+    #[test]
+    fn shift_click_sends_0x63() {
+        let (mut u, files) = ui();
+        u.shift = true;
+        let w = world(&[(7, mode::STORED, (0, 2, 3, 1), b"hp1 ")], None);
+        let out = u.press(&w, &files, &layout(), Point::new(160, 290));
+        assert_eq!(intents(&out), vec![vec![0x63, 7, 0, 0, 0]]);
+    }
 }

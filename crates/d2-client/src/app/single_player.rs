@@ -73,6 +73,9 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use crate::assets::game_files::GameFiles;
+use crate::assets::path::{CanonicalPath, FileSource};
+use d2_data::bin::TableFiles;
 use d2_data::tables::{
     decode_all, Charstats, Difficultylevels, Itemstatcost, Levels, Monstats, Objects, Record,
     Shrines, Skills,
@@ -80,6 +83,7 @@ use d2_data::tables::{
 use d2_formats::animdata::AnimData;
 use d2_formats::d2s::{self, D2s, ReadOptions};
 use d2_formats::mpq::ArchiveSet;
+use d2_native::source::NativeAsset;
 use d2_server::adapters::character::LoadContext;
 use d2_server::adapters::handlers::skills::wired::WiredSkills;
 use d2_server::adapters::handlers::world::{
@@ -95,14 +99,14 @@ use d2_server::host::SystemClock;
 use d2_server::seams::{ClientId, Clock, PlayerGate};
 use d2_server::world_data::game::GameTables;
 use d2_server::world_data::tables::{drop_tables, hireling_tables, LevelTables, SaveData};
-use d2_server::world_data::{archive as world_archive, Dt1Files, WorldFiles};
+use d2_server::world_data::{self, Dt1Files, WorldFiles};
 use d2_sim::combat::vitals::VitalsTables;
 use d2_sim::combat::CombatTables;
 use d2_sim::drlg::maze::{Maze, MazeData};
 use d2_sim::drlg::room::LinkAt;
 use d2_sim::drlg::{
     CellGrid, Drlg, DrlgData, DrlgError, DrlgRoomId, Dungeon, GridPass, LevelDef, LevelIdx,
-    LevelTypes, RoomGrids, RoomKind, TileInfo, TileRect, TileSource,
+    LevelTypes, PresetUnit, RoomGrids, RoomKind, TileInfo, TileRect, TileSource, WarpDef,
 };
 use d2_sim::game::Game;
 use d2_sim::items::inventory::tables::InvTables;
@@ -154,6 +158,16 @@ pub const ACT1_TOWN: u32 = 1;
 /// The Blood Moor (act 0), east of the synthetic town's room.
 pub const BLOOD_MOOR: u32 = 2;
 pub const COLD_PLAINS: u32 = 3;
+/// The Den of Evil (act 0): the cave entrance in the Blood Moor is a
+/// level warp ([`BLOOD_MOOR_TO_DEN`] / [`DEN_TO_BLOOD_MOOR`]).
+pub const DEN_OF_EVIL: u32 = 8;
+/// The `lvlwarp` `Id` (and tile class) of the Blood Moor's cave entrance
+/// and of the Den's way back (synthetic rows 0 and 1).
+pub const BLOOD_MOOR_TO_DEN: u32 = 11;
+pub const DEN_TO_BLOOD_MOOR: u32 = 12;
+/// Sub-tile of a warp tile in its room (the 40 × 40 sub-tile room's
+/// middle) and the synthetic walk-out.
+pub const WARP_TILE_XY: i32 = 20;
 pub const ACT2_TOWN: u32 = 40;
 /// The default game seed.
 pub const DEFAULT_SEED: u32 = 1234;
@@ -534,9 +548,32 @@ impl LevelTypes for Types {
             if id == ACT1_TOWN || id == BLOOD_MOOR {
                 drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
             }
+            // The cave entrance pair: Blood Moor slot 1 ↔ Den slot 0.
+            if id == BLOOD_MOOR {
+                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0 << 1;
+            }
+            if id == DEN_OF_EVIL {
+                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
+            }
             drlg.link_room(r, LinkAt::Tail);
         }
         Ok(())
+    }
+    /// The warp tiles of the cave entrance pair (`path-placement.md`
+    /// §12.1 rule 3 shape: unit type 5, class = the lvlwarp `Id`, room
+    /// sub-tiles). d2rs-own, unverified.
+    fn preset_units(&self, drlg: &Drlg, room: DrlgRoomId) -> Vec<PresetUnit> {
+        let class = match drlg.level(drlg.room(room).level).id {
+            BLOOD_MOOR => BLOOD_MOOR_TO_DEN,
+            DEN_OF_EVIL => DEN_TO_BLOOD_MOOR,
+            _ => return Vec::new(),
+        };
+        vec![PresetUnit {
+            unit_type: 5,
+            class,
+            x: WARP_TILE_XY,
+            y: WARP_TILE_XY,
+        }]
     }
     fn room_grids(
         &mut self,
@@ -638,9 +675,9 @@ impl WaypointTables {
 
     /// The user's own `levels` and `objects` tables (`loading.md`: the
     /// live `.bin` set, validated).
-    pub fn live(archives: &ArchiveSet) -> Result<Self, BuildError> {
-        let set =
-            d2_data::bin::load(archives, "eng").map_err(|e| BuildError::Tables(e.to_string()))?;
+    pub fn live(archives: &dyn TableFiles) -> Result<Self, BuildError> {
+        let set = d2_data::bin::load_from(archives, "eng")
+            .map_err(|e| BuildError::Tables(e.to_string()))?;
         let table = |name: &str| {
             set.table(name)
                 .ok_or_else(|| BuildError::Tables(format!("{name} not loaded")))
@@ -668,6 +705,39 @@ impl WaypointTables {
     }
 }
 
+/// Every DS1 / DT1 the level types read, through the typed reads of
+/// `files` (archives or native alike).
+fn load_world_files(files: &GameFiles, levels: &LevelTables) -> Result<WorldFiles, BuildError> {
+    let read = |path: &[u8]| -> Result<NativeAsset, world_data::WorldDataError> {
+        let name = world_data::file_name(path)?;
+        let canon = CanonicalPath::new(&name).map_err(|e| world_data::WorldDataError::Read {
+            path: name.clone(),
+            detail: e.to_string(),
+        })?;
+        match files.read_native(&canon) {
+            Some(Ok(a)) => Ok(a),
+            Some(Err(detail)) => Err(world_data::WorldDataError::Read { path: name, detail }),
+            None => Err(world_data::WorldDataError::Read {
+                path: name,
+                detail: "in no archive".into(),
+            }),
+        }
+    };
+    Ok(WorldFiles::load_typed(
+        &levels.drlg,
+        &levels.preset,
+        &levels.outdoor,
+        |p| match read(p)? {
+            NativeAsset::Ds1(d) => Ok(d),
+            _ => Err(world_data::WorldDataError::BadPath(p.to_vec())),
+        },
+        |p| match read(p)? {
+            NativeAsset::Dt1(d) => Ok(d),
+            _ => Err(world_data::WorldDataError::BadPath(p.to_vec())),
+        },
+    )?)
+}
+
 /// Everything the game reads from the user's files, loaded up front.
 #[derive(Debug)]
 pub struct LiveData {
@@ -686,23 +756,29 @@ pub struct LiveData {
     /// The `.d2s` reader's tables (`--save`), for the app's expansion game.
     pub save: SaveData,
     /// The archive set itself (the client's other readers: sounds).
-    pub archives: Arc<ArchiveSet>,
+    pub archives: Arc<GameFiles>,
 }
 
 impl LiveData {
     /// Loads the table sets, the waypoint, drop, hireling and save tables
     /// and the level data (a table or a named file that is missing or does
     /// not parse is an error; nothing falls back to synthetic data).
-    pub fn load(archives: Arc<ArchiveSet>) -> Result<Self, BuildError> {
-        let waypoints = WaypointTables::live(&archives)?;
-        let tables = GameTables::load(&archives)?;
+    pub fn load(archives: Arc<GameFiles>) -> Result<Self, BuildError> {
+        let waypoints = WaypointTables::live(archives.as_ref())?;
+        let bins = d2_data::bin::load_from(archives.as_ref(), d2_data::bin::DEFAULT_LANGUAGE)
+            .map_err(|e| BuildError::Tables(e.to_string()))?;
+        let anim = match archives.read_native(
+            &CanonicalPath::new(d2_formats::animdata::PATH)
+                .map_err(|e| BuildError::Tables(format!("{}: {e}", d2_formats::animdata::PATH)))?,
+        ) {
+            Some(Ok(NativeAsset::AnimData(a))) => a,
+            Some(Ok(_)) => return Err(BuildError::Tables("AnimData.d2: wrong kind".into())),
+            Some(Err(e)) => return Err(BuildError::Tables(format!("AnimData.d2: {e}"))),
+            None => return Err(BuildError::Tables("AnimData.d2: in no archive".into())),
+        };
+        let tables = GameTables::from_loaded(bins, anim)?;
         let levels = LevelTables::from_fixed(&tables.fixed)?;
-        let files = WorldFiles::load(
-            &levels.drlg,
-            &levels.preset,
-            &levels.outdoor,
-            world_archive::reader(&archives),
-        )?;
+        let files = load_world_files(&archives, &levels)?;
         Ok(LiveData {
             waypoints,
             levels,
@@ -793,11 +869,22 @@ impl GameData {
                     message: e.to_string(),
                 })?;
                 Ok(GameData::Live(Arc::new(LiveData::load(Arc::new(
-                    archives,
+                    GameFiles::archives(Arc::new(archives)),
                 ))?)))
             }
             _ => Ok(GameData::Synthetic),
         }
+    }
+
+    /// The data of a converted native folder (`play --native DIR`,
+    /// `native-assets.md` §5): the same tables and level files, read from
+    /// the native source.
+    pub fn select_native(dir: &std::path::Path) -> Result<Self, BuildError> {
+        let files = GameFiles::native(dir).map_err(|message| BuildError::Archives {
+            dir: dir.display().to_string(),
+            message,
+        })?;
+        Ok(GameData::Live(Arc::new(LiveData::load(Arc::new(files))?)))
     }
 
     fn tables(&self) -> WaypointTables {
@@ -869,7 +956,7 @@ fn synthetic_drlg_data() -> DrlgData {
     let mut files = vec![Vec::new(); 32];
     files[0] = b"floor.dt1".to_vec();
     drlg.lvltypes = vec![vec![Vec::new(); 32], files];
-    for id in [ACT1_TOWN, BLOOD_MOOR, COLD_PLAINS, ACT2_TOWN] {
+    for id in [ACT1_TOWN, BLOOD_MOOR, COLD_PLAINS, DEN_OF_EVIL, ACT2_TOWN] {
         drlg.levels[id as usize].drlg_type = 2;
         drlg.levels[id as usize].level_type = 1;
     }
@@ -878,6 +965,22 @@ fn synthetic_drlg_data() -> DrlgData {
     // flag WARP_0 ([`Types`]).
     drlg.levels[ACT1_TOWN as usize].vis[0] = BLOOD_MOOR;
     drlg.levels[BLOOD_MOOR as usize].vis[0] = ACT1_TOWN;
+    // The cave entrance: a warp pair (lvlwarp rows 0 and 1) in slot 1 of
+    // the Blood Moor and slot 0 of the Den (`rooms.md` §3.3).
+    drlg.levels[BLOOD_MOOR as usize].vis[1] = DEN_OF_EVIL;
+    drlg.levels[BLOOD_MOOR as usize].warp[1] = BLOOD_MOOR_TO_DEN as i32;
+    drlg.levels[DEN_OF_EVIL as usize].vis[0] = BLOOD_MOOR;
+    drlg.levels[DEN_OF_EVIL as usize].warp[0] = DEN_TO_BLOOD_MOOR as i32;
+    drlg.warps = [BLOOD_MOOR_TO_DEN, DEN_TO_BLOOD_MOOR]
+        .iter()
+        .map(|&id| WarpDef {
+            id: id as i32,
+            direction: b'b',
+            ..WarpDef::default()
+        })
+        .collect();
+    // ExitWalkX/Y per row: the walk-out after the arrival.
+    drlg.warp_exits = vec![(0, 0), (3, 3)];
     drlg
 }
 
@@ -890,6 +993,7 @@ fn synthetic_types() -> Types {
         (ACT1_TOWN, TileRect::new(16, 0, 8, 8)),
         (BLOOD_MOOR, TileRect::new(24, 0, 8, 8)),
         (COLD_PLAINS, TileRect::new(0, 0, 8, 8)),
+        (DEN_OF_EVIL, TileRect::new(0, 8, 8, 8)),
         (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
     ]))
 }
@@ -984,8 +1088,9 @@ pub fn client_waypoint_map(data: &GameData) -> d2_sim::world::waypoints::Waypoin
 /// panel (`ui/panels.md` §8.9, `0x00611D30`; `panels-2.md` §24 r2), for
 /// [`crate::ui::original::OriginalUi::set_resist_penalties`]. The field
 /// is read as a signed value.
-pub fn client_resist_penalties(archives: &ArchiveSet) -> Result<Vec<i32>, BuildError> {
-    let set = d2_data::bin::load(archives, "eng").map_err(|e| BuildError::Tables(e.to_string()))?;
+pub fn client_resist_penalties(archives: &dyn TableFiles) -> Result<Vec<i32>, BuildError> {
+    let set =
+        d2_data::bin::load_from(archives, "eng").map_err(|e| BuildError::Tables(e.to_string()))?;
     let table = set
         .table("difficultylevels")
         .ok_or_else(|| BuildError::Tables("difficultylevels not loaded".into()))?;
@@ -1027,8 +1132,9 @@ pub fn walk_speeds(
 /// `EType`, `skilldesc`, `srvdofunc`; `skills/levels.md` §1, §6:
 /// `charclass`, `maxlvl`), one row per skill id, from the user's `skills`
 /// table.
-pub fn client_skill_rows(archives: &ArchiveSet) -> Result<Vec<SkillRow>, BuildError> {
-    let set = d2_data::bin::load(archives, "eng").map_err(|e| BuildError::Tables(e.to_string()))?;
+pub fn client_skill_rows(archives: &dyn TableFiles) -> Result<Vec<SkillRow>, BuildError> {
+    let set =
+        d2_data::bin::load_from(archives, "eng").map_err(|e| BuildError::Tables(e.to_string()))?;
     let table = set
         .table("skills")
         .ok_or_else(|| BuildError::Tables("skills not loaded".to_owned()))?;
@@ -1038,8 +1144,9 @@ pub fn client_skill_rows(archives: &ArchiveSet) -> Result<Vec<SkillRow>, BuildEr
 
 /// Each class's `charstats` `Skill 1`…`Skill 10` (`client/msg-skills.md`
 /// §2 rule 8), one entry per `charstats` row, from the user's table.
-pub fn client_class_skills(archives: &ArchiveSet) -> Result<Vec<[u16; 10]>, BuildError> {
-    let set = d2_data::bin::load(archives, "eng").map_err(|e| BuildError::Tables(e.to_string()))?;
+pub fn client_class_skills(archives: &dyn TableFiles) -> Result<Vec<[u16; 10]>, BuildError> {
+    let set =
+        d2_data::bin::load_from(archives, "eng").map_err(|e| BuildError::Tables(e.to_string()))?;
     let table = set
         .table("charstats")
         .ok_or_else(|| BuildError::Tables("charstats not loaded".to_owned()))?;
@@ -1089,8 +1196,9 @@ fn monster_setup(m: &Monstats, raw: &[u8], m2: &[u8]) -> MonsterSetup {
 
 /// The skills tables and formula buffers of the client's passive refresh
 /// (`client/msg-skills.md` §2 r4), from the user's tables.
-pub fn client_skill_tables(archives: &ArchiveSet) -> Result<SkillTables, BuildError> {
-    let set = d2_data::bin::load(archives, "eng").map_err(|e| BuildError::Tables(e.to_string()))?;
+pub fn client_skill_tables(archives: &dyn TableFiles) -> Result<SkillTables, BuildError> {
+    let set =
+        d2_data::bin::load_from(archives, "eng").map_err(|e| BuildError::Tables(e.to_string()))?;
     SkillTables::from_bin(&set, d2_sim::skills::LEVEL_CAP_114D)
         .map_err(|e| BuildError::Tables(e.to_string()))
 }
@@ -1101,8 +1209,9 @@ pub fn client_skill_tables(archives: &ArchiveSet) -> Result<SkillTables, BuildEr
 /// `itemstatcost` send columns; §1.3 r3 and `client/model.md` §15 r1,
 /// `render/lighting.md` OQ 11: `objects.txt` and the `shrines.txt`
 /// codes), from the user's tables.
-pub fn client_unit_rows(archives: &ArchiveSet) -> Result<UnitRows, BuildError> {
-    let set = d2_data::bin::load(archives, "eng").map_err(|e| BuildError::Tables(e.to_string()))?;
+pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildError> {
+    let set =
+        d2_data::bin::load_from(archives, "eng").map_err(|e| BuildError::Tables(e.to_string()))?;
     let table = |name: &str| {
         set.table(name)
             .ok_or_else(|| BuildError::Tables(format!("{name} not loaded")))

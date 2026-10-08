@@ -26,6 +26,7 @@
 //! and the cube on the same unit world).
 
 mod action;
+mod hireling_drive;
 mod hireling_host;
 mod wired;
 
@@ -85,6 +86,9 @@ pub enum System {
     Quests,
     /// The object case of 0x13 (unit type 2; [`route`]).
     Objects,
+    /// The tile case of 0x13 (unit type 5, a level warp; [`route`]).
+    /// PROVISIONAL (REC-99).
+    Warps,
 }
 
 /// Every world-related C→S id (`client-messages.tsv`): (id, owner spec
@@ -208,6 +212,9 @@ pub fn route(msg: &[u8]) -> Option<System> {
     if id == 0x13 && msg.len() == 9 && msg[1..5] == 2u32.to_le_bytes() {
         return Some(System::Objects);
     }
+    if id == 0x13 && msg.len() == 9 && msg[1..5] == 5u32.to_le_bytes() {
+        return Some(System::Warps);
+    }
     system(id)
 }
 
@@ -324,6 +331,18 @@ pub trait WorldHost<D> {
         player: UnitId,
         guid: u32,
     ) -> Option<ObjectCase> {
+        None
+    }
+    /// The C→S 0x13 tile case (a level warp, `path-placement.md` §12.2;
+    /// PROVISIONAL, REC-99) by `player` on the tile with `guid`: the
+    /// result code. `None`: no provider.
+    fn warp_tile(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        player: UnitId,
+        guid: u32,
+    ) -> Option<u32> {
         None
     }
     /// The cube (`handlers::items`) on the host's economy.
@@ -479,6 +498,12 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
             .world
             .waypoints(game, events, WaypointRun { player, msg }),
         System::Quests => sim.world.quests(game, events, QuestRun { player, msg }),
+        System::Warps => {
+            let guid = u32::from_le_bytes([msg[5], msg[6], msg[7], msg[8]]);
+            sim.world
+                .warp_tile(game, events, player, guid)
+                .map(|c| Ok(Some(c)))
+        }
         System::Objects => {
             let guid = u32::from_le_bytes([msg[5], msg[6], msg[7], msg[8]]);
             match sim.world.objects(game, events, player, guid)? {

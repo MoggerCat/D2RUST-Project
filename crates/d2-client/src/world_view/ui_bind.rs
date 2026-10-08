@@ -13,6 +13,7 @@
 //! in [`OriginalTextHooks`].
 
 use crate::assets::path::CanonicalPath;
+use crate::assets::path::{read_dc6, read_font_table};
 use crate::bridge::click::ClickView;
 use crate::bridge::link::ServerLink;
 use crate::bridge::{Bridge, BridgeError};
@@ -187,16 +188,12 @@ impl TextAssetLoader {
             let UiDraw::Text(req) = d else { continue };
             let font = original_text_font(req.style)?;
             if !assets.fonts.contains_key(&font.table) {
-                let bytes = self.read(font.table.as_str())?;
-                let table = d2_formats::font::FontTable::parse(&bytes)
-                    .map_err(|e| fail(font.table.as_str(), e.to_string()))?;
+                let table = self.read_typed(font.table.as_str(), read_font_table)?;
                 assets.fonts.insert(font.table.clone(), table);
             }
             if !assets.frames.contains(&font.glyphs) {
                 let path = font.glyphs.path().to_owned();
-                let bytes = self.read(&path)?;
-                let dc6 =
-                    d2_formats::dc6::Dc6::parse(&bytes).map_err(|e| fail(&path, e.to_string()))?;
+                let dc6 = self.read_typed(&path, read_dc6)?;
                 let frames = crate::frames::FrameSet::from_dc6(&dc6, 0)
                     .map_err(|e| fail(&path, e.to_string()))?;
                 assets.frames.insert(font.glyphs.clone(), frames)?;
@@ -205,10 +202,13 @@ impl TextAssetLoader {
         Ok(())
     }
 
-    fn read(&self, path: &str) -> Result<Vec<u8>, ViewError> {
+    fn read_typed<T>(
+        &self,
+        path: &str,
+        read: fn(&dyn crate::assets::path::FileSource, &str) -> Option<Result<T, String>>,
+    ) -> Result<T, ViewError> {
         let archive = path.replace('/', "\\");
-        self.source
-            .read_file(&archive)
+        read(self.source.as_ref(), &archive)
             .ok_or_else(|| fail(path, "in no archive".into()))?
             .map_err(|e| fail(path, e))
     }

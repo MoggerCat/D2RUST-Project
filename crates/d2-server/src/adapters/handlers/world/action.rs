@@ -183,6 +183,17 @@ where
         events.action().operate_object_message(game, player, guid)
     }
 
+    /// The 0x13 tile case on the action wiring (REC-99).
+    fn warp_tile(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        player: UnitId,
+        guid: u32,
+    ) -> Option<u32> {
+        events.action().warp_tile_message(game, player, guid)
+    }
+
     fn skill(&mut self, call: SkillCall<'_, D>) -> Option<SkillHandled> {
         self.skills.handle(call)
     }

@@ -4,15 +4,15 @@
 //! (§4 r1), from the user's `.bin` set.
 
 use bevy::prelude::*;
+use d2_data::bin::TableFiles;
 use d2_data::tables::{decode_all, Experience, Skilldesc, Skills};
-use d2_formats::mpq::ArchiveSet;
 
 use crate::ui::original::hud::HudTables;
 use crate::world_view::WorldViewUi;
 
 /// The HUD tables of a live install.
-pub fn hud_tables(archives: &ArchiveSet) -> Result<HudTables, String> {
-    let set = d2_data::bin::load(archives, "eng").map_err(|e| e.to_string())?;
+pub fn hud_tables(archives: &dyn TableFiles) -> Result<HudTables, String> {
+    let set = d2_data::bin::load_from(archives, "eng").map_err(|e| e.to_string())?;
     let table = |name: &str| set.table(name).ok_or(format!("{name} not loaded"));
     let skills: Vec<Skills> = decode_all(table("skills")?).map_err(|e| e.to_string())?;
     let descs: Vec<Skilldesc> = decode_all(table("skilldesc")?).map_err(|e| e.to_string())?;
@@ -44,7 +44,7 @@ pub fn hud_tables(archives: &ArchiveSet) -> Result<HudTables, String> {
 }
 
 /// Gives the original UI of `app` the tables of `archives`.
-pub fn install_hud_tables(app: &mut App, archives: &ArchiveSet) -> Result<(), String> {
+pub fn install_hud_tables(app: &mut App, archives: &dyn TableFiles) -> Result<(), String> {
     let tables = hud_tables(archives)?;
     set_hud_tables(app, tables);
     Ok(())

@@ -369,29 +369,6 @@ fn view(o: Options) -> Result<()> {
     }
 }
 
-/// `play` on a native folder (`native-assets.md` §3.4, §5): opens and
-/// checks the root and loads the table set from it. The play app still
-/// reads levels, UI art and sound through the archive set, so it stops
-/// there with the seams named (`docs/handoff/native-n4.md`).
-fn play_native(dir: &std::path::Path) -> Result<()> {
-    let src = d2_native::source::NativeSource::open(dir)?;
-    println!(
-        "play: native folder {} (converter {}, {} mod layer(s))",
-        dir.display(),
-        src.manifest.converter_version,
-        src.layers.layers.len() - 1
-    );
-    let tables = src.tables(d2_data::bin::DEFAULT_LANGUAGE)?;
-    let bins = d2_data::bin::load_from(&tables, d2_data::bin::DEFAULT_LANGUAGE)?;
-    println!(
-        "play: native tables loaded ({} runtime tables)",
-        bins.tables.len()
-    );
-    bail!(
-        "play on a native folder: the source and tables load, but the play app still reads its levels, UI and sound through the archive set (seams in docs/handoff/native-n4.md); run with D2_GAME_DIR for now"
-    )
-}
-
 fn play(o: Options) -> Result<()> {
     use d2_client::app::{play, single_player};
     let choice = d2_client::assets::choose_source(
@@ -401,16 +378,22 @@ fn play(o: Options) -> Result<()> {
         d2_client::assets::default_native_dir(),
     )
     .map_err(anyhow::Error::msg)?;
-    if let d2_client::assets::SourceChoice::Native(dir) = &choice {
-        if !o.synthetic {
-            return play_native(dir);
-        }
-    }
+    let native = match &choice {
+        d2_client::assets::SourceChoice::Native(dir) if !o.synthetic => Some(dir.clone()),
+        _ => None,
+    };
     let dir = std::env::var_os("D2_GAME_DIR").map(PathBuf::from);
-    let data = single_player::GameData::select(dir.as_deref(), o.synthetic)?;
+    let data = match &native {
+        Some(dir) => single_player::GameData::select_native(dir)?,
+        None => single_player::GameData::select(dir.as_deref(), o.synthetic)?,
+    };
+    let origin = match &native {
+        Some(dir) => format!("native folder {}", dir.display()),
+        None => "D2_GAME_DIR".to_owned(),
+    };
     match &data {
         single_player::GameData::Live(d) => println!(
-            "play: game data from D2_GAME_DIR ({} levels, {} objects, waypoint object class {}; level files: {} DS1, {} lvlsub DS1, {} DT1)",
+            "play: game data from {origin} ({} levels, {} objects, waypoint object class {}; level files: {} DS1, {} lvlsub DS1, {} DT1)",
             d.waypoints.levels.len(),
             d.waypoints.objects.len(),
             d.waypoints.object_class,

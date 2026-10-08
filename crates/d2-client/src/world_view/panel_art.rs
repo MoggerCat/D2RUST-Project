@@ -215,12 +215,9 @@ impl PanelArtLoader {
                 assets.frames.insert(set, frames)?;
                 continue;
             }
-            let bytes = self
-                .source
-                .read_file(&archive)
+            let dc6 = crate::assets::path::read_dc6(self.source.as_ref(), &archive)
                 .ok_or_else(|| fail("in no archive".into()))?
                 .map_err(fail)?;
-            let dc6 = d2_formats::dc6::Dc6::parse(&bytes).map_err(|e| fail(e.to_string()))?;
             let frames = FrameSet::from_dc6(&dc6, 0).map_err(|e| fail(e.to_string()))?;
             assets.frames.insert(set, frames)?;
         }

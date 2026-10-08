@@ -451,6 +451,16 @@ impl OriginalUi {
         self.shared.borrow_mut().items.layouts = Some(layouts);
     }
 
+    /// The `belts.bin` records and the belts' types (`hud_belt`).
+    pub fn set_belt_parts(&mut self, parts: hud_belt::BeltParts) {
+        self.shared.borrow_mut().hud.belt.parts = parts;
+    }
+
+    /// Shift is held (set by the host each frame, `inv_items`).
+    pub fn set_shift(&mut self, shift: bool) {
+        self.shared.borrow_mut().items.shift = shift;
+    }
+
     /// Measured item graphic frame sizes by `invfile` (lower case).
     pub fn set_item_frame_sizes(&mut self, sizes: BTreeMap<String, (u32, u32)>) {
         self.shared.borrow_mut().items.frame_sizes = sizes;
@@ -805,10 +815,9 @@ impl FontMeasure {
         for &id in ids {
             let info = super::font_info(id).ok_or(format!("font id {id} is not 0–13"))?;
             let archive = info.tbl_path.replace('/', "\\");
-            let bytes = source
-                .read_file(&archive)
-                .ok_or(format!("{archive}: in no archive"))??;
-            let table = FontTable::parse(&bytes).map_err(|e| format!("{archive}: {e}"))?;
+            let table = crate::assets::path::read_font_table(source, &archive)
+                .ok_or(format!("{archive}: in no archive"))?
+                .map_err(|e| format!("{archive}: {e}"))?;
             m.insert(id, table);
         }
         Ok(m)
@@ -1049,6 +1058,9 @@ impl Panel for BorderUi {
 pub mod esc_menu;
 #[path = "hud.rs"]
 pub mod hud;
+
+#[path = "hud_belt.rs"]
+pub mod hud_belt;
 
 #[path = "msg_ui.rs"]
 pub mod msg_ui;

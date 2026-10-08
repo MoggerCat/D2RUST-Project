@@ -38,6 +38,7 @@ pub mod switch;
 pub mod unit_update;
 pub mod units;
 pub mod vitals_sync;
+pub mod warp_tile;
 pub mod waypoints;
 
 #[cfg(any(test, feature = "bench-fixtures"))]

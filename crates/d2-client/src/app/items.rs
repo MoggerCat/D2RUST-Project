@@ -9,11 +9,12 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use bevy::prelude::*;
+use d2_data::bin::TableFiles;
 use d2_data::tables::{decode_all, Armor, Inventory, Misc, Record, Weapons};
-use d2_formats::mpq::ArchiveSet;
 
 use crate::assets::path::FileSource;
 use crate::bridge::items::{ItemArtRow, ItemArtRows};
+use crate::ui::original::hud_belt::BeltParts;
 use crate::ui::original::OriginalUi;
 use crate::ui::panels::inv_items::inv_layout;
 use crate::world_view::ground_items::GroundItems;
@@ -25,6 +26,8 @@ use crate::world_view::WorldViewState;
 pub struct ItemParts {
     pub art: ItemArtRows,
     pub inventory: Vec<Inventory>,
+    /// The belt records and types (`ui::hud_belt`).
+    pub belts: BeltParts,
 }
 
 /// A table's string column (zero-terminated).
@@ -64,8 +67,8 @@ macro_rules! art {
 }
 
 /// The item parts of the user's tables (a load error is an error).
-pub fn item_parts(archives: &ArchiveSet) -> Result<ItemParts, String> {
-    let set = d2_data::bin::load(archives, "eng").map_err(|e| e.to_string())?;
+pub fn item_parts(archives: &dyn TableFiles) -> Result<ItemParts, String> {
+    let set = d2_data::bin::load_from(archives, "eng").map_err(|e| e.to_string())?;
     let mut rows = BTreeMap::new();
     add_rows::<Weapons>(&set, &mut rows, |r| art!(r))?;
     add_rows::<Armor>(&set, &mut rows, |r| art!(r))?;
@@ -75,7 +78,29 @@ pub fn item_parts(archives: &ArchiveSet) -> Result<ItemParts, String> {
     Ok(ItemParts {
         art: ItemArtRows(rows),
         inventory,
+        belts: belt_parts(&set).unwrap_or_else(|e| {
+            warn!("belt (d2rs-own, unverified): {e}; no belt row");
+            BeltParts::default()
+        }),
     })
+}
+
+/// The `belts.bin` records (`BeltRecord::from_bytes` of each 0x108-byte
+/// record) and the worn belts' rows (`armor` `belt`).
+fn belt_parts(set: &d2_data::bin::BinSet) -> Result<BeltParts, String> {
+    use crate::ui::panels::control::belt::BeltRecord;
+    let table = set.table("belts").ok_or("belts not loaded")?;
+    let records = table
+        .records
+        .chunks(table.record_size.max(1))
+        .filter_map(BeltRecord::from_bytes)
+        .collect();
+    let armor = set.table(Armor::TABLE).ok_or("armor not loaded")?;
+    let armor: Vec<Armor> = decode_all(armor).map_err(|e| e.to_string())?;
+    // `belt` 0 is also the default of non-belts: only belt items matter,
+    // and the host looks up the worn item at body location 8.
+    let types = armor.iter().map(|r| (r.code, r.belt)).collect();
+    Ok(BeltParts { records, types })
 }
 
 /// Hands the item parts to the world view's ground items (with `source`
@@ -96,4 +121,5 @@ pub fn prepare_ui(app: &App, original: &mut OriginalUi) {
     };
     original.set_item_art(parts.art.clone());
     original.set_inv_layouts(parts.inventory.iter().map(inv_layout).collect());
+    original.set_belt_parts(parts.belts.clone());
 }

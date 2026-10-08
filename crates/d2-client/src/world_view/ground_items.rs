@@ -304,10 +304,8 @@ fn load(
     let archive = flippy_archive_name(name);
     let path = CanonicalPath::new(&archive).map_err(|e| e.to_string())?;
     let key = FrameSetKey::new(path.as_str(), FramePart::Dir(0)).map_err(|e| e.to_string())?;
-    let bytes = source
-        .read_file(&archive)
+    let dc6 = crate::assets::path::read_dc6(source, &archive)
         .ok_or_else(|| "in no archive".to_string())??;
-    let dc6 = d2_formats::dc6::Dc6::parse(&bytes).map_err(|e| e.to_string())?;
     let frames = dc6.header.frames_per_direction as usize;
     if !assets.frames.contains(&key) {
         let set = FrameSet::from_dc6(&dc6, 0).map_err(|e| e.to_string())?;

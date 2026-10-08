@@ -1194,22 +1194,21 @@ fn belt_moves() {
     assert_eq!(bytes, t.pass(&[x9c(0x10, b), x9c(0x10, a)]));
 }
 
-/// 0x26 (§7.17): a belt potion used on the player (seam `use_item`,
-/// logged); not used → nothing more, 0. Used → charge update and removal
-/// (seams), 0.
+/// 0x26 (§7.17): a belt potion used on the player. PROVISIONAL (the
+/// item-use spec is unwritten): the host applies the potion itself, so
+/// the item leaves with the removal message (0x9D action 5, flag 0x20)
+/// and the rest's `use_item` is not asked.
 // Covers: specs/items/inventory-moves.md §7.17
 #[test]
 fn use_belt_item() {
     let mut t = setup();
     let a = t.picked(HP1);
-    let me = t.pguid();
     t.rest.take_log();
-    assert_eq!(t.frame(&msg(0x26, &[a, 0, 0])), (Done, NO_BYTES));
-    assert_eq!(t.rest.take_log(), [format!("use_item {me} {me} {a}")]);
-    t.rest.with(|r| r.use_ok = true);
-    assert_eq!(t.frame(&msg(0x26, &[a, 0, 0])).0, Done);
-    assert_eq!(t.rest.take_log(), [format!("use_item {me} {me} {a}")]);
-    assert_eq!(t.mode(a), 2, "the removal is the item-use spec's");
+    let (code, bytes) = t.frame(&msg(0x26, &[a, 0, 0]));
+    assert_eq!(code, Done);
+    assert_eq!(bytes.len(), 1);
+    assert_eq!(&bytes[0][..2], &[0x9D, 0x05]);
+    assert!(t.rest.take_log().is_empty());
 }
 
 /// 0x63 (§7.24): a stored potion to the first free belt slot. The two
