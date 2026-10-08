@@ -591,6 +591,7 @@ fn world_view_frame(
     mut sounds: Option<ResMut<UiSounds>>,
     mut walk: Option<ResMut<PreviewWalk>>,
     mut exit: MessageWriter<AppExit>,
+    mut windows: Query<&mut Window, With<PrimaryWindow>>,
 ) -> Result {
     let tick = bridge.0.world().server_ticks;
     if tick == 0 || state.last.is_some_and(|l| l.server_tick == tick) {
@@ -619,6 +620,14 @@ fn world_view_frame(
                 ui.original.as_mut(),
             )?;
             if let Some(original) = ui.original.as_mut() {
+                // The cursor jump of §4.3: warp the window cursor.
+                if let (Some(at), Ok(mut window)) =
+                    (original.take_cursor_warp(), windows.single_mut())
+                {
+                    if let Ok(pos) = edge::frame_to_window(&window, at) {
+                        window.set_physical_cursor_position(Some(pos.as_dvec2()));
+                    }
+                }
                 let outcome = original.take_outcome();
                 for e in &outcome.effects {
                     debug!("ui: {e:?}");
