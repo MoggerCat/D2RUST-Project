@@ -19,7 +19,7 @@ rules are `docs/handoff/build-loop.md`, the task rows are
 - Also merged (after PR #49 opened; not in it): q-a2-tyrael, q-town-gaps,
   q-menu-host, q-menu-loading, q-menu-difficulty, q-menu-create,
   q-menu-cinematics, q-menu-controls (6,900 tests).
-- **Check first (logged test change, q-town-gaps merge):** q-charms
+- **Check first: settled 2026-10-08 (third coordinator)** — `client/stat-lists.md` §1–§2 says base-only 0x1D and the client attaches each equipped item's list from its 0x9C/0x9D property stream (`items/bitstream.md` §4.6, already decoded by `d2_proto::item_bits`); the 0xFE/0xFD pseudo states are d2rs-own. Queued as row `q-item-bonus-wire` (REC-188). Original note: q-charms
   (REC-163) sent item-bonus totals in the base stat messages 0x1D;
   q-town-gaps changed that to base-only 0x1D plus bonus lists on pseudo
   states 0xFE/0xFD (0xA9), and rewrote the two vitals_sync tests to
@@ -47,6 +47,8 @@ rules are `docs/handoff/build-loop.md`, the task rows are
   Use REC-187.
 
 ## REC ids
+
+Batch launched 2026-10-08 (third coordinator, session_01QeN5r8PoLZsUhwAH2iDzLJ): q-menu-options REC-187, q-item-bonus-wire REC-188, q-fe-draw REC-189, q-fe-host-screens REC-231, q-skill-leap-talon REC-232, q-assassin-gaps REC-233, q-a2-tyrael-door REC-234, q-a4-quest-items REC-235; q-fe-start-flow REC-236 (launch after q-fe-host-screens merges). Next free after these: REC-237.
 
 Staging uses up to REC-186 plus REC-230 (REC-231 was renumbered away everywhere) (q-levels-warps-all); the front-
 end specs use REC-200..213 and REC-220..229. 164, 169 and 171 were

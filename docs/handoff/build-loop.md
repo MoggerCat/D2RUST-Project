@@ -25,5 +25,5 @@ Every commit message ends with:
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
 Claude-Session: <your session URL>
 
-Write docs/handoff/<task>.md (links connected, PROVISIONAL points, what's left, the user's local check: exact commands and what they should see), push, then send_message to session_01HvRxiwWBvDAgp82ZPnvPPR with the head SHA and a 4-line summary. Then stop.
+Write docs/handoff/<task>.md (links connected, PROVISIONAL points, what's left, the user's local check: exact commands and what they should see), push, then send_message to session_01QeN5r8PoLZsUhwAH2iDzLJ with the head SHA and a 4-line summary. Then stop.
 
