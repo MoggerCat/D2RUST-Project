@@ -54,13 +54,13 @@
 |   24. Wussie (131) `0x005EE3C0` | 600–627 |
 |   25. UberIzual (144) `0x005F8C80` | 628–643 |
 |   26. UberBaal (145), UberMephisto (146), UberDiablo (147) | 644–696 |
-|   27. ShadowMaster (106) `0x005EB970`, init `0x005EB490`; ShadowMasterNoInit (143), init `0x005EB5C0` | 697–839 |
-| Constants & data dependencies | 840–862 |
-| Randomness | 863–870 |
-| Edge cases & original bugs | 871–887 |
-| Test vectors | 888–905 |
-| Provenance | 906–937 |
-| Open questions | 938–949 |
+|   27. ShadowMaster (106) `0x005EB970`, init `0x005EB490`; ShadowMasterNoInit (143), init `0x005EB5C0` | 697–846 |
+| Constants & data dependencies | 847–869 |
+| Randomness | 870–877 |
+| Edge cases & original bugs | 878–894 |
+| Test vectors | 895–915 |
+| Provenance | 916–947 |
+| Open questions | 948–959 |
 <!-- /index -->
 
 ## Summary
@@ -749,12 +749,14 @@ K0; skill 0 ensured; left and right := 0; no class skills.
    traps) → shadows += 1, next. Else U with unit flag 0x4 and hostile
    to the unit: O ≠ 0 → dO := squared distance O→U; dO ≤ 100 → nearO +=
    1; dO < distO → bestO := U, distO := dO. dU := squared distance
-   unit→U ≤ 1024 → n += 1; dU ≤ 100 → near += 1; dU < dist → best := U,
-   dist := dU; U is "notable" (below) → boss := U.
-   PROVISIONAL: the n, near, best and notable tests are independent
-   (each is applied whatever the others gave; a U beyond 1024 skips
-   only n) (because the callback has no early return after the
-   counters); settled by REC-80.
+   unit→U; dU > 1024 → next U (the O counters above still counted it).
+   Else n += 1; dU ≤ 100 → near += 1; dU < dist → best := U, dist :=
+   dU; U is "notable" (below) → boss := U. So near, best and boss only
+   ever hold units within squared distance 1024 of the unit; a far
+   notable U never becomes boss. 1.14d-confirmed (asm): `0x005EB79B`
+   `cmp eax, 0x400` / `jg 0x5EB7CD` jumps past the n, near, best and
+   notable blocks (`0x005EB7A2`–`0x005EB7CA`) to the return; the dO
+   block (`0x005EB771`–`0x005EB78F`) runs before it.
 9. C = 0: T := X if set, else bestO if set, else boss when its squared
    distance < 1024. Then T not notable, T's minion owner (`0x0058F0D0(T)`)
    alive and within squared distance 1024 → T := that leader.
@@ -775,9 +777,10 @@ K0; skill 0 ensured; left and right := 0; no class skills.
     unless noted. By `aitype` (+0x230):
     - 1: `aurastate` > 0 and the unit lacks it → s := 0. dist ≤ 25 → −6.
       Same-group state active (`0x005EB7F0`) → −10, else +10. s := pick;
-      target := **the unit**. PROVISIONAL: "lacks it → s := 0" ends
-      the case (no pick, no draw) (because s = 0 is never appended);
-      settled by REC-82.
+      target := **the unit**. "Lacks it → s := 0" ends the case: no
+      dist / group test, no `roll(A2n)` draw, and s = 0 is never
+      appended. 1.14d-confirmed (asm): `0x005EC029` `je 0x5EC4F5` goes
+      to the append test, past the draw at `0x005EC05C`.
     - 2: the unit has `aurastate` (> 0) or T has `auratargetstate` (> 0)
       → s := 0. Else dist ≤ 25 → −10; s := pick.
     - 3: shadows > 5 → −2·shadows; dist ≤ 25 → −7; n < 3 → −10; s :=
@@ -789,10 +792,14 @@ K0; skill 0 ensured; left and right := 0; no class skills.
       `progressive` (flags +4 bit 2): the unit has `aurastate` (> 0)
       with a stat list holding `aurastat1` = v → charges += v, v ≥ 3 →
       s := 0; otherwise (4) + A1h, s := pick; (12) s := pick, +8 when L <
-      75, +12 more when L < 50. Not progressive (4 only): A1h > 0 and
-      not pg → −10, else + 4·charges + 3; s := pick. PROVISIONAL: a
-      non-progressive aitype 12 skill takes this same rule (because
-      the progressive test is shared by 4 and 12); settled by REC-82.
+      75, +12 more when L < 50. Not progressive: (4) A1h > 0 and not pg
+      → −10, else + 4·charges + 3; s := pick. (12) the same rule as the
+      progressive case with no charge stop: s := pick, +8 when L < 75,
+      +12 more when L < 50 (no A1h, pg or charges term). 1.14d-confirmed
+      (asm): in the aitype-12 case the progressive test `0x005EC406`
+      jumps on clear straight to the draw `0x005EC45F` and the L
+      bonuses `0x005EC46B`–`0x005EC478`; only the aitype-4 case
+      (`0x005EC124` onward) has the A1h / pg branch.
     - 5 and 11: clear, and (`srvmissile` ≥ 0, or `srvmissilea` < 0, or
       its missile row missing, or dT < (missile `Range` − 1)²);
       otherwise s := 0. dist ≤ 25 → −5; dT ≤ 25 → −5; pg → −5. (5) s :=
@@ -900,6 +907,9 @@ Synthetic (CI-safe), draws given as `lo' % 100` unless noted:
 | Spirit, param 0 = 0, C = 1 | none | param 0 := 1, A1 |
 | UberMephisto, any | none | nothing scheduled |
 | SiegeTower, owner alive | none | idle 40 |
+| ShadowMaster scan (§27 step 8), one hostile notable U at squared distance 2000, no other unit | none | n = near = 0, best = boss = none |
+| ShadowMaster scoring, aitype 1 skill, `aurastate` > 0 not on the unit | none (no `roll(A2n)`) | s = 0, not appended |
+| ShadowMaster scoring, aitype 12, not progressive, T a player, L = 40, base 5 after the A1n / A1m / C terms, `roll(A2n)` = 7 | 1 | s = 7 + 5 + 8 + 12 = 32 (no A1h / pg term) |
 
 Game-file vectors: Open question 1.
 
