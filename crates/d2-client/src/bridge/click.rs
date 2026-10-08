@@ -724,7 +724,7 @@ mod tests {
         use crate::bridge::world::{MonsterClass, MONSTER};
         // Model (100, 100), the walk prediction at (121, 100), a town NPC
         // at (122, 100): next to the player's own position, so the click
-        // interacts at once (C→S 0x13) instead of walking there.
+        // interacts at once instead of walking there.
         let mut w = world();
         w.set_local_walk(Some(((121 << 16) | 0x8000, (100 << 16) | 0x8000)), None);
         let npc = UnitKey::new(MONSTER, 9);
@@ -747,24 +747,21 @@ mod tests {
         };
         assert!(c.path_distance(npc) <= 2, "{}", c.path_distance(npc));
         let cam = c.camera().unwrap();
-        let at = (0..800)
-            .flat_map(|x| (0..550).map(move |y| (x, y)))
-            .find(|&(x, y)| screen_to_world(&cam, x, y) == (122, 100))
-            .expect("the NPC is on screen");
+        let at = crate::bridge::hover::feet(&cam, MONSTER, (122, 100));
+        // The play preview's pick (`bridge::hover`) finds the NPC under
+        // the press.
+        let mut v = view(at);
+        v.pick = true;
         let mut st = ClickState::default();
-        world_click(
-            &mut w,
-            &inputs,
-            &mut st,
-            view(at),
-            Kind::LeftDown,
-            Some(at),
-            0,
-        )
-        .unwrap();
-        let mut want = vec![0x13];
-        want.extend_from_slice(&1u32.to_le_bytes());
-        want.extend_from_slice(&9u32.to_le_bytes());
-        assert_eq!(w.outgoing, vec![want], "C→S 0x13 [type 1][guid 9]");
+        world_click(&mut w, &inputs, &mut st, v, Kind::LeftDown, Some(at), 0).unwrap();
+        // The NPC hold (C→S 0x59 with the NPC's cell) and the interact
+        // (§6 r9.2: reach 2, the interact sender), no walk to the unit:
+        // from the model cell (distance 21) a C→S 0x02 would follow.
+        let mut hold = vec![0x59];
+        hold.extend_from_slice(&1u32.to_le_bytes());
+        hold.extend_from_slice(&9u32.to_le_bytes());
+        hold.extend_from_slice(&122u32.to_le_bytes());
+        hold.extend_from_slice(&100u32.to_le_bytes());
+        assert_eq!(w.outgoing, vec![hold], "no walk to the NPC");
     }
 }

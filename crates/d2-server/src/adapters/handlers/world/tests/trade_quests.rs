@@ -983,7 +983,10 @@ fn a_ticks_messages_leave_in_production_order() {
     f.h.clock.0 += 40;
     assert!(f.h.frame().unwrap().ticked);
     let got = f.h.receive(0);
-    let at = got.iter().position(|m| *m == marker).expect("the quest message");
+    let at = got
+        .iter()
+        .position(|m| *m == marker)
+        .expect("the quest message");
     assert!(
         at + 1 < got.len(),
         "the death's messages follow the quest message: {got:02x?}"
