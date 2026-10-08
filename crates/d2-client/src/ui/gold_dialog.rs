@@ -20,7 +20,7 @@
 //! The client decides nothing: OK is a request the server checks
 //! (`inventory-moves.md` §7.22).
 
-use d2_proto::client::DropGold;
+use d2_proto::client::{ClickButton, DropGold};
 
 use super::hud::{FILL_FILE, FILL_H, FILL_W};
 use super::{left, SharedRef};
@@ -33,6 +33,7 @@ use crate::ui::gold::{
 };
 use crate::ui::panel::{ClientIntent, Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
 use crate::ui::panels::inventory::UI_INVENTORY;
+use crate::ui::panels::stash_cube::UI_STASH;
 use crate::ui::panels::{utf16, PanelOutput};
 use crate::ui::text::TextOpts;
 use crate::ui::FRAME;
@@ -109,12 +110,23 @@ impl GoldDialogUi {
             return;
         }
         let guid = ctx.world.local().map(|u| u.key.guid);
-        if let GoldSend::DropGold { guid, amount } = ok_action(d.kind, v, guid) {
-            sh.outputs
-                .push(PanelOutput::Intent(ClientIntent::from_message(&DropGold {
-                    unit: guid,
-                    amount,
-                })));
+        match ok_action(d.kind, v, guid) {
+            GoldSend::DropGold { guid, amount } => {
+                sh.outputs
+                    .push(PanelOutput::Intent(ClientIntent::from_message(&DropGold {
+                        unit: guid,
+                        amount,
+                    })))
+            }
+            // Kinds 3, 4: C→S 0x4F 0x14 / 0x13 [amount >> 16, amount & 0xFFFF].
+            GoldSend::StashButton { button, p1, p2, .. } => {
+                sh.outputs
+                    .push(PanelOutput::Intent(ClientIntent::from_message(
+                        &ClickButton { button, p1, p2 },
+                    )));
+                sh.outputs.push(PanelOutput::ClickSound);
+            }
+            _ => {}
         }
     }
 
@@ -160,8 +172,12 @@ impl GoldDialogUi {
 
     /// The inventory gold button (§21 r3–r5), dialog closed.
     fn button_event(&mut self, e: UiEvent, ctx: &UiCtx) -> UiResponse {
-        let inventory_open = self.sh.borrow().states.is_open(UI_INVENTORY);
-        if !inventory_open {
+        // The stash release handler also owns the button (`0x00489AC0`).
+        let open = {
+            let sh = self.sh.borrow();
+            sh.states.is_open(UI_INVENTORY) || sh.states.is_open(UI_STASH)
+        };
+        if !open {
             return UiResponse::Ignored;
         }
         let Some((down, at)) = left(e) else {
@@ -180,14 +196,15 @@ impl GoldDialogUi {
         }
         let was_pressed = sh.gold.buttons.inv_pressed;
         let kind = sh.gold.buttons.release_inventory(in_rect);
-        if let (Some(kind), Some((key, _))) = (kind, super::local_player(ctx.world)) {
-            if can_open(true, cursor, sh.gold.dialog.is_some()) {
-                // `0x00625480(P, 14, 0)`: the full stat is the maximum.
-                let max = ctx.world.total(key, kind.max_stat(), 0).max(0) as u32;
-                let (d, fx) = GoldDialog::open(kind, max, false);
-                sh.gold.buttons.dialog_flag = fx.set_dialog_flag;
-                sh.gold.dialog = Some(d);
-            }
+        if let Some(kind) = kind {
+            // With the stash open the same button deposits (§21 r3,
+            // kind 3).
+            let kind = if sh.states.is_open(UI_STASH) && kind == GoldKind::Drop {
+                GoldKind::Deposit
+            } else {
+                kind
+            };
+            open_dialog(&mut sh, ctx.world, kind, cursor);
         }
         if was_pressed {
             UiResponse::Consumed
@@ -284,5 +301,26 @@ impl Panel for GoldDialogUi {
     }
 }
 
-/// The kinds the inventory button opens in play (the stash is not wired).
+/// Opens the dialog of `kind` when `can_open` allows (§21 r3, r5): the
+/// maximum is the player's gold, the stash gold for kind 4.
+pub(super) fn open_dialog(
+    sh: &mut super::Shared,
+    world: &crate::bridge::world::ClientWorld,
+    kind: GoldKind,
+    cursor: bool,
+) {
+    let Some((key, _)) = super::local_player(world) else {
+        return;
+    };
+    if can_open(true, cursor, sh.gold.dialog.is_some()) {
+        // `0x00625480(P, 14 or 15, 0)`: the full stat is the maximum.
+        let max = world.total(key, kind.max_stat(), 0).max(0) as u32;
+        let (d, fx) = GoldDialog::open(kind, max, false);
+        sh.gold.buttons.dialog_flag = fx.set_dialog_flag;
+        sh.gold.dialog = Some(d);
+    }
+}
+
+/// The kinds the inventory button opens in play (the stash open makes it
+/// a deposit, `open_dialog`).
 pub const INVENTORY_KIND: GoldKind = GoldKind::Drop;

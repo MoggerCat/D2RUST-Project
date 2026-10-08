@@ -11,17 +11,24 @@
 //! - the resolution index of `belts.bin` is 0 below mode 2, else 1;
 //! - every belt item counts as usable, nothing is blocked; the cursor
 //!   item fits a belt by code ([`super::panels::inv_items::fits_belt`]);
-//! - no key labels or hover text (they need the string table by id).
+//! - the key labels are the default bindings' names (`1`–`4`, REC-240):
+//!   the bound key's name needs the controls table, which the HUD does
+//!   not hold; a rebound key still shows its default label;
+//! - the hover tip is the item tool tip ([`crate::ui::item_tip`]) at the
+//!   text position, not the `0x0048C060` / `0x004E6410` strings;
+//! - the highlight rectangles are in the draw list ([`BeltDraw::Box`])
+//!   but not painted: the play sink has no rectangle primitive.
 
 use std::collections::BTreeMap;
 
 use crate::bridge::items::{self, mode};
 use crate::bridge::world::ClientWorld;
 use crate::ui::draw::UiDrawSink;
+use crate::ui::item_tip::{ItemTips, TipLine};
 use crate::ui::panel::ClientIntent;
 use crate::ui::panels::control::belt::{
-    record_index, BeltDraw, BeltEffect, BeltItem, BeltRecord, BeltSlot8, BeltState, CursorInfo,
-    CursorItem, MoveGates, SlotInfo,
+    hover_text, record_index, BeltDraw, BeltEffect, BeltItem, BeltRecord, BeltSlot8, BeltState,
+    CursorInfo, CursorItem, MoveGates, SlotInfo, FONT_AFTER_BELT,
 };
 use crate::ui::panels::inv_items::{fits_belt, ItemsUi};
 use crate::ui::panels::UiFiles;
@@ -108,23 +115,27 @@ impl HudBelt {
         self.record(res2)?.boxes.iter().map(|b| b.top).min()
     }
 
-    /// Draws the belt: the type, the hover tracking, the pop-up rows and
-    /// the items (§5 r1–r4, r9). `mouse` is the pointer in the frame.
+    /// The key label of belt slot `i` (§5 r4): the default binding's
+    /// name (d2rs-own, unverified, REC-240).
+    fn key_name(i: usize) -> Option<Vec<u16>> {
+        (i < 4).then(|| vec![u16::from(b'1') + i as u16])
+    }
+
+    /// The belt's draw list (§5 r1–r5, r9): the type, the hover
+    /// tracking, the pop-up rows, then the slots (rectangles, items,
+    /// key labels) and the cursor-item highlight.
     #[allow(clippy::too_many_arguments)]
-    pub fn draw(
+    pub fn draw_list(
         &mut self,
         world: &ClientWorld,
-        items_ui: &ItemsUi,
-        files: &UiFiles,
         (w, h): (i32, i32),
         res2: bool,
         mouse: (i32, i32),
         alive: bool,
-        out: &mut dyn UiDrawSink,
-    ) {
+    ) -> Vec<BeltDraw> {
         self.update_type(world);
         let Some(rec) = self.record(res2).cloned() else {
-            return;
+            return Vec::new();
         };
         let slot_item = Self::slot_item(world);
         let cursor = Self::cursor(world);
@@ -139,14 +150,31 @@ impl HudBelt {
         self.state
             .mouse_move(&rec, w, h, mouse.0, mouse.1, &gates, &cursor, &slot_item);
         let mut draws = self.state.popup_draws(w, h);
-        let belt = belt_view(world);
         let slots: Vec<SlotInfo> = (0..rec.boxes.len())
             .map(|i| SlotInfo {
                 item: slot_item(i),
-                key_name: None,
+                key_name: Self::key_name(i),
             })
             .collect();
         draws.extend(self.state.slot_draws(&rec, &slots));
+        draws
+    }
+
+    /// Draws the belt (`draw_list`). `mouse` is the pointer in the frame.
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw(
+        &mut self,
+        world: &ClientWorld,
+        items_ui: &ItemsUi,
+        files: &UiFiles,
+        size: (i32, i32),
+        res2: bool,
+        mouse: (i32, i32),
+        alive: bool,
+        out: &mut dyn UiDrawSink,
+    ) {
+        let draws = self.draw_list(world, size, res2, mouse, alive);
+        let belt = belt_view(world);
         for d in draws {
             match d {
                 BeltDraw::PopRow { x, y } => {
@@ -159,11 +187,49 @@ impl HudBelt {
                         items_ui.draw_at(files, v, (x, y), out);
                     }
                 }
-                // Highlight rectangles and labels need the line / text
-                // draws the play HUD has none of (preview).
-                BeltDraw::Box { .. } | BeltDraw::Label(_) => {}
+                // §5 r4: font 1, color 4.
+                BeltDraw::Label(l) => {
+                    out.push(crate::ui::panels::text(
+                        l.text,
+                        l.x,
+                        l.y,
+                        FONT_AFTER_BELT,
+                        l.color as u16,
+                    ));
+                }
+                // No rectangle primitive in the play sink (module doc).
+                BeltDraw::Box { .. } => {}
             }
         }
+    }
+
+    /// The hover tip of the hovered belt item (§5 r8) and its anchor:
+    /// the lines of its last item stream. Empty unless the hover gate of
+    /// [`hover_text`] holds (belt hovered, an item, no cursor item, box
+    /// ≤ 3 or popped).
+    pub fn hover_tip(&self, world: &ClientWorld, tips: &ItemTips) -> (Vec<TipLine>, (i32, i32)) {
+        let belt = belt_view(world);
+        let Some(v) = self
+            .state
+            .hover_item
+            .and_then(|g| belt.values().find(|v| v.key.guid == g))
+        else {
+            return (Vec::new(), (0, 0));
+        };
+        let item = BeltItem {
+            guid: v.key.guid,
+            usable: true,
+            has_use: true,
+            blocked: false,
+            pos_x: 0,
+            quality3: false,
+        };
+        let cursor = items::cursor_item(world).is_some();
+        if hover_text(&self.state, cursor, Some(&item), &[], &[], None).is_none() {
+            return (Vec::new(), (0, 0));
+        }
+        let lines = items::stream(world, v.key).map_or_else(Vec::new, |s| tips.lines(s));
+        (lines, self.state.text_pos)
     }
 
     /// Whether the point is on the belt (hit area §5 r6).
