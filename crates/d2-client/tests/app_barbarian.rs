@@ -94,3 +94,45 @@ fn a_learned_mastery_puts_its_passive_stats_in_its_state() {
         "the passive state holds passivestat1 = passivecalc1 ({errors})"
     );
 }
+
+// Covers: specs/skills/bodies-3.md Leap (srvst 40)
+#[test]
+fn leap_spends_mana_and_moves_the_barbarian() {
+    let mut r = Rig::new(&[LEAP]);
+    r.leave_town();
+    r.select_right(LEAP);
+    let (mana0, from) = (
+        r.mana(),
+        r.with(|sim, p| sim.events.action.sys.hooks.path_position(p)),
+    );
+    r.right_click_point(5, 0);
+    r.step(40);
+    let to = r.with(|sim, p| sim.events.action.sys.hooks.path_position(p));
+    let errors = r.errors();
+    assert!(r.mana() < mana0, "Leap spent mana ({errors})");
+    assert!(
+        to.0 > from.0,
+        "the barbarian leapt east: {from:?} -> {to:?}"
+    );
+}
+
+// Covers: specs/skills/bodies-3.md Whirlwind (srvst 38)
+#[test]
+fn whirlwind_spends_mana_and_moves_the_barbarian() {
+    let mut r = Rig::new(&[WHIRLWIND]);
+    r.leave_town();
+    r.select_right(WHIRLWIND);
+    let (mana0, from) = (
+        r.mana(),
+        r.with(|sim, p| sim.events.action.sys.hooks.path_position(p)),
+    );
+    r.right_click_point(8, 0);
+    r.step(40);
+    let to = r.with(|sim, p| sim.events.action.sys.hooks.path_position(p));
+    let errors = r.errors();
+    assert!(r.mana() < mana0, "Whirlwind spent mana ({errors})");
+    assert!(
+        to.0 > from.0,
+        "the barbarian whirled east: {from:?} -> {to:?}"
+    );
+}
