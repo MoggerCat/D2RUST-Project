@@ -161,6 +161,30 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
         })
     }
 
+    /// A monster of `class` allocated in `room` at (x, y) in `mode`
+    /// (`units.md` §3.1); NPC classes count as allied.
+    fn spawn_unit(&mut self, room: RoomId, x: i32, y: i32, class: u16, mode: u8) -> Option<UnitId> {
+        let allied = self
+            .inner
+            .econ
+            .hooks
+            .tables
+            .combat
+            .monstats
+            .get(usize::from(class))
+            .is_some_and(|m| m.npc);
+        let req = crate::units::lifecycle::AllocRequest {
+            ty: UnitType::Monster,
+            class: u32::from(class),
+            room: Some(room),
+            add: true,
+            fixed_guid: None,
+            mode: u32::from(mode),
+            allied,
+        };
+        self.view(|g, v| v.allocate(g, &req, x, y))
+    }
+
     /// `0x005417D0` on the game's timer queue (`tick.md` §5.2); a refused
     /// schedule is a unit error of the action wiring.
     fn schedule(&mut self, object: UnitId, ev: u8, frame: i32) {
@@ -544,6 +568,8 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         self.inner
             .free_spot_at(room, x, y, size, mask, radius, limit)
     }
+    /// `0x005B2F20`: a monster unit allocated in a DRLG room through the
+    /// action wiring (`units.md` §3.1); else the rest's.
     fn spawn_monster(
         &mut self,
         room: RoomId,
@@ -553,6 +579,9 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         mode: u8,
         r: u32,
     ) -> Option<UnitId> {
+        if self.drlg_room(room) {
+            return self.spawn_unit(room, x, y, class, mode);
+        }
         self.inner.spawn_monster(room, x, y, class, mode, r)
     }
     fn or_unit_flags(&mut self, unit: UnitId, flags: u32) {
@@ -564,21 +593,58 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     fn npc_chat_clients(&self, npc: UnitId) -> Option<Vec<UnitId>> {
         self.inner.npc_chat_clients(npc)
     }
+    /// `0x005A7E60` + `0x005A7C20` (removal mode): the monster of the
+    /// game's lists is removed at once and every player told
+    /// (PROVISIONAL, REC-124: the removal mode's animation is not
+    /// modelled); else the rest's.
     fn remove_monster(&mut self, monster: UnitId) {
-        self.inner.remove_monster(monster)
+        let e = &mut *self.inner.econ;
+        let Some((ty, guid)) = e.game.lists.unit(monster).map(|u| (u.ty as u8, u.guid)) else {
+            return self.inner.remove_monster(monster);
+        };
+        let msg = crate::units::messages::remove_unit(ty, guid);
+        for p in e.game.lists.units_of_type(UnitType::Player) {
+            e.hooks.x.send(p, &msg);
+        }
+        self.view(|g, v| v.remove(g, monster));
     }
     fn drop_preset_monster(&mut self, act: u8, class: u16) {
         self.inner.drop_preset_monster(act, class)
     }
+    /// The first object of `class` in `object`'s act (PROVISIONAL,
+    /// REC-124: the spec's "rooms of the object's room list" is the
+    /// whole act here); else the rest's.
     fn find_object_near(&self, object: UnitId, class: u16) -> Option<UnitId> {
-        self.inner.find_object_near(object, class)
+        let e = &*self.inner.econ;
+        let act_of = |u: UnitId| {
+            e.game
+                .lists
+                .unit(u)
+                .and_then(|u| u.room())
+                .and_then(|r| e.game.lists.room(r))
+                .map(|r| r.act)
+        };
+        let Some(act) = act_of(object) else {
+            return self.inner.find_object_near(object, class);
+        };
+        e.game
+            .lists
+            .units_of_type(UnitType::Object)
+            .into_iter()
+            .filter(|&u| e.units.get(u).is_some_and(|r| r.class == u32::from(class)))
+            .find(|&u| act_of(u) == Some(act))
     }
     fn create_object(&mut self, room: RoomId, x: i32, y: i32, class: u16) -> Option<UnitId> {
+        if self.inner.econ.hooks.objects.is_some() && self.drlg_room(room) {
+            return self.view(|g, v| v.create_object(g, room, u32::from(class), x, y, 0));
+        }
         self.inner.create_object(room, x, y, class)
     }
     fn open_quest_message(&mut self, player: UnitId, object: UnitId, msg: u16) {
         self.inner.open_quest_message(player, object, msg)
     }
+    /// [`Self::spawn_monster`] with the spawn flags (PROVISIONAL, REC-124:
+    /// spread and flags are not applied).
     #[allow(clippy::too_many_arguments)]
     fn spawn_monster_flags(
         &mut self,
@@ -590,9 +656,16 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         spread: i32,
         flags: u32,
     ) -> Option<UnitId> {
+        if self.drlg_room(room) {
+            return self.spawn_unit(room, x, y, class, mode);
+        }
         self.inner
             .spawn_monster_flags(room, x, y, class, mode, spread, flags)
     }
+    /// `0x0056D130`: a portal object of `class` in mode 1 to `level`,
+    /// owned by `owner`, at (x, y) or the free spot next to it
+    /// (PROVISIONAL, REC-124: the body is unwritten; the town portal's
+    /// owner and level fields are reused).
     #[allow(clippy::too_many_arguments)]
     fn open_portal(
         &mut self,
@@ -604,8 +677,31 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         class: u16,
         exact: bool,
     ) -> Option<UnitId> {
-        self.inner
-            .open_portal(owner, room, x, y, level, class, exact)
+        if self.inner.econ.hooks.objects.is_none() || !self.drlg_room(room) {
+            return self
+                .inner
+                .open_portal(owner, room, x, y, level, class, exact);
+        }
+        let (room, x, y) = if exact {
+            (room, x, y)
+        } else {
+            helpers::free_spot(self, room, x, y, 2, 0x3E01, 100)
+                .map_or((room, x, y), |(fx, fy, fr)| (fr, fx, fy))
+        };
+        let portal = self.view(|g, v| v.create_object(g, room, u32::from(class), x, y, 1))?;
+        let guid = owner.map(|o| self.inner.econ.game.lists.unit(o).map_or(0, |u| u.guid));
+        if let Some(d) = self
+            .inner
+            .econ
+            .hooks
+            .objects
+            .as_mut()
+            .and_then(|st| st.control.data.get_mut(&portal))
+        {
+            d.interact = u8::try_from(level).unwrap_or(u8::MAX);
+            d.owner = guid.map(|g| g as i32);
+        }
+        Some(portal)
     }
     /// `0x0056EDE0` ([`helpers::missile_at_point`]) on the missile
     /// store when the action wiring holds one; else the rest's.
