@@ -33,6 +33,58 @@ pub fn game_flags(difficulty: u8, arena_flags: u32, expansion: bool, ladder: boo
     ]
 }
 
+/// S→C 0x5B PlayerJoined (`0x0053C940`, `intents-events.md` §8.3,
+/// `client/msg-units.md` §8 rule 3), zeroed first: size u16@1, GUID u32@3,
+/// class u8@7, the character name @8 (16 bytes), level u16@0x18, party
+/// id u16@0x1A (0xFFFF: none), u16@0x1C = u16@0x1E = 0, u16@0x20 = the
+/// client's u16 +0x45E (0 but for a legacy save), then two strings, both
+/// empty but for a legacy save: 36 bytes.
+pub fn player_joined(guid: u32, class: u8, name: &[u8; 16], level: u16, party: u16) -> Vec<u8> {
+    let mut m = vec![0u8; 36];
+    m[0] = 0x5B;
+    m[1..3].copy_from_slice(&36u16.to_le_bytes());
+    m[3..7].copy_from_slice(&guid.to_le_bytes());
+    m[7] = class;
+    m[8..24].copy_from_slice(name);
+    m[0x18..0x1A].copy_from_slice(&level.to_le_bytes());
+    m[0x1A..0x1C].copy_from_slice(&party.to_le_bytes());
+    m
+}
+
+/// S→C 0x65 PlayerKillCount (`0x0053D9C0`, 7 bytes): GUID u32@1, count
+/// u16@5 (`intents-events.md` §7.6; recorded at a join `65 01000000
+/// 0000`).
+pub fn player_kill_count(guid: u32, count: u16) -> [u8; 7] {
+    let g = guid.to_le_bytes();
+    let c = count.to_le_bytes();
+    [0x65, g[0], g[1], g[2], g[3], c[0], c[1]]
+}
+
+/// S→C 0x8D AssignPlayerToParty (`0x0053DF00`, 7 bytes,
+/// `server-messages.tsv`): GUID u32@1, party u16@5.
+pub fn assign_player_to_party(guid: u32, party: u16) -> [u8; 7] {
+    let g = guid.to_le_bytes();
+    let p = party.to_le_bytes();
+    [0x8D, g[0], g[1], g[2], g[3], p[0], p[1]]
+}
+
+/// The 40-byte S→C 0x5A EventMessage of a join (code 2) or leave (code
+/// 3) (`intents-events.md` §2.5 rule 2, §8.3): u8@2 = 4, u32@3 = 0, u8@7
+/// = 0, the character name @8 (16 bytes); single player has no account
+/// name, so @0x18–@0x27 stay 0.
+pub fn player_event(code: u8, name: &[u8; 16]) -> [u8; 40] {
+    let mut m = [0u8; 40];
+    m[0] = 0x5A;
+    m[1] = code;
+    m[2] = 4;
+    m[8..24].copy_from_slice(name);
+    m
+}
+
+/// No party (`0x00554630`'s answer for a player in none; recorded in
+/// 0x5B and 0x75 as 0xFFFF).
+pub const NO_PARTY: u16 = 0xFFFF;
+
 /// The 6-byte (id, unit type u8@1, GUID u32@2) layout of `0x0053B3D0`:
 /// 0x0B GameHandshake (§8.2 rule 3.2), 0x76 PlayerInProximity (§7.9
 /// rule 3).

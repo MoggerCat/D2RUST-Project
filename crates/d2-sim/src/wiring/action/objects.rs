@@ -99,6 +99,19 @@ pub trait QuestObjectHost<X> {
         v: &mut View<'_, X>,
         call: QuestObjectCall,
     ) -> Option<ObjectRoute>;
+    /// Quest event 3 CHANGEDLEVEL `0x00543B90(game, from, to, player)`
+    /// (`world/quests.md` §4.1), run now: the per-client update's level
+    /// change (`sim/tick.md` §6 rule 5). Default: nothing.
+    fn changed_level(
+        &mut self,
+        game: &mut Game,
+        v: &mut View<'_, X>,
+        player: UnitId,
+        from: u32,
+        to: u32,
+    ) {
+        let _ = (game, v, player, from, to);
+    }
     /// For the host taking its parts back.
     fn into_any(self: Box<Self>) -> Box<dyn std::any::Any>;
 }

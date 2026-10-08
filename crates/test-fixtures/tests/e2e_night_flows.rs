@@ -578,6 +578,16 @@ fn game_creation_then_the_real_join() {
     place.push(1);
     let states = vec![0xAA, 0, g[0], g[1], g[2], g[3], 8, 0xFF];
     let proximity = vec![0x76, 0, g[0], g[1], g[2], g[3]];
+    let relator2 = vec![0x48, 0, 0, g[0], g[1], g[2], g[3], 0, 0, 0, 0];
+    // 0x5B: size 36, GUID, class, name, level 0 (no stats in this
+    // fixture), party 0xFFFF, the rest 0.
+    let mut joined_5b = vec![0x5B, 36, 0, g[0], g[1], g[2], g[3], CLASS as u8];
+    joined_5b.extend(name());
+    joined_5b.extend([0, 0, 0xFF, 0xFF]);
+    joined_5b.extend([0; 8]);
+    let mut event_5a = vec![0x5A, 2, 4, 0, 0, 0, 0, 0];
+    event_5a.extend(name());
+    event_5a.extend([0; 16]);
     assert_eq!(
         fx.joined,
         vec![
@@ -592,7 +602,15 @@ fn game_creation_then_the_real_join() {
             reveal,
             place,
             vec![0x7E, 0, 0, 0, 0],
-            vec![0x04]
+            vec![0x04],
+            // Changed expectation (q-fix-flow-server, `sim/tick.md` §6
+            // rule 4, `intents-events.md` §8.3): the inventory refresh's
+            // 0x48, then the join sequence 0x5B, 0x65, 0x8D, 0x5A.
+            relator2.clone(),
+            joined_5b,
+            vec![0x65, g[0], g[1], g[2], g[3], 0, 0],
+            vec![0x8D, g[0], g[1], g[2], g[3], 0xFF, 0xFF],
+            event_5a,
         ],
         "{:02x?}",
         fx.joined

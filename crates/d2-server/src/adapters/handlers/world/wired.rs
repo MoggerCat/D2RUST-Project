@@ -132,8 +132,6 @@ pub struct WiredWorld<R, S = NoSkills> {
     /// play preview names the Horadric Cube, `box `, which charstats
     /// does not give). Empty: the original's start items only.
     pub start_extra: Vec<[u8; 4]>,
-    /// The levels the quest events last saw the players in.
-    quest_levels: quest_events::QuestLevels,
 }
 
 impl<R, S> WiredWorld<R, S> {
@@ -201,7 +199,6 @@ impl<R, S> WiredWorld<R, S> {
             item_queued: Vec::new(),
             arriving: false,
             start_extra: Vec::new(),
-            quest_levels: Default::default(),
         }
     }
 

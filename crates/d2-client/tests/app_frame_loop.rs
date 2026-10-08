@@ -230,7 +230,10 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // flag-ex bit 21 set by the item messages runs the inventory refresh's
     // 0x48, before the 0x04: `sim/tick.md` §6 rule 5, `intents-events.md`
     // §8.3, recorded frame 2 "0x1D / 0x1E, 0x48, 0x04": 48 + 8 + 1 = 57.)
-    assert_eq!(joined, 57);
+    // (q-fix-flow-server: after 0x04 the state-3 inventory refresh's 0x48
+    // and the join sequence 0x5B, 0x65, 0x8D, 0x5A, `sim/tick.md` §6 rule
+    // 4: 57 + 5 = 62.)
+    assert_eq!(joined, 62);
     // Plus two for the Blood Moor room bordering the synthetic town: its
     // 0x07 at the join and its 0x08 when the travel leaves the town.
     // Plus two for that room's cave entrance (a tile unit): its 0x09 at
@@ -248,7 +251,9 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // the start cube's 0x9C, all handled: 62, 6.)
     // (q-fix-flow-server: the first tick's eight stat messages and 0x48,
     // all handled, as `joined` above: 71, 6.)
-    assert_eq!((b.log().handled, b.log().queued), (71, 6));
+    // (q-fix-flow-server: the 0x48 and the join sequence after 0x04, all
+    // handled (0x8D by its no-op, `client/msg-units.md` §8 r11): 76, 6.)
+    assert_eq!((b.log().handled, b.log().queued), (76, 6));
     assert!(b.log().unowned.is_empty(), "{:?}", b.log().unowned);
     assert!(b.log().dropped.is_empty(), "{:?}", b.log().dropped);
     let sight: Vec<_> = b

@@ -477,22 +477,41 @@ impl<X: Pending> TickHooks for ActionSim<X> {
         View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks).room_cleanup(unit);
     }
 
-    /// Per-client update (`tick.md` §6.5): the player's room differs from
-    /// the client's: the room switch `0x00537B50` to the player's room
-    /// ([`View::room_switch`], `intents-events.md` §7.8).
+    /// Per-client update (`tick.md` §6 rule 5): the player's room differs
+    /// from the client's. When the two rooms' level ids differ, quest
+    /// event 3 CHANGEDLEVEL `0x00543B90(game, from, to, player)`
+    /// (`world/quests.md` §4.1) runs first, on the host's lent quest
+    /// control ([`super::objects::QuestObjectHost::changed_level`]; none
+    /// lent: nothing); then the room switch `0x00537B50` to the player's
+    /// room ([`View::room_switch`], `intents-events.md` §7.8).
     ///
-    /// TODO(wiring, tick.md §6 rule 5): when the two rooms' level ids
-    /// differ, quest event 3 `0x00543B90` (`QuestControl::changed_level`)
-    /// then the town-leave refresh `0x00537340` (`VendorDesk::level_changed`)
-    /// run before the room switch; this dispatcher holds neither the quest
-    /// control nor the vendor records, so neither is called yet.
+    /// TODO(tick.md §6 rule 5): the town-leave refresh `0x00537340`
+    /// (`VendorDesk::level_changed`) after quest event 3: the vendor
+    /// records are the host's and are not lent to the tick.
     fn client_level_change(&mut self, game: &mut Game, client: ClientId) {
-        let new = game
-            .lists
-            .client(client)
-            .and_then(|e| e.player)
+        let Some(c) = game.lists.client(client) else {
+            return;
+        };
+        let (player, client_room) = (c.player, c.room);
+        let new = player
             .and_then(|p| game.lists.unit(p))
             .and_then(|u| u.room());
+        let level =
+            |r: Option<RoomId>, h: &ActionHooks<X>| r.and_then(|r| h.drlg.level_id(game, r));
+        let (from, to) = (
+            level(client_room, &self.sys.hooks),
+            level(new, &self.sys.hooks),
+        );
+        if let (Some(p), Some(from), Some(to)) = (player, from, to) {
+            if from != to {
+                self.with(game, |g, v| {
+                    if let Some(mut host) = v.h.quest_host.take() {
+                        host.changed_level(g, v, p, from, to);
+                        v.h.quest_host = Some(host);
+                    }
+                });
+            }
+        }
         self.with(game, |g, v| v.room_switch(g, client, new));
     }
 
@@ -500,6 +519,74 @@ impl<X: Pending> TickHooks for ActionSim<X> {
     /// ready ([`View::client_room_ready`]).
     fn client_room_ready(&mut self, game: &mut Game, client: ClientId) -> bool {
         self.with(game, |g, v| v.client_room_ready(g, client))
+    }
+
+    /// Step 5, after state 4 (`tick.md` §6 rule 4): the inventory refresh
+    /// `0x0055DF00` → `0x0055DBC0` (`intents-events.md` §8.3, the second
+    /// recorded 0x48), whose send ends with S→C 0x48 (type 0, arg 0, the
+    /// player's GUID; `inventory.md` §5.7 step 8). PROVISIONAL (REC-291):
+    /// the pass's item steps are not run here.
+    fn refresh_inventory(&mut self, game: &mut Game, client: ClientId) {
+        let Some(p) = game.lists.client(client).and_then(|c| c.player) else {
+            return;
+        };
+        let Some(guid) = self.sys.units.get(p).map(|r| r.guid) else {
+            return;
+        };
+        let m = crate::items::moves::layouts::relator2(UnitType::Player as u8, 0, guid);
+        self.sys.hooks.x.send(p, &m);
+    }
+
+    /// Step 5, a joining client (`tick.md` §6 rule 4, `intents-events.md`
+    /// §8.3): `0x0052C410` (S→C 0x5B PlayerJoined `0x0053C940`, 0x65
+    /// `0x0053FC70`), `0x0055B620` (0x8D), the host callback (none in
+    /// single player), then the join 0x5A code 2 to every client in state
+    /// 4 in client-list order, the joiner included (`0x0054AA40`: only
+    /// when the name has a NUL within its 16 bytes).
+    ///
+    /// The joiner's own 0x5B, 0x65, 0x8D go to the joiner: level stat 12,
+    /// no party (0xFFFF, `0x00554630`), kill count 0 (a new client's
+    /// arena record). PROVISIONAL (REC-292; d2rs-own, unverified): what
+    /// `0x0052C410` / `0x0055B620` send to the other clients and about
+    /// them (multiplayer, out of scope) is not specified, and the 0x8D's
+    /// party word (no spec gives `0x0055B620`'s arguments) is the 0x5B's.
+    fn join_sequence(&mut self, game: &mut Game, client: ClientId) {
+        use crate::units::messages as msg;
+        let Some(p) = game.lists.client(client).and_then(|c| c.player) else {
+            return;
+        };
+        let Some(r) = self.sys.units.get(p) else {
+            return;
+        };
+        let (guid, class) = (r.guid, r.class as u8);
+        let name = self
+            .sys
+            .hooks
+            .session
+            .names
+            .get(&p)
+            .copied()
+            .unwrap_or_default();
+        let level = self.sys.stats.unit_base(p, crate::stats::stat::LEVEL, 0) as u16;
+        let x = &mut self.sys.hooks.x;
+        x.send(
+            p,
+            &msg::player_joined(guid, class, &name, level, msg::NO_PARTY),
+        );
+        x.send(p, &msg::player_kill_count(guid, 0));
+        x.send(p, &msg::assign_player_to_party(guid, msg::NO_PARTY));
+        if !name.contains(&0) {
+            return;
+        }
+        let joined = msg::player_event(2, &name);
+        for c in game.lists.clients() {
+            let Some(e) = game.lists.client(c) else {
+                continue;
+            };
+            if let (client_state::IN_GAME, Some(to)) = (e.state, e.player) {
+                self.sys.hooks.x.send(to, &joined);
+            }
+        }
     }
 
     /// Step 5: S→C 0x04 LoadComplete (`0x0053B320(client, 4)`, `tick.md`

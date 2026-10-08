@@ -258,12 +258,7 @@ pub fn game_setup(r: &CreateGame) -> GameSetup {
 /// u32@3 = 0, u8@7 = 0, the character name @8 (16 bytes); single player
 /// has no account name, so @0x18–@0x27 stay 0 (§2.5 rule 2, §8.3).
 pub fn player_event(code: u8, name: &[u8; 16]) -> [u8; 40] {
-    let mut m = [0u8; 40];
-    m[0] = 0x5A;
-    m[1] = code;
-    m[2] = 4;
-    m[8..24].copy_from_slice(name);
-    m
+    d2_sim::units::messages::player_event(code, name)
 }
 
 /// The 53-byte S→C 0xB2 (`0x0053B1B0`, §2.5 rule 3): the name (16
