@@ -1270,6 +1270,37 @@ fn put_list(out: &mut Vec<u8>, items: &[ItemEntry]) -> Result<(), WriteError> {
     Ok(())
 }
 
+/// The model fields the loader would not frame (a save d2rs writes must
+/// load in 1.14d): the skills byte count must be the one the header names
+/// (§7.2 rule 2 reads +0x2A bytes), the corpse list has at most one entry
+/// (§8.3 rule 4: n ≥ 2 is error 21), `kf` holds its item exactly when g ≠ 0
+/// (§8.5 rule 2) and `jf` holds a list exactly when the loader restores
+/// the header's hireling (§8.4 rule 2: a list the loader does not read
+/// makes the next marker check fail with 22 / 23).
+fn check_body(h: &Header, b: &Body, t: &dyn SaveTables) -> Result<(), WriteError> {
+    if b.skills.len() != usize::from(h.skill_count) {
+        return Err(WriteError::Model("skills length differs from header +0x2A"));
+    }
+    if b.corpses.len() > 1 {
+        return Err(WriteError::Model(
+            "more than one corpse (the loader rejects 2+)",
+        ));
+    }
+    if let Some(g) = &b.golem {
+        if (g.flag != 0) != g.item.is_some() {
+            return Err(WriteError::Model("golem flag and item disagree"));
+        }
+    }
+    if let Some(list) = &b.hireling_items {
+        if list.is_some() != t.hireling_restored(&h.hireling) {
+            return Err(WriteError::Model(
+                "jf item list present without a restored hireling, or missing for one",
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Writes the file: sections in §1 order, then the size at +0x08 and the
 /// checksum at +0x0C (§1 rule 4, §3 rule 2). The header's `file_size` and
 /// `checksum` fields are ignored.
@@ -1277,6 +1308,7 @@ pub fn write(save: &D2s, t: &dyn SaveTables) -> Result<Vec<u8>, WriteError> {
     let h = &save.header;
     let mut out = h.to_bytes().to_vec();
     if let Some(b) = &save.body {
+        check_body(h, b, t)?;
         // §4 rule 1.
         out.extend_from_slice(&QUEST_MAGIC.to_le_bytes());
         out.extend_from_slice(&QUEST_VERSION.to_le_bytes());

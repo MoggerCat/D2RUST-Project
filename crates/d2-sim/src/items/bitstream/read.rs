@@ -289,8 +289,11 @@ pub fn read_save_record(r: &mut BitReader<'_>, t: &ItemTables) -> Result<ReadIte
     }
     let code = r.read(32)?.to_le_bytes();
     if it.alt {
-        // §4.1 rule 4: the record ends after the base code.
+        // §4.1 rule 4: the record ends after the base code; the reader
+        // sets item level 1 and quality 1 (`bitstream-legacy.md` §3 r2).
         it.code = code;
+        it.ilvl = 1;
+        it.quality = 1;
         it.base_code = code;
         let record = record_of(t, code).ok_or(ReadError::UnknownCode(code))?;
         facts(&mut it, record);

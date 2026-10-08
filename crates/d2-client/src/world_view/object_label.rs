@@ -10,7 +10,7 @@
 //! is centred above the object's feet, in the chat font, colour 0.
 //! Monsters and items keep their own paths.
 
-use crate::bridge::hover::{feet, HIT_ABOVE};
+use crate::bridge::hover::{unit_feet, HIT_ABOVE};
 use crate::bridge::world::{ClientWorld, UnitKey};
 use crate::rules::camera::Camera;
 use crate::ui::messages::FONT_CHAT;
@@ -59,7 +59,7 @@ impl ObjectLabels {
         let u = world.units.get(&key)?;
         let text = self.text(u.class, strings)?;
         let cell = u.position?;
-        let (x, y) = feet(cam, OBJECT, cell);
+        let (x, y) = unit_feet(cam, key.unit_type, cell);
         Some(UiDraw::Text(TextRequest {
             text,
             at: Point::new(x, y - HIT_ABOVE),
@@ -124,7 +124,7 @@ mod tests {
     fn hovering_an_object_yields_its_name_over_its_feet() {
         let w = world();
         let cam = crate::world_view::corpse_click::camera_for(&w, 0).unwrap();
-        let at = feet(&cam, OBJECT, (103, 100));
+        let at = unit_feet(&cam, OBJECT, (103, 100));
         let hover = crate::bridge::hover::pick(&w, &cam, at);
         assert_eq!(hover, Some(CHEST));
         let Some(UiDraw::Text(t)) = labels().draw(&w, &cam, hover, &Strings) else {

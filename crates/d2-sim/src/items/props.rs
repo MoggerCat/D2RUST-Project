@@ -177,6 +177,18 @@ fn add_stat<S: ItemStats>(
     value
 }
 
+/// Functions 18 and 19 (Open question 5): the owner-or-item list of §4.2,
+/// written with the plain list set: no `valshift`, no itemstatcost range
+/// test, no stat-58 rule, and a value 0 is set like any other.
+fn set_raw<S: ItemStats>(item: &mut Item<S>, ctx: &mut PropCtx, id: u16, layer: u16, v: i32) {
+    let key = ctx.list;
+    let target: &mut dyn ItemStats = match ctx.owner.as_deref_mut() {
+        Some(o) => o,
+        None => &mut item.stats,
+    };
+    target.list_set(key, id, layer, v);
+}
+
 /// §4.3: base reset for a slot's stat.
 fn base_reset<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, id: u16) {
     let Some(r) = t.item(item.record).cloned() else {
@@ -321,11 +333,10 @@ fn call<S: ItemStats>(
             } else {
                 roll_value(&mut item.item_seed, rec.min, rec.max)
             };
-            if ctx.owner.is_some() {
-                add_stat(t, item, ctx, set, stat::MINDAMAGE_PERCENT, 0, v);
-                add_stat(t, item, ctx, set, stat::MAXDAMAGE_PERCENT, 0, v);
-                return 1;
-            }
+            // §5 rule 3 "item target" is I (§4.2 register mapping), which
+            // is always an item here, also with a foreign owner (§11 the
+            // player): the non-item branch (add 18 / 17, return 1) is
+            // never taken.
             base_reset(t, item, stat::MAXDAMAGE_PERCENT);
             base_reset(t, item, stat::MINDAMAGE_PERCENT);
             let b = t
@@ -402,9 +413,9 @@ fn call<S: ItemStats>(
             let p = rec.param.clamp(0, 3);
             let a = rec.min.wrapping_add(256).clamp(0, 1023);
             let b = rec.max.wrapping_add(256).clamp(0, 1023);
-            // TODO(items OQ-P1): "set the stat" read as §4.2 with set = 1
-            // (valshift applies, 0 writes nothing).
-            add_stat(t, item, ctx, true, id, 0, p + (b * 1024 + a) * 4);
+            // OQ 5: the plain list set, not §4.2 (no valshift, no range
+            // test, no stat-58 rule; a 0 is written).
+            set_raw(item, ctx, id, 0, p + (b * 1024 + a) * 4);
             b
         }
         19 => {
@@ -430,12 +441,10 @@ fn call<S: ItemStats>(
             let r = item.item_seed.roll(c - c / 8) as i32;
             let layer =
                 ((rec.param as u32) << t.stat_shift).wrapping_add(level as u32 & t.stat_mask);
-            // TODO(items OQ-P1): as function 18.
-            add_stat(
-                t,
+            // OQ 5: as function 18.
+            set_raw(
                 item,
                 ctx,
-                true,
                 id,
                 layer as u16,
                 c * 256 + ((r + c / 8 + 1) & 0xFF),

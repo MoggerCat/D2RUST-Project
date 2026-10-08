@@ -107,6 +107,38 @@ pub struct NpcMenuState {
 
 pub type SharedNpcMenu = Rc<RefCell<NpcMenuState>>;
 
+/// A row's caption (`menus.md` §2.3): Resurrect is `hireresurrect2`
+/// (22696, "%s … %d") with the merc name and the cost; the merc name id
+/// `[0x00725494]` is not in the client model, so the name is empty
+/// (d2rs-own gap). Identify is `NPCIdentify2` (4021) then `100 × n`.
+fn row_caption(
+    r: &Row,
+    label: &dyn Fn(u16, Option<OptionKind>) -> Vec<u16>,
+    strings: &dyn Fn(u16) -> Vec<u16>,
+) -> Vec<u16> {
+    use super::panels::npc_menu::{
+        slot_caption, Caption, CaptionCtx, STR_IDENTIFY_COST, STR_RESURRECT_SLOT,
+    };
+    match (r.kind, r.cost) {
+        (Some(OptionKind::Resurrect), Some(c)) => {
+            let ctx = CaptionCtx {
+                resurrect_cost: c as i32,
+                ..CaptionCtx::default()
+            };
+            match slot_caption(STR_RESURRECT_SLOT, &ctx, strings).0 {
+                Caption::Text(t) => t,
+                Caption::Skip => Vec::new(),
+            }
+        }
+        (_, Some(c)) => {
+            let mut t = label(STR_IDENTIFY_COST, r.kind);
+            t.extend(utf16s(&c.to_string()));
+            t
+        }
+        (_, None) => label(r.string, r.kind),
+    }
+}
+
 fn utf16s(s: &str) -> Vec<u16> {
     s.encode_utf16().collect()
 }
@@ -271,14 +303,12 @@ impl Panel for NpcMenuUi {
         };
         let (x, y) = st.box_pos();
         for (i, r) in o.rows.iter().enumerate() {
-            let mut t = match r.cost {
-                // `NPCIdentify2` "Identify Items: " then `100 × n`.
-                Some(_) => label(super::panels::npc_menu::STR_IDENTIFY_COST, r.kind),
-                None => label(r.string, r.kind),
-            };
-            if let Some(c) = r.cost {
-                t.extend(utf16s(&c.to_string()));
-            }
+            let t = row_caption(r, &label, &|id| {
+                ctx.strings
+                    .get_id(id)
+                    .map(<[u16]>::to_vec)
+                    .unwrap_or_default()
+            });
             out.push(text(t, Point::new(x + 20, y + ROW_H * (i as i32 + 2)), 0));
         }
         if o.talking {
@@ -451,5 +481,35 @@ impl OriginalUi {
     /// The open menu, for tests.
     pub fn npc_menu(&self) -> Option<Open> {
         self.npcm.borrow().up.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn strings(id: u16) -> Vec<u16> {
+        match id {
+            22696 => utf16s("Resurrect %s: %d"),
+            4021 => utf16s("Identify Items: "),
+            _ => Vec::new(),
+        }
+    }
+
+    // The Resurrect row is `hireresurrect2` with the cost, not the
+    // identify caption; Identify keeps 4021 + the cost.
+    // Covers: specs/ui/menus.md §2 r3
+    #[test]
+    fn resurrect_row_is_captioned_by_hireresurrect2() {
+        let label = |id: u16, _: Option<OptionKind>| strings(id);
+        let row = |kind, cost| Row {
+            string: 0x1507,
+            kind: Some(kind),
+            cost: Some(cost),
+        };
+        let t = row_caption(&row(OptionKind::Resurrect, 500), &label, &strings);
+        assert_eq!(String::from_utf16_lossy(&t), "Resurrect : 500");
+        let t = row_caption(&row(OptionKind::Identify, 300), &label, &strings);
+        assert_eq!(String::from_utf16_lossy(&t), "Identify Items: 300");
     }
 }

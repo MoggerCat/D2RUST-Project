@@ -149,7 +149,7 @@ fn with_a_prediction_every_camera_is_the_draw_camera() {
 // Covers: specs/seams/world-screen.md §2.5
 #[test]
 fn a_units_pick_anchor_is_its_draw_anchor() {
-    use d2_client::bridge::hover::feet;
+    use d2_client::bridge::hover::unit_feet as feet;
     use d2_client::bridge::world::{ITEM, MONSTER, OBJECT};
     let cam = Camera::new(
         FrameSize::D2RS,

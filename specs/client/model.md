@@ -52,7 +52,7 @@
 | Edge cases & original bugs | 1391–1415 |
 | Test vectors | 1416–1473 |
 | Provenance | 1474–1577 |
-| Open questions | 1578–1712 |
+| Open questions | 1578–1716 |
 <!-- /index -->
 
 ## Summary
@@ -1597,7 +1597,11 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    `record_frames.py` positions. PROVISIONAL: the local player is drawn
    at the last server-sent position (the message rules of §8 /
    `client/msg-units.md`), no local prediction (because d2rs runs client and server in one
-   process with no latency); settled by REC-51.
+   process with no latency); settled by REC-51. **Superseded for the play
+   preview** by the three PROVISIONAL points below (walk prediction, position
+   check, path step: REC-288, REC-277), which do predict the local walk; this
+   point still holds for a client without a client DRLG
+   (q-provisional-audit).
    PROVISIONAL (play preview's walk prediction): an S→C 0x0D code 1 for
    the local player (the arrival walk-outs of `sim/path-placement.md`
    §12.2 r5–6, `world/objects.md` §12 r11, `world/waypoints.md` §7 r7)

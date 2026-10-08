@@ -747,7 +747,7 @@ mod tests {
         };
         assert!(c.path_distance(npc) <= 2, "{}", c.path_distance(npc));
         let cam = c.camera().unwrap();
-        let at = crate::bridge::hover::feet(&cam, MONSTER, (122, 100));
+        let at = crate::bridge::hover::unit_feet(&cam, MONSTER, (122, 100));
         // The play preview's pick (`bridge::hover`) finds the NPC under
         // the press.
         let mut v = view(at);

@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 
 use super::game_messages::{backing, wide, Measure};
 use super::SharedRef;
-use crate::bridge::hover::feet;
+use crate::bridge::hover::unit_feet;
 use crate::bridge::world::{ClientWorld, UnitKey, PLAYER};
 use crate::rules::camera::{moving_to_client, Camera, FrameSize, OpenMode};
 use crate::ui::draw::{TextRequest, TextStyle, UiDraw, UiDrawSink};
@@ -124,7 +124,7 @@ impl Panel for OverheadUi {
             let Some(cell) = unit.position else {
                 continue;
             };
-            let (ux, uy) = feet(&cam, key.unit_type, cell);
+            let (ux, uy) = unit_feet(&cam, key.unit_type, cell);
             let kind = if key.unit_type == PLAYER {
                 UnitKind::Player
             } else {

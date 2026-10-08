@@ -13,7 +13,7 @@
 //! ground items, walks to it and asks again when the walk has ended (the
 //! server's walk toward a unit is a seam).
 
-use crate::bridge::hover::{feet, HIT_ABOVE, HIT_BELOW, HIT_HALF_WIDTH};
+use crate::bridge::hover::{unit_feet, HIT_ABOVE, HIT_BELOW, HIT_HALF_WIDTH};
 use crate::bridge::link::ServerLink;
 use crate::bridge::modes::player_mode;
 use crate::bridge::world::{ClientWorld, UnitKey};
@@ -68,7 +68,7 @@ impl CorpseClicks {
     pub fn hit(w: &ClientWorld, camera: &Camera, at: (i32, i32)) -> Option<UnitKey> {
         let mut best: Option<(i32, UnitKey)> = None;
         for (key, cell) in corpses(w) {
-            let (fx, fy) = feet(camera, PLAYER, cell);
+            let (fx, fy) = unit_feet(camera, PLAYER, cell);
             let (dx, dy) = (at.0 - fx, at.1 - fy);
             if dx.abs() > HIT_HALF_WIDTH || !(-HIT_ABOVE..=HIT_BELOW).contains(&dy) {
                 continue;
@@ -238,7 +238,7 @@ mod tests {
     fn a_press_on_a_corpse_sends_pick_item_type_0_then_walks_and_asks_again() {
         let (mut b, link) = scene(player_mode::DEAD);
         let cam = camera_for(b.world(), 0).unwrap();
-        let at = feet(&cam, PLAYER, (102, 100));
+        let at = unit_feet(&cam, PLAYER, (102, 100));
         let mut c = CorpseClicks::default();
         let rest = c
             .take_clicks(&mut b, Some(&cam), &[press(at), press((5, 5))])
@@ -267,7 +267,7 @@ mod tests {
     fn only_a_dead_player_unit_is_a_corpse() {
         let (mut b, link) = scene(player_mode::TOWN_NEUTRAL);
         let cam = camera_for(b.world(), 0).unwrap();
-        let at = feet(&cam, PLAYER, (102, 100));
+        let at = unit_feet(&cam, PLAYER, (102, 100));
         let mut c = CorpseClicks::default();
         let rest = c.take_clicks(&mut b, Some(&cam), &[press(at)]).unwrap();
         assert_eq!(rest.len(), 1);

@@ -312,6 +312,9 @@ pub struct PlayConfig {
     /// The 0x67 flags the front end chose (`front_start`); `None`: the
     /// character's own.
     pub start_flags: Option<u32>,
+    /// `--dump-draws DIR --at-tick N` (`specs/tools/facts-render.md` §5):
+    /// write one frame's rendering facts, then exit.
+    pub dump: Option<crate::facts::export::DumpRequest>,
 }
 
 #[derive(Resource)]
@@ -408,7 +411,10 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             .unwrap_or_else(super::save::default_save_dir),
     );
     let settings = super::config::load_settings(&cfg_dir)?;
-    let bindings = super::config::load_controls(&cfg_dir)?;
+    let bindings = super::config::load_controls(&super::config::controls_dir(
+        crate::ui::front_end::screens::controls::config_path().as_deref(),
+        &cfg_dir,
+    ))?;
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
         primary_window: Some(super::config::window_for(&settings)),
         ..default()
@@ -532,6 +538,9 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     super::death::add_death(&mut app);
     super::hardcore::add_hardcore(&mut app, hardcore);
     sound::add_output(&mut app);
+    if let Some(request) = config.dump {
+        app.insert_resource(crate::world_view::present::DrawDump::new(request));
+    }
     if let Some(frames) = config.exit_after {
         app.insert_resource(ExitAfter(frames))
             .add_systems(Update, exit_after);

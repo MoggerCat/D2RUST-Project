@@ -41,6 +41,7 @@ pub mod passive;
 mod passive_tests;
 pub mod predict;
 pub mod receive;
+pub mod skill_fallback;
 pub mod skills;
 pub mod update;
 pub mod world;
@@ -204,6 +205,10 @@ impl<L: ServerLink> Bridge<L> {
         if pumped.ticked && self.world.in_game {
             let before = self.log.rejected.len();
             report.drained = self.update_pass();
+            // The last step of the drawn pass (spec §8 rule 5).
+            if let Err(error) = skill_fallback::skill_fallback(&mut self.world, &self.inputs) {
+                self.log.rejected.push(receive::Rejected { id: 0, error });
+            }
             report.rejected += self.log.rejected.len() - before;
         }
         report.answered = self.send_outgoing()?;
