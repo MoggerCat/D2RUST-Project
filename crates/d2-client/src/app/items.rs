@@ -143,3 +143,34 @@ pub fn prepare_ui(app: &App, original: &mut OriginalUi) {
         original.set_item_tips(tips.clone());
     }
 }
+
+/// The item-stream decoder of the model over the game's item tables
+/// (`bridge::item_lists`, REC-188).
+pub struct TableDecoder(pub Arc<d2_sim::items::ItemTables>);
+
+impl crate::bridge::item_lists::StreamProps for TableDecoder {
+    fn props(&self, stream: &[u8]) -> (Vec<crate::bridge::item_lists::ItemProp>, bool) {
+        use d2_proto::item_bits::{decode, ItemLookup};
+        let t = &*self.0;
+        let lookup = d2_server::adapters::item_bits::TablesLookup(t);
+        let Ok(b) = decode(stream, &lookup) else {
+            return (Vec::new(), false);
+        };
+        let charm = lookup.code(b.code).is_some_and(|c| c.charm);
+        let props = b
+            .lists
+            .iter()
+            .flatten()
+            .flatten()
+            .map(|s| {
+                let shift = t.valshift.get(usize::from(s.stat)).copied().unwrap_or(0);
+                crate::bridge::item_lists::ItemProp {
+                    stat: s.stat,
+                    layer: s.param as u16,
+                    value: (s.value() as i32) << shift,
+                }
+            })
+            .collect();
+        (props, charm)
+    }
+}

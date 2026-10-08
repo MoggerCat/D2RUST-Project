@@ -182,6 +182,8 @@ fn client_world_holds_only_stated_fields() {
         frames,
         // d2rs-own, unverified: the shop panel's trade epoch.
         store_serial,
+        // `client/stat-lists.md` §2 (REC-188): the decoder's tables handle.
+        item_tables: _,
         server_ticks,
         units,
         local_player,

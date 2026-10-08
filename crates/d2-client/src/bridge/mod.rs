@@ -23,6 +23,7 @@ pub mod dispatch;
 pub mod drlg;
 pub mod hover;
 pub mod intent;
+pub mod item_lists;
 pub mod items;
 pub mod link;
 pub mod local;
@@ -458,6 +459,11 @@ impl<L: ServerLink> Bridge<L> {
     /// d2rs-own, unverified. PROVISIONAL (`client/model.md` OQ2; REC-51).
     pub fn recache_local_room(&mut self, x: u16, y: u16) -> bool {
         self.world.recache_local_room(x, y)
+    }
+
+    /// Installs the item tables the model decodes item streams with.
+    pub fn set_item_tables(&mut self, t: std::sync::Arc<dyn item_lists::StreamProps>) {
+        self.world.set_item_tables(t);
     }
 
     pub fn world(&self) -> &ClientWorld {

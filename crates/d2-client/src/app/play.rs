@@ -427,7 +427,15 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             super::items::item_parts(archives.as_ref()).map_err(anyhow::Error::msg)?;
         if let Some(lookup) = item_lookup {
             match lookup.and_then(|t| super::items::item_tips(archives.as_ref(), t)) {
-                Ok(t) => item_parts.tips = Some(t),
+                Ok(t) => {
+                    app.world_mut()
+                        .resource_mut::<BridgeResource>()
+                        .0
+                        .set_item_tables(std::sync::Arc::new(super::items::TableDecoder(
+                            t.tables(),
+                        )));
+                    item_parts.tips = Some(t);
+                }
                 Err(e) => warn!("item tips (d2rs-own, unverified): {e}; no tool tips"),
             }
         }
