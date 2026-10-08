@@ -452,6 +452,13 @@ impl<L: ServerLink> Bridge<L> {
         &mut self.world
     }
 
+    /// The play preview's own-walk room recache of the local player at
+    /// the predicted sub-tile ([`ClientWorld::recache_local_room`]).
+    /// d2rs-own, unverified. PROVISIONAL (`client/model.md` OQ2; REC-51).
+    pub fn recache_local_room(&mut self, x: u16, y: u16) -> bool {
+        self.world.recache_local_room(x, y)
+    }
+
     pub fn world(&self) -> &ClientWorld {
         &self.world
     }

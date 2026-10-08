@@ -193,6 +193,8 @@ fn the_session_flow_creates_the_game_then_loads_the_character_at_the_join() {
     assert_eq!(
         steps,
         [
+            // No `charstats` rows: `client/msg-skills.md` §2 r8's Skill 1–10.
+            "player skills",
             "new character set-up",
             "start stats",
             "start items",

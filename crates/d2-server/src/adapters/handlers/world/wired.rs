@@ -753,6 +753,15 @@ where
         out
     }
 
+    fn live_facts(
+        &mut self,
+        game: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<crate::adapters::UnitFacts> {
+        WorldHost::<D>::live_facts(&mut self.action, game, events, unit)
+    }
+
     fn vitals_sync(
         &mut self,
         game: &mut Game,

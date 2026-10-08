@@ -693,3 +693,45 @@ fn a_freed_room_leaves_a_server_unit_roomless_and_it_sends_0x4b_once() {
     m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
     assert_eq!(flags(&m, UnitKey::new(MONSTER, 9)), (true, true));
 }
+
+// Covers: specs/client/model.md §3 r3, §12 r2; specs/sim/unit-order.md §5 r6
+#[test]
+fn the_predicted_walk_recaches_the_local_players_room() {
+    use crate::world_view::model_feed::ModelFeed;
+    use crate::world_view::ViewFeed;
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 0, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    let room_of = |m: &Model| m.w.local_room().map(|r| (r.x0, r.y0, r.w, r.h));
+    assert_eq!(room_of(&m), Some(rect(1)));
+    // The prediction walked the player west into room 0: its room
+    // follows (the model position is the prediction's, not written).
+    assert!(m.w.recache_local_room(10, 6));
+    assert_eq!(room_of(&m), Some(rect(0)));
+    assert_eq!(m.w.local().unwrap().cell(), (46, 6));
+    let pl = UnitKey::new(PLAYER, 1);
+    assert_eq!(m.w.room_units.room_of(pl), m.w.local_room().map(|r| r.room));
+    // The near rooms are room 0's adjacency, with the player listed there.
+    let mut rows = vec![LevelRow::default(); 4];
+    rows[2].draw_edges = false;
+    let mut feed = ModelFeed::new(ZeroFacts).with_map();
+    feed.levels = Some(rows);
+    let own = m.w.local_room().copied().unwrap();
+    let cd = m.w.drlg.clone().unwrap();
+    let near = feed.near_rooms(&m.w).unwrap().unwrap();
+    assert_eq!(near.rooms.len(), cd.adjacency(own.room).len());
+    assert!(near
+        .rooms
+        .iter()
+        .any(|r| r.tiles.x == 0 && r.units.iter().any(|u| u.key == pl)));
+    // Same room again, or a point in no active room: unchanged.
+    assert!(!m.w.recache_local_room(11, 6));
+    assert!(!m.w.recache_local_room(1000, 1000));
+    assert_eq!(room_of(&m), Some(rect(0)));
+    // Unlinked from every room (a room free): the act lookup finds it.
+    m.w.room_units.leave(pl);
+    assert_eq!(m.w.local_room(), None);
+    assert!(m.w.recache_local_room(46, 6));
+    assert_eq!(room_of(&m), Some(rect(1)));
+}

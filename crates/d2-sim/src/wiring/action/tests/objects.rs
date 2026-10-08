@@ -319,9 +319,44 @@ fn update_pass_sends_the_state_message() {
     fx.sim.objects(&mut fx.game, |ctl, t, w| {
         obj::set_object_mode(ctl, t, w, o, 1).unwrap();
     });
+    // Already announced (the room clean-up cleared unit flag 0x10).
+    fx.sim.sys.units.get_mut(o).unwrap().flags &= !crate::units::record::flags::SEED_SET;
     crate::tick::TickHooks::send_unit_update(&mut fx.sim, &mut fx.game, c, o);
     let want = obj::state_message(guid(&fx, o), false, 1);
     assert_eq!(fx.sim.hooks().x.sent, [(p, want.to_vec())]);
+    fx.assert_clean();
+}
+
+// Covers: specs/sim/intents-events.md §7.1 r2, §7.2
+#[test]
+fn update_pass_announces_a_new_object_first() {
+    // An object created in a room the client already holds (unit flag
+    // 0x10 still set): its add message 0x51 goes out in the client pass,
+    // before the object update's state message.
+    let mut fx = fx();
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 22, 20);
+    let c = fx
+        .game
+        .lists
+        .add_client(Some(p), Some(a), crate::units::lists::client_state::IN_GAME);
+    let o = create(&mut fx, WAYPOINT, 20);
+    fx.sim.objects(&mut fx.game, |ctl, t, w| {
+        obj::set_object_mode(ctl, t, w, o, 1).unwrap();
+    });
+    crate::tick::TickHooks::send_unit_update(&mut fx.sim, &mut fx.game, c, o);
+    let og = guid(&fx, o);
+    let sent = fx.sim.hooks().x.sent.clone();
+    assert!(sent.iter().all(|(to, _)| *to == p));
+    assert_eq!(sent[0].1[0], 0x51);
+    assert_eq!(sent[0].1[1], 2);
+    assert_eq!(sent[0].1[2..6], og.to_le_bytes());
+    let want = obj::state_message(og, false, 1);
+    assert_eq!(sent.last().unwrap().1, want.to_vec());
+    // The client's own player is never announced to itself.
+    fx.sim.hooks().x.sent.clear();
+    crate::tick::TickHooks::send_unit_update(&mut fx.sim, &mut fx.game, c, p);
+    assert!(fx.sim.hooks().x.sent.iter().all(|(_, m)| m[0] != 0x59));
     fx.assert_clean();
 }
 

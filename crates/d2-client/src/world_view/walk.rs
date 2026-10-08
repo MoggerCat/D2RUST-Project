@@ -10,7 +10,8 @@
 //!   the prediction (`Predict::frame`);
 //! - the predicted position goes to the feed (camera centre and the local
 //!   player's draw, `ViewFeed::set_local_prediction`) and the predicted
-//!   mode (2 walk / 3 run) to the unit art (`UnitArt::pose_mode`).
+//!   mode (2 walk / 3 run) and facing to the unit art
+//!   (`UnitArt::pose_mode`, `UnitArt::pose_dir`).
 //!
 //! The world view reads [`PreviewWalk`] for its clicks: the `mods` word
 //! (`RunMods::word`) and the predicted position as the click's local
@@ -90,6 +91,10 @@ pub fn preview_walk_frame(
             .predict
             .player()
             .and_then(|k| Some((k, walk.predict.mode()?)));
+        art.pose_dir = walk
+            .predict
+            .player()
+            .and_then(|k| Some((k, walk.predict.facing()?)));
     }
 }
 

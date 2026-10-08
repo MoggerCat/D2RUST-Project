@@ -45,6 +45,7 @@ pub mod ui_bind;
 pub mod unit_assets;
 pub mod unit_rules;
 pub mod walk;
+pub mod walk_room;
 
 #[cfg(test)]
 mod tests;

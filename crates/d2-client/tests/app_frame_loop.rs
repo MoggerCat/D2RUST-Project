@@ -199,8 +199,12 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // five of the travel; the 0x0D waits on its unit's queue for the
     // update pass (`client/model.md` §4, §5); nothing is unowned
     // (`client/bridge.md` §6 rule 3).
-    assert_eq!(joined, 18);
-    assert_eq!((b.log().handled, b.log().queued), (23, 1));
+    // (Plus the room switch's 0x07 for the Blood Moor room bordering
+    // the synthetic town: 19.)
+    assert_eq!(joined, 19);
+    // Plus two for the Blood Moor room bordering the synthetic town: its
+    // 0x07 at the join and its 0x08 when the travel leaves the town.
+    assert_eq!((b.log().handled, b.log().queued), (25, 1));
     assert!(b.log().unowned.is_empty(), "{:?}", b.log().unowned);
     assert!(b.log().dropped.is_empty(), "{:?}", b.log().dropped);
     let sight: Vec<_> = b
@@ -214,9 +218,11 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         [
             (true, 1, 16, 0),
             (true, 1, 16, 0),
+            (true, 2, 24, 0),
             (true, 3, 0, 0),
             (true, 3, 0, 0),
-            (false, 1, 16, 0)
+            (false, 1, 16, 0),
+            (false, 2, 24, 0)
         ]
     );
     assert!(b.log().rejected.is_empty() && b.log().discarded.is_empty());
