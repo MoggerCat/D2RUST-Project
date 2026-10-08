@@ -57,6 +57,7 @@ pub mod unit_rules;
 pub mod unit_shadow;
 pub mod walk;
 pub mod walk_room;
+pub mod weather_view;
 
 #[cfg(test)]
 mod tests;

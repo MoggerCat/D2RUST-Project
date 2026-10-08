@@ -15,7 +15,8 @@ use crate::scene::{BlendOp, DrawKey, ShadeChain};
 use crate::world_view::{UnitPose, ViewAssets, ViewError, ViewFeed};
 use d2_sim::rng::Seed;
 
-use super::weather::{FloorContext, Weather};
+use super::sky::{SkyFrame, SkyPasses};
+use super::weather::{FloorContext, LocalPlayer, Pass9Input, Weather};
 
 use super::super::camera::{Camera, ClientPos, OpenMode, TileList, UnitPosition};
 use super::super::view::{BlockRect, MapTile, ViewSource};
@@ -75,6 +76,10 @@ pub struct WeatherFrame<'a> {
     pub seed: &'a mut Seed,
     pub update_count: u32,
     pub mud: bool,
+    /// What passes 4 and 9 need (`draw-order-2.md` §11.6, §11.7). `None`:
+    /// the passes are not wired for this feed, and a frame with live pools
+    /// or lightning fails ([`WeatherFrame::unwired_passes`]).
+    pub sky: Option<SkyFrame>,
 }
 
 impl WeatherFrame<'_> {
@@ -87,6 +92,41 @@ impl WeatherFrame<'_> {
         for &(x, y) in water {
             self.weather.water_floor(self.floors, x, y, self.seed);
         }
+    }
+}
+
+impl WeatherFrame<'_> {
+    /// Passes 4 and 9 of the frame (§11.6, §11.7): the pool cels and the
+    /// sky draws, pass 9's seed draws on the lent seed. Without a
+    /// [`SkyFrame`], [`WeatherFrame::unwired_passes`] and no draws.
+    pub fn sky_passes(&mut self) -> Result<SkyPasses, ViewError> {
+        let Some(s) = self.sky else {
+            self.unwired_passes()?;
+            return Ok(SkyPasses::default());
+        };
+        let pools = self.weather.pass4(s.frame, s.mode, s.shift_x);
+        let player = LocalPlayer {
+            seed: &mut *self.seed,
+            level: s.level,
+        };
+        let input = Pass9Input {
+            frame: s.frame,
+            mode: s.mode,
+            frame_rate: s.frame_rate,
+            low_quality: s.low_quality,
+            // Sound is deferred: no thunder sound starts, so the two
+            // position rolls are not drawn.
+            thunder_sound_starts: false,
+        };
+        let p9 = self
+            .weather
+            .pass9(Some(player), &input)
+            .map_err(|e| open("weather pass 9", e.to_string()))?;
+        Ok(SkyPasses {
+            pools,
+            sky: p9.draws,
+            thunder: p9.thunder,
+        })
     }
 }
 
@@ -138,6 +178,8 @@ pub struct OrderedSource<'a, S: ?Sized> {
     pub units: BTreeMap<UnitKey, UnitSlot>,
     /// Unit shadows ([`DrawEffects::shadows`]).
     pub shadows: BTreeMap<UnitKey, OrderKey>,
+    /// Passes 4 and 9 of the frame (`draw-order-2.md` §11.6, §11.7).
+    pub sky: SkyPasses,
 }
 
 impl<S: ViewSource + ?Sized> ViewSource for OrderedSource<'_, S> {
@@ -224,10 +266,18 @@ pub fn ordered_source<'a, F: ViewFeed + ?Sized>(
         resolve_drawn(camera, &order, |t| feed.tile_art(t, assets))?
     };
     // `draw-order-2.md` §11.5: the floor pass's water effects.
+    let mut sky = SkyPasses::default();
     match feed.weather_frame(world)? {
         Some(mut w) => {
             w.floor_pass(&effects.water);
-            w.unwired_passes()?;
+            // The frame, mode and shiftX are the camera's.
+            w.sky = w.sky.map(|s| SkyFrame {
+                frame: camera.size,
+                mode,
+                shift_x: camera.view.shift_x,
+                ..s
+            });
+            sky = w.sky_passes()?;
         }
         None if effects.water.is_empty() => {}
         None => {
@@ -252,6 +302,7 @@ pub fn ordered_source<'a, F: ViewFeed + ?Sized>(
         tiles,
         units,
         shadows: effects.shadows,
+        sky,
     }))
 }
 

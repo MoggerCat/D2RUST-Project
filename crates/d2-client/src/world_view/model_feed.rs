@@ -34,6 +34,7 @@ use crate::rules::{MapTile, OpenMode, UnitPosition, ViewSource};
 use super::feed::{NoFeed, RunningShake, ViewFeed};
 use super::near_rooms::MapState;
 use super::preview::{self, Preview};
+use super::weather_view::WeatherView;
 use super::{UnitPose, ViewAssets, ViewError};
 
 /// The 16.16 position of a dynamic path at the centre of cell `c`
@@ -91,9 +92,11 @@ pub const PENDING: &[(&str, &str)] = &[
          over it, but no unit code creates records)",
     ),
     (
-        "ViewFeed::weather_frame",
-        "the player's level is known now (`model.md` §11 r5), but no water floor is drawn \
-         without tile art (above) and passes 4 / 9 have no art path yet",
+        "ViewFeed::weather_frame, ViewFeed::sky_items (strict path)",
+        "the strict feed lends no weather state: the weather frame, the water floor and the art of \
+         passes 4 / 9 are the play preview's (`ModelFeed::weather`, `weather_view.rs`: the seed, \
+         update count, day period, video mode and frame rate are `d2rs-own, unverified` fills); \
+         lightning is never started (`draw-order-2.md` open question 4)",
     ),
     (
         "ViewFeed::player_seed, ViewFeed::shake",
@@ -124,6 +127,10 @@ pub struct ModelFeed<F = NoFeed> {
     /// The local player's predicted 16.16 position (decision D2,
     /// `bridge::predict`); read only with a [`Preview`].
     pub local_at: Option<(UnitKey, (u32, u32))>,
+    /// The play preview's weather (`weather_view`, `d2rs-own,
+    /// unverified`): water floors keep their bit, passes 4 and 9 draw.
+    /// `None`: no weather state.
+    pub weather: Option<WeatherView>,
 }
 
 impl<F> ModelFeed<F> {
@@ -135,7 +142,14 @@ impl<F> ModelFeed<F> {
             map: None,
             preview: None,
             local_at: None,
+            weather: None,
         }
+    }
+
+    /// The feed with the preview's weather (`weather_view`).
+    pub fn with_weather(mut self, weather: WeatherView) -> Self {
+        self.weather = Some(weather);
+        self
     }
 
     /// The feed with the map and the play preview's fills
@@ -296,6 +310,7 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
             levels,
             map,
             preview,
+            weather,
             ..
         } = self;
         let Some(map) = map.as_mut() else {
@@ -316,7 +331,9 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
             Ok(preview::unit_facts(world, u))
         }) {
             Ok(Some(near)) => {
-                preview::dry_floors(near);
+                if weather.is_none() {
+                    preview::dry_floors(near);
+                }
                 Ok(Some(near))
             }
             Ok(None) => Ok(None),
@@ -346,8 +363,21 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
             None => Vec::new(),
         };
         let local_at = self.local_at;
+        let mode = self.ui_open_mode.unwrap_or(OpenMode::NONE);
         let preview = self.preview.as_mut().expect("checked above");
         let r = preview.prepare(world, &entries, assets);
+        if let Some(w) = self.weather.as_mut() {
+            w.prepare(
+                world,
+                self.levels.as_deref(),
+                local_at.map(|l| l.1),
+                mode,
+                assets,
+            );
+            if let Some(m) = w.take_failure() {
+                preview.log_once(format!("weather: {m}"));
+            }
+        }
         let tables = preview
             .tiles
             .shades(world.palette_act.unwrap_or(0))
@@ -367,7 +397,31 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
         &mut self,
         world: &ClientWorld,
     ) -> Result<Option<crate::rules::draw_order::source::WeatherFrame<'_>>, ViewError> {
+        if self.weather.is_some() {
+            return Ok(self.weather.as_mut().and_then(WeatherView::frame));
+        }
         self.inner.weather_frame(world)
+    }
+
+    /// Preview weather: the cels and lines of passes 4 and 9
+    /// ([`WeatherView::items`]); a failure is logged once and the frame
+    /// goes without them.
+    fn sky_items(
+        &self,
+        sky: &crate::rules::draw_order::sky::SkyPasses,
+        assets: &ViewAssets,
+    ) -> Result<Vec<crate::scene::DrawItem>, ViewError> {
+        let (Some(w), Some(p)) = (&self.weather, &self.preview) else {
+            return self.inner.sky_items(sky, assets);
+        };
+        let mode = self.ui_open_mode.unwrap_or(OpenMode::NONE);
+        match w.items(sky, mode, assets.shades.as_ref(), assets) {
+            Ok(items) => Ok(items),
+            Err(e) => {
+                p.log_once(format!("weather draws: {e}"));
+                Ok(Vec::new())
+            }
+        }
     }
 
     fn fade_clock(&self, world: &ClientWorld) -> Result<FadeClock, ViewError> {

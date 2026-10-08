@@ -518,6 +518,8 @@ fn levels() -> Vec<LevelRow> {
         blank_screen: true,
         sound_env: 0,
         draw_edges: false,
+        rain: false,
+        mud: false,
     };
     (v[40].pal, v[40].act) = (1, 1);
     // A level whose `Pal` differs from its `Act` (as 125–127, 133–136).
@@ -564,6 +566,7 @@ fn join_level_comes_from_the_room_of_the_0x15_placement() {
         map: None,
         preview: None,
         local_at: None,
+        weather: None,
     };
     m.recv(&assign_player(0, 0)).hex("0b 00 01 00 00 00");
     // 0x03 seq 142: palette act 0; u16@6 (town level 1) is not the level.

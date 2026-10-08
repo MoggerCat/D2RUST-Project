@@ -1918,6 +1918,8 @@ pub fn client_level_rows(data: &GameData) -> Vec<LevelRow> {
             blank_screen: l.blankscreen != 0,
             sound_env: l.soundenv,
             draw_edges: l.drawedges != 0,
+            rain: l.rain != 0,
+            mud: l.mud != 0,
         })
         .collect()
 }

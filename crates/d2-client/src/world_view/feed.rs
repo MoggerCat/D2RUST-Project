@@ -31,13 +31,14 @@ use crate::bridge::ClientUnit;
 use crate::composite::{ComponentFrame, ComponentRequest, CompositeError, UnitParams};
 use crate::frames::IndexFrame;
 use crate::rules::camera::shake_offsets;
+use crate::rules::draw_order::sky::SkyPasses;
 use crate::rules::draw_order::source::{ordered_source, TileArt, WeatherFrame};
 use crate::rules::draw_order::{FadeClock, NearRooms, OrderedTile, UnitFacts};
 use crate::rules::lighting::view::{FrameLight, LitRules, LookFeed};
 use crate::rules::{
     Camera, FrameSize, MapTile, OpenMode, OriginalView, Shake, UnitPosition, ViewSource,
 };
-use crate::scene::{BlendOp, ShadeChain};
+use crate::scene::{BlendOp, DrawItem, ShadeChain};
 use crate::ui::{ImageRequest, TextRequest, UiDraw};
 
 use super::WorldFrame;
@@ -153,6 +154,24 @@ pub trait ViewFeed: ViewSource {
         _world: &ClientWorld,
     ) -> Result<Option<WeatherFrame<'_>>, ViewError> {
         Ok(None)
+    }
+
+    /// The draw items of the frame's passes 4 and 9 (`draw-order-2.md`
+    /// §11.6, §11.7), keyed at their passes. The default draws none and
+    /// refuses a frame that has draws (M07: nothing is dropped).
+    fn sky_items(&self, sky: &SkyPasses, _assets: &ViewAssets) -> Result<Vec<DrawItem>, ViewError> {
+        if sky.is_empty() {
+            return Ok(Vec::new());
+        }
+        Err(ViewError::Unresolved {
+            what: "weather draws",
+            spec: "render/draw-order-2.md",
+            message: format!(
+                "{} pool cel(s) and {} sky draw(s) and the feed has no art for them",
+                sky.pools.len(),
+                sky.sky.len()
+            ),
+        })
     }
 
     /// The fade clock of the frame (`draw-order.md` §8 clock arithmetic):
@@ -401,7 +420,18 @@ where
             assets,
         ),
         Some((camera, mode)) => match ordered_source(world, &camera, mode, feed, assets)? {
-            Some(source) => build_lit(world, ui, rules, camera, &source, source.source, assets),
+            Some(source) => {
+                let mut frame =
+                    build_lit(world, ui, rules, camera, &source, source.source, assets)?;
+                // Passes 4 and 9 (`draw-order-2.md` §11.6, §11.7) join the
+                // sorted list by their keys.
+                let sky = source.source.sky_items(&source.sky, assets)?;
+                if !sky.is_empty() {
+                    frame.items.extend(sky);
+                    crate::scene::order(&mut frame.items);
+                }
+                Ok(frame)
+            }
             None => build_lit(world, ui, rules, camera, &*feed, &*feed, assets),
         },
         None => build(

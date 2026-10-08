@@ -88,6 +88,11 @@ impl TileAssets {
         }
     }
 
+    /// The archives the tiles are read from.
+    pub fn source(&self) -> Option<Arc<dyn FileSource>> {
+        self.source.clone()
+    }
+
     /// Makes every entry resident that is neither resident nor failed.
     /// Returns the failures this call found (each entry once).
     pub fn ensure<'a>(
