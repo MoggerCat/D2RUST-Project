@@ -126,6 +126,9 @@ impl LoadingScreen {
             LoadEvent::S61 { id } => {
                 if video_name(id).is_some() {
                     self.videos.push(id);
+                    // L10 r2 (PROVISIONAL, REC-223): no loading redraw
+                    // after the video; black until L7.
+                    self.presented.push(Presented::Black);
                 }
             }
         }

@@ -140,16 +140,38 @@ impl StartChoice {
     }
 }
 
-/// Turns the model's state into [`LoadEvent`]s (edge detection per frame).
+/// Turns the model's session messages into [`LoadEvent`]s, in arrival
+/// order (L9, L10): 0x05, 0x03, 0x61, 0x04, including a repeated 0x03 of
+/// the same act. A model without session marks (state set directly) falls
+/// back to edge detection.
 #[derive(Debug, Default)]
 pub struct LoadFeed {
     act: Option<crate::bridge::world::ActLoad>,
     in_game: bool,
+    seen: u64,
 }
 
 impl LoadFeed {
     pub fn observe(&mut self, w: &ClientWorld) -> Vec<LoadEvent> {
+        use crate::bridge::world::SessionMark;
         let mut out = Vec::new();
+        let fresh = (w.session_total - self.seen) as usize;
+        if fresh > 0 {
+            let log = &w.session_log;
+            // Marks older than the log's window are gone; take what is left.
+            for m in &log[log.len() - fresh.min(log.len())..] {
+                out.push(match *m {
+                    SessionMark::LoadAct(act) => LoadEvent::S03 { act },
+                    SessionMark::LoadComplete => LoadEvent::S04,
+                    SessionMark::Unload => LoadEvent::S05,
+                    SessionMark::Video(id) => LoadEvent::S61 { id },
+                });
+            }
+            self.seen = w.session_total;
+            self.act = w.act;
+            self.in_game = w.in_game;
+            return out;
+        }
         if w.act != self.act {
             if let Some(a) = w.act {
                 out.push(LoadEvent::S03 { act: a.act });

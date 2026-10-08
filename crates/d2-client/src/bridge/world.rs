@@ -315,6 +315,25 @@ pub struct ActLoad {
     pub f8: u32,
 }
 
+/// A session message the loading flow cares about, in arrival order
+/// (`ui/frontend-loading.md` L9, L10). d2rs-own: the model keeps edges
+/// only, so a repeated same-act 0x03 or a 0x05 / 0x04 pair inside one
+/// frame would otherwise be lost.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SessionMark {
+    /// S→C 0x03 of this act.
+    LoadAct(u8),
+    /// S→C 0x04.
+    LoadComplete,
+    /// S→C 0x05.
+    Unload,
+    /// S→C 0x61 with this video id.
+    Video(u8),
+}
+
+/// Marks kept in [`ClientWorld::session_log`].
+pub const SESSION_LOG_CAP: usize = 64;
+
 /// One room-in-sight message (§9 rule 4).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RoomSight {
@@ -510,6 +529,10 @@ impl RoomUnits {
 /// The client world model.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ClientWorld {
+    /// Session messages seen so far (count, never reset).
+    pub session_total: u64,
+    /// The last [`SESSION_LOG_CAP`] of them, oldest first.
+    pub session_log: Vec<SessionMark>,
     /// Bridge frames run (`bridge.md` §5 rule 3).
     pub frames: u64,
     /// d2rs-own, unverified: S→C 0x9C action 0x0B records received (the
@@ -612,6 +635,15 @@ pub struct ClientWorld {
 }
 
 impl ClientWorld {
+    /// Records a session message for the loading flow.
+    pub fn mark_session(&mut self, m: SessionMark) {
+        self.session_total += 1;
+        self.session_log.push(m);
+        if self.session_log.len() > SESSION_LOG_CAP {
+            self.session_log.remove(0);
+        }
+    }
+
     /// The local player unit, if the model has one.
     pub fn local(&self) -> Option<&ClientUnit> {
         self.units.get(&self.local_player?)

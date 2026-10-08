@@ -135,3 +135,66 @@ fn loading_goes_through_its_events_to_the_world() {
     assert!(!s.covering());
     assert_eq!(s.advance(&w, true), Some(Presented::World { act: 1 }));
 }
+
+#[test]
+fn act_change_sequence_drives_the_states_in_spec_order() {
+    use d2_client::bridge::world::SessionMark as M;
+    let act = |n| ActLoad {
+        act: n,
+        init_seed: 1,
+        town_level: 40,
+        f8: 0,
+    };
+    let mut s = LoadingState::default();
+    let mut w = ClientWorld::default();
+    // Join: 0x03 act 0, 0x04, player placed.
+    w.act = Some(act(0));
+    w.mark_session(M::LoadAct(0));
+    w.in_game = true;
+    w.mark_session(M::LoadComplete);
+    assert_eq!(s.advance(&w, true), Some(Presented::Black));
+    assert_eq!(s.advance(&w, true), Some(Presented::World { act: 0 }));
+    assert!(!s.covering());
+    // Waypoint to Act II: 0x05, 0x03 (act 1), 0x61 id 2, then 0x04.
+    w.in_game = false;
+    w.mark_session(M::Unload);
+    w.act = Some(act(1));
+    w.mark_session(M::LoadAct(1));
+    w.mark_session(M::Video(2));
+    // The world frame is not drawn; loading frame 0, then black after the
+    // video (no redraw, REC-223).
+    assert_eq!(s.advance(&w, true), Some(Presented::Black));
+    assert!(s.covering());
+    assert_eq!(s.screen.videos, vec![2]);
+    let p = &s.screen.presented;
+    assert_eq!(
+        p[p.len() - 2..],
+        [Presented::Loading { frame: 0 }, Presented::Black]
+    );
+    w.in_game = true;
+    w.mark_session(M::LoadComplete);
+    assert_eq!(s.advance(&w, true), Some(Presented::Black));
+    assert!(!s.covering());
+    assert_eq!(s.advance(&w, true), Some(Presented::World { act: 1 }));
+}
+
+#[test]
+fn repeated_same_act_load_redraws_loading() {
+    use d2_client::bridge::world::SessionMark as M;
+    let a = ActLoad {
+        act: 1,
+        init_seed: 1,
+        town_level: 40,
+        f8: 0,
+    };
+    let mut s = LoadingState::default();
+    let mut w = ClientWorld {
+        act: Some(a),
+        ..ClientWorld::default()
+    };
+    w.mark_session(M::LoadAct(1));
+    s.advance(&w, false);
+    // A second 0x03 of the same act leaves the model's act unchanged.
+    w.mark_session(M::LoadAct(1));
+    assert_eq!(s.advance(&w, false), Some(Presented::Loading { frame: 2 }));
+}
