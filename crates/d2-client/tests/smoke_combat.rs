@@ -305,6 +305,11 @@ impl Rig {
                 ..MonsterClass::default()
             });
             b.0.set_unit_rows(units);
+            // The render side's visibility predicate (`model.md` §13 r6):
+            // headless there is no camera, COF or cel state, so this test
+            // supplies the input (every point visible). The play window
+            // installs none yet (open, docs/handoff/q-smoke-combat.md).
+            b.0.set_visibility(Some(|_, _, _| true));
             let mut natives = [0u16; 10];
             natives[0] = start_skill(class);
             let mut all = vec![[0u16; 10]; 7];
@@ -663,43 +668,43 @@ fn the_synthetic_play_join_is_clean() {
 
 // Covers: specs/skills/use.md §5; specs/combat/vitals.md §4
 #[test]
-#[ignore = "q-smoke-combat: stops at a known break, docs/handoff/q-smoke-combat.md"]
+#[ignore = "q-smoke-combat: stops at the left-skill kill (open break 3, docs/handoff/q-smoke-combat.md)"]
 fn amazon_fights_levels_dies_and_respawns() {
     scenario(0);
 }
 
 #[test]
-#[ignore = "q-smoke-combat: stops at a known break, docs/handoff/q-smoke-combat.md"]
+#[ignore = "q-smoke-combat: stops at the left-skill kill (open break 3, docs/handoff/q-smoke-combat.md)"]
 fn sorceress_fights_levels_dies_and_respawns() {
     scenario(1);
 }
 
 #[test]
-#[ignore = "q-smoke-combat: stops at a known break, docs/handoff/q-smoke-combat.md"]
+#[ignore = "q-smoke-combat: stops at the left-skill kill (open break 3, docs/handoff/q-smoke-combat.md)"]
 fn necromancer_fights_levels_dies_and_respawns() {
     scenario(2);
 }
 
 #[test]
-#[ignore = "q-smoke-combat: stops at a known break, docs/handoff/q-smoke-combat.md"]
+#[ignore = "q-smoke-combat: stops at the left-skill kill (open break 3, docs/handoff/q-smoke-combat.md)"]
 fn paladin_fights_levels_dies_and_respawns() {
     scenario(3);
 }
 
 #[test]
-#[ignore = "q-smoke-combat: stops at a known break, docs/handoff/q-smoke-combat.md"]
+#[ignore = "q-smoke-combat: stops at the left-skill kill (open break 3, docs/handoff/q-smoke-combat.md)"]
 fn barbarian_fights_levels_dies_and_respawns() {
     scenario(4);
 }
 
 #[test]
-#[ignore = "q-smoke-combat: stops at a known break, docs/handoff/q-smoke-combat.md"]
+#[ignore = "q-smoke-combat: stops at the left-skill kill (open break 3, docs/handoff/q-smoke-combat.md)"]
 fn druid_fights_levels_dies_and_respawns() {
     scenario(5);
 }
 
 #[test]
-#[ignore = "q-smoke-combat: stops at a known break, docs/handoff/q-smoke-combat.md"]
+#[ignore = "q-smoke-combat: stops at the left-skill kill (open break 3, docs/handoff/q-smoke-combat.md)"]
 fn assassin_fights_levels_dies_and_respawns() {
     scenario(6);
 }
