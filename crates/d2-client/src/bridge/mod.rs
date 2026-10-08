@@ -461,6 +461,14 @@ impl<L: ServerLink> Bridge<L> {
         self.world.recache_local_room(x, y)
     }
 
+    /// The play preview's predicted sub-tile of the local player, for the
+    /// position check ([`ClientWorld::set_local_walk`],
+    /// [`ClientWorld::predicted`]). d2rs-own, unverified. PROVISIONAL
+    /// (`client/model.md` OQ2; REC-51, REC-277).
+    pub fn set_local_walk(&mut self, cell: Option<(u16, u16)>) {
+        self.world.set_local_walk(cell);
+    }
+
     /// Installs the item tables the model decodes item streams with.
     pub fn set_item_tables(&mut self, t: std::sync::Arc<dyn item_lists::StreamProps>) {
         self.world.set_item_tables(t);

@@ -51,7 +51,7 @@
 | Edge cases & original bugs | 1061–1072 |
 | Test vectors | 1073–1120 |
 | Provenance | 1121–1199 |
-| Open questions | 1200–1315 |
+| Open questions | 1200–1322 |
 <!-- /index -->
 
 ## Summary
@@ -1233,6 +1233,13 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    correction) (because the 0x0D is the only message that tells the
    client where the server player walks after a warp or portal);
    settled by REC-288.
+   PROVISIONAL (play preview, position check): while the preview
+   predicts the local player's walk (no placement since), §6 rule 8 for
+   the local player takes the server's point and sends no C→S 0x5F
+   (because the preview's straight-line guess does not see collision, so
+   past an obstacle it parts from a server path that is right, and 0x5F
+   would walk the player to the guess, `sim/pathing.md` §1.6); settled by
+   REC-277 with REC-51 (the client path step).
 3. ~~`[0x007A04A4]`~~: answered in §6 rule 4 and §7 rule 11
    (2026-10-08 correction: the ping round trip written by 0x8F, not
    only zeroed); the single-player value is open question 18.

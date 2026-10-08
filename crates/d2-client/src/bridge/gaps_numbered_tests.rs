@@ -201,6 +201,9 @@ fn client_world_holds_only_stated_fields() {
         exit_requested,
         rooms_in_sight,
         outgoing,
+        // d2rs-own, unverified: the play preview's walk cell for the
+        // position check (`client/model.md` OQ2; REC-51, REC-277).
+        local_walk,
         use_cursor,
         // `client/model.md` §14 rule 5, §11 rules 2 and 4, §12 rules 1–2.
         pets,
@@ -238,6 +241,7 @@ fn client_world_holds_only_stated_fields() {
     } = ClientWorld::default();
     assert!(!connected && ping == Default::default() && pet_palette.is_empty());
     assert_eq!(belt_ready, [false; 4]);
+    assert!(local_walk.is_none());
     assert_eq!(objclient, Default::default());
     assert!(overrides == Default::default() && roster.is_empty() && roster_inactive.is_empty());
     assert!(weapon_set == 0 && item_table_ext.is_empty());

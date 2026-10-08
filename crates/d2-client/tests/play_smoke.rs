@@ -467,6 +467,12 @@ impl Run {
             "{step}: the server refused {:02X?}",
             w.refused
         );
+        // No position resync asked: the server never walks the player
+        // to a client guess (the rubber band, REC-277).
+        assert!(
+            !w.sent.iter().any(|m| m.first() == Some(&0x5F)),
+            "{step}: the client sent C→S 0x5F"
+        );
         drop(w);
         let b = &self.app.world().resource::<BridgeResource>().0;
         let log = b.log();
@@ -1149,7 +1155,6 @@ impl Run {
         for g in goals {
             for _ in 0..30 {
                 if self.server_level() == Some(to) {
-                    self.settle();
                     return;
                 }
                 let p = self.pos();
@@ -1164,33 +1169,6 @@ impl Run {
             }
         }
         assert_eq!(self.server_level(), Some(to), "walked into level {to}");
-        self.settle();
-    }
-
-    /// A one-sub-tile leg, so the walk prediction and the server stand on
-    /// the same cell: the preview's straight-line prediction ends apart
-    /// from the server's path when that stops short (REC-51), and the
-    /// next position check then walks the server player back to the
-    /// predicted cell (C→S 0x5F, `pathing.md` §1.6). See the handoff.
-    fn settle(&mut self) {
-        let p = self.pos();
-        self.leg((p.0 + 1, p.1));
-        self.step(60);
-        let walk = self
-            .app
-            .world()
-            .resource::<d2_client::world_view::walk::PreviewWalk>();
-        let pc = walk
-            .predict
-            .cell()
-            .map(|(x, y)| (i32::from(x), i32::from(y)))
-            .expect("a prediction");
-        // Within the check's tolerance (`model.md` §6 r4–r5).
-        let p = self.pos();
-        assert!(
-            test_fixtures::host::cheb(pc, p) <= 2,
-            "the prediction met the server: {pc:?} / {p:?}"
-        );
     }
 }
 
@@ -1199,8 +1177,11 @@ impl Run {
 /// the Blood Moor on foot (run legs, C→S 0x03). It failed twice on the way:
 /// the position checks of S→C 0x96 had no visibility predicate
 /// (`model.md` §13 r6: now the world view's), and a check correction sent
-/// the model's stale local position in C→S 0x5F, so the server put the
-/// player back at the join point (the model now follows the prediction).
+/// C→S 0x5F with a client position the server had not walked (the last
+/// placement, or the straight-line prediction past an obstacle), so the
+/// server walked the player there: the rubber band. While the preview
+/// predicts, the check now follows the server (REC-277); `Run::check`
+/// asserts no 0x5F is ever sent.
 #[test]
 fn the_live_run() {
     let dir = five_act_install("live");
@@ -1324,13 +1305,18 @@ fn the_live_run() {
         (rect.x + rect.w / 2) * test_fixtures::host::SUB,
         (rect.y + rect.h / 2) * test_fixtures::host::SUB,
     );
+    let mut unreachable = Vec::new();
     for _ in 0..30 {
         if run.player_stat(12) >= 2 {
             break;
         }
-        match run.monsters_near().first().copied() {
+        let near = run.monsters_near();
+        match near.into_iter().find(|m| !unreachable.contains(&m.guid)) {
             Some(m) => {
-                assert!(run.kill(m), "a beast died");
+                if !run.kill(m) {
+                    unreachable.push(m.guid);
+                    continue;
+                }
                 run.step(20);
                 run.check("kill");
             }
@@ -1359,7 +1345,6 @@ fn the_live_run() {
                         break;
                     }
                 }
-                run.settle();
             }
         }
     }
@@ -1539,9 +1524,33 @@ impl Run {
         })
     }
 
+    /// A 15-sub-tile leg in the first of the eight directions that moves
+    /// the player; `false` when none does.
+    fn sidestep(&mut self) -> bool {
+        let p = self.pos();
+        for d in [
+            (15, 0),
+            (0, 15),
+            (-15, 0),
+            (0, -15),
+            (15, 15),
+            (-15, 15),
+            (15, -15),
+            (-15, -15),
+        ] {
+            self.leg((p.0 + d.0, p.1 + d.1));
+            if test_fixtures::host::cheb(self.pos(), p) > 3 {
+                return true;
+            }
+        }
+        false
+    }
+
     /// Left skill (Attack) on `key` (C→S 0x06) until the server says it
     /// is dead; one message each time the player is back in a neutral
     /// mode.
+    /// `false`: out of reach (no leg toward it moves the player) or
+    /// still alive.
     fn kill(&mut self, key: UnitKey) -> bool {
         for _ in 0..150 {
             match self.monster_life(key.guid) {
@@ -1565,7 +1574,11 @@ impl Run {
                         p.0 + (mp.0 - p.0).clamp(-25, 25),
                         p.1 + (mp.1 - p.1).clamp(-25, 25),
                     ));
-                    self.settle();
+                    // A blocked leg stays: step aside, else give the
+                    // monster up (out of reach).
+                    if test_fixtures::host::cheb(self.pos(), p) <= 3 && !self.sidestep() {
+                        return false;
+                    }
                     continue;
                 }
             }
