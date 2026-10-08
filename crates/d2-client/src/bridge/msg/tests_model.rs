@@ -5,7 +5,8 @@
 use super::super::check::{check, Checked};
 use super::super::world::{
     room_of_point, update_order, ActLoad, ActiveRoom, ClientUnit, ClientWorld, LevelRow,
-    ModelInputs, MonsterClass, PetRecord, RoomSight, UnitKey, MISSILE, MONSTER, OBJECT, PLAYER,
+    ModelInputs, MonsterClass, PetRecord, RoomSight, UnitKey, VisibleFn, MISSILE, MONSTER, OBJECT,
+    PLAYER,
 };
 use super::support::{hex, Model};
 
@@ -267,11 +268,11 @@ fn shown(_: &ClientUnit, _: i32, _: i32) -> bool {
 fn position_check_vectors() {
     let none = ModelInputs::default();
     let shown = ModelInputs {
-        visible: Some(shown),
+        visible: Some(VisibleFn::new(shown)),
         ..ModelInputs::default()
     };
     let hidden = ModelInputs {
-        visible: Some(hidden),
+        visible: Some(VisibleFn::new(hidden)),
         ..ModelInputs::default()
     };
 

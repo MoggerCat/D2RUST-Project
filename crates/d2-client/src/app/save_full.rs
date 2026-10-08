@@ -1,4 +1,4 @@
-// Spec: specs/formats/d2s.md §7.2 (skills), §8.1 / §8.2 (items), specs/world/waypoints.md §3
+// Spec: specs/formats/d2s.md §7.2 (skills), §8.1 / §8.2 (items), §8.3 (corpse), specs/world/waypoints.md §3
 //! The rest of a played character's save (q-save-full): items, skill
 //! levels and waypoints, read from the running game at save time
 //! ([`read_extra`]) and made again at the join ([`join_items`]). d2rs-own,
@@ -139,12 +139,16 @@ pub fn join_items(s: &mut Sim, player: UnitId, save: &D2s) -> bool {
     let Some(body) = &save.body else {
         return true;
     };
-    if body.items.is_empty() {
+    join_player_items(s, player, &body.items)
+}
+
+fn join_player_items(s: &mut Sim, player: UnitId, items: &[ItemEntry]) -> bool {
+    if items.is_empty() {
         return true;
     }
     let loaded = s
         .world
-        .load_items(&mut s.game, &mut s.events, player, &body.items);
+        .load_items(&mut s.game, &mut s.events, player, items);
     let own: Vec<Vec<u8>> = loaded
         .sent
         .iter()
@@ -168,4 +172,38 @@ pub fn join_items(s: &mut Sim, player: UnitId, save: &D2s) -> bool {
             .map(|f| format!("join: save load: items: {f}")),
     );
     loaded.faults.is_empty()
+}
+
+/// The corpse section (`d2s.md` §8.3 rule 4): each saved corpse becomes a
+/// player corpse unit linked to `player` ([`d2_sim::wiring::action::ActionSim::load_corpse`])
+/// with the saved item list read into it, so the corpse and its items
+/// are there for the next save. Its 12 leading bytes are skipped, as the
+/// reader does. A corpse with no unit or an item that failed logs why.
+/// True when nothing failed (the load report's "corpse" step is then
+/// applied).
+pub fn join_corpses(s: &mut Sim, player: UnitId, save: &D2s) -> bool {
+    let Some(body) = &save.body else {
+        return true;
+    };
+    let mut ok = true;
+    for (i, corpse) in body.corpses.iter().enumerate() {
+        let Some(c) = s.events.action.load_corpse(&mut s.game, player) else {
+            let log = &mut s.events.action.hooks().x.log;
+            log.push(format!("join: save load: corpse {i}: no corpse unit"));
+            ok = false;
+            continue;
+        };
+        let loaded = s
+            .world
+            .load_corpse_items(&mut s.game, &mut s.events, c, &corpse.items);
+        ok &= loaded.faults.is_empty();
+        let log = &mut s.events.action.hooks().x.log;
+        log.extend(
+            loaded
+                .faults
+                .iter()
+                .map(|f| format!("join: save load: corpse {i} items: {f}")),
+        );
+    }
+    ok
 }

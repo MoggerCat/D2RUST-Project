@@ -419,7 +419,26 @@ where
     R: ViewRules + UiRules + ?Sized,
     F: ViewFeed + ?Sized,
 {
-    match camera_and_mode(world, feed)? {
+    let placed = camera_and_mode(world, feed)?;
+    let mut frame = build_placed(world, ui, rules, feed, assets, placed)?;
+    frame.camera = placed.map(|(camera, _)| camera);
+    Ok(frame)
+}
+
+/// [`build_frame`] with the frame's camera and open mode.
+fn build_placed<R, F>(
+    world: &ClientWorld,
+    ui: &[UiDraw],
+    rules: &R,
+    feed: &mut F,
+    assets: &ViewAssets,
+    placed: Option<(Camera, OpenMode)>,
+) -> Result<WorldFrame, ViewError>
+where
+    R: ViewRules + UiRules + ?Sized,
+    F: ViewFeed + ?Sized,
+{
+    match placed {
         Some((camera, mode)) if mode.get() == NO_WORLD_MODE => build(
             world,
             ui,

@@ -41,6 +41,15 @@ pub trait ActionEvents: EventDispatch {
     type X: Pending;
     fn action(&mut self) -> &mut ActionSim<Self::X>;
 
+    /// Runs `f` on [`Self::action`] with the game's monster state lent
+    /// to the action hooks (`ActionHooks::monster_world`), so a monster
+    /// allocated inside `f` gets its type init (`monsters/init.md` §5,
+    /// `units.md` §3.1 table) and a freed one leaves the monster state.
+    /// Without a monster state (a bare [`ActionSim`]) `f` runs as is.
+    fn lend_world<R>(&mut self, f: impl FnOnce(&mut ActionSim<Self::X>) -> R) -> R {
+        f(self.action())
+    }
+
     /// Game creation's fields (`docs/HANDOFF.md` §7 I7, W16) from
     /// `fields`: the game seed (`rng.md` §5.3) and the creation fields
     /// (difficulty +0x6D, expansion +0x70, game type +0x6A, ladder +0x74;
@@ -106,6 +115,10 @@ impl<X: WorldPending> ActionEvents for WorldSim<X> {
     type X = X;
     fn action(&mut self) -> &mut ActionSim<X> {
         &mut self.action
+    }
+
+    fn lend_world<R>(&mut self, f: impl FnOnce(&mut ActionSim<X>) -> R) -> R {
+        self.lend(f)
     }
 
     /// Also the world-generation copies (`WorldState::pop_info`,

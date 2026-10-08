@@ -27,6 +27,7 @@ pub mod monster_drop;
 pub mod npc_seams;
 pub mod palette;
 pub mod play;
+pub mod play_start;
 pub mod rest;
 pub mod save;
 pub mod save_full;
@@ -46,8 +47,10 @@ pub mod synthetic_client;
 pub mod synthetic_items;
 pub mod synthetic_maze;
 pub mod synthetic_tower;
+pub mod synthetic_vendors;
 pub mod town_npcs;
 pub mod ui;
+pub mod visibility;
 pub mod weapons;
 
 use std::path::PathBuf;

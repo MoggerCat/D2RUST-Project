@@ -96,11 +96,11 @@ pub const PENDING: &[(&str, &str)] = &[
          `original_tests.rs::stash_gold_withdraw_and_deposit_send_0x4f`)",
     ),
     (
-        "inventory equipment tints and empty-slot pictures (§9.4, `inventory.md` §6 r4)",
-        "the equipped-item tint (refused when the requirements fail, unidentified) is pushed \
-         as `UiDraw::Tint` by `ItemsUi::draw_panel` (REC-271); the scene has no fill \
-         primitive to paint it, the hover tint and the grid-item tints are not pushed, and \
-         the empty-slot pictures (§9.4 table) are not drawn",
+        "inventory tints (translucency) and empty-slot pictures (§9.4, `inventory.md` §2–§6)",
+        "the equipped and grid item tints and the hover tint are painted by \
+         `ItemsUi::draw_tints` as opaque `hudfill` tiles (REC-271: the UI sprite path has no \
+         A2 blend); the shooter / quiver and cursor-item tints are not read and the \
+         empty-slot pictures (§9.4 table) are not drawn",
     ),
     (
         "skill tree hover description and the no-points message (§10.5, §10.7)",
@@ -672,6 +672,20 @@ impl OriginalUi {
         self.shared.borrow().esc.controls.is_some()
     }
 
+    /// Whether the expansion is installed (`0x00408F20`: the Options and
+    /// Configure Controls tables, `ui/frontend-options.md` §O2, §O9).
+    pub fn expansion_installed(&self) -> bool {
+        self.shared.borrow().config.expansion_installed
+    }
+
+    /// The open Controls screen's state (hosts and tests read it).
+    pub fn controls_screen(
+        &self,
+    ) -> Option<crate::ui::front_end::screens::controls::ConfigureControls> {
+        let sh = self.shared.borrow();
+        sh.esc.controls.as_ref().map(|c| c.model().clone())
+    }
+
     /// A raw key (Windows virtual key) for the open Controls screen;
     /// false when it is not open (the key is for the game).
     pub fn controls_key(&mut self, vk: u16, now_ms: u64) -> bool {
@@ -821,6 +835,8 @@ impl Panel for InventoryUi {
         panel.draw(&sh.tables, &sh.env(), gold, out);
         let class = Facts::of(ctx.world).class;
         if let Some(l) = sh.items.layout(class, &sh.config.screen) {
+            sh.items
+                .draw_tints(ctx.world, &sh.tables.files, &l, sh.mouse, out);
             sh.items.draw_panel(ctx.world, &sh.tables.files, &l, out);
         }
     }
