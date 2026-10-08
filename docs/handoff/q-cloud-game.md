@@ -173,6 +173,60 @@ frames 0–5: 117×104, 128×55 ×3, 86×55, 117×104, offsets 0) equal
 The 1.14d frame's cursor (`protate.dc6` at 320, 240) and rain (`rain 1`)
 are known extra rows on the original side (`facts-render.md` edge cases).
 
+### Round 3 — exporter rows, the waypoint scene, the first real differences
+
+The coordinator gave the exporter gap to this branch (d2-client edits allowed).
+
+**Exporter (`d2-client::facts::export`, `facts-render.md` §5 r1, r9–r11)**:
+- `StartDraw(bClear = BlankScreen, 0, 0, 0)` first and `ClearScreen(0)` last
+  (when the plan clears after drawing), as `composition.md` §3 and the 1.14d
+  log;
+- pass 9's weather calls as one `DrawLine` / `DrawBox` row each (d2rs draws
+  them as 1×1 pixel items; `WorldFrame::sky` carries the calls) with
+  `mode` = color (`blend-modes.md` §8). `facts_render.py` fills the same
+  column from the 1.14d arguments;
+- §5 r1 merge fixed. A tile's blocks are separate frames with their own
+  offsets, so consecutive tile items giving the same row (same tag) are now
+  one row (1,995 floor rows → 94);
+- `play --input "wait N; move X Y; click X Y; rclick X Y"` (server ticks):
+  scripted pointer input, the window pointer ignored while it runs.
+
+Gate on each push: fmt, clippy `-D warnings`, nextest (2,296 passed after
+the staging merge), `coverage.py`, `spec_index.py`.
+
+**Scene `a1-town-waypoint-ama`** (1.14d, Wine): `--input "wait 1; click
+700 300; wait 15; click 650 300; wait 15; move 320 240; wait 6; end"` →
+player idle by the waypoint at (10864, 72848), dir 47, cursor at
+(320, 240): frame seq 91, tick 159, 301 draws. The same end position on 3
+runs. The d2rs counterpart: `play --input "wait 25; click 700 300; wait
+150; click 650 300; wait 150; move 320 240"`. Not run yet: d2rs drops
+most frames (below).
+
+**Compare `a1-town-arrival-ama`** after the crash fix (d2rs: dev build,
+`play --save ScnAma.d2s --seed 1234 --dump-draws DIR --at-tick 73`; the
+first drawn frame was tick 8,569, player still idle at arrival;
+`facts-compare ... --ignore tick`):
+
+- Equal: every frame input d2rs measures (act 0, level 1, tile origin
+  9920/72536, unit origin 9920/72532, open mode 0, shift 0), the palette
+  sha256, row 0 `StartDraw 1 0`, and floor rows 1–15 in file and position.
+- **First difference: `draws.tsv` row 1, column `frame`.**
+  `act1/town/floor.dt1` at (800, −56): 1.14d tile **132**, d2rs **39**.
+  Both carry the header key 0.0.0.1, shared by 12 of the file's 144 tiles
+  (35–44, 132, 133): the variant pick differs. Of the 88 positions both
+  draw, the file is equal 88 times and the index 32 times. → queue
+  `q-fix-render-real-floor-variant`.
+- With `--ignore tick,frame`: first difference at row 16, column `x`
+  (1.14d (160, −56), d2rs (800, 184)). d2rs omits the left column
+  x = −80 (8 tiles), so its floor walk differs. →
+  `q-fix-render-real-floor-range`.
+- Totals: units 25 vs 2, walls 32 vs 13, CelDraw 42 vs 18, rain lines 26
+  vs 0. The d2rs log says "1 units in the model". →
+  `q-fix-render-real-town-units`.
+- Most d2rs frames are dropped ("block shade … is not a block of the tile
+  in order"), and `play` panics at `app/play.rs:557` after the dump's exit.
+  → `q-fix-render-real-frames-dropped`.
+
 ## What the recorders need from Windows, and the Wine plan
 
 Read: `tools/trace-recorder/README.md`, `record_rng.py` (the Win32 base),

@@ -111,6 +111,7 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
     let mut draws: Vec<Vec<String>> = Vec::new();
     let mut sprites = BTreeMap::new();
     let mut last: Option<&DrawItem> = None;
+    let mut last_tile: Option<(ItemTag, Vec<String>)> = None;
     let mut sky = Some(sky_rows(cx.sky));
     for item in items {
         // §5 r10: the pass-9 calls stand where their first drawing is, or
@@ -194,6 +195,17 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
                 sprites.insert((key.path().to_owned(), u32::from(d), index), size);
             }
         }
+        // §5 r1: a tile's block draws are separate frames (each block with
+        // its own offsets) that give the same row: one row per tile.
+        let tile_row = matches!(key.part(), FramePart::Tile(_));
+        if tile_row
+            && last_tile
+                .as_ref()
+                .is_some_and(|(tag, r)| *tag == item.tag && *r == row)
+        {
+            continue;
+        }
+        last_tile = tile_row.then(|| (item.tag, row.clone()));
         draws.push(row);
     }
     if let Some(rows) = sky.take() {

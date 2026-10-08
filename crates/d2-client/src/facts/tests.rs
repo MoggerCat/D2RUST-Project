@@ -463,3 +463,60 @@ fn sky_calls_replace_their_pixel_items() {
     let cx = ExportContext { sky: &[], ..cx };
     assert_eq!(draw_rows(&[unit, ui], &cx).unwrap().draws.len(), 2);
 }
+
+/// §5 r1: the blocks of one tile, each its own frame of the tile's set
+/// with the block's offsets, give one row; the next tile's blocks another.
+#[test]
+fn block_frames_of_one_tile_are_one_row() {
+    use crate::scene::order::pass;
+    let mut s = FrameStore::new();
+    let block = |x_off| IndexFrame::new(32, 15, x_off, 0, vec![1; 32 * 15]).unwrap();
+    s.insert(
+        FrameSetKey::new("x/f.dt1", FramePart::Tile(3)).unwrap(),
+        FrameSet {
+            frames: vec![block(0), block(32), block(64)],
+        },
+    )
+    .unwrap();
+    let ids: Vec<_> = (0..3)
+        .map(|i| {
+            s.id(&FrameSetKey::new("x/f.dt1", FramePart::Tile(3)).unwrap(), i)
+                .unwrap()
+        })
+        .collect();
+    let item = |id, x: i32, tile: (i32, i32)| {
+        let mut i = DrawItem::new(id, x, 40);
+        i.key = DrawKey::new(pass::WALLS_UNITS, 0, 0, 0).unwrap();
+        i.tag = ItemTag::Tile {
+            x: tile.0,
+            y: tile.1,
+        };
+        i
+    };
+    let unit_type = |_: u32| None;
+    let cx = ExportContext {
+        frames: &s,
+        view_left: Some(0),
+        unit_type: &unit_type,
+        sky: &[],
+    };
+    let rows = draw_rows(
+        &[
+            item(ids[0], 100, (1, 1)),
+            item(ids[1], 132, (1, 1)),
+            item(ids[2], 164, (1, 1)),
+            item(ids[0], 260, (2, 1)),
+            item(ids[1], 292, (2, 1)),
+        ],
+        &cx,
+    )
+    .unwrap();
+    let cols: Vec<String> = rows.draws.iter().map(|r| r[..8].join(" ")).collect();
+    assert_eq!(
+        cols,
+        [
+            "0 TileDrawLit x/f.dt1 - 3 ? 100 40",
+            "1 TileDrawLit x/f.dt1 - 3 ? 260 40",
+        ]
+    );
+}
