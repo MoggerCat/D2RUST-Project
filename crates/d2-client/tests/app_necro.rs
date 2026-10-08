@@ -19,13 +19,16 @@ use d2_client::bridge::LOCAL_CLIENT;
 use d2_client::rules::unit_composite::code;
 use d2_client::world_view::unit_assets::UnitLooks;
 use d2_data::bin::BinTable;
+use d2_data::fixup::maps::StateMaps;
 use d2_data::fixup::records::stat_ops;
-use d2_data::tables::{Charstats, Itemstatcost, Missiles, Monstats, Monstats2, Record, Skills};
+use d2_data::tables::{
+    Charstats, Itemstatcost, Missiles, Monstats, Monstats2, Record, Skills, States,
+};
 use d2_formats::animdata::{self, AnimData, AnimRecord};
 use d2_server::seams::{Clock, Pos};
 use d2_sim::skills::list::ListOwner;
 use d2_sim::skills::use_::bodies::{BodyStat, BodyTables};
-use d2_sim::stats::{StatData, StatLists, StatTable};
+use d2_sim::stats::{StatData, StatLists, StatTable, StateTable};
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -35,7 +38,6 @@ impl Clock for StepClock {
     }
 }
 
-const FIRE_BOLT: usize = 3;
 const TEETH: usize = 67;
 const BONE_ARMOR: usize = 68;
 const POISON_NOVA: usize = 92;
@@ -90,8 +92,22 @@ fn stat_data() -> Arc<StatData> {
         records,
     };
     stat_ops(&mut t);
+    let n_states = 256;
+    let states = BinTable {
+        name: "states".into(),
+        source: "synthetic".into(),
+        count: n_states,
+        record_size: States::SIZE,
+        records: vec![0u8; n_states * States::SIZE],
+    };
+    let maps = StateMaps {
+        words: n_states / 32,
+        bitsets: vec![0; 40 * (n_states / 32)],
+        ..StateMaps::default()
+    };
     Arc::new(StatData {
         stats: StatTable::from_fixed(&t).expect("itemstatcost"),
+        states: StateTable::new(&states, &maps).expect("states"),
         ..StatData::default()
     })
 }
@@ -105,13 +121,13 @@ struct Game {
 
 impl Game {
     /// `skill` is the row under test; `fill` sets its columns.
-    fn joined(skill: usize, fill: impl FnOnce(&mut Skills)) -> Self {
+    fn joined(skill: usize, fill: impl FnOnce(&mut Skills) + Send + 'static) -> Self {
         let ms = Arc::new(AtomicU32::new(1000));
         let (link, _) =
             single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
         let mut g = Self { link, ms };
         g.link
-            .with(|l| {
+            .with(move |l| {
                 let h = l.host_mut().game.events.action.hooks();
                 let mut t = (*h.tables).clone();
                 t.skills.skills = vec![Skills::decode(&[0u8; Skills::SIZE]); 100];
@@ -166,7 +182,7 @@ impl Game {
         g.link.send(SendQueue::System, &[0x6B]).unwrap();
         g.ticks(3);
         g.link
-            .with(|l| {
+            .with(move |l| {
                 let sim = &mut l.host_mut().game;
                 let p = sim.player_of(LOCAL_CLIENT).expect("joined");
                 let h = &mut sim.events.action.sys.hooks;
@@ -250,7 +266,6 @@ impl Game {
     }
 }
 
-
 impl Game {
     fn cast_at_point(&mut self, dx: i32) -> (Vec<Vec<u8>>, usize, String) {
         let at = self.player_pos();
@@ -275,23 +290,28 @@ impl Game {
         self.link
             .with(|l| {
                 let s = &mut l.host_mut().game;
-                s.game.lists.units_of_type(d2_sim::units::UnitType::Monster).len()
+                s.game
+                    .lists
+                    .units_of_type(d2_sim::units::UnitType::Monster)
+                    .len()
             })
             .unwrap()
     }
 
     fn player_state(&mut self, state: u16) -> bool {
         self.link
-            .with(|l| {
+            .with(move |l| {
                 let s = &mut l.host_mut().game;
                 let p = s.player_of(LOCAL_CLIENT).unwrap();
-                s.events.action.with(&mut s.game, |_, v| v.has_state(p, state))
+                s.events
+                    .action
+                    .with(&mut s.game, |_, v| v.stats.has_state(p, state.into()))
             })
             .unwrap()
     }
 }
 
-// Covers: specs/skills/bodies.md §8.6 (Teeth)
+// Covers: specs/skills/bodies.md §8.6
 #[test]
 fn teeth_spends_mana_and_makes_missiles() {
     let mut g = Game::joined(TEETH, |r| {
@@ -306,7 +326,7 @@ fn teeth_spends_mana_and_makes_missiles() {
     assert!(got.iter().any(|m| m.contains(&0x4D)), "{errors}");
 }
 
-// Covers: specs/skills/bodies.md §8.4 (Poison Nova)
+// Covers: specs/skills/bodies.md §8.4
 #[test]
 fn poison_nova_makes_a_ring_of_missiles() {
     let mut g = Game::joined(POISON_NOVA, |r| {
@@ -318,7 +338,7 @@ fn poison_nova_makes_a_ring_of_missiles() {
     assert!(most > 1, "the ring made missiles: {most}; {errors}");
 }
 
-// Covers: specs/skills/bodies.md §4.3 (Bone Armor)
+// Covers: specs/skills/bodies.md §4.3
 #[test]
 fn bone_armor_turns_its_state_on() {
     let mut g = Game::joined(BONE_ARMOR, |r| {
@@ -332,7 +352,7 @@ fn bone_armor_turns_its_state_on() {
     assert!(got.iter().any(|m| m.contains(&0xA8)), "0xA8 sent: {errors}");
 }
 
-// Covers: specs/skills/bodies.md §8.9 (Clay Golem)
+// Covers: specs/skills/bodies.md §8.9
 #[test]
 fn clay_golem_summons_a_pet() {
     let mut g = Game::joined(CLAY_GOLEM, |r| {
@@ -346,5 +366,8 @@ fn clay_golem_summons_a_pet() {
     let (got, _, errors) = g.cast_at_point(2);
     assert!(g.mana() < MANA, "mana spent; {errors}");
     assert_eq!(g.monsters(), before + 1, "a golem exists; {errors}");
-    assert!(got.iter().any(|m| m.first() == Some(&0x7A)), "0x7A: {errors}");
+    assert!(
+        got.iter().any(|m| m.first() == Some(&0x7A)),
+        "0x7A: {errors}"
+    );
 }
