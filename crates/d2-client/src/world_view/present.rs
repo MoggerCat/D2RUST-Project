@@ -628,6 +628,7 @@ fn world_view_frame(
     mut walk: Option<ResMut<PreviewWalk>>,
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
     mut dump: Option<ResMut<DrawDump>>,
+    mut exit: MessageWriter<AppExit>,
 ) -> Result {
     let tick = bridge.0.world().server_ticks;
     if tick == 0 || state.last.is_some_and(|l| l.server_tick == tick) {
