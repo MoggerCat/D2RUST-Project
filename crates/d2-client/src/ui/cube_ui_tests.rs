@@ -6,9 +6,10 @@ use crate::bridge::items::mode;
 use crate::bridge::world::ClientWorld;
 use crate::ui::geom::Point;
 use crate::ui::layout::Screen;
+use crate::ui::original::UiConfig;
 use crate::ui::panel::{UiCtx, UiEvent};
 use crate::ui::panels::inv_items::tests::world;
-use crate::ui::{NoPanelRules, UiConfig};
+use crate::ui::NoPanelRules;
 
 fn ui() -> (OriginalUi, UiRoot) {
     let config = UiConfig {
