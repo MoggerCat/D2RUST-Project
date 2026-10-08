@@ -118,6 +118,7 @@ use d2_sim::stats::StatData;
 use d2_sim::units::hooks::{MonsterInfo, Sim as USim, UnitData};
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::{UnitId, UnitType};
+use d2_sim::wiring::action::warp_tile::HOST_MONSTER_PRESET;
 use d2_sim::wiring::action::{ActionHooks, ActionTables, DrlgWorld, Pending, SkillEvent};
 use d2_sim::wiring::economy::{DeathDrops, DropTables, GameFields};
 use d2_sim::wiring::interaction::skill_events;
@@ -137,7 +138,7 @@ use d2_sim::drlg::preset::{Ds1Input, Ds1Source};
 use super::rest::AppRest;
 use super::server_thread::{ThreadLink, ThreadStopped};
 use super::skill_rest::SkillStore;
-use super::{synthetic_maze, synthetic_tower};
+use super::{synthetic_burial, synthetic_maze, synthetic_tower};
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
 use crate::bridge::world::{
@@ -199,6 +200,9 @@ const SYNTHETIC_PORTAL_INIT: u8 = 11;
 pub const UNIT_Y: i32 = 20;
 /// Akara's x in the synthetic town room (sub-tiles from its origin).
 pub const AKARA_X: i32 = 28;
+/// Kashya's x in the synthetic town room (d2rs-own, unverified: she
+/// stands in the Rogue Encampment, 5 sub-tiles from the player's start).
+pub const KASHYA_X: i32 = 18;
 /// The player's character class (1, sorceress, as in the server tests).
 pub const PLAYER_CLASS: u32 = 1;
 /// The character's name (0x59 bytes 6..22, zero-padded).
@@ -741,7 +745,16 @@ impl Pending for LocalSeams {
     }
 }
 
-impl WorldPending for LocalSeams {}
+impl WorldPending for LocalSeams {
+    /// A host-placed monster of a level's preset list
+    /// ([`HOST_MONSTER_PRESET`]): Blood Raven carries chain 2 (`init.md`
+    /// §14.3), as her boss mods link it when population creates her.
+    fn host_monster_created(&mut self, unit: UnitId, class: u32) {
+        if class == synthetic_burial::BLOOD_RAVEN {
+            self.monster_quest_chain(unit, synthetic_burial::CHAIN);
+        }
+    }
+}
 
 impl Outbox for LocalSeams {
     fn take_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
@@ -779,6 +792,13 @@ impl LevelTypes for Types {
                 drlg.room_mut(r).flags |=
                     d2_sim::drlg::room_flags::WARP_0 | (d2_sim::drlg::room_flags::WARP_0 << 1);
             }
+            // The Burial Grounds pair: Blood Moor slot 3 ↔ slot 0 there.
+            if id == BLOOD_MOOR {
+                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0 << 3;
+            }
+            if id == synthetic_burial::BURIAL_GROUNDS {
+                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
+            }
             if id == DEN_OF_EVIL {
                 drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
                 // The stairs down to Cave Level 1 (slot 1, q-act1-dungeons).
@@ -792,6 +812,7 @@ impl LevelTypes for Types {
     /// §12.1 rule 3 shape: unit type 5, class = the lvlwarp `Id`, room
     /// sub-tiles). d2rs-own, unverified.
     fn preset_units(&self, drlg: &Drlg, room: DrlgRoomId) -> Vec<PresetUnit> {
+        use synthetic_burial as b;
         use synthetic_tower as t;
         let tile = |class, xy| PresetUnit {
             unit_type: 5,
@@ -807,6 +828,17 @@ impl LevelTypes for Types {
             BLOOD_MOOR => vec![
                 tile(BLOOD_MOOR_TO_DEN, WARP_TILE_XY),
                 tile(t::BLOOD_MOOR_TO_MARSH, t::MOOR_MARSH_XY),
+                tile(b::BLOOD_MOOR_TO_BURIAL, b::MOOR_BURIAL_XY),
+            ],
+            // Blood Raven, placed by the host (REC-130).
+            b::BURIAL_GROUNDS => vec![
+                PresetUnit {
+                    unit_type: HOST_MONSTER_PRESET,
+                    class: b::BLOOD_RAVEN,
+                    x: b::RAVEN_XY,
+                    y: b::RAVEN_XY,
+                },
+                tile(b::BURIAL_TO_BLOOD_MOOR, b::BACK_XY),
             ],
             DEN_OF_EVIL => vec![
                 tile(DEN_TO_BLOOD_MOOR, WARP_TILE_XY),
@@ -1236,6 +1268,7 @@ fn synthetic_drlg_data() -> DrlgData {
         COLD_PLAINS,
         STONY_FIELD,
         synthetic_tower::BLACK_MARSH,
+        synthetic_burial::BURIAL_GROUNDS,
         DEN_OF_EVIL,
         CATACOMBS_4,
         ACT2_TOWN,
@@ -1299,6 +1332,15 @@ fn synthetic_drlg_data() -> DrlgData {
             }
         }
     }
+    // The Burial Grounds (q-a1-bloodraven): Blood Moor slot 3 ↔ slot 0.
+    {
+        use synthetic_burial as b;
+        let l = &mut drlg.levels;
+        l[BLOOD_MOOR as usize].vis[3] = b::BURIAL_GROUNDS;
+        l[BLOOD_MOOR as usize].warp[3] = b::BLOOD_MOOR_TO_BURIAL as i32;
+        l[b::BURIAL_GROUNDS as usize].vis[0] = BLOOD_MOOR;
+        l[b::BURIAL_GROUNDS as usize].warp[0] = b::BURIAL_TO_BLOOD_MOOR as i32;
+    }
     let mut ids = vec![
         BLOOD_MOOR_TO_DEN,
         DEN_TO_BLOOD_MOOR,
@@ -1306,6 +1348,10 @@ fn synthetic_drlg_data() -> DrlgData {
         synthetic_maze::CAVE_TO_DEN,
     ];
     ids.extend(synthetic_tower::BLOOD_MOOR_TO_MARSH..=synthetic_tower::LAST_WARP);
+    ids.extend([
+        synthetic_burial::BLOOD_MOOR_TO_BURIAL,
+        synthetic_burial::BURIAL_TO_BLOOD_MOOR,
+    ]);
     drlg.warps = ids
         .iter()
         .map(|&id| WarpDef {
@@ -1335,6 +1381,7 @@ fn synthetic_types() -> Types {
         (DEN_OF_EVIL, TileRect::new(0, 8, 8, 8)),
         (CATACOMBS_4, TileRect::new(0, 24, 8, 8)),
         (synthetic_tower::BLACK_MARSH, TileRect::new(8, 16, 8, 8)),
+        (synthetic_burial::BURIAL_GROUNDS, TileRect::new(0, 24, 8, 8)),
         (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
     ]))
 }
@@ -1678,38 +1725,72 @@ fn synthetic_monstats() -> Vec<Monstats> {
     let mut v: Vec<Monstats> = (0..SYNTHETIC_MONSTATS)
         .map(|_| Monstats::decode(&vec![0u8; Monstats::SIZE]))
         .collect();
-    let a = &mut v[usize::from(d2_sim::world::npc::class::AKARA)];
-    a.npc = true;
-    a.interact = true;
-    // Warriv (act 1): the act travel of Sisters to the Slaughter
-    // (`docs/handoff/q-a1-andariel.md`).
-    let w = &mut v[usize::from(d2_sim::world::npc::class::WARRIV1)];
-    w.npc = true;
-    w.interact = true;
+    for class in [
+        d2_sim::world::npc::class::AKARA,
+        d2_sim::world::npc::class::KASHYA,
+        // Warriv (act 1): the act travel of Sisters to the Slaughter
+        // (`docs/handoff/q-a1-andariel.md`).
+        d2_sim::world::npc::class::WARRIV1,
+    ] {
+        let a = &mut v[usize::from(class)];
+        a.npc = true;
+        a.interact = true;
+    }
+    // Blood Raven (REC-130): a killable class, so the kill parse runs.
+    v[synthetic_burial::BLOOD_RAVEN as usize].killable = true;
     v
+}
+
+/// d2rs-own, unverified (preview; REC-130): Kashya's `hireling` rows
+/// (Rogue Scout, one per difficulty, version 100 = expansion), so her NPC
+/// start has a hire list.
+fn synthetic_hire_rows() -> Vec<HireRow> {
+    (1..=3)
+        .map(|difficulty| HireRow {
+            version: 100,
+            class: 271,
+            act: 1,
+            difficulty,
+            seller: u32::from(d2_sim::world::npc::class::KASHYA),
+            gold: 100,
+            level: 1,
+            name_first: 100,
+            name_last: 104,
+        })
+        .collect()
 }
 
 /// d2rs-own, unverified (preview): the client's monster rows for the
 /// synthetic game, so Akara's S→C 0xAC creates her unit (a class without
 /// a row is ignored, `client/msg-units.md` §1.2 r2).
 pub fn synthetic_unit_rows() -> UnitRows {
-    let npc = |_: ()| {
-        Some(MonsterClass {
-            components: [0; 16],
-            npc: true,
-            interact: true,
-            setup: Some(crate::bridge::world::MonsterSetup {
-                is_att: true,
-                is_sel: true,
-                ..Default::default()
-            }),
-        })
+    let raven = synthetic_burial::BLOOD_RAVEN as usize;
+    let npcs = [
+        d2_sim::world::npc::class::AKARA,
+        d2_sim::world::npc::class::KASHYA,
+        d2_sim::world::npc::class::WARRIV1,
+    ];
+    let top = npcs
+        .iter()
+        .map(|&c| usize::from(c))
+        .max()
+        .unwrap_or(0)
+        .max(raven);
+    let mut monsters = vec![None; top + 1];
+    let class_row = |npc| MonsterClass {
+        components: [0; 16],
+        npc,
+        interact: npc,
+        setup: Some(crate::bridge::world::MonsterSetup {
+            is_att: true,
+            is_sel: true,
+            ..Default::default()
+        }),
     };
-    let warriv = usize::from(d2_sim::world::npc::class::WARRIV1);
-    let akara = usize::from(d2_sim::world::npc::class::AKARA);
-    let mut monsters = vec![None; warriv.max(akara) + 1];
-    monsters[akara] = npc(());
-    monsters[warriv] = npc(());
+    for class in npcs {
+        monsters[usize::from(class)] = Some(class_row(true));
+    }
+    monsters[raven] = Some(class_row(false));
     UnitRows {
         monsters,
         ..UnitRows::default()
@@ -1757,7 +1838,7 @@ impl GameParts {
                 ..ObjectTables::default()
             },
             monstats: synthetic_monstats(),
-            hire_rows: Vec::new(),
+            hire_rows: synthetic_hire_rows(),
             items: ItemTables::default(),
             vendors: VendorTables::default(),
             anim: None,
@@ -2083,20 +2164,23 @@ pub fn build_with_objects(
     // waypoint (d2rs-own, unverified; the live game's NPCs come from the
     // town presets).
     if matches!(data, GameData::Synthetic) {
-        let req = AllocRequest {
-            ty: UnitType::Monster,
-            class: u32::from(d2_sim::world::npc::class::AKARA),
-            room: Some(room0),
-            add: true,
-            fixed_guid: None,
-            mode: 1,
-            allied: true,
-        };
-        sim.action
-            .with(&mut game, |g, v| {
-                v.allocate(g, &req, ox + AKARA_X, oy + UNIT_Y)
-            })
-            .ok_or_else(|| BuildError::Setup("allocating Akara failed".into()))?;
+        for (class, x) in [
+            (d2_sim::world::npc::class::AKARA, AKARA_X),
+            (d2_sim::world::npc::class::KASHYA, KASHYA_X),
+        ] {
+            let req = AllocRequest {
+                ty: UnitType::Monster,
+                class: u32::from(class),
+                room: Some(room0),
+                add: true,
+                fixed_guid: None,
+                mode: 1,
+                allied: true,
+            };
+            sim.action
+                .with(&mut game, |g, v| v.allocate(g, &req, ox + x, oy + UNIT_Y))
+                .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
+        }
     }
     let interact_classes: Vec<u16> = parts
         .monstats

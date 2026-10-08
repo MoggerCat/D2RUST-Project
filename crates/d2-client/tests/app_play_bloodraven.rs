@@ -1,9 +1,10 @@
-// Spec: specs/world/npc.md (§2, §3), specs/world/quests.md (§6.2, §7.2, §7.3), specs/client/msg-ui.md (§16); preview fills: docs/PLAN.md decisions D1–D3, docs/handoff/q-quests.md
-//! The quest path of the play preview headless, wired as `d2-client play`
-//! wires it (synthetic fixtures only, as in `app_play_npc.rs`): a left
-//! click on Akara walks there and sends C→S 0x13; the server starts the
-//! interaction (S→C 0x27, 0x29, 0x28), the client answers C→S 0x2F and
-//! the quest message 0x31, and the server starts the Den of Evil.
+// Spec: specs/world/quests-act1.md §10.5; specs/world/quests.md §4.4, §5, §6.2; specs/world/npc.md §2, §3; specs/monsters/init.md §14.3; preview fills: docs/handoff/q-a1-bloodraven.md
+//! Act I's Sisters' Burial Grounds in the play preview, headless over the
+//! synthetic game (as `app_play_quests.rs`): Kashya gives the quest
+//! (message 81), the player enters the Burial Grounds (quest event 3),
+//! Blood Raven is there with her quest chain link, her death completes the
+//! quest (event 8, the updater's timer) and Kashya's reward runs
+//! (message 92).
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
@@ -13,7 +14,8 @@ use d2_client::app::palette::{add_act_palettes, ActPalettes};
 use d2_client::app::play::{
     add_client_data, add_game, add_preview, add_walk, predict_link, send_create_game_for,
 };
-use d2_client::app::single_player::{self, GameData};
+use d2_client::app::server_thread::ThreadLink;
+use d2_client::app::single_player::{self, GameData, Link};
 use d2_client::app::ui::{add_original_ui_with, UiParts};
 use d2_client::assets::path::MemorySource;
 use d2_client::bridge::hover;
@@ -40,6 +42,26 @@ mod app_support;
 #[derive(Default)]
 struct Wire {
     sent: Vec<Vec<u8>>,
+}
+
+/// The server thread's link, shared with the test body.
+type Handle = Arc<Mutex<ThreadLink<Link<StepClock>>>>;
+
+struct Shared(Handle);
+
+impl ServerLink for Shared {
+    fn protocol_version(&self) -> u32 {
+        self.0.lock().unwrap().protocol_version()
+    }
+    fn send(&mut self, q: SendQueue, msg: &[u8]) -> Result<Sent, LinkError> {
+        self.0.lock().unwrap().send(q, msg)
+    }
+    fn pump(&mut self) -> Result<Pumped, LinkError> {
+        self.0.lock().unwrap().pump()
+    }
+    fn receive(&mut self) -> Vec<Vec<u8>> {
+        self.0.lock().unwrap().receive()
+    }
 }
 
 /// A link that records what crosses it.
@@ -214,7 +236,7 @@ fn queue(app: &mut App, e: UiEvent) {
 }
 
 /// The play app over the synthetic game, joined, with a left skill.
-fn play_app(ms: &Arc<AtomicU32>, wire: &Arc<Mutex<Wire>>) -> App {
+fn play_app(ms: &Arc<AtomicU32>, wire: &Arc<Mutex<Wire>>) -> (App, Handle) {
     let data = GameData::Synthetic;
     let character = single_player::new_character("sorceress", "Test").unwrap();
     let (link, _) = single_player::start_with(
@@ -224,13 +246,14 @@ fn play_app(ms: &Arc<AtomicU32>, wire: &Arc<Mutex<Wire>>) -> App {
         StepClock(ms.clone()),
     )
     .unwrap();
+    let handle: Handle = Arc::new(Mutex::new(link));
     let source = Arc::new(files());
     let mut app = App::new();
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
     let link = Recorder {
-        inner: Box::new(link),
+        inner: Box::new(Shared(handle.clone())),
         wire: wire.clone(),
     };
     let (link, tap) = predict_link(Box::new(link));
@@ -295,7 +318,7 @@ fn play_app(ms: &Arc<AtomicU32>, wire: &Arc<Mutex<Wire>>) -> App {
         .0
         .receive_chunk(&msgs)
         .unwrap();
-    app
+    (app, handle)
 }
 
 /// The client's monster rows: Akara is an `npc` and `interact` class,
@@ -307,15 +330,15 @@ fn set_npc_rows(app: &mut App) {
         .set_unit_rows(single_player::synthetic_unit_rows());
 }
 
-/// The screen point of Akara (the one monster in the model), as the
+/// The screen point of the NPC of `class` (a monster in the model), as the
 /// click's camera sees it.
-fn akara_on_screen(app: &App) -> (u32, Point) {
+fn npc_on_screen(app: &App, class: u16) -> (u32, Point) {
     let w = app.world().resource::<BridgeResource>().0.world();
     let (key, u) = w
         .units
         .iter()
-        .find(|(k, u)| k.unit_type == 1 && u.class == 148 && u.position.is_some())
-        .expect("Akara in the model");
+        .find(|(k, u)| k.unit_type == 1 && u.class == u32::from(class) && u.position.is_some())
+        .expect("the NPC in the model");
     let at = app
         .world()
         .resource::<PreviewWalk>()
@@ -354,29 +377,12 @@ fn ids(wire: &Arc<Mutex<Wire>>) -> Vec<u8> {
     wire.lock().unwrap().sent.iter().map(|m| m[0]).collect()
 }
 
-/// The player's quest record the client holds (`[0x007C0D43]`).
-fn client_record(app: &App) -> [u8; 96] {
-    let ui = app.world().non_send::<WorldViewUi>();
-    ui.original.as_ref().unwrap().more().client_quest
-}
-
-/// Talks to Akara: click, walk, C→S 0x13, then the server's reply and the
-/// client's 0x2F / 0x31.
-fn talk_to_akara(app: &mut App, ms: &AtomicU32, wire: &Arc<Mutex<Wire>>) -> u32 {
-    let guid = open_akara_menu(app, ms, wire);
-    // Cancel (the last row of the NPC menu box, R800: box x 300, y 150,
-    // rows from y 170, 20 high) ends the chat: C→S 0x30.
-    click(app, ms, Point::new(400, 170 + 20 * 2 + 5));
-    step(app, ms, 3);
-    guid
-}
-
-/// Clicks Akara and waits for her menu (S→C 0x28).
-fn open_akara_menu(app: &mut App, ms: &AtomicU32, wire: &Arc<Mutex<Wire>>) -> u32 {
-    let (guid, at) = akara_on_screen(app);
+/// Clicks the NPC of `class` and waits for its menu (S→C 0x28).
+fn open_menu(app: &mut App, ms: &AtomicU32, wire: &Arc<Mutex<Wire>>, class: u16) -> u32 {
+    let (guid, at) = npc_on_screen(app, class);
     assert!(
         (0..800).contains(&at.x) && (0..560).contains(&at.y),
-        "Akara is on screen: {at:?}"
+        "NPC {class} is on screen: {at:?}"
     );
     click(app, ms, at);
     let mut want = vec![0x13, 1, 0, 0, 0];
@@ -389,10 +395,28 @@ fn open_akara_menu(app: &mut App, ms: &AtomicU32, wire: &Arc<Mutex<Wire>>) -> u3
     }
     assert!(
         wire.lock().unwrap().sent.contains(&want),
-        "C→S 0x13 on Akara: {:?}",
+        "C→S 0x13 on NPC {class}: {:?}",
         ids(wire)
     );
-    step(app, ms, 6);
+    for _ in 0..300 {
+        let ui = app.world().non_send::<WorldViewUi>();
+        if ui.original.as_ref().unwrap().npc_menu().is_some() {
+            break;
+        }
+        step(app, ms, 1);
+    }
+    step(app, ms, 2);
+    guid
+}
+
+/// Talks to the NPC: the menu's Talk row (R800: box x 300, y 150, rows
+/// from y 170, 20 high), then Cancel ends the chat.
+fn talk(app: &mut App, ms: &AtomicU32, wire: &Arc<Mutex<Wire>>, class: u16) -> u32 {
+    let guid = open_menu(app, ms, wire, class);
+    click(app, ms, Point::new(400, 170 + 5));
+    step(app, ms, 4);
+    click(app, ms, Point::new(400, 170 + 20 * 2 + 5));
+    step(app, ms, 3);
     guid
 }
 
@@ -410,37 +434,6 @@ fn quest_messages(wire: &Arc<Mutex<Wire>>) -> Vec<(u32, u32)> {
             )
         })
         .collect()
-}
-
-// Covers: specs/world/npc.md §2, §3; specs/world/quests.md §7.2, §7.3
-#[test]
-fn talking_to_akara_twice_starts_the_den_of_evil() {
-    let ms = Arc::new(AtomicU32::new(1000));
-    let wire = Arc::new(Mutex::new(Wire::default()));
-    let mut app = play_app(&ms, &wire);
-    assert_eq!(client_record(&app)[2] & 0x04, 0, "Den not started yet");
-    // First talk: the server starts the interaction (S→C 0x27 / 0x29 /
-    // 0x28), the client answers C→S 0x2F and the quest message 0x31 of
-    // the list (Akara's introduction, string 12), then closes the chat.
-    let guid = talk_to_akara(&mut app, &ms, &wire);
-    let mut chat = vec![0x2F];
-    chat.extend_from_slice(&1u32.to_le_bytes());
-    chat.extend_from_slice(&guid.to_le_bytes());
-    assert!(
-        wire.lock().unwrap().sent.contains(&chat),
-        "C→S 0x2F: {:?}",
-        ids(&wire)
-    );
-    assert_eq!(quest_messages(&wire), [(guid, 12)]);
-    let mut end = vec![0x30];
-    end.extend_from_slice(&1u32.to_le_bytes());
-    end.extend_from_slice(&guid.to_le_bytes());
-    assert!(wire.lock().unwrap().sent.contains(&end), "C→S 0x30");
-    // Second talk: the list now carries the Den of Evil (message 64,
-    // `quest-messages.tsv`); the server starts the quest on it
-    // (`quests.md` §7.3): slot 1 bit 2 in the record S→C 0x28 sends.
-    talk_to_akara(&mut app, &ms, &wire);
-    assert_eq!(quest_messages(&wire), [(guid, 12), (guid, 64)]);
 }
 
 fn press_q(app: &mut App, ms: &AtomicU32) {
@@ -462,93 +455,226 @@ fn log_rows(app: &App) -> Vec<(u8, IconState, u8)> {
         .collect()
 }
 
-// Covers: specs/world/quests.md §6.2; specs/world/quests-status.md §3
+type Server = Handle;
+
+/// Runs `f` on the game inside the server thread.
+fn on_server<R: Send + 'static>(
+    h: &Server,
+    f: impl FnOnce(&mut single_player::Sim) -> R + Send + 'static,
+) -> R {
+    h.lock()
+        .unwrap()
+        .with(move |l| f(&mut l.host_mut().game))
+        .unwrap()
+}
+
+/// The server's quest record of `chain`: (state, status).
+fn quest(h: &Server, chain: u8) -> (u8, u8) {
+    on_server(h, move |s| {
+        let r = s.world.quests.record(chain).unwrap();
+        (r.state, r.status)
+    })
+}
+
+/// The Den of Evil done at game entry: its sequence opens chain 2 at state
+/// 1 (`quests-act1.md` §10.1, as the server test `burial_grounds_through_
+/// every_state` sets it up).
+fn den_done(h: &Server) {
+    on_server(h, |s| {
+        let (p, _) = single_player::local_player(s).expect("joined");
+        s.world.rest.quests.get_mut(&p).unwrap().flags[0].set(1, 0);
+        let r = s.world.quests.record_mut(1).unwrap();
+        r.not_intro = false;
+        r.active = false;
+        let r = s.world.quests.record_mut(2).unwrap();
+        r.not_intro = true;
+        r.active = true;
+        r.state = 1;
+    });
+}
+
+/// The server's level of the local player.
+fn level(h: &Server) -> Option<u32> {
+    on_server(h, |s| {
+        let (p, _) = single_player::local_player(s)?;
+        let room = s.game.lists.unit(p)?.room()?;
+        s.events.action.hooks().drlg.level_id(&s.game, room)
+    })
+}
+
+// Covers: specs/world/quests-act1.md §10.5 r7; specs/world/quests.md §7.3
 #[test]
-fn the_quest_log_shows_the_started_den_of_evil() {
+fn kashya_gives_the_sisters_burial_grounds() {
     let ms = Arc::new(AtomicU32::new(1000));
     let wire = Arc::new(Mutex::new(Wire::default()));
-    let mut app = play_app(&ms, &wire);
-    // Before Akara: the log opens, the server answers with every status 0.
-    press_q(&mut app, &ms);
-    assert!(wire.lock().unwrap().sent.contains(&vec![0x40]), "C→S 0x40");
-    {
-        let ui = app.world().non_send::<WorldViewUi>();
-        assert!(
-            ui.original.as_ref().unwrap().is_open(0x0F),
-            "quest log open"
-        );
-    }
-    let before = log_rows(&app);
-    assert_eq!(before.len(), 6, "six Act I rows: {before:?}");
+    let (mut app, h) = play_app(&ms, &wire);
+    den_done(&h);
+    assert_eq!(quest(&h, 2), (1, 0));
+    // The first talk is her introduction (message 24), the second the quest.
+    let kashya = talk(&mut app, &ms, &wire, 150);
+    assert_eq!(quest_messages(&wire), [(kashya, 24)]);
+    talk(&mut app, &ms, &wire, 150);
+    let msgs = quest_messages(&wire);
     assert!(
-        before.iter().all(|r| r.2 == 0),
-        "nothing started: {before:?}"
+        msgs.contains(&(kashya, 81)),
+        "Kashya's message 81: {msgs:?} {:?} {}",
+        ids(&wire),
+        on_server(&h, |s| format!(
+            "{:?} {:?}",
+            s.world.state.errors, s.world.rest.log
+        )) + &on_server(&h, |s| {
+            let (p, _) = single_player::local_player(s).unwrap();
+            let mut out = format!(
+                "player {:?} lists {:?} rec {} interact {:?} sent {:?}",
+                s.events.action.sys.hooks.path_position(p),
+                s.world.state.lists.keys().collect::<Vec<_>>(),
+                s.world.npc.record(150).is_some(),
+                s.events.action.sys.units.get(p).unwrap().interact.get(),
+                s.world.rest.sent.len()
+            );
+            for u in s.game.lists.units_of_type(d2_sim::units::UnitType::Monster) {
+                out += &format!(
+                    " m{} {:?}",
+                    s.events.action.sys.units.get(u).unwrap().class,
+                    s.events.action.sys.hooks.path_position(u)
+                );
+            }
+            out
+        })
     );
-    press_q(&mut app, &ms);
-    // Akara twice (introduction, then the Den of Evil), then the log.
-    talk_to_akara(&mut app, &ms, &wire);
-    talk_to_akara(&mut app, &ms, &wire);
+    assert_eq!(quest(&h, 2).0, 2, "the quest is started");
+    // The quest log: Act I row 2 shows the quest started.
     press_q(&mut app, &ms);
     let rows = log_rows(&app);
-    let den = rows.iter().find(|r| r.0 == 1).expect("the Den of Evil row");
-    assert_eq!(den.2, 1, "status 1 (started): {rows:?}");
-    assert_eq!(den.1, IconState::InProgress);
+    let row = rows
+        .iter()
+        .find(|r| r.0 == 2)
+        .expect("the Burial Grounds row");
+    assert_eq!(row.2, 1, "status 1 (started): {rows:?}");
+    assert_eq!(row.1, IconState::InProgress);
 }
 
-// Covers: specs/ui/menus.md §2; specs/world/npc.md §3
+// Covers: specs/world/quests-act1.md §10.5 r3, §10.5 r4, §10.5 r5, §10.5 r7; specs/world/quests.md §4.4, §5; specs/monsters/init.md §14.3
 #[test]
-fn akaras_menu_offers_talk_trade_and_cancel() {
+fn blood_raven_dies_and_kashya_pays() {
     let ms = Arc::new(AtomicU32::new(1000));
     let wire = Arc::new(Mutex::new(Wire::default()));
-    let mut app = play_app(&ms, &wire);
-    let guid = open_akara_menu(&mut app, &ms, &wire);
-    let menu = {
-        let ui = app.world().non_send::<WorldViewUi>();
-        ui.original.as_ref().unwrap().npc_menu()
-    };
-    let menu = menu.expect("the NPC menu is open after the 0x28");
-    assert_eq!(menu.guid, guid);
-    let kinds: Vec<_> = menu.rows.iter().map(|r| r.kind).collect();
-    use d2_client::ui::layout::OptionKind::{Talk, Trade};
-    assert_eq!(kinds, [Some(Talk), Some(Trade), None]);
-    // The automatic chat close is gone: the chat stays open.
-    assert!(
-        !ids(&wire).contains(&0x30),
-        "no C→S 0x30 yet: {:?}",
-        ids(&wire)
+    let (mut app, h) = play_app(&ms, &wire);
+    den_done(&h);
+    let kashya = talk(&mut app, &ms, &wire, 150);
+    talk(&mut app, &ms, &wire, 150);
+    assert_eq!(quest(&h, 2).0, 2, "started");
+    // Through the Blood Moor's second entrance to the Burial Grounds.
+    let entrance = app
+        .world()
+        .resource::<BridgeResource>()
+        .0
+        .world()
+        .units
+        .iter()
+        .find(|(k, u)| {
+            k.unit_type == d2_client::bridge::world::TILE
+                && u.class == d2_client::app::synthetic_burial::BLOOD_MOOR_TO_BURIAL
+        })
+        .map(|(k, _)| *k)
+        .expect("the Burial Grounds entrance reached the client");
+    app.world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .interact(entrance)
+        .unwrap();
+    for _ in 0..300 {
+        if level(&h) == Some(d2_client::app::synthetic_burial::BURIAL_GROUNDS) {
+            break;
+        }
+        step(&mut app, &ms, 1);
+    }
+    assert_eq!(
+        level(&h),
+        Some(d2_client::app::synthetic_burial::BURIAL_GROUNDS),
+        "arrived"
     );
-    // Talk shows the speech.
-    click(&mut app, &ms, Point::new(400, 170 + 5));
-    step(&mut app, &ms, 2);
-    let ui = app.world().non_send::<WorldViewUi>();
-    assert!(ui.original.as_ref().unwrap().npc_menu().unwrap().talking);
-    // Trade: C→S 0x38 action 1 [GUID] and the menu closes.
-    click(&mut app, &ms, Point::new(400, 170 + 20 + 5));
-    step(&mut app, &ms, 3);
-    let mut want = vec![0x38, 1, 0, 0, 0];
-    want.extend_from_slice(&guid.to_le_bytes());
-    want.extend_from_slice(&0u32.to_le_bytes());
-    assert!(
-        wire.lock().unwrap().sent.contains(&want),
-        "C→S 0x38 trade: {:?}",
-        ids(&wire)
-    );
-    let ui = app.world().non_send::<WorldViewUi>();
-    assert!(ui.original.as_ref().unwrap().npc_menu().is_none());
+    step(&mut app, &ms, 30);
+    // Event 3 (b = 17): state 3.
+    assert_eq!(quest(&h, 2).0, 3, "entered the Burial Grounds");
+    // Blood Raven stands there with her chain link.
+    let raven = on_server(&h, |s| {
+        let m = s.game.lists.units_of_type(d2_sim::units::UnitType::Monster);
+        let r = m.into_iter().find(|&u| {
+            s.events
+                .action
+                .sys
+                .units
+                .get(u)
+                .is_some_and(|r| r.class == 267)
+        });
+        let linked = r.is_some_and(|r| {
+            d2_sim::wiring::economy::QuestRest::quest_chain(&mut s.world.rest, r)
+                .is_some_and(|c| c.0 == [2])
+        });
+        r.filter(|_| linked)
+            .map(|r| s.game.lists.unit(r).unwrap().guid)
+    });
+    let raven = raven.expect("Blood Raven with chain 2");
+    {
+        let w = app.world().resource::<BridgeResource>().0.world();
+        assert!(
+            w.units
+                .iter()
+                .any(|(k, u)| k.guid == raven && u.class == 267),
+            "Blood Raven reached the client"
+        );
+    }
+    // She dies by the player's hand: event 8 → state 4.
+    on_server(&h, move |s| {
+        let (p, _) = single_player::local_player(s).unwrap();
+        let r = s
+            .game
+            .lists
+            .find_unit(d2_sim::units::UnitType::Monster, raven)
+            .unwrap();
+        s.events.action.combat(&mut s.game, |cv, _| {
+            d2_sim::wiring::action::reaction::kill(cv, r, p)
+        });
+    });
+    step(&mut app, &ms, 40);
+    assert_eq!(quest(&h, 2).0, 4, "Blood Raven is dead");
+    // The updater's timer (period 15, run every 20th frame) tells the
+    // client the quest is done (S→C 0x5D status 3).
+    step(&mut app, &ms, 20 * 17);
+    assert_eq!(quest(&h, 2).1, 3, "completed-now status");
+    let _ = kashya;
 }
 
-// Covers: specs/world/npc.md §3
+// Covers: specs/world/quests-act1.md §10.5 r7; specs/world/quests.md §6.2
 #[test]
-fn leaving_the_menu_sends_the_chat_end() {
+fn kashyas_reward_runs_after_blood_raven() {
     let ms = Arc::new(AtomicU32::new(1000));
     let wire = Arc::new(Mutex::new(Wire::default()));
-    let mut app = play_app(&ms, &wire);
-    let guid = talk_to_akara(&mut app, &ms, &wire);
-    let mut want = vec![0x30, 1, 0, 0, 0];
-    want.extend_from_slice(&guid.to_le_bytes());
+    let (mut app, h) = play_app(&ms, &wire);
+    den_done(&h);
+    // Blood Raven is dead and the player was near (J3: 2.1, event 8's 2.13).
+    on_server(&h, |s| {
+        let (p, _) = single_player::local_player(s).expect("joined");
+        let f = &mut s.world.rest.quests.get_mut(&p).unwrap().flags[0];
+        f.set(2, 1);
+        f.set(2, 13);
+        s.world.quests.record_mut(2).unwrap().state = 4;
+    });
+    let kashya = talk(&mut app, &ms, &wire, 150);
+    talk(&mut app, &ms, &wire, 150);
+    let msgs = quest_messages(&wire);
     assert!(
-        wire.lock().unwrap().sent.contains(&want),
-        "C→S 0x30: {:?}",
-        ids(&wire)
+        msgs.contains(&(kashya, 92)),
+        "Kashya's message 92: {msgs:?}"
     );
+    assert_eq!(quest(&h, 2), (5, 13), "rewarded");
+    // The reward marks one of Kashya's mercenaries hired; the synthetic
+    // game has no hireling tables, so the unit itself is not created
+    // (`NoHirelingTables`, docs/handoff/q-a1-bloodraven.md).
+    let hired = on_server(&h, |s| {
+        let hire = s.world.npc.record(150).and_then(|r| r.hire.as_ref());
+        hire.map(|h| h.slots.iter().filter(|s| s.hired).count())
+    });
+    assert_eq!(hired, Some(1), "the mercenary is Kashya's reward");
 }
