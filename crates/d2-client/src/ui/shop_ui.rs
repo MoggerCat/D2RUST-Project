@@ -33,8 +33,6 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use d2_proto::client::TerminateEntityChat;
-
 use super::{OriginalUi, SharedRef};
 use crate::bridge::items::{self, ItemView};
 use crate::bridge::world::{ClientWorld, MONSTER};
@@ -654,9 +652,10 @@ impl OriginalUi {
                 st.floor = world.store_serial;
                 st.closed = true;
             }
-            root.queue_intent(ClientIntent::from_message(&TerminateEntityChat {
-                id: o.npc_guid,
-            }));
+            // C→S 0x30 `[u32 1][u32 G]` (`ui/panels-2.md` §14 r5).
+            root.queue_intent(ClientIntent(
+                crate::ui::panels::npc::msg_chat_end(o.npc_guid).to_vec(),
+            ));
             // PROVISIONAL (ui/panels-2.md §14; REC-278): the inventory the
             // shop opened beside it closes with it; an inventory left open
             // refuses the next shop (`ui-states.tsv` C[1][0x0C] = 3).
