@@ -11,14 +11,16 @@ use d2_formats::dt1::Dt1Tile;
 
 use crate::bridge::world::ClientWorld;
 use crate::bridge::ClientUnit;
-use crate::composite::{ComponentFrame, ComponentRequest, CompositeError, UnitParams};
+use crate::composite::{
+    ComponentDraw, ComponentFrame, ComponentRequest, CompositeError, UnitParams,
+};
 use crate::frames::{FrameAnchor, IndexFrame};
-use crate::scene::{BlendOp, DrawKey, LightGradient, Rect, ShadeChain};
+use crate::scene::{BlendOp, DrawItem, DrawKey, LightGradient, Rect, ShadeChain};
 use crate::ui::{ImageRequest, TextRequest};
 use crate::world_view::{TileDraw, UiRules, UiSprite, UnitPose, ViewAssets, ViewError, ViewRules};
 
 use super::camera::{Camera, TileList, UnitPosition};
-use super::draw_order::UnitSlot;
+use super::draw_order::{OrderKey, UnitSlot};
 use super::placement;
 
 /// One DT1 block's rectangle in tile coordinates (`b.x`, `b.y`, size),
@@ -114,6 +116,13 @@ pub trait ViewSource {
     /// its keys to the wrapped rules.
     fn unit_slot(&self, _unit: &ClientUnit) -> UnitSlot {
         UnitSlot::Unordered
+    }
+
+    /// The unit's shadow entry in the frame's shadow pass
+    /// (`draw-order.md` §3 r4, §6 r3): its draw key position. `None` (the
+    /// default): no shadow is drawn.
+    fn unit_shadow_slot(&self, _unit: &ClientUnit) -> Option<OrderKey> {
+        None
     }
 
     /// The per-block shade and blend of a tile (`render/lighting.md` §11
@@ -378,6 +387,24 @@ impl<R: ViewRules + ?Sized, S: ViewSource + ?Sized> ViewRules for OriginalView<'
         req: &ComponentRequest<'_>,
     ) -> Result<ComponentFrame, CompositeError> {
         self.rules.component_frame(unit, pose, req)
+    }
+
+    /// The wrapped rules' shadow draws, keyed at the shadow pass slot the
+    /// source states (`draw-order.md` §6 r3); none without one.
+    fn unit_shadows(
+        &self,
+        world: &ClientWorld,
+        unit: &ClientUnit,
+        pose: &UnitPose,
+        _at: Option<OrderKey>,
+        draws: &[ComponentDraw],
+        assets: &ViewAssets,
+    ) -> Result<Vec<DrawItem>, ViewError> {
+        let Some(at) = self.source.unit_shadow_slot(unit) else {
+            return Ok(Vec::new());
+        };
+        self.rules
+            .unit_shadows(world, unit, pose, Some(at), draws, assets)
     }
 
     fn component_slot_frame(
