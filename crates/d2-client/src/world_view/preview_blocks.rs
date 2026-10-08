@@ -8,7 +8,6 @@
 //! - a roof takes the floor grid path (§11 r4: "the same grid") with the
 //!   roof's wall alpha blend; `shading.md` §4 names walls *and roofs* for
 //!   the corner path, so which one a roof block takes is open (PROVISIONAL);
-//! - a wall's fade state is 0 (the normal point table);
 //! - a tile whose light cannot be read (wall direction 0 or past 9, a grid
 //!   index out of range) keeps its flat tile shade.
 
@@ -27,7 +26,9 @@ const SUBTILES: i32 = 5;
 
 /// The per-block shades of the tile at absolute tile `cell`; empty when
 /// the tile keeps its flat shade (shadow tiles, unreadable light).
-/// `blend` is the tile's own blend ([`super::preview::tile_ops`]).
+/// `blend` is the tile's own blend ([`super::preview::tile_ops`]);
+/// `fade` the record's alpha byte and fade state (+0x24 as the frame's
+/// §8 filing left it: bit 0 reads the faded wall points, §11 r2).
 #[allow(clippy::too_many_arguments)]
 pub fn block_shades(
     light: &FrameLight,
@@ -35,11 +36,12 @@ pub fn block_shades(
     kind: TileKind,
     dt1: &Dt1Facts,
     cell: (i32, i32),
-    alpha: u8,
+    fade: (u8, u8),
     blend: BlendOp,
     blocks: &[BlockRect],
     grids: &[(u8, u8)],
 ) -> Vec<BlockShade> {
+    let (alpha, fade_state) = fade;
     let origin = (SUBTILES * cell.0, SUBTILES * cell.1);
     let grid_shades = |cells: [u8; 64]| -> Vec<BlockShade> {
         let mut out = Vec::with_capacity(blocks.len());
@@ -47,9 +49,20 @@ pub fn block_shades(
             let Ok(l) = floor_block_light(&cells, gx, gy, false) else {
                 return Vec::new();
             };
+            let shade = floor_block_chain(&light.tables, l, 0, 0);
+            // `shading.md` §4 floors r3–r4: the floor drawer lights rows
+            // r = 0…14 of a block, RLE (32 × 32, DT1 format 0x2005) or
+            // iso; a gradient block draws those rows only.
+            let block = match shade.gradient() {
+                Some(g) => BlockRect {
+                    height: block.height.min(g.kind.rows()),
+                    ..*block
+                },
+                None => *block,
+            };
             out.push(BlockShade {
-                block: *block,
-                shade: floor_block_chain(&light.tables, l, 0, 0),
+                block,
+                shade,
                 blend,
             });
         }
@@ -70,7 +83,12 @@ pub fn block_shades(
             .light_values(),
         ),
         TileKind::Wall | TileKind::LowerWall => {
-            let Ok(words) = wall_light_words(&light.map, origin, dt1.orientation, 0) else {
+            let Ok(words) = wall_light_words(
+                &light.map,
+                origin,
+                dt1.light_direction,
+                u32::from(fade_state),
+            ) else {
                 return Vec::new();
             };
             wall_block_shades(&light.tables, &words, blocks, alpha, false).unwrap_or_default()
@@ -148,13 +166,70 @@ mod tests {
             floor(),
             &Dt1Facts::default(),
             cell,
-            0xFF,
+            (0xFF, 0),
             BlendOp::Opaque,
             &[rect(0)],
             &[(0, 0)],
         );
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].shade.gradient().expect("gradient").corners, want);
+    }
+
+    // Covers: specs/render/shading.md §4
+    #[test]
+    fn an_rle_floor_block_with_a_gradient_stays_inside_its_15_rows() {
+        // The play crash on the real install (q-cloud-game step 4, Rogue
+        // Encampment): "drawn area Rect{560,296,32x32} leaves the gradient
+        // block Rect{560,296,32x15}". An RLE floor block (format 0x2005)
+        // is 32 × 32; the floor gradient covers rows 0…14 (§4 floors r3).
+        let f = frame(&[((102, 102), 6, (255, 255, 255))]);
+        for kind in [floor(), TileKind::Roof { pass: 1 }] {
+            let out = block_shades(
+                &f,
+                env(),
+                kind,
+                &Dt1Facts::default(),
+                (20, 20),
+                (0xFF, 0),
+                BlendOp::Opaque,
+                &[rect(0)],
+                &[(0, 0)],
+            );
+            assert_eq!(out.len(), 1);
+            let g = out[0].shade.gradient().expect("a lit gradient block");
+            assert_eq!(
+                out[0].block,
+                BlockRect {
+                    x: 0,
+                    y: 0,
+                    width: 32,
+                    height: 15
+                }
+            );
+            // As `rules::view` places it: the gradient moved to the
+            // block's screen position, the drawn area the block rect.
+            let moved = crate::scene::LightGradient {
+                x: 560,
+                y: 296,
+                ..*g
+            };
+            let drawn = crate::scene::Rect::new(560, 296, out[0].block.width, out[0].block.height);
+            assert_eq!(moved.block(), crate::scene::Rect::new(560, 296, 32, 15));
+            assert_eq!(drawn.intersect(&moved.block()), Some(drawn));
+        }
+        // A flat block keeps its whole rect (no gradient to stay in).
+        let flat = block_shades(
+            &frame(&[]),
+            env(),
+            floor(),
+            &Dt1Facts::default(),
+            (20, 20),
+            (0xFF, 0),
+            BlendOp::Opaque,
+            &[rect(0)],
+            &[(0, 0)],
+        );
+        assert_eq!(flat[0].block, rect(0));
     }
 
     // Covers: specs/render/shading.md §4
@@ -167,7 +242,7 @@ mod tests {
             floor(),
             &Dt1Facts::default(),
             (20, 20),
-            0xFF,
+            (0xFF, 0),
             BlendOp::Opaque,
             &[rect(0)],
             &[(0, 0)],
@@ -194,7 +269,7 @@ mod tests {
             floor(),
             &dt1,
             (20, 20),
-            0xFF,
+            (0xFF, 0),
             BlendOp::Opaque,
             &[rect(0)],
             &[(0, 0)],
@@ -219,7 +294,7 @@ mod tests {
             TileKind::Roof { pass: 1 },
             &dt1,
             (20, 20),
-            0xFF,
+            (0xFF, 0),
             BlendOp::Opaque,
             &[rect(0)],
             &[(0, 0)],
@@ -238,7 +313,7 @@ mod tests {
         let cell = (20, 20);
         for direction in 1..=9u32 {
             let dt1 = Dt1Facts {
-                orientation: direction,
+                light_direction: direction,
                 ..Dt1Facts::default()
             };
             let words = wall_light_words(&f.map, (100, 100), direction, 0).unwrap();
@@ -251,7 +326,7 @@ mod tests {
                     TileKind::Wall,
                     &dt1,
                     cell,
-                    0xFF,
+                    (0xFF, 0),
                     BlendOp::Opaque,
                     &[rect(32 * col as i32)],
                     &[(0, 0)],
@@ -267,16 +342,117 @@ mod tests {
 
     // Covers: specs/render/lighting.md §11 r2
     #[test]
+    fn a_wall_reads_the_points_of_its_light_direction_not_its_orientation() {
+        // Open question 8 (measured on every 1.14d DT1 header): the light
+        // direction is fixed by orientation, and differs from it for
+        // orientations 0, 4–19.
+        let pairs = [
+            (0, 3),
+            (1, 1),
+            (2, 2),
+            (3, 3),
+            (4, 3),
+            (5, 1),
+            (6, 2),
+            (7, 4),
+            (8, 1),
+            (9, 2),
+            (10, 1),
+            (11, 2),
+            (12, 3),
+            (13, 3),
+            (14, 3),
+            (16, 6),
+            (17, 7),
+            (18, 8),
+            (19, 9),
+        ];
+        let f = frame(&[((100, 100), 8, (255, 255, 255))]);
+        for (orientation, direction) in pairs {
+            let dt1 = Dt1Facts {
+                orientation,
+                light_direction: direction,
+                ..Dt1Facts::default()
+            };
+            let kind = if orientation >= 16 {
+                TileKind::LowerWall
+            } else {
+                TileKind::Wall
+            };
+            let words = wall_light_words(&f.map, (100, 100), direction, 0).unwrap();
+            let (a, b) = (words[0] as u8, words[1] as u8);
+            let out = block_shades(
+                &f,
+                env(),
+                kind,
+                &dt1,
+                (20, 20),
+                (0xFF, 0),
+                BlendOp::Opaque,
+                &[rect(0)],
+                &[(0, 0)],
+            );
+            let want = crate::rules::shading::wall_block_light([a, b, b, a], false);
+            let chain = f
+                .tables
+                .block_chain(want, crate::scene::GradientKind::Wall, 0, 0);
+            assert_eq!(out.len(), 1, "orientation {orientation}");
+            assert_eq!(out[0].shade, chain, "orientation {orientation}");
+        }
+    }
+
+    // Covers: specs/render/lighting.md §11 r2
+    #[test]
+    fn a_fading_wall_reads_the_faded_points() {
+        let f = frame(&[((100, 100), 8, (255, 255, 255))]);
+        let shade = |direction: u32, state: u8| {
+            let dt1 = Dt1Facts {
+                light_direction: direction,
+                ..Dt1Facts::default()
+            };
+            block_shades(
+                &f,
+                env(),
+                TileKind::Wall,
+                &dt1,
+                (20, 20),
+                (0xFF, state),
+                BlendOp::Opaque,
+                &[rect(0)],
+                &[(0, 0)],
+            )[0]
+            .shade
+        };
+        let mut differs = false;
+        for direction in 1..=9u32 {
+            // Fade state bit 0 (set with bit 1 by the §8 target update)
+            // selects the faded table; bit 1 alone does not.
+            for (state, fade) in [(0, 0), (2, 0), (3, 1), (1, 1)] {
+                let words = wall_light_words(&f.map, (100, 100), direction, fade).unwrap();
+                let (a, b) = (words[0] as u8, words[1] as u8);
+                let want = crate::rules::shading::wall_block_light([a, b, b, a], false);
+                let chain = f
+                    .tables
+                    .block_chain(want, crate::scene::GradientKind::Wall, 0, 0);
+                assert_eq!(shade(direction, state), chain, "{direction} {state}");
+            }
+            differs |= shade(direction, 3) != shade(direction, 0);
+        }
+        assert!(differs, "the faded table must change some wall's light");
+    }
+
+    // Covers: specs/render/lighting.md §11 r2
+    #[test]
     fn unreadable_light_keeps_the_flat_tile_shade() {
         let f = frame(&[]);
-        let dt1 = Dt1Facts::default(); // orientation 0
+        let dt1 = Dt1Facts::default(); // light direction 0
         let out = block_shades(
             &f,
             env(),
             TileKind::Wall,
             &dt1,
             (20, 20),
-            0xFF,
+            (0xFF, 0),
             BlendOp::Opaque,
             &[rect(0)],
             &[(0, 0)],
@@ -288,7 +464,7 @@ mod tests {
             TileKind::ShadowTile,
             &dt1,
             (20, 20),
-            0xFF,
+            (0xFF, 0),
             BlendOp::Opaque,
             &[rect(0)],
             &[(0, 0)]
@@ -328,7 +504,7 @@ mod tests {
                 floor(),
                 &Dt1Facts::default(),
                 (21, 20),
-                0xFF,
+                (0xFF, 0),
                 BlendOp::Opaque,
                 &[rect(0)],
                 &[(0, 0)],

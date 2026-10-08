@@ -815,3 +815,23 @@ fn quest_special_36_sets_the_zoo_latch() {
     assert_eq!(w.objclient.latches.zoo_word, 7);
     assert!(matches!(out[..], [Output::QuestSpecial { code: 36, .. }]));
 }
+
+// Covers: specs/client/bridge.md §10 r3
+#[test]
+fn a_client_only_free_appends_a_unit_freed_output() {
+    let mut w = ClientWorld::default();
+    let key = UnitKey::new(OBJECT, 0x40);
+    w.objclient.set_c.insert(key, ClientUnit::new(key));
+    assert!(remove_client_unit(&mut w, key).is_some());
+    // A key not in set C frees nothing.
+    assert!(remove_client_unit(&mut w, key).is_none());
+    let mut out = Vec::new();
+    super::super::output::move_freed(&mut w, &mut out);
+    assert_eq!(
+        out,
+        [Output::UnitFreed {
+            unit: key,
+            client_only: true
+        }]
+    );
+}

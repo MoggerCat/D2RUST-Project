@@ -192,7 +192,11 @@ pub fn add_preview_tinted(
     lights: Option<crate::world_view::light_sources::LightRows>,
     tints: Option<crate::world_view::state_tint::StateTints>,
 ) {
-    let weather = WeatherView::new(tiles.source());
+    let link = app
+        .world_mut()
+        .get_resource_or_insert_with(crate::audio::driver::SoundLink::default)
+        .clone();
+    let weather = WeatherView::new(tiles.source()).with_sound(link);
     let mut preview = Preview::new(tiles);
     preview.light.sources = lights.map(std::sync::Arc::new);
     preview.light.set_tints(tints.map(std::sync::Arc::new));

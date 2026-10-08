@@ -52,6 +52,12 @@ pub struct AutomapView {
 }
 
 impl AutomapView {
+    /// The option store the key commands write (`ui/controls.md` §3
+    /// cmds 9–11, 45).
+    pub fn store_mut(&mut self) -> &mut MemoryStore {
+        &mut self.store
+    }
+
     pub fn new(source: Arc<dyn FileSource>, expansion: bool) -> Self {
         AutomapView {
             source,
