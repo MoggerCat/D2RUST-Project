@@ -482,3 +482,102 @@ fn inventory_draws_the_gold_value_and_button_from_the_model() {
     // `%d` of stat 14 total, Font16, color 0, at (W − sx − 212, H + sy − 72).
     assert_eq!(gold_texts(&u), vec![("4330".to_string(), 508, 468, 1, 0)]);
 }
+
+// Covers: specs/ui/controls.md §3 row 56, specs/ui/panels.md §3.1 (d2rs-own layout)
+#[test]
+fn esc_opens_the_game_menu_closes_panels_first_and_closes_it_again() {
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    assert!(!u.ui.is_open(9));
+    // Nothing open: Esc opens the menu.
+    u.key(&w, Action::GameMenu);
+    assert!(u.ui.is_open(9));
+    assert!(u.root.open_panels().contains(&esc_menu::ESC_PANEL));
+    // Esc again closes it.
+    u.key(&w, Action::GameMenu);
+    assert!(!u.ui.is_open(9));
+    // A panel open: Esc closes the panel only; the next Esc opens the menu.
+    u.key(&w, Action::ToggleInventory);
+    assert!(u.ui.is_open(1));
+    u.key(&w, Action::GameMenu);
+    assert!(!u.ui.is_open(1) && !u.ui.is_open(9));
+    u.key(&w, Action::GameMenu);
+    assert!(u.ui.is_open(9));
+}
+
+// Covers: specs/ui/panels.md §3.1 (no player, no menu)
+#[test]
+fn esc_without_a_player_opens_nothing() {
+    let mut u = ui(Some(areas()), true);
+    u.key(&ClientWorld::default(), Action::GameMenu);
+    assert!(!u.ui.is_open(9));
+}
+
+// Covers: d2rs-own, unverified (the menu's entries)
+#[test]
+fn the_menu_entries_return_save_and_exit_and_swallow_clicks() {
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    let texts = |u: &Ui| -> Vec<String> {
+        let ctx = UiCtx {
+            tick: 0,
+            world: &w,
+            strings: &NoStrings,
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        u.root.draw(&ctx, &mut out);
+        out.iter()
+            .filter_map(|d| match d {
+                UiDraw::Text(t) => Some(String::from_utf16_lossy(&t.text)),
+                _ => None,
+            })
+            .collect()
+    };
+    assert!(texts(&u).is_empty());
+    u.key(&w, Action::GameMenu);
+    assert_eq!(
+        texts(&u),
+        vec!["Options", "Save and Exit Game", "Return to Game"]
+    );
+    let entry = |i: i32| Point::new(400, 215 + 45 * i);
+    // Options does nothing and the click is swallowed (not Unhandled).
+    let (_, r) = u.click(&w, entry(0));
+    assert_ne!(r, Routed::Unhandled);
+    assert!(u.ui.is_open(9) && !u.ui.take_exit_request());
+    // A click outside the box does not reach the world either.
+    let (_, r) = u.click(&w, Point::new(10, 10));
+    assert_ne!(r, Routed::Unhandled);
+    // Save and Exit asks the host once.
+    u.click(&w, entry(1));
+    assert!(u.ui.take_exit_request());
+    assert!(!u.ui.take_exit_request());
+    // Return closes.
+    u.click(&w, entry(2));
+    assert!(!u.ui.is_open(9));
+}
+
+// Covers: specs/ui/control-panel.md §9 (mini panel row 7: game menu)
+#[test]
+fn the_mini_panel_game_menu_button_opens_it() {
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    u.ui.set_ui(0x15, 0, false).unwrap();
+    u.root.sync_states(&u.ui.shared.borrow().states);
+    // Row 7 of the mini panel; the exact rectangle is the spec's, so
+    // find it by scanning the panel strip for a click that opens ui 9.
+    let mut opened = false;
+    'scan: for y in 440..600 {
+        for x in (250..560).step_by(2) {
+            u.click(&w, Point::new(x, y));
+            if u.ui.is_open(9) {
+                opened = true;
+                break 'scan;
+            }
+            if !u.ui.is_open(0x15) {
+                u.ui.set_ui(0x15, 0, false).unwrap();
+                u.root.sync_states(&u.ui.shared.borrow().states);
+            }
+        }
+    }
+    assert!(opened);
+}
