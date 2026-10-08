@@ -20,8 +20,12 @@
 //! - the blocks-light flags (§4) come from the client DRLG collision
 //!   (`collision_at`, mask 0x22); only the player's light (kind 0) is
 //!   shadowed, the other sources draw plain (REC-250);
-//! - the environment advances one update per drawn frame, from the
-//!   model's record (or a fresh one).
+//! - the environment advances one update per drawn frame (§9.2 r1 says
+//!   per client update), from the model's record, taken again whenever
+//!   the model's record changes (S→C 0x53 / 0x5D), or a fresh one;
+//! - the other units' lights sit at their sub-tile's `8·s + 4` (the model
+//!   holds no precise position); the local player's at `(P >> 13) + 4` of
+//!   its predicted 16.16 position (§6.1).
 
 use crate::bridge::world::ClientWorld;
 use crate::bridge::{ClientUnit, UnitKey};
@@ -46,6 +50,13 @@ const QUALITY: u8 = 2;
 
 /// The collision mask of the blocks-light test (§4: bits 0x02 and 0x20).
 pub const BLOCKS_LIGHT_MASK: u16 = 0x22;
+
+/// The blocks-light flag of a sub-tile from its collision mask (§4):
+/// mask 0x22 non-zero; a sub-tile in no loaded room (`None`) blocks light
+/// (§4 r2: the point test returns 0x27 unmasked).
+pub fn blocks_light(collision: Option<u16>) -> bool {
+    collision.is_none_or(|m| m & BLOCKS_LIGHT_MASK != 0)
+}
 
 /// Environment variable that turns the lighting off (full bright, D1).
 pub const FULLBRIGHT_VAR: &str = "D2RS_FULLBRIGHT";
@@ -112,6 +123,8 @@ pub struct PreviewLight {
     /// `D2RS_FULLBRIGHT=1`: no light is built, the D1 fill stays.
     pub fullbright: bool,
     env: Option<Environment>,
+    /// The model's record the last refresh saw (`world.environment`).
+    env_seen: Option<Environment>,
     periods: Option<PeriodTables>,
     /// The act environment's ambient of the frame (roof tiles, §11 r4).
     env_cell: crate::rules::lighting::map::LightCell,
@@ -155,27 +168,44 @@ pub fn build_map_blocked(
     lights: &[PointLight],
     shadow_first: bool,
 ) -> LightMap {
+    // A unit standing on a sub-tile's origin: `(P >> 13) + 4` = 8·s + 4
+    // (§6.1).
+    let lights: Vec<PointLight> = lights
+        .iter()
+        .map(|&((sx, sy), r, rgb)| ((8 * sx + 4, 8 * sy + 4), r, rgb))
+        .collect();
+    build_map_eighths(player, scene, blocks, &lights, shadow_first)
+}
+
+/// The light position of a unit at 16.16 position `(x16, y16)` (§6.1,
+/// `0x006203B0`): `(P >> 13) + 4` on each axis, in 1/8 sub-tile.
+pub fn light_pos_of(x16: u32, y16: u32) -> (i32, i32) {
+    (
+        crate::rules::lighting::records::unit_light_pos(x16 as i32),
+        crate::rules::lighting::records::unit_light_pos(y16 as i32),
+    )
+}
+
+/// [`build_map_blocked`] with each light's position already in 1/8
+/// sub-tile (§6.1: `(P >> 13) + 4` of the unit's precise position).
+pub fn build_map_eighths(
+    player: (i32, i32),
+    scene: &AmbientScene,
+    blocks: impl FnMut(i32, i32) -> bool,
+    lights: &[PointLight],
+    shadow_first: bool,
+) -> LightMap {
     let mut map = LightMap::new(player);
     map.fill_ambient(Some(scene));
     map.fill_blocks(blocks);
     let mut list = LightList::new();
-    for (n, &((sx, sy), r, (red, green, blue))) in lights.iter().enumerate() {
-        // The light's position is the sub-tile centre in 1/8 sub-tile.
+    for (n, &((px, py), r, (red, green, blue))) in lights.iter().enumerate() {
         let kind = if shadow_first && n == 0 {
             LightKind::Shadowed
         } else {
             LightKind::Plain
         };
-        list.create(
-            None,
-            (8 * sx + 4, 8 * sy + 4),
-            kind,
-            r,
-            255,
-            red,
-            green,
-            blue,
-        );
+        list.create(None, (px, py), kind, r, 255, red, green, blue);
     }
     let colored = list.colored;
     for (_, rec) in list.iter() {
@@ -311,11 +341,14 @@ impl PreviewLight {
         let Some(player) = world.local() else {
             return;
         };
-        let at = match local_at {
-            Some((key, (x, y))) if key == player.key => subtile_of(x, y),
-            _ => player
-                .position
-                .map_or((0, 0), |(x, y)| (i32::from(x), i32::from(y))),
+        let (at, at8) = match local_at {
+            Some((key, (x, y))) if key == player.key => (subtile_of(x, y), light_pos_of(x, y)),
+            _ => {
+                let at = player
+                    .position
+                    .map_or((0, 0), |(x, y)| (i32::from(x), i32::from(y)));
+                (at, (8 * at.0 + 4, 8 * at.1 + 4))
+            }
         };
         self.look.local = Some((player.key, at));
         let level = world.player_level().map_or(0, u32::from);
@@ -325,11 +358,16 @@ impl PreviewLight {
         let Some(periods) = self.periods else {
             return;
         };
-        let env = self.env.get_or_insert_with(|| {
-            world
-                .environment
-                .unwrap_or_else(|| Environment::new(&periods, 0))
-        });
+        // The model's record changes only through S→C 0x53 / 0x5D (§9.2
+        // r2–r4): take it whenever it changed, so the server's setting
+        // reaches the ambient instead of the first frame's copy only.
+        if world.environment != self.env_seen {
+            self.env = world.environment;
+            self.env_seen = world.environment;
+        }
+        let env = self
+            .env
+            .get_or_insert_with(|| Environment::new(&periods, 0));
         env.update(&periods, level);
         let a: EnvAmbient = env.ambient();
         let ambient = Ambient {
@@ -348,21 +386,19 @@ impl PreviewLight {
         let scene = self.scene(world, ambient, level);
         let radius = player_light_radius(player.stat(STAT_LIGHT_RADIUS)).max(1);
         let rgb = player_light_color(player.stat(STAT_LIGHT_COLOR) as u32);
-        let mut lights = vec![(at, radius, rgb)];
+        let mut lights = vec![(at8, radius, rgb)];
         if let Some(rows) = &self.sources {
-            lights.extend(rows.lights(world));
+            lights.extend(
+                rows.lights(world)
+                    .into_iter()
+                    .map(|((sx, sy), r, c)| ((8 * sx + 4, 8 * sy + 4), r, c)),
+            );
         }
         let drlg = world.drlg.as_ref().filter(|_| world.local_room().is_some());
-        let map = build_map_blocked(
+        let map = build_map_eighths(
             at,
             &scene,
-            |x, y| {
-                drlg.is_some_and(|d| {
-                    d.drlg
-                        .collision_at(x, y)
-                        .is_some_and(|m| m & BLOCKS_LIGHT_MASK != 0)
-                })
-            },
+            |x, y| drlg.is_some_and(|d| blocks_light(d.drlg.collision_at(x, y))),
             &lights,
             true,
         );
@@ -515,6 +551,67 @@ mod tests {
             wide.frame().unwrap().map.read(8 * edge.0, 8 * edge.1).i
                 > f.map.read(8 * edge.0, 8 * edge.1).i
         );
+    }
+
+    // Covers: specs/render/lighting.md §4 r2, §4 r3
+    #[test]
+    fn a_cell_in_no_room_blocks_light() {
+        assert!(blocks_light(None));
+        assert!(blocks_light(Some(0x02)));
+        assert!(blocks_light(Some(0x20)));
+        assert!(!blocks_light(Some(0x01 | 0x04 | 0x10 | 0x40)));
+        assert!(!blocks_light(Some(0)));
+    }
+
+    // Covers: specs/render/lighting.md §6.1
+    // (position `(P >> 13) + 4`; test vector: sub-tile 100, fraction 0 → 804)
+    #[test]
+    fn the_player_light_sits_at_its_precise_position() {
+        assert_eq!(light_pos_of(100 << 16, 100 << 16), (804, 804));
+        // Three quarters into sub-tile 100: 800 + 6 + 4.
+        assert_eq!(light_pos_of((100 << 16) + 0xC000, 100 << 16), (810, 804));
+        let mut w = ClientWorld::default();
+        let key = UnitKey::new(PLAYER, 1);
+        let mut u = ClientUnit::new(key);
+        u.position = Some((100, 100));
+        w.units.insert(key, u);
+        w.local_player = Some(key);
+        let t = tables();
+        let map = |x16: u32| {
+            let mut l = PreviewLight::default();
+            l.refresh(&w, Some((key, (x16, 100 << 16))), Some(&t));
+            l.frame().unwrap().map.clone()
+        };
+        let (whole, frac) = (map(100 << 16), map((100 << 16) + 0xC000));
+        // §7.1 r4: cell 110's corner 880 is 76 (whole) or 70 (frac) away,
+        // cell 90's corner 720 is 84 or 90: the light moved right.
+        let i = |m: &LightMap, sx: i32| m.read(8 * sx, 8 * 100).i;
+        assert!(i(&frac, 110) > i(&whole, 110));
+        assert!(i(&frac, 90) < i(&whole, 90));
+    }
+
+    // Covers: specs/render/lighting.md §9.2 r2
+    // (the 0x53 setter's record is what the ambient reads)
+    #[test]
+    fn a_new_environment_record_reaches_the_ambient() {
+        let mut w = ClientWorld::default();
+        let key = UnitKey::new(PLAYER, 1);
+        let mut u = ClientUnit::new(key);
+        u.position = Some((4000, 4000));
+        w.units.insert(key, u);
+        w.local_player = Some(key);
+        let t = tables();
+        let far = (8 * 4000 + 8 * 40, 8 * 4000);
+        let mut light = PreviewLight::default();
+        light.refresh(&w, None, Some(&t));
+        assert_eq!(light.frame().unwrap().map.read(far.0, far.1).i, 128);
+        // Noon (90 degrees, index 2): §9.3 r4 gives 255.
+        let periods = PeriodTables::builtin().unwrap();
+        let mut env = Environment::new(&periods, 0);
+        env.ticks = 90 * 128;
+        w.environment = Some(env);
+        light.refresh(&w, None, Some(&t));
+        assert_eq!(light.frame().unwrap().map.read(far.0, far.1).i, 255);
     }
 
     // Covers: specs/render/lighting.md §3.1 r2

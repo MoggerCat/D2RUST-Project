@@ -648,6 +648,24 @@ fn a_dropped_item_blocks_the_next_drop() {
     fx.assert_clean();
 }
 
+/// `treasure.md` §3.1 collision word with the path provider: a monster at
+/// a cell outside every room (no room among its room and the adjacent
+/// rooms) reads 0x27, non-zero → no drop, no draw.
+// Spec: specs/items/treasure.md §3.1, collision word 0x27 (no claim:
+// one part of the gate)
+#[test]
+fn a_monster_outside_every_room_grid_drops_nothing() {
+    let mut fx = Fx::new();
+    let (mut d, p, _mon) = drop_setup_paths(&mut fx);
+    let far = fx.spawn(UnitType::Monster, 0, fx.a, 5000, 5000);
+    fx.stats(far, &[(LEVEL_STAT, 3)]);
+    assert_eq!(fx.sim.hooks().path_position(far), (5000, 5000));
+    let seed = fx.sim.sys.units.get(far).unwrap().seed;
+    assert!(run_drop(&mut fx, &mut d, far, p).is_empty());
+    assert!(d.placed.is_empty());
+    assert_eq!(fx.sim.sys.units.get(far).unwrap().seed, seed);
+}
+
 /// The provider on without the walk-back field: the drop keeps the
 /// [`FreeSpot`] seam (here: the start as is), and the item is put there
 /// (`treasure.md` §7 step 4: its static path at the spot).

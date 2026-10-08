@@ -242,6 +242,7 @@ impl Panel for GoldDialogUi {
                         image: ImageRef { file, frame: DARK },
                         at: Point::new(x, y),
                         clip: Rect::new(x, y, cw as u16, ch as u16),
+                        look: crate::ui::CelLook::PLAIN,
                     }));
                     x += tw;
                 }

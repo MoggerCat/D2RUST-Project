@@ -300,6 +300,7 @@ fn ui_draws(n: u8) -> Vec<UiDraw> {
                 },
                 at: d2_client::ui::Point::new(i32::from(i) * 40, 500),
                 clip: d2_client::ui::Rect::new(0, 0, 800, 600),
+                look: d2_client::ui::CelLook::PLAIN,
             })
         })
         .collect()

@@ -173,7 +173,9 @@ fn mouse_skills_select_with_their_item() {
         ..SkillList::default()
     };
     let slots = mouse_slots(&list, &guids);
-    assert_eq!(slots[0], Slot::encode(36, true, 2).unwrap());
+    // No 0x8000 left flag on a mouse word (§2.4 rule 3).
+    assert_eq!(slots[0], Slot::encode(36, false, 2).unwrap());
+    assert_eq!(slots[0].code, 36);
     assert_eq!(slots[1], Slot::encode(59, false, 0).unwrap());
     // The loaded list starts with nothing selected.
     let (l, r) = (list.left.take(), list.right.take());
@@ -265,9 +267,71 @@ fn weapon_switch_trades_the_mouse_pairs() {
     assert_eq!((list.left, list.right), (Some(1), Some(2)));
     assert_eq!((list.swap_left, list.swap_right), (Some(0), Some(1)));
     let swap = d2_client::app::save_gaps::swap_slots(&list, &[500]);
-    assert_eq!(swap[0], Slot::encode(36, true, 0).unwrap());
+    assert_eq!(swap[0], Slot::encode(36, false, 0).unwrap());
     assert_eq!(swap[1], Slot::encode(37, false, 0).unwrap());
     list.switch_weapons();
     assert!(!list.weapon_switch);
     assert_eq!(list.left, Some(0));
+}
+
+/// The bytes of a written mouse pair (§2.4 rule 3, test vectors): the left
+/// skill 36 on a native entry is `24 00 00 00` at +0x78 (no 0x8000 flag),
+/// the swap pair (36 left, 0 right) with the switch byte set is
+/// `24 00 00 00` / `00 00 00 00` at +0x80 / +0x84 and `01 00 00 00` at +0x10.
+// Covers: specs/formats/d2s.md §2.4 r3
+#[test]
+fn mouse_words_have_no_left_flag_in_the_file() {
+    let list = SkillList {
+        entries: vec![entry(0, -1), entry(36, -1)],
+        left: Some(1),
+        right: Some(0),
+        swap_left: Some(1),
+        swap_right: Some(0),
+        weapon_switch: true,
+        ..SkillList::default()
+    };
+    let mut save = base();
+    let gaps = Gaps {
+        mouse: Some(mouse_slots(&list, &[])),
+        swap: Some((d2_client::app::save_gaps::swap_slots(&list, &[]), true)),
+        ..Gaps::default()
+    };
+    apply_gaps(&mut save, &gaps);
+    let b = save.header.to_bytes();
+    assert_eq!(&b[0x78..0x7C], &[0x24, 0, 0, 0]);
+    assert_eq!(&b[0x7C..0x80], &[0, 0, 0, 0]);
+    assert_eq!(&b[0x80..0x84], &[0x24, 0, 0, 0]);
+    assert_eq!(&b[0x84..0x88], &[0, 0, 0, 0]);
+    assert_eq!(&b[0x10..0x14], &[1, 0, 0, 0]);
+}
+
+/// A hireling block without a readable item list saves the empty list
+/// (`jf` cannot be omitted while `kf` follows); with the bare marker the
+/// loader would take the next marker for the list (22). A list without a block is
+/// dropped to the marker alone (§8.4 rule 2).
+// Covers: specs/formats/d2s.md §8.4 r2
+#[test]
+fn jf_and_the_hireling_block_agree() {
+    let t = Tables;
+    let o = ReadOptions {
+        expansion: true,
+        game: None,
+    };
+    let mut save = base();
+    save.body.as_mut().unwrap().hireling_items = Some(None);
+    apply_gaps(&mut save, &Gaps::default());
+    assert_eq!(
+        save.body.as_ref().unwrap().hireling_items,
+        Some(Some(vec![]))
+    );
+    let f = d2s::write(&save, &t).unwrap();
+    assert!(d2s::read(&f, &o, &t).is_ok());
+
+    let mut save = base();
+    save.header.hireling = Hireling::default();
+    save.body.as_mut().unwrap().hireling_items = Some(Some(vec![item(1)]));
+    apply_gaps(&mut save, &Gaps::default());
+    assert_eq!(save.body.as_ref().unwrap().hireling_items, Some(None));
+    let f = d2s::write(&save, &t).unwrap();
+    assert!(d2s::read(&f, &o, &t).is_ok());
 }

@@ -267,6 +267,7 @@ fn draw_is_bottom_most_first() {
         .map(|d| match d {
             UiDraw::Image(i) => i.image.file,
             UiDraw::Text(_) => panic!("text"),
+            UiDraw::Rect(_) => panic!("rectangle"),
         })
         .collect();
     assert_eq!(files, vec![1, 2]);
@@ -555,7 +556,8 @@ fn widgets_emit_requests_and_hit_by_rect() {
             UiDraw::Image(ImageRequest {
                 image: img,
                 at: Point::new(1, 1),
-                clip: FRAME
+                clip: FRAME,
+                look: crate::ui::CelLook::PLAIN,
             }),
             UiDraw::Text(TextRequest {
                 text: vec![0x48, 0x69],
@@ -1071,6 +1073,31 @@ mod text {
         assert_eq!(fr.rect, (Point::new(0, -16), Point::new(19, -6)));
         let fr = framed_text_tight(&g, &text, Point::new(0, 700), (800, 600)).unwrap();
         assert_eq!(fr.rect.1, Point::new(19, 569));
+    }
+
+    // Covers: specs/ui/control-panel.md §5 r14, §4 r2
+    // (the stamina tip at (W/2 − 76, H − 52): box centred on W/2 − 76,
+    // bottom H − 50)
+    #[test]
+    fn popup_text_is_centred_on_x_with_its_bottom_at_y_plus_2() {
+        let f = font16();
+        let g = GlyphLookup::new(&f);
+        let text = u("AB");
+        // W = 19 + 8 = 27; x0 = 324 − 13; y0 = b = 550; text at b − 3.
+        let fr = popup_text(&g, &text, Point::new(324, 548), true, (800, 600)).unwrap();
+        assert_eq!(fr.rect, (Point::new(311, 534), Point::new(338, 550)));
+        assert_eq!(fr.pen, Point::new(311, 547));
+        assert_eq!(
+            place(&f, "AB", fr.pen, 0, fr.opts),
+            [('A', 315, 547, 0), ('B', 327, 547, 0)]
+        );
+        // centre 0: x0 = x; x0 ≤ 0 → 0; x' ≤ Sw − W; b ≤ Sh − 5.
+        let fr = popup_text(&g, &text, Point::new(100, 0), false, (800, 600)).unwrap();
+        assert_eq!(fr.rect.0.x, 100);
+        let fr = popup_text(&g, &text, Point::new(5, 0), true, (800, 600)).unwrap();
+        assert_eq!(fr.rect.0.x, 0);
+        let fr = popup_text(&g, &text, Point::new(799, 700), true, (800, 600)).unwrap();
+        assert_eq!(fr.rect, (Point::new(773, 579), Point::new(800, 595)));
     }
 
     // Covers: specs/ui/text.md §9
