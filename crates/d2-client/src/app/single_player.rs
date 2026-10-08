@@ -567,7 +567,7 @@ impl Pending for LocalSeams {
                 .push(d2_sim::wiring::action::QuestEvent::Link { unit, chain });
         }
     }
-    /// d2rs-own, unverified (REC-136): Radament's and the Summoner's AI
+    /// d2rs-own, unverified (REC-141): Radament's and the Summoner's AI
     /// calls reach the quest control at the end of the tick.
     fn ai_quest_call(
         &mut self,
