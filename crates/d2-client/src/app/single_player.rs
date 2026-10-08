@@ -430,9 +430,6 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
 }
 
 impl Pending for LocalSeams {
-    fn skill_list(&self, unit: UnitId) -> Vec<d2_sim::skills::SkillEntry> {
-        self.book.lists.get(&unit).cloned().unwrap_or_default()
-    }
     fn position(&self, unit: UnitId) -> (i32, i32) {
         self.pos.get(&unit).copied().unwrap_or_default()
     }

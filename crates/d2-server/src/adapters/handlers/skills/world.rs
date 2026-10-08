@@ -458,10 +458,11 @@ impl<X: SkillRest> LearnUnits for World<'_, '_, X> {
     fn is_class_skill(&self, u: UnitId, skill: i32) -> bool {
         let h = &*self.u.cv.v.h;
         let class = SkillUnits::class_id(&*self.u, u);
-        h.tables
-            .skills
-            .skill(skill)
-            .is_some_and(|r| i32::from(r.charclass as i8) == class)
+        LearnRest::is_class_skill(self.x(), u, skill)
+            || h.tables
+                .skills
+                .skill(skill)
+                .is_some_and(|r| i32::from(r.charclass as i8) == class)
     }
     /// `0x00570080` after the cost check (`levels.md` §6.4 step 4): the
     /// cost comes off `newskills(5)`, the native entry of the player's
