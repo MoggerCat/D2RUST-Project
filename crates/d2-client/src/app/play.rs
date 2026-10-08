@@ -61,6 +61,7 @@ use crate::bridge::predict::{PredictLink, WalkTap};
 use crate::bridge::world::{ClientTables, LevelRow};
 use crate::bridge::{Bridge, BridgeError, BridgePlugin, BridgeResource};
 use crate::world_view::node::NodeRuns;
+use crate::world_view::object_label::ObjectLabels;
 use crate::world_view::preview::Preview;
 use crate::world_view::tile_assets::TileAssets;
 use crate::world_view::walk::{add_preview_walk, PreviewWalk};
@@ -325,6 +326,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     let level_rows = single_player::client_level_rows(&config.data);
     let waypoint_map = single_player::client_waypoint_map(&config.data);
     let object_rows = single_player::client_object_rows(&config.data);
+    let object_names = single_player::client_object_names(&config.data);
     let request = config.character.clone();
     let loading_files = match &config.data {
         GameData::Live(d) => Some(d.archives.source()),
@@ -419,6 +421,9 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         .resource_mut::<BridgeResource>()
         .0
         .set_object_rows(object_rows);
+    if let Some(mut state) = app.world_mut().get_resource_mut::<WorldViewState>() {
+        state.object_labels = ObjectLabels::new(object_names);
+    }
     if let Some(archives) = archives {
         let skills = single_player::client_skill_rows(archives.as_ref())?;
         let skill_tables = single_player::client_skill_tables(archives.as_ref())?;

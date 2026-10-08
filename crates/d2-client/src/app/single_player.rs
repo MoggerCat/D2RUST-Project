@@ -1820,6 +1820,20 @@ pub fn client_object_rows(data: &GameData) -> Vec<crate::bridge::objects::ObjCli
     }
 }
 
+/// The `objects.txt` `Name` of each class, for the mouse-over label
+/// (`world_view::object_label`; d2rs-own, unverified, REC-239).
+pub fn client_object_names(data: &GameData) -> Vec<String> {
+    data.tables()
+        .objects
+        .iter()
+        .map(|o| {
+            let n = &o.name;
+            let end = n.iter().position(|&b| b == 0).unwrap_or(n.len());
+            String::from_utf8_lossy(&n[..end]).into_owned()
+        })
+        .collect()
+}
+
 /// The `Levels.txt` fields the client reads (`client/model.md` §11
 /// rules 3–4: `Pal`, `Act`, `BlankScreen`; `audio/environment.md` §1 r2:
 /// `SoundEnv`), one row per level id, from the game's `levels` table.

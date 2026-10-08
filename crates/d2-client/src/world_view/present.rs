@@ -113,6 +113,8 @@ pub struct WorldViewState {
     pub corpse_clicks: super::corpse_click::CorpseClicks,
     /// Client missiles and cast / state overlays (`super::missiles`).
     pub missiles: super::missiles::Missiles,
+    /// The object mouse-over label (`super::object_label`).
+    pub object_labels: super::object_label::ObjectLabels,
 }
 
 impl WorldViewState {
@@ -139,6 +141,7 @@ impl WorldViewState {
             ground_items: Default::default(),
             corpse_clicks: Default::default(),
             missiles: Default::default(),
+            object_labels: Default::default(),
         }
     }
 }
@@ -584,7 +587,7 @@ fn world_view_frame(
     let ui_frame = match ui {
         Some(mut ui) => {
             let ui = &mut *ui;
-            let frame = run_ui_with(
+            let mut frame = run_ui_with(
                 &mut ui.root,
                 &mut ui.queue,
                 &mut bridge.0,
@@ -659,6 +662,17 @@ fn world_view_frame(
                 .filter(|_| over && state.preview)
                 .and_then(|c| crate::bridge::hover::pick(bridge.0.world(), c, mouse));
             state.feed.set_hover(hover);
+            // d2rs-own, unverified (REC-239): the hovered object's name.
+            if let Some(label) = cam.as_ref().and_then(|c| {
+                state
+                    .object_labels
+                    .draw(bridge.0.world(), c, hover, ui.strings.as_ref())
+            }) {
+                if let Some(text) = &ui.text {
+                    text.ensure(std::slice::from_ref(&label), &mut state.assets)?;
+                }
+                frame.draws.push(label);
+            }
             let unhandled =
                 state
                     .corpse_clicks
