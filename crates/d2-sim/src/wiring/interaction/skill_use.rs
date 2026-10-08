@@ -153,7 +153,7 @@ impl<X: Pending + UseRest> UseView<'_, X> {
     fn x(&self) -> &X {
         &self.cv.v.h.x
     }
-    fn xm(&mut self) -> &mut X {
+    pub(super) fn xm(&mut self) -> &mut X {
         &mut self.cv.v.h.x
     }
     fn error(&mut self, e: WiringError) {
@@ -933,7 +933,9 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             self.error(WiringError::EndlessProgressive { unit, skill, step });
             return;
         }
-        self.xm().body_effect(e);
+        if let Some(e) = self.pet_effect(e) {
+            self.xm().body_effect(e);
+        }
     }
     fn path_op(&mut self, u: UnitId, op: bodies::PathOp<UnitId>) -> i32 {
         self.xm().body_path_op(u, op)
@@ -1129,7 +1131,10 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         mode: i32,
         spread: i32,
     ) -> Option<UnitId> {
-        self.xm().create_monster(r, at, class, mode, spread)
+        match self.xm().create_monster(r, at, class, mode, spread) {
+            Some(m) => Some(m),
+            None => self.alloc_monster(r, at, class, mode),
+        }
     }
     fn mode_request(&mut self, m: UnitId, mode: i32, target: Option<UnitId>) -> i32 {
         Pending::mode_request(self.xm(), m, mode, target)

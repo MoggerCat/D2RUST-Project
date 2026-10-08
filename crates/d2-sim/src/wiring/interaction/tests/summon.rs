@@ -1,0 +1,139 @@
+// Spec: specs/sim/pets.md §2–§6, §8; specs/skills/bodies.md §6.2, §8.1
+//! A summon skill on the wired host: the druid summon body (`srvdo`
+//! 119) makes a real monster at the aimed point, adds it to the owner's
+//! pet list ([`crate::wiring::action::ActionHooks::pet_lists`]) and
+//! broadcasts 0x7A; a summon past the pet type's maximum removes the
+//! oldest pet; a dead pet leaves its list ([`View::pet_sweep`]).
+
+use std::sync::Arc;
+
+use crate::skills::use_::bodies::{BodyStat, BodyTables};
+use crate::skills::use_::do_skill;
+use crate::skills::SkillEntry;
+use crate::units::modes::monster_mode;
+use crate::units::{UnitId, UnitType};
+
+use super::skill_bodies::body_rec;
+use super::skill_use::Fx;
+use super::{stat_data, N_STATES};
+
+/// Formulas (`push i16 v; end`): 2, 1, 5.
+const F_2: u32 = 0;
+const F_1: u32 = 4;
+const F_5: u32 = 8;
+
+/// Pet type 2, whose maximum is `petmax` (class `summon` 0).
+fn summoner(petmax: u32) -> (Fx, UnitId) {
+    let mut r = body_rec();
+    r.srvdofunc = 119;
+    r.summon = 0;
+    r.summode = 1;
+    r.pettype = 2;
+    r.petmax = petmax;
+    r.calc2 = F_5;
+    let mut t = crate::skills::fake::skill_tables(vec![r]);
+    let mut code = Vec::new();
+    for v in [2i16, 1, 5] {
+        code.push(0x08);
+        code.extend(v.to_le_bytes());
+        code.push(0x00);
+    }
+    t.skills_code = code;
+    let mut fx = Fx::with(stat_data(), t);
+    fx.sim.sys.hooks.bodies = Some(Arc::new(BodyTables {
+        stats: vec![BodyStat::default(); 359],
+        state_group: vec![0; N_STATES],
+        state_aura: vec![false; N_STATES],
+        pettype_count: 3,
+        pettype_group: vec![0; 3],
+        ..BodyTables::default()
+    }));
+    let p = fx.spawn(UnitType::Player, 10, 10);
+    fx.set(p, &[(12, 10)]);
+    (fx, p)
+}
+
+fn cast(fx: &mut Fx, p: UnitId, at: (i32, i32)) -> i32 {
+    let e = SkillEntry {
+        skill: 0,
+        base: 1,
+        owner_guid: -1,
+        ..SkillEntry::default()
+    };
+    let x = &mut fx.sim.hooks().x;
+    x.skills.insert(p, vec![e]);
+    x.used.insert(p, e);
+    x.aim_at = at;
+    let t = fx.sim.sys.hooks.tables.skills.clone();
+    let game = &mut fx.game;
+    fx.sim.skill_use(game, |w| do_skill(w, &t, p, 0, 1))
+}
+
+fn pets(fx: &Fx, p: UnitId) -> Vec<i32> {
+    fx.sim
+        .sys
+        .hooks
+        .pet_lists
+        .get(&p)
+        .map(|l| l.entries[2].nodes.iter().map(|n| n.guid).collect())
+        .unwrap_or_default()
+}
+
+/// The 0x7A messages sent so far: (action, pet type, pet GUID).
+fn pet_msgs(fx: &mut Fx) -> Vec<(u8, u8, u32)> {
+    fx.sim
+        .hooks()
+        .x
+        .msgs
+        .iter()
+        .filter(|(_, b)| b[0] == 0x7A)
+        .map(|(_, b)| (b[1], b[2], u32::from_le_bytes(b[9..13].try_into().unwrap())))
+        .collect()
+}
+
+// Covers: specs/sim/pets.md §2 r6, §8; specs/skills/bodies.md §8.1 r6
+#[test]
+fn a_summon_makes_a_monster_and_lists_it_with_a_0x7a_add() {
+    let (mut fx, p) = summoner(F_2);
+    assert_eq!(cast(&mut fx, p, (12, 10)), 1);
+    let m = fx.game.lists.units_of_type(UnitType::Monster);
+    assert_eq!(m.len(), 1, "the summon allocated one monster");
+    let guid = fx.sim.sys.units.get(m[0]).unwrap().guid;
+    assert_eq!(pets(&fx, p), vec![guid as i32]);
+    assert_eq!(pet_msgs(&mut fx), vec![(1, 2, guid)]);
+    fx.assert_clean();
+}
+
+// Covers: specs/sim/pets.md §4 r3, §5 r2, §6
+#[test]
+fn a_summon_past_the_maximum_removes_the_oldest_pet() {
+    let (mut fx, p) = summoner(F_2);
+    cast(&mut fx, p, (12, 10));
+    cast(&mut fx, p, (13, 10));
+    let two = pets(&fx, p);
+    assert_eq!(two.len(), 2);
+    cast(&mut fx, p, (14, 10));
+    let now = pets(&fx, p);
+    assert_eq!(now.len(), 2, "the maximum is 2");
+    assert_eq!(now[0], two[1], "the oldest left, the next is the head");
+    assert!(
+        pet_msgs(&mut fx)
+            .iter()
+            .any(|&(a, _, g)| a == 0 && g as i32 == two[0]),
+        "0x7A remove for the oldest"
+    );
+    fx.assert_clean();
+}
+
+// Covers: specs/sim/pets.md §6, §8
+#[test]
+fn a_dead_pet_leaves_the_list() {
+    let (mut fx, p) = summoner(F_1);
+    cast(&mut fx, p, (12, 10));
+    let m = fx.game.lists.units_of_type(UnitType::Monster)[0];
+    fx.sim.sys.units.get_mut(m).unwrap().mode = monster_mode::DT;
+    let game = &mut fx.game;
+    fx.sim.with(game, |g, v| v.pet_sweep(g));
+    assert!(pets(&fx, p).is_empty());
+    assert!(pet_msgs(&mut fx).iter().any(|&(a, _, _)| a == 0));
+}

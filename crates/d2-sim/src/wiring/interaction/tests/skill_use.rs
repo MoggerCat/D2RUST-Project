@@ -67,6 +67,8 @@ pub(super) struct Open {
     pub(super) right: BTreeMap<UnitId, SkillEntry>,
     pub(super) aim_at: (i32, i32),
     pub(super) log: Vec<String>,
+    /// Bytes sent to a player's client (`Pending::send`).
+    pub(super) msgs: Vec<(UnitId, Vec<u8>)>,
     /// Path targets (`UseRest::target`).
     pub(super) targets: BTreeMap<UnitId, UnitId>,
     /// Items by (unit, body location); the current weapon; stackable
@@ -147,6 +149,9 @@ impl Pending for Open {
     }
     fn set_ai_state(&mut self, unit: UnitId, k: i32) {
         self.log.push(format!("ai {} {k}", unit.0));
+    }
+    fn send(&mut self, player: UnitId, msg: &[u8]) {
+        self.msgs.push((player, msg.to_vec()));
     }
 }
 

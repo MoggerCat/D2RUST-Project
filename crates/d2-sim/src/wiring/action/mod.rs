@@ -105,6 +105,8 @@ pub enum WiringError {
     /// A store was needed while it was lent out (a missile or AI call
     /// re-entered its own module).
     Reentrant(&'static str),
+    /// A pet list fatal assert (`sim/pets.md`).
+    Pet(crate::player::pets::PetError),
     Drlg(DrlgError),
     Unit(UnitError),
     /// The AnimData name lookup failed (`animdata.md` §4: a name longer
@@ -278,6 +280,9 @@ pub struct ActionHooks<X> {
     /// TODO(skills/levels.md): the combat and skill seams
     /// ([`Pending::skill_list`]) do not read them yet.
     pub skill_lists: BTreeMap<UnitId, crate::skills::list::SkillList>,
+    /// The players' pet lists (player data +0x44, `sim/pets.md` §1),
+    /// created on a player's first summon ([`crate::wiring::interaction::summon`]).
+    pub pet_lists: BTreeMap<UnitId, crate::player::pets::PetLists>,
     /// The inactive-unit store (game +0xD8, `units.md` §3.4;
     /// [`inactive`]). `None` (the default): tick step 9 compresses
     /// nothing and the restore is the host's, as before.
@@ -352,6 +357,7 @@ impl<X> ActionHooks<X> {
             death: death::DeathState::default(),
             session: switch::SessionState::default(),
             skill_lists: BTreeMap::new(),
+            pet_lists: BTreeMap::new(),
             inactive: None,
             x,
             orphan_seed: Seed::init(),

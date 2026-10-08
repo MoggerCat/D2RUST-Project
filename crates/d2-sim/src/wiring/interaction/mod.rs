@@ -47,6 +47,7 @@ pub mod npc_world;
 pub mod quest_npc;
 pub mod skill_events;
 pub mod skill_use;
+pub mod summon;
 pub mod vendor_world;
 pub mod vitals;
 

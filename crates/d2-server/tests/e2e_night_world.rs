@@ -1102,6 +1102,61 @@ fn the_hireling_attacks_a_hostile_monster_beside_it() {
     assert_eq!(fx.sim().events.action.sys.units.get(merc).unwrap().mode, 4);
 }
 
+// d2rs-own, unverified: `hireling_drive` (no spec rule checked)
+#[test]
+fn a_summoned_pet_attacks_a_hostile_monster_beside_it() {
+    use d2_sim::player::pets::{PetLists, PetNode};
+    let mut fx = Fx::new();
+    let p = fx.player;
+    let spawn = |fx: &mut Fx, class: u32, dy: i32| {
+        let room = fx.room(p);
+        let req = AllocRequest {
+            ty: UnitType::Monster,
+            class,
+            room,
+            add: true,
+            fixed_guid: None,
+            mode: 1,
+            allied: false,
+        };
+        let s = fx.sim();
+        s.events
+            .action
+            .with(&mut s.game, |g, v| {
+                v.allocate(g, &req, PLAYER_AT.0, PLAYER_AT.1 + dy)
+            })
+            .unwrap()
+    };
+    let pet = spawn(&mut fx, MERC_CLASS, 12);
+    let foe = spawn(&mut fx, 0, 14);
+    let pg = fx.guid(pet);
+    {
+        let s = fx.sim();
+        s.events.action.with(&mut s.game, |_, v| {
+            v.set_base(pet, 21, 10);
+            v.set_base(pet, 22, 10);
+            v.set_base(foe, 7, 50 << 8);
+            v.set_base(foe, 6, 50 << 8);
+            let mut lists = PetLists::new(3);
+            lists.entries[2].count = 1;
+            lists.entries[2].max = 1;
+            lists.entries[2].nodes = vec![PetNode {
+                flags: 0,
+                guid: pg as i32,
+                extra: [0; 3],
+            }];
+            v.h.pet_lists.insert(p, lists);
+        });
+    }
+    let before = fx.stat(foe, 6);
+    assert!(before > 0);
+    for _ in 0..40 {
+        fx.step(&[]);
+    }
+    assert!(fx.stat(foe, 6) < before, "the pet hurt its neighbour");
+    assert_eq!(fx.sim().events.action.sys.units.get(pet).unwrap().mode, 4);
+}
+
 // ---- 3. a room-population monster killed with a missile --------------------------------
 
 // Covers: specs/drlg/levels.md §11.6 text; specs/monsters/population.md §3; specs/skills/use.md §1 text; specs/missiles/missiles.md §r4-default-flight-server-do-1-0x005b0bc0-0x005ae1f0; specs/combat/damage.md §7.2; specs/items/treasure.md §3; specs/sim/intents-events.md §7.4 r7, §7.6 text

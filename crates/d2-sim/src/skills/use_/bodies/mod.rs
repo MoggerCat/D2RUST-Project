@@ -204,6 +204,8 @@ pub struct BodyTables {
     pub monlvl: Vec<d2_data::tables::Monlvl>,
     /// `pettype.txt` record count.
     pub pettype_count: i32,
+    /// `pettype.txt` `group` (+0x08, i16) by row (`sim/pets.md` §3).
+    pub pettype_group: Vec<i16>,
     /// The item-event layer split (data +0xC6C shift, +0xC70 mask;
     /// `data/runtime-maps.md` §3): `stuff` of itemstatcost record 0
     /// (+0x140) when in 1..8, else 6; mask (1 << stuff) − 1. `None`
@@ -222,10 +224,15 @@ impl BodyTables {
     /// From a loaded `.bin` set.
     pub fn from_bin(set: &d2_data::bin::BinSet) -> Result<Self, crate::skills::TablesError> {
         use crate::skills::TablesError;
+        use d2_data::tables::decode_all;
         let table = |n: &'static str| set.table(n).ok_or(TablesError::Missing(n));
         let mut b = Self::from_tables(table("itemstatcost")?, table("states")?, table("overlay")?)?;
         b.monlvl = d2_data::tables::decode_all(table("monlvl")?)?;
         b.pettype_count = i32::try_from(table("pettype")?.count).unwrap_or(i32::MAX);
+        b.pettype_group = decode_all::<d2_data::tables::Pettype>(table("pettype")?)?
+            .iter()
+            .map(|r| r.group as i16)
+            .collect();
         Ok(b)
     }
 
@@ -261,6 +268,7 @@ impl BodyTables {
             overlay_count: i32::try_from(overlay.count).unwrap_or(i32::MAX),
             monlvl: Vec::new(),
             pettype_count: 0,
+            pettype_group: Vec::new(),
             layer_split: isc.first().map(|r| layer_split(r.stuff)),
         })
     }
