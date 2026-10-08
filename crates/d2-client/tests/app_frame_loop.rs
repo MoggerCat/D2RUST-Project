@@ -219,8 +219,10 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // the join and its removal when the travel leaves the town.
     // Plus two for the Black Marsh tile (`q-a1-tower`): 32. Kashya's
     // three joined (two handled, her 0x6D queued) and the Burial Grounds
-    // tile's two (`q-a1-bloodraven`): 37, 3.
-    assert_eq!((b.log().handled, b.log().queued), (37, 3));
+    // tile's two (`q-a1-bloodraven`): 37, 3. Plus the two of Cold Plains's
+    // own warp tile, the waypoint's destination (`q-levels-warps-all`,
+    // d2rs-own): 39, 3.
+    assert_eq!((b.log().handled, b.log().queued), (39, 3));
     assert!(b.log().unowned.is_empty(), "{:?}", b.log().unowned);
     assert!(b.log().dropped.is_empty(), "{:?}", b.log().dropped);
     let sight: Vec<_> = b
@@ -229,6 +231,8 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         .iter()
         .map(|r| (r.show, r.level, r.x, r.y))
         .collect();
+    // Cold Plains's warp tile leads to level 5 (`q-levels-warps-all`,
+    // d2rs-own): its room joins the sight list like the Blood Moor's.
     assert_eq!(
         sight,
         [
@@ -237,6 +241,7 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
             (true, 2, 24, 0),
             (true, 3, 0, 0),
             (true, 3, 0, 0),
+            (true, 5, 8, 40),
             (false, 1, 16, 0),
             (false, 2, 24, 0)
         ]
@@ -251,7 +256,8 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
             // The local player: placeable, but the placeholder rules
             // (`world_view::Unspecified`) draw nothing for it.
             units_drawn: 0,
-            units_hidden: 1,
+            // Plus Cold Plains's warp tile (`q-levels-warps-all`).
+            units_hidden: 2,
             ui_sent: 0,
             ui_unhandled: 0,
             gpu: false,

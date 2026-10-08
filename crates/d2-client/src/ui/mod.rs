@@ -20,6 +20,7 @@ pub mod draw;
 pub mod edge;
 pub mod edit_box;
 pub mod frame;
+pub mod front_end;
 pub mod geom;
 pub mod gold;
 pub mod hire_list;
