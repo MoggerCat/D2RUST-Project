@@ -264,7 +264,7 @@ impl GroundItems {
         let mut log = self.ensure(world, assets);
         let camera = match (feed.player(world), feed.open_mode(world)) {
             (Ok(Some(p)), Ok(mode)) if mode.get() != NO_WORLD_MODE => {
-                Camera::new(FrameSize::D2RS, mode, p.client(), (0, 0))
+                Camera::new(FrameSize::play(), mode, p.client(), (0, 0))
             }
             (Err(e), _) | (_, Err(e)) => {
                 log.push(format!("ground items: no camera: {e}"));

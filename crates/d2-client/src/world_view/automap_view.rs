@@ -145,10 +145,10 @@ impl AutomapView {
             (u32::from(pos.0) << 16) | 0x8000,
             (u32::from(pos.1) << 16) | 0x8000,
         );
-        let cam = crate::rules::camera::Camera::new(FrameSize::D2RS, open_mode, at, (0, 0));
+        let cam = crate::rules::camera::Camera::new(FrameSize::play(), open_mode, at, (0, 0));
         let facts = FrameFacts {
-            width: FrameSize::D2RS.width,
-            height: FrameSize::D2RS.height,
+            width: FrameSize::play().width,
+            height: FrameSize::play().height,
             open_mode: open_mode.get(),
             mini_down: false,
             unit_origin: cam.unit,

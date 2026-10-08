@@ -393,7 +393,7 @@ fn camera_and_mode<F: ViewFeed + ?Sized>(
     let mode = feed.open_mode(world)?;
     let shake = frame_shake(world, feed)?;
     Ok(Some((
-        Camera::new(FrameSize::D2RS, mode, player.client(), shake),
+        Camera::new(FrameSize::play(), mode, player.client(), shake),
         mode,
     )))
 }

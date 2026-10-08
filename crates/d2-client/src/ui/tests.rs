@@ -267,6 +267,7 @@ fn draw_is_bottom_most_first() {
         .map(|d| match d {
             UiDraw::Image(i) => i.image.file,
             UiDraw::Text(_) => panic!("text"),
+            UiDraw::Rect(_) => panic!("rectangle"),
         })
         .collect();
     assert_eq!(files, vec![1, 2]);
@@ -555,7 +556,8 @@ fn widgets_emit_requests_and_hit_by_rect() {
             UiDraw::Image(ImageRequest {
                 image: img,
                 at: Point::new(1, 1),
-                clip: FRAME
+                clip: FRAME,
+                look: crate::ui::CelLook::PLAIN,
             }),
             UiDraw::Text(TextRequest {
                 text: vec![0x48, 0x69],
