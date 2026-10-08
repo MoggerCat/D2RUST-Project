@@ -2,7 +2,7 @@
 //! Character select on synthetic save folders, no game files.
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
 use d2_client::ui::front_end::screens::char_select::*;
@@ -236,15 +236,15 @@ fn labels() {
     assert_eq!(l.expansion, Some(22731));
 }
 
-fn front_end(dir: &PathBuf, expansion: bool) -> (FrontEnd, SelectionHandle) {
+fn front_end(dir: &Path, expansion: bool) -> (FrontEnd, SelectionHandle) {
     let handle = SelectionHandle::default();
     let mut reg = Registry::default();
     screens::register_all(&mut reg);
-    register_with(&mut reg, Some(dir.clone()), handle.clone());
+    register_with(&mut reg, Some(dir.to_path_buf()), handle.clone());
     let mut f = FrontEnd::new(
         expansion,
         Box::new(DirSaves {
-            dir: dir.clone(),
+            dir: dir.to_path_buf(),
             expansion,
         }),
         reg,
