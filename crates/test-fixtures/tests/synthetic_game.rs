@@ -1108,14 +1108,15 @@ fn a_full_save_loads_before_the_join_sequence() {
     let r = report.unwrap();
     assert!(!r.new_character);
     assert_eq!(r.act, 0);
-    // The steps without a provider are named, in order.
+    // The steps without a provider are named, in order. The waypoints step
+    // has one now (`ActionCharacter::set_waypoints`, `world/waypoints.md`
+    // §3: player data +0x1C), so it is applied and no longer listed.
     let steps: Vec<_> = r.unapplied.iter().map(|u| u.step).collect();
     assert_eq!(
         steps,
         [
             "header",
             "quests",
-            "waypoints",
             "npc fields",
             "item indices",
             "quest entry"
