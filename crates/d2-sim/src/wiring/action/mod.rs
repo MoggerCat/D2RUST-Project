@@ -34,6 +34,7 @@ pub mod objects;
 pub mod pending;
 pub mod reaction;
 pub mod rooms;
+pub mod state_update;
 pub mod switch;
 pub mod town_portal;
 pub mod unit_update;

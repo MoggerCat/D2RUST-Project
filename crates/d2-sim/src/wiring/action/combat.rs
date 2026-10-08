@@ -276,8 +276,12 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
     fn unit_event(&mut self, event: u8, unit: UnitId, other: UnitId, record: &mut DamageRecord) {
         self.fire_unit_event(event, Some(unit), Some(other), Some(record));
     }
+    /// Toggle `0x00625A70` then the update-queue insert `0x0064C040`
+    /// (as `0x00639DB0`, `ai.rs`), so the state-change message
+    /// ([`View::state_change_messages`]) goes out in the next client pass.
     fn set_state(&mut self, u: UnitId, state: u16, on: bool) {
         self.v.set_state(u, state, on);
+        let _ = self.game.lists.queue_update(u);
     }
     fn curse(
         &mut self,
