@@ -207,16 +207,18 @@ def read_sprites(path):
 
 def build(f, celfiles, compfiles, old_sprites):
     """(draw rows, merged sprite rows, conflicts) of one frame."""
-    lookup = {k: v[3:] for k, v in old_sprites.items()}
-    draws, merged, conflicts = [], dict(old_sprites), []
-    for i, d in enumerate(f["draws"]):
-        row, sprite = draw_row(i, d, celfiles, compfiles, lookup)
-        draws.append(row)
+    merged, conflicts = dict(old_sprites), []
+    for i, d in enumerate(f["draws"]):  # pass 1: this frame's measured cels join sprites.tsv
+        _, sprite = draw_row(i, d, celfiles, compfiles, {})
         if sprite:
             key = (sprite[0], int(sprite[1]), int(sprite[2]))
             old = merged.setdefault(key, sprite)
             if old != sprite:
                 conflicts.append(f"{key}: existing {old}, new {sprite}")
+    # pass 2 (§2 r3): every cel row takes its sprite's row, also a draw without its own
+    # header (e.g. CelDrawShadow, which does not reach the rasterizer of capture.md §3.5)
+    lookup = {k: v[3:] for k, v in merged.items()}
+    draws = [draw_row(i, d, celfiles, compfiles, lookup)[0] for i, d in enumerate(f["draws"])]
     return draws, sorted(merged.values(), key=sort_key), conflicts
 
 
@@ -251,6 +253,9 @@ def selftest():
              {"op": "CelDraw", "a": [320, 240, -1, 5, 0], "at": "0x4ff000",
               "cel": {"ctx": "0x20", "file": "0x4740000", "dir": 0, "frame": 0, "tokens": [None] * 5,
                       "hdr": {"flip": 0, "w": 30, "h": 27, "xoff": -1, "yoff": 24}}},
+             {"op": "CelDrawShadow", "a": [400, 292], "at": "0x4dbd00",
+              "cel": {"ctx": "0x10", "file": "0x0", "dir": 0, "frame": 0,
+                      "tokens": ["AM  ", "LG  ", "lit ", "TN  ", "1ht "]}},
              {"op": "CelDrawEx", "a": [29, 587, 0, 80, 5], "at": "0x4ff100",
               "cel": {"ctx": "0x30", "file": "0x4740000", "dir": 0, "frame": 1, "tokens": [None] * 5}},
          ]}
@@ -268,16 +273,18 @@ def selftest():
          "-13", "7", "5", "0xffffffff", "0", "-", "0x4dbc00"],
         ["4", "CelDraw", "data/global/ui/cursor/protate.dc6", "0", "0", "-", "320", "240", "30", "27", "-1",
          "24", "5", "0xffffffff", "0", "-", "0x4ff000"],
-        ["5", "CelDrawEx", "data/global/ui/cursor/protate.dc6", "0", "1", "-", "29", "587", "?", "?", "?", "?",
+        ["5", "CelDrawShadow", "data/global/chars/am/lg/amlglittn1ht.dcc", "0", "0", "-", "400", "292", "18",
+         "46", "-13", "7", "?", "?", "?", "-", "0x4dbd00"],
+        ["6", "CelDrawEx", "data/global/ui/cursor/protate.dc6", "0", "1", "-", "29", "587", "?", "?", "?", "?",
          "?", "?", "?", "-", "0x4ff100"],
     ]
     assert draws == want, "\n".join("\t".join(r) for r in draws)
     assert [s[0] for s in sprites] == ["data/global/chars/am/lg/amlglittn1ht.dcc",
                                        "data/global/ui/cursor/protate.dc6"], sprites
     fr = dict(frame_rows(f, draws, None))
-    assert (fr["player_x"], fr["level"], fr["draws"], fr["light_quality"]) == ("10320", "1", "6", "2"), fr
+    assert (fr["player_x"], fr["level"], fr["draws"], fr["light_quality"]) == ("10320", "1", "7", "2"), fr
     # M08: one changed source field changes exactly its cell
-    cases = [(lambda g: g["draws"][3]["cel"]["hdr"].__setitem__("yoff", 8), 3, "yoff"),
+    cases = [(lambda g: g["draws"][1]["tile"].__setitem__("rarity", 1), 1, "tile"),
              (lambda g: g["draws"][1]["tile"].__setitem__("index", 8), 1, "frame"),
              (lambda g: g["draws"][1]["tile"].__setitem__("sub", 3), 1, "tile"),
              (lambda g: g["draws"][4]["a"].__setitem__(3, 4), 4, "mode"),
@@ -289,6 +296,11 @@ def selftest():
         diff = [(i, DRAW_COLS[j]) for i in range(len(want)) for j in range(len(DRAW_COLS))
                 if d2[i][j] != want[i][j]]
         assert diff == [(row, col)], (row, col, diff)
+    # the measured header reaches every draw of that sprite (the shadow row too)
+    g = json.loads(json.dumps(f))
+    g["draws"][3]["cel"]["hdr"]["yoff"] = 8
+    d2, _, _ = build(g, celfiles, compfiles, {})
+    assert (d2[3][11], d2[5][11]) == ("8", "8") and d2[4] == want[4], (d2[3], d2[5])
     # a sprite seen twice with different headers is a conflict
     g = json.loads(json.dumps(f))
     g["draws"][4]["cel"]["hdr"]["w"] = 31

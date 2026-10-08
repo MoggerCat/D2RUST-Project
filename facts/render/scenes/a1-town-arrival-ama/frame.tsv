@@ -1,0 +1,22 @@
+# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py /tmp/claude-0/s1/frames.jsonl --scene a1-town-arrival-ama --frame 51 --out facts/render; game: 1.14d
+key	value
+seq	51
+tick	73
+w	800
+h	600
+act	0
+level	1
+player_x	10320
+player_y	72816
+tile_origin_x	9920
+tile_origin_y	72536
+unit_origin_x	9920
+unit_origin_y	72532
+open_mode	0
+shift_x	0
+light_quality	0
+rain	1
+snow	0
+draws	267
+index_sha256	8c62e71ad036a1c09a3dcf05bca88ce47011a95582922d92181b90cb2b4807f8
+palette_sha256	ba83219e51249002d7125a1a5a701d6abea94f04f44d6cfaa42becdfcff23337
