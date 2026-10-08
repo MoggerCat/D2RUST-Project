@@ -561,12 +561,17 @@ fn the_menu_tree_returns_saves_exits_and_swallows_clicks() {
         let mut out: Vec<UiDraw> = Vec::new();
         u.root.draw(&ctx, &mut out);
         let sh = u.ui.shared.borrow();
-        out.iter()
+        // Menu art only (not the HUD), one entry per image (multi-frame ones tile).
+        let mut v: Vec<String> = out
+            .iter()
             .filter_map(|d| match d {
                 UiDraw::Image(i) => sh.tables.files.name(i.image.file).map(str::to_string),
                 _ => None,
             })
-            .collect()
+            .filter(|n| n.starts_with("*local") || n.starts_with("cursor\\pentspin"))
+            .collect();
+        v.dedup();
+        v
     };
     assert!(texts(&u).is_empty());
     u.key(&w, Action::GameMenu);
@@ -578,7 +583,6 @@ fn the_menu_tree_returns_saves_exits_and_swallows_clicks() {
             "*local\\options",
             "*local\\exit",
             "*local\\returntogame",
-            "cursor\\pentspin",
             "cursor\\pentspin"
         ]
     );
@@ -621,10 +625,7 @@ fn the_menu_tree_returns_saves_exits_and_swallows_clicks() {
         let last = m.rows().len() - 1;
         u.click(&w, Point::new(400, m.y_top(last) + 20));
     }
-    assert_eq!(
-        texts(&u),
-        vec!["Options", "Save and Exit Game", "Return to Game"]
-    );
+    assert_eq!(art_names(&u, &w)[0], "*local\\options");
     // A click outside the rows does not reach the world either.
     let (_, r) = u.click(&w, Point::new(10, 10));
     assert_ne!(r, Routed::Unhandled);

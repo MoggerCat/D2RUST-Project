@@ -211,8 +211,8 @@ pub fn draw_pents(files: &UiFiles, m: &OptionsMenu, tick: u64, out: &mut dyn UiD
 
 #[cfg(test)]
 mod tests {
+    use super::super::options_menu::MenuId;
     use super::*;
-    use crate::ui::options_menu::MenuId;
 
     fn files() -> UiFiles {
         let mut f = UiFiles::new(&[]);
@@ -250,13 +250,15 @@ mod tests {
         // 160 / 434 / 356 px labels centred at 400 − 1 − w/2, baselines 224 / 274 / 324.
         assert_eq!(d[0], ("*local\\options".into(), 0, 319, 224));
         assert_eq!(d[1], ("*local\\exit".into(), 0, 182, 274));
-        assert_eq!(d[2], ("*local\\returntogame".into(), 0, 221, 324));
+        assert_eq!(d[2], ("*local\\exit".into(), 1, 438, 274));
+        assert_eq!(d[3], ("*local\\returntogame".into(), 0, 221, 324));
+        assert_eq!(d[4], ("*local\\returntogame".into(), 1, 477, 324));
         // Return to Game selected: pentagrams at (99, 336), (649, 336).
-        assert_eq!(d[3], ("cursor\\pentspin".into(), 0, 99, 336));
-        assert_eq!(d[4], ("cursor\\pentspin".into(), 0, 649, 336));
+        assert_eq!(d[5], ("cursor\\pentspin".into(), 0, 99, 336));
+        assert_eq!(d[6], ("cursor\\pentspin".into(), 0, 649, 336));
         // Later frame: the left one spins the other way.
         let d = draws(&f, &m, 6);
-        assert_eq!((d[3].1, d[4].1), (5, 3));
+        assert_eq!((d[5].1, d[6].1), (5, 3));
     }
 
     // d2rs-own, unverified: slider art against §O4 r2
