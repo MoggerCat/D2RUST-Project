@@ -168,6 +168,11 @@ pub struct Live {
     pub quests: Option<[[u8; 96]; 3]>,
     /// Items, skill levels and waypoints (q-save-full).
     pub extra: super::save_full::Extra,
+    /// The character is hardcore and the player is dying or dead
+    /// ([`super::hardcore`]): the save gets the dead bit.
+    pub hardcore_dead: bool,
+    /// The character is hardcore.
+    pub hardcore: bool,
 }
 
 /// Reads [`Live`] from the game's local player.
@@ -193,10 +198,21 @@ pub fn read_live(sim: &mut Sim) -> Result<Live, SaveError> {
         out
     });
     let extra = super::save_full::read_extra(sim, player);
+    let hardcore = sim.events.action.hooks().x.hardcore;
+    // Player modes 0 (DT) and 17 (DD).
+    let down = sim
+        .events
+        .action
+        .sys
+        .units
+        .get(player)
+        .is_some_and(|u| u.mode == 0 || u.mode == 17);
     Ok(Live {
         stats,
         quests,
         extra,
+        hardcore,
+        hardcore_dead: hardcore && down,
     })
 }
 
@@ -238,6 +254,10 @@ pub fn apply_live(base: &D2s, live: &Live, now: u32) -> D2s {
             save.header.level = level.min(99) as u8;
         }
     }
+    if live.hardcore {
+        save.header.status |= d2s::status::HARDCORE;
+    }
+    super::hardcore::mark_dead(&mut save, live.hardcore, live.hardcore_dead);
     if save.header.create_time == 0 {
         save.header.create_time = now;
     }
