@@ -7,19 +7,25 @@
 //! 0x4F 0x18, the item moves) leave through the root. The client decides
 //! nothing: the server transmutes.
 //!
-//! Preview fills (d2rs-own, unverified, REC-119): the transmute animation
-//! (§12.4) and the tool tips are not done. The cube-gone close runs once
-//! per pass ([`OriginalUi::cube_poll`]).
+//! The transmute animation (§12.4, [`HoradricAnim`]) runs on the frame
+//! tick and the open clears the close latch (`StashCubeInput::cube_opened`).
+//!
+//! Preview fills (d2rs-own, unverified, REC-267): the animation starts at
+//! the transmute button release (the spec gives the start routine
+//! `0x0048A540` but not its caller), the client frame counts 40 ms (the
+//! 25 Hz client, as `game_messages`) for the 70 ms wall-clock step, and the
+//! draw mode 3 of the cel is the sink's. The cube-gone close runs once per
+//! pass ([`OriginalUi::cube_poll`]).
 
 use super::{OriginalUi, OriginalUiError, SharedRef};
 use crate::bridge::items;
 use crate::bridge::world::ClientWorld;
-use crate::ui::draw::UiDrawSink;
+use crate::ui::draw::{ImageRef, ImageRequest, UiDraw, UiDrawSink};
 use crate::ui::geom::{Point, Rect};
 use crate::ui::panel::{Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
 use crate::ui::panels;
 use crate::ui::panels::cube_items::cube_present;
-use crate::ui::panels::stash_cube::{CubePanel, STR_TRANSMUTE, UI_CUBE};
+use crate::ui::panels::stash_cube::{horadric_pos, CubePanel, STR_TRANSMUTE, UI_CUBE};
 use crate::ui::panels::stash_input::{
     cube_close_hit, cube_tooltips, transmute_hit, Pointer, StashCubeInput,
 };
@@ -31,6 +37,15 @@ use crate::ui::PointerButton;
 /// `strClose` (`panels.md` §8 r1) and the tool tips' font.
 const STR_CLOSE: u16 = 4144;
 const TIP_FONT: u16 = 1;
+
+/// `menu\horadric` (31 frames), registered with the panel files.
+const HORADRIC_FILE: &str = "menu\\horadric";
+/// Milliseconds per client frame (d2rs-own, unverified; see the module).
+const FRAME_MS: u64 = 40;
+
+pub(super) fn cube_files() -> [String; 1] {
+    [HORADRIC_FILE.to_string()]
+}
 
 /// The cube adapter (ui 0x1A, left half above the control panel).
 pub(super) struct CubeUi {
@@ -65,8 +80,24 @@ impl Panel for CubeUi {
         {
             return;
         }
-        let g = sh.items.cube_grid(&sh.config.screen);
-        sh.items.draw_cube(ctx.world, &sh.tables.files, &g, out);
+        // §12.4: step on the (wrapping, 32-bit) millisecond tick, draw the
+        // cel, and hold the grid back for the first 14 steps.
+        let mut anim = sh.cube_anim.get();
+        anim.step((ctx.tick.wrapping_mul(FRAME_MS)) as u32);
+        sh.cube_anim.set(anim);
+        if let (Some(n), Some(file)) = (anim.frame(), sh.tables.files.id(HORADRIC_FILE)) {
+            let (x, y) = horadric_pos(&sh.config.screen);
+            let s = sh.config.screen;
+            out.push(UiDraw::Image(ImageRequest {
+                image: ImageRef { file, frame: n },
+                at: Point::new(x, y),
+                clip: Rect::new(0, 0, s.w as u16, s.h as u16),
+            }));
+        }
+        if anim.grid_visible() {
+            let g = sh.items.cube_grid(&sh.config.screen);
+            sh.items.draw_cube(ctx.world, &sh.tables.files, &g, out);
+        }
         // The button tool tips (§12 r5, `panels-2.md` §20 r3): the strict
         // button rectangles, `strClose` / `strUiMenu2` "Transmute". Drawn
         // when the string table is loaded (font 1, d2rs-own, unverified).
@@ -108,7 +139,11 @@ impl Panel for CubeUi {
             _ => return UiResponse::Ignored,
         };
         let mut sh = self.sh.borrow_mut();
+        if std::mem::take(&mut sh.cube_opened) {
+            self.input.cube_opened();
+        }
         let s = sh.config.screen;
+        let was_transmute = self.input.transmute_pressed;
         let ptr = Pointer {
             at,
             in_inv_close: false,
@@ -121,6 +156,19 @@ impl Panel for CubeUi {
         };
         if eff.sound4 {
             sh.outputs.push(PanelOutput::ClickSound);
+        }
+        // §12.4 start (flag, n := 0, stamp := now); the close clears it (§12 r7).
+        if !down && was_transmute && !self.input.transmute_pressed {
+            let mut a = sh.cube_anim.get();
+            a.start((ctx.tick.wrapping_mul(FRAME_MS)) as u32);
+            sh.cube_anim.set(a);
+        }
+        if eff
+            .outputs
+            .iter()
+            .any(|o| matches!(o, PanelOutput::SetUi { .. }))
+        {
+            sh.cube_anim.set(Default::default());
         }
         sh.outputs.extend(eff.outputs);
         if eff.consumed {

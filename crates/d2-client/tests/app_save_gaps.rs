@@ -4,7 +4,10 @@
 //! written file field by field. d2rs-own, unverified (REC-241).
 
 use d2_client::app::save_gaps::{apply_gaps, mouse_slots, select_mouse, Gaps};
-use d2_formats::d2s::{self, Body, D2s, Golem, Header, ItemEntry, ReadOptions, Slot, StatSave};
+use d2_formats::d2s::{
+    self, Body, D2s, Golem, Header, Hireling, ItemEntry, ReadOptions, Slot, StatSave,
+};
+use d2_server::adapters::handlers::world::HirelingBlock;
 use d2_sim::skills::list::{ListEntry, SkillList};
 
 /// 32-bit stats; every item entry is 3 bytes.
@@ -73,6 +76,21 @@ fn gaps_round_trip_through_a_written_file() {
         town: Some((1, 3)),
         hireling_items: Some(vec![item(1), item(2)]),
         golem: Some(Some(item(7))),
+        swap: Some((
+            [
+                Slot::encode(40, true, 0).unwrap(),
+                Slot::encode(43, false, 1).unwrap(),
+            ],
+            true,
+        )),
+        hireling: Some(HirelingBlock {
+            dead: true,
+            seed: 0xAB12,
+            name_index: 5,
+            id: 3,
+            experience: 1234,
+        }),
+        status: Some(0x0520),
     };
     let mut save = base();
     apply_gaps(&mut save, &gaps);
@@ -85,16 +103,16 @@ fn gaps_round_trip_through_a_written_file() {
     let h = &back.header;
     assert_eq!(h.mouse[0], gaps.mouse.unwrap()[0]);
     assert_eq!(h.mouse[1], gaps.mouse.unwrap()[1]);
+    let swap = gaps.swap.unwrap().0;
+    assert_eq!((h.mouse[2], h.mouse[3]), (swap[0], swap[1]));
+    assert_eq!(h.weapon_switch, 1);
     assert_eq!(
-        h.mouse[2],
-        base().header.mouse[2],
-        "swap left passes through"
+        (h.hireling.flags, h.hireling.seed, h.hireling.name_index),
+        (Hireling::DEAD, 0xAB12, 5)
     );
-    assert_eq!(
-        h.mouse[3],
-        base().header.mouse[3],
-        "swap right passes through"
-    );
+    assert_eq!((h.hireling.id, h.hireling.experience), (3, 1234));
+    assert_eq!(d2s::status::progression(h.status), 5);
+    assert!(h.status & d2s::status::EXPANSION != 0);
     // Nightmare's byte: act 3 | 0x80; the others are zero (§2.1).
     assert_eq!(h.towns, [0, 0x83, 0]);
     let b = back.body.unwrap();
@@ -212,4 +230,44 @@ fn hireling_items_need_a_hireling_block() {
         },
     );
     assert_eq!(save.body.unwrap().hireling_items, Some(None));
+}
+
+/// The progression is never lowered (`quests-act1-rest.md` §5): flags
+/// with a lower progression leave the loaded bits.
+#[test]
+fn progression_is_never_lowered() {
+    let mut save = base();
+    save.header.status |= 7 << 8;
+    apply_gaps(
+        &mut save,
+        &Gaps {
+            status: Some(0x0120),
+            ..Gaps::default()
+        },
+    );
+    assert_eq!(d2s::status::progression(save.header.status), 7);
+}
+
+/// The swap pair of a list encodes with its owner item and the weapon
+/// switch trades the pairs.
+#[test]
+fn weapon_switch_trades_the_mouse_pairs() {
+    let mut list = SkillList {
+        entries: vec![entry(36, -1), entry(37, -1), entry(38, 500)],
+        left: Some(0),
+        right: Some(1),
+        swap_left: Some(1),
+        swap_right: Some(2),
+        ..SkillList::default()
+    };
+    list.switch_weapons();
+    assert!(list.weapon_switch);
+    assert_eq!((list.left, list.right), (Some(1), Some(2)));
+    assert_eq!((list.swap_left, list.swap_right), (Some(0), Some(1)));
+    let swap = d2_client::app::save_gaps::swap_slots(&list, &[500]);
+    assert_eq!(swap[0], Slot::encode(36, true, 0).unwrap());
+    assert_eq!(swap[1], Slot::encode(37, false, 0).unwrap());
+    list.switch_weapons();
+    assert!(!list.weapon_switch);
+    assert_eq!(list.left, Some(0));
 }

@@ -239,6 +239,11 @@ struct Shared {
     messages: game_messages::GameMessages,
     /// The overhead text bubbles ([`overhead_ui`]).
     bubbles: overhead_ui::Bubbles,
+    /// S→C 0x77 0x15 opened the cube since the panel last looked: its
+    /// close latch clears (`0x0048A460`, [`cube_ui`]).
+    cube_opened: bool,
+    /// The transmute animation (`panels.md` §12 r4, [`cube_ui`]).
+    cube_anim: std::cell::Cell<super::panels::stash_cube::HoradricAnim>,
 }
 
 impl Shared {
@@ -344,6 +349,7 @@ impl OriginalUi {
         tables.files.extend(hud::hud_files());
         tables.files.extend(esc_art::esc_files());
         tables.files.extend(quest_log_ui::quest_files());
+        tables.files.extend(cube_ui::cube_files());
         let shared = Shared {
             tables,
             states: UiStates::new()?,
@@ -367,6 +373,8 @@ impl OriginalUi {
             gold: gold_dialog::GoldState::default(),
             messages: Default::default(),
             bubbles: Default::default(),
+            cube_opened: false,
+            cube_anim: Default::default(),
         };
         Ok(Self {
             shared: Rc::new(RefCell::new(shared)),

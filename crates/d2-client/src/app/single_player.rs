@@ -831,6 +831,9 @@ impl Pending for LocalSeams {
     fn monster_sequence_frame(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
         skill_events::monster_sequence_frame(h, sim, unit);
     }
+    fn golem_resummon(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, player: UnitId) -> bool {
+        skill_events::golem_resummon(h, sim, player)
+    }
     // d2rs-own, unverified (q-amazon, REC-150): the hand class, the item
     // shoots / stack facts of the skill bodies ([`super::weapons`]).
     fn composit_weapon_class(&self, unit: UnitId) -> i32 {
@@ -1043,21 +1046,11 @@ impl LevelTypes for Types {
             if id == BLOOD_MOOR {
                 drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0 << 1;
             }
-            // The Black Marsh pair: Blood Moor slot 2 ↔ Black Marsh slot 0;
-            // Black Marsh slot 1 ↔ the Tower (q-a1-tower).
-            if id == BLOOD_MOOR {
-                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0 << 2;
-            }
+            // Black Marsh slot 1 ↔ the Tower (q-a1-tower); its way back
+            // (slot 0) and the Burial Grounds' come from the Act I tree
+            // below (q-a1-vis-links).
             if id == synthetic_tower::BLACK_MARSH {
-                drlg.room_mut(r).flags |=
-                    d2_sim::drlg::room_flags::WARP_0 | (d2_sim::drlg::room_flags::WARP_0 << 1);
-            }
-            // The Burial Grounds pair: Blood Moor slot 3 ↔ slot 0 there.
-            if id == BLOOD_MOOR {
-                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0 << 3;
-            }
-            if id == synthetic_burial::BURIAL_GROUNDS {
-                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
+                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0 << 1;
             }
             // The Act IV line (q-a4): slot 0 back, slot 1 on.
             if let Some((back, on)) = synthetic_act4::links(id) {
@@ -1095,25 +1088,15 @@ impl LevelTypes for Types {
         };
         let id = drlg.level(drlg.room(room).level).id;
         let mut v = match id {
-            t::BLACK_MARSH => vec![
-                tile(t::MARSH_TO_BLOOD_MOOR, t::MARSH_BACK_XY),
-                tile(t::MARSH_TO_TOWER, t::MARSH_TOWER_XY),
-            ],
-            BLOOD_MOOR => vec![
-                tile(BLOOD_MOOR_TO_DEN, WARP_TILE_XY),
-                tile(t::BLOOD_MOOR_TO_MARSH, t::MOOR_MARSH_XY),
-                tile(b::BLOOD_MOOR_TO_BURIAL, b::MOOR_BURIAL_XY),
-            ],
+            t::BLACK_MARSH => vec![tile(t::MARSH_TO_TOWER, t::MARSH_TOWER_XY)],
+            BLOOD_MOOR => vec![tile(BLOOD_MOOR_TO_DEN, WARP_TILE_XY)],
             // Blood Raven, placed by the host (REC-130).
-            b::BURIAL_GROUNDS => vec![
-                PresetUnit {
-                    unit_type: HOST_MONSTER_PRESET,
-                    class: b::BLOOD_RAVEN,
-                    x: b::RAVEN_XY,
-                    y: b::RAVEN_XY,
-                },
-                tile(b::BURIAL_TO_BLOOD_MOOR, b::BACK_XY),
-            ],
+            b::BURIAL_GROUNDS => vec![PresetUnit {
+                unit_type: HOST_MONSTER_PRESET,
+                class: b::BLOOD_RAVEN,
+                x: b::RAVEN_XY,
+                y: b::RAVEN_XY,
+            }],
             id if synthetic_act4::index(id).is_some() => {
                 use synthetic_act4 as a;
                 let (back, on) = a::links(id).unwrap_or((None, None));
@@ -1709,10 +1692,6 @@ fn synthetic_drlg_data() -> DrlgData {
     {
         use synthetic_tower as t;
         let l = &mut drlg.levels;
-        l[BLOOD_MOOR as usize].vis[2] = t::BLACK_MARSH;
-        l[BLOOD_MOOR as usize].warp[2] = t::BLOOD_MOOR_TO_MARSH as i32;
-        l[t::BLACK_MARSH as usize].vis[0] = BLOOD_MOOR;
-        l[t::BLACK_MARSH as usize].warp[0] = t::MARSH_TO_BLOOD_MOOR as i32;
         l[t::BLACK_MARSH as usize].vis[1] = t::TOWER_LEVELS[0];
         l[t::BLACK_MARSH as usize].warp[1] = t::MARSH_TO_TOWER as i32;
         for (i, &id) in t::TOWER_LEVELS.iter().enumerate() {
@@ -1734,15 +1713,8 @@ fn synthetic_drlg_data() -> DrlgData {
             }
         }
     }
-    // The Burial Grounds (q-a1-bloodraven): Blood Moor slot 3 ↔ slot 0.
-    {
-        use synthetic_burial as b;
-        let l = &mut drlg.levels;
-        l[BLOOD_MOOR as usize].vis[3] = b::BURIAL_GROUNDS;
-        l[BLOOD_MOOR as usize].warp[3] = b::BLOOD_MOOR_TO_BURIAL as i32;
-        l[b::BURIAL_GROUNDS as usize].vis[0] = BLOOD_MOOR;
-        l[b::BURIAL_GROUNDS as usize].warp[0] = b::BURIAL_TO_BLOOD_MOOR as i32;
-    }
+    // The Burial Grounds hang off Cold Plains in the Act I tree
+    // (q-a1-vis-links; q-a1-bloodraven put them off the Blood Moor).
     // The Act IV line (q-a4): level i slot 1 ↔ level i + 1 slot 0.
     {
         use synthetic_act4 as a;
@@ -2997,6 +2969,7 @@ fn loader(
                 // are the join's item messages (rule 3.5), sent after the
                 // stat messages.
                 let (entry, report, items) = load_new_character_with_items(s, player, r.char_name);
+                super::save_gaps::seed_new_flags(s, player, GAME_SETUP.expansion);
                 let own: Vec<Vec<u8>> = items
                     .sent
                     .iter()
