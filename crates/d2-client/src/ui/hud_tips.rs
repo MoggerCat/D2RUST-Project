@@ -30,6 +30,9 @@ pub struct TipIn<'a> {
     pub state9_open: bool,
     pub exp: ExpIn,
     pub strings: &'a dyn StringLookup,
+    /// The tip font's measure (the pop-up placement, `control-panel.md`
+    /// §5 r14); `None`: the tips are drawn at their call point.
+    pub fonts: Option<&'a super::FontMeasure>,
 }
 
 /// The tips under the mouse, in the order run, menu, new stats, new
@@ -69,6 +72,42 @@ pub struct GlobeTextIn<'a> {
     pub strings: &'a dyn StringLookup,
     /// Width A of a string in the tip font; none without the font.
     pub width_a: &'a dyn Fn(&[u16]) -> i32,
+    /// As [`TipIn::fonts`].
+    pub fonts: Option<&'a super::FontMeasure>,
+}
+
+/// A tip (`0x00502280(text, x, y, k, centre)`) as the text call of its
+/// pop-up draw `0x00503000` (`control-panel.md` §5 r14): centred in a
+/// block of max width + 8 whose centre is x (centre 1), bottom y + 2,
+/// text at the bottom − 3 for Font16. Without the font's measure the
+/// call point is used as is. The backing box (colour 0, mode 2) is not
+/// drawn: the UI draw list has no rectangle primitive.
+fn tip_request(t: Tip, w: i32, h: i32, fonts: Option<&super::FontMeasure>) -> TextRequest {
+    let style = TextStyle {
+        font: TIP_FONT,
+        color: u16::from(t.color),
+    };
+    let at = Point::new(t.x, t.y);
+    if let Some(fr) = fonts.and_then(|f| f.popup(TIP_FONT, &t.text, at, t.centered, (w, h))) {
+        return TextRequest {
+            text: t.text,
+            at: fr.pen,
+            style,
+            opts: fr.opts,
+            clip: FRAME,
+        };
+    }
+    TextRequest {
+        text: t.text,
+        at,
+        style,
+        opts: if t.centered {
+            TextOpts::centered()
+        } else {
+            TextOpts::default()
+        },
+        clip: FRAME,
+    }
 }
 
 /// Pushes the life / mana numbers (§3 r6) and the stamina tip (§4 r2).
@@ -98,13 +137,7 @@ pub fn draw_globe_text(i: &GlobeTextIn<'_>, out: &mut dyn UiDrawSink) {
     let st = &i.stamina;
     if let Some(t) = stamina_tip(st.shown, st.max, st.shrine, i.w, i.h, i.numbers.mouse, &s) {
         if !t.text.is_empty() {
-            out.push(UiDraw::Text(TextRequest {
-                text: t.text,
-                at: Point::new(t.x, t.y),
-                style: style(u16::from(t.color)),
-                opts: TextOpts::centered(),
-                clip: FRAME,
-            }));
+            out.push(UiDraw::Text(tip_request(t, i.w, i.h, i.fonts)));
         }
     }
 }
@@ -112,20 +145,7 @@ pub fn draw_globe_text(i: &GlobeTextIn<'_>, out: &mut dyn UiDrawSink) {
 /// Pushes the tips as text draws.
 pub fn draw_tips(i: &TipIn<'_>, out: &mut dyn UiDrawSink) {
     for t in hud_tips(i) {
-        out.push(UiDraw::Text(TextRequest {
-            text: t.text,
-            at: Point::new(t.x, t.y),
-            style: TextStyle {
-                font: TIP_FONT,
-                color: u16::from(t.color),
-            },
-            opts: if t.centered {
-                TextOpts::centered()
-            } else {
-                TextOpts::default()
-            },
-            clip: FRAME,
-        }));
+        out.push(UiDraw::Text(tip_request(t, i.w, i.h, i.fonts)));
     }
 }
 
@@ -166,6 +186,7 @@ mod tests {
             state9_open: false,
             exp: ExpIn::default(),
             strings,
+            fonts: None,
         })
         .iter()
         .map(|t| String::from_utf16_lossy(&t.text))
@@ -190,6 +211,7 @@ mod tests {
                 state9_open: false,
                 exp: ExpIn::default(),
                 strings: &s,
+                fonts: None,
             },
             &mut out,
         );
@@ -210,6 +232,14 @@ mod tests {
     }
 
     fn globe_text(mouse: (i32, i32), show_hp: bool) -> Vec<(String, i32, i32, u16)> {
+        globe_text_in(mouse, show_hp, None)
+    }
+
+    fn globe_text_in(
+        mouse: (i32, i32),
+        show_hp: bool,
+        fonts: Option<&crate::ui::original::FontMeasure>,
+    ) -> Vec<(String, i32, i32, u16)> {
         let s = globe_strs();
         let mut out: Vec<UiDraw> = Vec::new();
         draw_globe_text(
@@ -233,6 +263,7 @@ mod tests {
                 },
                 strings: &s,
                 width_a: &|t| 6 * t.len() as i32,
+                fonts,
             },
             &mut out,
         );
@@ -272,6 +303,43 @@ mod tests {
         assert_eq!(
             globe_text((300, 580), false),
             [("Stamina: 20 / 25".to_string(), 324, 548, 0)]
+        );
+    }
+
+    // Covers: specs/ui/control-panel.md §4 r2, §5 r14
+    #[test]
+    fn the_stamina_tip_is_a_popup_centred_on_its_point() {
+        use d2_formats::font::{FontTable, Glyph};
+        // Font16 stand-in: every advance 6, height byte 10.
+        let glyphs = (0..256u16)
+            .map(|i| Glyph {
+                code: i,
+                unknown1: 0,
+                width: 6,
+                height: 10,
+                unknown2: 1,
+                unknown3: 0,
+                frame: i,
+                unknown5: 0,
+            })
+            .collect();
+        let mut m = crate::ui::original::FontMeasure::default();
+        m.insert(
+            TIP_FONT,
+            FontTable {
+                version: 1,
+                unknown: 0,
+                count: 256,
+                height: 10,
+                width: 0,
+                glyphs,
+            },
+        );
+        // 16 units, max width 96, W = 104: the block starts at 324 − 52;
+        // bottom 548 + 2, text row 550 − 3.
+        assert_eq!(
+            globe_text_in((300, 580), false, Some(&m)),
+            [("Stamina: 20 / 25".to_string(), 272, 547, 0)]
         );
     }
 

@@ -58,7 +58,10 @@ mod tests_c2ui;
 #[cfg(test)]
 mod tests_fdesc;
 
-pub use draw::{ImageRef, ImageRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
+pub use draw::{
+    CelLook, ImageRef, ImageRequest, RectRequest, Remap, TextRequest, TextStyle, UiDraw,
+    UiDrawSink, DRAW_MODE_OPAQUE,
+};
 pub use frame::{FrameError, FramePos, Presentation};
 pub use geom::{Point, Rect, FRAME, FRAME_H, FRAME_W};
 pub use panel::{

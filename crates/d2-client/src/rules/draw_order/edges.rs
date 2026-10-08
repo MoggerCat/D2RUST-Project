@@ -5,9 +5,10 @@
 //! (`0x004DDE80`, `draw-order.md` §6 r2, r6).
 //!
 //! The strips and their tests are computed here. The drawn tile is the
-//! act's edge record (act `+0x18`), whose DT1 tile is open question 2 of
-//! the spec: the caller supplies it, and a strip that needs it without
-//! one is an error naming the question.
+//! act's edge record (act `+0x18`, open question 2 answered: the first
+//! tile of a fixed key in the act's base library, acts I–III); the caller
+//! supplies it, and a strip that needs it in an act without one (IV, V:
+//! a zero record) is an error.
 
 use super::{OrderKey, TileRecord, REC_DRAWN, REC_SKIP};
 use crate::scene::order::pass;
@@ -28,9 +29,12 @@ pub const STRIP_LEN: usize = 3;
 /// Errors of the edge floors.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum EdgeError {
-    /// A strip draws, and the act's edge record (its DT1 tile) is not
-    /// known (§14, open question 2).
-    #[error("TODO(spec: {SPEC} open question 2): the act edge record (act +0x18) is not known")]
+    /// A strip draws in an act whose edge record holds no tile (acts IV
+    /// and V keep it zero; open question 2 says no more of its draw).
+    #[error(
+        "TODO(spec: {SPEC} open question 2): a strip draws the act edge record (act +0x18), \
+         which holds no tile in acts IV and V"
+    )]
     NoEdgeRecord,
     /// The strip tests read the extents before any floor was drawn; §14
     /// does not say what `0x004DDE80`'s extents hold then.

@@ -521,3 +521,19 @@ fn nudge_table() {
     assert_eq!(nudge((10, 10), 16), (8, 10));
     assert_eq!(nudge((10, 10), 63), (11, 11));
 }
+
+// The input reset `0x0044DA40`: left and right held := 0, so the next
+// pass runs no held repeat.
+// Covers: specs/client/msg-ui.md §2 r2
+#[test]
+fn input_reset_clears_both_held_buttons() {
+    let mut st = ClickState {
+        left_held: true,
+        right_held: true,
+        latch: true,
+        ..ClickState::default()
+    };
+    st.input_reset();
+    assert!(!st.left_held && !st.right_held);
+    assert!(st.latch, "the per-pass latch is not the reset's");
+}

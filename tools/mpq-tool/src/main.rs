@@ -4,11 +4,15 @@
 //!   mpq-tool info    <archive.mpq>
 //!   mpq-tool list    <archive.mpq>
 //!   mpq-tool extract <archive.mpq> <pattern> [out_dir]
+//!   mpq-tool extract-names <archive.mpq> <names.txt> <out_dir>
 //!   mpq-tool check   [game_dir]
 //!   mpq-tool formats [game_dir]
 //!   mpq-tool render  <name> [palette] [out.png]
 //!
 //! `pattern` is case-insensitive with `*` wildcards, e.g. `data\global\excel\*.txt`.
+//! `extract-names` extracts the names listed one per line (for archives
+//! whose `(listfile)` is missing or partial); names not in the archive are
+//! skipped and counted.
 //! Extracted files default to `game/extracted/<archive>/` (gitignored).
 //! `check` decodes every block of every archive in `game_dir` (default
 //! $D2_GAME_DIR) and prints a survey of flags and compression masks.
@@ -38,6 +42,9 @@ fn main() -> Result<()> {
         Some("list") if args.len() == 2 => list(&args[1]),
         Some("extract") if (3..=4).contains(&args.len()) => {
             extract(&args[1], &args[2], args.get(3).map(PathBuf::from))
+        }
+        Some("extract-names") if args.len() == 4 => {
+            extract_names(&args[1], &args[2], Path::new(&args[3]))
         }
         Some("check") if args.len() <= 2 => check(&game_dir(args.get(1))?),
         Some("formats") if args.len() <= 2 => formats::run(&game_dir(args.get(1))?),
@@ -147,8 +154,40 @@ fn extract(path: &str, pattern: &str, out: Option<PathBuf>) -> Result<()> {
         .unwrap_or_default();
     let out = out.unwrap_or_else(|| PathBuf::from("game/extracted").join(stem));
     let names = a.listfile()?.context("archive has no (listfile)")?;
-    let mut count = 0;
-    for name in names.iter().filter(|n| wildcard(pattern, n)) {
+    let names: Vec<String> = names
+        .iter()
+        .filter(|n| wildcard(pattern, n))
+        .map(|n| n.to_string())
+        .collect();
+    let (count, _) = write_names(&a, &names, &out, true)?;
+    println!("extracted {count} files to {}", out.display());
+    Ok(())
+}
+
+fn extract_names(path: &str, list: &str, out: &Path) -> Result<()> {
+    let a = open(path)?;
+    let text = std::fs::read_to_string(list).with_context(|| format!("reading {list}"))?;
+    let mut names: Vec<String> = text
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .map(String::from)
+        .collect();
+    names.sort_by_key(|n| n.to_ascii_lowercase());
+    names.dedup_by_key(|n| n.to_ascii_lowercase());
+    let (count, missing) = write_names(&a, &names, out, false)?;
+    println!(
+        "extracted {count} files to {} ({missing} listed names not in the archive)",
+        out.display()
+    );
+    Ok(())
+}
+
+/// Writes each name under `out`; returns (written, unreadable). Read errors
+/// are printed when `report` is set (names from the archive's own listfile).
+fn write_names(a: &Archive, names: &[String], out: &Path, report: bool) -> Result<(usize, usize)> {
+    let (mut count, mut missing) = (0, 0);
+    for name in names {
         let Some(rel) = safe_relative(name) else {
             eprintln!("skipping unsafe name: {name}");
             continue;
@@ -156,7 +195,10 @@ fn extract(path: &str, pattern: &str, out: Option<PathBuf>) -> Result<()> {
         let bytes = match a.read(name) {
             Ok(b) => b,
             Err(e) => {
-                eprintln!("{name}: {e}");
+                if report {
+                    eprintln!("{name}: {e}");
+                }
+                missing += 1;
                 continue;
             }
         };
@@ -167,8 +209,7 @@ fn extract(path: &str, pattern: &str, out: Option<PathBuf>) -> Result<()> {
         std::fs::write(&dest, bytes)?;
         count += 1;
     }
-    println!("extracted {count} files to {}", out.display());
-    Ok(())
+    Ok((count, missing))
 }
 
 #[derive(Default)]

@@ -3,9 +3,9 @@
 //! (resolution, window mode) and `controls.toml` (key bindings, §A6). The
 //! Esc menu's Options entry reads and writes them.
 //!
-//! PROVISIONAL (REC-172): the original's default key table has no
-//! `Preset::Original` data in the tree yet, so a missing `controls.toml`
-//! is written from the `dev` preset. The window mode row and the
+//! A missing `controls.toml` is written from the `original` preset
+//! (`ui/controls.md` §3, §B4); the `dev` preset applies only when a file
+//! names it. The window mode row and the
 //! `[video] window_mode` key are d2rs-own (the 1.14d menu has none).
 // d2rs-own, unverified
 
@@ -309,13 +309,14 @@ pub fn save_settings(dir: &Path, s: &Settings) -> Result<(), ConfigError> {
 }
 
 /// Load `controls.toml` from `dir`; a missing file is created from the
-/// `dev` preset (PROVISIONAL, REC-172) and returned.
+/// `original` preset (`client/ui.md` §A6, `ui/controls.md` §B4) and
+/// returned. The `dev` preset is used only when a file names it.
 pub fn load_controls(dir: &Path) -> anyhow::Result<Bindings> {
     let path = controls_path(dir);
     if !path.exists() {
-        let preset = Preset::Dev;
-        let bindings = preset.bindings().expect("dev preset");
-        let file = ControlsFile::from_effective(preset, &bindings).expect("dev preset");
+        let preset = Preset::Original;
+        let bindings = preset.bindings().expect("original preset");
+        let file = ControlsFile::from_effective(preset, &bindings).expect("original preset");
         write_atomic(&path, &controls::write(&file))?;
         return Ok(bindings);
     }
@@ -346,9 +347,21 @@ impl WindowMode {
     }
 }
 
+/// The window size of the play frame: 640 × 480 when `play --res 640x480`
+/// chose that frame (`rules::camera::FrameSize::play`), else the
+/// settings' [`Settings::window_size`].
+pub fn play_window_size(s: &Settings) -> (u32, u32) {
+    use crate::rules::camera::FrameSize;
+    if FrameSize::play() == FrameSize::LOW {
+        (FrameSize::LOW.width as u32, FrameSize::LOW.height as u32)
+    } else {
+        s.window_size()
+    }
+}
+
 /// The primary window the settings ask for (before the app starts).
 pub fn window_for(s: &Settings) -> bevy::window::Window {
-    let (w, h) = s.window_size();
+    let (w, h) = play_window_size(s);
     bevy::window::Window {
         title: "d2rs".into(),
         resolution: bevy::window::WindowResolution::new(w, h),
@@ -393,7 +406,7 @@ pub fn apply_settings(
     }
     for mut w in &mut windows {
         w.mode = new.window_mode.bevy();
-        let (width, height) = new.window_size();
+        let (width, height) = play_window_size(&new);
         w.resolution.set(width as f32, height as f32);
     }
 }

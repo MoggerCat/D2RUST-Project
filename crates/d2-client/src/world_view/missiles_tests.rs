@@ -63,6 +63,7 @@ fn rows() -> EffectRows {
                 loop_anim: true,
                 offset: (0, 0, 0),
                 explosion: 2,
+                trans: 1,
             },
             MissileRow {
                 cel_file: "boom".into(),
@@ -78,6 +79,8 @@ fn rows() -> EffectRows {
                 frames: 2,
                 anim_rate: 256,
                 offset: (0, 0),
+                trans: 3,
+                pre_draw: false,
             },
         ],
         ..EffectRows::default()
@@ -94,10 +97,15 @@ fn source() -> Arc<dyn FileSource> {
     Arc::new(src)
 }
 
+/// View assets with the act's shade tables (`blend-modes.md` §4 draws
+/// through them).
 fn assets() -> ViewAssets {
-    ViewAssets::new(Palette {
+    let mut a = ViewAssets::new(Palette {
         colors: [Rgb::default(); 256],
-    })
+    });
+    let pl2 = d2_formats::palette::Pl2::parse(&super::super::tile_assets::tests::pl2()).unwrap();
+    a.shades = Some(crate::rules::shading::ShadeTables::push(&mut a.maps, &pl2));
+    a
 }
 
 fn world() -> ClientWorld {
@@ -239,4 +247,156 @@ fn a_missing_art_file_is_logged_once_and_not_drawn() {
     assert!(m
         .add_to_frame(&w, &feed, &mut a, &mut WorldFrame::default())
         .is_empty());
+}
+
+// Covers: specs/render/blend-modes.md §4
+#[test]
+fn missiles_and_overlays_draw_in_their_trans_mode() {
+    let mut w = world();
+    let mut r = Run::new();
+    let t = r.a.shades.unwrap();
+    r.frame(&mut w, 10);
+    cast(&mut w, FIRE_BOLT as i32, (130, 100));
+    r.frame(&mut w, 11);
+    let ops = |m: &Missiles| -> Vec<(ShadeChain, BlendOp)> {
+        m.last()
+            .iter()
+            .map(|d| (d.item.shade, d.item.blend))
+            .collect()
+    };
+    // Cast overlay `Trans` 3 (the overlay's mode as is) and missile
+    // `Trans` 1 → mode 3: both additive, unlit, no remap.
+    let add = cel_ops(&t, 3, None, 0xFF);
+    assert_eq!(ops(&r.m), vec![add, add]);
+    assert_ne!(add.1, BlendOp::Opaque);
+    // Missile `Trans` 2 → mode 4, anything else → 5 (opaque).
+    assert_eq!(missile_mode(2, false), 4);
+    assert_eq!(missile_mode(0, false), MODE_OPAQUE);
+    let mut rows = rows();
+    rows.missiles[1].trans = 2;
+    rows.overlays[1].trans = 5;
+    let mut r = Run::new();
+    r.m = Missiles::new(source(), rows);
+    let mut w = world();
+    r.frame(&mut w, 10);
+    cast(&mut w, FIRE_BOLT as i32, (130, 100));
+    r.frame(&mut w, 11);
+    assert_eq!(
+        ops(&r.m),
+        vec![cel_ops(&t, 5, None, 0xFF), cel_ops(&t, 4, None, 0xFF)]
+    );
+    assert_eq!(ops(&r.m)[0], (ShadeChain::EMPTY, BlendOp::Opaque));
+}
+
+// Covers: specs/render/draw-order.md §3 r4; specs/render/unit-composite.md §5 r4
+#[test]
+fn missiles_join_their_cell_and_overlays_their_host() {
+    use crate::rules::camera::{moving_to_client, OpenMode};
+    use crate::rules::draw_order::{tile_of, DrawGrid, OrderKey, UnitSlot};
+    let mut w = world();
+    let mut r = Run::new();
+    r.frame(&mut w, 10);
+    cast(&mut w, FIRE_BOLT as i32, (130, 100));
+    r.frame(&mut w, 11);
+    // The player's camera; the missile starts at the caster's cell
+    // centre, so it is in the caster's draw cell.
+    let at = moving_to_client(cell_centre((100, 100)).0, cell_centre((100, 100)).1);
+    let camera = Camera::new(FrameSize::D2RS, OpenMode::NONE, at, (0, 0));
+    let grid = DrawGrid::of_camera(&camera);
+    let ci = grid.cell(tile_of(at.x, at.y)).unwrap() as u32;
+    let slot = |minor| {
+        UnitSlot::Drawn(OrderKey {
+            pass: pass::WALLS_UNITS,
+            major: ci,
+            minor,
+        })
+    };
+    let other = UnitKey::new(MONSTER, 9);
+    let slots = BTreeMap::from([(PLAYER, slot(3)), (other, slot(4))]);
+    // The caster below the missile (client y not smaller): the missile
+    // goes before it (sub 0, ahead of equal keys); the cast overlay
+    // (`PreDraw` 0) after the caster's slots (sub 255).
+    let below = |k: UnitKey| (k == PLAYER).then_some(i32::MAX);
+    let keyed = Missiles::keyed(r.m.last(), &slots, &grid, below);
+    let got: Vec<_> = keyed.iter().map(|(d, b)| (d.item.key, *b)).collect();
+    assert_eq!(
+        got,
+        vec![
+            (DrawKey::new(6, ci, 3, 255).unwrap(), false),
+            (DrawKey::new(6, ci, 3, 0).unwrap(), true),
+        ]
+    );
+    // Every unit of the cell above it: after the cell's units.
+    let keyed = Missiles::keyed(r.m.last(), &slots, &grid, |_| Some(i32::MIN));
+    assert_eq!(
+        keyed[1].0.item.key,
+        DrawKey::new(6, ci, DrawKey::MINOR_MAX, 255).unwrap()
+    );
+    assert!(!keyed[1].1);
+    // A back overlay draws before its host's slot 0; a hidden host hides
+    // its overlays.
+    let mut rows = rows();
+    rows.overlays[1].pre_draw = true;
+    let mut r2 = Run::new();
+    r2.m = Missiles::new(source(), rows);
+    let mut w2 = world();
+    r2.frame(&mut w2, 10);
+    cast(&mut w2, FIRE_BOLT as i32, (130, 100));
+    r2.frame(&mut w2, 11);
+    let keyed = Missiles::keyed(r2.m.last(), &slots, &grid, below);
+    assert_eq!(
+        (keyed[0].0.item.key, keyed[0].1),
+        (DrawKey::new(6, ci, 3, 0).unwrap(), true)
+    );
+    let hidden = BTreeMap::from([(PLAYER, UnitSlot::NotDrawn)]);
+    let keyed = Missiles::keyed(r2.m.last(), &hidden, &grid, below);
+    assert_eq!(keyed.len(), 1, "the missile alone: no units in its cell");
+    assert_eq!(
+        keyed[0].0.item.key,
+        DrawKey::new(6, ci, DrawKey::MINOR_MAX, 255).unwrap()
+    );
+
+    // In the frame, with the feed's positions: a monster two sub-tiles
+    // south of the caster is below the missile, which goes before its
+    // slot-0 item; the overlay after the caster's.
+    let mut w3 = world();
+    let mut m = ClientUnit::new(other);
+    m.position = Some((100, 102));
+    w3.units.insert(other, m);
+    let mut frame = WorldFrame {
+        slots: Some(BTreeMap::from([(PLAYER, slot(3)), (other, slot(5))])),
+        ..WorldFrame::default()
+    };
+    for (minor, tag) in [(3, ItemTag::Unit(1)), (5, ItemTag::Unit(9))] {
+        let mut item = DrawItem::new(crate::scene::FrameId(0), 0, 0);
+        item.key = DrawKey::new(6, ci, minor, 0).unwrap();
+        item.tag = tag;
+        frame.items.push(item);
+    }
+    let mut r3 = Run::new();
+    r3.frame(&mut w3, 10);
+    cast(&mut w3, FIRE_BOLT as i32, (130, 100));
+    w3.server_ticks = 11;
+    let feed = ModelFeed::<NoFeed>::default();
+    let log = r3.m.add_to_frame(&w3, &feed, &mut r3.a, &mut frame);
+    assert!(log.is_empty(), "{log:?}");
+    let got: Vec<_> = frame
+        .items
+        .iter()
+        .map(|i| (i.key.minor(), i.key.sub(), i.tag))
+        .collect();
+    assert_eq!(got.len(), 4, "{got:?}");
+    assert_eq!(got[0], (3, 0, ItemTag::Unit(1)));
+    assert_eq!(
+        (got[1].0, got[1].1),
+        (3, 255),
+        "the overlay after the caster"
+    );
+    assert_eq!(
+        (got[2].0, got[2].1),
+        (5, 0),
+        "the missile before the monster"
+    );
+    assert_ne!(got[2].2, ItemTag::Unit(9));
+    assert_eq!(got[3], (5, 0, ItemTag::Unit(9)));
 }

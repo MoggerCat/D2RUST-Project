@@ -46,6 +46,7 @@ mod tests {
                     )
                 }
                 UiDraw::Text(_) => panic!("text"),
+                UiDraw::Rect(_) => panic!("rectangle"),
             })
             .collect();
         (t, v)

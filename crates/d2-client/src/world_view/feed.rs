@@ -393,7 +393,7 @@ fn camera_and_mode<F: ViewFeed + ?Sized>(
     let mode = feed.open_mode(world)?;
     let shake = frame_shake(world, feed)?;
     Ok(Some((
-        Camera::new(FrameSize::D2RS, mode, player.client(), shake),
+        Camera::new(FrameSize::play(), mode, player.client(), shake),
         mode,
     )))
 }
@@ -451,6 +451,7 @@ where
             Some(source) => {
                 let mut frame =
                     build_lit(world, ui, rules, camera, &source, source.source, assets)?;
+                frame.slots = Some(source.units.clone());
                 // Passes 4 and 9 (`draw-order-2.md` §11.6, §11.7) join the
                 // sorted list by their keys.
                 let sky = source.source.sky_items(&source.sky, assets)?;
