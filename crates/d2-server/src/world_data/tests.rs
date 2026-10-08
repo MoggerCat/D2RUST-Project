@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 
 use d2_sim::drlg::outdoor::{SubDefs, SubFiles, SubRow};
 use d2_sim::drlg::preset::{Ds1File, Ds1Source, PresetData, PresetDef, PresetTables};
-use d2_sim::drlg::tiles::FIXED_LIBRARY;
+use d2_sim::drlg::tiles::{ACT_EDGE_TILE, FIXED_LIBRARY};
 use d2_sim::drlg::TileSource;
 use d2_sim::world::hirelings::HirelingTables;
 
@@ -418,7 +418,10 @@ fn new_disk() -> Disk {
     );
     files.insert("DATA\\GLOBAL\\TILES\\A\\s.ds1".to_owned(), sub.bytes());
     files.insert("DATA\\GLOBAL\\TILES\\A\\f.dt1".to_owned(), floor_dt1());
-    for p in FIXED_LIBRARY {
+    for p in FIXED_LIBRARY
+        .into_iter()
+        .chain(ACT_EDGE_TILE.iter().flatten().map(|&(p, _)| p))
+    {
         files.insert(String::from_utf8(p.to_vec()).unwrap(), floor_dt1());
     }
     Disk {
@@ -449,12 +452,16 @@ fn world_files_load_every_named_file_once_by_its_table_string() {
     for p in FIXED_LIBRARY {
         assert_eq!(w.dt1.dt1(p).unwrap()[0].rarity, 1);
     }
+    // The acts' base libraries (acts I–III; `levels.md` §3 step 5).
+    for &(p, _) in ACT_EDGE_TILE.iter().flatten() {
+        assert_eq!(w.dt1.dt1(p).unwrap().len(), 1);
+    }
     // Each file read once, placeholders never.
     let mut asked = disk.asked.clone();
     asked.sort();
     asked.dedup();
     assert_eq!(asked.len(), disk.asked.len());
-    assert_eq!(disk.asked.len(), 3 + FIXED_LIBRARY.len());
+    assert_eq!(disk.asked.len(), 3 + FIXED_LIBRARY.len() + 3);
 }
 
 #[test]

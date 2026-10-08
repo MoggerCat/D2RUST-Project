@@ -76,6 +76,8 @@ fn near(rooms: Vec<Room>) -> NearRooms {
         rooms,
         player_tile: (0, 0),
         player_logical: 0,
+        player_subtile: (0, 0),
+        edge: None,
         level: LevelFacts::default(),
     }
 }
@@ -627,7 +629,7 @@ fn tiles(order: &FrameOrder) -> Vec<OrderedTile> {
 }
 
 fn order(n: &mut NearRooms, positions: &BTreeMap<UnitKey, ClientPos>) -> FrameOrder {
-    order_grid(&grid(), OpenMode::NONE, n, positions, CLOCK).unwrap()
+    order_grid(&grid(), n, positions, CLOCK).unwrap()
 }
 
 // Covers: specs/render/draw-order.md §6 r5
@@ -841,20 +843,79 @@ fn open_mode_3_and_level_backgrounds() {
     .unwrap();
     assert!(o.items.is_empty());
     n.level.id = 74;
-    let e = order_grid(&grid(), OpenMode::NONE, &mut n, &BTreeMap::new(), CLOCK).unwrap_err();
+    let e = order_grid(&grid(), &mut n, &BTreeMap::new(), CLOCK).unwrap_err();
     assert!(matches!(e, OrderError::Open { question: 1, .. }));
     n.level.id = 1;
     n.level.draw_edges = true;
-    let e = order_grid(&grid(), OpenMode::NONE, &mut n, &BTreeMap::new(), CLOCK).unwrap_err();
-    assert!(matches!(e, OrderError::Open { question: 10, .. }));
-    assert!(order_grid(
-        &grid(),
+    // Edge floors (`draw-order-2.md` §14) are the camera's part
+    // (`order_frame`): the grid order draws the rooms alone.
+    assert!(order_grid(&grid(), &mut n, &BTreeMap::new(), CLOCK).is_ok());
+}
+
+/// A `DrawEdges` level: one drawn floor at the camera's tile (31, 18),
+/// sub-tile extents (155, 90)–(155, 90), the player at sub-tile (160, 95).
+fn edge_level() -> NearRooms {
+    let mut r = room();
+    r.floors.push(record((11, 8), 1, 0));
+    let mut n = near(vec![r]);
+    n.level.draw_edges = true;
+    n.player_subtile = (160, 95);
+    n.edge = Some(record((0, 0), 0, 0));
+    n
+}
+
+fn edge_items(o: &FrameOrder) -> Vec<OrderedTile> {
+    tiles(o)
+        .into_iter()
+        .filter(|t| t.array == TileArray::Edge)
+        .collect()
+}
+
+// Covers: specs/render/draw-order-2.md §14
+#[test]
+fn edge_floors_follow_the_last_room_at_open_mode_0() {
+    let cam = camera();
+    let mut n = edge_level();
+    let o = order_frame(&cam, OpenMode::NONE, &mut n, &BTreeMap::new(), CLOCK).unwrap();
+    let e = edge_items(&o);
+    // px − min x = 5 < 30: the first strip starts at (155 − 5, 95), step
+    // (0, −5): sub-tiles (150, 95), (150, 90), (150, 85).
+    let cells: Vec<_> = e.iter().take(3).map(|t| t.cell).collect();
+    assert_eq!(cells, vec![(30, 19), (30, 18), (30, 17)]);
+    for (k, t) in e.iter().enumerate() {
+        assert_eq!(t.key, edges::edge_key(1, k));
+        assert_eq!(t.kind, TileKind::Floor { layer: 1 });
+    }
+    // Floor items keep pass order: the room's floor, then the edges.
+    let floors: Vec<_> = tiles(&o)
+        .into_iter()
+        .filter(|t| t.key.pass == pass::FLOORS)
+        .map(|t| t.array)
+        .collect();
+    assert_eq!(floors[0], TileArray::Floor);
+    assert!(floors[1..].iter().all(|a| *a == TileArray::Edge));
+    assert_eq!(n.edge.unwrap().flags & REC_DRAWN, REC_DRAWN);
+    // Another open mode: no edge floors (`0x004DE730`).
+    let mut n = edge_level();
+    let o = order_frame(
+        &cam,
         OpenMode::new(1).unwrap(),
         &mut n,
         &BTreeMap::new(),
-        CLOCK
+        CLOCK,
     )
-    .is_ok());
+    .unwrap();
+    assert!(edge_items(&o).is_empty());
+    // Resolution mode 0 (640 × 480): none either.
+    let low = Camera::new(FrameSize::LOW, OpenMode::NONE, pos(1000, 2000), (0, 0));
+    let mut n = edge_level();
+    let o = order_frame(&low, OpenMode::NONE, &mut n, &BTreeMap::new(), CLOCK).unwrap();
+    assert!(edge_items(&o).is_empty());
+    // Acts IV and V: the record holds no tile.
+    let mut n = edge_level();
+    n.edge = None;
+    let e = order_frame(&cam, OpenMode::NONE, &mut n, &BTreeMap::new(), CLOCK).unwrap_err();
+    assert_eq!(e, OrderError::Edge(edges::EdgeError::NoEdgeRecord));
 }
 
 // ------------------------------------------------------------- wiring

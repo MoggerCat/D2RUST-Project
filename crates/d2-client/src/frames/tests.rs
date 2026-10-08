@@ -254,7 +254,7 @@ fn dcc_direction_uses_the_frame_box() {
     ));
 }
 
-// Covers: specs/client/render-pipeline.md §a2-indexed-frames; specs/client/assets.md §a3-derived-assets
+// Covers: specs/client/render-pipeline.md §a2-indexed-frames; specs/client/assets.md §a3-derived-assets; specs/render/shading.md §4 r4
 #[test]
 fn dt1_tile_uses_the_map_preview_tile_image() {
     // map-preview.md test vector: iso blocks at (0,0) and (64,32) give a
@@ -268,10 +268,14 @@ fn dt1_tile_uses_the_map_preview_tile_image() {
         ],
     };
     let set = FrameSet::from_dt1(&dt1, 0).unwrap();
-    assert_eq!(set.frames.len(), 1);
+    // The assembled image, then each block alone (shading.md §4 r4).
+    assert_eq!(set.frames.len(), 1 + 2);
     let fr = &set.frames[0];
     assert_eq!((fr.width, fr.height, fr.x_off, fr.y_off), (96, 47, 0, 0));
     assert_eq!(fr.pixels.len(), 96 * 47);
+    let b = &set.frames[DT1_BLOCK_FRAME0 + 1];
+    assert_eq!((b.width, b.height, b.x_off, b.y_off), (32, 15, 64, 32));
+    assert_eq!(b.pixels, dt1.tiles[0].blocks[1].pixels);
     // A tile without blocks has no image: an empty set.
     assert!(FrameSet::from_dt1(&dt1, 1).unwrap().frames.is_empty());
     assert!(matches!(

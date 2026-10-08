@@ -3472,6 +3472,20 @@ the dev-dependency) and record results here.
     centred on its point), walk with a torch-lit floor in view (the light
     pool moves with the player in 1/8-sub-tile steps).
 
+101. World render fixes (`docs/handoff/q-fix-render-world.md`, branch
+    `claude/q-fix-render-world`): `D2_GAME_DIR=<install> cargo test -p
+    d2-server --test game_world_data -- --ignored
+    act_edge_floor_records_resolve_in_the_base_libraries`: expect a tile
+    index printed for acts 0–2 (a miss is the original's fatal 0x44C:
+    the path or key in `ACT_EDGE_TILE` is wrong). Then `play`: walk from
+    the Rogue Encampment into the Blood Moor (a `DrawEdges` level): the
+    view keeps moving (no frozen frame) and edge floors fill the map's
+    outer strip; cast Fire Bolt next to a wall (the bolt hides behind
+    walls in front of it and is additive, not a dark block); drop an item
+    behind a wall in a `LOSDraw` level (hidden); an idle object (a
+    waypoint, a chest) holds its frame; a waypoint to another act shows
+    one black frame after the act load.
+
 Kept entries (unchanged):
 
 **Treasure** (`specs/items/treasure.md`, branch `claude/phase3-treasure`):
