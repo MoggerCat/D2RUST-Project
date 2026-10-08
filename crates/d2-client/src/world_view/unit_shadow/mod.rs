@@ -127,8 +127,8 @@ pub fn draws(
         item.clip = d.item.clip;
         item.shade = chain;
         item.blend = blend;
-        item.key = DrawKey::new(at.pass, at.major, at.minor, d.slot.slot)
-            .map_err(ViewError::Scene)?;
+        item.key =
+            DrawKey::new(at.pass, at.major, at.minor, d.slot.slot).map_err(ViewError::Scene)?;
         item.tag = crate::scene::ItemTag::Unit(unit_guid);
         out.push(item);
     }

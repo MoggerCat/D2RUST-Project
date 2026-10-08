@@ -75,7 +75,9 @@ fn draw(cof: &Cof, slot: u8, set: &FrameSetKey, assets: &ViewAssets) -> Componen
     }
 }
 
-// Covers: specs/render/blend-modes.md §5 r1, r3, §7
+// Covers: specs/render/blend-modes.md §5 r1
+// Covers: specs/render/blend-modes.md §5 r3
+// Covers: specs/render/blend-modes.md §7
 #[test]
 fn a_layer_with_the_shadow_byte_is_drawn_darkening_at_the_feet() {
     let cof = cof();

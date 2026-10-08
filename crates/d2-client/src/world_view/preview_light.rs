@@ -295,7 +295,7 @@ mod tests {
         assert_eq!(chain_of(&t, 0xFF), ShadeChain::EMPTY);
     }
 
-    // Covers: specs/render/blend-modes.md §3 (`h`)
+    // Covers: specs/render/blend-modes.md §3
     #[test]
     fn only_the_hover_target_is_highlighted() {
         let (a, b) = (UnitKey::new(PLAYER, 1), UnitKey::new(PLAYER, 2));
