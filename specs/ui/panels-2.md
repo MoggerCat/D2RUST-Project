@@ -30,15 +30,15 @@
 |   17. Character panel details (`panels.md` §8; answers UP-6) | 246–360 |
 |   18. Inventory close button and click area (`panels.md` §9; answers UP-7, UP-8) | 361–385 |
 |   19. Skill tree input and draw order (`panels.md` §10; answers UP-21, UP-22, UP-23) | 386–456 |
-|   20. Stash and cube buttons (`panels.md` §11, §12; answers UP-10, `panels.md` OQ 13) | 457–524 |
-|   21. Gold amounts, gold buttons and the gold dialog (`panels.md` §9 r6, §11 r6; answers `panels.md` OQ 5) | 525–619 |
-|   22. d2rs widget answers (`client/ui.md` §B1, §B2; code `TODO(spec: ui/panels.md …)`) | 620–677 |
-| Constants & data dependencies | 678–692 |
-| Randomness | 693–697 |
-| Edge cases & original bugs | 698–718 |
-| Test vectors | 719–744 |
-| Provenance | 745–773 |
-| Open questions | 774–800 |
+|   20. Stash and cube buttons (`panels.md` §11, §12; answers UP-10, `panels.md` OQ 13) | 457–530 |
+|   21. Gold amounts, gold buttons and the gold dialog (`panels.md` §9 r6, §11 r6; answers `panels.md` OQ 5) | 531–625 |
+|   22. d2rs widget answers (`client/ui.md` §B1, §B2; code `TODO(spec: ui/panels.md …)`) | 626–683 |
+| Constants & data dependencies | 684–698 |
+| Randomness | 699–703 |
+| Edge cases & original bugs | 704–724 |
+| Test vectors | 725–750 |
+| Provenance | 751–779 |
+| Open questions | 780–806 |
 <!-- /index -->
 
 ## Summary
@@ -489,9 +489,15 @@ flag `[0x007C0A38 + 4i]` (−1 = not learnable, 0, 1 pressed), remap
    transmute rectangle with pressed → pressed := 0, C→S 0x4F 0x18. The
    draw's hover tool tips use the same strict rectangles (`0x0048F0D7`,
    `0x0048F11F`): `strClose` at (`sx + 289 − w / 2`, `H + sy − 100`),
-   `strUiMenu2` at (`sx + 158 − w / 2`, `H + sy − 223`).
-4. **Cube-gone close** (`0x0048EEB0`–`0x0048F183`): when `0x0044DA30()`
-   or `0x00463DF0()` is set in inventory mode 0x0E, the draw calls
+   `strUiMenu2` at (`sx + 158 − w / 2`, `H + sy − 223`). Both tips are
+   pop-up text (`0x00502280` `D2Win_SetPopUpUnicodeText`, colour 0, centre
+   0) in font 1 (set at `0x0048F0CA`), drawn later by `0x00503000` with the
+   box of `ui/control-panel.md` §5 r14; string ids 4144 (`strClose`,
+   `0x0048F0E0`) and 3341 (`strUiMenu2`, `0x0048F12C`).
+4. **Exit / dead close** (`0x0048EEB0`–`0x0048F183`): when `0x0044DA30()`
+   (exit flag) or `0x00463DF0()` (no local player, or its mode is 0x11
+   dead) is set in inventory mode 0x0E (the only tests at `0x0048EEB0`–
+   `0x0048EEC4`; a missing cube does not close, `world/cube.md` §11 r3), the draw calls
    `SetUIState(0x1A, off, 0)` with the mode still 0x0E and the latch
    `[0x007BCC54]` untouched. If ui 0x1A was open, its close hook (case
    0x1A of `0x00455AE0`, jump table `0x00455E80`: `0x00455DDD` →

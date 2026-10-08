@@ -35,13 +35,13 @@
 |   9. Level lifecycle: activity and freeing | 265–313 |
 |   10. Spawn room in a level (`0x0066B2B0`) | 314–376 |
 |   11. Logical rooms (coordinate lists) and population queries | 377–656 |
-|   12. Level connections: Act I fields, Act III, Act V | 657–851 |
-| Constants & data dependencies | 852–872 |
-| Randomness | 873–891 |
-| Edge cases & original bugs | 892–916 |
-| Test vectors | 917–977 |
-| Provenance | 978–1025 |
-| Open questions | 1026–1105 |
+|   12. Level connections: Act I, Act III, Act V | 657–1009 |
+| Constants & data dependencies | 1010–1030 |
+| Randomness | 1031–1049 |
+| Edge cases & original bugs | 1050–1074 |
+| Test vectors | 1075–1154 |
+| Provenance | 1155–1216 |
+| Open questions | 1217–1305 |
 <!-- /index -->
 
 ## Summary
@@ -654,9 +654,10 @@ owners above; reproduce them, do not model them separately):
    game-seed user between creation and that room pass (`sim/rng.md`
    §5.2), so a population result depends on everything drawn before it.
 
-### 12. Level connections: Act I fields, Act III, Act V
+### 12. Level connections: Act I, Act III, Act V
 
-Owner of the per-level connection lists below (REC-230). It adds no
+Owner of the per-level connection lists below (REC-230; Act I
+dungeons, the Docks waypoint and the summit units REC-249, REC-246). It adds no
 rule: it applies §7, `drlg/outdoor.md` §2.3 / §2.7,
 `drlg/preset.md` §6, `drlg/rooms.md` §3.3 / §9.5.1,
 `sim/path-placement.md` §12 and `drlg/maze.md` §6 to the 1.14d data.
@@ -798,6 +799,15 @@ The jungle head 573 and tail 574 (`TransL/U`, `TravL/U`), the docks
 (`DockTown3.ds1`) and the Kurast border, gate and filler presets have
 no exit cell. Their crossings are all walk.
 
+**Docks waypoint** (REC-246 (b)). The Kurast Docks waypoint is a preset
+unit of `DockTown3.ds1` (lvlprest 529, v18, DS1 act 2): object record
+id 1 → object-preset table [2][1] = object 237 (`act3waypoint`, a
+waypoint row), DS1 sub-tile (159, 49), mode 0, kept by every filter
+(`preset.md` §5.3, §7). With level 75 at tile (1000, 1000) it stands at
+sub-tile (5159, 5049): room (1024, 1008) (column 3, row 1 of the 8-tile
+grid), (39, 9) from that room's sub-tile origin. It is the DS1's only
+waypoint unit. Its index (`world/waypoints.tsv`) is not a DRLG fact.
+
 #### 12.4 Act V
 
 The vis arrays are fixed once Act V is created. No table warps are set
@@ -848,6 +858,154 @@ down in the Worldstone Keep (`baal<dir>up0n`, `down0n`). Harrogath
 (`townWest.ds1`), the siege strips 865–879 and 880
 `siege2barricade.ds1` have no exit cell, and nor do the Dirt "From
 Cave" presets 911 and 912, which no 1.14d table row stamps.
+
+**Arreat Summit** (REC-246 (c)). Level 120 is one preset map,
+`MtnTop.ds1` (lvlprest 1089, v18, DS1 act 4, 20 × 28 tiles), at the
+level rect (2000, 2508), multi-room (8-tile grid: columns at x 0, 8, 16;
+rows at y 0, 8, 16, 24). Its exit cells are in wall layer 1, both
+hidden, orientation 10:
+
+| Cell | Style → slot | Row (`Id`, offsets) | Room (DS1 tiles) | Tile sub-tile from the room origin |
+|---|---|---|---|---|
+| (11, 25) | 0 → 118 | 79 'b' (2, 1) | (8, 24) | (17, 6) |
+| (9, 5) | 1 → 128 | 80 'b' (2, 1) | (8, 0) | (7, 26) |
+
+Its preset units (DS1 records → `preset.md` §5.3; no row is filtered
+by §7). Positions are DS1 sub-tiles; add (10000, 12540) for the level's
+sub-tile frame:
+
+| DS1 record | Unit | Sub-tile |
+|---|---|---|
+| object 142 | object-preset [4][142] = 564 summit door | (57, 127) |
+| object 128 | [4][128] = 547 ancients door ("To The Worldstone Keep Level 1") | (48, 25) |
+| object 127 | [4][127] = 546 ancients altar | (48, 78) |
+| monster 24 | monpreset Act V row 24 = monstats 537 `ancientstatue1` → object 476 | (48, 67) |
+| monster 25 | row 25 = 538 `ancientstatue2` → object 475 | (37, 77) |
+| monster 26 | row 26 = 539 `ancientstatue3` → object 474 | (58, 77) |
+
+So the summit door stands on the exit cell toward 118 and the ancients
+door on the one toward 128. The DS1 has no unit for object 561 (the
+invisible Ancient) or monsters 540–542 (the Ancients). Those come from
+quest code (`world/quests-act5*.md`), and the exits' closed state from
+`world/quests.md` §8.2 (`0x0058D090`), not from the DRLG.
+
+#### 12.5 Act I dungeons (REC-249)
+
+No draw decides any slot here either: the vis/warp arrays are
+leveldefs (no link-driver row names these levels, except 26 in §12.2),
+and each exit cell's style is its slot. Draws pick only which maze cell
+carries a stamp, its N/E/S/W variant (`maze.md` §6) and its file
+(`maze.md` §9 step 2: the stamp defs below lie outside every rotation
+range, so the file is the cell map's own `roll(Files)` on the level
+seed). Every lvlwarp row of Act I (`Id` 0–18) is direction 'b'.
+Positions: §6 rule 1 (`OffsetX/Y`; 27 and 33 by `Depend`), 28 by
+`maze.md` §7.1.
+
+| Level | Kind (DrlgType, LevelType) | Built from | Vis (Warp), non-zero slots | Walk to | Tile slots → level (lvlwarp `Id`) |
+|---|---|---|---|---|---|
+| 8 Den of Evil | maze, cave (1, 3) | cave_prev, cave_doe | 0: 2 (4) | — | 0 → 2 (4 "Cave Up"). The Den has no way on. |
+| 9 Cave Level 1 | maze, cave | cave_prev, cave_down, cave_coldcrow | 0: 3 (4); 4: 13 (5) | — | 0 → 3 (4); 4 → 13 (5 "Cave Down") |
+| 10 Underground Passage 1 | maze, cave | cave_prev, cave_down, cave_next | 0: 4, 1: 5 (4, 4); 4: 14 (5) | — | 0 → 4, 1 → 5 (4); 4 → 14 (5) |
+| 11 Hole 1 | maze, cave | cave_prev, cave_down | 0: 6 (4); 4: 15 (5) | — | 0 → 6 (4); 4 → 15 (5) |
+| 12 Pit 1 | maze, cave | cave_prev, cave_down | 0: 7 (4); 4: 16 (5) | — | 0 → 7 (4); 4 → 16 (5) |
+| 13–16 Cave Level 2, Underground Passage 2, Hole 2, Pit 2 | preset (2, 3) | lvlprest 104–107 `CaveRoom2..5.ds1` (one file each) | 1: 9 / 10 / 11 / 12 (4) | — | 1 → parent (4) |
+| 18 Crypt, 19 Mausoleum | maze, crypt (1, 4) | crypt_prev, then crypt_bonebreak (18) / crypt_chest (19) | 0: 17 (8) | — | 0 → 17 (8 "Crypt Up") |
+| 20 Forgotten Tower | preset (2, 2) | 164 `Tower2.ds1` | 0: 6 (11), 1: 21 (12) | — | 0 → 6 (11), 1 → 21 (12) |
+| 21–24 Tower Cellar 1–4 | maze, crypt | crypt_prev, crypt_next | 0: id − 1 (8), 1: id + 1 (9) | — | 0 → previous (8), 1 → next (9 "Crypt Down") |
+| 25 Tower Cellar 5 | preset (2, 4) | 159 `CryptCountess1/2.ds1` (Files 2) | 0: 24 (8) | — | 0 → 24 (8) |
+| 26 Monastery Gate | preset (2, 5) | 165 `facade1.ds1` (`Scan` 0) | 0: 7 (−1, §12.2), 1: 27 (−1) | 7, 27 | — |
+| 27 Outer Cloister | preset (2, 6) | 166 `CourtW/CourtN/…` (Files 3; `preset.md` §3.1) | 0: 26, 1: 28 (−1, −1) | 26, 28 | — |
+| 28 Barracks | maze, barracks (1, 7) | ring(2), grow tree, `maze.md` §7.1 (forge and next) | 0: 27 (−1), 1: 29 (14) | 27 | 1 → 29 (14 "Jail Down") |
+| 29 Jail 1 | maze, jail (1, 8) | jail_prev, jail_waypoint, jail_next | 0: 28 (13), 1: 30 (14) | — | 0 → 28 (13 "Jail Up"), 1 → 30 (14) |
+| 30 Jail 2 | maze, jail | jail_prev, jail_pitspawn, jail_next | 0: 29 (13), 1: 31 (14) | — | 0 → 29, 1 → 31 |
+| 31 Jail 3 | maze, jail | jail_prev, jail_cath | 0: 30 (13), 1: 32 (13) | — | 0 → 30 (13), 1 → 32 (13) |
+| 32 Inner Cloister | preset (2, 6) | 256 `Cat_Court.ds1` | 0: 31 (14), 1: 33 (−1) | 33 | 0 → 31 (14) |
+| 33 Cathedral | preset (2, 9) | 257 `Cathy3.ds1` | 0: 32 (−1), 1: 34 (15) | 32 | 1 → 34 (15) |
+| 34 Catacombs 1 | maze, catacombs (1, 10) | start cell 290 (Prev NSEW), catacombs_next | 0: 33 (16), 1: 35 (18) | — | 0 → 33 (16), 1 → 35 (18 "Catacombs Down") |
+| 35, 36 Catacombs 2, 3 | maze, catacombs | start cell 288 (Prev EW) or 289 (Prev NS), catacombs_next (+ waypoint in 35) | 0: id − 1 (17), 1: id + 1 (18) | — | 0 → previous (17 "Catacombs Up"), 1 → next (18) |
+| 37 Catacombs 4 | preset (2, 10) | 299 `Andy3.ds1` | 0: 36 (17) | — | 0 → 36 (17) |
+| 38 Tristram, 39 Moo Moo Farm | preset (2, 11) / outdoor (3, 2) | 300 `Tri_Town4.ds1` / `outdoor.md` | none | — | — (portals only, §12.1) |
+
+So the dungeon tree is: Blood Moor → Den; Cold Plains → Cave 1 → Cave
+2; Stony Field and Dark Wood → Underground Passage 1 → 2; Black Marsh →
+Tower → Cellars 1–5 and Black Marsh → Hole 1 → 2; Tamoe → Pit 1 → 2;
+Burial Grounds → Crypt, Mausoleum; Tamoe – Monastery Gate – Outer
+Cloister – Barracks by walking, then tiles Barracks → Jail 1–3 → Inner
+Cloister, walking Inner Cloister – Cathedral, then tiles Cathedral →
+Catacombs 1–4. The maze builders' unconditional stamps for 13–16, 25, 37
+(`maze.md` §6) never run: those levels are presets.
+
+**Walk links inside the monastery.** 27 hangs on 26 (`Depend` 26,
+offset (0, −40): rect (3000, 960, 56, 40) on 26's (3000, 1000, 64, 18)),
+and 33 on 32 (offset (−4, −34): (3996, 966, 28, 34) on (4000, 1000,
+18, 20)). Both pairs share the edge y = 1000. 28 is shifted against 27
+(`maze.md` §7.1). `preset.md` §6 step 3 runs for every map built through
+`0x00667ED0`, maze cells included (`maze.md` §9 step 3), so every room
+of 26, 27, 28, 32 and 33 carries flag 0x10 << i for each walk slot i.
+Rooms-near then appends the other level's rooms within the 6-tile gap
+(`rooms.md` §3.3, W = −1).
+
+**Exit cells and tile places.** Scan of every Act I lvlprest DS1 (Defs
+53–310; wall layers, orientation 10/11, style ≤ 7, sub 0/4 or bit 31).
+These are all the exit cells in the stamps used above. The coldcrow,
+Den, bonebreak, chest, waypoint, pitspawn, forge, court-connect and
+plain cells, 26, 27 and 38 have none. A tile unit is placed per
+`sim/path-placement.md` §12.1 at (5·lx + `OffsetX`, 5·ly + `OffsetY`)
+from the origin of the 8-tile room holding the cell. Cells of 12 × 12 or
+smaller build one room (`maze.md` §9 step 3), so (lx, ly) is the cell
+itself.
+
+| Stamp (Def, file) | Cell (x, y), orientation, style | Row | Room in the map | Tile (sub-tiles) |
+|---|---|---|---|---|
+| Cave Prev W/E/S/N 83–86 (files 1, 2 equal) | (3, 5) / (7, 3) / (3, 3) / (4, 5), 10, 0 | 4 (2, 5) | (0, 0) | (17, 30) / (37, 20) / (17, 20) / (22, 30) |
+| Cave Next W/E/S/N 87–90 (files equal) | same cells, style 1 | 4 | (0, 0) | same |
+| Cave Down W 91, file 1 / 2 | (14, 10) / (13, 20), 10, 4 | 5 (1, 3) | (8, 8) / (8, 16) | (31, 13) / (26, 23) |
+| Cave Down E 92, file 1 / 2 | (10, 9) / (10, 6), 10, 4 | 5 | (8, 8) / (8, 0) | (11, 8) / (11, 33) |
+| Cave Down S 93 / N 94 (files equal) | (9, 6) / (3, 18), 10, 4 | 5 | (8, 0) / (0, 16) | (6, 33) / (16, 13) |
+| `CaveRoom2` / `3` / `4` / `5` (levels 13–16) | (4, 5) / (10, 9) / (18, 9) / (4, 5), 10, 1 | 4 | (0, 0) / (8, 8) / (16, 8) / (0, 0) | (22, 30) / (12, 10) / (12, 10) / (22, 30) |
+| Crypt Prev W/E/S/N 139–142 | (3, 1) / (1, 2) / (3, 1) / (2, 4), 11, 0 | 8 (5, 1) | cell | (20, 6) / (10, 11) / (20, 6) / (15, 21) |
+| Crypt Next W/E/S/N 143–146 | (4, 3) / (0, 4) / (1, 4) / (1, 4), 10, 1 | 9 (1, 1) | cell | (21, 16) / (1, 21) / (6, 21) / (6, 21) |
+| `CryptCountess1` / `2` (25) | (26, 12) / (13, 25), 11, 0 | 8 | (24, 8) / (8, 24) | (15, 21) / (30, 6) |
+| `Tower2` (20) | (0, 1), 10, 0; (0, 2), 10, 1 | 11 (4, −2); 12 (2, 3) | (0, 0) | (4, 3); (2, 13) |
+| Barracks Next W/E/S/N 198–201 (10 × 14: two room rows) | (6, 7) / (4, 3) / (5, 4) / (5, 6), 10, 1 | 14 (−1, 3) | (0, 0) | (29, 38) / (19, 18) / (24, 23) / (24, 33) |
+| Jail Prev W/E/S/N 236–239 | (5, 2) / (5, 2) / (5, 2) / (3, 6), 11, 0 | 13 (5, 1) | cell | (30, 11) ×3 / (20, 31) |
+| Jail Next W/E/S/N 240–243 | (7, 3) / (4, 4) / (6, 6) / (7, 7), 10, 1 | 14 | cell | (34, 18) / (19, 23) / (29, 33) / (34, 38) |
+| Jail Cath W/E/S/N 244–247 | (5, 2) / (5, 2) / (5, 5) / (5, 5), 11, 1 | 13 | cell | (30, 11) / (30, 11) / (30, 26) / (30, 26) |
+| `Cat_Court` (32) | (2, 3), 10, 0 | 14 | (0, 0) | (9, 18) |
+| `Cathy3` (33) | (21, 10), 11, 1 | 15 (3, 1) | (16, 8) | (28, 11) |
+| Catacombs Prev NSEW 290 | (5, 7), 11, 0 | 16 (7, 1) | cell | (32, 36) |
+| Catacombs Prev EW 288, files 1–4 | (5, 1) / (5, 2) / (5, 6) / (5, 2), 11, 0 | 17 (5, 1) | cell | (30, 6) / (30, 11) / (30, 31) / (30, 11) |
+| Catacombs Prev NS 289, files 1–4 | (3, 10) / (3, 10) / (5, 7) / (7, 7), 11, 0 | 17 | cell | (20, 51) / (20, 51) / (30, 36) / (40, 36) |
+| Catacombs Next W 291, files 1 / 2 | (7, 4) / (7, 6), 10, 1 | 18 (−1, 3) | cell | (34, 23) / (34, 33) |
+| Catacombs Next E 292 | (4, 4) / (5, 5), 10, 1 | 18 | cell | (19, 23) / (24, 28) |
+| Catacombs Next S 293 (files equal) / N 294 | (6, 3) / (6, 6), (6, 7), 10, 1 | 18 | cell | (29, 18) / (29, 33), (29, 38) |
+| `Andy3` (37) | (18, 22), 11, 0 | 17 | (16, 16) | (15, 31) |
+
+Outdoor mouths, same rule (the stamp is one 8 × 8 room, `outdoor.md`
+§12.1; cells §12.2): `DenEnt` (3, 4) style 5 → row 2 (−1, 1) → (14, 21);
+`DenEnt2` (5, 4) style 6 → row 3 (1, −1) → (26, 19); `CaveDr1` (3, 4)
+style 5 → (14, 21); `CaveDr2` (3, 4) style 6 → (16, 19); `clfcave`
+(5, 2) style 3 → row 0 (1, −1) → (26, 9); `clfcave2` (6, 5) style 4 →
+row 1 (3, 1) → (33, 26); `Tower1` (3, 3) style 2 → row 10 (−4, 0) →
+(11, 15). `gravey.ds1` (24 × 32): (12, 27) style 0 → row 6 (5, 0),
+room (8, 24) → (25, 15); (11, 6) style 1 → row 7 (5, 2), room (8, 0) →
+(20, 32).
+
+Hidden cells (Cave, Barracks Next, Jail Next, Catacombs Next,
+`Cat_Court`, the outdoor mouths, `gravey`) place the tile through
+`rooms.md` §9.5.1 step 3; the others have sub 0 and place it through the
+wall warp tiles of step 6. Either way exactly one tile per exit cell.
+
+Den of Evil, worked: Blood Moor's cave mouth is stamp 52 file 1 or 2
+(`outdoor.md` §5.1). File 1 sets flag 0x10 << 5 on the stamp's room
+and a tile of class 2 at (14, 21) from its origin; file 2 sets 0x10 << 6
+and class 3 at (26, 19). In the Den, the cave_prev cell (variant N/E/S/W
+by the stamp row) carries flag 0x10 and a class-4 tile at (22, 30) /
+(37, 20) / (17, 20) / (17, 30). Linking the Den's room (W = 4): Blood
+Moor's first slot holding 8 is 3, and no room has flag 0x80. Slots 3..6
+are then tried in order; the mouth's slot (5 or 6) links (`rooms.md`
+§3.3). Arrival uses the far side's record and its tile
+(`sim/path-placement.md` §12.2).
 
 ## Constants & data dependencies
 
@@ -975,6 +1133,25 @@ levels 1–7, 17 and 26 and of Act V levels 109–112 equal the §12.2 and
 78; 78's is 86, 88, 76, 77, 79; 79's is 78, 80. Kurast 80–83 are as
 §12.3.
 
+Warp tile places (§12.5, `sim/path-placement.md` §12.1; game-file
+tests over the user's DS1 and lvlwarp files, `#[ignore]`):
+
+| Map, exit cell | Level / slot | Tile unit (type 5) |
+|---|---|---|
+| `DenEnt.ds1` stamped in the Blood Moor, (3, 4) style 5 | 2 / 5 | class 2 at (14, 21) from the stamp room's sub-tile origin |
+| `DenEnt2.ds1`, (5, 4) style 6 | 2 / 6 | class 3 at (26, 19) |
+| Den of Evil, Cave Prev N `CaveNPre1.ds1`, (4, 5) | 8 / 0 | class 4 at (22, 30) from the cell's first room |
+| Cave Level 1, Cave Down W `CaveWDown2.ds1`, (13, 20) | 9 / 4 | class 5 at (26, 23) from the room at cell tile (8, 16) |
+| Cathedral `Cathy3.ds1`, (21, 10) orientation 11 | 33 / 1 | class 15 at (28, 11) from the room at level tile (16, 8) |
+| Catacombs 2, Prev NS file 4 `CatNSUp4.ds1`, (7, 7) | 35 / 0 | class 17 at (40, 36) from the cell's room |
+| Arreat Summit `MtnTop.ds1`, (11, 25) / (9, 5) | 120 / 0, 1 | class 79 at (17, 6) from room (8, 24); class 80 at (7, 26) from room (8, 0) |
+
+Every row of the §12.5 tile table is a vector of the same form; a test
+over the Act I lvlprest DS1s of Defs 53–300 finds exactly those exit
+cells, the §12.2 ones of 108 and 163, and one in the unused 103
+`CaveRoom1.ds1` ((6, 18), style 1; no level row names Def 103). Preset units: Kurast Docks object 237 at DS1
+sub-tile (159, 49); Arreat Summit as the §12.4 unit table.
+
 ## Provenance
 
 - **1.14d `Game.exe`**: every address above read from the disassembly
@@ -1016,6 +1193,20 @@ levels 1–7, 17 and 26 and of Act V levels 109–112 equal the §12.2 and
     orientation 10/11, style ≤ 7, sub 0/4 or bit 31). The patch_d2.mpq
     overrides were checked by hash lookup of every listed name: only
     `townWest.ds1` is patched, and it has no exit cell.
+  - §12.5 and the §12.3 / §12.4 unit paragraphs (2026-10-08, REC-249,
+    REC-246): DrlgType / LevelType / vis / warp / offsets from patch_d2
+    `levels.txt` (= leveldefs, above); lvlmaze rows from patch_d2
+    `lvlmaze.txt`; lvlwarp offsets (`OffsetX` +0x1C… as read by
+    `0x0066E1C0`) from d2exp `LvlWarp.txt`. DS1s read from the user's
+    MPQs in Patch_D2 > d2exp > d2data order (`d2-formats` `ArchiveSet`
+    and `Ds1::parse`, scratch program outside the repo), Defs 51–310,
+    529 and 1089, with the §12 marker test; unit records mapped with
+    `preset.md` §5.3 through `preset-tables.tsv` (objpreset [2][1],
+    [4][127], [4][128], [4][142]) and patch_d2 `monpreset.txt` (Act V
+    rows 24–26). Tile places computed from `sim/path-placement.md`
+    §12.1 and the room grid of `preset.md` §6 step 10 / `maze.md` §9
+    step 3. The cave, crypt, jail, catacombs and barracks stamp defs
+    are those of `maze-specials.tsv`.
   - Jungle statistics: the `d2-sim` port of `0x00677880` (tested
     against the recorded Act III vector) run outside the repo over
     200,000 seeds.
@@ -1102,3 +1293,12 @@ levels 1–7, 17 and 26 and of Act V levels 109–112 equal the §12.2 and
     drlg +0x90 vis/warp records of 75–83 (§Test vectors); after
     entering Act V, the records of 109–112 and the warp units of 112
     and 117.
+12. *Answered (2026-10-08, static and data; REC-249, REC-246 (b), (c))*:
+    the Act I dungeons' kinds, slots, lvlwarp rows and tile places are
+    §12.5; the Kurast Docks waypoint unit is §12.3, the Arreat Summit's
+    exits and preset units §12.4. No recording is needed. Optional
+    confirmation (R-A1DUNGEON): walk Blood Moor → Den, Cold Plains →
+    Cave 1 → Cave 2, Black Marsh → Tower → Cellar 5, Monastery Gate →
+    Catacombs 4 and record each created type-5 unit (level, room sub-tile
+    origin, class, position) and the drlg +0x90 vis/warp records of the
+    levels entered.

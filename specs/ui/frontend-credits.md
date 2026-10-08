@@ -21,20 +21,20 @@
 |   C0 Front-end tick | 74–81 |
 |   C1 Startup sequence (`0x004359D0` → `0x00435230`) | 82–116 |
 |   C2 Trademark screen input (adds to `ui/frontend-menus.md` §F1.3) | 117–129 |
-|   C3 Credits screen (`0x004312C0`) | 130–177 |
-|   C4 Credits text file and parsing (`0x00430CD0`, `0x00431050`, `0x00430EF0`, `0x00430C80`) | 178–216 |
-|   C5 Video hook (all videos; stub in d2rs) | 217–247 |
-|   C6 Cinematics progress byte N | 248–266 |
-|   C7 Palette | 267–273 |
-|   C8 Cinematics menu (`0x00431600`) | 274–313 |
-|   C9 Sounds (deferred; owner `client/audio.md`) | 314–320 |
-|   C10 640 × 480 | 321–327 |
-| Constants & data dependencies | 328–345 |
-| Randomness | 346–349 |
-| Edge cases & original bugs | 350–367 |
-| Test vectors | 368–386 |
-| Provenance | 387–408 |
-| Open questions | 409–424 |
+|   C3 Credits screen (`0x004312C0`) | 130–180 |
+|   C4 Credits text file and parsing (`0x00430CD0`, `0x00431050`, `0x00430EF0`, `0x00430C80`) | 181–223 |
+|   C5 Video hook (all videos; stub in d2rs) | 224–254 |
+|   C6 Cinematics progress byte N | 255–273 |
+|   C7 Palette | 274–280 |
+|   C8 Cinematics menu (`0x00431600`) | 281–320 |
+|   C9 Sounds (deferred; owner `client/audio.md`) | 321–327 |
+|   C10 640 × 480 | 328–334 |
+| Constants & data dependencies | 335–352 |
+| Randomness | 353–356 |
+| Edge cases & original bugs | 357–374 |
+| Test vectors | 375–394 |
+| Provenance | 395–417 |
+| Open questions | 418–433 |
 <!-- /index -->
 
 ## Summary
@@ -150,8 +150,11 @@ Sounds are named only.
      at `off` 0); rows below y 600 fall off the screen;
    - x: column A: pen x = x − width A of the row (`ui/text.md` §6): the text ends at x (560 / 400). Column
      B: pen x = x (570 / 410). Column C: pen x = x + max(0, ⌊(250 − width A)/2⌋): centred in x … x + 250
-     (440–690 classic, 280–530 expansion; centre 565 / 405), and a row wider than 250 px starts at the
-     column's left edge instead of being centred;
+     (440–690 classic, 280–530 expansion; centre 565 / 405); the centring offset uses the whole row's
+     width A and is never negative. The general text-control layout (margins, alignment flags, row
+     clipping, wrap) is `ui/frontend-menus.md` §F1.1 r8; for these columns the margins are 0;
+   - clip (`0x004FBEE0`): each row is cut to its longest prefix whose width B is < 250 px before it is
+     drawn; after the C4 r5 wrap no shipped row is cut;
    - colour = the row's k (C4 r4); draw call `ui/text.md` §7 (not centred).
 3. Scroll (flag 0x80, inside the draw): first `off` −= 2; if `off` < −19 then `off` := 0 and the top row
    := the next row. Then the rows are drawn. So after draw t (t = 1, 2, …): top row = 20 + ⌊t/10⌋, `off` =
@@ -172,8 +175,8 @@ Sounds are named only.
    automatic return with the shipped files (because the scroll never updates the index the check reads);
    settled by REC-225. A list of ≤ ~62 rows in C returns on the first timer call (edge case 4).
 7. With the shipped English files (C4 r6): "The End" (C row R) is the top row from draw (R − 20)·10 and
-   disappears at draw (R − 19)·10: classic R = 1,230 → draw 12,110 (484.4 s); expansion R = 1,796 → draw
-   17,770 (710.8 s).
+   disappears at draw (R − 19)·10: classic R = 1,232 → draw 12,130 (485.2 s); expansion R = 1,800 → draw
+   17,810 (712.4 s).
 
 ### C4 Credits text file and parsing (`0x00430CD0`, `0x00431050`, `0x00430EF0`, `0x00430C80`)
 
@@ -205,14 +208,18 @@ Sounds are named only.
    4); `[0x0077996C]` := top index of C.
 4. Colours (`k` of `ui/text.md` §5, text-colour maps of the sky PL2, C7): headings k = 1, every other row
    k = 4. The shipped files hold no `ÿc` code (0 found).
-5. Wrap: columns A and B (flag 0x20 clear) hand a row whose width B over its first 255 units is ≥ 250 px
-   to the D2Win split helper `0x004FCDA0` (not traced); column C never wraps. No pair line of the shipped
-   files reaches 250 px (widest 236 classic, 193 expansion, FontFormal10 advances from `fontformal10.tbl`),
-   so with them the helper never runs. Six centred rows are wider than 250 px (2 classic, 4 expansion,
-   widest 406) and draw from the column's left edge (C3 r2).
-6. Shipped English files, by these rules: classic 93 headings, 730 pairs, 62 single lines → C has 1,231
-   rows (`The End` = row 1,230); expansion 184 headings, 913 pairs, 119 single lines → 1,797 rows (`The
-   End` = row 1,796). The parse reads every line of both files (no early stop).
+5. Wrap: all three columns wrap (flags 0x90 / 0x80 / 0x82 all have bit 0x20 clear; the add `0x004FC9B0`
+   skips the wrap only when 0x20 is set): a row whose width B over its first 255 units is ≥ 250 px is
+   split by `0x004FCDA0` into rows (`ui/frontend-menus.md` §F1.1 r8 (d)), each added with the row's
+   colour, no indent (the parse passes indent mode 0). No pair line of the shipped files reaches 250 px
+   (widest 236 classic, 193 expansion, FontFormal10 advances from `fontformal10.tbl`). Six C rows do, all
+   headings (2 classic: 268 and 406 px; 4 expansion: 287, 406, 268, 406): each splits into exactly two
+   rows (k = 1), so each adds one row to C, and the balance after the heading then adds one blank row
+   to A and B. (Corrected 2026-10-08: an earlier draft said column C never wraps.)
+6. Shipped English files, by these rules: classic 93 headings, 730 pairs, 62 single lines, 2 wrapped
+   headings → C has 1,233 rows (`The End` = row 1,232); expansion 184 headings, 913 pairs, 119 single
+   lines, 4 wrapped headings → 1,801 rows (`The End` = row 1,800). The parse reads every line of both
+   files (no early stop).
 
 ### C5 Video hook (all videos; stub in d2rs)
 
@@ -353,7 +360,7 @@ None.
    accented letter) ends the parse: the rest of the file never shows. The shipped files only have such
    lines as second lines of pairs.
 2. A pair whose second line is blank turns the first line into a centred single row.
-3. Centred rows wider than 250 px are drawn from the column's left edge (C3 r2), not centred.
+3. Rows ≥ 250 px wrap at load (C4 r5), in every column; the draw also cuts any row to < 250 px (C3 r2).
 4. A credits list of ≤ ~62 rows in column C returns to the main menu on the first timer call; a longer one
    never returns by itself (C3 r6).
 5. The scroll runs in the draw, so it advances one step per drawn tick; a stalled front end (debt dropped
@@ -377,9 +384,10 @@ None.
 | Startup, no N | logs the two logo videos and `DATA\LOCAL\video\ENG\d2intro640x292.bik`; N 0x22; trademark | C1 r2, r4 |
 | Credits (expansion), draw 1 / 9 / 10 | row 50 baseline 588 / 572 / 571; top row 20 / 20 / 21 | C3 r3–r4 |
 | Credits row 50 = pair L1 "Ab", L2 "Cd" (expansion) | "Ab" drawn ending at x 400; "Cd" starting at x 410 | C3 r2 |
-| Centred row of width 300 px (expansion) | pen x 280 | C3 r2 |
+| Synthetic heading `*AAAA BBBB`, width B of `AAAA` 240 px, of `AAAA B` 252 px | two C rows `AAAA` and `BBBB` (the leading space dropped), both k 1; A and B get one extra blank row | C4 r5, §F1.1 r8 |
+| Synthetic centred row `AAAA` of width 100 px (expansion) | pen x 280 + 75 = 355 | C3 r2 |
 | Lines `*H`, `Al`, `Bo`, (blank), `Cy` | C: …, `H` (k 1), blank, blank, … ; A/B: `Al` / `Bo` on the row after the heading's blank; `Cy` never shown | C4 r3 |
-| Shipped expansion file | C rows 1,797; `The End` gone at draw 17,770 | C3 r7, C4 r6 |
+| Shipped expansion file | C rows 1,801; `The End` gone at draw 17,810 | C3 r7, C4 r6 |
 | Trademark: key Q / key N / Space | stays / main menu / main menu | C2 |
 | Video playing: ← key / `a` / right click | plays on / ends / ends | C5 r2 |
 | Credits: Space, Enter, click on text | nothing; Esc → main menu | C3 r5 |
@@ -392,7 +400,8 @@ front-end entry `0x004359D0`; startup `0x00435230`, `0x00433640`, `0x004334E0`, 
 `0x004F9BF0`, `0x004F9B60`, `0x004FA760`, table `0x0072DC48`–`0x0072DDB8`; image ctor `0x004FD6C0`, click
 `0x004FD5D0`; timer `0x004FD9D0`, `0x004FD860`, `0x004FD8F0`, `0x004FD970`, `0x004FD830`, `0x004FDA50`;
 credits `0x004312C0`, `0x00431050`, `0x00430CD0`, `0x00430EF0`, `0x00430C80`, `0x004341F0`, `0x00435020`;
-text control `0x004FC7A0`, `0x004FC9B0`, `0x004FCF80`, `0x004FD060`, draw `0x004FBF30`, `0x004FB950`,
+text control `0x004FC7A0`, `0x004FC9B0`, `0x004FCF80`, `0x004FD060`, split `0x004FCDA0`, clip `0x004FBEE0`
+(2026-10-08 re-read: wrap in all columns, heading add `0x0043113C` colour 1, mode 0), draw `0x004FBF30`, `0x004FB950`,
 `0x004FBA30`, `0x004FB6A0`, font height `0x00501A40`; front-end loop `0x004FA590`; cinematics `0x00431600`,
 `0x004313D0`, `0x004313A0`, jump tables `0x00431550`, `0x004317AC`, entry callbacks
 `0x00434320`–`0x00434560`, `0x004345C0`, `0x00431870`, `0x0042FD10`, `0x004317D0`, `0x005009D0`,

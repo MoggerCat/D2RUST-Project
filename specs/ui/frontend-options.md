@@ -26,17 +26,17 @@
 |   O2. Menu records and the tree | 136–205 |
 |   O3. Save and Exit Game (`0x0047F2D0`) | 206–211 |
 |   O4. Draw (`0x0047E3D0`, while ui 9 is open, from the UI draw `0x00456F46`) | 212–268 |
-|   O5. Input (handler table `0x006D6030`, 7 entries, registered while ui 9 is open) | 269–308 |
-|   O6. Row effects (apply = +0x114, init = +0x118; registry writes are REG_DWORD) | 309–353 |
-|   O7. Settings storage and the d2rs config mapping | 354–385 |
-|   O8. d2rs stubs (rows drawn and navigated like the original, value kept in `settings.toml`, no effect) | 386–399 |
-|   O9. Configure Controls (ui 11, `UI_CONFIG`) | 400–485 |
-| Constants & data dependencies | 486–505 |
-| Randomness | 506–509 |
-| Edge cases & original bugs | 510–534 |
-| Test vectors | 535–564 |
-| Provenance | 565–595 |
-| Open questions | 596–603 |
+|   O5. Input (handler table `0x006D6030`, 7 entries, registered while ui 9 is open) | 269–313 |
+|   O6. Row effects (apply = +0x114, init = +0x118; registry writes are REG_DWORD) | 314–358 |
+|   O7. Settings storage and the d2rs config mapping | 359–390 |
+|   O8. d2rs stubs (rows drawn and navigated like the original, value kept in `settings.toml`, no effect) | 391–407 |
+|   O9. Configure Controls (ui 11, `UI_CONFIG`) | 408–501 |
+| Constants & data dependencies | 502–521 |
+| Randomness | 522–525 |
+| Edge cases & original bugs | 526–550 |
+| Test vectors | 551–580 |
+| Provenance | 581–614 |
+| Open questions | 615–622 |
 <!-- /index -->
 
 ## Summary
@@ -302,9 +302,14 @@ normal, 1 = the disabled look (`render/blend-modes.md`). Cel y is the value pass
    `0x0047CC90`: p = trunc((v − min + 1) × (n − 1) / (max − min)); value from position
    `0x0047CD00`: v = trunc(min + (max − min) / (n − 1) × p). Ranges: Sound, Music, 3D Bias 0–100, n
    21 (v = 5p; `audio/sound-table-2.md` §15); Gamma 55–255, n 21 (v = 55 + 10p); Contrast 0–100, n
-   100. PROVISIONAL: the divisions and products run at 53-bit (double) precision, so Contrast p 99
-   → 100 and v 100 → p 99 (because MSVC's default x87 precision is 53-bit unless a renderer
-   changed it); settled by REC-213.
+   100. Precision: 53-bit (double). The CRT start-up sets it (`__setdefaultprecision` `0x0068E70A`,
+   called at `0x00682FC4`: `_controlfp_s(_PC_53, _MCW_PC)`); both conversions keep every
+   intermediate on the x87 stack (no store to a 32-bit float) and change only the rounding bits
+   (`fnstcw`, OR 0xC00, `fldcw`, restored after `fistp`), and no game code writes the precision
+   bits. So Contrast p 99 → v 100 and v 100 → p 99. Integer arithmetic v = min + (max − min)·p /
+   (n − 1), p = (v − min + 1)·(n − 1) / (max − min) (truncating) gives the same result as the
+   53-bit computation for every p and v of the three ranges (enumerated 2026-10-08). REC-213 only
+   verifies (a 3D device that resets the FPU precision is outside `Game.exe`).
 
 ### O6. Row effects (apply = +0x114, init = +0x118; registry writes are REG_DWORD)
 
@@ -397,6 +402,9 @@ normal, 1 = the disabled look (`render/blend-modes.md`). Cel y is the value pass
 Implemented for real: Light Quality, Blended Shadows, all Automap rows, the navigation rows, Save
 and Exit Game, Configure Controls.
 
+d2rs adds no rows: every menu has exactly the §O2 r3 rows (Video exp: 8 rows, tops of §O4 r4).
+d2rs-only settings (e.g. the window mode) live in `settings.toml` only and have no menu row.
+
 ### O9. Configure Controls (ui 11, `UI_CONFIG`)
 
 1. **Open** (`0x0047F400`): ui 9 open → `SetUIState(9, off, 0)` (the remembered UI states of §O1
@@ -404,7 +412,9 @@ and Exit Game, Configure Controls.
    tables `0x006D6024` (1 entry) and `0x006D60C0` (13 entries), then `0x004A5200(1)`; the close
    hook (in `0x00455AE0`, `0x00455C73`) unregisters them and calls `0x004A5200(0)` (when not
    editing: key mode back, `0x0044DD20`, `0x00466FE0`). `0x004A5200(1)` does: table choice
-   (`ui/controls.md` §3.3: exp 62 rows, classic 51), and when not editing: snapshot the binding
+   (`0x004A43E0`, at every open: the joined game's expansion flag `0x0044DCC0` = `[0x007A04F4]`, not
+   the install, picks the expansion table `0x00724468` with 62 rows, else the classic one with 51;
+   `ui/controls.md` §3.3), and when not editing: snapshot the binding
    table (`0x00469D20`), key mode 0 (`ui/controls.md` §4.1 r5), `0x0044DCE0`, `0x00467A70`; top
    row := 0, selected row := 0; the column (`[0x007246D4]`, initial 1) and the latch
    (`[0x00724728]`, initial 1) keep their values across opens.
@@ -482,6 +492,12 @@ and Exit Game, Configure Controls.
 8. d2rs: Accept writes `controls.toml` (`client/ui.md` §A6: `[bindings]` per action in slot order
    1, 0; `[unbind]` for actions left without keys) instead of the `.key` files (one file for all
    characters); Default = `preset = "original"`.
+9. **Where it shows.** ui 11 is drawn by the UI pass step 1 (`ui/panels.md` §5 r1: `[9]` →
+   `0x0047E3D0`, then `[0x0B]` → `0x004A5270`) over the live world view; ui 9 is closed while it is
+   open (r1), the panels later in the pass draw over it, and single player pauses as for ui 9 (§O1
+   r6). Key mode 0 (r1) means no binding command runs while it is open (Esc reaches r3 / r5, not
+   command 56). Leaving: Accept → the game (ui 9 stays closed, saved states restored); Cancel → the
+   Options menu (r7).
 
 ## Constants & data dependencies
 
@@ -590,6 +606,9 @@ flags `0x006D6378` read from the image), xrefs of `0x0047E200` / `0x0047E090`, r
 `0x0047E208`, `0x0047F05F`, `0x004990D9`, `0x00499CAA`, `0x004A6AB9`, `0x004A6CE1`, `0x004A6DE9`,
 `0x004A7011`, `0x004BA64E`), client loop `0x0044EFA0`; DC6 headers of `options`, `exit`,
 `returntogame`, `pentspin` (d2data; `mpq-tool list` of d2exp / Patch_D2 shows no copies).
+2026-10-08 (REC-187 / REC-256): CRT precision `0x0068E70A` (caller `0x00682FC4`), the 40 `fldcw` sites
+of the image (game code: save / OR 0xC00 / restore only); key-config table choice `0x004A43E0`,
+`0x0044DCC0`, open / close `0x004A5200`.
 D2MOO (1.10f) `D2MenuItemStrc` / `D2MenuInfoStrc` used only as a hint for the record layout; every
 field confirmed from the 1.14d records and their users.
 
@@ -598,5 +617,5 @@ field confirmed from the 1.14d records and their users.
 - **REC-212** Esc menu tree capture. Verifies (rule 10) §O4 r4–r6 against pixels (positions,
   pentagram frames and placement, no backdrop) and §O1 r4; both behaviours are settled from the
   binary (2026-10-08) and are no longer provisional.
-- **REC-213** Slider float precision. Settles §O5 r7 (53-bit vs 24/64-bit x87 precision: Contrast
-  p 99 → 100 or 99).
+- **REC-213** Slider float precision. Verifies §O5 r7 (settled from the binary 2026-10-08: 53-bit,
+  the CRT default; Contrast p 99 → 100).

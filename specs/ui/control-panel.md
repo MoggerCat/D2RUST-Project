@@ -1,8 +1,9 @@
 # Spec: UI — Control panel overlays (globes, bars, belt, skill buttons, run / menu buttons, mini panel, new-stats / new-skills buttons)
 
 - **Status:** draft (2026-10-07, RE on the 1.14d `Game.exe`; 2026-10-08
-  REC-240 / REC-238: §5 r4, r5, r8, r13, r14, §3 r6, §6 r1; no capture
-  yet). Answers UP-28 (`ui/panels.md` §6 r3, §Open questions 1, control
+  REC-240 / REC-238: §5 r4, r5, r8, r13, r14, §3 r6, §6 r1; REC-252:
+  §3 r6 font and 640 × 480, §4 r2 stamina tip as pop-up text and the
+  `stambarblue` flag; no capture yet). Answers UP-28 (`ui/panels.md` §6 r3, §Open questions 1, control
   panel part). `ui/panels.md` §6 owns the border and the base art; this
   spec owns everything drawn on top of it and the control panel input.
 - **Target version:** 1.14d, English install
@@ -18,26 +19,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 43–56 |
-| Inputs | 57–70 |
-| Outputs / state changes | 71–78 |
-| Rules | 79–80 |
-|   1. Draw order (`0x00499450`) | 81–101 |
-|   2. Art files | 102–115 |
-|   3. Life and mana globes | 116–169 |
-|   4. Experience and stamina bars | 170–195 |
-|   5. Belt | 196–419 |
-|   6. Run / walk and menu buttons | 420–440 |
-|   7. Skill buttons | 441–463 |
-|   8. New-stats and new-skills buttons | 464–512 |
-|   9. Mini panel (state 0x15) | 513–573 |
-|   10. Control panel mouse input | 574–614 |
-| Constants & data dependencies | 615–625 |
-| Randomness | 626–629 |
-| Edge cases & original bugs | 630–642 |
-| Test vectors | 643–672 |
-| Provenance | 673–693 |
-| Open questions | 694–735 |
+| Summary | 44–57 |
+| Inputs | 58–71 |
+| Outputs / state changes | 72–79 |
+| Rules | 80–81 |
+|   1. Draw order (`0x00499450`) | 82–102 |
+|   2. Art files | 103–116 |
+|   3. Life and mana globes | 117–185 |
+|   4. Experience and stamina bars | 186–235 |
+|   5. Belt | 236–459 |
+|   6. Run / walk and menu buttons | 460–480 |
+|   7. Skill buttons | 481–503 |
+|   8. New-stats and new-skills buttons | 504–552 |
+|   9. Mini panel (state 0x15) | 553–613 |
+|   10. Control panel mouse input | 614–654 |
+| Constants & data dependencies | 655–666 |
+| Randomness | 667–670 |
+| Edge cases & original bugs | 671–683 |
+| Test vectors | 684–716 |
+| Provenance | 717–740 |
+| Open questions | 741–782 |
 <!-- /index -->
 
 ## Summary
@@ -166,6 +167,21 @@ draw mode 5 unless a rule says otherwise.
    color 0, not centred)` (`0x00502320`) for life, `(W − 80 − w / 2,
    H − 95)` for mana. No backing box: these are plain text draws, not
    pop-up text (§5 r14).
+   Settled for REC-252 (2026-10-08): the font is font 1 (Font16) in
+   every frame. The belt draw `0x00499040` sets it unconditionally as
+   its first act (`0x00499053`) and is called unconditionally by step 7
+   (`0x004994BF`); none of the later step-7 draws (`0x00496CF0`,
+   `0x00497A40`, `0x00498340`) nor the step-8 buttons (`0x004A6A70`,
+   `0x004A6B30`, `0x004A6DA0`, `0x004A6E60`) calls the font setter
+   `0x00502EF0`. The divisions by 256 are `sar 8` (arithmetic) here;
+   the "≤ 1" raise is an unsigned compare (`cmp esi, 1; ja`), so shown
+   0 and 1 become 1 (shown is never negative after r1's clamp). The
+   formatted text is copied into a second 100-unit buffer
+   (`0x00526700`, a wide-string append onto the zeroed buffer) before
+   the width and the draw; that copy changes nothing visible. Neither
+   function has a resolution branch: the 640 × 480 positions are the
+   same formulas with W = 640, H = 480 (life (65 − w / 2, 385), mana
+   (560 − w / 2, 385)).
 
 ### 4. Experience and stamina bars
 
@@ -185,13 +201,37 @@ draw mode 5 unless a rule says otherwise.
    index, computed once): red (255, 0, 0), gold (244, 192, 76), blue (0,
    0, 255). v = shown stamina, m = max. Color gold, scale m; if m + 5 <
    v or P has a state of group 24 (`stambarblue`, `0x0063A7B0`): scale :=
-   v, color blue. w = 0 when scale ≤ 0, else 102 · v / scale; w < 25 →
+   v, color blue. "Group 24" is the `states` flag bit 24 (`stambarblue`,
+   `data/fields.tsv`), not the `group` column: `0x0063A7B0(unit, k)`
+   (k ≤ 0x27) ANDs the mask of every state with flag k (`[0x00744304]`
+   + 0xCC + 4k, built at load) with the unit's state bits (`0x0063A130`,
+   `0x00625BB0`); any common bit → true. w = 0 when scale ≤ 0, else 102 · v / scale; w < 25 →
    red. Rectangle `0x0046EFD0(W/2 − 127, H − 27, w, 18, color, mode 2)`
    (= `DrawRectangle(x, y, x + w, y + 18, color, 2)`).
    - Hover x W/2 − 127…W/2 − 25, y H − 27…H − 9: tool tip `panelstamina`
      (4164, "Stamina: %d / %d") with v >> 8 and m >> 8 at (W/2 − 76, H −
      52), centred, color 0 — or color 3 with the value shown as the max
      when v >> 8 > m >> 8 or P has state 136 (`shrine_stamina`).
+   - Settled for REC-252 (2026-10-08, `0x00497684`–`0x00497766`): the
+     tip is **pop-up text** (§5 r14), not a `DrawText`:
+     `0x00502280(text, W/2 − 76, H − 52, colour, centre 1)` (W/2 by C
+     division, `cdq; sub; sar 1`). v and m are read again (stat 10 shown,
+     `0x00496DD0`, and the max `0x00625DB0`) and divided by 256
+     rounding toward zero (`cdq; and edx, 0xFF; add; sar 8`; equal to
+     `>> 8` for the non-negative values that occur). Colour 0
+     (no remap, `ui/text.md` §5) normally; colour 3 (blue, (105, 105,
+     255) in the act 1 palette, `ui/text.md` §5 table) and the
+     first number := m / 256 when v / 256 > m / 256 (signed) or P has
+     state 136 (`0x00639DF0(P, 0x88)`). Text: string 4164 formatted
+     with (first number, m / 256) into a 100-unit buffer (`0x005269D0`).
+     The mouse test (`0x00468730` / `0x00468740`, both ends inclusive)
+     runs after the bar is drawn, every frame, with no other condition.
+     Drawn by `0x00503000` at UI pass step 10 in the current font, i.e.
+     Font16 (font 1, set by the belt draw after this function, §5 r4)
+     over the colour-0 mode-2 box of §5 r14; its box is centred on W/2 −
+     76 and its bottom is H − 50 (y0 = y + 2). One slot: a later
+     `0x00502280` caller in the same frame replaces it (§5 r14). No
+     resolution branch (640 × 480: x 244, y 428).
 
 ### 5. Belt
 
@@ -621,7 +661,8 @@ draw mode 5 unless a rule says otherwise.
   (pop-up rows), `0x00497A1C` (row count), `0x0047ED6C` (mini panel),
   `0x0047F630` (tool tips); key-name jump tables `0x0046A448`,
   `0x0046A2CC`, `0x0046A2B8` (long), `0x0046A73C`, `0x0046A6BC` (short).
-- States: 2, 24 (group), 100, 106, 136; stats 6–13, 26, 74.
+- States: 2, 100, 106, 136; `states` flag bit 24 (`stambarblue`, §4
+  r2); stats 6–13, 26, 74.
 
 ## Randomness
 
@@ -653,6 +694,9 @@ Synthetic (rules as cited).
 | 800 × 600, X = 1,000, prev 500, next 1,500 | px = 59; lines (256, 562)–(315, 562) and y 563 | §4 r1 |
 | stamina v = m = 25,600 | w = 102, gold | §4 r2 |
 | stamina v = 5,000, m = 25,600 | w = 19 → red | §4 r2 |
+| 800 × 600, mouse (300, 580), stamina 12,800 of 25,600, no state 136 | pop-up `Stamina: 50 / 100` at (324, 548), centre 1, colour 0, Font16, box bottom 550 | §4 r2, §5 r14 |
+| same, P has state 136 | `Stamina: 100 / 100`, colour 3 | §4 r2 |
+| 640 × 480, Show HP Text on, shown life 25,600 of 25,600 | `Life: 100 / 100` `DrawText` at (65 − w / 2, 385), Font16, colour 0, no box | §3 r6 |
 | single player, 800 × 600, layout 2 | art at (323, 553); buttons at x 326, 347, 368, 389 (f 4), 410, 431, 452 | §9 r3, r4 |
 | multiplayer, 640 × 480, layout 1 | buttons x 118 + 21 i, y 430 | §9 r4 |
 | 640 × 480 belt type 0 popped | rows at y 439, 407 | §5 r3 |
@@ -687,7 +731,10 @@ Synthetic (rules as cited).
 `0x00469AA0`, `0x00469DE0`, `0x0046A530`, `0x004978D0`, `0x0046EFD0`,
 `0x00497A40`, `0x00489840`, `0x00502280`, `0x005022F0`, `0x00503000`,
 `0x00502C60` (2026-10-08: REC-240, REC-238; jump tables read from the
-image with `pefile`).
+image with `pefile`); REC-252 (2026-10-08, disassembled): `0x004975B0`
+(`0x00497684`–`0x00497766`), `0x00498120` (whole), `0x00499040`
+(`0x00499053`), `0x00499450` call list, `0x0063A7B0`, `0x0063A130`,
+font-setter `0x00502EF0` call sites.
 Strings, `belts.txt`, `states.txt` and `itemstatcost.txt` rows read
 with Python scripts outside the repo. No capture yet.
 

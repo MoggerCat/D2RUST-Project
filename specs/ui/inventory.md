@@ -166,7 +166,7 @@ anchor, `0x007BCC20` hovered body location).
    size w × h: x = left + cellW · c + (w · cellW) / 2, top = top + cellH ·
    r, bottom = top + cellH · (r + h) (`0x00721E3C` / `0x00721E44`,
    `0x00721E40`, `0x00721E48`); the hover box is drawn from these
-   (`ui/text.md` §8; queue `0x00502280`).
+   (`ui/text.md` §8; queue `0x00502280`; contents `ui/item-tips.md`).
 2. With a cursor item: the cursor cell is computed from the cursor
    graphic's size and the item's w × h, centred and clamped to the grid
    (`0x00487000` second branch); hover-in-grid := 1, hovered item cleared.

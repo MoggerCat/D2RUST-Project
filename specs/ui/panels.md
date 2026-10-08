@@ -42,17 +42,17 @@
 |   9. Inventory panel family (`0x0048EDF0`) | 475–535 |
 |   10. Skill tree (ui 4, right; `0x004AC690`) | 536–599 |
 |   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 600–635 |
-|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 636–686 |
-|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 687–739 |
-|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 740–745 |
-|   15. Event → intent summary | 746–773 |
-|   16. Machine tables | 774–808 |
-| Constants & data dependencies | 809–829 |
-| Randomness | 830–834 |
-| Edge cases & original bugs | 835–855 |
-| Test vectors | 856–896 |
-| Provenance | 897–941 |
-| Open questions | 942–1033 |
+|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 636–688 |
+|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 689–741 |
+|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 742–747 |
+|   15. Event → intent summary | 748–775 |
+|   16. Machine tables | 776–810 |
+| Constants & data dependencies | 811–831 |
+| Randomness | 832–836 |
+| Edge cases & original bugs | 837–857 |
+| Test vectors | 858–898 |
+| Provenance | 899–943 |
+| Open questions | 944–1035 |
 <!-- /index -->
 
 ## Summary
@@ -637,9 +637,11 @@ after both.
 
 1. Open: `0x0048A460` → `SetUIState(0x1A, on)`, mode 0x0E; the open
    hook loads `%s\ui\panel\supertransmogrifier` (`0x0048A4B0`).
-2. If the cube item is gone (`0x0044DA30` or `0x00463DF0`) while drawn:
-   `SetUIState(0x1A, off)`, then C→S 0x4F button 0x17 (`0x0048F183`)
-   and nothing more is drawn that frame.
+2. Exit flag (`0x0044DA30`) or missing / dead local player (`0x00463DF0`:
+   no player, or mode 0x11) while drawn (`0x0048EEB0`–`0x0048EEC4`, the
+   only tests): `SetUIState(0x1A, off)`, then C→S 0x4F button 0x17
+   (`0x0048F183`) and nothing more is drawn that frame. A missing cube does
+   not close the panel (`world/cube.md` §11 r3).
 3. Art: frames 0–3 as left quads; cube grid (page 3) via `0x00483FF0`.
    Close button at (`sx + 275`, `H + sy − 65`) frame 10 + `[0x007BCE40]`;
    transmute button `Panel\miniconvert` frame `[0x007BCE48]` (0/1) at
@@ -681,7 +683,7 @@ after both.
    close reaches the hook, the nested `0x0048A050`'s `SetUIState` finds
    the state closed (no hook again) and the latch lets only the first of
    the two calls send: **one** 0x4F 0x17 per open, whichever path closes.
-8. Button rectangles and the cube-gone close (two 0x4F 0x17):
+8. Button rectangles and the exit / dead close (two 0x4F 0x17):
    `ui/panels-2.md` §20.2–§20.4.
 
 ### 13. Waypoint menu (ui 0x14, left; `0x0049C9C0`)
@@ -753,7 +755,7 @@ call):
 |---|---|---|
 | character | release on an add button | 0x3A × ⌈n / 32⌉ (`combat/vitals.md` §2) |
 | skill tree | release on a pressed icon, points left | 0x3B (`skills/levels.md` §6.4) |
-| inventory, stash, cube, trade pages | grid click (`0x0048FFE0`) | 0x19 lift, 0x18 place, 0x1F swap, 0x20 use, 0x21 stack, 0x27 use on item, 0x28 socket, 0x29 scroll to tome, 0x2A to cube, 0x33 sell, 0x63 to belt, 0x4C (`items/inventory-moves.md` §7) |
+| inventory, stash, cube, trade pages | grid click (`0x0048FFE0`) | 0x19 lift, 0x18 place, 0x1F swap, 0x20 use (`0x00487740` → sender `0x004786D0`, call `0x004878F4`; with ui 0x19 open and the item a `box `, `[0x007BCC50]` := 1 first), 0x21 stack, 0x27 use on item, 0x28 socket, 0x29 scroll to tome, 0x2A to cube, 0x33 sell, 0x63 to belt, 0x4C (`items/inventory-moves.md` §7) |
 | inventory | body location click (`0x00490780`, `0x00490BA0`, `0x00490FC0`) | 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x21, 0x27, 0x4C (`items/inventory-moves.md` §7) |
 | inventory | socket fill (`0x004912A0`) | 0x28 |
 | inventory | weapon swap (`0x0048A730`) | 0x60 |
