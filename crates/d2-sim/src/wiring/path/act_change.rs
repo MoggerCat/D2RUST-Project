@@ -133,6 +133,15 @@ pub fn run<X: Pending>(mut c: PathCtx<'_, X>, player: UnitId, level: u32, tile_i
         // The handshake 0x0B makes it the local player again.
         let g = guid.to_le_bytes();
         c.v.h.x.send(player, &[0x0B, 0, g[0], g[1], g[2], g[3]]);
+        // The re-added unit has no stats on the client: its vitals sync
+        // caches start again (`combat/vitals.md` §5.2, a new client's
+        // cache is all 0), so the next sync sends the life message and
+        // every watched stat. d2rs-own, unverified (q-smoke-town, REC-278;
+        // goes with the re-add above).
+        if let (Some(client), Some(s)) = (client, c.v.h.sync.as_mut()) {
+            s.caches.remove(&client);
+            s.stats.remove(&client);
+        }
     }
     // LoadComplete: the client is in the game again (needs the placed
     // local player). d2rs-own, unverified: the recording shows none, the

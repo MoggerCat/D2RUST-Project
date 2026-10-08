@@ -152,11 +152,13 @@ pub fn run<X>(
 }
 
 /// The stats whose changes follow as stat messages: the attributes (0-3),
-/// stat and skill points (4, 5), the maxima (7, 9, 11), level (12),
-/// next-level experience (30), defense (31) and the resists (39-46).
-/// Life, mana, stamina, gold and experience have their own messages above.
-const WATCHED: [u16; 20] = [
-    0, 1, 2, 3, 4, 5, 7, 9, 11, 12, 30, 31, 39, 40, 41, 42, 43, 44, 45, 46,
+/// stat and skill points (4, 5), the maxima (7, 9, 11), level (12), the
+/// stash gold (15, a `Saved` stat of the changed-stat array,
+/// `stat-lists.md` §11 rule 1, with no message of its own), next-level
+/// experience (30), defense (31) and the resists (39-46). Life, mana,
+/// stamina, gold and experience have their own messages above.
+const WATCHED: [u16; 21] = [
+    0, 1, 2, 3, 4, 5, 7, 9, 11, 12, 15, 30, 31, 39, 40, 41, 42, 43, 44, 45, 46,
 ];
 
 /// The watched base values of `unit`, by stat. The item bonuses are not

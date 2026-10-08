@@ -11,9 +11,9 @@
 //! Wired to the model: `has_cursor_item` (§1.4 rule 3), `owns_item`,
 //! `in_inventory`, `equipped_items` (grid 0, §1.2), `place_in_backpack`
 //! (§2.4), `remove_stored` (§1.4 unlink, then the free), `copy_item`
-//! (§7.3, `InvDesk::copy_of`). Still the rest's
-//! (no written rule for the routine): `take_from_cursor` (`0x0055EEA0`),
-//! `unequip` (`0x00560CD0` by item), `can_belt` / `put_in_belt`
+//! (§7.3, `InvDesk::copy_of`), `take_from_cursor` (`0x0055EEA0`,
+//! `InvDesk::take_cursor`, PROVISIONAL REC-278). Still the rest's
+//! (no written rule for the routine): `unequip` (`0x00560CD0` by item), `can_belt` / `put_in_belt`
 //! (`0x0055E9B0`'s arguments here), `equip_ammo` (Open question 3),
 //! `find_tome`, `add_to_tome`, `find_partial_stack`, `lower_book_skill`.
 //!
@@ -307,8 +307,14 @@ where
         self.with_desk(|d| d.place(player, item, (0, 0), true, true))
             .unwrap_or(false)
     }
+    /// `0x0055EEA0` on the inventory model (`InvDesk::take_cursor`,
+    /// PROVISIONAL REC-278). Without inventory parts: the wrapped world's.
     fn take_from_cursor(&mut self, player: UnitId, item: UnitId) -> bool {
-        self.inner.take_from_cursor(player, item)
+        if self.inv.is_none() {
+            return self.inner.take_from_cursor(player, item);
+        }
+        self.with_desk(|d| d.take_cursor(player, item))
+            .unwrap_or(false)
     }
     fn lower_book_skill(&mut self, player: UnitId, item: UnitId, n: i32) {
         self.inner.lower_book_skill(player, item, n)

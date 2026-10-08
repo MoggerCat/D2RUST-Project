@@ -128,7 +128,7 @@ impl NpcMenus {
     /// The builder additions of §14.2 that the spec states exactly
     /// (`0x004B66B0` → `0x004B6410`): Kashya (150) with character level
     /// (stat 12) > 7 gets slot 1 = hire (3397), count 3. The Resurrect
-    /// insert / remove (`0x004B6440`) is not implemented (module Open).
+    /// insert / remove (`0x004B6440`) is [`Self::apply_resurrect`].
     pub fn apply_builder(&mut self, char_level: i32) {
         if char_level > 7 {
             self.each(NPC_KASHYA, |r| {
@@ -138,6 +138,16 @@ impl NpcMenus {
                 });
                 r.count = 3;
             });
+        }
+    }
+
+    /// The builder's Resurrect edit (`panels-2.md` §14.2, `0x004B66B0`):
+    /// for 150, 198, 252, 367 and 515 in an expansion game `0x004B6440`
+    /// inserts Resurrect when the mercenary is dead (`[0x00725494]` ≠ −1)
+    /// and removes it otherwise ([`resurrect_edit`]).
+    pub fn apply_resurrect(&mut self, merc_dead: bool, expansion_game: bool) {
+        for npc in RESURRECT_SELLERS {
+            self.each(npc, |r| resurrect_edit(r, merc_dead, expansion_game));
         }
     }
 
@@ -177,6 +187,10 @@ pub fn option_intent(kind: OptionKind, npc_guid: u32) -> Option<Vec<PanelOutput>
     };
     Some(vec![PanelOutput::Intent(i)])
 }
+
+/// The NPC classes whose menu the builder gives the Resurrect edit
+/// (`panels-2.md` §14.2: Kashya, Greiz, Asheara, Qual-Kehk 367 and 515).
+pub const RESURRECT_SELLERS: [u32; 5] = [150, 198, 252, 367, 515];
 
 /// The inserted Resurrect string id, a placeholder replaced at build time
 /// (§14.2; `ui/menus.md` §2.3).

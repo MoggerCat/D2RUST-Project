@@ -649,6 +649,58 @@ fn inv_vendors_answer_from_the_model() {
     assert!(probe.log.is_empty(), "{:?}", probe.log);
 }
 
+/// `vendors.md` §7.2 rule 9, mode 4 on the model (`0x0055EEA0`,
+/// PROVISIONAL REC-278): only the player's cursor item is taken; it leaves
+/// the cursor and is freed, and S→C 0x42 names the player whose cursor
+/// cleared (`client/msg-stats-items.md` §3 rule 1). Without inventory
+/// parts the wrapped world answers.
+// Rule (one clause each; no claim): vendors.md §7.2 r9.
+#[test]
+fn inv_vendors_take_the_cursor_item_on_the_model() {
+    let mut t = setup(4);
+    let (player, cube, ring) = (t.player, t.cube, t.ring);
+    let pg = t.guid(player);
+    let mut probe = Probe::default();
+    t.inventory().set_cursor(Some(ring));
+    let sent = with_vendors(
+        &mut t,
+        &mut probe,
+        |_| {},
+        |w| {
+            assert!(!w.take_from_cursor(player, cube), "not the cursor item");
+            assert!(w.take_from_cursor(player, ring));
+            assert!(!w.has_cursor_item(player));
+            w.sent.clone()
+        },
+    );
+    let mut clear = vec![0x42, 0];
+    clear.extend_from_slice(&pg.to_le_bytes());
+    assert_eq!(sent, [(player, clear)]);
+    assert!(!t.items().contains(ring), "the sold item is freed");
+    assert!(t.host.game.game.lists.unit(ring).is_none());
+    assert_eq!(t.inventory().items(), [cube]);
+    assert!(probe.log.is_empty(), "{:?}", probe.log);
+    // No inventory parts: the wrapped world's answer.
+    t.world().inventory = None;
+    with_vendors(
+        &mut t,
+        &mut probe,
+        |_| {},
+        |w| {
+            assert!(w.take_from_cursor(player, UnitId(1)));
+            assert!(!w.take_from_cursor(player, UnitId(2)));
+        },
+    );
+    let p = player.0;
+    assert_eq!(
+        probe.log,
+        [
+            format!("take_from_cursor {p} 1"),
+            format!("take_from_cursor {p} 2")
+        ]
+    );
+}
+
 // ---- InvVendors: every other call reaches the wrapped world -----------------------
 
 /// `vendor_inv.rs`: "every other call goes to the wrapped world
@@ -742,8 +794,11 @@ fn inv_vendors_pass_other_calls_through() {
             assert_eq!(w.quest_slot(player, 1, 2), 0x1234);
             assert_eq!(w.players_in_level(5), 105);
             assert_eq!(w.player_level_id(player), 7);
-            assert_eq!(w.gold_cap(player), 1234);
-            assert_eq!(w.stash_cap(player), 4321);
+            // The caps are the spec's (`0x00622E70` level × 10000,
+            // `0x00623460` the 1.14d constant), not the rest's.
+            let level = w.stat(player, 12, 0);
+            assert_eq!(w.gold_cap(player), level * 10_000);
+            assert_eq!(w.stash_cap(player), 2_500_000);
             assert_eq!(w.last_bought(player), 0xBEEF);
             w.drop_gold(player, 9);
             w.set_last_bought(player, 77);
@@ -805,8 +860,6 @@ fn inv_vendors_pass_other_calls_through() {
             assert!(!w.put_in_belt(player, two));
             assert!(w.equip_ammo(player, one));
             assert!(!w.equip_ammo(player, two));
-            assert!(w.take_from_cursor(player, one));
-            assert!(!w.take_from_cursor(player, two));
             w.lower_book_skill(player, one, 2);
             assert!(w.unequip(player, one));
             assert!(!w.unequip(player, two));
@@ -861,8 +914,6 @@ fn inv_vendors_pass_other_calls_through() {
             format!("put_in_belt {p} 2"),
             format!("equip_ammo {p} 1"),
             format!("equip_ammo {p} 2"),
-            format!("take_from_cursor {p} 1"),
-            format!("take_from_cursor {p} 2"),
             format!("lower_book_skill {p} 1 2"),
             format!("unequip {p} 1"),
             format!("unequip {p} 2"),

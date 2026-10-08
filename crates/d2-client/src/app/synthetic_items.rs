@@ -447,6 +447,13 @@ pub fn stat_data() -> StatData {
             r[o..o + 2].copy_from_slice(&0xFFFFu16.to_le_bytes());
         }
         r[0..2].copy_from_slice(&(s as u16).to_le_bytes());
+        // `Saved` (byte 5, bit 0x10) on stats 0–15, as 1.14d's
+        // `itemstatcost`: the stats the join's stat messages carry
+        // (`intents-events.md` §8.2 rule 3.4, the mod array of
+        // `stat-lists.md` §11); q-smoke-town, REC-278.
+        if s <= 15 {
+            r[5] |= 0x10;
+        }
     }
     let mut t = BinTable {
         name: "itemstatcost".into(),
