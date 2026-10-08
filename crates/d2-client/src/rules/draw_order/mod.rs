@@ -185,6 +185,9 @@ pub struct Dt1Facts {
     pub height: i32,
     /// Material flags (§6 r2: bit 0x2 starts water effects).
     pub material: u16,
+    /// Light direction (+0x00): the wall light points of
+    /// `render/lighting.md` §11 r2.
+    pub light_direction: u32,
 }
 
 /// A record's fade bytes (§8, §9: +0x24, +0x28, +0x29, +0x2A, +0x2C).

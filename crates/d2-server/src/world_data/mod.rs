@@ -190,6 +190,7 @@ pub fn tile_info(t: &Dt1Tile) -> TileInfo {
         subtile_flags: t.subtile_flags,
         roof_height: t.roof_height,
         height: t.height,
+        light_direction: t.light_direction,
     }
 }
 

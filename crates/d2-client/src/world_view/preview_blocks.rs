@@ -70,7 +70,7 @@ pub fn block_shades(
             .light_values(),
         ),
         TileKind::Wall | TileKind::LowerWall => {
-            let Ok(words) = wall_light_words(&light.map, origin, dt1.orientation, 0) else {
+            let Ok(words) = wall_light_words(&light.map, origin, dt1.light_direction, 0) else {
                 return Vec::new();
             };
             wall_block_shades(&light.tables, &words, blocks, alpha, false).unwrap_or_default()
@@ -238,7 +238,7 @@ mod tests {
         let cell = (20, 20);
         for direction in 1..=9u32 {
             let dt1 = Dt1Facts {
-                orientation: direction,
+                light_direction: direction,
                 ..Dt1Facts::default()
             };
             let words = wall_light_words(&f.map, (100, 100), direction, 0).unwrap();
@@ -265,11 +265,72 @@ mod tests {
         }
     }
 
+    // Covers: specs/render/lighting.md §11 r2, Open question 8
+    #[test]
+    fn a_wall_reads_the_points_of_its_light_direction_not_its_orientation() {
+        // Open question 8 (measured on every 1.14d DT1 header): the light
+        // direction is fixed by orientation, and differs from it for
+        // orientations 0, 4–19.
+        let pairs = [
+            (0, 3),
+            (1, 1),
+            (2, 2),
+            (3, 3),
+            (4, 3),
+            (5, 1),
+            (6, 2),
+            (7, 4),
+            (8, 1),
+            (9, 2),
+            (10, 1),
+            (11, 2),
+            (12, 3),
+            (13, 3),
+            (14, 3),
+            (16, 6),
+            (17, 7),
+            (18, 8),
+            (19, 9),
+        ];
+        let f = frame(&[((100, 100), 8, (255, 255, 255))]);
+        for (orientation, direction) in pairs {
+            let dt1 = Dt1Facts {
+                orientation,
+                light_direction: direction,
+                ..Dt1Facts::default()
+            };
+            let kind = if orientation >= 16 {
+                TileKind::LowerWall
+            } else {
+                TileKind::Wall
+            };
+            let words = wall_light_words(&f.map, (100, 100), direction, 0).unwrap();
+            let (a, b) = (words[0] as u8, words[1] as u8);
+            let out = block_shades(
+                &f,
+                env(),
+                kind,
+                &dt1,
+                (20, 20),
+                0xFF,
+                BlendOp::Opaque,
+                &[rect(0)],
+                &[(0, 0)],
+            );
+            let want = crate::rules::shading::wall_block_light([a, b, b, a], false);
+            let chain = f
+                .tables
+                .block_chain(want, crate::scene::GradientKind::Wall, 0, 0);
+            assert_eq!(out.len(), 1, "orientation {orientation}");
+            assert_eq!(out[0].shade, chain, "orientation {orientation}");
+        }
+    }
+
     // Covers: specs/render/lighting.md §11 r2
     #[test]
     fn unreadable_light_keeps_the_flat_tile_shade() {
         let f = frame(&[]);
-        let dt1 = Dt1Facts::default(); // orientation 0
+        let dt1 = Dt1Facts::default(); // light direction 0
         let out = block_shades(
             &f,
             env(),

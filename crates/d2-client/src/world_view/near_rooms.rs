@@ -205,6 +205,7 @@ impl MapState {
                                 roof_height: i32::from(info.roof_height),
                                 height: info.height,
                                 material: info.material,
+                                light_direction: info.light_direction,
                             },
                             fade,
                             logical,
