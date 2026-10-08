@@ -104,9 +104,7 @@ pub fn check(
     // Rule 3.
     unit.server_point = (x, y);
     let unit = &world.units[&key];
-    // The local player's own position: the play preview's walk cell
-    // ([`ClientWorld::own_cell`], PROVISIONAL client/model.md OQ2).
-    let (cx, cy) = world.own_cell(unit);
+    let (cx, cy) = unit.cell();
     let (xi, yi, cxi, cyi) = (i32::from(x), i32::from(y), i32::from(cx), i32::from(cy));
     // Rule 4.
     let t = tolerance(world, unit, kind);
@@ -159,7 +157,7 @@ fn correct(world: &mut ClientWorld, key: UnitKey, x: u16, y: u16) -> Checked {
     }
     if world.local_player == Some(key) {
         // C→S 0x5F with the unit's own position.
-        let (cx, cy) = world.own_cell(&world.units[&key]);
+        let (cx, cy) = world.units[&key].cell();
         let mut m = vec![0x5F];
         m.extend_from_slice(&cx.to_le_bytes());
         m.extend_from_slice(&cy.to_le_bytes());

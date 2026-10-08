@@ -1172,7 +1172,11 @@ fn a_stub_starts_a_new_character_before_the_join_sequence() {
     // fixture paladin's `StartSkill` is empty (-1): no start skill, so no
     // load 0x23; after the add messages 0x0B, 0x5F with +0x2C and the two
     // hands (hand 0 = 0).
-    assert_eq!(cs.startskill, u16::MAX, "the fixture paladin has no start skill");
+    assert_eq!(
+        cs.startskill,
+        u16::MAX,
+        "the fixture paladin has no start skill"
+    );
     assert_eq!(r.right_skill, None);
     let g = j.guid.to_le_bytes();
     let k = [0u8, 0];

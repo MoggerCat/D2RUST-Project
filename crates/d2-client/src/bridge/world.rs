@@ -577,10 +577,6 @@ pub struct ClientWorld {
     /// reserved slot ([`DIALOG_REPLY_SLOT`]): nothing after it is sent
     /// until the UI's answer fills or clears it.
     pub outgoing: Vec<Vec<u8>>,
-    /// The play preview's own-walk position of the local player (decision
-    /// D2): (the model `position` when it was set, the walk prediction's
-    /// sub-tile). [`Self::local_own_cell`] reads it.
-    pub local_walk: Option<((u16, u16), (u16, u16))>,
     /// 0x3F's use-item cursor.
     pub use_cursor: Option<UseCursor>,
     /// The pet list, newest first (§14 rule 5).
@@ -659,36 +655,6 @@ impl ClientWorld {
     /// The local player unit, if the model has one.
     pub fn local(&self) -> Option<&ClientUnit> {
         self.units.get(&self.local_player?)
-    }
-
-    /// Records the walk prediction's sub-tile of the local player
-    /// ([`Self::local_walk`]); `None` clears it.
-    pub fn set_local_walk(&mut self, cell: Option<(u16, u16)>) {
-        let pos = self.local().and_then(|u| u.position);
-        self.local_walk = pos.zip(cell);
-    }
-
-    /// The sub-tile the local player `unit` is at for the client: the
-    /// 1.14d client moves its own unit along its own path, so its position
-    /// follows the walk (`client/model.md` §3 rule 3); d2rs's play preview
-    /// moves only the prediction (open question 2), so its cell stands in
-    /// while the model position is still the one it was recorded against
-    /// (a placement since then wins). Other units, or no prediction: the
-    /// model position.
-    ///
-    /// d2rs-own, unverified. PROVISIONAL (client/model.md OQ2; REC-51):
-    /// without it the position check (§6 rule 8) asks the server with C→S
-    /// 0x5F at the last placement while the player walks on, and the
-    /// server's resync (`sim/pathing.md` §1.6) walks or snaps it back.
-    pub fn own_cell(&self, unit: &ClientUnit) -> (u16, u16) {
-        match self.local_walk {
-            Some((pos, cell))
-                if self.local_player == Some(unit.key) && unit.position == Some(pos) =>
-            {
-                cell
-            }
-            _ => unit.cell(),
-        }
     }
 
     /// Adds `unit` (§2 rule 4): an existing unit with the same key is

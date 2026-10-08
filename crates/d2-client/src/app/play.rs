@@ -432,16 +432,6 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         app.insert_resource(h.clone());
     }
     add_game(&mut app, link, true)?;
-    // PROVISIONAL (client/model.md §6 r6, §13; open question 7): the
-    // position check of S→C 0x95/0x96 asks whether the local player's
-    // sprite is on screen; the play camera keeps the local player centred,
-    // so it is visible. The full predicate (rules/unit_visibility.rs) needs
-    // the COF and cel of the frame; without any predicate every 0x96 (the
-    // run / stamina update) is refused and the player's position stalls.
-    app.world_mut()
-        .resource_mut::<BridgeResource>()
-        .0
-        .set_visibility(Some(local_player_on_screen));
     send_create_game_flags(&mut app, &request, config.start_flags)?;
     add_client_data(&mut app, drlg_source, level_rows.clone());
     app.world_mut()
@@ -561,10 +551,4 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         }
     }
     Ok(exit)
-}
-
-/// The play client's visibility input (see the PROVISIONAL note in
-/// [`run`]): the local player, whom the camera follows, is on screen.
-fn local_player_on_screen(_: &crate::bridge::world::ClientUnit, _: i32, _: i32) -> bool {
-    true
 }
