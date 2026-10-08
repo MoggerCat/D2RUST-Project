@@ -47,6 +47,16 @@ pub trait QuestInventory<H> {
     /// An economy error of a quest call's item creation (the host keeps
     /// it with its other provider errors).
     fn fault(&mut self, error: EconomyError);
+    /// The player's item list in link order (`inventory.md` §1.4 rule 1);
+    /// the quest item search `0x00558110` reads it.
+    fn items_of(&self, player: UnitId) -> Vec<UnitId>;
+    /// The player's cursor item (`0x0063C1E0`).
+    fn cursor_of(&self, player: UnitId) -> Option<UnitId>;
+    /// `0x0063BEF0`: the weapon in use (`quests-act3-2.md` §11.5).
+    fn weapon_in_use(&self, econ: &Economy<'_, H>, player: UnitId) -> Option<UnitId>;
+    /// `0x005440A0` (`quests.md` §9.2): the item leaves the player (the
+    /// client is told) and is freed.
+    fn delete(&mut self, econ: &mut Economy<'_, H>, player: UnitId, item: UnitId);
 }
 
 /// [`QuestInventory`] on the inventory wiring: an [`InvDesk`] over the
@@ -92,6 +102,37 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> QuestInventory<H> for QuestInv<'_, 
     }
     fn fault(&mut self, error: EconomyError) {
         self.errors.push(error);
+    }
+    fn items_of(&self, player: UnitId) -> Vec<UnitId> {
+        self.state.items_of(player)
+    }
+    fn cursor_of(&self, player: UnitId) -> Option<UnitId> {
+        self.state.cursor_of(player)
+    }
+    /// `quests-act3-2.md` §11.5: the item at body location 5, then 4, of
+    /// item type `weap` whose GUID is the inventory's weapon GUID.
+    ///
+    /// PROVISIONAL (M22; REC-235): nothing writes the weapon GUID (+0x1C)
+    /// yet (`weapon_in_use_update` is an open seam), so while it is unset
+    /// the first `weap` item of the two hands is the weapon in use.
+    fn weapon_in_use(&self, econ: &Economy<'_, H>, player: UnitId) -> Option<UnitId> {
+        let inv = self.state.of(player)?;
+        let guid = inv.weapon_guid;
+        [5, 4]
+            .into_iter()
+            .filter_map(|loc| inv.item_at(crate::items::inventory::grid_id::BODY, loc, 0))
+            .filter(|&i| {
+                econ.items
+                    .get(i)
+                    .is_some_and(|d| self.tables.is_type(d.record, crate::items::ty::WEAP as i16))
+            })
+            .find(|&i| {
+                guid == crate::items::inventory::NO_GUID
+                    || econ.units.get(i).is_some_and(|r| r.guid == guid)
+            })
+    }
+    fn delete(&mut self, econ: &mut Economy<'_, H>, player: UnitId, item: UnitId) {
+        InvDesk::new(econ, self.tables, self.state, self.rest).delete_held_item(player, item);
     }
 }
 

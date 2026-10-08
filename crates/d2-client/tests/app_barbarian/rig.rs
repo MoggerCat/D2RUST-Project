@@ -39,6 +39,12 @@ pub const BASH: usize = 126;
 pub const HOWL: usize = 130;
 pub const LEAP: usize = 132;
 pub const DOUBLE_SWING: usize = 133;
+/// Made-up ids of the Assassin's kicks (real: 269 and 273); the rig's
+/// player is a barbarian, but the kick body only reads stats.
+pub const DRAGON_TALON: usize = 101;
+pub const DRAGON_FLIGHT: usize = 102;
+/// Made-up id: the real Leap Attack is a monster skill.
+pub const LEAP_ATTACK: usize = 100;
 pub const SHOUT: usize = 138;
 pub const BATTLE_ORDERS: usize = 149;
 pub const WHIRLWIND: usize = 151;
@@ -110,6 +116,18 @@ fn anim_data() -> AnimData {
             events,
         });
     }
+    // d2rs-own, unverified: a longer cast animation (24 frames) for the
+    // leaps, which restart it from frame 10 (`bodies-2.md` §2.13) and step
+    // the path on the frame events 12, 14, ... 22.
+    let mut events = [0u8; animdata::EVENTS];
+    events[3..24].fill(1);
+    let name = *b"BASCHTH\0";
+    a.buckets[animdata::hash(&name[..7])].push(AnimRecord {
+        name,
+        frames: 24,
+        speed: 256,
+        events,
+    });
     a
 }
 
@@ -159,8 +177,37 @@ pub fn skill_row(skill: usize) -> Skills {
         }
         LEAP => {
             (s.srvstfunc, s.srvdofunc) = (40, 77);
+            s.anim = 10;
             // The leap's reach (`aurarangecalc`, `bodies-2.md` §2.13).
             s.aurarangecalc = RESIST_CALC;
+            // d2rs-own, unverified: the landing's area damage (`calc1`).
+            s.calc1 = LEN_CALC;
+        }
+        // The kicks: the `Kick` flag makes the physical part
+        // `(dex + str - 20) / 4..3` (`levels.md` §3.3); `Param1` / `Param2`
+        // are the enhanced damage per level (`bodies-2.md` §2.6).
+        DRAGON_TALON | DRAGON_FLIGHT => {
+            (s.srvstfunc, s.srvdofunc) = if skill == DRAGON_TALON {
+                (24, 42)
+            } else {
+                (0, 52)
+            };
+            s.kick = true;
+            s.param1 = 5;
+            s.param2 = 7;
+            s.hitshift = 8;
+            s.range = 1;
+        }
+        LEAP_ATTACK => {
+            (s.srvstfunc, s.srvdofunc) = (41, 78);
+            s.aurarangecalc = RESIST_CALC;
+            // d2rs-own, unverified: the strike's enhanced damage (`calc1`).
+            s.calc1 = LEN_CALC;
+            s.srvoverlay = 0xFFFF;
+            s.hitshift = 8;
+            // Cast from a distance (range 2), then leap.
+            s.range = 2;
+            s.anim = 10;
         }
         WHIRLWIND => {
             (s.srvstfunc, s.srvdofunc) = (38, 76);
@@ -424,6 +471,9 @@ impl Rig {
                 // hits 5% of the time (`hit.md` §3).
                 v.set_base(p, stat::LEVEL, 20);
                 v.set_base(p, TOHIT, 1000);
+                // The kick's physical part reads strength and dexterity.
+                v.set_base(p, 0, 100);
+                v.set_base(p, 2, 100);
                 v.set_base(p, MINDAMAGE, 5 << 8);
                 v.set_base(p, MAXDAMAGE, 5 << 8);
             });
