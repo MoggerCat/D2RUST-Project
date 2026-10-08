@@ -379,6 +379,7 @@ where
         self.desk.rest.remove_store_item(npc_class, item);
     }
     fn take_from_store(&mut self, npc_class: u16, item: UnitId) {
+        self.desk.state.taken.push(item);
         self.desk.rest.take_from_store(npc_class, item);
     }
     fn place_in_gamble(&mut self, npc_class: u16, player: u32, item: UnitId) -> bool {

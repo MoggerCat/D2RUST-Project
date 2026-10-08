@@ -34,6 +34,12 @@ pub fn is_identify(code: Option<[u8; 4]>) -> bool {
     matches!(code, Some(c) if &c == b"isc " || &c == b"ibk ")
 }
 
+/// The Town Portal scroll and tome codes (the server's use,
+/// `d2_sim::wiring::inventory::town_portal`).
+pub fn is_portal(code: Option<[u8; 4]>) -> bool {
+    matches!(code, Some(c) if &c == b"tsc " || &c == b"tbk ")
+}
+
 impl ItemsUi {
     /// The grid or equipped item under `at`, if any.
     pub fn item_at(
@@ -95,8 +101,8 @@ impl ItemsUi {
 
     /// A right press in the panel: an identify item in the grid becomes
     /// the used item (cursor state 6); while the state is set it cancels.
-    /// A stored Horadric Cube (`box `) is used (C→S 0x20), which opens it
-    /// (`world/cube.md` §1; d2rs-own, unverified, REC-119).
+    /// A stored Horadric Cube (`box `) or Town Portal scroll / tome is used
+    /// (C→S 0x20), which opens the cube (`world/cube.md` §1; d2rs-own, unverified, REC-119).
     pub fn right_press(
         &self,
         world: &ClientWorld,
@@ -119,7 +125,7 @@ impl ItemsUi {
         }
         if is_identify(it.code) {
             self.identify.set(Some(it.key.guid));
-        } else if is_cube(it.code) {
+        } else if is_cube(it.code) || is_portal(it.code) {
             let (x, y) = world.local().and_then(|u| u.position).unwrap_or((0, 0));
             return vec![PanelOutput::Intent(ClientIntent::from_message(
                 &items::use_grid(it.key.guid, u32::from(x), u32::from(y)),

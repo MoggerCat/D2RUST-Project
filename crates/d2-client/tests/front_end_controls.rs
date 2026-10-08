@@ -247,6 +247,18 @@ fn flow_returns_to_options() {
 }
 
 #[test]
+fn flow_options_opens_configure_controls() {
+    assert_eq!(
+        next(OPTIONS, Trigger::ConfigureControls, FlowCtx::default()),
+        Next::Screen(CONTROLS)
+    );
+    assert_eq!(
+        next(CONTROLS, Trigger::ConfigureControls, FlowCtx::default()),
+        Next::Stay
+    );
+}
+
+#[test]
 fn screen_click_key_accept_persists_and_cancel_does_not() {
     let dir = std::env::temp_dir().join(format!("d2rs-cfg-s-{}", std::process::id()));
     let path = dir.join("controls.toml");

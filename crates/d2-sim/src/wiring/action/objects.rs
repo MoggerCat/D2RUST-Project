@@ -217,6 +217,9 @@ fn log<T, X>(v: &mut View<'_, X>, r: Result<T, ObjectError>) -> Option<T> {
     }
 }
 
+/// State 102 (`just_portaled`, `objects.md` §12 rule 13).
+const JUST_PORTALED_STATE: u16 = 102;
+
 impl ObjectState {
     /// `0x00546C60` (§2) on `game_seed` (one step).
     pub fn new(game_seed: &mut Seed, tables: Arc<ObjectTables>) -> Self {
@@ -1349,7 +1352,25 @@ impl<X: Pending> MiscWorld for ObjectView<'_, X> {
         own.unwrap_or_else(|| self.v.h.x.object_portal_guid(player))
     }
     fn level_spawn_point(&mut self, level: u32) -> Option<(RoomId, i32, i32)> {
-        self.v.h.x.object_level_spawn(self.game, level)
+        if let Some(p) = self.v.h.x.object_level_spawn(self.game, level) {
+            return Some(p);
+        }
+        // PROVISIONAL (REC-234): a portal without a partner (Tyrael's,
+        // `quests-act2.md` §8.3) arrives at the level's spawn location
+        // of type 12 (the first step of `q6::portal_destination`); the
+        // free spot is rule 10's, not that function's (3, 0xBE11, 7).
+        // d2rs-own, unverified.
+        let act = crate::drlg::act_of_level(level);
+        let p = self
+            .v
+            .h
+            .drlg
+            .with_act(act, &mut self.game.lists, |d, svc| {
+                d.spawn_room(svc, level, 12)
+            })?
+            .ok()?;
+        let sub = crate::path::place::SPAWN_OFFSET;
+        Some((p.active?, p.x * 5 + sub, p.y * 5 + sub))
     }
     fn quest_level_change(&mut self, player: UnitId, from: u32, to: u32) {
         self.v.h.x.object_quest_level_change(player, from, to);
@@ -1372,6 +1393,30 @@ impl<X: Pending> MiscWorld for ObjectView<'_, X> {
     }
     fn just_portaled(&mut self, player: UnitId, expire: i32) {
         self.v.h.x.object_just_portaled(self.game, player, expire);
+        // Rule 13: stat list (expire f + 75), event 12 at f + 75, state
+        // 102 on, list state 102. Remove callback `0x0056E900` and the
+        // event 12 body are unwritten (REC-243, d2rs-own, unverified): the
+        // list's expiry frees the state.
+        if usize::from(JUST_PORTALED_STATE) >= self.v.stats.data().states.count() {
+            return;
+        }
+        if self.v.state_list(player, JUST_PORTALED_STATE).is_some() {
+            self.v
+                .stats
+                .free_state_list(&mut *self.v.h, player, u32::from(JUST_PORTALED_STATE));
+        }
+        if self
+            .v
+            .create_state_list(player, JUST_PORTALED_STATE, None, expire)
+            .is_none()
+        {
+            return;
+        }
+        if let Err(e) = self.game.schedule_event(player, 12, expire, None, 0, 0) {
+            self.v.unit_error(e.into());
+        }
+        self.v.set_state(player, JUST_PORTALED_STATE, true);
+        let _ = self.game.lists.queue_update(player);
     }
     fn vital_stat(&self, unit: UnitId, id: u16) -> u32 {
         let st = &*self.v.stats;
