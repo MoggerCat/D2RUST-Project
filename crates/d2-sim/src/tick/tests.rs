@@ -885,3 +885,43 @@ fn dispatch_data_matches_spec() {
     );
     assert!(!events::player_has_handler(15));
 }
+
+/// Records [`Game::character_save_due`] when the per-client loop runs.
+#[derive(Default)]
+struct SaveSeen(Vec<(i32, bool)>);
+
+impl EventDispatch for SaveSeen {
+    fn run_event(&mut self, _: &mut Game, _: &TimerRun) {}
+}
+
+impl TickHooks for SaveSeen {
+    fn send_removed_units(&mut self, g: &mut Game, _: ClientId) {
+        self.0.push((g.frame, g.character_save_due));
+    }
+}
+
+// Covers: specs/sim/tick.md §6 r3
+#[test]
+fn the_client_pass_raises_the_character_save_every_8192_frames() {
+    let mut g = Game::new();
+    g.lists.ensure_act(0).unwrap();
+    let room = g.lists.create_room(0).unwrap();
+    g.lists.activate_room(room).unwrap();
+    g.lists.add_client(None, Some(room), client_state::IN_GAME);
+    let mut h = SaveSeen::default();
+    g.frame = 8190;
+    // Frame 8191: no save; the host clears the flag after each tick.
+    tick(&mut g, &mut h);
+    assert!(!g.character_save_due);
+    // Frame 8192: raised before the per-client loop.
+    tick(&mut g, &mut h);
+    assert!(g.character_save_due);
+    assert_eq!(h.0, [(8191, false), (8192, true)]);
+    g.character_save_due = false;
+    // M08: the next period, and not between.
+    g.frame = 2 * 8192 - 2;
+    tick(&mut g, &mut h);
+    assert!(!g.character_save_due);
+    tick(&mut g, &mut h);
+    assert!(g.character_save_due);
+}

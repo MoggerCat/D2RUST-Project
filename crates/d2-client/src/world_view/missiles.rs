@@ -762,9 +762,12 @@ impl Missiles {
         self.advance(world);
         let mut log = self.ensure(world, assets);
         let camera = match (feed.player(world), feed.open_mode(world)) {
-            (Ok(Some(p)), Ok(mode)) if mode.get() != NO_WORLD_MODE => {
-                Camera::new(FrameSize::play(), mode, p.client(), (0, 0))
-            }
+            // The frame's one camera, shake included
+            // (`seams/world-screen.md` §2.6); a frame built without one:
+            // the player's, unshaken.
+            (Ok(Some(p)), Ok(mode)) if mode.get() != NO_WORLD_MODE => frame
+                .camera
+                .unwrap_or_else(|| Camera::new(FrameSize::play(), mode, p.client(), (0, 0))),
             (Err(e), _) | (_, Err(e)) => {
                 log.push(format!("effects: no camera: {e}"));
                 return log;

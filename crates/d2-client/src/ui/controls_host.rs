@@ -15,11 +15,12 @@
 use std::path::PathBuf;
 
 use super::esc_menu::DARK;
+use crate::controls::keymap::action_of_cmd;
 use crate::controls::Bindings;
 use crate::ui::draw::{TextRequest, TextStyle, UiDraw, UiDrawSink};
 use crate::ui::front_end::screens::controls::{
-    action_of_cmd, load_table, save_table, table_to_bindings, CfgDraw, ConfigureControls, Done,
-    BTN_HALF, C, FONT, M, T, VISIBLE, W,
+    load_table, save_table, table_to_bindings, CfgDraw, ConfigureControls, Done, BTN_HALF, C, FONT,
+    M, T, VISIBLE, W,
 };
 use crate::ui::geom::{Point, Rect};
 use crate::ui::panel::UiCtx;

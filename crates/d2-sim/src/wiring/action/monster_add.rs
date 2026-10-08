@@ -2,8 +2,8 @@
 //! The monster add messages of `0x00571F90` (`intents-events.md` §7.2):
 //! part A (0xAC `0x0053E2E0` in the full server layout of
 //! `monsters/init.md` §24, stat 328, class 528's 0x98, the skill
-//! messages 0x21, the unit states 0xAA; d2rs keeps no pending event
-//! records, §7.9 rule 2) and part B (the mode message §7.4, then the
+//! messages 0x21, the unit states 0xAA, the pending event records of
+//! §7.9 rule 2) and part B (the mode message §7.4, then the
 //! inventory messages `0x00534F80` for state 93 and classes 291, 417,
 //! 418). Sent by the room switch and by the per-unit walk for a monster
 //! not yet announced (§7.1 rule 2.1, [`View::monster_update`]).
@@ -218,6 +218,8 @@ impl<X: Pending> View<'_, X> {
         }
         let states = self.unit_states_message(UnitType::Monster as u8, guid, unit);
         self.h.x.send(receiver, &states);
+        // `0x00571CD0` (§7.2 part A, §7.9 rule 2).
+        self.send_event_records(receiver, unit);
         // Part B. Without the path provider no monster has a path record
         // (rule 4's fatal would be logged for every add), so the mode
         // message needs the provider, as [`View::monster_update`] does.

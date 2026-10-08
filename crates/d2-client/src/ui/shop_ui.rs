@@ -287,7 +287,7 @@ impl ShopUi {
         for e in effects {
             match e {
                 ShopEffect::Send(i) => sh.outputs.push(PanelOutput::Intent(i)),
-                ShopEffect::Sound(_) => sh.outputs.push(PanelOutput::ClickSound),
+                ShopEffect::Sound(id) => sh.outputs.push(PanelOutput::Sound(id as i32)),
                 // d2rs-own: no waiting note, no confirm dialog, no cancel.
                 ShopEffect::WaitingNote | ShopEffect::Confirm(_) | ShopEffect::Cancel => {}
             }
@@ -495,7 +495,8 @@ impl Panel for ShopUi {
             let (visible, active) = (panel.tabs[t].visible, panel.tabs[t].active);
             if visible && !active {
                 st.page = t as u8;
-                sh.outputs.push(PanelOutput::ClickSound);
+                // Id 6 (`client/ui.md` §B8.1, `0x00491F7B` …).
+                sh.outputs.push(PanelOutput::Sound(6));
             }
             return UiResponse::Consumed;
         }
@@ -510,7 +511,10 @@ impl Panel for ShopUi {
                 {
                     let rec = shop_button_records(open.npc_class)[i];
                     if rec.enabled {
-                        sh.outputs.push(PanelOutput::ClickSound);
+                        // Not a constant-id site of `client/ui.md` §B8.1:
+                        // the click sound of `panels-2.md` §16 (id 0).
+                        sh.outputs
+                            .push(PanelOutput::Sound(crate::ui::original::CLICK_SOUND_ID));
                         st.pressed = Some(i);
                         match rec.base_frame {
                             // Close (record 3 of the other traders).

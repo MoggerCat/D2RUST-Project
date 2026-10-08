@@ -45,7 +45,10 @@ fn audio_outputs_become_sound_requests_in_list_order_with_the_captured_position(
             at: Some((0x1241, 0x11C4)),
             event: 3,
         },
-        Output::UnitFreed { unit },
+        Output::UnitFreed {
+            unit,
+            client_only: false,
+        },
     ];
     let requests = deliver(&mut bridge, &list, None).unwrap();
     assert_eq!(
@@ -57,7 +60,10 @@ fn audio_outputs_become_sound_requests_in_list_order_with_the_captured_position(
                 at: Some((0x1241, 0x11C4)),
                 event: 3,
             },
-            SoundRequest::UnitFreed { unit },
+            SoundRequest::UnitFreed {
+                unit,
+                client_only: false,
+            },
         ]
     );
 }
@@ -119,4 +125,27 @@ fn a_ui_sound_asked_for_in_update_is_taken_by_the_same_frames_audio_frame() {
         without.1 + 1,
         "the audio frame is not in PostUpdate"
     );
+}
+
+// Covers: specs/seams/bridge-app.md §2.7
+#[test]
+fn the_presented_image_sits_where_the_click_mapping_reads_it() {
+    use d2_client::ui::Presentation;
+    for (w, h) in [
+        (1601u32, 1201u32),
+        (1600, 1200),
+        (2401, 1300),
+        (801, 601),
+        (1700, 1301),
+    ] {
+        let p = Presentation::new(w, h).unwrap();
+        let s = p.scale as f32;
+        // A sprite centred on the window, moved by the offset (y up): its
+        // top-left in physical window pixels (y down).
+        let (dx, dy) = p.centre_offset();
+        let left = w as f32 / 2.0 + dx - 400.0 * s;
+        let top = h as f32 / 2.0 - dy - 300.0 * s;
+        let (fx, fy) = p.from_frame(0, 0);
+        assert_eq!((left, top), (fx as f32, fy as f32), "window {w} × {h}");
+    }
 }

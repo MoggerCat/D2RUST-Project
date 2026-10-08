@@ -16,7 +16,7 @@ use crate::world_view::{UnitPose, ViewAssets, ViewError, ViewFeed};
 use d2_sim::rng::Seed;
 
 use super::sky::{SkyFrame, SkyPasses};
-use super::weather::{FloorContext, LocalPlayer, Pass9Input, Weather};
+use super::weather::{FloorContext, LocalPlayer, Pass9Input, ThunderSound, Weather};
 
 use super::super::camera::{Camera, ClientPos, OpenMode, TileList, UnitPosition};
 use super::super::view::{BlockRect, MapTile, ViewSource};
@@ -80,6 +80,10 @@ pub struct WeatherFrame<'a> {
     /// the passes are not wired for this feed, and a frame with live pools
     /// or lightning fails ([`WeatherFrame::unwired_passes`]).
     pub sky: Option<SkyFrame>,
+    /// The sound layer the thunder step requests sound 202 from
+    /// (`audio/triggers.md` §12); `None`: no sound layer, no request (the
+    /// request returns 0, so no position rolls).
+    pub thunder: Option<&'a mut (dyn ThunderSound + Send + Sync)>,
 }
 
 impl WeatherFrame<'_> {
@@ -114,13 +118,16 @@ impl WeatherFrame<'_> {
             mode: s.mode,
             frame_rate: s.frame_rate,
             low_quality: s.low_quality,
-            // Sound is deferred: no thunder sound starts, so the two
-            // position rolls are not drawn.
+            // Read only without a sound layer: no request, no handle.
             thunder_sound_starts: false,
         };
+        let sound = self
+            .thunder
+            .as_deref_mut()
+            .map(|t| t as &mut dyn ThunderSound);
         let p9 = self
             .weather
-            .pass9(Some(player), &input)
+            .pass9_with(Some(player), &input, sound)
             .map_err(|e| open("weather pass 9", e.to_string()))?;
         Ok(SkyPasses {
             pools,

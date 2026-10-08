@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 
 use super::game_messages::{backing, wide, Measure};
 use super::SharedRef;
-use crate::bridge::hover::feet;
+use crate::bridge::hover::unit_feet;
 use crate::bridge::world::{ClientWorld, UnitKey, PLAYER};
 use crate::rules::camera::{moving_to_client, Camera, FrameSize, OpenMode};
 use crate::ui::draw::{TextRequest, TextStyle, UiDraw, UiDrawSink};
@@ -73,11 +73,12 @@ impl Bubbles {
     }
 }
 
-/// The camera of the local player's model cell (as the world clicks build
-/// it); none without a local player.
+/// The camera of the local player's own position of the frame
+/// ([`ClientWorld::local_position`], as the world clicks build it); none
+/// without a local player.
 fn camera(w: &ClientWorld, open_mode: u8) -> Option<Camera> {
-    let (x, y) = w.local()?.cell();
-    let at = moving_to_client((u32::from(x) << 16) | 0x8000, (u32::from(y) << 16) | 0x8000);
+    let (x16, y16) = w.local_position()?;
+    let at = moving_to_client(x16, y16);
     let mode = OpenMode::new(open_mode).unwrap_or(OpenMode::NONE);
     Some(Camera::new(FrameSize::D2RS, mode, at, (0, 0)))
 }
@@ -123,7 +124,7 @@ impl Panel for OverheadUi {
             let Some(cell) = unit.position else {
                 continue;
             };
-            let (ux, uy) = feet(&cam, cell);
+            let (ux, uy) = unit_feet(&cam, key.unit_type, cell);
             let kind = if key.unit_type == PLAYER {
                 UnitKind::Player
             } else {

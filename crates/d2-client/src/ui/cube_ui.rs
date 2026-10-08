@@ -156,7 +156,7 @@ impl Panel for CubeUi {
             self.input.cube_up(&s, &ptr)
         };
         if eff.sound4 {
-            sh.outputs.push(PanelOutput::ClickSound);
+            sh.outputs.push(PanelOutput::Sound(4));
         }
         // §12.4 start (flag, n := 0, stamp := now); the close clears it (§12 r7).
         if !down && was_transmute && !self.input.transmute_pressed {
@@ -203,11 +203,13 @@ impl OriginalUi {
             match o {
                 PanelOutput::Intent(i) => root.queue_intent(i),
                 PanelOutput::SetUi { ui, mode, jump } => {
-                    self.set_ui(u32::from(ui), u32::from(mode), jump)?;
+                    // The two 0x4F 0x17 above include the hook's.
+                    self.set_ui_from(u32::from(ui), u32::from(mode), jump, Some(ui))?;
                 }
-                PanelOutput::ClickSound => {}
+                PanelOutput::Sound(_) => {}
             }
         }
+        self.flush_hooks(root);
         self.sync_root(root);
         Ok(())
     }

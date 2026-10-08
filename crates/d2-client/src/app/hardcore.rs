@@ -19,8 +19,9 @@
 //!
 //! PROVISIONAL (M22; REC-126): this preview also saves when the death
 //! screen comes up (the DT start), so the penalties are on disk even if
-//! the window closes during the death animation; both from the app,
-//! because the server has no save path of its own. Leaving a dead hardcore character closes the
+//! the window closes during the death animation; both asked by the app
+//! ([`SaveHandle`]) and written by the server's character storage
+//! (`save::FileStore`), because the server's DD save is not wired yet. Leaving a dead hardcore character closes the
 //! game (the original returns to the character screen). d2rs-own,
 //! unverified.
 

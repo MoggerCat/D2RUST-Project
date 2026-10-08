@@ -1,12 +1,13 @@
-// Spec: specs/render/lighting.md (§8 monster, object and missile rows)
+// Spec: specs/render/lighting.md (§8 monster, object and missile rows, Kind column; §6.4 r5)
 //! The light records of the units other than the local player, for the play
 //! preview's light map (q-light-radius-detail).
 //!
 //! `d2rs-own, unverified`:
-//! - the records are rebuilt every frame from the model's units, as plain
-//!   lights (§7.2, kind 0 / 1 / 2 alike), not kept in the client list, so
-//!   no radius walk (§6.4), flicker, target radius, umod 3 light, skill
-//!   cast light, overlay light or Den of Evil light;
+//! - the records are rebuilt every frame from the model's units with
+//!   their §8 kind (monsters 0, missiles 1, objects 2), not kept in the
+//!   client list, so no radius walk (§6.4 r2), kept kind-2 cache,
+//!   flicker, target radius, umod 3 light, skill cast light, overlay
+//!   light or Den of Evil light;
 //! - a monster's radius is `monstats2` `Light` (no component `L_c`, no level
 //!   8 quest override); a dead monster has none;
 //! - an object's radius is `Lit<mode>` / 2 with the `objects` colour;
@@ -16,7 +17,8 @@
 use d2_data::tables::{Missiles, Monstats, Monstats2, Objects};
 
 use crate::bridge::world::{ClientWorld, MISSILE, MONSTER, OBJECT};
-use crate::world_view::preview_light::PointLight;
+use crate::rules::lighting::records::LightKind;
+use crate::world_view::preview_light::SourceLight;
 
 /// `Light` radius and `Red`, `Green`, `Blue` of a row.
 type Row = (u8, (u8, u8, u8));
@@ -81,25 +83,34 @@ impl LightRows {
         }
     }
 
-    /// The lights of the world's non-player units, as sub-tile lights
-    /// (`radius` in sub-tiles, §8). Objects come from the `objects` rows.
-    pub fn lights(&self, world: &ClientWorld) -> Vec<PointLight> {
+    /// The lights of the world's non-player units (`radius` in sub-tiles,
+    /// §8), each with its §8 kind. Objects come from the `objects` rows.
+    pub fn lights(&self, world: &ClientWorld) -> Vec<SourceLight> {
         let mut out = Vec::new();
         for unit in world.units.values() {
             let (x, y) = unit.position.unwrap_or((0, 0));
             let at = (i32::from(x), i32::from(y));
             let class = unit.class as usize;
-            let (radius, rgb) = match unit.key.unit_type {
-                MONSTER if !unit.is_dead() => self.monsters.get(class).copied().unwrap_or_default(),
-                MISSILE => self.missiles.get(class).copied().unwrap_or_default(),
+            let ((radius, rgb), kind) = match unit.key.unit_type {
+                MONSTER if !unit.is_dead() => (
+                    self.monsters.get(class).copied().unwrap_or_default(),
+                    LightKind::Shadowed,
+                ),
+                MISSILE => (
+                    self.missiles.get(class).copied().unwrap_or_default(),
+                    LightKind::Plain,
+                ),
                 OBJECT => match self.objects.get(class) {
-                    Some((lit, rgb)) => (lit.get(unit.mode as usize).map_or(0, |l| l / 2), *rgb),
+                    Some((lit, rgb)) => (
+                        (lit.get(unit.mode as usize).map_or(0, |l| l / 2), *rgb),
+                        LightKind::Cached,
+                    ),
                     None => continue,
                 },
                 _ => continue,
             };
             if radius != 0 {
-                out.push((at, i32::from(radius), rgb));
+                out.push(SourceLight::at_subtile(at, i32::from(radius), rgb, kind));
             }
         }
         out
@@ -159,8 +170,11 @@ mod tests {
         unit(&mut w, PLAYER, 7, 0, 1, (130, 100));
         let l = rows.lights(&w);
         assert_eq!(l.len(), 3, "{l:?}");
-        assert!(l.contains(&((100, 100), 5, (230, 168, 255))));
-        assert!(l.contains(&((110, 100), 8, (1, 2, 3))));
-        assert!(l.contains(&((120, 100), 6, (9, 8, 7))));
+        // §8 Kind column: monsters 0 (shadowed), missiles 1 (plain),
+        // objects 2 (cached).
+        let at = |s, r, rgb, kind| SourceLight::at_subtile(s, r, rgb, kind);
+        assert!(l.contains(&at((100, 100), 5, (230, 168, 255), LightKind::Shadowed)));
+        assert!(l.contains(&at((110, 100), 8, (1, 2, 3), LightKind::Plain)));
+        assert!(l.contains(&at((120, 100), 6, (9, 8, 7), LightKind::Cached)));
     }
 }

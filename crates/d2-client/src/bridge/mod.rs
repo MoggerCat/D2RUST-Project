@@ -1,4 +1,4 @@
-// Spec: specs/client/bridge.md, specs/client/model.md (§4, §5, §6 rule 8, §7 rule 3)
+// Spec: specs/client/bridge.md, specs/client/model.md (§4, §5, §6 rule 8, §7 rule 3), specs/flows/save-exit.md (§1 r2)
 //! The only link between the Bevy app and the game. Outbound: requests
 //! become 1.14d C→S bytes built with `d2-proto` ([`intent`]). Inbound: the
 //! S→C bytes the server delivers are split with `d2-proto` and dispatched
@@ -154,6 +154,16 @@ impl<L: ServerLink> Bridge<L> {
     /// Sends a typed C→S message (spec §4 rule 1).
     pub fn send<M: FixedMessage>(&mut self, msg: &M) -> Result<Sent, BridgeError> {
         self.send_bytes(&intent::encode(msg))
+    }
+
+    /// Save and Exit Game (`flows/save-exit.md` §1 r2): C→S 0x69 through
+    /// the exit send `0x00477EE0` (system queue, no duplicate filter),
+    /// then `exit_requested` := 1. The client stays in the game until the
+    /// server's 0x05 (§4 r1).
+    pub fn save_and_exit(&mut self) -> Result<Sent, BridgeError> {
+        let sent = self.send_bytes(&[0x69])?;
+        self.world.exit_requested = true;
+        Ok(sent)
     }
 
     /// Sends C→S bytes after the classifier check (spec §4 rules 2–3).
@@ -471,12 +481,13 @@ impl<L: ServerLink> Bridge<L> {
         self.world.recache_local_room(x, y)
     }
 
-    /// The play preview's predicted sub-tile of the local player, for the
-    /// position check ([`ClientWorld::set_local_walk`],
-    /// [`ClientWorld::predicted`]). d2rs-own, unverified. PROVISIONAL
-    /// (`client/model.md` OQ2; REC-51, REC-277).
-    pub fn set_local_walk(&mut self, cell: Option<(u16, u16)>) {
-        self.world.set_local_walk(cell);
+    /// The play preview's predicted precise position of the local player
+    /// and its walk / run mode, for the position check
+    /// ([`ClientWorld::set_local_walk`], [`ClientWorld::predicted`]).
+    /// d2rs-own, unverified. PROVISIONAL (`client/model.md` OQ2; REC-51,
+    /// REC-277).
+    pub fn set_local_walk(&mut self, pos: Option<(u32, u32)>, mode: Option<u32>) {
+        self.world.set_local_walk(pos, mode);
     }
 
     /// Installs the item tables the model decodes item streams with.
@@ -504,7 +515,7 @@ impl<L: ServerLink> Bridge<L> {
     /// The play preview's monster motion on the model (d2rs-own,
     /// unverified; [`motion`]).
     pub fn preview_motion(&mut self, m: &mut motion::MonsterMotion) {
-        m.frame(&mut self.world);
+        m.frame(&mut self.world, &self.inputs.tables.monsters);
     }
 
     pub fn log(&self) -> &ReceiveLog {

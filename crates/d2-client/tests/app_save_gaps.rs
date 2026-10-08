@@ -74,6 +74,7 @@ fn gaps_round_trip_through_a_written_file() {
             Slot::encode(59, false, 2).unwrap(),
         ]),
         town: Some((1, 3)),
+        hotkeys: None,
         hireling_items: Some(vec![item(1), item(2)]),
         golem: Some(Some(item(7))),
         swap: Some((
@@ -334,4 +335,54 @@ fn jf_and_the_hireling_block_agree() {
     assert_eq!(save.body.as_ref().unwrap().hireling_items, Some(None));
     let f = d2s::write(&save, &t).unwrap();
     assert!(d2s::read(&f, &o, &t).is_ok());
+}
+
+/// §2.4 rules 1, 2, 4, 6.1: a hot key's item GUID is saved as its
+/// 1-based inventory position and loaded back as the GUID at that
+/// position; no item, an unknown GUID or a position past the end is
+/// "no item".
+// Covers: specs/formats/d2s.md §2.4 r1, §2.4 r2, §2.4 r4, §2.4 r6
+#[test]
+fn hotkey_items_are_saved_as_positions_and_loaded_as_guids() {
+    use d2_client::app::save_gaps::{hotkey_slots, loaded_hotkeys};
+    use d2_formats::d2s::Slot;
+    use d2_server::adapters::handlers::player::HotKey;
+    let guids = [40u32, 41, 42];
+    let mut keys = [HotKey::UNBOUND; 16];
+    keys[0] = HotKey {
+        skill: 36,
+        left: false,
+        item: 42,
+    };
+    keys[1] = HotKey {
+        skill: 7,
+        left: true,
+        item: u32::MAX,
+    };
+    keys[2] = HotKey {
+        skill: 9,
+        left: false,
+        item: 99,
+    };
+    let slots = hotkey_slots(&keys, &guids);
+    assert_eq!(slots[0], Slot { code: 36, item: 3 });
+    assert_eq!(
+        slots[1],
+        Slot {
+            code: 0x8007,
+            item: 0
+        }
+    );
+    assert_eq!(slots[2], Slot { code: 9, item: 0 });
+    assert_eq!(slots[3], Slot::NONE);
+    let back = loaded_hotkeys(&slots, &guids);
+    assert_eq!((back[0].skill, back[0].flag, back[0].item), (36, false, 42));
+    assert_eq!(
+        (back[1].skill, back[1].flag, back[1].item),
+        (7, true, u32::MAX)
+    );
+    assert_eq!(back[3].skill, -1);
+    // An index past the loaded list resolves to −1.
+    let past = loaded_hotkeys(&[Slot { code: 5, item: 4 }; 16], &guids);
+    assert_eq!(past[0].item, u32::MAX);
 }

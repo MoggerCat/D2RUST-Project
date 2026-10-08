@@ -1,13 +1,13 @@
-// Spec: specs/render/lighting.md (§1–§3, §7.2, §9, §11 r1–r4, §8 player row), specs/render/shading.md (§3)
+// Spec: specs/render/lighting.md (§1–§3, §6.4 r5, §7.2–§7.4, §9, §11 r1–r4, §8 player row), specs/render/shading.md (§3)
 //! The play preview's lighting (stitch-lighting; replaces the D1
 //! full-bright fill of [`super::preview`] unless `D2RS_FULLBRIGHT=1`).
 //!
 //! Per drawn frame ([`PreviewLight::refresh`]): the 48 × 48 light map
 //! around the local player (§1), the ambient fill from the act
-//! environment (§3, §9), the player's light record (radius 13 plus stat
-//! 89, §8) and the other records of the client light list, each plain
-//! (§7.2); then the cel light value of a unit (§11 r1) and of a tile
-//! ([`tile_chain`]) is read from it, and shaded through the act's PL2
+//! environment the bridge steps per client update (§3, §9.2 r1), the
+//! player's light record (radius 13 plus stat 89, §8) and the other
+//! units' records by kind (§6.4 r5); then the cel light value of a unit
+//! (§11 r1) and of a tile ([`tile_chain`]) is read from it, and shaded through the act's PL2
 //! tables.
 //!
 //! `d2rs-own, unverified`:
@@ -17,12 +17,9 @@
 //!   as 0), else the level's `Levels.txt` ambient when it has a colour,
 //!   else the environment's; the near rooms fill their rectangles (§3 r3);
 //! - the other lights are those of [`super::light_sources`];
-//! - the blocks-light flags (§4) come from the client DRLG collision
-//!   (`collision_at`, mask 0x22); only the player's light (kind 0) is
-//!   shadowed, the other sources draw plain (REC-250);
-//! - the environment advances one update per drawn frame (§9.2 r1 says
-//!   per client update), from the model's record, taken again whenever
-//!   the model's record changes (S→C 0x53 / 0x5D), or a fresh one;
+//! - the blocks-light flags (§4) and the kind-2 caches (§7.4 r1) come
+//!   from the client DRLG collision (`collision_at`, mask 0x22); each
+//!   record contributes by its §8 kind (§6.4 r5);
 //! - the other units' lights sit at their sub-tile's `8·s + 4` (the model
 //!   holds no precise position); the local player's at `(P >> 13) + 4` of
 //!   its predicted 16.16 position (§6.1).
@@ -122,9 +119,6 @@ impl LookFeed for PreviewLook {
 pub struct PreviewLight {
     /// `D2RS_FULLBRIGHT=1`: no light is built, the D1 fill stays.
     pub fullbright: bool,
-    env: Option<Environment>,
-    /// The model's record the last refresh saw (`world.environment`).
-    env_seen: Option<Environment>,
     periods: Option<PeriodTables>,
     /// The act environment's ambient of the frame (roof tiles, §11 r4).
     env_cell: crate::rules::lighting::map::LightCell,
@@ -146,6 +140,32 @@ pub fn level_ambient(rows: &[(u8, u8, u8, u8)], level: u32) -> Option<Ambient> {
 /// A light: sub-tile, radius, rgb.
 pub type PointLight = ((i32, i32), i32, (u8, u8, u8));
 
+/// A light record of the frame (§6.1, §8): position in 1/8 sub-tile,
+/// radius in sub-tiles, colour, the §8 kind and the owner's sub-tile
+/// (the centre of a kind-2 cache, §7.4 r1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourceLight {
+    pub at: (i32, i32),
+    pub radius: i32,
+    pub rgb: (u8, u8, u8),
+    pub kind: LightKind,
+    pub owner: (i32, i32),
+}
+
+impl SourceLight {
+    /// A light of a unit standing on sub-tile `s`: `(P >> 13) + 4` =
+    /// `8·s + 4` (§6.1).
+    pub fn at_subtile(s: (i32, i32), radius: i32, rgb: (u8, u8, u8), kind: LightKind) -> Self {
+        SourceLight {
+            at: (8 * s.0 + 4, 8 * s.1 + 4),
+            radius,
+            rgb,
+            kind,
+            owner: s,
+        }
+    }
+}
+
 /// The light map of a frame: ambient fill, then each `(sub-tile, radius,
 /// rgb)` light plain (§2 r2, r4; §7.2).
 pub fn build_map(player: (i32, i32), ambient: Ambient, lights: &[PointLight]) -> LightMap {
@@ -164,17 +184,23 @@ pub fn build_map(player: (i32, i32), ambient: Ambient, lights: &[PointLight]) ->
 pub fn build_map_blocked(
     player: (i32, i32),
     scene: &AmbientScene,
-    blocks: impl FnMut(i32, i32) -> bool,
+    blocks: impl Fn(i32, i32) -> bool,
     lights: &[PointLight],
     shadow_first: bool,
 ) -> LightMap {
-    // A unit standing on a sub-tile's origin: `(P >> 13) + 4` = 8·s + 4
-    // (§6.1).
-    let lights: Vec<PointLight> = lights
+    let lights: Vec<SourceLight> = lights
         .iter()
-        .map(|&((sx, sy), r, rgb)| ((8 * sx + 4, 8 * sy + 4), r, rgb))
+        .enumerate()
+        .map(|(n, &(s, r, rgb))| {
+            let kind = if shadow_first && n == 0 {
+                LightKind::Shadowed
+            } else {
+                LightKind::Plain
+            };
+            SourceLight::at_subtile(s, r, rgb, kind)
+        })
         .collect();
-    build_map_eighths(player, scene, blocks, &lights, shadow_first)
+    build_map_eighths(player, scene, blocks, &lights)
 }
 
 /// The light position of a unit at 16.16 position `(x16, y16)` (§6.1,
@@ -186,31 +212,41 @@ pub fn light_pos_of(x16: u32, y16: u32) -> (i32, i32) {
     )
 }
 
-/// [`build_map_blocked`] with each light's position already in 1/8
-/// sub-tile (§6.1: `(P >> 13) + 4` of the unit's precise position).
+/// The light map of a frame from its records (§2): ambient fill, the
+/// blocks-light flags, then each record by its kind (§6.4 r5): kind 0
+/// shadowed at `q` = 2 (§7.3), kind 2 cached (§7.4, the cache built from
+/// `blocks` around the owner's sub-tile), kind 1 plain (§7.2).
 pub fn build_map_eighths(
     player: (i32, i32),
     scene: &AmbientScene,
-    blocks: impl FnMut(i32, i32) -> bool,
-    lights: &[PointLight],
-    shadow_first: bool,
+    blocks: impl Fn(i32, i32) -> bool,
+    lights: &[SourceLight],
 ) -> LightMap {
     let mut map = LightMap::new(player);
     map.fill_ambient(Some(scene));
-    map.fill_blocks(blocks);
+    map.fill_blocks(&blocks);
     let mut list = LightList::new();
-    for (n, &((px, py), r, (red, green, blue))) in lights.iter().enumerate() {
-        let kind = if shadow_first && n == 0 {
-            LightKind::Shadowed
-        } else {
-            LightKind::Plain
-        };
-        list.create(None, (px, py), kind, r, 255, red, green, blue);
+    let mut owners = Vec::with_capacity(lights.len());
+    for l in lights {
+        let (red, green, blue) = l.rgb;
+        if let Some(id) = list.create(None, l.at, l.kind, l.radius, 255, red, green, blue) {
+            owners.push((id, l.owner));
+        }
     }
     let colored = list.colored;
-    for (_, rec) in list.iter() {
+    for (id, rec) in list.iter() {
         match rec.kind {
-            LightKind::Shadowed => contribute::shadowed(&mut map, rec, colored),
+            LightKind::Shadowed if QUALITY > 1 => contribute::shadowed(&mut map, rec, colored),
+            LightKind::Cached => {
+                let owner = owners
+                    .iter()
+                    .find_map(|&(i, o)| (i == id).then_some(o))
+                    .expect("every record has its source");
+                let mut rec = rec.clone();
+                rec.cache = contribute::build_cache(&rec, owner, &blocks);
+                rec.cache_valid = true;
+                contribute::cached_contribution(&mut map, &rec, colored);
+            }
             _ => contribute::plain(&mut map, rec, QUALITY, false, colored),
         }
     }
@@ -358,17 +394,13 @@ impl PreviewLight {
         let Some(periods) = self.periods else {
             return;
         };
-        // The model's record changes only through S→C 0x53 / 0x5D (§9.2
-        // r2–r4): take it whenever it changed, so the server's setting
-        // reaches the ambient instead of the first frame's copy only.
-        if world.environment != self.env_seen {
-            self.env = world.environment;
-            self.env_seen = world.environment;
-        }
-        let env = self
-            .env
-            .get_or_insert_with(|| Environment::new(&periods, 0));
-        env.update(&periods, level);
+        // The model's record (§9.1), stepped once per client update by the
+        // bridge (§9.2 r1) and set by S→C 0x53 / 0x5D (r2–r4); the map
+        // build only reads it. Before the act's record exists: a fresh
+        // one (creation values).
+        let env = world
+            .environment
+            .unwrap_or_else(|| Environment::new(&periods, 0));
         let a: EnvAmbient = env.ambient();
         let ambient = Ambient {
             i: a.i,
@@ -386,13 +418,16 @@ impl PreviewLight {
         let scene = self.scene(world, ambient, level);
         let radius = player_light_radius(player.stat(STAT_LIGHT_RADIUS)).max(1);
         let rgb = player_light_color(player.stat(STAT_LIGHT_COLOR) as u32);
-        let mut lights = vec![(at8, radius, rgb)];
+        // §8 player row: kind 0 for the local player.
+        let mut lights = vec![SourceLight {
+            at: at8,
+            radius,
+            rgb,
+            kind: LightKind::Shadowed,
+            owner: at,
+        }];
         if let Some(rows) = &self.sources {
-            lights.extend(
-                rows.lights(world)
-                    .into_iter()
-                    .map(|((sx, sy), r, c)| ((8 * sx + 4, 8 * sy + 4), r, c)),
-            );
+            lights.extend(rows.lights(world));
         }
         let drlg = world.drlg.as_ref().filter(|_| world.local_room().is_some());
         let map = build_map_eighths(
@@ -400,7 +435,6 @@ impl PreviewLight {
             &scene,
             |x, y| drlg.is_some_and(|d| blocks_light(d.drlg.collision_at(x, y))),
             &lights,
-            true,
         );
         self.frame = Some(FrameLight {
             tables: *tables,
@@ -610,9 +644,75 @@ mod tests {
         let periods = PeriodTables::builtin().unwrap();
         let mut env = Environment::new(&periods, 0);
         env.ticks = 90 * 128;
+        // As the bridge's client update leaves it (§9.2 r1): the map
+        // build reads the record, it no longer steps it.
+        env.update(&periods, 0);
         w.environment = Some(env);
         light.refresh(&w, None, Some(&t));
         assert_eq!(light.frame().unwrap().map.read(far.0, far.1).i, 255);
+    }
+
+    // Covers: specs/render/lighting.md §6.4 r5, §7.3, §7.4
+    #[test]
+    fn each_light_contributes_by_its_kind() {
+        let scene = AmbientScene {
+            player_ambient: dark(),
+            near: Vec::new(),
+        };
+        // A wall column at sub-tile x = 103 between the light (100, 100)
+        // and the cell (106, 100).
+        let wall = |x: i32, _: i32| x == 103;
+        let at = |kind, blocks: &dyn Fn(i32, i32) -> bool| {
+            let l = SourceLight::at_subtile((100, 100), 8, (255, 255, 255), kind);
+            build_map_eighths((100, 100), &scene, blocks, &[l]).read(8 * 106, 8 * 100)
+        };
+        for kind in [LightKind::Shadowed, LightKind::Cached] {
+            let (open, shut) = (at(kind, &|_, _| false), at(kind, &wall));
+            assert!(shut.i < open.i, "{kind:?}: {} < {}", shut.i, open.i);
+        }
+        // Kind 1 (missiles, other players) shines through.
+        assert_eq!(
+            at(LightKind::Plain, &wall),
+            at(LightKind::Plain, &|_, _| false)
+        );
+        // Without walls every kind lights alike (§7.3 / §7.4 with S = 0).
+        let open = at(LightKind::Plain, &|_, _| false);
+        assert_eq!(at(LightKind::Shadowed, &|_, _| false).i, open.i);
+        assert_eq!(at(LightKind::Cached, &|_, _| false).i, open.i);
+    }
+
+    // Covers: specs/render/lighting.md §9.2 r1
+    #[test]
+    fn drawn_frames_do_not_step_the_environment() {
+        let mut w = ClientWorld::default();
+        let key = UnitKey::new(PLAYER, 1);
+        let mut u = ClientUnit::new(key);
+        u.position = Some((4000, 4000));
+        w.units.insert(key, u);
+        w.local_player = Some(key);
+        let t = tables();
+        let far = (8 * 4000 + 8 * 40, 8 * 4000);
+        let periods = PeriodTables::builtin().unwrap();
+        // Mid-morning: the intensity changes with every update.
+        let mut env = Environment::new(&periods, 0);
+        env.ticks = 45 * 128;
+        env.update(&periods, 0);
+        w.environment = Some(env);
+        let mut light = PreviewLight::default();
+        // More drawn frames than one degree's ticks (speed 128): per-frame
+        // stepping would move the intensity.
+        let mut stepped = env;
+        for _ in 0..200 {
+            stepped.update(&periods, 0);
+        }
+        assert_ne!(stepped.ambient().i, env.ambient().i);
+        for _ in 0..200 {
+            light.refresh(&w, None, Some(&t));
+            assert_eq!(
+                light.frame().unwrap().map.read(far.0, far.1).i,
+                env.ambient().i
+            );
+        }
     }
 
     // Covers: specs/render/lighting.md §3.1 r2

@@ -113,9 +113,11 @@ fn a_monster_walks_and_a_left_click_on_it_attacks() {
         }]);
         b.0.set_unit_rows(UnitRows {
             monsters: vec![Some(MonsterClass {
+                // monstats `Velocity` 16: path velocity 0x1000 at 100 %.
                 setup: Some(MonsterSetup {
                     is_att: true,
                     is_sel: true,
+                    velocity: 16,
                     ..MonsterSetup::default()
                 }),
                 ..MonsterClass::default()
@@ -134,7 +136,9 @@ fn a_monster_walks_and_a_left_click_on_it_attacks() {
     // S→C 0x94 (skill 0 at level 1) and 0x23 (skill 0 left), as
     // `app_play_e2e.rs`; then 0xAC: monster 77 of class 0, four sub-tiles
     // east of the player, life 128; then 0x67: walk (code 1) to six
-    // more sub-tiles east at velocity 0x1000 (one sub-tile a tick).
+    // more sub-tiles east at velocity percent 100 (stat 67; with the
+    // class's `Velocity` 16 one sub-tile a tick,
+    // `seams/movement-prediction.md` §2.4 r3).
     let mut msgs = vec![0x94, 1];
     msgs.extend_from_slice(&guid.to_le_bytes());
     msgs.extend_from_slice(&[0, 0, 1]);
@@ -155,7 +159,7 @@ fn a_monster_walks_and_a_left_click_on_it_attacks() {
     walk.extend_from_slice(&(mx + 6).to_le_bytes());
     walk.extend_from_slice(&my.to_le_bytes());
     walk.extend_from_slice(&[0, 0, 0]);
-    walk.extend_from_slice(&0x1000u16.to_le_bytes());
+    walk.extend_from_slice(&100u16.to_le_bytes());
     walk.push(0);
     msgs.extend(walk);
     app.world_mut()

@@ -1,10 +1,10 @@
-// Spec: specs/formats/d2s.md (§1, §2, §7, §8), specs/formats/d2s-load.md, specs/ui/frontend-options.md (§O3)
+// Spec: specs/formats/d2s.md (§1, §2, §7, §8), specs/formats/d2s-load.md, specs/ui/frontend-options.md (§O3), specs/flows/save-exit.md (§1, §2, §4)
 //! Save smoke tests (q-smoke-save): the real play path end to end, no
 //! window. A character joins the synthetic single-player game through the
 //! bridge and the in-process server, is played (levels, stat and skill
 //! points, items in the inventory, stash and cube, waypoints, quests,
-//! gold), leaves through the Esc menu's "Save and Exit Game" (the app
-//! exits, then the save runs as `play::run` does it), and the written
+//! gold), leaves through the Esc menu's "Save and Exit Game" (C→S 0x69:
+//! the server's leave writes the file, then the app exits), and the written
 //! `.d2s` is read and joined again: every live value the save holds must
 //! come back exactly, and saving the reloaded character must give the
 //! same file. Then the same at Nightmare, a hardcore death and the
@@ -22,6 +22,7 @@ use d2_client::app::save::{self, Live, SaveHandle, SharedLink};
 use d2_client::app::single_player::{self, Character, GameData, Sim, DEFAULT_SEED};
 use d2_client::app::ui::{add_original_ui, UiParts};
 use d2_client::assets::path::MemorySource;
+use d2_client::bridge::BridgeResource;
 use d2_client::controls::Action;
 use d2_client::ui::{ActionId, Point, PointerButton, UiEvent};
 use d2_client::world_view::tile_assets::TileAssets;
@@ -180,7 +181,8 @@ impl Run {
             a.hooks().x.hardcore = hardcore;
         })
         .unwrap();
-        let (server, saver) = save::share(link, base, Arc::new(Tables::new()), path.into());
+        let (server, saver) =
+            save::share(link, base, Arc::new(Tables::new()), path.into()).unwrap();
         let mut app = App::new();
         app.add_plugins((MinimalPlugins, AssetPlugin::default()))
             .init_asset::<Image>()
@@ -254,20 +256,32 @@ impl Run {
     }
 
     /// Esc, then a click on "Save and Exit Game" (the game menu's second
-    /// row, `ui/frontend-options.md` §O3); the app must stop. Then the save
-    /// `play::run` makes after `app.run()` returns.
+    /// row, `ui/frontend-options.md` §O3): C→S 0x69, the server's leave
+    /// writes the file before its 0x05 (`flows/save-exit.md` §2 r2), and
+    /// the app stops on the server's answer (§4 r1).
     fn save_and_exit(mut self) {
         self.ui_event(UiEvent::Action(ActionId(Action::GameMenu.index() as u16)));
         let at = Point::new(400, 185 + 50 + 20);
         let b = PointerButton::Left;
         self.ui_event(UiEvent::Press { button: b, at });
         self.ui_event(UiEvent::Release { button: b, at });
-        self.step(1);
+        for _ in 0..10 {
+            if self.app.should_exit().is_some() {
+                break;
+            }
+            self.step(1);
+        }
         assert!(
             self.app.should_exit().is_some(),
-            "Save and Exit Game stops the app"
+            "Save and Exit Game stops the app on the server's answer"
         );
-        self.saver.save().unwrap();
+        let (gone, faults) = self.with(|s| {
+            let faults = s.session().map(|f| format!("{:?}", f.faults));
+            (s.client_list().is_empty(), faults.unwrap_or_default())
+        });
+        assert!(gone, "the server's leave removed the client");
+        assert!(!faults.contains("Save"), "the leave saved: {faults}");
+        assert!(self.saver.path().exists(), "the leave wrote the file");
     }
 }
 
@@ -731,7 +745,7 @@ fn each_save_keeps_the_previous_file_as_bak() {
 /// player, Save and Exit writes the corpse section; the reload makes the
 /// corpse again with the hammer in it (`d2s.md` §8.3 rule 4), so the
 /// next save keeps it.
-// Covers: specs/formats/d2s.md §8.3 r4
+// Covers: specs/formats/d2s.md §8.3 r4, §2.3
 #[test]
 fn a_corpse_with_its_items_survives_save_and_reload() {
     let dir = temp("corpse");
@@ -770,9 +784,13 @@ fn a_corpse_with_its_items_survives_save_and_reload() {
     let corpses = before.extra.corpses.clone().unwrap();
     assert_eq!(corpses.len(), 1, "one corpse with items");
     assert_eq!(corpses[0].items.len(), 1, "the hammer is on the corpse");
+    assert_eq!(before.status_set, 0x08, "the death starts set the dead bit");
     run.save_and_exit();
     let first = read(&file, 0).unwrap();
     assert_eq!(first.body.as_ref().unwrap().corpses.len(), 1);
+    // §2.3: a softcore character that died and respawned saves 0x0028
+    // (expansion | dead), the measured word of §8.3 rule 6.
+    assert_eq!(first.header.status, 0x0028, "status after a softcore death");
     let file2 = dir.join("Corpse-again.d2s");
     let again = Run::start(&loaded(first.clone(), 0), &file2);
     let broken: Vec<_> = again
@@ -785,6 +803,8 @@ fn a_corpse_with_its_items_survives_save_and_reload() {
     assert_eq!(after.extra.corpses, loaded_live(before).extra.corpses);
     again.save_and_exit();
     let second = read(&file2, 0).unwrap();
+    // No code clears the bit: the reloaded character keeps it.
+    assert_eq!(second.header.status, 0x0028);
     let mut want = first.body.unwrap().corpses;
     for c in &mut want {
         for e in &mut c.items {
@@ -795,5 +815,140 @@ fn a_corpse_with_its_items_survives_save_and_reload() {
         second.body.unwrap().corpses,
         want,
         "the corpse section of the next save"
+    );
+}
+
+/// The app stops without Save and Exit (window close, `--frames`) and
+/// with no `WorldViewState` (q-fix-play-exit-resource): `play::after_run`
+/// still leaves through the server first, so the server's leave writes
+/// the file, and nothing panics.
+// Covers: specs/flows/save-exit.md §2 r2
+#[test]
+fn the_window_close_leaves_through_the_server_first() {
+    let dir = temp("close");
+    let file = dir.join("Close.d2s");
+    let character = single_player::new_character("sorceress", "Close").unwrap();
+    let mut run = Run::start(&character, &file);
+    assert!(!file.exists());
+    let world = run.app.world_mut();
+    assert!(world
+        .remove_resource::<d2_client::world_view::WorldViewState>()
+        .is_some());
+    assert!(d2_client::app::play::after_run(world).unwrap());
+    assert!(file.exists(), "the server's leave wrote the file");
+    assert!(run.with(|s| s.client_list().is_empty()), "the client left");
+    // M08: a second call has nobody in game to leave.
+    assert!(d2_client::app::play::after_run(run.app.world_mut()).unwrap());
+    let faults = run.with(|s| {
+        s.session()
+            .map(|f| format!("{:?}", f.faults))
+            .unwrap_or_default()
+    });
+    assert!(!faults.contains("Save"), "{faults}");
+}
+
+/// A hot key bound in play (C→S 0x51, `intents-events.md` §9 r12) is
+/// saved from the client slot (`d2s.md` §2.4 r8: code with the left
+/// flag, item index), and the reload puts it back in the client slot
+/// (§2.4 r4–r6); unbound slots save as `FF FF 00 00` (r7).
+// Covers: specs/formats/d2s.md §2.4 r1, §2.4 r4, §2.4 r5, §2.4 r7, §2.4 r8
+#[test]
+fn a_hotkey_bound_in_play_round_trips() {
+    let dir = temp("hotkey");
+    let file = dir.join("Hotkey.d2s");
+    let character = single_player::new_character("sorceress", "Hotkey").unwrap();
+    let mut run = Run::start(&character, &file);
+    // Slot 3: the first skill of the player's list (a native one), left
+    // hand, no item (GUID −1).
+    let skill = run.with(|s| {
+        let (p, _) = single_player::local_player(s).unwrap();
+        let l = &s.events.action.hooks().skill_lists[&p];
+        l.entries.iter().find(|e| e.owner == -1).unwrap().skill
+    });
+    let code = skill as u16 | 0x8000;
+    let mut bind = vec![0x51];
+    bind.extend_from_slice(&code.to_le_bytes());
+    bind.extend_from_slice(&[3, 0]);
+    bind.extend_from_slice(&u32::MAX.to_le_bytes());
+    run.app
+        .world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .send_bytes(&bind)
+        .unwrap();
+    run.step(3);
+    let key = run.with(|s| s.hotkeys(s.client_list()[0])[3]);
+    assert_eq!(
+        (key.skill, key.left),
+        (skill as i16, true),
+        "0x51 stored the slot"
+    );
+    run.save_and_exit();
+    let saved = read(&file, 0).unwrap();
+    assert_eq!(
+        saved.header.hotkeys[3],
+        d2s::Slot {
+            code: 0x8000,
+            item: 0
+        }
+    );
+    for (i, s) in saved.header.hotkeys.iter().enumerate() {
+        if i != 3 {
+            assert_eq!(*s, d2s::Slot::NONE, "slot {i} unbound");
+        }
+    }
+    let again = Run::start(&loaded(saved, 0), &dir.join("Hotkey-again.d2s"));
+    let key = again.with(|s| s.hotkeys(s.client_list()[0])[3]);
+    assert_eq!(
+        (key.skill, key.left),
+        (0, true),
+        "the load restored the slot"
+    );
+    let unbound = again.with(|s| s.hotkeys(s.client_list()[0])[0]);
+    assert_eq!(unbound.skill, -1);
+}
+
+/// The NPC fields (`d2s.md` §6): A (first talk, `0x00572360`) and B
+/// (introduced, `0x00572420`) are saved from the player's NPC record and
+/// read back. Kashya (class 150, bit 3) heard in Normal is A = `08 00 …`,
+/// the measured save of §6 rule 3.
+// Covers: specs/formats/d2s.md §6 r1, §6 r2, §6 r3
+#[test]
+fn npc_fields_round_trip() {
+    let dir = temp("npcs");
+    let file = dir.join("Npcs.d2s");
+    let character = single_player::new_character("sorceress", "Npcs").unwrap();
+    let run = Run::start(&character, &file);
+    run.with(|s| {
+        let (p, _) = single_player::local_player(s).unwrap();
+        let q = s.world.rest.quests.get_mut(&p).unwrap();
+        q.hear(0, 150);
+        // Akara (148, bit 2) introduced in Normal; Warriv (155, bit 4)
+        // heard in Hell.
+        q.intro[0].insert(148);
+        q.hear(2, 155);
+    });
+    run.save_and_exit();
+    let saved = read(&file, 0).unwrap();
+    let npcs = &saved.body.as_ref().unwrap().npcs;
+    assert_eq!(npcs.a[0], [0x08, 0, 0, 0, 0, 0, 0, 0]);
+    assert_eq!(npcs.a[2], [0x10, 0, 0, 0, 0, 0, 0, 0]);
+    assert_eq!(npcs.b[0], [0x04, 0, 0, 0, 0, 0, 0, 0]);
+    assert_eq!((npcs.a[1], npcs.b[1], npcs.b[2]), ([0; 8], [0; 8], [0; 8]));
+    let again = Run::start(&loaded(saved, 0), &dir.join("Npcs-again.d2s"));
+    let (heard, intro) = again.with(|s| {
+        let (p, _) = single_player::local_player(s).unwrap();
+        let q = &s.world.rest.quests[&p];
+        (
+            [q.heard(0, 150), q.heard(0, 148), q.heard(2, 155)],
+            q.intro[0].clone(),
+        )
+    });
+    assert_eq!(heard, [true, false, true]);
+    assert_eq!(intro, std::collections::BTreeSet::from([148]));
+    let log = again.log();
+    assert!(
+        !log.iter().any(|l| l.contains("npc fields")),
+        "the load applied the NPC fields: {log:?}"
     );
 }
