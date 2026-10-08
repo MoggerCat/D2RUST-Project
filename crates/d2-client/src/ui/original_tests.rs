@@ -792,7 +792,7 @@ fn stash_gold_withdraw_and_deposit_send_0x4f() {
 }
 
 // d2rs-own, unverified: the stash GoldMax line reads string 4051 through
-// `ctx.strings` (REC-238); cap = the fixed stash limit.
+// `ctx.strings` (REC-234); cap = the fixed stash limit.
 #[test]
 fn stash_gold_max_line_resolves_its_string_id() {
     struct Strs(Vec<u16>);

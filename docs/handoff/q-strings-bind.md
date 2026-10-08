@@ -6,7 +6,7 @@
 - `ui/hud_tips.rs` (new, called once at the end of `HudUi::draw`): the control-panel tool tips `run_tip` (4179 / 4178), `menu_tip` (4167 / 4168), `tip_800` (3986 / 3987) and `exp_tip` (4163) now draw as centred text, resolved by id through `ctx.strings`.
 - Already bound before this task (checked, no change): NPC menu (`npc_menu_ui.rs`, `ctx.strings`), shop tabs, character panel, hire list, item tips (`item_tip.rs` over `TableStrings`).
 
-## PROVISIONAL (`// d2rs-own, unverified`, REC-238)
+## PROVISIONAL (`// d2rs-own, unverified`, REC-234)
 - The tip font (1, the globe-number font) is not named by `control-panel.md`.
 - The globe numbers (§3 r6) are still not drawn: they need text widths (`width_a`), which a panel does not have.
 - The 640 × 480 variant of the new-stats tips is not drawn (800 × 600 only).
