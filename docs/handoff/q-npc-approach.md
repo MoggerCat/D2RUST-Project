@@ -1,6 +1,6 @@
 # q-npc-approach: NPC approach in the play preview
 
-Branch `claude/q-npc-approach`. Nothing is verified against 1.14d (rule 10). Open point: REC-149 (`docs/HANDOFF.md` §7).
+Branch `claude/q-npc-approach`. Nothing is verified against 1.14d (rule 10). Open point: REC-151 (`docs/HANDOFF.md` §7).
 
 ## Finding
 
@@ -24,7 +24,7 @@ Two more causes surfaced:
 
 Test: `crates/d2-client/tests/app_play_npc_approach.rs`: one click on an NPC at four distances, the menu opens with no second click (fails at offset 32 without the approach).
 
-## PROVISIONAL (REC-149)
+## PROVISIONAL (REC-151)
 
 - Arrival is read from the player's mode at the start of the next tick, not the step result of `0x00580C20`.
 - All units have size 2 in `Snap::distance`; the synthetic charstats rows are made up.
