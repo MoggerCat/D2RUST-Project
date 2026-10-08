@@ -159,6 +159,9 @@ pub const ACT1_TOWN: u32 = 1;
 /// The Blood Moor (act 0), east of the synthetic town's room.
 pub const BLOOD_MOOR: u32 = 2;
 pub const COLD_PLAINS: u32 = 3;
+/// Stony Field: a waypoint level not built at game creation (its level
+/// init runs on arrival). d2rs-own, unverified (q-waypoint-travel).
+pub const STONY_FIELD: u32 = 4;
 /// The Den of Evil (act 0): the cave entrance in the Blood Moor is a
 /// level warp ([`BLOOD_MOOR_TO_DEN`] / [`DEN_TO_BLOOD_MOOR`]).
 pub const DEN_OF_EVIL: u32 = 8;
@@ -725,6 +728,7 @@ impl WaypointTables {
         }
         levels[1].waypoint = 0;
         levels[COLD_PLAINS as usize].waypoint = 1;
+        levels[STONY_FIELD as usize].waypoint = 2;
         levels[ACT2_TOWN as usize].waypoint = 9;
         let mut o: Objects = blank();
         o.operatefn = 23;
@@ -1026,7 +1030,14 @@ fn synthetic_drlg_data() -> DrlgData {
     let mut files = vec![Vec::new(); 32];
     files[0] = b"floor.dt1".to_vec();
     drlg.lvltypes = vec![vec![Vec::new(); 32], files];
-    for id in [ACT1_TOWN, BLOOD_MOOR, COLD_PLAINS, DEN_OF_EVIL, ACT2_TOWN] {
+    for id in [
+        ACT1_TOWN,
+        BLOOD_MOOR,
+        COLD_PLAINS,
+        STONY_FIELD,
+        DEN_OF_EVIL,
+        ACT2_TOWN,
+    ] {
         drlg.levels[id as usize].drlg_type = 2;
         drlg.levels[id as usize].level_type = 1;
     }
@@ -1063,6 +1074,7 @@ fn synthetic_types() -> Types {
         (ACT1_TOWN, TileRect::new(16, 0, 8, 8)),
         (BLOOD_MOOR, TileRect::new(24, 0, 8, 8)),
         (COLD_PLAINS, TileRect::new(0, 0, 8, 8)),
+        (STONY_FIELD, TileRect::new(0, 16, 8, 8)),
         (DEN_OF_EVIL, TileRect::new(0, 8, 8, 8)),
         (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
     ]))

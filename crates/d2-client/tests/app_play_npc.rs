@@ -400,7 +400,8 @@ fn clicking_the_waypoint_walks_there_and_interacts() {
         .iter()
         .map(|r| (r.level, r.known, r.current))
         .collect();
-    assert_eq!(rows, [(1, true, true), (3, true, false)]);
+    // Stony Field's waypoint exists but is unknown (listed, not clickable).
+    assert_eq!(rows, [(1, true, true), (3, true, false), (4, false, false)]);
     // A click on row 1 (`ui/menus.md` §1.2 / §1.6 hit, R800: x' = x − 80,
     // y' = y − 60) sends C→S 0x49 [GUID][level 3] and closes the menu.
     let at = Point::new(80 + 150, 60 + 110);
