@@ -61,7 +61,12 @@ pub fn is_tower_level(id: u32) -> bool {
 /// is the line's last level, the way on (a maze level's first room).
 pub fn maze_links(id: u32) -> Option<(u32, Option<u32>)> {
     if id == synthetic_maze::CAVE_LEVEL_1 {
-        return Some((synthetic_maze::CAVE_TO_DEN, None));
+        // The way on to Cave Level 2 comes from the Act I tree.
+        let on = super::synthetic_chains::slots(id)
+            .into_iter()
+            .find(|s| s.0 == 1)
+            .map(|s| s.2);
+        return Some((synthetic_maze::CAVE_TO_DEN, on));
     }
     let Some(i) = TOWER_LEVELS.iter().position(|&l| l == id) else {
         return super::synthetic_act2::maze_links(id);

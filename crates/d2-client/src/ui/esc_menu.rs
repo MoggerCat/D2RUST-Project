@@ -11,11 +11,10 @@
 //!
 //! The tree, rows, input and settings are `options_menu` (spec
 //! `ui/frontend-options.md` §O2–§O8); this panel draws it and routes
-//! events. d2rs-own, unverified: the DC6 labels, value images, bar,
-//! skull and pentspin are not available here, so labels and values are
-//! Font16 English text, the slider is a thin bar with a gold knob and the
-//! pentagrams are gold squares (REC-187); Esc closes the whole menu
-//! (`OriginalUi::game_menu_key`, §O1 r4).
+//! events. The DC6 art is `esc_art` (REC-257); a row without art (Window
+//! Mode) is Font16 English text with a thin bar and gold knob stand-in
+//! (REC-187). Esc closes the whole menu (`OriginalUi::game_menu_key`,
+//! §O1 r4).
 
 use super::hud::{FILL_FILE, FILL_H, FILL_W};
 use super::options_menu::{Kind, MenuEvent, OptionsMenu, HALF};
@@ -56,8 +55,25 @@ pub struct EscState {
     pub exit_requested: bool,
     /// "Configure Controls" was chosen and the host has not read it yet.
     pub controls_requested: bool,
+    /// The Configure Controls screen, while it is open over the menu
+    /// (`controls_host`).
+    pub controls: Option<super::controls_host::ControlsHost>,
+    /// Bindings accepted on that screen, until the host reads them.
+    pub accepted: Option<crate::controls::Bindings>,
     /// The menu tree and the settings it edits (`options_menu`).
     pub menu: OptionsMenu,
+}
+
+impl EscState {
+    /// Leave the Controls screen for the Options menu (Previous selected).
+    pub fn close_controls(&mut self, f: super::controls_host::Finished) {
+        use super::controls_host::Finished;
+        self.controls = None;
+        self.menu.return_from_controls();
+        if let Finished::Accept(b) = f {
+            self.accepted = Some(b);
+        }
+    }
 }
 
 /// A row's label x and the value / slider geometry, §O4 r1.
@@ -66,7 +82,7 @@ const VALUE_BLOCK: i32 = 130;
 
 /// The menu draws over the world with no backdrop (§O4, PROVISIONAL REC-212),
 /// so a dark strip behind the rows keeps the English stand-in text readable.
-fn push_fill(out: &mut dyn UiDrawSink, file: u32, frame: u32, r: Rect) {
+pub(super) fn push_fill(out: &mut dyn UiDrawSink, file: u32, frame: u32, r: Rect) {
     let (w, h) = (FILL_W as i32, FILL_H as i32);
     let mut y = r.y;
     while y < r.y + i32::from(r.h) {
@@ -114,11 +130,22 @@ impl Panel for EscMenuUi {
         FRAME
     }
 
-    fn draw(&self, _ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+        {
+            let mut sh = self.sh.borrow_mut();
+            let file = sh.tables.files.id(FILL_FILE);
+            if let Some(c) = sh.esc.controls.as_mut() {
+                c.draw(ctx, file, out);
+                return;
+            }
+        }
         let sh = self.sh.borrow();
         let m = &sh.esc.menu;
         let file = sh.tables.files.id(FILL_FILE);
         for (i, def) in m.rows().iter().enumerate() {
+            if super::esc_art::draw_row(&sh.tables.files, m, i, out) {
+                continue;
+            }
             let yb = m.baseline(i);
             let color = if !m.enabled(i) && def.kind != Kind::Title {
                 COLOR_DISABLED
@@ -159,12 +186,7 @@ impl Panel for EscMenuUi {
                 }
             }
         }
-        if let Some(file) = file {
-            // Pentagram stand-ins (no pentspin art here), both sides.
-            let y = m.pentagram_y();
-            push_fill(out, file, GOLD, Rect::new(HALF - 301, y - 6, 12, 12));
-            push_fill(out, file, GOLD, Rect::new(HALF + 249, y - 6, 12, 12));
-        }
+        super::esc_art::draw_pents(&sh.tables.files, m, ctx.tick, out);
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {
@@ -173,6 +195,26 @@ impl Panel for EscMenuUi {
 
     fn event(&mut self, e: UiEvent, _ctx: &UiCtx) -> UiResponse {
         let mut sh = self.sh.borrow_mut();
+        if let Some(c) = sh.esc.controls.as_mut() {
+            let done = match e {
+                UiEvent::CursorMoved(p) => {
+                    c.moved(p);
+                    None
+                }
+                UiEvent::Wheel { steps, .. } => {
+                    c.wheel(steps);
+                    None
+                }
+                _ => match left(e) {
+                    Some((true, at)) => c.press(at),
+                    _ => None,
+                },
+            };
+            if let Some(f) = done {
+                sh.esc.close_controls(f);
+            }
+            return UiResponse::Consumed;
+        }
         let m = &mut sh.esc.menu;
         let mut consumed = false;
         match e {

@@ -1612,6 +1612,16 @@ pub trait Pending {
     {
         0
     }
+    /// The join's Iron Golem re-summon (`formats/d2s-load.md` §3): routed
+    /// to [`crate::wiring::interaction::skill_events::golem_resummon`] by
+    /// a [`crate::wiring::interaction::UseRest`] value. True when a golem
+    /// was made. Default: false. d2rs-own, unverified (REC-265).
+    fn golem_resummon(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, player: UnitId) -> bool
+    where
+        Self: Sized,
+    {
+        false
+    }
     /// The skill part of the monster sequence event 0 `0x005A8670`
     /// (`units.md` §4.6 rule 13, before the animation refresh): E flags,
     /// the moving skill's step and the do `0x0056FC50` by frame code. A

@@ -146,13 +146,19 @@ impl<X: WorldPending> TickHooks for WorldSim<X> {
         self.population(game, |cx| preset::place_presets(cx, r));
         // PROVISIONAL (REC-99): the warp tile units of the room's presets.
         self.host(game, |h| {
-            let WorldHost { game, v, .. } = h;
-            v.spawn_warp_tiles(game, r);
-            v.spawn_host_objects(game, r);
-            // PROVISIONAL (REC-130): the monsters a level types provider
-            // lists for the host (`HOST_MONSTER_PRESET`).
-            for (u, class) in v.spawn_host_monsters(game, r) {
-                v.h.x.host_monster_created(u, class);
+            let created = {
+                let WorldHost { game, v, .. } = &mut *h;
+                v.spawn_warp_tiles(game, r);
+                v.spawn_host_objects(game, r);
+                // PROVISIONAL (REC-130): the monsters a level types
+                // provider lists for the host (`HOST_MONSTER_PRESET`).
+                v.spawn_host_monsters(game, r)
+            };
+            for (u, class) in created {
+                h.v.h.x.host_monster_created(u, class);
+                if h.v.h.x.host_monster_ai(class) {
+                    h.start_host_ai(u);
+                }
             }
         });
     }

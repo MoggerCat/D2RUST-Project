@@ -544,6 +544,22 @@ pub fn iron_golem<W: BodyWorld>(
         return 0;
     }
     let tg = target(w, u);
+    golem_summon(w, t, ct, u, skill, lvl, tg)
+}
+
+/// Steps 2–6 of §7.12 with `tg` as the item. The join's re-summon
+/// (`d2s-load.md` §3) calls it with no item unit: the saved item is not
+/// made as a unit yet, so the golem is spawned without it (d2rs-own,
+/// unverified, REC-265).
+pub fn golem_summon<W: BodyWorld>(
+    w: &mut W,
+    t: &SkillTables,
+    ct: &CombatTables,
+    u: W::Unit,
+    skill: i32,
+    lvl: i32,
+    tg: Option<W::Unit>,
+) -> i32 {
     flag_40(w, u);
     if skill == 0 {
         return 0;

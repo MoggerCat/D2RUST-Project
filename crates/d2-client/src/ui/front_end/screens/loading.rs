@@ -84,6 +84,9 @@ pub struct LoadingScreen {
     pub active: bool,
     /// Black frames still owed after the last loading draw.
     black_due: bool,
+    /// A video played since the last loading draw: the screen shows black
+    /// (no art) until the game frame (L10 r2, REC-223).
+    pub after_video: bool,
     /// Video requests recorded by the stub (L10 r1).
     pub videos: Vec<u8>,
     /// Everything presented, in order (consecutive repeats not merged).
@@ -110,6 +113,7 @@ impl LoadingScreen {
         self.counter += 1;
         self.active = true;
         self.black_due = true;
+        self.after_video = false;
     }
 
     /// Feed one event.
@@ -126,6 +130,9 @@ impl LoadingScreen {
             LoadEvent::S61 { id } => {
                 if video_name(id).is_some() {
                     self.videos.push(id);
+                    // L10 r2 (PROVISIONAL, REC-223): no loading redraw
+                    // after the video; black until L7.
+                    self.after_video = true;
                 }
             }
         }
@@ -143,6 +150,7 @@ impl LoadingScreen {
             self.art_held = false;
             self.active = false;
             self.black_due = false;
+            self.after_video = false;
             self.presented.push(Presented::Black);
             return Some(Presented::Black);
         }

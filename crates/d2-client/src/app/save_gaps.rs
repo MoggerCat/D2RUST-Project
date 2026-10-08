@@ -14,7 +14,8 @@
 //! re-summon, `d2s.md` Open question 15, is not wired); the progression
 //! bits of the status word have no live source and pass through.
 
-use d2_formats::d2s::{Body, D2s, Golem, ItemEntry, Slot};
+use d2_formats::d2s::{Body, D2s, Golem, Hireling, ItemEntry, Slot};
+use d2_server::adapters::handlers::world::HirelingBlock;
 use d2_sim::skills::list::SkillList;
 use d2_sim::units::UnitId;
 use d2_sim::wiring::economy::QuestRest;
@@ -35,6 +36,15 @@ pub struct Gaps {
     /// The Iron Golem's item: `Some(None)` a living golem without one.
     /// `None`: no golem; the loaded section passes through.
     pub golem: Option<Option<ItemEntry>>,
+    /// The mouse pair of the weapon set not in hand (header +0x80, +0x84)
+    /// and the switch bit (+0x10 bit 0). `None`: no skill list.
+    pub swap: Option<([Slot; 2], bool)>,
+    /// The live hireling's header block (`None`: no hireling node; the
+    /// loaded block passes through).
+    pub hireling: Option<HirelingBlock>,
+    /// The client's save flags (status word) with the progression
+    /// (bits 8–12) the quests raised. `None`: no flags for the player.
+    pub status: Option<u16>,
 }
 
 /// Reads [`Gaps`] from the game's `player`.
@@ -57,12 +67,33 @@ pub fn read_gaps(sim: &mut Sim, player: UnitId) -> Gaps {
         .world
         .golem_unit(&sim.game, &mut sim.events, player)
         .and_then(|g| sim.world.save_items(&mut sim.game, &mut sim.events, g).ok())
-        .map(|items| items.into_iter().next());
+        // A golem re-summoned at the join has no item unit (REC-265): the
+        // loaded item stays with it.
+        .map(|items| {
+            items
+                .into_iter()
+                .next()
+                .or_else(|| sim.world.rest.golem_items.get(&player).cloned())
+        });
+    let swap = sim
+        .events
+        .action
+        .hooks()
+        .skill_lists
+        .get(&player)
+        .map(|list| (swap_slots(list, &guids), list.weapon_switch));
+    let hireling = sim
+        .world
+        .hireling_block(&mut sim.game, &mut sim.events, player);
+    let status = sim.world.rest.save_flags.get(&player).copied();
     Gaps {
         mouse,
         town,
         hireling_items,
         golem,
+        swap,
+        hireling,
+        status,
     }
 }
 
@@ -77,6 +108,25 @@ pub fn apply_gaps(save: &mut D2s, gaps: &Gaps) {
     if let Some((difficulty, act)) = gaps.town {
         save.header.towns = [0; 3];
         save.header.towns[usize::from(difficulty).min(2)] = (if act < 5 { act } else { 0 }) | 0x80;
+    }
+    if let Some(([left, right], switch)) = gaps.swap {
+        save.header.mouse[2] = left;
+        save.header.mouse[3] = right;
+        save.header.weapon_switch = u32::from(switch);
+    }
+    // §2.5 rule 1: the block of the living hireling node.
+    if let Some(b) = gaps.hireling {
+        let h = &mut save.header.hireling;
+        h.flags = if b.dead { Hireling::DEAD } else { 0 };
+        h.seed = b.seed;
+        h.name_index = b.name_index;
+        h.id = b.id;
+        h.experience = b.experience;
+    }
+    // `quests-act1-rest.md` §5: the progression is never lowered.
+    if let Some(flags) = gaps.status {
+        let p = |s: u16| s & 0x1F00;
+        save.header.status = (save.header.status & !0x1F00) | p(flags).max(p(save.header.status));
     }
     let expansion = save.header.status & d2_formats::d2s::status::EXPANSION != 0;
     let hireling = save.header.hireling.is_present();
@@ -116,6 +166,44 @@ pub fn join_gaps(s: &mut Sim, player: UnitId, save: &D2s) {
         }
     }
     select_mouse_skills(s, player, &save.header.mouse[..2]);
+    select_swap_skills(
+        s,
+        player,
+        &save.header.mouse[2..4],
+        save.header.weapon_switch,
+    );
+    s.world.rest.save_flags.insert(player, save.header.status);
+    join_golem(s, player, body);
+}
+
+/// A new character's client save flags (no progression yet).
+pub fn seed_new_flags(s: &mut Sim, player: UnitId, expansion: bool) {
+    let flags = if expansion {
+        d2_formats::d2s::status::EXPANSION
+    } else {
+        0
+    };
+    s.world.rest.save_flags.insert(player, flags);
+}
+
+/// `d2s-load.md` §3: a saved golem item with the skill 90 entry present
+/// casts the Iron Golem at the join. The item is not made as a unit
+/// (REC-265), so the golem comes without it and the saved item bytes stay
+/// in the save.
+fn join_golem(s: &mut Sim, player: UnitId, body: &Body) {
+    let Some(Golem {
+        item: Some(item),
+        flag: 1,
+    }) = &body.golem
+    else {
+        return;
+    };
+    if s.events.action.golem_resummon(&mut s.game, player) {
+        s.world.rest.golem_items.insert(player, item.clone());
+    } else {
+        let log = &mut s.events.action.hooks().x.log;
+        log.push("join: save load: golem: not re-summoned (no skill 90 or no summon)".into());
+    }
 }
 
 /// §8.4 rule 2 on the hireling restored by the load: its unit is made by
@@ -197,6 +285,27 @@ pub fn select_mouse(list: &mut SkillList, mouse: &[Slot], guids: &[u32]) {
         } else {
             list.right = idx;
         }
+    }
+}
+
+/// §2.4 rules 1–3 for the swap set's pair.
+pub fn swap_slots(list: &SkillList, guids: &[u32]) -> [Slot; 2] {
+    let mut pair = list.clone();
+    pair.left = list.swap_left;
+    pair.right = list.swap_right;
+    mouse_slots(&pair, guids)
+}
+
+fn select_swap_skills(s: &mut Sim, player: UnitId, mouse: &[Slot], switch: u32) {
+    let guids = s.world.item_guids(player);
+    if let Some(list) = s.events.action.hooks().skill_lists.get_mut(&player) {
+        let mut pair = list.clone();
+        pair.left = None;
+        pair.right = None;
+        select_mouse(&mut pair, mouse, &guids);
+        list.swap_left = pair.left;
+        list.swap_right = pair.right;
+        list.weapon_switch = switch & 1 != 0;
     }
 }
 

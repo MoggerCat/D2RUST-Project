@@ -448,7 +448,9 @@ fn every_kurast_docks_npc_opens_its_menu() {
         menu_of(class::ALKOR),
         [Some(Talk), Some(Trade), Some(Gamble), None]
     );
-    assert_eq!(menu_of(class::CAIN4), [Some(Talk), Some(Identify), None]);
+    // `menus.md` §2.3: no unidentified item, no Identify row (n = 0).
+    assert_eq!(menu_of(class::CAIN4), [Some(Talk), None]);
+    let _ = Identify;
     assert_eq!(menu_of(town_npcs::NATALYA), [Some(Talk), None]);
 }
 
@@ -459,4 +461,94 @@ fn meshif_offers_the_sail_west() {
     let kinds = menu_of(d2_sim::world::npc::class::MESHIF2);
     assert_eq!(kinds.len(), 3, "{kinds:?}");
     assert_eq!(kinds[0], Some(Talk));
+}
+
+/// An item stream head (`items/bitstream.md` §2–§4.1) with header flags
+/// `flags`, a backpack cell and `code`.
+fn item_stream(flags: u32, cell: (u16, u16), code: &[u8; 4]) -> Vec<u8> {
+    let bits: [(u32, u32); 8] = [
+        (flags, 32),
+        (0x65, 10),
+        (0, 3),
+        (0, 4),
+        (u32::from(cell.0), 4),
+        (u32::from(cell.1), 4),
+        (1, 3),
+        (u32::from_le_bytes(*code), 32),
+    ];
+    let (mut out, mut acc, mut n) = (Vec::new(), 0u64, 0);
+    for (v, w) in bits {
+        acc |= u64::from(v) << n;
+        n += w;
+        while n >= 8 {
+            out.push(acc as u8);
+            acc >>= 8;
+            n -= 8;
+        }
+    }
+    if n > 0 {
+        out.push(acc as u8);
+    }
+    out
+}
+
+/// S→C 0x9C action 0 (to the pack): the item `guid`.
+fn item_to_pack(guid: u32, s: &[u8]) -> Vec<u8> {
+    let mut m = vec![0x9C, 0, (8 + s.len()) as u8, 0x10];
+    m.extend_from_slice(&guid.to_le_bytes());
+    m.extend_from_slice(s);
+    m
+}
+
+// Covers: specs/ui/menus.md §2; specs/world/npc.md §6
+#[test]
+fn cains_identify_row_shows_the_cost_and_sends_0x34() {
+    use d2_client::ui::layout::OptionKind::Identify;
+    let ms = Arc::new(AtomicU32::new(1000));
+    let wire = Arc::new(Mutex::new(Wire::default()));
+    let class = d2_sim::world::npc::class::CAIN4;
+    let mut app = play_app(&ms, &wire, vec![(class, 24)]);
+    // Two unidentified items (header flag 0x10 clear) and an identified one.
+    let mut msgs = item_to_pack(0x7001, &item_stream(0, (0, 0), b"cap "));
+    msgs.extend(item_to_pack(0x7002, &item_stream(0, (2, 0), b"cap ")));
+    msgs.extend(item_to_pack(0x7003, &item_stream(0x10, (4, 0), b"cap ")));
+    app.world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .receive_chunk(&msgs)
+        .unwrap();
+    step(&mut app, &ms, 2);
+    let (guid, kinds) = open_menu(&mut app, &ms, &wire, class);
+    assert_eq!(
+        kinds,
+        [
+            Some(d2_client::ui::layout::OptionKind::Talk),
+            Some(Identify),
+            None
+        ]
+    );
+    wire.lock().unwrap().sent.clear();
+    // Re-open and press the Identify row (row 1: box x 300, y 150, rows
+    // from y 170, 20 high; `open_menu` left through Cancel).
+    let (_, at) = npc_on_screen(&app, class);
+    click(&mut app, &ms, at);
+    step(&mut app, &ms, 40);
+    let menu = app
+        .world()
+        .non_send::<WorldViewUi>()
+        .original
+        .as_ref()
+        .unwrap()
+        .npc_menu()
+        .expect("menu open again");
+    assert_eq!(menu.rows[1].cost, Some(200), "100 × 2 unidentified items");
+    click(&mut app, &ms, Point::new(400, 170 + 20 + 5));
+    step(&mut app, &ms, 3);
+    let mut want = vec![0x34];
+    want.extend_from_slice(&guid.to_le_bytes());
+    assert!(
+        wire.lock().unwrap().sent.contains(&want),
+        "C→S 0x34 [GUID]: {:?}",
+        wire.lock().unwrap().sent
+    );
 }

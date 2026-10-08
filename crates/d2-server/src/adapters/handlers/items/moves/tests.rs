@@ -1073,6 +1073,30 @@ fn equip_and_remove_body_item() {
     assert_eq!(t.frame(&loc16(0x1C, 1)), (Done, NO_BYTES));
 }
 
+/// The equipment rules are on in play (`InvParts::new`): a cap whose
+/// strength requirement (`inventory.md` §4.2) is over the character's
+/// strength is refused and stays on the cursor; with enough strength it
+/// is worn and its link holds, so the §5.7 inventory pass ends.
+// Covers: specs/items/inventory.md §4.2, §5.7
+#[test]
+fn equip_over_strength_requirement_is_refused() {
+    let mut t = setup();
+    t.inv().tables.items[CAP].reqstr = 50;
+    let c = t.cursor_item(CAP);
+    let (code, bytes) = t.frame(&body(0x1A, c, 1));
+    // §4.6: a failed requirement is result 0 (nothing moved, nothing sent).
+    assert_eq!((code, bytes), (Done, NO_BYTES));
+    let u = t.unit(c);
+    assert_eq!(t.mode(c), 4);
+    assert_eq!(t.inventory().body_item(1), None);
+    assert_eq!(t.inventory().cursor(), u);
+    let p = t.player;
+    t.set_stat(p, 0, 50);
+    assert_eq!(t.frame(&body(0x1A, c, 1)).0, Done);
+    assert_eq!(t.mode(c), 1);
+    assert_eq!(t.inventory().body_item(1), u);
+}
+
 /// 0x1B (§7.6): a two-handed sword onto the right hand over a shield in
 /// the left: the shield leaves the body (mode 4, not linked; WV2), the
 /// sword goes to location 4 → 0x9D action 7 (row 6). Location 3 → 3.

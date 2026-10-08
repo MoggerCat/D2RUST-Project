@@ -163,9 +163,19 @@ fn walk_from_the_encampment_to_catacombs_4() {
         });
         settle(app, level);
     };
-    put(&mut app, single_player::BLOOD_MOOR);
-    let path = [6u32, 5, 7, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37];
-    let mut at = single_player::BLOOD_MOOR;
+    // 1.14d's order (q-a1-vis-links): Blood Moor → Cold Plains → Stony
+    // Field are borders (put); the tiles start at the Stony Field.
+    for level in [
+        single_player::BLOOD_MOOR,
+        single_player::COLD_PLAINS,
+        single_player::STONY_FIELD,
+    ] {
+        put(&mut app, level);
+    }
+    let path = [
+        10u32, 5, 6, 7, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37,
+    ];
+    let mut at = single_player::STONY_FIELD;
     for to in path {
         go(&mut app, at, to);
         at = to;
@@ -174,9 +184,10 @@ fn walk_from_the_encampment_to_catacombs_4() {
     go(&mut app, 37, 36);
     // Each branch once, from its parent.
     for (parent, child) in [
-        (3u32, 13u32),
-        (5, 38),
-        (5, 10),
+        (3u32, 17u32),
+        (9, 13),
+        (4, 38),
+        (4, 10),
         (10, 14),
         (7, 12),
         (12, 16),

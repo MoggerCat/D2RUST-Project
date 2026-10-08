@@ -170,3 +170,35 @@ pub fn monster_sequence_frame<X: Pending + UseRest>(
         do_it(&mut w);
     }
 }
+
+/// The join's Iron Golem re-summon (`formats/d2s-load.md` §3 step 2,
+/// `skills/bodies-2b.md` §7.12): the player's skill 90 level L (base +
+/// bonuses) and the golem spawned at the player. The saved item has no
+/// unit yet, so the body runs without it. True when a golem was made.
+/// d2rs-own, unverified (REC-265).
+pub fn golem_resummon<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    player: UnitId,
+) -> bool {
+    const IRON_GOLEM: i32 = 90;
+    let t = h.tables.clone();
+    let Some(entry) = h
+        .skill_lists
+        .get(&player)
+        .and_then(|l| l.view().into_iter().find(|e| e.skill == IRON_GOLEM))
+    else {
+        return false;
+    };
+    let ct = h.tables.combat.clone();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    let l = skill_level(&w, &t.skills, Some(player), Some(&entry), true);
+    crate::skills::use_::bodies::b3_lvl24::golem_summon(
+        &mut w, &t.skills, &ct, player, IRON_GOLEM, l, None,
+    ) == 1
+}

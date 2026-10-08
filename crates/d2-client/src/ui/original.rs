@@ -239,6 +239,11 @@ struct Shared {
     messages: game_messages::GameMessages,
     /// The overhead text bubbles ([`overhead_ui`]).
     bubbles: overhead_ui::Bubbles,
+    /// S→C 0x77 0x15 opened the cube since the panel last looked: its
+    /// close latch clears (`0x0048A460`, [`cube_ui`]).
+    cube_opened: bool,
+    /// The transmute animation (`panels.md` §12 r4, [`cube_ui`]).
+    cube_anim: std::cell::Cell<super::panels::stash_cube::HoradricAnim>,
 }
 
 impl Shared {
@@ -342,7 +347,9 @@ impl OriginalUi {
     pub fn new(config: UiConfig, inv_areas: Option<Vec<InvArea>>) -> Result<Self, LayoutError> {
         let mut tables = PanelTables::load()?;
         tables.files.extend(hud::hud_files());
+        tables.files.extend(esc_art::esc_files());
         tables.files.extend(quest_log_ui::quest_files());
+        tables.files.extend(cube_ui::cube_files());
         let shared = Shared {
             tables,
             states: UiStates::new()?,
@@ -366,6 +373,8 @@ impl OriginalUi {
             gold: gold_dialog::GoldState::default(),
             messages: Default::default(),
             bubbles: Default::default(),
+            cube_opened: false,
+            cube_anim: Default::default(),
         };
         Ok(Self {
             shared: Rc::new(RefCell::new(shared)),
@@ -630,6 +639,41 @@ impl OriginalUi {
         std::mem::take(&mut self.shared.borrow_mut().esc.controls_requested)
     }
 
+    /// Open the Configure Controls screen over the menu when it was
+    /// chosen (`controls_host`); `path` is the `controls.toml` to load and
+    /// save. Returns whether it opened.
+    pub fn service_controls(&mut self, expansion: bool, path: Option<std::path::PathBuf>) -> bool {
+        if !self.take_controls_request() {
+            return false;
+        }
+        self.shared.borrow_mut().esc.controls =
+            Some(controls_host::ControlsHost::open(expansion, path));
+        true
+    }
+
+    /// Whether the Configure Controls screen is open.
+    pub fn controls_open(&self) -> bool {
+        self.shared.borrow().esc.controls.is_some()
+    }
+
+    /// A raw key (Windows virtual key) for the open Controls screen;
+    /// false when it is not open (the key is for the game).
+    pub fn controls_key(&mut self, vk: u16, now_ms: u64) -> bool {
+        let mut sh = self.shared.borrow_mut();
+        let Some(c) = sh.esc.controls.as_mut() else {
+            return false;
+        };
+        if let Some(f) = c.key(vk, now_ms) {
+            sh.esc.close_controls(f);
+        }
+        true
+    }
+
+    /// The play bindings accepted on the Controls screen, once.
+    pub fn take_accepted_bindings(&mut self) -> Option<crate::controls::Bindings> {
+        self.shared.borrow_mut().esc.accepted.take()
+    }
+
     /// The settings the Esc menu's Options page shows (`app::config`).
     pub fn set_settings(&mut self, s: crate::app::config::Settings) {
         self.shared.borrow_mut().esc.menu.set_settings(s);
@@ -652,6 +696,7 @@ impl OriginalUi {
         // The Esc menu always reopens on its first page.
         if ui == u32::from(esc_menu::ESC_PANEL.0) {
             sh.esc.menu.open();
+            sh.esc.controls = None;
         }
         r
     }
@@ -1223,6 +1268,10 @@ impl Panel for BorderUi {
     }
 }
 
+#[path = "controls_host.rs"]
+pub mod controls_host;
+#[path = "esc_art.rs"]
+pub mod esc_art;
 #[path = "esc_menu.rs"]
 pub mod esc_menu;
 #[path = "game_messages.rs"]

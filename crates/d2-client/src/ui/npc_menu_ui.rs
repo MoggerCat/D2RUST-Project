@@ -28,6 +28,8 @@ use super::panels::npc::{msg_chat_end, option_intent, NpcMenus};
 use super::panels::PanelOutput;
 use super::text::TextOpts;
 use super::PointerButton;
+use crate::bridge::items;
+use crate::bridge::world::ClientWorld;
 use crate::ui::layout::OptionKind;
 
 /// The panel id (one past the hire list's, always open).
@@ -44,6 +46,25 @@ const NPC_TALK_BOX_W: i32 = 360;
 pub struct Row {
     pub string: u16,
     pub kind: Option<OptionKind>,
+    /// The `%d` the caption appends (`menus.md` §2.3: Cain's `100 × n`).
+    pub cost: Option<u32>,
+}
+
+/// Cain's identify count `0x0062A530` (`world/npc.md` §6 step 3): the
+/// local player's items without flag 0x10 in the backpack (page 0), the
+/// cube (page 3) or worn; the stash and the belt are skipped.
+pub fn unidentified_count(world: &ClientWorld) -> u32 {
+    items::local_items(world)
+        .iter()
+        .filter(|i| {
+            i.flags & 0x10 == 0
+                && match i.mode {
+                    items::mode::STORED => i.page == 0 || i.page == 3,
+                    items::mode::BODY => true,
+                    _ => false,
+                }
+        })
+        .count() as u32
 }
 
 /// The open menu.
@@ -85,7 +106,7 @@ fn fallback(kind: Option<OptionKind>) -> &'static str {
         Some(OptionKind::Hire) => "Hire",
         Some(OptionKind::TravelWest) => "Travel",
         Some(OptionKind::SailWest) => "Sail",
-        Some(OptionKind::Identify) => "Identify Items",
+        Some(OptionKind::Identify) => "Identify Items: ",
         Some(OptionKind::Resurrect) => "Resurrect",
         Some(OptionKind::Imbue) => "Imbue",
         None => "Cancel",
@@ -98,7 +119,14 @@ impl NpcMenuState {
     /// the builder additions (`panels.md` §14.2). A class without a
     /// record, or with only a talk option and no speech to show, still
     /// gets the box (record 0 rule, `panels.md` §14.7).
-    pub fn open(&mut self, guid: u32, class: u32, char_level: i32, speech: Vec<u16>) {
+    pub fn open(
+        &mut self,
+        guid: u32,
+        class: u32,
+        char_level: i32,
+        speech: Vec<u16>,
+        identify_n: u32,
+    ) {
         let menus = self.menus.get_or_insert_with(|| {
             NpcMenus::load().unwrap_or_else(|_| NpcMenus::from_records(Vec::new()))
         });
@@ -111,9 +139,14 @@ impl NpcMenuState {
         let mut rows: Vec<Row> = super::panels::npc::shown_options(rec)
             .into_iter()
             .flatten()
+            // `menus.md` §2.3: no items to identify, no row; else the
+            // caption carries `100 × n` (the quest-4 bits that waive it
+            // are not in the client model: d2rs-own, unverified).
+            .filter(|o| o.kind != OptionKind::Identify || identify_n > 0)
             .map(|o| Row {
                 string: o.string,
                 kind: Some(o.kind),
+                cost: (o.kind == OptionKind::Identify).then_some(100 * identify_n),
             })
             .collect();
         if class == NPC_CHARSI {
@@ -121,11 +154,13 @@ impl NpcMenuState {
             rows.push(Row {
                 string: 4017,
                 kind: Some(OptionKind::Imbue),
+                cost: None,
             });
         }
         rows.push(Row {
             string: STR_CANCEL,
             kind: None,
+            cost: None,
         });
         self.up = Some(Open {
             guid,
@@ -216,11 +251,15 @@ impl Panel for NpcMenuUi {
         };
         let (x, y) = st.box_pos();
         for (i, r) in o.rows.iter().enumerate() {
-            out.push(text(
-                label(r.string, r.kind),
-                Point::new(x + 20, y + ROW_H * (i as i32 + 2)),
-                0,
-            ));
+            let mut t = match r.cost {
+                // `NPCIdentify2` "Identify Items: " then `100 × n`.
+                Some(_) => label(super::panels::npc_menu::STR_IDENTIFY_COST, r.kind),
+                None => label(r.string, r.kind),
+            };
+            if let Some(c) = r.cost {
+                t.extend(utf16s(&c.to_string()));
+            }
+            out.push(text(t, Point::new(x + 20, y + ROW_H * (i as i32 + 2)), 0));
         }
         if o.talking {
             let tx = (st.screen.0 - NPC_TALK_BOX_W) / 2;
@@ -355,6 +394,11 @@ impl OriginalUi {
 
     /// Opens the NPC menu for a delivered 0x28 (`msg_ui`).
     pub fn open_npc_menu(&mut self, guid: u32, class: u32, level: i32) {
+        self.open_npc_menu_with(guid, class, level, 0);
+    }
+
+    /// [`Self::open_npc_menu`] with Cain's count of items to identify.
+    pub fn open_npc_menu_with(&mut self, guid: u32, class: u32, level: i32, identify_n: u32) {
         let speech: Vec<u16> = self.npc_text().map_or(Vec::new(), |t| {
             t.nodes()
                 .into_iter()
@@ -364,7 +408,9 @@ impl OriginalUi {
         });
         // A seller's hire list (S→C 0x4F) opens from the Hire option.
         self.hire.borrow_mut().up = None;
-        self.npcm.borrow_mut().open(guid, class, level, speech);
+        self.npcm
+            .borrow_mut()
+            .open(guid, class, level, speech, identify_n);
     }
 
     /// The NPC menu is up (the preview's automatic chat close waits for

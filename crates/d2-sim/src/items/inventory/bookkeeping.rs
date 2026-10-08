@@ -290,7 +290,10 @@ pub fn inventory_pass<W: EquipWorld + ?Sized>(w: &mut W, u: UnitId, send: bool) 
         }
     }
     // Step 4: switch on, until a sweep changes nothing.
-    loop {
+    // d2rs-own guard: every sweep that changes something links an item,
+    // so a world whose stat link never sticks would spin forever; at
+    // most one sweep per body location can change anything.
+    for _ in 0..=body::GLOVES {
         let mut changed = false;
         for loc in body::HEAD..=body::GLOVES {
             let Some(x) = w.body_item(u, loc) else {

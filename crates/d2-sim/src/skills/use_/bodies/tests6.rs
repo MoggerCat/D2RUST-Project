@@ -1420,6 +1420,21 @@ fn iron_golem_summon_class_and_pettype() {
     assert!(!f.take_log().iter().any(|s| s.starts_with("monster")));
 }
 
+// The join's re-summon (`formats/d2s-load.md` §3): the body runs with no
+// item unit, so the golem is spawned and added as a pet and no item moves.
+// Covers: specs/formats/d2s-load.md §3
+#[test]
+fn golem_summon_without_an_item_unit() {
+    let (t, ct, mut f, u, item) = golem_world();
+    assert_eq!(b3_lvl24::golem_summon(&mut f, &t, &ct, u, 1, 1, None), 1);
+    let log = f.take_log();
+    assert!(log
+        .iter()
+        .any(|s| s.starts_with("PetAdd") && s.contains("t: 3")));
+    assert!(!log.iter().any(|s| s.contains(&format!("{item}"))
+        && (s.starts_with("ItemLeaveRoom") || s.starts_with("ItemMode"))));
+}
+
 // Covers: specs/skills/bodies-2b.md §7.12 r4, §7.12 r5, §7.12 r6
 #[test]
 fn iron_golem_wears_the_item() {

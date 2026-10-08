@@ -32,6 +32,8 @@ use d2_sim::units::UnitId;
 use d2_sim::wiring::economy::Economy;
 use d2_sim::wiring::inventory::{InvDesk, InvRest, InvState};
 
+pub mod preview_skills;
+
 use super::super::super::SimGame;
 use super::super::world::{WorldError, WorldFault, WorldHost};
 use super::result_code;
@@ -130,6 +132,18 @@ pub trait MoveRest: InvRest {
     fn take_quest_flag_writes(&mut self) -> Vec<(Owner, u8, u8, bool)> {
         Vec::new()
     }
+
+    /// The players' skill lists, lent for one move call (the ranged-throw
+    /// test reads `tables`' item type equivalence).
+    fn stage_skills(&mut self, _stage: preview_skills::SkillStage, _tables: &InvTables) {}
+
+    /// The lent lists back, after the call.
+    fn take_skills(&mut self) -> Option<preview_skills::SkillStage> {
+        None
+    }
+
+    /// Messages made after the call, sent with the call's own.
+    fn queue_sent(&mut self, _sent: Vec<(Owner, Vec<u8>)>) {}
 }
 
 /// Where a player or an item is when an item-move call starts: its
@@ -156,9 +170,13 @@ pub struct InvParts {
 
 impl InvParts {
     pub fn new(tables: InvTables, rest: Box<dyn MoveRest + Send + Sync>) -> Self {
+        let mut state = InvState::new();
+        state.equip_rules = true;
+        // PROVISIONAL (REC-161): worn items attach their stats to the wearer.
+        state.link_item_stats = true;
         Self {
             tables,
-            state: InvState::new(),
+            state,
             rest,
         }
     }
@@ -212,6 +230,7 @@ impl MoveCall for MoveRun<'_> {
         let mut d = parts.desk(econ);
         let guid = d.guid_of(self.player);
         let r = sim_moves::handle(&mut d, guid, self.msg);
+        d.flush_equip();
         let portals = d.take_portal_requests();
         (r, take_sent(&mut d), portals)
     }
@@ -283,6 +302,9 @@ fn swap_weapons<D: EventDispatch, W: WorldHost<D>>(
     let player = sim.player_of(client)?;
     let (game, events) = (&mut sim.game, &mut sim.events);
     let (ok, sent) = sim.world.moves(game, events, SwapRun { player })?;
+    if ok {
+        sim.world.weapon_switched(events, player);
+    }
     for (unit, bytes) in sent {
         if let Some(c) = unit.and_then(|u| sim.client_of(u)) {
             // A full queue is the host's fault elsewhere; the swap stands.

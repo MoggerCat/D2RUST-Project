@@ -124,6 +124,12 @@ pub struct InvState {
     /// (`stat-lists.md` §8.4 gives the attach). Off (the default): those
     /// calls go to the rest, as before.
     pub link_item_stats: bool,
+    /// The weapon in use (inventory +0x1C, `0x0063BEF0`) is the right-hand
+    /// item when +0x1C holds none, for the weapon bookkeeping of §5.8.
+    /// PROVISIONAL (REC-266, d2rs-own, unverified): nothing in the play
+    /// host writes +0x1C (the setter `0x006233A0` is the skills code's), so
+    /// without this the bookkeeping never sees a weapon. Off by default.
+    pub weapon_hand_fallback: bool,
     /// Town Portal scroll / tome uses of the call, taken by the host
     /// ([`InvDesk::take_portal_requests`], REC-117).
     pub portal_requests: Vec<UnitId>,
@@ -422,13 +428,22 @@ impl<'d, 'a, H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'d, 'a, H, R> {
         let out = f(&mut inv, self);
         self.state.inventories.insert(u, inv);
         self.sync_out();
+        self.flush_equip();
+        Some(out)
+    }
+
+    /// Runs the queued equipment-rule calls, then the owner refreshes the
+    /// inventory functions asked for. A host calls it when a call that
+    /// ran the rules directly (not through [`InvDesk::with_inv`], e.g. a
+    /// body remove's inventory pass) returns, so no refresh outlives its
+    /// call.
+    pub fn flush_equip(&mut self) {
         self.run_equip_queue();
         for r in std::mem::take(&mut self.state.refresh) {
             if let Some(o) = self.owner_of(r) {
                 deferred::owner_refresh(self, o);
             }
         }
-        Some(out)
     }
 
     /// The update-list reset after the update pass (`0x00597B00`, §6.1

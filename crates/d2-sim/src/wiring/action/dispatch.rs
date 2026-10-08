@@ -55,6 +55,19 @@ impl<X: Pending> ActionSim<X> {
         f(game, &mut v)
     }
 
+    /// The join's Iron Golem re-summon for `player`
+    /// ([`Pending::golem_resummon`]).
+    pub fn golem_resummon(&mut self, game: &mut Game, player: UnitId) -> bool {
+        let s = &mut self.sys;
+        let mut sim = crate::units::hooks::Sim {
+            game,
+            units: &mut s.units,
+            stats: &mut s.stats,
+            data: &s.data,
+        };
+        X::golem_resummon(&mut s.hooks, &mut sim, player)
+    }
+
     /// Runs `f` with the missile code's context (creation from skills,
     /// tests).
     pub fn missiles<R>(
