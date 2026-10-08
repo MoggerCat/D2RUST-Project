@@ -37,12 +37,6 @@ pub enum CompositeError {
     LayerCount { layers: u8, count: usize },
     #[error("layer {index}: component {component} is not 0..{COMPONENTS}")]
     LayerComponent { index: usize, component: u8 },
-    #[error("layers {first} and {second} both carry component {component}")]
-    DuplicateLayer {
-        component: u8,
-        first: usize,
-        second: usize,
-    },
     #[error("COF draw order has {len} bytes, header needs {expected}")]
     DrawOrderLength { len: usize, expected: usize },
     /// A [`ComponentResolver`] hook could not answer (frame not resident,
@@ -86,25 +80,15 @@ fn check(cof: &Cof) -> Result<(), CompositeError> {
             expected,
         });
     }
-    let mut seen: [Option<usize>; COMPONENTS] = [None; COMPONENTS];
+    // A later record for the same component is not an error: the layer
+    // walk takes the first match (`unit-composite.md` §5.1 r5, §10).
     for (index, layer) in cof.layers.iter().enumerate() {
-        let c = usize::from(layer.component);
-        let Some(entry) = seen.get_mut(c) else {
+        if usize::from(layer.component) >= COMPONENTS {
             return Err(CompositeError::LayerComponent {
                 index,
                 component: layer.component,
             });
-        };
-        if let Some(first) = *entry {
-            // Two records for one component: which one a slot means is not
-            // stated anywhere (cof.md), so refuse rather than pick.
-            return Err(CompositeError::DuplicateLayer {
-                component: layer.component,
-                first,
-                second: index,
-            });
         }
-        *entry = Some(index);
     }
     Ok(())
 }

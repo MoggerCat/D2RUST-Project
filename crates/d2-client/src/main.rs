@@ -1,7 +1,7 @@
 //! d2-client entry point.
 //!
 //! Usage:
-//!   d2-client [play]     [--seed N] [--frames N] [--synthetic] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq]
+//!   d2-client [play]     [--res 800x600|640x480] [--seed N] [--frames N] [--synthetic] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq]
 //!   d2-client view       [--ds1 PATH] [--wall-base N] [--frames N]
 //!   d2-client verify     [--case NAME]... [--cases DIR] [--perturb N]
 //!   d2-client verify     [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out DIR] [--perturb N]
@@ -21,7 +21,9 @@
 //! (a name or 0–6: amazon, sorceress, necromancer, paladin, barbarian,
 //! druid, assassin) and name (1–15 of A–Z, a–z, 0–9, `-`, `_`), held in
 //! memory only: nothing is written to disk (decision D3, a stand-in for
-//! the unspecified select / create screens).
+//! the unspecified select / create screens). `--res 640x480` runs the game
+//! in the 640 × 480 frame (resolution mode 0: camera, panels, hit tests,
+//! window); the default is 800 × 600 (`client/ui.md` §A5).
 //! `view` opens a window (pan: arrows/WASD, zoom: mouse wheel). `verify`
 //! runs the render cases (`crates/d2-client/render-cases/*.toml`, spec
 //! `client/render-pipeline.md` §A10): per case, CPU reference vs GPU, byte
@@ -102,6 +104,18 @@ struct Options {
     at_tick: Option<u64>,
     /// `play --input SCRIPT`: scripted pointer input (`facts-render.md` §5 r11).
     input: Option<Vec<d2_client::world_view::input_script::Step>>,
+    /// `play --res 800x600|640x480`: the play frame (default 800 × 600).
+    res: Option<d2_client::rules::camera::FrameSize>,
+}
+
+/// `800x600` or `640x480`, the two frames of resolution modes 2 and 0.
+fn parse_res(s: &str) -> Result<d2_client::rules::camera::FrameSize> {
+    use d2_client::rules::camera::FrameSize;
+    match s {
+        "800x600" => Ok(FrameSize::D2RS),
+        "640x480" => Ok(FrameSize::LOW),
+        _ => bail!("--res {s}: use 800x600 or 640x480"),
+    }
 }
 
 fn parse_view(s: &str) -> Result<cpu::View> {
@@ -142,6 +156,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
         source: None,
         save_dir: None,
         hardcore: false,
+        res: None,
         dump_draws: None,
         at_tick: None,
         input: None,
@@ -183,6 +198,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
                     })?;
             }
             "--save-dir" => o.save_dir = Some(PathBuf::from(value()?)),
+            "--res" => o.res = Some(parse_res(value()?)?),
             "--new" => {
                 let class = value()?.clone();
                 let name = it
@@ -451,6 +467,10 @@ fn play(o: Options) -> Result<()> {
     use d2_client::app::front_host::{run_front_end, FrontArt};
     use d2_client::app::front_start::{front_host, Entry, StartChoice};
     use d2_client::ui::front_end::Outcome;
+    if let Some(res) = o.res {
+        d2_client::rules::camera::FrameSize::set_play(res)?;
+        println!("play: frame {} x {}", res.width, res.height);
+    }
     if o.save.is_some() || o.new.is_some() || o.frames.is_some() || o.dump_draws.is_some() {
         let (data, dir, origin) = select_data(&o)?;
         return play_once(&o, data, dir, origin, None, None);
@@ -601,7 +621,7 @@ fn main() -> Result<()> {
         Some("verify") => verify(parse_options(&args[1..])?),
         Some("play") | None => play(parse_options(args.get(1..).unwrap_or(&[]))?),
         Some("view") => view(parse_options(&args[1..])?),
-        _ => bail!("usage: d2-client [view|verify|cpu-render|play|facts-compare] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--synthetic] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq] [--dump-draws DIR [--at-tick N]] [--input SCRIPT]"),
+        _ => bail!("usage: d2-client [view|verify|cpu-render|play|facts-compare] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--synthetic] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq] [--dump-draws DIR [--at-tick N]] [--res 800x600|640x480] [--input SCRIPT]"),
     }
 }
 
@@ -641,6 +661,19 @@ mod tests {
         assert_eq!(o.input.as_deref().map(<[Step]>::len), Some(2));
         assert!(parse_options(&args(&["--input", "fly 1 2"])).is_err());
         assert!(parse_options(&args(&["--input"])).is_err());
+    }
+
+    #[test]
+    fn res_takes_the_two_frames() {
+        use d2_client::rules::camera::FrameSize;
+        let args = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(parse_options(&[]).unwrap().res, None);
+        let o = parse_options(&args(&["--res", "640x480"])).unwrap();
+        assert_eq!(o.res, Some(FrameSize::LOW));
+        let o = parse_options(&args(&["--res", "800x600"])).unwrap();
+        assert_eq!(o.res, Some(FrameSize::D2RS));
+        assert!(parse_options(&args(&["--res", "1024x768"])).is_err());
+        assert!(parse_options(&args(&["--res"])).is_err());
     }
 
     #[test]

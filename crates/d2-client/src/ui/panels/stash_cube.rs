@@ -311,6 +311,7 @@ mod tests {
                     x.style.font,
                     x.style.color,
                 ),
+                UiDraw::Rect(r) => panic!("rectangle {r:?}"),
             })
             .collect()
     }

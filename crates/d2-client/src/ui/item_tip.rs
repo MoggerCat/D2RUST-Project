@@ -62,6 +62,8 @@ pub mod color {
     pub const GREY: u16 = 5;
     pub const ORANGE: u16 = 8;
     pub const YELLOW: u16 = 9;
+    /// `ÿc:` (tempered names, `ui/item-tips.md` §4 r1).
+    pub const TEMPERED: u16 = 10;
 }
 
 /// Item quality ids (`generation.md` §1.1).
@@ -72,6 +74,7 @@ mod quality {
     pub const RARE: u8 = 6;
     pub const UNIQUE: u8 = 7;
     pub const CRAFTED: u8 = 8;
+    pub const TEMPERED: u8 = 9;
 }
 
 /// The font of the box (Font16) and the line step.
@@ -290,16 +293,7 @@ impl ItemTips {
         let ident = b.flags & 0x10 != 0;
         let base = self.base_name(b.code);
         let q = b.quality;
-        let name_color = match q {
-            quality::LOW => color::GREY,
-            quality::MAGIC => color::BLUE,
-            quality::SET => color::GREEN,
-            quality::RARE => color::YELLOW,
-            quality::UNIQUE => color::GOLD,
-            quality::CRAFTED => color::ORANGE,
-            _ if b.flags & 0x800 != 0 => color::GREY,
-            _ => color::WHITE,
-        };
+        let name_color = self.name_color(b);
         let qf = &b.quality_fields;
         if ident {
             match q {
@@ -430,6 +424,39 @@ impl ItemTips {
             }
         }
         out
+    }
+
+    /// The name colour (`ui/item-tips.md` §4 rules 1, 3, 4; later rules
+    /// win). Rule 2 (an unidentified store item in modes 1–9 → 0) needs
+    /// the store state, which the tip does not take.
+    fn name_color(&self, b: &ItemBits) -> u16 {
+        const ETHEREAL: u32 = 0x40_0000;
+        const BROKEN: u32 = 0x100;
+        const SPECIAL: [&[u8; 4]; 11] = [
+            b"ceh ", b"bet ", b"fed ", b"tes ", b"toa ", b"dhn ", b"bey ", b"mbr ", b"pk1 ",
+            b"pk2 ", b"pk3 ",
+        ];
+        let mut c = match b.quality {
+            quality::MAGIC => color::BLUE,
+            quality::SET => color::GREEN,
+            quality::RARE => color::YELLOW,
+            quality::UNIQUE => color::GOLD,
+            quality::CRAFTED => color::ORANGE,
+            quality::TEMPERED => color::TEMPERED,
+            quality::LOW..=3 if b.flags & (0x800 | ETHEREAL) != 0 => color::GREY,
+            _ => color::WHITE,
+        };
+        let rune = self
+            .lookup
+            .find_code(b.code)
+            .is_some_and(|i| self.lookup.is_type(i, d2_sim::items::ty::RUNE as i16));
+        if rune || SPECIAL.contains(&&b.code) {
+            c = color::ORANGE;
+        }
+        if b.flags & BROKEN != 0 {
+            c = color::RED;
+        }
+        c
     }
 
     /// (priority, text) of one stat; `None`: no description string.
@@ -565,6 +592,7 @@ pub fn draw_tip(
                     image: ImageRef { file, frame: DARK },
                     at: Point::new(tx, ty),
                     clip: Rect::new(tx, ty, cw as u16, ch as u16),
+                    look: crate::ui::CelLook::PLAIN,
                 }));
                 tx += tw;
             }
@@ -837,6 +865,33 @@ pub(crate) mod tests {
         };
         b.quality_fields.file_index = Some(index);
         b
+    }
+
+    // Covers: specs/ui/item-tips.md §4 r1, §4 r3, §4 r4
+    #[test]
+    fn the_name_colour_follows_quality_flags_codes_and_broken() {
+        let t = tips();
+        let c = |quality: u8, flags: u32, code: &[u8; 4]| {
+            t.name_color(&ItemBits {
+                flags,
+                code: *code,
+                quality,
+                ..ItemBits::default()
+            })
+        };
+        // r1: low / normal / superior are white, grey when socketed or
+        // ethereal; tempered is `ÿc:`.
+        assert_eq!(c(quality::LOW, 0, b"cap "), color::WHITE);
+        assert_eq!(c(2, 0, b"cap "), color::WHITE);
+        assert_eq!(c(quality::LOW, hflag::SOCKETED, b"cap "), color::GREY);
+        assert_eq!(c(3, 0x40_0000, b"cap "), color::GREY);
+        assert_eq!(c(quality::MAGIC, hflag::SOCKETED, b"cap "), color::BLUE);
+        assert_eq!(c(quality::TEMPERED, 0, b"cap "), color::TEMPERED);
+        // r3: the listed codes are orange; r4: broken is red (last).
+        assert_eq!(c(2, 0, b"pk1 "), color::ORANGE);
+        assert_eq!(c(quality::UNIQUE, 0, b"toa "), color::ORANGE);
+        assert_eq!(c(quality::MAGIC, 0x100, b"cap "), color::RED);
+        assert_eq!(c(2, 0x100, b"mbr "), color::RED);
     }
 
     #[test]

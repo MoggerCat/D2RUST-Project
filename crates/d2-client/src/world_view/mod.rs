@@ -81,8 +81,8 @@ use crate::frames::{
 };
 use crate::gpu_compositor::{self, Gpu, GpuError};
 use crate::scene::{
-    self, BlendOp, DrawItem, DrawKey, FrameCycle, FrameId, ItemTag, MapTable, Rect, SceneError,
-    ShadeChain,
+    self, BlendOp, DrawItem, DrawKey, FrameCycle, FrameId, ItemTag, MapId, MapTable, Rect,
+    SceneError, ShadeChain,
 };
 
 pub use feed::{
@@ -99,6 +99,13 @@ pub use ui_bind::{
 /// the world it shows is the camera's (render-pipeline §B7), decided by
 /// the [`ViewRules`] placement hooks, not by the view rectangle.
 pub const VIEW: Rect = Rect::FRAME;
+
+/// The region the play path composes: the whole play frame
+/// ([`crate::rules::camera::FrameSize::play`]); [`VIEW`] unless
+/// `play --res 640x480` chose the 640 × 480 frame.
+pub fn play_view() -> Rect {
+    crate::rules::camera::FrameSize::play().rect()
+}
 
 /// Errors of a world-view frame. Strict (METHODS M07): a frame the rules
 /// cannot fully answer fails as a whole; nothing is skipped or defaulted.
@@ -176,6 +183,14 @@ pub struct ViewAssets {
     /// feed has them: unit shadows (`blend-modes.md` §5) read the zero and
     /// alpha maps. `None`: no shadow is drawn.
     pub shades: Option<crate::rules::shading::ShadeTables>,
+    /// Row `c` = every entry `c` (`rules::blend::color_row`), rows
+    /// `base … base + 255`, once a UI rectangle needs them
+    /// (`blend-modes.md` §8 r2; [`ui_bind::ensure_rects`]).
+    pub color_rows: Option<MapId>,
+    /// The 8 item palette files' 21 maps each (`render/shading.md` §6 r4):
+    /// map `c` of file `t` is row `base + 21·(t − 1) + c`, once a UI cel
+    /// with an item colour needs them ([`panel_art::PanelArtLoader`]).
+    pub item_palettes: Option<MapId>,
 }
 
 impl ViewAssets {
@@ -188,6 +203,8 @@ impl ViewAssets {
             maps: MapTable::new(),
             palette,
             shades: None,
+            color_rows: None,
+            item_palettes: None,
         }
     }
 
@@ -276,6 +293,18 @@ pub trait ViewRules {
         pose: &UnitPose,
         req: &ComponentRequest<'_>,
     ) -> Result<ComponentFrame, CompositeError>;
+
+    /// `render/unit-composite.md` §4: whether the composite of `unit` with
+    /// `pose` passes the COF box pre-test at its final screen position.
+    /// The default (no camera) passes every unit.
+    fn unit_box_visible(
+        &self,
+        _unit: &ClientUnit,
+        _pose: &UnitPose,
+        _cof: &Cof,
+    ) -> Result<bool, ViewError> {
+        Ok(true)
+    }
 
     /// The unit's shadow draws (`render/blend-modes.md` §5 r1–r3), keyed
     /// at the shadow pass slot `at` (`draw-order.md` §6 r3; `None` until
@@ -425,6 +454,11 @@ pub struct WorldFrame {
     /// [`weather_view::is_sky_call_path`]; read by the facts export
     /// (`tools/facts-render.md` §5 r10), which writes one row per call.
     pub sky: Vec<crate::rules::draw_order::weather::SkyDraw>,
+    /// The units' draw slots of the frame's draw order (`draw-order.md`
+    /// §3 r4, §5, §10); `None` when no order was computed (no map feed).
+    /// The layers drawn after the build (ground items) take their keys
+    /// from it.
+    pub slots: Option<BTreeMap<crate::bridge::world::UnitKey, crate::rules::draw_order::UnitSlot>>,
 }
 
 /// The C7 resolver of one unit: the hooks. Frame ids are not a hook: they
@@ -518,6 +552,10 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
             .cofs
             .get(&pose.cof)
             .ok_or_else(|| ViewError::CofMissing(pose.cof.clone()))?;
+        if !rules.unit_box_visible(unit, &pose, cof)? {
+            units_hidden += 1;
+            continue;
+        }
         let params = rules.unit_params(world, unit, &pose)?;
         let resolver = UnitResolver {
             rules,
@@ -553,25 +591,26 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
         units_hidden,
         camera: None,
         sky: Vec::new(),
+        slots: None,
     })
 }
 
 /// CPU reference image of a built frame (§A8): RGBA8, alpha 255,
-/// `VIEW.width × VIEW.height`.
+/// [`play_view`] sized.
 pub fn compose_cpu(frame: &WorldFrame, assets: &ViewAssets) -> Result<Vec<u8>, ViewError> {
     Ok(scene::compose_rgba(
         &frame.items,
         &assets.frames,
         &assets.maps,
         &assets.palette,
-        VIEW,
+        play_view(),
     )?)
 }
 
 /// One frame of the frame cycle on the CPU reference (`composition.md`
 /// §3): `cycle.compose` with the plan of `blank_screen`, the draws onto
 /// the persistent framebuffer; returns the presented RGBA8 image through
-/// the frame palette (§4). The cycle must be `VIEW` sized. On error the
+/// the frame palette (§4). The cycle must be [`play_view`] sized. On error the
 /// cycle is unchanged.
 pub fn compose_cycle_cpu(
     cycle: &mut FrameCycle,
@@ -584,13 +623,14 @@ pub fn compose_cycle_cpu(
     Ok(scene::to_rgba(indices, &assets.palette))
 }
 
-/// The world view composes `VIEW`; a cycle of another size has no frame
-/// mapping.
+/// The world view composes [`play_view`]; a cycle of another size has no
+/// frame mapping.
 fn check_cycle(cycle: &FrameCycle) -> Result<(), ViewError> {
-    if cycle.view() != VIEW {
+    let view = play_view();
+    if cycle.view() != view {
         return Err(SceneError::BaseSize {
             len: cycle.pixels().len(),
-            pixels: u64::from(VIEW.width) * u64::from(VIEW.height),
+            pixels: u64::from(view.width) * u64::from(view.height),
         }
         .into());
     }
@@ -656,7 +696,7 @@ impl GpuAtlas {
         frame: &WorldFrame,
         assets: &ViewAssets,
     ) -> Result<gpu_compositor::Packed, ViewError> {
-        let bins = scene::bin(&frame.items, &assets.frames, &assets.maps, VIEW)?;
+        let bins = scene::bin(&frame.items, &assets.frames, &assets.maps, play_view())?;
         Ok(gpu_compositor::pack(
             &frame.items,
             &bins,
