@@ -668,6 +668,7 @@ fn world_view_frame(
             let ui = &mut *ui;
             if let Some(o) = ui.original.as_mut() {
                 o.set_frame_anchor(anchor);
+                o.set_palette(&state.assets.palette);
             }
             let mut frame = run_ui_with(
                 &mut ui.root,

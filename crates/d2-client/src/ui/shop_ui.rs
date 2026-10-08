@@ -412,7 +412,8 @@ impl Panel for ShopUi {
         let list = page_items(&sh, ctx.world, &st, page);
         for it in &list {
             let (x, y, _, _) = g.cell(i32::from(it.x), i32::from(it.y));
-            sh.items.draw_at(&sh.tables.files, it, (x, y), out);
+            sh.items
+                .draw_at(ctx.world, &sh.tables.files, it, (x, y), out);
         }
         // The repair-all total above the button bar (d2rs-own).
         if let (true, Some(_)) = (REPAIR_CLASSES.contains(&open.npc_class), &sh.fonts) {

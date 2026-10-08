@@ -107,6 +107,9 @@ struct CodeText {
     req_str: u16,
     req_dex: u16,
     req_lvl: u8,
+    /// `InvTrans` (items `+0x142`): the inventory picture's palette file
+    /// `t` (`render/shading.md` §6 r4).
+    inv_trans: u8,
 }
 
 /// The description columns of an `itemstatcost` row.
@@ -139,6 +142,12 @@ pub struct ItemTips {
     set_names: Vec<u16>,
     /// Per skill: its name string id and its class (255: none).
     skills: Vec<(u16, u8)>,
+    /// `transformcolor` of each magic prefix / suffix row, and
+    /// `invtransform` of each set / unique row (`render/shading.md` §6 r4).
+    prefix_color: Vec<u8>,
+    suffix_color: Vec<u8>,
+    set_inv_color: Vec<u8>,
+    unique_inv_color: Vec<u8>,
     strings: Arc<dyn StringLookup + Send + Sync>,
 }
 
@@ -183,6 +192,7 @@ impl ItemTips {
                         req_str: r.reqstr,
                         req_dex: r.reqdex,
                         req_lvl: r.levelreq,
+                        inv_trans: r.invtrans,
                     });
                 }
             };
@@ -230,6 +240,22 @@ impl ItemTips {
                 .map(|r| key(&r.index))
                 .collect(),
             set_of_item: rows::<Setitems>(set)?.iter().map(|r| r.set).collect(),
+            prefix_color: rows::<Magicprefix>(set)?
+                .iter()
+                .map(|r| r.transformcolor)
+                .collect(),
+            suffix_color: rows::<Magicsuffix>(set)?
+                .iter()
+                .map(|r| r.transformcolor)
+                .collect(),
+            set_inv_color: rows::<Setitems>(set)?
+                .iter()
+                .map(|r| r.invtransform)
+                .collect(),
+            unique_inv_color: rows::<Uniqueitems>(set)?
+                .iter()
+                .map(|r| r.invtransform)
+                .collect(),
             set_names: rows::<Sets>(set)?.iter().map(|r| r.name).collect(),
             skills: {
                 let descs = rows::<Skilldesc>(set)?;
@@ -245,6 +271,54 @@ impl ItemTips {
             },
             strings,
         })
+    }
+
+    /// The inventory picture's item colour `(t, c)` (`0x0062C100(0, item,
+    /// …, inv 1)`, `render/shading.md` §6 r4, `ui/inventory.md` §8 r4):
+    /// `t` = the code's `InvTrans`, `c` by quality: magic / rare affix
+    /// `transformcolor` (suffix slots, then prefix slots; 0xFF none), set /
+    /// unique `invtransform`; then [`crate::rules::shading::item_color`].
+    /// None: no map. Not read (d2rs-own, unverified: the model holds
+    /// neither): the automagic affix and the socketed gem `transform` of
+    /// qualities 1, 2, 3, 8, which give no map here.
+    pub fn inv_color(&self, stream: &[u8]) -> Option<(u8, u8)> {
+        self.inv_color_of(&self.bits(stream)?)
+    }
+
+    fn inv_color_of(&self, b: &ItemBits) -> Option<(u8, u8)> {
+        let t = self.codes.get(&b.code)?.inv_trans;
+        let qf = &b.quality_fields;
+        let affix = |table: &[u8], id: u16| {
+            (id != 0)
+                .then(|| table.get(usize::from(id)).copied())
+                .flatten()
+                .filter(|&c| c != 0xFF)
+        };
+        let row = |table: &[u8]| {
+            qf.file_index
+                .and_then(|i| table.get(usize::try_from(i).ok()?).copied())
+        };
+        let c = match b.quality {
+            d2_sim::items::q::MAGIC => {
+                let (p, x) = qf.magic?;
+                affix(&self.suffix_color, x).or_else(|| affix(&self.prefix_color, p))
+            }
+            d2_sim::items::q::RARE => {
+                let slots = qf.rare_slots?;
+                slots
+                    .iter()
+                    .find_map(|&(_, x)| affix(&self.suffix_color, x))
+                    .or_else(|| {
+                        slots
+                            .iter()
+                            .find_map(|&(p, _)| affix(&self.prefix_color, p))
+                    })
+            }
+            d2_sim::items::q::SET => row(&self.set_inv_color),
+            d2_sim::items::q::UNIQUE => row(&self.unique_inv_color),
+            _ => None,
+        }?;
+        crate::rules::shading::item_color(t, c)
     }
 
     fn text_by_key(&self, names: &[String], i: usize) -> Option<String> {
@@ -723,8 +797,51 @@ pub(crate) mod tests {
             set_of_item: vec![0],
             set_names: vec![11],
             skills: Vec::new(),
+            prefix_color: vec![0xFF, 0xFF],
+            suffix_color: vec![0xFF, 0xFF],
+            set_inv_color: vec![0xFF],
+            unique_inv_color: vec![0xFF],
             strings: Arc::new(strs),
         }
+    }
+
+    // Covers: specs/render/shading.md §6 r4
+    // Covers: specs/ui/inventory.md §8 r4
+    #[test]
+    fn the_inventory_colour_follows_invtrans_and_the_quality_source() {
+        let mut t = tips();
+        let identified = hflag::IDENTIFIED;
+        // No colour anywhere: no map.
+        assert_eq!(t.inv_color_of(&magic_cap(identified)), None);
+        // `InvTrans` 6 (invgrey); the prefix's transformcolor 9, then the
+        // suffix's 4, which is read first.
+        t.codes.get_mut(b"cap ").unwrap().inv_trans = 6;
+        t.prefix_color[1] = 9;
+        assert_eq!(t.inv_color_of(&magic_cap(identified)), Some((6, 9)));
+        t.suffix_color[1] = 4;
+        assert_eq!(t.inv_color_of(&magic_cap(identified)), Some((6, 4)));
+        // Files 3 and 4 are never selected; c ≥ 21 is no map.
+        t.codes.get_mut(b"cap ").unwrap().inv_trans = 3;
+        assert_eq!(t.inv_color_of(&magic_cap(identified)), None);
+        t.codes.get_mut(b"cap ").unwrap().inv_trans = 8;
+        assert_eq!(t.inv_color_of(&magic_cap(identified)), Some((8, 4)));
+        // The suffix's 21 is the first hit (0xFF alone means none): no map.
+        t.suffix_color[1] = 21;
+        assert_eq!(t.inv_color_of(&magic_cap(identified)), None);
+        // Unique / set: the row's invtransform.
+        let mut u = ItemBits {
+            flags: identified,
+            code: *b"cap ",
+            quality: 7,
+            ..ItemBits::default()
+        };
+        u.quality_fields.file_index = Some(0);
+        assert_eq!(t.inv_color_of(&u), None);
+        t.unique_inv_color[0] = 2;
+        assert_eq!(t.inv_color_of(&u), Some((8, 2)));
+        u.quality = 5;
+        t.set_inv_color[0] = 17;
+        assert_eq!(t.inv_color_of(&u), Some((8, 17)));
     }
 
     fn text(l: &TipLine) -> String {

@@ -36,7 +36,7 @@ use std::rc::Rc;
 
 use d2_formats::font::FontTable;
 
-use super::draw::{UiDraw, UiDrawSink};
+use super::draw::UiDrawSink;
 use super::geom::{Point, Rect};
 use super::item_tip;
 use super::layout::{LayoutError, PanelKey, RowKind, Screen};
@@ -543,6 +543,13 @@ impl OriginalUi {
         self.shared.borrow_mut().hud.belt.parts = parts;
     }
 
+    /// The act palette (`render/composition.md` §4) the UI's tint colours
+    /// are matched in (`ui/inventory.md` §2 r1), set by the host each frame.
+    pub fn set_palette(&mut self, palette: &d2_formats::palette::Palette) {
+        let p: Vec<[u8; 3]> = palette.colors.iter().map(|c| [c.r, c.g, c.b]).collect();
+        self.shared.borrow_mut().items.tint_colors = super::inv_grid::tint_indices(&p);
+    }
+
     /// The frame's local-player position and shake (the world view's
     /// one camera, `seams/world-screen.md` §2.2), set before each UI frame.
     pub fn set_frame_anchor(&mut self, anchor: Option<crate::rules::camera::FrameAnchor>) {
@@ -893,8 +900,7 @@ impl Panel for InventoryUi {
         panel.draw(&sh.tables, &sh.env(), gold, out);
         let class = Facts::of(ctx.world).class;
         if let Some(l) = sh.items.layout(class, &sh.config.screen) {
-            sh.items
-                .draw_tints(ctx.world, &sh.tables.files, &l, sh.mouse, out);
+            sh.items.draw_tints(ctx.world, &l, sh.mouse, out);
             sh.items.draw_panel(ctx.world, &sh.tables.files, &l, out);
         }
     }
@@ -1439,14 +1445,15 @@ impl Panel for TopUi {
             .and_then(|tips| sh.hud.belt.hover_tip(ctx.world, tips))
         {
             let (w, h) = (sh.config.screen.w, sh.config.screen.h);
-            out.push(UiDraw::Text(hud_tips::popup_request(
+            hud_tips::push_popup(
                 t.text,
                 Point::new(t.x, t.y),
                 u16::from(t.color),
                 t.centered,
                 (w, h),
                 sh.fonts.as_ref(),
-            )));
+                out,
+            );
         }
         // The item tool tip over everything (`item_tip`).
         if sh.states.is_open(UI_INVENTORY) {

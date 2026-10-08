@@ -20,22 +20,20 @@
 //!   `0x004E6410` strings: N is the tip's first line, S its other lines,
 //!   last first, each followed by an LF (drawn bottom-up, `ui/text.md`
 //!   §7, they read top-down as in the tip); no shop price;
-//! - the highlight rectangles ([`BeltDraw::Box`]) are painted by the
-//!   rectangle primitive ([`fill_rect`], REC-264): opaque tiles of the
-//!   nearest palette colour; the original's mode 0 table blend is not
-//!   applied.
+//! - the highlight rectangles ([`BeltDraw::Box`]) take the palette's
+//!   nearest colours from the inventory's tint colours (the same four
+//!   triples).
 
 use std::collections::BTreeMap;
 
 use crate::bridge::items::{self, mode};
 use crate::bridge::world::ClientWorld;
-use crate::ui::draw::UiDrawSink;
+use crate::ui::draw::{RectRequest, UiDraw, UiDrawSink};
 use crate::ui::item_tip::{ItemTips, TipLine};
-use crate::ui::original::hud::{BELT_FILL_BASE, FILL_FILE};
 use crate::ui::panel::ClientIntent;
 use crate::ui::panels::control::belt::{
-    hover_text, record_index, BeltColor, BeltDraw, BeltEffect, BeltItem, BeltRecord, BeltSlot8,
-    BeltState, CursorInfo, CursorItem, HoverText, MoveGates, SlotInfo, FONT_AFTER_BELT,
+    hover_text, record_index, BeltDraw, BeltEffect, BeltItem, BeltRecord, BeltSlot8, BeltState,
+    CursorInfo, CursorItem, HoverText, MoveGates, SlotInfo, FONT_AFTER_BELT,
 };
 use crate::ui::panels::inv_items::{fits_belt, ItemsUi};
 use crate::ui::panels::UiFiles;
@@ -73,20 +71,6 @@ pub struct HudBelt {
     /// The key name of each belt slot's action: `None` = not set yet
     /// (the default label), `Some(None)` = unbound.
     pub keys: Option<[Option<String>; 4]>,
-}
-
-/// Paints `rect` with the belt rectangle colour (module doc).
-pub fn fill_rect(out: &mut dyn UiDrawSink, files: &UiFiles, color: BeltColor, r: crate::ui::Rect) {
-    if let Some(f) = files.id(FILL_FILE) {
-        let frame = BELT_FILL_BASE
-            + match color {
-                BeltColor::Red => 0,
-                BeltColor::Green => 1,
-                BeltColor::Blue => 2,
-                BeltColor::Yellow => 3,
-            };
-        crate::ui::original::esc_menu::push_fill(out, f, frame, r);
-    }
 }
 
 fn belt_view(world: &ClientWorld) -> BTreeMap<u16, crate::bridge::items::ItemView> {
@@ -240,7 +224,7 @@ impl HudBelt {
                 }
                 BeltDraw::Item { guid, x, y } => {
                     if let Some(v) = belt.values().find(|v| v.key.guid == guid) {
-                        items_ui.draw_at(files, v, (x, y), out);
+                        items_ui.draw_at(world, files, v, (x, y), out);
                     }
                 }
                 // §5 r4: font 1, color 4.
@@ -253,14 +237,21 @@ impl HudBelt {
                         l.color as u16,
                     ));
                 }
+                // §5 r4 / r5: `0x0046EFD0(left, top, 29, 29, colour, 0)`,
+                // the colour the palette's nearest entry (the inventory's
+                // tint colours: the same four triples, `inventory.md` §2
+                // r1); no palette given: no box.
                 BeltDraw::Box { rect, color } => {
-                    let (w, h) = (rect.w.max(1) as u16, rect.h.max(1) as u16);
-                    fill_rect(
-                        out,
-                        files,
-                        color,
-                        crate::ui::Rect::new(rect.x, rect.y, w, h),
-                    );
+                    if let Some(c) = items_ui.tint_colors {
+                        out.push(UiDraw::Rect(RectRequest::sized(
+                            rect.x,
+                            rect.y,
+                            rect.w,
+                            rect.h,
+                            c[color as usize],
+                            rect.mode,
+                        )));
+                    }
                 }
             }
         }

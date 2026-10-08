@@ -467,7 +467,7 @@ fn ground_items_take_their_slot_from_the_draw_order() {
     let mut g = GroundItems::new(source(), rows());
     let mut a = assets();
     let feed = ModelFeed::<NoFeed>::default();
-    g.add_to_frame(&w, &feed, &mut a, &mut WorldFrame::default());
+    g.add_to_frame(&w, &feed, &mut a, &mut framed(&w));
     // Item 5 flat in the shadow list of cell 40 (pass 5); item 6
     // dropping (mode 5) in the unit list of cell 41 (pass 6); item 7
     // hidden by the sight test (not drawn).
@@ -487,7 +487,7 @@ fn ground_items_take_their_slot_from_the_draw_order() {
             (UnitKey::new(ITEM, 6), UnitSlot::Drawn(dropping)),
             (UnitKey::new(ITEM, 7), UnitSlot::NotDrawn),
         ])),
-        ..WorldFrame::default()
+        ..framed(&w)
     };
     g.add_to_frame(&w, &feed, &mut a, &mut frame);
     let keys: Vec<_> = frame.items.iter().map(|d| (d.tag, d.key)).collect();

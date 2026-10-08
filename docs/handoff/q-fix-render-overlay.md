@@ -5,10 +5,9 @@ with `claude/specs-staging-7`). Cloud, no game files. Rows worked:
 `q-fix-render-one-camera`, `q-fix-render-overlay-local-pos`,
 `q-fix-render-fade-player-tile`, `q-fix-render-automap-pass`,
 `q-fix-render-automap-blend`, `q-fix-render-belt-popup`.
-`q-fix-render-ui-blend` was **not** done here: it is the same
-`ImageRequest` mode / remap plumbing as `q-fix-ui-draw-sink` (its own
-session, which owns `ui/draw.rs`, `panel_art.rs` and the callers); that
-session was told by message.
+`q-fix-render-ui-blend` was done after `q-fix-ui-draw-sink` (CelLook,
+`UiDraw::Rect`) landed on staging (`f7477b26`), over its sink (section
+below).
 
 ## Local-player position
 
@@ -56,6 +55,25 @@ an LF. `TopUi` draws it through `hud_tips::popup_request` →
 `0x0048C060` / `0x004E6410` strings; no shop price. The r14 backing box
 still waits on the UI rectangle primitive (`q-fix-ui-draw-sink`).
 
+## UI blend (q-fix-render-ui-blend)
+
+- Inventory tints (`inventory.md` §2 r2–r3): `UiDraw::Rect(RectRequest::sized(x, y,
+  w, h, colour, 0))`, the colour the act palette's nearest entry of §2 r1
+  (`ItemsUi::tint_colors`, set by `OriginalUi::set_palette` from
+  `ViewAssets.palette` each frame). No palette given: no tint.
+- Belt boxes (`control-panel.md` §5 r4 / r5): the same primitive, mode 0,
+  the same four colours.
+- Pop-ups (§5 r14 step 5): the backing box `DrawRectangle(x', b − Ht,
+  x' + W, b, 0, mode 2)` before the text (`hud_tips::push_popup`, used by
+  the control-panel tips and the belt hover text).
+- Cube transmute animation (`panels.md` §12.4): mode 3 (`HORADRIC_LOOK`).
+- Item graphics (`inventory.md` §8 r4): mode 1 for ethereal (flag
+  0x400000), else 5; the remap is the inventory colour
+  (`ItemTips::inv_color`: `InvTrans`, magic / rare affix `transformcolor`
+  suffixes first, set / unique `invtransform`, `shading.md` §6 r4). Not
+  read (d2rs-own): the automagic affix and the socketed-gem `transform`
+  (no map from those branches).
+
 ## Changed expectations (spec-driven)
 
 - `belt.rs` `hover_text_rules`: the old order (name colour 3, LF, stats
@@ -66,7 +84,12 @@ still waits on the UI rectangle primitive (`q-fix-ui-draw-sink`).
   `hover_tip` returns the r8 hover text (point, colour, centring, name
   part) instead of tool-tip lines; the anchor (475, 562) is unchanged.
 - `ground_items_tests` / `missiles_tests` frames now carry the frame camera
-  (`framed`), as `present.rs` hands them.
+  (`framed`), as `present.rs` hands them (also the staging test
+  `missiles_join_their_cell_and_overlays_their_host`).
+- Inventory tint tests (`inv_items_tests`): mode-0 rectangles in the
+  palette colours instead of opaque `hudfill` tiles (§2 r2–r3); the belt
+  highlight test likewise (§5 r4); the stamina tip test skips the new r14
+  backing box.
 
 ## Checks
 
