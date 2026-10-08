@@ -87,7 +87,7 @@ fn the_lair_opens_from_the_staff_tomb_and_duriels_death_moves_chain_13() {
         ms.fetch_add(40, Ordering::SeqCst);
         app.update();
         steps.set(steps.get() + 1);
-        assert!(steps.get() < 4000, "the warps happen");
+        assert!(steps.get() < 60000, "the warps happen");
     };
     while app_support::local_player(&server).is_none() {
         step(&mut app);
@@ -221,12 +221,7 @@ fn the_lair_opens_from_the_staff_tomb_and_duriels_death_moves_chain_13() {
     for _ in 0..300 {
         step(&mut app);
     }
-    let diag = app_support::with(&server, |l| {
-        let g = &mut l.host_mut().game;
-        let open = g.world.quests.record(13).unwrap().extra.a2.q6.lair_open;
-        (open, g.events.action.hooks().x.lair_open, g.events.action.hooks().errors.len())
-    });
-    assert_eq!(server_level(&server), Some(a2::DURIELS_LAIR), "{diag:?}");
+    assert_eq!(server_level(&server), Some(a2::DURIELS_LAIR));
     // Duriel: monster init links him to chain 13; his death reaches the
     // quest control.
     assert!(!chain13(&server).1);

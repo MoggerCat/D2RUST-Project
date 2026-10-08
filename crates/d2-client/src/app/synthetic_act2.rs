@@ -232,8 +232,8 @@ pub fn add_levels(drlg: &mut DrlgData) {
         l.vis[k] = x.from;
         l.warp[k] = x.back_class as i32;
     }
-    for x in e.iter().filter(|x| x.to != DURIELS_LAIR) {
-        if let Some((_, _)) = maze_links(x.to) {
+    for x in &e {
+        if x.to != DURIELS_LAIR && maze_links(x.to).is_some() {
             let l = &mut drlg.levels[x.to as usize];
             l.vis[0] = x.from;
             l.warp[0] = x.back_class as i32;
