@@ -15,6 +15,7 @@ mod equip;
 mod gold;
 mod ground;
 mod host;
+mod identify;
 mod mutant_tests;
 mod queries;
 mod save_index;
@@ -58,6 +59,7 @@ pub const HP2: usize = 6;
 pub const KEY: usize = 7;
 pub const KNIFE: usize = 8;
 pub const HEAVY_CAP: usize = 9;
+pub const ISC: usize = 10;
 
 /// Itemtypes rows (D3 numbers where the spec gives them).
 const T_SHIE: u16 = 2;
@@ -142,7 +144,7 @@ fn equiv() -> EquivMatrix {
 /// (code, type, invwidth, invheight, reqstr, autobelt, useable, stackable,
 /// maxstack, durability) per record.
 type Row = ([u8; 4], u16, u8, u8, u16, u8, u8, u8, u32, u8);
-const ROWS: [Row; 10] = [
+const ROWS: [Row; 11] = [
     (*b"cap ", T_HELM, 2, 2, 0, 0, 0, 0, 0, 12),
     (*b"gld ", T_GOLD, 1, 1, 0, 0, 0, 0, 0, 0),
     (*b"ssd ", T_SWOR, 1, 3, 0, 0, 0, 0, 0, 24),
@@ -153,6 +155,7 @@ const ROWS: [Row; 10] = [
     (*b"key ", T_KEY, 1, 1, 0, 0, 0, 1, 12, 0),
     (*b"tkf ", T_TKNI, 1, 2, 0, 0, 0, 1, 50, 20),
     (*b"hlm ", T_HELM, 2, 2, 50, 0, 0, 0, 0, 12),
+    (*b"isc ", T_MISC, 1, 1, 0, 0, 1, 0, 0, 0),
 ];
 
 /// The items creation reads (`items::ItemTables`).

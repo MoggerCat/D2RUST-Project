@@ -24,6 +24,7 @@ pub mod geom;
 pub mod gold;
 pub mod hire_list;
 pub mod inv_grid;
+pub mod item_tip;
 pub mod layout;
 pub mod messages;
 pub mod original;

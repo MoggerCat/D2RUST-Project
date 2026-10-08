@@ -284,6 +284,10 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         GameData::Live(d) => Some(d.archives.clone()),
         GameData::Synthetic => None,
     };
+    let item_lookup = match &config.data {
+        GameData::Live(d) => Some(d.tables.item_tables().map_err(|e| e.to_string())),
+        GameData::Synthetic => None,
+    };
     let drlg_source = single_player::client_drlg_source(&config.data);
     let level_rows = single_player::client_level_rows(&config.data);
     let waypoint_map = single_player::client_waypoint_map(&config.data);
@@ -378,7 +382,14 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         let palettes = ActPalettes::live(archives.as_ref()).map_err(anyhow::Error::msg)?;
         let tiles = TileAssets::new(Some(archives.source()), Some(palettes.pl2.clone()));
         add_preview(&mut app, level_rows, tiles);
-        let item_parts = super::items::item_parts(archives.as_ref()).map_err(anyhow::Error::msg)?;
+        let mut item_parts =
+            super::items::item_parts(archives.as_ref()).map_err(anyhow::Error::msg)?;
+        if let Some(lookup) = item_lookup {
+            match lookup.and_then(|t| super::items::item_tips(archives.as_ref(), t)) {
+                Ok(t) => item_parts.tips = Some(t),
+                Err(e) => warn!("item tips (d2rs-own, unverified): {e}; no tool tips"),
+            }
+        }
         super::items::add_items(&mut app, archives.source(), item_parts);
         palette::add_act_palettes(&mut app, palettes);
         if let Some(source) = automap_source {

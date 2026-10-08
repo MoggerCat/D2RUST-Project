@@ -108,6 +108,7 @@ fn ui() -> (ItemsUi, UiFiles) {
         layouts: Some(vec![layout()]),
         frame_sizes: BTreeMap::new(),
         shift: false,
+        ..ItemsUi::default()
     };
     let mut files = UiFiles::new(&[]);
     u.register_files(&mut files);
@@ -413,4 +414,63 @@ mod belt {
         let out = u.press(&w, &files, &layout(), Point::new(160, 290));
         assert_eq!(intents(&out), vec![vec![0x63, 7, 0, 0, 0]]);
     }
+}
+
+fn in_cell(c: i32, r: i32) -> Point {
+    Point::new(100 + 29 * c + 5, 200 + 29 * r + 5)
+}
+
+// Covers: specs/ui/inventory.md §10 r1
+#[test]
+fn a_right_press_on_identify_then_a_grid_click_sends_0x27() {
+    let (u, files) = ui();
+    let w = world(
+        &[
+            (7, mode::STORED, (0, 0, 0, 1), b"isc "),
+            (8, mode::STORED, (0, 2, 0, 1), b"hp1 "),
+        ],
+        None,
+    );
+    let l = layout();
+    // A right press on a non-identify item does nothing.
+    u.right_press(&w, &files, &l, in_cell(2, 0));
+    assert!(!u.identify_pending());
+    u.right_press(&w, &files, &l, in_cell(0, 0));
+    assert!(u.identify_pending());
+    // Another right press cancels.
+    u.right_press(&w, &files, &l, in_cell(0, 0));
+    assert!(!u.identify_pending());
+    u.right_press(&w, &files, &l, in_cell(0, 0));
+    let out = u.press(&w, &files, &l, in_cell(2, 0));
+    // 0x27 target, used.
+    assert_eq!(
+        intents(&out),
+        vec![[&[0x27u8][..], &8u32.to_le_bytes(), &7u32.to_le_bytes()].concat()]
+    );
+    assert!(!u.identify_pending(), "the state ends with the click");
+    // Without the state a press lifts the item (0x19).
+    let out = u.press(&w, &files, &l, in_cell(2, 0));
+    assert_eq!(intents(&out)[0][0], 0x19);
+}
+
+// Covers: specs/ui/inventory.md §5 r1
+#[test]
+fn the_hovered_item_is_the_grid_or_equipped_item_under_the_mouse() {
+    let (u, files) = ui();
+    let w = world(
+        &[
+            (7, mode::STORED, (0, 0, 0, 1), b"hp1 "),
+            (8, mode::BODY, (3, 0, 0, 0), b"qui "),
+        ],
+        None,
+    );
+    let l = layout();
+    let guid = |p| u.item_at(&w, &files, &l, p).map(|i| i.key.guid);
+    assert_eq!(guid(in_cell(0, 0)), Some(7));
+    assert_eq!(guid(in_cell(1, 0)), None);
+    assert_eq!(guid(Point::new(20, 50)), Some(8));
+    // No tips data, or a cursor item: no lines.
+    assert!(u
+        .hover_lines(&w, &files, &Screen::R640, Some(0), in_cell(0, 0))
+        .is_empty());
 }
