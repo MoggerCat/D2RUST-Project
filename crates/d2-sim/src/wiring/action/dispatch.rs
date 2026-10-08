@@ -433,7 +433,7 @@ impl<X: Pending> TickHooks for ActionSim<X> {
     /// whose send ends with S→C 0x48 (type 0, arg 0, the player's GUID;
     /// `inventory.md` §5.7 step 8). `0x0055F4F0` is empty in 1.14d.
     ///
-    /// PROVISIONAL (REC-290; d2rs-own, unverified): the refresh's item and
+    /// PROVISIONAL (REC-291; d2rs-own, unverified): the refresh's item and
     /// skill steps (§5.7 steps 1–7) are not run here: they belong to the
     /// host's inventory model, which the tick hooks do not hold. Its 0x48
     /// is sent at the spec's place.
