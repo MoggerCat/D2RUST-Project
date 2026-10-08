@@ -436,7 +436,6 @@ fn quest_messages(wire: &Arc<Mutex<Wire>>) -> Vec<(u32, u32)> {
         .collect()
 }
 
-// Covers: specs/world/npc.md §2, §3; specs/world/quests.md §7.2, §7.3
 fn press_q(app: &mut App, ms: &AtomicU32) {
     queue(
         app,

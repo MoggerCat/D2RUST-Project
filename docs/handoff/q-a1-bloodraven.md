@@ -8,14 +8,13 @@ Stitching session, branch `claude/q-a1-bloodraven`. Nothing here is verified aga
 |---|---|---|---|
 | 1 | Kashya in the town (class 150, `npc` + `interact`) | none; the synthetic town held Akara only | `app/single_player.rs`: monstats row, client unit row, allocation at `KASHYA_X`; her `hireling` rows (`synthetic_hire_rows`), without which her NPC start stopped in `send_hire_list` |
 | 2 | Talk → message 24 (intro), then 81 (quest) → 0x28 / 0x5D | server tests only | real host, unchanged code; test `kashya_gives_the_sisters_burial_grounds` |
-| 3 | Level change → quest event 3 `0x00543B90` (state 3 on level 17) | `QuestControl::changed_level` had no caller in the live host (`tick.md` §6 rule 5 TODO) | `sync_seams` queues `QuestEvent::LevelChanged` per player room-level change into the shared snapshot; `WiredWorld::run_quest_events` (after each tick) runs it |
-| 4 | Kill → quest kill parse `0x00543A30` | `QuestControl::monster_killed` had no caller | `LocalSeams::kill_step(QuestKill)` (`damage.md` §7.2 step 3) queues `QuestEvent::Killed`, run the same way |
-| 5 | Monster quest chain link (unit +0x74) | `InitHost::quest_chain` kept the no-op default; `AppRest::quest_chain` returned `None` | `WorldHost::quest_chain` → `WorldPending::quest_chain_link` → `LocalSeams` → snapshot → `AppRest::quest_chain` (so a Blood Raven made by the live population gets chain 2 from her boss mods, `init.md` §14.3) |
-| 6 | The quest updater `0x00543E10` (timer period 15: the "quest complete" 0x5D) | not driven in the live host | `run_quest_events` runs `QuestControl::update` on every 20th frame (`quests.md` §5) |
-| 7 | A level to put Blood Raven in | none | synthetic Burial Grounds (level 17, one flat room), warp pair from the Blood Moor slot 2 (`lvlwarp` rows 15 / 16), host-placed Blood Raven (below) |
-| 8 | Kashya's reward (message 92 → state 5, status 13, 0x28, mercenary slot hired) | server tests only | test `kashyas_reward_runs_after_blood_raven` |
+| 3 | Level change → quest event 3 (state 3 on level 17), kill → kill parse, monster chain link | q-a1-tower's quest event queue (`wired/quest_events.rs`, `LocalSeams::{monster_quest_chain, kill_step}`, `AppRest::chains`) already carries them; reused as is. Blood Raven's link is queued by `LocalSeams::host_monster_created` (below); with game files her boss mods call `monster_quest_chain` (`init.md` §14.3) |
+| 4 | The quest updater `0x00543E10` (A1Q2's timer, period 15: the "quest complete" 0x5D) | not driven in the live host | `quest_events.rs` runs `QuestControl::update` on every 20th frame (`quests.md` §5) |
+| 5 | Kill → quest chain → state 4 | tests only | test `blood_raven_dies_and_kashya_pays` |
+| 6 | The reward (message 92 → state 5, status 13, 0x28, mercenary slot hired) | server tests only | test `kashyas_reward_runs_after_blood_raven` |
+| 7 | A level to put Blood Raven in | none | synthetic Burial Grounds (level 17, one flat room), warp pair from the Blood Moor slot 3 (warp ids 29 / 30), host-placed Blood Raven (below) |
 
-d2-sim changes: `WorldPending::{quest_chain_link, host_monster_created}`, `View::spawn_host_monsters` (`HOST_MONSTER_PRESET`, next to the warp tiles), `QuestEvent` and `QuestRest::take_quest_events`. d2-server: `WiredWorld::run_quest_events` from `after_tick`. d2-client: the synthetic level, Kashya, the event queue (`npc_seams::Snap::{events, links}`).
+d2-sim changes: `WorldPending::host_monster_created`, `View::spawn_host_monsters` (`HOST_MONSTER_PRESET`, next to the warp tiles). d2-server: the updater line in `quest_events.rs`. d2-client: `app/synthetic_burial.rs`, the level / Kashya edits in `single_player.rs`.
 
 ## Tests
 `cargo nextest run -p d2-client --test app_play_bloodraven` (3): the quest starts from Kashya (the client's quest log row 2 shows status 1); the player enters level 17 (state 3), Blood Raven stands there with chain 2 and reaches the client, her death (the sim's `kill`, the player as killer) takes the quest to state 4, 17 updater ticks later the status is 3 (completed now); Kashya's message 92 pays (state 5, status 13, one mercenary slot hired). `app_play_quests.rs` finds Akara by class now that a second NPC stands in the town.
@@ -29,6 +28,7 @@ d2-sim changes: `WorldPending::{quest_chain_link, host_monster_created}`, `View:
 
 ## What is left
 - The kill parse skips the `0x80000000` unit-flag guard of `damage.md` §7.2 step 3 (the sim's `kill` does not read it).
+- Expectations changed with the new scene, not weakened: `app_single_player` (one more seed step), `app_frame_loop` (joined 26, handled 37, queued 3), `app_play_quests` (Akara found by class).
 - Walking from the Blood Moor to Kashya in the synthetic world was not exercised (a walk west panicked in `path/walk/geom.rs:197`, index underflow: not this task's code; the reward test starts in the town instead).
 - With game files nothing here was run (no `game/` in the cloud).
 
