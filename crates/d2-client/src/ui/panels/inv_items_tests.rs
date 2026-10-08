@@ -759,3 +759,58 @@ fn the_cube_grid_draws_page_3_and_sends_the_page_3_intents() {
     assert_eq!(intents(&u.press_cube(&w, &files, &g, at)), vec![want]);
     assert!(u.press_cube(&w, &files, &g, Point::new(5, 5)).is_empty());
 }
+
+fn tints(d: &[UiDraw]) -> Vec<(i32, i32, u16, u16, u8)> {
+    d.iter()
+        .filter_map(|d| match d {
+            UiDraw::Tint(t) => Some((t.rect.x, t.rect.y, t.rect.w, t.rect.h, t.tint)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// A cap (requires level 3) worn in the head box, the player at `level`.
+fn cap_at_level(level: i32) -> Vec<UiDraw> {
+    let (mut u, _) = ui();
+    u.art.0.insert(
+        *b"cap ",
+        ItemArtRow {
+            inv_w: 2,
+            inv_h: 2,
+            inv_file: "invcap".into(),
+            flippy_file: String::new(),
+        },
+    );
+    u.tips = Some(crate::ui::item_tip::tests::tips());
+    let mut files = UiFiles::new(&[]);
+    u.register_files(&mut files);
+    let mut w = world(&[(8, mode::BODY, (1, 0, 0, 0), b"cap ")], None);
+    w.units.get_mut(&PLAYER).unwrap().stats.insert(12, level);
+    let mut l = layout();
+    l.equip[1] = EquipBox {
+        left: 30,
+        top: 40,
+        w: 58,
+        h: 58,
+    };
+    let mut out: Vec<UiDraw> = Vec::new();
+    u.draw_panel(&w, &files, &l, &mut out);
+    out
+}
+
+// Covers: specs/ui/inventory.md §6 r4, §2 r1
+#[test]
+fn an_equipped_item_over_the_players_level_draws_the_refused_tint() {
+    // Tint 0 over the head box, before the item's graphic.
+    let out = cap_at_level(1);
+    assert_eq!(tints(&out), vec![(30, 40, 58, 58, 0)]);
+    assert!(matches!(out[0], UiDraw::Tint(_)));
+}
+
+// Covers: specs/ui/inventory.md §6 r4
+#[test]
+fn a_usable_identified_equipped_item_has_no_tint() {
+    let out = cap_at_level(3);
+    assert!(tints(&out).is_empty());
+    assert_eq!(images(&out).len(), 1);
+}

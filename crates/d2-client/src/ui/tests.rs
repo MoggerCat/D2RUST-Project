@@ -266,7 +266,7 @@ fn draw_is_bottom_most_first() {
         .iter()
         .map(|d| match d {
             UiDraw::Image(i) => i.image.file,
-            UiDraw::Text(_) => panic!("text"),
+            UiDraw::Text(_) | UiDraw::Tint(_) => panic!("text"),
         })
         .collect();
     assert_eq!(files, vec![1, 2]);
