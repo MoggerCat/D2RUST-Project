@@ -120,6 +120,8 @@ pub struct WiredWorld<R, S = NoSkills> {
     /// What the inventory rules queued during vendor calls (receiving
     /// unit, bytes), sent after the rest's messages ([`WorldHost::take_sent`]).
     inv_sent: Vec<(UnitId, Vec<u8>)>,
+    /// The levels the quest events last saw the players in.
+    quest_levels: quest_events::QuestLevels,
 }
 
 impl<R, S> WiredWorld<R, S> {
@@ -184,6 +186,7 @@ impl<R, S> WiredWorld<R, S> {
             interact_classes: Vec::new(),
             now,
             inv_sent: Vec::new(),
+            quest_levels: Default::default(),
         }
     }
 
@@ -270,6 +273,8 @@ impl<R, S> WiredWorld<R, S> {
         })
     }
 }
+
+mod quest_events;
 
 /// 0x9C action of a store item shown to the client (`vendors.md` §3.1).
 const STORE_ITEM_ACTION: u8 = 11;
@@ -769,6 +774,7 @@ where
     fn after_tick(&mut self, game: &mut Game, events: &mut D) {
         let sent = self.desk(game, events, quest_objects);
         self.inv_sent.extend(sent);
+        self.run_quest_events(game, events);
         // A player with no life starts dying (`vitals.md` §4.8).
         events.action().player_deaths(game);
         self.pet_deaths(game, events);

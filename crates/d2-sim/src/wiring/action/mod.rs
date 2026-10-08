@@ -74,7 +74,7 @@ pub use monsters::MonsterWorld;
 pub use objects::{
     ObjectCase, ObjectReach, ObjectRoute, ObjectState, ObjectView, QuestObjectCall, QuestObjectHost,
 };
-pub use pending::{KillStep, NoPending, Pending, SkillEvent};
+pub use pending::{KillStep, NoPending, Pending, QuestEvent, SkillEvent};
 
 /// The tables the action modules read (typed `d2_data` records).
 #[derive(Debug, Clone)]

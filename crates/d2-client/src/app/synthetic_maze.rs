@@ -61,13 +61,15 @@ impl Ds1Source for FloorDs1 {
 /// The maze row of Cave Level 1: one room per cell kind, 24-tile cells.
 pub fn maze_data() -> MazeData {
     MazeData {
-        rows: vec![MazeRow {
-            level: CAVE_LEVEL_1,
-            rooms: [1; 3],
-            size_x: 24,
-            size_y: 24,
-            merge: 0,
-        }],
+        rows: super::synthetic_tower::maze_levels()
+            .map(|level| MazeRow {
+                level,
+                rooms: [1; 3],
+                size_x: 24,
+                size_y: 24,
+                merge: 0,
+            })
+            .collect(),
         prest_files: (0..1200).map(|d| (d, 1)).collect(),
         specials: Specials::shipped(),
     }
@@ -126,8 +128,12 @@ impl<F> SyntheticTypes<F> {
     }
 }
 
+fn is_maze(id: u32) -> bool {
+    super::synthetic_tower::maze_links(id).is_some()
+}
+
 fn room_is_maze(drlg: &Drlg, room: DrlgRoomId) -> bool {
-    drlg.level(drlg.room(room).level).id == CAVE_LEVEL_1
+    is_maze(drlg.level(drlg.room(room).level).id)
 }
 
 impl<F: LevelTypes> LevelTypes for SyntheticTypes<F> {
@@ -141,7 +147,7 @@ impl<F: LevelTypes> LevelTypes for SyntheticTypes<F> {
         data: &DrlgData,
         l: LevelIdx,
     ) -> Result<(), DrlgError> {
-        if drlg.level(l).id == CAVE_LEVEL_1 {
+        if is_maze(drlg.level(l).id) {
             self.maze.init_level(drlg, data, l)
         } else {
             self.flat.init_level(drlg, data, l)
@@ -149,19 +155,24 @@ impl<F: LevelTypes> LevelTypes for SyntheticTypes<F> {
     }
 
     fn generate(&mut self, drlg: &mut Drlg, data: &DrlgData, l: LevelIdx) -> Result<(), DrlgError> {
-        if drlg.level(l).id != CAVE_LEVEL_1 {
+        let id = drlg.level(l).id;
+        let Some((_, on)) = super::synthetic_tower::maze_links(id) else {
             return self.flat.generate(drlg, data, l);
-        }
+        };
         self.maze.generate(drlg, data, l)?;
-        // The way back (warp slot 0, `rooms.md` §3.3): the first room.
+        // The way back (warp slot 0, `rooms.md` §3.3) and, in the Tower
+        // line, the way on (slot 1): the first room.
         if let Some(r) = drlg.level_rooms(l).first().copied() {
             drlg.room_mut(r).flags |= room_flags::WARP_0;
+            if on.is_some() {
+                drlg.room_mut(r).flags |= room_flags::WARP_0 << 1;
+            }
         }
         Ok(())
     }
 
     fn reset_level(&mut self, drlg: &mut Drlg, l: LevelIdx) {
-        if drlg.level(l).id == CAVE_LEVEL_1 {
+        if is_maze(drlg.level(l).id) {
             self.maze.reset_level(drlg, l)
         } else {
             self.flat.reset_level(drlg, l)
@@ -182,13 +193,22 @@ impl<F: LevelTypes> LevelTypes for SyntheticTypes<F> {
         }
         let mut units = self.maze.preset_units(drlg, room);
         let level = drlg.room(room).level;
-        if drlg.level_rooms(level).first() == Some(&room) {
+        let links = super::synthetic_tower::maze_links(drlg.level(level).id);
+        if let (Some((back, on)), true) = (links, drlg.level_rooms(level).first() == Some(&room)) {
             units.push(PresetUnit {
                 unit_type: 5,
-                class: CAVE_TO_DEN,
+                class: back,
                 x: super::single_player::WARP_TILE_XY,
                 y: super::single_player::WARP_TILE_XY,
             });
+            if let Some(class) = on {
+                units.push(PresetUnit {
+                    unit_type: 5,
+                    class,
+                    x: DEN_STAIRS_XY,
+                    y: DEN_STAIRS_XY,
+                });
+            }
         }
         units
     }
