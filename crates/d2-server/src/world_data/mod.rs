@@ -280,10 +280,7 @@ impl WorldFiles {
             .iter()
             .flatten()
             .map(Vec::as_slice)
-            .chain(FIXED_LIBRARY)
-            // The acts' base libraries (`levels.md` §3 step 5), read by the
-            // client's edge floor record (`render/draw-order-2.md` §14).
-            .chain(ACT_EDGE_TILE.iter().flatten().map(|&(p, _)| p));
+            .chain(FIXED_LIBRARY);
         for path in library {
             if !names_file(path) || out.dt1.0.contains_key(path) {
                 continue;
@@ -292,6 +289,21 @@ impl WorldFiles {
             out.dt1
                 .0
                 .insert(path.to_vec(), dt1.tiles.iter().map(tile_info).collect());
+        }
+        // The acts' base libraries (`levels.md` §3 step 5), read by the
+        // client's edge floor record (`render/draw-order-2.md` §14). A
+        // library the install lacks is left out: only a level drawing edge
+        // floors needs it, and the client reports it there.
+        for &(path, _) in ACT_EDGE_TILE.iter().flatten() {
+            match dt1(path) {
+                Ok(d) => {
+                    out.dt1
+                        .0
+                        .insert(path.to_vec(), d.tiles.iter().map(tile_info).collect());
+                }
+                Err(WorldDataError::Read { .. }) => {}
+                Err(e) => return Err(e),
+            }
         }
         Ok(out)
     }

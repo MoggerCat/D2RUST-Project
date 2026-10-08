@@ -288,7 +288,7 @@ fn missiles_and_overlays_draw_in_their_trans_mode() {
     assert_eq!(ops(&r.m)[0], (ShadeChain::EMPTY, BlendOp::Opaque));
 }
 
-// Covers: specs/render/draw-order.md §3 r4; specs/render/unit-composite.md §5 r4, §10
+// Covers: specs/render/draw-order.md §3 r4; specs/render/unit-composite.md §5 r4
 #[test]
 fn missiles_join_their_cell_and_overlays_their_host() {
     use crate::rules::camera::{moving_to_client, OpenMode};

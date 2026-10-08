@@ -462,6 +462,14 @@ fn world_files_load_every_named_file_once_by_its_table_string() {
     asked.dedup();
     assert_eq!(asked.len(), disk.asked.len());
     assert_eq!(disk.asked.len(), 3 + FIXED_LIBRARY.len() + 3);
+    // An install without the base libraries still loads (the client asks
+    // for them only in a level that draws edge floors).
+    let mut disk = new_disk();
+    for &(p, _) in ACT_EDGE_TILE.iter().flatten() {
+        disk.files.remove(&String::from_utf8(p.to_vec()).unwrap());
+    }
+    let w = WorldFiles::load(&dd, &pd, &od, |n| disk.read(n)).unwrap();
+    assert!(w.dt1.dt1(ACT_EDGE_TILE[0].unwrap().0).is_none());
 }
 
 #[test]
