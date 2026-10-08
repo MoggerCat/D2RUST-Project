@@ -138,7 +138,7 @@ use d2_sim::drlg::preset::{Ds1Input, Ds1Source};
 use super::rest::AppRest;
 use super::server_thread::{ThreadLink, ThreadStopped};
 use super::skill_rest::SkillStore;
-use super::{synthetic_burial, synthetic_maze, synthetic_tower};
+use super::{synthetic_act2, synthetic_burial, synthetic_maze, synthetic_tower};
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
 use crate::bridge::world::{
@@ -533,6 +533,9 @@ pub struct LocalSeams {
     /// Monster chain links and deaths for the quest control, drained once
     /// per tick (`q-a1-tower`, d2rs-own, unverified).
     pub quest_events: Vec<d2_sim::wiring::action::QuestEvent>,
+    /// The Act II DRLG's staff-tomb level (0 = not yet known), set when
+    /// the acts are created (`q-a2-dungeons`).
+    pub staff_tomb: u32,
 }
 
 impl LocalSeams {
@@ -637,6 +640,14 @@ impl Pending for LocalSeams {
             _ => return false,
         }
         true
+    }
+    /// `0x0061AEB0`: the Act II staff tomb, the orifice's level.
+    fn object_staff_tomb(&self) -> u32 {
+        if self.staff_tomb == 0 {
+            u32::MAX
+        } else {
+            self.staff_tomb
+        }
     }
     fn take_quest_events(&mut self) -> Vec<d2_sim::wiring::action::QuestEvent> {
         std::mem::take(&mut self.quest_events)
@@ -1393,6 +1404,7 @@ fn synthetic_drlg_data() -> DrlgData {
         l[b::BURIAL_GROUNDS as usize].vis[0] = BLOOD_MOOR;
         l[b::BURIAL_GROUNDS as usize].warp[0] = b::BURIAL_TO_BLOOD_MOOR as i32;
     }
+    synthetic_act2::add_levels(&mut drlg);
     let mut ids = vec![
         BLOOD_MOOR_TO_DEN,
         DEN_TO_BLOOD_MOOR,
@@ -1404,6 +1416,7 @@ fn synthetic_drlg_data() -> DrlgData {
         synthetic_burial::BLOOD_MOOR_TO_BURIAL,
         synthetic_burial::BURIAL_TO_BLOOD_MOOR,
     ]);
+    ids.extend(synthetic_act2::FIRST_WARP..=synthetic_act2::last_warp());
     drlg.warps = ids
         .iter()
         .map(|&id| WarpDef {
@@ -2153,6 +2166,15 @@ pub fn build_with_objects(
             .map_err(BuildError::Drlg)?
             .ok_or_else(|| BuildError::Setup(format!("level {level}: no room streamed")))?;
         rooms.push(r);
+    }
+    // The Act II DRLG chose its staff tomb at creation (`levels.md` §3).
+    if let Some(t) = sim
+        .action
+        .hooks()
+        .drlg
+        .with_act(1, &mut game.lists, |d, _| d.staff_tomb)
+    {
+        sim.action.hooks().x.staff_tomb = t;
     }
     // The waypoint object stands in the town's first room at a fixed
     // sub-tile offset from its origin (subtile = tile × 5, `levels.md`
