@@ -106,5 +106,6 @@ fn fault(f: &LoadFault) -> &'static str {
         LoadFault::NotCreated => "no item unit could be made from the record",
         LoadFault::NoInventory => "the owner has no inventory",
         LoadFault::NoRoom => "no place for the item (freed)",
+        LoadFault::StaleRuneword => "runeword flag without a matching runeword (freed)",
     }
 }
