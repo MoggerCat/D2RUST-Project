@@ -9,7 +9,7 @@
 //! d2rs-own, unverified: without `inventory.bin` rows the grid is the
 //! measured expansion record 12 / 28 (6 × 8, cell 29, left 74 / 154, top
 //! 82 / 142); the classic stash (record 8 / 24, 6 × 4) uses the same
-//! corner. PROVISIONAL, REC-103 in `docs/HANDOFF.md` §7.
+//! corner. PROVISIONAL, REC-104 in `docs/HANDOFF.md` §7.
 
 use super::super::draw::UiDrawSink;
 use super::super::geom::Point;

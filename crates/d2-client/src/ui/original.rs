@@ -91,8 +91,9 @@ pub const PENDING: &[(&str, &str)] = &[
     ),
     (
         "inventory gold button press / release and the gold dialog (`panels-2.md` §21 r3–r9)",
-        "the gold value and button art are drawn ([`InventoryUi`]); the press plays sound 4 \
-         and the release opens the gold dialog (`ui::gold`), neither wired to the adapter",
+        "the gold value and button art are drawn ([`InventoryUi`]); the press / release and \
+         the drop dialog (kind 1) are wired in [`gold_dialog`] (d2rs-own box, REC-103); the \
+         press does not play sound 4 (deferred); the stash kinds 3 / 4 are not wired",
     ),
     (
         "inventory equipment backgrounds (§9.4)",
@@ -229,6 +230,8 @@ struct Shared {
     waypoint_open: Option<WaypointOpen>,
     /// The Esc game menu's state ([`esc_menu`]).
     esc: esc_menu::EscState,
+    /// The inventory gold button and the drop-gold dialog ([`gold_dialog`]).
+    gold: gold_dialog::GoldState,
 }
 
 impl Shared {
@@ -347,6 +350,7 @@ impl OriginalUi {
             waypoint_map: None,
             waypoint_open: None,
             esc: esc_menu::EscState::default(),
+            gold: gold_dialog::GoldState::default(),
         };
         Ok(Self {
             shared: Rc::new(RefCell::new(shared)),
@@ -391,10 +395,12 @@ impl OriginalUi {
         }))?;
         root.open(super::hire_list::HIRE_PANEL)?;
         root.add(Box::new(hud::HudUi { sh: sh.clone() }))?;
+        root.add(Box::new(gold_dialog::GoldDialogUi { sh: sh.clone() }))?;
         root.add(Box::new(esc_menu::EscMenuUi { sh: sh.clone() }))?;
         // Not a UI state: open for good.
         root.open(BORDER_PANEL)?;
         root.open(hud::HUD_PANEL)?;
+        root.open(gold_dialog::GOLD_PANEL)?;
         root.sync_states(&sh.borrow().states);
         let sc = sh.borrow().config.screen;
         self.hire.borrow_mut().screen = (sc.w, sc.h);
@@ -659,7 +665,12 @@ impl Panel for InventoryUi {
             (Some(_), Some((key, _))) => Some(ctx.world.total(key, inv_gold::STAT_GOLD, 0)),
             _ => None,
         };
-        self.panel.draw(&sh.tables, &sh.env(), gold, out);
+        // The gold button's pressed flag is the gold dialog module's.
+        let panel = InventoryPanel {
+            gold_pressed: sh.gold.buttons.inv_pressed,
+            ..self.panel
+        };
+        panel.draw(&sh.tables, &sh.env(), gold, out);
         let class = Facts::of(ctx.world).class;
         if let Some(l) = sh.items.layout(class, &sh.config.screen) {
             sh.items.draw_panel(ctx.world, &sh.tables.files, &l, out);
@@ -898,7 +909,7 @@ impl CharacterView for ModelCharacter<'_> {
 
 /// The local player's key and 0x59 name (up to its NUL), when the model
 /// has a local player unit.
-fn local_player(world: &ClientWorld) -> Option<(UnitKey, &[u8])> {
+pub(super) fn local_player(world: &ClientWorld) -> Option<(UnitKey, &[u8])> {
     let u = world.local().filter(|u| u.key.unit_type == PLAYER)?;
     let name: &[u8] = match &u.kind {
         KindData::Player(p) => {
@@ -1056,6 +1067,8 @@ impl Panel for BorderUi {
 
 #[path = "esc_menu.rs"]
 pub mod esc_menu;
+#[path = "gold_dialog.rs"]
+pub mod gold_dialog;
 #[path = "hud.rs"]
 pub mod hud;
 

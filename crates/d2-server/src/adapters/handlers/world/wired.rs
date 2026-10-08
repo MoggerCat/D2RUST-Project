@@ -706,7 +706,33 @@ where
             .hireling_tables
             .is_some()
             .then(|| self.state.hirelings.clone());
-        let out = self.with_economy(game, events, |econ, _| call.call(econ, &mut inv));
+        let out = self.with_economy(game, events, |econ, _| {
+            // d2rs-own, unverified (D1): the preview rest reads the
+            // places staged here (`MoveRest::stage`).
+            let mut places = Vec::new();
+            for u in econ
+                .game
+                .lists
+                .units_of_type(d2_sim::units::UnitType::Player)
+            {
+                let Some(r) = econ.units.get(u) else { continue };
+                places.push(super::super::items::moves::StagedPlace {
+                    owner: d2_sim::items::moves::Owner::player(r.guid),
+                    pos: econ.hooks.path_position(u),
+                    room: econ.game.lists.unit(u).and_then(|e| e.room()),
+                });
+            }
+            for (&u, it) in &inv.state.items {
+                places.push(super::super::items::moves::StagedPlace {
+                    owner: d2_sim::items::moves::Owner::item(it.guid),
+                    pos: (it.x, it.y),
+                    room: econ.game.lists.unit(u).and_then(|e| e.room()),
+                });
+            }
+            let format = d2_sim::items::ItemGame::item_format(&*econ.fields);
+            inv.rest.stage(&places, format);
+            call.call(econ, &mut inv)
+        });
         inv.state.hirelings = None;
         self.inventory = Some(inv);
         Some(out)

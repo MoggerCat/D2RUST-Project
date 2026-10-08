@@ -56,6 +56,9 @@ pub struct ItemView {
     pub y: u16,
     /// The inventory's unit: the 0x9D owner, else the local player.
     pub owner: Option<UnitKey>,
+    /// The amount of a compact gold pile (`gld`, `bitstream.md` §3 r1:
+    /// after the code a flag bit, then 32 or 12 bits); `None` otherwise.
+    pub gold: Option<u32>,
 }
 
 impl ItemView {
@@ -90,6 +93,30 @@ pub fn peek(stream: &[u8]) -> Option<Head> {
     Some((flags, m, body, page, x, y, code))
 }
 
+/// The gold amount of a compact `gld` record (`bitstream.md` §3 r1).
+fn gold_of(stream: &[u8]) -> Option<u32> {
+    let mut r = BitReader::new(stream);
+    let flags = r.read(32).ok()?;
+    if flags & hflag::COMPACT == 0 || flags & hflag::EAR != 0 {
+        return None;
+    }
+    let _version = r.read(10).ok()?;
+    let skip = if matches!(r.read(3).ok()? as u8, mode::GROUND | mode::DROPPING) {
+        32
+    } else {
+        15
+    };
+    r.read(skip).ok()?;
+    if r.read(32).ok()?.to_le_bytes() != *b"gld " {
+        return None;
+    }
+    if r.read(1).ok()? == 1 {
+        r.read(32).ok()
+    } else {
+        r.read(12).ok()
+    }
+}
+
 /// The last record took the item out of the world: RemoveFromContainer,
 /// Unequip or RemoveFromBelt with header flag 0x20 (§2 r5.3: "the item is
 /// removed, no write").
@@ -119,6 +146,7 @@ pub fn item(w: &ClientWorld, key: UnitKey) -> Option<ItemView> {
         x,
         y,
         owner: r.owner.or(w.local_player),
+        gold: gold_of(&r.stream),
     })
 }
 
