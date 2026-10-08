@@ -1,8 +1,929 @@
-// Spec: specs/ui/frontend-options.md
-//! Placeholder for the `controls` screen (q-menu-shell). Its row of
-//! `docs/handoff/build-queue.tsv` replaces `register` with a real
-//! `Screen`; until then the screen is the shell's Esc/Enter placeholder.
+// Spec: specs/ui/frontend-options.md (§O9), specs/ui/controls.md (§3.3, §5), specs/client/ui.md (§A6)
+//! CONFIGURE CONTROLS (`UI_CONFIG`, ui 11).
+//!
+//! [`ConfigureControls`] is the whole screen as plain state: 15 visible
+//! rows of the key-config table, the selected row and column, the blinking
+//! edit cell, the one-press latch, the two-key rule, Default / Accept /
+//! Cancel. [`ConfigureControls::draw_list`] gives the §O9 r2 layout with
+//! colours. [`ControlsScreen`] adapts it to the front-end shell: a control
+//! per key (capture), per visible key cell (click-to-edit) and per button.
+//!
+//! Persistence is d2rs-own (§O9 r8): Accept writes `controls.toml`
+//! (`client/ui.md` §A6) over the `dev` preset; [`saved_bindings`] is what
+//! play input loads. Everything not in the specs is `d2rs-own, unverified`
+//! under REC-184.
 
+use std::cell::RefCell;
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
+
+use crate::controls::original::{
+    assign_key, menu_table, AssignError, BindingTable, MenuRow, SEPARATOR, UNBOUND,
+};
+use crate::controls::{self, Action as Act, Bindings, Context, ControlsFile, Key, Preset};
+use crate::ui::front_end::control::{Action, Control, ControlKind};
+use crate::ui::front_end::flow::Trigger;
+use crate::ui::front_end::screen::{FrontCtx, Screen};
 use crate::ui::front_end::Registry;
 
-pub fn register(_reg: &mut Registry) {}
+use super::ids::CONTROLS;
+
+// ---- layout constants (§O9 r2), 800 × 600 frame -----------------------
+
+const W: i32 = 800;
+const H: i32 = 600;
+const M: i32 = (W - 620) / 2;
+const T: i32 = (H - 40 - 420) / 2;
+const C: i32 = (620 - 49) / 3;
+const VISIBLE: usize = 15;
+/// FontInGameChat.
+pub const FONT: u16 = 13;
+/// The error message stays for 2,000 ms (r2).
+const MESSAGE_MS: u64 = 2000;
+
+/// Text colours (r2).
+pub mod color {
+    pub const WHITE: u8 = 0;
+    pub const RED: u8 = 1;
+    pub const GREEN: u8 = 2;
+    pub const BLUE: u8 = 3;
+    pub const GOLD: u8 = 4;
+    pub const GREY: u8 = 5;
+}
+
+/// A sound request (named only: sound is deferred).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Sound {
+    CursorPass,
+    CursorSelect,
+}
+
+/// What a key or button did to the screen as a whole.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Done {
+    Stay,
+    /// Accept: bindings kept (the host persists with [`ConfigureControls::save`]).
+    Accept,
+    /// Cancel: the snapshot was restored.
+    Cancel,
+}
+
+/// One drawn thing of the screen, in draw order.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CfgDraw {
+    /// Filled rectangle (colour 0, mode 1: the dark box / selection).
+    Rect { x: i32, y: i32, w: i32, h: i32 },
+    /// `menu\boxpieces` border around the rectangle.
+    Border { x: i32, y: i32, w: i32, h: i32 },
+    /// A frame of `data\global\ui\MENU\textslid`.
+    Slider { frame: u32, x: i32, y: i32 },
+    /// Text; `string_id` 0 means literal `text`.
+    Text {
+        string_id: u32,
+        text: String,
+        x: i32,
+        y: i32,
+        color: u8,
+    },
+}
+
+/// The screen state (§O9).
+#[derive(Clone, Debug)]
+pub struct ConfigureControls {
+    expansion: bool,
+    rows: Vec<MenuRow>,
+    table: BindingTable,
+    snapshot: BindingTable,
+    top: usize,
+    selected: usize,
+    /// 1 = slot 1 "Key/Button One" (initial), 0 = slot 0.
+    column: i32,
+    latch: u8,
+    editing: bool,
+    message: Option<(AssignError, u64)>,
+    draws: u32,
+    /// Sounds requested since the last [`ConfigureControls::take_sounds`].
+    sounds: Vec<Sound>,
+}
+
+impl ConfigureControls {
+    /// Open (`0x004A5200(1)`): snapshot the table, top row and selected row 0.
+    pub fn open(expansion: bool, table: BindingTable) -> Self {
+        Self {
+            expansion,
+            rows: menu_table(expansion),
+            snapshot: table.clone(),
+            table,
+            top: 0,
+            selected: 0,
+            column: 1,
+            latch: 1,
+            editing: false,
+            message: None,
+            draws: 0,
+            sounds: Vec::new(),
+        }
+    }
+
+    pub fn table(&self) -> &BindingTable {
+        &self.table
+    }
+    pub fn selected(&self) -> usize {
+        self.selected
+    }
+    pub fn top(&self) -> usize {
+        self.top
+    }
+    pub fn column(&self) -> i32 {
+        self.column
+    }
+    pub fn editing(&self) -> bool {
+        self.editing
+    }
+    pub fn latch(&self) -> u8 {
+        self.latch
+    }
+    pub fn rows(&self) -> &[MenuRow] {
+        &self.rows
+    }
+    pub fn take_sounds(&mut self) -> Vec<Sound> {
+        std::mem::take(&mut self.sounds)
+    }
+    pub fn message(&self, now_ms: u64) -> Option<AssignError> {
+        self.message
+            .filter(|&(_, at)| now_ms.saturating_sub(at) < MESSAGE_MS)
+            .map(|(e, _)| e)
+    }
+
+    fn max_top(&self) -> usize {
+        self.rows.len().saturating_sub(VISIBLE)
+    }
+
+    fn is_sep(&self, row: usize) -> bool {
+        self.rows[row].cmd == SEPARATOR
+    }
+
+    fn cmd(&self) -> i32 {
+        self.rows[self.selected].cmd
+    }
+
+    /// Down / Up: ±1 skipping separators, no wrap, scrolling to keep the
+    /// selection among the 15 visible rows.
+    fn step(&mut self, down: bool) {
+        let mut r = self.selected;
+        loop {
+            if down {
+                if r + 1 >= self.rows.len() {
+                    return;
+                }
+                r += 1;
+            } else {
+                if r == 0 {
+                    return;
+                }
+                r -= 1;
+            }
+            if !self.is_sep(r) {
+                break;
+            }
+        }
+        self.selected = r;
+        if r < self.top {
+            self.top = r;
+        } else if r >= self.top + VISIBLE {
+            self.top = r + 1 - VISIBLE;
+        }
+        self.sounds.push(Sound::CursorPass);
+    }
+
+    fn start_edit(&mut self) {
+        self.editing = true;
+        self.sounds.push(Sound::CursorSelect);
+        self.latch = 0;
+    }
+
+    /// A key went down. `repeat`: auto-repeat. `now_ms` stamps an error.
+    pub fn key_down(&mut self, vk: u16, repeat: bool, now_ms: u64) -> Done {
+        if self.editing {
+            return self.edit_key(vk, repeat, now_ms);
+        }
+        match vk {
+            0x28 => self.step(true),
+            0x26 => self.step(false),
+            0x25 if self.column == 0 => {
+                self.column = 1;
+                self.sounds.push(Sound::CursorPass);
+            }
+            0x27 if self.column == 1 => {
+                self.column = 0;
+                self.sounds.push(Sound::CursorPass);
+            }
+            // Enter, Delete, Backspace, Esc, Space share the latch.
+            13 | 0x2E | 8 | 27 | 32 => {
+                if self.latch == 0 {
+                    self.latch = 1;
+                } else if !repeat {
+                    match vk {
+                        13 => {
+                            if !self.is_sep(self.selected) {
+                                self.start_edit();
+                            }
+                        }
+                        0x2E | 8 => {
+                            if !self.is_sep(self.selected) {
+                                let c = self.cmd();
+                                self.table.unbind(c, self.column);
+                                self.sounds.push(Sound::CursorSelect);
+                            }
+                        }
+                        _ => return self.cancel(),
+                    }
+                }
+            }
+            _ => {}
+        }
+        Done::Stay
+    }
+
+    /// A key went up (only the editing state reacts, r5).
+    pub fn key_up(&mut self, vk: u16, now_ms: u64) {
+        if !self.editing {
+            return;
+        }
+        if self.latch == 0 {
+            self.latch = 1;
+        } else {
+            self.assign(vk, now_ms);
+        }
+    }
+
+    fn edit_key(&mut self, vk: u16, repeat: bool, now_ms: u64) -> Done {
+        if repeat {
+            return Done::Stay;
+        }
+        if vk == 27 {
+            self.editing = false;
+            self.sounds.push(Sound::CursorPass);
+            self.latch = 0;
+        } else {
+            self.assign(vk, now_ms);
+        }
+        Done::Stay
+    }
+
+    /// Assign K to (selected command, column) with the two-key rule.
+    fn assign(&mut self, k: u16, now_ms: u64) {
+        let (c, s) = (self.cmd(), self.column);
+        match assign_key(&mut self.table, c, s, k) {
+            Ok(()) => {
+                self.editing = false;
+                self.sounds.push(Sound::CursorSelect);
+                self.latch = if matches!(k, 13 | 0x2E | 8 | 32) {
+                    0
+                } else {
+                    1
+                };
+            }
+            Err(e) => {
+                self.latch = 1;
+                self.message = Some((e, now_ms));
+            }
+        }
+    }
+
+    /// Wheel (not editing): n = delta / 120 scrolls the view by −2n rows.
+    pub fn wheel(&mut self, delta: i32) {
+        let n = delta / 120;
+        if self.editing || n == 0 {
+            return;
+        }
+        let top = (self.top as i32 - 2 * n).clamp(0, self.max_top() as i32) as usize;
+        self.top = top;
+        self.sounds.push(Sound::CursorPass);
+    }
+
+    /// A click on visible row `vis` (0..15), column `col`: stops an edit in
+    /// progress, selects the cell and (release on the same cell) edits it.
+    pub fn click_cell(&mut self, vis: usize, col: i32) {
+        self.editing = false;
+        let row = self.top + vis;
+        if vis >= VISIBLE || row >= self.rows.len() || self.is_sep(row) {
+            return;
+        }
+        self.selected = row;
+        self.column = col;
+        self.start_edit();
+    }
+
+    /// Scroll arrows: top ∓ 1.
+    pub fn scroll(&mut self, down: bool) {
+        self.editing = false;
+        self.top = if down {
+            (self.top + 1).min(self.max_top())
+        } else {
+            self.top.saturating_sub(1)
+        };
+    }
+
+    /// Default (`0x004A5010`): the compiled defaults; nothing is written.
+    pub fn default_all(&mut self) {
+        self.editing = false;
+        self.table = BindingTable::defaults();
+        self.sounds.push(Sound::CursorSelect);
+    }
+
+    /// Cancel (`0x004A5040`, also Esc / Space): restore the snapshot.
+    pub fn cancel(&mut self) -> Done {
+        self.editing = false;
+        self.table = self.snapshot.clone();
+        Done::Cancel
+    }
+
+    /// Accept (`0x004A5020`): keep the table (the host saves it).
+    pub fn accept(&mut self) -> Done {
+        self.editing = false;
+        self.sounds.push(Sound::CursorSelect);
+        Done::Accept
+    }
+
+    /// Name of the key held by (cmd, slot): "None" when unbound.
+    pub fn key_name(&self, cmd: i32, slot: i32) -> String {
+        match self.table.key_of(cmd, slot) {
+            UNBOUND => "None".into(),
+            vk => vk_name(vk),
+        }
+    }
+
+    /// Key colour (`0x004A4FA0`).
+    fn key_color(&self, row: usize, slot: i32) -> u8 {
+        let cmd = self.rows[row].cmd;
+        if self.editing && row == self.selected && slot == self.column {
+            return color::BLUE;
+        }
+        if !self.editing && row == self.selected && slot == self.column {
+            return color::BLUE;
+        }
+        let (a, b) = (self.table.is_bound(cmd, 1), self.table.is_bound(cmd, 0));
+        match (a, b) {
+            (false, false) => color::RED,
+            (true, true) => color::GREY,
+            _ => color::GOLD,
+        }
+    }
+
+    /// The §O9 r2 layout at 800 × 600. Increments the draw counter (the
+    /// edit cell blinks: hidden when counter & 15 ≤ 4).
+    pub fn draw_list(&mut self, now_ms: u64, pointer: Option<(i32, i32)>) -> Vec<CfgDraw> {
+        let mut out = Vec::new();
+        let text = |id: u32, t: &str, x: i32, y: i32, c: u8| CfgDraw::Text {
+            string_id: id,
+            text: t.to_string(),
+            x,
+            y,
+            color: c,
+        };
+        out.push(CfgDraw::Rect {
+            x: M,
+            y: T,
+            w: W - 2 * M,
+            h: 369,
+        });
+        out.push(CfgDraw::Border {
+            x: M,
+            y: T + 3,
+            w: W - 2 * M - 3,
+            h: 365,
+        });
+        out.push(CfgDraw::Border {
+            x: M,
+            y: T + 323,
+            w: W - 2 * M - 3,
+            h: 45,
+        });
+        for (i, id) in [3921u32, 3922, 3923].into_iter().enumerate() {
+            out.push(text(id, "", M + 18 + C * i as i32, T + 30, color::GOLD));
+        }
+        let blink_hidden = self.draws & 15 <= 4;
+        self.draws += 1;
+        for r in 0..VISIBLE {
+            let row = self.top + r;
+            let Some(mr) = self.rows.get(row).copied() else {
+                break;
+            };
+            let y = T + 52 + 18 * r as i32;
+            if row == self.selected {
+                out.push(CfgDraw::Rect {
+                    x: M + 18,
+                    y: T + 35 + 18 * r as i32,
+                    w: 3 * C,
+                    h: 18,
+                });
+            }
+            if mr.cmd == SEPARATOR {
+                continue;
+            }
+            let lc = if row == self.selected && self.editing {
+                color::BLUE
+            } else {
+                color::WHITE
+            };
+            out.push(text(mr.string_id, "", M + 30, y, lc));
+            for (slot, x) in [(1, M + 30 + C), (0, M + 30 + 2 * C)] {
+                if self.editing && row == self.selected && slot == self.column && blink_hidden {
+                    continue;
+                }
+                let (id, name) = match self.table.key_of(mr.cmd, slot) {
+                    UNBOUND => (3762, String::new()),
+                    vk => (0, vk_name(vk)),
+                };
+                out.push(text(id, &name, x, y, self.key_color(row, slot)));
+            }
+        }
+        self.scroll_bar(&mut out);
+        let labels = [
+            (3974u32, color::RED),
+            (3972, color::BLUE),
+            (3973, color::GREEN),
+        ];
+        for (i, (id, hot)) in labels.into_iter().enumerate() {
+            let c = M + 206 * i as i32 + 103;
+            let over = pointer.is_some_and(|(px, py)| {
+                (c - BTN_HALF..c + BTN_HALF).contains(&px) && (T + 329..T + 367).contains(&py)
+            });
+            // Text x = centre − w/2; the width is the host's font measure
+            // (REC-184): the centre is passed as x and the host centres.
+            out.push(text(
+                id,
+                "",
+                c,
+                T + 351,
+                if over { hot } else { color::GOLD },
+            ));
+        }
+        if let Some(e) = self.message(now_ms) {
+            out.push(text(e.string_id(), "", W / 2, T + 399, color::RED));
+        }
+        out
+    }
+
+    fn scroll_bar(&self, out: &mut Vec<CfgDraw>) {
+        let x = W - M - 31;
+        for k in 0..TRACK_FRAMES {
+            out.push(CfgDraw::Slider {
+                frame: 13,
+                x,
+                y: T + 59 + 12 * k,
+            });
+        }
+        out.push(CfgDraw::Slider {
+            frame: 11,
+            x,
+            y: T + 47,
+        });
+        out.push(CfgDraw::Slider {
+            frame: 10,
+            x,
+            y: T + 305,
+        });
+        let s: i32 = if self.expansion { 5 } else { 6 };
+        let max_top = self.max_top().max(1) as i32;
+        let ty = (246 - 12 * s) * self.top as i32 / max_top + 47 + T;
+        for j in 0..s {
+            out.push(CfgDraw::Slider {
+                frame: 14,
+                x: W - M - 32,
+                y: ty + 12 + 12 * j,
+            });
+        }
+    }
+}
+
+/// Track frames drawn (the span 59…305 is 246 px of 12-px steps).
+/// PROVISIONAL (REC-184): the spec gives the step, not the count.
+const TRACK_FRAMES: i32 = 20;
+/// Half width of a button hit box: spec is w/2 + 10 from the text width,
+/// which needs the font measure; PROVISIONAL (REC-184): w = 100.
+const BTN_HALF: i32 = 60;
+
+/// Display name of a key (d2rs-own: the original's names are localised).
+pub fn vk_name(vk: u16) -> String {
+    match vk_to_key(vk) {
+        Some(k) => k.name().to_string(),
+        None => format!("0x{vk:02X}"),
+    }
+}
+
+// ---- controls.toml bridge (d2rs-own) ----------------------------------
+
+/// Original command → d2rs action, for the commands that have one.
+fn action_of_cmd(cmd: i32) -> Option<Act> {
+    use Act::*;
+    const SKILLS: [Act; 16] = [
+        SkillSlot1,
+        SkillSlot2,
+        SkillSlot3,
+        SkillSlot4,
+        SkillSlot5,
+        SkillSlot6,
+        SkillSlot7,
+        SkillSlot8,
+        SkillSlot9,
+        SkillSlot10,
+        SkillSlot11,
+        SkillSlot12,
+        SkillSlot13,
+        SkillSlot14,
+        SkillSlot15,
+        SkillSlot16,
+    ];
+    Some(match cmd {
+        0 => ToggleCharacter,
+        1 => ToggleInventory,
+        2 => ToggleParty,
+        4 => ToggleQuests,
+        5 => OpenChat,
+        6 => ToggleHelp,
+        7 => ToggleAutomap,
+        8 => CenterAutomap,
+        9 => ToggleAutomapFade,
+        12 => ToggleSkillTree,
+        13 => ToggleSkillMenuRight,
+        14..=21 => SKILLS[(cmd - 14) as usize],
+        22 => ToggleBelt,
+        23 => BeltSlot1,
+        24 => BeltSlot2,
+        25 => BeltSlot3,
+        26 => BeltSlot4,
+        35 => ToggleRun,
+        36 => StandStill,
+        37 => ShowItems,
+        38 => ClearScreen,
+        42 => Screenshot,
+        43 => ShowPortraits,
+        44 => SwapWeapons,
+        46..=53 => SKILLS[(cmd - 46 + 8) as usize],
+        56 => GameMenu,
+        _ => return None,
+    })
+}
+
+/// Windows virtual key (or 0x100…0x104 mouse) → portable [`Key`].
+pub fn vk_to_key(vk: u16) -> Option<Key> {
+    const LETTERS: [Key; 26] = [
+        Key::A,
+        Key::B,
+        Key::C,
+        Key::D,
+        Key::E,
+        Key::F,
+        Key::G,
+        Key::H,
+        Key::I,
+        Key::J,
+        Key::K,
+        Key::L,
+        Key::M,
+        Key::N,
+        Key::O,
+        Key::P,
+        Key::Q,
+        Key::R,
+        Key::S,
+        Key::T,
+        Key::U,
+        Key::V,
+        Key::W,
+        Key::X,
+        Key::Y,
+        Key::Z,
+    ];
+    const DIGITS: [Key; 10] = [
+        Key::Digit0,
+        Key::Digit1,
+        Key::Digit2,
+        Key::Digit3,
+        Key::Digit4,
+        Key::Digit5,
+        Key::Digit6,
+        Key::Digit7,
+        Key::Digit8,
+        Key::Digit9,
+    ];
+    const F: [Key; 12] = [
+        Key::F1,
+        Key::F2,
+        Key::F3,
+        Key::F4,
+        Key::F5,
+        Key::F6,
+        Key::F7,
+        Key::F8,
+        Key::F9,
+        Key::F10,
+        Key::F11,
+        Key::F12,
+    ];
+    const PAD: [Key; 10] = [
+        Key::Numpad0,
+        Key::Numpad1,
+        Key::Numpad2,
+        Key::Numpad3,
+        Key::Numpad4,
+        Key::Numpad5,
+        Key::Numpad6,
+        Key::Numpad7,
+        Key::Numpad8,
+        Key::Numpad9,
+    ];
+    Some(match vk {
+        0x41..=0x5A => LETTERS[usize::from(vk - 0x41)],
+        0x30..=0x39 => DIGITS[usize::from(vk - 0x30)],
+        0x70..=0x7B => F[usize::from(vk - 0x70)],
+        0x60..=0x69 => PAD[usize::from(vk - 0x60)],
+        0x10 => Key::LeftShift,
+        0x11 => Key::LeftCtrl,
+        0x12 => Key::LeftAlt,
+        0x20 => Key::Space,
+        0x0D => Key::Enter,
+        0x09 => Key::Tab,
+        0x08 => Key::Backspace,
+        0x13 => Key::Pause,
+        0x21 => Key::PageUp,
+        0x22 => Key::PageDown,
+        0x23 => Key::End,
+        0x24 => Key::Home,
+        0x25 => Key::Left,
+        0x26 => Key::Up,
+        0x27 => Key::Right,
+        0x28 => Key::Down,
+        0x2C => Key::PrintScreen,
+        0x2D => Key::Insert,
+        0x2E => Key::Delete,
+        0x6A => Key::NumpadMultiply,
+        0x6B => Key::NumpadAdd,
+        0x6D => Key::NumpadSubtract,
+        0x6F => Key::NumpadDivide,
+        0xBA => Key::Semicolon,
+        0xBB => Key::Equals,
+        0xBC => Key::Comma,
+        0xBD => Key::Minus,
+        0xBE => Key::Period,
+        0xBF => Key::Slash,
+        0xC0 => Key::Grave,
+        0xDB => Key::LeftBracket,
+        0xDC => Key::Backslash,
+        0xDD => Key::RightBracket,
+        0xDE => Key::Quote,
+        0x100 => Key::MouseMiddle,
+        0x101 => Key::Mouse4,
+        0x102 => Key::Mouse5,
+        0x103 => Key::MouseWheelUp,
+        0x104 => Key::MouseWheelDown,
+        _ => return None,
+    })
+}
+
+/// The inverse of [`vk_to_key`]; keys the table cannot hold give `None`.
+pub fn key_to_vk(k: Key) -> Option<u16> {
+    (0u16..=0x104).find(|&vk| vk_to_key(vk) == Some(k))
+}
+
+/// The table → effective play bindings: the `dev` preset with every mapped
+/// command replaced by its (slot 1, slot 0) keys; unmapped dev actions
+/// lose an input a mapped action in the same context now holds.
+pub fn table_to_bindings(t: &BindingTable) -> Bindings {
+    let mut b = Preset::Dev.bindings().expect("dev preset");
+    let mut mapped = Vec::new();
+    let mut held: Vec<(Context, Key)> = Vec::new();
+    for cmd in 0..57 {
+        let Some(a) = action_of_cmd(cmd) else {
+            continue;
+        };
+        let keys: Vec<Key> = [1, 0]
+            .into_iter()
+            .map(|s| t.key_of(cmd, s))
+            .filter(|&vk| vk != UNBOUND)
+            .filter_map(vk_to_key)
+            .collect();
+        for &k in &keys {
+            held.push((a.context(), k));
+        }
+        b.set(a, &keys);
+        mapped.push(a);
+    }
+    for &a in Act::ALL.iter().filter(|a| !mapped.contains(a)) {
+        let keep: Vec<Key> = b
+            .inputs(a)
+            .iter()
+            .copied()
+            .filter(|k| !held.contains(&(a.context(), *k)))
+            .collect();
+        if keep.len() != b.inputs(a).len() {
+            b.set(a, &keep);
+        }
+    }
+    b
+}
+
+/// Overlay saved play bindings on `t`: each mapped command takes its
+/// action's inputs as (slot 1, slot 0).
+pub fn overlay_bindings(t: &mut BindingTable, b: &Bindings) {
+    for cmd in 0..57 {
+        let Some(a) = action_of_cmd(cmd) else {
+            continue;
+        };
+        let inputs = b.inputs(a);
+        for (i, slot) in [1, 0].into_iter().enumerate() {
+            let vk = inputs.get(i).and_then(|&k| key_to_vk(k)).unwrap_or(UNBOUND);
+            for e in t.0.iter_mut().filter(|e| e.cmd == cmd && e.slot == slot) {
+                e.key = vk;
+            }
+        }
+    }
+}
+
+/// `<config dir>/d2rs/controls.toml` (`client/ui.md` §A6); `D2RS_CONFIG_DIR`
+/// overrides the config dir.
+pub fn config_path() -> Option<PathBuf> {
+    let var = |k: &str| std::env::var_os(k).map(PathBuf::from);
+    let dir = var("D2RS_CONFIG_DIR").or_else(|| {
+        if cfg!(windows) {
+            var("APPDATA")
+        } else if cfg!(target_os = "macos") {
+            var("HOME").map(|h| h.join("Library/Application Support"))
+        } else {
+            var("XDG_CONFIG_HOME").or_else(|| var("HOME").map(|h| h.join(".config")))
+        }
+    })?;
+    Some(dir.join("d2rs").join("controls.toml"))
+}
+
+/// The saved play bindings, when a valid `controls.toml` exists.
+pub fn saved_bindings() -> Option<Bindings> {
+    let path = config_path().filter(|p| p.is_file())?;
+    controls::load(&path).ok().map(|(_, b)| b)
+}
+
+/// The key-config table to open with: defaults, then `path` when it holds
+/// a valid file.
+pub fn load_table(path: Option<&Path>) -> BindingTable {
+    let mut t = BindingTable::defaults();
+    if let Some((_, b)) = path
+        .filter(|p| p.is_file())
+        .and_then(|p| controls::load(p).ok())
+    {
+        overlay_bindings(&mut t, &b);
+    }
+    t
+}
+
+/// Write `t` to `path` as `controls.toml` over the `dev` preset.
+pub fn save_table(t: &BindingTable, path: &Path) -> anyhow::Result<()> {
+    let eff = table_to_bindings(t);
+    let file = ControlsFile::from_effective(Preset::Dev, &eff)
+        .ok_or_else(|| anyhow::anyhow!("dev preset unavailable"))?;
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    std::fs::write(path, controls::write(&file))?;
+    Ok(())
+}
+
+// ---- the front-end screen ---------------------------------------------
+
+const KEY_BASE: u32 = 0x1000;
+const CELL_BASE: u32 = 0x2000;
+const BTN_BASE: u32 = 0x3000;
+const ARROW_UP: u32 = 0x4000;
+const ARROW_DOWN: u32 = 0x4001;
+
+/// The front-end screen. The model is shared so the host can draw it
+/// ([`ControlsScreen::model`] + [`ConfigureControls::draw_list`]).
+pub struct ControlsScreen {
+    model: Rc<RefCell<ConfigureControls>>,
+    path: Option<PathBuf>,
+}
+
+impl ControlsScreen {
+    pub fn new(path: Option<PathBuf>) -> Self {
+        Self {
+            model: Rc::new(RefCell::new(ConfigureControls::open(
+                false,
+                BindingTable::defaults(),
+            ))),
+            path,
+        }
+    }
+
+    pub fn model(&self) -> Rc<RefCell<ConfigureControls>> {
+        self.model.clone()
+    }
+
+    fn finish(&self, d: Done) -> Option<Trigger> {
+        match d {
+            Done::Stay => None,
+            // Cancel and Accept both return to the Options menu (the
+            // front end has no game to go back to).
+            Done::Cancel => Some(Trigger::Exit),
+            Done::Accept => {
+                if let Some(p) = &self.path {
+                    // d2rs-own: a failed write is logged, the screen closes.
+                    if let Err(e) = save_table(self.model.borrow().table(), p) {
+                        eprintln!("controls: {e}");
+                    }
+                }
+                Some(Trigger::Ok)
+            }
+        }
+    }
+}
+
+impl Screen for ControlsScreen {
+    fn build(&mut self, ctx: &mut FrontCtx) -> Vec<Control> {
+        *self.model.borrow_mut() =
+            ConfigureControls::open(ctx.expansion, load_table(self.path.as_deref()));
+        let mut v = Vec::new();
+        // Keys (capture): one invisible control per virtual key.
+        for vk in 1..=0xFEu16 {
+            v.push(Control::key_only(
+                vk,
+                Action::Custom(KEY_BASE + u32::from(vk)),
+            ));
+        }
+        // Key cells: rows are hit by `y ≤ T + 58 + 18r` (r4).
+        for r in 0..VISIBLE as i32 {
+            let (bottom, h) = (T + 59 + 18 * r, if r == 0 { 19 } else { 18 });
+            for (col, x, w) in [(1, M + 18, 2 * C), (0, M + 18 + 2 * C, C)] {
+                let mut c = Control::new(ControlKind::Button, x, bottom, w as u16, h)
+                    .with_action(Action::Custom(CELL_BASE + (r as u32) * 2 + col as u32));
+                c.visible = false;
+                v.push(c);
+            }
+        }
+        for (i, id) in [3974u32, 3972, 3973].into_iter().enumerate() {
+            let c = M + 206 * i as i32 + 103;
+            let mut b = Control::new(
+                ControlKind::Button,
+                c - BTN_HALF,
+                T + 367,
+                (2 * BTN_HALF) as u16,
+                38,
+            )
+            .with_string(id)
+            .with_action(Action::Custom(BTN_BASE + i as u32));
+            b.visible = false;
+            v.push(b);
+        }
+        for (id, y) in [(ARROW_UP, T + 47 + 13), (ARROW_DOWN, T + 305 + 13)] {
+            let mut a = Control::new(ControlKind::Button, W - M - 31, y, 12, 13)
+                .with_action(Action::Custom(id));
+            a.visible = false;
+            v.push(a);
+        }
+        v
+    }
+
+    fn action(&mut self, ctx: &mut FrontCtx, id: u32) -> Option<Trigger> {
+        let done = {
+            let mut m = self.model.borrow_mut();
+            match id {
+                k if (KEY_BASE..KEY_BASE + 0x100).contains(&k) => {
+                    let vk = (k - KEY_BASE) as u16;
+                    let was = m.editing();
+                    let d = m.key_down(vk, false, ctx.now_ms);
+                    // The host has no key-up event: the release of the
+                    // Enter that began editing is swallowed here (r5).
+                    if !was && m.editing() {
+                        m.key_up(vk, ctx.now_ms);
+                    }
+                    d
+                }
+                c if (CELL_BASE..CELL_BASE + 0x40).contains(&c) => {
+                    let n = c - CELL_BASE;
+                    m.click_cell((n / 2) as usize, (n % 2) as i32);
+                    Done::Stay
+                }
+                BTN_BASE => m.cancel(),
+                x if x == BTN_BASE + 1 => {
+                    m.default_all();
+                    Done::Stay
+                }
+                x if x == BTN_BASE + 2 => m.accept(),
+                ARROW_UP => {
+                    m.scroll(false);
+                    Done::Stay
+                }
+                ARROW_DOWN => {
+                    m.scroll(true);
+                    Done::Stay
+                }
+                _ => Done::Stay,
+            }
+        };
+        self.finish(done)
+    }
+}
+
+pub fn register(reg: &mut Registry) {
+    reg.register(CONTROLS, Box::new(ControlsScreen::new(config_path())));
+}
