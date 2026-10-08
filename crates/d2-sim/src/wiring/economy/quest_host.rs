@@ -480,7 +480,11 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         self.inner.den_region()
     }
     fn true_tomb_level(&self) -> u32 {
-        self.inner.true_tomb_level()
+        // The Act II DRLG's staff-tomb level (act index 1, `0x0061AEB0`).
+        match self.inner.econ.hooks.drlg.staff_tomb(1) {
+            Some(level) if level != 0 => level,
+            _ => self.inner.true_tomb_level(),
+        }
     }
     /// `0x00545340` from the player's path position and room
     /// ([`helpers::free_spot`]) when the player is in a DRLG room; else

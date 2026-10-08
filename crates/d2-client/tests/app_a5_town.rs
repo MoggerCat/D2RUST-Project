@@ -73,7 +73,7 @@ fn server_level(server: &app_support::Server<StepClock>) -> Option<u32> {
 // Covers: specs/world/npc.md §3, §8.3; specs/world/waypoints.md §7 r5
 #[test]
 fn harrogaths_npcs_and_waypoint_are_there_and_talk() {
-    for which in 0..single_player::ACT5_NPCS.len() {
+    for which in 0..d2_client::app::town_npcs::ACT5.len() {
         session(which);
     }
 }
@@ -158,10 +158,10 @@ fn session(which: usize) {
         "the Act V waypoint is in the model: {units:?}"
     );
     let mut failed = Vec::new();
-    for (idx, class) in single_player::ACT5_NPCS
+    for (class, dx) in d2_client::app::town_npcs::ACT5
         .into_iter()
-        .enumerate()
-        .filter(|(i, _)| *i == which)
+        .skip(which)
+        .take(1)
     {
         let Some(&(key, _)) = units
             .iter()
@@ -175,10 +175,7 @@ fn session(which: usize) {
             let (p, _) = single_player::local_player(&l.host().game).unwrap();
             let g = &mut l.host_mut().game;
             let room = g.game.lists.unit(p).and_then(|u| u.room());
-            let (x, y) = (
-                single_player::ACT5_NPC_X0 + 4 * idx as i32,
-                single_player::ACT5_NPC_Y + 3,
-            );
+            let (x, y) = (dx, single_player::UNIT_Y + 3);
             g.events
                 .action
                 .with(&mut g.game, |g, v| v.path_teleport(g, p, room, x, y));

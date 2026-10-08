@@ -63,7 +63,9 @@ pub fn maze_links(id: u32) -> Option<(u32, Option<u32>)> {
     if id == synthetic_maze::CAVE_LEVEL_1 {
         return Some((synthetic_maze::CAVE_TO_DEN, None));
     }
-    let i = TOWER_LEVELS.iter().position(|&l| l == id)?;
+    let Some(i) = TOWER_LEVELS.iter().position(|&l| l == id) else {
+        return super::synthetic_act2::maze_links(id);
+    };
     let back = if i == 0 { TOWER_TO_MARSH } else { up(i - 1) };
     let on = (i + 1 < TOWER_LEVELS.len()).then(|| down(i));
     Some((back, on))
@@ -71,7 +73,9 @@ pub fn maze_links(id: u32) -> Option<(u32, Option<u32>)> {
 
 /// The levels the maze generator builds: the cave and the Tower line.
 pub fn maze_levels() -> impl Iterator<Item = u32> {
-    std::iter::once(synthetic_maze::CAVE_LEVEL_1).chain(TOWER_LEVELS)
+    std::iter::once(synthetic_maze::CAVE_LEVEL_1)
+        .chain(TOWER_LEVELS)
+        .chain(super::synthetic_act2::dungeon_levels())
 }
 
 #[cfg(test)]
