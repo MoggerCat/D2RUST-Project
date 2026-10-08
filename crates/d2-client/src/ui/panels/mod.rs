@@ -13,6 +13,7 @@ pub mod char_details;
 pub mod char_inputs;
 pub mod character;
 pub mod control;
+pub mod inv_gold;
 pub mod inventory;
 pub mod menu_box;
 pub mod npc;
@@ -72,6 +73,17 @@ impl UiFiles {
             }
         }
         Self { names }
+    }
+
+    /// Adds names not yet registered (lowercased), keeping the ids of the
+    /// ones before.
+    pub fn extend(&mut self, names: impl IntoIterator<Item = String>) {
+        for n in names {
+            let n = n.to_ascii_lowercase();
+            if !self.names.contains(&n) {
+                self.names.push(n);
+            }
+        }
     }
 
     pub fn names(&self) -> &[String] {

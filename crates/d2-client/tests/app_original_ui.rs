@@ -71,6 +71,7 @@ fn panel_files() -> MemorySource {
         ("panel\\buysellbtn", 12),
         ("panel\\800borderframe", 10),
         ("panel\\800ctrlpnl7", 6),
+        ("panel\\goldcoinbtn", 2),
     ] {
         s.insert(&format!("data\\global\\ui\\{name}.dc6"), dc6(frames));
     }
@@ -132,9 +133,10 @@ fn hotkey_opens_the_inventory_in_the_apps_frame() {
     assert_eq!(original.open_mode().get(), 1);
     let state = app.world().resource::<WorldViewState>();
     let last = state.last.unwrap();
-    // Inventory art 4 + close 1, right border 5, control panel 6.
-    assert_eq!((last.items, last.ui_unhandled), (16, 1));
-    assert_eq!(state.assets.frames.len(), 8 + 12 + 10 + 6);
+    // Inventory art 4 + gold button 1 + close 1, right border 5, control
+    // panel 6 (no local player: no HUD overlay).
+    assert_eq!((last.items, last.ui_unhandled), (17, 1));
+    assert_eq!(state.assets.frames.len(), 8 + 12 + 10 + 6 + 2);
     let world = app.world().resource::<BridgeResource>().0.world();
     assert_eq!(state.feed.open_mode(world).unwrap().get(), 1);
 

@@ -92,6 +92,10 @@ ctrlpnl	base5	draw	panel\800ctrlpnl7	5	W-117	H	-	-	-	-	res2	0x004983D0
 1	art1	draw	panel\invchar	5	W-sx-320+256	H+sy-224	-	-	-	-	classic	0x0048EDF0
 1	art2	draw	panel\invchar	6	W-sx-320	H+sy-48	-	-	-	-	classic	0x0048EDF0
 1	art3	draw	panel\invchar	7	W-sx-320+256	H+sy-48	-	-	-	-	classic	0x0048EDF0
+1	gold	text	-	value	W-sx-212	H+sy-72	-	-	0	1	always	0x00488100
+1	goldbtn	draw	panel\goldcoinbtn	0	W-sx-236	H+sy-71	-	-	-	-	released	0x00488100
+1	goldbtn	draw	panel\goldcoinbtn	1	W-sx-236	H+sy-70	-	-	-	-	pressed	0x00488100
+1	goldbtn	hit	-	-	W-sx-237	H+sy-87	21	19	-	-	always	0x00486DA0
 1	close	draw	panel\buysellbtn	10	W-sx-302	H+sy-64	-	-	-	-	released	0x0048EDF0
 1	close	draw	panel\buysellbtn	11	W-sx-302	H+sy-64	-	-	-	-	pressed	0x0048EDF0
 1	close	hit	-	-	W-sx-302	H+sy-96	33	33	-	-	always	0x00486EF0

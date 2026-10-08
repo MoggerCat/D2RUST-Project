@@ -202,6 +202,16 @@ impl PanelArtLoader {
                 spec: SPEC,
                 message: format!("{archive}: {message}"),
             };
+            // d2rs-own, unverified (D1): the HUD's fill cels are made
+            // here; a HUD file no archive holds draws nothing (logged).
+            if let Some(frames) = crate::ui::original::hud::preview_set(
+                name,
+                || self.source.read_file(&archive).is_none(),
+                &assets.palette,
+            ) {
+                assets.frames.insert(set, frames)?;
+                continue;
+            }
             let bytes = self
                 .source
                 .read_file(&archive)

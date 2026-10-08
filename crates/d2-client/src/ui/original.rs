@@ -46,6 +46,7 @@ use super::panels::char_inputs;
 use super::panels::character::{
     self, CharacterPanel, CharacterView, ResistEffect, STAT_STATPTS, UI_CHARACTER,
 };
+use super::panels::inv_gold;
 use super::panels::inventory::{InventoryPanel, UI_INVENTORY};
 use super::panels::skilltree::{SkillEntry, SkillTreePanel, SkillTreeView, UI_SKILLTREE};
 use super::panels::{
@@ -77,11 +78,19 @@ pub const PENDING: &[(&str, &str)] = &[
     (
         "character labels, class line, resist effects, shift-spend (§8.6, §8.9; \
          `panels-2.md` §17 r3, r5–r9)",
-        "the values and the name line are bound ([`ModelCharacter`]); the labels and the \
-         class line need the string table by id (`StringLookup::get_id`, `NoStrings` in \
-         play), the resist effects (`0x0063A570` family) need the state tests, the damage \
-         block and popups need the skill list and `monstats`; Shift is not in the UI events \
-         (a spend is 1 point); the language is English (0, `ui/text.md` §1.2)",
+        "the values and the name line are bound ([`ModelCharacter`]); the labels need the \
+         string table by id (`StringLookup::get_id`, `NoStrings` in play); the class line \
+         needs the `charstats` class name (record +0, not in `ClientTables`); next level \
+         (§8.11) needs `experience.txt` (not in the model: the panel shows stat 30); the \
+         resist and defense effects (`panels-3.md` §24 r1, r3) need the `states.txt` flag \
+         masks (not in `StateRow`); the damage block and popups need the skill list and \
+         `monstats`; Shift is not in the UI events (a spend is 1 point); the language is \
+         English (0, `ui/text.md` §1.2)",
+    ),
+    (
+        "inventory gold button press / release and the gold dialog (`panels-2.md` §21 r3–r9)",
+        "the gold value and button art are drawn ([`InventoryUi`]); the press plays sound 4 \
+         and the release opens the gold dialog (`ui::gold`), neither wired to the adapter",
     ),
     (
         "inventory equipment backgrounds (§9.4)",
@@ -208,6 +217,8 @@ struct Shared {
     /// `difficultylevels` `ResistPenalty` by difficulty (§8.9, `0x00611D30`);
     /// an expansion game draws no values without it.
     resist_penalties: Option<Vec<i32>>,
+    /// The control panel overlays' state ([`hud`]).
+    hud: hud::HudState,
 }
 
 impl Shared {
@@ -273,6 +284,8 @@ pub struct OriginalUi {
     /// `NpcDialog`, for the bridge (`client/msg-ui.md` §16 r4.3, open
     /// question 10 decided as A).
     dialog_answer: Option<(Box<NpcDialog>, DialogCase)>,
+    /// The hire list (`ui/hire_list.rs`, `menus.md` §3).
+    pub(super) hire: super::hire_list::SharedHire,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -303,8 +316,10 @@ impl OriginalUi {
     /// by record (§9.2), `None` when the table is not loaded (the right
     /// panels then take no pointer event).
     pub fn new(config: UiConfig, inv_areas: Option<Vec<InvArea>>) -> Result<Self, LayoutError> {
+        let mut tables = PanelTables::load()?;
+        tables.files.extend(hud::hud_files());
         let shared = Shared {
-            tables: PanelTables::load()?,
+            tables,
             states: UiStates::new()?,
             config,
             inv_areas,
@@ -317,6 +332,7 @@ impl OriginalUi {
             outputs: Vec::new(),
             fonts: None,
             resist_penalties: None,
+            hud: hud::HudState::default(),
         };
         Ok(Self {
             shared: Rc::new(RefCell::new(shared)),
@@ -325,6 +341,7 @@ impl OriginalUi {
             more: MsgUiMore::default(),
             npc_text: None,
             dialog_answer: None,
+            hire: super::hire_list::SharedHire::default(),
         })
     }
 
@@ -346,9 +363,17 @@ impl OriginalUi {
             panel: CharacterPanel::default(),
         }))?;
         root.add(Box::new(BorderUi { sh: sh.clone() }))?;
+        root.add(Box::new(super::hire_list::HireListUi {
+            st: self.hire.clone(),
+        }))?;
+        root.open(super::hire_list::HIRE_PANEL)?;
+        root.add(Box::new(hud::HudUi { sh: sh.clone() }))?;
         // Not a UI state: open for good.
         root.open(BORDER_PANEL)?;
+        root.open(hud::HUD_PANEL)?;
         root.sync_states(&sh.borrow().states);
+        let sc = sh.borrow().config.screen;
+        self.hire.borrow_mut().screen = (sc.w, sc.h);
         Ok(())
     }
 
@@ -370,6 +395,19 @@ impl OriginalUi {
     /// (§8.9 expansion penalty, `0x00611D30`; `panels-2.md` §24 r2).
     pub fn set_resist_penalties(&mut self, penalties: Vec<i32>) {
         self.shared.borrow_mut().resist_penalties = Some(penalties);
+    }
+
+    /// The HUD's skill icon and experience tables ([`hud::HudTables`]).
+    pub fn set_hud_tables(&mut self, tables: hud::HudTables) {
+        self.shared.borrow_mut().hud.tables = tables;
+    }
+
+    /// The walk's run toggle for the run button (§6 r1); returns the
+    /// toggles the run button asked for since the last call (§10 r2).
+    pub fn sync_run(&mut self, running: bool) -> u32 {
+        let mut sh = self.shared.borrow_mut();
+        sh.hud.running = running;
+        std::mem::take(&mut sh.hud.run_toggles)
     }
 
     /// The flags.
@@ -491,7 +529,9 @@ fn is_click(e: UiEvent) -> bool {
 
 const EMPTY: Rect = Rect::new(0, 0, 0, 0);
 
-/// Inventory (ui 1, §9.3): art and close button.
+/// Inventory (ui 1, §9.3): art, the gold line and gold button (§9.6,
+/// `panels-2.md` §21 r1: the local player's full stat 14, drawn with the
+/// fonts bound as the character values are) and the close button.
 struct InventoryUi {
     sh: SharedRef,
     panel: InventoryPanel,
@@ -506,9 +546,16 @@ impl Panel for InventoryUi {
         self.sh.borrow().right_area().unwrap_or(EMPTY)
     }
 
-    fn draw(&self, _ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let sh = self.sh.borrow();
-        self.panel.draw(&sh.tables, &sh.env(), out);
+        // `0x00625480(P, 14, 0)`: the total, layer 0 (`stat-lists.md`
+        // §1 r3). Font16 is drawn only with the fonts bound (their DC6
+        // are then in the frame's assets).
+        let gold = match (&sh.fonts, local_player(ctx.world)) {
+            (Some(_), Some((key, _))) => Some(ctx.world.total(key, inv_gold::STAT_GOLD, 0)),
+            _ => None,
+        };
+        self.panel.draw(&sh.tables, &sh.env(), gold, out);
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {
@@ -889,6 +936,9 @@ impl Panel for BorderUi {
         UiResponse::Ignored
     }
 }
+
+#[path = "hud.rs"]
+pub mod hud;
 
 #[path = "msg_ui.rs"]
 pub mod msg_ui;
