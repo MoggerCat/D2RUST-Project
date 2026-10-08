@@ -8,7 +8,7 @@
 - Expiry: `expire_lists` already toggles the state off; the changed bit then gives 0xA9.
 
 ## PROVISIONAL
-REC-118 (players get the messages too).
+REC-120 (players get the messages too).
 
 ## Left
 Unit tints for colour states; client-side state hooks; a recorded aura trace.
