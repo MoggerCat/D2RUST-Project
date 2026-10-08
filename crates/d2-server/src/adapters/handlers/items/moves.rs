@@ -192,6 +192,7 @@ struct MoveRun<'m> {
 type MoveOut = (
     Option<Result<u32, MoveFatal>>,
     Vec<(Option<UnitId>, Vec<u8>)>,
+    Vec<UnitId>,
 );
 
 impl MoveCall for MoveRun<'_> {
@@ -200,7 +201,8 @@ impl MoveCall for MoveRun<'_> {
         let mut d = parts.desk(econ);
         let guid = d.guid_of(self.player);
         let r = sim_moves::handle(&mut d, guid, self.msg);
-        (r, take_sent(&mut d))
+        let portals = d.take_portal_requests();
+        (r, take_sent(&mut d), portals)
     }
 }
 
@@ -226,7 +228,11 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
     // Every item-move id has a fixed size ≤ 17 (`client-messages.tsv`).
     let msg = &msg[..size.min(msg.len())];
     let (game, events) = (&mut sim.game, &mut sim.events);
-    let (run, sent) = sim.world.moves(game, events, MoveRun { player, msg })?;
+    let (run, sent, portals) = sim.world.moves(game, events, MoveRun { player, msg })?;
+    // REC-117: a used Town Portal scroll / tome opens its pair.
+    for p in portals {
+        sim.world.town_portal(game, events, p);
+    }
     let mut faults = Vec::new();
     for (unit, bytes) in sent {
         // §3.2 rule 1: a unit without a client receives nothing.

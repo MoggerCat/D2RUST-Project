@@ -186,6 +186,11 @@ pub const WAYPOINT_X: i32 = 20;
 pub const SYNTHETIC_CHEST_CLASS: u32 = 1;
 const SYNTHETIC_CHEST_OPERATE: u8 = 4;
 const SYNTHETIC_CHEST_INIT: u8 = 3;
+/// The synthetic town portal row's class, operate function and init
+/// function (`object-functions.tsv`; REC-117).
+pub const SYNTHETIC_PORTAL_CLASS: u32 = 59;
+const SYNTHETIC_PORTAL_OPERATE: u8 = 15;
+const SYNTHETIC_PORTAL_INIT: u8 = 11;
 pub const UNIT_Y: i32 = 20;
 /// Akara's x in the synthetic town room (sub-tiles from its origin).
 pub const AKARA_X: i32 = 28;
@@ -612,6 +617,12 @@ impl Pending for LocalSeams {
     fn object_in_range(&self, _: &Game, _: UnitId, _: UnitId) -> bool {
         true
     }
+    /// d2rs-own, unverified (REC-117): the preview has no quest records,
+    /// so every player has one and the portal's quest gate (§12 rule 7)
+    /// is the level's own `leveldefs` flag.
+    fn object_quest_record(&self, _: UnitId) -> bool {
+        true
+    }
     /// d2rs-own, unverified (stitch-objects): the preview's interact reach.
     fn object_preview_range(&self) -> Option<i32> {
         Some(crate::world_view::object_click::INTERACT_RANGE)
@@ -762,9 +773,20 @@ impl WaypointTables {
         chest.operatefn = SYNTHETIC_CHEST_OPERATE;
         chest.initfn = SYNTHETIC_CHEST_INIT;
         chest.framecnt1 = 15 << 8;
+        // Class 59: the town portal (`objects.md` §12), padded rows
+        // before it are blank. d2rs-own, unverified (REC-117).
+        let mut portal: Objects = blank();
+        portal.operatefn = SYNTHETIC_PORTAL_OPERATE;
+        portal.initfn = SYNTHETIC_PORTAL_INIT;
+        portal.framecnt1 = 15 << 8;
+        portal.sizex = 1;
+        portal.sizey = 1;
+        let mut objects = vec![o, chest];
+        objects.resize(SYNTHETIC_PORTAL_CLASS as usize, blank());
+        objects.push(portal);
         WaypointTables {
             levels,
-            objects: vec![o, chest],
+            objects,
             object_class: 0,
         }
     }
@@ -1508,6 +1530,9 @@ impl GameParts {
                 objects: wp.objects.clone(),
                 shrines: Vec::new(),
                 levels: wp.levels.clone(),
+                // The portal's quest gate reads a record per level
+                // (`objects.md` §12 rule 7): blank, no gate (REC-117).
+                leveldefs: vec![blank(); wp.levels.len()],
                 ..ObjectTables::default()
             },
             monstats: synthetic_monstats(),

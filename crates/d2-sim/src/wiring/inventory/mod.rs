@@ -47,6 +47,7 @@ pub mod pending;
 pub mod potion;
 pub mod queries;
 pub mod save_index;
+pub mod town_portal;
 pub mod units;
 
 #[cfg(test)]
@@ -113,6 +114,9 @@ pub struct InvState {
     /// on when its rest answers the equipment seams (the skill list,
     /// player data mouse slots, stat links).
     pub equip_rules: bool,
+    /// Town Portal scroll / tome uses of the call, taken by the host
+    /// ([`InvDesk::take_portal_requests`], REC-117).
+    pub portal_requests: Vec<UnitId>,
     /// Equipment-rule calls the inventory functions asked for while the
     /// owner's inventory was lent to them ([`InvDesk::with_inv`]); run
     /// when the call returns, before the owner refreshes.

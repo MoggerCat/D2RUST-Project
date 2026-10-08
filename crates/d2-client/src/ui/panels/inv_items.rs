@@ -313,6 +313,46 @@ impl ItemsUi {
         intent.map(PanelOutput::Intent).into_iter().collect()
     }
 
+    /// Right mouse down in the inventory panel (d2rs-own, REC-117): on a
+    /// page-0 grid item with no item on the cursor, C→S 0x20 UseGridItem
+    /// (`inventory-moves.md` §7.11) with the local player's point; the
+    /// server decides whether the item can be used.
+    pub fn use_press(
+        &self,
+        world: &ClientWorld,
+        layout: &InvLayout,
+        at: Point,
+    ) -> Vec<PanelOutput> {
+        let g = &layout.grid;
+        if g.cell_w == 0 || g.cell_h == 0 || !g.contains_mouse(at) {
+            return Vec::new();
+        }
+        if items::cursor_item(world).is_some() {
+            return Vec::new();
+        }
+        let (c, r) = g.mouse_cell(at);
+        let (c, r) = (c as i32, r as i32);
+        let hit = items::local_items(world).into_iter().find(|i| {
+            let (w, h) = self.art.get(i.code.unwrap_or([0; 4])).map_or((1, 1), |a| {
+                (i32::from(a.inv_w.max(1)), i32::from(a.inv_h.max(1)))
+            });
+            let (x, y) = (i32::from(i.x), i32::from(i.y));
+            i.mode == mode::STORED
+                && i.page == 0
+                && (x..x + w).contains(&c)
+                && (y..y + h).contains(&r)
+        });
+        let (Some(it), Some((px, py))) = (hit, world.local().and_then(|p| p.position)) else {
+            return Vec::new();
+        };
+        let m = d2_proto::client::UseGridItem {
+            item: it.key.guid,
+            x: u32::from(px),
+            y: u32::from(py),
+        };
+        vec![PanelOutput::Intent(ClientIntent::from_message(&m))]
+    }
+
     pub(super) fn grid_press(
         &self,
         files: &UiFiles,

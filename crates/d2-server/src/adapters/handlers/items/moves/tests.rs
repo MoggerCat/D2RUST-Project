@@ -65,6 +65,8 @@ const TWO_HANDER: usize = 3;
 const SHIELD: usize = 4;
 const HP1: usize = 5;
 const KEY: usize = 6;
+const TSC: usize = 7;
+const TBK: usize = 8;
 const SCROLL: usize = 7;
 const BOOK: usize = 8;
 
@@ -1222,6 +1224,23 @@ fn use_belt_item() {
     assert_eq!(bytes.len(), 1);
     assert_eq!(&bytes[0][..2], &[0x9D, 0x05]);
     assert!(t.rest.take_log().is_empty());
+}
+
+/// 0x20 (§7.11) of a Town Portal scroll (REC-117): used and consumed
+/// (0x9D with flag 0x20); a tome is used and stays.
+// Covers: specs/items/inventory-moves.md §7.11
+#[test]
+fn use_town_portal_scroll_and_tome() {
+    let mut t = setup();
+    let s = t.picked(TSC);
+    let (code, bytes) = t.frame(&msg(0x20, &[s, 0, 0]));
+    assert_eq!(code, Done);
+    assert!(bytes.iter().any(|m| m[0] == 0x9D), "{bytes:?}");
+    // A tome is not consumed by the move handler (REC-117).
+    let b = t.picked(TBK);
+    let (code, bytes) = t.frame(&msg(0x20, &[b, 0, 0]));
+    assert_eq!(code, Done);
+    assert!(!bytes.iter().any(|m| m[0] == 0x9D), "{bytes:?}");
 }
 
 /// 0x63 (§7.24): a stored potion to the first free belt slot. The two

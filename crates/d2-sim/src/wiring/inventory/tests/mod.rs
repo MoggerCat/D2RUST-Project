@@ -21,6 +21,7 @@ mod mutant_tests;
 mod queries;
 mod save_index;
 mod stack;
+mod town_portal;
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
@@ -69,6 +70,8 @@ const T_SWOR: u16 = 30;
 const T_HELM: u16 = 37;
 const T_KEY: u16 = 41;
 const T_TKNI: u16 = 42;
+const T_BOOK: u16 = 18;
+const T_SCRO: u16 = 22;
 const T_WEAP: u16 = 45;
 const T_ARMO: u16 = 50;
 const T_MISC: u16 = 52;
@@ -145,7 +148,7 @@ fn equiv() -> EquivMatrix {
 /// (code, type, invwidth, invheight, reqstr, autobelt, useable, stackable,
 /// maxstack, durability) per record.
 type Row = ([u8; 4], u16, u8, u8, u16, u8, u8, u8, u32, u8);
-const ROWS: [Row; 11] = [
+const ROWS: [Row; 13] = [
     (*b"cap ", T_HELM, 2, 2, 0, 0, 0, 0, 0, 12),
     (*b"gld ", T_GOLD, 1, 1, 0, 0, 0, 0, 0, 0),
     (*b"ssd ", T_SWOR, 1, 3, 0, 0, 0, 0, 0, 24),
@@ -157,7 +160,11 @@ const ROWS: [Row; 11] = [
     (*b"tkf ", T_TKNI, 1, 2, 0, 0, 0, 1, 50, 20),
     (*b"hlm ", T_HELM, 2, 2, 50, 0, 0, 0, 0, 12),
     (*b"isc ", T_MISC, 1, 1, 0, 0, 1, 0, 0, 0),
+    (*b"tsc ", T_SCRO, 1, 1, 0, 0, 1, 0, 0, 0),
+    (*b"tbk ", T_BOOK, 1, 2, 0, 0, 1, 1, 20, 0),
 ];
+pub const TSC: usize = 11;
+pub const TBK: usize = 12;
 
 /// The items creation reads (`items::ItemTables`).
 pub fn item_tables() -> ItemTables {

@@ -519,6 +519,7 @@ impl<X: Pending> View<'_, X> {
         let r = with_objects(game, self, |ctl, t, w| {
             objects::operate_in_range(ctl, t, w, operator, guid)
         })?;
+        self.flush_portal_removals(game, operator);
         log(self, r)
     }
 
@@ -1283,6 +1284,9 @@ impl<X: Pending> MiscWorld for ObjectView<'_, X> {
         self.v.h.x.object_party_id(unit)
     }
     fn portal_partner(&mut self, object: UnitId) -> Option<UnitId> {
+        if let Some(l) = self.v.h.portals.partner(object) {
+            return Some(l);
+        }
         self.v.h.x.object_portal_partner(self.game, object)
     }
     fn has_quest_record(&self, player: UnitId) -> bool {
@@ -1295,7 +1299,14 @@ impl<X: Pending> MiscWorld for ObjectView<'_, X> {
         self.v.h.x.object_quest_bit(player, quest, bit)
     }
     fn player_portal_guid(&self, player: UnitId) -> u32 {
-        self.v.h.x.object_portal_guid(player)
+        let own = self
+            .v
+            .h
+            .portals
+            .field_portal(player)
+            .and_then(|f| self.game.lists.unit(f))
+            .map(|e| e.guid);
+        own.unwrap_or_else(|| self.v.h.x.object_portal_guid(player))
     }
     fn level_spawn_point(&mut self, level: u32) -> Option<(RoomId, i32, i32)> {
         self.v.h.x.object_level_spawn(self.game, level)
@@ -1312,6 +1323,9 @@ impl<X: Pending> MiscWorld for ObjectView<'_, X> {
     }
     fn remove_portal(&mut self, object: UnitId) {
         self.v.h.x.object_remove_portal(self.game, object);
+        // The unit is freed once the object call returns
+        // ([`View::flush_portal_removals`]: the object state is lent).
+        self.v.h.portals.doom(object);
     }
     fn portal_act5_hook(&mut self, partner: UnitId) {
         self.v.h.x.object_portal_act5(partner);
