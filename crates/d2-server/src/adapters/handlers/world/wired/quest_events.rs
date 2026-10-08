@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 use d2_sim::game::Game;
 use d2_sim::units::UnitId;
 use d2_sim::wiring::action::{Pending, QuestEvent};
-use d2_sim::world::quests::{act2, QuestWorld};
+use d2_sim::world::quests::{act2, act5, QuestWorld};
 
 use super::{quest_call, ActionEvents, TradeRest, WiredWorld};
 
@@ -71,6 +71,13 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                         QuestEvent::StaffAssembled { player } => {
                             act2::q2::staff_assembled(q, w, player)
                         }
+                        QuestEvent::ShenkActivated { unit } => {
+                            act5::q1::shenk_activated(q, w, unit)
+                        }
+                        QuestEvent::NihlathakActivated => act5::q4::nihlathak_ai_status(q, w),
+                        QuestEvent::AncientsDisarm => act5::q5::disarm(q),
+                        QuestEvent::BaalToStairs => act5::q6::chamber_open(q, w),
+                        QuestEvent::AnyaOpenPortal { unit } => act5::q4::anya_ai_portal(q, w, unit),
                         _ => {}
                     }
                 }

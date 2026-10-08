@@ -29,7 +29,7 @@ use crate::wiring::interaction::NpcRest;
 use super::{Economy, EconomyQuests, GameFields, HostQuests, QuestRest};
 use crate::world::objects::{Dispatch, EventRun, Operate, Route};
 use crate::world::quests::act3::{self, InitPoint, KhalimChest};
-use crate::world::quests::{self, act1, act2, QuestControl, QuestWorld};
+use crate::world::quests::{self, act1, act2, act5, QuestControl, QuestWorld};
 
 /// What running one queued route did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -192,6 +192,24 @@ pub fn init_fn(n: u8) -> Option<u32> {
         54 => 0x0059_40E0,
         // CainPortal (`quests-act1-rest.md` §9 item 10).
         61 => 0x0059_4290,
+        // Act V objects (`quests-act5.md` §1.4).
+        62 => 0x0058_86A0,
+        63 => 0x0058_D150,
+        64 => 0x0058_D190,
+        65 => 0x0058_D110,
+        66 => 0x0058_EAC0,
+        67 => 0x0058_A5B0,
+        68 => 0x0058_A610,
+        69 => 0x0058_A6C0,
+        70 => 0x0058_7830,
+        71 => 0x0058_7840,
+        72 => 0x0058_D240,
+        73 => 0x0058_D280,
+        74 => 0x0058_AA50,
+        75 => 0x0058_E670,
+        76 => 0x0058_D640,
+        77 => 0x0058_E710,
+        79 => 0x0058_E830,
         _ => return None,
     })
 }
@@ -233,6 +251,17 @@ pub fn operate_fn(n: u8) -> Option<u32> {
         41 => 0x0059_9CF0,
         // SanctuaryTome (§6.7).
         42 => 0x0059_B970,
+        // Act V objects (`quests-act5.md` §1.4).
+        62 => 0x0058_D1E0,
+        63 => 0x0058_D200,
+        64 => 0x0058_D220,
+        65 => 0x0058_D310,
+        66 => 0x0058_D400,
+        67 => 0x0058_ABC0,
+        69 => 0x0058_D5E0,
+        70 => 0x0058_E6A0,
+        71 => 0x0058_D6A0,
+        72 => 0x0058_E740,
         _ => return None,
     })
 }
@@ -306,7 +335,22 @@ fn init<W: QuestWorld>(
         // (`quests-act1-rest.md` §9 item 2).
         54 => act1::q4::marker_init(ctl, w, object, c.room, c.x, c.y),
         61 => act1::q4::cain_portal_init(w, object),
-        // 31–33: `ret`.
+        62 => act5::q2::cage_init(ctl, w, object),
+        // The statue's class (474–476) picks its slot (part 2 §7.8).
+        63..=65 => act5::q5::statue_init(ctl, w, object, c.class),
+        66 => act5::q3::anya_town_dummy_init(ctl, w, object),
+        67 => act5::q3::anya_dummy_init(ctl, w, object),
+        68 => act5::q3::nihlathak_town_dummy_init(ctl, w, object),
+        69 => act5::q3::nihlathak_temple_dummy_init(ctl, w, object),
+        71 => act5::q1::larzuk_dummy_init(ctl, w, object),
+        72 => act5::q5::altar_init(ctl, w, object),
+        73 => act5::q5::keep_door_init(ctl, w, object),
+        74 => act5::q3::frozen_anya_init(ctl, w, object),
+        75 => act5::q6::portal_init(ctl, w, object),
+        76 => act5::q5::summit_door_init(ctl, w, object),
+        77 => act5::q6::last_portal_init(ctl, w, object),
+        79 => act5::q6::zoo_init(ctl, w),
+        // 31–33 and 70: `ret`.
         _ => {}
     }
     QuestObjectRun::Ran
@@ -366,6 +410,30 @@ fn operate<W: QuestWorld>(
             act2::q2::staff_chest(ctl, w, o, player);
         }
         42 => act2::q4::tome_operate(ctl, w, o, player),
+        62..=64 => {
+            act5::q5::statue_operate(w, player);
+        }
+        65 => {
+            act5::q5::altar_operate(ctl, w, o, player);
+        }
+        66 => {
+            act5::q5::keep_door_operate(ctl, w, o, player);
+        }
+        67 => {
+            act5::q3::frozen_anya_operate(ctl, w, o, player);
+        }
+        69 => {
+            act5::q5::invisible_ancient_operate(w, o, player);
+        }
+        70 => {
+            act5::q6::portal_operate(ctl, w, player);
+        }
+        71 => {
+            act5::q5::summit_door_operate(ctl, w, o, player);
+        }
+        72 => {
+            act5::q6::last_portal_operate(ctl, w, player);
+        }
         _ => return QuestObjectRun::HandBack(c.route),
     }
     QuestObjectRun::Ran
@@ -423,6 +491,18 @@ mod tests {
             assert!(init_fn(n).is_some(), "init {n}");
         }
         for n in [24, 25, 34, 39, 40, 41, 42] {
+            assert!(operate_fn(n).is_some(), "operate {n}");
+        }
+    }
+
+    #[test]
+    fn act_v_functions_are_stated() {
+        for n in [
+            62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 79,
+        ] {
+            assert!(init_fn(n).is_some(), "init {n}");
+        }
+        for n in [62, 63, 64, 65, 66, 67, 69, 70, 71, 72] {
             assert!(operate_fn(n).is_some(), "operate {n}");
         }
     }

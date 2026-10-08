@@ -646,9 +646,22 @@ impl Pending for LocalSeams {
                 .quest_events
                 .push(QuestEvent::RadamentActivated { unit }),
             QuestCall::SummonerActivated => self.quest_events.push(QuestEvent::SummonerActivated),
+            // d2rs-own, unverified (REC-148): the Act V AI calls.
+            QuestCall::Shenk => self.quest_events.push(QuestEvent::ShenkActivated { unit }),
+            QuestCall::Nihlathak => self.quest_events.push(QuestEvent::NihlathakActivated),
+            QuestCall::BaalToStairs => self.quest_events.push(QuestEvent::BaalToStairs),
+            QuestCall::AncientsNotActivatable => {
+                self.quest_events.push(QuestEvent::AncientsDisarm);
+                return false;
+            }
             _ => return false,
         }
         true
+    }
+    /// d2rs-own, unverified (REC-148): Anya's AI asks for the temple portal.
+    fn anya_open_portal(&mut self, _: &mut Game, unit: UnitId) {
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::AnyaOpenPortal { unit });
     }
     /// `0x0061AEB0`: the Act II staff tomb, the orifice's level.
     fn object_staff_tomb(&self) -> u32 {
