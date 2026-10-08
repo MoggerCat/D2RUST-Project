@@ -34,8 +34,8 @@ use std::sync::Arc;
 
 use d2_data::bin::BinSet;
 use d2_data::tables::{
-    decode_all, Armor, Itemstatcost, Magicprefix, Magicsuffix, Misc, Rareprefix, Raresuffix,
-    Record, Setitems, Sets, Skilldesc, Skills, Uniqueitems, Weapons,
+    decode_all, Armor, Charstats, Itemstatcost, Magicprefix, Magicsuffix, Misc, Monstats, Montype,
+    Rareprefix, Raresuffix, Record, Setitems, Sets, Skilldesc, Skills, Uniqueitems, Weapons,
 };
 use d2_proto::item_bits::{decode, ItemBits, Stat};
 use d2_server::adapters::item_bits::TablesLookup;
@@ -43,7 +43,7 @@ use d2_sim::items::ItemTables;
 
 use super::draw::{ImageRef, ImageRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
 use super::geom::{Point, Rect};
-use super::item_tip_desc as desc;
+use super::item_tip_desc::{self as desc, StatDesc};
 use super::item_tip_set as set;
 use super::original::hud::{FILL_FILE, FILL_H, FILL_W};
 use super::original::FontMeasure;
@@ -109,17 +109,6 @@ struct CodeText {
     req_lvl: u8,
 }
 
-/// The description columns of an `itemstatcost` row.
-#[derive(Clone, Copy, Debug, Default)]
-struct StatDesc {
-    priority: u16,
-    func: u8,
-    val: u8,
-    pos: u16,
-    neg: u16,
-    str2: u16,
-}
-
 /// What the tips read from the tables and strings.
 #[derive(Clone)]
 pub struct ItemTips {
@@ -137,8 +126,14 @@ pub struct ItemTips {
     /// set line at the foot of a set item's tip).
     set_of_item: Vec<u16>,
     set_names: Vec<u16>,
-    /// Per skill: its name string id and its class (255: none).
-    skills: Vec<(u16, u8)>,
+    /// Per skill: its skilldesc name string id (`None`: no skilldesc
+    /// row) and its `charclass` (255: none).
+    skills: Vec<(Option<u16>, u8)>,
+    /// Per charstats row: the class strings (`item-tips.md` §7.2).
+    class_strings: Vec<desc::ClassStrings>,
+    /// Montype `strplur` and monstats `NameStr` per row.
+    montype: Vec<u16>,
+    monstats: Vec<u16>,
     strings: Arc<dyn StringLookup + Send + Sync>,
 }
 
@@ -199,6 +194,16 @@ impl ItemTips {
                 pos: r.descstrpos,
                 neg: r.descstrneg,
                 str2: r.descstr2,
+                dgrp: r.dgrp,
+                dgrpfunc: r.dgrpfunc,
+                dgrpval: r.dgrpval,
+                dgrppos: r.dgrpstrpos,
+                dgrpneg: r.dgrpstrneg,
+                dgrpstr2: r.dgrpstr2,
+                op: r.op,
+                op_param: r.op_param,
+                op_base: r.op_base,
+                valshift: r.valshift,
             })
             .collect();
         Ok(ItemTips {
@@ -236,13 +241,21 @@ impl ItemTips {
                 rows::<Skills>(set)?
                     .iter()
                     .map(|r| {
-                        let name = descs
-                            .get(usize::from(r.skilldesc))
-                            .map_or(0, |d| d.str_name);
+                        let name = descs.get(usize::from(r.skilldesc)).map(|d| d.str_name);
                         (name, r.charclass)
                     })
                     .collect()
             },
+            class_strings: rows::<Charstats>(set)?
+                .iter()
+                .map(|r| desc::ClassStrings {
+                    all_skills: r.strallskills,
+                    tabs: [r.strskilltab1, r.strskilltab2, r.strskilltab3],
+                    class_only: r.strclassonly,
+                })
+                .collect(),
+            montype: rows::<Montype>(set)?.iter().map(|r| r.strplur).collect(),
+            monstats: rows::<Monstats>(set)?.iter().map(|r| r.namestr).collect(),
             strings,
         })
     }
@@ -251,6 +264,30 @@ impl ItemTips {
         let k = names.get(i)?;
         let t = self.strings.get(k)?;
         Some(String::from_utf16_lossy(t))
+    }
+
+    /// The name of magic affix id `id` as sent (`items/affixes.md` §1 r1
+    /// with `bitstream.md` §4.2: prefixes arrive as their magicprefix row
+    /// + 1, suffixes as their magicsuffix row + 1; 0 = none).
+    fn magic_name(&self, names: &[String], id: u16) -> Option<String> {
+        let row = usize::from(id).checked_sub(1)?;
+        self.text_by_key(names, row)
+    }
+
+    /// The rare name of rare id `id` (`items/affixes.md` §1 r1: combined
+    /// index + 1 in the rare array, raresuffix rows first, then
+    /// rareprefix; sent unchanged, `bitstream.md` §4.3 r5). `prefix`
+    /// picks the part the slot holds; an id outside that part is none.
+    fn rare_name(&self, id: u8, prefix: bool) -> Option<String> {
+        let combined = usize::from(id).checked_sub(1)?;
+        let n = self.rare_suffix.len();
+        if prefix {
+            self.text_by_key(&self.rare_prefix, combined.checked_sub(n)?)
+        } else if combined < n {
+            self.text_by_key(&self.rare_suffix, combined)
+        } else {
+            None
+        }
     }
 
     fn base_name(&self, code: [u8; 4]) -> String {
@@ -299,28 +336,21 @@ impl ItemTips {
             match q {
                 quality::MAGIC => {
                     let (p, s) = qf.magic.unwrap_or((0, 0));
-                    let pre = self.text_by_key(&self.magic_prefix, usize::from(p));
-                    let suf = self.text_by_key(&self.magic_suffix, usize::from(s));
+                    let pre = self.magic_name(&self.magic_prefix, p);
+                    let suf = self.magic_name(&self.magic_suffix, s);
                     let mut n = String::new();
-                    if p != 0 {
-                        n.extend(pre.map(|t| t + " "));
-                    }
+                    n.extend(pre.map(|t| t + " "));
                     n += &base;
-                    if s != 0 {
-                        n.extend(suf.map(|t| format!(" {t}")));
-                    }
+                    n.extend(suf.map(|t| format!(" {t}")));
                     out.push(TipLine::new(n, name_color));
                 }
                 quality::RARE | quality::CRAFTED => {
                     if let Some((a, c)) = qf.rare_names {
-                        let n = [
-                            self.text_by_key(&self.rare_prefix, usize::from(a)),
-                            self.text_by_key(&self.rare_suffix, usize::from(c)),
-                        ]
-                        .into_iter()
-                        .flatten()
-                        .collect::<Vec<_>>()
-                        .join(" ");
+                        let n = [self.rare_name(a, true), self.rare_name(c, false)]
+                            .into_iter()
+                            .flatten()
+                            .collect::<Vec<_>>()
+                            .join(" ");
                         if !n.is_empty() {
                             out.push(TipLine::new(n, name_color));
                         }
@@ -459,28 +489,13 @@ impl ItemTips {
         c
     }
 
-    /// (priority, text) of one stat; `None`: no description string.
+    /// (priority, text) of one stat (`item-tips.md` §7); `None`: no line.
     fn property(&self, s: &Stat) -> Option<(u16, String)> {
         let d = self.stats.get(usize::from(s.stat))?;
-        let v = s.value();
-        let id = if v < 0 && d.neg != 0 { d.neg } else { d.pos };
-        if id == 0 {
-            return None;
-        }
-        let name = String::from_utf16_lossy(self.strings.get_id(id)?);
-        let name2 = self.strings.get_id(d.str2).map(String::from_utf16_lossy);
-        let text = desc::render(
-            &desc::Shape {
-                func: d.func,
-                val: d.val,
-                value: v,
-                param: s.param,
-                name: &name,
-                name2: name2.as_deref(),
-            },
-            self,
-        );
-        Some((d.priority, text))
+        let viewer = desc::Viewer::default();
+        let v = desc::value(self, &viewer, s.stat, s.value() as i32, false);
+        let text = desc::line(self, &viewer, &desc::Shape::own(d), v, s.param)?;
+        Some((d.priority, String::from_utf16_lossy(&text)))
     }
 
     /// The set bonus lines under a set item's name (REC-242).
@@ -543,13 +558,33 @@ pub fn shop_marks(mut lines: Vec<TipLine>, price: u32, usable: bool) -> Vec<TipL
 }
 
 impl desc::DescNames for ItemTips {
-    fn skill(&self, id: u32) -> Option<String> {
-        let (name, _) = self.skills.get(id as usize)?;
-        self.strings.get_id(*name).map(String::from_utf16_lossy)
+    fn string(&self, id: u16) -> Vec<u16> {
+        self.strings
+            .get_id(id)
+            .map(<[u16]>::to_vec)
+            .unwrap_or_default()
     }
-    fn skill_class(&self, id: u32) -> Option<u32> {
-        let (_, class) = self.skills.get(id as usize)?;
-        (*class < 7).then_some(u32::from(*class))
+    fn stat_desc(&self, s: u16) -> Option<StatDesc> {
+        self.stats.get(usize::from(s)).copied()
+    }
+    fn skill_name(&self, skill: u32) -> Option<u16> {
+        self.skills.get(skill as usize)?.0
+    }
+    fn skill_class(&self, skill: u32) -> Option<i8> {
+        let (_, class) = self.skills.get(skill as usize)?;
+        Some(*class as i8)
+    }
+    fn skill_count(&self) -> u32 {
+        self.skills.len() as u32
+    }
+    fn class_strings(&self, class: u32) -> Option<desc::ClassStrings> {
+        self.class_strings.get(class as usize).copied()
+    }
+    fn montype_name(&self, row: u32) -> Option<u16> {
+        self.montype.get(row as usize).copied()
+    }
+    fn monstats_name(&self, row: u32) -> Option<u16> {
+        self.monstats.get(row as usize).copied()
     }
 }
 
@@ -641,8 +676,8 @@ pub(crate) mod tests {
         s.encode_utf16().collect()
     }
 
-    /// A cap (name id 7, requires level 3), prefix 1 `Sturdy`, suffix 1
-    /// `Fox`, stat 1 described by string 9 (`descfunc` 1, value first).
+    /// A cap (name id 7, requires level 3), magicprefix row 0 `Sturdy`,
+    /// magicsuffix row 0 `Fox` (wire ids 1), stat 1 described by string 9 (`descfunc` 1, value first).
     pub(crate) fn tips() -> ItemTips {
         tips_with(ItemTables::default())
     }
@@ -679,6 +714,8 @@ pub(crate) mod tests {
                 (11, "Sigon's Steel"),
                 (12, "to Mana"),
                 (13, "Defense"),
+                (desc::sid::SP, " "),
+                (desc::sid::PLUS, "+"),
             ]
             .map(|(k, v)| (k, u16s(v)))
             .into(),
@@ -693,28 +730,26 @@ pub(crate) mod tests {
                     func: 1,
                     val: 1,
                     pos: 9,
-                    neg: 0,
-                    str2: 0,
+                    ..StatDesc::default()
                 },
                 StatDesc {
                     priority: 5,
                     func: 1,
                     val: 1,
                     pos: 12,
-                    neg: 0,
-                    str2: 0,
+                    ..StatDesc::default()
                 },
                 StatDesc {
                     priority: 5,
                     func: 3,
                     val: 1,
                     pos: 13,
-                    neg: 0,
-                    str2: 0,
+                    ..StatDesc::default()
                 },
             ],
-            magic_prefix: vec![String::new(), "Sturdy".into()],
-            magic_suffix: vec![String::new(), "Fox".into()],
+            // Row 0 of each (wire id 1, `affixes.md` §1 r1).
+            magic_prefix: vec!["Sturdy".into()],
+            magic_suffix: vec!["Fox".into()],
             rare_prefix: Vec::new(),
             rare_suffix: Vec::new(),
             unique: vec!["Greymaker".into()],
@@ -722,6 +757,9 @@ pub(crate) mod tests {
             set_of_item: vec![0],
             set_names: vec![11],
             skills: Vec::new(),
+            class_strings: Vec::new(),
+            montype: Vec::new(),
+            monstats: Vec::new(),
             strings: Arc::new(strs),
         }
     }
@@ -772,6 +810,48 @@ pub(crate) mod tests {
         t.codes.get_mut(b"cap ").expect("cap").req_lvl = 2;
         let lines = t.lines_of(&magic_cap(hflag::IDENTIFIED));
         assert!(lines.iter().any(|l| text(l) == "Required Level: 2"));
+    }
+
+    // Wire affix ids are row + 1 (0 = none); rare ids index the rare
+    // array with the raresuffix rows first.
+    // Covers: specs/items/affixes.md §1 r1
+    // Covers: specs/items/bitstream.md §4.2
+    #[test]
+    fn affix_ids_are_rows_plus_one() {
+        let mut t = tips();
+        t.magic_prefix = vec!["Sturdy".into(), "Strong".into()];
+        t.magic_suffix = vec!["Fox".into(), "Wolf".into()];
+        t.rare_suffix = vec!["Fox".into(), "Wolf".into()];
+        t.rare_prefix = vec!["Sturdy".into(), "Strong".into()];
+        let strs = Strs {
+            keys: [
+                ("Sturdy", "Sturdy"),
+                ("Strong", "Strong"),
+                ("Fox", "of the Fox"),
+                ("Wolf", "of the Wolf"),
+            ]
+            .map(|(k, v)| (k.to_owned(), u16s(v)))
+            .into(),
+            ids: HashMap::new(),
+        };
+        t.strings = Arc::new(strs);
+        let name = |p: u16, s: u16| t.magic_name(&t.magic_prefix, p).zip(Some(s));
+        assert_eq!(t.magic_name(&t.magic_prefix, 0), None);
+        assert_eq!(name(1, 0).map(|x| x.0).as_deref(), Some("Sturdy"));
+        assert_eq!(t.magic_name(&t.magic_prefix, 2).as_deref(), Some("Strong"));
+        assert_eq!(
+            t.magic_name(&t.magic_suffix, 2).as_deref(),
+            Some("of the Wolf")
+        );
+        assert_eq!(t.magic_name(&t.magic_suffix, 3), None);
+        // Rare: suffix ids 1–2, prefix ids 3–4.
+        assert_eq!(t.rare_name(0, false), None);
+        assert_eq!(t.rare_name(1, false).as_deref(), Some("of the Fox"));
+        assert_eq!(t.rare_name(2, false).as_deref(), Some("of the Wolf"));
+        assert_eq!(t.rare_name(3, false), None);
+        assert_eq!(t.rare_name(2, true), None);
+        assert_eq!(t.rare_name(3, true).as_deref(), Some("Sturdy"));
+        assert_eq!(t.rare_name(4, true).as_deref(), Some("Strong"));
     }
 
     #[test]

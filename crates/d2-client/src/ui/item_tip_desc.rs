@@ -1,261 +1,400 @@
-// Spec: specs/ui/inventory.md (§5 hover state), specs/data/runtime-maps.md (§3 description list)
-//! The text shapes of the `itemstatcost` `descfunc` values 1–28 for the
-//! item tool tip ([`super::item_tip`]).
+// Spec: specs/ui/item-tips.md (§7 one stat line `0x004E4D80`, §7.1 value and strings, §7.2 descfunc table)
+//! One property line of the item tool tip ([`super::item_tip`]): the
+//! value of §7.1 r2 and the 28 `descfunc` shapes of §7.2, with every fixed
+//! phrase taken from the string tables by id.
 //!
-//! PROVISIONAL (REC-242, `docs/HANDOFF.md` §7): no spec gives the
-//! description builder behind `0x004E60A0`, so the shapes are the
-//! community-documented ones of `itemstatcost.txt` (English text, string
-//! ids of the fixed phrases unknown); settled by the item hover capture
-//! (`ui/text.md` capture `text-0002`). d2rs-own, unverified.
+//! Text is UTF-16 as the original builds it; numbers are `%i` decimal.
+//! Unverified until the `text-0002` capture cases run (rule 10).
 
-/// Names the shapes need beyond the stat's own strings.
-pub trait DescNames {
-    /// The display name of skill `id` (`skills` → `skilldesc` name).
-    fn skill(&self, id: u32) -> Option<String>;
-    /// The character class (0–6) a skill belongs to.
-    fn skill_class(&self, id: u32) -> Option<u32>;
+use super::wformat::{format, Arg};
+
+/// Fixed string ids of §7 (`data/field-types.md` §7; English text in
+/// the comments).
+pub mod sid {
+    /// `%`
+    pub const PCT: u16 = 4001;
+    /// `+`
+    pub const PLUS: u16 = 4002;
+    /// `to`
+    pub const TO: u16 = 4003;
+    /// space
+    pub const SP: u16 = 3995;
+    /// `-`
+    pub const DASH: u16 = 3996;
+    /// `:`
+    pub const COLON: u16 = 3997;
+    /// LF
+    pub const NL: u16 = 3998;
+    /// `an evil force`: the name of a missing skill.
+    pub const EVIL: u16 = 5382;
+    /// `(Based on Character Level)`
+    pub const BASED: u16 = 11091;
+    /// `Repairs %d durability per second`
+    pub const REPAIR_SEC: u16 = 21241;
+    /// `Repairs %d durability in %d seconds`
+    pub const REPAIR_IN: u16 = 21242;
+    /// `Level`
+    pub const LEVEL: u16 = 21249;
+    /// By-time period lines for p = 0 … 3 (§7.2 f 17).
+    pub const PERIODS: [u16; 4] = [21235, 21237, 21234, 21236];
 }
 
-/// The input of one stat line.
-pub struct Shape<'a> {
-    /// `descfunc` (1–28).
+/// The description columns of an `itemstatcost` row that §7 reads.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct StatDesc {
+    pub priority: u16,
     pub func: u8,
-    /// `descval`: 0 no value, 2 after the text, else before it.
     pub val: u8,
-    /// The stat value (without `Save Add`).
-    pub value: i64,
-    /// The stat's param (layer).
-    pub param: u32,
-    /// `descstrpos` or `descstrneg`, resolved.
-    pub name: &'a str,
-    /// `descstr2`, resolved.
-    pub name2: Option<&'a str>,
+    pub pos: u16,
+    pub neg: u16,
+    pub str2: u16,
+    pub dgrp: u16,
+    pub dgrpfunc: u8,
+    pub dgrpval: u8,
+    pub dgrppos: u16,
+    pub dgrpneg: u16,
+    pub dgrpstr2: u16,
+    pub op: u8,
+    pub op_param: u8,
+    pub op_base: u16,
+    pub valshift: u8,
 }
 
-const CLASSES: [&str; 7] = [
-    "Amazon",
-    "Sorceress",
-    "Necromancer",
-    "Paladin",
-    "Barbarian",
-    "Druid",
-    "Assassin",
-];
+/// The `charstats` strings of a class (§7.2 f 13, 14, 27).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ClassStrings {
+    pub all_skills: u16,
+    pub tabs: [u16; 3],
+    pub class_only: u16,
+}
 
-const TABS: [&str; 21] = [
-    "Bow and Crossbow",
-    "Passive and Magic",
-    "Javelin and Spear",
-    "Fire",
-    "Lightning",
-    "Cold",
-    "Curses",
-    "Poison and Bone",
-    "Necromancer Summoning",
-    "Paladin Combat",
-    "Offensive Auras",
-    "Defensive Auras",
-    "Barbarian Combat",
-    "Masteries",
-    "Warcries",
-    "Druid Summoning",
-    "Shape Shifting",
-    "Elemental",
-    "Traps",
-    "Shadow Disciplines",
-    "Martial Arts",
-];
-
-fn signed(v: i64) -> String {
-    if v < 0 {
-        format!("-{}", -v)
-    } else {
-        format!("+{v}")
+/// What the shapes read beyond the stat's own row.
+pub trait DescNames {
+    /// String `id`'s text (empty when missing).
+    fn string(&self, id: u16) -> Vec<u16>;
+    /// The `itemstatcost` description row of stat `s` (`None`: invalid
+    /// stat, §7.1 r1).
+    fn stat_desc(&self, s: u16) -> Option<StatDesc>;
+    /// The skilldesc `str name` id of `skill` (`0x004E6CE0`); `None` on
+    /// any miss.
+    fn skill_name(&self, skill: u32) -> Option<u16>;
+    /// The skills row's `charclass` (+0x0C, signed; −1 classless);
+    /// `None`: no skills row.
+    fn skill_class(&self, skill: u32) -> Option<i8>;
+    /// Rows of the skills table.
+    fn skill_count(&self) -> u32;
+    /// The charstats strings of class row `class`.
+    fn class_strings(&self, class: u32) -> Option<ClassStrings>;
+    /// Montype row `row`'s `strplur` (+0x0A).
+    fn montype_name(&self, row: u32) -> Option<u16>;
+    /// Monstats row `row`'s `NameStr`.
+    fn monstats_name(&self, row: u32) -> Option<u16>;
+    /// The description list (`data/runtime-maps.md` §3): stats with
+    /// `descfunc` ≠ 0 by ascending `descpriority`.
+    fn desc_list(&self) -> Vec<u16> {
+        Vec::new()
+    }
+    /// The stats whose `dgrp` is `g` (§7.1 r3).
+    fn group_members(&self, g: u16) -> Vec<u16> {
+        let _ = g;
+        Vec::new()
     }
 }
 
-fn plain(v: i64) -> String {
-    v.to_string()
+/// The units a line may read (§7.1 r2 op base, §7.2 f 17 / 18 / 28).
+#[derive(Clone, Copy, Default)]
+pub struct Viewer<'a> {
+    /// The local player P's total of (stat, layer) (`None`: no player).
+    pub player: Option<&'a dyn Fn(u16, u16) -> i32>,
+    /// P's class (0–6).
+    pub player_class: Option<u8>,
+    /// The described unit's class when it is a player (§9 r3).
+    pub unit_class: Option<u8>,
+    /// The client act's base time for by-time values (`sim/stats.md` §8;
+    /// `None`: no act).
+    pub act_time: Option<i32>,
 }
 
-/// `v * 100 / 128` as a percent (descfunc 5 and 10).
-fn scaled(v: i64) -> i64 {
-    v * 100 / 128
+fn w(s: &str) -> Vec<u16> {
+    s.encode_utf16().collect()
 }
 
-/// The value and the text placed by `descval`.
-fn place(val: u8, v: &str, name: &str) -> String {
-    match val {
-        0 => name.to_owned(),
-        2 => format!("{name} {v}"),
-        _ => format!("{v} {name}"),
+/// `%i` of `v`.
+pub fn num(v: i64) -> Vec<u16> {
+    w(&v.to_string())
+}
+
+/// §7.1 r2: the shown value of stat `s` with list value `v` (`blunt`:
+/// the item is-a 57 `blun`, for stat 122).
+pub fn value(names: &dyn DescNames, viewer: &Viewer, s: u16, v: i32, blunt: bool) -> i64 {
+    let Some(d) = names.stat_desc(s) else {
+        return i64::from(v);
+    };
+    let mut v = i64::from(v);
+    if (2..=5).contains(&d.op) {
+        let base_shift = names.stat_desc(d.op_base).map_or(0, |b| b.valshift);
+        let base = viewer.player.map_or(0, |p| p(d.op_base, 0));
+        v = ((i64::from(base) >> base_shift) * v) >> d.op_param;
     }
+    v >>= d.valshift;
+    if s == 122 && blunt {
+        v += 50;
+    }
+    v
 }
 
-/// Replaces the first `%d`-style conversion of a printf format.
-fn printf(fmt: &str, v: i64) -> String {
-    for pat in ["%+d", "%d", "%i", "%u"] {
-        if let Some(i) = fmt.find(pat) {
-            let n = if pat == "%+d" { signed(v) } else { plain(v) };
-            return format!("{}{}{}", &fmt[..i], n, &fmt[i + pat.len()..]);
+/// The strings and shape one line is printed with (§7.1 r3: the group
+/// columns when the stat prints its group).
+#[derive(Clone, Copy, Debug)]
+pub struct Shape {
+    pub func: u8,
+    pub val: u8,
+    pub pos: u16,
+    pub neg: u16,
+    pub str2: u16,
+}
+
+impl Shape {
+    pub fn own(d: &StatDesc) -> Self {
+        Shape {
+            func: d.func,
+            val: d.val,
+            pos: d.pos,
+            neg: d.neg,
+            str2: d.str2,
         }
     }
-    fmt.to_owned()
+    pub fn group(d: &StatDesc) -> Self {
+        Shape {
+            func: d.dgrpfunc,
+            val: d.dgrpval,
+            pos: d.dgrppos,
+            neg: d.dgrpneg,
+            str2: d.dgrpstr2,
+        }
+    }
 }
 
-fn class_name(c: u32) -> &'static str {
-    CLASSES.get(c as usize).copied().unwrap_or("")
+/// `+N` when `plus`, else N.
+fn signed(names: &dyn DescNames, v: i64, plus: bool) -> Vec<u16> {
+    let mut out = Vec::new();
+    if plus {
+        out.extend(names.string(sid::PLUS));
+    }
+    out.extend(num(v));
+    out
 }
 
-/// The line of one stat.
-pub fn render(s: &Shape, names: &dyn DescNames) -> String {
-    let (v, n) = (s.value, s.name);
-    let skill = |id: u32| names.skill(id).unwrap_or_else(|| format!("Skill {id}"));
-    match s.func {
-        2 => place(s.val, &format!("{}%", plain(v)), n),
-        3 => place(s.val, &plain(v), n),
-        9 => per_level(s, &plain(v)),
-        4 => place(s.val, &format!("{}%", signed(v)), n),
-        5 => place(s.val, &format!("{}%", plain(scaled(v))), n),
-        6 => per_level(s, &signed(v)),
-        7 => per_level(s, &format!("{}%", plain(v))),
-        8 => per_level(s, &format!("{}%", signed(v))),
-        10 => per_level(s, &format!("{}%", plain(scaled(v)))),
-        11 => format!("Repairs 1 Durability In {} Seconds", 100 / v.max(1)),
-        13 => format!("{} to {} Skill Levels", signed(v), class_name(s.param)),
+/// §7.1 r5: value part and str placed by `descval`.
+fn place(names: &dyn DescNames, dv: u8, part: Vec<u16>, s: &[u16]) -> Vec<u16> {
+    let sp = names.string(sid::SP);
+    match dv {
+        0 => s.to_vec(),
+        2 => [s, &sp, &part].concat(),
+        _ => [&part, &sp, s].concat(),
+    }
+}
+
+fn fmt(f: &[u16], args: &[Arg<'_>]) -> Vec<u16> {
+    format(1024, Some(f), args).unwrap_or_default()
+}
+
+fn skill_text(names: &dyn DescNames, skill: u32) -> Vec<u16> {
+    names.string(names.skill_name(skill).unwrap_or(sid::EVIL))
+}
+
+/// §7: the line of stat value `v` (already §7.1 r2) at `layer` with
+/// shape `sh`. `None`: no line.
+pub fn line(
+    names: &dyn DescNames,
+    viewer: &Viewer,
+    sh: &Shape,
+    v: i64,
+    layer: u32,
+) -> Option<Vec<u16>> {
+    let str_ = names.string(if v >= 0 { sh.pos } else { sh.neg });
+    let pct = names.string(sid::PCT);
+    let sp = names.string(sid::SP);
+    let n = num(v);
+    let vi = v as i32;
+    let mut text = match sh.func {
+        1 | 6 => place(names, sh.val, signed(names, v, v > 0), &str_),
+        12 => {
+            let part = if v == 1 {
+                Vec::new()
+            } else {
+                signed(names, v, v > 0)
+            };
+            place(names, sh.val, part, &str_)
+        }
+        2 | 7 => place(names, sh.val, [&n[..], &pct].concat(), &str_),
+        3 | 9 => place(names, sh.val, n, &str_),
+        4 | 8 => {
+            let part = [&signed(names, v, v >= 0)[..], &pct].concat();
+            place(names, sh.val, part, &str_)
+        }
+        5 | 10 => {
+            let part = [&num(v * 100 / 128)[..], &pct].concat();
+            place(names, sh.val, part, &str_)
+        }
+        11 => {
+            if v > 0 {
+                let t = 2500 / v;
+                if t <= 30 {
+                    fmt(&names.string(sid::REPAIR_SEC), &[Arg::Int(1)])
+                } else {
+                    let secs = ((t + 12) / 25) as i32;
+                    fmt(
+                        &names.string(sid::REPAIR_IN),
+                        &[Arg::Int(1), Arg::Int(secs)],
+                    )
+                }
+            } else {
+                fmt(&names.string(sid::REPAIR_SEC), &[Arg::Int(25)])
+            }
+        }
+        13 => {
+            if v == 0 {
+                return None;
+            }
+            let c = names.class_strings(layer)?;
+            let s = names.string(c.all_skills);
+            match sh.val {
+                0 => Vec::new(),
+                dv => place(names, dv, signed(names, v, v > 0), &s),
+            }
+        }
         14 => {
-            let tab = TABS.get((s.param & 7) as usize + 3 * (s.param >> 3) as usize);
-            let class = class_name(s.param >> 3);
-            format!(
-                "{} to {} Skills ({class} Only)",
-                signed(v),
-                tab.copied().unwrap_or("")
-            )
+            let tab = layer & 7;
+            if tab > 2 {
+                return None;
+            }
+            let c = names.class_strings(layer >> 3)?;
+            let mut out = fmt(&names.string(c.tabs[tab as usize]), &[Arg::Int(vi)]);
+            out.extend(&sp);
+            out.extend(names.string(c.class_only));
+            out
         }
-        // `item-tips.md` §7.2 f15 / f24: skill = layer >> 6, level =
-        // layer & 0x3F.
-        15 => format!(
-            "{v}% Chance to cast level {} {} {n}",
-            s.param & 0x3F,
-            skill(s.param >> 6)
-        ),
-        16 => format!("Level {v} {} Aura When Equipped", skill(s.param)),
-        17 => place(s.val, &plain(v), n),
-        18 => place(s.val, &format!("{}%", plain(v)), n),
-        19 => printf(n, v),
-        20 => place(s.val, &format!("-{}%", plain(v.abs())), n),
-        21 => place(s.val, &format!("-{}", plain(v.abs())), n),
-        22 | 23 => place(s.val, &format!("{}%", plain(v)), n),
-        24 => format!(
-            "Level {} {} ({}/{} Charges)",
-            s.param & 0x3F,
-            skill(s.param >> 6),
-            v & 0xFF,
-            (v >> 8) & 0xFF
-        ),
+        15 | 24 => {
+            let (skill, level) = (layer >> 6, (layer & 0x3F) as i32);
+            if skill == 0 || skill >= names.skill_count() {
+                return None;
+            }
+            let name = skill_text(names, skill);
+            if sh.func == 15 {
+                // `%%` eats the 0 (`ui/text.md` §14).
+                fmt(
+                    &names.string(sh.pos),
+                    &[Arg::Int(vi), Arg::Int(0), Arg::Int(level), Arg::Str(&name)],
+                )
+            } else {
+                let charges = fmt(&str_, &[Arg::Int(vi & 0xFF), Arg::Int(vi >> 8)]);
+                [
+                    &names.string(sid::LEVEL)[..],
+                    &sp,
+                    &num(i64::from(level)),
+                    &sp,
+                    &name,
+                    &sp,
+                    &charges,
+                ]
+                .concat()
+            }
+        }
+        16 => {
+            let name = skill_text(names, layer);
+            fmt(&str_, &[Arg::Int(vi), Arg::Str(&name)])
+        }
+        17 | 18 => {
+            let p = (vi & 3) as usize;
+            let mut out = names.string(sid::PERIODS[p]);
+            out.extend(names.string(sid::NL));
+            let x = match viewer.act_time {
+                Some(t) => i64::from(d2_sim::stats::by_time(vi, t)),
+                None => i64::from(((vi >> 2) & 0x3FF) - 256),
+            };
+            let mut part = if x >= 0 {
+                signed(names, x, true)
+            } else if v < 0 {
+                num(x)
+            } else {
+                Vec::new()
+            };
+            if sh.func == 18 {
+                part.extend(&pct);
+            }
+            if sh.val != 0 {
+                out.extend(place(names, sh.val, part, &str_));
+            }
+            out
+        }
+        19 => fmt(&str_, &[Arg::Int(vi)]),
+        20 | 21 => {
+            let m = -v;
+            let part = [&signed(names, m, m >= 0)[..], &pct].concat();
+            place(names, sh.val, part, &str_)
+        }
+        22 => {
+            let part = [&signed(names, v, v >= 0)[..], &pct].concat();
+            let mut out = place(names, sh.val, part, &str_);
+            out.extend(names.string(sid::COLON));
+            out.extend(&sp);
+            let mt = names.montype_name(layer).or_else(|| names.montype_name(0));
+            out.extend(mt.map(|id| names.string(id)).unwrap_or_default());
+            out
+        }
+        23 => {
+            let name = names.monstats_name(layer)?;
+            let mut out = place(names, sh.val, [&n[..], &pct].concat(), &str_);
+            out.extend(&sp);
+            out.extend(names.string(name));
+            out
+        }
+        25 | 26 => place(names, sh.val, signed(names, v, v < 0), &str_),
         27 => {
-            let class = names.skill_class(s.param).map(class_name).unwrap_or("");
-            format!("{} to {} ({class} Only)", signed(v), skill(s.param))
+            let name = names.skill_name(layer).filter(|_| v != 0)?;
+            let mut out = signed(names, v, v > 0);
+            out.extend(&sp);
+            out.extend(names.string(sid::TO));
+            out.extend(&sp);
+            out.extend(names.string(name));
+            out.extend(&sp);
+            let class = names.skill_class(layer).unwrap_or(-1);
+            if (0..=6).contains(&class) {
+                if let Some(c) = names.class_strings(class as u32) {
+                    out.extend(names.string(c.class_only));
+                }
+            }
+            out
         }
-        28 => format!("{} to {}", signed(v), skill(s.param)),
-        // 1, 12 and the shapes not described.
-        _ => place(s.val, &signed(v), n),
+        28 => {
+            let class = names.skill_class(layer).filter(|_| v != 0)?;
+            let unit = viewer.unit_class.or(viewer.player_class);
+            let v = if unit.is_some_and(|u| i32::from(class) == i32::from(u)) && v > 3 {
+                3
+            } else {
+                v
+            };
+            let mut out = signed(names, v, v > 0);
+            out.extend(&sp);
+            out.extend(names.string(sid::TO));
+            out.extend(&sp);
+            out.extend(skill_text(names, layer));
+            out
+        }
+        _ => return None,
+    };
+    if matches!(sh.func, 6..=10 | 21) {
+        text.extend(&sp);
+        let id = if sh.str2 == sid::EVIL {
+            sid::BASED
+        } else {
+            sh.str2
+        };
+        text.extend(names.string(id));
     }
-}
-
-/// Shapes 6–10: the stat's text and the per-level text of `descstr2`.
-fn per_level(s: &Shape, v: &str) -> String {
-    let base = place(s.val, v, s.name);
-    match s.name2 {
-        Some(t) if !t.is_empty() => format!("{base} {t}"),
-        _ => base,
-    }
+    Some(text)
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    struct N;
-    impl DescNames for N {
-        fn skill(&self, id: u32) -> Option<String> {
-            (id == 5).then(|| "Fire Bolt".to_owned())
-        }
-        fn skill_class(&self, id: u32) -> Option<u32> {
-            (id == 5).then_some(1)
-        }
-    }
-
-    fn line(func: u8, val: u8, value: i64, param: u32) -> String {
-        render(
-            &Shape {
-                func,
-                val,
-                value,
-                param,
-                name: "Thing",
-                name2: Some("(per level)"),
-            },
-            &N,
-        )
-    }
-
-    #[test]
-    fn each_descfunc_gives_its_line() {
-        let cases: [(u8, u8, i64, u32, &str); 24] = [
-            (1, 1, 5, 0, "+5 Thing"),
-            (2, 1, 5, 0, "5% Thing"),
-            (3, 1, 5, 0, "5 Thing"),
-            (4, 1, 5, 0, "+5% Thing"),
-            (5, 1, 64, 0, "50% Thing"),
-            (6, 1, 5, 0, "+5 Thing (per level)"),
-            (7, 1, 5, 0, "5% Thing (per level)"),
-            (8, 1, 5, 0, "+5% Thing (per level)"),
-            (9, 1, 5, 0, "5 Thing (per level)"),
-            (10, 1, 64, 0, "50% Thing (per level)"),
-            (11, 0, 20, 0, "Repairs 1 Durability In 5 Seconds"),
-            (12, 1, 5, 0, "+5 Thing"),
-            (13, 0, 2, 1, "+2 to Sorceress Skill Levels"),
-            (14, 0, 3, 8, "+3 to Fire Skills (Sorceress Only)"),
-            (
-                15,
-                0,
-                10,
-                // §7.2: skill = layer >> 6, level = layer & 0x3F.
-                (5 << 6) | 3,
-                "10% Chance to cast level 3 Fire Bolt Thing",
-            ),
-            (16, 0, 4, 5, "Level 4 Fire Bolt Aura When Equipped"),
-            (20, 1, 7, 0, "-7% Thing"),
-            (21, 1, 7, 0, "-7 Thing"),
-            (22, 1, 7, 0, "7% Thing"),
-            (
-                24,
-                0,
-                0x0A05,
-                (5 << 6) | 2,
-                "Level 2 Fire Bolt (5/10 Charges)",
-            ),
-            (27, 0, 1, 5, "+1 to Fire Bolt (Sorceress Only)"),
-            (28, 0, 1, 5, "+1 to Fire Bolt"),
-            (2, 2, 5, 0, "Thing 5%"),
-            (4, 0, 5, 0, "Thing"),
-        ];
-        for (f, v, value, p, want) in cases {
-            assert_eq!(line(f, v, value, p), want, "descfunc {f}");
-        }
-    }
-
-    #[test]
-    fn printf_shape_fills_the_value() {
-        let s = Shape {
-            func: 19,
-            val: 0,
-            value: 3,
-            param: 0,
-            name: "Adds %d Fire",
-            name2: None,
-        };
-        assert_eq!(render(&s, &N), "Adds 3 Fire");
-    }
-}
+mod tests;
