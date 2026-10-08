@@ -138,7 +138,7 @@ use d2_sim::drlg::preset::{Ds1Input, Ds1Source};
 use super::rest::AppRest;
 use super::server_thread::{ThreadLink, ThreadStopped};
 use super::skill_rest::SkillStore;
-use super::{synthetic_burial, synthetic_maze, synthetic_tower};
+use super::{synthetic_act2, synthetic_burial, synthetic_maze, synthetic_tower};
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
 use crate::bridge::world::{
@@ -176,8 +176,6 @@ pub const DEN_TO_BLOOD_MOOR: u32 = 12;
 /// middle) and the synthetic walk-out.
 pub const WARP_TILE_XY: i32 = 20;
 pub const ACT2_TOWN: u32 = 40;
-/// Kurast Docks, the Act III town (act 2; q-a3-quests).
-pub const ACT3_TOWN: u32 = 75;
 /// Catacombs Level 4, Andariel's lair (act 0; a flat level in the
 /// synthetic world, reached by a level warp: d2rs-own, unverified).
 pub const CATACOMBS_4: u32 = 37;
@@ -225,23 +223,6 @@ pub const ACT2_NPC_Y: i32 = 12;
 /// The Act II town waypoint (sub-tiles from its room's origin).
 pub const ACT2_WAYPOINT_XY: (i32, i32) = (20, 30);
 
-/// d2rs-own, unverified (q-a3-quests, REC-142): Kurast Docks' NPCs in the
-/// synthetic Act III town: Asheara, Hratli, Alkor, Ormus, Deckard Cain and
-/// Meshif (264), in a row at [`ACT3_NPC_Y`], four sub-tiles apart from
-/// [`ACT3_NPC_X0`].
-pub const ACT3_NPCS: [u16; 6] = [
-    d2_sim::world::npc::class::ASHEARA,
-    d2_sim::world::npc::class::HRATLI,
-    d2_sim::world::npc::class::ALKOR,
-    d2_sim::world::npc::class::ORMUS,
-    d2_sim::world::npc::class::CAIN3,
-    d2_sim::world::npc::class::MESHIF2,
-];
-pub const ACT3_NPC_X0: i32 = 3;
-pub const ACT3_NPC_Y: i32 = 12;
-/// The Act III town waypoint (sub-tiles from its room's origin).
-pub const ACT3_WAYPOINT_XY: (i32, i32) = (20, 30);
-
 /// Every NPC class of the synthetic game: the Rogue Encampment's Akara,
 /// Kashya and Warriv, and Lut Gholein's.
 fn synthetic_npc_classes() -> impl Iterator<Item = u16> {
@@ -254,7 +235,7 @@ fn synthetic_npc_classes() -> impl Iterator<Item = u16> {
     ]
     .into_iter()
     .chain(ACT2_NPCS)
-    .chain(ACT3_NPCS)
+    .chain(super::town_npcs::ACT3.iter().map(|&(c, _)| c))
 }
 /// The player's character class (1, sorceress, as in the server tests).
 pub const PLAYER_CLASS: u32 = 1;
@@ -553,6 +534,9 @@ pub struct LocalSeams {
     /// Monster chain links and deaths for the quest control, drained once
     /// per tick (`q-a1-tower`, d2rs-own, unverified).
     pub quest_events: Vec<d2_sim::wiring::action::QuestEvent>,
+    /// The Act II DRLG's staff-tomb level (0 = not yet known), set when
+    /// the acts are created (`q-a2-dungeons`).
+    pub staff_tomb: u32,
 }
 
 impl LocalSeams {
@@ -637,6 +621,33 @@ impl Pending for LocalSeams {
         if let Ok(chain) = u8::try_from(chain) {
             self.quest_events
                 .push(d2_sim::wiring::action::QuestEvent::Link { unit, chain });
+        }
+    }
+    /// d2rs-own, unverified (REC-136): Radament's and the Summoner's AI
+    /// calls reach the quest control at the end of the tick.
+    fn ai_quest_call(
+        &mut self,
+        _: &mut Game,
+        unit: UnitId,
+        call: d2_sim::monsters::ai::QuestCall,
+    ) -> bool {
+        use d2_sim::monsters::ai::QuestCall;
+        use d2_sim::wiring::action::QuestEvent;
+        match call {
+            QuestCall::RadamentActivated => self
+                .quest_events
+                .push(QuestEvent::RadamentActivated { unit }),
+            QuestCall::SummonerActivated => self.quest_events.push(QuestEvent::SummonerActivated),
+            _ => return false,
+        }
+        true
+    }
+    /// `0x0061AEB0`: the Act II staff tomb, the orifice's level.
+    fn object_staff_tomb(&self) -> u32 {
+        if self.staff_tomb == 0 {
+            u32::MAX
+        } else {
+            self.staff_tomb
         }
     }
     fn take_quest_events(&mut self) -> Vec<d2_sim::wiring::action::QuestEvent> {
@@ -976,19 +987,12 @@ impl WaypointTables {
         let mut levels = vec![blank::<Levels>(); 150];
         for (i, l) in levels.iter_mut().enumerate() {
             l.waypoint = NO_WAYPOINT;
-            l.act = if i >= 75 {
-                2
-            } else if i >= 40 {
-                1
-            } else {
-                0
-            };
+            l.act = if i >= 40 { 1 } else { 0 };
         }
         levels[1].waypoint = 0;
         levels[COLD_PLAINS as usize].waypoint = 1;
         levels[STONY_FIELD as usize].waypoint = 2;
         levels[ACT2_TOWN as usize].waypoint = 9;
-        levels[ACT3_TOWN as usize].waypoint = 18;
         let mut o: Objects = blank();
         o.operatefn = 23;
         o.initfn = 17;
@@ -1263,7 +1267,7 @@ struct LevelSource {
     tiles: Box<dyn TileSource>,
     types: Box<dyn LevelTypes>,
     /// (act, init seed, town level id) of each created act.
-    acts: [(u8, u32, u32); 3],
+    acts: [(u8, u32, u32); 2],
 }
 
 impl LevelSource {
@@ -1274,7 +1278,7 @@ impl LevelSource {
             data: Arc::new(synthetic_drlg_data()),
             tiles: Box::new(tiles()),
             types: Box::new(synthetic_level_types()),
-            acts: [(0, 1, 0), (1, 2, 0), (2, 3, 0)],
+            acts: [(0, 1, 0), (1, 2, 0)],
         }
     }
 
@@ -1298,11 +1302,7 @@ impl LevelSource {
             data,
             tiles: Box::new(d.files.dt1.clone()),
             types: Box::new(types),
-            acts: [
-                (0, init_seed, 1),
-                (1, init_seed, ACT2_TOWN),
-                (2, init_seed, ACT3_TOWN),
-            ],
+            acts: [(0, init_seed, 1), (1, init_seed, ACT2_TOWN)],
         }
     }
 }
@@ -1336,7 +1336,6 @@ fn synthetic_drlg_data() -> DrlgData {
         DEN_OF_EVIL,
         CATACOMBS_4,
         ACT2_TOWN,
-        ACT3_TOWN,
     ] {
         drlg.levels[id as usize].drlg_type = 2;
         drlg.levels[id as usize].level_type = 1;
@@ -1406,6 +1405,7 @@ fn synthetic_drlg_data() -> DrlgData {
         l[b::BURIAL_GROUNDS as usize].vis[0] = BLOOD_MOOR;
         l[b::BURIAL_GROUNDS as usize].warp[0] = b::BURIAL_TO_BLOOD_MOOR as i32;
     }
+    synthetic_act2::add_levels(&mut drlg);
     let mut ids = vec![
         BLOOD_MOOR_TO_DEN,
         DEN_TO_BLOOD_MOOR,
@@ -1417,6 +1417,7 @@ fn synthetic_drlg_data() -> DrlgData {
         synthetic_burial::BLOOD_MOOR_TO_BURIAL,
         synthetic_burial::BURIAL_TO_BLOOD_MOOR,
     ]);
+    ids.extend(synthetic_act2::FIRST_WARP..=synthetic_act2::last_warp());
     drlg.warps = ids
         .iter()
         .map(|&id| WarpDef {
@@ -1448,7 +1449,6 @@ fn synthetic_types() -> Types {
         (synthetic_tower::BLACK_MARSH, TileRect::new(8, 16, 8, 8)),
         (synthetic_burial::BURIAL_GROUNDS, TileRect::new(0, 24, 8, 8)),
         (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
-        (ACT3_TOWN, TileRect::new(0, 0, 8, 8)),
     ]))
 }
 
@@ -1830,19 +1830,6 @@ fn synthetic_hire_rows() -> Vec<HireRow> {
             name_first: 2000,
             name_last: 2002,
         }))
-        .chain(std::iter::once(HireRow {
-            // Asheara's one row (d2rs-own, unverified, q-a3-quests): the
-            // Iron Wolf, names 3000..3002.
-            version: 100,
-            class: 271,
-            act: 3,
-            difficulty: 1,
-            seller: u32::from(d2_sim::world::npc::class::ASHEARA),
-            gold: 300,
-            level: 15,
-            name_first: 3000,
-            name_last: 3002,
-        }))
         .collect()
 }
 
@@ -1918,7 +1905,10 @@ impl GameParts {
                 ..ObjectTables::default()
             },
             monstats: synthetic_monstats(),
-            hire_rows: synthetic_hire_rows(),
+            hire_rows: synthetic_hire_rows()
+                .into_iter()
+                .chain(super::town_npcs::synthetic_hire_rows())
+                .collect(),
             items: ItemTables::default(),
             vendors: VendorTables::default(),
             anim: None,
@@ -2049,6 +2039,27 @@ pub fn build_with_objects(
     chests: &[(i32, i32)],
     stash: Option<(i32, i32)>,
 ) -> Result<LocalGame, BuildError> {
+    build_with_town(
+        data,
+        seed,
+        character,
+        chests,
+        stash,
+        &super::town_npcs::ACT1,
+    )
+}
+
+/// [`build_with_objects`] with the synthetic town's NPCs given as (class,
+/// sub-tile offset from the room origin) pairs (`super::town_npcs`;
+/// synthetic data only, the live town's NPCs come from its presets).
+pub fn build_with_town(
+    data: &GameData,
+    seed: u32,
+    character: Character,
+    chests: &[(i32, i32)],
+    stash: Option<(i32, i32)>,
+    npcs: &[(u16, i32)],
+) -> Result<LocalGame, BuildError> {
     let mut wp_tables = data.tables();
     if stash.is_some() && matches!(data, GameData::Synthetic) {
         wp_tables
@@ -2154,8 +2165,6 @@ pub fn build_with_objects(
     // q-a1-tower, d2rs-own, unverified).
     if matches!(data, GameData::Synthetic) {
         start_levels.push((0, synthetic_tower::BLACK_MARSH));
-        // Kurast Docks, its NPCs and waypoint (q-a3-quests).
-        start_levels.push((2, ACT3_TOWN));
     }
     for (act, level) in start_levels {
         game.lists
@@ -2182,6 +2191,15 @@ pub fn build_with_objects(
             .map_err(BuildError::Drlg)?
             .ok_or_else(|| BuildError::Setup(format!("level {level}: no room streamed")))?;
         rooms.push(r);
+    }
+    // The Act II DRLG chose its staff tomb at creation (`levels.md` §3).
+    if let Some(t) = sim
+        .action
+        .hooks()
+        .drlg
+        .with_act(1, &mut game.lists, |d, _| d.staff_tomb)
+    {
+        sim.action.hooks().x.staff_tomb = t;
     }
     // The waypoint object stands in the town's first room at a fixed
     // sub-tile offset from its origin (subtile = tile × 5, `levels.md`
@@ -2242,14 +2260,10 @@ pub fn build_with_objects(
         .unit(waypoint)
         .ok_or_else(|| BuildError::Setup("waypoint unit missing".into()))?
         .guid;
-    // The synthetic game's town NPC: Akara, a few sub-tiles from the
-    // waypoint (d2rs-own, unverified; the live game's NPCs come from the
-    // town presets).
+    // The synthetic game's town NPCs (d2rs-own, unverified; the live
+    // game's NPCs come from the town presets).
     if matches!(data, GameData::Synthetic) {
-        for (class, x) in [
-            (d2_sim::world::npc::class::AKARA, AKARA_X),
-            (d2_sim::world::npc::class::KASHYA, KASHYA_X),
-        ] {
+        for &(class, dx) in npcs {
             let req = AllocRequest {
                 ty: UnitType::Monster,
                 class: u32::from(class),
@@ -2260,7 +2274,7 @@ pub fn build_with_objects(
                 allied: true,
             };
             sim.action
-                .with(&mut game, |g, v| v.allocate(g, &req, ox + x, oy + UNIT_Y))
+                .with(&mut game, |g, v| v.allocate(g, &req, ox + dx, oy + UNIT_Y))
                 .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
         }
     }
@@ -2299,42 +2313,6 @@ pub fn build_with_objects(
                 v.allocate(g, &req, ox2 + ACT2_WAYPOINT_XY.0, oy2 + ACT2_WAYPOINT_XY.1)
             })
             .ok_or_else(|| BuildError::Setup("allocating the Act II waypoint failed".into()))?;
-    }
-    // Kurast Docks: its NPCs and its waypoint (act 2's room, d2rs-own,
-    // unverified, q-a3-quests, REC-142).
-    if matches!(data, GameData::Synthetic) {
-        let (room3, rect3) = rooms[rooms.len() - 1];
-        let (ox3, oy3) = (rect3.x * 5, rect3.y * 5);
-        for (i, &class) in ACT3_NPCS.iter().enumerate() {
-            let req = AllocRequest {
-                ty: UnitType::Monster,
-                class: u32::from(class),
-                room: Some(room3),
-                add: true,
-                fixed_guid: None,
-                mode: 1,
-                allied: true,
-            };
-            sim.action
-                .with(&mut game, |g, v| {
-                    v.allocate(g, &req, ox3 + ACT3_NPC_X0 + 4 * i as i32, oy3 + ACT3_NPC_Y)
-                })
-                .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
-        }
-        let req = AllocRequest {
-            ty: UnitType::Object,
-            class: wp_tables.object_class,
-            room: Some(room3),
-            add: true,
-            fixed_guid: None,
-            mode: 1,
-            allied: false,
-        };
-        sim.action
-            .with(&mut game, |g, v| {
-                v.allocate(g, &req, ox3 + ACT3_WAYPOINT_XY.0, oy3 + ACT3_WAYPOINT_XY.1)
-            })
-            .ok_or_else(|| BuildError::Setup("allocating the Act III waypoint failed".into()))?;
     }
     let interact_classes: Vec<u16> = parts
         .monstats
@@ -2616,9 +2594,31 @@ pub fn start_with_objects<C: Clock + Send + 'static>(
     chests: Vec<(i32, i32)>,
     stash: Option<(i32, i32)>,
 ) -> Result<(ThreadLink<Link<C>>, Started), BuildError> {
+    start_with_town(
+        data,
+        seed,
+        character,
+        clock,
+        chests,
+        stash,
+        super::town_npcs::ACT1.to_vec(),
+    )
+}
+
+/// [`start_with_objects`] with the synthetic town's NPCs given
+/// ([`build_with_town`]).
+pub fn start_with_town<C: Clock + Send + 'static>(
+    data: GameData,
+    seed: u32,
+    character: Character,
+    clock: C,
+    chests: Vec<(i32, i32)>,
+    stash: Option<(i32, i32)>,
+    npcs: Vec<(u16, i32)>,
+) -> Result<(ThreadLink<Link<C>>, Started), BuildError> {
     let (tx, rx) = std::sync::mpsc::channel();
     let link = ThreadLink::spawn(move || {
-        let g = build_with_objects(&data, seed, character, &chests, stash)?;
+        let g = build_with_town(&data, seed, character, &chests, stash, &npcs)?;
         let _ = tx.send(Started {
             waypoint: g.waypoint,
             waypoint_guid: g.waypoint_guid,

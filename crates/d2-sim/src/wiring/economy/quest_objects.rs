@@ -439,6 +439,17 @@ mod tests {
         assert!(init_fn(37).is_none());
     }
 
+    // Covers: specs/world/quests-act3.md §1.4
+    #[test]
+    fn act3_functions_are_stated() {
+        for n in [23, 25, 39, 41, 42, 43, 44, 45, 49, 50, 52, 53, 60] {
+            assert!(init_fn(n).is_some(), "init {n}");
+        }
+        for n in [28, 31, 44, 45, 53, 57, 58, 59] {
+            assert!(operate_fn(n).is_some(), "operate {n}");
+        }
+    }
+
     // M08: a wrong address and a non-quest index are reported.
     #[test]
     fn table_check_catches_perturbations() {
