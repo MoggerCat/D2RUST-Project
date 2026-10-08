@@ -35,18 +35,18 @@
 |   5. Toward (type 2, `0x00679C80`) | 359–426 |
 |   6. Straight (type 7, `0x00679ED0`) | 427–436 |
 |   7. A* (type 1, `0x0067B850`) | 437–474 |
-|   8. Velocity, direction vector, facing | 475–561 |
-|   9. Per-tick movement | 562–745 |
-|   10. Messages | 746–776 |
-|   11. Missile paths (`0x00649760`) | 777–829 |
-|   12. Other path types (1.14d-read 2026-10-08) | 830–1043 |
-|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1044–1123 |
-| Constants & data dependencies | 1124–1160 |
-| Randomness | 1161–1171 |
-| Edge cases & original bugs | 1172–1219 |
-| Test vectors | 1220–1257 |
-| Provenance | 1258–1300 |
-| Open questions | 1301–1374 |
+|   8. Velocity, direction vector, facing | 475–568 |
+|   9. Per-tick movement | 569–752 |
+|   10. Messages | 753–783 |
+|   11. Missile paths (`0x00649760`) | 784–836 |
+|   12. Other path types (1.14d-read 2026-10-08) | 837–1050 |
+|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1051–1130 |
+| Constants & data dependencies | 1131–1167 |
+| Randomness | 1168–1178 |
+| Edge cases & original bugs | 1179–1226 |
+| Test vectors | 1227–1264 |
+| Provenance | 1265–1307 |
+| Open questions | 1308–1381 |
 <!-- /index -->
 
 ## Summary
@@ -511,6 +511,13 @@ Starting mode 3 or 19 attaches a temporary stat list (`0x00620E80`,
 flag 4, freed at the next mode set) with stat 67 = 100 · `RunVelocity`
 / `WalkVelocity` − 100 (truncated; 1.14d live: 100·9/6 − 100 = 50); the
 list is skipped when `WalkVelocity` is 0. Rule 8.1.2 then reads it.
+
+PROVISIONAL: a run start without a mode change (a new 0x03 while in
+mode 3: the mode set frees no TEMPONLY list, `sim/units.md` §4.1) keeps
+one run list and rewrites its stat 67, rather than attaching a second
+(because §1.5 rule 6 places the attach in the animation setup, which
+only a new mode runs); settled by a recording of two 0x03 in a row
+(velocity after the second).
 
 #### 8.3 Direction vector (`0x0064FC60`)
 
