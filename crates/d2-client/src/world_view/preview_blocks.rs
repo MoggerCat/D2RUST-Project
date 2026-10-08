@@ -265,7 +265,7 @@ mod tests {
         }
     }
 
-    // Covers: specs/render/lighting.md §11 r2, Open question 8
+    // Covers: specs/render/lighting.md §11 r2
     #[test]
     fn a_wall_reads_the_points_of_its_light_direction_not_its_orientation() {
         // Open question 8 (measured on every 1.14d DT1 header): the light
