@@ -229,6 +229,8 @@ struct Shared {
     waypoint_open: Option<WaypointOpen>,
     /// The Esc game menu's state ([`esc_menu`]).
     esc: esc_menu::EscState,
+    /// The quest log's inputs ([`quest_log_ui`]).
+    quest: quest_log_ui::QuestInputs,
 }
 
 impl Shared {
@@ -328,6 +330,7 @@ impl OriginalUi {
     pub fn new(config: UiConfig, inv_areas: Option<Vec<InvArea>>) -> Result<Self, LayoutError> {
         let mut tables = PanelTables::load()?;
         tables.files.extend(hud::hud_files());
+        tables.files.extend(quest_log_ui::quest_files());
         let shared = Shared {
             tables,
             states: UiStates::new()?,
@@ -347,6 +350,7 @@ impl OriginalUi {
             waypoint_map: None,
             waypoint_open: None,
             esc: esc_menu::EscState::default(),
+            quest: quest_log_ui::QuestInputs::default(),
         };
         Ok(Self {
             shared: Rc::new(RefCell::new(shared)),
@@ -380,6 +384,10 @@ impl OriginalUi {
             sh: sh.clone(),
             panel: Default::default(),
             seq: 0,
+        }))?;
+        root.add(Box::new(quest_log_ui::QuestLogUi {
+            sh: sh.clone(),
+            log: Default::default(),
         }))?;
         root.add(Box::new(BorderUi { sh: sh.clone() }))?;
         root.add(Box::new(super::hire_list::HireListUi {
@@ -503,6 +511,11 @@ impl OriginalUi {
             } else if let Some(ui) = hotkey_state(a) {
                 // §4.3: hot keys pass jump 0; mode 2 toggle.
                 self.set_ui(u32::from(ui), 2, false)?;
+                // The quest log asks the server for the quest data when
+                // it opens (`quest_log_ui`; d2rs-own, unverified).
+                if ui == quest_log_ui::UI_QUEST_SCREEN && self.is_open(ui) {
+                    root.queue_intent(quest_log_ui::request_quest_data());
+                }
             }
         }
         root.sync_states(&self.shared.borrow().states);
@@ -590,6 +603,7 @@ pub fn hotkey_state(a: ActionId) -> Option<u8> {
         (Action::ToggleInventory, UI_INVENTORY),
         (Action::ToggleCharacter, UI_CHARACTER),
         (Action::ToggleSkillTree, UI_SKILLTREE),
+        (Action::ToggleQuests, quest_log_ui::UI_QUEST_SCREEN),
     ]
     .into_iter()
     .find(|(action, _)| action.index() == i)
@@ -1048,6 +1062,11 @@ pub mod hud;
 
 #[path = "msg_ui.rs"]
 pub mod msg_ui;
+#[path = "quest_log_ui.rs"]
+pub mod quest_log_ui;
+#[cfg(test)]
+#[path = "quest_log_ui_tests.rs"]
+mod quest_log_ui_tests;
 #[path = "waypoint_ui.rs"]
 pub mod waypoint_ui;
 pub use msg_ui::{

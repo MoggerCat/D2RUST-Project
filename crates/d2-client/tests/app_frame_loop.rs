@@ -201,12 +201,20 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // (`client/bridge.md` §6 rule 3).
     // (Plus the room switch's 0x07 for the Blood Moor room bordering
     // the synthetic town: 19.)
-    assert_eq!(joined, 19);
+    // (Plus Akara, the synthetic town NPC: her 0xAC and one more: 21.)
+    assert_eq!(joined, 21);
     // Plus two for the Blood Moor room bordering the synthetic town: its
     // 0x07 at the join and its 0x08 when the travel leaves the town.
-    assert_eq!((b.log().handled, b.log().queued), (25, 1));
+    assert_eq!((b.log().handled, b.log().queued), (28, 1));
     assert!(b.log().unowned.is_empty(), "{:?}", b.log().unowned);
-    assert!(b.log().dropped.is_empty(), "{:?}", b.log().dropped);
+    // Akara's S→C 0x6D (MonsterStop) is dropped: it arrives for a unit
+    // the model does not hold yet (the synthetic town NPC, `q-quests`).
+    assert_eq!(
+        b.log().dropped.keys().copied().collect::<Vec<_>>(),
+        [0x6D],
+        "{:?}",
+        b.log().dropped
+    );
     let sight: Vec<_> = b
         .world()
         .rooms_in_sight
@@ -273,7 +281,7 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // game, so the queued 0x0D was drained by the update pass.
     let log = bridge(&app).0.log();
     assert_eq!((log.queued, log.drained), (1, 1));
-    assert!(log.dropped.is_empty());
+    assert_eq!(log.dropped.keys().copied().collect::<Vec<_>>(), [0x6D]);
     let w = bridge(&app).0.world();
     assert!(w.in_game);
     // 0x03 arrived; without a DRLG source (`add_client_data` is not
