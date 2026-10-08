@@ -1224,6 +1224,8 @@ pub mod hud;
 
 #[path = "hud_belt.rs"]
 pub mod hud_belt;
+#[path = "hud_tips.rs"]
+pub mod hud_tips;
 
 #[path = "cube_ui.rs"]
 pub(super) mod cube_ui;

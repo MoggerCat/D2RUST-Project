@@ -118,10 +118,24 @@ pub fn send_create_game_for(
     app: &mut App,
     character: &single_player::Character,
 ) -> Result<(), BridgeError> {
+    send_create_game_flags(app, character, None)
+}
+
+/// [`send_create_game_for`] with the 0x67 u32@0x27 the front end computed
+/// (`front_start`, `start_flags`).
+pub fn send_create_game_flags(
+    app: &mut App,
+    character: &single_player::Character,
+    flags: Option<u32>,
+) -> Result<(), BridgeError> {
+    let mut request = single_player::create_request_for(character);
+    if let Some(f) = flags {
+        request.flags = f;
+    }
     app.world_mut()
         .resource_mut::<BridgeResource>()
         .0
-        .send(&single_player::create_request_for(character))?;
+        .send(&request)?;
     Ok(())
 }
 
@@ -273,6 +287,9 @@ pub struct PlayConfig {
     /// A hardcore character (`play --new --hardcore`); a loaded save's own
     /// status bit makes it hardcore too ([`super::hardcore`]).
     pub hardcore: bool,
+    /// The 0x67 flags the front end chose (`front_start`); `None`: the
+    /// character's own.
+    pub start_flags: Option<u32>,
 }
 
 #[derive(Resource)]
@@ -309,6 +326,10 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     let waypoint_map = single_player::client_waypoint_map(&config.data);
     let object_rows = single_player::client_object_rows(&config.data);
     let request = config.character.clone();
+    let loading_files = match &config.data {
+        GameData::Live(d) => Some(d.archives.source()),
+        GameData::Synthetic => None,
+    };
     // d2rs-own, unverified: the map files sit next to the character save.
     let automap_files = config.save_path.as_deref().and_then(|p| {
         Some(super::automap::SaveFiles {
@@ -392,7 +413,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         app.insert_resource(h.clone());
     }
     add_game(&mut app, link, true)?;
-    send_create_game_for(&mut app, &request)?;
+    send_create_game_flags(&mut app, &request, config.start_flags)?;
     add_client_data(&mut app, drlg_source, level_rows.clone());
     app.world_mut()
         .resource_mut::<BridgeResource>()
@@ -457,6 +478,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         add_preview(&mut app, level_rows, TileAssets::default());
     }
     add_walk(&mut app, tap, speeds);
+    super::loading_overlay::add_loading(&mut app, loading_files);
     super::death::add_death(&mut app);
     super::hardcore::add_hardcore(&mut app, hardcore);
     sound::add_output(&mut app);
