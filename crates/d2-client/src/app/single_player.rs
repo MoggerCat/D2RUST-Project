@@ -440,6 +440,16 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
 }
 
 impl Pending for LocalSeams {
+    /// d2rs-own, unverified (REC-104): mode DT and the treasure drop
+    /// ([`super::monster_drop::death_start`]).
+    fn monster_death_start(
+        h: &mut ActionHooks<Self>,
+        sim: &mut d2_sim::units::hooks::Sim<'_>,
+        unit: UnitId,
+        target: Option<UnitId>,
+    ) -> bool {
+        super::monster_drop::death_start(h, sim, unit, target)
+    }
     fn position(&self, unit: UnitId) -> (i32, i32) {
         self.pos.get(&unit).copied().unwrap_or_default()
     }
