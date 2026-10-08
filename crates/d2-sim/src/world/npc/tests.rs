@@ -1327,7 +1327,7 @@ fn hire_greiz_and_refill() {
         *w.sent.last().unwrap(),
         transaction(0, 5, 101, 10_000 - o.price)
     );
-    assert!(w.has("spawn 1009 271 4"));
+    assert!(w.has("spawn 1009 271 1"));
     assert!(w.has(&format!(
         "init {} row 3 name 2000 seed {}",
         merc.0, slots[0].seed
@@ -1402,7 +1402,7 @@ fn hire_refusals() {
     c.hire(&mut w, PLAYER, &msg36(12, 1000)).unwrap();
     assert_eq!(last(&w), code::NOT_PLACED);
     assert!(w.get(PLAYER, stat::GOLD) < 10_000);
-    assert!(w.has("spawn 1012 271 4") && w.has("spawn 1 271 4"));
+    assert!(w.has("spawn 1012 271 1") && w.has("spawn 1 271 1"));
     // Second spawn near the player succeeds.
     w.spawn_fails = 1;
     c.hire(&mut w, PLAYER, &msg36(12, 1000)).unwrap();

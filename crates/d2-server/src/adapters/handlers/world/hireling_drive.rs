@@ -12,6 +12,9 @@
 //!    (run when farther than [`RUN_FROM`]);
 //! 3. else idle.
 //!
+//! A hireling whose AI control has the owner link (the hire's
+//! `0x0058F030`, wired with REC-279) is left to the real think.
+//!
 //! Everything is integer and drawn from no RNG (determinism). PROVISIONAL:
 //! REC-100 (docs/HANDOFF.md §7): no experience share, no drops, no
 //! get-hit, no skill pick (`hireling.txt` chances), no player-ward AI.
@@ -50,6 +53,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
     /// hireling tables there is no hireling.
     pub fn drive_hirelings<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D) {
         events.action().with(game, |g, v| v.pet_sweep(g));
+        self.publish_hireling_facts(game, events);
         let mut mercs: Vec<(UnitId, u32)> = if self.state.hireling_tables.is_none() {
             Vec::new()
         } else {
@@ -67,6 +71,19 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 })
                 .collect()
         };
+        // A hireling whose AI control holds its owner link (`hirelings.md`
+        // §3.2 rule 8) is driven by the real Hireable think
+        // (`ai-bodies-6.md` §7, REC-279): the stand-in leaves it.
+        mercs.retain(|&(m, _)| {
+            events
+                .action()
+                .sys
+                .hooks
+                .ai
+                .as_ref()
+                .and_then(|s| s.control(m))
+                .is_none_or(|c| c.minion_owner.is_none())
+        });
         // The summoned pets (`ActionHooks::pet_lists`, `q-summons`) follow
         // and fight by the same think.
         let pets: Vec<(UnitId, u32)> = events.action().with(game, |g, v| {
@@ -100,6 +117,33 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 think(v, g, merc, UnitId(owner), frame, &friends);
             }
         });
+    }
+}
+
+impl<R: TradeRest, S> WiredWorld<R, S> {
+    /// The hireling facts of the Hireable AI (`ActionHooks::hireling_ai`):
+    /// each living hireling unit's owner and node `Id` from the hireling
+    /// lists, and the rows of the hireling tables (set once).
+    fn publish_hireling_facts<D: ActionEvents>(&mut self, game: &Game, events: &mut D) {
+        let Some(t) = self.state.hireling_tables.as_ref() else {
+            return;
+        };
+        let ids = self
+            .state
+            .hirelings
+            .lists
+            .iter()
+            .flat_map(|(&p, l)| l.nodes.iter().filter(|n| !n.dead).map(move |n| (p, n)))
+            .filter_map(|(p, n)| {
+                let m = game.lists.find_unit(UnitType::Monster, n.guid)?;
+                Some((m, (p, n.id)))
+            })
+            .collect();
+        let facts = &mut events.action().sys.hooks.hireling_ai;
+        facts.ids = ids;
+        if facts.rows.is_none() {
+            facts.rows = Some(std::sync::Arc::new(t.rows.clone()));
+        }
     }
 }
 

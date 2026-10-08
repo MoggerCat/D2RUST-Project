@@ -108,6 +108,7 @@ fn skill_rows() -> Vec<Skills> {
     for (i, s) in v.iter_mut().enumerate() {
         s.srvdofunc = 1;
         s.anim = 7; // A1
+        s.monanim = 4; // monster A1
         s.range = 1; // h2h
         s.skpoints = d2_sim::skills::levels::NO_CALC;
         if i > 0 {
@@ -218,6 +219,14 @@ fn install_fixtures(sim: &mut single_player::Sim) {
     let mut merc = zombie[0].clone();
     merc.ai = 61;
     merc.code = *b"rg\0\0";
+    // The rogue's default action is monster skill 1 (`ai-bodies-6.md` §7
+    // step 7.6): Attack (skill 0) here, in mode A1.
+    merc.skill1 = 0;
+    merc.sk1lvl = 1;
+    (merc.velocity, merc.run) = (6, 9);
+    // AI param 1 ≠ 0: it closes in and attacks (§7 step 6) rather than
+    // backing off like an archer (step 5), as its skill is melee here.
+    merc.aip1 = 1;
     monstats[m] = merc;
     monstats2[m] = zombie2[0].clone();
     let mut skills = fx::skills();
@@ -232,7 +241,11 @@ fn install_fixtures(sim: &mut single_player::Sim) {
         skills,
         combat,
         levels: vec![blank(); 150],
-        skill_modes: vec![[0; 8]],
+        skill_modes: {
+            let mut m = vec![[0u8; 8]; MERC_CLASS as usize + 1];
+            m[MERC_CLASS as usize] = [4; 8];
+            m
+        },
     });
     s.hooks.vitals = Some(Arc::new(vitals()));
     s.hooks.anim_data = Some(Arc::new(anim_data()));
@@ -327,6 +340,7 @@ fn client_skill_rows() -> Vec<SkillRow> {
         .iter()
         .map(|s| SkillRow {
             anim: s.anim,
+            monanim: s.monanim,
             range: 1,
             maxlvl: 20,
             flags: d2_client::controls::click::skill_flag::IN_TOWN,
@@ -597,8 +611,8 @@ impl Rig {
                     v.set_base(m, stat::MAXHP, life << 8);
                     v.set_base(m, stat::HITPOINTS, life << 8);
                     v.set_base(m, TOHIT, 1000);
-                    v.set_base(m, MINDAMAGE, 3 << 8);
-                    v.set_base(m, MAXDAMAGE, 3 << 8);
+                    v.set_base(m, MINDAMAGE, 3);
+                    v.set_base(m, MAXDAMAGE, 3);
                 });
                 if ai {
                     // The spawner's first think (as `start_host_ai`,
@@ -616,16 +630,15 @@ impl Rig {
         })
     }
 
-    /// The GUID of the player unit that is not the local one: the
-    /// corpse (single player). Not matched on mode 17: a corpse that
-    /// comes back into view stays in 0x59's mode 5, because the add's
-    /// corpse 0x74 is not sent (open break 4 in
-    /// `docs/handoff/q-smoke-combat.md`).
+    /// The GUID of the dead player unit that is not the local one: the
+    /// corpse (single player). A corpse coming back into view gets 0x59
+    /// (mode 5), then the corpse 0x74 (PROVISIONAL REC-279), which sets
+    /// it to mode 0.
     fn corpse(&self) -> Option<u32> {
         let w = self.bridge().world();
         w.units
             .values()
-            .find(|u| u.key.unit_type == 0 && Some(u.key) != w.local_player)
+            .find(|u| u.key.unit_type == 0 && Some(u.key) != w.local_player && u.is_dead())
             .map(|u| u.key.guid)
     }
 
@@ -708,6 +721,35 @@ impl Rig {
         m.extend_from_slice(&100u32.to_le_bytes());
         self.send(&m);
         self.step(20, "hire");
+    }
+
+    /// The mercenary warped with the player (`hirelings.md` §6 rules 1,
+    /// 5): on the server it is in the player's level within 10
+    /// sub-tiles, and the client has it.
+    fn assert_merc_near(&self, merc: UnitKey, what: &str) {
+        let (p, _) = self.player();
+        let near = app_support::with(&self.server, move |l| {
+            let h = &l.host().game;
+            let m = h.game.lists.find_unit(UnitType::Monster, merc.guid)?;
+            let a = &h.events.action.sys.hooks;
+            let level = |u: UnitId| {
+                let room = h.game.lists.unit(u)?.room()?;
+                a.drlg.level_id(&h.game, room)
+            };
+            let ((mx, my), (px, py)) = (a.path_position(m), a.path_position(p));
+            Some(level(m)? == level(p)? && (mx - px).abs().max((my - py).abs()) <= 10)
+        });
+        assert_eq!(
+            near,
+            Some(true),
+            "class {}: the mercenary {what}",
+            self.class
+        );
+        assert!(
+            self.bridge().world().units.contains_key(&merc),
+            "class {}: the client has the mercenary ({what})",
+            self.class
+        );
     }
 
     /// The hired mercenary (class 271) in the client model.
@@ -803,6 +845,21 @@ fn scenario(class: u8) {
     });
     r.hire(kashya);
     let merc = r.merc().expect("the mercenary reached the client's model");
+    // The synthetic hireling rows give no to-hit or damage: the test's
+    // (as the Zombie's).
+    app_support::with(&r.server, move |l| {
+        let h = &mut l.host_mut().game;
+        let m = h
+            .game
+            .lists
+            .find_unit(UnitType::Monster, merc.guid)
+            .unwrap();
+        h.events.action.with(&mut h.game, |_, v| {
+            v.set_base(m, TOHIT, 1000);
+            v.set_base(m, MINDAMAGE, 3);
+            v.set_base(m, MAXDAMAGE, 3);
+        });
+    });
     // The hire's creation ran the monster type init (`monsters/init.md`
     // §5 step 1: unit flags |= 0x0A; the hire handler lends the world).
     let merc_flags = app_support::with(&r.server, move |l| {
@@ -811,6 +868,20 @@ fn scenario(class: u8) {
         u.and_then(|u| g.events.action.sys.units.get(u))
             .map(|r| r.flags)
     });
+    // The owner link (`hirelings.md` §3.2 rule 8, `0x0058F030`) is in the
+    // AI control, where the Hireable think reads it.
+    let (_, player_guid) = r.player();
+    let owner = app_support::with(&r.server, move |l| {
+        let g = &l.host().game;
+        let u = g.game.lists.find_unit(UnitType::Monster, merc.guid)?;
+        let c = g.events.action.sys.hooks.ai.as_ref()?.control(u)?;
+        c.minion_owner.map(|o| (o.ty, o.guid))
+    });
+    assert_eq!(
+        owner,
+        Some((UnitType::Player, player_guid)),
+        "class {class}: the mercenary's owner link"
+    );
     assert_eq!(
         merc_flags.map(|f| f & d2_sim::monsters::init::unit_flag::AT_INIT),
         Some(d2_sim::monsters::init::unit_flag::AT_INIT),
@@ -831,10 +902,7 @@ fn scenario(class: u8) {
     // Out of town; the mercenary follows (`hirelings.md` §6).
     r.leave_town();
     r.step(10, "the mercenary follows");
-    assert!(
-        r.bridge().world().units.contains_key(&merc),
-        "class {class}: the mercenary followed into the Den"
-    );
+    r.assert_merc_near(merc, "followed into the Den");
 
     // A pack of three: one killed with the left skill (Attack), two with
     // the right skill (the class's start skill, which costs mana).
@@ -880,10 +948,15 @@ fn scenario(class: u8) {
 
     // A monster that fights back: the player takes damage, then dies.
     let life = r.client_stat(stat::HITPOINTS);
-    r.spawn_pack(1, 1000, true);
+    // Only the mercenary attacks it: its life shows the mercenary's hits.
+    let zombie = r.spawn_pack(1, 1000, true)[0];
     let mut hurt = false;
+    let mut merc_modes = std::collections::BTreeSet::new();
     for _ in 0..600 {
         r.step(1, "monster attacks");
+        if let Some(u) = r.bridge().world().units.get(&merc) {
+            merc_modes.insert(u.mode);
+        }
         if r.client_stat(stat::HITPOINTS) < life {
             hurt = true;
         }
@@ -892,6 +965,23 @@ fn scenario(class: u8) {
         }
     }
     assert!(hurt, "class {class}: the client saw the player's life drop");
+    assert!(
+        merc_modes.contains(&4),
+        "class {class}: the client saw the mercenary attack (A1), modes {merc_modes:?}"
+    );
+    let zombie_life = app_support::with(&r.server, move |l| {
+        let h = &mut l.host_mut().game;
+        let z = h.game.lists.find_unit(UnitType::Monster, zombie);
+        z.map(|z| {
+            h.events
+                .action
+                .with(&mut h.game, |_, v| v.stat(z, stat::HITPOINTS) >> 8)
+        })
+    });
+    assert!(
+        zombie_life.is_some_and(|l| l < 1000),
+        "class {class}: the mercenary hurt the zombie ({zombie_life:?})"
+    );
     assert!(
         r.mode() == player_mode::DEATH || r.mode() == player_mode::DEAD,
         "class {class}: the player died (mode {})",
@@ -923,10 +1013,7 @@ fn scenario(class: u8) {
     // (`inventory-moves.md` §7.1, §12): S→C 0x8E, the corpse leaves.
     r.leave_town();
     r.step(10, "the corpse comes into view");
-    assert!(
-        r.bridge().world().units.contains_key(&merc),
-        "class {class}: the mercenary followed into the Den again"
-    );
+    r.assert_merc_near(merc, "followed into the Den again");
     let corpse = r.corpse().expect("the corpse lies where the player died");
     let mut taken = false;
     for _ in 0..40 {

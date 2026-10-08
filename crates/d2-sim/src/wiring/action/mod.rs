@@ -148,6 +148,17 @@ pub enum WiringError {
     },
 }
 
+/// What the Hireable AI reads of the hireling lists and table
+/// (`0x00574BD0`, `0x006562F0`; `ai-bodies-6.md` §7 steps 3 and 7.2):
+/// each living hireling unit's owner and its node's `hireling` `Id`
+/// (`hirelings.md` §3.2 rule 6), and the rows. The host that holds the
+/// lists writes it.
+#[derive(Debug, Clone, Default)]
+pub struct HirelingAiFacts {
+    pub ids: BTreeMap<UnitId, (UnitId, u32)>,
+    pub rows: Option<Arc<crate::world::hirelings::HirelingRows>>,
+}
+
 /// The [`crate::units::hooks::UnitHooks`] of [`ActionSim`]'s unit system
 /// and the state every action adapter shares.
 pub struct ActionHooks<X> {
@@ -198,6 +209,10 @@ pub struct ActionHooks<X> {
     /// default): the call does nothing (no pet list in the action
     /// wiring).
     pub pet_follows: Option<Vec<UnitId>>,
+    /// The hireling facts the Hireable AI reads (`ai-bodies-6.md` §7
+    /// steps 3 and 7.2), published by the host that holds the hireling
+    /// lists ([`HirelingAiFacts`]); empty: the AI finds no hireling.
+    pub hireling_ai: HirelingAiFacts,
     /// Monsters killed by the kill `0x0057CCB0` with flag 1 (every
     /// caller but the expired-pet kill), for the host that holds the
     /// hireling lists: `hirelings.md` §8 rule 1 (`0x005751A0` when the
@@ -365,6 +380,7 @@ impl<X> ActionHooks<X> {
             portals: Default::default(),
             object_drops: None,
             pet_follows: None,
+            hireling_ai: HirelingAiFacts::default(),
             pet_deaths: None,
             owner_deaths: None,
             hireling_calls: None,

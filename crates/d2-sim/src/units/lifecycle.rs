@@ -91,6 +91,25 @@ pub trait LifecycleHooks: UnitHooks {
     ) -> Option<UnitId> {
         None
     }
+
+    /// Owner data `0x0058F030(game, unit, GUID, type, …)` on the unit's AI
+    /// control record (`monsters/umod-callbacks.md` §1 rule 5, `ai.md`
+    /// §3.1: the minion owner), as `hirelings.md` §3.2 rule 8 links a
+    /// mercenary to its player. Provider: the host that holds the AI
+    /// store; the default does nothing.
+    fn set_ai_owner(&mut self, unit: UnitId, owner_type: u8, owner_guid: u32) {}
+
+    /// `0x005A4850(game, unit, umod, 0)`: the umod appended to the
+    /// monster's list and its init run (`monsters/init.md` create
+    /// `assign_umod`), as `hirelings.md` §3.2 rule 10 gives a mercenary
+    /// umod 19. Provider: the host that holds the monster state; the
+    /// default does nothing.
+    fn assign_umod(&mut self, sim: &mut Sim<'_>, unit: UnitId, umod: u8) {}
+
+    /// Warp of one pet to its player (`hirelings.md` §6 rules 1 and 5,
+    /// `0x00574D90` → `0x00574CC0`). Provider: the host that owns the
+    /// path code; the default does nothing.
+    fn warp_pet(&mut self, sim: &mut Sim<'_>, pet: UnitId, player: UnitId) {}
 }
 
 /// `0x00555230` (§3.1): [`allocate_unlinked`] (steps 1–7), then

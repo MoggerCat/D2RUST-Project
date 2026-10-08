@@ -367,6 +367,10 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     }
 }
 
+/// Flags 2 bit 0x10000 (`hirelings.md` §6 rule 5): the S→C 0x15 of the
+/// next update (`intents-events.md` §7.3 rule 2 step 1).
+const PET_WARP_REASSIGN: u32 = 0x10000;
+
 impl<X: Pending> LifecycleHooks for ActionHooks<X> {
     fn request_act_change(&mut self, player: UnitId, level: u32, arg: u32) {
         self.act_changes.push((player, level, arg));
@@ -443,6 +447,82 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
             allied: false,
         };
         View::of(sim.units, sim.stats, sim.data, self).allocate(sim.game, &req, x + 2, y + 2)
+    }
+
+    /// The minion owner of the unit's AI control record (owner data
+    /// `0x0058F030`): a unit without AI control keeps none. The lookup
+    /// is by GUID at every use (`umod-callbacks.md` §1 rule 5), so an
+    /// owner GUID that names no unit (−1) drops the link.
+    fn set_ai_owner(&mut self, unit: UnitId, owner_type: u8, owner_guid: u32) {
+        let Some(ty) = UnitType::ALL.get(usize::from(owner_type)).copied() else {
+            return;
+        };
+        if let Some(c) = self.ai.as_mut().and_then(|s| s.control_mut(unit)) {
+            c.minion_owner = Some(ai::UnitRef {
+                ty,
+                guid: owner_guid,
+            });
+        }
+    }
+
+    /// On the lent monster world (none: nothing).
+    fn assign_umod(&mut self, sim: &mut Sim<'_>, unit: UnitId, umod: u8) {
+        self.with_monster_world(|w, h| w.assign_umod(sim, h, unit, umod));
+    }
+
+    /// `0x00574CC0` (`hirelings.md` §6 rule 5): the pet placed at the
+    /// player's room and point (`0x00650BE0`, the path provider's
+    /// teleport, which also leaves the old room's list), queued for
+    /// update with flags 2 |= 0x10000 (the reassign of `intents-events.md`
+    /// §7.3 rule 2 step 1), then `0x00573780` (`ai.md` §1.5). No player
+    /// room or no path provider: nothing.
+    // TODO(hirelings.md §6 r5): the path reset `0x00648C30(path, 0x100)`
+    // "when not moving" has no reading of "moving" in the spec; not run.
+    fn warp_pet(&mut self, sim: &mut Sim<'_>, pet: UnitId, player: UnitId) {
+        let Some(room) = sim.game.lists.unit(player).and_then(|e| e.room()) else {
+            return;
+        };
+        let (x, y) = self.path_position(player);
+        let placed = View::of(sim.units, sim.stats, sim.data, self).path_teleport_to(
+            sim.game,
+            pet,
+            Some(room),
+            x,
+            y,
+        );
+        if placed.is_none() {
+            return;
+        }
+        if let Err(e) = sim.game.lists.queue_update(pet) {
+            self.errors
+                .push(WiringError::Unit(UnitError::Game(e.into())));
+        }
+        if let Some(r) = sim.units.get_mut(pet) {
+            r.flags2 |= PET_WARP_REASSIGN;
+        }
+        let Some(mut store) = self.ai.take() else {
+            return;
+        };
+        let t = self.tables.clone();
+        let info = self.ai_info;
+        {
+            let mut v = View::of(sim.units, sim.stats, sim.data, self);
+            let mut cx = ai::Ctx {
+                tables: ai::AiTables {
+                    monstats: &t.combat.monstats,
+                    monstats2: &t.combat.monstats2,
+                    levels: &t.levels,
+                    skill_modes: &t.skill_modes,
+                    skills: &t.skills.skills,
+                    missiles: &t.skills.missiles,
+                },
+                info,
+                store: &mut store,
+                world: &mut v,
+            };
+            ai::update_ai_callback(sim.game, &mut cx, pet);
+        }
+        self.ai = Some(store);
     }
 
     /// Step 8 linked the unit: its room is the list's from now on.
