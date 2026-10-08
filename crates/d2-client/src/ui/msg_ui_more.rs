@@ -227,6 +227,7 @@ impl OriginalUi {
             Output::QuestFlags { record } => self.more.client_quest = record,
             Output::OverheadClear { unit } => {
                 self.more.overhead.remove(&unit);
+                self.shared.borrow_mut().bubbles.clear(unit);
             }
             _ => return Ok(false),
         }
@@ -338,6 +339,7 @@ impl OriginalUi {
     /// text frees the unit's record; otherwise a new record replaces the
     /// old one.
     pub fn set_overhead(&mut self, unit: UnitKey, text: &[u8], lang: u8) {
+        self.shared.borrow_mut().bubbles.set(unit, text, lang);
         if text.is_empty() {
             self.more.overhead.remove(&unit);
             return;

@@ -58,9 +58,14 @@ pub fn subtile_of(x16: u32, y16: u32) -> (i32, i32) {
 /// The `LookFeed` of the preview: a unit's light is the cell at its
 /// sub-tile; the local player is at its predicted one; no ghostly, no
 /// override, hover only from the cursor pick, no remap (`d2rs-own, unverified`).
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct PreviewLook {
     pub local: Option<(UnitKey, (i32, i32))>,
+    /// The `colorpri` / `colorshift` of the states (`state_tint`, PROVISIONAL
+    /// REC-245); none: no unit is tinted.
+    pub tints: Option<std::sync::Arc<super::state_tint::StateTints>>,
+    /// The act tables of the frame, for the tint's remap map.
+    pub tables: Option<ShadeTables>,
     /// The unit under the cursor (drawn highlighted, `blend-modes.md` §3).
     pub hover: Option<UnitKey>,
 }
@@ -88,7 +93,10 @@ impl LookFeed for PreviewLook {
             ghostly: false,
             override_input: None,
             hovered: self.is_hovered(unit),
-            remap: None,
+            remap: self
+                .tints
+                .as_ref()
+                .and_then(|t| t.remap(&unit.states, self.tables.as_ref())),
         })
     }
 }
@@ -191,6 +199,11 @@ impl PreviewLight {
         self.look.hover = unit;
     }
 
+    /// The state tints of the tables (`state_tint`).
+    pub fn set_tints(&mut self, tints: Option<std::sync::Arc<super::state_tint::StateTints>>) {
+        self.look.tints = tints;
+    }
+
     pub fn look(&self) -> &PreviewLook {
         &self.look
     }
@@ -205,6 +218,7 @@ impl PreviewLight {
     ) {
         self.frame = None;
         self.look.local = None;
+        self.look.tables = tables.copied();
         let (Some(tables), false) = (tables, self.fullbright) else {
             return;
         };

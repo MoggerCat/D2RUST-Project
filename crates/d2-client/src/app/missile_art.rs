@@ -34,6 +34,19 @@ pub fn effect_rows(archives: &dyn TableFiles) -> Result<EffectRows, String> {
     ))
 }
 
+/// The `colorpri` / `colorshift` of the user's `states` table
+/// (`world_view::state_tint`).
+pub fn state_tints(
+    archives: &dyn TableFiles,
+) -> Result<crate::world_view::state_tint::StateTints, String> {
+    let set = d2_data::bin::load_from(archives, "eng").map_err(|e| e.to_string())?;
+    let rows: Vec<States> = match set.table("states") {
+        Some(t) => decode_all(t).map_err(|e| e.to_string())?,
+        None => Vec::new(),
+    };
+    Ok(crate::world_view::state_tint::StateTints::from_tables(&rows))
+}
+
 /// Hands the effect rows to the world view's missile layer (with `source`
 /// for the DCC / DC6 files). Call after the world view state exists.
 pub fn add_missiles(app: &mut App, source: Arc<dyn FileSource>, rows: EffectRows) {
