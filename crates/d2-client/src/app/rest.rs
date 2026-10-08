@@ -33,6 +33,14 @@ use crate::ui::original::ShopPrices;
 /// The rest of the app's wired host (module docs).
 #[derive(Debug, Default)]
 pub struct AppRest {
+    /// The players' client save flags (client +0x0A: the status word with
+    /// the progression in bits 8–12), set at the join from the loaded
+    /// header and raised by the quests' `0x00538680` (`quests-act1-rest.md`
+    /// §5). d2rs-own, unverified (REC-265).
+    pub save_flags: BTreeMap<UnitId, u16>,
+    /// The saved Iron Golem item of a golem re-summoned at the join: it
+    /// has no item unit, so the save writes these bytes back (REC-265).
+    pub golem_items: BTreeMap<UnitId, d2_formats::d2s::ItemEntry>,
     /// The units' quest chains (unit +0x74, `quests.md` §4.6).
     pub chains: std::collections::BTreeMap<UnitId, QuestChain>,
     /// Expansion game (the item format, `generation.md` §1.2).
@@ -394,6 +402,12 @@ impl VendorRest for AppRest {
 }
 
 impl QuestRest for AppRest {
+    fn client_save_flags(&self, p: UnitId) -> Option<u16> {
+        self.save_flags.get(&p).copied()
+    }
+    fn set_client_save_flags(&mut self, p: UnitId, flags: u16) {
+        self.save_flags.insert(p, flags);
+    }
     /// No act change provider: the game holds no act beyond the ones
     /// created, and no spec says when Act II counts as present.
     fn has_act2(&self) -> bool {

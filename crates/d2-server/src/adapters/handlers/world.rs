@@ -38,6 +38,7 @@ mod wired;
 pub(crate) mod tests;
 
 pub use action::{ActionEvents, ActionWorld, Outbox, ProcessState};
+pub use gap_items::HirelingBlock;
 pub use item_save::LoadedItems;
 pub use wired::{Parts, TradeRest, WiredWorld};
 
@@ -369,6 +370,9 @@ pub trait WorldHost<D> {
     fn moves<C: MoveCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
         None
     }
+    /// A weapon switch of `player` went through (C→S 0x60): the host's
+    /// per-player switch state follows. Default: none.
+    fn weapon_switched(&mut self, events: &mut D, player: UnitId) {}
     /// The skill handlers (`handlers::skills`).
     fn skill(&mut self, call: SkillCall<'_, D>) -> Option<SkillHandled> {
         None

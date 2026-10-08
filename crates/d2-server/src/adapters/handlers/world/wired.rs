@@ -1070,6 +1070,14 @@ where
         Some(out)
     }
 
+    /// The mouse pairs of the weapon sets trade places with the switch
+    /// (d2rs-own, unverified, REC-265).
+    fn weapon_switched(&mut self, events: &mut D, player: UnitId) {
+        if let Some(list) = events.action().hooks().skill_lists.get_mut(&player) {
+            list.switch_weapons();
+        }
+    }
+
     /// The skill handlers, then the pet follows their placements queued
     /// ([`WiredWorld::pet_follows`]).
     fn skill(&mut self, call: SkillCall<'_, D>) -> Option<SkillHandled> {
