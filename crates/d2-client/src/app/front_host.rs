@@ -277,6 +277,9 @@ pub struct FrontHost {
     stub: Option<(NewCharacterSink, PathBuf)>,
     /// The stub `.d2s` written for the last created character, or why not.
     pub created: Option<Result<PathBuf, String>>,
+    /// A copy of [`Self::outcome`] the caller keeps: the app's world (and
+    /// this resource with it) may be gone once the window has closed.
+    outcome_out: std::sync::Arc<std::sync::Mutex<Option<Outcome>>>,
 }
 
 /// Registers the credits screen with the text read from the archives when no
@@ -353,6 +356,7 @@ impl FrontHost {
             drawn: Vec::new(),
             outcome: None,
             frames: 0,
+            outcome_out: Default::default(),
         }
     }
 
@@ -492,6 +496,9 @@ fn drive(mut host: NonSendMut<FrontHost>, time: Res<Time>) {
         host.acc_ms -= TICK_MS;
         host.front.tick();
         host.outcome = host.front.outcome();
+        if let Ok(mut out) = host.outcome_out.lock() {
+            *out = host.outcome;
+        }
         if matches!(host.outcome, Some(Outcome::GameLoad(g)) if g.new_character) {
             host.write_created();
         }
@@ -539,11 +546,11 @@ pub fn run_front_end(host: FrontHost) -> Outcome {
         }),
         ..default()
     }));
+    let outcome = host.outcome_out.clone();
     add_front_end(&mut app, host);
     app.run();
-    // A closed window ends the program.
-    app.world()
-        .non_send::<FrontHost>()
-        .outcome
-        .unwrap_or(Outcome::Exit)
+    // A closed window ends the program. The resource may be gone after
+    // the run, so the outcome is read from the caller's copy.
+    let out = outcome.lock().ok().and_then(|o| *o);
+    out.unwrap_or(Outcome::Exit)
 }

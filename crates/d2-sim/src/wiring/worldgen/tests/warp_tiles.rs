@@ -157,7 +157,7 @@ fn tiles(fx: &mut Fx, room: RoomId) -> Vec<(u32, (i32, i32), u32)> {
     v
 }
 
-// Covers: specs/sim/path-placement.md §12.1 r1, §12.1 r2, §12.1 r3; specs/drlg/rooms.md §9.5.1 r1, §9.5.1 r3, §9.5.1 r6
+// Covers: specs/sim/path-placement.md §12.1 r1, §12.1 r2, §12.1 r3
 #[test]
 fn exit_cells_give_one_tile_preset_each() {
     let mut fx = isle_fx();

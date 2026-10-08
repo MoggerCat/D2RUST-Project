@@ -135,7 +135,7 @@ fn sent_to(fx: &mut Fx, p: UnitId) -> Vec<Vec<u8>> {
 
 // ---- the Town Portal cast (`objects-2.md` §27.1, §27.2) ---------------------
 
-// Covers: specs/world/objects-2.md §25 r5–r8, r14, r15, §27.1 r2, r6, r8, r10, §27.2
+// Covers: specs/world/objects-2.md §25 r5, §25 r6, §25 r7, §25 r8, §25 r14, §25 r15, §27.1 r2, §27.1 r6, §27.1 r8, §27.1 r10, §27.2
 #[test]
 fn a_cast_in_the_field_makes_a_linked_pair() {
     let mut fx = field_and_town();
@@ -192,7 +192,7 @@ fn a_cast_in_town_is_refused_and_the_pair_stays() {
     fx.assert_clean();
 }
 
-// Covers: specs/world/objects-2.md §27.1 r5, §27.4; specs/world/quests-helpers.md §7; specs/sim/tick.md §6.5
+// Covers: specs/world/objects-2.md §27.1 r5, §27.4; specs/world/quests-helpers.md §7
 #[test]
 fn a_second_cast_closes_the_old_pair_through_the_delete_lists() {
     let mut fx = field_and_town();
@@ -224,7 +224,7 @@ fn a_second_cast_closes_the_old_pair_through_the_delete_lists() {
     fx.assert_clean();
 }
 
-// Covers: specs/world/objects-2.md §27.3 r2, r3; specs/world/objects.md §12 r6, r8, r11, r12
+// Covers: specs/world/objects-2.md §27.3 r2, §27.3 r3; specs/world/objects.md §12 r6, §12 r8, §12 r11, §12 r12
 #[test]
 fn entering_the_pair_goes_to_town_and_back_and_the_owner_closes_it() {
     let mut fx = field_and_town();
@@ -256,7 +256,7 @@ fn entering_the_pair_goes_to_town_and_back_and_the_owner_closes_it() {
 
 // ---- `0x0056D130` (`objects-2.md` §25) -------------------------------------
 
-// Covers: specs/world/objects-2.md §25 r3, r4, r5
+// Covers: specs/world/objects-2.md §25 r3, §25 r4, §25 r5
 #[test]
 fn the_pair_rules_town_refusal_exception_exact_and_one_act() {
     let mut fx = fx_with(&[
@@ -296,7 +296,7 @@ fn the_pair_rules_town_refusal_exception_exact_and_one_act() {
     );
 }
 
-// Covers: specs/world/objects-2.md §25 r11–r13, Tyrael's portal; specs/world/quests-act2.md §8.11, §8.12 r6
+// Covers: specs/world/objects-2.md §25 r11, §25 r12, §25 r13; specs/world/quests-act2.md §8.11, §8.12 r6
 #[test]
 fn tyrael_s_pair_leads_to_lut_gholein_without_an_owner() {
     let mut fx = fx_with(&[
@@ -320,7 +320,7 @@ fn tyrael_s_pair_leads_to_lut_gholein_without_an_owner() {
 
 // ---- the act change (`waypoints.md` §11) ------------------------------------
 
-// Covers: specs/world/waypoints.md §11 steps 2, 4, 8–18, open question 1
+// Covers: specs/world/waypoints.md §11
 #[test]
 fn the_act_change_moves_the_player_and_its_client_to_the_new_act() {
     // Both acts' rooms at tiles (8, 8): the leave teleport to (0, 0)

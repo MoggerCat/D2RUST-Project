@@ -92,7 +92,7 @@ fn a_made_cast_uses_the_scroll() {
 /// The town refusal (result 0, no 0x7C from the cast): the scroll stays,
 /// its flag 0x4 is cleared with one S→C 0x3F, and the dispatcher's 0x7C
 /// is the only one (edge case 2).
-// Covers: specs/items/use.md §1 r5, §2, §4, edge case 2
+// Covers: specs/items/use.md §1 r5, §2, §4
 #[test]
 fn a_refused_cast_keeps_the_scroll() {
     let mut w = World::new();
@@ -108,7 +108,7 @@ fn a_refused_cast_keeps_the_scroll() {
 /// A cast that fails outside a town (result 0 after its own 0x7C): two
 /// 0x7C (edge case 2); without a cast host the use fails the same way
 /// with one.
-// Covers: specs/items/use.md §1 r5, edge case 2
+// Covers: specs/items/use.md §1 r5
 #[test]
 fn a_failed_cast_sends_two_item_messages() {
     let mut w = World::new();
@@ -127,7 +127,7 @@ fn a_failed_cast_sends_two_item_messages() {
 /// The failure reset clears flag 0x4 on every flagged item of the
 /// inventory, in list order, with `3F FF <GUID> FF FF` each (test
 /// vector of `items/use.md`).
-// Covers: specs/items/use.md §2, test vector 4
+// Covers: specs/items/use.md §2
 #[test]
 fn the_failure_reset_clears_every_flagged_item() {
     let mut w = World::new();
@@ -191,7 +191,7 @@ fn other_entries_keep_the_rest_answer() {
 /// 0x27 with a Town Portal scroll on an item: the use runs the cast;
 /// made → the scroll is consumed (§7.18 step 9), not made → result 1 and
 /// the scroll stays (step 5).
-// Covers: specs/items/inventory-moves.md §7.18 r5, r9; specs/items/use.md §4
+// Covers: specs/items/inventory-moves.md §7.18 r5, §7.18 r9; specs/items/use.md §4
 #[test]
 fn use_item_action_runs_the_cast() {
     let mut w = World::new();
