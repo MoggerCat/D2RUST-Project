@@ -8,7 +8,7 @@ rules are `docs/handoff/build-loop.md`, the task rows are
 
 ## State at hand-over (2026-10-08 ~09:20 UTC, second account switch)
 
-- `main`: includes PR #49 (merged 09:3x UTC; everything in the first list below).
+- `main`: includes PR #50 (everything merged in this file; staging = main + this doc).
 - `claude/specs-staging-7`: green (6,855 tests sim/server/client/
   test-fixtures). Merged after #48: q-mercs-acts, q-paladin,
   q-item-uniques, q-weapon-combat, q-assassin, q-gamble, q-barb,
