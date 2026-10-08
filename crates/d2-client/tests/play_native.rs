@@ -1,4 +1,5 @@
 // Spec: specs/formats/native-assets.md §5, §7.1 test 7 (play on native)
+// (In d2-client's tests: d2-convert stays free of Bevy, CLAUDE.md rule 5.)
 //! `play --native` loads what `play` loads from the archives: the synthetic
 //! install is converted by `d2-convert`, then the play app's data load
 //! (tables, level files, act palettes, typed art) runs on the archives and
