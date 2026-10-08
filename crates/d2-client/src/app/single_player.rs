@@ -1392,6 +1392,9 @@ pub fn build_with_chests(
     // The client vitals sync (`combat/vitals.md` §5.1): life, mana,
     // stamina and position sent to the client at the end of each tick.
     hooks.enable_vitals_sync();
+    // d2rs-own, unverified: the preview allocates the death's corpse unit
+    // itself (the inventory model has no corpse; PROVISIONAL REC-97).
+    hooks.death.allocate_corpses = true;
     // Game entry places through the path provider; on before any unit is
     // allocated.
     hooks

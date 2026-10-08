@@ -211,6 +211,22 @@ where
     /// unit's position (path, or the seam's staged position without the
     /// path provider; `pathing.md` §2.1). Items and missiles: none (an
     /// item's owner is not read here).
+    fn player_gate(
+        &mut self,
+        _: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<crate::seams::PlayerGate> {
+        let s = &events.action().sys;
+        if !s.hooks.death.died.contains(&unit) {
+            return None;
+        }
+        Some(crate::seams::PlayerGate {
+            mode: s.units.get(unit)?.mode,
+            uninterruptable: s.stats.has_state(unit, 0x36),
+        })
+    }
+
     fn live_facts(
         &mut self,
         game: &Game,

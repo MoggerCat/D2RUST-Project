@@ -539,6 +539,15 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
                 f.pos = Pos { x, y };
             }
         }
+        // The gate reads the unit's live mode (a dead player's 0x41).
+        let staged: Vec<UnitId> = self.players.keys().copied().collect();
+        for u in staged {
+            if let Some(g) = self.world.player_gate(&self.game, &mut self.events, u) {
+                if let Some(p) = self.players.get_mut(&u) {
+                    p.gate = g;
+                }
+            }
+        }
         let requests = self.world.take_host_requests();
         self.host_requests.extend(requests);
         for (unit, bytes) in self.world.take_sent(&mut self.events) {

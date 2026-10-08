@@ -5942,6 +5942,9 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Fights, kills, quest chains, hireling events: the input script has no combat loop, so these are [MANUAL] / [ASSISTED] (REC-07…11, 23…34) and never `--auto`.
 - `render/draw-order.md` OQ7 (TownE1 tile (950, 933)): off-screen from every reachable spot (`local-buddy-q9-rec` R2-1): REC-32 notes it.
 
+- REC-97 (PROVISIONAL, M22; player death in the play preview, `q-death`): the S→C form of a player's death is not specified (`sim/pathing.md` §10 r2 lists only the walk rows). Preview: 0x0D PlayerStop with the mode-request code 8 (DT) and 9 (DD), then code 7 (neutral after death) on the respawn, sent to every client; the corpse is a player-type unit allocated at the DD start (mode 17, state 7, owner GUID kept in `DeathState::owners`, announced by 0x59 + 0x0D code 9); its items stay with the player (the inventory model has no corpse grid, `vitals.md` §4.7 r1.7) and the dropped gold is not made into piles (`Pending::death_drop_gold` has no preview provider), so a death loses the gold of §4.6 rule 1 for good. The dispatch gate of a player who has died follows the live unit mode (it is staged at mode 1 otherwise), so C→S 0x41 is accepted in mode 17. Check: a death trace (S→C bytes of a player's death and of the 0x41 respawn).
+- REC-98 (PROVISIONAL, M22): no spec gives the screen or text shown while the player is dead. Preview: a Bevy text node "You have died / Press Esc to return to town" while the local player's mode is 0 or 0x11; Esc in mode 0x11 sends C→S 0x41 (`ui/panels.md` §3 r1). Needs the original's wording and layout (RE of the dead-state draw).
+
 ## 8. Lessons (problems met, fixes)
 
 | Problem | Fix |

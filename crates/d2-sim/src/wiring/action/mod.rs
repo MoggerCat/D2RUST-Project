@@ -24,6 +24,7 @@ pub mod ai;
 pub mod combat;
 pub mod death;
 pub mod dispatch;
+pub mod dying;
 pub mod hirelings;
 pub mod inactive;
 pub mod missiles;

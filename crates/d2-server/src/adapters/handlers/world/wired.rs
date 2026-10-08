@@ -639,6 +639,8 @@ where
     fn after_tick(&mut self, game: &mut Game, events: &mut D) {
         let sent = self.desk(game, events, quest_objects);
         self.inv_sent.extend(sent);
+        // A player with no life starts dying (`vitals.md` §4.8).
+        events.action().player_deaths(game);
         self.pet_deaths(game, events);
         self.hireling_calls(game, events);
         self.pet_follows(game, events);
@@ -755,6 +757,15 @@ where
         self.hireling_calls(game, events);
         self.pet_follows(game, events);
         out
+    }
+
+    fn player_gate(
+        &mut self,
+        game: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<crate::seams::PlayerGate> {
+        WorldHost::<D>::player_gate(&mut self.action, game, events, unit)
     }
 
     fn live_facts(

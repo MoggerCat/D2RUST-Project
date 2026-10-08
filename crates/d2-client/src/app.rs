@@ -10,6 +10,7 @@
 //! [`server_thread`]) through the bridge and the world view.
 
 pub mod automap;
+pub mod death;
 pub mod hud;
 pub mod items;
 pub mod palette;

@@ -393,6 +393,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         add_preview(&mut app, level_rows, TileAssets::default());
     }
     add_walk(&mut app, tap, speeds);
+    super::death::add_death(&mut app);
     sound::add_output(&mut app);
     if let Some(frames) = config.exit_after {
         app.insert_resource(ExitAfter(frames))
