@@ -842,6 +842,7 @@ impl World {
             state: &mut self.state,
             rest: &mut self.rest,
             now: self.now,
+            inv: None,
         };
         f(&mut desk, &mut self.ctl)
     }

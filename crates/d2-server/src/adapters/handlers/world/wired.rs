@@ -53,7 +53,8 @@ use d2_sim::wiring::economy::{
     QuestLoan, QuestRest,
 };
 use d2_sim::wiring::interaction::{
-    Desk, InteractionError, InteractionState, NpcRest, PlayerQuestsRef, VendorDesk, VendorRest,
+    Desk, InteractionError, InteractionState, NpcInv, NpcInventory, NpcRest, PlayerQuestsRef,
+    VendorDesk, VendorRest,
 };
 use d2_sim::world::hirelings::life;
 use d2_sim::world::npc::NpcControl;
@@ -253,6 +254,23 @@ impl<R, S> WiredWorld<R, S> {
             Option<&mut InvParts>,
         ) -> T,
     ) -> T {
+        self.desk_with(game, events, false, f)
+    }
+
+    /// [`Self::desk`]; with `lend` the inventory model is lent to the
+    /// desk for the NPC item services ([`NpcInv`], `Desk::inv`) and `f`
+    /// gets none.
+    pub(super) fn desk_with<D: ActionEvents, T>(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        lend: bool,
+        f: impl FnOnce(
+            &mut Desk<'_, '_, ActionHooks<D::X>, R>,
+            &mut NpcControl,
+            Option<&mut InvParts>,
+        ) -> T,
+    ) -> T {
         let classes = self.interact_classes.clone();
         self.with_economy(game, events, |econ, p| {
             for u in econ.game.lists.units_of_type(UnitType::Monster) {
@@ -261,6 +279,18 @@ impl<R, S> WiredWorld<R, S> {
                     p.state.add_npc(u);
                 }
             }
+            let mut lent = if lend { p.inventory.take() } else { None }.map(|v| {
+                let InvParts {
+                    tables,
+                    state,
+                    rest,
+                } = v;
+                NpcInv {
+                    tables: &*tables,
+                    state,
+                    rest: rest.as_mut(),
+                }
+            });
             let mut desk = Desk {
                 econ,
                 quests: &mut *p.quests,
@@ -268,6 +298,7 @@ impl<R, S> WiredWorld<R, S> {
                 state: &mut *p.state,
                 rest: &mut *p.rest,
                 now: p.now,
+                inv: lent.as_mut().map(|v| v as &mut dyn NpcInventory<_>),
             };
             f(&mut desk, &mut *p.npc, p.inventory.as_deref_mut())
         })
@@ -655,15 +686,22 @@ where
     D::X: Outbox,
 {
     fn npc<C: NpcCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
-        let (out, sent) = self.desk(game, events, |desk, ctl, mut inv| {
+        // The player inventories are staged on the rest for the NPC
+        // entries (Cain's identify, `inventory_entries`).
+        self.desk(game, events, |desk, _, inv| {
             let players = desk.econ.game.lists.units_of_type(UnitType::Player);
-            if let Some(p) = inv.as_deref_mut() {
+            if let Some(p) = inv {
                 let d = p.desk(&mut *desk.econ);
                 for &pl in &players {
                     desk.rest.stage_inventory(pl, d.npc_entries(pl));
                 }
             }
-            let out = call.call(ctl, desk);
+        });
+        // The call runs with the inventory lent to the desk (the item
+        // services: imbue, `Desk::inv`).
+        let out = self.desk_with(game, events, true, |desk, ctl, _| call.call(ctl, desk));
+        let (_, sent) = self.desk(game, events, |desk, _, mut inv| {
+            let players = desk.econ.game.lists.units_of_type(UnitType::Player);
             // Cain's identify (C→S 0x34) on the inventory model.
             let done = desk.rest.take_identified();
             if let (false, Some(p)) = (done.is_empty(), inv.as_deref_mut()) {
@@ -674,7 +712,7 @@ where
                     }
                 }
             }
-            (out, flush_shown(desk, inv))
+            ((), flush_shown(desk, inv))
         });
         self.inv_sent.extend(sent);
         Some(out)
