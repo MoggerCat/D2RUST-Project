@@ -88,7 +88,22 @@ the skills routine). Each owns its own linker (e.g. `skills_lookup.skill` is rea
 | Link targets (574 reads, IDs 11/13/15/19–21) | 0 failures: every target has an owner or is hand-built; code IDs read code keys and name IDs name keys; the owner compiles earlier, or is the same table (self links: `itemtypes`, `montype`, `itemstatcost`, `missiles`, `skills`, `monstats`; pass 1 fills them first). All 40 key entries name their own `table.column` |
 | Fields at the same offset | `levels` `camt1`–`camt4` (u16 at 220; the rightmost bound column wins) |
 | Partial overlaps | 18 pairs, each a `str(N)` whose NUL lands on the next field's first byte: `pettype` `baseicon`→`micon1`→…→`micon4`; `overlay` `Filename`→`version`; `missiles` `CelFile`→`AnimLen`; `treasureclassex` `treasure class`→`picks`, `item1`→…→`item10`→`prob1`; `hireling` `namefirst`→`namelast` |
-| Bytes no field writes | 1,702 bytes in 55 tables (ranges in `tables.tsv` notes). In `monstats`, `monstats2`, `monpreset`, `cubemain` the table-specific callbacks write some of them |
+| Bytes no field writes | 1,702 bytes in 55 tables (ranges in `tables.tsv` notes). The callbacks write 355 of them (§5.1); 1,347 bytes in 54 tables stay unwritten |
+
+#### 5.1 Callback footprints (`callbacks.md` §2–§6)
+The `tables.tsv` unwritten ranges count field footprints only. The table-specific callbacks write:
+
+| Table | Callback bytes | Still unwritten |
+|---|---|---|
+| `monstats` | 384–407 (`Sk1mode`–`Sk8mode`: modes 384–391, sequences 392–407) | 10-11,37,42-43,54-57,74-75,85,167,269,363 |
+| `monstats2` | 21–229 (counts 21–36, total 37, choices 38–229) | 2-3,7,15,230-231,234-235,237-239,242-243,262-263,278-279,293-295,305-307 |
+| `monpreset` | 1–3 (kind 1, index 2–3) | none |
+| `cubemain` | 20–75 (inputs); per output k = 0–2 at 76 + 84k: +0..+23 (+9..+10 and +11 are also the `lvl`/`plvl`/`ilvl` fields) | 5-7,17,111,123,135,147,159,195,207,219,231,243,279,291,303,315,327 |
+
+- Only `pre`/`suf` overflow (`callbacks.md` §3 r5) writes beyond these, into later field bytes.
+- Check (2026-10-08, scratch script over `tables.tsv` and the live P bins): every "still unwritten" byte is 0 in
+  every record (609, 734, 229, 151 records); the callback bytes hold 118,780 / 12,200 / 430 / 1,657 non-zero
+  bytes, the counts of `field-types.md` §10.
 
 Columns absent from the txt (each one gets its missing-column value, `field-types.md` §3):
 - `weapons` (35): minac, maxac, block, absorbs, missile, BetterGem, rArm, lArm, torso, legs, rspad,
@@ -120,5 +135,7 @@ None.
 | `runes 13 rune1 11 link32 0 152 items.code` | cell `r08` → 617 (`field-types.md` test vectors) |
 
 ## Open questions
-1. Footprints of the table-specific callbacks (§4) are unknown; their tables' unwritten ranges overstate.
-2. Not loader calls, so not here: sound tables (`0x481950`), client composite loader (`0x504430`).
+1. Answered (2026-10-08, from `callbacks.md`): §5.1.
+2. Answered: the sound lists (`0x00481950`) are owned by `audio/sound-table.md` §1–§2. The client composite
+   loader `0x00504430` takes field lists only in its compile branch, which never runs (switch `0x0072EF2C` = 1,
+   `loading.md` §3.5); its lists are not extracted.

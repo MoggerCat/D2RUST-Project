@@ -34,17 +34,17 @@
 |   4. Header row | 133–145 |
 |   5. Data rows and record numbering | 146–171 |
 |   6. Column binding | 172–228 |
-|   7. Cell conversions | 229–338 |
-|   8. Linkers | 339–399 |
-|   9. Strictness policy | 400–479 |
-|   10. Original-only behaviors not reproduced | 480–488 |
-| Constants & data dependencies | 489–501 |
-| Randomness | 502–505 |
-| Edge cases & original bugs | 506–529 |
-| Survey (1.14d data) | 530–696 |
-| Test vectors | 697–882 |
-| Provenance | 883–941 |
-| Open questions | 942–971 |
+|   7. Cell conversions | 229–339 |
+|   8. Linkers | 340–400 |
+|   9. Strictness policy | 401–481 |
+|   10. Original-only behaviors not reproduced | 482–490 |
+| Constants & data dependencies | 491–503 |
+| Randomness | 504–507 |
+| Edge cases & original bugs | 508–531 |
+| Survey (1.14d data) | 532–698 |
+| Test vectors | 699–885 |
+| Provenance | 886–944 |
+| Open questions | 945–977 |
 <!-- /index -->
 
 ## Summary
@@ -309,8 +309,9 @@ number: u32 little-endian (first byte = low byte).
 
 **Name key** (types 16–21): the first min(K, 31) bytes, then each byte
 0x41–0x5A replaced by that byte + 0x20. K = L for types 17–21; for type 16,
-K = the length of the text it stored. A byte ≥ 0x80 among those bytes is
-E11.
+K = the length of the text it stored. Bytes ≥ 0x80 among those bytes are
+mapped by 1.14d's signed-index rule (`field-types.md` §5.3: most become 0
+and end the key) and reported as KeyHigh.
 
 **Callbacks** (types 22–25). Each callback is defined by the spec of the
 table that uses it (string keys and formulas: `field-types.md` §7–§8). The
@@ -434,7 +435,7 @@ conditions are also reported as diagnostics.
 | E8 | record with a cell count ≠ `C` (removed `Expansion` lines excepted) | line | misread or fatal 389 / 646 (§5) |
 | E9 | NUL byte | line | cells shift (§2) |
 | E10 | file starts with `EF BB BF`, `FF FE` or `FE FF` | line 1 | BOM becomes part of the first column name |
-| E11 | byte ≥ 0x80 among the bytes that form a name key (§7) | line, column, field | the lowercase step reads outside its table; the key is mangled and can end early |
+| E11 | byte ≥ 0x80 in a calc formula's text (`calc-expressions.md` §4.2, d2rs policy 4). Name keys: KeyHigh, not E11 (2026-10-08) | line, column, field | the formula tokenizer stops at it |
 | E12 | type 12 registration index > 0xFF, or type 14 index > 0xFFFF | line, column, field | fatal 342 / 346 |
 | E13 | field list fails §6.1 | field | see §6.1 |
 | E14 | `C` + missing fields > 280 | — | column map overrun (Edge cases) |
@@ -473,6 +474,7 @@ from the 1.14d compile (Provenance).
 | DupName | type-16 registration of a key already present | the cell's | 0 |
 | CbMiss | non-empty table-callback text whose lookup misses (`callbacks.md` §8) | the cell's | 0 |
 | CbStop | a non-empty part of a table callback's text is ignored (`callbacks.md` §8) | the cell's | 0 |
+| KeyHigh | byte ≥ 0x80 among the bytes that form a name key (§7); the key is mapped per `field-types.md` §5.3 | the cell's | 0 |
 
 Find-or-register duplicates (types 17, 18) are not reported: 1.14d data
 relies on them (`monseq`). Empty lookup cells that miss are not reported.
@@ -852,8 +854,9 @@ BIT with len 10 at offset 16 (byte 17, mask 0x04): `"1"`, `"2"`, `"-1"`,
 | then Lookup `FIRE BOLT`, `""`, `Fire` | 0, 2, −1 |
 | UNKNOWN6 (register-always) `a`, `A`, `b` | `a` → 0, `b` → 2; `n` = 3; DupName on `A` |
 | two 40-byte names equal in their first 31 bytes | same key, same index |
-| NAMETOINDEX `b"Caf\xE9"` | E11, line 2, column 0 |
-| NAMETOINDEX, a 40-byte ASCII cell with 0xE9 at byte 35 | accepted (0xE9 is outside the key); key = first 31 bytes lowercased; TextCut |
+| NAMETOINDEX `b"Caf\xE9"` | key `caf`; KeyHigh, line 2, column 0 |
+| NAMETOINDEX cells `Caf`, `b"Caf\xE9"`, `b"ab\x80c"`, `b"\xC0x"` | stored 0, 0, 1, 2; keys `caf`, `ab\x05c`, `\x04x`; `n` = 3; KeyHigh on records 1–3 |
+| NAMETOINDEX, a 40-byte ASCII cell with 0xE9 at byte 35 | 0xE9 is outside the key (no KeyHigh); key = first 31 bytes lowercased; TextCut |
 
 **1.14d data** (`#[ignore]` tests reading `D2_GAME_DIR`; P = patch_d2,
 X = d2exp)
@@ -896,7 +899,7 @@ jump-table and constant bytes read from the PE file):
 | 0x6BDEA4 / 0x6BDEF2 | key callback (type 22; text in a 256-byte buffer; result stored as u16) / field callback (23–25; text, record, offset, len, record index, column) |
 | 0x6BD230 / 0x6BD130 | code linker register (sorted array; an equal key is incremented and the search retried; fatal 977 null, 984 name linker) / lookup |
 | 0x6BD500, 0x6BD5A0, 0x6BD3C0, 0x6BD490 | name linker register-always (fatal 1202 / 1206) / find-or-register (1228 / 1232) / lookup (1141 on a code linker) / tree insert |
-| 0x4135D0, 0x4113C0, table 0x6CEB98 | 32-byte bounded copy (31 characters); lowercase map, `A`–`Z` only, indexed by a signed byte (0x6CEB18–0x6CEB97 hold values 0–5) |
+| 0x4135D0, 0x4113C0, table 0x6CEB98 | 32-byte bounded copy (31 characters); lowercase map, `A`–`Z` only, indexed by a signed byte (0x6CEB18–0x6CEB97, constant `.rdata`, hold values 0–5; mapping in `field-types.md` §5.3) |
 | 0x410B10 / 0x410B50 | bit set / clear |
 | 0x6122F0, 0x6121F0 | loader: compile block when 0x96C8B4 ≠ 0 (`levels` for `leveldefs`; `.txt` at 0x6D48E0); writer `fopen(…, "wb")`, write skipped when it returns null; then the shared `.bin` read (0x744308 = 1, never written) |
 | 0x7063A4–0x7063FF, 0x44D9C0, 0x6125A0 | option record `TXT` / `TXT` / `txt` with target offset 0x215 (dword at 0x7063FC; neighbours: `nocompress` 0x206, `build` 0x223); the init stub passes (byte +0x215 == 0) to 0x6125A0, which stores (arg == 0) in 0x96C8B4 and is its only writer |
@@ -943,12 +946,11 @@ rule above comes from the 1.14d binary and data.
 
 1. Answered by `loading.md` open questions 2–3: the archive copy, unless
    `-direct` is also given.
-2. Table-specific field callbacks (types 23–25): what each 1.14d callback
-   does with a bound cell and with no text. Per-table specs
-   (`field-types.md` §8).
-3. Bytes ≥ 0x80 in name keys: 1.14d's lowercase step reads the 128 bytes
-   before its table (values 0–5; a 0 ends the key). Not reproduced (E11);
-   no 1.14d key has such a byte.
+2. Answered: `callbacks.md` (every 1.14d table callback, bound cell and
+   no text).
+3. Answered (static, `0x004113C0`, 2026-10-08): the 128 bytes are
+   constant `.rdata`; d2rs reproduces the mapping (`field-types.md` §5.3)
+   and reports KeyHigh (§9). E11 now covers only calc formulas.
 4. Rules confirmed from the binary only (1.14d data cannot show them):
    types 5, 7, 12, 14, 16, 24 (in no 1.14d list); the missing-column values
    of types 5, 7, 8, 10, 11, 12, 14, 16, 17, 18, 19, 21, 26 (no 1.14d table
@@ -958,13 +960,17 @@ rule above comes from the 1.14d binary and data.
    callback text cap (longest cell 199 bytes); the 280 limits (max 256
    columns, 253 entries, 256 slots); the row-end LF checks (no ragged
    1.14d row); the type-5 run check and the other fatal codes of §6.1.
-5. Quote handling inside callback columns (cube inputs, treasure-class
-   items, calc expressions, `monstats2` component lists) is up to those
-   callbacks. Not examined here.
-6. Linkers rebuilt from `.bin` records at runtime other than the item codes
-   (0x6315D0, same register routine, same order): per-table specs.
-7. The sound tables' field lists (`SoundHdr.cpp`) are not examined
-   (`loading.md` open question 11).
-8. `field-types.md` to align: its empty-key hit counts (23,937 code, 6,038
-   name) leave out `missiles` (505, 1,600); its Edge-cases note on the
-   type-22 missing column is settled by §7 (u16 0, no call).
+   Capture-only: a `-txt` run of 1.14d on synthetic files; the binary has
+   nothing more to give.
+5. Answered: each owner defines its quotes: cube inputs and outputs,
+   `monstats2` components (`callbacks.md` §1 r4 unquote), calc
+   expressions (`calc-expressions.md` §4.3: `"` skipped like a space),
+   treasure-class items (`items/treasure.md` §1.5: one leading `"` dropped,
+   cut at the next).
+6. Answered: `field-types.md` §6.6 lists every `.bin`-mode linker
+   rebuild (items, itemtypes, client composite codes; `@uniques`,
+   `@sets`, `@tc`).
+7. Answered: `audio/sound-table.md` §1–§2 (list in `0x00481950`,
+   re-extracted 2026-10-08).
+8. Answered: `field-types.md` §6.1–§6.2 give 24,442 / 7,638 and §3 / §7
+   give the type-22 missing column as u16 0, no call.
