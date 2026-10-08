@@ -112,6 +112,7 @@ pub fn skill_row(skill: usize) -> Skills {
     s.intown = true;
     s.range = 1;
     s.mana = 2;
+    s.manashift = 8;
     s.anim = 7;
     match skill {
         BASH => {
@@ -317,6 +318,9 @@ impl Rig {
                 for st in [stat::HITPOINTS, stat::MAXHP] {
                     v.set_base(p, st, 100 << 8);
                 }
+                // The synthetic player is level 0: a level-0 attacker
+                // hits 5% of the time (`hit.md` §3).
+                v.set_base(p, stat::LEVEL, 20);
                 v.set_base(p, TOHIT, 1000);
                 v.set_base(p, MINDAMAGE, 5 << 8);
                 v.set_base(p, MAXDAMAGE, 5 << 8);
@@ -349,7 +353,7 @@ impl Rig {
                 v.set_base(m, stat::HITPOINTS, 100 << 8);
             });
             a.sys.units.get_mut(m).unwrap().flags |=
-                flags::IS_VALID_TARGET | flags::CAN_BE_ATTACKED;
+                flags::BIT1 | flags::IS_VALID_TARGET | flags::CAN_BE_ATTACKED;
             m
         })
     }
