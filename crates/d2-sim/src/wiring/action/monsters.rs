@@ -63,6 +63,9 @@ pub trait MonsterWorld<X> {
         arg: Option<UnitId>,
         mode: u8,
     );
+    /// `0x005A4850(game, unit, umod, 0)`: append `umod` to the unit's
+    /// list and run its init (`init.md`, `assign_umod`).
+    fn assign_umod(&mut self, sim: &mut Sim<'_>, h: &mut ActionHooks<X>, unit: UnitId, umod: u8);
     /// The monster state's part of a unit free.
     fn forget(&mut self, unit: UnitId);
     /// The monster data (unit +0x14) of `unit`, if it has one.

@@ -50,6 +50,10 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         }
         self.set_item_flags(item, flags | iflag::IDENTIFIED | iflag::CHANGED);
         deferred::mark(self, player, item, 0);
+        // Identified, a charm or worn item may now be usable (§4.2): the
+        // inventory pass (`inventory.md` §5.7 steps 2, 4) links its list
+        // (REC-281; part of REC-113's unwritten effect).
+        crate::items::moves::MovePending::inventory_pass(self, player);
         true
     }
 

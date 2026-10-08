@@ -175,16 +175,12 @@ impl<X: Pending, F: FreeSpot> DropPlacer<ActionHooks<X>> for Spots<'_, F> {
         }
     }
 
-    /// With the path records: the path part of `SUNIT_Add` (§2.5) for
-    /// the item at its spot (mode 3: static path and footprint, mask
-    /// 0x200, in 0x3E01), whether or not the walk-back field chose the
-    /// spot (without it the spot is [`FreeSpot`]'s): the item's position
-    /// is its path's (`bitstream.md` §4.1 r2, the 0x9C ground x / y).
-    /// Without path records: nothing (as before the provider).
+    /// The path part of `SUNIT_Add` (§2.5) for the item at its spot
+    /// (mode 3: static path and footprint, mask 0x200, in 0x3E01;
+    /// without the path provider the `Pending::place` seam). Also without
+    /// the walk-back field: the spot [`FreeSpot`] chose is the item's
+    /// position (it was dropped, and the item had no position).
     fn placed(&mut self, econ: &mut Economy<'_, ActionHooks<X>>, item: UnitId, spot: DropSpot) {
-        if econ.hooks.paths.is_none() {
-            return;
-        }
         let game: &crate::game::Game = econ.game;
         View::of(econ.units, econ.stats, econ.data, econ.hooks)
             .path_place(game, item, spot.x, spot.y);

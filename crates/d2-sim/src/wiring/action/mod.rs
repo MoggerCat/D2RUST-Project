@@ -148,6 +148,17 @@ pub enum WiringError {
     },
 }
 
+/// What the Hireable AI reads of the hireling lists and table
+/// (`0x00574BD0`, `0x006562F0`; `ai-bodies-6.md` §7 steps 3 and 7.2):
+/// each living hireling unit's owner and its node's `hireling` `Id`
+/// (`hirelings.md` §3.2 rule 6), and the rows. The host that holds the
+/// lists writes it.
+#[derive(Debug, Clone, Default)]
+pub struct HirelingAiFacts {
+    pub ids: BTreeMap<UnitId, (UnitId, u32)>,
+    pub rows: Option<Arc<crate::world::hirelings::HirelingRows>>,
+}
+
 /// The [`crate::units::hooks::UnitHooks`] of [`ActionSim`]'s unit system
 /// and the state every action adapter shares.
 pub struct ActionHooks<X> {
@@ -198,6 +209,10 @@ pub struct ActionHooks<X> {
     /// default): the call does nothing (no pet list in the action
     /// wiring).
     pub pet_follows: Option<Vec<UnitId>>,
+    /// The hireling facts the Hireable AI reads (`ai-bodies-6.md` §7
+    /// steps 3 and 7.2), published by the host that holds the hireling
+    /// lists ([`HirelingAiFacts`]); empty: the AI finds no hireling.
+    pub hireling_ai: HirelingAiFacts,
     /// Monsters killed by the kill `0x0057CCB0` with flag 1 (every
     /// caller but the expired-pet kill), for the host that holds the
     /// hireling lists: `hirelings.md` §8 rule 1 (`0x005751A0` when the
@@ -218,6 +233,12 @@ pub struct ActionHooks<X> {
     /// player, destination level, argument), for the host that runs them
     /// (`wiring::path::act_change`) after the call.
     pub act_changes: Vec<(UnitId, u32, u32)>,
+    /// The removal records of freed ground items (GUID, room): sent as
+    /// S→C 0x0A by the per-client update's removals (`tick.md` §6 rule
+    /// 5, `0x0053A770`) and freed by tick step 7. PROVISIONAL (REC-281):
+    /// the record-making path is not specified; only ground items are
+    /// recorded.
+    pub removed_items: Vec<(u32, crate::units::RoomId)>,
     /// The loaded `AnimData.d2` (`formats/animdata.md`, parsed by
     /// `d2-formats`): the records `UnitHooks::anim_record` looks up by
     /// COF name. `None`: no record for any unit (as before the table is
@@ -359,10 +380,12 @@ impl<X> ActionHooks<X> {
             portals: Default::default(),
             object_drops: None,
             pet_follows: None,
+            hireling_ai: HirelingAiFacts::default(),
             pet_deaths: None,
             owner_deaths: None,
             hireling_calls: None,
             act_changes: Vec::new(),
+            removed_items: Vec::new(),
             anim_data: None,
             vitals: None,
             mode_target: None,

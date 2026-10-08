@@ -44,6 +44,10 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
             Some(r) if r == spot.room => {}
             Some(_) => self.state.errors.push(InvError::OtherRoom(u)),
         }
+        // The item's path follows its ground position (REC-281).
+        self.econ
+            .hooks
+            .ground_item_placed(u, spot.room, spot.x, spot.y);
     }
     fn in_room(&self, item: Guid) -> bool {
         self.item_unit(item)
@@ -138,7 +142,12 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn collides(&self, a: Owner, b: Owner, mask: u32) -> bool {
         self.rest.collides(a, b, mask)
     }
+    /// Recorded for the host ([`InvDesk::take_item_walks`]), then the
+    /// rest's seam.
     fn walk_to_item(&mut self, player: Owner, item: Guid, cursor: bool) {
+        if let (Some(p), Some(i)) = (self.unit_of(player), self.item_unit(item)) {
+            self.state.item_walks.push((p, i, cursor));
+        }
         self.rest.walk_to_item(player, item, cursor)
     }
     fn walk_to_unit(&mut self, player: Owner, target: Owner, cursor: bool) {
@@ -280,8 +289,16 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     ) -> Option<Spot> {
         self.rest.free_spot(start, origin, size, mask, mask2, last)
     }
+    /// `0x0061AB00` on the player's room through the unit side's levels
+    /// (REC-281: the stash page needs a town, `inventory-moves.md` §7.3),
+    /// else the rest's answer.
     fn in_town(&self, player: Owner) -> bool {
-        self.rest.in_town(player)
+        let room = self
+            .unit_of(player)
+            .and_then(|u| self.econ.game.lists.unit(u))
+            .and_then(|e| e.room());
+        room.is_some_and(|r| self.econ.hooks.town_room(self.econ.game, r))
+            || self.rest.in_town(player)
     }
     fn room_delete_notice(&mut self, item: Guid) {
         self.rest.room_delete_notice(item)
@@ -451,8 +468,28 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         }
         self.rest.remove_used(player, item)
     }
+    /// §4.9 on the inventory model (`equip_without_cursor`, skip 0), then
+    /// unit flag 0x2000000 cleared (`inventory.md` §4.9 step 3).
     fn equip_picked(&mut self, player: Owner, item: Guid) -> bool {
-        self.rest.equip_picked(player, item)
+        let Some(u) = self.item_unit(item) else {
+            return false;
+        };
+        let t = self.tables;
+        let ok = self
+            .with_inv(player, |inv, d| {
+                crate::items::inventory::equip::equip_without_cursor(inv, d, t, u, false)
+            })
+            .unwrap_or(false);
+        if ok {
+            let o = Owner::item(item);
+            let f = crate::items::moves::MoveUnits::unit_flags(self, o);
+            crate::items::moves::MoveUnits::set_unit_flags(
+                self,
+                o,
+                f & !crate::items::moves::uflag::ON_GROUND,
+            );
+        }
+        ok
     }
     /// The filler's properties (`properties.md` §9,
     /// [`InvDesk::apply_filler_properties`]), then the owner link

@@ -63,11 +63,31 @@ pub struct HirelingRow {
     pub resist: i32,
     pub resist_lvl: i32,
     pub skills: [RowSkill; SKILL_SLOTS],
+    /// `DefaultChance` (+0x64), `Chance1`–`6` (+0x90) and
+    /// `ChancePerLvl1`–`6` (+0xA8): the Hireable AI's skill pick (§1.1
+    /// rule 6, `ai-bodies-6.md` §7 step 7).
+    pub default_chance: i32,
+    pub chance: [i32; SKILL_SLOTS],
+    pub chance_per_lvl: [i32; SKILL_SLOTS],
     /// u8 +0xD2.
     pub hire_desc: u8,
     /// +0x114 / +0x116 (string ids, `fixups.md` §7).
     pub name_first: u16,
     pub name_last: u16,
+}
+
+impl HirelingRow {
+    /// The columns the Hireable AI's skill pick reads (`0x005E4D30`).
+    pub fn ai_row(&self) -> crate::monsters::ai::HireRow {
+        crate::monsters::ai::HireRow {
+            level: self.level,
+            default_chance: self.default_chance,
+            skill: self.skills.map(|s| s.skill),
+            chance: self.chance,
+            chance_per_lvl: self.chance_per_lvl,
+            mode: self.skills.map(|s| s.mode as u8),
+        }
+    }
 }
 
 /// The hireling tables of a game: the rows in table order and the two
@@ -131,6 +151,7 @@ impl HirelingRows {
             .map(|r| {
                 let h = Hireling::decode(r);
                 let i8_at = |o: usize| r[o] as i8;
+                let i32_at = |o: usize| i32::from_le_bytes([r[o], r[o + 1], r[o + 2], r[o + 3]]);
                 let skill = |k: usize| RowSkill {
                     skill: i32::from_le_bytes([
                         r[0x78 + 4 * k],
@@ -169,6 +190,9 @@ impl HirelingRows {
                     resist: h.resist as i32,
                     resist_lvl: h.resist_lvl as i32,
                     skills: std::array::from_fn(skill),
+                    default_chance: i32_at(0x64),
+                    chance: std::array::from_fn(|k| i32_at(0x90 + 4 * k)),
+                    chance_per_lvl: std::array::from_fn(|k| i32_at(0xA8 + 4 * k)),
                     hire_desc: h.hiredesc,
                     name_first: u16::from_le_bytes([r[0x114], r[0x115]]),
                     name_last: u16::from_le_bytes([r[0x116], r[0x117]]),
