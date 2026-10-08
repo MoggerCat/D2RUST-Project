@@ -132,10 +132,12 @@ pub fn render(s: &Shape, names: &dyn DescNames) -> String {
                 tab.copied().unwrap_or("")
             )
         }
+        // `item-tips.md` §7.2 f15 / f24: skill = layer >> 6, level =
+        // layer & 0x3F.
         15 => format!(
             "{v}% Chance to cast level {} {} {n}",
-            s.param >> 6,
-            skill(s.param & 0x3F)
+            s.param & 0x3F,
+            skill(s.param >> 6)
         ),
         16 => format!("Level {v} {} Aura When Equipped", skill(s.param)),
         17 => place(s.val, &plain(v), n),
@@ -146,8 +148,8 @@ pub fn render(s: &Shape, names: &dyn DescNames) -> String {
         22 | 23 => place(s.val, &format!("{}%", plain(v)), n),
         24 => format!(
             "Level {} {} ({}/{} Charges)",
-            s.param >> 6,
-            skill(s.param & 0x3F),
+            s.param & 0x3F,
+            skill(s.param >> 6),
             v & 0xFF,
             (v >> 8) & 0xFF
         ),
@@ -219,7 +221,8 @@ mod tests {
                 15,
                 0,
                 10,
-                (3 << 6) | 5,
+                // §7.2: skill = layer >> 6, level = layer & 0x3F.
+                (5 << 6) | 3,
                 "10% Chance to cast level 3 Fire Bolt Thing",
             ),
             (16, 0, 4, 5, "Level 4 Fire Bolt Aura When Equipped"),
@@ -230,7 +233,7 @@ mod tests {
                 24,
                 0,
                 0x0A05,
-                (2 << 6) | 5,
+                (5 << 6) | 2,
                 "Level 2 Fire Bolt (5/10 Charges)",
             ),
             (27, 0, 1, 5, "+1 to Fire Bolt (Sorceress Only)"),

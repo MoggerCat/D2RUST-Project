@@ -773,7 +773,15 @@ fn world_view_frame(
                     }
                 }
             }
-            super::swap_key::send_swaps(&frame.unhandled, &mut bridge.0)?;
+            // `ui/controls.md` §3 cmd 44: no swap while ui 0x0C, 0x17 or
+            // 0x19 is open.
+            let swap_ok = ui
+                .original
+                .as_ref()
+                .is_none_or(|o| super::swap_key::swap_allowed(&|s| o.is_open(s)));
+            if swap_ok {
+                super::swap_key::send_swaps(&frame.unhandled, &mut bridge.0)?;
+            }
             Some(frame)
         }
         None => None,
