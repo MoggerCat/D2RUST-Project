@@ -344,6 +344,11 @@ fn missile_trap_game() -> Rig {
         t.missiles[0].vel = 16;
         t.missiles[0].maxvel = 16;
         t.missiles[0].range = 200;
+        // A spell bolt: no to-hit roll (`ToHit` 0), so whether it hits does
+        // not hang on the trap's seed, which any other unit's creation moves
+        // (the arrow row's `ToHit` 1 missed once the synthetic town had one
+        // more NPC). d2rs-own, unverified.
+        t.missiles[0].tohit = 0;
         h.tables = Arc::new(t);
         h.x.monsters.modes = vec![0xFFFF, 0xFFFF];
         let mut looks = (**h.x.looks.as_ref().unwrap()).clone();

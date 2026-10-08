@@ -636,6 +636,9 @@ impl LocalSeams {
     }
 }
 
+/// Unit flags `0x005557D0` gives a preset unit (`population.md` §11.1).
+const SYNTHETIC_PRESET_FLAGS: u32 = 0x300_0000;
+
 /// d2rs-own, unverified (preview, D1): the melee reach of every unit in
 /// sub-tiles (`0x00622870` reads the unit's size and weapon; not
 /// answered here).
@@ -1331,12 +1334,18 @@ impl WaypointTables {
         o.operatefn = 23;
         o.initfn = 17;
         o.framecnt1 = 15 << 8;
+        // The town units the build places are kept by the inactive store
+        // (`units.md` §3.3: objects `Restore` ≠ 0; a chest only while
+        // unopened, `RestoreVirgins`). d2rs-own, unverified (REC-287).
+        o.restore = 1;
         // Class 1: a chest (`objects.md` §5.2, §8.1), placed only on
         // request ([`build_with_chests`]). d2rs-own, unverified.
         let mut chest: Objects = blank();
         chest.operatefn = SYNTHETIC_CHEST_OPERATE;
         chest.initfn = SYNTHETIC_CHEST_INIT;
         chest.framecnt1 = 15 << 8;
+        chest.restore = 1;
+        chest.restorevirgins = 1;
         // Class 59: the town portal (`objects.md` §12), padded rows
         // before it are blank. d2rs-own, unverified (REC-117).
         let mut portal: Objects = blank();
@@ -1351,6 +1360,7 @@ impl WaypointTables {
         tome.operatefn = synthetic_tower::TOME_OPERATE;
         tome.initfn = synthetic_tower::TOME_INIT;
         tome.framecnt1 = 15 << 8;
+        tome.restore = 1;
         let mut objects = vec![o, chest];
         objects.resize(SYNTHETIC_PORTAL_CLASS as usize, blank());
         objects.push(portal);
@@ -2592,6 +2602,7 @@ pub fn build_with_town(
         let row = &mut wp_tables.objects[STASH_CLASS as usize];
         row.operatefn = STASH_OPERATE;
         row.framecnt1 = 15 << 8;
+        row.restore = 1;
     }
     let (mut levels, parts) = match data {
         GameData::Synthetic => (LevelSource::synthetic(), GameParts::synthetic(&wp_tables)?),
@@ -2648,6 +2659,9 @@ pub fn build_with_town(
     hooks
         .enable_paths()
         .map_err(|e| BuildError::Setup(format!("path tables: {e:?}")))?;
+    // The inactive store (`units.md` §3.3–§3.4): a room the tick frees
+    // keeps its units' records, and its next build restores them.
+    hooks.enable_inactive_store();
     let info = GameInfo {
         expansion: GAME_SETUP.expansion,
         difficulty: character.difficulty(),
@@ -2953,6 +2967,20 @@ pub fn build_with_town(
                         v.allocate(g, &req, rect3.x * 5 + dx, rect3.y * 5 + dy)
                     })
                     .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
+            }
+        }
+    }
+    // The synthetic towns' units stand in for the live towns' preset units,
+    // which `0x005557D0` creates with unit flags 0x3000000
+    // (`population.md` §11.1), so the inactive store keeps them whatever
+    // the level's `SaveMonsters` (`units.md` §3.3 `S`). d2rs-own,
+    // unverified (REC-287).
+    if matches!(data, GameData::Synthetic) {
+        for ty in [UnitType::Monster, UnitType::Object] {
+            for u in game.lists.units_of_type(ty) {
+                if let Some(r) = sim.action.sys.units.get_mut(u) {
+                    r.flags |= SYNTHETIC_PRESET_FLAGS;
+                }
             }
         }
     }
