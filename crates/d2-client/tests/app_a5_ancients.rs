@@ -209,7 +209,9 @@ fn the_statues_and_the_altar_register_with_the_quest_and_the_altar_answers() {
 #[test]
 fn the_summit_exits_wait_for_the_ancients() {
     let mut rig = Rig::new();
-    let [back, on] = synthetic_chains::slots(a5::SUMMIT);
+    let slots = synthetic_chains::slots(a5::SUMMIT);
+    let back = slots.iter().find(|e| e.0 == 0).map(|e| (e.1, e.2));
+    let on = slots.iter().find(|e| e.0 != 0).map(|e| (e.1, e.2));
     let (_, back_class) = back.expect("a way back");
     let (keep, on_class) = on.expect("a way on");
     assert_eq!(keep, 128);
