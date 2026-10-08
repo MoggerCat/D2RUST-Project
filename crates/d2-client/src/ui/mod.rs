@@ -15,6 +15,7 @@
 //! behavior.
 
 pub mod automap;
+pub mod char_feed;
 pub mod cursor;
 pub mod draw;
 pub mod edge;

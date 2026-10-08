@@ -101,6 +101,11 @@ pub trait CharacterView {
     fn next_level(&self) -> Option<u32> {
         None
     }
+    /// The defense colour of the `armblue` / `armred` / `holyshield`
+    /// states (`panels-3.md` §24 r3); `None`: the §8.7 compare.
+    fn defense_color(&self) -> Option<u16> {
+        None
+    }
 }
 
 /// Pressed state of the character panel (`[0x007C02F4]` and the pressed
@@ -156,7 +161,9 @@ fn plain_value(view: &dyn CharacterView, stat: u16) -> Option<(i32, u16)> {
     if stat == STAT_HITPOINTS && view.alive() && shown < 1 {
         shown = 1;
     }
-    let color = if CMP_STATS.contains(&stat) {
+    let color = if stat == STAT_DEFENSE && view.defense_color().is_some() {
+        view.defense_color().unwrap_or(0)
+    } else if CMP_STATS.contains(&stat) {
         cmp_color(value, base)
     } else {
         0
