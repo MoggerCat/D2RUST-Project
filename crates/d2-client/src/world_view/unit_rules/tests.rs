@@ -360,3 +360,32 @@ fn units_face_their_walk_target_and_keep_the_facing() {
     loader.ensure(&world, &mut a);
     assert_eq!(dir(&world, &remote), 10);
 }
+
+// Covers: specs/skills/bodies-2b.md §8.11
+#[test]
+fn a_spinning_unit_loops_its_frames_from_frame_three() {
+    let mut src = MemorySource::default();
+    src.insert(
+        "data\\global\\chars\\QA\\cof\\QAQNhth.cof",
+        cof_dirs(16, 8, &[1]),
+    );
+    let (loader, rules) = setup(src);
+    let mut world = ClientWorld::default();
+    let local = unit(PLAYER, 2, 0, 1);
+    world.units.insert(local.key, local.clone());
+    world.local_player = Some(local.key);
+    let mut a = assets();
+    loader.ensure(&world, &mut a);
+    let frame = |w: &ClientWorld| {
+        rules
+            .unit_pose(w, w.local().unwrap())
+            .unwrap()
+            .unwrap()
+            .frame
+    };
+    rules.art.write().unwrap().spin = Some(local.key);
+    for t in 0..12u64 {
+        world.server_ticks = t;
+        assert!(frame(&world) >= 3, "tick {t} frame {}", frame(&world));
+    }
+}

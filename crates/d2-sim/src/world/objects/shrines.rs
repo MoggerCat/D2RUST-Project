@@ -54,6 +54,10 @@ pub const NO_GEM: [u8; 4] = *b"non ";
 /// Exploding / poison potion offsets of the 6 missiles (§9.3).
 pub const POTION_OFFSETS: [(i32, i32); 6] = [(-6, 6), (-6, -6), (0, 6), (0, -6), (6, 6), (6, -6)];
 
+/// Remove callback ids of the shrine states (§9.2).
+pub const SKILL_REMOVE: u32 = 0x0058_3BD0;
+pub const STAMINA_REMOVE: u32 = 0x0058_3A40;
+
 /// The remove callback of a shrine state (§9.2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RemoveCallback {

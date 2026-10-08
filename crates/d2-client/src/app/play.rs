@@ -65,6 +65,7 @@ use crate::world_view::object_label::ObjectLabels;
 use crate::world_view::preview::Preview;
 use crate::world_view::tile_assets::TileAssets;
 use crate::world_view::walk::{add_preview_walk, PreviewWalk};
+use crate::world_view::weather_view::WeatherView;
 use crate::world_view::{
     ModelFeed, NoFeed, Unspecified, ViewAssets, WorldViewPlugin, WorldViewState,
 };
@@ -187,6 +188,7 @@ pub fn add_preview_tinted(
     lights: Option<crate::world_view::light_sources::LightRows>,
     tints: Option<crate::world_view::state_tint::StateTints>,
 ) {
+    let weather = WeatherView::new(tiles.source());
     let mut preview = Preview::new(tiles);
     preview.light.sources = lights.map(std::sync::Arc::new);
     preview.light.set_tints(tints.map(std::sync::Arc::new));
@@ -196,7 +198,8 @@ pub fn add_preview_tinted(
             levels: Some(levels),
             ..ModelFeed::<NoFeed>::default()
         }
-        .with_preview(preview),
+        .with_preview(preview)
+        .with_weather(weather),
     );
     state.preview = true;
 }
@@ -221,6 +224,7 @@ pub fn add_walk(app: &mut App, tap: WalkTap, speeds: Option<crate::bridge::predi
         .map(|a| a.0.art.clone());
     add_preview_walk(app, walk);
     crate::world_view::monster_walk::add_monster_walk(app);
+    crate::world_view::skill_motion::add_skill_motion(app);
     crate::world_view::walk_room::add_preview_walk_room(app);
 }
 
@@ -465,6 +469,14 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             .map_err(|e| warn!("state tints (d2rs-own, unverified): {e}; no unit tinted"))
             .ok();
         add_preview_tinted(&mut app, level_rows, tiles, lights, tints);
+        match crate::world_view::unit_facts::load(archives.as_ref()) {
+            Ok(t) => {
+                if let Some(mut state) = app.world_mut().get_resource_mut::<WorldViewState>() {
+                    state.feed.set_unit_fact_tables(t);
+                }
+            }
+            Err(e) => warn!("unit facts tables: {e}; draw order uses the preview fills only"),
+        }
         let mut item_parts =
             super::items::item_parts(archives.as_ref()).map_err(anyhow::Error::msg)?;
         if let Some(lookup) = item_lookup {
@@ -495,6 +507,9 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             .map_err(anyhow::Error::msg)?;
         super::strings::install_strings(&mut app, strings);
         super::hud::install_hud_tables(&mut app, archives.as_ref()).map_err(anyhow::Error::msg)?;
+        super::hud::install_char_tables(&mut app, archives.as_ref()).map_err(anyhow::Error::msg)?;
+        super::hud::install_skill_tree_tables(&mut app, archives.as_ref())
+            .map_err(anyhow::Error::msg)?;
         ui::set_waypoint_map(&mut app, waypoint_map);
         ui::set_shop_prices(&mut app, started.prices.clone());
         super::hire_stats::install_hire_stats(&mut app, hire_rows, true);

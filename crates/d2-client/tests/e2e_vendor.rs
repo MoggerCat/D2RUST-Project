@@ -1313,5 +1313,15 @@ fn buying_a_store_item_sends_0x9c_action_12() {
         .map(|m| u32::from_le_bytes(m[4..8].try_into().unwrap()))
         .collect();
     assert_eq!(twelve, [bg], "one 0x9C action 12 for the bought item");
+    // The client: the store item left the shop grid (action 12). The
+    // copy's action 4 is the update pass's, which needs the player's room
+    // (this harness has none): `e2e_single_player` asserts it.
+    let w = fx.bridge.world();
+    assert!(
+        d2_client::bridge::items::store_items(w)
+            .iter()
+            .all(|i| i.key.guid != bg),
+        "the taken store item is not in the shop grid"
+    );
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
 }

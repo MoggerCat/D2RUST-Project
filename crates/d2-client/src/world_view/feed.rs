@@ -31,13 +31,14 @@ use crate::bridge::ClientUnit;
 use crate::composite::{ComponentFrame, ComponentRequest, CompositeError, UnitParams};
 use crate::frames::IndexFrame;
 use crate::rules::camera::shake_offsets;
+use crate::rules::draw_order::sky::SkyPasses;
 use crate::rules::draw_order::source::{ordered_source, TileArt, WeatherFrame};
 use crate::rules::draw_order::{FadeClock, NearRooms, OrderedTile, UnitFacts};
 use crate::rules::lighting::view::{FrameLight, LitRules, LookFeed};
 use crate::rules::{
     Camera, FrameSize, MapTile, OpenMode, OriginalView, Shake, UnitPosition, ViewSource,
 };
-use crate::scene::{BlendOp, ShadeChain};
+use crate::scene::{BlendOp, DrawItem, ShadeChain};
 use crate::ui::{ImageRequest, TextRequest, UiDraw};
 
 use super::WorldFrame;
@@ -79,10 +80,19 @@ pub trait ViewFeed: ViewSource {
     /// cell).
     fn set_local_prediction(&mut self, _at: Option<(UnitKey, (u32, u32))>) {}
 
+    /// The play preview's skill-move draw offsets `(dx, dy)` per unit
+    /// (`world_view::skill_motion`, Leap's arc; d2rs-own, unverified),
+    /// handed over before each build. The default ignores them.
+    fn set_motion_offsets(&mut self, _offsets: std::collections::BTreeMap<UnitKey, (i32, i32)>) {}
+
     /// The unit under the cursor, handed over before each build by the
     /// play preview (`bridge::hover::pick`; d2rs-own, unverified): drawn
     /// highlighted (`blend-modes.md` §3 `h`). The default ignores it.
     fn set_hover(&mut self, _unit: Option<UnitKey>) {}
+
+    /// The table columns of the unit facts (`world_view::unit_facts`). The
+    /// default ignores them.
+    fn set_unit_fact_tables(&mut self, _tables: super::unit_facts::UnitFactTables) {}
 
     /// Whether the view places a cel cut by the frame edge and leaves it
     /// to the frame clip (`OriginalView::with_edge_clip`, decision D1). The
@@ -153,6 +163,24 @@ pub trait ViewFeed: ViewSource {
         _world: &ClientWorld,
     ) -> Result<Option<WeatherFrame<'_>>, ViewError> {
         Ok(None)
+    }
+
+    /// The draw items of the frame's passes 4 and 9 (`draw-order-2.md`
+    /// §11.6, §11.7), keyed at their passes. The default draws none and
+    /// refuses a frame that has draws (M07: nothing is dropped).
+    fn sky_items(&self, sky: &SkyPasses, _assets: &ViewAssets) -> Result<Vec<DrawItem>, ViewError> {
+        if sky.is_empty() {
+            return Ok(Vec::new());
+        }
+        Err(ViewError::Unresolved {
+            what: "weather draws",
+            spec: "render/draw-order-2.md",
+            message: format!(
+                "{} pool cel(s) and {} sky draw(s) and the feed has no art for them",
+                sky.pools.len(),
+                sky.sky.len()
+            ),
+        })
     }
 
     /// The fade clock of the frame (`draw-order.md` §8 clock arithmetic):
@@ -401,7 +429,18 @@ where
             assets,
         ),
         Some((camera, mode)) => match ordered_source(world, &camera, mode, feed, assets)? {
-            Some(source) => build_lit(world, ui, rules, camera, &source, source.source, assets),
+            Some(source) => {
+                let mut frame =
+                    build_lit(world, ui, rules, camera, &source, source.source, assets)?;
+                // Passes 4 and 9 (`draw-order-2.md` §11.6, §11.7) join the
+                // sorted list by their keys.
+                let sky = source.source.sky_items(&source.sky, assets)?;
+                if !sky.is_empty() {
+                    frame.items.extend(sky);
+                    crate::scene::order(&mut frame.items);
+                }
+                Ok(frame)
+            }
             None => build_lit(world, ui, rules, camera, &*feed, &*feed, assets),
         },
         None => build(

@@ -56,6 +56,7 @@ use super::panels::{
     TextMeasure, UiFiles,
 };
 use super::root::{Routed, UiError, UiRoot};
+use super::skill_tree_ui;
 use super::states::{GateEnv, PlayerLife, UiEffect, UiStateError, UiStates};
 use super::PointerButton;
 use crate::assets::path::FileSource;
@@ -79,16 +80,13 @@ pub const CLICK_SOUND_ID: i32 = 0;
 /// the app does not hold yet (M02: named, not guessed).
 pub const PENDING: &[(&str, &str)] = &[
     (
-        "character labels, class line, resist effects, shift-spend (§8.6, §8.9; \
-         `panels-2.md` §17 r3, r5–r9)",
-        "the values and the name line are bound ([`ModelCharacter`]); the labels need the \
-         string table by id (`StringLookup::get_id`, `NoStrings` in play); the class line \
-         needs the `charstats` class name (record +0, not in `ClientTables`); next level \
-         (§8.11) needs `experience.txt` (not in the model: the panel shows stat 30); the \
-         resist and defense effects (`panels-3.md` §24 r1, r3) need the `states.txt` flag \
-         masks (not in `StateRow`); the damage block and popups need the skill list and \
-         `monstats`; Shift is not in the UI events (a spend is 1 point); the language is \
-         English (0, `ui/text.md` §1.2)",
+        "character shift-spend, popups and the skill-modified damage block (§8.6, §8.9; \
+         `panels-2.md` §17 r5–r9)",
+        "labels (string ids), the class line, next level, the resist / defense colours and a \
+         weapon-only damage / attack-rating block are bound ([`char_feed`], PROVISIONAL \
+         REC-269); the skill-specific `descdam` / `descatt` entries, the to-hit popups (need \
+         `monstats`) and Shift (not in the UI events: a spend is 1 point) are not; the language \
+         is English (0, `ui/text.md` §1.2)",
     ),
     (
         "inventory gold button press / release and the gold dialog (`panels-2.md` §21 r3–r9)",
@@ -97,15 +95,18 @@ pub const PENDING: &[(&str, &str)] = &[
          press does not play sound 4 (deferred); the stash kinds 3 / 4 are not wired",
     ),
     (
-        "inventory equipment backgrounds (§9.4)",
-        "equipped items per body location: the item stream is not decoded \
-         (`msg-stats-items.md` open question 3)",
+        "inventory equipment tints and empty-slot pictures (§9.4, `inventory.md` §6 r4)",
+        "the equipped-item tint (refused when the requirements fail, unidentified) is pushed \
+         as `UiDraw::Tint` by `ItemsUi::draw_panel` (REC-271); the scene has no fill \
+         primitive to paint it, the hover tint and the grid-item tints are not pushed, and \
+         the empty-slot pictures (§9.4 table) are not drawn",
     ),
     (
-        "skill tree icons and level numbers (§10.3–§10.5)",
-        "the skill list is in the model (`client/msg-skills.md`), but the icon file prefix \
-         `CC` (spec open), the flag mask `[0x006CE270]` and the fields the tree shows \
-         (`msg-skills.md` open question 3) are not",
+        "skill tree hover description and the no-points message (§10.5, §10.7)",
+        "icons, level numbers, the flag mask and the point spend (C→S 0x3B) are wired \
+         ([`skill_tree_ui`]); the point cost is 1 (`skpoints` formula not evaluated, \
+         REC-270); the tab tool tips, the free-points box and the no-points message are \
+         not wired",
     ),
     (
         "waypoint menu panel (ui 0x14, §13 r2–r7)",
@@ -221,8 +222,12 @@ struct Shared {
     /// `difficultylevels` `ResistPenalty` by difficulty (§8.9, `0x00611D30`);
     /// an expansion game draws no values without it.
     resist_penalties: Option<Vec<i32>>,
+    /// The character panel's extra tables ([`char_feed`]).
+    char_tables: super::char_feed::CharTables,
     /// The control panel overlays' state ([`hud`]).
     hud: hud::HudState,
+    /// The skill tree's class skill rows ([`skill_tree_ui`]).
+    skill_tree: skill_tree_ui::SkillTreeTables,
     /// The inventory panel's item facts (`inv_items`).
     items: ItemsUi,
     /// The levels' waypoint indexes (`waypoint_ui`).
@@ -350,6 +355,7 @@ impl OriginalUi {
         tables.files.extend(esc_art::esc_files());
         tables.files.extend(quest_log_ui::quest_files());
         tables.files.extend(cube_ui::cube_files());
+        tables.files.extend(skill_tree_ui::icon_files());
         let shared = Shared {
             tables,
             states: UiStates::new()?,
@@ -364,7 +370,9 @@ impl OriginalUi {
             outputs: Vec::new(),
             fonts: None,
             resist_penalties: None,
+            char_tables: Default::default(),
             hud: hud::HudState::default(),
+            skill_tree: Default::default(),
             items: ItemsUi::default(),
             waypoint_map: None,
             waypoint_open: None,
@@ -476,9 +484,20 @@ impl OriginalUi {
         self.shared.borrow_mut().resist_penalties = Some(penalties);
     }
 
+    /// The character panel's class keys, state flags and skilldesc rows.
+    pub fn set_char_tables(&mut self, tables: super::char_feed::CharTables) {
+        self.shared.borrow_mut().char_tables = tables;
+    }
+
     /// The HUD's skill icon and experience tables ([`hud::HudTables`]).
     pub fn set_hud_tables(&mut self, tables: hud::HudTables) {
         self.shared.borrow_mut().hud.tables = tables;
+    }
+
+    /// The skill tree's class skill rows (`skill_tree_ui`); without them
+    /// the tree shows no icons.
+    pub fn set_skill_tree_tables(&mut self, tables: skill_tree_ui::SkillTreeTables) {
+        self.shared.borrow_mut().skill_tree = tables;
     }
 
     /// The walk's run toggle for the run button (§6 r1); returns the
@@ -509,6 +528,11 @@ impl OriginalUi {
     /// The `belts.bin` records and the belts' types (`hud_belt`).
     pub fn set_belt_parts(&mut self, parts: hud_belt::BeltParts) {
         self.shared.borrow_mut().hud.belt.parts = parts;
+    }
+
+    /// The belt key labels follow the play bindings (`hud_belt`, REC-264).
+    pub fn set_belt_keys(&mut self, b: &crate::controls::Bindings) {
+        self.shared.borrow_mut().hud.belt.set_keys(b);
     }
 
     /// The item tool tips' tables and strings (`item_tip`).
@@ -861,11 +885,30 @@ impl Panel for InventoryUi {
     }
 }
 
-/// The skill tree's view of the model: the class only. The model holds
-/// no skill list, so there are no icons; free points and the flag mask
-/// are read only for icons (inert, `PENDING`).
+/// The skill tree's view of the model: the class, the icon file, the free
+/// points and the entries joined from the skill rows and the local
+/// player's list ([`skill_tree_ui::entries`]).
 struct ModelSkillTree {
     class: Option<u8>,
+    icon_file: Option<u32>,
+    free_points: i32,
+    entries: Vec<SkillEntry>,
+}
+
+impl ModelSkillTree {
+    fn of(sh: &Shared, world: &ClientWorld) -> Self {
+        let class = class_u8(sh.facts.class);
+        ModelSkillTree {
+            class,
+            icon_file: class
+                .and_then(skill_tree_ui::icon_file_name)
+                .and_then(|n| sh.tables.files.id(&n)),
+            free_points: world.local().map_or(0, |u| u.stat(5)),
+            entries: class
+                .map(|c| skill_tree_ui::entries(&sh.skill_tree, world, c))
+                .unwrap_or_default(),
+        }
+    }
 }
 
 impl SkillTreeView for ModelSkillTree {
@@ -873,16 +916,16 @@ impl SkillTreeView for ModelSkillTree {
         self.class
     }
     fn icon_file(&self) -> Option<u32> {
-        None
+        self.icon_file
     }
     fn free_points(&self) -> i32 {
-        0
+        self.free_points
     }
     fn flag_mask(&self) -> u8 {
-        0
+        skill_tree_ui::FLAG_INGAME
     }
     fn skills(&self) -> &[SkillEntry] {
-        &[]
+        &self.entries
     }
 }
 
@@ -905,11 +948,9 @@ impl Panel for SkillTreeUi {
         self.sh.borrow().right_area().unwrap_or(EMPTY)
     }
 
-    fn draw(&self, _ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let sh = self.sh.borrow();
-        let view = ModelSkillTree {
-            class: class_u8(sh.facts.class),
-        };
+        let view = ModelSkillTree::of(&sh, ctx.world);
         self.panel.draw(&sh.tables, &sh.env(), &view, sh.mouse, out);
     }
 
@@ -917,15 +958,13 @@ impl Panel for SkillTreeUi {
         None
     }
 
-    fn event(&mut self, e: UiEvent, _ctx: &UiCtx) -> UiResponse {
+    fn event(&mut self, e: UiEvent, ctx: &UiCtx) -> UiResponse {
         if !is_click(e) {
             return UiResponse::Ignored;
         }
         let mut sh = self.sh.borrow_mut();
         let env = sh.env();
-        let view = ModelSkillTree {
-            class: class_u8(sh.facts.class),
-        };
+        let view = ModelSkillTree::of(&sh, ctx.world);
         match left(e) {
             Some((true, at)) => {
                 let out = self.panel.mouse_down(&env, &view, at);
@@ -1034,6 +1073,9 @@ pub struct ModelCharacter<'a> {
     pub fonts: &'a FontMeasure,
     /// `difficultylevels` `ResistPenalty` by difficulty (expansion game).
     pub penalties: &'a [i32],
+    /// The extra tables and the `experience` rows ([`char_feed`]).
+    pub chars: &'a super::char_feed::CharTables,
+    pub experience: &'a [[u32; 7]],
 }
 
 impl CharacterView for ModelCharacter<'_> {
@@ -1069,10 +1111,24 @@ impl CharacterView for ModelCharacter<'_> {
         )
     }
 
-    /// The state tests (`0x0063A570` family) are not in the model
-    /// (`PENDING`): none active.
-    fn resist_effect(&self, _id: u16) -> ResistEffect {
-        ResistEffect::None
+    /// The state tests (`0x0063A570` family) by the `states` flags.
+    fn resist_effect(&self, id: u16) -> ResistEffect {
+        match self.world.units.get(&self.key) {
+            Some(u) => self.chars.resist_effect(&u.states, id),
+            None => ResistEffect::None,
+        }
+    }
+
+    fn defense_color(&self) -> Option<u16> {
+        self.chars
+            .defense_color(&self.world.units.get(&self.key)?.states)
+    }
+
+    fn next_level(&self) -> Option<u32> {
+        let u = self.world.units.get(&self.key)?;
+        let level = u32::try_from(self.base(12)).unwrap_or(0);
+        let stat30 = u32::try_from(self.stat(30)).unwrap_or(0);
+        super::char_feed::next_level(self.experience, u.class, level, stat30)
     }
 
     /// §8.8: the max width of the value in Font16.
@@ -1171,10 +1227,31 @@ impl Panel for CharacterUi {
             key,
             fonts,
             penalties,
+            chars: &sh.char_tables,
+            experience: &sh.hud.tables.experience,
         };
         let env = sh.env();
         self.panel
             .draw(&sh.tables, &env, &view, fonts, ctx.strings, out);
+        super::char_feed::damage_block(
+            ctx.world,
+            key,
+            &sh.char_tables,
+            ctx.strings,
+            &env.screen,
+            fonts,
+            out,
+        );
+        if let Some(u) = ctx.world.units.get(&key) {
+            super::char_feed::class_line(
+                u.class,
+                &sh.char_tables,
+                ctx.strings,
+                &env.screen,
+                fonts,
+                out,
+            );
+        }
         name_line(name, &env.screen, fonts, out);
     }
 
@@ -1314,6 +1391,10 @@ pub use waypoint_ui::WaypointOpen;
 #[cfg(test)]
 #[path = "original_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "char_feed_tests.rs"]
+mod char_feed_tests;
 
 #[cfg(test)]
 mod character_bind_tests {

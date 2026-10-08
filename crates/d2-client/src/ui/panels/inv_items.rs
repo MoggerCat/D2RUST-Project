@@ -20,18 +20,27 @@
 //!   `panels.md` §15): inside a box, cursor item + empty → 0x1A, cursor
 //!   item + occupied → 0x1D, no cursor item + occupied → 0x1C;
 //! - the drop cell `0x00486BD0` (not specified) is the cursor cell;
-//! - tints (§3 r2–r3, §6 r4), sockets, ethereal draw mode and the
-//!   item's colour remap are not drawn ([`super::super::ImageRequest`]
+//! - equipped-item tints (§6 r4) are pushed as [`UiDraw::Tint`]: refused
+//!   (0) when the requirements fail (strength, dexterity, level from the
+//!   tables, REC-242: stat modifiers of the requirements are not applied;
+//!   REC-271: the shooter / quiver, `0x004C2240` and `0x0062A4E0` terms and
+//!   the hover tint are not read), unidentified (4), else none; the scene
+//!   has no fill primitive yet, so the tint is not painted
+//!   ([`crate::world_view::ui_bind::ui_items`]); grid-item tints (§3) are
+//!   not pushed;
+//! - sockets, ethereal draw mode and the item's colour remap are not drawn ([`super::super::ImageRequest`]
 //!   has no draw mode or remap field).
 
 use std::collections::BTreeMap;
 
 use d2_proto::client::{RemoveBodyItem, SwapCursorBufferItem, SwapCursorWithBody};
 
-use super::super::draw::UiDrawSink;
+use super::super::draw::{TintRequest, UiDraw, UiDrawSink};
 use super::super::geom::Point;
+use super::super::geom::{Rect, FRAME};
 use super::super::inv_grid::{
-    equip_draw_point, grid_click, ClickCtx, EquipBox, GridMsg, GridRecord, ItemRef,
+    equip_draw_point, equip_item_tint, grid_click, ClickCtx, EquipBox, EquipItemFacts,
+    GridItemFacts, GridMsg, GridRecord, ItemRef, Tint,
 };
 use super::super::layout::Screen;
 use super::super::panel::ClientIntent;
@@ -247,12 +256,40 @@ impl ItemsUi {
                     if b.w == 0 || b.h == 0 {
                         continue;
                     }
+                    if let Some(t) = self.equip_tint(world, &it) {
+                        out.push(UiDraw::Tint(TintRequest {
+                            rect: Rect::new(b.left, b.top, b.w as u16, b.h as u16),
+                            tint: t as u8,
+                            clip: FRAME,
+                        }));
+                    }
                     equip_draw_point(it.body, b, cell, (a.w, a.h), false)
                 }
                 _ => continue,
             };
             out.push(cel(a.file, 0, top_left.x, top_left.y + a.gh));
         }
+    }
+
+    /// The tint of an equipped item's box (`inventory.md` §6 r4, module
+    /// doc): the requirement check against the local player's strength,
+    /// dexterity and level (stats 0, 2, 12), the flag 0x4 and identified
+    /// terms. `None`: no tint.
+    fn equip_tint(&self, world: &ClientWorld, it: &ItemView) -> Option<Tint> {
+        let me = world.local()?;
+        let requirements_fail = match (self.tips.as_ref(), it.code) {
+            (Some(t), Some(c)) => !t.can_use(c, me.stat(0), me.stat(2), me.stat(12)),
+            _ => false,
+        };
+        equip_item_tint(&EquipItemFacts {
+            grid: GridItemFacts {
+                requirements_fail,
+                flag_4: it.flags & 0x4 != 0,
+                identified: it.flags & 0x10 != 0,
+                ..GridItemFacts::default()
+            },
+            ..EquipItemFacts::default()
+        })
     }
 
     /// An item's graphic with its frame's top-left at (`left`, `top`)
