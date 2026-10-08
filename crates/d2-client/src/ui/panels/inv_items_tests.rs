@@ -574,6 +574,32 @@ fn a_right_press_on_the_cube_sends_0x20_with_the_player_position() {
     assert!(u.right_press(&w, &files, &l, in_cell(0, 0)).is_empty());
 }
 
+// Covers: specs/items/inventory-moves.md §7.11
+#[test]
+fn a_right_press_on_a_town_portal_scroll_or_tome_sends_0x20() {
+    let (u, files) = ui();
+    let mut w = world(
+        &[
+            (7, mode::STORED, (0, 0, 0, 1), b"tsc "),
+            (8, mode::STORED, (0, 2, 0, 1), b"tbk "),
+        ],
+        None,
+    );
+    w.units.get_mut(&PLAYER).unwrap().position = Some((10, 20));
+    let l = layout();
+    for (cell, guid) in [(0, 7u32), (2, 8)] {
+        let out = u.right_press(&w, &files, &l, in_cell(cell, 0));
+        let want = [
+            &[0x20u8][..],
+            &guid.to_le_bytes(),
+            &10u32.to_le_bytes(),
+            &20u32.to_le_bytes(),
+        ]
+        .concat();
+        assert_eq!(intents(&out), vec![want]);
+    }
+}
+
 // Covers: specs/ui/panels.md §12 r3
 #[test]
 fn the_cube_grid_draws_page_3_and_sends_the_page_3_intents() {

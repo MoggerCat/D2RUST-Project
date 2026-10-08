@@ -18,12 +18,11 @@
 //! - the labels `Defense:`, `Durability:`, `Quantity:`, `Required
 //!   Strength:` / `Dexterity:` / `Level:` are English text (their string
 //!   ids are not specified);
-//! - each property is one line from its `itemstatcost` `descfunc` 1–4
-//!   shapes (`+n text`, `n% text`, `n text`, `+n% text`) with `descval`
-//!   placing the value, ordered by `descpriority` descending; the other
-//!   `descfunc` shapes (skills, charges, per-level, grouped stats) fall
-//!   back to `+n text`, and a stat with no description string is
-//!   skipped;
+//! - each property is one line from its `itemstatcost` `descfunc`
+//!   shape ([`super::item_tip_desc`], 1–28; REC-242) with `descval`
+//!   placing the value, ordered by `descpriority` descending; a stat with
+//!   no description string is skipped; a set item's set lists are green
+//!   and the set's bonuses follow its name ([`super::item_tip_set`]);
 //! - affix, unique and set names are table indices as sent (prefix /
 //!   suffix id, file index) into the name tables, without the id offset
 //!   rules of `affixes.md`.
@@ -36,7 +35,7 @@ use std::sync::Arc;
 use d2_data::bin::BinSet;
 use d2_data::tables::{
     decode_all, Armor, Itemstatcost, Magicprefix, Magicsuffix, Misc, Rareprefix, Raresuffix,
-    Record, Setitems, Sets, Uniqueitems, Weapons,
+    Record, Setitems, Sets, Skilldesc, Skills, Uniqueitems, Weapons,
 };
 use d2_proto::item_bits::{decode, ItemBits, Stat};
 use d2_server::adapters::item_bits::TablesLookup;
@@ -44,6 +43,8 @@ use d2_sim::items::ItemTables;
 
 use super::draw::{ImageRef, ImageRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
 use super::geom::{Point, Rect};
+use super::item_tip_desc as desc;
+use super::item_tip_set as set;
 use super::original::hud::{FILL_FILE, FILL_H, FILL_W};
 use super::original::FontMeasure;
 use super::panel::StringLookup;
@@ -113,6 +114,7 @@ struct StatDesc {
     val: u8,
     pos: u16,
     neg: u16,
+    str2: u16,
 }
 
 /// What the tips read from the tables and strings.
@@ -132,6 +134,8 @@ pub struct ItemTips {
     /// set line at the foot of a set item's tip).
     set_of_item: Vec<u16>,
     set_names: Vec<u16>,
+    /// Per skill: its name string id and its class (255: none).
+    skills: Vec<(u16, u8)>,
     strings: Arc<dyn StringLookup + Send + Sync>,
 }
 
@@ -185,6 +189,7 @@ impl ItemTips {
                 val: r.descval,
                 pos: r.descstrpos,
                 neg: r.descstrneg,
+                str2: r.descstr2,
             })
             .collect();
         Ok(ItemTips {
@@ -217,6 +222,18 @@ impl ItemTips {
                 .collect(),
             set_of_item: rows::<Setitems>(set)?.iter().map(|r| r.set).collect(),
             set_names: rows::<Sets>(set)?.iter().map(|r| r.name).collect(),
+            skills: {
+                let descs = rows::<Skilldesc>(set)?;
+                rows::<Skills>(set)?
+                    .iter()
+                    .map(|r| {
+                        let name = descs
+                            .get(usize::from(r.skilldesc))
+                            .map_or(0, |d| d.str_name);
+                        (name, r.charclass)
+                    })
+                    .collect()
+            },
             strings,
         })
     }
@@ -370,18 +387,28 @@ impl ItemTips {
         // Properties, shown only for an identified item (`bitstream.md`
         // §4.3: the lists are not sent otherwise).
         if ident {
-            let mut props: Vec<(u16, String)> = b
+            let own: Vec<Stat> = b
+                .lists
+                .first()
+                .into_iter()
+                .flatten()
+                .flatten()
+                .copied()
+                .collect();
+            out.extend(self.stat_lines(&own, color::BLUE));
+            // The set lists of a set item (green).
+            let sets: Vec<Stat> = b
                 .lists
                 .iter()
+                .skip(1)
                 .flatten()
                 .flatten()
-                .filter_map(|s| self.property(s))
+                .copied()
                 .collect();
-            props.sort_by_key(|p| std::cmp::Reverse(p.0));
-            out.extend(props.into_iter().map(|(_, t)| TipLine::new(t, color::BLUE)));
+            out.extend(self.stat_lines(&sets, color::GREEN));
         }
-        // A set item names its set at the foot (PROVISIONAL, REC-161: the
-        // bonus lines of the set are not drawn; the layout is unverified).
+        // A set item names its set at the foot, then the bonuses of the
+        // set (PROVISIONAL, REC-242: all steps shown; layout unverified).
         if ident && q == quality::SET {
             let name = qf
                 .file_index
@@ -390,6 +417,9 @@ impl ItemTips {
                 .and_then(|&id| self.strings.get_id(id))
                 .map(String::from_utf16_lossy);
             out.extend(name.map(|n| TipLine::new(n, color::GOLD)));
+            if let Some(i) = qf.file_index {
+                out.extend(self.set_lines(i as usize));
+            }
         }
         out
     }
@@ -397,30 +427,94 @@ impl ItemTips {
     /// (priority, text) of one stat; `None`: no description string.
     fn property(&self, s: &Stat) -> Option<(u16, String)> {
         let d = self.stats.get(usize::from(s.stat))?;
-        let v = i64::from(s.raw) - i64::from(s.save_add);
+        let v = s.value();
         let id = if v < 0 && d.neg != 0 { d.neg } else { d.pos };
         if id == 0 {
             return None;
         }
         let name = String::from_utf16_lossy(self.strings.get_id(id)?);
-        let n = v.abs();
-        let sign = if v < 0 { "-" } else { "+" };
-        let val = match d.func {
-            2 | 3 if v >= 0 => n.to_string(),
-            2 | 3 => format!("-{n}"),
-            _ => format!("{sign}{n}"),
-        };
-        let val = match d.func {
-            2 => format!("{val}%"),
-            4 => format!("{val}%"),
-            _ => val,
-        };
-        let text = match d.val {
-            0 => name,
-            2 => format!("{name} {val}"),
-            _ => format!("{val} {name}"),
-        };
+        let name2 = self.strings.get_id(d.str2).map(String::from_utf16_lossy);
+        let text = desc::render(
+            &desc::Shape {
+                func: d.func,
+                val: d.val,
+                value: v,
+                param: s.param,
+                name: &name,
+                name2: name2.as_deref(),
+            },
+            self,
+        );
         Some((d.priority, text))
+    }
+
+    /// The set bonus lines under a set item's name (REC-242).
+    fn set_lines(&self, item_row: usize) -> Vec<TipLine> {
+        let Some(b) = set::bonuses(&self.lookup, item_row) else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        for (pieces, stats) in &b.partial {
+            let _ = pieces;
+            out.extend(self.stat_lines(stats, color::GREEN));
+        }
+        out.extend(self.stat_lines(&b.full, color::ORANGE));
+        out
+    }
+
+    fn stat_lines(&self, stats: &[Stat], color: u16) -> Vec<TipLine> {
+        let mut props: Vec<(u16, String)> = stats.iter().filter_map(|s| self.property(s)).collect();
+        props.sort_by_key(|p| std::cmp::Reverse(p.0));
+        props
+            .into_iter()
+            .map(|(_, t)| TipLine::new(t, color))
+            .collect()
+    }
+
+    /// Whether a character with these base stats meets the requirements
+    /// of an item with `code` (strength, dexterity, level; REC-242: item
+    /// stat modifiers of the requirements are not applied).
+    pub fn can_use(&self, code: [u8; 4], strength: i32, dexterity: i32, level: i32) -> bool {
+        self.codes.get(&code).is_none_or(|c| {
+            i32::from(c.req_str) <= strength
+                && i32::from(c.req_dex) <= dexterity
+                && i32::from(c.req_lvl) <= level
+        })
+    }
+
+    /// The tip of a vendor's item ([`shop_marks`] over its lines).
+    pub fn shop_lines(&self, stream: &[u8], price: u32, usable: bool) -> Vec<TipLine> {
+        shop_marks(self.lines(stream), price, usable)
+    }
+}
+
+/// A vendor tip: a price line at the foot and, when the player cannot use
+/// the item, its white lines (requirements, base facts) in red
+/// (REC-242: the price text and the colour are d2rs-own, unverified).
+pub fn shop_marks(mut lines: Vec<TipLine>, price: u32, usable: bool) -> Vec<TipLine> {
+    if lines.is_empty() {
+        return lines;
+    }
+    if !usable {
+        for l in lines.iter_mut().filter(|l| l.color == color::WHITE) {
+            l.color = color::RED;
+        }
+    }
+    lines.push(TipLine::new(
+        format!("Price: {price}"),
+        if usable { color::GOLD } else { color::RED },
+    ));
+    lines
+}
+
+impl desc::DescNames for ItemTips {
+    fn skill(&self, id: u32) -> Option<String> {
+        let (name, _) = self.skills.get(id as usize)?;
+        self.strings.get_id(*name).map(String::from_utf16_lossy)
+    }
+    fn skill_class(&self, id: u32) -> Option<u32> {
+        let (_, class) = self.skills.get(id as usize)?;
+        (*class < 7).then_some(u32::from(*class))
     }
 }
 
@@ -515,12 +609,16 @@ mod tests {
     /// A cap (name id 7, requires level 3), prefix 1 `Sturdy`, suffix 1
     /// `Fox`, stat 1 described by string 9 (`descfunc` 1, value first).
     fn tips() -> ItemTips {
+        tips_with(ItemTables::default())
+    }
+
+    fn tips_with(items: ItemTables) -> ItemTips {
         let items = ItemTables {
             items: vec![ItemRec {
                 code: *b"cap ",
                 ..ItemRec::default()
             }],
-            ..ItemTables::default()
+            ..items
         };
         let mut codes = BTreeMap::new();
         codes.insert(
@@ -540,9 +638,15 @@ mod tests {
             ]
             .map(|(k, v)| (k.to_owned(), u16s(v)))
             .into(),
-            ids: [(7, "Cap"), (9, "to Life"), (11, "Sigon's Steel")]
-                .map(|(k, v)| (k, u16s(v)))
-                .into(),
+            ids: [
+                (7, "Cap"),
+                (9, "to Life"),
+                (11, "Sigon's Steel"),
+                (12, "to Mana"),
+                (13, "Defense"),
+            ]
+            .map(|(k, v)| (k, u16s(v)))
+            .into(),
         };
         ItemTips {
             lookup: Arc::new(items),
@@ -555,6 +659,23 @@ mod tests {
                     val: 1,
                     pos: 9,
                     neg: 0,
+                    str2: 0,
+                },
+                StatDesc {
+                    priority: 5,
+                    func: 1,
+                    val: 1,
+                    pos: 12,
+                    neg: 0,
+                    str2: 0,
+                },
+                StatDesc {
+                    priority: 5,
+                    func: 3,
+                    val: 1,
+                    pos: 13,
+                    neg: 0,
+                    str2: 0,
                 },
             ],
             magic_prefix: vec![String::new(), "Sturdy".into()],
@@ -565,6 +686,7 @@ mod tests {
             set: vec!["Sigon's Visor".into()],
             set_of_item: vec![0],
             set_names: vec![11],
+            skills: Vec::new(),
             strings: Arc::new(strs),
         }
     }
@@ -722,5 +844,80 @@ mod tests {
         assert_eq!(got[0], ("Sigon's Visor".to_owned(), color::GREEN));
         assert_eq!(got[1], ("Cap".to_owned(), color::GREEN));
         assert_eq!(got.last(), Some(&("Sigon's Steel".to_owned(), color::GOLD)));
+    }
+
+    /// A two-piece set: 2 pieces give +5 life and +3 mana, the full set
+    /// (3 pieces) gives 9 defense; the item's own set list gives +4 life.
+    #[test]
+    fn a_set_item_shows_its_set_list_steps_and_full_bonus() {
+        use d2_sim::items::tables::{PropRec, PropSlot, PropertyRec, SetItemRec, SetRec};
+        let prop = |stat| {
+            let mut p = PropertyRec::default();
+            p.slots[0] = PropSlot {
+                func: 1,
+                stat,
+                set: 0,
+                val: 0,
+            };
+            p
+        };
+        let r = |code, v| PropRec {
+            code,
+            param: 0,
+            min: v,
+            max: v,
+        };
+        let mut partial = [PropRec::NONE; 8];
+        partial[0] = r(0, 5);
+        partial[1] = r(1, 3);
+        let mut full = [PropRec::NONE; 8];
+        full[0] = r(2, 9);
+        let t = tips_with(ItemTables {
+            properties: vec![prop(1), prop(2), prop(3)],
+            valshift: vec![0; 8],
+            sets: vec![SetRec {
+                count: 3,
+                partial,
+                full,
+            }],
+            setitems: vec![SetItemRec::default()],
+            ..ItemTables::default()
+        });
+        let mut b = quality_cap(quality::SET, 0);
+        b.lists = vec![
+            None,
+            Some(vec![Stat {
+                stat: 1,
+                param: 0,
+                raw: 4,
+                save_add: 0,
+            }]),
+        ];
+        let got: Vec<(String, u16)> = t.lines_of(&b).iter().map(|l| (text(l), l.color)).collect();
+        assert_eq!(
+            got,
+            [
+                ("Sigon's Visor".to_owned(), color::GREEN),
+                ("Cap".to_owned(), color::GREEN),
+                ("Required Level: 3".to_owned(), color::WHITE),
+                ("+4 to Life".to_owned(), color::GREEN),
+                ("Sigon's Steel".to_owned(), color::GOLD),
+                ("+5 to Life".to_owned(), color::GREEN),
+                ("+3 to Mana".to_owned(), color::GREEN),
+                ("9 Defense".to_owned(), color::ORANGE),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_shop_tip_has_a_price_and_marks_unusable_items_red() {
+        let lines = tips().lines_of(&magic_cap(hflag::IDENTIFIED));
+        let ok = shop_marks(lines.clone(), 120, true);
+        assert_eq!(ok.last(), Some(&TipLine::new("Price: 120", color::GOLD)));
+        assert_eq!(ok[1].color, color::WHITE);
+        let no = shop_marks(lines, 120, false);
+        assert_eq!(no[1], TipLine::new("Required Level: 3", color::RED));
+        assert_eq!(no.last(), Some(&TipLine::new("Price: 120", color::RED)));
+        assert!(shop_marks(Vec::new(), 1, true).is_empty());
     }
 }

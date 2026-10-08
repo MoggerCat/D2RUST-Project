@@ -423,8 +423,28 @@ impl Panel for ShopUi {
                 ));
             }
         }
-        // The hovered item's price.
-        if let (Some(it), Some(_)) = (item_at(&sh, &g, &list, sh.mouse), &sh.fonts) {
+        // The hovered item's tip with its price (REC-242), else the bare price.
+        let hovered = item_at(&sh, &g, &list, sh.mouse);
+        let tip = hovered.as_ref().and_then(|it| {
+            let tips = sh.items.tips.as_ref()?;
+            let stream = crate::bridge::items::stream(ctx.world, it.key)?;
+            let me = ctx.world.local()?;
+            let usable = it
+                .code
+                .is_none_or(|c| tips.can_use(c, me.stat(0), me.stat(2), me.stat(12)));
+            let lines = tips.shop_lines(stream, st.prices.get(it.key.guid).unwrap_or(0), usable);
+            (!lines.is_empty()).then_some(lines)
+        });
+        if let Some(lines) = tip {
+            crate::ui::item_tip::draw_tip(
+                &lines,
+                sh.mouse,
+                (s.w, s.h),
+                sh.fonts.as_ref(),
+                &sh.tables.files,
+                out,
+            );
+        } else if let (Some(it), Some(_)) = (hovered, &sh.fonts) {
             if let Some(price) = st.prices.get(it.key.guid) {
                 out.push(text(
                     utf16(&price.to_string()),
