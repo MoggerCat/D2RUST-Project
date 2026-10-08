@@ -18,6 +18,7 @@ pub mod bits;
 pub mod chat_end;
 pub mod check;
 pub mod click;
+pub mod client_path;
 pub mod combat;
 pub mod dispatch;
 pub mod drlg;
@@ -476,6 +477,14 @@ impl<L: ServerLink> Bridge<L> {
 
     pub fn world(&self) -> &ClientWorld {
         &self.world
+    }
+
+    /// The client DRLG, writable: a test seam for fixture collision (a
+    /// wall the fixture tiles lack, stamped in the server's grid too).
+    /// Nothing in the client writes the DRLG through it.
+    #[doc(hidden)]
+    pub fn drlg_mut(&mut self) -> Option<&mut drlg::ClientDrlg> {
+        self.world.drlg.as_mut()
     }
 
     /// The client `skills` row of `skill`, when the tables have one.

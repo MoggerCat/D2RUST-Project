@@ -1148,7 +1148,25 @@ impl Run {
             }
             self.step(1);
         }
+        // The walk prediction steps its last ticks (a frame behind).
+        self.step(10);
+        let (drawn, p) = (self.drawn(), self.pos());
+        assert!(
+            test_fixtures::host::cheb(drawn, p) <= 2,
+            "run leg to ({x}, {y}): the drawn player stands where the server's does: {drawn:?} / {p:?}"
+        );
         self.check("run leg");
+    }
+
+    /// The walk prediction's sub-tile: where the client draws its player.
+    fn drawn(&self) -> (i32, i32) {
+        self.app
+            .world()
+            .resource::<d2_client::world_view::walk::PreviewWalk>()
+            .predict
+            .cell()
+            .map(|(x, y)| (i32::from(x), i32::from(y)))
+            .expect("a prediction")
     }
 
     /// Run legs into level `to` (from `from`) until the server player is
@@ -1604,4 +1622,54 @@ impl Run {
         }
         matches!(self.monster_life(key.guid), None | Some(..=0))
     }
+}
+
+/// A run into a wall: the drawn player stops where the server's player
+/// stops. The fixture tiles have no walls, so the test stamps one (wall
+/// bit 0x1, `drlg/rooms.md` §10) into the server's and the client's grids
+/// alike, as 1.14d builds both from the same tiles. The walk prediction
+/// steps the player's own path over the client grids (`ClientPath`,
+/// REC-277 (d)); a straight line would run on through the wall.
+#[test]
+fn a_blocked_run_is_drawn_where_the_server_stops() {
+    let dir = five_act_install("wall");
+    let data = GameData::select(Some(&dir), false).unwrap();
+    let mut run = Run::start_on(data, |_| {});
+    let p = run.pos();
+    // 12 sub-tiles east, 61 long: past the A* radius (`pathing.md` §7),
+    // so neither path goes round it.
+    let wall: Vec<(i32, i32)> = (-30..=30).map(|k| (p.0 + 12, p.1 + k)).collect();
+    let w = wall.clone();
+    let server = app_support::with(&run.server, move |l| {
+        let g = &mut l.host_mut().game;
+        let d = g.events.action.hooks().drlg.dungeon.acts[0]
+            .as_mut()
+            .expect("Act I");
+        w.iter()
+            .filter_map(|&(x, y)| d.collision_at_mut(x, y).map(|v| *v |= 1))
+            .count()
+    });
+    let client = {
+        let mut b = run.app.world_mut().resource_mut::<BridgeResource>();
+        let d = &mut b.0.drlg_mut().expect("the client DRLG").drlg;
+        wall.iter()
+            .filter_map(|&(x, y)| d.collision_at_mut(x, y).map(|v| *v |= 1))
+            .count()
+    };
+    assert_eq!(
+        (server, client),
+        (wall.len(), wall.len()),
+        "the wall in both grids"
+    );
+    run.leg((p.0 + 24, p.1));
+    let s = run.pos();
+    assert!(
+        s.0 > p.0 && s.0 < p.0 + 12,
+        "the server stopped at the wall: {p:?} → {s:?}"
+    );
+    let drawn = run.drawn();
+    assert!(
+        test_fixtures::host::cheb(drawn, s) <= 2,
+        "the drawn player stopped there too: {drawn:?} / {s:?}"
+    );
 }

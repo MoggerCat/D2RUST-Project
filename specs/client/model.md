@@ -51,7 +51,7 @@
 | Edge cases & original bugs | 1061–1072 |
 | Test vectors | 1073–1120 |
 | Provenance | 1121–1199 |
-| Open questions | 1200–1322 |
+| Open questions | 1200–1329 |
 <!-- /index -->
 
 ## Summary
@@ -1240,6 +1240,13 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    past an obstacle it parts from a server path that is right, and 0x5F
    would walk the player to the guess, `sim/pathing.md` §1.6); settled by
    REC-277 with REC-51 (the client path step).
+   PROVISIONAL (play preview, path step): with a client DRLG the
+   prediction steps the player's own path with the server's path code
+   (`sim/pathing.md` §1.2 request, §3–§7 compute, §9.2 step) over the
+   client grids, the player's footprint on a private copy and no other
+   unit's footprint (because the 1.14d client runs the same path code
+   over the same rooms, so its walk stops where the server's does);
+   settled by REC-277 (d) with REC-51.
 3. ~~`[0x007A04A4]`~~: answered in §6 rule 4 and §7 rule 11
    (2026-10-08 correction: the ping round trip written by 0x8F, not
    only zeroed); the single-player value is open question 18.
