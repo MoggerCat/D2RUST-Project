@@ -3,9 +3,9 @@
 //! `d2-client play --new` wires it (synthetic fixtures only, as in
 //! `app_play_e2e.rs`): a left click on the town's waypoint object picks
 //! it as the hover target (d2rs-own preview pick), walks toward it with
-//! the interaction pending and sends C→S 0x13 on arrival. The server's
-//! S→C 0x63 (which would open the waypoint menu, UI 0x14) does not come
-//! yet: see the seam at the end of the test.
+//! the interaction pending and sends C→S 0x13 on arrival; the server
+//! answers S→C 0x63, the waypoint menu (UI 0x14) opens with the known
+//! destinations and a row click sends C→S 0x49.
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
@@ -268,6 +268,7 @@ fn play_app(ms: &Arc<AtomicU32>, wire: &Arc<Mutex<Wire>>) -> App {
         looks(),
     )
     .unwrap();
+    d2_client::app::ui::set_waypoint_map(&mut app, single_player::client_waypoint_map(&data));
     add_walk(&mut app, tap, Some(Speeds { walk: 6, run: 9 }));
     step(&mut app, ms, 10);
     // The synthetic join sends no skill list: S→C 0x94 + 0x23 (as in
@@ -383,8 +384,53 @@ fn clicking_the_waypoint_walks_there_and_interacts() {
         .interact
         .pending
         .is_none());
-    // Seam (docs/handoff/stitch-npc.md): the server's operate 23 needs
-    // the player's interact info staged, which no written spec opens, so
-    // no S→C 0x63 comes back yet and the menu stays closed.
-    assert_eq!(waypoint_open(&app), None);
+    drop(w);
+    // The server operates the waypoint (`waypoints.md` §5.2 step 3, the
+    // interact range PROVISIONAL REC-94) and answers S→C 0x63: the menu
+    // (UI 0x14) opens on the waypoint's GUID.
+    step(&mut app, &ms, 4);
+    assert_eq!(waypoint_open(&app), Some(guid));
+    let o = app.world().non_send::<WorldViewUi>();
+    let o = o.original.as_ref().unwrap();
+    assert!(o.is_open(0x14), "the waypoint menu is open");
+    // The known destinations: the town (current) and Cold Plains (the
+    // synthetic record knows it, `single_player` staging).
+    let rows: Vec<(u16, bool, bool)> = o
+        .waypoint_rows()
+        .iter()
+        .map(|r| (r.level, r.known, r.current))
+        .collect();
+    assert_eq!(rows, [(1, true, true), (3, true, false)]);
+    // A click on row 1 (`ui/menus.md` §1.2 / §1.6 hit, R800: x' = x − 80,
+    // y' = y − 60) sends C→S 0x49 [GUID][level 3] and closes the menu.
+    let at = Point::new(80 + 150, 60 + 110);
+    for e in [
+        UiEvent::Press {
+            button: PointerButton::Left,
+            at,
+        },
+        UiEvent::Release {
+            button: PointerButton::Left,
+            at,
+        },
+    ] {
+        queue(&mut app, e);
+    }
+    step(&mut app, &ms, 2);
+    let mut take = vec![0x49];
+    take.extend_from_slice(&guid.to_le_bytes());
+    take.extend_from_slice(&3u32.to_le_bytes());
+    assert!(
+        wire.lock().unwrap().sent.contains(&take),
+        "C→S 0x49 to level 3: {:?}",
+        wire.lock()
+            .unwrap()
+            .sent
+            .iter()
+            .rev()
+            .take(5)
+            .collect::<Vec<_>>()
+    );
+    let ui = app.world().non_send::<WorldViewUi>();
+    assert!(!ui.original.as_ref().unwrap().is_open(0x14), "menu closed");
 }

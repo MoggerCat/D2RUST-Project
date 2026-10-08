@@ -107,9 +107,9 @@ pub const PENDING: &[(&str, &str)] = &[
     ),
     (
         "waypoint menu panel (ui 0x14, §13 r2–r7)",
-        "S→C 0x63 opens it (flag, GUID, record: `msg_ui`), but the row rebuild, the tab \
-         gates (client quest flags, `msg-ui.md` open question 4) and the tab / row click \
-         rectangles (spec OQ 7) are not specified",
+        "installed (`waypoint_ui`: art, rows from the record, row click → C→S 0x49); the \
+         tab gates read the client quest flags (`msg-ui.md` open question 4, tab 0 only) \
+         and the row text needs the string table by id",
     ),
     (
         "stash and cube panels (ui 0x19, 0x1A; §11 r2–r6, §12 r2–r6)",
@@ -223,6 +223,10 @@ struct Shared {
     hud: hud::HudState,
     /// The inventory panel's item facts (`inv_items`).
     items: ItemsUi,
+    /// The levels' waypoint indexes (`waypoint_ui`).
+    waypoint_map: Option<d2_sim::world::waypoints::WaypointMap>,
+    /// The waypoint menu S→C 0x63 opened last (`waypoint_ui`).
+    waypoint_open: Option<WaypointOpen>,
 }
 
 impl Shared {
@@ -338,6 +342,8 @@ impl OriginalUi {
             resist_penalties: None,
             hud: hud::HudState::default(),
             items: ItemsUi::default(),
+            waypoint_map: None,
+            waypoint_open: None,
         };
         Ok(Self {
             shared: Rc::new(RefCell::new(shared)),
@@ -366,6 +372,11 @@ impl OriginalUi {
         root.add(Box::new(CharacterUi {
             sh: sh.clone(),
             panel: CharacterPanel::default(),
+        }))?;
+        root.add(Box::new(waypoint_ui::WaypointUi {
+            sh: sh.clone(),
+            panel: Default::default(),
+            seq: 0,
         }))?;
         root.add(Box::new(BorderUi { sh: sh.clone() }))?;
         root.add(Box::new(super::hire_list::HireListUi {
@@ -983,9 +994,12 @@ pub mod hud;
 
 #[path = "msg_ui.rs"]
 pub mod msg_ui;
+#[path = "waypoint_ui.rs"]
+pub mod waypoint_ui;
 pub use msg_ui::{
     ChatAction, IntroEntry, MsgUiMore, MsgUiState, NpcTextList, OverheadText, WaypointMenuState,
 };
+pub use waypoint_ui::WaypointOpen;
 
 #[cfg(test)]
 #[path = "original_tests.rs"]

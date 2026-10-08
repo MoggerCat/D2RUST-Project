@@ -399,6 +399,15 @@ impl Pending for LocalSeams {
     fn set_player_mode_arrival(&mut self, _: &mut Game, player: UnitId) {
         self.log.push(format!("arrival mode {}", player.0));
     }
+    /// `0x00623660`, the operate entry's interact range (`objects.md`
+    /// §7.1 rule 3): no written spec gives its test.
+    // PROVISIONAL (world/objects.md §7.1 r3; REC-94): in range. The
+    // preview client sends C→S 0x13 only on arrival
+    // (`world_view/interact.rs`); the §7.3 r3–r4 approach is
+    // `Pending::object_approach`'s default (operate).
+    fn object_in_range(&self, _: &Game, _: UnitId, _: UnitId) -> bool {
+        true
+    }
 }
 
 impl WorldPending for LocalSeams {}
@@ -857,6 +866,12 @@ pub fn client_level_rows(data: &GameData) -> Vec<LevelRow> {
             draw_edges: l.drawedges != 0,
         })
         .collect()
+}
+
+/// The levels' waypoint indexes (`levels` `Waypoint`,
+/// `world/waypoints.md` §1) for the client's waypoint menu.
+pub fn client_waypoint_map(data: &GameData) -> d2_sim::world::waypoints::WaypointMap {
+    d2_sim::world::waypoints::WaypointMap::new(&data.tables().levels)
 }
 
 /// `difficultylevels` `ResistPenalty` per row (difficulty), from the
