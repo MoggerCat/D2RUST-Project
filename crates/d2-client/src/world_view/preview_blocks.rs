@@ -296,6 +296,47 @@ mod tests {
         .is_empty());
     }
 
+    // Covers: specs/render/lighting.md §4, §7.3
+    #[test]
+    fn a_blocks_light_tile_between_the_light_and_a_floor_block_darkens_it() {
+        use crate::rules::lighting::map::AmbientScene;
+        use crate::world_view::preview_light::build_map_blocked;
+        let dark = Ambient {
+            i: 40,
+            r: 40,
+            g: 40,
+            b: 40,
+        };
+        let scene = AmbientScene {
+            player_ambient: dark,
+            near: Vec::new(),
+        };
+        let light = [((100, 100), 8, (255, 255, 255))];
+        let pl2 =
+            d2_formats::palette::Pl2::parse(&super::super::tile_assets::tests::pl2()).unwrap();
+        let tables = ShadeTables::push(&mut MapTable::new(), &pl2);
+        // A wall column at sub-tile x = 103 between the light (100) and the
+        // floor tile whose origin sub-tile is (105, 100).
+        let open = build_map_blocked((100, 100), &scene, |_, _| false, &light, true);
+        let shut = build_map_blocked((100, 100), &scene, |x, _| x == 103, &light, true);
+        let at = |m: &crate::rules::lighting::map::LightMap| m.read(8 * 106, 8 * 101).i;
+        assert!(at(&shut) < at(&open), "{} < {}", at(&shut), at(&open));
+        let shades = |map| {
+            block_shades(
+                &FrameLight { tables, map },
+                env(),
+                floor(),
+                &Dt1Facts::default(),
+                (21, 20),
+                0xFF,
+                BlendOp::Opaque,
+                &[rect(0)],
+                &[(0, 0)],
+            )
+        };
+        assert_ne!(shades(open)[0].shade, shades(shut)[0].shade);
+    }
+
     // Covers: specs/render/lighting.md §3.1 r2
     #[test]
     fn the_level_ambient_needs_a_colour() {
