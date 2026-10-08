@@ -65,6 +65,7 @@ use crate::world_view::object_label::ObjectLabels;
 use crate::world_view::preview::Preview;
 use crate::world_view::tile_assets::TileAssets;
 use crate::world_view::walk::{add_preview_walk, PreviewWalk};
+use crate::world_view::weather_view::WeatherView;
 use crate::world_view::{
     ModelFeed, NoFeed, Unspecified, ViewAssets, WorldViewPlugin, WorldViewState,
 };
@@ -187,6 +188,7 @@ pub fn add_preview_tinted(
     lights: Option<crate::world_view::light_sources::LightRows>,
     tints: Option<crate::world_view::state_tint::StateTints>,
 ) {
+    let weather = WeatherView::new(tiles.source());
     let mut preview = Preview::new(tiles);
     preview.light.sources = lights.map(std::sync::Arc::new);
     preview.light.set_tints(tints.map(std::sync::Arc::new));
@@ -196,7 +198,8 @@ pub fn add_preview_tinted(
             levels: Some(levels),
             ..ModelFeed::<NoFeed>::default()
         }
-        .with_preview(preview),
+        .with_preview(preview)
+        .with_weather(weather),
     );
     state.preview = true;
 }
