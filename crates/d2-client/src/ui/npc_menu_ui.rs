@@ -88,6 +88,16 @@ pub struct NpcMenuState {
     /// The last Trade / Gamble choice was Gamble: the shop that opens next
     /// is a gamble window (`panels-2.md` §14: the gamble shop flag).
     pub gamble: bool,
+    /// The NPC (GUID, class) the last Trade / Gamble was chosen for and
+    /// the model's store serial at the choice: the shop its store items
+    /// open, showing the records newer than that serial
+    /// (`OriginalUi::shop_poll`; d2rs-own, the menu's choice names the
+    /// trader, `menus.md` §3.1).
+    pub shop_for: Option<(u32, u32, u32)>,
+    /// The Resurrect edit of the next open (`panels-2.md` §14.2): the cost
+    /// `[0x007C0DD0]` while the mercenary is dead in an expansion game,
+    /// else `None`.
+    pub resurrect: Option<u32>,
     /// The Trade / Gamble choice's NPC (GUID, class): the shop opens for
     /// it on the next shop poll (`OriginalUi::shop_poll`). d2rs-own,
     /// unverified (REC-277).
@@ -137,6 +147,7 @@ impl NpcMenuState {
         self.imbue = None;
         menus.reset_for_interaction();
         menus.apply_builder(char_level);
+        menus.apply_resurrect(self.resurrect.is_some(), true);
         let Some(rec) = menus.menu(class) else {
             return;
         };
@@ -150,7 +161,12 @@ impl NpcMenuState {
             .map(|o| Row {
                 string: o.string,
                 kind: Some(o.kind),
-                cost: (o.kind == OptionKind::Identify).then_some(100 * identify_n),
+                cost: match o.kind {
+                    OptionKind::Identify => Some(100 * identify_n),
+                    // `menus.md` §2.3: `hireresurrect2` with the cost.
+                    OptionKind::Resurrect => self.resurrect,
+                    _ => None,
+                },
             })
             .collect();
         if class == NPC_CHARSI {
@@ -345,6 +361,7 @@ impl Panel for NpcMenuUi {
                     st.up = None;
                     if matches!(kind, OptionKind::Trade | OptionKind::Gamble) {
                         st.gamble = kind == OptionKind::Gamble;
+                        st.shop_for = Some((guid, class, ctx.world.store_serial));
                         st.shop_request = Some((guid, class));
                     }
                 }

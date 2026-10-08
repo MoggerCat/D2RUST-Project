@@ -172,6 +172,9 @@ fn correct(world: &mut ClientWorld, key: UnitKey, x: u16, y: u16) -> Checked {
         // the guess yields: the server's point is taken (rule 3 stored
         // it; the prediction snaps to it, `Predict::observe`) and nothing
         // is sent.
+        if let Some(u) = world.units.get_mut(&key) {
+            u.follows = u.follows.wrapping_add(1);
+        }
         return Checked::Followed;
     }
     if world.local_player == Some(key) {

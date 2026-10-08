@@ -187,11 +187,14 @@ where
         let (_, mut w) = self.desk.quest_world();
         quests::npc_gossip(&mut w, player, act);
     }
+    /// `0x00622E70`: level (stat 12) × 10000 (`world/stash.rs`).
     fn gold_cap(&self, player: UnitId) -> i32 {
-        self.desk.rest.gold_cap(player)
+        VendorWorld::stat(self, player, crate::world::stash::stat::LEVEL, 0)
+            .wrapping_mul(crate::world::stash::GOLD_PER_LEVEL)
     }
-    fn stash_cap(&self, player: UnitId) -> i32 {
-        self.desk.rest.stash_cap(player)
+    /// `0x00623460`: the 1.14d constant (`world/stash.rs`).
+    fn stash_cap(&self, _player: UnitId) -> i32 {
+        crate::world::stash::STASH_CAP
     }
     fn drop_gold(&mut self, player: UnitId, amount: i32) {
         self.desk.rest.drop_gold(player, amount);

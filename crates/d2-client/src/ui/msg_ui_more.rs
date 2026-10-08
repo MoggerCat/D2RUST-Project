@@ -143,7 +143,11 @@ impl Default for MsgUiMore {
             quest_7bf2b0: 0,
             quest_avail: [0; 37],
             quest_avail_set: false,
-            merc_state: 0,
+            // PROVISIONAL (client/msg-ui.md §15; REC-278): no mercenary
+            // dead until S→C 0x9B says so (a new character hires at once,
+            // `menus.md` §3.4 needs `[0x00725494]` = 0xFFFF); settled by
+            // a read of `[0x00725494]` at a join.
+            merc_state: 0xFFFF,
             merc_7c0dd0: 0,
             merc_menu_calls: Vec::new(),
             interact_npc: 0,

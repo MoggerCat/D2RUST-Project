@@ -24,6 +24,7 @@ use d2_client::app::play::{
 };
 use d2_client::app::server_thread::ThreadLink;
 use d2_client::app::single_player::{self, GameData};
+use d2_client::app::synthetic_items::BUCKLER;
 use d2_client::app::town_npcs;
 use d2_client::app::ui::{add_original_ui_with, UiParts};
 use d2_client::assets::path::MemorySource;
@@ -244,12 +245,20 @@ struct Rig {
     /// A test teleport moved the server player (the client's view of its
     /// position is stale from then on).
     teleported: bool,
+    /// The newest store record before the current trade opened.
+    store_floor: u32,
 }
 
 impl Rig {
     /// A new sorceress in the Act I town of the synthetic game, joined,
     /// with the play UI over it.
     fn new() -> Rig {
+        Rig::with_stash(STASH_XY)
+    }
+
+    /// [`Rig::new`] with the stash at `stash` (sub-tiles from the town
+    /// room's origin).
+    fn with_stash(stash: (i32, i32)) -> Rig {
         let data = GameData::Synthetic;
         let ms = Arc::new(AtomicU32::new(1000));
         let character = single_player::new_character("sorceress", "Test").unwrap();
@@ -259,7 +268,7 @@ impl Rig {
             character.clone(),
             StepClock(ms.clone()),
             Vec::new(),
-            Some(STASH_XY),
+            Some(stash),
             town_npcs::ACT1.to_vec(),
         )
         .unwrap();
@@ -304,8 +313,22 @@ impl Rig {
             &mut app,
             UiParts {
                 source: source.clone(),
-                inv_areas: None,
-                expansion_installed: false,
+                // The right panel's click area of every `inventory.bin`
+                // record (the user's file gives them; d2rs-own fixture:
+                // the right half above the control panel, 800 × 600).
+                inv_areas: Some(
+                    (0..32)
+                        .map(|_| d2_client::ui::original::InvArea {
+                            left: 400,
+                            right: 800,
+                            top: 0,
+                            bottom: 553,
+                        })
+                        .collect(),
+                ),
+                // An expansion install: the mercenary menus (Resurrect,
+                // `panels-2.md` §14.2) are the expansion's.
+                expansion_installed: true,
                 fonts: Some(fonts),
                 resist_penalties: Some(vec![0, 20, 50]),
             },
@@ -321,6 +344,7 @@ impl Rig {
             wire,
             steps: 0,
             teleported: false,
+            store_floor: 0,
         };
         while app_support::local_player(&rig.server).is_none() {
             rig.step(1);
@@ -344,17 +368,6 @@ impl Rig {
             .receive_chunk(&msgs)
             .unwrap();
         rig.step(2);
-        // Nor creation stats (no vitals tables): stage what 1.14d gives a
-        // new character (stat 67 `velocitypercent` 100, `combat/vitals.md`
-        // §1), else the server walks at the 25 % floor (`pathing.md` §8.1
-        // r2) behind the client's prediction, as `app_level_border.rs`.
-        app_support::with(&rig.server, |l| {
-            let (p, _) = single_player::local_player(&l.host().game).unwrap();
-            let g = &mut l.host_mut().game;
-            g.events
-                .action
-                .with(&mut g.game, |_, v| v.set_base(p, 67, 100));
-        });
         rig.check("join");
         rig
     }
@@ -792,4 +805,828 @@ fn act1_trade_and_gamble_rows_open_the_shop() {
         rig.step(10);
         rig.check(&format!("{class} chat end"));
     }
+}
+
+// ---- the shop ---------------------------------------------------------------------------
+
+/// The store grid's cell (x, y) on screen (`ui/shop_ui.rs`: 29 px cells
+/// at (`sx` + 15, `H` + `sy` − 400), R800).
+fn store_cell(x: i32, y: i32) -> Point {
+    let s = Screen::R800;
+    Point::new(s.sx() + 15 + 29 * x + 10, s.h + s.sy() - 400 + 29 * y + 10)
+}
+
+/// The backpack cell (x, y) on screen (the inventory panel's grid beside
+/// the shop, as `e2e_vendor.rs` reads it).
+fn backpack_cell(x: u16, y: u16) -> Point {
+    Point::new(
+        339 + 80 + 29 * i32::from(x) + 10,
+        255 + 60 + 29 * i32::from(y) + 10,
+    )
+}
+
+/// Shop button `i` of a four-button bar (`panels::shop::BUTTON_X`).
+fn shop_button(i: usize) -> Point {
+    let s = Screen::R800;
+    Point::new(
+        s.sx() + d2_client::ui::panels::shop::BUTTON_X[3][i] + 10,
+        s.h + s.sy() - 87,
+    )
+}
+
+impl Rig {
+    /// Steps until the client's gold differs from `from` (the vitals
+    /// sync's forced run, at most 20 client updates) and returns it.
+    fn gold_after(&mut self, from: i32) -> i32 {
+        for _ in 0..40 {
+            if self.gold() != from {
+                break;
+            }
+            self.step(1);
+        }
+        self.gold()
+    }
+
+    fn gold(&self) -> i32 {
+        let w = self.bridge().world();
+        w.local_player.map_or(0, |me| w.total(me, 14, 0))
+    }
+
+    /// Server: the local player's gold := `n` (a new character has none).
+    fn stage_gold(&mut self, n: i32) {
+        app_support::with(&self.server, move |l| {
+            let (p, _) = single_player::local_player(&l.host().game).unwrap();
+            let g = &mut l.host_mut().game;
+            g.events
+                .action
+                .with(&mut g.game, |_, v| v.set_base(p, 14, n));
+        });
+        // The vitals sync sends gold on its forced run (every 20 client
+        // updates, `combat/vitals.md` §5.1 rule 2).
+        for _ in 0..60 {
+            self.step(1);
+            if self.gold() == n {
+                break;
+            }
+        }
+    }
+
+    /// Server: the durability (stat 72) of the item `guid` := `n`.
+    fn stage_durability(&mut self, guid: u32, n: i32) {
+        app_support::with(&self.server, move |l| {
+            let g = &mut l.host_mut().game;
+            let item = g
+                .game
+                .lists
+                .find_unit(d2_sim::units::UnitType::Item, guid)
+                .expect("the item is on the server");
+            g.events
+                .action
+                .with(&mut g.game, |_, v| v.set_base(item, 72, n));
+        });
+        self.step(4);
+    }
+
+    /// The local player's backpack items (stored, page 0) of `code`.
+    fn backpack(&self, code: &[u8; 4]) -> Vec<d2_client::bridge::items::ItemView> {
+        d2_client::bridge::items::local_items(self.bridge().world())
+            .into_iter()
+            .filter(|i| i.code == Some(*code) && i.mode == 0 && i.page == 0 && !i.store)
+            .collect()
+    }
+
+    /// The open store's page-0 items in the panel's packing order (every
+    /// synthetic item is 1 × 1 without item art: cell k = (k mod 10, k / 10)).
+    fn store_page0(&self) -> Vec<d2_client::bridge::items::ItemView> {
+        let mut v: Vec<_> = d2_client::bridge::items::store_items(self.bridge().world())
+            .into_iter()
+            .filter(|i| i.page == 0 && i.store_seq > self.store_floor)
+            .collect();
+        v.sort_by_key(|i| i.store_seq);
+        v
+    }
+
+    /// S→C 0x2A of the step: (kind, code).
+    fn transactions(&self) -> Vec<(u8, u8)> {
+        self.wire
+            .lock()
+            .unwrap()
+            .received
+            .iter()
+            .filter(|m| m[0] == 0x2A)
+            .map(|m| (m[1], m[2]))
+            .collect()
+    }
+
+    /// Closes the shop's UI state (as Escape does); the close ends the
+    /// chat (C→S 0x30).
+    fn close_shop(&mut self) {
+        self.app
+            .world_mut()
+            .non_send_mut::<WorldViewUi>()
+            .original
+            .as_mut()
+            .unwrap()
+            .set_ui(0x0C, 1, false)
+            .unwrap();
+        self.step(10);
+        assert!(self.sent_ids().contains(&0x30), "{:02X?}", self.sent_ids());
+        self.check("shop close");
+    }
+
+    /// Opens the shop of `class` through its menu row `kind`.
+    fn open_shop(&mut self, class: u16, kind: OptionKind) {
+        // The store records of an earlier trade stay in the model; the
+        // shop shows only the newer ones (`ShopState` floor).
+        self.store_floor = d2_client::bridge::items::store_items(self.bridge().world())
+            .iter()
+            .map(|i| i.store_seq)
+            .max()
+            .unwrap_or(0);
+        self.choose(class, kind);
+        self.step(10);
+        assert!(
+            self.with_ui(|u| u.is_open(0x0C)),
+            "{class}: the shop is open"
+        );
+        assert!(
+            !self.store_page0().is_empty(),
+            "{class}: the store has items"
+        );
+    }
+
+    /// Right-clicks the store item of `code` (quick buy, C→S 0x32): the
+    /// bought copy's GUID.
+    fn buy(&mut self, code: &[u8; 4]) -> u32 {
+        let list = self.store_page0();
+        let k = list
+            .iter()
+            .position(|i| i.code == Some(*code))
+            .unwrap_or_else(|| panic!("{code:?} is in the store"));
+        let before: Vec<u32> = self.backpack(code).iter().map(|i| i.key.guid).collect();
+        let gold = self.gold();
+        self.click_with(
+            PointerButton::Right,
+            store_cell(k as i32 % 10, k as i32 / 10),
+        );
+        self.step(10);
+        assert!(self.sent_ids().contains(&0x32), "{:02X?}", self.sent_ids());
+        let tx = self.transactions();
+        assert!(
+            tx.iter()
+                .any(|&(kind, c)| c == 0 && (kind == 4 || kind == 5)),
+            "bought: {tx:?}"
+        );
+        let after = self.backpack(code);
+        let new = after
+            .iter()
+            .find(|i| !before.contains(&i.key.guid))
+            .unwrap_or_else(|| panic!("the copy is in the backpack: {after:?}"));
+        let now = self.gold_after(gold);
+        assert!(now < gold, "paid: {gold} → {now}");
+        let guid = new.key.guid;
+        self.check("buy");
+        guid
+    }
+}
+
+// Covers: specs/world/vendors.md §7.1, §7.2, §8.1, §5.3; specs/ui/menus.md §4
+#[test]
+fn act1_traders_buy_sell_repair_and_gamble() {
+    let mut rig = Rig::new();
+    // A level-1 character carries at most 10 000 (`0x00622E70`).
+    rig.stage_gold(5_000);
+    rig.check("gold");
+    assert_eq!(rig.gold(), 5_000, "the client model has the gold");
+
+    // Akara: buy a buckler, then sell it back (lift it from the backpack,
+    // drop it on the store grid: C→S 0x19, then 0x33).
+    rig.open_shop(class::AKARA, OptionKind::Trade);
+    let bought = rig.buy(&BUCKLER);
+    let it = rig
+        .backpack(&BUCKLER)
+        .into_iter()
+        .find(|i| i.key.guid == bought)
+        .unwrap();
+    rig.queue(UiEvent::Press {
+        button: PointerButton::Left,
+        at: backpack_cell(it.x, it.y),
+    });
+    rig.step(3);
+    rig.queue(UiEvent::Release {
+        button: PointerButton::Left,
+        at: backpack_cell(it.x, it.y),
+    });
+    rig.step(6);
+    assert_eq!(
+        d2_client::bridge::items::cursor_item(rig.bridge().world()).map(|i| i.key.guid),
+        Some(bought),
+        "the buckler is on the cursor: {:02X?}",
+        rig.wire.lock().unwrap().sent
+    );
+    rig.check("lift");
+    let gold = rig.gold();
+    rig.click(store_cell(9, 9));
+    rig.step(10);
+    assert!(rig.sent_ids().contains(&0x33), "{:02X?}", rig.sent_ids());
+    assert!(
+        rig.transactions().contains(&(3, 1)),
+        "sold: {:?}",
+        rig.transactions()
+    );
+    assert!(rig.gold_after(gold) > gold, "received the price");
+    assert!(
+        d2_client::bridge::items::local_items(rig.bridge().world())
+            .iter()
+            .all(|i| i.key.guid != bought || i.store),
+        "the sold buckler left the player"
+    );
+    rig.check("sell");
+    rig.close_shop();
+
+    // Charsi: buy a buckler, wear it down, repair it (button 2, then the
+    // item), wear it down again, repair all (button 3: worn items only).
+    rig.open_shop(class::CHARSI, OptionKind::Trade);
+    let bought = rig.buy(&BUCKLER);
+    rig.stage_durability(bought, 3);
+    rig.check("worn");
+    let it = rig
+        .backpack(&BUCKLER)
+        .into_iter()
+        .find(|i| i.key.guid == bought)
+        .unwrap();
+    rig.click(shop_button(2));
+    assert!(
+        rig.with_ui(|u| u.shop_state().repair_mode()),
+        "repair armed"
+    );
+    let gold = rig.gold();
+    rig.click(backpack_cell(it.x, it.y));
+    rig.step(10);
+    assert!(rig.sent_ids().contains(&0x35), "{:02X?}", rig.sent_ids());
+    assert!(
+        rig.transactions().contains(&(1, 2)),
+        "repaired: {:?}",
+        rig.transactions()
+    );
+    assert!(rig.gold_after(gold) < gold, "the repair was paid");
+    rig.check("repair one");
+    rig.stage_durability(bought, 2);
+    rig.check("worn again");
+    let gold = rig.gold();
+    rig.click(shop_button(3));
+    rig.step(10);
+    assert!(rig.sent_ids().contains(&0x35), "{:02X?}", rig.sent_ids());
+    assert!(
+        rig.transactions().contains(&(1, 2)),
+        "repaired all: {:?}",
+        rig.transactions()
+    );
+    // Repair all covers the equipped items only (`vendors.md` §8.1 rule
+    // 3): the worn buckler is in the backpack, so the total is 0 (code 2,
+    // nothing paid) and the buckler stays worn.
+    rig.step(30);
+    assert_eq!(rig.gold(), gold, "nothing equipped needs repair");
+    let dur = app_support::with(&rig.server, move |l| {
+        let g = &mut l.host_mut().game;
+        let item = g
+            .game
+            .lists
+            .find_unit(d2_sim::units::UnitType::Item, bought)
+            .unwrap();
+        g.events.action.with(&mut g.game, |_, v| v.stat(item, 72))
+    });
+    assert_eq!(dur, 2, "the backpack buckler was not repaired");
+    rig.check("repair all");
+    rig.close_shop();
+
+    // Gheed: the gamble window; a right click buys at the gamble price.
+    rig.store_floor = d2_client::bridge::items::store_items(rig.bridge().world())
+        .iter()
+        .map(|i| i.store_seq)
+        .max()
+        .unwrap_or(0);
+    rig.choose(class::GHEED, OptionKind::Gamble);
+    rig.step(10);
+    assert!(
+        rig.with_ui(|u| u.is_open(0x0C) && u.shop_state().gamble()),
+        "gamble window"
+    );
+    let list = rig.store_page0();
+    assert!(!list.is_empty(), "the gamble list");
+    let code = list[0].code.unwrap();
+    rig.buy(&code);
+    rig.close_shop();
+}
+
+// ---- mercenaries ------------------------------------------------------------------------
+
+impl Rig {
+    /// The model's units of `class` (type 1).
+    fn monsters_of(&self, class: u32) -> Vec<UnitKey> {
+        self.bridge()
+            .world()
+            .units
+            .iter()
+            .filter(|(k, u)| k.unit_type == 1 && u.class == class)
+            .map(|(k, _)| *k)
+            .collect()
+    }
+
+    /// Server: the mercenary `guid` dies (the host's pet-death queue, as
+    /// `app_mercs_acts.rs`).
+    fn kill_merc(&mut self, guid: u32) {
+        app_support::with(&self.server, move |l| {
+            let g = &mut l.host_mut().game;
+            let merc = g
+                .game
+                .lists
+                .find_unit(d2_sim::units::UnitType::Monster, guid)
+                .expect("the mercenary is on the server");
+            g.events
+                .action
+                .hooks()
+                .pet_deaths
+                .as_mut()
+                .unwrap()
+                .push(merc);
+        });
+        self.step(10);
+    }
+}
+
+/// Asheara's mercenary (`town_npcs::synthetic_hire_rows`, class 357).
+const ACT3_MERC: u32 = 357;
+
+// Covers: specs/world/npc.md §7.1, §7.4; specs/ui/menus.md §2, §3; specs/ui/panels-2.md §14 r2
+#[test]
+fn asheara_hires_and_resurrects_a_mercenary_through_her_menu() {
+    let mut rig = Rig::new();
+    rig.go_to_town(d2_client::app::synthetic_chains::KURAST_DOCKS);
+    rig.stage_gold(5_000);
+    rig.check("gold");
+    assert!(rig.monsters_of(ACT3_MERC).is_empty(), "no mercenary yet");
+
+    // Hire: the menu's Hire row opens the hire list (S→C 0x4E / 0x4F),
+    // a row click sends C→S 0x36 and the mercenary joins the model.
+    rig.choose(class::ASHEARA, OptionKind::Hire);
+    let offers = rig.with_ui(|u| u.hire_list().offers.len());
+    assert!(offers > 0, "the hire list has offers");
+    assert!(
+        rig.with_ui(|u| u.hire_list().up.is_some()),
+        "the list is up"
+    );
+    let (_, list) = d2_client::ui::panels::npc_menu::hire_geometry(800, 600);
+    rig.click(Point::new(list.0 + 40, list.1 + 5));
+    for _ in 0..60 {
+        rig.step(1);
+        if !rig.monsters_of(ACT3_MERC).is_empty() {
+            break;
+        }
+    }
+    assert!(
+        rig.sent_ids().contains(&0x36),
+        "C→S 0x36: {:02X?}",
+        rig.sent_ids()
+    );
+    let merc = rig.monsters_of(ACT3_MERC);
+    assert_eq!(merc.len(), 1, "the hired mercenary is in the model");
+    rig.check("hire");
+    // Leave the chat the hire left open.
+    let npc = rig.npc(class::ASHEARA).guid;
+    rig.app
+        .world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .send_bytes(&d2_client::ui::panels::npc::msg_chat_end(npc))
+        .unwrap();
+    rig.step(10);
+    rig.check("chat end");
+
+    // The mercenary dies (S→C 0x9B: the client knows it is dead); her
+    // menu now offers Resurrect with its cost, the row sends C→S 0x62,
+    // the server answers S→C 0x2A code 5 and the mercenary is back.
+    rig.kill_merc(merc[0].guid);
+    rig.check("merc death");
+    let kinds = rig.open_menu(class::ASHEARA);
+    let i = kinds
+        .iter()
+        .position(|k| *k == Some(OptionKind::Resurrect))
+        .unwrap_or_else(|| panic!("Resurrect is offered: {kinds:?}"));
+    let cost = rig.with_ui(|u| u.npc_menu().unwrap().rows[i].cost);
+    assert!(cost.is_some(), "the Resurrect caption has its cost");
+    rig.click(Rig::row_at(i));
+    for _ in 0..40 {
+        rig.step(1);
+        if rig.transactions().contains(&(0, 5)) {
+            break;
+        }
+    }
+    assert!(
+        rig.sent_ids().contains(&0x62),
+        "C→S 0x62: {:02X?}",
+        rig.sent_ids()
+    );
+    assert!(
+        rig.transactions().contains(&(0, 5)),
+        "resurrected: {:?}",
+        rig.transactions()
+    );
+    rig.step(10);
+    assert_eq!(rig.monsters_of(ACT3_MERC).len(), 1, "the mercenary is back");
+    rig.check("resurrect");
+}
+
+/// The walk to Akara ends on the stash's cell in the client's straight
+/// line prediction (REC-51: no client path, no object footprint); the
+/// server's position then snaps the view three cells and the click aimed
+/// at Kashya before the snap lands on the stash. Settled with the client
+/// path of REC-51.
+// Covers: specs/ui/controls.md §6 r9
+#[test]
+#[ignore = "q-smoke-town break 5: the straight-line walk prediction ends inside the stash (REC-51)"]
+fn a_click_on_an_npc_while_standing_on_the_stash_talks_to_the_npc() {
+    // The stash right below Akara (the walk to her ends on its cell).
+    let mut rig = Rig::with_stash((single_player::AKARA_X, single_player::UNIT_Y + 3));
+    rig.open_menu(class::AKARA);
+    rig.cancel(class::AKARA);
+    let kinds = rig.open_menu(class::KASHYA);
+    assert!(!rig.with_ui(|u| u.is_open(0x19)), "the stash stayed closed");
+    assert!(kinds.contains(&Some(OptionKind::Talk)), "{kinds:?}");
+    rig.cancel(class::KASHYA);
+}
+
+// ---- heal and identify -----------------------------------------------------------------
+
+impl Rig {
+    /// The local player's (life, max life) in the client model (stats 6,
+    /// 7, 8.8 fixed point).
+    fn life(&self) -> (i32, i32) {
+        let w = self.bridge().world();
+        w.local_player
+            .map_or((0, 0), |me| (w.total(me, 6, 0), w.total(me, 7, 0)))
+    }
+
+    /// Server: the local player's life := `n` (8.8).
+    fn stage_life(&mut self, n: i32) {
+        app_support::with(&self.server, move |l| {
+            let (p, _) = single_player::local_player(&l.host().game).unwrap();
+            let g = &mut l.host_mut().game;
+            g.events
+                .action
+                .with(&mut g.game, |_, v| v.set_base(p, 6, n));
+        });
+        for _ in 0..40 {
+            self.step(1);
+            if self.life().0 == n {
+                break;
+            }
+        }
+    }
+
+    /// Opens a trade or gamble window at `class` (the store floor of this
+    /// trade first).
+    fn open_window(&mut self, class: u16, kind: OptionKind) {
+        self.store_floor = d2_client::bridge::items::store_items(self.bridge().world())
+            .iter()
+            .map(|i| i.store_seq)
+            .max()
+            .unwrap_or(0);
+        self.choose(class, kind);
+        self.step(10);
+        assert!(
+            self.with_ui(|u| u.is_open(0x0C)),
+            "{class}: the window is open"
+        );
+    }
+}
+
+// Covers: specs/world/npc.md §5, §6; specs/world/vendors.md §5.3; specs/ui/menus.md §2
+#[test]
+fn kurast_docks_heals_gambles_and_identifies() {
+    let mut rig = Rig::new();
+    rig.go_to_town(d2_client::app::synthetic_chains::KURAST_DOCKS);
+    rig.stage_gold(5_000);
+    rig.check("gold");
+
+    // Ormus heals on the chat's start (`npc.md` §5): a wounded player's
+    // life is full again in the client model.
+    let (_, max) = rig.life();
+    assert!(max > 0, "the player has life");
+    rig.stage_life(max / 3);
+    rig.check("wounded");
+    assert!(rig.life().0 < max, "wounded in the model: {:?}", rig.life());
+    rig.open_menu(class::ORMUS);
+    for _ in 0..40 {
+        if rig.life().0 == max {
+            break;
+        }
+        rig.step(1);
+    }
+    assert_eq!(rig.life(), (max, max), "Ormus healed the player");
+    rig.cancel(class::ORMUS);
+
+    // Alkor's gamble window: the bought item is unidentified (flag 0x10).
+    rig.open_window(class::ALKOR, OptionKind::Gamble);
+    assert!(rig.with_ui(|u| u.shop_state().gamble()), "a gamble window");
+    let list = rig.store_page0();
+    let code = list[0].code.unwrap();
+    let item = rig.buy(&code);
+    rig.close_shop();
+    let flags = |rig: &Rig| {
+        d2_client::bridge::items::local_items(rig.bridge().world())
+            .iter()
+            .find(|i| i.key.guid == item)
+            .map(|i| i.flags)
+    };
+    assert_eq!(flags(&rig).map(|f| f & 0x10), Some(0), "unidentified");
+
+    // Cain: the Identify row costs 100 × 1; the row sends C→S 0x34, the
+    // server identifies the item (S→C 0x2A code 3, the item's update) and
+    // takes the price.
+    let kinds = rig.open_menu(class::CAIN4);
+    let i = kinds
+        .iter()
+        .position(|k| *k == Some(OptionKind::Identify))
+        .unwrap_or_else(|| panic!("Cain offers Identify: {kinds:?}"));
+    let cost = rig.with_ui(|u| u.npc_menu().unwrap().rows[i].cost);
+    assert_eq!(cost, Some(100), "one item to identify");
+    let gold = rig.gold();
+    rig.click(Rig::row_at(i));
+    for _ in 0..40 {
+        rig.step(1);
+        if flags(&rig).is_some_and(|f| f & 0x10 != 0) {
+            break;
+        }
+    }
+    assert!(
+        rig.sent_ids().contains(&0x34),
+        "C→S 0x34: {:02X?}",
+        rig.sent_ids()
+    );
+    assert!(
+        rig.transactions().contains(&(0, 3)),
+        "identified: {:?}",
+        rig.transactions()
+    );
+    assert_eq!(
+        flags(&rig).map(|f| f & 0x10),
+        Some(0x10),
+        "identified in the model"
+    );
+    assert_eq!(rig.gold_after(gold), gold - 100, "Cain took 100");
+    rig.check("identify");
+}
+
+// ---- the stash ----------------------------------------------------------------------------
+
+/// The stash grid's cell (x, y) on screen (`panels/stash_items.rs`
+/// fallback: (74, 82) + the 800 × 600 offset, 29 px cells).
+fn stash_cell(x: u16, y: u16) -> Point {
+    Point::new(154 + 29 * i32::from(x) + 10, 142 + 29 * i32::from(y) + 10)
+}
+
+/// The inventory gold button (`ui/gold.rs` `inventory_gold_hit`, 800 ×
+/// 600) and the stash gold button (`stash_gold_rect_hit`, expansion).
+const INV_GOLD_BUTTON: Point = Point::new(493, 462);
+const STASH_GOLD_BUTTON: Point = Point::new(190, 93);
+
+impl Rig {
+    /// The local player's stash gold (stat 15) in the client model.
+    fn stash_gold(&self) -> i32 {
+        let w = self.bridge().world();
+        w.local_player.map_or(0, |me| w.total(me, 15, 0))
+    }
+
+    /// Types `amount` into the open gold dialog and confirms it (Enter).
+    fn gold_dialog(&mut self, amount: u32) {
+        // The deposit box opens pre-filled with the maximum (§21 r3):
+        // backspaces clear it first (the edit box rules of §28 r4).
+        for _ in 0..10 {
+            self.queue(UiEvent::Char(8));
+        }
+        for c in amount.to_string().bytes() {
+            self.queue(UiEvent::Char(u16::from(c)));
+        }
+        self.queue(UiEvent::Char(0x0D));
+        self.step(10);
+    }
+
+    /// The local player's item `guid` (page, mode).
+    fn item_place(&self, guid: u32) -> Option<(u8, u8)> {
+        d2_client::bridge::items::local_items(self.bridge().world())
+            .iter()
+            .find(|i| i.key.guid == guid)
+            .map(|i| (i.page, i.mode))
+    }
+}
+
+// Covers: specs/ui/panels.md §11 r1; specs/ui/panels-2.md §21; specs/world/vendors-2.md §10.2 r2, §10.2 r3; specs/items/inventory-moves.md §7
+#[test]
+fn act1_stash_keeps_an_item_and_gold() {
+    let mut rig = Rig::new();
+    rig.stage_gold(5_000);
+    rig.check("gold");
+    rig.open_shop(class::AKARA, OptionKind::Trade);
+    let item = rig.buy(&BUCKLER);
+    rig.close_shop();
+    let gold = rig.gold();
+
+    // Walk to the stash and click it: C→S 0x13, S→C 0x77 0x10, ui 0x19.
+    let stash = *rig
+        .bridge()
+        .world()
+        .units
+        .iter()
+        .find(|(k, u)| k.unit_type == 2 && u.class == single_player::STASH_CLASS)
+        .expect("the stash is listed")
+        .0;
+    assert!(rig.walk_near(stash), "the stash is reachable");
+    let at = rig.pick_point(stash);
+    rig.click(at);
+    for _ in 0..200 {
+        rig.step(1);
+        if rig.with_ui(|u| u.is_open(0x19)) {
+            break;
+        }
+    }
+    assert!(rig.with_ui(|u| u.is_open(0x19)), "the stash opened");
+    rig.check("stash open");
+
+    // The buckler: backpack → cursor → stash grid (C→S 0x19, 0x18 page 4).
+    let (x, y) = d2_client::bridge::items::local_items(rig.bridge().world())
+        .iter()
+        .find(|i| i.key.guid == item)
+        .map(|i| (i.x, i.y))
+        .unwrap();
+    rig.click(backpack_cell(x, y));
+    rig.step(6);
+    rig.click(stash_cell(0, 0));
+    rig.step(10);
+    assert_eq!(
+        rig.item_place(item),
+        Some((4, 0)),
+        "the buckler is stored on the stash page"
+    );
+    rig.check("item to the stash");
+
+    // Gold: the inventory gold button deposits (kind 3), the stash gold
+    // button withdraws (kind 4); each moves stats 14 / 15.
+    rig.click(INV_GOLD_BUTTON);
+    rig.gold_dialog(1_000);
+    let now = rig.gold_after(gold);
+    assert_eq!(now, gold - 1_000, "deposited from the carried gold");
+    for _ in 0..40 {
+        if rig.stash_gold() == 1_000 {
+            break;
+        }
+        rig.step(1);
+    }
+    assert_eq!(rig.stash_gold(), 1_000, "the stash holds the deposit");
+    rig.check("deposit");
+    rig.click(STASH_GOLD_BUTTON);
+    rig.gold_dialog(400);
+    assert_eq!(
+        rig.gold_after(now),
+        now + 400,
+        "withdrawn to the carried gold"
+    );
+    assert_eq!(rig.stash_gold(), 600, "the stash keeps the rest");
+    rig.check("withdraw");
+
+    // The buckler back to its backpack cell (the start cube, REC-244,
+    // holds (0, 0)), then the stash closes.
+    rig.click(stash_cell(0, 0));
+    rig.step(6);
+    rig.click(backpack_cell(x, y));
+    rig.step(10);
+    assert_eq!(rig.item_place(item), Some((0, 0)), "back in the backpack");
+    rig.check("item back");
+    rig.app
+        .world_mut()
+        .non_send_mut::<WorldViewUi>()
+        .original
+        .as_mut()
+        .unwrap()
+        .set_ui(0x19, 1, false)
+        .unwrap();
+    rig.step(10);
+    assert!(!rig.with_ui(|u| u.is_open(0x19)), "the stash closed");
+    rig.check("stash close");
+}
+
+// ---- the cube -----------------------------------------------------------------------------
+
+/// The cube grid's cell (x, y) on screen (`panels/cube_items.rs`
+/// fallback: (116, 130) + the 800 × 600 offset, 29 px cells).
+fn cube_cell(x: u16, y: u16) -> Point {
+    Point::new(196 + 29 * i32::from(x) + 10, 190 + 29 * i32::from(y) + 10)
+}
+
+/// The transmute button and the cube's close button
+/// (`panels/stash_input.rs` `transmute_hit`, `cube_close_hit`), centred.
+fn transmute_button() -> Point {
+    let s = Screen::R800;
+    Point::new(s.sx() + 164, s.h + s.sy() - 203)
+}
+
+fn cube_close_button() -> Point {
+    let s = Screen::R800;
+    Point::new(s.sx() + 295, s.h + s.sy() - 80)
+}
+
+impl Rig {
+    /// The local player's item with `code` (GUID, x, y).
+    fn own_item(&self, code: &[u8; 4]) -> (u32, u16, u16) {
+        d2_client::bridge::items::local_items(self.bridge().world())
+            .iter()
+            .find(|i| i.code == Some(*code))
+            .map(|i| (i.key.guid, i.x, i.y))
+            .unwrap_or_else(|| panic!("the player holds {code:?}"))
+    }
+
+    /// The C→S 0x4F ClickButton messages sent since the last check, by
+    /// button.
+    fn buttons_sent(&self) -> Vec<u8> {
+        self.wire
+            .lock()
+            .unwrap()
+            .sent
+            .iter()
+            .filter(|m| m[0] == 0x4F)
+            .map(|m| m[1])
+            .collect()
+    }
+}
+
+// Covers: specs/ui/panels.md §12; specs/world/cube.md §1, §2; specs/items/inventory-moves.md §7
+#[test]
+fn act1_cube_holds_an_item_and_transmutes() {
+    use d2_client::controls::Action;
+    use d2_client::ui::panel::ActionId;
+    use d2_client::ui::panels::inventory::UI_INVENTORY;
+    use d2_client::ui::panels::stash_cube::UI_CUBE;
+    let mut rig = Rig::new();
+    rig.stage_gold(5_000);
+    rig.check("gold");
+    rig.open_shop(class::AKARA, OptionKind::Trade);
+    let item = rig.buy(&BUCKLER);
+    rig.close_shop();
+    let (_, x, y) = rig.own_item(&BUCKLER);
+
+    // The inventory (its toggle), then the start cube (REC-244) opened by
+    // its use: a right click on it, C→S 0x20, ui 0x1A.
+    rig.queue(UiEvent::Action(ActionId(
+        Action::ToggleInventory.index() as u16
+    )));
+    rig.step(3);
+    assert!(
+        rig.with_ui(|u| u.is_open(UI_INVENTORY)),
+        "the inventory opened"
+    );
+    let (_, cx, cy) = rig.own_item(b"box ");
+    rig.click_with(PointerButton::Right, backpack_cell(cx, cy));
+    for _ in 0..40 {
+        if rig.with_ui(|u| u.is_open(UI_CUBE)) {
+            break;
+        }
+        rig.step(1);
+    }
+    assert!(rig.with_ui(|u| u.is_open(UI_CUBE)), "the cube opened");
+    rig.check("cube open");
+
+    // The buckler: backpack → cursor → cube grid (page 3).
+    rig.click(backpack_cell(x, y));
+    rig.step(6);
+    rig.click(cube_cell(0, 0));
+    rig.step(10);
+    assert_eq!(
+        rig.item_place(item),
+        Some((3, 0)),
+        "the buckler is in the cube"
+    );
+    rig.check("item to the cube");
+
+    // Transmute (C→S 0x4F 0x18): no recipe takes a lone buckler, so it
+    // stays as it is (`cube.md` §2).
+    rig.click(transmute_button());
+    rig.step(10);
+    assert_eq!(rig.buttons_sent(), [0x18], "the transmute is sent");
+    assert_eq!(rig.item_place(item), Some((3, 0)), "the buckler stays");
+    rig.check("transmute");
+
+    // The buckler back to its backpack cell.
+    rig.click(cube_cell(0, 0));
+    rig.step(6);
+    rig.click(backpack_cell(x, y));
+    rig.step(10);
+    assert_eq!(rig.item_place(item), Some((0, 0)), "back in the backpack");
+    rig.check("item back");
+
+    // The cube's close button: C→S 0x4F 0x17, ui 0x1A closed.
+    rig.click(cube_close_button());
+    rig.step(10);
+    assert!(!rig.with_ui(|u| u.is_open(UI_CUBE)), "the cube closed");
+    assert_eq!(rig.buttons_sent(), [0x17], "the close is sent");
+    rig.check("cube close");
 }

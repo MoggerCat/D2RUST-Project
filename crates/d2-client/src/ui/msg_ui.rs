@@ -334,6 +334,11 @@ impl OriginalUi {
         // d2rs-own, unverified (`npc_menu_ui`): the menu box opens here.
         let level = world.local().map_or(1, |u| world.base(u.key, 12, 0));
         let n = crate::ui::npc_menu_ui::unidentified_count(world);
+        // `panels-2.md` §14.2: the Resurrect edit while the mercenary is
+        // dead (`[0x00725494]` ≠ −1, S→C 0x9B) in an expansion game.
+        let expansion = world.expansion != 0 && self.shared.borrow().config.expansion_installed;
+        self.npcm.borrow_mut().resurrect = (expansion && self.more.merc_state != 0xFFFF)
+            .then_some(u32::from(self.more.merc_7c0dd0));
         self.open_npc_menu_with(d.guid, d.class, level, n);
         match dialog_case(self.msg.ui_7c0c68, self.npc_text.as_ref(), d)? {
             Some(case) => self.dialog_answer = Some((Box::new(d.clone()), case)),

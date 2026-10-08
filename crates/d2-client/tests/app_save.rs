@@ -32,8 +32,13 @@ impl d2s::SaveTables for Tables {
             signed: true,
         })
     }
-    fn item_entry_len(&self, _: &[u8]) -> Result<usize, String> {
-        Err("no items in the synthetic tables".into())
+    /// A new character carries its start cube (REC-244): the entries
+    /// are read with the synthetic item tables.
+    fn item_entry_len(&self, buf: &[u8]) -> Result<usize, String> {
+        let items = d2_client::app::synthetic_items::item_tables();
+        d2_sim::items::bitstream::read::read_save_entry(buf, &items)
+            .map(|e| e.len)
+            .map_err(|e| e.to_string())
     }
 }
 

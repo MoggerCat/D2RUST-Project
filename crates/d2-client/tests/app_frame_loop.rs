@@ -216,7 +216,16 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // (q-a1-vis-links: the Blood Moor's tiles to the Black Marsh and the
     // Burial Grounds are gone, the fixture now follows the 1.14d links: 28.)
     // Warriv (q-smoke-travel, REC-280) adds two as Gheed and Charsi: 30.
-    assert_eq!(joined, 30);
+    // (q-smoke-town: the new character has its creation stats, so the
+    // join's vitals call sends S→C 0x95, `intents-events.md` §8.2 rule
+    // 3.9, and its eight stat messages twice, rules 3.4 and 3.8, now that
+    // the synthetic `itemstatcost` marks stats 0–15 `Saved`, as the
+    // recorded join's "8 stat messages" both times: 30 + 1 + 16 = 47.
+    // With creation stats the start items run too (`charstats` present):
+    // the new character's Horadric Cube (`start_extra`, REC-244), sent as
+    // the join's item messages (rule 3.5): its S→C 0x9C PutInContainer
+    // (`msg-stats-items.md` §2): 47 + 1 = 48.)
+    assert_eq!(joined, 48);
     // Plus two for the Blood Moor room bordering the synthetic town: its
     // 0x07 at the join and its 0x08 when the travel leaves the town.
     // Plus two for that room's cave entrance (a tile unit): its 0x09 at
@@ -230,7 +239,9 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // (q-a1-vis-links: the Black Marsh and Burial Grounds tiles left the
     // Blood Moor, so their four are gone: 41, 5.)
     // Warriv's (q-smoke-travel, REC-280), as Gheed's and Charsi's: 44, 6.
-    assert_eq!((b.log().handled, b.log().queued), (44, 6));
+    // (q-smoke-town: plus the join's S→C 0x95, its 16 stat messages and
+    // the start cube's 0x9C, all handled: 62, 6.)
+    assert_eq!((b.log().handled, b.log().queued), (62, 6));
     assert!(b.log().unowned.is_empty(), "{:?}", b.log().unowned);
     assert!(b.log().dropped.is_empty(), "{:?}", b.log().dropped);
     let sight: Vec<_> = b
@@ -266,8 +277,10 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
             // The local player: placeable, but the placeholder rules
             // (`world_view::Unspecified`) draw nothing for it.
             units_drawn: 0,
-            // Plus Cold Plains's warp tile (`q-levels-warps-all`).
-            units_hidden: 2,
+            // Plus Cold Plains's warp tile (`q-levels-warps-all`). Plus
+            // the start cube in the inventory (q-smoke-town, REC-244): an
+            // item unit of the model with no pose.
+            units_hidden: 3,
             ui_sent: 0,
             ui_unhandled: 0,
             gpu: false,

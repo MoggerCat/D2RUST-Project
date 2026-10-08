@@ -176,6 +176,11 @@ pub struct ClientUnit {
     pub position: Option<(u16, u16)>,
     /// The last point given to the position check (§6 rule 3).
     pub server_point: (u16, u16),
+    /// How many times the position check took the server's point for the
+    /// local player while the play preview predicts its walk (§6 rule 8,
+    /// `check::Checked::Followed`): the prediction snaps on a change.
+    /// d2rs-own, PROVISIONAL REC-277.
+    pub follows: u32,
     /// Stat list layer 0 base values.
     pub stats: BTreeMap<u16, i32>,
     /// Client copy of the unit seed {lo, hi} (§2 rule 6). `None` when it
@@ -263,6 +268,7 @@ impl ClientUnit {
             mode: 0,
             position: None,
             server_point: (0, 0),
+            follows: 0,
             stats: BTreeMap::new(),
             seed: Some(INIT_SEED),
             queue: Vec::new(),

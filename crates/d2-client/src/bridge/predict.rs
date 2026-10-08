@@ -195,8 +195,9 @@ fn isqrt(n: u64) -> u64 {
 pub struct Predict {
     /// The local player the prediction is for.
     player: Option<UnitKey>,
-    /// The model's (position, server point) at the last observation.
-    seen: Option<((u16, u16), (u16, u16))>,
+    /// The model's (position, rule-8 follow count) at the last
+    /// observation.
+    seen: Option<((u16, u16), u32)>,
     /// Precise (16.16) predicted position.
     at: Option<(i64, i64)>,
     /// The walk under way.
@@ -236,9 +237,9 @@ impl Predict {
 
     /// Snaps to the model (D2): a new local player starts at its
     /// position; a change of the model's position (0x15, a check
-    /// correction) or server point (0x0F and the other checked unit
-    /// messages, `client/model.md` §6 r3) moves the prediction to it,
-    /// server point first. The walk target is kept, unless the player's
+    /// correction) or a check that took the server's point
+    /// (`client/model.md` §6 r8, [`ClientUnit::follows`]) moves the
+    /// prediction to it, server point first. The walk target is kept, unless the player's
     /// level changed (a warp, portal or act change: the target is a point
     /// of the old level). A level change the prediction did not walk into
     /// is a placement (0x15 / 0x59): the prediction moves to the model's
@@ -254,7 +255,7 @@ impl Predict {
             *self = Self::default();
             return;
         };
-        let now = (pos, p.server_point);
+        let now = (pos, p.follows);
         let level = world.player_level();
         let act = world.act.as_ref().map(|a| a.act);
         if level != self.level {
@@ -293,12 +294,17 @@ impl Predict {
             };
             return;
         }
-        let Some((old_pos, old_point)) = self.seen else {
+        let Some((old_pos, old_follows)) = self.seen else {
             self.seen = Some(now);
             self.at = Some(centre(pos));
             return;
         };
-        if p.server_point != old_point && p.server_point.0 != 0 && p.server_point.1 != 0 {
+        // Only a check that took the server's point (§6 rule 8, the
+        // local player's `Checked::Followed`) moves the prediction: a
+        // kept check (rule 7) leaves the client's own position as it is,
+        // so a waypoint arrival's walk-out stays drawn while its server
+        // player stands at the arrival point within the tolerance.
+        if p.follows != old_follows && p.server_point.0 != 0 && p.server_point.1 != 0 {
             self.at = Some(centre(p.server_point));
         } else if pos != old_pos {
             self.at = Some(centre(pos));
@@ -721,8 +727,17 @@ mod tests {
         p.frame(&w, [walk_point(120, 100, false)], true, SPEEDS);
         p.frame(&w, [], true, SPEEDS);
         assert_eq!(p.position(), Some((0x65_4000, 0x64_8000)));
-        // A server point (0x0F check) snaps; the walk goes on from there.
+        // A kept check (rule 7) stores its point but does not move the
+        // prediction.
         w.units.get_mut(&key).unwrap().server_point = (104, 101);
+        let before = p.position();
+        p.frame(&w, [], false, SPEEDS);
+        assert_ne!(p.position(), Some((0x68_8000, 0x65_8000)));
+        assert!(before.is_some());
+        // A check that took the server's point (rule 8) snaps; the walk
+        // goes on from there.
+        w.units.get_mut(&key).unwrap().server_point = (104, 101);
+        w.units.get_mut(&key).unwrap().follows += 1;
         p.frame(&w, [], false, SPEEDS);
         assert_eq!(p.position(), Some((0x68_8000, 0x65_8000)));
         assert!(p.walking().is_some());

@@ -223,6 +223,10 @@ impl Game {
                     ids[k] = *i as u16;
                 }
                 let list = h.skill_lists.entry(p).or_default();
+                // The join ran the native skills on the synthetic `charstats`
+                // (`client/msg-skills.md` §2 rule 8); this game's class skills
+                // are the fixture's.
+                *list = Default::default();
                 list.init_player(&all, ListOwner::player(PLAYER_CLASS as i32), Some(&ids))
                     .unwrap();
                 let first = rows[0].0 as i32;
