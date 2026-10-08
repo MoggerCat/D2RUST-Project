@@ -29,7 +29,9 @@ pub fn preview_walk_room(mut bridge: ResMut<BridgeResource>, walk: Res<PreviewWa
     if let Some((x, y)) = cell {
         bridge.0.recache_local_room(x, y);
     }
-    bridge.0.set_local_walk(cell);
+    bridge
+        .0
+        .set_local_walk(walk.predict.position(), walk.predict.mode());
 }
 
 /// Adds [`preview_walk_room`] after the walk prediction's frame, before

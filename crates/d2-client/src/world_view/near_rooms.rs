@@ -52,6 +52,10 @@ pub struct MapState {
     /// DT1 entry.
     entries: Vec<[Vec<Dt1Entry>; 3]>,
     draw: BTreeMap<(DrlgRoomId, u8, usize), DrawState>,
+    /// The client DRLG the draw state belongs to: its act and init seed
+    /// ([`Self::drlg_key`]). Room slots are reused by a new act's DRLG,
+    /// so a change drops the draw state (`seams/bridge-app.md` §2.10).
+    drlg: Option<(u8, u32)>,
     /// The unit bits the order writes and the next frame reads
     /// (`draw-order.md` §5 r3, r4): flag 0x10000000 and flag-ex 0x80 of
     /// each unit, as the last frame left them.
@@ -81,22 +85,32 @@ fn unresolved(what: &'static str, message: String) -> ViewError {
 impl MapState {
     /// The near rooms of the frame `world.frames`, built once per bridge
     /// frame (the order mutates them during the frame). `None`: no client
-    /// DRLG or the local player has no room (no map). `player` is the
-    /// frame's one local-player sub-tile (`seams/world-screen.md` §2.4:
-    /// the position the camera is built from); `None`: the model cell.
+    /// DRLG or the local player has no room (no map).
     pub fn near_rooms(
         &mut self,
         world: &ClientWorld,
         levels: Option<&[LevelRow]>,
-        player: Option<(i32, i32)>,
         facts: impl Fn(&ClientUnit) -> Result<UnitFacts, ViewError>,
     ) -> Result<Option<&mut NearRooms>, ViewError> {
         if self.stamp != Some(world.frames) {
+            let key = Self::drlg_key(world);
+            if key != self.drlg {
+                // A new client DRLG (an act change, 0x03): the old act's
+                // records are freed with it, their flags and fades too.
+                self.near = None;
+                self.draw.clear();
+                self.drlg = key;
+            }
             self.save();
-            self.rebuild(world, levels, player, facts)?;
+            self.rebuild(world, levels, facts)?;
             self.stamp = Some(world.frames);
         }
         Ok(self.near.as_mut())
+    }
+
+    /// The identity of the model's client DRLG: (act, init seed).
+    fn drlg_key(world: &ClientWorld) -> Option<(u8, u32)> {
+        world.drlg.as_ref().map(|d| (d.drlg.act, d.drlg.init_seed))
     }
 
     /// The DT1 entry of a record of near room `room`.
@@ -165,7 +179,6 @@ impl MapState {
         &mut self,
         world: &ClientWorld,
         levels: Option<&[LevelRow]>,
-        player: Option<(i32, i32)>,
         facts: impl Fn(&ClientUnit) -> Result<UnitFacts, ViewError>,
     ) -> Result<(), ViewError> {
         self.near = None;
@@ -274,12 +287,9 @@ impl MapState {
         // `[0x007C8A08]` / `[0x007C8A10]`: the player's path sub-tile / 5;
         // `[0x007C8A0C]`: `0x0061B130` (`levels.md` §11.4) from the
         // player's room: none → 0, else the record index at the point.
-        // The path sub-tile is the frame's one player position (the drawn
-        // player's, `seams/world-screen.md` §2.4), not the model cell.
-        let (sx, sy) = player.unwrap_or_else(|| {
-            let (x, y) = world.local().map_or((0, 0), ClientUnit::cell);
-            (i32::from(x), i32::from(y))
-        });
+        // The local player's own cell (`seams/world-screen.md` §2.2).
+        let (sx, sy) = world.local_cell().unwrap_or((0, 0));
+        let (sx, sy) = (i32::from(sx), i32::from(sy));
         let player_logical = match world.cell_lookup(&own, sx, sy) {
             None => 0,
             Some(r) => d.coord_at(r.room, sx, sy).map_or(-1, |c| c.index as i32),

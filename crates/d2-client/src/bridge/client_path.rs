@@ -23,9 +23,10 @@
 //!
 //! d2rs-own, unverified. PROVISIONAL (`client/model.md` OQ2; REC-51,
 //! REC-277): that the 1.14d client step `0x00463390` runs these functions
-//! with these inputs (the unit's stats read as: velocity percent 100 plus
-//! the run bonus, stamina from the model, no state, no used skill, no
-//! drain), and that client units leave no footprints on the client grid.
+//! with these inputs (the unit's stats read as: velocity percent and
+//! stat 96 from the model ([`Own`]) plus the run bonus, stamina from the
+//! model, no state, no used skill, no drain), and that client units
+//! leave no footprints on the client grid.
 
 use std::collections::BTreeMap;
 
@@ -33,13 +34,13 @@ use d2_sim::drlg::{CollisionGrid, Drlg, TileRect};
 use d2_sim::path::record::{alloc_dynamic_path, DynamicKind, DynamicPath};
 use d2_sim::path::tables::PathTables;
 use d2_sim::path::walk::request::mode;
-use d2_sim::path::walk::velocity::STAT_VELOCITYPERCENT;
+use d2_sim::path::walk::velocity::{STAT_FASTERMOVE, STAT_VELOCITYPERCENT};
 use d2_sim::path::walk::{request, PathWorld, Point, Step, Walk, WalkTarget, WalkUnits};
 use d2_sim::path::CollisionRooms;
 use d2_sim::rng::Seed;
 use d2_sim::units::{ClientId, RoomId, UnitId, UnitType};
 
-use super::predict::Speeds;
+use super::predict::{MoveStats, Speeds};
 
 /// The local player in the path context.
 const ME: UnitId = UnitId(1);
@@ -47,6 +48,14 @@ const ME: UnitId = UnitId(1);
 const TARGET: UnitId = UnitId(2);
 /// The stamina stat (8.8).
 const STAT_STAMINA: u16 = 10;
+
+/// The local player's own stats the path reads from the model: stamina
+/// (stat 10) and the velocity stats ([`MoveStats`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Own {
+    pub stamina: i32,
+    pub moves: MoveStats,
+}
 
 /// What the walk goes to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -116,7 +125,7 @@ impl ClientPath {
         t: &PathTables,
         drlg: &Drlg,
         speeds: Speeds,
-        stamina: i32,
+        own: Own,
         to: PathTo,
         run: bool,
     ) -> bool {
@@ -125,7 +134,7 @@ impl ClientPath {
             PathTo::Point(x, y) => WalkTarget::Point(Point::new(i32::from(x), i32::from(y))),
             PathTo::Unit(ty, guid, _) => WalkTarget::Unit { ty, guid },
         };
-        let mut c = self.ctx(drlg, speeds, stamina, to);
+        let mut c = self.ctx(drlg, speeds, own, to);
         matches!(
             request(t, &mut c, ME, None, m, target, false),
             Ok(d2_sim::path::walk::Outcome::Moving(_))
@@ -138,7 +147,7 @@ impl ClientPath {
         t: &PathTables,
         drlg: &Drlg,
         speeds: Speeds,
-        stamina: i32,
+        own: Own,
         to: Option<PathTo>,
     ) -> bool {
         if !matches!(self.mode, mode::WALK | mode::RUN | mode::TOWN_WALK) {
@@ -146,12 +155,12 @@ impl ClientPath {
         }
         self.frame = self.frame.wrapping_add(1);
         let to = to.unwrap_or(PathTo::Point(0, 0));
-        let mut c = self.ctx(drlg, speeds, stamina, to);
+        let mut c = self.ctx(drlg, speeds, own, to);
         let mut w = Walk { t, c: &mut c };
         matches!(w.player_event0(ME), Ok(Step::Moving))
     }
 
-    fn ctx<'a>(&'a mut self, drlg: &'a Drlg, speeds: Speeds, stamina: i32, to: PathTo) -> Ctx<'a> {
+    fn ctx<'a>(&'a mut self, drlg: &'a Drlg, speeds: Speeds, own: Own, to: PathTo) -> Ctx<'a> {
         Ctx {
             rooms: Rooms {
                 drlg,
@@ -163,7 +172,7 @@ impl ClientPath {
             seed: &mut self.seed,
             frame: self.frame,
             speeds,
-            stamina,
+            own,
             to,
         }
     }
@@ -232,7 +241,7 @@ struct Ctx<'a> {
     seed: &'a mut Seed,
     frame: i32,
     speeds: Speeds,
-    stamina: i32,
+    own: Own,
     to: PathTo,
 }
 
@@ -343,13 +352,20 @@ impl WalkUnits for Ctx<'_> {
     fn stat(&self, unit: UnitId, stat: u16) -> i32 {
         match (unit, stat) {
             (ME, STAT_VELOCITYPERCENT) => {
-                100 + if *self.mode == mode::RUN {
-                    *self.run_bonus
-                } else {
-                    0
-                }
+                self.own.moves.percent
+                    + if *self.mode == mode::RUN {
+                        *self.run_bonus
+                    } else {
+                        0
+                    }
             }
-            (ME, STAT_STAMINA) => self.stamina,
+            (ME, STAT_STAMINA) => self.own.stamina,
+            _ => 0,
+        }
+    }
+    fn item_stat(&self, unit: UnitId, stat: u16) -> i32 {
+        match (unit, stat) {
+            (ME, STAT_FASTERMOVE) => self.own.moves.faster,
             _ => 0,
         }
     }

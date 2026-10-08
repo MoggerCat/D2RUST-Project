@@ -686,30 +686,92 @@ fn near_rooms_come_from_the_client_drlg() {
     assert!(bare.near_rooms(&m.w).is_err());
 }
 
-// Covers: specs/render/draw-order.md §9
-// Covers: specs/seams/world-screen.md §2.4
+// Covers: specs/render/draw-order-2.md §15 r2
 #[test]
-fn the_fade_player_tile_is_the_predicted_sub_tile() {
+fn the_preview_runs_the_sight_test_over_the_client_drlg() {
     use crate::world_view::model_feed::ModelFeed;
     use crate::world_view::preview::Preview;
+    use crate::world_view::unit_facts::UnitFactTables;
+    use crate::world_view::ViewFeed;
+    use d2_sim::drlg::collision::bits;
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    m.recv(&assign_monster(6, 46, 20));
+    let mut feed = ModelFeed::new(ZeroFacts)
+        .with_map()
+        .with_preview(Preview::default());
+    feed.levels = Some(vec![LevelRow::default(); 4]);
+    let mut los_draw = vec![false; 4];
+    los_draw[2] = true;
+    feed.set_unit_fact_tables(UnitFactTables {
+        unflat_dead: vec![Some(false)],
+        monster_size: vec![Some(1)],
+        los_draw,
+        ..UnitFactTables::default()
+    });
+    // The facts of the monster through both preview paths (the feed's
+    // `unit_facts` and the near-room build), which must agree.
+    fn hidden(
+        feed: &mut ModelFeed<ZeroFacts>,
+        w: &super::super::world::ClientWorld,
+    ) -> Option<bool> {
+        let monster = &w.units[&UnitKey::new(MONSTER, 6)];
+        let by_feed = feed.unit_facts(w, monster).unwrap().sight_hidden;
+        let near = feed.near_rooms(w).unwrap().unwrap();
+        let in_room = near
+            .rooms
+            .iter()
+            .flat_map(|r| &r.units)
+            .find(|u| u.key == monster.key)
+            .map(|u| u.facts.sight_hidden);
+        assert_eq!(in_room, Some(by_feed));
+        by_feed
+    }
+    // An open line: the monster is seen.
+    assert_eq!(hidden(&mut feed, &m.w), Some(false));
+    // A sight-blocking cell (collision 0x2) on the line hides it in a
+    // `LOSDraw` level (the preview answered "seen" for every unit).
+    let drlg = &mut m.w.drlg.as_mut().unwrap().drlg;
+    *drlg.collision_at_mut(46, 14).unwrap() |= bits::VISIBLE;
+    // The near-room build is per drawn frame.
+    m.w.frames += 1;
+    assert_eq!(hidden(&mut feed, &m.w), Some(true));
+    // `LOSDraw` 0: every unit passes.
+    feed.unit_tables.as_mut().unwrap().los_draw[2] = false;
+    m.w.frames += 1;
+    assert_eq!(hidden(&mut feed, &m.w), Some(false));
+}
+
+// Covers: specs/seams/bridge-app.md §2.10
+#[test]
+fn a_new_client_drlg_drops_the_tile_draw_state() {
+    use crate::rules::draw_order::REC_DRAWN;
+    use crate::world_view::model_feed::ModelFeed;
     use crate::world_view::ViewFeed;
     let mut m = model();
     m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
     m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
     m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
-    let mut feed = ModelFeed::new(ZeroFacts).with_preview(Preview::default());
-    feed.levels = Some(vec![LevelRow::default(); 4]);
-    // The model cell (46, 6) without a prediction.
+    let mut feed = ModelFeed::new(ZeroFacts).with_map();
+    let mut rows = vec![LevelRow::default(); 4];
+    rows[2].draw_edges = true;
+    feed.levels = Some(rows);
     let near = feed.near_rooms(&m.w).unwrap().unwrap();
-    assert_eq!(near.player_tile, (9, 1));
-    // The walk prediction at sub-tile (52, 11): the camera and the
-    // player draw use it, so the fade centre does too (§9: the path
-    // sub-tile / 5).
-    let me = m.w.local_player.unwrap();
-    feed.set_local_prediction(Some((me, ((52 << 16) | 0x8000, (11 << 16) | 0x8000))));
+    assert_eq!(near.rooms[0].floors[0].flags & REC_DRAWN, 0);
+    room_mut(near, 0).floors[0].flags |= REC_DRAWN;
+    // Same DRLG next frame: the flag is kept.
     m.w.frames += 1;
     let near = feed.near_rooms(&m.w).unwrap().unwrap();
-    assert_eq!(near.player_tile, (10, 2));
+    assert_ne!(near.rooms[0].floors[0].flags & REC_DRAWN, 0);
+    // A new client DRLG (another 0x03; here the same act with a new init
+    // seed, so the act's tile libraries stay) whose room slots are the
+    // same: nothing carried.
+    m.w.drlg.as_mut().unwrap().drlg.init_seed ^= 1;
+    m.w.frames += 1;
+    let near = feed.near_rooms(&m.w).unwrap().unwrap();
+    assert_eq!(near.rooms[0].floors[0].flags & REC_DRAWN, 0);
 }
 
 fn room_mut(
@@ -865,4 +927,64 @@ fn ground_items_join_the_room_of_their_point() {
     // A point in no active room: in no list.
     m.recv(&item_9c(0x03, 6, 3, 2000, 2000));
     assert_eq!(m.w.room_units.room_of(UnitKey::new(4, 6)), None);
+}
+
+// Covers: specs/render/lighting.md §9.2 r1, §10 r5
+#[test]
+fn each_client_update_steps_the_environment_and_the_overrides() {
+    use crate::rules::lighting::environment::{Ambient, PeriodTables};
+    let mut m = model();
+    let lit = Ambient {
+        i: 90,
+        r: 10,
+        g: 20,
+        b: 30,
+    };
+    m.inputs.tables.levels[2].ambient = lit;
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    assert_eq!(m.w.player_level(), Some(2));
+    let periods = PeriodTables::builtin().unwrap();
+    let mut env = m.w.environment.expect("the act's record");
+    m.w.overrides.den_counter = 0;
+    m.w.overrides.start_darkness(2, 1, 2, 2);
+    let mut overrides = m.w.overrides;
+    for _ in 0..3 {
+        m.drain();
+        // The same steps by hand, level 2 (§9.2 r1; §10 r5 r3 base = the
+        // leveldefs ambient, which has a colour).
+        overrides.update_darkness(lit, 2);
+        overrides.update_counters();
+        env.update(&periods, 2);
+        assert_eq!(m.w.environment, Some(env));
+        assert_eq!(m.w.overrides, overrides);
+    }
+    assert_eq!(m.w.overrides.den_counter, 3);
+    assert_eq!(m.w.overrides.darkness.map(|d| d.c), Some(3));
+}
+
+// Covers: specs/render/draw-order.md §9
+// Covers: specs/seams/world-screen.md §2.4
+#[test]
+fn the_fade_player_tile_is_the_predicted_sub_tile() {
+    use crate::world_view::model_feed::ModelFeed;
+    use crate::world_view::preview::Preview;
+    use crate::world_view::ViewFeed;
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    let mut feed = ModelFeed::new(ZeroFacts).with_preview(Preview::default());
+    feed.levels = Some(vec![LevelRow::default(); 4]);
+    // The model cell (46, 6) without a prediction.
+    let near = feed.near_rooms(&m.w).unwrap().unwrap();
+    assert_eq!(near.player_tile, (9, 1));
+    // The walk prediction at sub-tile (52, 11): the camera and the
+    // player draw use it, so the fade centre does too (§9: the path
+    // sub-tile / 5).
+    m.w.set_local_walk(Some(((52 << 16) | 0x8000, (11 << 16) | 0x8000)), None);
+    m.w.frames += 1;
+    let near = feed.near_rooms(&m.w).unwrap().unwrap();
+    assert_eq!(near.player_tile, (10, 2));
 }

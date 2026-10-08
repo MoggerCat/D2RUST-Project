@@ -269,7 +269,9 @@ impl HudBelt {
             .hover_item
             .and_then(|g| belt.values().find(|v| v.key.guid == g))?;
         let stream = items::stream(world, v.key)?;
-        let lines = tips.lines(stream);
+        let me = crate::ui::item_tip_world::WorldUnit::local(world);
+        let ctx = crate::ui::item_tip_world::hover_ctx(tips, world, me.as_ref(), v);
+        let lines = tips.tip_lines(stream, &ctx);
         let (name, stats) = tip_parts(&lines)?;
         let item = BeltItem {
             guid: v.key.guid,

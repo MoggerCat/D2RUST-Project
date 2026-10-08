@@ -76,6 +76,11 @@ macro_rules! messages {
             $( $g(gen::$g), )*
             $( $b($b), )*
             WardenRequest(WardenRequest),
+            /// 0x50 in any form [`QuestSpecial`] does not take (a code
+            /// other than 1, or bytes 9–14 not zero): the TSV layout,
+            /// code u16@1 and five words (`server-messages.tsv`; quest
+            /// codes 4, 13, 23, mercenary code 2).
+            QuestSpecialForm(gen::QuestSpecial),
         }
 
         /// Parses one whole S→C message (as `split_server_buffer` yields
@@ -84,9 +89,13 @@ macro_rules! messages {
         pub fn parse(b: &[u8]) -> Result<Message, ParseError> {
             expected_size(b)?;
             let id = b[0];
-            // The mercenary form of 0x50 (u16 2 at 1) is not built.
-            if id == QuestSpecial::ID && b[1..3] != [1, 0] {
-                return Err(ParseError::Unbuilt { id, status: Status::Partial });
+            // 0x50: the code-1 view when it decodes, else every other
+            // form through the TSV layout.
+            if id == QuestSpecial::ID {
+                if let Ok(m) = <QuestSpecial as ServerMsg>::decode(b) {
+                    return Ok(Message::QuestSpecial(m));
+                }
+                return Ok(Message::QuestSpecialForm(generated::<gen::QuestSpecial>(b)?));
             }
             Ok(match id {
                 $( $gid => Message::$g(generated::<gen::$g>(b)?), )*

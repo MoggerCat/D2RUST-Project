@@ -1,41 +1,23 @@
-// Spec: specs/ui/inventory.md (§5 hover state, §8 item drawing), specs/ui/text.md (§8 framed text), specs/items/bitstream.md (§4), specs/items/generation.md (§1.1 quality ids)
-//! Item tool tips: the hover box of an item (name, quality colour,
-//! identified state, requirements, properties).
+// Spec: specs/ui/item-tips.md (§1–§11), specs/ui/inventory.md (§5 hover state), specs/ui/text.md (§5 colour codes, §7 bottom-up lines)
+//! Item tool tips: the tables and strings of the hover text
+//! ([`ItemTips`]), the text of `ui/item-tips.md` built by
+//! [`super::item_tip_build`] ([`ItemTips::tip`]) and its lines for the
+//! box ([`ItemTips::tip_lines`], [`draw_tip`]).
 //!
-//! The lines are built from the item's last 0x9C / 0x9D stream, decoded
-//! with `d2_proto::item_bits::decode` over the game's item tables, and
-//! the string tables ([`ItemTips`]). The hover anchor of
-//! `inventory.md` §5 r1 is the cursor point here; the box is a preview
-//! box over the synthetic fill file.
-//!
-//! d2rs-own, unverified (REC-114): no spec gives the text of an item
-//! description (the builder behind `0x0048DD90` is unwritten), so
-//! - the name line is the base name (`namestr`) with the magic prefix and
-//!   suffix names around it, the rare / unique / set name above it, all
-//!   in the quality colour (`ÿc` codes 3 blue, 9 yellow, 4 gold, 2 green,
-//!   8 orange, 5 grey); an item whose identified flag (0x10) is clear
-//!   shows its base name and a red "Unidentified" line;
-//! - the labels `Defense:`, `Durability:`, `Quantity:`, `Required
-//!   Strength:` / `Dexterity:` / `Level:` are English text (their string
-//!   ids are not specified);
-//! - each property is one line from its `itemstatcost` `descfunc`
-//!   shape ([`super::item_tip_desc`], 1–28; REC-242) with `descval`
-//!   placing the value, ordered by `descpriority` descending; a stat with
-//!   no description string is skipped; a set item's set lists are green
-//!   and the set's bonuses follow its name ([`super::item_tip_set`]);
-//! - affix, unique and set names are table indices as sent (prefix /
-//!   suffix id, file index) into the name tables, without the id offset
-//!   rules of `affixes.md`.
-//!
-//! Nothing here counts as done (rule 10).
+//! The text is built from the item's last 0x9C / 0x9D stream, decoded
+//! with `d2_proto::item_bits::decode` over the game's item tables. The
+//! box drawing ([`draw_tip`]) is d2rs-own (the pop-up queue owner is
+//! `ui/panels.md` §5 step 10, item-tips.md open question 3).
+//! Unverified until the `text-0002` capture cases run (rule 10).
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use d2_data::bin::BinSet;
 use d2_data::tables::{
-    decode_all, Armor, Itemstatcost, Magicprefix, Magicsuffix, Misc, Rareprefix, Raresuffix,
-    Record, Setitems, Sets, Skilldesc, Skills, Uniqueitems, Weapons,
+    decode_all, Armor, Charstats, Gems, Itemstatcost, Lowqualityitems, Magicprefix, Magicsuffix,
+    Misc, Monstats, Montype, Rareprefix, Raresuffix, Record, Setitems, Sets, Skilldesc, Skills,
+    Uniqueitems, Weapons,
 };
 use d2_proto::item_bits::{decode, ItemBits, Stat};
 use d2_server::adapters::item_bits::TablesLookup;
@@ -43,8 +25,9 @@ use d2_sim::items::ItemTables;
 
 use super::draw::{ImageRef, ImageRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
 use super::geom::{Point, Rect};
-use super::item_tip_desc as desc;
-use super::item_tip_set as set;
+use super::item_tip_build::{Build, ItemText, PriceText, TipCtx, TipText};
+use super::item_tip_desc::{self as desc, StatDesc};
+use super::item_tip_props::StatList;
 use super::original::hud::{FILL_FILE, FILL_H, FILL_W};
 use super::original::FontMeasure;
 use super::panel::StringLookup;
@@ -66,17 +49,6 @@ pub mod color {
     pub const TEMPERED: u16 = 10;
 }
 
-/// Item quality ids (`generation.md` §1.1).
-mod quality {
-    pub const LOW: u8 = 1;
-    pub const MAGIC: u8 = 4;
-    pub const SET: u8 = 5;
-    pub const RARE: u8 = 6;
-    pub const UNIQUE: u8 = 7;
-    pub const CRAFTED: u8 = 8;
-    pub const TEMPERED: u8 = 9;
-}
-
 /// The font of the box (Font16) and the line step.
 const FONT: u16 = 1;
 /// d2rs-own, unverified: pixels per line.
@@ -92,7 +64,7 @@ pub struct TipLine {
 }
 
 impl TipLine {
-    fn new(s: impl AsRef<str>, color: u16) -> Self {
+    pub fn new(s: impl AsRef<str>, color: u16) -> Self {
         TipLine {
             text: s.as_ref().encode_utf16().collect(),
             color,
@@ -100,55 +72,44 @@ impl TipLine {
     }
 }
 
-/// The name and requirement columns of an items row.
-#[derive(Clone, Copy, Debug, Default)]
-struct CodeText {
-    name_id: u16,
-    req_str: u16,
-    req_dex: u16,
-    req_lvl: u8,
-    /// `InvTrans` (items `+0x142`): the inventory picture's palette file
-    /// `t` (`render/shading.md` §6 r4).
-    inv_trans: u8,
-}
-
-/// The description columns of an `itemstatcost` row.
-#[derive(Clone, Copy, Debug, Default)]
-struct StatDesc {
-    priority: u16,
-    func: u8,
-    val: u8,
-    pos: u16,
-    neg: u16,
-    str2: u16,
-}
-
 /// What the tips read from the tables and strings.
 #[derive(Clone)]
 pub struct ItemTips {
-    lookup: Arc<ItemTables>,
-    codes: BTreeMap<[u8; 4], CodeText>,
-    stats: Vec<StatDesc>,
+    pub(super) lookup: Arc<ItemTables>,
+    pub(super) codes: BTreeMap<[u8; 4], ItemText>,
+    pub(super) stats: Vec<StatDesc>,
+    /// The description list (`data/runtime-maps.md` §3).
+    pub(super) desc_order: Vec<u16>,
     /// String-table keys by table row.
-    magic_prefix: Vec<String>,
-    magic_suffix: Vec<String>,
-    rare_prefix: Vec<String>,
-    rare_suffix: Vec<String>,
-    unique: Vec<String>,
-    set: Vec<String>,
-    /// Set of each setitems row, and each set's name string id (the
-    /// set line at the foot of a set item's tip).
-    set_of_item: Vec<u16>,
-    set_names: Vec<u16>,
-    /// Per skill: its name string id and its class (255: none).
-    skills: Vec<(u16, u8)>,
+    pub(super) magic_prefix: Vec<String>,
+    pub(super) magic_suffix: Vec<String>,
+    pub(super) rare_prefix: Vec<String>,
+    pub(super) rare_suffix: Vec<String>,
+    pub(super) unique: Vec<String>,
+    pub(super) set: Vec<String>,
+    pub(super) low_quality: Vec<String>,
+    /// Each set's name string id.
+    pub(super) set_names: Vec<u16>,
+    /// Per skill: its skilldesc name string id (`None`: no skilldesc
+    /// row) and its `charclass` (255: none).
+    pub(super) skills: Vec<(Option<u16>, u8)>,
+    /// Per charstats row: the class strings (`item-tips.md` §7.2), the
+    /// `BlockFactor` (§3.10) and the class name.
+    pub(super) class_strings: Vec<desc::ClassStrings>,
+    pub(super) block_factors: Vec<u8>,
+    pub(super) class_names: Vec<String>,
+    /// Montype `strplur` and monstats `NameStr` per row.
+    pub(super) montype: Vec<u16>,
+    pub(super) monstats: Vec<u16>,
+    /// Gems `letter` per gems row (§3.12).
+    pub(super) gem_letters: Vec<String>,
     /// `transformcolor` of each magic prefix / suffix row, and
     /// `invtransform` of each set / unique row (`render/shading.md` §6 r4).
-    prefix_color: Vec<u8>,
-    suffix_color: Vec<u8>,
-    set_inv_color: Vec<u8>,
-    unique_inv_color: Vec<u8>,
-    strings: Arc<dyn StringLookup + Send + Sync>,
+    pub(super) prefix_color: Vec<u8>,
+    pub(super) suffix_color: Vec<u8>,
+    pub(super) set_inv_color: Vec<u8>,
+    pub(super) unique_inv_color: Vec<u8>,
+    pub(super) strings: Arc<dyn StringLookup + Send + Sync>,
 }
 
 impl std::fmt::Debug for ItemTips {
@@ -187,11 +148,35 @@ impl ItemTips {
         macro_rules! add {
             ($t:ty) => {
                 for r in rows::<$t>(set)? {
-                    codes.entry(r.code).or_insert(CodeText {
+                    codes.entry(r.code).or_insert(ItemText {
                         name_id: r.namestr,
                         req_str: r.reqstr,
                         req_dex: r.reqdex,
-                        req_lvl: r.levelreq,
+                        levelreq: r.levelreq,
+                        block: r.block,
+                        mindam: r.mindam,
+                        maxdam: r.maxdam,
+                        mindam2: r.f_2handmindam,
+                        maxdam2: r.f_2handmaxdam,
+                        minmisdam: r.minmisdam,
+                        maxmisdam: r.maxmisdam,
+                        durability: r.durability,
+                        nodurability: r.nodurability,
+                        quest: r.quest,
+                        questdiffcheck: r.questdiffcheck,
+                        skipname: r.skipname,
+                        gemoffset: r.gemoffset,
+                        spelldesc: r.spelldesc,
+                        spelldescstr: r.spelldescstr,
+                        stat1: r.stat1,
+                        hasinv: r.hasinv,
+                        twohanded: r.f_2handed,
+                        one_or_two: r.f_1or2handed,
+                        transmogrify: r.transmogrify,
+                        tmogtype: r.tmogtype,
+                        maxstack: r.maxstack,
+                        wclass: r.wclass,
+                        wclass2: r.f_2handedwclass,
                         inv_trans: r.invtrans,
                     });
                 }
@@ -200,6 +185,10 @@ impl ItemTips {
         add!(Weapons);
         add!(Armor);
         add!(Misc);
+        let desc_order = set
+            .table(Itemstatcost::TABLE)
+            .map(d2_data::fixup::maps::desc_list)
+            .unwrap_or_default();
         let stats = rows::<Itemstatcost>(set)?
             .iter()
             .map(|r| StatDesc {
@@ -209,12 +198,24 @@ impl ItemTips {
                 pos: r.descstrpos,
                 neg: r.descstrneg,
                 str2: r.descstr2,
+                dgrp: r.dgrp,
+                dgrpfunc: r.dgrpfunc,
+                dgrpval: r.dgrpval,
+                dgrppos: r.dgrpstrpos,
+                dgrpneg: r.dgrpstrneg,
+                dgrpstr2: r.dgrpstr2,
+                op: r.op,
+                op_param: r.op_param,
+                op_base: r.op_base,
+                valshift: r.valshift,
+                op_stats: [r.op_stat1, r.op_stat2, r.op_stat3],
             })
             .collect();
         Ok(ItemTips {
             lookup,
             codes,
             stats,
+            desc_order,
             magic_prefix: rows::<Magicprefix>(set)?
                 .iter()
                 .map(|r| key(&r.name))
@@ -239,7 +240,38 @@ impl ItemTips {
                 .iter()
                 .map(|r| key(&r.index))
                 .collect(),
-            set_of_item: rows::<Setitems>(set)?.iter().map(|r| r.set).collect(),
+            low_quality: rows::<Lowqualityitems>(set)?
+                .iter()
+                .map(|r| key(&r.name))
+                .collect(),
+            set_names: rows::<Sets>(set)?.iter().map(|r| r.name).collect(),
+            skills: {
+                let descs = rows::<Skilldesc>(set)?;
+                rows::<Skills>(set)?
+                    .iter()
+                    .map(|r| {
+                        let name = descs.get(usize::from(r.skilldesc)).map(|d| d.str_name);
+                        (name, r.charclass)
+                    })
+                    .collect()
+            },
+            class_strings: rows::<Charstats>(set)?
+                .iter()
+                .map(|r| desc::ClassStrings {
+                    all_skills: r.strallskills,
+                    tabs: [r.strskilltab1, r.strskilltab2, r.strskilltab3],
+                    class_only: r.strclassonly,
+                })
+                .collect(),
+            block_factors: rows::<Charstats>(set)?
+                .iter()
+                .map(|r| r.blockfactor)
+                .collect(),
+            class_names: rows::<Charstats>(set)?
+                .iter()
+                .map(|r| key(&r.class))
+                .collect(),
+            gem_letters: rows::<Gems>(set)?.iter().map(|r| key(&r.letter)).collect(),
             prefix_color: rows::<Magicprefix>(set)?
                 .iter()
                 .map(|r| r.transformcolor)
@@ -256,21 +288,16 @@ impl ItemTips {
                 .iter()
                 .map(|r| r.invtransform)
                 .collect(),
-            set_names: rows::<Sets>(set)?.iter().map(|r| r.name).collect(),
-            skills: {
-                let descs = rows::<Skilldesc>(set)?;
-                rows::<Skills>(set)?
-                    .iter()
-                    .map(|r| {
-                        let name = descs
-                            .get(usize::from(r.skilldesc))
-                            .map_or(0, |d| d.str_name);
-                        (name, r.charclass)
-                    })
-                    .collect()
-            },
+            montype: rows::<Montype>(set)?.iter().map(|r| r.strplur).collect(),
+            monstats: rows::<Monstats>(set)?.iter().map(|r| r.namestr).collect(),
             strings,
         })
+    }
+
+    fn text_by_key(&self, names: &[String], i: usize) -> Option<String> {
+        let k = names.get(i)?;
+        let t = self.strings.get(k)?;
+        Some(String::from_utf16_lossy(t))
     }
 
     /// The inventory picture's item colour `(t, c)` (`0x0062C100(0, item,
@@ -285,14 +312,13 @@ impl ItemTips {
         self.inv_color_of(&self.bits(stream)?)
     }
 
-    fn inv_color_of(&self, b: &ItemBits) -> Option<(u8, u8)> {
+    pub(super) fn inv_color_of(&self, b: &ItemBits) -> Option<(u8, u8)> {
         let t = self.codes.get(&b.code)?.inv_trans;
         let qf = &b.quality_fields;
+        // Affix id = row + 1 (0: none, [`Self::magic_name`]).
         let affix = |table: &[u8], id: u16| {
-            (id != 0)
-                .then(|| table.get(usize::from(id)).copied())
-                .flatten()
-                .filter(|&c| c != 0xFF)
+            let row = usize::from(id).checked_sub(1)?;
+            table.get(row).copied().filter(|&c| c != 0xFF)
         };
         let row = |table: &[u8]| {
             qf.file_index
@@ -321,18 +347,112 @@ impl ItemTips {
         crate::rules::shading::item_color(t, c)
     }
 
-    fn text_by_key(&self, names: &[String], i: usize) -> Option<String> {
-        let k = names.get(i)?;
-        let t = self.strings.get(k)?;
-        Some(String::from_utf16_lossy(t))
+    /// The name of magic affix id `id` as sent (`items/affixes.md` §1 r1
+    /// with `bitstream.md` §4.2: prefixes arrive as their magicprefix row
+    /// + 1, suffixes as their magicsuffix row + 1; 0 = none).
+    pub(super) fn magic_name(&self, names: &[String], id: u16) -> Option<String> {
+        let row = usize::from(id).checked_sub(1)?;
+        self.text_by_key(names, row)
     }
 
-    fn base_name(&self, code: [u8; 4]) -> String {
-        self.codes
-            .get(&code)
-            .and_then(|c| self.strings.get_id(c.name_id))
-            .map(String::from_utf16_lossy)
-            .unwrap_or_else(|| String::from_utf8_lossy(&code).trim_end().to_owned())
+    /// The rare name of rare id `id` (`items/affixes.md` §1 r1: combined
+    /// index + 1 in the rare array, raresuffix rows first, then
+    /// rareprefix; sent unchanged, `bitstream.md` §4.3 r5). `prefix`
+    /// picks the part the slot holds; an id outside that part is none.
+    pub(super) fn rare_name(&self, id: u8, prefix: bool) -> Option<String> {
+        let combined = usize::from(id).checked_sub(1)?;
+        let n = self.rare_suffix.len();
+        if prefix {
+            self.text_by_key(&self.rare_prefix, combined.checked_sub(n)?)
+        } else if combined < n {
+            self.text_by_key(&self.rare_suffix, combined)
+        } else {
+            None
+        }
+    }
+
+    /// The text of the string with key `names[i]`.
+    pub(super) fn key_text(&self, names: &[String], i: usize) -> Option<Vec<u16>> {
+        Some(self.strings.get(names.get(i)?)?.to_vec())
+    }
+
+    /// Charstats `BlockFactor` of `class` (§3.10).
+    pub(super) fn block_factor(&self, class: u32) -> i32 {
+        self.block_factors
+            .get(class as usize)
+            .map_or(0, |&b| i32::from(b))
+    }
+
+    /// The class name of an ear (`0x00484A70`; not specified: the
+    /// charstats `class` text).
+    pub(super) fn class_name(&self, class: u32) -> Vec<u16> {
+        self.class_names
+            .get(class as usize)
+            .map(|s| s.encode_utf16().collect())
+            .unwrap_or_default()
+    }
+
+    /// The gems-row letters of a rune with `code` (§3.12): is-a 74 with
+    /// `gemoffset` > 0.
+    pub(super) fn rune_letters(&self, code: [u8; 4]) -> Option<Vec<u16>> {
+        let i = self.lookup.find_code(code)?;
+        if !self.lookup.is_type(i, d2_sim::items::ty::RUNE as i16) {
+            return None;
+        }
+        let g = self.codes.get(&code)?.gemoffset;
+        if g == 0 {
+            return None;
+        }
+        let l = self.gem_letters.get(g as usize)?;
+        Some(l.encode_utf16().collect())
+    }
+
+    /// The stats whose op 13 (`sim/stats.md` §6.3: % of an item's own
+    /// base) targets `s`.
+    pub(super) fn op13_sources(&self, s: u16) -> Vec<(u16, StatDesc)> {
+        self.stats
+            .iter()
+            .enumerate()
+            .filter(|(_, d)| d.op == 13 && d.op_stats.contains(&s) && s != 0)
+            .map(|(i, d)| (i as u16, *d))
+            .collect()
+    }
+
+    /// §3.6: the list a gem / rune of `code` gives through its gems-row
+    /// mods block `slot` (`0x0065FEC0` on a temporary list; the mods are
+    /// fixed values, so the roll seed does not matter).
+    pub(super) fn filler_list(&self, code: [u8; 4], slot: usize) -> StatList {
+        let mut l = StatList::default();
+        let Some(record) = self.lookup.find_code(code) else {
+            return l;
+        };
+        let mut item = d2_sim::items::Item {
+            record,
+            format: 0,
+            ilvl: 0,
+            quality: 2,
+            file_index: -1,
+            prefix: [0; 3],
+            suffix: [0; 3],
+            rare_prefix: 0,
+            rare_suffix: 0,
+            auto_affix: 0,
+            flags: 0,
+            inv_page: 0xFF,
+            gfx: 0,
+            unit_seed: d2_sim::rng::Seed { lo: 0, hi: 0 },
+            init_seed: 0,
+            item_seed: d2_sim::rng::Seed { lo: 0, hi: 0 },
+            start_seed: 0,
+            name: [0; 16],
+            ear_level: 0,
+            stats: Recorder::default(),
+        };
+        d2_sim::items::props::apply_socket_filler(&self.lookup, &mut item, slot as u8);
+        for (&(s, layer), &v) in &item.stats.0 {
+            l.add(s, u32::from(layer), v);
+        }
+        l
     }
 
     /// The decoded record of an item stream (`None` when it does not
@@ -353,277 +473,211 @@ impl ItemTips {
         })
     }
 
-    /// The tip of the item with last stream `stream`; empty when the
+    /// The tip text of `ui/item-tips.md` (§1) of decoded item `b` with
+    /// `ctx`.
+    pub fn tip_of(&self, b: &ItemBits, ctx: &TipCtx<'_>) -> TipText {
+        // `bitstream.md` §4.1 r4 reader: an alt-code record is the base
+        // code's item with item level 1 and quality 1; the flags lose
+        // 0x2000000 and 0x80000 (edge case 9: a gamble item shows its
+        // normal-tier base).
+        if let Some(code) = b.base_code {
+            let b = ItemBits {
+                code,
+                ilvl: 1,
+                quality: 1,
+                flags: b.flags & !(d2_proto::item_bits::hflag::ALT_CODE | 0x8_0000),
+                ..b.clone()
+            };
+            return Build::new(self, &b, ctx).tip();
+        }
+        // PROVISIONAL (REC-242): a compact record carries no quality
+        // (`bitstream.md` §3) and the client's quality for it is not
+        // specified; read as normal (2), the only quality whose name
+        // branch a compact item can take (§5 r3.2).
+        if b.flags & d2_proto::item_bits::hflag::COMPACT != 0 && b.quality == 0 {
+            let b = ItemBits {
+                quality: 2,
+                ..b.clone()
+            };
+            return Build::new(self, &b, ctx).tip();
+        }
+        Build::new(self, b, ctx).tip()
+    }
+
+    /// The tip text of the item with last stream `stream`; empty when the
     /// stream does not decode.
-    pub fn lines(&self, stream: &[u8]) -> Vec<TipLine> {
+    pub fn tip(&self, stream: &[u8], ctx: &TipCtx<'_>) -> TipText {
         match decode(stream, &TablesLookup(&self.lookup)) {
-            Ok(bits) => self.lines_of(&bits),
-            Err(_) => Vec::new(),
+            Ok(b) => self.tip_of(&b, ctx),
+            Err(_) => TipText::default(),
         }
     }
 
-    fn lines_of(&self, b: &ItemBits) -> Vec<TipLine> {
-        let mut out = Vec::new();
-        let ident = b.flags & 0x10 != 0;
-        let base = self.base_name(b.code);
-        let q = b.quality;
-        let name_color = self.name_color(b);
-        let qf = &b.quality_fields;
-        if ident {
-            match q {
-                quality::MAGIC => {
-                    let (p, s) = qf.magic.unwrap_or((0, 0));
-                    let pre = self.text_by_key(&self.magic_prefix, usize::from(p));
-                    let suf = self.text_by_key(&self.magic_suffix, usize::from(s));
-                    let mut n = String::new();
-                    if p != 0 {
-                        n.extend(pre.map(|t| t + " "));
-                    }
-                    n += &base;
-                    if s != 0 {
-                        n.extend(suf.map(|t| format!(" {t}")));
-                    }
-                    out.push(TipLine::new(n, name_color));
-                }
-                quality::RARE | quality::CRAFTED => {
-                    if let Some((a, c)) = qf.rare_names {
-                        let n = [
-                            self.text_by_key(&self.rare_prefix, usize::from(a)),
-                            self.text_by_key(&self.rare_suffix, usize::from(c)),
-                        ]
-                        .into_iter()
-                        .flatten()
-                        .collect::<Vec<_>>()
-                        .join(" ");
-                        if !n.is_empty() {
-                            out.push(TipLine::new(n, name_color));
-                        }
-                    }
-                    out.push(TipLine::new(&base, name_color));
-                }
-                quality::UNIQUE | quality::SET => {
-                    let names = if q == quality::UNIQUE {
-                        &self.unique
-                    } else {
-                        &self.set
-                    };
-                    let idx = qf.file_index.unwrap_or(0) as usize;
-                    if let Some(n) = self.text_by_key(names, idx) {
-                        out.push(TipLine::new(n, name_color));
-                    }
-                    out.push(TipLine::new(&base, name_color));
-                }
-                _ => out.push(TipLine::new(&base, name_color)),
-            }
-        } else {
-            out.push(TipLine::new(&base, name_color));
-            out.push(TipLine::new("Unidentified", color::RED));
-        }
-        // Base facts.
-        if let Some(d) = b.defense {
-            out.push(TipLine::new(
-                format!("Defense: {}", d.raw.saturating_sub(d.save_add)),
-                color::WHITE,
-            ));
-        }
-        if let (Some(m), Some(d)) = (b.max_durability, b.durability) {
-            let (m, d) = (
-                m.raw.saturating_sub(m.save_add),
-                d.raw.saturating_sub(d.save_add),
-            );
-            if m > 0 {
-                out.push(TipLine::new(
-                    format!("Durability: {d} of {m}"),
-                    color::WHITE,
-                ));
-            }
-        }
-        if let Some(n) = b.quantity {
-            out.push(TipLine::new(format!("Quantity: {n}"), color::WHITE));
-        }
-        if let Some(c) = self.codes.get(&b.code) {
-            for (label, v) in [
-                ("Required Strength", u32::from(c.req_str)),
-                ("Required Dexterity", u32::from(c.req_dex)),
-                ("Required Level", u32::from(c.req_lvl)),
-            ] {
-                // `item-tips.md` §3.3 r4: the level line only when R > 1.
-                let min = if label == "Required Level" { 1 } else { 0 };
-                if v > min {
-                    out.push(TipLine::new(format!("{label}: {v}"), color::WHITE));
-                }
-            }
-        }
-        if b.sockets.is_some_and(|s| s > 0) {
-            out.push(TipLine::new(
-                format!("Socketed ({})", b.sockets.unwrap_or(0)),
-                color::BLUE,
-            ));
-        }
-        // Properties, shown only for an identified item (`bitstream.md`
-        // §4.3: the lists are not sent otherwise).
-        if ident {
-            let own: Vec<Stat> = b
-                .lists
-                .first()
-                .into_iter()
-                .flatten()
-                .flatten()
-                .copied()
-                .collect();
-            out.extend(self.stat_lines(&own, color::BLUE));
-            // The set lists of a set item (green).
-            let sets: Vec<Stat> = b
-                .lists
-                .iter()
-                .skip(1)
-                .flatten()
-                .flatten()
-                .copied()
-                .collect();
-            out.extend(self.stat_lines(&sets, color::GREEN));
-        }
-        // A set item names its set at the foot, then the bonuses of the
-        // set (PROVISIONAL, REC-242: all steps shown; layout unverified).
-        if ident && q == quality::SET {
-            let name = qf
-                .file_index
-                .and_then(|i| self.set_of_item.get(i as usize))
-                .and_then(|&s| self.set_names.get(usize::from(s)))
-                .and_then(|&id| self.strings.get_id(id))
-                .map(String::from_utf16_lossy);
-            out.extend(name.map(|n| TipLine::new(n, color::GOLD)));
-            if let Some(i) = qf.file_index {
-                out.extend(self.set_lines(i as usize));
-            }
-        }
-        out
-    }
-
-    /// The name colour (`ui/item-tips.md` §4 rules 1, 3, 4; later rules
-    /// win). Rule 2 (an unidentified store item in modes 1–9 → 0) needs
-    /// the store state, which the tip does not take.
-    fn name_color(&self, b: &ItemBits) -> u16 {
-        const ETHEREAL: u32 = 0x40_0000;
-        const BROKEN: u32 = 0x100;
-        const SPECIAL: [&[u8; 4]; 11] = [
-            b"ceh ", b"bet ", b"fed ", b"tes ", b"toa ", b"dhn ", b"bey ", b"mbr ", b"pk1 ",
-            b"pk2 ", b"pk3 ",
-        ];
-        let mut c = match b.quality {
-            quality::MAGIC => color::BLUE,
-            quality::SET => color::GREEN,
-            quality::RARE => color::YELLOW,
-            quality::UNIQUE => color::GOLD,
-            quality::CRAFTED => color::ORANGE,
-            quality::TEMPERED => color::TEMPERED,
-            quality::LOW..=3 if b.flags & (0x800 | ETHEREAL) != 0 => color::GREY,
-            _ => color::WHITE,
-        };
-        let rune = self
-            .lookup
-            .find_code(b.code)
-            .is_some_and(|i| self.lookup.is_type(i, d2_sim::items::ty::RUNE as i16));
-        if rune || SPECIAL.contains(&&b.code) {
-            c = color::ORANGE;
-        }
-        if b.flags & BROKEN != 0 {
-            c = color::RED;
-        }
-        c
-    }
-
-    /// (priority, text) of one stat; `None`: no description string.
-    fn property(&self, s: &Stat) -> Option<(u16, String)> {
-        let d = self.stats.get(usize::from(s.stat))?;
-        let v = s.value();
-        let id = if v < 0 && d.neg != 0 { d.neg } else { d.pos };
-        if id == 0 {
-            return None;
-        }
-        let name = String::from_utf16_lossy(self.strings.get_id(id)?);
-        let name2 = self.strings.get_id(d.str2).map(String::from_utf16_lossy);
-        let text = desc::render(
-            &desc::Shape {
-                func: d.func,
-                val: d.val,
-                value: v,
-                param: s.param,
-                name: &name,
-                name2: name2.as_deref(),
-            },
-            self,
-        );
-        Some((d.priority, text))
-    }
-
-    /// The set bonus lines under a set item's name (REC-242).
-    fn set_lines(&self, item_row: usize) -> Vec<TipLine> {
-        let Some(b) = set::bonuses(&self.lookup, item_row) else {
+    /// The box lines of the tip of `stream` with `ctx`, top line first.
+    pub fn tip_lines(&self, stream: &[u8], ctx: &TipCtx<'_>) -> Vec<TipLine> {
+        let t = self.tip(stream, ctx);
+        if t.text.is_empty() {
             return Vec::new();
-        };
-        let mut out = Vec::new();
-        for (pieces, stats) in &b.partial {
-            let _ = pieces;
-            out.extend(self.stat_lines(stats, color::GREEN));
         }
-        out.extend(self.stat_lines(&b.full, color::ORANGE));
-        out
+        text_lines(&t.text, t.color)
     }
 
-    fn stat_lines(&self, stats: &[Stat], color: u16) -> Vec<TipLine> {
-        let mut props: Vec<(u16, String)> = stats.iter().filter_map(|s| self.property(s)).collect();
-        props.sort_by_key(|p| std::cmp::Reverse(p.0));
-        props
-            .into_iter()
-            .map(|(_, t)| TipLine::new(t, color))
-            .collect()
+    /// The tip lines of `stream` without a store, unit or fillers.
+    pub fn lines(&self, stream: &[u8]) -> Vec<TipLine> {
+        self.tip_lines(stream, &TipCtx::default())
+    }
+
+    #[cfg(test)]
+    fn lines_of(&self, b: &ItemBits) -> Vec<TipLine> {
+        let t = self.tip_of(b, &TipCtx::default());
+        text_lines(&t.text, t.color)
+    }
+
+    #[cfg(test)]
+    fn name_color(&self, b: &ItemBits) -> u16 {
+        Build::new(self, b, &TipCtx::default()).name_color()
+    }
+
+    /// The list values of a stream list (`bitstream.md` §4.6 r4): a
+    /// stat's own entry is sent as value >> `ValShift`; the partners
+    /// written after 17, 48, 50, 52, 54, 57 are sent unshifted.
+    pub fn stat_list(&self, stats: &[Stat]) -> StatList {
+        let mut l = StatList::default();
+        let shift = |s: u16| self.stats.get(usize::from(s)).map_or(0, |d| d.valshift);
+        for (s, p, v) in super::item_tip_props::stream_values(stats, shift) {
+            l.add(s, p, v);
+        }
+        l
     }
 
     /// Whether a character with these base stats meets the requirements
     /// of an item with `code` (strength, dexterity, level; REC-242: item
-    /// stat modifiers of the requirements are not applied).
+    /// stat modifiers of the requirements are not applied). Used by the
+    /// grid tint, not by the tip.
     pub fn can_use(&self, code: [u8; 4], strength: i32, dexterity: i32, level: i32) -> bool {
         self.codes.get(&code).is_none_or(|c| {
             i32::from(c.req_str) <= strength
                 && i32::from(c.req_dex) <= dexterity
-                && i32::from(c.req_lvl) <= level
+                && i32::from(c.levelreq) <= level
         })
     }
 
-    /// The tip of a vendor's item ([`shop_marks`] over its lines).
+    /// The tip of a store item in buy mode (§11 r3 `Cost: ` with
+    /// `price`). The requirement colours come from the units of a
+    /// [`TipCtx`] ([`ItemTips::tip_lines`]); `usable` is no longer read.
     pub fn shop_lines(&self, stream: &[u8], price: u32, usable: bool) -> Vec<TipLine> {
-        shop_marks(self.lines(stream), price, usable)
+        let _ = usable;
+        let ctx = TipCtx {
+            mode: 1,
+            price: PriceText::Price {
+                label: super::item_tip_build::tid::COST,
+                price: price as i32,
+            },
+            ..TipCtx::default()
+        };
+        self.tip_lines(stream, &ctx)
     }
 }
 
-/// A vendor tip: a price line at the foot and, when the player cannot use
-/// the item, its white lines (requirements, base facts) in red
-/// (REC-242: the price text and the colour are d2rs-own, unverified).
-pub fn shop_marks(mut lines: Vec<TipLine>, price: u32, usable: bool) -> Vec<TipLine> {
-    if lines.is_empty() {
-        return lines;
-    }
-    if !usable {
-        for l in lines.iter_mut().filter(|l| l.color == color::WHITE) {
-            l.color = color::RED;
+/// The lines of a tip text, top line first (`ui/text.md` §7: the first
+/// line of the text is the bottom one). Each line's colour is the one in
+/// effect at its start (§5 codes run on across LF); leading codes are
+/// folded into it, inner ones stay in the text.
+pub fn text_lines(text: &[u16], start: u16) -> Vec<TipLine> {
+    let mut out = Vec::new();
+    let mut c = start;
+    for line in text.split(|&u| u == u16::from(b'\n')) {
+        let mut i = 0;
+        while line.len() >= i + 3 && line[i] == 0xFF && line[i + 1] == u16::from(b'c') {
+            c = line[i + 2].wrapping_sub(u16::from(b'0'));
+            i += 3;
+        }
+        let rest = &line[i..];
+        out.push(TipLine {
+            text: rest.to_vec(),
+            color: c,
+        });
+        let mut k = 0;
+        while k + 2 < rest.len() {
+            if rest[k] == 0xFF && rest[k + 1] == u16::from(b'c') {
+                c = rest[k + 2].wrapping_sub(u16::from(b'0'));
+                k += 3;
+            } else {
+                k += 1;
+            }
         }
     }
-    lines.push(TipLine::new(
-        format!("Price: {price}"),
-        if usable { color::GOLD } else { color::RED },
-    ));
-    lines
+    out.reverse();
+    out
+}
+
+/// A stat list that records what the property rules write (§3.6).
+#[derive(Default)]
+struct Recorder(BTreeMap<(u16, u16), i32>);
+
+impl d2_sim::items::ItemStats for Recorder {
+    fn has_stats(&self) -> bool {
+        true
+    }
+    fn stat(&self, id: u16, layer: u16) -> i32 {
+        self.0.get(&(id, layer)).copied().unwrap_or(0)
+    }
+    fn base(&self, id: u16, layer: u16) -> i32 {
+        self.stat(id, layer)
+    }
+    fn set_base(&mut self, id: u16, layer: u16, value: i32) {
+        self.0.insert((id, layer), value);
+    }
+    fn has_list(&self, _: d2_sim::items::ListKey) -> bool {
+        true
+    }
+    fn list_set(&mut self, _: d2_sim::items::ListKey, id: u16, layer: u16, value: i32) {
+        self.0.insert((id, layer), value);
+    }
+    fn list_add(&mut self, _: d2_sim::items::ListKey, id: u16, layer: u16, value: i32) {
+        *self.0.entry((id, layer)).or_default() += value;
+    }
+    fn list_get(&self, _: d2_sim::items::ListKey, id: u16, layer: u16) -> i32 {
+        self.stat(id, layer)
+    }
 }
 
 impl desc::DescNames for ItemTips {
-    fn skill(&self, id: u32) -> Option<String> {
-        let (name, _) = self.skills.get(id as usize)?;
-        self.strings.get_id(*name).map(String::from_utf16_lossy)
+    fn string(&self, id: u16) -> Vec<u16> {
+        self.strings
+            .get_id(id)
+            .map(<[u16]>::to_vec)
+            .unwrap_or_default()
     }
-    fn skill_class(&self, id: u32) -> Option<u32> {
-        let (_, class) = self.skills.get(id as usize)?;
-        (*class < 7).then_some(u32::from(*class))
+    fn stat_desc(&self, s: u16) -> Option<StatDesc> {
+        self.stats.get(usize::from(s)).copied()
+    }
+    fn skill_name(&self, skill: u32) -> Option<u16> {
+        self.skills.get(skill as usize)?.0
+    }
+    fn skill_class(&self, skill: u32) -> Option<i8> {
+        let (_, class) = self.skills.get(skill as usize)?;
+        Some(*class as i8)
+    }
+    fn skill_count(&self) -> u32 {
+        self.skills.len() as u32
+    }
+    fn class_strings(&self, class: u32) -> Option<desc::ClassStrings> {
+        self.class_strings.get(class as usize).copied()
+    }
+    fn montype_name(&self, row: u32) -> Option<u16> {
+        self.montype.get(row as usize).copied()
+    }
+    fn monstats_name(&self, row: u32) -> Option<u16> {
+        self.monstats.get(row as usize).copied()
+    }
+    fn desc_list(&self) -> Vec<u16> {
+        self.desc_order.clone()
+    }
+    fn group_members(&self, g: u16) -> Vec<u16> {
+        (0..self.stats.len() as u16)
+            .filter(|&s| self.stats[usize::from(s)].dgrp == g)
+            .collect()
     }
 }
 
@@ -692,425 +746,4 @@ pub fn draw_tip(
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
-    use super::*;
-    use d2_proto::item_bits::hflag;
-    use d2_sim::items::tables::ItemRec;
-    use std::collections::HashMap;
-
-    struct Strs {
-        keys: HashMap<String, Vec<u16>>,
-        ids: HashMap<u16, Vec<u16>>,
-    }
-
-    impl StringLookup for Strs {
-        fn get(&self, key: &str) -> Option<&[u16]> {
-            self.keys.get(key).map(Vec::as_slice)
-        }
-        fn get_id(&self, id: u16) -> Option<&[u16]> {
-            self.ids.get(&id).map(Vec::as_slice)
-        }
-    }
-
-    fn u16s(s: &str) -> Vec<u16> {
-        s.encode_utf16().collect()
-    }
-
-    /// A cap (name id 7, requires level 3), prefix 1 `Sturdy`, suffix 1
-    /// `Fox`, stat 1 described by string 9 (`descfunc` 1, value first).
-    pub(crate) fn tips() -> ItemTips {
-        tips_with(ItemTables::default())
-    }
-
-    fn tips_with(items: ItemTables) -> ItemTips {
-        let items = ItemTables {
-            items: vec![ItemRec {
-                code: *b"cap ",
-                ..ItemRec::default()
-            }],
-            ..items
-        };
-        let mut codes = BTreeMap::new();
-        codes.insert(
-            *b"cap ",
-            CodeText {
-                name_id: 7,
-                req_lvl: 3,
-                ..CodeText::default()
-            },
-        );
-        let strs = Strs {
-            keys: [
-                ("Sturdy", "Sturdy"),
-                ("Fox", "of the Fox"),
-                ("Greymaker", "Greymaker"),
-                ("Sigon's Visor", "Sigon's Visor"),
-            ]
-            .map(|(k, v)| (k.to_owned(), u16s(v)))
-            .into(),
-            ids: [
-                (7, "Cap"),
-                (9, "to Life"),
-                (11, "Sigon's Steel"),
-                (12, "to Mana"),
-                (13, "Defense"),
-            ]
-            .map(|(k, v)| (k, u16s(v)))
-            .into(),
-        };
-        ItemTips {
-            lookup: Arc::new(items),
-            codes,
-            stats: vec![
-                StatDesc::default(),
-                StatDesc {
-                    priority: 5,
-                    func: 1,
-                    val: 1,
-                    pos: 9,
-                    neg: 0,
-                    str2: 0,
-                },
-                StatDesc {
-                    priority: 5,
-                    func: 1,
-                    val: 1,
-                    pos: 12,
-                    neg: 0,
-                    str2: 0,
-                },
-                StatDesc {
-                    priority: 5,
-                    func: 3,
-                    val: 1,
-                    pos: 13,
-                    neg: 0,
-                    str2: 0,
-                },
-            ],
-            magic_prefix: vec![String::new(), "Sturdy".into()],
-            magic_suffix: vec![String::new(), "Fox".into()],
-            rare_prefix: Vec::new(),
-            rare_suffix: Vec::new(),
-            unique: vec!["Greymaker".into()],
-            set: vec!["Sigon's Visor".into()],
-            set_of_item: vec![0],
-            set_names: vec![11],
-            skills: Vec::new(),
-            prefix_color: vec![0xFF, 0xFF],
-            suffix_color: vec![0xFF, 0xFF],
-            set_inv_color: vec![0xFF],
-            unique_inv_color: vec![0xFF],
-            strings: Arc::new(strs),
-        }
-    }
-
-    // Covers: specs/render/shading.md §6 r4
-    // Covers: specs/ui/inventory.md §8 r4
-    #[test]
-    fn the_inventory_colour_follows_invtrans_and_the_quality_source() {
-        let mut t = tips();
-        let identified = hflag::IDENTIFIED;
-        // No colour anywhere: no map.
-        assert_eq!(t.inv_color_of(&magic_cap(identified)), None);
-        // `InvTrans` 6 (invgrey); the prefix's transformcolor 9, then the
-        // suffix's 4, which is read first.
-        t.codes.get_mut(b"cap ").unwrap().inv_trans = 6;
-        t.prefix_color[1] = 9;
-        assert_eq!(t.inv_color_of(&magic_cap(identified)), Some((6, 9)));
-        t.suffix_color[1] = 4;
-        assert_eq!(t.inv_color_of(&magic_cap(identified)), Some((6, 4)));
-        // Files 3 and 4 are never selected; c ≥ 21 is no map.
-        t.codes.get_mut(b"cap ").unwrap().inv_trans = 3;
-        assert_eq!(t.inv_color_of(&magic_cap(identified)), None);
-        t.codes.get_mut(b"cap ").unwrap().inv_trans = 8;
-        assert_eq!(t.inv_color_of(&magic_cap(identified)), Some((8, 4)));
-        // The suffix's 21 is the first hit (0xFF alone means none): no map.
-        t.suffix_color[1] = 21;
-        assert_eq!(t.inv_color_of(&magic_cap(identified)), None);
-        // Unique / set: the row's invtransform.
-        let mut u = ItemBits {
-            flags: identified,
-            code: *b"cap ",
-            quality: 7,
-            ..ItemBits::default()
-        };
-        u.quality_fields.file_index = Some(0);
-        assert_eq!(t.inv_color_of(&u), None);
-        t.unique_inv_color[0] = 2;
-        assert_eq!(t.inv_color_of(&u), Some((8, 2)));
-        u.quality = 5;
-        t.set_inv_color[0] = 17;
-        assert_eq!(t.inv_color_of(&u), Some((8, 17)));
-    }
-
-    fn text(l: &TipLine) -> String {
-        String::from_utf16_lossy(&l.text)
-    }
-
-    fn magic_cap(flags: u32) -> ItemBits {
-        let mut b = ItemBits {
-            flags,
-            code: *b"cap ",
-            quality: 4,
-            ..ItemBits::default()
-        };
-        b.quality_fields.magic = Some((1, 1));
-        b.lists = vec![Some(vec![Stat {
-            stat: 1,
-            param: 0,
-            raw: 25,
-            save_add: 10,
-        }])];
-        b
-    }
-
-    #[test]
-    fn an_identified_magic_item_shows_name_requirements_and_properties() {
-        let lines = tips().lines_of(&magic_cap(hflag::IDENTIFIED));
-        let got: Vec<(String, u16)> = lines.iter().map(|l| (text(l), l.color)).collect();
-        assert_eq!(
-            got,
-            [
-                ("Sturdy Cap of the Fox".to_owned(), color::BLUE),
-                ("Required Level: 3".to_owned(), color::WHITE),
-                ("+15 to Life".to_owned(), color::BLUE),
-            ]
-        );
-    }
-
-    // "Required Level:" only when the level is above 1.
-    // Covers: specs/ui/item-tips.md §3.3 r4
-    #[test]
-    fn a_level_1_requirement_shows_no_line() {
-        let mut t = tips();
-        t.codes.get_mut(b"cap ").expect("cap").req_lvl = 1;
-        let lines = t.lines_of(&magic_cap(hflag::IDENTIFIED));
-        assert!(lines.iter().all(|l| !text(l).starts_with("Required Level")));
-        t.codes.get_mut(b"cap ").expect("cap").req_lvl = 2;
-        let lines = t.lines_of(&magic_cap(hflag::IDENTIFIED));
-        assert!(lines.iter().any(|l| text(l) == "Required Level: 2"));
-    }
-
-    #[test]
-    fn an_unidentified_item_shows_its_base_name_and_no_properties() {
-        let lines = tips().lines_of(&magic_cap(0));
-        let got: Vec<(String, u16)> = lines.iter().map(|l| (text(l), l.color)).collect();
-        assert_eq!(
-            got,
-            [
-                ("Cap".to_owned(), color::BLUE),
-                ("Unidentified".to_owned(), color::RED),
-                ("Required Level: 3".to_owned(), color::WHITE),
-            ]
-        );
-    }
-
-    #[test]
-    fn a_compact_stream_decodes_to_its_name() {
-        // flags (compact | identified), version 0x65, mode 0, location
-        // 0 / 0 / 0 / page 0, code `cap `.
-        let bits: Vec<(u32, u32)> = vec![
-            (hflag::COMPACT | hflag::IDENTIFIED, 32),
-            (0x65, 10),
-            (0, 3),
-            (0, 4),
-            (0, 4),
-            (0, 4),
-            (0, 3),
-            (u32::from_le_bytes(*b"cap "), 32),
-        ];
-        let (mut out, mut acc, mut n) = (Vec::new(), 0u64, 0u32);
-        for (v, w) in bits {
-            acc |= u64::from(v) << n;
-            n += w;
-            while n >= 8 {
-                out.push(acc as u8);
-                acc >>= 8;
-                n -= 8;
-            }
-        }
-        if n > 0 {
-            out.push(acc as u8);
-        }
-        let lines = tips().lines(&out);
-        assert_eq!(lines.first().map(text).as_deref(), Some("Cap"));
-        assert!(tips().lines(&[1, 2]).is_empty(), "garbage gives no tip");
-    }
-
-    #[test]
-    fn the_box_has_one_centered_line_per_row_and_stays_on_screen() {
-        let lines = tips().lines_of(&magic_cap(hflag::IDENTIFIED));
-        let files = UiFiles::new(&[]);
-        let mut out: Vec<UiDraw> = Vec::new();
-        draw_tip(
-            &lines,
-            Point::new(790, 5),
-            (800, 600),
-            None,
-            &files,
-            &mut out,
-        );
-        let texts: Vec<&TextRequest> = out
-            .iter()
-            .filter_map(|d| match d {
-                UiDraw::Text(t) => Some(t),
-                _ => None,
-            })
-            .collect();
-        assert_eq!(texts.len(), lines.len());
-        for t in &texts {
-            let TextOpts::Draw { block_w, .. } = t.opts else {
-                panic!("draw call");
-            };
-            let w = block_w.unwrap();
-            assert!(t.at.x >= 0 && t.at.x + w <= 800, "{:?}", t.at);
-            assert!(t.at.y >= 0 && t.at.y <= 600);
-        }
-        assert_eq!(texts[0].style.color, color::BLUE);
-        let mut none: Vec<UiDraw> = Vec::new();
-        draw_tip(&[], Point::new(1, 1), (800, 600), None, &files, &mut none);
-        assert!(none.is_empty());
-    }
-
-    fn quality_cap(quality: u8, index: u32) -> ItemBits {
-        let mut b = ItemBits {
-            flags: hflag::IDENTIFIED,
-            code: *b"cap ",
-            quality,
-            ..ItemBits::default()
-        };
-        b.quality_fields.file_index = Some(index);
-        b
-    }
-
-    // Covers: specs/ui/item-tips.md §4 r1, §4 r3, §4 r4
-    #[test]
-    fn the_name_colour_follows_quality_flags_codes_and_broken() {
-        let t = tips();
-        let c = |quality: u8, flags: u32, code: &[u8; 4]| {
-            t.name_color(&ItemBits {
-                flags,
-                code: *code,
-                quality,
-                ..ItemBits::default()
-            })
-        };
-        // r1: low / normal / superior are white, grey when socketed or
-        // ethereal; tempered is `ÿc:`.
-        assert_eq!(c(quality::LOW, 0, b"cap "), color::WHITE);
-        assert_eq!(c(2, 0, b"cap "), color::WHITE);
-        assert_eq!(c(quality::LOW, hflag::SOCKETED, b"cap "), color::GREY);
-        assert_eq!(c(3, 0x40_0000, b"cap "), color::GREY);
-        assert_eq!(c(quality::MAGIC, hflag::SOCKETED, b"cap "), color::BLUE);
-        assert_eq!(c(quality::TEMPERED, 0, b"cap "), color::TEMPERED);
-        // r3: the listed codes are orange; r4: broken is red (last).
-        assert_eq!(c(2, 0, b"pk1 "), color::ORANGE);
-        assert_eq!(c(quality::UNIQUE, 0, b"toa "), color::ORANGE);
-        assert_eq!(c(quality::MAGIC, 0x100, b"cap "), color::RED);
-        assert_eq!(c(2, 0x100, b"mbr "), color::RED);
-    }
-
-    #[test]
-    fn a_unique_item_shows_its_name_in_gold() {
-        let got: Vec<(String, u16)> = tips()
-            .lines_of(&quality_cap(quality::UNIQUE, 0))
-            .iter()
-            .map(|l| (text(l), l.color))
-            .collect();
-        assert_eq!(
-            got[..2],
-            [
-                ("Greymaker".to_owned(), color::GOLD),
-                ("Cap".to_owned(), color::GOLD)
-            ]
-        );
-    }
-
-    #[test]
-    fn a_set_item_shows_its_name_in_green_and_its_set_in_gold() {
-        let got: Vec<(String, u16)> = tips()
-            .lines_of(&quality_cap(quality::SET, 0))
-            .iter()
-            .map(|l| (text(l), l.color))
-            .collect();
-        assert_eq!(got[0], ("Sigon's Visor".to_owned(), color::GREEN));
-        assert_eq!(got[1], ("Cap".to_owned(), color::GREEN));
-        assert_eq!(got.last(), Some(&("Sigon's Steel".to_owned(), color::GOLD)));
-    }
-
-    /// A two-piece set: 2 pieces give +5 life and +3 mana, the full set
-    /// (3 pieces) gives 9 defense; the item's own set list gives +4 life.
-    #[test]
-    fn a_set_item_shows_its_set_list_steps_and_full_bonus() {
-        use d2_sim::items::tables::{PropRec, PropSlot, PropertyRec, SetItemRec, SetRec};
-        let prop = |stat| {
-            let mut p = PropertyRec::default();
-            p.slots[0] = PropSlot {
-                func: 1,
-                stat,
-                set: 0,
-                val: 0,
-            };
-            p
-        };
-        let r = |code, v| PropRec {
-            code,
-            param: 0,
-            min: v,
-            max: v,
-        };
-        let mut partial = [PropRec::NONE; 8];
-        partial[0] = r(0, 5);
-        partial[1] = r(1, 3);
-        let mut full = [PropRec::NONE; 8];
-        full[0] = r(2, 9);
-        let t = tips_with(ItemTables {
-            properties: vec![prop(1), prop(2), prop(3)],
-            valshift: vec![0; 8],
-            sets: vec![SetRec {
-                count: 3,
-                partial,
-                full,
-            }],
-            setitems: vec![SetItemRec::default()],
-            ..ItemTables::default()
-        });
-        let mut b = quality_cap(quality::SET, 0);
-        b.lists = vec![
-            None,
-            Some(vec![Stat {
-                stat: 1,
-                param: 0,
-                raw: 4,
-                save_add: 0,
-            }]),
-        ];
-        let got: Vec<(String, u16)> = t.lines_of(&b).iter().map(|l| (text(l), l.color)).collect();
-        assert_eq!(
-            got,
-            [
-                ("Sigon's Visor".to_owned(), color::GREEN),
-                ("Cap".to_owned(), color::GREEN),
-                ("Required Level: 3".to_owned(), color::WHITE),
-                ("+4 to Life".to_owned(), color::GREEN),
-                ("Sigon's Steel".to_owned(), color::GOLD),
-                ("+5 to Life".to_owned(), color::GREEN),
-                ("+3 to Mana".to_owned(), color::GREEN),
-                ("9 Defense".to_owned(), color::ORANGE),
-            ]
-        );
-    }
-
-    #[test]
-    fn a_shop_tip_has_a_price_and_marks_unusable_items_red() {
-        let lines = tips().lines_of(&magic_cap(hflag::IDENTIFIED));
-        let ok = shop_marks(lines.clone(), 120, true);
-        assert_eq!(ok.last(), Some(&TipLine::new("Price: 120", color::GOLD)));
-        assert_eq!(ok[1].color, color::WHITE);
-        let no = shop_marks(lines, 120, false);
-        assert_eq!(no[1], TipLine::new("Required Level: 3", color::RED));
-        assert_eq!(no.last(), Some(&TipLine::new("Price: 120", color::RED)));
-        assert!(shop_marks(Vec::new(), 1, true).is_empty());
-    }
-}
+pub(crate) mod tests;

@@ -48,7 +48,6 @@ pub trait VendorRest {
     fn recharge(&mut self, item: UnitId);
     fn repair_broken(&mut self, item: UnitId);
     // ---- messages (transport)
-    fn send_item_stat(&mut self, player: UnitId, item: UnitId, stat: u16);
     fn send_transaction(&mut self, player: UnitId, t: Transaction);
     /// The buy price of a store item the player was just shown (S→C 0x9C
     /// action 11). The original client computes it from its own tables;
@@ -374,8 +373,18 @@ where
     fn identify(&mut self, item: UnitId) {
         NpcRest::identify(&mut *self.desk.rest, item);
     }
+    /// S→C 0x3E (`0x0053D130(client, item, 1, stat, value, 0)`) with the
+    /// item's base stat value (layer 0, `client/msg-stats-items.md` §5
+    /// r1.2), through the rest's transport. An item without a record
+    /// sends nothing. PROVISIONAL (`client/msg-stats-items.md` §5 r1.3;
+    /// REC-400): field widths, see `units::messages::update_item_stat`.
     fn send_item_stat(&mut self, player: UnitId, item: UnitId, stat: u16) {
-        self.desk.rest.send_item_stat(player, item, stat);
+        let Some(guid) = self.desk.econ.units.get(item).map(|r| r.guid) else {
+            return;
+        };
+        let value = self.desk.econ.stats.unit_base(item, stat, 0);
+        let msg = crate::units::messages::update_item_stat(guid, stat, value, 0);
+        QuestRest::send(&mut *self.desk.rest, player, &msg);
     }
     fn send_transaction(&mut self, player: UnitId, t: Transaction) {
         self.desk.rest.send_transaction(player, t);

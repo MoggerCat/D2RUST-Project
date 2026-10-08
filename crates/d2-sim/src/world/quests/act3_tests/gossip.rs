@@ -569,20 +569,23 @@ fn intro_bits() {
             let mut f = Fake3::new();
             // Another NPC's message: no bit.
             call(&mut ctl, &mut f, 39, scroll(P1, act3::npc::HRATLI, m));
-            assert!(f.p(P1).quests.intro[0].is_empty());
+            assert_eq!(f.p(P1).quests.first_talk[0], [0; 8]);
             call(&mut ctl, &mut f, 39, scroll(P1, class, m));
-            assert_eq!(f.p(P1).quests.intro[0], BTreeSet::from([class]));
+            assert_eq!(f.p(P1).quests.first_talk[0], first_talk_bits(class));
             assert!(text(&mut ctl, &mut f, 39, P1, n).is_empty());
         }
     }
     // A message of another NPC's set: nothing.
     call(&mut ctl, &mut f, 39, scroll(P1, act3::npc::ASHEARA, 501));
-    assert!(f.p(P1).quests.intro[0].is_empty());
+    assert_eq!(f.p(P1).quests.first_talk[0], [0; 8]);
     // Through C→S 0x31; the bit is per difficulty.
     f.f.difficulty = 1;
     say(&mut ctl, &mut f, P1, ORMUS_U, 514);
-    assert!(f.p(P1).quests.intro[0].is_empty());
-    assert_eq!(f.p(P1).quests.intro[1], BTreeSet::from([act3::npc::ORMUS]));
+    assert_eq!(f.p(P1).quests.first_talk[0], [0; 8]);
+    assert_eq!(
+        f.p(P1).quests.first_talk[1],
+        first_talk_bits(act3::npc::ORMUS)
+    );
 }
 
 // Covers: specs/world/quests-act3.md §9.3
@@ -601,10 +604,18 @@ fn intro_active_and_status() {
     ] {
         assert!(!active(&ctl, &mut f, 39, P1, c));
     }
-    f.p(P1).quests.intro[0].insert(act3::npc::CAIN3);
+    f.p(P1).quests.hear(0, act3::npc::CAIN3);
     assert!(!active(&ctl, &mut f, 39, P1, act3::npc::CAIN3));
     let i = ctl.find(39).unwrap();
     let pf = f.flags(P1);
     assert_eq!(act1::status_fn(&ctl, &mut f, i, P1, &pf, 0x005B_6E20), None);
     assert!(unhandled(&f).is_empty());
+}
+
+/// Field A of one difficulty with only NPC `class`'s first-talk bit
+/// (`formats/d2s.md` §6 rules 2–3).
+fn first_talk_bits(class: u16) -> [u8; 8] {
+    let mut q = crate::world::quests::PlayerQuests::default();
+    q.hear(0, class);
+    q.first_talk[0]
 }

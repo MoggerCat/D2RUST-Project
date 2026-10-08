@@ -59,7 +59,7 @@ use crate::bridge::link::ServerLink;
 use crate::bridge::world::{ClientWorld, UnitKey};
 use crate::bridge::{Bridge, BridgeError};
 use crate::frames::{FramePart, FrameSet, FrameSetKey};
-use crate::rules::camera::{static_to_client, Camera};
+use crate::rules::camera::{static_to_client, Camera, FrameSize};
 use crate::rules::draw_order::UnitSlot;
 use crate::rules::placement::place;
 use crate::scene::order::pass;
@@ -280,9 +280,14 @@ impl GroundItems {
             return Vec::new();
         }
         let mut log = self.ensure(world, assets);
-        let camera = match (frame.camera, feed.open_mode(world)) {
-            (Some(c), Ok(mode)) if mode.get() != NO_WORLD_MODE => c,
-            (_, Err(e)) => {
+        let camera = match (feed.player(world), feed.open_mode(world)) {
+            // The frame's one camera, shake included
+            // (`seams/world-screen.md` §2.6); a frame built without one:
+            // the player's, unshaken.
+            (Ok(Some(p)), Ok(mode)) if mode.get() != NO_WORLD_MODE => frame
+                .camera
+                .unwrap_or_else(|| Camera::new(FrameSize::play(), mode, p.client(), (0, 0))),
+            (Err(e), _) | (_, Err(e)) => {
                 log.push(format!("ground items: no camera: {e}"));
                 return log;
             }

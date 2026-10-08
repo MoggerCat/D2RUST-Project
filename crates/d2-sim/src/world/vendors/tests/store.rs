@@ -357,6 +357,39 @@ fn upgrades() {
     assert_eq!(run(2, 25, 5, &t).1, Seed::new(0, 5));
 }
 
+// An ubercode that is set but missing from the code map is still chosen
+// (rule 1 tests only ≠ 0 / spaces); its lookup gives class 0, which never
+// matches the chosen code, so both rounds fail and the item is null.
+// Covers: specs/world/vendors.md §3.1 r1, §3.1 r2
+#[test]
+fn an_unfound_upgrade_code_gives_no_item() {
+    let mut t = tables();
+    let hax = index(&t, "hax");
+    t.items[hax].ubercode = code("zzz");
+    let mut rec = record(&t, class::CHARSI, 0);
+    let mut w = Fake::new(class::CHARSI);
+    w.difficulty = 1;
+    // Nightmare, ilvl 35: r = 6239 < 6240 picks the ubercode.
+    let mut seed = Seed::new(0, 6239);
+    let got = make_store_item(&mut ctx(&t, &mut seed), &mut rec, &mut w, hax, 2, 35, 30);
+    assert_eq!(got, Ok(None));
+    // One creation per round, each of class 0 and destroyed.
+    assert_eq!(
+        w.created.iter().map(|c| c.0).collect::<Vec<_>>(),
+        vec![0, 0]
+    );
+    // Above the threshold the base code is kept.
+    let mut w = Fake::new(class::CHARSI);
+    w.difficulty = 1;
+    let mut seed = Seed::new(0, 6240);
+    let mut rec = record(&t, class::CHARSI, 0);
+    assert!(
+        make_store_item(&mut ctx(&t, &mut seed), &mut rec, &mut w, hax, 2, 35, 30)
+            .unwrap()
+            .is_some()
+    );
+}
+
 // Covers: specs/world/vendors.md §4 text, §4 r1, §4 r2, §4 r3, §6 r5
 #[test]
 fn trade_open() {

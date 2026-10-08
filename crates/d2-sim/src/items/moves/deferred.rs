@@ -396,6 +396,44 @@ fn item_message<W: MoveWorld>(
     Ok(out)
 }
 
+/// Unit +0xC8 bit 2: the vendor item flag (`world/vendors.md` §4).
+pub const VENDOR_ITEM: u32 = 0x4;
+/// 0x9C action of a store item shown to its client (`world/vendors.md`
+/// §4 step 3; `0x0053EF30` with 0x38).
+pub const STORE_SHOWN: u8 = 0x0B;
+
+/// The store check `0x0053EF30` with 0x38 (§6.2): S→C 0x9C action 0x0B
+/// of `item` with its store bit stream ([`MovePending::store_item_bits`],
+/// alt-code for an unidentified quality 4–9 item), then its fillers as
+/// [`item_message`] sends them.
+///
+/// [`MovePending::store_item_bits`]: super::seams::MovePending::store_item_bits
+pub fn store_item_message<W: MoveWorld>(w: &W, item: Guid) -> Result<Vec<Vec<u8>>, MoveFatal> {
+    let page = w.page(item);
+    let bits = w.store_item_bits(item, page);
+    let mut out = vec![layouts::item_world(
+        STORE_SHOWN,
+        category(w, item),
+        item,
+        &bits,
+    )?];
+    if w.item_flags(item) & iflag::SOCKETED == 0 {
+        return Ok(out);
+    }
+    for f in w.fillers(item) {
+        let fb = w.item_bits(f, FILLER_FLAG, w.page(f));
+        out.push(layouts::item_owned(
+            0x13,
+            category(w, f),
+            f,
+            Owner::ITEM,
+            item,
+            &fb,
+        )?);
+    }
+    Ok(out)
+}
+
 /// The dispatcher `0x005973F0` (§6.2) for one item of `inv`'s update list,
 /// as seen by the client of `client` (a player). Returns the messages in
 /// send order.
@@ -407,6 +445,12 @@ pub fn dispatch<W: MoveWorld>(
 ) -> Result<Vec<Vec<u8>>, MoveFatal> {
     let client = Owner::player(client);
     let mut out = w.store_messages(client, item);
+    // §6.2: the vendor-item store check ends the walk.
+    // TODO(inventory-moves §6.2): only the client trading with the owner
+    // gets the store message; the seam has no trading-client test.
+    if w.update_bits(Owner::item(item)) & VENDOR_ITEM != 0 {
+        return Ok(out);
+    }
     let is_owner = inv == client;
     let cmdf = w.cmd_flags(item);
     let itf = w.item_flags(item);

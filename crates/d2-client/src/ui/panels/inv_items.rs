@@ -529,7 +529,13 @@ impl ItemsUi {
             ready: true,
             own_player: true,
             own_inventory_context: true,
-            inventory_mode: if page == 4 { 0x0C } else { 0 },
+            // `ui/inventory.md` §4 r1: the stash grid in mode 0x0C, the
+            // cube grid (page 3) in mode 0x0E.
+            inventory_mode: match page {
+                4 => 0x0C,
+                3 => 0x0E,
+                _ => 0,
+            },
             page,
             shift: self.shift,
             ctrl: false,

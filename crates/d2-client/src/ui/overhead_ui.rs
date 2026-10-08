@@ -17,7 +17,7 @@ use std::collections::BTreeMap;
 
 use super::game_messages::{backing, wide, Measure};
 use super::SharedRef;
-use crate::bridge::hover::feet;
+use crate::bridge::hover::unit_feet;
 use crate::bridge::world::{ClientWorld, UnitKey, PLAYER};
 use crate::rules::camera::{moving_to_client, Camera, FrameAnchor, FrameSize, OpenMode};
 use crate::ui::draw::{TextRequest, TextStyle, UiDraw, UiDrawSink};
@@ -78,21 +78,26 @@ impl Bubbles {
 }
 
 /// The frame's camera (`seams/world-screen.md` §2.2): from the host's
-/// anchor; without one (no host, the strict path), the model sub-tile
-/// centre of the local player with no shake. None without a local player.
+/// anchor; without one (no host), the local player's own position
+/// ([`ClientWorld::local_position`]) with no shake. None without a local
+/// player.
 fn camera(w: &ClientWorld, anchor: Option<FrameAnchor>, open_mode: u8) -> Option<Camera> {
     let mode = OpenMode::new(open_mode).unwrap_or(OpenMode::NONE);
     if let Some(a) = anchor {
         return Some(a.camera(FrameSize::play(), mode));
     }
-    let (x, y) = w.local()?.cell();
-    let at = moving_to_client((u32::from(x) << 16) | 0x8000, (u32::from(y) << 16) | 0x8000);
-    Some(Camera::new(FrameSize::play(), mode, at, (0, 0)))
+    let (x16, y16) = w.local_position()?;
+    Some(Camera::new(
+        FrameSize::play(),
+        mode,
+        moving_to_client(x16, y16),
+        (0, 0),
+    ))
 }
 
 /// A unit's feet under the frame's camera: the local player at the
 /// anchor's position, the one it is drawn at (`seams/world-screen.md`
-/// §2.4), every other unit at its model sub-tile centre.
+/// §2.4), every other unit at its draw anchor by type (§2.5).
 fn unit_point(
     w: &ClientWorld,
     cam: &Camera,
@@ -102,7 +107,7 @@ fn unit_point(
 ) -> (i32, i32) {
     match anchor {
         Some(a) if w.local_player == Some(key) => cam.unit_draw(a.player.client(), (0, 0)),
-        _ => feet(cam, cell),
+        _ => unit_feet(cam, key.unit_type, cell),
     }
 }
 

@@ -20,8 +20,9 @@
 //! placement and warp arrival (`path-placement.md` §12.2,
 //! `waypoints.md` §7 rule 7); all go through the action wiring's
 //! `Pending::send` and reach the clients by [`WorldHost::take_sent`]
-//! (after a handler and after each tick). 0x96 has no sender spec yet
-//! (`pathing.md` §10 rule 5, open question 6): never sent.
+//! (after a handler and after each tick). 0x95 / 0x96 / 0x18 are the
+//! client vitals sync's (`pathing.md` §10 rule 5, `combat/vitals.md` §5:
+//! `SimGame`'s vitals sync at the end of each tick), not movement's.
 
 #[cfg(test)]
 mod tests;

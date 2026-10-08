@@ -53,7 +53,7 @@ use crate::bridge::predict::{cell_centre, facing};
 use crate::bridge::world::{ClientUnit, ClientWorld, ModeRequest, UnitKey, MONSTER};
 use crate::frames::{FramePart, FrameSet, FrameSetKey};
 use crate::rules::blend::{cel_ops, missile_mode, overlay_mode, MODE_OPAQUE};
-use crate::rules::camera::{moving_to_client, Camera, ClientPos, UnitPosition};
+use crate::rules::camera::{moving_to_client, Camera, ClientPos, FrameSize, UnitPosition};
 use crate::rules::draw_order::{tile_of, DrawGrid, UnitSlot};
 use crate::rules::placement::place;
 use crate::rules::unit_composite::{file_direction, unit_offset, TableOffset};
@@ -773,9 +773,14 @@ impl Missiles {
         self.observe(world, &at);
         self.advance(world);
         let mut log = self.ensure(world, assets);
-        let camera = match (frame.camera, feed.open_mode(world)) {
-            (Some(c), Ok(mode)) if mode.get() != NO_WORLD_MODE => c,
-            (_, Err(e)) => {
+        let camera = match (feed.player(world), feed.open_mode(world)) {
+            // The frame's one camera, shake included
+            // (`seams/world-screen.md` §2.6); a frame built without one:
+            // the player's, unshaken.
+            (Ok(Some(p)), Ok(mode)) if mode.get() != NO_WORLD_MODE => frame
+                .camera
+                .unwrap_or_else(|| Camera::new(FrameSize::play(), mode, p.client(), (0, 0))),
+            (Err(e), _) | (_, Err(e)) => {
                 log.push(format!("effects: no camera: {e}"));
                 return log;
             }

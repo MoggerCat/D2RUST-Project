@@ -742,9 +742,9 @@ fn world_view_frame(
     mut images: ResMut<Assets<Image>>,
     mut sounds: Option<ResMut<UiSounds>>,
     mut walk: Option<ResMut<PreviewWalk>>,
-    mut exit: MessageWriter<AppExit>,
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
     mut dump: Option<ResMut<DrawDump>>,
+    mut exit: MessageWriter<AppExit>,
 ) -> Result {
     let tick = bridge.0.world().server_ticks;
     if tick == 0 {
@@ -809,9 +809,12 @@ fn world_view_frame(
                     s.0.extend(outcome.sounds);
                 }
                 state.feed.set_ui_open_mode(original.open_mode());
-                // The Esc menu's "Save and Exit Game" (d2rs-own, unverified).
+                // The Esc menu's "Save and Exit Game" (`flows/save-exit.md`
+                // §1 r2): C→S 0x69; the app ends on the server's answer.
                 if original.take_exit_request() {
-                    crate::app::save::request_save_and_exit(&mut exit);
+                    if let Err(e) = crate::app::save::request_save_and_exit(&mut bridge.0) {
+                        warn!("save and exit: {e}");
+                    }
                 }
                 // Configure Controls over the game (`ui::controls_host`).
                 let expansion = original.expansion_installed();
@@ -1013,6 +1016,12 @@ fn world_view_frame(
         &state.assets,
         placed,
     );
+    // `sim/unit-order.md` §5 rule 7: the fill's Y sort persists in the
+    // client's room lists, on every frame the fill ran, the frames whose
+    // image is not built included (`seams/bridge-app.md` §2.8).
+    for (room, order) in state.feed.take_unit_orders() {
+        bridge.0.set_room_order(room, &order);
+    }
     let mut frame = match built {
         Ok(f) => f,
         // d2rs-own, unverified (D1): the preview keeps running; the
@@ -1066,11 +1075,6 @@ fn world_view_frame(
         let world = bridge.0.world();
         let near = state.feed.near_rooms(world)?;
         a.frame(world, near)?;
-    }
-    // `sim/unit-order.md` §5 rule 7: the fill's Y sort persists in the
-    // client's room lists.
-    for (room, order) in state.feed.take_unit_orders() {
-        bridge.0.set_room_order(room, &order);
     }
     let blank_screen = state.feed.blank_screen(bridge.0.world())?;
     let loads = bridge.0.world().act_loads;
@@ -1204,7 +1208,9 @@ fn world_view_frame(
 }
 
 /// Integer presentation scale (§A9; same factor as `ui::Presentation`, so
-/// the cursor mapping matches), converted to logical units for Bevy.
+/// the cursor mapping matches), converted to logical units for Bevy; the
+/// image's top-left sits at the presentation's (left, top)
+/// (`Presentation::centre_offset`, `seams/bridge-app.md` §2.7).
 fn present_scale(
     windows: Query<&Window, With<PrimaryWindow>>,
     mut sprites: Query<&mut Transform, With<WorldViewSprite>>,
@@ -1216,8 +1222,11 @@ fn present_scale(
         return;
     };
     let s = p.scale as f32 / window.scale_factor();
+    let (dx, dy) = p.centre_offset();
     for mut t in &mut sprites {
         t.scale = Vec3::new(s, s, 1.0);
+        t.translation.x = dx / window.scale_factor();
+        t.translation.y = dy / window.scale_factor();
     }
 }
 

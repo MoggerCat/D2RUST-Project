@@ -16,8 +16,51 @@ use crate::rules::lighting::environment::{
 use crate::rules::lighting::records::{unit_light_pos, LightKind, Owner};
 use crate::rules::lighting::sources::{self, ObjectLight};
 
-fn periods() -> Result<PeriodTables, HandlerError> {
-    PeriodTables::builtin().map_err(|_| HandlerError::Invalid("render/env-periods.tsv"))
+/// The period tables of `render/env-periods.tsv` (§9.1), parsed once.
+pub(crate) fn periods() -> Result<PeriodTables, HandlerError> {
+    static TABLES: std::sync::OnceLock<Option<PeriodTables>> = std::sync::OnceLock::new();
+    TABLES
+        .get_or_init(|| PeriodTables::builtin().ok())
+        .ok_or(HandlerError::Invalid("render/env-periods.tsv"))
+}
+
+/// The lighting part of a client update (`0x0044C790`, once per client
+/// update, never per drawn frame), with `L` = the local player's room's
+/// level id (0 when none):
+/// 1. the scripted overrides (`0x0046BEB0`, §10 r5): the darkness step
+///    (§10 r3, base = the room ambient without override, §3.1 r2–r3),
+///    then the Den and levels 107/108 counters;
+/// 2. the environment record (`0x0061BFC0`, §9.2 r1).
+///
+/// The spec places `0x0046BEB0` at `0x0044C7B0` and does not order
+/// `0x0061BFC0` against it or the unit walk; neither reads the other's
+/// state. The Den lights the Den counter starts at 30 (§10 r1:
+/// client missile 287, two player-seed draws per try) are not placed:
+/// the bridge has no client missile creation yet.
+pub fn lighting_update(
+    w: &mut ClientWorld,
+    levels: &[super::super::world::LevelRow],
+) -> Result<(), HandlerError> {
+    let level = w.player_level().map_or(0, u32::from);
+    if w.overrides.darkness.is_some() {
+        let defs = levels
+            .get(level as usize)
+            .map(|r| r.ambient)
+            .unwrap_or_default();
+        let base = match &w.environment {
+            Some(env) => {
+                crate::rules::lighting::environment::room_ambient_without_override(defs, env)
+            }
+            None => defs,
+        };
+        w.overrides.update_darkness(base, level);
+    }
+    // TODO(spec: render/lighting.md §10 r1): the Den lights of a `true`.
+    let _den_lights = w.overrides.update_counters();
+    if let Some(env) = w.environment.as_mut() {
+        env.update(&periods()?, level);
+    }
+    Ok(())
 }
 
 impl From<EnvError> for HandlerError {

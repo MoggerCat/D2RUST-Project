@@ -96,3 +96,58 @@ fn writer_changes_reach_the_item() {
     assert_eq!(w.desk(|d| d.item_stream(s, 0, 0)), second);
     assert!(w.state.write_backs.borrow().is_empty());
 }
+
+/// The store stream of an item: an unidentified quality 4–9 item with
+/// the vendor flag (unit +0xC8 bit 2) goes out as an alt-code record
+/// (flags with 0x2000000, the head, the `normcode` and nothing more:
+/// 109 bits for this ground item); identified, quality 2 or no vendor flag → the full record.
+// Covers: specs/items/bitstream.md §4.1 r4; specs/items/inventory-moves.md §6.2
+#[test]
+fn store_stream_of_an_unidentified_rare_vendor_item_is_alt_code() {
+    let mut w = World::new();
+    let s = w.ground_item(CAP, 20, 20);
+    let u = w.unit(s).unwrap();
+    {
+        let it = w.items.get_mut(u).unwrap();
+        it.quality = q::RARE;
+        it.flags &= !crate::items::moves::iflag::IDENTIFIED;
+    }
+    w.units.get_mut(u).unwrap().flags2 |= crate::items::moves::deferred::VENDOR_ITEM;
+    let alt = w.desk(|d| d.store_stream(s, 0));
+    let flags = u32::from_le_bytes(alt[0..4].try_into().unwrap());
+    assert_ne!(flags & 0x0200_0000, 0, "alt-code flag");
+    // Flags 32, version 10, mode 3, ground x / y 16 + 16, base code 32.
+    assert_eq!(alt.len(), 14, "109 bits: flags, head, base code");
+    let bits = u128::from_le_bytes({
+        let mut b = [0u8; 16];
+        b[..14].copy_from_slice(&alt);
+        b
+    });
+    assert_eq!(bits >> 109, 0, "nothing after the base code");
+    let code = ((bits >> 77) & 0xFFFF_FFFF) as u32;
+    let normcode = w.tables.items[CAP].normcode;
+    let normcode = if normcode == [0; 4] {
+        w.tables.items[CAP].code
+    } else {
+        normcode
+    };
+    assert_eq!(code.to_le_bytes(), normcode);
+    let full = |w: &mut World| {
+        let b = w.desk(|d| d.store_stream(s, 0));
+        u32::from_le_bytes(b[0..4].try_into().unwrap()) & 0x0200_0000
+    };
+    // Identified: full record.
+    w.items.get_mut(u).unwrap().flags |= crate::items::moves::iflag::IDENTIFIED;
+    assert_eq!(full(&mut w), 0);
+    // Quality 2: full record.
+    {
+        let it = w.items.get_mut(u).unwrap();
+        it.flags &= !crate::items::moves::iflag::IDENTIFIED;
+        it.quality = q::NORMAL;
+    }
+    assert_eq!(full(&mut w), 0);
+    // No vendor flag: full record.
+    w.items.get_mut(u).unwrap().quality = q::RARE;
+    w.units.get_mut(u).unwrap().flags2 &= !crate::items::moves::deferred::VENDOR_ITEM;
+    assert_eq!(full(&mut w), 0);
+}

@@ -433,7 +433,7 @@ fn game_start_and_leave() {
             f.p(P1).quests.flags[0].set(SLOT, b);
         }
         if heard {
-            f.p(P1).quests.intro[0].insert(513);
+            f.p(P1).quests.hear(0, 513);
         }
         ctl.record_mut(CHAIN).unwrap().state = state;
         let args = EventArgs {

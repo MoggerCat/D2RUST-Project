@@ -119,7 +119,7 @@ pub const AUDIT: [Audit; 0xB5] = [
     Audit { id: 0x4D, status: Generated, builder: Some("UnitSkillOnPoint"), note: "TSV layout" },
     Audit { id: 0x4E, status: Built, builder: Some("MercForHire"), note: "npc.md §7.2" },
     Audit { id: 0x4F, status: Generated, builder: Some("StartMercList"), note: "TSV layout" },
-    Audit { id: 0x50, status: Partial, builder: Some("QuestSpecial"), note: "quest form (u16 1 @1) built as QuestSpecial; mercenary form (u16 2 @1, name u16 @3; npc.md §7.5) has no bytes 5–14" },
+    Audit { id: 0x50, status: Built, builder: Some("QuestSpecial"), note: "code 1 (bytes 9–14 zero) parses as QuestSpecial; every other form (quest codes 4, 13, 23; mercenary code 2, name u16 @3, npc.md §7.5) as QuestSpecialForm, the TSV layout (q-fix-proto-quest-special)" },
     Audit { id: 0x51, status: Generated, builder: Some("AssignObject"), note: "TSV layout" },
     Audit { id: 0x52, status: Built, builder: Some("QuestLogInfo"), note: "quests.md §6.2 step 4" },
     Audit { id: 0x53, status: Generated, builder: Some("Darkness"), note: "TSV layout" },

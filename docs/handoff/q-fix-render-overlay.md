@@ -101,3 +101,17 @@ New tests: `seam_world_screen::with_a_prediction_every_camera_of_the_frame_is_th
 `automap_view_tests::automap_cel_modes_map_to_the_alpha_tables`.
 All unverified against 1.14d (no capture): local run entry 100 (`play` on
 the install) covers the screen.
+
+## Later merges (staging 98a5090)
+
+- `q-fix-seam-movement` landed `ClientWorld::local_position` / `local_cell`.
+  The near rooms (fade centre) now read it, staging's version; this
+  branch's `player` parameter of `MapState::near_rooms` is gone. The
+  overhead camera without a host anchor reads `local_position`. The frame
+  anchor still comes from the feed's `player` (the same prediction).
+- `q-fix-ui-input` runs the UI every loop pass and draws per tick: the
+  anchor is decided only on a drawn tick (`WorldViewState::anchor`) and
+  reused between ticks, so the feed and the shake's seed draws run once
+  per tick (`app_frame_loop` tests).
+- Item colours (`ItemTips::inv_color`) re-applied over the
+  `q-fix-items-tips` rewrite (affix id = row + 1).

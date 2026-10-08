@@ -156,24 +156,28 @@ impl crate::bridge::item_lists::StreamProps for TableDecoder {
         let Ok(b) = decode(stream, &lookup) else {
             return (Vec::new(), false);
         };
-        let charm = lookup.code(b.code).is_some_and(|c| c.charm);
+        // An alt-code record carries its base code (`bitstream.md` §4.1 r4).
+        let charm = lookup
+            .code(b.base_code.unwrap_or(b.code))
+            .is_some_and(|c| c.charm);
         // The armor's defense (stat 31, `bitstream.md` §4.4) is one of
         // the item's own values the reader stores in its list
         // (`client/stat-lists.md` §2 r1); it reaches the wearer's total
         // with the property lists. PROVISIONAL (REC-281, stat-lists.md
         // open question 2): durability, quantity and sockets are left
         // out (no total reads them).
+        // `bitstream.md` §4.6 r4.3: grouped partners are sent unshifted.
+        let shift = |s: u16| t.valshift.get(usize::from(s)).copied().unwrap_or(0);
         let props = b
             .defense
             .iter()
-            .chain(b.lists.iter().flatten().flatten())
-            .map(|s| {
-                let shift = t.valshift.get(usize::from(s.stat)).copied().unwrap_or(0);
-                crate::bridge::item_lists::ItemProp {
-                    stat: s.stat,
-                    layer: s.param as u16,
-                    value: (s.value() as i32) << shift,
-                }
+            .map(|d| vec![*d])
+            .chain(b.lists.iter().flatten().cloned())
+            .flat_map(|list| crate::ui::item_tip_props::stream_values(&list, shift))
+            .map(|(stat, layer, value)| crate::bridge::item_lists::ItemProp {
+                stat,
+                layer: layer as u16,
+                value,
             })
             .collect();
         (props, charm)
