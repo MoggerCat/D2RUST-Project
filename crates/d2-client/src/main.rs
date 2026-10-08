@@ -431,7 +431,16 @@ fn play(o: Options) -> Result<()> {
         let (art, expansion) = match &data {
             d2_client::app::single_player::GameData::Live(d) => {
                 use d2_data::bin::TableFiles;
-                (Some(FrontArt::new(d.archives.source())), d.archives.lod())
+                let mut art = FrontArt::new(d.archives.source());
+                if let Ok(t) = d2_client::app::strings::TableStrings::load(
+                    d.archives.as_ref(),
+                    d2_client::app::strings::LANG,
+                ) {
+                    art = art.with_strings(move |id| {
+                        u16::try_from(id).map(|i| t.by_id(i)).unwrap_or_default()
+                    });
+                }
+                (Some(art), d.archives.lod())
             }
             d2_client::app::single_player::GameData::Synthetic => (None, true),
         };
