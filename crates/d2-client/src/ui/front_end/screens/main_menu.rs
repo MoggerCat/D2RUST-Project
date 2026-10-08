@@ -13,11 +13,11 @@ pub const BACKGROUND_CLASSIC: &str = r"FrontEnd\gameselectscreen";
 /// Button cels (§F1.4 r3 art column). // d2rs-own, unverified: file names.
 pub const WIDE: &str = r"FrontEnd\WideButtonBlank";
 pub const NARROW: &str = r"FrontEnd\NarrowButtonBlank";
-pub const SHORT: &str = r"FrontEnd\ShortButtonBlank";
+pub const SHORT: &str = r"CharSelect\ShortButtonBlank";
 /// Logo halves (§F1.5 r1): the black base cel (the fire overlay is drawn
 /// additively over it by the host). // d2rs-own, unverified: file names.
-pub const LOGO_LEFT: &str = r"FrontEnd\BlackLeft";
-pub const LOGO_RIGHT: &str = r"FrontEnd\BlackRight";
+pub const LOGO_LEFT: &str = r"FrontEnd\D2logoBlackLeft";
+pub const LOGO_RIGHT: &str = r"FrontEnd\D2logoBlackRight";
 /// "v %d.%d%c" with 1, 14, 'd' (r4).
 pub const VERSION_TEXT: &str = "v 1.14d";
 /// Font16 (descriptor 0x115). // d2rs-own, unverified: font id.

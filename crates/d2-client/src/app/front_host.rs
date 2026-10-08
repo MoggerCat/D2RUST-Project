@@ -151,13 +151,16 @@ pub fn compose(items: &[DrawItem], art: Option<&mut FrontArt>) -> Vec<u8> {
                 let Some(f) = dc6.frames.get(*frame as usize) else {
                     continue;
                 };
-                let top = at.y - f.height as i32 + 1;
+                // The frame's offsets add to the position (`sprite-placement.md`
+                // §2), as for the blended cels; y is the bottom edge.
+                let top = at.y + f.offset_y - f.height as i32 + 1;
                 for row in 0..f.height {
                     for col in 0..f.width {
                         let idx = f.pixels[(row * f.width + col) as usize];
                         if idx != 0 {
                             let c = pal.colors[usize::from(idx)];
-                            plot(at.x + col as i32, top + row as i32, [c.r, c.g, c.b], false);
+                            let x = at.x + f.offset_x + col as i32;
+                            plot(x, top + row as i32, [c.r, c.g, c.b], false);
                         }
                     }
                 }

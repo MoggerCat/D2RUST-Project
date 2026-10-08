@@ -50,12 +50,12 @@ pub const FIRE: &str = r"FrontEnd\fire";
 /// Draw mode of every fire overlay (§F1.5 r2): additive.
 pub const FIRE_MODE: u8 = 3;
 
-/// The fire cel drawn additively over a logo half's black base (§F1.5 r1).
-/// // d2rs-own, unverified: file names (the base names are the main menu's).
+/// The fire cel drawn additively over a logo half's black base (§F1.5 r1;
+/// file names §F1.5 r1, `0x006D4014`–`0x006D4074`).
 pub fn fire_overlay(base: &str) -> Option<&'static str> {
     match base {
-        r"FrontEnd\BlackLeft" => Some(r"FrontEnd\FireLeft"),
-        r"FrontEnd\BlackRight" => Some(r"FrontEnd\FireRight"),
+        r"FrontEnd\D2logoBlackLeft" => Some(r"FrontEnd\D2logoFireLeft"),
+        r"FrontEnd\D2logoBlackRight" => Some(r"FrontEnd\D2logoFireRight"),
         _ => None,
     }
 }
@@ -462,7 +462,7 @@ impl FrontEnd {
             match c.kind {
                 ControlKind::Image => {
                     if let Some(file) = c.art {
-                        out.push(DrawItem::Art { file, frame: 0, at });
+                        out.extend(image_tiles(file, c.x, c.y, c.w, c.h));
                     }
                 }
                 ControlKind::AnimImage => {
@@ -491,8 +491,10 @@ impl FrontEnd {
                 ControlKind::Button => {
                     if let Some(file) = c.art {
                         let tiles = control::button_tiles(c.w, c.h);
+                        // §F1.1 r4: tiles draw left to right at +256 px.
                         for t in 0..tiles {
                             let frame = control::button_frame(t, tiles, pressed, c.enabled, false);
+                            let at = Point::new(c.x + 256 * t as i32, c.y);
                             out.push(DrawItem::Art { file, frame, at });
                         }
                     }
@@ -522,4 +524,28 @@ impl FrontEnd {
         }
         out
     }
+}
+
+/// An image control's cel cut in 256 × 256 tiles (§F1.1 r4, §F1.4 table:
+/// e.g. an 800 × 600 background is 4 × 3 frames, left to right, top to
+/// bottom): one draw per tile, each at its tile's bottom-left (y is the
+/// bottom edge, r3).
+fn image_tiles(file: &'static str, x: i32, y: i32, w: u16, h: u16) -> Vec<DrawItem> {
+    let (w, h) = (i32::from(w.max(1)), i32::from(h.max(1)));
+    let cols = (w + 255) / 256;
+    let rows = (h + 255) / 256;
+    let top = y - h + 1;
+    let mut out = Vec::with_capacity((cols * rows) as usize);
+    for r in 0..rows {
+        let row_h = (h - 256 * r).min(256);
+        let bottom = top + 256 * r + row_h - 1;
+        for c in 0..cols {
+            out.push(DrawItem::Art {
+                file,
+                frame: (r * cols + c) as u32,
+                at: Point::new(x + 256 * c, bottom),
+            });
+        }
+    }
+    out
 }
