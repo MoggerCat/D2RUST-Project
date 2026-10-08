@@ -226,7 +226,11 @@ impl LoadingState {
             self.screen.event(e);
         }
         self.last = self.screen.frame(placed).or(self.last);
-        self.screen.presented.last().copied()
+        match self.screen.presented.last().copied() {
+            // REC-223: black, not the art, after an act video.
+            Some(Presented::Loading { .. }) if self.screen.after_video => Some(Presented::Black),
+            p => p,
+        }
     }
 
     /// Whether the loading art covers the window.

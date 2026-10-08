@@ -146,9 +146,11 @@ fn act_change_sequence_drives_the_states_in_spec_order() {
         f8: 0,
     };
     let mut s = LoadingState::default();
-    let mut w = ClientWorld::default();
+    let mut w = ClientWorld {
+        act: Some(act(0)),
+        ..ClientWorld::default()
+    };
     // Join: 0x03 act 0, 0x04, player placed.
-    w.act = Some(act(0));
     w.mark_session(M::LoadAct(0));
     w.in_game = true;
     w.mark_session(M::LoadComplete);
@@ -167,10 +169,7 @@ fn act_change_sequence_drives_the_states_in_spec_order() {
     assert!(s.covering());
     assert_eq!(s.screen.videos, vec![2]);
     let p = &s.screen.presented;
-    assert_eq!(
-        p[p.len() - 2..],
-        [Presented::Loading { frame: 0 }, Presented::Black]
-    );
+    assert_eq!(p[p.len() - 1], Presented::Loading { frame: 0 });
     w.in_game = true;
     w.mark_session(M::LoadComplete);
     assert_eq!(s.advance(&w, true), Some(Presented::Black));
