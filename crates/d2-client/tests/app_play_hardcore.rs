@@ -5,7 +5,7 @@
 //! the death screen comes up, and Esc sends C→S 0x41, which respawns the
 //! player in town.
 //!
-//! Provisional (REC-120): the save at the death screen.
+//! Provisional (REC-126): the save at the death screen.
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};

@@ -1,6 +1,6 @@
 # q-hardcore: hardcore flag, permanent death, save at death (`claude/q-hardcore`)
 
-> Stitching session, 2026-10-08. Synthetic fixtures only; nothing verified against 1.14d (rule 10). Provisional: REC-120. Sound not wired.
+> Stitching session, 2026-10-08. Synthetic fixtures only; nothing verified against 1.14d (rule 10). Provisional: REC-126. Sound not wired.
 
 ## 1. The path, and what was missing
 

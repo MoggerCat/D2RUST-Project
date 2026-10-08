@@ -13,7 +13,7 @@
 //! gold and experience the death took stay lost whichever way the window
 //! is then closed.
 //!
-//! PROVISIONAL (M22; REC-120): the original saves at the DD start
+//! PROVISIONAL (M22; REC-126): the original saves at the DD start
 //! (`vitals.md` §4.8 r2, `0x00532400`); this preview saves when the death
 //! screen comes up (the DT start), from the app, because the server has no
 //! save path of its own. Leaving a dead hardcore character closes the
