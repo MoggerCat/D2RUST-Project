@@ -123,7 +123,7 @@ evidence; a trial that fails is removed or rewritten, not kept.
 - Rule: Work that needs the reference runs where the reference is; elsewhere, work proceeds on a branch and queues its checks (M02).
 - Why: environments without the reference cannot prove fidelity, but can do everything else.
 - Check: work that needs the reference is never marked done where the reference is absent.
-- Here: cloud has the repo only; local has `game/`, `re/`, `../refs/` (`CLAUDE.md` "Where work runs").
+- Here: cloud has the public repo plus the private data repo (the 1.14d install and extracted data, 2026-10-08); local also has `re/`, `../refs/` and Windows for the recorder (`CLAUDE.md` "Where work runs").
 - Status: proven — cloud implementation plus local confirmation (2026-10-05).
 
 ## M17 Generated code is committed and checked
@@ -167,3 +167,17 @@ evidence; a trial that fails is removed or rewritten, not kept.
 - Check: every provisional point is greppable and names its settling capture; it counts as unverified (M02), never done.
 - Here: spec line `PROVISIONAL: <chosen behavior> (because …); settled by <capture / recording id>`; code comment `// PROVISIONAL (<spec ref>)` on a plain implementation (no blocking seam); the cloud implementation session makes the choice while coding, no PC research; `grep -rn PROVISIONAL specs crates` is the testing-phase checklist; the settling captures are in the HANDOFF §7 recording list.
 - Status: trial — adopted 2026-10-07 by the user's decision; proven when the testing phase settles the provisional points with only local edits.
+
+## M23 Real data before green
+- Rule: From a feature's first commit, test it on the real data and against measured facts of the original, and give every boundary between systems a contract check (units, coordinate spaces, owner of each state) on both sides; invented fixtures only fill what the real data cannot reach, and are built from the real data's measured shape.
+- Why: code checked only against invented data and its own spec passes thousands of tests and still fails as a whole; the errors sit at the seams and in values the invented data never had.
+- Check: every merged feature has a test on real data or facts; a green gate reports how much of it ran on real data.
+- Here: the private data repo and `facts/` (CLAUDE.md rule 1); the play smoke path (`d2-client` `play_smoke`) on the real install; the 2026-10-08 lesson in `docs/HANDOFF.md` §8.
+- Status: trial — adopted 2026-10-08 by the user's decision; proven when real-data runs find seam bugs before a release instead of after.
+
+## M24 Progress as remaining work
+- Rule: When asked how close the build is to playable or exact, answer with the remaining work and its size (known divergences, systems never run on real data, open seams), with a stated uncertainty, never a single written-or-tested percentage.
+- Why: a percentage of specs implemented or tests passing said "99 % done" for a build that did not play; the remaining-work list is what decides the next step.
+- Check: progress answers name what is left and how sure the estimate is.
+- Here: the coordinator's reports (`docs/handoff/coordinator-resume.md`) and answers to the user.
+- Status: trial — adopted 2026-10-08 by the user's decision; proven when estimates track what the next releases actually needed.
