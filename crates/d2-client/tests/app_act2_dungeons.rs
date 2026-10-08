@@ -174,7 +174,10 @@ fn every_act2_dungeon_is_entered_built_and_left() {
     // on, then every way back.
     let edges = a2::edges();
     let mut visited = Vec::new();
-    for e in edges.iter().filter(|e| e.from == ACT2_TOWN || e.from == a2::CANYON) {
+    for e in edges
+        .iter()
+        .filter(|e| e.from == ACT2_TOWN || e.from == a2::CANYON)
+    {
         // The Canyon is entered first so the tombs' parent exists.
         if e.from == a2::CANYON && server_level(&server) != Some(a2::CANYON) {
             take(&mut app, edges_to(&edges, a2::CANYON).0, a2::CANYON);

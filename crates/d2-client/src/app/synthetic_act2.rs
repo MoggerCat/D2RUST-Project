@@ -97,6 +97,16 @@ pub fn is_tomb(id: u32) -> bool {
     (FIRST_TOMB..FIRST_TOMB + 7).contains(&id)
 }
 
+/// The lvlmaze `Rooms` of a dungeon level: 6 for the tombs, 61 for the
+/// Sanctuary's spiral (`maze.md` §5.5), 1 otherwise.
+pub fn base_rooms(id: u32) -> u32 {
+    match id {
+        ARCANE_SANCTUARY => 61,
+        _ if is_tomb(id) => 6,
+        _ => 1,
+    }
+}
+
 /// The tile classes a dungeon maze level carries: the way back and, unless
 /// it is its line's last level, the way on.
 pub fn maze_links(id: u32) -> Option<(u32, Option<u32>)> {
@@ -139,6 +149,11 @@ pub fn flat_flags(id: u32) -> u32 {
 /// every pair. Returns nothing; the warp rows are [`last_warp`]-bound.
 pub fn add_levels(drlg: &mut DrlgData) {
     let e = edges();
+    // The sewer, tomb and Sanctuary level types (13, 17, 19) have no tile
+    // library here, like the cave's.
+    if drlg.lvltypes.len() < 20 {
+        drlg.lvltypes.resize(20, vec![Vec::new(); 32]);
+    }
     {
         let c = &mut drlg.levels[CANYON as usize];
         c.drlg_type = 2;
@@ -155,6 +170,11 @@ pub fn add_levels(drlg: &mut DrlgData) {
         };
         c.size = [(200, 200); 3];
         c.offset = (1000 + 300 * n as i32, 2000);
+        if id == ARCANE_SANCTUARY {
+            // The spiral's 61 cells (`maze.md` §5.5) need room.
+            c.size = [(1200, 1200); 3];
+            c.offset = (1000, 4000);
+        }
     }
     // Flat levels: slot k = tile k of `flat_tiles`; maze levels: slot 0
     // the way back, slot 1 the way on.

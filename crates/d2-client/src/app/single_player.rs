@@ -2007,7 +2007,7 @@ pub fn build_with_objects(
         rooms.push(r);
     }
     // The Act II DRLG chose its staff tomb at creation (`levels.md` §3).
-    if let Some(Some(t)) = sim
+    if let Some(t) = sim
         .action
         .hooks()
         .drlg

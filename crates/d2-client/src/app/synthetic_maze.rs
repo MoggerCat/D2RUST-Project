@@ -13,12 +13,12 @@ use std::sync::Arc;
 use d2_sim::drlg::maze::{Maze, MazeData, MazeRow, Specials};
 use d2_sim::drlg::outdoor::{OutdoorData, SubFileMap};
 use d2_sim::drlg::preset::{Ds1Input, Ds1Source, PresetData, PresetDef, PresetTables};
+use d2_sim::drlg::room::LinkAt;
 use d2_sim::drlg::tiles::cell;
 use d2_sim::drlg::{
     room_flags, Drlg, DrlgData, DrlgError, DrlgRoomId, LevelIdx, LevelTypes, PresetUnit, RoomGrids,
     RoomKind, TileRect,
 };
-use d2_sim::drlg::room::LinkAt;
 use d2_sim::wiring::worldgen::levels::WorldTypes;
 
 /// Cave Level 1 (act 0): a maze level, the Den's second exit.
@@ -68,7 +68,7 @@ pub fn maze_data() -> MazeData {
                 level,
                 // Tal Rasha's tombs: 6 cells, ×3 / ×2 for the staff / boss
                 // tomb (`maze.md` §5.2).
-                rooms: [if super::synthetic_act2::is_tomb(level) { 6 } else { 1 }; 3],
+                rooms: [super::synthetic_act2::base_rooms(level); 3],
                 size_x: 24,
                 size_y: 24,
                 merge: 0,
