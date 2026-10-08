@@ -113,6 +113,21 @@ pub trait MoveRest: InvRest {
     /// The messages `MovePending::send` queued since the last take, in
     /// send order: (receiving unit, bytes).
     fn take_sent(&mut self) -> Vec<(Owner, Vec<u8>)>;
+
+    /// The places of the game's players and items at the start of a
+    /// move call, and the game's item format, for a rest that holds no
+    /// positions of its own (the play preview's, [`StagedPlace`]).
+    /// Default: ignored.
+    fn stage(&mut self, _places: &[StagedPlace], _item_format: u16) {}
+}
+
+/// Where a player or an item is when an item-move call starts: its
+/// owner key, position in sub-tiles and room.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StagedPlace {
+    pub owner: Owner,
+    pub pos: (i32, i32),
+    pub room: Option<d2_sim::units::RoomId>,
 }
 
 /// The item-move part of a game's world host: the inventory tables
