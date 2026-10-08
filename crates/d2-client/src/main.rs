@@ -382,8 +382,15 @@ fn view(o: Options) -> Result<()> {
     }
 }
 
-fn play(o: Options) -> Result<()> {
-    use d2_client::app::{play, single_player};
+/// The game data of the options (`play`'s source choice).
+fn select_data(
+    o: &Options,
+) -> Result<(
+    d2_client::app::single_player::GameData,
+    Option<PathBuf>,
+    String,
+)> {
+    use d2_client::app::single_player;
     let choice = d2_client::assets::choose_source(
         o.native.as_deref(),
         o.source.as_deref(),
@@ -404,6 +411,51 @@ fn play(o: Options) -> Result<()> {
         Some(dir) => format!("native folder {}", dir.display()),
         None => "D2_GAME_DIR".to_owned(),
     };
+    Ok((data, dir, origin))
+}
+
+/// `play`: the front end (main menu) first, then the game; the game's window
+/// closing returns to the main menu. `--new`, `--save` and `--frames` skip
+/// the front end (a shortcut straight into the game).
+fn play(o: Options) -> Result<()> {
+    use d2_client::app::front_host::{run_front_end, DirSaves, FrontArt, FrontHost};
+    use d2_client::ui::front_end::Outcome;
+    if o.save.is_some() || o.new.is_some() || o.frames.is_some() {
+        let (data, dir, origin) = select_data(&o)?;
+        return play_once(&o, data, dir, origin, None);
+    }
+    let mut first = true;
+    loop {
+        let (data, dir, origin) = select_data(&o)?;
+        let (art, expansion) = match &data {
+            d2_client::app::single_player::GameData::Live(d) => {
+                use d2_data::bin::TableFiles;
+                (Some(FrontArt::new(d.archives.source())), d.archives.lod())
+            }
+            d2_client::app::single_player::GameData::Synthetic => (None, true),
+        };
+        let saves = o
+            .save_dir
+            .clone()
+            .unwrap_or_else(d2_client::app::save::default_save_dir);
+        let host = FrontHost::new(expansion, Box::new(DirSaves(saves)), art, first);
+        first = false;
+        match run_front_end(host) {
+            Outcome::Exit => return Ok(()),
+            Outcome::GameLoad(g) => play_once(&o, data, dir, origin, g.difficulty)?,
+        }
+    }
+}
+
+fn play_once(
+    o: &Options,
+    data: d2_client::app::single_player::GameData,
+    dir: Option<PathBuf>,
+    origin: String,
+    menu_difficulty: Option<u8>,
+) -> Result<()> {
+    use d2_client::app::{play, single_player};
+    let difficulty = menu_difficulty.unwrap_or(o.difficulty);
     match &data {
         single_player::GameData::Live(d) => println!(
             "play: game data from {origin} ({} levels, {} objects, waypoint object class {}; level files: {} DS1, {} lvlsub DS1, {} DT1)",
@@ -436,8 +488,8 @@ fn play(o: Options) -> Result<()> {
         }
         (None, None) => single_player::Character::New,
     }
-    .with_difficulty(o.difficulty);
-    println!("play: difficulty {}", o.difficulty);
+    .with_difficulty(difficulty);
+    println!("play: difficulty {difficulty}");
     let result = play::run(play::PlayConfig {
         data,
         seed: o.seed,

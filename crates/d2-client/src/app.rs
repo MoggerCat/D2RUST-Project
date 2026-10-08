@@ -13,6 +13,7 @@ pub mod anim_names;
 pub mod automap;
 pub mod config;
 pub mod death;
+pub mod front_host;
 pub mod hardcore;
 pub mod hire_stats;
 pub mod hud;
