@@ -1,4 +1,4 @@
-// Spec: specs/skills/bodies-2.md (Charge, §5.4), specs/skills/bodies-3.md (Blessed Hammer, §6.9), specs/sim/pathing.md (§2, §3, §8.1)
+// Spec: specs/skills/bodies-2.md (Charge, §5.4), specs/skills/bodies-2b.md (Blessed Hammer, §6.9), specs/sim/pathing.md (§2, §3, §8.1)
 //! The path operations the skill bodies make on a unit's path
 //! ([`PathOp`]), on the path provider of the action wiring: velocity,
 //! target point and unit, path type, step counts, the two masks and the

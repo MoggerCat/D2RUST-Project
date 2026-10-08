@@ -1,4 +1,4 @@
-// Spec: specs/skills/use.md (§3, §5), specs/skills/bodies-3.md (Blessed Hammer, Holy Bolt), specs/sim/intents-events.md (§2.4 r4, §7.4)
+// Spec: specs/skills/use.md (§3, §5), specs/skills/bodies-2b.md (§6.9), specs/sim/intents-events.md (§2.4 r4, §7.4)
 //! Paladin skills on the play host, headless, on the synthetic
 //! single-player game (test-local skill / missile rows, as `app_cast.rs`).
 
@@ -301,7 +301,7 @@ fn holy_bolt_costs_mana_and_creates_the_missile() {
     assert!(got.iter().any(|m| m.contains(&0x4D)), "{errors}");
 }
 
-// Covers: specs/skills/bodies-3.md (Blessed Hammer)
+// Covers: specs/skills/bodies-2b.md §6.9
 #[test]
 fn blessed_hammer_spawns_its_missile_through_the_do_step() {
     let mut g = Game::joined(BLESSED_HAMMER);
@@ -314,7 +314,7 @@ fn blessed_hammer_spawns_its_missile_through_the_do_step() {
     assert!(got.iter().any(|m| m.contains(&0x4D)), "{errors}");
 }
 
-// Covers: specs/skills/bodies.md §4.5 (Basic aura), specs/sim/intents-events.md §3.5 r6
+// Covers: specs/skills/bodies.md §4.5
 #[test]
 fn might_sets_its_state_and_the_client_hears_of_it() {
     let mut g = Game::joined(MIGHT);
@@ -336,7 +336,7 @@ fn might_sets_its_state_and_the_client_hears_of_it() {
     );
 }
 
-// Covers: specs/skills/bodies-2.md (Charge start / do)
+// Covers: specs/skills/bodies-2.md §5.3, §5.4
 #[test]
 fn charge_at_a_point_moves_the_player() {
     let mut g = Game::joined(CHARGE);
