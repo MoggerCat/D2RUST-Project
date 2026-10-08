@@ -50,7 +50,7 @@ generator and are only re-exported here).
   a spec session should state the mask there).
 - Built types (`s2c::messages`): `GameHandshake` 0x0B, `PlayerStop` 0x0D, `QuestInfo` 0x28,
   `GameQuestInfo` 0x29, `NpcTransaction` 0x2A, `MercForHire` 0x4E,
-  `QuestSpecial` 0x50 (quest form only), `QuestLogInfo` 0x52, `OpenUi`
+  `QuestSpecial` 0x50 (code-1 view; other forms parse as `QuestSpecialForm`), `QuestLogInfo` 0x52, `OpenUi`
   0x58, `AssignPlayer` 0x59, `QuestItemState` 0x5D, `WaypointMenu` 0x63, `TradeAction` 0x77,
   `UniqueEvent` 0x89, `NpcWantsInteract` 0x8A, `NpcGossipAct` 0x91,
   `Unknown9B` 0x9B, `WardenRequest` 0xAE (variable; transport row, out of
@@ -165,7 +165,7 @@ row against `s2c::AUDIT` by `note_table_matches_audit`.
 | 0x4D | UnitSkillOnPoint | 17 | generated | `UnitSkillOnPoint` | TSV layout |
 | 0x4E | MercForHire | 7 | built | `MercForHire` | npc.md §7.2 |
 | 0x4F | StartMercList | 1 | generated | `StartMercList` | TSV layout |
-| 0x50 | QuestSpecial | 15 | partial | `QuestSpecial` | quest form (u16 1 @1) built as QuestSpecial; mercenary form (u16 2 @1, name u16 @3; npc.md §7.5) has no bytes 5–14 |
+| 0x50 | QuestSpecial | 15 | built | `QuestSpecial` | code 1 (bytes 9–14 zero) parses as QuestSpecial; every other form (quest codes 4, 13, 23; mercenary code 2, name u16 @3, npc.md §7.5) as QuestSpecialForm, the TSV layout (q-fix-proto-quest-special) |
 | 0x51 | AssignObject | 14 | generated | `AssignObject` | TSV layout |
 | 0x52 | QuestLogInfo | 42 | built | `QuestLogInfo` | quests.md §6.2 step 4 |
 | 0x53 | Darkness | 10 | generated | `Darkness` | TSV layout |
@@ -267,9 +267,8 @@ row against `s2c::AUDIT` by `note_table_matches_audit`.
 | 0xB3 | DownloadSave | u8@1+7;min=8 | unspecified | - | size rule only |
 | 0xB4 | ConnectionRefused | 5 | generated | `ConnectionRefused` | TSV layout |
 
-Totals (181 ids): 15 built (14 fixed + 0xAE), 30 generated, 20 partial
-(0x50 with its quest form built as `QuestSpecial`), 78 unspecified, 38
-never.
+Totals (181 ids): 16 built (15 fixed + 0xAE; 0x50 every form since
+q-fix-proto), 30 generated, 19 partial, 78 unspecified, 38 never.
 
 ## 4. Checks (`cargo test -p d2-proto s2c`)
 
@@ -282,7 +281,7 @@ never.
 | `recorded_waypoint_messages` | 0x63 ×3, 0x0D ×2, 0x07 recorded bytes encode and parse | |
 | `recorded_npc_and_quest_messages` | 0x2A ×2 (bytes 3–6 masked), 0x28 prefixes, 0x5D recorded + both fixed forms, 0x8A, 0x9B, 0x77 ×3 | |
 | `recorded_vector_perturbation_is_reported` | | every single-byte flip of a recorded 0x63 / 0x2A reported at its offset; flips of 0x2A bytes 3–6 not |
-| `recorded_unbuilt_messages_size_and_refuse` | recorded 0x15 ×2, 0x51 ×2 have the TSV size and parse as `Unbuilt`; 0x27 prefix, 0x50 mercenary form `Unbuilt` | |
+| `recorded_unbuilt_messages_size_and_refuse` | recorded 0x15 ×2, 0x51 ×2 have the TSV size and parse as `Unbuilt`; 0x27 prefix `Unbuilt`; 0x50 mercenary form `QuestSpecialForm` | |
 | `built_messages_round_trip_through_the_size_rule` | every built type: encode → size rule = length → parse = same value | |
 | `parse_rejects_bad_messages` | empty, size 0, past 0xB4, incomplete, wrong size, constant, unbuilt; unwritten bytes ignored | |
 | `warden_request_size_rule` | 0xAE: `AE 10 00` → 19, max 0x200, over-cap length → 3 | |
@@ -302,7 +301,7 @@ Gate (this branch): `cargo fmt --all -- --check`; `cargo clippy
 1. Spec sessions (local, Ghidra): layouts of the `partial` rows the
    sim needs first: 0x15 (sender `0x0053BC10`, HANDOFF §7 q8), 0x51
    (`0x0053BD10`), 0x5A (`use.md` OQ9), 0x27's 34-byte text list
-   (`0x00661480`), 0x50's mercenary form, 0xAC's bit positions
+   (`0x00661480`), 0xAC's bit positions
    (`init.md` §24), the item bit stream of 0x9C / 0x9D
    (`inventory.md` OQ1). Each row moves to `built` with a type and a
    vector from the recordings.

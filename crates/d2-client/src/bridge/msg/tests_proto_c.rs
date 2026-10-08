@@ -495,6 +495,18 @@ fn life_mana_update2_0x95_one_layout() {
             dy,
         );
         assert_eq!(wide, sim);
+        // The typed encode cuts the same way (q-fix-proto-packed-cut).
+        let typed = gen::LifeManaUpdate2 {
+            life: (life | 0x8000) as u16,
+            mana: mana as u16,
+            stamina: stamina as u16,
+            x,
+            y,
+            dx,
+            dy,
+        }
+        .encode();
+        assert_eq!(typed.to_vec(), sim.to_vec());
         // `msg-units.md` §5 r1–r3: stats 6, 8, 10 := v << 8; the check at
         // (x, y) stores the server point (x = 0 or y = 0: no check).
         let mut m = local_at((x, y));

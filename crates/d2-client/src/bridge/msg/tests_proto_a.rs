@@ -1041,8 +1041,8 @@ fn update_item_oskill_0x21_one_layout() {
 // Covers: specs/client/msg-skills.md §5 r1, §5 r2
 #[test]
 fn update_item_skill_0x22_one_layout() {
-    // No d2-sim producer (`send_skill_quantity` is a default no-op):
-    // d2_proto encode against the client handler.
+    // The d2-sim builder (`sim::update_item_skill`, sent by the inventory
+    // desk's `send_skill_quantity`) == the d2_proto encode == the client.
     let mut r = Rig::new();
     let mut check = |ty: u8, guid: u32, skill: u16, q: u8, flag: u8| {
         let p = gen::UpdateItemSkill {
@@ -1053,6 +1053,10 @@ fn update_item_skill_0x22_one_layout() {
             body_state: flag,
         };
         let b = p.encode();
+        assert_eq!(
+            sim::update_item_skill(ty, guid, skill, q, flag != 0).to_vec(),
+            b
+        );
         assert_eq!(parse(&b).unwrap(), S2c::UpdateItemSkill(p));
         let k = UnitKey::new(PLAYER, guid);
         r.put(k).skills = Some(SkillList {

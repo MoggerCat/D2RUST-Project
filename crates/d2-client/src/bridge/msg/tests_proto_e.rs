@@ -370,7 +370,7 @@ fn item_moves_0x16_to_0x63_one_layout() {
 
 /// The belt panel's `msg_u32s` 0x23 / 0x24 / 0x25 (`ui/panels-3.md`) =
 /// the typed messages.
-// Checks: specs/sim/client-messages.tsv 
+// Checks: specs/sim/client-messages.tsv
 #[test]
 fn belt_0x23_0x24_0x25_one_layout() {
     for (a, b) in pairs(&u32s()) {

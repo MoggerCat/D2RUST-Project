@@ -230,7 +230,7 @@ impl<X: Pending> View<'_, X> {
 
     /// Player part B as far as it is specified (§7.2, §7.9): the unit's
     /// states (0xAA, `0x00570E30`), its pending event records
-    /// (`0x00571CD0`: d2rs keeps none, so nothing) and the overhead text
+    /// (`0x00571CD0`, [`View::send_event_records`]) and the overhead text
     /// (`0x00571620`).
     pub fn player_part_b(&mut self, game: &Game, receiver: UnitId, unit: UnitId) {
         let Some(e) = game.lists.unit(unit) else {
@@ -242,6 +242,7 @@ impl<X: Pending> View<'_, X> {
         }
         let states = self.unit_states_message(ty, guid, unit);
         self.h.x.send(receiver, &states);
+        self.send_event_records(receiver, unit);
         self.overhead_message(receiver, unit, ty, guid);
     }
 

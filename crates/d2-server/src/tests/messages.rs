@@ -300,6 +300,29 @@ fn chat_string_checks() {
     assert_eq!(run(&mut g, &m), ResultCode::Invalid);
     // No NUL at all → 2.
     assert_eq!(run(&mut g, &[0x14, 0, 0, b'a']), ResultCode::Invalid);
+    // 0x15 (`0x0054A5D0`): strlen < 256 and strlen + 4 < size reach the
+    // handler; else rejected (2, PROVISIONAL REC-338).
+    let handled = g.handled.len();
+    assert_eq!(
+        run(&mut g, &[0x15, 1, 0, b'h', b'i', 0, 0]),
+        ResultCode::Done
+    );
+    assert_eq!(g.handled.len(), handled + 1);
+    // strlen + 4 = size: the msg's NUL is the last byte → rejected.
+    assert_eq!(
+        run(&mut g, &[0x15, 1, 0, b'h', b'i', 0]),
+        ResultCode::Invalid
+    );
+    // No NUL.
+    assert_eq!(run(&mut g, &[0x15, 1, 0, b'h', b'i']), ResultCode::Invalid);
+    // strlen 255 accepted, 256 rejected.
+    let mut m = vec![0x15, 1, 0];
+    m.extend(std::iter::repeat_n(b'a', 255));
+    m.extend([0, 0]);
+    assert_eq!(run(&mut g, &m), ResultCode::Done);
+    m.insert(3, b'a');
+    assert_eq!(run(&mut g, &m), ResultCode::Invalid);
+    assert_eq!(g.handled.len(), handled + 2);
 }
 
 // Covers: specs/sim/intents-events.md §2.4 r3

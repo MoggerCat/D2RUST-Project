@@ -279,7 +279,6 @@ impl VendorRest for Rest {
     }
     fn recharge(&mut self, _: UnitId) {}
     fn repair_broken(&mut self, _: UnitId) {}
-    fn send_item_stat(&mut self, _: UnitId, _: UnitId, _: u16) {}
     fn send_transaction(&mut self, _: UnitId, _: Transaction) {}
     fn new_store_inventory(&mut self, _: u16, _: Option<UnitId>) {}
     fn place_in_store(&mut self, _: u16, _: UnitId) -> bool {

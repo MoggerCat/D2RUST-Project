@@ -27,13 +27,13 @@
 |   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 112–241 |
 |   3. Other item messages | 242–342 |
 |   4. Hireling stats: 0x9E–0xA2 (`0x0045D540`) | 343–358 |
-|   5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6 | 359–471 |
-| Constants & data dependencies | 472–480 |
-| Randomness | 481–484 |
-| Edge cases & original bugs | 485–504 |
-| Test vectors | 505–543 |
-| Provenance | 544–579 |
-| Open questions | 580–620 |
+|   5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6 | 359–480 |
+| Constants & data dependencies | 481–489 |
+| Randomness | 490–493 |
+| Edge cases & original bugs | 494–513 |
+| Test vectors | 514–552 |
+| Provenance | 553–588 |
+| Open questions | 589–629 |
 <!-- /index -->
 
 Owned ids: 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x3F, 0x42,
@@ -389,6 +389,15 @@ stat-list links, `weapon_set`, the runtime item table (§5). No outputs.
       → item flags 4 and 0x4000 := 0 (`0x006280D0`).
    Model: the item's stats, item flags 4 / 0x4000, the refresh's item
    flags.
+   3. Sender (`0x0053D130(client, item, 1, s, v, param)`, server side;
+      d2-sim `units::messages::update_item_stat`): set flag 1, the item's
+      layer-0 base value of s after the change. PROVISIONAL: each sized
+      field takes the narrowest width that holds it (GUID and value: ≤
+      0xFF → 8, ≤ 0xFFFF → 16, else 32, a negative value as its 32-bit
+      two's complement; param: ≤ 0xFF → 8, else 16) and the item moves,
+      vendor and skill-body callers pass param 0 (because no spec read of
+      `0x0053D130`'s width choice exists and the client reads any width);
+      settled by REC-336.
 2. **0x40** ItemFlags (`0x0045E240` → `0x004C2020`, 13 bytes): GUID
    u32@1, mask u32@5, value u32@9. Item (4, GUID) present → item flags
    (item data +0x18): value ≠ 0 → |= mask, else &= ~mask (`0x006280D0`).

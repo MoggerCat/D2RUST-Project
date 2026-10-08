@@ -397,9 +397,6 @@ impl MovePending for Rest {
     fn send(&mut self, player: Owner, bytes: Vec<u8>) {
         self.sent.push((player, bytes));
     }
-    fn send_item_stat(&mut self, _: Owner, item: Guid, stat: u16) {
-        self.log.push(format!("send_item_stat {item} {stat}"));
-    }
 }
 
 impl InvRest for Rest {

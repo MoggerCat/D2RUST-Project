@@ -899,6 +899,61 @@ fn update_item_stats_0x3e_one_layout() {
     }
 }
 
+/// The d2-sim builder (`units::messages::update_item_stat`, PROVISIONAL
+/// widths REC-336: the narrowest that holds each field) equals the spec
+/// layout packed by hand, and the client sets every stat back (param
+/// unused off stat 204).
+// Covers: specs/client/msg-stats-items.md §5 r1
+#[test]
+fn update_item_stats_0x3e_sim_builder_to_client() {
+    let width = |v: u32| {
+        if v <= 0xFF {
+            8
+        } else if v <= 0xFFFF {
+            16
+        } else {
+            32
+        }
+    };
+    let sized = |v: u32| -> Vec<(u32, u32)> {
+        match width(v) {
+            8 => vec![(0, 1), (v, 8)],
+            16 => vec![(1, 1), (0, 1), (v, 16)],
+            _ => vec![(1, 1), (1, 1), (v, 32)],
+        }
+    };
+    let guids = [0u32, 0xFF, 0x100, 0xFFFF, 0x1_0000, u32::MAX];
+    let values = [0i32, 1, 0xFF, 0x100, 0xFFFF, 0x1_0000, i32::MAX, -1];
+    for (i, guid) in guids.iter().copied().chain(sweep(6)).enumerate() {
+        for (j, &value) in values.iter().enumerate() {
+            let stat = [70u16, 72, 73, 0x1FF, 0][(i + j) % 5];
+            let param = [0u16, 0xFF, 0x100, 0xFFFF][(i + j) % 4];
+            let b = d2_sim::units::messages::update_item_stat(guid, stat, value, param);
+            let mut f = sized(guid);
+            f.push((1, 1));
+            f.push((u32::from(stat), 9));
+            f.extend(sized(value as u32));
+            f.extend(if param <= 0xFF {
+                [(0, 1), (u32::from(param), 8)]
+            } else {
+                [(1, 1), (u32::from(param), 16)]
+            });
+            let stream = pack(&f);
+            let mut want = vec![0x3E, (2 + stream.len()) as u8];
+            want.extend(stream);
+            assert_eq!(b, want, "guid {guid:#x} value {value:#x}");
+            assert_eq!(tsv(&b, "size"), b.len() as u32);
+            one_size(&b);
+            let key = UnitKey::new(ITEM, guid);
+            let mut m = Model::default();
+            m.put(key).kind = KindData::Item(Default::default());
+            m.recv(&b);
+            assert!(m.log.rejected.is_empty(), "{:?}", m.rejected());
+            assert_eq!(m.unit(key).stats.get(&stat).copied(), Some(value));
+        }
+    }
+}
+
 // ---- fixed ids without a d2-sim builder: d2-proto encode → client
 
 // Covers: specs/client/msg-skills.md §8, §10; specs/client/msg-units.md §7 r11; specs/sim/intents-events.md §4
@@ -918,6 +973,17 @@ fn skill_npc_baal_0xa3_0xa4_0xa5_0xab_one_layout() {
             y: U32S[(i + 3) % 7],
         };
         let b = g.encode();
+        // The d2-sim record's sender (`wiring::action::event_records`).
+        let sim = d2_sim::wiring::action::event_records::progressive(
+            g.v,
+            g.skill,
+            g.level,
+            (g.type_, g.guid),
+            (g.target_type, g.target),
+            g.x,
+            g.y,
+        );
+        assert_eq!(sim.to_vec(), b.to_vec());
         assert_eq!(parse(&b).unwrap(), S2c::UnknownA3(g));
         one_size(&b);
         let mut m = Model::default();
@@ -977,6 +1043,10 @@ fn skill_npc_baal_0xa3_0xa4_0xa5_0xab_one_layout() {
         let class = U16S[i % 5];
         let g = gen::BaalWave { class };
         let b = g.encode();
+        assert_eq!(
+            d2_sim::wiring::action::event_records::preload(class).to_vec(),
+            b.to_vec()
+        );
         assert_eq!(parse(&b).unwrap(), S2c::BaalWave(g));
         one_size(&b);
         m.out.clear();

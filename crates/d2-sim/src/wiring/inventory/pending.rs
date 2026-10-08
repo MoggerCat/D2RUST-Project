@@ -552,8 +552,19 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn send(&mut self, player: Owner, bytes: Vec<u8>) {
         self.rest.send(player, bytes)
     }
+    /// S→C 0x3E (`0x0053D130(client, item, 1, stat, value, 0)`) with the
+    /// item's base stat value (layer 0, the value the client's base set
+    /// writes, `client/msg-stats-items.md` §5 r1.2), sent through the
+    /// rest's transport. An item without a unit sends nothing.
+    /// PROVISIONAL (`client/msg-stats-items.md` §5 r1.3; REC-336): field
+    /// widths, see `units::messages::update_item_stat`.
     fn send_item_stat(&mut self, player: Owner, item: Guid, stat: u16) {
-        self.rest.send_item_stat(player, item, stat)
+        let Some(u) = self.item_unit(item) else {
+            return;
+        };
+        let value = self.econ.stats.unit_base(u, stat, 0);
+        let msg = crate::units::messages::update_item_stat(item, stat, value, 0);
+        self.rest.send(player, msg)
     }
     /// The item bit stream (`items/bitstream.md`) of the real item
     /// ([`InvDesk::item_stream`]); the rest's default is not asked.

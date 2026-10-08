@@ -322,17 +322,33 @@ fn quest_special_0x50_one_layout() {
     assert_eq!(q.encode(), g.encode());
 }
 
+/// Every 0x50 form d2-sim sends (mercenary 2 `world/npc/hire.rs`, quest
+/// codes 4 `act1/q4.rs`, 13 `quests.rs`, 23 `act4/q2.rs`) parses: code 1
+/// with bytes 9–14 zero as the code-1 view, the rest as the TSV layout.
+// Checks: specs/sim/server-messages.tsv
 #[test]
-#[ignore = "q-fix-proto-quest-special: s2c::parse returns Unbuilt for every 0x50 code but 1, though codes 4 and 13 have full layouts (quests-act1-rest.md §7, quests.md §9.4)"]
 fn quest_special_0x50_parse_every_quest_form() {
-    for code in [4u16, 13] {
-        let b = gen::QuestSpecial {
-            code,
-            v0: 1,
-            ..Default::default()
+    for code in [2u16, 4, 13, 23, 1] {
+        for (i, v) in sweep(6).enumerate() {
+            let g = gen::QuestSpecial {
+                code,
+                v0: v as u16,
+                v1: (v >> 16) as u16,
+                v2: i as u16,
+                v3: if code == 1 { 0 } else { (v >> 8) as u16 },
+                v4: if code == 1 { 0 } else { 5 },
+            };
+            let b = g.encode();
+            let got = s2c::parse(&b);
+            if code == 1 {
+                let Ok(S2c::QuestSpecial(m)) = got else {
+                    panic!("code 1: {got:?}");
+                };
+                assert_eq!(m.encode().to_vec(), b);
+            } else {
+                assert_eq!(got, Ok(S2c::QuestSpecialForm(g)), "code {code}");
+            }
         }
-        .encode();
-        assert!(s2c::parse(&b).is_ok(), "code {code}");
     }
 }
 
@@ -380,7 +396,29 @@ fn darkness_0x53_one_layout() {
 
 #[test]
 fn npc_enchants_0x57_one_layout() {
-    // No d2rs producer (`0x00597C70` → `0x0053D880` not built).
+    // The d2-sim builder (`units::messages::npc_enchants`, sent by the
+    // monster update's step 10) == the d2_proto encode for every form it
+    // writes (umod2 one byte, flag 0 / 1).
+    for guid in u32s() {
+        for &name in &U16S {
+            for &u in &U8S {
+                for flag in [false, true] {
+                    let sim =
+                        d2_sim::units::messages::npc_enchants(guid, name, [0x7F, 0x80, u], flag);
+                    let p = gen::NpcEnchants {
+                        guid,
+                        type_: 1,
+                        name,
+                        umod0: 0x7F,
+                        umod1: 0x80,
+                        umod2: u16::from(u),
+                        flag: u16::from(flag),
+                    };
+                    assert_eq!(sim.to_vec(), p.encode());
+                }
+            }
+        }
+    }
     for guid in u32s() {
         for &name in &U16S {
             for &umod2 in &U16S {
@@ -685,6 +723,7 @@ fn event_message_0x5a_one_layout() {
                 f2: 4,
                 f3: 0,
                 name,
+                account: [0; 16],
             };
             assert_eq!(srv, g.encode());
             let mut m = Model::default();
@@ -698,9 +737,32 @@ fn event_message_0x5a_one_layout() {
             );
         }
     }
+    // A hosted game's account name @0x18 (`intents-events.md` §8.3, byte
+    // 0x27 := 0): the client copies all 40 bytes.
+    let mut account = [0u8; 16];
+    account[..15].fill(b'a');
+    let g = gen::EventMessage {
+        code: 2,
+        f2: 4,
+        f3: 0,
+        name: *b"name\0\0\0\0\0\0\0\0\0\0\0\0",
+        account,
+    };
+    let b = g.encode();
+    assert_eq!((&b[24..39], b[39]), (&[b'a'; 15][..], 0));
+    assert_eq!(s2c::parse(&b), Ok(S2c::EventMessage(g)));
+    let mut m = Model::default();
+    recv_ok(&mut m, &b);
+    assert_eq!(
+        m.out,
+        [Output::EventText {
+            bytes: b,
+            local_name: None,
+        }]
+    );
 }
 
-/// 0x5B from the TSV layout (no d2rs producer).
+/// 0x5B from the TSV layout, by hand.
 fn player_joined(
     guid: u32,
     class: u8,
@@ -762,6 +824,61 @@ fn roster_0x5b_0x5c_0x65_one_layout() {
         }
         // 0x5C: GUID u32@1.
         let l = gen::PlayerLeft { guid }.encode();
+        recv_ok(&mut m, &l);
+        assert!(m.w.roster.is_empty());
+    }
+}
+
+/// The d2-sim builders the join sequence and the leave send
+/// (`units::messages::{player_joined, player_kill_count, player_left,
+/// player_event}`) == the TSV layout / d2_proto encode == the client:
+/// the roster record (`msg-units.md` §8 r3: +0x20 level, +0x22 party,
+/// +0x30 / +0x44 0, strings empty), the kill count, the removal, and the
+/// join 0x5A's event text.
+// Covers: specs/client/msg-units.md §8 r3, §8 r4, §8 r5; specs/sim/intents-events.md §8.3, §2.5 r2
+#[test]
+fn roster_join_and_leave_sim_builders_to_client() {
+    use d2_sim::units::messages as sim;
+    for (i, guid) in u32s().into_iter().filter(|&g| g != u32::MAX).enumerate() {
+        let mut name = [0u8; 16];
+        name[..1 + i % 15].fill(b'n');
+        let class = (i % 7) as u8;
+        let level = U16S[i % 5];
+        let party = [0xFFFF, U16S[(i + 1) % 5]][i % 2];
+        let b = sim::player_joined(guid, class, &name, level, party);
+        assert_eq!(
+            b,
+            player_joined(guid, class, &name, [level, party, 0, 0, 0], b"", b"")
+        );
+        assert_eq!(
+            d2_proto::transport::server_size(&b),
+            d2_proto::schema::Size::Bytes(b.len())
+        );
+        let mut m = Model::default();
+        recv_ok(&mut m, &b);
+        let r = &m.w.roster[0];
+        assert_eq!(
+            (r.guid, r.class, r.name, r.f20, r.f22, r.f30, r.f44),
+            (guid, u32::from(class), name, level, party, 0, 0)
+        );
+        for &count in &U16S {
+            let k = sim::player_kill_count(guid, count);
+            assert_eq!(k.to_vec(), gen::PlayerKillCount { guid, count }.encode());
+            recv_ok(&mut m, &k);
+            assert_eq!(m.w.roster[0].kills, i32::from(count as i16));
+        }
+        let ev = sim::player_event(2, &name);
+        let g = gen::EventMessage {
+            code: 2,
+            f2: 4,
+            f3: 0,
+            name,
+            account: [0; 16],
+        };
+        assert_eq!(ev.to_vec(), g.encode());
+        recv_ok(&mut m, &ev);
+        let l = sim::player_left(guid);
+        assert_eq!(l.to_vec(), gen::PlayerLeft { guid }.encode());
         recv_ok(&mut m, &l);
         assert!(m.w.roster.is_empty());
     }

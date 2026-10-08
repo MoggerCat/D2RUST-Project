@@ -625,8 +625,6 @@ pub trait Pending {
     fn ai_change_class_list(&mut self, game: &mut Game, unit: UnitId, class: i32) {}
     /// WillOWisp's magic-find stat list.
     fn ai_wisp_buff(&mut self, game: &mut Game, target: UnitId, value: i32, expire: i32) {}
-    /// S→C 0xA4.
-    fn ai_preload_class(&mut self, game: &mut Game, unit: UnitId, class: i32) {}
     /// WillOWisp's unit find; nothing found by default.
     fn ai_wisp_find(&mut self, game: &mut Game, unit: UnitId) -> Vec<UnitId> {
         Vec::new()
@@ -1252,8 +1250,6 @@ pub trait Pending {
     /// `0x00558580(game, item)`: the quantity-replenish timer
     /// (`items/generation.md`).
     fn quantity_timer(&mut self, game: &mut Game, item: UnitId) {}
-    /// Message 0x3E (item stat) to the player's client.
-    fn send_item_stat(&mut self, unit: UnitId, item: UnitId, stat: u16, value: i32) {}
     /// `0x00580310(game, unit)`: attack-mode cleanup (`bodies.md` OQ4).
     fn attack_cleanup(&mut self, unit: UnitId) {}
     /// `0x00580380(game, unit)` (`bodies.md` OQ4).
@@ -1271,13 +1267,6 @@ pub trait Pending {
     fn set_ai_state(&mut self, unit: UnitId, k: i32) {}
     /// `0x005D2B60`: aura mana under blood mana (`levels.md` OQ8).
     fn blood_mana(&mut self, unit: UnitId, cost: i32) {}
-    /// `0x00571AA0`: message 0xA3 queued on the unit.
-    fn queue_progressive(
-        &mut self,
-        unit: UnitId,
-        msg: crate::skills::use_::bodies::ProgressiveMsg<UnitId>,
-    ) {
-    }
 
     // ---- skill bodies, batch 2 and 3 (`bodies.md` §6–§8, `bodies-2.md`, `bodies-2b.md`) --
 
