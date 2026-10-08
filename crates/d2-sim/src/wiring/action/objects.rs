@@ -702,9 +702,8 @@ impl<X: Pending> ObjectView<'_, X> {
     /// [`crate::wiring::economy::drop_helpers`]) with the drop state of
     /// [`super::ActionHooks::object_drops`] lent out and the object
     /// tables' `levels`; `None`: the game has no drop state. Without the
-    /// path provider's field the floor search finds nothing
-    /// ([`crate::wiring::economy::NoSpot`]): the picks still draw, no
-    /// item is created.
+    /// path provider's field the floor search takes the start spot
+    /// as is ([`crate::wiring::economy::StartSpot`]; PROVISIONAL, REC-260).
     fn with_drops<R>(
         &mut self,
         f: impl FnOnce(
@@ -712,7 +711,7 @@ impl<X: Pending> ObjectView<'_, X> {
             &mut crate::units::hooks::Sim<'_>,
             &mut crate::wiring::economy::DeathDrops,
             &[d2_data::tables::Levels],
-            &mut crate::wiring::economy::NoSpot,
+            &mut crate::wiring::economy::StartSpot,
         ) -> R,
     ) -> Option<R> {
         let mut d = self.v.h.object_drops.take()?;
@@ -729,7 +728,7 @@ impl<X: Pending> ObjectView<'_, X> {
                 &mut sim,
                 &mut d,
                 &t.levels,
-                &mut crate::wiring::economy::NoSpot,
+                &mut crate::wiring::economy::StartSpot,
             )
         };
         self.v.h.object_drops = Some(d);
@@ -1107,9 +1106,8 @@ impl<X: Pending> objects::populate::PopulateWorld for ObjectView<'_, X> {
 /// room" bound).
 impl<X: Pending> ChestWorld for ObjectView<'_, X> {
     /// `0x00585B90` with the operate record (`treasure.md` §4). Without
-    /// the path provider's field the free-spot search finds nothing
-    /// ([`crate::wiring::economy::NoSpot`]): the walk still draws, no item
-    /// is created.
+    /// the path provider's field the free-spot search takes the start spot
+    /// as is ([`crate::wiring::economy::StartSpot`]; PROVISIONAL, REC-260).
     fn chest_drop(&mut self, op: &Operate, q: u8) -> Option<UnitId> {
         let mut d = self.v.h.object_drops.take()?;
         let t = self.tables.clone();
@@ -1125,7 +1123,7 @@ impl<X: Pending> ChestWorld for ObjectView<'_, X> {
                 &mut sim,
                 &mut d,
                 &t.levels,
-                &mut crate::wiring::economy::NoSpot,
+                &mut crate::wiring::economy::StartSpot,
                 op.object,
                 op.operator,
                 q,

@@ -873,7 +873,7 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
             &mut sim,
             &mut d,
             &t.levels,
-            &mut super::NoSpot,
+            &mut super::StartSpot,
             object,
             Some(operator),
             kind,
