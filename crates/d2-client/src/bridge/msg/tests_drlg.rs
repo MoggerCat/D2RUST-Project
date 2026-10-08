@@ -686,6 +686,64 @@ fn near_rooms_come_from_the_client_drlg() {
     assert!(bare.near_rooms(&m.w).is_err());
 }
 
+// Covers: specs/render/draw-order-2.md §15 r2
+#[test]
+fn the_preview_runs_the_sight_test_over_the_client_drlg() {
+    use crate::world_view::model_feed::ModelFeed;
+    use crate::world_view::preview::Preview;
+    use crate::world_view::unit_facts::UnitFactTables;
+    use crate::world_view::ViewFeed;
+    use d2_sim::drlg::collision::bits;
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    m.recv(&assign_monster(6, 46, 20));
+    let mut feed = ModelFeed::new(ZeroFacts)
+        .with_map()
+        .with_preview(Preview::default());
+    feed.levels = Some(vec![LevelRow::default(); 4]);
+    let mut los_draw = vec![false; 4];
+    los_draw[2] = true;
+    feed.set_unit_fact_tables(UnitFactTables {
+        unflat_dead: vec![Some(false)],
+        monster_size: vec![Some(1)],
+        los_draw,
+        ..UnitFactTables::default()
+    });
+    // The facts of the monster through both preview paths (the feed's
+    // `unit_facts` and the near-room build), which must agree.
+    fn hidden(
+        feed: &mut ModelFeed<ZeroFacts>,
+        w: &super::super::world::ClientWorld,
+    ) -> Option<bool> {
+        let monster = &w.units[&UnitKey::new(MONSTER, 6)];
+        let by_feed = feed.unit_facts(w, monster).unwrap().sight_hidden;
+        let near = feed.near_rooms(w).unwrap().unwrap();
+        let in_room = near
+            .rooms
+            .iter()
+            .flat_map(|r| &r.units)
+            .find(|u| u.key == monster.key)
+            .map(|u| u.facts.sight_hidden);
+        assert_eq!(in_room, Some(by_feed));
+        by_feed
+    }
+    // An open line: the monster is seen.
+    assert_eq!(hidden(&mut feed, &m.w), Some(false));
+    // A sight-blocking cell (collision 0x2) on the line hides it in a
+    // `LOSDraw` level (the preview answered "seen" for every unit).
+    let drlg = &mut m.w.drlg.as_mut().unwrap().drlg;
+    *drlg.collision_at_mut(46, 14).unwrap() |= bits::VISIBLE;
+    // The near-room build is per drawn frame.
+    m.w.frames += 1;
+    assert_eq!(hidden(&mut feed, &m.w), Some(true));
+    // `LOSDraw` 0: every unit passes.
+    feed.unit_tables.as_mut().unwrap().los_draw[2] = false;
+    m.w.frames += 1;
+    assert_eq!(hidden(&mut feed, &m.w), Some(false));
+}
+
 fn room_mut(
     near: &mut crate::rules::draw_order::NearRooms,
     k: usize,
