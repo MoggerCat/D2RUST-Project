@@ -5802,6 +5802,13 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Output: `traces/raw/pc2rec-r94-packets.jsonl` + hook log.
 - Compare: the distance at which the hook first returns 1 and whether S→C 0x63 follows the C→S 0x13. Fold: write the range test into §7.1 r3 and drop its PROVISIONAL line.
 
+##### REC-99 [MANUAL] sim/path-placement.md §12.2 (C→S 0x13 on a warp tile, tile unit creation)
+- Priority P1.
+- Settles: sim/path-placement.md §12.2 callers (`0x00548C32`: what the 0x13 tile case checks before `0x005550B0`), `client/model.md` §8 rule 7 (the interact sender lists no tile case; `ui/controls.md` §6 r9.2 sends 0x13 (T, g) for a tile), and where 1.14d allocates the tile units from the type-5 presets (PROVISIONAL: every active room's type-5 presets become tile units once, `View::spawn_warp_tiles` in `crates/d2-sim/src/wiring/action/warp_tile.rs`; the 0x13 tile case is `View::warp_tile_message`, no range test).
+- Steps: `py tools/trace-recorder/record_packets.py --seconds 120` while clicking the Blood Moor cave entrance (Den of Evil) from 1, 3 and 8 subtiles away, once with the walk interrupted by a second click, plus a hook at `0x00548C32`.
+- Output: `traces/raw/pc2rec-r95-packets.jsonl` + hook log.
+- Compare: the C→S 0x13 (type, GUID) the client sends for a tile and when (on arrival or at once); the S→C 0x09 tile units of the room at join; the result of the warp (S→C 0x07, 0x15, 0x0D). Fold: write the tile case into §12.2 and drop the PROVISIONAL lines.
+
 ##### REC-50 [NO RUN] client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14
 - Priority P2.
 - Settles: client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14 r3 / OQ10 (reader of pet record +0x1C).

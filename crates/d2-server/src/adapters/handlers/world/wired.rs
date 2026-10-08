@@ -623,6 +623,17 @@ where
         out
     }
 
+    /// The 0x13 tile case on the action wiring (REC-99).
+    fn warp_tile(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        player: UnitId,
+        guid: u32,
+    ) -> Option<u32> {
+        WorldHost::<D>::warp_tile(&mut self.action, game, events, player, guid)
+    }
+
     /// The tick with this world's quest parts lent to the action hooks
     /// ([`WiredWorld::lend_quests`]): quest object inits run inside their
     /// allocation and object event 7 inside its timer event, in the tick

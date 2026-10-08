@@ -102,7 +102,7 @@ use d2_sim::drlg::maze::{Maze, MazeData};
 use d2_sim::drlg::room::LinkAt;
 use d2_sim::drlg::{
     CellGrid, Drlg, DrlgData, DrlgError, DrlgRoomId, Dungeon, GridPass, LevelDef, LevelIdx,
-    LevelTypes, RoomGrids, RoomKind, TileInfo, TileRect, TileSource,
+    LevelTypes, PresetUnit, RoomGrids, RoomKind, TileInfo, TileRect, TileSource, WarpDef,
 };
 use d2_sim::game::Game;
 use d2_sim::items::inventory::tables::InvTables;
@@ -154,6 +154,16 @@ pub const ACT1_TOWN: u32 = 1;
 /// The Blood Moor (act 0), east of the synthetic town's room.
 pub const BLOOD_MOOR: u32 = 2;
 pub const COLD_PLAINS: u32 = 3;
+/// The Den of Evil (act 0): the cave entrance in the Blood Moor is a
+/// level warp ([`BLOOD_MOOR_TO_DEN`] / [`DEN_TO_BLOOD_MOOR`]).
+pub const DEN_OF_EVIL: u32 = 8;
+/// The `lvlwarp` `Id` (and tile class) of the Blood Moor's cave entrance
+/// and of the Den's way back (synthetic rows 0 and 1).
+pub const BLOOD_MOOR_TO_DEN: u32 = 11;
+pub const DEN_TO_BLOOD_MOOR: u32 = 12;
+/// Sub-tile of a warp tile in its room (the 40 × 40 sub-tile room's
+/// middle) and the synthetic walk-out.
+pub const WARP_TILE_XY: i32 = 20;
 pub const ACT2_TOWN: u32 = 40;
 /// The default game seed.
 pub const DEFAULT_SEED: u32 = 1234;
@@ -534,9 +544,32 @@ impl LevelTypes for Types {
             if id == ACT1_TOWN || id == BLOOD_MOOR {
                 drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
             }
+            // The cave entrance pair: Blood Moor slot 1 ↔ Den slot 0.
+            if id == BLOOD_MOOR {
+                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0 << 1;
+            }
+            if id == DEN_OF_EVIL {
+                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
+            }
             drlg.link_room(r, LinkAt::Tail);
         }
         Ok(())
+    }
+    /// The warp tiles of the cave entrance pair (`path-placement.md`
+    /// §12.1 rule 3 shape: unit type 5, class = the lvlwarp `Id`, room
+    /// sub-tiles). d2rs-own, unverified.
+    fn preset_units(&self, drlg: &Drlg, room: DrlgRoomId) -> Vec<PresetUnit> {
+        let class = match drlg.level(drlg.room(room).level).id {
+            BLOOD_MOOR => BLOOD_MOOR_TO_DEN,
+            DEN_OF_EVIL => DEN_TO_BLOOD_MOOR,
+            _ => return Vec::new(),
+        };
+        vec![PresetUnit {
+            unit_type: 5,
+            class,
+            x: WARP_TILE_XY,
+            y: WARP_TILE_XY,
+        }]
     }
     fn room_grids(
         &mut self,
@@ -869,7 +902,7 @@ fn synthetic_drlg_data() -> DrlgData {
     let mut files = vec![Vec::new(); 32];
     files[0] = b"floor.dt1".to_vec();
     drlg.lvltypes = vec![vec![Vec::new(); 32], files];
-    for id in [ACT1_TOWN, BLOOD_MOOR, COLD_PLAINS, ACT2_TOWN] {
+    for id in [ACT1_TOWN, BLOOD_MOOR, COLD_PLAINS, DEN_OF_EVIL, ACT2_TOWN] {
         drlg.levels[id as usize].drlg_type = 2;
         drlg.levels[id as usize].level_type = 1;
     }
@@ -878,6 +911,22 @@ fn synthetic_drlg_data() -> DrlgData {
     // flag WARP_0 ([`Types`]).
     drlg.levels[ACT1_TOWN as usize].vis[0] = BLOOD_MOOR;
     drlg.levels[BLOOD_MOOR as usize].vis[0] = ACT1_TOWN;
+    // The cave entrance: a warp pair (lvlwarp rows 0 and 1) in slot 1 of
+    // the Blood Moor and slot 0 of the Den (`rooms.md` §3.3).
+    drlg.levels[BLOOD_MOOR as usize].vis[1] = DEN_OF_EVIL;
+    drlg.levels[BLOOD_MOOR as usize].warp[1] = BLOOD_MOOR_TO_DEN as i32;
+    drlg.levels[DEN_OF_EVIL as usize].vis[0] = BLOOD_MOOR;
+    drlg.levels[DEN_OF_EVIL as usize].warp[0] = DEN_TO_BLOOD_MOOR as i32;
+    drlg.warps = [BLOOD_MOOR_TO_DEN, DEN_TO_BLOOD_MOOR]
+        .iter()
+        .map(|&id| WarpDef {
+            id: id as i32,
+            direction: b'b',
+            ..WarpDef::default()
+        })
+        .collect();
+    // ExitWalkX/Y per row: the walk-out after the arrival.
+    drlg.warp_exits = vec![(0, 0), (3, 3)];
     drlg
 }
 
@@ -890,6 +939,7 @@ fn synthetic_types() -> Types {
         (ACT1_TOWN, TileRect::new(16, 0, 8, 8)),
         (BLOOD_MOOR, TileRect::new(24, 0, 8, 8)),
         (COLD_PLAINS, TileRect::new(0, 0, 8, 8)),
+        (DEN_OF_EVIL, TileRect::new(0, 8, 8, 8)),
         (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
     ]))
 }

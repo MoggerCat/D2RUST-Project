@@ -200,11 +200,14 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // update pass (`client/model.md` §4, §5); nothing is unowned
     // (`client/bridge.md` §6 rule 3).
     // (Plus the room switch's 0x07 for the Blood Moor room bordering
-    // the synthetic town: 19.)
-    assert_eq!(joined, 19);
+    // the synthetic town: 19; plus its cave entrance's 0x09, a level
+    // warp tile unit, `path-placement.md` §12.1: 20.)
+    assert_eq!(joined, 20);
     // Plus two for the Blood Moor room bordering the synthetic town: its
     // 0x07 at the join and its 0x08 when the travel leaves the town.
-    assert_eq!((b.log().handled, b.log().queued), (25, 1));
+    // Plus two for that room's cave entrance (a tile unit): its 0x09 at
+    // the join and its removal when the travel leaves the town.
+    assert_eq!((b.log().handled, b.log().queued), (27, 1));
     assert!(b.log().unowned.is_empty(), "{:?}", b.log().unowned);
     assert!(b.log().dropped.is_empty(), "{:?}", b.log().dropped);
     let sight: Vec<_> = b
