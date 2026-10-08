@@ -968,6 +968,12 @@ impl WorldPending for LocalSeams {
             self.monster_quest_chain(unit, synthetic_act4::IZUAL_CHAIN);
         }
     }
+    /// Duriel acts from the world (q-a2-duriel-ai, REC-254): the Lair's
+    /// population starts his AI as monster creation does. d2rs-own,
+    /// unverified.
+    fn host_monster_ai(&self, class: u32) -> bool {
+        class == synthetic_act2::DURIEL_CLASS
+    }
 }
 
 impl Outbox for LocalSeams {
