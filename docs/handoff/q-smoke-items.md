@@ -38,33 +38,24 @@ Steps covered:
 
 ## Breaks found and fixed
 
-Breaks 1 to 4 are in one commit, `Ground items reach the client`,
-because all of them are needed before a drop shows up and they share
-files. Break 5 has its own commit.
+The staging merge (q-chest-drops, REC-260) brought its own ground-item
+announcement (`update_pass` announces each ground item once per client)
+and the chests' `StartSpot`. This branch keeps that one implementation
+and adds what it lacked:
 
-1. **Ground items were never sent to the client.** The per-unit update
-   and the add messages skipped items: "the item world is not reachable
-   from the action wiring". So drops, chest loot and dropped items were
-   invisible.
-   - The action wiring now queues (receiver, item, 0x9C action) on
-     `ActionHooks::item_updates`.
-   - The server's item update pass builds those messages on the desk
-     (`items::moves::item_world_action`).
-2. **Dropped treasure had no position** when the game has no walk-back
+1. **Dropped treasure had no position** when the game has no walk-back
    field.
    - `Spots::placed` now always puts the item at its spot.
    - The inventory model's new item data reads the path position
      (`LifecycleHooks::path_xy`).
-3. **An item dropped from the cursor was never re-announced.** The
-   desk's item mode set neither set unit flag 0x1 nor queued the unit,
-   so §6.3 part 2 never fired. It now does both.
-4. **Picked-up gold stayed on the client's ground.** Nothing sent
+2. **An item dropped from the cursor was never re-announced.** It had
+   been announced once already. The pass now forgets an announced item
+   once it has no room (picked up or freed), so it is announced again
+   when it lands.
+3. **Picked-up gold stayed on the client's ground.** Nothing sent
    removals: `send_removed_units` was a no-op. Freed ground items are
    now recorded and sent as S→C 0x0A, and tick step 7 frees the
    records.
-5. **Chests dropped nothing in the play host.** `NoSpot` was used
-   without the walk-back field. They now use `StartSpot`, as monster
-   drops already did (REC-108).
 
 Synthetic data, not code breaks:
 
@@ -78,19 +69,12 @@ Synthetic data, not code breaks:
 
 ### Expectations changed
 
-These follow the spec (`inventory-moves.md` §6.3: one ground message per
-tick in which the item changed). Each test had encoded the missing
-message, several with a comment saying it was not wired:
-
-- `d2-server` `moves/tests.rs` (6 tests);
-- `prop_unified_items.rs`: the host settles one tick, and the pass
-  check ignores the §6.3 actions 0 / 2 / 3, which no dispatcher row
-  sends;
 - `d2-sim` `death.rs` `without_the_field_the_drop_keeps_the_free_spot_seam`:
-  the item is now placed;
-- `e2e_single_player.rs` and `e2e_full_loop.rs`: the join's ring add,
-  the gold pile add and removal, the cap drop, a room add during a walk,
-  and the handled counts.
+  the item is now placed at its spot.
+- `e2e_full_loop.rs`: the picked gold pile's removal 0x0A, and the
+  handled count.
+- `app_play_objects.rs`: the synthetic chest now drops the smoke chest
+  class (six items) instead of REC-260's one hammer.
 
 ## Still broken or not covered
 
@@ -105,6 +89,8 @@ message, several with a comment saying it was not wired:
 - **Ground item positions live in two places.** The desk keeps them in
   the item data, while the path record keeps the drop spot. After a
   cursor drop the path is stale.
+- **Only one ground message per landing.** 1.14d sends §6.3 part 2 in
+  every tick in which the item changed.
 - **Not reached in the time box:**
   - equip / unequip / weapon swap (W) with requirements;
   - socketing;

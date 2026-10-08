@@ -385,21 +385,6 @@ impl<X: Pending> TickHooks for ActionSim<X> {
                 }
             }
         }
-        // `inventory-moves.md` §6.3 part 2 (`0x0055BF30` / `0x0055BED0`):
-        // an announced item with unit flag 0x1 in mode 3 sends 0x9C
-        // action 2 (unit flag 0x1000) or 3, built by the host
-        // (`ActionHooks::item_updates`).
-        if let (Some(p), None) = (receiver, new) {
-            if let Some(r) = v.units.get(unit).filter(|r| {
-                r.ty == UnitType::Item
-                    && r.flags & crate::units::record::flags::CHANGED != 0
-                    && r.mode == u32::from(crate::items::moves::mode::GROUND)
-            }) {
-                let dropped = r.flags & crate::items::moves::uflag::DROPPED != 0;
-                v.h.item_updates
-                    .push((p, unit, if dropped { 2 } else { 3 }));
-            }
-        }
         // §3.5 rule 6 / §7.3 rule 2 step 8: the changed-state messages of
         // a unit that is not new to the client.
         if let (Some(p), None) = (receiver, new) {

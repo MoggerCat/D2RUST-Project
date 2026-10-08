@@ -470,6 +470,11 @@ impl<L: ServerLink> Bridge<L> {
         &self.world
     }
 
+    /// The client `skills` row of `skill`, when the tables have one.
+    pub fn skill_row(&self, skill: u16) -> Option<world::SkillRow> {
+        self.inputs.tables.skills.get(usize::from(skill)).copied()
+    }
+
     /// The play preview's monster motion on the model (d2rs-own,
     /// unverified; [`motion`]).
     pub fn preview_motion(&mut self, m: &mut motion::MonsterMotion) {

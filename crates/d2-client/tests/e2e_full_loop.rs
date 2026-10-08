@@ -1753,26 +1753,10 @@ fn walk(fx: &mut Fx, frames: &mut Vec<Frame>, msg: Vec<u8>, max: usize) -> Vec<(
             assert!(f.1.codes.is_empty());
         }
         let now = fx.sim_ref().game.frame;
-        // The add messages of the ground items of the rooms the walk
-        // brings in (`intents-events.md` §7.8 rule 2 → `inventory-moves.md`
-        // §6.3 part 1: 0x9C action 0; REC-281): each names an item on the
-        // ground.
-        let (adds, rest): (Vec<Vec<u8>>, Vec<Vec<u8>>) =
-            f.2.iter().cloned().partition(|m| m[0] == 0x9C && m[1] == 0);
-        for m in &adds {
-            let g = u32::from_le_bytes(m[4..8].try_into().unwrap());
-            let u = fx
-                .sim_ref()
-                .game
-                .lists
-                .find_unit(UnitType::Item, g)
-                .expect("an item");
-            assert_eq!(fx.mode(u), 3, "walk frame {i}: item {g} on the ground");
-        }
         match fx.due.take() {
-            Some((at, m)) if at == now => assert_eq!(rest, vec![m], "walk frame {i}"),
+            Some((at, m)) if at == now => assert_eq!(f.2, vec![m], "walk frame {i}"),
             due => {
-                assert!(rest.is_empty(), "walk frame {i}: {rest:?}");
+                assert!(f.2.is_empty(), "walk frame {i}: {:?}", f.2);
                 fx.due = due;
             }
         }
@@ -2029,9 +2013,10 @@ fn run_with(game_seed: u32) -> Transcript {
     // §7.4 rule 7): S→C 0x69 code 8 at the path target ((0, 0): the
     // monster's path never had a target), d = the path direction, e =
     // unit +0xB0 (`Pending::unit_b0`'s default 0). No other S→C so far
-    // but the join's 0x07s (frame 2): the missile's unit-add message
-    // belongs to the per-unit update `0x0053A500`, which the tick wiring
-    // does not run for it yet.
+    // but the join's 0x07s (frame 2): the unit-add / ground messages of
+    // the missile and the drop belong to the per-unit update
+    // `0x0053A500`, which the tick wiring does not run for them yet
+    // (`inventory-moves.md` §6.3; IS2).
     let md = fx.path(monster);
     let mguid = fx.guid(monster);
     let mut code8 = vec![0x69];
@@ -2049,17 +2034,7 @@ fn run_with(game_seed: u32) -> Transcript {
         let rest: Vec<_> = f.2.iter().filter(|m| m[0] != 0x4D).cloned().collect();
         assert_eq!(rest, none, "no S→C up to the hit but the 0x4D echo");
     }
-    // Then the gold pile's add message, 0x9C action 0 (a new ground item,
-    // `inventory-moves.md` §6.3 part 1; built by the host's item pass
-    // after the tick's unit messages, REC-281).
-    assert_eq!(hit.2.len(), 2, "{:?}", hit.2);
-    assert_eq!(hit.2[0], code8, "0x69 code 8 in the hit's frame");
-    let pile = &hit.2[1];
-    assert_eq!(
-        (pile[0], pile[1], usize::from(pile[2])),
-        (0x9C, 0, pile.len())
-    );
-    assert_eq!(pile[4..8], drops[0].0.to_le_bytes());
+    assert_eq!(hit.2, vec![code8], "0x69 code 8 in the hit's frame");
     // The death end: event 1 of the 4-frame DT animation (f_hit + 4)
     // sets mode 12 (`0x005A72B0`, §7.7 rule 3), whose 0x69 code 9 at the
     // monster's cell with e = 0 goes out in that tick (during the run of
@@ -2583,10 +2558,8 @@ fn run_with(game_seed: u32) -> Transcript {
     // its unit (`model.md` §4) and never drained in this staged game.
     assert!(log.unowned.is_empty(), "{:?}", log.unowned);
     // + the trade open's 0x9C action 11, one per store item.
-    // + the ground items' messages (`inventory-moves.md` §6.3, REC-281):
-    // the gold pile's add (0x9C action 0) and removal (0x0A), the add
-    // of the ground item of a room the walk brings in.
-    assert_eq!(log.handled, 28 + store.len() as u64);
+    // + the picked gold pile's removal 0x0A (REC-281).
+    assert_eq!(log.handled, 26 + store.len() as u64);
     assert_eq!(
         log.dropped,
         // + the player's own 0x4D echo (REC-95), dropped like 0x0D.

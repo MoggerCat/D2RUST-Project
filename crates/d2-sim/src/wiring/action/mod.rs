@@ -218,11 +218,6 @@ pub struct ActionHooks<X> {
     /// player, destination level, argument), for the host that runs them
     /// (`wiring::path::act_change`) after the call.
     pub act_changes: Vec<(UnitId, u32, u32)>,
-    /// The ground-item messages of the per-unit update
-    /// (`inventory-moves.md` §6.3: receiver, item, 0x9C action), queued
-    /// for the host that holds the item world, which builds them
-    /// ([`LifecycleHooks::take_item_updates`]).
-    pub item_updates: Vec<(UnitId, UnitId, u8)>,
     /// The removal records of freed ground items (GUID, room): sent as
     /// S→C 0x0A by the per-client update's removals (`tick.md` §6 rule
     /// 5, `0x0053A770`) and freed by tick step 7. PROVISIONAL (REC-281):
@@ -322,6 +317,10 @@ pub struct ActionHooks<X> {
     /// Scratch seed handed out for a unit without a record (an error is
     /// logged with it).
     pub orphan_seed: Seed,
+    /// Lists freed with a remove callback by the stat lists (unit, state,
+    /// callback id), taken by [`UnitHooks::lists_expired`] after the
+    /// expiry walk (`units.rs`).
+    pub removed_lists: Vec<(UnitId, u32, u32)>,
     pub errors: Vec<WiringError>,
 }
 
@@ -370,7 +369,6 @@ impl<X> ActionHooks<X> {
             owner_deaths: None,
             hireling_calls: None,
             act_changes: Vec::new(),
-            item_updates: Vec::new(),
             removed_items: Vec::new(),
             anim_data: None,
             vitals: None,
@@ -395,6 +393,7 @@ impl<X> ActionHooks<X> {
             inactive: None,
             x,
             orphan_seed: Seed::init(),
+            removed_lists: Vec::new(),
             errors: Vec::new(),
         }
     }

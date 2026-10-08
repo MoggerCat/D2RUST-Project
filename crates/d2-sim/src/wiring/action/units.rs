@@ -17,8 +17,9 @@ use crate::game::Game;
 use crate::missiles;
 use crate::monsters::ai;
 use crate::rng::Seed;
+use crate::stats::lists::RemoveCallback;
 use crate::stats::states::state;
-use crate::stats::{ListId, StatHost};
+use crate::stats::{ListId, StatHost, StatLists};
 use crate::tick::events::event;
 use crate::units::hooks::{Sim, UnitHooks};
 use crate::units::lifecycle::{AllocRequest, LifecycleHooks};
@@ -36,7 +37,24 @@ pub const STATE_JUSTHIT: u16 = 86;
 /// State 92 (`death_delay`), cleared for players by `0x005544B0`.
 pub const STATE_DEATH_DELAY: u16 = 92;
 
-impl<X: Pending> StatHost for ActionHooks<X> {}
+impl<X: Pending> StatHost for ActionHooks<X> {
+    /// §8.2 rule 6: queue the callbacks this wiring runs after the expiry
+    /// walk ([`UnitHooks::lists_expired`]): the default one and the shrine
+    /// ones. The others are run by their skill bodies.
+    fn list_removed(
+        &mut self,
+        _lists: &mut StatLists,
+        unit: UnitId,
+        state: u32,
+        _list: ListId,
+        callback: RemoveCallback,
+    ) {
+        use crate::world::objects::shrines::{SKILL_REMOVE, STAMINA_REMOVE};
+        if matches!(callback.0, 0x0056_E900 | SKILL_REMOVE | STAMINA_REMOVE) {
+            self.removed_lists.push((unit, state, callback.0));
+        }
+    }
+}
 
 impl<X: Pending> ActionHooks<X> {
     /// `0x0066A9B0` (`animdata.md` §5): the record of the COF name the
@@ -76,6 +94,30 @@ pub fn anim_record(r: &d2_formats::animdata::AnimRecord) -> AnimRecord {
 }
 
 impl<X: Pending> UnitHooks for ActionHooks<X> {
+    /// Runs the queued remove callbacks of the lists the expiry walk
+    /// freed (`stat-lists.md` §8.2 rule 6, `skills/bodies.md` §2.8).
+    // PROVISIONAL (REC-263; d2rs-own, unverified): the bodies of the shrine
+    // callbacks `0x00583BD0` / `0x00583A40` are unwritten. Each runs the
+    // default (state off) and the stamina one also clamps stamina to its
+    // maximum (the shrine set stamina to 2v on the list); the skill one's
+    // skill refresh has nothing to refresh here (levels read the stat).
+    fn lists_expired(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
+        use crate::world::objects::shrines::STAMINA_REMOVE;
+        for (u, state, cb) in std::mem::take(&mut self.removed_lists) {
+            let t = sim.stats.toggle_state(u, state, false);
+            if let (Some(d), Some(r)) = (t.disguise, sim.units.get_mut(u)) {
+                if d {
+                    r.flags2 |= flags2::DISGUISE;
+                } else {
+                    r.flags2 &= !flags2::DISGUISE;
+                }
+            }
+            if cb == STAMINA_REMOVE {
+                sim.stats.clamp_to_max(self, u);
+            }
+        }
+        let _ = unit;
+    }
     /// `0x00580EC0`: the death penalties at `0x00580F59`
     /// (`vitals.md` §4.6, [`super::death`]).
     fn player_death(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
@@ -328,9 +370,6 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
 impl<X: Pending> LifecycleHooks for ActionHooks<X> {
     fn request_act_change(&mut self, player: UnitId, level: u32, arg: u32) {
         self.act_changes.push((player, level, arg));
-    }
-    fn take_item_updates(&mut self) -> Vec<(UnitId, UnitId, u8)> {
-        std::mem::take(&mut self.item_updates)
     }
     fn path_xy(&self, unit: UnitId) -> Option<(i32, i32)> {
         self.path_has(unit).then(|| self.path_position(unit))

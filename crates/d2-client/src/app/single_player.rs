@@ -139,8 +139,8 @@ use super::rest::AppRest;
 use super::server_thread::{ThreadLink, ThreadStopped};
 use super::skill_rest::SkillStore;
 use super::{
-    synthetic_act2, synthetic_act4, synthetic_act5, synthetic_burial, synthetic_chains,
-    synthetic_maze, synthetic_tower,
+    synthetic_a1_maze, synthetic_act2, synthetic_act4, synthetic_act5, synthetic_burial,
+    synthetic_chains, synthetic_maze, synthetic_tower,
 };
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
@@ -940,6 +940,22 @@ impl Pending for LocalSeams {
             .is_some_and(|s| s.0 == UnitType::Monster);
         self.monsters.used_skill(unit, monster)
     }
+    // d2rs-own, unverified (preview, q-a2-charge-jab; REC-274): a monster
+    // has no skill list, so its used entry's flags and params (Charge's
+    // moving flag, target and hit mode, `skills/bodies-2.md` §5.3) are
+    // kept per unit in the skill store.
+    fn entry_param(&self, unit: UnitId, _: &d2_sim::skills::SkillEntry, i: u8) -> i32 {
+        self.unit_entry_param(unit, i)
+    }
+    fn set_entry_param_of(&mut self, unit: UnitId, _: &d2_sim::skills::SkillEntry, i: u8, v: i32) {
+        self.set_unit_entry_param(unit, i, v);
+    }
+    fn entry_flags(&self, unit: UnitId, _: &d2_sim::skills::SkillEntry) -> u32 {
+        d2_sim::wiring::interaction::UseRest::used_skill_flags(self, unit)
+    }
+    fn set_entry_flags(&mut self, unit: UnitId, _: &d2_sim::skills::SkillEntry, f: u32) {
+        d2_sim::wiring::interaction::UseRest::set_used_skill_flags(self, unit, f);
+    }
     /// d2rs-own, unverified (preview, D1; `0x00622870`).
     fn melee_range(&self, _: UnitId) -> i32 {
         PREVIEW_MELEE_RANGE
@@ -1673,6 +1689,9 @@ fn synthetic_drlg_data() -> DrlgData {
         c.vis[0] = DEN_OF_EVIL;
         c.warp[0] = synthetic_maze::CAVE_TO_DEN as i32;
     }
+    // The tree dungeons built by the maze generator (q-dungeon-builds);
+    // their vis / warp slots come from the tree below.
+    synthetic_a1_maze::add_levels(&mut drlg);
     drlg.levels[DEN_OF_EVIL as usize].vis[1] = synthetic_maze::CAVE_LEVEL_1;
     drlg.levels[DEN_OF_EVIL as usize].warp[1] = synthetic_maze::DEN_TO_CAVE as i32;
     // The town and the Blood Moor see each other through vis slot 0, a
@@ -1918,6 +1937,8 @@ pub fn client_level_rows(data: &GameData) -> Vec<LevelRow> {
             blank_screen: l.blankscreen != 0,
             sound_env: l.soundenv,
             draw_edges: l.drawedges != 0,
+            rain: l.rain != 0,
+            mud: l.mud != 0,
         })
         .collect()
 }
@@ -2844,6 +2865,23 @@ pub fn build_with_town(
                 .ok_or_else(|| {
                     BuildError::Setup("allocating the Act III waypoint failed".into())
                 })?;
+            // Its NPCs (`town_npcs::act3_docks`; q-smoke-town, REC-278).
+            for (class, (dx, dy)) in super::town_npcs::act3_docks() {
+                let req = AllocRequest {
+                    ty: UnitType::Monster,
+                    class: u32::from(class),
+                    room: Some(room3),
+                    add: true,
+                    fixed_guid: None,
+                    mode: 1,
+                    allied: true,
+                };
+                sim.action
+                    .with(&mut game, |g, v| {
+                        v.allocate(g, &req, rect3.x * 5 + dx, rect3.y * 5 + dy)
+                    })
+                    .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
+            }
         }
     }
     let interact_classes: Vec<u16> = parts
@@ -2892,6 +2930,7 @@ pub fn build_with_town(
     // reward path yet.
     world.start_extra = vec![*b"box "];
     let mut s: Sim = SimGame::with_world(game, sim, world);
+    s.announce_ground = true;
     s.set_host_sync(sync_seams);
     s.set_world_sync(super::weapons::sync);
     // The session sequence (`intents-events.md` §8) runs on the client's

@@ -16,6 +16,7 @@
 pub mod background;
 pub mod edges;
 pub mod sight;
+pub mod sky;
 pub mod source;
 pub mod weather;
 

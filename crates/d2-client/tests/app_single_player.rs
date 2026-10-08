@@ -362,6 +362,9 @@ fn game_creation_derives_the_four_controls_in_order_before_the_first_unit() {
         want.step(); // the Fortress's NPCs and its waypoint (d2rs-own, q-a4)
     }
     want.step(); // Kurast Docks's waypoint (q-act3-act5-gaps, d2rs-own)
+    for _ in d2_client::app::town_npcs::act3_docks() {
+        want.step(); // Kurast Docks's NPCs (q-smoke-town, d2rs-own)
+    }
     let h = g.sim.events.action.hooks();
     assert_eq!(h.game_seed, want);
     assert_eq!(h.objects.as_ref().map(|o| o.obj_seed), Some(obj_seed));

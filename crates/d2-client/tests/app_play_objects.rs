@@ -194,7 +194,9 @@ fn clicking_an_object_walks_to_it_and_operates_it() {
     // local check covers it, docs/handoff/stitch-objects.md.)
     let (link, _started) = single_player::start_with_chests(
         data.clone(),
-        single_player::DEFAULT_SEED,
+        // A seed whose chest roll drops (`objects.md` §8.1 rule 5: 25% of
+        // plain chests are empty).
+        single_player::DEFAULT_SEED + 1,
         character.clone(),
         StepClock(ms.clone()),
         vec![(single_player::WAYPOINT_X + 8, single_player::UNIT_Y + 3)],
@@ -326,4 +328,14 @@ fn clicking_an_object_walks_to_it_and_operates_it() {
         mode, mode0,
         "the server operated the chest (S→C 0x0E: opening)"
     );
+    // The chest's drop (`treasure.md` §4, §7; REC-260): the opened chest's
+    // item lies on the floor and the client heard it (0x9C ground item).
+    // The synthetic chest's class is the item smoke test's (REC-281):
+    // one pick of each entry, in order.
+    let ground = d2_client::bridge::items::ground_items(w);
+    let mut codes: Vec<[u8; 4]> = ground.iter().filter_map(|i| i.code).collect();
+    codes.sort();
+    let mut want = [*b"axe ", *b"hp1 ", *b"isc ", *b"tsc ", *b"cm1 ", *b"gsv "];
+    want.sort();
+    assert_eq!(codes, want, "the chest dropped its items on the floor");
 }

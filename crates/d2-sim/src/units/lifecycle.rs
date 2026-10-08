@@ -53,13 +53,6 @@ pub trait LifecycleHooks: UnitHooks {
     /// it right after the call; the default drops it.
     fn request_act_change(&mut self, player: UnitId, level: u32, arg: u32) {}
 
-    /// The ground-item messages the per-unit update asked for
-    /// (`items/inventory-moves.md` §6.3: receiver, item, 0x9C action),
-    /// taken by the host that builds item messages. The default has none.
-    fn take_item_updates(&mut self) -> Vec<(UnitId, UnitId, u8)> {
-        Vec::new()
-    }
-
     /// The unit's path position (static path +0x0C / +0x10), when it has
     /// a path: a ground item placed by the path code (a treasure drop)
     /// has its position there before the inventory model knows the item.

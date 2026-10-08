@@ -34,6 +34,8 @@ use crate::rules::{MapTile, OpenMode, UnitPosition, ViewSource};
 use super::feed::{NoFeed, RunningShake, ViewFeed};
 use super::near_rooms::MapState;
 use super::preview::{self, Preview};
+use super::unit_facts::{self, UnitFactTables};
+use super::weather_view::WeatherView;
 use super::{UnitPose, ViewAssets, ViewError};
 
 /// The 16.16 position of a dynamic path at the centre of cell `c`
@@ -70,12 +72,11 @@ pub fn unit_position(unit: &ClientUnit) -> Result<UnitPosition, String> {
 pub const PENDING: &[(&str, &str)] = &[
     (
         "ViewFeed::near_rooms (room unit facts)",
-        "the near rooms are built from the client DRLG (`ModelFeed::with_map`, `near_rooms.rs`: \
-         rooms, tile records with roof height and height, coordinate records, persisted fades, \
-         the room unit lists in the client's order with the fill's Y sort written back), but a \
-         listed unit's flags (+0xC4), flag-ex (+0xC8), monstats2 `unflatDead`, objects \
-         `DrawUnder`, states 7 / 143 / 146 and the sight test (`draw-order-2.md` §15) are not in \
-         the model (`ViewFeed::unit_facts` refuses)",
+        "the unit facts come from the model (`unit_facts.rs`: flags, flag-ex, states 7 / 143 / 146, \
+         `unflatDead`, `DrawUnder`, the `LOSDraw` gate) once `unit_tables` is set; without the \
+         tables `ViewFeed::unit_facts` refuses; the sight test runs over the client DRLG's collision \
+         grids and stays `None` where it cannot be placed (no DRLG, no local room, a class without \
+         a size row; PROVISIONAL REC-273)",
     ),
     (
         "ViewFeed::tile_art, ViewSource::tile_blocks",
@@ -85,15 +86,18 @@ pub const PENDING: &[(&str, &str)] = &[
     ),
     (
         "ViewFeed::light",
-        "the light map needs the act environment (S→C 0x53 has no client handler), light \
-         records and the per-unit look inputs (fade, ghostly, hover, items, remaps); none is in \
-         the model (the record list `ClientWorld::lights` exists and the act room callback runs \
-         over it, but no unit code creates records)",
+        "the app wires the light in the preview (`preview_light`: S→C 0x53 environment, the \
+         player and `light_sources` records; \
+         `preview_light::tests::the_model_feed_states_the_light_unless_fullbright`); the \
+         per-unit look inputs (fade, ghostly, hover, items, remaps) are not in the model, and \
+         no unit code creates records in `ClientWorld::lights`",
     ),
     (
-        "ViewFeed::weather_frame",
-        "the player's level is known now (`model.md` §11 r5), but no water floor is drawn \
-         without tile art (above) and passes 4 / 9 have no art path yet",
+        "ViewFeed::weather_frame, ViewFeed::sky_items (strict path)",
+        "the strict feed lends no weather state: the weather frame, the water floor and the art of \
+         passes 4 / 9 are the play preview's (`ModelFeed::weather`, `weather_view.rs`: the seed, \
+         update count, day period, video mode and frame rate are `d2rs-own, unverified` fills); \
+         lightning is never started (`draw-order-2.md` open question 4)",
     ),
     (
         "ViewFeed::player_seed, ViewFeed::shake",
@@ -124,6 +128,15 @@ pub struct ModelFeed<F = NoFeed> {
     /// The local player's predicted 16.16 position (decision D2,
     /// `bridge::predict`); read only with a [`Preview`].
     pub local_at: Option<(UnitKey, (u32, u32))>,
+    /// The table columns of the unit facts (`unit_facts`); `None`: the
+    /// facts the model needs them for refuse.
+    pub unit_tables: Option<UnitFactTables>,
+    /// The skill-move draw offsets of the preview (`skill_motion`).
+    pub motion_offsets: std::collections::BTreeMap<UnitKey, (i32, i32)>,
+    /// The play preview's weather (`weather_view`, `d2rs-own,
+    /// unverified`): water floors keep their bit, passes 4 and 9 draw.
+    /// `None`: no weather state.
+    pub weather: Option<WeatherView>,
 }
 
 impl<F> ModelFeed<F> {
@@ -135,7 +148,16 @@ impl<F> ModelFeed<F> {
             map: None,
             preview: None,
             local_at: None,
+            unit_tables: None,
+            motion_offsets: Default::default(),
+            weather: None,
         }
+    }
+
+    /// The feed with the preview's weather (`weather_view`).
+    pub fn with_weather(mut self, weather: WeatherView) -> Self {
+        self.weather = Some(weather);
+        self
     }
 
     /// The feed with the map and the play preview's fills
@@ -176,7 +198,13 @@ impl<F: ViewSource> ViewSource for ModelFeed<F> {
     /// feed's.
     fn unit_offset(&self, unit: &ClientUnit, pose: &UnitPose) -> Result<(i32, i32), String> {
         if self.preview.is_some() {
-            return Ok(preview::unit_offset());
+            let (x, y) = preview::unit_offset();
+            let (mx, my) = self
+                .motion_offsets
+                .get(&unit.key)
+                .copied()
+                .unwrap_or((0, 0));
+            return Ok((x + mx, y + my));
         }
         self.inner.unit_offset(unit, pose)
     }
@@ -231,6 +259,14 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
 
     fn set_local_prediction(&mut self, at: Option<(UnitKey, (u32, u32))>) {
         self.local_at = at;
+    }
+
+    fn set_unit_fact_tables(&mut self, tables: UnitFactTables) {
+        self.unit_tables = Some(tables);
+    }
+
+    fn set_motion_offsets(&mut self, offsets: std::collections::BTreeMap<UnitKey, (i32, i32)>) {
+        self.motion_offsets = offsets;
     }
 
     fn set_hover(&mut self, unit: Option<UnitKey>) {
@@ -296,6 +332,8 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
             levels,
             map,
             preview,
+            unit_tables,
+            weather,
             ..
         } = self;
         let Some(map) = map.as_mut() else {
@@ -303,7 +341,11 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
         };
         let Some(preview) = preview.as_ref() else {
             let inner = &*inner;
+            let tables = unit_tables.as_ref();
             return map.near_rooms(world, levels.as_deref(), |u| {
+                if let Some(t) = tables {
+                    return unit_facts::model_facts(world, u, t, levels.as_deref());
+                }
                 Ok(UnitFacts {
                     unit_type: u.key.unit_type,
                     mode: u.mode,
@@ -313,10 +355,16 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
             });
         };
         match map.near_rooms(world, levels.as_deref(), |u| {
-            Ok(preview::unit_facts(world, u))
+            let mut f = preview::unit_facts(world, u);
+            if let Some(t) = unit_tables.as_ref() {
+                unit_facts::fill_model(&mut f, u, t)?;
+            }
+            Ok(f)
         }) {
             Ok(Some(near)) => {
-                preview::dry_floors(near);
+                if weather.is_none() {
+                    preview::dry_floors(near);
+                }
                 Ok(Some(near))
             }
             Ok(None) => Ok(None),
@@ -329,7 +377,14 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
 
     fn unit_facts(&self, world: &ClientWorld, unit: &ClientUnit) -> Result<UnitFacts, ViewError> {
         if self.preview.is_some() {
-            return Ok(preview::unit_facts(world, unit));
+            let mut f = preview::unit_facts(world, unit);
+            if let Some(t) = &self.unit_tables {
+                unit_facts::fill_model(&mut f, unit, t)?;
+            }
+            return Ok(f);
+        }
+        if let Some(t) = &self.unit_tables {
+            return unit_facts::model_facts(world, unit, t, self.levels.as_deref());
         }
         self.inner.unit_facts(world, unit)
     }
@@ -346,8 +401,21 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
             None => Vec::new(),
         };
         let local_at = self.local_at;
+        let mode = self.ui_open_mode.unwrap_or(OpenMode::NONE);
         let preview = self.preview.as_mut().expect("checked above");
         let r = preview.prepare(world, &entries, assets);
+        if let Some(w) = self.weather.as_mut() {
+            w.prepare(
+                world,
+                self.levels.as_deref(),
+                local_at.map(|l| l.1),
+                mode,
+                assets,
+            );
+            if let Some(m) = w.take_failure() {
+                preview.log_once(format!("weather: {m}"));
+            }
+        }
         let tables = preview
             .tiles
             .shades(world.palette_act.unwrap_or(0))
@@ -367,7 +435,31 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
         &mut self,
         world: &ClientWorld,
     ) -> Result<Option<crate::rules::draw_order::source::WeatherFrame<'_>>, ViewError> {
+        if self.weather.is_some() {
+            return Ok(self.weather.as_mut().and_then(WeatherView::frame));
+        }
         self.inner.weather_frame(world)
+    }
+
+    /// Preview weather: the cels and lines of passes 4 and 9
+    /// ([`WeatherView::items`]); a failure is logged once and the frame
+    /// goes without them.
+    fn sky_items(
+        &self,
+        sky: &crate::rules::draw_order::sky::SkyPasses,
+        assets: &ViewAssets,
+    ) -> Result<Vec<crate::scene::DrawItem>, ViewError> {
+        let (Some(w), Some(p)) = (&self.weather, &self.preview) else {
+            return self.inner.sky_items(sky, assets);
+        };
+        let mode = self.ui_open_mode.unwrap_or(OpenMode::NONE);
+        match w.items(sky, mode, assets.shades.as_ref(), assets) {
+            Ok(items) => Ok(items),
+            Err(e) => {
+                p.log_once(format!("weather draws: {e}"));
+                Ok(Vec::new())
+            }
+        }
     }
 
     fn fade_clock(&self, world: &ClientWorld) -> Result<FadeClock, ViewError> {
@@ -467,6 +559,27 @@ mod tests {
             .is_empty());
         assert!(feed.player_seed(&w).is_err());
         assert_eq!(PENDING.len(), 5);
+    }
+
+    // Covers: specs/render/draw-order.md §3 r4
+    #[test]
+    fn unit_facts_come_from_the_tables_once_set() {
+        let mut feed = ModelFeed::<NoFeed>::default();
+        let w = ClientWorld::default();
+        let mut u = unit(MONSTER, None);
+        u.class = 1;
+        u.mode = 12;
+        assert!(feed.unit_facts(&w, &u).is_err());
+        feed.set_unit_fact_tables(UnitFactTables {
+            unflat_dead: vec![Some(false), Some(true)],
+            ..UnitFactTables::default()
+        });
+        let f = feed.unit_facts(&w, &u).unwrap();
+        assert!(f.unflat_dead && !crate::rules::draw_order::is_flat(&f));
+        u.class = 0;
+        assert!(crate::rules::draw_order::is_flat(
+            &feed.unit_facts(&w, &u).unwrap()
+        ));
     }
 
     // Covers: specs/client/model.md §1 r2

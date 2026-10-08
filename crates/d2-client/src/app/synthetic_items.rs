@@ -355,15 +355,13 @@ pub fn drop_tables() -> DropTables {
         ],
     );
     let monster_tc = fixed(b"smoke", &[smoke::SWORD, smoke::CAP, smoke::GOLD]);
-    let mut chest = [None; 45];
-    // Act I, Normal, every tier.
-    chest[..3].fill(Some(smoke::CHEST_TC));
     DropTables {
         items,
         tcs: TreasureClasses {
             tcs: vec![none, chest_tc, monster_tc],
             group_offset: 0,
-            chest,
+            // Every act, difficulty and tier (REC-260's synthetic chest).
+            chest: [Some(smoke::CHEST_TC); 45],
             notes: Vec::new(),
         },
         treasure_items,

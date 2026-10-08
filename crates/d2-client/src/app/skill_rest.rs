@@ -34,6 +34,9 @@ use crate::bridge::world::SkillRow;
 pub struct UnitSkills {
     /// Used-skill flags (bit 0 moving, bit 1 arrived).
     pub used_flags: u32,
+    /// Params 1…4 of the used entry of a unit without a skill list (a
+    /// monster: Charge keeps its target and hit mode there).
+    pub entry_params: [i32; 4],
     /// Param4 of the Attack entry (`use.md` §2 step 2).
     pub attack_param4: i32,
     /// Unit +0x38 bits 8+.
@@ -121,6 +124,25 @@ impl LocalSeams {
     // q-barb (REC-152): unit +0x38 bits 8+ is the frame event index the
     // use pipeline already keeps as `event_arg`; Double Swing and the
     // monster bodies read it back (`bodies-2.md` §4.8).
+    pub(super) fn unit_entry_param(&self, u: UnitId, i: u8) -> i32 {
+        let k = usize::from(i.wrapping_sub(1));
+        self.skills
+            .unit(u)
+            .and_then(|s| s.entry_params.get(k).copied())
+            .unwrap_or(0)
+    }
+
+    pub(super) fn set_unit_entry_param(&mut self, u: UnitId, i: u8, v: i32) {
+        if let Some(p) = self
+            .skills
+            .unit_mut(u)
+            .entry_params
+            .get_mut(usize::from(i.wrapping_sub(1)))
+        {
+            *p = v;
+        }
+    }
+
     pub(super) fn frame_event_index(&self, u: UnitId) -> i32 {
         self.skills.unit(u).map_or(0, |s| s.event_arg)
     }
