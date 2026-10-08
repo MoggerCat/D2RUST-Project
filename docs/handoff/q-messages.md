@@ -7,7 +7,7 @@
 - `FontMeasure` gained `wrap`, `width_a`, `width_c` for the metrics.
 - Tests (`game_messages::tests`): chat line drawn and expired, named line / whisper formats, quest message string.
 
-## PROVISIONAL (REC-124)
+## PROVISIONAL (REC-126)
 Expiry clock 40 ms per client frame; Latin-1 text; HUD fill tiles as the backing.
 
 ## Left
