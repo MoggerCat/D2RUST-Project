@@ -82,6 +82,8 @@ fn item_actions() {
             }),
             flags4: false,
             flags: 0,
+            props: Vec::new(),
+            charm: false,
         })
     );
     // A fatal action and an ignored one.
