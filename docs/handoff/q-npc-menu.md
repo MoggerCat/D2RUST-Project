@@ -1,6 +1,6 @@
 # q-npc-menu: NPC menu box in the play preview
 
-Branch `claude/q-npc-menu`. Nothing is verified against 1.14d (rule 10). Open point: REC-116 (`docs/HANDOFF.md` §7).
+Branch `claude/q-npc-menu`. Nothing is verified against 1.14d (rule 10). Open point: REC-121 (`docs/HANDOFF.md` §7).
 
 ## Links connected
 
@@ -18,7 +18,7 @@ Tests: `tests/app_play_quests.rs` (`akaras_menu_offers_talk_trade_and_cancel`, `
 
 ## PROVISIONAL / left
 
-- REC-116: fixed anchor, plain text rows, no box art/selection colour, no NPC name line, Talk has no scroll widget and sends nothing.
+- REC-121: fixed anchor, plain text rows, no box art/selection colour, no NPC name line, Talk has no scroll widget and sends nothing.
 - A press outside the box closes it and is consumed (the click does not also walk).
 - Cain's identify (C→S 0x34, `AppRest::identify` only logs): not done; the rest has no inventory access (`docs/handoff/q-identify.md`).
 - Trade shows no panel until `q-vendor-items` lands.

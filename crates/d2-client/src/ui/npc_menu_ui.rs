@@ -9,7 +9,7 @@
 //!
 //! The box opens when S→C 0x28 is delivered (`msg_ui`): the dialog
 //! branch's C→S 0x2F / 0x31 are the bridge's, as before. Preview fills
-//! (`// d2rs-own, unverified`, REC-116 in `docs/HANDOFF.md` §7): plain
+//! (`// d2rs-own, unverified`, REC-121 in `docs/HANDOFF.md` §7): plain
 //! text rows at a fixed anchor (no box art, no anchor from the NPC's
 //! screen point, no selection colour), English labels when the string
 //! table has no id, Talk draws the text list's strings (kind 0) with no
