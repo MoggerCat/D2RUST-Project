@@ -39,6 +39,22 @@ HANDOFF REC lines to update when HANDOFF is free (Lane B is editing it): REC-237
 
 Overlaps with staging rows added the same day (coordinator: merge them when launching): `q-hud-globes` ⊂ `q-fix-hud-popup` (2) (use control-panel §3 r5–r6); `q-options-art` overlaps `q-fix-esc-menu` (frontend-options §O2 r4 art table); `q-a2-duriel-ai` portal spot overlaps `q-fix-portal-pair` (objects-2 §25); `q-identify-cain` belt tips overlap `q-fix-belt-ui` (2).
 
+## Lane B — local run (Batches 1, 2, 3, 5)
+
+Recorded in `docs/HANDOFF.md` §5 Done block (2026-10-08, PC 1). Install
+hash identical (19 entries). GPU Intel HD Graphics 630 / Vulkan.
+Passing: Batch 1 all (1.4 with re-measured counts), 2.1–2.3, 2.6, 2.7,
+2.9, 2.10, 2.12, 2.14–2.16, 2.18, Batch 3 all (21 GPU cases, map 0 of
+32,238,080 differ, verify 11/11), Batch 5 baselines as expected. 31 claims
+unlocked; coverage game-file 416 (was 384), verified 496 of 10,583.
+Failing (findings, no expectation changed): 2.4 one test, 2.5 one test,
+2.8 one test, 2.11 two tests, 2.13 seven tests → rows `q-fix-sweep-counts`,
+`q-fix-lvlprest-beyond-files`, `q-fix-item-create-sweep`,
+`q-fix-cold-plains-rooms`, `q-fix-wired-host-walk`,
+`q-fix-placement-reader`. Spec note: evilhut is monstats row 529 (0-based),
+`population.md` says 528. Not run: Batch 4, 2.17, 3.15. Stale LOCAL-RUN
+expectations updated (1.4, 2.4, 3.1, 5.2).
+
 ## Lane C — recordings PC 2 needs (to move into HANDOFF §7)
 
 Recordability (tools/original-hooks.md §7): R-MIS-1/2, R-PAUSE-1, R-NOTICK-1, R-LVL-1/2, R-EXIT-1, R-MSG-1 need `q-rec-hooks` first. R-HCFLAG-1 from the menu by hand (no `--auto`) until `q-rec-joinflags`. R-MODE-1 needs a second client. R-LVL-2, R-ACT-1, R-TYRPORT-1 need saves at those quest stages. The rest is covered by the existing recorders.

@@ -187,7 +187,7 @@ merged tree (the coordinator's gate runs it).
 | 3at Tests of the night's code (`e2e-night-flows`, `gaps-night-specs`, `fixedset-act1`, `mutants-night-code`, `mutants-path`, `mutants-walk-handlers`) | **Tests only** (no fidelity code changed; test-support edits and one test-only seam each): `test-fixtures` `e2e_night_flows` (6: game creation and the real join, chest, shrine, Act I stone and gibbet, Act II journal, hiring at Greiz, hireling follows a waypoint, kill from live room population), `d2-server` `e2e_night_world` (3), `d2-client` `e2e_pet_action` (I-1; passes now). **Act I on synthetic data**: `test_fixtures::{act1.rs, host.rs}` and `tests/act1_game.rs` (the `outdoor.md` placement vector (the 20-level `levels.md` vector after the merge) with the 35-room town, every chain level generates, join + walk into Blood Moor; two runs give one digest); `d2-server/tests/game_wired_host.rs` is built on `GameData` + `host::Session` (the old live test could never find the town waypoint before the rooms were streamed, and 0x03 is no longer a stub). **Unit-test gaps** (`gaps-night-specs`): unit tier 79.6% → 80.8% over 17 specs; the units left and their reasons are in that note (`ui/panels.md` 20, `formats/d2s.md` 27, `hirelings.md` 13). **Mutation runs** (cargo-mutants 27.1.0 with `--cargo-test-arg=--lib`, `CARGO_INCREMENTAL=1`, `CARGO_PROFILE_DEV_DEBUG=false`; `mutants.out` never committed): `world::objects` 463 of 712 tested, 35 survivors: 20 killed by 9 new tests, 6 equivalent, 9 undecided seam defaults (`chests.rs` `unit_type`, `item_quality`, `trap_monster_id`, `room_units`, `within`, `in_room`); `world::hirelings`, `player::pets`, `missiles::bodies*` (1,381) not run; `d2_sim::path`: 1,389 of 1,828 tested (288 missed), the 50 tests were restored and ported to the current API, `walk/step.rs` 250 mutants: 74 missed → 11 (all equivalent), the other files not measured; `wiring::path` 193 of 340: the 58 targeted kills confirmed, 10 more killed, 5 equivalent left, `walk.rs` (147) not run; d2-server walk handlers 0x01–0x04: 0 missed. No code contradicted a spec | `cargo test -p test-fixtures`, `cargo test -p d2-server --test e2e_night_world`, `--test mutants_walk`; gates: 5,322 passed / 0 failed (`e2e-night-flows`), 5,303 (`gaps-night-specs`), 13 steps PASS (`fixedset-act1` after the merge); `tools/coverage.py --check`: 0 errors |
 | 3au Spec answers from PC 2's local session and the local run (`pc2-spec-d2s`, `pc2-spec-hirelings`, `pc2-spec-quests-act2`, `pc2-spec-quests-act3`, `pc2-spec-quests-core`, `local2-2026-10-06`) | **Specs only, no code** (the code side is row 3as): `formats/d2s.md` (DS-1–DS-5, flag 0x2000 and +0x88 → 0xFF, the new split `formats/d2s-load.md` with the new-character start `0x00569F80` and the load effects in order), `world/hirelings.md` + `npc.md` (HL1–HL9, WW-2, OQ6 / GN1; the hire recorded), `world/quests-act2-2.md` (QB-1–QB-20, Jerhyn, orifice, 0x58), `world/quests-act3-2.md` §11 (QC-1–QC-5, QC-7), `world/quests.md` / `quests-act1-rest.md` §9 (QA-1–QA-6, WW-6, WW-10, DS-4; `quests.tsv` row 40 and the Act III rows `specified`, `quest-messages.tsv` +15 rows). The local session (Windows, RX 9070 XT, Ghidra 12.1.4 export of 1.14d with no community labels) merged the spec-answer branches, ran C13 (passes exactly), C20 (passes after the TC 0 `picks` 1 → 0 fix), the fuzz crate (18 targets, ~1.59 G execs, one DT1 RLE crash fixed) and the real GPU on a second adapter (`gpu_compare` 18/18, `verify` 11/11); its live-run findings (`play --frames 1500` panics at `d2-sim/src/drlg/room.rs:144` "live DRLG room" after ~104 ticks; the batch 2 red rows) are queued as C98. Not done there: wave B tests for C10, C11, C12, C14, C18, C19, wave C groups, the wave D specs, wave F | recordings and local results are in §5 Done and `local-buddy-2026-10-06.md`; the 1.14d facts carry their addresses in the specs |
 | 3 not implemented | **Tenth fold (the list is current; the ninth fold's list is superseded):** AI: the special-state 6 think `0x005E7C10` and the `unread` rows no spec covers, the `TODO(spec: ai-bodies-6/7…)` readings (row 3ar); skills: no unit test for the batch 4 bodies (`bodies-3.md`, `bodies-4.md` at 0% unit tier), srvdo 53 / 138 / 142 `unreferenced`; providers behind seams: the `Pending::*` defaults the notes name (`event_*`, `stash_cap`, `body_*`, the umod seams `umod_target`, `umod_apply_state`, `quest_death`, `spawn_near`, `ai_use_skill`, `skill_level`, `monster_run_event0`, `missile_init_callback`), the `QuestWorld` calls left on the rest (QC-6: Act III inits and providers, C→S 0x44 `item_to_object`, `set_room_portal`), `PetWorld` on a host, item-use bodies, player data (HM3), sockets and the other `InvRest` seams; world: object population (`objects.md` §15, G1), footprints (G2), the key test `0x0055F140`, code drop (G3), trap / spawn parts (G4), shrine missiles (G5, G6), quest-chest gate (G7); hirelings: the C→S 0x61 swap, the classic act change and the restore's creation place (G8), `HirelingTables` has a loader but no caller; saves: every `Unapplied` step of `ActionCharacter` (the `d2s-load.md` effects), a new character's player record in the app; server messages: 0x73, monster add messages (0xAC server fields past `init.md` §24), 0x9C in the switch and the item bit stream of 0x9C / 0x9D, §7.3 r2 steps 3 and 5–10, the stat builder `0x0053BE40`, the join sequence after 0x04 (0x5B, 0x65, 0x8D, 0x5A), the loader's 0x94 / 0x22 / 0x21 / 0x5E / 0x28 / 0x29, C→S 0x67 name checks and 0x69 / 0x6A / 0x6C / 0x6E / 0x70; path: event 0 of run / knockback / sequence (MV2), mode starts of attack / skill / BL / KB / SQ (MV1), path types 0, 3, 5, 6, 8, 9, 11, 12, 15, 16 (MV8), missile init callbacks; combat: the player DT start from the damage §7.1 branch, the event layer split, the character-save part of `0x00580EC0`, corpse creation, `MovePending::corpse_pickup`; app: `set_session` and the C→S 0x67 / 0x6B send, `object_drops` and its unique bits, the game creation with `WorldSim::create_game`, `Entry::record`; client: passive skills, client stat lists, the 0x53 day-period refresh, eclipse parts, the UI parts of 0x5D / 0x63 / 0x77, monster skills at 0xAC, the NPC text-list walk (row 6, tenth fold) | specs exist as drafts or are unwritten (§7 ninth and tenth sets) |
-| 4 Conformance | recording proven feasible; coverage tool done; **eighth fold (`py tools/coverage.py --summary`): 4,194 claims over 3,339 rule units: unit 2,858 (85.6%), game-file 197 (5.9%), trace 30 (0.9%), verified 227 (6.8%), any tier 2,911 (87.2%); `--check` passes; the denominator grew with the three new specs (`ui/text.md` 39, `render/draw-order.md` 23, `render/unit-composite.md` 41 units, no claim yet) and with 39 table-row units of `sim/rng.md` §5.2–§7 and the numbered edge-case lists (`spec-unit-numbering`: rules 3,106 → 3,190 on its own base), so the any-tier share fell from 91.4% at the seventh fold; the tool's `verified` count counts game-file claims on `#[ignore]` tests that never ran** | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly. `py tools/coverage.py --summary` at `edd9925` (all branches merged, sixth fold): 3,542 claims over 3,106 rule units: unit 2,612 (84.1%), game-file 189 (6.1%), trace 30 (1.0%), verified 219 (7.1%), any 2,660 (85.6%) — tested (any tier) 85.6%, verified 7.1%; the percentages fell because the denominator grew by 402 rule units of specs written since (`inventory` 148, `pathing` 125, `path-placement` 84, `composition` 16, `camera` 11, `capture` 9, `sprite-placement` 9; `pathing`, `camera` and `sprite-placement` have no claim) while claims grew by 283; for the `4b5b0bf` figure: 3,259 claims over 2,704 units, unit 2,404 (88.9%), game-file 187, trace 30, verified 217, any 2,459 (90.9%); the 28 game-tier claims the `gaps-data-formats` session added and the one of `gaps-client-formats` (`ds1.md` edge cases) sit on `#[ignore]` tests that have never run, and the tool counts them (verified was 188 before the first 28), while that note and `docs/COVERAGE.md` §3 count a game claim as verified only while its latest local run passes: read 219 as an upper bound until §5 C17, C20 and C38 are run (the two game claims added since sit on `path::search::tests::expfield_live`); the 67 game-file tests of the sixth fold carry no claim yet (§1 3w), so none of them is in 189 (history: `--summary` total line on main at `fd37fba` was 3,164 claims, unit 86.6%, any 88.6%, verified 216; the `coverage-claims` branch measured 1,520 claims, unit 1,072, verified 180 before the implementation notes landed; per-branch figures of the gap-test notes, 67.1% → 71.6–73.5% any tier on their own bases and 88.8% → 89.2–89.9% for the second four, are not additive; the 90.9% above is the one merged run). Verified units come from the sim-0006/0007/0008 replays (tick.md 14, unit-order.md 12, rng.md §3 r2 / r4) and three ignored game-file tests (§5 C1, C8): the unit tier is claims by synthetic tests, not fidelity; seventh fold (all branches merged one by one, merged tree at this fold: `py tools/coverage.py --check` 4,038 claims, 0 errors; `--summary` 2,839 of 3,106 rules any tier (91.4%), unit 2,791 (89.9%), verified 219 (7.1%, unchanged: tick, rng and the game-file / trace checks of earlier folds); the notes' own gates reported 3,403, 3,813 and 3,869 claims; `pathing.md` 114 of 125 units any tier, `path-placement.md` 77 of 84, `camera.md` 11 of 11, `sprite-placement.md` 7 of 9, repository 2,827 of 3,106 (91.0%) any tier on `gaps-path-render`'s base; `prop-*` and `game-tests-inventory-path` add no claim; `mutants-monsters-missiles` adds 115 unit-tier claims. Replay harnesses for movement and placement exist but have never run on a 1.14d recording (row 3ab). Still no verified unit from this fold |
+| 4 Conformance | recording proven feasible; coverage tool done; **after the PC 1 run of 2026-10-08 (`py tools/coverage.py --summary`): 13,398 claims over 10,583 rule units: unit 9,659 (91.3%), game-file 416 (3.9%), trace 80 (0.8%), verified 496 (4.7%), any tier 9,767 (92.3%), `--check` 0 errors (31 game-tier claim lines unlocked: game 384 -> 416, verified 464 -> 496; the rule-unit count also moved with the spec sessions); eighth fold (`py tools/coverage.py --summary`): 4,194 claims over 3,339 rule units: unit 2,858 (85.6%), game-file 197 (5.9%), trace 30 (0.9%), verified 227 (6.8%), any tier 2,911 (87.2%); `--check` passes; the denominator grew with the three new specs (`ui/text.md` 39, `render/draw-order.md` 23, `render/unit-composite.md` 41 units, no claim yet) and with 39 table-row units of `sim/rng.md` §5.2–§7 and the numbered edge-case lists (`spec-unit-numbering`: rules 3,106 → 3,190 on its own base), so the any-tier share fell from 91.4% at the seventh fold; the tool's `verified` count counts game-file claims on `#[ignore]` tests that never ran** | `tools/trace-recorder`: 32,543 recorded RNG draws match the spec exactly. `py tools/coverage.py --summary` at `edd9925` (all branches merged, sixth fold): 3,542 claims over 3,106 rule units: unit 2,612 (84.1%), game-file 189 (6.1%), trace 30 (1.0%), verified 219 (7.1%), any 2,660 (85.6%) — tested (any tier) 85.6%, verified 7.1%; the percentages fell because the denominator grew by 402 rule units of specs written since (`inventory` 148, `pathing` 125, `path-placement` 84, `composition` 16, `camera` 11, `capture` 9, `sprite-placement` 9; `pathing`, `camera` and `sprite-placement` have no claim) while claims grew by 283; for the `4b5b0bf` figure: 3,259 claims over 2,704 units, unit 2,404 (88.9%), game-file 187, trace 30, verified 217, any 2,459 (90.9%); the 28 game-tier claims the `gaps-data-formats` session added and the one of `gaps-client-formats` (`ds1.md` edge cases) sit on `#[ignore]` tests that have never run, and the tool counts them (verified was 188 before the first 28), while that note and `docs/COVERAGE.md` §3 count a game claim as verified only while its latest local run passes: read 219 as an upper bound until §5 C17, C20 and C38 are run (the two game claims added since sit on `path::search::tests::expfield_live`); the 67 game-file tests of the sixth fold carry no claim yet (§1 3w), so none of them is in 189 (history: `--summary` total line on main at `fd37fba` was 3,164 claims, unit 86.6%, any 88.6%, verified 216; the `coverage-claims` branch measured 1,520 claims, unit 1,072, verified 180 before the implementation notes landed; per-branch figures of the gap-test notes, 67.1% → 71.6–73.5% any tier on their own bases and 88.8% → 89.2–89.9% for the second four, are not additive; the 90.9% above is the one merged run). Verified units come from the sim-0006/0007/0008 replays (tick.md 14, unit-order.md 12, rng.md §3 r2 / r4) and three ignored game-file tests (§5 C1, C8): the unit tier is claims by synthetic tests, not fidelity; seventh fold (all branches merged one by one, merged tree at this fold: `py tools/coverage.py --check` 4,038 claims, 0 errors; `--summary` 2,839 of 3,106 rules any tier (91.4%), unit 2,791 (89.9%), verified 219 (7.1%, unchanged: tick, rng and the game-file / trace checks of earlier folds); the notes' own gates reported 3,403, 3,813 and 3,869 claims; `pathing.md` 114 of 125 units any tier, `path-placement.md` 77 of 84, `camera.md` 11 of 11, `sprite-placement.md` 7 of 9, repository 2,827 of 3,106 (91.0%) any tier on `gaps-path-render`'s base; `prop-*` and `game-tests-inventory-path` add no claim; `mutants-monsters-missiles` adds 115 unit-tier claims. Replay harnesses for movement and placement exist but have never run on a 1.14d recording (row 3ab). Still no verified unit from this fold |
 | 5 Local server + bridge | **Tenth fold:** the session is C→S 0x67 → 0x6B → first tick through `SessionFlow` (row 3ap); the nine ids of CM-1–CM-6 have handlers (0x21–0x23, 0x2C, 0x53, 0x5D, 0x63, 0x77, 0x94; `impl-client-msgs-3`: 62 owned ids), then `impl-pc1-final` gave every owned S→C id a handler (167 of 181 owned; the rest are out of scope); `Dispatch::from_spec()` builds again, so the 85 `d2-client` reds (`TableError::Mismatch`) are gone. **Ninth fold:** the in-process server sends the session join (row 3ao); 53 of the 181 S→C ids of `bridge-dispatch.tsv` have an owner spec and a handler (0x7A / 0x81 from `impl-client-staging`, the rest from the `client/msg-*` and `model.md` specs), so the line "every S→C id still unowned" below is stale; 0x2C, 0x53, 0x5D, 0x63, 0x77, 0x94 stay `TBD` (`impl-client-msgs-2`, §7 CM-1–CM-6); the bridge owns a client DRLG (row 6, ninth fold). Earlier: bridge design `specs/client/bridge.md` and skeleton `d2-client::bridge` done; `bridge::local::LocalLink` implements `ServerLink` on `d2_server::host::Host` (`claude/p5-local-server`, synthetic data only, unverified; `d2-client` now depends on `d2-server`); every S→C id still unowned (`bridge-dispatch.tsv` all `TBD`); session code is the placeholder `PendingSession`; the app now builds the single-player game on a server thread (row 6) | `cargo test -p d2-client bridge`: every synthetic vector of `bridge.md`, the dispatch TSV check with its perturbation test, a windowless Bevy `App` mirror test; `bridge/local_tests.rs` headless end to end on the real host, `ProtoSizes` and `SimGame<ActionSim, ActionWorld>` (two-act synthetic DRLG, seed 1234, a sorceress at (42, 20) beside a Cold Plains waypoint): C→S 0x49 drained, dispatched (result 0), ticked, flushed, and the exact S→C `0D 00 <guid> 01 2D00 1700 0000` reaches a synthetic 0x0D handler that adds unit (0, guid) to `ClientWorld`; duplicate filter, protocol version check (a wrapper reporting version + 1 refused), unknown / unowned ids; `app_frame_loop` and `app_single_player` (row 6) run the same link through a Bevy `App` for 300 ticks |
 | 6 Client | design drafts `specs/client/{render-pipeline,assets,ui,audio}.md` (d2rs-own). Cloud tasks implemented (plain-Rust infrastructure, no original behavior): **C1** paths + loaders, **C2** residency cache, **C3** frames + atlas, **C4** scene + CPU compositor, **C5** GPU compute compositor (`gpu_compositor`: WGSL, integer math, no sampler, 16×16 workgroups), **C6** verify harness (`verify`: case files version 1, `--perturb`, `GpuCompositor` seam), **C6×C5** GPU half of the synthetic cases wired (`verify::gpu::Wgpu`, `[[unit]]` COF cases), **C7** COF composite mechanics (`composite`), **C8** UI core, **C9** controls file, **C10** audio core. Nothing original-behavior is reproduced: every §B point is a `TODO(spec: …)` hook or a `ComponentResolver` method. GPU byte-exactness **proven on a real GPU** (Intel HD Graphics 630, Vulkan: `gpu_compare` 12/12, `d2-client verify` 11/11, perturbations exact, §5 Done 2026-10-06) and on Mesa llvmpipe 25.2.8 | CI unit tests from each spec's vectors (`d2-client` per branch: frames 53 pass + 1 ignored, scene 20 tests, ui 20, controls 16, audio 25; `gpu_compositor` 11 + 2 ignored, `composite` 11 + 1 ignored, `verify` 191 lib tests pass, 5 ignored on the `p6-verify-gpu` branch); llvmpipe: all 12 `gpu_compare` cases and all 10 synthetic verify cases 0 differing, `--perturb 7` reports exactly 7 on every half; game-file and real-GPU halves queued (§5) |
 | 6 Client, fifth fold (`p6-window`, `verify-map`, `client-own-gaps`) | **The client is an app on a window** (`cargo run -p d2-client`, subcommand `play`, now the default; `view` stays): `SimGame<ActionSim<LocalSeams>, ActionWorld>` (two-act synthetic DRLG, sorceress beside the Cold Plains waypoint, 0x49 on its real provider) behind `d2_server::host::Host` in `bridge::local::LocalLink`, **on a server thread** (`app::server_thread::ThreadLink`, `Send + Sync` for any link; the game is not `Send`: `DrlgWorld` holds un-`Send` boxed `TileSource` / `LevelTypes` and `wiring::worldgen::SharedTypes` is an `Rc<RefCell<_>>`; `d2-sim` unchanged); per frame `BridgePlugin` pumps the server in `PreUpdate`, the world view packs the frame in `Update`, and the render-graph system `compose_node` runs the compute compositor on Bevy's own device (`Gpu::from_device`) and copies its RGBA rows into the presented texture, no readback. With `D2_GAME_DIR` (and no `--synthetic`) the `levels` / `objects` tables are the user's and the waypoint object is the first `objects` row with operate function 23 and init function 17 (`waypoints.md` §5.1 r1); the DRLG stays synthetic. **The window is black by design:** no S→C id has an owner spec, every §B rule is `Unspecified`, the frame palette is all zeros. **Frame store done** (`frames::FrameStore`: `(FrameSetKey, index)` → dense `scene::FrameId`, a `scene::FrameSource`, builds a C3 atlas; `composite::build_with` takes ids from it) and **the `map` verify case ported to the compositor** (`verify/map.rs`, chunks of ≤ 1024², three byte comparisons, `--perturb N` flips N indices and N RGBA pixels). **d2rs-own gaps now with code** (`client-own-gaps`): `audio::pool::SoundPool` (audio §A1 r1, r3; assets §A5 `sounds`), `assets::prefetch::PrefetchQueue` + `Pool::offer` (assets §A4 r3), `ui::text::layout_text` + `TextRules` (ui §A3); `WavDecoder`, the sound-id → file map and the text rules stay `TODO(spec: …)`. **Bug found and fixed in the staging** by the first window run: joining with `Some(room)` skips the client room switch (`rooms.md` §4.1), so tick step 9 freed the player's room and the next client update panicked (PW1) | `app_frame_loop` (2 tests: 300 ticks, 0x49 → unowned S→C 0x0D, presented image = CPU reference; GPU node output read back = CPU reference byte for byte, skipped without an adapter), `app_single_player` (4 + 1 ignored: `Send + Sync`, failing builder, deterministic build on the thread, live tables); `d2-client` lib 224 pass, 6 ignored. llvmpipe only (Xvfb, `xvfb-run cargo run -p d2-client -- play --frames 1000`, synthetic): 1,000 frames, 419 server ticks (~25/s at ~60 fps), `gpu: true`, node frames 999, exit 0; ignored GPU tests, `gpu_compare` 12/12 and `--perturb 7` exactly 7 re-run after the `device.rs` refactor; `verify::map::tests::gpu_map_matches_cpu_reference` (synthetic 100×70 map, chunk sides 32 / 64 / 1024) 0 differing, `--perturb 7` exactly 7 on CPU binned, GPU indices and GPU RGBA, `gpu_half` still 10/10; real `townN1` and a real GPU not run (§5 C24–C31). Coverage: audio 6 → 8 of 10 units, assets 8 → 9 of 12, ui 9 → 10 of 13 (unit tier); `bridge.md` §8 r1–r3 claimed on the frame loop; `render-pipeline.md` §a10 two claims (the map comparison and the exact `--perturb` count) |
@@ -1794,6 +1794,169 @@ Index: Done · A player · B Ghidra / spec edits · C game files and GPU · Bloc
 
 ### Done (kept for the record)
 
+Done 2026-10-08 (local PC 1, branch claude/local-pc1-s8 from 31291c8e;
+Lane B worker, Windows 10, `D2_GAME_DIR` = `d2rs\game`; entries C21, C22,
+C27-C33, C36-C38, C42-C45, C47, C48, C51, C54, C57, C61 and C66 part 1
+removed below; C23, C34, C35, C39, C46, C55, C56, C59 keep a `Result
+2026-10-08` line). Builds: `--release` for the d2-sim, d2-server, d2-formats
+sweep and every d2-client / GPU row (disk), debug for the d2-data /
+d2-formats `--ignored` run, the first d2-sim rows and the conformance rows.
+Other workers edited `specs/` in the same tree meanwhile (the
+`coverage.py` denominators moved with them).
+- Section 0.1: `hash-manifest` of the install vs `traces/reference-install.toml`:
+  `git diff --no-index` empty, 19 entries identical.
+- Batch 1: `data-tool tables` 73 runtime tables, 72 identical, 1 explained,
+  0 mismatched, code buffers 4/4 identical (1.1 pass); `links` 72,175 valid,
+  84,277 misses (-1), 0 broken, 0 unchecked fields (1.2); `mpq-tool check`
+  all blocks decoded (1.3); `mpq-tool formats` exit 0, 0 errors; the counts
+  differ from the LOCAL-RUN 1.4 expectation, which is the pre-fix
+  case-sensitive count (section 8 "counted a file twice"): cof 3,606 / 3,605
+  parsed + `amblxbow.cof`, dc6 **1,653**, dt1 **256 files / 250 parsed, the 6
+  gaps are the `KNOWN_UNUSED` ones**, dcc 21,717, ds1 **2,372**, tbl 29, pl2
+  17, wav 2,663 (1.4 pass on the fixed counts). 1.5 `cargo test -p d2-data -p
+  d2-formats -- --ignored` (debug; cargo stops at the first failing binary,
+  so the four `d2-formats` binaries after `game_sweep` were run separately):
+  **64 pass, 2 fail** (the two count assertions of `game_sweep`, findings
+  below; every file decodes). 1.6 `patch_game` 5/5 incl. G1-G8; 1.7 `patch
+  check` exit 0, one N01 note, digest `66010ecd...97a625` (pass); 1.8
+  `fixups_on_live_set` pass; 1.9 `dump-compare traces/raw/20261006-021210-tables`:
+  70 identical, 0 differ, `itemtypes_equiv` and `montype_equiv` identical;
+  1.10 `check_stats.py --files`: pass (359 stats, 84 ops, 42 op targets);
+  1.11 `path_tables.py`: ok, 582 rows equal `Game.exe` (18 tables); 1.12 C21
+  `ds1_layer_limits_and_truncated_trees_groups` pass; 1.13 C22 `automap.bin`
+  from `d2exp.mpq` (3,286 records of 44 bytes): no LevelName (bytes 0..16) or
+  TileName (16..24) that is empty or starts with `0` (a ten-line Python scan
+  of the `mpq-tool extract`ed `data\global\excel\automap.bin`).
+- Batch 2: 2.1 `d2-sim -- --ignored` (debug): the 11 lib ignored tests pass
+  (the five of C1 included), `game_core` 12 pass, then `game_drlg_tables` 11
+  pass / 1 fail (cargo stopped there; the other d2-sim game binaries were run
+  in 2.5-2.10). 2.2 C36 `real_grid_belt_and_type_tables` pass. 2.3 C38
+  `expfield_live` pass. 2.4 C34 `game_world` **10 passed**,
+  `game_drlg_tables` **12 tests: 11 passed, 1 failed** (`lvlprest_measurements`:
+  rows naming a file beyond `Files`: 80, test and spec say 82). 2.5 C35
+  (release) `game_treasure` **16 passed**, `game_items` **7 passed, 1 failed**
+  (`sweep_create_every_item_every_quality`: 560 failures = item 556 `ear`
+  "ear without a player" 160, 530 `isc` and 519 `ibk` "affix 1 does not fit"
+  160 each, 645 `0sc` "affix 3 does not fit" 80; 10 crafted requests end in
+  the affixes.md Edge case 3 crash and are counted, not failed). 2.6 C37
+  `game_core` **12 passed** (3,558 AnimData records scheduled, 0 with a speed
+  past i16; 357 skills, 78,804 values evaluated; 734 monstats rows, 673 with
+  `DamageRegen`). 2.7 `d2-server game_world_data` **3 passed**: 39 Act I
+  levels generate, 2,043 distinct lvlprest DS1 names, frame 100 with 0
+  messages queued. 2.8 C23 `world_data` **2 passed, 1 failed**
+  (`outdoor_levels_generate_through_the_dispatcher`: Cold Plains 97 rooms =
+  62 preset + 35 outdoor, recorded 98 = 61 + 37; the grid and substitution
+  difference lists are non-empty, C92). 2.9 C51 `game_inventory_path` **6
+  passed**: 659 items, 8 distinct sizes (1x1 ... 2x4), 0 zero-size, none
+  larger than 10x4, grids (3,4) (6,4) (6,8) (10,4) (10,10), 15 items equip at
+  body location 8, 27 beltable items (27 of them 1x1); `path_tables.py`
+  agrees. 2.10 C45 `game_monsters` **19 passed**, `game_skills` **16
+  passed**; evilhut is **monstats data row 529** (0-based; the only row with
+  `sparsePopulate` 40; the spec text says 528). 2.11 C46.1 `game_sweep`
+  (release, 64 s): **9 passed, 2 failed** (`ds1_every_file_parses`: 2,372
+  files, v3 1, v8 6, v12 14, v13 36, v15 13, v16 229, v17 147, v18 1,926, vs
+  2,456 / 1,997 expected; `dt1_every_live_file_decodes`: 250 files, 15,873
+  tiles, blocks {0x0001 226,996; 0x1001 108,905; 0x2005 15,712}, vs 110,259
+  for 0x1001). Also printed: COF 3,605 parse, failed only `amblxbow.cof` (72
+  bytes), 3 padded 42-byte files; DC6 1,653 files, 26,317 frames, 140 flipped;
+  DCC 21,717 files, 271,176 directions, 3,305,132 frames; AnimData 3,558
+  records, 3,529 with a `.cof` (3,500 distinct names, 9 non-matching copies
+  skipped); 19 `.dat` palettes, 17 `.pl2`; 14 font tables. 2.12 C46.2
+  `game_assets` (release) **5 passed**: 32,502 listed names read back
+  identical, **0 refused**; 16 `.pl2`, 3,512 `.cof` (failed only
+  `amblxbow.cof`), 36 `.tbl` (14 font, 20 strings); the two text `.tbl` files
+  `data\local\FONT\LATIN\DEFAULT.TBL` and `FONTER.TBL` end in
+  `Failed(... Format(Truncated { format: "tbl", offset: 8921 / 2303, needed:
+  2 }))` (GA1; the test passes). 2.13 C59 `game_wired_host`: **0 passed, 7
+  failed** (run twice, identical text): every class arrives in Blood Moor at
+  (4790, 5656), frame 1007, then `town waypoint: not reached after 4 legs;
+  player at (4798, 5634) in level Some(2)` (`crates/test-fixtures/src/host.rs:529`),
+  so no `digest` line is printed. 2.14 `all_live_cofs_give_slot_orders` pass
+  (3,511 names + `amblxbow.cof`, 242,300 frames, 0 failures). 2.15
+  `all_live_frame_sets_build_and_pack` pass (23,595 files, 6 parse errors,
+  288,702 frame sets, 3,345,171 frames, largest 96x960 `worldstone.dt1` tile
+  50). 2.16 C61: `wav_game` 2 pass (incl. `every_sounds_txt_file`),
+  `mpq_game` 4 pass, `mpq-tool formats` exit 0. 2.17 not run (optional). 2.18
+  C66 part 1 `real_saves_round_trip` pass; `d2s-tool check` OK for
+  `charactertest.d2s` (1,012 bytes) and `werwer.d2s` (1,289 bytes), read in
+  section order, rewritten byte for byte. `charactertest.d2s` raw bytes:
+  +0x10..+0x37 `00000000 6368617261637465727465737400 0000 20000000 04101e01
+  00000000 a130c46a ffffffff`, +0x88..+0xA7 `ffffffffff19ff4f` then `ff` x24,
+  `67 66` ("gf") at 0x2FD, `JM` at 844, `jf` at 1007, `kf` at 1009.
+- Batch 3, GPU **Intel(R) HD Graphics 630 (Vulkan, IntegratedGpu, driver not
+  reported: `driver ?`)** for every row: 3.1 `gpu_compare` **21 of 21** cases
+  `0 differing bytes` (the example has 21 cases now, LOCAL-RUN said 18); 3.2
+  `--perturb 7`: every case `7 differing ... 7 perturbed`, `Error: 21 of 21
+  cases differ`, exit 1; 3.3 `gpu_compositor::tests::gpu` 2 pass; 3.4
+  `verify::tests::gpu_half` pass (10 synthetic cases, 0 differing); 3.5
+  `scene_tests::gpu_half` pass (`GPU indices: 0 of 480000 bytes differ`,
+  `GPU: 0 of 480000 pixels differ`, 3 frames match); 3.6 `gpu_map` pass (sides
+  32 / 64 / 1024, 0 of 7,000 differ); 3.7 `app_frame_loop` 6 pass, 1 ignored
+  (`frame_loop_runs_on_the_users_levels`, C41, Batch 4), `adapter:
+  Intel(R) HD Graphics 630 (Vulkan, ?)`; 3.8 `gpu_compositor_on_real_frames`
+  pass (`GPU indices: 0 of 480000 bytes differ; GPU: 0 of 480000 pixels
+  differ`; perturb 7 -> RGBA 7 of 480000); 3.9 `verify --case map`: 2,697 draw
+  items, view 7840x4112 at -3200,-192 (as the last run), 40 chunks, `CPU
+  binned: 0 of 32,238,080`, `GPU indices: 0`, `GPU: 0 of 32,238,080 pixels`,
+  `PASS map (map)`, exit 0 (so no `palette[0]` / VM1 note); 3.10 `--perturb
+  7`: 7 / 7 / 7, `FAIL map (map): CPU and GPU halves`, exit 1; 3.11 `verify`:
+  `summary: 11 pass, 0 fail, 0 error, 0 GPU not wired, 0 no adapter`, exit 0,
+  one `GPU compositor: adapter:` line, nothing wrong with one device; 3.12
+  `verify --perturb 7`: `0 pass, 11 fail`, map 7 of 32,238,080, exit 1; 3.13
+  `--perturb 5`: 5 on each, exit 1; 3.14 `verify --ds1 ...townN1.ds1`: map
+  lines as 3.9, `PASS map (map)`, exit 0. 3.15 (PL2 palette, C49) not run: no
+  command exists.
+- Batch 5 (debug): 5.1 `tick_replay` 7 pass; 5.2 `recordings-needed`:
+  `units-anim` present (4 files), `stats-lists` MISSING, `packets` present
+  (2), **`movement-walk` present (2 `*-packets.jsonl` files)**,
+  `movement-path-state` BLOCKED, `placement-players` present (2),
+  `placement-monsters-items` BLOCKED; 5.3 `packets_replay` FAIL (expected):
+  `20261006-015956-packets.jsonl: record 5: s2c: recorded message
+  0100040010000100 to client 0 (size 8) not queued by the server`; 5.4
+  `placement_replay` FAIL `PLACEMENT NOT WIRED`: `...015956`
+  `PlacementReadStats { players: 2, with_room: 0, monster_assigns: 144,
+  item_messages: 114 }`, seq 178 frame 1 (4863, 5653) and seq 311452;
+  `...022633` `{ players: 4, with_room: 0, monster_assigns: 121,
+  item_messages: 15 }`, seq 154 (4673, 4548), seq 9751 frame 133 (4893,
+  4993), seq 94552 frame 1292 (4698, 4528), seq 127643; every `room None`; 5.5
+  `movement_replay` FAIL `MOVER NOT WIRED`: `...015956` `MoveReadStats {
+  requests: 385, ticks: 4239, seeds: 1, sent: {13: 1, 21: 1, 150: 122},
+  other_inputs: 109 }`, `...022633` `{ requests: 130, ticks: 4061, seeds: 1,
+  sent: {13: 5, 21: 3, 150: 32}, other_inputs: 42 }` (385 = 121 + 47 + 215 +
+  2 and 130 as `pathing.md` R4 / R5; no 0x0F / 0x10 in `sent`).
+- Claims: 31 `Claim once the first local run passes` / `Intended claim` lines
+  turned into `// Covers:` (same ids) for passing tests in `game_assets.rs`
+  (5), `game_sweep.rs` (8: dc6, dcc, cof, palettes, font, tbl, both
+  animdata), `game_world_data.rs` (1), `game_drlg_tables.rs` (1: `maze.md` s1
+  r1; the `s3.3` id was dropped because the spec has no such rule now),
+  `game_inventory_path.rs` (4), `game_items.rs` (2), `game_treasure.rs`
+  (10); `tbl.md` `live-tables-1-14d` was dropped from its claim (that id is
+  exempt). Left as intended claims because the test fails:
+  `dt1_every_live_file_decodes`, `ds1_every_file_parses`,
+  `sweep_create_every_item_every_quality`. `py tools/coverage.py --check`: 13,398
+  claims, 0 errors; `--summary`: rules 10,583 (+625 exempt), unit 9,659
+  (91.3%), game-file 416 (3.9%), trace 80 (0.8%), **verified 496 (4.7%)**,
+  any tier 9,767 (92.3%) (before this run: game 384, verified 464 of 10,529;
+  the denominator moved with the spec sessions in between).
+- **Findings** (expected values not changed; owner in brackets):
+  (1) `game_sweep` count assertions: the observed 2,372 DS1 (v18 1,926) and
+  108,905 0x1001 DT1 blocks agree with the case-insensitive `mpq-tool
+  formats` (ds1 2,372, dt1 256 files / 250 parsed); `specs/formats/ds1.md`
+  Status (2,456 / 1,997) and `specs/formats/dt1.md` (110,259) say otherwise
+  [tests `game_sweep.rs` `ds1_every_file_parses`, `dt1_every_live_file_decodes`;
+  also `docs/PLAN.md` line 175 and `specs/formats/native-assets.md` (2,456)].
+  (2) `lvlprest_measurements`: 80 vs 82 rows naming a file beyond `Files`
+  [`specs/drlg/preset.md` "Files beyond `Files`", `game_drlg_tables.rs:234`].
+  (3) `sweep_create_every_item_every_quality` 560 failures on items 519 `ibk`,
+  530 `isc`, 556 `ear`, 645 `0sc` [`specs/items/generation.md` s3 /
+  `affixes.md`, `game_items.rs:411`, `check_item`]. (4) Cold Plains 97 rooms
+  (62 preset + 35 outdoor) vs the recorded 98 (61 + 37), grid and
+  substitution lists non-empty [`specs/drlg/outdoor.md`,
+  `world_data/tests/game.rs:206`, C92]. (5) `game_wired_host`: all seven
+  classes stop at the first walk to the town waypoint
+  [`crates/test-fixtures/src/host.rs:529`, wired-host walk]. (6) 5.4:
+  `with_room` is 0 on both recordings [`conformance::placement` reader].
+
 Done 2026-10-06 (local PC 2, coordinator #2, main `63a706b`, Windows 11
 Pro 26200; `hash-manifest` of the install = `traces/reference-install.toml`
 byte for byte, 19 entries): `cargo build --workspace --release` OK;
@@ -2739,25 +2902,6 @@ the dev-dependency) and record results here.
     live `.bin` set and compare every TC record and entry byte for byte
     with `map-tc_records.bin` / `map-tc_entries.bin` (`tc_chest` as record
     indices via `manifest.json` `tc_base`). Expect identical.
-21. `d2-formats` DS1 game claim (`gaps-client-formats.md` §5; claim on
-    `ds1.md` edge cases, the last unclaimed unit of `ds1.md`):
-    `D2_GAME_DIR=<install> cargo test -p d2-formats --test formats_game
-    -- --ignored ds1_layer_limits_and_truncated_trees_groups`. Expect a
-    pass: `data\global\tiles\ACT1\OUTDOORS\trees.ds1` (from `d2exp.mpq`,
-    else `d2data.mpq`) reads version 12, tag_type 1, 14 groups,
-    `groups_truncated`, the 14th group's y / width / height 0, and its
-    `files` list holds `C:\D2\DATA\GLOBAL\TILES\ACT1\TOWN\trees.tg1`
-    (ASCII case ignored). The synthetic half (4 walls, 2 floors, 1 shadow
-    layer) already passes in CI. On failure fix the expected value from the
-    file or remove the claim in the same session (`COVERAGE.md` §3).
-22. `automap.bin` names (`gaps-data-rng.md` §7, deviation D5 / §7 GD10):
-    `cargo run -p data-tool -- tables`, then read the 1.14d `automap.bin`
-    for any record whose LevelName or TileName is empty or starts with
-    `0`. Expect none (the stricter `bin.rs` `post_load_check`, which treats
-    an empty name as known and has no `0` case, is then harmless); any such
-    record shows which of the spec (`0…` gives 0 without a compare, empty
-    fails) and the `.bin` check is right.
-
 23. Level data from the user's files (`drlg-data` §6; test code written,
     never run): `D2_GAME_DIR=<install> cargo test -p d2-server world_data
     -- --ignored`. Expect 3 pass. `act1_placement_matches_the_recorded_vector`:
@@ -2780,6 +2924,7 @@ the dev-dependency) and record results here.
     load error names the archive path. If it passes, `wire-worldgen.md` §7
     check 1 (the RNG trace compare, §5 Blocked) is the next step. Loads
     2,043 DS1s up front.
+    **Result 2026-10-08** (PC 1): `act1_placement_matches_the_recorded_vector` and `den_of_evil_matches_the_maze_vector` pass; `outdoor_levels_generate_through_the_dispatcher` fails: Cold Plains 97 rooms (62 preset + 35 outdoor) vs 98 (61 + 37), grid / substitution lists non-empty (C92).
 24. Window on a real GPU, synthetic tables (`p6-window` check 1):
     `cargo run -p d2-client --release -- play --synthetic --frames 1500`.
     Expect a black 800×600 view in the window; a log line every 250 frames
@@ -2794,41 +2939,6 @@ the dev-dependency) and record results here.
     --ignored`. Expect `live_tables_give_a_waypoint_object` passes (the
     waypoint object is the first `objects` row with operate function 23 and
     init function 17).
-27. GPU node byte check on the real GPU: `cargo test -p d2-client --test
-    app_frame_loop -- --nocapture`. Expect `adapter: <name> (<backend>,
-    <driver>)` (not llvmpipe) and both tests `ok` (0 differing pixels).
-28. The `map` case on the compute compositor (`verify-map` check 1; real
-    GPU, `D2_GAME_DIR` set): `cargo run --release -p d2-client -- verify
-    --case map`. Expect `verify data\global\tiles\ACT1\TOWN\townN1.ds1: <K>
-    draw items, view <W>x<H> at <L>,<T>` with the same K, W×H, L,T as the
-    last recorded Phase 1b run; `images in game/renders/verify-townN1`;
-    `PASS: GPU render matches the CPU reference exactly`; `<C> chunks of at
-    most 1024x1024`, `CPU binned: 0 of <W·H> bytes differ`, `GPU indices: 0 of
-    <W·H> bytes differ`, `GPU: 0 of <W·H> pixels differ`; `PASS map (map)`;
-    exit 0. If only the `GPU:` (RGBA) line is non-zero and `GPU indices` is
-    0, record `palette[0]` of the act palette: that is VM1 (index 0,
-    `render/composition.md` §B2), not a compositor bug.
-29. `cargo run --release -p d2-client -- verify --case map --perturb 7`.
-    Expect `CPU binned: 7 of …`, `GPU indices: 7 of …`, `GPU: 7 of …`,
-    `FAIL map (map): CPU and GPU halves`, exit 1. Any other count fails the
-    check (M08).
-30. `cargo run --release -p d2-client -- verify` (all 11 cases). Expect as
-    the `p6-verify-gpu` entry with the map lines of C28: `summary: 11 pass,
-    0 fail, 0 error, 0 GPU not wired, 0 no adapter`, exit 0. Record whether
-    two headless devices in one process (the runner's and the `map` case's)
-    cause any problem.
-31. `cargo test -p d2-client --lib verify::map::tests::gpu_map -- --ignored
-    --nocapture`. Expect first line `adapter: <real GPU name> (<backend>, …)`,
-    test passes. Record adapter name, backend and driver with each of
-    C28–C31; until then the `map` case's GPU half is proven on llvmpipe only.
-32. `D2_GAME_DIR=<install> cargo test -p d2-data --test game_data -- --ignored
-    fixups_on_live_set` (`fuzz-data`): must still pass (the live `itemtypes` /
-    `montype` walks stay far under the new n² × 128 budget, so
-    `fixup::apply` returns `Ok`).
-33. `cargo run --release -p data-tool -- dump-compare
-    traces/raw/20261006-021210-tables`: the `itemtypes_equiv` and
-    `montype_equiv` maps still identical to 1.14d memory (expected
-    unchanged: 70/70 tables and every map identical).
 34. World and DRLG table tests (`game-tests-drlg-world` §3; never run, every
     expected value from a spec): `D2_GAME_DIR=<install> cargo test -p d2-sim
     --test game_world -- --ignored` (expect 10 passed) and `… --test
@@ -2855,6 +2965,7 @@ the dev-dependency) and record results here.
     `preset.md` §2 r2 (`lvlprest_def_is_the_row_number`); `maze.md` §1 r3;
     `levels.md` §3 r2, §3 r3, §4 r1 and `preset.md` §3.1 r3
     (`act1_placement_on_live_tables`). Then record in §5 Done and §1.
+    **Result 2026-10-08** (PC 1): `game_world` 10 passed; `game_drlg_tables` is 12 tests now, 11 passed, `lvlprest_measurements` failed (80 rows name a file beyond `Files`, expected 82): finding for `preset.md`. Claims unlocked: all but that test's (it has none).
 35. Item and treasure tests (`game-tests-items-treasure` §2; these are the
     code for C3 and C4; C20, the byte compare with the dump, is not done
     here): `D2_GAME_DIR=<install> cargo test -p d2-sim --test game_treasure
@@ -2889,49 +3000,8 @@ the dev-dependency) and record results here.
     §edge-cases-original-bugs r4; `generation.md` §3 r1; measured with the
     claims written: game 187 → 200 units, verified 217 → 230, any 2,459 →
     2,460). The sweeps and table-fact tests with a wider rule get none.
+    **Result 2026-10-08** (PC 1, release): `game_treasure` 16 passed, claims unlocked; `game_items` 7 passed, 1 failed: `sweep_create_every_item_every_quality`, 560 failures on items 519 `ibk`, 530 `isc` ("affix 1 does not fit"), 556 `ear` ("ear without a player"), 645 `0sc` ("affix 3 does not fit"); its `generation.md` §3 r1 claim stays unconfirmed.
 
-36. Inventory tables (`impl-inventory` §6, D1–D3): `D2_GAME_DIR=<game>
-    cargo test -p d2-sim --lib real_grid_belt_and_type_tables -- --ignored`.
-    Expect a pass: `inventory.bin` 32 records with the §1.3 sizes for 0–15,
-    `belts.bin` numboxes `12, 8, 4, 16, 8, 12, 16, 12, 8, 4, 16, 8, 12, 16`,
-    and the D3 itemtypes codes (space-padded, `bow `, `axe `, `h2h `). The
-    values are the spec's measurements, never run: no claim until it passes
-    (`COVERAGE.md` §3).
-37. Stats, units, vitals, skill levels, world data and a wired game
-    (`game-tests-sim-core` §4; 15 tests, never run, every value from a
-    spec): `D2_GAME_DIR=<install> cargo test --release -p d2-sim --test
-    game_core -- --ignored --nocapture` (expect 12 passed) and `… -p
-    d2-server --test game_world_data -- --ignored --nocapture --test-threads
-    1` (expect 3 passed, 0 failed). Look at the printed lines: AnimData
-    records scheduled / skipped, monstats rows with `DamageRegen`, the
-    evaluated skill-value count, the DS1 version / type / id histograms, the
-    Act I room counts, frame and message count after 100 ticks. A non-empty
-    `WorldSim::errors()` in `wired_game_on_live_tables_runs_100_ticks` names
-    the failing adapter: a wiring finding before a table finding.
-    Interpretation points (GS1–GS6, §7): `threshold(c, 99)` is row 100 (a
-    panic past the table means the spec's "level 99" is row 99);
-    2,043 lvlprest files and the patch MPQ (a count mismatch with every
-    file parsing points at `preset.md` OQ5, not the parser; "1,054 rows" is
-    read as SizeX and SizeY both ≠ 0, try "either" if only that fails); op 1
-    stats 162, 163 each with an entry in entries(11); the fCallback list
-    asserts the count, the first six and the last; animation speed is the
-    AnimData speed (§4.3 unwritten); the player's stats go through
-    `VitalsView` with `NoHost`. After a pass turn each `Intended claim`
-    line into `// Covers:`: `fixups.md` §2 r3 (`op_tables_rebuild_from_the_
-    columns`), `vitals.md` §4.1 / §1 / §2 / §3 (`charstats_and_experience_
-    as_stated`, `player_creation_every_class`, `level_up_and_stat_point_
-    vectors`), `stat-lists.md` §7.2 r2 (`monster_damage_regen_every_class`),
-    `units.md` §4.2 (`anim_schedule_every_record`), `levels.md` §2, §4, §5
-    (`special_value_vectors`), `levels.md` §3 r2, r3, §4 r1, §5
-    (`every_act1_level_generates`); the data-fact tests get none; then
-    `py tools/coverage.py --check` and record in §5 Done and §1.
-38. `path::search::tests::expfield_live` (`impl-path-place` §5): `D2_GAME_DIR=…
-    cargo test -p d2-sim --lib path::search::tests::expfield_live --
-    --ignored`. Expect a pass: `ExpField.D2` is 65,546 bytes, header (0x010A,
-    256, 256), F1 bytes `3 4 5 / 2 8 6 / 1 0 7`, the F2 / F3 walks as the
-    spec lists. Written without the file; its `Covers:` (`path-placement.md`
-    §7.3 r1, r2, game tier) counts in `coverage.py` already and is verified
-    only after this passes.
 39. Packets replay baseline (`conformance-harness` §5 item 3): `cargo test -p
     conformance --test packets_replay -- --ignored --nocapture` on the
     existing `traces/raw/*-packets.jsonl`. **Expect FAIL** at the first
@@ -2939,6 +3009,7 @@ the dev-dependency) and record results here.
     no session code builds the recorded game, Phase 5): record the `seq` and
     the message id as the baseline. It passes only when a session and a world
     reproduce the recorded game and every S→C sender exists (Blocked).
+    **Baseline 2026-10-08** (PC 1): FAIL at `20261006-015956-packets.jsonl` record 5: `s2c: recorded message 0100040010000100 to client 0 (size 8) not queued by the server`.
 40. The window with the user's files (`p6-integrate` check 1): `D2_GAME_DIR=
     <game> cargo run -p d2-client --release -- play --frames 1500`. Expect
     `play: game data from D2_GAME_DIR (<n> levels, <m> objects, waypoint
@@ -2958,35 +3029,6 @@ the dev-dependency) and record results here.
     would be rect (920, 984, 80, 80) only with the recorded init seed, which
     the app's `--seed` is not, PI1) and `frame_loop_runs_on_the_users_levels`
     (101 frames, 100 ticks) to pass. Includes C26.
-42. `verify` on real cases on one device (`p6-integrate` check 3): `cargo run
-    --release -p d2-client -- verify`. Expect one `GPU compositor: adapter:
-    <real GPU>` line before the first case, the map lines of C28 and
-    `summary: 11 pass, 0 fail, 0 error, 0 GPU not wired, 0 no adapter`, exit
-    0; with `--perturb 7` every case FAILs with exactly 7 on each comparison,
-    exit 1. Supersedes the two-device note of C30.
-43. Single-map form (`p6-integrate` check 4): `cargo run --release -p
-    d2-client -- verify --ds1 'data\global\tiles\ACT1\TOWN\townN1.ds1'`. Expect
-    the map lines of C28 (now with the report lines printed) and exit 0.
-44. GPU node on a real GPU, store-backed assets (`p6-integrate` check 5):
-    `cargo test -p d2-client --test app_frame_loop -- --nocapture`. Expect
-    `adapter: <real GPU>` and all non-ignored tests `ok` (0 differing
-    pixels). Same as C27 on the new assets.
-45. Monsters, missiles, skills, vitals (`game-tests-monsters-skills` §3; 35
-    tests, never run): `D2_GAME_DIR=<install> cargo test --release -p d2-sim
-    --test game_monsters -- --ignored` (19 passed) and `… --test game_skills
-    -- --ignored` (16 passed, 0 failed; `--release` because the sweeps run
-    about 300,000 stats inits and 1.5 M formula evaluations). A failure
-    prints the failing row: fix the side the spec says is wrong (code, test
-    or spec). Interpretation points (GM1–GM6, §7): the evilhut row (528 or
-    529: the test checks "exactly one row, value 40"; record the row in
-    `population.md`), `block` read as all three difficulties, `MonDen`
-    checked on Normal only, "SrcDam 63" read as 63 rows with SrcDam ≠ 0 and
-    "skpoints 0" as no row with a `skpoints` formula, `periodic 2` as rows
-    {57, 277}, `mapped` = referenced by some live row, a non-zero
-    `pSrvDmgFunc` names a filled slot 1–14. Then add the claims of the table
-    in `game-tests-monsters-skills` §4 per passing test (they raised the
-    game tier from 187 to 277 units when measured; verified follows only
-    after the run), rerun `py tools/coverage.py --check`, record in §5 Done.
 46. Formats sweeps and the client asset path (`game-tests-client-assets` §4;
     17 tests, never run), release builds because the DCC sweep decodes about
     22k files: (1) `D2_GAME_DIR=<install> cargo test --release -p d2-formats
@@ -3030,16 +3072,7 @@ the dev-dependency) and record results here.
     Next local run: `cargo run -p mpq-tool -- formats` on the install, then
     the sweep rerun; update the expected counts only from that measurement
     (`docs/handoff/fix-sweep-counts.md`).
-47. Composition on a real GPU (`render-composition` C-rc1): `cargo run -p
-    d2-client --example gpu_compare` → 18/18 `0 differing bytes`; `-- --perturb
-    7` → every case FAIL with exactly 7 / 7, exit 1; `cargo test -p d2-client
-    --lib gpu_compositor::tests::gpu -- --ignored --nocapture --test-threads
-    1` → 2 pass. Record adapter name, backend and driver (llvmpipe only so
-    far).
-48. Composition in `verify` (C-rc2): `cargo run --release -p d2-client --
-    verify` → the `map` case and the 10 synthetic cases PASS (the map case has
-    no blend table, so the orientation change cannot move it); `--perturb 5`
-    → 5. Run together with C42.
+    **Result 2026-10-08** (PC 1): (1) 9 passed, 2 failed (`ds1_every_file_parses` 2,372 files, `dt1_every_live_file_decodes` 0x1001 blocks 108,905; spec numbers 2,456 / 110,259 are the pre-fix case-sensitive counts); (2) 5 passed, 0 refused; (3) pass on Intel HD Graphics 630. Only (1) remains: fix the specs' counts and the two assertions together.
 49. PL2 palette (`composition.md` OQ1; C-rc3): for each act, the first 1,024
     bytes of `pal.pl2` through `scene::present_palette` against the `.dat`
     palette, and entry 0 = (0, 0, 0). Decides whether the app may keep
@@ -3051,27 +3084,6 @@ the dev-dependency) and record results here.
     frames, `units.md` §4.2), then the e2e's lookups against real names once
     the composer is specified (`animdata.md` OQ2).
 
-51. Inventory grids, belts and path tables on the live files
-    (`game-tests-inventory-path` §4; `crates/d2-sim/tests/game_inventory_path.rs`):
-    `D2_GAME_DIR=<install> cargo test -p d2-sim --test game_inventory_path --
-    --ignored --nocapture` (the install with the MPQs and `Game.exe`).
-    Expect **6 passed, 0 failed** (`live_inventory_records_both_resolutions`,
-    `live_page_grids_every_owner`, `live_belt_capacities`,
-    `live_potion_groups_similar`, `sweep_every_item_size_places`,
-    `live_path_tables_equal_game_exe`); without `--ignored` the 2 CI tests
-    pass. Record the printed lines: belt-item count, item sizes, zero-size
-    items, items larger than 10 × 4, beltable and 1 × 1 beltable counts.
-    Cross-check: `py tools/trace-recorder/path_tables.py` exits 0 and agrees
-    with `live_path_tables_equal_game_exe`. Expected values are spec table
-    facts (`inventory.md` §1.3 measured table, §3.1, D1 / D2), **none has run**.
-    Then turn each `Claim once the first local run passes` line of a passing
-    test into `// Covers:` (`inventory.md` §1.3, §1.2, §3 r1, §3 r4; the sweep
-    and the path-table test get none) and re-run `py tools/coverage.py
-    --check`. A failing test: fix the test from the observation, or turn the
-    spec fact into an open question. Look first at GX1–GX3 (§7): record 29 =
-    255 × 255 although the spec calls it a copy of record 13 (0 × 0); pages 5
-    and 0xFF read as "other (0)" = the class record; items with body
-    location 8 that are not belts (read through `body_location_allowed`).
 52. DC6 / DCC / DT1 counts for placement (`render-camera-placement` "Local
     checks", C; the `mpq-tool formats` extension is code to write first):
     extend `mpq-tool formats` with (a) DC6 frames with `flip` ∉ {0, 1}
@@ -3089,14 +3101,6 @@ the dev-dependency) and record results here.
     server_tick: <t>, items: 0, … })` with `t` equal to that line's server
     ticks (one drawn frame per tick), no error, exit 0. Record the node frame
     count (now at most the tick count). Run with C40.
-54. Composition and capture on a real GPU (`render-wire` check 3):
-    `cargo test -p d2-client --lib
-    verify::capture_case::scene_tests::gpu_half -- --ignored --nocapture` →
-    `adapter: <real GPU>`, pass (llvmpipe: `GPU indices: 0`, `GPU: 0 of
-    480000 pixels differ`, perturb 7 → 7 on all three); `cargo test -p
-    d2-client --test app_frame_loop -- --nocapture` → 6 pass, 0 differing
-    pixels in the GPU node. Record adapter name, backend, driver. Run with
-    C47.
 55. Placement replay on the existing recordings, no player
     (`conformance-path-render` §5 item 1): `cargo test -p conformance --test
     placement_replay recorded_player_placements_replay_exactly -- --ignored
@@ -3107,6 +3111,7 @@ the dev-dependency) and record results here.
     WIRED`. Record the printed counts (players, with_room, monster_assigns,
     item_messages) as the baseline; different R1–R3 numbers are a reader
     finding.
+    **Baseline 2026-10-08** (PC 1): FAIL `PLACEMENT NOT WIRED`; `...015956` players 2, with_room 0, monster_assigns 144, item_messages 114; `...022633` players 4, with_room 0, monster_assigns 121, item_messages 15; every room `None` (R3's room not read: reader finding).
 56. Movement replay on the existing recordings, no player
     (`conformance-path-render` §5 item 2): `cargo test -p conformance --test
     movement_replay recorded_walks_replay_exactly -- --ignored
@@ -3116,13 +3121,7 @@ the dev-dependency) and record results here.
     72 = 130), no 0x0F / 0x10 in `sent` (R4), then FAIL `MOVER NOT WIRED`.
     Different request counts are a reader finding (the reader counts every
     `c2s`; R4 / R5 count dispatched ones: equal when nothing was dropped).
-57. The recordings list (`conformance-path-render` §5): `cargo run -p
-    conformance --bin recordings-needed` (`D2_TRACES_RAW=<dir>` for another
-    folder). Expect the 7 entries with MISSING / present / BLOCKED:
-    `movement-walk` MISSING, `movement-path-state` and
-    `placement-monsters-items` BLOCKED (recorder extensions, A-seventh),
-    `placement-players`, `packets`, `units`, `stats` present or missing per
-    the folder. Record the output as the baseline.
+    **Baseline 2026-10-08** (PC 1): FAIL `MOVER NOT WIRED`; `...015956` requests 385, ticks 4239, sent {13: 1, 21: 1, 150: 122}, other_inputs 109; `...022633` requests 130, ticks 4061, sent {13: 5, 21: 3, 150: 32}, other_inputs 42.
 58. Benches on the developer PC (optional; the note asks for no local
     run): the four `cargo bench` commands of §4, compare with the cloud
     baseline of §1 3ad (a real machine should not be slower by an order of
@@ -3139,18 +3138,12 @@ the dev-dependency) and record results here.
     time and compare the seven digests (determinism across processes). A failing
     assertion names its step: read it against GH1–GH7 (§7 eighth set) before
     changing a test. No `Covers:` claim: integration only.
+    **Result 2026-10-08** (PC 1): 0 passed, 7 failed, identical in two runs: Blood Moor arrival (4790, 5656) frame 1007, then `town waypoint: not reached after 4 legs; player at (4798, 5634) in level Some(2)` (`test-fixtures/src/host.rs:529`).
 60. `GameData::load` on the live set (`fixedset-game` §4; optional, after C59):
     with `D2_GAME_DIR` set, `GameData::load(bins, &archives)` with
     `ActCreation::Full` should reproduce the setup `game_wired_host.rs`
     assembles by hand (same level ids, same seeds, same digests). If it does,
     folding that file onto the constructor is the refactor of step 7e.
-61. Huffman decoder on game files after the speed-up (`mpq-huffman` queue 1):
-    `D2_GAME_DIR=<install> cargo test -p d2-formats -- --ignored` and
-    `cargo run --release -p mpq-tool -- formats`. Expect everything that passed
-    before still passes; in particular all **5,008 Huffman + ADPCM `.wav`
-    files** decode to their exact RIFF size (`mpq.md` Observations). The decoder
-    is held to the reference model by property tests, but no game-file sector
-    has run through the new code.
 62. Which Huffman weight tables the `.wav` sectors use (`mpq-huffman` queue 2;
     decides whether further decoder work pays, step 7r): count byte 0 of the
     Huffman stage over the 0x41 / 0x81 sectors (no tool prints this today: add
@@ -3186,7 +3179,7 @@ the dev-dependency) and record results here.
     of builds of 76..78, 111, 112, 117 stay `outdoor-act3-act5.md` OQ 1, 3.
 66. Character saves (`claude/impl-d2s`, note
     `docs/handoff/impl-d2s.md` §4; `docs/LOCAL-RUN.md` 2.18 and 6.7).
-    (1) `D2_SAVE_DIR=<Saved Games\Diablo II>` `cargo test --release -p
+    (1, done 2026-10-08) `D2_SAVE_DIR=<Saved Games\Diablo II>` `cargo test --release -p
     d2s-tool --test real_saves -- --ignored --nocapture`: every 1.14d
     `.d2s` parses in `formats/d2s.md` §1 order and rewrites byte for
     byte; record header +0x10..+0x37, +0x88..+0xA7, stats at 0x2FD,
