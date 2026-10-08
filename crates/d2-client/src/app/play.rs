@@ -289,6 +289,20 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     let waypoint_map = single_player::client_waypoint_map(&config.data);
     let object_rows = single_player::client_object_rows(&config.data);
     let request = config.character.clone();
+    // d2rs-own, unverified: the map files sit next to the character save.
+    let automap_files = config.save_path.as_deref().and_then(|p| {
+        Some(super::automap::SaveFiles {
+            dir: p.parent()?.to_path_buf(),
+            sub: None,
+            name: p.file_stem()?.to_string_lossy().into_owned(),
+        })
+    });
+    let automap_source = match &config.data {
+        GameData::Live(d) => {
+            Some(super::automap::live_source(&d.tables).map_err(anyhow::Error::msg)?)
+        }
+        GameData::Synthetic => None,
+    };
     let speeds = single_player::walk_speeds(&config.data, &config.character)?;
     let save_base = save::base_save(&config.character);
     let save_tables: Option<std::sync::Arc<dyn d2_formats::d2s::SaveTables + Send + Sync>> =
@@ -363,6 +377,9 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         let item_parts = super::items::item_parts(&archives).map_err(anyhow::Error::msg)?;
         super::items::add_items(&mut app, archives.clone(), item_parts);
         palette::add_act_palettes(&mut app, palettes);
+        if let Some(source) = automap_source {
+            super::automap::add_automap(&mut app, source, automap_files, archives.clone(), true);
+        }
         let parts = ui::UiParts::live(archives.clone()).map_err(anyhow::Error::msg)?;
         ui::add_original_ui(&mut app, parts)?;
         let strings = super::strings::TableStrings::load(archives.as_ref(), super::strings::LANG)
@@ -382,6 +399,16 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             .add_systems(Update, exit_after);
     }
     let exit = app.run();
+    if let Some(a) = app
+        .world_mut()
+        .resource_mut::<WorldViewState>()
+        .automap
+        .as_mut()
+    {
+        if let Err(e) = a.teardown() {
+            eprintln!("play: the automap was NOT saved: {e}");
+        }
+    }
     if let Some(h) = saver {
         match h.save() {
             Ok(()) => println!("play: saved the character to {}", h.path().display()),
