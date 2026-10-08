@@ -56,8 +56,25 @@ pub struct EscState {
     pub exit_requested: bool,
     /// "Configure Controls" was chosen and the host has not read it yet.
     pub controls_requested: bool,
+    /// The Configure Controls screen, while it is open over the menu
+    /// (`controls_host`).
+    pub controls: Option<super::controls_host::ControlsHost>,
+    /// Bindings accepted on that screen, until the host reads them.
+    pub accepted: Option<crate::controls::Bindings>,
     /// The menu tree and the settings it edits (`options_menu`).
     pub menu: OptionsMenu,
+}
+
+impl EscState {
+    /// Leave the Controls screen for the Options menu (Previous selected).
+    pub fn close_controls(&mut self, f: super::controls_host::Finished) {
+        use super::controls_host::Finished;
+        self.controls = None;
+        self.menu.return_from_controls();
+        if let Finished::Accept(b) = f {
+            self.accepted = Some(b);
+        }
+    }
 }
 
 /// A row's label x and the value / slider geometry, §O4 r1.
@@ -66,7 +83,7 @@ const VALUE_BLOCK: i32 = 130;
 
 /// The menu draws over the world with no backdrop (§O4, PROVISIONAL REC-212),
 /// so a dark strip behind the rows keeps the English stand-in text readable.
-fn push_fill(out: &mut dyn UiDrawSink, file: u32, frame: u32, r: Rect) {
+pub(super) fn push_fill(out: &mut dyn UiDrawSink, file: u32, frame: u32, r: Rect) {
     let (w, h) = (FILL_W as i32, FILL_H as i32);
     let mut y = r.y;
     while y < r.y + i32::from(r.h) {
@@ -114,7 +131,15 @@ impl Panel for EscMenuUi {
         FRAME
     }
 
-    fn draw(&self, _ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+        {
+            let mut sh = self.sh.borrow_mut();
+            let file = sh.tables.files.id(FILL_FILE);
+            if let Some(c) = sh.esc.controls.as_mut() {
+                c.draw(ctx, file, out);
+                return;
+            }
+        }
         let sh = self.sh.borrow();
         let m = &sh.esc.menu;
         let file = sh.tables.files.id(FILL_FILE);
@@ -173,6 +198,26 @@ impl Panel for EscMenuUi {
 
     fn event(&mut self, e: UiEvent, _ctx: &UiCtx) -> UiResponse {
         let mut sh = self.sh.borrow_mut();
+        if let Some(c) = sh.esc.controls.as_mut() {
+            let done = match e {
+                UiEvent::CursorMoved(p) => {
+                    c.moved(p);
+                    None
+                }
+                UiEvent::Wheel { steps, .. } => {
+                    c.wheel(steps);
+                    None
+                }
+                _ => match left(e) {
+                    Some((true, at)) => c.press(at),
+                    _ => None,
+                },
+            };
+            if let Some(f) = done {
+                sh.esc.close_controls(f);
+            }
+            return UiResponse::Consumed;
+        }
         let m = &mut sh.esc.menu;
         let mut consumed = false;
         match e {
