@@ -147,10 +147,15 @@ fn fresh(class: u8, name: &[u8], difficulty: u8) -> D2s {
     };
     // Town per difficulty: act 0 of the current one (§2.5).
     header.towns[usize::from(difficulty).min(2)] = 0x80;
+    // §1 rule 2, §8.4 rule 4, §8.5 rule 3: an expansion game's file always
+    // ends `6A 66 6B 66 00` when there is no hireling and no golem.
+    let expansion = header.status & d2s::status::EXPANSION != 0;
     D2s {
         header,
         body: Some(Body {
             skills: vec![0; usize::from(header_skill_count())],
+            hireling_items: expansion.then_some(None),
+            golem: expansion.then(d2s::Golem::default),
             ..Body::default()
         }),
     }
@@ -270,9 +275,8 @@ pub fn apply_live(base: &D2s, live: &Live, now: u32) -> D2s {
         save.header.status |= d2s::status::HARDCORE;
     }
     super::hardcore::mark_dead(&mut save, live.hardcore, live.hardcore_dead);
-    if save.header.create_time == 0 {
-        save.header.create_time = now;
-    }
+    // +0x2C stays as loaded: the game never sets the create time, so every
+    // game-written save holds 0 there (§2.2 rule 10, edge case 11).
     save.header.save_time = now;
     save
 }
