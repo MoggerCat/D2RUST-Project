@@ -12,7 +12,8 @@ use std::sync::OnceLock;
 use d2_sim::drlg::{Drlg, DrlgError, NoLevelTypes, RoomKind};
 use d2_sim::game::Game;
 use test_fixtures::act3::{self, MAZE_LEVELS, PRESET_LEVELS, TOWN};
-use test_fixtures::game::GameData;
+use test_fixtures::game::{ActCreation, GameData};
+use test_fixtures::host::{Session, Setup};
 use test_fixtures::install;
 
 const INIT: u32 = 644_409_375;
@@ -116,5 +117,53 @@ fn the_temples_and_durance_3_are_one_preset_room_levels() {
     for id in PRESET_LEVELS {
         let (rooms, _) = built(id);
         assert!(rooms > 0, "level {id}: no rooms");
+    }
+}
+
+fn setup() -> Setup {
+    Setup {
+        creation: ActCreation::Full,
+        init_seed: INIT,
+        town: TOWN,
+        game_seed: 1234,
+        class: 3,
+        known_waypoints: Vec::new(),
+    }
+}
+
+#[test]
+fn the_live_game_builds_every_dungeon_level_of_the_act() {
+    let mut fx = Session::new_in_act(data(), &setup(), ACT);
+    for &(id, _) in &act3::MAZE_LEVELS {
+        let sim = fx.sim();
+        let rooms = sim
+            .events
+            .action
+            .hooks()
+            .drlg
+            .with_act(ACT, &mut sim.game.lists, |dr, svc| {
+                let l = dr.get_or_alloc_level(svc.data, svc.types, id)?;
+                // A neighbouring level's stamps may have built it already.
+                if dr.level_rooms(l).is_empty() {
+                    dr.generate_level(svc.data, svc.types, l)?;
+                }
+                let rooms = dr.level_rooms(l);
+                for &r in &rooms {
+                    dr.stream_room(svc, r)?;
+                }
+                Ok::<_, d2_sim::drlg::DrlgError>(rooms.len())
+            })
+            .expect("act 2 has a DRLG")
+            .unwrap_or_else(|e| panic!("level {id}: {e:?}"));
+        assert!(rooms >= 36, "level {id}: {rooms} rooms");
+    }
+    // The built levels sit in the same act as the town.
+    for _ in 0..5 {
+        fx.frame();
+    }
+    fx.assert_clean("dungeon levels built");
+    for &(id, _) in &act3::MAZE_LEVELS {
+        let r = fx.level_rect(id);
+        assert!(r.w > 0 && r.h > 0, "level {id} has a rect");
     }
 }

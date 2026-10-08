@@ -56,6 +56,13 @@ impl DrlgWorld {
         Some(f(drlg, &mut svc))
     }
 
+    /// `0x0061AEB0`: the Act II DRLG's staff-tomb level (+0x94), the true
+    /// tomb (`quests-act2.md` §8.1); `None` while the act has no DRLG.
+    pub fn staff_tomb(&self, act: u8) -> Option<u32> {
+        let d = self.dungeon.acts.get(usize::from(act))?.as_ref()?;
+        Some(d.staff_tomb)
+    }
+
     /// The DRLG of an active room's act and the room's DRLG room.
     pub fn drlg_room(&self, game: &Game, room: RoomId) -> Option<(&Drlg, DrlgRoomId)> {
         let act = game.lists.room(room)?.act;

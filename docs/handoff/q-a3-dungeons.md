@@ -10,11 +10,11 @@ The maze generator and the Act III builders (`drlg/maze.md` §3.3, §6: Spider, 
 
 | Link | Before | Now |
 |---|---|---|
-| Act III-shaped set | none | `crates/test-fixtures/src/act3.rs`: levels 0..=102, Kurast Docks (75) preset town with the town waypoint, maze levels 84–93 and 100/101 with their level types and `lvlmaze` rows, the temples 94–99 and Durance 3 (102) as preset levels, lvlprest `Def` = row to 1100 |
-| Maze levels through `Drlg::create(2, ..)` (`TownOnly`) | untested | `tests/act3_dungeons.rs`: every maze level generates and streams as preset rooms only, no provider error; Spider Cave/Cavern are 4 cells, Sewers 1 is 18 cells (ring(5) + 2 stamps, spec §5.1/§6), Dungeon levels grow past the ring; a rebuild is identical; the temples and Durance 3 build |
+| Act III-shaped set | none | `crates/test-fixtures/src/act3.rs` (q-a3-fields' set, extended; one Act III set): levels 84..=102 added to its 0..=83 (Kurast Docks → Travincal), maze levels 84–93 and 100/101 with their level types and `lvlmaze` rows, the temples 94–99 and Durance 3 (102) as preset levels, lvlprest `Def` = row to 1100 |
+| Maze levels through `Drlg::create(2, ..)` (`TownOnly`) | untested | `tests/act3_dungeons.rs` (on a `TownOnly` DRLG): every maze level generates and streams as preset rooms only, no provider error; Spider Cave/Cavern are 4 cells, Sewers 1 is 18 cells (ring(5) + 2 stamps, spec §5.1/§6), Dungeon levels grow past the ring; a rebuild is identical; the temples and Durance 3 build |
 | A play `Session` in act 2 | untested | `tests/act3_play.rs`: `Session::new_in_act(.., 2)` starts in Kurast Docks, runs frames clean; every dungeon level is built and streamed inside the live game's own DRLG next to the town, no rejected message |
 
-No existing file changed except `lib.rs` (one `pub mod act3;`). `synthetic_maze.rs` / `synthetic_tower.rs` untouched: see Finding.
+Merged with staging (q-a3-fields); `lvltypes` now runs to 25, `LEVEL_COUNT` 103. `synthetic_maze.rs` / `synthetic_tower.rs` untouched: see Finding.
 
 ## PROVISIONAL (REC-139)
 

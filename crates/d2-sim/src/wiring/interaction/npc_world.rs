@@ -399,22 +399,40 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
         self.rest.identify(item);
     }
     fn cursor_item(&self, player: UnitId) -> Option<UnitId> {
-        self.rest.cursor_item(player)
+        match &self.inv {
+            Some(v) => v.cursor_item(player),
+            None => self.rest.cursor_item(player),
+        }
     }
     fn item_facts(&self, item: UnitId) -> ItemFacts {
-        self.rest.item_facts(item)
+        match self.inv {
+            Some(_) => self.facts_of(item).unwrap_or_default(),
+            None => self.rest.item_facts(item),
+        }
     }
     fn put_back(&mut self, player: UnitId, item: UnitId) {
         self.rest.put_back(player, item);
     }
     fn remove_cursor_item(&mut self, player: UnitId, item: UnitId) -> bool {
-        self.rest.remove_cursor_item(player, item)
+        match self.inv.as_deref_mut() {
+            Some(v) => v.remove_cursor_item(&mut *self.econ, player, item),
+            None => self.rest.remove_cursor_item(player, item),
+        }
     }
     fn duplicate(&mut self, player: UnitId, item: UnitId) -> Option<UnitId> {
         self.rest.duplicate(player, item)
     }
     fn create_imbued(&mut self, player: UnitId, input: UnitId, mods: &ImbueMods) -> Option<UnitId> {
-        self.rest.create_imbued(player, input, mods)
+        if self.inv.is_none() {
+            return self.rest.create_imbued(player, input, mods);
+        }
+        // The input has left the cursor; its record is still in the item
+        // store until the new item is made. It is freed after.
+        let new = self.imbue_from(input, mods);
+        if let Err(e) = self.econ.free_item(input) {
+            self.state.errors.push(super::InteractionError::Economy(e));
+        }
+        new
     }
     fn item_refresh(&mut self, item: UnitId) {
         self.rest.item_refresh(item);
@@ -438,7 +456,16 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
         self.rest.set_personal_name(item, name);
     }
     fn place_or_drop(&mut self, player: UnitId, item: UnitId) {
-        self.rest.place_or_drop(player, item);
+        match self.inv.as_deref_mut() {
+            // d2rs-own, unverified: with no free spot the item stays on
+            // the cursor (the ground drop near the player is unwired).
+            Some(v) => {
+                if !v.place(&mut *self.econ, player, item) {
+                    self.rest.place_or_drop(player, item);
+                }
+            }
+            None => self.rest.place_or_drop(player, item),
+        }
     }
     /// `generation.md` §7.2 on the item's record and level.
     fn max_sockets(&self, item: UnitId) -> u32 {
