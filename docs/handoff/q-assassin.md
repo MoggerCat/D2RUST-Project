@@ -4,10 +4,11 @@ Stopped early by the coordinator. Nothing here is verified against 1.14d (rule 1
 
 ## State
 
-- **Tests written, not yet compiled or run**: `crates/d2-client/tests/app_assassin.rs` (3 tests, harness copied from `app_amazon.rs`, with a synthetic states table whose rows 8 and 9 are progressive):
+- **Tests written, compile, all 3 FAIL (not yet diagnosed; `hooks().errors` is empty, the player ends in mode 5 = town neutral)**: `crates/d2-client/tests/app_assassin.rs` (3 tests, harness copied from `app_amazon.rs`, with a synthetic states table whose rows 8 and 9 are progressive):
   - `a_sentry_trap_is_laid_and_listed_as_a_pet` (srvdo 45, expects S→C 0x7A)
   - `shadow_warrior_summons_the_shadow` (srvdo 49, expects 0x7A)
   - `tiger_strike_adds_a_charge_on_a_hit` (srvst 23 / srvdo 34, expects the pgsv state on the player)
+- Run result: sentry and Shadow Warrior: no 0x7A seen; Tiger Strike: no charge state. Candidates: the skill never starts (the test rows lack fields the start core needs, e.g. `srvstfunc`/`anim` mode handling, `intown` vs `town` rule, skill not on the right button), or the do step runs but `create_monster`/pettype/states are refused silently. Add debug output from `sim.events.action.hooks()` first.
 - The first `cargo build` failed because the system libs (wayland etc.) were missing; they are now installed, but the test build had not finished. Expect compile fixes in the test file (field names/types of `Skills`, `StatLists::has_state`, `BodyTables` pub fields) before any result.
 - No source change in `crates/` yet; no missing link has been confirmed.
 

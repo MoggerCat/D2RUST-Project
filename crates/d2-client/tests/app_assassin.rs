@@ -201,8 +201,10 @@ impl Game {
                 t.combat.monstats2 = vec![Monstats2::decode(&[0u8; Monstats2::SIZE])];
                 h.tables = Arc::new(t);
                 let all = h.tables.skills.skills.clone();
-                let mut ids: Vec<u16> = rows.iter().map(|(i, _)| *i as u16).collect();
-                ids.resize(10, 0xFFFF);
+                let mut ids = [0xFFFFu16; 10];
+                for (k, (i, _)) in rows.iter().enumerate() {
+                    ids[k] = *i as u16;
+                }
                 let list = h.skill_lists.entry(p).or_default();
                 list.init_player(&all, ListOwner::player(PLAYER_CLASS as i32), Some(&ids))
                     .unwrap();
@@ -297,16 +299,6 @@ impl Game {
             .unwrap()
     }
 
-
-    fn player_mode(&mut self) -> u32 {
-        self.link
-            .with(|l| {
-                let s = &mut l.host_mut().game;
-                let p = s.player_of(LOCAL_CLIENT).unwrap();
-                s.events.action.sys.units.get(p).map_or(0, |u| u.mode)
-            })
-            .unwrap()
-    }
 
     /// Has the local player the state (a charge or a buff)?
     fn has_state(&mut self, state: u16) -> bool {
