@@ -95,6 +95,22 @@ pub struct EnvRow {
     pub material2: i32,
 }
 
+impl From<&d2_data::sounds::SoundEnvironRow> for EnvRow {
+    fn from(r: &d2_data::sounds::SoundEnvironRow) -> Self {
+        EnvRow {
+            song: r.song,
+            day_ambience: r.day_ambience,
+            night_ambience: r.night_ambience,
+            day_event: r.day_event,
+            night_event: r.night_event,
+            event_delay: r.event_delay,
+            indoors: r.indoors,
+            material1: r.material_1,
+            material2: r.material_2,
+        }
+    }
+}
+
 /// E for a level: row `SoundEnv` of `rows`; an index outside the table is
 /// no row (§1 r2).
 pub fn env_row(rows: &[EnvRow], sound_env: u8) -> Option<EnvRow> {
