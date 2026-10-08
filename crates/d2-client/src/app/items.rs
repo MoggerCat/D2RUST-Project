@@ -9,8 +9,8 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use bevy::prelude::*;
+use d2_data::bin::TableFiles;
 use d2_data::tables::{decode_all, Armor, Inventory, Misc, Record, Weapons};
-use d2_formats::mpq::ArchiveSet;
 
 use crate::assets::path::FileSource;
 use crate::bridge::items::{ItemArtRow, ItemArtRows};
@@ -67,8 +67,8 @@ macro_rules! art {
 }
 
 /// The item parts of the user's tables (a load error is an error).
-pub fn item_parts(archives: &ArchiveSet) -> Result<ItemParts, String> {
-    let set = d2_data::bin::load(archives, "eng").map_err(|e| e.to_string())?;
+pub fn item_parts(archives: &dyn TableFiles) -> Result<ItemParts, String> {
+    let set = d2_data::bin::load_from(archives, "eng").map_err(|e| e.to_string())?;
     let mut rows = BTreeMap::new();
     add_rows::<Weapons>(&set, &mut rows, |r| art!(r))?;
     add_rows::<Armor>(&set, &mut rows, |r| art!(r))?;

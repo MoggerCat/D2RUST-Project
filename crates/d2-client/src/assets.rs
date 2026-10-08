@@ -9,6 +9,7 @@
 //! plain-Rust [`cache`].
 
 pub mod cache;
+pub mod game_files;
 pub mod path;
 pub mod prefetch;
 pub mod size;
