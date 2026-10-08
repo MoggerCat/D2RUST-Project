@@ -1194,5 +1194,8 @@ pub fn preview_inv_parts(tables: InvTables) -> InvParts {
     // PROVISIONAL (REC-161, d2rs-own, unverified): worn items feed the
     // wearer's stats, set bonuses included (`wiring/inventory/item_link.rs`).
     parts.state.link_item_stats = true;
+    // PROVISIONAL (REC-266, d2rs-own, unverified): the weapon in use is the
+    // right-hand item (the play host has the skill lists it needs).
+    parts.state.weapon_hand_fallback = true;
     parts
 }

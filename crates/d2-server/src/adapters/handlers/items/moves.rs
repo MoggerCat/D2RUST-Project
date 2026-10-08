@@ -174,8 +174,6 @@ impl InvParts {
         state.equip_rules = true;
         // PROVISIONAL (REC-161): worn items attach their stats to the wearer.
         state.link_item_stats = true;
-        // PROVISIONAL (REC-266): the weapon in use is the right-hand item.
-        state.weapon_hand_fallback = true;
         Self {
             tables,
             state,
