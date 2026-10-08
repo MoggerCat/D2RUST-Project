@@ -763,7 +763,6 @@ fn entity_action(action: u32, npc: u32) -> Vec<u8> {
 
 // Covers: specs/ui/menus.md §2; specs/world/vendors.md §4
 #[test]
-#[ignore = "q-smoke-town break 3: the synthetic game has no vendor tables, no store item is shown"]
 fn act1_trade_and_gamble_rows_open_the_shop() {
     let mut rig = Rig::new();
     for (class, kind, action) in [

@@ -278,6 +278,15 @@ fn synthetic_npc_classes() -> impl Iterator<Item = u16> {
     .chain(super::town_npcs::ACT5.iter().map(|&(c, _)| c))
     .chain(super::town_npcs::ACT3.iter().map(|&(c, _)| c))
 }
+/// [`synthetic_npc_classes`] in `monstats` row order, once each (the
+/// vendor tables' `interact` list, `vendors.md` §1 r2).
+fn synthetic_interact_classes() -> Vec<u16> {
+    let mut v: Vec<u16> = synthetic_npc_classes().collect();
+    v.sort_unstable();
+    v.dedup();
+    v
+}
+
 /// The player's character class (1, sorceress, as in the server tests).
 pub const PLAYER_CLASS: u32 = 1;
 /// The character's name (0x59 bytes 6..22, zero-padded).
@@ -2326,7 +2335,12 @@ impl GameParts {
             monstats: synthetic_monstats(),
             hire_rows: hire_rows.clone(),
             items: super::synthetic_items::item_tables(),
-            vendors: VendorTables::default(),
+            // The stores of the synthetic traders (q-smoke-town, REC-278).
+            vendors: super::synthetic_vendors::vendor_tables(
+                &super::synthetic_items::item_tables(),
+                synthetic_interact_classes(),
+                SYNTHETIC_MONSTATS,
+            ),
             anim: None,
             vitals: None,
             bodies: None,
