@@ -198,6 +198,18 @@ pub fn controls_path(dir: &Path) -> PathBuf {
     dir.join("controls.toml")
 }
 
+/// The folder of `controls.toml`: the folder of `spec_path`, the
+/// `<config_dir>/d2rs/controls.toml` of `client/ui.md` §A6 that the
+/// Configure Controls screen saves to
+/// ([`crate::ui::front_end::screens::controls::config_path`]), so a
+/// rebind is what the next start loads; `fallback` when the platform has
+/// no config dir.
+pub fn controls_dir(spec_path: Option<&Path>, fallback: &Path) -> PathBuf {
+    spec_path
+        .and_then(Path::parent)
+        .map_or_else(|| fallback.to_path_buf(), Path::to_path_buf)
+}
+
 /// Parse `settings.toml`. Strict: an unknown key, a wrong type or an
 /// out-of-range value is an error naming the key.
 pub fn parse_settings(text: &str) -> Result<Settings, ConfigError> {
@@ -429,6 +441,19 @@ mod tests {
         ] {
             assert!(parse_settings(bad).is_err(), "{bad}");
         }
+    }
+
+    // Play loads `controls.toml` from the folder the Configure Controls
+    // screen saves to (`<config_dir>/d2rs/`); the save-folder parent only
+    // when the platform has no config dir.
+    // Covers: specs/client/ui.md §a6-controls-file-d2controls-1-m20 text
+    #[test]
+    fn controls_dir_is_the_configure_controls_folder() {
+        let spec = Path::new("/cfg/d2rs/controls.toml");
+        let fallback = Path::new("/docs/d2rs");
+        assert_eq!(controls_dir(Some(spec), fallback), Path::new("/cfg/d2rs"));
+        assert_eq!(controls_path(&controls_dir(Some(spec), fallback)), spec);
+        assert_eq!(controls_dir(None, fallback), fallback);
     }
 
     #[test]

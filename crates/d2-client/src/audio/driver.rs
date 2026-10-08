@@ -250,7 +250,7 @@ impl SoundDriver {
         Self {
             env_indoors: system.table().env_indoors().to_vec(),
             system,
-            globals: Globals::default(),
+            globals: Globals::sound_init(),
             cues: TriggerQueue::new(),
             last_server_tick: None,
             skipped: Vec::new(),

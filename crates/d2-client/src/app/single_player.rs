@@ -230,8 +230,9 @@ pub const ACT2_WAYPOINT_XY: (i32, i32) = (20, 30);
 
 /// The Harrogath waypoint (sub-tiles from its room's origin).
 pub const ACT5_WAYPOINT_XY: (i32, i32) = (20, 30);
-/// The Harrogath waypoint's index (`levels` `Waypoint`).
-const ACT5_WAYPOINT: u8 = 35;
+/// The Harrogath waypoint's index (`levels` `Waypoint`): 30, row
+/// `Harrogath` of `world/waypoints.tsv` (35 is Halls of Death's Calling).
+const ACT5_WAYPOINT: u8 = 30;
 /// Kurast Docks's waypoint object (sub-tiles from its room's origin).
 /// d2rs-own, unverified (q-act3-act5-gaps, REC-246).
 pub const ACT3_WAYPOINT_XY: (i32, i32) = (20, 30);
@@ -239,7 +240,7 @@ pub const ACT3_WAYPOINT_XY: (i32, i32) = (20, 30);
 /// ([`synthetic_chains`]) with their `levels` `Waypoint` indexes
 /// (`world/waypoints.tsv`; Kurast Docks 18 .. Durance of Hate Level 2 26,
 /// Rigid Highlands 31 .. the Worldstone Keep Level 2 38, those the chains have;
-/// Harrogath keeps the synthetic index 35 the Act IV portal lights).
+/// Harrogath is 30, [`ACT5_WAYPOINT`]; the Act IV portal lights it).
 /// d2rs-own, unverified (q-act3-act5-gaps, REC-246).
 pub const CHAIN_WAYPOINTS: [(u32, u8); 16] = [
     (75, 18),
