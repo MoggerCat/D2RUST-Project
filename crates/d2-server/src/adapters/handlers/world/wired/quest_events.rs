@@ -140,7 +140,10 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                     q.update(w);
                 }
                 lair = act2::q6::lair_warp_open(q);
-                summit = Some(act5::q5::summit_warp_open(q));
+                // PROVISIONAL (REC-246, d2rs-own, unverified): the exits close
+                // only once the altar was used; the preview has no fight to
+                // open them with, so a fresh game stays passable.
+                summit = Some(act5::q5::summit_warp_open(q) || !act5::q5::altar_used(q));
             });
             seen
         });

@@ -673,6 +673,12 @@ pub fn summit_warp_open(ctl: &QuestControl) -> bool {
         .is_none_or(|i| !ctl.records[i].not_intro || xr(ctl, i).defeated)
 }
 
+/// Whether the altar was operated (+0x4C altar mode 2) or the fight started.
+pub fn altar_used(ctl: &QuestControl) -> bool {
+    ctl.find(CHAIN)
+        .is_some_and(|i| xr(ctl, i).altar_mode == 2 || xr(ctl, i).fight_started)
+}
+
 /// Altar init 72 `0x0058D240` (object 546).
 pub fn altar_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId) {
     let Some(i) = ctl.find(CHAIN) else { return };

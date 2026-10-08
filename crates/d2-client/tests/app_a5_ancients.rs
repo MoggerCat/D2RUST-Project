@@ -21,6 +21,7 @@ use d2_client::bridge::predict::Speeds;
 use d2_client::bridge::world::{UnitKey, OBJECT, TILE};
 use d2_client::bridge::BridgeResource;
 use d2_server::seams::Clock;
+use d2_sim::missiles::seams::MissileBodies;
 
 mod app_support;
 use app_support::SharedLink;
@@ -164,7 +165,10 @@ impl Rig {
         (tx * 5, ty * 5)
     }
 
-    fn q5<T>(&self, f: impl FnOnce(&mut d2_sim::world::quests::QuestRecord) -> T) -> T {
+    fn q5<T: Send + 'static>(
+        &self,
+        f: impl FnOnce(&mut d2_sim::world::quests::QuestRecord) -> T + Send + 'static,
+    ) -> T {
         app_support::with(&self.server, |l| {
             f(l.host_mut()
                 .game
@@ -209,7 +213,11 @@ fn the_summit_exits_wait_for_the_ancients() {
     let (_, back_class) = back.expect("a way back");
     let (keep, on_class) = on.expect("a way on");
     assert_eq!(keep, 128);
-    rig.q5(|r| r.not_intro = true);
+    // The altar was used and the Ancients live.
+    rig.q5(|r| {
+        r.not_intro = true;
+        r.extra.a5.q5.altar_mode = 2;
+    });
     rig.step(30);
     for class in [on_class, back_class] {
         let t = rig.find(TILE, class).expect("the exit tile");

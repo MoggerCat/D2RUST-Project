@@ -139,8 +139,8 @@ use super::rest::AppRest;
 use super::server_thread::{ThreadLink, ThreadStopped};
 use super::skill_rest::SkillStore;
 use super::{
-    synthetic_act2, synthetic_act4, synthetic_act5, synthetic_burial, synthetic_chains, synthetic_maze,
-    synthetic_tower,
+    synthetic_act2, synthetic_act4, synthetic_act5, synthetic_burial, synthetic_chains,
+    synthetic_maze, synthetic_tower,
 };
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
@@ -231,16 +231,17 @@ pub const ACT2_WAYPOINT_XY: (i32, i32) = (20, 30);
 /// The Harrogath waypoint (sub-tiles from its room's origin).
 pub const ACT5_WAYPOINT_XY: (i32, i32) = (20, 30);
 /// The Harrogath waypoint's index (`levels` `Waypoint`).
-const ACT5_WAYPOINT: u8 = 30;
+const ACT5_WAYPOINT: u8 = 35;
 /// Kurast Docks's waypoint object (sub-tiles from its room's origin).
 /// d2rs-own, unverified (q-act3-act5-gaps, REC-246).
 pub const ACT3_WAYPOINT_XY: (i32, i32) = (20, 30);
 /// The Act III and Act V waypoint levels of the synthetic chains
 /// ([`synthetic_chains`]) with their `levels` `Waypoint` indexes
 /// (`world/waypoints.tsv`; Kurast Docks 18 .. Durance of Hate Level 2 26,
-/// Harrogath 30 .. the Worldstone Keep Level 2 38, those the chains have).
+/// Rigid Highlands 31 .. the Worldstone Keep Level 2 38, those the chains have;
+/// Harrogath keeps the synthetic index 35 the Act IV portal lights).
 /// d2rs-own, unverified (q-act3-act5-gaps, REC-246).
-pub const CHAIN_WAYPOINTS: [(u32, u8); 17] = [
+pub const CHAIN_WAYPOINTS: [(u32, u8); 16] = [
     (75, 18),
     (76, 19),
     (77, 20),
@@ -250,7 +251,6 @@ pub const CHAIN_WAYPOINTS: [(u32, u8); 17] = [
     (81, 24),
     (83, 25),
     (101, 26),
-    (109, 30),
     (111, 31),
     (112, 32),
     (113, 33),
@@ -1293,10 +1293,7 @@ impl WaypointTables {
             row.framecnt1 = 20 << 8;
         }
         // The Act V quest objects (q-act3-act5-gaps), by class.
-        let last = super::synthetic_act5::OBJECT_ROWS
-            .iter()
-            .map(|r| r.0)
-            .max();
+        let last = super::synthetic_act5::OBJECT_ROWS.iter().map(|r| r.0).max();
         objects.resize(
             last.map_or(0, |c| c as usize + 1).max(objects.len()),
             blank(),
@@ -2816,7 +2813,9 @@ pub fn build_with_town(
                 .with(&mut game, |g, v| {
                     v.allocate(g, &req, rect3.x * 5 + wx, rect3.y * 5 + wy)
                 })
-                .ok_or_else(|| BuildError::Setup("allocating the Act III waypoint failed".into()))?;
+                .ok_or_else(|| {
+                    BuildError::Setup("allocating the Act III waypoint failed".into())
+                })?;
         }
     }
     let interact_classes: Vec<u16> = parts

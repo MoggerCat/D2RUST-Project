@@ -20,12 +20,12 @@ use d2_sim::items::ItemTables;
 use d2_sim::rng::Seed;
 use d2_sim::units::lifecycle::{AllocRequest, LifecycleHooks};
 use d2_sim::units::{UnitId, UnitType};
-use d2_sim::wiring::action::{ActionHooks, ActionSim, NoPending};
+use d2_sim::wiring::action::{ActionHooks, ActionSim};
 use d2_sim::wiring::economy::{Economy, GameFields};
 use d2_sim::world::npc::NpcControl;
 use d2_sim::world::quests::{PlayerQuests, QuestControl, QuestTables};
 use d2_sim::world::vendors::VendorTables;
-use test_fixtures::game::{ActCreation, GameData};
+use test_fixtures::game::{ActCreation, GameData, Seams};
 use test_fixtures::{install, synth};
 
 #[path = "../../d2-client/tests/e2e_support/mod.rs"]
@@ -68,7 +68,7 @@ fn data() -> &'static GameData {
 
 struct Fx {
     game: Game,
-    sim: ActionSim<NoPending>,
+    sim: ActionSim<Seams>,
     world: WiredWorld<Rest>,
     player: UnitId,
 }
@@ -86,7 +86,7 @@ fn fx() -> Fx {
         Arc::new(d.action_tables().unwrap()),
         drlg,
         Seed::init_low(GAME_SEED),
-        NoPending,
+        Seams::default(),
     );
     hooks.vitals = Some(Arc::new(d.vitals().unwrap()));
     let mut sim = ActionSim::new(
@@ -112,6 +112,7 @@ fn fx() -> Fx {
     let sys = &mut sim.sys;
     sys.stats.unit_set(&mut sys.hooks, player, 12, 1, 0);
     let guid = sys.units.get(player).unwrap().guid;
+    let _ = guid;
     let items = ItemTables::from_fixed(&d.fixed).unwrap();
     let mut seed = sim.hooks().game_seed;
     let npc = NpcControl::new(&[], Vec::new(), true, 0, &mut seed).unwrap();
@@ -126,13 +127,8 @@ fn fx() -> Fx {
         Rest::default(),
         1000,
     );
-    world.inventory = Some(preview_inv_parts(
-        InvTables::from_fixed(&d.fixed).unwrap(),
-    ));
-    world
-        .rest
-        .quests
-        .insert(player, PlayerQuests::default());
+    world.inventory = Some(preview_inv_parts(InvTables::from_fixed(&d.fixed).unwrap()));
+    world.rest.quests.insert(player, PlayerQuests::default());
     Fx {
         game,
         sim,
@@ -146,23 +142,28 @@ impl Fx {}
 /// Makes `code` for the player and puts it in the inventory grid; its GUID.
 fn give(f: &mut Fx, code: [u8; 4]) -> (UnitId, u32) {
     let player = f.player;
-    let item = f
-        .world
-        .with_economy(&mut f.game, &mut f.sim, |econ, p| {
-            let inv = p.inventory.as_deref_mut().expect("inventory model");
-            let guid = econ.units.get(player).unwrap().guid;
-            let mut w = WiredStart {
-                econ,
-                inv,
+    let item = f.world.with_economy(&mut f.game, &mut f.sim, |econ, p| {
+        let inv = p.inventory.as_deref_mut().expect("inventory model");
+        let guid = econ.units.get(player).unwrap().guid;
+        if !inv.state.inventories.contains_key(&player) {
+            inv.state.add_inventory(
                 player,
-                owner: Owner::player(guid),
-                faults: Vec::new(),
-            };
-            let it = w.create(code).expect("the item");
-            assert!(w.place_inventory(it), "placed");
-            assert!(w.faults.is_empty(), "{:?}", w.faults);
-            it
-        });
+                d2_sim::items::inventory::UnitKind::Player { class: CLASS as u8 },
+                guid,
+            );
+        }
+        let mut w = WiredStart {
+            econ,
+            inv,
+            player,
+            owner: Owner::player(guid),
+            faults: Vec::new(),
+        };
+        let it = w.create(code).expect("the item");
+        assert!(w.place_inventory(it), "placed");
+        assert!(w.faults.is_empty(), "{:?}", w.faults);
+        it
+    });
     let guid = f.sim.sys.units.get(item).unwrap().guid;
     (item, guid)
 }
@@ -178,7 +179,7 @@ impl MoveCall for Use {
     fn call<H: LifecycleHooks>(self, econ: &mut Economy<'_, H>, parts: &mut InvParts) -> Self::Out {
         let mut d = parts.desk(econ);
         let guid = d.guid_of(self.player);
-        Some(sim_moves::handle(&mut d, guid, &self.msg)?)
+        sim_moves::handle(&mut d, guid, &self.msg)
     }
 }
 
@@ -220,13 +221,7 @@ fn the_book_of_skill_adds_a_skill_point_and_is_used_up() {
     assert_eq!(stat(&mut f, STAT_NEWSKILLS), before);
     assert!(in_grid(&f, item), "the book stays");
     // With it: the flag clears, +1 skill point, the item is consumed.
-    f.world
-        .rest
-        .quests
-        .get_mut(&f.player)
-        .unwrap()
-        .flags[0]
-        .set(9, 5);
+    f.world.rest.quests.get_mut(&f.player).unwrap().flags[0].set(9, 5);
     use_grid(&mut f, guid);
     assert!(!flag(&mut f, 9, 5), "the flag is cleared");
     assert_eq!(stat(&mut f, STAT_NEWSKILLS), before + 1);
@@ -242,13 +237,7 @@ fn the_potion_of_life_adds_twenty_life_and_is_used_up() {
     use_grid(&mut f, guid);
     assert_eq!(stat(&mut f, STAT_MAXHP), before);
     assert!(in_grid(&f, item));
-    f.world
-        .rest
-        .quests
-        .get_mut(&f.player)
-        .unwrap()
-        .flags[0]
-        .set(20, 5);
+    f.world.rest.quests.get_mut(&f.player).unwrap().flags[0].set(20, 5);
     use_grid(&mut f, guid);
     assert!(!flag(&mut f, 20, 5));
     assert_eq!(stat(&mut f, STAT_MAXHP), before + 0x1400);

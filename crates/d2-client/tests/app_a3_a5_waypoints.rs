@@ -93,7 +93,7 @@ fn travel(town: u32, wp_index: u32, field: u32, act: u8) {
     }
     // The character learns the field's waypoint (stands in for
     // activating it) and is moved to the act's town.
-    app_support::with(&server, |l| {
+    app_support::with(&server, move |l| {
         let (p, _) = single_player::local_player(&l.host().game).unwrap();
         let g = &mut l.host_mut().game;
         let wp = g.events.action.hooks().waypoints.entry(p).or_default();
