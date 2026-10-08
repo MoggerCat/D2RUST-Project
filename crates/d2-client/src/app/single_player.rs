@@ -115,7 +115,7 @@ use d2_sim::monsters::init::GameInfo;
 use d2_sim::rng::Seed;
 use d2_sim::skills::SkillTables;
 use d2_sim::stats::StatData;
-use d2_sim::units::hooks::{Sim as USim, UnitData};
+use d2_sim::units::hooks::{MonsterInfo, Sim as USim, UnitData};
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::{UnitId, UnitType};
 use d2_sim::wiring::action::{ActionHooks, ActionTables, DrlgWorld, Pending, SkillEvent};
@@ -184,6 +184,8 @@ pub const SYNTHETIC_CHEST_CLASS: u32 = 1;
 const SYNTHETIC_CHEST_OPERATE: u8 = 4;
 const SYNTHETIC_CHEST_INIT: u8 = 3;
 pub const UNIT_Y: i32 = 20;
+/// Akara's x in the synthetic town room (sub-tiles from its origin).
+pub const AKARA_X: i32 = 28;
 /// The player's character class (1, sorceress, as in the server tests).
 pub const PLAYER_CLASS: u32 = 1;
 /// The character's name (0x59 bytes 6..22, zero-padded).
@@ -418,6 +420,9 @@ pub struct LocalSeams {
     /// The unit tables of the client art's name rules ([`super::anim_names`]);
     /// none on synthetic data.
     pub looks: Option<Arc<crate::world_view::unit_assets::UnitLooks>>,
+    /// The players and monsters for the host rest's NPC and quest seams
+    /// (`npc_seams`), written by [`sync_seams`].
+    pub snap: super::npc_seams::SnapRef,
 }
 
 impl LocalSeams {
@@ -448,6 +453,30 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
         }
     }
     hooks.x.sides = sides;
+    let mut units = BTreeMap::new();
+    for ty in [UnitType::Player, UnitType::Monster] {
+        for u in game.lists.units_of_type(ty) {
+            let Some(e) = game.lists.unit(u) else {
+                continue;
+            };
+            let act = e
+                .room()
+                .and_then(|r| game.lists.room(r))
+                .map_or(0, |r| r.act);
+            units.insert(
+                u,
+                super::npc_seams::SnapUnit {
+                    ty,
+                    pos: hooks.path_position(u),
+                    act,
+                    guid: e.guid,
+                },
+            );
+        }
+    }
+    if let Ok(mut snap) = hooks.x.snap.lock() {
+        snap.units = units;
+    }
 }
 
 impl Pending for LocalSeams {
@@ -1378,6 +1407,45 @@ struct GameParts {
     inventory: Option<InvTables>,
 }
 
+/// Rows of the synthetic `monstats` (classes 0 … 399; Akara is the only
+/// NPC).
+const SYNTHETIC_MONSTATS: usize = 400;
+
+/// d2rs-own, unverified (preview): the synthetic game's `monstats`, all
+/// zero rows with Akara `npc` and `interact` (the town NPC of
+/// `docs/handoff/q-quests.md`).
+fn synthetic_monstats() -> Vec<Monstats> {
+    let mut v: Vec<Monstats> = (0..SYNTHETIC_MONSTATS)
+        .map(|_| Monstats::decode(&vec![0u8; Monstats::SIZE]))
+        .collect();
+    let a = &mut v[usize::from(d2_sim::world::npc::class::AKARA)];
+    a.npc = true;
+    a.interact = true;
+    v
+}
+
+/// d2rs-own, unverified (preview): the client's monster rows for the
+/// synthetic game, so Akara's S→C 0xAC creates her unit (a class without
+/// a row is ignored, `client/msg-units.md` §1.2 r2).
+pub fn synthetic_unit_rows() -> UnitRows {
+    let akara = usize::from(d2_sim::world::npc::class::AKARA);
+    let mut monsters = vec![None; akara + 1];
+    monsters[akara] = Some(MonsterClass {
+        components: [0; 16],
+        npc: true,
+        interact: true,
+        setup: Some(crate::bridge::world::MonsterSetup {
+            is_att: true,
+            is_sel: true,
+            ..Default::default()
+        }),
+    });
+    UnitRows {
+        monsters,
+        ..UnitRows::default()
+    }
+}
+
 impl GameParts {
     /// No game files: the waypoint rows, everything else empty; the world
     /// state's level types over the synthetic DRLG view with no preset,
@@ -1401,11 +1469,22 @@ impl GameParts {
             Box::new(d2_server::world_data::Ds1Files::default()),
             Box::new(d2_sim::drlg::outdoor::SubFileMap::default()),
         ));
+        let mut action = empty_action_tables();
+        // The unit path needs the monster's `monstats` row (the shape).
+        action.combat.monstats = synthetic_monstats();
         Ok(GameParts {
-            action: empty_action_tables(),
+            action,
             stats: StatData::default(),
             units: UnitData {
                 expansion: GAME_SETUP.expansion,
+                monsters: vec![
+                    MonsterInfo {
+                        enabled: true,
+                        aidel: [15; 3],
+                        moves: 0,
+                    };
+                    SYNTHETIC_MONSTATS
+                ],
                 ..UnitData::default()
             },
             world: WorldTables {
@@ -1419,7 +1498,7 @@ impl GameParts {
                 levels: wp.levels.clone(),
                 ..ObjectTables::default()
             },
-            monstats: Vec::new(),
+            monstats: synthetic_monstats(),
             hire_rows: Vec::new(),
             items: ItemTables::default(),
             vendors: VendorTables::default(),
@@ -1714,6 +1793,32 @@ pub fn build_with_objects(
         .unit(waypoint)
         .ok_or_else(|| BuildError::Setup("waypoint unit missing".into()))?
         .guid;
+    // The synthetic game's town NPC: Akara, a few sub-tiles from the
+    // waypoint (d2rs-own, unverified; the live game's NPCs come from the
+    // town presets).
+    if matches!(data, GameData::Synthetic) {
+        let req = AllocRequest {
+            ty: UnitType::Monster,
+            class: u32::from(d2_sim::world::npc::class::AKARA),
+            room: Some(room0),
+            add: true,
+            fixed_guid: None,
+            mode: 1,
+            allied: true,
+        };
+        sim.action
+            .with(&mut game, |g, v| {
+                v.allocate(g, &req, ox + AKARA_X, oy + UNIT_Y)
+            })
+            .ok_or_else(|| BuildError::Setup("allocating Akara failed".into()))?;
+    }
+    let interact_classes: Vec<u16> = parts
+        .monstats
+        .iter()
+        .enumerate()
+        .filter(|(_, m)| m.npc && m.interact)
+        .map(|(i, _)| i as u16)
+        .collect();
     // The wired host on the created controls.
     let action = ActionWorld {
         waypoints: Some(WaypointData::new(&wp_tables.levels, &wp_tables.objects)),
@@ -1724,6 +1829,7 @@ pub fn build_with_objects(
     };
     let rest = AppRest {
         expansion: GAME_SETUP.expansion,
+        snap: sim.action.sys.hooks.x.snap.clone(),
         ..AppRest::default()
     };
     // `WiredWorld::now` (store generation and refresh, `vendors.md` edge
@@ -1739,6 +1845,9 @@ pub fn build_with_objects(
         0,
     );
     world.state.hireling_tables = parts.hirelings;
+    // Monster init does not embed the interaction lists yet: the host
+    // registers the `interact` NPC units (d2rs-own, unverified).
+    world.interact_classes = interact_classes;
     // The play host's inventory model (`play-server` seam, D1 preview
     // fills in `PreviewMoveRest`): the new character's start items.
     world.inventory = parts.inventory.map(preview_inv_parts);

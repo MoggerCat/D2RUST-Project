@@ -45,7 +45,7 @@
 
 use d2_sim::game::Game;
 use d2_sim::items::ItemTables;
-use d2_sim::units::{RoomId, UnitId};
+use d2_sim::units::{RoomId, UnitId, UnitType};
 use d2_sim::wiring::action::Pending;
 use d2_sim::wiring::action::{ActionHooks, ObjectCase};
 use d2_sim::wiring::economy::{
@@ -107,6 +107,12 @@ pub struct WiredWorld<R, S = NoSkills> {
     pub vendor_tables: VendorTables,
     pub state: InteractionState,
     pub rest: R,
+    /// Monster classes whose units get an interaction list
+    /// (`npc.md` §1.1: monster init embeds one for an `interact` NPC;
+    /// d2rs-own, unverified: monster init does not call
+    /// `InteractionState::add_npc` yet, so a host names the classes and
+    /// each desk call registers their units, idempotently).
+    pub interact_classes: Vec<u16>,
     /// Host milliseconds (`GetTickCount`), an input of store generation
     /// and refresh (`vendors.md` edge case 10); the caller keeps it
     /// current.
@@ -141,6 +147,7 @@ impl<R, S> WiredWorld<R, S> {
             vendor_tables,
             state,
             rest,
+            interact_classes: Vec::new(),
             now,
             inv_sent: Vec::new(),
         }
@@ -209,7 +216,14 @@ impl<R, S> WiredWorld<R, S> {
             Option<&mut InvParts>,
         ) -> T,
     ) -> T {
+        let classes = self.interact_classes.clone();
         self.with_economy(game, events, |econ, p| {
+            for u in econ.game.lists.units_of_type(UnitType::Monster) {
+                let class = econ.units.get(u).map(|r| r.class);
+                if class.is_some_and(|c| classes.iter().any(|&k| u32::from(k) == c)) {
+                    p.state.add_npc(u);
+                }
+            }
             let mut desk = Desk {
                 econ,
                 quests: &mut *p.quests,
