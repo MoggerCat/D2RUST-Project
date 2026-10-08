@@ -109,6 +109,11 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         .init_resource::<ButtonInput<MouseButton>>();
     add_game(&mut app, Box::new(SharedLink(server.clone())), true).unwrap();
     app_support::synthetic_skill_rows(&mut app);
+    // Akara's monster row, so her 0xAC creates the unit.
+    app.world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .set_unit_rows(single_player::synthetic_unit_rows());
     // No original UI here: the open mode it would hand over with every
     // panel closed (`ui/panels.md` §4.2), so the world view can place.
     app.world_mut()
@@ -200,21 +205,19 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // update pass (`client/model.md` §4, §5); nothing is unowned
     // (`client/bridge.md` §6 rule 3).
     // (Plus the room switch's 0x07 for the Blood Moor room bordering
-    // the synthetic town: 19.)
-    // (Plus Akara, the synthetic town NPC: her 0xAC and one more: 21.)
-    assert_eq!(joined, 21);
+    // the synthetic town: 19; plus its cave entrance's 0x09, a level
+    // warp tile unit, `path-placement.md` §12.1: 20.)
+    // Plus Akara, the synthetic town NPC (`q-quests`): two handled
+    // messages of her add (her 0xAC and a stat/state message), her 0x6D
+    // waits on her unit's queue: 22.
+    assert_eq!(joined, 22);
     // Plus two for the Blood Moor room bordering the synthetic town: its
     // 0x07 at the join and its 0x08 when the travel leaves the town.
-    assert_eq!((b.log().handled, b.log().queued), (28, 1));
+    // Plus two for that room's cave entrance (a tile unit): its 0x09 at
+    // the join and its removal when the travel leaves the town.
+    assert_eq!((b.log().handled, b.log().queued), (30, 2));
     assert!(b.log().unowned.is_empty(), "{:?}", b.log().unowned);
-    // Akara's S→C 0x6D (MonsterStop) is dropped: it arrives for a unit
-    // the model does not hold yet (the synthetic town NPC, `q-quests`).
-    assert_eq!(
-        b.log().dropped.keys().copied().collect::<Vec<_>>(),
-        [0x6D],
-        "{:?}",
-        b.log().dropped
-    );
+    assert!(b.log().dropped.is_empty(), "{:?}", b.log().dropped);
     let sight: Vec<_> = b
         .world()
         .rooms_in_sight
@@ -280,8 +283,8 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // (`client/model.md` §5 rule 1); tick 2's 0x04 put the client in
     // game, so the queued 0x0D was drained by the update pass.
     let log = bridge(&app).0.log();
-    assert_eq!((log.queued, log.drained), (1, 1));
-    assert_eq!(log.dropped.keys().copied().collect::<Vec<_>>(), [0x6D]);
+    assert_eq!((log.queued, log.drained), (2, 2));
+    assert!(log.dropped.is_empty());
     let w = bridge(&app).0.world();
     assert!(w.in_game);
     // 0x03 arrived; without a DRLG source (`add_client_data` is not

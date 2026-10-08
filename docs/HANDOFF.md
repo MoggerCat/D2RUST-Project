@@ -5577,7 +5577,7 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Priority P0 (wire byte layout).
 - Settles: `intents-events.md` §7.4 r3 (the 0x4C / 0x4D level byte: base + bonus clamped to a byte, PROVISIONAL); `pathing.md` §10 r2 (which player modes send 0x4C / 0x4D, and whether the attacker's own client receives them; d2rs-own today: every skill mode A1, A2, SC, TH, KK, S1–S4, SQ, own client included).
 - Steps: `record_packets.py --seconds 120` on two clients in one game (TCP/IP) in the Blood Moor: client A attacks a Fallen (left click, Attack), casts a point skill on the ground and a unit skill on a monster; a Fallen Shaman casts at A. Log every S→C 0x4C / 0x4D / 0x0C on both clients with the server tick and the caster's skill level.
-- Output: `rec94-packets.jsonl`.
+- Output: `rec96-packets.jsonl`.
 - Compare: the level byte against the skill level; the player modes that send a skill message and which clients get it; fold into the cited rules and drop their PROVISIONAL lines. Also note, for `stitch-server-core.md` §2, the hostility (`0x00554200`) and melee-range (`0x00622870`) answers seen (who can attack whom, the reach in sub-tiles).
 
 #### Priority 1
@@ -5802,6 +5802,13 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Output: `traces/raw/pc2rec-r94-packets.jsonl` + hook log.
 - Compare: the distance at which the hook first returns 1 and whether S→C 0x63 follows the C→S 0x13. Fold: write the range test into §7.1 r3 and drop its PROVISIONAL line.
 
+##### REC-99 [MANUAL] sim/path-placement.md §12.2 (C→S 0x13 on a warp tile, tile unit creation)
+- Priority P1.
+- Settles: sim/path-placement.md §12.2 callers (`0x00548C32`: what the 0x13 tile case checks before `0x005550B0`), `client/model.md` §8 rule 7 (the interact sender lists no tile case; `ui/controls.md` §6 r9.2 sends 0x13 (T, g) for a tile), and where 1.14d allocates the tile units from the type-5 presets (PROVISIONAL: every active room's type-5 presets become tile units once, `View::spawn_warp_tiles` in `crates/d2-sim/src/wiring/action/warp_tile.rs`; the 0x13 tile case is `View::warp_tile_message`, no range test).
+- Steps: `py tools/trace-recorder/record_packets.py --seconds 120` while clicking the Blood Moor cave entrance (Den of Evil) from 1, 3 and 8 subtiles away, once with the walk interrupted by a second click, plus a hook at `0x00548C32`.
+- Output: `traces/raw/pc2rec-r95-packets.jsonl` + hook log.
+- Compare: the C→S 0x13 (type, GUID) the client sends for a tile and when (on arrival or at once); the S→C 0x09 tile units of the room at join; the result of the warp (S→C 0x07, 0x15, 0x0D). Fold: write the tile case into §12.2 and drop the PROVISIONAL lines.
+
 ##### REC-50 [NO RUN] client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14
 - Priority P2.
 - Settles: client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14 r3 / OQ10 (reader of pet record +0x1C).
@@ -5931,8 +5938,20 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Output: screenshots / `--draws-every 1` trace.
 - Compare: cel draws (order, X, Y, mode) and marker lines vs §10 and §11.
 
+##### REC-102 [MANUAL] items/inventory-moves.md §7.17 (potion use from the belt: item-use spec `0x005BF240` unwritten)
+- Priority 3 (manual play). PROVISIONAL, `claude/q-belt-ui`: a belt healing potion attaches a `healthpot` (state 100) list with stat 74 for 100 frames; a mana potion a `manapot` (106) list with stat 26; `rvs` / `rvl` restore 35 % / 70 % of both at once. Amounts (hp 45/90/150/270/480, mp 30/60/120/225/450) and the duration are d2rs-own, unverified (`d2-sim/src/wiring/inventory/potion.rs`).
+- Steps: new Amazon in town, take damage, press belt key 1–4; `record_packets.py --seconds 60` plain.
+- Compare: the S→C 0x95 life/mana bytes per tick (and 0x9D removal) against the PROVISIONAL list; fold the real amounts, duration and message order into a new item-use spec.
+
 #### Deferred (not recorded; outside Phases 0–6)
 - IT-1 `formats/d2s.md` OQ1 (legacy loader `0x00534020`, pre-1.09 saves), IT-2 OQ2 (item records of save versions 0x5C–0x5F), `formats/d2s-legacy.md` and `items/bitstream-legacy.md` Pending lines (1.07 / 1.08 / 1.00–1.06 saves): need sample files and are only needed if old saves must load. Record only if the user opens that scope.
+##### REC-96 [ASSISTED] Level-up stat messages (S→C 0x1D-0x1F, 0x21) around a level-up
+- Priority 2 (the play preview sends them by a diff at the tick's sync).
+- Settles: PROVISIONAL `combat/vitals.md` §3 step 7 / `wiring::action::vitals_sync::stat_changes` (the original sends a changed stat from the unit's client update from the changed-stat array, `sim/stat-lists.md` §11; the preview sends level, stat points, skill points, attributes, the maxima and next-level experience against a per-client cache at the end of each tick), and PROVISIONAL `skills/levels.md` §6.4 (the message after a spent skill point: 0x21 skill, base level; what 0x3B sends on the validator's codes 2 / 3, OQ5).
+- Steps: a new character at level 1; `record_packets.py --seconds 120` through one kill that levels up (stat points and a skill point appear), then spend one stat point (C→S 0x3A) and one skill point (C→S 0x3B).
+- Output: `rec96-packets.jsonl`.
+- Compare: which S→C stat ids, in which order and in which tick follow the level-up; the stat ids and values after 0x3A; the 0x21 (and any 0x22 / 0x23) after 0x3B against `d2-server` `skills/world.rs` `add_skill_level`. Fold: replace the two PROVISIONAL points.
+
 - **REC-44** legacy saves, cited by the specs as the capture: `formats/d2s-legacy.md` OQ2 (load one 1.07 / 1.08 save, version 0x57 / 0x59, in 1.14d and compare the unit (stats, skills, items, hireling) with the rules), `items/bitstream-legacy.md` OQ1 (the same 1.07 / 1.08 save: every item against §2–§4, affix ids after the offset of §2 rule 3) and OQ2 (a 1.00–1.06 save, version 0x47, holding a stored, equipped, belt, cursor and socketed item, an ear and a corpse with an equipped item: compare with §6–§8 and edge cases 7–9). No such save exists on this PC; record only if the user opens that scope (steps: place the save in `%USERPROFILE%\Saved Games\Diablo II`, `record_packets.py --seconds 60` plain, then `tools/d2s_check.py`).
 
 #### [NO] Not reachable with the current setup (and why)
@@ -5941,6 +5960,9 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Act V (levels 109–132, REC-30, REC-31 GH, and the Act V parts of REC-38 / REC-40): the waypoint panel of `TestSor` has tabs I–IV only.
 - Fights, kills, quest chains, hireling events: the input script has no combat loop, so these are [MANUAL] / [ASSISTED] (REC-07…11, 23…34) and never `--auto`.
 - `render/draw-order.md` OQ7 (TownE1 tile (950, 933)): off-screen from every reachable spot (`local-buddy-q9-rec` R2-1): REC-32 notes it.
+
+- REC-97 (PROVISIONAL, M22; player death in the play preview, `q-death`): the S→C form of a player's death is not specified (`sim/pathing.md` §10 r2 lists only the walk rows). Preview: 0x0D PlayerStop with the mode-request code 8 (DT) and 9 (DD), then code 7 (neutral after death) on the respawn, sent to every client; the corpse is a player-type unit allocated at the DD start (mode 17, state 7, owner GUID kept in `DeathState::owners`, announced by 0x59 + 0x0D code 9); its items stay with the player (the inventory model has no corpse grid, `vitals.md` §4.7 r1.7) and the dropped gold is not made into piles (`Pending::death_drop_gold` has no preview provider), so a death loses the gold of §4.6 rule 1 for good. The dispatch gate of a player who has died follows the live unit mode (it is staged at mode 1 otherwise), so C→S 0x41 is accepted in mode 17. Check: a death trace (S→C bytes of a player's death and of the 0x41 respawn).
+- REC-98 (PROVISIONAL, M22): no spec gives the screen or text shown while the player is dead. Preview: a Bevy text node "You have died / Press Esc to return to town" while the local player's mode is 0 or 0x11; Esc in mode 0x11 sends C→S 0x41 (`ui/panels.md` §3 r1). Needs the original's wording and layout (RE of the dead-state draw).
 
 ## 8. Lessons (problems met, fixes)
 
@@ -5990,8 +6012,11 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 
 - **REC-QESC-1** Esc game menu art, layout and strings (PROVISIONAL, `ui/esc_menu.rs`, M22): `controls.md` §3 row 56 and `panels.md` §3.1 specify only when the menu opens and closes. Needed for the spec: the ui 9 box art file and frames, the entry rectangles, the strings (Options, Save and Exit Game, Return to Game by id), what Options opens, and what `0x00456300(0, 1)` closes on Esc. Capture: screenshot of the Esc menu at 800 × 600 and the draw calls while it is open. The preview draws a dark box with Font16 English text.
 
-##### REC-52 [NO RUN] world/npc.md §2–§3 host seams in the play preview (q-quests)
+##### REC-104 [NO RUN] world/npc.md §2–§3 host seams in the play preview (q-quests)
 `AppRest` answers `distance` (integer Euclid in sub-tiles), `axis_check` (50 on both axes), `unit_check` (known GUID), `player_busy` (free), `start_allowed` (true), `tristram_cain_busy` (false), `approach` (logged only: the player is not moved) from a position snapshot. `0x00661480` (the 34 list bytes of S→C 0x27) is encoded as the inverse of the client's read. Monster init does not embed the interaction lists: `WiredWorld::interact_classes` registers the `npc && interact` units. After the client's dialog branch (0x2F, 0x31) the preview sends C→S 0x30 at once (no speech, no NPC menu). Needs a spec for `0x00548EF0`, `0x00548F80`, `0x00457490`, `0x00535060`, `0x00641530`, and the real close timing (recorded: 15 frames after 0x31).
 
-##### REC-53 [NO RUN] ui/panels.md ui 0x0F quest log draw `0x004A34F0`, open `0x004A3FE0`
+##### REC-105 [NO RUN] ui/panels.md ui 0x0F quest log draw `0x004A34F0`, open `0x004A3FE0`
 Not specified: the open function, the slot positions `0x00723EA8/EAC`, the cel layout, tab buttons, the 270 px wrap, the replay button. The preview opens on Q with C→S 0x40, draws a 3 × 2 slot grid, icon cels per state, one-line title/text; no just-completed animation and no C→S 0x58 acknowledge.
+- **REC-100** Hireling follow and fight (PROVISIONAL, `d2-server` `handlers/world/hireling_drive.rs`, M22): `hirelings-ai.md` §1 points to `ai-bodies-6.md` §7 for the Hireable think, but the live host has no AI target providers (`Pending::good_target_search`, owner link; `stitch-combat.md` §1 row 12) and `AppRest::HirelingRest` has no unit access. The preview runs a per-frame stand-in: hostile monster within 20 sub-tiles, walk to it, swing every 20 frames at mean `mindamage`/`maxdamage`; else walk or run to the owner past 6 sub-tiles. No XP share, drops, get-hit or `hireling.txt` skill pick. Needed for the spec: the target providers' rules (hostility, `0x00552FD0` owner), the swing/skill timing from the AI think. Capture: a merc in the Blood Moor, per-frame mode, position and target.
+- **REC-101** Hire list row text (PROVISIONAL, `app/hire_stats.rs`): the act of the list is not sent; the first act whose rolled row owns the name id is used; Life and Def read 0.
+- **REC-103** Gold: pile art, drop dialog, server fills (PROVISIONAL, `ui/gold_dialog.rs`, `world_view/ground_items.rs`, `PreviewMoveRest`, M22): (1) `panels-3.md` §28 gives the gold dialog's controls but no art file list or frames for the box, spinner, OK / Cancel, so the preview draws a dark box with Font16 English text (prompt string 4033 by id once strings are bound) and binds Enter / Escape and a raw digit-key map; capture a screenshot of the drop dialog at 800 × 600. (2) `inventory-moves.md` §10.2 leaves the `gld` creation request layout (`0x00559CE0`) unwritten: the play rest creates a plain normal-quality item of the game's format at ilvl 1; capture the request fields of a dropped pile. (3) `0x00641530` (unit distance) and the free-spot search `0x0064E810` are not specified for the play host: it uses the larger sub-tile axis distance of the staged places and takes the drop start point as free; the server's `walk_to_item` is still a seam, so the client walks to a clicked item and asks again (`GroundItems::frame`). (4) The flippy file of a `gld` pile is read from `misc.txt` by code and its direction is the amount class of `unit-composite.md` §9; confirm the `gld` flippy name and direction count against a real install (`data-tool`/render check).

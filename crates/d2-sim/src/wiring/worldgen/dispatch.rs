@@ -144,6 +144,11 @@ impl<X: WorldPending> TickHooks for WorldSim<X> {
     /// Step 3 `0x005559A0` (`population.md` §11.1).
     fn spawn_presets(&mut self, game: &mut Game, r: RoomId) {
         self.population(game, |cx| preset::place_presets(cx, r));
+        // PROVISIONAL (REC-99): the warp tile units of the room's presets.
+        self.host(game, |h| {
+            let WorldHost { game, v, .. } = h;
+            v.spawn_warp_tiles(game, r);
+        });
     }
     /// Step 3 `0x00542B40` (`units.md` §3.4 rule 4): on the action
     /// wiring's inactive store when it is on, else the host's.

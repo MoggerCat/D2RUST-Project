@@ -20,7 +20,6 @@ use d2_client::bridge::hover;
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::mirror::DynLink;
 use d2_client::bridge::predict::Speeds;
-use d2_client::bridge::world::{MonsterClass, MonsterSetup, UnitRows};
 use d2_client::bridge::BridgeResource;
 use d2_client::controls::Action;
 use d2_client::rules::camera::{moving_to_client, Camera, FrameSize, OpenMode};
@@ -302,25 +301,10 @@ fn play_app(ms: &Arc<AtomicU32>, wire: &Arc<Mutex<Wire>>) -> App {
 /// The client's monster rows: Akara is an `npc` and `interact` class,
 /// attackable-flagged so the pick takes her (`isAtt`, `bridge/click.rs`).
 fn set_npc_rows(app: &mut App) {
-    let akara = usize::from(d2_sim::world::npc::class::AKARA);
-    let mut monsters = vec![None; akara + 1];
-    monsters[akara] = Some(MonsterClass {
-        components: [0; 16],
-        npc: true,
-        interact: true,
-        setup: Some(MonsterSetup {
-            is_att: true,
-            is_sel: true,
-            ..MonsterSetup::default()
-        }),
-    });
     app.world_mut()
         .resource_mut::<BridgeResource>()
         .0
-        .set_unit_rows(UnitRows {
-            monsters,
-            ..UnitRows::default()
-        });
+        .set_unit_rows(single_player::synthetic_unit_rows());
 }
 
 /// The screen point of Akara (the one monster in the model), as the

@@ -36,6 +36,7 @@ pub mod place;
 pub mod rooms;
 pub mod units;
 pub mod walk;
+mod warp_dest;
 
 #[cfg(test)]
 mod tests;

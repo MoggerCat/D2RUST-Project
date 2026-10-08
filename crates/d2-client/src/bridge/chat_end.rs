@@ -8,7 +8,7 @@
 //! then runs the chat end (`QuestControl::npc_deactivate`) and a second
 //! talk starts a fresh interaction.
 //!
-//! d2rs-own, unverified; REC-52 in `docs/HANDOFF.md` §7 (the original's
+//! d2rs-own, unverified; REC-104 in `docs/HANDOFF.md` §7 (the original's
 //! close is 15 frames after the message in the recorded session).
 
 use super::link::ServerLink;

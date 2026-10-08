@@ -1,6 +1,6 @@
 # q-quests: quest log and Den of Evil in the play preview
 
-Branch `claude/q-quests`. Nothing is verified against 1.14d (rule 10). Open points: REC-52, REC-53 (`docs/HANDOFF.md` §7).
+Branch `claude/q-quests`. Nothing is verified against 1.14d (rule 10). Open points: REC-104, REC-105 (`docs/HANDOFF.md` §7).
 
 ## Links connected
 

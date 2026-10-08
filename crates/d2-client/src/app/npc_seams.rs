@@ -7,7 +7,7 @@
 //!
 //! d2rs-own, unverified (preview, decisions D1–D3): the unit distance
 //! `0x00641530` is not specified as a formula; it is read as the
-//! integer Euclidean distance in sub-tiles. REC-52 in `docs/HANDOFF.md`
+//! integer Euclidean distance in sub-tiles. REC-104 in `docs/HANDOFF.md`
 //! §7 (the NPC rest answers).
 
 use std::collections::BTreeMap;

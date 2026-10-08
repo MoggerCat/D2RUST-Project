@@ -251,7 +251,7 @@ fn the_recorded_join_on_the_install() {
     let own = w.local_room().unwrap();
     assert_eq!((own.x0, own.y0), (928 * 5, 904 * 5));
     // Every act palette is in the archives and is a valid `pal.pl2`.
-    let palettes = ActPalettes::live(&live.archives).unwrap();
+    let palettes = ActPalettes::live(live.archives.as_ref()).unwrap();
     for a in 0..5 {
         d2_client::scene::present_palette(palettes.of(a))
             .unwrap_or_else(|e| panic!("{}: {e}", act_palette_path(a)));

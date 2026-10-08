@@ -1104,8 +1104,14 @@ fn vitals_sync_on_the_host_tick() {
         dx: (d.x() as u16).wrapping_sub(d.target_x) as u8,
         dy: (d.y() as u16).wrapping_sub(d.target_y) as u8,
     };
-    assert_eq!(sent.last().unwrap(), &(0, want.encode().to_vec()));
-    assert_eq!(sync_msgs(&sent, 0).len(), 1);
+    // The sync's own message, then the stat messages of what is nonzero
+    // (the maxima: `vitals_sync::stat_changes`).
+    assert_eq!(sync_msgs(&sent, 0), [want.encode().to_vec()]);
+    assert!(sent
+        .iter()
+        .skip_while(|m| m.1[0] != 0x95)
+        .skip(1)
+        .all(|m| matches!(m.1[0], 0x1D..=0x1F)));
     assert!(sync_msgs(&sent, 1).is_empty());
     assert_eq!(
         fx.sim

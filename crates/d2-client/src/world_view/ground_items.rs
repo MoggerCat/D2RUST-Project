@@ -20,9 +20,11 @@
 //! d2rs-own, unverified (decision D1, the play preview's fills):
 //! - the cel is the flippy's last frame (the resting pose): the flip
 //!   animation's frame and timing need inputs the model lacks;
-//! - the unique / set flippy override and the gold amount class
-//!   (`unit-composite.md` §9) are not applied: the model's item view has
-//!   no quality, unique / set row or stat 14;
+//! - the unique / set flippy override (`unit-composite.md` §9) is not
+//!   applied: the model's item view has no quality or unique / set row.
+//!   A compact gold pile reads its amount from its record
+//!   ([`items::ItemView::gold`]) and draws the amount class's direction
+//!   (§9: < 100, < 500, < 5,000, else);
 //! - no colormap and no light (`0x0062C100`, `render/lighting.md`): the
 //!   cel is unshaded;
 //! - the draw key: pass 5 with major `DrawKey::MAJOR_MAX` (after the
@@ -82,6 +84,26 @@ pub struct GroundDraw {
     pub hit: Rect,
 }
 
+/// Frames to wait for the walk to show before picking up anyway, and
+/// between two pick-up requests. d2rs-own, unverified.
+pub const PICK_WAIT_FRAMES: u32 = 8;
+/// Pick-up requests after the first for one click. d2rs-own, unverified.
+pub const PICK_RETRIES: u32 = 3;
+
+/// A click on a ground item whose pick-up waits for the walk to it
+/// (d2rs-own, unverified: the original hovers the unit and walks to it,
+/// `controls.md` §6 r9.2, which the model does not hold).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PendingPick {
+    guid: u32,
+    /// The walk toward the item was sent.
+    walked: bool,
+    /// The predicted walk was seen.
+    seen_walk: bool,
+    frames: u32,
+    retries: u32,
+}
+
 /// The ground-item state of the world view: the item art rows (handed in
 /// by the app), the file source the flippy files are read from, the files
 /// loaded so far and the art rectangles of the last drawn frame (for the
@@ -90,11 +112,13 @@ pub struct GroundDraw {
 pub struct GroundItems {
     rows: ItemArtRows,
     source: Option<Arc<dyn FileSource>>,
-    /// Flippy name → its frame set and frame count; `None`: tried and
-    /// missing or refused.
-    files: BTreeMap<String, Option<(FrameSetKey, usize)>>,
+    /// (Flippy name, direction) → its frame set and frame count; `None`:
+    /// tried and missing or refused.
+    files: BTreeMap<(String, u8), Option<(FrameSetKey, usize)>>,
     /// The last drawn frame's items, in draw order.
     last: Vec<GroundDraw>,
+    /// The click waiting for its walk ([`PendingPick`]).
+    pending: Option<PendingPick>,
 }
 
 impl std::fmt::Debug for GroundItems {
@@ -117,6 +141,7 @@ impl GroundItems {
             source: Some(source),
             files: BTreeMap::new(),
             last: Vec::new(),
+            pending: None,
         }
     }
 
@@ -154,17 +179,18 @@ impl GroundItems {
             let Some(name) = self.flippy(item.code).map(str::to_owned) else {
                 continue;
             };
-            if self.files.contains_key(&name) {
+            let key = (name.clone(), art_direction(&item));
+            if self.files.contains_key(&key) {
                 continue;
             }
-            let loaded = load(source.as_ref(), &name, assets);
+            let loaded = load(source.as_ref(), &name, key.1, assets);
             if let Err(e) = &loaded {
                 log.push(format!(
                     "ground item art: {}: {e}",
                     flippy_archive_name(&name)
                 ));
             }
-            self.files.insert(name, loaded.ok());
+            self.files.insert(key, loaded.ok());
         }
         log
     }
@@ -182,7 +208,9 @@ impl GroundItems {
             let Some(name) = self.flippy(item.code) else {
                 continue;
             };
-            let Some(Some((set, frames))) = self.files.get(name) else {
+            let Some(Some((set, frames))) =
+                self.files.get(&(name.to_owned(), art_direction(&item)))
+            else {
                 continue;
             };
             let Some(index) = frames.checked_sub(1) else {
@@ -269,7 +297,7 @@ impl GroundItems {
     /// taken are left out of the returned list, the rest go on to the
     /// dispatcher.
     pub fn take_clicks<L: ServerLink>(
-        &self,
+        &mut self,
         bridge: &mut Bridge<L>,
         unhandled: &[UiEvent],
     ) -> Result<Vec<UiEvent>, BridgeError> {
@@ -286,6 +314,10 @@ impl GroundItems {
                 }
                 if let Some(guid) = self.hit(at.x, at.y) {
                     bridge.send(&items::pick(guid, false))?;
+                    self.pending = Some(PendingPick {
+                        guid,
+                        ..PendingPick::default()
+                    });
                     continue;
                 }
             }
@@ -295,22 +327,77 @@ impl GroundItems {
     }
 }
 
-/// Reads flippy `name` (direction 0 of its DC6) into the frame store.
+impl GroundItems {
+    /// One frame of the click waiting for its walk: the pick-up of a far
+    /// item is a walk the server does not make (the server's
+    /// `walk_to_item` is a seam), so after the first request the player
+    /// walks to the item, and once the predicted walk has ended
+    /// (`walking` false) the pick-up is asked again, up to
+    /// [`PICK_RETRIES`] times [`PICK_WAIT_FRAMES`] frames apart. The
+    /// record ends when the item leaves the ground. d2rs-own, unverified.
+    pub fn frame<L: ServerLink>(
+        &mut self,
+        bridge: &mut Bridge<L>,
+        walking: bool,
+    ) -> Result<(), BridgeError> {
+        let Some(mut p) = self.pending else {
+            return Ok(());
+        };
+        let Some(item) = items::ground_items(bridge.world())
+            .into_iter()
+            .find(|i| i.key.guid == p.guid)
+        else {
+            self.pending = None;
+            return Ok(());
+        };
+        p.frames += 1;
+        if !p.walked {
+            p.walked = true;
+            p.frames = 0;
+            bridge.send(&d2_proto::client::Walk {
+                x: item.x,
+                y: item.y,
+            })?;
+        } else if walking {
+            p.seen_walk = true;
+            p.frames = 0;
+        } else if p.frames >= PICK_WAIT_FRAMES || p.seen_walk {
+            if p.retries >= PICK_RETRIES {
+                self.pending = None;
+                return Ok(());
+            }
+            p.retries += 1;
+            p.seen_walk = false;
+            p.frames = 0;
+            bridge.send(&items::pick(p.guid, false))?;
+        }
+        self.pending = Some(p);
+        Ok(())
+    }
+}
+
+/// The direction of a ground item's art: a gold pile's amount class
+/// (`unit-composite.md` §9), else 0.
+fn art_direction(item: &items::ItemView) -> u8 {
+    item.gold
+        .map_or(0, crate::rules::unit_composite::gold_direction)
+}
+
+/// Reads direction `dir` of flippy `name`'s DC6 into the frame store.
 fn load(
     source: &dyn FileSource,
     name: &str,
+    dir: u8,
     assets: &mut ViewAssets,
 ) -> Result<(FrameSetKey, usize), String> {
     let archive = flippy_archive_name(name);
     let path = CanonicalPath::new(&archive).map_err(|e| e.to_string())?;
-    let key = FrameSetKey::new(path.as_str(), FramePart::Dir(0)).map_err(|e| e.to_string())?;
-    let bytes = source
-        .read_file(&archive)
+    let key = FrameSetKey::new(path.as_str(), FramePart::Dir(dir)).map_err(|e| e.to_string())?;
+    let dc6 = crate::assets::path::read_dc6(source, &archive)
         .ok_or_else(|| "in no archive".to_string())??;
-    let dc6 = d2_formats::dc6::Dc6::parse(&bytes).map_err(|e| e.to_string())?;
     let frames = dc6.header.frames_per_direction as usize;
     if !assets.frames.contains(&key) {
-        let set = FrameSet::from_dc6(&dc6, 0).map_err(|e| e.to_string())?;
+        let set = FrameSet::from_dc6(&dc6, dir).map_err(|e| e.to_string())?;
         assets
             .frames
             .insert(key.clone(), set)

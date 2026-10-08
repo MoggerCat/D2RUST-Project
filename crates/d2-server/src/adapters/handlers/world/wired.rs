@@ -637,6 +637,17 @@ where
         out
     }
 
+    /// The 0x13 tile case on the action wiring (REC-99).
+    fn warp_tile(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        player: UnitId,
+        guid: u32,
+    ) -> Option<u32> {
+        WorldHost::<D>::warp_tile(&mut self.action, game, events, player, guid)
+    }
+
     /// The tick with this world's quest parts lent to the action hooks
     /// ([`WiredWorld::lend_quests`]): quest object inits run inside their
     /// allocation and object event 7 inside its timer event, in the tick
@@ -653,9 +664,12 @@ where
     fn after_tick(&mut self, game: &mut Game, events: &mut D) {
         let sent = self.desk(game, events, quest_objects);
         self.inv_sent.extend(sent);
+        // A player with no life starts dying (`vitals.md` §4.8).
+        events.action().player_deaths(game);
         self.pet_deaths(game, events);
         self.hireling_calls(game, events);
         self.pet_follows(game, events);
+        self.drive_hirelings(game, events);
     }
 
     /// The quest control on the desk's economy and rest
@@ -706,7 +720,33 @@ where
             .hireling_tables
             .is_some()
             .then(|| self.state.hirelings.clone());
-        let out = self.with_economy(game, events, |econ, _| call.call(econ, &mut inv));
+        let out = self.with_economy(game, events, |econ, _| {
+            // d2rs-own, unverified (D1): the preview rest reads the
+            // places staged here (`MoveRest::stage`).
+            let mut places = Vec::new();
+            for u in econ
+                .game
+                .lists
+                .units_of_type(d2_sim::units::UnitType::Player)
+            {
+                let Some(r) = econ.units.get(u) else { continue };
+                places.push(super::super::items::moves::StagedPlace {
+                    owner: d2_sim::items::moves::Owner::player(r.guid),
+                    pos: econ.hooks.path_position(u),
+                    room: econ.game.lists.unit(u).and_then(|e| e.room()),
+                });
+            }
+            for (&u, it) in &inv.state.items {
+                places.push(super::super::items::moves::StagedPlace {
+                    owner: d2_sim::items::moves::Owner::item(it.guid),
+                    pos: (it.x, it.y),
+                    room: econ.game.lists.unit(u).and_then(|e| e.room()),
+                });
+            }
+            let format = d2_sim::items::ItemGame::item_format(&*econ.fields);
+            inv.rest.stage(&places, format);
+            call.call(econ, &mut inv)
+        });
         inv.state.hirelings = None;
         self.inventory = Some(inv);
         Some(out)
@@ -759,12 +799,25 @@ where
         Some(out)
     }
 
+    fn unit_positions(&mut self, events: &mut D, units: &[UnitId]) -> Vec<(UnitId, (i32, i32))> {
+        WorldHost::<D>::unit_positions(&mut self.action, events, units)
+    }
+
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
         let out = self.lend_quests(events, |a, ev| WorldHost::<D>::walk(a, game, ev, call));
         self.pet_deaths(game, events);
         self.hireling_calls(game, events);
         self.pet_follows(game, events);
         out
+    }
+
+    fn player_gate(
+        &mut self,
+        game: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<crate::seams::PlayerGate> {
+        WorldHost::<D>::player_gate(&mut self.action, game, events, unit)
     }
 
     fn live_facts(

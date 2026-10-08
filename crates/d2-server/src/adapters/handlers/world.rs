@@ -26,6 +26,7 @@
 //! and the cube on the same unit world).
 
 mod action;
+mod hireling_drive;
 mod hireling_host;
 mod wired;
 
@@ -50,7 +51,7 @@ use d2_sim::world::waypoints::{ArrivalList, WaypointData, WaypointError, Waypoin
 use super::super::character::{self, StartItemWorld, StartPlace};
 use super::super::SimGame;
 use super::items::moves::MoveCall;
-use super::items::moves::{take_sent as inv_take_sent, InvParts, MoveRest};
+use super::items::moves::{take_sent as inv_take_sent, InvParts, MoveRest, StagedPlace};
 use super::items::CubeCall;
 use super::player::{Outcome as PlayerOutcome, Run as PlayerRun};
 use super::skills::{Call as SkillCall, Handled as SkillHandled};
@@ -58,12 +59,16 @@ use super::walk::{WalkCall, WalkResult};
 use crate::buffers::QueueError;
 use crate::seams::{ClientId, MessageSink, ResultCode};
 use d2_sim::items::inventory::{InvTables, UnitKind};
-use d2_sim::items::moves::{InventoryOps, MovePending, MoveUnits, Owner};
+use d2_sim::items::moves::{InventoryOps, MovePending, MoveUnits, Owner, Spot};
+use d2_sim::items::ItemRequest;
 use d2_sim::items::{flag, q, stat as istat, ItemStats, ListKey};
 use d2_sim::units::lifecycle::LifecycleHooks;
+use d2_sim::units::RoomId;
 use d2_sim::wiring::economy::quest_reward::create_reward;
+use d2_sim::wiring::economy::ItemSpawn;
 use d2_sim::wiring::economy::{find_list, Economy, StatCtx, UnitStats};
 use d2_sim::wiring::inventory::InvRest;
+use std::collections::BTreeMap;
 
 /// Where a world-related C→S id's behaviour is specified.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -85,6 +90,9 @@ pub enum System {
     Quests,
     /// The object case of 0x13 (unit type 2; [`route`]).
     Objects,
+    /// The tile case of 0x13 (unit type 5, a level warp; [`route`]).
+    /// PROVISIONAL (REC-99).
+    Warps,
 }
 
 /// Every world-related C→S id (`client-messages.tsv`): (id, owner spec
@@ -208,6 +216,9 @@ pub fn route(msg: &[u8]) -> Option<System> {
     if id == 0x13 && msg.len() == 9 && msg[1..5] == 2u32.to_le_bytes() {
         return Some(System::Objects);
     }
+    if id == 0x13 && msg.len() == 9 && msg[1..5] == 5u32.to_le_bytes() {
+        return Some(System::Warps);
+    }
     system(id)
 }
 
@@ -326,6 +337,18 @@ pub trait WorldHost<D> {
     ) -> Option<ObjectCase> {
         None
     }
+    /// The C→S 0x13 tile case (a level warp, `path-placement.md` §12.2;
+    /// PROVISIONAL, REC-99) by `player` on the tile with `guid`: the
+    /// result code. `None`: no provider.
+    fn warp_tile(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        player: UnitId,
+        guid: u32,
+    ) -> Option<u32> {
+        None
+    }
     /// The cube (`handlers::items`) on the host's economy.
     fn cube<C: CubeCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
         None
@@ -349,8 +372,28 @@ pub trait WorldHost<D> {
     ) -> Option<PlayerOutcome> {
         None
     }
+    /// The path positions (sub-tiles) of the listed units that have a
+    /// path, read at the end of each tick to move the staged
+    /// [`UnitFacts`](super::UnitFacts) the point-message parser reads
+    /// (`intents-events.md` §2.4 rule 3). Default: none (the caller
+    /// stages positions itself).
+    fn unit_positions(&mut self, events: &mut D, units: &[UnitId]) -> Vec<(UnitId, (i32, i32))> {
+        Vec::new()
+    }
     /// The walk / run handlers (`handlers::walk`) on the path provider.
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
+        None
+    }
+    /// The live gate fields of a player (`intents-events.md` §2.3 rule 3:
+    /// unit mode, state 0x36), read after each tick to refresh the staged
+    /// [`super::super::PlayerFields`] (a dead player's gate opens 0x41).
+    /// `None`: the host has none; the staged fields stay.
+    fn player_gate(
+        &mut self,
+        game: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<crate::seams::PlayerGate> {
         None
     }
     /// The live act and position of `unit` the point / unit parser reads
@@ -459,6 +502,12 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
             .world
             .waypoints(game, events, WaypointRun { player, msg }),
         System::Quests => sim.world.quests(game, events, QuestRun { player, msg }),
+        System::Warps => {
+            let guid = u32::from_le_bytes([msg[5], msg[6], msg[7], msg[8]]);
+            sim.world
+                .warp_tile(game, events, player, guid)
+                .map(|c| Ok(Some(c)))
+        }
         System::Objects => {
             let guid = u32::from_le_bytes([msg[5], msg[6], msg[7], msg[8]]);
             match sim.world.objects(game, events, player, guid)? {
@@ -857,15 +906,88 @@ impl<H: LifecycleHooks> StartItemWorld for WiredStart<'_, '_, H> {
 #[derive(Debug, Default)]
 pub struct PreviewMoveRest {
     sent: Vec<(Owner, Vec<u8>)>,
+    /// The places staged at the start of the call ([`MoveRest::stage`]).
+    places: BTreeMap<Owner, StagedPlace>,
+    item_format: u16,
 }
 
 impl MovePending for PreviewMoveRest {
     fn send(&mut self, player: Owner, bytes: Vec<u8>) {
         self.sent.push((player, bytes));
     }
+    /// d2rs-own, unverified (D1): `0x00641530` is not specified; the
+    /// larger of the two sub-tile axis distances of the staged places,
+    /// out of range without both.
+    fn distance(&self, a: Owner, b: Owner) -> i32 {
+        match (self.places.get(&a), self.places.get(&b)) {
+            (Some(a), Some(b)) => (a.pos.0 - b.pos.0).abs().max((a.pos.1 - b.pos.1).abs()),
+            _ => i32::MAX,
+        }
+    }
+    /// d2rs-own, unverified (D1): a room exists wherever the player's
+    /// room does (no room lookup by position here).
+    fn room_at(&self, _: i32, _: i32) -> bool {
+        self.player_room().is_some()
+    }
+    /// d2rs-own, unverified (D1): `0x0064E810` (collision search) is not
+    /// provided; the start point in the player's room is free.
+    fn free_spot(
+        &self,
+        start: (i32, i32),
+        _: (i32, i32),
+        _: u32,
+        _: u32,
+        _: u32,
+        _: u32,
+    ) -> Option<Spot> {
+        Some(Spot {
+            room: self.player_room()?,
+            x: start.0,
+            y: start.1,
+        })
+    }
+}
+
+impl PreviewMoveRest {
+    /// The room of the first staged player (the preview has one).
+    fn player_room(&self) -> Option<RoomId> {
+        self.places
+            .values()
+            .find(|p| p.owner.is_player())
+            .and_then(|p| p.room)
+    }
 }
 
 impl InvRest for PreviewMoveRest {
+    /// d2rs-own, unverified (D1): the staged place of a unit.
+    fn pos(&self, u: Owner) -> (i32, i32) {
+        self.places.get(&u).map_or((0, 0), |p| p.pos)
+    }
+    fn set_pos(&mut self, u: Owner, x: i32, y: i32) {
+        if let Some(p) = self.places.get_mut(&u) {
+            p.pos = (x, y);
+        }
+    }
+    /// d2rs-own, unverified (D1): the request layout of a `gld` pile
+    /// (`0x00559CE0`) is unwritten; a plain normal-quality item of the
+    /// game's format, ground mode.
+    fn gold_request(&self, _: Owner, gld: usize) -> Option<(ItemRequest, ItemSpawn)> {
+        Some((
+            ItemRequest {
+                item: gld as i32,
+                format: self.item_format,
+                ilvl: 1,
+                quality: q::NORMAL,
+                flags2: 0x2,
+                ..ItemRequest::default()
+            },
+            ItemSpawn {
+                room: None,
+                mode: 3,
+                init_flags: 1,
+            },
+        ))
+    }
     fn item_active_on(&self, _: u32, _: Owner) -> bool {
         false
     }
@@ -898,6 +1020,10 @@ impl InvRest for PreviewMoveRest {
 impl MoveRest for PreviewMoveRest {
     fn take_sent(&mut self) -> Vec<(Owner, Vec<u8>)> {
         std::mem::take(&mut self.sent)
+    }
+    fn stage(&mut self, places: &[StagedPlace], item_format: u16) {
+        self.places = places.iter().map(|p| (p.owner, *p)).collect();
+        self.item_format = item_format;
     }
 }
 
