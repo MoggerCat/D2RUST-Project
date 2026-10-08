@@ -118,7 +118,7 @@ impl LocalSeams {
         self.skills.log.push(s);
     }
 
-    // q-barb (REC-158): unit +0x38 bits 8+ is the frame event index the
+    // q-barb (REC-152): unit +0x38 bits 8+ is the frame event index the
     // use pipeline already keeps as `event_arg`; Double Swing and the
     // monster bodies read it back (`bodies-2.md` §4.8).
     pub(super) fn frame_event_index(&self, u: UnitId) -> i32 {
@@ -129,7 +129,7 @@ impl LocalSeams {
         self.skills.unit_mut(u).event_arg = i;
     }
 
-    // q-barb (REC-158): the paths of skill moves are not provided
+    // q-barb (REC-152): the paths of skill moves are not provided
     // (Leap, Whirlwind: `skills/use.md` OQ10), but a body that retargets
     // the unit (Double Swing's second swing) is kept as the unit's mode
     // target, which `UseRest::target` reads back. d2rs-own, unverified.
@@ -327,7 +327,7 @@ impl UseRest for LocalSeams {
         }
     }
     // d2rs-own, unverified (collision not reachable): clear. q-barb
-    // (REC-158): "blocked" refused every `lineofsight` skill at its start
+    // (REC-152): "blocked" refused every `lineofsight` skill at its start
     // and left Double Swing's next-target scan (filter bit 0x200) empty;
     // a wall between the two is not seen until the collision grid reaches
     // the seams.

@@ -1,4 +1,4 @@
-// Spec: specs/skills/bodies.md §3.8, §4.2; specs/skills/bodies-2.md §4.6–§4.8; specs/skills/use.md §5
+// Spec: specs/skills/bodies.md §3.8; specs/skills/bodies-2.md §4.8; specs/skills/use.md §5
 //! The Barbarian's skills in the play preview, headless over the synthetic
 //! single-player game: a barbarian (class 4) joins, walks out of town by
 //! the cave warp (a monster in a town room is not a legal target of
@@ -31,7 +31,8 @@ fn bash_on_a_monster_costs_mana_and_hurts_it() {
     assert!(r.life(m) < life0, "Bash hurt the monster ({errors})");
 }
 
-// Covers: specs/skills/bodies-2.md §4.6 (srvdo 68), §6.8 (shout state)
+// Covers: specs/skills/bodies.md §8.2
+// Covers: specs/skills/bodies.md §6.8
 // Covers: specs/skills/use.md §5.4
 #[test]
 fn shout_and_battle_orders_put_their_state_on_the_barbarian() {
@@ -72,7 +73,8 @@ fn double_swing_hits_two_monsters_in_two_swings() {
     );
 }
 
-// Covers: specs/skills/levels.md §6.4; specs/client/msg-skills.md §2 r4
+// Covers: specs/skills/levels.md §6.4
+// Covers: specs/client/msg-skills.md §2 r4
 #[test]
 fn a_learned_mastery_puts_its_passive_stats_in_its_state() {
     let mut r = Rig::with_rows(&[NATURAL_RESISTANCE], &[]);
