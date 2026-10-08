@@ -32,7 +32,7 @@
 | Edge cases & original bugs | 357–368 |
 | Test vectors | 369–384 |
 | Provenance | 385–394 |
-| Open questions | 395–417 |
+| Open questions | 395–430 |
 <!-- /index -->
 
 ## Summary
@@ -407,10 +407,23 @@ rule 5, §3), game type 3 (§5.2), the unit snapshot fields (§4). Open:
    level seed, free point §7, mask 0x1C09) and §11; a level warp
    arrival by §12. `char at default` therefore means §13's point on both
    sides for the same map seed and level seed.
-2. The conventions of the §3.1 spawn calls outside room population and
-   the monster data field of the umod list (handoff §4 Q12–Q14).
-3. How a joining character gets items of a given quality, affixes,
-   unique / set / runeword id and sockets, and quest flags (handoff §4
-   Q3), for the original side and for `char save`.
-4. The base stat array of an extended stat list (for `stats` records;
-   original-hooks §4 gives the full array only).
+2. *Answered* in `tools/original-hooks-spawn.md` §1 (entry points,
+   registers, stack bytes), §2 (pointers) and §3 (kinds). One
+   consequence for §3.1: no entry forces a chosen umod set
+   (original-hooks-spawn §3 rule 1), so the `umod` list of `champion` /
+   `unique` steps cannot be imposed on 1.14d as written; the original
+   side writes such a step as a gap until §3.1 is changed to name the
+   seed instead of the umods. Original question: the conventions of the
+   §3.1 spawn calls outside room population and the monster data field
+   of the umod list (handoff §4 Q12–Q14).
+3. *Partly answered* (2026-10-08): the original side gets everything
+   from the save (`char save`, original-hooks §5.3: class, act,
+   progression, quest and waypoint flags, items all come from the
+   `.d2s`; the 0x67 message carries none of them). `d2s-tool` writes
+   quest flags (`--quests`), waypoints, stats, skills and normal
+   identified items only (`--item CODE`); items of another quality,
+   affixes, unique / set / runeword ids and sockets need an item writer
+   for `items/bitstream.md` (tool gap). Until then `char item` lines
+   other than normal items are a gap on the original side.
+4. *Answered*: original-hooks §4 rule 5 (base array: list +0x24, count
+   +0x28, for plain and extended lists).
