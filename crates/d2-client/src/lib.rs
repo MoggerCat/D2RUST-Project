@@ -8,6 +8,7 @@
 //! [`gpu_compositor`] is the GPU twin of the CPU compositor; [`verify`]
 //! runs the render cases (CPU reference vs GPU). [`world_view`] turns the
 //! bridge's client world into the frame's draw list and composes it.
+//! [`facts`] writes and compares rendering fact sets (`facts/render/`).
 
 pub mod app;
 pub mod assets;
@@ -15,6 +16,7 @@ pub mod audio;
 pub mod bridge;
 pub mod composite;
 pub mod controls;
+pub mod facts;
 pub mod frames;
 pub mod gpu_compositor;
 pub mod map;
