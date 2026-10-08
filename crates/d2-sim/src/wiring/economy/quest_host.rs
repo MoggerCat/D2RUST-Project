@@ -595,7 +595,7 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     }
     /// `0x005A7E60` + `0x005A7C20` (removal mode): the monster of the
     /// game's lists is removed at once and every player told
-    /// (PROVISIONAL, REC-124: the removal mode's animation is not
+    /// (PROVISIONAL, REC-127: the removal mode's animation is not
     /// modelled); else the rest's.
     fn remove_monster(&mut self, monster: UnitId) {
         let e = &mut *self.inner.econ;
@@ -612,7 +612,7 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         self.inner.drop_preset_monster(act, class)
     }
     /// The first object of `class` in `object`'s act (PROVISIONAL,
-    /// REC-124: the spec's "rooms of the object's room list" is the
+    /// REC-127: the spec's "rooms of the object's room list" is the
     /// whole act here); else the rest's.
     fn find_object_near(&self, object: UnitId, class: u16) -> Option<UnitId> {
         let e = &*self.inner.econ;
@@ -643,7 +643,7 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     fn open_quest_message(&mut self, player: UnitId, object: UnitId, msg: u16) {
         self.inner.open_quest_message(player, object, msg)
     }
-    /// [`Self::spawn_monster`] with the spawn flags (PROVISIONAL, REC-124:
+    /// [`Self::spawn_monster`] with the spawn flags (PROVISIONAL, REC-127:
     /// spread and flags are not applied).
     #[allow(clippy::too_many_arguments)]
     fn spawn_monster_flags(
@@ -664,7 +664,7 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     }
     /// `0x0056D130`: a portal object of `class` in mode 1 to `level`,
     /// owned by `owner`, at (x, y) or the free spot next to it
-    /// (PROVISIONAL, REC-124: the body is unwritten; the town portal's
+    /// (PROVISIONAL, REC-127: the body is unwritten; the town portal's
     /// owner and level fields are reused).
     #[allow(clippy::too_many_arguments)]
     fn open_portal(

@@ -1,6 +1,6 @@
 # q-a1-cain: Act I "Search for Cain" glue and Cain's identify
 
-Branch `claude/q-a1-cain`. Nothing is verified against 1.14d (rule 10). Open point: REC-124 (`docs/HANDOFF.md` §7).
+Branch `claude/q-a1-cain`. Nothing is verified against 1.14d (rule 10). Open point: REC-127 (`docs/HANDOFF.md` §7).
 
 ## The path, with the links that were missing
 
@@ -17,7 +17,7 @@ The quest rules (Akara's scroll, Cairn stones, tree, gibbet, Cain portal, town C
 
 Tests (synthetic): `d2-client/tests/app_cain_quest.rs` (spawn, portal, lookup, removal on the built play game; nothing reaches the rest's log), `wiring::inventory::tests::identify::cain_entries_and_identify_unit`, `app::rest::tests`.
 
-## PROVISIONAL (REC-124)
+## PROVISIONAL (REC-127)
 
 - Removal is immediate (no removal-mode animation); spread and spawn flags are not applied; the object search covers the act, not the room list; `open_portal`'s body is unwritten, so the town portal's owner/level fields are reused.
 - Cain's identify effect is REC-113's.
