@@ -96,7 +96,7 @@ pub trait UseRest {
     /// and checks read back through [`UseRest::target`] and
     /// [`UseRest::target_position`] (`use.md` §4: where `0x0057FE90` /
     /// `0x0057FEF0` store it is not stated). Default: not kept.
-    fn keep_target(&mut self, u: UnitId, target: ModeTarget<UnitId>) {}
+    fn keep_target(&mut self, _u: UnitId, _target: ModeTarget<UnitId>) {}
     fn event_arg(&self, u: UnitId) -> i32;
     fn set_event_arg(&mut self, u: UnitId, a: i32);
     fn step_path(&mut self, u: UnitId) -> i32;

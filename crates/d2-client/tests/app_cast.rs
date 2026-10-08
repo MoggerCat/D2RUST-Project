@@ -16,13 +16,13 @@ use d2_client::app::server_thread::ThreadLink;
 use d2_client::app::single_player::{self, GameData, Link, DEFAULT_SEED, PLAYER_CLASS};
 use d2_client::bridge::link::{SendQueue, ServerLink};
 use d2_client::bridge::LOCAL_CLIENT;
-use d2_data::bin::BinTable;
-use d2_data::fixup::records::stat_ops;
-use d2_data::tables::{Itemstatcost, Charstats, Missiles, Monstats, Monstats2, Record, Skills};
 use d2_client::rules::unit_composite::code;
 use d2_client::world_view::unit_assets::UnitLooks;
-use d2_server::seams::{Clock, Pos};
+use d2_data::bin::BinTable;
+use d2_data::fixup::records::stat_ops;
+use d2_data::tables::{Charstats, Itemstatcost, Missiles, Monstats, Monstats2, Record, Skills};
 use d2_formats::animdata::{self, AnimData, AnimRecord};
+use d2_server::seams::{Clock, Pos};
 use d2_sim::skills::list::ListOwner;
 use d2_sim::stats::{StatData, StatLists, StatTable};
 
@@ -56,11 +56,13 @@ fn anim_data() -> AnimData {
 /// The unit tables of the name rules: every class token `SO`, mode 10
 /// token `SC`.
 fn looks() -> UnitLooks {
-    let mut l = UnitLooks::default();
-    l.player_tokens = vec![code(b"SO"); 7];
-    l.player_modes = vec![code(b"NU"); 20];
-    l.player_modes[10] = code(b"SC");
-    l
+    let mut modes = vec![code(b"NU"); 20];
+    modes[10] = code(b"SC");
+    UnitLooks {
+        player_tokens: vec![code(b"SO"); 7],
+        player_modes: modes,
+        ..UnitLooks::default()
+    }
 }
 
 /// A synthetic itemstatcost (359 stats, no ops, fixed up): the
@@ -153,7 +155,18 @@ impl Game {
                 list.init_player(
                     &rows,
                     ListOwner::player(PLAYER_CLASS as i32),
-                    Some(&[FIRE_BOLT as u16, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF]),
+                    Some(&[
+                        FIRE_BOLT as u16,
+                        0xFFFF,
+                        0xFFFF,
+                        0xFFFF,
+                        0xFFFF,
+                        0xFFFF,
+                        0xFFFF,
+                        0xFFFF,
+                        0xFFFF,
+                        0xFFFF,
+                    ]),
                 )
                 .unwrap();
                 let i = list.view().iter().position(|e| e.skill == FIRE_BOLT as i32);
@@ -209,12 +222,11 @@ impl Game {
     }
 }
 
-// Covers: specs/skills/use.md §5.3 step 6.2 (mana), missiles.md §R2.3
+// Covers: specs/skills/use.md §5
 #[test]
 fn a_right_skill_at_a_point_costs_mana_and_creates_the_missile() {
     let mut g = Game::joined();
     let at = g.player_pos();
-    eprintln!("DBG mana before {}", g.mana());
     let mut msg = vec![0x0C];
     msg.extend(((at.x + 6) as u16).to_le_bytes());
     msg.extend((at.y as u16).to_le_bytes());
@@ -224,43 +236,23 @@ fn a_right_skill_at_a_point_costs_mana_and_creates_the_missile() {
         .link
         .with(|l| format!("{:?}", l.last_frame().messages))
         .unwrap();
-    eprintln!("DBG handled {handled}");
     assert!(handled.contains("Dispatched(Done)"), "{handled}");
     let mut got = Vec::new();
     let mut most = 0;
-    let d = g.link.with(|l| {
-        let s = &mut l.host_mut().game;
-        let p = s.player_of(LOCAL_CLIENT).unwrap();
-        s.events.action.with(&mut s.game, |_, v| v.units.get(p).map(|r| (r.mode, r.anim.frame)))
-    }).unwrap();
-    eprintln!("DBG after send {d:?}");
-    for i in 0..12 {
+    for _ in 0..12 {
         got.extend(g.ticks(1));
-        let d = g.link.with(|l| {
-            let s = &mut l.host_mut().game;
-            let p = s.player_of(LOCAL_CLIENT).unwrap();
-            s.events.action.with(&mut s.game, |_, v| v.units.get(p).map(|r| (r.mode, r.anim.frame)))
-        }).unwrap();
-        eprintln!("DBG tick {i} {d:?}");
         most = most.max(g.missiles());
-        eprintln!("DBG missiles {}", g.missiles());
     }
     let errors = g
         .link
         .with(|l| format!("{:?}", l.host_mut().game.events.action.hooks().errors))
         .unwrap();
-    let dbg = g.link.with(|l| {
-        let s = &mut l.host_mut().game;
-        let p = s.player_of(LOCAL_CLIENT).unwrap();
-        let m = s.events.action.with(&mut s.game, |_, v| v.units.get(p).map(|r| (r.mode, r.anim.frame, r.anim.speed, r.anim.frame_count)));
-        format!("{:?} {:?}", s.events.action.hooks().x.skills.log, m)
-    }).unwrap();
-    eprintln!("DBG {dbg} {:?}", got.iter().map(|m| m.clone()).collect::<Vec<_>>());
+    // Before: no action-frame route (no do step), no kept target (the
+    // missile has no aim), no animation names (`Anim(NoRecord)`).
     assert!(g.mana() < MANA, "mana spent; errors: {errors}");
-    assert!(most > 0 || got.iter().any(|m| m[0] == 0x4C), "{errors}");
+    assert!(most > 0, "the server made the missile; errors: {errors}");
     assert!(
         got.iter().any(|m| m.contains(&0x4D)),
-        "the cast mode reaches the client: {:?}; {errors}",
-        got.clone()
+        "the cast mode reaches the client: {got:?}; {errors}"
     );
 }
