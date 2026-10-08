@@ -353,6 +353,18 @@ pub trait WorldHost<D> {
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
         None
     }
+    /// The live gate fields of a player (`intents-events.md` §2.3 rule 3:
+    /// unit mode, state 0x36), read after each tick to refresh the staged
+    /// [`super::super::PlayerFields`] (a dead player's gate opens 0x41).
+    /// `None`: the host has none; the staged fields stay.
+    fn player_gate(
+        &mut self,
+        game: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<crate::seams::PlayerGate> {
+        None
+    }
     /// The live act and position of `unit` the point / unit parser reads
     /// (`intents-events.md` §2.4 rules 3–4), from the game's own unit
     /// (its room's act, its path position). `None`: the host has none

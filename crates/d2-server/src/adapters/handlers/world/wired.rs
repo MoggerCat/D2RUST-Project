@@ -755,6 +755,15 @@ where
         out
     }
 
+    fn player_gate(
+        &mut self,
+        game: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<crate::seams::PlayerGate> {
+        WorldHost::<D>::player_gate(&mut self.action, game, events, unit)
+    }
+
     fn live_facts(
         &mut self,
         game: &Game,

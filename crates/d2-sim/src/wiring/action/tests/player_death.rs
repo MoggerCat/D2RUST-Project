@@ -139,9 +139,12 @@ fn the_corpse_start_queues_the_owner_for_the_hireling_host() {
 fn a_player_with_no_life_dies_and_leaves_a_corpse() {
     let (mut fx, p, _, other) = setup();
     fx.sim.hooks().death.allocate_corpses = true;
-    fx.stats(p, &[(6, 0)]);
+    fx.stats(p, &[(6, 100 << 8)]);
     fx.stats(other, &[(6, 100 << 8)]);
     let all = [p, other];
+    // Alive: nothing; a player that never had life is left alone.
+    assert!(fx.sim.deaths_of(&mut fx.game, &all).is_empty());
+    fx.stats(p, &[(6, 0)]);
     let guid = fx.sim.sys.units.get(p).unwrap().guid;
     let changed = fx.sim.deaths_of(&mut fx.game, &all);
     assert_eq!(changed, [p]);
@@ -184,7 +187,16 @@ fn a_player_with_no_life_dies_and_leaves_a_corpse() {
     assert_eq!(owner, guid);
     assert!(fx.sim.sys.stats.has_state(c, STATE_PLAYERBODY));
     assert_eq!(fx.sim.sys.units.get(c).unwrap().mode, 17);
+    // Back on its feet (the 0x41 handler's mode 1): code 7, once.
+    fx.sim.sys.units.get_mut(p).unwrap().mode = 1;
+    fx.stats(p, &[(6, 100 << 8)]);
+    assert_eq!(fx.sim.deaths_of(&mut fx.game, &all), [p]);
+    assert_eq!(stops(&mut fx, 7), 2);
+    assert!(fx.sim.deaths_of(&mut fx.game, &all).is_empty());
     // The owner takes it back.
     assert!(hooks_on(&mut fx, |h, sim| h.corpse_pickup(sim, p, c)).is_some());
-    assert_eq!(hooks_on(&mut fx, |h, sim| h.corpse_pickup(sim, other, c)), None);
+    assert_eq!(
+        hooks_on(&mut fx, |h, sim| h.corpse_pickup(sim, other, c)),
+        None
+    );
 }

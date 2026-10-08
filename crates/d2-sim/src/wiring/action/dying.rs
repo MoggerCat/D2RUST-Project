@@ -7,7 +7,7 @@
 //! to every client.
 //!
 //! PROVISIONAL (sim/pathing.md §10 r2: the death rows of the player
-//! update function are not specified; REC-D1): the S→C message is 0x0D
+//! update function are not specified; REC-95): the S→C message is 0x0D
 //! PlayerStop with the client's mode-request code 8 (DT) / 9 (DD)
 //! (`client/model.md` §8 r4), the position and life percent 0. The
 //! corpse is allocated here (a player-type unit of the class in mode 17
@@ -29,6 +29,8 @@ const DD: u32 = 17;
 /// The client mode-request codes of DT and DD (`client/model.md` §8 r4).
 pub const CODE_DT: u8 = 8;
 pub const CODE_DD: u8 = 9;
+/// Neutral after death (`client/model.md` §8 r4 code 7).
+pub const CODE_UP: u8 = 7;
 /// Stat 6, `hitpoints`.
 const LIFE: u16 = 6;
 
@@ -86,38 +88,79 @@ impl<X: Pending> ActionSim<X> {
         self.deaths_of(game, &players)
     }
 
+    /// The DT start `0x00580EC0` for `p` now (the penalties, mode 0, the
+    /// death animation): what a lethal hit requests (`damage.md` §7.1
+    /// r5.4) and the life check of [`Self::player_deaths`] does. A
+    /// player already in DT / DD is left alone. The clients hear of it
+    /// in the next [`Self::player_deaths`] pass.
+    pub fn start_death(&mut self, game: &mut Game, p: UnitId) {
+        let s = &mut self.sys;
+        if s.units.get(p).is_none_or(|r| r.mode == DT || r.mode == DD) {
+            return;
+        }
+        s.hooks.mode_target = None;
+        // Ours to announce (code 0: started, nothing sent yet).
+        s.hooks.death.announced.entry(p).or_insert(0);
+        s.hooks.death.died.insert(p);
+        let mut sim = crate::units::hooks::Sim {
+            game,
+            units: &mut s.units,
+            stats: &mut s.stats,
+            data: &s.data,
+        };
+        if let Err(e) = player_start(&mut sim, &mut s.hooks, p, DT) {
+            s.hooks.errors.push(super::WiringError::Unit(e));
+        }
+    }
+
     /// [`Self::player_deaths`] for the given players (every one of them
     /// is told).
     pub fn deaths_of(&mut self, game: &mut Game, players: &[UnitId]) -> Vec<UnitId> {
         let mut changed = Vec::new();
         for &p in players {
-            let s = &mut self.sys;
-            let Some(mode) = s.units.get(p).map(|r| r.mode) else {
+            let Some(mode) = self.sys.units.get(p).map(|r| r.mode) else {
                 continue;
             };
-            if mode != DT && mode != DD && s.stats.unit_total(p, LIFE, 0) <= 0 {
-                s.hooks.mode_target = None;
-                let mut sim = crate::units::hooks::Sim {
-                    game: &mut *game,
-                    units: &mut s.units,
-                    stats: &mut s.stats,
-                    data: &s.data,
-                };
-                if let Err(e) = player_start(&mut sim, &mut s.hooks, p, DT) {
-                    s.hooks.errors.push(super::WiringError::Unit(e));
-                }
+            if self.sys.stats.unit_total(p, LIFE, 0) > 0 {
+                self.sys.hooks.death.seen_alive.insert(p);
+            } else if mode != DT && mode != DD && self.sys.hooks.death.seen_alive.remove(&p) {
+                self.start_death(game, p);
             }
+            let s = &mut self.sys;
             let mode = s.units.get(p).map_or(mode, |r| r.mode);
             let code = match mode {
                 DT => CODE_DT,
                 DD => CODE_DD,
                 _ => {
-                    s.hooks.death.announced.remove(&p);
+                    // Back on its feet (0x41): code 7, neutral after being
+                    // dead (`client/model.md` §8 r4).
+                    if s.hooks.death.announced.remove(&p).is_some() {
+                        changed.push(p);
+                        let Some(guid) = s.units.get(p).map(|r| r.guid) else {
+                            continue;
+                        };
+                        let (x, y) = s.hooks.path_position(p);
+                        let msg = crate::path::walk::messages::player_stop(
+                            UnitType::Player as u8,
+                            guid,
+                            CODE_UP,
+                            x as u16,
+                            y as u16,
+                            0,
+                            100,
+                        );
+                        for &to in players {
+                            s.hooks.x.send(to, &msg);
+                        }
+                    }
                     continue;
                 }
             };
-            if s.hooks.death.announced.get(&p) == Some(&code) {
-                continue;
+            // A unit that is in mode 0 / 17 without our start (a bare
+            // fixture) is not announced.
+            match s.hooks.death.announced.get(&p) {
+                Some(&c) if c != code => {}
+                _ => continue,
             }
             s.hooks.death.announced.insert(p, code);
             changed.push(p);

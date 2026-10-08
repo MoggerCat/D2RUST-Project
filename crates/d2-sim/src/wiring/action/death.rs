@@ -60,6 +60,12 @@ pub struct DeathState {
     /// The last death code sent per player (8 DT, 9 DD): each goes out
     /// once ([`super::dying`]).
     pub announced: BTreeMap<UnitId, u8>,
+    /// Players seen with life left: only these die when the life reaches
+    /// 0 (a player whose stats are not set up yet is left alone).
+    pub seen_alive: std::collections::BTreeSet<UnitId>,
+    /// Players that have died: their dispatch gate follows the live mode
+    /// (the host stages the others, `adapters::SimGame::set_player`).
+    pub died: std::collections::BTreeSet<UnitId>,
     /// Corpses allocated and not yet announced to the clients.
     pub fresh: Vec<UnitId>,
 }
