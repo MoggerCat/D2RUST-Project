@@ -91,7 +91,7 @@ impl Panel for StashUi {
             return UiResponse::Consumed;
         }
         if eff.sound4 {
-            sh.outputs.push(PanelOutput::ClickSound);
+            sh.outputs.push(PanelOutput::Sound(4));
         }
         sh.outputs.extend(eff.outputs);
         if eff.consumed {

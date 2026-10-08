@@ -674,8 +674,8 @@ pub struct ClientWorld {
     pub objclient: ClientObjects,
     /// Units freed since the receive path last moved them out, in free
     /// order: each becomes one `UnitFreed` output (`client/bridge.md` §10
-    /// r3.1 (a)).
-    pub freed: Vec<UnitKey>,
+    /// r3.1 (a)), with whether it was a client-only unit (set C).
+    pub freed: Vec<(UnitKey, bool)>,
 }
 
 impl ClientWorld {
@@ -723,7 +723,7 @@ impl ClientWorld {
     /// §10 r3.1). A key not in the set: nothing.
     pub fn remove(&mut self, key: UnitKey) -> Option<ClientUnit> {
         let unit = self.units.remove(&key)?;
-        self.freed.push(key);
+        self.freed.push((key, false));
         // The unit free leaves the room list (`unit-order.md` §5 rule 6).
         self.room_units.leave(key);
         if self.local_player == Some(key) {

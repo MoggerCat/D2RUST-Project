@@ -478,7 +478,7 @@ pub fn audio_request(o: &Output) -> Option<SoundRequest> {
             at,
             event,
         },
-        &Output::UnitFreed { unit } => SoundRequest::UnitFreed { unit },
+        &Output::UnitFreed { unit, client_only } => SoundRequest::UnitFreed { unit, client_only },
         Output::ObjectSound(ObjSound::Mode {
             unit,
             class,

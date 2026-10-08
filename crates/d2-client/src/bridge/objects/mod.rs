@@ -583,9 +583,13 @@ pub fn create_client_unit(
 }
 
 /// The client-only removal `0x00465F00(GUID, type)` (`model.md` §5 rule
-/// 5): unlink from set C and free; a key not in set C: nothing.
+/// 5): unlink from set C and free; a key not in set C: nothing. The free
+/// is recorded for its `UnitFreed` output (`client/bridge.md` §10 r3.1
+/// (a): every unit free, set C too).
 pub fn remove_client_unit(w: &mut ClientWorld, key: UnitKey) -> Option<ClientUnit> {
-    w.objclient.set_c.remove(&key)
+    let u = w.objclient.set_c.remove(&key)?;
+    w.freed.push((key, true));
+    Some(u)
 }
 
 /// `0x006416D0(a, b)` (`missiles/missiles.md` §R9.5) over client units:

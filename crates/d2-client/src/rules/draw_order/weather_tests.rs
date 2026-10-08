@@ -942,17 +942,18 @@ fn thunder_first_strike_silent() {
             &p9(30),
         )
         .unwrap();
+    // `audio/triggers.md` §12: the delay, then y before x.
     let cd = e.roll_range(500, 1_500);
-    let volume = e.roll_range(25, 50);
-    let px = e.roll_range(-200, 400);
-    let py = e.roll_range(-200, 400);
+    let delay = e.roll_range(25, 50);
+    let y = e.roll_range(-200, 400);
+    let x = e.roll_range(-200, 400);
     assert_eq!(w.lightning_countdown, cd);
     assert_eq!(
         out.thunder,
         Some(Thunder {
             sound: 202,
-            volume,
-            position: Some((px, py))
+            delay,
+            position: Some((x, y))
         })
     );
     assert_eq!(seed, e);
@@ -973,7 +974,7 @@ fn thunder_first_strike_silent() {
         )
         .unwrap();
     e.roll_range(500, 1_500);
-    assert_eq!(out.thunder.unwrap().volume, e.roll_range(25, 50));
+    assert_eq!(out.thunder.unwrap().delay, e.roll_range(25, 50));
     assert_eq!(seed, e);
 }
 
@@ -1258,4 +1259,69 @@ fn locked_rain_cycle_becomes_phase_2_and_then_keeps_it() {
     assert_eq!((w.length, w.countdown), (d, d - 1));
     assert_eq!(w.target, 100 * (d - 1) / d);
     assert_eq!(seed, probe);
+}
+
+/// A sound layer stand-in: the handle it returns and what it was asked.
+#[derive(Debug)]
+struct Sounds {
+    handle: u32,
+    calls: Vec<(u16, i32)>,
+    positions: Vec<(u32, i32, i32)>,
+}
+
+impl ThunderSound for Sounds {
+    fn request(&mut self, id: u16, delay: i32) -> u32 {
+        self.calls.push((id, delay));
+        self.handle
+    }
+    fn set_position(&mut self, h: u32, x: i32, y: i32) {
+        self.positions.push((h, x, y));
+    }
+}
+
+// Covers: specs/audio/triggers.md §12; specs/render/draw-order-2.md §11.7 r2
+#[test]
+fn thunder_requests_202_with_the_delay_and_places_it_y_first() {
+    let lv = level(1, 0, false, false);
+    let strike = |w: &mut Weather, seed: &mut Seed, s: &mut Sounds| {
+        w.lightning_on = true;
+        w.lightning_phase = 1;
+        w.lightning_trigger = 1;
+        w.thunder = true;
+        w.pass9_with(
+            Some(LocalPlayer { seed, level: lv }),
+            &Pass9Input {
+                thunder_sound_starts: false,
+                ..p9(30)
+            },
+            Some(s),
+        )
+        .unwrap()
+    };
+    let mut w = Weather::new();
+    let mut seed = Seed::new(0x1234_5678, 9);
+    let mut e = seed;
+    let mut s = Sounds {
+        handle: 7,
+        calls: Vec::new(),
+        positions: Vec::new(),
+    };
+    let out = strike(&mut w, &mut seed, &mut s);
+    e.roll_range(500, 1_500);
+    let delay = e.roll_range(25, 50);
+    let y = e.roll_range(-200, 400);
+    let x = e.roll_range(-200, 400);
+    assert_eq!(s.calls, [(202, delay)]);
+    assert_eq!(s.positions, [(7, x, y)]);
+    assert_eq!(out.thunder.unwrap().position, Some((x, y)));
+    assert_eq!(seed, e);
+    // No handle (the hook's answer, not the input flag): no position draws.
+    s.handle = 0;
+    let out = strike(&mut w, &mut seed, &mut s);
+    e.roll_range(500, 1_500);
+    let delay = e.roll_range(25, 50);
+    assert_eq!(s.calls[1], (202, delay));
+    assert_eq!(s.positions.len(), 1);
+    assert_eq!(out.thunder.unwrap().position, None);
+    assert_eq!(seed, e);
 }
