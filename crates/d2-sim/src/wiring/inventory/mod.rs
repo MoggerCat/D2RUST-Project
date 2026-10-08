@@ -41,6 +41,7 @@ pub mod equip_rules;
 pub mod host;
 pub mod identify;
 pub mod inv_world;
+pub mod item_link;
 pub mod load;
 pub mod merc;
 pub mod ops;
@@ -115,6 +116,13 @@ pub struct InvState {
     /// on when its rest answers the equipment seams (the skill list,
     /// player data mouse slots, stat links).
     pub equip_rules: bool,
+    /// An item moved onto a body slot attaches its stat list to the
+    /// wearer, and its leaving detaches it, with the set-item update and
+    /// the set bonuses ([`item_link`]). PROVISIONAL (REC-161): the stat
+    /// link `0x0063D1D0` / unlink `0x0063D2B0` bodies are unwritten
+    /// (`stat-lists.md` §8.4 gives the attach). Off (the default): those
+    /// calls go to the rest, as before.
+    pub link_item_stats: bool,
     /// Town Portal scroll / tome uses of the call, taken by the host
     /// ([`InvDesk::take_portal_requests`], REC-117).
     pub portal_requests: Vec<UnitId>,

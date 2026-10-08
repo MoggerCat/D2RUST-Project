@@ -138,6 +138,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvWorld for InvDesk<'_, '_, H, R> 
         self.rest.weapon_in_use_update(o)
     }
     fn stat_link(&mut self, unit: UnitId, item: UnitId) {
+        self.link_item_stats(unit, item);
         let (o, i) = (self.o(unit), self.g(item));
         self.rest.stat_link(o, i)
     }

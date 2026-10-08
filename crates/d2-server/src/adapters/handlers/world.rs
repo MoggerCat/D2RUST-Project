@@ -1078,5 +1078,9 @@ pub fn preview_cube_parts(cube: d2_sim::world::cube::CubeData) -> super::items::
 /// An inventory model for the play host ([`WiredWorld::inventory`]) over
 /// `tables` (`InvTables::from_fixed`) with [`PreviewMoveRest`].
 pub fn preview_inv_parts(tables: InvTables) -> InvParts {
-    InvParts::new(tables, Box::new(PreviewMoveRest::default()))
+    let mut parts = InvParts::new(tables, Box::new(PreviewMoveRest::default()));
+    // PROVISIONAL (REC-161, d2rs-own, unverified): worn items feed the
+    // wearer's stats, set bonuses included (`wiring/inventory/item_link.rs`).
+    parts.state.link_item_stats = true;
+    parts
 }

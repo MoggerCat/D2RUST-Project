@@ -753,6 +753,21 @@ impl Pending for LocalSeams {
     fn item_is(&self, item: UnitId, itype: i32) -> bool {
         self.weapons.item_is(item, itype)
     }
+    // d2rs-own, unverified (q-weapon-combat, REC-158): combat's weapon is
+    // the weapon in use; its damage reaches the wearer through the
+    // linked stat list.
+    fn current_weapon(&self, unit: UnitId) -> Option<UnitId> {
+        self.weapons.weapon(unit)
+    }
+    fn weapon(&self, unit: UnitId) -> Option<UnitId> {
+        self.weapons.weapon(unit)
+    }
+    fn item_at(&self, unit: UnitId, loc: u8) -> Option<UnitId> {
+        self.weapons.item_at(unit, loc)
+    }
+    fn wield_type(&self, item: UnitId) -> i32 {
+        self.weapons.facts(item).grip
+    }
     fn item_shoots(&self, item: UnitId) -> bool {
         self.weapons.facts(item).shoots
     }
@@ -1962,13 +1977,17 @@ fn synthetic_hire_rows() -> Vec<HireRow> {
             act: 2,
             difficulty: 1,
             seller: u32::from(d2_sim::world::npc::class::GREIZ),
-            gold: 200,
+            gold: 0, // no gold stat row in the synthetic game (REC-157)
             level: 9,
             name_first: 2000,
             name_last: 2002,
         }))
         .collect()
 }
+
+/// The synthetic hire rows' mercenary classes (Kashya's and Greiz's 271,
+/// Asheara's 357, Qual-Kehk's 560; made up).
+const MERC_CLASSES: [usize; 3] = [271, 357, 560];
 
 /// d2rs-own, unverified (preview): the client's monster rows for the
 /// synthetic game, so Akara's S→C 0xAC creates her unit (a class without
@@ -1981,7 +2000,8 @@ pub fn synthetic_unit_rows() -> UnitRows {
         .max()
         .unwrap_or(0)
         .max(raven)
-        .max(izual);
+        .max(izual)
+        .max(MERC_CLASSES.into_iter().max().unwrap_or(0));
     let mut monsters = vec![None; top + 1];
     let class_row = |npc| MonsterClass {
         components: [0; 16],
@@ -1998,6 +2018,10 @@ pub fn synthetic_unit_rows() -> UnitRows {
     }
     monsters[raven] = Some(class_row(false));
     monsters[izual] = Some(class_row(false));
+    // The hirable mercenaries (q-mercs-acts, REC-157): plain monster rows.
+    for c in MERC_CLASSES {
+        monsters[c] = Some(class_row(false));
+    }
     UnitRows {
         monsters,
         ..UnitRows::default()
@@ -2009,6 +2033,10 @@ impl GameParts {
     /// state's level types over the synthetic DRLG view with no preset,
     /// outdoor or maze data.
     fn synthetic(wp: &WaypointTables) -> Result<Self, BuildError> {
+        let hire_rows: Vec<HireRow> = synthetic_hire_rows()
+            .into_iter()
+            .chain(super::town_npcs::synthetic_hire_rows())
+            .collect();
         // The maze level's rows and DS1 (q-act1-dungeons).
         let world_types =
             SharedTypes::new(synthetic_maze::maze_types(Arc::new(synthetic_drlg_data())));
@@ -2046,17 +2074,14 @@ impl GameParts {
                 ..ObjectTables::default()
             },
             monstats: synthetic_monstats(),
-            hire_rows: synthetic_hire_rows()
-                .into_iter()
-                .chain(super::town_npcs::synthetic_hire_rows())
-                .collect(),
+            hire_rows: hire_rows.clone(),
             items: ItemTables::default(),
             vendors: VendorTables::default(),
             anim: None,
             vitals: None,
             bodies: None,
             drops: None,
-            hirelings: None,
+            hirelings: Some(super::merc_rows::synthetic_hireling_tables(&hire_rows)),
             inventory: None,
             cube: None,
         })

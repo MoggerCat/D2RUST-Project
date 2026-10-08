@@ -40,6 +40,9 @@ pub struct AppRest {
     /// The players' quest records (player data, `quests.md` §1.7), set at
     /// the join.
     pub quests: BTreeMap<UnitId, PlayerQuests>,
+    /// The units' owners (guid, type), set by `set_owner` (a hired
+    /// mercenary's player; `hirelings.md` §8 reads it on a kill).
+    pub owners: BTreeMap<UnitId, (u32, u8)>,
     /// The players' names (client record +0x0D), set at the join.
     pub names: BTreeMap<UnitId, Vec<u8>>,
     pub last_bought: BTreeMap<UnitId, u32>,
@@ -228,10 +231,10 @@ impl HirelingRest for AppRest {
         self.note(format!("skill level {} {skill} {level}", u.0));
     }
     fn set_owner(&mut self, u: UnitId, guid: u32, t: u8) {
-        self.note(format!("owner {} {guid} {t}", u.0));
+        self.owners.insert(u, (guid, t));
     }
-    fn owner(&self, _: UnitId) -> Option<(u32, u8)> {
-        None
+    fn owner(&self, u: UnitId) -> Option<(u32, u8)> {
+        self.owners.get(&u).copied()
     }
     fn join_team(&mut self, m: UnitId, p: UnitId) {
         self.note(format!("join team {} {}", m.0, p.0));
