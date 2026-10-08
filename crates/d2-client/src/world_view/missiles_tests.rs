@@ -118,6 +118,16 @@ fn cast(w: &mut ClientWorld, skill: i32, at: (i32, i32)) {
     });
 }
 
+/// A built frame of `w`: its one camera (`seams/world-screen.md` §2.2),
+/// `None` without a local player.
+fn framed(w: &ClientWorld) -> WorldFrame {
+    let mut feed = ModelFeed::<NoFeed>::default();
+    WorldFrame {
+        camera: crate::world_view::frame_camera(w, &mut feed).unwrap(),
+        ..WorldFrame::default()
+    }
+}
+
 struct Run {
     m: Missiles,
     a: ViewAssets,
@@ -136,7 +146,7 @@ impl Run {
     /// One frame at server tick `t`: the draws' positions.
     fn frame(&mut self, w: &mut ClientWorld, t: u64) -> Vec<(i32, i32)> {
         w.server_ticks = t;
-        let mut frame = WorldFrame::default();
+        let mut frame = framed(w);
         let log = self.m.add_to_frame(w, &self.feed, &mut self.a, &mut frame);
         assert!(log.is_empty(), "{log:?}");
         frame.items.iter().map(|d| (d.x, d.y)).collect()
@@ -214,7 +224,7 @@ fn a_state_overlay_plays_on_its_unit_and_no_rows_draw_nothing() {
     w.units.get_mut(&PLAYER).unwrap().states.clear();
     assert!(r.frame(&mut w, 4).is_empty());
     // The default: no rows, no source.
-    let mut frame = WorldFrame::default();
+    let mut frame = framed(&w);
     let mut a = assets();
     let feed = ModelFeed::<NoFeed>::default();
     let log = Missiles::default().add_to_frame(&w, &feed, &mut a, &mut frame);
@@ -228,15 +238,44 @@ fn a_missing_art_file_is_logged_once_and_not_drawn() {
     let feed = ModelFeed::<NoFeed>::default();
     let mut m = Missiles::new(Arc::new(MemorySource::default()), rows());
     let mut a = assets();
-    m.add_to_frame(&w, &feed, &mut a, &mut WorldFrame::default());
+    m.add_to_frame(&w, &feed, &mut a, &mut framed(&w));
     cast(&mut w, FIRE_BOLT as i32, (130, 100));
     w.server_ticks = 2;
-    let mut frame = WorldFrame::default();
+    let mut frame = framed(&w);
     let log = m.add_to_frame(&w, &feed, &mut a, &mut frame);
     assert_eq!(log.len(), 2, "overlay and missile: {log:?}");
     assert!(frame.items.is_empty());
     w.server_ticks = 3;
     assert!(m
-        .add_to_frame(&w, &feed, &mut a, &mut WorldFrame::default())
+        .add_to_frame(&w, &feed, &mut a, &mut framed(&w))
         .is_empty());
+}
+
+// Covers: specs/render/camera.md §2
+// Covers: specs/seams/world-screen.md §2.4
+#[test]
+fn the_local_players_overlays_follow_its_predicted_position() {
+    use crate::world_view::preview::Preview;
+    let mut w = world();
+    w.units.get_mut(&PLAYER).unwrap().states.insert(9);
+    let mut m = Missiles::new(source(), rows());
+    let mut a = assets();
+    let mut feed = ModelFeed::<NoFeed>::default().with_preview(Preview::default());
+    let mut draw = |feed: &mut ModelFeed<NoFeed>, t: u64| {
+        w.server_ticks = t;
+        let mut frame = WorldFrame {
+            camera: crate::world_view::frame_camera(&w, feed).unwrap(),
+            ..WorldFrame::default()
+        };
+        let log = m.add_to_frame(&w, &*feed, &mut a, &mut frame);
+        assert!(log.is_empty(), "{log:?}");
+        frame.items.iter().map(|d| (d.x, d.y)).collect::<Vec<_>>()
+    };
+    let at_cell = draw(&mut feed, 1);
+    assert_eq!(at_cell.len(), 1);
+    // The walk prediction three sub-tiles east of the model cell: the
+    // camera follows it, and so does the overlay (same screen point).
+    let c = |s: u32| (s << 16) | 0x8000;
+    feed.set_local_prediction(Some((PLAYER, (c(103), c(100)))));
+    assert_eq!(draw(&mut feed, 1), at_cell);
 }

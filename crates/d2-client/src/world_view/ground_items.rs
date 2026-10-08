@@ -58,7 +58,7 @@ use crate::bridge::link::ServerLink;
 use crate::bridge::world::ClientWorld;
 use crate::bridge::{Bridge, BridgeError};
 use crate::frames::{FramePart, FrameSet, FrameSetKey};
-use crate::rules::camera::{static_to_client, Camera, FrameSize};
+use crate::rules::camera::{static_to_client, Camera};
 use crate::rules::placement::place;
 use crate::scene::order::pass;
 use crate::scene::{BlendOp, DrawItem, DrawKey, ItemTag, Rect, ShadeChain};
@@ -247,9 +247,9 @@ impl GroundItems {
     }
 
     /// Loads the art ([`Self::ensure`]) and adds the ground items to a
-    /// built `frame` (re-sorted by key), under the camera of `feed`
-    /// (`camera.md` §3, no shake). No local player, or open mode 3 (no
-    /// world): nothing. Never fails the frame; returns log lines.
+    /// built `frame` (re-sorted by key), under the frame's one camera
+    /// (`frame.camera`, `seams/world-screen.md` §2.2, §2.6). No camera, or
+    /// open mode 3 (no world): nothing. Never fails the frame; returns log lines.
     pub fn add_to_frame<F: ViewFeed + ?Sized>(
         &mut self,
         world: &ClientWorld,
@@ -262,11 +262,9 @@ impl GroundItems {
             return Vec::new();
         }
         let mut log = self.ensure(world, assets);
-        let camera = match (feed.player(world), feed.open_mode(world)) {
-            (Ok(Some(p)), Ok(mode)) if mode.get() != NO_WORLD_MODE => {
-                Camera::new(FrameSize::D2RS, mode, p.client(), (0, 0))
-            }
-            (Err(e), _) | (_, Err(e)) => {
+        let camera = match (frame.camera, feed.open_mode(world)) {
+            (Some(c), Ok(mode)) if mode.get() != NO_WORLD_MODE => c,
+            (_, Err(e)) => {
                 log.push(format!("ground items: no camera: {e}"));
                 return log;
             }

@@ -172,6 +172,25 @@ pub enum TileList {
     },
 }
 
+/// The inputs of the frame's one camera besides the open mode (§3, §8):
+/// the local player's position and the shake offsets, decided once per
+/// frame (`seams/world-screen.md` §2.2, §2.4). Every reader that builds a
+/// camera or places the local player takes this one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FrameAnchor {
+    /// The local player's position (the walk prediction in `play`).
+    pub player: UnitPosition,
+    /// `(dx, dy)` of §8, `(0, 0)` when no shake runs.
+    pub shake: (i32, i32),
+}
+
+impl FrameAnchor {
+    /// The frame's camera in open mode `mode` (§3).
+    pub fn camera(&self, size: FrameSize, mode: OpenMode) -> Camera {
+        Camera::new(size, mode, self.player.client(), self.shake)
+    }
+}
+
 /// The camera of one drawn frame (§3): computed once, from the local
 /// player's client position, the open mode and the frame's shake offsets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

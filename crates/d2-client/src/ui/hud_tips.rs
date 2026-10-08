@@ -83,14 +83,33 @@ pub struct GlobeTextIn<'a> {
 /// call point is used as is. The backing box (colour 0, mode 2) is not
 /// drawn: the UI draw list has no rectangle primitive.
 fn tip_request(t: Tip, w: i32, h: i32, fonts: Option<&super::FontMeasure>) -> TextRequest {
+    popup_request(
+        t.text,
+        Point::new(t.x, t.y),
+        u16::from(t.color),
+        t.centered,
+        (w, h),
+        fonts,
+    )
+}
+
+/// The text draw of a pop-up call `0x00502280(text, at, color, centre)`
+/// in the tip font (§5 r14), as [`tip_request`] places it.
+pub(super) fn popup_request(
+    text: Vec<u16>,
+    at: Point,
+    color: u16,
+    centered: bool,
+    (w, h): (i32, i32),
+    fonts: Option<&super::FontMeasure>,
+) -> TextRequest {
     let style = TextStyle {
         font: TIP_FONT,
-        color: u16::from(t.color),
+        color,
     };
-    let at = Point::new(t.x, t.y);
-    if let Some(fr) = fonts.and_then(|f| f.popup(TIP_FONT, &t.text, at, t.centered, (w, h))) {
+    if let Some(fr) = fonts.and_then(|f| f.popup(TIP_FONT, &text, at, centered, (w, h))) {
         return TextRequest {
-            text: t.text,
+            text,
             at: fr.pen,
             style,
             opts: fr.opts,
@@ -98,10 +117,10 @@ fn tip_request(t: Tip, w: i32, h: i32, fonts: Option<&super::FontMeasure>) -> Te
         };
     }
     TextRequest {
-        text: t.text,
+        text,
         at,
         style,
-        opts: if t.centered {
+        opts: if centered {
             TextOpts::centered()
         } else {
             TextOpts::default()

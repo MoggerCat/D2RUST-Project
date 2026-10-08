@@ -53,7 +53,7 @@ use crate::frames::atlas::AtlasPage;
 use crate::ui::original::OriginalUi;
 use crate::ui::{edge, FramePos, PointerButton, StringLookup, UiEvent, UiRoot};
 
-use super::feed::{build_frame, ViewFeed};
+use super::feed::{build_frame_placed, ViewFeed};
 use super::node::{add_node, ComposeJob, NodeIndices};
 use super::panel_art::PanelArtLoader;
 use super::ui_bind::{run_ui_with, world_clicks, TextAssetLoader, UiQueue, UiRules};
@@ -393,24 +393,19 @@ pub fn deliver_with<L: ServerLink>(
 }
 
 /// The automap's frame facts (`ui/automap.md` §9): the d2rs frame, the
-/// open mode, the unit origin of the local player's camera.
+/// open mode, the unit origin of the frame's one camera
+/// (`seams/world-screen.md` §2.2); no camera: origin (0, 0).
 fn automap_facts(
-    world: &crate::bridge::world::ClientWorld,
+    camera: Option<&crate::rules::camera::Camera>,
     open_mode: u8,
 ) -> crate::ui::automap::FrameFacts {
-    use crate::rules::camera::{moving_to_client, Camera, FrameSize, OpenMode};
-    let at = world.local().map_or(Default::default(), |p| {
-        let (x, y) = p.cell();
-        moving_to_client((u32::from(x) << 16) | 0x8000, (u32::from(y) << 16) | 0x8000)
-    });
-    let mode = OpenMode::new(open_mode).unwrap_or(OpenMode::NONE);
-    let cam = Camera::new(FrameSize::D2RS, mode, at, (0, 0));
+    use crate::rules::camera::FrameSize;
     crate::ui::automap::FrameFacts {
         width: FrameSize::D2RS.width,
         height: FrameSize::D2RS.height,
         open_mode,
         mini_down: false,
-        unit_origin: cam.unit,
+        unit_origin: camera.map_or(Default::default(), |c| c.unit),
     }
 }
 
@@ -624,9 +619,20 @@ fn world_view_frame(
         }
     }
     let state = &mut *state;
+    // `seams/world-screen.md` §2.2, §2.4: the local player's position and
+    // the shake are decided once; the UI (overhead text), the pick, the
+    // labels, the automap and the world draw all read this one.
+    // An error here is the frame build's own, reported there.
+    let anchor: Option<crate::rules::camera::FrameAnchor> =
+        super::feed::frame_anchor(bridge.0.world(), state.feed.as_mut()).unwrap_or_default();
+    // The frame's one camera, once the UI has set this frame's open mode.
+    let mut placed = None;
     let ui_frame = match ui {
         Some(mut ui) => {
             let ui = &mut *ui;
+            if let Some(o) = ui.original.as_mut() {
+                o.set_frame_anchor(anchor);
+            }
             let mut frame = run_ui_with(
                 &mut ui.root,
                 &mut ui.queue,
@@ -713,7 +719,8 @@ fn world_view_frame(
                 }
                 None => (0, None),
             };
-            let cam = super::corpse_click::camera_for(bridge.0.world(), view.open_mode);
+            placed = super::feed::camera_at(bridge.0.world(), state.feed.as_ref(), anchor)?;
+            let cam = placed.map(|(c, _)| c);
             // d2rs-own, unverified (D1): the hover target (the preview's pick
             // under the cursor) is drawn highlighted (`blend-modes.md` §3 `h`).
             let over = matches!(ui.cursor, Some(FramePos::Inside(_)));
@@ -769,7 +776,7 @@ fn world_view_frame(
             if let Some(a) = state.automap.as_mut() {
                 for e in &frame.unhandled {
                     if *e == UiEvent::Action(crate::ui::ActionId(toggle)) {
-                        a.toggle(&automap_facts(bridge.0.world(), view.open_mode));
+                        a.toggle(&automap_facts(cam.as_ref(), view.open_mode));
                     }
                 }
             }
@@ -788,12 +795,17 @@ fn world_view_frame(
     };
     let draws = ui_frame.as_ref().map_or(&[][..], |f| &f.draws[..]);
     state.feed.prepare(bridge.0.world(), &mut state.assets)?;
-    let built = build_frame(
+    let placed = match ui_frame {
+        Some(_) => placed,
+        None => super::feed::camera_at(bridge.0.world(), state.feed.as_ref(), anchor)?,
+    };
+    let built = build_frame_placed(
         bridge.0.world(),
         draws,
         state.rules.as_ref(),
         state.feed.as_mut(),
         &state.assets,
+        placed,
     );
     let mut frame = match built {
         Ok(f) => f,
@@ -829,8 +841,15 @@ fn world_view_frame(
     // `ui/automap.md` §10: the open automap's draw pass.
     if let (Some(a), Some(v)) = (state.automap.as_mut(), state.automap_view.as_mut()) {
         let world = bridge.0.world();
-        if let Ok(mode) = state.feed.open_mode(world) {
-            for m in v.add_to_frame(a, world, mode, &mut state.assets, &mut frame) {
+        if let (Some((_, mode)), Some(at)) = (placed, anchor) {
+            for m in v.add_to_frame(
+                a,
+                world,
+                mode,
+                at.player.client(),
+                &mut state.assets,
+                &mut frame,
+            ) {
                 warn!("preview (d2rs-own, unverified): {m}");
             }
         }

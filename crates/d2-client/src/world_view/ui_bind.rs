@@ -369,7 +369,12 @@ pub(super) fn ui_items<R: UiRules + ?Sized>(
     if draws.is_empty() {
         return Ok(());
     }
-    let key = DrawKey::new(rules.ui_pass()?, 0, 0, 0)?;
+    let key = DrawKey::new(
+        rules.ui_pass()?,
+        crate::scene::order::pass::UI_PANELS_MAJOR,
+        0,
+        0,
+    )?;
     for (index, d) in draws.iter().enumerate() {
         let at = |error| ViewError::Ui {
             index,

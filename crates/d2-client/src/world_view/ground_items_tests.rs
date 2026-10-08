@@ -144,7 +144,7 @@ fn a_ground_item_draws_its_flippy_at_its_subtile() {
     populate(&mut w, &[(5, 3, (102, 100), b"cap ")]);
     let mut g = GroundItems::new(source(), rows());
     let mut a = assets();
-    let mut frame = WorldFrame::default();
+    let mut frame = framed(&w);
     let feed = ModelFeed::<NoFeed>::default();
     let log = g.add_to_frame(&w, &feed, &mut a, &mut frame);
     assert!(log.is_empty(), "{log:?}");
@@ -174,7 +174,7 @@ fn no_rows_or_missing_art_draw_nothing_and_never_fail() {
         &[(5, 3, (102, 100), b"cap "), (6, 0, (1, 1), b"cap ")],
     );
     let feed = ModelFeed::<NoFeed>::default();
-    let mut frame = WorldFrame::default();
+    let mut frame = framed(&w);
     let mut a = assets();
     // The default: no rows, no source.
     let log = GroundItems::default().add_to_frame(&w, &feed, &mut a, &mut frame);
@@ -188,8 +188,19 @@ fn no_rows_or_missing_art_draw_nothing_and_never_fail() {
     // No local player: no camera, nothing drawn.
     let mut g = GroundItems::new(source(), rows());
     w.local_player = None;
+    let mut frame = framed(&w);
     assert!(g.add_to_frame(&w, &feed, &mut a, &mut frame).is_empty());
     assert!(frame.items.is_empty());
+}
+
+/// A built frame of `w`: its one camera (`seams/world-screen.md` §2.2),
+/// `None` without a local player.
+fn framed(w: &ClientWorld) -> WorldFrame {
+    let mut feed = ModelFeed::<NoFeed>::default();
+    WorldFrame {
+        camera: crate::world_view::frame_camera(w, &mut feed).unwrap(),
+        ..WorldFrame::default()
+    }
 }
 
 #[derive(Clone, Default)]
@@ -227,7 +238,7 @@ fn scene(items: &[Fixture<'_>]) -> (Bridge<RecordingLink>, RecordingLink, Ground
     let mut b = Bridge::with_dispatch(link.clone(), Dispatch::empty()).unwrap();
     populate(b.world_mut(), items);
     let mut g = GroundItems::new(source(), rows());
-    let mut frame = WorldFrame::default();
+    let mut frame = framed(b.world());
     let feed = ModelFeed::<NoFeed>::default();
     g.add_to_frame(b.world(), &feed, &mut assets(), &mut frame);
     (b, link, g)
@@ -380,7 +391,7 @@ fn a_gold_pile_draws_the_direction_of_its_amount_class() {
     put_gold(&mut w, 9, (98, 98), 6000);
     let mut g = GroundItems::new(Arc::new(src), gold_rows());
     let mut a = assets();
-    let mut frame = WorldFrame::default();
+    let mut frame = framed(&w);
     let feed = ModelFeed::<NoFeed>::default();
     let log = g.add_to_frame(&w, &feed, &mut a, &mut frame);
     assert!(log.is_empty(), "{log:?}");

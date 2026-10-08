@@ -630,6 +630,32 @@ fn near_rooms_come_from_the_client_drlg() {
     assert!(bare.near_rooms(&m.w).is_err());
 }
 
+// Covers: specs/render/draw-order.md §9
+// Covers: specs/seams/world-screen.md §2.4
+#[test]
+fn the_fade_player_tile_is_the_predicted_sub_tile() {
+    use crate::world_view::model_feed::ModelFeed;
+    use crate::world_view::preview::Preview;
+    use crate::world_view::ViewFeed;
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    let mut feed = ModelFeed::new(ZeroFacts).with_preview(Preview::default());
+    feed.levels = Some(vec![LevelRow::default(); 4]);
+    // The model cell (46, 6) without a prediction.
+    let near = feed.near_rooms(&m.w).unwrap().unwrap();
+    assert_eq!(near.player_tile, (9, 1));
+    // The walk prediction at sub-tile (52, 11): the camera and the
+    // player draw use it, so the fade centre does too (§9: the path
+    // sub-tile / 5).
+    let me = m.w.local_player.unwrap();
+    feed.set_local_prediction(Some((me, ((52 << 16) | 0x8000, (11 << 16) | 0x8000))));
+    m.w.frames += 1;
+    let near = feed.near_rooms(&m.w).unwrap().unwrap();
+    assert_eq!(near.player_tile, (10, 2));
+}
+
 fn room_mut(
     near: &mut crate::rules::draw_order::NearRooms,
     k: usize,

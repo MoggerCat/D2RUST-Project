@@ -405,12 +405,30 @@ mod belt {
         };
         let w = compact(world(&[(7, mode::BELT, (0, 1, 0, 0), b"cap ")], None));
         // Nothing hovered yet: no tip.
-        assert!(b.hover_tip(&w, &tips).0.is_empty());
-        // Over box 1 (left 461, top 562): the tip anchors at (left + 14, top).
+        assert!(b.hover_tip(&w, &tips).is_none());
+        // Over box 1 (left 461, top 562): the pop-up's point is (left + 14,
+        // top), colour 0, centred (§5 r8, r14).
         b.draw_list(&w, (800, 600), false, (470, 570), true);
-        let (lines, at) = b.hover_tip(&w, &tips);
-        assert!(!lines.is_empty(), "the hovered potion has a tip");
-        assert_eq!(at, (475, 562));
+        let t = b
+            .hover_tip(&w, &tips)
+            .expect("the hovered potion has a tip");
+        assert_eq!((t.x, t.y, t.color, t.centered), (475, 562, 0, true));
+        // T ends with the name in colour 0 (`Prefix(N, 0)`).
+        let name = &tips.lines(
+            crate::bridge::items::stream(
+                &w,
+                w.units.keys().copied().find(|k| k.unit_type == 4).unwrap(),
+            )
+            .unwrap(),
+        )[0]
+        .text;
+        let mut tail = vec![0xFF, u16::from(b'c'), u16::from(b'0')];
+        tail.extend_from_slice(name);
+        assert!(
+            t.text.ends_with(&tail),
+            "{:?}",
+            String::from_utf16_lossy(&t.text)
+        );
         // An item on the cursor hides it (§5 r8).
         let w = compact(world(
             &[
@@ -419,11 +437,11 @@ mod belt {
             ],
             Some(9),
         ));
-        assert!(b.hover_tip(&w, &tips).0.is_empty());
+        assert!(b.hover_tip(&w, &tips).is_none());
         // Off the belt the hover ends.
         let w = compact(world(&[(7, mode::BELT, (0, 1, 0, 0), b"cap ")], None));
         b.draw_list(&w, (800, 600), false, (10, 10), true);
-        assert!(b.hover_tip(&w, &tips).0.is_empty());
+        assert!(b.hover_tip(&w, &tips).is_none());
     }
 
     // Covers: specs/ui/control-panel.md §5 r4

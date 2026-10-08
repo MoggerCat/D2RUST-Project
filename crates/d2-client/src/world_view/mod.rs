@@ -85,7 +85,8 @@ use crate::scene::{
 };
 
 pub use feed::{
-    blank_screen, build_frame, frame_camera, FeedLight, NoCamera, NoFeed, RunningShake, ViewFeed,
+    blank_screen, build_frame, build_frame_placed, camera_and_mode, camera_at, frame_anchor,
+    frame_camera, FeedLight, NoCamera, NoFeed, RunningShake, ViewFeed,
 };
 pub use model_feed::ModelFeed;
 pub use present::{UiSounds, WorldViewGpu, WorldViewPlugin, WorldViewState, WorldViewUi};

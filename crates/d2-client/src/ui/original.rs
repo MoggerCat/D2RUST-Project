@@ -36,7 +36,7 @@ use std::rc::Rc;
 
 use d2_formats::font::FontTable;
 
-use super::draw::UiDrawSink;
+use super::draw::{UiDraw, UiDrawSink};
 use super::geom::{Point, Rect};
 use super::item_tip;
 use super::layout::{LayoutError, PanelKey, RowKind, Screen};
@@ -541,6 +541,12 @@ impl OriginalUi {
     /// The `belts.bin` records and the belts' types (`hud_belt`).
     pub fn set_belt_parts(&mut self, parts: hud_belt::BeltParts) {
         self.shared.borrow_mut().hud.belt.parts = parts;
+    }
+
+    /// The frame's local-player position and shake (the world view's
+    /// one camera, `seams/world-screen.md` §2.2), set before each UI frame.
+    pub fn set_frame_anchor(&mut self, anchor: Option<crate::rules::camera::FrameAnchor>) {
+        self.shared.borrow_mut().bubbles.anchor = anchor;
     }
 
     /// The belt key labels follow the play bindings (`hud_belt`, REC-264).
@@ -1424,14 +1430,23 @@ impl Panel for TopUi {
 
     fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let sh = self.sh.borrow();
-        // The belt item's tip (`hud_belt`, `control-panel.md` §5 r8).
-        if let Some(tips) = sh.items.tips.as_ref() {
-            let (lines, at) = sh.hud.belt.hover_tip(ctx.world, tips);
-            if !lines.is_empty() {
-                let (w, h) = (sh.config.screen.w, sh.config.screen.h);
-                let at = Point::new(at.0, at.1);
-                item_tip::draw_tip(&lines, at, (w, h), sh.fonts.as_ref(), &sh.tables.files, out);
-            }
+        // The belt item's hover text (`hud_belt`, `control-panel.md` §5
+        // r8) as the r14 pop-up, in the belt's font 1 (§5 r4).
+        if let Some(t) = sh
+            .items
+            .tips
+            .as_ref()
+            .and_then(|tips| sh.hud.belt.hover_tip(ctx.world, tips))
+        {
+            let (w, h) = (sh.config.screen.w, sh.config.screen.h);
+            out.push(UiDraw::Text(hud_tips::popup_request(
+                t.text,
+                Point::new(t.x, t.y),
+                u16::from(t.color),
+                t.centered,
+                (w, h),
+                sh.fonts.as_ref(),
+            )));
         }
         // The item tool tip over everything (`item_tip`).
         if sh.states.is_open(UI_INVENTORY) {
