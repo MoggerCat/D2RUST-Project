@@ -278,6 +278,23 @@ fn reader_errors() {
     );
 }
 
+/// An alt-code record (§4.1 rule 4) ends after its base code; the reader
+/// gives the item level 1 and quality 1 whatever the writer's item held
+/// (`bitstream-legacy.md` §3 rule 2, `bitstream.md` edge case 9).
+// Covers: specs/items/bitstream.md §4.1 r4
+#[test]
+fn an_alt_code_record_reads_level_1_quality_1() {
+    let c = codes();
+    let mut cap = full(&c, b"cap ");
+    cap.alt = true;
+    cap.ilvl = 40;
+    cap.quality = 4;
+    let (bytes, _) = write_save(&cap, &c.t.isc).unwrap();
+    let r = read_save_entry(&bytes, &c.t).unwrap().item.item;
+    assert!(r.alt);
+    assert_eq!((r.code, r.ilvl, r.quality), (*b"cap ", 1, 1));
+}
+
 /// The decoder's rebuilt fields (`vendors-2.md` §7.3.1 rules 4, 5): a
 /// compact record gets item level 1, quality 2, seed field 0 and the
 /// suffix slot 0 of its scroll / tome code; a full record's level below
