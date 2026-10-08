@@ -494,3 +494,59 @@ fn the_create_request_has_the_builder_layout() {
         assert_eq!(r.flags, flags, "status {status:#x}");
     }
 }
+
+/// The join on the play path, up to the first tick's flush: the C→S 0x67
+/// and 0x6B of the app, two ticks; returns the second flush's message
+/// ids, in order.
+fn join_ids() -> Vec<Vec<u8>> {
+    use d2_client::bridge::link::SendQueue;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    let ms = std::sync::Arc::new(AtomicU32::new(1000));
+    let (mut link, _) =
+        single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+    let req = single_player::create_request();
+    link.send(SendQueue::System, &req.encode()).unwrap();
+    link.pump().unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    link.pump().unwrap();
+    link.receive();
+    link.send(SendQueue::System, &[0x6B]).unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    assert!(link.pump().unwrap().ticked);
+    link.receive()
+}
+
+/// The first tick after the join (`flows/game-join.md` §3 r2,
+/// `intents-events.md` §8.3, `flows/server-tick.md` §4 r2): the
+/// per-client update sends the player's stat messages (the changed-stat
+/// array, still holding the join's stats) after the game entry's 0x7E
+/// and before the 0x04, not after the tick; then the flag-ex bit 21
+/// inventory refresh.
+// Covers: specs/flows/server-tick.md §4 r2; specs/sim/tick.md §6 r5
+#[test]
+fn the_first_tick_sends_the_stats_in_the_client_pass_before_0x04() {
+    let got = join_ids();
+    let ids: Vec<u8> = got.iter().map(|m| m[0]).collect();
+    let entry = ids.iter().position(|&i| i == 0x7E).expect("0x7E");
+    let done = ids.iter().position(|&i| i == 0x04).expect("0x04");
+    let stats = ids[entry..done]
+        .iter()
+        .filter(|&&i| matches!(i, 0x1D..=0x1F))
+        .count();
+    assert!(stats > 0, "{:02X?}", &ids[entry..]);
+    // The join's item messages set flag-ex bit 21: the inventory refresh's
+    // 0x48 follows the stats, right before 0x04 (recorded `-022633`
+    // frame 2: units, 0x1D / 0x1E, 0x48, 0x04).
+    assert_eq!(ids[done - 1], 0x48, "{:02X?}", &ids[entry..]);
+    assert!(
+        matches!(ids[done - 2], 0x1D..=0x1F),
+        "{:02X?}",
+        &ids[entry..]
+    );
+    assert!(
+        !ids[done..].iter().any(|&i| matches!(i, 0x1D..=0x1F)),
+        "{:02X?}",
+        &ids[done..]
+    );
+}

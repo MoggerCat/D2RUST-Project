@@ -22,6 +22,7 @@ use crate::world::objects::{ObjectControl, ObjectTables};
 
 use super::combat::CombatView;
 use super::objects::{ObjectCase, ObjectState, ObjectView};
+use super::vitals_sync;
 use super::waypoints::WaypointView;
 use super::{ActionHooks, ActionTables, Pending, View, WiringError};
 
@@ -239,6 +240,11 @@ impl<X: Pending> EventDispatch for ActionSim<X> {
     }
 }
 
+/// Flag-ex (+0xC8) bit 21: the per-client update's inventory refresh
+/// (`tick.md` §6 rule 5; set by the join's item messages,
+/// `intents-events.md` §8.2 rule 3.5).
+pub const INVENTORY_REFRESH_EX: u32 = 0x0020_0000;
+
 impl<X: Pending> TickHooks for ActionSim<X> {
     /// Per-client update removals (`0x0053A770`, `tick.md` §6 rule 5):
     /// S→C 0x0A (`messages::remove_unit`) to the client's player for each
@@ -416,6 +422,40 @@ impl<X: Pending> TickHooks for ActionSim<X> {
             return;
         }
         crate::wiring::path::walk::update_messages(&mut v, game, client, unit);
+    }
+
+    /// Per-client update (`tick.md` §6 rule 5, after the unit updates):
+    /// the player's stat-change messages, the flush `0x006258D0` of its
+    /// changed-stat array (`stat-lists.md` §11 rule 2,
+    /// [`vitals_sync::mod_stat_messages`]); then, only when the player's
+    /// flag-ex (+0xC8) bit 21 is set, the inventory refresh
+    /// `0x0055DF00(…, 1, 1)` → `0x0055DBC0` (`intents-events.md` §8.3),
+    /// whose send ends with S→C 0x48 (type 0, arg 0, the player's GUID;
+    /// `inventory.md` §5.7 step 8). `0x0055F4F0` is empty in 1.14d.
+    ///
+    /// PROVISIONAL (REC-290; d2rs-own, unverified): the refresh's item and
+    /// skill steps (§5.7 steps 1–7) are not run here: they belong to the
+    /// host's inventory model, which the tick hooks do not hold. Its 0x48
+    /// is sent at the spec's place.
+    fn client_update_messages(&mut self, game: &mut Game, client: ClientId) {
+        let Some(p) = game.lists.client(client).and_then(|c| c.player) else {
+            return;
+        };
+        let Some(r) = self.sys.units.get(p) else {
+            return;
+        };
+        let (guid, refresh) = (r.guid, r.flags2 & INVENTORY_REFRESH_EX != 0);
+        let msgs = vitals_sync::mod_stat_messages(&self.sys.stats.mod_values(p));
+        let x = &mut self.sys.hooks.x;
+        for m in &msgs {
+            x.send(p, m);
+        }
+        if refresh {
+            x.send(
+                p,
+                &crate::items::moves::layouts::relator2(UnitType::Player as u8, 0, guid),
+            );
+        }
     }
 
     /// Step 6 (`0x00553220`, `intents-events.md` §7.5): the flag part of

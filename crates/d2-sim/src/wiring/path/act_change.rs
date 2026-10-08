@@ -135,12 +135,21 @@ pub fn run<X: Pending>(mut c: PathCtx<'_, X>, player: UnitId, level: u32, tile_i
         c.v.h.x.send(player, &[0x0B, 0, g[0], g[1], g[2], g[3]]);
         // The re-added unit has no stats on the client: its vitals sync
         // caches start again (`combat/vitals.md` §5.2, a new client's
-        // cache is all 0), so the next sync sends the life message and
-        // every watched stat. d2rs-own, unverified (q-smoke-town, REC-278;
-        // goes with the re-add above).
+        // cache is all 0), so the next sync sends the life message, and
+        // its non-zero `Saved` base stats (0–15 but the ones with their
+        // own messages) are sent now. d2rs-own, unverified (q-smoke-town,
+        // REC-278; goes with the re-add above).
         if let (Some(client), Some(s)) = (client, c.v.h.sync.as_mut()) {
             s.caches.remove(&client);
-            s.stats.remove(&client);
+        }
+        let stats: Vec<(i32, i32)> = (0u16..=15)
+            .filter(|s| ![6, 8, 10, 13, 14].contains(s))
+            .map(|s| (i32::from(s), c.v.stats.unit_base(player, s, 0)))
+            .filter(|&(_, v)| v != 0)
+            .map(|(s, v)| (crate::stats::key(s as u16, 0), v))
+            .collect();
+        for m in crate::wiring::action::vitals_sync::mod_stat_messages(&stats) {
+            c.v.h.x.send(player, &m);
         }
     }
     // LoadComplete: the client is in the game again (needs the placed

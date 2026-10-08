@@ -225,7 +225,12 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // the new character's Horadric Cube (`start_extra`, REC-244), sent as
     // the join's item messages (rule 3.5): its S→C 0x9C PutInContainer
     // (`msg-stats-items.md` §2): 47 + 1 = 48.)
-    assert_eq!(joined, 48);
+    // (q-fix-flow-server: the first tick's per-client update flushes the
+    // changed-stat array, still holding the join's eight stats, and the
+    // flag-ex bit 21 set by the item messages runs the inventory refresh's
+    // 0x48, before the 0x04: `sim/tick.md` §6 rule 5, `intents-events.md`
+    // §8.3, recorded frame 2 "0x1D / 0x1E, 0x48, 0x04": 48 + 8 + 1 = 57.)
+    assert_eq!(joined, 57);
     // Plus two for the Blood Moor room bordering the synthetic town: its
     // 0x07 at the join and its 0x08 when the travel leaves the town.
     // Plus two for that room's cave entrance (a tile unit): its 0x09 at
@@ -241,7 +246,9 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // Warriv's (q-smoke-travel, REC-280), as Gheed's and Charsi's: 44, 6.
     // (q-smoke-town: plus the join's S→C 0x95, its 16 stat messages and
     // the start cube's 0x9C, all handled: 62, 6.)
-    assert_eq!((b.log().handled, b.log().queued), (62, 6));
+    // (q-fix-flow-server: the first tick's eight stat messages and 0x48,
+    // all handled, as `joined` above: 71, 6.)
+    assert_eq!((b.log().handled, b.log().queued), (71, 6));
     assert!(b.log().unowned.is_empty(), "{:?}", b.log().unowned);
     assert!(b.log().dropped.is_empty(), "{:?}", b.log().dropped);
     let sight: Vec<_> = b
