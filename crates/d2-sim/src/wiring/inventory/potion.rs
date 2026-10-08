@@ -1,0 +1,135 @@
+// Spec: specs/items/inventory-moves.md §7.17; specs/sim/stat-lists.md §10.1
+//! Potion use from the belt (C→S 0x26, `use_item` / `remove_used` seams).
+//!
+//! The item-use spec (`0x005BF240`, `pSpell` table) is unwritten, so the
+//! effect is PROVISIONAL (`docs/HANDOFF.md` §7, REC-BELT-POTION): a
+//! healing potion attaches a `healthpot` (state 100) list with stat 74
+//! (life regeneration per tick) that expires after [`POTION_FRAMES`]; a
+//! mana potion a `manapot` (state 106) list with stat 26 (mana recovery).
+//! The regeneration tick (`stat-lists.md` §10.1) and the life / mana
+//! predictions (`vitals.md` §5.2) are the existing ones. A rejuvenation
+//! potion restores a share of both at once.
+//!
+//! d2rs-own, unverified: the codes, amounts, durations and the list
+//! flags below are preview fills, not facts of the original.
+
+use super::{InvDesk, InvRest};
+use crate::items::moves::{Guid, MovePending, MoveUnits, Owner};
+use crate::stats::lists::flag;
+use crate::units::lifecycle::LifecycleHooks;
+use crate::units::UnitId;
+
+/// States of the potion lists (`stat-lists.md` §10.1, `states.txt`).
+pub const STATE_HEALTHPOT: u32 = 100;
+pub const STATE_MANAPOT: u32 = 106;
+/// Stats: life regeneration per tick (74), mana recovery per tick (26),
+/// life (6), mana (8).
+const STAT_HPREGEN: u16 = 74;
+const STAT_MANARECOVERY: u16 = 26;
+const STAT_LIFE: u16 = 6;
+const STAT_MANA: u16 = 8;
+/// Frames a healing / mana potion works (d2rs-own, unverified).
+pub const POTION_FRAMES: i32 = 100;
+/// Page byte shown in the removal message (`inventory-moves.md` §6.4).
+const REMOVED_FLAG: u32 = 0x20;
+
+/// What a potion does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Potion {
+    /// Life over time, in whole points.
+    Life(i32),
+    /// Mana over time, in whole points.
+    Mana(i32),
+    /// Share of life and mana at once, in percent.
+    Rejuv(i32),
+}
+
+/// d2rs-own, unverified: the potion of an item code (`hp1`–`hp5`,
+/// `mp1`–`mp5`, `rvs`, `rvl`).
+pub fn classify(code: [u8; 4]) -> Option<Potion> {
+    let n = code[2].checked_sub(b'1')? as usize;
+    match (&code[..2], code[2]) {
+        (b"hp", b'1'..=b'5') => Some(Potion::Life([45, 90, 150, 270, 480][n])),
+        (b"mp", b'1'..=b'5') => Some(Potion::Mana([30, 60, 120, 225, 450][n])),
+        (b"rv", b's') => Some(Potion::Rejuv(35)),
+        (b"rv", b'l') => Some(Potion::Rejuv(70)),
+        _ => None,
+    }
+}
+
+impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
+    /// `use_item` for a potion: true = used. Not a potion → false.
+    pub fn use_potion(&mut self, player: Owner, item: Guid) -> bool {
+        let Some(u) = self.unit_of(player) else {
+            return false;
+        };
+        let Some(i) = self.item_unit(item) else {
+            return false;
+        };
+        let code = match self
+            .tables
+            .item(self.state.items.get(&i).map(|d| d.record).unwrap_or(0))
+        {
+            Some(r) => r.code,
+            None => return false,
+        };
+        let Some(p) = classify(code) else {
+            return false;
+        };
+        let frame = self.econ.game.frame;
+        match p {
+            Potion::Life(n) => self.attach_potion(u, STATE_HEALTHPOT, STAT_HPREGEN, n, frame),
+            Potion::Mana(n) => self.attach_potion(u, STATE_MANAPOT, STAT_MANARECOVERY, n, frame),
+            Potion::Rejuv(pct) => {
+                for (stat, max) in [
+                    (STAT_LIFE, self.econ.stats.max_life(u)),
+                    (STAT_MANA, self.econ.stats.max_mana(u)),
+                ] {
+                    let cur = self.econ.stats.unit_total(u, stat, 0);
+                    let v = cur.saturating_add(max / 100 * pct).min(max);
+                    if v > cur {
+                        let s = &mut *self.econ.stats;
+                        s.unit_set(&mut *self.econ.hooks, u, stat, v, 0);
+                    }
+                }
+            }
+        }
+        true
+    }
+
+    /// A new `state` list on the unit giving `points` over
+    /// [`POTION_FRAMES`] as stat `stat` per tick (8.8 fixed point);
+    /// replaces a running list of the same state.
+    fn attach_potion(&mut self, u: UnitId, state: u32, stat: u16, points: i32, frame: i32) {
+        let Some((ty, guid)) = self
+            .econ
+            .units
+            .get(u)
+            .map(|r| (r.ty.index() as u32, r.guid))
+        else {
+            return;
+        };
+        let per_tick = points.saturating_mul(256) / POTION_FRAMES;
+        let s = &mut *self.econ.stats;
+        let h = &mut *self.econ.hooks;
+        s.free_state_list(h, u, state);
+        let l = s.alloc(flag::NEWLENGTH, frame + POTION_FRAMES, ty, guid);
+        s.set_state(l, state);
+        s.add(h, l, stat, per_tick, 0);
+        s.attach(h, u, l, true);
+    }
+
+    /// `remove_used` of a belt potion: the removal message (flag 0x20),
+    /// then the item leaves the inventory and is freed (`0x0055E000`).
+    pub fn remove_used_item(&mut self, player: Owner, item: Guid) {
+        let Some(u) = self.item_unit(item) else {
+            return;
+        };
+        let Some(p) = self.unit_of(player) else {
+            return;
+        };
+        let page = self.page(item);
+        let _ = self.send_item_page(p, u, REMOVED_FLAG, page);
+        self.free_item(item);
+    }
+}

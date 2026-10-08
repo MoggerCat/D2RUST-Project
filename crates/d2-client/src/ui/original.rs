@@ -443,6 +443,16 @@ impl OriginalUi {
         self.shared.borrow_mut().items.layouts = Some(layouts);
     }
 
+    /// The `belts.bin` records and the belts' types (`hud_belt`).
+    pub fn set_belt_parts(&mut self, parts: hud_belt::BeltParts) {
+        self.shared.borrow_mut().hud.belt.parts = parts;
+    }
+
+    /// Shift is held (set by the host each frame, `inv_items`).
+    pub fn set_shift(&mut self, shift: bool) {
+        self.shared.borrow_mut().items.shift = shift;
+    }
+
     /// Measured item graphic frame sizes by `invfile` (lower case).
     pub fn set_item_frame_sizes(&mut self, sizes: BTreeMap<String, (u32, u32)>) {
         self.shared.borrow_mut().items.frame_sizes = sizes;
@@ -991,6 +1001,9 @@ impl Panel for BorderUi {
 
 #[path = "hud.rs"]
 pub mod hud;
+
+#[path = "hud_belt.rs"]
+pub mod hud_belt;
 
 #[path = "msg_ui.rs"]
 pub mod msg_ui;

@@ -80,33 +80,34 @@ fn switch_belt_item() {
     assert_eq!(item_msgs(&w.drain()), [(0x9C, 0x10, b), (0x9C, 0x10, c)]);
 }
 
-/// §7.17: a used belt potion: use (`0x005BF240`, seam) on the player, then
-/// the charge update, removal (seam) and compaction; result 0. Not used
-/// → nothing after the use call. A cursor item → 0 before the use.
+/// §7.17 with the provisional potion effect (REC-BELT-POTION): `hp1` on
+/// the player attaches a `healthpot` list with stat 74 per tick that
+/// expires; the potion leaves the belt with a removal message (0x9D
+/// action 5, flag 0x20) and the next potion moves to slot 0. A cursor
+/// item → 0 before the use.
 #[test]
 fn use_belt_item() {
+    use crate::wiring::inventory::potion::{POTION_FRAMES, STATE_HEALTHPOT};
     let mut w = World::new();
     let a = belted(&mut w, HP1);
+    let b = belted(&mut w, HP2);
     let p = w.pguid();
-    w.rest.log.clear();
+    let pu = w.player;
     let use_msg = |g: Guid| msg(0x26, &[g, 0, 0]);
+    assert_eq!(w.stats.unit_total(pu, 74, 0), 0);
     assert_eq!(w.handle(&use_msg(a)), Ok(0));
-    assert_eq!(w.rest.log, [format!("use_item {p} {p} {a}")]);
-    w.rest.use_ok = true;
-    w.rest.log.clear();
-    assert_eq!(w.handle(&use_msg(a)), Ok(0));
-    assert_eq!(
-        w.rest.log,
-        [
-            format!("use_item {p} {p} {a}"),
-            format!("charge_update {a}"),
-            format!("remove_used {a}"),
-        ]
-    );
-    // The removal is the item-use spec's: the potion is still in slot 0.
-    assert_eq!(slot_of(&w, a), 0);
+    assert_eq!(w.stats.unit_total(pu, 74, 0), 45 * 256 / POTION_FRAMES);
+    let l = w.stats.state_list_owner(pu, STATE_HEALTHPOT);
+    assert_eq!(l, Some((0, p)));
+    assert!(w.unit(a).is_none(), "the potion is freed");
+    assert_eq!(slot_of(&w, b), 1, "another column stays");
+    let sent: Vec<Vec<u8>> = w.rest.sent.iter().map(|(_, m)| m.clone()).collect();
+    assert_eq!(item_msgs(&sent), [(0x9D, 0x05, a)]);
+    // The list expires at its frame.
+    let f = w.game.frame + POTION_FRAMES;
+    w.stats.expire_lists(&mut w.hooks, pu, f).unwrap();
+    assert_eq!(w.stats.unit_total(pu, 74, 0), 0);
     let _c = w.cursor_item(KEY);
-    w.rest.log.clear();
-    assert_eq!(w.handle(&use_msg(a)), Ok(0));
-    assert!(w.rest.log.is_empty());
+    assert_eq!(w.handle(&use_msg(b)), Ok(0));
+    assert!(w.unit(b).is_some(), "a cursor item blocks the use");
 }

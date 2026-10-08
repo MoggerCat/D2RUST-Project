@@ -42,6 +42,7 @@ pub mod inv_world;
 pub mod merc;
 pub mod ops;
 pub mod pending;
+pub mod potion;
 pub mod queries;
 pub mod save_index;
 pub mod units;

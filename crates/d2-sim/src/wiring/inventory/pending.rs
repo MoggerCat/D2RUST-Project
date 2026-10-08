@@ -376,12 +376,19 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         self.rest.book_count_changed(player, n)
     }
     fn use_item(&mut self, player: Owner, target: Owner, item: Guid) -> bool {
+        // PROVISIONAL (REC-BELT-POTION): potions on the player.
+        if target == player && self.use_potion(player, item) {
+            return true;
+        }
         self.rest.use_item(player, target, item)
     }
     fn charge_update(&mut self, player: Owner, item: Guid) {
         self.rest.charge_update(player, item)
     }
     fn remove_used(&mut self, player: Owner, item: Guid) {
+        if self.item_unit(item).is_some() {
+            return self.remove_used_item(player, item);
+        }
         self.rest.remove_used(player, item)
     }
     fn equip_picked(&mut self, player: Owner, item: Guid) -> bool {

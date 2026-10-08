@@ -7,7 +7,7 @@
 //! with state 0x15 open (§9); the mouse input of §10 (run toggle, menu
 //! button, skill buttons → state 3, mini panel functions).
 //!
-//! Not drawn: the belt (stitch-items), the new-stats / new-skills
+//! The belt is `hud_belt`. Not drawn: the new-stats / new-skills
 //! buttons (§8), the tool tips and the globe numbers (they need the
 //! string table by id, `NoStrings` in play).
 //!
@@ -64,6 +64,7 @@ pub fn hud_files() -> Vec<String> {
         "panel\\minipanel",
         "panel\\minipanel_s",
         "panel\\minipanelbtn",
+        "panel\\ctrlpnl_popbelt",
         FILL_FILE,
     ]
     .iter()
@@ -151,6 +152,8 @@ pub struct HudState {
     pub run_toggles: u32,
     /// The skill button that opened state 3 (`0x004A8CE0(left)`).
     pub select_left: bool,
+    /// The belt (`hud_belt`).
+    pub belt: super::hud_belt::HudBelt,
 }
 
 impl Default for HudState {
@@ -164,6 +167,7 @@ impl Default for HudState {
             running: false,
             run_toggles: 0,
             select_left: true,
+            belt: Default::default(),
         }
     }
 }
@@ -284,11 +288,14 @@ impl Panel for HudUi {
         if sh.states.is_open(UI_SKILL_SELECT) {
             return Rect::new(0, 0, s.w as u16, s.h as u16);
         }
-        let top = if sh.states.is_open(UI_MINI) {
+        let mut top = if sh.states.is_open(UI_MINI) {
             s.h - 76
         } else {
             s.h - 47
         };
+        if let Some(t) = sh.hud.belt.popped_top(s.res2()) {
+            top = top.min(t);
+        }
         if s.w <= 0 {
             return EMPTY;
         }
@@ -371,6 +378,10 @@ impl Panel for HudUi {
         let mini_open = sh.states.is_open(UI_MINI);
         let menu = menu_button(w, h, mini_open, hud.input.menu_pressed, mouse);
         out.extend_one(cel(files, "panel\\menubutton", menu));
+        // §5 the belt (before the skill buttons, §1 r3).
+        let (res2, items_ui) = (sh.config.screen.res2(), &sh.items);
+        hud.belt
+            .draw(world, items_ui, files, (w, h), res2, mouse, living, out);
         // §7 r2 skill buttons.
         let list = unit.and_then(|u| u.skills.as_ref());
         for (side, entry) in [
@@ -490,6 +501,18 @@ impl Panel for HudUi {
             } else {
                 UiResponse::Ignored
             };
+        }
+        // §5 the belt click (the box hit on release; a press over the belt
+        // is consumed like `over_belt`, §10 r1).
+        let res2 = sh.config.screen.res2();
+        let at_px = (at.x, at.y);
+        if alive && sh.hud.belt.over(world, (w, h), res2, at_px) {
+            if !down {
+                for i in sh.hud.belt.click(world, res2, at_px) {
+                    sh.outputs.push(PanelOutput::Intent(i));
+                }
+            }
+            return UiResponse::Consumed;
         }
         // §10 the control panel strip.
         let env = InputEnv {
