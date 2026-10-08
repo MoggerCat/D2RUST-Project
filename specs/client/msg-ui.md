@@ -30,31 +30,31 @@
 |   1. 0x5D quest status (`0x0045E540` → `0x004A2CB0`) | 108–196 |
 |   2. 0x63 waypoint menu (`0x0045E670` → `0x0049CF90`) | 197–227 |
 |   3. 0x77 UI action (`0x0045E800` → `0x004B8CF0`) | 228–272 |
-|   4. 0x26 chat and overhead text (`0x0045DFC0` → `0x0049F490`) | 273–323 |
-|   5. 0x27 NPC text (`0x0045E0A0` → `0x004A1600`) | 324–353 |
-|   6. 0x4E hire offer and 0x4F hire list reset | 354–366 |
-|   7. 0x50 quest special (`0x0045E370` → `0x004B9210`) | 367–407 |
-|   8. 0x58 UI open (`0x0045E490` → `0x004C0550`) | 408–441 |
-|   9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`) | 442–470 |
-|   10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`) | 471–481 |
-|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 482–494 |
-|   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 495–504 |
-|   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 505–517 |
-|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 518–526 |
-|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 527–537 |
-|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 538–640 |
-|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 641–653 |
-|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 654–664 |
-|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 665–684 |
-|   20. 0x61 act video (`0x0045E660`) | 685–692 |
-|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 693–700 |
-|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 701–710 |
-| Constants & data dependencies | 711–722 |
-| Randomness | 723–727 |
-| Edge cases & original bugs | 728–744 |
-| Test vectors | 745–792 |
-| Provenance | 793–853 |
-| Open questions | 854–973 |
+|   4. 0x26 chat and overhead text (`0x0045DFC0` → `0x0049F490`) | 273–354 |
+|   5. 0x27 NPC text (`0x0045E0A0` → `0x004A1600`) | 355–384 |
+|   6. 0x4E hire offer and 0x4F hire list reset | 385–397 |
+|   7. 0x50 quest special (`0x0045E370` → `0x004B9210`) | 398–438 |
+|   8. 0x58 UI open (`0x0045E490` → `0x004C0550`) | 439–472 |
+|   9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`) | 473–501 |
+|   10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`) | 502–512 |
+|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 513–525 |
+|   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 526–535 |
+|   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 536–548 |
+|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 549–557 |
+|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 558–568 |
+|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 569–671 |
+|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 672–684 |
+|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 685–695 |
+|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 696–715 |
+|   20. 0x61 act video (`0x0045E660`) | 716–723 |
+|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 724–731 |
+|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 732–741 |
+| Constants & data dependencies | 742–753 |
+| Randomness | 754–758 |
+| Edge cases & original bugs | 759–775 |
+| Test vectors | 776–823 |
+| Provenance | 824–891 |
+| Open questions | 892–1021 |
 <!-- /index -->
 
 Owned ids: 0x26, 0x27, 0x29, 0x4E, 0x4F, 0x50, 0x52, 0x58, 0x5D, 0x5E,
@@ -122,7 +122,7 @@ layer.
    | bit 0 set | 3 | screen message of string 3708 (0xE7C) (`0x0049E3A0(text, 0)`) | output |
    | bit 0 set | 4 | every monster of set S of class 146 (`cain1`): unit flag +0xC4 bit 0x2 cleared (`0x00464990` with `0x004A2C70`) | model (r4) |
    | bit 0 set | 10 | eclipse (`0x0044C820`, `render/lighting.md` §9.2 r3) | model |
-   | bit 0 set | 13 | `0x0046F870(211, 1)` (client effect of monstats row 211; open question 1) | output |
+   | bit 0 set | 13 | `0x0046F870(211, 1)`: preload of monstats row 211's mode graphics (open question 1 answer); no model state, no visible effect | output |
    | bit 0 set | 15 | screen message of string 3710 (0xE7E) | output |
    | bit 0 set | 23 | `exit_requested` := 1 (`0x0044D520` → `[0x007A0620]`, `client/model.md` §1) | model |
    | bit 0 set | 33 | sound 237 | output |
@@ -296,6 +296,37 @@ layer.
       assert 0xFA8 of `0x00622150`); the text filter object
       (`0x00611560`) tests n (method +8) and the text (method +0x14);
       either non-zero → nothing.
+      1. **The filter object is the persistent ignore list**
+         (2026-10-08 read; answers open question 9). `0x00611560`
+         returns the singleton `[0x0096BC20]`, built on first use by
+         `0x00611200` (source file string `.\Chat\Ignorelist.cpp`,
+         vtable `0x006E62DC`): two string lists, A at +0x04 (names)
+         and B at +0x2C (phrases), a map at +0x54; path +0x80 := the
+         directory of `Game.exe` + `ignorelist` (`0x00406B60`,
+         `0x006E620C`); enabled +0x184 := the registry value
+         `Diablo II` / `Persistent Ignore` (`0x00414F10`, default 1;
+         written back by method +0x24 `0x0060DE00`); then the file is
+         loaded (`0x00611050`). Method +0x20 (`0x0060DDF0`) returns
+         enabled.
+      2. Method +8 (`0x00610380`, name n): n empty or disabled → 0.
+         Else n's two derived forms (`0x0060DE30`, and the account the
+         map gives through method +0x1C, else `0x0060DEA0`) are looked
+         up in list A (`0x0060FD50` → `0x0060F8B0` on +0x04); a hit →
+         non-zero.
+      3. Method +0x14 (`0x0060FC40`, text t): t empty or disabled → 0;
+         t found in list B as a whole (`0x0060F8B0` on +0x2C) → 1;
+         else for each entry e of B in list order (head +0x38, string
+         at node +0x14, next `0x0060EAA0`): lower-case copies of t and
+         e (`0x00414200` = `_strlwr`), e a substring of t
+         (`0x00686900` = `strstr`) → 1; none → 0.
+      4. Method +0x18 (`0x00611320`, from `0x0049E3A0`, not a
+         filter): a line "x(y)…" records y, prefixed with `*`, as the
+         map entry of x (`0x0060F510`, else created by `0x00611170`):
+         the name → account pairs method +8 uses.
+      Both lists are filled only from the `ignorelist` file and the
+      list's own add methods (chat ignore commands, Phase 6 UI); no
+      message writes them. So with no `ignorelist` file and no ignore
+      command (the d2rs single-player case) nothing is filtered.
    3. Text conversion `0x0049E280(text, lang)` fails → nothing:
       languages 6, 7, 9, 12 convert with `MultiByteToWideChar`; when
       lang differs from the client's own language id (`0x00525150`,
@@ -851,6 +882,13 @@ immediates); `disasm.py fn` on `0x00661400`, `0x00661440`,
 `0x00661510`, `0x00661270`, `0x006616E0`, `0x006615F0`, `0x006615D0`,
 `0x0049F900` (= `[0x007BF250]`).
 
+Gap pass (2026-10-08, PC 1 lane D): §4 r3.2.1–r3.2.4 from
+`0x00611560`, `0x00611200` (strings `0x006E6290`, `0x006E620C`,
+`0x006E6278`, vtable `0x006E62DC` read from the image), `0x0060DDF0`,
+`0x0060DE00`, `0x00610380`, `0x0060FD50`, `0x0060FC40`, `0x00611320`,
+`0x0049F503`–`0x0049F527`; OQ 1 from `0x0046F870`, `0x0046F650`,
+`0x006004E0`.
+
 ## Open questions
 
 1. `0x0046F870(row, 1)` (0x5D f bit 0, c 13; also `render/lighting.md`
@@ -858,7 +896,16 @@ immediates); `disasm.py fn` on `0x00661400`, `0x00661440`,
    effect spec. *Partly answered* (`client/msg-units.md` §7 r10):
    `0x0046F870(class, f)` loads the class's graphics for each mode its
    monstats2 row marks (15-mode table `0x00712AC4`, `0x0046F650`); open:
-   what the flag f = 1 changes.
+   what the flag f = 1 changes. *Answered (2026-10-08, read of
+   `0x0046F870` / `0x0046F650`)*: f (EDX, passed on as the third
+   argument of `0x0046F650`) changes only how each cel context of the
+   class's mode files is fetched: f ≠ 0 → `0x006001F0(ctx, 1, 1)`, and
+   when that returns 0 the direct load `0x006004E0(ctx)` (`0x0046F784`–
+   `0x0046F7A2`); f = 0 → `0x006001F0(ctx, 0, 0)` (`0x0046F7A9`). It is a
+   graphics preload: no model state, no output, the same cels (the
+   load arguments' meaning stays with `client/model.md` OQ 7 and
+   `render/sprite-placement.md` OQ 5). d2rs loads graphics on demand and
+   treats 0x5D f bit 0, c 13 as having no observable effect.
 2. The full client unit flag word +0xC4 (initial value per kind, other
    writers), so `quest_untargetable` can become a real flag field;
    owner `client/msg-units.md`. *Partly answered (2026-10-08, asm
@@ -873,12 +920,12 @@ immediates); `disasm.py fn` on `0x00661400`, `0x00661440`,
    `0x004AFF60`). **0x200** is set (with 2: `|= 0x202`) only by the
    client hireling setup `0x004B1090`, called by the 0xAC create when
    the new monster's pet type (`0x00479180`) is 7 and by 0x81 type 7
-   (`client/model.md` §14 r3); no client clear. PROVISIONAL: the
-   per-caller conditions of the 0x10000 writers inside the mode
-   machines follow `client/model.md` OQ 1's provisional (dead modes
-   only: set on entering a death / dead mode, cleared on leaving)
-   (because the 0x15 / death flow is the only one exercised by the
-   recordings); settled by REC-51.
+   (`client/model.md` §14 r3); no client clear. *0x10000 answered
+   (2026-10-08)*: the per-caller conditions are `client/msg-units.md`
+   §4 r6 (player codes 0x08 / 0x09 via `0x00461010`, monster code 0x09
+   and the frame-30 callback with mode 0xC; the rest mark client
+   missiles; cleared only by `0x004647D0`). Still open: the other bits
+   of the word and their initial value per kind.
 3. Who resets the quest-log latch `[0x007BF298]` and the meaning of
    `[0x007BF2A4]`, `[0x007BF2AC]`, `[0x007BF2B9]` in the quest-log draw
    (Phase 6 quest-log spec).
@@ -932,7 +979,8 @@ immediates); `disasm.py fn` on `0x00661400`, `0x00661440`,
    loop does with them after the exit (`0x0044B8A0`, `0x0044DD60`,
    `0x0044E0B0`, `0x0044E200`); owner `client/model.md` §7 if they are
    session state.
-9. The text filter object `0x00611560` (methods +8, +0x14) used by
+9. *Answered (2026-10-08)*: §4 r3.2.1–r3.2.4 (the persistent ignore
+   list; empty without an `ignorelist` file). Original question: the text filter object `0x00611560` (methods +8, +0x14) used by
    §4 r3.2: what it rejects (a squelch / profanity list?); UI spec.
    *Partly answered (2026-10-08):* the same object's method +0x18 also
    receives every screen message of color 4 that wraps to exactly one

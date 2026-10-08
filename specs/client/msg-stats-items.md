@@ -27,13 +27,13 @@
 |   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 101–230 |
 |   3. Other item messages | 231–301 |
 |   4. Hireling stats: 0x9E–0xA2 (`0x0045D540`) | 302–317 |
-|   5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6 | 318–403 |
-| Constants & data dependencies | 404–412 |
-| Randomness | 413–416 |
-| Edge cases & original bugs | 417–436 |
-| Test vectors | 437–475 |
-| Provenance | 476–505 |
-| Open questions | 506–539 |
+|   5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6 | 318–430 |
+| Constants & data dependencies | 431–439 |
+| Randomness | 440–443 |
+| Edge cases & original bugs | 444–463 |
+| Test vectors | 464–502 |
+| Provenance | 503–538 |
+| Open questions | 539–575 |
 <!-- /index -->
 
 Owned ids: 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x3F, 0x42,
@@ -365,12 +365,20 @@ stat-list links, `weapon_set`, the runtime item table (§5). No outputs.
    item's body location on the owner (`0x00623D60`).
    - code 0x100: item flag 0x100 := value (`0x006280D0`); the owner's
      gfx and body slot refreshed (`0x0046F950`, `0x004C1290(loc)`,
-     `0x00470610(owner, 0)`); the item's stats linked to the owner
-     (`0x00663CC0(owner, item, 1, 1)`); requirement refresh
+     `0x00470610(owner, 0)`; `0x004C1290` detaches the item's list,
+     `client/stat-lists.md` §2 r4.1); then the set-item update with
+     remove (`0x00663CC0(owner, item, 1, 1)` at `0x004C22F1`, whatever
+     the value: the item's set lists re-parked or unparked by the mask,
+     which skips items with flag 0x100, and the owner's list of that
+     set detached and freed; `client/stat-lists.md` §2 r5,
+     `items/properties.md` §13 r = 1); requirement refresh
      `0x004C1350(owner)`.
    - code 0x200: item flag 0x100 := 0; `0x004C12F0(owner, item, the
-     item's mode, loc)`; stats unlinked (`0x00663CC0(owner, item, 0,
-     0)`); `0x004C1350(owner)`.
+     item's mode, loc)` (the item placed again); the set-item re-add
+     (`0x00663CC0(owner, item, 0, 0)` at `0x004C232D`: set lists
+     unparked or parked by the mask, the owner's set list rebuilt for the
+     current count; `client/stat-lists.md` §2 r5);
+     `0x004C1350(owner)`.
    - other codes: nothing.
    Model: item flag 0x100, the owner's stat-list links
    (`sim/stat-lists.md`), item flags of the refresh. The gfx calls are
@@ -381,7 +389,9 @@ stat-list links, `weapon_set`, the runtime item table (§5). No outputs.
    gfx refresh (`0x0046F950`), the item unlinked (`0x0063D2B0`) and
    re-added (`0x0063AD90`; none → fatal 0xD5A, another item → fatal
    0xD5B); kind 3 → its body slot cleared (`0x0063C110`,
-   `0x0063BE30`); stats linked (`0x00663CC0(U, item, 1, 1)`); a player
+   `0x0063BE30`); the set-item update with remove (`0x00663CC0(U, item,
+   1, 1)` at `0x004C24A9`: the owner's list of that set detached and
+   freed, `client/stat-lists.md` §2 r5); a player
    (type 0) → `0x0063BEF0(inventory)`; item flag 0x100 clear →
    `0x006277F0(U, item)`; `0x004C1350`. A node without an item is
    fatal 0xD4F. Finally `0x0063E0B0(inventory)`. Model: U's inventory
@@ -399,7 +409,24 @@ stat-list links, `weapon_set`, the runtime item table (§5). No outputs.
    entries, the new ones zeroed, count := index + 1). The copy is always
    0x120 bytes, whatever the message size. Model: that table
    (`item_table_ext`), read through `0x00639D60(i)` (0 < i < count,
-   else fatal 0x972); meaning open question 7.
+   else fatal 0x972).
+   1. **The table is `runes`** (2026-10-08; answers open question 7).
+      `0x006394A0` (its only caller `0x00619300`, at `0x006193A7`)
+      reads `runes` (`.\DATATBLS\ItemTbls.cpp`; fields "rune name",
+      "complete", "server", `itype1`–`6`, `etype1`–`3`, `rune1`–`6`,
+      `t1code1`…`t1max7`; server-side copy name `runessrv`) into
+      0x120-byte records (`0x006122F0` at `0x00639C3F`, record size
+      pushed at `0x00639C28`; `specs/data/tables.tsv` row `runes`, 288
+      bytes), count `[0x0096CA98]`, rows `[0x0096CA9C]`, then each row's
+      +0x82 := `0x00524D30(row)` (`0x00639C6E`). Readers: `0x00639D60(i)`
+      and the runeword match `0x0062BED0` (`items/bitstream.md`, through
+      `0x00639CB0`, which returns `0x0096CA98`). So 0xA6 code 0
+      replaces (or appends) one runeword record on the client.
+   2. **Never sent by 1.14d.** `py tools/ghidra/disasm.py xref
+      0x53E1C0` finds no rel32 call or jump and no 4-byte pointer to
+      the sender, so no 1.14d server path builds 0xA6. The client
+      handler stays as rule 7 says (reachable only from a foreign
+      server); d2rs servers never send it.
 
 ## Constants & data dependencies
 
@@ -503,6 +530,12 @@ all.asm scan of `0x007BEFB0`; disassembly of `0x004C4130`
 (`0x004C4245`–`0x004C4276`), `0x004C42A0` (`0x004C4329`–`0x004C433F`),
 `0x004C4C70` (`0x004C4FBE`–`0x004C50E7`).
 
+Gap pass (2026-10-08, PC 1 lane D): §5 r4 / r5 set-update arguments
+re-read at `0x004C22EB`–`0x004C22F1`, `0x004C2327`–`0x004C232D`,
+`0x004C24A3`–`0x004C24A9`; §5 r7.1–r7.2 from `0x006394A0`
+(`0x00639C28`–`0x00639C6E`), `0x00639CB0`, `0x0045EDC0`, `xref
+0x53E1C0` (none).
+
 ## Open questions
 
 1. Which stat each recorded 0x1D / 0x1E sets is fixed by its byte; the
@@ -517,7 +550,9 @@ all.asm scan of `0x007BEFB0`; disassembly of `0x004C4130`
    record peek of `items/bitstream-legacy.md` §1 rule 1 (flags
    +0x0C, mode +0x08, x / y +0x04 / +0x06 or body location +0x11 and
    page +0x10, class +0x00, child count +0x14; no 0x4D4A word since
-   save = 0); the per-handler placement is §2 rule 5.3. Original
+   save = 0); the per-handler placement is §2 rule 5.3; which item stat
+   list each part of the record fills is `client/stat-lists.md` §2 r1.1.
+   Original
    question: the item stream header (`0x0062E410`) and each action handler's
    placement rule: after `items/inventory.md` open question 1, a client
    item spec takes §2 rule 3 to the bar.
@@ -532,7 +567,8 @@ all.asm scan of `0x007BEFB0`; disassembly of `0x004C4130`
    handler, whether it passes the action's item, a swapped-out item or
    0 to `0x0063C180`; with the header byte +8 of the GroundToCursor
    test named (open question 3's header spec).
-7. The runtime item table of 0xA6 (`[0x0096CA9C]`, 0x120-byte entries,
+7. *Answered (2026-10-08)*: §5 r7.1–r7.2 (the `runes` table; the
+   sender has no reference, 0xA6 is never sent). Original question: the runtime item table of 0xA6 (`[0x0096CA9C]`, 0x120-byte entries,
    built at load by `0x006394A0`, read by `0x00639D60` and
    `0x0062BED0`): which table it is and whether a single-player server
    ever sends 0xA6 (no static caller of `0x0053E1C0` found).

@@ -24,22 +24,22 @@
 | Inputs | 57–64 |
 | Outputs / state changes | 65–73 |
 | Rules | 74–75 |
-|   1. The client skill list (unit +0xA8) | 76–99 |
-|   2. Shared skill-list operations | 100–235 |
-|   3. 0x94 BaseSkillLevels (`0x0045DD60`) | 236–245 |
-|   4. 0x21 UpdateItemOSkill (`0x0045DCD0`) | 246–255 |
-|   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 256–265 |
-|   6. 0x23 SetSkill (`0x0045DE10`) | 266–272 |
-|   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 273–316 |
-|   8. 0xA3 skill do (`0x0045D5E0`) | 317–330 |
-|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 331–359 |
-|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 360–374 |
-| Constants & data dependencies | 375–386 |
-| Randomness | 387–390 |
-| Edge cases & original bugs | 391–400 |
-| Test vectors | 401–426 |
-| Provenance | 427–447 |
-| Open questions | 448–480 |
+|   1. The client skill list (unit +0xA8) | 76–117 |
+|   2. Shared skill-list operations | 118–253 |
+|   3. 0x94 BaseSkillLevels (`0x0045DD60`) | 254–263 |
+|   4. 0x21 UpdateItemOSkill (`0x0045DCD0`) | 264–273 |
+|   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 274–283 |
+|   6. 0x23 SetSkill (`0x0045DE10`) | 284–290 |
+|   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 291–334 |
+|   8. 0xA3 skill do (`0x0045D5E0`) | 335–348 |
+|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 349–377 |
+|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 378–392 |
+| Constants & data dependencies | 393–404 |
+| Randomness | 405–408 |
+| Edge cases & original bugs | 409–418 |
+| Test vectors | 419–444 |
+| Provenance | 445–470 |
+| Open questions | 471–505 |
 <!-- /index -->
 
 Owned ids: 0x21, 0x22, 0x23, 0x94, 0x99, 0x9A, 0xA3; §9–§10: 0x93, 0xA5.
@@ -94,8 +94,26 @@ layer; the skill events write no model state. 0x93 writes level bonuses
 5. Where the local player's skills come from: native entries and levels
    from 0x94 (join) and 0x21 (later changes); quantities of tome and
    scroll skills from 0x22; left / right from 0x23. Item-granted
-   entries (owner = item GUID, charges) have other client writers (open
-   question 1); the level bonus +0x2C: §2 rule 7.
+   entries (rule 6); the level bonus +0x2C: §2 rule 7.
+6. **Item-granted entries** (2026-10-08; answers open question 1). No
+   message carries charges or item skills. The only client writer of
+   charge entries is the local and remote players' stat-list callback
+   `0x004609F0` (installed by the player init `0x00460BF0` at
+   `0x00460C38` through `0x00626D40(U, 0, 0x004609F0, 0)`; rules in
+   `client/stat-lists.md` §1 r4): stat 204 `item_charged_skill`
+   (`fCallback` = 1) → `0x00647530` → `0x00647320(O, item GUID, s, l,
+   c, remove)`, the set / remove of `skills/levels.md` §7.6 (owner of
+   the entry fields: base +0x28, charges +0x38, has-charges +0x3C,
+   owner +0x34); stats 97 / 107 assign native entries through §2 r2.
+   The callback runs when an item's stat 204 changes inside a list
+   chain that reaches the player's list: the item's list attached by
+   equip (`client/stat-lists.md` §2 r2) or detached (§2 r4.1), and
+   0x3E stat 204 (`client/msg-stats-items.md` §5 r1.1, whose write
+   `0x00627220` → `0x00627170` carries the item as callback unit). The
+   charge values come from the item's own stream (`items/bitstream.md`
+   §4.6) and 0x3E. The setter `0x00643B70` is unreferenced in the
+   image (no call, no pointer: a scan of the image for its address
+   finds none).
 
 ### 2. Shared skill-list operations
 
@@ -445,14 +463,21 @@ Area 4 session (2026-10-07): §9 `0x0045DD10`, `0x004C7990`,
 bit 17 `enhanceable`, mask table `0x006CE268`), `0x00643AD0`,
 `0x006442A0`; §10 `0x0045D6A0` and its jump tables.
 
+Gap pass (2026-10-08, PC 1 lane D): §1 r6 from `0x00460BF0`
+(`0x00460C38`), `0x004609F0` (jump tables `0x00460B70` / `0x00460B5C`),
+`0x00647530`, `0x00647320`, `0x00627220` → `0x00627170`; image scan for
+the dword `0x00643B70` (none).
+
 ## Open questions
 
-1. Item-granted entries on the client (owner = item GUID, charges
-   +0x38, has-charges +0x3C): the set-charges function `0x00643B70` has
-   no direct caller in the export; find the client path (item equip,
+1. *Answered (2026-10-08)*: §1 r6 (the player stat callback
+   `0x004609F0`, stat 204 → `0x00647320`; no charge message;
+   `0x00643B70` unreferenced). REC-09 stays as the check of the
+   rule, no longer a settling capture. Original question: item-granted
+   entries on the client (owner = item GUID, charges +0x38, has-charges
+   +0x3C): the set-charges function `0x00643B70` has no direct caller
+   in the export; find the client path (item equip,
    `client/stat-lists.md` §2) and the message that carries charges.
-   Settle with a recording equipping a charged item.
-   PROVISIONAL: the client takes charges from the item's own stat list when the item is equipped, with no separate charge message (because the S→C item stream already carries the item's stats, `client/stat-lists.md` §2, and no charge message exists in this file's tables); settled by REC-09.
 2. *Answered (2026-10-08)*: §2 rule 7 (all writers, the split level,
    when each runs). Original question: the level bonus +0x2C on the client: writers `0x00647AA0` (set,
    called from `0x004C6140` and `0x004D88A0`) and `0x00647B20` (add,

@@ -25,17 +25,17 @@
 |   1. Unit add | 77–260 |
 |   2. 0x0A RemoveUnit (`0x0045CC10`) | 261–270 |
 |   3. 0x15 ReassignPlayer (`0x0045D160`) | 271–313 |
-|   4. Queued movement and action messages | 314–357 |
-|   5. Local player vitals: 0x18, 0x95, 0x96 | 358–379 |
-|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 380–410 |
-|   7. Other unit messages (general handlers, act at receive) | 411–526 |
-|   8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB) | 527–631 |
-| Constants & data dependencies | 632–643 |
-| Randomness | 644–651 |
-| Edge cases & original bugs | 652–674 |
-| Test vectors | 675–725 |
-| Provenance | 726–768 |
-| Open questions | 769–807 |
+|   4. Queued movement and action messages | 314–401 |
+|   5. Local player vitals: 0x18, 0x95, 0x96 | 402–423 |
+|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 424–454 |
+|   7. Other unit messages (general handlers, act at receive) | 455–590 |
+|   8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB) | 591–726 |
+| Constants & data dependencies | 727–738 |
+| Randomness | 739–746 |
+| Edge cases & original bugs | 747–769 |
+| Test vectors | 770–820 |
+| Provenance | 821–872 |
+| Open questions | 873–915 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
@@ -354,6 +354,50 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
    u16@0xD, u8@0xA) are never read, and u16@0xF is not copied into the
    record; for objects these bytes carry no client effect (`Code` @10
    and the zeros @11, @13, @15 of `world/objects.md` §14).
+6. **Dead flag** (unit flag +0xC4 bit 0x10000; 2026-10-08 read of the
+   nine callers of the setter `0x00464810`; answers `client/msg-ui.md`
+   OQ 2 for this bit). The dead test `0x00464820(U)` is: flag 0x10000
+   set, or player mode 0 / 0x11, or monster mode 0 / 0xC
+   (`client/model.md` §6 r2). Writers on players and monsters (the
+   other six set it on client-made missiles, below):
+   1. Player mode request code 0x08 (mode := 0) and code 0x09 (mode :=
+      0x11) end in `0x00461010(U)` (`0x004615B2`, `0x004615DA`):
+      `0x004C1E30`, path stop `0x00649F70(path, 0)`, **flag 0x10000
+      set**, flag 0x4 cleared, flag 0x2 cleared unless U has state 7
+      (`0x00639DF0(U, 7)`), `0x0046ECE0(U)`, `0x0046F020(U, 0)`, stat 6
+      (life) := 0 (`0x00627260(U, 6, 0, 0)`).
+   2. Monster mode request code 0x09 (`0x004AFF60`, byte table
+      `0x004B0DF8`[9] → `0x004B09E5`): path stop unless the monstats
+      row's byte +6 has the bit `[0x006CE274]`; stat 6 := 0; when U is
+      the local player's target (`0x004648F0`), the target is cleared
+      (`0x00620C10`); then monstats id 284 (`0x11C`, via `0x00463860`)
+      in mode 0xE → its skill restarted (`0x00620210`), no flag; any
+      other → mode := 0xC (`0x00480E70`) and **flag 0x10000 set**
+      (`0x004B0A5B`). Monster code 0x08 (`0x004B053E`) sets no flag
+      (its dead test is the mode).
+   3. The frame callback `0x004E2630(U)` (referenced from a data table,
+      no direct caller): at animation frame 30 (unit +0x44 >> 8 = 0x1E)
+      mode := 0xC and **flag 0x10000 set** (`0x004E2662`); frame 6 and
+      22 do other work (`0x006212C0`).
+   4. Missiles: the unit returned by the client missile creates
+      `0x004CDB40` (`0x004B0AB0`, monster id 435 in code 0x09),
+      `0x004CDBA0` (`0x004CF3AA`), `0x004CD540` (`0x004D16A9`,
+      `0x004D5B72`); the missile at its animation end (`0x006217C0`)
+      in the table functions `0x004D33E0` / `0x004D3D00`; and
+      `0x004F0590`'s unit when its fourth argument ≠ 0 (`0x004F0633`,
+      callers `0x004F06B6`, `0x004F10FE`).
+   Clear: only `0x004647D0(U)` (flag 0x10000 cleared; then flag 0x4
+   set unless U is a monster whose monstats2 flag 9 (`0x004638A0`) is
+   clear). Its callers: the player machine `0x00461250` (code 0x07,
+   `client/model.md` §8 r4), `0x00478BB0` (0x81 type 7, `client/
+   model.md` §14 r3), the level hook `0x0045D4B0`, `0x0045D9B0`,
+   `0x0045DB20` (the 0x18 / 0x95 revive of §5 r4 is among these),
+   `0x00453910`, `0x00463390`, `0x004AFF60`. So a player
+   or monster carries the flag from the request that made it dead
+   until one of these clears it; a mode change in between (e.g. a
+   walk request to a dead unit) leaves the dead test true. d2rs: the
+   flag is a field of the client unit, written exactly at 6.1–6.3 and
+   the clears; the dead test reads flag or mode.
 
 ### 5. Local player vitals: 0x18, 0x95, 0x96
 
@@ -523,6 +567,26 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
     (life) := u8@6 << 8 (`0x00627260`, layer 0). Any other type →
     roster life percent (§8 rule 6) := (u8@6 × 100) / 128, truncated
     toward zero. Recorded `ab 01 13000000 30` (`-015956` seq 219061).
+12. **0x16** UnitPositions (`0x0045D2E0`, general handler; size u16@1,
+    min 13; 2026-10-08 read; answers open question 6): count n := u8@3;
+    n = 0 → fatal 0x855. Entries of 9 bytes from @4, i = 0 … n − 1:
+    type u8@+0, GUID u32@+1, x u16@+5, y u16@+7; unit (type, GUID) in
+    S → `check(U, x, y, 0, 0, 0)` (`0x004804E0`, `client/model.md` §6;
+    the same call as §4 r1's check); absent → skipped. Nothing else.
+    The size word is not compared with 4 + 9n. No 1.14d function
+    produces 0x16, so d2rs registers the no-op of `client/bridge.md` §6
+    r6 (owner of the d2rs handling); this rule records what the 1.14d
+    handler would do.
+13. **0x17** (no layout; `sim/server-messages.tsv` row 0x17): the
+    general handler `0x0045C900` is a bare return; the unit handler
+    `0x0045D260(U, message)` does nothing for the local player, is
+    fatal 0x841 for no unit, and otherwise reads two 16-bit message
+    words (@8, @0xA) as **addresses** and dereferences them
+    (`0x0045D298`–`0x0045D2A7`) before a mode request `0x00480C10(u8@7,
+    U, {u8@6 >> 1, &those words}, 1)`: an access violation in 1.14d for
+    any value below 0x10000. 0x17 has size 0 in the size table, so the
+    split never dispatches it (`client/bridge.md` §6 r6, owner of the
+    d2rs no-op); this rule records the dead handler only.
 
 ### 8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB)
 
@@ -611,13 +675,44 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
     r's corpse list (r was found as a corpse holder), nothing. Else r
     +0x22 := party, +0x20 := level, +0x30 := u16@11 (zero-extended);
     u16@9 is not stored (the same slots as 0x5B's u16@0x1A, u16@0x18,
-    u16@0x1E, rule 3). Then the pet pass `0x00478FA0`: for each pet
-    record of type 4 (`client/model.md` §14) whose monster (1, pet
-    GUID) is present, palette level t := 1 when `0x00478E70(local
-    player, U)` = 0, else 0, set through `0x00463E20(U, t)` and
-    `0x00463E80(U, t)` (render state, not in the model; open question
-    11); then `RosterChanged` (`0x00479AB0`, `0x0049A640`). Single
-    player: recorded once in `-022633` (sender `0x0053DA90`): `75
+    u16@0x1E, rule 3). Then the pet pass `0x00478FA0`, rule 10.1;
+    then `RosterChanged` (`0x00479AB0`, `0x0049A640`).
+    1. **Pet pass** `0x00478FA0` (2026-10-08 read; answers open
+       question 11). A := the local player (`0x00463DD0` =
+       `[0x007A6A70]`, read once before the walk; may be none). For
+       each pet record p of the list `[0x007BB5BC]` (`client/model.md`
+       §14, link +0x30) in list order with type +0x04 = 4 (`pettype`
+       row 4, `skeleton`; type 5 `skeletonmage` is not passed) whose
+       monster U = (1, p +0x08) is in S (`0x00463990`): h :=
+       `0x00478E70(A, U)` and t := 1 when h = 0, else 0
+       (`0x00478FE3`–`0x00478FE9`); U's graphics record (unit +0x54)
+       +0x34 := t (`0x00463E20` → `0x0046F1C0`) and +0x38 := t
+       (`0x00463E80` → `0x0046F220`, the shift-index writer of
+       `render/shading.md` §6 r6.3: t is the `palshift` map index, 1 =
+       the friendly skeleton colours; render state, not in the model).
+       `0x00478E70(A, U)` (fastcall):
+       1. g := U's GUID (+0x0C); q := the **first** pet record of the
+          list with pet GUID +0x08 = g, any type (it can differ from p
+          when two records share the GUID).
+       2. A none → h = 1 (U is never none here).
+       3. q none: A and U both monsters (type 1) and
+          `0x00650D70(A, U)` ≠ 0 → 0, else 1 (unreachable from the pass:
+          q exists).
+       4. q's owner +0x0C = A's GUID → h = 0.
+       5. Else h := `0x0047A070(A's GUID, owner)`: a := the roster
+          record of A's GUID, b := that of the owner (both by §8 r2,
+          `0x004792E0`); either none → 1; a +0x22 = b +0x22 and ≠
+          0xFFFF (same party) → 0; else `0x004DC440(A's GUID, owner,
+          8)` (`render/shading.md` OQ 7 answer: the node for the owner
+          in A's roster relation list, flags & 8; no node → 0) ≠ 0 → 1,
+          else 0.
+       So t = 1 for a skeleton of the local player, of a party member,
+       or of a listed player without relation bit 8 (D2MOO: hostile)
+       toward them; t = 0 with no local player, an owner without a
+       roster record (or the local player without one), or bit 8 set.
+       Single player: every type-4 record is the local player's → t = 1
+       for each present skeleton.
+    0x75 in single player: recorded once in `-022633` (sender `0x0053DA90`): `75
     01000000 ffff 0200 0000 0100` (GUID 1, party 0xFFFF, level 2,
     u16@11 = 1).
 11. **Out of scope (Phases 0–6): multiplayer only**
@@ -766,6 +861,15 @@ Act-switch session (2026-10-07): `0x004654C0` at `0x00465603`–`0x00465634`
 `0x004FB480`, whose palette act is CL + 1); `levels` offsets from
 `data/fields.tsv`; Pal / Act counted in patch_d2 `levels.txt` (137 rows).
 
+Gap pass (2026-10-08, PC 1 lane D): §8 r10.1 from `0x00478FA0`,
+`0x00478E70`, `0x0047A070`, `0x004DC440`, `0x00463E20` → `0x0046F1C0`,
+`0x00463E80` → `0x0046F220`, `pettype.txt` rows; §4 r6 from
+`0x00464810` (nine call sites), `0x00464820`, `0x004647D0`,
+`0x00461010`, the `0x004AFF60` byte table `0x004B0DF8` / pointer table
+`0x004B0DC0` read from the image, `0x004E2630`, `0x006217C0`; §7
+r12–r13 from `0x0045D2E0`, `0x0045D260`, `0x0045C900`
+(`tools/ghidra/disasm.py fn` / `xref`).
+
 ## Open questions
 
 1. Meaning of each mode-request code per unit kind: Phase 6 unit-modes
@@ -784,7 +888,8 @@ Act-switch session (2026-10-07): `0x004654C0` at `0x00465603`–`0x00465634`
    shrine function called). Original question: `0x0063EA40` (0x15 rule 2) and `0x004BD6B0` (0x51 rule 3): what
    they test. *Answered* for `0x00621B00`: an object whose objects.txt
    `SubClass` has bit 0 (shrine), `client/model.md` §15 rule 1.
-6. 0x16 UnitPositions (`0x0045D2E0`, also a position check) and 0x17:
+6. *Answered (2026-10-08)*: §7 r12 (0x16) and §7 r13 (0x17; never
+   sent, its unit handler faults). Original question: 0x16 UnitPositions (`0x0045D2E0`, also a position check) and 0x17:
    not seen in the single-player recordings; left TBD.
 7. A recording with a hireling (0x7A / 0x81, 0xAC of the hireling)
    confirms §1.2 rules 2–3 and §2 rule 2 with a real pet list
@@ -800,7 +905,10 @@ Act-switch session (2026-10-07): `0x004654C0` at `0x00465603`–`0x00465634`
 10. The client missile body of 0x73 (`0x004CD540`, `0x0064A330`,
     `0x0045C3E0`) and the umod client functions of 0x57 (table
     `0x00724D78`): Phase 6 effects spec.
-11. §8 rule 10's pet pass `0x00478FA0`: which pets are type 4, what
+11. *Answered (2026-10-08)*: §8 r10.1 (type 4 = `skeleton`; the
+    owner / party / relation test; the pair writes graphics +0x34 and
+    +0x38, the shift index of `render/shading.md` §6 r6.3). Original
+    question: §8 rule 10's pet pass `0x00478FA0`: which pets are type 4, what
     `0x00478E70(local player, U)` tests, and which render spec owns the
     palette-level pair `0x00463E20` / `0x00463E80` it sets. Settle by
     reading `0x00478E70` and the pet-type writers of 0x7A / 0x81.
