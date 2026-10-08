@@ -1,4 +1,4 @@
-// Spec: specs/client/bridge.md (§7, §8), specs/client/render-pipeline.md (A1, A9)
+// Spec: specs/client/bridge.md (§7, §8), specs/client/render-pipeline.md (A1, A9), specs/flows/save-exit.md (§1, §4)
 //! `d2-client play`: a window running the local single-player game.
 //!
 //! Each Bevy frame: the bridge frame in `PreUpdate` (`pump` the
@@ -100,7 +100,8 @@ pub fn add_game(app: &mut App, link: DynLink, gpu: bool) -> Result<(), BridgeErr
             Box::new(Unspecified),
             Box::new(ModelFeed::<NoFeed>::default()),
         ))
-        .add_systems(Last, log_progress);
+        .add_systems(Last, log_progress)
+        .add_systems(Update, super::save::end_of_game);
     sound::add_audio(app, AudioParts::empty());
     // The position check's visibility predicate over no unit art (every
     // unit reads as not visible, the check corrects); `run` installs it
@@ -317,6 +318,29 @@ pub struct PlayConfig {
 #[derive(Resource)]
 struct ExitAfter(u32);
 
+/// Leaves the game through the server after the app stopped
+/// (`flows/save-exit.md` §1 r2 – §4 r1): a client still in game sends
+/// C→S 0x69 ([`Bridge::save_and_exit`]) and runs bridge frames until the
+/// server's 0x05 takes it out of the game (at most 100 frames: the drain
+/// of the next server frame answers it). Returns whether the client is
+/// out of the game. PROVISIONAL (REC-291): the window close of 1.14d
+/// runs the same exit path (`ui/frontend-options.md` §O3, `WM_CLOSE`);
+/// its chain is `flows/save-exit.md` OQ1. d2rs-own, unverified.
+pub fn leave_game<L: crate::bridge::link::ServerLink>(
+    bridge: &mut Bridge<L>,
+) -> Result<bool, BridgeError> {
+    if bridge.world().in_game && !bridge.world().exit_requested {
+        bridge.save_and_exit()?;
+    }
+    for _ in 0..100 {
+        if !bridge.world().in_game {
+            return Ok(true);
+        }
+        bridge.frame()?;
+    }
+    Ok(!bridge.world().in_game)
+}
+
 fn exit_after(limit: Res<ExitAfter>, mut seen: Local<u32>, mut exit: MessageWriter<AppExit>) {
     *seen += 1;
     if *seen >= limit.0 {
@@ -421,7 +445,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     .add_systems(Update, super::config::apply_settings);
     let (link, saver): (DynLink, Option<save::SaveHandle>) = match (config.save_path, save_tables) {
         (Some(path), Some(tables)) => {
-            let (link, handle) = save::share(link, save_base, tables, path);
+            let (link, handle) = save::share(link, save_base, tables, path)?;
             (Box::new(link), Some(handle))
         }
         (path, _) => {
@@ -547,11 +571,18 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             eprintln!("play: the automap was NOT saved: {e}");
         }
     }
-    if let Some(h) = saver {
-        match h.save() {
-            Ok(()) => println!("play: saved the character to {}", h.path().display()),
-            Err(e) => eprintln!("play: the character was NOT saved: {e}"),
-        }
+    // Every way out leaves through the server (`flows/save-exit.md` §2):
+    // a window closed in game sends the Save and Exit's 0x69 now, so the
+    // server's leave writes the character before its 0x05.
+    let left = leave_game(&mut app.world_mut().resource_mut::<BridgeResource>().0);
+    match (&saver, left) {
+        (Some(h), Ok(true)) => println!(
+            "play: left the game; the server's leave wrote {}",
+            h.path().display()
+        ),
+        (None, Ok(_)) => {}
+        (_, Ok(false)) => eprintln!("play: the server never answered the leave"),
+        (_, Err(e)) => eprintln!("play: the leave failed: {e}"),
     }
     Ok(exit)
 }

@@ -117,7 +117,8 @@ fn handle(character: &Character, path: &std::path::Path) -> SaveHandle {
         save::base_save(character),
         Arc::new(Tables),
         path.into(),
-    );
+    )
+    .unwrap();
     h
 }
 
@@ -291,7 +292,8 @@ fn waypoints_round_trip_through_the_save() {
         synthetic_save(),
         Arc::new(Tables),
         file.clone(),
-    );
+    )
+    .unwrap();
     h.save().unwrap();
     let opts = ReadOptions {
         expansion: true,

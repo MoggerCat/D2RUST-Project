@@ -1,8 +1,11 @@
-// Spec: specs/formats/d2s.md (§1 writer, §7 stats), specs/formats/d2s-load.md
+// Spec: specs/formats/d2s.md (§1 writer, §7 stats), specs/formats/d2s-load.md, specs/flows/save-exit.md (§1 r2, §2 r2, §3 r1, §4 r1)
 //! Saving the played character (stitch-save; `d2-client play`).
 //!
-//! The game writes the player's `.d2s` on window close and on an explicit
-//! save. Where it goes: `play --save <file>` writes that file;
+//! The server writes the player's `.d2s` (`flows/save-exit.md`): the
+//! app installs a [`FileStore`] as the server's character storage, and
+//! the server runs it in the leave of C→S 0x69 (Save and Exit,
+//! [`request_save_and_exit`]) before its 0x05, and every 8192 frames.
+//! Where it goes: `play --save <file>` writes that file;
 //! `play --new <class> <name>` writes `<name>.d2s` in a d2rs-own save
 //! folder ([`default_save_dir`], or `--save-dir`; never inside the game
 //! install).
@@ -24,8 +27,12 @@ use bevy::app::AppExit;
 use bevy::prelude::{MessageWriter, Resource};
 use d2_formats::d2s::{self, Body, D2s, Header, SaveTables, StatEntry, Stats};
 
+use d2_server::adapters::storage::CharacterStore;
+use d2_server::seams::ClientId;
+use d2_sim::wiring::worldgen::WorldSim;
+
 use super::server_thread::ThreadLink;
-use super::single_player::{self, Character, Link, Sim};
+use super::single_player::{self, Character, Link, LocalSeams, Sim, World};
 use crate::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 
 /// The base stats saved from the live player (`formats/d2s.md` §7:
@@ -333,8 +340,33 @@ impl<C: d2_server::seams::Clock + Send + 'static> ServerLink for SharedLink<C> {
     }
 }
 
-/// The save of the running game, callable from the app (a menu, the
-/// window close). Cloning shares the same game and file.
+/// The server's character writer of the app's game (`d2-server`
+/// `adapters::storage`): the server runs it in the leave of C→S 0x69
+/// before S→C 0x05 and every 8192 frames (`flows/save-exit.md` §2 r2,
+/// §3 r1); it reads the running game ([`read_live`]), lays it over
+/// `base` ([`apply_live`]) and writes `path` ([`write_file`]).
+pub struct FileStore {
+    pub path: PathBuf,
+    pub base: D2s,
+    pub tables: Arc<dyn SaveTables + Send + Sync>,
+}
+
+impl CharacterStore<WorldSim<LocalSeams>, World> for FileStore {
+    fn save(&mut self, sim: &mut Sim, _client: ClientId) -> Result<(), String> {
+        let live = read_live(sim).map_err(|e| e.to_string())?;
+        write_file(
+            &self.path,
+            &apply_live(&self.base, &live, now_secs()),
+            &*self.tables,
+        )
+        .map_err(|e| e.to_string())
+    }
+}
+
+/// A save the app asks of the running game (the death saves,
+/// [`super::hardcore`]): the server's `0x0052CA10` with its installed
+/// [`FileStore`], run on the server thread between frames. Cloning
+/// shares the same game and file.
 #[derive(Clone, Resource)]
 pub struct SaveHandle {
     path: PathBuf,
@@ -353,36 +385,70 @@ impl SaveHandle {
     }
 }
 
-/// `link` shared with a [`SaveHandle`] that writes `path` with `base`
-/// ([`base_save`]) and the `tables` of the game.
+/// Installs a [`FileStore`] that writes `path` with `base`
+/// ([`base_save`]) and the `tables` of the game as the server's character
+/// storage, and shares `link` with a [`SaveHandle`] over it.
 pub fn share<C: d2_server::seams::Clock + Send + 'static>(
-    link: ThreadLink<Link<C>>,
+    mut link: ThreadLink<Link<C>>,
     base: D2s,
     tables: Arc<dyn SaveTables + Send + Sync>,
     path: PathBuf,
-) -> (SharedLink<C>, SaveHandle) {
+) -> Result<(SharedLink<C>, SaveHandle), SaveError> {
+    let store = FileStore {
+        path: path.clone(),
+        base,
+        tables,
+    };
+    link.with(move |l| l.host_mut().game.set_storage(Box::new(store)))
+        .map_err(|e| SaveError::Server(e.to_string()))?;
     let shared = Arc::new(Mutex::new(link));
     let handle = shared.clone();
-    let file = path.clone();
     let save = move || {
-        let live = {
-            let mut link = handle.lock().unwrap_or_else(|e| e.into_inner());
-            link.with(|l| read_live(&mut l.host_mut().game))
-                .map_err(|e| SaveError::Server(e.to_string()))??
-        };
-        write_file(&file, &apply_live(&base, &live, now_secs()), &*tables)
+        let mut link = handle.lock().unwrap_or_else(|e| e.into_inner());
+        let saved = link
+            .with(|l| l.host_mut().game.save_characters())
+            .map_err(|e| SaveError::Server(e.to_string()))?;
+        match saved.into_iter().next() {
+            None => Err(SaveError::NoPlayer),
+            Some((_, r)) => r.map_err(|e| SaveError::Server(e.to_string())),
+        }
     };
-    (
+    Ok((
         SharedLink(shared),
         SaveHandle {
             path,
             save: Arc::new(save),
         },
-    )
+    ))
 }
 
-/// The Esc game menu's hook (stitch-hud): closes the game; `play::run`
-/// saves the character when the app has stopped, on every way out.
-pub fn request_save_and_exit(exit: &mut MessageWriter<AppExit>) {
-    exit.write(AppExit::Success);
+/// The Esc game menu's Save and Exit Game (`flows/save-exit.md` §1 r2):
+/// C→S 0x69 on the system queue and the model's `exit_requested`. The
+/// server saves and answers 0x05, 0x06; [`end_of_game`] then closes the
+/// app.
+pub fn request_save_and_exit<L: ServerLink>(
+    bridge: &mut crate::bridge::Bridge<L>,
+) -> Result<(), crate::bridge::BridgeError> {
+    bridge.save_and_exit().map(|_| ())
+}
+
+/// The client's end of the game (`flows/save-exit.md` §4 r1): the
+/// server's 0x05 took the client out of the game (`in_game` false) and
+/// the exit is asked (0x06, or the Save and Exit send): the app closes.
+/// PROVISIONAL (`ui/frontend-menus.md` §F1.3, REC-200): the original
+/// returns to character select; `play` has no front end around the game
+/// yet, so it ends.
+pub fn end_of_game(
+    bridge: Option<bevy::prelude::Res<crate::bridge::BridgeResource>>,
+    mut exit: MessageWriter<AppExit>,
+    mut done: bevy::prelude::Local<bool>,
+) {
+    let Some(b) = bridge else {
+        return;
+    };
+    let w = b.0.world();
+    if !*done && w.exit_requested && !w.in_game {
+        *done = true;
+        exit.write(AppExit::Success);
+    }
 }

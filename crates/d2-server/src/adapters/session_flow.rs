@@ -1,4 +1,4 @@
-// Spec: specs/sim/intents-events.md §2.5, §8.1, §8.2; specs/sim/path-placement.md §13 rule 2
+// Spec: specs/sim/intents-events.md §2.5, §8.1, §8.2; specs/sim/path-placement.md §13 rule 2; specs/flows/save-exit.md §2
 //! The single-player session sequence on the host's drain
 //! (`intents-events.md` §8): C→S 0x67 (game creation, `0x0052C330` →
 //! `0x00530BF0`) and C→S 0x6B (join, `0x0052C550` → `0x00530190`), both
@@ -53,6 +53,7 @@ use d2_sim::units::UnitId;
 
 use super::handlers::world::ActionEvents;
 use super::session::{enter_game, Entry, GameSetup, JoinError};
+use super::storage::SaveFault;
 use super::SimGame;
 use crate::buffers::QueueError;
 use crate::seams::{ClientId, MessageSink};
@@ -135,8 +136,11 @@ pub enum SessionFault {
     /// A message could not be queued.
     Queue(QueueError),
     /// §2.5 rule 2: the leave's character save (`0x00532400`) of this
-    /// client's player has no writer in d2rs.
+    /// client's player ran with no storage installed
+    /// ([`SimGame::set_storage`]).
     NotSaved,
+    /// §2.5 rule 2: the character storage refused the save.
+    SaveFailed(String),
     /// §2.5 table: 0x6C with total ≥ 0x2000 (fatal assert).
     UploadTotal(u32),
     /// §2.5 rule 4: count + len > total (fatal 0xB2F).
@@ -384,9 +388,11 @@ impl<D: ActionEvents, W> SessionFlow<D, W> {
         if s.game.lists.client(id).map(|e| e.state) != Some(client_state::IN_GAME) {
             return false;
         }
-        for c in s.client_list() {
-            if s.player_of(c).is_some() {
-                self.faults.push((c, SessionFault::NotSaved));
+        for (c, r) in s.save_characters() {
+            match r {
+                Ok(()) => {}
+                Err(SaveFault::NoStorage) => self.faults.push((c, SessionFault::NotSaved)),
+                Err(SaveFault::Failed(e)) => self.faults.push((c, SessionFault::SaveFailed(e))),
             }
         }
         let mut sent = out.queue(client, &[0x05]);

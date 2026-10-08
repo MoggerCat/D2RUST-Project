@@ -11,6 +11,7 @@ pub mod session;
 pub mod session_flow;
 mod sim;
 mod sizes;
+pub mod storage;
 
 pub use sim::{
     AdapterError, HostSync, PlayerData, PlayerFields, SimGame, UnitFacts, Unspecified, WorldSync,

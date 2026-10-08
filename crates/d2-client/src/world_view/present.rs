@@ -605,7 +605,6 @@ fn world_view_frame(
     mut images: ResMut<Assets<Image>>,
     mut sounds: Option<ResMut<UiSounds>>,
     mut walk: Option<ResMut<PreviewWalk>>,
-    mut exit: MessageWriter<AppExit>,
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
 ) -> Result {
     let tick = bridge.0.world().server_ticks;
@@ -651,9 +650,12 @@ fn world_view_frame(
                     s.0.extend(outcome.sounds);
                 }
                 state.feed.set_ui_open_mode(original.open_mode());
-                // The Esc menu's "Save and Exit Game" (d2rs-own, unverified).
+                // The Esc menu's "Save and Exit Game" (`flows/save-exit.md`
+                // §1 r2): C→S 0x69; the app ends on the server's answer.
                 if original.take_exit_request() {
-                    crate::app::save::request_save_and_exit(&mut exit);
+                    if let Err(e) = crate::app::save::request_save_and_exit(&mut bridge.0) {
+                        warn!("save and exit: {e}");
+                    }
                 }
                 // Configure Controls over the game (`ui::controls_host`).
                 let expansion = original.expansion_installed();

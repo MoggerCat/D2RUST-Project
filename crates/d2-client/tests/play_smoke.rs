@@ -1,4 +1,4 @@
-// Spec: specs/client/bridge.md (§2, §4, §6, §8), specs/sim/intents-events.md (§2.2, §8); preview fills: docs/PLAN.md decisions D1–D3, docs/handoff/q-play-smoke.md
+// Spec: specs/client/bridge.md (§2, §4, §6, §8), specs/sim/intents-events.md (§2.2, §8), specs/flows/save-exit.md (§1, §2, §4, §5); preview fills: docs/PLAN.md decisions D1–D3, docs/handoff/q-play-smoke.md
 //! The end-to-end play smoke run (task `q-play-smoke`): one scripted run
 //! through the real play path, headless (the bridge, the in-process
 //! server and the sim, the play app's systems and its original UI, no
@@ -28,9 +28,11 @@ use d2_client::bridge::local::{LocalLink, PendingSession};
 use d2_client::bridge::predict::Speeds;
 use d2_client::bridge::world::UnitKey;
 use d2_client::bridge::BridgeResource;
+use d2_client::controls::Action;
 use d2_client::rules::unit_composite::code;
 use d2_client::ui::layout::{OptionKind, Screen};
 use d2_client::ui::original::{FontMeasure, OriginalUi, UiConfig, CHARACTER_FONTS};
+use d2_client::ui::panel::ActionId;
 use d2_client::ui::{font_info, Point, PointerButton, UiEvent};
 use d2_client::world_view::tile_assets::TileAssets;
 use d2_client::world_view::unit_assets::UnitLooks;
@@ -244,7 +246,15 @@ struct Run {
 
 /// A character's state for the save round trip: (stat, value), (skill,
 /// base level), (item code, mode, body location).
-type Snapshot = (Vec<(u16, i32)>, Vec<(u16, i32)>, Vec<([u8; 4], u8, u8)>);
+/// The waypoint records and quest flag records of the three
+/// difficulties.
+type Snapshot = (
+    Vec<(u16, i32)>,
+    Vec<(u16, i32)>,
+    Vec<([u8; 4], u8, u8)>,
+    Option<[[u8; 16]; 3]>,
+    Option<Vec<[u8; 96]>>,
+);
 
 impl Run {
     /// The play app over the synthetic game, as `d2-client play --new`
@@ -1430,9 +1440,12 @@ fn the_live_run() {
     run.step(20);
     run.check("through the portal");
 
-    // Save and exit, as `play::run` does on every way out (`save::share`'s
-    // save: the running game read, applied over the base, written with
-    // the install's `.d2s` tables), then load the file and join again.
+    // Save and exit on the server's path (`flows/save-exit.md`): the
+    // server's character storage is the app's file writer (as
+    // `play::run`'s `save::share` installs it, with the install's `.d2s`
+    // tables); the Esc menu's Save and Exit sends C→S 0x69, the server's
+    // leave writes the file before its 0x05, 0x06, and the app ends on
+    // them. Then the file is loaded and joined again.
     let GameData::Live(live) = &data else {
         unreachable!("a live run")
     };
@@ -1440,11 +1453,44 @@ fn the_live_run() {
     let before = run.snapshot();
     {
         use d2_client::app::save;
-        let base = save::base_save(&run.character);
-        let got = app_support::with(&run.server, |l| save::read_live(&mut l.host_mut().game));
-        let d2s = save::apply_live(&base, &got.expect("the live read"), 0);
-        save::write_file(&path, &d2s, &live.save).expect("the save written");
+        let store = save::FileStore {
+            path: path.clone(),
+            base: save::base_save(&run.character),
+            tables: Arc::new(live.save.clone()),
+        };
+        app_support::with(&run.server, move |l| {
+            l.host_mut().game.set_storage(Box::new(store))
+        });
     }
+    assert!(!path.exists(), "nothing written before the leave");
+    run.queue(UiEvent::Action(ActionId(Action::GameMenu.index() as u16)));
+    run.step(2);
+    assert!(run.ui_open(9), "the Esc menu is open");
+    // Game menu rows: tops 185 / 235 / 285; Save and Exit is row 1.
+    run.click(Point::new(400, 185 + 50 + 20));
+    run.until("the app ends on the server's answer", 50, |r| {
+        r.app.should_exit().is_some()
+    });
+    assert!(
+        run.wire.lock().unwrap().sent.iter().any(|m| m == &[0x69]),
+        "Save and Exit sent C→S 0x69"
+    );
+    {
+        let w = run.app.world().resource::<BridgeResource>().0.world();
+        assert!(
+            !w.in_game && w.unloaded && w.exit_requested,
+            "0x05, 0x06 received"
+        );
+    }
+    let (gone, faults) = app_support::with(&run.server, |l| {
+        let g = &l.host().game;
+        let gone = g.client_list().is_empty();
+        let faults = g.session().map(|s| format!("{:?}", s.faults));
+        (gone, faults.unwrap_or_default())
+    });
+    assert!(gone, "the leave removed the client");
+    assert!(!faults.contains("Save"), "the leave saved: {faults}");
+    assert!(path.exists(), "the server's leave wrote the save");
     drop(run);
     let character = single_player::load_character(&data, &path, 0).expect("the save loads");
     let mut run = Run::start_as(data.clone(), character, |_| {});
@@ -1488,8 +1534,8 @@ impl Run {
     }
 
     /// What a save keeps of the server player: level, experience, the
-    /// stats, gold, its class skills' levels and its items (code, mode,
-    /// body location), sorted.
+    /// stats, gold, its class skills' levels, its items (code, mode,
+    /// body location), sorted, its waypoints and its quest flags.
     fn snapshot(&self) -> Snapshot {
         let stats = [0u16, 1, 2, 3, 4, 5, 12, 13, 14]
             .iter()
@@ -1513,7 +1559,15 @@ impl Run {
             .filter_map(|i| Some((i.code?, i.mode, i.body)))
             .collect();
         items.sort();
-        (stats, skills, items)
+        let (waypoints, quests) = app_support::with(&self.server, |l| {
+            let live = d2_client::app::save::read_live(&mut l.host_mut().game).unwrap();
+            (live.extra.waypoints, live.quests.map(|q| q.to_vec()))
+        });
+        assert!(
+            waypoints.is_some() && quests.is_some(),
+            "the save reads both"
+        );
+        (stats, skills, items, waypoints, quests)
     }
 
     /// The local player's items (`bridge::items::local_items`).

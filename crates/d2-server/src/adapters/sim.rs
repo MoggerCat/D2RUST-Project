@@ -1,4 +1,4 @@
-// Spec: specs/sim/intents-events.md; specs/combat/vitals.md §5.1; specs/world/quests-helpers.md §6
+// Spec: specs/sim/intents-events.md; specs/combat/vitals.md §5.1; specs/world/quests-helpers.md §6; specs/sim/tick.md §6 r3
 //! [`Intents`] and [`Tick`] on `d2_sim::game::Game` (§2.2–§2.4, §4;
 //! `tick.md` §3; client list order `unit-order.md` §7).
 //!
@@ -27,6 +27,7 @@ use super::handlers::player::{HotKey, HOTKEY_SLOTS};
 use super::handlers::world::ActionEvents;
 use super::handlers::world::{self as world_handlers, NoWorld, WorldError, WorldHost};
 use super::session_flow::{SessionFlow, SessionRunner};
+use super::storage::{CharacterStore, SaveFault};
 use crate::seams::{
     ClientId, Intents, MessageSink, PlayerGate, PlayerLookup, PointState, Pos, ResultCode, Tick,
     UnitTarget,
@@ -146,6 +147,12 @@ pub struct SimGame<D = Unspecified, W = NoWorld> {
     /// [`super::session_flow`]); `None`: every system message goes to the
     /// host's `SessionHandler`.
     session: Option<Box<dyn SessionRunner<D, W>>>,
+    /// The host's character writer ([`super::storage`]); `None`: saves
+    /// are recorded as [`SaveFault::NoStorage`].
+    storage: Option<Box<dyn CharacterStore<D, W>>>,
+    /// The periodic saves (`tick.md` §6 rule 3) that wrote nothing, in
+    /// order (the leave's go to the session faults).
+    pub save_faults: Vec<(ClientId, SaveFault)>,
 }
 
 /// [`SimGame`]'s fields borrowed apart (for a handler).
@@ -193,7 +200,38 @@ impl<D: EventDispatch, W> SimGame<D, W> {
             host_requests: Vec::new(),
             hotkeys: BTreeMap::new(),
             session: None,
+            storage: None,
+            save_faults: Vec::new(),
         }
+    }
+
+    /// Installs the character writer the saves run ([`super::storage`]).
+    pub fn set_storage(&mut self, store: Box<dyn CharacterStore<D, W>>) {
+        self.storage = Some(store);
+    }
+
+    /// `0x0052CA10` (`tick.md` §6 rule 3, `intents-events.md` §2.5 rule
+    /// 2): the character of every client with a player is saved
+    /// (`0x00532400`), in client-list order. Returns each such client
+    /// with its save's result.
+    pub fn save_characters(&mut self) -> Vec<(ClientId, Result<(), SaveFault>)> {
+        let mut store = self.storage.take();
+        let mut out = Vec::new();
+        for c in self.client_list() {
+            if self.player_of(c).is_none() {
+                continue;
+            }
+            let r = match store.as_mut() {
+                Some(s) => s.save(self, c).map_err(SaveFault::Failed),
+                None => Err(SaveFault::NoStorage),
+            };
+            out.push((c, r));
+        }
+        // A store the save installed wins over the one it ran with.
+        if self.storage.is_none() {
+            self.storage = store;
+        }
+        out
     }
 
     /// The quests' host requests drained so far ([`SimGame::host_requests`]),
@@ -556,6 +594,19 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
     fn tick(&mut self, out: &mut dyn MessageSink) {
         self.run_host_sync();
         self.world.run_tick(&mut self.game, &mut self.events);
+        // The client pass's 8192-frame save (`tick.md` §6 rule 3), raised
+        // by step 5 and written here, once the sim's steps are done: the
+        // writer reads the whole game, not only `Game`. PROVISIONAL
+        // (flows/save-exit.md §3 r1): the file holds the state after steps
+        // 6-11 of the frame, not the state at step 5; settled by REC-291
+        // (a save at a frame % 8192 = 0 tick). d2rs-own, unverified.
+        if std::mem::take(&mut self.game.character_save_due) {
+            for (c, r) in self.save_characters() {
+                if let Err(e) = r {
+                    self.save_faults.push((c, e));
+                }
+            }
+        }
         self.world.after_tick(&mut self.game, &mut self.events);
         // The staged positions follow the path records, so the point
         // parser sees where the walking player is.

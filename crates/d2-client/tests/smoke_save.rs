@@ -1,10 +1,10 @@
-// Spec: specs/formats/d2s.md (§1, §2, §7, §8), specs/formats/d2s-load.md, specs/ui/frontend-options.md (§O3)
+// Spec: specs/formats/d2s.md (§1, §2, §7, §8), specs/formats/d2s-load.md, specs/ui/frontend-options.md (§O3), specs/flows/save-exit.md (§1, §2, §4)
 //! Save smoke tests (q-smoke-save): the real play path end to end, no
 //! window. A character joins the synthetic single-player game through the
 //! bridge and the in-process server, is played (levels, stat and skill
 //! points, items in the inventory, stash and cube, waypoints, quests,
-//! gold), leaves through the Esc menu's "Save and Exit Game" (the app
-//! exits, then the save runs as `play::run` does it), and the written
+//! gold), leaves through the Esc menu's "Save and Exit Game" (C→S 0x69:
+//! the server's leave writes the file, then the app exits), and the written
 //! `.d2s` is read and joined again: every live value the save holds must
 //! come back exactly, and saving the reloaded character must give the
 //! same file. Then the same at Nightmare, a hardcore death and the
@@ -180,7 +180,8 @@ impl Run {
             a.hooks().x.hardcore = hardcore;
         })
         .unwrap();
-        let (server, saver) = save::share(link, base, Arc::new(Tables::new()), path.into());
+        let (server, saver) =
+            save::share(link, base, Arc::new(Tables::new()), path.into()).unwrap();
         let mut app = App::new();
         app.add_plugins((MinimalPlugins, AssetPlugin::default()))
             .init_asset::<Image>()
@@ -254,20 +255,32 @@ impl Run {
     }
 
     /// Esc, then a click on "Save and Exit Game" (the game menu's second
-    /// row, `ui/frontend-options.md` §O3); the app must stop. Then the save
-    /// `play::run` makes after `app.run()` returns.
+    /// row, `ui/frontend-options.md` §O3): C→S 0x69, the server's leave
+    /// writes the file before its 0x05 (`flows/save-exit.md` §2 r2), and
+    /// the app stops on the server's answer (§4 r1).
     fn save_and_exit(mut self) {
         self.ui_event(UiEvent::Action(ActionId(Action::GameMenu.index() as u16)));
         let at = Point::new(400, 185 + 50 + 20);
         let b = PointerButton::Left;
         self.ui_event(UiEvent::Press { button: b, at });
         self.ui_event(UiEvent::Release { button: b, at });
-        self.step(1);
+        for _ in 0..10 {
+            if self.app.should_exit().is_some() {
+                break;
+            }
+            self.step(1);
+        }
         assert!(
             self.app.should_exit().is_some(),
-            "Save and Exit Game stops the app"
+            "Save and Exit Game stops the app on the server's answer"
         );
-        self.saver.save().unwrap();
+        let (gone, faults) = self.with(|s| {
+            let faults = s.session().map(|f| format!("{:?}", f.faults));
+            (s.client_list().is_empty(), faults.unwrap_or_default())
+        });
+        assert!(gone, "the server's leave removed the client");
+        assert!(!faults.contains("Save"), "the leave saved: {faults}");
+        assert!(self.saver.path().exists(), "the leave wrote the file");
     }
 }
 
