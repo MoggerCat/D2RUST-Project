@@ -73,10 +73,7 @@ fn next_click(bridge: &mut B, from: (i32, i32), depth: i32) -> Option<(i32, i32)
             let rect = d.level(d.find_level(BLOOD_MOOR)?).rect;
             let goal = |(x, y): (i32, i32)| {
                 let (tx, ty) = (x.div_euclid(5), y.div_euclid(5));
-                tx >= rect.x + depth
-                    && tx < rect.x + rect.w
-                    && ty >= rect.y
-                    && ty < rect.y + rect.h
+                tx >= rect.x + depth && tx < rect.x + rect.w && ty >= rect.y && ty < rect.y + rect.h
             };
             let free = |p: (i32, i32)| d.collision_at(p.0, p.1).is_some_and(|c| c & 0x1C09 == 0);
             let centre = ((rect.x + rect.w / 2) * 5, (rect.y + rect.h / 2) * 5);
@@ -286,6 +283,10 @@ fn walking_out_of_town_brings_the_blood_moor_in() {
     let mut tiles = TileAssets::new(Some(archives), None);
     let mut assets = ViewAssets::new(unspecified_palette());
     let failed = tiles.ensure(entries.iter(), &mut assets);
-    println!("{} entries, {} failed: {failed:?}", entries.len(), failed.len());
+    println!(
+        "{} entries, {} failed: {failed:?}",
+        entries.len(),
+        failed.len()
+    );
     assert!(failed.is_empty(), "{failed:?}");
 }
