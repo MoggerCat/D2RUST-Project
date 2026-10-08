@@ -91,8 +91,9 @@ pub const PENDING: &[(&str, &str)] = &[
     ),
     (
         "inventory gold button press / release and the gold dialog (`panels-2.md` §21 r3–r9)",
-        "the gold value and button art are drawn ([`InventoryUi`]); the press plays sound 4 \
-         and the release opens the gold dialog (`ui::gold`), neither wired to the adapter",
+        "the gold value and button art are drawn ([`InventoryUi`]); the press / release and \
+         the drop dialog (kind 1) are wired in [`gold_dialog`] (d2rs-own box, REC-QGOLD-1); the \
+         press does not play sound 4 (deferred); the stash kinds 3 / 4 are not wired",
     ),
     (
         "inventory equipment backgrounds (§9.4)",

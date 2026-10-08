@@ -366,7 +366,7 @@ fn gold_rows() -> ItemArtRows {
     r
 }
 
-// Covers: specs/render/unit-composite.md §9 (the gold pile's amount class)
+// Covers: specs/render/unit-composite.md §9
 #[test]
 fn a_gold_pile_draws_the_direction_of_its_amount_class() {
     let mut src = MemorySource::default();
@@ -414,13 +414,13 @@ fn a_compact_gold_record_reads_its_amount() {
     assert_eq!(got, [(7, Some(4095)), (8, Some(123_456))]);
 }
 
-// Covers: specs/ui/controls.md §6 r9.2 (the walk to the item, d2rs-own)
+// Covers: specs/ui/controls.md §6 r9
 #[test]
 fn a_click_on_a_far_item_walks_to_it_then_asks_again() {
     let (mut b, link, mut g) = scene(&[(5, 3, (102, 100), b"cap ")]);
     g.take_clicks(&mut b, &[press(433, 299)]).unwrap();
     let pick = vec![0x16, 4, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0];
-    assert_eq!(*link.sent.lock().unwrap(), [pick.clone()]);
+    assert_eq!(*link.sent.lock().unwrap(), std::slice::from_ref(&pick));
     // The next frame sends the walk to the item's place.
     g.frame(&mut b, false).unwrap();
     let walk = vec![0x01, 102, 0, 100, 0];

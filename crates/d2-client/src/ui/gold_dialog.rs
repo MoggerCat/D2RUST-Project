@@ -22,23 +22,23 @@
 
 use d2_proto::client::DropGold;
 
-use crate::ui::gold::{
-    can_open, inventory_gold_hit, ok_action, CharResult, GoldButtons, GoldDialog, GoldKind,
-    GoldLayout, GoldSend,
-};
 use super::hud::{FILL_FILE, FILL_H, FILL_W};
-use crate::ui::panels::inventory::UI_INVENTORY;
 use super::{left, SharedRef};
 use crate::bridge::items;
 use crate::ui::draw::{ImageRef, ImageRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
 use crate::ui::geom::{Point, Rect};
+use crate::ui::gold::{
+    can_open, inventory_gold_hit, ok_action, CharResult, GoldButtons, GoldDialog, GoldKind,
+    GoldLayout, GoldSend,
+};
 use crate::ui::panel::{ClientIntent, Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
+use crate::ui::panels::inventory::UI_INVENTORY;
 use crate::ui::panels::{utf16, PanelOutput};
 use crate::ui::text::TextOpts;
 use crate::ui::FRAME;
 
 /// The adapter's id: not a UI state, open for good.
-pub const GOLD_PANEL: PanelId = PanelId(0x102);
+pub const GOLD_PANEL: PanelId = PanelId(0x110);
 
 /// The fill file's dark frame (made by `hud::fill_frames`).
 const DARK: u32 = 4;

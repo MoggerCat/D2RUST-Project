@@ -696,7 +696,11 @@ where
             // d2rs-own, unverified (D1): the preview rest reads the
             // places staged here (`MoveRest::stage`).
             let mut places = Vec::new();
-            for u in econ.game.lists.units_of_type(d2_sim::units::UnitType::Player) {
+            for u in econ
+                .game
+                .lists
+                .units_of_type(d2_sim::units::UnitType::Player)
+            {
                 let Some(r) = econ.units.get(u) else { continue };
                 places.push(super::super::items::moves::StagedPlace {
                     owner: d2_sim::items::moves::Owner::player(r.guid),

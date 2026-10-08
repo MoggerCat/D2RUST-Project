@@ -223,10 +223,19 @@ mod key_tests {
 
     #[test]
     fn typed_keys_become_chars() {
-        let e = key_chars(&[KeyCode::Digit4, KeyCode::KeyX, KeyCode::Backspace, KeyCode::Enter]);
+        let e = key_chars(&[
+            KeyCode::Digit4,
+            KeyCode::KeyX,
+            KeyCode::Backspace,
+            KeyCode::Enter,
+        ]);
         assert_eq!(
             e,
-            vec![UiEvent::Char(b'4' as u16), UiEvent::Char(8), UiEvent::Char(0x0D)]
+            vec![
+                UiEvent::Char(b'4' as u16),
+                UiEvent::Char(8),
+                UiEvent::Char(0x0D)
+            ]
         );
     }
 

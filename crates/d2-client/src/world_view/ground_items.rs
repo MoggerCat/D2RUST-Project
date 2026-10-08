@@ -208,7 +208,8 @@ impl GroundItems {
             let Some(name) = self.flippy(item.code) else {
                 continue;
             };
-            let Some(Some((set, frames))) = self.files.get(&(name.to_owned(), art_direction(&item)))
+            let Some(Some((set, frames))) =
+                self.files.get(&(name.to_owned(), art_direction(&item)))
             else {
                 continue;
             };
@@ -378,7 +379,8 @@ impl GroundItems {
 /// The direction of a ground item's art: a gold pile's amount class
 /// (`unit-composite.md` §9), else 0.
 fn art_direction(item: &items::ItemView) -> u8 {
-    item.gold.map_or(0, crate::rules::unit_composite::gold_direction)
+    item.gold
+        .map_or(0, crate::rules::unit_composite::gold_direction)
 }
 
 /// Reads direction `dir` of flippy `name`'s DC6 into the frame store.
