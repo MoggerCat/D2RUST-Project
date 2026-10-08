@@ -568,7 +568,7 @@ fn state_changes_are_sent_once_as_a_7_then_a_9() {
     let state_msgs = |v: Vec<(UnitId, Vec<u8>)>| -> Vec<Vec<u8>> {
         v.into_iter()
             .map(|(_, b)| b)
-            .filter(|b| matches!(b[0], 0xA7 | 0xA8 | 0xA9))
+            .filter(|b| matches!(b[0], 0xA7..=0xA9))
             .collect()
     };
     let s = &mut fx.sim.sys;
