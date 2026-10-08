@@ -196,6 +196,8 @@ fn client_world_holds_only_stated_fields() {
         ladder,
         game_flags,
         act,
+        // `render/composition.md` §3 step 4: the 0x03 loads handled.
+        act_loads: _,
         in_game,
         unloaded,
         exit_requested,

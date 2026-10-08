@@ -28,7 +28,7 @@ use std::collections::BTreeMap;
 use crate::bridge::world::UnitKey;
 use crate::scene::order::pass;
 
-use super::camera::{tile_entry, Camera, ClientPos, OpenMode};
+use super::camera::{tile_entry, Camera, ClientPos, OpenMode, TileList};
 use super::view::BlockRect;
 
 const SPEC: &str = "render/draw-order.md";
@@ -84,6 +84,9 @@ pub enum OrderError {
     /// A room unit without a client position.
     #[error("unit ({}, {}) of room {room} has no client position", .key.unit_type, .key.guid)]
     NoPosition { room: usize, key: UnitKey },
+    /// The edge floors (`draw-order-2.md` §14) lack an input.
+    #[error(transparent)]
+    Edge(#[from] edges::EdgeError),
     /// An open question of the spec decides this frame.
     #[error("TODO(spec: {SPEC} open question {question}): {message}")]
     Open { question: u8, message: String },
@@ -332,6 +335,12 @@ pub struct NearRooms {
     /// (`0x0061B130(player room, path sub-tile x, y)`, set by `0x004DDB70`
     /// each frame): 0 when the point is in no room, −1 for a null record.
     pub player_logical: i32,
+    /// The player's path sub-tile, the reference of the edge floor strips
+    /// (`draw-order-2.md` §14).
+    pub player_subtile: (i32, i32),
+    /// The act's edge floor record (act +0x18, `draw-order-2.md` §14, open
+    /// question 2): `None` in acts IV and V, whose record holds no tile.
+    pub edge: Option<TileRecord>,
     pub level: LevelFacts,
 }
 
@@ -354,6 +363,9 @@ pub enum TileArray {
     Wall,
     Floor,
     Shadow,
+    /// The act's edge floor record ([`NearRooms::edge`],
+    /// `draw-order-2.md` §14): its items carry room and record 0.
+    Edge,
 }
 
 /// A grid entry (§2): kind 0 unit, 1 tile, 2 unit shadow.
@@ -795,11 +807,14 @@ pub fn sets_drawn_flag(camera: &Camera, tile: &OrderedTile, blocks: &[BlockRect]
 /// §6 r6: writes flag 0x20000 into the records whose draw set it.
 pub fn mark_drawn(near: &mut NearRooms, drawn: &[(usize, TileArray, usize)]) {
     for &(room, array, record) in drawn {
-        let r = &mut near.rooms[room];
         let rec = match array {
-            TileArray::Wall => &mut r.walls[record],
-            TileArray::Floor => &mut r.floors[record],
-            TileArray::Shadow => &mut r.shadows[record],
+            TileArray::Edge => match near.edge.as_mut() {
+                Some(e) => e,
+                None => continue,
+            },
+            TileArray::Wall => &mut near.rooms[room].walls[record],
+            TileArray::Floor => &mut near.rooms[room].floors[record],
+            TileArray::Shadow => &mut near.rooms[room].shadows[record],
         };
         rec.flags |= REC_DRAWN;
     }
@@ -915,6 +930,7 @@ impl Passes<'_> {
             TileArray::Wall => &r.walls[record],
             TileArray::Floor => &r.floors[record],
             TileArray::Shadow => &r.shadows[record],
+            TileArray::Edge => unreachable!("edge floors are placed by order_frame"),
         };
         self.out.push(Ordered::Tile(OrderedTile {
             room,
@@ -1032,13 +1048,79 @@ pub fn order_frame(
     if mode.get() == 3 {
         return Ok(FrameOrder::default());
     }
-    order_grid(&DrawGrid::of_camera(camera), mode, near, positions, clock)
+    let mut order = order_grid(&DrawGrid::of_camera(camera), near, positions, clock)?;
+    let active = edges::edges_active(
+        near.level.draw_edges,
+        u32::from(mode.get()),
+        camera.size.resolution_mode(),
+    );
+    if active {
+        edge_floors(camera, near, &mut order)?;
+    }
+    Ok(order)
 }
 
-/// [`order_frame`] for a given grid.
+/// The edge floors of the frame (`draw-order-2.md` §14), after the floor
+/// pass's last room: the drawn extents are the sub-tiles (tile × 5) of
+/// the room floors that pass the whole-tile test at their floor position
+/// (`camera.md` §6, §7; `0x004DDE80`), and each drawn edge floor is a
+/// floor item (`ℓ` 1, filter argument 1) of the act's edge record keyed
+/// by [`edges::edge_key`].
+fn edge_floors(
+    camera: &Camera,
+    near: &mut NearRooms,
+    order: &mut FrameOrder,
+) -> Result<(), OrderError> {
+    let visible = |cell: (i32, i32)| {
+        camera.floor_roof_visible(camera.tile_handed(TileList::Floor, cell.0, cell.1))
+    };
+    let mut extents = edges::DrawnExtents::new();
+    let mut at = order.items.len();
+    for (i, item) in order.items.iter().enumerate() {
+        let key = match item {
+            Ordered::Tile(t) => {
+                if matches!(t.kind, TileKind::Floor { .. }) && visible(t.cell) {
+                    extents.widen((t.cell.0 * edges::SUBTILES, t.cell.1 * edges::SUBTILES));
+                }
+                t.key
+            }
+            Ordered::Unit { at, .. } | Ordered::UnitShadow { at, .. } => *at,
+        };
+        if key.pass > pass::FLOORS {
+            at = at.min(i);
+        }
+    }
+    let rooms = near.rooms.len();
+    let floors = edges::edge_floors(
+        &mut extents,
+        near.player_subtile,
+        false,
+        near.edge.as_mut(),
+        |f| visible(f.tile()),
+    )?;
+    let Some(rec) = near.edge else {
+        return Ok(());
+    };
+    let items = floors.iter().enumerate().map(|(n, f)| {
+        Ordered::Tile(OrderedTile {
+            room: 0,
+            array: TileArray::Edge,
+            record: 0,
+            kind: TileKind::Floor { layer: 1 },
+            cell: f.tile(),
+            dt1: rec.dt1,
+            alpha: rec.fade.alpha,
+            key: edges::edge_key(rooms, n),
+        })
+    });
+    order.items.splice(at..at, items.collect::<Vec<_>>());
+    Ok(())
+}
+
+/// [`order_frame`] for a given grid, without the edge floors of
+/// `draw-order-2.md` §14 (they need the camera's view test).
 pub fn order_grid(
     grid: &DrawGrid,
-    mode: OpenMode,
     near: &mut NearRooms,
     positions: &BTreeMap<UnitKey, ClientPos>,
     clock: FadeClock,
@@ -1074,13 +1156,6 @@ pub fn order_grid(
     }
 
     // Pass 3: floors (r2), straight from the rooms.
-    if p.near.level.draw_edges && mode.get() == 0 {
-        return Err(open(
-            10,
-            "the level draws edge floors (DrawEdges at open mode 0): draw-order-2.md §14 \
-             (`edges`) needs the resolution mode and the act edge record (its open question 2)",
-        ));
-    }
     for ri in 0..p.near.rooms.len() {
         for layer in 1..=2 {
             for i in 0..p.near.rooms[ri].floors.len() {

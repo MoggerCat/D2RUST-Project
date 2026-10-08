@@ -117,6 +117,19 @@ pub struct WorldViewState {
     pub object_labels: super::object_label::ObjectLabels,
     /// The last drawn frame's camera (`super::visibility`).
     pub camera: super::visibility::SharedCamera,
+    /// The model's act loads already handed to the cycle
+    /// ([`note_act_loads`]).
+    act_loads: u64,
+}
+
+/// `composition.md` §3 step 4: each S→C 0x03 the model handled since the
+/// last call sets the post-draw clear counter to 1 (`0x0044E100`), so the
+/// next presented frame is all index 0.
+pub fn note_act_loads(cycle: &mut FrameCycle, seen: &mut u64, loads: u64) {
+    if loads != *seen {
+        *seen = loads;
+        cycle.set_post_clear(1);
+    }
 }
 
 impl WorldViewState {
@@ -145,6 +158,7 @@ impl WorldViewState {
             missiles: Default::default(),
             object_labels: Default::default(),
             camera: Default::default(),
+            act_loads: 0,
         }
     }
 }
@@ -870,6 +884,8 @@ fn world_view_frame(
         bridge.0.set_room_order(room, &order);
     }
     let blank_screen = state.feed.blank_screen(bridge.0.world())?;
+    let loads = bridge.0.world().act_loads;
+    note_act_loads(&mut state.cycle, &mut state.act_loads, loads);
     if let Some(d) = dump.as_deref_mut().filter(|d| !d.done) {
         d.seen += 1;
         if tick >= d.request.at_tick {
@@ -1010,5 +1026,35 @@ fn present_scale(
     let s = p.scale as f32 / window.scale_factor();
     for mut t in &mut sprites {
         t.scale = Vec3::new(s, s, 1.0);
+    }
+}
+
+#[cfg(test)]
+mod act_load_tests {
+    use super::*;
+    use crate::scene::{FrameImage, MapTable};
+
+    // Covers: specs/render/composition.md §3
+    #[test]
+    fn the_frame_after_an_act_load_presents_all_index_0() {
+        // The spec's vector: framebuffer all 5, BlankScreen 1, nothing
+        // drawn, 800 × 600, counter 1 → all 0, counter back to 0.
+        let mut c = FrameCycle::with_pixels(800, 600, vec![5; 800 * 600]).unwrap();
+        let mut seen = 0;
+        note_act_loads(&mut c, &mut seen, 0);
+        assert_eq!(c.post_clear(), 0, "no 0x03 yet");
+        note_act_loads(&mut c, &mut seen, 1);
+        assert_eq!(c.post_clear(), 1);
+        let none: Vec<FrameImage> = Vec::new();
+        let out = c.compose(true, &[], &none, &MapTable::default()).unwrap();
+        assert!(out.iter().all(|&p| p == 0));
+        assert_eq!(c.post_clear(), 0);
+        // The same count again: no clear; the next frame keeps rows
+        // 553–599 (BlankScreen clears rows 0–552 only).
+        note_act_loads(&mut c, &mut seen, 1);
+        assert_eq!(c.post_clear(), 0);
+        // Two loads before one frame: one cleared frame.
+        note_act_loads(&mut c, &mut seen, 3);
+        assert_eq!(c.post_clear(), 1);
     }
 }
