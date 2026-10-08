@@ -5,10 +5,12 @@ reads D2_GAME_DIR (directly or through a helper in the same file).
   python3 tools/realdata_inventory.py > docs/handoff/realdata-tests.tsv
   python3 tools/realdata_inventory.py --crates     # crate names that have ignored tests
 
-  python3 tools/realdata_inventory.py --skip-names [--no-recordings]
-                                                   # gpu / dump tests (+ recording replays) the gate skips
+  python3 tools/realdata_inventory.py --skip-names [--no-recordings] [--no-save]
+                                                   # gpu / dump / repro tests (+ recording replays,
+                                                   # + D2_SAVE tests) the gate skips
 
-Columns: crate, file, test, kind (ignored|env), needs (data|gpu|dump|recording; no ignored test opens a window),
+Columns: crate, file, test, kind (ignored|env), needs (data|gpu|dump|recording|save|repro; repro = ignored as a known-bug
+repro, not for game files; no ignored test opens a window),
 files (heuristic from names in the test body), what (doc line / ignore reason).
 """
 import os, re, sys
@@ -77,6 +79,10 @@ def scan(path):
             need = ["dump"]
         elif "traces/raw" in " ".join(docs) + body + reason:
             need = ["recording"]
+        elif re.search(r'"D2_SAVE"', body):
+            need = ["save"]
+        elif reason and not re.search(r"game|D2_GAME_DIR|install|files|GPU|dump|1\.14d|extracted", reason, re.I):
+            need = ["repro"]
         files = sorted(set(x.replace("\\", "/") for x in FILE_RE.findall(body)))[:6]
         for key, label in EXTRA:
             if key in body and label not in files:
@@ -97,7 +103,11 @@ def main():
                     rows += scan(os.path.join(d, f))
     rows.sort()
     if "--skip-names" in sys.argv:
-        skip = ("gpu", "dump", "recording") if "--no-recordings" in sys.argv else ("gpu", "dump")
+        skip = ["gpu", "dump", "repro"]
+        if "--no-recordings" in sys.argv:
+            skip.append("recording")
+        if "--no-save" in sys.argv:
+            skip.append("save")
         print("\n".join(sorted({r[2] for r in rows if r[4] in skip})))
         return
     if "--crates" in sys.argv:
