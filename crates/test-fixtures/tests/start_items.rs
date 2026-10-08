@@ -55,7 +55,23 @@ struct Fx {
 /// host with the install's item and inventory tables; `inventory`: the
 /// host has an inventory model.
 fn fx(inventory: bool, add_player_inventory: bool) -> Fx {
-    let d = data();
+    fx_on(data(), inventory, add_player_inventory)
+}
+
+/// [`data`] plus the made-up Horadric Cube item (`test_fixtures::cube_item`).
+fn data_with_cube() -> &'static GameData {
+    static D: OnceLock<GameData> = OnceLock::new();
+    D.get_or_init(|| {
+        let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+            .join(format!("start-items-cube-{}", std::process::id()));
+        let mut s = synth::synthetic();
+        test_fixtures::cube_item::add_cube_item(&mut s.tables);
+        let i = install::build(&dir, &s).unwrap_or_else(|e| panic!("{e}"));
+        GameData::from_install(&i).unwrap_or_else(|e| panic!("{e}"))
+    })
+}
+
+fn fx_on(d: &'static GameData, inventory: bool, add_player_inventory: bool) -> Fx {
     let (drlg, types) = d.level_types();
     let drlg = d
         .drlg_world(drlg, &types, ActCreation::TownOnly, INIT, TOWN)
@@ -247,4 +263,28 @@ fn the_new_character_load_makes_start_items_on_the_preview_inventory() {
     let (_, report, items) = load_new_character_with_items(&mut s, player, [0; 16]);
     assert_eq!(items.faults.len(), 1);
     assert!(report.unapplied.iter().any(|u| u.step == "start items"));
+}
+
+// Covers: specs/world/cube.md §1
+#[test]
+fn a_new_character_has_the_cube_when_the_host_names_it_as_an_extra() {
+    let mut f = fx_on(data_with_cube(), true, true);
+    f.world.start_extra = vec![*b"box "];
+    let r = f.world.start_items(&mut f.game, &mut f.sim, f.player);
+    assert!(r.faults.is_empty(), "{:?}", r.faults);
+    // The charstats items first, the cube after them, in the inventory.
+    let codes: Vec<[u8; 4]> = r
+        .items
+        .iter()
+        .map(|i| i.0)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .map(|u| f.code(u))
+        .collect();
+    assert_eq!(codes, [*b"sb1 ", *b"pt1 ", *b"pt1 ", *b"box "]);
+    assert_eq!(r.items[3].1, StartPlace::Inventory);
+    // Without the extra the original's three items only.
+    let mut f = fx_on(data_with_cube(), true, true);
+    let r = f.world.start_items(&mut f.game, &mut f.sim, f.player);
+    assert_eq!(r.items.len(), 3);
 }
