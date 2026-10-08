@@ -113,7 +113,7 @@ pub fn can_act(is_player: bool, cursor_item: bool, mode: u32, class: u32) -> boo
 }
 
 impl ModelClick<'_> {
-    fn camera(&self) -> Option<Camera> {
+    pub(super) fn camera(&self) -> Option<Camera> {
         let p = self.world.local()?;
         let (x, y) = p.cell();
         let (px, py) = self

@@ -475,6 +475,14 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
     fn tick(&mut self, out: &mut dyn MessageSink) {
         self.world.run_tick(&mut self.game, &mut self.events);
         self.world.after_tick(&mut self.game, &mut self.events);
+        // The staged positions follow the path records, so the point
+        // parser sees where the walking player is.
+        let staged: Vec<UnitId> = self.units.keys().copied().collect();
+        for (unit, (x, y)) in self.world.unit_positions(&mut self.events, &staged) {
+            if let Some(f) = self.units.get_mut(&unit) {
+                f.pos = Pos { x, y };
+            }
+        }
         let requests = self.world.take_host_requests();
         self.host_requests.extend(requests);
         for (unit, bytes) in self.world.take_sent(&mut self.events) {
