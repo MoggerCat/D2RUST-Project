@@ -137,3 +137,33 @@ fn whirlwind_spends_mana_and_moves_the_barbarian() {
         "the barbarian whirled east: {from:?} -> {to:?}"
     );
 }
+
+// Covers: specs/skills/bodies-2.md §4.7
+#[test]
+fn leap_landing_hurts_a_monster_at_the_landing_point() {
+    let mut r = Rig::new(&[LEAP]);
+    r.leave_town();
+    r.select_right(LEAP);
+    let m = r.spawn_monster(5);
+    let life0 = r.life(m);
+    r.right_click_point(5, 0);
+    r.step(40);
+    let errors = r.errors();
+    assert!(r.life(m) < life0, "the landing hurt the monster ({errors})");
+}
+
+// Covers: specs/skills/bodies-2b.md §6.11, §6.12
+// Covers: specs/skills/bodies-2.md §2.19
+#[test]
+fn leap_attack_leaps_to_the_monster_and_strikes_it() {
+    let mut r = Rig::new(&[LEAP_ATTACK]);
+    r.leave_town();
+    r.select_right(LEAP_ATTACK);
+    let m = r.spawn_monster(6);
+    let (mana0, life0) = (r.mana(), r.life(m));
+    r.right_click_unit(m);
+    r.step(60);
+    let errors = r.errors();
+    assert!(r.mana() < mana0, "Leap Attack spent mana ({errors})");
+    assert!(r.life(m) < life0, "the strike hurt the monster ({errors})");
+}

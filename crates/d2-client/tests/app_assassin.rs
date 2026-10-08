@@ -448,3 +448,58 @@ fn dragon_flight_moves_the_assassin_to_the_monster() {
     let errors = g.errors();
     assert!(to.x > from.x, "flew east: {from:?} -> {to:?}; {errors}");
 }
+
+/// The monster's life.
+fn life_of(g: &mut Game, m: UnitId) -> i32 {
+    g.link
+        .with(move |l| {
+            let sim = &mut l.host_mut().game;
+            sim.events.action.with(&mut sim.game, |_, v| v.stat(m, 6))
+        })
+        .unwrap()
+}
+
+/// d2rs-own, unverified: kick stats on the player (`item_kickdamage`,
+/// stat 137, `levels.md` §3.5) so a kick has a physical part.
+fn give_kick_damage(g: &mut Game, k: i32) {
+    g.link
+        .with(move |l| {
+            let sim = &mut l.host_mut().game;
+            let p = sim.player_of(LOCAL_CLIENT).unwrap();
+            sim.events
+                .action
+                .with(&mut sim.game, |_, v| v.set_base(p, 137, k));
+        })
+        .unwrap();
+}
+
+// Covers: specs/skills/bodies-2.md §3.10, §2.5, §2.6
+#[test]
+fn dragon_talon_kick_hurts_the_monster() {
+    // calc1 (kicks) = the formula at offset 4 of the synthetic code.
+    let mut s = row(24, 42);
+    s.param1 = 5;
+    s.param2 = 7;
+    let mut g = Game::joined(vec![(3, s)]);
+    give_kick_damage(&mut g, 20);
+    let (m, guid) = g.monster(500);
+    let life0 = life_of(&mut g, m);
+    g.cast_on(guid);
+    let errors = g.errors();
+    assert!(life_of(&mut g, m) < life0, "the kick hurt it; {errors}");
+}
+
+// Covers: specs/skills/bodies-2b.md §7.20
+#[test]
+fn dragon_flight_kick_hurts_the_monster() {
+    let mut s = row(0, 52);
+    s.param1 = 5;
+    s.param2 = 7;
+    let mut g = Game::joined(vec![(3, s)]);
+    give_kick_damage(&mut g, 20);
+    let (m, guid) = g.monster(500);
+    let life0 = life_of(&mut g, m);
+    g.cast_on(guid);
+    let errors = g.errors();
+    assert!(life_of(&mut g, m) < life0, "the kick hurt it; {errors}");
+}

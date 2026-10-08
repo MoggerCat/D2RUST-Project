@@ -39,6 +39,8 @@ pub const BASH: usize = 126;
 pub const HOWL: usize = 130;
 pub const LEAP: usize = 132;
 pub const DOUBLE_SWING: usize = 133;
+/// Made-up id: the real Leap Attack is a monster skill.
+pub const LEAP_ATTACK: usize = 100;
 pub const SHOUT: usize = 138;
 pub const BATTLE_ORDERS: usize = 149;
 pub const WHIRLWIND: usize = 151;
@@ -161,6 +163,15 @@ pub fn skill_row(skill: usize) -> Skills {
             (s.srvstfunc, s.srvdofunc) = (40, 77);
             // The leap's reach (`aurarangecalc`, `bodies-2.md` §2.13).
             s.aurarangecalc = RESIST_CALC;
+            // d2rs-own, unverified: the landing's area damage (`calc1`).
+            s.calc1 = LEN_CALC;
+        }
+        LEAP_ATTACK => {
+            (s.srvstfunc, s.srvdofunc) = (41, 78);
+            s.aurarangecalc = RESIST_CALC;
+            // d2rs-own, unverified: the strike's enhanced damage (`calc1`).
+            s.calc1 = LEN_CALC;
+            s.srvoverlay = 0xFFFF;
         }
         WHIRLWIND => {
             (s.srvstfunc, s.srvdofunc) = (38, 76);
