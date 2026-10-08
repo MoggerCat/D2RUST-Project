@@ -123,6 +123,40 @@ pub struct WiredWorld<R, S = NoSkills> {
 }
 
 impl<R, S> WiredWorld<R, S> {
+    /// The unit facts of an item (`intents-events.md` §2.4 rule 4): the
+    /// owner from the inventory model (`InvItem::owner_guid`, the owning
+    /// player's GUID), the act from the item's room, or from its owner
+    /// when it is in an inventory, and the position of an item on the
+    /// ground from its static path. `None`: not an item, or no act.
+    fn item_facts<D: ActionEvents>(
+        &mut self,
+        game: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<crate::adapters::UnitFacts> {
+        use d2_sim::units::UnitType;
+        let e = game.lists.unit(unit)?;
+        if e.ty != UnitType::Item {
+            return None;
+        }
+        let owner = self
+            .inventory
+            .as_ref()
+            .and_then(|i| i.state.items.get(&unit))
+            .map(|i| i.owner_guid)
+            .filter(|&g| g != d2_sim::items::inventory::NO_GUID)
+            .and_then(|g| game.lists.find_unit(UnitType::Player, g));
+        let (x, y) = events.action().hooks().path_position(unit);
+        let act = match e.room() {
+            Some(r) => game.lists.room(r)?.act,
+            None => game.lists.room(game.lists.unit(owner?)?.room()?)?.act,
+        };
+        Some(crate::adapters::UnitFacts {
+            act,
+            pos: crate::seams::Pos { x, y },
+            owner,
+        })
+    }
     /// The vendor records at game creation (`npc.md` §1.1 step 5,
     /// `vendors.md` §1 rules 3–5) from the NPC records and the global
     /// column lists (`GlobalLists::build`). The creation fields are the
@@ -880,7 +914,10 @@ where
         events: &mut D,
         unit: UnitId,
     ) -> Option<crate::adapters::UnitFacts> {
-        WorldHost::<D>::live_facts(&mut self.action, game, events, unit)
+        if let Some(f) = WorldHost::<D>::live_facts(&mut self.action, game, events, unit) {
+            return Some(f);
+        }
+        self.item_facts(game, events, unit)
     }
 
     fn vitals_sync(

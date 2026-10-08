@@ -476,8 +476,15 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
         self.cv.v.h.x.start_mode(game, u, mode, target);
         self.cv.v.h.x.keep_target(u, target);
     }
+    /// The unit-form run request on the path provider; without one the
+    /// host's seam.
     fn run_to(&mut self, u: UnitId, target: UnitId, e: SkillEntry) {
-        self.xm().run_to(u, target, e);
+        if self.cv.v.h.paths.is_some() {
+            let mut p = crate::wiring::path::walk::PathCtx::of(&mut self.cv.v, &mut *self.cv.game);
+            p.run_to_unit(u, target, e.skill as u16);
+        } else {
+            self.xm().run_to(u, target, e);
+        }
     }
     fn target(&self, u: UnitId) -> Option<UnitId> {
         UseRest::target(self.x(), u)

@@ -72,6 +72,26 @@ impl<'a, X: Pending> PathCtx<'a, X> {
         }
     }
 
+    /// Player mode request, unit form `0x00580A70(game, unit, skill, 3,
+    /// type, GUID, 0)` (`pathing.md` §1.2): the run to a unit a skill
+    /// use asks for out of reach (`use.md` §3, `0x00548A50`); the skill
+    /// is remembered as the unit's used skill.
+    pub fn run_to_unit(&mut self, unit: UnitId, target: UnitId, skill: u16) -> Option<Outcome> {
+        let t = self.tables();
+        let (ty, guid) = {
+            let r = self.v.units.get(target)?;
+            (r.ty, r.guid)
+        };
+        let target = WalkTarget::Unit { ty, guid };
+        match request(&t, self, unit, Some(skill), 3, target, false) {
+            Ok(o) => Some(o),
+            Err(e) => {
+                self.walk_error(e);
+                None
+            }
+        }
+    }
+
     /// Teleport `0x00650910(path, room, x, y)` (`path-placement.md` §6
     /// rule 4) of a unit with a dynamic path; a static path is set
     /// (`0x00620AE0`) with its footprint moved.

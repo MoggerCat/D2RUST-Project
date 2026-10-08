@@ -108,9 +108,8 @@ pub struct SimGame<D = Unspecified, W = NoWorld> {
     live: std::collections::BTreeSet<UnitId>,
     /// The host's seam refresh, if set.
     host_sync: Option<HostSync<D>>,
-    /// Clients the point parser asked to resync with S→C 0x15, in order.
-    /// Not queued: the 11-byte layout of 0x15 is not in
-    /// `server-messages.tsv` (`docs/HANDOFF.md` §7).
+    /// Clients the point parser asked to resync with S→C 0x15, in order
+    /// (the player is queued for update as well, `queue_resync`).
     pub resyncs: Vec<ClientId>,
     /// Intents that passed the gate, size check and parse, in order:
     /// (client, id, size). Their handlers are not written (see `handle`).
@@ -413,10 +412,11 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
         }
     }
 
-    /// TODO(server-messages.tsv layout of 0x15): records the request; the
-    /// message is queued once its layout is specified.
+    /// Records the request and queues the player for the update pass
+    /// that sends S→C 0x15 ([`handlers::player::resync`]).
     fn queue_resync(&mut self, client: ClientId, _out: &mut dyn MessageSink) {
         self.resyncs.push(client);
+        handlers::player::resync(self, client);
     }
 
     /// §2.4 rule 4 in its order: missing → owned item → other act →
