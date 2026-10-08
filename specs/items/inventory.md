@@ -704,8 +704,8 @@ Callers (all pass U in EAX after the item move is done): repair
 `0x0055F900` (`generation.md` §12.1 step 5), equip from the cursor
 `0x005606B0` (§4.6), 0x1C `0x00560CD0`, 0x1D `0x00560F00`, 0x1E
 `0x00561220`, 0x1B `0x00563D20` (`inventory-moves.md` §7.6–§7.9), the
-weapon switch `0x005616A0` (0x60, `sim/intents-events.md` open
-question 16), the skill-body re-equip `0x00562A30` (`skills/bodies.md`),
+weapon switch `0x005616A0` (0x60, `inventory-moves.md` §7.25; runs
+while both hands are empty, so it does nothing), the skill-body re-equip `0x00562A30` (`skills/bodies.md`),
 equip without the cursor `0x00562E00` (§4.9), corpse take-back
 `0x00562F30` (`inventory-moves.md` §12.2).
 

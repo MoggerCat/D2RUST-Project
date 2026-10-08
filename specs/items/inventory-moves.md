@@ -16,12 +16,12 @@
 | Summary | 27–33 |
 | Rules | 34–35 |
 |   6. Deferred item messages | 36–129 |
-|   7. Intents | 130–574 |
-|   8. Pickup from the ground | 575–756 |
-|   9. Drop to the ground | 757–804 |
-|   10. Gold | 805–844 |
-|   11. Message layouts | 845–874 |
-|   12. Corpse take-back (`0x0057FB70` → `0x00562F30`) | 875–1002 |
+|   7. Intents | 130–681 |
+|   8. Pickup from the ground | 682–863 |
+|   9. Drop to the ground | 864–911 |
+|   10. Gold | 912–951 |
+|   11. Message layouts | 952–981 |
+|   12. Corpse take-back (`0x0057FB70` → `0x00562F30`) | 982–1109 |
 <!-- /index -->
 
 ## Summary
@@ -571,6 +571,113 @@ when: C is of type 3 (`tors`) or 37 (`helm`); or by hireling class:
    2, queue 0x9C action 0xE (`0x0053EE70`, now). Owner refresh (no
    update list). Result 0. A failed slot placement leaves the item in
    mode 4, not linked and not the cursor item (original quirk).
+
+#### 7.25 0x60 SwapWeapons (`0x0054CE70` → `0x005616A0`)
+
+Handler gates (size 1, expansion, used skill, dead; result 3 when the
+body fails): `sim/intents-events.md` §9 rule 14. Body `0x005616A0(ECX
+game, EDX player P, out)`, read in full from the disassembly
+(`0x005616A0`–`0x00561AF9`, 2026-10-08). Game or P none → fatal assert
+0xE1E / 0xE1F. No item-move gate, cursor, busy, trade, requirement or
+durability test: the switch is never refused for the items' sake.
+
+Move table (16-byte entries on the stack, `0x005616A7`–`0x005616FB`),
+walked in this order:
+
+| Entry | From | To | Link kind |
+|---|---|---|---|
+| 0 | 4 (right hand) | 11 | 4 |
+| 1 | 5 (left hand) | 12 | 4 |
+| 2 | 11 | 4 | 3 |
+| 3 | 12 | 5 | 3 |
+
+1. out := 0; targeting reset (`inventory.md` §5.3, `0x0055BF50`).
+2. Mouse-skill sets (player data = P +0x14; slots as `formats/d2s.md`
+   §2.4 rule 5): L := the saved swap-left pair (id +0x84, owner GUID
+   +0x8C) and R := the saved swap-right pair (+0x80, +0x88)
+   (`0x006231A0`, `0x00623120`; P none or not a player → (0, −1));
+   both also reset the throw-restore slots (`inventory.md` §5.8): +0x74
+   := 0, +0x7C := −1, +0x70 := 0, +0x78 := −1, and +0x90 := −1, +0x94
+   := 0. Then the current right skill → +0x80 / +0x88 (`0x00622F80`)
+   and the current left → +0x84 / +0x8C (`0x00622FF0`; id `0x00643CE0`,
+   owner `0x00643AD0`; non-players skipped).
+3. Look-up, entries 0–3: item := the item at From (`0x0063BDE0`);
+   present → `0x0063E490` (a no-op here: it only fills an empty
+   result) and the item must be in mode 1 (item +0x10), else out := 1,
+   result 0. This test runs after step 2, so a failure leaves the
+   skill slots exchanged (unreachable for game-placed body items, which
+   are always mode 1).
+4. Deactivation: hand-4 item present → `0x0055C730(item, P, 0, 1)`;
+   then the same for the hand-5 item (ECX game, EDX item).
+5. Removal, entries 0–3 with an item: entries 0–1 (hand items) → stat
+   unlink (`0x0063D2B0`); unlink from the inventory (`0x0063AD90`;
+   none or another item → out 1, result 0; this unlink also clears the
+   weapon in use when it was that item, `inventory.md` §1.4 rule 1);
+   From slot cleared (`0x0063BE30`); page := 0xFF (`0x00628280`);
+   command flag 0x200000 (`0x00628170`); item flag 0x1; item flag
+   0x4000 cleared when set (`0x006280A0` / `0x006280D0`); update list
+   += item (`0x0063CC70`). All four items are off the body before any
+   is placed.
+6. Placement, entries 0–3 with an item: put at To (`0x0063BDB0`) and
+   link with the entry's kind (`0x0063B210`); either failing → out 1,
+   result 0 (unreachable: To was emptied in step 5; items already
+   handled stay moved, later ones stay detached). Body location := To
+   (`0x00627D70`). To 4 or 5 → stat link (`0x0063D1D0`, which also sets
+   the weapon in use) and stat refresh `0x0055C2C0(item, P, 0)`, then
+   item flag 0x40; To 11 or 12 → item flag 0x80 (no stat link: the
+   swap set's stats never count). Then unit flag 0x2 cleared (+0xC4),
+   mode 1 (`0x00624690`), item flag 0x1, command flag 0x200000.
+   Entries 0–1 then run weapon bookkeeping (`inventory.md` §5.8,
+   `0x0055C5C0`); both hands are empty at that point and the weapon in
+   use is none, so it does nothing (`inventory.md` edge case 14).
+7. Inventory pass `0x0055DBC0(game, P, send 0)` (`inventory.md` §5.7):
+   this is where requirements act. A new hand item that is not usable
+   (§5.6: §4.2 not equipping, the quiver rule) gets item flag 0x4000
+   and its stat list unlinked, but stays in the hand. Broken items are
+   moved and linked like any other; what counts for them is §5.7's.
+   Step 7 of the pass is the owner refresh (`0x00621000(P, 1)`) that
+   gets the update list sent; send 0 means no 0x48 from the pass.
+8. Look up the step-2 pairs: Ls := P's skill (L id, L owner), Rs := P's
+   skill (R) (`0x006439B0`), after the pass, so item-granted skills of
+   the new hands exist.
+9. P's client (`0x005531C0`; none → fatal 0xE94): client weapon switch
+   +0x45C := (+0x45C = 0) (`0x00539220` / `0x00539230`); **S→C 0x97**
+   (1 byte, `0x0053E110`, queued now) to P's client only.
+10. Left: Ls exists and use_state(P, Ls) (`0x00647960`) ∉ {2, 7} →
+    select L on the left (`0x005701B0`, EDX 1; that call sends its own
+    S→C 0x23 to P's client at once, `0x0057026C`) and queue the event
+    record 0x23 (`0x00571C60`: skill u16 +0x0C = L id, item u32 +0x08 =
+    L owner, hand u8 +0x0E = 1). Else the record carries the current
+    left skill (`0x00620190`: id, owner; none → 0, −1) and nothing is
+    selected.
+11. Right: the same with Rs, R, the right skill (`0x006201D0`), EDX 0,
+    hand 0. Result 1 (handler result 0).
+
+Messages, in order. In the handler: any 0x23 that selections inside
+the pass send (`inventory.md` §5.7 step 6), S→C 0x97, then the direct
+0x23 of step 10 and of step 11 (each only when that side selects the
+saved skill). In the next per-unit update, to every client that
+processes P (`sim/intents-events.md` §7.3 rule 1, `0x00580860`): one
+**0x9D action 0x17** (`0x0053D110`, `item-actions.tsv` row 15, `to`
+all) per moved item in update-list order (hand 4, hand 5, swap 11,
+swap 12, those present; an item already listed this tick keeps its
+place), then 0x47 and 0x48, then the two queued **0x23** (left, then
+right; `0x00571CD0` at `0x005808FC`, layout `sim/server-messages.tsv`
+0x23: type u8@1, GUID u32@2, hand u8@6, skill u16@7, item u32@9). The
+stat changes of the link / unlink go by the stat-sync path, not by
+this handler.
+
+Example (synthetic). P holds sword A at 4, shield S at 5, axe X at 11,
+nothing at 12; left Attack (0, −1), right Bash; saved swap pairs (0,
+−1), (0, −1). After: X at 4, A at 11, S at 12, 5 empty; +0x84 / +0x8C
+= Attack, +0x80 / +0x88 = Bash; both saved pairs resolve to Attack
+(usable) → left and right select Attack (`0x005701B0` sends its 0x23
+even when the skill is already selected). Sent in the handler: 0x97,
+0x23 hand 1 skill 0, 0x23 hand 0 skill 0; next update: 0x9D
+0x17 for A, S, X, then 0x47, 0x48, 0x23 hand 1 skill 0, 0x23 hand 0
+skill 0. With nothing in 4, 5, 11 or 12: no item moves, no 0x9D, but
+the skill sets still trade, 0x97 is sent and two 0x23 records are
+queued; result 0.
 
 ### 8. Pickup from the ground
 

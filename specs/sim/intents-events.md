@@ -46,13 +46,13 @@
 |   6. Exact-match comparison | 672–779 |
 |   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 780–1205 |
 |   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1206–1420 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1421–1577 |
-| Constants & data dependencies | 1578–1596 |
-| Randomness | 1597–1602 |
-| Edge cases & original bugs | 1603–1648 |
-| Test vectors | 1649–1735 |
-| Provenance | 1736–1852 |
-| Open questions | 1853–1972 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1421–1580 |
+| Constants & data dependencies | 1581–1599 |
+| Randomness | 1600–1605 |
+| Edge cases & original bugs | 1606–1651 |
+| Test vectors | 1652–1738 |
+| Provenance | 1739–1855 |
+| Open questions | 1856–1983 |
 <!-- /index -->
 
 ## Summary
@@ -1448,7 +1448,7 @@ owned it yet, and states the handlers that are only message handling.
    | 0x53 StaminaOn, 0x54 StaminaOff | rule 13 |
    | 0x59 MakeEntityMove | `monsters/ai-bodies.md` §9.9 (AI params from NPC messages); client sender: the interact code `0x00461DC0` (`0x004620F1`, through builder `0x00478700`) sends [type][GUID][x][y] with the NPC's current position when the clicked monster's `monstats` has `npc` and `interact` (`ui/controls.md` §6 rule 9) |
    | 0x5F UpdatePlayerPos | `sim/pathing.md` §1.6 |
-   | 0x60 SwapWeapons | rule 14 (message part); `0x005616A0`: open question 16 |
+   | 0x60 SwapWeapons | rule 14 (message part); body `0x005616A0`: `items/inventory-moves.md` §7.25 |
 
 2. **0x12** (`0x0054A260`): size 1 else 3; state 12 (`inferno`) off on
    the player with an update-queue insert (`0x00639DB0(player, 12, 0)`,
@@ -1540,7 +1540,10 @@ owned it yet, and states the handlers that are only message handling.
     mode 3 → mode 2. Both 0.
 14. **0x60** (`0x0054CE70`): size 1 else 3; classic game → 3; a used
     skill (`0x00620250`) or dead (`0x005541B0`) → 0; else `0x005616A0(game,
-    player, &fail)`: 0, or 3 when it returns 0 with fail ≠ 0.
+    player, &fail)`: 0, or 3 when it returns 0 with fail ≠ 0. The body
+    (hands 4 / 5 trade with 11 / 12, the mouse-skill sets trade, S→C
+    0x97, 0x9D action 0x17 per moved item, two 0x23) is
+    `items/inventory-moves.md` §7.25.
 15. **0x4F** (`0x0054C7C0`): size 7 else 3; `0x00568060(game, player,
     button u16@1, (p1 u16@3 << 16) | p2 u16@5)` and its result: the
     two words reach the button handler as one u32, p1 high.
@@ -1940,8 +1943,16 @@ recorded seq 224. §7.3 rule 2 steps 6–10: `0x00597CF0`, `0x0053B430`,
     through `0x0053C750`, `0x0053C850`) and to whom.
 15. `0x005845D0` (0x3D, §9 rule 4): what a door highlight does to the
     object (object spec).
-16. `0x005616A0` (0x60, §9 rule 14): the weapon switch and its fail
-    flag (item spec).
+16. *Answered* (2026-10-08, static, `0x005616A0`–`0x00561AF9` read in
+    full): `items/inventory-moves.md` §7.25. No requirement or
+    durability test (an unusable new hand item is switched off by the
+    inventory pass `0x0055DBC0`, not refused); locations 4 ↔ 11 and
+    5 ↔ 12 (table `0x005616A7`); the saved swap mouse skills
+    (+0x80..+0x8C) trade with the current ones; messages: S→C 0x97
+    (`0x0053E110`) to P's client in the handler, 0x9D action 0x17 per
+    moved item (command flag 0x200000) and two queued 0x23
+    (`0x00571C60`, left then right) in the next update. Fail flag: a
+    body item not in mode 1, or an unlink / put / link failure.
 17. This spec is past 60 KB (`specs/README.md` Process): split §3.5
     and the S→C parts of §6–§7 into a sender spec in a later pass.
 18. Client side of ids §3.5 confirmed that still have no client owner
