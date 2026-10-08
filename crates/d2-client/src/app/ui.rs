@@ -145,7 +145,8 @@ pub fn add_original_ui_with(
     let files = original.files();
     let mut ui = WorldViewUi::new(root, Box::new(NoStrings));
     ui.original = Some(original);
-    ui.bindings = Preset::Dev.bindings();
+    ui.bindings = crate::ui::front_end::screens::controls::saved_bindings()
+        .or_else(|| Preset::Dev.bindings());
     ui.art = Some(PanelArtLoader {
         source: parts.source.clone(),
         files: files.clone(),
