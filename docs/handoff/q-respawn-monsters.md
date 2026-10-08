@@ -41,7 +41,7 @@ monumod row 0 `constants` empty).
 ## Local check
 `RUST_LOG=info cargo run -p d2-client --release -- play --new amazon Test`,
 walk out of the Rogue Encampment into the Blood Moor, then Cold Plains and
-Stony Field: groups of monsters appear as each area comes into view; some
-are labelled/tinted champions (blue-ish name) or uniques (gold name) with a
-pack, and Bishibosh / Rakanishu / Corpsefire-class bosses stand at their
-spots. Count of model units grows in the log.
+Stony Field: the model unit count in the log should grow as each area comes
+into view (monster 0xAC messages), with some packs. Not checked: how
+champions / uniques are drawn (name colour, tint); that is client art and
+not part of this change.
