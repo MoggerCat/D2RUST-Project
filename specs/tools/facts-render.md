@@ -2,9 +2,10 @@
 
 - **Status:** implemented (2026-10-08): the d2rs exporter (`d2-client play
   --dump-draws`) and `d2-client facts-compare` follow §1–§6; format tests
-  on hand-made TSVs pass. No 1.14d scene has been recorded in this format
-  yet (PC 1 step 3, `docs/handoff/pc1-data.md`), so no comparison has run
-  on real facts: unverified (M02).
+  on hand-made TSVs pass. `facts_render.py` 0.2.0 writes §1–§4 from a
+  `frames-raw-3` capture (selftest; first real capture converted under Wine
+  2026-10-08, q-cloud-game). Comparison on real facts: see the scene
+  handoffs; unverified (M02) until one passes.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-client::facts` (format, export, compare);
   `tools/trace-recorder/facts_render.py` (the 1.14d converter, PC 1)
@@ -17,23 +18,23 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 39–50 |
-| Inputs | 51–57 |
-| Outputs / state changes | 58–64 |
-| Rules | 65–66 |
-|   1. Files and header | 67–88 |
-|   2. `draws.tsv` | 89–127 |
-|   3. `frame.tsv` | 128–160 |
-|   4. `sprites.tsv` | 161–174 |
-|   5. d2rs export | 175–214 |
-|   6. Comparison | 215–237 |
-|   7. Requests | 238–249 |
-| Constants & data dependencies | 250–253 |
-| Randomness | 254–257 |
-| Edge cases & original bugs | 258–265 |
-| Test vectors | 266–274 |
-| Provenance | 275–279 |
-| Open questions | 280–293 |
+| Summary | 40–51 |
+| Inputs | 52–58 |
+| Outputs / state changes | 59–65 |
+| Rules | 66–67 |
+|   1. Files and header | 68–89 |
+|   2. `draws.tsv` | 90–131 |
+|   3. `frame.tsv` | 132–164 |
+|   4. `sprites.tsv` | 165–180 |
+|   5. d2rs export | 181–220 |
+|   6. Comparison | 221–243 |
+|   7. Requests | 244–255 |
+| Constants & data dependencies | 256–259 |
+| Randomness | 260–263 |
+| Edge cases & original bugs | 264–271 |
+| Test vectors | 272–280 |
+| Provenance | 281–285 |
+| Open questions | 286–300 |
 <!-- /index -->
 
 ## Summary
@@ -52,7 +53,7 @@ the presented hashes.
 
 | Name | Type | Source |
 |---|---|---|
-| 1.14d capture | `frames-raw-2` JSON lines + its `celfile` records | `record_frames.py --draws-every N` (PC 1) |
+| 1.14d capture | `frames-raw-3` JSON lines + its `celfile` and `compfile` records (`frames-raw-2` reads with the raw-3 cells `?`) | `record_frames.py --draws-every N` (PC 1, or the cloud under Wine: `tools/cloud-game/`) |
 | d2rs frame | the world view's built, sorted draw list (`WorldFrame`) | `d2-client play --dump-draws DIR --at-tick N` |
 
 ## Outputs / state changes
@@ -99,15 +100,18 @@ frame record's `draws`, `capture.md` §3.5; d2rs: §5).
    `CelDrawEx`, `CelDrawClipped`, `CelDrawShadow`, `CelDrawHilight`,
    `UtilDiamond`, `UtilRect`, `DrawBox`, `DrawBoxAlpha`, `DrawLine`) or
    `unit` for the unit draw `0x00471EC0`.
-3. Cel ops (`Cel*`): `file` = the cel file (the `celfile` path of the
-   context's `+0x34` pointer, else `?`), `dir` = context `+0x40`,
+3. Cel ops (`Cel*`): `file` = the cel file: the `celfile` path of the
+   context's `+0x34` pointer; when that pointer is null (unit
+   components), the `compfile` path whose name the context's five tokens
+   compose (`capture.md` §3.6); else `?`. `dir` = context `+0x40`,
    `frame` = context `+0x00`, `tile` = `-`; `x`, `y` = the call's X, Y
    arguments; `w h xoff yoff` = that sprite's row of `sprites.tsv` (§4;
-   `?` when it has none); `mode` = the draw-mode argument (5th argument
-   of `CelDraw`, `blend-modes.md`), `light` = the light argument as hex,
-   `pal` = `0` when the palette argument is null, else `?` (a pointer;
-   which table it is: Open question 2). Ops whose argument list has no
-   such argument write `-` there.
+   `?` when it has none); for `CelDraw` (arguments context, X, Y, light,
+   mode, palette; the cursor vector of `capture.md` §Test vectors)
+   `mode` = the draw-mode argument (`blend-modes.md`), `light` = the
+   light argument as hex, `pal` = `0` when the palette argument is null,
+   else `?` (a pointer; which table it is: Open question 2). The other cel
+   wrappers' argument positions are not specified: `mode light pal` = `?`.
 4. Tile ops: `file` = the DT1 path and `frame` = the tile's index in it
    (`capture.md` §3.5 lookup; `?` until the recorder resolves it, Open
    question 3), `dir` = `-`, `tile` = `orientation.main.sub.rarity` of
@@ -165,7 +169,9 @@ Columns: `file dir frame w h xoff yoff`. One row per distinct (`file`,
 then numbers), no duplicates.
 
 1. `w`, `h`: the decoded cel's width and height; `xoff`, `yoff`: its
-   offsets as 1.14d's cel holds them (`sprite-placement.md` §3, §8): for
+   offsets as 1.14d's cel holds them (1.14d: the `hdr` the recorder read
+   at the rasterizer, `capture.md` §3.5 raw-3; a cel op without one adds
+   no row) (`sprite-placement.md` §3, §8): for
    a bottom-up cel (DCC; DC6 with `flip & 1 = 0`) `yoff` names the
    bottom row, for a top-down DC6 cel the top row.
 2. Two producers' rows for the same key must be equal; the 1.14d file
@@ -285,8 +291,9 @@ Columns derived from what `record_frames.py` 0.2.0 logs (`capture.md`
    the rest meanwhile.
 2. The cel palette argument: which remap table each pointer is
    (recorder: name the PL2 / palshift table by address range).
-3. Tile file and index: `capture.md` Open question 3 (the lookup is
-   specified; the recorder does not do it yet).
-4. The 1.14d cel's width, height and offsets: read from the cel file the
-   context points at (`+0x34`) by the converter, or by a recorder hook
-   on the decode (REC-299).
+3. ~~Tile file and index~~: answered, `frames-raw-3` (`capture.md` §3.5).
+4. ~~The 1.14d cel's width, height and offsets~~: answered (REC-299), the
+   rasterizer hook of `capture.md` §3.5 raw-3; checked against 12 DC6
+   frame headers of the real files (all equal).
+5. Primitive rows' `mode` (`DrawBox`, `DrawBoxAlpha`, `DrawLine`): which
+   argument is the color is not specified; written `?`.

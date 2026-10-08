@@ -80,6 +80,44 @@ record (the script above, with `ms` and the header dropped).
 `convert_rng.py`'s own chain rule, converts with its `draw_data`, and
 compares each trace's `expected` in order. Exit 1 on any difference.
 
+### Step 3 — `frames-raw-3` and `facts_render.py` 0.2.0: works
+
+Merged `origin/claude/local-pc1-facts` (for `facts_render.py`).
+`record_frames.py` 0.3.0 writes `frames-raw-3` (`capture.md` §2, §3.5,
+§3.6, §5):
+
+- **cel header per cel draw**: hook on the common rasterizer `0x006014C0`
+  (its first argument is the cel context; the drawn cel is context
+  `+0x3C`: orientation, w, h, xoff, yoff), attached to the cel op just
+  logged;
+- **unit component paths**: two hooks right after the path `sprintf` in
+  `0x005FE610` (`0x005FE77C` .dcc, `0x005FE7A8` .dc6) emit `compfile`
+  `{name, path}`; a draw's five context tokens compose the name;
+- **DT1 file and tile index** per tile draw, from the loaded-DT1 list
+  `[0x008ADBB4]`;
+- **player direction** (path `+0x64`).
+
+`facts_render.py` was rewritten to the exact `facts-render.md` §1–§4
+columns that `d2-client facts-compare` reads (the PC 1 version wrote its
+own columns, which `facts-compare` refuses).
+
+Live run under Wine (`record_frames.py --auto ScnAma --seed 1234 --every
+25 --draws-every 100`), frame seq 1, 214 draws:
+
+| Measure | Result |
+|---|---|
+| tile draws named by DT1 file + index | 134 of 134 |
+| cel draws with a header | 50 of 53. Without: the empty shield component (`AMSHlitTN1ht`), and the two `Hlthmana` orbs drawn by `CelDrawEx`, which does not reach the rasterizer |
+| `compfile` records | 1,451 |
+| headers against the real files (private `extracted/`) | 12 DC6 frames (`800ctrlpnl7` 0/1/4/5, `overlap` 0/1, `minipanelbtn` 0/14, `Skillicon` 2, `level` 0/2, `protate` 0): **all equal** w, h, xoff, yoff |
+| `facts_render.py` | 214 rows, 38 sprite rows; `?` cells: file 8 (font cels of `0xb5730c`, not loaded through `0x004788B0`), w/h/xoff/yoff 11, mode 13, light/pal 12 |
+
+`--selftest` passes for both tools (perturbation of each new source
+field). Spec updates: `capture.md` (status, hooks, §3.5 cel header and DT1
+lookup, §3.6 `compfile`, §5 raw-3, OQ 3 / 4 done), `facts-render.md`
+(inputs, §2 r3 component files and the CelDraw argument order, §4 r1
+source, OQ 3 / 4 answered, OQ 5 primitive colour argument).
+
 ## What the recorders need from Windows, and the Wine plan
 
 Read: `tools/trace-recorder/README.md`, `record_rng.py` (the Win32 base),
