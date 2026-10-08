@@ -71,7 +71,7 @@ fn code() -> Vec<u8> {
 }
 
 /// A skills record with no formulas, states, stats, events or missile.
-fn body_rec() -> Skills {
+pub(super) fn body_rec() -> Skills {
     let mut r = skill_rec();
     r.srvmissile = NONE16;
     r.intown = true;

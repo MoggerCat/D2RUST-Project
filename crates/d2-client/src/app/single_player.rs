@@ -1535,6 +1535,9 @@ struct GameParts {
     vendors: VendorTables,
     anim: Option<Arc<AnimData>>,
     vitals: Option<Arc<VitalsTables>>,
+    /// The skill bodies' table data (`ActionHooks::bodies`: pet types,
+    /// state groups); `None`: synthetic.
+    bodies: Option<Arc<d2_sim::skills::use_::bodies::BodyTables>>,
     /// The chest drop's tables; `None`: no drop (synthetic).
     drops: Option<Arc<DropTables>>,
     /// `None`: the mercenary calls report no tables (synthetic).
@@ -1633,6 +1636,7 @@ impl GameParts {
             vendors: VendorTables::default(),
             anim: None,
             vitals: None,
+            bodies: None,
             drops: None,
             hirelings: None,
             inventory: None,
@@ -1657,6 +1661,7 @@ impl GameParts {
             vendors: t.vendor_tables()?,
             anim: Some(Arc::new(t.anim.clone())),
             vitals: Some(Arc::new(t.vitals()?)),
+            bodies: Some(Arc::new(t.body_tables()?)),
             drops: Some(d.drops.clone()),
             hirelings: Some(d.hirelings.clone()),
             inventory: Some(
@@ -1809,6 +1814,7 @@ pub fn build_with_objects(
             .map(Arc::new);
     }
     hooks.vitals = parts.vitals;
+    hooks.bodies = parts.bodies;
     // The client vitals sync (`combat/vitals.md` §5.1): life, mana,
     // stamina and position sent to the client at the end of each tick.
     hooks.enable_vitals_sync();
