@@ -19,10 +19,12 @@ use d2_client::app::palette::{add_act_palettes, ActPalettes};
 use d2_client::app::play::{
     add_client_data, add_game, add_preview, add_walk, predict_link, send_create_game_for,
 };
+use d2_client::app::server_thread::ThreadLink;
 use d2_client::app::single_player::{self, GameData};
 use d2_client::app::ui::{add_original_ui_with, UiParts};
 use d2_client::assets::path::MemorySource;
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
+use d2_client::bridge::local::{LocalLink, PendingSession};
 use d2_client::bridge::predict::Speeds;
 use d2_client::bridge::world::UnitKey;
 use d2_client::bridge::BridgeResource;
@@ -33,8 +35,10 @@ use d2_client::ui::{font_info, Point, PointerButton, UiEvent};
 use d2_client::world_view::tile_assets::TileAssets;
 use d2_client::world_view::unit_assets::UnitLooks;
 use d2_client::world_view::WorldViewUi;
+use d2_server::adapters::ProtoSizes;
 use d2_server::dispatch::Outcome;
 use d2_server::host::Handled;
+use d2_server::host::Host;
 use d2_server::seams::{Clock, ResultCode};
 
 mod app_support;
@@ -228,15 +232,31 @@ impl Run {
     /// The play app over the synthetic game, as `d2-client play --new`
     /// wires it, with a new sorceress; returns once the join ran.
     fn start() -> Self {
+        Self::start_with(|_| {})
+    }
+
+    /// [`Self::start`] with `install` run on the built game before the
+    /// join (fixture tables the synthetic game lacks).
+    fn start_with(install: fn(&mut single_player::Sim)) -> Self {
         let data = GameData::Synthetic;
         let character = single_player::new_character("sorceress", "Smoke").unwrap();
         let ms = Arc::new(AtomicU32::new(1000));
-        let (link, _) = single_player::start_with(
-            data.clone(),
-            single_player::DEFAULT_SEED,
-            character.clone(),
-            StepClock(ms.clone()),
-        )
+        let clock = StepClock(ms.clone());
+        let built = character.clone();
+        let link = ThreadLink::spawn(move || {
+            let mut g = single_player::build_with(
+                &GameData::Synthetic,
+                single_player::DEFAULT_SEED,
+                built,
+            )?;
+            install(&mut g.sim);
+            Ok::<_, single_player::BuildError>(LocalLink::new(Host::new(
+                g.sim,
+                ProtoSizes,
+                PendingSession::default(),
+                clock,
+            )))
+        })
         .unwrap();
         let server = Arc::new(Mutex::new(link));
         let wire = Arc::new(Mutex::new(Wire::default()));
@@ -353,6 +373,31 @@ impl Run {
             });
         }
         self.step(2);
+    }
+
+    /// The town waypoint to Cold Plains: interact, the menu opens, C→S
+    /// 0x49, the server player is there.
+    fn waypoint_to_cold_plains(&mut self) {
+        let wp = {
+            let w = self.app.world().resource::<BridgeResource>().0.world();
+            w.units
+                .iter()
+                .find(|(k, u)| k.unit_type == 2 && u.position.is_some())
+                .map(|(k, _)| *k)
+                .expect("the waypoint in the model")
+        };
+        self.bridge().interact(wp).unwrap();
+        self.until("the waypoint menu", 400, |r| r.ui_open(0x14));
+        self.check("open the waypoint");
+        let mut take = vec![0x49];
+        take.extend_from_slice(&wp.guid.to_le_bytes());
+        take.extend_from_slice(&single_player::COLD_PLAINS.to_le_bytes());
+        self.bridge().send_bytes(&take).unwrap();
+        self.until("Cold Plains", 400, |r| {
+            r.server_level() == Some(single_player::COLD_PLAINS)
+        });
+        self.step(30);
+        self.check("waypoint to Cold Plains");
     }
 
     fn ui_open(&self, ui: u8) -> bool {
@@ -506,27 +551,8 @@ fn the_scripted_play_run() {
         run.check("end the trade");
     }
 
-    // 3. The waypoint: interact, the menu opens, take Cold Plains.
-    let wp = run.find(2, 119).or_else(|| {
-        let w = run.app.world().resource::<BridgeResource>().0.world();
-        w.units
-            .iter()
-            .find(|(k, u)| k.unit_type == 2 && u.position.is_some())
-            .map(|(k, _)| *k)
-    });
-    let wp = wp.expect("the waypoint in the model");
-    run.bridge().interact(wp).unwrap();
-    run.until("the waypoint menu", 400, |r| r.ui_open(0x14));
-    run.check("open the waypoint");
-    let mut take = vec![0x49];
-    take.extend_from_slice(&wp.guid.to_le_bytes());
-    take.extend_from_slice(&single_player::COLD_PLAINS.to_le_bytes());
-    run.bridge().send_bytes(&take).unwrap();
-    run.until("Cold Plains", 400, |r| {
-        r.server_level() == Some(single_player::COLD_PLAINS)
-    });
-    run.step(30);
-    run.check("waypoint to Cold Plains");
+    // 3. The waypoint to Cold Plains.
+    run.waypoint_to_cold_plains();
     let units: Vec<(u8, u32)> = run
         .app
         .world()
@@ -538,4 +564,198 @@ fn the_scripted_play_run() {
         .map(|(k, u)| (k.unit_type, u.class))
         .collect();
     eprintln!("units in the field: {units:?}");
+}
+
+/// The combat tables of the field leg, on the server before the join (the
+/// synthetic game has none; as `app_play_monster_ai.rs` and
+/// `d2_sim::bench_fixtures::combat`): Attack (skill 0, do function 1),
+/// monster class 0 (killable, 100 experience), the vitals tables (level 2
+/// at 100 experience, 5 stat points a level), the stat table, and the
+/// AnimData records of the sorceress' A1 and the monster's death.
+fn install_combat(sim: &mut single_player::Sim) {
+    use d2_formats::animdata::{self, AnimRecord};
+    use d2_sim::bench_fixtures::combat as fx;
+    let s = &mut sim.events.action.sys;
+    s.stats = d2_sim::stats::StatLists::new(d2_sim::bench_fixtures::stat_data());
+    let mut skills = fx::skills();
+    let mut attack = fx::skill_rec();
+    attack.srvdofunc = 1;
+    attack.anim = 7;
+    attack.range = 1;
+    skills.skills[0] = attack;
+    skills.skills.truncate(1);
+    let combat = fx::combat_tables();
+    s.hooks.tables = Arc::new(d2_sim::wiring::action::ActionTables {
+        missiles: vec![fx::arrow()],
+        skills,
+        combat,
+        levels: vec![fx_blank(); 150],
+        skill_modes: vec![[0; 8]],
+    });
+    let mut a = fx::anim_data();
+    for (name, event) in [(b"SOA1HTH\0", Some(2usize)), (b"M0DTHTH\0", None)] {
+        let mut events = [0u8; animdata::EVENTS];
+        if let Some(i) = event {
+            events[i] = 1;
+        }
+        let len = name.iter().position(|&b| b == 0).unwrap();
+        a.buckets[animdata::hash(&name[..len])].push(AnimRecord {
+            name: *name,
+            frames: 6,
+            speed: 256,
+            events,
+        });
+    }
+    s.hooks.anim_data = Some(Arc::new(a));
+    s.hooks.vitals = Some(Arc::new(fx::vitals()));
+    // The server's animation names follow the client art's rules
+    // (`app/anim_names.rs`): the sorceress `SO`, monster class 0 `M0`.
+    let player_modes = [
+        "DT", "NU", "WL", "RN", "GH", "TN", "TW", "A1", "A2", "BL", "SC", "TH", "KK", "S1", "S2",
+        "S3", "S4", "DD", "SQ",
+    ];
+    let monster_modes = [
+        "DT", "NU", "WL", "GH", "A1", "A2", "BL", "SC", "S1", "S2", "S3", "S4", "DD", "KB", "SQ",
+        "RN",
+    ];
+    s.hooks.x.looks = Some(Arc::new(UnitLooks {
+        player_tokens: vec![code(b"SO"); 7],
+        player_modes: player_modes.iter().map(|m| code(m.as_bytes())).collect(),
+        monster_modes: monster_modes.iter().map(|m| code(m.as_bytes())).collect(),
+        monsters: [(
+            0,
+            d2_client::world_view::unit_assets::MonsterRow {
+                token: code(b"M0"),
+                base_w: None,
+                composite_death: false,
+            },
+        )]
+        .into(),
+        ..UnitLooks::default()
+    }));
+    s.data = d2_sim::units::hooks::UnitData {
+        monsters: vec![d2_sim::units::hooks::MonsterInfo {
+            enabled: true,
+            aidel: [15, 15, 15],
+            moves: 0,
+        }],
+        ..Default::default()
+    };
+}
+
+fn fx_blank<T: d2_data::tables::Record>() -> T {
+    T::decode(&vec![0u8; T::SIZE])
+}
+
+/// The field leg: out of town by the waypoint, a monster two sub-tiles
+/// away, the left skill (Attack) on it kills it (C→S 0x06), the kill's
+/// experience levels the player up, and a stat point is spent (C→S 0x3A).
+#[test]
+#[ignore = "follow-up F3 in docs/handoff/q-play-smoke.md: C→S 0x06 is accepted but the attack never starts on the play host"]
+fn the_field_leg_kills_levels_up_and_spends_a_point() {
+    use d2_sim::stats::stat;
+    let mut run = Run::start_with(install_combat);
+    run.check("join with the combat tables");
+    // The client's monster row for class 0 (a class without a row is
+    // ignored, `client/msg-units.md` §1.2 r2).
+    {
+        use d2_client::bridge::world::{MonsterClass, MonsterSetup};
+        let mut rows = single_player::synthetic_unit_rows();
+        rows.monsters[0] = Some(MonsterClass {
+            setup: Some(MonsterSetup {
+                is_att: true,
+                is_sel: true,
+                ..MonsterSetup::default()
+            }),
+            ..MonsterClass::default()
+        });
+        run.bridge().set_unit_rows(rows);
+    }
+    {
+        let w = run.app.world().resource::<BridgeResource>().0.world();
+        let skills = w.local().and_then(|p| p.skills.as_ref());
+        eprintln!("skills: {skills:?}");
+    }
+    run.waypoint_to_cold_plains();
+    let (p, m, guid) = app_support::with(&run.server, |l| {
+        use d2_sim::missiles::unit_flag as flags;
+        use d2_sim::units::lifecycle::AllocRequest;
+        use d2_sim::units::UnitType;
+        let sim = &mut l.host_mut().game;
+        let (p, _) = single_player::local_player(sim).expect("joined");
+        let a = &mut sim.events.action;
+        let (px, py) = a.sys.hooks.path_position(p);
+        let room = sim.game.lists.unit(p).and_then(|e| e.room());
+        let req = AllocRequest {
+            ty: UnitType::Monster,
+            class: 0,
+            room,
+            add: true,
+            fixed_guid: None,
+            mode: 1,
+            allied: false,
+        };
+        let m = a
+            .with(&mut sim.game, |g, v| v.allocate(g, &req, px + 2, py))
+            .expect("monster");
+        a.with(&mut sim.game, |_, v| {
+            v.set_base(p, 19, 1000);
+            v.set_base(p, 21, 2560);
+            v.set_base(p, 22, 2560);
+            v.set_base(m, stat::LEVEL, 1);
+            v.set_base(m, 13, 100);
+            v.set_base(m, stat::MAXHP, 256);
+            v.set_base(m, stat::HITPOINTS, 256);
+        });
+        a.sys.units.get_mut(m).unwrap().flags |= flags::IS_VALID_TARGET | flags::CAN_BE_ATTACKED;
+        (p, m, sim.game.lists.unit(m).unwrap().guid)
+    });
+    run.step(10);
+    run.check("a monster in the field");
+    let mut attack = vec![0x06, 1, 0, 0, 0];
+    attack.extend_from_slice(&guid.to_le_bytes());
+    run.bridge().send_bytes(&attack).unwrap();
+    let life = move |r: &mut Run| {
+        app_support::with(&r.server, move |l| {
+            let sim = &mut l.host_mut().game;
+            let a = &mut sim.events.action;
+            a.with(&mut sim.game, |_, v| v.stat(m, stat::HITPOINTS))
+        })
+    };
+    for _ in 0..60 {
+        if life(&mut run) <= 0 {
+            break;
+        }
+        run.step(1);
+    }
+    let (log, errors) = app_support::with(&run.server, |l| {
+        let h = l.host_mut().game.events.action.hooks();
+        (h.x.skills.log.clone(), format!("{:?}", h.errors))
+    });
+    let list = app_support::with(&run.server, move |l| {
+        let h = l.host_mut().game.events.action.hooks();
+        let lst = format!("{:?}", h.skill_lists.get(&p));
+        let xlog = format!("{:?}", h.x.log.iter().rev().take(8).collect::<Vec<_>>());
+        let mode = l.host().game.events.action.sys.units.get(p).map(|u| u.mode);
+        format!("{lst} mode {mode:?} xlog {xlog}")
+    });
+    let refused = format!("{:?}", run.wire.lock().unwrap().refused);
+    assert!(
+        life(&mut run) <= 0,
+        "the monster died: {log:?} {errors} list {list} refused {refused}"
+    );
+    run.step(20);
+    run.check("kill");
+    let level = |r: &mut Run, s: u16| {
+        app_support::with(&r.server, move |l| {
+            l.host().game.events.action.sys.stats.unit_base(p, s, 0)
+        })
+    };
+    assert_eq!(level(&mut run, stat::LEVEL), 2, "level up on the kill");
+    let points = level(&mut run, 4);
+    assert_eq!(points, 5, "stat points");
+    run.bridge().send_bytes(&[0x3A, 0, 0]).unwrap();
+    run.step(4);
+    run.check("spend a stat point");
+    assert_eq!(level(&mut run, 4), 4);
 }
