@@ -79,6 +79,15 @@ game_assets.rs`.
 
 ## Batch 1: tables and formats (fast)
 
+Batches 1 and 2 (except 1.7, 1.9, 1.10, 1.13, 2.17, 2.18) now run in the
+cloud: `sh tools/realdata-gate.sh` (`docs/handoff/q-realdata-gate.md`).
+First run 2026-10-08 (`docs/handoff/q-realdata-run.md`): every tool check
+passes; 213 of 224 runnable ignored tests pass. The open failures are
+2.7 / 2.8 / 2.13 (Cold Plains rooms: `outdoor_levels_generate_through_the_dispatcher`
+and all 7 `game_wired_host` classes), the 0x23 fatal, the horadric
+offsets and the controls-table order; 1.5's two sweep failures, 2.4's
+`lvlprest_measurements`, 2.5's item sweep and C99's `ktr` are fixed.
+
 Run in this order. Release builds of the three tools; no Bevy.
 
 | # | Command | Expect | Record |
