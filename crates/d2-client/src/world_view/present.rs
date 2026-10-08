@@ -644,8 +644,9 @@ fn world_view_frame(
                     crate::app::save::request_save_and_exit(&mut exit);
                 }
                 // Configure Controls over the game (`ui::controls_host`).
+                let expansion = original.expansion_installed();
                 original.service_controls(
-                    false,
+                    expansion,
                     crate::ui::front_end::screens::controls::config_path(),
                 );
                 if let Some(b) = original.take_accepted_bindings() {
