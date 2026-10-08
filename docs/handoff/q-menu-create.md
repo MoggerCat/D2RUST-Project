@@ -1,6 +1,6 @@
 # q-menu-create: character create screen
 
-Branch `claude/q-menu-create`. File `ui/front_end/screens/create.rs` (+ `tests/front_end_create.rs`). Spec `ui/frontend-menus.md` §F3.1–F3.8. Open points: REC-181 (HANDOFF §7).
+Branch `claude/q-menu-create`. File `ui/front_end/screens/create.rs` (+ `tests/front_end_create.rs`). Spec `ui/frontend-menus.md` §F3.1–F3.8. Open points: REC-231 (HANDOFF §7).
 
 ## Links connected
 
@@ -18,7 +18,7 @@ Branch `claude/q-menu-create`. File `ui/front_end/screens/create.rs` (+ `tests/f
 
 Test: `cargo nextest run -p d2-client --test front_end_create`.
 
-## PROVISIONAL (REC-181)
+## PROVISIONAL (REC-231)
 
 - A click on an idle hero counts as hovered (screens get no pointer-move yet).
 - Hero hit box is the 88×184 descriptor, not the DC6 frame-0 box (§F3.3 r5; needs real art).

@@ -10,7 +10,7 @@
 //! save (§F3.6 r3) is the host's job, as the screen sees no file system.
 //!
 //! Preview fills are `// d2rs-own, unverified`; open points are PROVISIONAL
-//! under REC-181.
+//! under REC-231.
 
 use std::cell::RefCell;
 use std::path::Path;
@@ -260,7 +260,7 @@ impl HeroAnim {
 }
 
 /// Whether `c` may be typed into the name box (§F3.4 r1–r2). `text` is the
-/// current text; the caret is at its end (PROVISIONAL, REC-181).
+/// current text; the caret is at its end (PROVISIONAL, REC-231).
 pub fn accepts_char(text: &str, c: char) -> bool {
     if text.chars().count() >= NAME_MAX {
         return false;
@@ -304,7 +304,7 @@ pub struct NewCharacter {
 }
 
 /// Why OK did not finish.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum OkResult {
     /// OK disabled (no class or invalid name): the click is ignored.
     Disabled,
@@ -384,7 +384,7 @@ impl CreateState {
         let Some(i) = self.heroes.iter().position(|h| h.class == class) else {
             return false;
         };
-        // PROVISIONAL (REC-181): the front end gets no pointer-move, but a
+        // PROVISIONAL (REC-231): the front end gets no pointer-move, but a
         // click lands where the pointer is, so an idle hero counts as hovered.
         let s = if self.heroes[i].state == IDLE {
             HOVER
