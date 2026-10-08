@@ -77,7 +77,7 @@ mod tests {
         }
     }
 
-    // Covers: specs/render/shading.md §6 r1 (provisional REC-245)
+    // Covers: specs/render/shading.md §6 r1
     #[test]
     fn the_highest_priority_state_gives_the_palette_index() {
         let t = tints();
@@ -91,7 +91,7 @@ mod tests {
         assert_eq!(t.palette_index(&BTreeSet::from([99])), 0);
     }
 
-    // Covers: specs/render/shading.md §6 r1 (provisional REC-245)
+    // Covers: specs/render/shading.md §6 r1
     #[test]
     fn a_tint_is_remap_map_shift_minus_one() {
         use crate::scene::MapTable;
@@ -108,7 +108,7 @@ mod tests {
         assert_eq!(t.remap(&BTreeSet::from([4]), Some(&tables)), None);
     }
 
-    // Covers: specs/render/shading.md §6 r1 (provisional REC-245)
+    // Covers: specs/render/shading.md §6 r1
     #[test]
     fn a_tinted_state_changes_the_units_palette_shift_in_the_draw_list() {
         use crate::bridge::world::{UnitKey, MONSTER};

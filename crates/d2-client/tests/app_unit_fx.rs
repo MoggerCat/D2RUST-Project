@@ -87,7 +87,7 @@ fn texts(app: &App) -> Vec<String> {
         .collect()
 }
 
-// Covers: specs/ui/messages.md §2 r1, §2 r4, §3 (type 4); specs/client/msg-ui.md §4 r3
+// Covers: specs/ui/messages.md §2 r1, §2 r4; specs/client/msg-ui.md §4 r3
 #[test]
 fn a_system_chat_line_shows_in_the_message_list() {
     let mut app = app(vec![vec![chat26(4, 0, 0, 1, "You cannot do that")]]);
@@ -95,7 +95,7 @@ fn a_system_chat_line_shows_in_the_message_list() {
     assert_eq!(texts(&app), vec!["You cannot do that".to_string()]);
 }
 
-// Covers: specs/client/msg-ui.md §4 r4 (type 5 needs the unit present)
+// Covers: specs/client/msg-ui.md §4 r4
 #[test]
 fn an_overhead_message_on_an_absent_unit_shows_nothing() {
     let mut app = app(vec![vec![chat26(5, 1, 77, 0, "hi")]]);

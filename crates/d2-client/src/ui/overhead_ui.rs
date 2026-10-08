@@ -290,7 +290,7 @@ mod tests {
         assert!(texts(&root, &w, past + 2).is_empty());
     }
 
-    // Covers: specs/ui/messages.md §5 r3 (monsters and objects: the string id)
+    // Covers: specs/ui/messages.md §5 r3
     #[test]
     fn a_monster_overhead_record_shows_its_string() {
         let (mut ui, root, w) = setup();
@@ -306,7 +306,7 @@ mod tests {
         assert!(hello.1 > mine.1);
     }
 
-    // Covers: specs/client/msg-ui.md §21 (0x76 overhead clear)
+    // Covers: specs/client/msg-ui.md §21
     #[test]
     fn the_overhead_clear_removes_the_bubble() {
         let (mut ui, root, w) = setup();
