@@ -167,7 +167,7 @@ fn threshold_vectors() {
     assert_eq!(threshold(i32::MAX, 2), i32::MAX.wrapping_mul(12));
 }
 
-// Covers: specs/world/hirelings.md §1.1 r1, §1.1 r3, §1.1 r6
+// Covers: specs/world/hirelings.md §1.1 r1, §1.1 r3
 #[test]
 fn from_table_reads_the_row_columns() {
     use d2_data::bin::BinTable;
