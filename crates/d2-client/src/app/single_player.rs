@@ -139,7 +139,7 @@ use super::rest::AppRest;
 use super::server_thread::{ThreadLink, ThreadStopped};
 use super::skill_rest::SkillStore;
 use super::{
-    synthetic_act2, synthetic_act4, synthetic_burial, synthetic_chains, synthetic_maze,
+    synthetic_act2, synthetic_act4, synthetic_act5, synthetic_burial, synthetic_chains, synthetic_maze,
     synthetic_tower,
 };
 use crate::bridge::drlg::DrlgSource;
@@ -231,7 +231,34 @@ pub const ACT2_WAYPOINT_XY: (i32, i32) = (20, 30);
 /// The Harrogath waypoint (sub-tiles from its room's origin).
 pub const ACT5_WAYPOINT_XY: (i32, i32) = (20, 30);
 /// The Harrogath waypoint's index (`levels` `Waypoint`).
-const ACT5_WAYPOINT: u8 = 35;
+const ACT5_WAYPOINT: u8 = 30;
+/// Kurast Docks's waypoint object (sub-tiles from its room's origin).
+/// d2rs-own, unverified (q-act3-act5-gaps, REC-246).
+pub const ACT3_WAYPOINT_XY: (i32, i32) = (20, 30);
+/// The Act III and Act V waypoint levels of the synthetic chains
+/// ([`synthetic_chains`]) with their `levels` `Waypoint` indexes
+/// (`world/waypoints.tsv`; Kurast Docks 18 .. Durance of Hate Level 2 26,
+/// Harrogath 30 .. the Worldstone Keep Level 2 38, those the chains have).
+/// d2rs-own, unverified (q-act3-act5-gaps, REC-246).
+pub const CHAIN_WAYPOINTS: [(u32, u8); 17] = [
+    (75, 18),
+    (76, 19),
+    (77, 20),
+    (78, 21),
+    (79, 22),
+    (80, 23),
+    (81, 24),
+    (83, 25),
+    (101, 26),
+    (109, 30),
+    (111, 31),
+    (112, 32),
+    (113, 33),
+    (115, 34),
+    (117, 36),
+    (118, 37),
+    (129, 38),
+];
 
 /// Every NPC class of the synthetic game: the Rogue Encampment's Akara,
 /// Kashya and Warriv, Lut Gholein's and Harrogath's.
@@ -554,6 +581,9 @@ pub struct LocalSeams {
     /// The lair warp check's answer, published once per tick by the quest
     /// control (`Pending::set_lair_open`, q-a2-duriel).
     pub lair_open: bool,
+    /// The Arreat Summit warp check's answer (`Pending::set_summit_open`,
+    /// q-act3-act5-gaps); the exits stay closed while it is `true`.
+    pub summit_closed: bool,
     /// The players' hands and the facts of the items in them
     /// ([`super::weapons`], q-amazon).
     pub weapons: super::weapons::Weapons,
@@ -707,8 +737,18 @@ impl Pending for LocalSeams {
     /// Lair has a way in from every tomb).
     fn warp_quest_gate(&self, source: u32, level: u32) -> u32 {
         u32::from(
-            level == synthetic_act2::DURIELS_LAIR && !(self.lair_open && source == self.staff_tomb),
+            (level == synthetic_act2::DURIELS_LAIR
+                && !(self.lair_open && source == self.staff_tomb))
+                // `0x0058D090` (`quests-act5-2.md` §7.8): leaving the
+                // summit for 118 or 128 waits for the Ancients (d2rs-own,
+                // unverified, REC-246: the made-up chain has both exits).
+                || (source == super::synthetic_act5::SUMMIT
+                    && matches!(level, 118 | 128)
+                    && self.summit_closed),
         )
+    }
+    fn set_summit_open(&mut self, open: bool) {
+        self.summit_closed = !open;
     }
     fn set_lair_open(&mut self, open: bool) {
         self.lair_open = open;
@@ -1074,6 +1114,17 @@ impl LevelTypes for Types {
             id if synthetic_chains::links(id).is_some() => {
                 let (back, on) = synthetic_chains::links(id).unwrap_or((None, None));
                 let mut v = Vec::new();
+                // The Arreat Summit's quest objects (q-act3-act5-gaps).
+                if id == synthetic_act5::SUMMIT {
+                    v.extend(synthetic_act5::PRESET_OBJECTS.iter().map(|&(class, xy)| {
+                        PresetUnit {
+                            unit_type: d2_sim::wiring::action::warp_tile::HOST_OBJECT_PRESET,
+                            class,
+                            x: xy.0,
+                            y: xy.1,
+                        }
+                    }));
+                }
                 v.extend(back.map(|c| tile(c, synthetic_chains::BACK_XY)));
                 v.extend(on.map(|c| tile(c, synthetic_chains::ON_XY)));
                 v
@@ -1179,6 +1230,9 @@ impl WaypointTables {
         levels[ACT2_TOWN as usize].waypoint = 9;
         levels[synthetic_act4::FORTRESS as usize].waypoint = 27;
         levels[ACT5_TOWN as usize].waypoint = ACT5_WAYPOINT;
+        for (level, wp) in CHAIN_WAYPOINTS {
+            levels[level as usize].waypoint = wp;
+        }
         let mut o: Objects = blank();
         o.operatefn = 23;
         o.initfn = 17;
@@ -1233,6 +1287,21 @@ impl WaypointTables {
             blank(),
         );
         for &(class, operate, init) in &synthetic_act4::OBJECT_ROWS {
+            let row = &mut objects[class as usize];
+            row.operatefn = operate;
+            row.initfn = init;
+            row.framecnt1 = 20 << 8;
+        }
+        // The Act V quest objects (q-act3-act5-gaps), by class.
+        let last = super::synthetic_act5::OBJECT_ROWS
+            .iter()
+            .map(|r| r.0)
+            .max();
+        objects.resize(
+            last.map_or(0, |c| c as usize + 1).max(objects.len()),
+            blank(),
+        );
+        for &(class, operate, init) in &super::synthetic_act5::OBJECT_ROWS {
             let row = &mut objects[class as usize];
             row.operatefn = operate;
             row.initfn = init;
@@ -2728,6 +2797,27 @@ pub fn build_with_town(
         sim.action
             .with(&mut game, |g, v| v.allocate(g, &req, ox6 + wx, oy6 + wy))
             .ok_or_else(|| BuildError::Setup("allocating the Act IV waypoint failed".into()))?;
+    }
+    // Kurast Docks's waypoint (rooms[6], d2rs-own, unverified,
+    // q-act3-act5-gaps, REC-246).
+    if matches!(data, GameData::Synthetic) {
+        if let Some(&(room3, rect3)) = rooms.get(6) {
+            let req = AllocRequest {
+                ty: UnitType::Object,
+                class: wp_tables.object_class,
+                room: Some(room3),
+                add: true,
+                fixed_guid: None,
+                mode: 1,
+                allied: false,
+            };
+            let (wx, wy) = ACT3_WAYPOINT_XY;
+            sim.action
+                .with(&mut game, |g, v| {
+                    v.allocate(g, &req, rect3.x * 5 + wx, rect3.y * 5 + wy)
+                })
+                .ok_or_else(|| BuildError::Setup("allocating the Act III waypoint failed".into()))?;
+        }
     }
     let interact_classes: Vec<u16> = parts
         .monstats

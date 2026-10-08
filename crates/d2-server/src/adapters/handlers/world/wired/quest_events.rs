@@ -51,6 +51,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
         let frame = game.frame;
         let mut seen = std::mem::take(&mut self.quest_levels.0);
         let mut lair = None;
+        let mut summit = None;
         seen = self.desk(game, events, |desk, ctl, inv| {
             let ((), _) = quest_call(desk, ctl, inv, |q, w| {
                 for e in &queued {
@@ -139,11 +140,15 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                     q.update(w);
                 }
                 lair = act2::q6::lair_warp_open(q);
+                summit = Some(act5::q5::summit_warp_open(q));
             });
             seen
         });
         if let Some(open) = lair {
             events.action().sys.hooks.x.set_lair_open(open);
+        }
+        if let Some(open) = summit {
+            events.action().sys.hooks.x.set_summit_open(open);
         }
         self.quest_levels.0 = seen;
     }
