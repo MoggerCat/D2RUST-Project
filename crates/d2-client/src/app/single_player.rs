@@ -2355,7 +2355,8 @@ impl GameParts {
             inventory: Some(super::synthetic_items::inv_tables(
                 &super::synthetic_items::item_tables(),
             )),
-            cube: None,
+            // No recipe; the stash and cube buttons need the parts (REC-281).
+            cube: Some(super::synthetic_items::cube_data()),
         })
     }
 

@@ -61,6 +61,7 @@ fn rows() -> Vec<([u8; 4], u16, (u8, u8))> {
         (smoke::PORTAL, ty::SCRO, (1, 1)),
         (smoke::CHARM, ty::CHAR, (1, 1)),
         (smoke::GOLD, ty::GOLD, (1, 1)),
+        (smoke::CUBE, ty::MISC, (2, 2)),
     ]);
     v
 }
@@ -79,6 +80,8 @@ pub mod smoke {
     pub const PORTAL: [u8; 4] = *b"tsc ";
     pub const CHARM: [u8; 4] = *b"cm1 ";
     pub const GOLD: [u8; 4] = *b"gld ";
+    /// The Horadric Cube (opened by its use, `cube.md` §2).
+    pub const CUBE: [u8; 4] = *b"box ";
     /// The healing potion's type (a beltable type; d2rs-own index).
     pub const HPOT: u16 = 76;
     /// The axe's strength requirement (above a new sorceress's 10).
@@ -275,7 +278,11 @@ pub fn inv_tables(t: &ItemTables) -> InvTables {
                 };
                 match r.code {
                     smoke::AXE => i.reqstr = smoke::AXE_STR,
-                    smoke::POTION | smoke::IDENTIFY | smoke::PORTAL => i.useable = 1,
+                    smoke::POTION => {
+                        i.useable = 1;
+                        i.autobelt = 1;
+                    }
+                    smoke::IDENTIFY | smoke::PORTAL | smoke::CUBE => i.useable = 1,
                     _ => {}
                 }
                 i
@@ -357,7 +364,12 @@ pub fn drop_tables() -> DropTables {
             q3::STANDARD_GEMS[0],
         ],
     );
-    let monster_tc = fixed(b"smoke", &[smoke::SWORD, smoke::CAP, smoke::GOLD]);
+    // (A chest drops at most 6 items, `treasure.md` §4: the cube is the
+    // monster's.)
+    let monster_tc = fixed(
+        b"smoke",
+        &[smoke::SWORD, smoke::CAP, smoke::GOLD, smoke::CUBE],
+    );
     DropTables {
         items,
         tcs: TreasureClasses {
@@ -395,5 +407,35 @@ pub fn stat_data() -> StatData {
     StatData {
         stats: StatTable::from_fixed(&t).expect("synthetic itemstatcost"),
         ..StatData::default()
+    }
+}
+
+/// The cube's table data over [`item_tables`] with no recipe (REC-281):
+/// the stash and cube buttons (C→S 0x4F, `vendors-2.md` §10.1) run on
+/// the host's cube parts, so a game without them never closes the stash
+/// or the cube. d2rs-own, unverified.
+pub fn cube_data() -> d2_sim::world::cube::CubeData {
+    let t = item_tables();
+    d2_sim::world::cube::CubeData {
+        recipes: Vec::new(),
+        items: t
+            .items
+            .iter()
+            .map(|r| d2_sim::world::cube::ItemRecord {
+                code: r.code,
+                normcode: r.normcode,
+                ubercode: r.ubercode,
+                ultracode: r.ultracode,
+                version: r.version,
+                level: r.level,
+                quest: r.quest,
+                questdiffcheck: r.questdiffcheck,
+                stackable: r.stackable,
+                spawnable: r.spawnable,
+                maxstack: r.maxstack,
+            })
+            .collect(),
+        valshift: t.valshift.clone(),
+        max_level: 99,
     }
 }
