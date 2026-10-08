@@ -49,6 +49,7 @@ rules are `docs/handoff/build-loop.md`, the task rows are
 ## REC ids
 
 Batch launched 2026-10-08 (third coordinator, session_01QeN5r8PoLZsUhwAH2iDzLJ): q-menu-options REC-187, q-item-bonus-wire REC-188, q-fe-draw REC-189, q-fe-host-screens REC-231, q-skill-leap-talon REC-232, q-assassin-gaps REC-233, q-a2-tyrael-door REC-234, q-a4-quest-items REC-235; q-fe-start-flow REC-236 (launch after q-fe-host-screens merges). Next free after these: REC-237.
+Running sessions (Sonnet): q-menu-options session_016djAfuUo6mksJrag4BJS9X, q-item-bonus-wire session_01Fx8FphWjp7gR1w8YSpkv3S, q-fe-draw session_01R7uxXBkqs66q9wvmMypqKu, q-fe-host-screens session_011WjT1AwSGKecTSHgHkSp4v, q-skill-leap-talon session_01LTwd6Jb8ouRzvhjhS8UXJQ, q-assassin-gaps session_01KsJbGT9bjKX5fd7bPkNRpz, q-a2-tyrael-door session_019yV6ZFtRM5GpghZ56UFrXN, q-a4-quest-items session_01ECXzfSJs7BMjsYtJbQDT6b. They report to session_01QeN5r8PoLZsUhwAH2iDzLJ (build-loop.md); a new coordinator must change that line to its own id.
 
 Staging uses up to REC-186 plus REC-230 (REC-231 was renumbered away everywhere) (q-levels-warps-all); the front-
 end specs use REC-200..213 and REC-220..229. 164, 169 and 171 were
