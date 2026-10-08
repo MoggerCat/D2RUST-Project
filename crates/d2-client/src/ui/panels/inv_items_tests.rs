@@ -474,3 +474,78 @@ fn the_hovered_item_is_the_grid_or_equipped_item_under_the_mouse() {
         .hover_lines(&w, &files, &Screen::R640, Some(0), in_cell(0, 0))
         .is_empty());
 }
+
+// Covers: specs/world/cube.md §1
+#[test]
+fn a_right_press_on_the_cube_sends_0x20_with_the_player_position() {
+    let (u, files) = ui();
+    let mut w = world(
+        &[
+            (7, mode::STORED, (0, 0, 0, 1), b"box "),
+            (8, mode::STORED, (0, 2, 0, 1), b"hp1 "),
+        ],
+        None,
+    );
+    w.units.get_mut(&PLAYER).unwrap().position = Some((10, 20));
+    let l = layout();
+    // A potion is not opened by a right press.
+    assert!(u.right_press(&w, &files, &l, in_cell(2, 0)).is_empty());
+    let out = u.right_press(&w, &files, &l, in_cell(0, 0));
+    let want = [
+        &[0x20u8][..],
+        &7u32.to_le_bytes(),
+        &10u32.to_le_bytes(),
+        &20u32.to_le_bytes(),
+    ]
+    .concat();
+    assert_eq!(intents(&out), vec![want]);
+    // With a cursor item nothing is used.
+    let mut w = world(
+        &[
+            (7, mode::STORED, (0, 0, 0, 1), b"box "),
+            (9, mode::CURSOR, (0, 0, 0, 0), b"hp1 "),
+        ],
+        Some(9),
+    );
+    w.units.get_mut(&PLAYER).unwrap().position = Some((10, 20));
+    assert!(u.right_press(&w, &files, &l, in_cell(0, 0)).is_empty());
+}
+
+// Covers: specs/ui/panels.md §12 r3
+#[test]
+fn the_cube_grid_draws_page_3_and_sends_the_page_3_intents() {
+    use crate::ui::panels::cube_items::{cube_present, cube_record, fallback_cube_grid};
+    let (u, files) = ui();
+    assert_eq!(cube_record(&Screen::R640), 9);
+    assert_eq!(cube_record(&Screen::R800), 25);
+    let g = fallback_cube_grid(&Screen::R800);
+    assert_eq!(u.cube_grid(&Screen::R800), g);
+    let w = world(
+        &[
+            (6, mode::STORED, (0, 0, 0, 1), b"box "),
+            // The stream's page is the grid page + 1.
+            (7, mode::STORED, (0, 1, 2, 4), b"hp1 "),
+            (8, mode::STORED, (0, 0, 0, 1), b"hp1 "),
+        ],
+        None,
+    );
+    assert!(cube_present(&w));
+    let mut out = Vec::new();
+    u.draw_cube(&w, &files, &g, &mut out);
+    let file = files.id(&item_file_name("invhp1")).unwrap();
+    // Cell (1, 2): (left + 29, top + 58), drawn at top + frame height 29.
+    assert_eq!(images(&out), vec![(file, 0, g.left + 29, g.top + 58 + 29)]);
+    // Lift the cube item (0x19); a page-0 item is not under the cube mouse.
+    let at = Point::new(g.left + 29 + 3, g.top + 58 + 3);
+    assert_eq!(
+        intents(&u.press_cube(&w, &files, &g, at)),
+        vec![vec![0x19, 7, 0, 0, 0]]
+    );
+    // A cursor item onto the empty cell (0, 0): 0x18 with page 3.
+    let w = world(&[(9, mode::CURSOR, (0, 0, 0, 0), b"hp1 ")], Some(9));
+    assert!(!cube_present(&w));
+    let at = Point::new(g.left + 3, g.top + 3);
+    let want = ClientIntent::from_message(&items::insert(9, 0, 0, 3)).0;
+    assert_eq!(intents(&u.press_cube(&w, &files, &g, at)), vec![want]);
+    assert!(u.press_cube(&w, &files, &g, Point::new(5, 5)).is_empty());
+}

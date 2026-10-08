@@ -261,6 +261,13 @@ pub fn to_belt(item: u32, slot: u32) -> ItemToBelt {
     ItemToBelt { item, slot }
 }
 
+/// C→S 0x20 UseGridItem (§7.11): use a stored item at the world point
+/// (x, y) (the player's own subtile position, within range of the
+/// server's check); the cube is opened this way.
+pub fn use_grid(item: u32, x: u32, y: u32) -> d2_proto::client::UseGridItem {
+    d2_proto::client::UseGridItem { item, x, y }
+}
+
 /// C→S 0x26 UseBeltItem (§7.17): use a belt item on the player.
 pub fn use_belt(item: u32) -> UseBeltItem {
     UseBeltItem { item, on_merc: 0 }

@@ -36,6 +36,7 @@
 
 pub mod bits;
 pub mod copy;
+pub mod cube_open;
 pub mod equip_rules;
 pub mod host;
 pub mod identify;

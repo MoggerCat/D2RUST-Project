@@ -150,6 +150,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn use_item_at(&mut self, player: Owner, item: Guid, x: i32, y: i32) -> bool {
         self.rest.use_item_at(player, item, x, y)
     }
+    fn open_cube(&mut self, player: Owner, cube: Guid) -> bool {
+        self.open_cube_desk(player, cube)
+    }
     fn consume_item(&mut self, player: Owner, item: Guid) {
         // PROVISIONAL (REC-113): a used identify scroll leaves the grid.
         if self.item_unit(item).is_some()
