@@ -408,7 +408,10 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             .unwrap_or_else(super::save::default_save_dir),
     );
     let settings = super::config::load_settings(&cfg_dir)?;
-    let bindings = super::config::load_controls(&cfg_dir)?;
+    let bindings = super::config::load_controls(&super::config::controls_dir(
+        crate::ui::front_end::screens::controls::config_path().as_deref(),
+        &cfg_dir,
+    ))?;
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
         primary_window: Some(super::config::window_for(&settings)),
         ..default()
