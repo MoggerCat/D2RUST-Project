@@ -42,7 +42,7 @@
 | Edge cases & original bugs | 758–806 |
 | Test vectors | 807–855 |
 | Provenance | 856–915 |
-| Open questions | 916–1019 |
+| Open questions | 916–1021 |
 <!-- /index -->
 
 ## Summary
@@ -916,7 +916,9 @@ size and fallback pushes at `0x00563B9C` / `0x00563C83`), `0x005628C0`.
 ## Open questions
 
 1. Answered: `items/bitstream.md` (owner; checked on all 144 recorded
-   0x9C / 0x9D streams).
+   0x9C / 0x9D streams). Which client stat lists the stream's stat
+   section fills (base array, list c = −1, runeword list, parked set
+   lists; all on the item): `client/stat-lists.md` §2 rule 1.1.
 2. Order of 0x9C/0x9D relative to other per-player update messages in
    one client pass (life, stats, 0x47/0x48). Settle: R1–R3 packet order.
    PROVISIONAL: 0x9C/0x9D are sent in the order the server produces them within the pass, with no reordering against the life/stats/0x47/0x48 messages (because the spec's rules (§4–§5) emit each message where its owner runs and state no sorting); settled by REC-08.

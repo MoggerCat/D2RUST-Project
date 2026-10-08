@@ -44,15 +44,15 @@
 |   5. Client world model | 175–194 |
 |   6. Dispatch table | 195–246 |
 |   7. Bevy mirror | 247–265 |
-|   8. Frame pacing | 266–286 |
-|   9. Versioning | 287–297 |
-|   10. Client outputs (bridge → UI and audio) | 298–460 |
-| Constants & data dependencies | 461–475 |
-| Randomness | 476–479 |
-| Edge cases & original bugs | 480–488 |
-| Test vectors | 489–519 |
-| Provenance | 520–530 |
-| Open questions | 531–568 |
+|   8. Frame pacing | 266–292 |
+|   9. Versioning | 293–303 |
+|   10. Client outputs (bridge → UI and audio) | 304–466 |
+| Constants & data dependencies | 467–481 |
+| Randomness | 482–485 |
+| Edge cases & original bugs | 486–494 |
+| Test vectors | 495–525 |
+| Provenance | 526–536 |
+| Open questions | 537–574 |
 <!-- /index -->
 
 ## Summary
@@ -283,6 +283,12 @@ receive).
    is returned from `bridge_frame` as an error (Bevy's error handler
    reports it). Unowned ids, discarded bytes and handler rejections are
    recorded, not errors.
+5. Skill fallback (2026-10-08; `client/model.md` §17 rule 4 owns the
+   rule and its 1.14d pass analysis): the last step of `bridge_frame`,
+   run only when the frame's pump ran a tick and `in_game` holds (the
+   1.14d drawn pass, `0x0044F28B`). A paused single-player frame (UI
+   state 9 or 11 open, `0x0044EFE3`–`0x0044F029`) runs no `pump` and no
+   `receive` (so no server tick, no drain) and only the fallback, once.
 
 ### 9. Versioning
 

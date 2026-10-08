@@ -34,24 +34,24 @@
 |   4. Receive and the unit message queue | 207–244 |
 |   5. Client update pass | 245–293 |
 |   6. Position check (`0x004804E0`) | 294–334 |
-|   7. Session messages | 335–493 |
-|   8. Mode requests | 494–578 |
-|   9. Room-in-sight messages | 579–613 |
-|   10. Bit reader | 614–628 |
-|   11. Current act and level (join and later) | 629–674 |
-|   12. Client DRLG and the room of a point | 675–716 |
-|   13. Visibility predicate (`0x004DBF20`) | 717–744 |
-|   14. Pet list and the hireling GUID | 745–784 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 785–851 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 852–886 |
-|   17. Model writes made by 1.14d UI code | 887–1004 |
-|   18. Audio driver inputs and the client object functions | 1005–1035 |
-| Constants & data dependencies | 1036–1048 |
-| Randomness | 1049–1060 |
-| Edge cases & original bugs | 1061–1072 |
-| Test vectors | 1073–1120 |
-| Provenance | 1121–1199 |
-| Open questions | 1200–1304 |
+|   7. Session messages | 335–506 |
+|   8. Mode requests | 507–591 |
+|   9. Room-in-sight messages | 592–626 |
+|   10. Bit reader | 627–641 |
+|   11. Current act and level (join and later) | 642–687 |
+|   12. Client DRLG and the room of a point | 688–729 |
+|   13. Visibility predicate (`0x004DBF20`) | 730–757 |
+|   14. Pet list and the hireling GUID | 758–811 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 812–878 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 879–913 |
+|   17. Model writes made by 1.14d UI code | 914–1060 |
+|   18. Audio driver inputs and the client object functions | 1061–1091 |
+| Constants & data dependencies | 1092–1104 |
+| Randomness | 1105–1116 |
+| Edge cases & original bugs | 1117–1128 |
+| Test vectors | 1129–1176 |
+| Provenance | 1177–1255 |
+| Open questions | 1256–1361 |
 <!-- /index -->
 
 ## Summary
@@ -435,11 +435,24 @@ position check of the local player.
    d2rs: the app builds these bytes from its own state: name empty, type
    3, the character's class and name, template 0, the chosen difficulty,
    u16@0x25 = 0, flags 0x00100004 for an expansion character, @0x2B =
-   @0x2C = 0, the language id. PROVISIONAL: a classic character sends
-   0x00000004 (because the server reads only bit 20 for expansion and
-   bits 1–2 for its check, and the builder's default sets bit 2; the
-   menu writer of C +0x209 is UI code not read here); settled by
-   REC-46. Bytes after a
+   @0x2C = 0, the language id. **Flags u32@0x27** (2026-10-08, static,
+   settles REC-46): the front-end writes C +0x209 before the game
+   starts, at every site the same way: := 4; := 0x804 when the
+   character is hardcore; then |= 0x100000 when the character record's
+   status byte +0x1EF has bit 0x20 (expansion). Sites: `0x004365B0`
+   (three: `0x004366EC`–`0x00436717`, `0x0043678F`–`0x004367BA`,
+   `0x004368B7`–`0x004368E2`; hardcore = status +0x1EF bit 0x04) and
+   `0x00434A00` (two: `0x00434AE3`–`0x00434B0D`, `0x00434D19`–
+   `0x00434D3F`; hardcore = bit 0x04 of its flags argument), both on
+   the launcher's record `[0x007795D4]` (same layout as C: name +0xBD,
+   status +0x1EF, flags +0x209); the third writer `0x004456D0`
+   (`0x0044585F` / `0x00445873`, record `[0x0077BBD8]`) ORs 0x800 for
+   status bit 0x04 and 0x100000 for bit 0x20 the same way. So the
+   builder's default (C +0x209 = 0 → 4 | 0x100000) is not reached from
+   the menus, and u32@0x27 is: classic softcore 0x00000004, classic
+   hardcore 0x00000804, expansion softcore 0x00100004, expansion
+   hardcore 0x00100804 (d2s status bits 0x04 / 0x20,
+   `formats/d2s.md`). REC-46 still confirms on live bytes. Bytes after a
    name's NUL: zero (the original's stack contents are not
    reproducible and no reader uses them).
 10. **0xAF** ConnectionInfo and **0xB0** ConnectionTerminated (system
@@ -769,10 +782,24 @@ player is in", the input of `render/composition.md` §3 step 2
    (`0x00466360`, pet type 7) passes the same pair from the record
    (`0x00478E40`): +0x28 low 16 bits and +0x24; `0x004B1090` hands the
    u16 to `0x00663750` / `0x0044DCC0` (hireling row lookup) and the u32
-   to `0x00463DD0` / `0x006637F0`. PROVISIONAL: +0x1C (100 at
-   creation) has no model reader, UI only (because no client reader was
-   traced); settled by REC-50 (reader scan of +0x1C) and REC-10 (0x81
-   bytes of a hireling).
+   to `0x00463DD0` / `0x006637F0`.
+   **+0x1C is a life percent that stays 100** (2026-10-08, scan of
+   every use of `[0x007BB5BC]`: the 19 functions `0x00478A50`–`0x00479230`).
+   Written only at creation (`0x00478B10`, 100; the update of an
+   existing record there leaves it) and by `0x00479010` (+0x1C := pct,
+   +0x10 := u16; a type-7 pet's stat 6 := max life × pct / 100), which
+   has no caller and no pointer to it in 1.14d `Game.exe` (no `call`
+   in `all.asm`, no little-endian 0x00479010 in the file): dead code.
+   Read only by the getter `0x00479080(pet GUID)` (0 for no record),
+   whose three callers are UI draws, none in the model: `0x004525F0`
+   (a monster's hover life bar on a 0–128 scale, `0x00452644`: a
+   monster with a pet record and a result ≥ 1 draws 100 × 128 / 100
+   = 128, full, instead of stat 6 / max life, unless its unit flag 0x4
+   path `0x00465C60` ≠ 0), `0x0048A990` (`0x0048AA74`) and
+   `0x00493A00` (`0x00493A0A`, a 0x2E-pixel bar); the UI owners of
+   those draws take the value 100. The model stores +0x1C = 100 and
+   never changes it. REC-10 (0x81 bytes of a hireling) still confirms
+   the 0x81 field writes.
 4. **Hireling GUID** (`0x00478F20(player, 7, any = 1)`, the call of
    `msg-units.md` §1.2 rule 2 and §2 rule 2): no player → −1; else the
    first record in list order with type 7 and owner GUID = the player's
@@ -951,11 +978,40 @@ bit 0x2 is the bit of `client/msg-ui.md` §1 r4 and §16).
    unchanged). 1.14d runs it in every frame's UI draw (`0x0044C990` →
    `0x00456EE0` → `0x00499450` at `0x0045709E`, unconditional; →
    `0x00496CF0` at `0x004994C4`). **d2rs:** the bridge runs it as the
-   last step of `bridge_frame` (`client/bridge.md` §8 rule 1). Nothing
+   last step of `bridge_frame` (`client/bridge.md` §8 rule 5). Nothing
    writes `ClientWorld` between that point and the UI draw (§10 r6
-   there), so the draw sees the same model as in 1.14d; frames that
-   1.14d draws more or fewer times than it receives are open question
-   17.
+   there), so the draw sees the same model as in 1.14d.
+   **Runs per loop pass** (2026-10-08, static, answers open question
+   17). `0x0044C990` is called only through the pointer `[0x007A0484]`
+   (set at `0x0044E300` in `0x0044E200`; no other reference in
+   `Game.exe`), from two sites of the loop pass `0x0044EFA0`, at most
+   once per pass. In single player (game type 0 / 1):
+   1. `0x004F6070` ≠ 0 → the pass returns at once: no receive, no
+      draw, no fallback.
+   2. Paused (UI state 9 or 11, `0x00453A90(9)` / `(0xB)`, a local
+      player with a room `0x004646A0`): draw at `0x0044F017` and
+      return, **no receive, no tick, no update**; so the fallback runs
+      once per loop pass while paused.
+   3. Otherwise the receive `0x0044C6E0` runs every pass, and the draw
+      (`0x0044F28B`) only when the skip counter `[0x007A0704]` is 0
+      and `in_game` and `0x004646A0` ≠ 0; the counter is incremented
+      at the end of every in-game pass (drawn or not). It is reset to 0
+      in a pass whose server tick ran with elapsed time e < 2 × 40 ms
+      (`[0x0070EF1C]` = 40); with e ≥ 80 ms it becomes (counter < 2)
+      (so a tick pass directly after a drawn tick pass, counter 1, is
+      skipped); and in any pass with e ≥ 40 ms while now <
+      `[0x007A04BC]` (the 10 s hold after an act load,
+      `ui/frontend-loading.md`; `0x0044F0CA`). So, outside that hold
+      and that lag case, the draw runs exactly in the passes where the
+      server ticked, and a receive in a pass without a tick has no
+      fallback after it (`render/camera.md` §9 states the same draw
+      schedule).
+   **d2rs:** run the fallback in `bridge_frame` only in a frame whose
+   pump ran a tick (the drawn pass), and once per frame while the game
+   is paused (rule 2, with no receive); not in a frame without a tick.
+   The two wall-clock cases of 3 (lag skip, act-load hold) depend on
+   real time, which d2rs's tick-stepped frame does not have; they are
+   not reproduced (equal for every pass that does not lag).
 5. **Town exit** (`0x004B3E10`, UI): called by the local player's
    room-change step `0x00460E70` (from the player update `0x00463390`
    at `0x004636D5`, §5) when the town flag `[0x007A5260]` (`0x0061AB00`
@@ -1247,8 +1303,9 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    DRLG room; check by comparing a monster's client `+0x20` seed after
    0xAC at a non-zero point with the server unit's seed (memory read).
 10. *Answered (2026-10-08)*: the 0x81 writes are §14 rule 3 (+0x24,
-    +0x28, +0x2C and the type-7 unit setup); the reader of +0x1C
-    stays PROVISIONAL there (settled by REC-10, REC-50).
+    +0x28, +0x2C and the type-7 unit setup); +0x1C (2026-10-08,
+    static, settles REC-50): §14 rule 3 (always 100; read by UI draws
+    only).
     Original question: the pet record fields +0x24… written by 0x81 and who
     reads +0x1C: UI (Phase 6); and a recording with a hireling (0x7A /
     0x81 seen) to confirm §14.
@@ -1291,11 +1348,11 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
     (`client/msg-ui.md` open question 10 is answered by
     `client/bridge.md` §10 r10, which covers the model writes; the hand-off
     of the update pass to the UI layer stays open.)
-17. §17 rule 4: whether 1.14d ever runs the in-game UI draw
-    (`0x0044C990` → `0x00456EE0`) a different number of times than
-    the receive per frame (frame skip, minimized window). It matters
-    only when the fallback repeats (a skill-0 entry with level ≤ 0).
-    Settle by reading `0x0044C990`'s callers.
+17. *Answered (2026-10-08)*: §17 rule 4 "Runs per loop pass" (the draw
+    runs in tick passes and in every paused pass, not in other passes;
+    two wall-clock exceptions). Original question: whether 1.14d ever
+    runs the in-game UI draw a different number of times than the
+    receive per frame (frame skip, minimized window).
 18. §7 rule 11.4: how often a 1.14d single-player ping round trip
     (`ping.rtt`) reaches 78 ms, giving the local player's position
     tolerance L = 1 in §6 rule 4 where d2rs uses 0. Settle with a memory
