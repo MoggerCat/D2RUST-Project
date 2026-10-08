@@ -138,7 +138,7 @@ use d2_sim::drlg::preset::{Ds1Input, Ds1Source};
 use super::rest::AppRest;
 use super::server_thread::{ThreadLink, ThreadStopped};
 use super::skill_rest::SkillStore;
-use super::{synthetic_act2, synthetic_burial, synthetic_maze, synthetic_tower};
+use super::{synthetic_act2, synthetic_act4, synthetic_burial, synthetic_maze, synthetic_tower};
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
 use crate::bridge::world::{
@@ -176,6 +176,8 @@ pub const DEN_TO_BLOOD_MOOR: u32 = 12;
 /// middle) and the synthetic walk-out.
 pub const WARP_TILE_XY: i32 = 20;
 pub const ACT2_TOWN: u32 = 40;
+/// Harrogath (act 4, the fifth act; `levels` row 109).
+pub const ACT5_TOWN: u32 = 109;
 /// Catacombs Level 4, Andariel's lair (act 0; a flat level in the
 /// synthetic world, reached by a level warp: d2rs-own, unverified).
 pub const CATACOMBS_4: u32 = 37;
@@ -223,8 +225,13 @@ pub const ACT2_NPC_Y: i32 = 12;
 /// The Act II town waypoint (sub-tiles from its room's origin).
 pub const ACT2_WAYPOINT_XY: (i32, i32) = (20, 30);
 
+/// The Harrogath waypoint (sub-tiles from its room's origin).
+pub const ACT5_WAYPOINT_XY: (i32, i32) = (20, 30);
+/// The Harrogath waypoint's index (`levels` `Waypoint`).
+const ACT5_WAYPOINT: u8 = 35;
+
 /// Every NPC class of the synthetic game: the Rogue Encampment's Akara,
-/// Kashya and Warriv, and Lut Gholein's.
+/// Kashya and Warriv, Lut Gholein's and Harrogath's.
 fn synthetic_npc_classes() -> impl Iterator<Item = u16> {
     [
         d2_sim::world::npc::class::AKARA,
@@ -235,6 +242,8 @@ fn synthetic_npc_classes() -> impl Iterator<Item = u16> {
     ]
     .into_iter()
     .chain(ACT2_NPCS)
+    .chain(synthetic_act4::NPCS)
+    .chain(super::town_npcs::ACT5.iter().map(|&(c, _)| c))
     .chain(super::town_npcs::ACT3.iter().map(|&(c, _)| c))
 }
 /// The player's character class (1, sorceress, as in the server tests).
@@ -537,6 +546,9 @@ pub struct LocalSeams {
     /// The Act II DRLG's staff-tomb level (0 = not yet known), set when
     /// the acts are created (`q-a2-dungeons`).
     pub staff_tomb: u32,
+    /// The players' hands and the facts of the items in them
+    /// ([`super::weapons`], q-amazon).
+    pub weapons: super::weapons::Weapons,
 }
 
 impl LocalSeams {
@@ -603,6 +615,7 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
     if let Ok(mut snap) = hooks.x.snap.lock() {
         snap.units = units;
     }
+    super::skill_rest::sync_shapes(game, sim);
 }
 
 impl Pending for LocalSeams {
@@ -638,9 +651,22 @@ impl Pending for LocalSeams {
                 .quest_events
                 .push(QuestEvent::RadamentActivated { unit }),
             QuestCall::SummonerActivated => self.quest_events.push(QuestEvent::SummonerActivated),
+            // d2rs-own, unverified (REC-148): the Act V AI calls.
+            QuestCall::Shenk => self.quest_events.push(QuestEvent::ShenkActivated { unit }),
+            QuestCall::Nihlathak => self.quest_events.push(QuestEvent::NihlathakActivated),
+            QuestCall::BaalToStairs => self.quest_events.push(QuestEvent::BaalToStairs),
+            QuestCall::AncientsNotActivatable => {
+                self.quest_events.push(QuestEvent::AncientsDisarm);
+                return false;
+            }
             _ => return false,
         }
         true
+    }
+    /// d2rs-own, unverified (REC-148): Anya's AI asks for the temple portal.
+    fn anya_open_portal(&mut self, _: &mut Game, unit: UnitId) {
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::AnyaOpenPortal { unit });
     }
     /// `0x0061AEB0`: the Act II staff tomb, the orifice's level.
     fn object_staff_tomb(&self) -> u32 {
@@ -698,6 +724,26 @@ impl Pending for LocalSeams {
     }
     fn monster_sequence_frame(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
         skill_events::monster_sequence_frame(h, sim, unit);
+    }
+    // d2rs-own, unverified (q-amazon, REC-150): the hand class, the item
+    // shoots / stack facts of the skill bodies ([`super::weapons`]).
+    fn composit_weapon_class(&self, unit: UnitId) -> i32 {
+        self.weapons.hand_class(unit)
+    }
+    fn hand_class(&self, unit: UnitId) -> i32 {
+        self.weapons.hand_class(unit)
+    }
+    fn item_is(&self, item: UnitId, itype: i32) -> bool {
+        self.weapons.item_is(item, itype)
+    }
+    fn item_shoots(&self, item: UnitId) -> bool {
+        self.weapons.facts(item).shoots
+    }
+    fn item_stackable(&self, item: UnitId) -> bool {
+        self.weapons.facts(item).stackable
+    }
+    fn item_max_stack(&self, item: UnitId) -> i32 {
+        self.weapons.facts(item).max_stack
     }
     fn anim_name(&self, _: UnitId, ty: UnitType, class: u32, mode: u32) -> Option<[u8; 8]> {
         super::anim_names::anim_key(self.looks.as_deref()?, ty, class, mode)
@@ -817,6 +863,9 @@ impl WorldPending for LocalSeams {
         if class == synthetic_burial::BLOOD_RAVEN {
             self.monster_quest_chain(unit, synthetic_burial::CHAIN);
         }
+        if class == synthetic_act4::IZUAL {
+            self.monster_quest_chain(unit, synthetic_act4::IZUAL_CHAIN);
+        }
     }
 }
 
@@ -863,6 +912,15 @@ impl LevelTypes for Types {
             if id == synthetic_burial::BURIAL_GROUNDS {
                 drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
             }
+            // The Act IV line (q-a4): slot 0 back, slot 1 on.
+            if let Some((back, on)) = synthetic_act4::links(id) {
+                if back.is_some() {
+                    drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
+                }
+                if on.is_some() {
+                    drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0 << 1;
+                }
+            }
             if id == DEN_OF_EVIL {
                 drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
                 // The stairs down to Cave Level 1 (slot 1, q-act1-dungeons).
@@ -904,6 +962,23 @@ impl LevelTypes for Types {
                 },
                 tile(b::BURIAL_TO_BLOOD_MOOR, b::BACK_XY),
             ],
+            id if synthetic_act4::index(id).is_some() => {
+                use synthetic_act4 as a;
+                let (back, on) = a::links(id).unwrap_or((None, None));
+                let mut v = Vec::new();
+                if id == a::PLAINS_OF_DESPAIR {
+                    // Izual, placed by the host (q-a4).
+                    v.push(PresetUnit {
+                        unit_type: HOST_MONSTER_PRESET,
+                        class: a::IZUAL,
+                        x: a::IZUAL_XY,
+                        y: a::IZUAL_XY,
+                    });
+                }
+                v.extend(back.map(|c| tile(c, a::BACK_XY)));
+                v.extend(on.map(|c| tile(c, a::ON_XY)));
+                v
+            }
             DEN_OF_EVIL => vec![
                 tile(DEN_TO_BLOOD_MOOR, WARP_TILE_XY),
                 tile(synthetic_maze::DEN_TO_CAVE, synthetic_maze::DEN_STAIRS_XY),
@@ -987,12 +1062,22 @@ impl WaypointTables {
         let mut levels = vec![blank::<Levels>(); 150];
         for (i, l) in levels.iter_mut().enumerate() {
             l.waypoint = NO_WAYPOINT;
-            l.act = if i >= 40 { 1 } else { 0 };
+            l.act = if i >= ACT5_TOWN as usize {
+                4
+            } else if i >= synthetic_act4::FORTRESS as usize {
+                3
+            } else if i >= 40 {
+                1
+            } else {
+                0
+            };
         }
         levels[1].waypoint = 0;
         levels[COLD_PLAINS as usize].waypoint = 1;
         levels[STONY_FIELD as usize].waypoint = 2;
         levels[ACT2_TOWN as usize].waypoint = 9;
+        levels[synthetic_act4::FORTRESS as usize].waypoint = 27;
+        levels[ACT5_TOWN as usize].waypoint = ACT5_WAYPOINT;
         let mut o: Objects = blank();
         o.operatefn = 23;
         o.initfn = 17;
@@ -1267,7 +1352,7 @@ struct LevelSource {
     tiles: Box<dyn TileSource>,
     types: Box<dyn LevelTypes>,
     /// (act, init seed, town level id) of each created act.
-    acts: [(u8, u32, u32); 2],
+    acts: Vec<(u8, u32, u32)>,
 }
 
 impl LevelSource {
@@ -1278,7 +1363,7 @@ impl LevelSource {
             data: Arc::new(synthetic_drlg_data()),
             tiles: Box::new(tiles()),
             types: Box::new(synthetic_level_types()),
-            acts: [(0, 1, 0), (1, 2, 0)],
+            acts: vec![(0, 1, 0), (1, 2, 0), (4, 3, 0), (synthetic_act4::ACT, 4, 0)],
         }
     }
 
@@ -1302,7 +1387,12 @@ impl LevelSource {
             data,
             tiles: Box::new(d.files.dt1.clone()),
             types: Box::new(types),
-            acts: [(0, init_seed, 1), (1, init_seed, ACT2_TOWN)],
+            acts: vec![
+                (0, init_seed, 1),
+                (1, init_seed, ACT2_TOWN),
+                (4, init_seed, ACT5_TOWN),
+                (synthetic_act4::ACT, init_seed, synthetic_act4::FORTRESS),
+            ],
         }
     }
 }
@@ -1336,7 +1426,11 @@ fn synthetic_drlg_data() -> DrlgData {
         DEN_OF_EVIL,
         CATACOMBS_4,
         ACT2_TOWN,
-    ] {
+        ACT5_TOWN,
+    ]
+    .into_iter()
+    .chain(synthetic_act4::LEVELS)
+    {
         drlg.levels[id as usize].drlg_type = 2;
         drlg.levels[id as usize].level_type = 1;
     }
@@ -1405,6 +1499,17 @@ fn synthetic_drlg_data() -> DrlgData {
         l[b::BURIAL_GROUNDS as usize].vis[0] = BLOOD_MOOR;
         l[b::BURIAL_GROUNDS as usize].warp[0] = b::BURIAL_TO_BLOOD_MOOR as i32;
     }
+    // The Act IV line (q-a4): level i slot 1 ↔ level i + 1 slot 0.
+    {
+        use synthetic_act4 as a;
+        for i in 0..a::LEVELS.len() - 1 {
+            let (from, to) = (a::LEVELS[i] as usize, a::LEVELS[i + 1] as usize);
+            drlg.levels[from].vis[1] = a::LEVELS[i + 1];
+            drlg.levels[from].warp[1] = a::on(i) as i32;
+            drlg.levels[to].vis[0] = a::LEVELS[i];
+            drlg.levels[to].warp[0] = a::back(i) as i32;
+        }
+    }
     synthetic_act2::add_levels(&mut drlg);
     let mut ids = vec![
         BLOOD_MOOR_TO_DEN,
@@ -1418,6 +1523,7 @@ fn synthetic_drlg_data() -> DrlgData {
         synthetic_burial::BURIAL_TO_BLOOD_MOOR,
     ]);
     ids.extend(synthetic_act2::FIRST_WARP..=synthetic_act2::last_warp());
+    ids.extend(synthetic_act4::first_warp()..=synthetic_act4::last_warp());
     drlg.warps = ids
         .iter()
         .map(|&id| WarpDef {
@@ -1449,6 +1555,19 @@ fn synthetic_types() -> Types {
         (synthetic_tower::BLACK_MARSH, TileRect::new(8, 16, 8, 8)),
         (synthetic_burial::BURIAL_GROUNDS, TileRect::new(0, 24, 8, 8)),
         (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
+        (synthetic_act4::FORTRESS, TileRect::new(0, 0, 8, 8)),
+        (synthetic_act4::OUTER_STEPPES, TileRect::new(8, 0, 8, 8)),
+        (
+            synthetic_act4::PLAINS_OF_DESPAIR,
+            TileRect::new(16, 0, 8, 8),
+        ),
+        (
+            synthetic_act4::CITY_OF_THE_DAMNED,
+            TileRect::new(24, 0, 8, 8),
+        ),
+        (synthetic_act4::RIVER_OF_FLAME, TileRect::new(32, 0, 8, 8)),
+        (synthetic_act4::CHAOS_SANCTUARY, TileRect::new(40, 0, 8, 8)),
+        (ACT5_TOWN, TileRect::new(0, 0, 8, 8)),
     ]))
 }
 
@@ -1782,7 +1901,7 @@ struct GameParts {
 
 /// Rows of the synthetic `monstats` (classes 0 … 399; Akara is the only
 /// NPC).
-const SYNTHETIC_MONSTATS: usize = 400;
+const SYNTHETIC_MONSTATS: usize = 600;
 
 /// d2rs-own, unverified (preview): the synthetic game's `monstats`, all
 /// zero rows with Akara `npc` and `interact` (the town NPC of
@@ -1798,6 +1917,7 @@ fn synthetic_monstats() -> Vec<Monstats> {
     }
     // Blood Raven (REC-130): a killable class, so the kill parse runs.
     v[synthetic_burial::BLOOD_RAVEN as usize].killable = true;
+    v[synthetic_act4::IZUAL as usize].killable = true;
     v
 }
 
@@ -1838,11 +1958,13 @@ fn synthetic_hire_rows() -> Vec<HireRow> {
 /// a row is ignored, `client/msg-units.md` §1.2 r2).
 pub fn synthetic_unit_rows() -> UnitRows {
     let raven = synthetic_burial::BLOOD_RAVEN as usize;
+    let izual = synthetic_act4::IZUAL as usize;
     let top = synthetic_npc_classes()
         .map(usize::from)
         .max()
         .unwrap_or(0)
-        .max(raven);
+        .max(raven)
+        .max(izual);
     let mut monsters = vec![None; top + 1];
     let class_row = |npc| MonsterClass {
         components: [0; 16],
@@ -1858,6 +1980,7 @@ pub fn synthetic_unit_rows() -> UnitRows {
         monsters[usize::from(c)] = Some(class_row(true));
     }
     monsters[raven] = Some(class_row(false));
+    monsters[izual] = Some(class_row(false));
     UnitRows {
         monsters,
         ..UnitRows::default()
@@ -1875,6 +1998,7 @@ impl GameParts {
         let mut action = empty_action_tables();
         // The unit path needs the monster's `monstats` row (the shape).
         action.combat.monstats = synthetic_monstats();
+        action.combat.charstats = synthetic_charstats();
         Ok(GameParts {
             action,
             stats: StatData::default(),
@@ -1951,6 +2075,20 @@ impl GameParts {
             ),
         })
     }
+}
+
+/// d2rs-own, unverified: one `charstats` row per player class with the
+/// walk / run velocities (6 / 9, the speeds of the preview's prediction),
+/// so the synthetic server moves the player (a zero velocity never
+/// does: the NPC approach walks, `docs/handoff/q-npc-approach.md`).
+fn synthetic_charstats() -> Vec<d2_data::tables::Charstats> {
+    use d2_data::tables::Record;
+    let mut raw = vec![0u8; d2_data::tables::Charstats::SIZE];
+    raw[64] = 6;
+    raw[65] = 9;
+    (0..7)
+        .map(|_| d2_data::tables::Charstats::decode(&raw))
+        .collect()
 }
 
 /// Action tables with no rows (the synthetic game reads none).
@@ -2074,7 +2212,7 @@ pub fn build_with_town(
         GameData::Live(d) => (LevelSource::live(d, seed), GameParts::live(d)?),
     };
     let mut dungeon = Dungeon::default();
-    for (act, init_seed, town) in levels.acts {
+    for (act, init_seed, town) in levels.acts.iter().copied() {
         dungeon.acts[usize::from(act)] = Some(
             Drlg::create(
                 act,
@@ -2165,6 +2303,10 @@ pub fn build_with_town(
     // q-a1-tower, d2rs-own, unverified).
     if matches!(data, GameData::Synthetic) {
         start_levels.push((0, synthetic_tower::BLACK_MARSH));
+        // Harrogath's room (rooms[4]; q-a5-town).
+        start_levels.push((4, ACT5_TOWN));
+        // The Pandemonium Fortress's room (rooms[5]; q-a4).
+        start_levels.push((synthetic_act4::ACT, synthetic_act4::FORTRESS));
     }
     for (act, level) in start_levels {
         game.lists
@@ -2314,6 +2456,78 @@ pub fn build_with_town(
             })
             .ok_or_else(|| BuildError::Setup("allocating the Act II waypoint failed".into()))?;
     }
+    // Harrogath: its NPCs and its waypoint (act 4's room, d2rs-own,
+    // unverified, q-a5-town, REC-144).
+    if matches!(data, GameData::Synthetic) {
+        let (room5, rect5) = rooms[4];
+        let (ox5, oy5) = (rect5.x * 5, rect5.y * 5);
+        for &(class, dx) in &super::town_npcs::ACT5 {
+            let req = AllocRequest {
+                ty: UnitType::Monster,
+                class: u32::from(class),
+                room: Some(room5),
+                add: true,
+                fixed_guid: None,
+                mode: 1,
+                allied: true,
+            };
+            sim.action
+                .with(&mut game, |g, v| {
+                    v.allocate(g, &req, ox5 + dx, oy5 + UNIT_Y)
+                })
+                .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
+        }
+        let req = AllocRequest {
+            ty: UnitType::Object,
+            class: wp_tables.object_class,
+            room: Some(room5),
+            add: true,
+            fixed_guid: None,
+            mode: 1,
+            allied: false,
+        };
+        sim.action
+            .with(&mut game, |g, v| {
+                v.allocate(g, &req, ox5 + ACT5_WAYPOINT_XY.0, oy5 + ACT5_WAYPOINT_XY.1)
+            })
+            .ok_or_else(|| BuildError::Setup("allocating the Act V waypoint failed".into()))?;
+    }
+    // Pandemonium Fortress: its NPCs and its waypoint (rooms[5], d2rs-own,
+    // unverified, q-a4, REC-143).
+    if matches!(data, GameData::Synthetic) {
+        let (room6, rect6) = rooms[5];
+        let (ox6, oy6) = (rect6.x * 5, rect6.y * 5);
+        for (i, &class) in synthetic_act4::NPCS.iter().enumerate() {
+            let req = AllocRequest {
+                ty: UnitType::Monster,
+                class: u32::from(class),
+                room: Some(room6),
+                add: true,
+                fixed_guid: None,
+                mode: 1,
+                allied: true,
+            };
+            let x = ox6 + synthetic_act4::NPC_X0 + synthetic_act4::NPC_STEP * i as i32;
+            sim.action
+                .with(&mut game, |g, v| {
+                    v.allocate(g, &req, x, oy6 + synthetic_act4::NPC_Y)
+                })
+                .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
+        }
+        let req = AllocRequest {
+            ty: UnitType::Object,
+            class: wp_tables.object_class,
+            room: Some(room6),
+            add: true,
+            fixed_guid: None,
+            mode: 1,
+            allied: false,
+        };
+        let (wx, wy) = synthetic_act4::WAYPOINT_XY;
+        sim.action
+            .with(&mut game, |g, v| v.allocate(g, &req, ox6 + wx, oy6 + wy))
+            .ok_or_else(|| BuildError::Setup("allocating the Act IV waypoint failed".into()))?;
+    }
     let interact_classes: Vec<u16> = parts
         .monstats
         .iter()
@@ -2357,6 +2571,7 @@ pub fn build_with_town(
     world.cube = parts.cube.map(preview_cube_parts);
     let mut s: Sim = SimGame::with_world(game, sim, world);
     s.set_host_sync(sync_seams);
+    s.set_world_sync(super::weapons::sync);
     // The session sequence (`intents-events.md` §8) runs on the client's
     // C→S 0x67 / 0x6B: game creation (the client record, 0x01, 0x00,
     // 0x02; state 1), then the join (this loader, the player's add

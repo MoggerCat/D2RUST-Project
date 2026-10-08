@@ -47,6 +47,7 @@ pub mod npc_vendors;
 pub mod npc_world;
 pub mod quest_npc;
 pub mod skill_events;
+mod skill_rooms;
 pub mod skill_use;
 pub mod summon;
 pub mod vendor_world;
@@ -115,6 +116,12 @@ pub struct InteractionState {
     pub shown_player: Option<UnitId>,
     /// The class of the NPC the shown items belong to.
     pub shown_class: u16,
+    /// Approach requests (`npc.md` §2 rule 3: C→S 0x13 at distance 7–8)
+    /// the host has not started yet: (player, NPC).
+    pub approaches: Vec<(UnitId, UnitId)>,
+    /// Queued interactions (player data +0x150..+0x15C, `npc.md` §2 rule
+    /// 3.2): (player, NPC GUID), run again when the player's run ends.
+    pub queued: Vec<(UnitId, u32)>,
 }
 
 impl InteractionState {
@@ -136,6 +143,8 @@ impl InteractionState {
             shown: Vec::new(),
             shown_player: None,
             shown_class: 0,
+            approaches: Vec::new(),
+            queued: Vec::new(),
         }
     }
 

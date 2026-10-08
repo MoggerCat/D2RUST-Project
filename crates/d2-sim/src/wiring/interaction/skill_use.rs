@@ -87,6 +87,18 @@ pub trait UseRest {
     fn equippable(&self, item: UnitId) -> bool;
     fn bow_equipped(&self, u: UnitId) -> bool;
     fn state_mask(&self, u: UnitId, mask: u32) -> bool;
+    /// The weapon in use and the item on a body location as the skill
+    /// bodies see them (ammo check, bow missile, `bodies.md` §2.3–§2.5),
+    /// ahead of combat's [`Pending::current_weapon`] / [`Pending::item_at`]:
+    /// a host whose equipped items do not yet feed the stat lists lets the
+    /// skills see its weapon without changing the melee damage rules.
+    /// Default: not answered (combat's).
+    fn skill_weapon(&self, _u: UnitId) -> Option<UnitId> {
+        None
+    }
+    fn skill_item_at(&self, _u: UnitId, _loc: u8) -> Option<UnitId> {
+        None
+    }
     // ---- modes and paths (units.md player modes, path spec)
     fn start_mode(&mut self, game: &mut Game, u: UnitId, mode: u32, target: ModeTarget<UnitId>);
     fn run_to(&mut self, u: UnitId, target: UnitId, e: SkillEntry);
@@ -150,7 +162,7 @@ impl<X: Pending + UseRest> UseView<'_, X> {
     fn list_mut(&mut self, u: UnitId) -> Option<&mut crate::skills::list::SkillList> {
         self.cv.v.h.skill_lists.get_mut(&u)
     }
-    fn x(&self) -> &X {
+    pub(super) fn x(&self) -> &X {
         &self.cv.v.h.x
     }
     pub(super) fn xm(&mut self) -> &mut X {
@@ -204,13 +216,17 @@ impl<X: Pending + UseRest> SkillUnits for UseView<'_, X> {
         self.cv.used_skill(u)
     }
     fn current_weapon(&self, u: UnitId) -> Option<UnitId> {
-        self.cv.current_weapon(u)
+        self.x()
+            .skill_weapon(u)
+            .or_else(|| self.cv.current_weapon(u))
     }
     fn weapon(&self, u: UnitId) -> Option<UnitId> {
-        self.cv.weapon(u)
+        self.x().skill_weapon(u).or_else(|| self.cv.weapon(u))
     }
     fn item_at(&self, u: UnitId, loc: u8) -> Option<UnitId> {
-        self.cv.item_at(u, loc)
+        self.x()
+            .skill_item_at(u, loc)
+            .or_else(|| self.cv.item_at(u, loc))
     }
     fn item_is(&self, item: UnitId, itype: i32) -> bool {
         self.cv.item_is(item, itype)
@@ -909,7 +925,19 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         self.cv.v.h.missiles = Some(store);
         made
     }
+    /// `0x00646F20`: every passive skill of the unit whose state is on
+    /// ([`bodies::passive`]), then the host's own hook.
     fn passive_refresh(&mut self, u: UnitId) {
+        let t = self.cv.v.h.tables.clone();
+        for e in self.skill_list(u) {
+            let p = t
+                .skills
+                .skill(e.skill)
+                .map_or(-1, |r| i32::from(r.passivestate as i16));
+            if p > 0 && SkillUnits::has_state(self, u, p as u16) {
+                bodies::passive::refresh(self, &t.skills, u, e.skill);
+            }
+        }
         self.xm().passive_refresh(u);
     }
     fn buff_refresh(&mut self, u: UnitId) {
@@ -918,7 +946,11 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     fn skill_resync(&mut self, u: UnitId) {
         self.xm().skill_resync(u);
     }
+    /// `0x00646D60`: the passive state's stat list ([`bodies::passive`]),
+    /// then the host's own hook.
     fn passive_state_apply(&mut self, u: UnitId, e: &SkillEntry) {
+        let t = self.cv.v.h.tables.clone();
+        bodies::passive::refresh(self, &t.skills, u, e.skill);
         self.xm().passive_state_apply(u, e);
     }
     fn set_ai_state(&mut self, u: UnitId, k: i32) {
@@ -1081,7 +1113,7 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         self.x().room_act(r)
     }
     fn room_teleport(&self, r: RoomId) -> Option<i32> {
-        self.x().room_teleport(r)
+        self.level_teleport(r).or_else(|| self.x().room_teleport(r))
     }
     fn free_point(
         &mut self,
@@ -1091,13 +1123,17 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         mask: u32,
         fallback: bool,
     ) -> Option<(RoomId, (i32, i32))> {
-        self.xm().free_point(r, at, size, mask, fallback)
+        match self.rooms_free_point(r, at, size, mask, fallback) {
+            Some(found) => found,
+            None => self.xm().free_point(r, at, size, mask, fallback),
+        }
     }
     fn pattern_collides(&self, r: RoomId, at: (i32, i32), u: UnitId, mask: u32) -> bool {
         self.x().pattern_collides(r, at, u, mask)
     }
     fn box_collides(&self, r: RoomId, at: (i32, i32), size: i32, mask: u32) -> bool {
-        self.x().box_collides(r, at, size, mask)
+        self.rooms_box_collides(r, at, size, mask)
+            .unwrap_or_else(|| self.x().box_collides(r, at, size, mask))
     }
     /// `0x0064E260` (`pathing.md` §13.3, [`crate::path::line::line_test`])
     /// on the DRLG rooms with the path provider; else [`Pending`].
@@ -1116,7 +1152,10 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         self.x().body_line_blocked(r, from, to, mask)
     }
     fn place_unit(&mut self, u: UnitId, r: Option<RoomId>, at: (i32, i32)) -> bool {
-        self.xm().place_unit(u, r, at)
+        match self.rooms_place_unit(u, r, at) {
+            Some(placed) => placed,
+            None => self.xm().place_unit(u, r, at),
+        }
     }
     fn has_path(&self, u: UnitId) -> bool {
         self.x().has_path(u)
@@ -1128,7 +1167,7 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         self.x().path_last_point(u)
     }
     fn path_target_point(&self, u: UnitId) -> (i32, i32) {
-        self.x().path_target_point(u)
+        self.cast_target_point(u)
     }
     fn create_monster(
         &mut self,
@@ -1296,7 +1335,7 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     /// a = 0: [`BodyWorld::place_unit`]'s provider.
     fn place_unit_flag(&mut self, u: UnitId, r: Option<RoomId>, at: (i32, i32), a: i32) -> bool {
         if a == 0 {
-            self.xm().place_unit(u, r, at)
+            BodyWorld::place_unit(self, u, r, at)
         } else {
             self.xm().body_place_unit_flag(u, r, at, a)
         }
