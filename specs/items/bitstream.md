@@ -29,14 +29,14 @@
 |   1. Writer | 80–96 |
 |   2. Header (`0x006312B0`) | 97–125 |
 |   3. Compact record (`0x0062AF80`) | 126–157 |
-|   4. Full record (`0x0062FFF0`) | 158–305 |
-|   5. Save-format extras (never on the wire) | 306–323 |
-| Constants & data dependencies | 324–347 |
-| Randomness | 348–351 |
-| Edge cases & original bugs | 352–388 |
-| Test vectors | 389–411 |
-| Provenance | 412–436 |
-| Open questions | 437–508 |
+|   4. Full record (`0x0062FFF0`) | 158–317 |
+|   5. Save-format extras (never on the wire) | 318–335 |
+| Constants & data dependencies | 336–359 |
+| Randomness | 360–363 |
+| Edge cases & original bugs | 364–400 |
+| Test vectors | 401–423 |
+| Provenance | 424–448 |
+| Open questions | 449–520 |
 <!-- /index -->
 
 ## Summary
@@ -302,6 +302,18 @@ In this order; "base" = the item's own value (`0x006253B0`), "total"
 6. Reader (`0x0062CBE0`): a set list of mask bit i is found or created
    with flags 0x2040 (never 0x40 alone); the runeword list with state
    171, flags 0x40 (`world/vendors-2.md` §7.3.1 rule 6).
+   Lookup `0x00625790(item, state, flags)` (2026-10-08): state ≠ 0 →
+   the item's list of that state, active chain first, then parked
+   (`0x00625650`, flags ignored); state 0 (the main list) → the first
+   active child with flag 0x40 (`0x006256E0`). A list not found is
+   allocated with those flags, attached to the item with reset 1 and
+   given the state (`0x0062D8F7`–`0x0062D937`); flag 0x2000 puts a set
+   list in the item's parked chain (`sim/stat-lists.md` §8.1 step 5),
+   so it counts nowhere until the set update unparks it
+   (`items/properties.md` §13; client: `client/stat-lists.md` §2 rule
+   5). Each stat is stored as (field − `Save Add`) << `ValShift` at its
+   param (`0x0062AC80`). The main list of a client item already exists
+   (empty) when the record is read (`client/stat-lists.md` §2 rule 1.1).
 
 ### 5. Save-format extras (never on the wire)
 
