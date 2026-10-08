@@ -192,6 +192,26 @@ pub fn drop_tables() -> DropTables {
             spawnable: 1,
         })
         .collect();
+    // d2rs-own, unverified (REC-260): the chest table entry names a class
+    // that picks the first item row once (the synthetic chest drop).
+    let chest_pick = TreasureClass {
+        name: b"chest".to_vec(),
+        group: 0,
+        level: 0,
+        total_classic: 1,
+        total_expansion: 1,
+        picks: 1,
+        nodrop: 0,
+        mods: [0; 6],
+        entries: vec![TcEntry {
+            start_classic: 0,
+            start_expansion: 0,
+            id: 0,
+            row: 0,
+            flags: 0,
+            mods: [0; 6],
+        }],
+    };
     let none = TreasureClass {
         name: b"none".to_vec(),
         group: 0,
@@ -206,9 +226,9 @@ pub fn drop_tables() -> DropTables {
     DropTables {
         items,
         tcs: TreasureClasses {
-            tcs: vec![none],
+            tcs: vec![none, chest_pick],
             group_offset: 0,
-            chest: [None; 45],
+            chest: [Some(1); 45],
             notes: Vec::new(),
         },
         treasure_items,

@@ -124,6 +124,14 @@ pub struct SimGame<D = Unspecified, W = NoWorld> {
     pub world: W,
     /// Messages sent during a tick that could not be queued, in order.
     pub tick_faults: Vec<(ClientId, WorldError)>,
+    /// Ground items already announced (S→C 0x9C) to a client by the item
+    /// update pass (`handlers::items::moves::update_pass`; PROVISIONAL,
+    /// REC-260, `// d2rs-own, unverified`).
+    /// Whether the update pass announces ground items at all (the play
+    /// host turns it on; the unit hosts keep the pass of the players'
+    /// update lists only).
+    pub announce_ground: bool,
+    pub(crate) announced_ground: std::collections::BTreeSet<(ClientId, UnitId)>,
     /// The host calls the quest rules raised (`quests-helpers.md` §6:
     /// game end `0x00530590`, save pass `0x0052E2A0`), drained from the
     /// world after each tick's steps, in call order. Running them is the
@@ -180,6 +188,8 @@ impl<D: EventDispatch, W> SimGame<D, W> {
             unhandled: Vec::new(),
             world,
             tick_faults: Vec::new(),
+            announce_ground: false,
+            announced_ground: std::collections::BTreeSet::new(),
             host_requests: Vec::new(),
             hotkeys: BTreeMap::new(),
             session: None,

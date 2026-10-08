@@ -35,6 +35,7 @@ use crate::bridge::world::{ClientWorld, UnitKey, PLAYER};
 use crate::ui::draw::{ImageRef, ImageRequest, UiDraw, UiDrawSink};
 use crate::ui::geom::{Point, Rect};
 use crate::ui::panel::{ClientIntent, Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
+use crate::ui::panels::control::belt::BeltColor;
 use crate::ui::panels::control::buttons::{
     draw_800, menu_button, run_button, skill_icon_file, skill_icon_pos, BtnEffect, BtnEnv,
     ButtonCel, NewBtn, NewButtons, SkillSide,
@@ -56,7 +57,10 @@ pub const UI_SKILL_SELECT: u8 = 3;
 
 /// The synthetic one-colour file of the bars (module doc). Frames: 0 red,
 /// 1 gold, 2 blue (stamina, §4 r2), 3 index 0xFF (experience, §4 r1), 4 the
-/// darkest colour (the Esc menu's box).
+/// darkest colour (the Esc menu's box), 5–8 the rectangle primitive's belt
+/// colours (red, green, blue, yellow: [`BELT_FILL_BASE`]).
+/// The first of the four rectangle colours (`BeltColor` order).
+pub const BELT_FILL_BASE: u32 = 5;
 pub const FILL_FILE: &str = "d2rs\\hudfill";
 /// Each fill frame is this wide and high (covers both bars).
 pub const FILL_W: u32 = 128;
@@ -111,6 +115,10 @@ pub fn fill_frames(palette: &d2_formats::palette::Palette) -> Vec<crate::frames:
         nearest(StaminaColor::Blue.rgb()),
         0xFF,
         nearest((0, 0, 0)),
+        nearest(BeltColor::Red.rgb()),
+        nearest(BeltColor::Green.rgb()),
+        nearest(BeltColor::Blue.rgb()),
+        nearest(BeltColor::Yellow.rgb()),
     ];
     colors
         .iter()
