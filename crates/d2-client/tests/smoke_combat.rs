@@ -1063,12 +1063,9 @@ fn the_synthetic_play_join_is_clean() {
         .keys()
         .filter(|k| k.unit_type == MONSTER)
         .count();
-    // Akara, Kashya, Gheed, Charsi and Warriv (REC-280).
-    assert_eq!(
-        npcs,
-        d2_client::app::town_npcs::ACT1.len(),
-        "the town's NPCs"
-    );
+    // Akara, Kashya, Gheed, Charsi and Warriv (new content: q-smoke-travel,
+    // REC-280, his travel row to Act II).
+    assert_eq!(npcs, 5, "the town's five NPCs");
 }
 
 // Covers: specs/skills/use.md §5; specs/combat/vitals.md §4
