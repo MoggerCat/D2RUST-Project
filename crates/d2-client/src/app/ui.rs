@@ -120,6 +120,7 @@ pub fn add_original_ui_with(
     // root's own rules are never asked.
     let mut root = UiRoot::new(Box::new(NoPanelRules));
     original.install(&mut root)?;
+    super::items::prepare_ui(app, &mut original);
     let files = original.files();
     let mut ui = WorldViewUi::new(root, Box::new(NoStrings));
     ui.original = Some(original);

@@ -295,6 +295,25 @@ pub fn item_action(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handler
         .map(|c| (c, set_item(w, action, p, key, &h))),
         _ => None,
     };
+    // Rule 6: the belt column-ready bytes (slots 0–3 only).
+    if let Some(h) = header {
+        let mut ready = |x: u16, v: bool| {
+            if let Some(b) = w.belt_ready.get_mut(usize::from(x)) {
+                *b = v;
+            }
+        };
+        match action {
+            0x0E => ready(h.x, true),
+            0x0F => ready(h.x, false),
+            0x15 if h.mode == 2 => {
+                if let Some(old) = was.filter(|o| o.mode == 2) {
+                    ready(old.x, false);
+                }
+                ready(h.x, true);
+            }
+            _ => {}
+        }
+    }
     let u = w.units.entry(key).or_insert_with(|| ClientUnit::new(key));
     // A ground item (header mode 3 or 5) stands at its sub-tile; any
     // other mode leaves the world (no cell).

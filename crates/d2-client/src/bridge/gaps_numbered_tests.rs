@@ -222,11 +222,14 @@ fn client_world_holds_only_stated_fields() {
         connected,
         ping,
         pet_palette,
+        // `client/msg-stats-items.md` §2 r6.
+        belt_ready,
         // `client/model.md` §2 rule 1 (set C); `world/objects-client.md`
         // §27 r2 (the latches).
         objclient,
     } = ClientWorld::default();
     assert!(!connected && ping == Default::default() && pet_palette.is_empty());
+    assert_eq!(belt_ready, [false; 4]);
     assert_eq!(objclient, Default::default());
     assert!(overrides == Default::default() && roster.is_empty() && roster_inactive.is_empty());
     assert!(weapon_set == 0 && item_table_ext.is_empty());

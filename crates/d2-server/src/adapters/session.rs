@@ -374,8 +374,13 @@ pub fn enter_game<D: ActionEvents, W>(
     // Rule 3.4 (the array is cleared only by the room update queue,
     // `stat-lists.md` §11 rule 3, so rule 3.8 sends the same values).
     let stats = stat_messages(&a.sys.stats.mod_values(player));
+    let items = a.sys.hooks.session.join_items.remove(&player);
     let x = &mut a.sys.hooks.x;
     for m in &stats {
+        x.send(player, m);
+    }
+    // Rule 3.5: the player's item messages (the loader's, in send order).
+    for m in items.iter().flatten() {
         x.send(player, m);
     }
     for (i, k) in entry.hotkeys.iter().enumerate() {
