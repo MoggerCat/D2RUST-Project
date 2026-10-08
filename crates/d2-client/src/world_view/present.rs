@@ -58,7 +58,7 @@ use super::node::{add_node, ComposeJob, NodeIndices};
 use super::panel_art::PanelArtLoader;
 use super::ui_bind::{run_ui_with, world_clicks, TextAssetLoader, UiQueue, UiRules};
 use super::walk::PreviewWalk;
-use super::{compose_cycle_cpu, GpuAtlas, ViewAssets, ViewRules, VIEW};
+use super::{compose_cycle_cpu, play_view, GpuAtlas, ViewAssets, ViewRules};
 use crate::scene::{FrameCycle, FramePlan};
 
 /// Render layer of the presented frame and its camera, so the world view
@@ -82,7 +82,7 @@ pub struct WorldViewState {
     pub assets: ViewAssets,
     pub rules: Box<dyn WorldRules + Send + Sync>,
     pub feed: Box<dyn ViewFeed + Send + Sync>,
-    /// The persistent index framebuffer (`composition.md` §3), `VIEW`
+    /// The persistent index framebuffer (`composition.md` §3), [`play_view`]
     /// sized: the last presented frame once committed.
     pub cycle: FrameCycle,
     /// Counts of the last frame, for logs and tests.
@@ -142,8 +142,8 @@ impl WorldViewState {
             assets,
             rules,
             feed,
-            cycle: FrameCycle::new(VIEW.width, VIEW.height)
-                .expect("VIEW is taller than the uncleared band"),
+            cycle: FrameCycle::new(play_view().width, play_view().height)
+                .expect("the play frame is taller than the uncleared band"),
             last: None,
             click: Default::default(),
             automap: None,
@@ -439,10 +439,10 @@ fn automap_facts(
         moving_to_client((u32::from(x) << 16) | 0x8000, (u32::from(y) << 16) | 0x8000)
     });
     let mode = OpenMode::new(open_mode).unwrap_or(OpenMode::NONE);
-    let cam = Camera::new(FrameSize::D2RS, mode, at, (0, 0));
+    let cam = Camera::new(FrameSize::play(), mode, at, (0, 0));
     crate::ui::automap::FrameFacts {
-        width: FrameSize::D2RS.width,
-        height: FrameSize::D2RS.height,
+        width: FrameSize::play().width,
+        height: FrameSize::play().height,
         open_mode,
         mini_down: false,
         unit_origin: cam.unit,
@@ -611,8 +611,8 @@ fn ui_input(
 fn rgba_image(rgba: Vec<u8>) -> Image {
     let mut image = Image::new(
         Extent3d {
-            width: VIEW.width,
-            height: VIEW.height,
+            width: play_view().width,
+            height: play_view().height,
             depth_or_array_layers: 1,
         },
         TextureDimension::D2,
@@ -715,13 +715,13 @@ fn world_view_frame(
                 _ => (0, 0),
             };
             let view = crate::bridge::click::ClickView {
-                size: crate::rules::camera::FrameSize::D2RS,
+                size: crate::rules::camera::FrameSize::play(),
                 open_mode: ui.original.as_ref().map_or(0, |o| o.open_mode().get()),
                 // `[0x007A521C]` = H − 40 (`ui/automap.md` §9).
-                right_panel_bottom: crate::rules::camera::FrameSize::D2RS.play_height(),
+                right_panel_bottom: crate::rules::camera::FrameSize::play().play_height(),
                 // PROVISIONAL (ui/controls.md §6 r7; controls-0001):
                 // `0x00454970()` is not specified: the play area H − 40.
-                skill_y_limit: crate::rules::camera::FrameSize::D2RS.play_height(),
+                skill_y_limit: crate::rules::camera::FrameSize::play().play_height(),
                 mouse,
                 game_menu_open: ui.original.as_ref().is_some_and(|o| o.is_open(9)),
                 // d2rs-own, unverified (D1): the preview's hover pick.
@@ -941,8 +941,8 @@ fn world_view_frame(
             let mut image = if use_gpu {
                 {
                     let mut image = Image::new_target_texture(
-                        VIEW.width,
-                        VIEW.height,
+                        play_view().width,
+                        play_view().height,
                         TextureFormat::Rgba8UnormSrgb,
                         None,
                     );
@@ -951,7 +951,10 @@ fn world_view_frame(
                     image
                 }
             } else {
-                rgba_image(vec![0; (VIEW.width * VIEW.height * 4) as usize])
+                rgba_image(vec![
+                    0;
+                    (play_view().width * play_view().height * 4) as usize
+                ])
             };
             image.sampler = ImageSampler::nearest();
             let image = images.add(image);

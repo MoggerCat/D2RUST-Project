@@ -143,6 +143,7 @@ fn art(files: &UiFiles, out: &mut dyn UiDrawSink, name: &str, w: i32, x: i32, y:
             },
             at: Point::new(x + 256 * k, y),
             clip: FRAME,
+            look: crate::ui::CelLook::PLAIN,
         }));
     }
 }
@@ -205,6 +206,7 @@ pub fn draw_pents(files: &UiFiles, m: &OptionsMenu, tick: u64, out: &mut dyn UiD
             image: ImageRef { file, frame },
             at: Point::new(x, y),
             clip: FRAME,
+            look: crate::ui::CelLook::PLAIN,
         }));
     }
 }

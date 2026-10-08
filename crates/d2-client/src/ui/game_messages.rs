@@ -237,6 +237,7 @@ pub(super) fn backing(file: u32, r: &crate::ui::messages::RectDraw, out: &mut dy
                 image: ImageRef { file, frame: DARK },
                 at: Point::new(x, y),
                 clip: Rect::new(x, y, cw as u16, ch as u16),
+                look: crate::ui::CelLook::PLAIN,
             }));
             x += tw;
         }
