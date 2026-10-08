@@ -21,6 +21,7 @@ use std::rc::Rc;
 
 use super::draw::{TextRequest, TextStyle, UiDraw, UiDrawSink};
 use super::geom::{Point, Rect, FRAME};
+use super::imbue_ui::{Imbue, NPC_CHARSI};
 use super::original::OriginalUi;
 use super::panel::{ClientIntent, Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
 use super::panels::npc::{msg_chat_end, option_intent, NpcMenus};
@@ -60,6 +61,8 @@ pub struct Open {
 #[derive(Default)]
 pub struct NpcMenuState {
     pub up: Option<Open>,
+    /// Charsi's imbue dialog (`imbue_ui.rs`).
+    pub imbue: Option<Imbue>,
     menus: Option<NpcMenus>,
     pub screen: (i32, i32),
 }
@@ -81,6 +84,7 @@ fn fallback(kind: Option<OptionKind>) -> &'static str {
         Some(OptionKind::SailWest) => "Sail",
         Some(OptionKind::Identify) => "Identify Items",
         Some(OptionKind::Resurrect) => "Resurrect",
+        Some(OptionKind::Imbue) => "Imbue",
         None => "Cancel",
     }
 }
@@ -95,6 +99,7 @@ impl NpcMenuState {
         let menus = self.menus.get_or_insert_with(|| {
             NpcMenus::load().unwrap_or_else(|_| NpcMenus::from_records(Vec::new()))
         });
+        self.imbue = None;
         menus.reset_for_interaction();
         menus.apply_builder(char_level);
         let Some(rec) = menus.menu(class) else {
@@ -108,6 +113,13 @@ impl NpcMenuState {
                 kind: Some(o.kind),
             })
             .collect();
+        if class == NPC_CHARSI {
+            // d2rs-own, unverified (REC-145): the imbue insert.
+            rows.push(Row {
+                string: 4017,
+                kind: Some(OptionKind::Imbue),
+            });
+        }
         rows.push(Row {
             string: STR_CANCEL,
             kind: None,
@@ -165,6 +177,9 @@ impl Panel for NpcMenuUi {
 
     fn rect(&self) -> Rect {
         let st = self.st.borrow();
+        if st.imbue.is_some() {
+            return Imbue::rect();
+        }
         if st.up.is_none() {
             return Rect::new(0, 0, 0, 0);
         }
@@ -174,6 +189,10 @@ impl Panel for NpcMenuUi {
 
     fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let st = self.st.borrow();
+        if let Some(im) = &st.imbue {
+            im.draw(ctx, out);
+            return;
+        }
         let Some(o) = &st.up else {
             return;
         };
@@ -215,6 +234,9 @@ impl Panel for NpcMenuUi {
     }
 
     fn hit(&self, p: Point) -> Option<WidgetId> {
+        if self.st.borrow().imbue.is_some() {
+            return Imbue::rect().contains(p).then_some(WidgetId(0));
+        }
         self.st
             .borrow()
             .box_rect()
@@ -222,7 +244,10 @@ impl Panel for NpcMenuUi {
             .then_some(WidgetId(0))
     }
 
-    fn event(&mut self, e: UiEvent, _ctx: &UiCtx) -> UiResponse {
+    fn event(&mut self, e: UiEvent, ctx: &UiCtx) -> UiResponse {
+        if self.st.borrow().imbue.is_some() {
+            return self.imbue_event(e, ctx);
+        }
         let Some(guid) = self.st.borrow().up.as_ref().map(|o| o.guid) else {
             return UiResponse::Ignored;
         };
@@ -257,6 +282,12 @@ impl Panel for NpcMenuUi {
                 }
                 UiResponse::Consumed
             }
+            Some(OptionKind::Imbue) => {
+                let mut st = self.st.borrow_mut();
+                st.up = None;
+                st.imbue = Some(Imbue::new(guid));
+                UiResponse::Consumed
+            }
             Some(OptionKind::Hire) => {
                 self.hire.borrow_mut().up = Some(guid);
                 self.st.borrow_mut().up = None;
@@ -277,9 +308,44 @@ impl Panel for NpcMenuUi {
     }
 }
 
+impl NpcMenuUi {
+    fn imbue_event(&mut self, e: UiEvent, ctx: &UiCtx) -> UiResponse {
+        let Some((press, at)) = Imbue::left(e) else {
+            return UiResponse::Ignored;
+        };
+        if !Imbue::press_inside(at) {
+            // Outside the dialog the inventory and the world keep working.
+            return UiResponse::Ignored;
+        }
+        if press {
+            return UiResponse::Consumed;
+        }
+        let mut st = self.st.borrow_mut();
+        let Some(im) = st.imbue.as_mut() else {
+            return UiResponse::Ignored;
+        };
+        let (r, close) = im.release(at, ctx);
+        if close {
+            st.imbue = None;
+        }
+        r
+    }
+}
+
 impl OriginalUi {
+    /// A delivered S->C 0x58 reaches Charsi's imbue dialog.
+    pub(super) fn imbue_output(&mut self, o: &crate::bridge::output::Output) {
+        let crate::bridge::output::Output::OpenUi { code, .. } = *o else {
+            return;
+        };
+        let mut st = self.npcm.borrow_mut();
+        if st.imbue.as_mut().is_some_and(|im| im.code(code)) {
+            st.imbue = None;
+        }
+    }
+
     /// Opens the NPC menu for a delivered 0x28 (`msg_ui`).
-    pub(super) fn open_npc_menu(&mut self, guid: u32, class: u32, level: i32) {
+    pub fn open_npc_menu(&mut self, guid: u32, class: u32, level: i32) {
         let speech: Vec<u16> = self.npc_text().map_or(Vec::new(), |t| {
             t.nodes()
                 .into_iter()
@@ -295,7 +361,14 @@ impl OriginalUi {
     /// The NPC menu is up (the preview's automatic chat close waits for
     /// its cancel).
     pub fn npc_menu_up(&self) -> bool {
-        self.npcm.borrow().up.is_some()
+        self.npcm.borrow().up.is_some() || self.npcm.borrow().imbue.is_some()
+    }
+
+    /// Places `guid` in the open imbue dialog (headless-test seam).
+    pub fn imbue_place(&mut self, guid: u32) {
+        if let Some(im) = self.npcm.borrow_mut().imbue.as_mut() {
+            im.place(guid);
+        }
     }
 
     /// The open menu, for tests.
