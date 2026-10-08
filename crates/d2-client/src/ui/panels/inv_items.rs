@@ -137,12 +137,12 @@ pub struct ItemsUi {
 
 /// An item's graphic: file id, footprint in cells, frame size.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct Art {
-    file: u32,
-    w: i32,
-    h: i32,
-    gw: i32,
-    gh: i32,
+pub(super) struct Art {
+    pub(super) file: u32,
+    pub(super) w: i32,
+    pub(super) h: i32,
+    pub(super) gw: i32,
+    pub(super) gh: i32,
 }
 
 impl ItemsUi {
@@ -165,7 +165,7 @@ impl ItemsUi {
         }
     }
 
-    fn art(&self, files: &UiFiles, item: &ItemView, cell: (i32, i32)) -> Option<Art> {
+    pub(super) fn art(&self, files: &UiFiles, item: &ItemView, cell: (i32, i32)) -> Option<Art> {
         let row = self.art.get(item.code?)?;
         if row.inv_file.is_empty() {
             return None;
@@ -245,33 +245,33 @@ impl ItemsUi {
         at: Point,
     ) -> Vec<PanelOutput> {
         let g = &layout.grid;
-        let cell = (i32::from(g.cell_w), i32::from(g.cell_h));
         if g.cell_w == 0 || g.cell_h == 0 {
             return Vec::new();
         }
         let all = items::local_items(world);
         let cursor = items::cursor_item(world);
         let intent = if g.contains_mouse(at) {
-            self.grid_press(files, g, cell, &all, cursor.as_ref(), at)
+            self.grid_press(files, g, &all, cursor.as_ref(), at, 0)
         } else {
             equip_press(layout, &all, cursor.as_ref(), at)
         };
         intent.map(PanelOutput::Intent).into_iter().collect()
     }
 
-    fn grid_press(
+    pub(super) fn grid_press(
         &self,
         files: &UiFiles,
         g: &GridRecord,
-        cell: (i32, i32),
         all: &[ItemView],
         cursor: Option<&ItemView>,
         at: Point,
+        page: u8,
     ) -> Option<ClientIntent> {
+        let cell = (i32::from(g.cell_w), i32::from(g.cell_h));
         // Page-0 grid items with their footprints.
         let grid: Vec<(&ItemView, i32, i32, i32, i32)> = all
             .iter()
-            .filter(|i| i.mode == mode::STORED && i.page == 0)
+            .filter(|i| i.mode == mode::STORED && i.page == page)
             .map(|i| {
                 let (w, h) = self.art.get(i.code.unwrap_or([0; 4])).map_or((1, 1), |r| {
                     (i32::from(r.inv_w.max(1)), i32::from(r.inv_h.max(1)))
@@ -323,8 +323,8 @@ impl ItemsUi {
             ready: true,
             own_player: true,
             own_inventory_context: true,
-            inventory_mode: 0,
-            page: 0,
+            inventory_mode: if page == 4 { 0x0C } else { 0 },
+            page,
             shift: false,
             ctrl: false,
             store_open: false,
