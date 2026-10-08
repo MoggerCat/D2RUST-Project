@@ -619,14 +619,13 @@ fn the_waypoint_tabs_take_the_player_back_to_the_act_before() {
     }
 }
 
-/// B2 (`docs/handoff/q-smoke-travel.md`): a town the player has not been
-/// to keeps its NPCs and waypoint however long the game ran. The server
-/// frees the idle town room and its units lose their room; the inactive
-/// store that would keep and restore them is off in the play host and
-/// its restore seams are not implemented.
+/// B2 (`docs/handoff/q-smoke-travel.md`, fixed by q-fix-idle-rooms): a
+/// town the player has not been to keeps its NPCs and waypoint however
+/// long the game ran. The server frees the idle town room; the inactive
+/// store keeps its units' records and the room's next build restores
+/// them.
 // Covers: specs/sim/units.md §3.3; specs/sim/units.md §3.4
 #[test]
-#[ignore = "open break B2 (docs/handoff/q-smoke-travel.md): idle rooms lose their units"]
 fn a_town_keeps_its_npcs_and_waypoint_after_a_long_game() {
     let mut rig = Rig::new();
     rig.put(single_player::COLD_PLAINS);
@@ -638,6 +637,173 @@ fn a_town_keeps_its_npcs_and_waypoint_after_a_long_game() {
         rig.find(MONSTER, u32::from(npc::WARRIV2)).is_some(),
         "Warriv"
     );
+}
+
+/// A server unit of a level: (type, class, GUID, position, mode).
+type ServerUnit = (UnitType, u32, u32, (i32, i32), u32);
+
+/// The monsters and objects the server has in `level`'s active rooms.
+fn server_units(rig: &Rig, level: u32) -> Vec<ServerUnit> {
+    app_support::with(&rig.server, move |l| {
+        let g = &l.host().game;
+        let sys = &g.events.action.sys;
+        let mut out = Vec::new();
+        for ty in [UnitType::Monster, UnitType::Object] {
+            for u in g.game.lists.units_of_type(ty) {
+                let Some(room) = g.game.lists.unit(u).and_then(|e| e.room()) else {
+                    continue;
+                };
+                if sys.hooks.drlg.level_id(&g.game, room) != Some(level) {
+                    continue;
+                }
+                let r = sys.units.get(u).unwrap();
+                out.push((ty, r.class, r.guid, sys.hooks.path_position(u), r.mode));
+            }
+        }
+        out.sort();
+        out
+    })
+}
+
+/// The active rooms of `level` on the server.
+fn server_rooms(rig: &Rig, act: u8, level: u32) -> usize {
+    app_support::with(&rig.server, move |l| {
+        let g = &l.host().game;
+        let rooms = g.game.lists.active_rooms(act);
+        let hooks = &g.events.action.sys.hooks;
+        rooms
+            .into_iter()
+            .filter(|&r| hooks.drlg.level_id(&g.game, r) == Some(level))
+            .count()
+    })
+}
+
+/// The monster records (class, GUID, x, y) and other records (type,
+/// class, x, y) the inactive store holds for `act`.
+#[allow(clippy::type_complexity)]
+fn stored(rig: &Rig, act: u8) -> (Vec<(u32, u32, i32, i32)>, Vec<(u8, u32, i32, i32)>) {
+    app_support::with(&rig.server, move |l| {
+        let g = &l.host().game;
+        let store = g
+            .events
+            .action
+            .sys
+            .hooks
+            .inactive
+            .as_ref()
+            .expect("the store is on");
+        let nodes = &store.acts[usize::from(act)];
+        let mut m: Vec<_> = nodes
+            .iter()
+            .flat_map(|n| n.monsters.iter().map(|r| (r.class, r.guid, r.x, r.y)))
+            .collect();
+        let mut o: Vec<_> = nodes
+            .iter()
+            .flat_map(|n| n.others.iter().map(|r| (r.ty, r.class, r.x, r.y)))
+            .collect();
+        m.sort();
+        o.sort();
+        (m, o)
+    })
+}
+
+/// B2 fixed: the town is left, the game runs until the server frees every
+/// town room (its units go to the inactive store, `units.md` §3.3), and
+/// the player comes back: each NPC is spawned again with its GUID at the
+/// place it was stored, the waypoint is a new object at its place
+/// (§3.4 rule 4), the client sees them, the waypoint still operates and
+/// Warriv still takes the player east.
+// Covers: specs/sim/units.md §3.3; specs/sim/units.md §3.4; specs/drlg/rooms.md §8
+#[test]
+fn the_act_i_town_comes_back_with_its_npcs_and_waypoint() {
+    let town = single_player::ACT1_TOWN;
+    let mut rig = Rig::new();
+    let before = server_units(&rig, town);
+    let classes = |v: &[ServerUnit]| -> Vec<(UnitType, u32)> {
+        let mut c: Vec<_> = v.iter().map(|u| (u.0, u.1)).collect();
+        c.sort();
+        c
+    };
+    for &(class, _) in &d2_client::app::town_npcs::ACT1 {
+        assert!(
+            before
+                .iter()
+                .any(|u| u.0 == UnitType::Monster && u.1 == u32::from(class)),
+            "NPC {class} in town at the start"
+        );
+    }
+    assert!(
+        before.iter().any(|u| u.0 == UnitType::Object && u.1 == 0),
+        "the waypoint"
+    );
+    rig.put(single_player::COLD_PLAINS);
+    let mut n = 0;
+    while server_rooms(&rig, 0, town) > 0 {
+        rig.step(1);
+        n += 1;
+        assert!(n < 20_000, "the idle town's rooms are freed");
+    }
+    assert!(server_units(&rig, town).is_empty());
+    let (monsters, others) = stored(&rig, 0);
+    for u in before.iter().filter(|u| u.0 == UnitType::Monster) {
+        assert!(
+            monsters.iter().any(|m| (m.0, m.1) == (u.1, u.2)),
+            "NPC {} (GUID {}) stored; {monsters:?}",
+            u.1,
+            u.2
+        );
+    }
+    assert!(
+        others.iter().any(|o| (o.0, o.1) == (2, 0)),
+        "the waypoint stored; {others:?}"
+    );
+    rig.put(town);
+    let after = server_units(&rig, town);
+    assert_eq!(classes(&after), classes(&before), "the town's units");
+    // The town's records (the act's store also holds the other idle
+    // levels' units, e.g. the Black Marsh's tome).
+    let guids: Vec<u32> = before
+        .iter()
+        .filter(|u| u.0 == UnitType::Monster)
+        .map(|u| u.2)
+        .collect();
+    for m in monsters.iter().filter(|m| guids.contains(&m.1)) {
+        assert!(
+            after
+                .iter()
+                .any(|u| (u.0, u.1, u.2, u.3) == (UnitType::Monster, m.0, m.1, (m.2, m.3))),
+            "NPC {m:?} restored with its GUID and place; {after:?}"
+        );
+    }
+    for o in before.iter().filter(|u| u.0 == UnitType::Object) {
+        assert!(
+            others
+                .iter()
+                .any(|r| (r.0, r.1, (r.2, r.3)) == (2, o.1, o.3)),
+            "object {o:?} stored at its place; {others:?}"
+        );
+        assert!(
+            after
+                .iter()
+                .any(|u| (u.0, u.1, u.3, u.4) == (UnitType::Object, o.1, o.3, o.4)),
+            "object {o:?} restored at its place in its mode; {after:?}"
+        );
+    }
+    assert!(
+        !stored(&rig, 0).0.iter().any(|m| guids.contains(&m.1)),
+        "the town's records are used"
+    );
+    for &(class, _) in &d2_client::app::town_npcs::ACT1 {
+        assert!(
+            rig.find(MONSTER, u32::from(class)).is_some(),
+            "the client sees NPC {class}"
+        );
+    }
+    let wp = rig.operate_waypoint();
+    rig.close_waypoint(wp);
+    // Sisters to the Slaughter done (slot 6 bit 0).
+    rig.set_quest_flag(6, 0);
+    rig.npc_travel("Warriv east", npc::WARRIV1, single_player::ACT2_TOWN);
 }
 
 /// The class-59 objects of the server's game.

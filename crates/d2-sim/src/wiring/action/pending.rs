@@ -268,15 +268,6 @@ pub trait Pending {
     /// Detach `0x0064C450`'s path part (§3.3: precise and client x / y
     /// := 0, point count 0, previous room, path flag 0x2).
     fn detach_path(&mut self, unit: UnitId, room: RoomId) {}
-    /// §3.4 rule 4.1: re-create a monster record (`how`) in `room`.
-    fn restore_monster(
-        &mut self,
-        game: &mut Game,
-        room: RoomId,
-        rec: &crate::units::inactive::MonsterRecord,
-        how: crate::units::inactive::MonsterRestore,
-    ) {
-    }
     /// §3.4 rule 4.2: re-create an item record with ground expiry
     /// `expiry` in `room`.
     fn restore_item(
@@ -285,14 +276,6 @@ pub trait Pending {
         room: RoomId,
         rec: &crate::units::inactive::ItemRecord,
         expiry: i32,
-    ) {
-    }
-    /// §3.4 rule 4.3: re-create or re-place an "other" record in `room`.
-    fn restore_other(
-        &mut self,
-        game: &mut Game,
-        room: RoomId,
-        rec: &crate::units::inactive::OtherRecord,
     ) {
     }
     /// Level 108 and `0x005B5210` (§3.4 rule 4.1). Default: no.
