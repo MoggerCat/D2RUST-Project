@@ -316,7 +316,8 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     };
     let speeds = single_player::walk_speeds(&config.data, &config.character)?;
     let mut save_base = save::base_save(&config.character);
-    let hardcore = config.hardcore || save_base.header.status & d2_formats::d2s::status::HARDCORE != 0;
+    let hardcore =
+        config.hardcore || save_base.header.status & d2_formats::d2s::status::HARDCORE != 0;
     if hardcore {
         save_base.header.status |= d2_formats::d2s::status::HARDCORE;
     }

@@ -50,11 +50,7 @@ pub fn mark_dead(save: &mut d2s::D2s, hardcore: bool, died: bool) {
 }
 
 /// Saves the character once when the death screen comes up.
-fn save_on_death(
-    screen: Res<DeathScreen>,
-    saver: Option<Res<SaveHandle>>,
-    mut was: Local<bool>,
-) {
+fn save_on_death(screen: Res<DeathScreen>, saver: Option<Res<SaveHandle>>, mut was: Local<bool>) {
     if screen.active && !*was {
         if let Some(h) = &saver {
             match h.save() {
@@ -74,8 +70,7 @@ fn leave_dead(
     keys: Option<Res<ButtonInput<KeyCode>>>,
     mut exit: MessageWriter<AppExit>,
 ) {
-    if run.0 && is_dead(bridge.0.world()) && keys.is_some_and(|k| k.just_pressed(KeyCode::Escape))
-    {
+    if run.0 && is_dead(bridge.0.world()) && keys.is_some_and(|k| k.just_pressed(KeyCode::Escape)) {
         println!("play: the hardcore character died; its save is marked dead");
         exit.write(AppExit::Success);
     }
@@ -116,9 +111,6 @@ mod tests {
         mark_dead(&mut s, true, false);
         assert_eq!(s.header.status & d2s::status::DEAD, 0);
         mark_dead(&mut s, true, true);
-        assert_eq!(
-            s.header.status,
-            d2s::status::HARDCORE | d2s::status::DEAD
-        );
+        assert_eq!(s.header.status, d2s::status::HARDCORE | d2s::status::DEAD);
     }
 }

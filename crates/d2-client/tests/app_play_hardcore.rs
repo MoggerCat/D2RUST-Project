@@ -13,8 +13,8 @@ use std::sync::{Arc, Mutex};
 use bevy::prelude::*;
 use d2_client::app::death::{add_death, DeathScreen};
 use d2_client::app::hardcore::add_hardcore;
-use d2_client::app::save;
 use d2_client::app::play::{add_client_data, add_game, add_preview, send_create_game_for};
+use d2_client::app::save;
 use d2_client::app::single_player::{self, GameData};
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::mirror::DynLink;
@@ -68,7 +68,6 @@ fn local_mode(app: &App) -> u32 {
         .expect("local")
         .mode
 }
-
 
 fn run(hardcore: bool) -> (Option<Vec<(d2_sim::units::UnitId, u32)>>, bool, bool, u16) {
     let data = GameData::Synthetic;
