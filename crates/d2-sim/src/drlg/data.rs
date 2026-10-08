@@ -210,6 +210,10 @@ pub struct DrlgData {
     pub levels: Vec<LevelDef>,
     /// `lvlwarp` rows in file order.
     pub warps: Vec<WarpDef>,
+    /// `ExitWalkX`, `ExitWalkY` (`lvlwarp` +0x14, +0x18) per row of
+    /// [`Self::warps`] (a missing entry reads as (0, 0)); the walk-out
+    /// of a warp arrival (`sim/path-placement.md` §12.2 rule 5).
+    pub warp_exits: Vec<(i32, i32)>,
     /// `lvltypes` `File 1..32` per row (level type), NUL-trimmed.
     pub lvltypes: Vec<Vec<Vec<u8>>>,
     /// `objects` subclass per object class (row).
@@ -231,6 +235,10 @@ impl DrlgData {
         Self {
             levels: leveldefs.iter().map(LevelDef::from_record).collect(),
             warps: lvlwarp.iter().map(WarpDef::from_record).collect(),
+            warp_exits: lvlwarp
+                .iter()
+                .map(|r| (r.exitwalkx as i32, r.exitwalky as i32))
+                .collect(),
             lvltypes: lvltypes.iter().map(lvltype_files).collect(),
             object_subclass: objects.iter().map(|o| o.subclass).collect(),
             wall_remap: WallRemap::original(),

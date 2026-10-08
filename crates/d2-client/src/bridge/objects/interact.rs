@@ -7,7 +7,7 @@
 use super::super::dispatch::HandlerError;
 use super::super::output::Output;
 use super::super::world::{
-    ClientWorld, ModeRequest, ModelInputs, UnitKey, ITEM, MONSTER, OBJECT, PLAYER,
+    ClientWorld, ModeRequest, ModelInputs, UnitKey, ITEM, MONSTER, OBJECT, PLAYER, TILE,
 };
 use super::{ObjFx, ObjSound};
 
@@ -72,6 +72,11 @@ pub fn send(
             m.extend_from_slice(&u32::from(inputs.objclient.pickup_flag).to_le_bytes());
             w.outgoing.push(m);
         }
+        // PROVISIONAL (REC-95): `ui/controls.md` §6 r9.2 sends 0x13 (T, g)
+        // for a tile, `model.md` §8 rule 7 lists no tile case: a tile (a
+        // level warp, `path-placement.md` §12.2) is sent as the 9-byte
+        // 0x13 of the other types.
+        TILE => w.outgoing.push(interact_bytes(ty, guid)),
         _ => {}
     }
     Ok(out)
