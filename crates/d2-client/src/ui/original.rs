@@ -193,6 +193,9 @@ struct Facts {
     /// A local player with a room (`0x00620BB0`; d2rs-own: read as a
     /// position), for the waypoint close hook.
     player_room: bool,
+    /// The local player has a hireling (`0x00478F20(P, 7)` ≠ −1), for the
+    /// hireling key (`ui/controls.md` §3 cmd 54).
+    has_hireling: bool,
 }
 
 impl Facts {
@@ -208,6 +211,7 @@ impl Facts {
             }),
             expansion_game: world.expansion != 0,
             player_room: local.is_some_and(|u| u.position.is_some()),
+            has_hireling: local.is_some_and(|u| world.hireling_guid(Some(u.key)) != u32::MAX),
         }
     }
 }
@@ -227,6 +231,9 @@ struct Shared {
     /// An input reset `0x0044DA40` was asked for since the host last took
     /// it ([`OriginalUi::take_input_reset`]).
     input_reset: bool,
+    /// Clear Screen closed nothing: the automap part is the host's
+    /// ([`OriginalUi::take_clear_automap`]).
+    clear_automap: bool,
     /// The fonts' glyph widths (character values and name line); none:
     /// no text is drawn.
     fonts: Option<FontMeasure>,
@@ -383,10 +390,12 @@ impl OriginalUi {
                 player: None,
                 expansion_game: false,
                 player_room: false,
+                has_hireling: false,
             },
             mouse: Point::new(0, 0),
             outputs: Vec::new(),
             input_reset: false,
+            clear_automap: false,
             fonts: None,
             resist_penalties: None,
             char_tables: Default::default(),
@@ -665,6 +674,25 @@ impl OriginalUi {
         if let (Routed::Unhandled, UiEvent::Action(a)) = (routed, e) {
             if a == ActionId(Action::GameMenu.index() as u16) {
                 self.game_menu_key()?;
+            } else if a == ActionId(Action::ClearScreen.index() as u16) {
+                // Command 38 (`0x0044C6B0`, `panels.md` §2 r9): the
+                // close-all (0, 1); when it closed nothing, the automap
+                // re-centre and the close-all with the automap (the host).
+                if !self.close_all(true)? {
+                    self.shared.borrow_mut().clear_automap = true;
+                }
+            } else if a == ActionId(Action::ToggleHireling.index() as u16) {
+                // Command 54 (`0x00469170`): an expansion game, a hireling
+                // and the expansion installed (`0x00408F20`).
+                let ok = {
+                    let sh = self.shared.borrow();
+                    sh.facts.expansion_game
+                        && sh.facts.has_hireling
+                        && sh.config.expansion_installed
+                };
+                if ok {
+                    self.set_ui(u32::from(super::states::id::MERC_INV), 2, true)?;
+                }
             } else if let Some(ui) = hotkey_state(a) {
                 // §4.3: the Character, Inventory, Party, Skill Tree and
                 // Hireling keys pass jump 1, every other hot key 0; mode 2
@@ -760,17 +788,40 @@ impl OriginalUi {
             self.restore_game_menu_states()?;
             return Ok(());
         }
-        let mut closed = false;
-        for ui in ESC_CLOSABLE {
-            if self.is_open(ui) {
-                self.set_ui(u32::from(ui), 1, true)?;
-                closed = true;
-            }
-        }
-        if !closed {
+        if !self.close_all(true)? {
             self.open_game_menu()?;
         }
         Ok(())
+    }
+
+    /// The close-all `0x00456300(0, jump)` (`panels.md` §2 r9) of the
+    /// Esc-closable states; whether it closed one.
+    fn close_all(&mut self, jump: bool) -> Result<bool, UiStateError> {
+        let mut closed = false;
+        for ui in ESC_CLOSABLE {
+            if self.is_open(ui) {
+                self.set_ui(u32::from(ui), 1, jump)?;
+                closed = true;
+            }
+        }
+        Ok(closed)
+    }
+
+    /// Show Items (command 37, `ui/controls.md` §3): the down handler sets
+    /// ui 0x0D on, the up handler off; `held` is the input's state this
+    /// pass, a change runs the handler.
+    pub fn set_show_items(&mut self, held: bool) -> Result<(), UiStateError> {
+        const UI_SHOW_ITEMS: u8 = 0x0D;
+        if held != self.is_open(UI_SHOW_ITEMS) {
+            self.set_ui(u32::from(UI_SHOW_ITEMS), if held { 0 } else { 1 }, false)?;
+        }
+        Ok(())
+    }
+
+    /// Whether Clear Screen closed nothing since the last call (its
+    /// automap part, `panels.md` §2 r9, is the host's).
+    pub fn take_clear_automap(&mut self) -> bool {
+        std::mem::take(&mut self.shared.borrow_mut().clear_automap)
     }
 
     /// `0x0047E090(save 1, menu 0)` (`frontend-options.md` §O1 r2): every
@@ -965,6 +1016,8 @@ pub fn hotkey_state(a: ActionId) -> Option<u8> {
         (Action::ToggleCharacter, UI_CHARACTER),
         (Action::ToggleSkillTree, UI_SKILLTREE),
         (Action::ToggleQuests, quest_log_ui::UI_QUEST_SCREEN),
+        // Command 3 (`0x00468980`): SetUIState(0x18, toggle, 0).
+        (Action::ToggleMessageLog, 0x18),
     ]
     .into_iter()
     .find(|(action, _)| action.index() == i)

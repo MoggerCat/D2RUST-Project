@@ -1,4 +1,4 @@
-// Spec: specs/ui/controls.md (§4.3 r3, §6 r1, §6 r2, §6 r6), specs/client/msg-ui.md (§2 r2.2)
+// Spec: specs/ui/controls.md (§3, §4.2, §4.3 r3, §6 r1, §6 r2, §6 r6), specs/client/msg-ui.md (§2 r2.2)
 //! The world clicks of the play app, headless: the app's own game wiring
 //! (`add_game`, the original UI) over the synthetic single-player game
 //! with a primary window, mouse buttons pressed and released through
@@ -9,7 +9,9 @@
 //!   a pass without a server tick (§6 r2, r6: per pass, not per tick);
 //! - a left release outside the frame ends the held button (§6 r1 kind
 //!   2, `[0x007A0650]` := 0);
-//! - a lost window focus runs the left release (§4.3 r3).
+//! - a lost window focus runs the left release (§4.3 r3);
+//! - the play bindings are the `original` preset (§3, `client/ui.md`
+//!   §A6): M toggles the message log, Alt shows items.
 //!
 //! Art, tables and the game are synthetic fixtures, not the user's files.
 
@@ -102,6 +104,10 @@ struct Game {
 
 impl Game {
     fn start() -> Self {
+        // No saved `controls.toml`: the play default.
+        let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR"))
+            .join(format!("input-pass-{}", std::process::id()));
+        std::env::set_var("D2RS_CONFIG_DIR", &dir);
         let start =
             play_start::resolve(&CliStart::default(), &GameData::Synthetic, None, None, None)
                 .unwrap();
@@ -302,4 +308,48 @@ fn a_lost_focus_releases_the_held_button() {
     });
     g.tick();
     assert!(!g.left_held(), "focus loss ran the left release");
+}
+
+impl Game {
+    fn key(&mut self, k: KeyCode, down: bool) {
+        let mut b = self.app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+        b.clear();
+        if down {
+            b.press(k);
+        } else {
+            b.release(k);
+        }
+    }
+
+    fn is_open(&mut self, ui: u8) -> bool {
+        self.app
+            .world_mut()
+            .non_send_mut::<d2_client::world_view::WorldViewUi>()
+            .original
+            .as_ref()
+            .unwrap()
+            .is_open(ui)
+    }
+}
+
+// The play app's default bindings are the original's: M (command 3)
+// toggles ui 0x18, Alt (command 37) holds ui 0x0D open (Ctrl as Run
+// held: `edge` tests). With the d2rs
+// dev preset none of these did anything.
+// Covers: specs/ui/controls.md §3 row4, §3 row22, §4.3 r1
+#[test]
+fn the_play_keys_are_the_original_preset() {
+    let mut g = Game::start();
+    assert!(!g.is_open(0x18));
+    g.key(KeyCode::KeyM, true);
+    g.pass();
+    assert!(g.is_open(0x18), "M opened the message log state");
+    g.key(KeyCode::KeyM, false);
+    g.pass();
+    g.key(KeyCode::AltLeft, true);
+    g.pass();
+    assert!(g.is_open(0x0D), "Alt shows items");
+    g.key(KeyCode::AltLeft, false);
+    g.pass();
+    assert!(!g.is_open(0x0D));
 }

@@ -522,6 +522,9 @@ fn ui_input(
     time: Option<Res<Time>>,
     focus: Option<Res<Messages<bevy::window::WindowFocused>>>,
     mut focus_cursor: Local<MessageCursor<bevy::window::WindowFocused>>,
+    wheel: Option<Res<Messages<bevy::input::mouse::MouseWheel>>>,
+    mut wheel_cursor: Local<MessageCursor<bevy::input::mouse::MouseWheel>>,
+    mut wheel_acc: Local<crate::controls::original::WheelAccumulator>,
 ) -> Result {
     let (Some(mut ui), Ok(window)) = (ui, windows.single()) else {
         return Ok(());
@@ -531,20 +534,70 @@ fn ui_input(
             ui.focus_lost = true;
         }
     }
-    // d2rs-own, unverified (D2): Stand Still (command 36) is held while
-    // a key bound to it is down (`ui/controls.md` §4.3 r1).
-    if let (Some(mut walk), Some(bindings), Some(keys)) = (walk, &ui.bindings, keys.as_deref()) {
-        let held = bindings
-            .inputs(crate::controls::Action::StandStill)
-            .iter()
-            .any(|k| {
-                edge::KEY_CODES
-                    .iter()
-                    .any(|&(c, key)| key == *k && keys.pressed(c))
-            });
-        if walk.run.stand_still != held {
-            walk.run.stand_still = held;
+    use crate::controls::{Action, Key};
+    // An input is down: a key, or the middle / X buttons.
+    let down = |k: Key| {
+        let key = keys.as_deref().is_some_and(|ks| {
+            edge::KEY_CODES
+                .iter()
+                .any(|&(c, key)| key == k && ks.pressed(c))
+        });
+        key || match k {
+            Key::MouseMiddle => buttons.pressed(MouseButton::Middle),
+            Key::Mouse4 => buttons.pressed(MouseButton::Back),
+            Key::Mouse5 => buttons.pressed(MouseButton::Forward),
+            _ => false,
         }
+    };
+    // Stand Still (command 36) and Run (command 34) are held while an
+    // input bound to them is down (`ui/controls.md` §3, §4.3 r1–r2: the
+    // down handler sets, the up handler clears; VK 0x10–0x12 both sides).
+    // The Run down handler's walk → run switch of a walking player (mode
+    // 3, C→S 0x53 / 0x54) is not modelled: the flag reaches the next
+    // world click (`RunMods::word`).
+    if let (Some(mut walk), Some(bindings)) = (walk, &ui.bindings) {
+        let still = edge::action_held(bindings, Action::StandStill, &down);
+        if walk.run.stand_still != still {
+            walk.run.stand_still = still;
+        }
+        let run = edge::action_held(bindings, Action::Run, &down);
+        if walk.run.run_held != run {
+            walk.run.run_held = run;
+        }
+    }
+    // Show Items (command 37): ui 0x0D on while held, off on the release.
+    let show = ui
+        .bindings
+        .as_ref()
+        .is_some_and(|b| edge::action_held(b, Action::ShowItems, &down));
+    if let Some(o) = ui.original.as_mut() {
+        o.set_show_items(show)?;
+    }
+    // The middle and X buttons and the wheel call their bound command
+    // (`ui/controls.md` §4.2 r2–r3): no panel takes them.
+    if let Some(bindings) = ui.bindings.clone() {
+        let mut pointer = Vec::new();
+        for (b, k) in [
+            (MouseButton::Middle, Key::MouseMiddle),
+            (MouseButton::Back, Key::Mouse4),
+            (MouseButton::Forward, Key::Mouse5),
+        ] {
+            if buttons.just_pressed(b) {
+                pointer.push(k);
+            }
+        }
+        if let Some(m) = wheel.as_deref() {
+            for e in wheel_cursor.read(m) {
+                // Windows units: 120 per notch.
+                let delta = match e.unit {
+                    bevy::input::mouse::MouseScrollUnit::Line => (e.y * 120.0) as i32,
+                    bevy::input::mouse::MouseScrollUnit::Pixel => e.y as i32,
+                };
+                pointer.extend(edge::wheel_key(&mut wheel_acc, delta));
+            }
+        }
+        let actions = edge::input_actions(&bindings, &pointer);
+        ui.queue.0.extend(actions);
     }
     // d2rs-own, unverified: Shift held, for the shift-click to the belt.
     if let (Some(o), Some(keys)) = (ui.original.as_mut(), keys.as_deref()) {
@@ -565,9 +618,7 @@ fn ui_input(
                 }
                 let vk = match c {
                     KeyCode::Escape => Some(27),
-                    _ => {
-                        edge::key_of(c).and_then(crate::ui::front_end::screens::controls::key_to_vk)
-                    }
+                    _ => edge::key_of(c).and_then(crate::controls::keymap::key_to_vk),
                 };
                 if let Some(vk) = vk {
                     o.controls_key(vk, now);
@@ -610,7 +661,6 @@ fn ui_input(
     for (bevy, button) in [
         (MouseButton::Left, PointerButton::Left),
         (MouseButton::Right, PointerButton::Right),
-        (MouseButton::Middle, PointerButton::Middle),
     ] {
         if inside && buttons.just_pressed(bevy) {
             ui.queue.0.push(UiEvent::Press { button, at });
@@ -864,6 +914,38 @@ fn world_view_frame(
                         a.toggle(&automap_facts(bridge.0.world(), view.open_mode));
                     }
                 }
+                // `ui/controls.md` §3 cmds 8–11, 45 (`ui/automap.md` §8
+                // r2): F9 re-centre, F10 fade, F11 party, F12 names, V the
+                // minimap side.
+                let f = automap_facts(bridge.0.world(), view.open_mode);
+                let mut spare = crate::ui::automap::options::MemoryStore::default();
+                let store: &mut dyn crate::ui::automap::OptionStore =
+                    match state.automap_view.as_mut() {
+                        Some(v) => v.store_mut(),
+                        None => &mut spare,
+                    };
+                for e in &frame.unhandled {
+                    use crate::controls::Action as A;
+                    let UiEvent::Action(id) = *e else {
+                        continue;
+                    };
+                    match A::ALL.get(usize::from(id.0)) {
+                        Some(A::CenterAutomap) => a.map.centre(&f),
+                        Some(A::ToggleAutomapFade) => a.map.options.cycle_fade(store),
+                        Some(A::ToggleAutomapParty) => a.map.options.toggle_party(store),
+                        Some(A::ToggleAutomapNames) => a.map.options.toggle_party_names(store),
+                        Some(A::ToggleMinimap) => a.map.options.toggle_left(store),
+                        _ => {}
+                    }
+                }
+                // Space with nothing to close (`panels.md` §2 r9):
+                // `0x00457640(0)`, then the close-all with the automap.
+                if ui.original.as_mut().is_some_and(|o| o.take_clear_automap()) {
+                    a.map.cleared(&f);
+                    if a.open {
+                        a.toggle(&f);
+                    }
+                }
             }
             // `ui/controls.md` §3 cmd 44: no swap while ui 0x0C, 0x17 or
             // 0x19 is open.
@@ -874,6 +956,9 @@ fn world_view_frame(
             if swap_ok {
                 super::swap_key::send_swaps(&frame.unhandled, &mut bridge.0)?;
             }
+            // `ui/controls.md` §3 cmds 27–33, 55: C→S 0x3F with 0x19 + k
+            // (0x20 for Say 7X).
+            super::swap_key::send_says(&frame.unhandled, &mut bridge.0)?;
             Some(frame)
         }
         None => None,

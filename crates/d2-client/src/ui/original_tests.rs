@@ -1409,3 +1409,48 @@ mod close_hooks {
         assert!(esc(&mut u, &nowhere).is_empty());
     }
 }
+
+/// Key commands with an `OriginalUi` handler (`ui/controls.md` §3).
+mod key_commands {
+    use super::*;
+
+    // Space (command 38): the close-all; with nothing to close, the
+    // automap part is handed to the host once.
+    // Covers: specs/ui/controls.md §3 row23; specs/ui/panels.md §2 r9
+    #[test]
+    fn clear_screen_closes_all_then_asks_for_the_automap() {
+        let w = world(AMAZON, 1, true);
+        let mut u = ui(Some(areas()), true);
+        u.key(&w, Action::ToggleInventory);
+        assert!(u.ui.is_open(1));
+        u.key(&w, Action::ClearScreen);
+        assert!(!u.ui.is_open(1));
+        assert!(!u.ui.take_clear_automap(), "it closed something");
+        u.key(&w, Action::ClearScreen);
+        assert!(u.ui.take_clear_automap());
+        assert!(!u.ui.take_clear_automap());
+        assert!(!u.ui.is_open(9), "Space never opens the game menu");
+    }
+
+    // O (command 54) without a hireling: nothing opens.
+    // Covers: specs/ui/controls.md §3 row32
+    #[test]
+    fn the_hireling_key_needs_a_hireling() {
+        let w = world(AMAZON, 1, true);
+        let mut u = ui(Some(areas()), true);
+        u.key(&w, Action::ToggleHireling);
+        assert!(!u.ui.is_open(0x24));
+    }
+
+    // M (command 3): SetUIState(0x18, toggle, 0).
+    // Covers: specs/ui/controls.md §3 row4
+    #[test]
+    fn m_toggles_the_message_log_state() {
+        let w = world(AMAZON, 1, true);
+        let mut u = ui(Some(areas()), true);
+        u.key(&w, Action::ToggleMessageLog);
+        assert!(u.ui.is_open(0x18));
+        u.key(&w, Action::ToggleMessageLog);
+        assert!(!u.ui.is_open(0x18));
+    }
+}
