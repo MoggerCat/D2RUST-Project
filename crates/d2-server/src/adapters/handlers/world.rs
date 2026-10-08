@@ -928,11 +928,33 @@ pub struct PreviewMoveRest {
     /// The places staged at the start of the call ([`MoveRest::stage`]).
     places: BTreeMap<Owner, StagedPlace>,
     item_format: u16,
+    /// The players' quest flags staged at the start of the call, and the
+    /// writes made since ([`MoveRest::stage_quest_flags`]).
+    quest_flags: BTreeMap<Owner, d2_sim::world::quests::QuestFlags>,
+    quest_writes: Vec<(Owner, u8, u8, bool)>,
 }
 
 impl MovePending for PreviewMoveRest {
     fn send(&mut self, player: Owner, bytes: Vec<u8>) {
         self.sent.push((player, bytes));
+    }
+    /// The staged quest record (`0x0065C310`).
+    fn quest_flag(&self, player: Owner, quest: u8, flag: u8) -> bool {
+        self.quest_flags
+            .get(&player)
+            .is_some_and(|f| f.get(quest, flag))
+    }
+    /// `0x0065C360` / `0x0065C3A0`: applied to the staged copy at once,
+    /// and recorded for the host to write back.
+    fn set_quest_flag(&mut self, player: Owner, quest: u8, flag: u8, on: bool) {
+        if let Some(f) = self.quest_flags.get_mut(&player) {
+            if on {
+                f.set(quest, flag);
+            } else {
+                f.clear(quest, flag);
+            }
+        }
+        self.quest_writes.push((player, quest, flag, on));
     }
     /// d2rs-own, unverified (D1): `0x00641530` is not specified; the
     /// larger of the two sub-tile axis distances of the staged places,
@@ -1043,6 +1065,13 @@ impl MoveRest for PreviewMoveRest {
     fn stage(&mut self, places: &[StagedPlace], item_format: u16) {
         self.places = places.iter().map(|p| (p.owner, *p)).collect();
         self.item_format = item_format;
+    }
+    fn stage_quest_flags(&mut self, flags: &[(Owner, d2_sim::world::quests::QuestFlags)]) {
+        self.quest_flags = flags.iter().copied().collect();
+        self.quest_writes.clear();
+    }
+    fn take_quest_flag_writes(&mut self) -> Vec<(Owner, u8, u8, bool)> {
+        std::mem::take(&mut self.quest_writes)
     }
 }
 

@@ -969,10 +969,32 @@ where
             .hireling_tables
             .is_some()
             .then(|| self.state.hirelings.clone());
-        let out = self.with_economy(game, events, |econ, _| {
+        let out = self.with_economy(game, events, |econ, parts| {
             // d2rs-own, unverified (D1): the preview rest reads the
             // places staged here (`MoveRest::stage`).
             let mut places = Vec::new();
+            // The players' quest flags of the game's difficulty, staged
+            // for the quest-item uses of 0x20 (`inventory-moves.md` §7.11
+            // step 4: `ass`, `xyz`, `tr2`) and written back after the call
+            // (PROVISIONAL, REC-246; d2rs-own, unverified).
+            let difficulty = usize::from(econ.fields.difficulty).min(2);
+            let mut flags = Vec::new();
+            let mut by_owner = Vec::new();
+            for u in econ
+                .game
+                .lists
+                .units_of_type(d2_sim::units::UnitType::Player)
+            {
+                let Some(guid) = econ.units.get(u).map(|r| r.guid) else {
+                    continue;
+                };
+                let owner = d2_sim::items::moves::Owner::player(guid);
+                if let Some(q) = parts.rest.quests(u) {
+                    flags.push((owner, q.flags[difficulty]));
+                    by_owner.push((owner, u));
+                }
+            }
+            inv.rest.stage_quest_flags(&flags);
             for u in econ
                 .game
                 .lists
@@ -994,7 +1016,21 @@ where
             }
             let format = d2_sim::items::ItemGame::item_format(&*econ.fields);
             inv.rest.stage(&places, format);
-            call.call(econ, &mut inv)
+            let out = call.call(econ, &mut inv);
+            for (owner, quest, flag, on) in inv.rest.take_quest_flag_writes() {
+                let Some(&(_, u)) = by_owner.iter().find(|(o, _)| *o == owner) else {
+                    continue;
+                };
+                if let Some(q) = parts.rest.quests(u) {
+                    let f = &mut q.flags[difficulty];
+                    if on {
+                        f.set(quest, flag);
+                    } else {
+                        f.clear(quest, flag);
+                    }
+                }
+            }
+            out
         });
         inv.state.hirelings = None;
         self.inventory = Some(inv);
