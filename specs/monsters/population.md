@@ -34,21 +34,21 @@
 |   3. Room population (`0x0054EC90(game, room)`) | 253–313 |
 |   4. Monster pick (`0x005BDE80(game, region, room, &record, chance, umon)`) | 314–340 |
 |   5. Boss or pack (`0x005BE020(region, room)`) | 341–358 |
-|   6. Random boss (champion or unique) | 359–435 |
-|   7. Packs (`0x0054DF80(game, room, cl, min, max)`, class in EBX) | 436–462 |
-|   8. Spawn point in a coordinate rectangle (`0x0054DC40`) | 463–498 |
-|   9. Placement search and creation call (`0x005B2A00`) | 499–613 |
-|   10. Party minions (monstats minion columns, `0x005B2830`) | 614–660 |
-|   11. Preset monsters (DS1 presets) | 661–799 |
-|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 800–824 |
-|   13. Region bookkeeping | 825–857 |
-|   14. Other table-driven and AI spawns | 858–882 |
-| Constants & data dependencies | 883–953 |
-| Randomness | 954–997 |
-| Edge cases & original bugs | 998–1038 |
-| Test vectors | 1039–1110 |
-| Provenance | 1111–1133 |
-| Open questions | 1134–1187 |
+|   6. Random boss (champion or unique) | 359–441 |
+|   7. Packs (`0x0054DF80(game, room, cl, min, max)`, class in EBX) | 442–468 |
+|   8. Spawn point in a coordinate rectangle (`0x0054DC40`) | 469–504 |
+|   9. Placement search and creation call (`0x005B2A00`) | 505–619 |
+|   10. Party minions (monstats minion columns, `0x005B2830`) | 620–671 |
+|   11. Preset monsters (DS1 presets) | 672–815 |
+|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 816–840 |
+|   13. Region bookkeeping | 841–873 |
+|   14. Other table-driven and AI spawns | 874–898 |
+| Constants & data dependencies | 899–969 |
+| Randomness | 970–1013 |
+| Edge cases & original bugs | 1014–1054 |
+| Test vectors | 1055–1126 |
+| Provenance | 1127–1150 |
+| Open questions | 1151–1209 |
 <!-- /index -->
 
 ## Summary
@@ -391,11 +391,17 @@ Arguments: game, room, cl, x, y, GUID, class, warp check.
 4. Without cl, with a GUID (restore paths, not population): flags 0x62,
    r = −1, then r = 5. Then a §8 search without warp check and r = −1.
    Last, the nearest free point from `0x0064E840` (mask 0x3C01, size 1;
-   `sim/path-placement.md` §8) with r = −1.
-   PROVISIONAL: the creation mode is 1 and the room passed to the
-   creation call is the room holding the nearest free point (because
-   population creates every monster in mode 1 and §9.3 takes the
-   accepted point's room); settled by REC-80.
+   `sim/path-placement.md` §8) with r = −1. Every creation call of
+   `0x005A09E0` passes mode 1 (`push 1` before each of `0x005B3040`,
+   `0x005B2F20`, `0x005B30E0` at `0x005A0A35`, `0x005A0A54`,
+   `0x005A0A76`, `0x005A0A8F`, `0x005A0AB5`, `0x005A0AF7`,
+   `0x005A0B48`). The last try searches from the current point:
+   the §8 point when the §8 search succeeded but its creation failed
+   (`0x0054DC40` writes x, y only on success), else the input (x, y)
+   (`0x005A0B0E`–`0x005A0B27`). `0x0064E840` returns its room through
+   the &room argument (`[ebp+8]`); null → return null (`0x005A0B34`);
+   else the creation gets that room and the moved point
+   (`0x005A0B2F`–`0x005A0B4F`), 1.14d-confirmed.
 5. On success, `0x005A0320(boss, game)`: if the boss has no type flag 8,
    bosses spawned (+0x2C8) of the region of the boss's level id
    (`0x00573520`) += 1. Then type flag 8 is set, and `0x005A09E0` sets
@@ -635,7 +641,7 @@ created with 0x40, so parties never nest.
 3. Each minion: `0x005B23C0(game, leader, class, mode 1, r 4, flags 0x40)`,
    which is §9 around the leader's position, bounded by the leader's
    room box. For each one created, if `SetBoss`: owner data `0x0058F030
-   (game, minion, owner data of leader (0x00451F50), 1, 0, 0)` and
+   (game, minion, leader GUID (`0x00451F50`: unit +0x0C, −1 for none), 1, 0, 0)` and
    `0x0058F100(game, leader, minion)` (minion list).
 4. Act 1 data: fallen1 → 2–3 fallen1 (SetBoss, BossXfer); fallenshaman1 →
    2–6 fallen1 (SetBoss).
@@ -649,10 +655,15 @@ count, set = ¬(flags >> 2) & 1, flags 0x40)` runs:
 1. k = `lo' mod 6` on the leader's unit seed (inlined). For each of count
    minions: point = leader position + offset[6·set + k] (table
    `0x006E2CF0`, i32 pairs); §9 with r = −1; k = (k + 5) mod 6. For each
-   one created: owner data and minion list as in 10.2.3.
-   PROVISIONAL: unconditional here (no `SetBoss` test inside
-   `0x005B2570`) (because 10.3 sets the leader's owner data always);
-   settled by REC-80.
+   one created: owner data and minion list as in 10.2.3, with no
+   `SetBoss` test: `0x005B2570` calls `0x0058F030(game, minion, leader
+   GUID (+0x0C, read once at `0x005B25A8`), 1, 0, 0)` and
+   `0x0058F100(game, leader, minion)` for every created unit
+   (`0x005B26BF`–`0x005B26E4`), 1.14d-confirmed. A set outside 0 … 2
+   becomes 0 (`0x005B2591`–`0x005B259A`). The leader position is the
+   path position (`0x006488C0` / `0x00648900`) for players, monsters
+   and missiles, else the static path's +0x0C / +0x10
+   (`0x005B25AE`–`0x005B260D`).
 2. Offsets, set 0: (−1,−4) (1,4) (1,−3) (−1,3) (0,2) (0,−2). Set 1:
    (−3,−1) (3,1) (2,−1) (−2,1) (1,0) (−1,0). The function accepts set = 2,
    which would read the next table (`0x006E2D50`) and then 16 bytes of
@@ -723,7 +734,7 @@ Let M = monstats count and S = superuniques count.
 
 | hcIdx | Superunique | Population effect (quest effects: quests spec) |
 |---|---|---|
-| 10 | Radament | `roll(5)` + 2 skeleton5 (4) via `0x005B23C0` (r 4, flags 0x40), then one each of 276, 382, 385, 389 (skeleton mages). PROVISIONAL: `roll(5)` on the boss's unit seed, each spawn in mode 1 (because every other boss-minion draw here uses the boss seed and `0x005B23C0` is called with mode 1 in §10.2); settled by REC-81 |
+| 10 | Radament | `roll(5)` + 2 skeleton5 (4) via `0x005B23C0` (r 4, flags 0x40), then one each of 276, 382, 385, 389 (skeleton mages). The `roll(5)` is on the boss's unit seed (`0x0045C390` with seed boss +0x20, `0x005A4CD1`–`0x005A4CD9`); count = roll + 2 (never 0); every spawn is `0x005B23C0(game, boss, class, mode 1, r 4, flags 0x40)` and its result is dropped: no owner data and no minion list for any of them (`0x005A4CE5`–`0x005A4D46`; `0x005B23C0` only places, through `0x005B2A00`), 1.14d-confirmed |
 | 42 | Siege boss (Shenk) | `0x005B24E0(boss, 453 minion1, 1, 20, 20, 0)` (count/radius: Open question 4) |
 | 60 | Nihlathak boss | owner data, then `0x005B24E0(boss, class-for-level(453), 1, 10, 20, 0x40)` |
 | 62 | Baal subject 2 | `0x005B24E0(boss, 381 skmage_cold3, 1, 20, 10, 0x40)` |
@@ -778,9 +789,14 @@ row:
    MaxGrp ≥ MinGrp; cl = `0x0061AD30(room, x, y)`; leader §9 with r −1
    and flags 0; then `roll(MaxGrp − MinGrp + 1)` + MinGrp − 1 members via
    `0x005B2F70` (r 3, flags 0), drawn on the leader's unit seed.
-6. **Any other id** (not a TSV row and not above): PROVISIONAL: nothing
-   is created and nothing is drawn (because every id the 1.14d DS1
-   presets use has a row or a rule here); settled by REC-80.
+6. **Any other id** (not a TSV row and not above): nothing is created
+   and nothing is drawn. The dispatcher `0x0054E600` switches on id − 2
+   (`0x0054E76F`–`0x0054E782`): above 30 unsigned (id < 2 or id > 32)
+   and the byte-table entries of ids 6, 7, 9, 12–16, 19–21 (table
+   `0x0054EB30`, entry 8 → `0x0054EAFE`) return null with no call; the
+   steps before the switch (`0x0061A1B0`, the superunique count
+   `0x00655710`) draw nothing. The handled ids are exactly the TSV ids
+   (2, 3, 4, 5, 8, 10, 11, 17, 18, 22–32), 1.14d-confirmed.
 
 #### 11.6 Class for level (`0x0063EC70(room, class)`, D2MOO `D2Common_11063`)
 
@@ -1116,7 +1132,8 @@ unique with 3 minions), and placement points.
   the asm). `0x005A0760` was read only up to the champion decision.
 - Tables dumped from the PE image (`.rdata`/`.data`): jump tables
   `0x005B2F04`, `0x00547CB0`/`0x00547CB8`, `0x0054E3D8`/`0x0054E3E0`,
-  `0x0054EB74`, `0x0054EB50`/`0x0054EB60`; bit bytes `0x006CE268`; offsets `0x006E2CF0`,
+  `0x0054EB74`, `0x0054EB50`/`0x0054EB60`, `0x0054EB0C`/`0x0054EB30`
+  (special preset ids, §11.5 rule 6); bit bytes `0x006CE268`; offsets `0x006E2CF0`,
   `0x006E2D50`; wanderer tables `0x00731B2C`/`0x00731B30`.
 - D2MOO 1.10f (`MonsterRegion.cpp`, `MonsterChoose.cpp`,
   `MonsterSpawn.cpp`, `MonsterUnique.cpp`, `Monsters.cpp`) was used as a
@@ -1184,3 +1201,8 @@ unique with 3 minions), and placement points.
    `0x00559CE0`), each taking game-seed steps (the item's unit seed and
    item seed) and the item's own rolls (`monsters/init.md` §14.3,
    Randomness step 9). `0x005B21B0` draws nothing (6 levels scanned).
+9. Answered (2026-10-08, pc1-s8, from the asm): the four PROVISIONAL
+   lines are now 1.14d-confirmed rules: §6.3 step 4 (mode 1, the
+   returned room, the search origin), §10.3 step 1 (no `SetBoss` test),
+   §11.4 hcIdx 10 (boss unit seed; no owner data), §11.5 rule 6 (the
+   default switch entry). REC-80 / REC-81 remain as checks only.
