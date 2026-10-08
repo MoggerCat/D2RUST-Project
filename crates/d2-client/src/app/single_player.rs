@@ -239,6 +239,8 @@ fn synthetic_npc_classes() -> impl Iterator<Item = u16> {
     [
         d2_sim::world::npc::class::AKARA,
         d2_sim::world::npc::class::KASHYA,
+        d2_sim::world::npc::class::GHEED,
+        d2_sim::world::npc::class::CHARSI,
         // Warriv (act 1): the act travel of Sisters to the Slaughter
         // (`docs/handoff/q-a1-andariel.md`).
         d2_sim::world::npc::class::WARRIV1,
@@ -802,6 +804,17 @@ impl Pending for LocalSeams {
     }
     fn item_at(&self, unit: UnitId, loc: u8) -> Option<UnitId> {
         self.weapons.item_at(unit, loc)
+    }
+    // d2rs-own, unverified (q-skill-gaps, REC-176): the shield and its
+    // smite damage from the weapon copy.
+    fn shield(&self, unit: UnitId) -> Option<UnitId> {
+        self.weapons.shield(unit)
+    }
+    fn has_shield(&self, unit: UnitId) -> bool {
+        self.weapons.shield(unit).is_some()
+    }
+    fn shield_damage(&self, item: UnitId) -> Option<(i32, i32)> {
+        Some(self.weapons.facts(item).dam)
     }
     fn wield_type(&self, item: UnitId) -> i32 {
         self.weapons.facts(item).grip
@@ -2185,6 +2198,9 @@ impl GameParts {
         // The unit path needs the monster's `monstats` row (the shape).
         action.combat.monstats = synthetic_monstats();
         action.combat.charstats = synthetic_charstats();
+        // The waypoint indexes of the levels (the quest-side
+        // `0x005B4FF0` reads them; q-a4-harrogath).
+        action.levels = wp.levels.clone();
         Ok(GameParts {
             action,
             stats: StatData::default(),

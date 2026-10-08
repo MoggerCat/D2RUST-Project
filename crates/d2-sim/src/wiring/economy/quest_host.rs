@@ -505,6 +505,11 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         self.inner.free_spot(player, size, mask, radius, limit)
     }
     fn create_portal(&mut self, player: UnitId, x: i32, y: i32, class: u16, level: u32) -> bool {
+        if self.inner.econ.hooks.objects.is_some() {
+            return self
+                .view(|g, v| v.create_quest_portal(g, player, (x, y), u32::from(class), level))
+                .is_some();
+        }
         self.inner.create_portal(player, x, y, class, level)
     }
     fn object_by_guid(&self, guid: u32) -> Option<(UnitId, u16)> {
@@ -940,6 +945,18 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     fn act_change(&mut self, player: UnitId, level: u32, arg: u32) {
         use crate::units::lifecycle::LifecycleHooks;
         self.inner.econ.hooks.request_act_change(player, level, arg);
+    }
+    /// `0x005B4FF0`: the level's waypoint index set in the player's
+    /// record of `difficulty` (`waypoints.md` §2; the host's records,
+    /// [`ActionHooks::waypoints`]). A level without a waypoint: nothing.
+    fn activate_waypoint(&mut self, player: UnitId, level: u32, difficulty: u8) {
+        use crate::world::waypoints::WaypointMap;
+        let h = &mut self.inner.econ.hooks;
+        let Some(idx) = WaypointMap::new(&h.tables.levels).index_of_level(level) else {
+            return;
+        };
+        let rec = h.waypoints.entry(player).or_default();
+        let _ = rec.get_mut(difficulty.min(2)).set(u32::from(idx));
     }
     fn player_busy(&mut self, player: UnitId) -> bool {
         self.inner.player_busy(player)

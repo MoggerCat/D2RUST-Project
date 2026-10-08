@@ -474,10 +474,27 @@ fn the_portal_to_harrogath_refuses_then_asks_for_the_act_change() {
     rig.operate(a4::HARROGATH_PORTAL, at);
     let log = rig.rest_log();
     assert!(log.iter().any(|l| l.starts_with("byte 4c")), "{log:?}");
-    assert!(log.iter().any(|l| l.contains("0x5b4ff0")), "{log:?}");
+    // The waypoint call is answered now (it was reported unhandled).
+    assert!(!log.iter().any(|l| l.contains("0x5b4ff0")), "{log:?}");
     let queued = app_support::with(&rig.server, |l| {
         l.host_mut().game.events.action.hooks().act_changes.len()
     });
     assert_eq!(queued, 0, "the host ran the act change");
+    // Diablo dead, portal, arrive in Harrogath (q-a4-harrogath).
+    rig.step(60);
+    assert_eq!(rig.level(), Some(single_player::ACT5_TOWN));
+    // The Harrogath waypoint is lit (`0x005B4FF0`).
+    let lit = app_support::with(&rig.server, |l| {
+        let g = &mut l.host_mut().game;
+        let (p, _) = single_player::local_player(g).unwrap();
+        let d = 0;
+        g.events
+            .action
+            .hooks()
+            .waypoints
+            .get_mut(&p)
+            .map(|r| r.get_mut(d).test(35).unwrap())
+    });
+    assert_eq!(lit, Some(true), "{:?}", rig.rest_log());
     rig.assert_clean();
 }

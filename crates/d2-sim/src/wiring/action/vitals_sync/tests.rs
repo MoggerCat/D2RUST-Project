@@ -139,33 +139,69 @@ fn changed_mod_stats_follow_as_stat_messages_once() {
 }
 
 // Covers: specs/items/inventory.md §5.7 r2
-// d2rs: item lists ride in the stat messages (PROVISIONAL, REC-163).
+// d2rs-own, unverified (REC-177): the item lists ride as the stat lists of
+// the pseudo states 0xFE / 0xFD, the base stat messages stay the base.
 #[test]
-fn linked_item_stats_follow_as_stat_messages() {
+fn linked_item_stats_follow_as_a_state_list() {
+    use crate::skills::use_::bodies::{BodyStat, BodyTables};
+    use std::sync::Arc;
     let (mut f, p, c) = fx();
     f.sim.sys.hooks.enable_vitals_sync();
+    // Send widths for max life (stat 7, 32 bits) and defense (31, 16 bits).
+    let mut bodies = BodyTables {
+        stats: vec![BodyStat::default(); 32],
+        ..BodyTables::default()
+    };
+    for (id, bits) in [(7usize, 32u8), (31, 16)] {
+        bodies.stats[id].send_bits = bits;
+    }
+    f.sim.sys.hooks.bodies = Some(Arc::new(bodies));
     run_fx(&mut f, c, false).unwrap();
     let a = f.a;
     let item = f.spawn(UnitType::Item, 0, a, 10, 12);
-    f.stats(item, &[(31, 12), (stat::STRENGTH, 3)]);
+    f.stats(item, &[(31, 12), (stat::MAXHP, 5 << 8)]);
     // Not linked: nothing changes for the player.
     assert!(run_fx(&mut f, c, false).unwrap().is_empty());
     let s = &mut f.sim.sys;
-    let (pr, ir) = (
-        s.stats.unit_list(p).unwrap(),
-        s.stats.unit_list(item).unwrap(),
-    );
-    let _ = pr;
+    let ir = s.stats.unit_list(item).unwrap();
     s.stats.equip(&mut s.hooks, p, Some(ir), false, true);
     let got = run_fx(&mut f, c, false).unwrap();
-    for m in [vec![0x1D, 31, 12], vec![0x1D, 0, 3]] {
-        assert!(got.contains(&m), "{m:02X?} in {got:02X?}");
-    }
+    // The base is untouched: no 0x1D for defense, max life stays 50.
+    assert!(
+        !got.iter().any(|m| m[0] == 0x1D && m[1] == 31),
+        "{got:02X?}"
+    );
+    let set: Vec<_> = got
+        .iter()
+        .filter(|m| m[0] == 0xA8 && m[7] == 0xFE)
+        .collect();
+    assert_eq!(set.len(), 1, "one SetState 0xFE in {got:02X?}");
+    assert!(
+        !got.iter().any(|m| m[0] == 0xA9),
+        "no end before a first list"
+    );
+    // The stream: stat 7 = 5 << 8 (32 bits), stat 31 = 12 (16 bits), end.
+    let mut bits = 0u128;
+    let mut n = 0;
+    let mut put = |v: u128, w: u32| {
+        bits |= v << n;
+        n += w;
+    };
+    put(7, 9);
+    put(5 << 8, 32);
+    put(31, 9);
+    put(12, 16);
+    put(0x1FF, 9);
+    let want: Vec<u8> = bits.to_le_bytes()[..(n as usize).div_ceil(8)].to_vec();
+    assert_eq!(&set[0][8..], &want[..], "{:02X?}", set[0]);
     assert!(run_fx(&mut f, c, false).unwrap().is_empty(), "sent once");
+    // Detached: the list ends.
     let s = &mut f.sim.sys;
     s.stats.detach(&mut s.hooks, ir);
     let got = run_fx(&mut f, c, false).unwrap();
-    for m in [vec![0x1D, 31, 0], vec![0x1D, 0, 0]] {
-        assert!(got.contains(&m), "{m:02X?} in {got:02X?}");
-    }
+    assert!(
+        got.iter().any(|m| m[0] == 0xA9 && m[6] == 0xFE),
+        "{got:02X?}"
+    );
+    assert!(!got.iter().any(|m| m[0] == 0xA8), "{got:02X?}");
 }

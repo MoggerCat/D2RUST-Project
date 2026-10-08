@@ -568,6 +568,8 @@ impl ItemsUi {
     }
 }
 
+#[path = "inv_items_repair.rs"]
+mod repair;
 #[path = "inv_items_socket.rs"]
 pub mod socket;
 #[path = "inv_items_tip.rs"]

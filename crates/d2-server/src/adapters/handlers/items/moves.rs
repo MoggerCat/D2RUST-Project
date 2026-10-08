@@ -244,6 +244,47 @@ impl MoveCall for CorpseFillRun {
     }
 }
 
+/// C→S 0x60 SwapWeapons. Its body (`0x005616A0`) is unwritten
+/// (`intents-events.md` open question 16): d2rs-own, unverified, REC-177
+/// ([`InvDesk::swap_weapon_sets`]). A host without the inventory parts
+/// keeps the player handler's stub.
+pub const SWAP_WEAPONS: u8 = 0x60;
+
+struct SwapRun {
+    player: UnitId,
+}
+
+impl MoveCall for SwapRun {
+    type Out = (bool, Vec<(Option<UnitId>, Vec<u8>)>);
+    fn call<H: LifecycleHooks>(self, econ: &mut Economy<'_, H>, parts: &mut InvParts) -> Self::Out {
+        let mut d = parts.desk(econ);
+        let owner = d.owner_of(self.player);
+        let ok = owner.is_some_and(|o| d.swap_weapon_sets(o));
+        (ok, take_sent(&mut d))
+    }
+}
+
+fn swap_weapons<D: EventDispatch, W: WorldHost<D>>(
+    sim: &mut SimGame<D, W>,
+    client: ClientId,
+    out: &mut dyn MessageSink,
+) -> Option<ResultCode> {
+    let player = sim.player_of(client)?;
+    let (game, events) = (&mut sim.game, &mut sim.events);
+    let (ok, sent) = sim.world.moves(game, events, SwapRun { player })?;
+    for (unit, bytes) in sent {
+        if let Some(c) = unit.and_then(|u| sim.client_of(u)) {
+            // A full queue is the host's fault elsewhere; the swap stands.
+            let _ = out.queue(c, &bytes);
+        }
+    }
+    Some(if ok {
+        ResultCode::Done
+    } else {
+        ResultCode::Refused
+    })
+}
+
 /// The handler of an item-move id after the dispatcher's gate and size
 /// check (`intents-events.md` §2.3–§2.4). `None`: not an item-move id,
 /// no player, or a host without the inventory parts, so the caller
@@ -259,6 +300,9 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
     out: &mut dyn MessageSink,
 ) -> Option<ResultCode> {
     let id = *msg.first()?;
+    if id == SWAP_WEAPONS && size == 1 {
+        return swap_weapons(sim, client, out);
+    }
     if !is_move_id(id) {
         return None;
     }

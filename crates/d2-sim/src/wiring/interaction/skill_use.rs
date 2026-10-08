@@ -138,6 +138,36 @@ pub struct UseView<'a, X> {
     pub cv: CombatView<'a, X>,
 }
 
+impl<X: Pending + UseRest> UseView<'_, X> {
+    /// The weapon-type test `0x00643F80` of `use_state` rule 5
+    /// (`client/stat-lists.md` §2 r8): the skill's `itypea1` against the
+    /// items at body locations 4 and 5, `etypea1` excluded.
+    // PROVISIONAL (REC-176): the spec names `itypea1` / `etypea1`; the
+    // columns `itypea2`, `itypea3` and `etypea2` are read the same way
+    // (a crossbow satisfies Magic Arrow's `itypea2`), and the hands
+    // combine as "some hand holds a wanted item that is not excluded".
+    // No wanted type (0xFFFF, or 0 of a blank test row) asks nothing.
+    fn weapon_type_ok(&self, u: UnitId, skill: i32) -> bool {
+        let Some(r) = self.cv.v.h.tables.skills.skill(skill) else {
+            return true;
+        };
+        let set = |v: u16| (v != 0 && v != 0xFFFF).then_some(i32::from(v));
+        let want: Vec<i32> = [r.itypea1, r.itypea2, r.itypea3]
+            .into_iter()
+            .filter_map(set)
+            .collect();
+        let not: Vec<i32> = [r.etypea1, r.etypea2].into_iter().filter_map(set).collect();
+        if want.is_empty() {
+            return true;
+        }
+        [4u8, 5].into_iter().any(|loc| {
+            self.item_at(u, loc).is_some_and(|i| {
+                want.iter().any(|&t| self.item_is(i, t)) && !not.iter().any(|&t| self.item_is(i, t))
+            })
+        })
+    }
+}
+
 impl<X: Pending + UseRest> ActionSim<X> {
     /// Runs `f` with the skill use pipeline's view (message handlers,
     /// the do / periodic event handlers, tests).
@@ -159,6 +189,22 @@ impl<X: Pending + UseRest> UseView<'_, X> {
     /// otherwise.
     fn list(&self, u: UnitId) -> Option<&crate::skills::list::SkillList> {
         self.cv.v.h.skill_lists.get(&u)
+    }
+    fn dynamic_path(&self, u: UnitId) -> Option<&crate::path::DynamicPath> {
+        self.cv.v.h.paths.as_ref()?.dynamic(u)
+    }
+    fn list_entry(&self, u: UnitId, e: &SkillEntry) -> Option<&crate::skills::list::ListEntry> {
+        let l = self.list(u)?;
+        l.entries.get(l.find(e.skill, e.owner_guid)?)
+    }
+    fn list_entry_mut(
+        &mut self,
+        u: UnitId,
+        e: &SkillEntry,
+    ) -> Option<&mut crate::skills::list::ListEntry> {
+        let l = self.list_mut(u)?;
+        let i = l.find(e.skill, e.owner_guid)?;
+        l.entries.get_mut(i)
     }
     fn list_mut(&mut self, u: UnitId) -> Option<&mut crate::skills::list::SkillList> {
         self.cv.v.h.skill_lists.get_mut(&u)
@@ -407,11 +453,19 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
             None => self.xm().set_used_skill(u, e),
         }
     }
+    /// The used entry's flags word (+0x0C; `use.md` §5.2 step 2): the
+    /// skill list's entry when the unit has one, else the seam.
     fn used_skill_flags(&self, u: UnitId) -> u32 {
-        self.x().used_skill_flags(u)
+        match self.list(u).and_then(|l| l.entries.get(l.current?)) {
+            Some(e) => e.flags,
+            None => self.x().used_skill_flags(u),
+        }
     }
     fn set_used_skill_flags(&mut self, u: UnitId, f: u32) {
-        self.xm().set_used_skill_flags(u, f);
+        match self.list_mut(u).and_then(|l| l.entries.get_mut(l.current?)) {
+            Some(e) => e.flags = f,
+            None => self.xm().set_used_skill_flags(u, f),
+        }
     }
     fn entry_mode(&self, u: UnitId, e: &SkillEntry) -> u32 {
         match self.list(u) {
@@ -428,7 +482,11 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
         self.xm().set_attack_param4(u, v);
     }
     fn use_state(&mut self, u: UnitId, e: &SkillEntry) -> UseState {
-        self.xm().use_state(u, e)
+        let st = self.xm().use_state(u, e);
+        if st == UseState::Usable && !self.weapon_type_ok(u, e.skill) {
+            return UseState::NoQuantity;
+        }
+        st
     }
     /// `0x0056C3F0` (`bodies.md` §2.5).
     fn dec_quantity(&mut self, u: UnitId, _skill: i32) {
@@ -524,8 +582,18 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
     fn set_event_arg(&mut self, u: UnitId, a: i32) {
         self.xm().set_event_arg(u, a);
     }
+    /// `0x00553490` / `0x00554CA0`: the path provider's step (2 when the
+    /// path is finished); without one the host's seam.
     fn step_path(&mut self, u: UnitId) -> i32 {
-        self.xm().step_path(u)
+        if self.cv.v.h.paths.is_none() {
+            return self.xm().step_path(u);
+        }
+        let mut p = crate::wiring::path::walk::PathCtx::of(&mut self.cv.v, &mut *self.cv.game);
+        let st = p.step(u);
+        match st {
+            Some(crate::path::walk::Step::Stopped) => 2,
+            _ => 0,
+        }
     }
     /// `0x005541B0` on the unit record.
     fn is_alive(&self, u: UnitId) -> bool {
@@ -1081,16 +1149,35 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         })
     }
     fn entry_param(&self, u: UnitId, e: &SkillEntry, i: u8) -> i32 {
-        Pending::entry_param(self.x(), u, e, i)
+        match self.list_entry(u, e).zip(i.checked_sub(1)) {
+            Some((l, k)) => l.params.get(usize::from(k)).copied().unwrap_or(0),
+            None => Pending::entry_param(self.x(), u, e, i),
+        }
     }
     fn set_entry_param_of(&mut self, u: UnitId, e: &SkillEntry, i: u8, v: i32) {
-        self.xm().set_entry_param_of(u, e, i, v);
+        match self.list_entry_mut(u, e) {
+            Some(l) => {
+                if let Some(p) = i
+                    .checked_sub(1)
+                    .and_then(|k| l.params.get_mut(usize::from(k)))
+                {
+                    *p = v;
+                }
+            }
+            None => self.xm().set_entry_param_of(u, e, i, v),
+        }
     }
     fn entry_flags(&self, u: UnitId, e: &SkillEntry) -> u32 {
-        self.x().entry_flags(u, e)
+        match self.list_entry(u, e) {
+            Some(l) => l.flags,
+            None => self.x().entry_flags(u, e),
+        }
     }
     fn set_entry_flags(&mut self, u: UnitId, e: &SkillEntry, f: u32) {
-        self.xm().set_entry_flags(u, e, f);
+        match self.list_entry_mut(u, e) {
+            Some(l) => l.flags = f,
+            None => self.xm().set_entry_flags(u, e, f),
+        }
     }
     fn set_entry_mode(&mut self, u: UnitId, e: &SkillEntry, m: u32) {
         self.xm().set_entry_mode(u, e, m);
@@ -1142,7 +1229,8 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         }
     }
     fn pattern_collides(&self, r: RoomId, at: (i32, i32), u: UnitId, mask: u32) -> bool {
-        self.x().pattern_collides(r, at, u, mask)
+        self.rooms_pattern_collides(r, at, u, mask)
+            .unwrap_or_else(|| self.x().pattern_collides(r, at, u, mask))
     }
     fn box_collides(&self, r: RoomId, at: (i32, i32), size: i32, mask: u32) -> bool {
         self.rooms_box_collides(r, at, size, mask)
@@ -1173,11 +1261,18 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     fn has_path(&self, u: UnitId) -> bool {
         self.cv.v.h.path_has(u)
     }
+    /// `0x006487D0`: the path record's point count, on the path provider.
     fn path_point_count(&self, u: UnitId) -> i32 {
-        self.x().path_point_count(u)
+        match self.dynamic_path(u) {
+            Some(d) => d.point_count as i32,
+            None => self.x().path_point_count(u),
+        }
     }
     fn path_last_point(&self, u: UnitId) -> (i32, i32) {
-        self.x().path_last_point(u)
+        match self.dynamic_path(u) {
+            Some(d) => d.live_points().last().map_or((0, 0), |p| (p.x, p.y)),
+            None => self.x().path_last_point(u),
+        }
     }
     fn path_target_point(&self, u: UnitId) -> (i32, i32) {
         self.cast_target_point(u)
@@ -1196,7 +1291,27 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         }
     }
     fn mode_request(&mut self, m: UnitId, mode: i32, target: Option<UnitId>) -> i32 {
-        Pending::mode_request(self.xm(), m, mode, target)
+        let r = Pending::mode_request(self.xm(), m, mode, target);
+        // d2rs-own, unverified (q-skill-gaps, REC-176): without a host
+        // answer the request is the monster mode set `0x005A7E60` +
+        // `0x005A7C20` (`units.md` §4.6) itself, so a revived corpse
+        // stands up.
+        let monster = self
+            .cv
+            .v
+            .units
+            .get(m)
+            .is_some_and(|r| r.ty == UnitType::Monster);
+        match u32::try_from(mode) {
+            Ok(mode) if r == 0 && monster => {
+                if let Some(t) = target {
+                    let t = crate::monsters::ai::ModeTarget::Unit(t);
+                    self.cv.v.h.x.set_mode_target(m, t);
+                }
+                i32::from(self.cv.v.monster_set_mode(&mut *self.cv.game, m, mode))
+            }
+            _ => r,
+        }
     }
     /// An item unit is its own item handle here.
     fn as_item(&self, u: UnitId) -> Option<UnitId> {

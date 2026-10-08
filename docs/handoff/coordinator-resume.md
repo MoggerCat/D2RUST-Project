@@ -8,7 +8,7 @@ rules are `docs/handoff/build-loop.md`, the task rows are
 
 ## State at hand-over (2026-10-08 ~09:20 UTC, second account switch)
 
-- `main`: includes PR #48 (through q-sorc).
+- `main`: includes PR #49 (merged 09:3x UTC; everything in the first list below).
 - `claude/specs-staging-7`: green (6,855 tests sim/server/client/
   test-fixtures). Merged after #48: q-mercs-acts, q-paladin,
   q-item-uniques, q-weapon-combat, q-assassin, q-gamble, q-barb,
@@ -16,38 +16,41 @@ rules are `docs/handoff/build-loop.md`, the task rows are
   q-menu rows), q-render-polish, q-wp-warp, q-levels-warps-all,
   q-menu-shell, q-config, q-perf, q-light-radius-detail. If a snapshot
   PR (`claude/release-8c`) is open, it carries these; merge it on green.
-- Sessions launched by the previous coordinator, each on its own
-  `claude/<task>` branch and reporting to that (now gone) coordinator.
-  Check each branch's head and its `docs/handoff/q-<task>.md`; merge the
-  finished ones with the recipe below, relaunch the unfinished ones:
-
-  | task | REC | note |
-  |---|---|---|
-  | q-skill-moves | 173 | Leap / Whirlwind / Dragon Flight on body_path.rs |
-  | q-a2-tyrael | 174 | Duriel AI, Tyrael, travel east |
-  | q-a4-harrogath | 175 | Fortress -> Harrogath move |
-  | q-skill-gaps | 176 | Sacrifice/Smite/Zeal, curses, summons |
-  | q-town-gaps | 177 | single repair, vendors, weapon swap, panel totals |
-  | q-menu-host | 178 | Bevy host for `ui::front_end` |
-  | q-menu-main | 179 | screens/main_menu.rs |
-  | q-menu-charselect | 180 | screens/char_select.rs |
-  | q-menu-create | 181 | screens/create.rs |
-  | q-menu-difficulty | 182 | screens/difficulty.rs |
-  | q-menu-loading | 183 | screens/loading.rs |
-  | q-menu-controls | 184 | screens/controls.rs |
-  | q-menu-credits | 185 | screens/credits.rs |
-  | q-menu-cinematics | 186 | screens/cinematics.rs |
-
-  Menu screen sessions were told to edit only their own screen file.
+- Also merged (after PR #49 opened; not in it): q-a2-tyrael, q-town-gaps,
+  q-menu-host, q-menu-loading, q-menu-difficulty, q-menu-create,
+  q-menu-cinematics, q-menu-controls (6,900 tests).
+- **Check first (logged test change, q-town-gaps merge):** q-charms
+  (REC-163) sent item-bonus totals in the base stat messages 0x1D;
+  q-town-gaps changed that to base-only 0x1D plus bonus lists on pseudo
+  states 0xFE/0xFD (0xA9), and rewrote the two vitals_sync tests to
+  match. Neither is the original's wire behavior (the 1.14d client sums
+  item stats itself): settle it against `specs/` and a trace, then fix
+  one way. The frame-loop / single-player packet counts in the same merge
+  only add Gheed's and Charsi's packets.
+- Also merged: q-skill-moves, q-skill-gaps, q-a4-harrogath, q-menu-main,
+  q-menu-charselect, q-menu-credits (6,943 tests). No sessions are
+  running at hand-over; every launched task is merged.
+- Open items the last sessions reported (queue them as rows):
+  - front end: the shared draw() ignores pressed state and has no fire
+    overlay; the host does not yet draw credits rows, create's hero
+    DrawItems or the controls draw_list; Options needs an arm into
+    CONTROLS; difficulty/char-select/host wiring of the 0x67 start flags;
+    loading screen not wired to the bridge; text drawn as bars only
+  - skills: Whirlwind hits along the path (needs a trace for use.md
+    §5.2), Leap landing damage, Dragon Talon kick damage, Lightning
+    Sentry's missiles, dual claws
+  - Act II: Tyrael's door (153), Tyrael/Duriel placed by the world
+  - Act IV: soulstone / hammer / gem item rows (needs synthetic
+    ItemTables + InvTables in GameParts::synthetic: its own session)
 - Queue row not started: `q-menu-options` (needs q-config, merged; it
   replaces q-config's simple Esc Options page with the full menu tree).
   Use REC-187.
 
 ## REC ids
 
-Staging uses up to REC-177 plus REC-230 (q-levels-warps-all); the front-
+Staging uses up to REC-186 plus REC-230 (REC-231 was renumbered away everywhere) (q-levels-warps-all); the front-
 end specs use REC-200..213 and REC-220..229. 164, 169 and 171 were
-reserved and never used. Next free: REC-187 (then 188, 189, 231+).
+reserved and never used. Next free: REC-187 (then 188, 189, 231+). Every menu session picked REC-231 (the next number after 230): tell sessions their id explicitly.
 Sessions often pick a taken id; on merge, renumber only the branch's new
 lines with `python3 tools/coord/renum.py REC-OLD REC-NEW` (run during an
 uncommitted merge, from the repo root).

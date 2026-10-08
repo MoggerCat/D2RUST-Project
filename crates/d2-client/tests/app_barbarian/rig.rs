@@ -21,7 +21,7 @@ use d2_client::world_view::tile_assets::TileAssets;
 use d2_client::world_view::unit_assets::{MonsterRow, UnitLooks};
 use d2_data::bin::BinTable;
 use d2_data::fixup::maps::StateMaps;
-use d2_data::tables::{Monstats, Monstats2, Record, Skills, States};
+use d2_data::tables::{Charstats, Monstats, Monstats2, Record, Skills, States};
 use d2_formats::animdata::{self, AnimData, AnimRecord};
 use d2_server::adapters::ProtoSizes;
 use d2_server::host::Host;
@@ -159,6 +159,8 @@ pub fn skill_row(skill: usize) -> Skills {
         }
         LEAP => {
             (s.srvstfunc, s.srvdofunc) = (40, 77);
+            // The leap's reach (`aurarangecalc`, `bodies-2.md` §2.13).
+            s.aurarangecalc = RESIST_CALC;
         }
         WHIRLWIND => {
             (s.srvstfunc, s.srvdofunc) = (38, 76);
@@ -326,6 +328,12 @@ fn install_fixtures(sim: &mut single_player::Sim, learned: &[usize]) {
     let mut combat = fx::combat_tables();
     combat.monstats = monstats.clone();
     combat.monstats2 = monstats2.clone();
+    // d2rs-own, unverified: made-up speeds so the leap and the whirl
+    // have a velocity (`charstats.txt` RunVelocity / WalkVelocity).
+    let mut cs = Charstats::decode(&[0u8; Charstats::SIZE]);
+    cs.walkvelocity = 6;
+    cs.runvelocity = 9;
+    combat.charstats = (0..7).map(|_| cs.clone()).collect();
     s.hooks.tables = Arc::new(ActionTables {
         missiles: vec![fx::arrow()],
         skills,
