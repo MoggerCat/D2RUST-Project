@@ -241,11 +241,19 @@ fn inv_tables() -> InvTables {
                 useable: r.5,
                 stackable: r.6,
                 maxstack: r.7,
+                // `misc.txt` `pSpell` 2 for `tsc` / `tbk` (`items/use.md`
+                // §3).
+                pspell: if matches!(&r.0, b"tsc " | b"tbk ") {
+                    2
+                } else {
+                    0
+                },
                 ..InvItemRec::default()
             })
             .collect(),
         itemtypes,
         equiv: equiv(),
+        books: Vec::new(),
     }
 }
 
@@ -1254,17 +1262,22 @@ fn use_belt_item() {
     assert!(t.rest.take_log().is_empty());
 }
 
-/// 0x20 (§7.11) of a Town Portal scroll (REC-117): used and consumed
-/// (0x9D with flag 0x20); a tome is used and stays.
-// Covers: specs/items/inventory-moves.md §7.11
+/// 0x20 (§7.11) of a Town Portal scroll or tome on a host without the
+/// object state: the item use (`items/use.md` §1, entry 2) runs the cast,
+/// which has no host, so the use fails: the failure reset (S→C 0x3F) and
+/// S→C 0x7C, nothing consumed (§7.11 rule 3 needs a nonzero result).
+/// The made pair and its charge: `d2_sim` `wiring::inventory` item-use
+/// tests and `wiring::action` travel tests.
+// Covers: specs/items/inventory-moves.md §7.11 r3; specs/items/use.md §1 r5, §2
 #[test]
 fn use_town_portal_scroll_and_tome() {
     let mut t = setup();
     let s = t.picked(TSC);
     let (code, bytes) = t.frame(&msg(0x20, &[s, 0, 0]));
     assert_eq!(code, Done);
-    assert!(bytes.iter().any(|m| m[0] == 0x9D), "{bytes:?}");
-    // A tome is not consumed by the move handler (REC-117).
+    assert!(!bytes.iter().any(|m| m[0] == 0x9D), "{bytes:?}");
+    assert!(bytes.iter().any(|m| m[0] == 0x7C), "{bytes:?}");
+    assert!(bytes.iter().any(|m| m[0] == 0x3F), "{bytes:?}");
     let b = t.picked(TBK);
     let (code, bytes) = t.frame(&msg(0x20, &[b, 0, 0]));
     assert_eq!(code, Done);

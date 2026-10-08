@@ -342,6 +342,7 @@ pub fn inv_tables(t: &ItemTables) -> InvTables {
             .collect(),
         itemtypes,
         equiv: t.equiv.clone(),
+        books: Vec::new(),
     }
 }
 

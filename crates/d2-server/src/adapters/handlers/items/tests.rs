@@ -245,6 +245,7 @@ fn inv_tables() -> InvTables {
             N_TYPES
         ],
         equiv: equiv(),
+        books: Vec::new(),
     }
 }
 

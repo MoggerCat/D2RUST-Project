@@ -216,14 +216,24 @@ impl<X: Pending> ActionSim<X> {
         self.with(game, |g, v| v.warp_tile_message(g, player, guid))
     }
 
-    /// The Town Portal scroll or tome of `player` ([`View::create_town_portal`]):
-    /// the pair's units. `None`: nothing was created.
+    /// The Town Portal cast of `player` without an item
+    /// ([`View::town_portal_cast`], `objects-2.md` §27.1): the pair's
+    /// units (object 1 next to the player, object 2 in town). `None`:
+    /// refused or not made.
     pub fn open_town_portal(
         &mut self,
         game: &mut Game,
         player: UnitId,
     ) -> Option<(UnitId, UnitId)> {
-        self.with(game, |g, v| v.create_town_portal(g, player))
+        self.with(game, |g, v| {
+            let (made, _) = v.town_portal_cast(g, player);
+            if made == 0 {
+                return None;
+            }
+            let g1 = v.h.portals.player_portal(player)?;
+            let o1 = g.lists.find_unit(crate::units::UnitType::Object, g1)?;
+            Some((o1, v.portal_partner(g, o1)?))
+        })
     }
 
     fn log(&mut self, r: Result<(), WiringError>) {
@@ -239,13 +249,9 @@ impl<X: Pending> EventDispatch for ActionSim<X> {
     }
 }
 
-impl<X: Pending> TickHooks for ActionSim<X> {
-    /// Per-client update removals (`0x0053A770`, `tick.md` §6 rule 5):
-    /// S→C 0x0A (`messages::remove_unit`) to the client's player for each
-    /// removal record in the client room's adjacent rooms. PROVISIONAL
-    /// (REC-281): the records are the freed ground items'
-    /// (`ActionHooks::removed_items`).
-    fn send_removed_units(&mut self, game: &mut Game, client: ClientId) {
+impl<X: Pending> ActionSim<X> {
+    /// The freed ground items' removal records (PROVISIONAL, REC-281).
+    fn send_removed_items(&mut self, game: &mut Game, client: ClientId) {
         let h = &mut self.sys.hooks;
         if h.removed_items.is_empty() {
             return;
@@ -268,10 +274,24 @@ impl<X: Pending> TickHooks for ActionSim<X> {
             }
         }
     }
+}
+
+impl<X: Pending> TickHooks for ActionSim<X> {
+    /// Per-client update removals (`0x0053A770`, `tick.md` §6 rule 5):
+    /// S→C 0x0A (`messages::remove_unit`) to the client's player for each
+    /// removal record in the client room's adjacent rooms. PROVISIONAL
+    /// (REC-281): the records are the freed ground items'
+    /// (`ActionHooks::removed_items`).
+    fn send_removed_units(&mut self, game: &mut Game, client: ClientId) {
+        self.send_removed_items(game, client);
+        // The room delete lists (`tick.md` §6.5, [`View::send_room_deletes`]).
+        self.with(game, |g, v| v.send_room_deletes(g, client));
+    }
 
     /// Step 7 (`0x0061A2C0`): the room's removal records are freed.
     fn free_removal_records(&mut self, _: &mut Game, room: RoomId) {
         self.sys.hooks.removed_items.retain(|&(_, r)| r != room);
+        self.sys.hooks.room_deletes.remove(&room);
     }
 
     /// Step 1 `0x0061C040(act, a)` (`render/lighting.md` §9.3 rule 5):

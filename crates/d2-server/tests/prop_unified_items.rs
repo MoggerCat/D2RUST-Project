@@ -543,6 +543,7 @@ fn inv_tables() -> InvTables {
             .collect(),
         itemtypes,
         equiv: equiv(),
+        books: Vec::new(),
     }
 }
 

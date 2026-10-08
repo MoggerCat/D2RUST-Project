@@ -154,6 +154,16 @@ impl<'a, X: Pending> PathCtx<'a, X> {
         }
     }
 
+    /// `0x00650BE0(path, room, x, y)` (`path-placement.md` §6 rule 4):
+    /// the teleport ([`PathCtx::teleport`]), then the path's point count
+    /// := 0.
+    pub fn teleport_clear(&mut self, unit: UnitId, room: Option<RoomId>, x: i32, y: i32) {
+        self.teleport(unit, room, x, y);
+        if let Some(d) = self.v.h.paths.as_mut().and_then(|p| p.dynamic_mut(unit)) {
+            d.point_count = 0;
+        }
+    }
+
     /// Room-change messages `0x00554670(game, unit, 0)` (`pathing.md`
     /// §9.8).
     pub fn room_change_messages(&mut self, unit: UnitId) {

@@ -933,11 +933,6 @@ where
         self.start_item_walk(game, events, walk);
     }
 
-    /// The Town Portal pair on the action wiring (REC-117).
-    fn town_portal(&mut self, game: &mut Game, events: &mut D, player: UnitId) -> bool {
-        WorldHost::<D>::town_portal(&mut self.action, game, events, player)
-    }
-
     /// The tick with this world's quest parts lent to the action hooks
     /// ([`WiredWorld::lend_quests`]): quest object inits run inside their
     /// allocation and object event 7 inside its timer event, in the tick

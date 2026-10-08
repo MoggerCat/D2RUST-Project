@@ -207,11 +207,6 @@ where
         events.action().warp_tile_message(game, player, guid)
     }
 
-    /// The Town Portal pair on the action wiring (REC-117).
-    fn town_portal(&mut self, game: &mut Game, events: &mut D, player: UnitId) -> bool {
-        events.action().open_town_portal(game, player).is_some()
-    }
-
     fn skill(&mut self, call: SkillCall<'_, D>) -> Option<SkillHandled> {
         self.skills.handle(call)
     }

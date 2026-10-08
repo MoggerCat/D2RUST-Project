@@ -74,6 +74,23 @@ pub trait LifecycleHooks: UnitHooks {
         false
     }
 
+    /// The Town Portal cast `0x005BE290(game, player; item, …)`
+    /// (`world/objects-2.md` §27.1), word 1 of item-use entry 2
+    /// (`items/use.md` §4), asked by the item use of a call that holds
+    /// the units and the game seed (`seed`: the call's game seed, drawn by
+    /// the portal objects' allocation, `rng.md` §5.3): the result (1 made,
+    /// 0 not) and whether the cast's own S→C 0x7C for the item is due
+    /// (step 9). Provider: the host that owns the objects and the path
+    /// code; `None` (the default): no such host, nothing happens.
+    fn town_portal_cast(
+        &mut self,
+        sim: &mut Sim<'_>,
+        seed: &mut Seed,
+        player: UnitId,
+    ) -> Option<(u32, bool)> {
+        None
+    }
+
     /// The free routine's other calls (§1 table) and `0x005C0A90`,
     /// `0x00571F40` at removal. Provider: the kind's spec.
     fn free_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}

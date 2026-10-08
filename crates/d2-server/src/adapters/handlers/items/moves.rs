@@ -221,10 +221,13 @@ pub(crate) struct MoveRun<'m> {
 pub(crate) type MoveOut = (
     Option<Result<u32, MoveFatal>>,
     Vec<(Option<UnitId>, Vec<u8>)>,
-    Vec<UnitId>,
     Vec<(UnitId, UnitId, bool)>,
 );
 
+/// The item use inside the handler (`items/use.md` §1) runs the Town
+/// Portal cast on the economy's hooks (`LifecycleHooks::town_portal_cast`),
+/// so a 0x20 / 0x26 / 0x27 charges the scroll or tome only when the cast
+/// made the pair (`inventory-moves.md` §7.11 rule 3, §7.17).
 impl MoveCall for MoveRun<'_> {
     type Out = MoveOut;
     fn call<H: LifecycleHooks>(self, econ: &mut Economy<'_, H>, parts: &mut InvParts) -> MoveOut {
@@ -232,9 +235,8 @@ impl MoveCall for MoveRun<'_> {
         let guid = d.guid_of(self.player);
         let r = sim_moves::handle(&mut d, guid, self.msg);
         d.flush_equip();
-        let portals = d.take_portal_requests();
         let walks = d.take_item_walks();
-        (r, take_sent(&mut d), portals, walks)
+        (r, take_sent(&mut d), walks)
     }
 }
 
@@ -345,11 +347,7 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
     // Every item-move id has a fixed size ≤ 17 (`client-messages.tsv`).
     let msg = &msg[..size.min(msg.len())];
     let (game, events) = (&mut sim.game, &mut sim.events);
-    let (run, sent, portals, walks) = sim.world.moves(game, events, MoveRun { player, msg })?;
-    // REC-117: a used Town Portal scroll / tome opens its pair.
-    for p in portals {
-        sim.world.town_portal(game, events, p);
-    }
+    let (run, sent, walks) = sim.world.moves(game, events, MoveRun { player, msg })?;
     // §7.1 step 2: a pick-up out of reach runs the player to the item.
     for w in walks {
         sim.world.item_walk(game, events, w);

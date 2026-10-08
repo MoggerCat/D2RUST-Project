@@ -356,12 +356,6 @@ pub trait WorldHost<D> {
     ) -> Option<u32> {
         None
     }
-    /// The Town Portal scroll or tome of `player` was used (REC-117,
-    /// `wiring::action::town_portal`): make the portal pair. `false`:
-    /// nothing was created.
-    fn town_portal(&mut self, game: &mut Game, events: &mut D, player: UnitId) -> bool {
-        false
-    }
     /// The run of `walk.0` to the ground item `walk.1` a pick-up asked
     /// for (`inventory-moves.md` §7.1 step 2, `0x00548A50`; cursor flag
     /// `walk.2`), with the pick-up on arrival. Default: nothing.
