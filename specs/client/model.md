@@ -142,7 +142,7 @@ position check of the local player.
    of 4-byte list heads (0x200 bytes per type): set **S** at
    `0x007A5E70` (units the server announced) and set **C** at
    `0x007A5270` (client-only units; unit flag +0xC4 bit 0x200000, set by
-   the creator `0x00466730` with 0x600000). Bucket = GUID & 0x7F; the
+   the creator `0x00466730` with 0x600000; GUID counter `[0x00711F30]` of `0x00466730`: `missiles/client.md` §C1). Bucket = GUID & 0x7F; the
    chain link is unit +0xE4.
 2. Every message lookup (`0x00463990(GUID, type)`; `0x00463940` walks
    the bucket) searches set S only. Set C units are never addressed by a
@@ -254,7 +254,7 @@ position check of the local player.
 2. Per unit (`0x00480810`): unless the unit is not the local player
    and has unit flag 0x800000 (rule 5), run the per-type update
    (player `0x00463390`, monster `0x004B13A0`, object `0x004BDFF0`,
-   missile `0x004D2C70`, item `0x004C1AD0`; Phase 6), then look the unit
+   missile `0x004D2C70` (`missiles/client.md` §C6), item `0x004C1AD0`; Phase 6), then look the unit
    up again by (type, GUID) in its own set and, if it still exists,
    drain its queue (§4 rule 5).
    The object update `0x004BDFF0` is the generic object step
@@ -904,7 +904,7 @@ record r (`msg-units.md` §4 rows 0x0E, 0x4D).
 6. **On-use functions** (rule 4 step 3; static read 2026-10-08). The
    missile ones fill a zeroed 0x5C-byte create record
    (`missiles/missiles.md` §R2.1 layout) and call the client missile
-   create `0x004CD540` once per missile, in the order given. Common
+   create `0x004CD540` (`missiles/client.md` §C2–§C4) once per missile, in the order given. Common
    fields: +0x04 owner := P, +0x14/+0x18 := U's position (static path
    +0x0C/+0x10 for unit types 2, 4, 5, else `0x006488C0` /
    `0x00648900`), +0x30 level := P's stat 12 (`level`,
@@ -1663,7 +1663,7 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
     *Answered* (static, 2026-10-08): on-use functions in §15 rule 6;
     the on-mode function's overlay calls are `render/overlay.md` §2 and
     §3 r9 (§15 rule 3). Open: the client missile create `0x004CD540`
-    itself (Phase 6 client missiles).
+    itself: `missiles/client.md` §C2–§C4.
 16. *Answered (2026-10-08)*: §17 rule 6 (the room-change step that
     reaches the town exit, emitted as `TownExit`, `client/bridge.md` §10
     r11 and table). Original question: §17 rule 5: the town exit runs UI code (greeting re-arm, interaction

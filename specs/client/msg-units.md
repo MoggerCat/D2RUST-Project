@@ -367,8 +367,8 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
       (`0x00639DF0(U, 7)`), `0x0046ECE0(U)`, `0x0046F020(U, 0)`, stat 6
       (life) := 0 (`0x00627260(U, 6, 0, 0)`).
    2. Monster mode request code 0x09 (`0x004AFF60`, byte table
-      `0x004B0DF8`[9] → `0x004B09E5`): path stop unless the monstats
-      row's byte +6 has the bit `[0x006CE274]`; stat 6 := 0; when U is
+      `0x004B0DF8`[9] → `0x004B09E5`): path stop unless the `monstats2`
+      row field `deadCol` (`client/model.md` §19) is set; stat 6 := 0; when U is
       the local player's target (`0x004648F0`), the target is cleared
       (`0x00620C10`); then monstats id 284 (`0x11C`, via `0x00463860`)
       in mode 0xE → its skill restarted (`0x00620210`), no flag; any
@@ -512,7 +512,7 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
    missile: source link (`0x00621CC0(m, u8@0x19, u32@0x1A)`), stat 328
    := u8@0x1F when ≠ 0, `0x0064A330(m, u16@0x17)`, and +0x44 :=
    `0x0045C3E0(seed +0x20, +0x48 >> 8)` << 8 (a draw on the missile's
-   own seed). Owner of the missile body: Phase 6 client missiles.
+   own seed). Owner of the missile body: `missiles/client.md`.
 7. **0x74** PlayerCorpseAssign (`0x0045E7B0` → `0x00462F60`, 10 bytes):
    u8@1, player GUID u32@2, corpse GUID u32@6 (both type 0). u8@1 = 0,
    or player P absent → nothing.
@@ -921,7 +921,7 @@ r12–r13 from `0x0045D2E0`, `0x0045D260`, `0x0045C900`
    value is the class-528 AI control +0x3C). Original question: monster
    data +0x40 (0x98, §7 r9): its reader and meaning.
 10. The client missile body of 0x73 (`0x004CD540`, `0x0064A330`,
-    `0x0045C3E0`) and the umod client functions of 0x57 (table
+    `0x0045C3E0`: `missiles/client.md`) and the umod client functions of 0x57 (table
     `0x00724D78`): Phase 6 effects spec.
 11. *Answered (2026-10-08)*: §8 r10.1 (type 4 = `skeleton`; the
     owner / party / relation test; the pair writes graphics +0x34 and

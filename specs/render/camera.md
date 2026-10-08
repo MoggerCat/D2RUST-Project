@@ -277,7 +277,7 @@ unit origin. `0x004769D0(a)` also drives a rumble sound (audio specs).
 Callers of `0x00476A80` (2026-10-08, static: every `call 0x476A80`
 in 1.14d, and every pointer to the calling functions in the image;
 (A, t1, t2, t3), times in ms). Missile functions run once per client
-update of a client missile, through table `0x0072A398` indexed by
+update of a client missile, through table `0x0072A398` (dispatch and function table: `missiles/client.md` §C6, §C12) indexed by
 `missiles` `pCltDoFunc`; "elapsed" = `0x0064A3B0`, "frames left" =
 `0x0064A380`, P1/P2 = `CltParam1`/`CltParam2` (missile record
 +0x58/+0x5C, record = `missiles` row of the missile class, unit +0x04;

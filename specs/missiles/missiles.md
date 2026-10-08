@@ -44,7 +44,7 @@
 | Edge cases & original bugs | 1113–1139 |
 | Test vectors | 1140–1222 |
 | Provenance | 1223–1275 |
-| Open questions | 1276–1356 |
+| Open questions | 1276–1357 |
 <!-- /index -->
 
 ## Summary
@@ -1042,7 +1042,7 @@ the unit accessor `0x006297A0`, which has no caller (no rel32 call or
 jump and no absolute pointer to it in the file); `ExplosionMissile` —
 client `0x004D2D70` only; `Qty`, `SpecialSetup` — none (the other
 +0x18E / +0x190 sites index skills records, 0x23C, or other structs).
-No D2MOO server read either.
+No D2MOO server read either. Client readers: `missiles/client.md` §C11.
 
 `ProgSound` is read only by client missile functions (`pCltDoFunc`
 table `0x0072A398`) 9, 29, 47 and 51; their conditions are owned by
@@ -1353,3 +1353,4 @@ Reading:
     0x70-byte damage record directly: crit → result flags 0x2000,
     bypass 103 / 104 / 106 → hit flags 0x100 / 0x200 / 0x400 (§R6.2;
     `0x005A89A0`).
+15. Does the server's 75 % speed step have the same `v > 0x100000` branch as the client's (`missiles/client.md` §C2 r7)? Settle: read the server speed step (R-section for missile speed) in the asm.

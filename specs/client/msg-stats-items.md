@@ -297,7 +297,7 @@ stat-list links, `weapon_set`, the runtime item table (§5). No outputs.
          §3 r6.8.)
       7. Changed: a player → `0x0046F950`, `0x00470610` (gfx, effects);
          any other unit → `0x004AFF60(U, 0)` (the monster mode machine,
-         `client/model.md` §8; Phase 6).
+         `client/model.md` §19; the six callers in `0x0046C770`–`0x0046CB40` are not yet read).
 
 ### 4. Hireling stats: 0x9E–0xA2 (`0x0045D540`)
 
