@@ -13,7 +13,7 @@ use super::{InvDesk, InvError, InvRest};
 use crate::items::inventory::{
     active_inventory_item, belt_removal_allowed, corpse_slot_fit, InvWorld, UnitKind,
 };
-use crate::items::moves::{Guid, MovePending, Owner, Spot};
+use crate::items::moves::{Guid, MovePending, MoveUnits, Owner, Spot};
 use crate::units::lifecycle::LifecycleHooks;
 use crate::units::UnitId;
 
@@ -151,6 +151,12 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         self.rest.use_item_at(player, item, x, y)
     }
     fn consume_item(&mut self, player: Owner, item: Guid) {
+        // PROVISIONAL (REC-104): a used identify scroll leaves the grid.
+        if self.item_unit(item).is_some()
+            && super::identify::IDENTIFY_CODES.contains(&self.code(item))
+        {
+            return self.remove_used_item(player, item);
+        }
         self.rest.consume_item(player, item)
     }
     fn item_skill(&self, item: Guid) -> i32 {
@@ -378,6 +384,10 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn use_item(&mut self, player: Owner, target: Owner, item: Guid) -> bool {
         // PROVISIONAL (REC-102): potions on the player.
         if target == player && self.use_potion(player, item) {
+            return true;
+        }
+        // PROVISIONAL (REC-104): identify scrolls and tomes on an item.
+        if self.use_identify(player, target, item) {
             return true;
         }
         self.rest.use_item(player, target, item)
