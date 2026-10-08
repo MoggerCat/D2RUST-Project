@@ -265,7 +265,10 @@ fn room_switch_sends_add_and_leave_messages_and_the_join_completes() {
 
 /// The lent quest host of [`quest_event_3_runs_in_the_level_change`]:
 /// records each quest event 3 with the number of messages sent before it.
-struct LevelLog(std::rc::Rc<std::cell::RefCell<Vec<(UnitId, u32, u32, usize)>>>);
+struct LevelLog(Calls);
+
+/// (player, from, to, messages sent before the call).
+type Calls = std::rc::Rc<std::cell::RefCell<Vec<(UnitId, u32, u32, usize)>>>;
 
 impl crate::wiring::action::QuestObjectHost<TestPending> for LevelLog {
     fn run(
