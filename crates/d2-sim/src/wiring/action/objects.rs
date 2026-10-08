@@ -1234,24 +1234,50 @@ impl<X: Pending> ShrineWorld for ObjectView<'_, X> {
     /// shrine: a plain state list on the target ending `duration` frames
     /// from now, the state on, and the type-12 timer that expires it
     /// (`stat-lists.md` §10.4); a list of the same state is replaced.
-    // PROVISIONAL (d2rs-own, unverified; REC-239): the helper's refusals
-    // (state table check, curse and monster rules, higher-level keep) and
-    // the shrine remove callbacks `0x00583BD0` / `0x00583A40` (skill
-    // refresh, stamina restore) are not wired here: the expiry runs the
-    // stat list's own free and the state goes off with it.
+    // PROVISIONAL (d2rs-own, unverified; REC-239, REC-263): the state table
+    // check and the refresh of a list of the same state are wired; the curse
+    // and monster rules do not apply to a player's shrine state. The shrine
+    // remove callbacks `0x00583BD0` / `0x00583A40` run
+    // [`UnitHooks::lists_expired`] (their bodies are unwritten, REC-263).
     fn apply_state(&mut self, req: StateRequest) -> Option<StateList> {
         let (p, state) = (req.target, req.state);
         let end = self.game.frame.wrapping_add(req.duration);
         let owner = self.game.lists.unit(req.source).map(|e| (e.ty, e.guid));
-        if self.v.state_list(p, state).is_some() {
-            let st = u32::from(state);
-            self.v.stats.free_state_list(&mut *self.v.h, p, st);
+        // `skills/bodies.md` §2.7 step 1: a state outside the table → none.
+        if usize::from(state) >= self.v.stats.data().states.count() {
+            return None;
+        }
+        // Step 4: a list of the same state (the shrine passes no skill or
+        // level, so they match) is refreshed, not replaced: a nonzero
+        // duration moves its expiry and arms a new type-12 timer.
+        // PROVISIONAL (REC-263; d2rs-own, unverified): the skill and level
+        // the shrine's request carries are not stated; taken as equal.
+        if let Some(old) = self.v.state_list(p, state) {
+            if req.duration != 0 {
+                self.v.stats.set_expire(old, end);
+                if let Err(e) = self.game.schedule_event(p, 12, end, None, 0, 0) {
+                    self.v.unit_error(e.into());
+                }
+            }
+            if req.stat != 0 || req.value != 0 {
+                self.v.set_list_stat(old, req.stat, req.value);
+            }
+            return Some(StateList((p.0 << 8) | u32::from(state)));
         }
         let expire = if req.duration != 0 { end } else { 0 };
         let l = self.v.create_state_list(p, state, owner, expire)?;
         if req.stat != 0 || req.value != 0 {
             self.v.set_list_stat(l, req.stat, req.value);
         }
+        use crate::world::objects::shrines::{RemoveCallback as Cb, SKILL_REMOVE, STAMINA_REMOVE};
+        let cb = match req.remove {
+            Cb::Default => 0x0056_E900,
+            Cb::Skill => SKILL_REMOVE,
+            Cb::Stamina => STAMINA_REMOVE,
+        };
+        self.v
+            .stats
+            .set_remove_callback(l, Some(crate::stats::lists::RemoveCallback(cb)));
         self.v.set_state(p, state, true);
         let _ = self.game.lists.queue_update(p);
         if req.duration != 0 {

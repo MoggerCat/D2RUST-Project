@@ -311,6 +311,10 @@ pub struct ActionHooks<X> {
     /// Scratch seed handed out for a unit without a record (an error is
     /// logged with it).
     pub orphan_seed: Seed,
+    /// Lists freed with a remove callback by the stat lists (unit, state,
+    /// callback id), taken by [`UnitHooks::lists_expired`] after the
+    /// expiry walk (`units.rs`).
+    pub removed_lists: Vec<(UnitId, u32, u32)>,
     pub errors: Vec<WiringError>,
 }
 
@@ -382,6 +386,7 @@ impl<X> ActionHooks<X> {
             inactive: None,
             x,
             orphan_seed: Seed::init(),
+            removed_lists: Vec::new(),
             errors: Vec::new(),
         }
     }

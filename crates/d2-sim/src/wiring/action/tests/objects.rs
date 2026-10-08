@@ -997,6 +997,9 @@ fn a_shrine_state_carries_its_stats_and_ends_on_its_tick() {
         .sim
         .with(&mut fx.game, |_, v| v.state_list(p, 129).is_none()));
     assert_eq!(fx.stat(p, 25), 0);
+    fx.sim.combat(&mut fx.game, |w, _| {
+        assert!(!w.has_state(p, 129), "state off")
+    });
     fx.assert_clean();
 }
 
@@ -1014,4 +1017,68 @@ fn portal_use_sets_state_102() {
         assert!(w.has_state(p, 102), "state 102 on");
         assert_eq!(w.state_list_expiry(p, 102), Some(85), "f + 75");
     });
+}
+
+fn use_shrine(fx: &mut Fx, o: UnitId, p: UnitId, code: u8, duration: i32) {
+    let mut s: d2_data::tables::Shrines = blank();
+    s.code = code;
+    s.arg0 = 50;
+    s.arg1 = 25;
+    s.duration_in_frames = duration as u32;
+    let r = fx.sim.objects(&mut fx.game, |_, t, w| {
+        crate::world::objects::shrines::effect(t, w, o, p, &s)
+    });
+    assert_eq!(r, Some(Ok(())));
+}
+
+// Covers: specs/skills/bodies.md §2.7 r4; specs/world/objects.md §9.2
+#[test]
+fn a_second_shrine_use_refreshes_the_state_instead_of_replacing_it() {
+    let mut fx = fx();
+    let o = create(&mut fx, TORCH, 20);
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 22, 20);
+    let start = fx.game.frame;
+    use_shrine(&mut fx, o, p, 7, 10);
+    for _ in 0..6 {
+        fx.frame();
+    }
+    use_shrine(&mut fx, o, p, 7, 10);
+    assert_eq!(fx.stat(p, 25), 25, "one list, not two");
+    assert!(fx.timers(p).contains(&(12, start + 16)));
+    while fx.game.frame < start + 10 {
+        fx.frame();
+    }
+    fx.sim.combat(&mut fx.game, |w, _| {
+        assert!(w.has_state(p, 129), "still on")
+    });
+    while fx.game.frame < start + 16 {
+        fx.frame();
+    }
+    fx.sim
+        .combat(&mut fx.game, |w, _| assert!(!w.has_state(p, 129), "off"));
+}
+
+// Covers: specs/world/objects.md §9.2
+#[test]
+fn the_stamina_shrine_callback_clamps_stamina_when_it_ends() {
+    let mut fx = fx();
+    let o = create(&mut fx, TORCH, 20);
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 22, 20);
+    fx.sim.with(&mut fx.game, |_, v| {
+        v.set_base(p, 11, 25600);
+        v.set_base(p, 162, 100);
+    });
+    let max = fx.sim.with(&mut fx.game, |_, v| v.stats.max_stamina(p));
+    assert!(max > 0);
+    use_shrine(&mut fx, o, p, 14, 5);
+    let during = fx.stat(p, 10);
+    assert!(during > max, "stamina is 2v while the state lasts");
+    for _ in 0..5 {
+        fx.frame();
+    }
+    assert_eq!(fx.stat(p, 10), max, "clamped to the maximum");
+    fx.sim
+        .combat(&mut fx.game, |w, _| assert!(!w.has_state(p, 136), "off"));
 }

@@ -296,4 +296,8 @@ pub trait UnitHooks: StatHost {
     /// Hover free (`0x00580B70`, `0x005A7F00` when timed out). Provider:
     /// hover/chat spec.
     fn free_hover(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}
+
+    /// After the type-12 expiry walk (`stat-lists.md` §10.4) of `unit`:
+    /// the remove callbacks of the lists it freed (§8.2 rule 6) run here.
+    fn lists_expired(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}
 }
