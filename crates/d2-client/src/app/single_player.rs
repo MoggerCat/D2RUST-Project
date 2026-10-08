@@ -2004,12 +2004,31 @@ pub fn client_object_names(data: &GameData) -> Vec<String> {
 
 /// The `Levels.txt` fields the client reads (`client/model.md` §11
 /// rules 3–4: `Pal`, `Act`, `BlankScreen`; `audio/environment.md` §1 r2:
-/// `SoundEnv`), one row per level id, from the game's `levels` table.
+/// `SoundEnv`), one row per level id, from the game's `levels` table,
+/// with the `leveldefs` ambient (`render/lighting.md` §3.1 r2).
 pub fn client_level_rows(data: &GameData) -> Vec<LevelRow> {
+    // `leveldefs` by level id (`render/lighting.md` §3.1 r2); a missing
+    // table or row reads no colour (the environment applies).
+    let defs = match data {
+        GameData::Live(d) => d
+            .tables
+            .rows::<d2_data::tables::Leveldefs>()
+            .unwrap_or_default(),
+        GameData::Synthetic => Vec::new(),
+    };
     data.tables()
         .levels
         .iter()
-        .map(|l| LevelRow {
+        .enumerate()
+        .map(|(n, l)| LevelRow {
+            ambient: defs.get(n).map_or_else(Default::default, |d| {
+                crate::rules::lighting::environment::Ambient {
+                    i: d.intensity,
+                    r: d.red,
+                    g: d.green,
+                    b: d.blue,
+                }
+            }),
             pal: l.pal,
             act: l.act,
             blank_screen: l.blankscreen != 0,

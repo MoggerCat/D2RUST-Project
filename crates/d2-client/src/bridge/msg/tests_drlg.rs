@@ -898,3 +898,38 @@ fn ground_items_join_the_room_of_their_point() {
     m.recv(&item_9c(0x03, 6, 3, 2000, 2000));
     assert_eq!(m.w.room_units.room_of(UnitKey::new(4, 6)), None);
 }
+
+// Covers: specs/render/lighting.md §9.2 r1, §10 r5
+#[test]
+fn each_client_update_steps_the_environment_and_the_overrides() {
+    use crate::rules::lighting::environment::{Ambient, PeriodTables};
+    let mut m = model();
+    let lit = Ambient {
+        i: 90,
+        r: 10,
+        g: 20,
+        b: 30,
+    };
+    m.inputs.tables.levels[2].ambient = lit;
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    assert_eq!(m.w.player_level(), Some(2));
+    let periods = PeriodTables::builtin().unwrap();
+    let mut env = m.w.environment.expect("the act's record");
+    m.w.overrides.den_counter = 0;
+    m.w.overrides.start_darkness(2, 1, 2, 2);
+    let mut overrides = m.w.overrides;
+    for _ in 0..3 {
+        m.drain();
+        // The same steps by hand, level 2 (§9.2 r1; §10 r5 r3 base = the
+        // leveldefs ambient, which has a colour).
+        overrides.update_darkness(lit, 2);
+        overrides.update_counters();
+        env.update(&periods, 2);
+        assert_eq!(m.w.environment, Some(env));
+        assert_eq!(m.w.overrides, overrides);
+    }
+    assert_eq!(m.w.overrides.den_counter, 3);
+    assert_eq!(m.w.overrides.darkness.map(|d| d.c), Some(3));
+}

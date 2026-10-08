@@ -4,7 +4,7 @@
 //!
 //! Per drawn frame ([`PreviewLight::refresh`]): the 48 × 48 light map
 //! around the local player (§1), the ambient fill from the act
-//! environment (§3, §9), the player's light record (radius 13 plus stat
+//! environment the bridge steps per client update (§3, §9.2 r1), the player's light record (radius 13 plus stat
 //! 89, §8) and the other records of the client light list, each plain
 //! (§7.2); then the cel light value of a unit (§11 r1) and of a tile
 //! ([`tile_chain`]) is read from it, and shaded through the act's PL2
@@ -20,9 +20,6 @@
 //! - the blocks-light flags (§4) come from the client DRLG collision
 //!   (`collision_at`, mask 0x22); only the player's light (kind 0) is
 //!   shadowed, the other sources draw plain (REC-250);
-//! - the environment advances one update per drawn frame (§9.2 r1 says
-//!   per client update), from the model's record, taken again whenever
-//!   the model's record changes (S→C 0x53 / 0x5D), or a fresh one;
 //! - the other units' lights sit at their sub-tile's `8·s + 4` (the model
 //!   holds no precise position); the local player's at `(P >> 13) + 4` of
 //!   its predicted 16.16 position (§6.1).
@@ -122,9 +119,6 @@ impl LookFeed for PreviewLook {
 pub struct PreviewLight {
     /// `D2RS_FULLBRIGHT=1`: no light is built, the D1 fill stays.
     pub fullbright: bool,
-    env: Option<Environment>,
-    /// The model's record the last refresh saw (`world.environment`).
-    env_seen: Option<Environment>,
     periods: Option<PeriodTables>,
     /// The act environment's ambient of the frame (roof tiles, §11 r4).
     env_cell: crate::rules::lighting::map::LightCell,
@@ -358,17 +352,13 @@ impl PreviewLight {
         let Some(periods) = self.periods else {
             return;
         };
-        // The model's record changes only through S→C 0x53 / 0x5D (§9.2
-        // r2–r4): take it whenever it changed, so the server's setting
-        // reaches the ambient instead of the first frame's copy only.
-        if world.environment != self.env_seen {
-            self.env = world.environment;
-            self.env_seen = world.environment;
-        }
-        let env = self
-            .env
-            .get_or_insert_with(|| Environment::new(&periods, 0));
-        env.update(&periods, level);
+        // The model's record (§9.1), stepped once per client update by the
+        // bridge (§9.2 r1) and set by S→C 0x53 / 0x5D (r2–r4); the map
+        // build only reads it. Before the act's record exists: a fresh
+        // one (creation values).
+        let env = world
+            .environment
+            .unwrap_or_else(|| Environment::new(&periods, 0));
         let a: EnvAmbient = env.ambient();
         let ambient = Ambient {
             i: a.i,
@@ -610,9 +600,46 @@ mod tests {
         let periods = PeriodTables::builtin().unwrap();
         let mut env = Environment::new(&periods, 0);
         env.ticks = 90 * 128;
+        // As the bridge's client update leaves it (§9.2 r1): the map
+        // build reads the record, it no longer steps it.
+        env.update(&periods, 0);
         w.environment = Some(env);
         light.refresh(&w, None, Some(&t));
         assert_eq!(light.frame().unwrap().map.read(far.0, far.1).i, 255);
+    }
+
+    // Covers: specs/render/lighting.md §9.2 r1
+    #[test]
+    fn drawn_frames_do_not_step_the_environment() {
+        let mut w = ClientWorld::default();
+        let key = UnitKey::new(PLAYER, 1);
+        let mut u = ClientUnit::new(key);
+        u.position = Some((4000, 4000));
+        w.units.insert(key, u);
+        w.local_player = Some(key);
+        let t = tables();
+        let far = (8 * 4000 + 8 * 40, 8 * 4000);
+        let periods = PeriodTables::builtin().unwrap();
+        // Mid-morning: the intensity changes with every update.
+        let mut env = Environment::new(&periods, 0);
+        env.ticks = 45 * 128;
+        env.update(&periods, 0);
+        w.environment = Some(env);
+        let mut light = PreviewLight::default();
+        // More drawn frames than one degree's ticks (speed 128): per-frame
+        // stepping would move the intensity.
+        let mut stepped = env;
+        for _ in 0..200 {
+            stepped.update(&periods, 0);
+        }
+        assert_ne!(stepped.ambient().i, env.ambient().i);
+        for _ in 0..200 {
+            light.refresh(&w, None, Some(&t));
+            assert_eq!(
+                light.frame().unwrap().map.read(far.0, far.1).i,
+                env.ambient().i
+            );
+        }
     }
 
     // Covers: specs/render/lighting.md §3.1 r2

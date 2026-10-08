@@ -545,6 +545,7 @@ fn levels() -> Vec<LevelRow> {
         draw_edges: false,
         rain: false,
         mud: false,
+        ambient: Default::default(),
     };
     (v[40].pal, v[40].act) = (1, 1);
     // A level whose `Pal` differs from its `Act` (as 125–127, 133–136).
