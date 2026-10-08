@@ -1421,7 +1421,7 @@ impl Rig {
     }
 }
 
-// Covers: specs/ui/panels.md §11; specs/world/stash.md §10; specs/items/inventory-moves.md §7
+// Covers: specs/ui/panels.md §11 r1; specs/ui/panels-2.md §21; specs/world/vendors-2.md §10.2 r2, §10.2 r3; specs/items/inventory-moves.md §7
 #[test]
 fn act1_stash_keeps_an_item_and_gold() {
     let mut rig = Rig::new();
