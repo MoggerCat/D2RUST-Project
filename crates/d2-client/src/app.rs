@@ -11,6 +11,7 @@
 
 pub mod anim_names;
 pub mod automap;
+pub mod config;
 pub mod death;
 pub mod hardcore;
 pub mod hire_stats;

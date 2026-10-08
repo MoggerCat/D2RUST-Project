@@ -341,13 +341,27 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         config.seed, started.waypoint, started.waypoint_guid
     );
     let mut app = App::new();
+    // d2rs-own, unverified: the config folder is next to the saves; a bad
+    // settings.toml or controls.toml stops here (no silent default).
+    let cfg_dir = super::config::config_dir(
+        &config
+            .save_path
+            .as_deref()
+            .and_then(|p| p.parent().map(std::path::Path::to_path_buf))
+            .unwrap_or_else(super::save::default_save_dir),
+    );
+    let settings = super::config::load_settings(&cfg_dir)?;
+    let bindings = super::config::load_controls(&cfg_dir)?;
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
-        primary_window: Some(Window {
-            title: "d2rs".into(),
-            ..default()
-        }),
+        primary_window: Some(super::config::window_for(&settings)),
         ..default()
     }));
+    app.insert_resource(super::config::ConfigRes {
+        dir: cfg_dir,
+        settings,
+        bindings,
+    })
+    .add_systems(Update, super::config::apply_settings);
     let (link, saver): (DynLink, Option<save::SaveHandle>) = match (config.save_path, save_tables) {
         (Some(path), Some(tables)) => {
             let (link, handle) = save::share(link, save_base, tables, path);

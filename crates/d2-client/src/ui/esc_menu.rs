@@ -12,9 +12,15 @@
 //! Preview fills, each `// d2rs-own, unverified`:
 //! - the box is tiles of the synthetic fill file ([`FILL_FILE`] frame
 //!   [`DARK`]), the three entries are Font16 text in English;
-//! - "Options" does nothing; "Save and Exit Game" asks the host to save
+//! - "Options" opens a second page (Resolution, Window Mode, Controls,
+//!   Previous) over the d2rs config (`app::config`): the two rows cycle
+//!   their value and set `settings_changed` for the host to write
+//!   `settings.toml` (REC-172); "Controls" only names `controls.toml`
+//!   (no Configure Controls screen yet); "Save and Exit Game" asks the host to save
 //!   and close (`app::save::request_save_and_exit`, read through
 //!   [`super::OriginalUi::take_exit_request`]); "Return to Game" closes.
+
+use crate::app::config::Settings;
 
 use super::hud::{FILL_FILE, FILL_H, FILL_W};
 use super::{left, SharedRef};
@@ -35,7 +41,7 @@ pub const DARK: u32 = 4;
 const FRAME_W: i32 = 800;
 const BOX_W: i32 = 260;
 const BOX_TOP: i32 = 190;
-const BOX_H: i32 = 180;
+const BOX_H: i32 = 215;
 const ITEM_TOP: i32 = 210;
 const ITEM_H: i32 = 45;
 /// Font16, and the colors of an entry at rest and under the mouse.
@@ -49,12 +55,26 @@ pub enum Entry {
     Options,
     SaveAndExit,
     Return,
+    Resolution,
+    WindowMode,
+    Controls,
+    Previous,
 }
 
-const ENTRIES: [(Entry, &str); 3] = [
-    (Entry::Options, "Options"),
-    (Entry::SaveAndExit, "Save and Exit Game"),
-    (Entry::Return, "Return to Game"),
+/// Which page is shown.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum View {
+    #[default]
+    Main,
+    Options,
+}
+
+const MAIN: [Entry; 3] = [Entry::Options, Entry::SaveAndExit, Entry::Return];
+const OPTIONS: [Entry; 4] = [
+    Entry::Resolution,
+    Entry::WindowMode,
+    Entry::Controls,
+    Entry::Previous,
 ];
 
 /// The menu's own state.
@@ -62,6 +82,35 @@ const ENTRIES: [(Entry, &str); 3] = [
 pub struct EscState {
     /// "Save and Exit Game" was chosen and the host has not read it yet.
     pub exit_requested: bool,
+    pub view: View,
+    /// The settings the Options page shows and edits.
+    pub settings: Settings,
+    /// A setting changed and the host has not written it yet.
+    pub settings_changed: bool,
+}
+
+impl EscState {
+    fn entries(&self) -> &'static [Entry] {
+        match self.view {
+            View::Main => &MAIN,
+            View::Options => &OPTIONS,
+        }
+    }
+
+    fn label(&self, e: Entry) -> String {
+        match e {
+            Entry::Options => "Options".into(),
+            Entry::SaveAndExit => "Save and Exit Game".into(),
+            Entry::Return => "Return to Game".into(),
+            Entry::Resolution => {
+                let (w, h) = self.settings.window_size();
+                format!("Resolution: {w}x{h}")
+            }
+            Entry::WindowMode => format!("Window Mode: {}", self.settings.window_mode.name()),
+            Entry::Controls => "Controls: controls.toml".into(),
+            Entry::Previous => "Previous".into(),
+        }
+    }
 }
 
 fn box_left() -> i32 {
@@ -78,12 +127,13 @@ fn entry_rect(i: usize) -> Rect {
 }
 
 /// The entry under `p`.
-pub fn entry_at(p: Point) -> Option<Entry> {
-    ENTRIES
+pub fn entry_at(state: &EscState, p: Point) -> Option<Entry> {
+    state
+        .entries()
         .iter()
         .enumerate()
         .find(|(i, _)| entry_rect(*i).contains(p))
-        .map(|(_, (e, _))| *e)
+        .map(|(_, e)| *e)
 }
 
 /// The adapter (installed last: top-most, so it takes every click).
@@ -121,15 +171,16 @@ impl Panel for EscMenuUi {
                 y += h;
             }
         }
-        for (i, (entry, label)) in ENTRIES.iter().enumerate() {
+        for (i, entry) in sh.esc.entries().iter().enumerate() {
             let r = entry_rect(i);
-            let color = if entry_at(sh.mouse) == Some(*entry) {
+            let label = sh.esc.label(*entry);
+            let color = if entry_at(&sh.esc, sh.mouse) == Some(*entry) {
                 COLOR_HOVER
             } else {
                 COLOR_REST
             };
             out.push(UiDraw::Text(TextRequest {
-                text: utf16(label),
+                text: utf16(&label),
                 at: Point::new(r.x, r.y + 30),
                 style: TextStyle { font: FONT, color },
                 opts: TextOpts::Draw {
@@ -150,8 +201,26 @@ impl Panel for EscMenuUi {
         let mut sh = self.sh.borrow_mut();
         // Release on an entry chooses it; everything else is swallowed.
         if let Some((false, at)) = left(e) {
-            match entry_at(at) {
-                Some(Entry::Options) => {}
+            match entry_at(&sh.esc, at) {
+                Some(Entry::Options) => {
+                    sh.outputs.push(PanelOutput::ClickSound);
+                    sh.esc.view = View::Options;
+                }
+                Some(Entry::Previous) => {
+                    sh.outputs.push(PanelOutput::ClickSound);
+                    sh.esc.view = View::Main;
+                }
+                Some(Entry::Resolution) => {
+                    sh.outputs.push(PanelOutput::ClickSound);
+                    sh.esc.settings.resolution ^= 1;
+                    sh.esc.settings_changed = true;
+                }
+                Some(Entry::WindowMode) => {
+                    sh.outputs.push(PanelOutput::ClickSound);
+                    sh.esc.settings.window_mode = sh.esc.settings.window_mode.next();
+                    sh.esc.settings_changed = true;
+                }
+                Some(Entry::Controls) => {}
                 Some(Entry::SaveAndExit) => {
                     sh.outputs.push(PanelOutput::ClickSound);
                     sh.esc.exit_requested = true;
