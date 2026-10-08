@@ -37,7 +37,7 @@
 | Edge cases & original bugs | 448–465 |
 | Test vectors | 466–494 |
 | Provenance | 495–531 |
-| Open questions | 532–627 |
+| Open questions | 532–639 |
 <!-- /index -->
 
 ## Summary
@@ -615,6 +615,18 @@ command-line handlers `0x004776E0`…`0x00477720`, `composition.md` §1).
 14. Whether any UI or cursor item is drawn between the world passes
     (`0x00456EE0` … `0x00477980` order): `client/ui.md` owner; a capture
     with a panel open.
+    *Answered* (static, 2026-10-08: call graph of every direct `call` /
+    `jmp` in `all.asm`): no. None of the UI entry points (`0x00456EE0`,
+    `0x004F98E0`, `0x00468820`, the cursor `0x004684C0`, `0x00477980`),
+    the `DrawText` wrappers (`0x00502320`, `0x00502360`, `0x005023B0`)
+    or the text cores they call (`0x00501840`, `0x005019C0`,
+    `0x00501A80`, `0x00501C30`) is reachable from the world draw
+    `0x00476BC0` (1,673 functions reachable). Its indirect transfers in
+    the client range are switch tables, the render-driver slot wrappers
+    `0x004F6340`–`0x004F69A0`, and one skill-test table call
+    (`0x004642F1`, table `0x00711F34` indexed by skills +0x15), none of
+    which is a UI draw. So every UI, text and cursor pixel is drawn after
+    pass 10 of §1, in the order of §1's first paragraph.
 15. ~~Who reads record flag 0x20000~~: the automap reveal
     `0x00458F40` (§6 r7); floors also set it (§6 r6). Search of every
     `0x20000` test in the export: no other reader of record `+0x14`.

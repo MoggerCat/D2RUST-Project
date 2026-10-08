@@ -49,7 +49,7 @@ Then `num_elements` u16 **indices** (element number → hash slot), then
 
 | Offset | Size | Field |
 |---|---|---|
-| 0 | u8 | used (0 = empty slot) |
+| 0 | u8 | used (1 = used; key lookup treats any other value as empty) |
 | 1 | u16 | index (element number) |
 | 3 | u32 | hash value |
 | 7 | u32 | key_offset (absolute file offset) |
@@ -109,19 +109,34 @@ empty.
 
 ### Key lookup
 
+As 1.14d (`0x00524C60`, hash `0x005249E0`; static, 2026-10-08):
+
 ```
 h = 0
-for each key byte c:            # bytes as unsigned
-    h = (h << 4) + c            # u32
+for each key byte c:            # c as a SIGNED char (movsx, 0x005249F0)
+    h = (h << 4) + c            # u32, wrapping; c >= 0x80 adds c - 256
     t = h & 0xF0000000
     if t != 0:
         h = (h & 0x0FFFFFFF) ^ (t >> 24)
-slot = h mod hash_table_size
+slot = h mod hash_table_size    # unsigned
 ```
 
-Probe `slot, slot+1, …` (wrapping), at most `max_tries` slots. An unused
-slot means not found. A used slot whose key equals the requested key (exact,
-case-sensitive byte comparison) is the answer.
+1. Probe `slot, slot+1, …` (wrapping mod `hash_table_size`), at most
+   `max_tries` slots in all (`max_tries` 0: none).
+2. A slot whose `used` byte is not exactly 1 is **skipped; the probe goes
+   on** (it does not end the search, `0x00524C94`).
+3. A slot with `used` = 1 whose key equals the requested key (exact,
+   case-sensitive byte comparison up to the NUL, `0x00524CA4`) is the
+   answer: its `index` field (offset 1) is the element number. The
+   stored `hash` field is never compared.
+4. No match within `max_tries` slots: not found (`0xFFFF`).
+
+For the 1.14d tables (all keys ASCII, `used` only 0 or 1, every used
+key resolves to its own slot) rules 2 and the signed byte give the same
+answers as stopping at an empty slot with unsigned bytes; they matter
+only for edited or mod tables. How the game combines the three tables
+by key (patch → expansion → base, empty key, miss text) is
+`data/field-types.md` §7 and `data/fixups.md` §1 (`0x00524D30`).
 
 ## Constants & data dependencies
 
@@ -147,6 +162,8 @@ None.
 | hash of `""` | 0 | §Key lookup |
 | hash of `"A"` (0x41), table size 1000 | 65 | §Key lookup |
 | hash of `"AB"`, table size 1000 | (0x41 << 4) + 0x42 = 1106 → 106 | §Key lookup |
+| hash of the byte 0x80, table size 1000 | 0xFFFFFF80 → (0x0FFFFF80 ^ 0xF0) = 0x0FFFFF70 = 268,435,312 → 312 (unsigned reading would give 128) | §Key lookup, `0x005249F0` |
+| synthetic table, size 4, `max_tries` 4: key `"A"` (home slot 65 mod 4 = 1) stored in slot 2, slot 1 unused | found in slot 2 (the empty slot 1 does not stop the probe) | §Key lookup rule 2 |
 | synthetic table built by the test | element and key lookups round-trip | §Rules |
 | `string.tbl`, `expansionstring.tbl`, `patchstring.tbl` (1.14d, eng) | every element's key resolves back to its own slot by key lookup (unless a duplicate key comes earlier in the probe sequence) | survey |
 | every `data\local\lng\*\*.tbl` in `d2data`, `d2exp`, `Patch_D2` (case-insensitive names) | 29 copies, 10 language folders + ENG\BETA, version 1, 63,167 used entries, 16,786 non-ASCII values all valid UTF-8, 0 raw `FF` | §Live tables, 2026-10-06 |
@@ -166,6 +183,8 @@ every used entry's value decoded as strict UTF-8 and as Windows-1252.
 1. Behavior of the original key hash for bytes ≥ 0x80 (signed char?). Keys
    in 1.14d are checked to be ASCII in the survey, so this doesn't matter
    for the original data.
+   *Answered* (static, `0x005249E0`): signed; and an unused slot does
+   not end the probe. §Key lookup.
 2. Does the game read the plain-text `DEFAULT.TBL` / `FONTER.TBL` at all?
    Check in an RE session. Until then they're treated as unused tool
    leftovers.
@@ -182,3 +201,10 @@ every used entry's value decoded as strict UTF-8 and as Windows-1252.
    read, 2026-10-07): no two used entries' key or value byte ranges
    overlap, and every table's string total is below its length. The
    copies in `Patch_D2.mpq` (no listfile) were not read.
+   *Answered* for those too (game-file read, 2026-10-08): the 9
+   `Patch_D2.mpq` `patchstring.tbl` copies (ENG, DEU, FRA, ESP, ITA, POL,
+   CHI, JPN, KOR; 1,179 elements, 1,181 slots, 1,179 used each) have no
+   overlapping key / value ranges and string totals below their lengths;
+   header file size = file length; `used` bytes are only 0 and 1 and no
+   key holds a byte ≥ 0x80 (also in the ENG `string`, `expansionstring`
+   and d2exp `patchstring`).

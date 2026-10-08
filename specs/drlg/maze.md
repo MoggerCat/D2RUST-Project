@@ -27,16 +27,16 @@
 |   3. Cell primitives | 123–242 |
 |   4. Generation sequence (`0x00673B30`, D2MOO `DRLGMAZE_GenerateLevel`) | 243–285 |
 |   5. Layout builders | 286–369 |
-|   6. Special cells by level | 370–469 |
-|   7. Placement against a neighbouring preset level | 470–521 |
-|   8. Theme cells (`0x006735F0`, D2MOO `RollAct_1_2_3_BasicPresets`) | 522–539 |
-|   9. Building cells and file choice (`0x00673A60`, `0x006738C0`) | 540–572 |
-| Constants & data dependencies | 573–586 |
-| Randomness | 587–623 |
-| Edge cases & original bugs | 624–649 |
-| Test vectors | 650–681 |
-| Provenance | 682–734 |
-| Open questions | 735–765 |
+|   6. Special cells by level | 370–474 |
+|   7. Placement against a neighbouring preset level | 475–526 |
+|   8. Theme cells (`0x006735F0`, D2MOO `RollAct_1_2_3_BasicPresets`) | 527–544 |
+|   9. Building cells and file choice (`0x00673A60`, `0x006738C0`) | 545–577 |
+| Constants & data dependencies | 578–591 |
+| Randomness | 592–628 |
+| Edge cases & original bugs | 629–654 |
+| Test vectors | 655–686 |
+| Provenance | 687–739 |
+| Open questions | 740–770 |
 <!-- /index -->
 
 ## Summary
@@ -415,6 +415,11 @@ of each builder):
   a3sewer_drain, a3sewer_chest.
 - Baal: baal_next; baal_waypoint if 129 (`0x006730F5`). So 132 gets
   baal_next.
+None of these "so" cases happens in 1.14d. Levels 13–16, 25, 37, 90,
+91, 93 and 132 have DrlgType 2 in `levels.txt` (preset levels, built
+from their lvlprest file, `drlg/levels.md` §12.5), so no maze builder
+runs for them. Their lvlmaze rows (13–16, 25, 37, 132) are unused
+leftovers.
 A level type not in the builder table above is fatal (row "other").
 
 **6.1 Lair** (`0x00672DC0`, Maggot Lair 62–64): r = level-seed step

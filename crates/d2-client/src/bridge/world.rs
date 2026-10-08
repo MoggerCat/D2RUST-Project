@@ -536,6 +536,18 @@ impl RoomUnits {
     }
 }
 
+/// The play preview's walk prediction of the local player as the
+/// position check sees it ([`ClientWorld::local_walk`]). d2rs-own,
+/// unverified. PROVISIONAL (`client/model.md` OQ2; REC-51, REC-277).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LocalWalk {
+    /// The model position when the cell was recorded: a placement since
+    /// then wins over the cell.
+    pub at: (u16, u16),
+    /// The predicted sub-tile.
+    pub cell: (u16, u16),
+}
+
 /// The client world model.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ClientWorld {
@@ -582,6 +594,11 @@ pub struct ClientWorld {
     /// reserved slot ([`DIALOG_REPLY_SLOT`]): nothing after it is sent
     /// until the UI's answer fills or clears it.
     pub outgoing: Vec<Vec<u8>>,
+    /// The play preview's own-walk cell of the local player, with the
+    /// model position it was recorded against ([`Self::set_local_walk`],
+    /// read by [`Self::predicted`]). `None`: no prediction (the strict
+    /// path, synthetic data without speeds).
+    pub local_walk: Option<LocalWalk>,
     /// 0x3F's use-item cursor.
     pub use_cursor: Option<UseCursor>,
     /// The pet list, newest first (§14 rule 5).
@@ -645,6 +662,10 @@ pub struct ClientWorld {
     /// Set C and the client latches of the object functions
     /// (`world/objects-client.md` §27, `model.md` §2 rule 1).
     pub objclient: ClientObjects,
+    /// Units freed since the receive path last moved them out, in free
+    /// order: each becomes one `UnitFreed` output (`client/bridge.md` §10
+    /// r3.1 (a)).
+    pub freed: Vec<UnitKey>,
 }
 
 impl ClientWorld {
@@ -662,6 +683,22 @@ impl ClientWorld {
         self.units.get(&self.local_player?)
     }
 
+    /// Records the play preview's predicted sub-tile of the local player
+    /// ([`Self::local_walk`]); `None` clears it.
+    pub fn set_local_walk(&mut self, cell: Option<(u16, u16)>) {
+        let at = self.local().and_then(|u| u.position);
+        self.local_walk = at.zip(cell).map(|(at, cell)| LocalWalk { at, cell });
+    }
+
+    /// The local player `unit`'s walk prediction, while the model
+    /// position is still the one it was recorded against (a placement
+    /// since then wins). The position check's rule 8 reads it
+    /// (`bridge::check`, REC-277).
+    pub fn predicted(&self, unit: &ClientUnit) -> Option<LocalWalk> {
+        self.local_walk
+            .filter(|w| self.local_player == Some(unit.key) && unit.position == Some(w.at))
+    }
+
     /// Adds `unit` (§2 rule 4): an existing unit with the same key is
     /// removed first (rule 5: its queue is dropped, and it stops being the
     /// local player).
@@ -671,10 +708,12 @@ impl ClientWorld {
     }
 
     /// Removes the unit `key` (§2 rule 5): its queue is dropped
-    /// unapplied; the local player is cleared if it was that unit. A key
-    /// not in the set: nothing.
+    /// unapplied; the local player is cleared if it was that unit; the
+    /// free is recorded for its `UnitFreed` output (`client/bridge.md`
+    /// §10 r3.1). A key not in the set: nothing.
     pub fn remove(&mut self, key: UnitKey) -> Option<ClientUnit> {
         let unit = self.units.remove(&key)?;
+        self.freed.push(key);
         // The unit free leaves the room list (`unit-order.md` §5 rule 6).
         self.room_units.leave(key);
         if self.local_player == Some(key) {

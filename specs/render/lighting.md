@@ -29,23 +29,23 @@
 | Rules | 87–88 |
 |   1. The light map | 89–102 |
 |   2. Build order (`0x00475800`) | 103–111 |
-|   3. Ambient fill (`0x00474610`) | 112–143 |
-|   4. Blocks-light flags (`0x004756D0`) | 144–152 |
-|   5. Light quality and the draw rate | 153–184 |
-|   6. Light records | 185–268 |
-|   7. Contribution of one record | 269–348 |
-|   8. Light sources | 349–413 |
-|   9. Environment (day and night) | 414–571 |
-|   10. Scripted ambient overrides (`0x0046BDD0`) | 572–629 |
-|   11. Light values handed to the draws | 630–660 |
-|   12. Captures (answers `capture.md` Open question 5) | 661–698 |
-|   13. d2rs answers | 699–709 |
-| Constants & data dependencies | 710–721 |
-| Randomness | 722–728 |
-| Edge cases & original bugs | 729–745 |
-| Test vectors | 746–779 |
-| Provenance | 780–828 |
-| Open questions | 829–937 |
+|   3. Ambient fill (`0x00474610`) | 112–147 |
+|   4. Blocks-light flags (`0x004756D0`) | 148–172 |
+|   5. Light quality and the draw rate | 173–204 |
+|   6. Light records | 205–288 |
+|   7. Contribution of one record | 289–368 |
+|   8. Light sources | 369–433 |
+|   9. Environment (day and night) | 434–591 |
+|   10. Scripted ambient overrides (`0x0046BDD0`) | 592–667 |
+|   11. Light values handed to the draws | 668–707 |
+|   12. Captures (answers `capture.md` Open question 5) | 708–745 |
+|   13. d2rs answers | 746–761 |
+| Constants & data dependencies | 762–773 |
+| Randomness | 774–780 |
+| Edge cases & original bugs | 781–797 |
+| Test vectors | 798–831 |
+| Provenance | 832–891 |
+| Open questions | 892–1000 |
 <!-- /index -->
 
 ## Summary
@@ -115,7 +115,11 @@ reaches the server.
    0 and flag 0.
 2. Every cell := the ambient of the player's room (§3.1), flag 0.
 3. Then each room of the player's room near list, in list order, except
-   the player's room itself (pointer compare): its ambient (§3.1) fills a
+   the player's room itself (pointer compare): the list is the active
+   room's adjacency array (`0x00619790` at `0x0047464D`, `drlg/rooms.md`
+   §6: the rooms-near list filtered to active rooms; it holds the room
+   itself, which the compare at `0x004746B3` skips), so only active rooms
+   fill. Each one's ambient (§3.1) fills a
    rectangle. With the room's sub-tile rectangle `(x, y, w, h)` (room
    `+0x4C..+0x58`, `0x00619730`) and `x' = x − ox`, `y' = y − oy`: skip
    the room when `x' > 48`, `x' + w < 0`, `y' > 48` or `y' + h < 0`;
@@ -149,6 +153,22 @@ cell's room and its near list (`0x00463740`; the player's room when none);
 the cell's flag := 1 when the collision point test (`0x0064CB30`,
 `sim/path-placement.md` §4) with mask 0x22 (bits 0x02 and 0x20,
 `drlg/rooms.md` §10.6) is non-zero. Otherwise the flag keeps the 0 of §3.
+
+1. The search room: `0x00463740(previous room, x, y)` with the previous
+   cell's result (the player's room `0x00620BB0` for the first cell);
+   none → the player's room (`0x00475720`). The point test then looks
+   the cell up again from that room (`0x0064CB30` → `0x00463740`).
+2. No room holds the cell, or the room has no collision record
+   (`0x0061A010`) or no mask array (record `+0x20`): the test returns
+   0x27 unmasked (`0x0064CB79`), so the flag is **1**. Cells outside the
+   loaded rooms block light; reproduce.
+3. **Collision source.** The client's own active-room grids: the client
+   creates active rooms through the same `0x00619890` → `0x0064C900`
+   build as the server (`drlg/rooms.md` §10.2, §10.4), from its own tile
+   records. Only DT1 sub-tile bits 0x02 and 0x20 can meet mask 0x22: the
+   record-flag bits of `drlg/rooms.md` §10.4 r4 are 0x10, 0x01, 0x04 and
+   unit bits start at 0x40 (§10.6). So the flag depends on the tiles and
+   the loaded rooms only, never on units.
 
 ### 5. Light quality and the draw rate
 
@@ -352,7 +372,7 @@ its shadow get partial `S` (soft edge); the blocking cell itself is lit.
 
 | Source | Site | Kind | Radius | R, G, B | Changes |
 |---|---|---|---|---|---|
-| Player (every player unit, client init `0x00460BF0`) | `0x00460CF0` | 0 for the local player (or when no local player exists yet), 1 for others | 13 (unit `+0x68`) | 255, 255, 255 | stat callback `0x004609F0` (`sim/stat-lists.md` §7): stat 89 `item_lightradius` → set radius (§6.2 r2) to 13 + new value (`0x00460930`); stat 90 `item_lightcolor` → R, G, B = bits 16–23, 8–15, 0–7 of the new value, 0 → white (`0x004609A0`) |
+| Player (every player unit, client init `0x00460BF0`) | `0x00460CF0` | 0 for the local player (or when no local player exists yet), 1 for others | 13 (unit `+0x68`) | 255, 255, 255 | stat callback `0x004609F0` (`sim/stat-lists.md` §7): stat 89 `item_lightradius` → set radius (§6.2 r2) to 13 + new value (`0x00460930`); stat 90 `item_lightcolor` → R, G, B = bits 16–23, 8–15, 0–7 of the new value, 0 → white (`0x004609A0`); the local player's light only: the state colour call (`render/shading.md` §6 r1.1) sets R, G, B = the winning state's `light-r`, `light-g`, `light-b`, or 255, 255, 255 when no state wins |
 | Monster (`0x004AE210`; callers `0x00478C75`, `0x004AEB82`, `0x004AF058`, `0x004AFFAF`) | `0x004AE2EE` | 0 | `max(L_c, monstats2 Light)`, `L_c` = `0x0063EBD0` (§8 r1); in level 8 with client quest byte 1 set, the unit not client-only (flag 0x200000, §6.4 r1) and monstats `Align` (`+0x4C`) ∉ {1, 2}: 3; none when 0 | `light-r`, `light-g`, `light-b` | replaces the unit's previous light |
 | Monster umod 3 `light` hook `0x004ACC70` (umod table `0x00724D78`, §8 r2) | `0x004ACCEF`, `0x004ACD2C` | 0 | 7 | §8 r2 | replaces the unit's light |
 | Overlay (`0x00470390`) | `0x00470555` | 1 | `InitRadius`, then target `Radius` when different; none when `Radius` = 0 | overlay `Red`, `Green`, `Blue` | — |
@@ -574,7 +594,11 @@ one normal day is 43,520 ticks plus the doubled night periods.
 By the room's level id:
 
 1. **Level 8** (Den of Evil, `0x0046BD50`): when `[0x007A745C]` = 0 and
-   client quest byte 1 (`[0x007C0EA5]`, `0x004B92E0`) ≠ 0: R, G, B = 255,
+   client quest byte 1 ≠ 0 (`[0x007C0EA5]`: `0x004B92E0(0, 1)` at
+   `0x0046BD60`, byte `A[1]` of the last S→C 0x5E, `world/quests-status.md`
+   §12, `client/msg-ui.md` §14; fatal, error string 0x60, while no 0x5E
+   has arrived, `[0x007C0ECC]` = 0 at `0x004B92E3`; not read when
+   `[0x007A745C]` ≠ 0): R, G, B = 255,
    64, 48 and `I` = 80 while the Den counter `[0x007129CC]` = −1, else
    `trunc(W[(a + 128) & 511] · 80.0)` with `a = trunc(counter · 128 / 30)`;
    else 0, 0, 0 (falls through, §3.1). `W[i]` = float(`sin(i · π_f /
@@ -592,8 +616,9 @@ By the room's level id:
 2. **Levels 107, 108**: when `[0x007A7460]` ≠ 0 and `[0x007129D0]` = −1:
    R, G, B = 255, 64, 48, `I` = 160; else 0, 0, 0. `0x0046B290` (event
    table `0x00712A08`) sets the flag; `0x0046B3A0` sets the counter 0;
-   the counter then rises per update and at > 29 resets flag and counter
-   (`0x0046BEB0`). Triggers: r4.
+   the counter then rises per update **only while the flag is set** and
+   at 30 resets flag := 0 and counter := −1 (`0x0046BEB0`, r5). So id 13
+   without id 12 leaves the counter at 0. Triggers: r4.
 3. **Other levels** — darkness event: `I` = `[0x007A7430]`, R, G, B =
    `[0x007A7434..36]`, all 0 when no event runs. An event
    (`0x0046AE50(in, hold, out, level)`, callers `0x004D8893`,
@@ -626,6 +651,19 @@ By the room's level id:
    owner `world/quests.md`). The second darkness caller `0x004D8893` is state
    setfunc 2 (table `0x0072A690`, `states` `setfunc` +0x1A):
    state 153 `cloak_of_shadows`.
+5. **Per client update** (`0x0046BEB0`, called once by the client update
+   `0x0044C790` at `0x0044C7B0`, after `0x0061AEF0` and
+   before `0x00470350`; one client update per pass in which the server
+   ticked, `client/model.md` §5; never per drawn frame), in this order:
+   1. darkness event step `0x0046AD10` (r3) when `[0x007A742C]` ≠ 0 (set
+      to 1 by `0x0046AE50` at `0x0046AE7B`);
+   2. Den: when `[0x007A745C]` = 0 and `[0x007129CC]` ≠ −1: counter += 1;
+      at 30 flag `[0x007A745C]` := 1 and the Den lights of r1
+      (`0x0046B0D0` at `0x0046BEE8`);
+   3. levels 107/108: when `[0x007A7460]` ≠ 0 and `[0x007129D0]` ≠ −1:
+      counter += 1; at 30 flag := 0 and counter := −1.
+   The map build (§3.1 r1) only reads these values; a drawn frame without
+   a client update shows the same override as the previous one.
 
 ### 11. Light values handed to the draws
 
@@ -644,7 +682,12 @@ sub-tile) clamps the cell to 0…47 on each axis.
    `+0x00`) gives the point count (`0x006DB9D8`: 0 for direction 0, else
    6; 1.14d tiles use 1–9 only, Open question 8) and the points of `render/wall-light-points.tsv` (`normal` =
    `0x0072A9E8`; `faded` = `0x0072ABC8` when the record's fade state bit 0
-   is set, `draw-order.md` §8); point `p` reads the cell at
+   is set, `draw-order.md` §8); the fade state is the record's `+0x24` as
+   the §8 target update of this frame's filing (`0x004DD180`, before any
+   pass) left it, so a wall that is "near" in `draw-order.md` §8 reads
+   the faded points from its first drawn frame on, on every renderer
+   (the render kind only changes the alpha ramp); lower walls never get a
+   target, so their state stays 0 (creation `0x0066DCCC`); point `p` reads the cell at
    `(X + 8·dx_p, Y + 8·dy_p)` → dword as for units. Per 32-pixel block
    column `c` = block x `>> 5` (GDI `0x006C94B0`, `0x006C93A0`): `c0 = c3 =
    I_c`, `c1 = c2 = I_{c+1}` (low bytes), the corners of `shading.md` §4.
@@ -657,6 +700,10 @@ sub-tile) clamps the cell to 0…47 on each axis.
 4. **Roofs** (`0x004DEA70`): the same grid at the roof record's sub-tile
    (draw entry `+4/+8 >> 3`); roof height (header `+0x04`) ≠ 0 → every
    cell := the act environment's `I`, R, G, B (§9), not the room ambient.
+   The grid goes to the floor drawer `0x004F68E0` (slot `+0x7C`,
+   `draw-order.md` §6 r5), so a roof block takes the floor gradient of
+   `shading.md` §4 (Floors r1–r4), never the wall corner path, and is
+   drawn opaque (`blend-modes.md` §6).
 
 ### 12. Captures (answers `capture.md` Open question 5)
 
@@ -706,6 +753,11 @@ sub-tile) clamps the cell to 0…47 on each axis.
 | `q` | §5; in verify cases taken from the recording, never measured |
 | light value per draw | §11; `ShadeChain` from `render/shading.md` |
 | floating point | §9.3, §9.4, §10 use doubles and `sin`; client-only (not `d2-sim`) |
+| blocks-light source | the client's active-room collision grids (§4 r3); a cell in no room or a room without a grid → flag 1 (§4 r2) |
+| near-room fills, overrides | §3 r3 and §10 run every frame in the map build; no d2rs-own shortcut (the level ambient alone is not §3) |
+| near-room source | the player's active room's adjacency array in its order (§3 r3), each entry's level from its own room (§3.1 r2) |
+| override state | §10 r5 per client update (the bridge's tick pass), not per drawn frame; quest byte 1 = `A[1]` of the client's last S→C 0x5E (§10 r1), held by the client, never a constant |
+| record kinds | each source's kind from §8's Kind column: kind 0 (the local player, monsters, umod 3) shadowed at `q` = 2 (§7.3), kind 2 (objects, `horadric_light`) cached (§7.4) at every `q`, kind 1 plain (§7.2); "only the player is shadowed" is not §6.4 r5 |
 
 ## Constants & data dependencies
 
@@ -797,6 +849,9 @@ call order in the `0x0061C240` disassembly), `0x0045E300`, `0x006427F0`, CRT
 `sin` `0x00688590` / `cos` `0x006886C0` (x87 `fsin` / `fcos` paths),
 `0x00682FD0` (truncating conversion); overrides `0x0046BEB0`,
 `0x0046AD10`, `0x0046AE50`, `0x0046B0C0`, `0x0046B0D0`, `0x0046AF70`,
+call site `0x0044C7B0` (client update `0x0044C790`), quest byte
+`0x004B92E0` (from `0x0046BD60`), near list `0x00619790` (from
+`0x0047464D`),
 `0x0046BE60`, `0x0046BF90`, `0x0046B290`, `0x0046B3A0`, sine table
 `0x00707800` (`0x0040B330`); draws `0x00475AA0`, `0x004DF1C0`,
 `0x004DD180`, `0x004DD600`, `0x004DE410`, `0x004DDEF0`, `0x004DEA70`,
@@ -825,6 +880,14 @@ data: `states` setfunc, `missiles` rows 191/288, `objects` row 17,
 (`0x0052D7C6`–`0x0052D83D`), `0x0061BFC0` (client call for comparison);
 every s2c 0x53 of both recordings listed (callers `0x0053C922`) and the
 transport buffer `-022633` seq 228 decoded.
+
+REC-247 (2026-10-08, static, `all.asm`): §4 r1–r3 from `0x004756D0`
+(`0x00475715`–`0x0047574E`), `0x0064CB30` (0x27 at `0x0064CB79`),
+`0x00463740`, `0x00620BB0`; §11 r2 fade state from `0x004DD180` (the
+only writer of the fade bytes +0x29 / +0x2A besides the record creators
+`0x0066DC50`, `0x0066DDE0`, `0x0066DF40`, which zero +0x24 and set
++0x28…+0x2A to 0xFF); §11 r4
+from `0x004DEA70` → `0x004F68E0` → GDI `0x006C95D0`.
 
 ## Open questions
 

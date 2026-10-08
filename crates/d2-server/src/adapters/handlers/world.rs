@@ -993,6 +993,25 @@ impl MovePending for PreviewMoveRest {
     fn send(&mut self, player: Owner, bytes: Vec<u8>) {
         self.sent.push((player, bytes));
     }
+    /// d2rs-own, unverified (M22, REC-277 (d)): the room delete record
+    /// `0x0061A270` reaches the room's clients as S→C 0x0A (type 4, GUID,
+    /// `units::messages::remove_unit`) at once; when 1.14d sends the
+    /// room's delete list is not written. The staged players stand for
+    /// the room's clients (single player: the one). Without it a picked
+    /// gold pile, freed on the server, stayed on the client's ground; an
+    /// item that goes on to the inventory is re-added by its 0x9C.
+    fn room_delete_notice(&mut self, item: d2_sim::items::moves::Guid) {
+        let players: Vec<Owner> = self
+            .places
+            .values()
+            .filter(|p| p.owner.is_player())
+            .map(|p| p.owner)
+            .collect();
+        for p in players {
+            let m = d2_sim::units::messages::remove_unit(4, item);
+            self.sent.push((p, m.to_vec()));
+        }
+    }
     /// The staged quest record (`0x0065C310`).
     fn quest_flag(&self, player: Owner, quest: u8, flag: u8) -> bool {
         self.quest_flags

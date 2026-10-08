@@ -32,3 +32,5 @@ cargo run -p d2-client --release -- play --new necromancer Test
 Leave town. Right-click with Teeth (missiles fly), Bone Armor (state overlay on you, mana drops), Poison Nova (a ring), Clay Golem (a pet appears and follows). Report any `NoRecord` / `Pet(` error in the log.
 
 Headless: `cargo test -p d2-client --test app_necro`.
+
+Local check done 2026-10-08 (PC 1 round 2, branch claude/local-pc1-s8): headless part passes: `app_necro` 4 pass; the Teeth / Bone Armor / Poison Nova / Clay Golem play check needs a player.

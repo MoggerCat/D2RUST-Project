@@ -1,9 +1,9 @@
 # Spec: Client — Stat list of client units (items, states, skills) and the totals
 
 - **Status:** draft: the client call sites read in the 1.14d `Game.exe`
-  (addresses below); the item stat contents wait for the item stream
-  (`items/inventory.md` open question 1); unverified: no executable
-  check runs it yet.
+  (addresses below); the item lists from the stream and the client set
+  update are read (§2 rules 1.1, 5, 6; 2026-10-08); unverified: no
+  executable check runs it yet.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-client::bridge::world` (the stat list of a
   client unit), used by the handlers that attach lists and by the
@@ -24,15 +24,15 @@
 | Outputs / state changes | 59–63 |
 | Rules | 64–65 |
 |   1. The list of a client unit | 66–101 |
-|   2. Items | 102–188 |
-|   3. States (S→C 0xA7, 0xA8, 0xA9) | 189–491 |
-|   4. Skills | 492–523 |
-| Constants & data dependencies | 524–534 |
-| Randomness | 535–539 |
-| Edge cases & original bugs | 540–547 |
-| Test vectors | 548–559 |
-| Provenance | 560–572 |
-| Open questions | 573–612 |
+|   2. Items | 102–265 |
+|   3. States (S→C 0xA7, 0xA8, 0xA9) | 266–574 |
+|   4. Skills | 575–606 |
+| Constants & data dependencies | 607–617 |
+| Randomness | 618–622 |
+| Edge cases & original bugs | 623–645 |
+| Test vectors | 646–662 |
+| Provenance | 663–682 |
+| Open questions | 683–736 |
 <!-- /index -->
 
 ## Summary
@@ -108,7 +108,36 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
    4, item GUID)`) attached to the item itself (`0x00626E10(item, list,
    1)`); when `0x00629900(item)` ≠ 0 and the item has no inventory
    (+0x60), it gets one (`0x0063ABD0`). The
-   item's own stat values come from the item stream (open question 2).
+   item's own stat values come from the item stream (rule 1.1).
+   1. **Lists from the item stream** (2026-10-08; answers open question
+      2). A 0x9C / 0x9D item is created by `0x004C0F20`: unit create
+      `0x004661C0` → `0x00465FD0`, which for type 4 runs `0x004C1910`
+      with fresh = 1 (`0x00466107`–`0x00466110`), so the item already
+      has its extended list (+0x5C) and an empty child list of state 0,
+      flags 0x40; then the record is read into it (`0x0062E430` →
+      `0x0062CBE0`, `0x004C0F75`; `items/bitstream.md` §4.6 rule 6).
+      Where each part lands (all on the item; nothing on the owner):
+
+      | Stream part (`items/bitstream.md`) | Item list | Counts when the item's list is attached |
+      |---|---|---|
+      | §4.5 values: defense 31, durability 72 / 73, quantity 70, sockets 194 | the item's own base array (+0x5C; `0x00627260`, sockets `0x0062BE00`) | yes |
+      | §4.6 list c = −1 (magic, rare, crafted, unique, set-item own and quality-2 properties alike) | child of state 0, flags 0x40 (found by flag, `0x00625790` → `0x006256E0`) | yes (active chain) |
+      | §4.6 runeword list | child of state 171, flags 0x40 | yes (active chain) |
+      | §4.6 set list of mask bit i (states 165 + i) | child of state 165 + i, flags 0x2040: **parked** (`sim/stat-lists.md` §2, §8.1 step 5) | only after rule 5 unparks it |
+
+      A value is stored as (field − `Save Add`) << `ValShift` with the
+      field's param (`0x0062AC80`, shift `0x0062AD85`–`0x0062AD88`, set
+      `0x00627150` at `0x0062AD8D`). So "the item's list" that equip
+      attaches (rule 2, `sim/stat-lists.md` §8.4) carries in its full
+      array the item's base values plus every active child: the
+      property list, the runeword list, the unparked set lists and the
+      lists of its socket fillers (rule 2.2: a filler's list is
+      attached to the socketed item, whose full array then holds it).
+      There is no separate "base / magic" split: the 1.14d client has
+      no other item list. A gem or rune filler gets its socket
+      properties from the `gems` table on the client (rule 2.2,
+      `0x0065FEC0` into the filler's own list); they are not in the
+      stream.
 2. **Equip.** `0x004C0D20(force)` (item in ESI, owner in EDI; 17 call
    sites in the action handlers `0x004C2AD0`–`0x004C4C70`) runs after an
    item is placed:
@@ -185,6 +214,54 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
       re-equips some body items itself (its rule:
       `client/msg-stats-items.md` §3 rule 3.1). An item placed
       again is attached by the equip rule (rule 2).
+5. **Set items** (2026-10-08). The client runs the shared set-item
+   state update `0x00663CC0(owner, item, r, p)` (`items/properties.md`
+   §13, owner of its steps; set bonuses §11) itself, from the data
+   tables; no message carries set bonuses. It does nothing for an item
+   whose quality is not 5. Client call sites (stdcall, arguments as
+   pushed):
+
+   | Site | Arguments | When |
+   |---|---|---|
+   | equip `0x004C0D20` (`0x004C0E06`) | (owner, item, 0, 0) | rule 2.2, every item that is not a gem or rune, before the 0x4000 test, so also for an item whose list then stays detached |
+   | 0x08 Unequip `0x004C3380` (`0x004C344E`) | (owner, item, 1, 1) | after the item left the body slot |
+   | 0x09 swap-out `0x004C3760` (`0x004C3860`) | (owner, old item, 1, 1) | after its detach |
+   | 0x11 AutoUnequip `0x004C4740` (`0x004C4857`) | (owner, item, 1, 1) | after its detach |
+   | 0x15 UpdateStats `0x004C4C70` (`0x004C4E7F`) | (owner, item, 1, 1) | after its detach |
+   | S→C 0x92 `0x004C23E0` (`0x004C24A9`) | (U, item, 1, 1) | per body / charm node |
+   | S→C 0x7D code 0x100 `0x004C2270` (`0x004C22F1`) | (owner, item, 1, 1) | item flag 0x100 set (`client/msg-stats-items.md` §5 r4) |
+   | S→C 0x7D code 0x200 (`0x004C232D`) | (owner, item, 0, 0) | item flag 0x100 cleared |
+
+   r = 0 (equip): the item's set lists (rule 1.1) are unparked or parked
+   by the equipped-set mask per the setitems `add func`
+   (`items/properties.md` §13 step 5), so a partial list counts exactly
+   while its condition holds; and the owner gets (or reuses) one plain
+   list of state 165–170 tagged with stat 71 = the set id, emptied and
+   refilled with the set's `pcode` / `fcode` bonuses for the current
+   count (§13 step 6, §11), attached to the owner with reset 1. r = 1,
+   p = 1 (removal): the item's set lists are re-parked or unparked by
+   the mask at that point (§13 step 2: mask 0 when the item is no
+   longer on a body page, as at the 0x08 / 0x09 / 0x11 / 0x15 sites, so
+   every rule of `add func` then parks; the mask `0x0062A370` counts only
+   body-page set items of the same set without item flags 0x4000 /
+   0x100, `0x0062A41D`–`0x0062A44D`), and the owner's list of that set
+   is detached and freed (§13 step 6); the next equip of a remaining
+   item of the set rebuilds it. The client set lists are the item's lists (states
+   165–169) and the owner's lists (states 165–170) of the same state
+   ids: different units, different chains.
+6. **Wire** (2026-10-08). No 1.14d message carries an item's or a
+   player's item totals. The stat messages 0x1D–0x1F (server flush
+   `0x006258D0`) send the unit's **base** value of each changed key:
+   the mod array (`sim/stat-lists.md` §11) is searched in the base array
+   (list +0x24, `0x00625901`–`0x0062590A`), and mod keys are inserted
+   only by base writes on an extended player list (§5.1), never by a
+   child list. The server's set owner lists (rule 5, the same code on
+   the server player) toggle no state bit (`0x00663B40`, `0x00660120`
+   call no `0x00639DB0` / `0x00625A70`), so they cause no 0xA8. So the
+   client total = base (0x1D–0x1F, creation) plus the lists it attaches
+   itself (rules 1–5, §3, §4). States 0xFE / 0xFD do not exist in 1.14d
+   (`patch_d2` `states.txt` has 185 rows, ids 0–184); a d2rs transport on them is d2rs-own and not
+   the original wire.
 
 ### 3. States (S→C 0xA7, 0xA8, 0xA9)
 
@@ -476,9 +553,15 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
       missile m := 18 + r2 % (2b) (a power of two → `& (2b − 1)`, same
       value) created at the cell by `0x004CDBA0(U, m, x', y', 0, 1)`
       (`monsters/umod-callbacks.md` §28 r4 "missile").
-   11. **Skill item test** `0x00647640(E, U)`: U's inventory (+0x60)
-      none → 0 (also for the cases below). E's record `scroll` flag
-      (bit 36) → E +0x30 > 0. Else by the record's skill id (+0x00):
+   11. **Skill item test** `0x00647640(E, U)` (re-read 2026-10-08,
+      `0x00647640`–`0x0064783E`): E or U null → 0. E's record `scroll`
+      flag (bit 36, `[0x006CE278]` at record +0x08) → U's inventory
+      (+0x60) none → 0, else E +0x30 > 0 (signed). Else by the record's
+      skill id (+0x00, `0x00647682`): skills 2, 4, 5 need U's inventory
+      (none → 0: skill 5 at `0x006476A4`, skill 4 at `0x0064770F`,
+      skill 2 at `0x00647783`); **every other skill → 1 with no inventory test**
+      (`0x00647699`), so only scrolls and skills 2, 4, 5 need an
+      inventory (`skills/use.md` §2 row 5 points here). Skills 2, 4, 5:
       the weapon pick `0x0063C9B0(inventory, &I, &loc, &inuse)`
       (`skills/bodies-3.md` §3.3 step 2), J := the item at the other
       location (`0x00643D60(loc)`), "throw-ok(X)" := X throwable type
@@ -544,6 +627,21 @@ belong to the overlay and missile specs).
   totals until the requirement refresh clears the flag.
 - 0xA8 stops reading at the first stat with `Send Bits` 0 or an id out
   of range; the stats before it stay set.
+- 0x07 IndirectlySwapBodyItem (`0x004C3070`) detaches the item it takes
+  off the other hand (`0x004C3187`) but makes no set-update call for it
+  (no `0x00663CC0` in the handler; only the newly equipped item's equip
+  `0x004C3328` runs one, for that item's set). A set item taken off that
+  way keeps its own set lists unparked (they do not count: its list is
+  detached) and the owner's list of its set keeps the old bonuses until
+  another set update of that set. Reproduce. The server sends nothing
+  that corrects it (2026-10-08, static; answers open question 8): its
+  0x1B Swap2HandedItem (`0x00563D20`, `items/inventory-moves.md` §7.6)
+  gives the item taken off no command flag and no update-list entry,
+  so the per-item dispatcher `0x005973F0` sends one message, 0x9D
+  action 7 for the item put on (row 6 of `items/item-actions.tsv`,
+  sender `0x0053D0B0`, its only call `0x00597580`); the owner's stat
+  refresh sends base values only (§2 rule 6). The taken-off item, now
+  the cursor item, gets its next message only when it is moved again.
 
 ## Test vectors
 
@@ -556,6 +654,11 @@ Synthetic (the recordings carry no 0xA8 and no item stream spec yet).
 | 0xA8 for a GUID not in S | no change | §3 rule 1 |
 | equipped item with list {strength 3}, flag 0x4000 clear, owner player | total strength base + 3 | §2 rule 2 |
 | same with flag 0x4000 set | total = base | §2 rule 2.3 |
+| item stream: §4.5 defense 20, list c = −1 {strength 5}, item equipped by a player | item base array {31: 20}; item state-0 / 0x40 child {0: 5}; player totals 31 += 20, 0 += 5 | §2 rule 1.1 |
+| runeword item, runeword list {stat 0: 3} | state-171 / 0x40 child on the item; player total strength += 3 when equipped | §2 rule 1.1 |
+| set item, mask bit 0, set list {strength 7}, not equipped | state-165 child with flags 0x2040 in the item's parked chain; item full array without the 7 | §2 rule 1.1 |
+| that item equipped alone, setitems `add func` 2 (popcount 1 → k = 0) | 0x00663CC0(owner, item, 0, 0): S[0..4] parked, the 7 does not count; owner gets a state-165…170 list with stat 71 = set id | §2 rule 5 |
+| any server step that changes only item lists of a player | no 0x1D–0x1F, no 0xA8 | §2 rule 6 |
 
 ## Provenance
 
@@ -565,6 +668,13 @@ from `tools/ghidra/disasm.py xref` of `0x00626E10` and `0x00627910`;
 `0x0045EE20`, `0x0045EDE0`, `0x0045EF60`, `0x004D9B20`, `0x004D9D70`,
 `0x004D9E60`, `0x00643620`, client callback `0x004609F0` (installed at
 `0x00460C39`). Item type rows from `patch_d2` `ItemTypes.txt`.
+
+2026-10-08 (REC-188): `all.asm` of `0x004C0F20`, `0x004661C0`,
+`0x00465FD0` (fresh item list), `0x0062CBE0` list loop
+(`0x0062D8E6`, states table `0x006E90B8`), `0x00625790`, `0x0062AC80`,
+`0x004C0D20`, every client caller of `0x00663CC0` (8 sites, arguments
+as pushed), `0x00663A20`, `0x00663B40`, `0x0062A370`, `0x004C3070`,
+`0x006258D0`; `states.txt` rows 165–171 (`patch_d2`).
 
 2026-10-08: `all.asm` of `0x004609F0` (jump tables decoded from the
 code), `0x00460930`, `0x004609A0`, `0x00643620` (caller `0x00646E30`),
@@ -577,8 +687,13 @@ code), `0x00460930`, `0x004609A0`, `0x00643620` (caller `0x00646E30`),
    the client callback (`ValueCallback::Client` implementing §1 r4);
    no waiting is needed. Its light effects go to the render light of
    the unit; its skill effects to the client skill list.
-2. The item stream's stat section (which lists an item gets: base,
-   magic, set, runeword) — `items/inventory.md` open question 1 and
+2. *Answered (2026-10-08)*: §2 rules 1.1 (the lists the stream fills,
+   all on the item; the set lists arrive parked), 5 (the client set
+   update unparks them and builds the owner's set-bonus list itself) and
+   6 (0x1D–0x1F carry base values only; no message carries item totals;
+   states 0xFE / 0xFD are d2rs-own). Original question: the item
+   stream's stat section (which lists an item gets: base, magic, set,
+   runeword) — `items/inventory.md` open question 1 and
    `client/msg-stats-items.md` open question 3.
 3. *Answered (2026-10-08)*: §2 rule 3.1. Original question:
    `0x00625820` (which items are re-equipped on a level change) and the
@@ -609,3 +724,12 @@ code), `0x00460930`, `0x004609A0`, `0x00643620` (caller `0x00646E30`),
    `0x00643620` arguments (pool, flags 0, expire 0, U's type and GUID),
    the attach with reset 1, and where the state bits live before a
    state list exists are §4 rules 3–4.
+8. *Answered (2026-10-08, static)*: Edge cases, the 0x07 entry (no
+   message for the item taken off; nothing corrects the set lists).
+   The recording below stays as the conformance check. Original
+   question: Does the server send anything after 0x07
+   IndirectlySwapBodyItem that refreshes the set lists of the item it
+   took off (edge cases)?
+   Settled by a recording that equips a two-handed weapon over a worn
+   set shield (or a set weapon over a set off-hand) with a partial set
+   bonus showing, then reads the character panel.

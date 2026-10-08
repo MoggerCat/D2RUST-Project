@@ -29,22 +29,22 @@
 | Outputs / state changes | 80–93 |
 | Rules | 94–95 |
 |   R1. Data the server keeps per missile | 96–140 |
-|   R2. Creation | 141–285 |
-|   R3. Per-tick dispatch | 286–315 |
-|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 316–446 |
-|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 447–499 |
-|   R6. Damage stage (missile-owned part) | 500–620 |
-|   R7. Lifetime and expiry | 621–644 |
-|   R8. Pierce | 645–671 |
-|   R9. Server-do and server-hit catalogues | 672–902 |
-|   R10. Behaviour of the recorded missiles | 903–936 |
-|   R11. `missiles.txt` columns and their server use | 937–977 |
-| Constants & data dependencies | 978–1004 |
-| Randomness | 1005–1037 |
-| Edge cases & original bugs | 1038–1064 |
-| Test vectors | 1065–1144 |
-| Provenance | 1145–1187 |
-| Open questions | 1188–1257 |
+|   R2. Creation | 141–322 |
+|   R3. Per-tick dispatch | 323–352 |
+|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 353–483 |
+|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 484–536 |
+|   R6. Damage stage (missile-owned part) | 537–657 |
+|   R7. Lifetime and expiry | 658–711 |
+|   R8. Pierce | 712–738 |
+|   R9. Server-do and server-hit catalogues | 739–969 |
+|   R10. Behaviour of the recorded missiles | 970–1004 |
+|   R11. `missiles.txt` columns and their server use | 1005–1052 |
+| Constants & data dependencies | 1053–1079 |
+| Randomness | 1080–1112 |
+| Edge cases & original bugs | 1113–1139 |
+| Test vectors | 1140–1222 |
+| Provenance | 1223–1275 |
+| Open questions | 1276–1357 |
 <!-- /index -->
 
 ## Summary
@@ -178,6 +178,43 @@ convenience wrappers (D2MOO `D2GAME_CreateMissile_6FD115E0` and the skill
 helpers) fill the record and call it; they belong to the skills spec.
 Missile-owned helpers: `0x005A9720` (D2MOO
 `MISSMODE_CreatePlagueJavelin…HitSubmissiles`) and `0x005A9820` (§R9.3).
+
+**Monster mode missile** `0x005A6D50(ECX game, EDX unit, mode)`
+(1.14d-confirmed, asm). Its only caller is the monster attack-family
+event 0 `0x005A7670`, in its branch for a monster with no used skill
+(`0x005A776E`). That event's tests are `skills/use.md` §5.2 (Open
+question 6).
+1. Unit null → 0. m := the monstats missile of the mode
+   (`0x0063E6B0(unit, mode)`, table in `skills/bodies-3.md` §5.18 step
+   3: `MissA1`, `MissA2`, `MissS1`…`MissS4`, `MissC`, `MissSQ`); m < 0
+   → 0, and the caller then runs the melee fallback `0x005A5490`.
+2. L := `difficultylevels` `MonsterSkillBonus` (record +0x10 of
+   `0x00611D30(game +0x6D)`) + 1, i.e. 1 / 4 / 8 on Normal / Nightmare
+   / Hell. A unit with unit flag 0x200 (+0xC4 bit 9, a hireling) uses
+   its own total stat 12 (level, `0x00625480(unit, 12, 0)`) instead.
+3. Create straight: `0x0056ECB0` (`skills/use.md` §5.5) with class m,
+   skill 0, level L, offsets 0, aim 0, take ammo 1. When it returns a
+   missile, run the quill volley `0x005A6B70`. Return 1, whether or not
+   the missile was made.
+4. **Quill volley** `0x005A6B70(game, unit)`. Only for a monster whose
+   class row has `BaseId` (monstats +0x02) = 63 (`quillrat1`).
+   1. Save the path target unit (`0x00553540`). (x, y) := its position,
+      or the path target point when there is none. Clear the target
+      unit (`0x00648B90(path, 0)`).
+   2. Local seed {lo 0x53454953, hi := unit GUID (+0x0C)}
+      (`0x00650E30`, `0x00650E40`, `sim/rng.md` §4). This is not the
+      unit's seed and not the game's seed, so no game draw is made.
+   3. Set sx := 5, sy := 5. Repeat `aip3` times, using the column for
+      the difficulty (monstats +0x62 + 2d):
+      - Step the seed; low bit 1 → sx := −sx.
+      - Step it again; low bit 1 → sy := −sy. The signs carry over
+        from one spike to the next.
+      - Target point := (x + sx, y + sy) (`0x00648AD0`).
+      - Create straight with class m, skill 0, **level 1**, offsets 0,
+        aim 0, take ammo 0.
+   4. Restore the saved target unit.
+   1.14d data: `aip3` is 0 on every difficulty for all eight
+   `quillrat1`-based rows, so the volley creates nothing.
 
 #### R2.3 Steps, in order (`0x0059FA30`, 1.14d-confirmed)
 
@@ -624,9 +661,39 @@ Entries 15–30 are null and never reached by live data (§R6.1).
    missile created in frame F during the timer-queue run (unit events,
    including other missiles' functions) first runs in frame F + 1
    (`tick.md` §5.5 consequence 1), then every frame. One created before
-   the queue run of F would already run in F (no such path is known; open
-   question 11). Observed: first run in F + 1 for all 70 recorded
-   missiles.
+   the queue run of F (tick steps 1–3, `tick.md` §3) already runs in F;
+   one created by a client message between ticks runs first in the next
+   tick, like one from the queue run. Observed: first run in F + 1 for
+   all 70 recorded missiles.
+   **Creation before the queue run** (1.14d, static; Open question 11).
+   In the call graph of `Game.exe` (direct calls, jump and function
+   tables), every path from the message drain `0x0052CFE0` or tick
+   steps 1–3 (`0x0052D7B0`, `0x0052D720`, `0x0052D160`) to the create
+   `0x0059FA30` that avoids the queue run `0x005414D0` passes through
+   the skill do core `0x0056F7F0` or the umod dispatcher `0x005A4270`.
+   - Do core there: the Iron Golem re-summon at join (`0x005394A0`,
+     `srvdofunc` 57 `0x005C5250`) and an `immediate` aura chosen by
+     C→S 0x3C or re-selected by the item refresh (`srvdofunc` 65
+     `0x005CF010`). Neither has `srvmissile` or a do function that
+     creates a missile.
+   - Dispatcher there: modes 0 and 1 run at a monster mode set
+     `0x005A7C20`. The only mode-0 or mode-1 callback that creates a
+     missile is umod 23 poisonhit's (`0x005A3490`, the
+     `queenpoisoncloud` cross burst, `monsters/umod-callbacks.md`
+     §16). A spawn or restore sets the mode before the umods are
+     copied (`0x005424F0`: creation `0x005B30E0` / `0x005A4440` /
+     `0x005A46E0` first, umod copy `0x005428D3` after). The mode set on
+     an existing monster in step 3 is the re-placement of a kept pet
+     (`0x00542B40` → `0x00554A30` → `0x005735A0`, the current mode set
+     again). The other mode-set route found, a think scheduled on a unit
+     with state 54 (`0x005416B0` → `0x005544B0` → kill or reaction), is
+     taken only by players (`monsters/ai.md` §1, the state-54 note).
+     No pet carries umod 23 in 1.14d data (`sumumod` 32, 33, 42;
+     hirelings 19).
+   So with 1.14d data no missile is created before the queue run, and
+   every missile first runs in the frame after its creation. A modded
+   umod-23 pet would create its clouds in step 3, and they would run in
+   that frame's step 4.
 2. With frames N = `Range + level × LevRange` (§R2.3 step 10, no flags)
    and N ≥ 1, run k leaves N − k frames; the expiry hit happens on run
    k = N (or run 1 when N ≤ 1). Unless the server-hit function returns
@@ -923,9 +990,10 @@ Pierce. Consequences of the rules:
    5; with `AlwaysExplode` the server-hit function would run first —
    none here); hit → direct damage (c = 3), removed unless pierce count
    remains (R8). Expires after `Range` runs.
-2. **spike1**: v = `((10 + level × 8 / 8) << 8) × 75 / 100`; level is
-   the creating skill's level (monster skill; skills spec). To-hit as 1;
-   no pierce.
+2. **spike1**: v = `((10 + level × 8 / 8) << 8) × 75 / 100`. The quill
+   rat's A2 has no used skill, so the monster mode missile (§R2.2) makes
+   it with level = `MonsterSkillBonus` + 1: v = 2112 on Normal (level
+   1), 2688 on Nightmare (4), 3456 on Hell (8). To-hit as 1; no pierce.
 3. **shafire1**: no to-hit test (always hits a valid unit); `Pierce`
    set but monster owners have no pierce stats (R8.1 P = 0) so it never
    pierces; `ExplosionMissile` (shamanexp) is client-side only.
@@ -961,13 +1029,20 @@ Not read by the server (client only, or unused): `pCltDoFunc`,
 `AnimLen`, `AnimSpeed`, `RandStart`, `LoopAnim`, `xoffset`, `yoffset`,
 `zoffset`, `Light`, `Flicker`, `Red`, `Green`, `Blue`, `Trans`,
 `NumDirections`, `LocalBlood`, `ClientCol`, `CltSrcTown`,
-`ExplosionMissile`, `InitSteps`, `Qty`, `SpecialSetup`. Evidence: no
-server-side read of their record offsets in missile-record code of the
-1.14d disassembly (search of `+0x135`, `+0x18E`, `+0x190`, `+0x16` in
-functions that index the missile table: only client functions
-0x004C…–0x004D… read `InitSteps`; `Qty` and `SpecialSetup` have no
-reader; `ExplosionMissile` none) and no D2MOO server read. A heuristic
-search; open question 7.
+`ExplosionMissile`, `InitSteps`, `Qty`, `SpecialSetup`. Evidence
+(1.14d, full xref, Open question 7): every `Game.exe` access with
+displacement +0x135 (`InitSteps`, u8), +0x18E (`Qty`, u8) or +0x190
+(`SpecialSetup`, u32) was classed by its base pointer, and every
+function that obtains a missile record (inline `class × 0x1A4` + data
+tables +0xB64, 214 functions, plus the 30 getters such as `0x0046ACE0`
+and their callers, 430 functions) was searched for those offsets and
+for word reads at +0x16 (`ExplosionMissile`). Readers: `InitSteps` —
+client `0x004CD540`, `0x004D30C0`, `0x004D38D0`, `0x004D4590`, and
+the unit accessor `0x006297A0`, which has no caller (no rel32 call or
+jump and no absolute pointer to it in the file); `ExplosionMissile` —
+client `0x004D2D70` only; `Qty`, `SpecialSetup` — none (the other
++0x18E / +0x190 sites index skills records, 0x23C, or other structs).
+No D2MOO server read either. Client readers: `missiles/client.md` §C11.
 
 `ProgSound` is read only by client missile functions (`pCltDoFunc`
 table `0x0072A398`) 9, 29, 47 and 51; their conditions are owned by
@@ -1070,6 +1145,9 @@ Synthetic (CI-safe):
 |---|---|---|
 | Vel 20, VelLev 0, level 5, no flags | v = 3840 | R2.3.5–7 |
 | Vel 10, VelLev 8, level 3 | (13 << 8) × 75 / 100 = 2496 | R2.3.5–7 |
+| Monster mode missile, quillrat1 A2, Hell, no flag 0x200 | `spike1` at level 7 + 1 = 8; skill 0; v = 3456 | R2.2, R10 |
+| Monster mode missile, hireling (flag 0x200) with stat 12 = 30, mode with `MissA1` ≥ 0 | level 30 | R2.2 |
+| Quill volley, `aip3` = 0 (1.14d data) | no extra missile, no seed step | R2.2 |
 | Vel 10, VelLev 7, level 3 | 21 / 8 = 2 → (12 << 8) × 75 / 100 = 2304 | R2.3.5 |
 | Vel 24, CanSlow, owner state 87 with stat 161 = 50 | 6144 × 50 / 100 = 3072 → 2304 | R2.3.6–7 |
 | Range 40, LevRange 2, level 3 | N = 46 runs, removed in frame F + 46 | R7.2 |
@@ -1184,6 +1262,16 @@ Reading:
   source: `0x00649D00` (missile: masks 0, then `0x00648CF0(path, 4)`)
   and `0x00648CF0` (flags := flags & 0xFFF800FF | table
   `0x006EB690`[t]; row 4 = 0x60000).
+- Monster mode missile and quill volley (R2.2), read 2026-10-08 from
+  the asm: `0x005A6D50` (`0x005A6D6B`–`0x005A6DB7`: mode missile,
+  difficulty record +0x10 + 1, flag 0x200 → stat 12), its call site
+  `0x005A776E` in `0x005A7670`; `0x005A6B70` (`BaseId` test 0x3F, local
+  seed `0x005A6C70`–`0x005A6C8D`, loop `0x005A6CB7`–`0x005A6D3C`).
+- Server use of `InitSteps` / `Qty` / `SpecialSetup` /
+  `ExplosionMissile` (R11) and creation outside the queue run (R7.1):
+  call-graph and displacement scans of `Game.exe` and `all.asm`
+  (2026-10-08). The edges were direct calls, jump and function tables
+  (read from the image), and pushed function addresses.
 
 ## Open questions
 
@@ -1212,26 +1300,37 @@ Reading:
    compared first, then y, via `0x0045ADF0` / `0x0045AE20` with the unit
    in ECX; a target unit equal to the owner is skipped before the
    compare. As D2MOO.
-7. Server reads of `InitSteps`, `Qty`, `SpecialSetup`,
-   `ExplosionMissile` were searched heuristically only (functions that
-   index the missile table). Settle: a full xref of record offsets
-   +0x135, +0x18E, +0x190, +0x16 through every missile-record pointer.
+7. Answered (2026-10-08), "Not read by the server" paragraph after the
+   field-owner table: none. Full xref of +0x135, +0x18E, +0x190 (every
+   site in `Game.exe`, classed by base) and +0x16 (every function that
+   obtains a missile record): only client readers (`InitSteps`
+   `0x004CD540`, `0x004D30C0`, `0x004D38D0`, `0x004D4590`;
+   `ExplosionMissile` `0x004D2D70`) and the uncalled accessor
+   `0x006297A0`; `Qty` and `SpecialSetup` have no reader.
 8. Answered (2026-10-08), R9.2 `status`: none is left. Every row of
    `srvdo.tsv` (53) and `srvhit.tsv` (71) is `spec'd-here`; the bodies
    are §R9.5–R9.6 (server-do 2, 3, 5, 7, server-hit 1, 4, 12, 13) and
    `missiles/bodies.md` §6 onward with `missiles/bodies-2.md` (the rest,
    1.14d-read). No status change was needed.
-9. The level passed by monster attacks for spike1 (VelLev 8 makes its
-   speed level-dependent) is the AI/skills spec's; a recording with
-   positions would confirm the speed formula.
+9. Answered (2026-10-08), §R2.2 "Monster mode missile" and §R10 item 2:
+   a monster attack with no used skill creates its monstats mode
+   missile at level `MonsterSkillBonus`(d) + 1 (1 / 4 / 8; hirelings
+   use their level, stat 12) (`0x005A6D50`, 1.14d asm). Also read: the
+   quill volley `0x005A6B70` (`BaseId` 63, `aip3` extra spikes on a
+   GUID-seeded local seed; 0 in 1.14d data). A recording with positions
+   would still confirm the speed (PC 2 list).
 10. Answered (2026-10-08), R9.1: nobody. A search of `Game.exe` 1.14d
     for the absolute value `0x005AD9D0` (all sections) and for E8 / E9
     / 0F 8x rel32 branches to it in `.text` finds nothing; the export
     lists 0 callers. Dead code; not implemented.
-11. Can a missile be created before the timer-queue run of a frame (e.g.
-    while client messages are handled)? It would then run in its creation
-    frame. Settle: a recording hooking `0x0059FA30` with the tick step
-    in progress.
+11. Answered statically (2026-10-08), §R7 rule 1 "Creation before the
+    queue run": not with 1.14d data. Paths outside the queue run reach
+    the create only through the do core (Iron Golem at join, immediate
+    auras; no missile) or the umod-23 mode-0 callback at a mode set on
+    a kept pet in step 3 (no 1.14d pet has umod 23). A message-time
+    missile would run first in the next tick anyway. The recording
+    check (hook `0x0059FA30` with the tick step) is still on the PC 2
+    list as confirmation.
 12. Answered (2026-10-08), R4.3 table: the computes are owned by
     `sim/pathing.md` §11.2 (type 10) and §11.3 (type 14, the x87 part
     as integer math; its precision-control question is pathing Open
@@ -1254,3 +1353,4 @@ Reading:
     0x70-byte damage record directly: crit → result flags 0x2000,
     bypass 103 / 104 / 106 → hit flags 0x100 / 0x200 / 0x400 (§R6.2;
     `0x005A89A0`).
+15. Does the server's 75 % speed step have the same `v > 0x100000` branch as the client's (`missiles/client.md` §C2 r7)? Settle: read the server speed step (R-section for missile speed) in the asm.

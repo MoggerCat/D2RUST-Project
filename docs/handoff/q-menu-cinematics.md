@@ -18,3 +18,5 @@ Branch `claude/q-menu-cinematics`. File: `ui/front_end/screens/cinematics.rs` (s
 cargo test -p d2-client --test front_end_cinematics --test front_end
 ```
 All pass (6 + 9). No visible change in `play` (front-end host not written).
+
+Local check done 2026-10-08 (PC 1 round 2, branch claude/local-pc1-s8): headless part passes (`front_end_cinematics` 6, `front_end` 12; this note's 6 + 9 are 6 + 12 now).

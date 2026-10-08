@@ -17,26 +17,27 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 42–55 |
-| Inputs | 56–68 |
-| Outputs / state changes | 69–79 |
-| Rules | 80–81 |
-|   1. Routing | 82–99 |
-|   2. Put an item into the cube (C→S 0x2A) | 100–146 |
-|   3. Transmute entry (`0x005665F0`) | 147–159 |
-|   4. Recipe eligibility | 160–174 |
-|   5. Ops | 175–194 |
-|   6. Input matching | 195–263 |
-|   7. Outputs | 264–398 |
-|   8. Commit | 399–467 |
-|   9. Portals | 468–487 |
-|   10. C→S 0x4C is not the cube | 488–502 |
-| Constants & data dependencies | 503–526 |
-| Randomness | 527–561 |
-| Edge cases & original bugs | 562–596 |
-| Test vectors | 597–644 |
-| Provenance | 645–683 |
-| Open questions | 684–801 |
+| Summary | 43–56 |
+| Inputs | 57–69 |
+| Outputs / state changes | 70–80 |
+| Rules | 81–82 |
+|   1. Routing | 83–100 |
+|   2. Put an item into the cube (C→S 0x2A) | 101–147 |
+|   3. Transmute entry (`0x005665F0`) | 148–160 |
+|   4. Recipe eligibility | 161–175 |
+|   5. Ops | 176–195 |
+|   6. Input matching | 196–264 |
+|   7. Outputs | 265–399 |
+|   8. Commit | 400–471 |
+|   9. Portals | 472–491 |
+|   10. C→S 0x4C is not the cube | 492–506 |
+|   11. Where a cube comes from; the cube leaving while open | 507–550 |
+| Constants & data dependencies | 551–574 |
+| Randomness | 575–609 |
+| Edge cases & original bugs | 610–644 |
+| Test vectors | 645–692 |
+| Provenance | 693–743 |
+| Open questions | 744–862 |
 <!-- /index -->
 
 ## Summary
@@ -83,7 +84,7 @@ C→S 0x4C is **not** the cube (§10).
 
 | Event | 1.14d | Behaviour |
 |---|---|---|
-| open cube (use the cube item) | `0x005BF0C0` (`SkillItem.cpp`). Item-use table at `0x00741790`: 31 entries (count at `0x0074178C`) of 8 bytes {check function, use function}, indexed by the item record's `pSpell` (+0x94, read at `0x005BF2C9`); live `misc.bin` row 41 `box ` has `pSpell` 7 → entry 7 = {none, `0x005BF0C0`} at `0x007417C8` / `0x007417CC` | If the player is interacting with the stash object (type 2, class 0x10B): clear the interaction (`0x00554190`), run `0x0055FA40`, queue 0x77 with 0x11. Then set interaction (type 4, cube GUID) through `0x00554120` (only if no interaction is active), queue 0x77 with 0x15, run `0x0055FA40`. |
+| open cube (use the cube item) | `0x005BF0C0` (`SkillItem.cpp`), reached through the item-use dispatcher `0x005BF240` (owner: `items/use.md` §1, §3). Item-use table at `0x00741790`: 31 entries (count at `0x0074178C`) of 8 bytes {check function, use function}, indexed by the item record's `pSpell` (+0x94, read at `0x005BF2C9`); live `misc.bin` row 41 `box ` has `pSpell` 7 → entry 7 = {none, `0x005BF0C0`} at `0x007417C8` / `0x007417CC` | If the player is interacting with the stash object (type 2, class 0x10B): clear the interaction (`0x00554190`), run `0x0055FA40`, queue 0x77 with 0x11. Then set interaction (type 4, cube GUID) through `0x00554120` (only if no interaction is active), queue 0x77 with 0x15, run `0x0055FA40`. |
 | C→S 0x4F, any button | `0x00568060` | No active interaction (player +0x6C = 0): queue 0x77 with 0x0C, result 0. |
 | C→S 0x4F button 0x17 | `0x00568060` → `0x00566AE0` | Interaction type ≠ 4 → result 3. Else reset it (GUID −1, type 6, active 0, `0x00554190`), then `0x0055FA40`; result 0. |
 | C→S 0x4F button 0x18 | `0x00568060` → `0x00566AE0` → `0x005665F0` | Interaction type ≠ 4 → result 3. Type 4: transmute (§3); result 0. The GUID is not checked: any interaction of type 4 transmutes page 3. |
@@ -421,6 +422,9 @@ is sent; outputs already made in out[] are neither placed nor freed
    `0x0059E5C0` (Act 2 Horadric Staff hook, `world/quests-act2.md`
    §4.9), `qf2 ` → `0x005B86E0` (Act 3 Khalim's Will hook,
    `world/quests-act3.md` §4.8); quest state changes: `world/quests.md`.
+   The client plays the Horadric animation when such an `hst ` /
+   `qf2 ` arrives in page 3 (its 0x9C action 4), never for other
+   outputs and not at the 0x4F 0x18 (`ui/panels-2.md` §20 r7).
 4. Fillers in order: page 3, place; failure frees, success sets
    identified.
 
@@ -499,6 +503,50 @@ request from the item, removes the item (`0x0055E000`), creates
 `TMogType` (+0xC8) and sets its quantity to `TMogMin` + roll(player unit
 seed, `TMogMax` − `TMogMin`) when both are > 0 (else 0). Owner: the
 item-use spec; listed here only to fix the routing.
+
+### 11. Where a cube comes from; the cube leaving while open
+
+1. No 1.14d table gives a cube: no `charstats.txt` start item and no
+   `cubemain.txt` output names `box ` (live `d2data`, `d2exp` and
+   `patch_d2` tables, 0 hits). The game creates `box ` items in two
+   places only: the Act II cube chest (object 354, operate 39
+   `0x00599DF0`; `world/quests-act2.md` §4.7: one normal-quality cube
+   per qualifying player, a player qualifies when holding no `box `)
+   and the Act III kill drop (`0x005BBC00` at `0x005BBCFA`;
+   `world/quests-act3.md` §7.6 rule 2: while the cube is not dropped
+   yet, one per player in Act III not holding `box `). The other server `box `
+   code tests in `Game.exe` (`0x005350F0`, `0x005351C0`, `0x0055CC90`,
+   `0x00561B00`, `0x005628C0`, `0x00563840`, `0x00567620`, quest
+   helpers `0x00599590`, `0x00599A30`, `0x0059E630`, `0x0059E850`,
+   `0x0059E970`) read the code and create nothing. A new character
+   therefore never holds a cube.
+2. The server interaction of §1 (type 4, cube GUID) is **not** ended
+   when the cube leaves the inventory. None of the paths that move it
+   calls the interaction reset `0x00554190`: lift 0x19 (`0x0054ACD0` →
+   `0x00560420`, which lets a busy player lift from any page,
+   `items/inventory-moves.md` §7.4), drop 0x17 (`0x0054AB40`, with the
+   spill `0x00563840`, `items/inventory-moves.md` §9.3), place 0x18
+   (`0x0054ABB0`). The cube interaction ends only through 0x4F 0x17
+   (§1), the quest helper `0x005351C0` (`world/quests-helpers.md` §5)
+   or another caller of `0x00554190` (Provenance; none of them an item
+   move). So with the cube on the cursor, on the ground or in another
+   page:
+   1. 0x4F 0x18 still transmutes the page-3 items (§1: the GUID is not
+      checked). The client's transmute button needs an empty cursor
+      (`ui/panels-2.md` §20 r2), so the cube must be off the cursor.
+   2. 0x2A fails while the cube is not stored (§2 step 2: the cube must
+      be in mode 0).
+   3. 0x18 with page 3 places into the cube page without any cube
+      (`items/inventory-moves.md` §7.3).
+   4. Dropping the cube on the ground spills its page-3 items into
+      page 0 first (`items/inventory-moves.md` §9.3), so a transmute
+      after the drop finds n = 0 and matches no record (§3 step 4).
+3. The client keeps the cube panel open: the draw's close test
+   (`0x0048EEB0`–`0x0048EEC4`) closes ui 0x1A only for the exit flag
+   `0x0044DA30` or a missing / dead local player `0x00463DF0`
+   (`ui/controls.md` §3), never for a missing cube; its grid draws the
+   page-3 items whatever holds them. The UI owner is
+   `ui/panels-2.md` §20 r4.
 
 ## Constants & data dependencies
 
@@ -659,6 +707,18 @@ jump table, `0x00566AA8` op jump table, the two Pandemonium stubs at
   `0x005658C0`, `0x00565010` (inputs, ops 15–28), `0x00565AB0` (outputs
   and commit), `0x00565930` (type pick), `0x00564F30` (removal),
   `0x00594140` (Cow portal).
+- §8 step 3 client note (2026-10-08, REC-267): the only caller of the
+  animation start `0x0048A540` is `0x004C2970` (`0x004C2AB7`), gated on
+  page byte 3 and code `hst ` / `qf2 ` (`0x004C2A92`–`0x004C2AB5`).
+- §11 (2026-10-08, REC-244): `box ` creators and readers from every
+  `cmp`/`mov` of the code value 0x20786F62 in `all.asm`; callers of
+  `0x00554190` (20 functions, none an item move); client draw
+  `0x0048EDF0` at `0x0048EEB0`–`0x0048EEC4` and `0x0048F16C`–
+  `0x0048F183`; grid click `0x004912A0` → `0x0048FFE0` (its `box ` tests
+  `0x004903C2`, `0x00490598`, `0x004906CB` all lie on the branch where
+  the cursor holds an item; the empty-cursor lift branch has none). Live tables: `charstats.txt`, `cubemain.txt` in all three
+  extracted layers (scratch grep). Recording: lift the cube with the
+  panel open (PC 2 list, REC-244).
 - Helper identities checked in their 1.14d bodies: page `0x00628250`
   (+0x45), quality `0x00627E70`, file index `0x00629DA0`, level
   `0x006281E0`, sockets `0x006299B0` (stat 194), ethereal `0x0062A8D0`,
@@ -796,5 +856,6 @@ jump table, `0x00566AA8` op jump table, the two Pandemonium stubs at
    is the only live `misc.txt` row with `pSpell` 7, so the cube-open
    routine is exactly entry 7, word 2.
    See §1 routing (table `0x00741790`, count `0x0074178C`, index
-   `pSpell`; `box ` → 7 → `0x005BF0C0`).
+   `pSpell`; `box ` → 7 → `0x005BF0C0`). The dispatcher and the whole
+   table are owned by `items/use.md`.
 8. Answered: `0x0055FA40` recounts the scroll/tome skill quantities (stored items on page 0 only); `items/inventory.md` §5.5.

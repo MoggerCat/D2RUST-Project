@@ -107,8 +107,8 @@ offset seen in the 1.14d code named in the last column):
 | +0x0C | GUID | `unit-order.md` §1 | — |
 | +0x10 | mode | §4 | `0x00624690` |
 | +0x14 | per-kind data | player/monster/object/missile/item data | `0x005553C8`, `0x005A73E0` |
-| +0x18 | act (u8) | act of the allocation room's level | `0x005552ED` |
-| +0x1C | act record | game +0xBC + 4·act | `0x005552FA` |
+| +0x18 | act (u8) | act of the allocation room's level; a player's is rewritten by the act change (`world/waypoints.md` §11 rule 15) | `0x005552ED`, `0x0053AE4E` |
+| +0x1C | act record | game +0xBC + 4·act (same writers as +0x18) | `0x005552FA`, `0x0053AE56` |
 | +0x20, +0x28 | seed, init seed | `rng.md` §5.3 | — |
 | +0x2C | path | freed at removal | `0x0055568B` |
 | +0x30 | sequence record (null: plain animation) | §4.2 | `0x005539CF` |
@@ -389,7 +389,7 @@ removed (`0x006272E0`, `stat-lists.md` §8.9) and the animation fields
 re-initialised (`0x00624390`); the same mode only queues
 the unit and sets flag 1 (not for a monster staying in mode 1). Setting
 a mode schedules nothing by itself. Mode starts that animate then call,
-in this order: prepare animation `0x005533D0` (action frame := 0;
+in this order: prepare animation `0x005533D0` (`skills/sequences.md` §2; action frame := 0;
 sequence modes — player 18, monster 14 with a sequence — load the
 sequence and its rate; otherwise sequence := null, current frame := 0,
 rate `0x00623F50` when the unit has a path, else only the AnimData
@@ -401,7 +401,7 @@ then §4.2. Movement starts set the mode, cancel and schedule §4.4.
 
 Inputs: frame f; speed s and frame count F (+0x3C/+0x34 with a
 sequence, else +0x4C/+0x48); event bytes E[i] (sequence: `0x006634C0`,
-owned by the sequence spec; else AnimData record +0x10 + i); start index.
+owned by `skills/sequences.md`; else AnimData record +0x10 + i); start index.
 
 Main form `0x005539B0` (start index = frame bonus b = `0x00623B10(unit)`):
 

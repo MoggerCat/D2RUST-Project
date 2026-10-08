@@ -18,6 +18,7 @@ pub mod bits;
 pub mod chat_end;
 pub mod check;
 pub mod click;
+pub mod client_path;
 pub mod combat;
 pub mod dispatch;
 pub mod drlg;
@@ -204,6 +205,7 @@ impl<L: ServerLink> Bridge<L> {
             report.rejected += self.log.rejected.len() - before;
         }
         report.answered = self.send_outgoing()?;
+        output::move_freed(&mut self.world, &mut self.outputs);
         report.outputs = self.outputs.len() - before;
         Ok(report)
     }
@@ -235,6 +237,7 @@ impl<L: ServerLink> Bridge<L> {
     /// clears the list (spec §10 rule 4: once per frame, after the
     /// frame).
     pub fn take_outputs(&mut self) -> Vec<Output> {
+        output::move_freed(&mut self.world, &mut self.outputs);
         std::mem::take(&mut self.outputs)
     }
 
@@ -461,6 +464,14 @@ impl<L: ServerLink> Bridge<L> {
         self.world.recache_local_room(x, y)
     }
 
+    /// The play preview's predicted sub-tile of the local player, for the
+    /// position check ([`ClientWorld::set_local_walk`],
+    /// [`ClientWorld::predicted`]). d2rs-own, unverified. PROVISIONAL
+    /// (`client/model.md` OQ2; REC-51, REC-277).
+    pub fn set_local_walk(&mut self, cell: Option<(u16, u16)>) {
+        self.world.set_local_walk(cell);
+    }
+
     /// Installs the item tables the model decodes item streams with.
     pub fn set_item_tables(&mut self, t: std::sync::Arc<dyn item_lists::StreamProps>) {
         self.world.set_item_tables(t);
@@ -468,6 +479,14 @@ impl<L: ServerLink> Bridge<L> {
 
     pub fn world(&self) -> &ClientWorld {
         &self.world
+    }
+
+    /// The client DRLG, writable: a test seam for fixture collision (a
+    /// wall the fixture tiles lack, stamped in the server's grid too).
+    /// Nothing in the client writes the DRLG through it.
+    #[doc(hidden)]
+    pub fn drlg_mut(&mut self) -> Option<&mut drlg::ClientDrlg> {
+        self.world.drlg.as_mut()
     }
 
     /// The client `skills` row of `skill`, when the tables have one.

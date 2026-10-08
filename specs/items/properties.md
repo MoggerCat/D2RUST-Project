@@ -34,14 +34,14 @@
 |   10. Runewords | 263–321 |
 |   11. Set bonuses (`0x00660120`) | 322–334 |
 |   12. Craft property lists (`0x00660240`) | 335–340 |
-|   13. Set-item state update (`0x00663CC0`) | 341–396 |
-|   14. Format-0 property functions (legacy table `0x00745B58`) | 397–464 |
-| Constants & data dependencies | 465–474 |
-| Randomness | 475–480 |
-| Edge cases & original bugs | 481–490 |
-| Test vectors | 491–509 |
-| Provenance | 510–529 |
-| Open questions | 530–619 |
+|   13. Set-item state update (`0x00663CC0`) | 341–403 |
+|   14. Format-0 property functions (legacy table `0x00745B58`) | 404–471 |
+| Constants & data dependencies | 472–481 |
+| Randomness | 482–487 |
+| Edge cases & original bugs | 488–497 |
+| Test vectors | 498–516 |
+| Provenance | 517–536 |
+| Open questions | 537–626 |
 <!-- /index -->
 
 ## Summary
@@ -344,7 +344,14 @@ is flagged ethereal (0x400000), re-apply ethereal (`items/generation.md`
 arguments). Callers and arguments: the stat refresh `0x0055C2C0` (§9
 rule 3) (0, 0); the repair `0x0055F900` (0, 0); the deactivation
 `0x0055C730` (1, 0); the break `0x0055F850` (1, 1); `0x0057F410` (1, 1);
-the client equip (`client/stat-lists.md`) (0, 0).
+and eight client sites (`client/stat-lists.md` §2 rule 5, which owns
+when each runs): the equip `0x004C0D20` (`0x004C0E06`) (0, 0); the
+0x9C / 0x9D actions 0x08 `0x004C3380` (`0x004C344E`), 0x09
+`0x004C3760` (`0x004C3860`), 0x11 `0x004C4740` (`0x004C4857`), 0x15
+`0x004C4C70` (`0x004C4E7F`) (1, 1); S→C 0x92 `0x004C23E0`
+(`0x004C24A9`) (1, 1); S→C 0x7D `0x004C2270` code 0x100
+(`0x004C22F1`) (1, 1) and code 0x200 (`0x004C232D`) (0, 0). These 13
+are every call of `0x00663CC0` in `all.asm`.
 
 1. O none → return 0. I none, not an item (type ≠ 4), or O without an
    inventory (unit +0x60) → return 0.

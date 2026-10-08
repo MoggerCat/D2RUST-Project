@@ -18,3 +18,5 @@ Branch `claude/q-menu-main`. File `crates/d2-client/src/ui/front_end/screens/mai
 cargo test -p d2-client --test front_end --test front_end_main_menu
 ```
 All 15 tests pass, no game files. Nothing visible in `play` until the host exists.
+
+Local check done 2026-10-08 (PC 1 round 2, branch claude/local-pc1-s8): headless part passes: `front_end` 12 + `front_end_main_menu` 6 (the note says 15 in all; 18 now).

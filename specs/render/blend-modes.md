@@ -25,15 +25,15 @@
 |   3. Draw mode of a composite unit component | 128–173 |
 |   4. Single-cel units and overlays | 174–185 |
 |   5. Shadows (the darkening blend) | 186–248 |
-|   6. Translucent walls and roofs | 249–266 |
-|   7. d2rs answers | 267–277 |
-|   8. Lines and rectangles (GDI) | 278–312 |
-| Constants & data dependencies | 313–321 |
-| Randomness | 322–325 |
-| Edge cases & original bugs | 326–340 |
-| Test vectors | 341–373 |
-| Provenance | 374–402 |
-| Open questions | 403–429 |
+|   6. Translucent walls and roofs | 249–283 |
+|   7. d2rs answers | 284–294 |
+|   8. Lines and rectangles (GDI) | 295–329 |
+| Constants & data dependencies | 330–338 |
+| Randomness | 339–342 |
+| Edge cases & original bugs | 343–357 |
+| Test vectors | 358–391 |
+| Provenance | 392–420 |
+| Open questions | 421–447 |
 <!-- /index -->
 
 ## Summary
@@ -100,7 +100,7 @@ A PL2 blend table is stored as `T[256·i + j]` (file byte
 | cel runs with `L` and `T` (`0x00606E40`, `0x00607060`) | lit translucent cels | `d' = T[256·d + L[s]]` — row = destination |
 | unit shadow rows (`0x00608D60`) | §5 | `d' = T[256·d + 0]` — row = destination |
 | translucent tile, unlit (`0x004F82D0`, DT1 helper `+0x14`) | shadow tiles (§5) | `d' = T[256·d + s]` — row = destination |
-| translucent wall, lit (`0x004F84F0`, DT1 helper `+0x18`; the store at `0x004F86A2` uses `T[(L[s] << 8) + d]`) | translucent walls and roofs (§6) | `d' = T[256·L[s] + d]` — **row = source** |
+| translucent wall, lit (`0x004F84F0`, DT1 helper `+0x18`; the store at `0x004F86A2` uses `T[(L[s] << 8) + d]`) | translucent walls (§6; roofs never, §6 roofs r1) | `d' = T[256·L[s] + d]` — **row = source** |
 
 **Verdict:** for cels and shadows the row is the destination, the column
 the source; only the lit translucent wall drawer reads the transpose.
@@ -248,7 +248,7 @@ of the view.
 
 ### 6. Translucent walls and roofs
 
-Walls and roofs with alpha byte `a` < 0xFF (`draw-order.md` §6 r1, §8)
+Walls with alpha byte `a` < 0xFF (`draw-order.md` §6 r1, §8)
 are drawn through slot `+0xA0` (GDI `0x006C93A0` → helper `0x004F84F0`):
 
 | `a` | `T` |
@@ -263,6 +263,23 @@ light map of `shading.md` §4 r4 always (this helper has no flat or unlit
 branch). Measured on act 1, `A0` read this way keeps 25 % of the wall and
 `A2` 75 %, so a wall fading from 0xFF toward 0x80 shows 100 % → 25 % →
 50 % (Edge case 1).
+
+**Roofs are never translucent** (2026-10-08, REC-247; the table above
+applies to walls only):
+
+1. The roof pass `0x004DEA70` draws through the floor drawer `0x004F68E0`
+   (slot `+0x7C`, `draw-order.md` §6 r5), not slot `+0xA0`. It passes the
+   alpha byte, but the GDI floor drawer `0x006C95D0` reads only X, Y and
+   the open mode of its stack arguments (`[ebp+8]`, `[ebp+0xC]`,
+   `[ebp+0x1C]`) and hands the block helper (`0x004F8B80`) the tile, X,
+   Y and the light grid: the alpha is ignored and the roof is drawn with
+   the opaque floor rule of `shading.md` §4.
+2. A roof's alpha stays 0xFF anyway: roof records are filed by
+   `0x004DD460`, which sets no fade target; only the wall filer
+   `0x004DD180` does (`draw-order.md` §8), and the record creators
+   (`0x0066DC50`, `0x0066DDE0`, `0x0066DF40`) set state 0 and alpha, from
+   and to 0xFF. So the 0x400 skip never fires for a roof either; a roof
+   is hidden only by record flag 0x8.
 
 ### 7. d2rs answers
 
@@ -359,6 +376,7 @@ Real values: act 1 `Pal.PL2` (`shading.md` Test vectors, SHA-256
 | shadow tile, blended, `d = 100`, `s = 200` | 207 | §5, live |
 | translucent wall `a = 0xC0`, `L[s] = 255`, `d = 172` | `A0[256·255 + 172]` = 190 | §6, live |
 | translucent wall `a = 0x3F` | nothing drawn | §6 |
+| roof record, alpha argument 0x80 (not reachable in 1.14d, §6 roofs r2), GDI | drawn as an opaque floor tile: same pixels as alpha 0xFF | §6 roofs r1 |
 | COF layer override 1 level 3, not ghostly, no `r`, hovered | mode 3 | §3 |
 | no override, ghostly monster, hovered | mode 1 | §3 |
 | no override, player, RH ethereal | mode 1; SH ethereal → 2 | §3 |
@@ -377,7 +395,7 @@ Real values: act 1 `Pal.PL2` (`shading.md` Test vectors, SHA-256
 table `0x0074C4A8` (slots `+0x7C`, `+0x84`, `+0x88`, `+0x90`, `+0x9C`,
 `+0xA0`, `+0xA4`); cel drawers `0x00607970`, `0x00607B90`, `0x00606E40`,
 `0x00607060`, dispatcher `0x00608540`; shadow `0x006C87E0`, `0x00601730`,
-`0x00608D60`, `0x00471620`, `0x004DB090`, `0x004F6540`; tile helpers
+`0x00608D60`, `0x00471620`, `0x004DB090`, `0x004F6540`; roofs (§6 roofs r1–r2, 2026-10-08) `0x004DEA70`, `0x004F68E0`, `0x006C95D0`, `0x004F8B80`, `0x004DD460`, `0x004DD180`, `0x0066DC50`, `0x0066DDE0`, `0x0066DF40`; tile helpers
 (table `0x0072DA60`) `0x004F7EA0`, `0x004F82D0`, `0x004F84F0`, GDI
 `0x006C9290`, `0x006C93A0`; settings `0x0072DA48`, `0x004F5200`,
 `0x0047D040`, `0x006C8A50`; composite `0x00470EC0` (`0x0047123B`–

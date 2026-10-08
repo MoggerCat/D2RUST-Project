@@ -17,24 +17,24 @@
 |   2. Crypt table | 91–107 |
 |   3. String hash | 108–127 |
 |   4. Decryption | 128–148 |
-|   5. Hash table | 149–173 |
-|   6. Block table | 174–202 |
-|   7. File key | 203–208 |
-|   8. Reading file data | 209–239 |
-|   9. Sector decompression | 240–258 |
-|   10. PKWARE Data Compression Library ("implode") stream | 259–295 |
-|   11. Huffman (Storm adaptive Huffman) | 296–354 |
-|   12. IMA ADPCM (Storm variant) | 355–381 |
-|   13. Recovering the key of an unnamed file | 382–399 |
-|   14. Listfile | 400–405 |
-| Constants & data dependencies | 406–410 |
-| Randomness | 411–414 |
-| Edge cases & original bugs | 415–424 |
-| Archive set (D2-specific) | 425–431 |
-| Observations (1.14d install) | 432–463 |
-| Test vectors | 464–477 |
-| Provenance | 478–495 |
-| Open questions | 496–509 |
+|   5. Hash table | 149–185 |
+|   6. Block table | 186–214 |
+|   7. File key | 215–220 |
+|   8. Reading file data | 221–251 |
+|   9. Sector decompression | 252–270 |
+|   10. PKWARE Data Compression Library ("implode") stream | 271–307 |
+|   11. Huffman (Storm adaptive Huffman) | 308–366 |
+|   12. IMA ADPCM (Storm variant) | 367–393 |
+|   13. Recovering the key of an unnamed file | 394–411 |
+|   14. Listfile | 412–417 |
+| Constants & data dependencies | 418–422 |
+| Randomness | 423–426 |
+| Edge cases & original bugs | 427–436 |
+| Archive set (D2-specific) | 437–443 |
+| Observations (1.14d install) | 444–475 |
+| Test vectors | 476–489 |
+| Provenance | 490–507 |
+| Open questions | 508–523 |
 <!-- /index -->
 
 ## Summary
@@ -168,8 +168,20 @@ a whole with the hash-table key:
 3. Stop at an empty entry. Skip deleted entries.
 4. An entry matches when `name_a == a`, `name_b == b` and
    `block_index < block_table_count`.
-5. Among matches, choose the first with locale 0. If none has locale 0,
-   choose the first match. No match means "file not found".
+5. Among matches, only entries with **locale 0 and platform 0** are
+   ever chosen; the first one wins. An entry with any other locale or
+   platform is never returned, even when it is the only match. No match
+   means "file not found". (1.14d Storm search `0x004155D0`, called from
+   the file lookup `0x00417F10` with the current locale word
+   `[0x0077905C]` and platform byte `[0x0077905E]`: an exact
+   locale + platform match returns at once, otherwise the last entry
+   whose locale is 0 or equal and whose platform is 0 or equal. Both
+   globals are in `.bss` (0 at start) and their only writers, the
+   setters `0x004166D0` / `0x00416700`, have no caller and no pointer
+   to them anywhere in `Game.exe` (byte search), so both stay 0 and
+   the two tests reduce to locale = platform = 0. The 1.14d archives
+   hold only locale-0 entries (§Observations), so this never changes
+   which file opens.)
 
 ### 6. Block table
 
@@ -500,6 +512,8 @@ Riiablo uses 16-bit Java `short` for the step sum, which can overflow.
    its open question 1.
 2. Locale handling: does 1.14d ever request a non-neutral locale? The
    observation survey records which locales appear in the tables.
+   *Answered* (static, 2026-10-08): no. The requested locale and
+   platform are always 0 (§5 Lookup rule 5, `0x004155D0`).
 3. ~~Which compression masks and flags 1.14d uses, and whether archives
    contain `(listfile)`.~~ Answered: see Observations.
 4. File names for unlisted files (most of `d2sfx.mpq`, all of

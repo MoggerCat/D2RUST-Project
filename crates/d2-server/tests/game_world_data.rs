@@ -233,7 +233,8 @@ fn type_errors(types: &SharedTypes) -> Vec<String> {
 /// `WorldTypes` (maze, preset, outdoor on the live tables and files) and
 /// its first room streamed (its DT1 library loads): no generation or
 /// level-type error, at least one room per level.
-// Intended claim (unconfirmed until the first local run): specs/drlg/levels.md §3 r2, §3 r3, §4 r1 (the recorded part; also claimed by world_data/tests/game.rs once it passes), §5 (game tier: every Act I level).
+// Covers: specs/drlg/levels.md §3 r2, §3 r3, §4 r1
+// (the recorded part; also claimed by world_data/tests/game.rs once it passes), §5 (game tier: every Act I level).
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn every_act1_level_generates() {

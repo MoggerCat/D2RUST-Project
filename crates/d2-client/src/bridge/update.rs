@@ -20,7 +20,7 @@
 use super::dispatch::{Dispatch, Handle, HandlerError, UnitMessage};
 use super::msg::lighting::object_light_of;
 use super::objects::{self, ObjFx, ObjUnit};
-use super::output::{Output, Outputs};
+use super::output::{move_freed, Output, Outputs};
 use super::receive::{ReceiveLog, Rejected};
 use super::world::{update_order, ClientWorld, ModelInputs, OBJECT};
 
@@ -79,6 +79,7 @@ pub fn update_pass(
                 log.rejected.push(Rejected { id: 0, error });
             }
             apply_object_lights(world, &outputs[start..]);
+            move_freed(world, outputs);
         }
         // Looked up again: an earlier unit's messages or its own update
         // may have removed it (§5 rule 2).
@@ -114,6 +115,7 @@ pub fn update_pass(
                 }
                 Err(error) => log.rejected.push(Rejected { id, error }),
             }
+            move_freed(world, outputs);
         }
     }
     if !c_objects_done {
@@ -126,6 +128,7 @@ pub fn update_pass(
         // A DRLG error is a fatal error of the original's code.
         log.rejected.push(Rejected { id: 0, error });
     }
+    move_freed(world, outputs);
     applied
 }
 
@@ -153,6 +156,7 @@ fn c_objects(
             log.rejected.push(Rejected { id: 0, error });
         }
         apply_object_lights(world, &outputs[start..]);
+        move_freed(world, outputs);
     }
 }
 

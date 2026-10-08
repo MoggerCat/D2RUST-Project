@@ -21,6 +21,10 @@ pub enum Checked {
     Kept,
     /// The local player: C→S 0x5F appended to `outgoing` (rule 8).
     Asked,
+    /// The local player while the play preview predicts its walk: rule 8
+    /// takes the server's point (the prediction snaps to it), no C→S 0x5F
+    /// ([`correct`]). d2rs-own, PROVISIONAL REC-277.
+    Followed,
     /// Another unit moved to (x, y) (rule 8).
     Moved,
     /// Rule 8 found no room for (x, y) in the client DRLG: nothing.
@@ -154,6 +158,21 @@ fn correct(world: &mut ClientWorld, key: UnitKey, x: u16, y: u16) -> Checked {
             return Checked::NoRoom;
         };
         room = Some(found.room);
+    }
+    if world.predicted(&world.units[&key]).is_some() {
+        // d2rs-own, unverified. PROVISIONAL (REC-277; `model.md` OQ2,
+        // REC-51): the 1.14d client's own position is its own path,
+        // stepped by the same path code as the server's (`sim/pathing.md`
+        // §3–§7) over the same rooms, so the two end together and rule 8
+        // asks only when they truly part. The play preview's position is
+        // a straight-line guess that does not see collision: past a wall
+        // or around an obstacle it parts from the server's path although
+        // the server is right, and C→S 0x5F would make the server walk
+        // (or snap) the player to the guess (`sim/pathing.md` §1.6). So
+        // the guess yields: the server's point is taken (rule 3 stored
+        // it; the prediction snaps to it, `Predict::observe`) and nothing
+        // is sent.
+        return Checked::Followed;
     }
     if world.local_player == Some(key) {
         // C→S 0x5F with the unit's own position.

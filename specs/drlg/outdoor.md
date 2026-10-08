@@ -42,7 +42,7 @@
 | Edge cases & original bugs | 926–947 |
 | Test vectors | 948–1122 |
 | Provenance | 1123–1163 |
-| Open questions | 1164–1255 |
+| Open questions | 1164–1261 |
 <!-- /index -->
 
 ## Summary
@@ -1168,8 +1168,14 @@ recording; level rects and outdoor flags equal a level-coordinate probe
    preset direction of levels 1 and 27 after act creation.
    *Answered (2026-10-08, recorded: `pc2rec-d1-rng`)* for the rects: all
    eleven equal the derived values (Test vectors, "Recorded Act I
-   rects"). Still open: the preset direction of levels 1 and 27 (no
-   field offset known).
+   rects"). Still open: the preset direction of levels 1 and 27.
+   *Field answered (2026-10-08, static)*: the direction is the u32 at
+   (level +0x14) +0x04, the preset info of a DrlgType-2 level; the
+   driver loads level +0x14 at `0x00677470` (`0x006774A4` for 27) and
+   stores at `0x00677490` (level 1: R0[row]; level 40: R0[row + 1])
+   and `0x006774F9` (27) (`levels.md` §1). Expected for the recorded
+   seed: Test vectors (Rogue Encampment direction 3, Outer Cloister 1).
+   Reading the two words after Act I creation is a recording item.
 2. Disassemble the linker bodies `0x00676150`–`0x00676DC0` (no function
    in the export) and compare with §2.4 (draw forms, B/A choice, BM size).
    *Partly answered* (static, `tools/ghidra/disasm.py at`): R4

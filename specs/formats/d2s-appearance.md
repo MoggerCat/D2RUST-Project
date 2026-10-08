@@ -30,12 +30,12 @@
 |   4. Helm and hand items (`0x0063DA70`) | 121–144 |
 |   5. Body armour (composite branch of `0x0063E510`) | 145–156 |
 |   6. Colour byte (`0x0062C100`(player, item, &byte, 0)) | 157–185 |
-| Constants & data dependencies | 186–199 |
-| Randomness | 200–203 |
-| Edge cases & original bugs | 204–222 |
-| Test vectors | 223–234 |
-| Provenance | 235–250 |
-| Open questions | 251–279 |
+| Constants & data dependencies | 186–219 |
+| Randomness | 220–223 |
+| Edge cases & original bugs | 224–242 |
+| Test vectors | 243–254 |
+| Provenance | 255–270 |
+| Open questions | 271–308 |
 <!-- /index -->
 
 ## Summary
@@ -185,8 +185,28 @@ mod 256 when 1 ≤ T ≤ 8 and 0 ≤ k ≤ 20, else 0; and ok(T, k) for
 
 ## Constants & data dependencies
 
-Token reference table `0x00744CA8` (256 × 8 bytes, types in the
-pre-1.08 numbering; only its is-a `weap` / `armo` test is used);
+Token reference table `0x00744CA8` (256 × 8 bytes: u32 code, i32
+type; only the type's is-a `weap` / `armo` test is used, through the
+1.14d itemtypes matrix). Types by slot (1.14d image, `.data`, file
+offset 0x344CA8): 0–3: 1; 4–10: 37; 11–26: 3; 27–30: 2; 31–33: 16;
+34–36: 15; 37–39: 19; 40: 37; 41–42: 2; 43–45: 25; 46: 29; 47: 43;
+48–49: 30; 50: 36; 51: 28; 52–53: 30; 54: 36; 55–56: 31; 57–58: 30;
+59–62: 38; 63–66: 32; 67–69: 33; 70–71: 30; 72–75: 33; 76–79: 27;
+80–83: 26; 84: 28; 85: 34; 86–87: 28; 88: 34; 89: 31; 90–91: 34;
+92–93: 35; 94: 43; 95: 29; 96: 30; 97: 36; 98: 24; 99–100: 38; 101:
+42; 102: 32; 103–105: 30; 106: 33; 107–110: 27; 111: 26; 112: 28; 113:
+34; 114: 28; 115–116: 35; 117: 1; 118–119: 3; 120: 2; 121: 3; 122–123:
+40; 124–125: 19; 126–127: 16; 128–129: 15; 130: 30; 131: 28; 132: 43;
+133: 29; 134: 3; 135–136: 28; 137–138: 36; 139–140: 30; 141–142: 32;
+143–145: 33; 146–147: 34; 148: 32; 149: 33; 150–151: 24; 152–153: 26;
+154: 36; 155–164: 28; 165–168: 25; 169: 36; 170–172: 24; 173–179: 36;
+180–193: 30; 194–197: 32; 198: 42; 199: 43; 200: 42; 201: 43; 202–211:
+33; 212–217: 34; 218–222: 26; 223–230: 27; 231–234: 35; 235–241: 37;
+242–255: 3. Under the 1.14d itemtypes is-a relation this reserves
+slots 43–116, 130–133 and 135–234 as `weap` and 4–42, 118–121,
+124–129, 134 and 235–255 as `armo`; 0–3, 117, 122 and 123 are
+neither. (The codes are the 1.00 item codes, e.g. 4 `cap`, 27 `buc`,
+47 `hax`; rule 1 does not read them.);
 `wclass` index table `0x007446A0` (`bow` 1, `1hs` 2, `1ht` 3, `stf` 4,
 `2hs` 5, `2ht` 6, `xbw` 7, `ht1` 12; count 8 at `0x007446E0`); the
 data-table offsets of Inputs. In 1.14d `states.txt` the rows with an
@@ -262,17 +282,26 @@ values of the Test vectors; saves read with `tools/d2s_check.py`
    Needs a local save, not a recording: one character with a helm, a
    body armour and a coloured magic or unique item equipped (recording
    list IT-6).
-3. The bytes of the reference table `0x00744CA8` (rule 1.2.4) are not
-   in this spec. PROVISIONAL: slots 57–124 are `weap` slots and no other
-   slot is reserved (because that is the smallest table that gives rule
-   1.3's positions: weapons 4–56, `cap` 57, `buc` 79, the throwing
-   potions 125–134; it does not give the second `ktr` at 243 of edge
-   case 4, which rule 2 never returns); settled by reading the 256
-   entries from the 1.14d image (local run queue; REC-91) or by the IT-6
-   saves (`docs/handoff/pc2-rec-pc2-items.md`).
-4. An empty `alternategfx` (code 0) in rule 2. PROVISIONAL: compared
-   like any code, so it matches the first unfilled entry (98 in 1.14d)
-   before a later entry holding `code` (because rule 2 states the
-   comparison without an exception); only items whose `code` sits above
-   the first hole (the throwing potions) or in no entry are affected;
-   settled by a save with such an item in a hand (IT-6; REC-92).
+3. The bytes of the reference table `0x00744CA8` (rule 1.2.4).
+   *Answered* (read from the 1.14d image, 2026-10-08): §Constants
+   gives the 256 types and the slots they reserve. Run through rule 1
+   with the 1.14d `patch_d2` item tables, this table gives every anchor
+   of rule 1.3 (`hax` 4 … `bst` 37, `ktr` 45, `cap` 57, `qlt` 64, `buc`
+   79, class items to 97, throwing potions at 125–129 and 134) and the
+   second `ktr` at 243 of edge case 4. The earlier reconstruction
+   (slots 57–124 `weap`, nothing else reserved) is withdrawn: run
+   literally through rule 1 it puts the throwing potions at 47–50 and
+   gives 75 of the 659 item records a different token (e.g. `amb` /
+   `am1` 54 vs 127; scratch simulation, 2026-10-08). REC-91 is no
+   longer needed.
+4. An empty `alternategfx` (code 0) in rule 2.
+   *Answered* (static, 2026-10-08): compared like any code. All four
+   call sites (`0x0063D9E3`, `0x0063DA37`, `0x0063DAEB`, `0x0063E5D3`)
+   load ESI := record +0x90 (`alternategfx`) and EDI := +0x80 (`code`)
+   unchanged, and `0x0063D900` compares each entry 1..254 with both
+   (`0x0063D917`, `0x0063D91B`) with no zero test. So an empty
+   `alternategfx` matches the first entry whose code is still 0 (98 in
+   1.14d, §Constants table) unless an entry below it holds `code`. In
+   1.14d this gives 98 for the throwing potions (`code` at 125–129,
+   134) and for any hand or helm item whose code is in no entry.
+   REC-92 is no longer needed.

@@ -100,6 +100,10 @@ pub fn set_mode<H: UnitHooks>(
     rec.flags |= flags::CHANGED;
     sim.game.lists.queue_update(unit).map_err(GameError::from)?;
     if changed {
+        // `0x006272E0` (`stat-lists.md` §8.9): a new mode frees the
+        // unit's TEMPONLY lists (the run list of `pathing.md` §8.2, the
+        // attack-rate lists of the skill bodies).
+        sim.stats.remove_temporary_lists(hooks, unit);
         hooks.reinit_anim(sim, unit);
     }
     Ok(())

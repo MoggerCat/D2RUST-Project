@@ -36,17 +36,17 @@
 |   3. Chat open and close (C→S 0x2F, 0x30) | 217–237 |
 |   4. Menu actions (C→S 0x38) | 238–275 |
 |   5. Healing on chat open | 276–303 |
-|   6. Cain identify (C→S 0x34) | 304–321 |
-|   7. Mercenaries | 322–444 |
-|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 445–524 |
-|   9. S→C 0x2A NPC transaction (15 bytes) | 525–558 |
-|   10. Dead code in 1.14d (no caller, no pointer reference) | 559–570 |
-| Constants & data dependencies | 571–583 |
-| Randomness | 584–596 |
-| Edge cases & original bugs | 597–672 |
-| Test vectors | 673–695 |
-| Provenance | 696–740 |
-| Open questions | 741–799 |
+|   6. Cain identify (C→S 0x34) | 304–332 |
+|   7. Mercenaries | 333–455 |
+|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 456–535 |
+|   9. S→C 0x2A NPC transaction (15 bytes) | 536–569 |
+|   10. Dead code in 1.14d (no caller, no pointer reference) | 570–581 |
+| Constants & data dependencies | 582–594 |
+| Randomness | 595–607 |
+| Edge cases & original bugs | 608–683 |
+| Test vectors | 684–706 |
+| Provenance | 707–751 |
+| Open questions | 752–810 |
 <!-- /index -->
 
 ## Summary
@@ -317,6 +317,17 @@ Handler `0x0054BBA0` (size 5 else 3) → `0x00578460(npc GUID u32 @1)`:
    0x10, inventory order; stash (page 4) and belt are skipped.
 6. One 0x2A code 3, flag 0, GUID −1.
 
+Client caption (owner `ui/menus.md` §2.3 r3; the menu build `0x004B4830`):
+the client counts n with the same `0x0062A530` (`0x004B4B86`) on its own
+item model and tests the same two bits on its copy of the player's quest
+record, `[0x007C0D43]` (written only by S→C 0x28, which arrives with the
+dialog before the menu is built, `client/msg-ui.md` §16 r7):
+`0x0065C310(record, 4, 0)` at `0x004B4B61`, then `(record, 4, 1)` at
+`0x004B4B74`. Both clear → `NPCIdentify2` (4021, `0x004B4BA2`) + `100 ×
+n` (`0x004B4BCB`); either set → 4020 `NPCIdentify1` as is (`0x004B4BFE`).
+So the caption shows a cost exactly when step 4 charges one, and the
+client needs no other quest state for it.
+
 C→S 0x37 (identify the item just gambled) is `vendors.md` §5.5.
 
 ### 7. Mercenaries
@@ -506,9 +517,9 @@ addresses.)
 |---|---|---|---|
 | warriv1 155 | any ∉ 1–3 | slot 6 bit 0 | act change to level 40 (`0x0054B830(40, 0)`), `0x005467E0(npc, 40, 1)` (`quests.md` §8.1), activate level 40's waypoint (`0x00660E00`, `0x00660EC0`; `waypoints.md`) |
 | warriv2 175 | any ∉ 1–3 | none | `0x0054B830(1, 5)` |
-| meshif1 210 | 0 | slot 14 bit 0 | level 75, `0x005467E0(npc, 75, 40)`, waypoint 75 |
+| meshif1 210 | 0 | slot 14 bit 0 | level 75 (`0x0054B830(75, 0)`), `0x005467E0(npc, 75, 40)`, waypoint 75 |
 | meshif2 264 | 0 | none | `0x0054B830(40, 5)` |
-| tyrael2 367 | 0 | expansion and slot 26 bit 0 | level 109, `0x005467E0(npc, 109, 103)`, waypoint 109 |
+| tyrael2 367 | 0 | expansion and slot 26 bit 0 | level 109 (`0x0054B830(109, 0)`), `0x005467E0(npc, 109, 103)`, waypoint 109 |
 | cain6 520 | 0 | none | `0x0054B830(103, 5)` |
 
 The three calls of a row run in the order listed (`0x0057A67A`,
@@ -519,7 +530,7 @@ player, level, arg)`: level 0 → warp to the town of the player's act
 (`0x0061AB70`) with arg; level in the player's act → a town-portal
 object (class 59) at the player's (x − 5, y) leading to it
 (`0x0056D130`); else the warp `0x0053AEC0(level, arg)`
-(`waypoints.md` §7 rule 5). Every §8.3 destination is in another act,
+(`waypoints.md` §7 rule 5, the act change §11; the argument is the spawn tile index). Every §8.3 destination is in another act,
 so only the warp runs.
 
 ### 9. S→C 0x2A NPC transaction (15 bytes)

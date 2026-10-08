@@ -123,7 +123,7 @@ fn holders(set: &ArchiveSet, name: &str) -> Vec<String> {
 // PCs, `docs/handoff/local-buddy-2026-10-06.md` G1); the same two runs
 // printed 26,317 frames, 140 flipped, EE×4 1,193 / CD×4 400 / 00×4 60
 // (the 4 removed files: 2 EE + 2 00). dc6.md Status still says 1,657.
-// Intended claim (unconfirmed until the first local run): specs/formats/dc6.md §file-header-24-bytes, §frame, §pixel-decoding
+// Covers: specs/formats/dc6.md §file-header-24-bytes, §frame, §pixel-decoding
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn dc6_every_file_decodes() {
@@ -163,7 +163,7 @@ fn dc6_every_file_decodes() {
 // dcc.md Status: all 21,717 `.dcc` files decode with every sub-stream
 // exactly consumed (the parser's end checks) and fewer than 8 leftover PCD
 // bits per direction; version 6 throughout; no frame has bottom-up = 1.
-// Intended claim (unconfirmed until the first local run): specs/formats/dcc.md §bit-reading, §file-header-little-endian-bytes, §direction-header-bits, §boxes, §cells, §stage-1-cell-colors-all-frames-in-order, §stage-2-building-frames-all-frames-in-order-after-stage-1, §end-checks
+// Covers: specs/formats/dcc.md §bit-reading, §file-header-little-endian-bytes, §direction-header-bits, §boxes, §cells, §stage-1-cell-colors-all-frames-in-order, §stage-2-building-frames-all-frames-in-order-after-stage-1, §end-checks
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn dcc_every_file_decodes() {
@@ -284,7 +284,7 @@ fn ds1_every_file_parses() {
 // 4: 3 padding bytes); `chars\am\cof\amblxbow.cof` (d2char.mpq) is 72
 // bytes of junk and the only failure. There is no `amblxbw.cof` in 1.14d:
 // the Amazon block COFs are `ambl1hs`, `ambl1ht` and `amblhth`.
-// Intended claim (unconfirmed until the first local run): specs/formats/cof.md §header-28-bytes, §layer-records-l-9-bytes, §frame-events-and-draw-order, §edge-cases-original-bugs
+// Covers: specs/formats/cof.md §header-28-bytes, §layer-records-l-9-bytes, §frame-events-and-draw-order, §edge-cases-original-bugs
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn cof_every_live_file_parses() {
@@ -347,7 +347,7 @@ fn cof_every_live_file_parses() {
 // palette.md Status: all 19 `pal.dat` and 17 `.pl2` files parse; one PL2
 // has 12 text colors, the rest 13. Test vectors: every `.dat` under
 // `data\global\palette` parses.
-// Intended claim (unconfirmed until the first local run): specs/formats/palette.md §dat-palette, §pl2-palette-transform, §edge-cases-original-bugs
+// Covers: specs/formats/palette.md §dat-palette, §pl2-palette-transform, §edge-cases-original-bugs
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn palettes_every_file_parses() {
@@ -402,7 +402,7 @@ fn tables(set: &ArchiveSet) -> (Files, Files) {
 }
 
 // font-tbl.md Status: all 14 font tables parse, each with 256 records.
-// Intended claim (unconfirmed until the first local run): specs/formats/font-tbl.md §header-12-bytes, §glyph-records-14-bytes-each
+// Covers: specs/formats/font-tbl.md §header-12-bytes, §glyph-records-14-bytes-each
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn font_tables_every_file_parses() {
@@ -426,7 +426,7 @@ fn font_tables_every_file_parses() {
 // 130 hold `C3 BF`. Test vector (eng tables): every key resolves to its
 // own slot, or to an earlier slot holding the same key (a duplicate first
 // in the probe sequence).
-// Intended claim (unconfirmed until the first local run): specs/formats/tbl.md §header-21-bytes, §strings, §live-tables-1-14d, §key-lookup
+// Covers: specs/formats/tbl.md §header-21-bytes, §strings, §key-lookup
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn string_tables_every_key_resolves() {
@@ -526,7 +526,7 @@ fn events(r: &AnimRecord) -> Vec<(usize, u8)> {
 }
 
 // animdata.md Test vectors "Real 1.14d" and §1 (the copies in the archives).
-// Intended claim (unconfirmed until the first local run): specs/formats/animdata.md §1, §2, §3, §4 r1, §4 r2, §4 r4, §6
+// Covers: specs/formats/animdata.md §1, §2, §3, §4 r1, §4 r2, §4 r4, §6
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn animdata_real_vectors() {
@@ -673,7 +673,7 @@ fn cof_for(set: &ArchiveSet, name: &str) -> Option<Cof> {
 // events = COF events zero-filled to 144, except, for each of the 9
 // differing duplicates, the copy that does not match: the second copy for
 // 64A1HTH, 64NUHTH, MINUHTH, the first for the other 6 (§Edge cases).
-// Intended claim (unconfirmed until the first local run): specs/formats/animdata.md §2
+// Covers: specs/formats/animdata.md §2
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn animdata_matches_every_cof() {

@@ -37,13 +37,13 @@
 |   5. `srvmissile` path | 818–833 |
 |   6. Shared helpers, batch 2 | 834–1172 |
 |   7. Start functions (srvst), batch 2 | 1173–1239 |
-|   8. Do functions (srvdo), batch 2 | 1240–1642 |
-| Constants & data dependencies | 1643–1689 |
-| Randomness | 1690–1708 |
-| Edge cases & original bugs | 1709–1758 |
-| Test vectors | 1759–1779 |
-| Provenance | 1780–1817 |
-| Open questions | 1818–1843 |
+|   8. Do functions (srvdo), batch 2 | 1240–1658 |
+| Constants & data dependencies | 1659–1705 |
+| Randomness | 1706–1724 |
+| Edge cases & original bugs | 1725–1774 |
+| Test vectors | 1775–1795 |
+| Provenance | 1796–1833 |
+| Open questions | 1834–1859 |
 <!-- /index -->
 
 ## Summary
@@ -1279,6 +1279,18 @@ Inferno Sentry, Death Sentry.
 4. Return 1 if `sentry(game, unit, x, y, R, skill, L)` (§6.9) made a
    unit, else 0.
 
+The laid trap is a monster (`pettype` `assassintrap`, `petmax` 5 for
+Lightning Sentry): its skills come from the caster's `sumskill1..5`
+(§6.5 step 6; Lightning Sentry: `sentry lightning` at L, Shock Field,
+Charged Bolt Sentry, Death Sentry at their base levels); its AI
+(target pick, shot, idle times, charges, death) is
+`monsters/ai-bodies-6.md` §14. With 1.14d data (`lightningsentry`: AI
+AssassinSentry, aip 100 / 10 / 15 / 25; `Skill1` `sentry lightning`,
+`calc4` `par8` = 10) that gives 10 shots and no lifetime timer. Each
+shot is `sentry lightning`'s `srvmissile` `sentrylightningbolt`
+(`use.md` §5.4 step 7), damage from its `missiles.txt` `Skill` column
+(Lightning Sentry).
+
 #### 8.4 22 Nova attack `0x005C9B50`
 
 Skills (class, 4): Howl, Frost Nova, Nova, Poison Nova (also 5 monster
@@ -1423,6 +1435,10 @@ calling it).
 3. Not dual: unit flags |= 0x40.
 4. srvdo 34 body (§8.8) with (game, unit, skill, L). Return 1 (its
    result is ignored).
+
+Which claw each run uses, whose stats count, and why a second frame
+event exists only with two claws (sequence 16, `ht2`): `bodies-2.md`
+§2.27.
 
 #### 8.11 13 Fend, Zeal, Fury `0x005DBC60`
 

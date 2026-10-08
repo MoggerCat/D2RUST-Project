@@ -25,22 +25,22 @@
 | Inputs | 66–76 |
 | Outputs / state changes | 77–82 |
 | Rules | 83–84 |
-|   1. Field lists | 85–112 |
-|   2. Compile procedure | 113–138 |
-|   3. Type vocabulary | 139–201 |
-|   4. Integers (`u8` … `u32`, `u8?`, `bit`) | 202–229 |
-|   5. Text, codes and names | 230–256 |
-|   6. Linkers (key → index) | 257–365 |
-|   7. String keys (`strkey`) | 366–397 |
-|   8. Callback fields (`cb`) | 398–449 |
-|   9. Records | 450–470 |
-|   10. Comparing a compiled `.txt` with a shipped `.bin` | 471–504 |
-| Constants & data dependencies | 505–519 |
-| Randomness | 520–523 |
-| Edge cases & original bugs | 524–531 |
-| Test vectors | 532–657 |
-| Provenance | 658–736 |
-| Open questions | 737–772 |
+|   1. Field lists | 85–114 |
+|   2. Compile procedure | 115–140 |
+|   3. Type vocabulary | 141–203 |
+|   4. Integers (`u8` … `u32`, `u8?`, `bit`) | 204–231 |
+|   5. Text, codes and names | 232–270 |
+|   6. Linkers (key → index) | 271–406 |
+|   7. String keys (`strkey`) | 407–438 |
+|   8. Callback fields (`cb`) | 439–495 |
+|   9. Records | 496–516 |
+|   10. Comparing a compiled `.txt` with a shipped `.bin` | 517–550 |
+| Constants & data dependencies | 551–565 |
+| Randomness | 566–569 |
+| Edge cases & original bugs | 570–577 |
+| Test vectors | 578–703 |
+| Provenance | 704–783 |
+| Open questions | 784–823 |
 <!-- /index -->
 
 ## Summary
@@ -101,14 +101,16 @@ would produce.
 - Header columns + missing fields must be ≤ 280 (the original keeps both
   in one 280-slot map and would overrun it).
 - In the 92 recovered 1.14d lists every 2-byte field sits at an even
-  offset and every 4-byte field at a multiple of 4 (the runtime sound
-  lists are unexamined, Open question 9). The compiler requires no
+  offset and every 4-byte field at a multiple of 4. The runtime `sounds`
+  list is not aligned (`audio/sound-table.md` §1: `Duration` u16 at 0x43,
+  `Compound` at 0x45, `Falloff` u32 at 0x47; list built in `0x00481950`,
+  compiled by the same `0x006BD780`). The compiler requires no
   alignment.
 - Errors use the codes of `txt-format.md` §9: a field list that fails
   `txt-format.md` §6.1 (size, type IDs, names, record size, `u8?` runs,
   linker kinds and existence, callbacks, field footprints) is E13; too
-  many slots E14; zero records E3; bad name-key bytes E11; `key(code1/2)`
-  overflow E12. This spec adds no codes.
+  many slots E14; zero records E3; `key(code1/2)` overflow E12. Name-key
+  bytes ≥ 0x80 are mapped (§5.3), not an error. This spec adds no codes.
 
 ### 2. Compile procedure
 
@@ -248,11 +250,23 @@ the field list. A missing `code4` or `key(code4)` column writes
 `00 00 00 00`: zeros, not spaces.
 
 **5.3 Name.** The first min(L, 31) cell bytes, then each byte `A`–`Z`
-(0x41–0x5A) becomes `a`–`z`. Other bytes are unchanged. Bytes ≥ 0x80: the
-original indexes its lowercase table with a signed byte and reads
-unrelated memory (mostly 0, which ends the key). No 1.14d key has such
-bytes; d2rs rejects a byte ≥ 0x80 within the key's first 31 bytes, in
-every name key including `param` lookups (`txt-format.md` E11).
+(0x41–0x5A) becomes `a`–`z`. Other bytes below 0x80 are unchanged.
+- **Bytes ≥ 0x80.** 1.14d indexes its 256-byte lowercase table
+  (`0x006CEB98`) with the *signed* byte, so byte b ≥ 0x80 becomes the
+  constant `.rdata` byte at `0x006CEB18 + (b − 0x80)` (`0x004113C0`). Those
+  128 bytes are 0 except at b = 0x80 + 8k: k = 0 → 0x05; k = 1–15 → 1 +
+  (number of trailing zero bits of k), i.e. 0x88 → 01, 0x90 → 02, 0x98 →
+  01, 0xA0 → 03, 0xA8 → 01, 0xB0 → 02, 0xB8 → 01, 0xC0 → 04, 0xC8 → 01,
+  0xD0 → 02, 0xD8 → 01, 0xE0 → 03, 0xE8 → 01, 0xF0 → 02, 0xF8 → 01.
+- The key ends at the first byte that maps to 0 (the original keeps
+  mapping past it, but every key compare, `0x006BD490` and the finds,
+  stops at the first 0). So key = map each of the first 31 bytes, then cut
+  at the first 0. `Caf\xE9` → `caf` (finds and collides with `Caf`);
+  `ab\x80c` → `ab\x05c`.
+- The same mapping runs in every name operation: find `0x006BD3C0`,
+  add-always `0x006BD500`, find-or-add `0x006BD5A0` (so `param` lookups,
+  callback name lookups and `@tc` too). No 1.14d key has a byte ≥ 0x80;
+  d2rs reproduces the mapping and reports `KeyHigh` (`txt-format.md` §9).
 
 ### 6. Linkers (key → index)
 
@@ -338,12 +352,31 @@ same bytes for the 1.14d lists (the Provenance model did this); d2rs does
 not rely on it. A lookup into a linker whose owner step has not started is
 E13.
 
-**6.6 `.bin` mode.** In normal play the compiler does not run. Some
-loaders rebuild a linker from the loaded records. Confirmed for item
-codes: the items loader registers `code` (offset 128) of the combined
-records in order with the §6.1 add, so duplicates bump as in a compile.
-The other runtime maps: `runtime-maps.md`; whether each rebuild treats
-duplicates the same way: Open question 3.
+**6.6 `.bin` mode.** In normal play the compiler does not run. The
+code add `0x006BD230` and the name adds `0x006BD500` / `0x006BD5A0` have
+only these callers outside the compiler (every call site in 1.14d), and
+every row but `@skillrange` is a linker that exists in `.bin` mode (the
+only ones):
+
+| Linker | Built by | When | Keys, in order | Add |
+|---|---|---|---|---|
+| `items.code` (`0x0096BCC4`) | items loader `0x006315D0` | compile switch off | `code` (offset 128) of the combined weapons, armor, misc records | §6.1 add: duplicates bump as in a compile |
+| `itemtypes.code` (`0x0096C824`) | itemtypes loader `0x00638D80` | compile switch off (and load-from-bin `0x00744308` ≠ 0, always) | `code` (offset 0) of each record | §6.1 add (1.14d: records 1, 14, 17, 23 bump, as compiled) |
+| client composite item codes (`0x0087D824`) | composite loader `0x00504570` | always, on its first use | offset 128 of its own combined copy (`loading.md` §3.5) | §6.1 add |
+| `@uniques` (`0x0096C850`), `@sets` (`0x0096C844`) | `0x006342B0`, `0x00634DC0` | every mode | names of `uniqueitems`, `setitems` (`callbacks.md` §7) | add-always |
+| `@tc` (`0x0096C5E8`) | TC routine via `0x00653F90` | every mode | §6.4 | add-always |
+| `@skillrange` | skills routine `0x00613F80` | compile switch on only | §6.4 | §6.1 add |
+
+- Find-or-add (`0x006BD5A0`) runs only inside the compiler, so no
+  `key(name16/32)` linker (`monstats.Id`, `skills.skill`, …) exists in
+  `.bin` mode; runtime name → index needs come from `runtime-maps.md` or
+  per-table specs.
+- The TC routine names its automatic TCs from the rebuilt
+  `itemtypes.code` linker by index (`0x006541C0` → reverse lookup
+  `0x006BD180`): it takes the *stored* key, so a bumped duplicate code
+  gives the bumped text, and each space byte becomes a 0 (the name ends
+  at the first space). A missing index (none in 1.14d) makes no TC. The
+  TC list itself: `loading.md` §10.6.
 
 **6.7 Link validation (d2rs).** A lookup field (IDs 11, 13, 15, 19–21)
 of a loaded record holds value `v` (its width, little-endian). It is
@@ -358,7 +391,15 @@ the low bits, `v < n(K)` is exact for every field width. Linker sizes come
 from the live records; a compile-only linker (`loading.md` §7.2) takes its
 size from its `.bin` by-product, or for a `<table>_lookup` list from the
 runtime table compiled from the same `.txt` (code: its record count;
-name: its own key's size). Gap: Open question 11. On the 1.14d set
+name: its own key's size). The by-product sizes hold for the shipped
+set: every shipped by-product `.bin` equals the compile of the live
+`.txt` the runtime tables were compiled from (§10). No callback writes a
+lookup field: the `callbacks.md` footprints miss every lookup field of
+their tables, except that a `cubemain` output's `pre`/`suf` overflow
+(`callbacks.md` §3 r5) can reach a later `mod` link field, whose column
+is to the right of that output in 1.14d `cubemain.txt` (columns 18 / 22,
+47 / 51, 76 / 80), so the lookup write wins (§2 order). Gap: Open
+question 11. On the 1.14d set
 (`data-tool links`, 2026-10-06): 72,175 valid, 84,277 misses, 0 broken,
 0 unchecked fields; `items.code` 659, `@treasureclass` 1,013,
 `sounds.Sound` 4,699, `monseq.sequence` 60.
@@ -431,7 +472,12 @@ store u16 (id if id ≠ 0 else 5,382)
 - No text, or empty text → u32 0.
 - First byte `-` or `0`–`9` → C `atol(text)`: optional sign, decimal digits,
   stop at the first non-digit (`41` → 41, `-5` → −5, `12abc` → 12).
-- Otherwise look up the name (§5.3, E11 included) in the skills linker (`skills.skill`),
+  1.14d `atol` (`0x00681E95`) is `strtol(text, NULL, 10)` (`0x0068676E`
+  → `0x00686543`, C locale): a `-` followed by a non-digit gives 0
+  (`-x`, `--5`, `- 5` → 0); out of range saturates (`0x006866E4`–
+  `0x0068670F`): `4294967296` → 2147483647, `-3000000000` →
+  −2147483648, `-2147483648` → −2147483648 (errno is set and unread).
+- Otherwise look up the name (§5.3, bytes ≥ 0x80 mapped) in the skills linker (`skills.skill`),
   then `montype.type`, then `states.state`. The first hit gives the index.
   No hit → 0. A linker that does not exist yet is skipped.
 - 1.14d: `runes` record 27 `t1param4` `Battle Command` → 155 (skills record
@@ -527,7 +573,7 @@ All reproduced unless noted; the rules carry them: missing vs empty
 `code4` (§5.2), `strkey` (§7) and link cells (§3, §6.1–§6.2);
 unreachable `string.tbl` element 0 (§7); `str(N)` NUL spill (§5.1);
 bumped duplicate codes (§6.1); unchecked `link8` low byte (§6.3); 31-byte
-name keys (§6.2). Not reproduced: name-key bytes ≥ 0x80 (§5.3, E11).
+name keys (§6.2); name-key bytes ≥ 0x80 (§5.3).
 
 ## Test vectors
 
@@ -588,7 +634,7 @@ Overlaps (§2): four `u16` fields at one offset, cells `1`–`4` in column
 order → `04 00`; `str(4)` @0 then `u8` @4, cells `abcd`, `7` →
 `61 62 63 64 07` (with the `u8` column first: `61 62 63 64 00`).
 Binding, field-list, missing-field overlap, callback-argument,
-code-displacement, 256-byte `strkey` and E11/E12 vectors: `txt-format.md`
+code-displacement, 256-byte `strkey`, name-key byte ≥ 0x80 and E12 vectors: `txt-format.md`
 Test vectors.
 
 **Linkers**
@@ -670,13 +716,14 @@ scratch script, and bytes read from the PE file; addresses are virtual):
 | 0x6BCE20 | column binding, 280-field limit, `u8?` grouping check |
 | 0x6BD230 / 0x6BD130 | code linker add (sorted array, +1 on duplicate) / find |
 | 0x6BD5A0 / 0x6BD500 / 0x6BD3C0 / 0x6BD490 | name linker find-or-add / add-always / find / tree insert |
-| 0x4135D0, 0x4113C0, table 0x6CEB98 | 32-byte bounded copy (31 characters); lowercase map, `A`–`Z` only |
+| 0x4135D0, 0x4113C0, table 0x6CEB98 | 32-byte bounded copy (31 characters); lowercase map, `A`–`Z` only, indexed by the signed byte: b ≥ 0x80 reads 0x6CEB18 + (b − 0x80) in `.rdata` (read-only; 128 bytes dumped from the PE, §5.3) |
 | 0x410B10 / 0x410B50, masks 0x6CE268 / 0x6CE2E8 | bit set / clear; masks `1 << k` / `~(1 << k)` |
 | 0x6117B0 → 0x524D30 → 0x524C60 | `strkey`: empty or unresolved → 5382; table order patch (0x8829BC), expansion (0x8829C0, if loaded), base (0x8829B8) |
 | 0x611BD0, 0x611C70, 0x631530, 0x6619A0 | calc callbacks (skills, skilldesc, items, missiles): append to buffer or 0xFFFFFFFF |
 | 0x6336A0 | `param` callback (skills linker 0x96C7CC, montype 0x96C868, states 0x96BCF0) |
 | 0x6122F0, 0x613E90 | load-or-compile routine; code buffer read/write |
-| 0x6315D0 | items loader: with compile off, registers the combined records' `code` (offset 128) with 0x6BD230 (§6.6) |
+| 0x6315D0, 0x638D80, 0x504570 | `.bin`-mode code-linker rebuilds with 0x6BD230: items (compile off), itemtypes (compile off), client composite (always) (§6.6); callers of 0x6BD230 / 0x6BD500 / 0x6BD5A0 enumerated over `all.asm` |
+| 0x6541C0 → 0x6BD180 | automatic TC names: itemtypes linker reverse lookup by index, spaces → 0 (§6.6) |
 | 0x65A390 → 0x6541C0, 0x6547D0, 0x653F90 | `@tc`: empty name first, automatic TCs, `treasureclassex` rows until an empty name; every entry added with add-always 0x6BD500 |
 | 0x7063A8 | command-line option `txt` → configuration offset 0x215 → compile switch (0x44D9C0 → 0x6125A0) |
 
@@ -739,16 +786,21 @@ functions) agrees with every rule here.
 1. Answered: the 92 field lists are published in `fields.tsv` /
    `tables.tsv` (`schema.md`).
 2. Answered: the table-specific callbacks (§8.3) are in `callbacks.md`.
-3. Runtime linker rebuilds other than the item codes (§6.6): which loaders
-   rebuild which linker, and whether duplicates bump as in §6.1.
+3. Answered (static, 2026-10-08: every caller of `0x006BD230`,
+   `0x006BD500`, `0x006BD5A0` in `all.asm`): §6.6 lists the `.bin`-mode
+   linkers; the three code rebuilds use the §6.1 add, so duplicates bump.
 4. IDs 5, 7, 12, 14, 16 and 24 appear in no 1.14d list. Their rules come
    from the code only.
+   Capture-only: a `-txt` run of 1.14d on synthetic tables would exercise
+   them; the binary has nothing more to give.
 5. The duplicate-code bump (§6.1) comes from the code only. No 1.14d lookup
-   uses a bumped key.
-6. `atol` edge cases in `param` (overflow, MSVC CRT behavior) were not
-   checked; all 1.14d `param` numbers are small.
+   uses a bumped key. Capture-only, as 4.
+6. Answered (static, 1.14d `0x00681E95` → `strtol` `0x00686543`):
+   saturating, sign then digits only (§8.2).
 7. Policy for monstats record 707 `NameStr`: keep the shipped 5382 or the
    compiled 11154 when d2rs compiles that table (§10).
+   d2rs design: the code has no special case (`callbacks.md` Provenance),
+   so 1.14d cannot settle it.
 8. Whether string-table element numbering is the same in every language.
    The shipped bins hold one set of IDs; this install has only `ENG`.
    *Answered* (game-file read, 2026-10-07): no. `d2exp.mpq` also carries
@@ -759,13 +811,12 @@ functions) agrees with every rule here.
    in ENG. The shipped `.bin` IDs therefore match only the ENG numbering;
    d2rs keeps ENG (the installed language) and treats another
    language's tables as out of scope.
-9. The client sound tables' field lists (`sounds.txt` 142-byte and
-   `soundenviron.txt` 88-byte records) were not examined; they use the same
-   compiler functions.
-10. Bytes ≥ 0x80 in name keys: the original's mapping is not reproduced.
-11. §6.7 checks range only. Not checked: that a by-product `.bin` was
-    compiled from the same `.txt` as the runtime tables that link to it
-    (sizes assume so); whether a table-specific callback (§8.3) overwrites
-    a lookup field's bytes after the lookup (no `fields.tsv` field overlaps
-    a lookup field, callbacks were not examined for this); and whether
-    1.14d code relies on a narrower range than `n(K)` for some fields.
+9. Answered (static, `0x00481950`): the two lists are in
+   `audio/sound-table.md` §1–§2 (re-extracted 2026-10-08, identical);
+   `sounds` is unaligned (§1).
+10. Answered (static, `0x004113C0`, `.rdata` `0x006CEB18`–`0x006CEB97`):
+    the mapping is a constant table and is reproduced (§5.3).
+11. §6.7 checks range only. Answered (§6.7): the by-product sizes (§10
+    byte match) and callback writes over lookup fields (none can stick in
+    1.14d). Open: whether 1.14d code relies on a narrower range than
+    `n(K)` for some fields (needs a per-consumer audit).
