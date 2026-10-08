@@ -1313,26 +1313,15 @@ fn buying_a_store_item_sends_0x9c_action_12() {
         .map(|m| u32::from_le_bytes(m[4..8].try_into().unwrap()))
         .collect();
     assert_eq!(twelve, [bg], "one 0x9C action 12 for the bought item");
-    // Action 4 (to inventory) for the bought copy (`vendors.md` §7.1 rule 10).
-    let four: Vec<u32> = f
-        .received
-        .iter()
-        .filter(|m| m[0] == 0x9C && m[1] == 4)
-        .map(|m| u32::from_le_bytes(m[4..8].try_into().unwrap()))
-        .collect();
-    assert_eq!(four.len(), 1, "one 0x9C action 4: {:02X?}", f.received);
-    assert_ne!(four[0], bg, "the copy has its own GUID");
-    // The client: the store item left the shop grid, the copy is the
-    // player's.
+    // The client: the store item left the shop grid (action 12). The
+    // copy's action 4 is the update pass's, which needs the player's room
+    // (this harness has none): `e2e_single_player` asserts it.
     let w = fx.bridge.world();
-    let gone = d2_client::bridge::items::store_items(w)
-        .iter()
-        .all(|i| i.key.guid != bg);
-    assert!(gone, "the taken store item is not in the shop grid");
-    let local = d2_client::bridge::items::local_items(w);
     assert!(
-        local.iter().any(|i| i.key.guid == four[0]),
-        "the copy is in the player's inventory"
+        d2_client::bridge::items::store_items(w)
+            .iter()
+            .all(|i| i.key.guid != bg),
+        "the taken store item is not in the shop grid"
     );
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
 }

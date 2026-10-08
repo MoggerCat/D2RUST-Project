@@ -19,7 +19,7 @@ Stitching session `q-tp-gaps`, branch `claude/q-tp-gaps`. Nothing here is verifi
 
 ## Left
 
-Action 4 for the bought copy is not sent here; "last field level" is only set by a cast (a walk back to town does not set it); the client does not yet remove the store item on action 12 (it ignores the message's effect on the shop grid).
+"last field level" is only set by a cast (a walk back to town does not set it).
 
 ## Local check
 
