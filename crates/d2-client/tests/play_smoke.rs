@@ -242,6 +242,10 @@ struct Run {
     character: single_player::Character,
 }
 
+/// A character's state for the save round trip: (stat, value), (skill,
+/// base level), (item code, mode, body location).
+type Snapshot = (Vec<(u16, i32)>, Vec<(u16, i32)>, Vec<([u8; 4], u8, u8)>);
+
 impl Run {
     /// The play app over the synthetic game, as `d2-client play --new`
     /// wires it, with a new sorceress; returns once the join ran.
@@ -1468,7 +1472,7 @@ impl Run {
     /// What a save keeps of the server player: level, experience, the
     /// stats, gold, its class skills' levels and its items (code, mode,
     /// body location), sorted.
-    fn snapshot(&self) -> (Vec<(u16, i32)>, Vec<(u16, i32)>, Vec<([u8; 4], u8, u8)>) {
+    fn snapshot(&self) -> Snapshot {
         let stats = [0u16, 1, 2, 3, 4, 5, 12, 13, 14]
             .iter()
             .map(|&s| (s, self.player_stat(s)))
