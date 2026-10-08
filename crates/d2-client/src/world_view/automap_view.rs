@@ -157,8 +157,8 @@ impl AutomapView {
         }
         let at = player_at;
         let facts = FrameFacts {
-            width: FrameSize::D2RS.width,
-            height: FrameSize::D2RS.height,
+            width: FrameSize::play().width,
+            height: FrameSize::play().height,
             open_mode: open_mode.get(),
             mini_down: false,
             unit_origin: cam.unit,

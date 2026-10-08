@@ -92,6 +92,7 @@ impl Panel for CubeUi {
                 image: ImageRef { file, frame: n },
                 at: Point::new(x, y),
                 clip: Rect::new(0, 0, s.w as u16, s.h as u16),
+                look: crate::ui::CelLook::PLAIN,
             }));
         }
         if anim.grid_visible() {

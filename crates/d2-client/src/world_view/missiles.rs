@@ -1,4 +1,4 @@
-// Spec: specs/render/unit-composite.md (§8, §9), specs/render/camera.md (§2, §4), specs/missiles/missiles.md (R4.1), specs/client/msg-units.md (§4), specs/sim/intents-events.md (§7.6 r1)
+// Spec: specs/render/unit-composite.md (§5, §8, §9), specs/render/blend-modes.md (§4), specs/render/draw-order.md (§3 r4), specs/render/camera.md (§2, §4), specs/missiles/missiles.md (R4.1), specs/client/msg-units.md (§4), specs/sim/intents-events.md (§7.6 r1)
 //! Client missiles and cast overlays in the play preview's world view: the
 //! skill messages S→C 0x4C / 0x4D (mode request codes 0x16 / 0x15, kept
 //! as the unit's `last_mode_request`) start a client missile, which flies
@@ -11,7 +11,12 @@
 //!   (`intents-events.md` §7.6 r1: the server sends none, 0x73 aside);
 //! - the art: `missiles` CelFile, one cel of one file by direction and
 //!   frame (`unit-composite.md` §9); offsets `xoffset`, `yoffset` +
-//!   `zoffset` (§8); camera position of a moving unit (`camera.md` §2, §4).
+//!   `zoffset` (§8); camera position of a moving unit (`camera.md` §2, §4);
+//! - the draw mode: `missiles.Trans` / `overlay.Trans` through the cel ops
+//!   (`blend-modes.md` §4);
+//! - the draw order: a missile in the unit list of its cell, an overlay
+//!   with its host unit ([`Missiles::keyed`], `draw-order.md` §3 r4,
+//!   `unit-composite.md` §5).
 //!
 //! d2rs-own, unverified (decision D1, the preview's fills; REC-116):
 //! - which missile and when: the skill's `cltmissile` at the unit's cast
@@ -29,8 +34,10 @@
 //!   `data\global\overlays\<Filename>.dcc`, else `.dc6` (file names only
 //!   from the `Missiles.txt` / `Overlay.txt` columns); frame
 //!   `age · AnimRate >> 8` (looping when `LoopAnim`, else the last frame);
-//! - opaque blend (the `Trans` columns are not applied), no light, draw key
-//!   pass 6 after every other unit;
+//! - no light (light byte 0xFF); a missile is never flat (unit flag
+//!   0x10000 not modeled) and not sight-tested (`draw-order.md` §5 r3);
+//! - without a draw order (no map feed): draw key pass 6 after every
+//!   other unit;
 //! - state overlays: each of the unit's states with an `overlay1` plays
 //!   looping on the unit; `ModelFeed` states the unit's position.
 //!
@@ -45,7 +52,9 @@ use crate::assets::path::{CanonicalPath, FileSource};
 use crate::bridge::predict::{cell_centre, facing};
 use crate::bridge::world::{ClientUnit, ClientWorld, ModeRequest, UnitKey, MONSTER};
 use crate::frames::{FramePart, FrameSet, FrameSetKey};
-use crate::rules::camera::{moving_to_client, Camera, UnitPosition};
+use crate::rules::blend::{cel_ops, missile_mode, overlay_mode, MODE_OPAQUE};
+use crate::rules::camera::{moving_to_client, Camera, ClientPos, UnitPosition};
+use crate::rules::draw_order::{tile_of, DrawGrid, UnitSlot};
 use crate::rules::placement::place;
 use crate::rules::unit_composite::{file_direction, unit_offset, TableOffset};
 use crate::scene::order::pass;
@@ -62,6 +71,8 @@ const CAST_POINT: u8 = 0x15;
 const CAST_UNIT: u8 = 0x16;
 /// Ticks one frame step may cover before the layer restarts its clock.
 const MAX_CATCH_UP: u64 = 64;
+/// The light byte of an unlit cel (`shading.md` §3 r1).
+const UNLIT: u8 = 0xFF;
 /// The tag base of an effect's draw (the unit tag space is the GUIDs).
 const TAG_BASE: u32 = 0xE000_0000;
 
@@ -78,6 +89,8 @@ pub struct MissileRow {
     pub offset: (i16, i16, i16),
     /// `explosionmissile` when `Explosion`, else 0 (none).
     pub explosion: u16,
+    /// `Trans` (`+0x18D`): the draw mode (`blend-modes.md` §4).
+    pub trans: u8,
 }
 
 /// One `overlay` row as the client reads it. d2rs-own, unverified.
@@ -87,6 +100,11 @@ pub struct OverlayRow {
     pub frames: u32,
     pub anim_rate: u32,
     pub offset: (i32, i32),
+    /// `Trans` (`+0x7C`): the draw mode (`blend-modes.md` §4).
+    pub trans: u8,
+    /// `PreDraw` (`+0x48`): drawn in the back call, before the host's
+    /// slot 0 (`unit-composite.md` §5 r4).
+    pub pre_draw: bool,
 }
 
 /// The rows the effect layer reads, by id (0 = none).
@@ -129,6 +147,7 @@ impl EffectRows {
                     loop_anim: m.loopanim != 0,
                     offset: (m.xoffset as i16, m.yoffset as i16, m.zoffset as i16),
                     explosion: if m.explosion { m.explosionmissile } else { 0 },
+                    trans: m.trans,
                 })
                 .collect(),
             overlays: overlays
@@ -138,6 +157,8 @@ impl EffectRows {
                     frames: o.frames,
                     anim_rate: o.animrate,
                     offset: (o.xoffset as i32, o.yoffset as i32),
+                    trans: o.trans,
+                    pre_draw: o.predraw != 0,
                 })
                 .collect(),
             state_overlay: states
@@ -163,6 +184,10 @@ struct Art {
     /// Ticks to live when it is not a flight (`life`).
     loops: bool,
     offset: (i32, i32),
+    /// The draw mode (`blend-modes.md` §4).
+    mode: u8,
+    /// Overlays: `PreDraw` (back call); `None` for missiles.
+    pre_draw: Option<bool>,
 }
 
 /// One live effect.
@@ -209,6 +234,18 @@ struct Placing<'a> {
 pub struct MissileDraw {
     pub id: u32,
     pub item: DrawItem,
+    join: Join,
+}
+
+/// Where an effect joins the frame's draw order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Join {
+    /// An overlay drawn with its host unit (`unit-composite.md` §5 r1,
+    /// r3, §10: back overlays sub 0 before slot 0, front ones sub 255).
+    Host { host: UnitKey, back: bool },
+    /// A missile: a room unit filed in the unit list of its cell
+    /// (`draw-order.md` §3 r4), at client position `at`.
+    Cell { at: ClientPos },
 }
 
 /// The effect layer of the world view: the rows (handed in by the app),
@@ -287,6 +324,9 @@ impl Missiles {
             },
             loops: row.loop_anim,
             offset: unit_offset(None, TableOffset::Missile(Some(row.offset))).unwrap_or((0, 0)),
+            // Never the hover target: client missiles are not units here.
+            mode: missile_mode(row.trans, false),
+            pre_draw: None,
         };
         Some((art, row))
     }
@@ -306,6 +346,8 @@ impl Missiles {
             },
             loops: looped,
             offset: row.offset,
+            mode: overlay_mode(row.trans),
+            pre_draw: Some(row.pre_draw),
         };
         Some((art, row))
     }
@@ -552,10 +594,19 @@ impl Missiles {
         let (x, y) = camera.unit_draw(moving_to_client(at.0, at.1), offset);
         let placed = place(image, x, y, Rect::FRAME);
         let clip = placed.clip?;
+        // `blend-modes.md` §4: no remap (overlays drop the blood map, Edge
+        // case 5; a missile's blood map needs the green-blood switch, off
+        // on the reference install, `shading.md` §6 r7, and the client
+        // missiles have no unit palette index), light byte 0xFF (unlit).
+        let (shade, blend) = match &assets.shades {
+            Some(t) => cel_ops(t, art.mode, None, UNLIT),
+            None if art.mode == MODE_OPAQUE => (ShadeChain::EMPTY, BlendOp::Opaque),
+            None => return None,
+        };
         let mut d = DrawItem::new(id, placed.x, placed.y);
         d.clip = clip;
-        d.shade = ShadeChain::EMPTY;
-        d.blend = BlendOp::Opaque;
+        d.shade = shade;
+        d.blend = blend;
         d.tag = ItemTag::Unit(tag);
         Some(d)
     }
@@ -570,7 +621,7 @@ impl Missiles {
         assets: &ViewAssets,
         at: &dyn Fn(&ClientUnit) -> Option<(u32, u32)>,
     ) -> Vec<MissileDraw> {
-        let mut found: Vec<(u32, DrawItem)> = Vec::new();
+        let mut found: Vec<(u32, DrawItem, Join)> = Vec::new();
         for fx in &self.live {
             let at = fx
                 .follow
@@ -586,8 +637,14 @@ impl Missiles {
                 life: fx.life,
                 tag: fx.id,
             };
+            let join = match (fx.art.pre_draw, fx.follow) {
+                (Some(back), Some(host)) => Join::Host { host, back },
+                _ => Join::Cell {
+                    at: moving_to_client(at.0, at.1),
+                },
+            };
             if let Some(d) = self.draw_one(camera, assets, p) {
-                found.push((fx.id, d));
+                found.push((fx.id, d, join));
             }
         }
         for unit in world.units.values() {
@@ -603,6 +660,7 @@ impl Missiles {
                     | 0x0080_0000
                     | (unit.key.guid & 0xFFFF) << 4
                     | u32::from(*state & 0xF);
+                let back = art.pre_draw.unwrap_or(false);
                 let p = Placing {
                     art: &art,
                     at: unit_at,
@@ -612,19 +670,86 @@ impl Missiles {
                     tag,
                 };
                 if let Some(d) = self.draw_one(camera, assets, p) {
-                    found.push((tag, d));
+                    let join = Join::Host {
+                        host: unit.key,
+                        back,
+                    };
+                    found.push((tag, d, join));
                 }
             }
         }
         found
             .into_iter()
             .enumerate()
-            .filter_map(|(minor, (id, mut item))| {
+            .filter_map(|(minor, (id, mut item, join))| {
                 let minor = u32::try_from(minor).ok()?;
                 item.key = DrawKey::new(pass::WALLS_UNITS, DrawKey::MAJOR_MAX, minor, 0).ok()?;
-                Some(MissileDraw { id, item })
+                Some(MissileDraw { id, item, join })
             })
             .collect()
+    }
+
+    /// The draws keyed into the frame's draw order (`slots`, the units'
+    /// slots), each with whether it goes before the items of equal key
+    /// (`true`) or after them:
+    /// - an overlay takes its host's slot, sub 0 before the host's items
+    ///   when it is a back overlay, else sub 255 after them; a host the
+    ///   order does not draw hides it (`unit-composite.md` §5 r1, r4, §10);
+    /// - a missile is filed in the unit list of its cell (`draw-order.md`
+    ///   §3 r4, the cell of its client position in `grid`): after the
+    ///   cell's walls, before the first unit of the cell whose client y
+    ///   (`y_of`) is not below its own (the list's Y sort, `unit-order.md`
+    ///   §5 r7; prepended at creation, r2, so ahead on equal y), else after
+    ///   the cell's units; outside the grid it is not filed (not drawn).
+    pub fn keyed(
+        draws: &[MissileDraw],
+        slots: &BTreeMap<UnitKey, UnitSlot>,
+        grid: &DrawGrid,
+        y_of: impl Fn(UnitKey) -> Option<i32>,
+    ) -> Vec<(MissileDraw, bool)> {
+        let mut out = Vec::with_capacity(draws.len());
+        for d in draws {
+            let (key, before) = match d.join {
+                Join::Host { host, back } => {
+                    let Some(UnitSlot::Drawn(k)) = slots.get(&host).copied() else {
+                        continue;
+                    };
+                    let sub = if back { 0 } else { u8::MAX };
+                    (DrawKey::new(k.pass, k.major, k.minor, sub), back)
+                }
+                Join::Cell { at } => {
+                    let Some(ci) = grid.cell(tile_of(at.x, at.y)) else {
+                        continue;
+                    };
+                    let ci = ci as u32;
+                    let mut units: Vec<(u32, UnitKey)> = slots
+                        .iter()
+                        .filter_map(|(&key, slot)| match slot {
+                            UnitSlot::Drawn(k) if k.pass == pass::WALLS_UNITS && k.major == ci => {
+                                Some((k.minor, key))
+                            }
+                            _ => None,
+                        })
+                        .collect();
+                    units.sort();
+                    let next = units
+                        .iter()
+                        .find(|&&(_, key)| y_of(key).is_some_and(|y| y >= at.y));
+                    match next {
+                        Some(&(minor, _)) => (DrawKey::new(pass::WALLS_UNITS, ci, minor, 0), true),
+                        None => (
+                            DrawKey::new(pass::WALLS_UNITS, ci, DrawKey::MINOR_MAX, u8::MAX),
+                            false,
+                        ),
+                    }
+                }
+            };
+            let Ok(key) = key else { continue };
+            let mut d = *d;
+            d.item.key = key;
+            out.push((d, before));
+        }
+        out
     }
 
     /// Runs the layer for this frame and adds its draws to a built
@@ -657,10 +782,32 @@ impl Missiles {
             _ => return log,
         };
         self.last = self.draws(world, &camera, assets, &at);
-        if !self.last.is_empty() {
-            frame.items.extend(self.last.iter().map(|d| d.item));
-            crate::scene::order(&mut frame.items);
+        let Some(slots) = &frame.slots else {
+            // No draw order (no map feed): after every other unit.
+            if !self.last.is_empty() {
+                frame.items.extend(self.last.iter().map(|d| d.item));
+                crate::scene::order(&mut frame.items);
+            }
+            return log;
+        };
+        let y_of = |k: UnitKey| {
+            let u = world.units.get(&k)?;
+            feed.unit_position(u).ok().map(|p| p.client().y)
+        };
+        let keyed = Self::keyed(&self.last, slots, &DrawGrid::of_camera(&camera), y_of);
+        // Into the sorted list: the "after" draws in order, then the
+        // "before" draws in reverse order, so equal keys keep build order.
+        for (d, _) in keyed.iter().filter(|(_, before)| !before) {
+            let k = d.item.key;
+            let at = frame.items.partition_point(|i| i.key <= k);
+            frame.items.insert(at, d.item);
         }
+        for (d, _) in keyed.iter().rev().filter(|(_, before)| *before) {
+            let k = d.item.key;
+            let at = frame.items.partition_point(|i| i.key < k);
+            frame.items.insert(at, d.item);
+        }
+        self.last = keyed.into_iter().map(|(d, _)| d).collect();
         log
     }
 }

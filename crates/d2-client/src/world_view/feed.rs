@@ -407,7 +407,7 @@ pub fn camera_at<F: ViewFeed + ?Sized>(
         return Ok(None);
     };
     let mode = feed.open_mode(world)?;
-    Ok(Some((anchor.camera(FrameSize::D2RS, mode), mode)))
+    Ok(Some((anchor.camera(FrameSize::play(), mode), mode)))
 }
 
 /// The frame's local-player position and shake (camera §3, §8;
@@ -494,6 +494,7 @@ where
             Some(source) => {
                 let mut frame =
                     build_lit(world, ui, rules, camera, &source, source.source, assets)?;
+                frame.slots = Some(source.units.clone());
                 // Passes 4 and 9 (`draw-order-2.md` §11.6, §11.7) join the
                 // sorted list by their keys.
                 let sky = source.source.sky_items(&source.sky, assets)?;

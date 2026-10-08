@@ -789,6 +789,7 @@ mod tests {
                     D::I(t.files.name(file).unwrap().into(), frame, i.at.x, i.at.y)
                 }
                 UiDraw::Text(x) => D::T(x.text, x.at.x, x.at.y, x.style.font, x.style.color),
+                UiDraw::Rect(r) => panic!("rectangle {r:?}"),
             })
             .collect()
     }

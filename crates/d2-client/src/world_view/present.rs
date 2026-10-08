@@ -58,7 +58,7 @@ use super::node::{add_node, ComposeJob, NodeIndices};
 use super::panel_art::PanelArtLoader;
 use super::ui_bind::{run_ui_with, world_clicks, TextAssetLoader, UiQueue, UiRules};
 use super::walk::PreviewWalk;
-use super::{compose_cycle_cpu, GpuAtlas, ViewAssets, ViewRules, VIEW};
+use super::{compose_cycle_cpu, play_view, GpuAtlas, ViewAssets, ViewRules};
 use crate::scene::{FrameCycle, FramePlan};
 
 /// Render layer of the presented frame and its camera, so the world view
@@ -82,7 +82,7 @@ pub struct WorldViewState {
     pub assets: ViewAssets,
     pub rules: Box<dyn WorldRules + Send + Sync>,
     pub feed: Box<dyn ViewFeed + Send + Sync>,
-    /// The persistent index framebuffer (`composition.md` §3), `VIEW`
+    /// The persistent index framebuffer (`composition.md` §3), [`play_view`]
     /// sized: the last presented frame once committed.
     pub cycle: FrameCycle,
     /// Counts of the last frame, for logs and tests.
@@ -117,6 +117,19 @@ pub struct WorldViewState {
     pub object_labels: super::object_label::ObjectLabels,
     /// The last drawn frame's camera (`super::visibility`).
     pub camera: super::visibility::SharedCamera,
+    /// The model's act loads already handed to the cycle
+    /// ([`note_act_loads`]).
+    act_loads: u64,
+}
+
+/// `composition.md` §3 step 4: each S→C 0x03 the model handled since the
+/// last call sets the post-draw clear counter to 1 (`0x0044E100`), so the
+/// next presented frame is all index 0.
+pub fn note_act_loads(cycle: &mut FrameCycle, seen: &mut u64, loads: u64) {
+    if loads != *seen {
+        *seen = loads;
+        cycle.set_post_clear(1);
+    }
 }
 
 impl WorldViewState {
@@ -129,8 +142,8 @@ impl WorldViewState {
             assets,
             rules,
             feed,
-            cycle: FrameCycle::new(VIEW.width, VIEW.height)
-                .expect("VIEW is taller than the uncleared band"),
+            cycle: FrameCycle::new(play_view().width, play_view().height)
+                .expect("the play frame is taller than the uncleared band"),
             last: None,
             click: Default::default(),
             automap: None,
@@ -145,6 +158,7 @@ impl WorldViewState {
             missiles: Default::default(),
             object_labels: Default::default(),
             camera: Default::default(),
+            act_loads: 0,
         }
     }
 }
@@ -422,8 +436,8 @@ fn automap_facts(
 ) -> crate::ui::automap::FrameFacts {
     use crate::rules::camera::FrameSize;
     crate::ui::automap::FrameFacts {
-        width: FrameSize::D2RS.width,
-        height: FrameSize::D2RS.height,
+        width: FrameSize::play().width,
+        height: FrameSize::play().height,
         open_mode,
         mini_down: false,
         unit_origin: camera.map_or(Default::default(), |c| c.unit),
@@ -592,8 +606,8 @@ fn ui_input(
 fn rgba_image(rgba: Vec<u8>) -> Image {
     let mut image = Image::new(
         Extent3d {
-            width: VIEW.width,
-            height: VIEW.height,
+            width: play_view().width,
+            height: play_view().height,
             depth_or_array_layers: 1,
         },
         TextureDimension::D2,
@@ -707,13 +721,13 @@ fn world_view_frame(
                 _ => (0, 0),
             };
             let view = crate::bridge::click::ClickView {
-                size: crate::rules::camera::FrameSize::D2RS,
+                size: crate::rules::camera::FrameSize::play(),
                 open_mode: ui.original.as_ref().map_or(0, |o| o.open_mode().get()),
                 // `[0x007A521C]` = H − 40 (`ui/automap.md` §9).
-                right_panel_bottom: crate::rules::camera::FrameSize::D2RS.play_height(),
+                right_panel_bottom: crate::rules::camera::FrameSize::play().play_height(),
                 // PROVISIONAL (ui/controls.md §6 r7; controls-0001):
                 // `0x00454970()` is not specified: the play area H − 40.
-                skill_y_limit: crate::rules::camera::FrameSize::D2RS.play_height(),
+                skill_y_limit: crate::rules::camera::FrameSize::play().play_height(),
                 mouse,
                 game_menu_open: ui.original.as_ref().is_some_and(|o| o.is_open(9)),
                 // d2rs-own, unverified (D1): the preview's hover pick.
@@ -889,6 +903,8 @@ fn world_view_frame(
         bridge.0.set_room_order(room, &order);
     }
     let blank_screen = state.feed.blank_screen(bridge.0.world())?;
+    let loads = bridge.0.world().act_loads;
+    note_act_loads(&mut state.cycle, &mut state.act_loads, loads);
     if let Some(d) = dump.as_deref_mut().filter(|d| !d.done) {
         d.seen += 1;
         if tick >= d.request.at_tick {
@@ -944,8 +960,8 @@ fn world_view_frame(
             let mut image = if use_gpu {
                 {
                     let mut image = Image::new_target_texture(
-                        VIEW.width,
-                        VIEW.height,
+                        play_view().width,
+                        play_view().height,
                         TextureFormat::Rgba8UnormSrgb,
                         None,
                     );
@@ -954,7 +970,10 @@ fn world_view_frame(
                     image
                 }
             } else {
-                rgba_image(vec![0; (VIEW.width * VIEW.height * 4) as usize])
+                rgba_image(vec![
+                    0;
+                    (play_view().width * play_view().height * 4) as usize
+                ])
             };
             image.sampler = ImageSampler::nearest();
             let image = images.add(image);
@@ -1029,5 +1048,35 @@ fn present_scale(
     let s = p.scale as f32 / window.scale_factor();
     for mut t in &mut sprites {
         t.scale = Vec3::new(s, s, 1.0);
+    }
+}
+
+#[cfg(test)]
+mod act_load_tests {
+    use super::*;
+    use crate::scene::{FrameImage, MapTable};
+
+    // Covers: specs/render/composition.md §3
+    #[test]
+    fn the_frame_after_an_act_load_presents_all_index_0() {
+        // The spec's vector: framebuffer all 5, BlankScreen 1, nothing
+        // drawn, 800 × 600, counter 1 → all 0, counter back to 0.
+        let mut c = FrameCycle::with_pixels(800, 600, vec![5; 800 * 600]).unwrap();
+        let mut seen = 0;
+        note_act_loads(&mut c, &mut seen, 0);
+        assert_eq!(c.post_clear(), 0, "no 0x03 yet");
+        note_act_loads(&mut c, &mut seen, 1);
+        assert_eq!(c.post_clear(), 1);
+        let none: Vec<FrameImage> = Vec::new();
+        let out = c.compose(true, &[], &none, &MapTable::default()).unwrap();
+        assert!(out.iter().all(|&p| p == 0));
+        assert_eq!(c.post_clear(), 0);
+        // The same count again: no clear; the next frame keeps rows
+        // 553–599 (BlankScreen clears rows 0–552 only).
+        note_act_loads(&mut c, &mut seen, 1);
+        assert_eq!(c.post_clear(), 0);
+        // Two loads before one frame: one cleared frame.
+        note_act_loads(&mut c, &mut seen, 3);
+        assert_eq!(c.post_clear(), 1);
     }
 }

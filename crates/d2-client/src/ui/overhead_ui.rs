@@ -83,11 +83,11 @@ impl Bubbles {
 fn camera(w: &ClientWorld, anchor: Option<FrameAnchor>, open_mode: u8) -> Option<Camera> {
     let mode = OpenMode::new(open_mode).unwrap_or(OpenMode::NONE);
     if let Some(a) = anchor {
-        return Some(a.camera(FrameSize::D2RS, mode));
+        return Some(a.camera(FrameSize::play(), mode));
     }
     let (x, y) = w.local()?.cell();
     let at = moving_to_client((u32::from(x) << 16) | 0x8000, (u32::from(y) << 16) | 0x8000);
-    Some(Camera::new(FrameSize::D2RS, mode, at, (0, 0)))
+    Some(Camera::new(FrameSize::play(), mode, at, (0, 0)))
 }
 
 /// A unit's feet under the frame's camera: the local player at the

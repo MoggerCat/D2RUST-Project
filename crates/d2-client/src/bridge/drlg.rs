@@ -1,4 +1,4 @@
-// Spec: specs/client/model.md (§7 rule 4, §9 rules 1–2, §12 rules 1, 2, 5), specs/drlg/levels.md (§2 rule 3, §9 rule 2), specs/drlg/rooms.md (§4.2, §4.6, §5 rules 5, 9)
+// Spec: specs/client/model.md (§7 rule 4, §9 rules 1–2, §12 rules 1, 2, 5), specs/drlg/levels.md (§2 rule 3, §9 rule 2), specs/drlg/rooms.md (§4.2, §4.6, §5 rules 5, 9), specs/render/draw-order-2.md (§14, open question 2)
 //! The client DRLG copy (`model.md` §12 rule 1): the `d2-sim` DRLG act
 //! built from S→C 0x03's fields with the client flag, owned by the bridge
 //! and never shared with the server's. 0x07 / 0x08 set and unset its
@@ -17,7 +17,10 @@
 
 use std::sync::Arc;
 
-use d2_sim::drlg::{ActRooms, Drlg, DrlgData, DrlgError, LevelTypes, Services, TileSource};
+use d2_sim::drlg::tiles::{first_entry, ACT_EDGE_TILE};
+use d2_sim::drlg::{
+    ActRooms, Drlg, DrlgData, DrlgError, LevelTypes, Services, TileInfo, TileSource,
+};
 use d2_sim::rng::Seed;
 use d2_sim::units::RoomId;
 
@@ -110,6 +113,17 @@ impl From<LightError> for HandlerError {
             _ => HandlerError::Invalid("light record error outside the new-room rule"),
         }
     }
+}
+
+/// The act's edge floor record (act +0x18, `levels.md` §2 rule 3,
+/// `0x00642A30`; `render/draw-order-2.md` §14, open question 2): the
+/// first entry of its fixed key in the act's base tile library.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EdgeTile {
+    /// The base library's DT1 path and the tile's index in file order.
+    pub path: Vec<u8>,
+    pub index: u32,
+    pub info: TileInfo,
 }
 
 /// The client DRLG act of `[0x007A0634]` (`model.md` §1, §12 rule 1).
@@ -279,6 +293,28 @@ impl ClientDrlg {
                 }
             })
             .collect()
+    }
+
+    /// The act's edge floor record ([`EdgeTile`]): `Ok(None)` for acts IV
+    /// and V (no lookup, the record stays zero). A base library without
+    /// the key is fatal 0x44C; a base library the tile source lacks is an
+    /// input error.
+    pub fn edge_tile(&self) -> Result<Option<EdgeTile>, String> {
+        let Some(&Some((path, key))) = ACT_EDGE_TILE.get(usize::from(self.drlg.act)) else {
+            return Ok(None);
+        };
+        let name = || String::from_utf8_lossy(path).into_owned();
+        let tiles = self
+            .tiles
+            .dt1(path)
+            .ok_or_else(|| format!("act base library {} not loaded", name()))?;
+        let index = first_entry(tiles, key)
+            .ok_or_else(|| format!("fatal 0x44C: no tile {key:?} in {}", name()))?;
+        Ok(Some(EdgeTile {
+            path: path.to_vec(),
+            index,
+            info: tiles[index as usize].clone(),
+        }))
     }
 
     /// The adjacency array of an active DRLG room (`rooms.md` §6 order;

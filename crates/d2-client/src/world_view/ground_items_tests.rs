@@ -450,3 +450,57 @@ fn a_click_on_a_far_item_walks_to_it_then_asks_again() {
     g.frame(&mut b, false).unwrap();
     assert_eq!(link.sent.lock().unwrap().len(), 3);
 }
+
+// Covers: specs/render/draw-order.md §3 r4, §5 r3, §10
+#[test]
+fn ground_items_take_their_slot_from_the_draw_order() {
+    use crate::rules::draw_order::OrderKey;
+    let mut w = ClientWorld::default();
+    populate(
+        &mut w,
+        &[
+            (5, 3, (102, 100), b"cap "),
+            (6, 5, (101, 100), b"cap "),
+            (7, 3, (100, 102), b"cap "),
+        ],
+    );
+    let mut g = GroundItems::new(source(), rows());
+    let mut a = assets();
+    let feed = ModelFeed::<NoFeed>::default();
+    g.add_to_frame(&w, &feed, &mut a, &mut WorldFrame::default());
+    // Item 5 flat in the shadow list of cell 40 (pass 5); item 6
+    // dropping (mode 5) in the unit list of cell 41 (pass 6); item 7
+    // hidden by the sight test (not drawn).
+    let flat = OrderKey {
+        pass: pass::SHADOWS,
+        major: 40,
+        minor: 2,
+    };
+    let dropping = OrderKey {
+        pass: pass::WALLS_UNITS,
+        major: 41,
+        minor: 1,
+    };
+    let mut frame = WorldFrame {
+        slots: Some(BTreeMap::from([
+            (UnitKey::new(ITEM, 5), UnitSlot::Drawn(flat)),
+            (UnitKey::new(ITEM, 6), UnitSlot::Drawn(dropping)),
+            (UnitKey::new(ITEM, 7), UnitSlot::NotDrawn),
+        ])),
+        ..WorldFrame::default()
+    };
+    g.add_to_frame(&w, &feed, &mut a, &mut frame);
+    let keys: Vec<_> = frame.items.iter().map(|d| (d.tag, d.key)).collect();
+    assert_eq!(
+        keys,
+        vec![
+            (ItemTag::Unit(5), DrawKey::new(5, 40, 2, 0).unwrap()),
+            (ItemTag::Unit(6), DrawKey::new(6, 41, 1, 0).unwrap()),
+        ]
+    );
+    // An item the order does not list is not drawn either.
+    frame.slots = Some(BTreeMap::new());
+    frame.items.clear();
+    g.add_to_frame(&w, &feed, &mut a, &mut frame);
+    assert!(frame.items.is_empty());
+}

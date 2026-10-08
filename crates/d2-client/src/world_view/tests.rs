@@ -244,6 +244,7 @@ fn ui_image(x: i32, y: i32) -> UiDraw {
         image: ImageRef { file: 1, frame: 0 },
         at: Point::new(x, y),
         clip: crate::ui::Rect::new(0, 0, 800, 600),
+        look: crate::ui::CelLook::PLAIN,
     })
 }
 
