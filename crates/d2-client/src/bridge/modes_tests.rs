@@ -90,6 +90,28 @@ fn player_hit_class_flag_and_path_stop() {
     assert!(!w.units[&P].path_stopped);
 }
 
+/// Code 7 on a dead player places it at (r0, r1) (PROVISIONAL REC-279:
+/// the respawn's 0x0D, after the 0x15 the dead player ignored); a living
+/// player stays where it is, and a dead one with record (0, 0) too.
+// Covers: specs/client/model.md §8 r4
+#[test]
+fn code_7_places_a_player_that_was_dead() {
+    let i = ModelInputs::default();
+    let back = [103, 23, 0, 0, 0, 0, 0];
+    for dead in [pm::DEAD, pm::DEATH] {
+        let mut w = world_with(P, dead);
+        req(&mut w, &i, P, 0x07, back).unwrap();
+        assert_eq!(w.units[&P].position, Some((103, 23)), "mode {dead}");
+        assert_eq!(w.units[&P].mode, pm::NEUTRAL);
+    }
+    let mut w = world_with(P, pm::NEUTRAL);
+    req(&mut w, &i, P, 0x07, back).unwrap();
+    assert_eq!(w.units[&P].position, Some((50, 50)));
+    let mut w = world_with(P, pm::DEAD);
+    req(&mut w, &i, P, 0x07, R0).unwrap();
+    assert_eq!(w.units[&P].position, Some((50, 50)));
+}
+
 // Covers: specs/client/model.md §8 r4
 #[test]
 fn player_invalid_codes_are_fatal_0x432() {
