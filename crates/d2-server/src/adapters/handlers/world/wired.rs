@@ -867,6 +867,7 @@ where
         events.action().player_deaths(game);
         self.corpse_fill(game, events);
         self.pet_deaths(game, events);
+        self.approaches(game, events);
         self.hireling_calls(game, events);
         self.pet_follows(game, events);
         self.drive_hirelings(game, events);
@@ -1004,6 +1005,7 @@ where
     }
 
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
+        self.drop_queued(call.player);
         let out = self.lend_quests(events, |a, ev| WorldHost::<D>::walk(a, game, ev, call));
         self.pet_deaths(game, events);
         self.hireling_calls(game, events);
