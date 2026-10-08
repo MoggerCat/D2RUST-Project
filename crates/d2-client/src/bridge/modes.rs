@@ -77,6 +77,7 @@ pub fn mode_request(
     };
     // Rule 3.
     u.last_mode_request = Some(ModeRequest { code, record });
+    u.mode_requests = u.mode_requests.wrapping_add(1);
     match key.unit_type {
         PLAYER => player(w, inputs, key, code, record),
         OBJECT => object(w, inputs, key, code, record, out),

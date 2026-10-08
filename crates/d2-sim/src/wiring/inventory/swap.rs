@@ -6,8 +6,9 @@
 //! (`intents-events.md` open question 16). This is d2rs-own, unverified:
 //! each hand item leaves its slot (its stat list detaches), the swap-set
 //! items take the hands (their stat lists attach; the stat link is not
-//! for 11 / 12, `inventory.md` §4), every moved item joins the update
-//! list so the client is told where it went, and S→C 0x97 flips the
+//! for 11 / 12, `inventory.md` §4), every moved item gets command flag
+//! 0x200000 and joins the update list so the client is told where it
+//! went (0x9D action 0x17), and S→C 0x97 flips the
 //! client's weapon set. Requirements are not rechecked and nothing is
 //! refused when both sets are empty.
 
@@ -18,6 +19,12 @@ use crate::units::lifecycle::LifecycleHooks;
 
 /// S→C 0x97 WeaponSwitch (`msg-items`: one byte).
 const WEAPON_SWITCH: u8 = 0x97;
+
+/// Command flag 0x200000 of a moved item: the dispatcher's row 15
+/// (`items/item-actions.tsv`: S→C 0x9D action 0x17 to every client), so
+/// the client hears where it went (REC-281; with only the update list,
+/// no row matched and nothing was sent).
+const SWITCHED: u32 = crate::items::inventory::cmd::WEAPON_SWITCH;
 
 impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
     /// Trades the hands with the swap set. False when the owner has no
@@ -50,16 +57,21 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             if let Some(i) = hand {
                 ok &= self.place_body(owner, i, swap_loc);
                 self.set_body_loc(i, swap_loc);
+                crate::items::moves::add_cmd(self, i, SWITCHED);
                 self.update_list_add(owner, i);
             }
             if let Some(i) = swap {
                 ok &= self.place_body(owner, i, hand_loc);
                 self.set_body_loc(i, hand_loc);
+                crate::items::moves::add_cmd(self, i, SWITCHED);
                 self.stat_link(owner, i);
                 self.update_list_add(owner, i);
             }
         }
         self.weapon_bookkeeping(owner);
+        // The owner refresh (`inventory-moves.md` §6.1 rule 1), so the
+        // tick's update pass sends the moved items (REC-281).
+        crate::items::moves::owner_refresh(self, owner);
         self.send(owner, vec![WEAPON_SWITCH]);
         ok
     }

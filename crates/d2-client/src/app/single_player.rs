@@ -562,6 +562,9 @@ pub struct LocalSeams {
     /// copied by [`sync_seams`] before each intent and tick: the
     /// hostility, alignment and melee-range seams have no game to read.
     pub sides: BTreeMap<UnitId, (UnitType, bool, (i32, i32))>,
+    /// The players and monsters of [`Self::sides`] that are dying or dead
+    /// (player modes 0 / 17, monster modes 0 / 12), for the target search.
+    pub down: std::collections::BTreeSet<UnitId>,
     /// The skill pipeline's per-unit fields and preview fills (`UseRest`,
     /// `LearnRest`: [`super::skill_rest`]).
     pub skills: SkillStore,
@@ -605,12 +608,44 @@ impl LocalSeams {
             .get(&unit)
             .map(|&(ty, allied, _)| ty == UnitType::Player || allied)
     }
+
+    /// PROVISIONAL (REC-279; d2rs-own, unverified): the good units'
+    /// target search (`ai.md` §5.2 step 4, scan 5 within 35, and
+    /// `0x005DDC30`, scan 6 + `0x005DD510`; the scan callbacks' bodies
+    /// are not written). The nearest monster of the other side that is
+    /// not dying or dead, by the no-size distance (`ai.md` §6,
+    /// `0x005DC530`), closer than `range`; ties: the lower unit id. No
+    /// line test, no alternative targets.
+    fn nearest_foe(&self, unit: UnitId, range: i32) -> Option<(UnitId, i32)> {
+        let &(_, _, at) = self.sides.get(&unit)?;
+        let side = self.player_side(unit)?;
+        self.sides
+            .iter()
+            .filter(|&(&u, &(ty, ..))| {
+                u != unit
+                    && ty == UnitType::Monster
+                    && self.player_side(u) != Some(side)
+                    && !self.down.contains(&u)
+            })
+            .map(|(&u, &(_, _, p))| {
+                let (dx, dy) = ((at.0 - p.0).abs(), (at.1 - p.1).abs());
+                (u, (2 * dx.max(dy) + dx.min(dy)) / 2)
+            })
+            .filter(|&(_, d)| d < range)
+            .min_by_key(|&(u, d)| (d, u))
+    }
 }
+
+/// Unit flags `0x005557D0` gives a preset unit (`population.md` §11.1).
+const SYNTHETIC_PRESET_FLAGS: u32 = 0x300_0000;
 
 /// d2rs-own, unverified (preview, D1): the melee reach of every unit in
 /// sub-tiles (`0x00622870` reads the unit's size and weapon; not
 /// answered here).
 const PREVIEW_MELEE_RANGE: i32 = 2;
+
+/// The good units' search range (`ai.md` §5.2 step 4: scan 5 within 35).
+const GOOD_SEARCH_RANGE: i32 = 35;
 
 /// The play host's seam refresh (`SimGame::set_host_sync`): the players
 /// and monsters with their allied flag (`UnitLists`), for
@@ -621,7 +656,18 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
         .flat_map(|ty| game.lists.units_of_type(ty))
         .filter_map(|u| Some((u, sim.action.sys.units.get(u)?.class)))
         .collect();
+    let down: std::collections::BTreeSet<UnitId> = classes
+        .keys()
+        .copied()
+        .filter(|&u| {
+            sim.action.sys.units.get(u).is_some_and(|r| match r.ty {
+                UnitType::Player => matches!(r.mode, 0 | 17),
+                _ => matches!(r.mode, 0 | 12),
+            })
+        })
+        .collect();
     let hooks = &mut sim.action.sys.hooks;
+    hooks.x.down = down;
     // d2rs-own, unverified (q-assassin-gaps, REC-233): a listed pet is on the
     // player side (the summon's alignment effect, `0x005543B0`, is not wired).
     let pets: std::collections::BTreeSet<u32> = hooks
@@ -965,6 +1011,20 @@ impl Pending for LocalSeams {
     fn set_entry_flags(&mut self, unit: UnitId, _: &d2_sim::skills::SkillEntry, f: u32) {
         d2_sim::wiring::interaction::UseRest::set_used_skill_flags(self, unit, f);
     }
+    /// `0x005DD7F0` step 4 for a good unit: [`LocalSeams::nearest_foe`]
+    /// within 35 (PROVISIONAL REC-279).
+    fn good_target_search(&mut self, _: &mut Game, unit: UnitId, _: bool) -> Option<(UnitId, i32)> {
+        self.nearest_foe(unit, GOOD_SEARCH_RANGE)
+    }
+    /// `0x005DDC30`: [`LocalSeams::nearest_foe`] within 35, with the
+    /// preview's melee flag (PROVISIONAL REC-279); none: distance
+    /// 0x7FFFFFFF.
+    fn secondary_target(&mut self, _: &mut Game, unit: UnitId) -> (Option<UnitId>, i32, bool) {
+        match self.nearest_foe(unit, GOOD_SEARCH_RANGE) {
+            Some((t, d)) => (Some(t), d, self.in_melee_range(unit, t, 0)),
+            None => (None, 0x7FFF_FFFF, false),
+        }
+    }
     /// d2rs-own, unverified (preview, D1; `0x00622870`).
     fn melee_range(&self, _: UnitId) -> i32 {
         PREVIEW_MELEE_RANGE
@@ -1274,12 +1334,18 @@ impl WaypointTables {
         o.operatefn = 23;
         o.initfn = 17;
         o.framecnt1 = 15 << 8;
+        // The town units the build places are kept by the inactive store
+        // (`units.md` §3.3: objects `Restore` ≠ 0; a chest only while
+        // unopened, `RestoreVirgins`). d2rs-own, unverified (REC-287).
+        o.restore = 1;
         // Class 1: a chest (`objects.md` §5.2, §8.1), placed only on
         // request ([`build_with_chests`]). d2rs-own, unverified.
         let mut chest: Objects = blank();
         chest.operatefn = SYNTHETIC_CHEST_OPERATE;
         chest.initfn = SYNTHETIC_CHEST_INIT;
         chest.framecnt1 = 15 << 8;
+        chest.restore = 1;
+        chest.restorevirgins = 1;
         // Class 59: the town portal (`objects.md` §12), padded rows
         // before it are blank. d2rs-own, unverified (REC-117).
         let mut portal: Objects = blank();
@@ -1294,6 +1360,7 @@ impl WaypointTables {
         tome.operatefn = synthetic_tower::TOME_OPERATE;
         tome.initfn = synthetic_tower::TOME_INIT;
         tome.framecnt1 = 15 << 8;
+        tome.restore = 1;
         let mut objects = vec![o, chest];
         objects.resize(SYNTHETIC_PORTAL_CLASS as usize, blank());
         objects.push(portal);
@@ -2220,6 +2287,7 @@ fn synthetic_monstats() -> Vec<Monstats> {
     for c in synthetic_act4::BOSSES {
         v[c as usize].killable = true;
     }
+    super::synthetic_items::smoke::monster(&mut v);
     v
 }
 
@@ -2294,6 +2362,8 @@ pub fn synthetic_unit_rows() -> UnitRows {
     for c in MERC_CLASSES {
         monsters[c] = Some(class_row(false));
     }
+    // The item smoke test's monster (q-smoke-items, REC-281).
+    monsters[super::synthetic_items::smoke::MONSTER as usize] = Some(class_row(false));
     UnitRows {
         monsters,
         ..UnitRows::default()
@@ -2366,7 +2436,8 @@ impl GameParts {
             inventory: Some(super::synthetic_items::inv_tables(
                 &super::synthetic_items::item_tables(),
             )),
-            cube: None,
+            // No recipe; the stash and cube buttons need the parts (REC-281).
+            cube: Some(super::synthetic_items::cube_data()),
         })
     }
 
@@ -2531,6 +2602,7 @@ pub fn build_with_town(
         let row = &mut wp_tables.objects[STASH_CLASS as usize];
         row.operatefn = STASH_OPERATE;
         row.framecnt1 = 15 << 8;
+        row.restore = 1;
     }
     let (mut levels, parts) = match data {
         GameData::Synthetic => (LevelSource::synthetic(), GameParts::synthetic(&wp_tables)?),
@@ -2587,6 +2659,9 @@ pub fn build_with_town(
     hooks
         .enable_paths()
         .map_err(|e| BuildError::Setup(format!("path tables: {e:?}")))?;
+    // The inactive store (`units.md` §3.3–§3.4): a room the tick frees
+    // keeps its units' records, and its next build restores them.
+    hooks.enable_inactive_store();
     let info = GameInfo {
         expansion: GAME_SETUP.expansion,
         difficulty: character.difficulty(),
@@ -2892,6 +2967,20 @@ pub fn build_with_town(
                         v.allocate(g, &req, rect3.x * 5 + dx, rect3.y * 5 + dy)
                     })
                     .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
+            }
+        }
+    }
+    // The synthetic towns' units stand in for the live towns' preset units,
+    // which `0x005557D0` creates with unit flags 0x3000000
+    // (`population.md` §11.1), so the inactive store keeps them whatever
+    // the level's `SaveMonsters` (`units.md` §3.3 `S`). d2rs-own,
+    // unverified (REC-287).
+    if matches!(data, GameData::Synthetic) {
+        for ty in [UnitType::Monster, UnitType::Object] {
+            for u in game.lists.units_of_type(ty) {
+                if let Some(r) = sim.action.sys.units.get_mut(u) {
+                    r.flags |= SYNTHETIC_PRESET_FLAGS;
+                }
             }
         }
     }
