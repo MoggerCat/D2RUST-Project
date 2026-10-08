@@ -5573,6 +5573,13 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Output: `pc2rec-r51-frames.jsonl`, `pc2rec-r51-rng.jsonl`.
 - Compare: client seed draws per frame against the message-driven draws in client/msg-units.md; every 0x004AFF60 mode change against that frame's S→C messages; local position against server position (any lead = prediction). Fold: write the result into the cited rule and drop its PROVISIONAL line.
 
+##### REC-95 [ASSISTED] sim/intents-events.md §7.4 r3 (0x4C / 0x4D level byte), sim/pathing.md §10 r2 (player skill-mode messages)
+- Priority P0 (wire byte layout).
+- Settles: `intents-events.md` §7.4 r3 (the 0x4C / 0x4D level byte: base + bonus clamped to a byte, PROVISIONAL); `pathing.md` §10 r2 (which player modes send 0x4C / 0x4D, and whether the attacker's own client receives them; d2rs-own today: every skill mode A1, A2, SC, TH, KK, S1–S4, SQ, own client included).
+- Steps: `record_packets.py --seconds 120` on two clients in one game (TCP/IP) in the Blood Moor: client A attacks a Fallen (left click, Attack), casts a point skill on the ground and a unit skill on a monster; a Fallen Shaman casts at A. Log every S→C 0x4C / 0x4D / 0x0C on both clients with the server tick and the caster's skill level.
+- Output: `rec96-packets.jsonl`.
+- Compare: the level byte against the skill level; the player modes that send a skill message and which clients get it; fold into the cited rules and drop their PROVISIONAL lines. Also note, for `stitch-server-core.md` §2, the hostility (`0x00554200`) and melee-range (`0x00622870`) answers seen (who can attack whom, the reach in sub-tiles).
+
 #### Priority 1
 
 ##### REC-01 [AUTO, no run] Analysis of two existing raw files
@@ -5788,6 +5795,13 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Output: `traces/raw/pc2rec-r93-packets.jsonl`.
 - Compare: count of S→C 0x2C event 11 in the opening tick (2 expected by the provisional reading, 1 otherwise). Fold: write the result into the cited rule and drop its PROVISIONAL line.
 
+##### REC-94 [MANUAL] world/objects.md §7.1 r3 (interact range `0x00623660`)
+- Priority P2.
+- Settles: world/objects.md §7.1 r3 (PROVISIONAL: a player operator is always in interact range; `LocalSeams::object_in_range` in `crates/d2-client/src/app/single_player.rs`).
+- Steps: `py tools/trace-recorder/record_packets.py --seconds 120` + NEW HOOK at `0x00623660` exit logging operator / object positions and the result, while clicking the Rogue Encampment waypoint from 1, 3, 5 and 8 subtiles away (walk interrupted by a second click) and a chest from the same distances.
+- Output: `traces/raw/pc2rec-r94-packets.jsonl` + hook log.
+- Compare: the distance at which the hook first returns 1 and whether S→C 0x63 follows the C→S 0x13. Fold: write the range test into §7.1 r3 and drop its PROVISIONAL line.
+
 ##### REC-50 [NO RUN] client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14
 - Priority P2.
 - Settles: client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14 r3 / OQ10 (reader of pet record +0x1C).
@@ -5910,14 +5924,21 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Output: `pc2rec-r46-packets.jsonl`.
 - Compare: the client_out 0x67 (seq 1) bytes @0x11–@0x14, @0x25, @0x27, @0x2B–@0x2D against §7 r9's table; S→C 0x01 u32@2 = u32@0x27 & 0x3179C7 and u8@6 = 0 (`intents-events.md` §8.1). Fold: replace the PROVISIONAL in `client/model.md` §7 r9.
 
+##### REC-47 [MANUAL] Automap in the play preview (draw modes, header, markers)
+- Priority 3 (manual play; the preview's automap is d2rs-own, unverified).
+- Settles: `ui/automap.md` automap-0001 / automap-0002 (the cel draw modes of §10 r4, the clip rectangle and origin of §9) against the preview, which draws every cel opaque, no header or name text, and only the local player's marker (`docs/handoff/q-automap.md`).
+- Steps: New character, Blood Moor, walk 30 s, Tab (full), screenshots; fade options 0–3; options → mini.
+- Output: screenshots / `--draws-every 1` trace.
+- Compare: cel draws (order, X, Y, mode) and marker lines vs §10 and §11.
+
 #### Deferred (not recorded; outside Phases 0–6)
 - IT-1 `formats/d2s.md` OQ1 (legacy loader `0x00534020`, pre-1.09 saves), IT-2 OQ2 (item records of save versions 0x5C–0x5F), `formats/d2s-legacy.md` and `items/bitstream-legacy.md` Pending lines (1.07 / 1.08 / 1.00–1.06 saves): need sample files and are only needed if old saves must load. Record only if the user opens that scope.
-##### REC-94 [ASSISTED] Level-up stat messages (S→C 0x1D-0x1F, 0x21) around a level-up
+##### REC-96 [ASSISTED] Level-up stat messages (S→C 0x1D-0x1F, 0x21) around a level-up
 - Priority 2 (the play preview sends them by a diff at the tick's sync).
 - Settles: PROVISIONAL `combat/vitals.md` §3 step 7 / `wiring::action::vitals_sync::stat_changes` (the original sends a changed stat from the unit's client update from the changed-stat array, `sim/stat-lists.md` §11; the preview sends level, stat points, skill points, attributes, the maxima and next-level experience against a per-client cache at the end of each tick), and PROVISIONAL `skills/levels.md` §6.4 (the message after a spent skill point: 0x21 skill, base level; what 0x3B sends on the validator's codes 2 / 3, OQ5).
 - Steps: a new character at level 1; `record_packets.py --seconds 120` through one kill that levels up (stat points and a skill point appear), then spend one stat point (C→S 0x3A) and one skill point (C→S 0x3B).
-- Output: `rec94-packets.jsonl`.
-- Compare: which S→C stat ids, in which order and in which tick follow the level-up; the stat ids and values after 0x3A; the 0x21 (and any 0x22 / 0x23) after 0x3B against `d2-server` `app/levelup.rs`. Fold: replace the two PROVISIONAL points.
+- Output: `rec96-packets.jsonl`.
+- Compare: which S→C stat ids, in which order and in which tick follow the level-up; the stat ids and values after 0x3A; the 0x21 (and any 0x22 / 0x23) after 0x3B against `d2-server` `skills/world.rs` `add_skill_level`. Fold: replace the two PROVISIONAL points.
 
 - **REC-44** legacy saves, cited by the specs as the capture: `formats/d2s-legacy.md` OQ2 (load one 1.07 / 1.08 save, version 0x57 / 0x59, in 1.14d and compare the unit (stats, skills, items, hireling) with the rules), `items/bitstream-legacy.md` OQ1 (the same 1.07 / 1.08 save: every item against §2–§4, affix ids after the offset of §2 rule 3) and OQ2 (a 1.00–1.06 save, version 0x47, holding a stored, equipped, belt, cursor and socketed item, an ear and a corpse with an equipped item: compare with §6–§8 and edge cases 7–9). No such save exists on this PC; record only if the user opens that scope (steps: place the save in `%USERPROFILE%\Saved Games\Diablo II`, `record_packets.py --seconds 60` plain, then `tools/d2s_check.py`).
 
@@ -5973,3 +5994,5 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 | DT1 `decode_rle` built a slice index for a skip-only `(skip, 0)` pair past the 32 × 32 block; the bounds check ran only for `count > 0` (panic; found 2026-10-06 by libFuzzer within minutes, missed by the 200k-case proptests) | the `dt1` fuzz target and the regress test; audit other parsers for a bounds check guarded by `count > 0` (M07, M21) |
 | GPU render exactness | R8Uint indices, sRGB palette via `textureLoad`, `Msaa::Off`, `Tonemapping::None`, pixel-aligned quads |
 | Two local sessions worked the same PC areas in parallel from different bases (2026-10-08, caught at the staging-6 merge: 8 of 9 PC 2 branches conflicted, "to reconcile" notes) | before writing, a lane diffs its files against every open integration branch (check: the lane start diffs its files against the open integration branches) |
+
+- **REC-QESC-1** Esc game menu art, layout and strings (PROVISIONAL, `ui/esc_menu.rs`, M22): `controls.md` §3 row 56 and `panels.md` §3.1 specify only when the menu opens and closes. Needed for the spec: the ui 9 box art file and frames, the entry rectangles, the strings (Options, Save and Exit Game, Return to Game by id), what Options opens, and what `0x00456300(0, 1)` closes on Esc. Capture: screenshot of the Esc menu at 800 × 600 and the draw calls while it is open. The preview draws a dark box with Font16 English text.

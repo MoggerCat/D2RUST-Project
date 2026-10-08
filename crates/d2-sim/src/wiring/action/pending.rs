@@ -1067,6 +1067,18 @@ pub trait Pending {
         super::objects::ObjectReach::Operate
     }
 
+    /// The preview's interact reach in sub-tiles (the Chebyshev distance
+    /// of the path positions), for a host whose range test
+    /// `0x00623660` and walk step are unwritten. `Some(r)`: the 0x13
+    /// object case refuses beyond 50 (`waypoints.md` §5.2), does nothing
+    /// beyond `r` (the client walks and sends 0x13 again on arrival) and
+    /// operates within it; [`Pending::object_in_range`] is then this
+    /// test. Default: none (the seams above decide).
+    /// d2rs-own, unverified (play preview, stitch-objects).
+    fn object_preview_range(&self) -> Option<i32> {
+        None
+    }
+
     // ---- the kill and the death (`damage.md` §7.2, `treasure.md` §3) ---
 
     /// A step of the kill with no written body ([`KillStep`]).

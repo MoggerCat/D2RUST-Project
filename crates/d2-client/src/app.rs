@@ -9,16 +9,18 @@
 //! single-player game ([`single_player`], on a server thread,
 //! [`server_thread`]) through the bridge and the world view.
 
+pub mod automap;
 pub mod hud;
 pub mod items;
-pub mod levelup;
 pub mod palette;
 pub mod play;
 pub mod rest;
 pub mod save;
 pub mod server_thread;
 pub mod single_player;
+pub mod skill_rest;
 pub mod sound;
+pub mod strings;
 pub mod ui;
 
 use std::path::PathBuf;

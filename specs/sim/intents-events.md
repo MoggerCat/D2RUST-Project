@@ -913,6 +913,9 @@ class is 291, 417 or 418; item → `0x0055BED0` (§7.3 rule 4); others nothing.
    GUID); else 0x4D (`0x0053D4D0`: path target x, y). Both builders
    send 0x99 / 0x9A instead when their last argument is non-zero; this
    caller passes 0. No skill → nothing. Stop.
+   PROVISIONAL: the level byte b is the used skill entry's base + bonus
+   level (+0x28 + +0x2C), as a byte (because the rule names only
+   "level"); settled by REC-95.
 4. The unit must have a path (fatal 0xE6). With T: id 0x68, code := E
    code to unit, (a, b) := (T type, T GUID); modes 2 and 15 with path
    type 5 or 6 (`0x00648E30`) instead id 0x67, code to point, (a, b) :=

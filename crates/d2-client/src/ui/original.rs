@@ -107,9 +107,9 @@ pub const PENDING: &[(&str, &str)] = &[
     ),
     (
         "waypoint menu panel (ui 0x14, §13 r2–r7)",
-        "S→C 0x63 opens it (flag, GUID, record: `msg_ui`), but the row rebuild, the tab \
-         gates (client quest flags, `msg-ui.md` open question 4) and the tab / row click \
-         rectangles (spec OQ 7) are not specified",
+        "installed (`waypoint_ui`: art, rows from the record, row click → C→S 0x49); the \
+         tab gates read the client quest flags (`msg-ui.md` open question 4, tab 0 only) \
+         and the row text needs the string table by id",
     ),
     (
         "stash and cube panels (ui 0x19, 0x1A; §11 r2–r6, §12 r2–r6)",
@@ -223,6 +223,12 @@ struct Shared {
     hud: hud::HudState,
     /// The inventory panel's item facts (`inv_items`).
     items: ItemsUi,
+    /// The levels' waypoint indexes (`waypoint_ui`).
+    waypoint_map: Option<d2_sim::world::waypoints::WaypointMap>,
+    /// The waypoint menu S→C 0x63 opened last (`waypoint_ui`).
+    waypoint_open: Option<WaypointOpen>,
+    /// The Esc game menu's state ([`esc_menu`]).
+    esc: esc_menu::EscState,
 }
 
 impl Shared {
@@ -338,6 +344,9 @@ impl OriginalUi {
             resist_penalties: None,
             hud: hud::HudState::default(),
             items: ItemsUi::default(),
+            waypoint_map: None,
+            waypoint_open: None,
+            esc: esc_menu::EscState::default(),
         };
         Ok(Self {
             shared: Rc::new(RefCell::new(shared)),
@@ -367,12 +376,18 @@ impl OriginalUi {
             sh: sh.clone(),
             panel: CharacterPanel::default(),
         }))?;
+        root.add(Box::new(waypoint_ui::WaypointUi {
+            sh: sh.clone(),
+            panel: Default::default(),
+            seq: 0,
+        }))?;
         root.add(Box::new(BorderUi { sh: sh.clone() }))?;
         root.add(Box::new(super::hire_list::HireListUi {
             st: self.hire.clone(),
         }))?;
         root.open(super::hire_list::HIRE_PANEL)?;
         root.add(Box::new(hud::HudUi { sh: sh.clone() }))?;
+        root.add(Box::new(esc_menu::EscMenuUi { sh: sh.clone() }))?;
         // Not a UI state: open for good.
         root.open(BORDER_PANEL)?;
         root.open(hud::HUD_PANEL)?;
@@ -483,13 +498,61 @@ impl OriginalUi {
             }
         }
         if let (Routed::Unhandled, UiEvent::Action(a)) = (routed, e) {
-            if let Some(ui) = hotkey_state(a) {
+            if a == ActionId(Action::GameMenu.index() as u16) {
+                self.game_menu_key()?;
+            } else if let Some(ui) = hotkey_state(a) {
                 // §4.3: hot keys pass jump 0; mode 2 toggle.
                 self.set_ui(u32::from(ui), 2, false)?;
             }
         }
         root.sync_states(&self.shared.borrow().states);
         Ok(())
+    }
+
+    /// Esc (command 56, `controls.md` §3): the open menu closes; else the
+    /// open panels close; else the menu opens. Which panels Esc closes is
+    /// d2rs-own, unverified (`0x00456300` is not specified).
+    fn game_menu_key(&mut self) -> Result<(), OriginalUiError> {
+        use super::states::id;
+        const CLOSEABLE: [u8; 17] = [
+            id::INVENTORY,
+            id::CHARACTER,
+            3,
+            id::SKILL_TREE,
+            id::NEW_STATS,
+            id::NEW_SKILLS,
+            id::NPC_MENU,
+            id::NPC_SHOP,
+            id::QUEST_SCREEN,
+            id::INI_SCROLL,
+            id::QUEST_LOG,
+            id::WAYPOINT,
+            id::PARTY,
+            id::STASH,
+            id::CUBE,
+            id::MERC_INV,
+            id::RECIPE_SCROLL,
+        ];
+        if self.is_open(id::ESC_MENU) {
+            self.set_ui(u32::from(id::ESC_MENU), 1, false)?;
+            return Ok(());
+        }
+        let mut closed = false;
+        for ui in CLOSEABLE {
+            if self.is_open(ui) {
+                self.set_ui(u32::from(ui), 1, true)?;
+                closed = true;
+            }
+        }
+        if !closed {
+            self.set_ui(u32::from(id::ESC_MENU), 0, false)?;
+        }
+        Ok(())
+    }
+
+    /// Whether "Save and Exit Game" was chosen since the last call.
+    pub fn take_exit_request(&mut self) -> bool {
+        std::mem::take(&mut self.shared.borrow_mut().esc.exit_requested)
     }
 
     /// `SetUIState(ui, mode, jump)` with the model's gate facts; effects
@@ -978,14 +1041,19 @@ impl Panel for BorderUi {
     }
 }
 
+#[path = "esc_menu.rs"]
+pub mod esc_menu;
 #[path = "hud.rs"]
 pub mod hud;
 
 #[path = "msg_ui.rs"]
 pub mod msg_ui;
+#[path = "waypoint_ui.rs"]
+pub mod waypoint_ui;
 pub use msg_ui::{
     ChatAction, IntroEntry, MsgUiMore, MsgUiState, NpcTextList, OverheadText, WaypointMenuState,
 };
+pub use waypoint_ui::WaypointOpen;
 
 #[cfg(test)]
 #[path = "original_tests.rs"]

@@ -168,7 +168,7 @@ fn watched<X>(sim: &ActionSim<X>, unit: UnitId) -> BTreeMap<i32, i32> {
 /// The watched stats of `unit` that changed since the last send to
 /// `client`, as stat messages (`0x0053BE40`, `intents-events.md` §3.5
 /// rule 7), in stat order.
-// PROVISIONAL (combat/vitals.md §3 step 7; settled by REC-94): the original sends a changed
+// PROVISIONAL (combat/vitals.md §3 step 7; settled by REC-96): the original sends a changed
 // stat from the unit's client update, from the changed-stat array
 // (`stat-lists.md` §11); d2rs keeps no pending array across the tick's
 // room clean-up, so the changes are found against a per-client cache at

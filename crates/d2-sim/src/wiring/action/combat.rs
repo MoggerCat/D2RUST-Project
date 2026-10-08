@@ -124,10 +124,10 @@ impl<X: Pending> SkillUnits for CombatView<'_, X> {
         self.v.seed(u)
     }
     fn skill_list(&self, u: UnitId) -> Vec<SkillEntry> {
-        self.v.h.x.skill_list(u)
+        self.v.h.skill_list_of(u)
     }
     fn used_skill(&self, u: UnitId) -> Option<SkillEntry> {
-        self.v.h.x.used_skill(u)
+        self.v.h.used_skill_of(u)
     }
     fn current_weapon(&self, u: UnitId) -> Option<UnitId> {
         self.v.h.x.current_weapon(u)

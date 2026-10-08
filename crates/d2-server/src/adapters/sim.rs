@@ -62,6 +62,11 @@ pub struct UnitFacts {
     pub owner: Option<UnitId>,
 }
 
+/// Lets the host's seams read the game before the sim runs on it
+/// ([`SimGame::set_host_sync`]): called before each handled intent and at
+/// the start of each tick.
+pub type HostSync<D> = fn(&Game, &mut D);
+
 /// Misuse of the adapter's client bookkeeping.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum AdapterError {
@@ -97,6 +102,12 @@ pub struct SimGame<D = Unspecified, W = NoWorld> {
     transport_ids: BTreeMap<SimClient, ClientId>,
     players: BTreeMap<UnitId, PlayerFields>,
     units: BTreeMap<UnitId, UnitFacts>,
+    /// The units whose facts came from the world host
+    /// ([`WorldHost::live_facts`]) rather than the caller: refreshed
+    /// before each point / unit parse.
+    live: std::collections::BTreeSet<UnitId>,
+    /// The host's seam refresh, if set.
+    host_sync: Option<HostSync<D>>,
     /// Clients the point parser asked to resync with S→C 0x15, in order.
     /// Not queued: the 11-byte layout of 0x15 is not in
     /// `server-messages.tsv` (`docs/HANDOFF.md` §7).
@@ -158,6 +169,8 @@ impl<D: EventDispatch, W> SimGame<D, W> {
             transport_ids: BTreeMap::new(),
             players: BTreeMap::new(),
             units: BTreeMap::new(),
+            live: Default::default(),
+            host_sync: None,
             resyncs: Vec::new(),
             unhandled: Vec::new(),
             world,
@@ -247,6 +260,18 @@ impl<D: EventDispatch, W> SimGame<D, W> {
     /// Stages a unit's act, position and owner.
     pub fn set_unit(&mut self, unit: UnitId, facts: UnitFacts) {
         self.units.insert(unit, facts);
+    }
+
+    /// Runs `sync` before each handled intent and at the start of each
+    /// tick (a host whose seams answer from a copy of the game's units).
+    pub fn set_host_sync(&mut self, sync: HostSync<D>) {
+        self.host_sync = Some(sync);
+    }
+
+    fn run_host_sync(&mut self) {
+        if let Some(f) = self.host_sync {
+            f(&self.game, &mut self.events);
+        }
     }
 
     /// The client's player unit, if it is a player (unit type 0).
@@ -339,6 +364,35 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
     }
 
     /// `None` without player data, or without a staged position.
+    /// The facts of the client's player and, for a unit message, of the
+    /// target, from the world host when the caller staged none (the app
+    /// stages none: without this every walk was refused `Invalid`).
+    fn refresh_targets(&mut self, client: ClientId, msg: &[u8]) {
+        let mut units: Vec<UnitId> = self.player_unit(client).into_iter().collect();
+        if let (Some(&id), Some(ty), Some(guid)) = (
+            msg.first(),
+            msg.get(1..5)
+                .map(|b| u32::from_le_bytes(b.try_into().unwrap())),
+            msg.get(5..9)
+                .map(|b| u32::from_le_bytes(b.try_into().unwrap())),
+        ) {
+            if crate::dispatch::is_unit(id) {
+                if let Some(&t) = UnitType::ALL.get(ty as usize) {
+                    units.extend(self.game.lists.find_unit(t, guid));
+                }
+            }
+        }
+        for u in units {
+            if self.units.contains_key(&u) && !self.live.contains(&u) {
+                continue;
+            }
+            if let Some(f) = self.world.live_facts(&self.game, &mut self.events, u) {
+                self.units.insert(u, f);
+                self.live.insert(u);
+            }
+        }
+    }
+
     fn point_state(&self, client: ClientId) -> Option<PointState> {
         let unit = self.player_unit(client)?;
         let data = self.players.get(&unit)?.data?;
@@ -408,6 +462,7 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
         size: usize,
         out: &mut dyn MessageSink,
     ) -> ResultCode {
+        self.run_host_sync();
         if let Some(r) = handlers::items::handle(self, client, msg, out) {
             return r;
         }
@@ -473,8 +528,17 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
     /// (`handlers::items::moves::update_pass`, `inventory-moves.md` §6.1), then
     /// the client vitals sync ([`SimGame::vitals_sync`]).
     fn tick(&mut self, out: &mut dyn MessageSink) {
+        self.run_host_sync();
         self.world.run_tick(&mut self.game, &mut self.events);
         self.world.after_tick(&mut self.game, &mut self.events);
+        // The staged positions follow the path records, so the point
+        // parser sees where the walking player is.
+        let staged: Vec<UnitId> = self.units.keys().copied().collect();
+        for (unit, (x, y)) in self.world.unit_positions(&mut self.events, &staged) {
+            if let Some(f) = self.units.get_mut(&unit) {
+                f.pos = Pos { x, y };
+            }
+        }
         let requests = self.world.take_host_requests();
         self.host_requests.extend(requests);
         for (unit, bytes) in self.world.take_sent(&mut self.events) {

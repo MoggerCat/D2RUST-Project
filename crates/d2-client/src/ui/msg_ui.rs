@@ -425,6 +425,15 @@ impl OriginalUi {
             tab,
             close_latch: false,
         });
+        // The installed menu's rows (`waypoint_ui`).
+        let mut sh = self.shared.borrow_mut();
+        let seq = sh.waypoint_open.map_or(1, |o| o.seq.wrapping_add(1));
+        sh.waypoint_open = Some(super::WaypointOpen {
+            guid,
+            record,
+            current: world.player_level().map_or(0, u32::from),
+            seq,
+        });
         Ok(())
     }
 

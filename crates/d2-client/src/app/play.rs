@@ -180,6 +180,7 @@ pub fn add_walk(app: &mut App, tap: WalkTap, speeds: Option<crate::bridge::predi
         .map(|a| a.0.art.clone());
     add_preview_walk(app, walk);
     crate::world_view::monster_walk::add_monster_walk(app);
+    crate::world_view::walk_room::add_preview_walk_room(app);
 }
 
 /// One log line every [`LOG_EVERY`] bridge frames.
@@ -188,7 +189,16 @@ fn log_progress(
     state: Res<WorldViewState>,
     runs: Option<Res<NodeRuns>>,
     audio: Option<Res<GameAudio>>,
+    walk: Option<Res<PreviewWalk>>,
+    mut seen_rejected: Local<usize>,
 ) {
+    // Every refused S→C message once, as it happens (a refused 0x07 or
+    // unit add leaves the model short with no other trace).
+    let rejected = &bridge.0.log().rejected;
+    for r in rejected.iter().skip(*seen_rejected) {
+        warn!("S→C 0x{:02X} refused: {}", r.id, r.error);
+    }
+    *seen_rejected = rejected.len();
     let w = bridge.0.world();
     if w.frames == 0 || !w.frames.is_multiple_of(LOG_EVERY) {
         return;
@@ -203,6 +213,37 @@ fn log_progress(
         runs.map_or(0, |r| r.get()),
         audio.map(|a| a.stats.clone()),
     );
+    let log = bridge.0.log();
+    info!(
+        "frame {}: {}; refused {}, dropped (unit not in the model) {:?}, discarded {}",
+        w.frames,
+        where_line(w, walk.as_deref()),
+        log.rejected.len(),
+        log.dropped,
+        log.discarded.len(),
+    );
+}
+
+/// The local player's place in the model for the progress log: its model
+/// sub-tile, the predicted one, its room, the client's active rooms by
+/// level and the model's units by type (0 player, 1 monster, 2 object…).
+fn where_line(w: &crate::bridge::world::ClientWorld, walk: Option<&PreviewWalk>) -> String {
+    let mut levels = std::collections::BTreeMap::<u16, usize>::new();
+    for r in w.active_rooms.as_deref().unwrap_or(&[]) {
+        *levels.entry(r.level).or_default() += 1;
+    }
+    let mut types = std::collections::BTreeMap::<u8, usize>::new();
+    for k in w.units.keys() {
+        *types.entry(k.unit_type).or_default() += 1;
+    }
+    format!(
+        "local cell {:?}, predicted {:?}, local room {:?}, active rooms by level {:?}, units by type {:?}",
+        w.local().map(|u| u.cell()),
+        walk.and_then(|p| p.predict.cell()),
+        w.local_room().map(|r| (r.level, r.x0, r.y0, r.w, r.h)),
+        levels,
+        types,
+    )
 }
 
 /// What `d2-client play` runs.
@@ -245,8 +286,23 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     };
     let drlg_source = single_player::client_drlg_source(&config.data);
     let level_rows = single_player::client_level_rows(&config.data);
+    let waypoint_map = single_player::client_waypoint_map(&config.data);
     let object_rows = single_player::client_object_rows(&config.data);
     let request = config.character.clone();
+    // d2rs-own, unverified: the map files sit next to the character save.
+    let automap_files = config.save_path.as_deref().and_then(|p| {
+        Some(super::automap::SaveFiles {
+            dir: p.parent()?.to_path_buf(),
+            sub: None,
+            name: p.file_stem()?.to_string_lossy().into_owned(),
+        })
+    });
+    let automap_source = match &config.data {
+        GameData::Live(d) => {
+            Some(super::automap::live_source(&d.tables).map_err(anyhow::Error::msg)?)
+        }
+        GameData::Synthetic => None,
+    };
     let speeds = single_player::walk_speeds(&config.data, &config.character)?;
     let save_base = save::base_save(&config.character);
     let save_tables: Option<std::sync::Arc<dyn d2_formats::d2s::SaveTables + Send + Sync>> =
@@ -321,9 +377,16 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         let item_parts = super::items::item_parts(&archives).map_err(anyhow::Error::msg)?;
         super::items::add_items(&mut app, archives.clone(), item_parts);
         palette::add_act_palettes(&mut app, palettes);
+        if let Some(source) = automap_source {
+            super::automap::add_automap(&mut app, source, automap_files, archives.clone(), true);
+        }
         let parts = ui::UiParts::live(archives.clone()).map_err(anyhow::Error::msg)?;
         ui::add_original_ui(&mut app, parts)?;
+        let strings = super::strings::TableStrings::load(archives.as_ref(), super::strings::LANG)
+            .map_err(anyhow::Error::msg)?;
+        super::strings::install_strings(&mut app, strings);
         super::hud::install_hud_tables(&mut app, &archives).map_err(anyhow::Error::msg)?;
+        ui::set_waypoint_map(&mut app, waypoint_map);
         let table = sound::sound_table_live(&archives).map_err(anyhow::Error::msg)?;
         app.insert_resource(GameAudio::new(AudioParts::original(archives, table)));
     } else {
@@ -336,6 +399,16 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             .add_systems(Update, exit_after);
     }
     let exit = app.run();
+    if let Some(a) = app
+        .world_mut()
+        .resource_mut::<WorldViewState>()
+        .automap
+        .as_mut()
+    {
+        if let Err(e) = a.teardown() {
+            eprintln!("play: the automap was NOT saved: {e}");
+        }
+    }
     if let Some(h) = saver {
         match h.save() {
             Ok(()) => println!("play: saved the character to {}", h.path().display()),

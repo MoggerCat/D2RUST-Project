@@ -349,8 +349,28 @@ pub trait WorldHost<D> {
     ) -> Option<PlayerOutcome> {
         None
     }
+    /// The path positions (sub-tiles) of the listed units that have a
+    /// path, read at the end of each tick to move the staged
+    /// [`UnitFacts`](super::UnitFacts) the point-message parser reads
+    /// (`intents-events.md` §2.4 rule 3). Default: none (the caller
+    /// stages positions itself).
+    fn unit_positions(&mut self, events: &mut D, units: &[UnitId]) -> Vec<(UnitId, (i32, i32))> {
+        Vec::new()
+    }
     /// The walk / run handlers (`handlers::walk`) on the path provider.
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
+        None
+    }
+    /// The live act and position of `unit` the point / unit parser reads
+    /// (`intents-events.md` §2.4 rules 3–4), from the game's own unit
+    /// (its room's act, its path position). `None`: the host has none
+    /// (the caller's staged [`super::super::UnitFacts`] are used).
+    fn live_facts(
+        &mut self,
+        game: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<super::super::UnitFacts> {
         None
     }
     /// The client vitals sync (`combat/vitals.md` §5) for one client at

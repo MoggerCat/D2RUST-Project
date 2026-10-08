@@ -61,8 +61,11 @@
 //!
 //! Seams without a provider are [`LocalSeams`] (the action and world
 //! wiring's): the narrowest answers (`Pending`'s and `WorldPending`'s
-//! defaults) plus a store of what the sim itself sets (positions) and
-//! the transport outbox; and [`super::rest::AppRest`] (the wired
+//! defaults) plus a store of what the sim itself sets (positions), the
+//! transport outbox, the combat seams' copy of the units
+//! ([`sync_seams`]) and the skill pipeline's preview fills
+//! ([`super::skill_rest`]: the world's skill slot is `WiredSkills`, on
+//! d2-sim's skill lists); and [`super::rest::AppRest`] (the wired
 //! host's). Nothing
 //! here decides an outcome: it stages the game the way the server tests
 //! do (a sorceress who knows her act's first waypoint, `bridge.md` §3).
@@ -78,6 +81,7 @@ use d2_formats::animdata::AnimData;
 use d2_formats::d2s::{self, D2s, ReadOptions};
 use d2_formats::mpq::ArchiveSet;
 use d2_server::adapters::character::LoadContext;
+use d2_server::adapters::handlers::skills::wired::WiredSkills;
 use d2_server::adapters::handlers::world::{
     preview_inv_parts, ActionEvents, ActionWorld, Outbox, WiredWorld,
 };
@@ -126,6 +130,7 @@ use d2_sim::drlg::preset::{Ds1Input, Ds1Source, PresetData};
 
 use super::rest::AppRest;
 use super::server_thread::{ThreadLink, ThreadStopped};
+use super::skill_rest::SkillStore;
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
 use crate::bridge::world::{
@@ -137,7 +142,7 @@ use crate::bridge::LOCAL_CLIENT;
 pub type Sim = SimGame<WorldSim<LocalSeams>, World>;
 
 /// The wired host of the app's game.
-pub type World = WiredWorld<AppRest, super::levelup::LevelUpSkills>;
+pub type World = WiredWorld<AppRest, WiredSkills>;
 
 /// The local link over [`Sim`] with clock `C`.
 pub type Link<C = SystemClock> = LocalLink<Sim, ProtoSizes, PendingSession, C>;
@@ -146,6 +151,8 @@ pub type Link<C = SystemClock> = LocalLink<Sim, ProtoSizes, PendingSession, C>;
 /// player: `sim/path-placement.md` §13 rule 2), Cold Plains (act 0) and
 /// Lut Gholein (act 1).
 pub const ACT1_TOWN: u32 = 1;
+/// The Blood Moor (act 0), east of the synthetic town's room.
+pub const BLOOD_MOOR: u32 = 2;
 pub const COLD_PLAINS: u32 = 3;
 pub const ACT2_TOWN: u32 = 40;
 /// The default game seed.
@@ -156,6 +163,11 @@ pub const GAME_TYPE: u8 = 3;
 /// Sub-tile x and y of the waypoint object from the origin of the town's
 /// first room (inside the synthetic 8 × 8-tile room, 40 sub-tiles square).
 pub const WAYPOINT_X: i32 = 20;
+/// The synthetic chest row's class, operate function and init function
+/// (`object-functions.tsv`).
+pub const SYNTHETIC_CHEST_CLASS: u32 = 1;
+const SYNTHETIC_CHEST_OPERATE: u8 = 4;
+const SYNTHETIC_CHEST_INIT: u8 = 3;
 pub const UNIT_Y: i32 = 20;
 /// The player's character class (1, sorceress, as in the server tests).
 pub const PLAYER_CLASS: u32 = 1;
@@ -378,8 +390,43 @@ pub struct LocalSeams {
     pub pos: BTreeMap<UnitId, (i32, i32)>,
     pub sent: Vec<(UnitId, Vec<u8>)>,
     pub log: Vec<String>,
-    /// The player skill list (`app/levelup.rs`).
-    pub book: super::levelup::SkillBook,
+    /// The game's players and monsters (type, allied, path position),
+    /// copied by [`sync_seams`] before each intent and tick: the
+    /// hostility, alignment and melee-range seams have no game to read.
+    pub sides: BTreeMap<UnitId, (UnitType, bool, (i32, i32))>,
+    /// The skill pipeline's per-unit fields and preview fills (`UseRest`,
+    /// `LearnRest`: [`super::skill_rest`]).
+    pub skills: SkillStore,
+}
+
+impl LocalSeams {
+    /// Player side: a player or an allied (good-aligned) monster.
+    fn player_side(&self, unit: UnitId) -> Option<bool> {
+        self.sides
+            .get(&unit)
+            .map(|&(ty, allied, _)| ty == UnitType::Player || allied)
+    }
+}
+
+/// d2rs-own, unverified (preview, D1): the melee reach of every unit in
+/// sub-tiles (`0x00622870` reads the unit's size and weapon; not
+/// answered here).
+const PREVIEW_MELEE_RANGE: i32 = 2;
+
+/// The play host's seam refresh (`SimGame::set_host_sync`): the players
+/// and monsters with their allied flag (`UnitLists`), for
+/// [`LocalSeams::sides`].
+pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
+    let hooks = &mut sim.action.sys.hooks;
+    let mut sides = BTreeMap::new();
+    for ty in [UnitType::Player, UnitType::Monster] {
+        for u in game.lists.units_of_type(ty) {
+            if let Some(e) = game.lists.unit(u) {
+                sides.insert(u, (ty, e.allied, hooks.path_position(u)));
+            }
+        }
+    }
+    hooks.x.sides = sides;
 }
 
 impl Pending for LocalSeams {
@@ -401,6 +448,67 @@ impl Pending for LocalSeams {
     }
     fn set_player_mode_arrival(&mut self, _: &mut Game, player: UnitId) {
         self.log.push(format!("arrival mode {}", player.0));
+    }
+    /// d2rs-own, unverified (preview, decision D1; `0x00554200` is not
+    /// specified): the player side (players, allied monsters) and the
+    /// other monsters may attack each other; nothing else, never itself.
+    fn may_attack(&self, attacker: UnitId, defender: UnitId) -> bool {
+        attacker != defender
+            && matches!(
+                (self.player_side(attacker), self.player_side(defender)),
+                (Some(a), Some(d)) if a != d
+            )
+    }
+    /// d2rs-own, unverified (preview, D1; `0x00622870`).
+    fn melee_range(&self, _: UnitId) -> i32 {
+        PREVIEW_MELEE_RANGE
+    }
+    /// d2rs-own, unverified (preview, D1; `combat/range.md` §7.2 step 3
+    /// with the preview reach and no line test): the larger axis
+    /// distance of the synced positions within reach + `extra` + 1.
+    fn in_melee_range(&self, a: UnitId, d: UnitId, extra: i32) -> bool {
+        let (Some(&(_, _, pa)), Some(&(_, _, pd))) = (self.sides.get(&a), self.sides.get(&d))
+        else {
+            return false;
+        };
+        let dist = (pa.0 - pd.0).abs().max((pa.1 - pd.1).abs());
+        dist <= PREVIEW_MELEE_RANGE + extra + 1
+    }
+    /// d2rs-own, unverified (preview, D1; `0x006259B0`): allied monsters
+    /// and players good (2), every other unit evil (0, the default).
+    fn alignment(&self, unit: UnitId) -> u8 {
+        if self.player_side(unit) == Some(true) {
+            2
+        } else {
+            0
+        }
+    }
+    /// d2rs-own, unverified (preview, D1; game +0x10F8, `ai.md` OQ6):
+    /// one target-node slot per player (the player alone, no pets), in
+    /// unit-list order, at most 8 (`ai.md` §5.2 step 5 reads 8).
+    fn target_nodes(&self, game: &Game) -> [Vec<UnitId>; 10] {
+        let mut nodes: [Vec<UnitId>; 10] = Default::default();
+        for (slot, p) in nodes
+            .iter_mut()
+            .zip(game.lists.units_of_type(UnitType::Player))
+            .take(8)
+        {
+            slot.push(p);
+        }
+        nodes
+    }
+    /// `0x00623660`, the operate entry's interact range (`objects.md`
+    /// §7.1 rule 3): no written spec gives its test.
+    // PROVISIONAL (world/objects.md §7.1 r3; REC-96): in range. The
+    // preview client sends C→S 0x13 only on arrival
+    // (`world_view/interact.rs`); the §7.3 r3–r4 approach is
+    // `Pending::object_approach`'s default (operate).
+    fn object_in_range(&self, _: &Game, _: UnitId, _: UnitId) -> bool {
+        true
+    }
+    /// d2rs-own, unverified (stitch-objects): the preview's interact reach.
+    fn object_preview_range(&self) -> Option<i32> {
+        Some(crate::world_view::object_click::INTERACT_RANGE)
     }
 }
 
@@ -426,6 +534,9 @@ impl LevelTypes for Types {
         if let Some(&rect) = self.0.get(&id) {
             let r = drlg.alloc_room(level, RoomKind::Preset, rect);
             drlg.room_mut(r).dt1_mask = 1;
+            if id == ACT1_TOWN || id == BLOOD_MOOR {
+                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
+            }
             drlg.link_room(r, LinkAt::Tail);
         }
         Ok(())
@@ -515,9 +626,15 @@ impl WaypointTables {
         o.operatefn = 23;
         o.initfn = 17;
         o.framecnt1 = 15 << 8;
+        // Class 1: a chest (`objects.md` §5.2, §8.1), placed only on
+        // request ([`build_with_chests`]). d2rs-own, unverified.
+        let mut chest: Objects = blank();
+        chest.operatefn = SYNTHETIC_CHEST_OPERATE;
+        chest.initfn = SYNTHETIC_CHEST_INIT;
+        chest.framecnt1 = 15 << 8;
         WaypointTables {
             levels,
-            objects: vec![o],
+            objects: vec![o, chest],
             object_class: 0,
         }
     }
@@ -755,19 +872,26 @@ fn synthetic_drlg_data() -> DrlgData {
     let mut files = vec![Vec::new(); 32];
     files[0] = b"floor.dt1".to_vec();
     drlg.lvltypes = vec![vec![Vec::new(); 32], files];
-    for id in [ACT1_TOWN, COLD_PLAINS, ACT2_TOWN] {
+    for id in [ACT1_TOWN, BLOOD_MOOR, COLD_PLAINS, ACT2_TOWN] {
         drlg.levels[id as usize].drlg_type = 2;
         drlg.levels[id as usize].level_type = 1;
     }
+    // The town and the Blood Moor see each other through vis slot 0, a
+    // border (warp −1, `drlg/rooms.md` §3.3): each one's room carries
+    // flag WARP_0 ([`Types`]).
+    drlg.levels[ACT1_TOWN as usize].vis[0] = BLOOD_MOOR;
+    drlg.levels[BLOOD_MOOR as usize].vis[0] = ACT1_TOWN;
     drlg
 }
 
 /// The synthetic level types: one 8×8-tile floor room in the Rogue
 /// Encampment (the game entry's town, at tile (16, 0): levels of one act
-/// do not overlap), one in Cold Plains and one in Lut Gholein.
+/// do not overlap), one in the Blood Moor east of it (tile (24, 0), a
+/// level border), one in Cold Plains and one in Lut Gholein.
 fn synthetic_types() -> Types {
     Types(BTreeMap::from([
         (ACT1_TOWN, TileRect::new(16, 0, 8, 8)),
+        (BLOOD_MOOR, TileRect::new(24, 0, 8, 8)),
         (COLD_PLAINS, TileRect::new(0, 0, 8, 8)),
         (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
     ]))
@@ -852,6 +976,12 @@ pub fn client_level_rows(data: &GameData) -> Vec<LevelRow> {
         .collect()
 }
 
+/// The levels' waypoint indexes (`levels` `Waypoint`,
+/// `world/waypoints.md` §1) for the client's waypoint menu.
+pub fn client_waypoint_map(data: &GameData) -> d2_sim::world::waypoints::WaypointMap {
+    d2_sim::world::waypoints::WaypointMap::new(&data.tables().levels)
+}
+
 /// `difficultylevels` `ResistPenalty` per row (difficulty), from the
 /// user's `.bin` set: the expansion resist penalty of the character
 /// panel (`ui/panels.md` §8.9, `0x00611D30`; `panels-2.md` §24 r2), for
@@ -906,22 +1036,7 @@ pub fn client_skill_rows(archives: &ArchiveSet) -> Result<Vec<SkillRow>, BuildEr
         .table("skills")
         .ok_or_else(|| BuildError::Tables("skills not loaded".to_owned()))?;
     let rows: Vec<Skills> = decode_all(table).map_err(|e| BuildError::Tables(e.to_string()))?;
-    Ok(rows
-        .iter()
-        .map(|s| SkillRow {
-            anim: s.anim,
-            monanim: s.monanim,
-            passivestate: s.passivestate,
-            maxlvl: s.maxlvl,
-            charclass: s.charclass as i8,
-            srvdofunc: s.srvdofunc as i16,
-            enhanceable: s.enhanceable,
-            skilldesc: s.skilldesc,
-            etype: s.etype,
-            range: s.range,
-            flags: crate::bridge::combat::skill_flags(s),
-        })
-        .collect())
+    Ok(rows.iter().map(super::skill_rest::skill_row).collect())
 }
 
 /// Each class's `charstats` `Skill 1`…`Skill 10` (`client/msg-skills.md`
@@ -932,15 +1047,7 @@ pub fn client_class_skills(archives: &ArchiveSet) -> Result<Vec<[u16; 10]>, Buil
         .table("charstats")
         .ok_or_else(|| BuildError::Tables("charstats not loaded".to_owned()))?;
     let rows: Vec<Charstats> = decode_all(table).map_err(|e| BuildError::Tables(e.to_string()))?;
-    Ok(rows
-        .iter()
-        .map(|c| {
-            [
-                c.skill_1, c.skill_2, c.skill_3, c.skill_4, c.skill_5, c.skill_6, c.skill_7,
-                c.skill_8, c.skill_9, c.skill_10,
-            ]
-        })
-        .collect())
+    Ok(rows.iter().map(super::skill_rest::class_skills).collect())
 }
 
 /// The `monstats` / `monstats2` columns of the client monster set-up
@@ -1237,6 +1344,18 @@ pub fn build_with(
     seed: u32,
     character: Character,
 ) -> Result<LocalGame, BuildError> {
+    build_with_chests(data, seed, character, &[])
+}
+
+/// [`build_with`] plus a synthetic chest (`SYNTHETIC_CHEST_CLASS`) in the
+/// town's first room at each sub-tile offset from the room origin
+/// (synthetic data only; the end-to-end tests of world objects).
+pub fn build_with_chests(
+    data: &GameData,
+    seed: u32,
+    character: Character,
+    chests: &[(i32, i32)],
+) -> Result<LocalGame, BuildError> {
     let wp_tables = data.tables();
     let (mut levels, parts) = match data {
         GameData::Synthetic => (LevelSource::synthetic(), GameParts::synthetic(&wp_tables)?),
@@ -1273,7 +1392,8 @@ pub fn build_with(
     );
     hooks.anim_data = parts.anim;
     hooks.vitals = parts.vitals;
-    // The client vitals sync and the stat changes with it (level, points).
+    // The client vitals sync (`combat/vitals.md` §5.1): life, mana,
+    // stamina and position sent to the client at the end of each tick.
     hooks.enable_vitals_sync();
     // Game entry places through the path provider; on before any unit is
     // allocated.
@@ -1362,6 +1482,16 @@ pub fn build_with(
             v.allocate(g, &req, ox + WAYPOINT_X, oy + UNIT_Y)
         })
         .ok_or_else(|| BuildError::Setup("allocating the waypoint object failed".into()))?;
+    for &(dx, dy) in chests {
+        let chest = AllocRequest {
+            class: SYNTHETIC_CHEST_CLASS,
+            mode: 0,
+            ..req
+        };
+        sim.action
+            .with(&mut game, |g, v| v.allocate(g, &chest, ox + dx, oy + dy))
+            .ok_or_else(|| BuildError::Setup("allocating a chest failed".into()))?;
+    }
     let waypoint_guid = game
         .lists
         .unit(waypoint)
@@ -1370,6 +1500,9 @@ pub fn build_with(
     // The wired host on the created controls.
     let action = ActionWorld {
         waypoints: Some(WaypointData::new(&wp_tables.levels, &wp_tables.objects)),
+        // The skill handlers (C→S 0x05–0x11, 0x3A–0x3C) on the action
+        // wiring, their open seams on `LocalSeams` (`super::skill_rest`).
+        skills: WiredSkills::default(),
         ..ActionWorld::default()
     };
     let rest = AppRest {
@@ -1393,6 +1526,7 @@ pub fn build_with(
     // fills in `PreviewMoveRest`): the new character's start items.
     world.inventory = parts.inventory.map(preview_inv_parts);
     let mut s: Sim = SimGame::with_world(game, sim, world);
+    s.set_host_sync(sync_seams);
     // The session sequence (`intents-events.md` §8) runs on the client's
     // C→S 0x67 / 0x6B: game creation (the client record, 0x01, 0x00,
     // 0x02; state 1), then the join (this loader, the player's add
@@ -1546,6 +1680,16 @@ fn loader(
         let rest = &mut s.world.rest;
         rest.quests.insert(player, quests);
         rest.names.insert(player, name[..n].to_vec());
+        // The point parser reads the staged position (`point_state`); the
+        // tick moves it to the path's ([`WorldHost::unit_positions`]).
+        s.set_unit(
+            player,
+            d2_server::adapters::UnitFacts {
+                act: 0,
+                pos: d2_server::seams::Pos { x: 0, y: 0 },
+                owner: None,
+            },
+        );
         s.set_player(
             player,
             PlayerFields {
@@ -1592,9 +1736,20 @@ pub fn start_with<C: Clock + Send + 'static>(
     character: Character,
     clock: C,
 ) -> Result<(ThreadLink<Link<C>>, Started), BuildError> {
+    start_with_chests(data, seed, character, clock, Vec::new())
+}
+
+/// [`start_with`] with synthetic chests ([`build_with_chests`]).
+pub fn start_with_chests<C: Clock + Send + 'static>(
+    data: GameData,
+    seed: u32,
+    character: Character,
+    clock: C,
+    chests: Vec<(i32, i32)>,
+) -> Result<(ThreadLink<Link<C>>, Started), BuildError> {
     let (tx, rx) = std::sync::mpsc::channel();
     let link = ThreadLink::spawn(move || {
-        let g = build_with(&data, seed, character)?;
+        let g = build_with_chests(&data, seed, character, &chests)?;
         let _ = tx.send(Started {
             waypoint: g.waypoint,
             waypoint_guid: g.waypoint_guid,

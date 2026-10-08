@@ -382,6 +382,9 @@ impl Fx {
         let player = alloc(UnitType::Player, CLASS, START);
         // Players are allocated in mode 0; neutral (`units.md` §2).
         events.sys.units.get_mut(player).unwrap().mode = 1;
+        // Staged as already announced to the client (the room clean-up
+        // cleared unit flag 0x10, `intents-events.md` §7.1 rule 2.1).
+        events.sys.units.get_mut(wp).unwrap().flags &= !d2_sim::units::record::flags::SEED_SET;
         events.with(&mut game, |_, v| {
             v.set_base(player, STAT_VELOCITY, 100);
             v.set_base(player, STAT_STAMINA, STAMINA);

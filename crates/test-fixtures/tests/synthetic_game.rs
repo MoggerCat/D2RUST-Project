@@ -1054,7 +1054,7 @@ fn save_named() -> d2_formats::d2s::D2s {
     }
 }
 
-// Covers: specs/formats/d2s-load.md §2 r1; specs/formats/d2s.md §9 r4, §2.2 r8
+// Covers: specs/formats/d2s-load.md §2 r1; specs/formats/d2s.md §9 r4, §2.2 r8; specs/sim/intents-events.md §8.2 r3; specs/client/msg-skills.md §3 r1, §2 r8
 #[test]
 fn a_full_save_loads_before_the_join_sequence() {
     use d2_formats::d2s::{StatEntry, Stats};
@@ -1078,9 +1078,21 @@ fn a_full_save_loads_before_the_join_sequence() {
     ]);
     let mut report = None;
     let mut life = None;
+    let mut native = None;
+    let vitals = data().vitals().unwrap();
     let j = join_with(|s, player| {
+        if s.events.action.hooks().vitals.is_none() {
+            s.events.action.hooks().vitals = Some(std::sync::Arc::new(vitals.clone()));
+        }
         let (p, r) = enter_game_from_save(s, CLIENT, &save, &LoadContext::default())
             .expect("loaded and placed");
+        native = s
+            .events
+            .action
+            .hooks()
+            .skill_lists
+            .get(&player)
+            .map(|l| l.base_levels());
         assert_eq!(p, player);
         let v = &s.events.action.sys.stats;
         assert_eq!(v.unit_base(player, 14, 0), 0, "gold over the limit → 0");
@@ -1111,13 +1123,20 @@ fn a_full_save_loads_before_the_join_sequence() {
     );
     // The session sequence follows the load unchanged (`intents-events.md`
     // §8): game creation, then the join (no player record given: no 0x5F,
-    // no 0x23).
-    let ids: Vec<u8> = j.received.iter().take(8).map(|m| m[0]).collect();
-    assert_eq!(ids, [0x01, 0x00, 0x02, 0x59, 0xAA, 0x76, 0x0B, 0x95]);
-    assert_eq!(j.received[8][0], 0x03);
+    // no 0x23). The skills section's S→C 0x94 follows the add messages
+    // (§8.2 rule 3.1 (b)), with the list the player init made
+    // (`msg-skills.md` §2 rule 8: skill 0, then the fixture class's only
+    // `Skill 1`…`Skill 10` id, Attack again, so rule 1 raises it to base
+    // 2): `94 01 <guid> 0000 02`.
+    assert_eq!(native, Some(vec![(0, 2)]));
+    let ids: Vec<u8> = j.received.iter().take(9).map(|m| m[0]).collect();
+    assert_eq!(ids, [0x01, 0x00, 0x02, 0x59, 0xAA, 0x76, 0x94, 0x0B, 0x95]);
+    let g = j.guid.to_le_bytes();
+    assert_eq!(j.received[6], [0x94, 1, g[0], g[1], g[2], g[3], 0, 0, 2]);
+    assert_eq!(j.received[9][0], 0x03);
 }
 
-// Covers: specs/formats/d2s-load.md §1 r1, §8 r1, §8 r3; specs/sim/intents-events.md §8.2 r7
+// Covers: specs/formats/d2s-load.md §1 r1, §8 r1, §8 r3; specs/sim/intents-events.md §8.2 r7; specs/client/msg-skills.md §2 r8
 #[test]
 fn a_stub_starts_a_new_character_before_the_join_sequence() {
     use d2_server::adapters::character::LoadContext;
@@ -1132,6 +1151,7 @@ fn a_stub_starts_a_new_character_before_the_join_sequence() {
         .clone();
     let mut report = None;
     let mut portals = Vec::new();
+    let mut list = None;
     let j = join_with(|s, player| {
         if s.events.action.hooks().vitals.is_none() {
             s.events.action.hooks().vitals = Some(std::sync::Arc::new(vitals.clone()));
@@ -1139,6 +1159,7 @@ fn a_stub_starts_a_new_character_before_the_join_sequence() {
         portals = s.events.action.hooks().drlg.data.portal_levels();
         let (_, r) = enter_game_from_save(s, CLIENT, &stub, &LoadContext::default())
             .expect("started and placed");
+        list = s.events.action.hooks().skill_lists.get(&player).cloned();
         let v = &s.events.action.sys.stats;
         // The creation stats (`vitals.md` §1).
         assert_eq!(v.unit_base(player, 0, 0), i32::from(cs.str));
@@ -1175,10 +1196,22 @@ fn a_stub_starts_a_new_character_before_the_join_sequence() {
         .collect();
     let n = stats.len();
     assert!(stats.contains(&&vec![0x1D, 0, cs.str]), "{stats:02X?}");
-    assert_eq!(j.received[9 + n], hand(1, [0, 0], [0; 4]));
-    assert_eq!(j.received[10 + n], hand(0, k, [0; 4]));
+    // PROVISIONAL (`d2s-load.md` §8 r3, REC-02): d2rs sends item −1, not
+    // the static reading's 0.
+    assert_eq!(j.received[9 + n], hand(1, [0, 0], [0xFF; 4]));
+    assert_eq!(j.received[10 + n], hand(0, k, [0xFF; 4]));
     let again: Vec<&Vec<u8>> = j.received[11 + n..11 + 2 * n].iter().collect();
     assert_eq!(again, stats);
+    // The server player init's native skills (`msg-skills.md` §2 rule 8):
+    // skill 0, then the fixture's only `Skill 1`…`Skill 10` id, Attack
+    // again (rule 1: base 2), owner −1, in both hands. The stub load reads no skills section, so the
+    // join has no S→C 0x94 (`intents-events.md` §8.2 rule 3.1).
+    let list = list.expect("the player has a server skill list");
+    assert_eq!(list.base_levels(), [(0, 2)]);
+    assert_eq!((list.left, list.right), (Some(0), Some(0)));
+    assert!(j.received.iter().all(|m| m[0] != 0x94));
+    // `StartSkill` is not a native skill (it comes with the start items'
+    // stat 107, which has no provider): "has skill" stays unapplied.
     let steps: Vec<_> = r.unapplied.iter().map(|u| u.step).collect();
     assert_eq!(
         steps,

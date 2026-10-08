@@ -345,10 +345,17 @@ impl Fx {
             mode: 1,
             allied: ty == UnitType::Player,
         };
-        self.sim
+        let u = self
+            .sim
             .events
             .with(&mut self.sim.game, |g, v| v.allocate(g, &req, x, y))
-            .expect("allocated")
+            .expect("allocated");
+        // Staged as already known to the clients: the room clean-up has
+        // cleared unit flag 0x10, so the client pass announces nothing
+        // (`intents-events.md` §7.1 rule 2.1).
+        self.sim.events.sys.units.get_mut(u).unwrap().flags &=
+            !d2_sim::units::record::flags::SEED_SET;
+        u
     }
 
     /// A player (neutral, velocity percent 100, stamina 0x6400) for

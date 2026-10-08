@@ -92,6 +92,8 @@ pub struct WorldViewState {
     /// The game's automap (`ui/automap.md`), when the app supplied its
     /// tables; `None`: no automap.
     pub automap: Option<crate::ui::automap::session::AutomapSession>,
+    /// The automap's draw sink (`super::automap_view`); `None`: not drawn.
+    pub automap_view: Option<super::automap_view::AutomapView>,
     /// The play preview (decision D1, [`super::preview`]): a frame whose
     /// build fails is logged (each message once) and not presented,
     /// instead of failing the app. `false`: strict (M07).
@@ -124,6 +126,7 @@ impl WorldViewState {
             last: None,
             click: Default::default(),
             automap: None,
+            automap_view: None,
             preview: false,
             preview_error: None,
             last_tags: Vec::new(),
@@ -530,6 +533,7 @@ fn world_view_frame(
     mut images: ResMut<Assets<Image>>,
     mut sounds: Option<ResMut<UiSounds>>,
     mut walk: Option<ResMut<PreviewWalk>>,
+    mut exit: MessageWriter<AppExit>,
 ) -> Result {
     let tick = bridge.0.world().server_ticks;
     if tick == 0 || state.last.is_some_and(|l| l.server_tick == tick) {
@@ -566,6 +570,10 @@ fn world_view_frame(
                     s.0.extend(outcome.sounds);
                 }
                 state.feed.set_ui_open_mode(original.open_mode());
+                // The Esc menu's "Save and Exit Game" (d2rs-own, unverified).
+                if original.take_exit_request() {
+                    crate::app::save::request_save_and_exit(&mut exit);
+                }
             }
             if let Some(art) = &ui.art {
                 art.ensure(&frame.draws, &mut state.assets)?;
@@ -586,7 +594,7 @@ fn world_view_frame(
                 // `0x00454970()` is not specified: the play area H − 40.
                 skill_y_limit: crate::rules::camera::FrameSize::D2RS.play_height(),
                 mouse,
-                game_menu_open: false,
+                game_menu_open: ui.original.as_ref().is_some_and(|o| o.is_open(9)),
                 // d2rs-own, unverified (D1): the preview's hover pick.
                 pick: state.preview,
             };
@@ -682,6 +690,15 @@ fn world_view_frame(
         &mut frame,
     ) {
         warn!("preview (d2rs-own, unverified): {m}");
+    }
+    // `ui/automap.md` §10: the open automap's draw pass.
+    if let (Some(a), Some(v)) = (state.automap.as_mut(), state.automap_view.as_mut()) {
+        let world = bridge.0.world();
+        if let Ok(mode) = state.feed.open_mode(world) {
+            for m in v.add_to_frame(a, world, mode, &mut state.assets, &mut frame) {
+                warn!("preview (d2rs-own, unverified): {m}");
+            }
+        }
     }
     // `ui/automap.md` §5 r1: the reveal of this frame, after the draw
     // marked its records (from the frame `0x0044C7EB`).

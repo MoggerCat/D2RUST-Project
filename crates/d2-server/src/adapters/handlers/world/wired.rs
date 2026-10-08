@@ -745,12 +745,25 @@ where
         Some(out)
     }
 
+    fn unit_positions(&mut self, events: &mut D, units: &[UnitId]) -> Vec<(UnitId, (i32, i32))> {
+        WorldHost::<D>::unit_positions(&mut self.action, events, units)
+    }
+
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
         let out = self.lend_quests(events, |a, ev| WorldHost::<D>::walk(a, game, ev, call));
         self.pet_deaths(game, events);
         self.hireling_calls(game, events);
         self.pet_follows(game, events);
         out
+    }
+
+    fn live_facts(
+        &mut self,
+        game: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<crate::adapters::UnitFacts> {
+        WorldHost::<D>::live_facts(&mut self.action, game, events, unit)
     }
 
     fn vitals_sync(

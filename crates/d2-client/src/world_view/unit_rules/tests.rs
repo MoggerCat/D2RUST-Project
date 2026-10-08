@@ -16,8 +16,13 @@ use crate::world_view::{build, Unspecified};
 /// given layers (component, weapon class), animation rate 256 (one frame
 /// per tick), each frame drawing the layers in order.
 fn cof_bytes(frames: u8, layers: &[u8]) -> Vec<u8> {
+    cof_dirs(1, frames, layers)
+}
+
+/// [`cof_bytes`] with `dirs` directions.
+fn cof_dirs(dirs: u8, frames: u8, layers: &[u8]) -> Vec<u8> {
     let l = layers.len() as u8;
-    let mut v = vec![l, frames, 1, 20, 0, 0, 0, 0];
+    let mut v = vec![l, frames, dirs, 20, 0, 0, 0, 0];
     for x in [-10i32, 10, -20, 0] {
         v.extend_from_slice(&x.to_le_bytes());
     }
@@ -27,7 +32,7 @@ fn cof_bytes(frames: u8, layers: &[u8]) -> Vec<u8> {
         v.extend_from_slice(b"hth\0");
     }
     v.extend(std::iter::repeat_n(0, usize::from(frames)));
-    for _ in 0..frames {
+    for _ in 0..usize::from(frames) * usize::from(dirs) {
         v.extend_from_slice(layers);
     }
     v
@@ -254,7 +259,7 @@ fn an_object_loads_draws_and_animates() {
     }
 }
 
-// Covers: specs/render/unit-composite.md §2 r4, §5 r2
+// Covers: specs/render/unit-composite.md §2 r4, §5 r2, §5.1 r3, §6 r4
 #[test]
 fn missing_files_are_skipped_with_one_log_line() {
     let mut src = MemorySource::default();
@@ -271,10 +276,85 @@ fn missing_files_are_skipped_with_one_log_line() {
     }
     let mut a = assets();
     let log = loader.ensure(&world, &mut a);
-    assert_eq!(log.len(), 3, "{log:?}");
+    // The missing COF is logged; the component files in no archive are
+    // the normal empty slots of §6 r4 (no line).
+    assert_eq!(log.len(), 1, "{log:?}");
+    assert!(log[0].contains("QMQNqwc.COF"), "{log:?}");
+    assert_eq!(rules.art.read().unwrap().files.len(), 2, "both remembered");
     assert!(loader.ensure(&world, &mut a).is_empty(), "never retried");
     // The player draws (no component has a file), the monster is hidden.
     let built = build(&world, &[], &rules, &a).unwrap();
     assert_eq!((built.units_drawn, built.units_hidden), (1, 1));
     assert!(built.items.is_empty());
+}
+
+// Covers: specs/render/unit-composite.md §5.1 r3, §6 r4
+#[test]
+fn an_unreadable_component_file_is_logged() {
+    let mut src = MemorySource::default();
+    src.insert(
+        "data\\global\\chars\\QA\\cof\\QAQNhth.cof",
+        cof_bytes(1, &[1]),
+    );
+    src.insert(
+        "data\\global\\chars\\QA\\QT\\QAQTlitQNhth.dcc",
+        vec![1, 2, 3],
+    );
+    let (loader, _) = setup(src);
+    let mut world = ClientWorld::default();
+    let p = unit(PLAYER, 1, 0, 1);
+    world.units.insert(p.key, p);
+    let log = loader.ensure(&world, &mut assets());
+    assert_eq!(log.len(), 1, "{log:?}");
+    assert!(log[0].contains("QAQTlitQNhth.dcc"), "{log:?}");
+}
+
+// Covers: specs/render/unit-composite.md §3 r1, §3 r3, §3 r4; specs/sim/pathing.md §8.3; specs/client/model.md §8 r4
+#[test]
+fn units_face_their_walk_target_and_keep_the_facing() {
+    let mut src = MemorySource::default();
+    src.insert(
+        "data\\global\\chars\\QA\\cof\\QAQNhth.cof",
+        cof_dirs(16, 1, &[1]),
+    );
+    let (loader, rules) = setup(src);
+    let mut world = ClientWorld::default();
+    let mut remote = unit(PLAYER, 1, 0, 1);
+    // 0x0F walk to (20, 10): east, dir64 56 (pathing case D1).
+    remote.last_mode_request = Some(crate::bridge::world::ModeRequest {
+        code: 0x01,
+        record: [20, 10, 0, 0, 0, 0, 0],
+    });
+    let local = unit(PLAYER, 2, 0, 1);
+    world.units.insert(remote.key, remote.clone());
+    world.units.insert(local.key, local.clone());
+    world.local_player = Some(local.key);
+    let mut a = assets();
+    loader.ensure(&world, &mut a);
+    let dir = |w: &ClientWorld, u: &ClientUnit| rules.unit_pose(w, u).unwrap().unwrap().dir;
+    // Remote player: n = 8 on a 16-direction COF, 56 snaps to 56 (table
+    // 0, 0, 2, 2, … on 56 >> 2 = 14 → 14 << 2), cof_dir 14.
+    assert_eq!(dir(&world, &remote), 14);
+    // No facing known: 0.
+    assert_eq!(dir(&world, &local), 0);
+    // The local player's predicted facing (n = 16): dir64 6 → cof_dir 2
+    // (§3 test vector).
+    rules.art.write().unwrap().pose_dir = Some((local.key, 6));
+    assert_eq!(dir(&world, &local), 2);
+
+    // The remote player arrives and its request is spent: the facing
+    // stays (the position change (10, 10) → (20, 10) is east as well).
+    let r = world.units.get_mut(&remote.key).unwrap();
+    r.position = Some((20, 10));
+    r.last_mode_request = None;
+    loader.ensure(&world, &mut a);
+    assert_eq!(dir(&world, &remote), 14);
+    // Standing still: kept.
+    loader.ensure(&world, &mut a);
+    assert_eq!(dir(&world, &remote), 14);
+    // A placement north (0x15) turns it: (20, 10) → (20, 0) is dir64 40,
+    // cof_dir 10.
+    world.units.get_mut(&remote.key).unwrap().position = Some((20, 0));
+    loader.ensure(&world, &mut a);
+    assert_eq!(dir(&world, &remote), 10);
 }

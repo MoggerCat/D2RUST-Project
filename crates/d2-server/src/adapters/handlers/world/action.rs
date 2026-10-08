@@ -160,6 +160,15 @@ where
         )
     }
 
+    fn unit_positions(&mut self, events: &mut D, units: &[UnitId]) -> Vec<(UnitId, (i32, i32))> {
+        let hooks = events.action().hooks();
+        units
+            .iter()
+            .filter(|&&u| hooks.path_has(u))
+            .map(|&u| (u, hooks.path_position(u)))
+            .collect()
+    }
+
     /// The 0x13 object case on the action wiring's object state
     /// (`ActionSim::operate_object_message`; `None` until
     /// `ActionSim::create_objects` ran). The object calls' host tick is
@@ -196,6 +205,34 @@ where
     /// `handlers::walk::run` (the path provider of the action wiring).
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
         super::super::walk::run(game, events, call)
+    }
+
+    /// A player, monster or object in a room: the room's act and the
+    /// unit's position (path, or the seam's staged position without the
+    /// path provider; `pathing.md` §2.1). Items and missiles: none (an
+    /// item's owner is not read here).
+    fn live_facts(
+        &mut self,
+        game: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<crate::adapters::UnitFacts> {
+        let e = game.lists.unit(unit)?;
+        if !matches!(
+            e.ty,
+            d2_sim::units::UnitType::Player
+                | d2_sim::units::UnitType::Monster
+                | d2_sim::units::UnitType::Object
+        ) {
+            return None;
+        }
+        let act = game.lists.room(e.room()?)?.act;
+        let (x, y) = events.action().hooks().path_position(unit);
+        Some(crate::adapters::UnitFacts {
+            act,
+            pos: crate::seams::Pos { x, y },
+            owner: None,
+        })
     }
 
     /// `d2_sim::wiring::action::vitals_sync::run` on the action wiring
