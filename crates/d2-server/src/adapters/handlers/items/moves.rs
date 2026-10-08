@@ -24,7 +24,7 @@
 
 use d2_sim::game::Game;
 use d2_sim::items::inventory::InvTables;
-use d2_sim::items::moves::{self as sim_moves, MoveFatal, MoveUnits, Owner, HANDLED};
+use d2_sim::items::moves::{self as sim_moves, mode::GROUND, MoveFatal, MoveUnits, Owner, HANDLED};
 use d2_sim::tick::EventDispatch;
 use d2_sim::units::lifecycle::LifecycleHooks;
 use d2_sim::units::sound::sound_message;
@@ -365,6 +365,9 @@ struct Receiver {
     client: ClientId,
     own: UnitId,
     players: Vec<UnitId>,
+    /// Item units of the client's rooms not yet announced to it (the
+    /// ground items' part of the unit update, §6.3 part 1).
+    ground: Vec<UnitId>,
 }
 
 /// The update pass of one tick.
@@ -400,7 +403,11 @@ impl UpdateRun {
     }
 }
 
-type UpdateOut = (Vec<(ClientId, Vec<u8>)>, Vec<(ClientId, MoveFatal)>);
+type UpdateOut = (
+    Vec<(ClientId, Vec<u8>)>,
+    Vec<(ClientId, MoveFatal)>,
+    Vec<(ClientId, UnitId)>,
+);
 
 impl MoveCall for UpdateRun {
     type Out = UpdateOut;
@@ -410,6 +417,7 @@ impl MoveCall for UpdateRun {
         let sounds = self.sounds(econ.game);
         let mut d = parts.desk(econ);
         let (mut sent, mut fatal) = (Vec::new(), Vec::new());
+        let mut announced = Vec::new();
         let mut sounds = sounds.into_iter();
         for r in &self.receivers {
             let own = d.guid_of(r.own);
@@ -423,6 +431,18 @@ impl MoveCall for UpdateRun {
                 // 0x48, flag 0x400 → `0x00571740` (S→C 0x2C).
                 if let Some(m) = sounds.next().flatten() {
                     sent.push((r.client, m.to_vec()));
+                }
+            }
+            // The ground items of the client's rooms (§6.3 part 1, the
+            // unit-add 0x9C of `0x00571F90`); d2rs-own, unverified.
+            for &u in &r.ground {
+                let guid = d.guid_of(u);
+                if d.unit_exists(Owner::item(guid)) && d.mode(guid) == GROUND {
+                    match sim_moves::announce_item(&d, guid) {
+                        Ok(m) => sent.push((r.client, m)),
+                        Err(e) => fatal.push((r.client, e)),
+                    }
+                    announced.push((r.client, u));
                 }
             }
         }
@@ -444,7 +464,7 @@ impl MoveCall for UpdateRun {
         }
         // The desk's borrow of the economy ends here.
         self.clear_sounds(econ.game);
-        (sent, fatal)
+        (sent, fatal, announced)
     }
 }
 
@@ -503,10 +523,23 @@ pub fn update_pass<D: EventDispatch, W: WorldHost<D>>(
                     .map(|&(p, _)| p)
             })
             .collect();
+        let ground: Vec<UnitId> = adjacent
+            .iter()
+            .filter(|_| sim.announce_ground)
+            .flat_map(|&room| sim.game.lists.room_units(room))
+            .filter(|&u| {
+                sim.game
+                    .lists
+                    .unit(u)
+                    .is_some_and(|e| e.ty == d2_sim::units::UnitType::Item)
+                    && !sim.announced_ground.contains(&(c, u))
+            })
+            .collect();
         receivers.push(Receiver {
             client: c,
             own,
             players: seen,
+            ground,
         });
     }
     let run = UpdateRun {
@@ -515,7 +548,7 @@ pub fn update_pass<D: EventDispatch, W: WorldHost<D>>(
     };
     let (game, events) = (&mut sim.game, &mut sim.events);
     let sound_only = run.clone();
-    let Some((sent, fatal)) = sim.world.moves(game, events, run) else {
+    let Some((sent, fatal, announced)) = sim.world.moves(game, events, run) else {
         // A host without inventory parts: no item messages; the players'
         // sounds still leave (`cube.md` §8 rule 3) and are cleared.
         let mut sounds = sound_only.sounds(&sim.game).into_iter();
@@ -540,6 +573,7 @@ pub fn update_pass<D: EventDispatch, W: WorldHost<D>>(
     for (c, e) in fatal {
         sim.tick_faults.push((c, WorldError::Move(e)));
     }
+    sim.announced_ground.extend(announced);
 }
 
 #[cfg(test)]

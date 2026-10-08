@@ -2917,6 +2917,7 @@ pub fn build_with_town(
     // reward path yet.
     world.start_extra = vec![*b"box "];
     let mut s: Sim = SimGame::with_world(game, sim, world);
+    s.announce_ground = true;
     s.set_host_sync(sync_seams);
     s.set_world_sync(super::weapons::sync);
     // The session sequence (`intents-events.md` §8) runs on the client's
