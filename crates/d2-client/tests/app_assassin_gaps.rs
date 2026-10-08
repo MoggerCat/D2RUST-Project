@@ -403,10 +403,16 @@ fn a_lightning_sentry_fires_its_missile() {
         r.step(1);
         // The host has no missile damage setup yet (`0x0059F900`, skills
         // spec): the missile gets its damage here, as the e2e tests do.
-        let (n, x) = r.with(|sim, _| {
+        let (n, x) = r.with(move |sim, _| {
             let ms = sim.game.lists.units_of_type(UnitType::Missile);
             let mut x = 0;
             sim.events.action.with(&mut sim.game, |_, v| {
+                // The hit test draws from the trap's seed (`hit_test`,
+                // chance 5–95): the roll is not under test, so the seed
+                // is pinned to a hit (first step 0) instead of whatever
+                // the town's allocations left it at (Warriv, REC-280,
+                // moved it onto a miss).
+                v.seed(trap).set(0, 0);
                 for &mi in &ms {
                     v.set_base(mi, 21, 2560);
                     v.set_base(mi, 22, 2560);

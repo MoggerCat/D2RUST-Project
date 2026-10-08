@@ -663,7 +663,12 @@ fn the_synthetic_play_join_is_clean() {
         .keys()
         .filter(|k| k.unit_type == MONSTER)
         .count();
-    assert_eq!(npcs, 4, "the town's four NPCs");
+    // Akara, Kashya, Gheed, Charsi and Warriv (REC-280).
+    assert_eq!(
+        npcs,
+        d2_client::app::town_npcs::ACT1.len(),
+        "the town's NPCs"
+    );
 }
 
 // Covers: specs/skills/use.md §5; specs/combat/vitals.md §4
