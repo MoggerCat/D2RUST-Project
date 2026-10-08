@@ -318,6 +318,28 @@ pub struct PlayConfig {
 #[derive(Resource)]
 struct ExitAfter(u32);
 
+/// What `run` does once `app.run()` returned: first the leave through
+/// the server ([`leave_game`]: every way out saves, `flows/save-exit.md`
+/// §2), then the automap teardown. Nothing here needs a resource to exist:
+/// a missing [`BridgeResource`] leaves nothing (`Ok(false)`), a missing
+/// [`WorldViewState`] has no automap to tear down. Returns
+/// [`leave_game`]'s result.
+pub fn after_run(world: &mut bevy::ecs::world::World) -> Result<bool, BridgeError> {
+    let left = match world.get_resource_mut::<BridgeResource>() {
+        Some(mut b) => leave_game(&mut b.0),
+        None => Ok(false),
+    };
+    if let Some(a) = world
+        .get_resource_mut::<WorldViewState>()
+        .and_then(|s| s.into_inner().automap.as_mut())
+    {
+        if let Err(e) = a.teardown() {
+            eprintln!("play: the automap was NOT saved: {e}");
+        }
+    }
+    left
+}
+
 /// Leaves the game through the server after the app stopped
 /// (`flows/save-exit.md` §1 r2 – §4 r1): a client still in game sends
 /// C→S 0x69 ([`Bridge::save_and_exit`]) and runs bridge frames until the
@@ -561,20 +583,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             .add_systems(Update, exit_after);
     }
     let exit = app.run();
-    if let Some(a) = app
-        .world_mut()
-        .resource_mut::<WorldViewState>()
-        .automap
-        .as_mut()
-    {
-        if let Err(e) = a.teardown() {
-            eprintln!("play: the automap was NOT saved: {e}");
-        }
-    }
-    // Every way out leaves through the server (`flows/save-exit.md` §2):
-    // a window closed in game sends the Save and Exit's 0x69 now, so the
-    // server's leave writes the character before its 0x05.
-    let left = leave_game(&mut app.world_mut().resource_mut::<BridgeResource>().0);
+    let left = after_run(app.world_mut());
     match (&saver, left) {
         (Some(h), Ok(true)) => println!(
             "play: left the game; the server's leave wrote {}",

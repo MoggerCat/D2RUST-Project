@@ -913,6 +913,21 @@ fn leave_saves_the_character_before_its_messages() {
     assert_eq!(faults(&host), []);
 }
 
+// Covers: specs/sim/tick.md §6 r3
+#[test]
+fn three_periods_of_ticks_save_three_times() {
+    let mut host = in_game_host();
+    let saves = with_recorder(&mut host);
+    let start = host.game.game.frame;
+    while host.game.game.frame < start + 3 * 8192 {
+        host.clock.0 += 40;
+        host.frame().expect("frame");
+        host.receive(CLIENT);
+    }
+    let frames: Vec<i32> = saves.lock().unwrap().iter().map(|s| s.1).collect();
+    assert_eq!(frames, [8192, 2 * 8192, 3 * 8192]);
+}
+
 // Covers: specs/flows/save-exit.md §2 r2
 #[test]
 fn a_refused_save_is_a_session_fault_and_the_leave_goes_on() {

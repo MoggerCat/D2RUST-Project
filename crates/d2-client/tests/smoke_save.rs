@@ -810,3 +810,32 @@ fn a_corpse_with_its_items_survives_save_and_reload() {
         "the corpse section of the next save"
     );
 }
+
+/// The app stops without Save and Exit (window close, `--frames`) and
+/// with no `WorldViewState` (q-fix-play-exit-resource): `play::after_run`
+/// still leaves through the server first, so the server's leave writes
+/// the file, and nothing panics.
+// Covers: specs/flows/save-exit.md §2 r2
+#[test]
+fn the_window_close_leaves_through_the_server_first() {
+    let dir = temp("close");
+    let file = dir.join("Close.d2s");
+    let character = single_player::new_character("sorceress", "Close").unwrap();
+    let mut run = Run::start(&character, &file);
+    assert!(!file.exists());
+    let world = run.app.world_mut();
+    assert!(world
+        .remove_resource::<d2_client::world_view::WorldViewState>()
+        .is_some());
+    assert!(d2_client::app::play::after_run(world).unwrap());
+    assert!(file.exists(), "the server's leave wrote the file");
+    assert!(run.with(|s| s.client_list().is_empty()), "the client left");
+    // M08: a second call has nobody in game to leave.
+    assert!(d2_client::app::play::after_run(run.app.world_mut()).unwrap());
+    let faults = run.with(|s| {
+        s.session()
+            .map(|f| format!("{:?}", f.faults))
+            .unwrap_or_default()
+    });
+    assert!(!faults.contains("Save"), "{faults}");
+}

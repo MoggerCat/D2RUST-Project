@@ -31,6 +31,18 @@ Branch `claude/q-fix-flow-save` (from `claude/q-tick-flow`, merged with
   (snapshot extended). M08: with the leave's save removed the leg fails at
   "the server's leave wrote the save".
 
+## q-save-audit rows taken here
+
+- `q-fix-save-autosave` (F12): the 8192-frame save above; through the
+  same `FileStore` (`write_file` keeps the `.bak`), by frame number;
+  `synthetic_game::three_periods_of_ticks_save_three_times` counts the
+  saves over 3 × 8192 frames (8192, 16384, 24576).
+- `q-fix-save-exit-order` (F13) and `q-fix-play-exit-resource`:
+  `play::after_run` leaves through the server first (the leave writes the
+  file), then tears the automap down; both through `get_resource_mut`, so
+  a missing `WorldViewState` or `BridgeResource` no longer panics;
+  `smoke_save::the_window_close_leaves_through_the_server_first`.
+
 ## Open
 
 - The save's inventory flag bit 1 clear (`inventory-moves.md` §6.1 r4).
