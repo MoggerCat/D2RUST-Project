@@ -378,6 +378,7 @@ impl<X: SkillRest> UseWorld for World<'_, '_, X> {
         UseRest::clear_target(self.x_mut(), u);
         UseRest::keep_target(self.x_mut(), u, target);
         self.with_sim(|sim, h| modes::animate(sim, h, u));
+        d2_sim::wiring::interaction::body_path::run_to_point(&mut self.u.cv.v, u, mode, target);
         if let Some(r) = self.u.cv.v.units.get_mut(u) {
             r.flags &= !flags::ATTACK_PENDING;
         }
