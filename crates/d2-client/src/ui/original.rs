@@ -386,6 +386,10 @@ impl OriginalUi {
             panel: Default::default(),
             seq: 0,
         }))?;
+        root.add(Box::new(stash_ui::StashUi {
+            sh: sh.clone(),
+            input: Default::default(),
+        }))?;
         root.add(Box::new(BorderUi { sh: sh.clone() }))?;
         root.add(Box::new(super::hire_list::HireListUi {
             st: self.hire.clone(),
@@ -1103,6 +1107,8 @@ pub mod hud_belt;
 
 #[path = "msg_ui.rs"]
 pub mod msg_ui;
+#[path = "stash_ui.rs"]
+pub(super) mod stash_ui;
 #[path = "waypoint_ui.rs"]
 pub mod waypoint_ui;
 pub use msg_ui::{

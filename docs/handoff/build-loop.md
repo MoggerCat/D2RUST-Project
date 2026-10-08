@@ -17,6 +17,8 @@ Method:
 2. Connect the links in order, each with a synthetic end-to-end test that fails before your change.
 3. If you finish early, stop. Don't start other features.
 
+Tests: never weaken an existing assertion to make it pass (for example turning `dropped.is_empty()` into "expect this message dropped"). If your change breaks an assertion, fix the cause; change an expectation only when the spec says the new value, and say why in the commit.
+
 Before each push: `cargo fmt --all`, `cargo clippy -p <crates touched> --all-targets -- -D warnings`, `cargo nextest run -p <crates touched>` (nextest, not `cargo test`: some d2-server tests need per-process temp dirs), and `python3 tools/coverage.py --check`.
 
 Every commit message ends with:

@@ -444,6 +444,16 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
 }
 
 impl Pending for LocalSeams {
+    /// d2rs-own, unverified (REC-108): mode DT and the treasure drop
+    /// ([`super::monster_drop::death_start`]).
+    fn monster_death_start(
+        h: &mut ActionHooks<Self>,
+        sim: &mut d2_sim::units::hooks::Sim<'_>,
+        unit: UnitId,
+        target: Option<UnitId>,
+    ) -> bool {
+        super::monster_drop::death_start(h, sim, unit, target)
+    }
     fn position(&self, unit: UnitId) -> (i32, i32) {
         self.pos.get(&unit).copied().unwrap_or_default()
     }
@@ -1462,7 +1472,34 @@ pub fn build_with_chests(
     character: Character,
     chests: &[(i32, i32)],
 ) -> Result<LocalGame, BuildError> {
-    let wp_tables = data.tables();
+    build_with_objects(data, seed, character, chests, None)
+}
+
+/// The stash object's class (`objects.txt` row 267, `world/objects.md`
+/// §16.10 `BANK_CLASS`) and its operate function (32, the bank).
+pub const STASH_CLASS: u32 = 267;
+const STASH_OPERATE: u8 = 32;
+
+/// [`build_with_chests`] plus, for synthetic data, a stash object
+/// ([`STASH_CLASS`]) in the town's first room at the sub-tile offset
+/// `stash` (the synthetic `objects` table is padded to the stash row).
+/// d2rs-own, unverified: the end-to-end tests of the stash.
+pub fn build_with_objects(
+    data: &GameData,
+    seed: u32,
+    character: Character,
+    chests: &[(i32, i32)],
+    stash: Option<(i32, i32)>,
+) -> Result<LocalGame, BuildError> {
+    let mut wp_tables = data.tables();
+    if stash.is_some() && matches!(data, GameData::Synthetic) {
+        wp_tables
+            .objects
+            .resize(STASH_CLASS as usize + 1, blank::<Objects>());
+        let row = &mut wp_tables.objects[STASH_CLASS as usize];
+        row.operatefn = STASH_OPERATE;
+        row.framecnt1 = 15 << 8;
+    }
     let (mut levels, parts) = match data {
         GameData::Synthetic => (LevelSource::synthetic(), GameParts::synthetic(&wp_tables)?),
         GameData::Live(d) => (LevelSource::live(d, seed), GameParts::live(d)?),
@@ -1600,6 +1637,16 @@ pub fn build_with_chests(
         sim.action
             .with(&mut game, |g, v| v.allocate(g, &chest, ox + dx, oy + dy))
             .ok_or_else(|| BuildError::Setup("allocating a chest failed".into()))?;
+    }
+    if let Some((dx, dy)) = stash {
+        let req = AllocRequest {
+            class: STASH_CLASS,
+            mode: 0,
+            ..req
+        };
+        sim.action
+            .with(&mut game, |g, v| v.allocate(g, &req, ox + dx, oy + dy))
+            .ok_or_else(|| BuildError::Setup("allocating the stash failed".into()))?;
     }
     let waypoint_guid = game
         .lists
@@ -1856,9 +1903,21 @@ pub fn start_with_chests<C: Clock + Send + 'static>(
     clock: C,
     chests: Vec<(i32, i32)>,
 ) -> Result<(ThreadLink<Link<C>>, Started), BuildError> {
+    start_with_objects(data, seed, character, clock, chests, None)
+}
+
+/// [`start_with_chests`] plus a stash ([`build_with_objects`]).
+pub fn start_with_objects<C: Clock + Send + 'static>(
+    data: GameData,
+    seed: u32,
+    character: Character,
+    clock: C,
+    chests: Vec<(i32, i32)>,
+    stash: Option<(i32, i32)>,
+) -> Result<(ThreadLink<Link<C>>, Started), BuildError> {
     let (tx, rx) = std::sync::mpsc::channel();
     let link = ThreadLink::spawn(move || {
-        let g = build_with_chests(&data, seed, character, &chests)?;
+        let g = build_with_objects(&data, seed, character, &chests, stash)?;
         let _ = tx.send(Started {
             waypoint: g.waypoint,
             waypoint_guid: g.waypoint_guid,
