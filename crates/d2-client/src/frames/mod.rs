@@ -97,6 +97,9 @@ impl IndexFrame {
     }
 }
 
+/// The frame of block 0 in a DT1 tile's frame set ([`FrameSet::from_dt1`]).
+pub const DT1_BLOCK_FRAME0: usize = 1;
+
 /// Which part of a file a frame set holds (`assets.md` §A3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FramePart {
@@ -236,19 +239,32 @@ impl FrameSet {
         Ok(Self { frames })
     }
 
-    /// Tile `tile` of a DT1: its blocks assembled into one image by the
-    /// `map-preview.md` rule (`crate::map::tiles::assemble`).
+    /// Tile `tile` of a DT1: frame 0 is its blocks assembled into one
+    /// image by the `map-preview.md` rule (`crate::map::tiles::assemble`);
+    /// frame [`DT1_BLOCK_FRAME0`] + `i` is block `i` alone (offsets the
+    /// block's x, y), for the per-block draws of `render/shading.md` §4 r4
+    /// (each block lights only its own pixels). No blocks: no frames.
     pub fn from_dt1(dt1: &Dt1, tile: u32) -> Result<Self, FrameError> {
         let t = dt1.tiles.get(tile as usize).ok_or(FrameError::NoPart {
             part: FramePart::Tile(tile),
             count: dt1.tiles.len(),
         })?;
-        let frames = match crate::map::tiles::assemble(t) {
-            Some(img) => vec![IndexFrame::new(
-                img.width, img.height, img.x0, img.y0, img.pixels,
-            )?],
-            None => Vec::new(),
+        let Some(img) = crate::map::tiles::assemble(t) else {
+            return Ok(Self { frames: Vec::new() });
         };
+        let mut frames = vec![IndexFrame::new(
+            img.width, img.height, img.x0, img.y0, img.pixels,
+        )?];
+        for b in &t.blocks {
+            let (w, h) = b.size();
+            frames.push(IndexFrame::new(
+                w as u32,
+                h as u32,
+                i32::from(b.x),
+                i32::from(b.y),
+                b.pixels.clone(),
+            )?);
+        }
         Ok(Self { frames })
     }
 }

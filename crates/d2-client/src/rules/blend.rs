@@ -579,26 +579,20 @@ pub fn gdi_mode_value(mode: u8) -> u8 {
     }
 }
 
-/// A GDI rectangle (§8 r2, `0x006C8A60`). Each coordinate is clamped to
-/// `[0, W − 1]` (x) or `[0, H − 1]` (y); nothing is drawn (`None`) when
-/// `x0 = x1` or `y0 = y1`; `y1 < y0` is fatal 0x32 (checked after the
-/// empty test, in the spec's order); `x1 < x0` is fatal (the original's
-/// negative row width faults). Pixels:
-/// columns `x0 … x1 − 1`, rows `y0 … y1 − 1`, written by `k`
-/// ([`gdi_mode_value`]): 0 → `d' = color`; 1 → `d' = T[d]` (row 0 of `T`,
-/// column `d`: chain `[Z]` and the transposed read); 2 → `d' = T[256·d +
-/// color]`. `color_map` is the pushed [`color_row`] of the color.
-#[allow(clippy::too_many_arguments)]
-pub fn gdi_rectangle(
-    tables: &ShadeTables,
+/// The pixels a GDI rectangle covers (§8 r2, `0x006C8A60`): each
+/// coordinate is clamped to `[0, W − 1]` (x) or `[0, H − 1]` (y); `None`
+/// (nothing drawn) when `x0 = x1` or `y0 = y1`; `y1 < y0` is fatal 0x32
+/// (checked after the empty test, in the spec's order); `x1 < x0` is
+/// fatal (the original's negative row width faults). Else the top-left
+/// `(x0, y0)` and the size `(x1 − x0, y1 − y0)`: columns `x0 … x1 − 1`,
+/// rows `y0 … y1 − 1`.
+pub fn gdi_rectangle_box(
     size: FrameSize,
-    color_map: MapId,
     x0: i32,
     y0: i32,
     x1: i32,
     y1: i32,
-    mode: u8,
-) -> Result<Option<GdiDraw>, BlendError> {
+) -> Result<Option<(i32, i32, u32, u32)>, BlendError> {
     let cx = |v: i32| v.clamp(0, (size.width - 1).max(0));
     let cy = |v: i32| v.clamp(0, (size.height - 1).max(0));
     let (x0, y0, x1, y1) = (cx(x0), cy(y0), cx(x1), cy(y1));
@@ -611,14 +605,32 @@ pub fn gdi_rectangle(
     if x1 < x0 {
         return Err(BlendError::RectangleColumnsReversed { x0, x1 });
     }
-    let (w, h) = ((x1 - x0) as u32, (y1 - y0) as u32);
-    let table = mode_table(mode).map(|t| t.base(tables));
-    let (shade, blend) = match (gdi_mode_value(mode), table) {
-        (1, Some(t)) => (
+    Ok(Some((x0, y0, (x1 - x0) as u32, (y1 - y0) as u32)))
+}
+
+/// The pixel write of a GDI rectangle of draw mode `mode` over an image of
+/// index 1 (§8 r2), by `k` ([`gdi_mode_value`]): 0 → `d' = color`
+/// (chain `[color]`, opaque); 1 → `d' = T[d]` (row 0 of `T`, column `d`:
+/// chain `[Z]` and the transposed read); 2 → `d' = T[256·d + color]`
+/// (chain `[color]`, `T`). `color_map` is the pushed [`color_row`] of the
+/// color. `None` when the mode needs `T` and `tables` is `None`.
+pub fn gdi_rectangle_ops(
+    tables: Option<&ShadeTables>,
+    color_map: MapId,
+    mode: u8,
+) -> Option<(ShadeChain, BlendOp)> {
+    let k = gdi_mode_value(mode);
+    let table = match (k, tables) {
+        (0, _) => None,
+        (_, Some(tables)) => mode_table(mode).map(|t| (tables, t.base(tables))),
+        (_, None) => return None,
+    };
+    Some(match (k, table) {
+        (1, Some((tables, t))) => (
             ShadeChain::new(&[tables.zero]).expect("one map"),
             BlendOp::IndexTableSrcRow(t),
         ),
-        (2, Some(t)) => (
+        (2, Some((_, t))) => (
             ShadeChain::new(&[color_map]).expect("one map"),
             BlendOp::IndexTable(t),
         ),
@@ -626,7 +638,26 @@ pub fn gdi_rectangle(
             ShadeChain::new(&[color_map]).expect("one map"),
             BlendOp::Opaque,
         ),
+    })
+}
+
+/// A GDI rectangle (§8 r2, `0x006C8A60`): the pixels of
+/// [`gdi_rectangle_box`] written by [`gdi_rectangle_ops`].
+#[allow(clippy::too_many_arguments)]
+pub fn gdi_rectangle(
+    tables: &ShadeTables,
+    size: FrameSize,
+    color_map: MapId,
+    x0: i32,
+    y0: i32,
+    x1: i32,
+    y1: i32,
+    mode: u8,
+) -> Result<Option<GdiDraw>, BlendError> {
+    let Some((x0, y0, w, h)) = gdi_rectangle_box(size, x0, y0, x1, y1)? else {
+        return Ok(None);
     };
+    let (shade, blend) = gdi_rectangle_ops(Some(tables), color_map, mode).expect("tables given");
     Ok(Some(GdiDraw {
         image: FrameImage {
             width: w,
