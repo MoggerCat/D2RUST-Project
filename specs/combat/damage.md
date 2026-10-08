@@ -28,19 +28,19 @@
 |   0. Shared integer helpers | 82–104 |
 |   1. Damage record | 105–138 |
 |   2. Pipeline | 139–153 |
-|   3. Rolling: `start_combat` = `0x0057DBF0` | 154–296 |
-|   4. Totals and resistances: `totals` = `0x0057C1E0` | 297–398 |
-|   5. Application | 399–589 |
-|   6. Hit class and hit recovery | 590–620 |
-|   7. Reaction and death trigger | 621–722 |
-|   8. Event functions (table `0x007325B0`, 32 entries) | 723–786 |
-|   9. Durability `0x0057D3D0` | 787–808 |
-| Constants & data dependencies | 809–830 |
-| Randomness | 831–863 |
-| Edge cases & original bugs | 864–898 |
-| Test vectors | 899–931 |
-| Provenance | 932–957 |
-| Open questions | 958–1007 |
+|   3. Rolling: `start_combat` = `0x0057DBF0` | 154–299 |
+|   4. Totals and resistances: `totals` = `0x0057C1E0` | 300–401 |
+|   5. Application | 402–592 |
+|   6. Hit class and hit recovery | 593–623 |
+|   7. Reaction and death trigger | 624–725 |
+|   8. Event functions (table `0x007325B0`, 32 entries) | 726–789 |
+|   9. Durability `0x0057D3D0` | 790–811 |
+| Constants & data dependencies | 812–833 |
+| Randomness | 834–866 |
+| Edge cases & original bugs | 867–901 |
+| Test vectors | 902–934 |
+| Provenance | 935–960 |
+| Open questions | 961–1010 |
 <!-- /index -->
 
 ## Summary
@@ -173,8 +173,11 @@ Fastcall ECX game, EDX attacker; stack defender, record, `SrcDam`.
 
 `s = 0` is treated as 128. In order:
 
-1. `0x00535D10(attacker, offhand)`: dual-wield weapon stat-list
-   switching (`sim/stat-lists.md`); undone at step 14 by `0x00535E20`.
+1. `0x00535D10(attacker, offhand)` (call `0x0057B800`): the dual-weapon
+   stat switch, owned by `skills/bodies-2.md` §2.27 (damage weapon
+   `0x00535BC0` by the used skill's `weapsel`, which hand's item stat
+   lists are on); undone at step 14 by `0x00535E20` (call `0x0057BD84`,
+   same section).
 2. Hit flags |= 0x20.
 3. Attacker is a player, or its alignment (`0x006259B0`) is 2 (good),
    and the defender is a monster:
