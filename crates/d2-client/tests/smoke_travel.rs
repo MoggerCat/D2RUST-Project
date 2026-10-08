@@ -246,6 +246,22 @@ impl Rig {
             .map(|(k, _)| *k)
     }
 
+    /// The portal of the player's own level. The other end of the pair
+    /// can be in the model too, in a room of a neighbouring level in
+    /// sight (the synthetic Spider Forest borders Kurast Docks), out of
+    /// reach of a click (B4).
+    fn portal_here(&self) -> Option<UnitKey> {
+        let w = self.bridge().world();
+        let level = w.player_level()?;
+        w.units
+            .iter()
+            .filter(|(k, u)| {
+                k.unit_type == OBJECT && u.class == single_player::SYNTHETIC_PORTAL_CLASS
+            })
+            .map(|(k, _)| *k)
+            .find(|&k| w.unit_room(k).is_some_and(|r| r.level == level))
+    }
+
     fn interact(&mut self, key: UnitKey) {
         let sent = self
             .app
@@ -681,15 +697,11 @@ fn town_portal_in_act(act: usize) {
     assert!(made, "act {act}: the pair");
     rig.step(10);
     rig.check("the portal pair");
-    let portal = rig
-        .find(OBJECT, single_player::SYNTHETIC_PORTAL_CLASS)
-        .expect("the field portal in the model");
+    let portal = rig.portal_here().expect("the field portal in the model");
     // The portal's hostile delay (`objects.md` §12 rule 2).
     rig.ms.fetch_add(10_000, Ordering::SeqCst);
     rig.travel("to town", town, |r| r.interact(portal));
-    let portal = rig
-        .find(OBJECT, single_player::SYNTHETIC_PORTAL_CLASS)
-        .expect("the town portal in the model");
+    let portal = rig.portal_here().expect("the town portal in the model");
     rig.travel("back", field, |r| r.interact(portal));
     assert_eq!(server_portals(&rig), 0, "act {act}: the pair went");
     assert!(rig
@@ -705,7 +717,6 @@ fn a_town_portal_in_act_i_goes_to_town_and_back() {
 
 // Covers: specs/world/objects.md §12 r6; specs/world/objects.md §12 r12
 #[test]
-#[ignore = "open break B4 (docs/handoff/q-smoke-travel.md): the Kurast Docks portal does not take the player back to Spider Forest"]
 fn a_town_portal_in_act_iii_goes_to_town_and_back() {
     town_portal_in_act(2);
 }
