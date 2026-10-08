@@ -10,11 +10,12 @@
 //!   the local player, else the facing toward the walk target or the last
 //!   position change, else 0), mapped to the COF row with §3 r3's
 //!   expected count (`UnitArt::expected_directions`);
-//! - frame: the model's +0x44 frame when set, else the COF's animation
-//!   rate advanced by the server tick count (the client model runs no
-//!   animation yet);
-//! - no COF box pre-test (§4: the screen position is the placement
-//!   hook's; the view clips at the frame edge);
+//! - frame: objects take the model's +0x44 frame as is (§3 r2; the
+//!   client object update animates it); players, monsters and missiles
+//!   the COF's animation rate advanced by the server tick count (the
+//!   client model runs no animation for them yet);
+//! - the COF box pre-test (§4) is the view's (`OriginalView`, which
+//!   knows the final screen position);
 //! - draw key: pass 6 at major / minor 0 when the source states no draw
 //!   order (`OriginalView` overwrites it when it does);
 //! - shade: none (full bright, `shading.md` §3 r1 `v = 0xFF`); blend:
@@ -24,7 +25,7 @@
 
 use std::sync::Arc;
 
-use crate::bridge::world::ClientWorld;
+use crate::bridge::world::{ClientWorld, OBJECT};
 use crate::bridge::ClientUnit;
 use crate::composite::{
     ComponentDraw, ComponentFrame, ComponentRequest, CompositeError, UnitParams,
@@ -49,12 +50,15 @@ impl<R> UnitRules<R> {
     /// The COF frame of `unit` this tick (module doc: d2rs-own,
     /// unverified).
     fn frame(world: &ClientWorld, unit: &ClientUnit, frames: u8, rate: u32) -> usize {
-        let frames = usize::from(frames.max(1));
-        if unit.frame > 0 {
-            return frame_index(unit.frame as u32) % frames;
+        // §3 r2: +0x44 >> 8 as is (no bound, §3 r6) where the model
+        // animates the unit: objects (the client object update,
+        // `world/objects-client.md` §26 generic step).
+        if unit.key.unit_type == OBJECT {
+            return frame_index(unit.frame as u32);
         }
         // d2rs-own, unverified (D1): 8.8 animation rate per tick.
-        ((world.server_ticks.wrapping_mul(u64::from(rate)) >> 8) % frames as u64) as usize
+        let frames = u64::from(frames.max(1));
+        ((world.server_ticks.wrapping_mul(u64::from(rate)) >> 8) % frames) as usize
     }
 }
 

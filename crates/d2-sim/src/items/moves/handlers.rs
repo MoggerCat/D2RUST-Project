@@ -782,6 +782,8 @@ pub fn swap_cursor_buffer<W: MoveWorld>(
     add_cmd(w, t, cmd::SWAP_IN_PAGE);
     changed_if_filled(w, t);
     w.update_list_add(p, t);
+    // Rule 5: item flag 0x4000 is cleared on T before C's placement.
+    clear_iflags(w, t, iflag::NOEQUIP);
     // The cursor item C.
     if !w.place_at(p, c, pg, x as i32, y as i32) {
         return Ok(res::REFUSED);
@@ -797,6 +799,10 @@ pub fn swap_cursor_buffer<W: MoveWorld>(
     if w.is_active(p, c) {
         w.stat_refresh(p);
     }
+    // Rule 5: C's item flag 0x1 test (socket-filled), then its 0x4000
+    // clear.
+    changed_if_filled(w, c);
+    clear_iflags(w, c, iflag::NOEQUIP);
     w.set_mode(c, mode::STORED);
     add_cmd(w, c, cmd::SWAP_IN_PAGE);
     w.update_list_add(p, c);

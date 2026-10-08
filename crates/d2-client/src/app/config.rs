@@ -346,9 +346,21 @@ impl WindowMode {
     }
 }
 
+/// The window size of the play frame: 640 × 480 when `play --res 640x480`
+/// chose that frame (`rules::camera::FrameSize::play`), else the
+/// settings' [`Settings::window_size`].
+pub fn play_window_size(s: &Settings) -> (u32, u32) {
+    use crate::rules::camera::FrameSize;
+    if FrameSize::play() == FrameSize::LOW {
+        (FrameSize::LOW.width as u32, FrameSize::LOW.height as u32)
+    } else {
+        s.window_size()
+    }
+}
+
 /// The primary window the settings ask for (before the app starts).
 pub fn window_for(s: &Settings) -> bevy::window::Window {
-    let (w, h) = s.window_size();
+    let (w, h) = play_window_size(s);
     bevy::window::Window {
         title: "d2rs".into(),
         resolution: bevy::window::WindowResolution::new(w, h),
@@ -393,7 +405,7 @@ pub fn apply_settings(
     }
     for mut w in &mut windows {
         w.mode = new.window_mode.bevy();
-        let (width, height) = new.window_size();
+        let (width, height) = play_window_size(&new);
         w.resolution.set(width as f32, height as f32);
     }
 }

@@ -9,18 +9,16 @@ use crate::items::props::STATE_RUNEWORD;
 /// Stat 204 `item_charged_skill`.
 pub const CHARGED_SKILL: u16 = 204;
 
-/// The lists with flag 0x40 that set the charges searches, in order.
-// PROVISIONAL (generation.md §12.2 "X's stat lists with flag 0x40 in list
-// order"): the item list (state 0), then the runeword list (state 171);
-// a charged skill's key is in one list only, so the order shows only when
-// both hold it; settled by: recharge of a runeword item with charges on a
-// base that has the same charged skill (save capture).
+/// The lists with flag 0x40 that set the charges searches, in order
+/// (`generation.md` §12.2 "List order of the walk"): the walk starts at the
+/// most recently attached flag-0x40 list, so for a runeword item the
+/// runeword list (state 171) comes first, then the main list (state 0).
 const LISTS: [ListKey; 2] = [
-    ListKey::ITEM,
     ListKey {
         state: STATE_RUNEWORD,
         flags: LIST_FLAGS,
     },
+    ListKey::ITEM,
 ];
 
 /// Set the charges `0x0065C940`(X, key, n) on X's own lists: the first
@@ -102,6 +100,28 @@ mod tests {
             ]
         );
         assert!(recharge(&[], |_, _| ()).is_empty());
+    }
+
+    // Covers: specs/items/generation.md §12.2 text
+    // (list order of the walk: the runeword list, then the main list; the
+    // first entry found is the one written)
+    #[test]
+    fn set_charges_walks_the_runeword_list_first() {
+        let rw = ListKey {
+            state: STATE_RUNEWORD,
+            flags: LIST_FLAGS,
+        };
+        let mut s = FakeStats::default();
+        s.list_set(ListKey::ITEM, CHARGED_SKILL, 7, 10 * 256 + 2);
+        s.list_set(rw, CHARGED_SKILL, 7, 20 * 256 + 3);
+        assert!(set_charges(&mut s, 7, 99));
+        assert_eq!(s.list_get(rw, CHARGED_SKILL, 7), 20 * 256 + 20);
+        assert_eq!(s.list_get(ListKey::ITEM, CHARGED_SKILL, 7), 10 * 256 + 2);
+        // A found entry with mx out of 1 … 255 ends the search with 0.
+        s.list_set(rw, CHARGED_SKILL, 8, 300 * 256);
+        s.list_set(ListKey::ITEM, CHARGED_SKILL, 8, 5 * 256);
+        assert!(!set_charges(&mut s, 8, 3));
+        assert_eq!(s.list_get(ListKey::ITEM, CHARGED_SKILL, 8), 5 * 256);
     }
 
     // Covers: specs/items/generation.md §12.2 text

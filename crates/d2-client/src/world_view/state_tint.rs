@@ -1,19 +1,21 @@
-// Spec: specs/client/stat-lists.md (§3 r6.1, r6.3), specs/render/shading.md (§6 r1)
-//! The unit state tint of the play preview: a state with a `colorshift`
-//! recolours the unit it is on.
+// Spec: specs/client/stat-lists.md (§3 r6.1, r6.3), specs/render/shading.md (§6 r1, r1.1)
+//! The unit state tint: a state with a `colorshift` recolours the unit it
+//! is on through the unit palette index (unit `+0x6C`, `shading.md` §6
+//! r1), so the component's `P` is remap map `p − 1` of the act PL2.
 //!
-//! The spec names the call (`0x004D97F0`, "color", run when a state with
-//! `colorshift` ≠ 0 turns on or off) but not its body.
+//! The choice is `shading.md` §6 r1.1 (`0x004D97F0`): over the states that
+//! are on, in id order, a state becomes the best when its `colorpri` is
+//! greater than the best so far (which starts at 0), so a `colorpri` of 0
+//! never wins, equal priorities keep the lowest id and `colorshift` plays
+//! no part in the choice; a best with id > 0 gives `p` = its `colorshift`
+//! (which may be 0), none gives `p` = 0. The `'h'` exception needs render
+//! kind ≥ 4, never under the GDI reference.
 //!
-//! PROVISIONAL (REC-245; M22): the call is read as setting the unit
-//! palette index (unit `+0x6C`, `shading.md` §6 r1) to `colorshift` on
-//! the state's on and to 0 on its off, so the component's `P` is remap
-//! map `colorshift − 1` of the act PL2. With several tinted states on,
-//! the highest `colorpri` wins; equal priorities take the lowest state
-//! id. Settled by a capture of a unit under a tinted state (a shrine
-//! buff, Frozen, Poison); until then nothing here counts as done
-//! (rule 10).
-// d2rs-own, unverified
+//! d2rs-own, unverified: the palette index is recomputed from the states
+//! on at each draw, where 1.14d reruns the call only when a state with
+//! `colorshift` ≠ 0 turns on or off (equal on the live `states` rows,
+//! whose seven `colorpri` rows all have a `colorshift`). No capture of a
+//! tinted unit yet (rule 10: unverified).
 
 use std::collections::BTreeSet;
 
@@ -36,20 +38,26 @@ impl StateTints {
         }
     }
 
-    /// The palette index `p` the states give a unit: the `colorshift` of
-    /// the tinted state of highest `colorpri` (lowest id on a tie), 0 for
-    /// none (module doc).
+    /// The palette index `p` the states give a unit (`shading.md` §6
+    /// r1.1): the `colorshift` of the first state of strictly greatest
+    /// `colorpri` above 0 (lowest id on a tie), when its id is above 0;
+    /// else 0.
     pub fn palette_index(&self, states: &BTreeSet<u8>) -> u8 {
+        let mut best_pri = 0u8;
         let mut best: Option<(u8, u8)> = None;
         for &id in states {
             let Some(&(pri, shift)) = self.rows.get(usize::from(id)) else {
                 continue;
             };
-            if shift != 0 && best.is_none_or(|(p, _)| pri > p) {
-                best = Some((pri, shift));
+            if pri > best_pri {
+                best_pri = pri;
+                best = Some((id, shift));
             }
         }
-        best.map_or(0, |(_, shift)| shift)
+        match best {
+            Some((id, shift)) if id > 0 => shift,
+            _ => 0,
+        }
     }
 
     /// The remap `P` of a unit with `states`: none without a tinted
@@ -89,6 +97,31 @@ mod tests {
         assert_eq!(t.palette_index(&BTreeSet::from([2, 3])), 9);
         // A state outside the table is ignored.
         assert_eq!(t.palette_index(&BTreeSet::from([99])), 0);
+    }
+
+    // Covers: specs/render/shading.md §6 r1
+    #[test]
+    fn the_choice_is_by_colorpri_only() {
+        // Rows by state id: 1 `freeze` (100, 108), 2 `poison` (95, 104),
+        // 11 `cold` (100, 108); synthetic 5 (pri 0, shift 9), 7 (pri 3,
+        // shift 0).
+        let mut rows = vec![(0u8, 0u8); 12];
+        rows[1] = (100, 108);
+        rows[2] = (95, 104);
+        rows[11] = (100, 108);
+        rows[5] = (0, 9);
+        rows[7] = (3, 0);
+        let t = StateTints { rows };
+        assert_eq!(t.palette_index(&BTreeSet::from([2, 11])), 108);
+        assert_eq!(t.palette_index(&BTreeSet::from([1, 11])), 108);
+        // State 7 wins with shift 0; state 5 (pri 0) can never win.
+        assert_eq!(t.palette_index(&BTreeSet::from([5, 7])), 0);
+        assert_eq!(t.palette_index(&BTreeSet::from([5])), 0);
+        // A best state with id 0 is none.
+        let t0 = StateTints {
+            rows: vec![(9, 4), (3, 5)],
+        };
+        assert_eq!(t0.palette_index(&BTreeSet::from([0, 1])), 0);
     }
 
     // Covers: specs/render/shading.md §6 r1

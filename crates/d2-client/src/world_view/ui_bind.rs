@@ -1,4 +1,4 @@
-// Spec: specs/client/ui.md (A2, A4), specs/client/render-pipeline.md (A3, A6), specs/ui/text.md (§1, §4, §12, §13)
+// Spec: specs/client/ui.md (A2, A4), specs/client/render-pipeline.md (A3, A6), specs/ui/text.md (§1, §4, §9, §12, §13), specs/render/blend-modes.md (§1, §8 r2), specs/ui/panels.md (§1.4, §1.6)
 //! The C8 UI core bound to the bridge: each frame the panels see the
 //! client world model read-only ([`UiCtx`]), route the frame's input
 //! events, hand their intents to the bridge (only the root forwards, §A2),
@@ -19,15 +19,20 @@ use crate::bridge::link::ServerLink;
 use crate::bridge::{Bridge, BridgeError};
 use crate::composite::ComponentFrame;
 use crate::controls::click::{ClickOut, ClickState, Kind};
-use crate::frames::{FramePart, FrameSetKey};
+use crate::frames::{FramePart, FrameSet, FrameSetKey, IndexFrame};
+use crate::rules::blend::{
+    cel_ops, color_row, gdi_rectangle_box, gdi_rectangle_ops, mode_table, MODE_HIGHLIGHT,
+};
+use crate::rules::camera::FrameSize;
 use crate::rules::placement::draw_position;
+use crate::rules::shading::{item_color, ShadeTables, ITEM_PALETTE_MAPS};
 use crate::scene::{BlendOp, DrawItem, DrawKey, ItemTag, MapId, MapTable, Rect, ShadeChain};
 use crate::ui::original::{OriginalUi, OriginalUiError};
-use crate::ui::text::{TEXT_COLORS, TEXT_COLOR_MAP_OFFSET, TEXT_DRAW_MODE};
+use crate::ui::text::{TEXT_COLORS, TEXT_COLOR_MAP_OFFSET};
 use crate::ui::Routed;
 use crate::ui::{
-    font_info, layout_text, ImageRequest, OriginalText, PointerButton, StringLookup, TextRequest,
-    TextRules, TextStyle, UiCtx, UiDraw, UiEvent, UiInput, UiRoot,
+    font_info, layout_text, ImageRequest, OriginalText, PointerButton, RectRequest, Remap,
+    StringLookup, TextRequest, TextRules, TextStyle, UiCtx, UiDraw, UiEvent, UiInput, UiRoot,
 };
 
 use super::{Unspecified, ViewAssets, ViewError};
@@ -224,10 +229,13 @@ fn fail(path: &str, message: String) -> ViewError {
 
 /// The text hooks of `ui/text.md`: fonts from `text-fonts.tsv` (§1.3),
 /// the [`OriginalText`] rules, glyph look per §4.3. `colors` are the
-/// frame's text-color maps; without them only color 0 draws.
+/// frame's text-color maps; without them only color 0 draws. `shades` are
+/// the act's blend tables (`render/blend-modes.md` §1): a draw mode other
+/// than 5 (the §9 draw with mode) needs them.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct OriginalTextHooks {
     pub colors: Option<TextColors>,
+    pub shades: Option<ShadeTables>,
 }
 
 /// The font of id `style.font` (`text-fonts.tsv`).
@@ -274,36 +282,208 @@ fn build_text_font(style: TextStyle) -> Result<TextFont, ViewError> {
     })
 }
 
-/// Glyph look of `ui/text.md` §4.3: no light, blend none (draw mode 5),
-/// remap = text-color map `k` (none for 0).
+/// Glyph look of `ui/text.md` §4.3: no light (byte 0xFF), remap =
+/// text-color map `k` (none for 0), blend by the draw mode (5 for the
+/// plain call, the §9 argument for the draw with mode;
+/// [`ui_cel_ops`]).
 fn original_glyph_look(
     colors: Option<&TextColors>,
+    shades: Option<&ShadeTables>,
     color: i32,
     mode: u8,
 ) -> Result<(ShadeChain, BlendOp), ViewError> {
-    if mode != TEXT_DRAW_MODE {
-        return Err(ViewError::unresolved(
-            "UI text draw mode",
-            "render/blend-modes.md",
-        ));
-    }
-    if color == 0 {
-        return Ok((ShadeChain::EMPTY, BlendOp::Opaque));
-    }
-    if !(1..TEXT_COLORS as i32).contains(&color) {
-        return Err(ViewError::Unresolved {
+    let remap = if color == 0 {
+        None
+    } else {
+        if !(1..TEXT_COLORS as i32).contains(&color) {
+            return Err(ViewError::Unresolved {
+                what: "UI text color",
+                spec: "ui/text.md",
+                message: format!("color {color} outside 0–12 (open question 2)"),
+            });
+        }
+        let colors = colors.ok_or_else(|| ViewError::Unresolved {
             what: "UI text color",
             spec: "ui/text.md",
-            message: format!("color {color} outside 0–12 (open question 2)"),
+            message: "the frame's PL2 text-color maps are not loaded".into(),
+        })?;
+        Some(colors.maps[color as usize - 1])
+    };
+    ui_cel_ops(shades, mode, remap)
+}
+
+/// Shade and blend of a UI cel draw (light byte 0xFF, `ui/panels.md`
+/// §1.4, §1.6) of draw mode `mode` with remap `P` (`render/blend-modes.md`
+/// §1, §2): `d' = T[256·d + P[s]]` with `T` of the mode, `d' = P[s]`
+/// without (modes 5 and other values), `d' = H[s]` in mode 7
+/// ([`cel_ops`]). Without the act's tables only a mode with neither `T`
+/// nor `H` draws; the others are an error naming the missing tables.
+pub fn ui_cel_ops(
+    shades: Option<&ShadeTables>,
+    mode: u8,
+    remap: Option<MapId>,
+) -> Result<(ShadeChain, BlendOp), ViewError> {
+    if let Some(t) = shades {
+        return Ok(cel_ops(t, mode, remap, 0xFF));
+    }
+    if mode_table(mode).is_some() || mode == MODE_HIGHLIGHT {
+        return Err(ViewError::Unresolved {
+            what: "UI draw mode",
+            spec: "render/blend-modes.md",
+            message: format!("draw mode {mode} needs the act's blend tables, not loaded"),
         });
     }
-    let colors = colors.ok_or_else(|| ViewError::Unresolved {
-        what: "UI text color",
+    let maps: Vec<MapId> = remap.into_iter().collect();
+    Ok((ShadeChain::new(&maps)?, BlendOp::Opaque))
+}
+
+/// The remap `P` of a UI cel's [`Remap`] (`ui/panels.md` §1.6):
+/// - `Palette(k)` reads pointer `+0xD0 + 4k` of the palette-table block
+///   (`ui/text.md` §4.3–§4.5): 0 none, 1–12 PL2 text-colour map `k`
+///   (`colors`), −18 … −48 light maps 31 … 1 (`shades`); −1 (selected
+///   unit shift), −2 … −17 (inventory colour variations) and every other
+///   `k` have no map in d2rs and are errors;
+/// - `ItemColor { t, c }`: `rules::shading::item_color` (`shading.md`
+///   §6 r4): no map for `t` 0, 3, 4, ≥ 9 or `c` ≥ 21, else map `c` of
+///   file `t` (`assets.item_palettes`).
+pub fn ui_remap(
+    remap: Remap,
+    colors: Option<&TextColors>,
+    assets: &ViewAssets,
+) -> Result<Option<MapId>, ViewError> {
+    let fail = |message: String| ViewError::Unresolved {
+        what: "UI cel remap",
         spec: "ui/text.md",
-        message: "the frame's PL2 text-color maps are not loaded".into(),
+        message,
+    };
+    match remap {
+        Remap::None | Remap::Palette(0) => Ok(None),
+        Remap::Palette(k) if (1..TEXT_COLORS as i32).contains(&k) => {
+            let colors = colors
+                .ok_or_else(|| fail("the frame's PL2 text-color maps are not loaded".into()))?;
+            Ok(Some(colors.maps[k as usize - 1]))
+        }
+        Remap::Palette(k) if (-48..=-18).contains(&k) => {
+            let shades = assets
+                .shades
+                .as_ref()
+                .ok_or_else(|| fail(format!("k {k}: the act's light maps are not loaded")))?;
+            Ok(Some(shades.light_map((49 + k) as u8)))
+        }
+        Remap::Palette(k) => Err(fail(format!(
+            "palette argument {k}: no map of the §4.5 block in d2rs"
+        ))),
+        Remap::ItemColor { t, c } => {
+            let Some((t, c)) = item_color(t, c) else {
+                return Ok(None);
+            };
+            let base = assets.item_palettes.ok_or_else(|| ViewError::Unresolved {
+                what: "UI cel remap",
+                spec: "render/shading.md",
+                message: format!("item colour ({t}, {c}): the item palette maps are not loaded"),
+            })?;
+            Ok(Some(MapId(
+                base.0 + u32::from(ITEM_PALETTE_MAPS) * (u32::from(t) - 1) + u32::from(c),
+            )))
+        }
+    }
+}
+
+/// The frame set of a rectangle of `w × h` pixels: one frame of index 1
+/// (`rules::blend` GDI draws: the chain turns 1 into the written source).
+pub fn rect_key(w: u32, h: u32) -> FrameSetKey {
+    FrameSetKey::new(format!("d2rs/ui/rect/{w}x{h}"), FramePart::Tile(0)).expect("canonical")
+}
+
+/// Makes what the frame's rectangles need resident: the colour rows
+/// (once) and one `w × h` frame per clamped size (`blend-modes.md` §8
+/// r2 on the `size` surface). A rectangle the original refuses (rows or
+/// columns reversed) is an error.
+pub fn ensure_rects(
+    draws: &[UiDraw],
+    size: FrameSize,
+    assets: &mut ViewAssets,
+) -> Result<(), ViewError> {
+    for d in draws {
+        let UiDraw::Rect(r) = d else { continue };
+        if assets.color_rows.is_none() {
+            let base = MapId(assets.maps.len() as u32);
+            for c in 0..=255u8 {
+                assets.maps.push(color_row(c));
+            }
+            assets.color_rows = Some(base);
+        }
+        let Some((_, _, w, h)) = rect_box(r, size)? else {
+            continue;
+        };
+        let key = rect_key(w, h);
+        if assets.frames.contains(&key) {
+            continue;
+        }
+        let frame = IndexFrame::new(w, h, 0, 0, vec![1; w as usize * h as usize]).map_err(|e| {
+            ViewError::Unresolved {
+                what: "UI rectangle",
+                spec: "render/blend-modes.md",
+                message: e.to_string(),
+            }
+        })?;
+        assets.frames.insert(
+            key,
+            FrameSet {
+                frames: vec![frame],
+            },
+        )?;
+    }
+    Ok(())
+}
+
+fn rect_box(r: &RectRequest, size: FrameSize) -> Result<Option<(i32, i32, u32, u32)>, ViewError> {
+    gdi_rectangle_box(size, r.x0, r.y0, r.x1, r.y1).map_err(|e| ViewError::Unresolved {
+        what: "UI rectangle",
+        spec: "render/blend-modes.md",
+        message: e.to_string(),
+    })
+}
+
+/// The sprite of a rectangle (`blend-modes.md` §8 r2) on the `size`
+/// surface: its clamped box ([`gdi_rectangle_box`], `None`: nothing
+/// drawn) and the write of its draw mode ([`gdi_rectangle_ops`]). The
+/// resident rows and frame are [`ensure_rects`]'.
+pub fn rect_sprite(
+    r: &RectRequest,
+    size: FrameSize,
+    assets: &ViewAssets,
+) -> Result<Option<UiSprite>, ViewError> {
+    let Some((x, y, w, h)) = rect_box(r, size)? else {
+        return Ok(None);
+    };
+    let rows = assets.color_rows.ok_or_else(|| ViewError::Unresolved {
+        what: "UI rectangle",
+        spec: "render/blend-modes.md",
+        message: "the colour rows are not resident".into(),
     })?;
-    let map = colors.maps[color as usize - 1];
-    Ok((ShadeChain::new(&[map])?, BlendOp::Opaque))
+    let color = MapId(rows.0 + u32::from(r.color));
+    let (shade, blend) =
+        gdi_rectangle_ops(assets.shades.as_ref(), color, r.mode).ok_or_else(|| {
+            ViewError::Unresolved {
+                what: "UI rectangle",
+                spec: "render/blend-modes.md",
+                message: format!(
+                    "draw mode {} needs the act's blend tables, not loaded",
+                    r.mode
+                ),
+            }
+        })?;
+    Ok(Some(UiSprite {
+        frame: ComponentFrame {
+            set: rect_key(w, h),
+            index: 0,
+        },
+        x,
+        y,
+        shade,
+        blend,
+    }))
 }
 
 impl TextHooks for OriginalTextHooks {
@@ -316,7 +496,7 @@ impl TextHooks for OriginalTextHooks {
     }
 
     fn glyph_look(&self, color: i32, mode: u8) -> Result<(ShadeChain, BlendOp), ViewError> {
-        original_glyph_look(self.colors.as_ref(), color, mode)
+        original_glyph_look(self.colors.as_ref(), self.shades.as_ref(), color, mode)
     }
 }
 
@@ -332,7 +512,7 @@ impl TextHooks for Unspecified {
     }
 
     fn glyph_look(&self, color: i32, mode: u8) -> Result<(ShadeChain, BlendOp), ViewError> {
-        original_glyph_look(None, color, mode)
+        original_glyph_look(None, None, color, mode)
     }
 }
 
@@ -376,13 +556,22 @@ pub(super) fn ui_items<R: UiRules + ?Sized>(
             error: Box::new(error),
         };
         let (sprites, clip) = match d {
-            UiDraw::Image(r) => (vec![rules.ui_image(r, assets).map_err(at)?], r.clip),
-            UiDraw::Text(r) => (rules.ui_text(r, assets).map_err(at)?, r.clip),
+            UiDraw::Image(r) => (
+                vec![rules.ui_image(r, assets).map_err(at)?],
+                clip_rect(r.clip),
+            ),
+            UiDraw::Text(r) => (rules.ui_text(r, assets).map_err(at)?, clip_rect(r.clip)),
+            // The GDI rectangle clamps to the surface, no other clip (§8 r2).
+            UiDraw::Rect(r) => {
+                let size = FrameSize::play();
+                let s = rect_sprite(r, size, assets).map_err(at)?;
+                (s.into_iter().collect(), size.rect())
+            }
         };
         for s in sprites {
             let id = assets.id(&s.frame.set, s.frame.index).map_err(at)?;
             let mut item = DrawItem::new(id, s.x, s.y);
-            item.clip = clip_rect(clip);
+            item.clip = clip;
             item.shade = s.shade;
             item.blend = s.blend;
             item.key = key;
@@ -599,6 +788,7 @@ mod text_tests {
         }
         let hooks = OriginalTextHooks {
             colors: Some(colors),
+            shades: None,
         };
         assert_eq!(
             hooks.glyph_look(0, 5).unwrap(),
@@ -780,3 +970,7 @@ mod text_tests {
         assert!(original_text_font(TextStyle { font: 14, color: 0 }).is_err());
     }
 }
+
+#[cfg(test)]
+#[path = "ui_draw_sink_tests.rs"]
+mod draw_sink_tests;

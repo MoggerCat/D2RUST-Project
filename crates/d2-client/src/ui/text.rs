@@ -682,6 +682,40 @@ pub fn framed_text_tight(
     })
 }
 
+/// The pop-up text draw `0x00503000` of a `0x00502280(text, x, y, k,
+/// centre)` call (`ui/control-panel.md` §5 r14 steps 2, 4–6) on a
+/// `screen` of (Sw, Sh), in the current font `g`: block W = max width +
+/// 8, x0 = x − (W >> 1) when `centre`, else x; y0 = y + 2; x' = 0 when
+/// x0 ≤ 0, then min(x', Sw − W); b = max(y0, Ht − 5), Sh − 5 when that
+/// is not below Sh − 5; the backing box (x', b − Ht)–(x' + W, b) (colour 0,
+/// mode 2) and the text at (x', b − trunc(3 · height / 10)), block W,
+/// centred. The too-tall font swap (step 3) is not applied here.
+pub fn popup_text(
+    g: &GlyphLookup<'_>,
+    text: &[u16],
+    at: Point,
+    centre: bool,
+    screen: (i32, i32),
+) -> Result<FramedText, TextError> {
+    let (sw, sh) = screen;
+    let w = max_width(g, text)? + 8;
+    let ht = text_height(g, text);
+    let x0 = if centre { at.x - (w >> 1) } else { at.x };
+    let y0 = at.y + 2;
+    let x = if x0 <= 0 { 0 } else { x0 }.min(sw - w);
+    let m = y0.max(ht - 5);
+    let b = if m < sh - 5 { m } else { sh - 5 };
+    Ok(FramedText {
+        rect: (Point::new(x, b - ht), Point::new(x + w, b)),
+        pen: Point::new(x, b - 3 * g.height() / 10),
+        opts: TextOpts::Draw {
+            centered: true,
+            block_w: Some(w),
+            mode: TEXT_DRAW_MODE,
+        },
+    })
+}
+
 /// White space of the wrap break test (`0x00526D30`, §10.2.2): `< 0x100`
 /// and CRT `isspace` in the "C" locale.
 fn is_space(u: u16) -> bool {

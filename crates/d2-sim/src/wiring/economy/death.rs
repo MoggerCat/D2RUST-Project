@@ -191,12 +191,13 @@ impl<X: Pending, F: FreeSpot> DropPlacer<ActionHooks<X>> for Spots<'_, F> {
 /// death target `target` (`R`). Returns the created items (also
 /// appended to [`DeathDrops::placed`]).
 ///
-/// TODO(treasure.md §3.1): the collision word at a position outside
-/// every room grid is read as 0. TODO(treasure.md §7 step 2): the free
-/// spot search gets the room the start-offset search found, else the
-/// monster's room (with the provider, the floor drop's rule 1 finds the
-/// same start from that room: both lookups are the room and its
-/// adjacent rooms).
+/// TODO(treasure.md §3.1): without the path provider the collision word
+/// at a position outside every room grid is read as 0 (with it: 0x27).
+/// TODO(treasure.md §7 step 2): the free spot search gets the room the
+/// start-offset search found, else the monster's room (spec: always the
+/// monster's room, `0x00555DEC`; the [`FreeSpot`] seam's start-spot
+/// fallback places the item in the room it is given, so it needs the
+/// start's room until it looks the room up itself).
 pub fn monster_death_drop<X: Pending, F: FreeSpot>(
     h: &mut ActionHooks<X>,
     sim: &mut Sim<'_>,
@@ -214,9 +215,15 @@ pub fn monster_death_drop<X: Pending, F: FreeSpot>(
     }
     let (x, y) = h.path_position(unit);
     let room = sim.game.lists.unit(unit).and_then(|e| e.room());
-    let collision = room
-        .and_then(|rm| h.drlg.collision(sim.game, rm, x, y))
-        .unwrap_or(0);
+    // `0x0064CB30` (§3.1): with the path provider, the cell's room among
+    // the monster's room and its adjacent rooms; no such room, no record
+    // or no grid → 0x27 (no drop).
+    let collision = if h.paths.is_some() {
+        crate::path::collision::point_value(&h.drlg, room, x, y, GATE_MASK)
+    } else {
+        room.and_then(|rm| h.drlg.collision(sim.game, rm, x, y))
+            .unwrap_or(0)
+    };
     match monster_drop_gate(flags, u32::from(collision & GATE_MASK), class) {
         Ok(true) => {}
         Ok(false) => return Vec::new(),

@@ -254,7 +254,8 @@ fn live_values_overlay_the_base() {
     assert!(!got.iter().any(|e| e.0 == 14));
     assert_eq!(out.header.level, 6);
     assert_eq!(out.header.save_time, 777);
-    assert_eq!(out.header.create_time, 777);
+    // The create time is never set by a game save (§2.2 r10, edge case 11).
+    assert_eq!(out.header.create_time, base.header.create_time);
     assert_eq!(out.body.unwrap().quests.records, rec);
     // No live stats (a game with no stat table): the base stays as it is.
     let kept = save::apply_live(&base, &save::Live::default(), 1);
@@ -345,4 +346,16 @@ fn extra_values_overlay_the_body() {
     );
     assert_eq!(body.items.len(), 1);
     assert_eq!(body.skills[2], 20);
+}
+
+/// A new expansion character's file ends `6A 66 6B 66 00` like the game's
+/// (§1 rule 2, §8.4 rule 4, §8.5 rule 3); a classic one has neither.
+// Covers: specs/formats/d2s.md §8.4 r4, §8.5 r3
+#[test]
+fn a_new_character_writes_jf_and_kf_in_an_expansion_game() {
+    let exp = single_player::GAME_SETUP.expansion;
+    let base = save::base_save(&Character::New);
+    let body = base.body.as_ref().unwrap();
+    assert_eq!(body.hireling_items.is_some(), exp);
+    assert_eq!(body.golem.is_some(), exp);
 }

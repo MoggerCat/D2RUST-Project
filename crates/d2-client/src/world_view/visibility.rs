@@ -68,7 +68,7 @@ impl ViewVisibility {
             return false;
         };
         let cel = tr_cel(&self.looks, &art, unit, &name, cof);
-        let size = FrameSize::D2RS;
+        let size = FrameSize::play();
         unit_visible(
             cof,
             cel,

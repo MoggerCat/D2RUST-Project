@@ -136,6 +136,8 @@ fn near() -> NearRooms {
         }],
         player_tile: (0, 0),
         player_logical: 0,
+        player_subtile: (0, 0),
+        edge: None,
         level: LevelFacts {
             id: 2,
             ..LevelFacts::default()
