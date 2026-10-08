@@ -46,3 +46,25 @@ server-side player skill list (`adapters/character.rs` `add_skill_level` "no pro
 "She can run. Only animation is downward animation. Task manager 380mb memory use low cpu."
 "When I pressed C and I the panels appeared just fine with some missing details … But it worked. And
 outside town is still entirely black and no NPCs."
+
+## Later the same night (branch `claude/local-2026-10-07`)
+
+Merged and play-tested by the user:
+- `claude/pc1-native-skills` (b11b98d): native skills at player creation (`client/msg-skills.md` §2 r8) → clicks walk.
+- `claude/fix-facing` (1751f4f): the preview draws the local player facing its predicted movement. User: "the directions are amazing".
+- `claude/fix-npcs` (cd7719e): one shared level-types handle for act maps and population, the object preset pass
+  (PROVISIONAL, REC-94), 0x51 before the first object update → 7 NPCs and 17 objects reach the client (28 units).
+- 7690c64: a pending sound-world question (line test `0x00622AA0`, no client collision rooms) is logged once in the
+  preview instead of closing the app (it crashed as soon as NPCs existed).
+
+User's notes on the last build: NPCs, stash and waypoint are drawn but cannot be used and do not animate; outside the
+town gate is still black. Likely cause (to confirm): the server-side player does not follow the client's predicted
+walk, so interact (C→S 0x13) fails the server's distance test and no room switch / 0x07 is sent outside town. Non-local
+units have no client animation in the preview (only the local player's frames advance).
+
+Open, for the next session:
+- `claude/fix-outdoor` (worker stopped at shutdown; WIP pushed if any): does C→S 0x01 move the server player; client
+  rooms / DT1 tiles outside town; the player hidden under black when stopped.
+- Server: no S→C 0x94 and no server-side player skill list (`adapters/character.rs` `add_skill_level` "no provider").
+- Random object population calls a placeholder (`wiring/worldgen/dispatch.rs:156`).
+- Disk: `target\debug` was deleted to free 23 GB; the next debug build starts from scratch.
