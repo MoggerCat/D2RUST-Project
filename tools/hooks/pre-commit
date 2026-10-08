@@ -1,7 +1,8 @@
 #!/bin/sh
-# Blocks commits that include original game files or RE output.
+# Blocks commits that include original game files or RE output (public repo,
+# CLAUDE.md rule 1: they belong in the private data repo).
 blocked=$(git diff --cached --name-only --diff-filter=ACM | \
-  grep -Ei '\.(mpq|exe|dll|d2s|dc6|dcc|dt1|ds1|cof|tbl|bin)$|^game/|^re/')
+  grep -Ei '\.(mpq|exe|dll|d2s|dc6|dcc|dt1|ds1|cof|tbl|bin|wav)$|(^|/)excel/[^/]*\.txt$|\.part-[0-9]+$|^game/|^re/|^install/|^extracted/')
 if [ -n "$blocked" ]; then
   echo "Commit blocked: original game files or RE output staged:"
   echo "$blocked"

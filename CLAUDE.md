@@ -26,17 +26,31 @@ decompiled code.
 
 ## Hard rules (never break these)
 
-1. **No Blizzard files in git.** MPQs, executables, DLLs, extracted assets,
-   extracted .txt/.bin tables and saves go in `game/` (gitignored). Never
-   commit, embed, or `include_bytes!` them. The pre-commit hook in
-   `tools/hooks/` enforces this.
+1. **No Blizzard files in the public repo; the red line is distribution.**
+   This repository is **public**. MPQs, executables, DLLs, saves, extracted
+   assets and full extracted tables never go here, in their original form or
+   any re-encoding a process could rebuild them from. They live in the
+   **private** repository `MoggerCat/D2RUST-private-repo.` (layout in its
+   `README.md`) and in `game/` locally (gitignored); cloud sessions fetch
+   them from there and may use them freely. Never `include_bytes!` them.
+   The red line: never distribute the game, or anything playable without
+   the user's own copy, outside the project (rule 9 guards the release).
+   **Allowed in the public repo, at any depth:** our own observation and
+   analysis of 1.14d: specs, measured facts (sizes, offsets, counts, links,
+   coordinates, timings, draw order), expected outputs for fixed seeds,
+   digests, traces and draw lists, in `facts/` and `traces/`. Facts are
+   **produced by a tool** from the real files or a recording, never from
+   memory, and carry a format version and the command that made them. The
+   pre-commit hook in `tools/hooks/` enforces the forbidden half.
 2. **No decompiled code in `crates/`.** Ghidra output lives only in `re/`
    (gitignored). Rust code implements a spec in `specs/`, and every module
    names the spec it implements: `// Spec: specs/items/affix-rolling.md`.
 3. **Session separation.** *Implementation* tasks read `specs/`, `docs/`,
    and `crates/` only; do not open `re/` or `../refs/`. *Spec-writing* tasks
-   may read `re/` and `../refs/`; their output is prose, tables and behavior descriptions in
-   `specs/`, never pasted decompiler output.
+   may read `re/` and `../refs/`; their output is prose, tables, behavior descriptions and
+   **authored pseudocode** (our own words and structure) in `specs/`,
+   never pasted decompiler output. Implementation tasks may read the
+   private data repo and `facts/`.
 4. **License hygiene.** D2MOO (MIT) and Riiablo (Apache-2.0) may be adapted
    with notices in `THIRD_PARTY_NOTICES.md`. OpenDiablo2 / OpenD2 (GPL-3.0):
    read for understanding only, never copy code.
@@ -140,14 +154,16 @@ rule:
 
 ## Where work runs
 
-Cloud sessions have the repo only: no `game/`, no `re/`, no `../refs/`.
+Cloud sessions have the public repo and the private data repo
+(`MoggerCat/D2RUST-private-repo.`: the 1.14d install and extracted data,
+fetched per its `README.md`); no `re/`, no `../refs/`.
 
 | Work | Where | Needs |
 |---|---|---|
 | Implementation from `specs/`, unit tests, refactors, CI fixes | cloud (or local) | repo |
 | Spec writing / RE | local | `re/`, `../refs/`, `game/` |
-| Game-file checks: `data-tool tables`, `mpq-tool formats`, ignored tests, `d2-client verify`, renders | local | `game/` |
-| Recording traces from the original game | local (Windows) | `game/`, `tools/trace-recorder` |
+| Game-file checks: `data-tool tables`, `mpq-tool formats`, ignored tests, `d2-client verify`, renders | cloud or local | private data repo / `game/` |
+| Recording traces from the original game | local (Windows); cloud under Wine once proven | `game/`, `tools/trace-recorder` |
 
 The ordered local run guide is `docs/LOCAL-RUN.md`.
 

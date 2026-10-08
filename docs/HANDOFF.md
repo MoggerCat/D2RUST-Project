@@ -6256,6 +6256,7 @@ Spec rules these confirm or settle were written from the 1.14d binary on `claude
 
 | Problem | Fix |
 |---|---|
+| 2026-10-08: the build passed 7,000+ tests and was reported about 99 % done, yet was not coherent or playable on the real install (rendering seams, rubber-banding, shop). Cloud code was built and tested only against invented "synthetic" fixtures and its own specs; nobody measured the real game for the cloud, and no check covered the seams between systems | M23 (real data and measured facts from the first commit, contract checks at seams), M24 (progress as remaining work); CLAUDE.md rule 1 rewritten: game files in the private data repo, cloud has them; measured facts in public `facts/` |
 | Ghidra 12.1 crashes on JDK 25 | use JDK 21 (`JAVA_HOME_OVERRIDE` in Ghidra's `launch.properties`) |
 | Cargo can't extend workspace lints | `d2-sim` repeats them in its own `[lints]` |
 | Running `cargo` outside the repo reinstalled `stable` (1.3 GB) | default toolchain set to 1.99.0 |
