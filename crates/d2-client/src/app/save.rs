@@ -171,6 +171,9 @@ fn now_secs() -> u32 {
         .map_or(0, |d| d.as_secs() as u32)
 }
 
+/// One NPC bit field per difficulty (`formats/d2s.md` §6).
+pub type NpcField = [[u8; 8]; 3];
+
 /// What the running game says about the player at save time.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Live {
@@ -194,6 +197,10 @@ pub struct Live {
     /// The game's map seed (game +0x7C, the DRLG init seed of act 0:
     /// `formats/d2s.md` §2.1 +0xAB); `None`: no DRLG (synthetic data).
     pub map_seed: Option<u32>,
+    /// The NPC fields A (first talk) and B (introduced) per difficulty
+    /// (`formats/d2s.md` §6, `PlayerQuests::first_talk` / `intro`);
+    /// `None`: no quest record for the player.
+    pub npcs: Option<(NpcField, NpcField)>,
 }
 
 /// Reads [`Live`] from the game's local player.
@@ -211,6 +218,12 @@ pub fn read_live(sim: &mut Sim) -> Result<Live, SaveError> {
     if stats.iter().any(|&(id, v)| id == LEVEL_STAT && v <= 0) {
         stats.clear();
     }
+    let npcs = sim
+        .world
+        .rest
+        .quests
+        .get(&player)
+        .map(|q| (q.first_talk, [0, 1, 2].map(|d| q.intro_bits(d))));
     let quests = sim.world.rest.quests.get(&player).map(|q| {
         let mut out = [[0u8; 96]; 3];
         for (rec, f) in out.iter_mut().zip(&q.flags) {
@@ -249,6 +262,7 @@ pub fn read_live(sim: &mut Sim) -> Result<Live, SaveError> {
         .and_then(Option::as_ref)
         .map(|d| d.init_seed);
     Ok(Live {
+        npcs,
         map_seed,
         stats,
         quests,
@@ -291,6 +305,11 @@ pub fn apply_live(base: &D2s, live: &Live, now: u32) -> D2s {
     }
     if let Some(records) = &live.quests {
         body.quests.records = *records;
+    }
+    // §6 rule 1: the writer copies A and B of each difficulty.
+    if let Some((a, b)) = live.npcs {
+        body.npcs.a = a;
+        body.npcs.b = b;
     }
     super::save_full::apply_extra(body, &live.extra);
     super::save_gaps::apply_gaps(&mut save, &live.gaps);

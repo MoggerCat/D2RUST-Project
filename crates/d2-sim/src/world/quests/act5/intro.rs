@@ -77,15 +77,14 @@ pub fn init(r: &mut QuestRecord) {
 /// `0x005723C0`: the NPC's intro bit.
 fn heard<W: QuestWorld>(w: &mut W, player: UnitId, class: u16) -> bool {
     let d = usize::from(w.difficulty());
-    w.quests(player)
-        .is_some_and(|q| q.intro[d].contains(&class))
+    w.quests(player).is_some_and(|q| q.heard(d, class))
 }
 
 /// `0x00572360`: set the NPC's intro bit.
 fn hear<W: QuestWorld>(w: &mut W, player: UnitId, class: u16) {
     let d = usize::from(w.difficulty());
     if let Some(q) = w.quests(player) {
-        q.intro[d].insert(class);
+        q.hear(d, class);
     }
 }
 

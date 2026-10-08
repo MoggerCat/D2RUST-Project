@@ -79,6 +79,21 @@ Branch `claude/q-fix-flow-save` (from `claude/q-tick-flow`, merged with
   the saved `code | 0x8000`, unbound `FF FF 00 00`, the reloaded slot),
   `app_save_gaps::hotkey_items_are_saved_as_positions_and_loaded_as_guids`.
 
+- `q-fix-save-npc-fields` (F5): `d2-sim` `PlayerQuests::first_talk`
+  holds field A (set `0x00572360` = `hear`, test `0x005723C0` = `heard`,
+  bit by `d2s::npc_bit`); `intro` stays field B, with `intro_bits` /
+  `set_intro_bits` for the writer and reader. The intro chains of acts
+  I, III, V and Malah's quest kept their first-talk bits in `intro`
+  (field B) — a conflation of the two fields; they now use field A, and
+  the `QuestWorld` defaults of `npc_intro_heard` / `set_npc_intro`
+  (chain 38, act II, which reported "unhandled") use it too. The save
+  writes A and B (`Live::npcs`); the app's loader restores both.
+  Changed to the spec (§6 r3, `quests.md` §6.7): `act1_intro_first_talk`,
+  act III `intro_bits` / `intro_active_and_status`, act V intro tests and
+  `q1_tests` read / seed field A instead of `intro`. Test
+  `smoke_save::npc_fields_round_trip` (Kashya heard in Normal → A =
+  `08 00 …`, the measured save).
+
 ## Open
 
 - The save's inventory flag bit 1 clear (`inventory-moves.md` §6.1 r4).

@@ -3258,6 +3258,8 @@ fn loader(
                             .iter()
                             .filter(|u| !(items_ok && u.step == "items"))
                             .filter(|u| !(corpses_ok && u.step == "corpse"))
+                            // Applied below, with the quest record.
+                            .filter(|u| u.step != "npc fields")
                             .map(|u| format!("join: save load: {u:?}")),
                     );
                     // Load §2 quests row (`0x0056A370` → `0x0065C4D0`,
@@ -3271,6 +3273,12 @@ fn loader(
                                 Ok(f) => quests.flags[d] = f,
                                 Err(e) => log.push(format!("join: save load: quests {d}: {e}")),
                             }
+                        }
+                        // `d2s.md` §6 rule 1 (reader `0x0056A470`): fields A
+                        // and B back into the player's NPC record.
+                        quests.first_talk = body.npcs.a;
+                        for (d, &b) in body.npcs.b.iter().enumerate() {
+                            quests.set_intro_bits(d, b);
                         }
                     }
                     (entry, quests)

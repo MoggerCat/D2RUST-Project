@@ -907,3 +907,48 @@ fn a_hotkey_bound_in_play_round_trips() {
     let unbound = again.with(|s| s.hotkeys(s.client_list()[0])[0]);
     assert_eq!(unbound.skill, -1);
 }
+
+/// The NPC fields (`d2s.md` §6): A (first talk, `0x00572360`) and B
+/// (introduced, `0x00572420`) are saved from the player's NPC record and
+/// read back. Kashya (class 150, bit 3) heard in Normal is A = `08 00 …`,
+/// the measured save of §6 rule 3.
+// Covers: specs/formats/d2s.md §6 r1, §6 r2, §6 r3
+#[test]
+fn npc_fields_round_trip() {
+    let dir = temp("npcs");
+    let file = dir.join("Npcs.d2s");
+    let character = single_player::new_character("sorceress", "Npcs").unwrap();
+    let run = Run::start(&character, &file);
+    run.with(|s| {
+        let (p, _) = single_player::local_player(s).unwrap();
+        let q = s.world.rest.quests.get_mut(&p).unwrap();
+        q.hear(0, 150);
+        // Akara (148, bit 2) introduced in Normal; Warriv (155, bit 4)
+        // heard in Hell.
+        q.intro[0].insert(148);
+        q.hear(2, 155);
+    });
+    run.save_and_exit();
+    let saved = read(&file, 0).unwrap();
+    let npcs = &saved.body.as_ref().unwrap().npcs;
+    assert_eq!(npcs.a[0], [0x08, 0, 0, 0, 0, 0, 0, 0]);
+    assert_eq!(npcs.a[2], [0x10, 0, 0, 0, 0, 0, 0, 0]);
+    assert_eq!(npcs.b[0], [0x04, 0, 0, 0, 0, 0, 0, 0]);
+    assert_eq!((npcs.a[1], npcs.b[1], npcs.b[2]), ([0; 8], [0; 8], [0; 8]));
+    let again = Run::start(&loaded(saved, 0), &dir.join("Npcs-again.d2s"));
+    let (heard, intro) = again.with(|s| {
+        let (p, _) = single_player::local_player(s).unwrap();
+        let q = &s.world.rest.quests[&p];
+        (
+            [q.heard(0, 150), q.heard(0, 148), q.heard(2, 155)],
+            q.intro[0].clone(),
+        )
+    });
+    assert_eq!(heard, [true, false, true]);
+    assert_eq!(intro, std::collections::BTreeSet::from([148]));
+    let log = again.log();
+    assert!(
+        !log.iter().any(|l| l.contains("npc fields")),
+        "the load applied the NPC fields: {log:?}"
+    );
+}
