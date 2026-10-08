@@ -979,13 +979,16 @@ impl AutomapReveal {
     /// One frame of `0x00459020` (called by the frame `0x0044C7EB`): a
     /// non-zero countdown is decremented instead; otherwise, when the
     /// player moved by `d = (2·max + min) / 2 ≥ 0x50` since the last
-    /// reveal, stores the position and reveals every near room of the
-    /// player's level (`level`).
+    /// reveal, stores the position and reveals every near room whose
+    /// level has the same leveldefs `Layer` as the player's level
+    /// (`level`; `layer` maps a level id to its `Layer`), not only the
+    /// rooms of the player's level.
     pub fn frame(
         &mut self,
         player: (i32, i32),
         level: u32,
         near: &NearRooms,
+        layer: impl Fn(u32) -> u32,
     ) -> Vec<RevealedRecord> {
         let mut out = Vec::new();
         if self.countdown != 0 {
@@ -999,8 +1002,9 @@ impl AutomapReveal {
             return out;
         }
         self.last = player;
+        let l = layer(level);
         for (ri, room) in near.rooms.iter().enumerate() {
-            if room.level == level {
+            if layer(room.level) == l {
                 reveal_room(ri, room, false, &mut out);
             }
         }

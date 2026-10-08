@@ -1320,19 +1320,21 @@ fn automap_reveal_distance_and_records() {
     let mut other = r.clone();
     other.level = 2;
     let n = near(vec![r, other]);
+    // Levels 1 and 2 on distinct leveldefs `Layer`s.
+    let own = |level: u32| level;
 
     let mut a = AutomapReveal {
         countdown: 0,
         last: (1000, 2000),
     };
     // d = 45 / 60: no reveal; the last position stays.
-    assert!(a.frame((1040, 2010), 1, &n).is_empty());
-    assert!(a.frame((1060, 2000), 1, &n).is_empty());
+    assert!(a.frame((1040, 2010), 1, &n, own).is_empty());
+    assert!(a.frame((1060, 2000), 1, &n, own).is_empty());
     assert_eq!(a.last, (1000, 2000));
     // d = 80 = 0x50: floors then walls of the player level's rooms,
     // drawn and not hidden.
     assert_eq!(
-        a.frame((1080, 2000), 1, &n),
+        a.frame((1080, 2000), 1, &n, own),
         [(0, TileArray::Floor, 0), (0, TileArray::Wall, 0)]
     );
     assert_eq!(a.last, (1080, 2000));
@@ -1341,12 +1343,38 @@ fn automap_reveal_distance_and_records() {
         countdown: 2,
         last: (0, 0),
     };
-    assert!(c.frame((5000, 0), 1, &n).is_empty());
+    assert!(c.frame((5000, 0), 1, &n, own).is_empty());
     assert_eq!((c.countdown, c.last), (1, (0, 0)));
     // The AutoMap preset path reveals every record.
     let mut all = Vec::new();
     reveal_room(0, &n.rooms[0], true, &mut all);
     assert_eq!(all.len(), 4);
+}
+
+// Covers: specs/render/draw-order.md §6 r7
+#[test]
+fn automap_reveal_takes_rooms_of_every_level_on_the_player_layer() {
+    // §6 r7: rooms whose level has the same leveldefs `Layer` as the
+    // player's level are revealed, not only the player level's rooms.
+    let mut r = room();
+    r.level = 1;
+    let mut drawn = record((0, 0), 1, 1);
+    drawn.flags |= REC_DRAWN;
+    r.walls.push(drawn);
+    let mut same = r.clone();
+    same.level = 2;
+    let mut apart = r.clone();
+    apart.level = 3;
+    let n = near(vec![r, same, apart]);
+    let layer = |level: u32| if level == 3 { 9 } else { 4 };
+    let mut a = AutomapReveal {
+        countdown: 0,
+        last: (0, 0),
+    };
+    assert_eq!(
+        a.frame((80, 0), 1, &n, layer),
+        [(0, TileArray::Wall, 0), (1, TileArray::Wall, 0)]
+    );
 }
 
 // Covers: specs/render/draw-order-2.md §11.5 r1; specs/render/draw-order.md §6 r2; specs/render/draw-order.md §6 r6

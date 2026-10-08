@@ -162,17 +162,14 @@ fn s7_slot_has_no_own_graphic_and_is_the_inline_slot() {
     assert_eq!(inline_slot(&three_layer(), 0, 0).unwrap(), None);
 }
 
+// unit-composite.md §5.1 r5, §10: a duplicate layer record is not an
+// error; every slot of the component uses the first record.
 #[test]
-fn duplicate_layer_records_are_an_error() {
+fn duplicate_layer_records_use_the_first_match() {
     let cof = parse(&cof_bytes(1, 1, &[(1, b"hth"), (1, b"1hs")], &[0], &[1, 1]));
-    assert_eq!(
-        slot_order(&cof, 0, 0),
-        Err(CompositeError::DuplicateLayer {
-            component: 1,
-            first: 0,
-            second: 1
-        })
-    );
+    let slots = slot_order(&cof, 0, 0).unwrap();
+    assert_eq!(components(&slots), [1, 1]);
+    assert!(slots.iter().all(|s| s.layer == 0));
 }
 
 #[test]
