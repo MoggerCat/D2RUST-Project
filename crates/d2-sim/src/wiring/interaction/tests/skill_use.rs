@@ -685,14 +685,16 @@ fn item_event_layer_split_is_the_1_14d_stuff() {
 #[test]
 fn use_line_clear_sees_a_wall_on_the_rooms_once_paths_are_on() {
     use crate::skills::use_::UseWorld;
-    let mut fx = Fx::new();
-    let player = fx.spawn(UnitType::Player, 10, 10);
     // Without the path provider the seam answers (the fixture's: clear).
-    let off = fx
+    let mut off = Fx::new();
+    let p = off.spawn(UnitType::Player, 10, 10);
+    assert!(off
         .sim
-        .skill_use(&mut fx.game, |w| w.line_clear(player, (16, 10), 0x805));
-    assert!(off);
+        .skill_use(&mut off.game, |w| w.line_clear(p, (16, 10), 0x805)));
+    // The server turns the provider on before any unit is allocated.
+    let mut fx = Fx::new();
     fx.sim.hooks().enable_paths().expect("embedded tables");
+    let player = fx.spawn(UnitType::Player, 10, 10);
     let clear = fx
         .sim
         .skill_use(&mut fx.game, |w| w.line_clear(player, (16, 10), 0x805));

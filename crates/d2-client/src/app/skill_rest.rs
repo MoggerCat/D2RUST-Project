@@ -326,11 +326,10 @@ impl UseRest for LocalSeams {
                 .or_else(|| self.pos.get(&t).copied()),
         }
     }
-    // d2rs-own, unverified (collision not reachable): clear. q-barb
-    // (REC-152): "blocked" refused every `lineofsight` skill at its start
-    // and left Double Swing's next-target scan (filter bit 0x200) empty;
-    // a wall between the two is not seen until the collision grid reaches
-    // the seams.
+    // d2rs-own, unverified: the fallback for a host without the path
+    // provider is "clear" (q-barb, REC-152: "blocked" refused every
+    // `lineofsight` skill). The play host has the provider, and the use
+    // view answers from the DRLG collision before asking here (REC-248).
     fn line_clear(&self, _: UnitId, _: (i32, i32), _: u32) -> bool {
         true
     }
