@@ -465,6 +465,14 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             .map_err(|e| warn!("state tints (d2rs-own, unverified): {e}; no unit tinted"))
             .ok();
         add_preview_tinted(&mut app, level_rows, tiles, lights, tints);
+        match crate::world_view::unit_facts::load(archives.as_ref()) {
+            Ok(t) => {
+                if let Some(mut state) = app.world_mut().get_resource_mut::<WorldViewState>() {
+                    state.feed.set_unit_fact_tables(t);
+                }
+            }
+            Err(e) => warn!("unit facts tables: {e}; draw order uses the preview fills only"),
+        }
         let mut item_parts =
             super::items::item_parts(archives.as_ref()).map_err(anyhow::Error::msg)?;
         if let Some(lookup) = item_lookup {

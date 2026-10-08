@@ -84,6 +84,10 @@ pub trait ViewFeed: ViewSource {
     /// highlighted (`blend-modes.md` §3 `h`). The default ignores it.
     fn set_hover(&mut self, _unit: Option<UnitKey>) {}
 
+    /// The table columns of the unit facts (`world_view::unit_facts`). The
+    /// default ignores them.
+    fn set_unit_fact_tables(&mut self, _tables: super::unit_facts::UnitFactTables) {}
+
     /// Whether the view places a cel cut by the frame edge and leaves it
     /// to the frame clip (`OriginalView::with_edge_clip`, decision D1). The
     /// default (strict) is `false`.
