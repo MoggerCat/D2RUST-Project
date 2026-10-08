@@ -2969,7 +2969,12 @@ fn loader(
                 // are the join's item messages (rule 3.5), sent after the
                 // stat messages.
                 let (entry, report, items) = load_new_character_with_items(s, player, r.char_name);
-                super::save_gaps::seed_new_flags(s, player, GAME_SETUP.expansion);
+                super::save_gaps::seed_new_flags(
+                    s,
+                    player,
+                    GAME_SETUP.expansion,
+                    character.difficulty(),
+                );
                 let own: Vec<Vec<u8>> = items
                     .sent
                     .iter()
