@@ -22,6 +22,7 @@ use d2_client::app::save::{self, Live, SaveHandle, SharedLink};
 use d2_client::app::single_player::{self, Character, GameData, Sim, DEFAULT_SEED};
 use d2_client::app::ui::{add_original_ui, UiParts};
 use d2_client::assets::path::MemorySource;
+use d2_client::bridge::BridgeResource;
 use d2_client::controls::Action;
 use d2_client::ui::{ActionId, Point, PointerButton, UiEvent};
 use d2_client::world_view::tile_assets::TileAssets;
@@ -844,4 +845,65 @@ fn the_window_close_leaves_through_the_server_first() {
             .unwrap_or_default()
     });
     assert!(!faults.contains("Save"), "{faults}");
+}
+
+/// A hot key bound in play (C→S 0x51, `intents-events.md` §9 r12) is
+/// saved from the client slot (`d2s.md` §2.4 r8: code with the left
+/// flag, item index), and the reload puts it back in the client slot
+/// (§2.4 r4–r6); unbound slots save as `FF FF 00 00` (r7).
+// Covers: specs/formats/d2s.md §2.4 r1, §2.4 r4, §2.4 r5, §2.4 r7, §2.4 r8
+#[test]
+fn a_hotkey_bound_in_play_round_trips() {
+    let dir = temp("hotkey");
+    let file = dir.join("Hotkey.d2s");
+    let character = single_player::new_character("sorceress", "Hotkey").unwrap();
+    let mut run = Run::start(&character, &file);
+    // Slot 3: the first skill of the player's list (a native one), left
+    // hand, no item (GUID −1).
+    let skill = run.with(|s| {
+        let (p, _) = single_player::local_player(s).unwrap();
+        let l = &s.events.action.hooks().skill_lists[&p];
+        l.entries.iter().find(|e| e.owner == -1).unwrap().skill
+    });
+    let code = skill as u16 | 0x8000;
+    let mut bind = vec![0x51];
+    bind.extend_from_slice(&code.to_le_bytes());
+    bind.extend_from_slice(&[3, 0]);
+    bind.extend_from_slice(&u32::MAX.to_le_bytes());
+    run.app
+        .world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .send_bytes(&bind)
+        .unwrap();
+    run.step(3);
+    let key = run.with(|s| s.hotkeys(s.client_list()[0])[3]);
+    assert_eq!(
+        (key.skill, key.left),
+        (skill as i16, true),
+        "0x51 stored the slot"
+    );
+    run.save_and_exit();
+    let saved = read(&file, 0).unwrap();
+    assert_eq!(
+        saved.header.hotkeys[3],
+        d2s::Slot {
+            code: 0x8000,
+            item: 0
+        }
+    );
+    for (i, s) in saved.header.hotkeys.iter().enumerate() {
+        if i != 3 {
+            assert_eq!(*s, d2s::Slot::NONE, "slot {i} unbound");
+        }
+    }
+    let again = Run::start(&loaded(saved, 0), &dir.join("Hotkey-again.d2s"));
+    let key = again.with(|s| s.hotkeys(s.client_list()[0])[3]);
+    assert_eq!(
+        (key.skill, key.left),
+        (0, true),
+        "the load restored the slot"
+    );
+    let unbound = again.with(|s| s.hotkeys(s.client_list()[0])[0]);
+    assert_eq!(unbound.skill, -1);
 }

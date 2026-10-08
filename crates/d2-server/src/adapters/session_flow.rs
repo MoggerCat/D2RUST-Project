@@ -1,4 +1,4 @@
-// Spec: specs/sim/intents-events.md §2.5, §8.1, §8.2; specs/sim/path-placement.md §13 rule 2; specs/flows/save-exit.md §2
+// Spec: specs/sim/intents-events.md §2.5, §8.1, §8.2; specs/sim/path-placement.md §13 rule 2; specs/flows/save-exit.md §2; specs/formats/d2s.md §2.4 r5
 //! The single-player session sequence on the host's drain
 //! (`intents-events.md` §8): C→S 0x67 (game creation, `0x0052C330` →
 //! `0x00530BF0`) and C→S 0x6B (join, `0x0052C550` → `0x00530190`), both
@@ -51,6 +51,7 @@ use d2_sim::units::lists::client_state;
 use d2_sim::units::messages as msg;
 use d2_sim::units::UnitId;
 
+use super::handlers::player::HotKey;
 use super::handlers::world::ActionEvents;
 use super::session::{enter_game, Entry, GameSetup, JoinError};
 use super::storage::SaveFault;
@@ -512,6 +513,20 @@ impl<D: ActionEvents, W> SessionFlow<D, W> {
         };
         if let Some(e) = s.game.lists.client_mut(id) {
             e.player = Some(loaded.player);
+        }
+        // The load writes the client's hot-key slots (`formats/d2s.md`
+        // §2.4 rules 5–6, `0x0056A283`): the slots the save reads back and
+        // C→S 0x51 changes (`intents-events.md` §9 rule 12). Unbound slots
+        // (skill −1) stay as a new record holds them.
+        for (slot, k) in loaded.entry.hotkeys.iter().enumerate() {
+            if k.skill >= 0 {
+                let key = HotKey {
+                    skill: k.skill,
+                    left: k.flag,
+                    item: k.item,
+                };
+                s.set_hotkey(client, slot, key);
+            }
         }
         match enter_game(s, client, &loaded.entry) {
             Ok(p) => Some(p),

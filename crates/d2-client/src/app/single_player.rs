@@ -3240,11 +3240,17 @@ fn loader(
                 (entry, PlayerQuests::default())
             }
             Character::Save(save, ctx) => match load_save(s, player, save, ctx) {
-                Ok((entry, report)) => {
+                Ok((mut entry, report)) => {
                     // q-save-full: the save's items, made on the wired host.
                     let items_ok = super::save_full::join_items(s, player, save);
                     let corpses_ok = super::save_full::join_corpses(s, player, save);
                     super::save_gaps::join_gaps(s, player, save);
+                    // `d2s.md` §2.4 rules 4–6: the hot keys, their item
+                    // indices resolved over the loaded inventory list.
+                    entry.hotkeys = super::save_gaps::loaded_hotkeys(
+                        &save.header.hotkeys,
+                        &s.world.item_guids(player),
+                    );
                     let log = &mut s.events.action.hooks().x.log;
                     log.extend(
                         report

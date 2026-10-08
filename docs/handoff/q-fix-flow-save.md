@@ -65,6 +65,20 @@ Branch `claude/q-fix-flow-save` (from `claude/q-tick-flow`, merged with
   asserts the saved seed, the town byte and the same rects of levels 1–3
   (M08: without the write the saved seed is 0 and the leg fails).
 
+- `q-fix-save-hotkeys` (F4): the save encodes the client record's 16
+  slots (`SimGame::hotkeys`, written by C→S 0x51) with the item GUID as
+  its 1-based inventory position (`save_gaps::hotkey_slots`, §2.4 r1–r2,
+  r8); the load decodes the save's slots, resolves the indices to GUIDs
+  over the loaded items (`save_gaps::loaded_hotkeys`, r4, r6.1) into the
+  join entry (so the join's 0x7B go out), and `SessionFlow` writes them to
+  the client record (r5). Seam fix found on the way: the 0x51 check
+  `ActionPlayer::has_skill` read `Pending::skill_list`, which the play
+  host never provides, so every 0x51 in play was refused with 3; it now
+  reads `ActionHooks::skill_list_of` (the wired list, else the Pending's).
+  Tests: `smoke_save::a_hotkey_bound_in_play_round_trips` (a real 0x51,
+  the saved `code | 0x8000`, unbound `FF FF 00 00`, the reloaded slot),
+  `app_save_gaps::hotkey_items_are_saved_as_positions_and_loaded_as_guids`.
+
 ## Open
 
 - The save's inventory flag bit 1 clear (`inventory-moves.md` §6.1 r4).
