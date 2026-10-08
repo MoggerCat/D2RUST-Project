@@ -257,6 +257,7 @@ fn remove_state<H: UnitHooks>(
 ) -> Result<(), UnitError> {
     let f = sim.game.frame;
     sim.stats.expire_lists(hooks, unit, f)?;
+    hooks.lists_expired(sim, unit);
     Ok(())
 }
 
