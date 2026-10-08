@@ -39,6 +39,7 @@ pub mod copy;
 pub mod equip_rules;
 pub mod host;
 pub mod inv_world;
+pub mod load;
 pub mod merc;
 pub mod ops;
 pub mod pending;

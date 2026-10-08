@@ -28,12 +28,14 @@
 mod action;
 mod hireling_drive;
 mod hireling_host;
+mod item_save;
 mod wired;
 
 #[cfg(test)]
 pub(crate) mod tests;
 
 pub use action::{ActionEvents, ActionWorld, Outbox, ProcessState};
+pub use item_save::LoadedItems;
 pub use wired::{Parts, TradeRest, WiredWorld};
 
 use d2_sim::game::Game;

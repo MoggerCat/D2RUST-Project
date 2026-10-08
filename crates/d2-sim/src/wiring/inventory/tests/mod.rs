@@ -15,6 +15,7 @@ mod equip;
 mod gold;
 mod ground;
 mod host;
+mod load;
 mod mutant_tests;
 mod queries;
 mod save_index;
