@@ -349,6 +349,14 @@ pub trait WorldHost<D> {
     ) -> Option<PlayerOutcome> {
         None
     }
+    /// The path positions (sub-tiles) of the listed units that have a
+    /// path, read at the end of each tick to move the staged
+    /// [`UnitFacts`](super::UnitFacts) the point-message parser reads
+    /// (`intents-events.md` §2.4 rule 3). Default: none (the caller
+    /// stages positions itself).
+    fn unit_positions(&mut self, events: &mut D, units: &[UnitId]) -> Vec<(UnitId, (i32, i32))> {
+        Vec::new()
+    }
     /// The walk / run handlers (`handlers::walk`) on the path provider.
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
         None
