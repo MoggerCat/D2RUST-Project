@@ -34,6 +34,7 @@ pub mod strings;
 pub mod synthetic_act2;
 pub mod synthetic_act4;
 pub mod synthetic_burial;
+pub mod synthetic_chains;
 pub mod synthetic_maze;
 pub mod synthetic_tower;
 pub mod town_npcs;
