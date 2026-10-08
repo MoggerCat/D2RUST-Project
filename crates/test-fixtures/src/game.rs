@@ -284,10 +284,7 @@ impl GameData {
         act: u8,
         town: u32,
     ) -> Result<DrlgWorld, GameError> {
-        let drlg_err = |source| GameError::Drlg {
-            act,
-            source,
-        };
+        let drlg_err = |source| GameError::Drlg { act, source };
         let mut handle = types.clone();
         let drlg = match creation {
             ActCreation::Full => {
