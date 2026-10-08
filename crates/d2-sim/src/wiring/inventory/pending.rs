@@ -460,8 +460,28 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         }
         self.rest.remove_used(player, item)
     }
+    /// §4.9 on the inventory model (`equip_without_cursor`, skip 0), then
+    /// unit flag 0x2000000 cleared (`inventory.md` §4.9 step 3).
     fn equip_picked(&mut self, player: Owner, item: Guid) -> bool {
-        self.rest.equip_picked(player, item)
+        let Some(u) = self.item_unit(item) else {
+            return false;
+        };
+        let t = self.tables;
+        let ok = self
+            .with_inv(player, |inv, d| {
+                crate::items::inventory::equip::equip_without_cursor(inv, d, t, u, false)
+            })
+            .unwrap_or(false);
+        if ok {
+            let o = Owner::item(item);
+            let f = crate::items::moves::MoveUnits::unit_flags(self, o);
+            crate::items::moves::MoveUnits::set_unit_flags(
+                self,
+                o,
+                f & !crate::items::moves::uflag::ON_GROUND,
+            );
+        }
+        ok
     }
     /// The filler's properties (`properties.md` §9,
     /// [`InvDesk::apply_filler_properties`]), then the owner link
