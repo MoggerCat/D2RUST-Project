@@ -277,6 +277,13 @@ impl ItemsUi {
 
     /// The cursor item (`panels-3.md` §23 r9): its graphic with the
     /// top-left at (mx − gw / 2, my − gh / 2) (adj 0, halves rounded down).
+    /// The cursor item's graphic frame size `gw` × `gh` (`panels-3.md`
+    /// §23 r9), when its art is known.
+    pub fn cursor_graphic_size(&self, files: &UiFiles, item: &ItemView) -> Option<(u32, u32)> {
+        let a = self.art(files, item, (29, 29))?;
+        Some((a.gw as u32, a.gh as u32))
+    }
+
     pub fn draw_cursor(
         &self,
         world: &ClientWorld,

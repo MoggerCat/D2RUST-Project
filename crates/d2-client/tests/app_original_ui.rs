@@ -72,6 +72,14 @@ fn panel_files() -> MemorySource {
         ("panel\\800borderframe", 10),
         ("panel\\800ctrlpnl7", 6),
         ("panel\\goldcoinbtn", 2),
+        // The cursor cels, drawn every frame (`panels-3.md` §23 r1).
+        ("cursor\\gaunt", 1),
+        ("cursor\\grasp", 8),
+        ("cursor\\ohand", 8),
+        ("cursor\\orotate", 8),
+        ("cursor\\ppress", 8),
+        ("cursor\\protate", 8),
+        ("cursor\\buysell", 10),
     ] {
         s.insert(&format!("data\\global\\ui\\{name}.dc6"), dc6(frames));
     }
@@ -134,13 +142,15 @@ fn hotkey_opens_the_inventory_in_the_apps_frame() {
     let state = app.world().resource::<WorldViewState>();
     let last = state.last.unwrap();
     // Inventory art 4 + gold button 1 + close 1, right border 5, control
-    // panel 6 (no local player: no HUD overlay).
-    assert_eq!((last.items, last.ui_unhandled), (17, 1));
-    assert_eq!(state.assets.frames.len(), 8 + 12 + 10 + 6 + 2);
+    // panel 6 (no local player: no HUD overlay), the cursor cel last
+    // (`panels-3.md` §23 r9–r10: `protate`, 8 frames loaded).
+    assert_eq!((last.items, last.ui_unhandled), (18, 1));
+    assert_eq!(state.assets.frames.len(), 8 + 12 + 10 + 6 + 2 + 8);
     let world = app.world().resource::<BridgeResource>().0.world();
     assert_eq!(state.feed.open_mode(world).unwrap().get(), 1);
 
-    // Toggle again: closed, mode 0; only the control panel is drawn.
+    // Toggle again: closed, mode 0; only the control panel and the cursor
+    // are drawn.
     app.world_mut()
         .non_send_mut::<WorldViewUi>()
         .queue
@@ -149,7 +159,7 @@ fn hotkey_opens_the_inventory_in_the_apps_frame() {
     ms.fetch_add(40, Ordering::SeqCst);
     app.update();
     let state = app.world().resource::<WorldViewState>();
-    assert_eq!(state.last.unwrap().items, 6);
+    assert_eq!(state.last.unwrap().items, 7);
     let world = app.world().resource::<BridgeResource>().0.world();
     assert_eq!(state.feed.open_mode(world).unwrap().get(), 0);
 

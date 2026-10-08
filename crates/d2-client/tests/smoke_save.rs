@@ -136,6 +136,14 @@ fn panel_files() -> MemorySource {
         ("panel\\800borderframe", 10),
         ("panel\\800ctrlpnl7", 6),
         ("panel\\goldcoinbtn", 2),
+        // The cursor cels, drawn every frame (`panels-3.md` §23 r1).
+        ("cursor\\gaunt", 1),
+        ("cursor\\grasp", 8),
+        ("cursor\\ohand", 8),
+        ("cursor\\orotate", 8),
+        ("cursor\\ppress", 8),
+        ("cursor\\protate", 8),
+        ("cursor\\buysell", 10),
     ] {
         s.insert(&format!("data\\global\\ui\\{name}.dc6"), dc6(frames));
     }

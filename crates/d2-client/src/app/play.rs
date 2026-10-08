@@ -421,6 +421,12 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     ))?;
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
         primary_window: Some(super::config::window_for(&settings)),
+        // The game draws its own cursor (`ui/panels-3.md` §23,
+        // `ui::original::cursor_ui`): the OS cursor is hidden.
+        primary_cursor_options: Some(bevy::window::CursorOptions {
+            visible: false,
+            ..default()
+        }),
         ..default()
     }));
     app.insert_resource(super::config::ConfigRes {

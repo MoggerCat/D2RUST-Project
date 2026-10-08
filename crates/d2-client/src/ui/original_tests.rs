@@ -227,7 +227,7 @@ fn panel_images(v: &[(String, u32, i32, i32)], prefix: &str) -> Vec<(u32, i32, i
 // Covers: specs/ui/panels.md §5, §6 r1, §6 r2
 // Covers: specs/ui/panels-3.md §23 r9
 // (the cursor item and the step-10 tips in the last panel, after the HUD
-// of step 7)
+// of step 7; the HUD (step 7) before the NPC menu family (step 9))
 #[test]
 fn install_mirrors_the_flags_and_keeps_the_border_open() {
     let u = ui(Some(areas()), true);
@@ -235,8 +235,8 @@ fn install_mirrors_the_flags_and_keeps_the_border_open() {
         u.root.open_panels(),
         vec![
             BORDER_PANEL,
-            crate::ui::hire_list::HIRE_PANEL,
             hud::HUD_PANEL,
+            crate::ui::hire_list::HIRE_PANEL,
             crate::ui::original::gold_dialog::GOLD_PANEL,
             crate::ui::original::game_messages::MESSAGES_PANEL,
             crate::ui::original::overhead_ui::OVERHEAD_PANEL,
@@ -278,8 +278,8 @@ fn hotkeys_toggle_their_state_with_the_specs_jump() {
         vec![
             PanelId(1),
             BORDER_PANEL,
-            crate::ui::hire_list::HIRE_PANEL,
             hud::HUD_PANEL,
+            crate::ui::hire_list::HIRE_PANEL,
             crate::ui::original::gold_dialog::GOLD_PANEL,
             crate::ui::original::game_messages::MESSAGES_PANEL,
             crate::ui::original::overhead_ui::OVERHEAD_PANEL,
@@ -302,8 +302,8 @@ fn hotkeys_toggle_their_state_with_the_specs_jump() {
         u.root.open_panels(),
         vec![
             BORDER_PANEL,
-            crate::ui::hire_list::HIRE_PANEL,
             hud::HUD_PANEL,
+            crate::ui::hire_list::HIRE_PANEL,
             crate::ui::original::gold_dialog::GOLD_PANEL,
             crate::ui::original::game_messages::MESSAGES_PANEL,
             crate::ui::original::overhead_ui::OVERHEAD_PANEL,

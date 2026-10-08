@@ -271,6 +271,10 @@ struct Shared {
     cube_opened: bool,
     /// The transmute animation (`panels.md` §12 r4, [`cube_ui`]).
     cube_anim: std::cell::Cell<super::panels::stash_cube::HoradricAnim>,
+    /// The mouse cursor machine (`panels-3.md` §23), drawn last by
+    /// [`TopUi`], and the local copy of the client seed its step draws on.
+    cursor: RefCell<super::cursor::Cursor>,
+    cursor_seed: std::cell::Cell<Option<u64>>,
 }
 
 impl Shared {
@@ -381,6 +385,7 @@ impl OriginalUi {
         tables.files.extend(quest_log_ui::quest_files());
         tables.files.extend(cube_ui::cube_files());
         tables.files.extend(npc_talk::socket_files());
+        tables.files.extend(cursor_files());
         tables.files.extend(skill_tree_ui::icon_files());
         let shared = Shared {
             tables,
@@ -414,6 +419,14 @@ impl OriginalUi {
             bubbles: Default::default(),
             cube_opened: false,
             cube_anim: Default::default(),
+            // §23 r3: init with adj 0 (the only caller passes 0).
+            cursor: RefCell::new(super::cursor::Cursor::init(
+                0,
+                config.screen.w,
+                config.screen.h,
+                0,
+            )),
+            cursor_seed: std::cell::Cell::new(None),
         };
         Ok(Self {
             shared: Rc::new(RefCell::new(shared)),
@@ -434,10 +447,33 @@ impl OriginalUi {
     /// control panel (step 7).
     pub fn install(&self, root: &mut UiRoot) -> Result<(), UiError> {
         let sh = &self.shared;
+        // `panels.md` §5 (draw order = add order; the root routes the
+        // last-added first): step 4 the quest log (ui 0x0F), step 5 the
+        // inventory family, step 6 skill tree, character and waypoint,
+        // step 7 the border and control panel with the HUD overlays, step
+        // 9 the NPC menu family (ui 8: menu box, hire box) and ui 0x0E. The
+        // Esc menu (step 1) stays above: its input routing is coupled to
+        // the add order (q-fix-ui-input).
+        root.add(Box::new(quest_log_ui::QuestLogUi {
+            sh: sh.clone(),
+            log: Default::default(),
+        }))?;
         root.add(Box::new(InventoryUi {
             sh: sh.clone(),
             shop: self.shop.clone(),
             panel: InventoryPanel::default(),
+        }))?;
+        root.add(Box::new(stash_ui::StashUi {
+            sh: sh.clone(),
+            input: Default::default(),
+        }))?;
+        root.add(Box::new(shop_ui::ShopUi {
+            sh: sh.clone(),
+            st: self.shop.clone(),
+        }))?;
+        root.add(Box::new(cube_ui::CubeUi {
+            sh: sh.clone(),
+            input: Default::default(),
         }))?;
         root.add(Box::new(SkillTreeUi {
             sh: sh.clone(),
@@ -452,23 +488,8 @@ impl OriginalUi {
             panel: Default::default(),
             seq: 0,
         }))?;
-        root.add(Box::new(quest_log_ui::QuestLogUi {
-            sh: sh.clone(),
-            log: Default::default(),
-        }))?;
-        root.add(Box::new(stash_ui::StashUi {
-            sh: sh.clone(),
-            input: Default::default(),
-        }))?;
-        root.add(Box::new(shop_ui::ShopUi {
-            sh: sh.clone(),
-            st: self.shop.clone(),
-        }))?;
-        root.add(Box::new(cube_ui::CubeUi {
-            sh: sh.clone(),
-            input: Default::default(),
-        }))?;
         root.add(Box::new(BorderUi { sh: sh.clone() }))?;
+        root.add(Box::new(hud::HudUi { sh: sh.clone() }))?;
         root.add(Box::new(super::hire_list::HireListUi {
             st: self.hire.clone(),
         }))?;
@@ -483,7 +504,6 @@ impl OriginalUi {
             sh: sh.clone(),
             st: self.npcm.clone(),
         }))?;
-        root.add(Box::new(hud::HudUi { sh: sh.clone() }))?;
         root.add(Box::new(gold_dialog::GoldDialogUi { sh: sh.clone() }))?;
         root.add(Box::new(game_messages::MessagesUi { sh: sh.clone() }))?;
         root.open(game_messages::MESSAGES_PANEL)?;
@@ -610,6 +630,7 @@ impl OriginalUi {
     /// Reads the model facts of the next event (call before routing it).
     pub fn before_event(&mut self, e: UiEvent, world: &ClientWorld) {
         self.refresh_facts(world);
+        self.cursor_event(e, world);
         if let Some(p) = e.at() {
             self.shared.borrow_mut().mouse = p;
             self.track_grid_hover(world, p);
@@ -1662,9 +1683,9 @@ impl Panel for TopUi {
                 out,
             );
         }
-        // The cursor item last (`panels-3.md` §23 r9).
-        sh.items
-            .draw_cursor(ctx.world, &sh.tables.files, (29, 29), sh.mouse, out);
+        // The cursor last: the item's graphic or the type's cel
+        // (`panels-3.md` §23 r9–r11, `cursor_ui`).
+        cursor_ui::draw(&sh, ctx, out);
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {
@@ -1700,12 +1721,15 @@ pub mod hud_tips;
 
 #[path = "cube_ui.rs"]
 pub(super) mod cube_ui;
+#[path = "cursor_ui.rs"]
+pub mod cursor_ui;
 #[path = "msg_ui.rs"]
 pub mod msg_ui;
 #[path = "npc_box.rs"]
 pub mod npc_box;
 #[path = "npc_talk.rs"]
 pub mod npc_talk;
+use cursor_ui::cursor_files;
 #[path = "quest_log_ui.rs"]
 pub mod quest_log_ui;
 #[cfg(test)]
