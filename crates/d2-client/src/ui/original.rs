@@ -186,6 +186,9 @@ struct Facts {
     player: Option<PlayerLife>,
     /// An expansion game (`[0x007A04F4]`).
     expansion_game: bool,
+    /// A local player with a room (`0x00620BB0`; d2rs-own: read as a
+    /// position), for the waypoint close hook.
+    player_room: bool,
 }
 
 impl Facts {
@@ -200,6 +203,7 @@ impl Facts {
                 dead: u.mode == 0x11,
             }),
             expansion_game: world.expansion != 0,
+            player_room: local.is_some_and(|u| u.position.is_some()),
         }
     }
 }
@@ -326,6 +330,9 @@ pub struct OriginalUi {
     shop: shop_ui::SharedShop,
     /// The NPC menu (`ui/npc_menu_ui.rs`, `menus.md` §2).
     pub(super) npcm: super::npc_menu_ui::SharedNpcMenu,
+    /// The C→S messages of the close hooks (`panels.md` §2 r6) not yet
+    /// handed to the root ([`Self::flush_hooks`]).
+    hook_intents: Vec<super::ClientIntent>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -371,6 +378,7 @@ impl OriginalUi {
                 class: None,
                 player: None,
                 expansion_game: false,
+                player_room: false,
             },
             mouse: Point::new(0, 0),
             outputs: Vec::new(),
@@ -402,6 +410,7 @@ impl OriginalUi {
             hire: super::hire_list::SharedHire::default(),
             shop: shop_ui::SharedShop::default(),
             npcm: Default::default(),
+            hook_intents: Vec::new(),
         })
     }
 
@@ -631,7 +640,9 @@ impl OriginalUi {
                 }
                 PanelOutput::SetUi { ui, mode, jump } => {
                     let was_menu = ui == super::states::id::ESC_MENU && self.is_open(ui);
-                    self.set_ui(u32::from(ui), u32::from(mode), jump)?;
+                    // The panel's outputs already carry its own close
+                    // hook's message (`stash_input`, `waypoint`).
+                    self.set_ui_from(u32::from(ui), u32::from(mode), jump, Some(ui))?;
                     // Return to Game closes the menu through
                     // `0x0047E200(1)` (`frontend-options.md` §O1 r3).
                     if was_menu && !self.is_open(ui) {
@@ -659,8 +670,73 @@ impl OriginalUi {
                 }
             }
         }
+        self.flush_hooks(root);
         root.sync_states(&self.shared.borrow().states);
         Ok(())
+    }
+
+    /// Hands the close hooks' messages to the root, in call order.
+    pub fn flush_hooks(&mut self, root: &mut UiRoot) {
+        for i in self.hook_intents.drain(..) {
+            root.queue_intent(i);
+        }
+    }
+
+    /// The close hook `0x00455AE0(ui)` (`panels.md` §2 r6), the parts
+    /// that send: stash (ui 0x19, `0x00489EE0`, §11 r5, r7: only in
+    /// inventory mode 0x0C / 0x0D, mode := 0, C→S 0x4F 0x12), cube (ui
+    /// 0x1A, `0x0048A500`: mode := 0, the latched 0x4F 0x17 of
+    /// `0x0048A050`, §12 r7) and waypoint (ui 0x14, `0x0049CF50`: the
+    /// latched 0x49 level 0, `menus.md` §1.5, with a player and its
+    /// room). `send` false: the caller's outputs carry the message
+    /// already (a panel's own close path); the mode is still reset.
+    ///
+    /// d2rs-own reading: the latches (`[0x007BCE9C]`-family cube close
+    /// sent, `[0x007BF085]`) live in the panels; every panel path that
+    /// sets one closes its state in the same outputs (and its hook runs
+    /// with `send` false), so on any other close the latch is clear and
+    /// the hook sends. "Its room" is read as the local player having a
+    /// position.
+    fn close_hook(&mut self, ui: u8, send: bool) {
+        use super::states::id;
+        let msg = match ui {
+            id::STASH => {
+                if !matches!(
+                    self.msg.inventory_mode,
+                    msg_ui::MODE_STASH | msg_ui::MODE_STASH_2
+                ) {
+                    return;
+                }
+                self.msg.inventory_mode = 0;
+                super::ClientIntent::from_message(&d2_proto::client::ClickButton {
+                    button: 0x12,
+                    p1: 0,
+                    p2: 0,
+                })
+            }
+            id::CUBE => {
+                self.msg.inventory_mode = 0;
+                super::ClientIntent::from_message(&d2_proto::client::ClickButton {
+                    button: 0x17,
+                    p1: 0,
+                    p2: 0,
+                })
+            }
+            id::WAYPOINT => {
+                let sh = self.shared.borrow();
+                let Some(open) = sh.waypoint_open.filter(|_| sh.facts.player_room) else {
+                    return;
+                };
+                super::ClientIntent::from_message(&d2_proto::client::TakeOrCloseWp {
+                    wp: open.guid,
+                    level: 0,
+                })
+            }
+            _ => return,
+        };
+        if send {
+            self.hook_intents.push(msg);
+        }
     }
 
     /// Esc (command 56, `frontend-options.md` §O1 r2–r4): with ui 9 open
@@ -791,16 +867,45 @@ impl OriginalUi {
 
     /// `SetUIState(ui, mode, jump)` with the model's gate facts; effects
     /// are kept for [`Self::take_outcome`].
+    /// Every state it closes runs its close hook ([`Self::close_hook`]);
+    /// the hooks' messages leave at the next [`Self::flush_hooks`].
     pub fn set_ui(&mut self, ui: u32, mode: u32, jump: bool) -> Result<bool, UiStateError> {
-        let mut sh = self.shared.borrow_mut();
-        let mut env = sh.gate_env();
-        let r = sh
-            .states
-            .set(ui, mode, jump, &mut env, &mut self.outcome.effects);
-        // The Esc menu always reopens on its first page.
-        if ui == u32::from(esc_menu::ESC_PANEL.0) {
-            sh.esc.menu.open();
-            sh.esc.controls = None;
+        self.set_ui_from(ui, mode, jump, None)
+    }
+
+    /// [`Self::set_ui`] for a panel's `SetUi` output: the close hook of
+    /// `own` sends nothing (the panel's outputs carry its message); the
+    /// other states the gate closes run theirs in full.
+    fn set_ui_from(
+        &mut self,
+        ui: u32,
+        mode: u32,
+        jump: bool,
+        own: Option<u8>,
+    ) -> Result<bool, UiStateError> {
+        let start = self.outcome.effects.len();
+        let r = {
+            let mut sh = self.shared.borrow_mut();
+            let mut env = sh.gate_env();
+            let r = sh
+                .states
+                .set(ui, mode, jump, &mut env, &mut self.outcome.effects);
+            // The Esc menu always reopens on its first page.
+            if ui == u32::from(esc_menu::ESC_PANEL.0) {
+                sh.esc.menu.open();
+                sh.esc.controls = None;
+            }
+            r
+        };
+        let closed: Vec<u8> = self.outcome.effects[start..]
+            .iter()
+            .filter_map(|e| match e {
+                UiEffect::Closed(u) => Some(*u),
+                _ => None,
+            })
+            .collect();
+        for u in closed {
+            self.close_hook(u, own != Some(u));
         }
         r
     }

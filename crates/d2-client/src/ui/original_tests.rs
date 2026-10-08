@@ -1318,3 +1318,88 @@ mod grid_hover {
         assert_eq!(u.root.take_intents(), vec![want]);
     }
 }
+
+/// The close hooks `0x00455AE0` (`panels.md` §2 r6) of a close that is
+/// not the panel's own button: Esc's close-all here.
+mod close_hooks {
+    use super::*;
+    use crate::ui::states::id;
+
+    fn alive() -> ClientWorld {
+        let mut w = world(AMAZON, 1, true);
+        let p = w.local_player.unwrap();
+        w.units.get_mut(&p).unwrap().position = Some((100, 100));
+        w
+    }
+
+    fn esc(u: &mut Ui, w: &ClientWorld) -> Vec<ClientIntent> {
+        u.key(w, Action::GameMenu);
+        u.root.take_intents()
+    }
+
+    // Stash open in inventory mode 0x0C (S→C 0x77 0x10), Esc: the hook
+    // sends one 0x4F 0x12 and resets the mode; opened without the mode
+    // (not by the server) it sends nothing (§11 r7).
+    // Covers: specs/ui/panels.md §2 r6, §2 r9, §11 r5, §11 r7
+    #[test]
+    fn esc_closing_the_stash_sends_one_0x4f_0x12() {
+        let w = alive();
+        let mut u = ui(Some(areas()), true);
+        u.ui.set_ui(u32::from(id::STASH), 0, false).unwrap();
+        u.ui.msg.inventory_mode = msg_ui::MODE_STASH;
+        u.ui.sync_root(&mut u.root);
+        assert_eq!(
+            esc(&mut u, &w),
+            vec![ClientIntent(vec![0x4F, 0x12, 0, 0, 0, 0, 0])]
+        );
+        assert!(!u.ui.is_open(id::STASH));
+        assert_eq!(u.ui.msg.inventory_mode, 0);
+        // Mode 0: the hook sends nothing.
+        u.ui.set_ui(u32::from(id::STASH), 0, false).unwrap();
+        u.ui.sync_root(&mut u.root);
+        assert!(esc(&mut u, &w).is_empty());
+    }
+
+    // Covers: specs/ui/panels.md §2 r6, §12 r7; specs/ui/panels-2.md §20 r4
+    #[test]
+    fn esc_closing_the_cube_sends_one_0x4f_0x17() {
+        let w = alive();
+        let mut u = ui(Some(areas()), true);
+        u.ui.set_ui(u32::from(id::CUBE), 0, false).unwrap();
+        u.ui.msg.inventory_mode = msg_ui::MODE_CUBE;
+        u.ui.sync_root(&mut u.root);
+        assert_eq!(
+            esc(&mut u, &w),
+            vec![ClientIntent(vec![0x4F, 0x17, 0, 0, 0, 0, 0])]
+        );
+        assert_eq!(u.ui.msg.inventory_mode, 0);
+    }
+
+    // The waypoint menu open (S→C 0x63 stored), Esc: the latched 0x49
+    // with level 0; without a room for the player nothing is sent.
+    // Covers: specs/ui/panels.md §2 r6, §13 r1; specs/ui/menus.md §1 r5
+    #[test]
+    fn esc_closing_the_waypoint_menu_sends_0x49_level_0() {
+        let open = WaypointOpen {
+            guid: 0x0A,
+            record: Default::default(),
+            current: 1,
+            seq: 1,
+        };
+        let w = alive();
+        let mut u = ui(Some(areas()), true);
+        u.ui.shared.borrow_mut().waypoint_open = Some(open);
+        u.ui.set_ui(u32::from(id::WAYPOINT), 0, false).unwrap();
+        u.ui.sync_root(&mut u.root);
+        let want =
+            ClientIntent::from_message(&d2_proto::client::TakeOrCloseWp { wp: 0x0A, level: 0 });
+        assert_eq!(esc(&mut u, &w), vec![want]);
+        // No position (no room): the hook sends nothing.
+        let mut nowhere = alive();
+        let p = nowhere.local_player.unwrap();
+        nowhere.units.get_mut(&p).unwrap().position = None;
+        u.ui.set_ui(u32::from(id::WAYPOINT), 0, false).unwrap();
+        u.ui.sync_root(&mut u.root);
+        assert!(esc(&mut u, &nowhere).is_empty());
+    }
+}
