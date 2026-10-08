@@ -650,8 +650,25 @@ where
     D::X: Outbox,
 {
     fn npc<C: NpcCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
-        let (out, sent) = self.desk(game, events, |desk, ctl, inv| {
+        let (out, sent) = self.desk(game, events, |desk, ctl, mut inv| {
+            let players = desk.econ.game.lists.units_of_type(UnitType::Player);
+            if let Some(p) = inv.as_deref_mut() {
+                let d = p.desk(&mut *desk.econ);
+                for &pl in &players {
+                    desk.rest.stage_inventory(pl, d.npc_entries(pl));
+                }
+            }
             let out = call.call(ctl, desk);
+            // Cain's identify (C→S 0x34) on the inventory model.
+            let done = desk.rest.take_identified();
+            if let (false, Some(p)) = (done.is_empty(), inv.as_deref_mut()) {
+                let mut d = p.desk(&mut *desk.econ);
+                for item in done {
+                    if let Some(&pl) = players.iter().find(|&&pl| d.state.holds(pl, item)) {
+                        d.identify_unit(pl, item);
+                    }
+                }
+            }
             (out, flush_shown(desk, inv))
         });
         self.inv_sent.extend(sent);

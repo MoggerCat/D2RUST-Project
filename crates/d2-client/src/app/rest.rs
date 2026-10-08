@@ -47,6 +47,11 @@ pub struct AppRest {
     pub log: Vec<String>,
     /// The players and monsters at the last sync (`npc_seams`).
     pub snap: SnapRef,
+    /// The players' inventory entries staged for the NPC call
+    /// (`NpcRest::stage_inventory`).
+    pub staged: BTreeMap<UnitId, Vec<InvEntry>>,
+    /// Items Cain identified in the call (`NpcRest::take_identified`).
+    pub identified: Vec<UnitId>,
     /// The store item buy prices the shop panel shows (d2rs-own,
     /// unverified: `VendorRest::store_price`).
     pub prices: ShopPrices,
@@ -154,11 +159,19 @@ impl NpcRest for AppRest {
     fn personalize_granted(&mut self, p: UnitId) {
         self.note(format!("personalize granted {}", p.0));
     }
-    fn inventory_entries(&self, _: UnitId) -> Vec<InvEntry> {
-        Vec::new()
+    fn inventory_entries(&self, p: UnitId) -> Vec<InvEntry> {
+        self.staged.get(&p).cloned().unwrap_or_default()
     }
+    fn stage_inventory(&mut self, p: UnitId, entries: Vec<InvEntry>) {
+        self.staged.insert(p, entries);
+    }
+    fn take_identified(&mut self) -> Vec<UnitId> {
+        std::mem::take(&mut self.identified)
+    }
+    /// Cain's identify: the server applies it on the inventory model
+    /// after the call (d2rs-own, unverified).
     fn identify(&mut self, item: UnitId) {
-        self.note(format!("identify {}", item.0));
+        self.identified.push(item);
     }
     fn cursor_item(&self, _: UnitId) -> Option<UnitId> {
         None
@@ -547,5 +560,32 @@ impl QuestRest for AppRest {
     }
     fn unhandled(&mut self, chain: u8, function: u32) {
         self.note(format!("unhandled {chain} {function:#x}"));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use d2_sim::world::npc::Place;
+
+    // Covers: specs/world/npc.md §6
+    #[test]
+    fn cains_inventory_is_the_staged_entries_and_his_identify_is_taken_once() {
+        let mut r = AppRest::default();
+        let (p, item) = (UnitId(1), UnitId(9));
+        assert!(r.inventory_entries(p).is_empty());
+        r.stage_inventory(
+            p,
+            vec![InvEntry {
+                item,
+                place: Place::Grid(0),
+                flags: 0,
+            }],
+        );
+        assert_eq!(r.inventory_entries(p)[0].item, item);
+        r.identify(item);
+        assert_eq!(r.take_identified(), vec![item]);
+        assert!(r.take_identified().is_empty());
+        assert!(r.log.is_empty(), "nothing is only logged any more");
     }
 }

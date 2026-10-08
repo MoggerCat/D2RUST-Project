@@ -16,8 +16,11 @@
 //! not used" answer are preview fills.
 
 use super::{InvDesk, InvRest};
+use crate::items::inventory::mode;
 use crate::items::moves::{deferred, iflag, Guid, MoveUnits, Owner};
 use crate::units::lifecycle::LifecycleHooks;
+use crate::units::UnitId;
+use crate::world::npc::{InvEntry, Place};
 
 /// Items codes of the identify scroll and tome (d2rs-own, unverified).
 pub const IDENTIFY_CODES: [[u8; 4]; 2] = [*b"isc ", *b"ibk "];
@@ -35,12 +38,52 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         if self.item_unit(t).is_none() {
             return false;
         }
-        let flags = self.item_flags(t);
+        self.mark_identified(player, t)
+    }
+
+    /// Item flags 0x10 and 0x1 on `item` and the owner update queued;
+    /// false when it is already identified.
+    fn mark_identified(&mut self, player: Owner, item: Guid) -> bool {
+        let flags = self.item_flags(item);
         if flags & iflag::IDENTIFIED != 0 {
             return false;
         }
-        self.set_item_flags(t, flags | iflag::IDENTIFIED | iflag::CHANGED);
-        deferred::mark(self, player, t, 0);
+        self.set_item_flags(item, flags | iflag::IDENTIFIED | iflag::CHANGED);
+        deferred::mark(self, player, item, 0);
         true
+    }
+
+    /// The player's items in link order with their places and item flags
+    /// (`npc.md` §6 step 3: what Cain's identify walks).
+    pub fn npc_entries(&self, player: UnitId) -> Vec<InvEntry> {
+        self.state
+            .items_of(player)
+            .into_iter()
+            .filter_map(|u| {
+                let d = self.state.items.get(&u)?;
+                let place = match d.mode {
+                    mode::STORED => Place::Grid(d.page),
+                    mode::EQUIPPED => Place::Equipped,
+                    mode::BELT => Place::Belt,
+                    _ => Place::Other,
+                };
+                Some(InvEntry {
+                    item: u,
+                    place,
+                    flags: d.flags,
+                })
+            })
+            .collect()
+    }
+
+    /// Cain's identify (C→S 0x34, `AppRest::identify`'s call) of the
+    /// item unit `item` held by `player` (d2rs-own, unverified, REC-113's
+    /// effect): flags set and the owner update queued.
+    pub fn identify_unit(&mut self, player: UnitId, item: UnitId) -> bool {
+        let (Some(o), Some(_)) = (self.owner_of(player), self.state.items.get(&item)) else {
+            return false;
+        };
+        let g = self.guid_of(item);
+        self.mark_identified(o, g)
     }
 }

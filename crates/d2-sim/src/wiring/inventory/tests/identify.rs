@@ -58,3 +58,23 @@ fn only_identify_items_identify() {
     assert!(!w.desk(|d| d.use_identify(p, p, scroll)));
     assert!(w.desk(|d| d.use_identify(p, Owner::item(target), scroll)));
 }
+
+// Covers: specs/world/npc.md §6
+/// Cain's walk: the entries list the stored item with its page and
+/// flags; `identify_unit` sets flag 0x10 once and queues the update.
+#[test]
+fn cain_entries_and_identify_unit() {
+    let mut w = World::new();
+    let target = stored(&mut w, CAP, 0, 0);
+    clear_identified(&mut w, target);
+    let tu = w.unit(target).unwrap();
+    let pu = w.player;
+    let entries = w.desk(|d| d.npc_entries(pu));
+    let e = entries.iter().find(|e| e.item == tu).expect("listed");
+    assert_eq!(e.place, crate::world::npc::Place::Grid(0));
+    assert_eq!(e.flags & iflag::IDENTIFIED, 0);
+    assert!(w.desk(|d| d.identify_unit(pu, tu)));
+    assert!(!w.desk(|d| d.identify_unit(pu, tu)), "already identified");
+    assert_ne!(w.data(target).flags & iflag::IDENTIFIED, 0);
+    assert!(item_msgs(&w.drain()).contains(&(0x9D, 0x15, target)));
+}
