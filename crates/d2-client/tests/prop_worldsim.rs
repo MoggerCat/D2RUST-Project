@@ -1009,7 +1009,9 @@ fn run(game_seed: u32, ops: &[Op], quiet: u32) -> Result<Vec<Entry>, String> {
                 }
                 set_player_flags2(&mut fx, flags2_before);
             } else if flags2_after != flags2_before && rejected {
-                return Err(format!("{m:02X?}: rejected without a resync, flags2 changed"));
+                return Err(format!(
+                    "{m:02X?}: rejected without a resync, flags2 changed"
+                ));
             }
             if rejected {
                 let after = fx.digest();
