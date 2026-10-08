@@ -526,7 +526,7 @@ fn esc_without_a_player_opens_nothing() {
     assert!(!u.ui.is_open(9));
 }
 
-// d2rs-own, unverified: the menu entries (REC-QESC-1)
+// d2rs-own, unverified: the menu entries (REC-237)
 #[test]
 fn the_menu_entries_return_save_and_exit_and_swallow_clicks() {
     let mut u = ui(Some(areas()), true);

@@ -48,7 +48,7 @@ rules are `docs/handoff/build-loop.md`, the task rows are
 
 ## REC ids
 
-Batch launched 2026-10-08 (third coordinator, session_01QeN5r8PoLZsUhwAH2iDzLJ): q-menu-options REC-187, q-item-bonus-wire REC-188, q-fe-draw REC-189, q-fe-host-screens REC-231, q-skill-leap-talon REC-232, q-assassin-gaps REC-233, q-a2-tyrael-door REC-234, q-a4-quest-items REC-235; q-fe-start-flow REC-236 (launch after q-fe-host-screens merges). Next free after these: REC-237.
+Batch launched 2026-10-08 (third coordinator, session_01QeN5r8PoLZsUhwAH2iDzLJ): q-menu-options REC-187, q-item-bonus-wire REC-188, q-fe-draw REC-189, q-fe-host-screens REC-231, q-skill-leap-talon REC-232, q-assassin-gaps REC-233, q-a2-tyrael-door REC-234, q-a4-quest-items REC-235; q-fe-start-flow REC-236 (launch after q-fe-host-screens merges). Batch 2 (same day, user asked for more parallel sessions): q-fe-start-flow REC-236 (launched with batch 2 despite the host overlap), q-strings-bind REC-238, q-shrines-labels REC-239, q-belt-stash REC-240, q-save-gaps REC-241, q-item-tips REC-242, q-town-portal REC-243, q-cube-gaps REC-244, q-unit-fx REC-245, q-act3-act5-gaps REC-246, q-lighting-detail REC-247, q-client-collision REC-248, q-a1-dungeons REC-249 (REC-237 = the old REC-QESC-1). Every follow-up below is now a row. Next free: REC-250.
 Running sessions (Sonnet): q-menu-options session_016djAfuUo6mksJrag4BJS9X, q-item-bonus-wire session_01Fx8FphWjp7gR1w8YSpkv3S, q-fe-draw session_01R7uxXBkqs66q9wvmMypqKu, q-fe-host-screens session_011WjT1AwSGKecTSHgHkSp4v, q-skill-leap-talon session_01LTwd6Jb8ouRzvhjhS8UXJQ, q-assassin-gaps session_01KsJbGT9bjKX5fd7bPkNRpz, q-a2-tyrael-door session_019yV6ZFtRM5GpghZ56UFrXN, q-a4-quest-items session_01ECXzfSJs7BMjsYtJbQDT6b. They report to session_01QeN5r8PoLZsUhwAH2iDzLJ (build-loop.md); a new coordinator must change that line to its own id.
 
 Staging uses up to REC-186 plus REC-230 (REC-231 was renumbered away everywhere) (q-levels-warps-all); the front-
@@ -109,7 +109,7 @@ and `cargo run -p depcheck` (CI builds the workspace without Bevy:
 Items now covered by a merged task or a running row above are removed.
 
 - strings: bind `TableStrings::by_id` in NPC menu / HUD / item-name panels
-- REC-QESC-1 is a nonstandard id; renumber
+- (done: REC-QESC-1 renumbered to REC-237)
 - shrine timed-state effects; client object mouse-over label
 - belt key labels / hover text / highlight rects; stash gold kinds 3/4
 - save: mouse skills, act byte, merc/golem/corpse items, runeword refresh

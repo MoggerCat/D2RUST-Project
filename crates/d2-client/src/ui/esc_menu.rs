@@ -7,7 +7,7 @@
 //! `0x004690B0`); the gate of state 9 (`panels.md` §3.1: no player, no
 //! menu; a dead player respawns instead); the world takes no click while
 //! it is open (`controls.md` §7 r2). The menu's art, layout and strings
-//! have no spec yet (REC-QESC-1 in `docs/HANDOFF.md` §7, M22).
+//! have no spec yet (REC-237 in `docs/HANDOFF.md` §7, M22).
 //!
 //! Preview fills, each `// d2rs-own, unverified`:
 //! - the box is tiles of the synthetic fill file ([`FILL_FILE`] frame
