@@ -1,0 +1,616 @@
+// Spec: specs/ui/frontend-menus.md (§F1.3, §F2, §F3), specs/ui/frontend-credits.md (C1–C3), specs/ui/frontend-options.md (§O1–§O9), specs/ui/frontend-loading.md (L2)
+//! Front-end smoke test (q-smoke-frontend): the whole menu flow and the
+//! game start without a window, the way `main`'s `play` runs it
+//! (`front_start::front_host`, the front-end host's own systems,
+//! `play_start::resolve`, the app's game wiring), on synthetic art, a
+//! temp save folder and the synthetic game. No game files.
+//!
+//! startup → trademark → main menu → Single Player → create (each class) →
+//! OK → game start with that name / class; Esc → Options (each sub-menu, a
+//! slider, Configure Controls with a rebind) → Save and Exit → character
+//! select lists the character → select → load → same character; a
+//! character with Nightmare open → difficulty popup → Nightmare; Credits,
+//! Cinematics and back; delete; the `--new` / `--save` CLI paths.
+
+#[path = "app_support/mod.rs"]
+mod app_support;
+
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use bevy::prelude::*;
+use bevy::time::TimeUpdateStrategy;
+use d2_client::app::front_host::{add_front_end, write_stub, FrontArt, FrontHost};
+use d2_client::app::front_start::{front_host, Entry, StartChoice, StartHandles};
+use d2_client::app::play_start::{self, CliStart};
+use d2_client::app::single_player::{self, GameData, DEFAULT_SEED};
+use d2_client::assets::path::FileSource;
+use d2_client::ui::front_end::screens::create::{Class, NewCharacter, EXPANSION};
+use d2_client::ui::front_end::*;
+use d2_client::ui::geom::Point;
+use d2_server::seams::Clock;
+
+use app_support::SharedLink;
+
+// ---------------------------------------------------------------- art
+
+/// Synthetic art: every DC6 the screens name is a 32-frame 8 × 8 cel (a
+/// font's 256 frames), every font table 256 glyphs of width 6, the sky
+/// palette a grey ramp. Fixtures, not the user's files.
+struct SyntheticArt {
+    dc6: Vec<u8>,
+    font: Vec<u8>,
+    palette: Vec<u8>,
+}
+
+/// A `.tbl` (`formats/font-tbl.md`): 256 records of width 6.
+fn tbl() -> Vec<u8> {
+    let mut d = b"Woo!".to_vec();
+    d.extend_from_slice(&1u16.to_le_bytes());
+    d.extend_from_slice(&0u16.to_le_bytes());
+    d.extend_from_slice(&256u16.to_le_bytes());
+    d.extend_from_slice(&[10, 0]);
+    for i in 0..256u16 {
+        d.extend_from_slice(&i.to_le_bytes());
+        d.extend_from_slice(&[0, 6, 10, 0, 0, 0]);
+        d.extend_from_slice(&i.to_le_bytes());
+        d.extend_from_slice(&[0; 4]);
+    }
+    d
+}
+
+impl SyntheticArt {
+    fn new() -> Self {
+        use test_fixtures::sprites::{dc6_file, dc6_frames, Dc6Shape};
+        let cel = |n: u32| {
+            let shape = Dc6Shape {
+                directions: 1,
+                frames: n,
+                width: 8,
+                height: 8,
+                panel: true,
+            };
+            dc6_file(&dc6_frames(shape, 7), 1, n)
+        };
+        Self {
+            dc6: cel(32),
+            font: cel(256),
+            palette: (0..768).map(|i| (i / 3) as u8).collect(),
+        }
+    }
+}
+
+impl FileSource for SyntheticArt {
+    fn read_file(&self, name: &str) -> Option<Result<Vec<u8>, String>> {
+        if name.eq_ignore_ascii_case(SKY_PALETTE[0]) {
+            return Some(Ok(self.palette.clone()));
+        }
+        let n = name.to_ascii_lowercase().replace('/', "\\");
+        if n.contains("\\font\\") {
+            return match () {
+                _ if n.ends_with(".tbl") => Some(Ok(tbl())),
+                _ if n.ends_with(".dc6") => Some(Ok(self.font.clone())),
+                _ => None,
+            };
+        }
+        n.ends_with(".dc6").then(|| Ok(self.dc6.clone()))
+    }
+}
+
+fn art() -> FrontArt {
+    FrontArt::new(Arc::new(SyntheticArt::new()))
+}
+
+// ---------------------------------------------------------- front end
+
+fn temp_dir(tag: &str) -> PathBuf {
+    let d = Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join(format!("smoke-front-{tag}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&d);
+    std::fs::create_dir_all(&d).unwrap();
+    d
+}
+
+/// The front-end window's app, headless: the host's real systems.
+struct Front {
+    app: App,
+    handles: StartHandles,
+    dir: PathBuf,
+}
+
+impl Front {
+    fn open(dir: &Path, entry: Entry) -> Self {
+        let (host, handles) = front_host(dir, Some(art()), true, entry);
+        let mut app = App::new();
+        app.add_plugins((
+            MinimalPlugins,
+            bevy::asset::AssetPlugin::default(),
+            bevy::input::InputPlugin,
+        ))
+        .init_asset::<Image>()
+        .insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_millis(
+            40,
+        )));
+        add_front_end(&mut app, host);
+        let mut f = Self {
+            app,
+            handles,
+            dir: dir.to_path_buf(),
+        };
+        f.frames(1);
+        f
+    }
+
+    fn host(&self) -> &FrontHost {
+        self.app.world().non_send::<FrontHost>()
+    }
+
+    fn input(&mut self, ev: FrontInput) {
+        self.app
+            .world_mut()
+            .non_send_mut::<FrontHost>()
+            .front
+            .input(ev);
+    }
+
+    fn frames(&mut self, n: u32) {
+        for _ in 0..n {
+            self.app.update();
+        }
+    }
+
+    fn current(&self) -> ScreenId {
+        self.host().front.current()
+    }
+
+    fn outcome(&self) -> Option<Outcome> {
+        self.host().outcome
+    }
+
+    /// A point where the front end's hit test (topmost clickable control)
+    /// finds the first control matching `want`.
+    fn point_of(&self, want: impl Fn(&Control) -> bool) -> Point {
+        let controls = self.host().front.controls();
+        let clickable = |c: &Control| {
+            c.enabled
+                && c.visible
+                && matches!(
+                    c.kind,
+                    ControlKind::Image | ControlKind::Button | ControlKind::AnimImage
+                )
+                && c.action != Action::None
+        };
+        let i = controls
+            .iter()
+            .position(|c| want(c) && clickable(c))
+            .unwrap_or_else(|| panic!("no such control on {:?}", self.current()));
+        let r = controls[i].hit_box();
+        for y in r.y..r.y + i32::from(controls[i].h) {
+            for x in r.x..r.x + i32::from(controls[i].w) {
+                let p = Point::new(x, y);
+                let top = controls.iter().rposition(|c| clickable(c) && c.contains(p));
+                if top == Some(i) {
+                    return p;
+                }
+            }
+        }
+        panic!("control {i} on {:?} is covered", self.current());
+    }
+
+    /// A click (move, down, up) on the control matching `want`.
+    fn click(&mut self, want: impl Fn(&Control) -> bool) {
+        let p = self.point_of(want);
+        self.input(FrontInput::Move(p));
+        self.input(FrontInput::Down(p));
+        self.input(FrontInput::Up(p));
+        self.frames(2);
+    }
+
+    fn click_trigger(&mut self, t: Trigger) {
+        self.click(|c| c.action == Action::Trigger(t));
+    }
+
+    fn click_custom(&mut self, id: u32) {
+        self.click(|c| c.action == Action::Custom(id));
+    }
+
+    fn key(&mut self, vk: u16) {
+        self.input(FrontInput::Key(vk));
+        self.input(FrontInput::KeyUp(vk));
+        self.frames(2);
+    }
+
+    fn type_text(&mut self, s: &str) {
+        for u in s.encode_utf16() {
+            self.input(FrontInput::Char(u));
+        }
+        self.frames(2);
+    }
+
+    /// The texts the select screen shows (character names).
+    fn texts(&self) -> Vec<String> {
+        self.host()
+            .front
+            .controls()
+            .iter()
+            .filter_map(|c| c.text.clone())
+            .collect()
+    }
+
+    /// The flow ended in a game load: the choice `main` resolves.
+    fn choice(&self) -> (GameLoad, StartChoice) {
+        let Some(Outcome::GameLoad(g)) = self.outcome() else {
+            panic!("no game load: {:?} on {:?}", self.outcome(), self.current());
+        };
+        let c = StartChoice::resolve(g, &self.handles, &self.dir).expect("a choice");
+        (g, c)
+    }
+}
+
+/// Trademark (first entry) → main menu by a click on the picture.
+fn to_main_menu(f: &mut Front) {
+    assert_eq!(f.current(), TRADEMARK);
+    // The trademark art is drawn (synthetic cel, sky palette).
+    assert!(f
+        .host()
+        .drawn
+        .iter()
+        .any(|d| matches!(d, DrawItem::Art { .. })));
+    f.click_trigger(Trigger::Continue);
+    assert_eq!(f.current(), MAIN_MENU);
+}
+
+/// Create screen: pick `class`, type `name`, OK.
+fn create(f: &mut Front, class: Class, name: &str) {
+    assert_eq!(f.current(), CHAR_CREATE);
+    let id = d2_client::ui::front_end::screens::create::act::CLASS + u32::from(class.id());
+    f.click_custom(id);
+    f.type_text(name);
+    f.click_custom(d2_client::ui::front_end::screens::create::act::OK);
+}
+
+// --------------------------------------------------------------- game
+
+struct StepClock(Arc<AtomicU32>);
+
+impl Clock for StepClock {
+    fn now_ms(&mut self) -> u32 {
+        self.0.load(Ordering::SeqCst)
+    }
+}
+
+/// `main`'s `play_once` up to the window: the game start resolved from
+/// the front end's choice, on the synthetic game.
+fn resolve(dir: &Path, g: GameLoad, c: &StartChoice) -> anyhow::Result<play_start::GameStart> {
+    play_start::resolve(
+        &CliStart {
+            save_dir: Some(dir.to_path_buf()),
+            ..CliStart::default()
+        },
+        &GameData::Synthetic,
+        None,
+        g.difficulty,
+        Some(c),
+    )
+}
+
+/// What the joined game holds for the local player.
+#[derive(Debug, PartialEq, Eq)]
+struct Joined {
+    class: u32,
+    name: Vec<u8>,
+    difficulty: u8,
+}
+
+/// The game window's app, headless: the app's own game wiring
+/// (`add_game`, the 0x67 with the front end's flags) and the original UI
+/// on synthetic panel files.
+struct Game {
+    app: App,
+    server: app_support::Server<StepClock>,
+    ms: Arc<AtomicU32>,
+}
+
+impl Game {
+    fn start(start: play_start::GameStart) -> Self {
+        let ms = Arc::new(AtomicU32::new(1000));
+        let request = start.character.clone();
+        let (link, _) = single_player::start_with(
+            GameData::Synthetic,
+            DEFAULT_SEED,
+            start.character,
+            StepClock(ms.clone()),
+        )
+        .unwrap();
+        let server = Arc::new(Mutex::new(link));
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()))
+            .init_asset::<Image>()
+            .init_resource::<ButtonInput<MouseButton>>()
+            .init_resource::<ButtonInput<KeyCode>>();
+        // The input system reads the primary window (no OS window here).
+        app.world_mut()
+            .spawn((Window::default(), bevy::window::PrimaryWindow));
+        d2_client::app::play::add_game(&mut app, Box::new(SharedLink(server.clone())), true)
+            .unwrap();
+        d2_client::app::play::send_create_game_flags(&mut app, &request, start.start_flags)
+            .unwrap();
+        app_support::synthetic_skill_rows(&mut app);
+        // The client's own level data, as `play::run` adds it.
+        d2_client::app::play::add_client_data(
+            &mut app,
+            single_player::client_drlg_source(&GameData::Synthetic),
+            single_player::client_level_rows(&GameData::Synthetic),
+        );
+        // The act palettes with their text colours (`formats/palette.md`).
+        d2_client::app::palette::add_act_palettes(
+            &mut app,
+            d2_client::app::palette::ActPalettes {
+                pl2: std::array::from_fn(|_| vec![0; 1024 + 1714 * 256 + 13 * (3 + 256)]),
+                shown: None,
+            },
+        );
+        d2_client::app::ui::add_original_ui(
+            &mut app,
+            d2_client::app::ui::UiParts {
+                source: Arc::new(SyntheticArt::new()),
+                inv_areas: None,
+                expansion_installed: true,
+                fonts: None,
+                resist_penalties: None,
+            },
+        )
+        .unwrap();
+        // The loading screen covers the window until the world is placed
+        // (`frontend-loading.md` L5–L7).
+        d2_client::app::loading_overlay::add_loading(&mut app, Some(Arc::new(SyntheticArt::new())));
+        let mut g = Self { app, server, ms };
+        g.app.update();
+        assert!(g.loading(), "no loading screen at game start");
+        for _ in 0..200 {
+            g.frame();
+            if g.joined().is_some() && g.in_game() && !g.loading() {
+                return g;
+            }
+        }
+        panic!("the game never left the loading screen into the world");
+    }
+
+    fn frame(&mut self) {
+        self.ms.fetch_add(40, Ordering::SeqCst);
+        self.app.update();
+    }
+
+    fn loading(&self) -> bool {
+        self.app
+            .world()
+            .resource::<d2_client::app::front_start::LoadingState>()
+            .covering()
+    }
+
+    fn in_game(&self) -> bool {
+        let w = self
+            .app
+            .world()
+            .resource::<d2_client::bridge::BridgeResource>()
+            .0
+            .world();
+        w.in_game && w.local_player.is_some()
+    }
+
+    fn joined(&self) -> Option<Joined> {
+        app_support::local_player(&self.server)?;
+        Some(app_support::with(&self.server, |l| {
+            let sim = &l.host().game;
+            let (p, _) = single_player::local_player(sim).expect("joined");
+            Joined {
+                class: sim.events.action.sys.units.get(p).map_or(99, |u| u.class),
+                name: sim.world.rest.names.get(&p).cloned().unwrap_or_default(),
+                difficulty: l.host_mut().game.events.action.hooks().ai_info.difficulty,
+            }
+        }))
+    }
+}
+
+/// A save header with progression `status` (expansion bit, difficulties
+/// open) the select screen reads (`frontend-menus.md` §F2.3).
+fn save_with_status(dir: &Path, name: &str, class: u8, status: u16) {
+    let c = NewCharacter {
+        name: name.into(),
+        class: Class::Amazon,
+        hardcore: false,
+        expansion: true,
+    };
+    let path = write_stub(dir, &c, 1).unwrap();
+    let mut b = std::fs::read(&path).unwrap();
+    b[0x24..0x26].copy_from_slice(&status.to_le_bytes());
+    b[0x28] = class;
+    // The header checksum is not checked by the select scan.
+    std::fs::write(&path, b).unwrap();
+}
+
+const NAMES: [&str; 7] = ["Barb", "Sorc", "Pala", "Necro", "Assa", "Amaz", "Drui"];
+
+// ---------------------------------------------------------------- tests
+
+/// Each class: trademark → main menu → Single Player (no saves: create) →
+/// hero, name, OK → stub written → game started with that name and class
+/// at Normal.
+#[test]
+fn each_class_is_created_and_starts_the_game() {
+    for (i, &(class, _, _)) in EXPANSION.iter().enumerate() {
+        let name = NAMES[i];
+        let dir = temp_dir(&format!("class{i}"));
+        let mut f = Front::open(&dir, Entry::First);
+        to_main_menu(&mut f);
+        f.click_trigger(Trigger::SinglePlayer);
+        create(&mut f, class, name);
+        let (g, c) = f.choice();
+        assert!(g.new_character, "{class:?}");
+        assert!(dir.join(format!("{name}.d2s")).is_file(), "{class:?} stub");
+        assert_eq!((c.name.as_str(), c.class), (name, class.id()));
+        let start = resolve(&dir, g, &c).unwrap_or_else(|e| panic!("{class:?}: {e}"));
+        assert_eq!(start.difficulty, 0);
+        assert_eq!(start.save_path, Some(dir.join(format!("{name}.d2s"))));
+        let game = Game::start(start);
+        assert_eq!(
+            game.joined(),
+            Some(Joined {
+                class: u32::from(class.id()),
+                name: name.as_bytes().to_vec(),
+                difficulty: 0,
+            }),
+            "{class:?}"
+        );
+    }
+}
+
+/// A character with Nightmare open: OK → the difficulty popup →
+/// Nightmare → the game runs on Nightmare; Esc on the popup goes back.
+#[test]
+fn difficulty_popup_starts_the_game_on_nightmare() {
+    let dir = temp_dir("diff");
+    // Expansion, progression 5: Normal and Nightmare open.
+    save_with_status(&dir, "Zed", 4, 0x0520);
+    let mut f = Front::open(&dir, Entry::MainMenu);
+    assert_eq!(f.current(), MAIN_MENU);
+    f.click_trigger(Trigger::SinglePlayer);
+    assert_eq!(f.current(), CHAR_SELECT);
+    f.click_custom(d2_client::ui::front_end::screens::char_select::ids::SLOT_TEXT);
+    f.key(13);
+    assert_eq!(f.current(), DIFFICULTY);
+    f.key(27);
+    assert_eq!(f.current(), CHAR_SELECT);
+    f.key(13);
+    assert_eq!(f.current(), DIFFICULTY);
+    f.click_trigger(Trigger::Difficulty(1));
+    let (g, c) = f.choice();
+    assert_eq!(g.difficulty, Some(1));
+    let start = resolve(&dir, g, &c).unwrap();
+    assert_eq!(start.difficulty, 1);
+    let game = Game::start(start);
+    assert_eq!(
+        game.joined(),
+        Some(Joined {
+            class: 4,
+            name: b"Zed".to_vec(),
+            difficulty: 1,
+        })
+    );
+}
+
+/// Credits and Cinematics open from the main menu and come back; Esc on
+/// the main menu exits.
+#[test]
+fn credits_and_cinematics_and_back() {
+    let dir = temp_dir("credits");
+    let mut f = Front::open(&dir, Entry::MainMenu);
+    f.click_trigger(Trigger::Credits);
+    assert_eq!(f.current(), CREDITS);
+    f.frames(30);
+    f.key(27);
+    assert_eq!(f.current(), MAIN_MENU);
+    f.click_trigger(Trigger::Credits);
+    f.click_trigger(Trigger::Exit);
+    assert_eq!(f.current(), MAIN_MENU);
+    f.click_trigger(Trigger::Cinematics);
+    assert_eq!(f.current(), CINEMATICS);
+    f.frames(5);
+    f.click_trigger(Trigger::Exit);
+    assert_eq!(f.current(), MAIN_MENU);
+    f.click_trigger(Trigger::Cinematics);
+    f.key(27);
+    assert_eq!(f.current(), MAIN_MENU);
+    f.key(27);
+    assert_eq!(f.outcome(), Some(Outcome::Exit));
+}
+
+/// Character select: Delete → Yes removes the file and the slot; the
+/// other character stays; Create New and Exit lead where §F1.3 says.
+#[test]
+fn delete_a_character() {
+    use d2_client::ui::front_end::screens::char_select::ids;
+    let dir = temp_dir("delete");
+    for (name, class) in [("Keep", Class::Paladin), ("Gone", Class::Druid)] {
+        let c = NewCharacter {
+            name: name.into(),
+            class,
+            hardcore: false,
+            expansion: true,
+        };
+        write_stub(&dir, &c, 1).unwrap();
+    }
+    let mut f = Front::open(&dir, Entry::MainMenu);
+    f.click_trigger(Trigger::SinglePlayer);
+    assert_eq!(f.current(), CHAR_SELECT);
+    let names = f.texts();
+    let slot = names
+        .iter()
+        .filter(|t| *t == "Keep" || *t == "Gone")
+        .position(|t| t == "Gone")
+        .expect("Gone listed");
+    f.click_custom(ids::SLOT_TEXT + slot as u32);
+    f.click_custom(ids::DELETE);
+    // No keeps it.
+    f.click_custom(ids::POPUP_NO);
+    assert!(dir.join("Gone.d2s").is_file());
+    f.click_custom(ids::DELETE);
+    f.click_custom(ids::POPUP_YES);
+    assert!(!dir.join("Gone.d2s").exists());
+    assert!(dir.join("Keep.d2s").is_file());
+    let texts = f.texts();
+    assert!(!texts.iter().any(|t| t == "Gone"), "{texts:?}");
+    assert!(texts.iter().any(|t| t == "Keep"), "{texts:?}");
+    f.click_trigger(Trigger::CreateNew);
+    assert_eq!(f.current(), CHAR_CREATE);
+    f.key(27);
+    assert_eq!(f.current(), CHAR_SELECT);
+    f.key(27);
+    assert_eq!(f.current(), MAIN_MENU);
+}
+
+/// `play --new CLASS NAME [--save-dir]` and `play --save FILE` still
+/// resolve as before the front end: the new character joins with its
+/// class and name; a name already saved, a save inside the install and a
+/// save on synthetic data stop before the window with an error.
+#[test]
+fn play_cli_new_and_save_paths() {
+    let dir = temp_dir("cli");
+    let cli = CliStart {
+        new: Some(("necromancer".into(), "Cli".into())),
+        save_dir: Some(dir.clone()),
+        difficulty: 2,
+        ..CliStart::default()
+    };
+    let start = play_start::resolve(&cli, &GameData::Synthetic, None, None, None).unwrap();
+    assert_eq!(start.save_path, Some(dir.join("Cli.d2s")));
+    assert_eq!((start.difficulty, start.start_flags), (2, None));
+    let game = Game::start(start);
+    assert_eq!(
+        game.joined(),
+        Some(Joined {
+            class: 2,
+            name: b"Cli".to_vec(),
+            difficulty: 2,
+        })
+    );
+    // The name is taken once the file exists.
+    std::fs::write(dir.join("Cli.d2s"), b"x").unwrap();
+    let err = play_start::resolve(&cli, &GameData::Synthetic, None, None, None).unwrap_err();
+    assert!(err.to_string().contains("already exists"), "{err}");
+    // --save: synthetic data cannot read a save; inside the install refused.
+    let save = CliStart {
+        save: Some(dir.join("Cli.d2s")),
+        ..CliStart::default()
+    };
+    let err = play_start::resolve(&save, &GameData::Synthetic, None, None, None).unwrap_err();
+    assert!(err.to_string().contains("D2_GAME_DIR"), "{err}");
+    let err = play_start::resolve(&save, &GameData::Synthetic, Some(&dir), None, None).unwrap_err();
+    assert!(err.to_string().contains("inside the game install"), "{err}");
+    // Neither flag: the default character, not saved.
+    let start =
+        play_start::resolve(&CliStart::default(), &GameData::Synthetic, None, None, None).unwrap();
+    assert_eq!(start.save_path, None);
+}

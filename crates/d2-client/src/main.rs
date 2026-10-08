@@ -418,9 +418,9 @@ fn select_data(
 /// closing returns to the main menu. `--new`, `--save` and `--frames` skip
 /// the front end (a shortcut straight into the game).
 fn play(o: Options) -> Result<()> {
-    use d2_client::app::front_host::{run_front_end, DirSaves, FrontArt, FrontHost};
-    use d2_client::app::front_start::{registry, StartChoice, StartHandles};
-    use d2_client::ui::front_end::{FrontEnd, Outcome};
+    use d2_client::app::front_host::{run_front_end, FrontArt};
+    use d2_client::app::front_start::{front_host, Entry, StartChoice};
+    use d2_client::ui::front_end::Outcome;
     if o.save.is_some() || o.new.is_some() || o.frames.is_some() {
         let (data, dir, origin) = select_data(&o)?;
         return play_once(&o, data, dir, origin, None, None);
@@ -448,14 +448,12 @@ fn play(o: Options) -> Result<()> {
             .save_dir
             .clone()
             .unwrap_or_else(d2_client::app::save::default_save_dir);
-        let handles = StartHandles::default();
-        let mut reg = registry(&saves, &handles);
-        if let Some(a) = &art {
-            d2_client::app::front_host::register_credits(&mut reg, a);
-        }
-        let front = FrontEnd::new(expansion, Box::new(DirSaves(saves.clone())), reg);
-        let host = FrontHost::with_front(front, art, first)
-            .with_stub_writer(handles.created.clone(), saves.clone());
+        let entry = if first {
+            Entry::First
+        } else {
+            Entry::MainMenu
+        };
+        let (host, handles) = front_host(&saves, art, expansion, entry);
         first = false;
         match run_front_end(host) {
             Outcome::Exit => return Ok(()),
@@ -476,7 +474,6 @@ fn play_once(
     choice: Option<d2_client::app::front_start::StartChoice>,
 ) -> Result<()> {
     use d2_client::app::{play, single_player};
-    let difficulty = menu_difficulty.unwrap_or(o.difficulty);
     match &data {
         single_player::GameData::Live(d) => println!(
             "play: game data from {origin} ({} levels, {} objects, waypoint object class {}; level files: {} DS1, {} lvlsub DS1, {} DT1)",
@@ -490,51 +487,31 @@ fn play_once(
         single_player::GameData::Synthetic => println!("play: synthetic tables and levels"),
     }
     // Before the window opens: a bad folder or a name taken stops here.
-    let new_name = match &choice {
-        Some(c) if c.save.is_none() => Some(c.name.as_str()),
-        Some(_) => None,
-        None => o.new.as_ref().map(|(_, name)| name.as_str()),
-    };
-    let save_path = d2_client::app::save::save_path(
-        choice
-            .as_ref()
-            .and_then(|c| c.save.as_deref())
-            .or(o.save.as_deref()),
-        new_name,
-        o.save_dir.as_deref(),
+    let start = d2_client::app::play_start::resolve(
+        &d2_client::app::play_start::CliStart {
+            save: o.save.clone(),
+            new: o.new.clone(),
+            save_dir: o.save_dir.clone(),
+            difficulty: o.difficulty,
+            hardcore: o.hardcore,
+        },
+        &data,
         dir.as_deref(),
+        menu_difficulty,
+        choice.as_ref(),
     )?;
-    let character = match (&o.save, &o.new) {
-        _ if choice.is_some() => {
-            let c = choice.as_ref().expect("checked").character(&data)?;
-            println!(
-                "play: front-end character {}",
-                choice.as_ref().expect("checked").name
-            );
-            c
-        }
-        (Some(path), _) => {
-            let c = single_player::load_character(&data, path, o.difficulty)?;
-            println!("play: character from {}", path.display());
-            c
-        }
-        (None, Some((class, name))) => {
-            let c = single_player::new_character(class, name)?;
-            println!("play: new character {name} ({class})");
-            c
-        }
-        (None, None) => single_player::Character::New,
+    if choice.is_some() || o.save.is_some() || o.new.is_some() {
+        println!("play: {}", start.origin);
     }
-    .with_difficulty(difficulty);
-    println!("play: difficulty {difficulty}");
+    println!("play: difficulty {}", start.difficulty);
     let result = play::run(play::PlayConfig {
         data,
         seed: o.seed,
-        character,
+        character: start.character,
         exit_after: o.frames,
-        save_path: save_path.clone(),
-        start_flags: choice.as_ref().map(|c| c.create_request().flags),
-        hardcore: o.hardcore || choice.as_ref().is_some_and(|c| c.hardcore()),
+        save_path: start.save_path,
+        start_flags: start.start_flags,
+        hardcore: start.hardcore,
     })?;
     match result {
         bevy::app::AppExit::Success => Ok(()),

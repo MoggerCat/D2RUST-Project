@@ -27,6 +27,7 @@ pub mod monster_drop;
 pub mod npc_seams;
 pub mod palette;
 pub mod play;
+pub mod play_start;
 pub mod rest;
 pub mod save;
 pub mod save_full;
