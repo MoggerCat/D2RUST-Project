@@ -17,6 +17,7 @@ mod gold;
 mod ground;
 mod host;
 mod identify;
+mod link;
 mod load;
 mod mutant_tests;
 mod queries;
