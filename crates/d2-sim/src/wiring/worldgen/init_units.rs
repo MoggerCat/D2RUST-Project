@@ -188,6 +188,10 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
         self.v.h.x.boss_quest_hook(unit);
     }
 
+    fn quest_chain(&mut self, unit: UnitId, chain: u32) {
+        self.v.h.x.monster_quest_chain(unit, chain);
+    }
+
     /// `0x0058F030(game, boss, boss GUID, 1, 1, 0)`.
     fn boss_owner_data(&mut self, unit: UnitId) {
         self.v

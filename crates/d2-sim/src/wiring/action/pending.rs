@@ -61,6 +61,21 @@ pub enum KillStep {
     BarricadeDoors,
 }
 
+/// What a host's seams queue for the quest control (`quests.md` §4.4
+/// kill parse, §4.6 add link); the quest-owning host drains them each
+/// tick ([`Pending::take_quest_events`]). d2rs-own, unverified: the play
+/// host's route from the monster seams to the quest control.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum QuestEvent {
+    /// Monster init linked `unit` to quest chain `chain` (`0x005436B0`).
+    Link { unit: UnitId, chain: u8 },
+    /// `victim` died (`0x00543A30`), `killer` the attacker.
+    Kill {
+        victim: UnitId,
+        killer: Option<UnitId>,
+    },
+}
+
 /// Seams without a provider (see the module doc). Grouped by the spec
 /// that will own them.
 #[allow(unused_variables)]
@@ -1081,6 +1096,14 @@ pub trait Pending {
 
     // ---- the kill and the death (`damage.md` §7.2, `treasure.md` §3) ---
 
+    /// Monster init's quest chain link (`population.md` §14.3,
+    /// `0x005436B0`). Default: none.
+    fn monster_quest_chain(&mut self, unit: UnitId, chain: u32) {}
+    /// The quest events queued since the last take, in order. Default:
+    /// none.
+    fn take_quest_events(&mut self) -> Vec<QuestEvent> {
+        Vec::new()
+    }
     /// A step of the kill with no written body ([`KillStep`]).
     fn kill_step(&mut self, game: &mut Game, step: KillStep, defender: UnitId, attacker: UnitId) {}
     /// `0x0057E7B0` for a monster attacker (`vitals.md` §4.4 step 2):

@@ -33,6 +33,8 @@ use crate::ui::original::ShopPrices;
 /// The rest of the app's wired host (module docs).
 #[derive(Debug, Default)]
 pub struct AppRest {
+    /// The units' quest chains (unit +0x74, `quests.md` §4.6).
+    pub chains: std::collections::BTreeMap<UnitId, QuestChain>,
     /// Expansion game (the item format, `generation.md` §1.2).
     pub expansion: bool,
     /// The players' quest records (player data, `quests.md` §1.7), set at
@@ -393,8 +395,10 @@ impl QuestRest for AppRest {
     fn set_player_byte_4c(&mut self, p: UnitId, v: u8) {
         self.note(format!("byte 4c {} {v}", p.0));
     }
-    fn quest_chain(&mut self, _: UnitId) -> Option<&mut QuestChain> {
-        None
+    /// d2rs-own, unverified (`q-a1-tower`): a chain per unit, created on
+    /// first use, for monster init's links and the kill parse.
+    fn quest_chain(&mut self, u: UnitId) -> Option<&mut QuestChain> {
+        Some(self.chains.entry(u).or_default())
     }
     fn unit_act(&self, u: UnitId) -> Option<u8> {
         self.snap.lock().ok()?.units.get(&u).map(|u| u.act)
