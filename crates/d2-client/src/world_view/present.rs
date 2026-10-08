@@ -56,7 +56,7 @@ use crate::ui::{edge, FramePos, PointerButton, StringLookup, UiEvent, UiRoot};
 use super::feed::{build_frame, ViewFeed};
 use super::node::{add_node, ComposeJob, NodeIndices};
 use super::panel_art::PanelArtLoader;
-use super::ui_bind::{run_ui_with, TextAssetLoader, UiQueue, UiRules};
+use super::ui_bind::{run_ui_with, world_clicks, TextAssetLoader, UiQueue, UiRules};
 use super::walk::PreviewWalk;
 use super::{compose_cycle_cpu, GpuAtlas, ViewAssets, ViewRules, VIEW};
 use crate::scene::{FrameCycle, FramePlan};
