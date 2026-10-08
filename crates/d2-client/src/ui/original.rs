@@ -88,8 +88,9 @@ pub const GAME_MENU_KEEP: [u8; 6] = [6, 7, 10, 17, 21, 35];
 /// r9): not a UI state, open for good.
 pub const TOP_PANEL: PanelId = PanelId(0x113);
 
-/// The click sound of §10.2: `0x004B9A00(0, 0, 0)` = request id 0, no
-/// unit, delay 0 (`audio/triggers.md` §1 r1).
+/// The click sound `0x004B9A00(0, 0, 0)` = request id 0 (silent), no unit,
+/// delay 0 (`audio/triggers.md` §1 r1), at the sites `client/ui.md`
+/// §B8.1 does not list with a constant id 1–6, 15, 16.
 pub const CLICK_SOUND_ID: i32 = 0;
 
 /// Panels and inputs not wired, each with the input the client model or
@@ -191,6 +192,12 @@ struct Facts {
     player: Option<PlayerLife>,
     /// An expansion game (`[0x007A04F4]`).
     expansion_game: bool,
+    /// A local player with a room (`0x00620BB0`; d2rs-own: read as a
+    /// position), for the waypoint close hook.
+    player_room: bool,
+    /// The local player has a hireling (`0x00478F20(P, 7)` ≠ −1), for the
+    /// hireling key (`ui/controls.md` §3 cmd 54).
+    has_hireling: bool,
 }
 
 impl Facts {
@@ -205,6 +212,8 @@ impl Facts {
                 dead: u.mode == 0x11,
             }),
             expansion_game: world.expansion != 0,
+            player_room: local.is_some_and(|u| u.position.is_some()),
+            has_hireling: local.is_some_and(|u| world.hireling_guid(Some(u.key)) != u32::MAX),
         }
     }
 }
@@ -221,6 +230,12 @@ struct Shared {
     mouse: Point,
     /// Panel outputs of the event being routed, in order.
     outputs: Vec<PanelOutput>,
+    /// An input reset `0x0044DA40` was asked for since the host last took
+    /// it ([`OriginalUi::take_input_reset`]).
+    input_reset: bool,
+    /// Clear Screen closed nothing: the automap part is the host's
+    /// ([`OriginalUi::take_clear_automap`]).
+    clear_automap: bool,
     /// The fonts' glyph widths (character values and name line); none:
     /// no text is drawn.
     fonts: Option<FontMeasure>,
@@ -328,6 +343,9 @@ pub struct OriginalUi {
     shop: shop_ui::SharedShop,
     /// The NPC menu (`ui/npc_menu_ui.rs`, `menus.md` §2).
     pub(super) npcm: super::npc_menu_ui::SharedNpcMenu,
+    /// The C→S messages of the close hooks (`panels.md` §2 r6) not yet
+    /// handed to the root ([`Self::flush_hooks`]).
+    hook_intents: Vec<super::ClientIntent>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -373,9 +391,13 @@ impl OriginalUi {
                 class: None,
                 player: None,
                 expansion_game: false,
+                player_room: false,
+                has_hireling: false,
             },
             mouse: Point::new(0, 0),
             outputs: Vec::new(),
+            input_reset: false,
+            clear_automap: false,
             fonts: None,
             resist_penalties: None,
             char_tables: Default::default(),
@@ -403,6 +425,7 @@ impl OriginalUi {
             hire: super::hire_list::SharedHire::default(),
             shop: shop_ui::SharedShop::default(),
             npcm: Default::default(),
+            hook_intents: Vec::new(),
         })
     }
 
@@ -591,6 +614,33 @@ impl OriginalUi {
         self.refresh_facts(world);
         if let Some(p) = e.at() {
             self.shared.borrow_mut().mouse = p;
+            self.track_grid_hover(world, p);
+        }
+    }
+
+    /// The hover handler `0x00487000` (`inventory.md` §5) of every open
+    /// item grid under `p`: the inventory (page 0), stash (page 4) and
+    /// cube (page 3) grids, so the grid click reads the kept cursor cell
+    /// (§5 r3, §10 r4).
+    fn track_grid_hover(&self, world: &ClientWorld, p: Point) {
+        use super::states::id;
+        let sh = self.shared.borrow();
+        let s = sh.config.screen;
+        let files = &sh.tables.files;
+        if sh.states.is_open(id::STASH) {
+            let g = sh.items.stash_grid(sh.env().exp, &s);
+            sh.items
+                .track_hover(world, files, &g, super::panels::stash_items::STASH_PAGE, p);
+        }
+        if sh.states.is_open(id::CUBE) {
+            let g = sh.items.cube_grid(&s);
+            sh.items
+                .track_hover(world, files, &g, super::panels::cube_items::CUBE_PAGE, p);
+        }
+        if sh.states.is_open(id::INVENTORY) {
+            if let Some(l) = sh.items.layout(Facts::of(world).class, &s) {
+                sh.items.track_hover(world, files, &l.grid, 0, p);
+            }
         }
     }
 
@@ -622,21 +672,40 @@ impl OriginalUi {
                 }
                 PanelOutput::SetUi { ui, mode, jump } => {
                     let was_menu = ui == super::states::id::ESC_MENU && self.is_open(ui);
-                    self.set_ui(u32::from(ui), u32::from(mode), jump)?;
+                    // The panel's outputs already carry its own close
+                    // hook's message (`stash_input`, `waypoint`).
+                    self.set_ui_from(u32::from(ui), u32::from(mode), jump, Some(ui))?;
                     // Return to Game closes the menu through
                     // `0x0047E200(1)` (`frontend-options.md` §O1 r3).
                     if was_menu && !self.is_open(ui) {
                         self.restore_game_menu_states()?;
                     }
                 }
-                PanelOutput::ClickSound => {
-                    self.outcome.sounds.push(SoundRequest::Ui(CLICK_SOUND_ID))
-                }
+                PanelOutput::Sound(id) => self.outcome.sounds.push(SoundRequest::Ui(id)),
             }
         }
         if let (Routed::Unhandled, UiEvent::Action(a)) = (routed, e) {
             if a == ActionId(Action::GameMenu.index() as u16) {
                 self.game_menu_key()?;
+            } else if a == ActionId(Action::ClearScreen.index() as u16) {
+                // Command 38 (`0x0044C6B0`, `panels.md` §2 r9): the
+                // close-all (0, 1); when it closed nothing, the automap
+                // re-centre and the close-all with the automap (the host).
+                if !self.close_all(true)? {
+                    self.shared.borrow_mut().clear_automap = true;
+                }
+            } else if a == ActionId(Action::ToggleHireling.index() as u16) {
+                // Command 54 (`0x00469170`): an expansion game, a hireling
+                // and the expansion installed (`0x00408F20`).
+                let ok = {
+                    let sh = self.shared.borrow();
+                    sh.facts.expansion_game
+                        && sh.facts.has_hireling
+                        && sh.config.expansion_installed
+                };
+                if ok {
+                    self.set_ui(u32::from(super::states::id::MERC_INV), 2, true)?;
+                }
             } else if let Some(ui) = hotkey_state(a) {
                 // §4.3: the Character, Inventory, Party, Skill Tree and
                 // Hireling keys pass jump 1, every other hot key 0; mode 2
@@ -650,8 +719,73 @@ impl OriginalUi {
                 }
             }
         }
+        self.flush_hooks(root);
         root.sync_states(&self.shared.borrow().states);
         Ok(())
+    }
+
+    /// Hands the close hooks' messages to the root, in call order.
+    pub fn flush_hooks(&mut self, root: &mut UiRoot) {
+        for i in self.hook_intents.drain(..) {
+            root.queue_intent(i);
+        }
+    }
+
+    /// The close hook `0x00455AE0(ui)` (`panels.md` §2 r6), the parts
+    /// that send: stash (ui 0x19, `0x00489EE0`, §11 r5, r7: only in
+    /// inventory mode 0x0C / 0x0D, mode := 0, C→S 0x4F 0x12), cube (ui
+    /// 0x1A, `0x0048A500`: mode := 0, the latched 0x4F 0x17 of
+    /// `0x0048A050`, §12 r7) and waypoint (ui 0x14, `0x0049CF50`: the
+    /// latched 0x49 level 0, `menus.md` §1.5, with a player and its
+    /// room). `send` false: the caller's outputs carry the message
+    /// already (a panel's own close path); the mode is still reset.
+    ///
+    /// d2rs-own reading: the latches (`[0x007BCE9C]`-family cube close
+    /// sent, `[0x007BF085]`) live in the panels; every panel path that
+    /// sets one closes its state in the same outputs (and its hook runs
+    /// with `send` false), so on any other close the latch is clear and
+    /// the hook sends. "Its room" is read as the local player having a
+    /// position.
+    fn close_hook(&mut self, ui: u8, send: bool) {
+        use super::states::id;
+        let msg = match ui {
+            id::STASH => {
+                if !matches!(
+                    self.msg.inventory_mode,
+                    msg_ui::MODE_STASH | msg_ui::MODE_STASH_2
+                ) {
+                    return;
+                }
+                self.msg.inventory_mode = 0;
+                super::ClientIntent::from_message(&d2_proto::client::ClickButton {
+                    button: 0x12,
+                    p1: 0,
+                    p2: 0,
+                })
+            }
+            id::CUBE => {
+                self.msg.inventory_mode = 0;
+                super::ClientIntent::from_message(&d2_proto::client::ClickButton {
+                    button: 0x17,
+                    p1: 0,
+                    p2: 0,
+                })
+            }
+            id::WAYPOINT => {
+                let sh = self.shared.borrow();
+                let Some(open) = sh.waypoint_open.filter(|_| sh.facts.player_room) else {
+                    return;
+                };
+                super::ClientIntent::from_message(&d2_proto::client::TakeOrCloseWp {
+                    wp: open.guid,
+                    level: 0,
+                })
+            }
+            _ => return,
+        };
+        if send {
+            self.hook_intents.push(msg);
+        }
     }
 
     /// Esc (command 56, `frontend-options.md` §O1 r2–r4): with ui 9 open
@@ -667,17 +801,40 @@ impl OriginalUi {
             self.restore_game_menu_states()?;
             return Ok(());
         }
-        let mut closed = false;
-        for ui in ESC_CLOSABLE {
-            if self.is_open(ui) {
-                self.set_ui(u32::from(ui), 1, true)?;
-                closed = true;
-            }
-        }
-        if !closed {
+        if !self.close_all(true)? {
             self.open_game_menu()?;
         }
         Ok(())
+    }
+
+    /// The close-all `0x00456300(0, jump)` (`panels.md` §2 r9) of the
+    /// Esc-closable states; whether it closed one.
+    fn close_all(&mut self, jump: bool) -> Result<bool, UiStateError> {
+        let mut closed = false;
+        for ui in ESC_CLOSABLE {
+            if self.is_open(ui) {
+                self.set_ui(u32::from(ui), 1, jump)?;
+                closed = true;
+            }
+        }
+        Ok(closed)
+    }
+
+    /// Show Items (command 37, `ui/controls.md` §3): the down handler sets
+    /// ui 0x0D on, the up handler off; `held` is the input's state this
+    /// pass, a change runs the handler.
+    pub fn set_show_items(&mut self, held: bool) -> Result<(), UiStateError> {
+        const UI_SHOW_ITEMS: u8 = 0x0D;
+        if held != self.is_open(UI_SHOW_ITEMS) {
+            self.set_ui(u32::from(UI_SHOW_ITEMS), if held { 0 } else { 1 }, false)?;
+        }
+        Ok(())
+    }
+
+    /// Whether Clear Screen closed nothing since the last call (its
+    /// automap part, `panels.md` §2 r9, is the host's).
+    pub fn take_clear_automap(&mut self) -> bool {
+        std::mem::take(&mut self.shared.borrow_mut().clear_automap)
     }
 
     /// `0x0047E090(save 1, menu 0)` (`frontend-options.md` §O1 r2): every
@@ -782,16 +939,45 @@ impl OriginalUi {
 
     /// `SetUIState(ui, mode, jump)` with the model's gate facts; effects
     /// are kept for [`Self::take_outcome`].
+    /// Every state it closes runs its close hook ([`Self::close_hook`]);
+    /// the hooks' messages leave at the next [`Self::flush_hooks`].
     pub fn set_ui(&mut self, ui: u32, mode: u32, jump: bool) -> Result<bool, UiStateError> {
-        let mut sh = self.shared.borrow_mut();
-        let mut env = sh.gate_env();
-        let r = sh
-            .states
-            .set(ui, mode, jump, &mut env, &mut self.outcome.effects);
-        // The Esc menu always reopens on its first page.
-        if ui == u32::from(esc_menu::ESC_PANEL.0) {
-            sh.esc.menu.open();
-            sh.esc.controls = None;
+        self.set_ui_from(ui, mode, jump, None)
+    }
+
+    /// [`Self::set_ui`] for a panel's `SetUi` output: the close hook of
+    /// `own` sends nothing (the panel's outputs carry its message); the
+    /// other states the gate closes run theirs in full.
+    fn set_ui_from(
+        &mut self,
+        ui: u32,
+        mode: u32,
+        jump: bool,
+        own: Option<u8>,
+    ) -> Result<bool, UiStateError> {
+        let start = self.outcome.effects.len();
+        let r = {
+            let mut sh = self.shared.borrow_mut();
+            let mut env = sh.gate_env();
+            let r = sh
+                .states
+                .set(ui, mode, jump, &mut env, &mut self.outcome.effects);
+            // The Esc menu always reopens on its first page.
+            if ui == u32::from(esc_menu::ESC_PANEL.0) {
+                sh.esc.menu.open();
+                sh.esc.controls = None;
+            }
+            r
+        };
+        let closed: Vec<u8> = self.outcome.effects[start..]
+            .iter()
+            .filter_map(|e| match e {
+                UiEffect::Closed(u) => Some(*u),
+                _ => None,
+            })
+            .collect();
+        for u in closed {
+            self.close_hook(u, own != Some(u));
         }
         r
     }
@@ -807,6 +993,13 @@ impl OriginalUi {
         let mut sh = self.shared.borrow_mut();
         sh.mouse.x = x;
         Some(sh.mouse)
+    }
+
+    /// Whether an input reset `0x0044DA40` was asked for since the last
+    /// call (`client/msg-ui.md` §2 r2.2, `control-panel.md` §9): the host
+    /// applies it to the world clicks (`ClickState::input_reset`).
+    pub fn take_input_reset(&mut self) -> bool {
+        std::mem::take(&mut self.shared.borrow_mut().input_reset)
     }
 
     /// The effects and sounds since the last call.
@@ -836,6 +1029,8 @@ pub fn hotkey_state(a: ActionId) -> Option<u8> {
         (Action::ToggleCharacter, UI_CHARACTER),
         (Action::ToggleSkillTree, UI_SKILLTREE),
         (Action::ToggleQuests, quest_log_ui::UI_QUEST_SCREEN),
+        // Command 3 (`0x00468980`): SetUIState(0x18, toggle, 0).
+        (Action::ToggleMessageLog, 0x18),
     ]
     .into_iter()
     .find(|(action, _)| action.index() == i)

@@ -7,6 +7,7 @@
 use super::movement::flee;
 use super::npc::{greet, GreetMode, NpcGreeting};
 use super::{class_record, sid, Ctx, TriggerError, Unit, UnitSound, MONSTER, PLAYER};
+use crate::audio::calls::SoundCalls;
 use crate::bridge::world::UnitKey;
 
 /// A non-audio effect of an event rule, for its owner.
@@ -150,6 +151,49 @@ pub const FIXED_EVENTS: [(u16, i32, bool); 9] = [
 /// Event 11: 228 `item_key_used` on U.
 pub const EVENT_KEY_USED: (u16, i32) = (11, 228);
 
+/// §3 r4: quest line e (33–83) of a class whose quest line base is
+/// `base`, on U: held by a stinger (the follow-up) or requested with its
+/// delay. The id requested, if any.
+fn quest_request(
+    s: &mut dyn SoundCalls,
+    base: i32,
+    u: UnitKey,
+    e: u16,
+    out: &mut Vec<Followup>,
+) -> Option<i32> {
+    let id = base + (e as i32 - 33);
+    if QUEST_STINGER_EVENTS.contains(&e) {
+        out.push(Followup::QuestStinger { event: e, id });
+        return None;
+    }
+    let d = if QUEST_DELAY0_EVENTS.contains(&e) {
+        0
+    } else {
+        QUEST_DELAY
+    };
+    s.request(id, Some(u), d, 0, 0);
+    Some(id)
+}
+
+/// The player event sound `0x004CB9C0(U, e)` for a quest line e (33–83,
+/// §3 r1, r2, r4, r7) on the plain sound surface: the level-entry lines
+/// call it (`audio/environment.md` §4 r2). Other events: nothing.
+pub fn quest_line_event(
+    s: &mut dyn SoundCalls,
+    u: &Unit,
+    e: u16,
+) -> Result<Vec<Followup>, TriggerError> {
+    let rec = class_record(u.class)?;
+    if (u.is_local && u.mode == 17) || !(33..=83).contains(&e) {
+        return Ok(Vec::new());
+    }
+    let mut out = Vec::new();
+    if let Some(id) = quest_request(s, rec.quest_base, u.key, e, &mut out) {
+        out.push(Followup::OverheadText(id));
+    }
+    Ok(out)
+}
+
 /// Player event sound `0x004CB9C0(U, e)` (§3). U is a player; its class
 /// is `u.class`.
 pub fn player_event(cx: &mut Ctx, u: &Unit, e: u16) -> Result<Vec<Followup>, TriggerError> {
@@ -172,21 +216,7 @@ pub fn player_event(cx: &mut Ctx, u: &Unit, e: u16) -> Result<Vec<Followup>, Tri
                 Some(id)
             }
         }
-        33..=83 => {
-            let id = rec.quest_base + (e as i32 - 33);
-            if QUEST_STINGER_EVENTS.contains(&e) {
-                out.push(Followup::QuestStinger { event: e, id });
-                None
-            } else {
-                let d = if QUEST_DELAY0_EVENTS.contains(&e) {
-                    0
-                } else {
-                    QUEST_DELAY
-                };
-                cx.req(id, on_u, d);
-                Some(id)
-            }
-        }
+        33..=83 => quest_request(&mut *cx.s, rec.quest_base, u.key, e, &mut out),
         19..=24 => {
             let id = match e {
                 19 => rec.impossible,

@@ -662,6 +662,8 @@ pub fn run_ui_with<L: ServerLink>(
         if let Some(o) = original.as_deref_mut() {
             o.shop_poll(world, root);
             o.cube_poll(world, root)?;
+            // The close hooks of the outputs delivered since the last pass.
+            o.flush_hooks(root);
             o.sync_root(root);
         }
         for e in events {

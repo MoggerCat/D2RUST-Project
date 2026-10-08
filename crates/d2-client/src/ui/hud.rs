@@ -574,7 +574,7 @@ impl Panel for HudUi {
             for a in acts {
                 match a {
                     MiniAction::Ui(o) => sh.outputs.push(o),
-                    MiniAction::Sound(_) => sh.outputs.push(PanelOutput::ClickSound),
+                    MiniAction::Sound(id) => sh.outputs.push(PanelOutput::Sound(id as i32)),
                     // `frontend-options.md` §O1 r2: the game menu opens through
                     // `0x0047E090(1, 0)` (`OriginalUi::open_game_menu`).
                     MiniAction::GameMenu => sh.outputs.push(PanelOutput::SetUi {
@@ -582,6 +582,9 @@ impl Panel for HudUi {
                         mode: 0,
                         jump: false,
                     }),
+                    // `0x0044DA40` after a release that ran a function
+                    // (`control-panel.md` §9).
+                    MiniAction::InputReset => sh.input_reset = true,
                     // The quest log has no panel in play.
                     _ => {}
                 }
@@ -669,7 +672,7 @@ impl Panel for HudUi {
         for eff in effects {
             match eff {
                 CtrlEffect::Ui(o) => sh.outputs.push(o),
-                CtrlEffect::Sound(_) => sh.outputs.push(PanelOutput::ClickSound),
+                CtrlEffect::Sound(id) => sh.outputs.push(PanelOutput::Sound(id as i32)),
                 CtrlEffect::Send(i) => sh.outputs.push(PanelOutput::Intent(i)),
                 CtrlEffect::SkillSelect(l) => sh.hud.select_left = l,
                 CtrlEffect::ToggleRun => sh.hud.run_toggles += 1,
