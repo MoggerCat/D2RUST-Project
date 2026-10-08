@@ -574,7 +574,8 @@ impl Panel for HudUi {
                 match a {
                     MiniAction::Ui(o) => sh.outputs.push(o),
                     MiniAction::Sound(_) => sh.outputs.push(PanelOutput::ClickSound),
-                    // d2rs-own, unverified: the game menu button opens ui 9.
+                    // `frontend-options.md` §O1 r2: the game menu opens through
+                    // `0x0047E090(1, 0)` (`OriginalUi::open_game_menu`).
                     MiniAction::GameMenu => sh.outputs.push(PanelOutput::SetUi {
                         ui: 9,
                         mode: 0,
@@ -595,10 +596,20 @@ impl Panel for HudUi {
         let res2 = sh.config.screen.res2();
         let at_px = (at.x, at.y);
         if alive && sh.hud.belt.over(world, (w, h), res2, at_px) {
-            if !down {
-                for i in sh.hud.belt.click(world, res2, at_px) {
-                    sh.outputs.push(PanelOutput::Intent(i));
+            if down {
+                // §10 r1: a press over the belt records `[0x007BEFA4]`.
+                sh.hud.input.press_recorded = true;
+            } else {
+                // §10 r2: no press recorded → no belt click; always
+                // cleared after the release.
+                if sh.hud.input.press_recorded {
+                    for i in sh.hud.belt.click(world, res2, at_px) {
+                        sh.outputs.push(PanelOutput::Intent(i));
+                    }
                 }
+                sh.hud.input.press_recorded = false;
+                sh.hud.input.menu_pressed = false;
+                sh.hud.input.run_pressed = false;
             }
             return UiResponse::Consumed;
         }

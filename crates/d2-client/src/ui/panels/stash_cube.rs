@@ -176,7 +176,8 @@ pub struct CubePanel {
 }
 
 impl CubePanel {
-    /// §12.2–§12.3: when the cube item is gone, returns `SetUIState(0x1A,
+    /// §12.2–§12.3: when the local player is missing or dead
+    /// (`player_ok` false), returns `SetUIState(0x1A,
     /// off)` and C→S 0x4F 0x17 and draws nothing; else draws the art
     /// quads, the close button and the transmute button and returns
     /// nothing. (§12.2 gives no `jump`; the cube is a full-kind state, for
@@ -185,10 +186,10 @@ impl CubePanel {
         &self,
         t: &PanelTables,
         env: &PanelEnv,
-        cube_present: bool,
+        player_ok: bool,
         out: &mut dyn UiDrawSink,
     ) -> Vec<PanelOutput> {
-        if !cube_present {
+        if !player_ok {
             // `panels-2.md` §20 r4: the close hook sends the latched 0x17,
             // then `0x0048F183` sends it again: two messages.
             return vec![
@@ -408,7 +409,7 @@ mod tests {
 
     // Covers: specs/ui/panels.md §12 r2
     #[test]
-    fn cube_gone_closes_and_draws_nothing() {
+    fn dead_or_absent_player_closes_and_draws_nothing() {
         let t = PanelTables::load().unwrap();
         let mut out: Vec<UiDraw> = Vec::new();
         let o = CubePanel::default().draw(&t, &env(Screen::R800, true), false, &mut out);

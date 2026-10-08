@@ -273,9 +273,11 @@ impl InventoryPanel {
         }
     }
 
-    /// Mouse up (`0x00486EF0`): in the close rectangle,
+    /// Mouse up (`0x00486EF0`): first clears the pressed flag
+    /// (`panels-2.md` §18 r1); in the close rectangle,
     /// `SetUIState(1, off, 0)` without checking pressed (§Edge cases).
     pub fn release(&mut self, t: &PanelTables, s: &Screen, at: Point) -> Vec<PanelOutput> {
+        self.close_pressed = false;
         if close_rect(t, s).is_some_and(|r| r.contains(at)) {
             vec![PanelOutput::SetUi {
                 ui: UI_INVENTORY,
@@ -421,6 +423,23 @@ mod tests {
         assert!(!p.close_pressed);
         p.press(&t, &s, Point::new(338, 416));
         assert!(p.close_pressed);
+    }
+
+    // Mouse up clears the pressed flag first, wherever it lands: a drag
+    // off the button leaves it drawn up.
+    // Covers: specs/ui/panels-2.md §18 r1
+    #[test]
+    fn release_clears_the_close_pressed_flag() {
+        let t = tables();
+        let s = Screen::R640;
+        let mut p = InventoryPanel::default();
+        p.press(&t, &s, Point::new(338, 416));
+        assert!(p.close_pressed);
+        assert!(p.release(&t, &s, Point::new(100, 100)).is_empty());
+        assert!(!p.close_pressed);
+        p.press(&t, &s, Point::new(338, 416));
+        assert_eq!(p.release(&t, &s, Point::new(338, 416)).len(), 1);
+        assert!(!p.close_pressed);
     }
 
     fn record16() -> EquipRects {

@@ -33,8 +33,6 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use d2_proto::client::TerminateEntityChat;
-
 use super::{OriginalUi, SharedRef};
 use crate::bridge::items::{self, ItemView};
 use crate::bridge::world::{ClientWorld, MONSTER};
@@ -42,6 +40,7 @@ use crate::ui::draw::UiDrawSink;
 use crate::ui::geom::{Point, Rect};
 use crate::ui::inv_grid::GridRecord;
 use crate::ui::panel::{ClientIntent, Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
+use crate::ui::panels::npc::msg_chat_end;
 use crate::ui::panels::shop::{
     shop_button_records, shop_start_page, shop_tabs, ClickArgs, ClickEnv, ClickOutcome, ItemFacts,
     SendFacts, ShopButton, ShopEffect, ShopPanel, ShopTx, TxKind, DEFAULT_TABS, IDENTIFY_CLASSES,
@@ -654,9 +653,8 @@ impl OriginalUi {
                 st.floor = world.store_serial;
                 st.closed = true;
             }
-            root.queue_intent(ClientIntent::from_message(&TerminateEntityChat {
-                id: o.npc_guid,
-            }));
+            // panels-2.md §14.9: `0x004B3C20` sends 30 [1 u32][GUID u32].
+            root.queue_intent(ClientIntent(msg_chat_end(o.npc_guid).to_vec()));
             // PROVISIONAL (ui/panels-2.md §14; REC-278): the inventory the
             // shop opened beside it closes with it; an inventory left open
             // refuses the next shop (`ui-states.tsv` C[1][0x0C] = 3).

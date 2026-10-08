@@ -220,12 +220,16 @@ impl SoundTableData {
         if n <= 3 && roll(n + 1) == 0 {
             k -= 1;
         }
-        loop {
+        // Bounded: with a real seed a miss has probability <= 1/2 per draw, so
+        // 64 misses never happen; a roll stuck at 0 (no client seed yet,
+        // `SoundSystem::roll`) would otherwise spin forever.
+        for _ in 0..64 {
             let v = id.wrapping_add(roll(n) as i32);
             if !e.history[..k].contains(&v) {
                 return v;
             }
         }
+        id
     }
 
     /// History update (`0x004E0213`, §4 r4) on the requested id's record.

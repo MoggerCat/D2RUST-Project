@@ -227,6 +227,16 @@ pub struct Globals {
     pub speech_id: i32,
 }
 
+impl Globals {
+    /// The state sound init leaves at game start (§1 r6): idle gap 90.
+    pub fn sound_init() -> Self {
+        Self {
+            idle_gap: 90,
+            ..Self::default()
+        }
+    }
+}
+
 /// What a rule call works with: the sound layer, the globals and the
 /// client update counter C (§1 r5).
 pub struct Ctx<'a> {
