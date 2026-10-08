@@ -17,6 +17,7 @@
 use d2_sim::combat::RoomKind;
 use d2_sim::rng::Seed;
 use d2_sim::skills::list::ListOwner;
+use d2_sim::skills::use_::bodies::BodyWorld;
 use d2_sim::skills::use_::{
     MissileAim, ModeTarget, ServerMsg, SkillFunctions, UseMissiles, UseState, UseWorld,
 };
@@ -487,6 +488,21 @@ impl<X: SkillRest> LearnUnits for World<'_, '_, X> {
             return;
         };
         let level = list.entries[i].base;
+        let entry = d2_sim::skills::levels::highest_entry(&list.view(), skill);
+        // `0x00647110`: the skill's passive state on, then the refresh
+        // `0x00646D60` (Critical Strike, Dodge ...; q-amazon, REC-150).
+        let passive = h
+            .tables
+            .skills
+            .skill(skill)
+            .map_or(-1, |r| i32::from(r.passivestate as i16));
+        if passive > 0 {
+            self.u.cv.v.set_state(u, passive as u16, true);
+            if let Some(entry) = entry {
+                BodyWorld::passive_state_apply(&mut *self.u, u, &entry);
+            }
+        }
+        let h = &mut *self.u.cv.v.h;
         let mut m = vec![0x21, 0, 0];
         m.extend_from_slice(&guid.to_le_bytes());
         m.extend_from_slice(&(skill as u16).to_le_bytes());

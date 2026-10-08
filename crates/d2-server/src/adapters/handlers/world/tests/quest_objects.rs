@@ -13,8 +13,7 @@ use std::sync::Arc;
 use d2_data::tables::Objects;
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::{UnitId, UnitType};
-use d2_sim::wiring::action::ObjectRoute;
-use d2_sim::world::objects::{Dispatch, ObjectTables, Operate};
+use d2_sim::world::objects::ObjectTables;
 
 use super::trade_quests::Fx;
 use super::waypoints::blank;
@@ -141,26 +140,19 @@ fn the_gibbet_operate_and_its_event_7_run_on_the_quest_control() {
     assert!(fx.h.game.events.hooks().x.routes.is_empty());
 }
 
-// Covers: specs/world/objects.md §7.2 r4
+// Covers: specs/world/objects.md §7.2 r4; specs/world/quests-act3.md §3.6
 #[test]
-fn a_quest_operate_no_spec_states_is_handed_back() {
-    // Operate 28 has no entry in the wired dispatcher
-    // (`quest_objects::operate_fn`; Wirt's 33 has one since
-    // `quests-act1-rest.md` §9 item 11 stated it).
+fn lam_esens_tome_operate_runs_on_the_quest_code() {
+    // Operate 28 (`0x005B7A60`) is stated since q-a3-quests
+    // (`quests-act3.md` §3.6): it runs on the quest control and the route
+    // is no longer handed back (it was before the Act III routing).
     let mut fx = fixture();
     let tome = fx.object(LAM_ESEN_TOME);
     fx.frames(1);
     let g = fx.guid(tome);
     let (code, _) = send(&mut fx.h, &operate(g));
     assert_eq!(code, ResultCode::Done);
-    let p = fx.player;
-    let want = ObjectRoute::Operate(Dispatch::Quest(Operate {
-        object: tome,
-        operator: Some(p),
-        class: LAM_ESEN_TOME as u16,
-        operate_fn: 28,
-    }));
-    assert_eq!(fx.h.game.events.hooks().x.routes, vec![want]);
+    assert!(fx.h.game.events.hooks().x.routes.is_empty());
 }
 
 // Covers: specs/world/quests-act1-rest.md §9 r11, §edge-cases-original-bugs r9

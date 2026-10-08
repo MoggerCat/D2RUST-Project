@@ -207,6 +207,7 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
         }
     }
     fn approach(&mut self, player: UnitId, npc: UnitId) {
+        self.state.approaches.push((player, npc));
         self.rest.approach(player, npc);
     }
     fn interaction(&mut self, npc: UnitId) -> Option<&mut InteractionList> {

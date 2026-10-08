@@ -369,6 +369,13 @@ impl QuestRest for Rest {
     fn unit_kind(&self, u: UnitId) -> UnitKind {
         if self.quests.contains_key(&u) {
             UnitKind::Player
+        } else if self.chains.get(&u).is_some_and(|c| c.0.contains(&31)) {
+            // Shenk: monster init links superunique 42 to chain 31.
+            UnitKind::Monster {
+                class: 0,
+                superunique: Some(42),
+                owner: None,
+            }
         } else {
             UnitKind::Other
         }

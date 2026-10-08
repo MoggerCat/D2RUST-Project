@@ -235,6 +235,7 @@ impl OriginalUi {
     ) -> Result<(), OriginalUiError> {
         self.refresh_facts(world);
         self.hire_auto_open(o, world);
+        self.imbue_output(o);
         if matches!(o, Output::ChatLine { .. }) {
             // `messages.md` §3: the screen message; the overhead record
             // of type 5 is `chat_line`'s.

@@ -167,7 +167,7 @@ pub fn option_intent(kind: OptionKind, npc_guid: u32) -> Option<Vec<PanelOutput>
         })
     };
     let i = match kind {
-        OptionKind::Talk | OptionKind::Hire => return None,
+        OptionKind::Talk | OptionKind::Hire | OptionKind::Imbue => return None,
         OptionKind::Trade => action(1, 0),
         OptionKind::Gamble => action(2, 0),
         OptionKind::TravelWest => action(0, 1),

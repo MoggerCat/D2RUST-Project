@@ -34,6 +34,7 @@ use std::sync::{Arc, RwLock};
 use d2_data::bin::{excel_path, BinTable};
 use d2_data::tables::{
     decode_all, Composit, Monmode, Monstats, Monstats2, Objects, Objmode, Plrmode, Plrtype, Record,
+    States,
 };
 use d2_formats::cof::{Cof, CofLayer};
 
@@ -76,6 +77,8 @@ pub struct UnitLooks {
     pub monsters: BTreeMap<u32, MonsterRow>,
     /// `objects` `Token` by row.
     pub objects: BTreeMap<u32, Code>,
+    /// The shape states' draw identity (`unit-composite.md` §1.1).
+    pub shapes: super::disguise::Disguise,
 }
 
 fn read_table<T: Record>(source: &dyn FileSource) -> Result<Vec<T>, String> {
@@ -86,6 +89,25 @@ fn read_table<T: Record>(source: &dyn FileSource) -> Result<Vec<T>, String> {
     let table =
         BinTable::parse(T::TABLE, "archive", &file, &bytes, T::SIZE).map_err(|e| e.to_string())?;
     decode_all(&table).map_err(|e| e.to_string())
+}
+
+/// The `monstats2` mode bits (mDT = bit 0 … mRN = bit 15) by monster row.
+fn monstats2_modes(monstats: &[Monstats], monstats2: &[Monstats2]) -> BTreeMap<u32, u16> {
+    monstats
+        .iter()
+        .enumerate()
+        .filter_map(|(i, m)| {
+            let r = monstats2.get(usize::from(m.monstatsex))?;
+            let bits = [
+                r.mdt, r.mnu, r.mwl, r.mgh, r.ma1, r.ma2, r.mbl, r.msc, r.ms1, r.ms2, r.ms3, r.ms4,
+                r.mdd, r.mkb, r.msq, r.mrn,
+            ]
+            .iter()
+            .enumerate()
+            .fold(0u16, |a, (b, &on)| a | (u16::from(on) << b));
+            Some((i as u32, bits))
+        })
+        .collect()
 }
 
 fn code4(c: [u8; 4]) -> Code {
@@ -115,6 +137,15 @@ impl UnitLooks {
                 )
             })
             .collect();
+        let shapes = super::disguise::Disguise {
+            states: read_table::<States>(source)?
+                .iter()
+                .enumerate()
+                .filter(|(_, r)| matches!(r.gfxtype, 1 | 2))
+                .map(|(i, r)| (i as u8, r.gfxtype, r.gfxclass))
+                .collect(),
+            mode_bits: monstats2_modes(&read_table::<Monstats>(source)?, &monstats2),
+        };
         let objects = read_table::<Objects>(source)?
             .iter()
             .enumerate()
@@ -143,6 +174,7 @@ impl UnitLooks {
                 .collect(),
             monsters,
             objects,
+            shapes,
         })
     }
 
@@ -200,6 +232,7 @@ fn base_mode_token(looks: &UnitLooks, kind: CompositeKind, mode: u8) -> Code {
 /// The COF name of a model unit (§2), `None` for a unit without a
 /// composite (types 3–5, unknown class or mode).
 pub fn unit_cof(looks: &UnitLooks, unit: &ClientUnit) -> Option<CofName> {
+    let unit = &*looks.shapes.identity(unit);
     let (kind, mode) = kind_mode(unit)?;
     let token = unit_token(looks, unit, kind)?;
     let m = mode_token(
@@ -232,6 +265,7 @@ pub fn component_codes(
     name: &CofName,
     layer: &CofLayer,
 ) -> Option<ComponentCodes> {
+    let unit = &*looks.shapes.identity(unit);
     let (kind, mode) = kind_mode(unit)?;
     let c = layer.component;
     let component_token = *looks.components.get(usize::from(c))?;
@@ -422,7 +456,7 @@ impl UnitArtLoader {
         art.observe_facing(world);
         for unit in world.units.values() {
             let posed = art.posed(unit).into_owned();
-            let unit = &posed;
+            let unit = &*self.looks.shapes.identity(&posed);
             let Some(name) = unit_cof(&self.looks, unit) else {
                 continue;
             };
