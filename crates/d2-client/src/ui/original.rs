@@ -1215,10 +1215,10 @@ pub mod esc_menu;
 pub mod game_messages;
 #[path = "gold_dialog.rs"]
 pub mod gold_dialog;
-#[path = "overhead_ui.rs"]
-pub mod overhead_ui;
 #[path = "hud.rs"]
 pub mod hud;
+#[path = "overhead_ui.rs"]
+pub mod overhead_ui;
 
 #[path = "hud_belt.rs"]
 pub mod hud_belt;

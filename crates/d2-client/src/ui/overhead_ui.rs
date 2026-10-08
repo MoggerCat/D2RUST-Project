@@ -16,8 +16,8 @@ use std::collections::BTreeMap;
 
 use super::game_messages::{backing, wide, Measure};
 use super::SharedRef;
-use crate::bridge::world::{ClientWorld, UnitKey, PLAYER};
 use crate::bridge::hover::feet;
+use crate::bridge::world::{ClientWorld, UnitKey, PLAYER};
 use crate::rules::camera::{moving_to_client, Camera, FrameSize, OpenMode};
 use crate::ui::draw::{TextRequest, TextStyle, UiDraw, UiDrawSink};
 use crate::ui::geom::{Point, Rect};
@@ -137,7 +137,12 @@ impl Panel for OverheadUi {
             let Some((px, py)) = bubble_point(ux, uy, pass.view, kind, open_mode, w, h) else {
                 continue;
             };
-            let string = |id: u32| u16::try_from(id).ok().and_then(|i| ctx.strings.get_id(i)).map(<[u16]>::to_vec);
+            let string = |id: u32| {
+                u16::try_from(id)
+                    .ok()
+                    .and_then(|i| ctx.strings.get_id(i))
+                    .map(<[u16]>::to_vec)
+            };
             let convert = |t: &[u8], _lang: u8| Some(wide(t));
             let Some(text) = bubble_text(kind, rec, &string, &convert).filter(|t| !t.is_empty())
             else {
@@ -194,7 +199,13 @@ mod tests {
             None
         }
         fn get_id(&self, id: u16) -> Option<&[u16]> {
-            const T: [u16; 5] = [b'H' as u16, b'e' as u16, b'l' as u16, b'l' as u16, b'o' as u16];
+            const T: [u16; 5] = [
+                b'H' as u16,
+                b'e' as u16,
+                b'l' as u16,
+                b'l' as u16,
+                b'o' as u16,
+            ];
             (id == 2500).then_some(&T[..])
         }
     }
