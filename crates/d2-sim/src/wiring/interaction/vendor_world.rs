@@ -219,6 +219,11 @@ where
     /// are not written; 1 as drops and the cube, so the store item is in
     /// the unit lists the 0x32 GUID lookup searches. The forced flag and
     /// the other request fields stay 0.
+    ///
+    /// §3.1 rule 2 / `generation.md` §10.2: never-ethereal 1 (request
+    /// flags2 0x02, no-sockets 0), and on success item flag 0x10
+    /// (identified), which the §3.1 rule 4 / §5.1 step 7 repair needs
+    /// (§9.2 rule 0).
     fn create_item(
         &mut self,
         npc_class: u16,
@@ -235,6 +240,7 @@ where
             item: record as i32,
             format: VendorWorld::item_format(self),
             quality,
+            flags2: crate::items::req::NEVER_ETHEREAL,
             ..ItemRequest::default()
         };
         let spawn = ItemSpawn {
@@ -243,7 +249,12 @@ where
             init_flags: 1,
         };
         match self.desk.econ.create_item(&mut rq, false, spawn) {
-            Ok(u) => Some(u),
+            Ok(u) => {
+                if let Some(i) = self.desk.econ.items.get_mut(u) {
+                    i.flags |= crate::items::flag::IDENTIFIED;
+                }
+                Some(u)
+            }
             Err(EconomyError::Create(CreateError::Fatal(f))) => {
                 self.desk
                     .state

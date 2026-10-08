@@ -72,11 +72,6 @@ use crate::rules::camera::OpenMode;
 /// are), so [`UiRoot::sync_states`] leaves it open.
 pub const BORDER_PANEL: PanelId = PanelId(0x100);
 
-/// The step-10 overlays' adapter (hover tips, then the cursor item), drawn
-/// after every other panel (`ui/panels.md` §5 step 10, `panels-3.md` §23
-/// r9): not a UI state, open for good.
-pub const TOP_PANEL: PanelId = PanelId(0x113);
-
 /// The Esc-closable states (`panels.md` §2 r9, flag table `0x006D6378`
 /// = 1), in the close-all's order i = 0 … 37.
 pub const ESC_CLOSABLE: [u8; 27] = [
@@ -87,6 +82,10 @@ pub const ESC_CLOSABLE: [u8; 27] = [
 /// The states the game menu's open remembers and its close reopens
 /// (`frontend-options.md` §O1 r2: keep = 1).
 pub const GAME_MENU_KEEP: [u8; 6] = [6, 7, 10, 17, 21, 35];
+/// The step-10 overlays' adapter (hover tips, then the cursor item), drawn
+/// after every other panel (`ui/panels.md` §5 step 10, `panels-3.md` §23
+/// r9): not a UI state, open for good.
+pub const TOP_PANEL: PanelId = PanelId(0x113);
 
 /// The click sound of §10.2: `0x004B9A00(0, 0, 0)` = request id 0, no
 /// unit, delay 0 (`audio/triggers.md` §1 r1).

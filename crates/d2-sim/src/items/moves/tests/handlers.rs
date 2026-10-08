@@ -2,7 +2,7 @@
 
 use super::{me, Fake, P};
 use crate::items::moves::{
-    handle, mode, res, ty, InventoryOps, MoveFatal, MoveUnits, Owner, HANDLED,
+    handle, iflag, mode, res, ty, InventoryOps, MoveFatal, MoveUnits, Owner, HANDLED,
 };
 
 /// Message `id` followed by u32 fields.
@@ -465,6 +465,20 @@ fn swap_cursor_buffer_placement_fails() {
     // C stays in mode 4, in no grid and not the cursor.
     assert_eq!(f.it(10).mode, mode::CURSOR);
     assert_eq!(f.it(11).mode, mode::CURSOR);
+}
+
+// Covers: specs/items/inventory-moves.md §7.10 r5
+#[test]
+fn swap_cursor_buffer_clears_4000_on_both() {
+    let mut f = Fake::new();
+    f.item(10, mode::CURSOR).iflags = iflag::NOEQUIP;
+    f.items.get_mut(&10).unwrap().filled = true;
+    f.item(11, mode::STORED).iflags = iflag::NOEQUIP;
+    assert_eq!(run(&mut f, &m32(0x1F, &[10, 11, 2, 3])), res::OK);
+    // Item flag 0x4000 cleared on T and on C; C (socket-filled) gets 0x1.
+    assert_eq!(f.it(11).iflags & iflag::NOEQUIP, 0);
+    assert_eq!(f.it(10).iflags & iflag::NOEQUIP, 0);
+    assert_ne!(f.it(10).iflags & iflag::CHANGED, 0);
 }
 
 // ---- 0x20
