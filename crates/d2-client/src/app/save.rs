@@ -301,6 +301,21 @@ impl<C: d2_server::seams::Clock + Send + 'static> SharedLink<C> {
     fn lock(&self) -> std::sync::MutexGuard<'_, ThreadLink<Link<C>>> {
         self.0.lock().unwrap_or_else(|e| e.into_inner())
     }
+
+    /// Runs `f` on the server thread's link between frames (tests, tools).
+    pub fn with<R, F>(&self, f: F) -> Result<R, super::server_thread::ThreadStopped>
+    where
+        R: Send + 'static,
+        F: FnOnce(&mut Link<C>) -> R + Send + 'static,
+    {
+        self.lock().with(f)
+    }
+}
+
+impl<C: d2_server::seams::Clock + Send + 'static> Clone for SharedLink<C> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
 }
 
 impl<C: d2_server::seams::Clock + Send + 'static> ServerLink for SharedLink<C> {

@@ -278,6 +278,15 @@ fn synthetic_npc_classes() -> impl Iterator<Item = u16> {
     .chain(super::town_npcs::ACT5.iter().map(|&(c, _)| c))
     .chain(super::town_npcs::ACT3.iter().map(|&(c, _)| c))
 }
+/// [`synthetic_npc_classes`] in `monstats` row order, once each (the
+/// vendor tables' `interact` list, `vendors.md` §1 r2).
+fn synthetic_interact_classes() -> Vec<u16> {
+    let mut v: Vec<u16> = synthetic_npc_classes().collect();
+    v.sort_unstable();
+    v.dedup();
+    v
+}
+
 /// The player's character class (1, sorceress, as in the server tests).
 pub const PLAYER_CLASS: u32 = 1;
 /// The character's name (0x59 bytes 6..22, zero-padded).
@@ -2342,7 +2351,12 @@ impl GameParts {
             monstats: synthetic_monstats(),
             hire_rows: hire_rows.clone(),
             items: super::synthetic_items::item_tables(),
-            vendors: VendorTables::default(),
+            // The stores of the synthetic traders (q-smoke-town, REC-278).
+            vendors: super::synthetic_vendors::vendor_tables(
+                &super::synthetic_items::item_tables(),
+                synthetic_interact_classes(),
+                SYNTHETIC_MONSTATS,
+            ),
             anim: None,
             vitals: None,
             bodies: None,
@@ -3008,7 +3022,12 @@ fn loader(
                 // are the join's item messages (rule 3.5), sent after the
                 // stat messages.
                 let (entry, report, items) = load_new_character_with_items(s, player, r.char_name);
-                super::save_gaps::seed_new_flags(s, player, GAME_SETUP.expansion);
+                super::save_gaps::seed_new_flags(
+                    s,
+                    player,
+                    GAME_SETUP.expansion,
+                    character.difficulty(),
+                );
                 let own: Vec<Vec<u8>> = items
                     .sent
                     .iter()
@@ -3051,6 +3070,7 @@ fn loader(
                 Ok((entry, report)) => {
                     // q-save-full: the save's items, made on the wired host.
                     let items_ok = super::save_full::join_items(s, player, save);
+                    let corpses_ok = super::save_full::join_corpses(s, player, save);
                     super::save_gaps::join_gaps(s, player, save);
                     let log = &mut s.events.action.hooks().x.log;
                     log.extend(
@@ -3058,6 +3078,7 @@ fn loader(
                             .unapplied
                             .iter()
                             .filter(|u| !(items_ok && u.step == "items"))
+                            .filter(|u| !(corpses_ok && u.step == "corpse"))
                             .map(|u| format!("join: save load: {u:?}")),
                     );
                     // Load §2 quests row (`0x0056A370` → `0x0065C4D0`,

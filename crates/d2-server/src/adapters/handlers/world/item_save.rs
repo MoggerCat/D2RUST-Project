@@ -57,6 +57,30 @@ impl<R, S> WiredWorld<R, S> {
         player: UnitId,
         entries: &[ItemEntry],
     ) -> LoadedItems {
+        self.load_list(game, events, player, entries, false)
+    }
+
+    /// [`Self::load_items`] for a corpse unit's list (`d2s.md` §8.2 rule
+    /// 3, §8.3 rule 4): placed by the corpse placement
+    /// (`InvDesk::load_corpse_entry`).
+    pub fn load_corpse_items<D: ActionEvents>(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        corpse: UnitId,
+        entries: &[ItemEntry],
+    ) -> LoadedItems {
+        self.load_list(game, events, corpse, entries, true)
+    }
+
+    fn load_list<D: ActionEvents>(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        player: UnitId,
+        entries: &[ItemEntry],
+        corpse: bool,
+    ) -> LoadedItems {
         let mut r = LoadedItems::default();
         if entries.is_empty() {
             return r;
@@ -91,7 +115,12 @@ impl<R, S> WiredWorld<R, S> {
                         continue;
                     }
                 };
-                match d.load_entry(player, &rec) {
+                let made = if corpse {
+                    d.load_corpse_entry(player, &rec)
+                } else {
+                    d.load_entry(player, &rec)
+                };
+                match made {
                     Ok(u) => r.items.push(u),
                     Err(f) => r.faults.push(format!("item {i}: {}", fault(&f))),
                 }

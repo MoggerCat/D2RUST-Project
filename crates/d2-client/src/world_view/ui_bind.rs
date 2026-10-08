@@ -378,10 +378,6 @@ pub(super) fn ui_items<R: UiRules + ?Sized>(
         let (sprites, clip) = match d {
             UiDraw::Image(r) => (vec![rules.ui_image(r, assets).map_err(at)?], r.clip),
             UiDraw::Text(r) => (rules.ui_text(r, assets).map_err(at)?, r.clip),
-            // REC-271: the scene has no fill primitive; the tint (blend
-            // kind 2 over the destination, `inventory.md` §2 r3) is not
-            // painted yet.
-            UiDraw::Tint(_) => continue,
         };
         for s in sprites {
             let id = assets.id(&s.frame.set, s.frame.index).map_err(at)?;
