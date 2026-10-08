@@ -47,6 +47,9 @@ Branch `claude/local-pc1-s8` from `origin/claude/specs-staging-7`
 | ui/text OQ2 (by pattern), OQ7; fixups OQ3, OQ6; loading OQ12; item-tips OQ1 (elixir) | caller `k` patterns A–H (230 of 253 sites always 0–12; recipe scroll uses the raw 0x26 type-7 byte); return chains never read the glyph record; gems +0x2C never read; bad-input behaviours; tile path buffer is 60 bytes + cookie (old 64 wrong); minimum table counts (experience MaxLvl+2, arena 1, composit 16, armtype 3); elixir text table `0x0072D6C0` | `ui/text.md` §7, OQ2, OQ7; `data/fixups.md` §12 r2, edge 10, OQ3, OQ6; `data/loading.md` §10 r8, OQ12; `ui/item-tips.md` §6 r1 | text, fixups match; count checks and elixir do not | `q-fix-count-minimums`, `q-fix-elixir-tip` |
 | REC-257 (1)–(5); pointer edits; PLAN.md counts | pentspin steps on GetTickCount > 50 ms, once per draw, never reset (`[0x007BC944]`); disabled rows mode 1, slider rectangles `0x0046EFD0` mode by style; no Window Mode row in 1.14d (Video has 8 rows); a missing art file crashes the original (d2rs: load error at join); body-click / hireling / events 84–86 pointers; PLAN DC6 1,653, tbl 29 | `ui/frontend-options.md` §O4 r3, r7, §O8; `ui/panels.md` §15; `items/inventory.md` §5.6; `ui/inventory.md` §10 r5; `audio/triggers.md` §2 r2; `docs/PLAN.md` | textslid matches | `q-fix-esc-menu` extended |
 | REC-267 (start, sound, latch; frame clock d2rs-own), REC-265 (1)–(6) | Horadric animation starts only on 0x9C placement of hst/qf2 into cube page 3 when quest bit 11 of 10/18 is clear (`0x0048A540` from `0x004C2970`), no own sound; open latch `0x0048A460`; mouse words plain skill id; swap getters; switch byte setter `0x00539230`; hotkeys from C->S 0x51 | `ui/panels-2.md` §20 r7–r8; `world/cube.md` §8; `formats/d2s.md` §2.1, §2.4 r3, r8 | HoradricAnim, switch bit, progression formula, hireling block fields match | `q-fix-cube-panel`, `q-fix-save-gaps` extended |
+| REC-266, REC-259 (REC premise wrong: the Vis/Warp values were already in the specs) | item-granted skills: callback on every 97/107 change incl. worn-item load, per stat, @10 = bonus level, 0x23 on every select; throw ammo/missile/mastery already specified and code matches; weapon-in-use +0x1C needed for Throw (fallback d2rs-own and wrong); Act I fixture tree vs §12.2/§12.5 | `skills/levels.md` §7.1, vector; `skills/use.md` §2 row 5 | throw body matches; stat callback, preview rest, +0x1C, tree do not | `q-fix-skill-stat-callback`, `q-fix-preview-skill-rest`; `q-fix-quest-items`, `q-fix-item-type-test`, `q-fix-level-connections` extended |
+
+Follow-ups still for another worker: `world/quests-act3-2.md` §11.5 r1 re-link case (+0x1C := -1 when the re-linked usable non-tpot item is the weapon in use, `0x0063D283`–`0x0063D298`); `items/inventory.md` §4.6 and `items/inventory-moves.md` §7 call `0x0063D1D0` "stat link" but its whole body is the +0x1C write.
 
 Follow-ups status (end of session): all pointer follow-ups listed below are done except the six `0x004AFF60` callers in `0x0046C770`–`0x0046CB40` (unread) and missiles.md OQ15 (server 75 % branch).
 
@@ -334,3 +337,11 @@ Recordability (tools/original-hooks.md §7): R-MIS-1/2, R-PAUSE-1, R-NOTICK-1, R
   item save and reload (kf, golem at join, item kept, OQ15); dead hireling
   (0x10000) and hireling with items (OQ4); status bits 8–12 after each act
   II–V; F1–F3 hotkeys (one item skill).
+- **R-OSKILL-1** [MANUAL] (wire bytes; top of the M22 list) Confirms
+  skills/levels §7.1. Sorceress without Teleport equips a +1 Teleport item
+  (107): 0x21 @10 = 1; Teleport on the right button, unequip: one 0x23 (hand 0,
+  skill 0, owner FFFFFFFF), no 0x21; a 97 and a 107 item together, remove the
+  97 item: entry removed. Join wearing an oskill item: 0x21 in the join with
+  @10 = bonus. Throwing potion into the empty weapon hand with Attack left:
+  0x23 (hand 1, skill 2, owner -1); throw: 0x3E stat 70 and a lob; unequip: no
+  0x23. Two 1H weapons, remove the first-wielded, throw from the other.

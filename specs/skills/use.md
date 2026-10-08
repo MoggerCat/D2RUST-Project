@@ -37,8 +37,8 @@
 | Randomness | 515–524 |
 | Edge cases & original bugs | 525–546 |
 | Test vectors | 547–567 |
-| Provenance | 568–584 |
-| Open questions | 585–636 |
+| Provenance | 568–587 |
+| Open questions | 588–639 |
 <!-- /index -->
 
 ## Summary
@@ -134,7 +134,7 @@ at the first failure (entry null → fatal assert):
 | 2 | `skill_level(unit, entry, 1)` = 0 (`0x006442A0`) | 7 |
 | 3 | `aura` | 6 |
 | 4 | `passive` | 5 |
-| 5 | quantity and throw `0x00647640`, then item type `0x00643F80` | 2 |
+| 5 | skill item test `0x00647640` (`client/stat-lists.md` §3 rule 6.11, the same function on the server: scroll / book skills need quantity +0x30 > 0; Throw and Left Hand Throw a throwable item in the hand the weapon in use picks, and Throw without dual wield fails while inventory +0x1C names no item (writers `world/quests-act3-2.md` §11.5); Left Hand Swing a second weapon; other skills pass), then item type `0x00643F80` | 2 |
 | 6 | mana `can_afford` `0x00647540` (`skills/levels.md` §4) | 1 |
 | 7 | shape `0x00644060` | 4 |
 | 8 | start stat `0x006440F0` | 1 |
@@ -567,6 +567,9 @@ their own (`combat/*`, `skills/levels.md`). The unit-seed reseeder
 
 ## Provenance
 
+- §2 test 5 re-read 2026-10-08 (REC-266): `0x00647640` (skill ids 2, 4,
+  5 by `0x0063C9B0` / `0x00643D60`; other ids return 1 before the
+  inventory test).
 - 1.14d disassembly; tables read from the image: srvst `0x00732140`,
   srvdo `0x007322B0`, mode starts `0x006E1740`, player per-mode handlers
   `0x00732C10`. Function identification: same null pattern as D2MOO's
