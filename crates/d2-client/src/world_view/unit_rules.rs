@@ -97,7 +97,15 @@ impl<R: ViewRules> ViewRules for UnitRules<R> {
         Ok(Some(UnitPose {
             cof: path,
             dir: usize::from(dir.cof_dir),
-            frame: Self::frame(world, unit, cof.frames, cof.animation_rate),
+            frame: if art.spin == Some(unit.key) {
+                super::skill_motion::spin_frame(
+                    world.server_ticks,
+                    cof.animation_rate,
+                    usize::from(cof.frames),
+                )
+            } else {
+                Self::frame(world, unit, cof.frames, cof.animation_rate)
+            },
         }))
     }
 
