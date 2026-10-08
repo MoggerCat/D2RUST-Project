@@ -258,10 +258,19 @@ impl<'a, R: ?Sized, S: ?Sized> OriginalView<'a, R, S> {
         );
         let mut out = Vec::with_capacity(blocks.len());
         // Shades name the tile's blocks in block order (some may be left
-        // out): block `i` is the next block with the shade's rectangle.
+        // out): block `i` is the next block at the shade's position and
+        // width. A shade may be shorter than its block: a floor gradient
+        // lights rows 0…14 only (`shading.md` §4 floors r3–r4), and the
+        // draw covers the shade's rows.
         let mut next = 0;
         for b in blocks {
-            let Some(i) = (next..tile.blocks.len()).find(|&j| tile.blocks[j] == b.block) else {
+            let same = |r: &BlockRect| {
+                r.x == b.block.x
+                    && r.y == b.block.y
+                    && r.width == b.block.width
+                    && b.block.height <= r.height
+            };
+            let Some(i) = (next..tile.blocks.len()).find(|&j| same(&tile.blocks[j])) else {
                 return Err(unresolved(
                     "tile blocks",
                     PLACEMENT,

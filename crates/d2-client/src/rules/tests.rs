@@ -932,6 +932,17 @@ fn tile_blocks_draw_one_item_per_block() {
     let mut wrong = shades;
     wrong.reverse();
     assert!(view.tile_draws(&tile, &image, &wrong).is_err());
+    // A floor gradient shade shorter than its block (rows 0…14, shading §4
+    // floors r3–r4) names that block; the draw covers the shade's rows.
+    let mut short = shades;
+    short[1].block.height = 15;
+    let draws = view.tile_draws(&tile, &image, &short).unwrap();
+    assert_eq!(draws[1].clip, Rect::new(whole.x + 32, 360, 32, 15));
+    assert_eq!(draws[1].frame.index, 2);
+    // Taller than the block, or at another x: not that block.
+    let mut tall = shades;
+    tall[1].block.height = 33;
+    assert!(view.tile_draws(&tile, &image, &tall).is_err());
     // A left-out block (wall alpha) keeps the others' indexes.
     let draws = view.tile_draws(&tile, &image, &shades[1..]).unwrap();
     assert_eq!((draws[0].x, draws[0].frame.index), (whole.x + 32, 2));
