@@ -1,6 +1,6 @@
 # q-levels-warps-all: every inter-level warp, all acts
 
-Branch `claude/q-levels-warps-all`. Nothing here is verified against 1.14d (rule 10). Open point: REC-168 (`docs/HANDOFF.md` §7).
+Branch `claude/q-levels-warps-all`. Nothing here is verified against 1.14d (rule 10). Open point: REC-230 (`docs/HANDOFF.md` §7).
 
 ## Links connected
 
@@ -15,7 +15,7 @@ Test: `crates/d2-client/tests/app_levels_warps_all.rs`. For every level of the s
 
 Expectations changed (not weakened): `app_frame_loop` (the waypoint to Cold Plains now meets Cold Plains's own tile: 39 handled messages, one more room in the sight list, one more hidden unit).
 
-## PROVISIONAL (REC-168)
+## PROVISIONAL (REC-230)
 
 Chain orders, ids and tile places are made up; Stony Field stays out of the chains (the waypoint test needs it unbuilt). Act III's live town room is not pre-streamed (like Harrogath): check the first act change into Kurast.
 

@@ -5,7 +5,7 @@
 //! `app_act_travel`), then every warp tile of the level is clicked
 //! (C→S 0x13): the server player must end in the level the DRLG's vis
 //! slot names, the client's model must follow, and nothing is rejected.
-//! PROVISIONAL (REC-168): the chain levels' places are made up.
+//! PROVISIONAL (REC-230): the chain levels' places are made up.
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
@@ -103,7 +103,13 @@ fn every_warp_of_every_level_loads_its_destination() {
             "the client follows to {to}"
         );
     };
-    let warps = single_player::synthetic_level_warps();
+    // Duriel's Lair is quest-gated (`0x00545B80`, `quests-act2.md` §8.2):
+    // its warps are `app_act2_duriel`'s.
+    let lair = d2_client::app::synthetic_act2::DURIELS_LAIR;
+    let warps: Vec<_> = single_player::synthetic_level_warps()
+        .into_iter()
+        .filter(|w| w.0 != lair && w.1 != lair)
+        .collect();
     assert!(warps.len() > 40, "{}", warps.len());
     let mut levels: Vec<u32> = warps.iter().map(|w| w.0).collect();
     levels.dedup();

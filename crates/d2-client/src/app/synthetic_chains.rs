@@ -7,7 +7,7 @@
 //! town or Cold Plains); every level after it gets a way back (slot 0)
 //! and, unless last, a way on (slot 1).
 //!
-//! PROVISIONAL (M22; REC-168): the real worlds join these levels through
+//! PROVISIONAL (M22; REC-230): the real worlds join these levels through
 //! outdoor placement, stairs and cave mouths with several exits per level;
 //! the chain order, the level ids' neighbours and every tile place are
 //! made up. `// d2rs-own, unverified`.

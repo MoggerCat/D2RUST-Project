@@ -162,7 +162,7 @@ impl<X: WorldPending> TickHooks for WorldSim<X> {
         if !self.lend(|a| a.restore(game, r)) {
             self.host(game, |h| {
                 h.v.h.x.restore_inactive_units(r);
-                // PROVISIONAL (REC-168): without the inactive store a
+                // PROVISIONAL (REC-230): without the inactive store a
                 // reactivated room has lost its warp tile units (they left
                 // the room with its deactivation); allocate them again
                 // from the room's presets (idempotent).
