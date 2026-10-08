@@ -297,7 +297,13 @@ impl Plugin for WorldViewPlugin {
             )
             .add_systems(
                 Update,
-                (init_gpu, ui_input, world_view_frame, present_scale)
+                (
+                    init_gpu,
+                    ui_input,
+                    script_input,
+                    world_view_frame,
+                    present_scale,
+                )
                     .chain()
                     .run_if(resource_exists::<BridgeResource>)
                     .run_if(resource_exists::<WorldViewState>),
@@ -507,6 +513,7 @@ fn ui_input(
     keys: Option<Res<ButtonInput<KeyCode>>>,
     walk: Option<ResMut<PreviewWalk>>,
     time: Option<Res<Time>>,
+    script: Option<Res<super::input_script::InputScript>>,
 ) -> Result {
     let (Some(mut ui), Ok(window)) = (ui, windows.single()) else {
         return Ok(());
@@ -565,6 +572,10 @@ fn ui_input(
         ui.queue.0.extend(actions);
         ui.queue.0.extend(edge::key_chars(&pressed));
     }
+    // `play --input`: the script owns the pointer (`script_input`).
+    if script.is_some() {
+        return Ok(());
+    }
     // A window below 800×600 has no frame mapping (`ui.md` open question
     // 1 of the C8 notes): pointer input is dropped as outside the frame.
     let pos = edge::cursor_frame_pos(window).unwrap_or(FramePos::Outside);
@@ -592,6 +603,29 @@ fn ui_input(
         }
     }
     Ok(())
+}
+
+/// `play --input` (`facts-render.md` §5 r11): the script's events, once
+/// per new server tick, into the UI queue in place of the window pointer.
+fn script_input(
+    ui: Option<NonSendMut<WorldViewUi>>,
+    bridge: Res<BridgeResource>,
+    script: Option<ResMut<super::input_script::InputScript>>,
+    mut last: Local<u64>,
+) {
+    let (Some(mut ui), Some(mut script)) = (ui, script) else {
+        return;
+    };
+    let tick = bridge.0.world().server_ticks;
+    if tick == 0 || tick == *last {
+        return;
+    }
+    *last = tick;
+    let events = script.events(tick);
+    if !events.is_empty() {
+        ui.queue.0.extend(events);
+        ui.cursor = script.cursor();
+    }
 }
 
 fn rgba_image(rgba: Vec<u8>) -> Image {

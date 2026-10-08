@@ -33,6 +33,7 @@ pub mod corpse_click;
 pub mod disguise;
 pub mod feed;
 pub mod ground_items;
+pub mod input_script;
 pub mod interact;
 pub mod light_sources;
 pub mod missiles;
@@ -419,6 +420,11 @@ pub struct WorldFrame {
     /// `None` without one. Read back by [`visibility`] (the origin
     /// getters of `client/model.md` §13 r1 return the last drawn frame's).
     pub camera: Option<crate::rules::camera::Camera>,
+    /// Pass 9's calls in call order (`draw-order-2.md` §11.7: the flash or
+    /// the particle lines), drawn as the items of
+    /// [`weather_view::is_sky_call_path`]; read by the facts export
+    /// (`tools/facts-render.md` §5 r10), which writes one row per call.
+    pub sky: Vec<crate::rules::draw_order::weather::SkyDraw>,
 }
 
 /// The C7 resolver of one unit: the hooks. Frame ids are not a hook: they
@@ -546,6 +552,7 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
         units_drawn,
         units_hidden,
         camera: None,
+        sky: Vec::new(),
     })
 }
 

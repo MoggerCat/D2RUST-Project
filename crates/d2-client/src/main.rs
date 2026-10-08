@@ -6,7 +6,7 @@
 //!   d2-client verify     [--case NAME]... [--cases DIR] [--perturb N]
 //!   d2-client verify     [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out DIR] [--perturb N]
 //!   d2-client cpu-render [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out FILE]
-//!   d2-client play       ... --dump-draws DIR [--at-tick N]
+//!   d2-client play       ... --dump-draws DIR [--at-tick N] [--input SCRIPT]
 //!   d2-client facts-compare ORIGINAL_DIR D2RS_DIR [--ignore COL,...]
 //!
 //! `play` (the default) opens a window running the local single-player game: the
@@ -38,6 +38,9 @@
 //! `play --dump-draws DIR [--at-tick N]` writes the rendering facts
 //! (`specs/tools/facts-render.md` §5) of the first drawn frame at server
 //! tick N or later (default 1) to DIR and exits (skips the front end).
+//! `play --input "move X Y; wait N; click X Y; rclick X Y"` plays the
+//! steps as pointer input, timed in server ticks, in place of the window's
+//! pointer (`facts-render.md` §5 r11).
 //! `facts-compare` reports the first difference between a 1.14d scene's
 //! facts and a d2rs dump (§6): exit 0 match, 1 diverged, 2 partial, 3 error.
 //!
@@ -97,6 +100,8 @@ struct Options {
     dump_draws: Option<PathBuf>,
     /// `play --at-tick N`: the dump's first server tick.
     at_tick: Option<u64>,
+    /// `play --input SCRIPT`: scripted pointer input (`facts-render.md` §5 r11).
+    input: Option<Vec<d2_client::world_view::input_script::Step>>,
 }
 
 fn parse_view(s: &str) -> Result<cpu::View> {
@@ -139,6 +144,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
         hardcore: false,
         dump_draws: None,
         at_tick: None,
+        input: None,
     };
     let mut it = args.iter();
     while let Some(flag) = it.next() {
@@ -160,6 +166,12 @@ fn parse_options(args: &[String]) -> Result<Options> {
             "--hardcore" => o.hardcore = true,
             "--dump-draws" => o.dump_draws = Some(PathBuf::from(value()?)),
             "--at-tick" => o.at_tick = Some(value()?.parse().context("--at-tick")?),
+            "--input" => {
+                o.input = Some(
+                    d2_client::world_view::input_script::parse(value()?)
+                        .map_err(|e| anyhow::anyhow!("--input: {e}"))?,
+                )
+            }
             "--save" => o.save = Some(PathBuf::from(value()?)),
             "--native" => o.native = Some(PathBuf::from(value()?)),
             "--source" => o.source = Some(value()?.clone()),
@@ -539,6 +551,7 @@ fn play_once(
                 at_tick: o.at_tick.unwrap_or(1),
                 command: std::env::args().collect::<Vec<_>>().join(" "),
             }),
+        input: o.input.clone(),
     })?;
     match result {
         bevy::app::AppExit::Success => Ok(()),
@@ -588,7 +601,7 @@ fn main() -> Result<()> {
         Some("verify") => verify(parse_options(&args[1..])?),
         Some("play") | None => play(parse_options(args.get(1..).unwrap_or(&[]))?),
         Some("view") => view(parse_options(&args[1..])?),
-        _ => bail!("usage: d2-client [view|verify|cpu-render|play|facts-compare] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--synthetic] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq] [--dump-draws DIR [--at-tick N]]"),
+        _ => bail!("usage: d2-client [view|verify|cpu-render|play|facts-compare] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--synthetic] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq] [--dump-draws DIR [--at-tick N]] [--input SCRIPT]"),
     }
 }
 
@@ -618,6 +631,16 @@ mod tests {
         assert!(parse_options(&args(&["--new", "amazon"])).is_err());
         assert!(parse_options(&args(&["--new"])).is_err());
         assert!(parse_options(&args(&["--new", "0", "A", "--save", "x.d2s"])).is_err());
+    }
+
+    #[test]
+    fn input_takes_a_script() {
+        use d2_client::world_view::input_script::Step;
+        let args = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let o = parse_options(&args(&["--input", "wait 3; click 600 300"])).unwrap();
+        assert_eq!(o.input.as_deref().map(<[Step]>::len), Some(2));
+        assert!(parse_options(&args(&["--input", "fly 1 2"])).is_err());
+        assert!(parse_options(&args(&["--input"])).is_err());
     }
 
     #[test]

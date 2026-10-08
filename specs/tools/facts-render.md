@@ -23,18 +23,18 @@
 | Outputs / state changes | 59–65 |
 | Rules | 66–67 |
 |   1. Files and header | 68–89 |
-|   2. `draws.tsv` | 90–131 |
-|   3. `frame.tsv` | 132–164 |
-|   4. `sprites.tsv` | 165–180 |
-|   5. d2rs export | 181–220 |
-|   6. Comparison | 221–243 |
-|   7. Requests | 244–255 |
-| Constants & data dependencies | 256–259 |
-| Randomness | 260–263 |
-| Edge cases & original bugs | 264–271 |
-| Test vectors | 272–280 |
-| Provenance | 281–285 |
-| Open questions | 286–300 |
+|   2. `draws.tsv` | 90–133 |
+|   3. `frame.tsv` | 134–166 |
+|   4. `sprites.tsv` | 167–182 |
+|   5. d2rs export | 183–253 |
+|   6. Comparison | 254–276 |
+|   7. Requests | 277–288 |
+| Constants & data dependencies | 289–292 |
+| Randomness | 293–296 |
+| Edge cases & original bugs | 297–304 |
+| Test vectors | 305–313 |
+| Provenance | 314–318 |
+| Open questions | 319–333 |
 <!-- /index -->
 
 ## Summary
@@ -124,8 +124,10 @@ frame record's `draws`, `capture.md` §3.5; d2rs: §5).
    other column `-`.
 6. Primitives (`Util*`, `DrawBox*`, `DrawLine`, `StartDraw`,
    `ClearScreen`): `x`, `y` = the rectangle's left, top (`Util*`) or
-   the first two arguments; `mode` = the color argument; every other
-   column `-`.
+   the first two arguments (`ClearScreen` has one: `y` = `-`); `mode` =
+   the color argument (`Util*`: the second; `DrawLine`, `DrawBox`: the
+   fifth, `blend-modes.md` §8 r1–r2; `DrawBoxAlpha`: not specified, `?`;
+   `StartDraw`, `ClearScreen`: `-`); every other column `-`.
 7. `at`: the call site as hex (1.14d) or `-` (d2rs). Information only:
    never compared.
 
@@ -217,6 +219,37 @@ composition, through `d2-client` only (game logic untouched).
 8. `frame.tsv` `tick` is the bridge's server tick count; `index_sha256`
    is the CPU reference composition of the frame onto the persistent
    framebuffer (`composition.md` §3), the frame d2rs presents.
+9. The frame cycle's own calls frame the item rows, as in 1.14d's draw
+   log (`a1-town-arrival-ama` row 0: `StartDraw 1 0`, at `0x0044CAD5`;
+   a `ClearScreen 0` row after every draw, cursor included, on frames
+   whose post-draw counter is above 0): first a `StartDraw` row with
+   `x` = BlankScreen of the player's level (`bClear`,
+   `render/composition.md` §3 step 2) and `y` = 0; last, when the frame's
+   plan clears after drawing (§3 step 4), a `ClearScreen` row with `x` =
+   0 (its one argument; `y` = `-`). Every other column `-`.
+10. Pass 9's calls (`draw-order-2.md` §11.7: the particle lines or the
+   lightning flash; `WorldFrame::sky`) are one row each, in call order,
+   in place of the 1×1 line-pixel and flash items d2rs composes them
+   with (those items write no row): `DrawLine` for a line, `DrawBox` for
+   the flash (`DrawRectangle` `0x004F6300`), `x`, `y` = x0, y0 and `mode`
+   = the color (`blend-modes.md` §8 r1–r2), every other column `-`. The
+   rows stand where the first such item is, else (every pixel
+   off-screen) before the first item of a later pass, else at the end.
+   Other primitives (`DrawBox`, `DrawBoxAlpha`, `Util*`) are written only
+   for primitives d2rs draws; it draws no other yet (the 1.14d arrival
+   scene also has the stamina bar box `0x0046EFE9` of
+   `ui/control-panel.md` §4 and a hover-label box `0x005031C1`), so those
+   rows are real divergences, not export gaps.
+
+11. `play --input SCRIPT` brings a d2rs scene where a 1.14d scene's
+   `autostart.py --input` brought it: steps separated by `;`, `wait N`
+   (N server ticks; autostart's `wait` counts seconds), `move X Y`,
+   `click X Y`, `rclick X Y` (800 × 600 frame pixels; a click is cursor,
+   press, and the release on the next tick). The steps are the window's
+   pointer events (the window's own pointer is ignored while a script
+   runs), delivered once per new server tick. Scenes match by place, not
+   by timing: a script waits until the walk is over before the dumped
+   tick.
 
 ### 6. Comparison
 
@@ -295,5 +328,5 @@ Columns derived from what `record_frames.py` 0.2.0 logs (`capture.md`
 4. ~~The 1.14d cel's width, height and offsets~~: answered (REC-299), the
    rasterizer hook of `capture.md` §3.5 raw-3; checked against 12 DC6
    frame headers of the real files (all equal).
-5. Primitive rows' `mode` (`DrawBox`, `DrawBoxAlpha`, `DrawLine`): which
-   argument is the color is not specified; written `?`.
+5. `DrawBoxAlpha`'s color argument (`0x004F6340`): not specified; its
+   `mode` is `?`. (`DrawLine` and `DrawBox`: `blend-modes.md` §8.)
