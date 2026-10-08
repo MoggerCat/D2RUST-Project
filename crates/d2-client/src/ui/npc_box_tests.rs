@@ -287,7 +287,8 @@ fn talk_closes_the_box_and_its_end_rebuilds_the_menu() {
     assert!(m.talking);
     assert!(ui.npc_menu_box().is_none());
     assert!(root.take_intents().is_empty(), "talk sends nothing");
-    click(&mut ui, &mut root, &w, Point::new(400, 300));
+    let p = ui.npc_topic_cancel_point().expect("the topic box");
+    click(&mut ui, &mut root, &w, p);
     ui.npc_menu_poll(&w, &mut root, &Strs::new());
     assert!(ui.npc_menu_box().is_some());
     assert!(!ui.npc_menu().unwrap().talking);

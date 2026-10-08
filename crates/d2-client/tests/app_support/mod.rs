@@ -88,3 +88,14 @@ pub fn npc_menu_len(app: &bevy::prelude::App) -> usize {
         .filter(|m| !m.talking)
         .map_or(0, |m| m.rows.len())
 }
+
+/// The centre of the talk topic box's cancel (`ui/messages.md` §6 r3).
+pub fn npc_topic_cancel(app: &bevy::prelude::App) -> d2_client::ui::Point {
+    app.world()
+        .non_send::<d2_client::world_view::WorldViewUi>()
+        .original
+        .as_ref()
+        .expect("the original UI")
+        .npc_topic_cancel_point()
+        .expect("the talk topic box is up")
+}

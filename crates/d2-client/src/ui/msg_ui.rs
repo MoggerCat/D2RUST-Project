@@ -292,6 +292,7 @@ impl OriginalUi {
     /// (`0x004A0680`).
     pub fn free_npc_text(&mut self) {
         self.npc_text = None;
+        self.talk_list();
     }
 
     /// The NPC text list `[0x007BF250]` (§5 r2), `None` when freed.
@@ -324,6 +325,7 @@ impl OriginalUi {
             // r2.3.
             _ => self.npc_text = None,
         }
+        self.talk_list();
         self.skip(skip::NPC_TEXT_SHOW);
         Ok(())
     }

@@ -517,14 +517,17 @@ fn akaras_menu_offers_talk_trade_and_cancel() {
         "no C→S 0x30 yet: {:?}",
         ids(&wire)
     );
-    // Talk closes the box and shows the speech (`panels-2.md` §14.9).
+    // Talk closes the box and opens the topic box (`panels-2.md` §14.9,
+    // `messages.md` §6 r3).
     let p = app_support::npc_menu_row(&app, 0);
     click(&mut app, &ms, p);
     step(&mut app, &ms, 2);
     let ui = app.world().non_send::<WorldViewUi>();
     assert!(ui.original.as_ref().unwrap().npc_menu().unwrap().talking);
-    // The talk's end builds Akara's menu again (§14.8: flag 1).
-    click(&mut app, &ms, Point::new(400, 300));
+    // The topic box's cancel ends the talk: Akara's menu is built again
+    // (§14.8: flag 1).
+    let p = app_support::npc_topic_cancel(&app);
+    click(&mut app, &ms, p);
     step(&mut app, &ms, 2);
     assert_eq!(app_support::npc_menu_len(&app), 3, "the menu is back");
     // Trade: C→S 0x38 action 1 [GUID] and the menu closes.

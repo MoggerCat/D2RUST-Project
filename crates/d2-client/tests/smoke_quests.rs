@@ -568,14 +568,15 @@ impl Smoke {
         self.menu()?.rows.iter().position(|r| r.kind == kind)
     }
 
-    /// Talks to the NPC of `class`: its menu, Talk, a press that ends the
-    /// talk (`panels-2.md` §14.8: the menu is built again, or the chat
-    /// ends), then Cancel.
+    /// Talks to the NPC of `class`: its menu, Talk (the topic box), the
+    /// topic box's cancel that ends the talk (`panels-2.md` §14.8: the
+    /// menu is built again, or the chat ends), then Cancel.
     fn talk(&mut self, class: u32) -> u32 {
         let guid = self.open_menu(class);
         if let Some(t) = self.menu_row_of(Some(OptionKind::Talk)) {
             self.menu_row(t);
-            self.click(Point::new(400, 300));
+            let p = app_support::npc_topic_cancel(&self.app);
+            self.click(p);
             self.step(3);
         }
         if self.menu().is_some_and(|m| !m.talking) {

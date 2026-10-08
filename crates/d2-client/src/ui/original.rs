@@ -362,6 +362,7 @@ impl OriginalUi {
         tables.files.extend(esc_art::esc_files());
         tables.files.extend(quest_log_ui::quest_files());
         tables.files.extend(cube_ui::cube_files());
+        tables.files.extend(npc_talk::socket_files());
         tables.files.extend(skill_tree_ui::icon_files());
         let shared = Shared {
             tables,
@@ -454,6 +455,10 @@ impl OriginalUi {
             shop: self.shop.clone(),
             st: self.npcm.clone(),
             hire: self.hire.clone(),
+        }))?;
+        root.add(Box::new(npc_talk::SocketUi {
+            sh: sh.clone(),
+            st: self.npcm.clone(),
         }))?;
         root.add(Box::new(hud::HudUi { sh: sh.clone() }))?;
         root.add(Box::new(gold_dialog::GoldDialogUi { sh: sh.clone() }))?;
@@ -1504,6 +1509,8 @@ pub(super) mod cube_ui;
 pub mod msg_ui;
 #[path = "npc_box.rs"]
 pub mod npc_box;
+#[path = "npc_talk.rs"]
+pub mod npc_talk;
 #[path = "quest_log_ui.rs"]
 pub mod quest_log_ui;
 #[cfg(test)]

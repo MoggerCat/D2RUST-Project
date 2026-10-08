@@ -25,7 +25,6 @@ pub mod front_end;
 pub mod geom;
 pub mod gold;
 pub mod hire_list;
-pub mod imbue_ui;
 pub mod inv_grid;
 pub mod item_tip;
 pub mod item_tip_desc;

@@ -20,8 +20,8 @@
 // - a left release on the item pressed runs its handler; a left press
 //   outside the box ends the interaction (C→S 0x30, `SetUIState(8,
 //   off)`) and is consumed;
-// - Talk keeps the preview's speech lines under the box
-//   (q-fix-ui-npc-talk wires the topic box and the dialog panel);
+// - Talk and the services are `npc_talk`'s (topic box, dialog panel,
+//   item-socket dialog);
 // - Charsi's Imbue row is inserted before the cancel (REC-145);
 // - the NPC's name line is empty (monstats name keys are not in the
 //   client model) and the heal cost is 0 (`0x00622DE0` not in the model);
@@ -39,14 +39,14 @@ use crate::rules::camera::{moving_to_client, Camera, FrameSize, OpenMode};
 use crate::ui::draw::{RectRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
 use crate::ui::geom::{Point, Rect, FRAME};
 use crate::ui::hire_list::hire_intent;
-use crate::ui::imbue_ui::{Imbue, NPC_CHARSI};
 use crate::ui::layout::{MenuOption, NpcMenuRecord, OptionKind};
+use crate::ui::messages::socket::NPC_CHARSI;
 use crate::ui::messages::Ltrb;
 use crate::ui::panel::WidgetId;
 use crate::ui::panel::{ClientIntent, Panel, PanelId, StringLookup, UiCtx, UiEvent, UiResponse};
 use crate::ui::panels::menu_box::{anchor, MenuBox, MenuDraw, WaitingNote, STR_WAITING};
 use crate::ui::panels::npc::{
-    cain_count_reset, msg_chat_end, option_intent, record_index, talk_end, NpcMenus, TalkEnd,
+    cain_count_reset, msg_chat_end, option_intent, record_index, NpcMenus,
 };
 use crate::ui::panels::npc_menu::{
     build_npc_menu, hire_open, CaptionCtx, HireOpen, NpcMenuBuild, NpcMenuHandler, NpcMenuInput,
@@ -77,9 +77,6 @@ pub const MENU_FAILED: u8 = 12;
 pub const SOUND_TX_DONE: i32 = 221;
 /// `NPCImbue` string of the d2rs-own insert (REC-145).
 const STR_IMBUE: u16 = 4017;
-/// d2rs-own: the preview speech lines under the box, 20 px apart.
-const SPEECH_ROW: i32 = 20;
-const SPEECH_W: i32 = 360;
 
 /// One selectable row of the box: its string id, the option it runs
 /// (`None` = the cancel item) and the `%d` its caption carries.
@@ -98,9 +95,8 @@ pub struct Open {
     /// The selectable items of the box in order (the options, then the
     /// cancel item).
     pub rows: Vec<Row>,
-    /// The text list's strings of kind 0 (the NPC's speech), by id.
-    pub speech: Vec<u16>,
-    /// Talk was chosen: the box is closed, the speech is drawn.
+    /// Talk was chosen: the box is closed, the topic box or the dialog
+    /// panel is up (`npc_talk`).
     pub talking: bool,
 }
 
@@ -127,8 +123,6 @@ struct Interaction {
     guid: u32,
     class: u32,
     identify_n: u32,
-    speech: Vec<u16>,
-    talking: bool,
     /// The box was asked for and not built yet (needs the strings).
     build: bool,
 }
@@ -151,8 +145,9 @@ pub struct NpcMenuState {
     /// Messages of the build (C→S 0x38 action 3) waiting for the root.
     pending: Vec<PanelOutput>,
     menus: Option<NpcMenus>,
-    /// Charsi's imbue dialog (`imbue_ui.rs`).
-    pub imbue: Option<Imbue>,
+    /// The talk, its dialog panel and the item-socket dialog
+    /// (`npc_talk`).
+    pub(super) talk: super::npc_talk::TalkState,
     /// The last Trade / Gamble choice was Gamble: the shop that opens next
     /// is a gamble window (`panels-2.md` §14: the gamble shop flag).
     pub gamble: bool,
@@ -213,7 +208,7 @@ fn ltrb_contains(r: &Ltrb, p: Point) -> bool {
 }
 
 /// The item of `bx` at `p` that is selectable.
-fn item_at<H: Clone + PartialEq>(bx: &MenuBox<H>, p: Point) -> Option<usize> {
+pub(super) fn item_at<H: Clone + PartialEq>(bx: &MenuBox<H>, p: Point) -> Option<usize> {
     (0..bx.items.len()).find(|&i| bx.items[i].selectable && ltrb_contains(&item_rect(bx, i), p))
 }
 
@@ -257,21 +252,20 @@ impl NpcMenuState {
 
     /// The interaction start (`panels-2.md` §14.2): the table edits; the
     /// box is built by [`Self::build`] once the strings are at hand.
-    fn start(&mut self, guid: u32, class: u32, level: i32, speech: Vec<u16>, identify_n: u32) {
+    fn start(&mut self, guid: u32, class: u32, level: i32, identify_n: u32) {
         let resurrect = self.resurrect.is_some();
         let menus = self.menus();
         menus.reset_for_interaction();
         menus.apply_builder(level);
         menus.apply_resurrect(resurrect, true);
-        self.imbue = None;
+        self.talk.topic = None;
+        self.talk.active = false;
         self.note = None;
         self.menu_state = 1;
         self.up = Some(Interaction {
             guid,
             class,
             identify_n,
-            speech,
-            talking: false,
             build: true,
         });
     }
@@ -390,6 +384,11 @@ impl NpcMenuState {
 
     /// The box and the interaction go (the interaction's end).
     fn close(&mut self) {
+        self.talk.topic = None;
+        self.talk.active = false;
+        if self.talk.dialog.panel.is_some() {
+            let _ = self.talk.dialog.close();
+        }
         self.up = None;
         self.bx = None;
         self.rec = None;
@@ -412,9 +411,43 @@ impl NpcMenuState {
         ]
     }
 
+    /// [`Self::end`] for the talk and the services.
+    pub(super) fn end_interaction(&mut self, guid: u32) -> Vec<PanelOutput> {
+        self.end(guid)
+    }
+
+    /// The interaction NPC's class.
+    pub(super) fn npc_class(&self) -> Option<u32> {
+        self.up.as_ref().map(|it| it.class)
+    }
+
+    /// The built record's flag byte (§14.8).
+    pub(super) fn record_flag(&self) -> u8 {
+        self.rec.as_ref().map_or(0, |r| r.flag)
+    }
+
+    /// The menu is built again at the next poll.
+    pub(super) fn ask_build(&mut self) {
+        if let Some(it) = self.up.as_mut() {
+            it.build = true;
+        }
+    }
+
+    /// The NPC's anchor (§2.6), else the frame's centre (d2rs-own).
+    pub(super) fn anchor_or_centre(&self) -> (i32, i32) {
+        self.anchor
+            .unwrap_or((self.screen.0 / 2, self.screen.1 / 3))
+    }
+
+    /// Outputs that wait for the next poll (outside an event).
+    pub(super) fn push_pending(&mut self, o: Vec<PanelOutput>) {
+        self.pending.extend(o);
+    }
+
     fn open_view(&self) -> Option<Open> {
         let it = self.up.as_ref()?;
-        (self.bx.is_some() || it.talking).then(|| Open {
+        let talking = self.talk.active;
+        (self.bx.is_some() || talking).then(|| Open {
             guid: it.guid,
             class: it.class,
             rows: if self.bx.is_some() {
@@ -422,8 +455,7 @@ impl NpcMenuState {
             } else {
                 Vec::new()
             },
-            speech: it.speech.clone(),
-            talking: it.talking,
+            talking,
         })
     }
 
@@ -449,6 +481,10 @@ pub struct NpcMenuUi {
 impl NpcMenuUi {
     fn out(&self, o: Vec<PanelOutput>) {
         self.sh.borrow_mut().outputs.extend(o);
+    }
+
+    pub(super) fn out_pub(&self, o: Vec<PanelOutput>) {
+        self.out(o);
     }
 
     fn run(&mut self, item: usize, ctx: &UiCtx) -> UiResponse {
@@ -483,13 +519,14 @@ impl NpcMenuUi {
         st.pressed = None;
         match kind {
             OptionKind::Talk => {
-                if let Some(it) = st.up.as_mut() {
-                    it.talking = true;
-                }
+                drop(st);
+                self.talk_open(ctx);
                 UiResponse::Consumed
             }
             OptionKind::Imbue => {
-                st.imbue = Some(Imbue::new(guid));
+                let o = super::npc_talk::open_imbue(&mut st, guid, class, ctx.world);
+                drop(st);
+                self.out(o);
                 UiResponse::Consumed
             }
             OptionKind::Hire => {
@@ -520,51 +557,6 @@ impl NpcMenuUi {
                 }
                 UiResponse::Consumed
             }
-        }
-    }
-
-    /// The talk's end (`panels-2.md` §14.8) on a left press while the
-    /// speech is up (the trigger is d2rs-own until q-fix-ui-npc-talk: the
-    /// topic box's sequence end): the record's flag rebuilds the menu or
-    /// ends the interaction.
-    fn talk_event(&mut self, e: UiEvent, guid: u32, ctx: &UiCtx) -> UiResponse {
-        let talking = self.st.borrow().up.as_ref().is_some_and(|it| it.talking);
-        if !talking {
-            return UiResponse::Ignored;
-        }
-        match e {
-            UiEvent::Press {
-                button: PointerButton::Left,
-                ..
-            } => {
-                let (class, flag) = {
-                    let st = self.st.borrow();
-                    let class = st.up.as_ref().map_or(0, |it| it.class);
-                    (class, st.rec.as_ref().map_or(0, |r| r.flag))
-                };
-                let present = ctx.world.units.contains_key(&UnitKey::new(1, guid));
-                let mut st = self.st.borrow_mut();
-                match talk_end(present, class, flag) {
-                    TalkEnd::RebuildMenu => {
-                        st.menu_state = 1;
-                        if let Some(it) = st.up.as_mut() {
-                            it.talking = false;
-                            it.build = true;
-                        }
-                    }
-                    TalkEnd::EndInteraction => {
-                        let o = st.end(guid);
-                        drop(st);
-                        self.out(o);
-                    }
-                }
-                UiResponse::Consumed
-            }
-            UiEvent::Release {
-                button: PointerButton::Left,
-                ..
-            } => UiResponse::Consumed,
-            _ => UiResponse::Ignored,
         }
     }
 
@@ -650,28 +642,6 @@ impl NpcMenuUi {
         }
         UiResponse::Consumed
     }
-
-    fn imbue_event(&mut self, e: UiEvent, ctx: &UiCtx) -> UiResponse {
-        let Some((press, at)) = Imbue::left(e) else {
-            return UiResponse::Ignored;
-        };
-        if !Imbue::press_inside(at) {
-            // Outside the dialog the inventory and the world keep working.
-            return UiResponse::Ignored;
-        }
-        if press {
-            return UiResponse::Consumed;
-        }
-        let mut st = self.st.borrow_mut();
-        let Some(im) = st.imbue.as_mut() else {
-            return UiResponse::Ignored;
-        };
-        let (r, close) = im.release(at, ctx);
-        if close {
-            st.imbue = None;
-        }
-        r
-    }
 }
 
 impl Panel for NpcMenuUi {
@@ -684,10 +654,7 @@ impl Panel for NpcMenuUi {
             return FRAME;
         }
         let st = self.st.borrow();
-        if st.imbue.is_some() {
-            return Imbue::rect();
-        }
-        let talking = st.up.as_ref().is_some_and(|it| it.talking);
+        let talking = st.talk.active;
         if st.bx.is_some() || talking {
             // The whole frame: a press outside the box ends the chat; a
             // press while talking ends the talk.
@@ -699,10 +666,6 @@ impl Panel for NpcMenuUi {
 
     fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let st = self.st.borrow();
-        if let Some(im) = &st.imbue {
-            im.draw(ctx, out);
-            return;
-        }
         let sh = self.sh.borrow();
         let m = Measure(sh.fonts.as_ref());
         let mut spin = 0;
@@ -715,28 +678,12 @@ impl Panel for NpcMenuUi {
         if let Some(c) = &self.shop.borrow().confirm {
             push_menu_draws(c.bx.draw(&mut spin, &m), out);
         }
-        let Some(it) = st.up.as_ref().filter(|it| it.talking) else {
-            return;
-        };
-        let (tx, ty) = st.anchor.unwrap_or((st.screen.0 / 2, st.screen.1 / 4));
-        for (i, id) in it.speech.iter().enumerate() {
-            if let Some(t) = ctx.strings.get_id(*id) {
-                out.push(UiDraw::Text(TextRequest {
-                    text: t.to_vec(),
-                    at: Point::new(tx - SPEECH_W / 2, ty + SPEECH_ROW * (i as i32 + 1)),
-                    style: TextStyle { font: 1, color: 0 },
-                    opts: TextOpts::default(),
-                    clip: FRAME,
-                }));
-            }
-        }
+        self.draw_talk(&st, &m, out);
+        let _ = ctx;
     }
 
     fn hit(&self, p: Point) -> Option<WidgetId> {
         let st = self.st.borrow();
-        if st.imbue.is_some() {
-            return Imbue::rect().contains(p).then_some(WidgetId(0));
-        }
         let bx = st.bx.as_ref()?;
         ltrb_contains(&bx.rect(), p).then(|| WidgetId(item_at(bx, p).map_or(0, |i| i as u16 + 1)))
     }
@@ -744,9 +691,6 @@ impl Panel for NpcMenuUi {
     fn event(&mut self, e: UiEvent, ctx: &UiCtx) -> UiResponse {
         if self.shop.borrow().confirm.is_some() {
             return self.confirm_event(e);
-        }
-        if self.st.borrow().imbue.is_some() {
-            return self.imbue_event(e, ctx);
         }
         let Some(guid) = self.st.borrow().up.as_ref().map(|it| it.guid) else {
             return UiResponse::Ignored;
@@ -803,17 +747,6 @@ impl Panel for NpcMenuUi {
 }
 
 impl OriginalUi {
-    /// A delivered S->C 0x58 reaches Charsi's imbue dialog.
-    pub(super) fn imbue_output(&mut self, o: &crate::bridge::output::Output) {
-        let crate::bridge::output::Output::OpenUi { code, .. } = *o else {
-            return;
-        };
-        let mut st = self.npcm.borrow_mut();
-        if st.imbue.as_mut().is_some_and(|im| im.code(code)) {
-            st.imbue = None;
-        }
-    }
-
     /// Opens the NPC menu for a delivered 0x28 (`msg_ui`; `menus.md`
     /// §2.2): `SetUIState(8, on)`, the table edits, the anchor; the box
     /// is built at the next [`Self::npc_menu_poll`] (it needs the
@@ -832,20 +765,14 @@ impl OriginalUi {
         identify_n: u32,
         world: &ClientWorld,
     ) {
-        let speech: Vec<u16> = self.npc_text().map_or(Vec::new(), |t| {
-            t.nodes()
-                .into_iter()
-                .filter(|&(k, _)| k == 0)
-                .map(|(_, id)| id)
-                .collect()
-        });
+        self.talk_list();
         // A seller's hire list (S→C 0x4F) opens from the Hire option.
         self.hire.borrow_mut().up = None;
         let _ = self.set_ui(u32::from(id::NPC_MENU), 0, false);
         let open_mode = self.open_mode().get();
         let mut st = self.npcm.borrow_mut();
         st.anchor = npc_anchor(world, guid, open_mode);
-        st.start(guid, class, level, speech, identify_n);
+        st.start(guid, class, level, identify_n);
     }
 
     /// Per UI frame, before the events: builds an asked-for box with the
@@ -913,6 +840,7 @@ impl OriginalUi {
                 st.build(world, strings, &m);
             }
         }
+        self.talk_poll(world, strings);
         let pending = std::mem::take(&mut self.npcm.borrow_mut().pending);
         for o in pending {
             match o {
@@ -969,15 +897,8 @@ impl OriginalUi {
         let menu = st
             .up
             .as_ref()
-            .is_some_and(|it| it.build || it.talking || st.bx.is_some());
-        menu || st.imbue.is_some()
-    }
-
-    /// Places `guid` in the open imbue dialog (headless-test seam).
-    pub fn imbue_place(&mut self, guid: u32) {
-        if let Some(im) = self.npcm.borrow_mut().imbue.as_mut() {
-            im.place(guid);
-        }
+            .is_some_and(|it| it.build || st.talk.active || st.bx.is_some());
+        menu || st.talk.socket.is_some()
     }
 
     /// The open menu (built box or talk), for tests and the host.
