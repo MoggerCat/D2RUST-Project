@@ -79,7 +79,7 @@ pub const CLICK_SOUND_ID: i32 = 0;
 /// the app does not hold yet (M02: named, not guessed).
 pub const PENDING: &[(&str, &str)] = &[
     (
-        "character labels, class line, resist effects, shift-spend (§8.6, §8.9; \
+        "character labels, class line, resist effects (§8.6, §8.9; \
          `panels-2.md` §17 r3, r5–r9)",
         "the values and the name line are bound ([`ModelCharacter`]); the labels need the \
          string table by id (`StringLookup::get_id`, `NoStrings` in play); the class line \
@@ -87,14 +87,14 @@ pub const PENDING: &[(&str, &str)] = &[
          (§8.11) needs `experience.txt` (not in the model: the panel shows stat 30); the \
          resist and defense effects (`panels-3.md` §24 r1, r3) need the `states.txt` flag \
          masks (not in `StateRow`); the damage block and popups need the skill list and \
-         `monstats`; Shift is not in the UI events (a spend is 1 point); the language is \
-         English (0, `ui/text.md` §1.2)",
+         `monstats`; the language is English (0, `ui/text.md` §1.2)",
     ),
     (
         "inventory gold button press / release and the gold dialog (`panels-2.md` §21 r3–r9)",
         "the gold value and button art are drawn ([`InventoryUi`]); the press / release and \
          the drop dialog (kind 1) are wired in [`gold_dialog`] (d2rs-own box, REC-103); the \
-         press does not play sound 4 (deferred); the stash kinds 3 / 4 are not wired",
+         press does not play sound 4 (deferred); the stash kinds 3 / 4 are wired (\
+         `original_tests.rs::stash_gold_withdraw_and_deposit_send_0x4f`)",
     ),
     (
         "inventory equipment backgrounds (§9.4)",
@@ -108,27 +108,15 @@ pub const PENDING: &[(&str, &str)] = &[
          (`msg-skills.md` open question 3) are not",
     ),
     (
-        "waypoint menu panel (ui 0x14, §13 r2–r7)",
-        "installed (`waypoint_ui`: art, rows from the record, row click → C→S 0x49); the \
-         tab gates read the client quest flags (`msg-ui.md` open question 4, tab 0 only) \
-         and the row text needs the string table by id",
+        "waypoint menu panel (ui 0x14, §13 r2–r7): tab gates",
+        "the panel is installed and covered (`waypoint_ui`; \
+         `app_play_npc.rs::clicking_the_waypoint_walks_there_and_interacts`; the row and tab \
+         text come from the string table by id); the tab gates read the client quest flags \
+         (`msg-ui.md` open question 4, tab 0 only): every act tab is shown (d2rs-own)",
     ),
     (
-        "stash and cube panels (ui 0x19, 0x1A; §11 r2–r6, §12 r2–r6)",
-        "S→C 0x77 opens and closes them (flag and inventory mode: `msg_ui`); their art, \
-         grids and buttons are not wired",
-    ),
-    (
-        "NPC menu, NPC shop (ui 8, 0x0C; §14)",
-        "their openers (NPC interaction messages) have no client handler",
-    ),
-    (
-        "cursor jump (§4.3, `UiEffect::CursorX`)",
-        "the waypoint menu passes jump 1 (S→C 0x63); the effect is reported but there is \
-         no cursor-warp edge",
-    ),
-    (
-        "hotkeys for other states (escape menu, chat, automap, quests, party)",
+        "hotkeys for other states (escape menu, chat, automap, party; the quest log, ToggleQuests, is \
+         bound: `quest_log_ui_tests.rs`)",
         "their panels are not specified (§Open questions 1); the original key table is \
          `ui/controls.md` (§Open questions 2)",
     ),
@@ -701,6 +689,19 @@ impl OriginalUi {
         r
     }
 
+    /// The cursor jump the pending effects ask for (§4.3,
+    /// [`UiEffect::CursorX`]): the frame position `(x, mouse y)` of the last
+    /// one, which also becomes the UI's mouse. Leaves the effects in place.
+    pub fn take_cursor_warp(&mut self) -> Option<Point> {
+        let x = self.outcome.effects.iter().rev().find_map(|e| match e {
+            UiEffect::CursorX(x) => Some(*x),
+            _ => None,
+        })?;
+        let mut sh = self.shared.borrow_mut();
+        sh.mouse.x = x;
+        Some(sh.mouse)
+    }
+
     /// The effects and sounds since the last call.
     pub fn take_outcome(&mut self) -> UiOutcome {
         std::mem::take(&mut self.outcome)
@@ -1197,8 +1198,9 @@ impl Panel for CharacterUi {
         match left(e) {
             Some((true, at)) => self.panel.press(&sh.tables, &s, at, statpts),
             Some((false, at)) => {
-                // Shift is not in the UI events (`PENDING`): one point.
-                let out = self.panel.release(&sh.tables, &s, at, false, statpts);
+                // Shift is the host's per-frame flag (`set_shift`): all points.
+                let shift = sh.items.shift;
+                let out = self.panel.release(&sh.tables, &s, at, shift, statpts);
                 sh.outputs.extend(out);
             }
             None => {}

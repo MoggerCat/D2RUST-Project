@@ -1405,3 +1405,13 @@ fn cell_grid_inventory_geometry() {
         Some((0, 0))
     );
 }
+
+// Covers: specs/ui/panels.md §4 r3 (the cursor warp edge)
+#[test]
+fn from_frame_is_the_inverse_of_to_frame() {
+    // 1700 × 1300: scale 2, left bar 50, top bar 50.
+    let p = Presentation::new(1700, 1300).unwrap();
+    assert_eq!(p.from_frame(300, 77), (650, 204));
+    let (x, y) = p.from_frame(300, 77);
+    assert_eq!(p.to_frame(x, y), FramePos::Inside(Point::new(300, 77)));
+}

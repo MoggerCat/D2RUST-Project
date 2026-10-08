@@ -85,10 +85,11 @@ pub const PENDING: &[(&str, &str)] = &[
     ),
     (
         "ViewFeed::light",
-        "the light map needs the act environment (S→C 0x53 has no client handler), light \
-         records and the per-unit look inputs (fade, ghostly, hover, items, remaps); none is in \
-         the model (the record list `ClientWorld::lights` exists and the act room callback runs \
-         over it, but no unit code creates records)",
+        "the app wires the light in the preview (`preview_light`: S→C 0x53 environment, the \
+         player and `light_sources` records; \
+         `preview_light::tests::the_model_feed_states_the_light_unless_fullbright`); the \
+         per-unit look inputs (fade, ghostly, hover, items, remaps) are not in the model, and \
+         no unit code creates records in `ClientWorld::lights`",
     ),
     (
         "ViewFeed::weather_frame",
