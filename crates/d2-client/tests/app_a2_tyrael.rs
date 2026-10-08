@@ -380,7 +380,7 @@ fn duriel_fights_tyrael_opens_the_portal_and_meshif_travels_east() {
     take(&mut app, into(a2::DURIELS_LAIR), a2::DURIELS_LAIR);
 
     // The Lair's population: Duriel, Tyrael and his door are there with
-    // no test spawn (REC-234).
+    // no test spawn (REC-238).
     for _ in 0..30 {
         step(&mut app);
     }
@@ -402,6 +402,9 @@ fn duriel_fights_tyrael_opens_the_portal_and_meshif_travels_east() {
         a.with(&mut sim.game, |_, v| {
             v.set_base(p, stat::MAXHP, 256_000);
             v.set_base(p, stat::HITPOINTS, 256_000);
+            v.set_base(duriel, stat::LEVEL, 1);
+            v.set_base(duriel, stat::MAXHP, 25600);
+            v.set_base(duriel, stat::HITPOINTS, 25600);
             v.set_base(duriel, TOHIT, 1000);
             v.set_base(duriel, MINDAMAGE, 64);
             v.set_base(duriel, MAXDAMAGE, 64);
@@ -409,7 +412,7 @@ fn duriel_fights_tyrael_opens_the_portal_and_meshif_travels_east() {
     });
     let before = life(&server);
     start_ai(&server, duriel);
-    for _ in 0..120 {
+    for _ in 0..800 {
         step(&mut app);
     }
     let after = life(&server);

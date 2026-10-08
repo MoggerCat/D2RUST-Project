@@ -32,7 +32,7 @@ pub const DURIELS_LAIR: u32 = 73;
 pub const ORIFICE_CLASS: u32 = 152;
 pub const LAIR_ENTRANCE_CLASS: u32 = 100;
 /// The Lair's population (q-a2-tyrael-door, d2rs-own, unverified,
-/// REC-234): Duriel (`monstats` 211), Tyrael (251) and Tyrael's door
+/// REC-238): Duriel (`monstats` 211), Tyrael (251) and Tyrael's door
 /// (`objects` 153), at sub-tiles of the Lair's first room. Duriel's real
 /// place is the Lair's own presets.
 pub const DURIEL_CLASS: u32 = 211;
