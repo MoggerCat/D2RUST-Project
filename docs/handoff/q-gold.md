@@ -54,3 +54,7 @@ cargo run -p d2-client --release -- play --new sorceress Test
 2. With gold (after another branch's drops, or a saved character): press and release the coin button. A dark box asks "How much gold / do you want to drop?". Type digits (the box takes at most your gold), press **Enter**: your gold falls and a pile appears on the ground at your feet. **Escape** cancels, and 0 sends nothing.
 3. Click the pile on the ground. The character walks to it and the pile disappears; the inventory gold rises by its amount. A small pile (< 100) and a large one (≥ 500) must show different art.
 4. If a step shows nothing, send the log lines with `ground item`, `item`, `ui:` or `world click`, and say which step.
+
+## Gate
+
+`cargo fmt --all`, `cargo clippy -p d2-client -p d2-server --all-targets -- -D warnings` and `python3 tools/coverage.py --check` (0 errors) are clean. `cargo test -p d2-client -p d2-server` passes except `d2-server --test world_data_tables` (`every_game_view_builds_from_the_synthetic_install`, `drop_tables_hold_…`, `a_saved_hireling_…`), which fails on the base too (the tests share one synthetic install directory and race on it; see `stitch-items.md`).
