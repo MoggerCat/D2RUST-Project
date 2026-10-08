@@ -56,6 +56,7 @@ use super::panels::{
     TextMeasure, UiFiles,
 };
 use super::root::{Routed, UiError, UiRoot};
+use super::skill_tree_ui;
 use super::states::{GateEnv, PlayerLife, UiEffect, UiStateError, UiStates};
 use super::PointerButton;
 use crate::assets::path::FileSource;
@@ -99,10 +100,11 @@ pub const PENDING: &[(&str, &str)] = &[
          (`msg-stats-items.md` open question 3)",
     ),
     (
-        "skill tree icons and level numbers (§10.3–§10.5)",
-        "the skill list is in the model (`client/msg-skills.md`), but the icon file prefix \
-         `CC` (spec open), the flag mask `[0x006CE270]` and the fields the tree shows \
-         (`msg-skills.md` open question 3) are not",
+        "skill tree hover description and the no-points message (§10.5, §10.7)",
+        "icons, level numbers, the flag mask and the point spend (C→S 0x3B) are wired \
+         ([`skill_tree_ui`]); the point cost is 1 (`skpoints` formula not evaluated, \
+         REC-270); the tab tool tips, the free-points box and the no-points message are \
+         not wired",
     ),
     (
         "waypoint menu panel (ui 0x14, §13 r2–r7)",
@@ -222,6 +224,8 @@ struct Shared {
     char_tables: super::char_feed::CharTables,
     /// The control panel overlays' state ([`hud`]).
     hud: hud::HudState,
+    /// The skill tree's class skill rows ([`skill_tree_ui`]).
+    skill_tree: skill_tree_ui::SkillTreeTables,
     /// The inventory panel's item facts (`inv_items`).
     items: ItemsUi,
     /// The levels' waypoint indexes (`waypoint_ui`).
@@ -349,6 +353,7 @@ impl OriginalUi {
         tables.files.extend(esc_art::esc_files());
         tables.files.extend(quest_log_ui::quest_files());
         tables.files.extend(cube_ui::cube_files());
+        tables.files.extend(skill_tree_ui::icon_files());
         let shared = Shared {
             tables,
             states: UiStates::new()?,
@@ -365,6 +370,7 @@ impl OriginalUi {
             resist_penalties: None,
             char_tables: Default::default(),
             hud: hud::HudState::default(),
+            skill_tree: Default::default(),
             items: ItemsUi::default(),
             waypoint_map: None,
             waypoint_open: None,
@@ -484,6 +490,12 @@ impl OriginalUi {
     /// The HUD's skill icon and experience tables ([`hud::HudTables`]).
     pub fn set_hud_tables(&mut self, tables: hud::HudTables) {
         self.shared.borrow_mut().hud.tables = tables;
+    }
+
+    /// The skill tree's class skill rows (`skill_tree_ui`); without them
+    /// the tree shows no icons.
+    pub fn set_skill_tree_tables(&mut self, tables: skill_tree_ui::SkillTreeTables) {
+        self.shared.borrow_mut().skill_tree = tables;
     }
 
     /// The walk's run toggle for the run button (§6 r1); returns the
@@ -871,11 +883,30 @@ impl Panel for InventoryUi {
     }
 }
 
-/// The skill tree's view of the model: the class only. The model holds
-/// no skill list, so there are no icons; free points and the flag mask
-/// are read only for icons (inert, `PENDING`).
+/// The skill tree's view of the model: the class, the icon file, the free
+/// points and the entries joined from the skill rows and the local
+/// player's list ([`skill_tree_ui::entries`]).
 struct ModelSkillTree {
     class: Option<u8>,
+    icon_file: Option<u32>,
+    free_points: i32,
+    entries: Vec<SkillEntry>,
+}
+
+impl ModelSkillTree {
+    fn of(sh: &Shared, world: &ClientWorld) -> Self {
+        let class = class_u8(sh.facts.class);
+        ModelSkillTree {
+            class,
+            icon_file: class
+                .and_then(skill_tree_ui::icon_file_name)
+                .and_then(|n| sh.tables.files.id(&n)),
+            free_points: world.local().map_or(0, |u| u.stat(5)),
+            entries: class
+                .map(|c| skill_tree_ui::entries(&sh.skill_tree, world, c))
+                .unwrap_or_default(),
+        }
+    }
 }
 
 impl SkillTreeView for ModelSkillTree {
@@ -883,16 +914,16 @@ impl SkillTreeView for ModelSkillTree {
         self.class
     }
     fn icon_file(&self) -> Option<u32> {
-        None
+        self.icon_file
     }
     fn free_points(&self) -> i32 {
-        0
+        self.free_points
     }
     fn flag_mask(&self) -> u8 {
-        0
+        skill_tree_ui::FLAG_INGAME
     }
     fn skills(&self) -> &[SkillEntry] {
-        &[]
+        &self.entries
     }
 }
 
@@ -915,11 +946,9 @@ impl Panel for SkillTreeUi {
         self.sh.borrow().right_area().unwrap_or(EMPTY)
     }
 
-    fn draw(&self, _ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let sh = self.sh.borrow();
-        let view = ModelSkillTree {
-            class: class_u8(sh.facts.class),
-        };
+        let view = ModelSkillTree::of(&sh, ctx.world);
         self.panel.draw(&sh.tables, &sh.env(), &view, sh.mouse, out);
     }
 
@@ -927,15 +956,13 @@ impl Panel for SkillTreeUi {
         None
     }
 
-    fn event(&mut self, e: UiEvent, _ctx: &UiCtx) -> UiResponse {
+    fn event(&mut self, e: UiEvent, ctx: &UiCtx) -> UiResponse {
         if !is_click(e) {
             return UiResponse::Ignored;
         }
         let mut sh = self.sh.borrow_mut();
         let env = sh.env();
-        let view = ModelSkillTree {
-            class: class_u8(sh.facts.class),
-        };
+        let view = ModelSkillTree::of(&sh, ctx.world);
         match left(e) {
             Some((true, at)) => {
                 let out = self.panel.mouse_down(&env, &view, at);

@@ -40,6 +40,7 @@ pub mod quest_log;
 pub mod root;
 pub mod skill_desc;
 pub mod skill_desc_more;
+pub mod skill_tree_ui;
 pub mod states;
 pub mod text;
 pub mod wformat;
