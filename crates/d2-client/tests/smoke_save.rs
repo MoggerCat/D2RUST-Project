@@ -339,7 +339,8 @@ fn play(run: &mut Run, seed: i32) -> Played {
             q.flags[d].set(1 + d as u8, 0);
             q.flags[d].set(2, 12);
         }
-        give(s, p, 2, page::INVENTORY, (0, 0));
+        // (5, 0): the new character's start cube (REC-244) holds (0, 0).
+        give(s, p, 2, page::INVENTORY, (5, 0));
         give(s, p, 30, page::INVENTORY, (3, 1));
         give(s, p, 0, page::STASH, (0, 0));
         give(s, p, 31, page::STASH, (4, 2));
@@ -498,8 +499,9 @@ fn round_trip(class: &str, name: &str, difficulty: u8, seed: i32) {
     let played = play(&mut run, seed);
     let before = run.live();
     assert!(
-        before.extra.items.as_ref().is_some_and(|i| i.len() == 6),
-        "{name}: six items before the save: {:?}",
+        // The six of `play` and the start cube (REC-244).
+        before.extra.items.as_ref().is_some_and(|i| i.len() == 7),
+        "{name}: seven items before the save: {:?}",
         before.extra.items
     );
     run.save_and_exit();
