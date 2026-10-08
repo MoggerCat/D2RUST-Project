@@ -120,3 +120,12 @@ was consulted. The `ambl*` facts in Edge cases: `mpq-tool list` of
 
 1. Units of the animation rate, and how events and the bounding box are
    used: animation spec (Phase 3/6).
+   *Partly answered* in the owners: the bounding box is the composite
+   pre-draw cull (`render/unit-composite.md` §4, `0x004709A0`); frame
+   timing and action events come from AnimData, not the COF
+   (`sim/units.md` §4.2–§4.3: speed +0x4C from the AnimData speed,
+   events from the AnimData event bytes), and the composite draw reads
+   neither the COF rate nor its event bytes (`render/unit-composite.md`
+   §2 r2). Still open: whether any 1.14d code reads the COF rate
+   (+24) or event bytes at all (a reader scan of loaded-COF +0x18 /
+   +0x1C + 9L).

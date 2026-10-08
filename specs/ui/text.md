@@ -38,13 +38,13 @@
 |   12. Clipping (decision CG2) | 380–390 |
 |   13. d2rs answers (hooks in `d2-client`) | 391–405 |
 |   14. Wide formatter `0x005269D0` (added 2026-10-07) | 406–453 |
-|   15. Edit box caret and selection (`0x004FF620`, added 2026-10-08) | 454–534 |
-| Constants & data dependencies | 535–550 |
-| Randomness | 551–554 |
-| Edge cases & original bugs | 555–584 |
-| Test vectors | 585–620 |
-| Provenance | 621–654 |
-| Open questions | 655–721 |
+|   15. Edit box caret and selection (`0x004FF620`, added 2026-10-08) | 454–547 |
+| Constants & data dependencies | 548–563 |
+| Randomness | 564–567 |
+| Edge cases & original bugs | 568–597 |
+| Test vectors | 598–633 |
+| Provenance | 634–667 |
+| Open questions | 668–754 |
 <!-- /index -->
 
 ## Summary
@@ -522,15 +522,28 @@ function table; control record E). Per drawn line, after the line's text
    2·(E +0x40); with E +0x260 bit 0 (password) widths are measured on n
    `*` (0x2A) instead of the text. wt = width of the text, wc = width
    of `_`. When (wt + wc if caret = n, else wt) ≤ W: first := 0, last :=
-   n − 1. Otherwise W′ = W − wc when caret = n, else W, and: caret >
-   last → last := caret, first walks down from caret − 1 while the span
-   fits (< W′), then first + 1; caret ≤ first + 1 → first := max(caret −
-   1, 0), last walks up from first + 1 while the span fits, then − 1.
-   PROVISIONAL: the remaining case (caret inside the window) refits
-   from the end of the text when the text from the window start fits,
-   else keeps `first` and walks `last` up as above (because the two
-   width calls take their spans in registers not traced here); settled
-   by REC-60.
+   n − 1 (`0x004FE89D` → `0x004FE9D1`). Otherwise W′ = W − wc when
+   caret = n, else W. span(a, b) = width B (`0x005017D0`, pointer ECX =
+   unit a, count EDX = b − a + 1) of units a … b; tail(a) = width A
+   (`0x00501820`) of units a … n − 1. "Fits" is always **strictly
+   less** than W′ (`jge` exits). Comparisons are signed. Three cases,
+   tested in this order:
+   1. caret > last (`0x004FE8A9`): last := caret, first := caret − 1.
+      While first ≠ 0 and span(first, last) fits: first −= 1. Then
+      first += 1. So first is never 0 here: caret 1 gives first = 1
+      even when unit 0 would fit (original behavior, reproduced).
+   2. caret ≤ first + 1 (`0x004FE8F4`): first := max(caret − 1, 0),
+      last := first + 1; while last < n and span(first, last) fits:
+      last += 1. Then last −= 1.
+   3. Otherwise (caret inside the window, `0x004FE942`): if tail(first)
+      fits, the window is refit from the end (`0x004FE952`): last :=
+      n − 1, first := n − 2; while first ≠ 0 and tail(first) fits:
+      first −= 1; then first += 1 (first ≥ 1, as in case 1). If
+      tail(first) does not fit (`0x004FE996`): first is kept and last
+      walks up exactly as in case 2 (last := first + 1, …, then − 1).
+   (Answered statically 2026-10-08 from the register arguments of the
+   width calls at `0x004FE8CB`–`0x004FE9B5`; replaces the PROVISIONAL
+   reading, REC-60 no longer needed.)
 
 ## Constants & data dependencies
 
@@ -664,7 +677,8 @@ pushed `k` (214 sites).
    `k ≥ 13` or a negative `k`.
 3. Answered (2026-10-08), §15: caret `_` blinking on the second, the
    selection rectangle; key handling and the scroll window answered
-   in §15 r5 / r6 (2026-10-08; one case PROVISIONAL, REC-60).
+   in §15 r5 / r6 (2026-10-08; the caret-inside case of r6 answered
+   statically the same day, REC-60 withdrawn).
 4. Text-box control `0x004FBF30` (alignment flags, marquee scroll −2 px
    per draw, selected row `0x005025C0`): belongs to the controls owner;
    listed so it is not lost.
@@ -718,3 +732,22 @@ pushed `k` (214 sites).
     elements 103–105 to confirm it is shifted by one and that every
     format string in the 1.14d English tables uses only `%d`, `%u`,
     `%s`, `%%` (§14 rule 2).
+    *Answered* (game-file read, 2026-10-08, `Patch_D2.mpq`
+    `data\local\lng\eng\patchstring.tbl`, 1,179 elements): element 103
+    is `charmonsterX`, 104 `charmontohit1X` ("Average chance %s will hit
+    you: %d%%"), 105 `charmontohit2X` (the block + chance text of §14
+    rule 3). Patch_D2 is searched before d2exp (`client/assets.md` §B1),
+    so 0x2778 / 0x2779 load exactly the two texts §14 rule 3 names; the
+    d2exp copy (same path) is one element behind but is never read.
+    Format units in the three English tables the game loads (Patch_D2
+    `patchstring`, d2exp `expansionstring`, d2data `string`; the
+    shadowed d2exp `patchstring` agrees): every `%` is followed by `d`,
+    `u`, `s` or `%` except (a) 17 name templates with positional
+    `%0`–`%2` (`string` 1709–1722 `ScrollFormat` … `Monster2Format`,
+    `expansionstring` 1768 `ChampionFormatX`, Patch_D2 `patchstring`
+    89 `SetItemFormatX` and 1072 (key `x`)): these would hit the §14
+    rule 2 fatal row if given to `0x005269D0` (their filler is the item
+    / monster naming owner's, not checked here); (b) `string` 3471 /
+    3472 `ItemStatsrejuv1` / `2` ("Heals 35% Life and Mana", `%` +
+    space) and 4001 `percent` (a lone `%`): plain display text, likewise
+    not valid `0x005269D0` formats.
