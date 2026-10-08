@@ -613,6 +613,15 @@ impl<X: Pending> View<'_, X> {
                 UpdateMessage::Portal(b) => self.h.x.send(receiver, &b),
             }
         }
+        // Rule 2: flag 0x100 → the hover message `0x00571620` (the
+        // overhead 0x26 form 5 / 0x76 of `intents-events.md` §7.9 r3).
+        let (flags, guid) = (
+            self.units.get(unit).map_or(0, |r| r.flags),
+            game.lists.unit(unit).map_or(0, |e| e.guid),
+        );
+        if flags & objects::oflags::HOVER_FREED != 0 {
+            self.overhead_message(receiver, unit, UnitType::Object as u8, guid);
+        }
         true
     }
 
@@ -1190,6 +1199,34 @@ impl<X: Pending> ChestWorld for ObjectView<'_, X> {
 /// update message is not stated beyond the stat-list hooks; the set runs
 /// through the stat list's host ([`super::ActionHooks`]) only.
 impl<X: Pending> ShrineWorld for ObjectView<'_, X> {
+    /// `0x00661110`: the object's overhead record (unit +0xA4) with the
+    /// text of string `string_id`, ending `8 · length + 125` frames from
+    /// now; sent to clients as the overhead 0x26 of the update pass
+    /// (flag 0x100, `objects.md` §14 rule 2).
+    // PROVISIONAL (objects.md §9.1 r3; d2rs-own, unverified): the sim holds
+    // no string tables, so the record's text is the decimal string id
+    // (`"%d"`, 3683 + shrine id); the client resolves it against its
+    // string tables (REC-new, docs/handoff/q-doors.md).
+    fn create_hover(&mut self, obj: UnitId, string_id: u32) -> bool {
+        let text = string_id.to_string().into_bytes();
+        let end = self
+            .game
+            .frame
+            .wrapping_add(crate::world::objects::shrines::hover_lifetime(
+                text.len() as u32
+            ));
+        self.v.replace_overhead(obj, &text, 0, end);
+        true
+    }
+    fn hover_expiry(&self, obj: UnitId) -> Option<i32> {
+        self.v.units.get(obj)?.hover
+    }
+    fn free_hover(&mut self, obj: UnitId) {
+        if let Some(r) = self.v.units.get_mut(obj) {
+            r.hover = None;
+        }
+        self.v.h.session.overheads.remove(&obj);
+    }
     fn stat(&self, unit: UnitId, id: u16) -> i32 {
         self.v.stat(unit, id)
     }
