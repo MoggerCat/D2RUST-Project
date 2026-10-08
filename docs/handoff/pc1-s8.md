@@ -49,8 +49,9 @@ Branch `claude/local-pc1-s8` from `origin/claude/specs-staging-7`
 | REC-267 (start, sound, latch; frame clock d2rs-own), REC-265 (1)–(6) | Horadric animation starts only on 0x9C placement of hst/qf2 into cube page 3 when quest bit 11 of 10/18 is clear (`0x0048A540` from `0x004C2970`), no own sound; open latch `0x0048A460`; mouse words plain skill id; swap getters; switch byte setter `0x00539230`; hotkeys from C->S 0x51 | `ui/panels-2.md` §20 r7–r8; `world/cube.md` §8; `formats/d2s.md` §2.1, §2.4 r3, r8 | HoradricAnim, switch bit, progression formula, hireling block fields match | `q-fix-cube-panel`, `q-fix-save-gaps` extended |
 | REC-266, REC-259 (REC premise wrong: the Vis/Warp values were already in the specs) | item-granted skills: callback on every 97/107 change incl. worn-item load, per stat, @10 = bonus level, 0x23 on every select; throw ammo/missile/mastery already specified and code matches; weapon-in-use +0x1C needed for Throw (fallback d2rs-own and wrong); Act I fixture tree vs §12.2/§12.5 | `skills/levels.md` §7.1, vector; `skills/use.md` §2 row 5 | throw body matches; stat callback, preview rest, +0x1C, tree do not | `q-fix-skill-stat-callback`, `q-fix-preview-skill-rest`; `q-fix-quest-items`, `q-fix-item-type-test`, `q-fix-level-connections` extended |
 | schema OQ1, OQ2; field-types OQ3, OQ9, OQ10, OQ11 (part); txt-format OQ2, 3, 5–8; patch-layers OQ2 (part); patch-layers OQ1, 3–5 and field-types OQ7 d2rs design; OQ4/5 capture-only | callback byte footprints (355 bytes); composite field lists never compiled; code-linker table per mode (§6.6); sound lists unaligned; name-key bytes >= 0x80 map through `0x6CEB18` (Café -> caf) | `data/schema.md` §5, §5.1; `data/field-types.md` §1, §5.3, §6.6–6.7, §8.2; `data/txt-format.md` name key, §9 KeyHigh; `data/patch-layers.md` OQs | items.code rebuild matches | `q-fix-namekey-high`, `q-fix-auto-tc-names` |
+| REC-260 | code drop `0x00585970` (new objects-2 §20.7); chest opened in play (§28): server order, items carry flag 0x10 never 0x1000 → 0x9C action 0 (recording `20261006-015956` agrees), receivers by adjacent rooms, message order newest-queued first, sounds 22/11, drop-code call args; tracked `announced_ground` set is d2rs-own and wrong | `world/objects-2.md` §20.7, §28 new, randomness, edge cases; `world/objects.md` §8, §8.1 r7, OQ1; `items/treasure.md` §7 s5 | code drop, action 0 match; drop spot and announce path do not | `q-fix-ground-announce`; `q-fix-quest-items` extended |
 
-Follow-ups still for another worker: `data/callbacks.md` ~96 "E11 applies" → bytes >= 0x80 mapped, KeyHigh; `items/treasure.md` §1.3 stored-key TC naming rule; `world/quests-act3-2.md` §11.5 r1 re-link case (+0x1C := -1 when the re-linked usable non-tpot item is the weapon in use, `0x0063D283`–`0x0063D298`); `items/inventory.md` §4.6 and `items/inventory-moves.md` §7 call `0x0063D1D0` "stat link" but its whole body is the +0x1C write.
+Follow-ups still for another worker: `sim/intents-events.md` §7.6 r3 says monster TC gold gets 0x1000 and action 2 — wrong, action 0 (no `0x00558AA0` on the `0x0055A550` path; recording frames 3090/3317/3532 show `9c 00`); `world/objects-2.md` is 64.6 KB: move §25–§28 to a new `objects-3.md`; `data/callbacks.md` ~96 "E11 applies" → bytes >= 0x80 mapped, KeyHigh; `items/treasure.md` §1.3 stored-key TC naming rule; `world/quests-act3-2.md` §11.5 r1 re-link case (+0x1C := -1 when the re-linked usable non-tpot item is the weapon in use, `0x0063D283`–`0x0063D298`); `items/inventory.md` §4.6 and `items/inventory-moves.md` §7 call `0x0063D1D0` "stat link" but its whole body is the +0x1C write.
 
 Follow-ups status (end of session): all pointer follow-ups listed below are done except the six `0x004AFF60` callers in `0x0046C770`–`0x0046CB40` (unread) and missiles.md OQ15 (server 75 % branch).
 
@@ -351,3 +352,12 @@ Recordability (tools/original-hooks.md §7): R-MIS-1/2, R-PAUSE-1, R-NOTICK-1, R
   per type, a duplicate key(code4) read by its bumped key, a 32-byte name
   collision; compare the written .bin with d2rs compile_all. Optional: a
   uniqueitems name with 0xE9 and one with 0x80 (field-types §5.3).
+- **R-CHEST-1** [AUTO] (RNG; top of the M22 list) Settles objects-2 §28,
+  treasure OQ1 for chests. One Blood Moor chest (not locked, not sparkling)
+  with the RNG trace: control-seed roll(100) at `0x005862F8` (or `0x00586032`
+  first when sparkling), the TC walk draws on the chest's unit seed
+  (`0x0055A9FC`, `0x0045C3E0` per quality step), the open mode set's draw, the
+  drop-code draws. Same chest with record_packets.py: 0x9C action 0 once per
+  item in the next pass; positions = floor search (x+2, y+3, mask 0x3E01);
+  order 0x0E (@7 = 0) [0x2C event 13] then items last-created first; away and
+  back gives action 3.

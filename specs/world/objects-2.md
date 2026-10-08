@@ -17,28 +17,29 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 44–53 |
-| Inputs | 54–57 |
-| Outputs / state changes | 58–62 |
-| Rules | 63–64 |
-|   16. Operate functions, part 2 | 65–192 |
-|   17. Small init functions | 193–219 |
-|   18. Object events 0, 3, 8, 9, 10 | 220–287 |
-|   19. Obelisk completion (C→S 0x44, `0x00585240`) | 288–334 |
-|   20. Item drop helpers (open question 13) | 335–430 |
-|   21. Curable-state removal (`0x00578C20`, open question 15) | 431–443 |
-|   22. Object allocation modes (open question 8) | 444–492 |
-|   23. Client side of S→C 0x0E and 0x4D (open question 4) | 493–510 |
-|   24. Guards and corner cases of part 1 (read 2026-10-07) | 511–552 |
-|   25. Portal pair creation (`0x0056D130`, `0x0056CF40`) | 553–649 |
-|   26. Shrine state lists and shrine texts (REC-239, read 2026-10-08) | 650–743 |
-|   27. Town Portal cast and the life of the pair (`0x005BE290`; REC-117, REC-243, read 2026-10-08) | 744–877 |
-| Constants & data dependencies | 878–881 |
-| Randomness | 882–896 |
-| Edge cases & original bugs | 897–928 |
-| Test vectors | 929–968 |
-| Provenance | 969–1019 |
-| Open questions | 1020–1023 |
+| Summary | 45–54 |
+| Inputs | 55–58 |
+| Outputs / state changes | 59–63 |
+| Rules | 64–65 |
+|   16. Operate functions, part 2 | 66–193 |
+|   17. Small init functions | 194–220 |
+|   18. Object events 0, 3, 8, 9, 10 | 221–288 |
+|   19. Obelisk completion (C→S 0x44, `0x00585240`) | 289–335 |
+|   20. Item drop helpers (open question 13) | 336–455 |
+|   21. Curable-state removal (`0x00578C20`, open question 15) | 456–468 |
+|   22. Object allocation modes (open question 8) | 469–517 |
+|   23. Client side of S→C 0x0E and 0x4D (open question 4) | 518–535 |
+|   24. Guards and corner cases of part 1 (read 2026-10-07) | 536–577 |
+|   25. Portal pair creation (`0x0056D130`, `0x0056CF40`) | 578–674 |
+|   26. Shrine state lists and shrine texts (REC-239, read 2026-10-08) | 675–768 |
+|   27. Town Portal cast and the life of the pair (`0x005BE290`; REC-117, REC-243, read 2026-10-08) | 769–902 |
+|   28. A chest opened in play (REC-260, read 2026-10-08) | 903–980 |
+| Constants & data dependencies | 981–984 |
+| Randomness | 985–1007 |
+| Edge cases & original bugs | 1008–1045 |
+| Test vectors | 1046–1092 |
+| Provenance | 1093–1151 |
+| Open questions | 1152–1155 |
 <!-- /index -->
 
 ## Summary
@@ -427,6 +428,30 @@ L > 65 → fatal 0x180. The gold id is cached at `0x008846EC` (flag
 g + ⌊L/2⌋ + 5 → armor pick; r < 80 → weapon pick; else misc pick (with
 m). So gold (65 − L) %, armor (⌊L/2⌋ + 5) %, weapon (⌈L/2⌉ + 10) %,
 misc 20 %.
+
+#### 20.7 Code drop, `0x00585970(ECX game, EDX U; code, quality)` (`ret 8`; REC-260, read 2026-10-08)
+
+The chest's `C(code)` (`world/objects.md` §8) and the quest gold
+piles. No draw of its own.
+
+1. id := `0x00633680(code)`; −1 → return none (no fatal, unlike
+   §20.4 rule 3).
+2. Floor search from U's position (`0x00620870`) in U's room
+   (`0x00620BB0`): `0x00555DA0(room, &pos, &out, 1, 1)`; none → return
+   none.
+3. Request (zeroed 0x84 bytes): +0x00 U, +0x04 0, +0x08 game, +0x0C
+   ilvl := `0x00558200(U, 0)` (the §20.4 rule 2 level: for an object
+   the area level of its room's level, at least 1), +0x14 id, +0x18
+   spawn mode 3, +0x1C / +0x20 the search's position, +0x24 its room,
+   +0x28 init flags 1, +0x2A format (game +0x78), +0x30 `quality`;
+   every other field 0. `0x00558D90(game, request, 0)`; return its
+   item.
+
+So the item level is read after the search (neither draws). The chest
+calls pass quality 0 (`items/quality.md` OQ2). No gold find: its only
+caller is the TC walk (`0x005589A0` from `0x0055A6D0`), so a chest's
+`gld ` code piles keep the pipeline amount (`items/treasure.md` §8
+step 1).
 
 ### 21. Curable-state removal (`0x00578C20`, open question 15)
 
@@ -875,6 +900,84 @@ The object is then freed (`0x00555600`) and the room refreshed
 3. Object update pass (`world/objects.md` §14 rule 1): 0x0E then 0x60.
 4. Removal: 0x0A (§27.4). Arrival of the user: 0x0D (§12 rule 11).
 
+### 28. A chest opened in play (REC-260, read 2026-10-08)
+
+The chain from a chest operate (`world/objects.md` §8.1, `0x00585F60`)
+to what each client receives. Every step has its owner (linked); this
+section owns the links, the order and the unit flags the created items
+carry.
+
+#### 28.1 Server side, in order
+
+1. Lock (`InteractType` bit 0x80): no key → sound 22 queued on the
+   operator P with target P (`0x00553380` at `0x00585FCB`), return; no
+   draw. Key used (or class 6) → sound 11 queued on P (`0x00585FE4`)
+   and sent at once to P's client (`0x005531C0` →`0x00571740` at
+   `0x00586000`; the second send of the same event is
+   `audio/triggers-2.md` §14 rule 2, REC-93).
+2. Control-seed draws (operate record +0x0C, `world/objects.md` §2):
+   sparkle `roll(100)` (`0x00586032`) only for a sparkling chest; then
+   class 397 `roll(10000)` (`0x00586098`), any other chest `roll(100)`
+   (`0x005862F8`).
+3. Drops, in call order (§8.1 rules 4–5): each `D(Q)` is one TC walk
+   (`items/treasure.md` §4–§5, draws on the chest's unit seed, at most
+   6 items); each `C(code)` is §20.7. Every item is placed by the floor
+   search (`items/treasure.md` §7 step 2, `sim/path-placement.md` §9)
+   and added to the world before the next search, so later items avoid
+   earlier ones (item footprint 0x200 inside the search mask 0x3E01).
+4. Open (§8.1 rule 7, `0x00586380`–`0x00586406`): mode set 1 with
+   ENDANIM (`Mode1` ≠ 0) or mode set 2 (`0x00624690`, which queues the
+   chest and sets unit flag 0x1); selectable flag 0x2 cleared; drop
+   code (U +0xB8 ≠ 0) → `0x00559A30(game, U, quality 2, &level, request
+   out none, type −1, act flag 1)` (§20.4; pushes `0x005863E3`–
+   `0x005863F1`); trap arm (§8.3: sound 13 on the chest, target none,
+   event 4 at frame + 35).
+
+#### 28.2 Unit flags of a created item
+
+The allocation sets unit flag 0x10 "not yet announced" (`0x0055532F`);
+the item is added in mode 3 at the search's room and position and
+queued in that room (`sim/path-placement.md` §2.5, `sim/unit-order.md`
+§6 rule 2). Unit flag 0x1000 ("dropped") is **not** set: its only
+setters are `0x00558AA0` (`or 0x1002` at `0x00558ADF`, the put-down of
+an item a unit held) and `0x0055C9A0` (refused pickup), and no chest
+path reaches them (`0x00585B90` → `0x0055A6D0` → `0x0055A550`,
+`0x00585970` and `0x00559A30` each create through `0x00558D90` only;
+`0x00558D90` and `0x00555230` set no 0x1000; the `0x1000` pushes at
+`0x00558EE9` / `0x00558EF5` are item-data flags).
+
+#### 28.3 Messages
+
+In the client pass of the next tick (`sim/tick.md` §6 rule 5; an
+operate from C→S 0x13 runs before it), for each client whose room's
+adjacent-room array holds the item's room (`sim/intents-events.md`
+§7.1):
+
+1. Each created item: S→C 0x9C **action 0** (new) with its stream
+   (`items/inventory-moves.md` §6.3 part 1, `items/bitstream.md`), once:
+   part B and the item update find flag 0x10 still set and send
+   nothing; tick step 6 clears 0x10 and 0x1.
+2. The chest: 0x0E (type 2, GUID, 3, byte @7 = 0 since 0x2 is clear,
+   mode 1 or 2; `world/objects.md` §14 rule 1), then 0x2C event 13 when
+   the trap armed (flag 0x400).
+3. Order within one room: most recently queued first
+   (`sim/unit-order.md` §6 rule 5): in the chest's room the drop-code
+   item (queued after the mode set) first, then the chest, then the
+   walk and code items, last created first; a unit queued earlier in
+   the same tick keeps its earlier place (§6 rule 3). Items the search
+   put in another room follow that room's place in the client room's
+   adjacency array.
+4. A client whose rooms do not hold the item's room in that pass never
+   gets action 0: it gets the item from the add messages of its room
+   switch (`sim/intents-events.md` §7.2 part B: 0x9C action 3, or 2 in
+   a tick where 0x1000 is set), each time the room enters its view.
+
+Recorded for TC drops (monster deaths; same creation path from
+`0x0055A550`): `traces/raw/20261006-015956-packets.jsonl` frames 3090,
+3317, 3532, 3574, 3200 send `9c 00 …` in the kill's client pass; the
+recording has no 0x9C action 2 and one action 3 (frame 3187, an item
+entering view). No chest is recorded (REC-260).
+
 ## Constants & data dependencies
 
 Listed in `world/objects.md` (Constants & data dependencies).
@@ -893,6 +996,14 @@ Listed in `world/objects.md` (Constants & data dependencies).
    quality-4 loop; with a drop code it draws nothing itself. The
    pipeline's own draws follow (`items/generation.md`).
 3. Curable-state removal (§21): none.
+4. Code drop (§20.7): none of its own; the pipeline's draws only (the
+   new item's seeds, a gold pile's amount on the new item's seed,
+   `items/treasure.md` §8).
+5. Chest opened in play (§28.1): [sparkle `roll(100)` C], `roll(10000)`
+   or `roll(100)` C, then each drop's draws in call order, then the
+   open mode change (U, `world/objects.md` §4), then the drop-code
+   item's pipeline draws. The key test, the floor search, the trap arm
+   and the messages draw nothing.
 
 ## Edge cases & original bugs
 
@@ -925,6 +1036,12 @@ Listed in `world/objects.md` (Constants & data dependencies).
    the GUID slot gets the type, not P's GUID.
 10. **Stale +0x48** (§27.4): never cleared; harmless because GUIDs
     are not reused within a game.
+11. **Chest and monster drops are "new", never "dropped"** (§28.2):
+    0x9C action 0, and only to clients in range in the next pass; a
+    client that walks up later sees the item as action 3 (no drop
+    animation).
+12. **Unknown code in a code drop gives nothing** (§20.7 rule 1),
+    where `0x00559A30` is fatal (0x9EA) for the same code.
 
 ## Test vectors
 
@@ -965,6 +1082,13 @@ Listed in `world/objects.md` (Constants & data dependencies).
 | party member Q enters P's O2 | Q next to O1; pair kept | §27.3 r3 |
 | portal O1 added to a client, owner P in the game, O2 GUID g | 0x51, 0x60, 0x82 with u32@1 = P's GUID, P's name, u32@21 = O1, u32@25 = g | §27.5 r2 |
 | the same, O's owner GUID −1 (Tyrael's portal) | 0x51, 0x60, no 0x82 | §27.5 r2 |
+| code drop, code not an items code | none; no fatal, no draw | §20.7 r1 |
+| code drop `gld `, U a chest in level 2 (area level 1, normal), search finds a spot | request ilvl 1, quality 0, spawn mode 3, unit U; gold amount `roll(5)` + 1 on the new item's seed; no gold find (`0x005589A0` is called only by the TC walk) | §20.7 r3, `items/treasure.md` §8 |
+| chest: unlocked, not sparkling, class ≠ 397, C `roll(100)` ≥ 25, `Mode1` 0, no trap, no drop code; the walk creates i1 then i2 in the chest's room; one client in range | C: one `roll(100)`; next client pass to that client: 0x0E (2, chest GUID, 3, 0, mode 2), 0x9C action 0 i2, 0x9C action 0 i1 | §28.1, §28.3 r1–r3 |
+| same, C `roll(100)` < 25 | no item, chest opens: 0x0E only | §28.1, `world/objects.md` §8.1 r5 |
+| same as row 3 with trap 1 | 0x0E, 0x2C event 13 (target none), 0x9C i2, 0x9C i1 | §28.3 r2 |
+| locked, P without a key | no draw, chest stays mode 0; 0x2C event 22 to P's client in P's update | §28.1 r1 |
+| a second client enters the room after that pass | 0x9C action 3 for each item (room switch, part B) | §28.3 r4 |
 
 ## Provenance
 
@@ -979,6 +1103,14 @@ The §16–§18 bullet of `world/objects.md` Provenance; §18.6 from
 - §20: `0x005594C0`, `0x00559630`, `0x00559300`, `0x00559A30`,
   `0x00555E00`, `0x00555E70`, `0x00555FB0`, `0x005560F0`, `0x00556240`,
   `0x00629CC0`, `0x006427F0` (thresholds `0x006EB2F0`).
+- §20.7, §28 (read 2026-10-08, `all.asm`): `0x00585970`–`0x00585A79`,
+  `0x00558200`, the chest operate `0x00585F60` (draws at `0x00586032`,
+  `0x00586098`, `0x005862F8`; sounds `0x00585FCB`, `0x00585FE4`,
+  `0x00586000`; open tail `0x00586380`–`0x00586406`), the setters of
+  unit flag 0x1000 (all `or …+0xC4` sites: `0x00558ADF`, `0x0055C9D1`),
+  the callers of `0x00558AA0`, the call lists of `0x0055A550` and
+  `0x00558D90`, the 0x10 set at `0x0055532F`. Recording
+  `20261006-015956` (0x9C action counts: 8 × 0, 1 × 3, 0 × 2).
 - §21: `0x00578C20`, `0x0063A460` (bitset 12 = `curable`, cross-checked
   with bitset 2 `hide` at +0xD4 and 33 `udead` at +0x150); live
   `states.txt` `curable` column.

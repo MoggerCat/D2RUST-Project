@@ -37,15 +37,15 @@
 |   4. Chest drop (`0x00585B90`) | 294–320 |
 |   5. The TC walk (`0x0055A6D0`) | 321–427 |
 |   6. Drop quality (`0x00558640`) | 428–459 |
-|   7. Creation inputs and placement (`0x0055A550`) | 460–490 |
-|   8. Gold amount | 491–506 |
-|   9. Quest drop helper (`0x00559A30`) | 507–592 |
-| Constants & data dependencies | 593–622 |
-| Randomness | 623–639 |
-| Edge cases & original bugs | 640–663 |
-| Test vectors | 664–693 |
-| Provenance | 694–718 |
-| Open questions | 719–882 |
+|   7. Creation inputs and placement (`0x0055A550`) | 460–496 |
+|   8. Gold amount | 497–512 |
+|   9. Quest drop helper (`0x00559A30`) | 513–598 |
+| Constants & data dependencies | 599–628 |
+| Randomness | 629–645 |
+| Edge cases & original bugs | 646–669 |
+| Test vectors | 670–699 |
+| Provenance | 700–724 |
+| Open questions | 725–888 |
 <!-- /index -->
 
 ## Summary
@@ -487,6 +487,12 @@ Inputs: item id, `L`, game, `U`, `R`, the slot mods. Draws are `roll`
    `sim/path-placement.md` §2.5: static path, footprint, room list) inside
    `0x00558D90`, before its base stats; so the next drop's search sees
    it.
+5. Announcement: the new item has unit flag 0x10 and not 0x1000 (no
+   path from `0x0055A550` reaches the setters `0x00558AA0` /
+   `0x0055C9A0`), so clients in range get S→C 0x9C **action 0** in the
+   next client pass (`sim/intents-events.md` §7.1–§7.2; chest order:
+   `world/objects-2.md` §28). Recorded: the `20261006-015956` monster
+   drops at frames 3090, 3200, 3317, 3532, 3574 are all `9c 00`.
 
 ### 8. Gold amount
 

@@ -45,21 +45,21 @@
 |   5. Init functions | 212–286 |
 |   6. Preset object classes 574–582 (`0x0054F490`) | 287–323 |
 |   7. Operate dispatch | 324–382 |
-|   8. Chests and breakables | 383–516 |
-|   9. Shrines | 517–630 |
-|   10. Doors, operate 8 (`0x00581D40`) | 631–654 |
-|   11. Wells, operate 22 (`0x005858A0`) | 655–686 |
-|   12. Portals, operate 15 (`0x00584870`) | 687–757 |
-|   13. Torch, operate 11 (`0x005843D0`) | 758–762 |
-|   14. Client messages | 763–790 |
-|   15. Not covered yet | 791–805 |
-|   16.–18. Moved | 806–812 |
-| Constants & data dependencies | 813–859 |
-| Randomness | 860–905 |
-| Edge cases & original bugs | 906–972 |
-| Test vectors | 973–1011 |
-| Provenance | 1012–1069 |
-| Open questions | 1070–1118 |
+|   8. Chests and breakables | 383–518 |
+|   9. Shrines | 519–632 |
+|   10. Doors, operate 8 (`0x00581D40`) | 633–656 |
+|   11. Wells, operate 22 (`0x005858A0`) | 657–688 |
+|   12. Portals, operate 15 (`0x00584870`) | 689–759 |
+|   13. Torch, operate 11 (`0x005843D0`) | 760–764 |
+|   14. Client messages | 765–792 |
+|   15. Not covered yet | 793–807 |
+|   16.–18. Moved | 808–814 |
+| Constants & data dependencies | 815–861 |
+| Randomness | 862–908 |
+| Edge cases & original bugs | 909–975 |
+| Test vectors | 976–1014 |
+| Provenance | 1015–1072 |
+| Open questions | 1073–1122 |
 <!-- /index -->
 
 ## Summary
@@ -389,8 +389,8 @@ Common pieces:
   none.
 - **Magic test** (`0x0062A0F0`): the item exists, is type 4 and its
   quality is 4…9.
-- **Code drop** `C(code)` = `0x00585970(game, object, code, 0)` (items
-  spec): one item of that 4-character code.
+- **Code drop** `C(code)` = `0x00585970(game, object, code, 0)`
+  (`world/objects-2.md` §20.7): one item of that 4-character code.
 - **Open** = the end of the chest operate (§8.1 rule 7).
 - **Trap arm** = §8.3 with `InteractType` & 0x7F.
 
@@ -429,8 +429,10 @@ Common pieces:
 6. Rule 5 always ends in open.
 7. **Open:** `Mode1` (+0x140) ≠ 0 → mode 1 and ENDANIM at frame +
    (`FrameCnt1` >> 8) + 1; else mode 2. Clear flag 0x2. If the drop item
-   code (+0xB8) ≠ 0: drop it at the object (`0x00559A30`, items spec).
-   Trap arm. Return 1.
+   code (+0xB8) ≠ 0: drop it at the object (`0x00559A30(game, object,
+   quality 2, &level, none, type −1, act flag 1)`, `world/objects-2.md`
+   §20.4). Trap arm. Return 1. What clients receive and in which order:
+   `world/objects-2.md` §28.
 8. Every path returns 1 (`0x00586406`). The assassin exemption tests the
    operator's class id only (`[P +0x04] = 6`, no type test), so any
    operator unit of class 6 skips the key. A locked chest with no
@@ -874,7 +876,8 @@ Seeds: **C** = object-control seed (§2), **U** = the object's unit seed,
 4. Chest operate: [sparkle `roll(100)` C]; class 397: `roll(10000)` C,
    else `roll(100)` C; then the chest-drop draws (`items/treasure.md`
    §4, on the dropping unit's seed) in drop order; the open mode change
-   (§4, U).
+   (§4, U); then the drop-code item's creation draws
+   (`world/objects-2.md` Randomness 5).
 5. Casket: drop draws, mode change, `roll(10000)` C. Urn: mode change,
    `roll(100)` C, drop draws. Barrel: mode change, `roll(10000)` C,
    `roll(100)` C, drops. Evil urn: drops, mode change, `roll(255)` C.
@@ -1072,7 +1075,8 @@ lists of §2 from the live `shrines.txt`.
 1. **Needs recording**: no recording of a chest, shrine, door, well or
    portal yet: record
    `packets` + RNG traces for one of each to confirm draw order and the
-   0x0E/0x4D bytes.
+   0x0E/0x4D bytes. Chest: REC-260, expected sequence
+   `world/objects-2.md` §28 (vectors there).
 2. **Answered (confirmed by recording `obj1`)**: no animation setup runs
    before the init function; §4 rule 5 (`0x005553E5`, `0x00624690`).
 3. **Answered**: `0x005474C0` read in 1.14d, §8.3 "Trap monster id".
