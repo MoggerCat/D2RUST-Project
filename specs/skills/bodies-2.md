@@ -26,15 +26,15 @@
 | Rules | 61–62 |
 |   1. Conventions | 63–74 |
 |   2. Shared helpers, batch 3 | 75–733 |
-|   3. Bodies, required level 1 | 734–914 |
-|   4. Bodies, required level 6 | 915–1126 |
-|   5. Bodies, required level 12 | 1127–1302 |
-| Constants & data dependencies | 1303–1337 |
-| Randomness | 1338–1376 |
-| Edge cases & original bugs | 1377–1446 |
-| Test vectors | 1447–1484 |
-| Provenance | 1485–1504 |
-| Open questions | 1505–1543 |
+|   3. Bodies, required level 1 | 734–918 |
+|   4. Bodies, required level 6 | 919–1130 |
+|   5. Bodies, required level 12 | 1131–1306 |
+| Constants & data dependencies | 1307–1341 |
+| Randomness | 1342–1380 |
+| Edge cases & original bugs | 1381–1450 |
+| Test vectors | 1451–1488 |
+| Provenance | 1489–1508 |
+| Open questions | 1509–1547 |
 <!-- /index -->
 
 ## Summary
@@ -911,6 +911,10 @@ The start makes the first kick itself.
 
 With n kicks the start makes kick 1 and each do one more; every do also
 applies the previous kick's stored record first (step 2).
+Dragon Talon's `anim` is KK (mode 12): it plays the plain KK AnimData
+animation, never sequence 19 (`sequences.md` §5), and each rewind re-arms
+that animation's code-1 frame. It has no `InTown`, so the start refuses
+in town (`use.md` §5.3 step 5).
 
 ### 4. Bodies, required level 6
 

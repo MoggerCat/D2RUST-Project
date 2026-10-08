@@ -29,16 +29,16 @@
 |   2. `use_at_point(game, unit, skill, x, y)` = `0x00549AD0` | 109–191 |
 |   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 192–210 |
 |   4. Mode change gates | 211–250 |
-|   5. Start and do | 251–408 |
-|   6. Cooldown | 409–422 |
-|   7. Periodic skills and auras | 423–472 |
-|   8. Function tables | 473–492 |
-| Constants & data dependencies | 493–513 |
-| Randomness | 514–523 |
-| Edge cases & original bugs | 524–545 |
-| Test vectors | 546–566 |
-| Provenance | 567–583 |
-| Open questions | 584–635 |
+|   5. Start and do | 251–409 |
+|   6. Cooldown | 410–423 |
+|   7. Periodic skills and auras | 424–473 |
+|   8. Function tables | 474–493 |
+| Constants & data dependencies | 494–514 |
+| Randomness | 515–524 |
+| Edge cases & original bugs | 525–546 |
+| Test vectors | 547–567 |
+| Provenance | 568–584 |
+| Open questions | 585–636 |
 <!-- /index -->
 
 ## Summary
@@ -299,13 +299,14 @@ code-1 event:
 |---|---|---|
 | Whirlwind (10; 8 frames; 3, 7) | `bodies-2b.md` §8.11 step 4: player → animation from frame 3, then `Pacing` strikes (0, 1 or 2) | frame 3's code 1 at F + 1 for every speed s < 1280 (first loop pass reaches index 3): one path step and one do per tick |
 | Leap (13; 15 frames; 5, 11, 14) | the frame-5 do launches (`bodies-2.md` §4.7, flags 0x1101); later dos run Land, not there → player animation from frame 10 | frame 11's code 1 at F + 1 for s ≥ 256, else F + 2 or later |
+| Leap Attack (14; 22–28 frames by class; 5, 11, strike 16–18) | as Leap (`bodies-2b.md` §6.12: start flags 0x1080, launch → 0x1101, Land not there → frame 10) | as Leap; after landing the strike event (`bodies-2b.md` §6.12) |
 
 On arrival the Whirlwind do ends the move (`bodies-2b.md` §8.11 step
 3) and strikes nothing on that tick; the Leap do lands (`bodies-2.md`
-§4.7). Sequence frame records read from the image through table
-`0x007483B8` (12-byte record per weapon class: frame list, frame count,
-count; 6-byte frames, event byte +5): every weapon-class record of
-`seqnum` 10 and 13 is the same.
+§4.7); the Leap Attack do lands and rewinds to frame 16 for its strike
+(`bodies-2b.md` §6.12). Frames, code-1 indices and classes of these
+sequences: `skills/sequences.md` §4 (`seqnum` 10 and 13 have one record
+for every class that has one; 14 has four).
 
 Monsters: start `0x005A75C0`, per-frame `0x005A7670` (monsters branch;
 Open question 6).

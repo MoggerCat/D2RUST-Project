@@ -16,9 +16,9 @@
 |---|---|
 | Summary | 24–30 |
 | Rules | 31–32 |
-|   6. Bodies, required level 18 | 33–335 |
-|   7. Bodies, required level 24 | 336–636 |
-|   8. Bodies, required level 30 | 637–895 |
+|   6. Bodies, required level 18 | 33–367 |
+|   7. Bodies, required level 24 | 368–693 |
+|   8. Bodies, required level 30 | 694–952 |
 <!-- /index -->
 
 ## Summary
@@ -238,6 +238,38 @@ off; anim refresh.
    - 0x80: return Launch (`bodies-2.md` §2.13).
    - 0x200 (landed): return Strike (`bodies-2.md` §2.19) with (game, skill, L).
    - Otherwise: E flags := 0x1000; return 1.
+
+The tests run in this order: 0x100, then 0x80, then 0x200 (asm
+`0x005DA800`, `0x005DA864`, `0x005DA879`). No area knockback: unlike Leap
+(`bodies-2.md` §4.7) the landing itself hits nobody; the only hit is the
+Strike. Leap Attack is the Barbarian skill 143 (`anim` SQ, `seqnum` 14,
+`itypea1` `mele`); its frames are `sequences.md` §4.
+
+Course of one Leap Attack by a player (`use.md` §5.2 rules 2–3):
+
+1. Start: E flags 0x1080 (bit 0 clear: not yet a moving skill).
+2. Code-1 event index 5: rule 3 runs the do; 0x80 → Launch: E flags
+   0x1101 (moving).
+3. Every later type-0 event steps the path. Not finished: rule 3 runs
+   the do on code 1 (index 11): Land finds the unit away from (x, y) →
+   animation from frame 10 (re-arms index 11), the do returns 1.
+4. Step result 2 (arrival): mask 2, the do at once: Land succeeds
+   (player: E flags := 0x200, type-1 timer at F + 1). Pick:
+   - K found → animation from frame 16 (`0x00553DC0`, which cancels the
+     unit's type-0 and type-1 events, the landing's F + 1 end included);
+   - none → the type-1 timer moves to F + 4 and the animation ends there
+     with no strike (the do returns 0).
+5. The strike event (index 16 for hth, 1hs, 1ht and the dual classes, 17
+   for 2hs, 18 for 2ht and stf; at F + max(1, ⌈256·(i − 16)/s⌉),
+   `sequences.md` test vectors): E flags 0x200, bit 0 clear → rule 3 → the
+   do runs Strike. Strike picks again (`bodies-2.md` §2.19 Pick): the
+   current target if in melee range, else the stored unit (E params 3, 4
+   from the start or the landing pick), else the unit `next_unit` returns
+   within melee range + 4 (filter 0x20003, g = −1). Hit: knockback
+   (result |= 8), enhanced damage `calc1` (`ln34 +
+   skill('Leap'.blvl)*par8`: 100 + 30·(L − 1) + 10 per base level of
+   Leap), the weapon's damage through `fill` (`SrcDam` 128), `apply_melee`,
+   overlay `bash`, stun removed.
 
 #### 6.13 srvst 57 Rabies `0x005C79E0`
 
@@ -632,7 +664,32 @@ Convert `0x005D7430` (U in ECX, context in EAX; game, source): test
    `pair_record(unit, T)`; finisher `0x005D5220(game, unit, p)`;
    `apply_melee(game, unit, T)`. Return 1.
 
-The start is srvst 12 (`bodies.md` §7.4).
+The start is srvst 12 (`bodies.md` §7.4): T within `aurarangecalc` (`par7`
+= 27) and hostile, neither room in town.
+
+Course of one Dragon Flight by a player: mode SQ, `seqnum` 21 (all
+classes: SC frames 0–9, KK frames 0–12; code 1 at indices 9 and 14,
+`sequences.md` §4). Index 9 → event arg2 0 (even): the flight; index 14 →
+arg2 1 (odd): the kick. Not a moving skill: the flight is one placement
+(`0x00554EA0`, exact 0: the free-spot search around T's position,
+`sim/path-placement.md` §10), not a path. The kick:
+
+- has no range test: it hits T from wherever the unit stands, also when
+  the flight returned 0 (Edge case below);
+- never knocks back (no 0xC in the result, unlike `kick_hit`,
+  `bodies-2.md` §2.6) and has no knockback roll;
+- damage: enhanced damage `ln12` = `Param1` + (L − 1)·`Param2` = 100 +
+  25·(L − 1) %, then `kick_damage` (`bodies-2.md` §2.5: physical
+  ((str + dex − 20) / 4 … / 3) << 8, `levels.md` §3.3, plus kick stats
+  and boots), to-hit bonus `to_hit(unit, skill, L)` +
+  `progressive_tohit(325)`;
+- the finisher (`bodies.md` §2.14) and `apply_melee` follow
+  `start_combat` on hit and miss.
+
+The do's result is not read by the frame-event handler (`use.md` §5.2
+rule 3, `0x005804E2`), so a failed flight (no target position, the level's
+`Teleport` 0, or `Teleport` 2 with the line blocked: 1.14d only `Act 2 -
+Duriel's Lair` has 2) still kicks T at the start range (up to 27).
 
 ### 8. Bodies, required level 30
 
