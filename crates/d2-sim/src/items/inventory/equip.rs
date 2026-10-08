@@ -62,7 +62,12 @@ fn stat_ok<W: InvWorld + ?Sized>(
     if v < 1 || v < req {
         return false;
     }
-    if equipping && w.item_active_on(item, unit) {
+    // Strength (step 3) tests the stat-list link (`0x00625820`,
+    // `0x0062EBF1`) before subtracting the socket contribution; dexterity
+    // (step 4, `0x0062EC4A`–`0x0062EC75`) goes straight to `0x0062B450(2)`
+    // with no link test. The asymmetry is reproduced.
+    let linked = id != stat::STRENGTH || w.item_active_on(item, unit);
+    if equipping && linked {
         let v = v - w.own_contribution(item, unit, id);
         if v < 1 || v < req {
             return false;

@@ -51,6 +51,8 @@ mod gaps_numbered_tests;
 #[cfg(test)]
 mod local_tests;
 #[cfg(test)]
+mod seam_movement_tests;
+#[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod tests_c2cli;

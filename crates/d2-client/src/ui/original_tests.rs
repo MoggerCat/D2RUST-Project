@@ -4,6 +4,7 @@
 //! client model holds the inputs).
 
 use super::*;
+use crate::bridge::output::Output;
 use crate::bridge::world::{ClientUnit, UnitKey};
 use crate::ui::draw::UiDraw;
 use crate::ui::{ClientIntent, NoPanelRules, NoStrings};
@@ -43,6 +44,113 @@ fn world(class: u32, mode: u32, expansion: bool) -> ClientWorld {
 struct Ui {
     ui: OriginalUi,
     root: UiRoot,
+}
+
+// The right panel's area: right exclusive, bottom inclusive (record 0
+// at 640 × 480: x 320–639, y 0–441).
+// Covers: specs/ui/panels-2.md §18 r2
+#[test]
+fn inv_area_rect_has_an_inclusive_bottom() {
+    let r = areas()[0].rect();
+    assert!(r.contains(Point::new(639, 441)));
+    assert!(r.contains(Point::new(320, 0)));
+    assert!(!r.contains(Point::new(640, 100)));
+    assert!(!r.contains(Point::new(400, 442)));
+}
+
+// An expansion game's waypoint tabs step by 64 over five tabs: a press
+// at (300, 80) at 800 × 600 (x' = 220, y' = 20) selects tab 3 (`menus.md`
+// test vector), drawn as `expwaygatetabs` frame 2t = 6.
+// Covers: specs/ui/menus.md §1 r3
+// Covers: specs/ui/panels.md §13 r3
+#[test]
+fn expansion_waypoint_tab_click_uses_five_tabs() {
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    let record = [2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    u.ui.apply_output(&Output::WaypointMenu { guid: 0x0A, record }, &w)
+        .unwrap();
+    u.root.sync_states(&u.ui.shared.borrow().states);
+    assert!(u.ui.is_open(0x14));
+    let tabs = |u: &Ui| -> Vec<u32> {
+        panel_images(&u.images(&w), "menu\\expwaygatetabs")
+            .into_iter()
+            .map(|(f, ..)| f)
+            .collect()
+    };
+    assert!(!tabs(&u).contains(&6));
+    u.send(
+        &w,
+        UiEvent::Press {
+            button: PointerButton::Left,
+            at: Point::new(300, 80),
+        },
+    );
+    assert!(tabs(&u).contains(&6), "{:?}", tabs(&u));
+}
+
+// A release over the belt clicks only after a press there (`[0x007BEFA4]`
+// recorded): a press in the world dragged onto the belt picks nothing.
+// Covers: specs/ui/control-panel.md §10 r1, §10 r2
+#[test]
+fn a_belt_release_without_a_belt_press_does_not_click() {
+    use crate::bridge::items::mode;
+    use crate::ui::panels::control::belt::{BeltBox, BeltRecord};
+    use crate::ui::panels::inv_items::tests::world as item_world;
+    let mut u = ui(Some(areas()), true);
+    // Four boxes in the strip (y 562..590, x 430 + 31 i), in every
+    // record (whichever the belt type picks).
+    let boxes: Vec<BeltBox> = (0..4)
+        .map(|i| BeltBox {
+            left: 430 + 31 * i,
+            right: 458 + 31 * i,
+            top: 562,
+            bottom: 590,
+        })
+        .collect();
+    let records = vec![BeltRecord { boxes }; 14];
+    u.ui.set_belt_parts(hud_belt::BeltParts {
+        records,
+        types: BTreeMap::new(),
+    });
+    let mut w = item_world(&[(7, mode::BELT, (0, 0, 0, 0), b"hp1 ")], None);
+    let me = w.local_player.unwrap();
+    w.units.get_mut(&me).unwrap().mode = 1;
+    let (b, box0, field) = (
+        PointerButton::Left,
+        Point::new(440, 570),
+        Point::new(300, 200),
+    );
+    u.send(
+        &w,
+        UiEvent::Press {
+            button: b,
+            at: field,
+        },
+    );
+    u.send(
+        &w,
+        UiEvent::Release {
+            button: b,
+            at: box0,
+        },
+    );
+    assert!(u.root.take_intents().is_empty());
+    u.send(
+        &w,
+        UiEvent::Press {
+            button: b,
+            at: box0,
+        },
+    );
+    u.send(
+        &w,
+        UiEvent::Release {
+            button: b,
+            at: box0,
+        },
+    );
+    assert!(!u.root.take_intents().is_empty());
 }
 
 fn ui(inv: Option<Vec<InvArea>>, installed: bool) -> Ui {
@@ -117,6 +225,9 @@ fn panel_images(v: &[(String, u32, i32, i32)], prefix: &str) -> Vec<(u32, i32, i
 }
 
 // Covers: specs/ui/panels.md §5, §6 r1, §6 r2
+// Covers: specs/ui/panels-3.md §23 r9
+// (the cursor item and the step-10 tips in the last panel, after the HUD
+// of step 7)
 #[test]
 fn install_mirrors_the_flags_and_keeps_the_border_open() {
     let u = ui(Some(areas()), true);
@@ -129,7 +240,8 @@ fn install_mirrors_the_flags_and_keeps_the_border_open() {
             hud::HUD_PANEL,
             crate::ui::original::gold_dialog::GOLD_PANEL,
             crate::ui::original::game_messages::MESSAGES_PANEL,
-            crate::ui::original::overhead_ui::OVERHEAD_PANEL
+            crate::ui::original::overhead_ui::OVERHEAD_PANEL,
+            crate::ui::original::TOP_PANEL
         ]
     );
     let w = world(AMAZON, 1, true);
@@ -172,7 +284,8 @@ fn hotkeys_toggle_their_state_with_the_specs_jump() {
             hud::HUD_PANEL,
             crate::ui::original::gold_dialog::GOLD_PANEL,
             crate::ui::original::game_messages::MESSAGES_PANEL,
-            crate::ui::original::overhead_ui::OVERHEAD_PANEL
+            crate::ui::original::overhead_ui::OVERHEAD_PANEL,
+            crate::ui::original::TOP_PANEL
         ],
         "the root mirrors the flag"
     );
@@ -196,7 +309,8 @@ fn hotkeys_toggle_their_state_with_the_specs_jump() {
             hud::HUD_PANEL,
             crate::ui::original::gold_dialog::GOLD_PANEL,
             crate::ui::original::game_messages::MESSAGES_PANEL,
-            crate::ui::original::overhead_ui::OVERHEAD_PANEL
+            crate::ui::original::overhead_ui::OVERHEAD_PANEL,
+            crate::ui::original::TOP_PANEL
         ]
     );
 }
@@ -524,6 +638,37 @@ fn esc_opens_the_game_menu_closes_panels_first_and_closes_it_again() {
     assert!(!u.ui.is_open(1) && !u.ui.is_open(9));
     u.key(&w, Action::GameMenu);
     assert!(u.ui.is_open(9));
+}
+
+// The close-all closes only Esc-closable states (flag 1): the automap
+// (0x0A, flag 0) does not block the menu; the menu's open closes it and
+// remembers it (keep = 1), the menu's close reopens it. Chat (5, flag 1)
+// is closed by the first Esc and the menu stays shut.
+// Covers: specs/ui/panels.md §2 r9
+// Covers: specs/ui/frontend-options.md §o1-where-options-live-opening-and-closing-the-game-menu r2, §o1-where-options-live-opening-and-closing-the-game-menu r3
+#[test]
+fn esc_closes_closable_states_and_the_menu_restores_the_kept_ones() {
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    u.key(&w, Action::ToggleInventory);
+    assert!(u.ui.is_open(1));
+    u.ui.set_ui(0x0A, 0, false).expect("automap on");
+    assert!(u.ui.is_open(0x0A));
+    // First Esc: the inventory (flag 1) closes; the automap stays.
+    u.key(&w, Action::GameMenu);
+    assert!(!u.ui.is_open(1) && !u.ui.is_open(9) && u.ui.is_open(0x0A));
+    // Second Esc: nothing closable is open, the menu opens and closes
+    // the automap.
+    u.key(&w, Action::GameMenu);
+    assert!(u.ui.is_open(9) && !u.ui.is_open(0x0A));
+    // Esc with the menu open: the menu closes, the automap reopens.
+    u.key(&w, Action::GameMenu);
+    assert!(!u.ui.is_open(9) && u.ui.is_open(0x0A));
+    // Chat is Esc-closable: the first Esc closes it, the menu stays shut.
+    if u.ui.set_ui(5, 0, false).expect("chat on") {
+        u.key(&w, Action::GameMenu);
+        assert!(!u.ui.is_open(5) && !u.ui.is_open(9));
+    }
 }
 
 // Covers: specs/ui/panels.md §3

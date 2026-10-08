@@ -96,12 +96,34 @@ fn panel_files_frame_counts_and_sizes() {
         let d = dc6(&set, file);
         assert_eq!(d.frames.len(), n, "{file}");
         for (i, fr) in d.frames.iter().enumerate() {
-            assert_eq!((fr.offset_x, fr.offset_y), (0, 0), "{file} frame {i}");
+            // §1 r3: every file but `menu\horadric` has zero offsets; its
+            // own vectors are checked below (§12.4, Test vectors).
+            if file != "menu\\horadric" {
+                assert_eq!((fr.offset_x, fr.offset_y), (0, 0), "{file} frame {i}");
+            }
             if let Some(s) = size {
                 assert_eq!((fr.width, fr.height), s, "{file} frame {i}");
             }
         }
     }
+    // §12.4 / Test vectors: frames 0 and 30 are 2 × 2 at (0, 0), frame 1
+    // is 92 × 121 at (−205, 17), frame 15 sits at (−280, 82).
+    let h = dc6(&set, "menu\\horadric");
+    for i in [0, 30] {
+        let fr = &h.frames[i];
+        assert_eq!(
+            (fr.width, fr.height, fr.offset_x, fr.offset_y),
+            (2, 2, 0, 0),
+            "menu\\horadric frame {i}"
+        );
+    }
+    let f1 = &h.frames[1];
+    assert_eq!(
+        (f1.width, f1.height, f1.offset_x, f1.offset_y),
+        (92, 121, -205, 17)
+    );
+    let f15 = &h.frames[15];
+    assert_eq!((f15.offset_x, f15.offset_y), (-280, 82));
     for c in ['a', 's', 'n', 'p', 'b', 'd', 'i'] {
         let file = format!("spells\\skltree_{c}_back");
         assert_eq!(dc6(&set, &file).frames.len(), 16, "{file}");
