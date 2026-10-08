@@ -16,9 +16,9 @@
 |---|---|
 | Summary | 24–30 |
 | Rules | 31–32 |
-|   6. Bodies, required level 18 | 33–331 |
-|   7. Bodies, required level 24 | 332–632 |
-|   8. Bodies, required level 30 | 633–891 |
+|   6. Bodies, required level 18 | 33–335 |
+|   7. Bodies, required level 24 | 336–636 |
+|   8. Bodies, required level 30 | 637–895 |
 <!-- /index -->
 
 ## Summary
@@ -61,6 +61,10 @@ Also VampireFirewall, PrimeFirewall, CountessFirewall (monster rows).
    create.
 6. `srvmissileb` valid → flags := 1, target (0, 0), class
    `srvmissileb`: create (at the centre). Return 1.
+
+PROVISIONAL: with no walk (a cast at a point) the path's target point of
+step 3 is the point kept at the mode start (because the preview's cast
+sends no path target); settled by REC-154.
 
 #### 6.3 srvdo 25 Enchant `0x005CA030`
 

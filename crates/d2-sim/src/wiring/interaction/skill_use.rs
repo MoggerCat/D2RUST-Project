@@ -150,7 +150,7 @@ impl<X: Pending + UseRest> UseView<'_, X> {
     fn list_mut(&mut self, u: UnitId) -> Option<&mut crate::skills::list::SkillList> {
         self.cv.v.h.skill_lists.get_mut(&u)
     }
-    fn x(&self) -> &X {
+    pub(super) fn x(&self) -> &X {
         &self.cv.v.h.x
     }
     pub(super) fn xm(&mut self) -> &mut X {
@@ -1081,7 +1081,7 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         self.x().room_act(r)
     }
     fn room_teleport(&self, r: RoomId) -> Option<i32> {
-        self.x().room_teleport(r)
+        self.level_teleport(r).or_else(|| self.x().room_teleport(r))
     }
     fn free_point(
         &mut self,
@@ -1091,13 +1091,17 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         mask: u32,
         fallback: bool,
     ) -> Option<(RoomId, (i32, i32))> {
-        self.xm().free_point(r, at, size, mask, fallback)
+        match self.rooms_free_point(r, at, size, mask, fallback) {
+            Some(found) => found,
+            None => self.xm().free_point(r, at, size, mask, fallback),
+        }
     }
     fn pattern_collides(&self, r: RoomId, at: (i32, i32), u: UnitId, mask: u32) -> bool {
         self.x().pattern_collides(r, at, u, mask)
     }
     fn box_collides(&self, r: RoomId, at: (i32, i32), size: i32, mask: u32) -> bool {
-        self.x().box_collides(r, at, size, mask)
+        self.rooms_box_collides(r, at, size, mask)
+            .unwrap_or_else(|| self.x().box_collides(r, at, size, mask))
     }
     /// `0x0064E260` (`pathing.md` §13.3, [`crate::path::line::line_test`])
     /// on the DRLG rooms with the path provider; else [`Pending`].
@@ -1116,7 +1120,10 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         self.x().body_line_blocked(r, from, to, mask)
     }
     fn place_unit(&mut self, u: UnitId, r: Option<RoomId>, at: (i32, i32)) -> bool {
-        self.xm().place_unit(u, r, at)
+        match self.rooms_place_unit(u, r, at) {
+            Some(placed) => placed,
+            None => self.xm().place_unit(u, r, at),
+        }
     }
     fn has_path(&self, u: UnitId) -> bool {
         self.x().has_path(u)
@@ -1128,7 +1135,7 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         self.x().path_last_point(u)
     }
     fn path_target_point(&self, u: UnitId) -> (i32, i32) {
-        self.x().path_target_point(u)
+        self.cast_target_point(u)
     }
     fn create_monster(
         &mut self,
@@ -1296,7 +1303,7 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     /// a = 0: [`BodyWorld::place_unit`]'s provider.
     fn place_unit_flag(&mut self, u: UnitId, r: Option<RoomId>, at: (i32, i32), a: i32) -> bool {
         if a == 0 {
-            self.xm().place_unit(u, r, at)
+            BodyWorld::place_unit(self, u, r, at)
         } else {
             self.xm().body_place_unit_flag(u, r, at, a)
         }
