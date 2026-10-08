@@ -563,8 +563,11 @@ impl OriginalUi {
             if a == ActionId(Action::GameMenu.index() as u16) {
                 self.game_menu_key()?;
             } else if let Some(ui) = hotkey_state(a) {
-                // §4.3: hot keys pass jump 0; mode 2 toggle.
-                self.set_ui(u32::from(ui), 2, false)?;
+                // §4.3: the Character, Inventory, Party, Skill Tree and
+                // Hireling keys pass jump 1, every other hot key 0; mode 2
+                // toggle.
+                let jump = matches!(ui, 1 | 2 | 4 | 0x16 | 0x24);
+                self.set_ui(u32::from(ui), 2, jump)?;
                 // The quest log asks the server for the quest data when
                 // it opens (`quest_log_ui`; d2rs-own, unverified).
                 if ui == quest_log_ui::UI_QUEST_SCREEN && self.is_open(ui) {

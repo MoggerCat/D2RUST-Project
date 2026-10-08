@@ -144,11 +144,11 @@ fn install_mirrors_the_flags_and_keeps_the_border_open() {
 
 // Covers: specs/ui/panels.md §2 r2, §2 r5, §2 r6, §4 r2, §4 r3
 #[test]
-fn hotkeys_toggle_their_state_with_jump_0() {
+fn hotkeys_toggle_their_state_with_the_specs_jump() {
     let mut u = ui(Some(areas()), true);
     let w = world(AMAZON, 1, true);
-    // The mouse at x 500 would jump with jump 1 (§4.3 vector); hot keys
-    // pass 0.
+    // §4.3 (corrected 2026-10-07, vector "key I at 800 × 600, mouse x 500"):
+    // the Inventory key passes jump 1, so the cursor goes to x 300.
     u.send(&w, UiEvent::CursorMoved(Point::new(500, 300)));
     assert_eq!(u.key(&w, Action::ToggleInventory), Routed::Unhandled);
     assert!(u.ui.is_open(UI_INVENTORY));
@@ -158,7 +158,8 @@ fn hotkeys_toggle_their_state_with_jump_0() {
         vec![
             UiEffect::Opened(1),
             UiEffect::InventoryHook,
-            UiEffect::OpenMode(OpenMode::new(1).unwrap())
+            UiEffect::OpenMode(OpenMode::new(1).unwrap()),
+            UiEffect::CursorX(300)
         ]
     );
     assert_eq!(
