@@ -55,7 +55,6 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
             .lists
             .iter()
             .flat_map(|(&p, l)| l.nodes.iter().filter(|n| !n.dead).map(move |n| (p, n.guid)))
-            .map(|(p, guid)| (p, guid))
             .collect::<Vec<_>>()
             .into_iter()
             .filter_map(|(p, guid)| {

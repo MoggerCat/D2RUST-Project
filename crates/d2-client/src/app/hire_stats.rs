@@ -12,7 +12,8 @@
 //! PROVISIONAL: REC-HIRE-STATS (docs/HANDOFF.md §7).
 
 use bevy::prelude::App;
-use d2_sim::world::npc::{hire_init, HireRow};
+use d2_sim::world::npc::hire::hire_init;
+use d2_sim::world::npc::HireRow;
 
 use crate::ui::panels::npc_menu::HireStats;
 use crate::world_view::WorldViewUi;

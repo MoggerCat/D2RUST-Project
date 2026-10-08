@@ -1045,7 +1045,7 @@ fn the_hireling_follows_a_waypoint_teleport() {
 
 // ---- 2b. the hireling fights (preview stand-in think) ----------------------------------
 
-// Covers: specs/world/hirelings-ai.md; specs/monsters/ai-bodies-6.md §7 (d2rs-own, unverified: `hireling_drive`)
+// d2rs-own, unverified: `hireling_drive` (no spec rule checked)
 #[test]
 fn the_hireling_attacks_a_hostile_monster_beside_it() {
     let mut fx = Fx::new();
