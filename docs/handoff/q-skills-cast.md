@@ -3,7 +3,7 @@
 > Stitching session, 2026-10-08. Read only `specs/`, `docs/`, `crates/`,
 > `tools/`. Synthetic fixtures only. Nothing here is verified against
 > 1.14d (rule 10); fills are marked `// d2rs-own, unverified`, spec gaps
-> PROVISIONAL (REC-106). Sound not wired.
+> PROVISIONAL (REC-109). Sound not wired.
 
 ## 1. The path and where it stopped
 
@@ -24,7 +24,7 @@ The Fire Bolt row is a test-local copy (the synthetic game has no `skills`,
 stat table, because the synthetic game has none (`StatData::default()`: no
 stat could be set, so mana and life did not exist).
 
-## 2. PROVISIONAL points (REC-106)
+## 2. PROVISIONAL points (REC-109)
 
 - The kept cast target (`use.md` §4 does not say where it lives).
 - The animation key and rate (`animdata.md` OQ2; animation-rate spec not
