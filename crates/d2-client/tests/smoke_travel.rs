@@ -208,6 +208,38 @@ impl Rig {
         })
     }
 
+    /// The server player's position.
+    fn server_position(&self) -> (i32, i32) {
+        app_support::with(&self.server, |l| {
+            let (p, _) = single_player::local_player(&l.host().game).unwrap();
+            l.host_mut().game.events.action.hooks().path_position(p)
+        })
+    }
+
+    /// Where the view draws the local player: the walk prediction's
+    /// sub-tile.
+    fn drawn(&self) -> Option<(u16, u16)> {
+        self.app
+            .world()
+            .resource::<d2_client::world_view::walk::PreviewWalk>()
+            .predict
+            .cell()
+    }
+
+    /// A warp (`sim/path-placement.md` §12.2 r5) or portal
+    /// (`world/objects.md` §12 r11) arrival walks the server player out
+    /// to the 0x0D's target: the drawn player ends where it does (B3).
+    fn drawn_on_server(&self, what: &str) {
+        let (x, y) = self.server_position();
+        let server = (u16::try_from(x).unwrap(), u16::try_from(y).unwrap());
+        assert_eq!(
+            self.drawn(),
+            Some(server),
+            "{what}: the drawn player stands on the server player; trail {:?}",
+            self.trail
+        );
+    }
+
     fn client_level(&self) -> Option<u32> {
         self.bridge().world().player_level().map(u32::from)
     }
@@ -359,6 +391,27 @@ impl Rig {
             self.bridge().world().units[&me].position,
             Some(placed),
             "{at}: the model position"
+        );
+        // The drawn player (the walk prediction) is where the arrival's
+        // walk request took it: the last S→C 0x0D code 1 of the move
+        // (player code 0x01, walk to (x, y), `client/model.md` §8 r4; the
+        // warp, portal and waypoint walk-outs), else the placement (B3,
+        // REC-288).
+        let walk_out = self.log.lock().unwrap().iter().rev().find_map(|m| {
+            // 0x0D: type @1, GUID @2, code @6, x @7, y @9.
+            (m[0] == 0x0D && m[1] == 0 && m[2..6] == me.guid.to_le_bytes() && m[6] == 1).then(
+                || {
+                    (
+                        u16::from_le_bytes([m[7], m[8]]),
+                        u16::from_le_bytes([m[9], m[10]]),
+                    )
+                },
+            )
+        });
+        assert_eq!(
+            self.drawn(),
+            Some(walk_out.unwrap_or(placed)),
+            "{at}: the drawn player"
         );
         let w = self.bridge().world();
         let me = w.local_player.expect("the local player");
@@ -701,8 +754,10 @@ fn town_portal_in_act(act: usize) {
     // The portal's hostile delay (`objects.md` §12 rule 2).
     rig.ms.fetch_add(10_000, Ordering::SeqCst);
     rig.travel("to town", town, |r| r.interact(portal));
+    rig.drawn_on_server("to town");
     let portal = rig.portal_here().expect("the town portal in the model");
     rig.travel("back", field, |r| r.interact(portal));
+    rig.drawn_on_server("back");
     assert_eq!(server_portals(&rig), 0, "act {act}: the pair went");
     assert!(rig
         .find(OBJECT, single_player::SYNTHETIC_PORTAL_CLASS)
@@ -935,4 +990,5 @@ fn take_tile(rig: &mut Rig, level: u32, to: u32, class: u32) {
         .find(TILE, class)
         .unwrap_or_else(|| panic!("level {level}: tile {class} (to {to}) in the model"));
     rig.travel(&format!("tile {class}"), to, |r| r.interact(tile));
+    rig.drawn_on_server(&format!("tile {class} to {to}"));
 }
