@@ -43,6 +43,17 @@ Branch `claude/q-fix-flow-save` (from `claude/q-tick-flow`, merged with
   a missing `WorldViewState` or `BridgeResource` no longer panics;
   `smoke_save::the_window_close_leaves_through_the_server_first`.
 
+- `q-fix-save-status` (F7, the dead bit): `d2-sim` `ClientEntry::status_set`
+  and `UnitLists::set_player_status` (`0x00538650`); the DT start sets
+  0x08 after the penalties (`0x00580F83`), the DD start after the corpse
+  (`0x0057FD46`), softcore too; `save::Live::status_set` is ORed into the
+  header. `smoke_save::a_corpse_with_its_items_survives_save_and_reload`
+  now asserts status 0x0028 after a softcore death and respawn, and after
+  the reload's save. Changed to the spec: `app_play_hardcore::
+  a_softcore_death_respawns_and_the_save_stays_alive` expected 0x08 clear
+  (§2.3 says set). Left: the progression bits 8–12 (`0x00538680` at the
+  act-credit sites) and the ladder bit (no ladder in single player).
+
 ## Open
 
 - The save's inventory flag bit 1 clear (`inventory-moves.md` §6.1 r4).

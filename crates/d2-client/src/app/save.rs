@@ -187,6 +187,10 @@ pub struct Live {
     pub hardcore_dead: bool,
     /// The character is hardcore.
     pub hardcore: bool,
+    /// The status bits the game set on the player's client
+    /// (`ClientEntry::status_set`, `formats/d2s.md` §2.3: 0x08 at every
+    /// death start, softcore too); the save ORs them in.
+    pub status_set: u16,
 }
 
 /// Reads [`Live`] from the game's local player.
@@ -222,6 +226,14 @@ pub fn read_live(sim: &mut Sim) -> Result<Live, SaveError> {
         .units
         .get(player)
         .is_some_and(|u| u.mode == 0 || u.mode == 17);
+    let status_set = sim
+        .game
+        .lists
+        .clients()
+        .into_iter()
+        .filter_map(|c| sim.game.lists.client(c))
+        .filter(|e| e.player == Some(player))
+        .fold(0, |a, e| a | e.status_set);
     Ok(Live {
         stats,
         quests,
@@ -229,6 +241,7 @@ pub fn read_live(sim: &mut Sim) -> Result<Live, SaveError> {
         gaps,
         hardcore,
         hardcore_dead: hardcore && down,
+        status_set,
     })
 }
 
@@ -274,6 +287,9 @@ pub fn apply_live(base: &D2s, live: &Live, now: u32) -> D2s {
     if live.hardcore {
         save.header.status |= d2s::status::HARDCORE;
     }
+    // The client word's bits set in game (§2.3: the writer copies the
+    // client word, which no code clears).
+    save.header.status |= live.status_set;
     super::hardcore::mark_dead(&mut save, live.hardcore, live.hardcore_dead);
     // +0x2C stays as loaded: the game never sets the create time, so every
     // game-written save holds 0 there (§2.2 rule 10, edge case 11).

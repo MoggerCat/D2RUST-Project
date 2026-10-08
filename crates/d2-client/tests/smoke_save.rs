@@ -744,7 +744,7 @@ fn each_save_keeps_the_previous_file_as_bak() {
 /// player, Save and Exit writes the corpse section; the reload makes the
 /// corpse again with the hammer in it (`d2s.md` §8.3 rule 4), so the
 /// next save keeps it.
-// Covers: specs/formats/d2s.md §8.3 r4
+// Covers: specs/formats/d2s.md §8.3 r4, §2.3
 #[test]
 fn a_corpse_with_its_items_survives_save_and_reload() {
     let dir = temp("corpse");
@@ -783,9 +783,13 @@ fn a_corpse_with_its_items_survives_save_and_reload() {
     let corpses = before.extra.corpses.clone().unwrap();
     assert_eq!(corpses.len(), 1, "one corpse with items");
     assert_eq!(corpses[0].items.len(), 1, "the hammer is on the corpse");
+    assert_eq!(before.status_set, 0x08, "the death starts set the dead bit");
     run.save_and_exit();
     let first = read(&file, 0).unwrap();
     assert_eq!(first.body.as_ref().unwrap().corpses.len(), 1);
+    // §2.3: a softcore character that died and respawned saves 0x0028
+    // (expansion | dead), the measured word of §8.3 rule 6.
+    assert_eq!(first.header.status, 0x0028, "status after a softcore death");
     let file2 = dir.join("Corpse-again.d2s");
     let again = Run::start(&loaded(first.clone(), 0), &file2);
     let broken: Vec<_> = again
@@ -798,6 +802,8 @@ fn a_corpse_with_its_items_survives_save_and_reload() {
     assert_eq!(after.extra.corpses, loaded_live(before).extra.corpses);
     again.save_and_exit();
     let second = read(&file2, 0).unwrap();
+    // No code clears the bit: the reloaded character keeps it.
+    assert_eq!(second.header.status, 0x0028);
     let mut want = first.body.unwrap().corpses;
     for c in &mut want {
         for e in &mut c.items {
