@@ -27,6 +27,7 @@ Branch `claude/local-pc1-s8` from `origin/claude/specs-staging-7`
 | calc-expressions OQ1, 2, 4, 6, 7, 9; loading OQ2, 3, 12 (part); field-types OQ6; txt-format OQ1 | missile `rand` seed = (formula offset, missile-id arg) local to one evaluation; bytes ≥ 0x80 stop the tokenizer; missing code file → family evaluates 0; items context = target unit + item; special-value low byte; stat mode whole-name compare; loose files only with `-direct`; `experience` needs MaxLvl + 2 rows; `atol` = strtol saturating. calc "unspec" hits were false ("pending") | `data/calc-expressions.md` §1.5, §3.5, §4.2, §4.4, policy 6, OQs; `data/loading.md` §2, §4.3, OQs; `data/field-types.md` §8.2; `data/txt-format.md` OQ1 | stat mode, low byte, atol, loading policy match; missile rand does not | `q-fix-calc-missile-rand` |
 | REC-230 follow-up (warp tiles on deactivate/reactivate), REC-99 (where tiles spawn); rooms OQ12, OQ14; preset OQ2 (reachability), OQ3, OQ5, OQ7; outdoor OQ1 (field part) | preset units spawn once per DRLG room (flag 0x4000000); tiles stored/freed on deactivation and re-created with new GUIDs by the restore `0x00542B40`; `0x005559A0` spawns non-monster presets first; item store always frees the item (old §8 r5 wrong); no animated shadow tiles; hardcoded units before transfer; DS1 priority Patch_D2 > d2exp > d2data (10 Patch_D2 files); waypoints always in grid; preset direction u32 at `[level+0x14]+0x04` | `drlg/rooms.md` §1, §8 r5–r6, OQ12, OQ14; `drlg/preset.md` §6 s9, OQs; `drlg/outdoor.md` OQ1; `drlg/levels.md` §1 | tile set after reactivation matches; order and once-rule do not | `q-fix-warp-tile-restore` |
 | assets OQ1 (budgets); dc6 flip values; render-pipeline page fit | measured 23,595 DCC/DC6/DT1 files: decoded ≈ 2.8 GiB (eviction required), scene sizes (town ≈ 22 MiB, busy field ≈ 105 MiB); largest frames DCC 345×324, DC6 319×256, DT1 160×864 (all fit a 2048² page); DC6 flip only 0/1; no zero-size frames | `client/assets.md` §A5, OQ1; `client/render-pipeline.md` §A2; `formats/dc6.md` pixel decoding | `assets/cache.rs:43-46` defaults match | — |
+| REC-245 (1)–(3), REC-247 (1)–(4) | tint: `0x004D97F0` picks colorpri strictly greater (state 0 never wins), sets colorshift and the local player's light colour; bubbles step per drawn frame from the unit's drawn point; S→C 0x26 type 4 never sent (builder `0x0054A9B0` unreachable); roofs take the floor drawer, opaque; wall fade = record +0x24; blocks-light: cells outside rooms → flag 1, only DT1 bits 0x02/0x20 | `render/lighting.md` §4 r1–r3, §8, §11, §13; `render/shading.md` §4, §6 r1.1, edge 5; `render/blend-modes.md` §2, §6; `ui/messages.md` §3 r4, §5 r1, r3 | type 4 and roof path match (drop `preview_blocks.rs:10`); tint, bubbles, wall fade, light map do not | `q-fix-state-tint`, `q-fix-preview-light` |
 
 Follow-ups for a later worker (other owners; msg-stats-items labels, properties §13 callers and the OQ pointers are done): `client/stat-lists.md` §2 r8 should link the `skills/use.md` §2 item type test.
 
@@ -145,3 +146,15 @@ Recordability (tools/original-hooks.md §7): R-MIS-1/2, R-PAUSE-1, R-NOTICK-1, R
 - **R-WARP-RESTORE** [AUTO] Confirms rooms §8 r6. Blood Moor: log the room's
   type-5 units (GUID, class, x, y) before deactivation and after
   reactivation, plus the tick step they appear in (expect new GUIDs).
+- **R-TINT-1** [MANUAL] Confirms shading §6 r1.1, lighting §8. Monster under
+  Poison then Cold, local player under Poison, GDI `-w`: cel draws' palette
+  argument and the player's light colour (record +0x25..+0x27).
+- **R-WALL-1** [MANUAL] Confirms lighting §11 r2, r4 / blend-modes §6. A wall
+  in a preset with Logicals (Jail or Cathedral) next to a light, plus a Lut
+  Gholein roof: per-pixel tile output and the light-map words.
+- **R-LIGHTEDGE-1** [AUTO] Confirms lighting §4 r2. Light-map flag words at
+  `0x007B0E68` at the edge of the loaded rooms.
+- **R-BUBBLE-1** [MANUAL] Confirms messages §5 r1. An NPC overhead bubble at
+  two draw rates; when it disappears, in drawn frames.
+- **R-SYS4-1** [AUTO, optional] Scan packet recordings for S→C 0x26 with
+  u8@1 = 4 (none expected).

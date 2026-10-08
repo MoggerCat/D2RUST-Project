@@ -30,22 +30,22 @@
 |   1. The light map | 89–102 |
 |   2. Build order (`0x00475800`) | 103–111 |
 |   3. Ambient fill (`0x00474610`) | 112–143 |
-|   4. Blocks-light flags (`0x004756D0`) | 144–152 |
-|   5. Light quality and the draw rate | 153–184 |
-|   6. Light records | 185–268 |
-|   7. Contribution of one record | 269–348 |
-|   8. Light sources | 349–413 |
-|   9. Environment (day and night) | 414–571 |
-|   10. Scripted ambient overrides (`0x0046BDD0`) | 572–629 |
-|   11. Light values handed to the draws | 630–660 |
-|   12. Captures (answers `capture.md` Open question 5) | 661–698 |
-|   13. d2rs answers | 699–709 |
-| Constants & data dependencies | 710–721 |
-| Randomness | 722–728 |
-| Edge cases & original bugs | 729–745 |
-| Test vectors | 746–779 |
-| Provenance | 780–828 |
-| Open questions | 829–937 |
+|   4. Blocks-light flags (`0x004756D0`) | 144–168 |
+|   5. Light quality and the draw rate | 169–200 |
+|   6. Light records | 201–284 |
+|   7. Contribution of one record | 285–364 |
+|   8. Light sources | 365–429 |
+|   9. Environment (day and night) | 430–587 |
+|   10. Scripted ambient overrides (`0x0046BDD0`) | 588–645 |
+|   11. Light values handed to the draws | 646–685 |
+|   12. Captures (answers `capture.md` Open question 5) | 686–723 |
+|   13. d2rs answers | 724–736 |
+| Constants & data dependencies | 737–748 |
+| Randomness | 749–755 |
+| Edge cases & original bugs | 756–772 |
+| Test vectors | 773–806 |
+| Provenance | 807–863 |
+| Open questions | 864–972 |
 <!-- /index -->
 
 ## Summary
@@ -149,6 +149,22 @@ cell's room and its near list (`0x00463740`; the player's room when none);
 the cell's flag := 1 when the collision point test (`0x0064CB30`,
 `sim/path-placement.md` §4) with mask 0x22 (bits 0x02 and 0x20,
 `drlg/rooms.md` §10.6) is non-zero. Otherwise the flag keeps the 0 of §3.
+
+1. The search room: `0x00463740(previous room, x, y)` with the previous
+   cell's result (the player's room `0x00620BB0` for the first cell);
+   none → the player's room (`0x00475720`). The point test then looks
+   the cell up again from that room (`0x0064CB30` → `0x00463740`).
+2. No room holds the cell, or the room has no collision record
+   (`0x0061A010`) or no mask array (record `+0x20`): the test returns
+   0x27 unmasked (`0x0064CB79`), so the flag is **1**. Cells outside the
+   loaded rooms block light; reproduce.
+3. **Collision source.** The client's own active-room grids: the client
+   creates active rooms through the same `0x00619890` → `0x0064C900`
+   build as the server (`drlg/rooms.md` §10.2, §10.4), from its own tile
+   records. Only DT1 sub-tile bits 0x02 and 0x20 can meet mask 0x22: the
+   record-flag bits of `drlg/rooms.md` §10.4 r4 are 0x10, 0x01, 0x04 and
+   unit bits start at 0x40 (§10.6). So the flag depends on the tiles and
+   the loaded rooms only, never on units.
 
 ### 5. Light quality and the draw rate
 
@@ -352,7 +368,7 @@ its shadow get partial `S` (soft edge); the blocking cell itself is lit.
 
 | Source | Site | Kind | Radius | R, G, B | Changes |
 |---|---|---|---|---|---|
-| Player (every player unit, client init `0x00460BF0`) | `0x00460CF0` | 0 for the local player (or when no local player exists yet), 1 for others | 13 (unit `+0x68`) | 255, 255, 255 | stat callback `0x004609F0` (`sim/stat-lists.md` §7): stat 89 `item_lightradius` → set radius (§6.2 r2) to 13 + new value (`0x00460930`); stat 90 `item_lightcolor` → R, G, B = bits 16–23, 8–15, 0–7 of the new value, 0 → white (`0x004609A0`) |
+| Player (every player unit, client init `0x00460BF0`) | `0x00460CF0` | 0 for the local player (or when no local player exists yet), 1 for others | 13 (unit `+0x68`) | 255, 255, 255 | stat callback `0x004609F0` (`sim/stat-lists.md` §7): stat 89 `item_lightradius` → set radius (§6.2 r2) to 13 + new value (`0x00460930`); stat 90 `item_lightcolor` → R, G, B = bits 16–23, 8–15, 0–7 of the new value, 0 → white (`0x004609A0`); the local player's light only: the state colour call (`render/shading.md` §6 r1.1) sets R, G, B = the winning state's `light-r`, `light-g`, `light-b`, or 255, 255, 255 when no state wins |
 | Monster (`0x004AE210`; callers `0x00478C75`, `0x004AEB82`, `0x004AF058`, `0x004AFFAF`) | `0x004AE2EE` | 0 | `max(L_c, monstats2 Light)`, `L_c` = `0x0063EBD0` (§8 r1); in level 8 with client quest byte 1 set, the unit not client-only (flag 0x200000, §6.4 r1) and monstats `Align` (`+0x4C`) ∉ {1, 2}: 3; none when 0 | `light-r`, `light-g`, `light-b` | replaces the unit's previous light |
 | Monster umod 3 `light` hook `0x004ACC70` (umod table `0x00724D78`, §8 r2) | `0x004ACCEF`, `0x004ACD2C` | 0 | 7 | §8 r2 | replaces the unit's light |
 | Overlay (`0x00470390`) | `0x00470555` | 1 | `InitRadius`, then target `Radius` when different; none when `Radius` = 0 | overlay `Red`, `Green`, `Blue` | — |
@@ -644,7 +660,12 @@ sub-tile) clamps the cell to 0…47 on each axis.
    `+0x00`) gives the point count (`0x006DB9D8`: 0 for direction 0, else
    6; 1.14d tiles use 1–9 only, Open question 8) and the points of `render/wall-light-points.tsv` (`normal` =
    `0x0072A9E8`; `faded` = `0x0072ABC8` when the record's fade state bit 0
-   is set, `draw-order.md` §8); point `p` reads the cell at
+   is set, `draw-order.md` §8); the fade state is the record's `+0x24` as
+   the §8 target update of this frame's filing (`0x004DD180`, before any
+   pass) left it, so a wall that is "near" in `draw-order.md` §8 reads
+   the faded points from its first drawn frame on, on every renderer
+   (the render kind only changes the alpha ramp); lower walls never get a
+   target, so their state stays 0 (creation `0x0066DCCC`); point `p` reads the cell at
    `(X + 8·dx_p, Y + 8·dy_p)` → dword as for units. Per 32-pixel block
    column `c` = block x `>> 5` (GDI `0x006C94B0`, `0x006C93A0`): `c0 = c3 =
    I_c`, `c1 = c2 = I_{c+1}` (low bytes), the corners of `shading.md` §4.
@@ -657,6 +678,10 @@ sub-tile) clamps the cell to 0…47 on each axis.
 4. **Roofs** (`0x004DEA70`): the same grid at the roof record's sub-tile
    (draw entry `+4/+8 >> 3`); roof height (header `+0x04`) ≠ 0 → every
    cell := the act environment's `I`, R, G, B (§9), not the room ambient.
+   The grid goes to the floor drawer `0x004F68E0` (slot `+0x7C`,
+   `draw-order.md` §6 r5), so a roof block takes the floor gradient of
+   `shading.md` §4 (Floors r1–r4), never the wall corner path, and is
+   drawn opaque (`blend-modes.md` §6).
 
 ### 12. Captures (answers `capture.md` Open question 5)
 
@@ -706,6 +731,8 @@ sub-tile) clamps the cell to 0…47 on each axis.
 | `q` | §5; in verify cases taken from the recording, never measured |
 | light value per draw | §11; `ShadeChain` from `render/shading.md` |
 | floating point | §9.3, §9.4, §10 use doubles and `sin`; client-only (not `d2-sim`) |
+| blocks-light source | the client's active-room collision grids (§4 r3); a cell in no room or a room without a grid → flag 1 (§4 r2) |
+| near-room fills, overrides | §3 r3 and §10 run every frame in the map build; no d2rs-own shortcut (the level ambient alone is not §3) |
 
 ## Constants & data dependencies
 
@@ -825,6 +852,14 @@ data: `states` setfunc, `missiles` rows 191/288, `objects` row 17,
 (`0x0052D7C6`–`0x0052D83D`), `0x0061BFC0` (client call for comparison);
 every s2c 0x53 of both recordings listed (callers `0x0053C922`) and the
 transport buffer `-022633` seq 228 decoded.
+
+REC-247 (2026-10-08, static, `all.asm`): §4 r1–r3 from `0x004756D0`
+(`0x00475715`–`0x0047574E`), `0x0064CB30` (0x27 at `0x0064CB79`),
+`0x00463740`, `0x00620BB0`; §11 r2 fade state from `0x004DD180` (the
+only writer of the fade bytes +0x29 / +0x2A besides the record creators
+`0x0066DC50`, `0x0066DDE0`, `0x0066DF40`, which zero +0x24 and set
++0x28…+0x2A to 0xFF); §11 r4
+from `0x004DEA70` → `0x004F68E0` → GDI `0x006C95D0`.
 
 ## Open questions
 
