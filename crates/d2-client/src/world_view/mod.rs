@@ -34,6 +34,7 @@ pub mod disguise;
 pub mod feed;
 pub mod ground_items;
 pub mod interact;
+pub mod light_sources;
 pub mod missiles;
 pub mod model_feed;
 pub mod monster_walk;
