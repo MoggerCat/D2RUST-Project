@@ -124,6 +124,13 @@ pub trait UnitHooks: StatHost {
         false
     }
 
+    /// A static path's position, +0x0C / +0x10 (`path-placement.md`
+    /// §2.1): a ground item's sub-tile. `None`: no static path record
+    /// (no path provider, or none for the unit). Provider: path spec.
+    fn static_position(&self, unit: UnitId) -> Option<(i32, i32)> {
+        None
+    }
+
     /// `0x006272E0`, `0x00624390`: the rest of the animation-field
     /// re-initialisation at a mode change. Provider: animation spec.
     fn reinit_anim(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}

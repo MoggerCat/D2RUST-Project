@@ -58,6 +58,10 @@ impl Clock for StepClock {
 struct Wire {
     sent: Vec<Vec<u8>>,
     refused: Vec<(u8, Handled)>,
+    /// The ids of every S→C message received.
+    received: Vec<u8>,
+    /// Every drained C→S message's id and fate.
+    drained: Vec<(u8, Handled)>,
 }
 
 /// The app's link: the shared server thread, recording both directions'
@@ -80,6 +84,7 @@ impl ServerLink for Probe {
         let drained = app_support::with(&self.server, |l| l.last_frame().messages.clone());
         let mut w = self.wire.lock().unwrap();
         for m in drained {
+            w.drained.push((m.id, m.handled));
             let ok = matches!(
                 m.handled,
                 Handled::System | Handled::Game(Outcome::Dispatched(ResultCode::Done))
@@ -91,7 +96,15 @@ impl ServerLink for Probe {
         Ok(p)
     }
     fn receive(&mut self) -> Vec<Vec<u8>> {
-        SharedLink(self.server.clone()).receive()
+        let got = SharedLink(self.server.clone()).receive();
+        let mut w = self.wire.lock().unwrap();
+        for c in &got {
+            // Chunk ids only (the bridge splits them); enough for a trace.
+            if let Some(&id) = c.first() {
+                w.received.push(id);
+            }
+        }
+        got
     }
 }
 
@@ -812,6 +825,163 @@ fn five_act_set() -> test_fixtures::synth::Synthetic {
     pad(&mut s, "pettype.txt", "pet type", 8);
     // `WaypointTables::live` needs a waypoint object (operatefn 23,
     // initfn 17).
+    // `itemstatcost` to 1.14d's 359 rows (the base set has the first 16;
+    // a stat past them, e.g. 67 velocitypercent, is not kept, so a player
+    // runs at the 25 % floor, `pathing.md` §8.1 r2). Made-up names, 10
+    // send / save bits, 32 for the 32-bit ones the play path reads.
+    {
+        let f = s.tables.file("itemstatcost.txt");
+        let have = f.rows.len();
+        for i in have..359 {
+            let name = format!("stat{i}");
+            let bits = "32";
+            s.tables.row(
+                "itemstatcost",
+                &[
+                    ("stat", name.as_str()),
+                    ("send bits", bits),
+                    ("save bits", bits),
+                    ("csvbits", bits),
+                ],
+            );
+        }
+    }
+    // Single player reads `monlvl`'s `L-` columns (`monsters/init.md`
+    // §8.1, game type 3); the base set fills `L-AC` and `L-HP` only, so
+    // a monster had no experience, to-hit or damage: the `L-` values are
+    // the plain columns'.
+    {
+        let f = s.tables.files.get_mut("monlvl.txt").unwrap();
+        let col = |f: &test_fixtures::synth::TxtFile, n: &str| {
+            f.columns
+                .iter()
+                .position(|c| c.eq_ignore_ascii_case(n))
+                .unwrap()
+        };
+        for (from, to) in [("XP", "L-XP"), ("TH", "L-TH"), ("DM", "L-DM")] {
+            let (a, b) = (col(f, from), col(f, to));
+            for r in f.rows.iter_mut() {
+                r[b] = r[a].clone();
+            }
+        }
+    }
+    // `itemtypes` on 1.14d's row numbers: the game reads some types by
+    // row (`items::ty`: gold 4, play 7, weap 45, armo 50, misc 52); the
+    // base set's rows are in its own order (gold on row 7, the ear type),
+    // so a gold drop was made as an ear and failed (`Create(NotPlayer)`).
+    // The other rows are placeholders; potn and blad take rows no `ty`
+    // constant names.
+    {
+        let f = s.tables.files.get_mut("itemtypes.txt").unwrap();
+        let code = f
+            .columns
+            .iter()
+            .position(|c| c.eq_ignore_ascii_case("code"))
+            .unwrap();
+        let old = std::mem::take(&mut f.rows);
+        let at = |c: &str| match c {
+            "" => Some(0),
+            "tors" => Some(3),
+            "gold" => Some(4),
+            "potn" => Some(9),
+            "blad" => Some(30),
+            "weap" => Some(45),
+            "armo" => Some(50),
+            "misc" => Some(52),
+            _ => None,
+        };
+        let mut rows: Vec<Vec<String>> = (0..75)
+            .map(|i| {
+                let mut r = vec![String::new(); f.columns.len()];
+                r[code] = format!("x{i:02}");
+                r
+            })
+            .collect();
+        for r in old {
+            let i = at(&r[code]).unwrap_or_else(|| panic!("itemtypes {:?}", r[code]));
+            rows[i] = r;
+        }
+        f.rows = rows;
+    }
+    // Every kill drops all of its treasure class (below).
+    {
+        let f = s.tables.files.get_mut("treasureclassex.txt").unwrap();
+        let col = |f: &test_fixtures::synth::TxtFile, n: &str| {
+            f.columns
+                .iter()
+                .position(|c| c.eq_ignore_ascii_case(n))
+                .unwrap()
+        };
+        let (tc, nodrop, picks) = (col(f, "Treasure Class"), col(f, "NoDrop"), col(f, "Picks"));
+        let probs: Vec<usize> = (1..=4).map(|i| col(f, &format!("Prob{i}"))).collect();
+        for r in f.rows.iter_mut().filter(|r| r[tc] == "Synth Act 1") {
+            // Negative picks: each item its `Prob` times (`treasure.md`):
+            // the gold pile, a weapon, an armor and a potion, once each.
+            r[nodrop] = String::new();
+            r[picks] = "-4".into();
+            for &p in &probs {
+                r[p] = "1".into();
+            }
+        }
+    }
+    // `playerclass` row 7 with the empty code, as 1.14d's ("Expansion"):
+    // an empty `class` cell (`itemtypes`, a `playerclass.code` link)
+    // links to it, the no-class value 7 (`CLASS_NONE`); without it the
+    // link fails (255) and no class may equip the type.
+    s.tables.row("playerclass", &[("code", "")]);
+    // The short blade a level-1 character can wear (the base set's asks
+    // level 2: the equip check fails and it stays on the cursor).
+    {
+        let f = s.tables.files.get_mut("weapons.txt").unwrap();
+        let col = |f: &test_fixtures::synth::TxtFile, n: &str| {
+            f.columns
+                .iter()
+                .position(|c| c.eq_ignore_ascii_case(n))
+                .unwrap()
+        };
+        let (code, req) = (col(f, "code"), col(f, "levelreq"));
+        for r in f.rows.iter_mut().filter(|r| r[code] == "sb1") {
+            r[req] = "1".into();
+        }
+    }
+    // Attack as 1.14d's `skills.txt` row 0 has it: `anim` / `monanim` A1
+    // and the Attack do function (`srvdofunc` 1, `bodies.md` §4.1).
+    for (c, v) in [("anim", "A1"), ("monanim", "A1"), ("srvdofunc", "1")] {
+        s.tables.set("skills", 0, c, v);
+    }
+    // AnimData for the player classes (the base set has the monsters'
+    // only): every `plrtype` token × `plrmode` token, bare hands, 8 frames
+    // at speed 256; A1 with its attack event (1) on frame 4.
+    for i in 0..7 {
+        for mode in ["DT", "NU", "WL", "RN", "GH", "TN", "TW", "A1"] {
+            s.animdata.push(test_fixtures::animdata::Anim {
+                name: format!("C{i}{mode}HTH"),
+                frames: 8,
+                speed: 256,
+                events: if mode == "A1" {
+                    vec![(4, 1)]
+                } else {
+                    Vec::new()
+                },
+            });
+        }
+    }
+    // Monsters spawn in the outdoor levels (as `act1_stream.rs`'s
+    // `spawning_act1`): every monster row with a `Rarity` is `isSpawn`.
+    let f = s.tables.file("monstats.txt");
+    let col = |n: &str| {
+        f.columns
+            .iter()
+            .position(|c| c.eq_ignore_ascii_case(n))
+            .unwrap()
+    };
+    let (rarity, id) = (col("Rarity"), col("Id"));
+    let rows: Vec<usize> = (0..f.rows.len())
+        .filter(|&i| !f.rows[i][rarity].is_empty() && !f.rows[i][id].is_empty())
+        .collect();
+    for i in rows {
+        s.tables.set("monstats", i, "isSpawn", "1");
+    }
     let o = s.tables.files.get_mut("objects.txt").unwrap();
     for (col, v) in [("OperateFn", "23"), ("InitFn", "17")] {
         let c = o.columns.iter().position(|x| x == col).unwrap();
@@ -932,4 +1102,202 @@ fn the_live_run() {
     run.step(20);
     run.check("Blood Moor");
     assert_eq!(run.server_level(), Some(2), "out of town on foot");
+    // Spawned monsters, killed with the left skill (Attack), until one
+    // drops something.
+    let mut ground = Vec::new();
+    for n in 0..8 {
+        let near = run.monsters_near();
+        let target = *near.first().expect("a monster spawned in the Blood Moor");
+        let killed = run.kill(target);
+        assert!(
+            killed,
+            "monster {n} died: life {:?}",
+            run.monster_life(target.guid)
+        );
+        run.step(30);
+        run.check("kill");
+        ground = run.ground_items();
+        let xp = run.player_stat(13);
+        eprintln!(
+            "kill {n}: experience {xp}, ground {:?}",
+            ground
+                .iter()
+                .map(|i| (i.key.guid, i.code))
+                .collect::<Vec<_>>()
+        );
+
+        if !ground.is_empty() {
+            break;
+        }
+    }
+    assert!(!ground.is_empty(), "a kill dropped an item");
+
+    // Pick up every drop (C→S 0x16, auto placement: the gold to the
+    // player's gold, the items to the belt or the inventory), running to
+    // it first as the client does (C→S 0x04, run to the unit).
+    let gold0 = run.player_stat(14);
+    for it in &ground {
+        let p = run.pos();
+        if (p.0 - i32::from(it.x))
+            .abs()
+            .max((p.1 - i32::from(it.y)).abs())
+            > 2
+        {
+            let mut m = vec![0x04];
+            m.extend_from_slice(&4u32.to_le_bytes());
+            m.extend_from_slice(&it.key.guid.to_le_bytes());
+            run.bridge().send_bytes(&m).unwrap();
+            run.step(2);
+            for _ in 0..300 {
+                if !test_fixtures::host::MOVING.contains(&run.mode()) {
+                    break;
+                }
+                run.step(1);
+            }
+            run.check("run to the item");
+        }
+        run.bridge()
+            .send(&d2_client::bridge::items::pick(it.key.guid, false))
+            .unwrap();
+        run.step(6);
+        run.check("pick up");
+    }
+    let left: Vec<_> = run
+        .ground_items()
+        .iter()
+        .map(|i| (i.key.guid, i.code))
+        .collect();
+    assert!(left.is_empty(), "everything picked up: {left:?}");
+    assert!(run.player_stat(14) > gold0, "the gold reached the player");
+    let mine = run.local_items();
+    for it in ground.iter().filter(|i| i.code != Some(*b"gld ")) {
+        assert!(
+            mine.iter().any(|m| m.key == it.key),
+            "{:?} is the player's: {mine:?}",
+            it.code
+        );
+    }
+
+    // Equip: the start weapon off the right arm to the cursor (C→S 0x1C)
+    // and back on (0x1A).
+    let weapon = run
+        .local_items()
+        .into_iter()
+        .find(|i| i.mode == 1 && i.body == 4)
+        .expect("the start weapon in the right arm")
+        .key
+        .guid;
+    run.bridge()
+        .send(&d2_proto::client::RemoveBodyItem { bodyloc: 4 })
+        .unwrap();
+    run.step(6);
+    run.check("unequip");
+    let cursor = {
+        let w = run.app.world().resource::<BridgeResource>().0.world();
+        d2_client::bridge::items::cursor_item(w).map(|i| i.key.guid)
+    };
+    assert_eq!(cursor, Some(weapon), "the weapon on the cursor");
+    run.bridge()
+        .send(&d2_client::bridge::items::equip(weapon, 4))
+        .unwrap();
+    run.step(6);
+    run.check("equip");
+    let worn = run
+        .local_items()
+        .into_iter()
+        .find(|i| i.mode == 1 && i.body == 4)
+        .map(|i| i.key.guid);
+    assert_eq!(worn, Some(weapon), "the weapon is worn again");
+}
+
+impl Run {
+    /// The beasts (monster class 0, the fixture's weakest) of the model
+    /// with a position, nearest to the player first: a bare-handed new
+    /// character kills them in a few dozen swings.
+    fn monsters_near(&self) -> Vec<UnitKey> {
+        let w = self.app.world().resource::<BridgeResource>().0.world();
+        let Some((px, py)) = w.local().and_then(|p| p.position) else {
+            return Vec::new();
+        };
+        let mut v: Vec<(i32, UnitKey)> = w
+            .units
+            .iter()
+            .filter(|(k, u)| {
+                k.unit_type == 1 && u.class == 0 && u.position.is_some() && !u.is_dead()
+            })
+            .map(|(k, u)| {
+                let (x, y) = u.position.unwrap();
+                let d = (i32::from(x) - i32::from(px))
+                    .abs()
+                    .max((i32::from(y) - i32::from(py)).abs());
+                (d, *k)
+            })
+            .collect();
+        v.sort();
+        v.into_iter().map(|(_, k)| k).collect()
+    }
+
+    /// The ground items of the model (`bridge::items::ground_items`).
+    fn ground_items(&self) -> Vec<d2_client::bridge::items::ItemView> {
+        let w = self.app.world().resource::<BridgeResource>().0.world();
+        d2_client::bridge::items::ground_items(w)
+    }
+
+    /// The local player's items (`bridge::items::local_items`).
+    fn local_items(&self) -> Vec<d2_client::bridge::items::ItemView> {
+        let w = self.app.world().resource::<BridgeResource>().0.world();
+        d2_client::bridge::items::local_items(w)
+    }
+
+    /// The server player's base stat `s`.
+    fn player_stat(&self, s: u16) -> i32 {
+        app_support::with(&self.server, move |l| {
+            let g = &l.host().game;
+            let (p, _) = single_player::local_player(g).unwrap();
+            g.events.action.sys.stats.unit_base(p, s, 0)
+        })
+    }
+
+    /// The server's life of the monster `guid` (`None`: gone).
+    fn monster_life(&self, guid: u32) -> Option<i32> {
+        app_support::with(&self.server, move |l| {
+            let sim = &mut l.host_mut().game;
+            let m = sim
+                .game
+                .lists
+                .find_unit(d2_sim::units::UnitType::Monster, guid)?;
+            let a = &mut sim.events.action;
+            Some(a.with(&mut sim.game, |_, v| {
+                v.stat(m, d2_sim::stats::stat::HITPOINTS)
+            }))
+        })
+    }
+
+    /// Left skill (Attack) on `key` (C→S 0x06) until the server says it
+    /// is dead; one message each time the player is back in a neutral
+    /// mode.
+    fn kill(&mut self, key: UnitKey) -> bool {
+        for _ in 0..150 {
+            match self.monster_life(key.guid) {
+                Some(l) if l > 0 => {}
+                _ => return true,
+            }
+            let mut m = vec![0x06, 1, 0, 0, 0];
+            m.extend_from_slice(&key.guid.to_le_bytes());
+            self.bridge().send_bytes(&m).unwrap();
+            let mut seen = vec![self.mode()];
+            for _ in 0..200 {
+                self.step(1);
+                let m = self.mode();
+                if seen.last() != Some(&m) {
+                    seen.push(m);
+                }
+                if seen.len() > 1 && matches!(m, 1 | 5) {
+                    break;
+                }
+            }
+            self.check("attack");
+        }
+        matches!(self.monster_life(key.guid), None | Some(..=0))
+    }
 }
