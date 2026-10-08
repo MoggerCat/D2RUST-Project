@@ -29,16 +29,16 @@
 |   2. `use_at_point(game, unit, skill, x, y)` = `0x00549AD0` | 109–191 |
 |   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 192–210 |
 |   4. Mode change gates | 211–250 |
-|   5. Start and do | 251–405 |
-|   6. Cooldown | 406–419 |
-|   7. Periodic skills and auras | 420–469 |
-|   8. Function tables | 470–489 |
-| Constants & data dependencies | 490–510 |
-| Randomness | 511–520 |
-| Edge cases & original bugs | 521–542 |
-| Test vectors | 543–563 |
-| Provenance | 564–580 |
-| Open questions | 581–632 |
+|   5. Start and do | 251–408 |
+|   6. Cooldown | 409–422 |
+|   7. Periodic skills and auras | 423–472 |
+|   8. Function tables | 473–492 |
+| Constants & data dependencies | 493–513 |
+| Randomness | 514–523 |
+| Edge cases & original bugs | 524–545 |
+| Test vectors | 546–566 |
+| Provenance | 567–583 |
+| Open questions | 584–635 |
 <!-- /index -->
 
 ## Summary
@@ -339,6 +339,9 @@ Open question 6).
       line test `0x00645950` with collision mask 4 / 0x1C09 / 0x180 /
       0x804 / 0x805; failure → 0; value > 5 → 0. (1.14d: only value 4,
       48 skills.)
+      The walk runs from the target point to the caster's position
+      (`0x00645950`, `sim/pathing.md` §13.4: owner of its direction,
+      rooms and end cells).
    5. `srvstfunc` ∉ 0…90 → 0. Null entry → result 1, nothing charged
       (step 7 still runs).
    6. Else `r = srvst[srvstfunc](game, unit, skill, L)` (table

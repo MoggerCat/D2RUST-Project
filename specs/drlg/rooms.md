@@ -36,13 +36,13 @@
 |   7. Room clients and the inactivity counter | 447–467 |
 |   8. Deactivation (tick step 9) | 468–585 |
 |   9. Room tile grid | 586–1229 |
-|   10. Collision map from tiles | 1230–1308 |
-| Constants & data dependencies | 1309–1323 |
-| Randomness | 1324–1341 |
-| Edge cases & original bugs | 1342–1359 |
-| Test vectors | 1360–1410 |
-| Provenance | 1411–1462 |
-| Open questions | 1463–1585 |
+|   10. Collision map from tiles | 1230–1316 |
+| Constants & data dependencies | 1317–1331 |
+| Randomness | 1332–1349 |
+| Edge cases & original bugs | 1350–1367 |
+| Test vectors | 1368–1418 |
+| Provenance | 1419–1470 |
+| Open questions | 1471–1593 |
 <!-- /index -->
 
 ## Summary
@@ -1244,6 +1244,14 @@ its record flags. Units then set and clear higher bits at run time
 (alloc + build) after `0x00619800`, before the act's room callback.
 `0x0064CA10` frees it (from `0x0061A840`, active room removal). Module
 anchor: `.\COLLISN\Collisn.cpp` (0x006EB730) in `0x0064C900`/`0x0064CA10`.
+These are the only call sites (`0x00619946`, `0x0061A885`; tile changes
+`0x0064C860` only from `0x0066E740`, §10.5), and the client DRLG copy
+creates its active rooms through the same `0x00619890` (§4.6, §5), so the
+client's grid is built from its own rooms' DT1 sub-tile flags, never
+received: no S→C message carries collision words (`sim/server-messages.tsv`).
+A grid lives from active-room creation to removal; between them only
+§10.5 and the unit footprints (`sim/path-placement.md` §5) change it.
+(1.14d-read 2026-10-08.)
 
 #### 10.3 Grid layout
 

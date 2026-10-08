@@ -40,13 +40,13 @@
 |   10. Messages | 746–808 |
 |   11. Missile paths (`0x00649760`) | 809–861 |
 |   12. Other path types (1.14d-read 2026-10-08) | 862–1075 |
-|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1076–1155 |
-| Constants & data dependencies | 1156–1192 |
-| Randomness | 1193–1203 |
-| Edge cases & original bugs | 1204–1251 |
-| Test vectors | 1252–1289 |
-| Provenance | 1290–1338 |
-| Open questions | 1339–1412 |
+|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1076–1225 |
+| Constants & data dependencies | 1226–1262 |
+| Randomness | 1263–1273 |
+| Edge cases & original bugs | 1274–1321 |
+| Test vectors | 1322–1359 |
+| Provenance | 1360–1415 |
+| Open questions | 1416–1489 |
 <!-- /index -->
 
 ## Summary
@@ -1139,7 +1139,8 @@ and `to` := the blocking cell (the first cell that fails).
    that cell (it is not tested). Then the walk goes on in the new room
    with the same error term.
 
-Callers named in other specs: the line test `0x00645910`
+Callers named in other specs: the point-to-unit line `0x00645950`
+(§13.4, the skill `lineofsight` test), the line test `0x00645910`
 (`skills/bodies-2.md`, `monsters/ai.md` §7.4), the missile line test
 (`skills/bodies.md` §2.11), event flag 0x200 (`skills/bodies.md`). No
 draws.
@@ -1152,6 +1153,75 @@ Test vectors (synthetic; one room rect (0, 0, 20, 20), mask 1, cell
 | (0, 0) → (6, 2) | (0,0) (1,0) (2,0) (3,1) | 1, (3, 1) |
 | (0, 0) → (2, 6) | (0,0) (0,1) (0,2) (1,3) (1,4) (1,5) (2,6) | 0 |
 | (3, 1) → (3, 1) | (3,1) | 1, (3, 1) |
+
+The walk is not symmetric: from → to and to → from round ⌊k·minor /
+major⌋ from opposite ends, so they can visit different cells (vector
+L4 below). No null-grid guard: every room the walk enters was found by
+the cell lookup, and every active room has a grid (`drlg/rooms.md`
+§10.2).
+
+#### 13.4 Point-to-unit line `0x00645950` and the coordinate wrapper `0x00645910` (1.14d-read 2026-10-08)
+
+1. **`0x00645950(x, y, unit U, mask)`** → 1 clear, 0 blocked (cdecl,
+   4 args). It calls §13.3 as `0x0064E260(R, &from, &to, mask)` with
+   R := U's room (`0x00620BB0`: types 2, 4, 5 the static path's room,
+   else the dynamic path's room `0x00648A80`, none without a path),
+   **from := (x, y), the point**, and **to := U's position** (types 2,
+   4, 5 static path +0x0C / +0x10, else `0x006488C0` / `0x00648900`,
+   (0, 0) without a path). So:
+   - the walk runs from the point **toward the unit**; both end cells
+     are tested (the point's cell first, U's own cell last);
+   - the point's room is looked up from U's room (§13.3 rule 1: U's room
+     itself, else U's room's adjacency array, `sim/path-placement.md`
+     §4 rule 1). A point outside every room of that array is blocked
+     at once, even when a chain of rooms would reach it; U without a
+     room → blocked (rule 1);
+   - cells in no loaded room met during the walk block (rule 4); no
+     unit size, footprint or stop cell is applied (unlike the unit
+     line `0x00622AA0`, `render/draw-order-2.md` §15.1); U's own
+     footprint bits are in the last cell and count when the mask has
+     them (of item 3's masks only 0x180, PLAYER | MONSTER, holds a bit a
+     player or monster stamps for itself, so `lineofsight` 3 blocks on
+     the caster's own cell when the caster is stamped there; 4, 0x1C09,
+     0x804, 0x805 do not).
+2. **`0x00645910(x1, y1, x2, y2, room, mask)`** → 1 clear: §13.3 with
+   from := (x1, y1), to := (x2, y2) and the given room. Callers:
+   `0x004C82A7`, `0x005D9BE7`, `0x005FD5E9`–`0x005FD798` (four),
+   `0x00645EC2`; bodies in the specs named in §13.3.
+3. **Callers of `0x00645950`** (all four in `Game.exe`):
+
+   | Call site | Who | Point (x, y) | U | Mask |
+   |---|---|---|---|---|
+   | `0x0056F74B` in `0x0056F640` | server skill start, `skills/use.md` §5.3 step 6.4 | target position `0x0056D2C0` (§13.2; none → test skipped) | caster | `lineofsight` 1–5 → 4, 0x1C09, 0x180, 0x804, 0x805 (jump table `0x0056F7DC` = `0x0056F720`, `…727`, `…72E`, `…735`, `…73C` in that order) |
+   | `0x004C61DB` in `0x004C6140` | client skill start (`client/msg-skills.md` §2 rule 7) | client target position `0x004C52E0` (below) | caster | same values (table `0x004C664C` = `0x004C61B0` … `0x004C61CC` in order); failure → the client start returns 0 |
+   | `0x0057E1B1` in `0x0057E090` | area damage (`monsters/umod-callbacks.md` §3.2) | the area centre | victim | 0x805 |
+   | `0x005C86F4` in `0x005C8520` | Armageddon state function (`skills/bodies-4.md` §4.9) | the random point | the unit | 0x805 |
+
+   Value 0 skips the test; a value > 5 fails the start on both sides.
+4. **Client target position `0x004C52E0(unit, &x, &y)`**: the path's
+   target unit (`0x00648BF0`) when set → its position; else the path's
+   target point (`0x00648A00` / `0x00648A10`). Either coordinate 0 →
+   (x, y) := the unit's position plus an offset by facing octant
+   (`0x004C51E0`: octant = facing (`0x00620100`) >> 3; dx = [0, −1, −2,
+   −1, 0, 1, 2, 1], dy = [2, 1, 0, −1, −2, −1, 0, 1], as read). It
+   always returns 1, so the client never skips the test, unlike the
+   server (§13.2 rule 2 returns 0 for a zero coordinate).
+5. **Which grid.** Each side tests its own DRLG's active-room grids:
+   the server's, and on the client the client DRLG copy's, built by the
+   same code at each client active-room creation (`drlg/rooms.md`
+   §10.2). Tile bits are equal on both when the rooms are; unit bits
+   (DOOR 0x800 in mask 0x804, MONSTER, PLAYER) are those each side's
+   units stamped (`sim/path-placement.md` §5), and a cell in a room the
+   client has not built blocks there and not on the server.
+
+Test vector L4 (synthetic; one room rect (0, 0, 20, 20), U in it at
+(0, 0), cell (5, 2) = 4, all others 0, mask 4 (`lineofsight` 1)):
+
+| Call | Cells | Result |
+|---|---|---|
+| `0x00645950(6, 2, U, 4)` | (6,2) (5,2) | 0 (blocked at (5, 2)) |
+| §13.3 from (0, 0) to (6, 2), mask 4 | (0,0) (1,0) (2,0) (3,1) (4,1) (5,1) (6,2) | clear |
+| `0x00645950(30, 2, U, 4)`, no room holds (30, 2) | — | 0 (rule 1, no cell tested) |
 
 ## Constants & data dependencies
 
@@ -1317,6 +1387,13 @@ Real (recordings; message side):
   `0x00648AD0`; decompile of `0x0056D2C0` and `0x0064E260` (branch
   structure checked against its error-term updates); test vectors hand
   computed from §13.3.
+- §13.4 (2026-10-08, REC-248): decompile of `0x00645950`, `0x00645910`,
+  `0x00620BB0`, `0x004C52E0`, `0x004C51E0`, `0x00620100`; `all.asm` call
+  sites `0x0056F6EB`–`0x0056F74B` and `0x004C617D`–`0x004C61DB` (push
+  order: x, y, unit, mask); jump tables `0x0056F7DC` and `0x004C664C`
+  read from `Game.exe` (`re/scripts/rd.py`); every caller of
+  `0x00645950` / `0x00645910` / `0x0064E260` listed from `all.asm`.
+  Vector L4 hand computed from §13.3.
 - D2MOO 1.10f as a map (`D2Common_10142`, `PATH_Toward_6FDAA9F0`,
   `PATH_RayTrace`, `PATH_Straight_Compute`, `PATH_AStar_*`,
   `PATH_PreparePathTargetForPathUpdate`,
