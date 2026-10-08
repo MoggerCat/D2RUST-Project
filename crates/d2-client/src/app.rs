@@ -28,6 +28,7 @@ pub mod play;
 pub mod rest;
 pub mod save;
 pub mod save_full;
+pub mod save_gaps;
 pub mod server_thread;
 pub mod single_player;
 pub mod skill_rest;

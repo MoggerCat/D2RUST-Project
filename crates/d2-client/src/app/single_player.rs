@@ -2890,6 +2890,7 @@ fn loader(
                 Ok((entry, report)) => {
                     // q-save-full: the save's items, made on the wired host.
                     let items_ok = super::save_full::join_items(s, player, save);
+                    super::save_gaps::join_gaps(s, player, save);
                     let log = &mut s.events.action.hooks().x.log;
                     log.extend(
                         report

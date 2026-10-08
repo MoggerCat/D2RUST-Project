@@ -8,7 +8,7 @@
 use d2_formats::d2s::ItemEntry;
 use d2_sim::items::bitstream::read::read_save_entry;
 use d2_sim::items::inventory::UnitKind;
-use d2_sim::units::UnitId;
+use d2_sim::units::{UnitId, UnitType};
 use d2_sim::wiring::inventory::load::LoadFault;
 
 use super::{inv_take_sent, ActionEvents, Game, WiredWorld};
@@ -67,13 +67,19 @@ impl<R, S> WiredWorld<R, S> {
             return r;
         };
         self.with_economy(game, events, |econ, _| {
-            let Some((class, guid)) = econ.units.get(player).map(|u| (u.class, u.guid)) else {
+            let Some((ty, class, guid)) = econ.units.get(player).map(|u| (u.ty, u.class, u.guid))
+            else {
                 r.faults.push(format!("no player unit {player:?}"));
                 return;
             };
             if !inv.state.inventories.contains_key(&player) {
-                inv.state
-                    .add_inventory(player, UnitKind::Player { class: class as u8 }, guid);
+                // The hireling and the golem lists are monsters' (q-save-gaps).
+                let kind = if ty == UnitType::Monster {
+                    UnitKind::Monster { class }
+                } else {
+                    UnitKind::Player { class: class as u8 }
+                };
+                inv.state.add_inventory(player, kind, guid);
             }
             let mut d = inv.desk(econ);
             for (i, e) in entries.iter().enumerate() {
