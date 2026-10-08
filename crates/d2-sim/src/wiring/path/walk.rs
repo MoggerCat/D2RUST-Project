@@ -92,6 +92,32 @@ impl<'a, X: Pending> PathCtx<'a, X> {
         }
     }
 
+    /// The NPC approach `0x00548A50` (`npc.md` §2 rule 3.1): the run
+    /// request to a unit with no skill, `0x00580A70(no skill, mode 3,
+    /// type, GUID, 0)`; it clears the queued action (`clear_queued_action`).
+    pub fn approach_unit(&mut self, unit: UnitId, target: UnitId) -> Option<Outcome> {
+        let t = self.tables();
+        let (ty, guid) = {
+            let r = self.v.units.get(target)?;
+            (r.ty, r.guid)
+        };
+        match request(
+            &t,
+            self,
+            unit,
+            None,
+            3,
+            WalkTarget::Unit { ty, guid },
+            false,
+        ) {
+            Ok(o) => Some(o),
+            Err(e) => {
+                self.walk_error(e);
+                None
+            }
+        }
+    }
+
     /// Teleport `0x00650910(path, room, x, y)` (`path-placement.md` §6
     /// rule 4) of a unit with a dynamic path; a static path is set
     /// (`0x00620AE0`) with its footprint moved.
