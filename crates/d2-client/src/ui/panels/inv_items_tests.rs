@@ -398,6 +398,51 @@ mod belt {
         assert_eq!(images(&out), vec![(f, 0, 461, 591)]);
     }
 
+    // Covers: specs/ui/control-panel.md §5 r4, §5 r8
+    #[test]
+    fn the_belt_draw_list_has_key_labels_and_the_hover_rect() {
+        use crate::ui::panels::control::belt::{BeltColor, BeltDraw};
+        let w = world(
+            &[
+                (7, mode::BELT, (0, 1, 0, 0), b"hp1 "),
+                (8, mode::BELT, (0, 3, 0, 0), b"hp1 "),
+            ],
+            None,
+        );
+        let mut b = HudBelt {
+            parts: parts(),
+            ..Default::default()
+        };
+        // Off the belt: labels at (left + 2, bottom - 2), color 4, no rect.
+        let d = b.draw_list(&w, (800, 600), false, (0, 0), true);
+        let labels: Vec<_> = d
+            .iter()
+            .filter_map(|d| match d {
+                BeltDraw::Label(l) => Some((l.text.clone(), l.x, l.y, l.color)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            labels,
+            vec![
+                (vec![u16::from(b'2')], 463, 588, 4),
+                (vec![u16::from(b'4')], 525, 588, 4)
+            ]
+        );
+        assert!(!d.iter().any(|d| matches!(d, BeltDraw::Box { .. })));
+        // Over box 1: the item's green 29 x 29 hover rectangle at its box.
+        let d = b.draw_list(&w, (800, 600), false, (470, 570), true);
+        let boxes: Vec<_> = d
+            .iter()
+            .filter_map(|d| match d {
+                BeltDraw::Box { rect, color } => Some((rect.x, rect.y, rect.w, rect.h, *color)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(boxes, vec![(461, 562, 29, 29, BeltColor::Green)]);
+        assert_eq!(b.state.hover_item, Some(7));
+    }
+
     #[test]
     fn clicking_the_belt_takes_and_puts_potions() {
         let b = HudBelt {

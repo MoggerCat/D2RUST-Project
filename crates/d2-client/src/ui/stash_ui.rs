@@ -9,16 +9,18 @@
 //!
 //! Preview fills (d2rs-own, unverified): the GoldMax line needs the
 //! string table by id (`NoStrings` in play), so only the art is drawn;
-//! the stash gold button and dialog are not wired (`panels-2.md` §21,
-//! stitch-hud `PENDING`).
+//! the stash gold button opens the withdraw dialog (kind 4) and the
+//! inventory gold button the deposit (kind 3, `gold_dialog`, whose
+//! frame-wide panel sees the right half).
 
 use super::SharedRef;
 use crate::bridge::items;
 use crate::ui::draw::UiDrawSink;
 use crate::ui::geom::{Point, Rect};
+use crate::ui::gold::GoldKind;
 use crate::ui::panel::{NoStrings, Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
 use crate::ui::panels::stash_cube::{StashPanel, UI_STASH};
-use crate::ui::panels::stash_input::{Pointer, StashCubeInput, GOLD_MAX_FONT};
+use crate::ui::panels::stash_input::{stash_gold_rect_hit, Pointer, StashCubeInput, GOLD_MAX_FONT};
 use crate::ui::panels::PanelOutput;
 use crate::ui::PointerButton;
 
@@ -80,6 +82,15 @@ impl Panel for StashUi {
         } else {
             self.input.stash_up(&s, exp, &ptr)
         };
+        // The stash gold button opens the withdraw dialog (kind 4) on a
+        // release inside it (`inventory.md` §11 r1).
+        if !down && std::mem::take(&mut self.input.stash_gold) {
+            if stash_gold_rect_hit(&s, exp, at) {
+                let cursor = ptr.cursor_item;
+                super::gold_dialog::open_dialog(&mut sh, ctx.world, GoldKind::Withdraw, cursor);
+            }
+            return UiResponse::Consumed;
+        }
         if eff.sound4 {
             sh.outputs.push(PanelOutput::ClickSound);
         }
