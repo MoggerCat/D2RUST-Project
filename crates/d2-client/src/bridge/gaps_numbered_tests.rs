@@ -182,6 +182,10 @@ fn client_world_holds_only_stated_fields() {
         frames,
         // d2rs-own, unverified: the shop panel's trade epoch.
         store_serial,
+        // d2rs-own, unverified: session messages for the loading flow
+        // (`ui/frontend-loading.md` L9, L10).
+        session_total,
+        session_log,
         server_ticks,
         units,
         local_player,
@@ -243,6 +247,7 @@ fn client_world_holds_only_stated_fields() {
     assert!(room_allied.is_empty());
     assert_eq!((frames, server_ticks, units.len()), (0, 0, 0));
     assert_eq!(store_serial, 0);
+    assert!(session_total == 0 && session_log.is_empty());
     assert_eq!((local_player, act, use_cursor), (None, None, None));
     assert_eq!((difficulty, expansion, ladder, game_flags), (0, 0, 0, 0));
     assert!(!in_game && !unloaded && !exit_requested);
