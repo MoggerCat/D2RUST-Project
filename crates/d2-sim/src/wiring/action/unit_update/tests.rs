@@ -560,7 +560,7 @@ fn a_player_attacking_a_monster_sends_0x4c() {
 
 /// §3.5 rule 6: a state toggled on a unit reaches the client as 0xA7
 /// (no list entries) in the next client pass, once; toggled off, 0xA9.
-// Covers: specs/sim/intents-events.md §3.5 r6, §7.3 r2 step 8
+// Covers: specs/sim/intents-events.md §3.5 r6, §7.3 r2
 #[test]
 fn state_changes_are_sent_once_as_a_7_then_a_9() {
     let (mut fx, p, m) = setup();
