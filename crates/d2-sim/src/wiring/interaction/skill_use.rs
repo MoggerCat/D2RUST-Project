@@ -136,6 +136,15 @@ impl<X: Pending + UseRest> ActionSim<X> {
 }
 
 impl<X: Pending + UseRest> UseView<'_, X> {
+    /// The unit's list in `ActionHooks::skill_lists` (`client/msg-skills.md`
+    /// §1), when it has one: the list calls answer from it, the seam
+    /// otherwise.
+    fn list(&self, u: UnitId) -> Option<&crate::skills::list::SkillList> {
+        self.cv.v.h.skill_lists.get(&u)
+    }
+    fn list_mut(&mut self, u: UnitId) -> Option<&mut crate::skills::list::SkillList> {
+        self.cv.v.h.skill_lists.get_mut(&u)
+    }
     fn x(&self) -> &X {
         &self.cv.v.h.x
     }
@@ -329,28 +338,52 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
     }
 
     fn left_skill(&self, u: UnitId) -> Option<SkillEntry> {
-        self.x().left_skill(u)
+        match self.list(u) {
+            Some(l) => l.left.and_then(|i| l.view().get(i).copied()),
+            None => self.x().left_skill(u),
+        }
     }
     fn right_skill(&self, u: UnitId) -> Option<SkillEntry> {
-        self.x().right_skill(u)
+        match self.list(u) {
+            Some(l) => l.right.and_then(|i| l.view().get(i).copied()),
+            None => self.x().right_skill(u),
+        }
     }
     fn set_left_skill(&mut self, u: UnitId, e: SkillEntry) {
-        self.xm().set_left_skill(u, e);
+        match self.list_mut(u) {
+            Some(l) => l.left = l.find(e.skill, e.owner_guid),
+            None => self.xm().set_left_skill(u, e),
+        }
     }
     fn set_right_skill(&mut self, u: UnitId, e: SkillEntry) {
-        self.xm().set_right_skill(u, e);
+        match self.list_mut(u) {
+            Some(l) => l.right = l.find(e.skill, e.owner_guid),
+            None => self.xm().set_right_skill(u, e),
+        }
     }
     fn find_entry(&self, u: UnitId, skill: i32) -> Option<SkillEntry> {
-        self.x().find_entry(u, skill)
+        match self.list(u) {
+            Some(l) => l.view().into_iter().find(|e| e.skill == skill),
+            None => self.x().find_entry(u, skill),
+        }
     }
     fn find_entry_owned(&self, u: UnitId, skill: i32, owner: i32) -> Option<SkillEntry> {
-        self.x().find_entry_owned(u, skill, owner)
+        match self.list(u) {
+            Some(l) => l.find(skill, owner).and_then(|i| l.view().get(i).copied()),
+            None => self.x().find_entry_owned(u, skill, owner),
+        }
     }
     fn owns_skill(&self, u: UnitId, skill: i32) -> bool {
-        self.x().owns_skill(u, skill)
+        match self.list(u) {
+            Some(l) => l.has(skill),
+            None => self.x().owns_skill(u, skill),
+        }
     }
     fn set_used_skill(&mut self, u: UnitId, e: Option<SkillEntry>) {
-        self.xm().set_used_skill(u, e);
+        match self.list_mut(u) {
+            Some(l) => l.current = e.and_then(|e| l.find(e.skill, e.owner_guid)),
+            None => self.xm().set_used_skill(u, e),
+        }
     }
     fn used_skill_flags(&self, u: UnitId) -> u32 {
         self.x().used_skill_flags(u)
@@ -359,7 +392,12 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
         self.xm().set_used_skill_flags(u, f);
     }
     fn entry_mode(&self, u: UnitId, e: &SkillEntry) -> u32 {
-        self.x().entry_mode(u, e)
+        match self.list(u) {
+            Some(l) => l
+                .find(e.skill, e.owner_guid)
+                .map_or(0, |i| l.entries[i].mode),
+            None => self.x().entry_mode(u, e),
+        }
     }
     fn attack_param4(&self, u: UnitId) -> i32 {
         self.x().attack_param4(u)

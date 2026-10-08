@@ -290,7 +290,7 @@ pub fn update_messages<X: Pending>(
             // unverified: sent to the own client too (the click's mode
             // request is not applied, `ui/controls.md` §6 r7, so the
             // client sets the attack mode from this echo); settled by
-            // REC-94.
+            // REC-95.
             let target = path
                 .target_unit
                 .filter(|t| game.lists.find_unit(t.ty, t.guid) == Some(t.unit))
@@ -448,7 +448,7 @@ impl<X: Pending> WalkUnits for PathCtx<'_, X> {
     /// flags (`0x006446A0`, skill +0x0C) are the used skill entry's
     /// runtime E-flags word, not a skills.txt column (`pathing.md` §8.1).
     fn used_skill(&self, unit: UnitId) -> Option<UsedSkill> {
-        let e = self.v.h.x.used_skill(unit)?;
+        let e = self.v.h.used_skill_of(unit)?;
         let row = self.v.h.tables.skills.skills.get(e.skill as usize)?;
         Some(UsedSkill {
             id: e.skill as u16,

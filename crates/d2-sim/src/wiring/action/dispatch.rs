@@ -302,6 +302,26 @@ impl<X: Pending> TickHooks for ActionSim<X> {
     fn send_unit_update(&mut self, game: &mut Game, client: ClientId, unit: UnitId) {
         let s = &mut self.sys;
         let mut v = View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks);
+        // §7.1 rule 2.1: a unit not yet announced (unit flag 0x10), other
+        // than the client's player: a missile sends nothing at all; any
+        // other type its add messages (§7.2) first. A monster's are sent
+        // by its update ([`View::monster_update`], which also reads
+        // "announced" for its step 8).
+        let receiver = game.lists.client(client).and_then(|c| c.player);
+        let new = v
+            .units
+            .get(unit)
+            .filter(|r| r.flags & crate::units::record::flags::SEED_SET != 0)
+            .map(|r| r.ty);
+        if let (Some(ty), Some(p)) = (new, receiver) {
+            if p != unit {
+                match ty {
+                    UnitType::Missile => return,
+                    UnitType::Monster => {}
+                    _ => v.add_messages(game, p, unit),
+                }
+            }
+        }
         if game
             .lists
             .unit(unit)

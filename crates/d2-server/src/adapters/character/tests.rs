@@ -36,6 +36,9 @@ impl Rec {
 }
 
 impl CharacterWorld for Rec {
+    fn player_skills(&mut self) -> Result<(), Unapplied> {
+        self.step("player_skills", "player skills".into())
+    }
     fn new_character_setup(&mut self) -> Result<(), Unapplied> {
         self.step("setup", "setup".into())
     }
@@ -171,6 +174,8 @@ fn full_save_runs_the_steps_in_the_masters_order() {
     assert_eq!(r.act, 2);
     assert!(r.unapplied.is_empty());
     let want = [
+        // The player init's native skills (msg-skills.md §2 r8).
+        "player skills",
         "header act 2",
         // Slot 0: bit 1 kept, bit 15 set; bits 13, 14 cleared.
         "quests 0280",
@@ -221,7 +226,7 @@ fn golem_item_needs_the_iron_golem_skill() {
     assert!(!w.log.iter().any(|l| l.contains("Golem")));
 }
 
-// Covers: specs/formats/d2s-load.md §1 r1, §edge-cases-original-bugs r1; specs/formats/d2s.md §9 r1, §9 r6
+// Covers: specs/formats/d2s-load.md §1 r1, §edge-cases-original-bugs r1; specs/formats/d2s.md §9 r1, §9 r6; specs/client/msg-skills.md §2 r8
 #[test]
 fn stub_starts_a_new_character() {
     let stub = D2s::new_stub(b"Neo", 2, 0, 1).unwrap();
@@ -236,6 +241,7 @@ fn stub_starts_a_new_character() {
     assert_eq!(
         w.log,
         [
+            "player skills",
             "setup",
             "start stats 0",
             "start items",
@@ -249,7 +255,7 @@ fn stub_starts_a_new_character() {
         ..Rec::default()
     };
     load(&stub, &LoadContext::default(), &mut w).unwrap();
-    assert_eq!(w.log[3], "mouse None");
+    assert_eq!(w.log[4], "mouse None");
     // Nothing of §4–§8 is read.
     assert!(!w.log.iter().any(|l| l.starts_with("stat")));
 }

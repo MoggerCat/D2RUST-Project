@@ -62,9 +62,10 @@
 //! Seams without a provider are [`LocalSeams`] (the action and world
 //! wiring's): the narrowest answers (`Pending`'s and `WorldPending`'s
 //! defaults) plus a store of what the sim itself sets (positions), the
-//! transport outbox and the units' skill lists with the skill pipeline's
-//! preview fills ([`super::skill_rest`]: the world's skill slot is
-//! `WiredSkills`; the loader runs the server player's native skills); and [`super::rest::AppRest`] (the wired
+//! transport outbox, the combat seams' copy of the units
+//! ([`sync_seams`]) and the skill pipeline's preview fills
+//! ([`super::skill_rest`]: the world's skill slot is `WiredSkills`, on
+//! d2-sim's skill lists); and [`super::rest::AppRest`] (the wired
 //! host's). Nothing
 //! here decides an outcome: it stages the game the way the server tests
 //! do (a sorceress who knows her act's first waypoint, `bridge.md` §3).
@@ -88,7 +89,7 @@ use d2_server::adapters::session::{load_new_character_with_items, load_save, Gam
 use d2_server::adapters::session_flow::{
     create_flags, CharacterLoader, CreateGame, Loaded, SessionFlow,
 };
-use d2_server::adapters::{world_sim_facts, PlayerData, PlayerFields, ProtoSizes, SimGame};
+use d2_server::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame};
 use d2_server::host::Host;
 use d2_server::host::SystemClock;
 use d2_server::seams::{ClientId, Clock, PlayerGate};
@@ -150,6 +151,8 @@ pub type Link<C = SystemClock> = LocalLink<Sim, ProtoSizes, PendingSession, C>;
 /// player: `sim/path-placement.md` §13 rule 2), Cold Plains (act 0) and
 /// Lut Gholein (act 1).
 pub const ACT1_TOWN: u32 = 1;
+/// The Blood Moor (act 0), east of the synthetic town's room.
+pub const BLOOD_MOOR: u32 = 2;
 pub const COLD_PLAINS: u32 = 3;
 pub const ACT2_TOWN: u32 = 40;
 /// The default game seed.
@@ -386,8 +389,8 @@ pub struct LocalSeams {
     /// copied by [`sync_seams`] before each intent and tick: the
     /// hostility, alignment and melee-range seams have no game to read.
     pub sides: BTreeMap<UnitId, (UnitType, bool, (i32, i32))>,
-    /// The units' skill lists and the skill pipeline's preview fills
-    /// (`UseRest`, `LearnRest`: [`super::skill_rest`]).
+    /// The skill pipeline's per-unit fields and preview fills (`UseRest`,
+    /// `LearnRest`: [`super::skill_rest`]).
     pub skills: SkillStore,
 }
 
@@ -422,18 +425,6 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
 }
 
 impl Pending for LocalSeams {
-    fn skill_list(&self, unit: UnitId) -> Vec<d2_sim::skills::SkillEntry> {
-        self.skill_list_of(unit)
-    }
-    fn used_skill(&self, unit: UnitId) -> Option<d2_sim::skills::SkillEntry> {
-        self.used_skill_of(unit)
-    }
-    fn select_hand_skill(&mut self, unit: UnitId, left: bool, skill: i32) -> bool {
-        self.select_hand(unit, left, skill)
-    }
-    fn assign_skill_level(&mut self, unit: UnitId, skill: i32, level: i32) -> bool {
-        self.assign_level(unit, skill, level)
-    }
     fn position(&self, unit: UnitId) -> (i32, i32) {
         self.pos.get(&unit).copied().unwrap_or_default()
     }
@@ -498,6 +489,15 @@ impl Pending for LocalSeams {
         }
         nodes
     }
+    /// `0x00623660`, the operate entry's interact range (`objects.md`
+    /// §7.1 rule 3): no written spec gives its test.
+    // PROVISIONAL (world/objects.md §7.1 r3; REC-94): in range. The
+    // preview client sends C→S 0x13 only on arrival
+    // (`world_view/interact.rs`); the §7.3 r3–r4 approach is
+    // `Pending::object_approach`'s default (operate).
+    fn object_in_range(&self, _: &Game, _: UnitId, _: UnitId) -> bool {
+        true
+    }
 }
 
 impl WorldPending for LocalSeams {}
@@ -522,6 +522,9 @@ impl LevelTypes for Types {
         if let Some(&rect) = self.0.get(&id) {
             let r = drlg.alloc_room(level, RoomKind::Preset, rect);
             drlg.room_mut(r).dt1_mask = 1;
+            if id == ACT1_TOWN || id == BLOOD_MOOR {
+                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
+            }
             drlg.link_room(r, LinkAt::Tail);
         }
         Ok(())
@@ -851,19 +854,26 @@ fn synthetic_drlg_data() -> DrlgData {
     let mut files = vec![Vec::new(); 32];
     files[0] = b"floor.dt1".to_vec();
     drlg.lvltypes = vec![vec![Vec::new(); 32], files];
-    for id in [ACT1_TOWN, COLD_PLAINS, ACT2_TOWN] {
+    for id in [ACT1_TOWN, BLOOD_MOOR, COLD_PLAINS, ACT2_TOWN] {
         drlg.levels[id as usize].drlg_type = 2;
         drlg.levels[id as usize].level_type = 1;
     }
+    // The town and the Blood Moor see each other through vis slot 0, a
+    // border (warp −1, `drlg/rooms.md` §3.3): each one's room carries
+    // flag WARP_0 ([`Types`]).
+    drlg.levels[ACT1_TOWN as usize].vis[0] = BLOOD_MOOR;
+    drlg.levels[BLOOD_MOOR as usize].vis[0] = ACT1_TOWN;
     drlg
 }
 
 /// The synthetic level types: one 8×8-tile floor room in the Rogue
 /// Encampment (the game entry's town, at tile (16, 0): levels of one act
-/// do not overlap), one in Cold Plains and one in Lut Gholein.
+/// do not overlap), one in the Blood Moor east of it (tile (24, 0), a
+/// level border), one in Cold Plains and one in Lut Gholein.
 fn synthetic_types() -> Types {
     Types(BTreeMap::from([
         (ACT1_TOWN, TileRect::new(16, 0, 8, 8)),
+        (BLOOD_MOOR, TileRect::new(24, 0, 8, 8)),
         (COLD_PLAINS, TileRect::new(0, 0, 8, 8)),
         (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
     ]))
@@ -946,6 +956,12 @@ pub fn client_level_rows(data: &GameData) -> Vec<LevelRow> {
             draw_edges: l.drawedges != 0,
         })
         .collect()
+}
+
+/// The levels' waypoint indexes (`levels` `Waypoint`,
+/// `world/waypoints.md` §1) for the client's waypoint menu.
+pub fn client_waypoint_map(data: &GameData) -> d2_sim::world::waypoints::WaypointMap {
+    d2_sim::world::waypoints::WaypointMap::new(&data.tables().levels)
 }
 
 /// `difficultylevels` `ResistPenalty` per row (difficulty), from the
@@ -1346,9 +1362,6 @@ pub fn build_with(
     );
     hooks.anim_data = parts.anim;
     hooks.vitals = parts.vitals;
-    // The server-side skill lists read the action wiring's `skills` and
-    // `charstats` rows (`client/msg-skills.md` §2).
-    hooks.x.skills = SkillStore::from_tables(&hooks.tables);
     // The client vitals sync (`combat/vitals.md` §5.1): life, mana,
     // stamina and position sent to the client at the end of each tick.
     hooks.enable_vitals_sync();
@@ -1473,11 +1486,6 @@ pub fn build_with(
     // fills in `PreviewMoveRest`): the new character's start items.
     world.inventory = parts.inventory.map(preview_inv_parts);
     let mut s: Sim = SimGame::with_world(game, sim, world);
-    // The unit facts of the point and unit-target parse (act, position)
-    // from the sim's own unit and path records: the play host stages
-    // none, so without this every walk, skill and unit intent is
-    // refused (`intents-events.md` §2.4 rules 3–4).
-    s.set_facts_source(world_sim_facts);
     s.set_host_sync(sync_seams);
     // The session sequence (`intents-events.md` §8) runs on the client's
     // C→S 0x67 / 0x6B: game creation (the client record, 0x01, 0x00,
@@ -1529,15 +1537,6 @@ fn loader(
         if let Some(u) = s.events.action.sys.units.get_mut(player) {
             u.mode = 1;
         }
-        // The server player init `0x005348C0`: the skill list, then its
-        // native skills `0x00647EE0` (`client/msg-skills.md` §2 rule 8),
-        // before the load reads it (`StartSkill`, the save's levels).
-        s.events
-            .action
-            .hooks()
-            .x
-            .skills
-            .init_player(player, u32::from(r.class));
         let (entry, quests) = match &character {
             Character::New | Character::Named(_) => {
                 if let Some(index) = cold_plains_wp {
@@ -1563,9 +1562,24 @@ fn loader(
                 // so the join sends 0x5F and the two 0x23.
                 // Then the start items (`items/generation.md` §10.3) on
                 // the wired host. Their queued 0x9C / 0x9D (`items.sent`)
-                // are dropped: the join sends no item messages yet
-                // (rule 3.5; the item stream decode is G16).
+                // are the join's item messages (rule 3.5), sent after the
+                // stat messages.
                 let (entry, report, items) = load_new_character_with_items(s, player, r.char_name);
+                let own: Vec<Vec<u8>> = items
+                    .sent
+                    .iter()
+                    .filter(|(u, _)| *u == player)
+                    .map(|(_, b)| b.clone())
+                    .collect();
+                if !own.is_empty() {
+                    s.events
+                        .action
+                        .sys
+                        .hooks
+                        .session
+                        .join_items
+                        .insert(player, own);
+                }
                 let has_inventory = s.world.inventory.is_some();
                 let log = &mut s.events.action.hooks().x.log;
                 log.extend(

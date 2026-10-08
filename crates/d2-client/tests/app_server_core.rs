@@ -16,12 +16,12 @@ use std::sync::Arc;
 
 use d2_client::app::server_thread::ThreadLink;
 use d2_client::app::single_player::{self, GameData, Link, DEFAULT_SEED};
-use d2_client::app::skill_rest::SkillStore;
 use d2_client::bridge::link::{SendQueue, ServerLink};
 use d2_client::bridge::LOCAL_CLIENT;
 use d2_data::tables::{Charstats, Monstats, Monstats2, Record, Skills};
 use d2_proto::client::Walk;
 use d2_server::seams::{Clock, Pos};
+use d2_sim::skills::list::ListOwner;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -53,9 +53,8 @@ impl Game {
         let (link, _) =
             single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
         let mut g = Self { link, ms };
-        // The test-local skill rows (as `app_server_skills.rs`): eight
-        // zero `skills` records, so the join gives the player skill 0
-        // (Attack) in both hands.
+        // The test-local skill rows: eight zero `skills` records with
+        // Attack's `anim` and `range`.
         g.link
             .with(|l| {
                 let h = l.host_mut().game.events.action.hooks();
@@ -66,9 +65,6 @@ impl Game {
                 t.skills.skills[0].range = 1;
                 t.skills.level_cap = d2_sim::skills::LEVEL_CAP_114D;
                 h.tables = Arc::new(t);
-                let mut store = SkillStore::from_tables(&h.tables);
-                store.class_skills = vec![[0xFFFF; 10]; 7];
-                h.x.skills = store;
             })
             .unwrap();
         let req = single_player::create_request();
@@ -78,12 +74,23 @@ impl Game {
         g.ticks(3);
         g.link
             .with(|l| {
-                let h = &mut l.host_mut().game.events.action.sys.hooks;
+                let sim = &mut l.host_mut().game;
+                let p = sim.player_of(LOCAL_CLIENT).expect("joined");
+                let h = &mut sim.events.action.sys.hooks;
                 let mut t = (*h.tables).clone();
                 t.combat.charstats = (0..7).map(|_| charstats_row()).collect();
                 t.combat.monstats = vec![Monstats::decode(&[0u8; Monstats::SIZE])];
                 t.combat.monstats2 = vec![Monstats2::decode(&[0u8; Monstats2::SIZE])];
                 h.tables = Arc::new(t);
+                // The synthetic game has no vitals tables, so the join's
+                // native skills (`msg-skills.md` §2 rule 8) did not run:
+                // give the player its list here (skill 0 in both hands).
+                let rows = h.tables.skills.skills.clone();
+                h.skill_lists
+                    .entry(p)
+                    .or_default()
+                    .init_player(&rows, ListOwner::player(1), Some(&[0xFFFF; 10]))
+                    .unwrap();
             })
             .unwrap();
         g
@@ -101,10 +108,16 @@ impl Game {
         got
     }
 
-    /// The server-side position of the local player (`SimGame::player_pos`).
+    /// The server-side position of the local player: its path record
+    /// (`path-placement.md` §2.1), the position the point parse reads.
     fn player_pos(&mut self) -> Option<Pos> {
         self.link
-            .with(|l| l.host().game.player_pos(LOCAL_CLIENT))
+            .with(|l| {
+                let s = &mut l.host_mut().game;
+                let p = s.player_of(LOCAL_CLIENT)?;
+                let (x, y) = s.events.action.hooks().path_position(p);
+                Some(Pos { x, y })
+            })
             .unwrap()
     }
 }
@@ -140,7 +153,8 @@ fn monster_next_to_player(g: &mut Game) -> u32 {
             let s = &mut l.host_mut().game;
             let (p, _) = single_player::local_player(s).expect("joined");
             let room = s.game.lists.unit(p).and_then(|e| e.room());
-            let pos = s.player_pos(LOCAL_CLIENT).unwrap();
+            let (x, y) = s.events.action.hooks().path_position(p);
+            let pos = Pos { x, y };
             let monsters = &mut s.events.action.sys.data.monsters;
             if monsters.is_empty() {
                 monsters.push(d2_sim::units::hooks::MonsterInfo {

@@ -112,3 +112,106 @@ fn the_app_game_runs_3000_ticks_while_an_unvisited_level_is_freed() {
     // Step 10 freed the never-visited level (`levels.md` §9.2).
     assert_eq!(cold_plains_rooms(&server), 0);
 }
+
+/// The server player's sub-tile.
+fn server_player(server: &app_support::Server<StepClock>) -> Option<(i32, i32)> {
+    app_support::with(server, |l| {
+        let (p, _) = single_player::local_player(&l.host().game)?;
+        let game = &mut l.host_mut().game;
+        game.game.lists.unit(p)?.room()?;
+        Some(game.events.action.hooks().path_position(p))
+    })
+}
+
+// Covers: specs/client/model.md §3 r3, §12 r2; specs/sim/intents-events.md §2.4 r3
+#[test]
+fn walking_east_out_of_the_town_the_map_follows_into_the_blood_moor() {
+    use d2_client::app::play::{add_walk, predict_link};
+    use d2_client::bridge::predict::Speeds;
+    let data = GameData::Synthetic;
+    let ms = Arc::new(AtomicU32::new(1000));
+    let (link, _) = single_player::start(
+        data.clone(),
+        single_player::DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap();
+    let server = Arc::new(Mutex::new(link));
+    let mut app = App::new();
+    app.add_plugins((MinimalPlugins, AssetPlugin::default()))
+        .init_asset::<Image>()
+        .init_resource::<ButtonInput<MouseButton>>();
+    let (link, tap) = predict_link(Box::new(SharedLink(server.clone())));
+    add_game(&mut app, link, false).unwrap();
+    add_walk(&mut app, tap, Some(Speeds { walk: 6, run: 9 }));
+    send_create_game(&mut app).unwrap();
+    add_client_data(
+        &mut app,
+        single_player::client_drlg_source(&data),
+        single_player::client_level_rows(&data),
+    );
+    app_support::synthetic_skill_rows(&mut app);
+    app.update();
+    let mut steps = 0;
+    let mut step = |app: &mut App| {
+        ms.fetch_add(40, Ordering::SeqCst);
+        app.update();
+        steps += 1;
+        assert!(steps < 2000, "the walk ends");
+    };
+    while app_support::local_player(&server).is_none() {
+        step(&mut app);
+    }
+    for _ in 0..10 {
+        step(&mut app);
+    }
+    let level = |app: &App| {
+        app.world()
+            .resource::<BridgeResource>()
+            .0
+            .world()
+            .player_level()
+    };
+    assert_eq!(level(&app), Some(single_player::ACT1_TOWN as u16));
+    let start = server_player(&server).expect("player placed");
+    // The town room spans sub-tiles x 80..120; the Blood Moor's 120..160.
+    assert!((80..120).contains(&start.0), "{start:?}");
+    let target = (140u16, start.1 as u16);
+    // The synthetic set has no `charstats` rows and no vitals tables, so
+    // its player cannot move (velocity 0, `pathing.md` §8.1 r2): stage
+    // what a 1.14d install gives (WalkVelocity 6, RunVelocity 9; stat 67
+    // velocitypercent 100 from creation, `combat/vitals.md` §1).
+    app_support::with(&server, |l| {
+        let (p, _) = single_player::local_player(&l.host().game).unwrap();
+        let g = &mut l.host_mut().game;
+        let hooks = g.events.action.hooks();
+        let mut t = (*hooks.tables).clone();
+        use d2_data::tables::{Charstats, Record};
+        let mut row = Charstats::decode(&[0u8; Charstats::SIZE]);
+        row.walkvelocity = 6;
+        row.runvelocity = 9;
+        t.combat.charstats = vec![row; 7];
+        hooks.tables = Arc::new(t);
+        let game = &mut g.game;
+        g.events.action.with(game, |_, v| v.set_base(p, 67, 100));
+    });
+    app.world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .send(&d2_proto::client::Walk {
+            x: target.0,
+            y: target.1,
+        })
+        .unwrap();
+    while server_player(&server).map(|s| s.0) != Some(i32::from(target.0)) {
+        step(&mut app);
+    }
+    for _ in 0..10 {
+        step(&mut app);
+    }
+    // The server player walked into the Blood Moor; the client's player
+    // is there too (the predicted walk recached its room).
+    assert_eq!(level(&app), Some(single_player::BLOOD_MOOR as u16));
+    let b = &app.world().resource::<BridgeResource>().0;
+    assert!(b.log().rejected.is_empty(), "{:?}", b.log().rejected);
+}

@@ -31,6 +31,9 @@ const SPEC: &str = "ui/panels.md";
 /// The archive name of a [`UiFiles`] name (§7.1: relative to
 /// `DATA\GLOBAL\UI\`, `.dc6`).
 pub fn archive_name(name: &str) -> String {
+    if let Some(item) = name.strip_prefix(crate::ui::panels::inv_items::ITEMS_PREFIX) {
+        return crate::ui::inv_grid::inventory_path(item); // ui/inventory.md §8 r2
+    }
     format!("data\\global\\ui\\{name}.dc6")
 }
 

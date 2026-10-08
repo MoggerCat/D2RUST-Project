@@ -891,21 +891,6 @@ pub trait Pending {
     fn used_skill(&self, unit: UnitId) -> Option<crate::skills::SkillEntry> {
         None
     }
-    /// The character load's hand selection `0x005701B0(unit, hand, skill,
-    /// −1)` on the skill list (`formats/d2s-load.md` §1 rule 1; the list
-    /// part: select `client/msg-skills.md` §2 rule 3, the entry (skill,
-    /// −1)). `false`: no skill-list provider (default); the message it
-    /// sends is the session's (`intents-events.md` §8.2 rule 3.1).
-    fn select_hand_skill(&mut self, unit: UnitId, left: bool, skill: i32) -> bool {
-        false
-    }
-    /// `0x0056DEB0(unit, skill, level, 1)` → assign `0x00647280`
-    /// (`client/msg-skills.md` §2 rule 2; the save's skills,
-    /// `formats/d2s.md` §7.2 rule 2). `false`: no skill-list provider
-    /// (default).
-    fn assign_skill_level(&mut self, unit: UnitId, skill: i32, level: i32) -> bool {
-        false
-    }
     /// `0x00535BC0`.
     fn current_weapon(&self, unit: UnitId) -> Option<UnitId> {
         None

@@ -762,7 +762,7 @@ town access 0.
    every client including the player's own (d2rs-own: the client applies
    no mode request for its click, `ui/controls.md` §6 r7) (because the
    table's other rows are not read and `0x00548090` is the other named
-   caller of the builders); settled by REC-94.
+   caller of the builders); settled by REC-95.
 3. Same pass, before it: a player with flags 2 bit 0x10000, or bit 0x800
    when the client's player is not this unit → S→C 0x15 (`0x00548010`:
    type, GUID, x, y, flag 1 for 0x10000 else 0). Waypoint arrival and

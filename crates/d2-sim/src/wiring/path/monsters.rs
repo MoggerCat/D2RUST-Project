@@ -481,7 +481,7 @@ impl<X: Pending> ActionHooks<X> {
             }
         }
         self.plain_mode(sim, unit, m);
-        if self.x.used_skill(unit).is_some() {
+        if self.used_skill_of(unit).is_some() {
             let _ = X::monster_skill_start(self, sim, unit);
         }
         true

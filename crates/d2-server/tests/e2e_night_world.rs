@@ -1180,7 +1180,7 @@ fn a_population_monster_killed_with_a_missile() {
     // IS2) for the kill or the drop. The monster's two mode changes while
     // its skill is in use send the skill message instead of a mode
     // message (§7.4 rule 3, `0x00597D70` → `0x0053D4D0`, §3.5 rule 5):
-    // 0x4D type 1, GUID 3, skill 1 (u32), level 10 (PROVISIONAL, REC-94:
+    // 0x4D type 1, GUID 3, skill 1 (u32), level 10 (PROVISIONAL, REC-95:
     // base + bonus), the path target (0, 0: no target point), w 0.
     let skill_4d = vec![0x4D, 1, 3, 0, 0, 0, 1, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0];
     assert_eq!(transcript, vec![skill_4d; 2]);

@@ -241,6 +241,9 @@ pub fn dispatch(
     if let Err(code) = check_size(sizes, id, msg, size) {
         return code;
     }
+    if is_point(id) || is_unit(id) {
+        game.refresh_targets(client, msg);
+    }
     if let Err(code) = parse(game, out, client, id, msg) {
         return code;
     }

@@ -443,6 +443,11 @@ pub fn run_ui_with<L: ServerLink>(
         };
         let mut events = Vec::new();
         input.drain(&mut events);
+        // The flags the delivered S→C outputs set since the last event
+        // (S→C 0x63 opens ui 0x14), mirrored before routing.
+        if let Some(o) = original.as_deref() {
+            o.sync_root(root);
+        }
         for e in events {
             if let Some(o) = original.as_deref_mut() {
                 o.before_event(e, world);

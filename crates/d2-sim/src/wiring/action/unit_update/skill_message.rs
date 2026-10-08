@@ -79,7 +79,7 @@ pub fn monster_hit(guid: u32, b0: u8, life: u8, flag_100: bool) -> [u8; 9] {
 // PROVISIONAL (sim/pathing.md §10 rule 2): the table's non-walk rows
 // are not specified; read as `0x00548090` → `0x0053D530` / `0x0053D4D0`
 // (intents-events.md §3.5 rule 5 caller, flag 0, w 0) for the skill
-// modes; settled by REC-94.
+// modes; settled by REC-95.
 pub fn player_skill_mode(mode: u32) -> bool {
     matches!(mode, 7 | 8 | 10..=16 | 18)
 }
@@ -98,12 +98,12 @@ impl<X: Pending> View<'_, X> {
         target: Option<(u8, u32)>,
         point: (u16, u16),
     ) -> bool {
-        let Some(e) = self.h.x.used_skill(unit) else {
+        let Some(e) = self.h.used_skill_of(unit) else {
             return false;
         };
         // PROVISIONAL (sim/intents-events.md §7.4 rule 3): "level" is
         // read as the entry's base + bonus level (+0x28 + +0x2C), as a
-        // byte; settled by REC-94.
+        // byte; settled by REC-95.
         let b = e.base.wrapping_add(e.level_bonus).clamp(0, 255) as u8;
         let m = match target {
             Some(t) => self.skill_on_unit_message(game, receiver, (ty, guid), e.skill, b, t),

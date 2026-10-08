@@ -104,6 +104,9 @@ pub struct WorldViewState {
     pub last_ui: Vec<crate::ui::UiDraw>,
     /// The preview's pending interaction (`super::interact`).
     pub interact: super::interact::PreviewInteract,
+    /// Ground items (`super::ground_items`): the app hands in the item art
+    /// rows and the archives; the default draws nothing.
+    pub ground_items: super::ground_items::GroundItems,
 }
 
 impl WorldViewState {
@@ -126,6 +129,7 @@ impl WorldViewState {
             last_tags: Vec::new(),
             last_ui: Vec::new(),
             interact: Default::default(),
+            ground_items: Default::default(),
         }
     }
 }
@@ -608,11 +612,15 @@ fn world_view_frame(
                 }
                 None => (0, None),
             };
+            let unhandled = state
+                .ground_items
+                .take_clicks(&mut bridge.0, &frame.unhandled)?;
+            crate::bridge::belt::send_keys(&mut bridge.0, &frame.unhandled)?;
             let outs = world_clicks(
                 &mut bridge.0,
                 &mut state.click,
                 view,
-                &frame.unhandled,
+                &unhandled,
                 mods,
                 local_at,
             )?;
@@ -653,7 +661,7 @@ fn world_view_frame(
         state.feed.as_mut(),
         &state.assets,
     );
-    let frame = match built {
+    let mut frame = match built {
         Ok(f) => f,
         // d2rs-own, unverified (D1): the preview keeps running; the
         // frame is not presented.
@@ -667,6 +675,14 @@ fn world_view_frame(
         }
         Err(e) => return Err(e.into()),
     };
+    for m in state.ground_items.add_to_frame(
+        bridge.0.world(),
+        state.feed.as_ref(),
+        &mut state.assets,
+        &mut frame,
+    ) {
+        warn!("preview (d2rs-own, unverified): {m}");
+    }
     // `ui/automap.md` §5 r1: the reveal of this frame, after the draw
     // marked its records (from the frame `0x0044C7EB`).
     if let Some(a) = state.automap.as_mut() {

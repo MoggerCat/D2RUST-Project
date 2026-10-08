@@ -524,7 +524,7 @@ fn monster_hit_life_byte() {
     assert_eq!(skill_message::monster_hit(9, 4, 0x40, true)[7..], [4, 0xBF]);
 }
 
-/// PROVISIONAL (pathing.md §10 r2; REC-94): a player entering a skill
+/// PROVISIONAL (pathing.md §10 r2; REC-95): a player entering a skill
 /// mode (A1) with a used skill sends 0x4C on its path's target unit, to
 /// its own client too; a walk mode still sends nothing to it.
 // Covers: specs/sim/pathing.md §10 r2; specs/sim/intents-events.md §3.5 r5

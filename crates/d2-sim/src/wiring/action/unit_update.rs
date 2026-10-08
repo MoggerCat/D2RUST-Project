@@ -206,7 +206,7 @@ impl<X: Pending> View<'_, X> {
         Some(ModeInput {
             mode,
             guid,
-            skill_in_use: self.h.x.used_skill(unit).is_some(),
+            skill_in_use: self.h.used_skill_of(unit).is_some(),
             target,
             cell: (path.x() as u16, path.y() as u16),
             path_target: (path.target_x, path.target_y),

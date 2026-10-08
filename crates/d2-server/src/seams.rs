@@ -160,6 +160,14 @@ pub trait Intents {
     /// The game frame counter (`tick.md` §2, game +0xA8).
     fn frame(&self) -> i32;
 
+    /// Before the point / unit parse (spec §2.4 rules 3–4) of message
+    /// `msg`: the provider brings the facts the parse reads (the
+    /// client's player and, for a unit message, the target) up to date.
+    /// Default: nothing (the facts are staged by the caller).
+    fn refresh_targets(&mut self, client: ClientId, msg: &[u8]) {
+        let _ = (client, msg);
+    }
+
     /// Point parser inputs (spec §2.4 rule 3); `None` when the player has
     /// no player data (→ 2).
     fn point_state(&self, client: ClientId) -> Option<PointState>;

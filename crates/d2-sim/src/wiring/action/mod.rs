@@ -265,6 +265,13 @@ pub struct ActionHooks<X> {
     /// (`sim/intents-events.md` §8; [`switch`]): player names, hot keys,
     /// skill hands, portal flags.
     pub session: switch::SessionState,
+    /// The players' server skill lists (unit +0xA8,
+    /// [`crate::skills::list`]): created by the player init
+    /// (`client/msg-skills.md` §2 rule 8) and filled by the character
+    /// load (`formats/d2s.md` §7.2); the join's S→C 0x94 reads them.
+    /// TODO(skills/levels.md): the combat and skill seams
+    /// ([`Pending::skill_list`]) do not read them yet.
+    pub skill_lists: BTreeMap<UnitId, crate::skills::list::SkillList>,
     /// The inactive-unit store (game +0xD8, `units.md` §3.4;
     /// [`inactive`]). `None` (the default): tick step 9 compresses
     /// nothing and the restore is the host's, as before.
@@ -275,6 +282,28 @@ pub struct ActionHooks<X> {
     /// logged with it).
     pub orphan_seed: Seed,
     pub errors: Vec<WiringError>,
+}
+
+impl<X: Pending> ActionHooks<X> {
+    /// The unit's skill list: its list in [`ActionHooks::skill_lists`]
+    /// when it has one (`client/msg-skills.md` §1), else
+    /// [`Pending::skill_list`].
+    pub fn skill_list_of(&self, unit: UnitId) -> Vec<crate::skills::SkillEntry> {
+        match self.skill_lists.get(&unit) {
+            Some(l) => l.view(),
+            None => self.x.skill_list(unit),
+        }
+    }
+
+    /// The unit's current skill entry (`use.md` §1 rule 2, +0x10): its
+    /// list's current entry when it has a list, else
+    /// [`Pending::used_skill`].
+    pub fn used_skill_of(&self, unit: UnitId) -> Option<crate::skills::SkillEntry> {
+        match self.skill_lists.get(&unit) {
+            Some(l) => l.current.and_then(|i| l.view().get(i).copied()),
+            None => self.x.used_skill(unit),
+        }
+    }
 }
 
 impl<X> ActionHooks<X> {
@@ -315,6 +344,7 @@ impl<X> ActionHooks<X> {
             sync: None,
             death: death::DeathState::default(),
             session: switch::SessionState::default(),
+            skill_lists: BTreeMap::new(),
             inactive: None,
             x,
             orphan_seed: Seed::init(),

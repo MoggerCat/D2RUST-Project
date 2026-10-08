@@ -98,6 +98,16 @@ pub fn add_original_ui(app: &mut App, parts: UiParts) -> Result<(), OriginalUiEr
     add_original_ui_with(app, parts, looks)
 }
 
+/// The levels' waypoint indexes for the installed waypoint menu
+/// ([`OriginalUi::set_waypoint_map`]); nothing without the original UI.
+pub fn set_waypoint_map(app: &mut App, map: d2_sim::world::waypoints::WaypointMap) {
+    if let Some(mut ui) = app.world_mut().get_non_send_mut::<WorldViewUi>() {
+        if let Some(o) = ui.original.as_mut() {
+            o.set_waypoint_map(map);
+        }
+    }
+}
+
 /// [`add_original_ui`] with the unit tables `looks` (instead of the ones
 /// read from `parts.source`).
 pub fn add_original_ui_with(
@@ -120,6 +130,7 @@ pub fn add_original_ui_with(
     // root's own rules are never asked.
     let mut root = UiRoot::new(Box::new(NoPanelRules));
     original.install(&mut root)?;
+    super::items::prepare_ui(app, &mut original);
     let files = original.files();
     let mut ui = WorldViewUi::new(root, Box::new(NoStrings));
     ui.original = Some(original);

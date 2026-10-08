@@ -10,6 +10,7 @@
 //! [`server_thread`]) through the bridge and the world view.
 
 pub mod hud;
+pub mod items;
 pub mod palette;
 pub mod play;
 pub mod rest;

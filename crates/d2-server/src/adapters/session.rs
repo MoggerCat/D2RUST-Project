@@ -1,4 +1,4 @@
-// Spec: specs/sim/intents-events.md §3.5 r7, §8.1, §8.2; specs/client/msg-skills.md §3; specs/sim/stat-lists.md §11; specs/render/lighting.md §9.2; specs/sim/path-placement.md §11, §13; specs/client/model.md §11 rules 1, 3; specs/formats/d2s-load.md
+// Spec: specs/sim/intents-events.md §3.5 r7, §8.1, §8.2; specs/client/msg-skills.md §3 r1; specs/sim/stat-lists.md §11; specs/render/lighting.md §9.2; specs/sim/path-placement.md §11, §13; specs/client/model.md §11 rules 1, 3; specs/formats/d2s-load.md
 //! The single-player session sequence of a client whose player is not
 //! yet placed (`intents-events.md` §8): the game-creation messages of
 //! C→S 0x67 (`0x00530BF0`, [`create_game`]) and the join of C→S 0x6B
@@ -13,9 +13,13 @@
 //!
 //! 1. the player's own add messages (§7.2, rule 3.1): S→C 0x59
 //!    AssignPlayer (GUID, class, name, (0, 0): the player is placed
-//!    nowhere yet), then part B: 0xAA (its states), 0x76; then the
-//!    loader's S→C 0x94 with the player's native skills when the action
-//!    wiring's `Pending` holds a skill list ([`base_skill_levels`]);
+//!    nowhere yet), then part B: 0xAA (its states), 0x76; then, for a
+//!    loaded save ([`Entry::base_skills`]), the skills section's S→C 0x94
+//!    BaseSkillLevels (rule 3.1 (b), `0x0053C5D0` at `0x0056A7B7`;
+//!    `client/msg-skills.md` §3) from the player's server skill list; a
+//!    new character's stub load reads no skills section (rule 3.1, load
+//!    §1), so it sends none (the client's own player init gives it its
+//!    native skills, `msg-skills.md` §2 rule 8);
 //! 2. S→C 0x0B GameHandshake (type 0, the player's GUID, rule 3.2);
 //! 3. S→C 0x5F PortalFlags (rule 3.3), with the player record;
 //! 4. the player's stat messages (rule 3.4: the mod-array flush
@@ -54,8 +58,8 @@
 //! load's own 0x23; a caller without a record gets no 0x5F and no 0x23.
 //!
 //! Not sent, because no spec gives them (named, not guessed):
-//! - the loader's other messages after 0x76 and 0x94 (rule 3.1: 0x22,
-//!   0x21, 0x23, 0x5E, 0x28, 0x29 from the loader's callees);
+//! - the loader's other messages after 0x94 (rule 3.1: 0x22, 0x21,
+//!   0x23, 0x5E, 0x28, 0x29 from the loader's callees);
 //! - the item messages of rule 3.5 and the update-list reset of rule 3.10
 //!   (the item world is not reachable from the session), and
 //!   `0x0058A0A0` of an expansion game;
@@ -149,6 +153,11 @@ pub struct Entry {
     /// `formats/d2s-load.md` §1 rule 1, §8 rule 3): one S→C 0x23 sent
     /// right after the add messages (`intents-events.md` §8.2 rule 3.1).
     pub load_skill: Option<SkillHand>,
+    /// The load read a skills section (a full save, `formats/d2s.md`
+    /// §7.2): its S→C 0x94 (`0x0053C5D0` at `0x0056A7B7`) follows the add
+    /// messages (`intents-events.md` §8.2 rule 3.1 (b)). False for the
+    /// stub (load §1 reads no section) and a caller without a load.
+    pub base_skills: bool,
 }
 
 impl Entry {
@@ -160,6 +169,16 @@ impl Entry {
             hotkeys: [NO_HOT_KEY; 16],
             record: None,
             load_skill: None,
+            base_skills: false,
+        }
+    }
+
+    /// A loaded full save's entry: act `act`, and the skills section's
+    /// S→C 0x94 ([`Entry::base_skills`]).
+    pub fn loaded(act: u8, name: [u8; 16]) -> Self {
+        Self {
+            base_skills: true,
+            ..Self::new(act, name)
         }
     }
 
@@ -283,36 +302,6 @@ pub fn stat_messages(values: &[(i32, i32)]) -> Vec<Vec<u8>> {
         .collect()
 }
 
-/// S→C 0x94 BaseSkillLevels (`0x0053C5D0`; layout `client/msg-skills.md`
-/// §3 rule 1, `server-messages.tsv`: count u8@1, GUID u32@2, then per
-/// entry skill u16, level u8) of a player whose list is `list`. `None`
-/// when the list has no native entry (no provider, or no list).
-///
-/// PROVISIONAL (client/msg-skills.md §3 r1; intents-events.md §8.2 r3.1):
-/// which entries the sender writes and which level is not specified; the
-/// native entries (owner −1) in list order with their base level, as the
-/// recorded join carries (`intents-events.md` test vector "skill list of
-/// player 1, 8 entries": skill 0 and the class skills, level 1 each),
-/// at most 255 (the count is a u8), a base clamped to 0–255. The 1.14d
-/// new-character load skips the skills step (b) and no new-character
-/// join is recorded (`formats/d2s-load.md` OQ4, REC-02): d2rs sends it on
-/// both paths, after the add messages.
-pub fn base_skill_levels(guid: u32, list: &[d2_sim::skills::SkillEntry]) -> Option<Vec<u8>> {
-    let native: Vec<_> = list.iter().filter(|e| e.is_native()).take(255).collect();
-    if native.is_empty() {
-        return None;
-    }
-    let mut m = Vec::with_capacity(6 + 3 * native.len());
-    m.push(0x94);
-    m.push(native.len() as u8);
-    m.extend_from_slice(&guid.to_le_bytes());
-    for e in native {
-        m.extend_from_slice(&(e.skill as u16).to_le_bytes());
-        m.push(e.base.clamp(0, 255) as u8);
-    }
-    Some(m)
-}
-
 /// The game-creation messages of `client` (`intents-events.md` §8.1
 /// rules 3–6): S→C 0x01, 0x00 (client state := 1), 0x02, to the client's
 /// player.
@@ -390,10 +379,17 @@ pub fn enter_game<D: ActionEvents, W>(
         .x
         .send(player, &assign_player(guid, class as u8, &entry.name, 0, 0));
     a.with(&mut s.game, |g, v| v.player_part_b(g, player, player));
-    // Rule 3.1, the loader's skills step (b): S→C 0x94 with the player's
-    // native skills (none without a skill-list provider).
-    if let Some(m) = base_skill_levels(guid, &a.sys.hooks.x.skill_list(player)) {
-        a.sys.hooks.x.send(player, &m);
+    // Rule 3.1 (b): the skills section's 0x94, from the player's list.
+    if entry.base_skills {
+        let m = a
+            .sys
+            .hooks
+            .skill_lists
+            .get(&player)
+            .and_then(|l| msg::base_skill_levels(guid, &l.base_levels()));
+        if let Some(m) = m {
+            a.sys.hooks.x.send(player, &m);
+        }
     }
     // Rule 3.1, the stub load's right-skill selection (§8.2 rule 7).
     if let Some(h) = entry.load_skill {
@@ -411,8 +407,13 @@ pub fn enter_game<D: ActionEvents, W>(
     // Rule 3.4 (the array is cleared only by the room update queue,
     // `stat-lists.md` §11 rule 3, so rule 3.8 sends the same values).
     let stats = stat_messages(&a.sys.stats.mod_values(player));
+    let items = a.sys.hooks.session.join_items.remove(&player);
     let x = &mut a.sys.hooks.x;
     for m in &stats {
+        x.send(player, m);
+    }
+    // Rule 3.5: the player's item messages (the loader's, in send order).
+    for m in items.iter().flatten() {
         x.send(player, m);
     }
     for (i, k) in entry.hotkeys.iter().enumerate() {
@@ -531,7 +532,7 @@ pub fn load_save<D: ActionEvents, W>(
         let portals = s.events.action().sys.hooks.drlg.data.portal_levels();
         Entry::new_character(save.header.name, &portals, report.right_skill)
     } else {
-        Entry::new(report.act, save.header.name)
+        Entry::loaded(report.act, save.header.name)
     };
     Ok((entry, report))
 }

@@ -1,4 +1,4 @@
-// Spec: specs/client/model.md (§3 r3, open question 2), specs/sim/pathing.md (§8.1–8.2, §9.4, case M1), specs/ui/controls.md (§6 r7)
+// Spec: specs/client/model.md (§3 r3, open question 2), specs/sim/pathing.md (§8.1–8.5, §9.4, cases M1, D1–D4), specs/ui/controls.md (§6 r7)
 //! Provisional own-walk motion of the local player (first playable
 //! preview, decision D2 in `docs/PLAN.md`).
 //!
@@ -14,7 +14,11 @@
 //!   straight line at the charstats walk / run speed ([`Speeds`]);
 //! - every change of the model's local position or server point (0x15
 //!   placement, 0x0F / position-check correction) snaps it back to the
-//!   model ([`Predict::observe`]).
+//!   model ([`Predict::observe`]);
+//! - the facing (`dir64`, [`Predict::facing`]) is the direction of
+//!   `sim/pathing.md` §8.3 from the predicted position toward the target
+//!   (§8.4 r2, facing §8.5 without the client's turn), set when a walk is
+//!   taken and each step; it stays when the walk ends.
 //!
 //! The server stays the authority (rule 7): nothing here is sent or
 //! written to the model; the prediction only feeds the view and the
@@ -22,11 +26,36 @@
 //!
 //! d2rs-own, unverified. PROVISIONAL (client/model.md OQ2; REC-51): the
 //! straight line (the server walks the path of `sim/pathing.md` §4), the
-//! snap rule and the tick step are not 1.14d facts. Used only by the
+//! snap rule, the tick step and the facing (the client turns, §8.5) are
+//! not 1.14d facts. Used only by the
 //! `play` preview; the strict path never builds one.
+
+use std::sync::OnceLock;
+
+use d2_sim::path::tables::PathTables;
+use d2_sim::path::walk::geom::direction_vector;
 
 use super::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use super::world::{ClientWorld, UnitKey, PLAYER};
+
+/// The direction `dir64` (0–63) from precise (16.16) point `from` toward
+/// `to` (`sim/pathing.md` §8.3, `tan` table of `path-tables.tsv`, without
+/// the path flag 0x200 flip); `None` when the points are equal (§8.4 r1:
+/// no direction toward the point the unit is on) or the tables do not
+/// parse.
+pub fn facing(from: (u32, u32), to: (u32, u32)) -> Option<u8> {
+    static TABLES: OnceLock<Option<PathTables>> = OnceLock::new();
+    if from == to {
+        return None;
+    }
+    let tables = TABLES.get_or_init(|| PathTables::spec().ok()).as_ref()?;
+    Some(direction_vector(tables, from, to).1)
+}
+
+/// The precise (16.16) centre of a sub-tile, as `u32`.
+pub fn cell_centre((x, y): (u16, u16)) -> (u32, u32) {
+    ((u32::from(x) << 16) | 0x8000, (u32::from(y) << 16) | 0x8000)
+}
 
 /// The charstats speeds of the local player's class (`WalkVelocity`
 /// +0x40, `RunVelocity`; `sim/pathing.md` §8.1 r2, §8.2).
@@ -124,6 +153,8 @@ pub struct Predict {
     at: Option<(i64, i64)>,
     /// The walk under way.
     walk: Option<Walk>,
+    /// The predicted facing `dir64`; kept when the walk ends.
+    dir: Option<u8>,
 }
 
 impl Predict {
@@ -153,6 +184,7 @@ impl Predict {
                 seen: Some(now),
                 at: Some(centre(pos)),
                 walk: None,
+                dir: None,
             };
             return;
         }
@@ -197,6 +229,9 @@ impl Predict {
             return;
         };
         let (tx, ty) = centre(target);
+        if let Some(d) = facing((x as u32, y as u32), (tx as u32, ty as u32)) {
+            self.dir = Some(d);
+        }
         let (dx, dy) = (tx - x, ty - y);
         let step = speeds.step(walk.run);
         let dist = isqrt(dx.unsigned_abs().pow(2) + dy.unsigned_abs().pow(2)) as i64;
@@ -210,8 +245,24 @@ impl Predict {
         self.at = Some((x + dx * step / dist, y + dy * step / dist));
     }
 
+    /// Faces the walk's target from the predicted position (module doc);
+    /// no walk, no target or already on it: the facing stays.
+    fn face(&mut self, world: &ClientWorld) {
+        let (Some((x, y)), Some(walk)) = (self.at, self.walk) else {
+            return;
+        };
+        let target = match walk.to {
+            WalkTo::Point(tx, ty) => Some((tx, ty)),
+            WalkTo::Unit(k) => world.units.get(&k).and_then(|u| u.position),
+        };
+        if let Some(d) = target.and_then(|t| facing((x as u32, y as u32), cell_centre(t))) {
+            self.dir = Some(d);
+        }
+    }
+
     /// One bridge frame: [`Self::observe`], the walks sent since the last
-    /// frame (last one wins), then [`Self::tick`] if the server ticked.
+    /// frame (last one wins), the facing toward the target, then
+    /// [`Self::tick`] if the server ticked.
     pub fn frame(
         &mut self,
         world: &ClientWorld,
@@ -223,6 +274,7 @@ impl Predict {
         for w in walks {
             self.walk(w);
         }
+        self.face(world);
         if ticked {
             self.tick(world, speeds);
         }
@@ -248,6 +300,13 @@ impl Predict {
     /// The walk under way, if any.
     pub fn walking(&self) -> Option<Walk> {
         self.walk
+    }
+
+    /// The predicted facing `dir64` (0–63, module doc); `None` before the
+    /// first walk. Stays after the walk ends (a standing unit keeps its
+    /// direction).
+    pub fn facing(&self) -> Option<u8> {
+        self.dir
     }
 
     /// The player mode the view shows while the prediction moves: 2
@@ -495,6 +554,37 @@ mod tests {
         w.units.remove(&npc);
         p.frame(&w, [], true, SPEEDS);
         assert_eq!(p.walking(), None);
+    }
+
+    // Covers: specs/sim/pathing.md §8.3
+    #[test]
+    fn facing_follows_the_direction_vector() {
+        let c = |x: i32, y: i32| cell_centre(((100 + x) as u16, (100 + y) as u16));
+        let o = c(0, 0);
+        assert_eq!(facing(o, c(10, 0)), Some(56));
+        assert_eq!(facing(o, c(0, -10)), Some(40));
+        assert_eq!(facing(o, c(5, 5)), Some(0));
+        assert_eq!(facing(o, c(3, 1)), Some(59));
+        assert_eq!(facing(o, o), None);
+    }
+
+    // Covers: specs/sim/pathing.md §8.3, §8.4
+    #[test]
+    fn the_walk_sets_the_facing_and_it_stays_when_standing() {
+        let (w, _) = world_at(100, 100);
+        let mut p = Predict::new();
+        p.observe(&w);
+        assert_eq!(p.facing(), None);
+        // Taken before any tick: faces the target at once.
+        p.frame(&w, [walk_point(100, 90, false)], false, SPEEDS);
+        assert_eq!(p.facing(), Some(40));
+        for _ in 0..40 {
+            p.frame(&w, [], true, SPEEDS);
+        }
+        assert_eq!((p.walking(), p.cell()), (None, Some((100, 90))));
+        assert_eq!(p.facing(), Some(40), "kept after the walk ends");
+        p.frame(&w, [walk_point(110, 90, true)], true, SPEEDS);
+        assert_eq!(p.facing(), Some(56));
     }
 
     fn walk_point(x: u16, y: u16, run: bool) -> Walk {

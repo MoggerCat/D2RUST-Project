@@ -2060,7 +2060,7 @@ fn run_with(game_seed: u32) -> Transcript {
     let (hit, before) = frames[1..].split_last().unwrap();
     // The player's own skill message (S→C 0x4D while in its attack
     // mode) is the d2rs-own echo of `pathing.md` §10 r2 (PROVISIONAL,
-    // REC-94); nothing else up to the hit.
+    // REC-95); nothing else up to the hit.
     for f in before {
         let rest: Vec<_> = f.2.iter().filter(|m| m[0] != 0x4D).cloned().collect();
         assert_eq!(rest, none, "no S→C up to the hit but the 0x4D echo");
@@ -2577,7 +2577,7 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(log.handled, 25);
     assert_eq!(
         log.dropped,
-        // + the player's own 0x4D echo (REC-94), dropped like 0x0D.
+        // + the player's own 0x4D echo (REC-95), dropped like 0x0D.
         BTreeMap::from([(0x0D, 1), (0x4D, 1), (0x69, 2), (0x6D, 1)])
     );
     assert_eq!((log.queued, log.drained), (1, 0));
