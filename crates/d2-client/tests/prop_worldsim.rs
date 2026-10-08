@@ -970,8 +970,13 @@ fn run(game_seed: u32, ops: &[Op], quiet: u32) -> Result<Vec<Entry>, String> {
         fx.stage();
         if let Some(m) = message(&mut fx, &op.msg) {
             let before = fx.digest();
+            let resyncs = fx.sim.resyncs.len();
             let code = fx.send(&m);
-            if dispatcher_rejects(&fx, &m, code)? {
+            // A refused target more than 25 frames after the last accepted
+            // one queues the player for S→C 0x15 (`intents-events.md` §2.4
+            // r3): that is the one state change a rejection may make.
+            let resynced = fx.sim.resyncs.len() != resyncs;
+            if !resynced && dispatcher_rejects(&fx, &m, code)? {
                 let after = fx.digest();
                 if after != before {
                     return Err(format!(

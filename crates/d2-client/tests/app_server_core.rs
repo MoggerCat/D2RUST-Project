@@ -244,7 +244,7 @@ fn an_out_of_range_walk_resyncs_the_client_with_0x15() {
     assert_eq!(r[10], 1);
 }
 
-// Covers: specs/skills/use.md §3, specs/sim/pathing.md §1.2
+// Covers: specs/skills/use.md §3; specs/sim/pathing.md §1.2
 #[test]
 fn a_left_skill_on_a_far_monster_runs_the_server_player_to_it() {
     let mut g = Game::joined();
