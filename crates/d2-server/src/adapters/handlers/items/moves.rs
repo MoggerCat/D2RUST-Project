@@ -288,6 +288,9 @@ fn swap_weapons<D: EventDispatch, W: WorldHost<D>>(
     let player = sim.player_of(client)?;
     let (game, events) = (&mut sim.game, &mut sim.events);
     let (ok, sent) = sim.world.moves(game, events, SwapRun { player })?;
+    if ok {
+        sim.world.weapon_switched(events, player);
+    }
     for (unit, bytes) in sent {
         if let Some(c) = unit.and_then(|u| sim.client_of(u)) {
             // A full queue is the host's fault elsewhere; the swap stands.

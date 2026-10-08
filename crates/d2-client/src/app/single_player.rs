@@ -831,6 +831,9 @@ impl Pending for LocalSeams {
     fn monster_sequence_frame(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
         skill_events::monster_sequence_frame(h, sim, unit);
     }
+    fn golem_resummon(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, player: UnitId) -> bool {
+        skill_events::golem_resummon(h, sim, player)
+    }
     // d2rs-own, unverified (q-amazon, REC-150): the hand class, the item
     // shoots / stack facts of the skill bodies ([`super::weapons`]).
     fn composit_weapon_class(&self, unit: UnitId) -> i32 {
@@ -2997,6 +3000,7 @@ fn loader(
                 // are the join's item messages (rule 3.5), sent after the
                 // stat messages.
                 let (entry, report, items) = load_new_character_with_items(s, player, r.char_name);
+                super::save_gaps::seed_new_flags(s, player, GAME_SETUP.expansion);
                 let own: Vec<Vec<u8>> = items
                     .sent
                     .iter()

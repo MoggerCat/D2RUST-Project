@@ -90,6 +90,14 @@ pub struct SkillList {
     pub left: Option<usize>,
     pub right: Option<usize>,
     pub current: Option<usize>,
+    /// The mouse skills of the weapon set not in hand (header +0x80 /
+    /// +0x84, `d2s.md` §2.4), as indices into `entries`. d2rs-own,
+    /// unverified (REC-265).
+    pub swap_left: Option<usize>,
+    pub swap_right: Option<usize>,
+    /// The weapon switch state (header +0x10 bit 0): the swap set is in
+    /// hand. d2rs-own, unverified (REC-265).
+    pub weapon_switch: bool,
     /// Effects owed to the unit, in call order; the owner drains them.
     pub fx: Vec<ListFx>,
 }
@@ -106,6 +114,14 @@ fn passive_state(r: &Skills) -> Option<u16> {
 }
 
 impl SkillList {
+    /// The weapon switch (C→S 0x60): the two mouse pairs trade places and
+    /// the switch state flips. d2rs-own, unverified (REC-265).
+    pub fn switch_weapons(&mut self) {
+        std::mem::swap(&mut self.left, &mut self.swap_left);
+        std::mem::swap(&mut self.right, &mut self.swap_right);
+        self.weapon_switch = !self.weapon_switch;
+    }
+
     /// "The entry of (skill, owner)" (§1 rule 4, `0x006439B0`): the
     /// first in list order.
     pub fn find(&self, skill: i32, owner: i32) -> Option<usize> {

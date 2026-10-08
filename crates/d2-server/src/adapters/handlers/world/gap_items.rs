@@ -15,7 +15,53 @@ pub const IRON_GOLEM_CLASS: u32 = 0x123;
 /// The golem's pet type (`d2s.md` §8.5 rule 1: "pet node (type 3)").
 const GOLEM_PET_TYPE: usize = 3;
 
+/// The live hireling's header block (`d2s.md` §2.5 rule 1), field by
+/// field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HirelingBlock {
+    pub dead: bool,
+    pub seed: u32,
+    pub name_index: u16,
+    pub id: u16,
+    pub experience: u32,
+}
+
 impl<R, S> WiredWorld<R, S> {
+    /// §2.5 rule 1: the block of the player's hireling node (type 7) whose
+    /// row is found: seed and name of the node, the name index relative
+    /// to the row's `NameFirst`, experience from the unit's stat 13 (0
+    /// without a unit). `None`: no node or no row. d2rs-own, unverified
+    /// (REC-265).
+    pub fn hireling_block<D: ActionEvents>(
+        &self,
+        game: &mut Game,
+        events: &mut D,
+        player: UnitId,
+    ) -> Option<HirelingBlock> {
+        let node = *self.state.hirelings.first_node(player, true)?;
+        let tables = self.state.hireling_tables.as_ref()?;
+        let expansion = events.action().sys.data.expansion;
+        let version = if expansion { 100 } else { 0 };
+        let row = tables
+            .rows
+            .rows
+            .iter()
+            .find(|r| r.id == node.id && r.version == version)?;
+        let merc = self.hireling_unit(game, player);
+        let experience = merc.map_or(0, |m| {
+            events
+                .action()
+                .with(game, |_, v| v.stats.unit_base(m, 13, 0))
+        });
+        Some(HirelingBlock {
+            dead: node.dead,
+            seed: node.seed,
+            name_index: node.name.wrapping_sub(row.name_first),
+            id: node.id as u16,
+            experience: experience.max(0) as u32,
+        })
+    }
+
     /// The player's hireling unit: the first node of its hireling list
     /// (`hirelings.md` §5 rule 4, dead nodes included) whose unit exists.
     pub fn hireling_unit(&self, game: &Game, player: UnitId) -> Option<UnitId> {
