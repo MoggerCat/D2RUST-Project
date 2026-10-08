@@ -1795,6 +1795,8 @@ S9-A1–S9-A7 (S9-A1 is PC 1's recording list for PC 2) and one B pointer to
 
 Index: Done · A player · B Ghidra / spec edits · C game files and GPU · Blocked.
 
+- **q-realdata-gate (moves these runs to the cloud)**: once the private repo `MoggerCat/D2RUST-private-repo` has the commit `install: complete` (full 1.14d install plus `extracted/`), the window-free runs of `docs/LOCAL-RUN.md` Batches 1–2 (`data-tool tables` / `links`, `mpq-tool check` / `formats`, every `#[ignore]` game-file test) no longer need the developer PC. A cloud session runs `sh tools/realdata-gate.sh` (fetches and assembles the install into `$HOME/game` by itself; `--no-client` skips the Bevy crate; `--help` lists options). Look for: exit 0 and the summary line `ignored tests: N passed, 0 failed`; exit 2 means the install is not complete yet (nothing ran). Record the summary in Done and remove the matching `C<n>` entries as their rows pass. Still local: GPU and window runs (Batches 3–6), recordings, and the two `D2_TABLES_DUMP` tests. Inventory: `docs/handoff/realdata-tests.tsv`; reading guide: `docs/handoff/q-realdata-gate.md`.
+
 ### Done (kept for the record)
 
 Done 2026-10-08 round 2 (local PC 1, branch claude/local-pc1-s8 from 4660bf4;
