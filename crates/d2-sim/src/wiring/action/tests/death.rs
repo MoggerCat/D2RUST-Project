@@ -649,7 +649,11 @@ fn a_dropped_item_blocks_the_next_drop() {
 }
 
 /// The provider on without the walk-back field: the drop keeps the
-/// [`FreeSpot`] seam (here: the start as is), at the path position.
+/// [`FreeSpot`] seam (here: the start as is), and the item still gets
+/// its static path at that spot (`path-placement.md` §2.5, the path part
+/// of `SUNIT_Add`): its 0x9C ground x / y is the static path's
+/// (`bitstream.md` §4.1 r2). Before q-play-smoke the item had no path
+/// record here, so a dropped item reached the client at (0, 0).
 #[test]
 fn without_the_field_the_drop_keeps_the_free_spot_seam() {
     let mut fx = Fx::new();
@@ -660,14 +664,11 @@ fn without_the_field_the_drop_keeps_the_free_spot_seam() {
     let spot = spot_of(&mut fx, &mut d, mon, p);
     assert_eq!((spot.x, spot.y), (15, 13));
     let item = d.placed[0].0;
-    assert!(fx
-        .sim
-        .hooks()
-        .paths
-        .as_ref()
-        .unwrap()
-        .record(item)
-        .is_none());
+    let rec = fx.sim.hooks().paths.as_ref().unwrap().record(item).cloned();
+    match rec {
+        Some(crate::path::UnitPath::Static(s)) => assert_eq!((s.x, s.y), (15, 13)),
+        other => panic!("a static path at the spot: {other:?}"),
+    }
     fx.assert_clean();
 }
 
