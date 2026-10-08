@@ -294,12 +294,14 @@ impl OptionsMenu {
     }
 
     /// Enabled test (§O2 r3 with the stubs of §O8): titles never; 3D
-    /// Sound, EAX, 3D Bias and Perspective are disabled in d2rs.
+    /// Sound, EAX, 3D Bias and Perspective are disabled in d2rs; Party
+    /// Names only while the party is shown (`0x004577B0`).
     pub fn enabled(&self, i: usize) -> bool {
-        !matches!(
-            self.rows()[i].row,
-            Row::Title | Row::Sound3d | Row::Eax | Row::Bias3d | Row::Perspective
-        )
+        match self.rows()[i].row {
+            Row::Title | Row::Sound3d | Row::Eax | Row::Bias3d | Row::Perspective => false,
+            Row::MapNames => self.settings.automap_party != 0,
+            _ => true,
+        }
     }
 
     /// The stored integer of a setting row (registry-style value).

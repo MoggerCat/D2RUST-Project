@@ -46,6 +46,14 @@ pub fn fallback_cube_grid(screen: &Screen) -> GridRecord {
     }
 }
 
+/// The cube panel's keep-open test (`panels.md` §12 r2, `0x00463DF0`):
+/// a local player whose mode is not 0x11 (dead). The exit flag
+/// (`0x0044DA30`) is not in the model. A missing cube does not close the
+/// panel (`world/cube.md` §11 r3).
+pub fn cube_player_ok(world: &ClientWorld) -> bool {
+    world.local().is_some_and(|u| u.mode != 0x11)
+}
+
 /// The cube item (code `box `, stored in the inventory) is in the model.
 pub fn cube_present(world: &ClientWorld) -> bool {
     items::local_items(world)

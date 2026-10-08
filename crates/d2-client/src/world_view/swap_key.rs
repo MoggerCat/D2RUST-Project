@@ -10,6 +10,10 @@ use crate::bridge::{Bridge, BridgeError};
 use crate::controls::Action;
 use crate::ui::{ActionId, UiEvent};
 
+/// The UI states that block the swap command (`ui/controls.md` §3 row
+/// 44, `0x00469140`: NPC shop, trade, stash).
+pub const SWAP_BLOCKING: [u8; 3] = [0x0C, 0x17, 0x19];
+
 /// Sends C→S 0x60 for each swap-weapons action in `unhandled`; returns
 /// how many left.
 pub fn send_swaps<L: ServerLink>(
@@ -23,4 +27,26 @@ pub fn send_swaps<L: ServerLink>(
         sent += 1;
     }
     Ok(sent)
+}
+
+/// Whether the swap command runs (`ui/controls.md` §3 row 44): none of
+/// [`SWAP_BLOCKING`] is open.
+pub fn swap_allowed(is_open: &dyn Fn(u8) -> bool) -> bool {
+    !SWAP_BLOCKING.iter().any(|&s| is_open(s))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Covers: specs/ui/controls.md §3 row29
+    #[test]
+    fn no_swap_with_the_shop_trade_or_stash_open() {
+        assert!(swap_allowed(&|_| false));
+        for s in [0x0C, 0x17, 0x19] {
+            assert!(!swap_allowed(&|u| u == s), "ui {s:#x}");
+        }
+        // The inventory or the cube do not block it.
+        assert!(swap_allowed(&|u| u == 1 || u == 0x1A));
+    }
 }
