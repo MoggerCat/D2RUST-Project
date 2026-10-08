@@ -1173,6 +1173,15 @@ impl Panel for BorderUi {
         // The cursor item last (`panels-3.md` §23 r9).
         sh.items
             .draw_cursor(ctx.world, &sh.tables.files, (29, 29), sh.mouse, out);
+        // The belt item's tip (`hud_belt`, `control-panel.md` §5 r8).
+        if let Some(tips) = sh.items.tips.as_ref() {
+            let (lines, at) = sh.hud.belt.hover_tip(ctx.world, tips);
+            if !lines.is_empty() {
+                let (w, h) = (sh.config.screen.w, sh.config.screen.h);
+                let at = Point::new(at.0, at.1);
+                item_tip::draw_tip(&lines, at, (w, h), sh.fonts.as_ref(), &sh.tables.files, out);
+            }
+        }
         // The item tool tip over everything (`item_tip`).
         if sh.states.is_open(UI_INVENTORY) {
             let class = Facts::of(ctx.world).class;
