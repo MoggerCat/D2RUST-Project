@@ -26,7 +26,7 @@ Spec: `specs/formats/native-assets.md` §5, §7.1 test 7. Branch
 
 ## Tests
 
-- `tools/d2-convert/tests/play_native.rs`: the synthetic install (plus act
+- `crates/d2-client/tests/play_native.rs` (moved from `tools/d2-convert/tests/` so d2-convert stays free of Bevy): the synthetic install (plus act
   PL2s and a DC6) converted by `d2-convert`, then `GameData::select` vs
   `GameData::select_native`: waypoint tables, every parsed DS1 / DT1, the
   fixed-up tables, `ActPalettes`, a typed DC6 all equal; `.wav` is absent.
