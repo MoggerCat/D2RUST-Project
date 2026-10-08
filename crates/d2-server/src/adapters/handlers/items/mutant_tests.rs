@@ -466,6 +466,7 @@ fn with_vendors<O>(
             state: &mut *p.state,
             rest: probe,
             now: p.now,
+            inv: None,
         };
         let inner = desk.vendors(Some(&mut *p.npc));
         let mut w = InvVendors::new(inner, p.inventory.as_deref_mut());

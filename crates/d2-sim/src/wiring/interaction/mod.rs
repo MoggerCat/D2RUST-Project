@@ -42,6 +42,7 @@
 //! a seam call to a provider call.
 
 pub mod hirelings;
+pub mod npc_items;
 pub mod npc_vendors;
 pub mod npc_world;
 pub mod quest_npc;
@@ -57,6 +58,7 @@ pub(crate) mod tests;
 use std::collections::BTreeMap;
 
 pub use hirelings::{HireView, HirelingRest};
+pub use npc_items::{NpcInv, NpcInventory};
 pub use npc_vendors::VendorDesk;
 pub use npc_world::NpcRest;
 pub use skill_use::{UseRest, UseView};
@@ -189,6 +191,9 @@ pub struct Desk<'d, 'a, H, R> {
     /// Host milliseconds (`GetTickCount`), an input of store generation
     /// and refresh (`vendors.md` edge case 10).
     pub now: u32,
+    /// The host's inventory model for the NPC item services
+    /// ([`NpcInventory`]); `None`: those answer from the rest.
+    pub inv: Option<&'d mut dyn NpcInventory<H>>,
 }
 
 impl<'a, H, R: QuestRest> Desk<'_, 'a, H, R> {
