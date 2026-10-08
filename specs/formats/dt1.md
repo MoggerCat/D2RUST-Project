@@ -1,9 +1,11 @@
 # Spec: Formats — DT1 (map tiles)
 
-- **Status:** implemented. All 254 live `.dt1` files in 1.14d parse and
-  decode (6 unused version-4 leftovers excepted, see Edge cases). Block
-  formats seen: 0x0001 iso (226,996), 0x1001 (110,259) and 0x2005 (15,712),
-  both RLE.
+- **Status:** implemented. All 256 live `.dt1` files in 1.14d (names
+  case-insensitive, `mpq-tool formats` 2026-10-08) are read: 250 decode
+  and 6 unused version-4 leftovers are refused (see Edge cases). Block
+  formats seen: 0x0001 iso (226,996), 0x1001 (108,905) and 0x2005 (15,712),
+  both RLE. (The earlier 254 files / 110,259 0x1001 blocks counted names
+  case-sensitively.)
 - **Target version:** 1.14d
 - **Crate/module:** `d2-formats::dt1`
 - **Related specs:** `specs/formats/ds1.md` (maps that reference tiles)
@@ -184,7 +186,10 @@ consulted.
 3. Whole-file block limit (`file length / 20`, §Block header) assumes
    tiles never share block headers: confirm on every 1.14d `.dt1`
    (`mpq-tool formats`).
-   *Answered* (game-file read, 2026-10-07, the 251 used DT1s of
-   d2data + d2exp, 15,928 tiles, 397,668 blocks; `Patch_D2.mpq`
+   *Answered* (game-file read, 2026-10-07, the 251 DT1s of
+   d2data + d2exp by name = 245 version-7 files plus the 6 unused
+   version-4 leftovers; the totals quoted then, 15,928 tiles and 397,668
+   blocks, are for those 251 files. Version-7 only, re-read 2026-10-08:
+   15,637 tiles, 345,923 blocks, see Unknown and runtime fields; `Patch_D2.mpq`
    unlisted): no two tiles' block-header ranges overlap and every file's
    block total is within `length / 20`.

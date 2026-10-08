@@ -320,7 +320,7 @@ draw mode 5 unless a rule says otherwise.
       moves the pen up, `ui/text.md` §7), so the stat lines (colour 3,
       blue) are the lower lines and the name (colour 0, white) is drawn
       above them, as the stat-line builder leaves them (its line breaks
-      are `0x004E6410`'s, not specified here).
+      are `0x004E6410`'s, specified in `ui/item-tips.md` §6).
    4. Only when the text position (`[0x00722360]`, `[0x00722364]`) is ≥
       0 in both: when an NPC trade inventory mode is open
       (`0x00489840`: `[0x007BCBF0]` ∈ {1, 2, 3}) and

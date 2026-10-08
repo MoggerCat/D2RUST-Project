@@ -389,7 +389,7 @@ removed (`0x006272E0`, `stat-lists.md` §8.9) and the animation fields
 re-initialised (`0x00624390`); the same mode only queues
 the unit and sets flag 1 (not for a monster staying in mode 1). Setting
 a mode schedules nothing by itself. Mode starts that animate then call,
-in this order: prepare animation `0x005533D0` (action frame := 0;
+in this order: prepare animation `0x005533D0` (`skills/sequences.md` §2; action frame := 0;
 sequence modes — player 18, monster 14 with a sequence — load the
 sequence and its rate; otherwise sequence := null, current frame := 0,
 rate `0x00623F50` when the unit has a path, else only the AnimData
@@ -401,7 +401,7 @@ then §4.2. Movement starts set the mode, cancel and schedule §4.4.
 
 Inputs: frame f; speed s and frame count F (+0x3C/+0x34 with a
 sequence, else +0x4C/+0x48); event bytes E[i] (sequence: `0x006634C0`,
-owned by the sequence spec; else AnimData record +0x10 + i); start index.
+owned by `skills/sequences.md`; else AnimData record +0x10 + i); start index.
 
 Main form `0x005539B0` (start index = frame bonus b = `0x00623B10(unit)`):
 

@@ -16,12 +16,12 @@
 | Summary | 27–33 |
 | Rules | 34–35 |
 |   6. Deferred item messages | 36–129 |
-|   7. Intents | 130–681 |
-|   8. Pickup from the ground | 682–863 |
-|   9. Drop to the ground | 864–911 |
-|   10. Gold | 912–951 |
-|   11. Message layouts | 952–981 |
-|   12. Corpse take-back (`0x0057FB70` → `0x00562F30`) | 982–1109 |
+|   7. Intents | 130–686 |
+|   8. Pickup from the ground | 687–868 |
+|   9. Drop to the ground | 869–916 |
+|   10. Gold | 917–956 |
+|   11. Message layouts | 957–986 |
+|   12. Corpse take-back (`0x0057FB70` → `0x00562F30`) | 987–1114 |
 <!-- /index -->
 
 ## Summary
@@ -346,17 +346,22 @@ per axis (`0x00548EF0`), else 1; `0x0055E170(game, player, I, x, y,
    difficulty (`0x00543520`; flag test `0x0065C310`, clear
    `0x0065C3A0`, set `0x0065C360`; meanings `world/quests.md`):
    - `ass`: targeting reset; flag (9, 5) set → clear it, stat 5
-     (`newskills`) += 1, `0x005458E0`, consume I, 1.
+     (`newskills`) += 1, `0x005458E0(player, 8)`, consume I, 1.
    - `xyz`: targeting reset; flag (20, 5) set → clear it, stat 7
-     (`maxhp`) += 0x1400 (20 life, 8.8 fixed), `0x005458E0`, consume I,
-     1.
+     (`maxhp`) += 0x1400 (20 life, 8.8 fixed), `0x005458E0(player, 18)`,
+     consume I, 1.
    - `tr2`: targeting reset; (37, 8) set and (37, 7) clear → set (37,
-     7), `0x0058A0A0`, `0x005458E0`, consume I, 1.
+     7), `0x0058A0A0`, `0x005458E0(player, 33)`, consume I, 1.
    - `toa`: targeting reset, `0x00570360`, `0x00570C80` (skills and
      stats reset; skills / character owner), consume I, sound
      `0x00553380`, 1.
    - Other codes → 0. A failed flag test above → sound `0x00553380`,
      1.
+
+   `0x005458E0(player, chain)` (calls at `0x0055E40C` chain 8 `ass`,
+   `0x0055E48D` chain 18 `xyz`, `0x0055E506` chain 33 `tr2`) sends S→C
+   0x5D to the user's own client: bytes 5D, chain, 02, 00, 0000 (the
+   quest-chain notice; the chain number is fixed per item code).
 
 #### 7.12 0x21 StackItems (`0x0054B300` → `0x0055E7C0`)
 

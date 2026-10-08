@@ -512,7 +512,7 @@ the simulation. Exact fade values: render spec.
 | `Expansion` | load filter (§2.3) |
 
 Files beyond `Files` are only reachable through outdoor code setting the
-picked file (82 rows name such files, e.g. Defs 4–7 `File4`/`File5`).
+picked file (80 rows in the live d2exp table name such files: any of `File`(`Files`+1)..`File6` holding a string of more than one character, the 0/1-character strings being the `0` placeholders, `data/fixups.md` §12; 76 of them are in the 863 base rows, 4 in the expansion rows; e.g. Defs 4–7 `File4`/`File5`). Measured 2026-10-08 on d2exp `LvlPrest.txt` (1,091 rows) and `crates/d2-sim/tests/game_drlg_tables.rs` `lvlprest_measurements`; an earlier figure of 82 was not reproducible under any slot or placeholder rule tried.
 
 ## Constants & data dependencies
 

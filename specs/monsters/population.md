@@ -446,7 +446,7 @@ gets its party (§10).
    the picked record.
 2. **sparsePopulate:** if the record's `sparsePopulate` ≠ 0: one
    **game-seed** step; `lo' mod 100` > sparsePopulate → no pack (the try
-   ends). 1.14d data: only evilhut (528) has it (40).
+   ends). 1.14d data: only evilhut (record 528, hcIdx; the compare `0x0054E00F` is against 0x210; file data row 529 counting the dropped `Expansion` separator) has it (40).
 3. min = 0, max = 0 or max < min → no pack.
 4. Point: §8 (cl, class, warp check 1). Failure → no pack.
 5. Leader: §9 at the point inside cl, mode 1, r = −1, flags 0 (party
@@ -1100,7 +1100,7 @@ Real (1.14d tables, `game/extracted/patch_d2`; `#[ignore]`, needs
 | superuniques 0–9 | as listed in §11.4 | superuniques.txt |
 | monumod row 0 constants | 20 | monumod.txt |
 | placespawn rows | 206–209 crownest1–4 → foulcrow1–4 | monstats.txt |
-| sparsePopulate rows | 528 evilhut = 40 only | monstats.txt |
+| sparsePopulate rows | record 528 evilhut (file data row 529, 0-based, counting the `Expansion` separator at row 410) = 40 only | monstats.txt |
 | `0x00731B2C` | {270}; `0x00731B30` act bytes {0,1},{0,0}… | Game.exe .data |
 | `0x006E2CF0` | 12 offset pairs as §10.3; `0x006E2D50` = (0,−3),(3,0),(0,3),(−3,0) | Game.exe .rdata |
 
