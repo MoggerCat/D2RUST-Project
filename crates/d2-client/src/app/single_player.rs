@@ -1139,6 +1139,18 @@ impl WaypointTables {
         objects.push(portal);
         debug_assert_eq!(objects.len(), synthetic_tower::TOME_CLASS as usize);
         objects.push(tome);
+        // The Act IV endgame objects (q-a4-endgame), by class.
+        let last = synthetic_act4::OBJECT_ROWS.iter().map(|r| r.0).max();
+        objects.resize(
+            last.map_or(0, |c| c as usize + 1).max(objects.len()),
+            blank(),
+        );
+        for &(class, operate, init) in &synthetic_act4::OBJECT_ROWS {
+            let row = &mut objects[class as usize];
+            row.operatefn = operate;
+            row.initfn = init;
+            row.framecnt1 = 20 << 8;
+        }
         WaypointTables {
             levels,
             objects,
@@ -1598,7 +1610,12 @@ fn synthetic_types() -> Types {
             TileRect::new(24, 0, 8, 8),
         ),
         (synthetic_act4::RIVER_OF_FLAME, TileRect::new(32, 0, 8, 8)),
-        (synthetic_act4::CHAOS_SANCTUARY, TileRect::new(40, 0, 8, 8)),
+        // 40 × 40 tiles: the seal bosses stand up to 52 sub-tiles from
+        // their seals (`quests-act4.md` §5.4; q-a4-endgame).
+        (
+            synthetic_act4::CHAOS_SANCTUARY,
+            TileRect::new(40, 0, 40, 40),
+        ),
         (ACT5_TOWN, TileRect::new(0, 0, 8, 8)),
     ]))
 }
@@ -1950,6 +1967,10 @@ fn synthetic_monstats() -> Vec<Monstats> {
     // Blood Raven (REC-130): a killable class, so the kill parse runs.
     v[synthetic_burial::BLOOD_RAVEN as usize].killable = true;
     v[synthetic_act4::IZUAL as usize].killable = true;
+    // The Act IV endgame bosses (q-a4-endgame).
+    for c in synthetic_act4::BOSSES {
+        v[c as usize].killable = true;
+    }
     v
 }
 

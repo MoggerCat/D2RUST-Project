@@ -29,7 +29,7 @@ use crate::wiring::interaction::NpcRest;
 use super::{Economy, EconomyQuests, GameFields, HostQuests, QuestRest};
 use crate::world::objects::{Dispatch, EventRun, Operate, Route};
 use crate::world::quests::act3::{self, InitPoint, KhalimChest};
-use crate::world::quests::{self, act1, act2, act5, QuestControl, QuestWorld};
+use crate::world::quests::{self, act1, act2, act4, act5, QuestControl, QuestWorld};
 
 /// What running one queued route did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -192,6 +192,12 @@ pub fn init_fn(n: u8) -> Option<u32> {
         54 => 0x0059_40E0,
         // CainPortal (`quests-act1-rest.md` §9 item 10).
         61 => 0x0059_4290,
+        // Act IV objects (`quests-act4.md` §1.4, q-a4-endgame).
+        48 => 0x005B_5A20,
+        55 => 0x005B_5590,
+        56 => 0x005B_5620,
+        59 => 0x0054_FE10,
+        78 => 0x005B_5840,
         // Act V objects (`quests-act5.md` §1.4).
         62 => 0x0058_86A0,
         63 => 0x0058_D150,
@@ -251,6 +257,13 @@ pub fn operate_fn(n: u8) -> Option<u32> {
         41 => 0x0059_9CF0,
         // SanctuaryTome (§6.7).
         42 => 0x0059_B970,
+        // Act IV objects (`quests-act4.md` §1.4, q-a4-endgame).
+        49 => 0x005B_5C10,
+        52 => 0x005B_5630,
+        54 => 0x005B_6B70,
+        55 => 0x005B_6BC0,
+        56 => 0x005B_6C10,
+        73 => 0x005B_5880,
         // Act V objects (`quests-act5.md` §1.4).
         62 => 0x0058_D1E0,
         63 => 0x0058_D200,
@@ -318,6 +331,10 @@ fn init<W: QuestWorld>(
         52 => act3::natalya_init(ctl, w, object),
         53 => act3::stairs_r_init(ctl, w, object),
         60 => act3::orb_init(ctl, w, object),
+        48 => act4::q3::forge_init(ctl, w, object),
+        55 => act4::q2::start_point_init(ctl, w, object),
+        59 => act4::q2::dummy_init(w, object),
+        78 => act4::q2::portal_init(ctl, w, object),
         // The stone's class is its value (`quests-act1-rest.md` §2.1).
         6 => act1::q4::stone_init(ctl, w, object, c.class),
         7 => act1::q4::gibbet_init(ctl, w, object),
@@ -434,6 +451,12 @@ fn operate<W: QuestWorld>(
         72 => {
             act5::q6::last_portal_operate(ctl, w, player);
         }
+        49 => act4::q3::forge_operate(ctl, w, o, player),
+        52 => act4::q2::seal_operate(ctl, w, o, player, op.class),
+        54 => act4::q2::infector_seal_operate(ctl, w, o, player, op.class),
+        55 => act4::q2::de_seis_seal_operate(ctl, w, o, player, op.class),
+        56 => act4::q2::vizier_seal_operate(ctl, w, o, player, op.class),
+        73 => act4::q2::portal_operate(ctl, w, o, player),
         _ => return QuestObjectRun::HandBack(c.route),
     }
     QuestObjectRun::Ran
@@ -526,6 +549,17 @@ mod tests {
             assert!(init_fn(n).is_some(), "init {n}");
         }
         for n in [28, 31, 44, 45, 53, 57, 58, 59] {
+            assert!(operate_fn(n).is_some(), "operate {n}");
+        }
+    }
+
+    // Covers: specs/world/quests-act4.md §1.4
+    #[test]
+    fn act4_functions_are_stated() {
+        for n in [48, 55, 56, 59, 78] {
+            assert!(init_fn(n).is_some(), "init {n}");
+        }
+        for n in [49, 52, 54, 55, 56, 73] {
             assert!(operate_fn(n).is_some(), "operate {n}");
         }
     }

@@ -24,6 +24,10 @@ use super::{quest_call, ActionEvents, TradeRest, WiredWorld};
 const ANDARIEL: u16 = 156;
 /// Mephisto's monster class (`monstats.txt` row 242, `quests-act3.md` §8).
 const MEPHISTO: u16 = d2_sim::world::quests::act3::npc::MEPHISTO;
+/// Diablo's and Hephasto's monster classes (`quests-act4.md` §8; Hephasto's
+/// base id is the class here, as `quests-act4.md` §4).
+const DIABLO: u16 = 243;
+const HEPHASTO: u16 = d2_sim::world::quests::act4::q3::HEPHASTO_BASE;
 
 /// The level each player was last seen in.
 #[derive(Debug, Default)]
@@ -93,6 +97,19 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                         // Andariel's; no spec names where chain 20 is added.
                         if w.monster_class(victim) == Some(MEPHISTO) {
                             q.add_link(w, victim, 20, None);
+                        }
+                        // PROVISIONAL (REC-166, d2rs-own, unverified): the
+                        // Act IV links of monster creation (`quests-act4.md`
+                        // §8: 243 → chain 23, 409 → chain 24) by class, as
+                        // Mephisto's; a refused duplicate is harmless.
+                        match w.monster_class(victim) {
+                            Some(DIABLO) => {
+                                q.add_link(w, victim, 23, None);
+                            }
+                            Some(HEPHASTO) => {
+                                q.add_link(w, victim, 24, None);
+                            }
+                            _ => {}
                         }
                         q.monster_killed(w, victim, killer);
                     }
