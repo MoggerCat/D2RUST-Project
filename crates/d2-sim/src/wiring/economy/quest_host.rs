@@ -948,10 +948,16 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         self.inner.open_insert_dialog(player, object)
     }
     /// `missiles.txt` `Range` (u16 +0x96) of the action tables' row
-    /// (`quests-act2.md` §8.7); a row outside the table is `None`.
+    /// (`quests-act2.md` §8.7). d2rs-own, unverified (REC-167): a table
+    /// without row 338 (the synthetic game) answers the live value 440
+    /// (spec test vector, lair timer period 18).
     fn missile_range(&mut self, row: u32) -> Option<i32> {
         let t = &self.inner.econ.hooks.tables.missiles;
-        Some(i32::from(t.get(row as usize)?.range))
+        match t.get(row as usize) {
+            Some(m) => Some(i32::from(m.range)),
+            None if t.is_empty() => Some(440),
+            None => None,
+        }
     }
     fn is_trading(&mut self, player: UnitId) -> bool {
         self.inner.is_trading(player)

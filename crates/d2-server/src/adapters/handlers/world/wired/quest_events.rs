@@ -14,7 +14,7 @@
 use std::collections::BTreeMap;
 
 use d2_sim::game::Game;
-use d2_sim::units::UnitId;
+use d2_sim::units::{UnitId, UnitType};
 use d2_sim::wiring::action::{Pending, QuestEvent};
 use d2_sim::world::quests::{act2, act5, QuestWorld};
 
@@ -23,6 +23,8 @@ use super::{quest_call, ActionEvents, TradeRest, WiredWorld};
 /// Andariel's monster class (`monstats.txt` row 156).
 const ANDARIEL: u16 = 156;
 /// Mephisto's monster class (`monstats.txt` row 242, `quests-act3.md` §8).
+/// Duriel's monster class (`monstats.txt` row 211).
+const DURIEL: u16 = 211;
 const MEPHISTO: u16 = d2_sim::world::quests::act3::npc::MEPHISTO;
 /// Diablo's and Hephasto's monster classes (`quests-act4.md` §8; Hephasto's
 /// base id is the class here, as `quests-act4.md` §4).
@@ -48,6 +50,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
         }
         let frame = game.frame;
         let mut seen = std::mem::take(&mut self.quest_levels.0);
+        let mut lair = None;
         seen = self.desk(game, events, |desk, ctl, inv| {
             let ((), _) = quest_call(desk, ctl, inv, |q, w| {
                 for e in &queued {
@@ -82,6 +85,16 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                         QuestEvent::AncientsDisarm => act5::q5::disarm(q),
                         QuestEvent::BaalToStairs => act5::q6::chamber_open(q, w),
                         QuestEvent::AnyaOpenPortal { unit } => act5::q4::anya_ai_portal(q, w, unit),
+                        // C→S 0x44 (REC-167): the staff in the orifice.
+                        QuestEvent::InsertItem {
+                            player,
+                            object,
+                            item,
+                            action,
+                        } => {
+                            let item = w.unit_by_guid(UnitType::Item as u8, item);
+                            act2::q6::item_to_object(q, w, player, object, item, action)
+                        }
                         _ => {}
                     }
                 }
@@ -102,7 +115,12 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                         // Act IV links of monster creation (`quests-act4.md`
                         // §8: 243 → chain 23, 409 → chain 24) by class, as
                         // Mephisto's; a refused duplicate is harmless.
+                        // PROVISIONAL (REC-167, d2rs-own, unverified): Duriel's
+                        // link to chain 13 is by class, as Andariel's.
                         match w.monster_class(victim) {
+                            Some(DURIEL) => {
+                                q.add_link(w, victim, 13, None);
+                            }
                             Some(DIABLO) => {
                                 q.add_link(w, victim, 23, None);
                             }
@@ -120,9 +138,13 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 if frame % 20 == 0 {
                     q.update(w);
                 }
+                lair = act2::q6::lair_warp_open(q);
             });
             seen
         });
+        if let Some(open) = lair {
+            events.action().sys.hooks.x.set_lair_open(open);
+        }
         self.quest_levels.0 = seen;
     }
 }
