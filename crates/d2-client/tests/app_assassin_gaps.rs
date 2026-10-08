@@ -325,7 +325,7 @@ fn missile_trap_game() -> Rig {
     lay.pettype = 2;
     lay.anim = 10;
     lay.calc4 = rig::CALC_3;
-    let mut shot = row(0, 0);
+    let mut shot = row(1, 0);
     shot.srvmissile = 0;
     shot.anim = 7;
     let mut r = assassin(vec![(TRAP, lay), (SHOT, shot)]);
@@ -339,6 +339,11 @@ fn missile_trap_game() -> Rig {
         t.combat.monstats.push(m);
         t.combat.monstats2.push(m2);
         t.skill_modes.push([4; 8]);
+        // The lightning bolt: fast and long (the arrow row crawls).
+        // d2rs-own, unverified: not the real `missiles.txt` row.
+        t.missiles[0].vel = 16;
+        t.missiles[0].maxvel = 16;
+        t.missiles[0].range = 200;
         h.tables = Arc::new(t);
         h.x.monsters.modes = vec![0xFFFF, 0xFFFF];
         let mut looks = (**h.x.looks.as_ref().unwrap()).clone();
@@ -377,25 +382,41 @@ fn a_lightning_sentry_fires_its_missile() {
     let m = r.spawn_monster(6);
     r.with(move |sim, _| {
         let a = &mut sim.events.action;
-        a.with(&mut sim.game, |_, v| {
+        a.with(&mut sim.game, |g, v| {
             v.set_base(trap, 12, 30);
             v.set_base(trap, 19, 1000);
             v.set_base(trap, 21, 20);
             v.set_base(trap, 22, 30);
             v.set_base(m, d2_sim::stats::stat::MAXHP, 1000 << 8);
             v.set_base(m, d2_sim::stats::stat::HITPOINTS, 1000 << 8);
+            // The synthetic monster has no path footprint: stamp the
+            // unit-collision bit its sub-tile would carry (d2rs-own).
+            let (x, y) = v.h.path_position(m);
+            let room = g.lists.unit(m).and_then(|e| e.room());
+            d2_sim::path::footprint::stamp_size(&mut v.h.drlg, room, x, y, 1, 0x100);
         });
     });
     let life0 = r.life(m);
     let mut flew = 0;
+    let mut farthest = 0;
     for _ in 0..60 {
         r.step(1);
-        flew = flew.max(r.with(|sim, _| {
-            sim.game
-                .lists
-                .units_of_type(d2_sim::units::UnitType::Missile)
-                .len()
-        }));
+        // The host has no missile damage setup yet (`0x0059F900`, skills
+        // spec): the missile gets its damage here, as the e2e tests do.
+        let (n, x) = r.with(|sim, _| {
+            let ms = sim.game.lists.units_of_type(UnitType::Missile);
+            let mut x = 0;
+            sim.events.action.with(&mut sim.game, |_, v| {
+                for &mi in &ms {
+                    v.set_base(mi, 21, 2560);
+                    v.set_base(mi, 22, 2560);
+                    x = x.max(v.h.path_position(mi).0);
+                }
+            });
+            (ms.len(), x)
+        });
+        flew = flew.max(n);
+        farthest = farthest.max(x);
     }
     let errors = r.errors();
     assert!(flew > 0, "a missile flew ({errors})");
@@ -403,5 +424,6 @@ fn a_lightning_sentry_fires_its_missile() {
         shots_left(&mut r).is_none_or(|s| s < SHOTS),
         "a shot was spent ({errors})"
     );
+    assert!(farthest <= 27, "the bolt ended at the monster ({farthest})");
     assert!(r.life(m) < life0, "the missile hit ({errors})");
 }
