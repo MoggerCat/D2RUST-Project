@@ -840,11 +840,106 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
             self.inner.drop_gold(object)
         }
     }
+    /// `0x0061AED0(room, arg)` on the room's DRLG room
+    /// ([`crate::wiring::action::DrlgWorld::refresh_room`]: `on` is the
+    /// nonzero argument, which clears the flag); else the rest's.
     fn set_room_portal(&mut self, room: RoomId, on: bool) {
+        let e = &mut *self.inner.econ;
+        if e.hooks.drlg.refresh_room(e.game, room, on) {
+            return;
+        }
         self.inner.set_room_portal(room, on)
     }
+    /// `0x00555230` (the Act II call form) through the object state;
+    /// else the rest's.
     fn spawn_quest_object(&mut self, room: RoomId, x: i32, y: i32, class: u16) -> Option<UnitId> {
+        if self.inner.econ.hooks.objects.is_some() && self.drlg_room(room) {
+            return self.view(|g, v| v.create_object(g, room, u32::from(class), x, y, 0));
+        }
         self.inner.spawn_quest_object(room, x, y, class)
+    }
+    // -- Act IV, Terror's End (`quests-act4.md` §5; q-a4-endgame). The
+    // object's mode flags and the spawn spread are not modelled
+    // (PROVISIONAL, REC-160, `// d2rs-own, unverified`).
+    /// `FrameCnt1` of the object's `objects.txt` row (the raw column is
+    /// × 256).
+    fn object_frame_count1(&mut self, object: UnitId) -> i32 {
+        self.object_anim_length(object) >> 8
+    }
+    /// `0x005541B0` on the unit record.
+    fn unit_dead(&mut self, unit: UnitId) -> bool {
+        self.inner.econ.units.is_dead(unit)
+    }
+    /// `0x006259B0` (the action wiring's [`Pending::alignment`]).
+    fn alignment(&mut self, unit: UnitId) -> u32 {
+        u32::from(self.inner.econ.hooks.x.alignment(unit))
+    }
+    /// The monsters of `level`'s rooms, in the game's unit-list order.
+    fn level_monsters(&mut self, level: u32) -> Vec<UnitId> {
+        let e = &*self.inner.econ;
+        e.game
+            .lists
+            .units_of_type(UnitType::Monster)
+            .into_iter()
+            .filter(|&m| {
+                e.game
+                    .lists
+                    .unit(m)
+                    .and_then(|u| u.room())
+                    .and_then(|r| e.hooks.drlg.level_id(e.game, r))
+                    == Some(level)
+            })
+            .collect()
+    }
+    /// The hcIdx → `superuniques.txt` row map is the identity in live
+    /// data for entries 36–38 (`quests-act4.md` §5.4).
+    fn superunique_id(&mut self, n: u8) -> u16 {
+        u16::from(n)
+    }
+    /// `0x0054E600`: the superunique's class from the drop tables'
+    /// `superuniques` rows (else the id as a class, for a game without
+    /// them), allocated plain and linked to chain 23 (§8: hcIdx 36–38).
+    fn preset_superunique_spawn(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        superunique: u16,
+    ) -> Option<UnitId> {
+        let class = self
+            .inner
+            .econ
+            .hooks
+            .object_drops
+            .as_ref()
+            .and_then(|d| d.tables.superuniques.get(usize::from(superunique)))
+            .map_or(superunique, |r| r.class as u16);
+        let unit = self.spawn_unit(room, x, y, class, 1)?;
+        if (36..=38).contains(&superunique) {
+            self.inner.econ.hooks.x.monster_quest_chain(unit, 23);
+        }
+        Some(unit)
+    }
+    /// `0x00555230` with the flag arguments through the object state.
+    fn place_object(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        flags: [u8; 3],
+    ) -> Option<UnitId> {
+        let _ = flags;
+        self.spawn_quest_object(room, x, y, class)
+    }
+    /// The client exists and is not busy.
+    fn client_idle(&mut self, player: UnitId) -> bool {
+        !self.inner.player_busy(player)
+    }
+    /// `0x0054B830`: the host's act change queue (`ActionHooks::act_changes`).
+    fn act_change(&mut self, player: UnitId, level: u32, arg: u32) {
+        use crate::units::lifecycle::LifecycleHooks;
+        self.inner.econ.hooks.request_act_change(player, level, arg);
     }
     fn player_busy(&mut self, player: UnitId) -> bool {
         self.inner.player_busy(player)

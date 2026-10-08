@@ -481,6 +481,20 @@ fn boss_seal<W: QuestWorld>(
     seal_activate(ctl, w, object, class);
 }
 
+/// Init 59 `0x0054FE10` of the dummy (class 131, `quests.md` §9 rule 7):
+/// in mode 0, mode 1, object event 7 at f + 27 and event 1 at
+/// f + `FrameCnt1` + 1.
+pub fn dummy_init<W: QuestWorld>(w: &mut W, object: UnitId) {
+    if w.object_mode(object) != 0 {
+        return;
+    }
+    w.set_object_mode(object, 1);
+    let f = w.frame();
+    w.schedule_quest_event(object, f + 27);
+    let at = f + w.object_frame_count1(object) + 1;
+    w.schedule_object_event(object, 1, at);
+}
+
 /// `0x005B5750`: object event 7 of the seal-boss dummy (class 131) in
 /// level 108 (§5.4): at a boss pair, spawn that pair's superunique;
 /// failure → event 7 again at f + 10.
