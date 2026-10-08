@@ -30,7 +30,7 @@ decompiled code.
    This repository is **public**. MPQs, executables, DLLs, saves, extracted
    assets and full extracted tables never go here, in their original form or
    any re-encoding a process could rebuild them from. They live in the
-   **private** repository `MoggerCat/D2RUST-private-repo.` (layout in its
+   **private** repository `MoggerCat/D2RUST-private-repo` (layout in its
    `README.md`) and in `game/` locally (gitignored); cloud sessions fetch
    them from there and may use them freely. Never `include_bytes!` them.
    The red line: never distribute the game, or anything playable without
@@ -155,7 +155,7 @@ rule:
 ## Where work runs
 
 Cloud sessions have the public repo and the private data repo
-(`MoggerCat/D2RUST-private-repo.`: the 1.14d install and extracted data,
+(`MoggerCat/D2RUST-private-repo`: the 1.14d install and extracted data,
 fetched per its `README.md`); no `re/`, no `../refs/`.
 
 | Work | Where | Needs |
