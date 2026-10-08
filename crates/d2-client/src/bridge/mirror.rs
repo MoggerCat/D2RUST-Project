@@ -59,17 +59,27 @@ impl Plugin for BridgePlugin {
     }
 }
 
+/// A scripted host clock (`world/objects-client.md` §25 r6: "headless
+/// tests and replays pass a scripted value"): when present,
+/// [`bridge_frame`] gives the bridge this value instead of the real time.
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScriptedNow(pub u32);
+
 /// One bridge frame (§8 rule 1), then its outputs are handed over (§10
 /// rule 4). Errors go to Bevy's error handler.
 pub fn bridge_frame(
     mut bridge: ResMut<BridgeResource>,
     mut outputs: ResMut<FrameOutputs>,
+    scripted: Option<Res<ScriptedNow>>,
     time: Option<Res<Time<Real>>>,
 ) -> Result {
     // The host clock as `GetTickCount` (`world/objects-client.md` §25 r6):
-    // wrapping milliseconds since the app started. An app without Bevy's
-    // time (headless tests) keeps the value it set.
-    if let Some(time) = time {
+    // a scripted value when the app sets one ([`ScriptedNow`]), else
+    // wrapping milliseconds since the app started. An app with neither
+    // keeps the value it set.
+    if let Some(now) = scripted {
+        bridge.0.set_now(now.0);
+    } else if let Some(time) = time {
         bridge.0.set_now(time.elapsed().as_millis() as u32);
     }
     bridge.0.frame()?;
