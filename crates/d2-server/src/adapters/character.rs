@@ -365,7 +365,8 @@ fn new_character(w: &mut dyn CharacterWorld, act: u8, r: &mut LoadReport) -> Opt
     note(r, w.start_items());
     let right = if act == 0 {
         match w.start_skill() {
-            Ok(0) => None,
+            // An empty `StartSkill` reads as -1 (0xFFFF): no start skill.
+            Ok(0) | Ok(u16::MAX) => None,
             Ok(s) => match w.has_skill(s) {
                 Ok(true) => Some(s),
                 Ok(false) => None,

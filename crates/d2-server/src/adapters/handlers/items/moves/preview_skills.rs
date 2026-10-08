@@ -83,6 +83,12 @@ impl PreviewSkills {
             return;
         };
         let rows = &st.tables.skills.skills;
+        // No skill (-1) or one outside the table: 0x005701B0 finds no entry,
+        // so nothing changes and nothing is sent (client/msg-skills.md §2
+        // r3); a 0x23 with such a skill is a fatal 0x668 on the client.
+        if usize::try_from(s.0).map_or(true, |i| i >= rows.len()) {
+            return;
+        }
         let Some(sl) = st.lists.get_mut(&u) else {
             return;
         };

@@ -260,9 +260,17 @@ impl<'a, R: ?Sized, S: ?Sized> OriginalView<'a, R, S> {
             else {
                 continue;
             };
-            let shade = match b.shade.gradient() {
-                Some(g) => b.shade.with_gradient(LightGradient { x, y, ..*g }),
-                None => b.shade,
+            let (shade, clip) = match b.shade.gradient() {
+                Some(g) => {
+                    let g = LightGradient { x, y, ..*g };
+                    // A gradient covers `kind.rows()` rows (15 for an RLE
+                    // floor block): the draw stays inside it.
+                    let Some(clip) = clip.intersect(&g.block()) else {
+                        continue;
+                    };
+                    (b.shade.with_gradient(g), clip)
+                }
+                None => (b.shade, clip),
             };
             out.push(TileDraw {
                 clip,
