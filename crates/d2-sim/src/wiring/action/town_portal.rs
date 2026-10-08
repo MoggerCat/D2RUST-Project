@@ -19,6 +19,11 @@
 //! when the player arrives from town. A cast in town, or a cast without
 //! a town spawn, creates nothing; the scroll is still used. A new cast
 //! removes the player's previous pair.
+//!
+//! PROVISIONAL (REC-243, in-town cast): the original's last-field-level
+//! source is unwritten; a cast in a town opens the pair to the field
+//! level of the player's latest cast there (near portal in town, far
+//! portal at that level's spawn point); none yet → nothing is made.
 // d2rs-own, unverified
 
 use std::collections::BTreeMap;
@@ -43,6 +48,8 @@ pub struct PortalLinks {
     partner: BTreeMap<UnitId, UnitId>,
     /// The player's field portal (player data +0x48 holds its GUID).
     field: BTreeMap<UnitId, UnitId>,
+    /// The field level of the player's latest cast there.
+    last_field: BTreeMap<UnitId, u32>,
     /// Portals the object call removed, freed when it returns.
     doomed: Vec<UnitId>,
 }
@@ -56,6 +63,15 @@ impl PortalLinks {
     /// The field portal of `player`'s pair.
     pub fn field_portal(&self, player: UnitId) -> Option<UnitId> {
         self.field.get(&player).copied()
+    }
+
+    /// The field level `player` last cast a Town Portal in.
+    pub fn last_field_level(&self, player: UnitId) -> Option<u32> {
+        self.last_field.get(&player).copied()
+    }
+
+    fn set_last_field_level(&mut self, player: UnitId, level: u32) {
+        self.last_field.insert(player, level);
     }
 
     fn link(&mut self, player: UnitId, field: UnitId, town: UnitId) {
@@ -93,25 +109,37 @@ impl<X: Pending> View<'_, X> {
         self.h.objects.as_ref()?;
         let room = game.lists.unit(player)?.room()?;
         let level = self.h.drlg.level_id(game, room)?;
-        if crate::drlg::is_town(level) {
-            return None;
-        }
         let guid = game.lists.unit(player)?.guid;
-        let town = crate::drlg::TOWN_LEVELS[usize::from(crate::drlg::act_of_level(level))];
+        let in_town = crate::drlg::is_town(level);
+        // The level the pair leads to from the player's side: the act's
+        // town from the field, the last field level cast from when in a
+        // town (module docs, REC-243).
+        let far_level = if in_town {
+            self.h.portals.last_field_level(player)?
+        } else {
+            crate::drlg::TOWN_LEVELS[usize::from(crate::drlg::act_of_level(level))]
+        };
         if let Some(old) = self.h.portals.field_portal(player) {
             self.remove_portal_pair(game, old, Some(player));
         }
         let (px, py) = self.h.path_position(player);
-        let (froom, fx, fy) = self.portal_spot(room, px, py)?;
-        let (troom, tx, ty) = self.town_spot(game, town)?;
-        let field = self.create_object(game, froom, TOWN_PORTAL_CLASS, fx, fy, 1)?;
-        let Some(dest) = self.create_object(game, troom, TOWN_PORTAL_CLASS, tx, ty, 2) else {
-            self.remove_and_tell(game, field, None);
+        let (nroom, nx, ny) = self.portal_spot(room, px, py)?;
+        let (froom, fx, fy) = self.town_spot(game, far_level)?;
+        // `near` is next to the player; `far` at the other end. In the
+        // field the near one is the field portal (what rule 12 removes
+        // the pair from); in town the far one is.
+        let near = self.create_object(game, nroom, TOWN_PORTAL_CLASS, nx, ny, 1)?;
+        let Some(far) = self.create_object(game, froom, TOWN_PORTAL_CLASS, fx, fy, 2) else {
+            self.remove_and_tell(game, near, None);
             return None;
         };
+        let (field, dest) = if in_town { (far, near) } else { (near, far) };
+        if !in_town {
+            self.h.portals.set_last_field_level(player, level);
+        }
         self.h.portals.link(player, field, dest);
         let st = self.h.objects.as_mut()?;
-        for (portal, to) in [(field, town), (dest, level)] {
+        for (portal, to) in [(near, far_level), (far, level)] {
             if let Some(d) = st.control.data.get_mut(&portal) {
                 d.interact = u8::try_from(to).unwrap_or(u8::MAX);
                 d.owner = Some(guid as i32);
@@ -119,7 +147,7 @@ impl<X: Pending> View<'_, X> {
         }
         // The field portal appears in the player's room: announce it
         // (the town one comes with the room switch).
-        self.add_messages(game, player, field);
+        self.add_messages(game, player, near);
         Some((field, dest))
     }
 

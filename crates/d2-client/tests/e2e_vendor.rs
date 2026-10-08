@@ -1261,3 +1261,57 @@ fn swap_weapons_is_answered_with_0x97() {
     assert!(f.received.contains(&vec![0x97]), "{:02X?}", f.received);
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
 }
+
+// Covers: specs/world/vendors.md §7.1 r10, §7.1 r12
+/// Buying a store item that is not permanent (a buckler) takes it out of
+/// the NPC's grid: the next frame's S→C 0x9C is action 12 for its GUID
+/// (`vendors.md` §7.1 rule 10); the permanent cap leaves none.
+#[test]
+fn buying_a_store_item_sends_0x9c_action_12() {
+    let mut fx = Fx::new(GAME_SEED, PLAYER_GOLD);
+    let ng = fx.guid(fx.npc);
+    assert!(!fx.bridge.frame().unwrap().ticked);
+    fx.step(&[bytes(&InteractWithEntity { type_: 1, id: ng })]);
+    fx.step(&[bytes(&InitEntityChat { id: ng })]);
+    let f = fx.step(&[bytes(&EntityAction {
+        action: 1,
+        npc: ng,
+        item: 0,
+    })]);
+    let store = {
+        let w = &fx.sim_ref().world;
+        let i = w.state.vendor_index(class::AKARA).unwrap();
+        w.state.vendors[i].store.clone()
+    };
+    let buckler = store
+        .iter()
+        .copied()
+        .find(|&i| {
+            fx.sim_ref()
+                .events
+                .sys
+                .hooks
+                .items
+                .get(i)
+                .is_some_and(|it| it.record == BUC)
+        })
+        .expect("a buckler in the store");
+    let bg = fx.guid(buckler);
+    assert!(f.received.iter().all(|m| m[1] == 11), "opening: action 11");
+    fx.set_gold(PLAYER_GOLD);
+    let f = fx.step(&[bytes(&BuyItem {
+        npc: ng,
+        item: bg,
+        transaction: 0,
+        client_price: 0,
+    })]);
+    assert_eq!(f.codes, [(0x32, Some(ResultCode::Done))]);
+    let twelve: Vec<u32> = f
+        .received
+        .iter()
+        .filter(|m| m[0] == 0x9C && m[1] == 12)
+        .map(|m| u32::from_le_bytes(m[4..8].try_into().unwrap()))
+        .collect();
+    assert_eq!(twelve, [bg], "one 0x9C action 12 for the bought item");
+    assert!(fx.errors().is_empty(), "{:?}", fx.errors());
+}

@@ -217,6 +217,9 @@ fn log<T, X>(v: &mut View<'_, X>, r: Result<T, ObjectError>) -> Option<T> {
     }
 }
 
+/// State 102 (`just_portaled`, `objects.md` §12 rule 13).
+const JUST_PORTALED_STATE: u16 = 102;
+
 impl ObjectState {
     /// `0x00546C60` (§2) on `game_seed` (one step).
     pub fn new(game_seed: &mut Seed, tables: Arc<ObjectTables>) -> Self {
@@ -1372,6 +1375,30 @@ impl<X: Pending> MiscWorld for ObjectView<'_, X> {
     }
     fn just_portaled(&mut self, player: UnitId, expire: i32) {
         self.v.h.x.object_just_portaled(self.game, player, expire);
+        // Rule 13: stat list (expire f + 75), event 12 at f + 75, state
+        // 102 on, list state 102. Remove callback `0x0056E900` and the
+        // event 12 body are unwritten (REC-243, d2rs-own, unverified): the
+        // list's expiry frees the state.
+        if usize::from(JUST_PORTALED_STATE) >= self.v.stats.data().states.count() {
+            return;
+        }
+        if self.v.state_list(player, JUST_PORTALED_STATE).is_some() {
+            self.v
+                .stats
+                .free_state_list(&mut *self.v.h, player, u32::from(JUST_PORTALED_STATE));
+        }
+        if self
+            .v
+            .create_state_list(player, JUST_PORTALED_STATE, None, expire)
+            .is_none()
+        {
+            return;
+        }
+        if let Err(e) = self.game.schedule_event(player, 12, expire, None, 0, 0) {
+            self.v.unit_error(e.into());
+        }
+        self.v.set_state(player, JUST_PORTALED_STATE, true);
+        let _ = self.game.lists.queue_update(player);
     }
     fn vital_stat(&self, unit: UnitId, id: u16) -> u32 {
         let st = &*self.v.stats;

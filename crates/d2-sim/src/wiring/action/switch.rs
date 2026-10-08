@@ -195,7 +195,9 @@ impl<X: Pending> View<'_, X> {
                 self.h.x.send(receiver, &m);
                 self.player_part_b(game, receiver, unit);
             }
-            UnitType::Object => self.object_add(receiver, unit, guid, class, mode, (x, y)),
+            UnitType::Object => {
+                self.object_add(game, receiver, (unit, guid), (class, mode), (x, y))
+            }
             UnitType::Tile => {
                 let m = messages::assign_warp(ty as u8, guid, class as u8, x as u16, y as u16);
                 self.h.x.send(receiver, &m);
@@ -323,11 +325,10 @@ impl<X: Pending> View<'_, X> {
     /// rule 6) from [`Pending::portal_owner`].
     fn object_add(
         &mut self,
+        game: &Game,
         receiver: UnitId,
-        unit: UnitId,
-        guid: u32,
-        class: u32,
-        mode: u32,
+        (unit, guid): (UnitId, u32),
+        (class, mode): (u32, u32),
         (x, y): (i32, i32),
     ) {
         let st = self.h.objects.as_ref();
@@ -344,7 +345,12 @@ impl<X: Pending> View<'_, X> {
             self.h.x.send(receiver, &b);
         }
         if class == 59 {
-            if let Some((owner, name, portal2)) = self.h.x.portal_owner(unit) {
+            if let Some((owner, name, portal2)) = self
+                .h
+                .x
+                .portal_owner(unit)
+                .or_else(|| self.portal_owner_from_links(game, unit))
+            {
                 // PROVISIONAL (intents-events.md §7.2, §6 rule 6): u32@21 is
                 // this portal's GUID and u32@25 its pair's (−1: none), as
                 // the client handler reads them (`client/msg-units.md`
@@ -353,6 +359,30 @@ impl<X: Pending> View<'_, X> {
                 self.h.x.send(receiver, &m);
             }
         }
+    }
+
+    /// S→C 0x82's owner GUID, owner name and pair GUID from the portal
+    /// links and the object's owner (`msg-units.md` §8 rule 7: the client
+    /// stores the name on the portal object). d2rs-own, unverified
+    /// (REC-243): the original's `0x0053DB90` source of the name is
+    /// unwritten; the owner player's join name stands in.
+    fn portal_owner_from_links(&self, game: &Game, portal: UnitId) -> Option<(u32, Vec<u8>, u32)> {
+        let owner = self.h.objects.as_ref()?.control.data.get(&portal)?.owner?;
+        let owner = owner as u32;
+        let player = game
+            .lists
+            .units_of_type(UnitType::Player)
+            .into_iter()
+            .find(|p| game.lists.unit(*p).is_some_and(|e| e.guid == owner))?;
+        let raw = self.h.session.names.get(&player)?;
+        let len = raw.iter().position(|b| *b == 0).unwrap_or(raw.len());
+        let pair = self
+            .h
+            .portals
+            .partner(portal)
+            .and_then(|p| game.lists.unit(p))
+            .map_or(0xFFFF_FFFF, |e| e.guid);
+        Some((owner, raw[..len].to_vec(), pair))
     }
 
     /// Room ready `0x0061A460(R)` (`tick.md` §6 rule 6), R = the client's
