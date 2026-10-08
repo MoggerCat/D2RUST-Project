@@ -596,8 +596,12 @@ pub fn remove_client_unit(w: &mut ClientWorld, key: UnitKey) -> Option<ClientUni
 /// per axis |Δ| − (size(a) / 2 + size(b) / 2), floored at 0, then
 /// (2·max + min) / 2. Positions are the client cells.
 pub fn distance(a: &ClientUnit, size_a: i32, b: &ClientUnit, size_b: i32) -> i32 {
-    let (ax, ay) = a.cell();
-    let (bx, by) = b.cell();
+    distance_at(a.cell(), size_a, b.cell(), size_b)
+}
+
+/// [`distance`] between two cells.
+pub fn distance_at(a: (u16, u16), size_a: i32, b: (u16, u16), size_b: i32) -> i32 {
+    let ((ax, ay), (bx, by)) = (a, b);
     d2_sim::world::objects::chests::reach_distance(
         (i32::from(ax), i32::from(ay)),
         size_a,

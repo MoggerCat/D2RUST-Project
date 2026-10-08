@@ -618,6 +618,16 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
                 f.pos = Pos { x, y };
             }
         }
+        // So does their act: a cross-act warp moves a staged unit into
+        // the new act's rooms (`seams/sim-server.md` §2.5); the position
+        // and owner stay the caller's.
+        for u in staged {
+            if let Some(live) = self.world.live_facts(&self.game, &mut self.events, u) {
+                if let Some(f) = self.units.get_mut(&u) {
+                    f.act = live.act;
+                }
+            }
+        }
         // The gate reads the unit's live mode (a dead player's 0x41).
         let staged: Vec<UnitId> = self.players.keys().copied().collect();
         for u in staged {

@@ -744,6 +744,36 @@ fn the_preview_runs_the_sight_test_over_the_client_drlg() {
     assert_eq!(hidden(&mut feed, &m.w), Some(false));
 }
 
+// Covers: specs/seams/bridge-app.md §2.10
+#[test]
+fn a_new_client_drlg_drops_the_tile_draw_state() {
+    use crate::rules::draw_order::REC_DRAWN;
+    use crate::world_view::model_feed::ModelFeed;
+    use crate::world_view::ViewFeed;
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    let mut feed = ModelFeed::new(ZeroFacts).with_map();
+    let mut rows = vec![LevelRow::default(); 4];
+    rows[2].draw_edges = true;
+    feed.levels = Some(rows);
+    let near = feed.near_rooms(&m.w).unwrap().unwrap();
+    assert_eq!(near.rooms[0].floors[0].flags & REC_DRAWN, 0);
+    room_mut(near, 0).floors[0].flags |= REC_DRAWN;
+    // Same DRLG next frame: the flag is kept.
+    m.w.frames += 1;
+    let near = feed.near_rooms(&m.w).unwrap().unwrap();
+    assert_ne!(near.rooms[0].floors[0].flags & REC_DRAWN, 0);
+    // A new client DRLG (another 0x03; here the same act with a new init
+    // seed, so the act's tile libraries stay) whose room slots are the
+    // same: nothing carried.
+    m.w.drlg.as_mut().unwrap().drlg.init_seed ^= 1;
+    m.w.frames += 1;
+    let near = feed.near_rooms(&m.w).unwrap().unwrap();
+    assert_eq!(near.rooms[0].floors[0].flags & REC_DRAWN, 0);
+}
+
 fn room_mut(
     near: &mut crate::rules::draw_order::NearRooms,
     k: usize,
