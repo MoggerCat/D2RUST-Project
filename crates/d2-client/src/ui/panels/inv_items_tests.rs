@@ -382,6 +382,19 @@ mod belt {
         }
     }
 
+    /// The fixture items as compact records (the tip decodes those
+    /// without the extended fields).
+    fn compact(mut w: ClientWorld) -> ClientWorld {
+        for u in w.units.values_mut() {
+            if let KindData::Item(d) = &mut u.kind {
+                if let Some(r) = d.last.as_mut() {
+                    r.stream[2] |= (d2_proto::item_bits::hflag::COMPACT >> 16) as u8;
+                }
+            }
+        }
+        w
+    }
+
     // Covers: specs/ui/control-panel.md §5 r8, §5 r12
     #[test]
     fn hovering_a_belt_item_yields_its_tip_at_the_box() {
@@ -390,7 +403,7 @@ mod belt {
             parts: parts(),
             ..Default::default()
         };
-        let w = world(&[(7, mode::BELT, (0, 1, 0, 0), b"cap ")], None);
+        let w = compact(world(&[(7, mode::BELT, (0, 1, 0, 0), b"cap ")], None));
         // Nothing hovered yet: no tip.
         assert!(b.hover_tip(&w, &tips).0.is_empty());
         // Over box 1 (left 461, top 562): the tip anchors at (left + 14, top).
@@ -399,16 +412,16 @@ mod belt {
         assert!(!lines.is_empty(), "the hovered potion has a tip");
         assert_eq!(at, (475, 562));
         // An item on the cursor hides it (§5 r8).
-        let w = world(
+        let w = compact(world(
             &[
                 (7, mode::BELT, (0, 1, 0, 0), b"cap "),
                 (9, mode::CURSOR, (0, 0, 0, 0), b"cap "),
             ],
             Some(9),
-        );
+        ));
         assert!(b.hover_tip(&w, &tips).0.is_empty());
         // Off the belt the hover ends.
-        let w = world(&[(7, mode::BELT, (0, 1, 0, 0), b"cap ")], None);
+        let w = compact(world(&[(7, mode::BELT, (0, 1, 0, 0), b"cap ")], None));
         b.draw_list(&w, (800, 600), false, (10, 10), true);
         assert!(b.hover_tip(&w, &tips).0.is_empty());
     }

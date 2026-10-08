@@ -500,7 +500,7 @@ fn item_to_pack(guid: u32, s: &[u8]) -> Vec<u8> {
     m
 }
 
-// Covers: specs/ui/menus.md §2.3; specs/world/npc.md §6 (client end)
+// Covers: specs/ui/menus.md §2; specs/world/npc.md §6
 #[test]
 fn cains_identify_row_shows_the_cost_and_sends_0x34() {
     use d2_client::ui::layout::OptionKind::Identify;
