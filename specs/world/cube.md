@@ -28,16 +28,16 @@
 |   5. Ops | 176–195 |
 |   6. Input matching | 196–264 |
 |   7. Outputs | 265–399 |
-|   8. Commit | 400–468 |
-|   9. Portals | 469–488 |
-|   10. C→S 0x4C is not the cube | 489–503 |
-|   11. Where a cube comes from; the cube leaving while open | 504–547 |
-| Constants & data dependencies | 548–571 |
-| Randomness | 572–606 |
-| Edge cases & original bugs | 607–641 |
-| Test vectors | 642–689 |
-| Provenance | 690–737 |
-| Open questions | 738–856 |
+|   8. Commit | 400–471 |
+|   9. Portals | 472–491 |
+|   10. C→S 0x4C is not the cube | 492–506 |
+|   11. Where a cube comes from; the cube leaving while open | 507–550 |
+| Constants & data dependencies | 551–574 |
+| Randomness | 575–609 |
+| Edge cases & original bugs | 610–644 |
+| Test vectors | 645–692 |
+| Provenance | 693–743 |
+| Open questions | 744–862 |
 <!-- /index -->
 
 ## Summary
@@ -422,6 +422,9 @@ is sent; outputs already made in out[] are neither placed nor freed
    `0x0059E5C0` (Act 2 Horadric Staff hook, `world/quests-act2.md`
    §4.9), `qf2 ` → `0x005B86E0` (Act 3 Khalim's Will hook,
    `world/quests-act3.md` §4.8); quest state changes: `world/quests.md`.
+   The client plays the Horadric animation when such an `hst ` /
+   `qf2 ` arrives in page 3 (its 0x9C action 4), never for other
+   outputs and not at the 0x4F 0x18 (`ui/panels-2.md` §20 r7).
 4. Fillers in order: page 3, place; failure frees, success sets
    identified.
 
@@ -704,6 +707,9 @@ jump table, `0x00566AA8` op jump table, the two Pandemonium stubs at
   `0x005658C0`, `0x00565010` (inputs, ops 15–28), `0x00565AB0` (outputs
   and commit), `0x00565930` (type pick), `0x00564F30` (removal),
   `0x00594140` (Cow portal).
+- §8 step 3 client note (2026-10-08, REC-267): the only caller of the
+  animation start `0x0048A540` is `0x004C2970` (`0x004C2AB7`), gated on
+  page byte 3 and code `hst ` / `qf2 ` (`0x004C2A92`–`0x004C2AB5`).
 - §11 (2026-10-08, REC-244): `box ` creators and readers from every
   `cmp`/`mov` of the code value 0x20786F62 in `all.asm`; callers of
   `0x00554190` (20 functions, none an item move); client draw

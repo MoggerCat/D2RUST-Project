@@ -44,21 +44,21 @@
 | Outputs / state changes | 90–95 |
 | Rules | 96–97 |
 |   1. File layout and framing | 98–143 |
-|   2. Header (335 bytes) | 144–433 |
-|   3. Checksum (`0x00411130`) | 434–444 |
-|   4. Quest section (298 bytes at 0x14F) | 445–465 |
-|   5. Waypoint section (80 bytes at 0x279) | 466–471 |
-|   6. NPC flag section (52 bytes at 0x2C9) | 472–528 |
-|   7. Stats and skills | 529–621 |
-|   8. Item sections | 622–811 |
-|   9. Load sequence (`0x0056B180`) | 812–836 |
-|   10. Errors | 837–883 |
-| Constants & data dependencies | 884–903 |
-| Randomness | 904–908 |
-| Edge cases & original bugs | 909–975 |
-| Test vectors | 976–1015 |
-| Provenance | 1016–1103 |
-| Open questions | 1104–1243 |
+|   2. Header (335 bytes) | 144–455 |
+|   3. Checksum (`0x00411130`) | 456–466 |
+|   4. Quest section (298 bytes at 0x14F) | 467–487 |
+|   5. Waypoint section (80 bytes at 0x279) | 488–493 |
+|   6. NPC flag section (52 bytes at 0x2C9) | 494–550 |
+|   7. Stats and skills | 551–643 |
+|   8. Item sections | 644–833 |
+|   9. Load sequence (`0x0056B180`) | 834–858 |
+|   10. Errors | 859–905 |
+| Constants & data dependencies | 906–925 |
+| Randomness | 926–930 |
+| Edge cases & original bugs | 931–997 |
+| Test vectors | 998–1039 |
+| Provenance | 1040–1133 |
+| Open questions | 1134–1273 |
 <!-- /index -->
 
 ## Summary
@@ -153,7 +153,7 @@ Written by `0x00568F20` into a zeroed 0x14F-byte block:
 | 0x04 | u32 | version | 0x60 |
 | 0x08 | u32 | file size | total length (§1 rule 4) |
 | 0x0C | u32 | checksum | §3 |
-| 0x10 | u32 | weapon switch | bit 0 = client +0x45C ≠ 0; other bits 0 |
+| 0x10 | u32 | weapon switch | bit 0 = client +0x45C ≠ 0 (`0x00539220`, `0x005690B7`); other bits 0. The byte's one setter `0x00539230` is called by the 0x60 switch (`0x005619FC`, toggles it, `items/inventory-moves.md` §7.25 step 9) and the loads (`0x0056A1BA`, §2.2 rule 8; legacy `0x005329DE`) |
 | 0x14 | 16 | name | client name (+0x0D), NUL-terminated; the rest zero |
 | 0x24 | u16 | status | client status word (+0x0A), OR 0x20 if the game is expansion, OR 0x40 if game +0x74 ≠ 0 (§2.3) |
 | 0x26 | u16 | — | 0 |
@@ -292,6 +292,21 @@ as loaded or created.
    entry, u16 item index of that skill's owner item (rule 2). Left
    (0x78) only when the player has a left skill (else both words 0);
    right always; the swap pair from `0x00623220` / `0x00623290`.
+   Exact (2026-10-08, `0x00569144`–`0x00569221`): the four mouse words
+   are the plain skill id; unlike the hotkeys (rule 1) no 0x8000 left
+   flag is or-ed in (left `0x00569155`–`0x0056915B`, right
+   `0x0056918B`–`0x00569191`, swap `0x005691C2`–`0x005691CF`,
+   `0x005691FB`–`0x0056920D`). Left / right come from the selected
+   entries (`0x00620190` / `0x006201D0`; id `0x00643CE0`, owner
+   `0x00643AD0`). +0x80 is the swap-left pair, player data +0x84 /
+   +0x8C (`0x00623220`); +0x84 the swap-right pair, +0x80 / +0x88
+   (`0x00623290`). Both getters only read (P none or not a player →
+   (0, −1), written `00 00 00 00`); they are not the switch's
+   `0x006231A0` / `0x00623120`, which also reset slots. The pairs hold
+   (skill id, owner GUID), not entries: the 0x60 switch trades them with
+   the current selection and looks the saved ones up by id and owner
+   after its inventory pass (`items/inventory-moves.md` §7.25 steps 2,
+   8–11); nothing else writes them in a game.
 4. Decode (`0x00569EC0`), for hotkeys and mouse skills: code 0xFFFF →
    skill −1, left 0, item −1. Else skill = code & 0x0FFF, left = code
    >> 15, item = the index word, 0 → −1.
@@ -336,6 +351,13 @@ as loaded or created.
    skill 0, no item). A Sorceress that selected Fire Bolt as right skill
    (base level 0; +1 from the starting staff) has right = `24 00 00
    00` (skill 36, item index 0).
+8. Live source of the hotkeys (2026-10-08): the client record's slots
+   (+0x3DC + 8i) are written only by the load (`0x0056A283`), C→S 0x51
+   (`0x005356DD`; `sim/intents-events.md` §9 rule 12) and the post-load
+   index resolve (`0x0056B060`, rule 6.1); the writer reads them
+   through `0x005390D0` (`0x005690ED`). A hotkey bound in the game is
+   therefore saved as 0x51 stored it (skill, left flag, item GUID → its
+   index, rule 2).
 
 #### 2.5 Hireling block (+0xAF, 32 bytes)
 
@@ -998,6 +1020,8 @@ save.
 | corpse count 2 | internal 21 → result 8 | §8.3 rule 4 |
 | expansion, no hireling, no golem | `6A 66 6B 66 00` | §8.4, §8.5 |
 | hotkey: skill 36, left flag, no item | `24 80 00 00` | §2.4 rule 1 |
+| left mouse skill 36 (native entry), no item | +0x78 = `24 00 00 00` (no 0x8000) | §2.4 rule 3 |
+| saved swap pairs (36, −1) left and (0, −1) right, switch byte 1 | +0x80 = `24 00 00 00`, +0x84 = `00 00 00 00`, +0x10 = `01 00 00 00` | §2.1, §2.4 rule 3 |
 | hotkey: none | `FF FF 00 00`; decodes to skill −1, item −1 | §2.4 rules 1, 4 |
 | expansion, hireling present with no items, no golem | `6A 66 4A 4D 00 00 6B 66 00` | §8.4 rules 2, 5; §8.5 |
 | a compact item stored with flags 0x00A02010, loaded, saved again (nothing else changed) | flags written 0x00A00010; the rest of its record unchanged | §8.2 rule 7; `items/bitstream.md` §2 rule 1 |
@@ -1015,6 +1039,12 @@ and prints every field; it holds no save data.
 
 ## Provenance
 
+- 2026-10-08 (REC-265, read in `all.asm`): header writer `0x00568F20`
+  mouse words `0x00569144`–`0x00569221` (no 0x8000 on any mouse word),
+  swap getters `0x00623220` (+0x84 / +0x8C) and `0x00623290` (+0x80 /
+  +0x88), switch byte setter `0x00539230` and its three callers, hotkey
+  slot writer `0x005390A0` callers (`sim/intents-events.md` §8.2 rule
+  3.6).
 - 2026-10-08 (REC-241, read in `all.asm`): town byte `0x00569228`–
   `0x00569233`, act writer `0x005382E0` and its four callers; status
   word writers `0x00538630`, `0x00538650` (callers `0x0057FD46`,

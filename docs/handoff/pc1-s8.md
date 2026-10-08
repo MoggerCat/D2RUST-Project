@@ -46,6 +46,7 @@ Branch `claude/local-pc1-s8` from `origin/claude/specs-staging-7`
 | client missile bodies; missiles/client OQ5 (search order), OQ6 (path flag 0x08) | 16 more do-functions (all used by 3+ live rows done), create helpers, hit table `0x0072A508` (81 slots) and 11 hit bodies; five original bugs kept (grimward level field, fn 46 removal, fn 6 Range, hit 1/31 fixed classes, fn 27 wander collapse); flag 0x08 = last step entered a new subtile | `missiles/client-bodies.md` new; `missiles/client.md` §C7 r12, §C9, §C12–§C14, OQs | no client missile layer | `q-fix-client-missiles` extended |
 | ui/text OQ2 (by pattern), OQ7; fixups OQ3, OQ6; loading OQ12; item-tips OQ1 (elixir) | caller `k` patterns A–H (230 of 253 sites always 0–12; recipe scroll uses the raw 0x26 type-7 byte); return chains never read the glyph record; gems +0x2C never read; bad-input behaviours; tile path buffer is 60 bytes + cookie (old 64 wrong); minimum table counts (experience MaxLvl+2, arena 1, composit 16, armtype 3); elixir text table `0x0072D6C0` | `ui/text.md` §7, OQ2, OQ7; `data/fixups.md` §12 r2, edge 10, OQ3, OQ6; `data/loading.md` §10 r8, OQ12; `ui/item-tips.md` §6 r1 | text, fixups match; count checks and elixir do not | `q-fix-count-minimums`, `q-fix-elixir-tip` |
 | REC-257 (1)–(5); pointer edits; PLAN.md counts | pentspin steps on GetTickCount > 50 ms, once per draw, never reset (`[0x007BC944]`); disabled rows mode 1, slider rectangles `0x0046EFD0` mode by style; no Window Mode row in 1.14d (Video has 8 rows); a missing art file crashes the original (d2rs: load error at join); body-click / hireling / events 84–86 pointers; PLAN DC6 1,653, tbl 29 | `ui/frontend-options.md` §O4 r3, r7, §O8; `ui/panels.md` §15; `items/inventory.md` §5.6; `ui/inventory.md` §10 r5; `audio/triggers.md` §2 r2; `docs/PLAN.md` | textslid matches | `q-fix-esc-menu` extended |
+| REC-267 (start, sound, latch; frame clock d2rs-own), REC-265 (1)–(6) | Horadric animation starts only on 0x9C placement of hst/qf2 into cube page 3 when quest bit 11 of 10/18 is clear (`0x0048A540` from `0x004C2970`), no own sound; open latch `0x0048A460`; mouse words plain skill id; swap getters; switch byte setter `0x00539230`; hotkeys from C->S 0x51 | `ui/panels-2.md` §20 r7–r8; `world/cube.md` §8; `formats/d2s.md` §2.1, §2.4 r3, r8 | HoradricAnim, switch bit, progression formula, hireling block fields match | `q-fix-cube-panel`, `q-fix-save-gaps` extended |
 
 Follow-ups status (end of session): all pointer follow-ups listed below are done except the six `0x004AFF60` callers in `0x0046C770`–`0x0046CB40` (unread) and missiles.md OQ15 (server 75 % branch).
 
@@ -322,3 +323,14 @@ Recordability (tools/original-hooks.md §7): R-MIS-1/2, R-PAUSE-1, R-NOTICK-1, R
   quest panels.
 - **R-TEXT-2** [AUTO] Settles ui/text §7 pattern G. S->C 0x26 type 7 byte +8,
   if the single-player server ever sends one.
+- **R-CUBE-3** [MANUAL] Confirms panels-2 §20 r7. Act II: cube a Horadric
+  Staff with ui 0x1A open; per drawn frame GetTickCount, `[0x007BCC10]`,
+  `[0x007BCC14]`, frame drawn; ticks of 0x4F 0x18 sent, 0x9C action 4 and 0x28
+  received; renders of frames 1 and 15 at 640x480; then cube 3 chipped gems
+  (no animation). Also Khalim's Will twice with a 0x28 between (plays again).
+- **R-SAVE-6** [MANUAL] Confirms d2s §2.4 r3, r8, §2.5, §8.5, §2.3. Weapon set 2
+  active with different mouse skills per set (one item-granted): save,
+  compare +0x10, +0x78–+0x87, press W after reload (0x97 / 0x23); Iron Golem
+  item save and reload (kf, golem at join, item kept, OQ15); dead hireling
+  (0x10000) and hireling with items (OQ4); status bits 8–12 after each act
+  II–V; F1–F3 hotkeys (one item skill).
