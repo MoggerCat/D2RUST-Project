@@ -21,8 +21,9 @@
 //! named in [`SoundDriver::take_skipped`].
 
 use std::cell::RefCell;
+use std::sync::{Arc, Mutex};
 
-use crate::audio::sound_table::{SoundSystem, SoundWorld};
+use crate::audio::sound_table::{SoundSettings, SoundSystem, SoundWorld};
 use crate::audio::triggers::events::{player_event, server_event, EventExtra, Followup};
 use std::collections::BTreeMap;
 
@@ -31,6 +32,7 @@ use crate::audio::triggers::tables::ObjectSounds;
 use crate::audio::triggers::{detach_all, ui, Ctx, Globals, TriggerError, Unit, UnitSound};
 use crate::audio::{CueSource, TriggerQueue};
 use crate::bridge::world::{ClientUnit, ClientWorld, LevelRow, UnitKey, MONSTER};
+use crate::rules::draw_order::weather::ThunderSound;
 use crate::rules::UnitPosition;
 use crate::world_view::model_feed::unit_position;
 use d2_sim::rng::Seed;
@@ -289,6 +291,15 @@ impl SoundDriver {
         &self.system
     }
 
+    /// The settings the sound layer reads (`sound-table.md` §9, written
+    /// by the options menu, `sound-table-2.md` §15 r6): in force from the
+    /// next sound tick.
+    pub fn set_settings(&mut self, s: SoundSettings) {
+        if *self.system.settings() != s {
+            self.system.set_settings(s);
+        }
+    }
+
     /// The local player's drawn position for the next frames (the play
     /// preview's prediction, 16.16 subtiles); `None`: the model's cell.
     pub fn set_local_prediction(&mut self, at: Option<(UnitKey, (u32, u32))>) {
@@ -378,6 +389,82 @@ fn capture_point(unit: UnitKey, at: (u16, u16)) -> (i32, i32) {
     u.position = Some(at);
     let p = unit_position(&u).map(|p| p.client()).unwrap_or_default();
     (p.x, p.y)
+}
+
+/// The sound layer as other client systems reach it outside the audio
+/// frame: the app's [`SoundDriver`], set by the audio frame (none before
+/// the first one, or without a sound table). The weather's thunder step
+/// requests through it (`audio/triggers.md` §12).
+#[derive(Clone, Default, bevy::prelude::Resource)]
+pub struct SoundLink(Arc<Mutex<Option<Arc<Mutex<SoundDriver>>>>>);
+
+impl std::fmt::Debug for SoundLink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("SoundLink")
+    }
+}
+
+impl SoundLink {
+    /// Points the link at `driver` (`None`: no sound layer).
+    pub fn set(&self, driver: Option<&Arc<Mutex<SoundDriver>>>) {
+        let mut l = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        let same = match (&*l, driver) {
+            (Some(a), Some(b)) => Arc::ptr_eq(a, b),
+            (None, None) => true,
+            _ => false,
+        };
+        if !same {
+            *l = driver.cloned();
+        }
+    }
+
+    fn driver(&self) -> Option<Arc<Mutex<SoundDriver>>> {
+        self.0.lock().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+}
+
+/// No unit: the request of a sound with no unit reads no world.
+struct NoUnits;
+
+impl SoundWorld for NoUnits {
+    fn local_player(&self) -> Option<UnitKey> {
+        None
+    }
+    fn position(&self, _: UnitKey) -> Option<(i32, i32)> {
+        None
+    }
+    fn blocked(&self, _: UnitKey) -> bool {
+        false
+    }
+    fn indoors(&self) -> bool {
+        false
+    }
+    fn state_duck(&self) -> bool {
+        false
+    }
+    fn client_seed(&mut self) -> Option<&mut Seed> {
+        None
+    }
+}
+
+impl ThunderSound for SoundLink {
+    /// `0x004B9A00(202, none, delay)` at the current sound tick: no unit,
+    /// so nothing of the world is read (`sound-table.md` §5).
+    fn request(&mut self, id: u16, delay: i32) -> u32 {
+        let Some(d) = self.driver() else { return 0 };
+        let mut d = d.lock().unwrap_or_else(|e| e.into_inner());
+        let delay = u32::try_from(delay).unwrap_or(0);
+        d.system
+            .request(&mut NoUnits, i32::from(id), None, delay, 0, 0)
+    }
+
+    /// `0x004B99A0(h, x, y, 0)`: (x, y, 640.0) (`sound-table.md` §5 r8).
+    fn set_position(&mut self, h: u32, x: i32, y: i32) {
+        if let Some(d) = self.driver() {
+            let mut d = d.lock().unwrap_or_else(|e| e.into_inner());
+            d.system.set_position(h, x, y, 0);
+        }
+    }
 }
 
 /// The unit as the event rules read it: key and class (captured at
@@ -662,7 +749,7 @@ mod tests {
         assert_eq!(sw.position(UnitKey::new(MONSTER, 5)), None);
     }
 
-    // Covers: specs/audio/sound-table.md §4 r5
+    // Covers: specs/audio/sound-table.md §4 r5; specs/seams/bridge-app.md §2.9
     #[test]
     fn a_question_the_model_cannot_answer_is_reported_not_fatal() {
         let mut d = driver();
@@ -678,6 +765,37 @@ mod tests {
             .iter()
             .all(|&q| q == "local player client seed (§4 r5): read-only model seed"));
         assert!(d.take_pending().is_empty(), "handed over once");
+    }
+
+    // Covers: specs/audio/triggers.md §12; specs/audio/sound-table.md §5 r8
+    #[test]
+    fn the_thunder_step_requests_through_the_link() {
+        let mut s = String::from(
+            "Sound\tIndex\tFileName\tVolume\tGroup Size\tBlock 1\tBlock 2\tBlock 3\r\n",
+        );
+        for i in 0..=202 {
+            let v = if i == 0 { 0 } else { 255 };
+            s += &format!("s{i}\t{i}\ts{i}.wav\t{v}\t0\t-1\t-1\t-1\r\n");
+        }
+        let e = "Handle\tIndex\tSong\r\nx\t0\t0\r\n";
+        let st = d2_data::txt::TxtTable::parse("sounds.txt", s.as_bytes()).unwrap();
+        let et = d2_data::txt::TxtTable::parse("soundenviron.txt", e.as_bytes()).unwrap();
+        let t = SoundTableData::from_txt(&st, &et).unwrap();
+        let mut link = SoundLink::default();
+        // No sound layer yet: no request, no handle.
+        assert_eq!(link.request(202, 30), 0);
+        let d = Arc::new(Mutex::new(SoundDriver::new(SoundSystem::new(
+            t,
+            Box::new(Bank),
+        ))));
+        link.set(Some(&d));
+        let h = link.request(202, 30);
+        assert_ne!(h, 0);
+        link.set_position(h, -150, 90);
+        let d = d.lock().unwrap();
+        let r = d.system().request_by_handle(h).unwrap();
+        assert_eq!((r.id, r.start_tick, r.units.len()), (202, 30, 0));
+        assert_eq!(r.pos, [-150.0, 90.0, 640.0]);
     }
 
     fn walker(w: &mut ClientWorld, key: UnitKey, at: (u16, u16)) {
@@ -712,7 +830,7 @@ mod tests {
         assert!(d.system().unit_requests(m).is_empty());
     }
 
-    // Covers: specs/audio/sound-table.md §8.1 r1
+    // Covers: specs/audio/sound-table.md §8.1 r1; specs/seams/bridge-app.md §2.7 r2
     #[test]
     fn the_listener_is_the_drawn_local_player() {
         let mut w = at_tick(1);

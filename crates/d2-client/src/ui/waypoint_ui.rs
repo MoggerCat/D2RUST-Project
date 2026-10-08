@@ -200,7 +200,7 @@ impl Panel for WaypointUi {
         for e in effects {
             match e {
                 WpEffect::Out(o) => sh.outputs.push(o),
-                WpEffect::Sound(_) => sh.outputs.push(PanelOutput::ClickSound),
+                WpEffect::Sound(id) => sh.outputs.push(PanelOutput::Sound(id as i32)),
                 WpEffect::RebuildRows => {}
             }
         }

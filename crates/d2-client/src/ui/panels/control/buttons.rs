@@ -466,7 +466,7 @@ impl NewButtons {
 
     /// Press (WM_LBUTTONDOWN: `0x004A66E0`, `0x004A6790`; §8 r4): nothing
     /// at 800 × 600 while state 9 is open. A hit sets the pressed flag,
-    /// plays sound 0, runs the cursor press and consumes the event, except
+    /// plays sound 4 (`client/ui.md` §B8.1), runs the cursor press and consumes the event, except
     /// when the open mode is 2 (new stats) / 1 (new skills) and the NPC
     /// menu is up (`0x004B3470()` ≠ 0): then not consumed. A miss is not
     /// consumed. `(x, y)` is the event, `mouse` the current mouse.
@@ -489,7 +489,8 @@ impl NewButtons {
         }
         *self.flag(which) = true;
         let eff = vec![
-            BtnEffect::Out(PanelOutput::ClickSound),
+            // Id 4 (`client/ui.md` §B8.1: `0x004A6749`, `0x004A67F9`).
+            BtnEffect::Out(PanelOutput::Sound(4)),
             BtnEffect::CursorPress,
         ];
         let special = match which {
@@ -943,7 +944,7 @@ mod tests {
         assert_eq!(
             eff,
             vec![
-                BtnEffect::Out(PanelOutput::ClickSound),
+                BtnEffect::Out(PanelOutput::Sound(4)),
                 BtnEffect::CursorPress
             ]
         );

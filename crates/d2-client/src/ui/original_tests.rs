@@ -428,13 +428,14 @@ fn skill_tree_art_tabs_and_close() {
         panel_images(&img, "panel\\buysellbtn"),
         vec![(10, 571, 477)]
     );
-    // Tab 2 (mouse down in its rectangle): the click sound, frames 8–11.
+    // Tab 2 (mouse down in its rectangle): sound 6 (`client/ui.md`
+    // §B8.1, `0x004ABA32`), frames 8–11.
     let tab2 = Point::new(650, 300);
     assert_eq!(skilltree_tab(tab2), Some(2));
     u.click(&w, tab2);
     assert_eq!(
         u.ui.take_outcome().sounds,
-        vec![crate::audio::driver::SoundRequest::Ui(CLICK_SOUND_ID)]
+        vec![crate::audio::driver::SoundRequest::Ui(6)]
     );
     let art = panel_images(&u.images(&w), "spells\\skltree_a_back");
     assert_eq!(
@@ -675,7 +676,7 @@ fn esc_without_a_player_opens_nothing() {
 
 // The rows of the tree replace the old three-entry / Options page; the
 // Game menu rows are now at the spec's y tops 185 / 235 / 285.
-// Covers: specs/ui/frontend-options.md §o3-save-and-exit-game-0x0047f2d0 r1, §o5-input-handler-table-0x006d6030-7-entries-registered-while-ui-9-is-open r6, §o7-settings-storage-and-the-d2rs-config-mapping r2
+// Covers: specs/ui/frontend-options.md §o3-save-and-exit-game-0x0047f2d0 r1, §o5-input-handler-table-0x006d6030-7-entries-registered-while-ui-9-is-open r6, §o7-settings-storage-and-the-d2rs-config-mapping r2; specs/audio/sound-table-2.md §15 r5; specs/audio/triggers-2.md §17
 #[test]
 fn the_menu_tree_returns_saves_exits_and_swallows_clicks() {
     let mut u = ui(Some(areas()), true);
@@ -734,6 +735,11 @@ fn the_menu_tree_returns_saves_exits_and_swallows_clicks() {
     let (_, r) = u.click(&w, row(0));
     assert_ne!(r, Routed::Unhandled);
     assert!(u.ui.is_open(9) && !u.ui.take_exit_request());
+    // An action entry activated: sound 2 (`sound-table-2.md` §15 r5,
+    // `audio/triggers-2.md` §17).
+    use crate::audio::driver::SoundRequest;
+    let sounds = u.ui.take_outcome().sounds;
+    assert_eq!(sounds.last(), Some(&SoundRequest::Ui(2)), "{sounds:?}");
     assert_eq!(
         art_names(&u, &w)[..5],
         [
@@ -756,7 +762,10 @@ fn the_menu_tree_returns_saves_exits_and_swallows_clicks() {
     // Window Mode cycles and reports the change once; the value round-trips
     // through the config text (§O7).
     assert!(u.ui.take_settings_change().is_none());
+    u.ui.take_outcome();
     u.click(&w, wm);
+    // A choice entry activated: sound 1 (§15 r5).
+    assert_eq!(u.ui.take_outcome().sounds, [SoundRequest::Ui(1)]);
     let s = u.ui.take_settings_change().unwrap();
     assert_eq!(s.window_mode, crate::app::config::WindowMode::Borderless);
     assert!(u.ui.take_settings_change().is_none());

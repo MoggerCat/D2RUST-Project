@@ -83,8 +83,9 @@ pub const ESC_CLOSABLE: [u8; 27] = [
 /// (`frontend-options.md` §O1 r2: keep = 1).
 pub const GAME_MENU_KEEP: [u8; 6] = [6, 7, 10, 17, 21, 35];
 
-/// The click sound of §10.2: `0x004B9A00(0, 0, 0)` = request id 0, no
-/// unit, delay 0 (`audio/triggers.md` §1 r1).
+/// The click sound `0x004B9A00(0, 0, 0)` = request id 0 (silent), no unit,
+/// delay 0 (`audio/triggers.md` §1 r1), at the sites `client/ui.md`
+/// §B8.1 does not list with a constant id 1–6, 15, 16.
 pub const CLICK_SOUND_ID: i32 = 0;
 
 /// Panels and inputs not wired, each with the input the client model or
@@ -607,9 +608,7 @@ impl OriginalUi {
                         self.restore_game_menu_states()?;
                     }
                 }
-                PanelOutput::ClickSound => {
-                    self.outcome.sounds.push(SoundRequest::Ui(CLICK_SOUND_ID))
-                }
+                PanelOutput::Sound(id) => self.outcome.sounds.push(SoundRequest::Ui(id)),
             }
         }
         if let (Routed::Unhandled, UiEvent::Action(a)) = (routed, e) {

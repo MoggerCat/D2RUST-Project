@@ -28,11 +28,12 @@ use bevy::prelude::*;
 use d2_data::bin::TableFiles;
 use d2_data::txt::TxtTable;
 
+use crate::app::config::{ConfigRes, Settings};
 use crate::assets::cache::{Budgets, CacheEvent};
 use crate::assets::path::{CanonicalPath, FileSource, MemorySource};
-use crate::audio::driver::{DriverError, SoundDriver};
+use crate::audio::driver::{DriverError, SoundDriver, SoundLink};
 use crate::audio::output::{self, MixerStream};
-use crate::audio::sound_table::{DeviceGain, SoundSystem, SoundTableData};
+use crate::audio::sound_table::{DeviceGain, SoundSettings, SoundSystem, SoundTableData};
 use crate::audio::D2Wav;
 use crate::audio::{
     AudioEngine, AudioError, CueSource, GainCurve, Sound, SoundBank, SoundId, SoundPool,
@@ -197,8 +198,9 @@ pub struct GameAudio {
     pub engine: Arc<Mutex<AudioEngine>>,
     pub pool: Arc<Mutex<SoundPool>>,
     cues: Box<dyn CueSource + Send + Sync>,
-    /// The original sound layer, when the parts carry a sound table.
-    pub driver: Option<Mutex<SoundDriver>>,
+    /// The original sound layer, when the parts carry a sound table
+    /// (shared with the thunder step through [`SoundLink`]).
+    pub driver: Option<Arc<Mutex<SoundDriver>>>,
     errors: Arc<Mutex<Vec<SoundPoolError>>>,
     pub stats: AudioStats,
 }
@@ -223,7 +225,10 @@ impl GameAudio {
                 pool: Arc::clone(&pool),
                 errors: Arc::clone(&errors),
             };
-            Mutex::new(SoundDriver::new(SoundSystem::new(table, Box::new(bank))))
+            Arc::new(Mutex::new(SoundDriver::new(SoundSystem::new(
+                table,
+                Box::new(bank),
+            ))))
         });
         GameAudio {
             engine: Arc::new(Mutex::new(AudioEngine::new(
@@ -258,12 +263,14 @@ pub enum AudioFrameError {
 /// Adds the audio frame (after the bridge frame) and a [`GameAudio`] with
 /// `parts`. A later `insert_resource(GameAudio::new(…))` replaces it.
 pub fn add_audio(app: &mut App, parts: AudioParts) {
-    app.insert_resource(GameAudio::new(parts)).add_systems(
-        PostUpdate,
-        audio_frame
-            .run_if(resource_exists::<BridgeResource>)
-            .run_if(resource_exists::<GameAudio>),
-    );
+    app.insert_resource(GameAudio::new(parts))
+        .init_resource::<SoundLink>()
+        .add_systems(
+            PostUpdate,
+            audio_frame
+                .run_if(resource_exists::<BridgeResource>)
+                .run_if(resource_exists::<GameAudio>),
+        );
 }
 
 /// Plays the mixed stream on the app's audio device. Needs Bevy's audio
@@ -292,8 +299,13 @@ fn audio_frame(
     mut audio: ResMut<GameAudio>,
     ui_sounds: Option<ResMut<UiSounds>>,
     walk: Option<Res<PreviewWalk>>,
+    config: Option<Res<ConfigRes>>,
+    link: Option<Res<SoundLink>>,
 ) -> std::result::Result<(), BevyError> {
     let audio = &mut *audio;
+    if let Some(l) = link {
+        l.set(audio.driver.as_ref());
+    }
     let world = bridge.0.world();
     let tick =
         u32::try_from(world.server_ticks).map_err(|_| AudioFrameError::Tick(world.server_ticks))?;
@@ -316,6 +328,12 @@ fn audio_frame(
         None => None,
     };
     if let Some(d) = driver.as_deref_mut() {
+        // The options the menu wrote (`sound-table.md` §9; heard from the
+        // next sound tick).
+        if let Some(c) = config.as_deref() {
+            let s = sound_settings(&c.settings, *d.system().settings());
+            d.set_settings(s);
+        }
         // The listener is where the player is drawn (`seams/bridge-app.md`
         // §2.7).
         d.set_local_prediction(walk.as_deref().and_then(PreviewWalk::local_at));
@@ -372,6 +390,22 @@ fn audio_frame(
     s.load_errors += load_errors.len();
     s.engine_errors += engine_errors.len();
     Ok(())
+}
+
+/// The sound layer's settings from the app's (`sound-table.md` §9;
+/// `frontend-options.md` §O7 keeps the 1.14d integers): mixer mode 0 (the
+/// only one d2rs reproduces, §9), `Master Volume`, `Music Volume`,
+/// `Positional Bias`, `NPC Speech`; `Options Music` and the game-loaded
+/// flag are not app settings and keep `prev`'s.
+pub fn sound_settings(s: &Settings, prev: SoundSettings) -> SoundSettings {
+    SoundSettings {
+        mixer_mode: 0,
+        master_volume: i32::from(s.master_volume),
+        music_volume: i32::from(s.music_volume),
+        positional_bias: i32::from(s.positional_bias),
+        npc_speech: i32::from(s.npc_speech),
+        ..prev
+    }
 }
 
 /// The user's `sounds.txt` and `soundenviron.txt` (`sound-table.md` §1,

@@ -155,7 +155,7 @@ impl Panel for CubeUi {
             self.input.cube_up(&s, &ptr)
         };
         if eff.sound4 {
-            sh.outputs.push(PanelOutput::ClickSound);
+            sh.outputs.push(PanelOutput::Sound(4));
         }
         // §12.4 start (flag, n := 0, stamp := now); the close clears it (§12 r7).
         if !down && was_transmute && !self.input.transmute_pressed {
@@ -204,7 +204,7 @@ impl OriginalUi {
                 PanelOutput::SetUi { ui, mode, jump } => {
                     self.set_ui(u32::from(ui), u32::from(mode), jump)?;
                 }
-                PanelOutput::ClickSound => {}
+                PanelOutput::Sound(_) => {}
             }
         }
         self.sync_root(root);

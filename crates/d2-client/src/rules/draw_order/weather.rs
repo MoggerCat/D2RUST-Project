@@ -325,9 +325,20 @@ pub struct Pass9Input {
     pub frame_rate: u32,
     /// Low-quality setting `[0x0072DA50]` ≠ 0.
     pub low_quality: bool,
-    /// Whether the audio layer starts sound 202 (`0x004B9A00`); the two
-    /// position rolls happen only then.
+    /// Without a [`ThunderSound`] hook: whether the request of sound 202
+    /// (`0x004B9A00`) returns a handle; the two position rolls happen only
+    /// then.
     pub thunder_sound_starts: bool,
+}
+
+/// The sound layer as the thunder step of pass 9 calls it
+/// (`audio/triggers.md` §12, "Thunder, draws").
+pub trait ThunderSound: std::fmt::Debug {
+    /// `0x004B9A00(id, none, delay)`: the request's handle, 0 when none
+    /// was made.
+    fn request(&mut self, id: u16, delay: i32) -> u32;
+    /// `0x004B99A0(h, x, y, 0)` (`sound-table.md` §5 r8).
+    fn set_position(&mut self, h: u32, x: i32, y: i32);
 }
 
 /// A pass-4 draw (§11.6): cel `frame` of the kind's file at (`x`, `y`),
@@ -376,9 +387,11 @@ impl SkyDraw {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Thunder {
     pub sound: u16,
-    /// `roll_range(25, 50)`.
-    pub volume: i32,
-    /// The two `roll_range(−200, 400)` of `0x004B99A0`, when it started.
+    /// The request's delay `roll_range(25, 50)` (`audio/triggers.md` §12;
+    /// not a volume).
+    pub delay: i32,
+    /// (x, y) of `0x004B99A0` when the request returned a handle: y =
+    /// `roll_range(−200, 400)` is drawn first, then x.
     pub position: Option<(i32, i32)>,
 }
 
@@ -1060,6 +1073,18 @@ impl Weather {
         player: Option<LocalPlayer<'_>>,
         input: &Pass9Input,
     ) -> Result<Pass9, WeatherError> {
+        self.pass9_with(player, input, None)
+    }
+
+    /// [`Weather::pass9`] with the sound layer called at the thunder step
+    /// (`audio/triggers.md` §12): its handle decides the position rolls
+    /// (`input.thunder_sound_starts` is then not read).
+    pub fn pass9_with(
+        &mut self,
+        player: Option<LocalPlayer<'_>>,
+        input: &Pass9Input,
+        mut sound: Option<&mut dyn ThunderSound>,
+    ) -> Result<Pass9, WeatherError> {
         let player = player.ok_or(WeatherError::Fatal(0x573))?;
         let seed = player.seed;
         let (l, r) = span(input.frame, input.mode);
@@ -1075,15 +1100,24 @@ impl Weather {
                     self.lightning_countdown = seed.roll_range(500, 1_500);
                     self.lightning_phase = 0;
                     if self.thunder {
-                        let volume = seed.roll_range(25, 50);
-                        let position = input.thunder_sound_starts.then(|| {
-                            let px = seed.roll_range(-200, 400);
-                            let py = seed.roll_range(-200, 400);
-                            (px, py)
+                        // `audio/triggers.md` §12: delay, request, then y
+                        // and x when it returned a handle.
+                        let delay = seed.roll_range(25, 50);
+                        let h = match sound.as_deref_mut() {
+                            Some(s) => s.request(THUNDER_SOUND, delay),
+                            None => u32::from(input.thunder_sound_starts),
+                        };
+                        let position = (h != 0).then(|| {
+                            let y = seed.roll_range(-200, 400);
+                            let x = seed.roll_range(-200, 400);
+                            (x, y)
                         });
+                        if let (Some(s), Some((x, y))) = (sound, position) {
+                            s.set_position(h, x, y);
+                        }
                         out.thunder = Some(Thunder {
                             sound: THUNDER_SOUND,
-                            volume,
+                            delay,
                             position,
                         });
                     } else {

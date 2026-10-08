@@ -268,8 +268,10 @@ pub enum PanelOutput {
     Intent(super::ClientIntent),
     /// `SetUIState(ui, mode, jump)` (§2.2; mode 0 on, 1 off, 2 toggle).
     SetUi { ui: u8, mode: u8, jump: bool },
-    /// The UI click sound (`0x004B9A00(0, 0, 0)`, §10.2).
-    ClickSound,
+    /// A UI sound `0x004B9A00(id, 0, 0, 0)` with the site's id
+    /// (`audio/triggers.md` §11; the site → id map is `client/ui.md`
+    /// §B8.1).
+    Sound(i32),
 }
 
 /// A string as UTF-16 code units.
