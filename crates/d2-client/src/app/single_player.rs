@@ -2841,6 +2841,23 @@ pub fn build_with_town(
                 .ok_or_else(|| {
                     BuildError::Setup("allocating the Act III waypoint failed".into())
                 })?;
+            // Its NPCs (`town_npcs::act3_docks`; q-smoke-town, REC-278).
+            for (class, (dx, dy)) in super::town_npcs::act3_docks() {
+                let req = AllocRequest {
+                    ty: UnitType::Monster,
+                    class: u32::from(class),
+                    room: Some(room3),
+                    add: true,
+                    fixed_guid: None,
+                    mode: 1,
+                    allied: true,
+                };
+                sim.action
+                    .with(&mut game, |g, v| {
+                        v.allocate(g, &req, rect3.x * 5 + dx, rect3.y * 5 + dy)
+                    })
+                    .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
+            }
         }
     }
     let interact_classes: Vec<u16> = parts

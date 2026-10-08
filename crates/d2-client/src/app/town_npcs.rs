@@ -35,6 +35,17 @@ pub const ACT3: [(u16, i32); 7] = [
     (class::CAIN4, 84),
 ];
 
+/// The Act III NPCs in the synthetic Kurast Docks room (d2rs-own,
+/// unverified, REC-278: the real positions come from the town presets):
+/// the [`ACT3`] classes in a row (x 3, 7, … at y 12, as Lut Gholein's),
+/// inside the 40 × 40 sub-tile room; [`ACT3`]'s own offsets place them
+/// beside the Act I start for the single-NPC rigs.
+pub fn act3_docks() -> impl Iterator<Item = (u16, (i32, i32))> {
+    ACT3.into_iter()
+        .enumerate()
+        .map(|(i, (class, _))| (class, (3 + 4 * i as i32, 12)))
+}
+
 /// Act V (Harrogath, REC-144; its own room, q-a5-town): Larzuk, Anya,
 /// Malah, Nihlathak, Qual-Kehk and Cain.
 pub const ACT5: [(u16, i32); 6] = [
