@@ -34,12 +34,15 @@ GAME_DEFAULT=$HOME/game
 
 CRATES="d2-formats d2-data d2-sim d2-server conformance d2s-tool scenario-run seed-finder"
 [ $NO_CLIENT = 1 ] || CRATES="$CRATES d2-client"
-SKIP_NAMES=$($PY tools/realdata_inventory.py --skip-names)
+# recording replays need traces/raw/ (gitignored, local recordings): skipped when it is empty
+REC_FLAG=--no-recordings
+ls traces/raw/*.jsonl >/dev/null 2>&1 && REC_FLAG=
+SKIP_NAMES=$($PY tools/realdata_inventory.py --skip-names $REC_FLAG)
 
 if [ $LIST = 1 ]; then
   echo "crates (nextest --run-ignored only, else cargo test -- --ignored): $CRATES"
   echo "tool checks: data-tool tables | links ; mpq-tool check | formats"
-  echo "skipped (needs-window): GPU tests and dump-recording tests:"; echo "$SKIP_NAMES" | sed 's/^/  /'
+  echo "skipped (needs-window): GPU tests, dump tests and (without traces/raw/*.jsonl) recording replays:"; echo "$SKIP_NAMES" | sed 's/^/  /'
   echo "skipped (needs-window): d2-client play / verify / examples (LOCAL-RUN Batches 3-6)"
   exit 0
 fi
@@ -149,6 +152,7 @@ echo "=========== realdata-gate summary (install: $GAME)"
 printf '%s' "$SUMMARY"
 echo "ignored tests: $NPASS passed, $NFAIL failed"
 echo "needs-window (not run): $(echo $SKIP_NAMES | tr ' ' ',')"
+[ -n "$REC_FLAG" ] && echo "  (recording replays skipped: no traces/raw/*.jsonl)"
 echo "needs-window (not run): d2-client play / verify / gpu_compare (docs/LOCAL-RUN.md Batches 3-6), trace recordings"
 [ $NO_CLIENT = 1 ] && echo "skipped on request: d2-client ignored tests (--no-client)"
 echo "logs: $LOGDIR"

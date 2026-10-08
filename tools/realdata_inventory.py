@@ -5,7 +5,10 @@ reads D2_GAME_DIR (directly or through a helper in the same file).
   python3 tools/realdata_inventory.py > docs/handoff/realdata-tests.tsv
   python3 tools/realdata_inventory.py --crates     # crate names that have ignored tests
 
-Columns: crate, file, test, kind (ignored|env), needs (data|gpu|dump; no ignored test opens a window),
+  python3 tools/realdata_inventory.py --skip-names [--no-recordings]
+                                                   # gpu / dump tests (+ recording replays) the gate skips
+
+Columns: crate, file, test, kind (ignored|env), needs (data|gpu|dump|recording; no ignored test opens a window),
 files (heuristic from names in the test body), what (doc line / ignore reason).
 """
 import os, re, sys
@@ -72,6 +75,8 @@ def scan(path):
             need = ["gpu"]
         elif "D2_TABLES_DUMP" in body + reason:
             need = ["dump"]
+        elif "traces/raw" in " ".join(docs) + body + reason:
+            need = ["recording"]
         files = sorted(set(x.replace("\\", "/") for x in FILE_RE.findall(body)))[:6]
         for key, label in EXTRA:
             if key in body and label not in files:
@@ -92,7 +97,8 @@ def main():
                     rows += scan(os.path.join(d, f))
     rows.sort()
     if "--skip-names" in sys.argv:
-        print("\n".join(sorted({r[2] for r in rows if r[4] in ("gpu", "dump")})))
+        skip = ("gpu", "dump", "recording") if "--no-recordings" in sys.argv else ("gpu", "dump")
+        print("\n".join(sorted({r[2] for r in rows if r[4] in skip})))
         return
     if "--crates" in sys.argv:
         print("\n".join(sorted({r[0] for r in rows if r[3] == "ignored"})))
