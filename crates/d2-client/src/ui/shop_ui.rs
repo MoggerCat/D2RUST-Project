@@ -22,7 +22,7 @@
 //! - the buy price shown is published by the server host
 //!   ([`ShopPrices`]); the original client computes it from its tables;
 //! - the repair button (frame 6) toggles a mode; the next click on one of
-//!   the player's items sends C→S 0x35 for it (no confirm dialog, REC-230);
+//!   the player's items sends C→S 0x35 for it (no confirm dialog, REC-231);
 //! - the action button frames are 45 × 44 hit areas (`panels-2.md` §14
 //!   r13); the Buy / Sell buttons only press and release;
 //! - the time of the transaction rules is the bridge frame × 40 ms (+ 60 s).
@@ -106,7 +106,7 @@ pub struct ShopState {
     /// The window is a gamble window (the menu chose Gamble).
     gamble: bool,
     /// The repair button is down: the next click on one of the player's
-    /// items repairs it (d2rs-own, unverified; REC-230).
+    /// items repairs it (d2rs-own, unverified; REC-231).
     repair_mode: bool,
 }
 
@@ -517,13 +517,25 @@ impl Panel for ShopUi {
         let cursor = items::cursor_item(ctx.world);
         match (button, cursor.as_ref(), under.as_ref()) {
             // A cursor item dropped on the store grid: sell it.
-            (PointerButton::Left, Some(c), _) => {
-                Self::click(&mut sh, &mut st, open, ctx.world, Some((c, true)), false, false)
-            }
+            (PointerButton::Left, Some(c), _) => Self::click(
+                &mut sh,
+                &mut st,
+                open,
+                ctx.world,
+                Some((c, true)),
+                false,
+                false,
+            ),
             // Right click (quick buy, §4.5) and, d2rs-own, left click.
-            (PointerButton::Left | PointerButton::Right, None, Some(it)) => {
-                Self::click(&mut sh, &mut st, open, ctx.world, Some((it, false)), false, false)
-            }
+            (PointerButton::Left | PointerButton::Right, None, Some(it)) => Self::click(
+                &mut sh,
+                &mut st,
+                open,
+                ctx.world,
+                Some((it, false)),
+                false,
+                false,
+            ),
             _ => {}
         }
         UiResponse::Consumed

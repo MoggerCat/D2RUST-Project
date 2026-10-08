@@ -171,7 +171,7 @@ const ITEM_SHOWN: [u16; 22] = [
 
 /// The pseudo states that carry the item bonuses to the client, at most
 /// [`messages::STATE_LIST_ENTRIES`] stats each. d2rs-own, unverified
-/// (REC-230): the client builds no item stat lists, so the sum of the
+/// (REC-231): the client builds no item stat lists, so the sum of the
 /// unit's linked item lists rides as the stat lists of these states (the
 /// client's total is the base plus its attached lists, so the panel's
 /// "value above base" colour follows). The ids are past the `states`
@@ -256,9 +256,7 @@ fn item_state_changes<X>(sim: &mut ActionSim<X>, client: ClientId, unit: UnitId)
 fn watched<X>(sim: &ActionSim<X>, unit: UnitId) -> BTreeMap<i32, i32> {
     WATCHED
         .iter()
-        .map(|&s| {
-            (i32::from(s), sim.sys.stats.unit_base(unit, s, 0))
-        })
+        .map(|&s| (i32::from(s), sim.sys.stats.unit_base(unit, s, 0)))
         .collect()
 }
 

@@ -2,7 +2,7 @@
 //! The weapon-swap key (W, `Cfgswapweapons`): the action no panel took
 //! leaves as C→S 0x60 SwapWeapons. The server trades the hands with the
 //! swap set and answers with the item updates and S→C 0x97; this module
-//! only asks (CLAUDE.md rule 7). d2rs-own, unverified (REC-230): the
+//! only asks (CLAUDE.md rule 7). d2rs-own, unverified (REC-231): the
 //! command's own handler (`0x00469140`) is not specified further.
 
 use crate::bridge::link::ServerLink;

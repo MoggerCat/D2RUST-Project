@@ -2,7 +2,7 @@
 //! The weapon switch (C→S 0x60): the items on the weapon-swap body
 //! locations 11 / 12 trade places with the ones in the hands (4 / 5).
 //!
-//! PROVISIONAL (M22, REC-230): the body of `0x005616A0` is not written
+//! PROVISIONAL (M22, REC-231): the body of `0x005616A0` is not written
 //! (`intents-events.md` open question 16). This is d2rs-own, unverified:
 //! each hand item leaves its slot (its stat list detaches), the swap-set
 //! items take the hands (their stat lists attach; the stat link is not
@@ -13,7 +13,7 @@
 
 use super::{InvDesk, InvRest};
 use crate::items::inventory::body;
-use crate::items::moves::{InventoryOps, MovePending, Owner};
+use crate::items::moves::{InventoryOps, MovePending, MoveUnits, Owner};
 use crate::units::lifecycle::LifecycleHooks;
 
 /// S→C 0x97 WeaponSwitch (`msg-items`: one byte).
@@ -49,10 +49,12 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         for (&(hand_loc, swap_loc), &(hand, swap)) in pairs.iter().zip(&held) {
             if let Some(i) = hand {
                 ok &= self.place_body(owner, i, swap_loc);
+                self.set_body_loc(i, swap_loc);
                 self.update_list_add(owner, i);
             }
             if let Some(i) = swap {
                 ok &= self.place_body(owner, i, hand_loc);
+                self.set_body_loc(i, hand_loc);
                 self.stat_link(owner, i);
                 self.update_list_add(owner, i);
             }

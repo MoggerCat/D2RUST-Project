@@ -139,7 +139,7 @@ fn changed_mod_stats_follow_as_stat_messages_once() {
 }
 
 // Covers: specs/items/inventory.md §5.7 r2
-// d2rs-own, unverified (REC-230): the item lists ride as the stat lists of
+// d2rs-own, unverified (REC-231): the item lists ride as the stat lists of
 // the pseudo states 0xFE / 0xFD, the base stat messages stay the base.
 #[test]
 fn linked_item_stats_follow_as_a_state_list() {
@@ -148,8 +148,10 @@ fn linked_item_stats_follow_as_a_state_list() {
     let (mut f, p, c) = fx();
     f.sim.sys.hooks.enable_vitals_sync();
     // Send widths for max life (stat 7, 32 bits) and defense (31, 16 bits).
-    let mut bodies = BodyTables::default();
-    bodies.stats = vec![BodyStat::default(); 32];
+    let mut bodies = BodyTables {
+        stats: vec![BodyStat::default(); 32],
+        ..BodyTables::default()
+    };
     for (id, bits) in [(7usize, 32u8), (31, 16)] {
         bodies.stats[id].send_bits = bits;
     }
@@ -165,7 +167,10 @@ fn linked_item_stats_follow_as_a_state_list() {
     s.stats.equip(&mut s.hooks, p, Some(ir), false, true);
     let got = run_fx(&mut f, c, false).unwrap();
     // The base is untouched: no 0x1D for defense, max life stays 50.
-    assert!(!got.iter().any(|m| m[0] == 0x1D && m[1] == 31), "{got:02X?}");
+    assert!(
+        !got.iter().any(|m| m[0] == 0x1D && m[1] == 31),
+        "{got:02X?}"
+    );
     let set: Vec<_> = got
         .iter()
         .filter(|m| m[0] == 0xA8 && m[7] == 0xFE)
@@ -176,9 +181,9 @@ fn linked_item_stats_follow_as_a_state_list() {
         "no end before a first list"
     );
     // The stream: stat 7 = 5 << 8 (32 bits), stat 31 = 12 (16 bits), end.
-    let mut bits = 0u64;
+    let mut bits = 0u128;
     let mut n = 0;
-    let mut put = |v: u64, w: u32| {
+    let mut put = |v: u128, w: u32| {
         bits |= v << n;
         n += w;
     };
@@ -194,6 +199,9 @@ fn linked_item_stats_follow_as_a_state_list() {
     let s = &mut f.sim.sys;
     s.stats.detach(&mut s.hooks, ir);
     let got = run_fx(&mut f, c, false).unwrap();
-    assert!(got.iter().any(|m| m[0] == 0xA9 && m[6] == 0xFE), "{got:02X?}");
+    assert!(
+        got.iter().any(|m| m[0] == 0xA9 && m[6] == 0xFE),
+        "{got:02X?}"
+    );
     assert!(!got.iter().any(|m| m[0] == 0xA8), "{got:02X?}");
 }

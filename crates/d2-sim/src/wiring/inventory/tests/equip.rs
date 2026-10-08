@@ -241,7 +241,7 @@ fn a_charm_in_the_inventory_counts_and_stops_when_picked_up() {
     assert!(w.state.errors.is_empty(), "{:?}", w.state.errors);
 }
 
-/// REC-230 (d2rs-own, unverified): the weapon switch trades the hands
+/// REC-231 (d2rs-own, unverified): the weapon switch trades the hands
 /// with body locations 11 / 12: the swap set's damage reaches the
 /// wearer, the other set's goes, and the client is told (S→C 0x97).
 #[test]

@@ -10,14 +10,14 @@ use d2_sim::world::npc::class;
 
 /// Act I: Akara and Kashya (the default synthetic town; Warriv is a
 /// class only), plus Gheed (gambles) and Charsi (repairs) east of Akara
-/// (d2rs-own, unverified, REC-230: the real positions come from the
+/// (d2rs-own, unverified, REC-231: the real positions come from the
 /// town presets). Act II's Elzix and Act IV's Jamella are in
 /// `single_player::ACT2_NPCS` and `synthetic_act4::NPCS`.
 pub const ACT1: [(u16, i32); 4] = [
     (class::AKARA, super::single_player::AKARA_X),
     (class::KASHYA, super::single_player::KASHYA_X),
-    (class::GHEED, 38),
-    (class::CHARSI, 48),
+    (class::GHEED, 36),
+    (class::CHARSI, 8),
 ];
 
 /// Natalya's `monstats` row (`npc-menus.tsv` record 20, Talk only).

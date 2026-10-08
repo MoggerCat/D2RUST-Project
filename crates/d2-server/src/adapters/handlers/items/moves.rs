@@ -245,7 +245,7 @@ impl MoveCall for CorpseFillRun {
 }
 
 /// C→S 0x60 SwapWeapons. Its body (`0x005616A0`) is unwritten
-/// (`intents-events.md` open question 16): d2rs-own, unverified, REC-230
+/// (`intents-events.md` open question 16): d2rs-own, unverified, REC-231
 /// ([`InvDesk::swap_weapon_sets`]). A host without the inventory parts
 /// keeps the player handler's stub.
 pub const SWAP_WEAPONS: u8 = 0x60;
