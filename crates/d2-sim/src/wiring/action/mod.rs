@@ -32,6 +32,7 @@ pub mod monster_add;
 pub mod monsters;
 pub mod objects;
 pub mod pending;
+pub mod quest_events;
 pub mod reaction;
 pub mod rooms;
 pub mod state_update;
@@ -206,6 +207,11 @@ pub struct ActionHooks<X> {
     /// player, destination level, argument), for the host that runs them
     /// (`wiring::path::act_change`) after the call.
     pub act_changes: Vec<(UnitId, u32, u32)>,
+    /// The quest events raised (kills, level changes), for the host that
+    /// holds the quest control ([`quest_events`]).
+    pub quest_events: Vec<quest_events::QuestEvent>,
+    /// The last level id noted per player, for the level-change event.
+    pub quest_levels: BTreeMap<UnitId, u32>,
     /// The loaded `AnimData.d2` (`formats/animdata.md`, parsed by
     /// `d2-formats`): the records `UnitHooks::anim_record` looks up by
     /// COF name. `None`: no record for any unit (as before the table is
@@ -344,6 +350,8 @@ impl<X> ActionHooks<X> {
             owner_deaths: None,
             hireling_calls: None,
             act_changes: Vec::new(),
+            quest_events: Vec::new(),
+            quest_levels: BTreeMap::new(),
             anim_data: None,
             vitals: None,
             mode_target: None,

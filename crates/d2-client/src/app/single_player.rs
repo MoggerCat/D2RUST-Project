@@ -175,6 +175,9 @@ pub const DEN_TO_BLOOD_MOOR: u32 = 12;
 /// middle) and the synthetic walk-out.
 pub const WARP_TILE_XY: i32 = 20;
 pub const ACT2_TOWN: u32 = 40;
+/// Catacombs Level 4, Andariel's lair (act 0; a flat level in the
+/// synthetic world, reached by a level warp: d2rs-own, unverified).
+pub const CATACOMBS_4: u32 = 37;
 /// The default game seed.
 pub const DEFAULT_SEED: u32 = 1234;
 /// Game +0x6A of a single-player game: 3 (`rng.md` §5 open question,
@@ -503,6 +506,11 @@ const PREVIEW_MELEE_RANGE: i32 = 2;
 /// and monsters with their allied flag (`UnitLists`), for
 /// [`LocalSeams::sides`].
 pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
+    let classes: BTreeMap<UnitId, u32> = [UnitType::Player, UnitType::Monster]
+        .into_iter()
+        .flat_map(|ty| game.lists.units_of_type(ty))
+        .filter_map(|u| Some((u, sim.action.sys.units.get(u)?.class)))
+        .collect();
     let hooks = &mut sim.action.sys.hooks;
     let mut sides = BTreeMap::new();
     for ty in [UnitType::Player, UnitType::Monster] {
@@ -523,6 +531,11 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
                 .room()
                 .and_then(|r| game.lists.room(r))
                 .map_or(0, |r| r.act);
+            let level = e
+                .room()
+                .and_then(|r| hooks.drlg.level_id(game, r))
+                .unwrap_or(0);
+            let class = classes.get(&u).copied().unwrap_or(0);
             units.insert(
                 u,
                 super::npc_seams::SnapUnit {
@@ -530,6 +543,8 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
                     pos: hooks.path_position(u),
                     act,
                     guid: e.guid,
+                    level,
+                    class,
                 },
             );
         }
@@ -1160,6 +1175,7 @@ fn synthetic_drlg_data() -> DrlgData {
         COLD_PLAINS,
         STONY_FIELD,
         DEN_OF_EVIL,
+        CATACOMBS_4,
         ACT2_TOWN,
     ] {
         drlg.levels[id as usize].drlg_type = 2;
@@ -1219,6 +1235,7 @@ fn synthetic_types() -> Types {
         (COLD_PLAINS, TileRect::new(0, 0, 8, 8)),
         (STONY_FIELD, TileRect::new(0, 16, 8, 8)),
         (DEN_OF_EVIL, TileRect::new(0, 8, 8, 8)),
+        (CATACOMBS_4, TileRect::new(8, 16, 8, 8)),
         (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
     ]))
 }
@@ -1565,6 +1582,11 @@ fn synthetic_monstats() -> Vec<Monstats> {
     let a = &mut v[usize::from(d2_sim::world::npc::class::AKARA)];
     a.npc = true;
     a.interact = true;
+    // Warriv (act 1): the act travel of Sisters to the Slaughter
+    // (`docs/handoff/q-a1-andariel.md`).
+    let w = &mut v[usize::from(d2_sim::world::npc::class::WARRIV1)];
+    w.npc = true;
+    w.interact = true;
     v
 }
 
@@ -1572,18 +1594,23 @@ fn synthetic_monstats() -> Vec<Monstats> {
 /// synthetic game, so Akara's S→C 0xAC creates her unit (a class without
 /// a row is ignored, `client/msg-units.md` §1.2 r2).
 pub fn synthetic_unit_rows() -> UnitRows {
+    let npc = |_: ()| {
+        Some(MonsterClass {
+            components: [0; 16],
+            npc: true,
+            interact: true,
+            setup: Some(crate::bridge::world::MonsterSetup {
+                is_att: true,
+                is_sel: true,
+                ..Default::default()
+            }),
+        })
+    };
+    let warriv = usize::from(d2_sim::world::npc::class::WARRIV1);
     let akara = usize::from(d2_sim::world::npc::class::AKARA);
-    let mut monsters = vec![None; akara + 1];
-    monsters[akara] = Some(MonsterClass {
-        components: [0; 16],
-        npc: true,
-        interact: true,
-        setup: Some(crate::bridge::world::MonsterSetup {
-            is_att: true,
-            is_sel: true,
-            ..Default::default()
-        }),
-    });
+    let mut monsters = vec![None; warriv.max(akara) + 1];
+    monsters[akara] = npc(());
+    monsters[warriv] = npc(());
     UnitRows {
         monsters,
         ..UnitRows::default()

@@ -397,6 +397,16 @@ fn quest_objects<X: Pending, R: TradeRest>(
 ) -> Vec<(UnitId, Vec<u8>)> {
     let mut sent = Vec::new();
     loop {
+        // The kills and level changes the tick raised
+        // (`ActionHooks::quest_events`, PROVISIONAL: run when the tick
+        // returns).
+        let events = desk.econ.hooks.take_quest_events();
+        if !events.is_empty() {
+            let ((), s) = quest_call(desk, ctl, inv.as_deref_mut(), |q, w| {
+                d2_sim::wiring::action::quest_events::run(q, w, events)
+            });
+            sent.extend(s);
+        }
         let calls = desk
             .econ
             .hooks

@@ -406,6 +406,14 @@ impl<X: Pending> TickHooks for ActionSim<X> {
             .and_then(|e| e.player)
             .and_then(|p| game.lists.unit(p))
             .and_then(|u| u.room());
+        // Quest event 3 (`quests.md` §4.3): queued for the host that
+        // holds the quest control ([`super::quest_events`]).
+        let player = game.lists.client(client).and_then(|e| e.player);
+        if let (Some(p), Some(r)) = (player, new) {
+            if let Some(level) = self.sys.hooks.drlg.level_id(game, r) {
+                self.sys.hooks.note_player_level(p, level);
+            }
+        }
         self.with(game, |g, v| v.room_switch(g, client, new));
     }
 

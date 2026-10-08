@@ -50,6 +50,9 @@ pub struct AppRest {
     /// The store item buy prices the shop panel shows (d2rs-own,
     /// unverified: `VendorRest::store_price`).
     pub prices: ShopPrices,
+    /// The units' quest chains (unit +0x74, `quests.md` §4.6): a monster
+    /// linked to a chain, in link order.
+    pub chains: BTreeMap<UnitId, QuestChain>,
 }
 
 impl AppRest {
@@ -393,20 +396,28 @@ impl QuestRest for AppRest {
     fn set_player_byte_4c(&mut self, p: UnitId, v: u8) {
         self.note(format!("byte 4c {} {v}", p.0));
     }
-    fn quest_chain(&mut self, _: UnitId) -> Option<&mut QuestChain> {
-        None
+    fn quest_chain(&mut self, u: UnitId) -> Option<&mut QuestChain> {
+        Some(self.chains.entry(u).or_default())
     }
     fn unit_act(&self, u: UnitId) -> Option<u8> {
         self.snap.lock().ok()?.units.get(&u).map(|u| u.act)
     }
-    fn unit_level(&self, _: UnitId) -> Option<u32> {
-        None
+    /// The level id of the last sync (`npc_seams`).
+    fn unit_level(&self, u: UnitId) -> Option<u32> {
+        let s = self.snap.lock().ok()?;
+        s.units.get(&u).map(|u| u.level).filter(|&l| l != 0)
     }
     fn unit_kind(&self, u: UnitId) -> UnitKind {
         if self.quests.contains_key(&u) {
-            UnitKind::Player
-        } else {
-            UnitKind::Other
+            return UnitKind::Player;
+        }
+        match self.snap.lock().ok().and_then(|s| s.units.get(&u).copied()) {
+            Some(s) if s.ty == UnitType::Monster => UnitKind::Monster {
+                class: s.class,
+                superunique: None,
+                owner: None,
+            },
+            _ => UnitKind::Other,
         }
     }
     /// d2rs-own, unverified (REC-106): every player (single player).
