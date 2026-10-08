@@ -1462,6 +1462,9 @@ fn the_live_run() {
             path: path.clone(),
             base: save::base_save(&run.character),
             tables: Arc::new(live.save.clone()),
+            appearance: Some(Arc::new(
+                save::appearance_tables(&live.tables.fixed).expect("appearance tables"),
+            )),
         };
         app_support::with(&run.server, move |l| {
             l.host_mut().game.set_storage(Box::new(store))
@@ -1509,6 +1512,29 @@ fn the_live_run() {
         "the saved map seed"
     );
     assert_eq!(saved.header.towns[0] & 0x80, 0x80, "the Normal town byte");
+    // `d2s.md` §2.8: the server's save rebuilt the appearance bytes from
+    // the equipped items (a new character's base has none, all 0xFF): the
+    // `sb1 ` in hand draws as token 4, the first weapon slot after `lit` /
+    // `med` / `hvy` (`d2s-appearance.md` §1 r3: `hax` 4 in 1.14d); no
+    // other part, no colour. Its part is the hand owner's (§4 r1): RH (5)
+    // as the weapon in use, LH (6) otherwise. d2-sim never writes the
+    // weapon in use (inventory +0x1C, `quests-act3-2.md` §11.5 r1; row
+    // q-fix-weapon-in-use), so today the sword is the left-hand owner.
+    let hands = [
+        d2_formats::d2s::appearance::part::RH,
+        d2_formats::d2s::appearance::part::LH,
+    ];
+    let c = saved.header.components;
+    assert!(
+        hands.iter().any(|&h| c[h] == 4),
+        "the sword's token in a hand: {c:02X?}"
+    );
+    for (p, &v) in c.iter().enumerate() {
+        if !hands.contains(&p) {
+            assert_eq!(v, 0xFF, "part {p}");
+        }
+    }
+    assert_eq!(saved.header.colours, [0xFF; 16], "appearance colours");
     assert_eq!(
         single_player::game_seed(&character, None),
         saved.header.map_seed

@@ -431,6 +431,13 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     if hardcore {
         save_base.header.status |= d2_formats::d2s::status::HARDCORE;
     }
+    // `d2s.md` §2.8: the server's saves rebuild the appearance bytes.
+    let appearance = match &config.data {
+        GameData::Live(d) => Some(std::sync::Arc::new(
+            save::appearance_tables(&d.tables.fixed).map_err(anyhow::Error::msg)?,
+        )),
+        GameData::Synthetic => None,
+    };
     let save_tables: Option<std::sync::Arc<dyn d2_formats::d2s::SaveTables + Send + Sync>> =
         match &config.data {
             GameData::Live(d) => Some(std::sync::Arc::new(d.save.clone())),
@@ -477,7 +484,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     .add_systems(Update, super::config::apply_settings);
     let (link, saver): (DynLink, Option<save::SaveHandle>) = match (config.save_path, save_tables) {
         (Some(path), Some(tables)) => {
-            let (link, handle) = save::share(link, save_base, tables, path)?;
+            let (link, handle) = save::share(link, save_base, tables, appearance, path)?;
             (Box::new(link), Some(handle))
         }
         (path, _) => {

@@ -1,4 +1,4 @@
-// Spec: specs/formats/d2s.md §8.1 (item list writing), §8.2 (item list reading); specs/items/bitstream.md §5
+// Spec: specs/formats/d2s.md §8.1 (item list writing), §8.2 (item list reading), §2.8 (appearance inputs); specs/items/bitstream.md §5
 //! The player's items through a save: the item list written from the
 //! wired host's economy and inventory model ([`WiredWorld::save_items`],
 //! `adapters::character::save::item_list` over an inventory desk) and the
@@ -12,7 +12,9 @@ use d2_sim::units::{UnitId, UnitType};
 use d2_sim::wiring::inventory::load::LoadFault;
 
 use super::{inv_take_sent, ActionEvents, Game, WiredWorld};
-use crate::adapters::character::save::item_list;
+use d2_formats::d2s::appearance::Equipment;
+
+use crate::adapters::character::save::{equipment, item_list, SaveContext};
 
 /// What the load of a save's item list did ([`WiredWorld::load_items`]).
 #[derive(Debug, Default)]
@@ -45,6 +47,28 @@ impl<R, S> WiredWorld<R, S> {
         });
         self.inventory = Some(inv);
         out
+    }
+
+    /// The appearance inputs of `player`'s items (`d2s-appearance.md`
+    /// Inputs, `adapters::character::save::equipment` over an inventory
+    /// desk) with `ctx`'s weapon class and states. `Err`: no inventory
+    /// model.
+    pub fn save_equipment<D: ActionEvents>(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        player: UnitId,
+        ctx: &SaveContext,
+    ) -> Result<Equipment, String> {
+        let Some(mut inv) = self.inventory.take() else {
+            return Err("no inventory model (WiredWorld::inventory is None)".into());
+        };
+        let out = self.with_economy(game, events, |econ, _| {
+            let d = inv.desk(econ);
+            equipment(&d, player, ctx)
+        });
+        self.inventory = Some(inv);
+        Ok(out)
     }
 
     /// Makes the items of a save's list on `player` and places them
