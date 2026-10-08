@@ -36,11 +36,15 @@ fn rune_codes() -> impl Iterator<Item = [u8; 4]> {
 }
 
 /// The combined array's codes, with each row's type and invwidth ×
-/// invheight: the hammer (weapons), then misc (the soulstone, gems,
-/// skulls, runes).
+/// invheight: the hammer and the smoke weapons (weapons), the cap
+/// (armor), then misc (the soulstone, gems, skulls, runes, then the
+/// smoke misc items).
 fn rows() -> Vec<([u8; 4], u16, (u8, u8))> {
     let mut v = vec![
         (q3::HAMMER, ty::WEAP, (2, 3)),
+        (smoke::SWORD, ty::WEAP, (1, 3)),
+        (smoke::AXE, ty::WEAP, (2, 3)),
+        (smoke::CAP, ty::HELM, (2, 2)),
         (q3::SOULSTONE, ty::MISC, (1, 1)),
     ];
     for code in q3::PERFECT_GEMS
@@ -51,7 +55,71 @@ fn rows() -> Vec<([u8; 4], u16, (u8, u8))> {
         v.push((*code, ty::GEM, (1, 1)));
     }
     v.extend(rune_codes().map(|c| (c, ty::RUNE, (1, 1))));
+    v.extend([
+        (smoke::POTION, smoke::HPOT, (1, 1)),
+        (smoke::IDENTIFY, ty::SCRO, (1, 1)),
+        (smoke::PORTAL, ty::SCRO, (1, 1)),
+        (smoke::CHARM, ty::CHAR, (1, 1)),
+        (smoke::GOLD, ty::GOLD, (1, 1)),
+    ]);
     v
+}
+
+/// (q-smoke-items, REC-281) The items of the item smoke test: a
+/// one-handed sword with two sockets, an axe with a strength
+/// requirement, a cap, a healing potion (belt), the identify and town
+/// portal scrolls, a small charm and gold. Every value is `d2rs-own,
+/// unverified`; codes are the original's.
+pub mod smoke {
+    pub const SWORD: [u8; 4] = *b"ssd ";
+    pub const AXE: [u8; 4] = *b"axe ";
+    pub const CAP: [u8; 4] = *b"cap ";
+    pub const POTION: [u8; 4] = *b"hp1 ";
+    pub const IDENTIFY: [u8; 4] = *b"isc ";
+    pub const PORTAL: [u8; 4] = *b"tsc ";
+    pub const CHARM: [u8; 4] = *b"cm1 ";
+    pub const GOLD: [u8; 4] = *b"gld ";
+    /// The healing potion's type (a beltable type; d2rs-own index).
+    pub const HPOT: u16 = 76;
+    /// The axe's strength requirement (above a new sorceress's 10).
+    pub const AXE_STR: u16 = 32;
+    /// The weapon rows' damage (min, max).
+    pub const SWORD_DAMAGE: (u8, u8) = (2, 7);
+    pub const AXE_DAMAGE: (u8, u8) = (4, 11);
+    /// The sword's sockets (`gemsockets`).
+    pub const SWORD_SOCKETS: u8 = 2;
+    /// The cap's defense range.
+    pub const CAP_AC: (u32, u32) = (3, 5);
+    /// The chest's and the smoke monster's treasure classes (indexes in
+    /// [`super::drop_tables`]).
+    pub const CHEST_TC: u16 = 1;
+    pub const MONSTER_TC: u16 = 2;
+    /// The smoke monster's class: killable, drops [`MONSTER_TC`].
+    pub const MONSTER: u32 = 5;
+
+    /// The one magic affix: a suffix for charms only, without a
+    /// property.
+    pub fn charm_suffix() -> d2_sim::items::tables::AffixRec {
+        let none = d2_sim::items::tables::PropRec {
+            code: -1,
+            ..Default::default()
+        };
+        d2_sim::items::tables::AffixRec {
+            spawnable: 1,
+            frequency: 1,
+            classspecific: 0xFF,
+            itype: [d2_sim::items::ty::CHAR as i16, 0, 0, 0, 0, 0, 0],
+            mods: [none; 3],
+            ..Default::default()
+        }
+    }
+
+    /// Gives the smoke monster its `monstats` row.
+    pub fn monster(monstats: &mut [d2_data::tables::Monstats]) {
+        let m = &mut monstats[MONSTER as usize];
+        m.killable = true;
+        m.treasureclass1 = MONSTER_TC;
+    }
 }
 
 /// Every type is its own and type 0's (as the fixtures' `equiv`).
@@ -92,14 +160,38 @@ pub fn item_tables() -> ItemTables {
     let rows = rows();
     let items: Vec<ItemRec> = rows
         .iter()
-        .map(|&(code, t, (w, h))| ItemRec {
-            code,
-            type_: t as i16,
-            level: 1,
-            invwidth: w,
-            invheight: h,
-            spawnable: 1,
-            ..ItemRec::default()
+        .map(|&(code, t, (w, h))| {
+            let mut r = ItemRec {
+                code,
+                type_: t as i16,
+                level: 1,
+                invwidth: w,
+                invheight: h,
+                spawnable: 1,
+                ..ItemRec::default()
+            };
+            match code {
+                smoke::SWORD => {
+                    (r.mindam, r.maxdam) = smoke::SWORD_DAMAGE;
+                    r.gemsockets = smoke::SWORD_SOCKETS;
+                    r.durability = 24;
+                }
+                smoke::AXE => {
+                    (r.mindam, r.maxdam) = smoke::AXE_DAMAGE;
+                    r.durability = 24;
+                }
+                smoke::CAP => {
+                    (r.minac, r.maxac) = smoke::CAP_AC;
+                    r.durability = 12;
+                }
+                // Saved compact (the original's misc rows of these).
+                smoke::GOLD | smoke::POTION | smoke::IDENTIFY | smoke::PORTAL => {
+                    r.compactsave = 1;
+                    r.nodurability = 1;
+                }
+                _ => {}
+            }
+            r
         })
         .collect();
     let n = items.len();
@@ -123,7 +215,11 @@ pub fn item_tables() -> ItemTables {
         isc: save_columns(),
         stat_shift: 6,
         stat_mask: 0x3F,
-        parts: [Some((0, 1)), None, Some((1, n - 1))],
+        parts: [Some((0, 3)), Some((3, 1)), Some((4, n - 4))],
+        // One charm suffix with no property (REC-281): a charm is always
+        // magic (`affixes.md` §5: no affix → fatal).
+        magic: vec![smoke::charm_suffix()],
+        n_suffix: 1,
         ..ItemTables::default()
     }
 }
@@ -153,18 +249,33 @@ pub fn inv_tables(t: &ItemTables) -> InvTables {
     weap.body = 1;
     weap.bodyloc1 = 4;
     weap.bodyloc2 = 5;
+    let helm = &mut itemtypes[usize::from(ty::HELM)];
+    helm.body = 1;
+    helm.bodyloc1 = 1;
+    helm.bodyloc2 = 1;
+    itemtypes[usize::from(smoke::HPOT)].beltable = 1;
     InvTables {
         grids,
         belts: vec![12, 8, 4, 16, 8, 12, 16, 12, 8, 4, 16, 8, 12, 16],
         items: t
             .items
             .iter()
-            .map(|r| InvItemRec {
-                code: r.code,
-                type_: r.type_,
-                invwidth: r.invwidth,
-                invheight: r.invheight,
-                ..InvItemRec::default()
+            .map(|r| {
+                let mut i = InvItemRec {
+                    code: r.code,
+                    type_: r.type_,
+                    invwidth: r.invwidth,
+                    invheight: r.invheight,
+                    mindam: r.mindam,
+                    maxdam: r.maxdam,
+                    ..InvItemRec::default()
+                };
+                match r.code {
+                    smoke::AXE => i.reqstr = smoke::AXE_STR,
+                    smoke::POTION | smoke::IDENTIFY | smoke::PORTAL => i.useable = 1,
+                    _ => {}
+                }
+                i
             })
             .collect(),
         itemtypes,
@@ -203,12 +314,56 @@ pub fn drop_tables() -> DropTables {
         mods: [0; 6],
         entries: Vec::<TcEntry>::new(),
     };
+    // The smoke treasure classes (REC-281): negative picks, one pick of
+    // each entry in order (`treasure.md` §5.3), so the drops are fixed.
+    let find = |c: [u8; 4]| items.items.iter().position(|r| r.code == c).unwrap() as u16;
+    let fixed = |name: &[u8], codes: &[[u8; 4]]| {
+        let entries: Vec<TcEntry> = codes
+            .iter()
+            .enumerate()
+            .map(|(i, &c)| TcEntry {
+                start_classic: i as i32,
+                start_expansion: i as i32,
+                id: find(c),
+                // Gold: the multiplier (`treasure.md` §6), 1×.
+                row: if c == smoke::GOLD { 1024 } else { 0 },
+                flags: 0,
+                mods: [0; 6],
+            })
+            .collect();
+        TreasureClass {
+            name: name.to_vec(),
+            group: 0,
+            level: 0,
+            total_classic: entries.len() as i32,
+            total_expansion: entries.len() as i32,
+            picks: -(entries.len() as i32),
+            nodrop: 0,
+            mods: [0; 6],
+            entries,
+        }
+    };
+    let chest_tc = fixed(
+        b"Act 1 Chest A",
+        &[
+            smoke::AXE,
+            smoke::POTION,
+            smoke::IDENTIFY,
+            smoke::PORTAL,
+            smoke::CHARM,
+            q3::STANDARD_GEMS[0],
+        ],
+    );
+    let monster_tc = fixed(b"smoke", &[smoke::SWORD, smoke::CAP, smoke::GOLD]);
+    let mut chest = [None; 45];
+    // Act I, Normal, every tier.
+    chest[..3].fill(Some(smoke::CHEST_TC));
     DropTables {
         items,
         tcs: TreasureClasses {
-            tcs: vec![none],
+            tcs: vec![none, chest_tc, monster_tc],
             group_offset: 0,
-            chest: [None; 45],
+            chest,
             notes: Vec::new(),
         },
         treasure_items,
