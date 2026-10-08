@@ -1,6 +1,6 @@
 # q-weapon-combat: equipped weapon and worn stats in combat
 
-Nothing here is verified against 1.14d (rule 10); fills are `d2rs-own, unverified`, REC-156.
+Nothing here is verified against 1.14d (rule 10); fills are `d2rs-own, unverified`, REC-158.
 
 ## Links connected
 - Equip/unequip now link the item's stat list to the wearer (`InvDesk::link_item_stats`/`unlink_item_stats`, called from `InvWorld::stat_link`, `MovePending::stat_link`, `body_leave_effects`, `stat_unlink`). Item base damage (stats 21/22/23/24) and gem/rune fillers (already attached to their target by q-sockets) reach the wearer's totals.

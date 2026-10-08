@@ -22,7 +22,7 @@
 //! stats; q-weapon-combat links the worn items' stat lists to the wearer
 //! (`d2-sim` `InvDesk::link_item_stats`), so combat reads the same weapon
 //! ([`LocalSeams`]'s `Pending::current_weapon`, `wield_type`).
-//! d2rs-own, unverified (REC-156): the grip is 2 for a two-handed base
+//! d2rs-own, unverified (REC-158): the grip is 2 for a two-handed base
 //! item (`0x0063D340` is not written for the preview).
 
 use std::collections::BTreeMap;
