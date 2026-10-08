@@ -35,6 +35,10 @@
 5. Monster AI uses `good_target_search` = none for good monsters; town NPCs stay out (players in town are skipped by §5.2 step 5).
 6. 0x3B skill points (stat seam), server passive states; the client draws no missiles yet.
 7. `stitch-combat.md` rows 5–9, 12–14 are superseded by this note.
+8. **Merging stitch-objects (`90febd75`).** Its server half fits with this branch: it stages the player's facts at the join and moves them along the path each tick. Staged facts win over the live source here, and the live source answers every other unit.
+   - Two files conflict, `single_player.rs` and `world_view/present.rs`. Resolution: keep both `Pending` blocks, and call `object_click::world_clicks_objects` into `let outs = …`.
+   - After that merge, `app_play_objects.rs` needs `pick: false` in its `ClickView`.
+   - Even resolved, `app_play_npc` `clicking_the_waypoint_walks_there_and_interacts` fails. stitch-objects' object click and stitch-npc2's pending interaction both send C→S 0x13 for the waypoint, so the interaction is left pending. One of the two client systems must own object clicks. That choice is outside this server branch, so stitch-objects is not merged here.
 
 ## 4. The user's local check (Windows, PowerShell, 1.14d files)
 
