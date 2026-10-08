@@ -101,3 +101,112 @@ fn the_cube_buttons_show_their_tool_tips_on_hover() {
     assert_eq!(tips(&mut u, &root, &w, trans), ["Trx"]);
     assert!(tips(&mut u, &root, &w, Point::new(5, 5)).is_empty());
 }
+
+/// A cube in the stash page and a living local player (mode 1): the
+/// message path's gate reads the player's life (§2.5).
+fn alive_world() -> ClientWorld {
+    let mut w = world(&[(7, mode::STORED, (0, 0, 0, 1), b"box ")], None);
+    let p = w.local_player.unwrap();
+    w.units.get_mut(&p).unwrap().mode = 1;
+    w
+}
+
+fn click(u: &mut OriginalUi, root: &mut UiRoot, w: &ClientWorld, at: Point) {
+    use crate::ui::PointerButton;
+    let ctx = UiCtx {
+        tick: 0,
+        world: w,
+        strings: &Strs,
+    };
+    for e in [
+        UiEvent::Press {
+            button: PointerButton::Left,
+            at,
+        },
+        UiEvent::Release {
+            button: PointerButton::Left,
+            at,
+        },
+    ] {
+        u.before_event(e, w);
+        let routed = root.dispatch(e, &ctx);
+        u.after_event(root, e, routed).unwrap();
+    }
+}
+
+fn open_cube(u: &mut OriginalUi, root: &mut UiRoot, w: &ClientWorld) {
+    use crate::bridge::output::Output;
+    u.apply_output(
+        &Output::TradeAction {
+            code: 0x15,
+            dead_or_absent: false,
+        },
+        w,
+    )
+    .unwrap();
+    u.sync_root(root);
+}
+
+// Covers: specs/ui/panels.md §12 r7
+#[test]
+fn opening_and_closing_the_cube_twice_sends_0x17_each_time() {
+    let (mut u, mut root) = ui();
+    let w = alive_world();
+    let s = Screen::R800;
+    let close = Point::new(s.sx() + 290, s.h + s.sy() - 80);
+    for _ in 0..2 {
+        open_cube(&mut u, &mut root, &w);
+        assert!(u.is_open(id::CUBE));
+        click(&mut u, &mut root, &w, close);
+        assert!(!u.is_open(id::CUBE));
+        let sent: Vec<Vec<u8>> = root.take_intents().into_iter().map(|i| i.0).collect();
+        assert_eq!(sent.len(), 1, "{sent:?}");
+        assert_eq!(sent[0][..2], [0x4F, 0x17]);
+    }
+}
+
+fn frames(u: &OriginalUi, root: &UiRoot, w: &ClientWorld, tick: u64) -> Vec<u32> {
+    use crate::ui::draw::UiDraw;
+    let ctx = UiCtx {
+        tick,
+        world: w,
+        strings: &Strs,
+    };
+    let mut out: Vec<UiDraw> = Vec::new();
+    root.draw(&ctx, &mut out);
+    let horadric = u.shared.borrow().tables.files.id("menu\\horadric").unwrap();
+    out.iter()
+        .filter_map(|d| match d {
+            UiDraw::Image(i) if i.image.file == horadric => Some(i.image.frame),
+            _ => None,
+        })
+        .collect()
+}
+
+// Covers: specs/ui/panels.md §12 r4
+#[test]
+fn the_transmute_animation_plays_frames_0_to_29_on_the_70ms_steps() {
+    let (mut u, mut root) = ui();
+    let w = alive_world();
+    open_cube(&mut u, &mut root, &w);
+    // No animation before the transmute button is released.
+    assert!(frames(&u, &root, &w, 100).is_empty());
+    let s = Screen::R800;
+    let trans = Point::new(s.sx() + 160, s.h + s.sy() - 200);
+    // Released at tick 0 (stamp 0 ms).
+    click(&mut u, &mut root, &w, trans);
+    assert_eq!(root.take_intents().len(), 1);
+    // 40 ms frames: a step needs more than 70 ms, so every second frame.
+    let mut seen = Vec::new();
+    for t in 0..80u64 {
+        let f = frames(&u, &root, &w, t);
+        if let Some(&n) = f.first() {
+            if seen.last() != Some(&n) {
+                seen.push(n);
+            }
+        }
+    }
+    assert_eq!(seen, (0..30).collect::<Vec<u32>>());
+    // Stopped after frame 29: nothing drawn (frame 30 never).
+    assert!(frames(&u, &root, &w, 200).is_empty());
+}

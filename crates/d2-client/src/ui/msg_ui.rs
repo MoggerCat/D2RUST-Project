@@ -506,6 +506,10 @@ impl OriginalUi {
             0x15 => {
                 self.set_ui(UI_CUBE, ON, false)?;
                 self.msg.inventory_mode = MODE_CUBE;
+                // The open clears the close latch and the animation flag.
+                let mut sh = self.shared.borrow_mut();
+                sh.cube_opened = true;
+                sh.cube_anim.set(Default::default());
             }
             // 0x03, 0x04, 0x07, 0x08, 0x0B, 0x12–0x14 and past 0x15.
             _ => {}
