@@ -302,7 +302,7 @@ mod tests {
         assert_eq!(w.hand_class(UnitId(2)), class::HAND_TO_HAND);
     }
 
-    // Covers: specs/combat/damage.md §3.2 r1 (the weapon in use is combat's)
+    // Covers: specs/combat/damage.md §3.2 r1
     #[test]
     fn combat_reads_the_weapon_in_use() {
         use d2_sim::wiring::action::Pending;
