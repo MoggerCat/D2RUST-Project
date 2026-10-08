@@ -102,6 +102,10 @@ pub fn add_game(app: &mut App, link: DynLink, gpu: bool) -> Result<(), BridgeErr
         ))
         .add_systems(Last, log_progress);
     sound::add_audio(app, AudioParts::empty());
+    // The position check's visibility predicate over no unit art (every
+    // unit reads as not visible, the check corrects); `run` installs it
+    // again once the original UI's unit art exists.
+    super::visibility::add_visibility(app);
     Ok(())
 }
 
