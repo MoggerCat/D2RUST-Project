@@ -185,6 +185,10 @@ pub struct ClientUnit {
     /// Queued unit-handler messages (§4).
     pub queue: Vec<Vec<u8>>,
     pub last_mode_request: Option<ModeRequest>,
+    /// How many mode requests (§8 rule 1) the unit has had: d2rs
+    /// bookkeeping (no 1.14d field), so a reader can tell a new request
+    /// from a repeat of the same one.
+    pub mode_requests: u32,
     pub kind: KindData,
     /// The skill list (+0xA8, `msg-skills.md` §1 rule 1); `None` = no
     /// list.
@@ -263,6 +267,7 @@ impl ClientUnit {
             seed: Some(INIT_SEED),
             queue: Vec::new(),
             last_mode_request: None,
+            mode_requests: 0,
             kind: KindData::None,
             skills: None,
             quest_untargetable: false,

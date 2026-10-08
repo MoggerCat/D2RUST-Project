@@ -51,7 +51,7 @@
 | Edge cases & original bugs | 1061–1072 |
 | Test vectors | 1073–1120 |
 | Provenance | 1121–1199 |
-| Open questions | 1200–1304 |
+| Open questions | 1200–1315 |
 <!-- /index -->
 
 ## Summary
@@ -1222,6 +1222,17 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    at the last server-sent position (the message rules of §8 /
    `client/msg-units.md`), no local prediction (because d2rs runs client and server in one
    process with no latency); settled by REC-51.
+   PROVISIONAL (play preview's walk prediction): an S→C 0x0D code 1 for
+   the local player (the arrival walk-outs of `sim/path-placement.md`
+   §12.2 r5–6, `world/objects.md` §12 r11, `world/waypoints.md` §7 r7)
+   walks the drawn player to (r0, r1) (§8 rule 4, code 0x01) from the
+   arrival point of the 0x15 that follows it, although that placement's
+   teleport sets the path's point count to 0 (`sim/path-placement.md`
+   §6 rule 4); so a waypoint arrival is drawn at x + 3, y + 3 while its
+   server player stays at x, y (inside the §6 rule 4 tolerance, no
+   correction) (because the 0x0D is the only message that tells the
+   client where the server player walks after a warp or portal);
+   settled by REC-288.
 3. ~~`[0x007A04A4]`~~: answered in §6 rule 4 and §7 rule 11
    (2026-10-08 correction: the ping round trip written by 0x8F, not
    only zeroed); the single-player value is open question 18.
