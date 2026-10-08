@@ -19,13 +19,13 @@
 | Inputs | 37–40 |
 | Outputs / state changes | 41–44 |
 | Rules | 45–46 |
-|   11. Clarifications (implementation questions QC-1 … QC-7, 2026-10-07) | 47–207 |
-| Constants & data dependencies | 208–216 |
-| Randomness | 217–222 |
-| Edge cases & original bugs | 223–229 |
-| Test vectors | 230–241 |
-| Provenance | 242–256 |
-| Open questions | 257–261 |
+|   11. Clarifications (implementation questions QC-1 … QC-7, 2026-10-07) | 47–208 |
+| Constants & data dependencies | 209–217 |
+| Randomness | 218–223 |
+| Edge cases & original bugs | 224–230 |
+| Test vectors | 231–242 |
+| Provenance | 243–257 |
+| Open questions | 258–262 |
 <!-- /index -->
 
 ## Summary
@@ -134,8 +134,9 @@ test, `quests-act4.md` §4.6, reads the same field):
    usable (`0x0062A4E0`: identified, not broken, no flag 0x4000) →
    +0x1C := −1 when it held this item's GUID. Usable → W := the weapon
    in use (`0x0063BEF0`); W none, W not `weap`, or W of type 38 `tpot`
-   → +0x1C := the item's GUID; else unchanged (the first wielded
-   weapon stays the weapon in use).
+   → +0x1C := the item's GUID; W is the item itself (and not `tpot`) →
+   +0x1C := −1 (`0x0063D283`–`0x0063D298`); else unchanged (the first
+   wielded weapon stays the weapon in use).
 2. Body unlink `0x0063D2B0(inventory, item)` (`ret 8`, 22 call sites):
    only for a `weap` item: +0x1C = its GUID → −1; then, when it was at
    location 4 the item at 5 (and the reverse), when present and usable,

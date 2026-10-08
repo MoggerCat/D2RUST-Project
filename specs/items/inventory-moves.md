@@ -627,8 +627,8 @@ walked in this order:
    link with the entry's kind (`0x0063B210`); either failing → out 1,
    result 0 (unreachable: To was emptied in step 5; items already
    handled stay moved, later ones stay detached). Body location := To
-   (`0x00627D70`). To 4 or 5 → stat link (`0x0063D1D0`, which also sets
-   the weapon in use) and stat refresh `0x0055C2C0(item, P, 0)`, then
+   (`0x00627D70`). To 4 or 5 → weapon-in-use link (`0x0063D1D0`, §11.5 of
+   world/quests-act3-2.md; writes only inventory +0x1C) and stat refresh `0x0055C2C0(item, P, 0)`, then
    item flag 0x40; To 11 or 12 → item flag 0x80 (no stat link: the
    swap set's stats never count). Then unit flag 0x2 cleared (+0xC4),
    mode 1 (`0x00624690`), item flag 0x1, command flag 0x200000.
@@ -818,7 +818,7 @@ result 0 and nothing else.
       none, X's body location := L, unit flag 0x2 cleared, mode 1,
       command flag 0x8, P's update list += X, P refreshed
       (`0x00621000(P, 1)`), unit flag 0x2000000 cleared, page := 0xFF;
-      kind 3 only: stat link `0x0063D1D0`, stat refresh `0x0055C2C0(P,
+      kind 3 only: weapon-in-use link `0x0063D1D0`, stat refresh `0x0055C2C0(P,
       0)`, item-skill link `0x0055C270`, weapon bookkeeping
       `0x0055C5C0`; quest event ITEMPICKEDUP (`0x00543D80`).
    3. Either success (1 or 2): replenish timers (`0x00558530`,
@@ -1044,7 +1044,7 @@ item into U (`0x0063AFD0`) first unlinks it from C's inventory
    reproduce), body location := L, unit flag 0x2 cleared, mode 1,
    command flag 0x8, update list += X, owner refresh
    (`0x00621000`(U, 1)), unit flag 0x2000000 cleared, page := 0xFF;
-   k = 3 only: stat link `0x0063D1D0`, stat refresh `0x0055C2C0`(X;
+   k = 3 only: weapon-in-use link `0x0063D1D0`, stat refresh `0x0055C2C0`(X;
    U, 0), item-skill link `0x0055C270`(U, X), weapon bookkeeping
    `0x0055C5C0`(U). Then quest hook ITEMPICKEDUP (`0x00543D80`(game,
    U, X)) and the replenish timers.

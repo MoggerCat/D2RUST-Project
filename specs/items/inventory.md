@@ -449,7 +449,7 @@ neither has sockets (`0x006299B0` = 0). Used by 0x21 and hand result 6.
    update).
 5. Put at L (`0x0063BDB0` = §2.2 on grid 0), link (`0x0063B210`, kind 3,
    or 4 for 11/12; failure → out := 1, 0). Body location := L. L ∉
-   {11, 12} → stat link `0x0063D1D0` and stat refresh. Cursor := none,
+   {11, 12} → weapon-in-use link `0x0063D1D0` (world/quests-act3-2.md §11.5; writes only inventory +0x1C) and stat refresh. Cursor := none,
    unit flag 0x2 cleared, mode 1, page 0xFF, command flag 0x8, item flag
    0x1, item flag 0x4000 cleared, update list += item, refresh, weapon
    bookkeeping `0x0055C5C0` (§5.8), inventory pass (§5.7) `0x0055DBC0(0)`. Result 1.
@@ -531,7 +531,7 @@ vendor buy §7.1 rule 9.7 of `world/vendors.md` (`0x00577D90`), and
    (`ItemMode.cpp` line 0x1674). L = 11 or 12 → fatal assert (0x1656;
    §4.7 never returns them). Link check `0x0063B210(kind 3)` fails →
    location L emptied again (`0x0063BE30`), then fatal assert (0x1671).
-3. Body location := L (`0x00627D70`); stat link `0x0063D1D0`; cursor :=
+3. Body location := L (`0x00627D70`); weapon-in-use link `0x0063D1D0` (world/quests-act3-2.md §11.5; writes only inventory +0x1C); cursor :=
    none (§1.4 rule 3); stat refresh `0x0055C2C0(U, 0)`; unit flag 0x2
    cleared; mode 1; command flag 0x200 (`item-actions.tsv` row 5: 0x9D
    action 6 to every client); unit flag 0x2000000 cleared; update list +=
@@ -692,7 +692,7 @@ hirelings). U without an inventory → nothing (after step 1).
 2. Charms: each item of the item list with node kind 1 (+0x69,
    `0x0063E020`) that is an active inventory item (§5.6), whose stat list
    is not linked to U (`0x00625820` = 0) and is usable → item flag 0x4000
-   cleared, then `0x0055D970`: stat link (`0x0063D1D0`, skipped for
+   cleared, then `0x0055D970`: weapon-in-use link (`0x0063D1D0`, skipped for
    body locations 11 / 12), and when the item is in mode 1, or in mode 0
    and an active inventory item, stat refresh `0x0055C2C0(item, U, 1)`.
 3. Switch off: body locations 1–10 in order, each item X that is (not
@@ -704,7 +704,7 @@ hirelings). U without an inventory → nothing (after step 1).
    flag 0x4000 cleared, stat link (not for 11 / 12), and when X is in
    mode 1, or in mode 0 and an active inventory item, stat refresh
    `0x0055C2C0(X, U, 1)`. "Linked" is `0x00625820(X, 0)` ≠ 0 (X's stat
-   list has a parent), the state the stat link `0x0063D1D0` leaves; the
+   list has a parent), the state the stat linking in `0x0055D970` leaves (one of its callees `0x00627D40` / `0x0062FF70` / `0x00621190`, not pinned; not `0x0063D1D0`, which only writes +0x1C); the
    sweep's change flag is set by every switch-on (REC-253, re-read
    2026-10-08, `0x0055DBC0` sweep loop). The repeat exists because a
    switched-on item's stats can make another item usable (its strength
