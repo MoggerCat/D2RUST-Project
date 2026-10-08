@@ -37,8 +37,8 @@ pub const BACKGROUND_EXPANSION: &str = "CharSelect\\creditsbckgexpand";
 pub const BUTTON: &str = "FrontEnd\\MediumButtonBlank";
 /// String 5101, `EXIT`.
 const EXIT_STRING: u32 = 5101;
-/// FontFormal10 (`0x007089D4`).
-pub const FONT: u16 = 3;
+/// FontFormal10 (`0x007089D4`): id 4 of `ui/text-fonts.tsv` (3 is Font42).
+pub const FONT: u16 = 4;
 
 /// One text row of a column.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -398,6 +398,17 @@ mod tests {
     }
     fn file(s: &str) -> Vec<u16> {
         decode(s.replace('\n', "\r\n").as_bytes()).unwrap()
+    }
+
+    /// `frontend-credits.md` §C (credits text font): FontFormal10, id 4.
+    #[test]
+    fn the_text_font_is_formal10_id_4_of_the_font_table() {
+        let tsv = include_str!("../../../../../../specs/ui/text-fonts.tsv");
+        let row = tsv
+            .lines()
+            .find(|l| l.starts_with(&format!("{FONT}\t")))
+            .unwrap();
+        assert_eq!(row.split('\t').nth(1), Some("FontFormal10"));
     }
 
     #[test]

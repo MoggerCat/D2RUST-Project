@@ -373,7 +373,9 @@ impl ItemTips {
                 ("Required Dexterity", u32::from(c.req_dex)),
                 ("Required Level", u32::from(c.req_lvl)),
             ] {
-                if v > 0 {
+                // `item-tips.md` §3.3 r4: the level line only when R > 1.
+                let min = if label == "Required Level" { 1 } else { 0 };
+                if v > min {
                     out.push(TipLine::new(format!("{label}: {v}"), color::WHITE));
                 }
             }
@@ -757,6 +759,19 @@ pub(crate) mod tests {
                 ("+15 to Life".to_owned(), color::BLUE),
             ]
         );
+    }
+
+    // "Required Level:" only when the level is above 1.
+    // Covers: specs/ui/item-tips.md §3.3 r4
+    #[test]
+    fn a_level_1_requirement_shows_no_line() {
+        let mut t = tips();
+        t.codes.get_mut(b"cap ").expect("cap").req_lvl = 1;
+        let lines = t.lines_of(&magic_cap(hflag::IDENTIFIED));
+        assert!(lines.iter().all(|l| !text(l).starts_with("Required Level")));
+        t.codes.get_mut(b"cap ").expect("cap").req_lvl = 2;
+        let lines = t.lines_of(&magic_cap(hflag::IDENTIFIED));
+        assert!(lines.iter().any(|l| text(l) == "Required Level: 2"));
     }
 
     #[test]

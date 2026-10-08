@@ -293,7 +293,7 @@ impl WaypointPanel {
                 }
             }
             if let Some(tr) = find(t, key, &name, RowKind::Text) {
-                let color = if sel || row.current {
+                let color = if (sel && !self.close_pressed) || row.current {
                     3
                 } else if row.known {
                     0
@@ -769,6 +769,23 @@ mod tests {
         let s = Screen::R640;
         assert!(close_hover(&s, Point::new(273, 387)).is_some());
         assert!(close_hover(&s, Point::new(308, 420)).is_some());
+    }
+
+    // The pressed row's text is color 3 only while the close button is
+    // not pressed; the current level stays 3 either way.
+    // Covers: specs/ui/panels.md §13 r5
+    #[test]
+    fn pressed_row_text_is_plain_while_the_close_button_is_pressed() {
+        let mut v = view();
+        v.rows = vec![row(1, true, false), row(3, true, true)];
+        let p = WaypointPanel {
+            selected: Some(0),
+            close_pressed: true,
+            ..Default::default()
+        };
+        let (_, out) = draw(&p, &env(Screen::R640, true), &v);
+        let colors: Vec<_> = texts(&out)[..2].iter().map(|t| t.style.color).collect();
+        assert_eq!(colors, vec![0, 3]);
     }
 
     // Row icons (frame sel / 3 + sel, frame 0 again for the current

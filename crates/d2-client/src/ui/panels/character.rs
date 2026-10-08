@@ -58,7 +58,7 @@ pub const ADD_BUTTON_STATS: [u16; 4] = [0, 2, 3, 1];
 const RESISTS: [(u16, u16); 4] = [(39, 40), (43, 44), (41, 42), (45, 46)];
 
 /// Stats colored by the `cmp` rule of §8.7 (besides the resistances).
-const CMP_STATS: [u16; 8] = [0, 2, 3, 1, 7, 9, 11, 31];
+const CMP_STATS: [u16; 9] = [0, 2, 3, 1, 7, 9, 11, 12, 31];
 
 /// Which resist effect is active on the player (§8.9; `0x0063A570`…
 /// family): drives the resist value color.
@@ -763,6 +763,21 @@ mod tests {
         assert!(tx.contains(&("20".into(), 286, 308, 1, 0)));
         // level (12): compare color, `%ld`, centered in [13, 53] at y 59.
         assert!(tx.contains(&("7".into(), 31, 59, 1, 0)));
+    }
+
+    // The level (stat 12) takes the compare color: blue above its base,
+    // red below.
+    // Covers: specs/ui/panels.md §8 r7
+    #[test]
+    fn level_takes_the_compare_color() {
+        let v = |total| View {
+            stats: vec![(12, total, 7)],
+            alive: true,
+            ..View::default()
+        };
+        assert_eq!(plain_value(&v(8), 12), Some((8, 3)));
+        assert_eq!(plain_value(&v(6), 12), Some((6, 1)));
+        assert_eq!(plain_value(&v(7), 12), Some((7, 0)));
     }
 
     #[test]
