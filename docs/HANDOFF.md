@@ -3463,6 +3463,18 @@ the dev-dependency) and record results here.
     of the 1.14d image into the spec (settles Open question 3).
     **Result 2026-10-08 round 2** (PC 1, release): FAIL at `character_save.rs:358`: `ktr` position left 51, right 45 (assertions before it, `hax` 4 and the earlier tokens, pass). Finding `q-fix-appearance-token-ktr` (`d2s-appearance.md` s1 r3 / OQ3: read the 256 x 8 bytes at `0x00744CA8`).
 
+100. Render audit fixes on the install (`docs/handoff/q-render-audit.md`,
+    branch `claude/q-render-audit`): `D2_GAME_DIR=<install> cargo test
+    -p d2-client --test game_panels -- --ignored`: expect
+    `panel_files_frame_counts_and_sizes` to pass with `menu\horadric`
+    frames 0 / 30 2 x 2 at (0, 0), frame 1 92 x 121 at (-205, 17), frame
+    15 at (-280, 82) (`ui/panels.md` §12.4; replaces row
+    `q-fix-panel-horadric-offsets`). Then `play` in the Rogue Encampment:
+    hover an object (box and name on the object, not 8 rows below), hold
+    an item over the belt (drawn over it), hover the run button (tip
+    centred on its point), walk with a torch-lit floor in view (the light
+    pool moves with the player in 1/8-sub-tile steps).
+
 Kept entries (unchanged):
 
 **Treasure** (`specs/items/treasure.md`, branch `claude/phase3-treasure`):
