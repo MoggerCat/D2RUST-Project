@@ -15,7 +15,7 @@
 //! them.
 //!
 //! The belt is `hud_belt`. Not drawn: the 640 × 480 variant of §8, the
-//! globe numbers (they need text widths); the tool tips are `hud_tips`.
+//! tool tips, globe numbers and the stamina tip are `hud_tips`.
 //!
 //! Preview fills (decision D1), each `// d2rs-own, unverified`:
 //! - the bars' lines and rectangle are cels of a synthetic one-colour file
@@ -41,7 +41,7 @@ use crate::ui::panels::control::buttons::{
 };
 use crate::ui::panels::control::globes::{
     exp_bar, life_globe, mana_globe, stamina_bar, ExpIn, GlobeDraw, GlobeFile, GlobeSmoothing,
-    LifeIn, ManaIn, StaminaColor,
+    LifeIn, ManaIn, NumbersIn, StaminaColor, StaminaIn,
 };
 use crate::ui::panels::control::input::{CtrlEffect, CtrlInput, InputEnv, UpFacts};
 use crate::ui::panels::control::minipanel::{self, MiniAction, MiniPanel, PlayerFacts, UI_MINI};
@@ -334,6 +334,7 @@ impl Panel for HudUi {
         // §3 r2 life globe.
         let (life, life_max) = (stat(6), stat(7));
         let shown = hud.smoothing.records[0].shown(life, life_max, c, true);
+        let life_shown = shown;
         let life_in = LifeIn {
             shown,
             max: life_max,
@@ -348,6 +349,7 @@ impl Panel for HudUi {
         // §3 r3 mana globe.
         let (mana, mana_max) = (stat(8), stat(9));
         let shown = hud.smoothing.records[1].shown(mana, mana_max, c, false);
+        let mana_shown = shown.min(mana_max);
         let mana_in = ManaIn {
             shown,
             max: mana_max,
@@ -380,6 +382,7 @@ impl Panel for HudUi {
         // §4 r2 stamina bar (state group 24 is not in the model: gold).
         let (stamina, stamina_max) = (stat(10), stat(11));
         let shown = hud.smoothing.records[2].shown(stamina, stamina_max, c, false);
+        let stamina_shown = shown;
         let bar = stamina_bar(shown, stamina_max, false, w, h);
         let frame = match bar.color {
             StaminaColor::Red => 0,
@@ -458,6 +461,32 @@ impl Panel for HudUi {
                 state9_open: sh.states.is_open(9),
                 exp: exp_in,
                 strings: ctx.strings,
+            },
+            out,
+        );
+        // §3 r6 life / mana numbers and the §4 r2 stamina tip.
+        let fonts = sh.fonts.as_ref();
+        super::hud_tips::draw_globe_text(
+            &super::hud_tips::GlobeTextIn {
+                w,
+                h,
+                numbers: NumbersIn {
+                    show_hp: hud.input.show_hp,
+                    show_mp: hud.input.show_mp,
+                    mouse,
+                    life_shown,
+                    life_max,
+                    mana_shown,
+                    mana_max,
+                    living_player: living,
+                },
+                stamina: StaminaIn {
+                    shown: stamina_shown,
+                    max: stamina_max,
+                    shrine: has(136),
+                },
+                strings: ctx.strings,
+                width_a: &|t| fonts.and_then(|f| f.width_a(1, t)).unwrap_or(0),
             },
             out,
         );

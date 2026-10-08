@@ -4,14 +4,16 @@
 //! experience hovers resolve their string ids through [`StringLookup`]
 //! and leave as centred text draws.
 // d2rs-own, unverified: the tip font (1, the font of the globe numbers)
-// is not named by the spec; the globe numbers (§3 r6) need text widths
-// and are not drawn.
+// is not named by the spec. Without the font measure the globe numbers
+// are centred on width 0.
 
 use crate::ui::draw::{TextRequest, TextStyle, UiDraw, UiDrawSink};
 use crate::ui::geom::Point;
 use crate::ui::panel::StringLookup;
 use crate::ui::panels::control::buttons::{menu_tip, run_tip, tip_800, BtnEnv, NewBtn};
-use crate::ui::panels::control::globes::{exp_tip, ExpIn, Tip};
+use crate::ui::panels::control::globes::{
+    exp_tip, globe_numbers, stamina_tip, ExpIn, NumbersIn, StaminaIn, Tip,
+};
 use crate::ui::text::TextOpts;
 use crate::ui::FRAME;
 
@@ -56,6 +58,55 @@ pub fn hud_tips(i: &TipIn<'_>) -> Vec<Tip> {
     .flatten()
     .filter(|t| !t.text.is_empty())
     .collect()
+}
+
+/// What the globe numbers and the stamina tip read (§3 r6, §4 r2).
+pub struct GlobeTextIn<'a> {
+    pub w: i32,
+    pub h: i32,
+    pub numbers: NumbersIn,
+    pub stamina: StaminaIn,
+    pub strings: &'a dyn StringLookup,
+    /// Width A of a string in the tip font; none without the font.
+    pub width_a: &'a dyn Fn(&[u16]) -> i32,
+}
+
+/// Pushes the life / mana numbers (§3 r6) and the stamina tip (§4 r2).
+pub fn draw_globe_text(i: &GlobeTextIn<'_>, out: &mut dyn UiDrawSink) {
+    let s = |id: u16| {
+        i.strings
+            .get_id(id)
+            .map(<[u16]>::to_vec)
+            .unwrap_or_default()
+    };
+    let style = |color: u16| TextStyle {
+        font: TIP_FONT,
+        color,
+    };
+    for l in globe_numbers(&i.numbers, i.w, i.h, &s, i.width_a) {
+        if l.text.is_empty() {
+            continue;
+        }
+        out.push(UiDraw::Text(TextRequest {
+            text: l.text,
+            at: Point::new(l.x, l.y),
+            style: style(l.color as u16),
+            opts: TextOpts::default(),
+            clip: FRAME,
+        }));
+    }
+    let st = &i.stamina;
+    if let Some(t) = stamina_tip(st.shown, st.max, st.shrine, i.w, i.h, i.numbers.mouse, &s) {
+        if !t.text.is_empty() {
+            out.push(UiDraw::Text(TextRequest {
+                text: t.text,
+                at: Point::new(t.x, t.y),
+                style: style(u16::from(t.color)),
+                opts: TextOpts::centered(),
+                clip: FRAME,
+            }));
+        }
+    }
 }
 
 /// Pushes the tips as text draws.
@@ -143,6 +194,85 @@ mod tests {
             &mut out,
         );
         assert_eq!(out.len(), 1);
+    }
+
+    fn globe_strs() -> Strs {
+        Strs(
+            [
+                (4165, "Life: %d / %d"),
+                (4166, "Mana: %d / %d"),
+                (4164, "Stamina: %d / %d"),
+            ]
+            .into_iter()
+            .map(|(k, v)| (k, v.encode_utf16().collect()))
+            .collect(),
+        )
+    }
+
+    fn globe_text(mouse: (i32, i32), show_hp: bool) -> Vec<(String, i32, i32, u16)> {
+        let s = globe_strs();
+        let mut out: Vec<UiDraw> = Vec::new();
+        draw_globe_text(
+            &GlobeTextIn {
+                w: 800,
+                h: 600,
+                numbers: NumbersIn {
+                    show_hp,
+                    mouse,
+                    life_shown: 50 << 8,
+                    life_max: 100 << 8,
+                    mana_shown: 30 << 8,
+                    mana_max: 40 << 8,
+                    living_player: true,
+                    ..NumbersIn::default()
+                },
+                stamina: StaminaIn {
+                    shown: 20 << 8,
+                    max: 25 << 8,
+                    shrine: false,
+                },
+                strings: &s,
+                width_a: &|t| 6 * t.len() as i32,
+            },
+            &mut out,
+        );
+        out.into_iter()
+            .map(|d| match d {
+                UiDraw::Text(t) => (
+                    String::from_utf16_lossy(&t.text),
+                    t.at.x,
+                    t.at.y,
+                    t.style.color,
+                ),
+                _ => panic!("text only"),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn hovering_the_life_globe_draws_the_numbers() {
+        // "Life: 50 / 100" is 14 units, width 84: x = 65 - 42.
+        assert_eq!(
+            globe_text((60, 550), false),
+            [("Life: 50 / 100".to_string(), 23, 505, 0)]
+        );
+        // Mana: "Mana: 30 / 40" is 13 units, width 78: x = 720 - 39.
+        assert_eq!(
+            globe_text((700, 550), false),
+            [("Mana: 30 / 40".to_string(), 681, 505, 0)]
+        );
+        // The toggle shows life without hover; elsewhere nothing.
+        assert_eq!(globe_text((400, 300), true).len(), 1);
+        assert!(globe_text((400, 300), false).is_empty());
+    }
+
+    #[test]
+    fn hovering_stamina_draws_its_tip() {
+        // Stamina rectangle x 273…375, y 573…591; centred at (324, 548).
+        assert_eq!(
+            globe_text((300, 580), false),
+            [("Stamina: 20 / 25".to_string(), 324, 548, 0)]
+        );
     }
 
     #[test]
