@@ -12,13 +12,13 @@
 //! empty, so `population.md` §2.3 draws no region entry and no monster
 //! ever spawns). No `Covers:` claim on the data: it is made up.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use d2_formats::ds1::Ds1Object;
 use d2_sim::units::UnitType;
-use test_fixtures::act1::{self, BLOOD_MOOR, TOWN};
+use test_fixtures::act1::{self, BLOOD_MOOR, COLD_PLAINS, TOWN};
 use test_fixtures::drlg::archive_name;
 use test_fixtures::game::{ActCreation, GameData};
 use test_fixtures::host::{border_goals, Session, Setup};
@@ -48,6 +48,20 @@ fn spawning_act1() -> Synthetic {
     for i in rows {
         s.tables.set("monstats", i, "isSpawn", "1");
     }
+    // Random bosses (`population.md` §6): every outdoor level asks for
+    // champions / uniques (made up: 4..=6 per level).
+    let f = s.tables.file("levels.txt");
+    let den = f.columns.iter().position(|c| c == "MonDen").unwrap();
+    let outdoor: Vec<usize> = (0..f.rows.len())
+        .filter(|&i| !f.rows[i][den].is_empty())
+        .collect();
+    // The champion chance, monumod row 0 `constants` (20 in 1.14d,
+    // `population.md` §6.2 step 2).
+    s.tables.set("monumod", 0, "constants", "20");
+    for i in outdoor {
+        s.tables.set("levels", i, "MonUMin", "4");
+        s.tables.set("levels", i, "MonUMax", "6");
+    }
     // The town NPC: act 1's `monpreset` rows are beast1, Warden 0, then
     // this one (DS1 id 2).
     s.tables
@@ -59,6 +73,15 @@ fn spawning_act1() -> Synthetic {
         id: NPC_DS1_ID,
         x: x + 5,
         y: y + 5,
+        flags: 0,
+    });
+    // A superunique (Bishibosh's kind: `monpreset` act 1 row "Warden 0",
+    // DS1 id 1 → superuniques row 0, `population.md` §11.4).
+    town.objects.push(Ds1Object {
+        kind: 1,
+        id: SUPERUNIQUE_DS1_ID,
+        x: x + 9,
+        y: y + 9,
         flags: 0,
     });
     let name = archive_name(act1::TOWN_DS1);
@@ -73,6 +96,8 @@ fn spawning_act1() -> Synthetic {
 
 /// The NPC's DS1 id (its `monpreset` act 1 row).
 const NPC_DS1_ID: u32 = 2;
+/// The superunique's DS1 id (`monpreset` act 1 row "Warden 0").
+const SUPERUNIQUE_DS1_ID: u32 = 1;
 
 fn data() -> &'static GameData {
     static D: OnceLock<GameData> = OnceLock::new();
@@ -182,4 +207,132 @@ fn the_town_npc_reaches_the_client() {
 #[test]
 fn the_stream_is_deterministic() {
     assert_eq!(walked().transcript, walked().transcript);
+}
+
+const STONY_FIELD: u32 = 4;
+
+/// `monsters/init.md` type flags (`type_flag`).
+const SUPERUNIQUE: u16 = 0x02;
+const CHAMPION: u16 = 0x04;
+const UNIQUE: u16 = 0x08;
+const MINION: u16 = 0x10;
+
+/// The session walked on, level by level along the A1W chain, until its
+/// player stands in `to`.
+fn walked_on(fx: &mut Session, from: u32, to: u32) {
+    let a = fx.level_rect(from);
+    let b = fx.level_rect(to);
+    let p = fx.pos();
+    let goals = border_goals(a, b, p);
+    fx.walk(&goals, |f| f.unit_level(f.player) == Some(to), "next level");
+    fx.assert_clean("level walk");
+}
+
+/// Monster counts per level id and the type flags seen.
+fn census(fx: &mut Session) -> (BTreeMap<u32, usize>, u16, Vec<u32>) {
+    let mons = fx.sim().game.lists.units_of_type(UnitType::Monster);
+    let mut per = BTreeMap::new();
+    let mut flags = 0u16;
+    let mut bosses = Vec::new();
+    for u in mons {
+        let f = fx
+            .sim()
+            .events
+            .world
+            .monsters
+            .get(u)
+            .map_or(0, |m| m.type_flags);
+        flags |= f;
+        if f & (UNIQUE | CHAMPION) != 0 {
+            bosses.push(fx.sim().game.lists.unit(u).unwrap().guid);
+        }
+        if let Some(l) = fx.unit_level(u) {
+            *per.entry(l).or_insert(0) += 1;
+        }
+    }
+    (per, flags, bosses)
+}
+
+/// Monsters spawn in every Act I outdoor level of the A1W chain as the
+/// player walks into it (`population.md` §3: room activation), the
+/// random bosses among them: uniques with their minions and champions
+/// (§6), all announced to the client (S→C 0xAC with the type flags).
+#[test]
+fn every_outdoor_level_spawns_monsters_with_champions_and_uniques() {
+    let mut fx = walked();
+    let mut per_level = Vec::new();
+    let mut flags = 0u16;
+    let mut bosses = Vec::new();
+    for (from, to) in [(BLOOD_MOOR, COLD_PLAINS), (COLD_PLAINS, STONY_FIELD)] {
+        let (n, f, b) = census(&mut fx);
+        per_level.push(n);
+        flags |= f;
+        bosses.extend(b);
+        walked_on(&mut fx, from, to);
+    }
+    let (n, f, b) = census(&mut fx);
+    per_level.push(n);
+    flags |= f;
+    bosses.extend(b);
+    for (lvl, n) in [BLOOD_MOOR, COLD_PLAINS, STONY_FIELD]
+        .into_iter()
+        .zip(&per_level)
+    {
+        assert!(n.get(&lvl).copied().unwrap_or(0) > 0, "level {lvl}: {n:?}");
+    }
+    for (bit, what) in [
+        (UNIQUE, "unique"),
+        (CHAMPION, "champion"),
+        (MINION, "minion"),
+    ] {
+        assert!(flags & bit != 0, "no {what} spawned: flags {flags:#x}");
+    }
+    // The client was told of a boss (S→C 0xAC, GUID at 1).
+    let added: BTreeSet<u32> = fx
+        .transcript
+        .iter()
+        .filter(|m| m[0] == 0xAC && m.len() >= 5)
+        .map(|m| u32::from_le_bytes([m[1], m[2], m[3], m[4]]))
+        .collect();
+    assert!(bosses.iter().any(|g| added.contains(g)), "{bosses:?}");
+}
+
+/// A DS1 preset superunique (Bishibosh, Corpsefire's class of spawn):
+/// the room pass creates it with the superunique type flag and its
+/// group (`population.md` §11.4), and the client is told of it.
+#[test]
+fn a_preset_superunique_spawns_with_its_group_and_reaches_the_client() {
+    let mut fx = Session::new(data(), &setup());
+    for _ in 0..10 {
+        fx.frame();
+    }
+    fx.assert_clean("town");
+    let mons = fx.sim().game.lists.units_of_type(UnitType::Monster);
+    let flags_of = |fx: &mut Session, u| {
+        fx.sim()
+            .events
+            .world
+            .monsters
+            .get(u)
+            .map_or(0, |m| m.type_flags)
+    };
+    let su: Vec<_> = mons
+        .iter()
+        .copied()
+        .filter(|&u| flags_of(&mut fx, u) & SUPERUNIQUE != 0)
+        .collect();
+    assert_eq!(su.len(), 1, "one superunique in the town");
+    let minions = mons
+        .iter()
+        .filter(|&&u| flags_of(&mut fx, u) & MINION != 0)
+        .count();
+    assert!(minions >= 2, "its MinGrp..MaxGrp group: {minions}");
+    let guid = fx.sim().game.lists.unit(su[0]).unwrap().guid;
+    let added: Vec<u32> = fx
+        .transcript
+        .iter()
+        .filter(|m| m[0] == 0xAC && m.len() >= 5)
+        .map(|m| u32::from_le_bytes([m[1], m[2], m[3], m[4]]))
+        .collect();
+    assert!(added.contains(&guid), "0xAC of the superunique");
 }
