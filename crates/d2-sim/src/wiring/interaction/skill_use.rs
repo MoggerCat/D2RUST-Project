@@ -614,8 +614,25 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
     fn room(&self, u: UnitId) -> RoomKind {
         CombatWorld::room(&self.cv, u)
     }
+    /// The host's answer, else (a monster's skill, which has no player
+    /// skill target) the path's target: the target unit's position, or
+    /// the path's target point (`0x0056D2C0`, `pathing.md` §13.2 r2–3,
+    /// read-only here: no stale-target clearing). Both coordinates must
+    /// be non-zero.
     fn target_position(&self, u: UnitId) -> Option<(i32, i32)> {
-        self.x().target_position(u)
+        if let Some(p) = self.x().target_position(u) {
+            return Some(p);
+        }
+        let d = self.cv.v.h.paths.as_ref()?.dynamic(u)?;
+        let (x, y) = match d.target_unit {
+            Some(t)
+                if t.unit != u && self.cv.game.lists.find_unit(t.ty, t.guid) == Some(t.unit) =>
+            {
+                self.cv.v.h.path_position(t.unit)
+            }
+            _ => (i32::from(d.target_x), i32::from(d.target_y)),
+        };
+        (x != 0 && y != 0).then_some((x, y))
     }
     fn line_clear(&self, u: UnitId, to: (i32, i32), mask: u32) -> bool {
         self.rooms_line_clear(u, to, mask)

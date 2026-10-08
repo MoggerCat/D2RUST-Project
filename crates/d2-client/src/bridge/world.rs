@@ -1170,6 +1170,10 @@ pub struct LevelRow {
     pub sound_env: u8,
     /// `DrawEdges` (+9, `render/draw-order.md` §6 r2).
     pub draw_edges: bool,
+    /// `Rain` (+0x05, `render/draw-order-2.md` §11.8).
+    pub rain: bool,
+    /// `Mud` (+0x06, `render/draw-order-2.md` §11.5).
+    pub mud: bool,
 }
 
 /// Inputs of the message rules that are not model state.

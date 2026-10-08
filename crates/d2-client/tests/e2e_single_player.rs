@@ -1549,6 +1549,14 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(streams(&fx, &frames[29].2), want);
     assert_eq!(fx.stat(player, GOLD), gold_now);
     assert_eq!(fx.inventory(), [fx.buckler, fx.cap, fx.cube, bought]);
+    // The client's model: the copy (action 4) is a stored backpack item,
+    // not a store item (this harness has no local player to own it).
+    assert!(
+        d2_client::bridge::items::items(fx.bridge.world())
+            .iter()
+            .any(|i| i.key.guid == bg && !i.store && i.mode == 0 && i.page == 0),
+        "the bought copy {bg} is in the client's backpack"
+    );
 
     // 21. Sell the player's stored buckler (re-sellable, not a
     // permanent code): §7.2 rule 8 copies it into the store (restored,

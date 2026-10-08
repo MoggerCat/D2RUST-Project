@@ -4,7 +4,7 @@
 use super::*;
 use crate::bridge::items::ItemArtRow;
 use crate::bridge::world::{ClientUnit, ItemData, ItemRecord, KindData, PlayerData, UnitKey};
-use crate::ui::draw::UiDraw;
+use crate::ui::draw::{ImageRef, UiDraw};
 
 pub(crate) const PLAYER: UnitKey = UnitKey::new(0, 1);
 
@@ -487,6 +487,83 @@ mod belt {
         assert_eq!(b.state.hover_item, Some(7));
     }
 
+    // Covers: specs/ui/control-panel.md §5 r4
+    #[test]
+    fn a_hovered_belt_slot_paints_its_highlight_rect() {
+        use crate::ui::original::hud::{BELT_FILL_BASE, FILL_FILE};
+        use crate::ui::panels::control::belt::BeltColor;
+        let (u, mut files) = ui();
+        files.add(FILL_FILE);
+        let w = world(&[(7, mode::BELT, (0, 1, 0, 0), b"hp1 ")], None);
+        let mut b = HudBelt {
+            parts: parts(),
+            ..Default::default()
+        };
+        let fill = files.id(FILL_FILE).expect("fill file");
+        let green = BELT_FILL_BASE + BeltColor::Green as u32;
+        let tiles = |out: &[UiDraw]| -> Vec<(i32, i32, u16, u16)> {
+            out.iter()
+                .filter_map(|d| match d {
+                    UiDraw::Image(i)
+                        if i.image
+                            == (ImageRef {
+                                file: fill,
+                                frame: green,
+                            }) =>
+                    {
+                        Some((i.clip.x, i.clip.y, i.clip.w, i.clip.h))
+                    }
+                    _ => None,
+                })
+                .collect()
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        b.draw(&w, &u, &files, (800, 600), false, (0, 0), true, &mut out);
+        assert!(tiles(&out).is_empty(), "no hover, no rectangle");
+        out.clear();
+        b.draw(
+            &w,
+            &u,
+            &files,
+            (800, 600),
+            false,
+            (470, 570),
+            true,
+            &mut out,
+        );
+        // 29 x 29 at (461, 562): an 18-high tile and an 11-high tile.
+        assert_eq!(tiles(&out), vec![(461, 562, 29, 18), (461, 580, 29, 11)]);
+    }
+
+    // Covers: specs/ui/control-panel.md §5 r4
+    #[test]
+    fn rebinding_a_belt_key_changes_its_label() {
+        use crate::controls::{Action, Key, Preset};
+        let w = world(&[(7, mode::BELT, (0, 1, 0, 0), b"hp1 ")], None);
+        let mut b = HudBelt {
+            parts: parts(),
+            ..Default::default()
+        };
+        let label = |b: &mut HudBelt| -> Vec<Vec<u16>> {
+            b.draw_list(&w, (800, 600), false, (0, 0), true)
+                .into_iter()
+                .filter_map(|d| match d {
+                    crate::ui::panels::control::belt::BeltDraw::Label(l) => Some(l.text),
+                    _ => None,
+                })
+                .collect()
+        };
+        assert_eq!(label(&mut b), vec![vec![u16::from(b'2')]]);
+        let mut bind = Preset::Dev.bindings().unwrap();
+        assert_eq!(bind.inputs(Action::BeltSlot2), &[Key::Digit2]);
+        bind.set(Action::BeltSlot2, &[Key::F]);
+        b.set_keys(&bind);
+        assert_eq!(label(&mut b), vec!["F".encode_utf16().collect::<Vec<_>>()]);
+        bind.set(Action::BeltSlot2, &[]);
+        b.set_keys(&bind);
+        assert!(label(&mut b).is_empty(), "unbound: no label");
+    }
+
     #[test]
     fn clicking_the_belt_takes_and_puts_potions() {
         let b = HudBelt {
@@ -681,4 +758,122 @@ fn the_cube_grid_draws_page_3_and_sends_the_page_3_intents() {
     let want = ClientIntent::from_message(&items::insert(9, 0, 0, 3)).0;
     assert_eq!(intents(&u.press_cube(&w, &files, &g, at)), vec![want]);
     assert!(u.press_cube(&w, &files, &g, Point::new(5, 5)).is_empty());
+}
+
+/// The (x, y, w, h) of the tiles of fill frame `frame`.
+fn tiles(files: &UiFiles, d: &[UiDraw], frame: u32) -> Vec<(i32, i32, u16, u16)> {
+    let fill = files.id(crate::ui::original::hud::FILL_FILE).expect("fill");
+    d.iter()
+        .filter_map(|d| match d {
+            UiDraw::Image(i) if i.image.file == fill && i.image.frame == frame => {
+                Some((i.clip.x, i.clip.y, i.clip.w, i.clip.h))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+/// A cap (requires level 3) worn in the head box, the player at `level`;
+/// the mouse at `mouse`.
+fn cap_tints(level: i32, mouse: Point) -> (UiFiles, Vec<UiDraw>) {
+    let (mut u, mut files) = ui();
+    u.art.0.insert(
+        *b"cap ",
+        ItemArtRow {
+            inv_w: 2,
+            inv_h: 2,
+            inv_file: "invcap".into(),
+            flippy_file: String::new(),
+        },
+    );
+    u.tips = Some(crate::ui::item_tip::tests::tips());
+    files.add(crate::ui::original::hud::FILL_FILE);
+    u.register_files(&mut files);
+    let mut w = world(&[(8, mode::BODY, (1, 0, 0, 0), b"cap ")], None);
+    w.units.get_mut(&PLAYER).unwrap().stats.insert(12, level);
+    let mut l = layout();
+    l.equip[1] = EquipBox {
+        left: 30,
+        top: 40,
+        w: 58,
+        h: 18,
+    };
+    let mut out: Vec<UiDraw> = Vec::new();
+    u.draw_tints(&w, &files, &l, mouse, &mut out);
+    (files, out)
+}
+
+// Covers: specs/ui/inventory.md §6 r4, §2 r1
+#[test]
+fn an_equipped_item_over_the_players_level_paints_the_red_tint() {
+    use crate::ui::original::hud::BELT_FILL_BASE;
+    let (files, out) = cap_tints(1, Point::new(0, 0));
+    assert_eq!(tiles(&files, &out, BELT_FILL_BASE), vec![(30, 40, 58, 18)]);
+}
+
+// Covers: specs/ui/inventory.md §6 r4
+#[test]
+fn a_usable_identified_equipped_item_paints_no_tint() {
+    let (files, out) = cap_tints(3, Point::new(0, 0));
+    assert!(out.is_empty(), "{} fills", out.len());
+    let _ = files;
+}
+
+// Covers: specs/ui/inventory.md §6 r4, §2 r1
+#[test]
+fn a_hovered_equipped_item_paints_the_green_tint() {
+    use crate::ui::original::hud::BELT_FILL_BASE;
+    let (files, out) = cap_tints(1, Point::new(40, 45));
+    assert_eq!(
+        tiles(&files, &out, BELT_FILL_BASE + 1),
+        vec![(30, 40, 58, 18)]
+    );
+    assert!(tiles(&files, &out, BELT_FILL_BASE).is_empty());
+}
+
+// Covers: specs/ui/inventory.md §3 r3
+#[test]
+fn grid_items_paint_blue_usable_and_red_refused_tints() {
+    use crate::ui::original::hud::BELT_FILL_BASE;
+    let (mut u, mut files) = ui();
+    u.art.0.insert(
+        *b"cap ",
+        ItemArtRow {
+            inv_w: 1,
+            inv_h: 1,
+            inv_file: "invcap".into(),
+            flippy_file: String::new(),
+        },
+    );
+    u.tips = Some(crate::ui::item_tip::tests::tips());
+    files.add(crate::ui::original::hud::FILL_FILE);
+    let w = |level| {
+        let mut w = world(&[(7, mode::STORED, (0, 2, 3, 1), b"cap ")], None);
+        w.units.get_mut(&PLAYER).unwrap().stats.insert(12, level);
+        w
+    };
+    let l = layout();
+    let (mut ok, mut bad) = (Vec::new(), Vec::new());
+    u.draw_tints(&w(3), &files, &l, Point::new(0, 0), &mut ok);
+    u.draw_tints(&w(1), &files, &l, Point::new(0, 0), &mut bad);
+    // Cell (2, 3): (158, 287), 29 x 29 = an 18-high and an 11-high tile.
+    let cell = vec![(158, 287, 29, 18), (158, 305, 29, 11)];
+    assert_eq!(tiles(&files, &ok, BELT_FILL_BASE + 2), cell);
+    assert_eq!(tiles(&files, &bad, BELT_FILL_BASE), cell);
+}
+
+// Covers: specs/ui/inventory.md §2 r1
+#[test]
+fn the_red_fill_frame_is_the_palette_entry_nearest_to_0x80_0_0() {
+    use crate::ui::original::hud::{fill_frames, BELT_FILL_BASE};
+    let mut colors = [d2_formats::palette::Rgb::default(); 256];
+    colors[9] = d2_formats::palette::Rgb {
+        r: 0x80,
+        g: 0,
+        b: 0,
+    };
+    let pal = d2_formats::palette::Palette { colors };
+    let frames = fill_frames(&pal);
+    let red = &frames[BELT_FILL_BASE as usize];
+    assert!(red.pixels.iter().all(|&p| p == 9));
 }
