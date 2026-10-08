@@ -887,8 +887,8 @@ fn five_act_set() -> test_fixtures::synth::Synthetic {
         }
     }
     // A Town Portal scroll: type `scro` (1.14d row 22, `items::ty::SCRO`),
-    // code `tsc` (the item-use stand-in of REC-117), one in the
-    // sorceress' start items.
+    // code `tsc`, item-use entry 2 (`pSpell`, `items/use.md` §3), one in
+    // the sorceress' start items.
     s.tables.row(
         "itemtypes",
         &[
@@ -913,6 +913,7 @@ fn five_act_set() -> test_fixtures::synth::Synthetic {
             ("cost", "25"),
             ("spawnable", "1"),
             ("useable", "1"),
+            ("pSpell", "2"),
         ],
     );
     for (c, v) in [("item3", "tsc"), ("item3count", "1")] {

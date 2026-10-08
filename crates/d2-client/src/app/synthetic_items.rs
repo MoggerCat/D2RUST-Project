@@ -330,11 +330,22 @@ pub fn inv_tables(t: &ItemTables) -> InvTables {
                 };
                 match r.code {
                     smoke::AXE => i.reqstr = smoke::AXE_STR,
+                    // `pSpell` as the live `misc.txt` rows (`items/use.md`
+                    // §3): potions 3, identify 1, Town Portal 2.
                     smoke::POTION => {
                         i.useable = 1;
                         i.autobelt = 1;
+                        i.pspell = 3;
                     }
-                    smoke::IDENTIFY | smoke::PORTAL | smoke::CUBE => i.useable = 1,
+                    smoke::IDENTIFY => {
+                        i.useable = 1;
+                        i.pspell = 1;
+                    }
+                    smoke::PORTAL => {
+                        i.useable = 1;
+                        i.pspell = 2;
+                    }
+                    smoke::CUBE => i.useable = 1,
                     _ => {}
                 }
                 i
@@ -342,6 +353,7 @@ pub fn inv_tables(t: &ItemTables) -> InvTables {
             .collect(),
         itemtypes,
         equiv: t.equiv.clone(),
+        books: Vec::new(),
     }
 }
 

@@ -137,7 +137,8 @@ pub struct InvState {
     /// without this the bookkeeping never sees a weapon. Off by default.
     pub weapon_hand_fallback: bool,
     /// Town Portal scroll / tome uses of the call, taken by the host
-    /// ([`InvDesk::take_portal_requests`], REC-117).
+    /// ([`InvDesk::take_portal_requests`]; `items/use.md` §4, the cast of
+    /// `world/objects-2.md` §27.1 past its town refusal).
     pub portal_requests: Vec<UnitId>,
     /// The walks to a ground item the pick-ups of the call asked for
     /// (§7.1 step 2, `0x00548A50`: player, item, cursor flag), taken by

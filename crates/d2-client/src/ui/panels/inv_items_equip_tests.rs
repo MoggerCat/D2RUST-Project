@@ -99,6 +99,7 @@ pub(crate) fn tables() -> InvTables {
         items,
         itemtypes,
         equiv: equiv(),
+        books: Vec::new(),
     }
 }
 

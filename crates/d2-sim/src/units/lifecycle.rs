@@ -74,6 +74,11 @@ pub trait LifecycleHooks: UnitHooks {
         false
     }
 
+    /// The level id of the room. The default knows no levels.
+    fn room_level(&self, game: &crate::game::Game, room: RoomId) -> Option<u32> {
+        None
+    }
+
     /// The free routine's other calls (§1 table) and `0x005C0A90`,
     /// `0x00571F40` at removal. Provider: the kind's spec.
     fn free_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}

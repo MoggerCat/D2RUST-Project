@@ -86,6 +86,17 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         self.note_equip(r);
     }
 
+    /// `0x0055E0D0(S)` on the rules ([`bk::skill_decrement`]).
+    pub fn run_skill_decrement(&mut self, owner: UnitId, skill: i32) {
+        let r = bk::skill_decrement(self, owner, skill);
+        self.note_equip(r);
+    }
+
+    /// The player has skill S (`0x006439B0`): its quantity slot exists.
+    pub fn owns_skill(&self, owner: UnitId, skill: i32) -> bool {
+        bk::EquipWorld::skill_quantity(self, owner, skill).is_some()
+    }
+
     /// `0x00576E40` on the rules ([`bk::item_skill_remove`]).
     pub fn run_item_skill_remove(&mut self, owner: UnitId, item: UnitId, n: i32) {
         bk::item_skill_remove(self, owner, item, n);

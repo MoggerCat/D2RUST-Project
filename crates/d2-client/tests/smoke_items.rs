@@ -807,9 +807,10 @@ fn sockets_charm_identify_potion_and_scrolls() {
     );
     rig.step(20);
     rig.check("after the portal");
-    // Read in town with no field cast before: the scroll is used and no
-    // portal opens (`wiring::action::town_portal`, REC-243).
-    assert!(!rig.exists(tsc), "the scroll was read");
+    // Read in town: the cast refuses (`world/objects-2.md` §27.1 step 4),
+    // so the use reports 0 and costs nothing (`items/use.md` §4): the
+    // scroll stays.
+    assert!(rig.exists(tsc), "in town the scroll is not read");
 }
 
 // Covers: specs/items/inventory-moves.md §7.3, §7.4; specs/world/npc.md §6

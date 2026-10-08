@@ -160,10 +160,11 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn tile_warp(&mut self, player: Owner, tile: Owner) {
         self.rest.tile_warp(player, tile)
     }
+    /// `0x005BF240(I, I, x, y)` ([`InvDesk::dispatch_use`]); an item
+    /// with no use entry goes to the rest.
     fn use_item_at(&mut self, player: Owner, item: Guid, x: i32, y: i32) -> bool {
-        // PROVISIONAL (REC-117): Town Portal scroll and tome.
-        if self.use_portal_item(player, item) {
-            return true;
+        if self.use_entry(item).is_some() {
+            return self.dispatch_use(player, item, Owner::item(item), x, y);
         }
         self.rest.use_item_at(player, item, x, y)
     }
@@ -171,8 +172,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         self.open_cube_desk(player, cube)
     }
     fn consume_item(&mut self, player: Owner, item: Guid) {
-        // PROVISIONAL (REC-113, REC-117): a used identify or Town Portal
-        // scroll leaves the grid.
+        // PROVISIONAL (REC-113): a used identify scroll leaves the grid;
+        // a used Town Portal scroll too (`items/use.md` §4: the caller's
+        // consumption, `inventory-moves.md` §7.11 step 3).
         if (self.item_unit(item).is_some()
             && super::identify::IDENTIFY_CODES.contains(&self.code(item)))
             || self.is_portal_scroll(item)
@@ -184,14 +186,27 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         }
         self.rest.consume_item(player, item)
     }
+    /// `0x0055E050` from the books rows ([`InvDesk::book_item_skill`]);
+    /// no row → the rest.
     fn item_skill(&self, item: Guid) -> i32 {
-        self.rest.item_skill(item)
+        match self.book_item_skill(item) {
+            -1 => self.rest.item_skill(item),
+            s => s,
+        }
     }
+    /// `0x006439B0` and `0x0055E0D0` on the equipment rules when
+    /// [`InvState::equip_rules`](super::InvState::equip_rules) is on.
     fn has_skill(&self, player: Owner, skill: i32) -> bool {
-        self.rest.has_skill(player, skill)
+        match (self.state.equip_rules, self.unit_of(player)) {
+            (true, Some(p)) => self.owns_skill(p, skill),
+            _ => self.rest.has_skill(player, skill),
+        }
     }
     fn skill_decrement(&mut self, player: Owner, skill: i32) {
-        self.rest.skill_decrement(player, skill)
+        match (self.state.equip_rules, self.unit_of(player)) {
+            (true, Some(p)) => self.run_skill_decrement(p, skill),
+            _ => self.rest.skill_decrement(player, skill),
+        }
     }
     fn set_quest_flag(&mut self, player: Owner, quest: u8, flag: u8, on: bool) {
         self.rest.set_quest_flag(player, quest, flag, on)
@@ -477,7 +492,12 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
             _ => self.rest.book_count_changed(player, book, n),
         }
     }
+    /// `0x005BF240(I, T, 0, 0)` ([`InvDesk::dispatch_use`]); an item with
+    /// no use entry keeps the earlier answers.
     fn use_item(&mut self, player: Owner, target: Owner, item: Guid) -> bool {
+        if self.use_entry(item).is_some() {
+            return self.dispatch_use(player, item, target, 0, 0);
+        }
         // PROVISIONAL (REC-102): potions on the player.
         if target == player && self.use_potion(player, item) {
             return true;

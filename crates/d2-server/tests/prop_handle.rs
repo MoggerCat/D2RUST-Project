@@ -928,6 +928,7 @@ fn inv_tables(items: &[([u8; 4], u16, u8, u8)], n_types: usize, equiv: EquivMatr
             n_types
         ],
         equiv,
+        books: Vec::new(),
     }
 }
 

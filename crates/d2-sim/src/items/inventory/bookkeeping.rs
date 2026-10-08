@@ -252,6 +252,29 @@ pub fn item_skill_remove<W: EquipWorld + ?Sized>(w: &mut W, u: UnitId, i: UnitId
     }
 }
 
+/// Skill decrement `0x0055E0D0(S)` (`inventory-moves.md` §7.18 step 6):
+/// S's quantity − 1; below 1 → 0, and S as the right skill → skill 0
+/// (owner −1) on the right; S→C 0x22. U lacking S → fatal.
+pub fn skill_decrement<W: EquipWorld + ?Sized>(
+    w: &mut W,
+    u: UnitId,
+    s: i32,
+) -> Result<(), EquipFatal> {
+    let Some(cur) = w.skill_quantity(u, s) else {
+        return Err(EquipFatal::UnlinkSkillMissing(s));
+    };
+    let mut new = cur.wrapping_sub(1);
+    if new < 1 {
+        new = 0;
+        if w.mouse_skill(u, false).is_some_and(|m| m.0 == s) {
+            w.select_skill(u, false, (0, -1));
+        }
+    }
+    w.set_skill_quantity(u, s, new);
+    w.send_skill_quantity(u, s, new);
+    Ok(())
+}
+
 /// Recount on cube open / close (`0x0055FA40`, §5.5).
 pub fn cube_recount<W: EquipWorld + ?Sized>(w: &mut W, u: UnitId) -> Result<(), EquipFatal> {
     let mut count = 0usize;

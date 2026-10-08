@@ -241,11 +241,18 @@ fn inv_tables() -> InvTables {
                 useable: r.5,
                 stackable: r.6,
                 maxstack: r.7,
+                // `pSpell` of the live `misc.txt` rows (`items/use.md` §3).
+                pspell: match &r.0 {
+                    b"tsc " | b"tbk " => 2,
+                    b"hp1 " => 3,
+                    _ => 0,
+                },
                 ..InvItemRec::default()
             })
             .collect(),
         itemtypes,
         equiv: equiv(),
+        books: Vec::new(),
     }
 }
 
@@ -1237,10 +1244,12 @@ fn belt_moves() {
     assert_eq!(bytes, t.pass(&[x9c(0x10, b), x9c(0x10, a)]));
 }
 
-/// 0x26 (§7.17): a belt potion used on the player. PROVISIONAL (the
-/// item-use spec is unwritten): the host applies the potion itself, so
-/// the item leaves with the removal message (0x9D action 5, flag 0x20)
-/// and the rest's `use_item` is not asked.
+/// 0x26 (§7.17): a belt potion used on the player. The dispatcher arms
+/// it (item flag 0x4, `items/use.md` §1 step 5), so the targeting reset
+/// after the use (`inventory.md` §5.3) clears it with S→C 0x3F before the
+/// removal message (0x9D action 5, flag 0x20). PROVISIONAL (REC-102):
+/// the host applies the potion itself; the rest's `use_item` is not
+/// asked.
 // Covers: specs/items/inventory-moves.md §7.17
 #[test]
 fn use_belt_item() {
@@ -1249,22 +1258,40 @@ fn use_belt_item() {
     t.rest.take_log();
     let (code, bytes) = t.frame(&msg(0x26, &[a, 0, 0]));
     assert_eq!(code, Done);
-    assert_eq!(bytes.len(), 1);
-    assert_eq!(&bytes[0][..2], &[0x9D, 0x05]);
+    let mut reset = vec![0x3F, 0xFF];
+    reset.extend_from_slice(&a.to_le_bytes());
+    reset.extend_from_slice(&[0xFF, 0xFF]);
+    assert_eq!(bytes.len(), 2);
+    assert_eq!(bytes[0], reset);
+    assert_eq!(&bytes[1][..2], &[0x9D, 0x05]);
     assert!(t.rest.take_log().is_empty());
 }
 
-/// 0x20 (§7.11) of a Town Portal scroll (REC-117): used and consumed
-/// (0x9D with flag 0x20); a tome is used and stays.
-// Covers: specs/items/inventory-moves.md §7.11
+/// 0x20 (§7.11) of a Town Portal scroll (`items/use.md` §4): in a town
+/// the cast refuses and the scroll stays (no 0x9D, S→C 0x3F and 0x7C of
+/// the failure reset); outside, used and consumed (0x9D with flag 0x20);
+/// a tome is used and stays.
+// Covers: specs/items/inventory-moves.md §7.11; specs/items/use.md §4
 #[test]
 fn use_town_portal_scroll_and_tome() {
     let mut t = setup();
     let s = t.picked(TSC);
+    t.rest.with(|r| r.in_town = true);
+    let (code, bytes) = t.frame(&msg(0x20, &[s, 0, 0]));
+    assert_eq!(code, Done);
+    assert!(!bytes.iter().any(|m| m[0] == 0x9D), "{bytes:?}");
+    assert!(
+        bytes.iter().any(|m| m[0] == 0x3F && m[1] == 0xFF),
+        "{bytes:?}"
+    );
+    assert!(bytes.iter().any(|m| m[0] == 0x7C), "{bytes:?}");
+    assert!(t.unit(s).is_some(), "the scroll stays");
+    t.rest.with(|r| r.in_town = false);
     let (code, bytes) = t.frame(&msg(0x20, &[s, 0, 0]));
     assert_eq!(code, Done);
     assert!(bytes.iter().any(|m| m[0] == 0x9D), "{bytes:?}");
-    // A tome is not consumed by the move handler (REC-117).
+    // A tome is not consumed (§7.11 step 3, type 18); with no books row
+    // its skill is −1, so its charge stays too.
     let b = t.picked(TBK);
     let (code, bytes) = t.frame(&msg(0x20, &[b, 0, 0]));
     assert_eq!(code, Done);
