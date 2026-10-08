@@ -207,3 +207,36 @@ fn a_socketed_gem_reaches_the_wearer() {
     assert_eq!(w.handle(&unequip(4)), Ok(0));
     assert_eq!(w.stats.unit_total(p, STAT, 0), before);
 }
+
+/// Defense (stat 31) of the player's totals.
+fn defense(w: &World) -> i32 {
+    w.stats.unit_total(w.player, 31, 0)
+}
+
+// Covers: specs/items/inventory.md §5.7 r2
+// d2rs: a charm that left page 0 is unlinked (PROVISIONAL, REC-163).
+#[test]
+fn a_charm_in_the_inventory_counts_and_stops_when_picked_up() {
+    let mut w = World::new();
+    w.state.link_item_stats = true;
+    // Created as a box (a magic charm needs the affix tables), then
+    // turned into the charm record.
+    let c = w.ground_item(BOX, 11, 11);
+    let cu = w.unit(c).unwrap();
+    w.items.get_mut(cu).unwrap().record = CHARM;
+    assert_eq!(w.handle(&pick(c, 1)), Ok(0));
+    w.drain();
+    w.stats.unit_add(&mut w.hooks, cu, 31, 5, 0);
+    let before = defense(&w);
+    assert_eq!(w.handle(&insert(c, 0, 0, 0)), Ok(0));
+    w.drain();
+    assert_eq!(w.mode(c), 0);
+    assert_eq!(defense(&w), before + 5, "the charm's stats count");
+    assert_eq!(w.handle(&lift(c)), Ok(0));
+    w.drain();
+    assert_eq!(defense(&w), before, "off again on the cursor");
+    assert_eq!(w.handle(&insert(c, 1, 0, 0)), Ok(0));
+    w.drain();
+    assert_eq!(defense(&w), before + 5);
+    assert!(w.state.errors.is_empty(), "{:?}", w.state.errors);
+}

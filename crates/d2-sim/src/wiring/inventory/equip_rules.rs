@@ -35,6 +35,8 @@ pub enum EquipCall {
     SetLink(UnitId, UnitId),
     /// The set-item update after an item left the body.
     SetUnlink(UnitId, UnitId),
+    /// The charm links of the inventory pass (§5.7 step 2).
+    Charms(UnitId),
 }
 
 /// Unit type 4 (item), the owner type of a new set list (§13 step 6).
@@ -66,6 +68,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
                 EquipCall::Weapons(o) => self.run_weapon_bookkeeping(o),
                 EquipCall::SetLink(o, i) => self.run_set_link(o, i),
                 EquipCall::SetUnlink(o, i) => self.run_set_unlink(o, i),
+                EquipCall::Charms(o) => self.run_link_charms(o),
             }
         }
     }

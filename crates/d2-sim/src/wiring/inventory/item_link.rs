@@ -16,7 +16,7 @@
 
 use super::equip_rules::EquipCall;
 use super::{InvDesk, InvError, InvRest};
-use crate::items::inventory::{body, iflag, node, InvWorld};
+use crate::items::inventory::{active_inventory_item, body, iflag, node, InvWorld};
 use crate::items::set_state::{self, QUALITY_SET};
 use crate::items::{props, ListKey};
 use crate::units::lifecycle::LifecycleHooks;
@@ -54,6 +54,45 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             self.set_update(EquipCall::SetUnlink(owner, item));
         }
         true
+    }
+
+    /// Inventory pass step 2 (`inventory.md` §5.7): each active
+    /// inventory item (a charm on page 0, §5.6) whose list is not linked
+    /// to `owner` is linked. PROVISIONAL (REC-163): the rest of the pass
+    /// is the rest's (or the equipment rules'); the unlink of a charm that
+    /// leaves page 0 is `charm_unlink` (the bodies of `0x0063D1D0` /
+    /// `0x0063D2B0` are unwritten, `inventory.md` OQ6).
+    pub(super) fn link_charms(&mut self, owner: UnitId) {
+        if !self.state.link_item_stats {
+            return;
+        }
+        // The owner's inventory is lent out during an inventory call:
+        // the sweep then runs at its end.
+        if self.state.inventories.contains_key(&owner) {
+            self.run_link_charms(owner);
+        } else {
+            self.queue_equip(EquipCall::Charms(owner));
+        }
+    }
+
+    /// The sweep of [`Self::link_charms`].
+    pub(super) fn run_link_charms(&mut self, owner: UnitId) {
+        let items = self
+            .state
+            .inventories
+            .get(&owner)
+            .map(|inv| inv.items().to_vec())
+            .unwrap_or_default();
+        for i in items {
+            let linked = self
+                .econ
+                .stats
+                .unit_list(i)
+                .is_some_and(|l| self.econ.stats.attached_unit(l) == Some(owner));
+            if !linked && active_inventory_item(self, self.tables, i, owner) {
+                self.link_item_stats(owner, i);
+            }
+        }
     }
 
     /// The set update needs the owner's inventory (§13 step 1), which is

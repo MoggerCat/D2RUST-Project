@@ -324,6 +324,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
             (true, Some(o), Some(i)) => self.run_item_skill_link(o, i, false),
             _ => self.rest.charm_unlink(owner, item),
         }
+        if let (Some(o), Some(i)) = (self.unit_of(owner), self.item_unit(item)) {
+            self.unlink_item_stats(o, i);
+        }
     }
     /// §5.6 (`0x0062FF70`).
     fn is_active(&self, owner: Owner, item: Guid) -> bool {
@@ -337,6 +340,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         match (self.state.equip_rules, self.unit_of(owner)) {
             (true, Some(o)) => self.run_inventory_pass(o, false),
             _ => self.rest.inventory_pass(owner),
+        }
+        if let Some(o) = self.unit_of(owner) {
+            self.link_charms(o);
         }
     }
     fn weapon_in_use_update(&mut self, owner: Owner) {
