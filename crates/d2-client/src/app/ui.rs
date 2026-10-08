@@ -93,7 +93,8 @@ pub fn inv_area(r: &Inventory) -> InvArea {
 /// the world view's UI (root with the wired panels, `dev` bindings, art
 /// loader), [`UiSounds`] for the audio frame, and [`PanelArtRules`] over
 /// [`UnitRules`] over the placeholder rules, with the unit art loader
-/// ([`install_unit_rules`]). The 800 × 600 frame is resolution mode 2.
+/// ([`install_unit_rules`]). The play frame's screen ([`Screen::play`]):
+/// resolution mode 2 (800 × 600) unless `play --res 640x480`.
 pub fn add_original_ui(app: &mut App, parts: UiParts) -> Result<(), OriginalUiError> {
     let looks = unit_looks(parts.source.as_ref());
     add_original_ui_with(app, parts, looks)
@@ -127,7 +128,7 @@ pub fn add_original_ui_with(
     looks: UnitLooks,
 ) -> Result<(), OriginalUiError> {
     let config = UiConfig {
-        screen: Screen::R800,
+        screen: Screen::play(),
         expansion_installed: parts.expansion_installed,
     };
     let mut original = OriginalUi::new(config, parts.inv_areas)?;

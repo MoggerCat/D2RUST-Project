@@ -14,9 +14,17 @@ use super::panel::{ActionId, UiEvent};
 use crate::controls::original::{WheelAccumulator, WHEEL_UP};
 use crate::controls::{Action, Bindings, Context, Key};
 
-/// The presentation for a window's current physical size.
+/// The presentation of the play frame
+/// ([`crate::rules::camera::FrameSize::play`]) for a window's current
+/// physical size.
 pub fn presentation(window: &Window) -> Result<Presentation, FrameError> {
-    Presentation::new(window.physical_width(), window.physical_height())
+    let frame = crate::rules::camera::FrameSize::play();
+    Presentation::for_frame(
+        window.physical_width(),
+        window.physical_height(),
+        frame.width as u32,
+        frame.height as u32,
+    )
 }
 
 /// The window pixel holding a physical cursor position: Bevy reports it

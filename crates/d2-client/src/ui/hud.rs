@@ -215,6 +215,7 @@ fn image(files: &UiFiles, name: &str, frame: u32, x: i32, y: i32, clip: Rect) ->
         image: ImageRef { file, frame },
         at: Point::new(x, y),
         clip,
+        look: crate::ui::CelLook::PLAIN,
     }))
 }
 
