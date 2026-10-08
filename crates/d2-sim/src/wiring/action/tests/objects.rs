@@ -961,3 +961,19 @@ fn shrine_hover_is_kept_sent_and_expires() {
     });
     assert_eq!(fx.sim.sys.units.get(o).unwrap().hover, None);
 }
+
+// Covers: specs/world/objects.md §12 r13
+#[test]
+fn portal_use_sets_state_102() {
+    use crate::world::objects::misc::MiscWorld;
+    let mut fx = fx();
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 22, 20);
+    fx.game.frame = 10;
+    fx.sim
+        .objects(&mut fx.game, |_, _, w| w.just_portaled(p, 85));
+    fx.sim.combat(&mut fx.game, |w, _| {
+        assert!(w.has_state(p, 102), "state 102 on");
+        assert_eq!(w.state_list_expiry(p, 102), Some(85), "f + 75");
+    });
+}
