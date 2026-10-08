@@ -11,13 +11,16 @@
 //! - the resolution index of `belts.bin` is 0 below mode 2, else 1;
 //! - every belt item counts as usable, nothing is blocked; the cursor
 //!   item fits a belt by code ([`super::panels::inv_items::fits_belt`]);
-//! - the key labels are the default bindings' names (`1`–`4`, REC-240):
-//!   the bound key's name needs the controls table, which the HUD does
-//!   not hold; a rebound key still shows its default label;
+//! - the key labels are the play bindings' key names for the belt slot
+//!   actions ([`HudBelt::set_keys`], REC-264): the first bound key; an
+//!   unbound slot has no label; the default `1`–`4` until bindings are
+//!   set; no cut to width 28 (§5 r4); not the string ids 4049 / 4050;
 //! - the hover tip is the item tool tip ([`crate::ui::item_tip`]) at the
 //!   text position, not the `0x0048C060` / `0x004E6410` strings;
-//! - the highlight rectangles are in the draw list ([`BeltDraw::Box`])
-//!   but not painted: the play sink has no rectangle primitive.
+//! - the highlight rectangles ([`BeltDraw::Box`]) are painted by the
+//!   rectangle primitive ([`fill_rect`], REC-264): opaque tiles of the
+//!   nearest palette colour; the original's mode 0 table blend is not
+//!   applied.
 
 use std::collections::BTreeMap;
 
@@ -25,10 +28,11 @@ use crate::bridge::items::{self, mode};
 use crate::bridge::world::ClientWorld;
 use crate::ui::draw::UiDrawSink;
 use crate::ui::item_tip::{ItemTips, TipLine};
+use crate::ui::original::hud::{BELT_FILL_BASE, FILL_FILE};
 use crate::ui::panel::ClientIntent;
 use crate::ui::panels::control::belt::{
-    hover_text, record_index, BeltDraw, BeltEffect, BeltItem, BeltRecord, BeltSlot8, BeltState,
-    CursorInfo, CursorItem, MoveGates, SlotInfo, FONT_AFTER_BELT,
+    hover_text, record_index, BeltColor, BeltDraw, BeltEffect, BeltItem, BeltRecord, BeltSlot8,
+    BeltState, CursorInfo, CursorItem, MoveGates, SlotInfo, FONT_AFTER_BELT,
 };
 use crate::ui::panels::inv_items::{fits_belt, ItemsUi};
 use crate::ui::panels::UiFiles;
@@ -50,6 +54,23 @@ pub struct BeltParts {
 pub struct HudBelt {
     pub state: BeltState,
     pub parts: BeltParts,
+    /// The key name of each belt slot's action: `None` = not set yet
+    /// (the default label), `Some(None)` = unbound.
+    pub keys: Option<[Option<String>; 4]>,
+}
+
+/// Paints `rect` with the belt rectangle colour (module doc).
+pub fn fill_rect(out: &mut dyn UiDrawSink, files: &UiFiles, color: BeltColor, r: crate::ui::Rect) {
+    if let Some(f) = files.id(FILL_FILE) {
+        let frame = BELT_FILL_BASE
+            + match color {
+                BeltColor::Red => 0,
+                BeltColor::Green => 1,
+                BeltColor::Blue => 2,
+                BeltColor::Yellow => 3,
+            };
+        crate::ui::esc_menu::push_fill(out, f, frame, r);
+    }
 }
 
 fn belt_view(world: &ClientWorld) -> BTreeMap<u16, crate::bridge::items::ItemView> {
@@ -117,8 +138,27 @@ impl HudBelt {
 
     /// The key label of belt slot `i` (§5 r4): the default binding's
     /// name (d2rs-own, unverified, REC-240).
-    fn key_name(i: usize) -> Option<Vec<u16>> {
-        (i < 4).then(|| vec![u16::from(b'1') + i as u16])
+    fn key_name(&self, i: usize) -> Option<Vec<u16>> {
+        if i >= 4 {
+            return None;
+        }
+        match &self.keys {
+            None => Some(vec![u16::from(b'1') + i as u16]),
+            Some(k) => k[i].as_ref().map(|n| n.encode_utf16().collect()),
+        }
+    }
+
+    /// Takes the key names of the belt slot actions from `b` (the
+    /// primary, i.e. first, bound key of each).
+    pub fn set_keys(&mut self, b: &crate::controls::Bindings) {
+        use crate::controls::Action;
+        let acts = [
+            Action::BeltSlot1,
+            Action::BeltSlot2,
+            Action::BeltSlot3,
+            Action::BeltSlot4,
+        ];
+        self.keys = Some(acts.map(|a| b.inputs(a).first().map(|k| k.name().to_string())));
     }
 
     /// The belt's draw list (§5 r1–r5, r9): the type, the hover
@@ -153,7 +193,7 @@ impl HudBelt {
         let slots: Vec<SlotInfo> = (0..rec.boxes.len())
             .map(|i| SlotInfo {
                 item: slot_item(i),
-                key_name: Self::key_name(i),
+                key_name: self.key_name(i),
             })
             .collect();
         draws.extend(self.state.slot_draws(&rec, &slots));
@@ -197,8 +237,15 @@ impl HudBelt {
                         l.color as u16,
                     ));
                 }
-                // No rectangle primitive in the play sink (module doc).
-                BeltDraw::Box { .. } => {}
+                BeltDraw::Box { rect, color } => {
+                    let (w, h) = (rect.w.max(1) as u16, rect.h.max(1) as u16);
+                    fill_rect(
+                        out,
+                        files,
+                        color,
+                        crate::ui::Rect::new(rect.x, rect.y, w, h),
+                    );
+                }
             }
         }
     }

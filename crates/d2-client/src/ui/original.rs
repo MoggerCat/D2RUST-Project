@@ -502,6 +502,11 @@ impl OriginalUi {
         self.shared.borrow_mut().hud.belt.parts = parts;
     }
 
+    /// The belt key labels follow the play bindings (`hud_belt`, REC-264).
+    pub fn set_belt_keys(&mut self, b: &crate::controls::Bindings) {
+        self.shared.borrow_mut().hud.belt.set_keys(b);
+    }
+
     /// The item tool tips' tables and strings (`item_tip`).
     pub fn set_item_tips(&mut self, tips: item_tip::ItemTips) {
         self.shared.borrow_mut().items.tips = Some(tips);

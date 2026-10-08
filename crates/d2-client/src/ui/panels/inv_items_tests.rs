@@ -4,7 +4,7 @@
 use super::*;
 use crate::bridge::items::ItemArtRow;
 use crate::bridge::world::{ClientUnit, ItemData, ItemRecord, KindData, PlayerData, UnitKey};
-use crate::ui::draw::UiDraw;
+use crate::ui::draw::{ImageRef, UiDraw};
 
 pub(crate) const PLAYER: UnitKey = UnitKey::new(0, 1);
 
@@ -441,6 +441,82 @@ mod belt {
             .collect();
         assert_eq!(boxes, vec![(461, 562, 29, 29, BeltColor::Green)]);
         assert_eq!(b.state.hover_item, Some(7));
+    }
+
+    // Covers: specs/ui/control-panel.md §5 r4 (the hover rectangle)
+    #[test]
+    fn a_hovered_belt_slot_paints_its_highlight_rect() {
+        use crate::ui::original::hud::{BELT_FILL_BASE, FILL_FILE};
+        use crate::ui::panels::control::belt::BeltColor;
+        let (u, files) = ui();
+        let w = world(&[(7, mode::BELT, (0, 1, 0, 0), b"hp1 ")], None);
+        let mut b = HudBelt {
+            parts: parts(),
+            ..Default::default()
+        };
+        let fill = files.id(FILL_FILE).expect("fill file");
+        let green = BELT_FILL_BASE + BeltColor::Green as u32;
+        let tiles = |out: &[UiDraw]| -> Vec<(i32, i32, u16, u16)> {
+            out.iter()
+                .filter_map(|d| match d {
+                    UiDraw::Image(i)
+                        if i.image
+                            == (ImageRef {
+                                file: fill,
+                                frame: green,
+                            }) =>
+                    {
+                        Some((i.clip.x, i.clip.y, i.clip.w, i.clip.h))
+                    }
+                    _ => None,
+                })
+                .collect()
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        b.draw(&w, &u, &files, (800, 600), false, (0, 0), true, &mut out);
+        assert!(tiles(&out).is_empty(), "no hover, no rectangle");
+        out.clear();
+        b.draw(
+            &w,
+            &u,
+            &files,
+            (800, 600),
+            false,
+            (470, 570),
+            true,
+            &mut out,
+        );
+        // 29 x 29 at (461, 562): an 18-high tile and an 11-high tile.
+        assert_eq!(tiles(&out), vec![(461, 562, 29, 18), (461, 580, 29, 11)]);
+    }
+
+    // Covers: specs/ui/control-panel.md §5 r4 (the key label)
+    #[test]
+    fn rebinding_a_belt_key_changes_its_label() {
+        use crate::controls::{Action, Key, Preset};
+        let w = world(&[(7, mode::BELT, (0, 1, 0, 0), b"hp1 ")], None);
+        let mut b = HudBelt {
+            parts: parts(),
+            ..Default::default()
+        };
+        let label = |b: &mut HudBelt| -> Vec<Vec<u16>> {
+            b.draw_list(&w, (800, 600), false, (0, 0), true)
+                .into_iter()
+                .filter_map(|d| match d {
+                    crate::ui::panels::control::belt::BeltDraw::Label(l) => Some(l.text),
+                    _ => None,
+                })
+                .collect()
+        };
+        assert_eq!(label(&mut b), vec![vec![u16::from(b'2')]]);
+        let mut bind = Preset::Dev.bindings().unwrap();
+        assert_eq!(bind.inputs(Action::BeltSlot2), &[Key::Digit2]);
+        bind.set(Action::BeltSlot2, &[Key::F]);
+        b.set_keys(&bind);
+        assert_eq!(label(&mut b), vec!["F".encode_utf16().collect::<Vec<_>>()]);
+        bind.set(Action::BeltSlot2, &[]);
+        b.set_keys(&bind);
+        assert!(label(&mut b).is_empty(), "unbound: no label");
     }
 
     #[test]
