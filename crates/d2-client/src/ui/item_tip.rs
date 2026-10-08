@@ -36,7 +36,7 @@ use std::sync::Arc;
 use d2_data::bin::BinSet;
 use d2_data::tables::{
     decode_all, Armor, Itemstatcost, Magicprefix, Magicsuffix, Misc, Rareprefix, Raresuffix,
-    Record, Setitems, Uniqueitems, Weapons,
+    Record, Setitems, Sets, Uniqueitems, Weapons,
 };
 use d2_proto::item_bits::{decode, ItemBits, Stat};
 use d2_server::adapters::item_bits::TablesLookup;
@@ -128,6 +128,10 @@ pub struct ItemTips {
     rare_suffix: Vec<String>,
     unique: Vec<String>,
     set: Vec<String>,
+    /// Set of each setitems row, and each set's name string id (the
+    /// set line at the foot of a set item's tip).
+    set_of_item: Vec<u16>,
+    set_names: Vec<u16>,
     strings: Arc<dyn StringLookup + Send + Sync>,
 }
 
@@ -211,6 +215,8 @@ impl ItemTips {
                 .iter()
                 .map(|r| key(&r.index))
                 .collect(),
+            set_of_item: rows::<Setitems>(set)?.iter().map(|r| r.set).collect(),
+            set_names: rows::<Sets>(set)?.iter().map(|r| r.name).collect(),
             strings,
         })
     }
@@ -374,6 +380,17 @@ impl ItemTips {
             props.sort_by_key(|p| std::cmp::Reverse(p.0));
             out.extend(props.into_iter().map(|(_, t)| TipLine::new(t, color::BLUE)));
         }
+        // A set item names its set at the foot (PROVISIONAL, REC-161: the
+        // bonus lines of the set are not drawn; the layout is unverified).
+        if ident && q == quality::SET {
+            let name = qf
+                .file_index
+                .and_then(|i| self.set_of_item.get(i as usize))
+                .and_then(|&s| self.set_names.get(usize::from(s)))
+                .and_then(|&id| self.strings.get_id(id))
+                .map(String::from_utf16_lossy);
+            out.extend(name.map(|n| TipLine::new(n, color::GOLD)));
+        }
         out
     }
 
@@ -515,10 +532,15 @@ mod tests {
             },
         );
         let strs = Strs {
-            keys: [("Sturdy", "Sturdy"), ("Fox", "of the Fox")]
-                .map(|(k, v)| (k.to_owned(), u16s(v)))
-                .into(),
-            ids: [(7, "Cap"), (9, "to Life")]
+            keys: [
+                ("Sturdy", "Sturdy"),
+                ("Fox", "of the Fox"),
+                ("Greymaker", "Greymaker"),
+                ("Sigon's Visor", "Sigon's Visor"),
+            ]
+            .map(|(k, v)| (k.to_owned(), u16s(v)))
+            .into(),
+            ids: [(7, "Cap"), (9, "to Life"), (11, "Sigon's Steel")]
                 .map(|(k, v)| (k, u16s(v)))
                 .into(),
         };
@@ -539,8 +561,10 @@ mod tests {
             magic_suffix: vec![String::new(), "Fox".into()],
             rare_prefix: Vec::new(),
             rare_suffix: Vec::new(),
-            unique: Vec::new(),
-            set: Vec::new(),
+            unique: vec!["Greymaker".into()],
+            set: vec!["Sigon's Visor".into()],
+            set_of_item: vec![0],
+            set_names: vec![11],
             strings: Arc::new(strs),
         }
     }
@@ -659,5 +683,44 @@ mod tests {
         let mut none: Vec<UiDraw> = Vec::new();
         draw_tip(&[], Point::new(1, 1), (800, 600), None, &files, &mut none);
         assert!(none.is_empty());
+    }
+
+    fn quality_cap(quality: u8, index: u32) -> ItemBits {
+        let mut b = ItemBits {
+            flags: hflag::IDENTIFIED,
+            code: *b"cap ",
+            quality,
+            ..ItemBits::default()
+        };
+        b.quality_fields.file_index = Some(index);
+        b
+    }
+
+    #[test]
+    fn a_unique_item_shows_its_name_in_gold() {
+        let got: Vec<(String, u16)> = tips()
+            .lines_of(&quality_cap(quality::UNIQUE, 0))
+            .iter()
+            .map(|l| (text(l), l.color))
+            .collect();
+        assert_eq!(
+            got[..2],
+            [
+                ("Greymaker".to_owned(), color::GOLD),
+                ("Cap".to_owned(), color::GOLD)
+            ]
+        );
+    }
+
+    #[test]
+    fn a_set_item_shows_its_name_in_green_and_its_set_in_gold() {
+        let got: Vec<(String, u16)> = tips()
+            .lines_of(&quality_cap(quality::SET, 0))
+            .iter()
+            .map(|l| (text(l), l.color))
+            .collect();
+        assert_eq!(got[0], ("Sigon's Visor".to_owned(), color::GREEN));
+        assert_eq!(got[1], ("Cap".to_owned(), color::GREEN));
+        assert_eq!(got.last(), Some(&("Sigon's Steel".to_owned(), color::GOLD)));
     }
 }
