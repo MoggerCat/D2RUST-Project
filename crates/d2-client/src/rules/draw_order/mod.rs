@@ -1110,6 +1110,7 @@ fn edge_floors(
             cell: f.tile(),
             dt1: rec.dt1,
             alpha: rec.fade.alpha,
+            fade_state: rec.fade.state,
             key: edges::edge_key(rooms, n),
         })
     });
