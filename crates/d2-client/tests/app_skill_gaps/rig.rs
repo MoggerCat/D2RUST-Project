@@ -59,6 +59,8 @@ pub struct Cfg {
 /// Offsets in `skills_code` of the formulas "3" and "8".
 pub const CALC_3: u32 = 12;
 pub const CALC_8: u32 = 16;
+/// The formula "100".
+pub const CALC_100: u32 = 20;
 
 pub struct StepClock(Arc<AtomicU32>);
 
@@ -110,8 +112,12 @@ fn anim_data(token: &[u8; 2]) -> AnimData {
         name[2..4].copy_from_slice(mode);
         name[4..7].copy_from_slice(b"HTH");
         let mut events = [0u8; animdata::EVENTS];
-        events[3] = 1;
-        events[4] = 2;
+        // The swings fire the attack event, the cast the missile event.
+        if mode == b"SC" {
+            events[4] = 2;
+        } else {
+            events[3] = 1;
+        }
         a.buckets[animdata::hash(&name[..7])].push(AnimRecord {
             name,
             frames: 8,
@@ -245,7 +251,7 @@ fn install_fixtures(sim: &mut single_player::Sim, cfg: Cfg) {
     attack.intown = true;
     skills.skills_code = vec![
         0, 0, 0, 0, 0x08, 0xF4, 0x01, 0x00, 0x08, 0x19, 0x00, 0x00, 0x08, 0x03, 0x00, 0x00, 0x08,
-        0x08, 0x00, 0x00,
+        0x08, 0x00, 0x00, 0x08, 0x64, 0x00, 0x00,
     ];
     skills.skills = vec![fx::skill_rec(); 160];
     skills.skills[0] = attack;
@@ -263,6 +269,15 @@ fn install_fixtures(sim: &mut single_player::Sim, cfg: Cfg) {
         levels: vec![blank(); 150],
         skill_modes: vec![[0; 8]],
     });
+    s.hooks.bodies = Some(Arc::new(d2_sim::skills::use_::bodies::BodyTables {
+        stats: vec![d2_sim::skills::use_::bodies::BodyStat::default(); 359],
+        state_group: vec![0; 256],
+        state_aura: vec![false; 256],
+        pettype_count: 3,
+        pettype_group: vec![0; 3],
+        monlvl: vec![blank::<d2_data::tables::Monlvl>()],
+        ..d2_sim::skills::use_::bodies::BodyTables::default()
+    }));
     s.hooks.anim_data = Some(Arc::new(anim_data(cfg.token)));
     let modes = [
         "dt", "nu", "wl", "gh", "a1", "a2", "bl", "sc", "s1", "s2", "s3", "s4", "dd", "kb", "sq",
@@ -480,5 +495,16 @@ impl Rig {
 
     pub fn errors(&mut self) -> String {
         self.with(move |sim, _| format!("{:?}", sim.events.action.sys.hooks.errors))
+    }
+
+    /// The pets the client model knows (S→C 0x7A).
+    pub fn pets(&self) -> usize {
+        self.app
+            .world()
+            .resource::<BridgeResource>()
+            .0
+            .world()
+            .pets
+            .len()
     }
 }

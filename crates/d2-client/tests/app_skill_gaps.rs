@@ -48,6 +48,8 @@ fn game(class: &'static str, rows: Vec<(usize, Skills)>) -> Rig {
         setup: None,
     });
     r.leave_town();
+    // The monster class has every mode (the walk test of the curses).
+    r.with(|sim, _| sim.events.action.sys.hooks.x.monsters.modes = vec![0xFFFF]);
     r
 }
 
@@ -151,4 +153,119 @@ fn zeal_strikes_the_monster() {
     r.right_click_unit(m);
     r.step(60);
     assert!(r.life(m) < life0, "Zeal hurt it ({})", r.errors());
+}
+
+/// Edits the combat tables of the running sim.
+fn edit_tables(r: &mut Rig, f: impl FnOnce(&mut d2_sim::wiring::action::ActionTables) + Send + 'static) {
+    r.with(move |sim, _| {
+        let h = &mut sim.events.action.sys.hooks;
+        let mut t = (*h.tables).clone();
+        f(&mut t);
+        h.tables = std::sync::Arc::new(t);
+    });
+}
+
+/// The corpse test needs a dead monster class that may be raised.
+fn corpse_class(r: &mut Rig) {
+    edit_tables(r, |t| {
+        t.combat.monstats2[0].corpsesel = true;
+        t.combat.monstats2[0].revive = true;
+        t.combat.monstats2[0].isatt = true;
+        t.combat.monstats[0].switchai = true;
+    });
+}
+
+/// A dead monster (mode 12) `dx` sub-tiles east of the player.
+fn spawn_corpse(r: &mut Rig, dx: i32) -> UnitId {
+    let m = r.spawn_monster(dx);
+    r.with(move |sim, _| {
+        sim.events.action.sys.units.get_mut(m).unwrap().mode = 12;
+    });
+    m
+}
+
+fn monsters(r: &mut Rig) -> usize {
+    r.with(|sim, _| sim.game.lists.units_of_type(UnitType::Monster).len())
+}
+
+/// The curse row: `state` on the target, a 500-tick duration, range 500.
+fn curse(state: u16) -> Skills {
+    let mut s = row(0, 30);
+    s.anim = 10;
+    s.auratargetstate = state;
+    s.aurastat1 = 0xFFFF;
+    s.auralencalc = 4;
+    s.aurarangecalc = 4;
+    s.aurafilter = 0x583;
+    s
+}
+
+// Covers: specs/skills/bodies.md §4.4
+#[test]
+fn a_curse_puts_its_state_on_the_monster() {
+    let mut r = game("necromancer", vec![(SKILL, curse(9))]);
+    corpse_class(&mut r);
+    let m = r.spawn_monster(3);
+    r.select_right(SKILL);
+    assert!(!r.has_state(m, 9));
+    r.right_click_point(3, 0);
+    r.step(30);
+    assert!(r.has_state(m, 9), "cursed ({})", r.errors());
+}
+
+// Covers: specs/skills/bodies-2.md §4.5
+#[test]
+fn corpse_explosion_hurts_the_monsters_around_the_corpse() {
+    let mut s = row(17, 55);
+    s.anim = 10;
+    s.targetcorpse = true;
+    s.aurarangecalc = rig::CALC_8;
+    s.aurafilter = 0x583;
+    (s.calc1, s.calc2) = (rig::CALC_100, rig::CALC_100);
+    let mut r = game("necromancer", vec![(SKILL, s)]);
+    corpse_class(&mut r);
+    let corpse = spawn_corpse(&mut r, 2);
+    let near = r.spawn_monster(3);
+    r.select_right(SKILL);
+    let life0 = r.life(near);
+    r.right_click_unit(corpse);
+    r.step(30);
+    assert!(r.life(near) < life0, "the blast hurt it ({})", r.errors());
+}
+
+// Covers: specs/skills/bodies.md §3.6, §8.14
+#[test]
+fn raise_skeleton_turns_a_corpse_into_a_pet() {
+    let mut s = row(15, 31);
+    s.anim = 10;
+    s.targetcorpse = true;
+    (s.summon, s.summode, s.pettype) = (0, 1, 2);
+    s.petmax = rig::CALC_3;
+    let mut r = game("necromancer", vec![(SKILL, s)]);
+    corpse_class(&mut r);
+    let corpse = spawn_corpse(&mut r, 2);
+    let before = monsters(&mut r);
+    r.select_right(SKILL);
+    r.right_click_unit(corpse);
+    r.step(30);
+    assert!(r.pets() > 0, "a skeleton follows ({}, {before})", r.errors());
+}
+
+// Covers: specs/skills/bodies-2b.md §8.6, §8.7
+#[test]
+fn revive_stands_the_corpse_up_as_a_pet() {
+    let mut s = row(21, 58);
+    s.anim = 10;
+    s.targetcorpse = true;
+    (s.summon, s.summode, s.pettype) = (0, 1, 2);
+    s.petmax = rig::CALC_3;
+    let mut r = game("necromancer", vec![(SKILL, s)]);
+    corpse_class(&mut r);
+    let corpse = spawn_corpse(&mut r, 2);
+    r.select_right(SKILL);
+    r.right_click_unit(corpse);
+    r.step(30);
+    assert!(r.pets() > 0, "a revived pet follows ({})", r.errors());
+    let mode = r.with(move |sim, _| sim.events.action.sys.units.get(corpse).map(|u| u.mode));
+    assert_ne!(mode, Some(12), "it stands up ({})", r.errors());
 }

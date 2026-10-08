@@ -1196,7 +1196,22 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         }
     }
     fn mode_request(&mut self, m: UnitId, mode: i32, target: Option<UnitId>) -> i32 {
-        Pending::mode_request(self.xm(), m, mode, target)
+        let r = Pending::mode_request(self.xm(), m, mode, target);
+        // d2rs-own, unverified (q-skill-gaps, REC-176): without a host
+        // answer the request is the monster mode set `0x005A7E60` +
+        // `0x005A7C20` (`units.md` §4.6) itself, so a revived corpse
+        // stands up.
+        let monster = self.cv.v.units.get(m).is_some_and(|r| r.ty == UnitType::Monster);
+        match u32::try_from(mode) {
+            Ok(mode) if r == 0 && monster => {
+                if let Some(t) = target {
+                    let t = crate::monsters::ai::ModeTarget::Unit(t);
+                    self.cv.v.h.x.set_mode_target(m, t);
+                }
+                i32::from(self.cv.v.monster_set_mode(&mut *self.cv.game, m, mode))
+            }
+            _ => r,
+        }
     }
     /// An item unit is its own item handle here.
     fn as_item(&self, u: UnitId) -> Option<UnitId> {
