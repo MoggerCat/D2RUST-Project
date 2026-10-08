@@ -49,9 +49,20 @@ pub fn block_shades(
             let Ok(l) = floor_block_light(&cells, gx, gy, false) else {
                 return Vec::new();
             };
+            let shade = floor_block_chain(&light.tables, l, 0, 0);
+            // `shading.md` §4 floors r3–r4: the floor drawer lights rows
+            // r = 0…14 of a block, RLE (32 × 32, DT1 format 0x2005) or
+            // iso; a gradient block draws those rows only.
+            let block = match shade.gradient() {
+                Some(g) => BlockRect {
+                    height: block.height.min(g.kind.rows()),
+                    ..*block
+                },
+                None => *block,
+            };
             out.push(BlockShade {
-                block: *block,
-                shade: floor_block_chain(&light.tables, l, 0, 0),
+                block,
+                shade,
                 blend,
             });
         }
@@ -162,6 +173,63 @@ mod tests {
         );
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].shade.gradient().expect("gradient").corners, want);
+    }
+
+    // Covers: specs/render/shading.md §4
+    #[test]
+    fn an_rle_floor_block_with_a_gradient_stays_inside_its_15_rows() {
+        // The play crash on the real install (q-cloud-game step 4, Rogue
+        // Encampment): "drawn area Rect{560,296,32x32} leaves the gradient
+        // block Rect{560,296,32x15}". An RLE floor block (format 0x2005)
+        // is 32 × 32; the floor gradient covers rows 0…14 (§4 floors r3).
+        let f = frame(&[((102, 102), 6, (255, 255, 255))]);
+        for kind in [floor(), TileKind::Roof { pass: 1 }] {
+            let out = block_shades(
+                &f,
+                env(),
+                kind,
+                &Dt1Facts::default(),
+                (20, 20),
+                (0xFF, 0),
+                BlendOp::Opaque,
+                &[rect(0)],
+                &[(0, 0)],
+            );
+            assert_eq!(out.len(), 1);
+            let g = out[0].shade.gradient().expect("a lit gradient block");
+            assert_eq!(
+                out[0].block,
+                BlockRect {
+                    x: 0,
+                    y: 0,
+                    width: 32,
+                    height: 15
+                }
+            );
+            // As `rules::view` places it: the gradient moved to the
+            // block's screen position, the drawn area the block rect.
+            let moved = crate::scene::LightGradient {
+                x: 560,
+                y: 296,
+                ..*g
+            };
+            let drawn = crate::scene::Rect::new(560, 296, out[0].block.width, out[0].block.height);
+            assert_eq!(moved.block(), crate::scene::Rect::new(560, 296, 32, 15));
+            assert_eq!(drawn.intersect(&moved.block()), Some(drawn));
+        }
+        // A flat block keeps its whole rect (no gradient to stay in).
+        let flat = block_shades(
+            &frame(&[]),
+            env(),
+            floor(),
+            &Dt1Facts::default(),
+            (20, 20),
+            (0xFF, 0),
+            BlendOp::Opaque,
+            &[rect(0)],
+            &[(0, 0)],
+        );
+        assert_eq!(flat[0].block, rect(0));
     }
 
     // Covers: specs/render/shading.md §4
