@@ -1667,6 +1667,17 @@ latter for the gate).
 ## 5. Local run queue
 
 - **stitch-save** (`docs/handoff/stitch-save.md`): `play --new sorceress Tester`, close; `play --save <Tester.d2s>` shows the same character; second close makes `.bak`. Record any `NOT saved` line.
+- **Front end (`claude/pc1-frontend`, `ui/frontend-*.md`)**: screenshots of the 1.14d front end at 800×600 (and 640×480 where named), `game\Game.exe -w`; restore any registry value changed.
+  - **Front end: main menu, character select, create (`ui/frontend-menus.md` §F1.4, §F2.4, §F3.2–F3.3).** Start, skip to the main menu, screenshot (expansion layout: buttons at the §F1.4 table rects, "v 1.14d" bottom-left, logo fire animating). Single Player with ≥ 9 saves: screenshot the 8 slots and scroll once. Create New: screenshot the line-up, click the Paladin and record ≥ 50 fps (walk-forward then idle-selected loop, REC-168); type `a-b_c` and `-x` into the name box (REC-167). Look for slot / class positions and frames as in the spec tables; a different value is a finding for `ui/frontend-menus.md`.
+  - **Front end: options art check, no game run (`ui/frontend-options.md` §O2 r3, Constants).** `target/release/mpq-tool.exe extract game/d2data.mpq "data\local\UI\ENG\*.dc6" <scratch>`, same for d2exp, plus `data\global\ui\WIDGETS\opt*`, `data\global\ui\CURSOR\pentspin.DC6`, `data\global\ui\MENU\textslid.DC6`. Expect pentspin widths 51, 43, 27, 9, 23, 40, 50, 52; optbar 255+35 × 33; optbarC × 37; textslid 17 frames of 12×13; `exit.dc6` reads "SAVE AND EXIT GAME".
+  - **Front end: Esc-menu screenshots, 800×600 (REC-170).** Esc → each sub-menu, one screenshot each; pixel-compare with the d2rs render of `d2-client::ui::front_end::options` once it exists. Look for pentagram positions / frames, slider fill darkness (modes 1/2/0 per style), labels at x 170 (left) and right edge 630.
+  - **Front end: Configure Controls screenshot, 800×600 (§O9).** Esc → Options → Configure Controls. Look for headings at x 108 / 298 / 488, y 100; row 0 text at y 122; selection bar 570 wide; Cancel / Default / Accept centred at 193 / 399 / 605. Select Inventory, Enter, then C: Character's second key becomes "None" and Inventory's first key C. Cancel returns to the Options menu with Previous selected.
+  - **Front end: loading-screen pixel check (`ui/frontend-loading.md` L-rules).** Manual: `Game.exe -w` at 800×600 and 640×480; Single Player → expansion character with progression ≥ 5 → OK → Normal; screenshot during the load (or break on `0x004F6190` in `0x004565E0`). Look for: `loadingscreen.dc6` frame 0 then frame 1, top-left at (272,173) / (192,113), rest index 0, no text or bar, Loading palette; first world frame all black.
+  - **Front end: act-change capture (REC-181, REC-183).** Packet capture plus per-frame screenshots: waypoint Act I → Act II, then a first-time Warriv travel. Look for: 0x05/0x03/…/0x04 order with ticks, loading frame 0 in both, 0x61 `02` before 0x04, what is on screen after the video.
+  - **Front end: difficulty enable check (`ui/frontend-loading.md`).** Test saves with status +0x24 = 0x0420, 0x0520, 0x0920, 0x0A20, 0x0400, 0x0804 (fix the checksum); press OK on each. Expect: no box / box Hell off / Hell off / Hell on / box Hell off / box Hell on (the spec's test vectors).
+  - **Front end: cinematics enable pixel check (`ui/frontend-credits.md`, REC-188).** `reg add "HKCU\Software\Blizzard Entertainment\Diablo II" /v "Aux Battle.net" /t REG_SZ /d 216.148.246.34 /f`, start `game\Game.exe -w`, open Cinematics, screenshot; repeat with `.178` (0xB2) and `.35` (0x23). Look for 1 / 6 / 7 enabled entries (expansion; classic 1/5/5), blank labels on disabled expansion buttons, the C8 button rects, no logo fire in the expansion menu.
+  - **Front end: credits screenshots (REC-185).** Main menu → Credits; screenshot at the click, ~12 s and ~12 min. Look for the first text near y 590 scrolling up, headings colour 1 centred at x 405, left column ending x 400 / right column starting x 410, sky palette; at the end a blank screen with EXIT and no return; Esc leaves.
+  - **Front end: startup chain and keys (REC-189).** `reg delete "HKCU\Software\Blizzard Entertainment\Diablo II" /v "Aux Battle.net" /f`, start the game. Expect two Blizzard videos, the D2 intro, then the trademark screen (no static Blizzard-logo picture). During a video Left arrow does not skip, `a` does. On the trademark screen Q does nothing, N goes to the main menu. Restart: no intro; the registry now holds `216.148.246.34`. (Restore the user's registry value afterwards.)
 
 Ordered, copy-pasteable guide to running this queue: `docs/LOCAL-RUN.md`.
 
@@ -5957,75 +5968,129 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 
 ##### REC-158 [MANUAL] Front end: Game exit target
 - Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
-- Settles: `ui/front-end.md` PROVISIONAL REC-158.
+- Settles: `ui/frontend-menus.md` PROVISIONAL REC-158.
 - Steps and compare: Game exit target. Capture: in single player, Save and Exit from a game. Steps: hook `0x0044B8A0` return and the next screen builder called (`0x0043B080` vs `0x004336C0`). Settles: which screen return value 4 maps to (expected character select).
-- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+- Fold: write the result into the cited `ui/frontend-menus.md` rule and drop its PROVISIONAL line.
 
 ##### REC-159 [MANUAL] Front end: Control draw order
 - Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
-- Settles: `ui/front-end.md` PROVISIONAL REC-159.
+- Settles: `ui/frontend-menus.md` PROVISIONAL REC-159.
 - Steps and compare: Control draw order. Capture: break in the D2Win list draw while the main menu shows; log the control order (types 2, 3, 3, 6…). Settles: creation order = draw order (logo over background, buttons over logo).
-- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
-
-##### REC-160 [MANUAL] Front end: Front-end palette
-- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
-- Settles: `ui/front-end.md` PROVISIONAL REC-160.
-- Steps and compare: Front-end palette. Capture: hook the D2GFX palette load during start-up and on reaching the main menu; log the `pal.dat` path. Settles: ACT1 vs another palette for all front-end art.
-- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+- Fold: write the result into the cited `ui/frontend-menus.md` rule and drop its PROVISIONAL line.
 
 ##### REC-161 [MANUAL] Front end: Character-select OK condition
 - Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
-- Settles: `ui/front-end.md` PROVISIONAL REC-161.
+- Settles: `ui/frontend-menus.md` PROVISIONAL REC-161.
 - Steps and compare: Character-select OK condition. Capture: press OK with a new character and with one that finished Normal; log whether `0x00439780` or `0x00434A00` runs and the session values compared at `0x00439A79`–`0x00439A97`. Settles: when the difficulty popup appears (owned by part 2 if it covers character select).
-- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+- Fold: write the result into the cited `ui/frontend-menus.md` rule and drop its PROVISIONAL line.
 
 ##### REC-162 [MANUAL] Front end: Mouse wheel on character select
 - Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
-- Settles: `ui/front-end.md` PROVISIONAL REC-162.
+- Settles: `ui/frontend-menus.md` PROVISIONAL REC-162.
 - Steps and compare: Mouse wheel on character select. Capture: 1.14d, ≥ 11 characters, wheel up / down over the list and over the scroll bar; log `[0x00779DC8]` and `[0x0070CC00]` per event (hook `0x00439DF0`, `0x00439E90`). Settles: whether the wheel scrolls (`first` changes) and by how much, or nothing.
-- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+- Fold: write the result into the cited `ui/frontend-menus.md` rule and drop its PROVISIONAL line.
 
 ##### REC-163 [MANUAL] Front end: Dead hardcore figure
 - Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
-- Settles: `ui/front-end.md` PROVISIONAL REC-163.
+- Settles: `ui/frontend-menus.md` PROVISIONAL REC-163.
 - Steps and compare: Dead hardcore figure. Capture: a hardcore save with status 0x0C (male and female class); screenshot the slot; hook `0x005066C0` args. Settles: what class' 8 / 9 draws (token, mode, palette) and the draw flags from `0x006CE278`.
-- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+- Fold: write the result into the cited `ui/frontend-menus.md` rule and drop its PROVISIONAL line.
 
 ##### REC-164 [MANUAL] Front end: Legacy `Save Path` migration
 - Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
-- Settles: `ui/front-end.md` PROVISIONAL REC-164.
+- Settles: `ui/frontend-menus.md` PROVISIONAL REC-164.
 - Steps and compare: Legacy `Save Path` migration. Capture: registry with `Save Path` → a folder with saves, no `NewSavePath`; start the game; read `NewSavePath` after; repeat with an empty folder. Hook `0x00406DE0` return. Settles: which folder is kept.
-- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+- Fold: write the result into the cited `ui/frontend-menus.md` rule and drop its PROVISIONAL line.
 
 ##### REC-165 [MANUAL] Front end: Slot level line text
 - Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
-- Settles: `ui/front-end.md` PROVISIONAL REC-165.
+- Settles: `ui/frontend-menus.md` PROVISIONAL REC-165.
 - Steps and compare: Slot level line text. Capture: screenshot one slot per class; or read the string id pushed to the `D2Lang_GetStringByIndex` call after `" %d "` in `0x004380F0` (`disasm.py fn 0x004380F0`). Settles: the exact level / class line text and colour.
-- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+- Fold: write the result into the cited `ui/frontend-menus.md` rule and drop its PROVISIONAL line.
 
 ##### REC-166 [MANUAL] Front end: class names 10097 / 10098
 - Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
-- Settles: `ui/front-end.md` PROVISIONAL REC-166.
+- Settles: `ui/frontend-menus.md` PROVISIONAL REC-166.
 - Steps and compare: class names 10097 / 10098. Capture: extract `data\local\lng\eng\patchstring.tbl` from `Patch_D2.mpq` (by name; the archive has no listfile) or, in the 1.14d game with expansion, hover the Druid and the Assassin on the create screen and screenshot text 197. Settles which id shows which name.
-- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+- Fold: write the result into the cited `ui/frontend-menus.md` rule and drop its PROVISIONAL line.
 
 ##### REC-167 [MANUAL] Front end: filter argument 2
 - Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
-- Settles: `ui/front-end.md` PROVISIONAL REC-167.
+- Settles: `ui/frontend-menus.md` PROVISIONAL REC-167.
 - Steps and compare: filter argument 2. Capture: on the create screen, select a class, type `-` into the empty box, then `a-`; hook `0x00430590` and log its 3 arguments. Settles whether a leading separator is rejected (arg = caret position) or the argument means something else.
-- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+- Fold: write the result into the cited `ui/frontend-menus.md` rule and drop its PROVISIONAL line.
 
 ##### REC-168 [MANUAL] Front end: animation timing
 - Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
-- Settles: `ui/front-end.md` PROVISIONAL REC-168.
+- Settles: `ui/frontend-menus.md` PROVISIONAL REC-168.
 - Steps and compare: animation timing. Capture: record the create screen at ≥ 50 fps; click the Paladin; count frames from click to `panu3` start (expect 79 × 40 ms ≈ 3.2 s) and check that loops skip the last frame. Settles §F3.3 rule 2/4 as implemented.
-- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+- Fold: write the result into the cited `ui/frontend-menus.md` rule and drop its PROVISIONAL line.
 
 ##### REC-169 [MANUAL] Front end: hardcore availability
 - Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
-- Settles: `ui/front-end.md` PROVISIONAL REC-169.
+- Settles: `ui/frontend-menus.md` PROVISIONAL REC-169.
 - Steps and compare: hardcore availability. Capture: fresh install, empty save folder, Single Player → create screen, select any class; check the Hardcore box is shown (and log `[0x00779DA4]` at `0x00435580`). Settles §F3.5 rule 2.
-- Fold: write the result into the cited `ui/front-end.md` rule and drop its PROVISIONAL line.
+- Fold: write the result into the cited `ui/frontend-menus.md` rule and drop its PROVISIONAL line.
+
+##### REC-170 [MANUAL] Front end: Esc menu tree capture
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/frontend-options.md` PROVISIONAL REC-170.
+- Steps and compare: 1.14d single player at 800×600 (`-w`): open inventory, quest log and automap, press Esc, then Options → Video Options, press Esc there. Expect the whole menu to close and the saved panels to reopen (§O1 r4). Screenshot the Game, Options, Sound, Video and Automap menus and one with a slider row selected; pixel-compare with §O4 r4 (label x/y, both pentagrams — Return to Game selected: (99, 336) and (649, 336) — slider bar and skull, no backdrop). Optional: hook `0x00454850` to confirm the pentagram step after > 50 ms.
+- Fold: write the result into the cited `ui/frontend-options.md` rule and drop its PROVISIONAL line.
+
+##### REC-171 [MANUAL] Front end: Options slider float precision
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/frontend-options.md` PROVISIONAL REC-171.
+- Steps and compare: in game, Video Options → Contrast; press Right to the last position (99); read `HKCU\Software\Blizzard Entertainment\Diablo II\Contrast`: 100 means 53-bit precision, 99 single precision. Also break in `0x0047CD00` and read the x87 control word (FNSTCW, bits 8–9).
+- Fold: write the result into the cited `ui/frontend-options.md` rule and drop its PROVISIONAL line.
+
+##### REC-180 [MANUAL] Front end: loading-screen art source
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/frontend-loading.md` PROVISIONAL REC-180.
+- Steps and compare: extract `data\global\ui\Loading\loadingscreen.dc6` from `Patch_D2.mpq` by name (no listfile) or hook the cel load `0x004788B0` at `0x004565A0` during a single-player start and log the path and the archive it opened from; compare with the d2data copy (666,014 bytes, 10 frames 256×256). Same bytes or no Patch_D2 entry settles it.
+- Fold: write the result into the cited `ui/frontend-loading.md` rule and drop its PROVISIONAL line.
+
+##### REC-181 [MANUAL] Front end: act-change loading end tick
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/frontend-loading.md` PROVISIONAL REC-181.
+- Steps and compare: single player, waypoint Rogue Encampment → Lut Gholein; record S→C packets with tick numbers and a screenshot per client frame. Expected 0x05, 0x03, 0x53, 0x07×n, 0x0D in the 0x49 drain, then 0x04 next tick; presented frames: last world frame, loading frame 0, one black frame, Act II world.
+- Fold: write the result into the cited `ui/frontend-loading.md` rule and drop its PROVISIONAL line.
+
+##### REC-182 [MANUAL] Front end: keys during loading
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/frontend-loading.md` PROVISIONAL REC-182.
+- Steps and compare: press Esc, and separately a skill hotkey, between the first loading draw and the first game frame (game start and act change); hook `0x004690B0`, log ui 9 (`[0x007A27E4]`) and whether the server ticks (`0x0052FC20`). If Esc opens the menu or pauses the load, d2rs must dispatch keys; otherwise it ignores them as written.
+- Fold: write the result into the cited `ui/frontend-loading.md` rule and drop its PROVISIONAL line.
+
+##### REC-183 [MANUAL] Front end: screen after an act-start video
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/frontend-loading.md` PROVISIONAL REC-183.
+- Steps and compare: first Warriv travel with videos enabled; screenshot each frame from the end of `ACT02START` to the first Act II world frame. Black settles the written rule; the loading frame means a redraw exists (find its caller).
+- Fold: write the result into the cited `ui/frontend-loading.md` rule and drop its PROVISIONAL line.
+
+##### REC-185 [MANUAL] Front end: credits scroll rate and end
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/frontend-credits.md` PROVISIONAL REC-185.
+- Steps and compare: 1.14d expansion, main menu → Credits; record at ≥ 50 fps for 13 min, hook `0x004341F0` and `0x004FBF30`, log `[0x0077996C]` and column C's `[+0x58]` / `[+0x9C]` per tick. Compare against C3: first text row at baseline y 590, 19 px per 10 ticks, "The End" gone at draw 17,770, no automatic return to the main menu after.
+- Fold: write the result into the cited `ui/frontend-credits.md` rule and drop its PROVISIONAL line.
+
+##### REC-186 [MANUAL] Front end: 640×480 frame
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/frontend-credits.md` PROVISIONAL REC-186.
+- Steps and compare: set the 640×480 video option and restart; screenshot the main menu, Credits and Cinematics. Settles whether the front end stays 800×600 with the C3/C8 positions, or shows what changes.
+- Fold: write the result into the cited `ui/frontend-credits.md` rule and drop its PROVISIONAL line.
+
+##### REC-188 [MANUAL] Front end: disabled cinematics buttons
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/frontend-credits.md` PROVISIONAL REC-188.
+- Steps and compare: set `Aux Battle.net` = `216.148.246.34`, open Cinematics with the classic and the expansion front end, screenshot both. Compare the disabled buttons: draw mode 1, blank labels in the expansion menu, the colour of the kept classic label against an enabled one.
+- Fold: write the result into the cited `ui/frontend-credits.md` rule and drop its PROVISIONAL line.
+
+##### REC-189 [MANUAL] Front end: startup chain, no blizno screen
+- Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
+- Settles: `ui/frontend-credits.md` PROVISIONAL REC-189 and `ui/front-end.md` §F1.3 rows 1–2.
+- Steps and compare: delete `Aux Battle.net`, start 1.14d hooking `0x004F5D90` (log video paths) and `0x0042F430` (log descriptor ids); repeat with the value present. Settles if no descriptor 0/1 is ever built and the videos are the two Bliz logos plus `d2intro` on the first run only.
+- Fold: write the result into the cited `ui/frontend-credits.md` rule and drop its PROVISIONAL line.
 
 #### Deferred (not recorded; outside Phases 0–6)
 - IT-1 `formats/d2s.md` OQ1 (legacy loader `0x00534020`, pre-1.09 saves), IT-2 OQ2 (item records of save versions 0x5C–0x5F), `formats/d2s-legacy.md` and `items/bitstream-legacy.md` Pending lines (1.07 / 1.08 / 1.00–1.06 saves): need sample files and are only needed if old saves must load. Record only if the user opens that scope.

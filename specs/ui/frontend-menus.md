@@ -20,33 +20,33 @@
 | Rules | 82–83 |
 |   F1.1 Control descriptors (the data every front-end screen is built from) | 84–123 |
 |   F1.2 Art preload | 124–151 |
-|   F1.3 Screen flow (single player) | 152–176 |
-|   F1.4 Main menu (`0x004336C0`) | 177–205 |
-|   F1.5 Title animation (logo fire) | 206–233 |
-|   F1.6 Palette and sounds | 234–254 |
-|   F2.1 Save folder (`0x00407050`) | 255–273 |
-|   F2.2 Scan and entry filter (`0x00438F70`, `0x0043C8A0`, `0x00438AD0`) | 274–300 |
-|   F2.3 Sort order (`0x00438AD0`) | 301–306 |
-|   F2.4 Layout (`0x0043AE30`, draw `0x004380F0`) | 307–330 |
-|   F2.5 Selection, scrolling and keys | 331–360 |
-|   F2.6 OK / Enter (`0x00439840`) | 361–373 |
-|   F2.7 Other buttons | 374–398 |
-|   F2.8 Difficulty box (`0x00439780`) | 399–418 |
-|   F2.9 Control records and art | 419–455 |
-|   F3.1 Character-create screen build (`0x00435580`) | 456–491 |
-|   F3.2 Class line-up (positions, creation order) | 492–507 |
-|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 508–567 |
-|   F3.4 Name entry (edit box, descriptor 204) | 568–582 |
-|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 583–604 |
-|   F3.6 OK / Cancel behaviour and the new save | 605–630 |
-|   F3.7 Sounds (deferred) | 631–635 |
-|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 636–664 |
-| Constants & data dependencies | 665–701 |
-| Randomness | 702–705 |
-| Edge cases & original bugs | 706–736 |
-| Test vectors | 737–767 |
-| Provenance | 768–805 |
-| Open questions | 806–850 |
+|   F1.3 Screen flow (single player) | 152–180 |
+|   F1.4 Main menu (`0x004336C0`) | 181–209 |
+|   F1.5 Title animation (logo fire) | 210–237 |
+|   F1.6 Palette and sounds | 238–260 |
+|   F2.1 Save folder (`0x00407050`) | 261–279 |
+|   F2.2 Scan and entry filter (`0x00438F70`, `0x0043C8A0`, `0x00438AD0`) | 280–306 |
+|   F2.3 Sort order (`0x00438AD0`) | 307–312 |
+|   F2.4 Layout (`0x0043AE30`, draw `0x004380F0`) | 313–336 |
+|   F2.5 Selection, scrolling and keys | 337–366 |
+|   F2.6 OK / Enter (`0x00439840`) | 367–379 |
+|   F2.7 Other buttons | 380–404 |
+|   F2.8 Difficulty box (`0x00439780`) | 405–424 |
+|   F2.9 Control records and art | 425–461 |
+|   F3.1 Character-create screen build (`0x00435580`) | 462–497 |
+|   F3.2 Class line-up (positions, creation order) | 498–513 |
+|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 514–573 |
+|   F3.4 Name entry (edit box, descriptor 204) | 574–588 |
+|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 589–610 |
+|   F3.6 OK / Cancel behaviour and the new save | 611–636 |
+|   F3.7 Sounds (deferred) | 637–641 |
+|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 642–670 |
+| Constants & data dependencies | 671–707 |
+| Randomness | 708–711 |
+| Edge cases & original bugs | 712–743 |
+| Test vectors | 744–774 |
+| Provenance | 775–812 |
+| Open questions | 813–854 |
 <!-- /index -->
 
 ## Summary
@@ -170,6 +170,10 @@ function or in `0x004326F0` (character-create art, per class).
 | difficulty popup | **Esc** (descriptor 173: invisible 10×10 button at (900,900), hotkey 27) | `0x00432EE0` → `0x0042F3F0` (pops list A) | character select |
 | in game | exit (0x50 code 23 path) | `0x0044B8A0` returns 4 for single player (`client/msg-ui.md` OQ8) | PROVISIONAL: character select (because 1.14d returns to it after Save and Exit); settled by REC-158 |
 
+Rows 1–2 (the `blizno` picture and its 8 s timer): PROVISIONAL: never shown in 1.14d (because the
+start-up chain `0x00435230` plays the Blizzard videos and goes straight to the trademark screen; no
+caller builds descriptors 0 / 1); settled by REC-189. The start-up chain is `ui/frontend-credits.md` C1.
+
 Every screen builder starts with `0x0043C4F0` (descriptors 8 background,
 6, 7 logo halves) except the character screens, which draw their own
 backgrounds. Re-entering the main menu rebuilds all its controls.
@@ -233,11 +237,13 @@ backgrounds. Re-entering the main menu rebuilds all its controls.
 
 ### F1.6 Palette and sounds
 
-1. Palette: PROVISIONAL: the front end draws with
-   `data\global\palette\ACT1\pal.dat` (because no front-end palette switch
-   was found and the menus share the in-game DC6 pipeline); settled by
-   REC-160. Other palettes present (`Menu0`–`menu4`, `Trademark`,
-   `loading`, `fechar`) are not referenced by the code traced here.
+1. Palette: every screen built through `0x0043C4F0` loads
+   `data\global\palette\sky\pal.dat` and `pal.pl2` (paths at
+   `0x006D3A08` / `0x006D3A0C`, loader `0x0042F2E0`); trademark, credits and cinematics
+   load the same files (`ui/frontend-credits.md` C7). Other
+   palettes present (`Menu0`–`menu4`, `Trademark`, `loading`, `fechar`) are
+   not loaded by the front-end screens traced here (`fechar` is only
+   compared against by `0x0042F2E0`; `loading` is `ui/frontend-loading.md`).
 2. Menu sound files (behaviour deferred to `client/audio.md`): button
    click `cursor\button.wav` (Sounds.txt row 4 `cursor_button_click`),
    `cursor\select.wav` (row 2), `cursor\windowopen.wav` (rows 3, 6), class
@@ -707,7 +713,8 @@ None. The front end draws no game-seed values; its animations run on wall-clock 
 
 1. Logo frame 29 is never displayed (`mod (frames−1)`, `0x005005B0`).
 2. Timers fire on whole-second boundaries of GetTickCount/1000, so the
-   Blizzard screen lasts between 8 and 10 s depending on the start phase.
+   Blizzard screen would last between 8 and 9 s depending on the start phase (§F1.1 r7; the screen
+   itself is not built in 1.14d, §F1.3 note).
 3. Single Player with no `.d2s` in the save directory goes straight to
    character create; Esc there lands on an empty character select, not the
    main menu (`0x00430C30`).
@@ -813,9 +820,6 @@ D2Win anim control `0x00500850` / `0x005005B0` / `0x00500480` / `0x005003A0` / `
   while the main menu shows; log the control order (types 2, 3, 3, 6…).
   Settles: creation order = draw order (logo over background, buttons
   over logo).
-- **REC-160** Front-end palette. Capture: hook the D2GFX palette load
-  during start-up and on reaching the main menu; log the `pal.dat` path.
-  Settles: ACT1 vs another palette for all front-end art.
 - **REC-161** Character-select OK condition. Capture: press OK with a new
   character and with one that finished Normal; log whether `0x00439780`
   or `0x00434A00` runs and the session values compared at
