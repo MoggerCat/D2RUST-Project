@@ -49,23 +49,74 @@ impl WindowMode {
     }
 }
 
-/// The video settings. `resolution` keeps the 1.14d value (0 = 640x480,
-/// 1 = 800x600, `frontend-options.md` §O7); the frame stays 800 x 600
-/// (§O8), the window is sized to it.
+/// Every setting of `frontend-options.md` §O7 (1.14d integers, so a
+/// registry import is a copy). `resolution` is 0 = 640x480, 1 = 800x600;
+/// the frame stays 800 x 600 (§O8), the window is sized to it. The rows
+/// of §O8 are stored and shown, with no effect.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Settings {
+    pub master_volume: u8,
+    pub music_volume: u8,
+    pub mixer: u8,
+    pub positional_bias: u8,
+    pub npc_speech: u8,
     pub resolution: u8,
     pub window_mode: WindowMode,
+    pub light_quality: u8,
+    pub blended_shadows: u8,
+    pub perspective: u8,
+    pub gamma: u16,
+    pub contrast: u8,
+    pub automap_mode: u8,
+    pub automap_fade: u8,
+    pub automap_centers: u8,
+    pub automap_party: u8,
+    pub automap_party_names: u8,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Settings {
+            master_volume: 100,
+            music_volume: 50,
+            mixer: 0,
+            positional_bias: 50,
+            npc_speech: 2,
             resolution: 1,
             window_mode: WindowMode::Windowed,
+            light_quality: 2,
+            blended_shadows: 1,
+            perspective: 1,
+            gamma: 155,
+            contrast: 100,
+            automap_mode: 0,
+            automap_fade: 0,
+            automap_centers: 1,
+            automap_party: 1,
+            automap_party_names: 1,
         }
     }
 }
+
+/// The integer keys: `(section, key, min, max)`, §O7 r2 order.
+pub const INT_KEYS: [(&str, &str, i64, i64); 16] = [
+    ("audio", "master_volume", 0, 100),
+    ("audio", "music_volume", 0, 100),
+    ("audio", "mixer", 0, 2),
+    ("audio", "positional_bias", 0, 100),
+    ("audio", "npc_speech", 0, 2),
+    ("video", "resolution", 0, 1),
+    ("video", "light_quality", 0, 2),
+    ("video", "blended_shadows", 0, 1),
+    ("video", "perspective", 0, 1),
+    ("video", "gamma", 55, 255),
+    ("video", "contrast", 0, 100),
+    ("automap", "mode", 0, 1),
+    ("automap", "fade", 0, 3),
+    ("automap", "centers", 0, 1),
+    ("automap", "party", 0, 1),
+    ("automap", "party_names", 0, 1),
+];
 
 impl Settings {
     /// The window size the resolution row asks for.
@@ -74,6 +125,50 @@ impl Settings {
             (640, 480)
         } else {
             (800, 600)
+        }
+    }
+
+    /// The value of integer key `i` of [`INT_KEYS`].
+    pub fn get(&self, i: usize) -> i64 {
+        match i {
+            0 => self.master_volume.into(),
+            1 => self.music_volume.into(),
+            2 => self.mixer.into(),
+            3 => self.positional_bias.into(),
+            4 => self.npc_speech.into(),
+            5 => self.resolution.into(),
+            6 => self.light_quality.into(),
+            7 => self.blended_shadows.into(),
+            8 => self.perspective.into(),
+            9 => self.gamma.into(),
+            10 => self.contrast.into(),
+            11 => self.automap_mode.into(),
+            12 => self.automap_fade.into(),
+            13 => self.automap_centers.into(),
+            14 => self.automap_party.into(),
+            _ => self.automap_party_names.into(),
+        }
+    }
+
+    /// Set integer key `i` (the caller keeps `v` in range).
+    pub fn set(&mut self, i: usize, v: i64) {
+        match i {
+            0 => self.master_volume = v as u8,
+            1 => self.music_volume = v as u8,
+            2 => self.mixer = v as u8,
+            3 => self.positional_bias = v as u8,
+            4 => self.npc_speech = v as u8,
+            5 => self.resolution = v as u8,
+            6 => self.light_quality = v as u8,
+            7 => self.blended_shadows = v as u8,
+            8 => self.perspective = v as u8,
+            9 => self.gamma = v as u16,
+            10 => self.contrast = v as u8,
+            11 => self.automap_mode = v as u8,
+            12 => self.automap_fade = v as u8,
+            13 => self.automap_centers = v as u8,
+            14 => self.automap_party = v as u8,
+            _ => self.automap_party_names = v as u8,
         }
     }
 }
@@ -114,28 +209,31 @@ pub fn parse_settings(text: &str) -> Result<Settings, ConfigError> {
     for (k, item) in doc.as_table().iter() {
         match k {
             "version" => version = item.as_integer(),
-            "video" => {
+            "audio" | "video" | "automap" => {
                 let t = item
                     .as_table_like()
-                    .ok_or_else(|| bad("[video] must be a table".into()))?;
+                    .ok_or_else(|| bad(format!("[{k}] must be a table")))?;
                 for (vk, v) in t.iter() {
-                    match vk {
-                        "resolution" => {
-                            s.resolution = match v.as_integer() {
-                                Some(n @ 0..=1) => n as u8,
-                                _ => return Err(bad("video.resolution must be 0 or 1".into())),
-                            }
-                        }
-                        "window_mode" => {
-                            let name = v.as_str().unwrap_or("");
-                            s.window_mode = WindowMode::ALL
-                                .into_iter()
-                                .find(|m| m.name() == name)
-                                .ok_or_else(|| {
-                                    bad("video.window_mode must be windowed, borderless or fullscreen".into())
-                                })?;
-                        }
-                        other => return Err(bad(format!("unknown key video.{other}"))),
+                    if k == "video" && vk == "window_mode" {
+                        let name = v.as_str().unwrap_or("");
+                        s.window_mode = WindowMode::ALL
+                            .into_iter()
+                            .find(|m| m.name() == name)
+                            .ok_or_else(|| {
+                                bad(
+                                    "video.window_mode must be windowed, borderless or fullscreen"
+                                        .into(),
+                                )
+                            })?;
+                        continue;
+                    }
+                    let Some(i) = INT_KEYS.iter().position(|e| e.0 == k && e.1 == vk) else {
+                        return Err(bad(format!("unknown key {k}.{vk}")));
+                    };
+                    let (_, _, lo, hi) = INT_KEYS[i];
+                    match v.as_integer() {
+                        Some(n) if (lo..=hi).contains(&n) => s.set(i, n),
+                        _ => return Err(bad(format!("{k}.{vk} must be {lo} to {hi}"))),
                     }
                 }
             }
@@ -150,11 +248,19 @@ pub fn parse_settings(text: &str) -> Result<Settings, ConfigError> {
 }
 
 pub fn write_settings(s: &Settings) -> String {
-    format!(
-        "version = {SETTINGS_VERSION}\n\n[video]\nresolution = {}\nwindow_mode = \"{}\"\n",
-        s.resolution,
-        s.window_mode.name()
-    )
+    let mut out = format!("version = {SETTINGS_VERSION}\n");
+    let mut section = "";
+    for (i, (sec, key, _, _)) in INT_KEYS.iter().enumerate() {
+        if *sec != section {
+            section = sec;
+            out.push_str(&format!("\n[{sec}]\n"));
+        }
+        out.push_str(&format!("{key} = {}\n", s.get(i)));
+        if *sec == "video" && *key == "resolution" {
+            out.push_str(&format!("window_mode = \"{}\"\n", s.window_mode.name()));
+        }
+    }
+    out
 }
 
 fn io_err(path: &Path, e: impl std::fmt::Display) -> ConfigError {
@@ -297,6 +403,10 @@ mod tests {
         let s = Settings {
             resolution: 0,
             window_mode: WindowMode::Fullscreen,
+            music_volume: 45,
+            gamma: 165,
+            automap_fade: 3,
+            ..Settings::default()
         };
         save_settings(&d, &s).unwrap();
         assert_eq!(load_settings(&d).unwrap(), s);
@@ -313,6 +423,9 @@ mod tests {
             "version = 1\n[video]\nresolution = 2\n",
             "version = 1\n[video]\nwindow_mode = \"big\"\n",
             "version = 1\n[video]\nbogus = 1\n",
+            "version = 1\n[audio]\nmaster_volume = 101\n",
+            "version = 1\n[video]\ngamma = 54\n",
+            "version = 1\n[automap]\nfade = 4\n",
         ] {
             assert!(parse_settings(bad).is_err(), "{bad}");
         }

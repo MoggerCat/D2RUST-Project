@@ -26,6 +26,8 @@ pub enum Trigger {
     Difficulty(u8),
     /// The in-game exit (`0x50` code 23 path).
     GameExit,
+    /// Options menu: Configure Controls (`0x0047F400`, §O9 r1).
+    ConfigureControls,
 }
 
 /// How the game is started when a flow ends in a game load.
@@ -103,6 +105,7 @@ pub fn next(from: ScreenId, t: Trigger, ctx: FlowCtx) -> Next {
         // Save and Exit; settled by REC-200.
         // Configure Controls: Cancel / Accept return to the Options menu
         // (q-menu-controls, REC-184).
+        (f, ConfigureControls) if f == OPTIONS => Next::Screen(CONTROLS),
         (f, Exit | Ok) if f == CONTROLS => Next::Screen(OPTIONS),
         (_, GameExit) => Next::Screen(CHAR_SELECT),
         _ => Next::Stay,
