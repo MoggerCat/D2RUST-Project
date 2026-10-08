@@ -254,7 +254,7 @@ impl OriginalUi {
             Output::NpcText {
                 ref bytes, present, ..
             } => self.npc_text_record(bytes, present),
-            Output::NpcDialog(ref d) => self.npc_dialog(d),
+            Output::NpcDialog(ref d) => self.npc_dialog(d, world),
             // Not UI outputs (`client/bridge.md` §10 rule 5).
             Output::ServerSound { .. } | Output::ShrineSound { .. } => Ok(()),
             _ if o.consumer() != Consumer::Ui => Ok(()),
@@ -321,10 +321,13 @@ impl OriginalUi {
 
     /// §16 r4 at delivery: the UI-only calls are skipped; the branch case
     /// is chosen and kept for the bridge.
-    fn npc_dialog(&mut self, d: &NpcDialog) -> Result<(), OriginalUiError> {
+    fn npc_dialog(&mut self, d: &NpcDialog, world: &ClientWorld) -> Result<(), OriginalUiError> {
         // r4.2: `[0x007C0D43]` := Q (§16 r7).
         self.more.client_quest = d.quest_flags;
         self.skip(skip::NPC_DIALOG_UI);
+        // d2rs-own, unverified (`npc_menu_ui`): the menu box opens here.
+        let level = world.local().map_or(1, |u| world.base(u.key, 12, 0));
+        self.open_npc_menu(d.guid, d.class, level);
         match dialog_case(self.msg.ui_7c0c68, self.npc_text.as_ref(), d)? {
             Some(case) => self.dialog_answer = Some((Box::new(d.clone()), case)),
             None => self.skip(skip::NPC_DIALOG_M),

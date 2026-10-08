@@ -13,6 +13,7 @@ pub mod char_details;
 pub mod char_inputs;
 pub mod character;
 pub mod control;
+pub mod cube_items;
 pub mod inv_gold;
 pub mod inv_items;
 pub mod inventory;

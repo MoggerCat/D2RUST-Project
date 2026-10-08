@@ -19,8 +19,14 @@ use crate::bridge::world::ClientWorld;
 use crate::ui::geom::Point;
 use crate::ui::item_tip::TipLine;
 use crate::ui::layout::Screen;
-use crate::ui::panels::UiFiles;
+use crate::ui::panel::ClientIntent;
+use crate::ui::panels::{PanelOutput, UiFiles};
 use d2_proto::client::UseItemAction;
+
+/// The Horadric Cube's code (`items.txt` `box`).
+pub fn is_cube(code: Option<[u8; 4]>) -> bool {
+    matches!(code, Some(c) if &c == b"box ")
+}
 
 /// The identify scroll and tome codes (as the server's use effect,
 /// `d2_sim::wiring::inventory::identify::IDENTIFY_CODES`).
@@ -82,24 +88,44 @@ impl ItemsUi {
         let Some(it) = self.item_at(world, files, &layout, at) else {
             return Vec::new();
         };
-        items::stream(world, it.key).map_or_else(Vec::new, |s| tips.lines(s))
+        let mut lines = items::stream(world, it.key).map_or_else(Vec::new, |s| tips.lines(s));
+        lines.extend(super::socket::contents_lines(tips, world, &it));
+        lines
     }
 
     /// A right press in the panel: an identify item in the grid becomes
     /// the used item (cursor state 6); while the state is set it cancels.
-    pub fn right_press(&self, world: &ClientWorld, files: &UiFiles, layout: &InvLayout, at: Point) {
+    /// A stored Horadric Cube (`box `) is used (C→S 0x20), which opens it
+    /// (`world/cube.md` §1; d2rs-own, unverified, REC-119).
+    pub fn right_press(
+        &self,
+        world: &ClientWorld,
+        files: &UiFiles,
+        layout: &InvLayout,
+        at: Point,
+    ) -> Vec<PanelOutput> {
         if self.identify.get().is_some() {
             self.identify.set(None);
-            return;
+            return Vec::new();
         }
         if items::cursor_item(world).is_some() {
-            return;
+            return Vec::new();
         }
-        if let Some(it) = self.item_at(world, files, layout, at) {
-            if it.mode == mode::STORED && is_identify(it.code) {
-                self.identify.set(Some(it.key.guid));
-            }
+        let Some(it) = self.item_at(world, files, layout, at) else {
+            return Vec::new();
+        };
+        if it.mode != mode::STORED {
+            return Vec::new();
         }
+        if is_identify(it.code) {
+            self.identify.set(Some(it.key.guid));
+        } else if is_cube(it.code) {
+            let (x, y) = world.local().and_then(|u| u.position).unwrap_or((0, 0));
+            return vec![PanelOutput::Intent(ClientIntent::from_message(
+                &items::use_grid(it.key.guid, u32::from(x), u32::from(y)),
+            ))];
+        }
+        Vec::new()
     }
 
     /// The 0x27 intent of a [`GridMsg::TargetUsed`](super::super::inv_grid::GridMsg);

@@ -87,7 +87,7 @@ use d2_native::source::NativeAsset;
 use d2_server::adapters::character::LoadContext;
 use d2_server::adapters::handlers::skills::wired::WiredSkills;
 use d2_server::adapters::handlers::world::{
-    preview_inv_parts, ActionEvents, ActionWorld, Outbox, WiredWorld,
+    preview_cube_parts, preview_inv_parts, ActionEvents, ActionWorld, Outbox, WiredWorld,
 };
 use d2_server::adapters::session::{load_new_character_with_items, load_save, GameSetup};
 use d2_server::adapters::session_flow::{
@@ -102,7 +102,7 @@ use d2_server::world_data::tables::{drop_tables, hireling_tables, LevelTables, S
 use d2_server::world_data::{self, Dt1Files, WorldFiles};
 use d2_sim::combat::vitals::VitalsTables;
 use d2_sim::combat::CombatTables;
-use d2_sim::drlg::maze::{Maze, MazeData};
+use d2_sim::drlg::maze::Maze;
 use d2_sim::drlg::room::LinkAt;
 use d2_sim::drlg::{
     CellGrid, Drlg, DrlgData, DrlgError, DrlgRoomId, Dungeon, GridPass, LevelDef, LevelIdx,
@@ -123,6 +123,7 @@ use d2_sim::wiring::economy::{DeathDrops, DropTables, GameFields};
 use d2_sim::wiring::interaction::skill_events;
 use d2_sim::wiring::worldgen::levels::{SharedTypes, WorldTypes};
 use d2_sim::wiring::worldgen::{CreationTables, WorldPending, WorldSim, WorldState, WorldTables};
+use d2_sim::world::cube::CubeData;
 use d2_sim::world::hirelings::HirelingTables;
 use d2_sim::world::npc::HireRow;
 use d2_sim::world::objects::ObjectTables;
@@ -130,12 +131,13 @@ use d2_sim::world::quests::{PlayerQuests, QuestFlags, QuestTables};
 use d2_sim::world::vendors::VendorTables;
 use d2_sim::world::waypoints::{WaypointData, NO_WAYPOINT};
 
-use d2_sim::drlg::outdoor::{OutdoorData, SubFile, SubFiles};
-use d2_sim::drlg::preset::{Ds1Input, Ds1Source, PresetData};
+use d2_sim::drlg::outdoor::{SubFile, SubFiles};
+use d2_sim::drlg::preset::{Ds1Input, Ds1Source};
 
 use super::rest::AppRest;
 use super::server_thread::{ThreadLink, ThreadStopped};
 use super::skill_rest::SkillStore;
+use super::synthetic_maze;
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
 use crate::bridge::world::{
@@ -250,7 +252,7 @@ pub fn create_request_for(character: &Character) -> CreateGame {
         game_type: GAME_TYPE,
         class,
         template: 0,
-        difficulty: GAME_SETUP.difficulty,
+        difficulty: character.difficulty(),
         char_name,
         arena: 0,
         flags: if expansion {
@@ -288,6 +290,50 @@ pub enum Character {
     Save(Box<D2s>, LoadContext),
 }
 
+impl Character {
+    /// The difficulty the game runs on: a save's load context, else a
+    /// named character's own (Normal for [`Character::New`]).
+    pub fn difficulty(&self) -> u8 {
+        match self {
+            Character::New => GAME_SETUP.difficulty,
+            Character::Named(c) => c.difficulty,
+            Character::Save(_, ctx) => ctx.difficulty,
+        }
+    }
+
+    /// This character on difficulty `d` (`play --difficulty`). A save's
+    /// difficulty is set at load ([`load_character`]); a default new
+    /// character becomes the stand-in sorceress as a named one.
+    pub fn with_difficulty(self, d: u8) -> Character {
+        match self {
+            Character::New => {
+                let mut name = [0u8; 16];
+                name[..PLAYER_NAME.len()].copy_from_slice(PLAYER_NAME);
+                Character::Named(NewCharacter {
+                    class: PLAYER_CLASS as u8,
+                    name,
+                    difficulty: d,
+                })
+            }
+            Character::Named(c) => Character::Named(NewCharacter { difficulty: d, ..c }),
+            Character::Save(s, mut ctx) => {
+                ctx.difficulty = d;
+                Character::Save(s, ctx)
+            }
+        }
+    }
+}
+
+/// Parses `--difficulty`: `normal`, `nightmare`, `hell` (any case) or 0–2.
+pub fn parse_difficulty(s: &str) -> Option<u8> {
+    match s.to_ascii_lowercase().as_str() {
+        "normal" | "0" => Some(0),
+        "nightmare" | "1" => Some(1),
+        "hell" | "2" => Some(2),
+        _ => None,
+    }
+}
+
 /// The class names of `play --new` in class-id order (`charstats` rows
 /// 0–6; `items/inventory.md` §1.3 uses the same ids).
 pub const CLASS_NAMES: [&str; 7] = [
@@ -311,6 +357,8 @@ pub struct NewCharacter {
     pub class: u8,
     /// The name, NUL-padded (bytes after the name are 0).
     pub name: [u8; 16],
+    /// The game's difficulty 0–2 (`play --difficulty`; Normal by default).
+    pub difficulty: u8,
 }
 
 impl NewCharacter {
@@ -367,7 +415,11 @@ pub fn new_character(class: &str, name: &str) -> Result<Character, NewCharacterE
     }
     let mut bytes = [0u8; 16];
     bytes[..name.len()].copy_from_slice(name.as_bytes());
-    Ok(Character::Named(NewCharacter { class, name: bytes }))
+    Ok(Character::Named(NewCharacter {
+        class,
+        name: bytes,
+        difficulty: 0,
+    }))
 }
 
 /// The load result the loader gives when the player unit cannot be
@@ -660,6 +712,8 @@ impl LevelTypes for Types {
             }
             if id == DEN_OF_EVIL {
                 drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
+                // The stairs down to Cave Level 1 (slot 1, q-act1-dungeons).
+                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0 << 1;
             }
             drlg.link_room(r, LinkAt::Tail);
         }
@@ -671,7 +725,22 @@ impl LevelTypes for Types {
     fn preset_units(&self, drlg: &Drlg, room: DrlgRoomId) -> Vec<PresetUnit> {
         let class = match drlg.level(drlg.room(room).level).id {
             BLOOD_MOOR => BLOOD_MOOR_TO_DEN,
-            DEN_OF_EVIL => DEN_TO_BLOOD_MOOR,
+            DEN_OF_EVIL => {
+                return vec![
+                    PresetUnit {
+                        unit_type: 5,
+                        class: DEN_TO_BLOOD_MOOR,
+                        x: WARP_TILE_XY,
+                        y: WARP_TILE_XY,
+                    },
+                    PresetUnit {
+                        unit_type: 5,
+                        class: synthetic_maze::DEN_TO_CAVE,
+                        x: synthetic_maze::DEN_STAIRS_XY,
+                        y: synthetic_maze::DEN_STAIRS_XY,
+                    },
+                ]
+            }
             _ => return Vec::new(),
         };
         vec![PresetUnit {
@@ -915,14 +984,14 @@ impl LiveData {
     /// hardcore). The client's name is the save's own: the client sends
     /// the selected character's name in its C→S 0x67
     /// ([`create_request_for`]).
-    pub fn read_save(&self, bytes: &[u8]) -> Result<D2s, d2s::D2sError> {
+    pub fn read_save(&self, bytes: &[u8], difficulty: u8) -> Result<D2s, d2s::D2sError> {
         let opts = ReadOptions {
             expansion: GAME_SETUP.expansion,
             game: Some(d2s::GameContext {
                 client_name: save_name(bytes).to_vec(),
                 expansion: GAME_SETUP.expansion,
                 hardcore: false,
-                difficulty: GAME_SETUP.difficulty,
+                difficulty,
             }),
         };
         d2s::read(bytes, &opts, &self.save)
@@ -946,7 +1015,11 @@ pub fn save_name(bytes: &[u8]) -> &[u8] {
 /// map seed does not apply: the app's game runs on a fixed seed, game
 /// +0x84 = 1, `formats/d2s.md` §2.2 rule 8, `rng.md` §5.2). Synthetic
 /// data has no save tables: an error.
-pub fn load_character(data: &GameData, path: &std::path::Path) -> Result<Character, BuildError> {
+pub fn load_character(
+    data: &GameData,
+    path: &std::path::Path,
+    difficulty: u8,
+) -> Result<Character, BuildError> {
     let err = |message: String| BuildError::Save {
         path: path.display().to_string(),
         message,
@@ -957,11 +1030,13 @@ pub fn load_character(data: &GameData, path: &std::path::Path) -> Result<Charact
         ));
     };
     let bytes = std::fs::read(path).map_err(|e| err(e.to_string()))?;
-    let save = d.read_save(&bytes).map_err(|e| err(e.to_string()))?;
+    let save = d
+        .read_save(&bytes, difficulty)
+        .map_err(|e| err(e.to_string()))?;
     Ok(Character::Save(
         Box::new(save),
         LoadContext {
-            difficulty: GAME_SETUP.difficulty,
+            difficulty,
             map_seed_applies: false,
         },
     ))
@@ -1030,7 +1105,7 @@ impl LevelSource {
         LevelSource {
             data: Arc::new(synthetic_drlg_data()),
             tiles: Box::new(tiles()),
-            types: Box::new(synthetic_types()),
+            types: Box::new(synthetic_level_types()),
             acts: [(0, 1, 0), (1, 2, 0)],
         }
     }
@@ -1073,7 +1148,12 @@ fn synthetic_drlg_data() -> DrlgData {
     }
     let mut files = vec![Vec::new(); 32];
     files[0] = b"floor.dt1".to_vec();
-    drlg.lvltypes = vec![vec![Vec::new(); 32], files];
+    drlg.lvltypes = vec![
+        vec![Vec::new(); 32],
+        files.clone(),
+        vec![Vec::new(); 32],
+        files,
+    ];
     for id in [
         ACT1_TOWN,
         BLOOD_MOOR,
@@ -1085,6 +1165,20 @@ fn synthetic_drlg_data() -> DrlgData {
         drlg.levels[id as usize].drlg_type = 2;
         drlg.levels[id as usize].level_type = 1;
     }
+    // Cave Level 1: a maze level (q-act1-dungeons), warp pair with the
+    // Den (Den slot 1, cave slot 0).
+    {
+        let c = &mut drlg.levels[synthetic_maze::CAVE_LEVEL_1 as usize];
+        c.drlg_type = 1;
+        // Level type 3 (cave): the maze generator's type (`maze.md` §1).
+        c.level_type = 3;
+        c.size = [(200, 200); 3];
+        c.offset = (1500, 1000);
+        c.vis[0] = DEN_OF_EVIL;
+        c.warp[0] = synthetic_maze::CAVE_TO_DEN as i32;
+    }
+    drlg.levels[DEN_OF_EVIL as usize].vis[1] = synthetic_maze::CAVE_LEVEL_1;
+    drlg.levels[DEN_OF_EVIL as usize].warp[1] = synthetic_maze::DEN_TO_CAVE as i32;
     // The town and the Blood Moor see each other through vis slot 0, a
     // border (warp −1, `drlg/rooms.md` §3.3): each one's room carries
     // flag WARP_0 ([`Types`]).
@@ -1096,16 +1190,21 @@ fn synthetic_drlg_data() -> DrlgData {
     drlg.levels[BLOOD_MOOR as usize].warp[1] = BLOOD_MOOR_TO_DEN as i32;
     drlg.levels[DEN_OF_EVIL as usize].vis[0] = BLOOD_MOOR;
     drlg.levels[DEN_OF_EVIL as usize].warp[0] = DEN_TO_BLOOD_MOOR as i32;
-    drlg.warps = [BLOOD_MOOR_TO_DEN, DEN_TO_BLOOD_MOOR]
-        .iter()
-        .map(|&id| WarpDef {
-            id: id as i32,
-            direction: b'b',
-            ..WarpDef::default()
-        })
-        .collect();
+    drlg.warps = [
+        BLOOD_MOOR_TO_DEN,
+        DEN_TO_BLOOD_MOOR,
+        synthetic_maze::DEN_TO_CAVE,
+        synthetic_maze::CAVE_TO_DEN,
+    ]
+    .iter()
+    .map(|&id| WarpDef {
+        id: id as i32,
+        direction: b'b',
+        ..WarpDef::default()
+    })
+    .collect();
     // ExitWalkX/Y per row: the walk-out after the arrival.
-    drlg.warp_exits = vec![(0, 0), (3, 3)];
+    drlg.warp_exits = vec![(0, 0), (3, 3), (0, 0), (3, 3)];
     drlg
 }
 
@@ -1122,6 +1221,11 @@ fn synthetic_types() -> Types {
         (DEN_OF_EVIL, TileRect::new(0, 8, 8, 8)),
         (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
     ]))
+}
+
+/// The synthetic level types: the flat levels plus the maze level.
+fn synthetic_level_types() -> synthetic_maze::SyntheticTypes<Types> {
+    synthetic_maze::SyntheticTypes::new(synthetic_types(), Arc::new(synthetic_drlg_data()))
 }
 
 /// The live DS1 files of the client DRLG's level types, shared with the
@@ -1152,7 +1256,7 @@ pub fn client_drlg_source(data: &GameData) -> DrlgSource {
         GameData::Synthetic => DrlgSource {
             data: Arc::new(synthetic_drlg_data()),
             tiles: Arc::new(tiles()),
-            types: Arc::new(|| Box::new(synthetic_types())),
+            types: Arc::new(|| Box::new(synthetic_level_types())),
         },
         GameData::Live(d) => {
             let live = d.clone();
@@ -1439,6 +1543,9 @@ struct GameParts {
     /// character's start items, `items/generation.md` §10.3); none for
     /// synthetic data (the start items then stay unapplied).
     inventory: Option<InvTables>,
+    /// The Horadric Cube's recipes and item columns; none for synthetic
+    /// data (the cube then stays a stub).
+    cube: Option<CubeData>,
 }
 
 /// Rows of the synthetic `monstats` (classes 0 … 399; Akara is the only
@@ -1485,24 +1592,9 @@ impl GameParts {
     /// state's level types over the synthetic DRLG view with no preset,
     /// outdoor or maze data.
     fn synthetic(wp: &WaypointTables) -> Result<Self, BuildError> {
-        let presets = PresetData {
-            defs: Vec::new(),
-            monpreset_acts: Default::default(),
-            monpreset: Vec::new(),
-            monstats_count: 0,
-            superuniques_count: 0,
-            hdm_item: -1,
-            tables: d2_sim::drlg::preset::PresetTables::spec()
-                .map_err(|e| BuildError::Tables(format!("preset-tables.tsv: {e}")))?,
-        };
-        let world_types = SharedTypes::new(WorldTypes::new(
-            Arc::new(synthetic_drlg_data()),
-            Maze::new(MazeData::default()),
-            presets,
-            OutdoorData::default(),
-            Box::new(d2_server::world_data::Ds1Files::default()),
-            Box::new(d2_sim::drlg::outdoor::SubFileMap::default()),
-        ));
+        // The maze level's rows and DS1 (q-act1-dungeons).
+        let world_types =
+            SharedTypes::new(synthetic_maze::maze_types(Arc::new(synthetic_drlg_data())));
         let mut action = empty_action_tables();
         // The unit path needs the monster's `monstats` row (the shape).
         action.combat.monstats = synthetic_monstats();
@@ -1544,6 +1636,7 @@ impl GameParts {
             drops: None,
             hirelings: None,
             inventory: None,
+            cube: None,
         })
     }
 
@@ -1569,6 +1662,10 @@ impl GameParts {
             inventory: Some(
                 InvTables::from_fixed(&t.fixed)
                     .map_err(|e| BuildError::Tables(format!("inventory tables: {e}")))?,
+            ),
+            cube: Some(
+                CubeData::from_fixed(&t.fixed)
+                    .map_err(|e| BuildError::Tables(format!("cube tables: {e}")))?,
             ),
         })
     }
@@ -1725,7 +1822,7 @@ pub fn build_with_objects(
         .map_err(|e| BuildError::Setup(format!("path tables: {e:?}")))?;
     let info = GameInfo {
         expansion: GAME_SETUP.expansion,
-        difficulty: GAME_SETUP.difficulty,
+        difficulty: character.difficulty(),
         game_type: GAME_TYPE,
         ladder: GAME_SETUP.ladder,
         ..GameInfo::default()
@@ -1735,7 +1832,7 @@ pub fn build_with_objects(
     // Game creation (`rng.md` §5.2): the creation fields to their home,
     // then the four seeded controls in order, before any unit.
     let fields = GameFields {
-        difficulty: GAME_SETUP.difficulty,
+        difficulty: character.difficulty(),
         game_type: GAME_TYPE,
         ladder: GAME_SETUP.ladder,
         ..GameFields::new(Seed::init_low(seed), GAME_SETUP.expansion)
@@ -1888,6 +1985,8 @@ pub fn build_with_objects(
     // The play host's inventory model (`play-server` seam, D1 preview
     // fills in `PreviewMoveRest`): the new character's start items.
     world.inventory = parts.inventory.map(preview_inv_parts);
+    // The cube (d2rs-own, unverified, REC-119): the user's `cubemain`.
+    world.cube = parts.cube.map(preview_cube_parts);
     let mut s: Sim = SimGame::with_world(game, sim, world);
     s.set_host_sync(sync_seams);
     // The session sequence (`intents-events.md` §8) runs on the client's
@@ -1950,7 +2049,7 @@ fn loader(
                         .waypoints
                         .entry(player)
                         .or_default()
-                        .get_mut(0)
+                        .get_mut(character.difficulty())
                         .set(u32::from(index));
                     if let Err(e) = set {
                         s.events

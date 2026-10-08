@@ -229,6 +229,24 @@ impl ItemTips {
             .unwrap_or_else(|| String::from_utf8_lossy(&code).trim_end().to_owned())
     }
 
+    /// The decoded record of an item stream (`None` when it does not
+    /// decode).
+    pub fn bits(&self, stream: &[u8]) -> Option<ItemBits> {
+        decode(stream, &TablesLookup(&self.lookup)).ok()
+    }
+
+    /// d2rs-own, unverified (REC-121; `0x0062BEB0` is not
+    /// specified): the item with `code` is a gem (20), rune (74) or
+    /// jewel (58), as the server's socket-filler test.
+    pub fn is_socket_filler(&self, code: [u8; 4]) -> bool {
+        use d2_sim::items::ty;
+        self.lookup.find_code(code).is_some_and(|i| {
+            [ty::GEM, ty::RUNE, ty::JEWL]
+                .into_iter()
+                .any(|t| self.lookup.is_type(i, t as i16))
+        })
+    }
+
     /// The tip of the item with last stream `stream`; empty when the
     /// stream does not decode.
     pub fn lines(&self, stream: &[u8]) -> Vec<TipLine> {

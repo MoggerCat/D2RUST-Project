@@ -35,6 +35,7 @@ pub mod mode {
     pub const GROUND: u8 = 3;
     pub const CURSOR: u8 = 4;
     pub const DROPPING: u8 = 5;
+    pub const SOCKETED: u8 = 6;
 }
 
 /// One item of the model, as its last record places it.
@@ -277,6 +278,13 @@ pub fn equip(item: u32, body: u8) -> EquipItem {
 /// C→S 0x23 ItemToBelt (§7.14): the cursor item to a belt slot.
 pub fn to_belt(item: u32, slot: u32) -> ItemToBelt {
     ItemToBelt { item, slot }
+}
+
+/// C→S 0x20 UseGridItem (§7.11): use a stored item at the world point
+/// (x, y) (the player's own subtile position, within range of the
+/// server's check); the cube is opened this way.
+pub fn use_grid(item: u32, x: u32, y: u32) -> d2_proto::client::UseGridItem {
+    d2_proto::client::UseGridItem { item, x, y }
 }
 
 /// C→S 0x26 UseBeltItem (§7.17): use a belt item on the player.

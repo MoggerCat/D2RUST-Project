@@ -29,6 +29,7 @@ pub mod single_player;
 pub mod skill_rest;
 pub mod sound;
 pub mod strings;
+pub mod synthetic_maze;
 pub mod ui;
 
 use std::path::PathBuf;

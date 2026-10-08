@@ -303,7 +303,7 @@ impl<X: Pending> LevelView<RoomId> for Shared<'_, '_, X> {
 }
 
 /// Runs `f` on three handles of one context.
-fn with_shared<X: Pending, R>(
+pub(super) fn with_shared<X: Pending, R>(
     c: PathCtx<'_, X>,
     f: impl FnOnce(&mut Shared<'_, '_, X>, &mut Shared<'_, '_, X>, &mut Shared<'_, '_, X>) -> R,
 ) -> R {
@@ -444,7 +444,10 @@ pub fn coarse_free_box(
     crate::path::search::coarse_free_box(&Rooms(drlg), room, point, n, mask)
 }
 
-fn log<X: Pending, T>(cv: &mut Shared<'_, '_, X>, r: Result<T, PlaceError>) -> Option<T> {
+pub(super) fn log<X: Pending, T>(
+    cv: &mut Shared<'_, '_, X>,
+    r: Result<T, PlaceError>,
+) -> Option<T> {
     match r {
         Ok(v) => Some(v),
         Err(e) => {

@@ -557,3 +557,45 @@ fn a_player_attacking_a_monster_sends_0x4c() {
         assert_eq!(sent(&mut fx), vec![], "mode {mode}");
     }
 }
+
+/// §3.5 rule 6: a state toggled on a unit reaches the client as 0xA7
+/// (no list entries) in the next client pass, once; toggled off, 0xA9.
+// Covers: specs/sim/intents-events.md §3.5 r6, §7.3 r2
+#[test]
+fn state_changes_are_sent_once_as_a_7_then_a_9() {
+    let (mut fx, p, m) = setup();
+    let g = guid(&fx, m).to_le_bytes();
+    let state_msgs = |v: Vec<(UnitId, Vec<u8>)>| -> Vec<Vec<u8>> {
+        v.into_iter()
+            .map(|(_, b)| b)
+            .filter(|b| matches!(b[0], 0xA7..=0xA9))
+            .collect()
+    };
+    let s = &mut fx.sim.sys;
+    let mut v = View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks);
+    v.set_state(m, 1, true);
+    fx.game.lists.queue_update(m).unwrap();
+    fx.tick();
+    let on = state_msgs(sent(&mut fx));
+    assert_eq!(on, vec![vec![0xA7, 1, g[0], g[1], g[2], g[3], 1]]);
+    fx.tick();
+    assert_eq!(state_msgs(sent(&mut fx)), Vec::<Vec<u8>>::new());
+    let s = &mut fx.sim.sys;
+    let mut v = View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks);
+    v.set_state(m, 1, false);
+    fx.game.lists.queue_update(m).unwrap();
+    fx.tick();
+    let off = state_msgs(sent(&mut fx));
+    assert_eq!(off, vec![vec![0xA9, 1, g[0], g[1], g[2], g[3], 1]]);
+    let _ = p;
+}
+
+/// 0xA8 carries the state list's entries (§3.5 rule 6).
+// Covers: specs/sim/intents-events.md §3.5 r6
+#[test]
+fn set_state_message_layout() {
+    let m = crate::units::messages::set_state(1, 0x0102_0304, 9, &[], |_| None);
+    // size = 8 + stream (the 0x1FF end: 9 bits = 2 bytes).
+    assert_eq!(m[..8], [0xA8, 1, 4, 3, 2, 1, 10, 9]);
+    assert_eq!(m.len(), 10);
+}

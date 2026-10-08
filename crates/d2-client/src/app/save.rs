@@ -116,15 +116,16 @@ pub fn save_path(
 pub fn base_save(character: &Character) -> D2s {
     match character {
         Character::Save(save, _) => (**save).clone(),
-        Character::Named(c) => fresh(c.class, c.name()),
+        Character::Named(c) => fresh(c.class, c.name(), c.difficulty),
         Character::New => fresh(
             single_player::PLAYER_CLASS as u8,
             single_player::PLAYER_NAME,
+            single_player::GAME_SETUP.difficulty,
         ),
     }
 }
 
-fn fresh(class: u8, name: &[u8]) -> D2s {
+fn fresh(class: u8, name: &[u8], difficulty: u8) -> D2s {
     let mut header = Header {
         class,
         ..Header::default()
@@ -138,7 +139,7 @@ fn fresh(class: u8, name: &[u8]) -> D2s {
         0
     };
     // Town per difficulty: act 0 of the current one (§2.5).
-    header.towns[usize::from(single_player::GAME_SETUP.difficulty).min(2)] = 0x80;
+    header.towns[usize::from(difficulty).min(2)] = 0x80;
     D2s {
         header,
         body: Some(Body {

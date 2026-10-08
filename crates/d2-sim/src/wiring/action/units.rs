@@ -326,6 +326,9 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
 }
 
 impl<X: Pending> LifecycleHooks for ActionHooks<X> {
+    fn request_act_change(&mut self, player: UnitId, level: u32, arg: u32) {
+        self.act_changes.push((player, level, arg));
+    }
     /// The monster type init `0x00574250` (`init.md` §5, `units.md` §3.1
     /// table: the allocator's per-kind init of a monster) on the lent
     /// monster world ([`super::monsters`]); the object data and init

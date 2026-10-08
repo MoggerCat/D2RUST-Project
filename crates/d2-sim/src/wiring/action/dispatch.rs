@@ -338,6 +338,11 @@ impl<X: Pending> TickHooks for ActionSim<X> {
                 }
             }
         }
+        // §3.5 rule 6 / §7.3 rule 2 step 8: the changed-state messages of
+        // a unit that is not new to the client.
+        if let (Some(p), None) = (receiver, new) {
+            v.state_change_messages(p, unit);
+        }
         if game
             .lists
             .unit(unit)

@@ -304,6 +304,8 @@ pub struct OriginalUi {
     pub(super) hire: super::hire_list::SharedHire,
     /// The NPC shop (`shop_ui`, `panels-2.md` §14 r4).
     shop: shop_ui::SharedShop,
+    /// The NPC menu (`ui/npc_menu_ui.rs`, `menus.md` §2).
+    pub(super) npcm: super::npc_menu_ui::SharedNpcMenu,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -368,6 +370,7 @@ impl OriginalUi {
             dialog_answer: None,
             hire: super::hire_list::SharedHire::default(),
             shop: shop_ui::SharedShop::default(),
+            npcm: Default::default(),
         })
     }
 
@@ -405,11 +408,20 @@ impl OriginalUi {
             sh: sh.clone(),
             st: self.shop.clone(),
         }))?;
+        root.add(Box::new(cube_ui::CubeUi {
+            sh: sh.clone(),
+            input: Default::default(),
+        }))?;
         root.add(Box::new(BorderUi { sh: sh.clone() }))?;
         root.add(Box::new(super::hire_list::HireListUi {
             st: self.hire.clone(),
         }))?;
         root.open(super::hire_list::HIRE_PANEL)?;
+        root.add(Box::new(super::npc_menu_ui::NpcMenuUi {
+            st: self.npcm.clone(),
+            hire: self.hire.clone(),
+        }))?;
+        root.open(super::npc_menu_ui::NPC_MENU_PANEL)?;
         root.add(Box::new(hud::HudUi { sh: sh.clone() }))?;
         root.add(Box::new(gold_dialog::GoldDialogUi { sh: sh.clone() }))?;
         root.add(Box::new(esc_menu::EscMenuUi { sh: sh.clone() }))?;
@@ -420,6 +432,7 @@ impl OriginalUi {
         root.sync_states(&sh.borrow().states);
         let sc = sh.borrow().config.screen;
         self.hire.borrow_mut().screen = (sc.w, sc.h);
+        self.npcm.borrow_mut().screen = (sc.w, sc.h);
         Ok(())
     }
 
@@ -721,7 +734,8 @@ impl Panel for InventoryUi {
         {
             let class = Facts::of(ctx.world).class;
             if let Some(l) = sh.items.layout(class, &s) {
-                sh.items.right_press(ctx.world, &sh.tables.files, &l, at);
+                let out = sh.items.right_press(ctx.world, &sh.tables.files, &l, at);
+                sh.outputs.extend(out);
             }
             return UiResponse::Consumed;
         }
@@ -1146,6 +1160,8 @@ pub mod hud;
 #[path = "hud_belt.rs"]
 pub mod hud_belt;
 
+#[path = "cube_ui.rs"]
+pub(super) mod cube_ui;
 #[path = "msg_ui.rs"]
 pub mod msg_ui;
 #[path = "quest_log_ui.rs"]

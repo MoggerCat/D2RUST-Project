@@ -19,7 +19,7 @@ Method:
 
 Tests: never weaken an existing assertion to make it pass (for example turning `dropped.is_empty()` into "expect this message dropped"). If your change breaks an assertion, fix the cause; change an expectation only when the spec says the new value, and say why in the commit.
 
-Before each push: `cargo fmt --all`, `cargo clippy -p <crates touched> --all-targets -- -D warnings`, `cargo nextest run -p d2-sim -p d2-server -p d2-client --no-fail-fast` (all three, whatever you touched; install with `cargo install cargo-nextest --locked` if missing) (nextest, not `cargo test`: some d2-server tests need per-process temp dirs), and `python3 tools/coverage.py --check`.
+Before each push: `cargo fmt --all`, `cargo clippy -p <crates touched> --all-targets -- -D warnings`, `cargo nextest run -p d2-sim -p d2-server -p d2-client -p test-fixtures --no-fail-fast` (all three, whatever you touched; install with `cargo install cargo-nextest --locked` if missing) (nextest, not `cargo test`: some d2-server tests need per-process temp dirs), and `python3 tools/coverage.py --check`.
 
 Every commit message ends with:
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>

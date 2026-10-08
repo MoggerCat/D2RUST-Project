@@ -840,6 +840,15 @@ pub fn use_grid_body<W: MoveWorld>(w: &mut W, p: Owner, i: Guid, x: i32, y: i32)
     if w.trading(p) {
         return Outcome::NOTHING;
     }
+    // The cube is opened, not used up (`cube.md` §1; PROVISIONAL, the
+    // item-use spec `0x005BF240` is unwritten).
+    if &w.code(i) == b"box " {
+        return if w.open_cube(p, i) {
+            Outcome::DONE
+        } else {
+            Outcome::NOTHING
+        };
+    }
     // Step 3.
     if w.use_item_at(p, i, x, y) {
         let s = w.item_skill(i);

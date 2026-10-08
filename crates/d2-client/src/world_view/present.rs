@@ -357,7 +357,7 @@ pub fn deliver_with<L: ServerLink>(
                         bridge.borrow_mut().npc_dialog_branch(&d, case)?;
                         // Preview: no speech or menu, so the chat closes
                         // at once (`bridge::chat_end`; d2rs-own).
-                        if preview_chat_end {
+                        if preview_chat_end && !ui.npc_menu_up() {
                             bridge.borrow_mut().preview_chat_end(d.guid)?;
                         }
                     }

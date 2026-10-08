@@ -306,9 +306,10 @@ impl ItemsUi {
         let all = items::local_items(world);
         let cursor = items::cursor_item(world);
         let intent = if g.contains_mouse(at) {
-            self.grid_press(files, g, &all, cursor.as_ref(), at, 0)
+            self.grid_press(world, files, g, cursor.as_ref(), at, 0)
         } else {
-            equip_press(layout, &all, cursor.as_ref(), at)
+            self.equip_socket(world, layout, &all, cursor.as_ref(), at)
+                .or_else(|| equip_press(layout, &all, cursor.as_ref(), at))
         };
         intent.map(PanelOutput::Intent).into_iter().collect()
     }
@@ -355,14 +356,15 @@ impl ItemsUi {
 
     pub(super) fn grid_press(
         &self,
+        world: &ClientWorld,
         files: &UiFiles,
         g: &GridRecord,
-        all: &[ItemView],
         cursor: Option<&ItemView>,
         at: Point,
         page: u8,
     ) -> Option<ClientIntent> {
         let cell = (i32::from(g.cell_w), i32::from(g.cell_h));
+        let all = items::local_items(world);
         // Page-0 grid items with their footprints.
         let grid: Vec<(&ItemView, i32, i32, i32, i32)> = all
             .iter()
@@ -388,7 +390,13 @@ impl ItemsUi {
             fits_belt: fits_belt(i.code),
         };
         let (mc, mr) = g.mouse_cell(at);
-        let under_mouse = at_cell(mc as i32, mr as i32).map(iref);
+        let under_view = at_cell(mc as i32, mr as i32);
+        let under_mouse = under_view.map(iref);
+        // §6 r5 / `inventory-moves.md` §7.19: a filler over a socketed item.
+        let socket = cursor.zip(under_view).and_then(|(c, u)| {
+            let tips = self.tips.as_ref()?;
+            socket::socket_intent(tips, world, c, u)
+        });
         // Cursor cell (§5 r3) and the overlap under the footprint.
         let mut cursor_cell = (mc, mr);
         let mut overlap: Vec<&ItemView> = Vec::new();
@@ -440,7 +448,7 @@ impl ItemsUi {
             swap_ok: overlap.len() == 1,
             cursor_cell,
             cube_has_room: false,
-            cursor_can_socket: false,
+            cursor_can_socket: socket.is_some(),
         };
         match grid_click(&ctx).msg? {
             GridMsg::Lift { item } => Some(ClientIntent::from_message(&items::remove(item))),
@@ -464,7 +472,8 @@ impl ItemsUi {
             GridMsg::TargetUsed { target, used } => {
                 Some(ClientIntent::from_message(&self.target_used(target, used)))
             }
-            // Not produced by the facts above (no stack / socket / scroll
+            GridMsg::Socket { .. } => socket.map(|m| ClientIntent::from_message(&m)),
+            // Not produced by the facts above (no stack / scroll
             // / cube / shop facts in the preview).
             _ => None,
         }
@@ -508,19 +517,24 @@ pub fn cursor_cell_for(
 }
 
 /// d2rs-own, unverified: an equipment-box press (module doc).
+/// The equipment box under `at`.
+fn equip_loc(layout: &InvLayout, at: Point) -> Option<u8> {
+    (1u8..=10).find(|&l| {
+        let b = layout.equip[usize::from(l)];
+        b.w > 0
+            && b.h > 0
+            && (b.left..b.left + b.w).contains(&at.x)
+            && (b.top..b.top + b.h).contains(&at.y)
+    })
+}
+
 fn equip_press(
     layout: &InvLayout,
     all: &[ItemView],
     cursor: Option<&ItemView>,
     at: Point,
 ) -> Option<ClientIntent> {
-    let loc = (1u8..=10).find(|&l| {
-        let b = layout.equip[usize::from(l)];
-        b.w > 0
-            && b.h > 0
-            && (b.left..b.left + b.w).contains(&at.x)
-            && (b.top..b.top + b.h).contains(&at.y)
-    })?;
+    let loc = equip_loc(layout, at)?;
     let worn = all.iter().find(|i| i.mode == mode::BODY && i.body == loc);
     match (cursor, worn) {
         (Some(c), None) => Some(ClientIntent::from_message(&items::equip(c.key.guid, loc))),
@@ -535,6 +549,27 @@ fn equip_press(
     }
 }
 
+impl ItemsUi {
+    /// A filler on the cursor over a worn socketed item: C→S 0x28
+    /// (`inventory.md` §6 r5 counts the equipment boxes too).
+    fn equip_socket(
+        &self,
+        world: &ClientWorld,
+        layout: &InvLayout,
+        all: &[ItemView],
+        cursor: Option<&ItemView>,
+        at: Point,
+    ) -> Option<ClientIntent> {
+        let (tips, c) = (self.tips.as_ref()?, cursor?);
+        let loc = equip_loc(layout, at)?;
+        let worn = all.iter().find(|i| i.mode == mode::BODY && i.body == loc)?;
+        let m = socket::socket_intent(tips, world, c, worn)?;
+        Some(ClientIntent::from_message(&m))
+    }
+}
+
+#[path = "inv_items_socket.rs"]
+pub mod socket;
 #[path = "inv_items_tip.rs"]
 mod tip;
 pub use tip::is_identify;
