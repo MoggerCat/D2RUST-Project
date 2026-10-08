@@ -553,7 +553,7 @@ mod tests {
         );
     }
 
-    // Covers: specs/render/lighting.md §4 r2, r3
+    // Covers: specs/render/lighting.md §4 r2, §4 r3
     #[test]
     fn a_cell_in_no_room_blocks_light() {
         assert!(blocks_light(None));
@@ -563,8 +563,8 @@ mod tests {
         assert!(!blocks_light(Some(0)));
     }
 
-    // Covers: specs/render/lighting.md §6.1 (position `(P >> 13) + 4`),
-    // Test vectors (sub-tile 100, fraction 0 → 804)
+    // Covers: specs/render/lighting.md §6.1
+    // (position `(P >> 13) + 4`; test vector: sub-tile 100, fraction 0 → 804)
     #[test]
     fn the_player_light_sits_at_its_precise_position() {
         assert_eq!(light_pos_of(100 << 16, 100 << 16), (804, 804));
@@ -590,8 +590,8 @@ mod tests {
         assert!(i(&frac, 90) < i(&whole, 90));
     }
 
-    // Covers: specs/render/lighting.md §9.2 r2 (the 0x53 setter's record
-    // is what the ambient reads)
+    // Covers: specs/render/lighting.md §9.2 r2
+    // (the 0x53 setter's record is what the ambient reads)
     #[test]
     fn a_new_environment_record_reaches_the_ambient() {
         let mut w = ClientWorld::default();

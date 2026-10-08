@@ -1073,8 +1073,9 @@ mod text {
         assert_eq!(fr.rect.1, Point::new(19, 569));
     }
 
-    // Covers: specs/ui/control-panel.md §5 r14, §4 r2 (the stamina tip
-    // at (W/2 − 76, H − 52): box centred on W/2 − 76, bottom H − 50)
+    // Covers: specs/ui/control-panel.md §5 r14, §4 r2
+    // (the stamina tip at (W/2 − 76, H − 52): box centred on W/2 − 76,
+    // bottom H − 50)
     #[test]
     fn popup_text_is_centred_on_x_with_its_bottom_at_y_plus_2() {
         let f = font16();

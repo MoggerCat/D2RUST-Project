@@ -99,7 +99,7 @@ mod tests {
         assert_eq!(t.palette_index(&BTreeSet::from([99])), 0);
     }
 
-    // Covers: specs/render/shading.md §6 r1.1 (test vectors)
+    // Covers: specs/render/shading.md §6 r1
     #[test]
     fn the_choice_is_by_colorpri_only() {
         // Rows by state id: 1 `freeze` (100, 108), 2 `poison` (95, 104),

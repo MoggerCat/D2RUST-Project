@@ -117,8 +117,9 @@ fn panel_images(v: &[(String, u32, i32, i32)], prefix: &str) -> Vec<(u32, i32, i
 }
 
 // Covers: specs/ui/panels.md §5, §6 r1, §6 r2
-// Covers: specs/ui/panels-3.md §23 r9 (the cursor item and the step-10
-// tips in the last panel, after the HUD of step 7)
+// Covers: specs/ui/panels-3.md §23 r9
+// (the cursor item and the step-10 tips in the last panel, after the HUD
+// of step 7)
 #[test]
 fn install_mirrors_the_flags_and_keeps_the_border_open() {
     let u = ui(Some(areas()), true);
