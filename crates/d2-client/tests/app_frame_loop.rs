@@ -213,7 +213,9 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // tile, to the Black Marsh (`q-a1-tower`, d2rs-own): its 0x09: 23. Kashya
     // (`q-a1-bloodraven`) adds the same three as Akara: 26. Gheed and
     // Charsi (`q-town-gaps`) add two each (their 0x6D is not counted): 30.
-    assert_eq!(joined, 30);
+    // (q-a1-vis-links: the Blood Moor's tiles to the Black Marsh and the
+    // Burial Grounds are gone, the fixture now follows the 1.14d links: 28.)
+    assert_eq!(joined, 28);
     // Plus two for the Blood Moor room bordering the synthetic town: its
     // 0x07 at the join and its 0x08 when the travel leaves the town.
     // Plus two for that room's cave entrance (a tile unit): its 0x09 at
@@ -224,7 +226,9 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // own warp tile, the waypoint's destination (`q-levels-warps-all`,
     // d2rs-own): 39, 3. Gheed's and Charsi's (three handled and one queued
     // each, `q-town-gaps`): 45, 5.
-    assert_eq!((b.log().handled, b.log().queued), (45, 5));
+    // (q-a1-vis-links: the Black Marsh and Burial Grounds tiles left the
+    // Blood Moor, so their four are gone: 41, 5.)
+    assert_eq!((b.log().handled, b.log().queued), (41, 5));
     assert!(b.log().unowned.is_empty(), "{:?}", b.log().unowned);
     assert!(b.log().dropped.is_empty(), "{:?}", b.log().dropped);
     let sight: Vec<_> = b
@@ -233,9 +237,10 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         .iter()
         .map(|r| (r.show, r.level, r.x, r.y))
         .collect();
-    // Cold Plains's warp tile leads to level 13, Cave Level 2
-    // (`q-a1-dungeons`, d2rs-own; it led to level 5 before the tree
-    // moved the Dark Wood under the Black Marsh): its room joins the sight list like the Blood Moor's.
+    // Cold Plains's warp tile leads to level 17, the Burial Grounds
+    // (`q-a1-vis-links`, d2rs-own; it led to level 13 before the tree
+    // followed the 1.14d links): its room joins the sight list like the
+    // Blood Moor's.
     assert_eq!(
         sight,
         [
@@ -244,7 +249,7 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
             (true, 2, 24, 0),
             (true, 3, 0, 0),
             (true, 3, 0, 0),
-            (true, 13, 24, 40),
+            (true, 17, 0, 24),
             (false, 1, 16, 0),
             (false, 2, 24, 0)
         ]
@@ -298,7 +303,10 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // game, so the queued 0x0D (one more with Kashya) were drained by the
     // update pass.
     let log = bridge(&app).0.log();
-    assert_eq!((log.queued, log.drained), (5, 5));
+    // (q-a1-vis-links: 6, not 5: the Burial Grounds, now Cold Plains's
+    // neighbour, are built and populated during the 300 ticks, and one
+    // more 0x0D of theirs is queued and drained.)
+    assert_eq!((log.queued, log.drained), (6, 6));
     assert!(log.dropped.is_empty());
     let w = bridge(&app).0.world();
     assert!(w.in_game);

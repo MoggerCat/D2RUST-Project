@@ -18,22 +18,29 @@ use super::single_player::{ACT5_TOWN, COLD_PLAINS};
 /// Kurast Docks, the Act III town.
 pub const KURAST_DOCKS: u32 = 75;
 
-/// Act I's dungeon tree (task `q-a1-dungeons`): (parent, parent's vis
-/// slot, child). The parent either exists already (Cold Plains slot 1,
-/// Black Marsh slot 2, the Burial Grounds slots 1 and 2) or is an earlier
-/// child; a child's slot 0 is always its way back. Level ids are
+/// Act I's dungeon tree (task `q-a1-dungeons`, parents aligned with the
+/// level links by `q-a1-vis-links`): (parent, parent's vis slot, child).
+/// 1.14d's chain is Stony Field → Underground Passage 1 → Dark Wood →
+/// Black Marsh → Tamoe Highland → Monastery Gate …; Tristram hangs off the
+/// Stony Field, the Burial Grounds off Cold Plains, Cave 2 off Cave 1, the
+/// Hole off the Black Marsh, the Pit off Tamoe. (Blood Moor → Cold Plains →
+/// Stony Field are outdoor borders, not tiles.) The parent either exists
+/// already (Cold Plains, Stony Field, Cave 1; Black Marsh's slot 1 is the
+/// Tower's) or is an earlier child; a child's slot 0 is always its way back. Level ids are
 /// `levels.txt` ids: Cold Plains 3, Dark Wood 5, Black Marsh 6, Tamoe
 /// Highland 7, Underground Passage 1/2 = 10/14, Hole 1/2 = 11/15, Pit
 /// 1/2 = 12/16, Cave 2 = 13, Crypt 18, Mausoleum 19, Monastery Gate 26,
 /// Outer Cloister 27, Barracks 28, Jail 1–3 = 29–31, Inner Cloister 32,
 /// Cathedral 33, Catacombs 1–4 = 34–37, Tristram 38.
 const ACT1_TREE: &[(u32, usize, u32)] = &[
-    (6, 2, 5),
-    (COLD_PLAINS, 1, 13),
-    (5, 1, 7),
-    (5, 2, 10),
-    (5, 3, 38),
+    (COLD_PLAINS, 1, 17),
+    (9, 1, 13),
+    (4, 1, 10),
+    (4, 2, 38),
     (10, 1, 14),
+    (10, 2, 5),
+    (5, 1, 6),
+    (6, 2, 7),
     (6, 3, 11),
     (11, 1, 15),
     (7, 1, 26),
@@ -163,11 +170,17 @@ mod tests {
         let e = edges();
         assert_eq!(e.len(), ACT1_TREE.len() + 11 + 13);
         assert_eq!(last_warp(), first_warp() + 2 * e.len() as u32 - 1);
-        // Dark Wood: way back to the Black Marsh (slot 0), three ways on.
+        // Dark Wood: way back to Underground Passage 1 (slot 0), on to the
+        // Black Marsh (slot 1).
         let dw = slots(5);
-        assert_eq!(dw.iter().map(|s| s.0).collect::<Vec<_>>(), [0, 1, 2, 3]);
-        assert_eq!(dw[0].1, 6);
-        assert!(slots(9).is_empty());
+        assert_eq!(dw.iter().map(|s| s.0).collect::<Vec<_>>(), [0, 1]);
+        assert_eq!((dw[0].1, dw[1].1), (10, 6));
+        // 1.14d's Act I order: Stony Field → UP1 → Dark Wood → Black
+        // Marsh → Tamoe → Monastery Gate.
+        for (from, to) in [(4, 10), (10, 5), (5, 6), (6, 7), (7, 26)] {
+            assert!(slots(from).iter().any(|s| s.0 != 0 && s.1 == to));
+        }
+        assert!(slots(2).is_empty(), "the Blood Moor is no tree level");
         // No (parent, slot) twice.
         for (i, a) in e.iter().enumerate() {
             assert!(e[i + 1..]
