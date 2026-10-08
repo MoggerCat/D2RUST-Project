@@ -94,6 +94,10 @@ pub struct NpcMenuState {
     /// (`OriginalUi::shop_poll`; d2rs-own, the menu's choice names the
     /// trader, `menus.md` §3.1).
     pub shop_for: Option<(u32, u32, u32)>,
+    /// The Resurrect edit of the next open (`panels-2.md` §14.2): the cost
+    /// `[0x007C0DD0]` while the mercenary is dead in an expansion game,
+    /// else `None`.
+    pub resurrect: Option<u32>,
     pub screen: (i32, i32),
 }
 
@@ -139,6 +143,7 @@ impl NpcMenuState {
         self.imbue = None;
         menus.reset_for_interaction();
         menus.apply_builder(char_level);
+        menus.apply_resurrect(self.resurrect.is_some(), true);
         let Some(rec) = menus.menu(class) else {
             return;
         };
@@ -152,7 +157,12 @@ impl NpcMenuState {
             .map(|o| Row {
                 string: o.string,
                 kind: Some(o.kind),
-                cost: (o.kind == OptionKind::Identify).then_some(100 * identify_n),
+                cost: match o.kind {
+                    OptionKind::Identify => Some(100 * identify_n),
+                    // `menus.md` §2.3: `hireresurrect2` with the cost.
+                    OptionKind::Resurrect => self.resurrect,
+                    _ => None,
+                },
             })
             .collect();
         if class == NPC_CHARSI {

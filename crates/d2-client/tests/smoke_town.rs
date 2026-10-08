@@ -320,7 +320,9 @@ impl Rig {
                         })
                         .collect(),
                 ),
-                expansion_installed: false,
+                // An expansion install: the mercenary menus (Resurrect,
+                // `panels-2.md` §14.2) are the expansion's.
+                expansion_installed: true,
                 fonts: Some(fonts),
                 resist_penalties: Some(vec![0, 20, 50]),
             },
@@ -1109,4 +1111,122 @@ fn act1_traders_buy_sell_repair_and_gamble() {
     let code = list[0].code.unwrap();
     rig.buy(&code);
     rig.close_shop();
+}
+
+// ---- mercenaries ------------------------------------------------------------------------
+
+impl Rig {
+    /// The model's units of `class` (type 1).
+    fn monsters_of(&self, class: u32) -> Vec<UnitKey> {
+        self.bridge()
+            .world()
+            .units
+            .iter()
+            .filter(|(k, u)| k.unit_type == 1 && u.class == class)
+            .map(|(k, _)| *k)
+            .collect()
+    }
+
+    /// Server: the mercenary `guid` dies (the host's pet-death queue, as
+    /// `app_mercs_acts.rs`).
+    fn kill_merc(&mut self, guid: u32) {
+        app_support::with(&self.server, move |l| {
+            let g = &mut l.host_mut().game;
+            let merc = g
+                .game
+                .lists
+                .find_unit(d2_sim::units::UnitType::Monster, guid)
+                .expect("the mercenary is on the server");
+            g.events
+                .action
+                .hooks()
+                .pet_deaths
+                .as_mut()
+                .unwrap()
+                .push(merc);
+        });
+        self.step(10);
+    }
+}
+
+/// Asheara's mercenary (`town_npcs::synthetic_hire_rows`, class 357).
+const ACT3_MERC: u32 = 357;
+
+// Covers: specs/world/npc.md §7.1, §7.4; specs/ui/menus.md §2, §3; specs/ui/panels-2.md §14 r2
+#[test]
+fn asheara_hires_and_resurrects_a_mercenary_through_her_menu() {
+    let mut rig = Rig::new();
+    rig.go_to_town(d2_client::app::synthetic_chains::KURAST_DOCKS);
+    rig.stage_gold(5_000);
+    rig.check("gold");
+    assert!(rig.monsters_of(ACT3_MERC).is_empty(), "no mercenary yet");
+
+    // Hire: the menu's Hire row opens the hire list (S→C 0x4E / 0x4F),
+    // a row click sends C→S 0x36 and the mercenary joins the model.
+    rig.choose(class::ASHEARA, OptionKind::Hire);
+    let offers = rig.with_ui(|u| u.hire_list().offers.len());
+    assert!(offers > 0, "the hire list has offers");
+    assert!(
+        rig.with_ui(|u| u.hire_list().up.is_some()),
+        "the list is up"
+    );
+    let (_, list) = d2_client::ui::panels::npc_menu::hire_geometry(800, 600);
+    rig.click(Point::new(list.0 + 40, list.1 + 5));
+    for _ in 0..60 {
+        rig.step(1);
+        if !rig.monsters_of(ACT3_MERC).is_empty() {
+            break;
+        }
+    }
+    assert!(
+        rig.sent_ids().contains(&0x36),
+        "C→S 0x36: {:02X?}",
+        rig.sent_ids()
+    );
+    let merc = rig.monsters_of(ACT3_MERC);
+    assert_eq!(merc.len(), 1, "the hired mercenary is in the model");
+    rig.check("hire");
+    // Leave the chat the hire left open.
+    let npc = rig.npc(class::ASHEARA).guid;
+    rig.app
+        .world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .send_bytes(&d2_client::ui::panels::npc::msg_chat_end(npc))
+        .unwrap();
+    rig.step(10);
+    rig.check("chat end");
+
+    // The mercenary dies (S→C 0x9B: the client knows it is dead); her
+    // menu now offers Resurrect with its cost, the row sends C→S 0x62,
+    // the server answers S→C 0x2A code 5 and the mercenary is back.
+    rig.kill_merc(merc[0].guid);
+    rig.check("merc death");
+    let kinds = rig.open_menu(class::ASHEARA);
+    let i = kinds
+        .iter()
+        .position(|k| *k == Some(OptionKind::Resurrect))
+        .unwrap_or_else(|| panic!("Resurrect is offered: {kinds:?}"));
+    let cost = rig.with_ui(|u| u.npc_menu().unwrap().rows[i].cost);
+    assert!(cost.is_some(), "the Resurrect caption has its cost");
+    rig.click(Rig::row_at(i));
+    for _ in 0..40 {
+        rig.step(1);
+        if rig.transactions().contains(&(0, 5)) {
+            break;
+        }
+    }
+    assert!(
+        rig.sent_ids().contains(&0x62),
+        "C→S 0x62: {:02X?}",
+        rig.sent_ids()
+    );
+    assert!(
+        rig.transactions().contains(&(0, 5)),
+        "resurrected: {:?}",
+        rig.transactions()
+    );
+    rig.step(10);
+    assert_eq!(rig.monsters_of(ACT3_MERC).len(), 1, "the mercenary is back");
+    rig.check("resurrect");
 }
