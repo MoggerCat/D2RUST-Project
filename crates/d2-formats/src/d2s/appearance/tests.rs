@@ -627,3 +627,19 @@ fn wclass_indices() {
     assert_eq!(wclass_index(code("stf")), 4);
     assert_eq!(wclass_index(code("")), 0);
 }
+
+// Covers: specs/formats/d2s-appearance.md §1 r2
+#[test]
+fn reference_types_cover_the_256_slots_in_order() {
+    let mut next = 0usize;
+    for &(a, b, _) in &REFERENCE_TYPES {
+        assert_eq!(usize::from(a), next, "runs are contiguous");
+        assert!(b >= a);
+        next = usize::from(b) + 1;
+    }
+    assert_eq!(next, 256);
+    let t = reference_types();
+    // Spot values of the Constants list.
+    assert_eq!((t[0], t[3], t[4], t[10], t[11]), (1, 1, 37, 37, 3));
+    assert_eq!((t[47], t[117], t[134], t[198], t[255]), (43, 1, 3, 42, 3));
+}
