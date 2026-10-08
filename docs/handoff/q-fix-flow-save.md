@@ -94,6 +94,17 @@ Branch `claude/q-fix-flow-save` (from `claude/q-tick-flow`, merged with
   `smoke_save::npc_fields_round_trip` (Kashya heard in Normal → A =
   `08 00 …`, the measured save).
 
+- `q-fix-save-old-version` (F8): `apply_live` upgrades a loaded
+  0x5C–0x5E file to 0x60 with the mask stats turned into bit-field
+  entries at layer 0 (§1 r6, §7.1 r7); `FileStore::save` refuses to
+  overwrite such a file when a loaded item list would pass through as
+  loaded (`save::old_items_pass_through`: no inventory model, no
+  hireling / golem unit), so the old-layout records never sit under a
+  0x60 header; the file and its `.bak` stay. Tests:
+  `app_save::an_old_version_save_is_written_as_0x60`,
+  `app_save::old_item_records_that_pass_through_are_named`. Local check
+  still owed: a real 0x5C–0x5E save loaded and re-saved on PC 1 (row text).
+
 ## Open
 
 - The save's inventory flag bit 1 clear (`inventory-moves.md` §6.1 r4).

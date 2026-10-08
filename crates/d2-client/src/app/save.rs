@@ -331,6 +331,20 @@ pub fn apply_live(base: &D2s, live: &Live, now: u32) -> D2s {
     super::hardcore::mark_dead(&mut save, live.hardcore, live.hardcore_dead);
     // +0x2C stays as loaded: the game never sets the create time, so every
     // game-written save holds 0 there (§2.2 rule 10, edge case 11).
+    // §1 r6, §2.1, §7.1 r7: the game writes only 0x60, with the bit-field
+    // stats; a loaded 0x5C–0x5E file is upgraded (its item records are
+    // the sim's 1.14d ones, or [`FileStore`] refuses the save,
+    // [`old_items_pass_through`]).
+    if save.header.version < d2s::VERSION {
+        save.header.version = d2s::VERSION;
+        if let Some(body) = save.body.as_mut() {
+            if let Stats::Mask { .. } = body.stats {
+                let mut entries = body.stats.entries();
+                entries.sort_by_key(|e| (e.id, e.layer));
+                body.stats = Stats::Bits(entries);
+            }
+        }
+    }
     save.header.save_time = now;
     save
 }
@@ -409,9 +423,35 @@ pub struct FileStore {
     pub tables: Arc<dyn SaveTables + Send + Sync>,
 }
 
+/// Whether a save of `base` (a loaded file) with `live` would carry item
+/// records as loaded: a list the running game cannot read back (no
+/// inventory model, no hireling or golem unit) passes through. For a
+/// 0x5C–0x5E file those records are in the old bit layout
+/// (`items/bitstream-legacy.md`) and cannot sit under the 0x60 header the
+/// writer gives the file (`formats/d2s.md` §1 r6).
+pub fn old_items_pass_through(base: &D2s, live: &Live) -> bool {
+    let Some(b) = &base.body else {
+        return false;
+    };
+    (live.extra.items.is_none() && !b.items.is_empty())
+        || (live.extra.corpses.is_none() && b.corpses.iter().any(|c| !c.items.is_empty()))
+        || (live.gaps.hireling_items.is_none()
+            && matches!(&b.hireling_items, Some(Some(v)) if !v.is_empty()))
+        || (live.gaps.golem.is_none() && b.golem.as_ref().is_some_and(|g| g.item.is_some()))
+}
+
 impl CharacterStore<WorldSim<LocalSeams>, World> for FileStore {
     fn save(&mut self, sim: &mut Sim, _client: ClientId) -> Result<(), String> {
         let live = read_live(sim).map_err(|e| e.to_string())?;
+        // A 0x5C–0x5E file whose item records would pass through as
+        // loaded is not overwritten (the file and its `.bak` stay).
+        if self.base.header.version < d2s::VERSION && old_items_pass_through(&self.base, &live) {
+            return Err(format!(
+                "{}: a version {:#x} save whose items the game cannot rewrite is not overwritten",
+                self.path.display(),
+                self.base.header.version
+            ));
+        }
         write_file(
             &self.path,
             &apply_live(&self.base, &live, now_secs()),
