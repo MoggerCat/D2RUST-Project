@@ -98,7 +98,7 @@ pub const TOWN_WAYPOINT: (u32, u32, u32, u32) = (2, WAYPOINT_DS1_ID, 142, 102);
 /// (made up; the others 255).
 pub const WAYPOINTS: [(u32, u32); 2] = [(TOWN, 0), (COLD_PLAINS, 1)];
 
-fn n(v: impl ToString) -> String {
+pub(crate) fn n(v: impl ToString) -> String {
     v.to_string()
 }
 
@@ -114,7 +114,7 @@ pub fn act1() -> Synthetic {
     s
 }
 
-fn clear(t: &mut TableSet, txt: &str) {
+pub(crate) fn clear(t: &mut TableSet, txt: &str) {
     t.files
         .get_mut(&format!("{txt}.txt"))
         .unwrap_or_else(|| panic!("{txt}.txt is compiled"))
@@ -243,7 +243,7 @@ fn tables(t: &mut TableSet) {
 }
 
 /// A floor-only preset of `w × h` tiles.
-fn floor_preset(w: u32, h: u32) -> Ds1 {
+pub(crate) fn floor_preset(w: u32, h: u32) -> Ds1 {
     let mut d = crate::ds1::blank(w + 1, h + 1, 0);
     d.files = FLOOR_DT1
         .iter()
