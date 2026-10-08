@@ -209,3 +209,22 @@ fn the_options_master_volume_reaches_the_sound_layer() {
     assert_eq!(d.system().settings().master_volume, 0);
     assert_eq!(d.system().settings().music_volume, 50);
 }
+
+// Covers: specs/audio/environment.md §1 r1, §1 r2, §2 r1, §2 r3, §2 r6; specs/audio/sound-table.md §6.1
+#[test]
+fn the_town_levels_song_starts_on_the_play_path() {
+    let ms = Arc::new(AtomicU32::new(1000));
+    let (mut app, _) = play_app(&ms);
+    frames(&mut app, &ms, 2);
+    let level = app
+        .world()
+        .resource::<BridgeResource>()
+        .0
+        .world()
+        .player_level();
+    assert_eq!(level, Some(single_player::ACT1_TOWN as u16));
+    let audio = app.world().resource::<GameAudio>();
+    let d = audio.driver.as_ref().unwrap().lock().unwrap();
+    assert_eq!(d.environment().unwrap().music.cur, SONG);
+    assert!(d.system().requests().any(|r| r.id == SONG));
+}

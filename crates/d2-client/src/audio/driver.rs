@@ -7,6 +7,12 @@
 //! audio core (the core then runs with [`crate::audio::Unlimited`] and
 //! presents the sound tick, [`SoundDriver::tick`]).
 //!
+//! The environment machines (`audio/environment.md`: ambience, rain,
+//! event cues, music, quest stingers, level-entry lines) run in each
+//! sound tick before the request update (`sound-table.md` §6.1), on the
+//! level, day phase, weather and settings of the frame; the variant and
+//! cue draws step the local player's client seed ([`ClientSeed`]).
+//!
 //! Trigger feeds wired, as one ordered request list ([`SoundRequest`]):
 //! the UI sounds (`triggers.md` §11: the click sound of `ui/panels.md`
 //! §10.2 and the sounds of the S→C 0x5D / 0x77 UI outputs), the server
@@ -23,10 +29,18 @@
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 
+use crate::audio::calls::SoundCalls;
+use crate::audio::environment::{
+    env_row, stinger_for_event, EnvCalls, EnvHooks, EnvRow, Environment, PlayerState, SongRange,
+    TickInput,
+};
 use crate::audio::sound_table::{SoundSettings, SoundSystem, SoundWorld};
-use crate::audio::triggers::events::{player_event, server_event, EventExtra, Followup};
+use crate::audio::triggers::events::{
+    player_event, quest_line_event, server_event, EventExtra, Followup,
+};
 use std::collections::BTreeMap;
 
+use crate::audio::triggers::npc::GreetingRecords;
 use crate::audio::triggers::objects::object_mode;
 use crate::audio::triggers::tables::ObjectSounds;
 use crate::audio::triggers::{detach_all, ui, Ctx, Globals, TriggerError, Unit, UnitSound};
@@ -40,15 +54,14 @@ use d2_sim::rng::Seed;
 /// Trigger feeds not wired, each with the input it lacks (M02).
 pub const PENDING: &[(&str, &str)] = &[
     (
-        "server sound events 12, 16 (monsters), 17, 18 (§2 r2)",
-        "event 12's `stsound` (open question 4), the `monsounds` rows, the per-unit sound \
-         fields and the NPC greeting records are not held by the driver",
+        "server sound events 12, 16 (monsters), 17 (§2 r2)",
+        "event 12's `stsound` (open question 4: U's state-68 stat list and the skill row), \
+         the `monsounds` rows and the per-unit sound fields of set S are not held by the \
+         driver",
     ),
     (
-        "event follow-ups: overhead text (`0x004A0200`), quest stingers and the stinger \
-         re-arm (§2 r3, §3 r4, r7)",
-        "the overhead text (`client/ui.md`) and the stinger machine (`environment.md` §3) \
-         are not wired",
+        "event follow-up: overhead text (`0x004A0200`, §2 r3, §3 r7)",
+        "the overhead text (`client/ui.md`) is not wired",
     ),
     (
         "mode sounds, footsteps, idle voices (§4–§6)",
@@ -62,11 +75,10 @@ pub const PENDING: &[(&str, &str)] = &[
     ),
     ("NPC speech (§10)", "no NPC interaction in the client model"),
     (
-        "ambience, rain, music (`environment.md`)",
-        "the player's level and its sound environment are known now (`model.md` §11 r5, \
-         `environment.md` §1 r2), but every tick of the machines also reads the day phase \
-         (`environment.md` open question 3: the act environment, S→C 0x53 unhandled) and the \
-         weather (open question 4, `draw-order-2.md` §11 state not in the model)",
+        "level-entry lines (`environment.md` §4 r2)",
+        "the client quest check `0x004A4180` (`world/quests-status.md` §12) needs the 0x5E \
+         bytes and the quest records, which no client owner holds for the sound layer: asked \
+         as pending, answered no",
     ),
 ];
 
@@ -98,7 +110,7 @@ pub enum SoundRequest {
     /// free's detach of every request of the unit without force
     /// (`audio/triggers-2.md` §19 r5); the sample-lock release
     /// `0x004CC160(U, −1)` is cache only (`sound-table.md` §10 r4).
-    UnitFreed { unit: UnitKey },
+    UnitFreed { unit: UnitKey, client_only: bool },
     /// A player event sound `0x004CB9C0(unit, event)` (§3) the UI asked
     /// for (S→C 0x77 code 9 on the local player, `client/msg-ui.md` §3),
     /// or the client object code (`client/model.md` §8 rule 7).
@@ -124,7 +136,6 @@ pub enum SoundRequest {
 pub const SKIP_EVENT_12: &str = "S→C 0x2C event 12: the skill `stsound` (triggers.md OQ 4)";
 pub const SKIP_EVENT_16: &str = "S→C 0x2C event 16 on a monster: its `monsounds` record";
 pub const SKIP_EVENT_17: &str = "S→C 0x2C event 17: the monster flee voice (§6 r4)";
-pub const SKIP_EVENT_18: &str = "S→C 0x2C event 18: the NPC greeting record (§10 r1)";
 pub const SKIP_OVERHEAD: &str = "overhead text 0x004A0200 (client/ui.md)";
 pub const SKIP_STINGER: &str = "quest stinger line (environment.md §3)";
 pub const SKIP_REARM: &str = "stinger speech re-arm 0x004DCE10 (environment.md §3 r5)";
@@ -151,6 +162,9 @@ pub struct ModelSoundWorld<'a> {
     /// where the view and the clicks put the player
     /// (`seams/bridge-app.md` §2.7).
     pub local_at: Option<(UnitKey, (u32, u32))>,
+    /// The local player's client seed ([`ClientSeed`]); `None`: no local
+    /// player, or its seed is not in the model.
+    pub seed: Option<&'a mut Seed>,
 }
 
 impl<'a> ModelSoundWorld<'a> {
@@ -167,6 +181,7 @@ impl<'a> ModelSoundWorld<'a> {
             asked: RefCell::new(Vec::new()),
             captured: None,
             local_at: None,
+            seed: None,
         }
     }
 
@@ -238,13 +253,89 @@ impl SoundWorld for ModelSoundWorld<'_> {
         false
     }
 
-    /// The local player's client seed (player + 0x20) is the model's,
-    /// shared with the camera shake (`camera.md` open question 6) and
-    /// read-only to the audio frame: pending.
+    /// The local player's client seed (player + 0x20, `sound-table.md`
+    /// §4 r5), kept by the driver in step with the model's copy
+    /// ([`ClientSeed`]). A local player whose seed the model does not hold
+    /// (derived from a client room with no client DRLG): pending.
     fn client_seed(&mut self) -> Option<&mut Seed> {
-        self.ask("local player client seed (§4 r5): read-only model seed");
-        None
+        if self.seed.is_none() && self.world.local_player.is_some() {
+            self.ask("local player client seed (§4 r5): not in the client model");
+        }
+        self.seed.as_deref_mut()
     }
+}
+
+/// The most steps a model seed change is replayed over before it counts
+/// as a new seed (`ClientSeed::sync`).
+const MAX_REPLAY: u32 = 4_096;
+
+/// The local player's client unit seed as the sound layer draws on it
+/// (`sound-table.md` §4 r5). The model keeps the unit's copy
+/// (`client/model.md` §1, `ClientUnit::seed`) and steps it in the receive
+/// and the client update (`sound-table-2.md` §14.3: S→C 0x59, the client
+/// object functions); the audio draws come after them in a loop pass
+/// (§14.2 r1), and stepping is order-free for the state reached, so each
+/// frame the steps the model made since the last frame are replayed on
+/// this copy before the frame's sound draws. A model value no replay
+/// reaches (a new seed: a new local player or a re-derived one) is taken
+/// as is. Draw-phase users of the seed are separate in d2rs
+/// (`sound-table-2.md` §14.4).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ClientSeed {
+    /// The local player the seed belongs to, its model value at the last
+    /// sync, and the seed the sound draws step.
+    state: Option<(UnitKey, ModelSeed, Option<Seed>)>,
+}
+
+impl ClientSeed {
+    /// Follows the model: the local player's seed, with the model's steps
+    /// since the last call replayed.
+    pub fn sync(&mut self, world: &ClientWorld) {
+        let Some(key) = world.local_player else {
+            self.state = None;
+            return;
+        };
+        let model = world.units.get(&key).and_then(|u| u.seed);
+        let state = match self.state {
+            Some((k, last, Some(mut seed))) if k == key && last.is_some() => {
+                if model != last {
+                    let (Some(from), Some(to)) = (last, model) else {
+                        self.state = Some((key, model, model.map(|(l, h)| Seed::new(l, h))));
+                        return;
+                    };
+                    match replay_steps(from, to) {
+                        Some(n) => (0..n).for_each(|_| {
+                            seed.step();
+                        }),
+                        None => seed = Seed::new(to.0, to.1),
+                    }
+                }
+                (key, model, Some(seed))
+            }
+            _ => (key, model, model.map(|(l, h)| Seed::new(l, h))),
+        };
+        self.state = Some(state);
+    }
+
+    /// The seed the sound draws step, if the local player's is held.
+    pub fn seed(&mut self) -> Option<&mut Seed> {
+        self.state.as_mut()?.2.as_mut()
+    }
+}
+
+/// A unit seed as the model keeps it ({lo, hi}; `None`: not held).
+type ModelSeed = Option<(u32, u32)>;
+
+/// How many steps take seed `from` to `to` (at most [`MAX_REPLAY`]).
+fn replay_steps(from: (u32, u32), to: (u32, u32)) -> Option<u32> {
+    let mut s = Seed::new(from.0, from.1);
+    for n in 1..=MAX_REPLAY {
+        s.step();
+        if (s.lo, s.hi) == to {
+            return Some(n);
+        }
+    }
+    None
 }
 
 /// The sound system, its trigger globals and the cues not yet handed to
@@ -265,6 +356,24 @@ pub struct SoundDriver {
     /// The frame's predicted local-player position
     /// ([`ModelSoundWorld::local_at`]).
     local_at: Option<(UnitKey, (u32, u32))>,
+    /// The local player's client seed (§4 r5).
+    seed: ClientSeed,
+    /// The ambience, rain, music and level-entry machines
+    /// (`environment.md`); `None` when no `soundenviron` row has a song.
+    env: Option<Environment>,
+    /// The `soundenviron` rows (`environment.md` §1 r2).
+    env_rows: Vec<EnvRow>,
+    /// Whether the last frame had a local player (the game start's sound
+    /// init).
+    had_player: bool,
+    /// The weather this frame (`environment.md` §6).
+    weather: WeatherSound,
+    /// The NPC greeting records and their state (`triggers.md` §10 r1,
+    /// r5: `npc-greetings.tsv`), for event 18.
+    greetings: GreetingRecords,
+    /// The last client pixel point of each unit with requests, and the
+    /// `ServerSound` captures (`client/bridge.md` §10 r3.1 (b)).
+    seen: BTreeMap<UnitKey, (i32, i32)>,
     /// The per-unit sound fields +0x70 … +0x88 (`client/model.md` §18
     /// rule 1: zero at creation, written only by the audio rules), by
     /// (unit, in set C); a unit gone from the model drops its fields
@@ -274,7 +383,14 @@ pub struct SoundDriver {
 
 impl SoundDriver {
     pub fn new(system: SoundSystem) -> Self {
+        let env_rows: Vec<EnvRow> = system.table().env_rows().iter().map(EnvRow::from).collect();
         Self {
+            env: SongRange::from_rows(&env_rows).map(Environment::new),
+            env_rows,
+            had_player: false,
+            weather: WeatherSound::default(),
+            greetings: GreetingRecords::spec(),
+            seen: BTreeMap::new(),
             env_indoors: system.table().env_indoors().to_vec(),
             system,
             globals: Globals::sound_init(),
@@ -283,6 +399,7 @@ impl SoundDriver {
             skipped: Vec::new(),
             pending: Vec::new(),
             local_at: None,
+            seed: ClientSeed::default(),
             unit_sounds: BTreeMap::new(),
         }
     }
@@ -304,6 +421,16 @@ impl SoundDriver {
     /// preview's prediction, 16.16 subtiles); `None`: the model's cell.
     pub fn set_local_prediction(&mut self, at: Option<(UnitKey, (u32, u32))>) {
         self.local_at = at;
+    }
+
+    /// The weather the next sound ticks read (`environment.md` §6).
+    pub fn set_weather(&mut self, w: WeatherSound) {
+        self.weather = w;
+    }
+
+    /// The environment machines, if the table has songs.
+    pub fn environment(&self) -> Option<&Environment> {
+        self.env.as_ref()
     }
 
     /// The sound tick T (ticks run so far): what the core presents.
@@ -336,15 +463,26 @@ impl SoundDriver {
                 world.units.contains_key(&k)
             }
         });
-        let captured = RefCell::new(BTreeMap::new());
+        self.seed.sync(world);
+        let captured = RefCell::new(self.seen.clone());
         let mut sw = ModelSoundWorld::with_env(world, levels, &self.env_indoors);
         sw.captured = Some(&captured);
         sw.local_at = self.local_at;
+        sw.seed = self.seed.seed();
+        // Sound init at a game start (`environment.md` §2 r9, §4 r4,
+        // `triggers.md` §1 r6): the first frame with a local player.
+        let has_player = world.local_player.is_some();
+        if has_player && !self.had_player {
+            if let Some(env) = self.env.as_mut() {
+                env.sound_init(false);
+            }
+            self.globals = Globals::sound_init();
+        }
+        self.had_player = has_player;
         if !requests.is_empty() {
             // C: one client update per server tick (§1 r5).
             let c = now as u32;
             let mut ctx = self.system.with(&mut sw);
-            let mut cx = Ctx::new(&mut ctx, &mut self.globals, c);
             for r in requests {
                 if let SoundRequest::Server {
                     unit, at: Some(at), ..
@@ -352,16 +490,90 @@ impl SoundDriver {
                 {
                     captured.borrow_mut().insert(unit, capture_point(unit, at));
                 }
-                request(&mut cx, world, r, &mut self.unit_sounds, &mut self.skipped)?;
+                let out = {
+                    let mut cx = Ctx::new(&mut ctx, &mut self.globals, c);
+                    request(
+                        &mut cx,
+                        world,
+                        r,
+                        &mut self.unit_sounds,
+                        &mut self.greetings,
+                        &mut self.skipped,
+                    )?
+                };
+                apply_followups(out, &mut ctx, self.env.as_mut(), c, &mut self.skipped);
             }
         }
-        for _ in 0..ticks {
+        let level = world.player_level().map_or(0, u32::from);
+        let env_row = levels
+            .get(level as usize)
+            .and_then(|r| env_row(&self.env_rows, r.sound_env));
+        let settings = *self.system.settings();
+        let player = world.local_player.map(|key| PlayerState {
+            key,
+            // `0x00464820(P)`: dead = player mode 17 (as `triggers.md` §3
+            // r2 reads it).
+            alive: world.units.get(&key).is_none_or(|u| u.mode != 17),
+            last_voice: self
+                .unit_sounds
+                .get(&(key, false))
+                .map_or(0, |u| u.last_voice),
+        });
+        for i in 0..ticks {
+            // C of the client update this sound tick follows (§1 r5).
+            let c = (now - ticks + i + 1) as u32;
+            if let Some(env) = self.env.as_mut() {
+                let inp = TickInput {
+                    level,
+                    env: env_row,
+                    // `environment.md` §1 r3, r5: the client act's period
+                    // index; before the act exists, its creation value 2.
+                    day_phase: day_phase(world),
+                    weather_active: self.weather.active,
+                    rain_level: self.weather.rain_level,
+                    master_volume: settings.master_volume,
+                    music_volume: settings.music_volume,
+                    c,
+                    player,
+                    level_count: levels.len() as u32,
+                };
+                let mut hooks = Hooks {
+                    world,
+                    asked: RefCell::new(Vec::new()),
+                    follow: Vec::new(),
+                    errors: Vec::new(),
+                };
+                let mut ctx = self.system.with(&mut sw);
+                env.tick(&mut ctx, &mut hooks, &inp);
+                let follow = std::mem::take(&mut hooks.follow);
+                apply_followups(follow, &mut ctx, Some(env), c, &mut self.skipped);
+                self.pending.extend(hooks.asked.into_inner());
+                if let Some(e) = hooks.errors.into_iter().next() {
+                    return Err(e.into());
+                }
+            }
             self.system.run_tick(&mut sw, &mut self.cues);
         }
         if ticks > 0 {
             self.last_server_tick = Some(now);
         }
         self.pending.extend(sw.asked.borrow().iter().copied());
+        drop(sw);
+        self.seen.extend(captured.into_inner());
+        // §10 r3.1 (b), kept across frames: the last point of every unit
+        // with requests (as the frame ends), for a unit no longer in the
+        // model at a later delivery or tick.
+        let attached: Vec<UnitKey> = self.system.attached_units().collect();
+        self.seen.retain(|k, _| attached.contains(k));
+        let mut sw = ModelSoundWorld::new(world);
+        sw.local_at = self.local_at;
+        for k in attached {
+            if world.units.contains_key(&k) {
+                if let Some(p) = sw.position(k) {
+                    self.seen.insert(k, p);
+                }
+            }
+        }
         Ok(())
     }
 
@@ -382,6 +594,15 @@ impl SoundDriver {
     }
 }
 
+/// The day phase the sound rules read (`environment.md` §1 r3, r5): the
+/// period index of the client act's environment record; before the act
+/// exists, its creation value 2 (`render/lighting.md` §9.1).
+fn day_phase(world: &ClientWorld) -> u32 {
+    world
+        .environment
+        .map_or(2, |e| u32::try_from(e.index).unwrap_or(0))
+}
+
 /// The client pixel point of a `ServerSound` capture: the event unit's
 /// cell at receive, projected as [`ModelSoundWorld::position`] does.
 fn capture_point(unit: UnitKey, at: (u16, u16)) -> (i32, i32) {
@@ -396,7 +617,35 @@ fn capture_point(unit: UnitKey, at: (u16, u16)) -> (i32, i32) {
 /// the first one, or without a sound table). The weather's thunder step
 /// requests through it (`audio/triggers.md` §12).
 #[derive(Clone, Default, bevy::prelude::Resource)]
-pub struct SoundLink(Arc<Mutex<Option<Arc<Mutex<SoundDriver>>>>>);
+pub struct SoundLink {
+    driver: Arc<Mutex<Option<Arc<Mutex<SoundDriver>>>>>,
+    weather: Arc<Mutex<WeatherSound>>,
+}
+
+/// The weather as the rain rule reads it (`environment.md` §6 r1, open
+/// question 4 answered): active = snow mode off and the local player's
+/// level has `Rain`; the level `trunc(intensity × 255.0)`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct WeatherSound {
+    pub active: bool,
+    pub rain_level: i32,
+}
+
+impl WeatherSound {
+    /// From the weather's intensity `n / 256` (`render/draw-order-2.md`
+    /// §11.1): trunc(f32(n / 256) × 255.0) = ⌊255 n / 256⌋ (exact in f32
+    /// for every n below 2^16).
+    pub fn new(active: bool, intensity_256: u32) -> Self {
+        WeatherSound {
+            active,
+            rain_level: if active {
+                (u64::from(intensity_256) * 255 / 256) as i32
+            } else {
+                0
+            },
+        }
+    }
+}
 
 impl std::fmt::Debug for SoundLink {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -407,7 +656,7 @@ impl std::fmt::Debug for SoundLink {
 impl SoundLink {
     /// Points the link at `driver` (`None`: no sound layer).
     pub fn set(&self, driver: Option<&Arc<Mutex<SoundDriver>>>) {
-        let mut l = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        let mut l = self.driver.lock().unwrap_or_else(|e| e.into_inner());
         let same = match (&*l, driver) {
             (Some(a), Some(b)) => Arc::ptr_eq(a, b),
             (None, None) => true,
@@ -419,7 +668,21 @@ impl SoundLink {
     }
 
     fn driver(&self) -> Option<Arc<Mutex<SoundDriver>>> {
-        self.0.lock().unwrap_or_else(|e| e.into_inner()).clone()
+        self.driver
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+    }
+
+    /// The weather's state after its update step (written by the weather
+    /// view in the draw phase, read by the next sound tick: `sound-table-2.md`
+    /// §14.2 r1).
+    pub fn set_weather(&self, w: WeatherSound) {
+        *self.weather.lock().unwrap_or_else(|e| e.into_inner()) = w;
+    }
+
+    pub fn weather(&self) -> WeatherSound {
+        *self.weather.lock().unwrap_or_else(|e| e.into_inner())
     }
 }
 
@@ -481,13 +744,77 @@ fn event_unit(world: &ClientWorld, key: UnitKey, class: u32) -> Unit<'static> {
     u
 }
 
-fn followups(out: Vec<Followup>, skipped: &mut Vec<&'static str>) {
+/// The follow-ups of an event (§2 r3, §3 r4, r7): the quest stinger
+/// (`environment.md` §3 r1–r3, r6) and the event-92 re-arm `0x004DCE10(25,
+/// 1)` (§3 r5) go to the music machine; the overhead text is not wired.
+fn apply_followups(
+    out: Vec<Followup>,
+    s: &mut dyn EnvCalls,
+    env: Option<&mut Environment>,
+    c: u32,
+    skipped: &mut Vec<&'static str>,
+) {
+    let Some(env) = env else {
+        for f in out {
+            skipped.push(match f {
+                Followup::OverheadText(_) => SKIP_OVERHEAD,
+                Followup::QuestStinger { .. } => SKIP_STINGER,
+                Followup::StingerRearm => SKIP_REARM,
+            });
+        }
+        return;
+    };
     for f in out {
-        skipped.push(match f {
-            Followup::OverheadText(_) => SKIP_OVERHEAD,
-            Followup::QuestStinger { .. } => SKIP_STINGER,
-            Followup::StingerRearm => SKIP_REARM,
-        });
+        match f {
+            Followup::OverheadText(_) => skipped.push(SKIP_OVERHEAD),
+            Followup::QuestStinger { event, id } => {
+                // S = the class quest line base + e − 33 = `id`.
+                let base = id - (i32::from(event) - 33);
+                match u8::try_from(event)
+                    .ok()
+                    .and_then(|e| stinger_for_event(e, base))
+                {
+                    Some(a) => env.music.start_stinger(s, c, a),
+                    None => skipped.push(SKIP_STINGER),
+                }
+            }
+            Followup::StingerRearm => env.music.rearm_stinger(c, 25, true),
+        }
+    }
+}
+
+/// The client calls the environment machines make (`environment.md` §4
+/// r2): the quest check and the level-entry player event on P.
+struct Hooks<'a> {
+    world: &'a ClientWorld,
+    asked: RefCell<Vec<&'static str>>,
+    follow: Vec<Followup>,
+    errors: Vec<TriggerError>,
+}
+
+impl EnvHooks for Hooks<'_> {
+    /// `0x004A4180(q)` reads the client quest state of
+    /// `world/quests-status.md` §12 (the 0x5E bytes, the quest records),
+    /// which no client owner holds for the sound layer yet: pending.
+    fn quest_check(&self, _: u8) -> bool {
+        self.asked
+            .borrow_mut()
+            .push("client quest check 0x004A4180 (environment.md §4 r2): quest state not held");
+        false
+    }
+
+    fn player_event(&mut self, s: &mut dyn SoundCalls, e: u8) {
+        let Some(p) = self.world.local_player else {
+            return;
+        };
+        let Some(class) = self.world.units.get(&p).map(|u| u.class) else {
+            return;
+        };
+        let u = event_unit(self.world, p, class);
+        match quest_line_event(s, &u, u16::from(e)) {
+            Ok(out) => self.follow.extend(out),
+            Err(err) => self.errors.push(err),
+        }
     }
 }
 
@@ -497,8 +824,9 @@ fn request(
     world: &ClientWorld,
     r: &SoundRequest,
     unit_sounds: &mut BTreeMap<(UnitKey, bool), UnitSound>,
+    greetings: &mut GreetingRecords,
     skipped: &mut Vec<&'static str>,
-) -> Result<(), DriverError> {
+) -> Result<Vec<Followup>, DriverError> {
     match *r {
         SoundRequest::Ui(id) => ui::ui_sound(cx, id),
         SoundRequest::ObjectMode {
@@ -517,7 +845,10 @@ fn request(
         SoundRequest::UnitRequest { id, unit } => {
             cx.unit_request(id, unit);
         }
-        SoundRequest::UnitFreed { unit } => detach_all(cx.s, unit, false),
+        SoundRequest::UnitFreed { unit, client_only } => {
+            detach_all(cx.s, unit, false);
+            unit_sounds.remove(&(unit, client_only));
+        }
         SoundRequest::Server {
             unit, class, event, ..
         } => {
@@ -526,33 +857,37 @@ fn request(
                 12 => Some(SKIP_EVENT_12),
                 16 if unit.unit_type == MONSTER => Some(SKIP_EVENT_16),
                 17 => Some(SKIP_EVENT_17),
-                18 => Some(SKIP_EVENT_18),
                 _ => None,
             };
             if let Some(s) = skip {
                 skipped.push(s);
-                return Ok(());
+                return Ok(Vec::new());
             }
             let extra = EventExtra {
                 local: world.local_player,
                 event12_stsound: 0,
-                greeting: None,
-                day_phase: 0,
+                // Event 18 (§10 r1): U's greeting record by class.
+                greeting: greetings.for_class(class as i32),
+                day_phase: u8::try_from(day_phase(world)).unwrap_or(0),
             };
-            let out = server_event(cx, &u, &mut UnitSound::default(), event, extra)?;
-            followups(out, skipped);
+            return Ok(server_event(
+                cx,
+                &u,
+                &mut UnitSound::default(),
+                event,
+                extra,
+            )?);
         }
         SoundRequest::PlayerEvent { unit, event } => {
             let Some(p) = world.units.get(&unit) else {
                 skipped.push(SKIP_NO_UNIT);
-                return Ok(());
+                return Ok(Vec::new());
             };
             let u = event_unit(world, unit, p.class);
-            let out = player_event(cx, &u, event)?;
-            followups(out, skipped);
+            return Ok(player_event(cx, &u, event)?);
         }
     }
-    Ok(())
+    Ok(Vec::new())
 }
 
 impl CueSource for SoundDriver {
@@ -693,7 +1028,7 @@ mod tests {
         );
         assert_eq!(
             d.take_skipped(),
-            [SKIP_OVERHEAD, SKIP_EVENT_12, SKIP_EVENT_18, SKIP_NO_UNIT]
+            [SKIP_OVERHEAD, SKIP_EVENT_12, SKIP_NO_UNIT]
         );
         // The dead local player makes no player event sound (§3 r2).
         w.units.get_mut(&p).unwrap().mode = 17;
@@ -730,8 +1065,15 @@ mod tests {
         assert_eq!(d.system().unit_requests(m).len(), 1);
         w.units.remove(&m);
         w.server_ticks = 2;
-        d.frame(&w, &[], &[SoundRequest::UnitFreed { unit: m }])
-            .unwrap();
+        d.frame(
+            &w,
+            &[],
+            &[SoundRequest::UnitFreed {
+                unit: m,
+                client_only: false,
+            }],
+        )
+        .unwrap();
         assert!(d.system().unit_requests(m).is_empty());
     }
 
@@ -763,7 +1105,7 @@ mod tests {
         assert!(!asked.is_empty());
         assert!(asked
             .iter()
-            .all(|&q| q == "local player client seed (§4 r5): read-only model seed"));
+            .all(|&q| q == "local player client seed (§4 r5): not in the client model"));
         assert!(d.take_pending().is_empty(), "handed over once");
     }
 
@@ -796,6 +1138,241 @@ mod tests {
         let r = d.system().request_by_handle(h).unwrap();
         assert_eq!((r.id, r.start_tick, r.units.len()), (202, 30, 0));
         assert_eq!(r.pos, [-150.0, 90.0, 640.0]);
+    }
+
+    /// `sound-table.md` §4 r3 for an id heading a group of 2, on `e`,
+    /// with the requested id's history `hist` (r4).
+    fn pick_of_2(e: &mut Seed, id: i32, hist: &mut [i32; 2]) -> i32 {
+        let mut k = 1;
+        if e.roll(3) == 0 {
+            k -= 1;
+        }
+        let v = loop {
+            let v = id + e.roll(2) as i32;
+            if !hist[..k].contains(&v) {
+                break v;
+            }
+        };
+        *hist = [v, hist[0]];
+        v
+    }
+
+    // Covers: specs/audio/sound-table.md §4 r3, §4 r4, §4 r5
+    #[test]
+    fn variants_draw_on_the_local_players_client_seed() {
+        let mut d = driver();
+        let mut w = at_tick(0);
+        let p = UnitKey::new(PLAYER, 1);
+        let mut u = ClientUnit::new(p);
+        u.seed = Some((0x1234_5678, 0x9ABC));
+        w.units.insert(p, u);
+        w.local_player = Some(p);
+        let mut e = Seed::new(0x1234_5678, 0x9ABC);
+        let mut hist = [0; 2];
+        let (mut picks, mut want) = (Vec::new(), Vec::new());
+        for t in 1..=12u64 {
+            if t == 7 {
+                // The model steps its copy three times (an S→C 0x59 for
+                // the local player and two client object draws,
+                // `sound-table-2.md` §14.3): the sound draws continue
+                // from there.
+                let u = w.units.get_mut(&p).unwrap();
+                let mut m = u.seed.map(|(l, h)| Seed::new(l, h)).unwrap();
+                for _ in 0..3 {
+                    m.step();
+                    e.step();
+                }
+                u.seed = Some((m.lo, m.hi));
+            }
+            w.server_ticks = t;
+            d.frame(&w, &[], &[SoundRequest::Ui(2)]).unwrap();
+            assert!(d.take_pending().is_empty());
+            picks.push(d.system().requests().next().unwrap().id);
+            want.push(pick_of_2(&mut e, 2, &mut hist));
+        }
+        assert_eq!(picks, want);
+        assert!(picks.contains(&2) && picks.contains(&3), "variants vary");
+    }
+
+    // Covers: specs/audio/sound-table.md §4 r5
+    #[test]
+    fn a_new_local_player_or_seed_is_taken_as_is() {
+        let mut w = ClientWorld::default();
+        let mut c = ClientSeed::default();
+        c.sync(&w);
+        assert!(c.seed().is_none(), "no local player");
+        let p = UnitKey::new(PLAYER, 1);
+        let mut u = ClientUnit::new(p);
+        u.seed = Some((5, 6));
+        w.units.insert(p, u);
+        w.local_player = Some(p);
+        c.sync(&w);
+        c.seed().unwrap().step();
+        // A model value no replay reaches: the new value.
+        w.units.get_mut(&p).unwrap().seed = Some((77, 0));
+        c.sync(&w);
+        assert_eq!(c.seed().copied(), Some(Seed::new(77, 0)));
+        // A seed the model does not hold: none (the draws are pending).
+        w.units.get_mut(&p).unwrap().seed = None;
+        c.sync(&w);
+        assert!(c.seed().is_none());
+    }
+
+    /// Sound rows 0–4,700 (row 0 silent) and `soundenviron` rows 0 (no
+    /// song) and 1 (song 4,660, day bed 50, night bed 51).
+    fn env_driver() -> SoundDriver {
+        let mut s = String::from(
+            "Sound\tIndex\tFileName\tVolume\tGroup Size\tBlock 1\tBlock 2\tBlock 3\r\n",
+        );
+        for i in 0..=4700 {
+            let v = if i == 0 { 0 } else { 255 };
+            s += &format!("s{i}\t{i}\ts{i}.wav\t{v}\t0\t-1\t-1\t-1\r\n");
+        }
+        let e = "Handle\tIndex\tSong\tDay Ambience\tNight Ambience\r\n\
+                 none\t0\t0\t0\t0\r\n\
+                 town\t1\t4660\t50\t51\r\n";
+        let st = d2_data::txt::TxtTable::parse("sounds.txt", s.as_bytes()).unwrap();
+        let et = d2_data::txt::TxtTable::parse("soundenviron.txt", e.as_bytes()).unwrap();
+        let t = SoundTableData::from_txt(&st, &et).unwrap();
+        SoundDriver::new(SoundSystem::new(t, Box::new(Bank)))
+    }
+
+    /// A world at server tick `n` with the local player (class 0) in a
+    /// room of level 1, whose `SoundEnv` is row 1.
+    fn in_level_1(n: u64) -> (ClientWorld, Vec<LevelRow>, UnitKey) {
+        use crate::bridge::drlg::DrlgRoomId;
+        use crate::bridge::world::ActiveRoom;
+        let mut w = at_tick(n);
+        let p = UnitKey::new(PLAYER, 7);
+        let mut u = ClientUnit::new(p);
+        u.position = Some((45, 5));
+        w.units.insert(p, u);
+        w.local_player = Some(p);
+        w.room_units.place(p, Some(DrlgRoomId(0)));
+        w.active_rooms = Some(vec![ActiveRoom {
+            x0: 40,
+            y0: 0,
+            w: 40,
+            h: 40,
+            level: 1,
+            room: DrlgRoomId(0),
+        }]);
+        let levels = vec![
+            LevelRow::default(),
+            LevelRow {
+                sound_env: 1,
+                ..LevelRow::default()
+            },
+        ];
+        (w, levels, p)
+    }
+
+    // Covers: specs/audio/environment.md §1 r1, §1 r2, §2 r1, §2 r3, §2 r6, §5 r1; specs/audio/sound-table.md §6.1
+    #[test]
+    fn the_levels_song_and_bed_start_on_the_sound_tick() {
+        let mut d = env_driver();
+        assert!(d.environment().is_some(), "a song row: the machines run");
+        let (w, levels, _) = in_level_1(1);
+        d.frame(&w, &levels, &[]).unwrap();
+        let ids: Vec<i32> = d.system().requests().map(|r| r.id).collect();
+        // Day (phase 2 before any 0x53): bed 50; the song (cur was 0, so
+        // at once).
+        assert!(ids.contains(&4660), "{ids:?}");
+        assert!(ids.contains(&50), "{ids:?}");
+        assert_eq!(d.environment().unwrap().music.cur, 4660);
+        // No level (no room): neither machine runs (§1 r1).
+        let mut d = env_driver();
+        let mut w = in_level_1(1).0;
+        w.active_rooms = None;
+        d.frame(&w, &levels, &[]).unwrap();
+        assert_eq!(d.system().requests().count(), 0);
+    }
+
+    // Covers: specs/audio/environment.md §3 r1, §3 r4, §3 r6; specs/audio/triggers.md §3 r4
+    #[test]
+    fn a_quest_stinger_event_starts_the_stinger() {
+        let mut d = env_driver();
+        let (w, levels, p) = in_level_1(1);
+        d.frame(&w, &levels, &[]).unwrap();
+        // 0x2C event 33 on the local player (class 0): stinger row 33,
+        // M = 4,685 at once, S = the quest line 425 updates later.
+        let (mut w, _, _) = in_level_1(2);
+        w.units.get_mut(&p).unwrap().class = 0;
+        let ev = SoundRequest::Server {
+            unit: p,
+            class: 0,
+            at: None,
+            event: 33,
+        };
+        d.frame(&w, &levels, &[ev]).unwrap();
+        assert!(!d.take_skipped().contains(&SKIP_STINGER));
+        let m = &d.environment().unwrap().music;
+        assert!(m.stinger.active && m.stinger.m == 4685);
+        assert!(d.system().requests().any(|r| r.id == 4685));
+        assert!(
+            d.system()
+                .requests()
+                .filter(|r| r.id == 4660)
+                .all(|r| r.stop),
+            "the song is stopped"
+        );
+    }
+
+    // Covers: specs/client/bridge.md §10 r3; specs/audio/triggers-2.md §19 r5
+    #[test]
+    fn a_client_only_free_detaches_and_a_gone_unit_keeps_its_last_point() {
+        let mut d = driver();
+        let mut w = at_tick(0);
+        let p = UnitKey::new(PLAYER, 1);
+        let m = UnitKey::new(MONSTER, 2);
+        walker(&mut w, p, (100, 100));
+        walker(&mut w, m, (140, 100));
+        w.local_player = Some(p);
+        d.frame(&w, &[], &[SoundRequest::UnitRequest { id: 1, unit: m }])
+            .unwrap();
+        // The monster leaves the model; a later request names it: it is
+        // placed at the point it had, not at the listener.
+        w.units.remove(&m);
+        d.frame(&w, &[], &[SoundRequest::UnitRequest { id: 3, unit: m }])
+            .unwrap();
+        let (h, id) = d.system().unit_requests(m)[0];
+        assert_eq!(id, 3);
+        let r = d.system().request_by_handle(h).unwrap();
+        assert_eq!(r.pos, [640.0, 640.0, 640.0]);
+        // A set-C free detaches the unit's requests too (§10 r3.1 (a)).
+        let obj = UnitKey::new(crate::bridge::world::OBJECT, 9);
+        d.frame(&w, &[], &[SoundRequest::UnitRequest { id: 1, unit: obj }])
+            .unwrap();
+        assert_eq!(d.system().unit_requests(obj).len(), 1);
+        let freed = SoundRequest::UnitFreed {
+            unit: obj,
+            client_only: true,
+        };
+        d.frame(&w, &[], &[freed]).unwrap();
+        assert!(d.system().unit_requests(obj).is_empty());
+    }
+
+    // Covers: specs/audio/triggers.md §2 r2, §10 r1, §10 r5
+    #[test]
+    fn event_18_greets_with_the_npcs_record() {
+        let mut d = env_driver();
+        let (mut w, levels, p) = in_level_1(1);
+        w.units.get_mut(&p).unwrap().seed = Some((0x00C0_FFEE, 3));
+        let akara = UnitKey::new(MONSTER, 0x30);
+        let ev = SoundRequest::Server {
+            unit: akara,
+            class: 148,
+            at: Some((47, 5)),
+            event: 18,
+        };
+        d.frame(&w, &levels, &[ev]).unwrap();
+        // `npc-greetings.tsv` class 148: greet 3,480, time 3,485. Mode 1:
+        // s = greet; time ≠ 0 and s ≠ 0 → roll(3); 0 → time + 1 (day
+        // phase 2 before any 0x53). Requested on P, flags 1 (exact).
+        let mut e = Seed::new(0x00C0_FFEE, 3);
+        let want = if e.roll(3) == 0 { 3486 } else { 3480 };
+        assert_eq!(d.system().unit_requests(p).first().map(|r| r.1), Some(want));
+        assert!(!d.take_skipped().iter().any(|s| s.contains("event 18")));
     }
 
     fn walker(w: &mut ClientWorld, key: UnitKey, at: (u16, u16)) {

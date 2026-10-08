@@ -303,9 +303,10 @@ fn audio_frame(
     link: Option<Res<SoundLink>>,
 ) -> std::result::Result<(), BevyError> {
     let audio = &mut *audio;
-    if let Some(l) = link {
+    let weather = link.as_deref().map(|l| {
         l.set(audio.driver.as_ref());
-    }
+        l.weather()
+    });
     let world = bridge.0.world();
     let tick =
         u32::try_from(world.server_ticks).map_err(|_| AudioFrameError::Tick(world.server_ticks))?;
@@ -333,6 +334,9 @@ fn audio_frame(
         if let Some(c) = config.as_deref() {
             let s = sound_settings(&c.settings, *d.system().settings());
             d.set_settings(s);
+        }
+        if let Some(w) = weather {
+            d.set_weather(w);
         }
         // The listener is where the player is drawn (`seams/bridge-app.md`
         // §2.7).

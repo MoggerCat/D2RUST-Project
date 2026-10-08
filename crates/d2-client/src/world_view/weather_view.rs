@@ -20,7 +20,7 @@
 //! the line color, `blend-modes.md` §8 r1); the flash is a rectangle
 //! frame of the clipped size, mode 5 (opaque).
 
-use crate::audio::driver::SoundLink;
+use crate::audio::driver::{SoundLink, WeatherSound};
 use crate::rules::draw_order::weather::ThunderSound;
 use std::sync::Arc;
 
@@ -199,6 +199,11 @@ impl WeatherView {
         mode: OpenMode,
         assets: &mut ViewAssets,
     ) {
+        // The rain rule's input (`audio/environment.md` §6, OQ 4): not
+        // active unless this frame's update ran with a rain level.
+        if let Some(l) = &self.thunder {
+            l.set_weather(WeatherSound::default());
+        }
         if self.failure.is_some() {
             return;
         }
@@ -247,6 +252,10 @@ impl WeatherView {
         };
         if let Err(e) = self.weather.update(Some(player), &input) {
             return self.fail(e.to_string());
+        }
+        if let Some(l) = &self.thunder {
+            let active = !self.weather.snow_mode && level.rain;
+            l.set_weather(WeatherSound::new(active, self.weather.intensity_256));
         }
         if self.weather.lightning_on {
             if let Err(m) = self.ensure_flash(mode, assets) {
