@@ -25,11 +25,10 @@ synthetic single-player game. After every step `Run::check` asserts:
 | talk to Akara | `Bridge::interact` → 0x13 → S→C 0x27/0x28 → NPC menu (Talk, Trade, Cancel) | clean |
 | Trade | menu row click → 0x38 | clean, but see F1 |
 | waypoint | interact → S→C 0x63 → menu (UI 0x14) → 0x49 → Cold Plains | clean |
-| field kill → level up → 0x3A | `the_field_leg_kills_levels_up_and_spends_a_point` | **`#[ignore]`, F3** |
-| drops, equip, Town Portal, save → load | not reached | F3 blocks; F4 |
+| field kill → level up → 0x3A | `the_field_leg_kills_levels_up_and_spends_a_point` (bench combat tables installed before the join) | clean (F3 fixed) |
+| drops, equip, Town Portal, save → load | not reached yet | F4 |
 
-`the_scripted_play_run` passes; the field leg is in the file, ignored with
-the reason naming F3, so the next session un-ignores it when F3 is fixed.
+Both tests pass.
 
 ## Findings (what broke, and why it is not fixed here)
 
@@ -50,20 +49,18 @@ the reason naming F3, so the next session un-ignores it when F3 is fixed.
   A five-act fixture install (acts 2–5 exist as `test_fixtures::act2..5`
   variants, not merged into one set) would let this whole run go through
   `GameData::Live` exactly as the user's `play` does. Follow-up.
-- **F3. The player's attack never starts on the play host (blocks kill,
-  drops, XP, level up).** With the combat fixtures installed before the
-  join (`install_combat`: bench Attack row with do function 1, monster
-  class 0, vitals tables, stat table, AnimData `SOA1HTH` / `M0DTHTH`,
-  server `UnitLooks`), the server list holds Attack (left and right),
-  the monster reaches the client (0xAC, then 0x6D), and C→S 0x06 on it
-  is `Dispatched(Done)`; but the player stays in mode 1, the skill log
-  is empty and no hook error is recorded. `use.md` §1's handler returns
-  0 whatever `use_on_unit` (`d2-sim` `skills/use_/mod.rs:615`) did, and
-  that function has five silent exits (entry state not usable, entry
-  mode 0, no row, bad type, run-to). Next step: find which one with the
-  ignored test (it prints the list, mode and log), fix it in its owner.
-  The 0x3A step after it is the `app_levelup.rs` path and is expected to
-  pass.
+- **F3 (fixed: a fixture gap, not a path bug).** The field leg's
+  monster was allocated raw with unit flags 0x08 | 0x04 only (copied
+  from `app_play_monster_ai.rs`). Monster init sets `|= 0x0A` (and 0x04
+  for `isAtt`, `monsters/init.md`); without 0x02 the skill start's target
+  check (`use.md` §5.3 step 2, `FLAG_TARGETABLE`) clears the target, so
+  the Attack do (`bodies.md` §4.1) at the A1 frame event found none and
+  dealt no damage, silently. Traced: 0x06 → `use_on_unit` (in melee) →
+  `set_mode_with_skill` → A1 started → frame event 1 → `attack_frame_event`
+  → srvdo 1 → `target()` None. With the init flags the run kills the
+  monster, levels the player to 2 (5 stat points) and C→S 0x3A spends
+  one, all clean. `app_play_monster_ai.rs` has the same partial flags
+  (it only needs the monster to attack, so it is not affected).
 - **F4. Not reachable on synthetic data without more fixtures:** a new
   character's start items (`ActionCharacter::start_items` is Unapplied),
   store contents and a Town Portal scroll (`tsc`) need item tables;
@@ -86,13 +83,10 @@ The test needs no game files:
 git fetch origin claude/q-play-smoke
 git checkout claude/q-play-smoke
 cargo test -p d2-client --test play_smoke
-cargo test -p d2-client --test play_smoke -- --ignored --nocapture
 ```
 
-The first command passes (1 passed, 1 ignored). The second shows F3's
-failure message (the server skill list, the player's mode 1, the log).
+It passes (2 passed).
 In the window (`cargo run -p d2-client --release -- play --new sorceress
 Test`): talk to Akara, Trade, close the shop, then use the waypoint to
 Cold Plains; it should work with real stores (F1 only bites an empty
-store). Then attack a monster in the Blood Moor: if she never swings,
-that is F3 on real data too; report it.
+store). Then attack a monster in the Blood Moor: she swings and it dies.

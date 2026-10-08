@@ -651,7 +651,6 @@ fn fx_blank<T: d2_data::tables::Record>() -> T {
 /// away, the left skill (Attack) on it kills it (C→S 0x06), the kill's
 /// experience levels the player up, and a stat point is spent (C→S 0x3A).
 #[test]
-#[ignore = "follow-up F3 in docs/handoff/q-play-smoke.md: C→S 0x06 is accepted but the attack never starts on the play host"]
 fn the_field_leg_kills_levels_up_and_spends_a_point() {
     use d2_sim::stats::stat;
     let mut run = Run::start_with(install_combat);
@@ -707,7 +706,11 @@ fn the_field_leg_kills_levels_up_and_spends_a_point() {
             v.set_base(m, stat::MAXHP, 256);
             v.set_base(m, stat::HITPOINTS, 256);
         });
-        a.sys.units.get_mut(m).unwrap().flags |= flags::IS_VALID_TARGET | flags::CAN_BE_ATTACKED;
+        // Monster init's unit flags (`monsters/init.md`: |= 0x0A at
+        // init, 0x04 for `isAtt`); 0x02 is the target check's
+        // "targetable" (`use.md` §5.3 step 2).
+        a.sys.units.get_mut(m).unwrap().flags |=
+            0x02 | flags::IS_VALID_TARGET | flags::CAN_BE_ATTACKED;
         (p, m, sim.game.lists.unit(m).unwrap().guid)
     });
     run.step(10);
