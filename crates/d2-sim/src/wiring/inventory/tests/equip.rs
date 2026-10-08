@@ -143,7 +143,7 @@ fn swap_cursor_with_body() {
     assert_eq!(item_msgs(&w.drain()), [(0x9D, 0x09, e), (0x9D, 0x09, n)]);
 }
 
-/// REC-158 (d2rs-own, unverified): a worn item's stat list is attached to
+/// REC-156 (d2rs-own, unverified): a worn item's stat list is attached to
 /// the wearer, so its base damage reaches the wearer's stats (21 / 22),
 /// and goes with the item when it comes off.
 #[test]

@@ -179,7 +179,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
     /// `0x00627910`): the item's own list (its base damage, armor and
     /// properties, and the lists of its socketed fillers attached to it)
     /// is attached to the wearer.
-    // d2rs-own, unverified (REC-158): called from the equip paths of the
+    // d2rs-own, unverified (REC-156): called from the equip paths of the
     // move handlers; the original's stat-link function is not specified.
     pub(super) fn link_item_stats(&mut self, unit: UnitId, item: UnitId) {
         let l = self.econ.stats.unit_list(item);
@@ -190,7 +190,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
 
     /// The reverse of [`Self::link_item_stats`]: the item's list leaves
     /// the wearer (the list stays the item's).
-    // d2rs-own, unverified (REC-158).
+    // d2rs-own, unverified (REC-156).
     pub(super) fn unlink_item_stats(&mut self, item: UnitId) {
         if let Some(l) = self.econ.stats.unit_list(item) {
             self.econ.stats.detach(&mut *self.econ.hooks, l);
