@@ -25,14 +25,14 @@
 | Rules | 64–65 |
 |   1. The list of a client unit | 66–101 |
 |   2. Items | 102–265 |
-|   3. States (S→C 0xA7, 0xA8, 0xA9) | 266–568 |
-|   4. Skills | 569–600 |
-| Constants & data dependencies | 601–611 |
-| Randomness | 612–616 |
-| Edge cases & original bugs | 617–632 |
-| Test vectors | 633–649 |
-| Provenance | 650–669 |
-| Open questions | 670–719 |
+|   3. States (S→C 0xA7, 0xA8, 0xA9) | 266–574 |
+|   4. Skills | 575–606 |
+| Constants & data dependencies | 607–617 |
+| Randomness | 618–622 |
+| Edge cases & original bugs | 623–645 |
+| Test vectors | 646–662 |
+| Provenance | 663–682 |
+| Open questions | 683–736 |
 <!-- /index -->
 
 ## Summary
@@ -553,9 +553,15 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
       missile m := 18 + r2 % (2b) (a power of two → `& (2b − 1)`, same
       value) created at the cell by `0x004CDBA0(U, m, x', y', 0, 1)`
       (`monsters/umod-callbacks.md` §28 r4 "missile").
-   11. **Skill item test** `0x00647640(E, U)`: U's inventory (+0x60)
-      none → 0 (also for the cases below). E's record `scroll` flag
-      (bit 36) → E +0x30 > 0. Else by the record's skill id (+0x00):
+   11. **Skill item test** `0x00647640(E, U)` (re-read 2026-10-08,
+      `0x00647640`–`0x0064783E`): E or U null → 0. E's record `scroll`
+      flag (bit 36, `[0x006CE278]` at record +0x08) → U's inventory
+      (+0x60) none → 0, else E +0x30 > 0 (signed). Else by the record's
+      skill id (+0x00, `0x00647682`): skills 2, 4, 5 need U's inventory
+      (none → 0: skill 5 at `0x006476A4`, skill 4 at `0x0064770F`,
+      skill 2 at `0x00647783`); **every other skill → 1 with no inventory test**
+      (`0x00647699`), so only scrolls and skills 2, 4, 5 need an
+      inventory (`skills/use.md` §2 row 5 points here). Skills 2, 4, 5:
       the weapon pick `0x0063C9B0(inventory, &I, &loc, &inuse)`
       (`skills/bodies-3.md` §3.3 step 2), J := the item at the other
       location (`0x00643D60(loc)`), "throw-ok(X)" := X throwable type
@@ -627,8 +633,15 @@ belong to the overlay and missile specs).
   `0x004C3328` runs one, for that item's set). A set item taken off that
   way keeps its own set lists unparked (they do not count: its list is
   detached) and the owner's list of its set keeps the old bonuses until
-  another set update of that set. Reproduce; whether the server follows
-  with a message that corrects it is for a capture (open question 8).
+  another set update of that set. Reproduce. The server sends nothing
+  that corrects it (2026-10-08, static; answers open question 8): its
+  0x1B Swap2HandedItem (`0x00563D20`, `items/inventory-moves.md` §7.6)
+  gives the item taken off no command flag and no update-list entry,
+  so the per-item dispatcher `0x005973F0` sends one message, 0x9D
+  action 7 for the item put on (row 6 of `items/item-actions.tsv`,
+  sender `0x0053D0B0`, its only call `0x00597580`); the owner's stat
+  refresh sends base values only (§2 rule 6). The taken-off item, now
+  the cursor item, gets its next message only when it is moved again.
 
 ## Test vectors
 
@@ -711,8 +724,12 @@ code), `0x00460930`, `0x004609A0`, `0x00643620` (caller `0x00646E30`),
    `0x00643620` arguments (pool, flags 0, expire 0, U's type and GUID),
    the attach with reset 1, and where the state bits live before a
    state list exists are §4 rules 3–4.
-8. Does the server send anything after 0x07 IndirectlySwapBodyItem that
-   refreshes the set lists of the item it took off (edge cases)?
+8. *Answered (2026-10-08, static)*: Edge cases, the 0x07 entry (no
+   message for the item taken off; nothing corrects the set lists).
+   The recording below stays as the conformance check. Original
+   question: Does the server send anything after 0x07
+   IndirectlySwapBodyItem that refreshes the set lists of the item it
+   took off (edge cases)?
    Settled by a recording that equips a two-handed weapon over a worn
    set shield (or a set weapon over a set off-hand) with a partial set
    bonus showing, then reads the character panel.

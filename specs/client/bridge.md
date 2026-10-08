@@ -46,13 +46,13 @@
 |   7. Bevy mirror | 247–265 |
 |   8. Frame pacing | 266–292 |
 |   9. Versioning | 293–303 |
-|   10. Client outputs (bridge → UI and audio) | 304–466 |
-| Constants & data dependencies | 467–481 |
-| Randomness | 482–485 |
-| Edge cases & original bugs | 486–494 |
-| Test vectors | 495–525 |
-| Provenance | 526–536 |
-| Open questions | 537–574 |
+|   10. Client outputs (bridge → UI and audio) | 304–488 |
+| Constants & data dependencies | 489–503 |
+| Randomness | 504–507 |
+| Edge cases & original bugs | 508–516 |
+| Test vectors | 517–547 |
+| Provenance | 548–558 |
+| Open questions | 559–599 |
 <!-- /index -->
 
 ## Summary
@@ -326,8 +326,29 @@ model state: 1.14d's handler calls a UI or sound function directly
    model to fill a payload field, because a later message in the same
    frame may have changed it. A consumer may resolve a unit key for
    something 1.14d tracks over time (a sound's position follows its unit,
-   `audio/triggers.md` §1); a key that no longer resolves is open
-   question 6.
+   `audio/triggers.md` §1); a key that no longer resolves is rule
+   3.1.
+   1. **A unit freed after its sound output** (2026-10-08; answers open
+      question 6). In 1.14d the request is made inside the handler,
+      while the unit exists, and the later free of that unit
+      (`0x00465870`, `client/model.md` §2 rule 5) detaches every
+      request of the unit without force before anything else
+      (`0x004CA9C0(U, 0)`, then the sample-lock release
+      `0x004CC160(U, −1)`): a loop whose last unit was U stops, a
+      one-shot keeps playing at its last position
+      (`audio/triggers-2.md` §19 r5). The request took its position
+      from the unit when it was made (`audio/sound-table.md` §5 r3),
+      and no sound update runs between the receive and the free. So:
+      (a) every model unit free (0x0A and every other free path of
+      `client/model.md` §2 r5) appends one `UnitFreed` output {unit
+      key} in list order, which the audio layer applies as that
+      detach and lock release; (b) an audio output that names a unit
+      also captures the unit's position x, y at the call (rule 3), and
+      the audio layer uses the captured position when the key no
+      longer resolves at delivery. The request is then made, attached
+      and detached in 1.14d order, with the 1.14d position. The
+      request-log recording of open question 6 stays as the
+      conformance check (capture).
 4. **Delivery.** At the end of `bridge_frame` (§8 rule 1, after every
    chunk is dispatched and the counters are updated) the list is handed
    over whole and cleared. One dispatcher applies it in list order,
@@ -421,7 +442,7 @@ model state: 1.14d's handler calls a UI or sound function directly
 <!-- rows -->
 | Variant | Payload | Producer | Consumer | Owner (what the consumer does) |
 |---|---|---|---|---|
-| `ServerSound` | unit key (type, GUID), unit class, event u16 | 0x2C | audio | `audio/triggers.md` §2 r4 |
+| `ServerSound` | unit key (type, GUID), unit class, unit x, y (§10 r3.1), event u16 | 0x2C | audio | `audio/triggers.md` §2 r4 |
 | `QuestUi` | chain u8, flags u8, status u8, extra i16 | 0x5D (the rows marked output in `client/msg-ui.md` §1 r2; none for model rows or "nothing" rows, §1 r5) | UI | `client/msg-ui.md` §1 |
 | `WaypointMenu` | object GUID u32, record 16 bytes (as received) | 0x63 | UI | `client/msg-ui.md` §2 |
 | `TradeAction` | code u8, local player absent or dead (`0x00463DF0`, captured) | 0x77 | UI | `client/msg-ui.md` §3 |
@@ -461,6 +482,7 @@ model state: 1.14d's handler calls a UI or sound function directly
 | `JoinRefused` | error number u8 (the mapped code) | 0xB4 | UI | `client/model.md` §7 rule 8 |
 | `TownExit` | local player key, GUIDs of the S monsters | update | UI | `client/model.md` §17 rule 6; delivery `client/bridge.md` §10 r11 |
 | `StateFx` | unit key, state u16, phase (on / hooks / off), bit set before, unit dead, hook number u8 (setfunc / remfunc, 0 = none), two hook values i32 (`client/stat-lists.md` §3 r6.7) | 0xA8 (also 0xA7, 0xA9, 0xAA) | effects | `client/stat-lists.md` §3 rule 6 |
+| `UnitFreed` | unit key | 0x0A and every unit free of `client/model.md` §2 r5 | audio | §10 r3.1; `audio/triggers-2.md` §19 r5 |
 | `ObjectSound` | the call (mode sound: unit key, set S or C, class, mode; request: id, unit; player event: player key, event) | update | audio | `world/objects-client.md` §25 r2, §26, §28 r3; `client/model.md` §8 rule 7 |
 | `ObjectFx` | the call (graphics refresh, graphics load, overlay create / remove, object light, client skill start) with the values read | update | effects | `world/objects-client.md` §26, §28 r3; `render/overlay.md` §5; `render/lighting.md` open question 11 |
 
@@ -558,7 +580,10 @@ from `specs/`, `docs/` and `crates/` only.
    open questions 1, 2).
 5. Answered by `client/model.md` §4 rule 2: the pre-steps of 0x0D, 0x18,
    0x95, 0x96 write nothing any handler reads; they have no effect.
-6. A sound output whose unit is removed later in the same frame (§10
+6. *Answered (2026-10-08)*: §10 rule 3.1 (`UnitFreed` output; the
+   free's detach is `audio/triggers-2.md` §19 r5); the request-log
+   recording below stays as its check. Original question: A sound
+   output whose unit is removed later in the same frame (§10
    rule 3): 1.14d starts the sound inside the handler, while the unit
    exists; whether the audio layer must then keep its last position or
    drop the position tracking follows `audio/triggers.md` §1's rule for a

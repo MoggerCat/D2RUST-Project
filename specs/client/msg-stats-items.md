@@ -23,17 +23,17 @@
 | Inputs | 56–62 |
 | Outputs / state changes | 63–68 |
 | Rules | 69–70 |
-|   1. Local player stats: 0x19–0x1F (`0x0045D780`) | 71–100 |
-|   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 101–230 |
-|   3. Other item messages | 231–301 |
-|   4. Hireling stats: 0x9E–0xA2 (`0x0045D540`) | 302–317 |
-|   5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6 | 318–430 |
-| Constants & data dependencies | 431–439 |
-| Randomness | 440–443 |
-| Edge cases & original bugs | 444–463 |
-| Test vectors | 464–502 |
-| Provenance | 503–538 |
-| Open questions | 539–575 |
+|   1. Local player stats: 0x19–0x1F (`0x0045D780`) | 71–111 |
+|   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 112–241 |
+|   3. Other item messages | 242–342 |
+|   4. Hireling stats: 0x9E–0xA2 (`0x0045D540`) | 343–358 |
+|   5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6 | 359–471 |
+| Constants & data dependencies | 472–480 |
+| Randomness | 481–484 |
+| Edge cases & original bugs | 485–504 |
+| Test vectors | 505–543 |
+| Provenance | 544–579 |
+| Open questions | 580–620 |
 <!-- /index -->
 
 Owned ids: 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x3F, 0x42,
@@ -91,12 +91,23 @@ stat-list links, `weapon_set`, the runtime item table (§5). No outputs.
 4. **0x20** StatUpdate (`0x0045D880`): GUID u32@1, stat u8@5, value
    u32@6. Look up (0, GUID) (players only); none → nothing; else set
    (stat, value) and run the hook on that unit.
-5. **Hook** (`0x0045D4B0(stat, unit, value)`): stat 6 (life) with value
-   ≠ 0 on a unit in mode 0x11 (dead) → `0x00480E70`, `0x004647D0`
-   (leave the dead mode; `client/model.md` open question 1). Stat 12
-   (level) → `0x0045D3B0`; if the unit is the local player also
-   `0x0045D3E0` and `0x004C1C10`. Stats 0 and 2 → `0x004C1C10`. Others:
-   nothing. (`0x0045D3B0`, `0x0045D3E0`, `0x004C1C10`: open question 2.)
+5. **Hook** (`0x0045D4B0(stat, unit, value)`; unit null → nothing;
+   stats > 12 → nothing; byte table `0x0045D524`, jump table
+   `0x0045D514`, read from the image 2026-10-08): stat 6 (life) with
+   value ≠ 0 on a unit in mode 0x11 (dead) → mode set 5
+   (`0x00480E70(U, 5)`), `0x004647D0` (leave the dead mode;
+   `client/model.md` open question 1). Stat 12 (level), in order
+   (`0x0045D4ED`–`0x0045D509`; answers open question 2):
+   1. the requirement refresh (§3 rule 3.1) of the **local player**,
+      whatever unit the stat is on: `0x0045D3B0` receives the local
+      player (`0x00463DD0`, `[0x007A6A70]`) in EAX, builds `47 00 00
+      <its GUID>` and runs `0x004C1BC0` → lookup → `0x004C1350`;
+   2. only when the unit is the local player: the level change
+      `0x0045D3E0` (`client/stat-lists.md` §2 rule 3.1), then
+      `0x004C1C10(U)`, which is only a call of `0x004C1350(U)` (a
+      second requirement refresh of the same player).
+   Stats 0 and 2 (strength, dexterity) → `0x004C1C10(U)`, i.e. the
+   requirement refresh of U. Others: nothing.
 
 ### 2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`)
 
@@ -296,8 +307,38 @@ stat-list links, `weapon_set`, the runtime item table (§5). No outputs.
          same for right. (`0x004D9FC0`'s results: `client/stat-lists.md`
          §3 r6.8.)
       7. Changed: a player → `0x0046F950`, `0x00470610` (gfx, effects);
-         any other unit → `0x004AFF60(U, 0)` (the monster mode machine,
-         `client/model.md` §19; the six callers in `0x0046C770`–`0x0046CB40` are not yet read).
+         any other unit → the monster mode machine with code 0x07 and
+         no record (`0x004C16A3`–`0x004C16AC`: ECX 7, EDX U, record
+         pointer 0 pushed; the call lies past the function end Ghidra
+         set, read from the image 2026-10-08). By `client/model.md` §19
+         r3–r4 row 0x07 this is, for the hireling (flag 0x200, the only
+         non-player that reaches here): head, W(0), flags |= 2, flag
+         0x20 := not `shadow`, dead flag cleared, then the neutral
+         fallback (mode 1…15 other than 12 → path stop and mode set 1
+         `NU`). So an equipment change that switches an item of a
+         hireling on or off puts it into its neutral mode.
+         1. **The other callers of `0x004AFF60`** (2026-10-08, all.asm):
+            besides this site, `0x00480C10` (the per-type request
+            dispatch, `client/model.md` §19) and the machine itself, the
+            six sites `0x0046C7C2`, `0x0046C945`, `0x0046CA51`,
+            `0x0046CA9B`, `0x0046CB32`, `0x0046CBC2` are request helpers
+            (`0x0046C770`, `0x0046C7D0`, `0x0046C960`, `0x0046CA60`,
+            `0x0046CAB0`, `0x0046CB40`) called only from the client-only
+            monster behaviour `0x0046D780` and its class branches
+            `0x0046CCD0`–`0x0046D660` (run by the C-set walk
+            `0x00463CC0` for type 1, `client/model.md` §3; Phase 6). No
+            S→C message reaches them. Codes they pass: 0x00 (unit
+            target, `0x0046C770`, from `0x0046D223` / `0x0046D712`),
+            0x01 (point; most `0x0046C7D0` / `0x0046C960` / `0x0046CA60`
+            calls), 0x0C (point, `0x0046CD42`, `0x0046CD51`), 0x08
+            (`0x0046CAB0`, fixed) and 0x07 (`0x0046CB40`, fixed). Records:
+            `0x0046CAB0` / `0x0046CB40` U's own position (`0x006488C0` /
+            `0x00648900`, or path +0x0C / +0x10 for unit types 2, 4,
+            5); `0x0046C960` that position plus a seeded random offset
+            (seed U +0x20, constant `0x6AC690C5`); `0x0046C7D0` a point
+            stepped from another unit's position; `0x0046C770` /
+            `0x0046CA60` a unit (type, GUID) / point given by the
+            caller.
 
 ### 4. Hireling stats: 0x9E–0xA2 (`0x0045D540`)
 
@@ -543,8 +584,12 @@ re-read at `0x004C22EB`–`0x004C22F1`, `0x004C2327`–`0x004C232D`,
    versus these: check by replaying the join and comparing the client's
    stat list (recorder: dump the local player's stat list after frame
    2).
-2. `0x0045D3B0`, `0x0045D3E0`, `0x004C1C10` (level and attribute
-   hooks): UI and requirement effects; Phase 6 UI spec.
+2. *Answered (2026-10-08)*: §1 rule 5 (`0x0045D3B0` = the 0x47
+   requirement refresh of the local player, `0x004C1C10` = the
+   requirement refresh of U, `0x0045D3E0` = `client/stat-lists.md` §2
+   rule 3.1). Original question: `0x0045D3B0`, `0x0045D3E0`,
+   `0x004C1C10` (level and attribute hooks): UI and requirement
+   effects; Phase 6 UI spec.
 3. *Answered (2026-10-08)*: `0x0062E410(stream, bytes, save, out)`
    is `0x0062AE20(stream, bytes, save 0, out, version 0x60)`, the
    record peek of `items/bitstream-legacy.md` §1 rule 1 (flags
