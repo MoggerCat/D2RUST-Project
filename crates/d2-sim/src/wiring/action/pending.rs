@@ -74,6 +74,12 @@ pub enum QuestEvent {
         victim: UnitId,
         killer: Option<UnitId>,
     },
+    /// Radament's AI ran in his level (`0x00599420`, `ai-bodies-2.md` §3).
+    RadamentActivated { unit: UnitId },
+    /// The Summoner's AI first ran (`0x0059C330`, `ai-bodies-2.md` §15).
+    SummonerActivated,
+    /// The cube placed a Horadric Staff for `player` (`0x0059E5C0`).
+    StaffAssembled { player: UnitId },
 }
 
 /// Seams without a provider (see the module doc). Grouped by the spec

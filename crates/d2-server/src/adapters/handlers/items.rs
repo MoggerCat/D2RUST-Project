@@ -140,6 +140,11 @@ pub trait ItemPending {
     fn recharge(&mut self, item: UnitId);
     /// `hst ` / `qf2 ` hooks (Act II / III quests, not specified).
     fn quest_item_hook(&mut self, player: UnitId, item: UnitId, code: [u8; 4]);
+    /// The `(player, code)` quest item hooks recorded since the last take
+    /// (the host runs them on the quest control). Default: none.
+    fn take_quest_items(&mut self) -> Vec<(UnitId, [u8; 4])> {
+        Vec::new()
+    }
     /// Kind 1 (`world/quests.md` §8.4 through the game's quest control).
     fn cow_portal(&mut self, player: UnitId) -> bool;
 }
