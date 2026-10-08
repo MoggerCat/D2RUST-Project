@@ -680,3 +680,33 @@ fn item_event_layer_split_is_the_1_14d_stuff() {
     let layer = (54u32 << shift) + 13;
     assert_eq!((layer >> shift, layer & mask), (54, 13));
 }
+
+// Covers: specs/sim/pathing.md §13.3 (line test), specs/client/model.md §12 (REC-248, d2rs-own, unverified)
+#[test]
+fn use_line_clear_sees_a_wall_on_the_rooms_once_paths_are_on() {
+    use crate::skills::use_::UseWorld;
+    let mut fx = Fx::new();
+    let player = fx.spawn(UnitType::Player, 10, 10);
+    // Without the path provider the seam answers (the fixture's: clear).
+    let off = fx
+        .sim
+        .skill_use(&mut fx.game, |w| w.line_clear(player, (16, 10), 0x805));
+    assert!(off);
+    fx.sim.hooks().enable_paths().expect("embedded tables");
+    let clear = fx
+        .sim
+        .skill_use(&mut fx.game, |w| w.line_clear(player, (16, 10), 0x805));
+    assert!(clear, "no wall yet");
+    let room = fx.room;
+    *fx.sim
+        .sys
+        .hooks
+        .drlg
+        .collision_mut(&fx.game, room, 13, 10)
+        .expect("in a grid") |= bits::WALL;
+    let blocked = fx
+        .sim
+        .skill_use(&mut fx.game, |w| w.line_clear(player, (16, 10), 0x805));
+    assert!(!blocked, "the wall between the two");
+    fx.assert_clean();
+}
