@@ -73,9 +73,9 @@ pub const PENDING: &[(&str, &str)] = &[
         "ViewFeed::near_rooms (room unit facts)",
         "the unit facts come from the model (`unit_facts.rs`: flags, flag-ex, states 7 / 143 / 146, \
          `unflatDead`, `DrawUnder`, the `LOSDraw` gate) once `unit_tables` is set; without the \
-         tables `ViewFeed::unit_facts` refuses, and in a `LOSDraw` level the sight test's line \
-         test needs the client DRLG's collision grid (`sight_hidden` stays `None`, PROVISIONAL \
-         REC-273)",
+         tables `ViewFeed::unit_facts` refuses; the sight test runs over the client DRLG's collision \
+         grids and stays `None` where it cannot be placed (no DRLG, no local room, a class without \
+         a size row; PROVISIONAL REC-273)",
     ),
     (
         "ViewFeed::tile_art, ViewSource::tile_blocks",
