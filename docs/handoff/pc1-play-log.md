@@ -15,3 +15,5 @@ files, what was fixed. Newest last.
 Open: character select class portraits; intro cinematics (no video playback);
 gate on this PC: d2-client release test crates hit a rustc STATUS_STACK_BUFFER_OVERRUN
 (retry with RUST_MIN_STACK), d2-sim `missiles::tests::cov_text` fails on Windows paths only.
+
+Not merged at hand-off: origin/claude/specs-staging-7 (2026-10-08 evening) conflicts with this branch in crates/d2-sim/src/wiring/action/inactive.rs (warp-tile restore vs staging), specs/client/model.md and specs/sim/pathing.md (index blocks); the merge was aborted so the coordinator resolves it.
