@@ -483,7 +483,7 @@ fn inventory_draws_the_gold_value_and_button_from_the_model() {
     assert_eq!(gold_texts(&u), vec![("4330".to_string(), 508, 468, 1, 0)]);
 }
 
-// Covers: specs/ui/controls.md §3
+// d2rs-own, unverified: Esc order (controls.md §3 row 56)
 #[test]
 fn esc_opens_the_game_menu_closes_panels_first_and_closes_it_again() {
     let mut u = ui(Some(areas()), true);
