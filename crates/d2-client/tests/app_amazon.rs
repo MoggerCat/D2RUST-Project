@@ -16,8 +16,8 @@ use std::sync::Arc;
 
 use d2_client::app::server_thread::ThreadLink;
 use d2_client::app::single_player::{self, GameData, Link, DEFAULT_SEED, PLAYER_CLASS};
-use d2_client::bridge::link::{SendQueue, ServerLink};
 use d2_client::app::weapons::{class, Hands, ItemFacts};
+use d2_client::bridge::link::{SendQueue, ServerLink};
 use d2_client::bridge::LOCAL_CLIENT;
 use d2_client::rules::unit_composite::code;
 use d2_client::world_view::unit_assets::UnitLooks;
@@ -27,9 +27,9 @@ use d2_data::tables::{Charstats, Itemstatcost, Missiles, Monstats, Monstats2, Re
 use d2_formats::animdata::{self, AnimData, AnimRecord};
 use d2_server::seams::{Clock, Pos};
 use d2_sim::skills::list::ListOwner;
-use d2_sim::units::{UnitId, UnitType};
-use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::stats::{StatData, StatLists, StatTable};
+use d2_sim::units::lifecycle::AllocRequest;
+use d2_sim::units::{UnitId, UnitType};
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -40,6 +40,7 @@ impl Clock for StepClock {
 }
 
 const FIRE_BOLT: usize = 3;
+const JAB: usize = 4;
 /// The attack animation: 8 frames at speed 256, the missile event (2)
 /// on frame 4 (`animdata.md` §2).
 fn anim_data() -> AnimData {
@@ -124,6 +125,17 @@ impl Game {
                 fb.decquant = true;
                 fb.srvmissile = 1;
                 t.skills.level_cap = d2_sim::skills::LEVEL_CAP_114D;
+                let jab = &mut t.skills.skills[JAB];
+                jab.anim = 7;
+                jab.range = 1;
+                jab.mana = 0;
+                jab.minmana = 0;
+                jab.intown = true;
+                jab.srvstfunc = 5;
+                jab.srvdofunc = 7;
+                jab.srvmissile = 0xFFFF;
+                jab.hitshift = 8;
+                jab.srcdam = 128;
                 let mut m = Missiles::decode(&[0u8; Missiles::SIZE]);
                 m.range = 20;
                 m.vel = 16;
@@ -153,7 +165,9 @@ impl Game {
                 c.walkvelocity = 6;
                 c.runvelocity = 9;
                 t.combat.charstats = (0..7).map(|_| c.clone()).collect();
-                t.combat.monstats = vec![Monstats::decode(&[0u8; Monstats::SIZE])];
+                let mut ms = Monstats::decode(&[0u8; Monstats::SIZE]);
+                ms.killable = true;
+                t.combat.monstats = vec![ms];
                 t.combat.monstats2 = vec![Monstats2::decode(&[0u8; Monstats2::SIZE])];
                 h.tables = Arc::new(t);
                 let rows = h.tables.skills.skills.clone();
@@ -163,7 +177,7 @@ impl Game {
                     ListOwner::player(PLAYER_CLASS as i32),
                     Some(&[
                         FIRE_BOLT as u16,
-                        0xFFFF,
+                        JAB as u16,
                         0xFFFF,
                         0xFFFF,
                         0xFFFF,
@@ -275,6 +289,65 @@ impl Game {
             .unwrap()
     }
 
+    fn select_right(&mut self, skill: usize) {
+        self.link
+            .with(move |l| {
+                let sim = &mut l.host_mut().game;
+                let p = sim.player_of(LOCAL_CLIENT).unwrap();
+                let list = sim.events.action.hooks().skill_lists.get_mut(&p).unwrap();
+                list.right = list.view().iter().position(|e| e.skill == skill as i32);
+            })
+            .unwrap();
+    }
+
+    /// A monster of class 0 beside the player with `life` life; its GUID.
+    fn monster(&mut self, life: i32) -> (UnitId, u32) {
+        self.link
+            .with(move |l| {
+                let sim = &mut l.host_mut().game;
+                let p = sim.player_of(LOCAL_CLIENT).unwrap();
+                let (x, y) = sim.events.action.hooks().path_position(p);
+                let room = sim.game.lists.unit(p).and_then(|e| e.room());
+                let req = AllocRequest {
+                    ty: UnitType::Monster,
+                    class: 0,
+                    room,
+                    add: true,
+                    fixed_guid: None,
+                    mode: 1,
+                    allied: false,
+                };
+                let m = sim
+                    .events
+                    .action
+                    .with(&mut sim.game, |g, v| v.allocate(g, &req, x + 2, y))
+                    .expect("a monster");
+                // Monster init sets the targetable flag (`use.md` §5.3 step 2).
+                sim.events.action.sys.units.get_mut(m).unwrap().flags |= 2;
+                sim.events.action.with(&mut sim.game, |_, v| {
+                    v.set_base(m, 12, 10);
+                    v.set_base(p, 12, 10);
+                    v.set_base(p, 19, 1000);
+                    v.set_base(p, 21, 20);
+                    v.set_base(p, 22, 30);
+                    v.set_base(m, 7, life << 8);
+                    v.set_base(m, 6, life << 8);
+                });
+                (m, sim.events.action.sys.units.get(m).unwrap().guid)
+            })
+            .unwrap()
+    }
+
+    fn player_mode(&mut self) -> u32 {
+        self.link
+            .with(|l| {
+                let s = &mut l.host_mut().game;
+                let p = s.player_of(LOCAL_CLIENT).unwrap();
+                s.events.action.sys.units.get(p).map_or(0, |u| u.mode)
+            })
+            .unwrap()
+    }
+
     fn quantity(&mut self, item: UnitId) -> i32 {
         self.link
             .with(move |l| {
@@ -293,7 +366,6 @@ impl Game {
             .unwrap()
     }
 }
-
 
 fn shoot(g: &mut Game) -> (Vec<Vec<u8>>, usize, String) {
     let at = g.player_pos();
@@ -329,7 +401,7 @@ fn a_bow_skill_takes_an_arrow_and_shoots_the_missile() {
     assert!(got.iter().any(|m| m.contains(&0x4D)), "{got:?}");
 }
 
-// Covers: specs/skills/bodies.md §3.4 (no ammo: the start refuses)
+// Covers: specs/skills/bodies.md §3.4
 #[test]
 fn a_bow_skill_without_arrows_does_not_start() {
     let mut g = Game::joined();
@@ -340,11 +412,35 @@ fn a_bow_skill_without_arrows_does_not_start() {
     assert_eq!(g.mana(), MANA, "no mana spent");
 }
 
-// Covers: specs/skills/bodies.md §3.4 (no weapon: the start refuses)
+// Covers: specs/skills/bodies.md §3.4
 #[test]
 fn a_bow_skill_with_bare_hands_does_not_start() {
     let mut g = Game::joined();
     let (_, most, _) = shoot(&mut g);
     assert_eq!(most, 0);
     assert_eq!(g.mana(), MANA);
+}
+
+// No rule claim: the Jab body (bodies-2.md §3.1) is not checked here.
+// The synthetic game is the camp, where the rules cut the hit before the
+// damage (`combat/damage.rs`, town room): this checks the cast path of a
+// unit-target skill (the start function `srvst 5` reads the kept target
+// of a targetable monster; the attack mode runs and ends), not the damage.
+#[test]
+fn jab_on_a_monster_starts_the_attack_mode_and_ends_it() {
+    let mut g = Game::joined();
+    g.select_right(JAB);
+    let (_, guid) = g.monster(500);
+    let mut msg = vec![0x0D];
+    msg.extend(1u32.to_le_bytes());
+    msg.extend(guid.to_le_bytes());
+    g.link.send(SendQueue::Game, &msg).unwrap();
+    g.link.pump().unwrap();
+    let mut seen = vec![g.player_mode()];
+    for _ in 0..14 {
+        g.ticks(1);
+        seen.push(g.player_mode());
+    }
+    assert!(seen.contains(&7), "the attack mode ran: {seen:?}");
+    assert_eq!(seen.last(), Some(&5), "and ended in town neutral: {seen:?}");
 }

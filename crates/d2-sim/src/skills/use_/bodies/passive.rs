@@ -9,7 +9,7 @@
 //! layer 0 here: the body world's list setter has no layer.
 //! PROVISIONAL (REC-150), `// d2rs-own, unverified`.
 
-use super::helpers::{eval, rec, s16, state_ok, stat_ok};
+use super::helpers::{eval, rec, s16, stat_ok, state_ok};
 use super::BodyWorld;
 use crate::skills::levels::{highest_entry, skill_level};
 use crate::skills::SkillTables;

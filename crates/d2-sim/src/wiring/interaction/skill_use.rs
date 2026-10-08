@@ -216,7 +216,9 @@ impl<X: Pending + UseRest> SkillUnits for UseView<'_, X> {
         self.cv.used_skill(u)
     }
     fn current_weapon(&self, u: UnitId) -> Option<UnitId> {
-        self.x().skill_weapon(u).or_else(|| self.cv.current_weapon(u))
+        self.x()
+            .skill_weapon(u)
+            .or_else(|| self.cv.current_weapon(u))
     }
     fn weapon(&self, u: UnitId) -> Option<UnitId> {
         self.x().skill_weapon(u).or_else(|| self.cv.weapon(u))
@@ -928,7 +930,10 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     fn passive_refresh(&mut self, u: UnitId) {
         let t = self.cv.v.h.tables.clone();
         for e in self.skill_list(u) {
-            let p = t.skills.skill(e.skill).map_or(-1, |r| i32::from(r.passivestate as i16));
+            let p = t
+                .skills
+                .skill(e.skill)
+                .map_or(-1, |r| i32::from(r.passivestate as i16));
             if p > 0 && SkillUnits::has_state(self, u, p as u16) {
                 bodies::passive::refresh(self, &t.skills, u, e.skill);
             }

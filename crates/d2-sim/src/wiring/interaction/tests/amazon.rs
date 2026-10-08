@@ -61,7 +61,7 @@ fn entry(skill: i32, base: i32) -> SkillEntry {
     }
 }
 
-// Covers: specs/skills/bodies-2b.md §8.1 r3–r5; specs/sim/pets.md §2 r6, §8
+// Covers: specs/skills/bodies-2b.md §8.1 r3; specs/sim/pets.md §2 r6
 #[test]
 fn a_valkyrie_is_a_listed_pet_with_state_93() {
     let (mut fx, p) = valkyrie_caster();
@@ -82,9 +82,9 @@ fn a_valkyrie_is_a_listed_pet_with_state_93() {
         .map(|n| n.guid)
         .collect();
     assert_eq!(listed, vec![guid as i32], "listed under the pet type");
-    let on = fx
-        .sim
-        .with(&mut fx.game, |_, v| v.stats.has_state(m[0], u32::from(VALKYRIE)));
+    let on = fx.sim.with(&mut fx.game, |_, v| {
+        v.stats.has_state(m[0], u32::from(VALKYRIE))
+    });
     assert!(on, "state 93 (valkyrie) is on");
     fx.assert_clean();
 }
@@ -123,7 +123,7 @@ fn a_passive_skill_gives_its_stat_through_the_state_list() {
     fx.assert_clean();
 }
 
-// Covers: specs/client/msg-skills.md §2 r4 (L = 0 frees the list)
+// Covers: specs/client/msg-skills.md §2 r4
 #[test]
 fn a_passive_skill_at_level_zero_gives_nothing() {
     let (mut fx, p, e) = passive_player(1);

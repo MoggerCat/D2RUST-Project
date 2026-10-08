@@ -158,11 +158,7 @@ fn facts_of(t: &InvTables, record: usize) -> ItemFacts {
 
 /// The play host's world sync ([`d2_server::adapters::SimGame::set_world_sync`]):
 /// the hands of every player and the facts of the items in them.
-pub fn sync<R, S>(
-    _: &Game,
-    sim: &mut WorldSim<LocalSeams>,
-    world: &mut WiredWorld<R, S>,
-) {
+pub fn sync<R, S>(_: &Game, sim: &mut WorldSim<LocalSeams>, world: &mut WiredWorld<R, S>) {
     let Some(inv) = world.inventory.as_ref() else {
         return;
     };
@@ -184,14 +180,113 @@ pub fn sync<R, S>(
             *slot = Some(item);
             w.items.insert(item, facts_of(&inv.tables, d.record));
         }
-        hands.weapon = hands
-            .right
-            .filter(|r| w.items.get(r).is_some_and(|f| f.class != class::HAND_TO_HAND));
+        hands.weapon = hands.right.filter(|r| {
+            w.items
+                .get(r)
+                .is_some_and(|f| f.class != class::HAND_TO_HAND)
+        });
         if hands.right.is_some() || hands.left.is_some() {
             w.hands.insert(owner, hands);
         }
     }
     if sim.action.sys.hooks.x.weapons != w {
         sim.action.sys.hooks.x.weapons = w;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use d2_data::fixup::maps::EquivMatrix;
+    use d2_sim::items::inventory::tables::{InvItemRec, InvTypeRec};
+
+    use super::*;
+
+    /// Types: 0 `weap`, 1 `bow` (a `weap`), 2 `jave` (a `weap`), 3 `aqv`
+    /// (arrows). Items: 0 a bow, 1 a javelin, 2 arrows, 3 a sword (a `weap`).
+    fn tables() -> InvTables {
+        let n = 5;
+        let mut m = EquivMatrix {
+            n,
+            words: 1,
+            bits: vec![0; n],
+        };
+        for i in 0..n {
+            m.bits[i] |= 1 << i;
+        }
+        m.bits[1] |= 1;
+        m.bits[2] |= 1;
+        let ty = |c: &[u8; 4]| InvTypeRec {
+            code: *c,
+            ..InvTypeRec::default()
+        };
+        let it = |t: i16, stack: u8| InvItemRec {
+            type_: t,
+            stackable: stack,
+            maxstack: if stack != 0 { 500 } else { 0 },
+            ..InvItemRec::default()
+        };
+        InvTables {
+            itemtypes: vec![
+                ty(b"weap"),
+                ty(b"bow\0"),
+                ty(b"jave"),
+                ty(b"aqv\0"),
+                ty(b"misc"),
+            ],
+            items: vec![it(1, 0), it(2, 0), it(3, 1), it(0, 0)],
+            equiv: m,
+            ..InvTables::default()
+        }
+    }
+
+    // Covers: specs/skills/bodies.md §2.3
+    #[test]
+    fn a_bow_is_hand_class_1_and_shoots() {
+        let f = facts_of(&tables(), 0);
+        assert_eq!((f.class, f.shoots), (class::BOW, true));
+        assert!(f.types.contains(&1) && f.types.contains(&0));
+    }
+
+    #[test]
+    fn a_javelin_is_a_thrusting_weapon_that_does_not_shoot() {
+        let f = facts_of(&tables(), 1);
+        assert_eq!((f.class, f.shoots), (class::ONE_HAND_THRUST, false));
+    }
+
+    #[test]
+    fn arrows_are_a_stack_and_no_weapon() {
+        let f = facts_of(&tables(), 2);
+        assert_eq!(f.class, class::HAND_TO_HAND);
+        assert!(f.stackable);
+        assert_eq!(f.max_stack, 500);
+    }
+
+    #[test]
+    fn any_other_weapon_swings() {
+        let t = tables();
+        assert_eq!(facts_of(&t, 3).class, class::ONE_HAND_SWING);
+    }
+
+    #[test]
+    fn the_hand_class_follows_the_weapon_in_use() {
+        let t = tables();
+        let (bow, quiver) = (UnitId(7), UnitId(8));
+        let mut w = Weapons::default();
+        w.items.insert(bow, facts_of(&t, 0));
+        w.items.insert(quiver, facts_of(&t, 2));
+        let p = UnitId(1);
+        w.hands.insert(
+            p,
+            Hands {
+                right: Some(bow),
+                left: Some(quiver),
+                weapon: Some(bow),
+            },
+        );
+        assert_eq!(w.hand_class(p), class::BOW);
+        assert_eq!(w.item_at(p, body::LEFT_HAND), Some(quiver));
+        assert_eq!(w.item_at(p, body::HEAD), None);
+        assert!(w.item_is(bow, 1) && !w.item_is(quiver, 1));
+        assert_eq!(w.hand_class(UnitId(2)), class::HAND_TO_HAND);
     }
 }
