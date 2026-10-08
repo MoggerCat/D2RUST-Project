@@ -483,7 +483,7 @@ fn inventory_draws_the_gold_value_and_button_from_the_model() {
     assert_eq!(gold_texts(&u), vec![("4330".to_string(), 508, 468, 1, 0)]);
 }
 
-// Covers: specs/ui/controls.md §3 row 56, specs/ui/panels.md §3.1 (d2rs-own layout)
+// Covers: specs/ui/controls.md §3, specs/ui/panels.md §3
 #[test]
 fn esc_opens_the_game_menu_closes_panels_first_and_closes_it_again() {
     let mut u = ui(Some(areas()), true);
@@ -505,7 +505,7 @@ fn esc_opens_the_game_menu_closes_panels_first_and_closes_it_again() {
     assert!(u.ui.is_open(9));
 }
 
-// Covers: specs/ui/panels.md §3.1 (no player, no menu)
+// Covers: specs/ui/panels.md §3
 #[test]
 fn esc_without_a_player_opens_nothing() {
     let mut u = ui(Some(areas()), true);
@@ -513,7 +513,7 @@ fn esc_without_a_player_opens_nothing() {
     assert!(!u.ui.is_open(9));
 }
 
-// Covers: d2rs-own, unverified (the menu's entries)
+// d2rs-own, unverified: the menu entries (REC-QESC-1)
 #[test]
 fn the_menu_entries_return_save_and_exit_and_swallow_clicks() {
     let mut u = ui(Some(areas()), true);
@@ -556,7 +556,7 @@ fn the_menu_entries_return_save_and_exit_and_swallow_clicks() {
     assert!(!u.ui.is_open(9));
 }
 
-// Covers: specs/ui/control-panel.md §9 (mini panel row 7: game menu)
+// Covers: specs/ui/control-panel.md §9
 #[test]
 fn the_mini_panel_game_menu_button_opens_it() {
     let mut u = ui(Some(areas()), true);
