@@ -405,6 +405,10 @@ impl OriginalUi {
             sh: sh.clone(),
             st: self.shop.clone(),
         }))?;
+        root.add(Box::new(cube_ui::CubeUi {
+            sh: sh.clone(),
+            input: Default::default(),
+        }))?;
         root.add(Box::new(BorderUi { sh: sh.clone() }))?;
         root.add(Box::new(super::hire_list::HireListUi {
             st: self.hire.clone(),
@@ -721,7 +725,8 @@ impl Panel for InventoryUi {
         {
             let class = Facts::of(ctx.world).class;
             if let Some(l) = sh.items.layout(class, &s) {
-                sh.items.right_press(ctx.world, &sh.tables.files, &l, at);
+                let out = sh.items.right_press(ctx.world, &sh.tables.files, &l, at);
+                sh.outputs.extend(out);
             }
             return UiResponse::Consumed;
         }
@@ -1146,6 +1151,8 @@ pub mod hud;
 #[path = "hud_belt.rs"]
 pub mod hud_belt;
 
+#[path = "cube_ui.rs"]
+pub(super) mod cube_ui;
 #[path = "msg_ui.rs"]
 pub mod msg_ui;
 #[path = "quest_log_ui.rs"]

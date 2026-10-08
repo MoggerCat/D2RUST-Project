@@ -154,6 +154,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         }
         self.rest.use_item_at(player, item, x, y)
     }
+    fn open_cube(&mut self, player: Owner, cube: Guid) -> bool {
+        self.open_cube_desk(player, cube)
+    }
     fn consume_item(&mut self, player: Owner, item: Guid) {
         // PROVISIONAL (REC-113, REC-117): a used identify or Town Portal
         // scroll leaves the grid.

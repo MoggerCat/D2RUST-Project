@@ -87,7 +87,7 @@ use d2_native::source::NativeAsset;
 use d2_server::adapters::character::LoadContext;
 use d2_server::adapters::handlers::skills::wired::WiredSkills;
 use d2_server::adapters::handlers::world::{
-    preview_inv_parts, ActionEvents, ActionWorld, Outbox, WiredWorld,
+    preview_cube_parts, preview_inv_parts, ActionEvents, ActionWorld, Outbox, WiredWorld,
 };
 use d2_server::adapters::session::{load_new_character_with_items, load_save, GameSetup};
 use d2_server::adapters::session_flow::{
@@ -123,6 +123,7 @@ use d2_sim::wiring::economy::{DeathDrops, DropTables, GameFields};
 use d2_sim::wiring::interaction::skill_events;
 use d2_sim::wiring::worldgen::levels::{SharedTypes, WorldTypes};
 use d2_sim::wiring::worldgen::{CreationTables, WorldPending, WorldSim, WorldState, WorldTables};
+use d2_sim::world::cube::CubeData;
 use d2_sim::world::hirelings::HirelingTables;
 use d2_sim::world::npc::HireRow;
 use d2_sim::world::objects::ObjectTables;
@@ -1486,6 +1487,9 @@ struct GameParts {
     /// character's start items, `items/generation.md` §10.3); none for
     /// synthetic data (the start items then stay unapplied).
     inventory: Option<InvTables>,
+    /// The Horadric Cube's recipes and item columns; none for synthetic
+    /// data (the cube then stays a stub).
+    cube: Option<CubeData>,
 }
 
 /// Rows of the synthetic `monstats` (classes 0 … 399; Akara is the only
@@ -1576,6 +1580,7 @@ impl GameParts {
             drops: None,
             hirelings: None,
             inventory: None,
+            cube: None,
         })
     }
 
@@ -1601,6 +1606,10 @@ impl GameParts {
             inventory: Some(
                 InvTables::from_fixed(&t.fixed)
                     .map_err(|e| BuildError::Tables(format!("inventory tables: {e}")))?,
+            ),
+            cube: Some(
+                CubeData::from_fixed(&t.fixed)
+                    .map_err(|e| BuildError::Tables(format!("cube tables: {e}")))?,
             ),
         })
     }
@@ -1920,6 +1929,8 @@ pub fn build_with_objects(
     // The play host's inventory model (`play-server` seam, D1 preview
     // fills in `PreviewMoveRest`): the new character's start items.
     world.inventory = parts.inventory.map(preview_inv_parts);
+    // The cube (d2rs-own, unverified, REC-119): the user's `cubemain`.
+    world.cube = parts.cube.map(preview_cube_parts);
     let mut s: Sim = SimGame::with_world(game, sim, world);
     s.set_host_sync(sync_seams);
     // The session sequence (`intents-events.md` §8) runs on the client's
