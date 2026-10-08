@@ -980,3 +980,81 @@ fn stash_gold_max_line_resolves_its_string_id() {
         vec!["Gold Max: 2500000"]
     );
 }
+
+fn tree_tables() -> skill_tree_ui::SkillTreeTables {
+    use skill_tree_ui::SkillTreeRow;
+    let row = |skill, page, r, c, cel, req: u16| SkillTreeRow {
+        skill,
+        class: 0,
+        page,
+        row: r,
+        column: c,
+        icon_cel: cel,
+        maxlvl: 20,
+        ingame: true,
+        reqlevel: req,
+        reqskill: [u16::MAX; 3],
+        ..Default::default()
+    };
+    skill_tree_ui::SkillTreeTables {
+        rows: vec![
+            row(6, 1, 1, 1, 2, 1),
+            row(7, 1, 2, 3, 4, 6),
+            row(8, 2, 3, 2, 6, 1),
+        ],
+    }
+}
+
+// Covers: specs/ui/panels.md §10 r3, §10 r4, §10 r5
+#[test]
+fn skill_tree_draws_icons_and_levels_and_spends_a_point() {
+    use crate::bridge::skills::{SkillEntry as Entry, SkillList, NATIVE};
+    let mut w = world(AMAZON, 1, true);
+    let key = w.local_player.unwrap();
+    {
+        let u = w.units.get_mut(&key).unwrap();
+        u.stats.insert(12, 5); // level
+        u.stats.insert(5, 2); // free points
+        u.skills = Some(SkillList {
+            entries: vec![Entry {
+                skill: 6,
+                base: 3,
+                owner: NATIVE,
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+    }
+    let mut u = ui(Some(areas()), true);
+    u.ui.set_skill_tree_tables(tree_tables());
+    u.key(&w, Action::ToggleSkillTree);
+    let img = u.images(&w);
+    // Tab 1: skills 6 (column 1, row 1) and 7 (column 3, row 2).
+    let icons = panel_images(&img, "spells\\amskillicon");
+    assert_eq!(icons, vec![(2, 415, 122), (4, 553, 190)]);
+    // The level number of skill 6 (hard points 3), none for skill 7.
+    let ctx = UiCtx {
+        tick: 0,
+        world: &w,
+        strings: &NoStrings,
+    };
+    let mut out: Vec<UiDraw> = Vec::new();
+    u.root.draw(&ctx, &mut out);
+    let numbers: Vec<_> = out
+        .iter()
+        .filter_map(|d| match d {
+            UiDraw::Text(t) => Some((String::from_utf16_lossy(&t.text), t.at.x, t.at.y)),
+            _ => None,
+        })
+        .filter(|(s, ..)| s == "3")
+        .collect();
+    assert_eq!(numbers.len(), 1);
+    // A click on skill 6's icon with a free point sends 0x3B.
+    u.click(&w, Point::new(430, 100));
+    let want = ClientIntent::from_message(&d2_proto::client::AddSkillPoint { skill: 6 });
+    assert_eq!(u.root.intents(), &[want]);
+    // Skill 7 needs level 6: its click sends nothing.
+    u.root.take_intents();
+    u.click(&w, Point::new(570, 170));
+    assert!(u.root.intents().is_empty());
+}
