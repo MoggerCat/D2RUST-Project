@@ -35,6 +35,7 @@ pub mod pending;
 pub mod reaction;
 pub mod rooms;
 pub mod switch;
+pub mod town_portal;
 pub mod unit_update;
 pub mod units;
 pub mod vitals_sync;
@@ -168,6 +169,8 @@ pub struct ActionHooks<X> {
     pub objects: Option<ObjectState>,
     /// The object state is lent out for a call.
     objects_out: bool,
+    /// The town portal pairs ([`town_portal`], REC-110).
+    pub portals: town_portal::PortalLinks,
     /// The drop state of the object code's chest drop `D(Q)`
     /// (`treasure.md` §4, [`crate::wiring::economy::object_chest_drop`];
     /// the `levels` rows are the object tables'). `None` (the default):
@@ -324,6 +327,7 @@ impl<X> ActionHooks<X> {
             waypoints: BTreeMap::new(),
             objects: None,
             objects_out: false,
+            portals: Default::default(),
             object_drops: None,
             pet_follows: None,
             pet_deaths: None,

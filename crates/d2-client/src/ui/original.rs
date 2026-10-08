@@ -696,7 +696,20 @@ impl Panel for InventoryUi {
                 let out = self.panel.release(&sh.tables, &s, at);
                 sh.outputs.extend(out);
             }
-            None => {}
+            None => {
+                // Right press: use the item under the mouse (REC-110).
+                if let UiEvent::Press {
+                    button: PointerButton::Right,
+                    at,
+                } = e
+                {
+                    let class = Facts::of(ctx.world).class;
+                    if let Some(l) = sh.items.layout(class, &s) {
+                        let out = sh.items.use_press(ctx.world, &l, at);
+                        sh.outputs.extend(out);
+                    }
+                }
+            }
         }
         UiResponse::Consumed
     }

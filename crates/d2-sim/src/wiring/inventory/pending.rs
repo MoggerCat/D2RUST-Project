@@ -148,9 +148,17 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         self.rest.tile_warp(player, tile)
     }
     fn use_item_at(&mut self, player: Owner, item: Guid, x: i32, y: i32) -> bool {
+        // PROVISIONAL (REC-110): Town Portal scroll and tome.
+        if self.use_portal_item(player, item) {
+            return true;
+        }
         self.rest.use_item_at(player, item, x, y)
     }
     fn consume_item(&mut self, player: Owner, item: Guid) {
+        // PROVISIONAL (REC-110): a used Town Portal scroll leaves.
+        if self.is_portal_scroll(item) {
+            return self.remove_used_item(player, item);
+        }
         self.rest.consume_item(player, item)
     }
     fn item_skill(&self, item: Guid) -> i32 {

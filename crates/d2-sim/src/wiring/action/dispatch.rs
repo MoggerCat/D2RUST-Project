@@ -203,6 +203,16 @@ impl<X: Pending> ActionSim<X> {
         self.with(game, |g, v| v.warp_tile_message(g, player, guid))
     }
 
+    /// The Town Portal scroll or tome of `player` ([`View::create_town_portal`]):
+    /// the pair's units. `None`: nothing was created.
+    pub fn open_town_portal(
+        &mut self,
+        game: &mut Game,
+        player: UnitId,
+    ) -> Option<(UnitId, UnitId)> {
+        self.with(game, |g, v| v.create_town_portal(g, player))
+    }
+
     fn log(&mut self, r: Result<(), WiringError>) {
         if let Err(e) = r {
             self.sys.hooks.errors.push(e);

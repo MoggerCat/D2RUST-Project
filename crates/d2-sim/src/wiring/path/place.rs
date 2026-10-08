@@ -13,6 +13,7 @@
 use std::cell::RefCell;
 
 use crate::drlg::{act_of_level, TileRect};
+use crate::game::Game;
 use crate::path::collision::{box_value, find_room, point_value, size_value};
 use crate::path::coords::Point;
 use crate::path::place_seams::{
@@ -22,7 +23,7 @@ use crate::path::search::ExpField;
 use crate::path::warp::WarpOutcome;
 use crate::path::CollisionRooms;
 use crate::units::{RoomId, UnitId, UnitType};
-use crate::wiring::action::{DrlgWorld, HirelingCall, Pending, WiringError};
+use crate::wiring::action::{DrlgWorld, HirelingCall, Pending, View, WiringError};
 
 use super::walk::PathCtx;
 
@@ -352,6 +353,23 @@ pub fn game_entry<X: Pending>(c: PathCtx<'_, X>, player: UnitId, act: u8) -> boo
             }
         }
         placed
+    })
+}
+
+/// Level spawn point `0x0061B060(act, level, tile index, &x, &y, 3)`
+/// (§11): the room and point, `None` without a spawn room or a free
+/// point (the portal creation's destination, `objects.md` §12 rule 8).
+pub fn level_spawn<X: Pending>(
+    v: &mut View<'_, X>,
+    game: &mut Game,
+    act: u8,
+    level: u32,
+    tile_index: u32,
+) -> Option<(RoomId, i32, i32)> {
+    let c = PathCtx::of(v, game);
+    with_shared(c, |cv, _, lv| {
+        let r = crate::path::place::level_spawn_point(cv, lv, Some(act), level, tile_index, 3);
+        log(cv, r).flatten().map(|(room, p)| (room, p.x, p.y))
     })
 }
 

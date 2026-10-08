@@ -349,6 +349,12 @@ pub trait WorldHost<D> {
     ) -> Option<u32> {
         None
     }
+    /// The Town Portal scroll or tome of `player` was used (REC-110,
+    /// `wiring::action::town_portal`): make the portal pair. `false`:
+    /// nothing was created.
+    fn town_portal(&mut self, game: &mut Game, events: &mut D, player: UnitId) -> bool {
+        false
+    }
     /// The cube (`handlers::items`) on the host's economy.
     fn cube<C: CubeCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
         None

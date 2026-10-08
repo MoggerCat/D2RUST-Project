@@ -219,6 +219,23 @@ fn a_grid_item_without_a_cursor_item_sends_0x19() {
         .is_empty());
 }
 
+// Covers: specs/items/inventory-moves.md §7.11
+#[test]
+fn a_right_click_on_a_grid_item_sends_0x20_with_the_player_point() {
+    let (u, _) = ui();
+    let mut w = world(&[(7, mode::STORED, (0, 2, 3, 1), b"hp1 ")], None);
+    w.units.get_mut(&PLAYER).unwrap().position = Some((300, 400));
+    let out = u.use_press(&w, &layout(), Point::new(160, 290));
+    assert_eq!(
+        intents(&out),
+        vec![vec![0x20, 7, 0, 0, 0, 0x2C, 1, 0, 0, 0x90, 1, 0, 0]]
+    );
+    // An empty cell, or an item on the cursor: nothing.
+    assert!(u.use_press(&w, &layout(), Point::new(101, 201)).is_empty());
+    let c = world(&[(7, mode::STORED, (0, 2, 3, 1), b"hp1 ")], Some(9));
+    assert!(u.use_press(&c, &layout(), Point::new(160, 290)).is_empty());
+}
+
 // Covers: specs/ui/inventory.md §5 r3
 #[test]
 fn the_cursor_cell_centres_an_even_item() {
