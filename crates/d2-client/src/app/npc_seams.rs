@@ -26,6 +26,10 @@ pub struct SnapUnit {
     pub pos: (i32, i32),
     pub act: u8,
     pub guid: u32,
+    /// The level id of the unit's room (0 without a DRLG room).
+    pub level: u32,
+    /// The unit's class (monsters: the `monstats` row).
+    pub class: u32,
 }
 
 /// The players and monsters of the game at the last sync.
@@ -80,6 +84,8 @@ mod tests {
             pos: (x, y),
             act: 0,
             guid: 0,
+            level: 0,
+            class: 0,
         };
         s.units.insert(UnitId(1), u(UnitType::Player, 0, 0));
         s.units.insert(UnitId(2), u(UnitType::Monster, 3, 4));

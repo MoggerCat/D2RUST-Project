@@ -416,14 +416,22 @@ impl QuestRest for AppRest {
     fn unit_act(&self, u: UnitId) -> Option<u8> {
         self.snap.lock().ok()?.units.get(&u).map(|u| u.act)
     }
-    fn unit_level(&self, _: UnitId) -> Option<u32> {
-        None
+    /// The level id of the last sync (`npc_seams`).
+    fn unit_level(&self, u: UnitId) -> Option<u32> {
+        let s = self.snap.lock().ok()?;
+        s.units.get(&u).map(|u| u.level).filter(|&l| l != 0)
     }
     fn unit_kind(&self, u: UnitId) -> UnitKind {
         if self.quests.contains_key(&u) {
-            UnitKind::Player
-        } else {
-            UnitKind::Other
+            return UnitKind::Player;
+        }
+        match self.snap.lock().ok().and_then(|s| s.units.get(&u).copied()) {
+            Some(s) if s.ty == UnitType::Monster => UnitKind::Monster {
+                class: s.class,
+                superunique: None,
+                owner: None,
+            },
+            _ => UnitKind::Other,
         }
     }
     /// d2rs-own, unverified (REC-106): every player (single player).

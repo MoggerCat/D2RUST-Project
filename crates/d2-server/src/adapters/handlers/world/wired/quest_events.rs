@@ -20,6 +20,9 @@ use d2_sim::world::quests::QuestWorld;
 
 use super::{quest_call, ActionEvents, TradeRest, WiredWorld};
 
+/// Andariel's monster class (`monstats.txt` row 156).
+const ANDARIEL: u16 = 156;
+
 /// The level each player was last seen in.
 #[derive(Debug, Default)]
 pub struct QuestLevels(BTreeMap<UnitId, u32>);
@@ -52,6 +55,11 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 seen = now;
                 for e in &queued {
                     if let QuestEvent::Kill { victim, killer } = *e {
+                        // PROVISIONAL (REC-132, d2rs-own, unverified): no
+                        // spec links Andariel to chain 6.
+                        if w.monster_class(victim) == Some(ANDARIEL) {
+                            q.add_link(w, victim, 6, None);
+                        }
                         q.monster_killed(w, victim, killer);
                     }
                 }
