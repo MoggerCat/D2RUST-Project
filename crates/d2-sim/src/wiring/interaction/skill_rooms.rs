@@ -21,6 +21,30 @@ impl<X: Pending + UseRest> UseView<'_, X> {
         self.cv.v.h.paths.is_some()
     }
 
+    /// The line from the unit's position to `to` is clear under `mask`
+    /// (`0x0064E260` from the unit's room, `pathing.md` §13.3); `None`
+    /// without the provider. A unit without a room is blocked (rule 1).
+    // d2rs-own, unverified (REC-248): the use pipeline's line test is the
+    // plain cell walk from the caster's path position, as the server's
+    // area-find line is (`umod_line_clear`).
+    pub(super) fn rooms_line_clear(&self, u: UnitId, to: (i32, i32), mask: u32) -> Option<bool> {
+        if !self.on_rooms() {
+            return None;
+        }
+        let from = self.cv.v.h.path_position(u);
+        let room = self.cv.game.lists.unit(u).and_then(|e| e.room());
+        Some(
+            !crate::path::line::line_test(
+                &self.cv.v.h.drlg,
+                room,
+                Point::new(from.0, from.1),
+                Point::new(to.0, to.1),
+                mask as u16,
+            )
+            .blocked(),
+        )
+    }
+
     /// The `Teleport` column of the room's level (`levels.txt`); `None`
     /// without the provider, a level or a row.
     pub(super) fn level_teleport(&self, r: RoomId) -> Option<i32> {
