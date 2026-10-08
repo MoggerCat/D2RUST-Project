@@ -1514,3 +1514,119 @@ fn act1_stash_keeps_an_item_and_gold() {
     assert!(!rig.with_ui(|u| u.is_open(0x19)), "the stash closed");
     rig.check("stash close");
 }
+
+// ---- the cube -----------------------------------------------------------------------------
+
+/// The cube grid's cell (x, y) on screen (`panels/cube_items.rs`
+/// fallback: (116, 130) + the 800 × 600 offset, 29 px cells).
+fn cube_cell(x: u16, y: u16) -> Point {
+    Point::new(196 + 29 * i32::from(x) + 10, 190 + 29 * i32::from(y) + 10)
+}
+
+/// The transmute button and the cube's close button
+/// (`panels/stash_input.rs` `transmute_hit`, `cube_close_hit`), centred.
+fn transmute_button() -> Point {
+    let s = Screen::R800;
+    Point::new(s.sx() + 164, s.h + s.sy() - 203)
+}
+
+fn cube_close_button() -> Point {
+    let s = Screen::R800;
+    Point::new(s.sx() + 295, s.h + s.sy() - 80)
+}
+
+impl Rig {
+    /// The local player's item with `code` (GUID, x, y).
+    fn own_item(&self, code: &[u8; 4]) -> (u32, u16, u16) {
+        d2_client::bridge::items::local_items(self.bridge().world())
+            .iter()
+            .find(|i| i.code == Some(*code))
+            .map(|i| (i.key.guid, i.x, i.y))
+            .unwrap_or_else(|| panic!("the player holds {code:?}"))
+    }
+
+    /// The C→S 0x4F ClickButton messages sent since the last check, by
+    /// button.
+    fn buttons_sent(&self) -> Vec<u8> {
+        self.wire
+            .lock()
+            .unwrap()
+            .sent
+            .iter()
+            .filter(|m| m[0] == 0x4F)
+            .map(|m| m[1])
+            .collect()
+    }
+}
+
+// Covers: specs/ui/panels.md §12; specs/world/cube.md §1, §2; specs/items/inventory-moves.md §7
+#[test]
+fn act1_cube_holds_an_item_and_transmutes() {
+    use d2_client::controls::Action;
+    use d2_client::ui::panel::ActionId;
+    use d2_client::ui::panels::inventory::UI_INVENTORY;
+    use d2_client::ui::panels::stash_cube::UI_CUBE;
+    let mut rig = Rig::new();
+    rig.stage_gold(5_000);
+    rig.check("gold");
+    rig.open_shop(class::AKARA, OptionKind::Trade);
+    let item = rig.buy(&BUCKLER);
+    rig.close_shop();
+    let (_, x, y) = rig.own_item(&BUCKLER);
+
+    // The inventory (its toggle), then the start cube (REC-244) opened by
+    // its use: a right click on it, C→S 0x20, ui 0x1A.
+    rig.queue(UiEvent::Action(ActionId(
+        Action::ToggleInventory.index() as u16
+    )));
+    rig.step(3);
+    assert!(
+        rig.with_ui(|u| u.is_open(UI_INVENTORY)),
+        "the inventory opened"
+    );
+    let (_, cx, cy) = rig.own_item(b"box ");
+    rig.click_with(PointerButton::Right, backpack_cell(cx, cy));
+    for _ in 0..40 {
+        if rig.with_ui(|u| u.is_open(UI_CUBE)) {
+            break;
+        }
+        rig.step(1);
+    }
+    assert!(rig.with_ui(|u| u.is_open(UI_CUBE)), "the cube opened");
+    rig.check("cube open");
+
+    // The buckler: backpack → cursor → cube grid (page 3).
+    rig.click(backpack_cell(x, y));
+    rig.step(6);
+    rig.click(cube_cell(0, 0));
+    rig.step(10);
+    assert_eq!(
+        rig.item_place(item),
+        Some((3, 0)),
+        "the buckler is in the cube"
+    );
+    rig.check("item to the cube");
+
+    // Transmute (C→S 0x4F 0x18): no recipe takes a lone buckler, so it
+    // stays as it is (`cube.md` §2).
+    rig.click(transmute_button());
+    rig.step(10);
+    assert_eq!(rig.buttons_sent(), [0x18], "the transmute is sent");
+    assert_eq!(rig.item_place(item), Some((3, 0)), "the buckler stays");
+    rig.check("transmute");
+
+    // The buckler back to its backpack cell.
+    rig.click(cube_cell(0, 0));
+    rig.step(6);
+    rig.click(backpack_cell(x, y));
+    rig.step(10);
+    assert_eq!(rig.item_place(item), Some((0, 0)), "back in the backpack");
+    rig.check("item back");
+
+    // The cube's close button: C→S 0x4F 0x17, ui 0x1A closed.
+    rig.click(cube_close_button());
+    rig.step(10);
+    assert!(!rig.with_ui(|u| u.is_open(UI_CUBE)), "the cube closed");
+    assert_eq!(rig.buttons_sent(), [0x17], "the close is sent");
+    rig.check("cube close");
+}
