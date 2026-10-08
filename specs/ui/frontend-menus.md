@@ -20,33 +20,33 @@
 | Rules | 82–83 |
 |   F1.1 Control descriptors (the data every front-end screen is built from) | 84–123 |
 |   F1.2 Art preload | 124–151 |
-|   F1.3 Screen flow (single player) | 152–180 |
-|   F1.4 Main menu (`0x004336C0`) | 181–209 |
-|   F1.5 Title animation (logo fire) | 210–237 |
-|   F1.6 Palette and sounds | 238–260 |
-|   F2.1 Save folder (`0x00407050`) | 261–279 |
-|   F2.2 Scan and entry filter (`0x00438F70`, `0x0043C8A0`, `0x00438AD0`) | 280–306 |
-|   F2.3 Sort order (`0x00438AD0`) | 307–312 |
-|   F2.4 Layout (`0x0043AE30`, draw `0x004380F0`) | 313–336 |
-|   F2.5 Selection, scrolling and keys | 337–366 |
-|   F2.6 OK / Enter (`0x00439840`) | 367–379 |
-|   F2.7 Other buttons | 380–404 |
-|   F2.8 Difficulty box (`0x00439780`) | 405–424 |
-|   F2.9 Control records and art | 425–461 |
-|   F3.1 Character-create screen build (`0x00435580`) | 462–497 |
-|   F3.2 Class line-up (positions, creation order) | 498–513 |
-|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 514–573 |
-|   F3.4 Name entry (edit box, descriptor 204) | 574–588 |
-|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 589–610 |
-|   F3.6 OK / Cancel behaviour and the new save | 611–636 |
-|   F3.7 Sounds (deferred) | 637–641 |
-|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 642–670 |
-| Constants & data dependencies | 671–707 |
-| Randomness | 708–711 |
-| Edge cases & original bugs | 712–743 |
-| Test vectors | 744–774 |
-| Provenance | 775–812 |
-| Open questions | 813–854 |
+|   F1.3 Screen flow (single player) | 152–183 |
+|   F1.4 Main menu (`0x004336C0`) | 184–212 |
+|   F1.5 Title animation (logo fire) | 213–240 |
+|   F1.6 Palette and sounds | 241–263 |
+|   F2.1 Save folder (`0x00407050`) | 264–282 |
+|   F2.2 Scan and entry filter (`0x00438F70`, `0x0043C8A0`, `0x00438AD0`) | 283–309 |
+|   F2.3 Sort order (`0x00438AD0`) | 310–315 |
+|   F2.4 Layout (`0x0043AE30`, draw `0x004380F0`) | 316–339 |
+|   F2.5 Selection, scrolling and keys | 340–384 |
+|   F2.6 OK / Enter (`0x00439840`) | 385–397 |
+|   F2.7 Other buttons | 398–422 |
+|   F2.8 Difficulty box (`0x00439780`) | 423–442 |
+|   F2.9 Control records and art | 443–479 |
+|   F3.1 Character-create screen build (`0x00435580`) | 480–515 |
+|   F3.2 Class line-up (positions, creation order) | 516–531 |
+|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 532–591 |
+|   F3.4 Name entry (edit box, descriptor 204) | 592–606 |
+|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 607–630 |
+|   F3.6 OK / Cancel behaviour and the new save | 631–656 |
+|   F3.7 Sounds (deferred) | 657–661 |
+|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 662–690 |
+| Constants & data dependencies | 691–727 |
+| Randomness | 728–731 |
+| Edge cases & original bugs | 732–763 |
+| Test vectors | 764–797 |
+| Provenance | 798–835 |
+| Open questions | 836–880 |
 <!-- /index -->
 
 ## Summary
@@ -170,9 +170,12 @@ function or in `0x004326F0` (character-create art, per class).
 | difficulty popup | **Esc** (descriptor 173: invisible 10×10 button at (900,900), hotkey 27) | `0x00432EE0` → `0x0042F3F0` (pops list A) | character select |
 | in game | exit (0x50 code 23 path) | `0x0044B8A0` returns 4 for single player (`client/msg-ui.md` OQ8) | PROVISIONAL: character select (because 1.14d returns to it after Save and Exit); settled by REC-200 |
 
-Rows 1–2 (the `blizno` picture and its 8 s timer): PROVISIONAL: never shown in 1.14d (because the
-start-up chain `0x00435230` plays the Blizzard videos and goes straight to the trademark screen; no
-caller builds descriptors 0 / 1); settled by REC-229. The start-up chain is `ui/frontend-credits.md` C1.
+Rows 1–2 (the `blizno` picture and its 8 s timer): never shown in 1.14d. The start-up chain
+`0x00435230` plays the Blizzard videos and goes straight to the trademark screen, and no caller
+builds descriptors 0 / 1: none of the 347 call sites of the adders `0x0042F430` / `0x0042F3A0`
+passes 0 or 1 in ECX (scan of the ECX write before each call, 2026-10-08; the smallest is 0x1F), and the timer
+callback `0x00434D90` is referenced only by descriptors 0 and 1 (`0x00708D30`, `0x00708D60`).
+REC-229 only verifies. The start-up chain is `ui/frontend-credits.md` C1.
 
 Every screen builder starts with `0x0043C4F0` (descriptors 8 background,
 6, 7 logo halves) except the character screens, which draw their own
@@ -358,8 +361,23 @@ State: `sel` = `[0x0070CC00]` (index into the list), `first` = `[0x00779DC8]`, `
    ⌈(n − 8) / 2⌉ when n > 8 (`0x004FC5E0` at `0x0043B04D`). Its callback (`0x00439DF0`): position change d
    → `first` += 2d, clamped to [0, n − 1]; `sel` is not changed. The arrows and thumb are the D2Win scroll
    bar widget's.
-5. Mouse wheel: PROVISIONAL: none (because no wheel handler was found in the character select code);
-   settled by REC-204.
+5. Mouse wheel (D2Win front-end handler `0x004FA340`, last entry of the 33-entry front-end message
+   table `0x0072DC48`, registered by `0x004F8FE0`; disassembled 2026-10-08): k = (signed 16-bit wheel
+   delta, high word of wParam) / 120, truncated toward 0. Ignored while the D2Win control held at
+   `[0x0087E974]` (type 0x0B) is visible and enabled (`0x005085C0`). Among the controls of the list
+   `[0x007D55D4]` (when set) or else the main D2Win list `[0x007D55BC]`, it takes the visible, enabled
+   scroll bars (D2Win type 5) whose range is > 0 and keeps the one nearest the pointer (`0x004FA200`;
+   no hit test: the wheel works with the pointer anywhere). On character select the only one is the
+   list's scroll bar (control 0xA7, a text box created with flag 4, which gives it a scroll bar; range
+   set by r4 only when n > 8; unlinked from the text box and given the callback `0x00439DF0` at build,
+   `0x0043AF30` / `0x0043AF40`). The step (`0x00508030`, skipped while the bar's +0x58 is set): k > 0
+   (wheel up) → position − 1; k < 0 → position + 1; k = 0 → unchanged (one step per message whatever
+   |k|); clamped to [0, range]; then the callback: `first` += 2 × (position change), clamped to [0, n −
+   1], `sel` unchanged, then `0x00438560` and `0x00439210` (as for the arrows, r4). The handler then
+   offers the wheel to every visible, enabled button (D2Win type 6) with button flag 8 (k > 0) or 0x10
+   (k < 0) (field +0x40; which front-end buttons set them is not traced: open question). With n ≤ 8
+   saves (n as in r4) the wheel does nothing. This replaces the earlier "no wheel" reading (REC-204 now
+   only verifies).
 6. Buttons enabled (`0x004390A0`): no entry at `sel` → OK, Delete, Convert off; else OK and Delete on,
    Convert on unless status & 0x20; Create New on (`[0x00779DB8]` = 0; its only write is 0 at
    `0x0043AD21`).
@@ -605,8 +623,10 @@ unchecked / checked). Each click toggles one bit of the creation flags `[+0x1EF]
    5/6).
 2. The hardcore pair exists only when `[0x00779DA4]` ≠ 0 (else created disabled and never shown).
    `[0x00779DA4]` is set to 1 unconditionally by character select (`0x0043B080`) and the other entry
-   paths (`0x00438AD0`, `0x0043AE30`, `0x0043B9A0`, `0x0043BF60`). PROVISIONAL: hardcore is always offered
-   in 1.14d single player (because no path stores 0 there before the create screen); settled by REC-211.
+   paths (`0x00438AD0`, `0x0043AE30`, `0x0043B9A0`, `0x0043BF60`). Hardcore is always offered in 1.14d
+   single player: the xref scan of `[0x00779DA4]` (2026-10-08) finds five writers, all storing 1
+   (`0x00438E51`, `0x0043AE4F`, `0x0043B113`, `0x0043B9B0`, `0x0043BFA6`), and three readers
+   (`0x00433EF3`, `0x004357A5`–`0x00435869`); no unlock condition exists. REC-211 only verifies.
 
 ### F3.6 OK / Cancel behaviour and the new save
 
@@ -750,6 +770,9 @@ None. The front end draws no game-seed values; its animations run on wall-clock 
 | mouse (264, 289) / (264, 324) on Single Player (y 324, h 35) | inside / outside | F1.1 r3 |
 | Wide button 272×35 | tiles 2: up frames 0–1, pressed 2–3 | F1.1 r4 |
 | version text | "v 1.14d" | F1.4 r4 |
+| character select, 11 saves (bar range 2), `first` 0, bar 0; wheel delta −120 three times | `first` 2, 4, 4 (bar 1, 2, 2); `sel` unchanged | F2.5 r5 |
+| then wheel delta +120; then +60 | `first` 2 (bar 1); then no change (k = 0) | F2.5 r5 |
+| character select, 8 saves, any wheel | nothing (no range) | F2.5 r5 |
 | button h = 25 | font 10, k = 2 | F1.1 r5 |
 
 | Input | Expected |
@@ -812,6 +835,9 @@ D2Win anim control `0x00500850` / `0x005005B0` / `0x00500480` / `0x005003A0` / `
 
 ## Open questions
 
+- Wheel on front-end buttons (§F2.5 r5): which D2Win buttons carry flag 8 / 0x10 at +0x40 (set by
+  `0x00501290` from the descriptor or later); a read of the button constructor and its setters
+  settles it.
 - **REC-200** Game exit target. Capture: in single player, Save and Exit
   from a game. Steps: hook `0x0044B8A0` return and the next screen builder
   called (`0x0043B080` vs `0x004336C0`). Settles: which screen return
@@ -828,7 +854,7 @@ D2Win anim control `0x00500850` / `0x005005B0` / `0x00500480` / `0x005003A0` / `
 
 - **REC-204** Mouse wheel on character select. Capture: 1.14d, ≥ 11 characters, wheel up / down over the list
   and over the scroll bar; log `[0x00779DC8]` and `[0x0070CC00]` per event (hook `0x00439DF0`, `0x00439E90`).
-  Settles: whether the wheel scrolls (`first` changes) and by how much, or nothing.
+  Verifies §F2.5 r5 (settled from the binary 2026-10-08: one notch = scroll bar ±1 = `first` ∓ 2).
 - **REC-205** Dead hardcore figure. Capture: a hardcore save with status 0x0C (male and female class);
   screenshot the slot; hook `0x005066C0` args. Settles: what class' 8 / 9 draws (token, mode, palette) and
   the draw flags from `0x006CE278`.
@@ -850,4 +876,4 @@ D2Win anim control `0x00500850` / `0x005005B0` / `0x00500480` / `0x005003A0` / `
   last frame. Settles §F3.3 rule 2/4 as implemented.
 - **REC-211** — hardcore availability. Capture: fresh install, empty save folder, Single Player → create
   screen, select any class; check the Hardcore box is shown (and log `[0x00779DA4]` at `0x00435580`).
-  Settles §F3.5 rule 2.
+  Verifies §F3.5 rule 2 (settled from the binary 2026-10-08: always offered).

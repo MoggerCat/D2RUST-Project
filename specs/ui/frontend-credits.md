@@ -19,22 +19,22 @@
 | Outputs / state changes | 63–71 |
 | Rules | 72–73 |
 |   C0 Front-end tick | 74–81 |
-|   C1 Startup sequence (`0x004359D0` → `0x00435230`) | 82–115 |
-|   C2 Trademark screen input (adds to `ui/frontend-menus.md` §F1.3) | 116–128 |
-|   C3 Credits screen (`0x004312C0`) | 129–176 |
-|   C4 Credits text file and parsing (`0x00430CD0`, `0x00431050`, `0x00430EF0`, `0x00430C80`) | 177–215 |
-|   C5 Video hook (all videos; stub in d2rs) | 216–246 |
-|   C6 Cinematics progress byte N | 247–265 |
-|   C7 Palette | 266–272 |
-|   C8 Cinematics menu (`0x00431600`) | 273–312 |
-|   C9 Sounds (deferred; owner `client/audio.md`) | 313–319 |
-|   C10 640 × 480 | 320–326 |
-| Constants & data dependencies | 327–344 |
-| Randomness | 345–348 |
-| Edge cases & original bugs | 349–366 |
-| Test vectors | 367–385 |
-| Provenance | 386–407 |
-| Open questions | 408–423 |
+|   C1 Startup sequence (`0x004359D0` → `0x00435230`) | 82–116 |
+|   C2 Trademark screen input (adds to `ui/frontend-menus.md` §F1.3) | 117–129 |
+|   C3 Credits screen (`0x004312C0`) | 130–177 |
+|   C4 Credits text file and parsing (`0x00430CD0`, `0x00431050`, `0x00430EF0`, `0x00430C80`) | 178–216 |
+|   C5 Video hook (all videos; stub in d2rs) | 217–247 |
+|   C6 Cinematics progress byte N | 248–266 |
+|   C7 Palette | 267–273 |
+|   C8 Cinematics menu (`0x00431600`) | 274–313 |
+|   C9 Sounds (deferred; owner `client/audio.md`) | 314–320 |
+|   C10 640 × 480 | 321–327 |
+| Constants & data dependencies | 328–345 |
+| Randomness | 346–349 |
+| Edge cases & original bugs | 350–367 |
+| Test vectors | 368–386 |
+| Provenance | 387–408 |
+| Open questions | 409–424 |
 <!-- /index -->
 
 ## Summary
@@ -99,11 +99,12 @@ Sounds are named only.
    6. `0x004F9060(1)` and the trademark screen `0x0042FB20` (`ui/frontend-menus.md` §F1.3). On the first run
       the trademark screen is built twice (at the end of `0x00433640`, then again here): the second build
       replaces the first, and its 9 s timer counts from the second build.
-3. PROVISIONAL: 1.14d shows no Blizzard-logo DC6 screen; the rows "start → Blizzard logo" and "Blizzard
+3. 1.14d shows no Blizzard-logo DC6 screen; the rows "start → Blizzard logo" and "Blizzard
    logo → trademark" of `ui/frontend-menus.md` §F1.3 (descriptors 0 `blizno` + 1 timer 8 s, callback
    `0x00434D90`) are dead data, and the logo is the two videos of step 3 (because no caller of the adders
    `0x0042F430` / `0x0042F3A0` passes 0 or 1, and `0x00434D90` is referenced only by those two
-   descriptors); settled by REC-229.
+   descriptors; confirmed by the call-site scan of `ui/frontend-menus.md` §F1.3, 2026-10-08). REC-229
+   only verifies.
 4. Order in d2rs (stub, C5 r6), expansion installed:
 
 | Case | Log lines (in order) | N after |
@@ -417,6 +418,6 @@ backgrounds; video lists of `d2video.mpq` / `D2XVIDEO.MPQ`. Strings: ENG `string
   screenshot; compare the disabled buttons' pixels and labels against C8 r3. Settles the disabled label
   colour (classic) and the blank labels (expansion).
 - **REC-229** Startup chain. Capture: delete `Aux Battle.net`, start 1.14d, hook `0x004F5D90` (log paths)
-  and `0x0042F430` (log ids); repeat with the value present. Settles C1 r3 (no `blizno` screen; descriptors
-  0 / 1 never built) and the first-run intro.
+  and `0x0042F430` (log ids); repeat with the value present. Verifies C1 r3 (settled from the binary
+  2026-10-08: no `blizno` screen) and settles the first-run intro.
 - Folded into `ui/frontend-menus.md` 2026-10-08: §F1.3 rows 1–2 note (REC-229), §F1.6 rule 1 (sky palette), edge case 2 (8–9 s).

@@ -32,27 +32,27 @@
 | Outputs / state changes | 91–95 |
 | Rules | 96–97 |
 |   1. Screen layout model | 98–134 |
-|   2. UI states and the open/close call | 135–174 |
-|   3. The conflict gate (`0x00453910`) | 175–203 |
-|   4. Slots, open mode and the view shift | 204–261 |
-|   5. UI pass order (`0x00456EE0`) | 262–301 |
-|   6. 800 × 600 border and control panel art (`0x00499450`) | 302–322 |
-|   7. Shared panel parts | 323–340 |
-|   8. Character panel (ui 2, left; `0x004A7D00`) | 341–443 |
-|   9. Inventory panel family (`0x0048EDF0`) | 444–504 |
-|   10. Skill tree (ui 4, right; `0x004AC690`) | 505–568 |
-|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 569–604 |
-|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 605–655 |
-|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 656–708 |
-|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 709–714 |
-|   15. Event → intent summary | 715–742 |
-|   16. Machine tables | 743–777 |
-| Constants & data dependencies | 778–798 |
-| Randomness | 799–803 |
-| Edge cases & original bugs | 804–824 |
-| Test vectors | 825–865 |
-| Provenance | 866–906 |
-| Open questions | 907–998 |
+|   2. UI states and the open/close call | 135–200 |
+|   3. The conflict gate (`0x00453910`) | 201–234 |
+|   4. Slots, open mode and the view shift | 235–292 |
+|   5. UI pass order (`0x00456EE0`) | 293–332 |
+|   6. 800 × 600 border and control panel art (`0x00499450`) | 333–353 |
+|   7. Shared panel parts | 354–371 |
+|   8. Character panel (ui 2, left; `0x004A7D00`) | 372–474 |
+|   9. Inventory panel family (`0x0048EDF0`) | 475–535 |
+|   10. Skill tree (ui 4, right; `0x004AC690`) | 536–599 |
+|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 600–635 |
+|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 636–686 |
+|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 687–739 |
+|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 740–745 |
+|   15. Event → intent summary | 746–773 |
+|   16. Machine tables | 774–808 |
+| Constants & data dependencies | 809–829 |
+| Randomness | 830–834 |
+| Edge cases & original bugs | 835–855 |
+| Test vectors | 856–896 |
+| Provenance | 897–941 |
+| Open questions | 942–1033 |
 <!-- /index -->
 
 ## Summary
@@ -171,6 +171,32 @@ cursor position (cursor jump, §4.3), UI `DrawItem`s, C→S messages (§15).
 8. Mode "on" for a state that is already open still runs the gate, and
    most states refuse themselves (`ui-states.tsv` diagonal = 2), so
    "on" twice returns 0 the second time.
+9. **Close-all** `0x00456300(automap, jump)` (ECX, EDX; disassembled
+   2026-10-08). For i = 0 … 37 in order, state i is closed when it is open
+   and its Esc-closable flag (u32 table `0x006D6378`, read from the
+   image) is 1, or when `automap` ≠ 0 and i = 0x0A. Flag 1: ui 1, 2, 3, 4,
+   5, 9, 0x0B, 0x0C, 0x0D, 0x0F, 0x10, 0x12, 0x14, 0x16–0x21, 0x24, 0x25.
+   Flag 0: ui 0, 6, 7, 8, 0x0A, 0x0E, 0x11, 0x13, 0x15, 0x22, 0x23. Per
+   state closed:
+   - ui 0x23–0x25 unless the game is an expansion game with the
+     expansion installed (r3): skipped, flag left set;
+   - else the gate in mode off (§3: passes), flag := 0, close hook
+     `0x00455AE0(i)` (r6), then the open mode by slot kind as in §4 r2
+     (right / left / full / anvil; ui 0x0B calls `0x004A5DE0` instead;
+     kind none: no change), with the cursor jump of §4 r3 for the
+     "closed, other side not open" cases when `jump` ≠ 0;
+   - ui 1 and 0x19 also call `0x00487990` (ui 1 before and after the mode
+     step).
+   Returns 1 when at least one state passed the open-and-flag test (even
+   one skipped by the expansion rule), else 0. Callers (xref scan, 17
+   sites): Esc (0, 1) (`0x004690DF`, `ui/frontend-options.md` §O1 r2);
+   Clear Screen, command 38 (`0x0044C6B0`, in game only): (0, 1), and
+   when that returns 0, `0x00457640(0)` then (1, 0); (1, 0) also at
+   `0x0044E3BB`, `0x0044F2E6`, `0x00461553`, `0x00498C00`, `0x004B53C1`;
+   (0, 0) at the UI pass `0x00457133`, the mini-panel Game Menu button
+   `0x0047ED4C`, the NPC menu paths `0x004B5057`, `0x004B6712`,
+   `0x004B6F84`, `0x004B701C`, `0x004B70A4` and the message box
+   `0x004C038A` (`ui/messages.md`).
 
 ### 3. The conflict gate (`0x00453910`)
 
@@ -183,6 +209,11 @@ skips it and passes).
    - ui 9 with no player is refused; ui 9 while the player is dead (mode
      0x11) does not open the menu: it runs the respawn path
      (`0x004647D0`, C→S 0x41 via `0x00478590`) and returns 0.
+     Ui 9 is the Esc game menu: its opening (`0x0047E090`, which first
+     closes and remembers the other states), the Esc logic, art, layout,
+     input and the single-player pause are `ui/frontend-options.md`
+     §O1–§O5; which panels one Esc closes before the menu can open is the
+     close-all of §2 r9.
 2. While `[0x007BF0A4]` ≠ 0 (a modal text screen, `0x004A0000`) only
    ui 0x0A, 0x13, 0x11, 6 and 7 may open; any other request is refused.
 3. Then, for every open state `i` (0 … 37 in order), the action
@@ -903,6 +934,10 @@ Horadric animation `0x0048F03E`–`0x0048F0C0`, start `0x0048A540`, frame
 headers of d2data `menu\horadric.dc6` (all 31 frames, Python, outside the
 repo; HANDOFF §5 C71 found frame 1 at (−205, 17)); cube close
 `0x0048A050`, `0x0048A190`, `0x0048A500`; Resurrect insert `0x004B6440`.
+2026-10-08 additions (REC-237): close-all `0x00456300` (disassembly,
+jump table `0x00456508` / index bytes `0x00456520`, Esc-closable flags
+`0x006D6378` read from the image, 17 call sites by `tools/ghidra/disasm.py
+xref`), Clear Screen `0x0044C6B0`, Esc `0x004690B0`.
 
 ## Open questions
 

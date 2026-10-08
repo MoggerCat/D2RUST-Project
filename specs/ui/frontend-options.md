@@ -22,21 +22,21 @@
 | Inputs | 54–66 |
 | Outputs / state changes | 67–76 |
 | Rules | 77–78 |
-|   O1. Where options live; opening and closing the game menu | 79–111 |
-|   O2. Menu records and the tree | 112–168 |
-|   O3. Save and Exit Game (`0x0047F2D0`) | 169–174 |
-|   O4. Draw (`0x0047E3D0`, while ui 9 is open, from the UI draw `0x00456F46`) | 175–222 |
-|   O5. Input (handler table `0x006D6030`, 7 entries, registered while ui 9 is open) | 223–262 |
-|   O6. Row effects (apply = +0x114, init = +0x118; registry writes are REG_DWORD) | 263–307 |
-|   O7. Settings storage and the d2rs config mapping | 308–339 |
-|   O8. d2rs stubs (rows drawn and navigated like the original, value kept in `settings.toml`, no effect) | 340–353 |
-|   O9. Configure Controls (ui 11, `UI_CONFIG`) | 354–439 |
-| Constants & data dependencies | 440–459 |
-| Randomness | 460–463 |
-| Edge cases & original bugs | 464–488 |
-| Test vectors | 489–514 |
-| Provenance | 515–539 |
-| Open questions | 540–546 |
+|   O1. Where options live; opening and closing the game menu | 79–135 |
+|   O2. Menu records and the tree | 136–205 |
+|   O3. Save and Exit Game (`0x0047F2D0`) | 206–211 |
+|   O4. Draw (`0x0047E3D0`, while ui 9 is open, from the UI draw `0x00456F46`) | 212–268 |
+|   O5. Input (handler table `0x006D6030`, 7 entries, registered while ui 9 is open) | 269–308 |
+|   O6. Row effects (apply = +0x114, init = +0x118; registry writes are REG_DWORD) | 309–353 |
+|   O7. Settings storage and the d2rs config mapping | 354–385 |
+|   O8. d2rs stubs (rows drawn and navigated like the original, value kept in `settings.toml`, no effect) | 386–399 |
+|   O9. Configure Controls (ui 11, `UI_CONFIG`) | 400–485 |
+| Constants & data dependencies | 486–505 |
+| Randomness | 506–509 |
+| Edge cases & original bugs | 510–534 |
+| Test vectors | 535–564 |
+| Provenance | 565–595 |
+| Open questions | 596–603 |
 <!-- /index -->
 
 ## Summary
@@ -92,14 +92,22 @@ the settings mapping and the d2rs stubs; the effects of each setting are owned b
      10, 17, 21, 35.
    - `SetUIState(9, on, 0)`; current menu := `menu`; selected row := row count − 1 (for the game
      menu: Return to Game).
+   Esc reaches this call only when nothing Esc-closable was open: command 56 (`0x004690B0`,
+   disassembled 2026-10-08) does nothing while an NPC interaction is active (`0x004B34A0`) or a
+   modal text screen is up (`0x004A0000`); with ui 9 open it calls `0x0047E200(1)` (r3); else it
+   calls the close-all `0x00456300(0, 1)` (`ui/panels.md` §2 r9) and opens the menu only when
+   that returns 0. So a first Esc with the inventory open closes the inventory; a second opens
+   the menu. Open states that are not Esc-closable (e.g. the automap 10, the mini panel 21) do
+   not block the menu: r2 closes them and r3 reopens the keep = 1 ones.
 3. **Close and restore** `0x0047E200(restore)`: ui 9 open → `SetUIState(9, off, 0)`; restore ≠ 0
    → `SetUIState(i, on, 0)` for every i remembered in r2. Used by Return to Game, Esc, Save and
    Exit Game and Accept (§O9).
 4. **Esc anywhere in the tree closes the whole menu.** The menu's key table (§O5 r1) has no Esc
    entry; Esc reaches command 56, which with ui 9 open calls `0x0047E200(1)`. There is no "Esc =
-   previous menu". PROVISIONAL: Esc in a sub-menu closes the whole menu and restores the saved
-   UI states (because the menu table lacks VK 0x1B and command 56 tests only ui 9); settled by
-   REC-212.
+   previous menu". Confirmed by the xref scan (2026-10-08): `0x0047E200` has exactly four callers
+   (Esc `0x004690D3`, Save and Exit `0x0047F2F9`, Return to Game `0x0047F305`, Configure
+   Controls Accept `0x004A5039`), the ui-9 hooks do not change the key mode (`ui/controls.md`
+   §4.1 r5), so Esc in any sub-menu closes the menu and restores the saved UI states (r3).
 5. **Load / free.** At every game join the in-game UI set-up (`0x00456970`) runs `0x0047DD70`:
    for each table in order game, Options, Sound, Video (exp or classic), Automap (exp or
    classic), for each row (exp-only rows only when expansion is installed): load the label cel
@@ -108,6 +116,22 @@ the settings mapping and the d2rs stubs; the effects of each setting are owned b
    `OptBar`, `OptBarC`, `OptSkull` and the widest `pentspin` frame width (52). Freed at game end
    (`0x0047DFD0`). So every stored setting is applied once per game join, before the first
    world draw.
+6. **What an open ui 9 changes elsewhere** (every reader of flag 9 found by the scan of
+   `[0x007A27E4]` and of the getters `0x004538D0` / `0x00453A90` with ui 9, 2026-10-08):
+   - **Single-player pause** (client loop `0x0044EFE3`): game type `[0x007A0610]` 0 or 1, ui 9
+     or ui 11 open and the local player in a room (`0x004646A0`): the loop pass only draws and
+     runs one sound tick (`audio/sound-table.md` §6.1), then returns before the receive and the
+     server / client update; the update clock `[0x007A0490]` := now each paused pass, so no
+     catch-up ticks follow the close. d2rs: while paused the host pumps no server tick and runs
+     no receive or client update, only the draw and the sound tick (`client/bridge.md` owns the
+     pump and does not state the pause yet).
+   - world clicks: the click dispatcher `0x00462D00` returns at once (`ui/controls.md` §6 r2);
+   - belt (`ui/control-panel.md` §5): the belt draw `0x00499040` folds the popped rows
+     (`0x004990D9`) and the mouse move does not pop them (`0x00499CAA`, §5 r9);
+   - the new-stats / new-skills button draws test it (`0x004A6AB9`, `0x004A6CE1`, `0x004A6DE9`,
+     `0x004A7011`; `ui/control-panel.md`);
+   - mini-panel button down (`0x0047F05F`, `ui/control-panel.md` §9 r7);
+   - the sound request update (`0x004BA64E`, `audio/sound-table.md`).
 
 ### O2. Menu records and the tree
 
@@ -162,6 +186,19 @@ the settings mapping and the d2rs stubs; the effects of each setting are owned b
    (`SaveAndExitGame`, `KeysAndButtons`, `MouseSensitivity`, `2dsound`, `dolby`, …) is not referenced.
 4. **No string ids.** No row has a `string.tbl` label; the text is in the images (per language
    folder). d2rs draws the images, never a font.
+   The three game-menu entries (REC-237): Options = `Options.dc6`, Save and Exit Game =
+   `Exit.dc6`, Return to Game = `ReturnToGame.dc6`, all `data\local\ui\eng\` in d2data
+   (Patch_D2 and d2exp have none). DC6 headers (1 direction; frames as width × height, offset x,
+   offset y), measured 2026-10-08 with `mpq-tool extract` + a header read:
+
+   | File | Frames | Frame sizes (w × h, ox, oy) |
+   |---|---|---|
+   | `Options` | 1 | 160 × 36 (0, 0) |
+   | `Exit` | 2 | 256 × 36 (0, 0); 178 × 36 (0, 0) |
+   | `ReturnToGame` | 2 | 256 × 36 (0, 0); 100 × 36 (0, 0) |
+   | `data\global\ui\CURSOR\pentspin` | 8 | 51 × 52 (−1, 0); 43 × 53 (3, 0); 27 × 53 (11, 0); 9 × 53 (21, 0); 23 × 53 (15, 0); 40 × 53 (7, 0); 50 × 52 (1, 0); 52 × 51 (−1, 0) |
+
+   The unused `SaveAndExitGame` label (r3) is not the one drawn.
 5. **Entering a menu** (every navigation callback, `0x0047F2A0` … `0x0047F460`): `SetUIState(9,
    on, 0)` (already on: no change), current menu := target, selected := target row count − 1 (the
    Previous / SPrevious row; for the Game menu, Return to Game). The drag flags stay as they are.
@@ -217,8 +254,17 @@ normal, 1 = the disabled look (`render/blend-modes.md`). Cel y is the value pass
    Baseline = y_top + 39 (Game, Options) or + 34 (sub-menus); pentagram y = y_top + 51 or + 49;
    slider Y = y_top + 36. Example: Game menu at 800 × 600, Return to Game selected: label at
    (400 − 1 − 178, 324) = (221, 324), pentagrams at (99, 336) and (649, 336).
-   PROVISIONAL: the menu draws over the world with no backdrop of its own (because `0x0047E3D0`
-   draws no rectangle or panel); settled by REC-212.
+5. **No backdrop.** The menu draws over the live world view with no box, panel or dimming: the UI
+   pass draws ui 9 first (`ui/panels.md` §5 r1), `0x0047E3D0` draws only cels (`0x00502680`, the
+   pentagram cel draw) and, for slider rows, the two rectangles of r2; no other reader of flag 9
+   draws (§O1 r6). The control panel and border (`ui/panels.md` §5 r7) and the other overlays
+   later in the pass draw over the menu. All panels that could overlap it are closed by §O1 r2.
+   The REC-212 screenshots verify the pixels (rule 10); they are no longer needed to choose the
+   behaviour.
+6. **Hover and selection look.** A row has no hover or selected art and no colour change: the
+   selected row is shown only by the two pentagrams (r3); a disabled row draws in mode 1. Moving
+   the pointer over a row selects it (§O5 r3), so with the mouse the pentagrams follow the
+   pointer.
 
 ### O5. Input (handler table `0x006D6030`, 7 entries, registered while ui 9 is open)
 
@@ -505,7 +551,11 @@ None.
 | Press on a slider row at x 341 (W 800) | no drag (strict h − 59 < x) | §O5 r5 |
 | Sound menu 800 × 600 (row tops 80, 125, 170, …), pointer y 175 / 180 / 300 | Sound (row 1) / Music (row 2) / no change (row 4 EAX disabled) | §O5 r2 |
 | Pointer y 80 or 440 in the Sound menu | no row (strict bounds) | §O5 r2 |
-| Esc in Video Options | menu closed, remembered panels reopened | §O1 r4 (REC-212) |
+| Esc in Video Options | menu closed, remembered panels reopened | §O1 r4 |
+| Esc with the inventory (ui 1) open | inventory closed (cursor jump rule of `ui/panels.md` §4 r3), menu not opened; a second Esc opens it | §O1 r2, `ui/panels.md` §2 r9 |
+| Esc with only the automap (ui 10) open | menu opens, automap closed and remembered; Return to Game reopens it | §O1 r2–r3 |
+| Game menu 800 × 600, pointer y 186 / 188 / 237 / 238 / 288 / 334 / 335, any x | none / Options / Options / Save and Exit Game / Return to Game / Return to Game / none | §O5 r2 |
+| Single player, Esc menu open for 10 s | no server tick, no client update; after Return to Game the next tick follows one tick length after the close, no catch-up | §O1 r6 |
 | Key config 800 × 600 | headings at x 108, 298, 488, y 100; row 0 text y 122; buttons centred at 193, 399, 605 | §O9 r2 |
 | Key config: Inventory row, column One, Enter, press C | Character slot 0 → None, Inventory slot 1 = C, `cursor_select`, editing ends | §O9 r5–r6 |
 | Editing, press Esc, then Enter | no change; the Enter is swallowed (latch), next Enter edits | §O9 r3, r5 |
@@ -534,12 +584,19 @@ multi-frame cel `0x00502680`, rectangle `0x0046EFD0`; pentagram gate `0x00454850
 `0x004A5980`–`0x004A63B0`; button records `0x007246D8`; binding helpers `0x00469A60`, `0x00469C20`,
 `0x00469D40`, `0x00469D50`, `0x00469D70`, `0x00469D90`, `0x00469DE0`, `0x004698D0`. Art: DC6 headers of
 the files in d2data / d2exp (`tools/mpq-tool` into a scratch dir). Strings: ENG `string.tbl` (d2data).
+2026-10-08 (REC-237): Esc command `0x004690B0` (disassembled), close-all `0x00456300` (Esc-closable
+flags `0x006D6378` read from the image), xrefs of `0x0047E200` / `0x0047E090`, readers of ui 9
+(`[0x007A27E4]`; `0x004538D0` / `0x00453A90` called with 9: `0x0044EFE3`, `0x00462D11`,
+`0x0047E208`, `0x0047F05F`, `0x004990D9`, `0x00499CAA`, `0x004A6AB9`, `0x004A6CE1`, `0x004A6DE9`,
+`0x004A7011`, `0x004BA64E`), client loop `0x0044EFA0`; DC6 headers of `options`, `exit`,
+`returntogame`, `pentspin` (d2data; `mpq-tool list` of d2exp / Patch_D2 shows no copies).
 D2MOO (1.10f) `D2MenuItemStrc` / `D2MenuInfoStrc` used only as a hint for the record layout; every
 field confirmed from the 1.14d records and their users.
 
 ## Open questions
 
-- **REC-212** Esc menu tree capture. Settles §O1 r4 (Esc from a sub-menu closes the whole menu) and
-  §O4 (no backdrop; positions and pentagram placement of §O4 r4 against pixels).
+- **REC-212** Esc menu tree capture. Verifies (rule 10) §O4 r4–r6 against pixels (positions,
+  pentagram frames and placement, no backdrop) and §O1 r4; both behaviours are settled from the
+  binary (2026-10-08) and are no longer provisional.
 - **REC-213** Slider float precision. Settles §O5 r7 (53-bit vs 24/64-bit x87 precision: Contrast
   p 99 → 100 or 99).
