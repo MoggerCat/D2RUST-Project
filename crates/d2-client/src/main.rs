@@ -76,8 +76,9 @@ struct Options {
     cases: Vec<String>,
     /// `view`, `play`: close after this many frames (smoke test).
     frames: Option<u32>,
-    /// `play`: game seed.
-    seed: u32,
+    /// `play`: the fixed game seed (`--seed N`); `None`: a save's map
+    /// seed or the default (`single_player::game_seed`).
+    seed: Option<u32>,
     /// `play`: synthetic tables even with $D2_GAME_DIR set.
     synthetic: bool,
     /// `play --save`: the character save the join loads.
@@ -128,7 +129,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
         case_dir: None,
         cases: Vec::new(),
         frames: None,
-        seed: d2_client::app::single_player::DEFAULT_SEED,
+        seed: None,
         synthetic: false,
         difficulty: 0,
         save: None,
@@ -155,7 +156,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
             "--out" => o.out = Some(PathBuf::from(value()?)),
             "--perturb" => o.perturb = value()?.parse().context("--perturb")?,
             "--frames" => o.frames = Some(value()?.parse().context("--frames")?),
-            "--seed" => o.seed = value()?.parse().context("--seed")?,
+            "--seed" => o.seed = Some(value()?.parse().context("--seed")?),
             "--synthetic" => o.synthetic = true,
             "--hardcore" => o.hardcore = true,
             "--dump-draws" => o.dump_draws = Some(PathBuf::from(value()?)),
@@ -525,7 +526,7 @@ fn play_once(
     println!("play: difficulty {}", start.difficulty);
     let result = play::run(play::PlayConfig {
         data,
-        seed: o.seed,
+        seed: d2_client::app::single_player::game_seed(&start.character, o.seed),
         character: start.character,
         exit_after: o.frames,
         save_path: start.save_path,

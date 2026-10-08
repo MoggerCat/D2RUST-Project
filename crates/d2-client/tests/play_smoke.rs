@@ -287,8 +287,11 @@ impl Run {
         let clock = StepClock(ms.clone());
         let built = character.clone();
         let game_data = data.clone();
+        // The seed `d2-client play` builds with when no `--seed` is given:
+        // a save's map seed, else the default (`game_seed`).
+        let seed = single_player::game_seed(&character, None);
         let link = ThreadLink::spawn(move || {
-            let mut g = single_player::build_with(&game_data, single_player::DEFAULT_SEED, built)?;
+            let mut g = single_player::build_with(&game_data, seed, built)?;
             install(&mut g.sim);
             Ok::<_, single_player::BuildError>(LocalLink::new(Host::new(
                 g.sim,
@@ -1451,6 +1454,8 @@ fn the_live_run() {
     };
     let path = dir.join("Smoke.d2s");
     let before = run.snapshot();
+    let layouts = |r: &Run| -> Vec<_> { [1u32, 2, 3].map(|l| r.level_rect(l)).to_vec() };
+    let layout_before = layouts(&run);
     {
         use d2_client::app::save;
         let store = save::FileStore {
@@ -1492,9 +1497,25 @@ fn the_live_run() {
     assert!(!faults.contains("Save"), "the leave saved: {faults}");
     assert!(path.exists(), "the server's leave wrote the save");
     drop(run);
+    // The map seed (`d2s.md` §2.1 +0xAB = game +0x7C) is the one the game
+    // was built with, and the town byte marks it for restoring (§2.2 r8).
     let character = single_player::load_character(&data, &path, 0).expect("the save loads");
+    let single_player::Character::Save(saved, _) = &character else {
+        unreachable!("a loaded save")
+    };
+    assert_eq!(
+        saved.header.map_seed,
+        single_player::DEFAULT_SEED,
+        "the saved map seed"
+    );
+    assert_eq!(saved.header.towns[0] & 0x80, 0x80, "the Normal town byte");
+    assert_eq!(
+        single_player::game_seed(&character, None),
+        saved.header.map_seed
+    );
     let mut run = Run::start_as(data.clone(), character, |_| {});
     run.check("join the saved character");
+    assert_eq!(layouts(&run), layout_before, "the same level layouts");
     let after = run.snapshot();
     assert_eq!(after, before, "the loaded character is the saved one");
 }

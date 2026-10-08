@@ -54,6 +54,17 @@ Branch `claude/q-fix-flow-save` (from `claude/q-tick-flow`, merged with
   (§2.3 says set). Left: the progression bits 8–12 (`0x00538680` at the
   act-credit sites) and the ladder bit (no ladder in single player).
 
+- `q-fix-save-map-seed` (F6): `save::Live::map_seed` (the act-0 DRLG
+  init seed = game +0x7C) is written to +0xAB; `single_player::game_seed`
+  picks the seed `play` builds with: `--seed N` (game +0x84 = 1) wins, else
+  a save whose town byte for the difficulty has 0x80 restores +0xAB
+  (`d2s.md` §2.2 r8), else `DEFAULT_SEED` (REC-291 (4): 1.14d draws a
+  fresh one). `main.rs` `--seed` is now optional. Tests:
+  `single_player::new_character_tests::the_map_seed_comes_from_the_switch_then_the_save`;
+  `play_smoke::the_live_run` reloads with `game_seed` (as `play` does) and
+  asserts the saved seed, the town byte and the same rects of levels 1–3
+  (M08: without the write the saved seed is 0 and the leg fails).
+
 ## Open
 
 - The save's inventory flag bit 1 clear (`inventory-moves.md` §6.1 r4).

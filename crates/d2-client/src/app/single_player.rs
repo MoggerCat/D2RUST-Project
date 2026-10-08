@@ -186,6 +186,31 @@ pub const ACT5_TOWN: u32 = 109;
 pub const CATACOMBS_4: u32 = 37;
 /// The default game seed.
 pub const DEFAULT_SEED: u32 = 1234;
+
+/// The map seed the game is built with (game +0x7C; the DRLG seed of
+/// `sim/rng.md` §5.4). `fixed` is `play --seed N`, the fixed-seed switch
+/// (game +0x84 := 1): it wins. Otherwise a loaded save whose town byte
+/// for the game's difficulty has 0x80 gives its saved map seed
+/// (`formats/d2s.md` §2.2 rule 8, +0xAB). Otherwise [`DEFAULT_SEED`].
+/// PROVISIONAL (REC-291): 1.14d draws a fresh seed for a new character
+/// (`time_value`, `rng.md` §5.2); d2rs keeps the fixed default so dev
+/// runs and draw dumps stay reproducible. d2rs-own, unverified.
+pub fn game_seed(character: &Character, fixed: Option<u32>) -> u32 {
+    if let Some(n) = fixed {
+        return n;
+    }
+    match character {
+        Character::Save(save, ctx) => {
+            let t = save.header.towns[usize::from(ctx.difficulty).min(2)];
+            if t & 0x80 != 0 {
+                save.header.map_seed
+            } else {
+                DEFAULT_SEED
+            }
+        }
+        _ => DEFAULT_SEED,
+    }
+}
 /// Game +0x6A of a single-player game: 3 (`rng.md` §5 open question,
 /// answered: the client's create message carries 3, stored at +0x6A).
 pub const GAME_TYPE: u8 = 3;
@@ -3387,6 +3412,32 @@ pub fn start_with_town<C: Clock + Send + 'static>(
 #[cfg(test)]
 mod new_character_tests {
     use super::*;
+
+    // Covers: specs/formats/d2s.md §2.2 r8
+    #[test]
+    fn the_map_seed_comes_from_the_switch_then_the_save() {
+        let saved = |town: u8, difficulty: u8| {
+            let mut s = d2_formats::d2s::D2s::new_stub(b"Seed", 1, 0x20, 0).unwrap();
+            s.header.map_seed = 0x2468_ACE0;
+            s.header.towns[usize::from(difficulty)] = town;
+            Character::Save(
+                Box::new(s),
+                LoadContext {
+                    difficulty,
+                    map_seed_applies: false,
+                },
+            )
+        };
+        // The town byte's 0x80 for the game's difficulty restores it.
+        assert_eq!(game_seed(&saved(0x80, 0), None), 0x2468_ACE0);
+        assert_eq!(game_seed(&saved(0x82, 2), None), 0x2468_ACE0);
+        // Without 0x80 (or on another difficulty): not restored.
+        assert_eq!(game_seed(&saved(0x00, 0), None), DEFAULT_SEED);
+        // `--seed N` (game +0x84 = 1) wins.
+        assert_eq!(game_seed(&saved(0x80, 0), Some(7)), 7);
+        assert_eq!(game_seed(&Character::New, None), DEFAULT_SEED);
+        assert_eq!(game_seed(&Character::New, Some(9)), 9);
+    }
 
     // Covers: specs/sim/intents-events.md §2.5 r1
     #[test]

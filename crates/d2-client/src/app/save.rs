@@ -191,6 +191,9 @@ pub struct Live {
     /// (`ClientEntry::status_set`, `formats/d2s.md` §2.3: 0x08 at every
     /// death start, softcore too); the save ORs them in.
     pub status_set: u16,
+    /// The game's map seed (game +0x7C, the DRLG init seed of act 0:
+    /// `formats/d2s.md` §2.1 +0xAB); `None`: no DRLG (synthetic data).
+    pub map_seed: Option<u32>,
 }
 
 /// Reads [`Live`] from the game's local player.
@@ -234,7 +237,19 @@ pub fn read_live(sim: &mut Sim) -> Result<Live, SaveError> {
         .filter_map(|c| sim.game.lists.client(c))
         .filter(|e| e.player == Some(player))
         .fold(0, |a, e| a | e.status_set);
+    let map_seed = sim
+        .events
+        .action
+        .sys
+        .hooks
+        .drlg
+        .dungeon
+        .acts
+        .first()
+        .and_then(Option::as_ref)
+        .map(|d| d.init_seed);
     Ok(Live {
+        map_seed,
         stats,
         quests,
         extra,
@@ -290,6 +305,10 @@ pub fn apply_live(base: &D2s, live: &Live, now: u32) -> D2s {
     // The client word's bits set in game (§2.3: the writer copies the
     // client word, which no code clears).
     save.header.status |= live.status_set;
+    // +0xAB is game +0x7C (§2.1): the seed the game was built with.
+    if let Some(seed) = live.map_seed {
+        save.header.map_seed = seed;
+    }
     super::hardcore::mark_dead(&mut save, live.hardcore, live.hardcore_dead);
     // +0x2C stays as loaded: the game never sets the create time, so every
     // game-written save holds 0 there (§2.2 rule 10, edge case 11).
