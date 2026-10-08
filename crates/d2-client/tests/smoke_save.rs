@@ -455,7 +455,8 @@ fn loaded(save: D2s, difficulty: u8) -> Character {
     )
 }
 
-/// `live` as a load leaves it: every item's 0x2000 (instore) cleared
+/// `live` as a load leaves it: every item's 0x2000 (instore) cleared, in
+/// the player, hireling and corpse lists alike
 /// (`d2s.md` §8.2 rule 7: "a file's 0x2000 never survives a load"). The
 /// flags are the 32 bits after `JM`; 0x2000 is bit 5 of byte 3.
 fn loaded_live(mut live: Live) -> Live {
@@ -469,6 +470,9 @@ fn loaded_live(mut live: Live) -> Live {
     }
     if let Some(items) = &mut live.gaps.hireling_items {
         clear(items);
+    }
+    for c in live.extra.corpses.iter_mut().flatten() {
+        clear(&mut c.items);
     }
     live
 }
@@ -719,4 +723,75 @@ fn each_save_keeps_the_previous_file_as_bak() {
     let again = Run::start(&loaded(read(&file, 0).unwrap(), 0), &file);
     again.save_and_exit();
     assert_eq!(std::fs::read(&bak).unwrap(), second);
+}
+
+/// Softcore death: the corpse takes the worn hammer, Esc respawns the
+/// player, Save and Exit writes the corpse section; the reload makes the
+/// corpse again with the hammer in it (`d2s.md` §8.3 rule 4), so the
+/// next save keeps it.
+// Covers: specs/formats/d2s.md §8.3 r4
+#[test]
+fn a_corpse_with_its_items_survives_save_and_reload() {
+    let dir = temp("corpse");
+    let file = dir.join("Corpse.d2s");
+    let character = single_player::new_character("sorceress", "Corpse").unwrap();
+    let mut run = Run::start(&character, &file);
+    play(&mut run, 0);
+    run.with(|s| {
+        let (p, _) = single_player::local_player(s).unwrap();
+        s.events.action.start_death(&mut s.game, p);
+    });
+    run.step(4);
+    run.with(|s| {
+        let (p, _) = single_player::local_player(s).unwrap();
+        let sys = &mut s.events.action.sys;
+        let mut u = d2_sim::units::hooks::Sim {
+            game: &mut s.game,
+            units: &mut sys.units,
+            stats: &mut sys.stats,
+            data: &sys.data,
+        };
+        d2_sim::units::modes::player_event1(&mut u, &mut sys.hooks, p).unwrap();
+    });
+    run.step(3);
+    run.app
+        .world_mut()
+        .resource_mut::<ButtonInput<KeyCode>>()
+        .press(KeyCode::Escape);
+    run.step(6);
+    run.app
+        .world_mut()
+        .resource_mut::<ButtonInput<KeyCode>>()
+        .release(KeyCode::Escape);
+    run.step(2);
+    let before = run.live();
+    let corpses = before.extra.corpses.clone().unwrap();
+    assert_eq!(corpses.len(), 1, "one corpse with items");
+    assert_eq!(corpses[0].items.len(), 1, "the hammer is on the corpse");
+    run.save_and_exit();
+    let first = read(&file, 0).unwrap();
+    assert_eq!(first.body.as_ref().unwrap().corpses.len(), 1);
+    let file2 = dir.join("Corpse-again.d2s");
+    let again = Run::start(&loaded(first.clone(), 0), &file2);
+    let broken: Vec<_> = again
+        .log()
+        .into_iter()
+        .filter(|l| l.contains("corpse") || l.contains("items:"))
+        .collect();
+    assert!(broken.is_empty(), "the load reported: {broken:?}");
+    let after = again.live();
+    assert_eq!(after.extra.corpses, loaded_live(before).extra.corpses);
+    again.save_and_exit();
+    let second = read(&file2, 0).unwrap();
+    let mut want = first.body.unwrap().corpses;
+    for c in &mut want {
+        for e in &mut c.items {
+            e.bytes[3] &= !0x20;
+        }
+    }
+    assert_eq!(
+        second.body.unwrap().corpses,
+        want,
+        "the corpse section of the next save"
+    );
 }

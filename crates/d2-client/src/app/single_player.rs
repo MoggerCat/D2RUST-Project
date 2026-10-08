@@ -3017,6 +3017,7 @@ fn loader(
                 Ok((entry, report)) => {
                     // q-save-full: the save's items, made on the wired host.
                     let items_ok = super::save_full::join_items(s, player, save);
+                    let corpses_ok = super::save_full::join_corpses(s, player, save);
                     super::save_gaps::join_gaps(s, player, save);
                     let log = &mut s.events.action.hooks().x.log;
                     log.extend(
@@ -3024,6 +3025,7 @@ fn loader(
                             .unapplied
                             .iter()
                             .filter(|u| !(items_ok && u.step == "items"))
+                            .filter(|u| !(corpses_ok && u.step == "corpse"))
                             .map(|u| format!("join: save load: {u:?}")),
                     );
                     // Load §2 quests row (`0x0056A370` → `0x0065C4D0`,

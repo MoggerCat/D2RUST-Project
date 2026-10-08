@@ -45,6 +45,15 @@ impl<X: Pending> super::ActionHooks<X> {
         if !self.death.allocate_corpses {
             return None;
         }
+        let c = self.new_corpse(sim, p)?;
+        self.death.fresh.push(c);
+        self.death.loot.push((p, c));
+        Some(c)
+    }
+
+    /// A player corpse unit of `p`'s class at `p`'s position, in its room
+    /// (none for a player not yet placed): mode 17, state 7, owner `p`.
+    fn new_corpse(&mut self, sim: &mut crate::units::hooks::Sim<'_>, p: UnitId) -> Option<UnitId> {
         let (x, y) = self.path_position(p);
         let r = sim.units.get(p)?;
         let (class, guid) = (r.class, r.guid);
@@ -65,9 +74,26 @@ impl<X: Pending> super::ActionHooks<X> {
             r.mode = DD;
         }
         self.death.owners.insert(c, guid);
-        self.death.fresh.push(c);
-        self.death.loot.push((p, c));
         Some(c)
+    }
+}
+
+impl<X: Pending> ActionSim<X> {
+    /// The corpse of a save (`formats/d2s.md` §8.3 rule 4, `0x0056A830`):
+    /// a player corpse unit of `p`'s class linked to `p`, with no items
+    /// (the caller reads the saved list into it). Not a death: no
+    /// penalty, nothing moved from the player, nothing announced.
+    /// PROVISIONAL (REC-282): where the original puts it is not specified;
+    /// it is made where the player is at the join (no room yet).
+    pub fn load_corpse(&mut self, game: &mut Game, p: UnitId) -> Option<UnitId> {
+        let s = &mut self.sys;
+        let mut sim = crate::units::hooks::Sim {
+            game,
+            units: &mut s.units,
+            stats: &mut s.stats,
+            data: &s.data,
+        };
+        s.hooks.new_corpse(&mut sim, p)
     }
 }
 
