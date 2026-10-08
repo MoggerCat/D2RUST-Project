@@ -206,6 +206,44 @@ impl MoveCall for MoveRun<'_> {
     }
 }
 
+/// The item part of the corpse creations the death queued
+/// (`ActionHooks::death.loot`, `vitals.md` §4.7 rule 1.7): each corpse
+/// gets an inventory, then the player's cursor and body items move onto
+/// it ([`sim_moves::ground::corpse_fill`]). The result carries what the
+/// rest sent.
+pub struct CorpseFillRun {
+    /// (player, corpse) with their GUIDs and the corpse's class.
+    pub pairs: Vec<(Owner, Owner, u32)>,
+    /// (player, amount) gold drops of the death penalty.
+    pub gold: Vec<(Owner, i32)>,
+}
+
+impl MoveCall for CorpseFillRun {
+    type Out = (Vec<MoveFatal>, Vec<(Option<UnitId>, Vec<u8>)>);
+    fn call<H: LifecycleHooks>(self, econ: &mut Economy<'_, H>, parts: &mut InvParts) -> Self::Out {
+        let mut faults = Vec::new();
+        let mut d = parts.desk(econ);
+        // `0x00535510`: piles near the player's death spot, the amount
+        // already off the player's stat (the penalty set it).
+        for (p, amount) in self.gold {
+            sim_moves::ground::gold_piles(&mut d, p, amount, sim_moves::MAX_PILES);
+        }
+        for (p, c, class) in self.pairs {
+            if let Some(cu) = d.unit_of(c) {
+                d.state.add_inventory(
+                    cu,
+                    d2_sim::items::inventory::UnitKind::Player { class: class as u8 },
+                    c.guid,
+                );
+            }
+            if let Err(e) = sim_moves::ground::corpse_fill(&mut d, p, c) {
+                faults.push(e);
+            }
+        }
+        (faults, take_sent(&mut d))
+    }
+}
+
 /// The handler of an item-move id after the dispatcher's gate and size
 /// check (`intents-events.md` §2.3–§2.4). `None`: not an item-move id,
 /// no player, or a host without the inventory parts, so the caller
