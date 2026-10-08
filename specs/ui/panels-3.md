@@ -1,13 +1,15 @@
-# Spec: UI — Panels, part 3 (cursor, character and skill-tree inputs, waypoint rows, scroll panels)
+# Spec: UI — Panels, part 3 (cursor, character and skill-tree inputs, waypoint rows, scroll panels, equipment and hireling item clicks)
 
 - **Status:** draft (2026-10-07, RE on the 1.14d `Game.exe` and the
   1.14d cursor / scroll DC6 headers; no capture yet). Continues
   `ui/panels.md` and `ui/panels-2.md`; section numbers continue their
-  numbering (§23–§27). Owner of `client/ui.md` §B6 (cursor).
+  numbering (§23–§30). §29–§30 (body-location and hireling item
+  clicks): RE of 2026-10-08, no capture yet. Owner of `client/ui.md` §B6 (cursor).
 - **Target version:** 1.14d, English install
 - **Crate/module:** `d2-client::ui` (cursor, `panels::character`,
   `panels::skilltree`, `panels::waypoint`, scroll panels),
-  `d2-client::ui::original` (`PENDING` inputs)
+  `d2-client::ui::original` (`PENDING` inputs), `ui/panels/inv_items.rs`
+  (§29), hireling panel (§30, not built yet)
 - **Related specs:** `ui/panels.md` (§1 coordinates `W`, `H`, `sx`, `sy`,
   §2 `SetUIState`, §5 pass order, §8 character, §10 skill tree, §13
   waypoint), `ui/panels-2.md` (§17, §19, §22), `ui/menus.md` §1
@@ -16,27 +18,32 @@
   `render/sprite-placement.md` §2, `render/blend-modes.md`,
   `skills/levels.md` (`skill_level`, `bonus_level`), `world/waypoints.md`
   §2 (record bits), `client/msg-ui.md` (S→C 0x63, quest flags),
-  `sim/rng.md` (generator step).
+  `sim/rng.md` (generator step), `items/inventory.md` §4.1–§4.4, §5.6
+  (equip check, requirement branch), `items/inventory-moves.md` §7 (server
+  side of §29–§30), `world/hirelings.md` §11, `audio/triggers.md` §2,
+  §9 (sound events, place sound), `ui/menus.md` §4 (store click).
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 42–54 |
-| Inputs | 55–66 |
-| Outputs / state changes | 67–72 |
-| Rules | 73–74 |
-|   23. Mouse cursor (`client/ui.md` §B6; takes the rule of `render/capture.md` §3.3) | 75–180 |
-|   24. Character panel inputs (`panels.md` §8.7–§8.9; the `PENDING` character values) | 181–225 |
-|   25. Skill tree inputs (`panels.md` §10.3–§10.5; the `PENDING` icons and levels) | 226–261 |
-|   26. Waypoint rows (`panels.md` §13 r2–r7; the `PENDING` waypoint panel) | 262–296 |
-|   27. Scroll and other panels (`panels.md` OQ 9) | 297–370 |
-|   28. Gold dialog box and controls (`panels-2.md` §21 r9; answers `panels-2.md` OQ 6) | 371–531 |
-| Constants & data dependencies | 532–546 |
-| Randomness | 547–552 |
-| Edge cases & original bugs | 553–566 |
-| Test vectors | 567–591 |
-| Provenance | 592–619 |
-| Open questions | 620–636 |
+| Summary | 49–64 |
+| Inputs | 65–76 |
+| Outputs / state changes | 77–82 |
+| Rules | 83–84 |
+|   23. Mouse cursor (`client/ui.md` §B6; takes the rule of `render/capture.md` §3.3) | 85–190 |
+|   24. Character panel inputs (`panels.md` §8.7–§8.9; the `PENDING` character values) | 191–235 |
+|   25. Skill tree inputs (`panels.md` §10.3–§10.5; the `PENDING` icons and levels) | 236–271 |
+|   26. Waypoint rows (`panels.md` §13 r2–r7; the `PENDING` waypoint panel) | 272–306 |
+|   27. Scroll and other panels (`panels.md` OQ 9) | 307–380 |
+|   28. Gold dialog box and controls (`panels-2.md` §21 r9; answers `panels-2.md` OQ 6) | 381–541 |
+|   29. Inventory body-location clicks (`panels.md` §15, row "body location click") | 542–627 |
+|   30. Hireling item checks and clicks (`world/hirelings.md` §11 r9; `panels.md` §15, row "mercenary") | 628–714 |
+| Constants & data dependencies | 715–738 |
+| Randomness | 739–744 |
+| Edge cases & original bugs | 745–772 |
+| Test vectors | 773–814 |
+| Provenance | 815–854 |
+| Open questions | 855–871 |
 <!-- /index -->
 
 ## Summary
@@ -50,7 +57,10 @@ level with bonuses and decides per frame which icons can take a point
 (§25). The waypoint menu rebuilds its rows from the act's level range and
 the waypoint record of S→C 0x63 (§26). The scroll panels (Inifuss,
 Horadric, recipe) are left-slot pictures with a few animated symbols or
-one text line (§27).
+one text line (§27). A press on an equipment box becomes one C→S item
+message chosen from the equip check result (§29); the hireling panel and
+portrait give and take items with C→S 0x61 after a client-side wearable
+test (§30).
 
 ## Inputs
 
@@ -529,6 +539,179 @@ inclusive unless noted.
    close; a click outside the box → close; typing digits edits the
    amount, clamped to the max as typed.
 
+### 29. Inventory body-location clicks (`panels.md` §15, row "body location click")
+
+Client side of a left press on one of the player's ten equipment boxes
+in the inventory panel. Owners not restated here: the requirement branch
+(§4.3 result 0) is `items/inventory.md` §5.6; the equip check codes are
+`items/inventory.md` §4.3; server handling `items/inventory-moves.md`
+§7; message layouts `sim/client-messages.tsv`; the place sound
+`audio/triggers.md` §9 r3; the store click `ui/menus.md` §4.
+
+Terms. P = local player (`0x00463DD0`); c = P's cursor item (`0x0063C1E0`
+on P's inventory); L = clicked location; T = item at L, X = item at the
+other hand O (O = 5 for L = 4, 4 for L = 5; `0x0063BDE0`); m = inventory
+mode `[0x007BCBF0]` (`panels.md` §9.1); absent item → GUID −1.
+**Ready(i, …)** = the busy test `0x004C2240` = 0 for each listed item
+and the send throttle `0x00486D10` ≠ 0 (`ui/inventory.md` §9 r2, §10).
+**Mark i** = `0x004C21F0(i)`. **Sound of i** = `0x004B9A00(0x004C1D60(i,
+0, 0, 0), 0, …)`. **Lift flag** = `[0x007BCBEC]` := 1. **Store click
+S(i)** = `0x004B3870(ECX P, EDX i, 1, latched x [0x007BCA4C], latched y
+[0x007BCBD8], 0, 0, 0)`; a non-zero result sets m := 5 and calls
+`0x00468070(0)`. **Own-body mode** = `0x00486B80` ≠ 0: m ∈ {0, 1, 2,
+0x0B, 0x0C, 0x0E, 0x0F, 0x13} (byte table `0x00486BB0`, m > 0x13 → 0);
+m ∈ {3–10, 0x0D, 0x10, 0x11, 0x12} → 0. Senders: `0x004786A0` (id, u32,
+u32: 9 bytes), `0x00478680` (id, u32: 5), `0x004785B0` (id, u16: 3).
+
+1. **Box hit and dispatch** (`0x004912A0`, the inventory-family mouse
+   down, after the panel area test, the close button and the grid test;
+   `panels-2.md` §18). Boxes L = 0 … 10 at `0x007BCC58 + 0x14·L`
+   (left, right, top, bottom; both ends inclusive), first hit in L
+   order. On a hit:
+   1. cursor state (`0x00468830`) 6 or 8 → step 3;
+   2. else c can fill a socket of T (`0x004843E0`, ECX c, EAX T;
+      `ui/inventory.md` §6 r5): Ready(c) → C→S **0x28** (c, T), mark
+      c, sound of **T**, consumed; not ready → rule 6. The handler is not
+      called on this branch.
+   3. else the handler of L from the table `0x00721E58` (ECX P, EDX P's
+      inventory, stack L): L 4 → `0x00490780`, L 5 → `0x00490BA0`,
+      L 1–3 and 6–10 → `0x00490FC0`. Entry 0 is null and box 0 is never
+      loaded (all zero); the panel area test excludes (0, 0), so L = 0
+      is never hit.
+   4. After step 3 (and after a miss, rule 6): result r = 0 → cursor
+      state 6: `0x00453EC0` (use cancelled, `ui/controls.md` §6);
+      state 8: C→S **0x4C** [−1]. Then `[0x007BCBE4]`, `[0x007BCBE8]`,
+      `[0x007BCBF4]`, `[0x007BCBF8]` := 0; when neither a handler ran
+      nor 0x28 was sent, the press goes on to `0x00486E60`.
+2. **Use cursors.** Hands: state 6 (used item u = `0x004680A0`) with T
+   and u present and Ready(T) → C→S **0x27** (T, u), mark T; state 8
+   with T and Ready(T) → **0x4C** [T], mark T. Either send makes the
+   result 1, and the hand handlers then **continue** with rule 3.
+   `0x00490FC0` does the same two sends but returns at once (1 sent,
+   0 not), never reaching rule 3.
+3. **Equip check** e = `items/inventory.md` §4.3 (P, L, c, skip 0).
+   Hands take e 0–7, `0x00490FC0` takes 0–5 (2 and 4 cannot occur off
+   the hands); "—" leaves the result as it was (0, or 1 after rule 2).
+
+   | e | Hands (`0x00490780` L 4, `0x00490BA0` L 5) | Other locations (`0x00490FC0`) |
+   |---|---|---|
+   | 0 | `items/inventory.md` §5.6 (no message), 1 | same, 1 |
+   | 1 | Ready(c) → **0x1A** (c, L), mark c, sound of c, 1 | Ready(c) → **0x1A** (c, L), mark c, sound of c, lift flag, 1 |
+   | 2 | Ready(c, X) → **0x1B** (c, L), mark X, mark c, sound of c, lift flag, 1 | — |
+   | 3 | own-body mode: Ready(T) → **0x1C** [L], mark T, lift flag, 1; else (m < 0x13) S(T) | own-body mode: throttle only (no busy test, no mark) → **0x1C** [L], lift flag, 1; else m < 0x13 and T → S(T) |
+   | 4 | m = 4 → S(X); else Ready(X) → **0x1C** [O], mark X, lift flag, 1 | — |
+   | 5 | Ready(**T**) → **0x1D** (c, L), mark c, sound of c, 1 | Ready(c) → **0x1D** (c, L), mark c, sound of c, 1 |
+   | 6 | Ready(c) and m ≠ 0x0B → **0x21** (c, T), mark c, sound of c, 1 | — |
+   | 7 | Ready(c, T, X) → **0x1E** (c, L), mark c, T and X, no sound, 1 | — |
+
+   After S the handler returns its current result (0, or 1 after a rule 2
+   send) whatever S returned, so rule 1.4's use-cursor cancel can follow
+   a successful store click.
+4. **Fields.** 0x1A, 0x1B, 0x1D, 0x1E: u32 GUID of c @1, L as a **u32**
+   @5 (the server reads the u8 @5; bytes 6–8 are 0). 0x1C: u16 L @1.
+   0x21: c @1, T @5. 0x27: T @1, u @5. 0x28: c @1, T @5. 0x4C: T @1.
+   The client changes nothing locally: the body and cursor change only
+   when the server's 0x9D arrives (`items/inventory-moves.md` §7).
+5. **Swap with a two-hander, by case** (from §4.3's table): a two-hander
+   on the cursor over an empty hand whose other hand holds a shield → e
+   2 → 0x1B; a one-hander over the empty hand opposite a two-hander → e
+   1 when §4.4 allows the pair (barbarian, ammo), else 2 → 0x1B; a
+   two-hander over a worn one-hander with an item in the other hand →
+   e 7 → 0x1E when X fits page 0 (`0x0063CB00`), else 0 (event 19 or
+   20); an empty hand opposite a two-hander with no cursor item → e 4 →
+   0x1C for the **other** hand.
+6. **Miss** (no box hit, or rule 1.2 not ready): expansion
+   (`0x0044DCC0`) and the swap-tab test `0x00486860(x, y)` →
+   `0x0048A730` (C→S 0x60, `panels.md` §15), consumed; else rule 1.4
+   with r = 0.
+
+### 30. Hireling item checks and clicks (`world/hirelings.md` §11 r9; `panels.md` §15, row "mercenary")
+
+Client side of giving items to and taking items from the hireling
+(expansion). Server side and the give / take effects:
+`items/inventory-moves.md` §7.23 and `world/hirelings.md` §11. Terms as
+§29 (P, c, mark, sound of, Ready); H = the hireling: its GUID from the
+pet list (`0x00478F20(P, 7, any 0)`, `client/model.md` §14 r4; any 0
+skips gone records, so a dead hireling has none), its unit the monster
+(1, GUID) (`0x00463990`). Item types are tested with equivalence
+(`0x00629BB0`, `items/inventory.md` MV5). Hireling sound events go to
+`0x004CBDE0(H GUID, 1, e)` (`audio/triggers.md` §2 r2): 84 thank you,
+85 `cant_use_that_ever`, 86 `cant_use_that_yet`.
+
+1. **Wearable type W(c, H)** (`0x0048B290`; EBX = c, stack H, EDI → out
+   flag "type allowed"): out := 0. Classic (`0x0044DCC0` = 0) → 0. c not
+   identified (item flag 0x10) or broken (0x100) → 0. Allowed (out :=
+   1) when c is of type 3 `tors` or 37 `helm`, or by H's class (the
+   pet-record class, `0x00479120(H GUID)`; no record → 0, general types
+   only):
+
+   | Class (hireling) | Allowed besides `tors` / `helm` |
+   |---|---|
+   | 271 (0x10F, act 1) | 27 `bow` |
+   | 338 (0x152, act 2) | 33 `spea`, 34 `pole` |
+   | 359 (0x167, act 3) | 2 `shie`; 30 `swor` not two-handed (`0x006289C0` = 0) |
+   | 560 (0x230, act 5) | 28 `axe` not two-handed; 71 `phlm` |
+   | 561 (0x231, act 5) | 30 `swor` (any); 71 `phlm` |
+
+   Allowed → result = `items/inventory.md` §4.2 (c, H, equipping 0);
+   else 0. The list equals the server's (`0x0054D230`); with the 1.14d
+   `itemtypes.txt` the 71 test is redundant (`phlm`, `pelt` 72 and
+   `circ` 75 have `Equiv1` `helm`, `cloa` 73 has `tors`), and §4.2's
+   class test then refuses class items of other classes (barbarian
+   helms pass only for 560 / 561).
+2. **Hireling panel press** (ui 0x24 `UI_MERCINV`, left;
+   **WM_LBUTTONUP** handler `0x0048B7C0`, table entry `0x006D6350`):
+   1. No H GUID, or no H unit → `SetUIState(0x24, toggle, 0)`, return.
+   2. Message not handled (+0x18 := 0); cursor release `0x00467FA0`
+      (§23); close pressed `[0x007BCEA0]` := 0. Mouse outside x ∈ [0,
+      W / 2], y ∈ [0, H − 49] → return.
+   3. Close rectangle x ∈ [sx + 272, sx + 304], y ∈ [H + sy − 95, H + sy
+      − 63] (inclusive) → `SetUIState(0x24, toggle, 0)`, handled.
+   4. Else slots L = 0 … 10 at `0x007BCD38 + 0x14·L` (left, right, top,
+      bottom, inclusive; record 13 / 29 loaded by `0x004835B0`,
+      `panels.md` §9.2; a slot with left ≤ 0 is skipped, so only rArm,
+      torso, lArm and head exist). For each slot under the mouse:
+      - no c: H's item at L present → mark it, C→S **0x61** [u16 L],
+        `[0x007BCBE4]`, `[0x007BCBE8]`, `[0x007BCBF4]` := 0; the loop
+        continues. No busy or throttle test.
+      - c present: §4.1 (`0x0062ED50(c, L)`), §4.2 (c, H, 0) and W(c, H)
+        all pass → mark c, sound of c, C→S **0x61** [u16 **0**] (the
+        server chooses the slot, `world/hirelings.md` §11 r2); else
+        event 85 on H. Either way the loop stops.
+   5. Then `0x0044DA70()`; handled.
+   The refusal meant for "requirements not met" (event 86 when §4.1
+   holds, W ≠ 0 and its out flag is set) is dead: W ≠ 0 already includes
+   §4.2, so the first branch would have been taken. Every refusal,
+   including too-high requirements and unidentified items, plays 85
+   (original bug; reproduce).
+3. **Portrait drop** (WM_LBUTTONDOWN `0x004936E0`, table entry
+   `0x006D6320`; expansion only): message not handled; portraits shown
+   (`[0x007BEECC]` ≠ 2, `ui/messages.md`), x ∈ [`[0x007BEED4]`,
+   `[0x007BEED4]` + 46], y ∈ [24, 60]; else `[0x007BEEE8]` := 0 and
+   return. Then G(1) ≠ 0 → C→S **0x61** [u16 0], handled. No mark and
+   no place sound.
+4. **Give test G(sound)** (`0x004934D0`): classic, no P, no c or no H
+   GUID → 0. c not identified or broken → event 86 (when sound), 0. c
+   of type 76 `hpot`, 80 `apot` or 81 `wpot` (so also 78 `rpot`, whose
+   `Equiv1` is `hpot`) → event 84 (when sound), 1; no H unit needed.
+   Else no H unit → 0, silent. The type rule is r1's **without** the
+   71 tests (560: `axe` one-handed only; 561: `swor` only; `phlm` still
+   passes as `helm`): not allowed → event 85 (when sound), 0; allowed →
+   §4.2 (c, H, 0): pass 1, fail 0 **silent**.
+5. **Portrait hover** (WM_MOUSEMOVE `0x00493760`, table entry
+   `0x006D632C`; expansion only): `[0x007BEEE0]` := 0 on every move.
+   Over the rule 3 rectangle: `[0x007BEEE8]` := `GetTickCount` when it is
+   0; with no c and an H GUID, `[0x007BEEE0]` := 1 and, once
+   `GetTickCount` − `[0x007BEEE8]` ≥ 700 (unsigned), the highlight
+   `[0x007BEEDC]` := 1; then G(0) ≠ 0 → `[0x007BEEDC]` := 1 (no sounds).
+   Outside it (or portraits hidden): `[0x007BEEDC]`, `[0x007BEEE8]` := 0.
+6. **Slot tint** (`0x0048B3F0`, ECX = H unit; from the panel draw
+   `0x004929F0`): with c present, each slot of r2.4 under the mouse
+   gets a filled rectangle `0x0046EFD0(left, top, w, h, tint, 0)`
+   (`ui/inventory.md` §2): tint 1 `[0x007BCAD9]` when §4.1 (c, L), W(c,
+   H) and §4.2 (c, H, 0) pass, else tint 0 `[0x007BCAD8]`; drawn only
+   when 0 ≤ left < `[0x007A5220]` and 0 ≤ top < `[0x007A521C]`.
+
 ## Constants & data dependencies
 
 - Cursor type table `0x00712010` (7 × 0x1C), cels
@@ -540,6 +723,15 @@ inclusive unless noted.
 - `skills.txt` `maxlvl`, `skpoints`, `reqlevel`, `reqstr`, `reqdex`,
   `reqint`, `reqvit`, `reqskill1`–`3`, `InGame`; mask `[0x006CE270]` = 4.
 - Waypoint tab table `0x007224AC`; `levels.txt` `Waypoint`.
+- Body-click handler table `0x00721E58` (11 pointers by body location;
+  entry 0 null, 4 → `0x00490780`, 5 → `0x00490BA0`, the others
+  `0x00490FC0`); own-body mode byte table `0x00486BB0` (20 bytes, values
+  0 / 1 / 2 → jump table `0x00486BA4`); box tables `0x007BCC58`
+  (player) and `0x007BCD38` (hireling), 11 × 0x14 bytes.
+- `itemtypes.txt` ids (1.14d, the `Expansion` line skipped): 2 `shie`, 3
+  `tors`, 27 `bow`, 28 `axe`, 30 `swor`, 33 `spea`, 34 `pole`, 37
+  `helm`, 71 `phlm`, 72 `pelt`, 73 `cloa`, 75 `circ`, 76 `hpot`, 78
+  `rpot`, 80 `apot`, 81 `wpot`.
 - Scroll tables `0x00722EB8`, `0x00722EE0`, `0x00722F08`; item codes
   `bks`, `bkd`, `tr1`; files `menu\scroin`, `scroin2`, `scroin3`,
   `recipescroll`.
@@ -563,6 +755,20 @@ Reproduced by default.
 - The waypoint tab ranges are computed once per process (§26 r2).
 - The scroll base fills down to `H − 48` without `sy` (§27 r2).
 - A deciphered scroll's symbol slot 5 is a fatal error (§27 r3).
+- Hand clicks continue after a use-cursor send (§29 r2): with cursor
+  state 6 on an empty hand opposite a two-hander, no 0x27 goes (no T)
+  but e 4 still sends 0x1C for the other hand; with T present, T is
+  marked by the 0x27 send so e 3's 0x1C fails Ready(T), yet a store
+  click S(T) (no busy test) still runs outside the own-body modes.
+- The hands test T, not the cursor item, for busy before 0x1D; the other
+  locations test the cursor item (§29 r3).
+- The non-hand 0x1C has no busy test and no mark: presses inside one
+  server round trip each send 0x1C (only the throttle limits them).
+- The lift flag follows 0x1A only off the hands, 0x1B and 0x1C always,
+  never 0x1D, 0x1E or 0x21 (§29 r3).
+- Hireling panel refusals always play event 85; the event 86 branch is
+  dead (§30 r2). A requirement failure on a portrait drop is silent
+  (§30 r4).
 
 ## Test vectors
 
@@ -588,6 +794,23 @@ Reproduced by default.
 | gold dialog, Enter (WM_CHAR 0x0D) | OK callback `0x00454080` | §28 r3 |
 | gold dialog, mouse down at (100, 100) | close (cancel), consumed | §28 r2 |
 | spinner up held, draws n = 40, 2,500 ms after press, 70 ms since last step | step 40 >> 4 = 2 | §28 r5 |
+| m 0, no cursor item, helm worn, press on box 1, ready | C→S `1C 01 00`, helm marked, lift flag | §29 r3 e 3 |
+| m 3, no cursor item, helm worn, press on box 1 | no message; S(helm) (`0x004B3870` a1 = 1) | §29 r3 e 3 |
+| one-handed sword GUID 0x10 on the cursor, both hands empty, press on box 4 | C→S `1A 10 00 00 00 04 00 00 00`, place sound of the sword | §29 r3 e 1 |
+| two-handed axe GUID 0x10 on the cursor, box 4 empty, shield in 5, press on box 4 | C→S `1B 10 00 00 00 04 00 00 00`, shield and axe marked, lift flag | §29 r3 e 2, r5 |
+| no cursor item, box 5 empty, bow in 4, m 0, press on box 5 | C→S `1C 04 00` (the bow's hand) | §29 r3 e 4 |
+| arrows GUID 0x11 on the cursor, arrows GUID 0x22 worn in 5, m 0, press on box 5 | C→S `21 11 00 00 00 22 00 00 00` | §29 r3 e 6 |
+| ring GUID 0x12 on the cursor, ring worn in 6, press on box 6 | C→S `1D 12 00 00 00 06 00 00 00` | §29 r3 e 5 |
+| cursor state 6, nothing in box 9, press on box 9 | no message from the handler (0); dispatcher cancels the use (`0x00453EC0`) | §29 r1.4, r2 |
+| item requiring more strength on the cursor, press on its box | no message, event 20 (`items/inventory.md` §5.6) | §29 r3 e 0 |
+| act 2 hireling (338), identified polearm on the cursor, requirements met, release on its rArm slot | C→S `61 00 00`, polearm marked, place sound | §30 r1, r2.4 |
+| act 2 hireling, sword on the cursor, release on rArm | no message, event 85 on H | §30 r2.4 |
+| act 2 hireling, armor needing more strength, release on torso | no message, event 85 (not 86) | §30 r2 |
+| act 1 hireling, no cursor item, helm worn, release on head slot | C→S `61 01 00` | §30 r2.4 |
+| healing potion on the cursor, press on the portrait | event 84 on H, C→S `61 00 00` | §30 r3, r4 |
+| unidentified helm on the cursor, press on the portrait | event 86, no message | §30 r4 |
+| act 5 hireling (560), two-handed axe on the cursor, portrait | event 85, no message | §30 r4 |
+| 800 × 600 (record 29), mouse (240, 90) over the hireling panel | slot L 1 (head: 215–269 × 68–119); (240, 160) → L 3 (torso 213–269 × 137–219) | §30 r2.4, `inventory.txt` `Hireling2` |
 
 ## Provenance
 
@@ -616,6 +839,18 @@ cursor `0x004680B0`, `0x00468170`, `0x00468840`, `0x00467F20`,
 (d2data / d2exp) and `difficultylevels.txt` read with Python scripts
 outside the repo. The state-mask offsets match the `states.txt` flag bit
 numbers of `data/fields.tsv` for all ten wrappers. No D2MOO code used.
+§29–§30 (2026-10-08): `re/exports/all.asm` read of `0x004912A0`,
+`0x00490780`, `0x00490BA0`, `0x00490FC0`, `0x00486B80`, `0x004843E0`
+(entry registers), `0x0048B290`, `0x0048B3F0`, `0x0048B680`,
+`0x0048B7C0`, `0x004934D0`, `0x004936E0`, `0x00493760`, `0x00478F20`,
+`0x00479120`, loader `0x004835B0` (`0x00483712`–`0x00483788`, slot →
+address); jump tables `0x00490B7C`, `0x00490F9C`, `0x00491284`, the
+handler table `0x00721E58`, the byte table `0x00486BB0` and the window
+message table `0x006D6310`–`0x006D6354` (0x201 → `0x004936E0`, 0x200 →
+`0x00493760`, 0x201 → `0x0048B680`, 0x202 → `0x0048B7C0`) read from the
+image with `re/scripts/rd.py`; `itemtypes.txt` ids and `inventory.txt`
+`Hireling` / `Hireling2` rows read from `game/extracted/patch_d2` with
+Python outside the repo. No D2MOO code used.
 
 ## Open questions
 

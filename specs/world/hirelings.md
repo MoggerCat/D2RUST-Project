@@ -42,16 +42,16 @@
 |   8. Death (`0x0057CCB0` → `0x005751A0`) | 521–583 |
 |   9. Revive | 584–621 |
 |   10. Restoring from a save | 622–660 |
-|   11. Items (expansion) | 661–718 |
-|   12. Services (links) | 719–722 |
-|   13. Messages | 723–789 |
-|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 790–796 |
-| Constants & data dependencies | 797–820 |
-| Randomness | 821–831 |
-| Edge cases & original bugs | 832–883 |
-| Test vectors | 884–934 |
-| Provenance | 935–991 |
-| Open questions | 992–1084 |
+|   11. Items (expansion) | 661–724 |
+|   12. Services (links) | 725–728 |
+|   13. Messages | 729–795 |
+|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 796–802 |
+| Constants & data dependencies | 803–826 |
+| Randomness | 827–837 |
+| Edge cases & original bugs | 838–889 |
+| Test vectors | 890–940 |
+| Provenance | 941–997 |
+| Open questions | 998–1090 |
 <!-- /index -->
 
 ## Summary
@@ -715,6 +715,12 @@ allows C:
 8. A duplicate that fails (`0x0055A2A0` returns none) and the
    socket and replenish details of the copies: `world/hirelings-2.md`
    §17.
+9. Client side (expansion): the wearable test before a 0x61 (identified,
+   not broken, the per-class type list of §7.23, then §4.2 against the
+   hireling's stats; `0x0048B290`, portrait variant `0x004934D0`), the
+   hireling panel and portrait clicks that send 0x61 [L] (take) or
+   [0] (give), the sound events 84 / 85 / 86 on refusal or a potion, and
+   the slot tint `0x0048B3F0`: `ui/panels-3.md` §30.
 
 ### 12. Services (links)
 
