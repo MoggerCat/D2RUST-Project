@@ -309,7 +309,7 @@ impl<X: Pending> TickHooks for ActionSim<X> {
     }
 
     /// Step 9 `0x005433F0` (`units.md` §3.3) on the inactive store
-    /// ([`ActionSim::compress`]; nothing while the store is off).
+    /// ([`ActionSim::compress`]; only warp tiles while the store is off).
     fn compress_unit(&mut self, game: &mut Game, unit: UnitId) {
         self.compress(game, unit);
     }

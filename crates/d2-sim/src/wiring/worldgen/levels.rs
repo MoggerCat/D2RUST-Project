@@ -1,4 +1,4 @@
-// Spec: specs/drlg/levels.md §3.7, §4.3, §5.2, §9.4; specs/drlg/rooms.md §4, §9.2, §9.5.1; specs/drlg/preset.md §3, §8–§11; specs/drlg/maze.md §1, §4; specs/drlg/outdoor.md §2.3, §3, §12
+// Spec: specs/drlg/levels.md §3.7, §4.3, §5.2, §9.4; specs/drlg/rooms.md §4, §9.2, §9.5.1; specs/drlg/preset.md §3, §8–§11; specs/drlg/maze.md §1, §4; specs/drlg/outdoor.md §2.3, §3, §12; specs/sim/path-placement.md §12.1
 //! DRLG ↔ level types: [`WorldTypes`] is the act DRLG's
 //! [`LevelTypes`], dispatching by leveldefs `DrlgType` (1 maze, 2 preset,
 //! 3 outdoor) to [`Maze`], [`Presets`] and [`Outdoor`]. Rooms are told
@@ -20,8 +20,10 @@ use crate::drlg::maze::{Maze, MazeError};
 use crate::drlg::outdoor::{Outdoor, OutdoorData, OutdoorError, SubFiles, DRLG_OUTDOOR};
 use crate::drlg::preset::{Ds1Cache, Ds1Source, PresetCtx, PresetData, PresetError, Presets};
 use crate::drlg::{
-    Drlg, DrlgData, DrlgError, DrlgRoomId, LevelIdx, LevelTypes, PresetUnit, RoomGrids,
+    Drlg, DrlgData, DrlgError, DrlgRoomId, LevelIdx, LevelTypes, PresetUnit, RoomGrids, TileRect,
 };
+use crate::path::place_seams::{LvlWarp, WarpTileView};
+use crate::path::warp::{warp_slot, warp_tile_preset};
 
 use super::maze_presets::MazeToPreset;
 use super::outdoor_presets::OutdoorToPreset;
@@ -436,6 +438,39 @@ impl LevelTypes for WorldTypes {
             }
         }
     }
+
+    /// The warp tile preset `0x0066E1C0` (`sim/path-placement.md` §12.1)
+    /// on any room of the live level types: a type-5 preset unit of class
+    /// lvlwarp `Id` prepended to the room's list. No lvlwarp record is
+    /// fatal ([`DrlgError::NoLvlWarp`] with the slot's warp id).
+    fn warp_unit(
+        &mut self,
+        drlg: &mut Drlg,
+        data: &DrlgData,
+        room: DrlgRoomId,
+        wx: i32,
+        wy: i32,
+        cell: u32,
+        orientation: u32,
+    ) -> Result<bool, DrlgError> {
+        let p = self.parts(drlg.act);
+        let mut view = WarpTiles {
+            drlg,
+            data,
+            presets: p.presets,
+            outdoor: p.outdoor,
+        };
+        match warp_tile_preset(&mut view, room, orientation, wx, wy, cell) {
+            Ok(added) => Ok(added),
+            Err(_) => {
+                let level = drlg.level(drlg.room(room).level).id;
+                let slot = (warp_slot(cell) as usize).min(7);
+                Err(DrlgError::NoLvlWarp(
+                    drlg.warp_id(data, level, slot).unwrap_or(-1),
+                ))
+            }
+        }
+    }
 }
 
 /// The handle to a game's [`WorldTypes`] the act DRLGs hold
@@ -517,7 +552,79 @@ impl LevelTypes for SharedTypes {
             .door_unit(drlg, data, room, wx, wy, cell, orientation)
     }
 
-    fn warp_unit(&mut self, drlg: &mut Drlg, room: DrlgRoomId, wx: i32, wy: i32, cell: u32) {
-        self.0.borrow_mut().warp_unit(drlg, room, wx, wy, cell)
+    fn warp_unit(
+        &mut self,
+        drlg: &mut Drlg,
+        data: &DrlgData,
+        room: DrlgRoomId,
+        wx: i32,
+        wy: i32,
+        cell: u32,
+        orientation: u32,
+    ) -> Result<bool, DrlgError> {
+        self.0
+            .borrow_mut()
+            .warp_unit(drlg, data, room, wx, wy, cell, orientation)
+    }
+}
+
+/// The DRLG side of the warp tile preset (`sim/path-placement.md` §12.1)
+/// for [`WorldTypes`]: the room's tile rect, the lvlwarp record of a
+/// warp slot of the room's level (`drlg/levels.md` §7 rule 4), and the
+/// room's preset list (a preset room's, else an outdoor room's).
+struct WarpTiles<'a> {
+    drlg: &'a Drlg,
+    data: &'a DrlgData,
+    presets: &'a mut Presets,
+    outdoor: &'a mut Outdoor,
+}
+
+impl WarpTileView for WarpTiles<'_> {
+    type DrlgRoom = DrlgRoomId;
+
+    fn tile_rect(&self, room: DrlgRoomId) -> TileRect {
+        self.drlg.room(room).rect
+    }
+
+    fn lvlwarp(&self, room: DrlgRoomId, slot: u32, letter: u8) -> Option<LvlWarp> {
+        // Only slots 0..7 exist; `rooms.md` §9.5.1 step 1 stops main ≥ 8
+        // before the call.
+        let slot = usize::try_from(slot).ok().filter(|&s| s < 8)?;
+        let level = self.drlg.level(self.drlg.room(room).level).id;
+        let row = self.drlg.lvlwarp_row(self.data, level, slot, letter).ok()?;
+        let w = self.data.warps.get(row)?;
+        Some(LvlWarp {
+            id: w.id as u32,
+            offset_x: w.offset_x,
+            offset_y: w.offset_y,
+        })
+    }
+
+    fn add_preset_unit(&mut self, room: DrlgRoomId, ty: u8, class: u32, mode: u32, x: i32, y: i32) {
+        let unit = crate::drlg::preset::PresetUnit {
+            unit_type: u32::from(ty),
+            class: class as i32,
+            mode,
+            x,
+            y,
+            flags: 0,
+            path: None,
+        };
+        if self.presets.prepend_room_unit(room, unit) {
+            return;
+        }
+        // An outdoor room's list (`OutdoorRoom::units`, the seam view:
+        // mode 0 is the only mode §12.1 adds).
+        if let Some(r) = self.outdoor.rooms.get_mut(&room) {
+            r.units.insert(
+                0,
+                PresetUnit {
+                    unit_type: u32::from(ty),
+                    class,
+                    x,
+                    y,
+                },
+            );
+        }
     }
 }
