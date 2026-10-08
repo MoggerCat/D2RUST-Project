@@ -16,9 +16,10 @@ use std::sync::Arc;
 
 use d2_client::app::server_thread::ThreadLink;
 use d2_client::app::single_player::{self, GameData, Link, DEFAULT_SEED};
+use d2_client::app::skill_rest::SkillStore;
 use d2_client::bridge::link::{SendQueue, ServerLink};
 use d2_client::bridge::LOCAL_CLIENT;
-use d2_data::tables::{Charstats, Record};
+use d2_data::tables::{Charstats, Monstats, Monstats2, Record, Skills};
 use d2_proto::client::Walk;
 use d2_server::seams::{Clock, Pos};
 
@@ -52,6 +53,24 @@ impl Game {
         let (link, _) =
             single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
         let mut g = Self { link, ms };
+        // The test-local skill rows (as `app_server_skills.rs`): eight
+        // zero `skills` records, so the join gives the player skill 0
+        // (Attack) in both hands.
+        g.link
+            .with(|l| {
+                let h = l.host_mut().game.events.action.hooks();
+                let mut t = (*h.tables).clone();
+                t.skills.skills = vec![Skills::decode(&[0u8; Skills::SIZE]); 8];
+                // Attack: `anim` A1 (mode 7), `range` h2h (1).
+                t.skills.skills[0].anim = 7;
+                t.skills.skills[0].range = 1;
+                t.skills.level_cap = d2_sim::skills::LEVEL_CAP_114D;
+                h.tables = Arc::new(t);
+                let mut store = SkillStore::from_tables(&h.tables);
+                store.class_skills = vec![[0xFFFF; 10]; 7];
+                h.x.skills = store;
+            })
+            .unwrap();
         let req = single_player::create_request();
         g.link.send(SendQueue::System, &req.encode()).unwrap();
         g.ticks(1);
@@ -62,6 +81,8 @@ impl Game {
                 let h = &mut l.host_mut().game.events.action.sys.hooks;
                 let mut t = (*h.tables).clone();
                 t.combat.charstats = (0..7).map(|_| charstats_row()).collect();
+                t.combat.monstats = vec![Monstats::decode(&[0u8; Monstats::SIZE])];
+                t.combat.monstats2 = vec![Monstats2::decode(&[0u8; Monstats2::SIZE])];
                 h.tables = Arc::new(t);
             })
             .unwrap();
@@ -107,4 +128,76 @@ fn the_server_side_player_walks_on_a_client_walk() {
         end.x > start.x,
         "the server moved the player: {start:?} → {end:?}"
     );
+}
+
+/// A monster of class 0 allocated by the server next to the player, in
+/// the player's room; its GUID.
+fn monster_next_to_player(g: &mut Game) -> u32 {
+    use d2_sim::units::lifecycle::AllocRequest;
+    use d2_sim::units::UnitType;
+    g.link
+        .with(|l| {
+            let s = &mut l.host_mut().game;
+            let (p, _) = single_player::local_player(s).expect("joined");
+            let room = s.game.lists.unit(p).and_then(|e| e.room());
+            let pos = s.player_pos(LOCAL_CLIENT).unwrap();
+            let monsters = &mut s.events.action.sys.data.monsters;
+            if monsters.is_empty() {
+                monsters.push(d2_sim::units::hooks::MonsterInfo {
+                    enabled: true,
+                    ..Default::default()
+                });
+            }
+            let req = AllocRequest {
+                ty: UnitType::Monster,
+                class: 0,
+                room,
+                add: true,
+                fixed_guid: None,
+                mode: 1,
+                allied: false,
+            };
+            let m = s
+                .events
+                .action
+                .with(&mut s.game, |gm, v| v.allocate(gm, &req, pos.x + 2, pos.y))
+                .unwrap_or_else(|| {
+                    let h = s.events.action.hooks();
+                    panic!("monster allocated: {:?} {:?}", h.x.log, h.errors)
+                });
+            s.game.lists.unit(m).unwrap().guid
+        })
+        .unwrap()
+}
+
+// Covers: specs/sim/intents-events.md §2.4 r4
+#[test]
+fn a_left_skill_on_a_monster_next_to_the_player_starts_the_attack() {
+    let mut g = Game::joined();
+    let guid = monster_next_to_player(&mut g);
+    let mut msg = vec![0x06, 1, 0, 0, 0];
+    msg.extend(guid.to_le_bytes());
+    g.link.send(SendQueue::Game, &msg).unwrap();
+    g.link.pump().unwrap();
+    let handled = g
+        .link
+        .with(|l| format!("{:?}", l.last_frame().messages))
+        .unwrap();
+    // Before: no facts for the monster → `Refused`; no skill slot → the
+    // stub; no left skill → `Malformed` (code 3).
+    assert!(handled.contains("Dispatched(Done)"), "{handled}");
+    g.ticks(2);
+    let (log, errors) = g
+        .link
+        .with(|l| {
+            let h = l.host_mut().game.events.action.hooks();
+            (h.x.skills.log.clone(), format!("{:?}", h.errors))
+        })
+        .unwrap();
+    // In melee reach: the skill's mode starts at once (`use.md` §3), no
+    // run to the target. The synthetic game has no animdata, so the
+    // attack animation itself fails here (`Anim(NoRecord)`); with the
+    // user's files it runs (local check, docs/handoff/stitch-server-core.md).
+    assert!(log.iter().all(|l| !l.starts_with("run to")), "{log:?}");
+    assert!(errors.contains("NoRecord"), "{errors}");
 }

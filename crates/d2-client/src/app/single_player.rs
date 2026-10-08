@@ -382,10 +382,10 @@ pub struct LocalSeams {
     pub pos: BTreeMap<UnitId, (i32, i32)>,
     pub sent: Vec<(UnitId, Vec<u8>)>,
     pub log: Vec<String>,
-    /// The game's players and monsters (type, allied), copied by
-    /// [`sync_seams`] before each intent and tick: the hostility and
-    /// alignment seams have no game to read.
-    pub sides: BTreeMap<UnitId, (UnitType, bool)>,
+    /// The game's players and monsters (type, allied, path position),
+    /// copied by [`sync_seams`] before each intent and tick: the
+    /// hostility, alignment and melee-range seams have no game to read.
+    pub sides: BTreeMap<UnitId, (UnitType, bool, (i32, i32))>,
     /// The units' skill lists and the skill pipeline's preview fills
     /// (`UseRest`, `LearnRest`: [`super::skill_rest`]).
     pub skills: SkillStore,
@@ -396,23 +396,29 @@ impl LocalSeams {
     fn player_side(&self, unit: UnitId) -> Option<bool> {
         self.sides
             .get(&unit)
-            .map(|&(ty, allied)| ty == UnitType::Player || allied)
+            .map(|&(ty, allied, _)| ty == UnitType::Player || allied)
     }
 }
+
+/// d2rs-own, unverified (preview, D1): the melee reach of every unit in
+/// sub-tiles (`0x00622870` reads the unit's size and weapon; not
+/// answered here).
+const PREVIEW_MELEE_RANGE: i32 = 2;
 
 /// The play host's seam refresh (`SimGame::set_host_sync`): the players
 /// and monsters with their allied flag (`UnitLists`), for
 /// [`LocalSeams::sides`].
 pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
-    let sides = &mut sim.action.sys.hooks.x.sides;
-    sides.clear();
+    let hooks = &mut sim.action.sys.hooks;
+    let mut sides = BTreeMap::new();
     for ty in [UnitType::Player, UnitType::Monster] {
         for u in game.lists.units_of_type(ty) {
             if let Some(e) = game.lists.unit(u) {
-                sides.insert(u, (ty, e.allied));
+                sides.insert(u, (ty, e.allied, hooks.path_position(u)));
             }
         }
     }
+    hooks.x.sides = sides;
 }
 
 impl Pending for LocalSeams {
@@ -453,6 +459,21 @@ impl Pending for LocalSeams {
                 (self.player_side(attacker), self.player_side(defender)),
                 (Some(a), Some(d)) if a != d
             )
+    }
+    /// d2rs-own, unverified (preview, D1; `0x00622870`).
+    fn melee_range(&self, _: UnitId) -> i32 {
+        PREVIEW_MELEE_RANGE
+    }
+    /// d2rs-own, unverified (preview, D1; `combat/range.md` §7.2 step 3
+    /// with the preview reach and no line test): the larger axis
+    /// distance of the synced positions within reach + `extra` + 1.
+    fn in_melee_range(&self, a: UnitId, d: UnitId, extra: i32) -> bool {
+        let (Some(&(_, _, pa)), Some(&(_, _, pd))) = (self.sides.get(&a), self.sides.get(&d))
+        else {
+            return false;
+        };
+        let dist = (pa.0 - pd.0).abs().max((pa.1 - pd.1).abs());
+        dist <= PREVIEW_MELEE_RANGE + extra + 1
     }
     /// d2rs-own, unverified (preview, D1; `0x006259B0`): allied monsters
     /// and players good (2), every other unit evil (0, the default).
