@@ -118,6 +118,61 @@ lookup, §3.6 `compfile`, §5 raw-3, OQ 3 / 4 done), `facts-render.md`
 (inputs, §2 r3 component files and the CelDraw argument order, §4 r1
 source, OQ 3 / 4 answered, OQ 5 primitive colour argument).
 
+### Step 4 — scene compare: the tools work; d2rs cannot draw the scene yet
+
+**Scene.** `a1-town-arrival-ama`: ScnAma (`d2s-tool new --class ama
+--expansion`), `-seed 1234`, idle at the arrival point in the Rogue
+Encampment, player at client (10320, 72816). This is the arrival point,
+not "by the waypoint": d2rs `play` has no input script, so arrival is the
+one place both sides can show. The 1.14d facts are committed in
+`facts/render/scenes/a1-town-arrival-ama/` (frame seq 51, tick 73, 267
+draws) and `facts/render/sprites.tsv` (39 rows):
+
+```
+tools/cloud-game/run.sh --python --seconds 400 -- tools/trace-recorder/record_frames.py \
+    --game "$D2_GAME_DIR/Game.exe" --seconds 300 --every 1 --draws-every 10 --ticks 120 --auto ScnAma --seed 1234
+python3 tools/trace-recorder/facts_render.py <capture> --scene a1-town-arrival-ama --frame 51
+```
+
+Format check: `d2-client facts-compare <scene> <scene>` → `PARTIAL` (no
+difference; only `?` cells), so `facts-compare` accepts the converter's
+output.
+
+**d2rs side.** Built with `cargo build --release -p d2-client`. It runs
+under Xvfb on Mesa lavapipe (`mesa-vulkan-drivers`, plus
+`libxkbcommon-x11-0` and Bevy's X libraries; adapter "llvmpipe"):
+
+```
+DISPLAY=:98 WGPU_BACKEND=vulkan target/release/d2-client play --save ScnAma.d2s --seed 1234 \
+    --dump-draws DIR --at-tick N
+```
+
+| `--at-tick` | Result |
+|---|---|
+| 73 (the 1.14d frame), 3 | **fails**: `export: compose: draw item 653: drawn area Rect { x: 560, y: 296, width: 32, height: 32 } leaves the gradient block Rect { x: 560, y: 296, width: 32, height: 15 }` (exit 101; the same error stops the play window's frame system). A d2rs bug in `world_view` composition on the real install; not fixed here (no code in `crates/`) |
+| 1 | dump written: 6 items (the control panel `800ctrlpnl7.dc6` frames 0–5 only; no world yet) |
+
+**First difference** (`facts-compare` 1.14d seq 1 tick 3 vs d2rs tick 1,
+`--ignore tick`): `DIVERGED` at `draws.tsv` row 0, column `op`. The original
+has `StartDraw` (`1 0`, at `0x44cad5`) and d2rs has `CelDraw
+800ctrlpnl7.dc6`. Before that stage, the frame inputs d2rs measures
+(`w`, `h`, `open_mode`) are equal, and its 6 sprite rows (`800ctrlpnl7`
+frames 0–5: 117×104, 128×55 ×3, 86×55, 117×104, offsets 0) equal
+1.14d's. Two findings for the d2rs side (owner: `d2-client`):
+
+1. The exporter writes no `StartDraw`, `ClearScreen` or primitive rows
+   (`facts-render.md` §5 r1 lists only draw items), while 1.14d's list
+   starts with `StartDraw` and has `DrawBox`, `DrawLine`, `ClearScreen`
+   rows. Position matching (§6 r2) therefore diverges at row 0 of every
+   scene. Fix either the exporter (emit the frame's start / clear /
+   primitive rows) or §6 (skip the ops d2rs does not model).
+2. The composition error above blocks every populated frame of this
+   scene. It comes first: no world draw can be compared until it is
+   fixed.
+
+The 1.14d frame's cursor (`protate.dc6` at 320, 240) and rain (`rain 1`)
+are known extra rows on the original side (`facts-render.md` edge cases).
+
 ## What the recorders need from Windows, and the Wine plan
 
 Read: `tools/trace-recorder/README.md`, `record_rng.py` (the Win32 base),
