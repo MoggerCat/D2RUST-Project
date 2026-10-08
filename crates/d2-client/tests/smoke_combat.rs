@@ -630,16 +630,15 @@ impl Rig {
         })
     }
 
-    /// The GUID of the player unit that is not the local one: the
-    /// corpse (single player). Not matched on mode 17: a corpse that
-    /// comes back into view stays in 0x59's mode 5, because the add's
-    /// corpse 0x74 is not sent (open break 4 in
-    /// `docs/handoff/q-smoke-combat.md`).
+    /// The GUID of the dead player unit that is not the local one: the
+    /// corpse (single player). A corpse coming back into view gets 0x59
+    /// (mode 5), then the corpse 0x74 (PROVISIONAL REC-279), which sets
+    /// it to mode 0.
     fn corpse(&self) -> Option<u32> {
         let w = self.bridge().world();
         w.units
             .values()
-            .find(|u| u.key.unit_type == 0 && Some(u.key) != w.local_player)
+            .find(|u| u.key.unit_type == 0 && Some(u.key) != w.local_player && u.is_dead())
             .map(|u| u.key.guid)
     }
 
