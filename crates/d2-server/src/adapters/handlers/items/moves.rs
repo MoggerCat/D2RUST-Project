@@ -145,9 +145,13 @@ pub struct InvParts {
 
 impl InvParts {
     pub fn new(tables: InvTables, rest: Box<dyn MoveRest + Send + Sync>) -> Self {
+        let mut state = InvState::new();
+        state.equip_rules = true;
+        // PROVISIONAL (REC-161): worn items attach their stats to the wearer.
+        state.link_item_stats = true;
         Self {
             tables,
-            state: InvState::new(),
+            state,
             rest,
         }
     }
@@ -201,6 +205,7 @@ impl MoveCall for MoveRun<'_> {
         let mut d = parts.desk(econ);
         let guid = d.guid_of(self.player);
         let r = sim_moves::handle(&mut d, guid, self.msg);
+        d.flush_equip();
         let portals = d.take_portal_requests();
         (r, take_sent(&mut d), portals)
     }

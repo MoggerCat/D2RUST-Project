@@ -422,13 +422,22 @@ impl<'d, 'a, H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'d, 'a, H, R> {
         let out = f(&mut inv, self);
         self.state.inventories.insert(u, inv);
         self.sync_out();
+        self.flush_equip();
+        Some(out)
+    }
+
+    /// Runs the queued equipment-rule calls, then the owner refreshes the
+    /// inventory functions asked for. A host calls it when a call that
+    /// ran the rules directly (not through [`InvDesk::with_inv`], e.g. a
+    /// body remove's inventory pass) returns, so no refresh outlives its
+    /// call.
+    pub fn flush_equip(&mut self) {
         self.run_equip_queue();
         for r in std::mem::take(&mut self.state.refresh) {
             if let Some(o) = self.owner_of(r) {
                 deferred::owner_refresh(self, o);
             }
         }
-        Some(out)
     }
 
     /// The update-list reset after the update pass (`0x00597B00`, §6.1
