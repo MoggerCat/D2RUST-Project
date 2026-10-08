@@ -219,6 +219,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> EquipWorld for InvDesk<'_, '_, H, R
         InvWorld::stat_link(self, u, i)
     }
     fn stat_unlink(&mut self, u: UnitId, i: UnitId) {
+        if self.unlink_item_stats(u, i) {
+            return;
+        }
         let (o, g) = (self.owner_or_none(u), self.guid_of(i));
         self.rest.stat_unlink(o, g)
     }
