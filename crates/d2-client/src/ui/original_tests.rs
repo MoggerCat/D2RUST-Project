@@ -69,6 +69,10 @@ impl Ui {
         r
     }
 
+    fn root_char(&mut self, w: &ClientWorld, c: u16) -> Routed {
+        self.send(w, UiEvent::Char(c))
+    }
+
     fn key(&mut self, w: &ClientWorld, a: Action) -> Routed {
         self.send(w, UiEvent::Action(ActionId(a.index() as u16)))
     }
@@ -526,9 +530,11 @@ fn esc_without_a_player_opens_nothing() {
     assert!(!u.ui.is_open(9));
 }
 
-// d2rs-own, unverified: the menu entries (REC-QESC-1)
+// The rows of the tree replace the old three-entry / Options page; the
+// Game menu rows are now at the spec's y tops 185 / 235 / 285.
+// Covers: specs/ui/frontend-options.md §o3-save-and-exit-game-0x0047f2d0 r1, §o5-input-handler-table-0x006d6030-7-entries-registered-while-ui-9-is-open r6, §o7-settings-storage-and-the-d2rs-config-mapping r2
 #[test]
-fn the_menu_entries_return_save_and_exit_and_swallow_clicks() {
+fn the_menu_tree_returns_saves_exits_and_swallows_clicks() {
     let mut u = ui(Some(areas()), true);
     let w = world(AMAZON, 1, true);
     let texts = |u: &Ui| -> Vec<String> {
@@ -552,44 +558,73 @@ fn the_menu_entries_return_save_and_exit_and_swallow_clicks() {
         texts(&u),
         vec!["Options", "Save and Exit Game", "Return to Game"]
     );
-    let entry = |i: i32| Point::new(400, 215 + 45 * i);
-    // Options opens its page (d2rs config, REC-172); the click is
-    // swallowed and nothing is requested.
-    let (_, r) = u.click(&w, entry(0));
+    // Rows: Game menu tops 185 / 235 / 285 (click inside the 50 px row).
+    let row = |i: i32| Point::new(400, 185 + 50 * i + 20);
+    let (_, r) = u.click(&w, row(0));
     assert_ne!(r, Routed::Unhandled);
     assert!(u.ui.is_open(9) && !u.ui.take_exit_request());
     assert_eq!(
         texts(&u),
         vec![
-            "Resolution: 800x600",
-            "Window Mode: windowed",
-            "Controls: controls.toml",
-            "Previous"
+            "Sound Options",
+            "Video Options",
+            "Automap Options",
+            "Configure Controls",
+            "Previous Menu"
         ]
     );
-    // Window Mode cycles and reports the change once.
+    // Options rows (tops 135, 185, ...): Video Options.
+    let orow = |i: i32| Point::new(400, 135 + 50 * i + 20);
+    u.click(&w, orow(1));
+    let t = texts(&u);
+    assert_eq!(t[0], "Video Options");
+    assert!(t.contains(&"Window Mode".to_string()));
+    // Video rows (tops 70 + 45 k for 9 rows): Window Mode is row 2.
+    let m = u.ui.shared.borrow().esc.menu.clone();
+    let wm = Point::new(400, m.y_top(2) + 20);
+    // Window Mode cycles and reports the change once; the value round-trips
+    // through the config text (§O7).
     assert!(u.ui.take_settings_change().is_none());
-    u.click(&w, entry(1));
+    u.click(&w, wm);
     let s = u.ui.take_settings_change().unwrap();
     assert_eq!(s.window_mode, crate::app::config::WindowMode::Borderless);
     assert!(u.ui.take_settings_change().is_none());
-    u.click(&w, entry(0));
-    assert_eq!(u.ui.take_settings_change().unwrap().resolution, 0);
-    // Previous goes back to the first page.
-    u.click(&w, entry(3));
+    let back = crate::app::config::parse_settings(&crate::app::config::write_settings(&s));
+    assert_eq!(back.unwrap(), s);
+    // Previous Menu (last row) twice: Options, then the Game menu.
+    for _ in 0..2 {
+        let m = u.ui.shared.borrow().esc.menu.clone();
+        let last = m.rows().len() - 1;
+        u.click(&w, Point::new(400, m.y_top(last) + 20));
+    }
     assert_eq!(
         texts(&u),
         vec!["Options", "Save and Exit Game", "Return to Game"]
     );
-    // A click outside the box does not reach the world either.
+    // A click outside the rows does not reach the world either.
     let (_, r) = u.click(&w, Point::new(10, 10));
     assert_ne!(r, Routed::Unhandled);
-    // Save and Exit asks the host once.
-    u.click(&w, entry(1));
+    // Arrow keys and Enter: Down wraps to Options; Right on a choice row.
+    u.root_char(&w, 0xF028);
+    u.root_char(&w, 0x0D);
+    assert_eq!(texts(&u)[0], "Sound Options");
+    // Configure Controls is requested once.
+    for _ in 0..4 {
+        u.root_char(&w, 0xF028);
+    }
+    u.root_char(&w, 0x0D);
+    assert!(u.ui.take_controls_request());
+    assert!(!u.ui.take_controls_request());
+    // Esc closes the whole menu from a sub-menu (§O1 r4).
+    u.key(&w, Action::GameMenu);
+    assert!(!u.ui.is_open(9));
+    // Reopened: first page, Save and Exit asks the host once.
+    u.key(&w, Action::GameMenu);
+    u.click(&w, row(1));
     assert!(u.ui.take_exit_request());
     assert!(!u.ui.take_exit_request());
     // Return closes.
-    u.click(&w, entry(2));
+    u.click(&w, row(2));
     assert!(!u.ui.is_open(9));
 }
 
@@ -729,4 +764,115 @@ fn the_gold_button_opens_the_dialog_and_ok_sends_drop_gold() {
     );
     u.send(&w, UiEvent::Char(0x0D));
     assert_eq!(u.root.intents().len(), 1);
+}
+
+// Covers: specs/ui/inventory.md §11 r1, §11 r2, §11 r4
+// d2rs-own, unverified: the stash gold dialogs (REC-240).
+#[test]
+fn stash_gold_withdraw_and_deposit_send_0x4f() {
+    let mut u = ui(Some(areas()), true);
+    let mut w = world(AMAZON, 1, true);
+    let key = w.local_player.unwrap();
+    w.units.get_mut(&key).unwrap().stats.insert(14, 5000);
+    w.units.get_mut(&key).unwrap().stats.insert(15, 70000);
+    u.ui.set_ui(0x19, 0, false).unwrap();
+    u.root.sync_states(&u.ui.shared.borrow().states);
+    assert!(u.ui.is_open(0x19));
+    let texts = |u: &Ui| -> Vec<String> {
+        let ctx = UiCtx {
+            tick: 0,
+            world: &w,
+            strings: &NoStrings,
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        u.root.draw(&ctx, &mut out);
+        out.iter()
+            .filter_map(|d| match d {
+                UiDraw::Text(t) => Some(String::from_utf16_lossy(&t.text)),
+                _ => None,
+            })
+            .collect()
+    };
+    // The stash gold button (kind 4, withdraw): typed 1234 -> 0x4F 0x13.
+    let s = Screen::R800;
+    let btn = Point::new(s.sx() + 80, s.h + s.sy() - 455 + 5);
+    u.click(&w, btn);
+    assert!(texts(&u).contains(&"_".to_string()));
+    for c in "1234".chars() {
+        u.send(&w, UiEvent::Char(c as u16));
+    }
+    u.send(&w, UiEvent::Char(0x0D));
+    assert_eq!(
+        u.root.intents(),
+        &[ClientIntent(vec![0x4F, 0x13, 0, 0, 0, 0xD2, 0x04])]
+    );
+    // Over the stash maximum nothing grows: the field takes the stat 15.
+    u.click(&w, btn);
+    for c in "9999999".chars() {
+        u.send(&w, UiEvent::Char(c as u16));
+    }
+    assert!(texts(&u).contains(&"70000_".to_string()));
+    u.send(&w, UiEvent::Char(0x1B));
+    assert_eq!(u.root.intents().len(), 1);
+    // The inventory gold button with the stash open (kind 3, deposit):
+    // the field is pre-filled with the carried gold -> 0x4F 0x14.
+    let inv_btn = Point::new(493, 462);
+    u.click(&w, inv_btn);
+    assert!(texts(&u).contains(&"5000_".to_string()));
+    u.send(&w, UiEvent::Char(0x0D));
+    assert_eq!(
+        u.root.intents().last(),
+        Some(&ClientIntent(vec![0x4F, 0x14, 0, 0, 0, 0x88, 0x13]))
+    );
+}
+
+// d2rs-own, unverified: the stash GoldMax line reads string 4051 through
+// `ctx.strings` (REC-238); cap = the fixed stash limit.
+#[test]
+fn stash_gold_max_line_resolves_its_string_id() {
+    struct Strs(Vec<u16>);
+    impl crate::ui::StringLookup for Strs {
+        fn get(&self, _: &str) -> Option<&[u16]> {
+            None
+        }
+        fn get_id(&self, id: u16) -> Option<&[u16]> {
+            (id == 4051).then_some(self.0.as_slice())
+        }
+    }
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    u.ui.apply_output(
+        &crate::bridge::output::Output::TradeAction {
+            code: 0x10,
+            dead_or_absent: false,
+        },
+        &w,
+    )
+    .unwrap();
+    // Mirror the state flags into the root (no action: no hotkey runs).
+    let e = UiEvent::Press {
+        button: PointerButton::Right,
+        at: Point::new(0, 0),
+    };
+    u.ui.after_event(&mut u.root, e, Routed::Unhandled).unwrap();
+    let texts = |s: &dyn crate::ui::StringLookup| -> Vec<String> {
+        let ctx = UiCtx {
+            tick: 0,
+            world: &w,
+            strings: s,
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        u.root.draw(&ctx, &mut out);
+        out.iter()
+            .filter_map(|d| match d {
+                UiDraw::Text(t) => Some(String::from_utf16_lossy(&t.text)),
+                _ => None,
+            })
+            .collect()
+    };
+    assert!(texts(&NoStrings).is_empty());
+    assert_eq!(
+        texts(&Strs("Gold Max: %d".encode_utf16().collect())),
+        vec!["Gold Max: 2500000"]
+    );
 }

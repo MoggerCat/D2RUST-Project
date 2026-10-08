@@ -1,0 +1,316 @@
+// Spec: specs/render/lighting.md (§11 r2–r4), specs/render/shading.md (§4), specs/render/blend-modes.md (§6)
+//! Per-block light of the play preview's tiles (q-lighting-detail): the
+//! wall / floor / roof gradients of `shading.md` §4 from the frame's light
+//! map, through the CPU reference rules ([`crate::rules::lighting::draws`],
+//! [`crate::rules::shading`]) that the GPU path is checked against.
+//!
+//! `d2rs-own, unverified`:
+//! - a roof takes the floor grid path (§11 r4: "the same grid") with the
+//!   roof's wall alpha blend; `shading.md` §4 names walls *and roofs* for
+//!   the corner path, so which one a roof block takes is open (PROVISIONAL);
+//! - a wall's fade state is 0 (the normal point table);
+//! - a tile whose light cannot be read (wall direction 0 or past 9, a grid
+//!   index out of range) keeps its flat tile shade.
+
+use crate::rules::draw_order::{Dt1Facts, TileKind};
+use crate::rules::lighting::draws::{
+    floor_light_grid, roof_light_grid, wall_block_shades, wall_light_words,
+};
+use crate::rules::lighting::map::LightCell;
+use crate::rules::lighting::view::FrameLight;
+use crate::rules::shading::{floor_block_chain, floor_block_light};
+use crate::rules::{BlockRect, BlockShade};
+use crate::scene::BlendOp;
+
+/// Sub-tiles per tile edge.
+const SUBTILES: i32 = 5;
+
+/// The per-block shades of the tile at absolute tile `cell`; empty when
+/// the tile keeps its flat shade (shadow tiles, unreadable light).
+/// `blend` is the tile's own blend ([`super::preview::tile_ops`]).
+#[allow(clippy::too_many_arguments)]
+pub fn block_shades(
+    light: &FrameLight,
+    environment: LightCell,
+    kind: TileKind,
+    dt1: &Dt1Facts,
+    cell: (i32, i32),
+    alpha: u8,
+    blend: BlendOp,
+    blocks: &[BlockRect],
+    grids: &[(u8, u8)],
+) -> Vec<BlockShade> {
+    let origin = (SUBTILES * cell.0, SUBTILES * cell.1);
+    let grid_shades = |cells: [u8; 64]| -> Vec<BlockShade> {
+        let mut out = Vec::with_capacity(blocks.len());
+        for (block, &(gx, gy)) in blocks.iter().zip(grids) {
+            let Ok(l) = floor_block_light(&cells, gx, gy, false) else {
+                return Vec::new();
+            };
+            out.push(BlockShade {
+                block: *block,
+                shade: floor_block_chain(&light.tables, l, 0, 0),
+                blend,
+            });
+        }
+        out
+    };
+    match kind {
+        TileKind::ShadowTile => Vec::new(),
+        TileKind::Floor { .. } => grid_shades(
+            floor_light_grid(&light.map, origin, u32::from(dt1.material)).light_values(),
+        ),
+        TileKind::Roof { .. } => grid_shades(
+            roof_light_grid(
+                &light.map,
+                (8 * origin.0, 8 * origin.1),
+                dt1.roof_height as u32,
+                environment,
+            )
+            .light_values(),
+        ),
+        TileKind::Wall | TileKind::LowerWall => {
+            let Ok(words) = wall_light_words(&light.map, origin, dt1.orientation, 0) else {
+                return Vec::new();
+            };
+            wall_block_shades(&light.tables, &words, blocks, alpha, false).unwrap_or_default()
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rules::lighting::map::Ambient;
+    use crate::rules::shading::ShadeTables;
+    use crate::scene::{MapTable, ShadeChain};
+    use crate::world_view::preview_light::{build_map, level_ambient};
+
+    fn frame(lights: &[crate::world_view::preview_light::PointLight]) -> FrameLight {
+        let pl2 =
+            d2_formats::palette::Pl2::parse(&super::super::tile_assets::tests::pl2()).unwrap();
+        let dark = Ambient {
+            i: 40,
+            r: 40,
+            g: 40,
+            b: 40,
+        };
+        FrameLight {
+            tables: ShadeTables::push(&mut MapTable::new(), &pl2),
+            map: build_map((100, 100), dark, lights),
+        }
+    }
+
+    fn rect(x: i32) -> BlockRect {
+        BlockRect {
+            x,
+            y: 0,
+            width: 32,
+            height: 32,
+        }
+    }
+
+    fn env() -> LightCell {
+        LightCell {
+            blocks: 0,
+            i: 77,
+            r: 1,
+            g: 2,
+            b: 3,
+        }
+    }
+
+    fn floor() -> TileKind {
+        TileKind::Floor { layer: 1 }
+    }
+
+    // Covers: specs/render/lighting.md §11 r3
+    #[test]
+    fn a_floor_block_takes_the_gradient_corners_of_the_spec() {
+        // A light centred in the tile's grid makes the neighbours differ.
+        let f = frame(&[((102, 102), 6, (255, 255, 255))]);
+        let cell = (20, 20); // origin sub-tile (100, 100)
+        let e = |n: i32| i32::from(f.map.read(8 * (99 + n % 8), 8 * (99 + n / 8)).i);
+        let g = 0;
+        let delta = (e(g + 10) - e(g + 9)).abs()
+            + (e(g + 17) - e(g + 9)).abs()
+            + (e(g + 18) - e(g + 10)).abs();
+        assert!(delta >= 10, "the light must make a gradient: {delta}");
+        let want = [
+            ((e(8) + e(9) + e(16) + e(17)) >> 2) as u8,
+            ((e(1) + e(2) + e(9) + e(10)) >> 2) as u8,
+            ((e(10) + e(11) + e(17) + e(19)) >> 2) as u8,
+            ((e(17) + e(18) + e(25) + e(26)) >> 2) as u8,
+        ];
+        let out = block_shades(
+            &f,
+            env(),
+            floor(),
+            &Dt1Facts::default(),
+            cell,
+            0xFF,
+            BlendOp::Opaque,
+            &[rect(0)],
+            &[(0, 0)],
+        );
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].shade.gradient().expect("gradient").corners, want);
+    }
+
+    // Covers: specs/render/shading.md §4
+    #[test]
+    fn a_flat_floor_block_uses_one_light_map() {
+        let f = frame(&[]);
+        let out = block_shades(
+            &f,
+            env(),
+            floor(),
+            &Dt1Facts::default(),
+            (20, 20),
+            0xFF,
+            BlendOp::Opaque,
+            &[rect(0)],
+            &[(0, 0)],
+        );
+        // Ambient 40: every cell 40, flat, light map 40 >> 3 = 5.
+        assert!(out[0].shade.gradient().is_none());
+        assert_eq!(
+            out[0].shade,
+            ShadeChain::new(&[f.tables.light_map(5)]).unwrap()
+        );
+    }
+
+    // Covers: specs/render/lighting.md §11 r3
+    #[test]
+    fn an_unlit_floor_material_is_light_map_31() {
+        let f = frame(&[((102, 102), 6, (255, 255, 255))]);
+        let dt1 = Dt1Facts {
+            material: 0x100,
+            ..Dt1Facts::default()
+        };
+        let out = block_shades(
+            &f,
+            env(),
+            floor(),
+            &dt1,
+            (20, 20),
+            0xFF,
+            BlendOp::Opaque,
+            &[rect(0)],
+            &[(0, 0)],
+        );
+        assert_eq!(
+            out[0].shade,
+            ShadeChain::new(&[f.tables.light_map(31)]).unwrap()
+        );
+    }
+
+    // Covers: specs/render/lighting.md §11 r4
+    #[test]
+    fn a_high_roof_takes_the_environment_light() {
+        let f = frame(&[((102, 102), 6, (255, 255, 255))]);
+        let dt1 = Dt1Facts {
+            roof_height: 3,
+            ..Dt1Facts::default()
+        };
+        let out = block_shades(
+            &f,
+            env(),
+            TileKind::Roof { pass: 1 },
+            &dt1,
+            (20, 20),
+            0xFF,
+            BlendOp::Opaque,
+            &[rect(0)],
+            &[(0, 0)],
+        );
+        // Environment I = 77 in every cell: flat, light map 77 >> 3 = 9.
+        assert_eq!(
+            out[0].shade,
+            ShadeChain::new(&[f.tables.light_map(9)]).unwrap()
+        );
+    }
+
+    // Covers: specs/render/lighting.md §11 r2
+    #[test]
+    fn a_wall_block_takes_its_column_corners_from_the_points() {
+        let f = frame(&[((100, 100), 8, (255, 255, 255))]);
+        let cell = (20, 20);
+        for direction in 1..=9u32 {
+            let dt1 = Dt1Facts {
+                orientation: direction,
+                ..Dt1Facts::default()
+            };
+            let words = wall_light_words(&f.map, (100, 100), direction, 0).unwrap();
+            let low = |w: u32| w as u8;
+            for col in 0..2usize {
+                let (a, b) = (low(words[col]), low(words[col + 1]));
+                let out = block_shades(
+                    &f,
+                    env(),
+                    TileKind::Wall,
+                    &dt1,
+                    cell,
+                    0xFF,
+                    BlendOp::Opaque,
+                    &[rect(32 * col as i32)],
+                    &[(0, 0)],
+                );
+                let want = crate::rules::shading::wall_block_light([a, b, b, a], false);
+                let chain = f
+                    .tables
+                    .block_chain(want, crate::scene::GradientKind::Wall, 0, 0);
+                assert_eq!(out[0].shade, chain, "direction {direction} column {col}");
+            }
+        }
+    }
+
+    // Covers: specs/render/lighting.md §11 r2
+    #[test]
+    fn unreadable_light_keeps_the_flat_tile_shade() {
+        let f = frame(&[]);
+        let dt1 = Dt1Facts::default(); // orientation 0
+        let out = block_shades(
+            &f,
+            env(),
+            TileKind::Wall,
+            &dt1,
+            (20, 20),
+            0xFF,
+            BlendOp::Opaque,
+            &[rect(0)],
+            &[(0, 0)],
+        );
+        assert!(out.is_empty());
+        assert!(block_shades(
+            &f,
+            env(),
+            TileKind::ShadowTile,
+            &dt1,
+            (20, 20),
+            0xFF,
+            BlendOp::Opaque,
+            &[rect(0)],
+            &[(0, 0)]
+        )
+        .is_empty());
+    }
+
+    // Covers: specs/render/lighting.md §3.1 r2
+    #[test]
+    fn the_level_ambient_needs_a_colour() {
+        let rows = [(0, 0, 0, 0), (30, 255, 255, 255), (8, 0, 0, 1)];
+        assert_eq!(level_ambient(&rows, 0), None, "no colour: the environment");
+        assert_eq!(
+            level_ambient(&rows, 1),
+            Some(Ambient {
+                i: 30,
+                r: 255,
+                g: 255,
+                b: 255
+            })
+        );
+        assert_eq!(level_ambient(&rows, 2).map(|a| a.i), Some(8));
+        assert_eq!(level_ambient(&rows, 9), None, "past the table");
+    }
+}

@@ -190,6 +190,12 @@ impl<F: ViewSource> ViewSource for ModelFeed<F> {
     }
 
     fn tile_blocks(&self, tile: &MapTile) -> Result<Vec<crate::rules::BlockShade>, ViewError> {
+        if let Some(p) = &self.preview {
+            let shades = p.block_shades_of(tile.key);
+            if !shades.is_empty() {
+                return Ok(shades);
+            }
+        }
         self.inner.tile_blocks(tile)
     }
 }

@@ -583,11 +583,20 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
         .filter_map(|u| Some((u, sim.action.sys.units.get(u)?.class)))
         .collect();
     let hooks = &mut sim.action.sys.hooks;
+    // d2rs-own, unverified (q-assassin-gaps, REC-233): a listed pet is on the
+    // player side (the summon's alignment effect, `0x005543B0`, is not wired).
+    let pets: std::collections::BTreeSet<u32> = hooks
+        .pet_lists
+        .values()
+        .flat_map(|l| l.entries.iter())
+        .flat_map(|e| e.nodes.iter().map(|n| n.guid as u32))
+        .collect();
     let mut sides = BTreeMap::new();
     for ty in [UnitType::Player, UnitType::Monster] {
         for u in game.lists.units_of_type(ty) {
             if let Some(e) = game.lists.unit(u) {
-                sides.insert(u, (ty, e.allied, hooks.path_position(u)));
+                let pet = ty == UnitType::Monster && pets.contains(&e.guid);
+                sides.insert(u, (ty, e.allied || pet, hooks.path_position(u)));
             }
         }
     }
@@ -804,6 +813,15 @@ impl Pending for LocalSeams {
     }
     fn item_at(&self, unit: UnitId, loc: u8) -> Option<UnitId> {
         self.weapons.item_at(unit, loc)
+    }
+    // d2rs-own, unverified (q-assassin-gaps, REC-233): a player whose hands
+    // the weapon copy knows has an inventory, and a copied item is usable
+    // (not broken); the dual-claw test of srvdo 35 (`bodies.md` §8.10).
+    fn has_inventory(&self, unit: UnitId) -> bool {
+        self.weapons.hands.contains_key(&unit)
+    }
+    fn item_usable(&self, item: UnitId) -> bool {
+        self.weapons.items.contains_key(&item)
     }
     // d2rs-own, unverified (q-skill-gaps, REC-176): the shield and its
     // smite damage from the weapon copy.
@@ -1215,6 +1233,8 @@ impl WaypointTables {
         for (class, operate, init) in [
             (synthetic_act2::LAIR_ENTRANCE_CLASS, 0, 0),
             (synthetic_act2::ORIFICE_CLASS, 25, 21),
+            // Tyrael's door: init 38 (`quests-act2.md` §8.8), REC-234.
+            (synthetic_act2::TYRAEL_DOOR_CLASS, 0, 38),
         ] {
             let c = class as usize;
             if objects.len() <= c {
@@ -1820,6 +1840,20 @@ pub fn client_object_rows(data: &GameData) -> Vec<crate::bridge::objects::ObjCli
     }
 }
 
+/// The `objects.txt` `Name` of each class, for the mouse-over label
+/// (`world_view::object_label`; d2rs-own, unverified, REC-239).
+pub fn client_object_names(data: &GameData) -> Vec<String> {
+    data.tables()
+        .objects
+        .iter()
+        .map(|o| {
+            let n = &o.name;
+            let end = n.iter().position(|&b| b == 0).unwrap_or(n.len());
+            String::from_utf8_lossy(&n[..end]).into_owned()
+        })
+        .collect()
+}
+
 /// The `Levels.txt` fields the client reads (`client/model.md` §11
 /// rules 3–4: `Pal`, `Act`, `BlankScreen`; `audio/environment.md` §1 r2:
 /// `SoundEnv`), one row per level id, from the game's `levels` table.
@@ -2100,6 +2134,7 @@ fn synthetic_monstats() -> Vec<Monstats> {
     // Blood Raven (REC-130): a killable class, so the kill parse runs.
     v[synthetic_burial::BLOOD_RAVEN as usize].killable = true;
     v[synthetic_act4::IZUAL as usize].killable = true;
+    v[synthetic_act2::DURIEL_CLASS as usize].killable = true;
     // The Act IV endgame bosses (q-a4-endgame).
     for c in synthetic_act4::BOSSES {
         v[c as usize].killable = true;
@@ -2155,6 +2190,7 @@ pub fn synthetic_unit_rows() -> UnitRows {
         .unwrap_or(0)
         .max(raven)
         .max(izual)
+        .max(synthetic_act2::DURIEL_CLASS as usize)
         .max(MERC_CLASSES.into_iter().max().unwrap_or(0));
     let mut monsters = vec![None; top + 1];
     let class_row = |npc| MonsterClass {
@@ -2172,6 +2208,7 @@ pub fn synthetic_unit_rows() -> UnitRows {
     }
     monsters[raven] = Some(class_row(false));
     monsters[izual] = Some(class_row(false));
+    monsters[synthetic_act2::DURIEL_CLASS as usize] = Some(class_row(false));
     // The hirable mercenaries (q-mercs-acts, REC-157): plain monster rows.
     for c in MERC_CLASSES {
         monsters[c] = Some(class_row(false));
@@ -2770,6 +2807,10 @@ pub fn build_with_town(
     world.inventory = parts.inventory.map(preview_inv_parts);
     // The cube (d2rs-own, unverified, REC-119): the user's `cubemain`.
     world.cube = parts.cube.map(preview_cube_parts);
+    // A new character carries the Horadric Cube (d2rs-own, unverified,
+    // REC-244): charstats gives none, and the preview has no Act II quest
+    // reward path yet.
+    world.start_extra = vec![*b"box "];
     let mut s: Sim = SimGame::with_world(game, sim, world);
     s.set_host_sync(sync_seams);
     s.set_world_sync(super::weapons::sync);
@@ -2890,6 +2931,7 @@ fn loader(
                 Ok((entry, report)) => {
                     // q-save-full: the save's items, made on the wired host.
                     let items_ok = super::save_full::join_items(s, player, save);
+                    super::save_gaps::join_gaps(s, player, save);
                     let log = &mut s.events.action.hooks().x.log;
                     log.extend(
                         report

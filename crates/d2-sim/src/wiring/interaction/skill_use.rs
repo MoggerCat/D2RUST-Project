@@ -618,7 +618,8 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
         self.x().target_position(u)
     }
     fn line_clear(&self, u: UnitId, to: (i32, i32), mask: u32) -> bool {
-        self.x().line_clear(u, to, mask)
+        self.rooms_line_clear(u, to, mask)
+            .unwrap_or_else(|| self.x().line_clear(u, to, mask))
     }
 
     /// `0x005416B0` (`tick.md` §5.2).

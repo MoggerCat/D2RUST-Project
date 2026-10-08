@@ -25,7 +25,7 @@
 //!   as the empty [`skip_key`] frame) and logged once; a near-room build
 //!   that fails leaves the frame without the map, logged once.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
 
 use crate::bridge::world::ClientWorld;
@@ -38,7 +38,7 @@ use crate::rules::draw_order::{
     NearRooms, OrderedTile, TileArray, TileKind, UnitFacts, UNIT_EX_VISIBLE,
 };
 use crate::rules::shading::ShadeTables;
-use crate::scene::{BlendOp, ShadeChain};
+use crate::scene::{BlendOp, DrawKey, ShadeChain};
 
 use super::near_rooms::{Dt1Entry, MapState};
 use super::tile_assets::{tile_key, TileAssets};
@@ -188,6 +188,9 @@ pub struct Preview {
     /// `D2RS_FULLBRIGHT=1`.
     pub light: super::preview_light::PreviewLight,
     logged: Arc<Mutex<BTreeSet<String>>>,
+    /// The frame's per-block shades by draw key (`preview_blocks`), filled
+    /// by [`Self::tile_art`], read by `ViewSource::tile_blocks`.
+    block_shades: Arc<Mutex<BTreeMap<DrawKey, Vec<crate::rules::BlockShade>>>>,
 }
 
 impl Preview {
@@ -197,6 +200,22 @@ impl Preview {
             light: super::preview_light::PreviewLight::new(),
             ..Preview::default()
         }
+    }
+
+    /// Stores the per-block shades of the tile with draw key `key`.
+    pub(crate) fn put_block_shades(&self, key: DrawKey, shades: Vec<crate::rules::BlockShade>) {
+        if let Ok(mut b) = self.block_shades.lock() {
+            b.insert(key, shades);
+        }
+    }
+
+    /// The per-block shades of the tile with draw key `key` this frame.
+    pub fn block_shades_of(&self, key: DrawKey) -> Vec<crate::rules::BlockShade> {
+        self.block_shades
+            .lock()
+            .ok()
+            .and_then(|b| b.get(&key).cloned())
+            .unwrap_or_default()
     }
 
     /// Logs `message` the first time it is seen; returns whether it was new.
@@ -229,6 +248,9 @@ impl Preview {
         assets: &mut ViewAssets,
     ) -> Result<(), ViewError> {
         self.act = world.palette_act.unwrap_or(0);
+        if let Ok(mut b) = self.block_shades.lock() {
+            b.clear();
+        }
         if let Err(m) = self.tiles.ensure_shades(self.act, &mut assets.maps) {
             self.log_once(m);
         }
@@ -279,6 +301,17 @@ impl Preview {
                 .tile_chain(tile.kind, &tile.dt1, tile.cell)
                 .unwrap_or(shade),
         };
+        if !matches!(tile.kind, TileKind::ShadowTile) {
+            let grids = self.tiles.grids(&key).unwrap_or_default();
+            let shades = self.light.block_shades(
+                tile.kind, &tile.dt1, tile.cell, tile.alpha, blend, blocks, grids,
+            );
+            if !shades.is_empty() {
+                if let Ok(k) = DrawKey::new(tile.key.pass, tile.key.major, tile.key.minor, 0) {
+                    self.put_block_shades(k, shades);
+                }
+            }
+        }
         TileArt {
             frame: ComponentFrame { set: key, index: 0 },
             blocks: blocks.to_vec(),

@@ -168,6 +168,8 @@ pub struct Live {
     pub quests: Option<[[u8; 96]; 3]>,
     /// Items, skill levels and waypoints (q-save-full).
     pub extra: super::save_full::Extra,
+    /// Mouse skills, town act, hireling and golem items (q-save-gaps).
+    pub gaps: super::save_gaps::Gaps,
     /// The character is hardcore and the player is dying or dead
     /// ([`super::hardcore`]): the save gets the dead bit.
     pub hardcore_dead: bool,
@@ -198,6 +200,7 @@ pub fn read_live(sim: &mut Sim) -> Result<Live, SaveError> {
         out
     });
     let extra = super::save_full::read_extra(sim, player);
+    let gaps = super::save_gaps::read_gaps(sim, player);
     let hardcore = sim.events.action.hooks().x.hardcore;
     // Player modes 0 (DT) and 17 (DD).
     let down = sim
@@ -211,6 +214,7 @@ pub fn read_live(sim: &mut Sim) -> Result<Live, SaveError> {
         stats,
         quests,
         extra,
+        gaps,
         hardcore,
         hardcore_dead: hardcore && down,
     })
@@ -249,6 +253,7 @@ pub fn apply_live(base: &D2s, live: &Live, now: u32) -> D2s {
         body.quests.records = *records;
     }
     super::save_full::apply_extra(body, &live.extra);
+    super::save_gaps::apply_gaps(&mut save, &live.gaps);
     if let Some(&(_, level)) = live.stats.iter().find(|s| s.0 == LEVEL_STAT) {
         if level > 0 {
             save.header.level = level.min(99) as u8;

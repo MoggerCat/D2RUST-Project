@@ -8,18 +8,29 @@
 //! nothing: the server transmutes.
 //!
 //! Preview fills (d2rs-own, unverified, REC-119): the transmute animation
-//! (§12.4), the tool tips and the cube-gone close are not done.
+//! (§12.4) and the tool tips are not done. The cube-gone close runs once
+//! per pass ([`OriginalUi::cube_poll`]).
 
-use super::SharedRef;
+use super::{OriginalUi, OriginalUiError, SharedRef};
 use crate::bridge::items;
+use crate::bridge::world::ClientWorld;
 use crate::ui::draw::UiDrawSink;
 use crate::ui::geom::{Point, Rect};
 use crate::ui::panel::{Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
+use crate::ui::panels;
 use crate::ui::panels::cube_items::cube_present;
-use crate::ui::panels::stash_cube::{CubePanel, UI_CUBE};
-use crate::ui::panels::stash_input::{Pointer, StashCubeInput};
+use crate::ui::panels::stash_cube::{CubePanel, STR_TRANSMUTE, UI_CUBE};
+use crate::ui::panels::stash_input::{
+    cube_close_hit, cube_tooltips, transmute_hit, Pointer, StashCubeInput,
+};
 use crate::ui::panels::PanelOutput;
+use crate::ui::root::UiRoot;
+use crate::ui::states::id;
 use crate::ui::PointerButton;
+
+/// `strClose` (`panels.md` §8 r1) and the tool tips' font.
+const STR_CLOSE: u16 = 4144;
+const TIP_FONT: u16 = 1;
 
 /// The cube adapter (ui 0x1A, left half above the control panel).
 pub(super) struct CubeUi {
@@ -45,8 +56,9 @@ impl Panel for CubeUi {
             transmute_pressed: self.input.transmute_pressed,
         };
         // The cube-gone close (§12.2, two 0x4F 0x17) is not sent from a
-        // draw: outputs leave only after an event. The panel draws
-        // nothing while the cube item is absent (d2rs-own, unverified).
+        // draw: outputs leave only after an event, so
+        // [`OriginalUi::cube_poll`] sends it. The panel draws nothing
+        // while the cube item is absent.
         if !panel
             .draw(&sh.tables, &env, cube_present(ctx.world), out)
             .is_empty()
@@ -55,6 +67,28 @@ impl Panel for CubeUi {
         }
         let g = sh.items.cube_grid(&sh.config.screen);
         sh.items.draw_cube(ctx.world, &sh.tables.files, &g, out);
+        // The button tool tips (§12 r5, `panels-2.md` §20 r3): the strict
+        // button rectangles, `strClose` / `strUiMenu2` "Transmute". Drawn
+        // when the string table is loaded (font 1, d2rs-own, unverified).
+        let s = sh.config.screen;
+        let tip = if cube_close_hit(&s, sh.mouse) {
+            Some((STR_CLOSE, true))
+        } else if transmute_hit(&s, sh.mouse) {
+            Some((STR_TRANSMUTE, false))
+        } else {
+            None
+        };
+        if let Some(text) = tip.and_then(|(id, close)| Some((ctx.strings.get_id(id)?, close))) {
+            let (t, close) = text;
+            let w = sh
+                .fonts
+                .as_ref()
+                .and_then(|f| f.width_a(TIP_FONT, t))
+                .unwrap_or(0);
+            let (c, m) = cube_tooltips(&s, w, w);
+            let at = if close { c } else { m };
+            out.push(panels::text(t.to_vec(), at.x, at.y, TIP_FONT, 0));
+        }
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {
@@ -100,3 +134,36 @@ impl Panel for CubeUi {
         UiResponse::Consumed
     }
 }
+
+impl OriginalUi {
+    /// Once per pass: when ui 0x1A is open and the cube item is no longer
+    /// in the model (moved out of the inventory, sold, dropped), the
+    /// cube-gone close of `panels.md` §12 r2 / `panels-2.md` §20 r4:
+    /// `SetUIState(0x1A, off)`, then C→S 0x4F 0x17 twice (the latched
+    /// close, then the unconditional one). The state was just open, so
+    /// the close latch is the open's (clear). Nothing otherwise.
+    pub fn cube_poll(
+        &mut self,
+        world: &ClientWorld,
+        root: &mut UiRoot,
+    ) -> Result<(), OriginalUiError> {
+        if !self.is_open(id::CUBE) || cube_present(world) {
+            return Ok(());
+        }
+        for o in StashCubeInput::default().cube_gone(true) {
+            match o {
+                PanelOutput::Intent(i) => root.queue_intent(i),
+                PanelOutput::SetUi { ui, mode, jump } => {
+                    self.set_ui(u32::from(ui), u32::from(mode), jump)?;
+                }
+                PanelOutput::ClickSound => {}
+            }
+        }
+        self.sync_root(root);
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+#[path = "cube_ui_tests.rs"]
+mod tests;

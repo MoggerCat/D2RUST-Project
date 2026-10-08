@@ -274,6 +274,28 @@ impl<F: LevelTypes> LevelTypes for SyntheticTypes<F> {
                     });
                 }
             }
+            // The Lair's population: Duriel, Tyrael and Tyrael's door
+            // (q-a2-tyrael-door, d2rs-own, unverified, REC-234).
+            if drlg.level(level).id == super::synthetic_act2::DURIELS_LAIR {
+                use super::synthetic_act2 as a;
+                for (class, (x, y)) in [
+                    (a::DURIEL_CLASS, a::DURIEL_XY),
+                    (a::TYRAEL_CLASS, a::TYRAEL_XY),
+                ] {
+                    units.push(PresetUnit {
+                        unit_type: d2_sim::wiring::action::warp_tile::HOST_MONSTER_PRESET,
+                        class,
+                        x,
+                        y,
+                    });
+                }
+                units.push(PresetUnit {
+                    unit_type: d2_sim::wiring::action::warp_tile::HOST_OBJECT_PRESET,
+                    class: a::TYRAEL_DOOR_CLASS,
+                    x: a::TYRAEL_DOOR_XY.0,
+                    y: a::TYRAEL_DOOR_XY.1,
+                });
+            }
             // The orifice stands in the first room of the tomb the DRLG
             // chose for it (q-a2-duriel, d2rs-own, unverified).
             if drlg.level(level).id == drlg.staff_tomb && drlg.staff_tomb != 0 {

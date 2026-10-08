@@ -119,6 +119,10 @@ pub struct InteractionState {
     pub shown_class: u16,
     /// The trade open that added them was a gamble (`vendors.md` §4).
     pub shown_gamble: bool,
+    /// Store items a purchase took out of the NPC's grid
+    /// (`VendorWorld::take_from_store`), for S→C 0x9C action 12 to the
+    /// trading player (`vendors.md` §7.1 rule 10), in take order.
+    pub taken: Vec<UnitId>,
     /// Approach requests (`npc.md` §2 rule 3: C→S 0x13 at distance 7–8)
     /// the host has not started yet: (player, NPC).
     pub approaches: Vec<(UnitId, UnitId)>,
@@ -147,6 +151,7 @@ impl InteractionState {
             shown_player: None,
             shown_class: 0,
             shown_gamble: false,
+            taken: Vec::new(),
             approaches: Vec::new(),
             queued: Vec::new(),
         }

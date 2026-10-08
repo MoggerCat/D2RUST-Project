@@ -6,7 +6,7 @@ use crate::bridge::items::ItemArtRow;
 use crate::bridge::world::{ClientUnit, ItemData, ItemRecord, KindData, PlayerData, UnitKey};
 use crate::ui::draw::UiDraw;
 
-const PLAYER: UnitKey = UnitKey::new(0, 1);
+pub(crate) const PLAYER: UnitKey = UnitKey::new(0, 1);
 
 /// An item stream head (`items/bitstream.md` §2): flags, version, mode,
 /// location (body, x, y, page + 1), code.
@@ -40,9 +40,9 @@ fn stream(m: u8, loc: (u8, u16, u16, u8), code: &[u8; 4]) -> Vec<u8> {
 /// A world with the local player (class 0) and items (guid, mode,
 /// location, code); `cursor` names the cursor item.
 /// guid, mode, location (body, x, y, page + 1), code.
-type Fixture<'a> = (u32, u8, (u8, u16, u16, u8), &'a [u8; 4]);
+pub(crate) type Fixture<'a> = (u32, u8, (u8, u16, u16, u8), &'a [u8; 4]);
 
-fn world(items: &[Fixture], cursor: Option<u32>) -> ClientWorld {
+pub(crate) fn world(items: &[Fixture], cursor: Option<u32>) -> ClientWorld {
     let mut w = ClientWorld::default();
     let mut p = ClientUnit::new(PLAYER);
     p.kind = KindData::Player(PlayerData {
@@ -398,6 +398,51 @@ mod belt {
         assert_eq!(images(&out), vec![(f, 0, 461, 591)]);
     }
 
+    // Covers: specs/ui/control-panel.md §5 r4, §5 r8
+    #[test]
+    fn the_belt_draw_list_has_key_labels_and_the_hover_rect() {
+        use crate::ui::panels::control::belt::{BeltColor, BeltDraw};
+        let w = world(
+            &[
+                (7, mode::BELT, (0, 1, 0, 0), b"hp1 "),
+                (8, mode::BELT, (0, 3, 0, 0), b"hp1 "),
+            ],
+            None,
+        );
+        let mut b = HudBelt {
+            parts: parts(),
+            ..Default::default()
+        };
+        // Off the belt: labels at (left + 2, bottom - 2), color 4, no rect.
+        let d = b.draw_list(&w, (800, 600), false, (0, 0), true);
+        let labels: Vec<_> = d
+            .iter()
+            .filter_map(|d| match d {
+                BeltDraw::Label(l) => Some((l.text.clone(), l.x, l.y, l.color)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            labels,
+            vec![
+                (vec![u16::from(b'2')], 463, 588, 4),
+                (vec![u16::from(b'4')], 525, 588, 4)
+            ]
+        );
+        assert!(!d.iter().any(|d| matches!(d, BeltDraw::Box { .. })));
+        // Over box 1: the item's green 29 x 29 hover rectangle at its box.
+        let d = b.draw_list(&w, (800, 600), false, (470, 570), true);
+        let boxes: Vec<_> = d
+            .iter()
+            .filter_map(|d| match d {
+                BeltDraw::Box { rect, color } => Some((rect.x, rect.y, rect.w, rect.h, *color)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(boxes, vec![(461, 562, 29, 29, BeltColor::Green)]);
+        assert_eq!(b.state.hover_item, Some(7));
+    }
+
     #[test]
     fn clicking_the_belt_takes_and_puts_potions() {
         let b = HudBelt {
@@ -527,6 +572,32 @@ fn a_right_press_on_the_cube_sends_0x20_with_the_player_position() {
     );
     w.units.get_mut(&PLAYER).unwrap().position = Some((10, 20));
     assert!(u.right_press(&w, &files, &l, in_cell(0, 0)).is_empty());
+}
+
+// Covers: specs/items/inventory-moves.md §7.11
+#[test]
+fn a_right_press_on_a_town_portal_scroll_or_tome_sends_0x20() {
+    let (u, files) = ui();
+    let mut w = world(
+        &[
+            (7, mode::STORED, (0, 0, 0, 1), b"tsc "),
+            (8, mode::STORED, (0, 2, 0, 1), b"tbk "),
+        ],
+        None,
+    );
+    w.units.get_mut(&PLAYER).unwrap().position = Some((10, 20));
+    let l = layout();
+    for (cell, guid) in [(0, 7u32), (2, 8)] {
+        let out = u.right_press(&w, &files, &l, in_cell(cell, 0));
+        let want = [
+            &[0x20u8][..],
+            &guid.to_le_bytes(),
+            &10u32.to_le_bytes(),
+            &20u32.to_le_bytes(),
+        ]
+        .concat();
+        assert_eq!(intents(&out), vec![want]);
+    }
 }
 
 // Covers: specs/ui/panels.md §12 r3

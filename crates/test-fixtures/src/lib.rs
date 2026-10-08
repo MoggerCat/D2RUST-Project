@@ -32,6 +32,7 @@ pub mod act4;
 pub mod act5;
 pub mod animdata;
 pub mod content;
+pub mod cube_item;
 pub mod drlg;
 pub mod ds1;
 pub mod dt1;

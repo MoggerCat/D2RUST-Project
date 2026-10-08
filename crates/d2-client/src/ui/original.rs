@@ -620,15 +620,20 @@ impl OriginalUi {
         std::mem::take(&mut self.shared.borrow_mut().esc.exit_requested)
     }
 
+    /// Whether Configure Controls was chosen since the last call.
+    pub fn take_controls_request(&mut self) -> bool {
+        std::mem::take(&mut self.shared.borrow_mut().esc.controls_requested)
+    }
+
     /// The settings the Esc menu's Options page shows (`app::config`).
     pub fn set_settings(&mut self, s: crate::app::config::Settings) {
-        self.shared.borrow_mut().esc.settings = s;
+        self.shared.borrow_mut().esc.menu.set_settings(s);
     }
 
     /// The settings after a change on the Options page, once per change.
     pub fn take_settings_change(&mut self) -> Option<crate::app::config::Settings> {
         let mut sh = self.shared.borrow_mut();
-        std::mem::take(&mut sh.esc.settings_changed).then_some(sh.esc.settings)
+        sh.esc.menu.take_changed()
     }
 
     /// `SetUIState(ui, mode, jump)` with the model's gate facts; effects
@@ -641,7 +646,7 @@ impl OriginalUi {
             .set(ui, mode, jump, &mut env, &mut self.outcome.effects);
         // The Esc menu always reopens on its first page.
         if ui == u32::from(esc_menu::ESC_PANEL.0) {
-            sh.esc.view = esc_menu::View::Main;
+            sh.esc.menu.open();
         }
         r
     }
@@ -1173,6 +1178,15 @@ impl Panel for BorderUi {
         // The cursor item last (`panels-3.md` §23 r9).
         sh.items
             .draw_cursor(ctx.world, &sh.tables.files, (29, 29), sh.mouse, out);
+        // The belt item's tip (`hud_belt`, `control-panel.md` §5 r8).
+        if let Some(tips) = sh.items.tips.as_ref() {
+            let (lines, at) = sh.hud.belt.hover_tip(ctx.world, tips);
+            if !lines.is_empty() {
+                let (w, h) = (sh.config.screen.w, sh.config.screen.h);
+                let at = Point::new(at.0, at.1);
+                item_tip::draw_tip(&lines, at, (w, h), sh.fonts.as_ref(), &sh.tables.files, out);
+            }
+        }
         // The item tool tip over everything (`item_tip`).
         if sh.states.is_open(UI_INVENTORY) {
             let class = Facts::of(ctx.world).class;
@@ -1212,9 +1226,13 @@ pub mod game_messages;
 pub mod gold_dialog;
 #[path = "hud.rs"]
 pub mod hud;
+#[path = "options_menu.rs"]
+pub mod options_menu;
 
 #[path = "hud_belt.rs"]
 pub mod hud_belt;
+#[path = "hud_tips.rs"]
+pub mod hud_tips;
 
 #[path = "cube_ui.rs"]
 pub(super) mod cube_ui;

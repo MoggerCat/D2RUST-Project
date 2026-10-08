@@ -181,3 +181,135 @@ fn a_town_portal_takes_the_player_to_town_and_back_and_goes() {
     let b = &app.world().resource::<BridgeResource>().0;
     assert!(b.log().rejected.is_empty(), "{:?}", b.log().rejected);
 }
+
+/// The synthetic game booted up to the Blood Moor, as the test above.
+fn boot() -> (App, app_support::Server<StepClock>, Arc<AtomicU32>) {
+    let data = GameData::Synthetic;
+    let ms = Arc::new(AtomicU32::new(1000));
+    let (link, _) = single_player::start(
+        data.clone(),
+        single_player::DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap();
+    let server = Arc::new(Mutex::new(link));
+    let mut app = App::new();
+    app.add_plugins((MinimalPlugins, AssetPlugin::default()))
+        .init_asset::<Image>()
+        .init_resource::<ButtonInput<MouseButton>>();
+    let (link, tap) = predict_link(Box::new(SharedLink(server.clone())));
+    add_game(&mut app, link, false).unwrap();
+    add_walk(&mut app, tap, Some(Speeds { walk: 6, run: 9 }));
+    send_create_game(&mut app).unwrap();
+    add_client_data(
+        &mut app,
+        single_player::client_drlg_source(&data),
+        single_player::client_level_rows(&data),
+    );
+    app_support::synthetic_skill_rows(&mut app);
+    app.update();
+    (app, server, ms)
+}
+
+// Covers: specs/world/objects.md §12 r13; specs/client/msg-units.md §8 r7; specs/sim/intents-events.md §6 r6
+#[test]
+fn casting_in_town_opens_to_the_last_field_level_and_the_owner_name_arrives() {
+    let (mut app, server, ms) = boot();
+    let mut steps = 0;
+    let mut step = |app: &mut App| {
+        ms.fetch_add(40, Ordering::SeqCst);
+        app.update();
+        steps += 1;
+        assert!(steps < 6000, "the test finishes");
+    };
+    while app_support::local_player(&server).is_none() {
+        step(&mut app);
+    }
+    for _ in 0..30 {
+        step(&mut app);
+    }
+    let find_all = |app: &App, ty: u8, class: u32| -> Vec<UnitKey> {
+        app.world()
+            .resource::<BridgeResource>()
+            .0
+            .world()
+            .units
+            .iter()
+            .filter(|(k, u)| k.unit_type == ty && u.class == class)
+            .map(|(k, _)| *k)
+            .collect()
+    };
+    let cast = |server: &app_support::Server<StepClock>| {
+        app_support::with(server, |l| {
+            let (p, _) = single_player::local_player(&l.host().game).unwrap();
+            let g = &mut l.host_mut().game;
+            g.events.action.open_town_portal(&mut g.game, p).is_some()
+        })
+    };
+
+    // A cast in town before any field cast makes nothing.
+    assert!(!cast(&server), "no field level yet");
+    assert_eq!(server_portals(&server), 0);
+
+    // Into the Den, cast there: the owner name rides with the portal.
+    let entrance = find_all(&app, TILE, single_player::BLOOD_MOOR_TO_DEN)[0];
+    app.world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .interact(entrance)
+        .unwrap();
+    while server_level(&server) != Some(single_player::DEN_OF_EVIL) {
+        step(&mut app);
+    }
+    for _ in 0..30 {
+        step(&mut app);
+    }
+    assert!(cast(&server));
+    for _ in 0..10 {
+        step(&mut app);
+    }
+    let field = find_all(&app, OBJECT, 59)[0];
+    let name = app.world().resource::<BridgeResource>().0.world().units[&field]
+        .kind
+        .clone();
+    let d2_client::bridge::world::KindData::Object(d) = name else {
+        panic!("an object");
+    };
+    let owner = d.owner_name.expect("S→C 0x82 named the owner");
+    assert_ne!(owner[0], 0, "a name, not an empty field");
+
+    // To town through it (state 102 needs a states table: the unit test
+    // `portal_use_sets_state_102`).
+    ms.fetch_add(10_000, Ordering::SeqCst);
+    app.world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .interact(field)
+        .unwrap();
+    while server_level(&server) != Some(single_player::ACT1_TOWN) {
+        step(&mut app);
+    }
+    for _ in 0..30 {
+        step(&mut app);
+    }
+
+    // A cast in town: the pair leads back to the Den.
+    assert!(cast(&server), "a pair to the last field level");
+    assert_eq!(server_portals(&server), 2, "the old pair was replaced");
+    for _ in 0..10 {
+        step(&mut app);
+    }
+    let near = find_all(&app, OBJECT, 59);
+    assert!(!near.is_empty(), "the town portal reached the client");
+    ms.fetch_add(10_000, Ordering::SeqCst);
+    app.world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .interact(near[0])
+        .unwrap();
+    while server_level(&server) != Some(single_player::DEN_OF_EVIL) {
+        step(&mut app);
+    }
+    let b = &app.world().resource::<BridgeResource>().0;
+    assert!(b.log().rejected.is_empty(), "{:?}", b.log().rejected);
+}

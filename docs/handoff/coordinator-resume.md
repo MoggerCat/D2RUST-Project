@@ -8,7 +8,7 @@ rules are `docs/handoff/build-loop.md`, the task rows are
 
 ## State at hand-over (2026-10-08 ~09:20 UTC, second account switch)
 
-- `main`: includes PR #49 (merged 09:3x UTC; everything in the first list below).
+- `main`: includes PR #50 (everything merged in this file; staging = main + this doc).
 - `claude/specs-staging-7`: green (6,855 tests sim/server/client/
   test-fixtures). Merged after #48: q-mercs-acts, q-paladin,
   q-item-uniques, q-weapon-combat, q-assassin, q-gamble, q-barb,
@@ -19,7 +19,7 @@ rules are `docs/handoff/build-loop.md`, the task rows are
 - Also merged (after PR #49 opened; not in it): q-a2-tyrael, q-town-gaps,
   q-menu-host, q-menu-loading, q-menu-difficulty, q-menu-create,
   q-menu-cinematics, q-menu-controls (6,900 tests).
-- **Check first (logged test change, q-town-gaps merge):** q-charms
+- **Check first: settled 2026-10-08 (third coordinator)** — `client/stat-lists.md` §1–§2 says base-only 0x1D and the client attaches each equipped item's list from its 0x9C/0x9D property stream (`items/bitstream.md` §4.6, already decoded by `d2_proto::item_bits`); the 0xFE/0xFD pseudo states are d2rs-own. Queued as row `q-item-bonus-wire` (REC-188). Original note: q-charms
   (REC-163) sent item-bonus totals in the base stat messages 0x1D;
   q-town-gaps changed that to base-only 0x1D plus bonus lists on pseudo
   states 0xFE/0xFD (0xA9), and rewrote the two vitals_sync tests to
@@ -46,7 +46,18 @@ rules are `docs/handoff/build-loop.md`, the task rows are
   replaces q-config's simple Esc Options page with the full menu tree).
   Use REC-187.
 
+## Merge log (third coordinator)
+
+Merged into staging: q-belt-stash, q-strings-bind, q-fe-start-flow, q-cube-gaps, q-shrines-labels, q-lighting-detail, q-client-collision, q-save-gaps, q-fe-draw, q-tp-gaps, q-assassin-gaps, q-a2-tyrael-door, q-item-tips, q-menu-options (7,007 tests). Sent back: q-fe-host-screens (keep front_start's registry and q-fe-draw's glyph text; drop its duplicates). New follow-ups from these: lighting blocks-light flags / near-room fills (q-lighting-detail), shrine overhead text 0x26 type 5 (q-shrines-labels; maybe q-unit-fx), 0x61 act videos (q-fe-start-flow), HUD globe numbers (q-strings-bind).
+
 ## REC ids
+
+PC 1 loop (`docs/handoff/pc1-loop.md`, branch `claude/local-pc1-s8`): REC-300..349 are PC 1's; cloud ids stay below 300. Merge that branch into staging like a task branch (it changes specs/docs, plus `// Covers:` lines); turn its `q-fix-*` rows into sessions.
+
+Batch launched 2026-10-08 (third coordinator, session_01QeN5r8PoLZsUhwAH2iDzLJ): q-menu-options REC-187, q-item-bonus-wire REC-188, q-fe-draw REC-189, q-fe-host-screens REC-231, q-skill-leap-talon REC-232, q-assassin-gaps REC-233, q-a2-tyrael-door REC-234, q-a4-quest-items REC-235; q-fe-start-flow REC-236 (launch after q-fe-host-screens merges). Batch 2 (same day, user asked for more parallel sessions): q-fe-start-flow REC-236 (launched with batch 2 despite the host overlap), q-strings-bind REC-238, q-shrines-labels REC-239, q-belt-stash REC-240, q-save-gaps REC-241, q-item-tips REC-242, q-tp-gaps REC-243, q-cube-gaps REC-244, q-unit-fx REC-245, q-act3-act5-gaps REC-246, q-lighting-detail REC-247, q-client-collision REC-248, q-a1-dungeons REC-249 (REC-237 = the old REC-QESC-1). Every follow-up below is now a row. Batch 3: q-lighting-blocks REC-250, q-fe-act-videos REC-251, q-hud-globes REC-252, q-equip-rules REC-253, q-a2-duriel-ai REC-254, q-identify-cain REC-255, q-controls-ingame REC-256, q-options-art REC-257. Next free: REC-258.
+Batch 3 sessions: q-lighting-blocks session_01FkbE9oAejuWgNUXEQGWLwn, q-fe-act-videos session_01LBf6ogfJsw3YdfvJRQ1wSb, q-hud-globes session_0112rSJPNS9V8wwJ3F9WVpPd, q-equip-rules session_016A5Vq7HpXZb4CintEBhnJc, q-a2-duriel-ai session_019aeyMy8J99P5qzkWGfPvPG, q-identify-cain session_01AsvCYqWt6Q2tEt6cHVvQKj, q-controls-ingame session_01Ffkk35UYvEDbCw1hc3EqGR, q-options-art session_01H4FeiZFYKQxXb1UWnq63ec.
+Batch 2 sessions (Sonnet): q-fe-start-flow session_01D8YxnU7ifFU8FTbjqRcq4K, q-strings-bind session_019HoAaT5j7S2gr4JGpJVY1H, q-shrines-labels session_01XGJBp6ahpXvtXT3tDkv13C, q-belt-stash session_01RexUqu1ZMA3suNoPxoGvSg, q-save-gaps session_01RbxjBKGQT9AT4HpZ5VnjfH, q-item-tips session_01TWdwkVAMGo4ANkE9NGnbpY, q-tp-gaps session_016kdVuTpR3ZM1FBnEGWYgi3, q-cube-gaps session_01ExfXkkq7qwDuLzNN51rrsu, q-unit-fx session_01EgKzh5VautVYNZRKSkidUH, q-act3-act5-gaps session_01HhgwinoUMppQA5V5Dxpd52, q-lighting-detail session_01CScXFDiWAkNKRBEsdhnvRC, q-client-collision session_01Sqa13BDnVFJnPaWmgN8Pgx, q-a1-dungeons session_01YCzKS85esX9nF4BaJGJmqh.
+Running sessions (Sonnet): q-menu-options session_016djAfuUo6mksJrag4BJS9X, q-item-bonus-wire session_01Fx8FphWjp7gR1w8YSpkv3S, q-fe-draw session_01R7uxXBkqs66q9wvmMypqKu, q-fe-host-screens session_011WjT1AwSGKecTSHgHkSp4v, q-skill-leap-talon session_01LTwd6Jb8ouRzvhjhS8UXJQ, q-assassin-gaps session_01KsJbGT9bjKX5fd7bPkNRpz, q-a2-tyrael-door session_019yV6ZFtRM5GpghZ56UFrXN, q-a4-quest-items session_01ECXzfSJs7BMjsYtJbQDT6b. They report to session_01QeN5r8PoLZsUhwAH2iDzLJ (build-loop.md); a new coordinator must change that line to its own id.
 
 Staging uses up to REC-186 plus REC-230 (REC-231 was renumbered away everywhere) (q-levels-warps-all); the front-
 end specs use REC-200..213 and REC-220..229. 164, 169 and 171 were
@@ -106,7 +117,7 @@ and `cargo run -p depcheck` (CI builds the workspace without Bevy:
 Items now covered by a merged task or a running row above are removed.
 
 - strings: bind `TableStrings::by_id` in NPC menu / HUD / item-name panels
-- REC-QESC-1 is a nonstandard id; renumber
+- (done: REC-QESC-1 renumbered to REC-237)
 - shrine timed-state effects; client object mouse-over label
 - belt key labels / hover text / highlight rects; stash gold kinds 3/4
 - save: mouse skills, act byte, merc/golem/corpse items, runeword refresh

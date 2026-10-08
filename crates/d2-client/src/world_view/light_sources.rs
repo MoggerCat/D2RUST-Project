@@ -30,9 +30,21 @@ pub struct LightRows {
     pub missiles: Vec<Row>,
     /// By `objects` row: `Lit0`…`Lit7` and the colour.
     pub objects: Vec<([u8; 8], (u8, u8, u8))>,
+    /// By level id: `Intensity`, `Red`, `Green`, `Blue` of the leveldefs
+    /// (`lighting.md` §3.1 r2).
+    pub levels: Vec<(u8, u8, u8, u8)>,
 }
 
 impl LightRows {
+    /// These rows with the level ambients of `defs`.
+    pub fn with_levels(mut self, defs: &[d2_data::tables::Leveldefs]) -> Self {
+        self.levels = defs
+            .iter()
+            .map(|d| (d.intensity, d.red, d.green, d.blue))
+            .collect();
+        self
+    }
+
     pub fn from_tables(
         monstats: &[Monstats],
         monstats2: &[Monstats2],
@@ -65,6 +77,7 @@ impl LightRows {
                     )
                 })
                 .collect(),
+            levels: Vec::new(),
         }
     }
 
@@ -108,7 +121,8 @@ pub fn load(archives: &dyn d2_data::bin::TableFiles) -> Result<LightRows, String
         &all::<Monstats2>(&set, "monstats2")?,
         &all::<Missiles>(&set, "missiles")?,
         &all::<Objects>(&set, "objects")?,
-    ))
+    )
+    .with_levels(&all::<d2_data::tables::Leveldefs>(&set, "leveldefs")?))
 }
 
 #[cfg(test)]
@@ -133,6 +147,7 @@ mod tests {
             objects: vec![([0, 0, 12, 0, 0, 0, 0, 0], (9, 8, 7))],
             monsters: vec![(0, (0, 0, 0)), (5, (230, 168, 255))],
             missiles: vec![(8, (1, 2, 3))],
+            levels: Vec::new(),
         };
         let mut w = ClientWorld::default();
         unit(&mut w, MONSTER, 1, 1, 1, (100, 100));

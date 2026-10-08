@@ -7,8 +7,8 @@
 //! ([`Outcome::GameLoad`]) or exits, and comes back here (main menu) after
 //! the game window closes. No game logic lives here (CLAUDE.md rule 5).
 //!
-//! `// d2rs-own, unverified` and PROVISIONAL (REC-178): text items are not
-//! drawn (a bar marks each); art is frame `frame` of the DC6 placed with its
+//! `// d2rs-own, unverified` and PROVISIONAL (REC-178): text items are
+//! drawn as glyphs (REC-189); art is frame `frame` of the DC6 placed with its
 //! bottom-left at the control position; the sky palette is used for every
 //! screen; the game starts with the default character (the select / create
 //! screens do not yet report a choice).
@@ -22,14 +22,17 @@ use bevy::input::ButtonState;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use d2_formats::dc6::Dc6;
+use d2_formats::font::FontTable;
 use d2_formats::palette::Palette;
 
 use crate::assets::path::FileSource;
+use crate::ui::front_end::glyphs::text_quads;
 use crate::ui::front_end::startup::{MemProgress, StubVideo};
 use crate::ui::front_end::{
     DrawItem, FrontEnd, FrontInput, Outcome, SaveFolder, SKY_PALETTE, TICK_MS,
 };
 use crate::ui::geom::Point;
+use crate::ui::text::font_info;
 
 pub const WIDTH: u32 = 800;
 pub const HEIGHT: u32 = 600;
@@ -56,6 +59,9 @@ pub struct FrontArt {
     source: Arc<dyn FileSource>,
     palette: Option<Palette>,
     cache: HashMap<&'static str, Option<Dc6>>,
+    fonts: HashMap<u16, Option<(FontTable, Dc6)>>,
+    /// UTF-16 text of a string id (button labels); `None`: labels blank.
+    strings: Option<Box<dyn Fn(u32) -> Vec<u16>>>,
 }
 
 impl FrontArt {
@@ -68,7 +74,28 @@ impl FrontArt {
             source,
             palette,
             cache: HashMap::new(),
+            fonts: HashMap::new(),
+            strings: None,
         }
+    }
+
+    /// The string-table lookup the button labels use.
+    pub fn with_strings(mut self, f: impl Fn(u32) -> Vec<u16> + 'static) -> Self {
+        self.strings = Some(Box::new(f));
+        self
+    }
+
+    fn font(&mut self, id: u16) -> Option<&(FontTable, Dc6)> {
+        let source = &self.source;
+        self.fonts
+            .entry(id)
+            .or_insert_with(|| {
+                let info = font_info(id)?;
+                let table = crate::assets::path::read_font_table(&**source, info.tbl_path)?.ok()?;
+                let dc6 = Dc6::parse(&source.read_file(info.dc6_path)?.ok()?).ok()?;
+                Some((table, dc6))
+            })
+            .as_ref()
     }
 
     fn dc6(&mut self, file: &'static str) -> Option<&Dc6> {
@@ -90,10 +117,12 @@ pub fn compose(items: &[DrawItem], art: Option<&mut FrontArt>) -> Vec<u8> {
     for p in px.as_chunks_mut::<4>().0 {
         p[3] = 255;
     }
-    let mut put = |x: i32, y: i32, rgb: [u8; 3]| {
+    let mut plot = |x: i32, y: i32, rgb: [u8; 3], additive: bool| {
         if (0..WIDTH as i32).contains(&x) && (0..HEIGHT as i32).contains(&y) {
             let i = ((y as u32 * WIDTH + x as u32) * 4) as usize;
-            px[i..i + 3].copy_from_slice(&rgb);
+            for (d, s) in px[i..i + 3].iter_mut().zip(rgb) {
+                *d = if additive { d.saturating_add(s) } else { s };
+            }
         }
     };
     let mut art = art;
@@ -116,15 +145,86 @@ pub fn compose(items: &[DrawItem], art: Option<&mut FrontArt>) -> Vec<u8> {
                         let idx = f.pixels[(row * f.width + col) as usize];
                         if idx != 0 {
                             let c = pal.colors[usize::from(idx)];
-                            put(at.x + col as i32, top + row as i32, [c.r, c.g, c.b]);
+                            plot(at.x + col as i32, top + row as i32, [c.r, c.g, c.b], false);
                         }
                     }
                 }
             }
-            // PROVISIONAL (REC-178): no glyphs yet; a bar marks the text.
-            DrawItem::Text { at, .. } => {
-                for x in 0..24 {
-                    put(at.x + x, at.y, [200, 180, 120]);
+            // PROVISIONAL (REC-189): draw mode 3 is the additive blend of
+            // §F1.5 r2 (per-channel `min(255, d + s)`, the spec's fit of the
+            // PL2 table); the frame's offsets add to the position
+            // (`sprite-placement.md` §2). Other modes draw opaque.
+            DrawItem::Blend {
+                file,
+                frame,
+                at,
+                mode,
+            } => {
+                let Some(a) = art.as_deref_mut() else {
+                    continue;
+                };
+                let Some(pal) = a.palette.clone() else {
+                    continue;
+                };
+                let Some(dc6) = a.dc6(file) else { continue };
+                let Some(f) = dc6.frames.get(*frame as usize) else {
+                    continue;
+                };
+                let top = at.y + f.offset_y - f.height as i32 + 1;
+                for row in 0..f.height {
+                    for col in 0..f.width {
+                        let idx = f.pixels[(row * f.width + col) as usize];
+                        if idx != 0 {
+                            let c = pal.colors[usize::from(idx)];
+                            let (x, y) = (at.x + f.offset_x + col as i32, top + row as i32);
+                            plot(x, y, [c.r, c.g, c.b], *mode == 3);
+                        }
+                    }
+                }
+            }
+            DrawItem::Text { .. } => {
+                let Some(a) = art.as_deref_mut() else {
+                    continue;
+                };
+                let Some(pal) = a.palette.clone() else {
+                    continue;
+                };
+                let none = |_| Vec::new();
+                let strings = a.strings.take();
+                let resolve: &dyn Fn(u32) -> Vec<u16> = match &strings {
+                    Some(f) => f,
+                    None => &none,
+                };
+                let mut tables = HashMap::new();
+                if let DrawItem::Text { font, .. } = it {
+                    if let Some((t, _)) = a.font(*font) {
+                        tables.insert(*font, t.clone());
+                    }
+                }
+                let quads = text_quads(it, resolve, &|id| tables.get(&id).cloned());
+                a.strings = strings;
+                for q in quads {
+                    let Some((_, dc6)) = a.font(q.font) else {
+                        continue;
+                    };
+                    let Some(f) = dc6.frames.get(usize::from(q.frame)) else {
+                        continue;
+                    };
+                    let top = q.at.y - f.height as i32 + 1;
+                    for row in 0..f.height {
+                        for col in 0..f.width {
+                            let idx = f.pixels[(row * f.width + col) as usize];
+                            if idx != 0 {
+                                let c = pal.colors[usize::from(idx)];
+                                plot(
+                                    q.at.x + col as i32,
+                                    top + row as i32,
+                                    [c.r, c.g, c.b],
+                                    false,
+                                );
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -153,7 +253,12 @@ impl FrontHost {
         art: Option<FrontArt>,
         first_entry: bool,
     ) -> Self {
-        let mut front = FrontEnd::with_screens(expansion, saves);
+        Self::with_front(FrontEnd::with_screens(expansion, saves), art, first_entry)
+    }
+
+    /// [`FrontHost::new`] over a front end the caller built (a registry
+    /// with the select / create screens wired, `app::front_start`).
+    pub fn with_front(mut front: FrontEnd, art: Option<FrontArt>, first_entry: bool) -> Self {
         front.start(first_entry, &mut MemProgress::default(), &mut StubVideo);
         Self {
             front,

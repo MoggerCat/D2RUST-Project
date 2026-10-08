@@ -121,6 +121,11 @@ pub struct WiredWorld<R, S = NoSkills> {
     /// What the inventory rules queued during vendor calls (receiving
     /// unit, bytes), sent after the rest's messages ([`WorldHost::take_sent`]).
     inv_sent: Vec<(UnitId, Vec<u8>)>,
+    /// d2rs-own, unverified (REC-244): item codes a new character gets
+    /// after its charstats start items, one each, to the inventory (the
+    /// play preview names the Horadric Cube, `box `, which charstats
+    /// does not give). Empty: the original's start items only.
+    pub start_extra: Vec<[u8; 4]>,
     /// The levels the quest events last saw the players in.
     quest_levels: quest_events::QuestLevels,
 }
@@ -187,6 +192,7 @@ impl<R, S> WiredWorld<R, S> {
             interact_classes: Vec::new(),
             now,
             inv_sent: Vec::new(),
+            start_extra: Vec::new(),
             quest_levels: Default::default(),
         }
     }
@@ -309,6 +315,9 @@ mod quest_events;
 
 /// 0x9C action of a store item shown to the client (`vendors.md` §3.1).
 const STORE_ITEM_ACTION: u8 = 11;
+/// 0x9C action of a store item a purchase took from the NPC's grid
+/// (`vendors.md` §7.1 rule 10: "next frame 0x9C action 12 for GUID 0x12").
+const STORE_TAKEN_ACTION: u8 = 12;
 
 /// The store items a trade open added to the NPC's trade inventory, as
 /// S→C 0x9C action 11 to the opening player, one per item in add order
@@ -359,6 +368,27 @@ fn flush_shown<X: Pending, R: TradeRest>(
     for item in items {
         // PROVISIONAL: a failed encode skips the item.
         let _ = d.send_item_world(player, item, STORE_ITEM_ACTION, 0);
+    }
+    inv_take_sent(&mut d)
+        .into_iter()
+        .filter_map(|(u, b)| Some((u?, b)))
+        .collect()
+}
+
+/// The store items a purchase took out of the NPC's grid, as S→C 0x9C
+/// action 12 to the trading player, in take order (`vendors.md` §7.1
+/// rule 10). Without the inventory model the items stay unsent.
+fn flush_taken<X: Pending, R: TradeRest>(
+    desk: &mut Desk<'_, '_, ActionHooks<X>, R>,
+    inv: Option<&mut InvParts>,
+) -> Vec<(UnitId, Vec<u8>)> {
+    let taken = std::mem::take(&mut desk.state.taken);
+    let (Some(parts), Some(player)) = (inv, desk.state.shown_player) else {
+        return Vec::new();
+    };
+    let mut d = parts.desk(&mut *desk.econ);
+    for item in taken {
+        let _ = d.send_item_world(player, item, STORE_TAKEN_ACTION, 0);
     }
     inv_take_sent(&mut d)
         .into_iter()
@@ -798,11 +828,13 @@ where
             let mut records = std::mem::take(&mut desk.state.vendors);
             let tables = desk.vendor_tables;
             let inner: VendorDesk<'_, '_, '_, _, _> = desk.vendors(Some(ctl));
-            let mut w = InvVendors::new(inner, inv);
+            let mut inv = inv;
+            let mut w = InvVendors::new(inner, inv.as_deref_mut());
             let out = call.call(tables, &mut records, &mut w);
-            let sent = std::mem::take(&mut w.sent);
+            let mut sent = std::mem::take(&mut w.sent);
             drop(w);
             desk.state.vendors = records;
+            sent.extend(flush_taken(desk, inv));
             (out, sent)
         });
         self.inv_sent.extend(sent);

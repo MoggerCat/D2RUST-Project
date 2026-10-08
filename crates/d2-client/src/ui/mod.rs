@@ -27,6 +27,8 @@ pub mod hire_list;
 pub mod imbue_ui;
 pub mod inv_grid;
 pub mod item_tip;
+pub mod item_tip_desc;
+pub mod item_tip_set;
 pub mod layout;
 pub mod messages;
 pub mod npc_menu_ui;
