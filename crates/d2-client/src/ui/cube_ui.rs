@@ -7,7 +7,7 @@
 //! 0x4F 0x18, the item moves) leave through the root. The client decides
 //! nothing: the server transmutes.
 //!
-//! Preview fills (d2rs-own, unverified, REC-116): the transmute animation
+//! Preview fills (d2rs-own, unverified, REC-118): the transmute animation
 //! (§12.4), the tool tips and the cube-gone close are not done.
 
 use super::SharedRef;

@@ -8,7 +8,7 @@
 //! GUID) and S→C 0x77 0x15 is queued; the inventory pass `0x0055FA40`
 //! follows.
 //!
-//! d2rs-own, unverified (REC-116): the item-use table entry is read
+//! d2rs-own, unverified (REC-118): the item-use table entry is read
 //! through the code `box `, not through `pSpell` 7 of `misc.txt`
 //! (the item-use spec `0x005BF240` is unwritten, `cube.md` OQ 7).
 

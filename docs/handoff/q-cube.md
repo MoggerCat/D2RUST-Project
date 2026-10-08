@@ -1,6 +1,6 @@
 # q-cube: the Horadric Cube in the play preview
 
-Branch `claude/q-cube`. Everything here is d2rs-own, unverified (rule 10); REC-116.
+Branch `claude/q-cube`. Everything here is d2rs-own, unverified (rule 10); REC-118.
 
 ## The path, and where it was cut
 
@@ -23,7 +23,7 @@ Right press on the cube in the inventory → `ItemsUi::right_press` → C→S 0x
 
 ## PROVISIONAL points
 
-REC-116 (see `docs/HANDOFF.md` §7).
+REC-118 (see `docs/HANDOFF.md` §7).
 
 ## What is left
 

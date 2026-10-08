@@ -1,4 +1,4 @@
-//! 0x20 UseGridItem on the Horadric Cube (`cube.md` §1; REC-116).
+//! 0x20 UseGridItem on the Horadric Cube (`cube.md` §1; REC-118).
 
 use super::*;
 

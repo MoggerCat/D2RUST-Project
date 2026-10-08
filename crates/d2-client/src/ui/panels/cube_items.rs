@@ -7,7 +7,7 @@
 //!
 //! d2rs-own, unverified: without `inventory.bin` rows the grid is an
 //! estimated 3 × 4 grid of 29-pixel cells centred in the left half, above
-//! the transmute button. PROVISIONAL, REC-116 in `docs/HANDOFF.md` §7.
+//! the transmute button. PROVISIONAL, REC-118 in `docs/HANDOFF.md` §7.
 
 use super::super::draw::UiDrawSink;
 use super::super::geom::Point;
