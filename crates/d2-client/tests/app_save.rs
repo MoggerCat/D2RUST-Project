@@ -312,13 +312,32 @@ fn extra_values_overlay_the_body() {
             items: Some(vec![d2s::ItemEntry { bytes: vec![9] }]),
             skills: Some(vec![0, 3, 20]),
             waypoints: Some(wp),
+            corpses: None,
         },
     );
     assert_eq!(body.items, [d2s::ItemEntry { bytes: vec![9] }]);
     assert_eq!(&body.skills[..4], [0, 3, 20, 0]);
     assert_eq!(body.skills.len(), 30);
     assert_eq!(body.waypoints.records, wp);
+    // The corpse section follows the live corpse (`d2s.md` §8.3).
+    let corpse = d2s::Corpse {
+        items: vec![d2s::ItemEntry { bytes: vec![7] }],
+        ..d2s::Corpse::default()
+    };
+    apply_extra(
+        &mut body,
+        &Extra {
+            corpses: Some(vec![corpse.clone()]),
+            ..Extra::default()
+        },
+    );
+    assert_eq!(body.corpses, [corpse]);
     apply_extra(&mut body, &Extra::default());
+    assert_eq!(
+        body.corpses.len(),
+        1,
+        "no model: the section passes through"
+    );
     assert_eq!(body.items.len(), 1);
     assert_eq!(body.skills[2], 20);
 }

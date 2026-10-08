@@ -364,7 +364,11 @@ fn other_hand(loc: u8) -> u8 {
 /// Removal from the body (§7.6): `0x0062A360`, `0x0063D2B0`, unlink, slot
 /// cleared; a belt (primary type 19) then the belt change with no new
 /// belt (§3 rule 9).
-fn remove_from_body<W: MoveWorld>(w: &mut W, owner: Owner, item: Guid) -> Result<(), MoveFatal> {
+pub(super) fn remove_from_body<W: MoveWorld>(
+    w: &mut W,
+    owner: Owner,
+    item: Guid,
+) -> Result<(), MoveFatal> {
     let loc = w.body_loc(item);
     w.body_leave_effects(owner, item);
     if !w.unlink(owner, item) {
