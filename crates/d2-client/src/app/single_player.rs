@@ -1932,6 +1932,7 @@ impl GameParts {
         let mut action = empty_action_tables();
         // The unit path needs the monster's `monstats` row (the shape).
         action.combat.monstats = synthetic_monstats();
+        action.combat.charstats = synthetic_charstats();
         Ok(GameParts {
             action,
             stats: StatData::default(),
@@ -2008,6 +2009,20 @@ impl GameParts {
             ),
         })
     }
+}
+
+/// d2rs-own, unverified: one `charstats` row per player class with the
+/// walk / run velocities (6 / 9, the speeds of the preview's prediction),
+/// so the synthetic server moves the player (a zero velocity never
+/// does: the NPC approach walks, `docs/handoff/q-npc-approach.md`).
+fn synthetic_charstats() -> Vec<d2_data::tables::Charstats> {
+    use d2_data::tables::Record;
+    let mut raw = vec![0u8; d2_data::tables::Charstats::SIZE];
+    raw[64] = 6;
+    raw[65] = 9;
+    (0..7)
+        .map(|_| d2_data::tables::Charstats::decode(&raw))
+        .collect()
 }
 
 /// Action tables with no rows (the synthetic game reads none).
