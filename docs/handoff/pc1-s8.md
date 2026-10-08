@@ -25,6 +25,8 @@ Follow-ups for a later worker (other owners; msg-stats-items labels, properties 
 
 HANDOFF REC lines to update when HANDOFF is free (Lane B is editing it): REC-237, REC-204, REC-211, REC-212, REC-229 → "settled from the binary 2026-10-08 (pc1-s8), capture verifies only", pointing at the sections above; REC-177 (3), REC-188, REC-232, REC-233 likewise; REC-90 closed (path-placement §10 r1); REC-95 reduced to confirmation captures (intents-events §7.4 r3, pathing §10 r2); `docs/handoff/stitch-server-core.md:23` → pathing §10 r2; REC-82, REC-60, REC-91, REC-92 settled from the binary (drop from the PC 2 list; REC-91 also clears local-run item 99).
 
+Overlaps with staging rows added the same day (coordinator: merge them when launching): `q-hud-globes` ⊂ `q-fix-hud-popup` (2) (use control-panel §3 r5–r6); `q-options-art` overlaps `q-fix-esc-menu` (frontend-options §O2 r4 art table); `q-a2-duriel-ai` portal spot overlaps `q-fix-portal-pair` (objects-2 §25); `q-identify-cain` belt tips overlap `q-fix-belt-ui` (2).
+
 ## Lane C — recordings PC 2 needs (to move into HANDOFF §7)
 
 - **R-SWAP-1** [MANUAL] Settles: REC-177 (3) message order and fields.
