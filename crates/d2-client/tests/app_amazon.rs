@@ -176,6 +176,10 @@ impl Game {
                 h.tables = Arc::new(t);
                 let rows = h.tables.skills.skills.clone();
                 let list = h.skill_lists.entry(p).or_default();
+                // The join ran the native skills on the synthetic `charstats`
+                // (`client/msg-skills.md` §2 rule 8); this game's class skills
+                // are the fixture's.
+                *list = Default::default();
                 list.init_player(
                     &rows,
                     ListOwner::player(PLAYER_CLASS as i32),

@@ -110,6 +110,32 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             .unwrap_or(false)
     }
 
+    /// Takes `item` off the owner's cursor and consumes it (`0x0055EEA0`;
+    /// `world/vendors.md` §7.2 rule 9, mode 4). False when it is not the
+    /// owner's cursor item.
+    ///
+    /// PROVISIONAL (world/vendors.md §7.2 r9; REC-278): the routine has no
+    /// written body; it is read as the stack merge's consume of a cursor
+    /// item (`items/inventory-moves.md` §7.12: cursor := none with S→C
+    /// 0x42, then the free `0x00557FD0`), which the recorded sale from the
+    /// cursor (S→C 0x42 before the 0x2A) matches; 0x42 names the player
+    /// (the client clears its own cursor item); settled by a capture of a
+    /// cursor sale with the 0x42 bytes.
+    pub fn take_cursor(&mut self, owner: UnitId, item: UnitId) -> bool {
+        if self.state.cursor_of(owner) != Some(item) {
+            return false;
+        }
+        let Some(o) = self.owner_of(owner) else {
+            return false;
+        };
+        // S→C 0x42 names the player whose cursor clears
+        // (`client/msg-stats-items.md` §3 rule 1).
+        let pg = self.guid_of(owner);
+        MovePending::send(self, o, crate::items::moves::layouts::clear_cursor(0, pg));
+        self.free(item);
+        true
+    }
+
     /// Frees an item unit (`0x00557FD0`, the inventory wiring's reading:
     /// the unit removal `0x00555600`, item data dropped).
     pub fn free(&mut self, item: UnitId) {

@@ -816,11 +816,30 @@ impl<R, S> WiredWorld<R, S> {
             r.items = character::start_items(&mut w, &slots, start_skill);
             r.faults.append(&mut w.faults);
             let mut d = inv.desk(econ);
+            // The placements put the items on the player's update list
+            // (`inventory-moves.md` §6.1 rule 1). The join sends that list
+            // as the player's item messages (`intents-events.md` §8.2 rule
+            // 3.5, `0x00597890`) and resets it (rule 3.10, `0x00597B00`),
+            // so no tick's unit update sends them again. Here both run at
+            // the start items' end: the load's later steps (start skill,
+            // mouse skills) never touch the list. d2rs-own placement of
+            // the two calls, unverified (no new-character join recorded;
+            // PROVISIONAL REC-278).
+            let owner = Owner::player(guid);
+            let mut listed = Vec::new();
+            if d.update_bits(owner) & 1 != 0 {
+                match d2_sim::items::moves::update_list_pass(&mut d, guid, guid) {
+                    Ok(m) => listed = m,
+                    Err(e) => r.faults.push(format!("start items: update list: {e:?}")),
+                }
+                d.update_done(owner);
+            }
             d.sync_out();
             r.sent = inv_take_sent(&mut d)
                 .into_iter()
                 .filter_map(|(u, b)| Some((u?, b)))
                 .collect();
+            r.sent.extend(listed.into_iter().map(|m| (player, m)));
         });
         self.inventory = Some(inv);
         r

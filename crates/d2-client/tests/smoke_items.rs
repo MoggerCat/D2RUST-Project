@@ -386,10 +386,19 @@ impl Rig {
 
     /// The GUID of the one item with `code` (server store).
     fn guid(&self, code: [u8; 4]) -> u32 {
+        self.guid_where(code, |_| true)
+    }
+
+    /// The GUID of the one item with `code` lying on the ground.
+    fn ground_guid(&self, code: [u8; 4]) -> u32 {
+        self.guid_where(code, |p| p.0 == mode::GROUND)
+    }
+
+    fn guid_where(&self, code: [u8; 4], keep: impl Fn(&Place) -> bool) -> u32 {
         let v: Vec<u32> = self
             .server_items()
             .into_iter()
-            .filter(|(_, (c, _))| *c == code)
+            .filter(|(_, (c, p))| *c == code && keep(p))
             .map(|(g, _)| g)
             .collect();
         assert_eq!(v.len(), 1, "one {:?}: {:?}", code, self.server_items());
@@ -836,7 +845,9 @@ fn stash_cube_and_cain_identify() {
     rig.act_bytes("close the stash", &[0x4F, 0x12, 0, 0, 0, 0, 0]);
     // The cube page (3) needs no open cube to put in (§7.3 step 3); to
     // take out, the cube is opened by its use (0x20, `cube.md` §2).
-    let cube = rig.guid(smoke::CUBE);
+    // The chest's cube (the new character's start cube, REC-244, is
+    // already stored).
+    let cube = rig.ground_guid(smoke::CUBE);
     rig.act("pick cube", &items::pick(cube, false));
     assert_eq!(rig.place_of(cube).0, mode::STORED);
     rig.act("cap to cursor", &items::remove(cap));

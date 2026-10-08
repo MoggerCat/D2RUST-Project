@@ -476,19 +476,20 @@ pub fn dispatch<W: MoveWorld>(
     Ok(out)
 }
 
-/// Player unit update `0x00580860` (§6.1 rules 2–3) for the client of
-/// `client`: when `player` has +0xC8 bit 0, the update-list pass
-/// `0x00597890`, then S→C 0x47 and 0x48 for the player.
-pub fn player_update<W: MoveWorld>(
+/// The update-list pass `0x00597890` (§6.1 rule 3) of `player` for the
+/// client of `client`: for each node of the player's update list, in
+/// order, the item looked up by GUID (missing → skipped) and the
+/// dispatcher (§6.2), then the dispatcher over the item's own update
+/// list when it has +0xC8 bit 0; then the hireling owner pass. The join
+/// sends it as the player's item messages (`intents-events.md` §8.2 rule
+/// 3.5).
+pub fn update_list_pass<W: MoveWorld>(
     w: &mut W,
     client: Guid,
     player: Guid,
 ) -> Result<Vec<Vec<u8>>, MoveFatal> {
     let p = Owner::player(player);
     let mut out = Vec::new();
-    if w.update_bits(p) & 1 == 0 {
-        return Ok(out);
-    }
     for g in w.update_list(p) {
         if !w.unit_exists(Owner::item(g)) {
             continue;
@@ -502,6 +503,22 @@ pub fn player_update<W: MoveWorld>(
         }
     }
     w.hireling_owner_pass(p);
+    Ok(out)
+}
+
+/// Player unit update `0x00580860` (§6.1 rules 2–3) for the client of
+/// `client`: when `player` has +0xC8 bit 0, the update-list pass
+/// `0x00597890`, then S→C 0x47 and 0x48 for the player.
+pub fn player_update<W: MoveWorld>(
+    w: &mut W,
+    client: Guid,
+    player: Guid,
+) -> Result<Vec<Vec<u8>>, MoveFatal> {
+    let p = Owner::player(player);
+    if w.update_bits(p) & 1 == 0 {
+        return Ok(Vec::new());
+    }
+    let mut out = update_list_pass(w, client, player)?;
     out.push(layouts::relator1(Owner::PLAYER, player));
     out.push(layouts::relator2(Owner::PLAYER, 0, player));
     // The per-item reset and the list free are the room clean-up's

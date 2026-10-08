@@ -301,6 +301,10 @@ impl Rig {
             let h = &mut sim.events.action.sys.hooks;
             let rows = h.tables.skills.skills.clone();
             let list = h.skill_lists.entry(p).or_default();
+            // The join ran the native skills on the synthetic `charstats`
+            // (`client/msg-skills.md` §2 rule 8); this game's class skills
+            // are the fixture's.
+            *list = Default::default();
             let mut ids = [0xFFFFu16; 10];
             for (slot, s) in ids.iter_mut().zip(&learned) {
                 *slot = *s as u16;
@@ -458,6 +462,16 @@ impl Rig {
             self.step(1);
         }
         self.step(20);
+        // Stand at one free spot of the Den whatever the walk's speed (the
+        // tests aim their points from it; d2rs-own fixture position).
+        self.with(move |sim, p| {
+            use d2_sim::missiles::seams::MissileBodies;
+            let room = sim.game.lists.unit(p).and_then(|u| u.room());
+            sim.events
+                .action
+                .with(&mut sim.game, |g, v| v.path_teleport(g, p, room, 21, 61));
+        });
+        self.step(4);
         // A strong player: hits land, mana and life are plentiful.
         self.with(move |sim, p| {
             sim.events.action.with(&mut sim.game, |_, v| {
