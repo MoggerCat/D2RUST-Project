@@ -115,11 +115,12 @@ use d2_sim::monsters::init::GameInfo;
 use d2_sim::rng::Seed;
 use d2_sim::skills::SkillTables;
 use d2_sim::stats::StatData;
-use d2_sim::units::hooks::UnitData;
+use d2_sim::units::hooks::{Sim as USim, UnitData};
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::{UnitId, UnitType};
-use d2_sim::wiring::action::{ActionHooks, ActionTables, DrlgWorld, Pending};
+use d2_sim::wiring::action::{ActionHooks, ActionTables, DrlgWorld, Pending, SkillEvent};
 use d2_sim::wiring::economy::{DeathDrops, DropTables, GameFields};
+use d2_sim::wiring::interaction::skill_events;
 use d2_sim::wiring::worldgen::levels::{SharedTypes, WorldTypes};
 use d2_sim::wiring::worldgen::{CreationTables, WorldPending, WorldSim, WorldState, WorldTables};
 use d2_sim::world::hirelings::HirelingTables;
@@ -411,6 +412,9 @@ pub struct LocalSeams {
     /// The skill pipeline's per-unit fields and preview fills (`UseRest`,
     /// `LearnRest`: [`super::skill_rest`]).
     pub skills: SkillStore,
+    /// The unit tables of the client art's name rules ([`super::anim_names`]);
+    /// none on synthetic data.
+    pub looks: Option<Arc<crate::world_view::unit_assets::UnitLooks>>,
 }
 
 impl LocalSeams {
@@ -453,6 +457,33 @@ impl Pending for LocalSeams {
         target: Option<UnitId>,
     ) -> bool {
         super::monster_drop::death_start(h, sim, unit, target)
+    }
+    // The skill timer events and the action frame reach the skill use
+    // pipeline (`use.md` §5.2, §7); without them a cast's do step never
+    // runs: no mana spent, no missile.
+    fn skill_event(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, ev: SkillEvent) {
+        skill_events::route(h, sim, ev);
+    }
+    fn action_frame(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        unit: UnitId,
+        a1: u32,
+        a2: u32,
+    ) -> u32 {
+        skill_events::action_frame(h, sim, unit, a1, a2)
+    }
+    fn monster_skill_start(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) -> i32 {
+        skill_events::monster_skill_start(h, sim, unit)
+    }
+    fn monster_sequence_frame(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
+        skill_events::monster_sequence_frame(h, sim, unit);
+    }
+    fn anim_name(&self, _: UnitId, ty: UnitType, class: u32, mode: u32) -> Option<[u8; 8]> {
+        super::anim_names::anim_key(self.looks.as_deref()?, ty, class, mode)
+    }
+    fn anim_rate(&self, _: UnitId, speed: Option<u32>) -> i16 {
+        super::anim_names::anim_rate(speed)
     }
     fn position(&self, unit: UnitId) -> (i32, i32) {
         self.pos.get(&unit).copied().unwrap_or_default()
@@ -1534,6 +1565,12 @@ pub fn build_with_objects(
         LocalSeams::default(),
     );
     hooks.anim_data = parts.anim;
+    if let GameData::Live(d) = data {
+        // The server's animation names follow the client art's name rules.
+        hooks.x.looks = crate::world_view::unit_assets::UnitLooks::live(d.archives.as_ref())
+            .ok()
+            .map(Arc::new);
+    }
     hooks.vitals = parts.vitals;
     // The client vitals sync (`combat/vitals.md` §5.1): life, mana,
     // stamina and position sent to the client at the end of each tick.
