@@ -165,6 +165,8 @@ pub struct Live {
     pub stats: Vec<(u16, i32)>,
     /// The quest flag records per difficulty (`QuestFlags::copy_out`).
     pub quests: Option<[[u8; 96]; 3]>,
+    /// Items, skill levels and waypoints (q-save-full).
+    pub extra: super::save_full::Extra,
 }
 
 /// Reads [`Live`] from the game's local player.
@@ -189,7 +191,12 @@ pub fn read_live(sim: &mut Sim) -> Result<Live, SaveError> {
         }
         out
     });
-    Ok(Live { stats, quests })
+    let extra = super::save_full::read_extra(sim, player);
+    Ok(Live {
+        stats,
+        quests,
+        extra,
+    })
 }
 
 /// `base` with the live values laid over it (the module docs list what).
@@ -224,6 +231,7 @@ pub fn apply_live(base: &D2s, live: &Live, now: u32) -> D2s {
     if let Some(records) = &live.quests {
         body.quests.records = *records;
     }
+    super::save_full::apply_extra(body, &live.extra);
     if let Some(&(_, level)) = live.stats.iter().find(|s| s.0 == LEVEL_STAT) {
         if level > 0 {
             save.header.level = level.min(99) as u8;

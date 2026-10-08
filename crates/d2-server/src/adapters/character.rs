@@ -27,6 +27,7 @@ use d2_sim::skills::list::{class_skills, ListOwner};
 use d2_sim::units::UnitId;
 use d2_sim::wiring::action::{HirelingCall, Pending, View};
 use d2_sim::world::hirelings::life::{Loader, SavedHireling};
+use d2_sim::world::waypoints::{WaypointRecord, WaypointRecords};
 
 /// Stat ids the load reads or writes (`formats/d2s.md` §9).
 pub mod stat {
@@ -558,8 +559,18 @@ impl<X: Pending> CharacterWorld for ActionCharacter<'_, '_, X> {
             "the player's quest records live in the host rest (QuestRest::quests)",
         )
     }
-    fn set_waypoints(&mut self, _: &[[u8; 16]; 3]) -> Result<(), Unapplied> {
-        unapplied("waypoints", "player data +0x1C is not in d2-sim")
+    /// `0x0056A3E0` (`world/waypoints.md` §3): the records, magic
+    /// normalised, in `ActionHooks::waypoints` (player data +0x1C).
+    fn set_waypoints(&mut self, records: &[[u8; 16]; 3]) -> Result<(), Unapplied> {
+        let mut out = WaypointRecords::default();
+        for (slot, src) in out.0.iter_mut().zip(records) {
+            *slot = WaypointRecord::load_copy(src).map_err(|_| Unapplied {
+                step: "waypoints",
+                reason: "a record's magic is not 0x0102 / 0x0101 / 0 (waypoints.md §2)",
+            })?;
+        }
+        self.v.h.waypoints.insert(self.player, out);
+        Ok(())
     }
     fn set_npc_fields(&mut self, _: &[[u8; 8]; 3], _: &[[u8; 8]; 3]) -> Result<(), Unapplied> {
         unapplied("npc fields", "player data +0x60 is not in d2-sim")

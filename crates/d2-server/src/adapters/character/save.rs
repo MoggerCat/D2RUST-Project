@@ -222,7 +222,11 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> SaveItems for InvDesk<'_, '_, H, R>
     }
     fn stream(&self, item: UnitId) -> Option<StreamItem> {
         let d = self.state.items.get(&item)?;
-        self.stream_item(d.guid, 0, d.page)
+        let mut s = self.stream_item(d.guid, 0, d.page)?;
+        // The save-only 32 bits are the unit record's init seed
+        // (`bitstream.md` §4.1 rule 7; as `InvDesk::save_view`).
+        s.unit28 = self.econ.units.get(item)?.init_seed;
+        Some(s)
     }
     fn appearance(&self, item: UnitId) -> Option<EquippedItem> {
         let d = self.state.items.get(&item)?;

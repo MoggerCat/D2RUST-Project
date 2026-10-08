@@ -1956,11 +1956,14 @@ fn loader(
             }
             Character::Save(save, ctx) => match load_save(s, player, save, ctx) {
                 Ok((entry, report)) => {
+                    // q-save-full: the save's items, made on the wired host.
+                    let items_ok = super::save_full::join_items(s, player, save);
                     let log = &mut s.events.action.hooks().x.log;
                     log.extend(
                         report
                             .unapplied
                             .iter()
+                            .filter(|u| !(items_ok && u.step == "items"))
                             .map(|u| format!("join: save load: {u:?}")),
                     );
                     // Load §2 quests row (`0x0056A370` → `0x0065C4D0`,
