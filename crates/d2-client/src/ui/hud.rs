@@ -48,7 +48,8 @@ pub const HUD_PANEL: PanelId = PanelId(0x101);
 pub const UI_SKILL_SELECT: u8 = 3;
 
 /// The synthetic one-colour file of the bars (module doc). Frames: 0 red,
-/// 1 gold, 2 blue (stamina, §4 r2), 3 index 0xFF (experience, §4 r1).
+/// 1 gold, 2 blue (stamina, §4 r2), 3 index 0xFF (experience, §4 r1), 4 the
+/// darkest colour (the Esc menu's box).
 pub const FILL_FILE: &str = "d2rs\\hudfill";
 /// Each fill frame is this wide and high (covers both bars).
 pub const FILL_W: u32 = 128;
@@ -100,6 +101,7 @@ pub fn fill_frames(palette: &d2_formats::palette::Palette) -> Vec<crate::frames:
         nearest(StaminaColor::Gold.rgb()),
         nearest(StaminaColor::Blue.rgb()),
         0xFF,
+        nearest((0, 0, 0)),
     ];
     colors
         .iter()
@@ -481,7 +483,13 @@ impl Panel for HudUi {
                 match a {
                     MiniAction::Ui(o) => sh.outputs.push(o),
                     MiniAction::Sound(_) => sh.outputs.push(PanelOutput::ClickSound),
-                    // The quest log and game menu have no panel in play.
+                    // d2rs-own, unverified: the game menu button opens ui 9.
+                    MiniAction::GameMenu => sh.outputs.push(PanelOutput::SetUi {
+                        ui: 9,
+                        mode: 0,
+                        jump: false,
+                    }),
+                    // The quest log has no panel in play.
                     _ => {}
                 }
             }
