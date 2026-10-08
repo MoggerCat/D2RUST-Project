@@ -164,6 +164,15 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvWorld for InvDesk<'_, '_, H, R> 
         self.econ.stats.unit_total(item, STAT_REQ_PERCENT, 0)
     }
     fn item_active_on(&self, item: UnitId, unit: UnitId) -> bool {
+        if self.state.link_item_stats {
+            // The item's stat list is attached to the wearer
+            // (`item_link`; `stat-lists.md` §8.4).
+            return self
+                .econ
+                .stats
+                .unit_list(item)
+                .is_some_and(|l| self.econ.stats.attached_unit(l) == Some(unit));
+        }
         self.rest.item_active_on(self.g(item), self.o(unit))
     }
     fn own_contribution(&self, item: UnitId, unit: UnitId, stat: u16) -> i32 {

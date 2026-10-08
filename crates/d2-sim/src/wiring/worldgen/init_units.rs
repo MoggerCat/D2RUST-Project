@@ -44,6 +44,23 @@ impl<X: WorldPending> WorldHost<'_, X> {
             .map_or(0, |r| self.room_level_id(r))
     }
 
+    /// A host-placed monster's creation-time AI (`init.md` §5 step 5,
+    /// `ai.md` §3.3): control block, install state 0, first think next
+    /// frame. PROVISIONAL (REC-254); d2rs-own, unverified.
+    pub(super) fn start_host_ai(&mut self, unit: UnitId) {
+        InitHost::alloc_ai(self, unit);
+        InitHost::ai_install(self, unit, 0);
+        let at = self.game.frame + 1;
+        let _ = self.game.schedule_event(
+            unit,
+            u32::from(crate::tick::events::event::AI_THINK),
+            at,
+            None,
+            0,
+            0,
+        );
+    }
+
     /// `0x00547BC0` (`population.md` §2.5) for the unit's class in its
     /// room's region: the entry, added on demand on the unit seed.
     fn region_entry(&mut self, unit: UnitId, class: u32) -> Option<(i32, usize)> {

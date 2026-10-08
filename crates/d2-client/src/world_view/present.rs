@@ -470,6 +470,7 @@ fn ui_input(
     buttons: Res<ButtonInput<MouseButton>>,
     keys: Option<Res<ButtonInput<KeyCode>>>,
     walk: Option<ResMut<PreviewWalk>>,
+    time: Option<Res<Time>>,
 ) -> Result {
     let (Some(mut ui), Ok(window)) = (ui, windows.single()) else {
         return Ok(());
@@ -495,7 +496,30 @@ fn ui_input(
     }
     // Keys in `KEY_CODES` order, so one frame's actions are ordered the
     // same on every run.
-    if let (Some(bindings), Some(keys)) = (&ui.bindings, keys.as_deref()) {
+    // The Controls screen takes the raw keys while it is open, and the
+    // game's key bindings none (`ui::controls_host`).
+    let mut controls_open = false;
+    if let (Some(o), Some(keys)) = (ui.original.as_mut(), keys.as_deref()) {
+        if o.controls_open() {
+            controls_open = true;
+            let now = time.as_ref().map_or(0, |t| t.elapsed().as_millis() as u64);
+            for &(c, _) in edge::KEY_CODES {
+                if !keys.just_pressed(c) {
+                    continue;
+                }
+                let vk = match c {
+                    KeyCode::Escape => Some(27),
+                    _ => {
+                        edge::key_of(c).and_then(crate::ui::front_end::screens::controls::key_to_vk)
+                    }
+                };
+                if let Some(vk) = vk {
+                    o.controls_key(vk, now);
+                }
+            }
+        }
+    }
+    if let (Some(bindings), Some(keys), false) = (&ui.bindings, keys.as_deref(), controls_open) {
         let pressed: Vec<KeyCode> = edge::KEY_CODES
             .iter()
             .map(|&(c, _)| c)
@@ -606,6 +630,14 @@ fn world_view_frame(
                 // The Esc menu's "Save and Exit Game" (d2rs-own, unverified).
                 if original.take_exit_request() {
                     crate::app::save::request_save_and_exit(&mut exit);
+                }
+                // Configure Controls over the game (`ui::controls_host`).
+                original.service_controls(
+                    false,
+                    crate::ui::front_end::screens::controls::config_path(),
+                );
+                if let Some(b) = original.take_accepted_bindings() {
+                    ui.bindings = Some(b);
                 }
             }
             if let Some(art) = &ui.art {
