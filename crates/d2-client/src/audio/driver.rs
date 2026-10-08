@@ -27,7 +27,7 @@ use std::collections::BTreeMap;
 
 use crate::audio::triggers::objects::object_mode;
 use crate::audio::triggers::tables::ObjectSounds;
-use crate::audio::triggers::{ui, Ctx, Globals, TriggerError, Unit, UnitSound};
+use crate::audio::triggers::{detach_all, ui, Ctx, Globals, TriggerError, Unit, UnitSound};
 use crate::audio::{CueSource, TriggerQueue};
 use crate::bridge::world::{ClientWorld, LevelRow, UnitKey, MONSTER};
 use d2_sim::rng::Seed;
@@ -81,13 +81,21 @@ pub enum DriverError {
 pub enum SoundRequest {
     /// A UI sound: request(id, none), delay 0 (§11).
     Ui(i32),
-    /// A `ServerSound` output (S→C 0x2C, §2 r4): the event unit's key and
-    /// class captured at receive, and the event.
+    /// A `ServerSound` output (S→C 0x2C, §2 r4): the event unit's key,
+    /// class and position captured at receive, and the event. The
+    /// position is used when the key no longer resolves at delivery
+    /// (`client/bridge.md` §10 r3.1 (b)).
     Server {
         unit: UnitKey,
         class: u32,
+        at: Option<(u16, u16)>,
         event: u16,
     },
+    /// A `UnitFreed` output (`client/bridge.md` §10 r3.1 (a)): the unit
+    /// free's detach of every request of the unit without force
+    /// (`audio/triggers-2.md` §19 r5); the sample-lock release
+    /// `0x004CC160(U, −1)` is cache only (`sound-table.md` §10 r4).
+    UnitFreed { unit: UnitKey },
     /// A player event sound `0x004CB9C0(unit, event)` (§3) the UI asked
     /// for (S→C 0x77 code 9 on the local player, `client/msg-ui.md` §3),
     /// or the client object code (`client/model.md` §8 rule 7).
@@ -130,6 +138,10 @@ pub struct ModelSoundWorld<'a> {
     pub env_indoors: &'a [u8],
     /// Pending questions asked, in order.
     pub asked: RefCell<Vec<&'static str>>,
+    /// The positions `ServerSound` outputs captured, by unit, for a unit
+    /// no longer in the model at delivery (`client/bridge.md` §10 r3.1
+    /// (b)); the latest capture of a unit wins.
+    pub captured: Option<&'a RefCell<BTreeMap<UnitKey, (i32, i32)>>>,
 }
 
 impl<'a> ModelSoundWorld<'a> {
@@ -144,6 +156,7 @@ impl<'a> ModelSoundWorld<'a> {
             levels,
             env_indoors,
             asked: RefCell::new(Vec::new()),
+            captured: None,
         }
     }
 
@@ -157,11 +170,18 @@ impl SoundWorld for ModelSoundWorld<'_> {
         self.world.local_player
     }
 
-    /// The model's cell of the unit (`client/model.md` §1 r2). The units
-    /// per type are `sound-table.md` open question 2.
+    /// The model's cell of the unit (`client/model.md` §1 r2); a unit no
+    /// longer in the model: the position its `ServerSound` captured
+    /// (`client/bridge.md` §10 r3.1 (b)). The units per type are
+    /// `sound-table.md` open question 2.
     fn position(&self, unit: UnitKey) -> Option<(i32, i32)> {
-        let (x, y) = self.world.units.get(&unit)?.position?;
-        Some((i32::from(x), i32::from(y)))
+        match self.world.units.get(&unit) {
+            Some(u) => {
+                let (x, y) = u.position?;
+                Some((i32::from(x), i32::from(y)))
+            }
+            None => self.captured?.borrow().get(&unit).copied(),
+        }
     }
 
     /// `0x00622AA0(player, unit, 2)` needs the client collision rooms (no
@@ -272,13 +292,22 @@ impl SoundDriver {
                 world.units.contains_key(&k)
             }
         });
+        let captured = RefCell::new(BTreeMap::new());
         let mut sw = ModelSoundWorld::with_env(world, levels, &self.env_indoors);
+        sw.captured = Some(&captured);
         if !requests.is_empty() {
             // C: one client update per server tick (§1 r5).
             let c = now as u32;
             let mut ctx = self.system.with(&mut sw);
             let mut cx = Ctx::new(&mut ctx, &mut self.globals, c);
             for r in requests {
+                if let SoundRequest::Server {
+                    unit, at: Some(at), ..
+                } = *r
+                {
+                    let at = (i32::from(at.0), i32::from(at.1));
+                    captured.borrow_mut().insert(unit, at);
+                }
                 request(&mut cx, world, r, &mut self.unit_sounds, &mut self.skipped)?;
             }
         }
@@ -355,7 +384,10 @@ fn request(
         SoundRequest::UnitRequest { id, unit } => {
             cx.unit_request(id, unit);
         }
-        SoundRequest::Server { unit, class, event } => {
+        SoundRequest::UnitFreed { unit } => detach_all(cx.s, unit, false),
+        SoundRequest::Server {
+            unit, class, event, ..
+        } => {
             let u = event_unit(world, unit, class);
             let skip = match event {
                 12 => Some(SKIP_EVENT_12),
@@ -484,6 +516,7 @@ mod tests {
             SoundRequest::Server {
                 unit: obj,
                 class: 5,
+                at: None,
                 event: 13,
             },
             SoundRequest::Ui(5000),
@@ -492,17 +525,20 @@ mod tests {
             SoundRequest::Server {
                 unit: p,
                 class: 0,
+                at: None,
                 event: 2,
             },
             // Events whose record the driver does not hold.
             SoundRequest::Server {
                 unit: obj,
                 class: 5,
+                at: None,
                 event: 12,
             },
             SoundRequest::Server {
                 unit: UnitKey::new(MONSTER, 3),
                 class: 5,
+                at: None,
                 event: 18,
             },
             SoundRequest::PlayerEvent {
@@ -534,12 +570,49 @@ mod tests {
         let bad = SoundRequest::Server {
             unit: UnitKey::new(PLAYER, 2),
             class: 9,
+            at: None,
             event: 2,
         };
         assert_eq!(
             d.frame(&w, &[], &[bad]),
             Err(DriverError::Trigger(TriggerError::PlayerClass(9)))
         );
+    }
+
+    // Covers: specs/client/bridge.md §10 r3; specs/audio/triggers-2.md §19 r5
+    #[test]
+    fn a_unit_freed_output_detaches_the_units_requests() {
+        let mut d = driver();
+        let mut w = at_tick(1);
+        let m = UnitKey::new(MONSTER, 4);
+        let mut u = ClientUnit::new(m);
+        u.position = Some((100, 200));
+        w.units.insert(m, u);
+        // The request is made; its tick's line test needs the client
+        // collision rooms (pending, not part of this rule).
+        assert!(matches!(
+            d.frame(&w, &[], &[SoundRequest::UnitRequest { id: 1, unit: m }]),
+            Err(DriverError::Pending(_))
+        ));
+        assert_eq!(d.system().unit_requests(m).len(), 1);
+        w.units.remove(&m);
+        w.server_ticks = 2;
+        d.frame(&w, &[], &[SoundRequest::UnitFreed { unit: m }])
+            .unwrap();
+        assert!(d.system().unit_requests(m).is_empty());
+    }
+
+    // Covers: specs/client/bridge.md §10 r3
+    #[test]
+    fn a_freed_units_position_is_the_one_its_sound_captured() {
+        let w = ClientWorld::default();
+        let gone = UnitKey::new(MONSTER, 4);
+        let captured = RefCell::new(BTreeMap::from([(gone, (100, 200))]));
+        let mut sw = ModelSoundWorld::new(&w);
+        assert_eq!(sw.position(gone), None);
+        sw.captured = Some(&captured);
+        assert_eq!(sw.position(gone), Some((100, 200)));
+        assert_eq!(sw.position(UnitKey::new(MONSTER, 5)), None);
     }
 
     // Covers: specs/audio/sound-table.md §4 r5

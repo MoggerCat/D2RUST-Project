@@ -204,6 +204,7 @@ impl<L: ServerLink> Bridge<L> {
             report.rejected += self.log.rejected.len() - before;
         }
         report.answered = self.send_outgoing()?;
+        output::move_freed(&mut self.world, &mut self.outputs);
         report.outputs = self.outputs.len() - before;
         Ok(report)
     }
@@ -235,6 +236,7 @@ impl<L: ServerLink> Bridge<L> {
     /// clears the list (spec §10 rule 4: once per frame, after the
     /// frame).
     pub fn take_outputs(&mut self) -> Vec<Output> {
+        output::move_freed(&mut self.world, &mut self.outputs);
         std::mem::take(&mut self.outputs)
     }
 
