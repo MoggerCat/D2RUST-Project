@@ -42,6 +42,7 @@ pub mod host;
 pub mod identify;
 pub mod inv_world;
 pub mod item_link;
+pub mod item_use;
 pub mod load;
 pub mod merc;
 pub mod ops;
@@ -50,7 +51,6 @@ pub mod potion;
 pub mod queries;
 pub mod save_index;
 pub mod swap;
-pub mod town_portal;
 pub mod units;
 
 #[cfg(test)]
@@ -130,9 +130,6 @@ pub struct InvState {
     /// host writes +0x1C (the setter `0x006233A0` is the skills code's), so
     /// without this the bookkeeping never sees a weapon. Off by default.
     pub weapon_hand_fallback: bool,
-    /// Town Portal scroll / tome uses of the call, taken by the host
-    /// ([`InvDesk::take_portal_requests`], REC-117).
-    pub portal_requests: Vec<UnitId>,
     /// Equipment-rule calls the inventory functions asked for while the
     /// owner's inventory was lent to them ([`InvDesk::with_inv`]); run
     /// when the call returns, before the owner refreshes.

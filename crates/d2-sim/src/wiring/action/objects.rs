@@ -523,7 +523,7 @@ impl<X: Pending> View<'_, X> {
         let r = with_objects(game, self, |ctl, t, w| {
             objects::operate_in_range(ctl, t, w, operator, guid)
         })?;
-        self.flush_portal_removals(game, operator);
+        self.flush_portal_removals(game);
         log(self, r)
     }
 
@@ -807,8 +807,11 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
     fn room(&self, unit: UnitId) -> Option<RoomId> {
         self.game.lists.unit(unit).and_then(|e| e.room())
     }
+    /// The level of the unit's room; during its allocation's init, the
+    /// allocation's room (`units.md` §3.1 rule 7.2, [`View::init_room`]:
+    /// the init runs before `SUNIT_Add` links the unit).
     fn level(&self, unit: UnitId) -> Option<u32> {
-        let room = self.room(unit)?;
+        let room = self.v.init_room(self.game, unit)?;
         self.v.h.drlg.level_id(self.game, room)
     }
     fn room_level(&self, room: RoomId) -> Option<u32> {
@@ -1350,9 +1353,11 @@ impl<X: Pending> MiscWorld for ObjectView<'_, X> {
     fn party_id(&self, unit: UnitId) -> u16 {
         self.v.h.x.object_party_id(unit)
     }
+    /// `0x00553720` on the pair links ([`View::portal_partner`]); an
+    /// object without a link: [`Pending::object_portal_partner`].
     fn portal_partner(&mut self, object: UnitId) -> Option<UnitId> {
-        if let Some(l) = self.v.h.portals.partner(object) {
-            return Some(l);
+        if self.v.h.portals.link(object).is_some() {
+            return self.v.portal_partner(self.game, object);
         }
         self.v.h.x.object_portal_partner(self.game, object)
     }
@@ -1365,42 +1370,25 @@ impl<X: Pending> MiscWorld for ObjectView<'_, X> {
     fn player_quest_bit(&self, player: UnitId, quest: u32, bit: u8) -> bool {
         self.v.h.x.object_quest_bit(player, quest, bit)
     }
+    /// `0x005353F0`: player data +0x48 ([`super::town_portal::PortalLinks::player_portal`]);
+    /// never written: [`Pending::object_portal_guid`].
     fn player_portal_guid(&self, player: UnitId) -> u32 {
-        let own = self
-            .v
+        self.v
             .h
             .portals
-            .field_portal(player)
-            .and_then(|f| self.game.lists.unit(f))
-            .map(|e| e.guid);
-        own.unwrap_or_else(|| self.v.h.x.object_portal_guid(player))
+            .player_portal(player)
+            .unwrap_or_else(|| self.v.h.x.object_portal_guid(player))
     }
+    /// `0x0061B060(act, level, 0, &x, &y, 3)` (`objects.md` §12 rule 8,
+    /// [`crate::wiring::path::place::level_spawn`]) for a portal without
+    /// a partner (a class-60 portal of a quest; every pair has one from
+    /// creation, `objects-2.md` §25).
     fn level_spawn_point(&mut self, level: u32) -> Option<(RoomId, i32, i32)> {
         if let Some(p) = self.v.h.x.object_level_spawn(self.game, level) {
             return Some(p);
         }
-        // A portal without a partner (Tyrael's, `quests-act2.md` §8.3
-        // portal check `0x0059DFD0`): the spawn location of type 12 of
-        // the level, then the free spot `0x0064E7E0(room, &pt, size 3,
-        // mask 0xBE11, step 7)` (`path-placement.md` §7.1). The portal
-        // check's gate (+0x3C = 1) is not asked here: PROVISIONAL
-        // (REC-254), every partnerless portal takes this rule.
-        // d2rs-own, unverified.
         let act = crate::drlg::act_of_level(level);
-        let p = self
-            .v
-            .h
-            .drlg
-            .with_act(act, &mut self.game.lists, |d, svc| {
-                d.spawn_room(svc, level, 12)
-            })?
-            .ok()?;
-        let sub = crate::path::place::SPAWN_OFFSET;
-        let mut pt = crate::path::coords::Point::new(p.x * 5 + sub, p.y * 5 + sub);
-        let rooms = crate::wiring::path::place::Rooms(&self.v.h.drlg);
-        let room = crate::path::search::free_point_step(&rooms, p.active, &mut pt, 3, 0xBE11, 7)
-            .ok()??;
-        Some((room, pt.x, pt.y))
+        crate::wiring::path::place::level_spawn(&mut self.v, self.game, act, level, 0)
     }
     fn quest_level_change(&mut self, player: UnitId, from: u32, to: u32) {
         self.v.h.x.object_quest_level_change(player, from, to);

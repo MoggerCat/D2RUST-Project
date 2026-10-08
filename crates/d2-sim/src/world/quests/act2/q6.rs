@@ -782,7 +782,7 @@ fn tyrael_portal<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, p: 
     x(ctl, i).portal_opening = true;
     let created = w
         .unit_position(p)
-        .is_some_and(|(px, py, _)| w.create_portal(p, px, py, PORTAL, TOWN));
+        .is_some_and(|(px, py, _)| w.create_tyrael_portal(p, px, py, PORTAL, TOWN));
     if created {
         ctl.records[i].state = 4;
         // `0x0059C860` for each player from Tyrael: room level 73 and

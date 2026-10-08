@@ -351,10 +351,15 @@ impl ItemsUi {
         intent.map(PanelOutput::Intent).into_iter().collect()
     }
 
-    /// Right mouse down in the inventory panel (d2rs-own, REC-117): on a
-    /// page-0 grid item with no item on the cursor, C→S 0x20 UseGridItem
-    /// (`inventory-moves.md` §7.11) with the local player's point; the
-    /// server decides whether the item can be used.
+    /// Right mouse down in the inventory panel, the grid handler
+    /// `0x00487740` (`items/use.md` Inputs): on a page-0 grid item with no
+    /// item on the cursor, C→S 0x20 UseGridItem (`0x004786D0`,
+    /// `inventory-moves.md` §7.11) with the item's GUID and the local
+    /// player's point.
+    ///
+    /// TODO(items/use.md Inputs): the client's items `useable` gate
+    /// (`0x00628C20`) and the cube-open flag of `box ` are not applied
+    /// here; the server refuses a non-useable item (§7.11 rule 1).
     pub fn use_press(
         &self,
         world: &ClientWorld,

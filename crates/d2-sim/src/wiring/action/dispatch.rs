@@ -216,14 +216,24 @@ impl<X: Pending> ActionSim<X> {
         self.with(game, |g, v| v.warp_tile_message(g, player, guid))
     }
 
-    /// The Town Portal scroll or tome of `player` ([`View::create_town_portal`]):
-    /// the pair's units. `None`: nothing was created.
+    /// The Town Portal cast of `player` without an item
+    /// ([`View::town_portal_cast`], `objects-2.md` §27.1): the pair's
+    /// units (object 1 next to the player, object 2 in town). `None`:
+    /// refused or not made.
     pub fn open_town_portal(
         &mut self,
         game: &mut Game,
         player: UnitId,
     ) -> Option<(UnitId, UnitId)> {
-        self.with(game, |g, v| v.create_town_portal(g, player))
+        self.with(game, |g, v| {
+            let (made, _) = v.town_portal_cast(g, player);
+            if made == 0 {
+                return None;
+            }
+            let g1 = v.h.portals.player_portal(player)?;
+            let o1 = g.lists.find_unit(crate::units::UnitType::Object, g1)?;
+            Some((o1, v.portal_partner(g, o1)?))
+        })
     }
 
     fn log(&mut self, r: Result<(), WiringError>) {
@@ -274,6 +284,17 @@ impl<X: Pending> TickHooks for ActionSim<X> {
             let m = a.environment.message();
             self.sys.hooks.x.send(player, &m);
         }
+    }
+
+    /// Per-client update (`tick.md` §6.5, `0x0053A770`): the removal
+    /// messages of the room delete lists ([`View::send_room_deletes`]).
+    fn send_removed_units(&mut self, game: &mut Game, client: ClientId) {
+        self.with(game, |g, v| v.send_room_deletes(g, client));
+    }
+
+    /// Step 7 `0x0061A2C0`: the room's delete list is freed.
+    fn free_removal_records(&mut self, _: &mut Game, room: RoomId) {
+        self.sys.hooks.room_deletes.remove(&room);
     }
 
     /// Step 9 `0x0061A790` (`rooms.md` §7.2).

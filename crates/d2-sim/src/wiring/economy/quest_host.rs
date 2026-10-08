@@ -144,6 +144,62 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
         f(&mut *e.game, &mut v)
     }
 
+    /// [`Self::view`] with the economy's game seed lent to the hooks for
+    /// the call (the portal pair's allocations draw it, `rng.md` §5.3)
+    /// and taken back after it.
+    fn view_seeded<T>(
+        &mut self,
+        f: impl FnOnce(&mut crate::game::Game, &mut View<'_, X>) -> T,
+    ) -> T {
+        let e = &mut *self.inner.econ;
+        e.hooks.game_seed = e.fields.seed;
+        let r = {
+            let mut v = View::of(&mut *e.units, &mut *e.stats, e.data, &mut *e.hooks);
+            f(&mut *e.game, &mut v)
+        };
+        e.fields.seed = e.hooks.game_seed;
+        r
+    }
+
+    /// `0x0056D130` for the quest calls of the `create_portal` form
+    /// ([`View::create_portal_pair`]): at (x, y) in `unit`'s room.
+    ///
+    /// PROVISIONAL (objects-2.md §25; quests-act2.md §8.11,
+    /// quests-act1.md O7, quests-act5-2.md §6.7): the form names no owner
+    /// and no `exact`; a player unit is the owner with exact 0 (Tyrael's
+    /// and Andariel's portals), any other unit (Anya, dummy 459) gives no
+    /// owner with exact 1 (the temple portal).
+    fn quest_pair(
+        &mut self,
+        unit: UnitId,
+        (x, y): (i32, i32),
+        class: u16,
+        level: u32,
+        tyrael: bool,
+    ) -> bool {
+        let room = self.inner.econ.game.lists.unit(unit).and_then(|e| e.room());
+        let player = self
+            .inner
+            .econ
+            .units
+            .get(unit)
+            .is_some_and(|r| r.ty == UnitType::Player);
+        let owner = player.then_some(unit);
+        let (made, _) = self.view_seeded(|g, v| {
+            v.create_portal_pair(
+                g,
+                owner,
+                room,
+                (x, y),
+                level,
+                u32::from(class),
+                !player,
+                tyrael,
+            )
+        });
+        made != 0
+    }
+
     /// `0x00559A30` with the drop code `code` (`treasure.md` §9,
     /// [`super::unit_quest_drop`]) when the game holds the drop state
     /// (`ActionHooks::object_drops`) and `unit` has a record; `None`: no
@@ -557,9 +613,22 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     }
     fn create_portal(&mut self, player: UnitId, x: i32, y: i32, class: u16, level: u32) -> bool {
         if self.inner.econ.hooks.objects.is_some() {
-            return self
-                .view(|g, v| v.create_quest_portal(g, player, (x, y), u32::from(class), level))
-                .is_some();
+            return self.quest_pair(player, (x, y), class, level, false);
+        }
+        self.inner.create_portal(player, x, y, class, level)
+    }
+    /// Tyrael's call (`quests-act2.md` §8.11): +0x3C is 1, so the arrival
+    /// hook `0x0059DFD0` places object 2 in Lut Gholein (§25 rule 11).
+    fn create_tyrael_portal(
+        &mut self,
+        player: UnitId,
+        x: i32,
+        y: i32,
+        class: u16,
+        level: u32,
+    ) -> bool {
+        if self.inner.econ.hooks.objects.is_some() {
+            return self.quest_pair(player, (x, y), class, level, true);
         }
         self.inner.create_portal(player, x, y, class, level)
     }
@@ -722,10 +791,9 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         self.inner
             .spawn_monster_flags(room, x, y, class, mode, spread, flags)
     }
-    /// `0x0056D130`: a portal object of `class` in mode 1 to `level`,
-    /// owned by `owner`, at (x, y) or the free spot next to it
-    /// (PROVISIONAL, REC-128: the body is unwritten; the town portal's
-    /// owner and level fields are reused).
+    /// `0x0056D130(game, owner, room, x, y, level, &out, class, exact)`
+    /// ([`View::create_portal_pair`], `objects-2.md` §25): object 1 when
+    /// the pair was made.
     #[allow(clippy::too_many_arguments)]
     fn open_portal(
         &mut self,
@@ -742,26 +810,19 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
                 .inner
                 .open_portal(owner, room, x, y, level, class, exact);
         }
-        let (room, x, y) = if exact {
-            (room, x, y)
-        } else {
-            helpers::free_spot(self, room, x, y, 2, 0x3E01, 100)
-                .map_or((room, x, y), |(fx, fy, fr)| (fr, fx, fy))
-        };
-        let portal = self.view(|g, v| v.create_object(g, room, u32::from(class), x, y, 1))?;
-        let guid = owner.map(|o| self.inner.econ.game.lists.unit(o).map_or(0, |u| u.guid));
-        if let Some(d) = self
-            .inner
-            .econ
-            .hooks
-            .objects
-            .as_mut()
-            .and_then(|st| st.control.data.get_mut(&portal))
-        {
-            d.interact = u8::try_from(level).unwrap_or(u8::MAX);
-            d.owner = guid.map(|g| g as i32);
-        }
-        Some(portal)
+        let (made, o1) = self.view_seeded(|g, v| {
+            v.create_portal_pair(
+                g,
+                owner,
+                Some(room),
+                (x, y),
+                level,
+                u32::from(class),
+                exact,
+                false,
+            )
+        });
+        o1.filter(|_| made != 0)
     }
     /// `0x0056EDE0` ([`helpers::missile_at_point`]) on the missile
     /// store when the action wiring holds one; else the rest's.
@@ -1265,26 +1326,43 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
             None => self.inner.close_cube(player),
         }
     }
-    /// `0x005353F0`: player data +0x48 through the action wiring's one
-    /// seam for it (`Pending::object_portal_guid`, the portal operate's,
-    /// `objects.md` §12); a unit other than a player has no player data.
+    /// `0x005353F0`: player data +0x48 on the action wiring's portal
+    /// links (`PortalLinks::player_portal`, written by the Town Portal
+    /// cast, `objects-2.md` §27.1 step 8; never written:
+    /// `Pending::object_portal_guid`); a unit other than a player has no
+    /// player data.
     fn town_portal_guid(&mut self, player: UnitId) -> Option<u32> {
+        let h = &self.inner.econ.hooks;
         match self.inner.econ.units.get(player).map(|r| r.ty) {
-            Some(UnitType::Player) => Some(self.inner.econ.hooks.x.object_portal_guid(player)),
+            Some(UnitType::Player) => Some(
+                h.portals
+                    .player_portal(player)
+                    .unwrap_or_else(|| h.x.object_portal_guid(player)),
+            ),
             Some(_) => None,
             None => self.inner.town_portal_guid(player),
         }
     }
-    /// `0x00553720` through the action wiring's seam the portal operate
-    /// uses (`Pending::object_portal_partner`, `objects.md` §12 rule 6).
+    /// `0x00553720` on the action wiring's portal links
+    /// ([`View::portal_partner`]); a portal without a link:
+    /// `Pending::object_portal_partner`.
     fn portal_partner(&mut self, portal: UnitId) -> Option<UnitId> {
-        self.view(|g, v| v.h.x.object_portal_partner(g, portal))
+        self.view(|g, v| {
+            if v.h.portals.link(portal).is_some() {
+                return v.portal_partner(g, portal);
+            }
+            v.h.x.object_portal_partner(g, portal)
+        })
     }
     /// `quests-helpers.md` §7 step 4 = `objects.md` §12 rule 12's removal
-    /// (`0x0061A270`, `0x00555600`, `0x0061AED0(room, 1)`) through the
-    /// action wiring's seam for it (`Pending::object_remove_portal`).
+    /// (`0x0061A270`, `0x00555600`, `0x0061AED0(room, 1)`,
+    /// [`View::remove_portal_object`]), after the rest's seam
+    /// (`Pending::object_remove_portal`).
     fn free_portal_object(&mut self, portal: UnitId) {
-        self.view(|g, v| v.h.x.object_remove_portal(g, portal));
+        self.view(|g, v| {
+            v.h.x.object_remove_portal(g, portal);
+            v.remove_portal_object(g, portal);
+        });
     }
     /// `0x005DDFC0(game, monster, mode, x, y)` (`monsters/ai.md` §7.1: the
     /// mode request at a point, no path step set) on the action wiring's

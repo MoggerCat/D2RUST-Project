@@ -164,8 +164,8 @@ impl<X: Pending> WaypointWorld for WaypointView<'_, X> {
             {
                 return;
             }
-            // Another act: the act change (d2rs-own wiring, unverified;
-            // `wiring::path::act_change`).
+            // Another act: the act change `0x0053ACC0` (`waypoints.md`
+            // §11, `wiring::path::act_change`).
             let c = crate::wiring::path::PathCtx::of(&mut self.v, self.game);
             if crate::wiring::path::act_change::run(c, player, level, u32::from(tile_code)) {
                 return;

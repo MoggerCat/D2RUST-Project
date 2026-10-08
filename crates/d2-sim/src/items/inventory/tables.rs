@@ -8,7 +8,9 @@
 
 use d2_data::fixup::maps::EquivMatrix;
 use d2_data::fixup::FixedSet;
-use d2_data::tables::{decode_all, Armor, Belts, Inventory, Itemtypes, Misc, Record, Weapons};
+use d2_data::tables::{
+    decode_all, Armor, Belts, Books, Inventory, Itemtypes, Misc, Record, Weapons,
+};
 
 use crate::items::tables::TableError;
 
@@ -46,6 +48,9 @@ pub struct InvItemRec {
     /// (`bodies-2.md` §3.4).
     pub mindam: u8,
     pub maxdam: u8,
+    /// `pSpell` (+0x94): the item-use table index (`items/use.md` §1
+    /// rule 2.2).
+    pub pspell: u32,
 }
 
 macro_rules! inv_item_rec {
@@ -71,6 +76,7 @@ macro_rules! inv_item_rec {
                     levelreq: r.levelreq,
                     mindam: r.mindam,
                     maxdam: r.maxdam,
+                    pspell: r.pspell,
                 }
             }
         }
@@ -117,6 +123,32 @@ pub struct InvTables {
     pub itemtypes: Vec<InvTypeRec>,
     /// Itemtypes equivalence (`data/runtime-maps.md` §2).
     pub equiv: EquivMatrix,
+    /// `books.txt` rows (`items/inventory.md` §5.5, `items/use.md` §1
+    /// rule 2.1), by spell index (item data +0x3E). Empty: no books
+    /// table.
+    pub books: Vec<InvBookRec>,
+}
+
+/// The `books.txt` columns the item use reads (`items/use.md` Inputs,
+/// `inventory-moves.md` §7.18 step 6).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub struct InvBookRec {
+    /// `pSpell` (+0x04): the item-use table index.
+    pub pspell: i32,
+    /// `scrollskill` (+0x08), −1: none.
+    pub scrollskill: i32,
+    /// `bookskill` (+0x0C), −1: none.
+    pub bookskill: i32,
+}
+
+impl From<&Books> for InvBookRec {
+    fn from(r: &Books) -> Self {
+        InvBookRec {
+            pspell: r.pspell as i32,
+            scrollskill: r.scrollskill as i32,
+            bookskill: r.bookskill as i32,
+        }
+    }
 }
 
 fn typed<T: Record>(f: &FixedSet) -> Result<Vec<T>, TableError> {
@@ -142,6 +174,7 @@ impl InvTables {
             items,
             itemtypes: typed::<Itemtypes>(f)?.iter().map(Into::into).collect(),
             equiv: f.itemtypes_equiv.clone(),
+            books: typed::<Books>(f)?.iter().map(Into::into).collect(),
         })
     }
 

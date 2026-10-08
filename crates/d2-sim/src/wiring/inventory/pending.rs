@@ -13,7 +13,7 @@ use super::{InvDesk, InvError, InvRest};
 use crate::items::inventory::{
     active_inventory_item, belt_removal_allowed, corpse_slot_fit, InvWorld, UnitKind,
 };
-use crate::items::moves::{Guid, MovePending, MoveUnits, Owner, Spot};
+use crate::items::moves::{Guid, MovePending, Owner, Spot};
 use crate::units::lifecycle::LifecycleHooks;
 use crate::units::UnitId;
 
@@ -147,32 +147,33 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn tile_warp(&mut self, player: Owner, tile: Owner) {
         self.rest.tile_warp(player, tile)
     }
+    /// `0x005BF240(I, I, x, y)` (`items/use.md` §1): the entries run here
+    /// ([`InvDesk::item_use`]: the Town Portal cast); any other entry: the
+    /// rest's.
     fn use_item_at(&mut self, player: Owner, item: Guid, x: i32, y: i32) -> bool {
-        // PROVISIONAL (REC-117): Town Portal scroll and tome.
-        if self.use_portal_item(player, item) {
-            return true;
+        if let Some(r) = self.item_use(player, item) {
+            return r != 0;
         }
         self.rest.use_item_at(player, item, x, y)
     }
     fn open_cube(&mut self, player: Owner, cube: Guid) -> bool {
         self.open_cube_desk(player, cube)
     }
+    /// `0x0055E000` (§7.11 step 3, §7.18 step 9): the removal message
+    /// (flag 0x20), then the item leaves its inventory and is freed
+    /// ([`InvDesk::remove_used_item`]); an item without a unit: the
+    /// rest's.
     fn consume_item(&mut self, player: Owner, item: Guid) {
-        // PROVISIONAL (REC-113, REC-117): a used identify or Town Portal
-        // scroll leaves the grid.
-        if (self.item_unit(item).is_some()
-            && super::identify::IDENTIFY_CODES.contains(&self.code(item)))
-            || self.is_portal_scroll(item)
-            // A used quest item (`inventory-moves.md` §7.11 step 4; REC-246).
-            || (self.item_unit(item).is_some()
-                && matches!(&self.code(item), b"ass " | b"xyz " | b"tr2 "))
-        {
+        if self.item_unit(item).is_some() {
             return self.remove_used_item(player, item);
         }
         self.rest.consume_item(player, item)
     }
+    /// `0x0055E050` on the books rows ([`InvDesk::books_item_skill`]);
+    /// not a book or scroll, or no books table: the rest's.
     fn item_skill(&self, item: Guid) -> i32 {
-        self.rest.item_skill(item)
+        self.books_item_skill(item)
+            .unwrap_or_else(|| self.rest.item_skill(item))
     }
     fn has_skill(&self, player: Owner, skill: i32) -> bool {
         self.rest.has_skill(player, skill)
@@ -432,6 +433,11 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         self.rest.book_count_changed(player, n)
     }
     fn use_item(&mut self, player: Owner, target: Owner, item: Guid) -> bool {
+        // `0x005BF240(U, T, …)` for the entries run here (the Town Portal
+        // cast, [`InvDesk::item_use`]).
+        if let Some(r) = self.item_use(player, item) {
+            return r != 0;
+        }
         // PROVISIONAL (REC-102): potions on the player.
         if target == player && self.use_potion(player, item) {
             return true;

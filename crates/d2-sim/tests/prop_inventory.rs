@@ -397,6 +397,7 @@ fn build(dna: &[u8]) -> (InvTables, World) {
         items,
         itemtypes,
         equiv,
+        books: Vec::new(),
     };
     let mut w = World {
         expansion,

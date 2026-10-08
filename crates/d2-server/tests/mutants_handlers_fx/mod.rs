@@ -851,6 +851,7 @@ pub fn inv_tables(
             n_types
         ],
         equiv,
+        books: Vec::new(),
     }
 }
 

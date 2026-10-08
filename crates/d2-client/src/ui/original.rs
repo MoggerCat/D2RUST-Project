@@ -867,7 +867,8 @@ impl Panel for InventoryUi {
                 sh.outputs.extend(out);
             }
             None => {
-                // Right press: use the item under the mouse (REC-117).
+                // Right press: use the item under the mouse (`0x00487740`,
+                // `items/use.md` Inputs).
                 if let UiEvent::Press {
                     button: PointerButton::Right,
                     at,

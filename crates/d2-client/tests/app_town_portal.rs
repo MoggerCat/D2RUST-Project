@@ -1,13 +1,12 @@
-// Spec: specs/world/objects.md (§5.5, §12), specs/skills/bodies-3.md (§4.4), specs/client/model.md (§8 rule 7)
+// Spec: specs/world/objects.md (§5.5, §12), specs/world/objects-2.md (§25, §27), specs/client/model.md (§8 rule 7)
 //! Town Portal in the app's own synthetic game, headless (task
 //! `q-town-portal`, `docs/handoff/q-town-portal.md`). The player stands in
 //! the Den of Evil (reached through its warp tile, as `app_level_warp.rs`);
-//! the Town Portal use (`ActionSim::open_town_portal`, what the scroll's
-//! C→S 0x20 ends in) makes the portal pair: the field portal reaches the
-//! client (S→C 0x51), a click on it (C→S 0x13) moves the player to the
-//! town, where the town portal's click brings the player back and removes
-//! the pair. PROVISIONAL (REC-117): the creation, the links, the
-//! removal on the way back from town.
+//! the Town Portal cast (`ActionSim::open_town_portal`, `0x005BE290`,
+//! what the scroll's C→S 0x20 ends in) makes the portal pair: the field
+//! portal reaches the client (S→C 0x51), a click on it (C→S 0x13) moves
+//! the player to the town, where the town portal's click brings the
+//! player back and removes the pair (`objects-2.md` §27.3, §27.4).
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
@@ -211,9 +210,9 @@ fn boot() -> (App, app_support::Server<StepClock>, Arc<AtomicU32>) {
     (app, server, ms)
 }
 
-// Covers: specs/world/objects.md §12 r13; specs/client/msg-units.md §8 r7; specs/sim/intents-events.md §6 r6
+// Covers: specs/world/objects-2.md §27.1 r4, §27.5 r2; specs/world/objects.md §12 r13; specs/client/msg-units.md §8 r7
 #[test]
-fn casting_in_town_opens_to_the_last_field_level_and_the_owner_name_arrives() {
+fn casting_in_town_is_refused_and_the_owner_name_arrives() {
     let (mut app, server, ms) = boot();
     let mut steps = 0;
     let mut step = |app: &mut App| {
@@ -247,8 +246,8 @@ fn casting_in_town_opens_to_the_last_field_level_and_the_owner_name_arrives() {
         })
     };
 
-    // A cast in town before any field cast makes nothing.
-    assert!(!cast(&server), "no field level yet");
+    // A cast in town is refused (`objects-2.md` §27.1 step 4).
+    assert!(!cast(&server), "refused in town");
     assert_eq!(server_portals(&server), 0);
 
     // Into the Den, cast there: the owner name rides with the portal.
@@ -293,9 +292,10 @@ fn casting_in_town_opens_to_the_last_field_level_and_the_owner_name_arrives() {
         step(&mut app);
     }
 
-    // A cast in town: the pair leads back to the Den.
-    assert!(cast(&server), "a pair to the last field level");
-    assert_eq!(server_portals(&server), 2, "the old pair was replaced");
+    // A cast in town: refused, the pair stays; its town end leads back
+    // to the Den.
+    assert!(!cast(&server), "refused in town");
+    assert_eq!(server_portals(&server), 2, "the old pair stays");
     for _ in 0..10 {
         step(&mut app);
     }
