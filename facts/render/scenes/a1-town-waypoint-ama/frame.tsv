@@ -1,0 +1,22 @@
+# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py /tmp/claude-0/w3/frames.jsonl --scene a1-town-waypoint-ama --frame 91 --out facts/render; game: 1.14d
+key	value
+seq	91
+tick	159
+w	800
+h	600
+act	0
+level	1
+player_x	10864
+player_y	72848
+tile_origin_x	10464
+tile_origin_y	72568
+unit_origin_x	10464
+unit_origin_y	72564
+open_mode	0
+shift_x	0
+light_quality	0
+rain	1
+snow	0
+draws	301
+index_sha256	61cf646c12cd4a04e0cebea878f2bc6f4bb321d43f626ab2b4f5109716f6a304
+palette_sha256	ba83219e51249002d7125a1a5a701d6abea94f04f44d6cfaa42becdfcff23337

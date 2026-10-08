@@ -138,8 +138,10 @@ def draw_row(i, d, celfiles, compfiles, sprites):
                  mode=val(a[0] if a else None))
     else:  # StartDraw, ClearScreen, DrawBox, DrawBoxAlpha, DrawLine: §2 r6
         r.update(x=val(a[0] if a else None), y=val(a[1] if len(a) > 1 else None) if len(a) > 1 else NA)
-        if op not in ("StartDraw", "ClearScreen"):
-            r["mode"] = UNK  # which argument is the color: not specified for these wrappers
+        if op in ("DrawLine", "DrawBox"):  # x0, y0, x1, y1, color, alpha / mode: blend-modes.md §8
+            r["mode"] = val(a[4] if len(a) > 4 else None)
+        elif op != "StartDraw" and op != "ClearScreen":
+            r["mode"] = UNK  # DrawBoxAlpha: which argument is the color is not specified
     return [r[c] for c in DRAW_COLS], sprite
 
 
@@ -256,6 +258,7 @@ def selftest():
              {"op": "CelDrawShadow", "a": [400, 292], "at": "0x4dbd00",
               "cel": {"ctx": "0x10", "file": "0x0", "dir": 0, "frame": 0,
                       "tokens": ["AM  ", "LG  ", "lit ", "TN  ", "1ht "]}},
+             {"op": "DrawLine", "a": [596, 151, 595, 156, 185, 127], "at": "0x47368e"},
              {"op": "CelDrawEx", "a": [29, 587, 0, 80, 5], "at": "0x4ff100",
               "cel": {"ctx": "0x30", "file": "0x4740000", "dir": 0, "frame": 1, "tokens": [None] * 5}},
          ]}
@@ -275,20 +278,22 @@ def selftest():
          "24", "5", "0xffffffff", "0", "-", "0x4ff000"],
         ["5", "CelDrawShadow", "data/global/chars/am/lg/amlglittn1ht.dcc", "0", "0", "-", "400", "292", "18",
          "46", "-13", "7", "?", "?", "?", "-", "0x4dbd00"],
-        ["6", "CelDrawEx", "data/global/ui/cursor/protate.dc6", "0", "1", "-", "29", "587", "?", "?", "?", "?",
+        ["6", "DrawLine", "-", "-", "-", "-", "596", "151", "-", "-", "-", "-", "185", "-", "-", "-", "0x47368e"],
+        ["7", "CelDrawEx", "data/global/ui/cursor/protate.dc6", "0", "1", "-", "29", "587", "?", "?", "?", "?",
          "?", "?", "?", "-", "0x4ff100"],
     ]
     assert draws == want, "\n".join("\t".join(r) for r in draws)
     assert [s[0] for s in sprites] == ["data/global/chars/am/lg/amlglittn1ht.dcc",
                                        "data/global/ui/cursor/protate.dc6"], sprites
     fr = dict(frame_rows(f, draws, None))
-    assert (fr["player_x"], fr["level"], fr["draws"], fr["light_quality"]) == ("10320", "1", "7", "2"), fr
+    assert (fr["player_x"], fr["level"], fr["draws"], fr["light_quality"]) == ("10320", "1", "8", "2"), fr
     # M08: one changed source field changes exactly its cell
     cases = [(lambda g: g["draws"][1]["tile"].__setitem__("rarity", 1), 1, "tile"),
              (lambda g: g["draws"][1]["tile"].__setitem__("index", 8), 1, "frame"),
              (lambda g: g["draws"][1]["tile"].__setitem__("sub", 3), 1, "tile"),
              (lambda g: g["draws"][4]["a"].__setitem__(3, 4), 4, "mode"),
-             (lambda g: g["draws"][2]["u"].__setitem__("guid", 2), 2, "unit")]
+             (lambda g: g["draws"][2]["u"].__setitem__("guid", 2), 2, "unit"),
+             (lambda g: g["draws"][6]["a"].__setitem__(4, 186), 6, "mode")]
     for change, row, col in cases:
         g = json.loads(json.dumps(f))
         change(g)
