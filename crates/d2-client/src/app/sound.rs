@@ -321,7 +321,7 @@ fn audio_frame(
         ) {
             Ok(()) => {}
             Err(DriverError::Pending(q)) => debug!("sound layer pending: {q}"),
-            Err(e) => return Err(AudioFrameError::from(e)),
+            Err(e) => return Err(AudioFrameError::from(e).into()),
         }
         for s in d.take_skipped() {
             debug!("sound layer skipped: {s}");
