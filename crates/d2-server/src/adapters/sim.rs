@@ -67,6 +67,9 @@ pub struct UnitFacts {
 /// the start of each tick.
 pub type HostSync<D> = fn(&Game, &mut D);
 
+/// [`HostSync`] with the host's world as well ([`SimGame::set_world_sync`]).
+pub type WorldSync<D, W> = fn(&Game, &mut D, &mut W);
+
 /// Misuse of the adapter's client bookkeeping.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum AdapterError {
@@ -108,6 +111,8 @@ pub struct SimGame<D = Unspecified, W = NoWorld> {
     live: std::collections::BTreeSet<UnitId>,
     /// The host's seam refresh, if set.
     host_sync: Option<HostSync<D>>,
+    /// The host's seam refresh that reads the world too, if set.
+    world_sync: Option<WorldSync<D, W>>,
     /// Clients the point parser asked to resync with S→C 0x15, in order
     /// (the player is queued for update as well, `queue_resync`).
     pub resyncs: Vec<ClientId>,
@@ -170,6 +175,7 @@ impl<D: EventDispatch, W> SimGame<D, W> {
             units: BTreeMap::new(),
             live: Default::default(),
             host_sync: None,
+            world_sync: None,
             resyncs: Vec::new(),
             unhandled: Vec::new(),
             world,
@@ -267,9 +273,19 @@ impl<D: EventDispatch, W> SimGame<D, W> {
         self.host_sync = Some(sync);
     }
 
+    /// Like [`SimGame::set_host_sync`], for a host whose seams answer
+    /// from the game's world (the inventory model): called at the same
+    /// points, after the host sync.
+    pub fn set_world_sync(&mut self, sync: WorldSync<D, W>) {
+        self.world_sync = Some(sync);
+    }
+
     fn run_host_sync(&mut self) {
         if let Some(f) = self.host_sync {
             f(&self.game, &mut self.events);
+        }
+        if let Some(f) = self.world_sync {
+            f(&self.game, &mut self.events, &mut self.world);
         }
     }
 

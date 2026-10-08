@@ -212,8 +212,18 @@ impl UseRest for LocalSeams {
     fn equippable(&self, _: UnitId) -> bool {
         false
     }
-    fn bow_equipped(&self, _: UnitId) -> bool {
-        false
+    // q-amazon (REC-150): the weapons of [`super::weapons`].
+    fn bow_equipped(&self, u: UnitId) -> bool {
+        matches!(
+            self.weapons.hand_class(u),
+            super::weapons::class::BOW | super::weapons::class::CROSSBOW
+        )
+    }
+    fn skill_weapon(&self, u: UnitId) -> Option<UnitId> {
+        self.weapons.weapon(u)
+    }
+    fn skill_item_at(&self, u: UnitId, loc: u8) -> Option<UnitId> {
+        self.weapons.item_at(u, loc)
     }
     fn state_mask(&self, _: UnitId, _: u32) -> bool {
         false
