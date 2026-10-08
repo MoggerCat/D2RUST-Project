@@ -1041,7 +1041,10 @@ impl MoveRest for PreviewMoveRest {
 /// a copy, a tempered affix, the runeword and repair / recharge effects
 /// and the quest hooks do nothing, and the Cow portal is refused.
 #[derive(Debug, Default)]
-pub struct PreviewCubePending;
+pub struct PreviewCubePending {
+    /// `hst ` hooks recorded for the quest control (REC-136).
+    quest_items: Vec<(UnitId, [u8; 4])>,
+}
 
 impl super::items::ItemPending for PreviewCubePending {
     fn inventory_pass(&mut self, _: UnitId, _: &mut Vec<Vec<u8>>) {}
@@ -1054,7 +1057,12 @@ impl super::items::ItemPending for PreviewCubePending {
     fn drop_runeword_stats(&mut self, _: UnitId) {}
     fn repair(&mut self, _: UnitId) {}
     fn recharge(&mut self, _: UnitId) {}
-    fn quest_item_hook(&mut self, _: UnitId, _: UnitId, _: [u8; 4]) {}
+    fn quest_item_hook(&mut self, player: UnitId, _: UnitId, code: [u8; 4]) {
+        self.quest_items.push((player, code));
+    }
+    fn take_quest_items(&mut self) -> Vec<(UnitId, [u8; 4])> {
+        std::mem::take(&mut self.quest_items)
+    }
     fn cow_portal(&mut self, _: UnitId) -> bool {
         false
     }
@@ -1063,7 +1071,7 @@ impl super::items::ItemPending for PreviewCubePending {
 /// The cube parts of the play host ([`WiredWorld::cube`]) over `cube`
 /// (`CubeData::from_fixed`) with [`PreviewCubePending`].
 pub fn preview_cube_parts(cube: d2_sim::world::cube::CubeData) -> super::items::CubeParts {
-    super::items::CubeParts::new(cube, Box::new(PreviewCubePending))
+    super::items::CubeParts::new(cube, Box::new(PreviewCubePending::default()))
 }
 
 /// An inventory model for the play host ([`WiredWorld::inventory`]) over

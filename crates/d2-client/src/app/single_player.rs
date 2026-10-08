@@ -619,6 +619,25 @@ impl Pending for LocalSeams {
                 .push(d2_sim::wiring::action::QuestEvent::Link { unit, chain });
         }
     }
+    /// d2rs-own, unverified (REC-136): Radament's and the Summoner's AI
+    /// calls reach the quest control at the end of the tick.
+    fn ai_quest_call(
+        &mut self,
+        _: &mut Game,
+        unit: UnitId,
+        call: d2_sim::monsters::ai::QuestCall,
+    ) -> bool {
+        use d2_sim::monsters::ai::QuestCall;
+        use d2_sim::wiring::action::QuestEvent;
+        match call {
+            QuestCall::RadamentActivated => self
+                .quest_events
+                .push(QuestEvent::RadamentActivated { unit }),
+            QuestCall::SummonerActivated => self.quest_events.push(QuestEvent::SummonerActivated),
+            _ => return false,
+        }
+        true
+    }
     fn take_quest_events(&mut self) -> Vec<d2_sim::wiring::action::QuestEvent> {
         std::mem::take(&mut self.quest_events)
     }
