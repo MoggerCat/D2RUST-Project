@@ -94,9 +94,8 @@ impl ItemsUi {
         if g.cell_w == 0 || g.cell_h == 0 || !g.contains_mouse(at) {
             return Vec::new();
         }
-        let all = items::local_items(world);
         let cursor = items::cursor_item(world);
-        self.grid_press(files, g, &all, cursor.as_ref(), at, STASH_PAGE)
+        self.grid_press(world, files, g, cursor.as_ref(), at, STASH_PAGE)
             .map(PanelOutput::Intent)
             .into_iter()
             .collect()
