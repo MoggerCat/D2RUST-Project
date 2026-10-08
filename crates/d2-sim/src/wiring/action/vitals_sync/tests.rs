@@ -137,3 +137,35 @@ fn changed_mod_stats_follow_as_stat_messages_once() {
     // Sent once: unchanged values are not repeated.
     assert_eq!(run_fx(&mut f, c, false).unwrap(), Vec::<Vec<u8>>::new());
 }
+
+// Covers: specs/items/inventory.md §5.7 r2
+// d2rs: item lists ride in the stat messages (PROVISIONAL, REC-163).
+#[test]
+fn linked_item_stats_follow_as_stat_messages() {
+    let (mut f, p, c) = fx();
+    f.sim.sys.hooks.enable_vitals_sync();
+    run_fx(&mut f, c, false).unwrap();
+    let a = f.a;
+    let item = f.spawn(UnitType::Item, 0, a, 10, 12);
+    f.stats(item, &[(31, 12), (stat::STRENGTH, 3)]);
+    // Not linked: nothing changes for the player.
+    assert!(run_fx(&mut f, c, false).unwrap().is_empty());
+    let s = &mut f.sim.sys;
+    let (pr, ir) = (
+        s.stats.unit_list(p).unwrap(),
+        s.stats.unit_list(item).unwrap(),
+    );
+    let _ = pr;
+    s.stats.equip(&mut s.hooks, p, Some(ir), false, true);
+    let got = run_fx(&mut f, c, false).unwrap();
+    for m in [vec![0x1D, 31, 12], vec![0x1D, 0, 3]] {
+        assert!(got.contains(&m), "{m:02X?} in {got:02X?}");
+    }
+    assert!(run_fx(&mut f, c, false).unwrap().is_empty(), "sent once");
+    let s = &mut f.sim.sys;
+    s.stats.detach(&mut s.hooks, ir);
+    let got = run_fx(&mut f, c, false).unwrap();
+    for m in [vec![0x1D, 31, 0], vec![0x1D, 0, 0]] {
+        assert!(got.contains(&m), "{m:02X?} in {got:02X?}");
+    }
+}
