@@ -38,6 +38,7 @@ pub mod bits;
 pub mod copy;
 pub mod equip_rules;
 pub mod host;
+pub mod identify;
 pub mod inv_world;
 pub mod merc;
 pub mod ops;

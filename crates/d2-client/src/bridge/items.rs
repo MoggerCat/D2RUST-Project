@@ -150,6 +150,15 @@ pub fn item(w: &ClientWorld, key: UnitKey) -> Option<ItemView> {
     })
 }
 
+/// The last item bit stream of item unit `key` (the bytes after the
+/// 0x9C / 0x9D head), for the readers that decode more than the head.
+pub fn stream(w: &ClientWorld, key: UnitKey) -> Option<&[u8]> {
+    match &w.units.get(&key)?.kind {
+        KindData::Item(d) => d.last.as_ref().map(|r| r.stream.as_slice()),
+        _ => None,
+    }
+}
+
 /// Every item of the model in key order.
 pub fn items(w: &ClientWorld) -> Vec<ItemView> {
     w.units
