@@ -381,11 +381,22 @@ impl<F: LevelTypes> LevelTypes for SyntheticTypes<F> {
         }
     }
 
-    fn warp_unit(&mut self, drlg: &mut Drlg, room: DrlgRoomId, wx: i32, wy: i32, cell: u32) {
+    fn warp_unit(
+        &mut self,
+        drlg: &mut Drlg,
+        data: &DrlgData,
+        room: DrlgRoomId,
+        wx: i32,
+        wy: i32,
+        cell: u32,
+        orientation: u32,
+    ) -> Result<bool, DrlgError> {
         if room_is_maze(drlg, room) {
-            self.maze.warp_unit(drlg, room, wx, wy, cell)
+            self.maze
+                .warp_unit(drlg, data, room, wx, wy, cell, orientation)
         } else {
-            self.flat.warp_unit(drlg, room, wx, wy, cell)
+            self.flat
+                .warp_unit(drlg, data, room, wx, wy, cell, orientation)
         }
     }
 }

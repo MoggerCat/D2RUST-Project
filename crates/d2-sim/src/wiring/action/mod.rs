@@ -306,6 +306,13 @@ pub struct ActionHooks<X> {
     /// [`inactive`]). `None` (the default): tick step 9 compresses
     /// nothing and the restore is the host's, as before.
     pub inactive: Option<crate::units::inactive::InactiveStore>,
+    /// The warp tiles' records while [`Self::inactive`] is off: tick step
+    /// 9 stores and frees each tile of a deactivated room here, and the
+    /// room's restore re-creates them after the host's restore (in the
+    /// store's order, `rooms.md` §8 rule 6). PROVISIONAL (REC-230): the
+    /// tile part of the store without the rest of it. d2rs-own,
+    /// unverified.
+    pub fallback_tiles: crate::units::inactive::InactiveStore,
     /// Seams with no provider yet.
     pub x: X,
     /// Scratch seed handed out for a unit without a record (an error is
@@ -384,6 +391,7 @@ impl<X> ActionHooks<X> {
             pet_lists: BTreeMap::new(),
             sentries: BTreeMap::new(),
             inactive: None,
+            fallback_tiles: crate::units::inactive::InactiveStore::default(),
             x,
             orphan_seed: Seed::init(),
             removed_lists: Vec::new(),

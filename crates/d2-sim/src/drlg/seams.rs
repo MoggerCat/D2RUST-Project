@@ -111,9 +111,26 @@ pub trait LevelTypes {
         false
     }
 
-    /// A hidden exit cell's warp unit (`0x0066E1C0`, `rooms.md` §9.5.1
-    /// step 3; wall warp tiles for sub 0 or 4).
-    fn warp_unit(&mut self, drlg: &mut Drlg, room: DrlgRoomId, wx: i32, wy: i32, cell: u32) {}
+    /// An exit cell's warp tile preset (`0x0066E1C0`,
+    /// `sim/path-placement.md` §12.1; `rooms.md` §9.5.1 step 3 for a
+    /// hidden cell, the wall warp tiles for sub 0 or 4): world tile
+    /// (`wx`, `wy`), packed `cell`, cell type `orientation` (10 or 11).
+    /// `Ok(true)`: a type-5 preset unit was prepended to the room's list;
+    /// `Ok(false)`: none (far edge, or a provider with no warp tiles);
+    /// `Err`: no lvlwarp record (fatal in the original).
+    #[allow(clippy::too_many_arguments)]
+    fn warp_unit(
+        &mut self,
+        drlg: &mut Drlg,
+        data: &DrlgData,
+        room: DrlgRoomId,
+        wx: i32,
+        wy: i32,
+        cell: u32,
+        orientation: u32,
+    ) -> Result<bool, DrlgError> {
+        Ok(false)
+    }
 }
 
 /// A [`LevelTypes`] that generates nothing (levels stay empty).

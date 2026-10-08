@@ -524,7 +524,8 @@ impl Drlg {
         Ok(idx)
     }
 
-    /// Wall warp tiles `0x0066E260` (§9.5).
+    /// Wall warp tiles `0x0066E260` (§9.5) for a wall record of type `t`.
+    #[allow(clippy::too_many_arguments)]
     fn wall_warp_tiles(
         &mut self,
         svc: &mut Services<'_>,
@@ -532,14 +533,17 @@ impl Drlg {
         wx: i32,
         wy: i32,
         v: u32,
-    ) {
+        t: u32,
+    ) -> Result<(), DrlgError> {
         let sub = cell::sub(v);
-        if sub == 0 || sub == 4 {
-            svc.types.warp_unit(self, id, wx, wy, v);
+        if (sub == 0 || sub == 4) && !svc.types.warp_unit(self, svc.data, id, wx, wy, v, t)? {
+            // No unit added: stop here.
+            return Ok(());
         }
         // TODO(rooms.md §9.5 "Warp tiles"): chaining to the room's warp
         // entry and the LitVersion extra record need the cell → warp entry
         // lookup, which the spec does not give; not modelled (no draw).
+        Ok(())
     }
 
     /// Floor warp tiles `0x0066E360` (§9.5).
@@ -619,7 +623,7 @@ impl Drlg {
                 return Ok(());
             }
             if is_exit(t) {
-                svc.types.warp_unit(self, id, wx, wy, v);
+                svc.types.warp_unit(self, svc.data, id, wx, wy, v, t)?;
                 self.floor_warp_tiles(id);
                 return Ok(());
             }
@@ -651,7 +655,7 @@ impl Drlg {
             let tile = self.choose_tile(id, t, main, sub)?;
             self.add_wall(svc, id, x, y, v, t, tile)?;
             if is_exit(t) && level_id != 133 {
-                self.wall_warp_tiles(svc, id, wx, wy, v);
+                self.wall_warp_tiles(svc, id, wx, wy, v, t)?;
             }
         }
         // 7.
@@ -760,7 +764,7 @@ impl Drlg {
                         // stated for §9.5.1 step 6 only; applied here too.
                         let level_id = self.level(self.room(id).level).id;
                         if is_exit(t) && level_id != 133 {
-                            self.wall_warp_tiles(svc, id, wx, wy, v);
+                            self.wall_warp_tiles(svc, id, wx, wy, v, t)?;
                         }
                     }
                 }

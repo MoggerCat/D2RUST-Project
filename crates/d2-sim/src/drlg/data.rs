@@ -75,6 +75,11 @@ pub struct WarpDef {
     pub direction: u8,
     pub lit_version: u32,
     pub tiles: u32,
+    /// `OffsetX`, `OffsetY` (lvlwarp +0x1C, +0x20, signed): the warp tile
+    /// unit's offset from 5 × its cell (`sim/path-placement.md` §12.1
+    /// rule 3).
+    pub offset_x: i32,
+    pub offset_y: i32,
 }
 
 impl WarpDef {
@@ -84,6 +89,8 @@ impl WarpDef {
             direction: r.direction[0],
             lit_version: r.litversion,
             tiles: r.tiles,
+            offset_x: r.offsetx as i32,
+            offset_y: r.offsety as i32,
         }
     }
 }
