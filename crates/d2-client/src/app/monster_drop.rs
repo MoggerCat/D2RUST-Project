@@ -12,31 +12,12 @@
 //! path walk-back field takes the start spot as is. `// d2rs-own, unverified`.
 
 use d2_sim::units::hooks::Sim;
-use d2_sim::units::{modes, RoomId, UnitId};
+use d2_sim::units::{modes, UnitId};
 use d2_sim::wiring::action::{ActionHooks, Pending};
-use d2_sim::wiring::economy::{monster_death_drop, DropSpot, FreeSpot};
+use d2_sim::wiring::economy::{monster_death_drop, StartSpot};
 
 /// The monster death mode (`MONSTER_MODES[0]`, DT).
 const MODE_DT: u32 = 0;
-
-/// The start spot as is (`treasure.md` §7 step 2 without the collision
-/// search). d2rs-own, unverified.
-struct StartSpot;
-
-impl FreeSpot for StartSpot {
-    fn free_spot(
-        &mut self,
-        room: Option<RoomId>,
-        start: (i32, i32),
-        _: (i32, i32),
-    ) -> Option<DropSpot> {
-        Some(DropSpot {
-            room,
-            x: start.0,
-            y: start.1,
-        })
-    }
-}
 
 /// Sets mode DT and drops the monster's treasure when the game holds
 /// the drop state. Returns whether the mode started.

@@ -160,6 +160,18 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         let _ = self.send_item_page(p, u, REMOVED_FLAG, page);
         self.free_item(item);
     }
+
+    /// `0x005440A0` (`quests.md` §9.2): the removal message, then the
+    /// item leaves the player (inventory, body or cursor) and is freed.
+    ///
+    /// PROVISIONAL (quests.md §9.2): the equipped branch's unequip path
+    /// is the same removal (no weapon bookkeeping).
+    pub fn delete_held_item(&mut self, player: UnitId, item: UnitId) {
+        let g = self.guid_of(item);
+        let page = self.page(g);
+        let _ = self.send_item_page(player, item, REMOVED_FLAG, page);
+        self.free_item(g);
+    }
 }
 
 #[cfg(test)]

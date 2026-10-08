@@ -291,8 +291,7 @@ fn session(s: &Seller) {
     );
     // The mercenary dies (the host's pet death queue), then the seller
     // resurrects it (C→S 0x62, `npc.md` §7.4): S→C 0x2A code 5 (the
-    // mercenary's GUID) after the cost is paid (level 0 in the synthetic
-    // game: free).
+    // mercenary's GUID) after the cost is paid.
     let merc_guid = after
         .iter()
         .find(|(k, c)| k.unit_type == 1 && *c == s.merc)
@@ -314,6 +313,16 @@ fn session(s: &Seller) {
             .push(merc);
     });
     step(&mut app, 5);
+    // The synthetic game has a stat table now (q-a4-quest-items), so the
+    // resurrect costs what its level asks: the player carries the gold
+    // (stat 14).
+    app_support::with(&server, |l| {
+        let g = &mut l.host_mut().game;
+        let (p, _) = single_player::local_player(g).unwrap();
+        g.events
+            .action
+            .with(&mut g.game, |_, v| v.set_base(p, 14, 1_000_000));
+    });
     let before = codes.lock().unwrap().len();
     let mut msg = vec![0x62];
     msg.extend(key.guid.to_le_bytes());

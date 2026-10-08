@@ -18,9 +18,10 @@ use d2_client::app::play::{
 use d2_client::app::server_thread::ThreadLink;
 use d2_client::app::single_player::{self, GameData};
 use d2_client::app::synthetic_act4 as a4;
+use d2_client::bridge::items;
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::predict::Speeds;
-use d2_client::bridge::world::{UnitKey, OBJECT, TILE};
+use d2_client::bridge::world::{UnitKey, MONSTER, OBJECT, TILE};
 use d2_client::bridge::BridgeResource;
 use d2_server::seams::Clock;
 use d2_sim::missiles::seams::MissileBodies;
@@ -437,12 +438,14 @@ fn the_hellforge_answers_and_hephastos_death_reaches_chain_24() {
     rig.step(5);
     assert_eq!(rig.kill_class(a4::HEPHASTO), 1);
     rig.step(10);
+    // The drop is a real item now (the synthetic game has drop and item
+    // tables): the hammer lies on the ground.
     assert!(
-        rig.rest_log()
+        rig.server_items()
             .iter()
-            .any(|l| l.starts_with("drop item") && l.contains("[104, 102, 104, 32]")),
-        "the hammer drop was asked for: {:?}",
-        rig.rest_log()
+            .any(|(c, held, _)| c == b"hfh " && !held),
+        "the hammer is on the ground: {:?}",
+        rig.server_items()
     );
     rig.assert_clean();
 }
@@ -496,5 +499,144 @@ fn the_portal_to_harrogath_refuses_then_asks_for_the_act_change() {
             .map(|r| r.get_mut(d).test(35).unwrap())
     });
     assert_eq!(lit, Some(true), "{:?}", rig.rest_log());
+    rig.assert_clean();
+}
+
+impl Rig {
+    /// C→S 0x31: the message `msg` to the NPC `guid`.
+    fn say(&mut self, guid: u32, msg: u32) {
+        let mut m = vec![0x31];
+        m.extend_from_slice(&guid.to_le_bytes());
+        m.extend_from_slice(&msg.to_le_bytes());
+        self.app
+            .world_mut()
+            .resource_mut::<BridgeResource>()
+            .0
+            .send_bytes(&m)
+            .unwrap();
+    }
+
+    /// The items of the server's store: (code, held by the local player,
+    /// GUID).
+    fn server_items(&self) -> Vec<([u8; 4], bool, u32)> {
+        app_support::with(&self.server, |l| {
+            let g = &mut l.host_mut().game;
+            let (p, _) = single_player::local_player(g).unwrap();
+            let held = g
+                .world
+                .inventory
+                .as_ref()
+                .map(|i| i.state.items_of(p))
+                .unwrap_or_default();
+            let all = g.game.lists.units_of_type(UnitType::Item);
+            all.into_iter()
+                .filter_map(|u| {
+                    let rec = g.events.action.hooks().items.get(u)?.record;
+                    let code = g.world.tables.item(rec)?.code;
+                    let guid = g.game.lists.unit(u)?.guid;
+                    Some((code, held.contains(&u), guid))
+                })
+                .collect()
+        })
+    }
+
+    fn send<M: d2_proto::wire::FixedMessage>(&mut self, m: &M) {
+        self.app
+            .world_mut()
+            .resource_mut::<BridgeResource>()
+            .0
+            .send(m)
+            .unwrap();
+    }
+}
+
+// Covers: specs/world/quests-act4.md §4.4; specs/world/quests-act4.md §4.6; specs/world/quests-act4.md §4.7; specs/world/quests-act4.md §4.8
+#[test]
+fn the_hellforge_takes_the_soulstone_three_hammer_hits_and_drops_gems() {
+    use d2_sim::world::quests::act4::q3;
+    let mut rig = Rig::new();
+    let has = |rig: &Rig, code: [u8; 4], held: bool| {
+        rig.server_items()
+            .iter()
+            .any(|(c, h, _)| *c == code && *h == held)
+    };
+    // Cain's scroll message 679 (no stone held): the soulstone is made
+    // into the inventory (`0x005466B0`).
+    let cain = rig
+        .find(MONSTER, u32::from(q3::CAIN4))
+        .expect("Cain in the model");
+    rig.interact(cain);
+    rig.step(20);
+    rig.say(cain.guid, 679);
+    rig.step(20);
+    assert!(
+        has(&rig, q3::SOULSTONE, true),
+        "the soulstone is in the inventory: {:?}",
+        rig.server_items()
+    );
+    // The Hellforge takes it.
+    rig.walk_to(a4::RIVER_OF_FLAME);
+    let at = (RIVER_OX + 20, 20);
+    rig.place(a4::HELLFORGE, at);
+    rig.step(5);
+    rig.operate(a4::HELLFORGE, at);
+    rig.step(60);
+    assert!(
+        !has(&rig, q3::SOULSTONE, true) && !has(&rig, q3::SOULSTONE, false),
+        "the forge deleted the soulstone: {:?}",
+        rig.server_items()
+    );
+    // Hephasto's death drops the hammer on the ground; pick it up to the
+    // cursor and wield it (right hand).
+    rig.place_monster(a4::HEPHASTO, (RIVER_OX + 30, 30));
+    rig.step(5);
+    assert_eq!(rig.kill_class(a4::HEPHASTO), 1);
+    rig.step(20);
+    let hammer = rig
+        .server_items()
+        .into_iter()
+        .find(|(c, held, _)| *c == q3::HAMMER && !held)
+        .unwrap_or_else(|| panic!("a hammer on the ground: {:?}", rig.server_items()));
+    // The drop starts at the monster's spot + (2, 3) (`treasure.md` §7).
+    rig.stand_at(RIVER_OX + 32, 33);
+    rig.send(&items::pick(hammer.2, true));
+    rig.step(10);
+    // The synthetic player has no charstats: strength, dexterity and
+    // level 0 fail every wield requirement (`inventory.md` §4.2), so the
+    // test gives the base stats a new sorceress starts with.
+    app_support::with(&rig.server, |l| {
+        let g = &mut l.host_mut().game;
+        let (p, _) = single_player::local_player(g).unwrap();
+        g.events.action.with(&mut g.game, |_, v| {
+            v.set_base(p, 0, 10); // strength
+            v.set_base(p, 2, 25); // dexterity
+            v.set_base(p, d2_sim::items::stat::LEVEL, 1);
+        });
+    });
+    rig.send(&items::equip(hammer.2, 4));
+    rig.step(10);
+    assert!(
+        has(&rig, q3::HAMMER, true),
+        "the hammer is held: {:?}",
+        rig.server_items()
+    );
+    // Three hits smash the soulstone; the hammer is spent and the gems
+    // drop (§4.6, §4.7).
+    for _ in 0..3 {
+        rig.operate(a4::HELLFORGE, at);
+    }
+    rig.step(200);
+    assert!(
+        !has(&rig, q3::HAMMER, true),
+        "the third hit deleted the hammer: {:?}",
+        rig.server_items()
+    );
+    assert!(
+        rig.server_items()
+            .iter()
+            .any(|(c, held, _)| !held && q3::PERFECT_GEMS.contains(c)),
+        "perfect gems dropped: {:?}",
+        rig.server_items()
+    );
     rig.assert_clean();
 }

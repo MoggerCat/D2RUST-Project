@@ -60,7 +60,7 @@ pub mod treasure_items;
 #[cfg(test)]
 mod tests;
 
-pub use chest_drop::{object_chest_drop, NoSpot};
+pub use chest_drop::{object_chest_drop, NoSpot, StartSpot};
 pub use cube_items::{CubeRest, EconomyCube};
 pub use death::{monster_death_drop, DeathDrops, DropTables, FreeSpot};
 pub use game_fields::GameFields;
@@ -69,7 +69,7 @@ pub use item_units::{Economy, ItemScope, ItemSpawn, ItemStore};
 pub use quest_drop::unit_quest_drop;
 pub use quest_host::HostQuests;
 pub use quest_items::{EconomyQuests, QuestDeferred, QuestRest};
-pub use quest_objects::{QuestLoan, QuestObjectRun};
+pub use quest_objects::{LoanedInventory, NoInventory, QuestLoan, QuestObjectRun};
 pub use quest_reward::{QuestInv, QuestInventory};
 pub use quest_tick::{QuestTick, UnitSide};
 pub use treasure_items::{dropper, recipient, DropPlacer, DropSpot, ItemDrops};
