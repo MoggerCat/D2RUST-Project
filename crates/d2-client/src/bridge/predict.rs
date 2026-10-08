@@ -155,6 +155,10 @@ pub struct Predict {
     walk: Option<Walk>,
     /// The predicted facing `dir64`; kept when the walk ends.
     dir: Option<u8>,
+    /// The local player's stamina (stat 10) is zero: the server walks
+    /// instead of running (`pathing.md` §9.9, `units.md` §4.5), so the
+    /// prediction does too. d2rs-own, unverified (client prediction).
+    exhausted: bool,
 }
 
 impl Predict {
@@ -185,6 +189,7 @@ impl Predict {
                 at: Some(centre(pos)),
                 walk: None,
                 dir: None,
+                exhausted: false,
             };
             return;
         }
@@ -203,6 +208,7 @@ impl Predict {
 
     /// A walk intent the client sent: the new target.
     pub fn walk(&mut self, walk: Walk) {
+        self.exhausted = false;
         if self.at.is_some() {
             self.walk = Some(walk);
         }
@@ -233,7 +239,10 @@ impl Predict {
             self.dir = Some(d);
         }
         let (dx, dy) = (tx - x, ty - y);
-        let step = speeds.step(walk.run);
+        self.exhausted = world
+            .local()
+            .is_some_and(|p| p.stats.get(&10).is_some_and(|s| *s == 0));
+        let step = speeds.step(walk.run && !self.exhausted);
         let dist = isqrt(dx.unsigned_abs().pow(2) + dy.unsigned_abs().pow(2)) as i64;
         if dist <= step || step <= 0 {
             if step > 0 {
@@ -312,7 +321,8 @@ impl Predict {
     /// The player mode the view shows while the prediction moves: 2
     /// (walk) or 3 (run); `None`: the model's mode.
     pub fn mode(&self) -> Option<u32> {
-        self.walk.map(|w| if w.run { 3 } else { 2 })
+        self.walk
+            .map(|w| if w.run && !self.exhausted { 3 } else { 2 })
     }
 }
 
@@ -585,6 +595,24 @@ mod tests {
         assert_eq!(p.facing(), Some(40), "kept after the walk ends");
         p.frame(&w, [walk_point(110, 90, true)], true, SPEEDS);
         assert_eq!(p.facing(), Some(56));
+    }
+
+    // Covers: specs/sim/pathing.md §9.9
+    #[test]
+    fn a_run_with_no_stamina_walks() {
+        let (mut w, key) = world_at(100, 100);
+        w.units.get_mut(&key).unwrap().stats.insert(10, 5 << 8);
+        let mut p = Predict::new();
+        p.observe(&w);
+        p.walk(walk_point(110, 100, true));
+        p.tick(&w, SPEEDS);
+        assert_eq!(p.mode(), Some(3));
+        let run_at = p.position().unwrap().0;
+        w.units.get_mut(&key).unwrap().stats.insert(10, 0);
+        p.tick(&w, SPEEDS);
+        assert_eq!(p.mode(), Some(2));
+        let walked = p.position().unwrap().0 - run_at;
+        assert_eq!(walked, 6 * 0x1000);
     }
 
     fn walk_point(x: u16, y: u16, run: bool) -> Walk {
