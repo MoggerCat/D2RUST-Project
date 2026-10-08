@@ -46,7 +46,7 @@ const MESHIF: u32 = 210;
 const TYRAEL: u32 = 251;
 const ACT3_TOWN: u32 = 75;
 const PORTAL: u32 = 59;
-const DURIEL_A1: &[u8; 8] = b"DUA1HTH\0";
+const DURIEL_ANIMS: [&[u8; 8]; 2] = [b"DUA1HTH\0", b"DUA2HTH\0"];
 const MINDAMAGE: u16 = 21;
 const MAXDAMAGE: u16 = 22;
 const TOHIT: u16 = 19;
@@ -76,6 +76,7 @@ fn rows() -> (Vec<Monstats>, Vec<Monstats2>) {
     v[DURIEL as usize].ai = 44;
     for c in &mut v {
         c.skill4 = 0xFFFF;
+        c.aip4 = 100;
     }
     let mut m2: Monstats2 = blank();
     (m2.mnu, m2.mwl, m2.ma1, m2.mdt) = (true, true, true, true);
@@ -86,13 +87,15 @@ fn anim_data() -> AnimData {
     let mut a = fx::anim_data();
     let mut events = [0u8; animdata::EVENTS];
     events[2] = 1;
-    let len = DURIEL_A1.iter().position(|&b| b == 0).unwrap();
-    a.buckets[animdata::hash(&DURIEL_A1[..len])].push(AnimRecord {
-        name: *DURIEL_A1,
-        frames: 6,
-        speed: 256,
-        events,
-    });
+    for name in DURIEL_ANIMS {
+        let len = name.iter().position(|&b| b == 0).unwrap();
+        a.buckets[animdata::hash(&name[..len])].push(AnimRecord {
+            name: *name,
+            frames: 6,
+            speed: 256,
+            events,
+        });
+    }
     a
 }
 
@@ -190,7 +193,7 @@ fn spawn(server: &Server, class: u32) -> (UnitId, u32) {
             allied: false,
         };
         let m = a
-            .with(&mut sim.game, |g, v| v.allocate(g, &req, px + 1, py))
+            .with(&mut sim.game, |g, v| v.allocate(g, &req, px, py))
             .expect("monster");
         a.with(&mut sim.game, |_, v| {
             v.set_base(m, stat::LEVEL, 1);
@@ -220,11 +223,12 @@ fn start_ai(server: &Server, m: UnitId) {
 }
 
 fn send(app: &mut App, m: &[u8]) {
-    app.world_mut()
+    let r = app
+        .world_mut()
         .resource_mut::<BridgeResource>()
         .0
-        .send_bytes(m)
-        .unwrap();
+        .send_bytes(m);
+    eprintln!("SENT {r:?} {m:?}");
 }
 
 /// C→S 0x31: the message `msg` to the NPC `guid`.
@@ -361,19 +365,34 @@ fn duriel_fights_tyrael_opens_the_portal_and_meshif_travels_east() {
             v.set_base(p, stat::MAXHP, 256_000);
             v.set_base(p, stat::HITPOINTS, 256_000);
             v.set_base(duriel, TOHIT, 1000);
-            v.set_base(duriel, MINDAMAGE, 1280);
-            v.set_base(duriel, MAXDAMAGE, 1280);
+            v.set_base(duriel, MINDAMAGE, 64);
+            v.set_base(duriel, MAXDAMAGE, 64);
         });
     });
+    let mode_of = |server: &Server| app_support::with(server, |l| {
+        let sim = &l.host().game;
+        let (p, _) = single_player::local_player(sim).unwrap();
+        sim.events.action.sys.units.get(p).map(|u| u.mode)
+    });
+    eprintln!("MODE before fight {:?}", mode_of(&server));
     let before = life(&server);
     start_ai(&server, duriel);
     for _ in 0..120 {
         step(&mut app);
     }
     let after = life(&server);
+    eprintln!("MODE after fight {:?}", mode_of(&server));
     assert!(after < before, "Duriel hit the player: {before} -> {after}");
 
-    // Duriel dies by the player's hand (the kill parse).
+    // The player lives to see it: Duriel dies by his hand (the kill
+    // parse).
+    app_support::with(&server, move |l| {
+        let sim = &mut l.host_mut().game;
+        let (p, _) = single_player::local_player(sim).unwrap();
+        sim.events.action.with(&mut sim.game, |_, v| {
+            v.set_base(p, stat::HITPOINTS, 256_000);
+        });
+    });
     assert!(!chain13(&server).1);
     app_support::with(&server, move |l| {
         let sim = &mut l.host_mut().game;
@@ -390,6 +409,11 @@ fn duriel_fights_tyrael_opens_the_portal_and_meshif_travels_east() {
     // Tyrael: message 302 opens the portal to Lut Gholein.
     let (_, tyrael) = spawn(&server, TYRAEL);
     assert_eq!(objects_of(&app, PORTAL), 0);
+    eprintln!("LIFE before talk {} mode {:?}", life(&server), app_support::with(&server, |l| {
+        let sim = &l.host().game;
+        let (p, _) = single_player::local_player(sim).unwrap();
+        sim.events.action.sys.units.get(p).map(|u| u.mode)
+    }));
     say(&mut app, tyrael, 302);
     for _ in 0..60 {
         step(&mut app);
