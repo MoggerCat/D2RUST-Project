@@ -619,13 +619,30 @@ impl OriginalUi {
         std::mem::take(&mut self.shared.borrow_mut().esc.exit_requested)
     }
 
+    /// The settings the Esc menu's Options page shows (`app::config`).
+    pub fn set_settings(&mut self, s: crate::app::config::Settings) {
+        self.shared.borrow_mut().esc.settings = s;
+    }
+
+    /// The settings after a change on the Options page, once per change.
+    pub fn take_settings_change(&mut self) -> Option<crate::app::config::Settings> {
+        let mut sh = self.shared.borrow_mut();
+        std::mem::take(&mut sh.esc.settings_changed).then_some(sh.esc.settings)
+    }
+
     /// `SetUIState(ui, mode, jump)` with the model's gate facts; effects
     /// are kept for [`Self::take_outcome`].
     pub fn set_ui(&mut self, ui: u32, mode: u32, jump: bool) -> Result<bool, UiStateError> {
         let mut sh = self.shared.borrow_mut();
         let mut env = sh.gate_env();
-        sh.states
-            .set(ui, mode, jump, &mut env, &mut self.outcome.effects)
+        let r = sh
+            .states
+            .set(ui, mode, jump, &mut env, &mut self.outcome.effects);
+        // The Esc menu always reopens on its first page.
+        if ui == u32::from(esc_menu::ESC_PANEL.0) {
+            sh.esc.view = esc_menu::View::Main;
+        }
+        r
     }
 
     /// The effects and sounds since the last call.
