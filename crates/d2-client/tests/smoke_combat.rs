@@ -35,7 +35,7 @@ use d2_client::app::single_player::{self, BuildError, GameData};
 use d2_client::app::synthetic_client;
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::local::{LocalLink, PendingSession};
-use d2_client::bridge::mirror::DynLink;
+use d2_client::bridge::mirror::{DynLink, ScriptedNow};
 use d2_client::bridge::modes::player_mode;
 use d2_client::bridge::world::{MonsterClass, MonsterSetup, SkillRow, UnitKey, MONSTER, TILE};
 use d2_client::bridge::BridgeResource;
@@ -469,6 +469,14 @@ impl Rig {
     /// handled.
     fn step(&mut self, n: usize, what: &str) {
         for _ in 0..n {
+            // The client's host clock follows the server's step clock
+            // (`objects-client.md` §25 r6: headless tests pass a scripted
+            // value), never the wall clock: with Bevy's real time a fast
+            // run reached Kashya within 200 ms of the app's start and the
+            // monster interact gate (`model.md` §8 r7, `now` − 0 < 200)
+            // dropped the C→S 0x13, so the hire was refused with code 9.
+            let now = self.ms.load(Ordering::SeqCst);
+            self.app.insert_resource(ScriptedNow(now));
             self.app.update();
             self.ms.fetch_add(40, Ordering::SeqCst);
             let msgs = app_support::with(&self.server, |l| l.last_frame().messages.clone());
