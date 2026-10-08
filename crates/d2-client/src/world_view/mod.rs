@@ -30,6 +30,7 @@
 
 pub mod automap_view;
 pub mod corpse_click;
+pub mod disguise;
 pub mod feed;
 pub mod ground_items;
 pub mod interact;
