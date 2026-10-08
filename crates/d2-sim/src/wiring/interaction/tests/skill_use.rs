@@ -681,7 +681,7 @@ fn item_event_layer_split_is_the_1_14d_stuff() {
     assert_eq!((layer >> shift, layer & mask), (54, 13));
 }
 
-// Covers: specs/sim/pathing.md §13.3 (line test), specs/client/model.md §12 (REC-248, d2rs-own, unverified)
+// Covers: specs/sim/pathing.md §13.3 r1; specs/client/model.md §12
 #[test]
 fn use_line_clear_sees_a_wall_on_the_rooms_once_paths_are_on() {
     use crate::skills::use_::UseWorld;
