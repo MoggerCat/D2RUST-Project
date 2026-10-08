@@ -115,6 +115,19 @@ impl<R: ViewRules> ViewRules for PanelArtRules<R> {
         self.rules.unit_params(world, unit, pose)
     }
 
+    fn unit_shadows(
+        &self,
+        world: &ClientWorld,
+        unit: &ClientUnit,
+        pose: &UnitPose,
+        at: Option<crate::rules::draw_order::OrderKey>,
+        draws: &[crate::composite::ComponentDraw],
+        assets: &ViewAssets,
+    ) -> Result<Vec<crate::scene::DrawItem>, ViewError> {
+        self.rules
+            .unit_shadows(world, unit, pose, at, draws, assets)
+    }
+
     fn component_frame(
         &self,
         unit: &ClientUnit,

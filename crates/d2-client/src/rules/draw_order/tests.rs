@@ -932,22 +932,23 @@ fn unresolved_items_fail_the_frame() {
     let (tiles, _, fx) = resolve_drawn(&camera(), &o, art).unwrap();
     assert_eq!(tiles.len(), 1);
     assert!(fx.water.is_empty() && fx.drawn.is_empty());
-    // A unit shadow (blend-modes.md §5, not wired).
+    // A unit shadow (blend-modes.md §5): its shadow pass slot is recorded.
+    let slot = OrderKey {
+        pass: 5,
+        major: 0,
+        minor: 0,
+    };
+    let key = UnitKey {
+        unit_type: 1,
+        guid: 1,
+    };
     let o = FrameOrder {
-        items: vec![Ordered::UnitShadow {
-            key: UnitKey {
-                unit_type: 1,
-                guid: 1,
-            },
-            at: OrderKey {
-                pass: 5,
-                major: 0,
-                minor: 0,
-            },
-        }],
+        items: vec![Ordered::UnitShadow { key, at: slot }],
         count: 1,
     };
-    assert!(resolve(&camera(), &o, art).is_err());
+    let (_, units, fx) = resolve_drawn(&camera(), &o, art).unwrap();
+    assert!(units.is_empty());
+    assert_eq!(fx.shadows.get(&key), Some(&slot));
 }
 
 /// A feed with near rooms; every unit stands at subtile (187, 62).

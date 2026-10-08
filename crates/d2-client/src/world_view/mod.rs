@@ -49,6 +49,7 @@ pub mod tile_assets;
 pub mod ui_bind;
 pub mod unit_assets;
 pub mod unit_rules;
+pub mod unit_shadow;
 pub mod walk;
 pub mod walk_room;
 
@@ -161,6 +162,10 @@ pub struct ViewAssets {
     /// (`composition.md` §4); the act's `pal.pl2` through
     /// [`scene::present_palette`] ([`ViewAssets::from_pl2`]).
     pub palette: Palette,
+    /// The shade tables of the act's PL2 (pushed into `maps`), once a
+    /// feed has them: unit shadows (`blend-modes.md` §5) read the zero and
+    /// alpha maps. `None`: no shadow is drawn.
+    pub shades: Option<crate::rules::shading::ShadeTables>,
 }
 
 impl ViewAssets {
@@ -172,6 +177,7 @@ impl ViewAssets {
             frames: FrameStore::new(),
             maps: MapTable::new(),
             palette,
+            shades: None,
         }
     }
 
@@ -260,6 +266,23 @@ pub trait ViewRules {
         pose: &UnitPose,
         req: &ComponentRequest<'_>,
     ) -> Result<ComponentFrame, CompositeError>;
+
+    /// The unit's shadow draws (`render/blend-modes.md` §5 r1–r3), keyed
+    /// at the shadow pass slot `at` (`draw-order.md` §6 r3; `None` until
+    /// `OriginalView` fills it from the frame's draw order), from the
+    /// component draws `draws` the unit just built. The default draws
+    /// none.
+    fn unit_shadows(
+        &self,
+        _world: &ClientWorld,
+        _unit: &ClientUnit,
+        _pose: &UnitPose,
+        _at: Option<crate::rules::draw_order::OrderKey>,
+        _draws: &[composite::ComponentDraw],
+        _assets: &ViewAssets,
+    ) -> Result<Vec<DrawItem>, ViewError> {
+        Ok(Vec::new())
+    }
 
     /// The component's frame, or `None` when the slot draws nothing
     /// (`render/unit-composite.md` §5 r2, §6 r4: failed component request,
@@ -496,7 +519,9 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
             guid: unit.key.guid,
             error,
         })?;
+        let shadows = rules.unit_shadows(world, unit, &pose, None, &draws, assets)?;
         items.extend(draws.into_iter().map(|d| d.item));
+        items.extend(shadows);
         units_drawn += 1;
     }
 

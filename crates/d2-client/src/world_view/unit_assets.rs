@@ -567,7 +567,14 @@ impl UnitArtLoader {
             let key = FrameSetKey::new(path.as_str(), FramePart::Dir(dir as u8))
                 .map_err(|e| e.to_string())?;
             if !assets.frames.contains(&key) {
+                // The derived shadow set (`unit_shadow`), frame for frame.
+                let shadow = super::unit_shadow::shadow_key(&key)?;
+                let shadows = super::unit_shadow::shadow_set(&set);
                 assets.frames.insert(key, set).map_err(|e| e.to_string())?;
+                assets
+                    .frames
+                    .insert(shadow, shadows)
+                    .map_err(|e| e.to_string())?;
             }
         }
         Ok((

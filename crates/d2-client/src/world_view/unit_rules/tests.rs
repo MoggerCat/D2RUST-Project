@@ -238,10 +238,12 @@ fn an_object_loads_draws_and_animates() {
     assert_eq!(rules.unit_pose(&world, &o).unwrap(), None);
     assert!(loader.ensure(&world, &mut a).is_empty());
     assert_eq!(a.cofs.len(), 1);
-    assert_eq!(a.frames.len(), 3, "one direction of three frames");
+    // One direction of three frames, and its derived shadow set
+    // (`unit_shadow`, blend-modes.md §5): three more.
+    assert_eq!(a.frames.len(), 6, "one direction of three frames + shadows");
     // Loaded once.
     assert!(loader.ensure(&world, &mut a).is_empty());
-    assert_eq!(a.frames.len(), 3);
+    assert_eq!(a.frames.len(), 6);
 
     for (tick, frame) in [(1, 1), (2, 2), (3, 0)] {
         world.server_ticks = tick;
