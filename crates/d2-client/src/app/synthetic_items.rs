@@ -69,7 +69,7 @@ fn rows() -> Vec<([u8; 4], u16, (u8, u8))> {
 /// (q-smoke-items, REC-281) The items of the item smoke test: a
 /// one-handed sword with two sockets, an axe with a strength
 /// requirement, a cap, a healing potion (belt), the identify and town
-/// portal scrolls, a small charm and gold. Every value is `d2rs-own,
+/// portal scrolls, a small charm of strength, the cube and gold. Every value is `d2rs-own,
 /// unverified`; codes are the original's.
 pub mod smoke {
     pub const SWORD: [u8; 4] = *b"ssd ";
@@ -100,19 +100,42 @@ pub mod smoke {
     /// The smoke monster's class: killable, drops [`MONSTER_TC`].
     pub const MONSTER: u32 = 5;
 
-    /// The one magic affix: a suffix for charms only, without a
-    /// property.
+    /// The charm's property: + [`CHARM_STR`] strength (stat 0).
+    pub const CHARM_STAT: u16 = 0;
+    pub const CHARM_STR: i32 = 3;
+
+    /// Properties row 0: function 1 (a stat rolled in min..max) on
+    /// strength.
+    pub fn charm_property() -> d2_sim::items::tables::PropertyRec {
+        let mut r = d2_sim::items::tables::PropertyRec::default();
+        r.slots[0] = d2_sim::items::tables::PropSlot {
+            func: 1,
+            stat: CHARM_STAT,
+            set: 0,
+            val: 0,
+        };
+        r
+    }
+
+    /// The one magic affix: a suffix for charms only, + [`CHARM_STR`]
+    /// strength (properties row 0).
     pub fn charm_suffix() -> d2_sim::items::tables::AffixRec {
         let none = d2_sim::items::tables::PropRec {
             code: -1,
             ..Default::default()
+        };
+        let strength = d2_sim::items::tables::PropRec {
+            code: 0,
+            param: 0,
+            min: CHARM_STR,
+            max: CHARM_STR,
         };
         d2_sim::items::tables::AffixRec {
             spawnable: 1,
             frequency: 1,
             classspecific: 0xFF,
             itype: [d2_sim::items::ty::CHAR as i16, 0, 0, 0, 0, 0, 0],
-            mods: [none; 3],
+            mods: [strength, none, none],
             ..Default::default()
         }
     }
@@ -154,6 +177,8 @@ fn save_columns() -> Vec<Isc> {
         ..Isc::default()
     };
     t[usize::from(stat::ARMORCLASS)] = bits(11, 10);
+    // Strength, the charm's property (the original's 8 bits, add 32).
+    t[usize::from(smoke::CHARM_STAT)] = bits(8, 32);
     t[usize::from(stat::DURABILITY)] = bits(9, 0);
     t[usize::from(stat::MAXDURABILITY)] = bits(8, 0);
     t
@@ -226,6 +251,7 @@ pub fn item_tables() -> ItemTables {
         // magic (`affixes.md` §5: no affix → fatal).
         magic: vec![smoke::charm_suffix()],
         n_suffix: 1,
+        properties: vec![smoke::charm_property()],
         ..ItemTables::default()
     }
 }

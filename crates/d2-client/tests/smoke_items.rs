@@ -256,6 +256,17 @@ impl Rig {
         })
     }
 
+    /// The local player's total of `stat` on the server.
+    fn server_unit_stat(&self, stat: u16) -> i32 {
+        app_support::with(&self.server, move |l| {
+            let g = &mut l.host_mut().game;
+            let (p, _) = single_player::local_player(g).unwrap();
+            g.events
+                .action
+                .with(&mut g.game, |_, v| v.stats.unit_total(p, stat, 0))
+        })
+    }
+
     /// The local player's (base, total) of `stat` in the client model.
     fn client_stat(&self, stat: u16) -> (i32, i32) {
         let w = self.bridge().world();
@@ -729,8 +740,13 @@ fn sockets_charm_identify_potion_and_scrolls() {
     assert_eq!(rig.place_of(gem).0, mode::SOCKETED, "the gem in the sword");
     // The charm, carried in the inventory (page 0).
     let charm = rig.guid(smoke::CHARM);
+    let strength = rig.client_stat(0);
     rig.act("pick charm", &items::pick(charm, false));
     assert_eq!(rig.place_of(charm).0, mode::STORED);
+    // Unidentified it counts for nothing (`inventory.md` §4.2 identified;
+    // the stream carries no list, `bitstream.md` §4.6).
+    rig.step(10);
+    assert_eq!(rig.client_stat(0), strength, "an unidentified charm");
     assert_eq!(rig.server_flags(charm) & IDENTIFIED, 0, "a magic charm");
     assert_eq!(rig.client_flags(charm) & IDENTIFIED, 0);
     // Identify with the scroll: use it (0x20), then on the charm (0x27).
@@ -748,6 +764,15 @@ fn sockets_charm_identify_potion_and_scrolls() {
     assert_ne!(rig.server_flags(charm) & IDENTIFIED, 0, "identified");
     assert_ne!(rig.client_flags(charm) & IDENTIFIED, 0, "the client knows");
     assert!(!rig.exists(isc), "the scroll was used up");
+    // Identified and carried on page 0, its list adds to the total
+    // (`inventory.md` §5.7; `client/stat-lists.md` §2), the base the same.
+    rig.step(10);
+    assert_eq!(
+        rig.client_stat(0),
+        (strength.0, strength.1 + smoke::CHARM_STR),
+        "the charm's strength"
+    );
+    assert_eq!(rig.server_unit_stat(0), strength.1 + smoke::CHARM_STR);
     // The potion: to the belt, drink it at half life.
     let hp = rig.guid(smoke::POTION);
     rig.act("pick potion", &items::pick(hp, false));
@@ -759,6 +784,20 @@ fn sockets_charm_identify_potion_and_scrolls() {
     assert!(!rig.exists(hp), "the potion was drunk");
     rig.step(60);
     assert!(rig.client_stat(6).1 > life, "life rose from {life}");
+    // The town portal scroll, used from the grid (0x20).
+    let tsc = rig.guid(smoke::PORTAL);
+    rig.act("pick portal scroll", &items::pick(tsc, false));
+    assert_eq!(rig.place_of(tsc).0, mode::STORED);
+    let (px, py) = rig.player_at();
+    rig.act(
+        "read portal scroll",
+        &items::use_grid(tsc, px as u32, py as u32),
+    );
+    rig.step(20);
+    rig.check("after the portal");
+    // Read in town with no field cast before: the scroll is used and no
+    // portal opens (`wiring::action::town_portal`, REC-243).
+    assert!(!rig.exists(tsc), "the scroll was read");
 }
 
 // Covers: specs/items/inventory-moves.md §7.3, §7.4; specs/world/npc.md §6
