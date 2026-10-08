@@ -176,14 +176,34 @@ pub fn join_gaps(s: &mut Sim, player: UnitId, save: &D2s) {
     join_golem(s, player, body);
 }
 
-/// A new character's client save flags (no progression yet).
-pub fn seed_new_flags(s: &mut Sim, player: UnitId, expansion: bool) {
-    let flags = if expansion {
+/// A new character's client save flags: the expansion bit, and the
+/// least progression that unlocks `difficulty` (the reader's §2.2 rule 5.4
+/// test: Nightmare 5 / 4, Hell 10 / 8, expansion / classic), so the save
+/// of a `play --new --difficulty` character loads on the difficulty it
+/// was played on. d2rs-own, unverified (REC-282): the original has no new
+/// character above Normal.
+pub fn seed_new_flags(s: &mut Sim, player: UnitId, expansion: bool, difficulty: u8) {
+    s.world
+        .rest
+        .save_flags
+        .insert(player, new_flags(expansion, difficulty));
+}
+
+/// The flags of [`seed_new_flags`].
+pub fn new_flags(expansion: bool, difficulty: u8) -> u16 {
+    let progression: u16 = match (difficulty, expansion) {
+        (0, _) => 0,
+        (1, true) => 5,
+        (1, false) => 4,
+        (_, true) => 10,
+        (_, false) => 8,
+    };
+    let exp = if expansion {
         d2_formats::d2s::status::EXPANSION
     } else {
         0
     };
-    s.world.rest.save_flags.insert(player, flags);
+    exp | progression << 8
 }
 
 /// `d2s-load.md` §3: a saved golem item with the skill 90 entry present

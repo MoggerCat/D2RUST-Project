@@ -554,13 +554,16 @@ fn drops_pick_up_grid_belt_cursor_and_ground() {
 fn a_far_pick_up_runs_to_the_item_and_picks_it() {
     let mut rig = Rig::new();
     // The walk-verify S→C 0x96 a run brings needs the render seam's
-    // visibility predicate (`model.md` open question 7, q-fix-visibility
-    // wires it in the app): given here as an input, every sprite seen.
+    // visibility predicate (`model.md` §13 r6): the play app installs the
+    // world view's (`app::visibility`); this rig has no world view, so
+    // it is given as an input, every sprite seen.
     rig.app
         .world_mut()
         .resource_mut::<BridgeResource>()
         .0
-        .set_visibility(Some(|_, _, _| true));
+        .set_visibility(Some(d2_client::bridge::world::VisibleFn::new(|_, _, _| {
+            true
+        })));
     let (px, py) = rig.player_at();
     // A monster dies 8 sub-tiles away: its drop lies out of the
     // pick-up reach (distance ≥ 5, §7.1 step 2).

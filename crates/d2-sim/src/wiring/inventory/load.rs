@@ -16,8 +16,9 @@
 use super::{InvDesk, InvError, InvRest};
 use crate::items::bitstream::hflag;
 use crate::items::bitstream::read::ReadEntry;
+use crate::items::inventory::page;
 use crate::items::inventory::UnitKind;
-use crate::items::moves::{mode, InventoryOps, Owner};
+use crate::items::moves::{mode, InventoryOps, MoveUnits, Owner};
 use crate::units::lifecycle::LifecycleHooks;
 use crate::units::UnitId;
 
@@ -40,6 +41,29 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
     /// in `owner`'s inventory. Placements queue the owner's item messages
     /// (take them with the host's sent queue).
     pub fn load_entry(&mut self, owner: UnitId, entry: &ReadEntry) -> Result<UnitId, LoadFault> {
+        self.load_entry_in(owner, entry, false)
+    }
+
+    /// [`Self::load_entry`] for a corpse's list (`d2s.md` §8.2 rule 3: the
+    /// corpse placement `0x00531390`, `items/bitstream-legacy.md` rule 2):
+    /// a worn item is put straight at its saved body location (mode 1,
+    /// page none; no equip from the cursor, no requirement test); a
+    /// stored one at its saved cell, sending nothing; no free-position
+    /// fallback (a failure frees the unit).
+    pub fn load_corpse_entry(
+        &mut self,
+        corpse: UnitId,
+        entry: &ReadEntry,
+    ) -> Result<UnitId, LoadFault> {
+        self.load_entry_in(corpse, entry, true)
+    }
+
+    fn load_entry_in(
+        &mut self,
+        owner: UnitId,
+        entry: &ReadEntry,
+        corpse: bool,
+    ) -> Result<UnitId, LoadFault> {
         if !self.state.inventories.contains_key(&owner) {
             return Err(LoadFault::NoInventory);
         }
@@ -92,6 +116,23 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             self.owner_of(owner).unwrap_or(Owner::player(0)),
             self.guid_of(unit),
         );
+        if corpse {
+            let placed = match saved_mode {
+                mode::EQUIPPED if self.place_body(o, g, it.body_loc) => {
+                    self.set_body_loc(g, it.body_loc);
+                    self.set_mode(g, mode::EQUIPPED);
+                    self.set_page(g, page::NONE);
+                    true
+                }
+                mode::EQUIPPED => false,
+                _ => self.place(owner, unit, (it.x, it.y), false, false),
+            };
+            if placed {
+                return Ok(unit);
+            }
+            self.free(unit);
+            return Err(LoadFault::NoRoom);
+        }
         let at_saved_place = match saved_mode {
             mode::EQUIPPED => self.equip_from_cursor(o, g, it.body_loc, true).0,
             mode::BELT => self.belt_place(o, g, it.x as u32),

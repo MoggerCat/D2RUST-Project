@@ -20,7 +20,7 @@ refusal code (7, 9–15, `npc.md` §9).
 |---|---|---|
 | `act1_town_every_npc_talks_and_cancels` | Akara, Kashya, Gheed, Charsi: walk up by ground clicks, click the NPC (hover pick → walk → C→S 0x13), menu opens from S→C 0x28, cancel row → C→S 0x30, menu closes | passes |
 | `every_act_town_npc_talks_and_cancels` | after the act change to Lut Gholein, Kurast Docks, the Pandemonium Fortress and Harrogath: every NPC's menu opens with its `npc-menus.tsv` rows and cancels cleanly | passes (failed before fix 1) |
-| `act1_trade_and_gamble_rows_open_the_shop` | Akara / Charsi Trade and Gheed Gamble rows send C→S 0x38 action 1 / 2; the store items and the shop panel should follow | `#[ignore]`d: break 3 |
+| `act1_trade_and_gamble_rows_open_the_shop` | Akara / Charsi Trade and Gheed Gamble rows send C→S 0x38 action 1 / 2; the store items (S→C 0x9C action 11) arrive and the shop panel opens | passes (failed before fix 3) |
 
 ## Breaks found
 
@@ -45,7 +45,7 @@ refusal code (7, 9–15, `npc.md` §9).
    `charstats` rows plus an `experience` table); it also makes the
    synthetic start items run (`has_inventory`), so every synthetic app
    test needs a re-check: a task of its own.
-3. **No vendor store in the synthetic game** (not fixed). `GameParts::
+3. **No vendor store in the synthetic game** (fixed). The synthetic item tables now carry a cap and a buckler (armor part of the combined array, `synthetic_items::ARMOR_ROWS`) and `GameParts::synthetic` installs `synthetic_vendors::vendor_tables`: every trader column lists the cap (permanent) and the buckler (Min 1, Max 2), one `npc.txt` price row per trader, a gamble list of both (REC-278). Was: `GameParts::
    synthetic` has `vendors: VendorTables::default()` and the synthetic
    item tables hold only the Act IV quest items, so a trade or gamble
    open shows no store item: the shop panel (ui 0x0C) never opens and

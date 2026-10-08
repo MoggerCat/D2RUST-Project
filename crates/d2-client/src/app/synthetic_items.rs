@@ -35,16 +35,26 @@ fn rune_codes() -> impl Iterator<Item = [u8; 4]> {
     (1..=25u8).map(|n| [b'r', b'0' + n / 10, b'0' + n % 10, b' '])
 }
 
+/// The store armor (q-smoke-town, REC-278): a cap (helm) and a buckler
+/// (shield), the vendors' stock (`super::synthetic_vendors`), with their
+/// defense range.
+pub const CAP: [u8; 4] = *b"cap ";
+pub const BUCKLER: [u8; 4] = *b"buc ";
+/// Rows of the armor part of the combined array (after the hammer and
+/// the smoke weapons, REC-281).
+pub const ARMOR_ROWS: std::ops::Range<usize> = 3..5;
+
 /// The combined array's codes, with each row's type and invwidth ×
-/// invheight: the hammer and the smoke weapons (weapons), the cap
-/// (armor), then misc (the soulstone, gems, skulls, runes, then the
+/// invheight: the hammer and the smoke weapons (weapons), the cap and
+/// buckler (armor), then misc (the soulstone, gems, skulls, runes, then the
 /// smoke misc items).
 fn rows() -> Vec<([u8; 4], u16, (u8, u8))> {
     let mut v = vec![
         (q3::HAMMER, ty::WEAP, (2, 3)),
         (smoke::SWORD, ty::WEAP, (1, 3)),
         (smoke::AXE, ty::WEAP, (2, 3)),
-        (smoke::CAP, ty::HELM, (2, 2)),
+        (CAP, ty::HELM, (2, 2)),
+        (BUCKLER, ty::SHIE, (2, 2)),
         (q3::SOULSTONE, ty::MISC, (1, 1)),
     ];
     for code in q3::PERFECT_GEMS
@@ -74,7 +84,8 @@ fn rows() -> Vec<([u8; 4], u16, (u8, u8))> {
 pub mod smoke {
     pub const SWORD: [u8; 4] = *b"ssd ";
     pub const AXE: [u8; 4] = *b"axe ";
-    pub const CAP: [u8; 4] = *b"cap ";
+    /// The cap is the store's (REC-278's row).
+    pub const CAP: [u8; 4] = super::CAP;
     pub const POTION: [u8; 4] = *b"hp1 ";
     pub const IDENTIFY: [u8; 4] = *b"isc ";
     pub const PORTAL: [u8; 4] = *b"tsc ";
@@ -148,8 +159,9 @@ pub mod smoke {
     }
 }
 
-/// Every type is its own and type 0's (as the fixtures' `equiv`).
-fn equiv() -> EquivMatrix {
+/// Every type is its own and type 0's (as the fixtures' `equiv`); helm
+/// and shield are armor.
+pub fn equiv() -> EquivMatrix {
     let n = N_TYPES;
     let words = n.div_ceil(32);
     let mut m = EquivMatrix {
@@ -161,9 +173,10 @@ fn equiv() -> EquivMatrix {
         m.bits[i * words] |= 1;
         m.bits[i * words + i / 32] |= 1 << (i % 32);
     }
-    // The cap's `helm` is `armo` (REC-281): armor base stats and stream.
-    let (h, a) = (usize::from(ty::HELM), usize::from(ty::ARMO));
-    m.bits[h * words + a / 32] |= 1 << (a % 32);
+    let armo = usize::from(ty::ARMO);
+    for t in [ty::HELM, ty::SHIE] {
+        m.bits[usize::from(t) * words + armo / 32] |= 1 << (armo % 32);
+    }
     m
 }
 
@@ -211,8 +224,12 @@ pub fn item_tables() -> ItemTables {
                     (r.mindam, r.maxdam) = smoke::AXE_DAMAGE;
                     r.durability = 24;
                 }
-                smoke::CAP => {
+                CAP => {
                     (r.minac, r.maxac) = smoke::CAP_AC;
+                    r.durability = 12;
+                }
+                BUCKLER => {
+                    (r.minac, r.maxac) = (4, 6);
                     r.durability = 12;
                 }
                 // Saved compact (the original's misc rows of these).
@@ -246,7 +263,11 @@ pub fn item_tables() -> ItemTables {
         isc: save_columns(),
         stat_shift: 6,
         stat_mask: 0x3F,
-        parts: [Some((0, 3)), Some((3, 1)), Some((4, n - 4))],
+        parts: [
+            Some((0, ARMOR_ROWS.start)),
+            Some((ARMOR_ROWS.start, ARMOR_ROWS.len())),
+            Some((ARMOR_ROWS.end, n - ARMOR_ROWS.end)),
+        ],
         // One charm suffix with no property (REC-281): a charm is always
         // magic (`affixes.md` §5: no affix → fatal).
         magic: vec![smoke::charm_suffix()],
@@ -281,10 +302,15 @@ pub fn inv_tables(t: &ItemTables) -> InvTables {
     weap.body = 1;
     weap.bodyloc1 = 4;
     weap.bodyloc2 = 5;
+    // The cap on the head (1), the buckler in either hand.
     let helm = &mut itemtypes[usize::from(ty::HELM)];
     helm.body = 1;
     helm.bodyloc1 = 1;
     helm.bodyloc2 = 1;
+    let shie = &mut itemtypes[usize::from(ty::SHIE)];
+    shie.body = 1;
+    shie.bodyloc1 = 4;
+    shie.bodyloc2 = 5;
     itemtypes[usize::from(smoke::HPOT)].beltable = 1;
     InvTables {
         grids,

@@ -53,21 +53,10 @@ pub struct TextRequest {
     pub clip: Rect,
 }
 
-/// A translucent tint over a rectangle (`ui/inventory.md` §2 r2–r3): the
-/// fill of palette tint `tint` (0 refused, 1 fits, 2 usable, 3 swap,
-/// 4 unidentified; [`super::inv_grid::Tint`]) at draw mode 0.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct TintRequest {
-    pub rect: Rect,
-    pub tint: u8,
-    pub clip: Rect,
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UiDraw {
     Image(ImageRequest),
     Text(TextRequest),
-    Tint(TintRequest),
 }
 
 /// Receives a panel's draw requests in order.

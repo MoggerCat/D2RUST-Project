@@ -47,7 +47,7 @@ use d2_sim::game::Game;
 use d2_sim::items::ItemTables;
 use d2_sim::units::{RoomId, UnitId, UnitType};
 use d2_sim::wiring::action::Pending;
-use d2_sim::wiring::action::{ActionHooks, ObjectCase};
+use d2_sim::wiring::action::{ActionHooks, ActionSim, ObjectCase};
 use d2_sim::wiring::economy::{
     quest_objects, Economy, EconomyQuests, GameFields, HostQuests, LoanedInventory, QuestInv,
     QuestInventory, QuestLoan, QuestRest,
@@ -215,7 +215,18 @@ impl<R, S> WiredWorld<R, S> {
         events: &mut D,
         f: impl FnOnce(&mut Economy<'_, ActionHooks<D::X>>, &mut Parts<'_, R>) -> T,
     ) -> T {
-        let s = &mut events.action().sys;
+        // With the monster state lent: a monster the call creates (the
+        // hired mercenary, `npc.md` §7.3 step 7) gets its type init.
+        events.lend_world(|a| self.with_economy_on(game, a, f))
+    }
+
+    fn with_economy_on<X: Pending, T>(
+        &mut self,
+        game: &mut Game,
+        a: &mut ActionSim<X>,
+        f: impl FnOnce(&mut Economy<'_, ActionHooks<X>>, &mut Parts<'_, R>) -> T,
+    ) -> T {
+        let s = &mut a.sys;
         let mut fields = GameFields::from_action(
             s.hooks.game_seed,
             &s.hooks.ai_info,

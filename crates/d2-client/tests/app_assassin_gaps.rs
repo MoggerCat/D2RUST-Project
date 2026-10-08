@@ -378,15 +378,10 @@ fn a_lightning_sentry_fires_its_missile() {
     r.select_right(TRAP);
     r.right_click_point(5, 0);
     r.step(40);
-    let trap = traps(&mut r)[0];
     let m = r.spawn_monster(6);
     r.with(move |sim, _| {
         let a = &mut sim.events.action;
         a.with(&mut sim.game, |g, v| {
-            v.set_base(trap, 12, 30);
-            v.set_base(trap, 19, 1000);
-            v.set_base(trap, 21, 20);
-            v.set_base(trap, 22, 30);
             v.set_base(m, d2_sim::stats::stat::MAXHP, 1000 << 8);
             v.set_base(m, d2_sim::stats::stat::HITPOINTS, 1000 << 8);
             // The synthetic monster has no path footprint: stamp the
@@ -396,11 +391,55 @@ fn a_lightning_sentry_fires_its_missile() {
             d2_sim::path::footprint::stamp_size(&mut v.h.drlg, room, x, y, 1, 0x100);
         });
     });
+    // A sentry's level, attack rating and damage.
+    let arm = |r: &mut Rig, trap: UnitId| {
+        r.with(move |sim, _| {
+            let a = &mut sim.events.action;
+            a.with(&mut sim.game, |_, v| {
+                v.set_base(trap, 12, 30);
+                v.set_base(trap, 19, 1000);
+                v.set_base(trap, 21, 20);
+                v.set_base(trap, 22, 30);
+            });
+        });
+    };
+    let mut armed = traps(&mut r);
+    for &t in &armed.clone() {
+        arm(&mut r, t);
+    }
     let life0 = r.life(m);
     let mut flew = 0;
     let mut farthest = 0;
-    for _ in 0..60 {
+    // Each bolt's hit test (`hit.md` §3.3) is a draw on the sentry's seed
+    // against the 95 cap, and a sentry fires a few bolts: when one is
+    // spent without a hit (its seed's draws, which any unit allocated
+    // earlier in the game moves, `rng.md` §5.3), the assassin lays
+    // another, as in play, up to four.
+    let mut lays = 1;
+    for _ in 0..1200 {
+        if r.life(m) < life0 {
+            break;
+        }
+        if traps(&mut r).is_empty() {
+            if lays == 4 {
+                break;
+            }
+            r.right_click_point(5, 0);
+            lays += 1;
+            // Laying takes frames (the cast animation).
+            let mut n = 0;
+            while traps(&mut r).is_empty() && n < 60 {
+                r.step(1);
+                n += 1;
+            }
+        }
         r.step(1);
+        for t in traps(&mut r) {
+            if !armed.contains(&t) {
+                arm(&mut r, t);
+                armed.push(t);
+            }
+        }
         // The host has no missile damage setup yet (`0x0059F900`, skills
         // spec): the missile gets its damage here, as the e2e tests do.
         let (n, x) = r.with(|sim, _| {

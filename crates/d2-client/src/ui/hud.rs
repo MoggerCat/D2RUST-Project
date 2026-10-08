@@ -61,6 +61,8 @@ pub const UI_SKILL_SELECT: u8 = 3;
 /// colours (red, green, blue, yellow: [`BELT_FILL_BASE`]).
 /// The first of the four rectangle colours (`BeltColor` order).
 pub const BELT_FILL_BASE: u32 = 5;
+/// The fill frame of the unidentified tint (`inventory.md` §2 r1 index 4).
+pub const UNIDENTIFIED_FILL: u32 = 9;
 pub const FILL_FILE: &str = "d2rs\\hudfill";
 /// Each fill frame is this wide and high (covers both bars).
 pub const FILL_W: u32 = 128;
@@ -119,6 +121,7 @@ pub fn fill_frames(palette: &d2_formats::palette::Palette) -> Vec<crate::frames:
         nearest(BeltColor::Green.rgb()),
         nearest(BeltColor::Blue.rgb()),
         nearest(BeltColor::Yellow.rgb()),
+        nearest((0x80, 0x40, 0x40)),
     ];
     colors
         .iter()
