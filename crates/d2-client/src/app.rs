@@ -16,6 +16,7 @@ pub mod hardcore;
 pub mod hire_stats;
 pub mod hud;
 pub mod items;
+pub mod merc_rows;
 pub mod missile_art;
 pub mod monster_ai;
 pub mod monster_drop;
