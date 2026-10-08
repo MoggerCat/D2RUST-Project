@@ -546,6 +546,9 @@ pub struct LocalSeams {
     /// The Act II DRLG's staff-tomb level (0 = not yet known), set when
     /// the acts are created (`q-a2-dungeons`).
     pub staff_tomb: u32,
+    /// The lair warp check's answer, published once per tick by the quest
+    /// control (`Pending::set_lair_open`, q-a2-duriel).
+    pub lair_open: bool,
     /// The players' hands and the facts of the items in them
     /// ([`super::weapons`], q-amazon).
     pub weapons: super::weapons::Weapons,
@@ -675,6 +678,38 @@ impl Pending for LocalSeams {
         } else {
             self.staff_tomb
         }
+    }
+    /// `0x00545B80` for level 73 (`quests.md` §8.2, `quests-act2.md`
+    /// §8.8): closed until the lair is open, and then only from the tomb
+    /// holding the orifice (d2rs-own, unverified, REC-159: the synthetic
+    /// Lair has a way in from every tomb).
+    fn warp_quest_gate(&self, source: u32, level: u32) -> u32 {
+        u32::from(
+            level == synthetic_act2::DURIELS_LAIR && !(self.lair_open && source == self.staff_tomb),
+        )
+    }
+    fn set_lair_open(&mut self, open: bool) {
+        self.lair_open = open;
+    }
+    /// C→S 0x44 (`quests-act2-2.md` §3.2): queued for the quest control
+    /// (REC-159, d2rs-own, unverified: it runs after the tick, not inside
+    /// the handler); the handler's own result is 0.
+    fn staff_in_orifice(
+        &mut self,
+        _: &mut Game,
+        player: UnitId,
+        object: u32,
+        item: u32,
+        action: u16,
+    ) -> Option<u32> {
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::InsertItem {
+                player,
+                object,
+                item,
+                action,
+            });
+        Some(0)
     }
     fn take_quest_events(&mut self) -> Vec<d2_sim::wiring::action::QuestEvent> {
         std::mem::take(&mut self.quest_events)
@@ -1107,6 +1142,20 @@ impl WaypointTables {
         objects.push(portal);
         debug_assert_eq!(objects.len(), synthetic_tower::TOME_CLASS as usize);
         objects.push(tome);
+        // Class 100: Duriel's Lair entrance (a quest object, `quests-act2.md`
+        // §8.8; no operate here, the way in is the warp tile), and class
+        // 152: the orifice (operate 25, init 21). d2rs-own, unverified
+        // (REC-159).
+        objects.resize(synthetic_act2::LAIR_ENTRANCE_CLASS as usize, blank());
+        let mut entrance: Objects = blank();
+        entrance.framecnt1 = 15 << 8;
+        objects.push(entrance);
+        objects.resize(synthetic_act2::ORIFICE_CLASS as usize, blank());
+        let mut orifice: Objects = blank();
+        orifice.operatefn = 25;
+        orifice.initfn = 21;
+        orifice.framecnt1 = 15 << 8;
+        objects.push(orifice);
         WaypointTables {
             levels,
             objects,

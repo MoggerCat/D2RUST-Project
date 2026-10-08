@@ -30,6 +30,9 @@ pub const CAVE_TO_DEN: u32 = 14;
 /// Sub-tile of the Den's stairs tile (the way back is at
 /// [`super::single_player::WARP_TILE_XY`]).
 pub const DEN_STAIRS_XY: i32 = 10;
+/// Sub-tile of the orifice in its tomb's first room (q-a2-duriel,
+/// d2rs-own, unverified).
+pub const ORIFICE_XY: (i32, i32) = (30, 30);
 
 /// One 24 × 24 floor DS1 for every path.
 pub struct FloorDs1(Ds1Input);
@@ -200,6 +203,12 @@ impl<F: LevelTypes> LevelTypes for SyntheticTypes<F> {
             if on.is_some() {
                 drlg.room_mut(r).flags |= room_flags::WARP_0 << 1;
             }
+            // Duriel's Lair: one way back per tomb (slots 0..7).
+            if id == super::synthetic_act2::DURIELS_LAIR {
+                for k in 1..super::synthetic_act2::lair_backs().len() {
+                    drlg.room_mut(r).flags |= room_flags::WARP_0 << k;
+                }
+            }
         }
         Ok(())
     }
@@ -252,6 +261,27 @@ impl<F: LevelTypes> LevelTypes for SyntheticTypes<F> {
                     class,
                     x: DEN_STAIRS_XY,
                     y: DEN_STAIRS_XY,
+                });
+            }
+            if drlg.level(level).id == super::synthetic_act2::DURIELS_LAIR {
+                // The other tombs' ways back (the first is `back` above).
+                for &(class, (x, y)) in super::synthetic_act2::lair_backs().iter().skip(1) {
+                    units.push(PresetUnit {
+                        unit_type: 5,
+                        class,
+                        x,
+                        y,
+                    });
+                }
+            }
+            // The orifice stands in the first room of the tomb the DRLG
+            // chose for it (q-a2-duriel, d2rs-own, unverified).
+            if drlg.level(level).id == drlg.staff_tomb && drlg.staff_tomb != 0 {
+                units.push(PresetUnit {
+                    unit_type: 2,
+                    class: super::synthetic_act2::ORIFICE_CLASS,
+                    x: ORIFICE_XY.0,
+                    y: ORIFICE_XY.1,
                 });
             }
         }

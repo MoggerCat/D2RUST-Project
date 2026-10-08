@@ -14,7 +14,7 @@
 use std::collections::BTreeMap;
 
 use d2_sim::game::Game;
-use d2_sim::units::UnitId;
+use d2_sim::units::{UnitId, UnitType};
 use d2_sim::wiring::action::{Pending, QuestEvent};
 use d2_sim::world::quests::{act2, act5, QuestWorld};
 
@@ -23,6 +23,8 @@ use super::{quest_call, ActionEvents, TradeRest, WiredWorld};
 /// Andariel's monster class (`monstats.txt` row 156).
 const ANDARIEL: u16 = 156;
 /// Mephisto's monster class (`monstats.txt` row 242, `quests-act3.md` §8).
+/// Duriel's monster class (`monstats.txt` row 211).
+const DURIEL: u16 = 211;
 const MEPHISTO: u16 = d2_sim::world::quests::act3::npc::MEPHISTO;
 
 /// The level each player was last seen in.
@@ -44,6 +46,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
         }
         let frame = game.frame;
         let mut seen = std::mem::take(&mut self.quest_levels.0);
+        let mut lair = None;
         seen = self.desk(game, events, |desk, ctl, inv| {
             let ((), _) = quest_call(desk, ctl, inv, |q, w| {
                 for e in &queued {
@@ -78,6 +81,16 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                         QuestEvent::AncientsDisarm => act5::q5::disarm(q),
                         QuestEvent::BaalToStairs => act5::q6::chamber_open(q, w),
                         QuestEvent::AnyaOpenPortal { unit } => act5::q4::anya_ai_portal(q, w, unit),
+                        // C→S 0x44 (REC-159): the staff in the orifice.
+                        QuestEvent::InsertItem {
+                            player,
+                            object,
+                            item,
+                            action,
+                        } => {
+                            let item = w.unit_by_guid(UnitType::Item as u8, item);
+                            act2::q6::item_to_object(q, w, player, object, item, action)
+                        }
                         _ => {}
                     }
                 }
@@ -94,6 +107,11 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                         if w.monster_class(victim) == Some(MEPHISTO) {
                             q.add_link(w, victim, 20, None);
                         }
+                        // PROVISIONAL (REC-159, d2rs-own, unverified): Duriel's
+                        // link to chain 13 is by class, as Andariel's.
+                        if w.monster_class(victim) == Some(DURIEL) {
+                            q.add_link(w, victim, 13, None);
+                        }
                         q.monster_killed(w, victim, killer);
                     }
                 }
@@ -103,9 +121,13 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 if frame % 20 == 0 {
                     q.update(w);
                 }
+                lair = act2::q6::lair_warp_open(q);
             });
             seen
         });
+        if let Some(open) = lair {
+            events.action().sys.hooks.x.set_lair_open(open);
+        }
         self.quest_levels.0 = seen;
     }
 }

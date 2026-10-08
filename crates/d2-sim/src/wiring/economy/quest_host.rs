@@ -840,23 +840,36 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
             self.inner.drop_gold(object)
         }
     }
-    fn set_room_portal(&mut self, room: RoomId, on: bool) {
-        self.inner.set_room_portal(room, on)
-    }
+    /// d2rs-own, unverified (REC-159): the has-portal room flag
+    /// (`0x0061AED0`) is not modelled; nothing reads it here.
+    fn set_room_portal(&mut self, _room: RoomId, _on: bool) {}
+    /// `0x00555230` (mode 0 form) on the object state when there is one
+    /// ([`View::create_object`]); else the rest's.
     fn spawn_quest_object(&mut self, room: RoomId, x: i32, y: i32, class: u16) -> Option<UnitId> {
+        if self.inner.econ.hooks.objects.is_some() {
+            return self.view(|g, v| v.create_object(g, room, u32::from(class), x, y, 0));
+        }
         self.inner.spawn_quest_object(room, x, y, class)
     }
-    fn player_busy(&mut self, player: UnitId) -> bool {
-        self.inner.player_busy(player)
+    /// d2rs-own, unverified (REC-159): `0x00535060` is not read; never
+    /// busy.
+    fn player_busy(&mut self, _player: UnitId) -> bool {
+        false
     }
     fn open_insert_dialog(&mut self, player: UnitId, object: UnitId) {
         self.inner.open_insert_dialog(player, object)
     }
     /// `missiles.txt` `Range` (u16 +0x96) of the action tables' row
-    /// (`quests-act2.md` §8.7); a row outside the table is `None`.
+    /// (`quests-act2.md` §8.7). d2rs-own, unverified (REC-159): a table
+    /// without row 338 (the synthetic game) answers the live value 440
+    /// (spec test vector, lair timer period 18).
     fn missile_range(&mut self, row: u32) -> Option<i32> {
         let t = &self.inner.econ.hooks.tables.missiles;
-        Some(i32::from(t.get(row as usize)?.range))
+        match t.get(row as usize) {
+            Some(m) => Some(i32::from(m.range)),
+            None if t.is_empty() => Some(440),
+            None => None,
+        }
     }
     fn is_trading(&mut self, player: UnitId) -> bool {
         self.inner.is_trading(player)

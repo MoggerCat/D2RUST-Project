@@ -25,6 +25,12 @@ pub const CLAW_VIPER_TEMPLE_1: u32 = 58;
 pub const MAGGOT_LAIR_1: u32 = 62;
 pub const FIRST_TOMB: u32 = 66;
 pub const ARCANE_SANCTUARY: u32 = 74;
+/// Duriel's Lair: entered from the tomb holding the orifice, behind the
+/// quest gate (q-a2-duriel, d2rs-own, unverified, REC-159).
+pub const DURIELS_LAIR: u32 = 73;
+/// The orifice's and the lair entrance's `objects` rows (`objects.txt`).
+pub const ORIFICE_CLASS: u32 = 152;
+pub const LAIR_ENTRANCE_CLASS: u32 = 100;
 
 /// A dungeon line: the level it hangs off and the levels in order.
 const LINES: [(u32, &[u32]); 14] = [
@@ -77,6 +83,18 @@ pub fn edges() -> Vec<Edge> {
             from = to;
         }
     }
+    // Every tomb has a way on to the Lair (the DRLG picks the tomb that
+    // holds the orifice at run time; the quest gate lets only that one
+    // through). The Lair carries one way back per tomb.
+    for from in FIRST_TOMB..FIRST_TOMB + 7 {
+        out.push(Edge {
+            from,
+            to: DURIELS_LAIR,
+            to_class: id,
+            back_class: id + 1,
+        });
+        id += 2;
+    }
     out
 }
 
@@ -91,6 +109,27 @@ pub fn dungeon_levels() -> impl Iterator<Item = u32> {
         .into_iter()
         .flat_map(|(_, l)| l.iter().copied())
         .filter(|&l| l != CANYON)
+        .chain([DURIELS_LAIR])
+}
+
+/// The Lair's ways back, one per tomb in tomb order, with the sub-tile
+/// of each in the Lair's first room (the first is the usual back tile's).
+pub fn lair_backs() -> Vec<(u32, (i32, i32))> {
+    const AT: [(i32, i32); 7] = [
+        (20, 20),
+        (8, 8),
+        (32, 8),
+        (8, 32),
+        (32, 32),
+        (20, 8),
+        (20, 32),
+    ];
+    edges()
+        .iter()
+        .filter(|e| e.to == DURIELS_LAIR)
+        .enumerate()
+        .map(|(k, e)| (e.back_class, AT[k]))
+        .collect()
 }
 
 /// Whether `id` is a Tal Rasha tomb.
@@ -166,7 +205,7 @@ pub fn add_levels(drlg: &mut DrlgData) {
         c.level_type = match id {
             47..=49 => 13,
             ARCANE_SANCTUARY => 19,
-            _ if is_tomb(id) || (55..=61).contains(&id) => 17,
+            _ if is_tomb(id) || id == DURIELS_LAIR || (55..=61).contains(&id) => 17,
             _ => 3,
         };
         c.size = [(200, 200); 3];
@@ -188,7 +227,12 @@ pub fn add_levels(drlg: &mut DrlgData) {
             }
         }
     }
-    for x in &e {
+    for (k, x) in e.iter().filter(|x| x.to == DURIELS_LAIR).enumerate() {
+        let l = &mut drlg.levels[DURIELS_LAIR as usize];
+        l.vis[k] = x.from;
+        l.warp[k] = x.back_class as i32;
+    }
+    for x in e.iter().filter(|x| x.to != DURIELS_LAIR) {
         if let Some((_, _)) = maze_links(x.to) {
             let l = &mut drlg.levels[x.to as usize];
             l.vis[0] = x.from;
@@ -221,5 +265,6 @@ mod tests {
         assert_eq!(flat_tiles(ACT2_TOWN).len(), 7);
         assert_eq!(flat_tiles(CANYON).len(), 8);
         assert_eq!(dungeon_levels().filter(|&l| is_tomb(l)).count(), 7);
+        assert_eq!(lair_backs().len(), 7);
     }
 }
