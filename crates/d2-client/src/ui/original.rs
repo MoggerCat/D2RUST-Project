@@ -302,6 +302,8 @@ pub struct OriginalUi {
     dialog_answer: Option<(Box<NpcDialog>, DialogCase)>,
     /// The hire list (`ui/hire_list.rs`, `menus.md` §3).
     pub(super) hire: super::hire_list::SharedHire,
+    /// The NPC shop (`shop_ui`, `panels-2.md` §14 r4).
+    shop: shop_ui::SharedShop,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -365,6 +367,7 @@ impl OriginalUi {
             npc_text: None,
             dialog_answer: None,
             hire: super::hire_list::SharedHire::default(),
+            shop: shop_ui::SharedShop::default(),
         })
     }
 
@@ -397,6 +400,10 @@ impl OriginalUi {
         root.add(Box::new(stash_ui::StashUi {
             sh: sh.clone(),
             input: Default::default(),
+        }))?;
+        root.add(Box::new(shop_ui::ShopUi {
+            sh: sh.clone(),
+            st: self.shop.clone(),
         }))?;
         root.add(Box::new(BorderUi { sh: sh.clone() }))?;
         root.add(Box::new(super::hire_list::HireListUi {
@@ -1133,6 +1140,8 @@ pub mod quest_log_ui;
 #[cfg(test)]
 #[path = "quest_log_ui_tests.rs"]
 mod quest_log_ui_tests;
+#[path = "shop_ui.rs"]
+pub mod shop_ui;
 #[path = "stash_ui.rs"]
 pub(super) mod stash_ui;
 #[path = "waypoint_ui.rs"]
@@ -1140,6 +1149,7 @@ pub mod waypoint_ui;
 pub use msg_ui::{
     ChatAction, IntroEntry, MsgUiMore, MsgUiState, NpcTextList, OverheadText, WaypointMenuState,
 };
+pub use shop_ui::ShopPrices;
 pub use waypoint_ui::WaypointOpen;
 
 #[cfg(test)]

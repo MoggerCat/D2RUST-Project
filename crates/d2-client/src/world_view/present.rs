@@ -109,6 +109,8 @@ pub struct WorldViewState {
     /// Ground items (`super::ground_items`): the app hands in the item art
     /// rows and the archives; the default draws nothing.
     pub ground_items: super::ground_items::GroundItems,
+    /// Client missiles and cast / state overlays (`super::missiles`).
+    pub missiles: super::missiles::Missiles,
 }
 
 impl WorldViewState {
@@ -133,6 +135,7 @@ impl WorldViewState {
             last_ui: Vec::new(),
             interact: Default::default(),
             ground_items: Default::default(),
+            missiles: Default::default(),
         }
     }
 }
@@ -709,6 +712,14 @@ fn world_view_frame(
         Err(e) => return Err(e.into()),
     };
     for m in state.ground_items.add_to_frame(
+        bridge.0.world(),
+        state.feed.as_ref(),
+        &mut state.assets,
+        &mut frame,
+    ) {
+        warn!("preview (d2rs-own, unverified): {m}");
+    }
+    for m in state.missiles.add_to_frame(
         bridge.0.world(),
         state.feed.as_ref(),
         &mut state.assets,

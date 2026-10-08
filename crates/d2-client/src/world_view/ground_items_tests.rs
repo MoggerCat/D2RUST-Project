@@ -102,6 +102,7 @@ fn populate(w: &mut ClientWorld, items: &[Fixture<'_>]) {
                 action: 0,
                 category: 0,
                 owner: None,
+                seq: 0,
                 stream: stream(m, loc, code),
             }),
             ..ItemData::default()
@@ -307,6 +308,7 @@ fn put_gold(w: &mut ClientWorld, guid: u32, loc: (u16, u16), amount: u32) {
             action: 0,
             category: 0,
             owner: None,
+            seq: 0,
             stream: gold_stream(loc, amount),
         }),
         ..ItemData::default()

@@ -99,6 +99,11 @@ pub struct ItemRecord {
     /// The owner of 0x9D.
     pub owner: Option<UnitKey>,
     pub stream: Vec<u8>,
+    /// d2rs-own, unverified: [`ClientWorld::store_serial`] when this
+    /// store-shown record (action 0x0B) arrived; 0 for every other
+    /// action. Lets the shop panel tell the items of the current trade
+    /// from those of an earlier one.
+    pub seq: u32,
 }
 
 /// Item data (`msg-stats-items.md` §2 rule 4, §3 rule 2, §5).
@@ -507,6 +512,9 @@ impl RoomUnits {
 pub struct ClientWorld {
     /// Bridge frames run (`bridge.md` §5 rule 3).
     pub frames: u64,
+    /// d2rs-own, unverified: S→C 0x9C action 0x0B records received (the
+    /// store items a trade open shows, `world/vendors.md` §4 step 3).
+    pub store_serial: u32,
     /// Bridge frames whose pump ran a server tick (`bridge.md` §5 rule 3).
     pub server_ticks: u64,
     /// Set S: the units the server announced, in key order (§2 rule 8).

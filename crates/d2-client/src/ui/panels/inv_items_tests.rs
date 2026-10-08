@@ -60,6 +60,7 @@ fn world(items: &[Fixture], cursor: Option<u32>) -> ClientWorld {
                 action: 0x04,
                 category: 0,
                 owner: None,
+                seq: 0,
                 stream: stream(m, loc, code),
             }),
             ..ItemData::default()

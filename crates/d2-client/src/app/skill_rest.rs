@@ -228,10 +228,13 @@ impl UseRest for LocalSeams {
         self.note(format!("run to {} {} skill {}", u.0, target.0, e.skill));
     }
     fn target(&self, u: UnitId) -> Option<UnitId> {
-        match self.skills.unit(u)?.target? {
+        // The monster side: the AI's request target, kept past the skill
+        // start's clear (q-monster-ai; the next request replaces it).
+        let kept = self.skills.unit(u).and_then(|s| match s.target? {
             ModeTarget::Unit(t) => Some(t),
             ModeTarget::Point(..) => None,
-        }
+        });
+        kept.or_else(|| self.monsters.target(u))
     }
     fn clear_target(&mut self, u: UnitId) {
         self.skills.unit_mut(u).target = None;

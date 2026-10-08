@@ -391,6 +391,9 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             }
         }
         super::items::add_items(&mut app, archives.source(), item_parts);
+        let effects =
+            super::missile_art::effect_rows(archives.as_ref()).map_err(anyhow::Error::msg)?;
+        super::missile_art::add_missiles(&mut app, archives.source(), effects);
         palette::add_act_palettes(&mut app, palettes);
         if let Some(source) = automap_source {
             super::automap::add_automap(&mut app, source, automap_files, archives.source(), true);
@@ -402,6 +405,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         super::strings::install_strings(&mut app, strings);
         super::hud::install_hud_tables(&mut app, archives.as_ref()).map_err(anyhow::Error::msg)?;
         ui::set_waypoint_map(&mut app, waypoint_map);
+        ui::set_shop_prices(&mut app, started.prices.clone());
         super::hire_stats::install_hire_stats(&mut app, hire_rows, true);
         let table = sound::sound_table_live(archives.as_ref()).map_err(anyhow::Error::msg)?;
         app.insert_resource(GameAudio::new(AudioParts::original(
