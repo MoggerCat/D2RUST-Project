@@ -235,7 +235,7 @@ fn scene(items: &[Fixture<'_>]) -> (Bridge<RecordingLink>, RecordingLink, Ground
 // Covers: specs/items/inventory-moves.md §7.1
 #[test]
 fn a_press_on_a_ground_item_sends_pick_item() {
-    let (mut b, link, g) = scene(&[(5, 3, (102, 100), b"cap ")]);
+    let (mut b, link, mut g) = scene(&[(5, 3, (102, 100), b"cap ")]);
     let rest = g
         .take_clicks(&mut b, &[press(433, 299), press(10, 10)])
         .unwrap();
@@ -253,7 +253,7 @@ fn a_press_on_a_ground_item_sends_pick_item() {
 // Covers: specs/ui/controls.md §6 r4; specs/items/inventory-moves.md §7.2
 #[test]
 fn a_world_press_with_a_cursor_item_sends_drop_item() {
-    let (mut b, link, g) = scene(&[(5, 3, (102, 100), b"cap "), (9, 4, (0, 0), b"cap ")]);
+    let (mut b, link, mut g) = scene(&[(5, 3, (102, 100), b"cap "), (9, 4, (0, 0), b"cap ")]);
     if let Some(KindData::Player(d)) = b.world_mut().units.get_mut(&PLAYER).map(|u| &mut u.kind) {
         d.cursor_item = Some(9);
     }
@@ -261,4 +261,179 @@ fn a_world_press_with_a_cursor_item_sends_drop_item() {
     let rest = g.take_clicks(&mut b, &[press(433, 299)]).unwrap();
     assert!(rest.is_empty());
     assert_eq!(*link.sent.lock().unwrap(), [vec![0x17, 9, 0, 0, 0]]);
+}
+
+// ---- gold piles and the pick-up walk (q-gold) --------------------------------------
+
+/// A compact `gld` record on the ground (`bitstream.md` §3 r1): the head,
+/// then the gold flag bit and 12 bits (a 32-bit amount past 4,095).
+fn gold_stream(loc: (u16, u16), amount: u32) -> Vec<u8> {
+    let mut bits: Vec<(u32, u32)> = vec![
+        (0x10 | 0x20_0000, 32),
+        (0x65, 10),
+        (3, 3),
+        (u32::from(loc.0), 16),
+        (u32::from(loc.1), 16),
+        (u32::from_le_bytes(*b"gld "), 32),
+    ];
+    if amount < 4096 {
+        bits.extend([(0, 1), (amount, 12)]);
+    } else {
+        bits.extend([(1, 1), (amount, 32)]);
+    }
+    let (mut out, mut acc, mut n) = (Vec::new(), 0u64, 0);
+    for (v, w) in bits {
+        acc |= u64::from(v) << n;
+        n += w;
+        while n >= 8 {
+            out.push(acc as u8);
+            acc >>= 8;
+            n -= 8;
+        }
+    }
+    if n > 0 {
+        out.push(acc as u8);
+    }
+    out
+}
+
+fn put_gold(w: &mut ClientWorld, guid: u32, loc: (u16, u16), amount: u32) {
+    let k = UnitKey::new(ITEM, guid);
+    let mut u = ClientUnit::new(k);
+    u.position = Some(loc);
+    u.kind = KindData::Item(ItemData {
+        last: Some(ItemRecord {
+            id: 0x9C,
+            action: 0,
+            category: 0,
+            owner: None,
+            stream: gold_stream(loc, amount),
+        }),
+        ..ItemData::default()
+    });
+    w.units.insert(k, u);
+}
+
+/// A DC6 of four directions with one frame each, `1 + d` pixels wide.
+fn dc6_four_directions() -> Vec<u8> {
+    let mut d = Vec::new();
+    for v in [6i32, 1, 0] {
+        d.extend_from_slice(&v.to_le_bytes());
+    }
+    d.extend_from_slice(&[0xEE; 4]);
+    d.extend_from_slice(&4u32.to_le_bytes());
+    d.extend_from_slice(&1u32.to_le_bytes());
+    let mut frames = Vec::new();
+    for dir in 0..4u32 {
+        let w = 1 + dir;
+        let mut rows = Vec::new();
+        rows.push(w as u8);
+        rows.extend((0..w).map(|i| 1 + i as u8));
+        rows.push(0x80);
+        frames.push([
+            [0u32, w, 1, 0, 0, 0, 0, rows.len() as u32]
+                .iter()
+                .flat_map(|v| v.to_le_bytes())
+                .collect::<Vec<u8>>(),
+            rows,
+            vec![0xEE; 3],
+        ]);
+    }
+    let mut at = d.len() + 16;
+    for f in &frames {
+        d.extend_from_slice(&(at as u32).to_le_bytes());
+        at += f.iter().map(Vec::len).sum::<usize>();
+    }
+    for f in frames {
+        for part in f {
+            d.extend(part);
+        }
+    }
+    d
+}
+
+fn gold_rows() -> ItemArtRows {
+    let mut r = ItemArtRows::default();
+    r.0.insert(
+        *b"gld ",
+        ItemArtRow {
+            inv_w: 1,
+            inv_h: 1,
+            inv_file: "invgld".into(),
+            flippy_file: "gold".into(),
+        },
+    );
+    r
+}
+
+// Covers: specs/render/unit-composite.md §9 (the gold pile's amount class)
+#[test]
+fn a_gold_pile_draws_the_direction_of_its_amount_class() {
+    let mut src = MemorySource::default();
+    src.insert("data\\global\\items\\gold.dc6", dc6_four_directions());
+    let mut w = ClientWorld::default();
+    populate(&mut w, &[]);
+    put_gold(&mut w, 7, (102, 100), 50);
+    put_gold(&mut w, 8, (100, 102), 700);
+    put_gold(&mut w, 9, (98, 98), 6000);
+    let mut g = GroundItems::new(Arc::new(src), gold_rows());
+    let mut a = assets();
+    let mut frame = WorldFrame::default();
+    let feed = ModelFeed::<NoFeed>::default();
+    let log = g.add_to_frame(&w, &feed, &mut a, &mut frame);
+    assert!(log.is_empty(), "{log:?}");
+    assert_eq!(frame.items.len(), 3);
+    let path = "data/global/items/gold.dc6";
+    let dir = |d: u8| FrameSetKey::new(path, FramePart::Dir(d)).unwrap();
+    let id = |d: u8| a.id(&dir(d), 0).unwrap();
+    let by_guid = |guid: u32| {
+        frame
+            .items
+            .iter()
+            .find(|i| i.tag == ItemTag::Unit(guid))
+            .unwrap()
+            .frame
+    };
+    // < 100 → direction 0, < 5,000 and ≥ 500 → 2, else 3.
+    assert_eq!(by_guid(7), id(0));
+    assert_eq!(by_guid(8), id(2));
+    assert_eq!(by_guid(9), id(3));
+}
+
+// Covers: specs/items/bitstream.md §3 r1
+#[test]
+fn a_compact_gold_record_reads_its_amount() {
+    let mut w = ClientWorld::default();
+    populate(&mut w, &[]);
+    put_gold(&mut w, 7, (1, 1), 4095);
+    put_gold(&mut w, 8, (1, 1), 123_456);
+    let got: Vec<_> = items::ground_items(&w)
+        .iter()
+        .map(|i| (i.key.guid, i.gold))
+        .collect();
+    assert_eq!(got, [(7, Some(4095)), (8, Some(123_456))]);
+}
+
+// Covers: specs/ui/controls.md §6 r9.2 (the walk to the item, d2rs-own)
+#[test]
+fn a_click_on_a_far_item_walks_to_it_then_asks_again() {
+    let (mut b, link, mut g) = scene(&[(5, 3, (102, 100), b"cap ")]);
+    g.take_clicks(&mut b, &[press(433, 299)]).unwrap();
+    let pick = vec![0x16, 4, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0];
+    assert_eq!(*link.sent.lock().unwrap(), [pick.clone()]);
+    // The next frame sends the walk to the item's place.
+    g.frame(&mut b, false).unwrap();
+    let walk = vec![0x01, 102, 0, 100, 0];
+    assert_eq!(link.sent.lock().unwrap()[1], walk);
+    // While the predicted walk runs nothing is sent; when it has ended the
+    // pick-up is asked again.
+    g.frame(&mut b, true).unwrap();
+    assert_eq!(link.sent.lock().unwrap().len(), 2);
+    g.frame(&mut b, false).unwrap();
+    assert_eq!(link.sent.lock().unwrap()[2], pick);
+    // The item leaving the ground ends the record.
+    b.world_mut().units.remove(&UnitKey::new(ITEM, 5));
+    g.frame(&mut b, false).unwrap();
+    g.frame(&mut b, false).unwrap();
+    assert_eq!(link.sent.lock().unwrap().len(), 3);
 }

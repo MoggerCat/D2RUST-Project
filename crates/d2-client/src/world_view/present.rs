@@ -471,6 +471,7 @@ fn ui_input(
             .collect();
         let actions = edge::key_actions(bindings, &pressed);
         ui.queue.0.extend(actions);
+        ui.queue.0.extend(edge::key_chars(&pressed));
     }
     // A window below 800×600 has no frame mapping (`ui.md` open question
     // 1 of the C8 notes): pointer input is dropped as outside the frame.
@@ -646,6 +647,7 @@ fn world_view_frame(
                 for o in state.interact.frame(&mut bridge.0, walking)? {
                     debug!("interact: {o:?}");
                 }
+                state.ground_items.frame(&mut bridge.0, walking)?;
             }
             // `ui/automap.md` §8 r2: the toggle command no panel took.
             let toggle = crate::controls::Action::ToggleAutomap.index() as u16;
