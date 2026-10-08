@@ -188,7 +188,7 @@ impl Panel for OverheadUi {
 mod tests {
     use super::*;
     use crate::bridge::output::Output;
-    use crate::bridge::world::{ClientUnit, MONSTER};
+    use crate::bridge::world::{ClientUnit, MONSTER, OBJECT};
     use crate::ui::layout::Screen;
     use crate::ui::original::{OriginalUi, UiConfig};
     use crate::ui::{NoPanelRules, StringLookup, UiRoot};
@@ -304,6 +304,32 @@ mod tests {
         let hello = v.iter().find(|t| t.0 == "Hello").unwrap();
         let mine = v.iter().find(|t| t.0 == "hi").unwrap();
         assert!(hello.1 > mine.1);
+    }
+
+    // Covers: specs/world/objects.md §9.1 r3; specs/world/objects.md §14 r2; specs/ui/messages.md §5 r3; specs/ui/messages.md §5 r4
+    #[test]
+    fn a_shrine_overhead_text_draws_above_the_object_for_its_frames() {
+        let (mut ui, root, mut w) = setup();
+        let shrine = UnitKey::new(OBJECT, 9);
+        let mut u = ClientUnit::new(shrine);
+        u.position = Some((1000, 1003));
+        w.units.insert(shrine, u);
+        // The server's hover text is the decimal string id; its record
+        // lives 8 · 4 + 125 frames from the message.
+        assert!(texts(&root, &w, 1).is_empty());
+        let c0 = ui.shared.borrow().bubbles.counter;
+        ui.apply_output(&chat5(shrine, "2500"), &w).unwrap();
+        let end = c0 + 157;
+        let v = texts(&root, &w, 2);
+        assert!(v.iter().any(|t| t.0 == "Hello"), "{v:?}");
+        let counter = ui.shared.borrow().bubbles.counter;
+        for tick in 3..=u64::from(end - counter + 2) {
+            assert_eq!(texts(&root, &w, tick).len(), 1, "tick {tick}");
+        }
+        let past = u64::from(end - counter + 3);
+        assert_eq!(texts(&root, &w, past + 1).len(), 1, "the freeing frame");
+        assert!(!ui.shared.borrow().bubbles.contains(shrine));
+        assert!(texts(&root, &w, past + 2).is_empty());
     }
 
     // Covers: specs/client/msg-ui.md §21

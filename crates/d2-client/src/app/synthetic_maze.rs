@@ -71,7 +71,11 @@ pub fn maze_data() -> MazeData {
                 level,
                 // Tal Rasha's tombs: 6 cells, ×3 / ×2 for the staff / boss
                 // tomb (`maze.md` §5.2).
-                rooms: [super::synthetic_act2::base_rooms(level); 3],
+                rooms: [if super::synthetic_a1_maze::is_level(level) {
+                    super::synthetic_a1_maze::base_rooms(level)
+                } else {
+                    super::synthetic_act2::base_rooms(level)
+                }; 3],
                 size_x: 24,
                 size_y: 24,
                 merge: 0,
@@ -136,7 +140,7 @@ impl<F> SyntheticTypes<F> {
 }
 
 fn is_maze(id: u32) -> bool {
-    super::synthetic_tower::maze_links(id).is_some()
+    super::synthetic_tower::maze_links(id).is_some() || super::synthetic_a1_maze::is_level(id)
 }
 
 fn room_is_maze(drlg: &Drlg, room: DrlgRoomId) -> bool {
@@ -192,6 +196,16 @@ impl<F: LevelTypes> LevelTypes for SyntheticTypes<F> {
 
     fn generate(&mut self, drlg: &mut Drlg, data: &DrlgData, l: LevelIdx) -> Result<(), DrlgError> {
         let id = drlg.level(l).id;
+        if super::synthetic_a1_maze::is_level(id) {
+            self.maze.generate(drlg, data, l)?;
+            // Every slot of the tree (way back = 0): the first room.
+            if let Some(r) = drlg.level_rooms(l).first().copied() {
+                for (slot, _, _) in super::synthetic_chains::slots(id) {
+                    drlg.room_mut(r).flags |= room_flags::WARP_0 << slot;
+                }
+            }
+            return Ok(());
+        }
         let Some((_, on)) = super::synthetic_tower::maze_links(id) else {
             return self.generate_flat(drlg, data, l);
         };
@@ -247,6 +261,23 @@ impl<F: LevelTypes> LevelTypes for SyntheticTypes<F> {
         }
         let mut units = self.maze.preset_units(drlg, room);
         let level = drlg.room(room).level;
+        if super::synthetic_a1_maze::is_level(drlg.level(level).id) {
+            if drlg.level_rooms(level).first() == Some(&room) {
+                let id = drlg.level(level).id;
+                units.extend(super::synthetic_chains::slots(id).into_iter().map(
+                    |(slot, _, class)| {
+                        let (x, y) = super::synthetic_chains::tile_xy(slot);
+                        PresetUnit {
+                            unit_type: 5,
+                            class,
+                            x,
+                            y,
+                        }
+                    },
+                ));
+            }
+            return units;
+        }
         let links = super::synthetic_tower::maze_links(drlg.level(level).id);
         if let (Some((back, on)), true) = (links, drlg.level_rooms(level).first() == Some(&room)) {
             units.push(PresetUnit {
