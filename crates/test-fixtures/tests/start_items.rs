@@ -265,7 +265,7 @@ fn the_new_character_load_makes_start_items_on_the_preview_inventory() {
     assert!(report.unapplied.iter().any(|u| u.step == "start items"));
 }
 
-// Covers: specs/world/cube.md §1 (d2rs-own, unverified: REC-244)
+// Covers: specs/world/cube.md §1
 #[test]
 fn a_new_character_has_the_cube_when_the_host_names_it_as_an_extra() {
     let mut f = fx_on(data_with_cube(), true, true);
