@@ -44,6 +44,7 @@ use d2_sim::items::ItemTables;
 use super::draw::{ImageRef, ImageRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
 use super::geom::{Point, Rect};
 use super::item_tip_desc::{self as desc, StatDesc};
+use super::item_tip_props::{self as props, StatList};
 use super::item_tip_set as set;
 use super::original::hud::{FILL_FILE, FILL_H, FILL_W};
 use super::original::FontMeasure;
@@ -115,6 +116,8 @@ pub struct ItemTips {
     lookup: Arc<ItemTables>,
     codes: BTreeMap<[u8; 4], CodeText>,
     stats: Vec<StatDesc>,
+    /// The description list (`data/runtime-maps.md` §3).
+    desc_order: Vec<u16>,
     /// String-table keys by table row.
     magic_prefix: Vec<String>,
     magic_suffix: Vec<String>,
@@ -185,6 +188,10 @@ impl ItemTips {
         add!(Weapons);
         add!(Armor);
         add!(Misc);
+        let desc_order = set
+            .table(Itemstatcost::TABLE)
+            .map(d2_data::fixup::maps::desc_list)
+            .unwrap_or_default();
         let stats = rows::<Itemstatcost>(set)?
             .iter()
             .map(|r| StatDesc {
@@ -210,6 +217,7 @@ impl ItemTips {
             lookup,
             codes,
             stats,
+            desc_order,
             magic_prefix: rows::<Magicprefix>(set)?
                 .iter()
                 .map(|r| key(&r.name))
@@ -489,13 +497,35 @@ impl ItemTips {
         c
     }
 
-    /// (priority, text) of one stat (`item-tips.md` §7); `None`: no line.
-    fn property(&self, s: &Stat) -> Option<(u16, String)> {
-        let d = self.stats.get(usize::from(s.stat))?;
-        let viewer = desc::Viewer::default();
-        let v = desc::value(self, &viewer, s.stat, s.value() as i32, false);
-        let text = desc::line(self, &viewer, &desc::Shape::own(d), v, s.param)?;
-        Some((d.priority, String::from_utf16_lossy(&text)))
+    /// The list values of a stream list (`bitstream.md` §4.6 r4): a
+    /// stat's own entry is sent as value >> `ValShift`; the partners
+    /// written after 17, 48, 50, 52, 54, 57 are sent unshifted.
+    pub fn stat_list(&self, stats: &[Stat]) -> StatList {
+        let mut l = StatList::default();
+        let mut partners: &[u16] = &[];
+        for s in stats {
+            let partner = partners.first() == Some(&s.stat);
+            partners = if partner {
+                &partners[1..]
+            } else {
+                match s.stat {
+                    17 => &[18],
+                    48 => &[49],
+                    50 => &[51],
+                    52 => &[53],
+                    54 => &[55, 56],
+                    57 => &[58, 59],
+                    _ => &[],
+                }
+            };
+            let v = s.value() as i32;
+            let shift = self
+                .stats
+                .get(usize::from(s.stat))
+                .map_or(0, |d| d.valshift);
+            l.add(s.stat, s.param, if partner { v } else { v << shift });
+        }
+        l
     }
 
     /// The set bonus lines under a set item's name (REC-242).
@@ -512,13 +542,32 @@ impl ItemTips {
         out
     }
 
+    /// The property lines (`item-tips.md` §6, multi-line) of `stats`,
+    /// top line first.
     fn stat_lines(&self, stats: &[Stat], color: u16) -> Vec<TipLine> {
-        let mut props: Vec<(u16, String)> = stats.iter().filter_map(|s| self.property(s)).collect();
-        props.sort_by_key(|p| std::cmp::Reverse(p.0));
-        props
-            .into_iter()
-            .map(|(_, t)| TipLine::new(t, color))
-            .collect()
+        let l = self.stat_list(stats);
+        let args = props::PropArgs {
+            undead: false,
+            multi: true,
+            label: &[],
+        };
+        let t = props::property_text(
+            self,
+            &desc::Viewer::default(),
+            &props::PropItem::default(),
+            &l,
+            &args,
+        );
+        let mut lines: Vec<TipLine> = t
+            .split(|&u| u == u16::from(b'\n'))
+            .filter(|l| !l.is_empty())
+            .map(|l| TipLine {
+                text: l.to_vec(),
+                color,
+            })
+            .collect();
+        lines.reverse();
+        lines
     }
 
     /// Whether a character with these base stats meets the requirements
@@ -585,6 +634,14 @@ impl desc::DescNames for ItemTips {
     }
     fn monstats_name(&self, row: u32) -> Option<u16> {
         self.monstats.get(row as usize).copied()
+    }
+    fn desc_list(&self) -> Vec<u16> {
+        self.desc_order.clone()
+    }
+    fn group_members(&self, g: u16) -> Vec<u16> {
+        (0..self.stats.len() as u16)
+            .filter(|&s| self.stats[usize::from(s)].dgrp == g)
+            .collect()
     }
 }
 
@@ -716,6 +773,7 @@ pub(crate) mod tests {
                 (13, "Defense"),
                 (desc::sid::SP, " "),
                 (desc::sid::PLUS, "+"),
+                (desc::sid::NL, "\n"),
             ]
             .map(|(k, v)| (k, u16s(v)))
             .into(),
@@ -723,6 +781,7 @@ pub(crate) mod tests {
         ItemTips {
             lookup: Arc::new(items),
             codes,
+            desc_order: vec![3, 2, 1],
             stats: vec![
                 StatDesc::default(),
                 StatDesc {
