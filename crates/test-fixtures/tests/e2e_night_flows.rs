@@ -429,6 +429,10 @@ impl Fx {
             .action
             .with(&mut s.game, |g, v| v.allocate(g, &req, at.0, at.1))
             .expect("allocated");
+        // Staged as already announced to the client (the room clean-up
+        // cleared unit flag 0x10, `intents-events.md` §7.1 rule 2.1).
+        s.events.action.sys.units.get_mut(u).unwrap().flags &=
+            !d2_sim::units::record::flags::SEED_SET;
         self.stage(u);
         u
     }
@@ -672,12 +676,13 @@ fn using_a_shrine() {
     assert_eq!(codes, [ResultCode::Done]);
     let f = fx.frame() - 1;
     // §9.1 rule 2: +0x0C := operator GUID + 1, flag 0x1, mode 1; rule 3:
-    // no hover is created (the hover seam has no provider); rule 4: the
-    // code-2 effect runs on the stat seams (none on the wired host);
-    // rule 5: reset time 1 minute → event 5 at frame + 1201.
+    // the hover is created (the host now provides it; q-doors) and event 6
+    // is queued at frame + 300; rule 4: the code-2 effect runs on the stat
+    // seams (none on the wired host); rule 5: reset time 1 minute → event
+    // 5 at frame + 1201.
     assert_eq!(fx.mode(shrine), 1);
     assert_eq!(data(&mut fx).operator, pg + 1);
-    assert_eq!(fx.timers(shrine), [(5, f + 1201)]);
+    assert_eq!(fx.timers(shrine), [(5, f + 1201), (6, f + 300)]);
     // §14 rule 1: 0x0E (mode 1), then, mode 1 with `SubClass` bit 0 and
     // an operator, 0x4D: 2 @1, object GUID @2, operator GUID @6, the
     // shrine's `Code` @10, zero u8 @11 and u16s @13, @15 (17 bytes).
@@ -686,11 +691,29 @@ fn using_a_shrine() {
     shrine_msg.extend(pg.to_le_bytes());
     shrine_msg.push(SHRINE_CODE);
     shrine_msg.extend([0; 6]);
-    assert_eq!(got, [object_state(g, true, 1), shrine_msg]);
+    // Then the hover (flag 0x100, `intents-events.md` §7.9 r3 / §7.1 0x26
+    // form 5): u8@2 0, unit type 2 @3, GUID @4, bytes 8–9 unwritten (0),
+    // empty name @10, the text "%d"(3683 + shrine id) after it.
+    let mut hover = vec![0x26, 5, 0, 2];
+    hover.extend(g.to_le_bytes());
+    hover.extend([0; 2]);
+    hover.push(0);
+    hover.extend(format!("{}", 3683 + SHRINE_ID).bytes());
+    hover.push(0);
+    assert_eq!(got, [object_state(g, true, 1), shrine_msg, hover]);
     // §9.1 rule 1: a used shrine refuses (nothing sent).
     assert_eq!(fx.frames(5), Vec::<Vec<u8>>::new());
     let (codes, got) = fx.step(&[interact(g)]);
     assert_eq!((codes, got), (vec![ResultCode::Done], vec![]));
+    // Event 6 (§9.1) at frame + 300: the hover has expired → freed, queued
+    // with flag 0x100: 0x76 (type u8@1, GUID u32@2, `intents-events.md`
+    // §7.9 r3), and nothing else until event 5.
+    let n = (f + 300 - fx.frame()) as usize;
+    assert_eq!(fx.frames(n - 1), Vec::<Vec<u8>>::new());
+    let mut gone = vec![0x76, 2];
+    gone.extend(g.to_le_bytes());
+    assert_eq!(fx.frames(1), [gone]);
+    assert_eq!(fx.frame(), f + 300);
     // Event 5 (`SubClass` bit 0): mode 0, +0x0C := 0, queued: 0x0E.
     let n = (f + 1201 - fx.frame()) as usize;
     let quiet = fx.frames(n - 1);

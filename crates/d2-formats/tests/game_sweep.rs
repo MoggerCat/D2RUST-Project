@@ -9,8 +9,8 @@
 //! which counts files per archive (`cof.md`'s 3,605 counts files, not
 //! distinct names; `docs/HANDOFF.md` §5) and finds the 6 DC6 of
 //! `patch_d2.mpq`, which has no `(listfile)`. This file rebuilds that
-//! scope: every name of the union of all listfiles and of `mpq-tool`'s
-//! `EXTRA_NAMES`, one per archive lookup key (`mpq.md` §3 `normalize`:
+//! scope: every name of the union of all listfiles and of `EXTRA_NAMES`
+//! (`d2_formats::mpq::names`, shared with `mpq-tool`), one per archive lookup key (`mpq.md` §3 `normalize`:
 //! case and `/` vs `\`), in every archive that holds it. Until 2026-10-06
 //! `mpq-tool formats` kept names case-sensitively and counted a file twice
 //! when two listfiles spelled it differently, so spec counts taken from it
@@ -33,6 +33,7 @@ use d2_formats::dcc::Dcc;
 use d2_formats::ds1::Ds1;
 use d2_formats::dt1::Dt1;
 use d2_formats::font::FontTable;
+use d2_formats::mpq::names::known_names;
 use d2_formats::mpq::{Archive, ArchiveSet};
 use d2_formats::palette::{Palette, Pl2};
 use d2_formats::tbl::StringTable;
@@ -42,25 +43,16 @@ fn set() -> ArchiveSet {
     ArchiveSet::open_dir(&dir).expect("archives in D2_GAME_DIR open")
 }
 
-/// Names missing from every `(listfile)` that `mpq-tool formats` adds
-/// (its `EXTRA_NAMES`, `tools/mpq-tool/src/formats.rs`; keep in step).
-const EXTRA_NAMES: &[&str] = &[
-    r"data\local\lng\eng\patchstring.tbl",
-    r"data\local\lng\eng\string.tbl",
-    r"data\local\lng\eng\expansionstring.tbl",
-];
-
 /// Distinct names over every archive of `set` (listfiles and
-/// [`EXTRA_NAMES`]), lowercase with `\` separators: one per archive lookup
+/// `EXTRA_NAMES`, from `d2_formats::mpq::names`, the source `mpq-tool
+/// formats` uses), lowercase with `\` separators: one per archive lookup
 /// key (`mpq.md` §3 `normalize`).
 fn listed(set: &ArchiveSet) -> BTreeSet<String> {
-    let mut names: BTreeSet<String> = EXTRA_NAMES.iter().map(|n| n.to_string()).collect();
-    for a in set.archives() {
-        for n in a.listfile().unwrap().unwrap_or_default() {
-            names.insert(n.to_ascii_lowercase().replace('/', "\\"));
-        }
-    }
-    names
+    known_names(set.archives())
+        .unwrap()
+        .into_values()
+        .map(|n| n.to_ascii_lowercase().replace('/', "\\"))
+        .collect()
 }
 
 /// One file: an archive (index in `set.archives()`) and a name it holds.

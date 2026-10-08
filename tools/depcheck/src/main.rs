@@ -19,6 +19,7 @@ const NO_BEVY: &[&str] = &[
     "d2-server",
     "d2-verify",
     "conformance",
+    "d2-native",
 ];
 
 /// (crate, forbidden dependency) pairs: layering rules beyond Bevy.

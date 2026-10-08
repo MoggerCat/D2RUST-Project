@@ -160,6 +160,15 @@ where
         )
     }
 
+    fn unit_positions(&mut self, events: &mut D, units: &[UnitId]) -> Vec<(UnitId, (i32, i32))> {
+        let hooks = events.action().hooks();
+        units
+            .iter()
+            .filter(|&&u| hooks.path_has(u))
+            .map(|&u| (u, hooks.path_position(u)))
+            .collect()
+    }
+
     /// The 0x13 object case on the action wiring's object state
     /// (`ActionSim::operate_object_message`; `None` until
     /// `ActionSim::create_objects` ran). The object calls' host tick is
@@ -172,6 +181,22 @@ where
         guid: u32,
     ) -> Option<ObjectCase> {
         events.action().operate_object_message(game, player, guid)
+    }
+
+    /// The 0x13 tile case on the action wiring (REC-99).
+    fn warp_tile(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        player: UnitId,
+        guid: u32,
+    ) -> Option<u32> {
+        events.action().warp_tile_message(game, player, guid)
+    }
+
+    /// The Town Portal pair on the action wiring (REC-117).
+    fn town_portal(&mut self, game: &mut Game, events: &mut D, player: UnitId) -> bool {
+        events.action().open_town_portal(game, player).is_some()
     }
 
     fn skill(&mut self, call: SkillCall<'_, D>) -> Option<SkillHandled> {
@@ -196,6 +221,50 @@ where
     /// `handlers::walk::run` (the path provider of the action wiring).
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
         super::super::walk::run(game, events, call)
+    }
+
+    /// A player, monster or object in a room: the room's act and the
+    /// unit's position (path, or the seam's staged position without the
+    /// path provider; `pathing.md` §2.1). Items and missiles: none (an
+    /// item's owner is not read here).
+    fn player_gate(
+        &mut self,
+        _: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<crate::seams::PlayerGate> {
+        let s = &events.action().sys;
+        if !s.hooks.death.died.contains(&unit) {
+            return None;
+        }
+        Some(crate::seams::PlayerGate {
+            mode: s.units.get(unit)?.mode,
+            uninterruptable: s.stats.has_state(unit, 0x36),
+        })
+    }
+
+    fn live_facts(
+        &mut self,
+        game: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<crate::adapters::UnitFacts> {
+        let e = game.lists.unit(unit)?;
+        if !matches!(
+            e.ty,
+            d2_sim::units::UnitType::Player
+                | d2_sim::units::UnitType::Monster
+                | d2_sim::units::UnitType::Object
+        ) {
+            return None;
+        }
+        let act = game.lists.room(e.room()?)?.act;
+        let (x, y) = events.action().hooks().path_position(unit);
+        Some(crate::adapters::UnitFacts {
+            act,
+            pos: crate::seams::Pos { x, y },
+            owner: None,
+        })
     }
 
     /// `d2_sim::wiring::action::vitals_sync::run` on the action wiring

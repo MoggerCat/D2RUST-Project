@@ -192,12 +192,17 @@ fn the_join_builds_the_client_drlg_in_the_app() {
         .iter()
         .map(|r| (r.show, r.level, r.x, r.y))
         .collect();
-    // The synthetic town room is at tile (16, 0).
-    assert_eq!(shown, vec![(true, 1, 16, 0), (true, 1, 16, 0)]);
+    // The synthetic town room is at tile (16, 0); the Blood Moor room
+    // east of it (tile (24, 0), level 2) is in the town room's adjacency
+    // across the level border (`drlg/rooms.md` §3.3).
+    assert_eq!(
+        shown,
+        vec![(true, 1, 16, 0), (true, 1, 16, 0), (true, 2, 24, 0)]
+    );
     assert_eq!(
         w.active_rooms.as_ref().map(|r| r.len()),
-        Some(1),
-        "the one room of the town"
+        Some(2),
+        "the one room of the town and the bordering Blood Moor room"
     );
     // Tick 2 populated the town room, so the client's room was ready and
     // the client pass sent 0x04 (`tick.md` §6 rule 6): the
@@ -246,7 +251,7 @@ fn the_recorded_join_on_the_install() {
     let own = w.local_room().unwrap();
     assert_eq!((own.x0, own.y0), (928 * 5, 904 * 5));
     // Every act palette is in the archives and is a valid `pal.pl2`.
-    let palettes = ActPalettes::live(&live.archives).unwrap();
+    let palettes = ActPalettes::live(live.archives.as_ref()).unwrap();
     for a in 0..5 {
         d2_client::scene::present_palette(palettes.of(a))
             .unwrap_or_else(|e| panic!("{}: {e}", act_palette_path(a)));

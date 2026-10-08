@@ -458,10 +458,12 @@ impl Outdoor {
         // not stated. Kept: flags (+0x00) and neighbour entries, which
         // only act creation writes; a regeneration then starts from the
         // flags the last generation left (0x20, 0x40 included).
-        let rooms: Vec<DrlgRoomId> = drlg.level_rooms(l);
-        for r in rooms {
-            self.rooms.remove(&r);
-        }
+        // `levels.md` §9.4: the type data reset runs after every room of
+        // the level was freed, while the level's room list still names
+        // them, so the list cannot be walked here (it read freed rooms:
+        // the live panic of `docs/handoff/play-drlg.md`). A room's outdoor
+        // record goes with the room: drop the records of freed rooms.
+        self.rooms.retain(|&r, _| drlg.try_room(r).is_some());
         if let Some(info) = self.levels.get_mut(&l) {
             info.grids = Default::default();
             info.vertices.clear();

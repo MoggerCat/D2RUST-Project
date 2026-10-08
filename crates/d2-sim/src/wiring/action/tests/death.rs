@@ -755,3 +755,59 @@ fn the_quest_drop_with_an_unknown_code_is_fatal() {
     assert!(d.placed.is_empty());
     assert_eq!(fx.sim.hooks().game_seed, game);
 }
+
+/// `damage.md` §7.1 step 4.6: a get-hit result the get-hit test lets
+/// through puts the monster into get-hit (mode 3, toward the attacker);
+/// a soft result only sets unit flag 0x8000 and queues the unit (step
+/// 4.7). A dead monster is left alone.
+// Covers: specs/combat/damage.md §7.1 r4
+#[test]
+fn a_hit_puts_the_monster_into_get_hit_or_marks_it_soft() {
+    use crate::combat::result;
+    let mut fx = Fx::new();
+    let (p, m) = kill_setup(&mut fx);
+    let mut rec = crate::combat::DamageRecord {
+        result: result::HIT | result::GET_HIT,
+        total: 2000,
+        ..Default::default()
+    };
+    fx.sim.combat(&mut fx.game, |w, _| {
+        crate::wiring::action::reaction::reaction(w, p, m, &mut rec);
+    });
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().mode, monster_mode::GH);
+    assert_eq!(fx.sim.hooks().mode_target, None);
+
+    // Too small a hit: no get-hit, the soft path.
+    let mut fx = Fx::new();
+    let (p, m) = kill_setup(&mut fx);
+    let mut rec = crate::combat::DamageRecord {
+        result: result::HIT | result::GET_HIT,
+        total: 100,
+        ..Default::default()
+    };
+    fx.sim.combat(&mut fx.game, |w, _| {
+        crate::wiring::action::reaction::reaction(w, p, m, &mut rec);
+    });
+    let r = fx.sim.sys.units.get(m).unwrap();
+    assert_eq!(r.mode, 1);
+    assert_ne!(r.flags & 0x8000, 0, "soft hit");
+
+    // A soft result alone; a dead monster is unchanged.
+    let mut fx = Fx::new();
+    let (p, m) = kill_setup(&mut fx);
+    let mut rec = crate::combat::DamageRecord {
+        result: result::HIT | result::SOFT_HIT,
+        total: 100,
+        ..Default::default()
+    };
+    fx.sim.sys.units.get_mut(m).unwrap().mode = monster_mode::DD;
+    fx.sim.combat(&mut fx.game, |w, _| {
+        crate::wiring::action::reaction::reaction(w, p, m, &mut rec);
+    });
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().flags & 0x8000, 0);
+    fx.sim.sys.units.get_mut(m).unwrap().mode = 1;
+    fx.sim.combat(&mut fx.game, |w, _| {
+        crate::wiring::action::reaction::reaction(w, p, m, &mut rec);
+    });
+    assert_ne!(fx.sim.sys.units.get(m).unwrap().flags & 0x8000, 0);
+}

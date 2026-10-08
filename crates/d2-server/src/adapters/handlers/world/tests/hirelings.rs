@@ -354,3 +354,23 @@ fn the_load_queues_the_saved_hireling_for_the_host() {
         }])
     );
 }
+
+/// An NPC's act change (Warriv's "Go East", `NpcWorld::act_change`) is
+/// queued on the action hooks for the host that runs it; a call in the
+/// queue is drained by the next frame (no path provider here: dropped).
+// Covers: specs/world/npc.md §8.3
+#[test]
+fn an_npc_act_change_is_queued_for_the_host() {
+    use d2_sim::world::npc::NpcWorld;
+    let mut fx = Fx::new(|_| {});
+    let p = fx.player;
+    let s = &mut fx.h.game;
+    s.world.desk(&mut s.game, &mut s.events, |desk, _, _| {
+        NpcWorld::act_change(desk, p, 40, 0);
+    });
+    assert_eq!(fx.h.game.events.hooks().act_changes, vec![(p, 40, 0)]);
+    fx.h.connect(0);
+    fx.h.clock.0 += 40;
+    assert!(fx.h.frame().unwrap().ticked);
+    assert!(fx.h.game.events.hooks().act_changes.is_empty());
+}

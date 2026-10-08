@@ -478,14 +478,20 @@ fn scan_unit_visits_accepted_units_in_range() {
     assert_eq!(run_scan(&mut f, u, (0, 0), 9, 3, false, 1).1, vec![b]);
     // x or y = 0 means the source's position; an explicit centre moves it.
     f.pos.insert(u, (30, 0));
-    assert_eq!(run_scan(&mut f, u, (0, 0), 7, 3, false, 1).1, vec![]);
+    assert_eq!(
+        run_scan(&mut f, u, (0, 0), 7, 3, false, 1).1,
+        Vec::<usize>::new()
+    );
     assert_eq!(
         run_scan(&mut f, u, (30, 40), 5, 3, false, 1).1,
         vec![f.scan[3]]
     );
     f.pos.insert(u, (0, 0));
     // f = 0 is replaced by 0x583, which needs the unit flags 0x4 and 0x8.
-    assert_eq!(run_scan(&mut f, u, (0, 0), 10, 0, false, 1).1, vec![]);
+    assert_eq!(
+        run_scan(&mut f, u, (0, 0), 10, 0, false, 1).1,
+        Vec::<usize>::new()
+    );
     for x in [a, b] {
         f.c.units[x].flags = 0xC;
     }

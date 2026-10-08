@@ -110,8 +110,13 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvWorld for InvDesk<'_, '_, H, R> 
         let o = self.o(owner);
         self.rest.stat_refresh(o)
     }
+    /// `0x0055F590`: the item's own inventory holds a filler.
     fn socket_filled(&self, item: UnitId) -> bool {
-        self.rest.socket_filled(self.g(item))
+        self.state
+            .inventories
+            .get(&item)
+            .is_some_and(|inv| !inv.items().is_empty())
+            || self.rest.socket_filled(self.g(item))
     }
     /// Run after the call (`items::moves::owner_refresh`, §6.1 rule 1).
     fn owner_refresh(&mut self, owner: UnitId) {

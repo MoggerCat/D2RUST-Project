@@ -159,6 +159,61 @@ pub fn corpse_pickup_rest<W: MoveWorld>(
     Ok(())
 }
 
+/// S→C 0x0A for an item that left the player's inventory for the corpse,
+/// so the client drops it (the take-back sends it again, §12.2).
+/// d2rs-own, unverified (PROVISIONAL REC-141): no spec states the
+/// client's view of the corpse creation's item moves.
+fn gone_from<W: MoveWorld>(w: &mut W, p: Owner, item: Guid) {
+    w.send(
+        p,
+        crate::units::messages::remove_unit(Owner::ITEM, item).to_vec(),
+    );
+}
+
+/// The item part of the corpse creation `0x0057F700` (`combat/vitals.md`
+/// §4.7 rule 1.7): the cursor item goes into the corpse C's grid, then
+/// each body item (locations 0–12) onto the same location of C; grid and
+/// belt items stay on the player P. An item C cannot take is left on P
+/// (the original drops it near P: the free-spot drop is the rest's,
+/// PROVISIONAL REC-141). True when every item moved.
+pub fn corpse_fill<W: MoveWorld>(w: &mut W, p: Owner, c: Owner) -> Result<bool, MoveFatal> {
+    if !w.has_inventory(p) || !w.has_inventory(c) {
+        return Ok(false);
+    }
+    let mut all = true;
+    if let Some(x) = w.cursor(p) {
+        // Detaches the cursor item from P (`inventory.md` §1.4 rule 3).
+        w.set_cursor(p, None);
+        match w.find_free(c, x, page::INVENTORY) {
+            Some((px, py)) if w.place_at(c, x, page::INVENTORY, px, py) => {
+                clear_uflags(w, x, uflag::TARGETABLE);
+                w.set_mode(x, mode::STORED);
+                w.set_page(x, page::INVENTORY);
+                gone_from(w, p, x);
+            }
+            _ => all = false,
+        }
+    }
+    for loc in 0..=12u8 {
+        let Some(x) = w.body_item(p, loc) else {
+            continue;
+        };
+        super::handlers::remove_from_body(w, p, x)?;
+        if w.place_body(c, x, loc) {
+            w.set_body_loc(x, loc);
+            w.set_mode(x, mode::EQUIPPED);
+            w.set_page(x, page::NONE);
+            gone_from(w, p, x);
+        } else {
+            all = false;
+        }
+    }
+    w.stat_refresh(p);
+    owner_refresh(w, p);
+    w.inventory_pass(p);
+    Ok(all)
+}
+
 /// Corpse take-back `0x00562F30(game, U, C)` (§12.2). True (result 1)
 /// when the last sweep met no can-pick refusal and no failed grid put.
 pub fn corpse_take_back<W: MoveWorld>(w: &mut W, u: Owner, c: Owner) -> Result<bool, MoveFatal> {

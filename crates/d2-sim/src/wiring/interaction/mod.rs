@@ -42,11 +42,13 @@
 //! a seam call to a provider call.
 
 pub mod hirelings;
+pub mod npc_items;
 pub mod npc_vendors;
 pub mod npc_world;
 pub mod quest_npc;
 pub mod skill_events;
 pub mod skill_use;
+pub mod summon;
 pub mod vendor_world;
 pub mod vitals;
 
@@ -56,6 +58,7 @@ pub(crate) mod tests;
 use std::collections::BTreeMap;
 
 pub use hirelings::{HireView, HirelingRest};
+pub use npc_items::{NpcInv, NpcInventory};
 pub use npc_vendors::VendorDesk;
 pub use npc_world::NpcRest;
 pub use skill_use::{UseRest, UseView};
@@ -104,6 +107,14 @@ pub struct InteractionState {
     /// (`hirelings.md` §13 rule 4, `0x005718C0`), in queue order, for the
     /// client pass's flush ([`InteractionState::unit_stat_messages`]).
     pub unit_stats: BTreeMap<UnitId, Vec<(u16, u32)>>,
+    /// The store or gamble items added to an NPC's trade inventory since
+    /// the host last took them (`vendors.md` §4 step 3: the client gets
+    /// one 0x9C action 11 per item), in add order, and the player whose
+    /// trade open added them.
+    pub shown: Vec<UnitId>,
+    pub shown_player: Option<UnitId>,
+    /// The class of the NPC the shown items belong to.
+    pub shown_class: u16,
 }
 
 impl InteractionState {
@@ -122,6 +133,9 @@ impl InteractionState {
             hirelings: HirelingState::default(),
             hireling_tables: None,
             unit_stats: BTreeMap::new(),
+            shown: Vec::new(),
+            shown_player: None,
+            shown_class: 0,
         }
     }
 
@@ -177,6 +191,9 @@ pub struct Desk<'d, 'a, H, R> {
     /// Host milliseconds (`GetTickCount`), an input of store generation
     /// and refresh (`vendors.md` edge case 10).
     pub now: u32,
+    /// The host's inventory model for the NPC item services
+    /// ([`NpcInventory`]); `None`: those answer from the rest.
+    pub inv: Option<&'d mut dyn NpcInventory<H>>,
 }
 
 impl<'a, H, R: QuestRest> Desk<'_, 'a, H, R> {

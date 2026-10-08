@@ -157,6 +157,14 @@ pub struct ObjectView<'a, X> {
     pub tables: Arc<ObjectTables>,
 }
 
+/// The Chebyshev distance of two units' path positions (sub-tiles), for
+/// [`Pending::object_preview_range`]. d2rs-own, unverified.
+fn preview_distance<X: Pending>(v: &View<'_, X>, a: UnitId, b: UnitId) -> i32 {
+    let (ax, ay) = v.h.path_position(a);
+    let (bx, by) = v.h.path_position(b);
+    (ax - bx).abs().max((ay - by).abs())
+}
+
 /// A shorter-lived [`View`] over the same parts.
 pub fn reborrow<'b, X>(v: &'b mut View<'_, X>) -> View<'b, X> {
     View {
@@ -511,6 +519,7 @@ impl<X: Pending> View<'_, X> {
         let r = with_objects(game, self, |ctl, t, w| {
             objects::operate_in_range(ctl, t, w, operator, guid)
         })?;
+        self.flush_portal_removals(game, operator);
         log(self, r)
     }
 
@@ -536,7 +545,25 @@ impl<X: Pending> View<'_, X> {
         if self.units.get(object).map_or(0, |r| r.mode) >= u32::from(objects::MODE_BOUND) {
             return Some(ObjectCase::Code(3));
         }
-        match self.h.x.object_approach(game, player, object) {
+        let reach = match self.h.x.object_preview_range() {
+            Some(r) => {
+                // d2rs-own, unverified: the preview's reach test.
+                let d = {
+                    let (px, py) = self.h.path_position(player);
+                    let (ox, oy) = self.h.path_position(object);
+                    (px - ox).abs().max((py - oy).abs())
+                };
+                if d > 50 {
+                    ObjectReach::TooFar
+                } else if d > r {
+                    ObjectReach::Walk
+                } else {
+                    ObjectReach::Operate
+                }
+            }
+            None => self.h.x.object_approach(game, player, object),
+        };
+        match reach {
             ObjectReach::TooFar => return Some(ObjectCase::Code(1)),
             ObjectReach::Walk => return Some(ObjectCase::Code(0)),
             ObjectReach::Operate => {}
@@ -586,6 +613,15 @@ impl<X: Pending> View<'_, X> {
                 UpdateMessage::Shrine(b) => self.h.x.send(receiver, &b),
                 UpdateMessage::Portal(b) => self.h.x.send(receiver, &b),
             }
+        }
+        // Rule 2: flag 0x100 → the hover message `0x00571620` (the
+        // overhead 0x26 form 5 / 0x76 of `intents-events.md` §7.9 r3).
+        let (flags, guid) = (
+            self.units.get(unit).map_or(0, |r| r.flags),
+            game.lists.unit(unit).map_or(0, |e| e.guid),
+        );
+        if flags & objects::oflags::HOVER_FREED != 0 {
+            self.overhead_message(receiver, unit, UnitType::Object as u8, guid);
         }
         true
     }
@@ -835,7 +871,10 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
         self.v.h.x.object_key_test(player)
     }
     fn in_interact_range(&self, operator: UnitId, object: UnitId) -> bool {
-        self.v.h.x.object_in_range(self.game, operator, object)
+        match self.v.h.x.object_preview_range() {
+            Some(r) => preview_distance(&self.v, operator, object) <= r,
+            None => self.v.h.x.object_in_range(self.game, operator, object),
+        }
     }
     /// `0x00554100`: the interact info on the player's unit record.
     fn interact_active(&self, player: UnitId) -> bool {
@@ -1161,6 +1200,34 @@ impl<X: Pending> ChestWorld for ObjectView<'_, X> {
 /// update message is not stated beyond the stat-list hooks; the set runs
 /// through the stat list's host ([`super::ActionHooks`]) only.
 impl<X: Pending> ShrineWorld for ObjectView<'_, X> {
+    /// `0x00661110`: the object's overhead record (unit +0xA4) with the
+    /// text of string `string_id`, ending `8 · length + 125` frames from
+    /// now; sent to clients as the overhead 0x26 of the update pass
+    /// (flag 0x100, `objects.md` §14 rule 2).
+    // PROVISIONAL (objects.md §9.1 r3; d2rs-own, unverified): the sim holds
+    // no string tables, so the record's text is the decimal string id
+    // (`"%d"`, 3683 + shrine id); the client resolves it against its
+    // string tables (REC-new, docs/handoff/q-doors.md).
+    fn create_hover(&mut self, obj: UnitId, string_id: u32) -> bool {
+        let text = string_id.to_string().into_bytes();
+        let end = self
+            .game
+            .frame
+            .wrapping_add(crate::world::objects::shrines::hover_lifetime(
+                text.len() as u32
+            ));
+        self.v.replace_overhead(obj, &text, 0, end);
+        true
+    }
+    fn hover_expiry(&self, obj: UnitId) -> Option<i32> {
+        self.v.units.get(obj)?.hover
+    }
+    fn free_hover(&mut self, obj: UnitId) {
+        if let Some(r) = self.v.units.get_mut(obj) {
+            r.hover = None;
+        }
+        self.v.h.session.overheads.remove(&obj);
+    }
     fn stat(&self, unit: UnitId, id: u16) -> i32 {
         self.v.stat(unit, id)
     }
@@ -1217,6 +1284,9 @@ impl<X: Pending> MiscWorld for ObjectView<'_, X> {
         self.v.h.x.object_party_id(unit)
     }
     fn portal_partner(&mut self, object: UnitId) -> Option<UnitId> {
+        if let Some(l) = self.v.h.portals.partner(object) {
+            return Some(l);
+        }
         self.v.h.x.object_portal_partner(self.game, object)
     }
     fn has_quest_record(&self, player: UnitId) -> bool {
@@ -1229,7 +1299,14 @@ impl<X: Pending> MiscWorld for ObjectView<'_, X> {
         self.v.h.x.object_quest_bit(player, quest, bit)
     }
     fn player_portal_guid(&self, player: UnitId) -> u32 {
-        self.v.h.x.object_portal_guid(player)
+        let own = self
+            .v
+            .h
+            .portals
+            .field_portal(player)
+            .and_then(|f| self.game.lists.unit(f))
+            .map(|e| e.guid);
+        own.unwrap_or_else(|| self.v.h.x.object_portal_guid(player))
     }
     fn level_spawn_point(&mut self, level: u32) -> Option<(RoomId, i32, i32)> {
         self.v.h.x.object_level_spawn(self.game, level)
@@ -1246,6 +1323,9 @@ impl<X: Pending> MiscWorld for ObjectView<'_, X> {
     }
     fn remove_portal(&mut self, object: UnitId) {
         self.v.h.x.object_remove_portal(self.game, object);
+        // The unit is freed once the object call returns
+        // ([`View::flush_portal_removals`]: the object state is lent).
+        self.v.h.portals.doom(object);
     }
     fn portal_act5_hook(&mut self, partner: UnitId) {
         self.v.h.x.object_portal_act5(partner);

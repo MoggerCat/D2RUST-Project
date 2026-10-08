@@ -26,13 +26,16 @@
 //! and the cube on the same unit world).
 
 mod action;
+mod hireling_drive;
 mod hireling_host;
+mod item_save;
 mod wired;
 
 #[cfg(test)]
 pub(crate) mod tests;
 
 pub use action::{ActionEvents, ActionWorld, Outbox, ProcessState};
+pub use item_save::LoadedItems;
 pub use wired::{Parts, TradeRest, WiredWorld};
 
 use d2_sim::game::Game;
@@ -47,14 +50,27 @@ use d2_sim::world::vendors::trade::{buy, repair, sell, BuyMsg, RepairMsg, SellMs
 use d2_sim::world::vendors::{VendorRecord, VendorTables, VendorWorld};
 use d2_sim::world::waypoints::{ArrivalList, WaypointData, WaypointError, WaypointWorld};
 
+use super::super::character::{self, StartItemWorld, StartPlace};
 use super::super::SimGame;
 use super::items::moves::MoveCall;
+use super::items::moves::{take_sent as inv_take_sent, InvParts, MoveRest, StagedPlace};
 use super::items::CubeCall;
 use super::player::{Outcome as PlayerOutcome, Run as PlayerRun};
 use super::skills::{Call as SkillCall, Handled as SkillHandled};
 use super::walk::{WalkCall, WalkResult};
 use crate::buffers::QueueError;
 use crate::seams::{ClientId, MessageSink, ResultCode};
+use d2_sim::items::inventory::{InvTables, UnitKind};
+use d2_sim::items::moves::{InventoryOps, MovePending, MoveUnits, Owner, Spot};
+use d2_sim::items::ItemRequest;
+use d2_sim::items::{flag, q, stat as istat, ItemStats, ListKey};
+use d2_sim::units::lifecycle::LifecycleHooks;
+use d2_sim::units::RoomId;
+use d2_sim::wiring::economy::quest_reward::create_reward;
+use d2_sim::wiring::economy::ItemSpawn;
+use d2_sim::wiring::economy::{find_list, Economy, StatCtx, UnitStats};
+use d2_sim::wiring::inventory::InvRest;
+use std::collections::BTreeMap;
 
 /// Where a world-related C→S id's behaviour is specified.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -76,6 +92,9 @@ pub enum System {
     Quests,
     /// The object case of 0x13 (unit type 2; [`route`]).
     Objects,
+    /// The tile case of 0x13 (unit type 5, a level warp; [`route`]).
+    /// PROVISIONAL (REC-99).
+    Warps,
 }
 
 /// Every world-related C→S id (`client-messages.tsv`): (id, owner spec
@@ -199,6 +218,9 @@ pub fn route(msg: &[u8]) -> Option<System> {
     if id == 0x13 && msg.len() == 9 && msg[1..5] == 2u32.to_le_bytes() {
         return Some(System::Objects);
     }
+    if id == 0x13 && msg.len() == 9 && msg[1..5] == 5u32.to_le_bytes() {
+        return Some(System::Warps);
+    }
     system(id)
 }
 
@@ -317,6 +339,24 @@ pub trait WorldHost<D> {
     ) -> Option<ObjectCase> {
         None
     }
+    /// The C→S 0x13 tile case (a level warp, `path-placement.md` §12.2;
+    /// PROVISIONAL, REC-99) by `player` on the tile with `guid`: the
+    /// result code. `None`: no provider.
+    fn warp_tile(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        player: UnitId,
+        guid: u32,
+    ) -> Option<u32> {
+        None
+    }
+    /// The Town Portal scroll or tome of `player` was used (REC-117,
+    /// `wiring::action::town_portal`): make the portal pair. `false`:
+    /// nothing was created.
+    fn town_portal(&mut self, game: &mut Game, events: &mut D, player: UnitId) -> bool {
+        false
+    }
     /// The cube (`handlers::items`) on the host's economy.
     fn cube<C: CubeCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
         None
@@ -340,8 +380,40 @@ pub trait WorldHost<D> {
     ) -> Option<PlayerOutcome> {
         None
     }
+    /// The path positions (sub-tiles) of the listed units that have a
+    /// path, read at the end of each tick to move the staged
+    /// [`UnitFacts`](super::UnitFacts) the point-message parser reads
+    /// (`intents-events.md` §2.4 rule 3). Default: none (the caller
+    /// stages positions itself).
+    fn unit_positions(&mut self, events: &mut D, units: &[UnitId]) -> Vec<(UnitId, (i32, i32))> {
+        Vec::new()
+    }
     /// The walk / run handlers (`handlers::walk`) on the path provider.
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
+        None
+    }
+    /// The live gate fields of a player (`intents-events.md` §2.3 rule 3:
+    /// unit mode, state 0x36), read after each tick to refresh the staged
+    /// [`super::super::PlayerFields`] (a dead player's gate opens 0x41).
+    /// `None`: the host has none; the staged fields stay.
+    fn player_gate(
+        &mut self,
+        game: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<crate::seams::PlayerGate> {
+        None
+    }
+    /// The live act and position of `unit` the point / unit parser reads
+    /// (`intents-events.md` §2.4 rules 3–4), from the game's own unit
+    /// (its room's act, its path position). `None`: the host has none
+    /// (the caller's staged [`super::super::UnitFacts`] are used).
+    fn live_facts(
+        &mut self,
+        game: &Game,
+        events: &mut D,
+        unit: UnitId,
+    ) -> Option<super::super::UnitFacts> {
         None
     }
     /// The client vitals sync (`combat/vitals.md` §5) for one client at
@@ -438,6 +510,12 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
             .world
             .waypoints(game, events, WaypointRun { player, msg }),
         System::Quests => sim.world.quests(game, events, QuestRun { player, msg }),
+        System::Warps => {
+            let guid = u32::from_le_bytes([msg[5], msg[6], msg[7], msg[8]]);
+            sim.world
+                .warp_tile(game, events, player, guid)
+                .map(|c| Ok(Some(c)))
+        }
         System::Objects => {
             let guid = u32::from_le_bytes([msg[5], msg[6], msg[7], msg[8]]);
             match sim.world.objects(game, events, player, guid)? {
@@ -625,4 +703,379 @@ impl QuestCall for QuestRun<'_> {
             _ => None,
         })
     }
+}
+
+/// What the start items (`items/generation.md` §10.3) did on the wired
+/// host ([`WiredWorld::start_items`]).
+#[derive(Debug, Default)]
+pub struct StartItems {
+    /// Each created item and where it went, in creation order.
+    pub items: Vec<(UnitId, StartPlace)>,
+    /// What the inventory placements queued (receiving unit, bytes), in
+    /// send order. Not sent by the join (`intents-events.md` §8.2 rule
+    /// 3.5 is not wired); the caller decides.
+    pub sent: Vec<(UnitId, Vec<u8>)>,
+    /// Why no item was made: no charstats row, no inventory model, or an
+    /// item creation error.
+    pub faults: Vec<String>,
+}
+
+impl<R, S> WiredWorld<R, S> {
+    /// The start items `0x00534F10` (`items/generation.md` §10.3) of
+    /// `player` on this host's economy and inventory model
+    /// ([`character::start_items`] over [`WiredStart`]). The player's
+    /// inventory is added to the model when it has none (the 1.14d unit
+    /// allocation makes it; here the first item user does).
+    pub fn start_items<D: ActionEvents>(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        player: UnitId,
+    ) -> StartItems {
+        let mut r = StartItems::default();
+        let Some(mut inv) = self.inventory.take() else {
+            r.faults
+                .push("no inventory model (WiredWorld::inventory is None)".into());
+            return r;
+        };
+        self.with_economy(game, events, |econ, _| {
+            let Some((class, guid)) = econ.units.get(player).map(|u| (u.class, u.guid)) else {
+                r.faults.push(format!("no player unit {player:?}"));
+                return;
+            };
+            let Some(vitals) = econ.hooks.vitals.clone() else {
+                r.faults
+                    .push("no vitals tables (charstats) on the action wiring".into());
+                return;
+            };
+            let Some(cs) = vitals.charstats(class as i32) else {
+                // §10.3: no row → nothing.
+                return;
+            };
+            let slots = character::start_slots(cs);
+            let skills = econ.hooks.tables.skills.skills.len();
+            let start_skill = Some(cs.startskill).filter(|&k| usize::from(k) < skills);
+            // d2rs-own, unverified: the play host never adds the player's
+            // inventory (unit allocation `0x0063ABD0` has no caller there).
+            if !inv.state.inventories.contains_key(&player) {
+                inv.state
+                    .add_inventory(player, UnitKind::Player { class: class as u8 }, guid);
+            }
+            let mut w = WiredStart {
+                econ,
+                inv: &mut inv,
+                player,
+                owner: Owner::player(guid),
+                faults: Vec::new(),
+            };
+            r.items = character::start_items(&mut w, &slots, start_skill);
+            r.faults.append(&mut w.faults);
+            let mut d = inv.desk(econ);
+            d.sync_out();
+            r.sent = inv_take_sent(&mut d)
+                .into_iter()
+                .filter_map(|(u, b)| Some((u?, b)))
+                .collect();
+        });
+        self.inventory = Some(inv);
+        r
+    }
+}
+
+/// [`StartItemWorld`] on the wired host's economy and inventory model:
+/// creation through the quest reward's `create_reward` (§10.1, §10.2 with
+/// §10.3's arguments), the stat writes through the item's stat lists,
+/// placement through an inventory desk per call.
+pub struct WiredStart<'e, 'a, H> {
+    pub econ: &'e mut Economy<'a, H>,
+    pub inv: &'e mut InvParts,
+    pub player: UnitId,
+    pub owner: Owner,
+    pub faults: Vec<String>,
+}
+
+impl<H: LifecycleHooks> WiredStart<'_, '_, H> {
+    fn guid(&self, item: UnitId) -> u32 {
+        self.econ.units.get(item).map_or(u32::MAX, |u| u.guid)
+    }
+    fn set_stat(&mut self, item: UnitId, id: u16, v: i32) {
+        self.econ
+            .with_stats(|ctx| UnitStats::new(ctx, item).set_base(id, 0, v));
+    }
+}
+
+impl<H: LifecycleHooks> StartItemWorld for WiredStart<'_, '_, H> {
+    fn create(&mut self, code: [u8; 4]) -> Option<UnitId> {
+        // `create_reward`: level 0 → the player's base level (≥ 1),
+        // quality 2, spawn mode 4, no sockets, not ethereal, no seeds, then
+        // durability := max and page 0 (step 2.6 sets 72 again after the
+        // placement, the same value).
+        match create_reward(self.econ, self.player, code, 0, q::NORMAL) {
+            Ok(i) => i,
+            Err(e) => {
+                self.faults.push(format!("start item {code:?}: {e:?}"));
+                None
+            }
+        }
+    }
+    fn drop_class_skill_list(&mut self, item: UnitId) {
+        self.econ.with_stats(|ctx| {
+            let mut c = ctx.borrow_mut();
+            let StatCtx { lists, host } = &mut *c;
+            if let Some(l) = find_list(lists, item, ListKey::ITEM) {
+                lists.unit_detach(*host, l);
+                lists.free_plain(*host, l);
+            }
+        });
+    }
+    fn set_single_skill(&mut self, item: UnitId, skill: u16) {
+        self.econ.with_stats(|ctx| {
+            UnitStats::new(ctx, item).list_set(ListKey::ITEM, istat::ITEM_SINGLESKILL, skill, 1)
+        });
+    }
+    fn stackable(&mut self, item: UnitId) -> bool {
+        let g = self.guid(item);
+        self.inv.desk(self.econ).stackable(g)
+    }
+    fn fill_stack(&mut self, item: UnitId) {
+        let g = self.guid(item);
+        let n = self.inv.desk(self.econ).max_stack(g);
+        self.set_stat(item, istat::QUANTITY, n);
+    }
+    fn mark_start(&mut self, item: UnitId, loc: u8) {
+        if let Some(i) = self.econ.items.get_mut(item) {
+            i.flags |= flag::STARTITEM;
+        }
+        let d = self.inv.desk(self.econ);
+        if let Some(i) = d.state.items.get_mut(&item) {
+            i.body_loc = loc;
+        }
+    }
+    fn beltable(&mut self, item: UnitId) -> bool {
+        let g = self.guid(item);
+        InventoryOps::beltable(&self.inv.desk(self.econ), g)
+    }
+    fn place_belt(&mut self, item: UnitId) -> bool {
+        // d2rs-own, unverified: `0x0055E9B0(item, slot = item x, find 1)`
+        // (`inventory-moves.md` §7.14) read as the free-slot search (§3.5)
+        // then the slot placement (§3.7); the item's x is not read.
+        let (o, g) = (self.owner, self.guid(item));
+        let mut d = self.inv.desk(self.econ);
+        match d.belt_free_slot(o, g) {
+            Some(s) => d.belt_place(o, g, u32::from(s)),
+            None => false,
+        }
+    }
+    fn place_inventory(&mut self, item: UnitId) -> bool {
+        if let Some(i) = self.econ.items.get_mut(item) {
+            i.inv_page = 0;
+        }
+        let p = self.player;
+        self.inv.desk(self.econ).place(p, item, (0, 0), true, true)
+    }
+    fn equip(&mut self, item: UnitId, loc: u8) -> bool {
+        let (o, g) = (self.owner, self.guid(item));
+        self.inv
+            .desk(self.econ)
+            .equip_from_cursor(o, g, loc, true)
+            .0
+    }
+    fn quiver(&mut self, item: UnitId) -> bool {
+        let g = self.guid(item);
+        self.inv.desk(self.econ).quiver(g)
+    }
+    fn set_quantity(&mut self, item: UnitId, n: i32) {
+        self.set_stat(item, istat::QUANTITY, n);
+    }
+    fn fill_durability(&mut self, item: UnitId) {
+        // `0x00625E00`: 0 without a base stat 73, else its total.
+        let max = self.econ.with_stats(|ctx| {
+            let s = UnitStats::new(ctx, item);
+            if s.base(istat::MAXDURABILITY, 0) == 0 {
+                0
+            } else {
+                s.stat(istat::MAXDURABILITY, 0)
+            }
+        });
+        self.set_stat(item, istat::DURABILITY, max);
+    }
+}
+
+/// The item-move seams no d2-sim module provides, answered for the first
+/// playable preview (`docs/PLAN.md` decisions, D1) so the play host can
+/// have an inventory model ([`preview_inv_parts`]): nothing is active,
+/// no own contribution, every location allowed, no quiver kind, player
+/// data +0x4C / +0x50 zero, no NPC talk, no player trade; the sends are
+/// collected for [`MoveRest::take_sent`].
+///
+/// d2rs-own, unverified: every answer here is a preview fill, not a
+/// spec'd behaviour; each one names the open point of `inventory.md` it
+/// stands in for (the `InvRest` method docs).
+#[derive(Debug, Default)]
+pub struct PreviewMoveRest {
+    sent: Vec<(Owner, Vec<u8>)>,
+    /// The places staged at the start of the call ([`MoveRest::stage`]).
+    places: BTreeMap<Owner, StagedPlace>,
+    item_format: u16,
+}
+
+impl MovePending for PreviewMoveRest {
+    fn send(&mut self, player: Owner, bytes: Vec<u8>) {
+        self.sent.push((player, bytes));
+    }
+    /// d2rs-own, unverified (D1): `0x00641530` is not specified; the
+    /// larger of the two sub-tile axis distances of the staged places,
+    /// out of range without both.
+    fn distance(&self, a: Owner, b: Owner) -> i32 {
+        match (self.places.get(&a), self.places.get(&b)) {
+            (Some(a), Some(b)) => (a.pos.0 - b.pos.0).abs().max((a.pos.1 - b.pos.1).abs()),
+            _ => i32::MAX,
+        }
+    }
+    /// d2rs-own, unverified (D1): a room exists wherever the player's
+    /// room does (no room lookup by position here).
+    fn room_at(&self, _: i32, _: i32) -> bool {
+        self.player_room().is_some()
+    }
+    /// d2rs-own, unverified (D1): `0x0064E810` (collision search) is not
+    /// provided; the start point in the player's room is free.
+    fn free_spot(
+        &self,
+        start: (i32, i32),
+        _: (i32, i32),
+        _: u32,
+        _: u32,
+        _: u32,
+        _: u32,
+    ) -> Option<Spot> {
+        Some(Spot {
+            room: self.player_room()?,
+            x: start.0,
+            y: start.1,
+        })
+    }
+}
+
+impl PreviewMoveRest {
+    /// The room of the first staged player (the preview has one).
+    fn player_room(&self) -> Option<RoomId> {
+        self.places
+            .values()
+            .find(|p| p.owner.is_player())
+            .and_then(|p| p.room)
+    }
+}
+
+impl InvRest for PreviewMoveRest {
+    /// d2rs-own, unverified (D1): the staged place of a unit.
+    fn pos(&self, u: Owner) -> (i32, i32) {
+        self.places.get(&u).map_or((0, 0), |p| p.pos)
+    }
+    fn set_pos(&mut self, u: Owner, x: i32, y: i32) {
+        if let Some(p) = self.places.get_mut(&u) {
+            p.pos = (x, y);
+        }
+    }
+    /// d2rs-own, unverified (D1): the request layout of a `gld` pile
+    /// (`0x00559CE0`) is unwritten; a plain normal-quality item of the
+    /// game's format, ground mode.
+    fn gold_request(&self, _: Owner, gld: usize) -> Option<(ItemRequest, ItemSpawn)> {
+        Some((
+            ItemRequest {
+                item: gld as i32,
+                format: self.item_format,
+                ilvl: 1,
+                quality: q::NORMAL,
+                flags2: 0x2,
+                ..ItemRequest::default()
+            },
+            ItemSpawn {
+                room: None,
+                mode: 3,
+                init_flags: 1,
+            },
+        ))
+    }
+    fn item_active_on(&self, _: u32, _: Owner) -> bool {
+        false
+    }
+    fn own_contribution(&self, _: u32, _: Owner, _: u16) -> i32 {
+        0
+    }
+    fn one_or_two_handed(&self, _: Owner, _: u32) -> bool {
+        false
+    }
+    fn has_allowed_location(&self, _: u32) -> bool {
+        true
+    }
+    fn quiver_kind(&self, _: u32) -> bool {
+        false
+    }
+    fn player_data_4c(&self, _: Owner) -> u32 {
+        0
+    }
+    fn player_data_50(&self, _: Owner) -> u32 {
+        0
+    }
+    fn npc_talking(&self, _: Owner, _: Owner) -> bool {
+        false
+    }
+    fn player_trade_gate(&self, _: Owner) -> Option<bool> {
+        None
+    }
+}
+
+impl MoveRest for PreviewMoveRest {
+    fn take_sent(&mut self) -> Vec<(Owner, Vec<u8>)> {
+        std::mem::take(&mut self.sent)
+    }
+    fn stage(&mut self, places: &[StagedPlace], item_format: u16) {
+        self.places = places.iter().map(|p| (p.owner, *p)).collect();
+        self.item_format = item_format;
+    }
+}
+
+/// d2rs-own, unverified (REC-119): the cube's calls no written spec owns
+/// ([`ItemPending`]) in the play host. The inventory pass queues nothing
+/// (the transmuted items leave through the inventory model's own sends),
+/// a copy, a tempered affix, the runeword and repair / recharge effects
+/// and the quest hooks do nothing, and the Cow portal is refused.
+#[derive(Debug, Default)]
+pub struct PreviewCubePending {
+    /// `hst ` hooks recorded for the quest control (REC-136).
+    quest_items: Vec<(UnitId, [u8; 4])>,
+}
+
+impl super::items::ItemPending for PreviewCubePending {
+    fn inventory_pass(&mut self, _: UnitId, _: &mut Vec<Vec<u8>>) {}
+    fn duplicate(&mut self, _: UnitId, _: bool) -> Option<UnitId> {
+        None
+    }
+    fn tempered_affix(&mut self, _: UnitId, _: bool) -> u16 {
+        0
+    }
+    fn drop_runeword_stats(&mut self, _: UnitId) {}
+    fn repair(&mut self, _: UnitId) {}
+    fn recharge(&mut self, _: UnitId) {}
+    fn quest_item_hook(&mut self, player: UnitId, _: UnitId, code: [u8; 4]) {
+        self.quest_items.push((player, code));
+    }
+    fn take_quest_items(&mut self) -> Vec<(UnitId, [u8; 4])> {
+        std::mem::take(&mut self.quest_items)
+    }
+    fn cow_portal(&mut self, _: UnitId) -> bool {
+        false
+    }
+}
+
+/// The cube parts of the play host ([`WiredWorld::cube`]) over `cube`
+/// (`CubeData::from_fixed`) with [`PreviewCubePending`].
+pub fn preview_cube_parts(cube: d2_sim::world::cube::CubeData) -> super::items::CubeParts {
+    super::items::CubeParts::new(cube, Box::new(PreviewCubePending::default()))
+}
+
+/// An inventory model for the play host ([`WiredWorld::inventory`]) over
+/// `tables` (`InvTables::from_fixed`) with [`PreviewMoveRest`].
+pub fn preview_inv_parts(tables: InvTables) -> InvParts {
+    InvParts::new(tables, Box::new(PreviewMoveRest::default()))
 }

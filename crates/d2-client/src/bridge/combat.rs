@@ -1,0 +1,212 @@
+// Spec: specs/ui/controls.md (§6 r2, r8, r9.3, r9.7), specs/skills/use.md (§3 r6); preview fills: docs/PLAN.md decisions D1–D3
+//! What the world-click dispatcher ([`super::click::ModelClick`]) needs
+//! to attack a monster: the skill row facts of §6 r8 from the client
+//! `skills` rows, `range(P, skill)`, and the play preview's answers for
+//! the inputs the model does not hold (hover, hostility, melee range).
+//! Each preview answer is marked `d2rs-own, unverified` (decision D1).
+
+use crate::controls::click::{range, skill_flag, SkillRowFacts};
+
+use super::world::{ClientUnit, ClientWorld, ModelInputs, SkillRow, UnitKey, MONSTER};
+
+/// The §6 r8 flag word of a `skills` row, by `skills.txt` bit
+/// (`controls::click::skill_flag`; `data/fields.tsv`).
+pub fn skill_flags(s: &d2_data::tables::Skills) -> u32 {
+    [
+        (s.passive, skill_flag::PASSIVE),
+        (s.intown, skill_flag::IN_TOWN),
+        (s.targetableonly, skill_flag::TARGETABLE_ONLY),
+        (s.searchenemyxy, skill_flag::SEARCH_ENEMY_XY),
+        (s.searchenemynear, skill_flag::SEARCH_ENEMY_NEAR),
+        (s.searchopenxy, skill_flag::SEARCH_OPEN_XY),
+        (s.targetcorpse, skill_flag::TARGET_CORPSE),
+        (s.targetpet, skill_flag::TARGET_PET),
+        (s.targetally, skill_flag::TARGET_ALLY),
+        (s.targetitem, skill_flag::TARGET_ITEM),
+        (s.attacknomana, skill_flag::ATTACK_NO_MANA),
+    ]
+    .into_iter()
+    .filter(|(on, _)| *on)
+    .fold(0, |m, (_, f)| m | f)
+}
+
+/// The facts of skill `id` (§6 r8), `None` for an id outside the table.
+pub fn row_facts(inputs: &ModelInputs, id: u16) -> Option<SkillRowFacts> {
+    let r = inputs.tables.skills.get(usize::from(id))?;
+    Some(SkillRowFacts {
+        flags: r.flags,
+        range: r.range,
+        srvdofunc: r.srvdofunc,
+    })
+}
+
+/// `range(P, skill)` `0x00645460` (`skills/use.md` §3 r6): the row's
+/// `range`, with `both` (3) as h2h. PROVISIONAL (use.md §3 r6): `both`
+/// is rng with a bow or crossbow equipped; the preview player holds no
+/// items (D1), so it reads as h2h; the state-mask 0x26 rule needs the
+/// client states and is not applied.
+pub fn skill_range(row: &SkillRow) -> u8 {
+    match row.range {
+        3 => range::H2H,
+        r @ (range::NONE | range::H2H | range::RNG | range::LOC) => r,
+        _ => range::NONE,
+    }
+}
+
+/// [`skill_range`] of skill `id`; `NONE` outside the table.
+pub fn range_of(inputs: &ModelInputs, id: u16) -> u8 {
+    inputs
+        .tables
+        .skills
+        .get(usize::from(id))
+        .map_or(range::NONE, skill_range)
+}
+
+/// A monster that is a town NPC (`monstats` `npc`).
+fn is_npc(inputs: &ModelInputs, u: &ClientUnit) -> bool {
+    inputs
+        .tables
+        .monsters
+        .get(u.class as usize)
+        .and_then(|c| c.as_ref())
+        .is_some_and(|c| c.npc)
+}
+
+/// The hovered unit `0x00467A10` for a click at world sub-tile `at`.
+///
+/// d2rs-own, unverified (D1; TODO(spec: client/model.md hover
+/// `0x00467A10`)): the model has no hover (no sprite boxes), so the
+/// preview hovers the nearest monster that is not a town NPC (NPC
+/// clicks stay with their own path) whose feet are within one sub-tile
+/// of `at`, or of `at` moved up to four sub-tiles down-screen (+1, +1
+/// per step: a click on the body lands behind the feet). Nearest = the
+/// fewest down-screen steps, then the smallest Chebyshev distance, then
+/// the lowest key (stable).
+pub fn hover_at(world: &ClientWorld, inputs: &ModelInputs, at: (i32, i32)) -> Option<UnitKey> {
+    let mut best: Option<((i32, i32), UnitKey)> = None;
+    for (key, u) in &world.units {
+        if key.unit_type != MONSTER || Some(*key) == world.local_player || is_npc(inputs, u) {
+            continue;
+        }
+        let Some((x, y)) = u.position else {
+            continue;
+        };
+        let (ux, uy) = (i32::from(x), i32::from(y));
+        let score = (0..=4).find_map(|k| {
+            let d = (at.0 + k - ux).abs().max((at.1 + k - uy).abs());
+            (d <= 1).then_some((k, d))
+        });
+        if let Some(s) = score {
+            if best.is_none_or(|(b, _)| s < b) {
+                best = Some((s, *key));
+            }
+        }
+    }
+    best.map(|(_, k)| k)
+}
+
+/// The hostility test `0x00465C60(P, U)` (§6 r9.7) for a monster.
+///
+/// In town: 1 (§6 r9.7, no pet list in the preview). Out of town:
+/// d2rs-own, unverified (D1; the relation flags, `alSel` / `noSel` and
+/// the unit alignment are not in the model): a monster is hostile
+/// unless its set-up `Align` is 1 (an ally); without set-up columns it
+/// is hostile.
+pub fn hostile(world: &ClientWorld, inputs: &ModelInputs, u: UnitKey) -> bool {
+    if u.unit_type != MONSTER {
+        return false;
+    }
+    if let Some(p) = world.local_player {
+        if super::modes::in_town(world, p) {
+            return true;
+        }
+    }
+    let Some(unit) = world.units.get(&u) else {
+        return false;
+    };
+    inputs
+        .tables
+        .monsters
+        .get(unit.class as usize)
+        .and_then(|c| c.as_ref())
+        .and_then(|c| c.setup.as_ref())
+        .is_none_or(|s| s.align != 1)
+}
+
+/// The melee-range test `0x00622C40(P, U, moving)` (§6 r9.3).
+///
+/// d2rs-own, unverified (D1): the client holds no melee-range rule, so
+/// the preview always answers "in range": the click sends the skill on
+/// the unit (C→S 0x06 / 0x0D), and the server's `use_on_unit`
+/// (`skills/use.md` §3 r6) runs to the target and fires on arrival when
+/// it is out of range. The client's own approach walk (code 2 / 4 with
+/// the pending attack) is therefore never taken in the preview.
+pub fn melee_range(_world: &ClientWorld, _u: UnitKey) -> bool {
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::bridge::world::{MonsterClass, PLAYER};
+
+    fn world_with(units: &[(UnitKey, (u16, u16), u32)]) -> ClientWorld {
+        let mut w = ClientWorld::default();
+        for &(k, at, class) in units {
+            let mut u = ClientUnit::new(k);
+            u.position = Some(at);
+            u.class = class;
+            w.units.insert(k, u);
+        }
+        w
+    }
+
+    #[test]
+    fn hover_picks_the_monster_under_the_click() {
+        let m1 = UnitKey::new(MONSTER, 5);
+        let m2 = UnitKey::new(MONSTER, 6);
+        let npc = UnitKey::new(MONSTER, 7);
+        let p = UnitKey::new(PLAYER, 1);
+        let mut w = world_with(&[
+            (m1, (100, 100), 0),
+            (m2, (110, 100), 0),
+            (npc, (120, 100), 1),
+            (p, (90, 90), 0),
+        ]);
+        w.local_player = Some(p);
+        let mut inputs = ModelInputs::default();
+        inputs.tables.monsters = vec![
+            Some(MonsterClass::default()),
+            Some(MonsterClass {
+                npc: true,
+                ..MonsterClass::default()
+            }),
+        ];
+        assert_eq!(hover_at(&w, &inputs, (100, 101)), Some(m1));
+        // A click on the body: up-screen of the feet.
+        assert_eq!(hover_at(&w, &inputs, (107, 97)), Some(m2));
+        assert_eq!(
+            hover_at(&w, &inputs, (120, 100)),
+            None,
+            "NPCs are not hovered"
+        );
+        assert_eq!(
+            hover_at(&w, &inputs, (90, 90)),
+            None,
+            "the player is not a monster"
+        );
+        assert_eq!(hover_at(&w, &inputs, (105, 120)), None);
+    }
+
+    #[test]
+    fn range_reads_both_as_h2h() {
+        let row = |r| SkillRow {
+            range: r,
+            ..SkillRow::default()
+        };
+        assert_eq!(skill_range(&row(1)), range::H2H);
+        assert_eq!(skill_range(&row(2)), range::RNG);
+        assert_eq!(skill_range(&row(3)), range::H2H);
+        assert_eq!(skill_range(&row(9)), range::NONE);
+    }
+}

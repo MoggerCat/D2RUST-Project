@@ -51,6 +51,31 @@ pub struct DeathState {
     /// Client +0x508 per player: the last death's experience loss
     /// (`0x005391E0` writes it, the corpse creation reads and clears it).
     pub exp_lost: BTreeMap<UnitId, u32>,
+    /// The owner GUID of each corpse this wiring allocated (the
+    /// inventory of a corpse, `0x0063D450`, is not modelled).
+    pub owners: BTreeMap<UnitId, u32>,
+    /// Allocate the corpse unit when [`Pending::create_corpse`] gives
+    /// none (the preview host; off in the spec tests).
+    pub allocate_corpses: bool,
+    /// The last death code sent per player (8 DT, 9 DD): each goes out
+    /// once ([`super::dying`]).
+    pub announced: BTreeMap<UnitId, u8>,
+    /// Players seen with life left: only these die when the life reaches
+    /// 0 (a player whose stats are not set up yet is left alone).
+    pub seen_alive: std::collections::BTreeSet<UnitId>,
+    /// Players that have died: their dispatch gate follows the live mode
+    /// (the host stages the others, `adapters::SimGame::set_player`).
+    pub died: std::collections::BTreeSet<UnitId>,
+    /// Corpses allocated and not yet announced to the clients.
+    pub fresh: Vec<UnitId>,
+    /// (player, corpse) pairs whose items have not moved yet: the host
+    /// that holds the inventory model runs `items::moves::ground::
+    /// corpse_fill` for each (`vitals.md` §4.7 rule 1.7).
+    pub loot: Vec<(UnitId, UnitId)>,
+    /// (player, amount) gold drops of the death penalty (`vitals.md` §4.6
+    /// rule 1, `0x00535510`): the host that holds the inventory model
+    /// makes the piles (`items::moves::ground::gold_piles`).
+    pub gold_drops: Vec<(UnitId, i32)>,
 }
 
 impl<X: Pending> ActionHooks<X> {
@@ -94,10 +119,12 @@ impl<X: Pending> ActionHooks<X> {
             }
             if let Some(q) = g.drop {
                 cv.v.h.x.death_drop_gold(cv.game, p, q);
+                cv.v.h.death.gold_drops.push((p, q));
             }
         } else {
             if let Some(q) = g.drop {
                 cv.v.h.x.death_drop_gold(cv.game, p, q);
+                cv.v.h.death.gold_drops.push((p, q));
             }
             if let Some(v) = g.gold {
                 cv.set_base_stat(p, gold_stat::GOLD, v);
@@ -134,7 +161,8 @@ impl<X: Pending> ActionHooks<X> {
     /// client +0x508, then +0x508 := 0.
     /// With no corpse (§4.7 rule 1.2) +0x508 is left unchanged.
     pub fn corpse_creation(&mut self, sim: &mut Sim<'_>, p: UnitId) {
-        let Some(c) = self.x.create_corpse(sim.game, p) else {
+        let made = self.x.create_corpse(sim.game, p);
+        let Some(c) = made.or_else(|| self.allocate_corpse(sim, p)) else {
             return;
         };
         let v = self.death.exp_lost.get(&p).copied().unwrap_or(0) as i32;
@@ -154,11 +182,16 @@ impl<X: Pending> ActionHooks<X> {
     /// or none when refused; the item take-back `0x00562F30` and the rest
     /// of §12.1 are the inventory's (`items::moves::ground`).
     pub fn corpse_pickup(&mut self, sim: &mut Sim<'_>, p: UnitId, c: UnitId) -> Option<i32> {
-        if !sim.stats.has_state(c, STATE_PLAYERBODY) {
+        // A corpse this wiring allocated has state 7 by construction (the
+        // state table of a bare fixture may not hold the row).
+        if !sim.stats.has_state(c, STATE_PLAYERBODY) && !self.death.owners.contains_key(&c) {
             return None;
         }
         let guid = sim.units.get(p).map(|r| r.guid);
-        let owner = self.x.corpse_owner_guid(c);
+        let owner = self
+            .x
+            .corpse_owner_guid(c)
+            .or_else(|| self.death.owners.get(&c).copied());
         let own = owner.is_some() && owner == guid;
         if !own && !self.x.corpse_loot_allowed(c, p) {
             return None;

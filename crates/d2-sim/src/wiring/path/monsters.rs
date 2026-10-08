@@ -49,6 +49,8 @@ pub const WALK_EVENT0: u32 = MONSTER_MODES[2].event0;
 pub const RUN_EVENT0: u32 = MONSTER_MODES[15].event0;
 pub const KB_EVENT0: u32 = MONSTER_MODES[13].event0;
 pub const SQ_EVENT0: u32 = MONSTER_MODES[14].event0;
+/// The attack-family event 0 `0x005A7670` (modes 4, 5, 7, 8, 9).
+pub const ATTACK_EVENT0: u32 = MONSTER_MODES[4].event0;
 pub const S3_EVENT0: u32 = MONSTER_MODES[10].event0;
 /// S3 event 1 `0x005A74D0`: nothing.
 pub const S3_EVENT1: u32 = MONSTER_MODES[10].event1;
@@ -375,6 +377,10 @@ impl<X: Pending> ActionHooks<X> {
                 self.monster_sq_event0(sim, unit);
                 true
             }
+            ATTACK_EVENT0 => {
+                self.monster_attack_event0(sim, unit);
+                true
+            }
             S3_EVENT0 => {
                 self.monster_s3_event0(sim, unit);
                 true
@@ -481,7 +487,7 @@ impl<X: Pending> ActionHooks<X> {
             }
         }
         self.plain_mode(sim, unit, m);
-        if self.x.used_skill(unit).is_some() {
+        if self.used_skill_of(unit).is_some() {
             let _ = X::monster_skill_start(self, sim, unit);
         }
         true
@@ -600,6 +606,16 @@ impl<X: Pending> ActionHooks<X> {
             self.ai_mode_end(sim, unit, ended as u8);
             return;
         }
+        X::monster_sequence_frame(self, sim, unit);
+        self.x.refresh_animation(sim.game, unit);
+    }
+
+    /// Attack-family event 0 `0x005A7670` (`skills/use.md` §5.2: "monsters
+    /// branch", Open question 6).
+    // PROVISIONAL (skills/use.md OQ6; REC-111): the sequence frame's skill
+    // part (the do by frame code, unit +0x4E = 1 or 2 or 4), then the
+    // animation refresh. The spec says the test reads +0x4E = 1.
+    fn monster_attack_event0(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         X::monster_sequence_frame(self, sim, unit);
         self.x.refresh_animation(sim.game, unit);
     }

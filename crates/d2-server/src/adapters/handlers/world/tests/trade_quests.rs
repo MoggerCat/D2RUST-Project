@@ -61,9 +61,14 @@ pub struct ActionRest {
     pub sent: Vec<(UnitId, Vec<u8>)>,
     pub in_range: bool,
     pub routes: Vec<ObjectRoute>,
+    /// Quest events the tests queue for the host's `after_tick`.
+    pub quest_events: Vec<d2_sim::wiring::action::QuestEvent>,
 }
 
 impl Pending for ActionRest {
+    fn take_quest_events(&mut self) -> Vec<d2_sim::wiring::action::QuestEvent> {
+        std::mem::take(&mut self.quest_events)
+    }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
     }

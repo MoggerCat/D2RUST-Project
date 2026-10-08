@@ -162,6 +162,47 @@ pub fn key_actions(bindings: &Bindings, pressed: &[KeyCode]) -> Vec<UiEvent> {
         .collect()
 }
 
+/// The typed characters of the keys pressed this frame, for the text
+/// the UI asks for (the gold dialog's digits): digit keys → the digit,
+/// Backspace → 8, Enter → 0x0D, Escape → 0x1B, as [`UiEvent::Char`].
+/// d2rs-own, unverified (D1): a raw key map (no layout, no shift); the
+/// panels that take no text ignore these events.
+pub fn key_chars(pressed: &[KeyCode]) -> Vec<UiEvent> {
+    use KeyCode as C;
+    const DIGITS: [(KeyCode, u16); 20] = [
+        (C::Digit0, b'0' as u16),
+        (C::Digit1, b'1' as u16),
+        (C::Digit2, b'2' as u16),
+        (C::Digit3, b'3' as u16),
+        (C::Digit4, b'4' as u16),
+        (C::Digit5, b'5' as u16),
+        (C::Digit6, b'6' as u16),
+        (C::Digit7, b'7' as u16),
+        (C::Digit8, b'8' as u16),
+        (C::Digit9, b'9' as u16),
+        (C::Numpad0, b'0' as u16),
+        (C::Numpad1, b'1' as u16),
+        (C::Numpad2, b'2' as u16),
+        (C::Numpad3, b'3' as u16),
+        (C::Numpad4, b'4' as u16),
+        (C::Numpad5, b'5' as u16),
+        (C::Numpad6, b'6' as u16),
+        (C::Numpad7, b'7' as u16),
+        (C::Numpad8, b'8' as u16),
+        (C::Numpad9, b'9' as u16),
+    ];
+    pressed
+        .iter()
+        .filter_map(|c| match c {
+            C::Backspace => Some(8),
+            C::Enter | C::NumpadEnter => Some(0x0D),
+            C::Escape => Some(0x1B),
+            c => DIGITS.iter().find(|(d, _)| d == c).map(|&(_, u)| u),
+        })
+        .map(UiEvent::Char)
+        .collect()
+}
+
 #[cfg(test)]
 mod key_tests {
     use super::*;
@@ -178,6 +219,24 @@ mod key_tests {
         for (i, (c, _)) in KEY_CODES.iter().enumerate() {
             assert!(KEY_CODES[..i].iter().all(|(d, _)| d != c));
         }
+    }
+
+    #[test]
+    fn typed_keys_become_chars() {
+        let e = key_chars(&[
+            KeyCode::Digit4,
+            KeyCode::KeyX,
+            KeyCode::Backspace,
+            KeyCode::Enter,
+        ]);
+        assert_eq!(
+            e,
+            vec![
+                UiEvent::Char(b'4' as u16),
+                UiEvent::Char(8),
+                UiEvent::Char(0x0D)
+            ]
+        );
     }
 
     // Covers: specs/client/ui.md §a4-input-actions, §a6-controls-file-d2controls-1-m20 r2

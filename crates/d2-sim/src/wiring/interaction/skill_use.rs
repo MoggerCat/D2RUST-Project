@@ -92,6 +92,11 @@ pub trait UseRest {
     fn run_to(&mut self, u: UnitId, target: UnitId, e: SkillEntry);
     fn target(&self, u: UnitId) -> Option<UnitId>;
     fn clear_target(&mut self, u: UnitId);
+    /// The target of a mode start: the point or unit the skill's missile
+    /// and checks read back through [`UseRest::target`] and
+    /// [`UseRest::target_position`] (`use.md` §4: where `0x0057FE90` /
+    /// `0x0057FEF0` store it is not stated). Default: not kept.
+    fn keep_target(&mut self, _u: UnitId, _target: ModeTarget<UnitId>) {}
     fn event_arg(&self, u: UnitId) -> i32;
     fn set_event_arg(&mut self, u: UnitId, a: i32);
     fn step_path(&mut self, u: UnitId) -> i32;
@@ -136,10 +141,19 @@ impl<X: Pending + UseRest> ActionSim<X> {
 }
 
 impl<X: Pending + UseRest> UseView<'_, X> {
+    /// The unit's list in `ActionHooks::skill_lists` (`client/msg-skills.md`
+    /// §1), when it has one: the list calls answer from it, the seam
+    /// otherwise.
+    fn list(&self, u: UnitId) -> Option<&crate::skills::list::SkillList> {
+        self.cv.v.h.skill_lists.get(&u)
+    }
+    fn list_mut(&mut self, u: UnitId) -> Option<&mut crate::skills::list::SkillList> {
+        self.cv.v.h.skill_lists.get_mut(&u)
+    }
     fn x(&self) -> &X {
         &self.cv.v.h.x
     }
-    fn xm(&mut self) -> &mut X {
+    pub(super) fn xm(&mut self) -> &mut X {
         &mut self.cv.v.h.x
     }
     fn error(&mut self, e: WiringError) {
@@ -329,28 +343,52 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
     }
 
     fn left_skill(&self, u: UnitId) -> Option<SkillEntry> {
-        self.x().left_skill(u)
+        match self.list(u) {
+            Some(l) => l.left.and_then(|i| l.view().get(i).copied()),
+            None => self.x().left_skill(u),
+        }
     }
     fn right_skill(&self, u: UnitId) -> Option<SkillEntry> {
-        self.x().right_skill(u)
+        match self.list(u) {
+            Some(l) => l.right.and_then(|i| l.view().get(i).copied()),
+            None => self.x().right_skill(u),
+        }
     }
     fn set_left_skill(&mut self, u: UnitId, e: SkillEntry) {
-        self.xm().set_left_skill(u, e);
+        match self.list_mut(u) {
+            Some(l) => l.left = l.find(e.skill, e.owner_guid),
+            None => self.xm().set_left_skill(u, e),
+        }
     }
     fn set_right_skill(&mut self, u: UnitId, e: SkillEntry) {
-        self.xm().set_right_skill(u, e);
+        match self.list_mut(u) {
+            Some(l) => l.right = l.find(e.skill, e.owner_guid),
+            None => self.xm().set_right_skill(u, e),
+        }
     }
     fn find_entry(&self, u: UnitId, skill: i32) -> Option<SkillEntry> {
-        self.x().find_entry(u, skill)
+        match self.list(u) {
+            Some(l) => l.view().into_iter().find(|e| e.skill == skill),
+            None => self.x().find_entry(u, skill),
+        }
     }
     fn find_entry_owned(&self, u: UnitId, skill: i32, owner: i32) -> Option<SkillEntry> {
-        self.x().find_entry_owned(u, skill, owner)
+        match self.list(u) {
+            Some(l) => l.find(skill, owner).and_then(|i| l.view().get(i).copied()),
+            None => self.x().find_entry_owned(u, skill, owner),
+        }
     }
     fn owns_skill(&self, u: UnitId, skill: i32) -> bool {
-        self.x().owns_skill(u, skill)
+        match self.list(u) {
+            Some(l) => l.has(skill),
+            None => self.x().owns_skill(u, skill),
+        }
     }
     fn set_used_skill(&mut self, u: UnitId, e: Option<SkillEntry>) {
-        self.xm().set_used_skill(u, e);
+        match self.list_mut(u) {
+            Some(l) => l.current = e.and_then(|e| l.find(e.skill, e.owner_guid)),
+            None => self.xm().set_used_skill(u, e),
+        }
     }
     fn used_skill_flags(&self, u: UnitId) -> u32 {
         self.x().used_skill_flags(u)
@@ -359,7 +397,12 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
         self.xm().set_used_skill_flags(u, f);
     }
     fn entry_mode(&self, u: UnitId, e: &SkillEntry) -> u32 {
-        self.x().entry_mode(u, e)
+        match self.list(u) {
+            Some(l) => l
+                .find(e.skill, e.owner_guid)
+                .map_or(0, |i| l.entries[i].mode),
+            None => self.x().entry_mode(u, e),
+        }
     }
     fn attack_param4(&self, u: UnitId) -> i32 {
         self.x().attack_param4(u)
@@ -431,9 +474,17 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
     fn start_mode(&mut self, u: UnitId, mode: u32, target: ModeTarget<UnitId>) {
         let game = &mut *self.cv.game;
         self.cv.v.h.x.start_mode(game, u, mode, target);
+        self.cv.v.h.x.keep_target(u, target);
     }
+    /// The unit-form run request on the path provider; without one the
+    /// host's seam.
     fn run_to(&mut self, u: UnitId, target: UnitId, e: SkillEntry) {
-        self.xm().run_to(u, target, e);
+        if self.cv.v.h.paths.is_some() {
+            let mut p = crate::wiring::path::walk::PathCtx::of(&mut self.cv.v, &mut *self.cv.game);
+            p.run_to_unit(u, target, e.skill as u16);
+        } else {
+            self.xm().run_to(u, target, e);
+        }
     }
     fn target(&self, u: UnitId) -> Option<UnitId> {
         UseRest::target(self.x(), u)
@@ -889,7 +940,9 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             self.error(WiringError::EndlessProgressive { unit, skill, step });
             return;
         }
-        self.xm().body_effect(e);
+        if let Some(e) = self.pet_effect(e) {
+            self.xm().body_effect(e);
+        }
     }
     fn path_op(&mut self, u: UnitId, op: bodies::PathOp<UnitId>) -> i32 {
         self.xm().body_path_op(u, op)
@@ -1085,7 +1138,10 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         mode: i32,
         spread: i32,
     ) -> Option<UnitId> {
-        self.xm().create_monster(r, at, class, mode, spread)
+        match self.xm().create_monster(r, at, class, mode, spread) {
+            Some(m) => Some(m),
+            None => self.alloc_monster(r, at, class, mode),
+        }
     }
     fn mode_request(&mut self, m: UnitId, mode: i32, target: Option<UnitId>) -> i32 {
         Pending::mode_request(self.xm(), m, mode, target)

@@ -153,14 +153,21 @@ impl<X: Pending> WaypointWorld for WaypointView<'_, X> {
     }
     /// `0x0053AEC0` (rule 5): with the path provider, the same-act warp
     /// is the spawn point and placement of `path-placement.md` §11
-    /// ([`crate::wiring::path::place::level_warp`]); an act change (and
-    /// every warp without the provider) goes to [`Pending::warp`].
+    /// ([`crate::wiring::path::place::level_warp`]), an act change is
+    /// [`crate::wiring::path::act_change::run`]; a warp without the
+    /// provider (or without the destination act) goes to [`Pending::warp`].
     fn warp(&mut self, player: UnitId, level: u32, tile_code: u8) {
         if self.v.h.paths.is_some() {
             let c = crate::wiring::path::PathCtx::of(&mut self.v, self.game);
             if crate::wiring::path::place::level_warp(c, player, level, u32::from(tile_code))
                 .is_some()
             {
+                return;
+            }
+            // Another act: the act change (d2rs-own wiring, unverified;
+            // `wiring::path::act_change`).
+            let c = crate::wiring::path::PathCtx::of(&mut self.v, self.game);
+            if crate::wiring::path::act_change::run(c, player, level, u32::from(tile_code)) {
                 return;
             }
         }

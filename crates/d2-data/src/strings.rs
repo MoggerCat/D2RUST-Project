@@ -45,6 +45,9 @@ pub enum StringsError {
     Mpq { file: String, source: MpqError },
     #[error("{file}: {source}")]
     Format { file: String, source: FormatError },
+    /// A read error from a native source (`native-assets.md` §5.3).
+    #[error("{file}: {detail}")]
+    Source { file: String, detail: String },
 }
 
 /// `string.tbl`, `patchstring.tbl` and (LoD only) `expansionstring.tbl`.
@@ -66,14 +69,17 @@ impl StringTables {
     /// set: `string.tbl`, `patchstring.tbl`, then `expansionstring.tbl`
     /// when `lod` (`loading.md` §10.1).
     pub fn load(set: &ArchiveSet, lang: &str, lod: bool) -> Result<StringTables, StringsError> {
-        let read = |name: &str| -> Result<StringTable, StringsError> {
-            let file = format!("data\\local\\lng\\{lang}\\{name}");
-            let bytes = set.read(&file).map_err(|source| StringsError::Mpq {
-                file: file.clone(),
-                source,
-            })?;
-            StringTable::parse(&bytes).map_err(|source| StringsError::Format { file, source })
-        };
+        StringTables::load_from(set, lang, lod)
+    }
+
+    /// [`StringTables::load`] over any table source: the archive set or a
+    /// native folder (`native-assets.md` §5.3).
+    pub fn load_from(
+        set: &dyn crate::bin::TableFiles,
+        lang: &str,
+        lod: bool,
+    ) -> Result<StringTables, StringsError> {
+        let read = |name: &str| set.string_table(&format!("data\\local\\lng\\{lang}\\{name}"));
         Ok(StringTables {
             base: Some(read("string.tbl")?),
             patch: Some(read("patchstring.tbl")?),

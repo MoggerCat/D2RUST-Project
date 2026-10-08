@@ -215,7 +215,7 @@ impl Atlas {
                 Some(p) => p,
                 None if (layouts.len() as u32) < self.max_pages => {
                     let mut l = Layout::new();
-                    let (x, y) = l.place(w, h).expect("a MAX_SIDE frame fits an empty page");
+                    let (x, y) = l.place(w, h).ok_or(AtlasError::TooLarge { w, h })?;
                     layouts.push(l);
                     (layouts.len() - 1, x, y)
                 }

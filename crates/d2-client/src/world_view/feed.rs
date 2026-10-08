@@ -73,6 +73,19 @@ pub trait ViewFeed: ViewSource {
     /// default ignores it: the feed answers [`Self::open_mode`] itself.
     fn set_ui_open_mode(&mut self, _mode: OpenMode) {}
 
+    /// The play preview's predicted position of the local player
+    /// (`bridge::predict`, decision D2; 16.16 sub-tiles), handed over
+    /// before each build. The default ignores it (strict path: the model's
+    /// cell).
+    fn set_local_prediction(&mut self, _at: Option<(UnitKey, (u32, u32))>) {}
+
+    /// Whether the view places a cel cut by the frame edge and leaves it
+    /// to the frame clip (`OriginalView::with_edge_clip`, decision D1). The
+    /// default (strict) is `false`.
+    fn edge_clip(&self) -> bool {
+        false
+    }
+
     /// The shake running at this frame, if any (camera §8, started by
     /// `0x00476A80`). The starts d2rs knows are [`event_shake`]'s.
     fn shake(&self, world: &ClientWorld) -> Result<Option<RunningShake>, ViewError>;
@@ -92,6 +105,13 @@ pub trait ViewFeed: ViewSource {
     /// = the model states no map, and `map_tiles` answers alone.
     fn near_rooms(&mut self, _world: &ClientWorld) -> Result<Option<&mut NearRooms>, ViewError> {
         Ok(None)
+    }
+
+    /// Before the frame's build (`present.rs`): makes the assets the
+    /// feed's answers name resident (the map's DT1 tiles, the act's shade
+    /// tables; `client/assets.md` §A4). The default needs none.
+    fn prepare(&mut self, _world: &ClientWorld, _assets: &mut ViewAssets) -> Result<(), ViewError> {
+        Ok(())
     }
 
     /// The facts of a room unit the draw order reads (`draw-order.md` §3
@@ -371,7 +391,7 @@ where
             world,
             ui,
             &NoWorld {
-                view: &OriginalView::new(camera, rules, &*feed),
+                view: &OriginalView::new(camera, rules, &*feed).with_edge_clip(feed.edge_clip()),
             },
             assets,
         ),
@@ -407,6 +427,7 @@ where
     S: ViewSource + ?Sized,
     F: ViewFeed + ?Sized,
 {
+    let clip = feed.edge_clip();
     match feed.light(world)? {
         Some(l) => {
             let lit = LitRules {
@@ -414,9 +435,13 @@ where
                 feed: l.look,
                 light: l.light,
             };
-            build(world, ui, &OriginalView::new(camera, &lit, source), assets)
+            let view = OriginalView::new(camera, &lit, source).with_edge_clip(clip);
+            build(world, ui, &view, assets)
         }
-        None => build(world, ui, &OriginalView::new(camera, rules, source), assets),
+        None => {
+            let view = OriginalView::new(camera, rules, source).with_edge_clip(clip);
+            build(world, ui, &view, assets)
+        }
     }
 }
 

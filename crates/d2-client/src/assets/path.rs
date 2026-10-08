@@ -1,4 +1,5 @@
 // Spec: specs/client/assets.md
+// Spec: specs/formats/native-assets.md §5 (native FileSource, typed reads)
 //! Canonical asset paths (§A1) and the plain-Rust read behind the `mpq://`
 //! source.
 //!
@@ -11,6 +12,7 @@
 use std::fmt;
 
 use d2_formats::mpq::ArchiveSet;
+use d2_native::source::{decode_original, AssetKind, NativeAsset, NativeSource};
 
 /// An archive path in canonical form, without the `mpq://` prefix:
 /// `data/global/palette/act1/pal.dat`.
@@ -114,6 +116,114 @@ pub trait FileSource: Send + Sync + 'static {
     /// Reads `archive_name` (`\` separators). `None` if no archive holds
     /// it; `Some(Err(message))` if one does but reading failed.
     fn read_file(&self, archive_name: &str) -> Option<Result<Vec<u8>, String>>;
+
+    /// The decoded asset at `path` (`native-assets.md` §5 r1, typed
+    /// loaders). The archive side decodes the original bytes with the
+    /// `d2-formats` readers, so every caller has one code path. `None`
+    /// when the source has no such file, or for a kind not converted.
+    fn read_native(&self, path: &CanonicalPath) -> Option<Result<NativeAsset, String>> {
+        match self.read_file(&path.archive_name())? {
+            Ok(bytes) => decode_original(path.as_str(), &bytes),
+            Err(e) => Some(Err(e)),
+        }
+    }
+
+    /// `true` for a native folder: the loaders then take
+    /// [`FileSource::read_native`], and the bytes are only a presence mark.
+    fn is_native(&self) -> bool {
+        false
+    }
+}
+
+/// The decoded asset at `archive` (`\` or `/` separators, any case) from
+/// `source`, picked by `pick` (`native-assets.md` §5 r1): on a native
+/// folder the typed file, on the archives the decoded original bytes.
+/// `None`: no such file (or a wrong kind).
+fn read_typed<S: FileSource + ?Sized, T>(
+    source: &S,
+    archive: &str,
+    pick: fn(NativeAsset) -> Option<T>,
+) -> Option<Result<T, String>> {
+    let path = match CanonicalPath::new(archive) {
+        Ok(p) => p,
+        Err(e) => return Some(Err(e.to_string())),
+    };
+    match source.read_native(&path)? {
+        Ok(a) => pick(a).map(Ok),
+        Err(e) => Some(Err(e)),
+    }
+}
+
+macro_rules! typed_reader {
+    ($(#[$m:meta])* $name:ident, $variant:ident, $ty:ty) => {
+        $(#[$m])*
+        pub fn $name<S: FileSource + ?Sized>(
+            source: &S,
+            archive: &str,
+        ) -> Option<Result<$ty, String>> {
+            read_typed(source, archive, |a| match a {
+                NativeAsset::$variant(x) => Some(x),
+                _ => None,
+            })
+        }
+    };
+}
+
+typed_reader!(
+    /// The DC6 at `archive`, from archives or native alike.
+    read_dc6, Dc6, d2_formats::dc6::Dc6
+);
+typed_reader!(
+    /// The DCC at `archive`.
+    read_dcc, Dcc, d2_formats::dcc::Dcc
+);
+typed_reader!(
+    /// The DT1 at `archive`.
+    read_dt1_file, Dt1, d2_formats::dt1::Dt1
+);
+typed_reader!(
+    /// The font `.tbl` at `archive`.
+    read_font_table, Font, d2_formats::font::FontTable
+);
+typed_reader!(
+    /// The palette (`pal.dat`) at `archive`.
+    read_palette, Pal, d2_formats::palette::Palette
+);
+typed_reader!(
+    /// The PL2 at `archive`.
+    read_pl2, Pl2, d2_formats::palette::Pl2
+);
+
+/// The converted native folder (`native-assets.md` §5). Raw bytes exist
+/// only for the kinds whose native file is the original format: excel
+/// `.txt` (verbatim). Audio is deferred: `.wav` reads are `None`, so the
+/// sound paths skip them (no sound on the native source for now).
+impl FileSource for NativeSource {
+    fn read_file(&self, archive_name: &str) -> Option<Result<Vec<u8>, String>> {
+        let p = fold(archive_name);
+        match AssetKind::of(&p)? {
+            AssetKind::Excel => match self.read_native(&p)? {
+                Ok(NativeAsset::Excel(b)) => Some(Ok(b)),
+                Ok(_) => None,
+                Err(e) => Some(Err(e)),
+            },
+            AssetKind::Wav => None,
+            // A typed kind: present (empty bytes) or absent; the loaders
+            // read it through `read_native`.
+            _ => self.contains(&p).then(|| Ok(Vec::new())),
+        }
+    }
+
+    fn read_native(&self, path: &CanonicalPath) -> Option<Result<NativeAsset, String>> {
+        if AssetKind::of(path.as_str()) == Some(AssetKind::Wav) {
+            return None;
+        }
+        NativeSource::read_native(self, path.as_str())
+    }
+
+    fn is_native(&self) -> bool {
+        true
+    }
 }
 
 impl FileSource for ArchiveSet {

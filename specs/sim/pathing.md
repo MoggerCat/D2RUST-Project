@@ -37,16 +37,16 @@
 |   7. A* (type 1, `0x0067B850`) | 437–474 |
 |   8. Velocity, direction vector, facing | 475–561 |
 |   9. Per-tick movement | 562–745 |
-|   10. Messages | 746–768 |
-|   11. Missile paths (`0x00649760`) | 769–821 |
-|   12. Other path types (1.14d-read 2026-10-08) | 822–1035 |
-|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1036–1115 |
-| Constants & data dependencies | 1116–1152 |
-| Randomness | 1153–1163 |
-| Edge cases & original bugs | 1164–1211 |
-| Test vectors | 1212–1249 |
-| Provenance | 1250–1292 |
-| Open questions | 1293–1366 |
+|   10. Messages | 746–776 |
+|   11. Missile paths (`0x00649760`) | 777–829 |
+|   12. Other path types (1.14d-read 2026-10-08) | 830–1043 |
+|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1044–1123 |
+| Constants & data dependencies | 1124–1160 |
+| Randomness | 1161–1171 |
+| Edge cases & original bugs | 1172–1219 |
+| Test vectors | 1220–1257 |
+| Provenance | 1258–1300 |
+| Open questions | 1301–1374 |
 <!-- /index -->
 
 ## Summary
@@ -755,6 +755,14 @@ town access 0.
    unit set: code, target type, target GUID, x, y) or 0x0F (code, target
    x, y, 0, x, y). Codes: walk 1 / unit 0, run 0x17 / 0x18 (walk and
    town walk share the row).
+   PROVISIONAL: the skill modes A1 7, A2 8, SC 10, TH 11, KK 12, S1–S4
+   13–16, SQ 18 with a used skill run `0x00548090`: the skill message of
+   `sim/intents-events.md` §3.5 rule 5 (flag 0, w 0; the path's target
+   unit → `0x0053D530`, else `0x0053D4D0` at the path target), sent to
+   every client including the player's own (d2rs-own: the client applies
+   no mode request for its click, `ui/controls.md` §6 r7) (because the
+   table's other rows are not read and `0x00548090` is the other named
+   caller of the builders); settled by REC-95.
 3. Same pass, before it: a player with flags 2 bit 0x10000, or bit 0x800
    when the client's player is not this unit → S→C 0x15 (`0x00548010`:
    type, GUID, x, y, flag 1 for 0x10000 else 0). Waypoint arrival and

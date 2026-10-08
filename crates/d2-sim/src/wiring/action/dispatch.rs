@@ -197,6 +197,22 @@ impl<X: Pending> ActionSim<X> {
         self.with(game, |g, v| v.object_message(g, player, guid))
     }
 
+    /// The C→S 0x13 tile case ([`View::warp_tile_message`]). `None`: no
+    /// path provider.
+    pub fn warp_tile_message(&mut self, game: &mut Game, player: UnitId, guid: u32) -> Option<u32> {
+        self.with(game, |g, v| v.warp_tile_message(g, player, guid))
+    }
+
+    /// The Town Portal scroll or tome of `player` ([`View::create_town_portal`]):
+    /// the pair's units. `None`: nothing was created.
+    pub fn open_town_portal(
+        &mut self,
+        game: &mut Game,
+        player: UnitId,
+    ) -> Option<(UnitId, UnitId)> {
+        self.with(game, |g, v| v.create_town_portal(g, player))
+    }
+
     fn log(&mut self, r: Result<(), WiringError>) {
         if let Err(e) = r {
             self.sys.hooks.errors.push(e);
@@ -302,6 +318,31 @@ impl<X: Pending> TickHooks for ActionSim<X> {
     fn send_unit_update(&mut self, game: &mut Game, client: ClientId, unit: UnitId) {
         let s = &mut self.sys;
         let mut v = View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks);
+        // §7.1 rule 2.1: a unit not yet announced (unit flag 0x10), other
+        // than the client's player: a missile sends nothing at all; any
+        // other type its add messages (§7.2) first. A monster's are sent
+        // by its update ([`View::monster_update`], which also reads
+        // "announced" for its step 8).
+        let receiver = game.lists.client(client).and_then(|c| c.player);
+        let new = v
+            .units
+            .get(unit)
+            .filter(|r| r.flags & crate::units::record::flags::SEED_SET != 0)
+            .map(|r| r.ty);
+        if let (Some(ty), Some(p)) = (new, receiver) {
+            if p != unit {
+                match ty {
+                    UnitType::Missile => return,
+                    UnitType::Monster => {}
+                    _ => v.add_messages(game, p, unit),
+                }
+            }
+        }
+        // §3.5 rule 6 / §7.3 rule 2 step 8: the changed-state messages of
+        // a unit that is not new to the client.
+        if let (Some(p), None) = (receiver, new) {
+            v.state_change_messages(p, unit);
+        }
         if game
             .lists
             .unit(unit)

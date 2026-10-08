@@ -53,6 +53,58 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         Some(v)
     }
 
+    /// One child record of §7.3 step 5 / `d2s.md` §8.2 rule 4: read as
+    /// step 3 with no room (failure → none; the copy and the children read
+    /// so far stay), mode 4, socketed into `parent`, flags 0x80000 /
+    /// 0x2000, command flag 0x1 cleared. `parent` has an inventory.
+    pub(crate) fn insert_filler(&mut self, parent: UnitId, rec: &read::ReadItem) -> Option<UnitId> {
+        let cg = self.guid_of(parent);
+        let child = match self.econ.item_from_record(rec, None) {
+            Ok(c) => c,
+            Err(e) => {
+                self.state.errors.push(InvError::Economy(e));
+                return None;
+            }
+        };
+        self.sync_in();
+        // Mode 4, then `0x00562660(child, copy, &out, 0, 1, 0, 0)`
+        // with EDX = the copy (`inventory-moves.md` §7.19 rule 4).
+        // The rule 2 gates (f3 = 0: no target mode test) hold for
+        // a stream written from a socketed source whose fillers
+        // passed them, so result 0 (fatal, line 0xDD4) does not
+        // arise; the link cannot fail here.
+        if let Some(d) = self.state.items.get_mut(&child) {
+            d.mode = mode::CURSOR;
+        }
+        let fg = self.guid_of(child);
+        let mut inv = self.state.inventories.remove(&parent)?;
+        inv.link(self, child, None);
+        // f2 = 1: the copy's inventory cursor := none.
+        inv.put_cursor(self, None);
+        self.state.inventories.insert(parent, inv);
+        clear_uflags(self, fg, uflag::TARGETABLE);
+        // Filler properties `0x0055C2C0` and owner link `0x006276C0`.
+        self.filler_linked(fg, cg);
+        if let Some(d) = self.state.items.get_mut(&child) {
+            d.mode = mode::SOCKETED;
+        }
+        // f4 = 0: a match runs the runeword stats and the timers
+        // without the recharge `0x0055FE80`; f1 = 0: no match
+        // returns here, before the tail.
+        if self.activate_runeword_on(parent) {
+            add_iflags(self, cg, iflag::CHANGED);
+            clear_iflags(self, cg, iflag::NOEQUIP);
+            deferred::owner_refresh(self, Owner::item(cg));
+            self.update_list_add(Owner::item(cg), cg);
+        }
+        if let Some(d) = self.state.items.get_mut(&child) {
+            d.flags = (d.flags | flag::INIT) & !flag::INSTORE;
+            d.cmd_flags &= !CMD_REMOVE;
+        }
+        self.sync_out();
+        Some(child)
+    }
+
     /// `0x0055A2A0` (§7.3): a copy of `src`, or none. `fillers`: read
     /// and socket the source's children into the copy (step 5).
     pub fn copy_of(&mut self, src: UnitId, fillers: bool) -> Option<UnitId> {
@@ -117,49 +169,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             for _ in 0..n {
                 let entry = read::read_save_entry(bytes.get(at..)?, self.econ.tables).ok()?;
                 at += entry.len;
-                let child = match self.econ.item_from_record(&entry.item, None) {
-                    Ok(c) => c,
-                    Err(e) => {
-                        self.state.errors.push(InvError::Economy(e));
-                        return None;
-                    }
-                };
-                self.sync_in();
-                // Mode 4, then `0x00562660(child, copy, &out, 0, 1, 0, 0)`
-                // with EDX = the copy (`inventory-moves.md` §7.19 rule 4).
-                // The rule 2 gates (f3 = 0: no target mode test) hold for
-                // a stream written from a socketed source whose fillers
-                // passed them, so result 0 (fatal, line 0xDD4) does not
-                // arise; the link cannot fail here.
-                if let Some(d) = self.state.items.get_mut(&child) {
-                    d.mode = mode::CURSOR;
-                }
-                let fg = self.guid_of(child);
-                let mut inv = self.state.inventories.remove(&copy)?;
-                inv.link(self, child, None);
-                // f2 = 1: the copy's inventory cursor := none.
-                inv.put_cursor(self, None);
-                self.state.inventories.insert(copy, inv);
-                clear_uflags(self, fg, uflag::TARGETABLE);
-                // Filler properties `0x0055C2C0` and owner link `0x006276C0`.
-                self.filler_linked(fg, cg);
-                if let Some(d) = self.state.items.get_mut(&child) {
-                    d.mode = mode::SOCKETED;
-                }
-                // f4 = 0: a match runs the runeword stats and the timers
-                // without the recharge `0x0055FE80`; f1 = 0: no match
-                // returns here, before the tail.
-                if self.activate_runeword_on(copy) {
-                    add_iflags(self, cg, iflag::CHANGED);
-                    clear_iflags(self, cg, iflag::NOEQUIP);
-                    deferred::owner_refresh(self, Owner::item(cg));
-                    self.update_list_add(Owner::item(cg), cg);
-                }
-                if let Some(d) = self.state.items.get_mut(&child) {
-                    d.flags = (d.flags | flag::INIT) & !flag::INSTORE;
-                    d.cmd_flags &= !CMD_REMOVE;
-                }
-                self.sync_out();
+                self.insert_filler(copy, &entry.item)?;
             }
         }
         // 6. The source's flag.

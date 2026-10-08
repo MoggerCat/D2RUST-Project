@@ -61,6 +61,27 @@ pub enum KillStep {
     BarricadeDoors,
 }
 
+/// What a host's seams queue for the quest control (`quests.md` §4.4
+/// kill parse, §4.6 add link); the quest-owning host drains them each
+/// tick ([`Pending::take_quest_events`]). d2rs-own, unverified: the play
+/// host's route from the monster seams to the quest control.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum QuestEvent {
+    /// Monster init linked `unit` to quest chain `chain` (`0x005436B0`).
+    Link { unit: UnitId, chain: u8 },
+    /// `victim` died (`0x00543A30`), `killer` the attacker.
+    Kill {
+        victim: UnitId,
+        killer: Option<UnitId>,
+    },
+    /// Radament's AI ran in his level (`0x00599420`, `ai-bodies-2.md` §3).
+    RadamentActivated { unit: UnitId },
+    /// The Summoner's AI first ran (`0x0059C330`, `ai-bodies-2.md` §15).
+    SummonerActivated,
+    /// The cube placed a Horadric Staff for `player` (`0x0059E5C0`).
+    StaffAssembled { player: UnitId },
+}
+
 /// Seams without a provider (see the module doc). Grouped by the spec
 /// that will own them.
 #[allow(unused_variables)]
@@ -1067,8 +1088,28 @@ pub trait Pending {
         super::objects::ObjectReach::Operate
     }
 
+    /// The preview's interact reach in sub-tiles (the Chebyshev distance
+    /// of the path positions), for a host whose range test
+    /// `0x00623660` and walk step are unwritten. `Some(r)`: the 0x13
+    /// object case refuses beyond 50 (`waypoints.md` §5.2), does nothing
+    /// beyond `r` (the client walks and sends 0x13 again on arrival) and
+    /// operates within it; [`Pending::object_in_range`] is then this
+    /// test. Default: none (the seams above decide).
+    /// d2rs-own, unverified (play preview, stitch-objects).
+    fn object_preview_range(&self) -> Option<i32> {
+        None
+    }
+
     // ---- the kill and the death (`damage.md` §7.2, `treasure.md` §3) ---
 
+    /// Monster init's quest chain link (`population.md` §14.3,
+    /// `0x005436B0`). Default: none.
+    fn monster_quest_chain(&mut self, unit: UnitId, chain: u32) {}
+    /// The quest events queued since the last take, in order. Default:
+    /// none.
+    fn take_quest_events(&mut self) -> Vec<QuestEvent> {
+        Vec::new()
+    }
     /// A step of the kill with no written body ([`KillStep`]).
     fn kill_step(&mut self, game: &mut Game, step: KillStep, defender: UnitId, attacker: UnitId) {}
     /// `0x0057E7B0` for a monster attacker (`vitals.md` §4.4 step 2):

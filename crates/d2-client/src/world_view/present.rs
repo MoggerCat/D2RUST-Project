@@ -56,7 +56,8 @@ use crate::ui::{edge, FramePos, PointerButton, StringLookup, UiEvent, UiRoot};
 use super::feed::{build_frame, ViewFeed};
 use super::node::{add_node, ComposeJob, NodeIndices};
 use super::panel_art::PanelArtLoader;
-use super::ui_bind::{run_ui_with, world_clicks, UiQueue, UiRules};
+use super::ui_bind::{run_ui_with, world_clicks, TextAssetLoader, UiQueue, UiRules};
+use super::walk::PreviewWalk;
 use super::{compose_cycle_cpu, GpuAtlas, ViewAssets, ViewRules, VIEW};
 use crate::scene::{FrameCycle, FramePlan};
 
@@ -91,6 +92,27 @@ pub struct WorldViewState {
     /// The game's automap (`ui/automap.md`), when the app supplied its
     /// tables; `None`: no automap.
     pub automap: Option<crate::ui::automap::session::AutomapSession>,
+    /// The automap's draw sink (`super::automap_view`); `None`: not drawn.
+    pub automap_view: Option<super::automap_view::AutomapView>,
+    /// The play preview (decision D1, [`super::preview`]): a frame whose
+    /// build fails is logged (each message once) and not presented,
+    /// instead of failing the app. `false`: strict (M07).
+    pub preview: bool,
+    /// The last logged preview frame error.
+    preview_error: Option<String>,
+    /// The last drawn frame's item tags (tiles, units, UI) and UI draws,
+    /// in draw order: what the frame shows, for logs and tests.
+    pub last_tags: Vec<crate::scene::ItemTag>,
+    pub last_ui: Vec<crate::ui::UiDraw>,
+    /// The preview's pending interaction (`super::interact`).
+    pub interact: super::interact::PreviewInteract,
+    /// Ground items (`super::ground_items`): the app hands in the item art
+    /// rows and the archives; the default draws nothing.
+    pub ground_items: super::ground_items::GroundItems,
+    /// The click on a corpse (`super::corpse_click`).
+    pub corpse_clicks: super::corpse_click::CorpseClicks,
+    /// Client missiles and cast / state overlays (`super::missiles`).
+    pub missiles: super::missiles::Missiles,
 }
 
 impl WorldViewState {
@@ -108,6 +130,15 @@ impl WorldViewState {
             last: None,
             click: Default::default(),
             automap: None,
+            automap_view: None,
+            preview: false,
+            preview_error: None,
+            last_tags: Vec::new(),
+            last_ui: Vec::new(),
+            interact: Default::default(),
+            ground_items: Default::default(),
+            corpse_clicks: Default::default(),
+            missiles: Default::default(),
         }
     }
 }
@@ -140,6 +171,9 @@ pub struct WorldViewUi {
     pub bindings: Option<Bindings>,
     /// Makes the panel DC6 files of the frame's UI draws resident.
     pub art: Option<PanelArtLoader>,
+    /// Makes the UI text fonts (`.tbl` and glyph DC6) of the frame's text
+    /// draws resident (`ui_bind::TextAssetLoader`).
+    pub text: Option<TextAssetLoader>,
     /// Last cursor position sent, so moves are reported once.
     cursor: Option<FramePos>,
 }
@@ -153,6 +187,7 @@ impl WorldViewUi {
             original: None,
             bindings: None,
             art: None,
+            text: None,
             cursor: None,
         }
     }
@@ -262,6 +297,7 @@ pub fn deliver_outputs(
     outputs: Option<ResMut<FrameOutputs>>,
     ui: Option<NonSendMut<WorldViewUi>>,
     sounds: Option<ResMut<UiSounds>>,
+    state: Option<Res<WorldViewState>>,
 ) -> Result {
     let Some(mut outputs) = outputs else {
         return Ok(());
@@ -271,7 +307,8 @@ pub fn deliver_outputs(
         return Ok(());
     }
     let original = ui.map(|u| u.into_inner()).and_then(|u| u.original.as_mut());
-    let requests = deliver(&mut bridge.0, &list, original)?;
+    let preview = state.is_some_and(|s| s.preview);
+    let requests = deliver_with(&mut bridge.0, &list, original, preview)?;
     if let Some(mut s) = sounds {
         s.0.extend(requests);
     }
@@ -293,7 +330,19 @@ pub fn deliver_outputs(
 pub fn deliver<L: ServerLink>(
     bridge: &mut Bridge<L>,
     list: &[Output],
+    original: Option<&mut OriginalUi>,
+) -> Result<Vec<SoundRequest>, DeliverError> {
+    deliver_with(bridge, list, original, false)
+}
+
+/// [`deliver`], with the play preview's chat close after the dialog
+/// branch when `preview_chat_end` (`bridge::chat_end`; d2rs-own,
+/// unverified).
+pub fn deliver_with<L: ServerLink>(
+    bridge: &mut Bridge<L>,
+    list: &[Output],
     mut original: Option<&mut OriginalUi>,
+    preview_chat_end: bool,
 ) -> Result<Vec<SoundRequest>, DeliverError> {
     let requests = std::cell::RefCell::new(Vec::new());
     let bridge = std::cell::RefCell::new(bridge);
@@ -309,6 +358,11 @@ pub fn deliver<L: ServerLink>(
                     }
                     if let Some((d, case)) = ui.take_dialog_answer() {
                         bridge.borrow_mut().npc_dialog_branch(&d, case)?;
+                        // Preview: no speech or menu, so the chat closes
+                        // at once (`bridge::chat_end`; d2rs-own).
+                        if preview_chat_end && !ui.npc_menu_up() {
+                            bridge.borrow_mut().preview_chat_end(d.guid)?;
+                        }
                     }
                 }
                 None => debug!("ui output {o:?}: no original UI"),
@@ -412,13 +466,33 @@ fn ui_input(
     windows: Query<&Window, With<PrimaryWindow>>,
     buttons: Res<ButtonInput<MouseButton>>,
     keys: Option<Res<ButtonInput<KeyCode>>>,
+    walk: Option<ResMut<PreviewWalk>>,
 ) -> Result {
     let (Some(mut ui), Ok(window)) = (ui, windows.single()) else {
         return Ok(());
     };
+    // d2rs-own, unverified (D2): Stand Still (command 36) is held while
+    // a key bound to it is down (`ui/controls.md` §4.3 r1).
+    if let (Some(mut walk), Some(bindings), Some(keys)) = (walk, &ui.bindings, keys.as_deref()) {
+        let held = bindings
+            .inputs(crate::controls::Action::StandStill)
+            .iter()
+            .any(|k| {
+                edge::KEY_CODES
+                    .iter()
+                    .any(|&(c, key)| key == *k && keys.pressed(c))
+            });
+        if walk.run.stand_still != held {
+            walk.run.stand_still = held;
+        }
+    }
+    // d2rs-own, unverified: Shift held, for the shift-click to the belt.
+    if let (Some(o), Some(keys)) = (ui.original.as_mut(), keys.as_deref()) {
+        o.set_shift(keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight));
+    }
     // Keys in `KEY_CODES` order, so one frame's actions are ordered the
     // same on every run.
-    if let (Some(bindings), Some(keys)) = (&ui.bindings, keys) {
+    if let (Some(bindings), Some(keys)) = (&ui.bindings, keys.as_deref()) {
         let pressed: Vec<KeyCode> = edge::KEY_CODES
             .iter()
             .map(|&(c, _)| c)
@@ -426,6 +500,7 @@ fn ui_input(
             .collect();
         let actions = edge::key_actions(bindings, &pressed);
         ui.queue.0.extend(actions);
+        ui.queue.0.extend(edge::key_chars(&pressed));
     }
     // A window below 800×600 has no frame mapping (`ui.md` open question
     // 1 of the C8 notes): pointer input is dropped as outside the frame.
@@ -487,6 +562,8 @@ fn world_view_frame(
     target: Option<Res<WorldViewTarget>>,
     mut images: ResMut<Assets<Image>>,
     mut sounds: Option<ResMut<UiSounds>>,
+    mut walk: Option<ResMut<PreviewWalk>>,
+    mut exit: MessageWriter<AppExit>,
 ) -> Result {
     let tick = bridge.0.world().server_ticks;
     if tick == 0 || state.last.is_some_and(|l| l.server_tick == tick) {
@@ -523,9 +600,16 @@ fn world_view_frame(
                     s.0.extend(outcome.sounds);
                 }
                 state.feed.set_ui_open_mode(original.open_mode());
+                // The Esc menu's "Save and Exit Game" (d2rs-own, unverified).
+                if original.take_exit_request() {
+                    crate::app::save::request_save_and_exit(&mut exit);
+                }
             }
             if let Some(art) = &ui.art {
                 art.ensure(&frame.draws, &mut state.assets)?;
+            }
+            if let Some(text) = &ui.text {
+                text.ensure(&frame.draws, &mut state.assets)?;
             }
             let mouse = match ui.cursor {
                 Some(FramePos::Inside(p)) => (p.x, p.y),
@@ -540,10 +624,63 @@ fn world_view_frame(
                 // `0x00454970()` is not specified: the play area H − 40.
                 skill_y_limit: crate::rules::camera::FrameSize::D2RS.play_height(),
                 mouse,
-                game_menu_open: false,
+                game_menu_open: ui.original.as_ref().is_some_and(|o| o.is_open(9)),
+                // d2rs-own, unverified (D1): the preview's hover pick.
+                pick: state.preview,
             };
-            for o in world_clicks(&mut bridge.0, &mut state.click, view, &frame.unhandled)? {
+            // d2rs-own, unverified (D2): the run lock (command 35) is the
+            // toggle action no panel took; the click reads the predicted
+            // position and the modifier word.
+            let (mods, local_at) = match walk.as_deref_mut() {
+                Some(w) => {
+                    let toggle = crate::controls::Action::ToggleRun.index() as u16;
+                    for e in &frame.unhandled {
+                        if *e == UiEvent::Action(crate::ui::ActionId(toggle)) {
+                            w.run.toggle_run();
+                        }
+                    }
+                    // The run button (control panel §10 r2) toggles it too.
+                    if let Some(o) = ui.original.as_mut() {
+                        for _ in 0..o.sync_run(w.run.run_lock) {
+                            w.run.toggle_run();
+                        }
+                        o.sync_run(w.run.run_lock);
+                    }
+                    (w.run.word(), w.predict.position())
+                }
+                None => (0, None),
+            };
+            let cam = super::corpse_click::camera_for(bridge.0.world(), view.open_mode);
+            let unhandled =
+                state
+                    .corpse_clicks
+                    .take_clicks(&mut bridge.0, cam.as_ref(), &frame.unhandled)?;
+            let unhandled = state.ground_items.take_clicks(&mut bridge.0, &unhandled)?;
+            crate::bridge::belt::send_keys(&mut bridge.0, &frame.unhandled)?;
+            let outs = world_clicks(
+                &mut bridge.0,
+                &mut state.click,
+                view,
+                &unhandled,
+                mods,
+                local_at,
+            )?;
+            for o in &outs {
                 debug!("world click: {o:?}");
+            }
+            if let Some(w) = walk.as_deref() {
+                // d2rs-own, unverified (D1, D2): the pending interaction.
+                let pressed = frame
+                    .unhandled
+                    .iter()
+                    .any(|e| matches!(e, UiEvent::Press { .. }));
+                state.interact.note(&outs, pressed);
+                let walking = w.predict.walking().is_some();
+                for o in state.interact.frame(&mut bridge.0, walking)? {
+                    debug!("interact: {o:?}");
+                }
+                state.ground_items.frame(&mut bridge.0, walking)?;
+                state.corpse_clicks.frame(&mut bridge.0, walking)?;
             }
             // `ui/automap.md` §8 r2: the toggle command no panel took.
             let toggle = crate::controls::Action::ToggleAutomap.index() as u16;
@@ -559,13 +696,53 @@ fn world_view_frame(
         None => None,
     };
     let draws = ui_frame.as_ref().map_or(&[][..], |f| &f.draws[..]);
-    let frame = build_frame(
+    state.feed.prepare(bridge.0.world(), &mut state.assets)?;
+    let built = build_frame(
         bridge.0.world(),
         draws,
         state.rules.as_ref(),
         state.feed.as_mut(),
         &state.assets,
-    )?;
+    );
+    let mut frame = match built {
+        Ok(f) => f,
+        // d2rs-own, unverified (D1): the preview keeps running; the
+        // frame is not presented.
+        Err(e) if state.preview => {
+            let message = e.to_string();
+            if state.preview_error.as_deref() != Some(message.as_str()) {
+                warn!("preview (d2rs-own, unverified): frame not drawn: {message}");
+                state.preview_error = Some(message);
+            }
+            return Ok(());
+        }
+        Err(e) => return Err(e.into()),
+    };
+    for m in state.ground_items.add_to_frame(
+        bridge.0.world(),
+        state.feed.as_ref(),
+        &mut state.assets,
+        &mut frame,
+    ) {
+        warn!("preview (d2rs-own, unverified): {m}");
+    }
+    for m in state.missiles.add_to_frame(
+        bridge.0.world(),
+        state.feed.as_ref(),
+        &mut state.assets,
+        &mut frame,
+    ) {
+        warn!("preview (d2rs-own, unverified): {m}");
+    }
+    // `ui/automap.md` §10: the open automap's draw pass.
+    if let (Some(a), Some(v)) = (state.automap.as_mut(), state.automap_view.as_mut()) {
+        let world = bridge.0.world();
+        if let Ok(mode) = state.feed.open_mode(world) {
+            for m in v.add_to_frame(a, world, mode, &mut state.assets, &mut frame) {
+                warn!("preview (d2rs-own, unverified): {m}");
+            }
+        }
+    }
     // `ui/automap.md` §5 r1: the reveal of this frame, after the draw
     // marked its records (from the frame `0x0044C7EB`).
     if let Some(a) = state.automap.as_mut() {
@@ -581,6 +758,8 @@ fn world_view_frame(
     let blank_screen = state.feed.blank_screen(bridge.0.world())?;
     let use_gpu = gpu.is_some();
     let bridge_frame = bridge.0.world().frames;
+    state.last_tags = frame.items.iter().map(|i| i.tag).collect();
+    state.last_ui = draws.to_vec();
     state.last = Some(FrameStats {
         bridge_frame,
         server_tick: tick,

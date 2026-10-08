@@ -129,3 +129,74 @@ fn the_corpse_start_queues_the_owner_for_the_hireling_host() {
     hooks_on(&mut fx, |h, sim| h.player_corpse(sim, p));
     assert_eq!(fx.sim.hooks().owner_deaths, Some(vec![p]));
 }
+
+/// A player with no life starts DT once (the penalties run, every
+/// player is told with 0x0D code 8); the ENDANIM turns it into DD (the
+/// corpse is allocated with state 7 and its owner, code 9 sent once); a
+/// player with life is left alone.
+// Covers: specs/combat/vitals.md §4.8
+#[test]
+fn a_player_with_no_life_dies_and_leaves_a_corpse() {
+    let (mut fx, p, _, other) = setup();
+    fx.sim.hooks().death.allocate_corpses = true;
+    fx.stats(p, &[(6, 100 << 8)]);
+    fx.stats(other, &[(6, 100 << 8)]);
+    let all = [p, other];
+    // Alive: nothing; a player that never had life is left alone.
+    assert!(fx.sim.deaths_of(&mut fx.game, &all).is_empty());
+    fx.stats(p, &[(6, 0)]);
+    let guid = fx.sim.sys.units.get(p).unwrap().guid;
+    let changed = fx.sim.deaths_of(&mut fx.game, &all);
+    assert_eq!(changed, [p]);
+    assert_eq!(fx.sim.sys.units.get(p).unwrap().mode, 0);
+    assert_eq!(fx.sim.sys.units.get(other).unwrap().mode, 1);
+    // Penalties ran: gold 5000 dropped.
+    assert_eq!(fx.stat(p, gold_stat::GOLD), 0);
+    let stops = |fx: &mut Fx, code: u8| {
+        fx.sim
+            .hooks()
+            .x
+            .sent
+            .iter()
+            .filter(|(_, m)| m[0] == 0x0D && m[6] == code && m[2..6] == guid.to_le_bytes())
+            .count()
+    };
+    assert_eq!(stops(&mut fx, 8), 2, "both players are told");
+    // A second pass starts nothing and tells nothing.
+    assert!(fx.sim.deaths_of(&mut fx.game, &all).is_empty());
+    assert_eq!(stops(&mut fx, 8), 2);
+    // The ENDANIM: DD, corpse.
+    hooks_on(&mut fx, |h, sim| {
+        crate::units::modes::player_event1(sim, h, p).unwrap()
+    });
+    assert_eq!(fx.sim.sys.units.get(p).unwrap().mode, 17);
+    let changed = fx.sim.deaths_of(&mut fx.game, &all);
+    assert_eq!(changed, [p]);
+    assert_eq!(stops(&mut fx, 9), 2);
+    let (&c, &owner) = fx.sim.hooks().death.owners.iter().next().expect("a corpse");
+    // The corpse appears (0x59) and lies dead (0x0D code 9), to both.
+    let cguid = fx.sim.sys.units.get(c).unwrap().guid;
+    let sent = fx.sim.hooks().x.sent.clone();
+    assert_eq!(sent.iter().filter(|(_, m)| m[0] == 0x59).count(), 2);
+    assert_eq!(
+        sent.iter()
+            .filter(|(_, m)| m[0] == 0x0D && m[6] == 9 && m[2..6] == cguid.to_le_bytes())
+            .count(),
+        2
+    );
+    assert_eq!(owner, guid);
+    assert!(fx.sim.sys.stats.has_state(c, STATE_PLAYERBODY));
+    assert_eq!(fx.sim.sys.units.get(c).unwrap().mode, 17);
+    // Back on its feet (the 0x41 handler's mode 1): code 7, once.
+    fx.sim.sys.units.get_mut(p).unwrap().mode = 1;
+    fx.stats(p, &[(6, 100 << 8)]);
+    assert_eq!(fx.sim.deaths_of(&mut fx.game, &all), [p]);
+    assert_eq!(stops(&mut fx, 7), 2);
+    assert!(fx.sim.deaths_of(&mut fx.game, &all).is_empty());
+    // The owner takes it back.
+    assert!(hooks_on(&mut fx, |h, sim| h.corpse_pickup(sim, p, c)).is_some());
+    assert_eq!(
+        hooks_on(&mut fx, |h, sim| h.corpse_pickup(sim, other, c)),
+        None
+    );
+}

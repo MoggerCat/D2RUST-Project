@@ -13,6 +13,9 @@ pub mod char_details;
 pub mod char_inputs;
 pub mod character;
 pub mod control;
+pub mod cube_items;
+pub mod inv_gold;
+pub mod inv_items;
 pub mod inventory;
 pub mod menu_box;
 pub mod npc;
@@ -23,6 +26,7 @@ pub mod skill_inputs;
 pub mod skilltree;
 pub mod stash_cube;
 pub mod stash_input;
+pub mod stash_items;
 pub mod waypoint;
 pub mod waypoint_rows;
 
@@ -74,6 +78,17 @@ impl UiFiles {
         Self { names }
     }
 
+    /// Adds names not yet registered (lowercased), keeping the ids of the
+    /// ones before.
+    pub fn extend(&mut self, names: impl IntoIterator<Item = String>) {
+        for n in names {
+            let n = n.to_ascii_lowercase();
+            if !self.names.contains(&n) {
+                self.names.push(n);
+            }
+        }
+    }
+
     pub fn names(&self) -> &[String] {
         &self.names
     }
@@ -85,6 +100,17 @@ impl UiFiles {
             .iter()
             .position(|n| *n == name)
             .and_then(|i| u32::try_from(i).ok())
+    }
+
+    /// Adds `name` (lower case) when it is not a name yet; its id. For
+    /// files outside `panel-layout.tsv` (item graphics,
+    /// [`inv_items::ITEMS_PREFIX`]).
+    pub fn add(&mut self, name: &str) -> u32 {
+        if let Some(id) = self.id(name) {
+            return id;
+        }
+        self.names.push(name.to_ascii_lowercase());
+        (self.names.len() - 1) as u32
     }
 
     /// The name of an id.

@@ -7,8 +7,8 @@
 //! rule 4, which hands `Pal` as `a`). The five files are read from the
 //! user's archives once, up front; a missing file is an error.
 
+use crate::assets::path::{read_pl2, FileSource};
 use bevy::prelude::*;
-use d2_formats::mpq::ArchiveSet;
 
 use crate::bridge::mirror::bridge_frame;
 use crate::bridge::BridgeResource;
@@ -36,10 +36,15 @@ pub struct ActPalettes {
 
 impl ActPalettes {
     /// Reads the five act palettes from the archives.
-    pub fn live(archives: &ArchiveSet) -> Result<Self, String> {
+    pub fn live(archives: &dyn FileSource) -> Result<Self, String> {
+        // The flat file layout back from the decoded table (`Pl2::to_bytes`):
+        // one path for the archives and a native folder.
         let read = |a: u8| {
             let path = act_palette_path(a);
-            archives.read(&path).map_err(|e| format!("{path}: {e}"))
+            read_pl2(archives, &path)
+                .ok_or_else(|| format!("{path}: in no archive"))?
+                .map(|p| p.to_bytes())
+                .map_err(|e| format!("{path}: {e}"))
         };
         Ok(ActPalettes {
             pl2: [read(0)?, read(1)?, read(2)?, read(3)?, read(4)?],

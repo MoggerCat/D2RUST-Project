@@ -112,9 +112,8 @@ pub struct ModeInput {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ModeMessage {
     /// Rule 3: the skill message `0x00597D70` (0x4C with the kept target,
-    /// else 0x4D). Its layouts are not in the spec (`server-messages.tsv`
-    /// rows 0x4C / 0x4D: `partial`, no fields), so the caller cannot
-    /// build it.
+    /// else 0x4D), built by the caller from the used skill
+    /// (`wiring::action::unit_update::skill_message`).
     Skill { to_unit: bool },
     /// Rule 3: mode 14 with no skill in use: nothing.
     Nothing,

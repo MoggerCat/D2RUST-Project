@@ -1,0 +1,78 @@
+﻿cargo :    Compiling d2-formats v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-formats)
+At line:1 char:514
++ ...  "sccache"; cargo run -p d2-client --release -- play --frames 3000 2> ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (   Compiling d2...tes\d2-formats):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+   Compiling d2-proto v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-proto)
+   Compiling d2-verify v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-verify)
+   Compiling d2-data v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-data)
+   Compiling d2-net v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-net)
+   Compiling d2-sim v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-sim)
+   Compiling d2-server v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-server)
+   Compiling d2-client v0.0.0 (C:\Users\pc\Documents\Claude code folder\w-integ\crates\d2-client)
+    Finished `release` profile [optimized] target(s) in 2m 42s
+     Running `C:\Users\pc\Documents\Claude code folder\d2rs\target\release\d2-client.exe play --frames 3000`
+play: game data from D2_GAME_DIR (137 levels, 573 objects, waypoint object class 119; level files: 2043 DS1, 34 lvlsub DS1, 241 DT1)
+single player: seed 1234, waypoint unit UnitId(0) (GUID 1)
+2026-10-07T21:40:09.476571Z  INFO bevy_diagnostic::system_information_diagnostics_plugin::internal: SystemInfo { os: 
+"Windows 10 Enterprise", kernel: "19045", cpu: "Intel(R) Core(TM) i7-7700HQ CPU @ 2.80GHz", core_count: "4", memory: 
+"15.9 GiB" }
+2026-10-07T21:40:09.793959Z  INFO bevy_render::renderer: AdapterInfo { name: "Intel(R) HD Graphics 630", vendor: 
+32902, device: 22811, device_type: IntegratedGpu, device_pci_bus_id: "", driver: "?", driver_info: "?", backend: 
+Vulkan, subgroup_min_size: 4, subgroup_max_size: 128, transient_saves_memory: false }
+2026-10-07T21:40:10.233023Z  INFO bevy_pbr::cluster: GPU clustering is supported on this device.
+2026-10-07T21:40:10.233094Z  INFO bevy_render::batching::gpu_preprocessing: GPU preprocessing is fully supported on 
+this device.
+2026-10-07T21:40:10.233922Z  INFO bevy_winit::system: Creating new window d2rs (65v0)
+2026-10-07T21:40:15.216657Z  INFO d2_client::app::play: frame 250: 104 server ticks, 1 units in the model, unowned S→C 
+ids {}; last view Some(FrameStats { bridge_frame: 248, server_tick: 103, items: 6, units_drawn: 0, units_hidden: 1, 
+ui_sent: 0, ui_unhandled: 0, gpu: true }); node frames 82; audio Some(AudioStats { frame: 250, presented: 104, 
+decodes: 9, load_errors: 0, engine_errors: 0 })
+
+thread 'd2-server' (16088) panicked at crates\d2-sim\src\drlg\room.rs:152:44:
+live DRLG room
+stack backtrace:
+   0: std::panicking::panic_handler
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library\std\src\panicking.rs:679
+   1: core::panicking::panic_fmt
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library\core\src\panicking.rs:80
+   2: core::panicking::panic_display
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library\core\src\panicking.rs:259
+   3: core::option::expect_failed
+             at /rustc/b940084d7eb6a299eb4bfeb8e34901bc051e7ac4/library\core\src\option.rs:2257
+   4: <d2_sim::drlg::level::Drlg>::level_rooms
+   5: <d2_sim::drlg::outdoor::Outdoor>::reset_level
+   6: <d2_sim::wiring::worldgen::levels::WorldTypes as d2_sim::drlg::seams::LevelTypes>::reset_level
+   7: <d2_sim::wiring::worldgen::levels::SharedTypes as d2_sim::drlg::seams::LevelTypes>::reset_level
+   8: <d2_sim::drlg::level::Drlg>::free_level_rooms
+   9: <d2_sim::drlg::level::Drlg>::free_inactive_levels
+  10: <d2_sim::wiring::action::DrlgWorld>::free_inactive_rooms
+  11: <d2_sim::wiring::worldgen::dispatch::WorldSim<d2_client::app::single_player::LocalSeams> as 
+d2_sim::tick::TickHooks>::free_inactive_rooms
+  12: d2_sim::tick::tick::<d2_sim::wiring::worldgen::dispatch::WorldSim<d2_client::app::single_player::LocalSeams>>
+  13: RNvXs4_NtNtNtNtCseLDL9ApRUFT_9d2_server8adapters8handlers5world5wiredINtB5_10WiredWorldNtNtNtCs31xj8mDR1Wl_9d2_cl
+ient3app4rest7AppRestEINtB7_9WorldHostINtNtNtNtCskC4TbCnNILd_6d2_sim6wiring8worldgen8dispatch8WorldSimNtNtB1r_13single_
+player10LocalSeamsEE8run
+  14: RNvXs3_NtNtCseLDL9ApRUFT_9d2_server8adapters3simINtB5_7SimGameINtNtNtNtCskC4TbCnNILd_6d2_sim6wiring8worldgen8disp
+atch8WorldSimNtNtNtCs31xj8mDR1Wl_9d2_client3app13single_player10LocalSeamsEINtNtNtNtB7_8handlers5world5wired10WiredWorl
+dNtNtB24_4rest7AppRestEE
+  15: RNvXs2_NtNtCs31xj8mDR1Wl_9d2_client6bridge5localINtB5_9LocalLinkINtNtNtCseLDL9ApRUFT_9d2_server8adapters3sim7SimG
+ameINtNtNtNtCskC4TbCnNILd_6d2_sim6wiring8worldgen8dispatch8WorldSimNtNtNtB9_3app13single_player10LocalSeamsEINtNtNtNtB1
+5_8handlers5world5wired1
+  16: RINvNtNtCs31xj8mDR1Wl_9d2_client3app13server_thread5serveINtNtNtB6_6bridge5local9LocalLinkINtNtNtCseLDL9ApRUFT_9d
+2_server8adapters3sim7SimGameINtNtNtNtCskC4TbCnNILd_6d2_sim6wiring8worldgen8dispatch8WorldSimNtNtB4_13single_player10Lo
+calSeamsEINtNtNtNtB1v_8h
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+Encountered an error in system `<Enable the debug feature to see the name>`: server: server thread stopped: no answer from the server thread
+   4: <bevy_ecs::error::bevy_error::BevyError as core::convert::From<d2_client::bridge::BridgeError>>::from
+   5: d2_client::bridge::mirror::bridge_frame
+   6: RNvXsa_NtNtCslz1oGxipbbw_8bevy_ecs6system15function_systemINtB5_14FunctionSystemFINtNtNtB9_16change_detection6params3ResNtNtNtCs31xj8mDR1Wl_9d2_client6bridge6mirror14BridgeResourceEINtB1k_6ResMutNtNtNtB20_3app5sound9GameAudioEINtNtCs9rw95XCWuke_4core6optio
+note: Some "noisy" backtrace lines have been filtered out. Run with `BEVY_BACKTRACE=full` for a verbose backtrace.
+
+Encountered a panic in system `<Enable the debug feature to see the name>`!
+Encountered a panic in system `<Enable the debug feature to see the name>`!
+error: process didn't exit successfully: `C:\Users\pc\Documents\Claude code folder\d2rs\target\release\d2-client.exe 
+play --frames 3000` (exit code: 101)
+EXIT=101

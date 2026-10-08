@@ -48,6 +48,10 @@ pub struct SessionState {
     /// [`View::replace_overhead`]): text (`0x006611E0`) and byte +8. The
     /// record is live while the unit's `hover` frame is set.
     pub overheads: BTreeMap<UnitId, (Vec<u8>, u8)>,
+    /// The player's item messages of the join (`intents-events.md` §8.2
+    /// rule 3.5: 0x9C, 0x9D), queued by the loader and sent once by the
+    /// join after the stat messages.
+    pub join_items: BTreeMap<UnitId, Vec<Vec<u8>>>,
 }
 
 /// S→C 0x59 AssignPlayer (`0x0053E8F0`, 26 bytes, §7.2 part A): GUID

@@ -11,6 +11,7 @@ mod regen;
 mod skill_bodies;
 mod skill_events;
 mod skill_use;
+mod summon;
 mod unit_events;
 mod vendors;
 mod vitals;
@@ -841,6 +842,7 @@ impl World {
             state: &mut self.state,
             rest: &mut self.rest,
             now: self.now,
+            inv: None,
         };
         f(&mut desk, &mut self.ctl)
     }

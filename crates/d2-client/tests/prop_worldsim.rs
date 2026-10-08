@@ -894,6 +894,22 @@ fn message(fx: &mut Fx, msg: &Msg) -> Option<Vec<u8>> {
 /// Whether the dispatcher itself rejects `m` before any handler
 /// (`intents-events.md` §2.3 rule 3, §2.4 rules 1, 3, 4), given the
 /// player's staged position; checked against the result code.
+fn player_flags2(fx: &Fx) -> u32 {
+    fx.sim
+        .events
+        .action
+        .sys
+        .units
+        .get(fx.player)
+        .map_or(0, |r| r.flags2)
+}
+
+fn set_player_flags2(fx: &mut Fx, v: u32) {
+    if let Some(r) = fx.sim.events.action.sys.units.get_mut(fx.player) {
+        r.flags2 = v;
+    }
+}
+
 fn dispatcher_rejects(fx: &Fx, m: &[u8], code: ResultCode) -> Result<bool, String> {
     let (id, size) = (m[0], m.len());
     let row = &CLIENT_MESSAGES[id as usize];
@@ -970,9 +986,38 @@ fn run(game_seed: u32, ops: &[Op], quiet: u32) -> Result<Vec<Entry>, String> {
         fx.stage();
         if let Some(m) = message(&mut fx, &op.msg) {
             let before = fx.digest();
+            let resyncs = fx.sim.resyncs.len();
+            let flags2_before = player_flags2(&fx);
             let code = fx.send(&m);
-            if dispatcher_rejects(&fx, &m, code)? {
+            let rejected = dispatcher_rejects(&fx, &m, code)?;
+            // A refused target more than 25 frames after the last accepted
+            // one queues the player for S→C 0x15 (`intents-events.md` §2.4
+            // r3, `pathing.md` §10 r2): the unit's flag-ex (flags2) bit
+            // 0x10000 is set and the unit joins the update queue. The digest
+            // holds the flag word, not the queue, so that bit is the one
+            // field that may differ; exactly it, and only on a resync.
+            let resynced = fx.sim.resyncs.len() != resyncs;
+            let flags2_after = player_flags2(&fx);
+            if resynced {
+                if !rejected {
+                    return Err(format!("{m:02X?}: resync without a refusal ({code:?})"));
+                }
+                if flags2_after != flags2_before | 0x10000 {
+                    return Err(format!(
+                        "{m:02X?}: resync set flags2 {flags2_before:#x} -> {flags2_after:#x}, not just 0x10000"
+                    ));
+                }
+                set_player_flags2(&mut fx, flags2_before);
+            } else if flags2_after != flags2_before && rejected {
+                return Err(format!(
+                    "{m:02X?}: rejected without a resync, flags2 changed"
+                ));
+            }
+            if rejected {
                 let after = fx.digest();
+                if resynced {
+                    set_player_flags2(&mut fx, flags2_after);
+                }
                 if after != before {
                     return Err(format!(
                         "{m:02X?} was rejected ({code:?}) and changed the digest:\n{before}\n---\n{after}"

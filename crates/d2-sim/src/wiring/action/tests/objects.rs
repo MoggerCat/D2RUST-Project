@@ -27,6 +27,8 @@ const DOOR: u32 = 2;
 const QUEST_DOOR: u32 = 3;
 const WAYPOINT: u32 = 4;
 const LOCKED_OUT_DOOR: u32 = 5;
+/// A 2 × 2 door that blocks vision (footprint mask 0x806).
+const BIG_DOOR: u32 = 6;
 
 /// objects.txt rows 0–5; `levels` 150 blank rows with `MonLvl1` 1 for the
 /// fixture's level.
@@ -319,9 +321,44 @@ fn update_pass_sends_the_state_message() {
     fx.sim.objects(&mut fx.game, |ctl, t, w| {
         obj::set_object_mode(ctl, t, w, o, 1).unwrap();
     });
+    // Already announced (the room clean-up cleared unit flag 0x10).
+    fx.sim.sys.units.get_mut(o).unwrap().flags &= !crate::units::record::flags::SEED_SET;
     crate::tick::TickHooks::send_unit_update(&mut fx.sim, &mut fx.game, c, o);
     let want = obj::state_message(guid(&fx, o), false, 1);
     assert_eq!(fx.sim.hooks().x.sent, [(p, want.to_vec())]);
+    fx.assert_clean();
+}
+
+// Covers: specs/sim/intents-events.md §7.1 r2, §7.2
+#[test]
+fn update_pass_announces_a_new_object_first() {
+    // An object created in a room the client already holds (unit flag
+    // 0x10 still set): its add message 0x51 goes out in the client pass,
+    // before the object update's state message.
+    let mut fx = fx();
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 22, 20);
+    let c = fx
+        .game
+        .lists
+        .add_client(Some(p), Some(a), crate::units::lists::client_state::IN_GAME);
+    let o = create(&mut fx, WAYPOINT, 20);
+    fx.sim.objects(&mut fx.game, |ctl, t, w| {
+        obj::set_object_mode(ctl, t, w, o, 1).unwrap();
+    });
+    crate::tick::TickHooks::send_unit_update(&mut fx.sim, &mut fx.game, c, o);
+    let og = guid(&fx, o);
+    let sent = fx.sim.hooks().x.sent.clone();
+    assert!(sent.iter().all(|(to, _)| *to == p));
+    assert_eq!(sent[0].1[0], 0x51);
+    assert_eq!(sent[0].1[1], 2);
+    assert_eq!(sent[0].1[2..6], og.to_le_bytes());
+    let want = obj::state_message(og, false, 1);
+    assert_eq!(sent.last().unwrap().1, want.to_vec());
+    // The client's own player is never announced to itself.
+    fx.sim.hooks().x.sent.clear();
+    crate::tick::TickHooks::send_unit_update(&mut fx.sim, &mut fx.game, c, p);
+    assert!(fx.sim.hooks().x.sent.iter().all(|(_, m)| m[0] != 0x59));
     fx.assert_clean();
 }
 
@@ -860,4 +897,67 @@ fn curable_state_removal() {
         fx.sim.hooks().objects.as_ref().unwrap().control.seed,
         before
     );
+}
+
+// Covers: specs/world/objects.md §10 r2; specs/sim/path-placement.md §3
+#[test]
+fn door_operate_frees_then_restamps_the_footprint() {
+    let mut fx = Fx::new();
+    let mut t = (*tables()).clone();
+    let mut big: Objects = blank();
+    (big.initfn, big.operatefn, big.monsterok) = (5, 8, 1);
+    (big.sizex, big.sizey, big.isdoor, big.blocksvis) = (2, 2, 1, 1);
+    big.hascollision0 = 1;
+    t.objects.push(big);
+    fx.sim.create_objects(Arc::new(t));
+    let door = create(&mut fx, BIG_DOOR, 20);
+    let a = fx.a;
+    let cell = |fx: &mut Fx| fx.sim.hooks().drlg.collision(&fx.game, a, 20, 20).unwrap() & 0x806;
+    // The closed door's footprint stands (stamped by the preset code).
+    fx.sim.objects(&mut fx.game, |_, _, w| {
+        w.stamp_footprint(door, Some(a), 20, 20)
+    });
+    assert_eq!(cell(&mut fx), 0x806);
+    let p = fx.spawn(UnitType::Player, 0, a, 22, 20);
+    let g = guid(&fx, door);
+    fx.sim.hooks().x.reach = Some(crate::wiring::action::ObjectReach::Operate);
+    let op = |fx: &mut Fx| fx.sim.operate_object_message(&mut fx.game, p, g);
+    // Open: the footprint is freed, mode 2.
+    fx.sim.hooks().objects.as_mut().unwrap().host_tick = 1000;
+    op(&mut fx);
+    assert_eq!(fx.sim.sys.units.get(door).unwrap().mode, 2);
+    assert_eq!(cell(&mut fx), 0);
+    // Close (after the 500 ms debounce): stamped again, mode 0.
+    fx.sim.hooks().objects.as_mut().unwrap().host_tick += 1000;
+    op(&mut fx);
+    assert_eq!(fx.sim.sys.units.get(door).unwrap().mode, 0);
+    assert_eq!(cell(&mut fx), 0x806);
+}
+
+// Covers: specs/world/objects.md §9.1 r3, §14 r2
+#[test]
+fn shrine_hover_is_kept_sent_and_expires() {
+    let mut fx = fx();
+    let o = create(&mut fx, CHEST, 20);
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 22, 20);
+    fx.game.frame = 10;
+    fx.sim.objects(&mut fx.game, |_, _, w| {
+        assert!(crate::world::objects::ShrineWorld::create_hover(w, o, 3690));
+        w.queue_update(o);
+        w.set_flags(o, w.flags(o) | oflags::HOVER_FREED);
+    });
+    // "3690" is 4 characters: 8 · 4 + 125 frames.
+    let exp = fx.sim.sys.units.get(o).unwrap().hover;
+    assert_eq!(exp, Some(10 + 157));
+    assert!(fx.sim.with(&mut fx.game, |g, v| v.object_update(g, p, o)));
+    let sent = &fx.sim.hooks().x.sent;
+    let m = &sent.last().expect("hover message").1;
+    assert_eq!(m[0], 0x26);
+    assert_eq!(m[1], 5);
+    assert!(m.windows(4).any(|w| w == b"3690"));
+    fx.sim.objects(&mut fx.game, |_, _, w| {
+        crate::world::objects::ShrineWorld::free_hover(w, o);
+    });
+    assert_eq!(fx.sim.sys.units.get(o).unwrap().hover, None);
 }

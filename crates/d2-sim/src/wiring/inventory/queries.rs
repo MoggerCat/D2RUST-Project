@@ -11,11 +11,12 @@ use super::{InvDesk, InvError, InvRest};
 use crate::items::affixes::affix;
 use crate::items::inventory::{level_requirement, AffixReq, LevelReqItem, LevelReqUnit};
 use crate::items::recharge::{self, Recharged};
-use crate::items::{props, replenish_timer, stat};
+use crate::items::{props, replenish_timer, stat, ListKey};
 use crate::stats::{key_layer, key_stat};
 use crate::units::lifecycle::LifecycleHooks;
 use crate::units::record::flags2;
 use crate::units::{UnitId, UnitType};
+use crate::wiring::economy::find_list;
 
 /// Stat 92 `item_levelreq` (§4.8).
 pub const STAT_LEVELREQ: u16 = 92;
@@ -163,6 +164,13 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             props::apply_socket_filler(s.tables, s.item, apply)
         }) {
             self.state.errors.push(InvError::Economy(e));
+        }
+        // §9 rule 4: the filler's list reaches the socketed item by
+        // stat-list linking (`stat-lists.md` §8.4: attach to the target).
+        if let Some(l) = find_list(self.econ.stats, filler, ListKey::ITEM) {
+            self.econ
+                .stats
+                .equip(&mut *self.econ.hooks, target, Some(l), false, true);
         }
         self.sync_in();
     }

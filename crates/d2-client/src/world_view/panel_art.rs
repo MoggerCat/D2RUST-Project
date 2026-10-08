@@ -31,6 +31,9 @@ const SPEC: &str = "ui/panels.md";
 /// The archive name of a [`UiFiles`] name (§7.1: relative to
 /// `DATA\GLOBAL\UI\`, `.dc6`).
 pub fn archive_name(name: &str) -> String {
+    if let Some(item) = name.strip_prefix(crate::ui::panels::inv_items::ITEMS_PREFIX) {
+        return crate::ui::inv_grid::inventory_path(item); // ui/inventory.md §8 r2
+    }
     format!("data\\global\\ui\\{name}.dc6")
 }
 
@@ -79,7 +82,16 @@ pub fn panel_sprite(
 pub struct PanelArtRules<R> {
     pub rules: R,
     pub files: UiFiles,
+    /// With text colours, `ui_text` is the original text hooks with the
+    /// act's PL2 text-colour maps (`ui/text.md` §4.4,
+    /// [`super::ui_bind::OriginalTextHooks`]); `None`: `rules`' answer.
+    pub text: Option<SharedTextColors>,
 }
+
+/// The frame's PL2 text-colour maps (`ui/text.md` §4.4), set when the
+/// palette act's maps are pushed; `None` inside: not yet pushed (only
+/// colour 0 draws).
+pub type SharedTextColors = std::sync::Arc<std::sync::RwLock<Option<super::ui_bind::TextColors>>>;
 
 impl<R: ViewRules> ViewRules for PanelArtRules<R> {
     fn tiles(&self, world: &ClientWorld, assets: &ViewAssets) -> Result<Vec<TileDraw>, ViewError> {
@@ -154,7 +166,11 @@ impl<R: UiRules> UiRules for PanelArtRules<R> {
     }
 
     fn ui_text(&self, req: &TextRequest, assets: &ViewAssets) -> Result<Vec<UiSprite>, ViewError> {
-        self.rules.ui_text(req, assets)
+        let Some(text) = &self.text else {
+            return self.rules.ui_text(req, assets);
+        };
+        let colors = *text.read().unwrap_or_else(|e| e.into_inner());
+        super::ui_bind::text_sprites(&super::ui_bind::OriginalTextHooks { colors }, req, assets)
     }
 
     /// Pass 11: everything after the world draw (`draw-order.md` §10),
@@ -189,12 +205,19 @@ impl PanelArtLoader {
                 spec: SPEC,
                 message: format!("{archive}: {message}"),
             };
-            let bytes = self
-                .source
-                .read_file(&archive)
+            // d2rs-own, unverified (D1): the HUD's fill cels are made
+            // here; a HUD file no archive holds draws nothing (logged).
+            if let Some(frames) = crate::ui::original::hud::preview_set(
+                name,
+                || self.source.read_file(&archive).is_none(),
+                &assets.palette,
+            ) {
+                assets.frames.insert(set, frames)?;
+                continue;
+            }
+            let dc6 = crate::assets::path::read_dc6(self.source.as_ref(), &archive)
                 .ok_or_else(|| fail("in no archive".into()))?
                 .map_err(fail)?;
-            let dc6 = d2_formats::dc6::Dc6::parse(&bytes).map_err(|e| fail(e.to_string()))?;
             let frames = FrameSet::from_dc6(&dc6, 0).map_err(|e| fail(e.to_string()))?;
             assets.frames.insert(set, frames)?;
         }

@@ -44,6 +44,29 @@ fn player_act(game: &Game, player: UnitId) -> u32 {
 }
 
 impl<R: TradeRest, S> WiredWorld<R, S> {
+    /// The quest/NPC act changes the calls asked
+    /// (`LifecycleHooks::request_act_change`, Warriv's "Go East"): the
+    /// level warp, which is the act change when the level is in another
+    /// act ([`d2_sim::wiring::path::act_change`], d2rs-own, unverified).
+    /// Run when the handler or tick that asked returns.
+    fn act_changes<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D) {
+        let a = events.action();
+        if a.sys.hooks.act_changes.is_empty() || a.sys.hooks.paths.is_none() {
+            a.sys.hooks.act_changes.clear();
+            return;
+        }
+        let q = std::mem::take(&mut a.sys.hooks.act_changes);
+        a.with(game, |g, v| {
+            for (player, level, _arg) in q {
+                let c = d2_sim::wiring::path::PathCtx::of(v, g);
+                if d2_sim::wiring::path::place::level_warp(c, player, level, 0).is_none() {
+                    let c = d2_sim::wiring::path::PathCtx::of(v, g);
+                    d2_sim::wiring::path::act_change::run(c, player, level, 0);
+                }
+            }
+        });
+    }
+
     /// The hireling calls the action wiring queued, in order
     /// (`ActionHooks::hireling_calls`, on from the first frame). Without
     /// hireling tables the game has no hireling: the queue is dropped.
@@ -51,6 +74,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
     /// [`Loader::Current`], whose skips are "no hireling"); a fatal skip
     /// goes to the interaction errors.
     pub fn hireling_calls<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D) {
+        self.act_changes(game, events);
         let q = events
             .action()
             .sys
