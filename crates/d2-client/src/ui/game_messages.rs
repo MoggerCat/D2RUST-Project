@@ -35,7 +35,7 @@ const UI_STATE_13: u8 = 0x13;
 const UI_MESSAGE_LOG: u8 = 0x18;
 
 /// The wide text of 8-bit message bytes (Latin-1, module doc).
-fn wide(b: &[u8]) -> Vec<u16> {
+pub(super) fn wide(b: &[u8]) -> Vec<u16> {
     b.iter().map(|&c| u16::from(c)).collect()
 }
 
@@ -50,7 +50,7 @@ pub struct GameMessages {
 
 /// Font metrics from the loaded tables; without them a line is not
 /// wrapped and a unit is 8 pixels wide.
-struct Measure<'a>(Option<&'a FontMeasure>);
+pub(super) struct Measure<'a>(pub(super) Option<&'a FontMeasure>);
 
 impl Metrics for Measure<'_> {
     fn wrap(&self, font: u16, text: &[u16], max: i32) -> Vec<Vec<u16>> {
@@ -226,7 +226,7 @@ impl Panel for MessagesUi {
 }
 
 /// The dark text backing of rectangle `r` as fill tiles.
-fn backing(file: u32, r: &crate::ui::messages::RectDraw, out: &mut dyn UiDrawSink) {
+pub(super) fn backing(file: u32, r: &crate::ui::messages::RectDraw, out: &mut dyn UiDrawSink) {
     let (tw, th) = (FILL_W as i32, FILL_H as i32);
     let mut y = r.y;
     while y < r.y + r.h {

@@ -128,7 +128,8 @@ fn install_mirrors_the_flags_and_keeps_the_border_open() {
             crate::ui::npc_menu_ui::NPC_MENU_PANEL,
             hud::HUD_PANEL,
             crate::ui::original::gold_dialog::GOLD_PANEL,
-            crate::ui::original::game_messages::MESSAGES_PANEL
+            crate::ui::original::game_messages::MESSAGES_PANEL,
+            crate::ui::original::overhead_ui::OVERHEAD_PANEL
         ]
     );
     let w = world(AMAZON, 1, true);
@@ -169,7 +170,8 @@ fn hotkeys_toggle_their_state_with_jump_0() {
             crate::ui::npc_menu_ui::NPC_MENU_PANEL,
             hud::HUD_PANEL,
             crate::ui::original::gold_dialog::GOLD_PANEL,
-            crate::ui::original::game_messages::MESSAGES_PANEL
+            crate::ui::original::game_messages::MESSAGES_PANEL,
+            crate::ui::original::overhead_ui::OVERHEAD_PANEL
         ],
         "the root mirrors the flag"
     );
@@ -192,7 +194,8 @@ fn hotkeys_toggle_their_state_with_jump_0() {
             crate::ui::npc_menu_ui::NPC_MENU_PANEL,
             hud::HUD_PANEL,
             crate::ui::original::gold_dialog::GOLD_PANEL,
-            crate::ui::original::game_messages::MESSAGES_PANEL
+            crate::ui::original::game_messages::MESSAGES_PANEL,
+            crate::ui::original::overhead_ui::OVERHEAD_PANEL
         ]
     );
 }
