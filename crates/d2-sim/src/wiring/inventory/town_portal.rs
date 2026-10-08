@@ -64,4 +64,10 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
     pub fn take_portal_requests(&mut self) -> Vec<UnitId> {
         std::mem::take(&mut self.state.portal_requests)
     }
+
+    /// The walks to ground items since the last call (player, item,
+    /// cursor flag).
+    pub fn take_item_walks(&mut self) -> Vec<(UnitId, UnitId, bool)> {
+        std::mem::take(&mut self.state.item_walks)
+    }
 }
