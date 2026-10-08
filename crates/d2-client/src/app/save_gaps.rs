@@ -139,6 +139,17 @@ pub fn apply_gaps(save: &mut D2s, gaps: &Gaps) {
     if let Some(list) = gaps.hireling_items.as_ref().filter(|_| hireling) {
         body.set_hireling_items(expansion, Some(list.clone()));
     }
+    // The loader reads a `jf` list exactly when it restores the header's
+    // hireling (§8.4 rule 2): a block without a list, or a list without a
+    // block, would make it take the next marker for an item list (22).
+    // `jf` cannot be left out while `kf` follows (the loader would read
+    // `kf` as the `jf` marker), so a block whose items could not be read
+    // saves the empty list (§8.4 rule 5).
+    match (&body.hireling_items, hireling) {
+        (Some(None), true) => body.hireling_items = Some(Some(Vec::new())),
+        (Some(Some(_)), false) => body.hireling_items = Some(None),
+        _ => {}
+    }
     if let Some(item) = &gaps.golem {
         set_golem(body, expansion, item.clone());
     }
@@ -269,7 +280,9 @@ fn join_hireling_items(s: &mut Sim, player: UnitId, items: &[ItemEntry]) {
 /// unknown GUID give 0. No left skill is the all-zero pair.
 pub fn mouse_slots(list: &SkillList, guids: &[u32]) -> [Slot; 2] {
     let view = list.view();
-    let slot = |idx: Option<usize>, left: bool| {
+    // The four mouse words are the plain skill id: unlike the hotkeys, no
+    // 0x8000 left flag is or-ed in (§2.4 rule 3, `0x00569155`–`0x0056920D`).
+    let slot = |idx: Option<usize>| {
         let Some(e) = idx.and_then(|i| view.get(i)) else {
             return Slot::default();
         };
@@ -277,9 +290,9 @@ pub fn mouse_slots(list: &SkillList, guids: &[u32]) -> [Slot; 2] {
             .iter()
             .position(|&g| g as i32 == e.owner_guid)
             .map_or(0, |p| p as u16 + 1);
-        Slot::encode(e.skill, left, item).unwrap_or_default()
+        Slot::encode(e.skill, false, item).unwrap_or_default()
     };
-    [slot(list.left, true), slot(list.right, false)]
+    [slot(list.left), slot(list.right)]
 }
 
 /// §2.4 rules 4–6: the left and right skill with the item of their index
