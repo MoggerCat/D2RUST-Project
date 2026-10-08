@@ -37,6 +37,7 @@ use std::rc::Rc;
 use d2_formats::font::FontTable;
 
 use super::draw::UiDrawSink;
+use super::item_tip;
 use super::geom::{Point, Rect};
 use super::layout::{LayoutError, PanelKey, RowKind, Screen};
 use super::panel::{ActionId, Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
@@ -458,6 +459,11 @@ impl OriginalUi {
         self.shared.borrow_mut().hud.belt.parts = parts;
     }
 
+    /// The item tool tips' tables and strings (`item_tip`).
+    pub fn set_item_tips(&mut self, tips: item_tip::ItemTips) {
+        self.shared.borrow_mut().items.tips = Some(tips);
+    }
+
     /// Shift is held (set by the host each frame, `inv_items`).
     pub fn set_shift(&mut self, shift: bool) {
         self.shared.borrow_mut().items.shift = shift;
@@ -683,6 +689,17 @@ impl Panel for InventoryUi {
         }
         let mut sh = self.sh.borrow_mut();
         let s = sh.config.screen;
+        if let UiEvent::Press {
+            button: PointerButton::Right,
+            at,
+        } = e
+        {
+            let class = Facts::of(ctx.world).class;
+            if let Some(l) = sh.items.layout(class, &s) {
+                sh.items.right_press(ctx.world, &sh.tables.files, &l, at);
+            }
+            return UiResponse::Consumed;
+        }
         match left(e) {
             Some((true, at)) => {
                 self.panel.press(&sh.tables, &s, at);
@@ -1050,6 +1067,19 @@ impl Panel for BorderUi {
         // The cursor item last (`panels-3.md` §23 r9).
         sh.items
             .draw_cursor(ctx.world, &sh.tables.files, (29, 29), sh.mouse, out);
+        // The item tool tip over everything (`item_tip`).
+        if sh.states.is_open(UI_INVENTORY) {
+            let class = Facts::of(ctx.world).class;
+            let lines = sh.items.hover_lines(
+                ctx.world,
+                &sh.tables.files,
+                &sh.config.screen,
+                class,
+                sh.mouse,
+            );
+            let (w, h) = (sh.config.screen.w, sh.config.screen.h);
+            item_tip::draw_tip(&lines, sh.mouse, (w, h), sh.fonts.as_ref(), &sh.tables.files, out);
+        }
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {

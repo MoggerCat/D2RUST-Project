@@ -3,7 +3,7 @@
 //! `use_item` seam).
 //!
 //! The item-use spec (`0x005BF240`) is unwritten, so the effect is
-//! PROVISIONAL (`docs/HANDOFF.md` §7, REC-104): a scroll of identify
+//! PROVISIONAL (`docs/HANDOFF.md` §7, REC-109): a scroll of identify
 //! (`isc`) or a tome of identify (`ibk`) used on a stored or equipped
 //! item that is not identified sets the identified flag (`generation.md`
 //! §1.1, item flag 0x10) and marks the item changed (item flag 0x1), so

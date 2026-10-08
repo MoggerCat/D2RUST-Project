@@ -28,6 +28,8 @@ pub struct ItemParts {
     pub inventory: Vec<Inventory>,
     /// The belt records and types (`ui::hud_belt`).
     pub belts: BeltParts,
+    /// The item tool tips' tables ([`item_tips`]); none on synthetic data.
+    pub tips: Option<crate::ui::item_tip::ItemTips>,
 }
 
 /// A table's string column (zero-terminated).
@@ -82,7 +84,22 @@ pub fn item_parts(archives: &dyn TableFiles) -> Result<ItemParts, String> {
             warn!("belt (d2rs-own, unverified): {e}; no belt row");
             BeltParts::default()
         }),
+        tips: None,
     })
+}
+
+/// The item tool tips of the user's tables: the game's item tables for
+/// the stream reader, the name and description columns, and the string
+/// tables (`ui::item_tip`). d2rs-own, unverified: a load error is
+/// logged by the caller and leaves the preview without tips.
+pub fn item_tips(
+    archives: &dyn TableFiles,
+    items: d2_sim::items::ItemTables,
+) -> Result<crate::ui::item_tip::ItemTips, String> {
+    let set = d2_data::bin::load_from(archives, "eng").map_err(|e| e.to_string())?;
+    let strings = super::strings::TableStrings::load(archives, super::strings::LANG)
+        .map_err(|e| e.to_string())?;
+    crate::ui::item_tip::ItemTips::new(Arc::new(items), &set, Arc::new(strings))
 }
 
 /// The `belts.bin` records (`BeltRecord::from_bytes` of each 0x108-byte
@@ -122,4 +139,7 @@ pub fn prepare_ui(app: &App, original: &mut OriginalUi) {
     original.set_item_art(parts.art.clone());
     original.set_inv_layouts(parts.inventory.iter().map(inv_layout).collect());
     original.set_belt_parts(parts.belts.clone());
+    if let Some(tips) = &parts.tips {
+        original.set_item_tips(tips.clone());
+    }
 }

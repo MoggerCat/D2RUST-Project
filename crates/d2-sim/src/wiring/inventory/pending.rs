@@ -151,7 +151,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         self.rest.use_item_at(player, item, x, y)
     }
     fn consume_item(&mut self, player: Owner, item: Guid) {
-        // PROVISIONAL (REC-104): a used identify scroll leaves the grid.
+        // PROVISIONAL (REC-109): a used identify scroll leaves the grid.
         if self.item_unit(item).is_some()
             && super::identify::IDENTIFY_CODES.contains(&self.code(item))
         {
@@ -386,7 +386,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         if target == player && self.use_potion(player, item) {
             return true;
         }
-        // PROVISIONAL (REC-104): identify scrolls and tomes on an item.
+        // PROVISIONAL (REC-109): identify scrolls and tomes on an item.
         if self.use_identify(player, target, item) {
             return true;
         }

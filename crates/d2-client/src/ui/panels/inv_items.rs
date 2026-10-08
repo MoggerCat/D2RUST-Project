@@ -136,6 +136,10 @@ pub struct ItemsUi {
     /// Shift is held (set by the host each frame): a shift-click on a
     /// belt-able grid item sends 0x63 (`inventory.md` §10 r3.4).
     pub shift: bool,
+    /// The item tool tips' data (`inv_items_tip`); none: no tips.
+    pub tips: Option<super::super::item_tip::ItemTips>,
+    /// The used item of the identify cursor (cursor state 6, `inv_items_tip`).
+    pub identify: std::cell::Cell<Option<u32>>,
 }
 
 /// d2rs-own, unverified: whether an item code is a belt-able potion
@@ -366,8 +370,14 @@ impl ItemsUi {
             }
         }
         let ctx = ClickCtx {
-            cursor_state: if cursor.is_some() { 4 } else { 1 },
-            used_item: None,
+            cursor_state: if cursor.is_some() {
+                4
+            } else if self.identify.get().is_some() {
+                6
+            } else {
+                1
+            },
+            used_item: self.identify.get(),
             cursor_item: cursor.map(iref),
             cursor_scroll_kind: None,
             under_mouse,
@@ -410,6 +420,9 @@ impl ItemsUi {
             })),
             GridMsg::ToBelt { item } => Some(ClientIntent::from_message(
                 &d2_proto::client::ItemToBeltShift { item },
+            )),
+            GridMsg::TargetUsed { target, used } => Some(ClientIntent::from_message(
+                &self.target_used(target, used),
             )),
             // Not produced by the facts above (no stack / socket / scroll
             // / cube / shop facts in the preview).
@@ -481,6 +494,10 @@ fn equip_press(
         (None, None) => None,
     }
 }
+
+#[path = "inv_items_tip.rs"]
+mod tip;
+pub use tip::is_identify;
 
 #[cfg(test)]
 #[path = "inv_items_tests.rs"]
