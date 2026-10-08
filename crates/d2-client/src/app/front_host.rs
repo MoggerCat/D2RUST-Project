@@ -15,7 +15,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use bevy::asset::RenderAssetUsages;
 use bevy::input::keyboard::KeyboardInput;
@@ -27,8 +27,8 @@ use d2_formats::dc6::Dc6;
 use d2_formats::palette::Palette;
 
 use crate::assets::path::FileSource;
-use crate::ui::front_end::screens::create::{self, name_taken_in, NewCharacter, NewCharacterSink};
-use crate::ui::front_end::screens::{char_select, credits, register_all};
+use crate::ui::front_end::screens::create::{NewCharacter, NewCharacterSink};
+use crate::ui::front_end::screens::credits;
 use crate::ui::front_end::startup::{MemProgress, StubVideo};
 use crate::ui::front_end::{
     DrawItem, FrontEnd, FrontInput, Outcome, Registry, SaveFolder, SKY_PALETTE, TICK_MS,
@@ -164,10 +164,9 @@ pub struct FrontHost {
     /// Set when the flow ended.
     pub outcome: Option<Outcome>,
     pub frames: u32,
-    /// Where the create screen leaves its choice.
-    sink: NewCharacterSink,
-    /// The Save folder (new characters are written here).
-    save_dir: Option<PathBuf>,
+    /// Where the create screen leaves its choice, and the Save folder the
+    /// stub is written to ([`FrontHost::with_stub_writer`]).
+    stub: Option<(NewCharacterSink, PathBuf)>,
     /// The stub `.d2s` written for the last created character, or why not.
     pub created: Option<Result<PathBuf, String>>,
 }
@@ -178,38 +177,23 @@ pub fn provisional_adv(_font: u16, text: &[u16]) -> i32 {
     8 * text.len() as i32
 }
 
-/// The screens with the host's data behind them: saved characters and the
-/// duplicate-name check from `save_dir`, the credits text from the archives.
-fn registry(save_dir: Option<&Path>, sink: NewCharacterSink, art: Option<&FrontArt>) -> Registry {
-    let mut reg = Registry::default();
-    register_all(&mut reg);
-    char_select::register_with(
-        &mut reg,
-        save_dir.map(Path::to_path_buf),
-        Arc::new(Mutex::new(None)),
+/// Registers the credits screen with the text read from the archives when no
+/// loose file is under `D2_GAME_DIR`.
+pub fn register_credits(reg: &mut Registry, art: &FrontArt) {
+    let src = art.source.clone();
+    credits::register_with(
+        reg,
+        Box::new(move |expansion| {
+            let name = if expansion {
+                "ExpansionCredits.txt"
+            } else {
+                "Credits.txt"
+            };
+            // d2rs-own, unverified: loose file first, then the archives.
+            credits::loose_file(expansion)
+                .or_else(|| src.read_file(&format!(r"data\local\ui\eng\{name}"))?.ok())
+        }),
     );
-    let dir = save_dir.map(Path::to_path_buf);
-    create::register_with(
-        &mut reg,
-        sink,
-        Box::new(move |n| dir.as_deref().is_some_and(|d| name_taken_in(d, n))),
-    );
-    if let Some(src) = art.map(|a| a.source.clone()) {
-        credits::register_with(
-            &mut reg,
-            Box::new(move |expansion| {
-                let name = if expansion {
-                    "ExpansionCredits.txt"
-                } else {
-                    "Credits.txt"
-                };
-                // d2rs-own, unverified: loose file first, then the archives.
-                credits::loose_file(expansion)
-                    .or_else(|| src.read_file(&format!(r"data\local\ui\eng\{name}"))?.ok())
-            }),
-        );
-    }
-    reg
 }
 
 /// The 335-byte stub `.d2s` of a new character (`formats/d2s.md` §2.6),
@@ -251,25 +235,15 @@ impl FrontHost {
         art: Option<FrontArt>,
         first_entry: bool,
     ) -> Self {
-        Self::with_save_dir(expansion, saves, art, first_entry, None)
+        Self::with_front(FrontEnd::with_screens(expansion, saves), art, first_entry)
     }
 
-    /// As [`FrontHost::new`], with the Save folder behind the character
-    /// select and create screens.
-    pub fn with_save_dir(
-        expansion: bool,
-        saves: Box<dyn SaveFolder>,
-        art: Option<FrontArt>,
-        first_entry: bool,
-        save_dir: Option<PathBuf>,
-    ) -> Self {
-        let sink: NewCharacterSink = Default::default();
-        let reg = registry(save_dir.as_deref(), sink.clone(), art.as_ref());
-        let mut front = FrontEnd::new(expansion, saves, reg);
+    /// [`FrontHost::new`] over a front end the caller built (a registry
+    /// with the select / create screens wired, `app::front_start`).
+    pub fn with_front(mut front: FrontEnd, art: Option<FrontArt>, first_entry: bool) -> Self {
         front.start(first_entry, &mut MemProgress::default(), &mut StubVideo);
         Self {
-            sink,
-            save_dir,
+            stub: None,
             created: None,
             front,
             art,
@@ -280,16 +254,25 @@ impl FrontHost {
         }
     }
 
+    /// Writes the stub `.d2s` of a character the create screen finishes
+    /// into `save_dir`. The choice stays in the sink for the game start.
+    pub fn with_stub_writer(mut self, sink: NewCharacterSink, save_dir: PathBuf) -> Self {
+        self.stub = Some((sink, save_dir));
+        self
+    }
+
     /// The flow ended in a game load from character create: write the stub.
     fn write_created(&mut self) {
-        let Some(c) = self.sink.borrow_mut().take() else {
+        let Some((sink, dir)) = &self.stub else {
+            return;
+        };
+        let Some(c) = sink.borrow().clone() else {
             return;
         };
         let time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |d| d.as_secs() as u32);
-        let dir = self.save_dir.clone().unwrap_or_default();
-        self.created = Some(write_stub(&dir, &c, time));
+        self.created = Some(write_stub(dir, &c, time));
     }
 }
 
@@ -407,7 +390,7 @@ fn drive(mut host: NonSendMut<FrontHost>, time: Res<Time>) {
         host.acc_ms -= TICK_MS;
         host.front.tick();
         host.outcome = host.front.outcome();
-        if host.outcome.is_some() {
+        if matches!(host.outcome, Some(Outcome::GameLoad(g)) if g.new_character) {
             host.write_created();
         }
     }

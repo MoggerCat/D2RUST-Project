@@ -9,7 +9,10 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy::time::TimeUpdateStrategy;
-use d2_client::app::front_host::{add_front_end, write_stub, FrontArt, FrontHost};
+use d2_client::app::front_host::{
+    add_front_end, register_credits, write_stub, DirSaves, FrontArt, FrontHost,
+};
+use d2_client::app::front_start::{registry, StartHandles};
 use d2_client::assets::path::MemorySource;
 use d2_client::ui::front_end::screens::create::{Class, NewCharacter, EXPANSION, HERO_H, HERO_W};
 use d2_client::ui::front_end::*;
@@ -29,6 +32,23 @@ fn app(host: FrontHost) -> App {
     )));
     add_front_end(&mut app, host);
     app
+}
+
+/// The host as `main` builds it: the start-flow registry, the credits text
+/// from `art`, the stub writer.
+fn host_for(dir: &std::path::Path, saves: bool, art: Option<FrontArt>) -> FrontHost {
+    let handles = StartHandles::default();
+    let mut reg = registry(dir, &handles);
+    if let Some(a) = &art {
+        register_credits(&mut reg, a);
+    }
+    let saves: Box<dyn SaveFolder> = if saves {
+        Box::new(DirSaves(dir.to_path_buf()))
+    } else {
+        Box::new(false)
+    };
+    let front = FrontEnd::new(true, saves, reg);
+    FrontHost::with_front(front, art, false).with_stub_writer(handles.created, dir.to_path_buf())
 }
 
 fn front(a: &mut App) -> Mut<'_, FrontHost> {
@@ -72,7 +92,7 @@ fn credits_rows_are_drawn_after_ticks() {
         b"*Heads\r\nAl\r\nBo\r\n".to_vec(),
     );
     let art = FrontArt::new(Arc::new(mem));
-    let host = FrontHost::new(true, Box::new(false), Some(art), false);
+    let host = host_for(&temp_dir("credits"), false, Some(art));
     let mut a = app(host);
     front(&mut a).front.trigger(Trigger::Credits);
     assert_eq!(front(&mut a).front.current(), CREDITS);
@@ -94,7 +114,7 @@ fn credits_rows_are_drawn_after_ticks() {
 #[test]
 fn create_hover_frames_and_stub_save() {
     let dir = temp_dir("create");
-    let host = FrontHost::with_save_dir(true, Box::new(false), None, false, Some(dir.clone()));
+    let host = host_for(&dir, false, None);
     let mut a = app(host);
     front(&mut a).front.trigger(Trigger::SinglePlayer);
     assert_eq!(front(&mut a).front.current(), CHAR_CREATE);
@@ -157,13 +177,7 @@ fn char_select_lists_a_saved_character() {
         expansion: true,
     };
     write_stub(&dir, &c, 1).unwrap();
-    let host = FrontHost::with_save_dir(
-        true,
-        Box::new(d2_client::app::front_host::DirSaves(dir.clone())),
-        None,
-        false,
-        Some(dir),
-    );
+    let host = host_for(&dir, true, None);
     let mut a = app(host);
     front(&mut a).front.trigger(Trigger::SinglePlayer);
     assert_eq!(front(&mut a).front.current(), CHAR_SELECT);
@@ -178,7 +192,7 @@ fn char_select_lists_a_saved_character() {
 
 #[test]
 fn controls_screen_is_drawn_and_takes_wheel() {
-    let host = FrontHost::new(true, Box::new(false), None, false);
+    let host = host_for(&temp_dir("controls"), false, None);
     let mut a = app(host);
     front(&mut a).front.goto(CONTROLS);
     ticks(&mut a, 2);

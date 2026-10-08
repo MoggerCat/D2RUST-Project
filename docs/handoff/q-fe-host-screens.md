@@ -26,3 +26,7 @@ See REC-231. Text is still a bar until q-fe-draw's glyph path; the host's text w
 ## Local check
 
 `D2_GAME_DIR=... cargo run -p d2-client --release -- play`: Credits scrolls (bars, not glyphs, until q-fe-draw); on Create New the heroes follow the pointer (hover animation), a click walks the hero forward and the name box / OK appear; typing a name and OK writes `<save dir>/<Name>.d2s` (335 bytes); the next run lists that character on char select.
+
+## Reconciled with q-fe-start-flow
+
+One registry: `app::front_start::registry` + `StartHandles`. The host adds `register_credits` (archive fallback for the credits text) and `FrontHost::with_stub_writer(handles.created, save_dir)`, which writes the stub `.d2s` at a new-character game load and leaves the choice in the sink for `StartChoice::resolve`. q-fe-draw was not in staging at this merge: text is still a bar and `provisional_adv` stays until it lands.
