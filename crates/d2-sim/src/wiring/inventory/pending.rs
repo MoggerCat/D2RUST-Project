@@ -224,9 +224,35 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         let a = a.and_then(|g| self.item_unit(g));
         corpse_slot_fit(self, self.tables, u, xu, d, a, l)
     }
-    /// The corpse list, room and unit removal are not modelled by the
-    /// desk: the rest's.
+    /// The corpse list is not modelled by the desk (the rest's
+    /// `corpse_taken` runs after).
+    ///
+    /// d2rs-own, unverified (PROVISIONAL REC-136): §12.1 step 4 on the
+    /// wired side. The corpse unit leaves its room and is freed with its
+    /// inventory (`0x0061A270`, `0x00555600`); the player is sent S→C 0x8E
+    /// `CorpseAssign` [1] 0, the player's and the corpse's GUID, and 0x0A
+    /// for the unit, so the client drops it. Other players' clients are
+    /// not told (single-player preview); the rest's `corpse_taken` still
+    /// runs.
     fn corpse_taken(&mut self, player: Owner, corpse: Owner) {
+        if let Some(c) = self.unit_of(corpse) {
+            let mut assign = vec![0x8E, 0];
+            assign.extend_from_slice(&player.guid.to_le_bytes());
+            assign.extend_from_slice(&corpse.guid.to_le_bytes());
+            self.rest.send(player, assign);
+            self.rest.send(
+                player,
+                crate::units::messages::remove_unit(0, corpse.guid).to_vec(),
+            );
+            let r = self.econ.game.lists.room_remove(c);
+            self.note_list(r);
+            self.state.inventories.remove(&c);
+            let (mut sim, hooks) = self.econ.split();
+            if let Err(e) = crate::units::lifecycle::remove(&mut sim, hooks, c) {
+                self.state.errors.push(InvError::Economy(e.into()));
+            }
+            self.sync_in();
+        }
         self.rest.corpse_taken(player, corpse)
     }
     fn replenish_timers(&mut self, item: Guid) {

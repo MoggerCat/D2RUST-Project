@@ -4,7 +4,7 @@
 //! ([`read_extra`]) and made again at the join ([`join_items`]). d2rs-own,
 //! unverified: the placement of loaded items is PROVISIONAL (REC-115).
 
-use d2_formats::d2s::{Body, D2s, ItemEntry};
+use d2_formats::d2s::{Body, Corpse, D2s, ItemEntry};
 use d2_sim::skills::list::class_skills;
 use d2_sim::units::UnitId;
 
@@ -20,6 +20,11 @@ pub struct Extra {
     pub skills: Option<Vec<u8>>,
     /// The three 16-byte waypoint records (`waypoints.md` §3).
     pub waypoints: Option<[[u8; 16]; 3]>,
+    /// The player's corpse with its items (`d2s.md` §8.3: the one with the
+    /// highest score is saved; this preview has at most the newest per
+    /// owner). `None`: no inventory model; the loaded section passes
+    /// through. `Some(vec![])`: no corpse with items.
+    pub corpses: Option<Vec<Corpse>>,
 }
 
 /// Reads [`Extra`] from the game's `player`.
@@ -28,6 +33,7 @@ pub fn read_extra(sim: &mut Sim, player: UnitId) -> Extra {
         .world
         .save_items(&mut sim.game, &mut sim.events, player)
         .ok();
+    let corpses = items.as_ref().map(|_| read_corpses(sim, player));
     let class = sim
         .events
         .action
@@ -66,7 +72,45 @@ pub fn read_extra(sim: &mut Sim, player: UnitId) -> Extra {
         items,
         skills,
         waypoints,
+        corpses,
     }
+}
+
+/// The corpses of `player` that lie dead (mode 17) and hold items, as
+/// save sections (`d2s.md` §8.3). d2rs-own, unverified (REC-136): x and y
+/// are 0, the value measured for a corpse saved after a town respawn
+/// (rule 6); the unknown u32 is 0 (rule 3); of several corpses the
+/// newest is kept (the spec scores them by repair cost).
+fn read_corpses(sim: &mut Sim, player: UnitId) -> Vec<Corpse> {
+    let Some(guid) = sim.events.action.sys.units.get(player).map(|u| u.guid) else {
+        return Vec::new();
+    };
+    let sys = &sim.events.action.sys;
+    let mut mine: Vec<UnitId> = sys
+        .hooks
+        .death
+        .owners
+        .iter()
+        .filter(|&(&c, &o)| o == guid && sys.units.get(c).is_some_and(|r| r.mode == 17))
+        .map(|(&c, _)| c)
+        .collect();
+    mine.sort();
+    let mut out = Vec::new();
+    for c in mine.into_iter().rev() {
+        match sim.world.save_items(&mut sim.game, &mut sim.events, c) {
+            Ok(items) if !items.is_empty() => {
+                out.push(Corpse {
+                    unk: 0,
+                    x: 0,
+                    y: 0,
+                    items,
+                });
+                break;
+            }
+            _ => {}
+        }
+    }
+    out
 }
 
 /// `body` with the [`Extra`] laid over it.
@@ -81,6 +125,9 @@ pub fn apply_extra(body: &mut Body, extra: &Extra) {
     }
     if let Some(records) = &extra.waypoints {
         body.waypoints.records = *records;
+    }
+    if let Some(c) = &extra.corpses {
+        body.corpses = c.clone();
     }
 }
 

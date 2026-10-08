@@ -729,7 +729,11 @@ impl T {
         if let Some(inv) = &sim.world.inventory {
             assert_eq!(inv.state.errors, Vec::new());
         }
-        assert!(sim.events.sys.hooks.errors.is_empty());
+        assert!(
+            sim.events.sys.hooks.errors.is_empty(),
+            "{:?}",
+            sim.events.sys.hooks.errors
+        );
         assert_eq!(sim.tick_faults, Vec::new());
         assert_eq!(sim.world.action.faults, Vec::new());
     }
@@ -1690,4 +1694,123 @@ fn preview_rest_drops_gold_into_a_pile() {
     let pile = piles[0];
     assert_eq!(t.stat(pile, stat::GOLD), 1500);
     assert!(t.sim().game.lists.unit(pile).unwrap().room().is_some());
+}
+
+// ---- the corpse (q-corpse) -----------------------------------------------------------
+
+/// The whole softcore path on the item-move fixture: a player with a cap
+/// on the head, a key in the backpack and an item on the cursor dies;
+/// at the corpse creation the cursor and body items move onto the corpse
+/// and the grid stays (`vitals.md` §4.7 rule 1.7); after the respawn
+/// 0x16 type 0 on the corpse takes everything back and the corpse is
+/// freed (`inventory-moves.md` §7.1, §12).
+// Covers: specs/combat/vitals.md §4.7; specs/items/inventory-moves.md §7.1, §12
+#[test]
+fn die_respawn_click_the_corpse_items_come_back() {
+    use d2_sim::units::hooks::Sim as UnitSim;
+    use d2_sim::units::modes::player_event1;
+
+    let mut t = setup();
+    let p = t.player;
+    t.sim().events.sys.hooks.death.allocate_corpses = true;
+    let cap = t.cursor_item(CAP);
+    assert_eq!(t.frame(&body(0x1A, cap, 1)).0, Done);
+    let key = t.picked(KEY);
+    let cursor = t.cursor_item(SWORD);
+    let (cap_u, key_u, sword_u) = (
+        t.unit(cap).unwrap(),
+        t.unit(key).unwrap(),
+        t.unit(cursor).unwrap(),
+    );
+
+    t.set_stat(p, stat::GOLD, 1000);
+    // The fixture's player record is in mode 0: on its feet (neutral).
+    t.sim().events.sys.units.get_mut(p).unwrap().mode = 1;
+    let room = t.room;
+    t.rest.with(|r| {
+        r.gold = true;
+        r.spot = Some(Spot { room, x: 10, y: 10 });
+    });
+
+    // DT, then DD (ENDANIM by hand: the fixture has no animation data).
+    {
+        let sim = t.sim();
+        sim.events.start_death(&mut sim.game, p);
+        // The fixture has no AnimData row: the animation start's error.
+        sim.events.sys.hooks.errors.clear();
+    }
+    t.idle();
+    // The gold penalty (§4.6 rule 1): 1 % of 1000 is lost, the rest lies
+    // in piles where the player died.
+    assert_eq!(t.stat(p, stat::GOLD), 0);
+    let items = t.sim().game.lists.units_of_type(UnitType::Item);
+    let mut piles = 0;
+    for u in items {
+        if t.sim()
+            .events
+            .sys
+            .units
+            .get(u)
+            .is_some_and(|r| r.class == GOLD as u32)
+        {
+            piles += t.stat(u, stat::GOLD);
+        }
+    }
+    assert_eq!(piles, 990, "the gold left lies on the ground");
+    {
+        let sim = t.sim();
+        let s = &mut sim.events.sys;
+        let mut u = UnitSim {
+            game: &mut sim.game,
+            units: &mut s.units,
+            stats: &mut s.stats,
+            data: &s.data,
+        };
+        player_event1(&mut u, &mut s.hooks, p).unwrap();
+        s.hooks.errors.clear();
+    }
+    t.idle();
+    let corpses: Vec<UnitId> = t
+        .sim()
+        .game
+        .lists
+        .units_of_type(UnitType::Player)
+        .into_iter()
+        .filter(|&u| u != p)
+        .collect();
+    assert_eq!(corpses.len(), 1, "the corpse");
+    let c = corpses[0];
+    let cguid = t.sim().events.sys.units.get(c).unwrap().guid;
+    // The cursor and body items are on the corpse; the grid stays.
+    {
+        let ci = &t.inv().state.inventories[&c];
+        assert_eq!(ci.body_item(1), Some(cap_u), "the cap on the corpse's head");
+        assert_eq!(ci.cursor(), None);
+        assert!(ci.contains(sword_u), "the cursor item");
+        assert!(!ci.contains(key_u));
+    }
+    assert_eq!(t.inventory().body_item(1), None);
+    assert_eq!(t.inventory().cursor(), None);
+    assert!(t.inventory().contains(key_u), "grid stays");
+    assert!(!t.inventory().contains(sword_u));
+
+    // The respawn (0x41 is the app test's): on its feet again.
+    t.sim().events.sys.units.get_mut(p).unwrap().mode = 1;
+    t.idle();
+
+    // The click: 0x16 type 0 on the corpse.
+    let (code, _) = t.frame(&msg(0x16, &[0, cguid, 0]));
+    assert_eq!(code, Done);
+    let inv = t.inventory();
+    assert_eq!(inv.body_item(1), Some(cap_u), "the cap back on the head");
+    assert!(inv.contains(sword_u), "the cursor item back");
+    assert!(inv.contains(key_u));
+    assert!(
+        t.sim()
+            .game
+            .lists
+            .find_unit(UnitType::Player, cguid)
+            .is_none(),
+        "the corpse is freed"
+    );
 }

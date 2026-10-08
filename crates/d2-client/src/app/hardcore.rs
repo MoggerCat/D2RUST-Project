@@ -13,10 +13,14 @@
 //! gold and experience the death took stay lost whichever way the window
 //! is then closed.
 //!
-//! PROVISIONAL (M22; REC-126): the original saves at the DD start
-//! (`vitals.md` §4.8 r2, `0x00532400`); this preview saves when the death
-//! screen comes up (the DT start), from the app, because the server has no
-//! save path of its own. Leaving a dead hardcore character closes the
+//! The save at the DD start (`vitals.md` §4.8 r2, `0x00532400`) is the
+//! spec's: the corpse then holds the cursor and body items, and the save
+//! writes them in its corpse section (`d2s.md` §8.3, `save_full`).
+//!
+//! PROVISIONAL (M22; REC-126): this preview also saves when the death
+//! screen comes up (the DT start), so the penalties are on disk even if
+//! the window closes during the death animation; both from the app,
+//! because the server has no save path of its own. Leaving a dead hardcore character closes the
 //! game (the original returns to the character screen). d2rs-own,
 //! unverified.
 
@@ -62,6 +66,29 @@ fn save_on_death(screen: Res<DeathScreen>, saver: Option<Res<SaveHandle>>, mut w
     *was = screen.active;
 }
 
+/// Saves the character once when the corpse lies (the local player in
+/// mode 17, the DD start): the corpse section holds its items.
+fn save_at_dd(
+    bridge: Option<Res<BridgeResource>>,
+    saver: Option<Res<SaveHandle>>,
+    mut was: Local<bool>,
+) {
+    let dd = bridge.is_some_and(|b| {
+        b.0.world()
+            .local()
+            .is_some_and(|p| p.mode == crate::bridge::modes::player_mode::DEAD)
+    });
+    if dd && !*was {
+        if let Some(h) = &saver {
+            match h.save() {
+                Ok(()) => info!("play: saved the character at its corpse (DD)"),
+                Err(e) => warn!("play: the corpse was NOT saved: {e}"),
+            }
+        }
+    }
+    *was = dd;
+}
+
 /// Hardcore: Esc on the dead player (the server drops the client, 0x41)
 /// closes the game; the dead save is already written.
 fn leave_dead(
@@ -82,6 +109,7 @@ pub fn add_hardcore(app: &mut App, hardcore: bool) {
         Update,
         (
             save_on_death,
+            save_at_dd,
             leave_dead.run_if(resource_exists::<BridgeResource>),
         ),
     );

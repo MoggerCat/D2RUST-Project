@@ -68,6 +68,14 @@ pub struct DeathState {
     pub died: std::collections::BTreeSet<UnitId>,
     /// Corpses allocated and not yet announced to the clients.
     pub fresh: Vec<UnitId>,
+    /// (player, corpse) pairs whose items have not moved yet: the host
+    /// that holds the inventory model runs `items::moves::ground::
+    /// corpse_fill` for each (`vitals.md` §4.7 rule 1.7).
+    pub loot: Vec<(UnitId, UnitId)>,
+    /// (player, amount) gold drops of the death penalty (`vitals.md` §4.6
+    /// rule 1, `0x00535510`): the host that holds the inventory model
+    /// makes the piles (`items::moves::ground::gold_piles`).
+    pub gold_drops: Vec<(UnitId, i32)>,
 }
 
 impl<X: Pending> ActionHooks<X> {
@@ -111,10 +119,12 @@ impl<X: Pending> ActionHooks<X> {
             }
             if let Some(q) = g.drop {
                 cv.v.h.x.death_drop_gold(cv.game, p, q);
+                cv.v.h.death.gold_drops.push((p, q));
             }
         } else {
             if let Some(q) = g.drop {
                 cv.v.h.x.death_drop_gold(cv.game, p, q);
+                cv.v.h.death.gold_drops.push((p, q));
             }
             if let Some(v) = g.gold {
                 cv.set_base_stat(p, gold_stat::GOLD, v);
@@ -172,7 +182,9 @@ impl<X: Pending> ActionHooks<X> {
     /// or none when refused; the item take-back `0x00562F30` and the rest
     /// of §12.1 are the inventory's (`items::moves::ground`).
     pub fn corpse_pickup(&mut self, sim: &mut Sim<'_>, p: UnitId, c: UnitId) -> Option<i32> {
-        if !sim.stats.has_state(c, STATE_PLAYERBODY) {
+        // A corpse this wiring allocated has state 7 by construction (the
+        // state table of a bare fixture may not hold the row).
+        if !sim.stats.has_state(c, STATE_PLAYERBODY) && !self.death.owners.contains_key(&c) {
             return None;
         }
         let guid = sim.units.get(p).map(|r| r.guid);
