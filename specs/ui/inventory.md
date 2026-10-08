@@ -359,7 +359,7 @@ u32) and `0x00478700` (u32 + three u32); field order is the layout in
       grid (`0x0063B850`, record of page 3) → **0x2A** (cursor, cube);
       none → the "cannot" note `0x004CB9C0`.
 5. Return value 1 = consumed. Equipment clicks (`0x00490780`,
-   `0x00490BA0`, `0x00490FC0`): `ui/panels.md` §15 (not read here).
+   `0x00490BA0`, `0x00490FC0`): `ui/panels-3.md` §29.
 
 ### 11. Gold amount dialog (`0x00454150`)
 

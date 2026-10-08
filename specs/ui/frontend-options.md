@@ -9,7 +9,7 @@
   (the command list), `ui/control-panel.md` §9 r5 (mini-panel "Game Menu" button), `ui/panels.md` §2
   (`SetUIState`), `ui/ui-states.tsv` (ui 9 `UI_ESCMENU`, ui 11 `UI_CONFIG`), `ui/text.md` (Unicode text
   draw), `ui/messages.md` (`menu\boxpieces` border `0x00452E50`, "Text Display Beta"),
-  `render/sprite-placement.md` §2 (DC6 placement), `render/blend-modes.md` §2 (rectangle draw modes),
+  `render/sprite-placement.md` §2 (DC6 placement), `render/blend-modes.md` §1 (cel draw modes), §8 r2 (rectangles),
   `render/lighting.md` §5 (light quality), `ui/automap.md` §8 (automap options),
   `audio/sound-table.md` §9 and `audio/sound-table-2.md` §15 (audio settings and slider math, sound
   deferred), `audio/triggers.md` (NPC speech), `client/ui.md` §A5 (one logical size), §A6 (controls file),
@@ -25,18 +25,18 @@
 |   O1. Where options live; opening and closing the game menu | 79–135 |
 |   O2. Menu records and the tree | 136–205 |
 |   O3. Save and Exit Game (`0x0047F2D0`) | 206–211 |
-|   O4. Draw (`0x0047E3D0`, while ui 9 is open, from the UI draw `0x00456F46`) | 212–268 |
-|   O5. Input (handler table `0x006D6030`, 7 entries, registered while ui 9 is open) | 269–313 |
-|   O6. Row effects (apply = +0x114, init = +0x118; registry writes are REG_DWORD) | 314–358 |
-|   O7. Settings storage and the d2rs config mapping | 359–390 |
-|   O8. d2rs stubs (rows drawn and navigated like the original, value kept in `settings.toml`, no effect) | 391–407 |
-|   O9. Configure Controls (ui 11, `UI_CONFIG`) | 408–501 |
-| Constants & data dependencies | 502–521 |
-| Randomness | 522–525 |
-| Edge cases & original bugs | 526–550 |
-| Test vectors | 551–580 |
-| Provenance | 581–614 |
-| Open questions | 615–622 |
+|   O4. Draw (`0x0047E3D0`, while ui 9 is open, from the UI draw `0x00456F46`) | 212–302 |
+|   O5. Input (handler table `0x006D6030`, 7 entries, registered while ui 9 is open) | 303–347 |
+|   O6. Row effects (apply = +0x114, init = +0x118; registry writes are REG_DWORD) | 348–392 |
+|   O7. Settings storage and the d2rs config mapping | 393–424 |
+|   O8. d2rs stubs (rows drawn and navigated like the original, value kept in `settings.toml`, no effect) | 425–449 |
+|   O9. Configure Controls (ui 11, `UI_CONFIG`) | 450–543 |
+| Constants & data dependencies | 544–563 |
+| Randomness | 564–567 |
+| Edge cases & original bugs | 568–592 |
+| Test vectors | 593–623 |
+| Provenance | 624–663 |
+| Open questions | 664–671 |
 <!-- /index -->
 
 ## Summary
@@ -212,7 +212,9 @@ the settings mapping and the d2rs stubs; the effects of each setting are owned b
 ### O4. Draw (`0x0047E3D0`, while ui 9 is open, from the UI draw `0x00456F46`)
 
 W = `[0x0071146C]`, H = `[0x00711470]`, h = W / 2. Divisions truncate toward zero. Draw mode 5 =
-normal, 1 = the disabled look (`render/blend-modes.md`). Cel y is the value passed to the cel draw
+normal (opaque), 1 = the disabled look: every cel pixel of the row (label, value, bar, skull) is
+blended 50 % with what is under it, `d' = A1[256·d + P[s]]` (`render/blend-modes.md` §1 mode 1, §2
+cel runs); the cel draw `0x00502680` passes the row mode to the renderer unchanged. Cel y is the value passed to the cel draw
 (`render/sprite-placement.md` §2); multi-frame images are drawn frame by frame at +256 px.
 
 1. **Rows.** y0 = (H − 80) / 2 − (pitch × n) / 2. For each row in order (exp-only rows skipped on
@@ -229,7 +231,11 @@ normal, 1 = the disabled look (`render/blend-modes.md`). Cel y is the value pass
    truncating; computed as −265 / (n − 1) × p); draw in order:
    - rectangle x [h − 59, h − 59 + t + 12) × y [Y − 30, Y), color 0, mode 1 (style 1) or 2 (style 0);
    - rectangle x [h − 59 + t + 12, h + 230) × y [Y − 30, Y), color 0, mode 1 (style 1) or 0 (style 0)
-     (`render/blend-modes.md` §2: modes 0–2 with color 0 darken the background);
+     (both through `0x0046EFD0(x, y, w, 30, 0, mode)` → `D2GFX_DrawRectangle` `0x004F6300`; mode
+     from `neg / sbb / add 2` and `setne` on the style at `0x0047E30F`, `0x0047E334`). Pixels:
+     `render/blend-modes.md` §8 r2 with color 0: `d' = T[256·d + 0]`, T = A2 (mode 0, 25 % black),
+     A1 (mode 1, 50 %), A0 (mode 2, 75 %), the row mode does not apply to them (a disabled slider
+     row darkens the same); the clamps and the x1 < x0 fault of §8 r2 cannot arise (t ≤ 265);
    - bar `OptBarC` (style 1; 2 frames 255 + 35 = 290 × 37) or `OptBar` (style 0; 290 × 33), right
      edge at h + 230 (left X0 = h − 60), y = Y, row mode;
    - skull `OptSkull` (28 × 28) at x = X0 + t, y = Y − 1 − (style = 0 ? 1 : 0), row mode.
@@ -239,6 +245,20 @@ normal, 1 = the disabled look (`render/blend-modes.md`). Cel y is the value pass
    right at x = h + 249, frame f; both y = y_top(selected) + pentagram offset, mode 5. Then, when
    more than 50 ms passed since the last advance (`0x00454850`: GetTickCount − `[0x007A313C]` >
    50; its only caller), f := (f + 1) mod 8 and the stamp := now. The left one spins the other way.
+   **Clock** (REC-257, 2026-10-08, static): the clock is `GetTickCount()` (import `0x006CC260`, u32
+   ms, unsigned subtraction), not the game tick or the frame count. f and the stamp are static
+   zeros of the image (both read 0 from `Game.exe`); the only writers are `0x0047E6FD` (f) and
+   `0x00454863` (stamp), both inside this draw, so neither is reset on opening the menu, on
+   entering a sub-menu or at game join: f keeps its value across openings and games of one
+   process. At most one step per draw, and only on draws of the open menu: the first draw after
+   an opening steps at once when > 50 ms passed since the last step (always true after a pause
+   longer than 50 ms); while open, a step happens on the first draw at which ≥ 51 ms have passed,
+   so the step period is 51 ms rounded up to the next draw (e.g. 80 ms at 25 draws / s; on a
+   15.6 ms `GetTickCount` resolution, ≈ 62.5 ms at faster draw rates; informative). d2rs: the same
+   rule on the client's millisecond wall clock (u32, wrapping subtraction), f and the stamp kept for
+   the process (zero at start), evaluated once per drawn frame of the open menu after the two
+   pentagram draws. It is a UI animation with no tick meaning; rule 10 compares the frame shown
+   for a given elapsed time (REC-212).
 4. **Positions** (y_top / label baseline / pentagram y; x: labels h − 230, values right edge h +
    230, bar h − 60 … h + 230, pentagrams h − 301 and h + 249; h = 400 at 800 × 600, 320 at 640 ×
    480):
@@ -265,6 +285,20 @@ normal, 1 = the disabled look (`render/blend-modes.md`). Cel y is the value pass
    selected row is shown only by the two pentagrams (r3); a disabled row draws in mode 1. Moving
    the pointer over a row selects it (§O5 r3), so with the mouse the pentagrams follow the
    pointer.
+7. **Missing art file** (REC-257, 2026-10-08, static). Every file of this menu loads through
+   `0x004788B0` → the archive read `0x00517079`; a file that does not open writes the non-fatal
+   log line `Error opening file: %s` (`0x00516E46` → `0x00410610`, as for code files in
+   `data/loading.md`) and the loader returns a null cel (`0x00601340` skips a null buffer). No
+   load site tests the result (`0x0047DCA7` label, `0x0047DD0B` values, `0x0047DE4F` …
+   `0x0047DE9C` widgets, `0x00456CD9` `pentspin`). The first use of a null cel reads address 0 in
+   the frame-count getter `0x006019F0` (called first by the cel draw `0x00502680`): an access
+   violation, i.e. the original crashes, at game join for `pentspin` (the width walk of r5,
+   `0x0047DEB2`) and at the first draw of the row for a label, value cel, `OptBar` / `OptBarC` or
+   `OptSkull`. The one tested pointer is a slider row's label (`0x0047E5BF`): null → the
+   "no label" layout of r2. d2rs: a file of this menu that is not in the archives is a load
+   error reported at game join (the install is incomplete; the original cannot run past it
+   either), not a crash and not a silent skip. All the files are present in a 1.14d install
+   (§O2 r4, Constants).
 
 ### O5. Input (handler table `0x006D6030`, 7 entries, registered while ui 9 is open)
 
@@ -404,6 +438,14 @@ and Exit Game, Configure Controls.
 
 d2rs adds no rows: every menu has exactly the §O2 r3 rows (Video exp: 8 rows, tops of §O4 r4).
 d2rs-only settings (e.g. the window mode) live in `settings.toml` only and have no menu row.
+Confirmed (REC-257, 2026-10-08, image read): the Video exp header `0x0071875C` has n = 8 and its
+records `0x0071ACA0` + 0x550·k name `VideoOptions`, `Resolution`, `LightQuality`, `BlendShadow`,
+`Perspective`, `Gamma`, `Contrast`, `SPrevious`; classic `0x00718770` the same without
+`Resolution` (n = 7). Windowed mode exists in `Game.exe` only as the launch switches `-window` and
+`-windowed` (section `VIDEO`, key `WINDOW`; switch table `0x00705040`, `tools/original-hooks.md`)
+and the start-up error text at `0x006DC5D3` (a case-insensitive scan of the image for `windowed`,
+`window mode`, `borderless` finds nothing else): never a menu row, and no Window Mode label art
+exists. A Window Mode row (or its text fallback) in the Video menu is a deviation to remove.
 
 ### O9. Configure Controls (ui 11, `UI_CONFIG`)
 
@@ -553,6 +595,7 @@ None.
 | Input | Expected | Source |
 |---|---|---|
 | Esc in game (nothing else open) | Game menu, selected row 2 (Return to Game); pentagrams at (99, 336), (649, 336) at 800 × 600 | §O1 r2, §O4 r3–r4 |
+| Pentagrams: f = 3, last step at 1,000 ms; menu reopened, draws at 5,000, 5,040, 5,080, 5,120, 5,160 ms | f after each draw: 4, 4, 5, 5, 6 (right frames drawn 3, 4, 4, 5, 5; left 5, 4, 4, 3, 3) | §O4 r3 |
 | Down on Return to Game | selected Options (wrap), `cursor_pass` | §O5 r4 |
 | Enter on Options | Options menu, selected Previous (row 4), `cursor_select` | §O2 r5, §O5 r6 |
 | Sound menu, selected SPrevious (7); Up, Up (d2rs: 3D Bias, EAX, 3D Sound disabled) | NPC Speech (6), then Music (2) | §O5 r4, §O8 |
@@ -609,6 +652,12 @@ flags `0x006D6378` read from the image), xrefs of `0x0047E200` / `0x0047E090`, r
 2026-10-08 (REC-187 / REC-256): CRT precision `0x0068E70A` (caller `0x00682FC4`), the 40 `fldcw` sites
 of the image (game code: save / OR 0xC00 / restore only); key-config table choice `0x004A43E0`,
 `0x0044DCC0`, open / close `0x004A5200`.
+2026-10-08 (REC-257): pentagram step `0x0047E6DB`–`0x0047E6FD` and gate `0x00454850` (all xrefs of
+`[0x007BC944]` and `[0x007A313C]`; initial values read from the image), rectangle mode code
+`0x0047E30F`–`0x0047E34B`, wrapper `0x0046EFD0`; cel draw argument flow `0x00502680` →
+`D2GFX_DrawCelContext` `0x004F6480`; missing-file path `0x004788B0`, `0x00517079`, `0x00516E46`,
+`0x00601340`, `0x006019F0`; Video headers / records `0x0071875C`, `0x0071ACA0`, `0x00718770` and a
+string scan of the image (`tools`: `re/scripts/rd.py`, `pefile`).
 D2MOO (1.10f) `D2MenuItemStrc` / `D2MenuInfoStrc` used only as a hint for the record layout; every
 field confirmed from the 1.14d records and their users.
 

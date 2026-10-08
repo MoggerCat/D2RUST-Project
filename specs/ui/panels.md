@@ -756,10 +756,10 @@ call):
 | character | release on an add button | 0x3A × ⌈n / 32⌉ (`combat/vitals.md` §2) |
 | skill tree | release on a pressed icon, points left | 0x3B (`skills/levels.md` §6.4) |
 | inventory, stash, cube, trade pages | grid click (`0x0048FFE0`) | 0x19 lift, 0x18 place, 0x1F swap, 0x20 use (`0x00487740` → sender `0x004786D0`, call `0x004878F4`; with ui 0x19 open and the item a `box `, `[0x007BCC50]` := 1 first), 0x21 stack, 0x27 use on item, 0x28 socket, 0x29 scroll to tome, 0x2A to cube, 0x33 sell, 0x63 to belt, 0x4C (`items/inventory-moves.md` §7) |
-| inventory | body location click (`0x00490780`, `0x00490BA0`, `0x00490FC0`) | 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x21, 0x27, 0x4C (`items/inventory-moves.md` §7) |
-| inventory | socket fill (`0x004912A0`) | 0x28 |
+| inventory | body location click (`0x00490780`, `0x00490BA0`, `0x00490FC0`) | 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x21, 0x27, 0x4C (`items/inventory-moves.md` §7); client rules: `ui/panels-3.md` §29 |
+| inventory | socket fill (`0x004912A0`) | 0x28; client rules: `ui/panels-3.md` §29 |
 | inventory | weapon swap (`0x0048A730`) | 0x60 |
-| mercenary | item on merc (`0x0048B7C0`, `0x004936E0`) | 0x61 |
+| mercenary | item on merc (`0x0048B7C0`, `0x004936E0`) | 0x61; `ui/panels-3.md` §30 (`0x0048B7C0` is WM_LBUTTONUP) |
 | belt | `0x00498870` / `0x00498A90` | 0x23 / 0x24, 0x26 |
 | stash | close | 0x4F 0x12 |
 | cube | transmute / close | 0x4F 0x18 / 0x4F 0x17 (`world/cube.md`) |

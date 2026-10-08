@@ -662,10 +662,10 @@ scrolls and tomes therefore stop counting after the first cube use.
   its stats stay off.
 - **Client pre-check of a body click** (the requirement branch of the
   three body-location click handlers `0x00490780`, `0x00490BA0`,
-  `0x00490FC0`; the rest of those handlers is `ui/panels.md` §15's,
-  not read here). The handler runs §4.3 for (the local player, the
-  clicked location, the cursor item, skip 0) (`0x00490831`,
-  `0x00490C57`, `0x004910B6`). Result 0:
+  `0x00490FC0`; the rest of those handlers is `ui/panels-3.md` §29).
+  The handler runs §4.3 for (the local player, the clicked location,
+  the cursor item, skip 0) (`0x00490831`, `0x00490C57`, `0x004910B6`).
+  Result 0:
   1. no cursor item → consumed (return 1), nothing sent;
   2. §4.3 again with skip 1 ≠ 0 (only §4.2 failed) and the item's class
      (`0x0062C0B0`) is 7 (none) or the player's class → player event
@@ -678,7 +678,7 @@ scrolls and tomes therefore stop counting after the first cube use.
      0x1E that arrives.
   Other client readers (display only): the tints of `ui/inventory.md`
   §3 r3 / §6 r4–r5, the hireling slots `0x0048B290`, `0x0048B3F0`,
-  `0x004934D0` (no spec yet) and the item description's three out
+  `0x004934D0` (`ui/panels-3.md` §30) and the item description's three out
   flags (§4.2; `0x0048D1D0`, no spec yet).
 
 #### 5.7 Inventory pass (`0x0055DBC0`, ECX = game, EDX = unit U, send)

@@ -171,8 +171,9 @@ the app's session, the seams that have a spec now, tests).
       formats, render)
 **Exit:** every file in the target MPQs opens and decodes without error.
 **Status (2026-10-05): met.** `mpq-tool check` decodes all 35,364 blocks.
-`mpq-tool formats` parses every live file of every Phase 1 format (21,717
-DCC, 1,657 DC6, 3,605 COF, 2,372 DS1 (case-insensitive names, 2026-10-08), 256 DT1 (250 decoded + 6 v4), 33 string tables, 14 font
+`mpq-tool formats` parses every live file of every Phase 1 format (counts
+with case-insensitive names, re-measured 2026-10-08: 21,717 DCC, 1,653 DC6,
+3,605 COF, 2,372 DS1, 256 DT1 (250 decoded + 6 v4), 29 string tables, 14 font
 tables, 19 palettes, 17 PL2). The only exceptions are 7 documented unused
 leftovers (6 version-4 DT1s, 1 junk COF). DT1, DC6 (including flipped
 frames) and DCC were also checked visually with `mpq-tool render`.
