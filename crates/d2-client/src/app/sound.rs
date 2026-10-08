@@ -25,9 +25,8 @@
 use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
-use d2_data::bin::read_excel;
+use d2_data::bin::TableFiles;
 use d2_data::txt::TxtTable;
-use d2_formats::mpq::ArchiveSet;
 
 use crate::assets::cache::{Budgets, CacheEvent};
 use crate::assets::path::{CanonicalPath, FileSource, MemorySource};
@@ -361,9 +360,10 @@ fn audio_frame(
 /// The user's `sounds.txt` and `soundenviron.txt` (`sound-table.md` §1,
 /// §2), read from the archives and compiled; a missing or bad table is an
 /// error, never a fallback.
-pub fn sound_table_live(archives: &ArchiveSet) -> Result<SoundTableData, String> {
+pub fn sound_table_live(archives: &dyn TableFiles) -> Result<SoundTableData, String> {
     let txt = |f: &str| -> Result<TxtTable, String> {
-        let (_, b) = read_excel(archives, f)
+        let (_, b) = archives
+            .read_excel(f)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| format!("{f}: in no archive"))?;
         TxtTable::parse(f, &b).map_err(|e| e.to_string())

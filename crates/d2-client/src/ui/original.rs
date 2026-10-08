@@ -801,10 +801,9 @@ impl FontMeasure {
         for &id in ids {
             let info = super::font_info(id).ok_or(format!("font id {id} is not 0–13"))?;
             let archive = info.tbl_path.replace('/', "\\");
-            let bytes = source
-                .read_file(&archive)
-                .ok_or(format!("{archive}: in no archive"))??;
-            let table = FontTable::parse(&bytes).map_err(|e| format!("{archive}: {e}"))?;
+            let table = crate::assets::path::read_font_table(source, &archive)
+                .ok_or(format!("{archive}: in no archive"))?
+                .map_err(|e| format!("{archive}: {e}"))?;
             m.insert(id, table);
         }
         Ok(m)

@@ -481,25 +481,37 @@ impl UnitArtLoader {
         format: FileFormat,
         assets: &mut ViewAssets,
     ) -> Result<(CanonicalPath, FileFacts), Option<String>> {
-        let bytes = match self.source.read_file(&codes.file(format)) {
+        let file = codes.file(format);
+        let src = self.source.as_ref();
+        let loaded = match format {
+            FileFormat::Dcc => {
+                crate::assets::path::read_dcc(src, &file).map(|r| r.map(Loaded::Dcc))
+            }
+            FileFormat::Dc6 => {
+                crate::assets::path::read_dc6(src, &file).map(|r| r.map(Loaded::Dc6))
+            }
+        };
+        let loaded = match loaded {
             None => return Err(None),
             Some(r) => r.map_err(Some)?,
         };
-        self.store_file(codes, format, &bytes, assets).map_err(Some)
+        self.store_file(codes, format, loaded, assets).map_err(Some)
     }
 
     fn store_file(
         &self,
         codes: &ComponentCodes,
         format: FileFormat,
-        bytes: &[u8],
+        loaded: Loaded,
         assets: &mut ViewAssets,
     ) -> Result<(CanonicalPath, FileFacts), String> {
         let path = codes.path(format).map_err(|e| e.to_string())?;
         let mut sets = Vec::new();
         let (directions, frames) = match format {
             FileFormat::Dcc => {
-                let dcc = d2_formats::dcc::Dcc::parse(bytes).map_err(|e| e.to_string())?;
+                let Loaded::Dcc(dcc) = loaded else {
+                    return Err("format mismatch".into());
+                };
                 let d = u8::try_from(dcc.directions.len()).map_err(|_| "too many directions")?;
                 for dir in 0..d {
                     sets.push(FrameSet::from_dcc(&dcc, dir).map_err(|e| e.to_string())?);
@@ -507,7 +519,9 @@ impl UnitArtLoader {
                 (d, dcc.frames_per_direction as usize)
             }
             FileFormat::Dc6 => {
-                let dc6 = d2_formats::dc6::Dc6::parse(bytes).map_err(|e| e.to_string())?;
+                let Loaded::Dc6(dc6) = loaded else {
+                    return Err("format mismatch".into());
+                };
                 let d = u8::try_from(dc6.header.directions).map_err(|_| "too many directions")?;
                 for dir in 0..d {
                     sets.push(FrameSet::from_dc6(&dc6, dir).map_err(|e| e.to_string())?);
@@ -531,4 +545,10 @@ impl UnitArtLoader {
             },
         ))
     }
+}
+
+/// A unit art file read through [`FileSource::read_native`].
+enum Loaded {
+    Dcc(d2_formats::dcc::Dcc),
+    Dc6(d2_formats::dc6::Dc6),
 }

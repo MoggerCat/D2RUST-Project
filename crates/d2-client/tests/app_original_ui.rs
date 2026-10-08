@@ -182,7 +182,10 @@ fn wired_panels_load_from_the_install() {
 
     let dir = std::env::var("D2_GAME_DIR").expect("D2_GAME_DIR must be set");
     let archives = Arc::new(ArchiveSet::open_dir(dir).expect("archives open"));
-    let parts = UiParts::live(archives.clone()).unwrap();
+    let files = Arc::new(d2_client::assets::game_files::GameFiles::archives(
+        archives.clone(),
+    ));
+    let parts = UiParts::live(files).unwrap();
     let areas = parts.inv_areas.clone().unwrap();
     assert_eq!(areas.len(), 32);
     let area = |left, right, top, bottom| InvArea {
@@ -193,7 +196,7 @@ fn wired_panels_load_from_the_install() {
     };
     assert_eq!(areas[0], area(320, 640, 0, 441));
     assert_eq!(areas[16], area(400, 720, 60, 501));
-    sound_table_live(&archives).unwrap();
+    sound_table_live(archives.as_ref()).unwrap();
 
     let mut assets = ViewAssets::new(d2_client::app::play::unspecified_palette());
     for class in 0..7 {

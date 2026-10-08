@@ -353,16 +353,16 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         .0
         .set_object_rows(object_rows);
     if let Some(archives) = archives {
-        let skills = single_player::client_skill_rows(&archives)?;
-        let skill_tables = single_player::client_skill_tables(&archives)?;
-        let class_skills = single_player::client_class_skills(&archives)?;
+        let skills = single_player::client_skill_rows(archives.as_ref())?;
+        let skill_tables = single_player::client_skill_tables(archives.as_ref())?;
+        let class_skills = single_player::client_class_skills(archives.as_ref())?;
         {
             let mut bridge = app.world_mut().resource_mut::<BridgeResource>();
             bridge.0.set_skill_rows(skills);
             bridge.0.set_class_skills(class_skills);
             bridge.0.set_skill_tables(std::sync::Arc::new(skill_tables));
         }
-        let units = single_player::client_unit_rows(&archives)?;
+        let units = single_player::client_unit_rows(archives.as_ref())?;
         app.world_mut()
             .resource_mut::<BridgeResource>()
             .0
@@ -371,24 +371,27 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             .resource_mut::<BridgeResource>()
             .0
             .set_wall_seconds(wall_seconds);
-        let palettes = ActPalettes::live(&archives).map_err(anyhow::Error::msg)?;
-        let tiles = TileAssets::new(Some(archives.clone()), Some(palettes.pl2.clone()));
+        let palettes = ActPalettes::live(archives.as_ref()).map_err(anyhow::Error::msg)?;
+        let tiles = TileAssets::new(Some(archives.source()), Some(palettes.pl2.clone()));
         add_preview(&mut app, level_rows, tiles);
-        let item_parts = super::items::item_parts(&archives).map_err(anyhow::Error::msg)?;
-        super::items::add_items(&mut app, archives.clone(), item_parts);
+        let item_parts = super::items::item_parts(archives.as_ref()).map_err(anyhow::Error::msg)?;
+        super::items::add_items(&mut app, archives.source(), item_parts);
         palette::add_act_palettes(&mut app, palettes);
         if let Some(source) = automap_source {
-            super::automap::add_automap(&mut app, source, automap_files, archives.clone(), true);
+            super::automap::add_automap(&mut app, source, automap_files, archives.source(), true);
         }
         let parts = ui::UiParts::live(archives.clone()).map_err(anyhow::Error::msg)?;
         ui::add_original_ui(&mut app, parts)?;
         let strings = super::strings::TableStrings::load(archives.as_ref(), super::strings::LANG)
             .map_err(anyhow::Error::msg)?;
         super::strings::install_strings(&mut app, strings);
-        super::hud::install_hud_tables(&mut app, &archives).map_err(anyhow::Error::msg)?;
+        super::hud::install_hud_tables(&mut app, archives.as_ref()).map_err(anyhow::Error::msg)?;
         ui::set_waypoint_map(&mut app, waypoint_map);
-        let table = sound::sound_table_live(&archives).map_err(anyhow::Error::msg)?;
-        app.insert_resource(GameAudio::new(AudioParts::original(archives, table)));
+        let table = sound::sound_table_live(archives.as_ref()).map_err(anyhow::Error::msg)?;
+        app.insert_resource(GameAudio::new(AudioParts::original(
+            archives.source(),
+            table,
+        )));
     } else {
         add_preview(&mut app, level_rows, TileAssets::default());
     }

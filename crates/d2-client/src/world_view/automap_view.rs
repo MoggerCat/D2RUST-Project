@@ -95,12 +95,9 @@ impl AutomapView {
         if assets.frames.contains(&key) {
             return Ok(key);
         }
-        let bytes = self
-            .source
-            .read_file(&path)
+        let dc6 = crate::assets::path::read_dc6(self.source.as_ref(), &path)
             .ok_or_else(|| format!("{path}: in no archive"))?
             .map_err(|e| format!("{path}: {e}"))?;
-        let dc6 = d2_formats::dc6::Dc6::parse(&bytes).map_err(|e| format!("{path}: {e}"))?;
         let set = FrameSet::from_dc6(&dc6, 0).map_err(|e| format!("{path}: {e}"))?;
         assets
             .frames
