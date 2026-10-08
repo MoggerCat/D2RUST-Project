@@ -239,6 +239,8 @@ fn synthetic_npc_classes() -> impl Iterator<Item = u16> {
     [
         d2_sim::world::npc::class::AKARA,
         d2_sim::world::npc::class::KASHYA,
+        d2_sim::world::npc::class::GHEED,
+        d2_sim::world::npc::class::CHARSI,
         // Warriv (act 1): the act travel of Sisters to the Slaughter
         // (`docs/handoff/q-a1-andariel.md`).
         d2_sim::world::npc::class::WARRIV1,

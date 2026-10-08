@@ -21,9 +21,10 @@
 //!   buy (§4.5), a left click with a cursor item on the grid sells it;
 //! - the buy price shown is published by the server host
 //!   ([`ShopPrices`]); the original client computes it from its tables;
+//! - the repair button (frame 6) toggles a mode; the next click on one of
+//!   the player's items sends C→S 0x35 for it (no confirm dialog, REC-177);
 //! - the action button frames are 45 × 44 hit areas (`panels-2.md` §14
-//!   r13); the Buy / Sell buttons only press and release; the single-item
-//!   repair button is not wired (repair all is);
+//!   r13); the Buy / Sell buttons only press and release;
 //! - the time of the transaction rules is the bridge frame × 40 ms (+ 60 s).
 
 use std::cell::RefCell;
@@ -42,7 +43,7 @@ use crate::ui::inv_grid::GridRecord;
 use crate::ui::panel::{ClientIntent, Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
 use crate::ui::panels::shop::{
     shop_button_records, shop_start_page, shop_tabs, ClickArgs, ClickEnv, ClickOutcome, ItemFacts,
-    SendFacts, ShopButton, ShopEffect, ShopPanel, ShopTx, DEFAULT_TABS, IDENTIFY_CLASSES,
+    SendFacts, ShopButton, ShopEffect, ShopPanel, ShopTx, TxKind, DEFAULT_TABS, IDENTIFY_CLASSES,
     REPAIR_CLASSES, SELL_CLASSES, UI_SHOP,
 };
 use crate::ui::panels::{cel, text, utf16, PanelOutput, TextMeasure};
@@ -104,9 +105,17 @@ pub struct ShopState {
     prices: ShopPrices,
     /// The window is a gamble window (the menu chose Gamble).
     gamble: bool,
+    /// The repair button is down: the next click on one of the player's
+    /// items repairs it (d2rs-own, unverified; REC-177).
+    repair_mode: bool,
 }
 
 impl ShopState {
+    /// The single-item repair button is down.
+    pub fn repair_mode(&self) -> bool {
+        self.repair_mode
+    }
+
     /// The window is a gamble window.
     pub fn gamble(&self) -> bool {
         self.gamble
@@ -289,6 +298,7 @@ impl ShopUi {
         world: &ClientWorld,
         item: Option<(&ItemView, bool)>,
         repair_all: bool,
+        repair_one: bool,
     ) {
         let (guid, class, mode, a1) = match item {
             Some((it, player)) => (
@@ -308,7 +318,7 @@ impl ShopUi {
                 at_location_4: false,
                 // d2rs-own: the server checks what may be sold.
                 sellable: true,
-                repairable: false,
+                repairable: repair_one,
                 type_ok_16: false,
             },
             a1,
@@ -332,13 +342,36 @@ impl ShopUi {
             cursor_item: items::cursor_item(world).is_some(),
             gamble_shop: st.gamble,
             repair_all_button_on: true,
-            repair_button_on: false,
+            repair_button_on: repair_one,
             repair_all_price: st.prices.get(REPAIR_ALL_KEY).unwrap_or(0),
             price: &price,
         };
         if let ClickOutcome::Effects(e) = st.tx.click(&args, &env) {
+            // d2rs-own: no confirm dialog; a repair is confirmed at once.
+            let confirm = e.contains(&ShopEffect::Confirm(TxKind::Repair));
             Self::apply(sh, e);
+            if confirm {
+                let e = st.tx.send_with(0, args.now, &args.send_facts);
+                Self::apply(sh, e);
+            }
         }
+    }
+
+    /// The repair button is down and the player clicked one of their
+    /// items: C→S 0x35 for it. Returns whether the click was taken.
+    pub(super) fn repair_click(
+        sh: &mut super::Shared,
+        st: &mut ShopState,
+        world: &ClientWorld,
+        item: Option<&ItemView>,
+    ) -> bool {
+        let Some(open) = st.open.filter(|_| st.repair_mode) else {
+            return false;
+        };
+        if let Some(it) = item {
+            Self::click(sh, st, open, world, Some((it, true)), false, true);
+        }
+        true
     }
 }
 
@@ -463,8 +496,11 @@ impl Panel for ShopUi {
                                 mode: 1,
                                 jump: false,
                             }),
+                            // Repair one item: the button toggles; the
+                            // next click on the player's item sends it.
+                            6 => st.repair_mode = !st.repair_mode,
                             // Repair all.
-                            18 => Self::click(&mut sh, &mut st, open, ctx.world, None, true),
+                            18 => Self::click(&mut sh, &mut st, open, ctx.world, None, true, false),
                             _ => {}
                         }
                     }
@@ -481,13 +517,25 @@ impl Panel for ShopUi {
         let cursor = items::cursor_item(ctx.world);
         match (button, cursor.as_ref(), under.as_ref()) {
             // A cursor item dropped on the store grid: sell it.
-            (PointerButton::Left, Some(c), _) => {
-                Self::click(&mut sh, &mut st, open, ctx.world, Some((c, true)), false)
-            }
+            (PointerButton::Left, Some(c), _) => Self::click(
+                &mut sh,
+                &mut st,
+                open,
+                ctx.world,
+                Some((c, true)),
+                false,
+                false,
+            ),
             // Right click (quick buy, §4.5) and, d2rs-own, left click.
-            (PointerButton::Left | PointerButton::Right, None, Some(it)) => {
-                Self::click(&mut sh, &mut st, open, ctx.world, Some((it, false)), false)
-            }
+            (PointerButton::Left | PointerButton::Right, None, Some(it)) => Self::click(
+                &mut sh,
+                &mut st,
+                open,
+                ctx.world,
+                Some((it, false)),
+                false,
+                false,
+            ),
             _ => {}
         }
         UiResponse::Consumed
@@ -509,6 +557,7 @@ impl OriginalUi {
             });
             st.tx = ShopTx::default();
             st.pressed = None;
+            st.repair_mode = false;
             // The start page of the class (`panels-2.md` §14 r12).
             st.page = shop_start_page(npc_class).0;
         }
@@ -548,6 +597,7 @@ impl OriginalUi {
         if let Some(o) = open.filter(|_| !self.is_open(id::NPC_SHOP)) {
             let mut st = self.shop.borrow_mut();
             st.open = None;
+            st.repair_mode = false;
             st.floor = world.store_serial;
             root.queue_intent(ClientIntent::from_message(&TerminateEntityChat {
                 id: o.npc_guid,

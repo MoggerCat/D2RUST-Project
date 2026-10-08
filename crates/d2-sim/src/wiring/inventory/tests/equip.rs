@@ -240,3 +240,38 @@ fn a_charm_in_the_inventory_counts_and_stops_when_picked_up() {
     assert_eq!(defense(&w), before + 5);
     assert!(w.state.errors.is_empty(), "{:?}", w.state.errors);
 }
+
+/// REC-177 (d2rs-own, unverified): the weapon switch trades the hands
+/// with body locations 11 / 12: the swap set's damage reaches the
+/// wearer, the other set's goes, and the client is told (S→C 0x97).
+#[test]
+fn the_weapon_switch_trades_the_hands_with_the_swap_set() {
+    const MAX: u16 = 22;
+    let mut w = World::new();
+    w.state.link_item_stats = true;
+    let p = w.player;
+    let owner = Owner::player(w.pguid());
+    // Set 1 is in the hands (max damage 9); set 2 (max 20) was put on
+    // the swap slots by an earlier switch.
+    let second = equipped(&mut w, SWORD, 4);
+    let su = w.unit(second).unwrap();
+    w.set_stat(su, MAX, 20);
+    assert!(w.desk(|d| d.swap_weapon_sets(owner)));
+    assert_eq!(w.data(second).body_loc, 11);
+    assert_eq!(w.stats.unit_total(p, MAX, 0), 0, "off the hands, no effect");
+    let first = equipped(&mut w, SWORD, 4);
+    let fu = w.unit(first).unwrap();
+    w.set_stat(fu, MAX, 9);
+    w.drain();
+    assert_eq!(w.stats.unit_total(p, MAX, 0), 9);
+    // The switch: the second set takes the hands.
+    assert!(w.desk(|d| d.swap_weapon_sets(owner)));
+    assert_eq!(w.data(second).body_loc, 4);
+    assert_eq!(w.data(first).body_loc, 11);
+    assert_eq!(w.stats.unit_total(p, MAX, 0), 20);
+    assert!(w.rest.sent.iter().any(|(_, b)| b == &[0x97]), "0x97 sent");
+    // And back.
+    assert!(w.desk(|d| d.swap_weapon_sets(owner)));
+    assert_eq!(w.data(first).body_loc, 4);
+    assert_eq!(w.stats.unit_total(p, MAX, 0), 9);
+}

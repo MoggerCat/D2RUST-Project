@@ -211,8 +211,9 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // messages of her add (her 0xAC and a stat/state message), her 0x6D
     // waits on her unit's queue: 22. Plus the Blood Moor's second warp
     // tile, to the Black Marsh (`q-a1-tower`, d2rs-own): its 0x09: 23. Kashya
-    // (`q-a1-bloodraven`) adds the same three as Akara: 26.
-    assert_eq!(joined, 26);
+    // (`q-a1-bloodraven`) adds the same three as Akara: 26. Gheed and
+    // Charsi (`q-town-gaps`) add two each (their 0x6D is not counted): 30.
+    assert_eq!(joined, 30);
     // Plus two for the Blood Moor room bordering the synthetic town: its
     // 0x07 at the join and its 0x08 when the travel leaves the town.
     // Plus two for that room's cave entrance (a tile unit): its 0x09 at
@@ -221,8 +222,9 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // three joined (two handled, her 0x6D queued) and the Burial Grounds
     // tile's two (`q-a1-bloodraven`): 37, 3. Plus the two of Cold Plains's
     // own warp tile, the waypoint's destination (`q-levels-warps-all`,
-    // d2rs-own): 39, 3.
-    assert_eq!((b.log().handled, b.log().queued), (39, 3));
+    // d2rs-own): 39, 3. Gheed's and Charsi's (three handled and one queued
+    // each, `q-town-gaps`): 45, 5.
+    assert_eq!((b.log().handled, b.log().queued), (45, 5));
     assert!(b.log().unowned.is_empty(), "{:?}", b.log().unowned);
     assert!(b.log().dropped.is_empty(), "{:?}", b.log().dropped);
     let sight: Vec<_> = b
@@ -295,7 +297,7 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // game, so the queued 0x0D (one more with Kashya) were drained by the
     // update pass.
     let log = bridge(&app).0.log();
-    assert_eq!((log.queued, log.drained), (3, 3));
+    assert_eq!((log.queued, log.drained), (5, 5));
     assert!(log.dropped.is_empty());
     let w = bridge(&app).0.world();
     assert!(w.in_game);
