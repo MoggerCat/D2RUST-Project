@@ -41,8 +41,7 @@ const MINDAMAGE: u16 = 21;
 const MAXDAMAGE: u16 = 22;
 
 /// One test's set-up: the character, the skill rows and the learned
-/// skills, the progressive (`pgsv`) states and a hook on the sim before
-/// the join.
+/// skills and the progressive (`pgsv`) states.
 pub struct Cfg {
     /// `single_player::new_character` class name.
     pub class: &'static str,
@@ -53,7 +52,6 @@ pub struct Cfg {
     pub rows: Vec<(usize, Skills)>,
     pub learned: Vec<usize>,
     pub pgsv: Vec<usize>,
-    pub setup: Option<Box<dyn FnOnce(&mut single_player::Sim) + Send>>,
 }
 
 /// Offsets in `skills_code` of the formulas "3" and "8".
@@ -313,9 +311,6 @@ fn install_fixtures(sim: &mut single_player::Sim, cfg: Cfg) {
         }],
         ..UnitData::default()
     };
-    if let Some(f) = cfg.setup {
-        f(sim);
-    }
 }
 
 impl Rig {
@@ -495,6 +490,11 @@ impl Rig {
 
     pub fn errors(&mut self) -> String {
         self.with(move |sim, _| format!("{:?}", sim.events.action.sys.hooks.errors))
+    }
+
+    /// The unit's state flag is on.
+    pub fn state_on(&mut self, u: UnitId, state: i16) -> bool {
+        self.with(move |sim, _| sim.events.action.sys.stats.has_state(u, state as u32))
     }
 
     /// The pets the client model knows (S→C 0x7A).

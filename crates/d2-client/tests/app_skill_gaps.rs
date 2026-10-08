@@ -5,7 +5,7 @@
 //! takes no damage), a monster / corpse stands beside, and the right
 //! skill is used through C→S 0x0D / 0x0C. Each test asserts an outcome
 //! (damage, state, pet or missile). Rows are test-local
-//! (`// d2rs-own, unverified`); provisional notes: REC-176.
+//! (`// d2rs-own, unverified`); provisional notes: REC-231.
 
 #[path = "app_skill_gaps/rig.rs"]
 mod rig;
@@ -45,7 +45,6 @@ fn game(class: &'static str, rows: Vec<(usize, Skills)>) -> Rig {
         rows,
         learned,
         pgsv: Vec::new(),
-        setup: None,
     });
     r.leave_town();
     // The monster class has every mode (the walk test of the curses).
@@ -83,7 +82,8 @@ fn hold(r: &mut Rig, right: bool, facts: ItemFacts) -> UnitId {
     })
 }
 
-// Covers: specs/skills/bodies-2.md §3.4 (Smite with a shield)
+// Covers: specs/skills/bodies-2.md §3.4
+// (Smite with a shield)
 #[test]
 fn smite_with_a_shield_hurts_the_monster() {
     let mut r = game("paladin", vec![(SKILL, row(0, 150))]);
@@ -104,7 +104,8 @@ fn smite_with_a_shield_hurts_the_monster() {
     assert!(r.life(m) < life0, "Smite hurt it ({})", r.errors());
 }
 
-// Covers: specs/skills/bodies-2.md §3.4 step 3.1 (no shield: no hit)
+// Covers: specs/skills/bodies-2.md §3.4
+// (step 3.1: no shield, no hit)
 #[test]
 fn smite_without_a_shield_does_nothing() {
     let mut r = game("paladin", vec![(SKILL, row(0, 150))]);
@@ -116,7 +117,8 @@ fn smite_without_a_shield_does_nothing() {
     assert_eq!(r.life(m), life0, "{}", r.errors());
 }
 
-// Covers: specs/skills/bodies.md §3.7, bodies-2.md §3.3
+// Covers: specs/skills/bodies.md §3.7
+// Covers: specs/skills/bodies-2.md §3.3
 #[test]
 fn sacrifice_hurts_the_monster_and_the_caster() {
     let mut s = row(29, 64);
@@ -156,7 +158,10 @@ fn zeal_strikes_the_monster() {
 }
 
 /// Edits the combat tables of the running sim.
-fn edit_tables(r: &mut Rig, f: impl FnOnce(&mut d2_sim::wiring::action::ActionTables) + Send + 'static) {
+fn edit_tables(
+    r: &mut Rig,
+    f: impl FnOnce(&mut d2_sim::wiring::action::ActionTables) + Send + 'static,
+) {
     r.with(move |sim, _| {
         let h = &mut sim.events.action.sys.hooks;
         let mut t = (*h.tables).clone();
@@ -248,7 +253,11 @@ fn raise_skeleton_turns_a_corpse_into_a_pet() {
     r.select_right(SKILL);
     r.right_click_unit(corpse);
     r.step(30);
-    assert!(r.pets() > 0, "a skeleton follows ({}, {before})", r.errors());
+    assert!(
+        r.pets() > 0,
+        "a skeleton follows ({}, {before})",
+        r.errors()
+    );
 }
 
 // Covers: specs/skills/bodies-2b.md §8.6, §8.7
@@ -268,4 +277,126 @@ fn revive_stands_the_corpse_up_as_a_pet() {
     assert!(r.pets() > 0, "a revived pet follows ({})", r.errors());
     let mode = r.with(move |sim, _| sim.events.action.sys.units.get(corpse).map(|u| u.mode));
     assert_ne!(mode, Some(12), "it stands up ({})", r.errors());
+}
+
+/// A game of the assassin with `pgsv` progressive states.
+fn assassin(rows: Vec<(usize, Skills)>, pgsv: Vec<usize>) -> Rig {
+    let learned = rows.iter().map(|r| r.0).collect();
+    let mut r = Rig::build(Cfg {
+        class: "assassin",
+        class_id: 6,
+        token: b"AI",
+        rows,
+        learned,
+        pgsv,
+    });
+    r.leave_town();
+    r.with(|sim, _| sim.events.action.sys.hooks.x.monsters.modes = vec![0xFFFF]);
+    r
+}
+
+/// The claw item type of the tests (`itemtypes` row, made up).
+const CLAW: i16 = 77;
+const CHARGE_STATE: usize = 8;
+
+fn claw() -> ItemFacts {
+    ItemFacts {
+        types: vec![CLAW],
+        class: class::ONE_HAND_SWING,
+        ..ItemFacts::default()
+    }
+}
+
+/// Tiger Strike: a charge state on a hit, claws required.
+fn tiger_strike() -> Skills {
+    let mut s = row(23, 34);
+    s.aurastate = CHARGE_STATE as u16;
+    s.aurastat1 = 10;
+    s.itypea1 = CLAW as u16;
+    s
+}
+
+// Covers: specs/skills/bodies.md §8.8, §2.14
+#[test]
+fn tiger_strike_with_a_claw_hurts_and_charges() {
+    let mut r = assassin(vec![(SKILL, tiger_strike())], vec![CHARGE_STATE]);
+    hold(&mut r, true, claw());
+    let me = r.player();
+    let m = r.spawn_monster(1);
+    r.select_right(SKILL);
+    let life0 = r.life(m);
+    r.right_click_unit(m);
+    r.step(30);
+    let errors = r.errors();
+    assert!(r.life(m) < life0, "the strike hurt it ({errors})");
+    assert!(r.state_on(me, CHARGE_STATE as i16), "a charge ({errors})");
+}
+
+// Covers: specs/client/stat-lists.md §2
+// (rule 8: the weapon-type test of use_state)
+#[test]
+fn tiger_strike_without_a_claw_is_refused() {
+    let mut r = assassin(vec![(SKILL, tiger_strike())], vec![CHARGE_STATE]);
+    hold(
+        &mut r,
+        true,
+        ItemFacts {
+            types: vec![CLAW + 1],
+            class: class::ONE_HAND_SWING,
+            ..ItemFacts::default()
+        },
+    );
+    let me = r.player();
+    let m = r.spawn_monster(1);
+    r.select_right(SKILL);
+    let life0 = r.life(m);
+    r.right_click_unit(m);
+    r.step(30);
+    assert_eq!(r.life(m), life0, "no strike ({})", r.errors());
+    assert!(!r.state_on(me, CHARGE_STATE as i16), "no charge");
+}
+
+// Covers: specs/skills/bodies.md §8.10
+// (a finisher strikes through the srvdo 34 body)
+#[test]
+fn a_finisher_hurts_the_monster_and_charges() {
+    let mut s = row(23, 35);
+    s.aurastate = CHARGE_STATE as u16;
+    s.aurastat1 = 10;
+    s.itypea1 = CLAW as u16;
+    let mut r = assassin(vec![(SKILL, s)], vec![CHARGE_STATE]);
+    hold(&mut r, true, claw());
+    let me = r.player();
+    let m = r.spawn_monster(1);
+    r.select_right(SKILL);
+    let life0 = r.life(m);
+    r.right_click_unit(m);
+    r.step(30);
+    let errors = r.errors();
+    assert!(r.life(m) < life0, "the finisher hurt it ({errors})");
+    assert!(r.state_on(me, CHARGE_STATE as i16), "its charge ({errors})");
+}
+
+/// The most missiles alive at once while the skill runs.
+fn missiles_seen(r: &mut Rig, ticks: usize) -> usize {
+    let mut most = 0;
+    for _ in 0..ticks {
+        r.step(1);
+        most = most.max(r.with(|sim, _| sim.game.lists.units_of_type(UnitType::Missile).len()));
+    }
+    most
+}
+
+// Covers: specs/skills/bodies.md §5
+// (the srvmissile path)
+#[test]
+fn fire_blast_throws_a_missile() {
+    let mut s = row(0, 0);
+    s.anim = 10;
+    s.srvmissile = 0;
+    let mut r = assassin(vec![(SKILL, s)], Vec::new());
+    r.select_right(SKILL);
+    r.right_click_point(8, 0);
+    let most = missiles_seen(&mut r, 30);
+    assert!(most > 0, "a missile flew ({})", r.errors());
 }

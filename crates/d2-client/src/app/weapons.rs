@@ -60,7 +60,7 @@ pub struct ItemFacts {
     /// The grip (`0x0063D340`): 2 for a two-handed base item, else 1.
     pub grip: i32,
     /// A shield (type `shld`), with its armor `mindam` / `maxdam`
-    /// (d2rs-own, unverified: q-skill-gaps, REC-176).
+    /// (d2rs-own, unverified: q-skill-gaps, REC-231).
     pub shield: bool,
     pub dam: (i32, i32),
 }
