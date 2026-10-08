@@ -1830,6 +1830,19 @@ fn synthetic_hire_rows() -> Vec<HireRow> {
             name_first: 2000,
             name_last: 2002,
         }))
+        .chain(std::iter::once(HireRow {
+            // Asheara's one row (d2rs-own, unverified, q-a3-quests): the
+            // Iron Wolf, names 3000..3002.
+            version: 100,
+            class: 271,
+            act: 3,
+            difficulty: 1,
+            seller: u32::from(d2_sim::world::npc::class::ASHEARA),
+            gold: 300,
+            level: 15,
+            name_first: 3000,
+            name_last: 3002,
+        }))
         .collect()
 }
 
