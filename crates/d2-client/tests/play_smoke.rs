@@ -531,25 +531,29 @@ fn the_scripted_play_run() {
             d2_client::bridge::items::local_items(w).len()
         );
     }
-    let shop_open = run.ui_open(0x0C);
-    eprintln!("shop open: {shop_open}");
-    if shop_open {
-        run.app
-            .world_mut()
-            .non_send_mut::<WorldViewUi>()
-            .original
-            .as_mut()
-            .unwrap()
-            .set_ui(0x0C, 1, false)
-            .unwrap();
-        run.step(10);
-        run.check("close the shop");
-    } else {
-        let end = d2_client::ui::panels::npc::msg_chat_end(akara.guid);
-        run.bridge().send_bytes(&end).unwrap();
-        run.step(4);
-        run.check("end the trade");
-    }
+    // The Trade choice opens the shop even with an empty store (REC-277),
+    // and its close ends the interaction with C→S 0x30.
+    assert!(run.ui_open(0x0C), "the shop opened on the Trade choice");
+    run.app
+        .world_mut()
+        .non_send_mut::<WorldViewUi>()
+        .original
+        .as_mut()
+        .unwrap()
+        .set_ui(0x0C, 1, false)
+        .unwrap();
+    run.step(10);
+    // C→S 0x30: the server reads the NPC GUID at +5 only
+    // (`client-messages.tsv`).
+    let ended = run
+        .wire
+        .lock()
+        .unwrap()
+        .sent
+        .iter()
+        .any(|m| m.len() == 9 && m[0] == 0x30 && m[5..9] == akara.guid.to_le_bytes());
+    assert!(ended, "closing the shop sent C→S 0x30 for Akara");
+    run.check("close the shop");
 
     // 3. The waypoint to Cold Plains.
     run.waypoint_to_cold_plains();
