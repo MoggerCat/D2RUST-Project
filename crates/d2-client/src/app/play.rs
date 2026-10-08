@@ -303,6 +303,10 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         }
         GameData::Synthetic => None,
     };
+    let hire_rows = match &config.data {
+        GameData::Live(d) => d.tables.hire_rows().map_err(anyhow::Error::msg)?,
+        GameData::Synthetic => Vec::new(),
+    };
     let speeds = single_player::walk_speeds(&config.data, &config.character)?;
     let save_base = save::base_save(&config.character);
     let save_tables: Option<std::sync::Arc<dyn d2_formats::d2s::SaveTables + Send + Sync>> =
@@ -387,6 +391,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         super::strings::install_strings(&mut app, strings);
         super::hud::install_hud_tables(&mut app, &archives).map_err(anyhow::Error::msg)?;
         ui::set_waypoint_map(&mut app, waypoint_map);
+        super::hire_stats::install_hire_stats(&mut app, hire_rows, true);
         let table = sound::sound_table_live(&archives).map_err(anyhow::Error::msg)?;
         app.insert_resource(GameAudio::new(AudioParts::original(archives, table)));
     } else {

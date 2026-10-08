@@ -11,6 +11,7 @@
 
 pub mod automap;
 pub mod death;
+pub mod hire_stats;
 pub mod hud;
 pub mod items;
 pub mod palette;
