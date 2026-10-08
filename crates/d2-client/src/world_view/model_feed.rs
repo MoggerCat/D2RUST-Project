@@ -124,6 +124,8 @@ pub struct ModelFeed<F = NoFeed> {
     /// The local player's predicted 16.16 position (decision D2,
     /// `bridge::predict`); read only with a [`Preview`].
     pub local_at: Option<(UnitKey, (u32, u32))>,
+    /// The skill-move draw offsets of the preview (`skill_motion`).
+    pub motion_offsets: std::collections::BTreeMap<UnitKey, (i32, i32)>,
 }
 
 impl<F> ModelFeed<F> {
@@ -135,6 +137,7 @@ impl<F> ModelFeed<F> {
             map: None,
             preview: None,
             local_at: None,
+            motion_offsets: Default::default(),
         }
     }
 
@@ -176,7 +179,13 @@ impl<F: ViewSource> ViewSource for ModelFeed<F> {
     /// feed's.
     fn unit_offset(&self, unit: &ClientUnit, pose: &UnitPose) -> Result<(i32, i32), String> {
         if self.preview.is_some() {
-            return Ok(preview::unit_offset());
+            let (x, y) = preview::unit_offset();
+            let (mx, my) = self
+                .motion_offsets
+                .get(&unit.key)
+                .copied()
+                .unwrap_or((0, 0));
+            return Ok((x + mx, y + my));
         }
         self.inner.unit_offset(unit, pose)
     }
@@ -231,6 +240,10 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
 
     fn set_local_prediction(&mut self, at: Option<(UnitKey, (u32, u32))>) {
         self.local_at = at;
+    }
+
+    fn set_motion_offsets(&mut self, offsets: std::collections::BTreeMap<UnitKey, (i32, i32)>) {
+        self.motion_offsets = offsets;
     }
 
     fn set_hover(&mut self, unit: Option<UnitKey>) {

@@ -221,6 +221,7 @@ pub fn add_walk(app: &mut App, tap: WalkTap, speeds: Option<crate::bridge::predi
         .map(|a| a.0.art.clone());
     add_preview_walk(app, walk);
     crate::world_view::monster_walk::add_monster_walk(app);
+    crate::world_view::skill_motion::add_skill_motion(app);
     crate::world_view::walk_room::add_preview_walk_room(app);
 }
 
