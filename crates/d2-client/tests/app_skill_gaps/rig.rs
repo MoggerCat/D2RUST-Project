@@ -229,15 +229,18 @@ fn install_fixtures(sim: &mut single_player::Sim, cfg: Cfg) {
         record_size: States::SIZE,
         records,
     };
-    data.states = StateTable::new(
-        &states,
-        &StateMaps {
+    // With progressive states the group bitsets come from the records
+    // (the PGSV flag); else none has a group flag.
+    let maps = if cfg.pgsv.is_empty() {
+        StateMaps {
             words: 7,
             bitsets: vec![0; 40 * 7],
             ..StateMaps::default()
-        },
-    )
-    .expect("states");
+        }
+    } else {
+        d2_data::fixup::maps::states(&states)
+    };
+    data.states = StateTable::new(&states, &maps).expect("states");
     s.stats = StatLists::new(Arc::new(data));
     let (monstats, monstats2) = dummy();
     let mut skills = fx::skills();

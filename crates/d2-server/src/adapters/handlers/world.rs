@@ -31,6 +31,7 @@ mod hireling_drive;
 mod hireling_host;
 mod item_save;
 mod npc_approach;
+mod sentry_drive;
 mod wired;
 
 #[cfg(test)]
