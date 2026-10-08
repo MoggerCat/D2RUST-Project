@@ -41,6 +41,7 @@
 //! here decides game behaviour: rules stay in the modules; an adapter maps
 //! a seam call to a provider call.
 
+pub mod body_path;
 pub mod hirelings;
 pub mod npc_items;
 pub mod npc_vendors;
