@@ -82,7 +82,7 @@ impl NpcRest for AppRest {
     fn axis_check(&self, p: UnitId, n: UnitId) -> u32 {
         self.snap.lock().map_or(1, |s| s.axis_check(p, n))
     }
-    /// d2rs-own, unverified (REC-104): `0x00548F80` accepts a known unit.
+    /// d2rs-own, unverified (REC-106): `0x00548F80` accepts a known unit.
     fn unit_check(&self, _: UnitId, guid: u32) -> u32 {
         let known = self
             .snap
@@ -96,12 +96,12 @@ impl NpcRest for AppRest {
     fn approach(&mut self, p: UnitId, n: UnitId) {
         self.note(format!("approach {} {}", p.0, n.0));
     }
-    /// d2rs-own, unverified (REC-104, `0x00535060`): free; the interact
+    /// d2rs-own, unverified (REC-106, `0x00535060`): free; the interact
     /// unit is checked by the module and the cursor item is not read.
     fn player_busy(&self, _: UnitId) -> u32 {
         0
     }
-    /// d2rs-own, unverified (REC-104, `0x00457490` unspecified).
+    /// d2rs-own, unverified (REC-106, `0x00457490` unspecified).
     fn start_allowed(&self, _: UnitId, _: UnitId) -> bool {
         true
     }
@@ -401,7 +401,7 @@ impl QuestRest for AppRest {
             UnitKind::Other
         }
     }
-    /// d2rs-own, unverified (REC-104): every player (single player).
+    /// d2rs-own, unverified (REC-106): every player (single player).
     fn players_near(&self, _: UnitId) -> Vec<UnitId> {
         self.quests.keys().copied().collect()
     }

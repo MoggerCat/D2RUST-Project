@@ -260,6 +260,85 @@ fn equipment_box_clicks_send_equip_swap_and_unequip() {
     );
 }
 
+fn stash_grid() -> GridRecord {
+    GridRecord {
+        grid_x: 6,
+        grid_y: 8,
+        left: 154,
+        right: 154 + 6 * 29,
+        top: 142,
+        bottom: 142 + 8 * 29,
+        cell_w: 29,
+        cell_h: 29,
+    }
+}
+
+// Covers: specs/items/inventory.md §1.3
+#[test]
+fn the_stash_grid_is_record_12_or_8_plus_16_at_800() {
+    use crate::ui::panels::stash_items::{fallback_stash_grid, stash_record};
+    assert_eq!(stash_record(true, &Screen::R640), 12);
+    assert_eq!(stash_record(true, &Screen::R800), 28);
+    assert_eq!(stash_record(false, &Screen::R800), 24);
+    let g = fallback_stash_grid(true, &Screen::R800);
+    assert_eq!((g.left, g.top, g.grid_x, g.grid_y), (154, 142, 6, 8));
+    // Layouts of the install win over the fallback.
+    let mut u = ui().0;
+    let mut l = vec![layout(); 29];
+    l[28].grid = stash_grid();
+    u.layouts = Some(l);
+    assert_eq!(u.stash_grid(true, &Screen::R800), stash_grid());
+}
+
+// Covers: specs/ui/inventory.md §3 r1; specs/ui/inventory.md §8 r4
+#[test]
+fn a_stash_item_draws_at_its_stash_cell_and_not_in_the_inventory() {
+    let (u, files) = ui();
+    let w = world(
+        &[
+            (7, mode::STORED, (0, 2, 3, 5), b"hp1 "),
+            (8, mode::STORED, (0, 0, 0, 1), b"hp1 "),
+        ],
+        None,
+    );
+    let mut out = Vec::new();
+    u.draw_stash(&w, &files, &stash_grid(), &mut out);
+    let file = files.id(&item_file_name("invhp1")).unwrap();
+    // Cell (2, 3): (154 + 58, 142 + 87), drawn at top + frame height 29.
+    assert_eq!(images(&out), vec![(file, 0, 212, 258)]);
+    let mut inv = Vec::new();
+    u.draw_panel(&w, &files, &layout(), &mut inv);
+    assert_eq!(images(&inv).len(), 1, "only the page-0 item");
+}
+
+// Covers: specs/ui/inventory.md §10 r3; specs/ui/inventory.md §10 r4
+#[test]
+fn stash_grid_clicks_send_the_page_4_intents() {
+    let (u, files) = ui();
+    // Cursor item onto the empty stash cell (4, 1): 0x18 with page 4.
+    let w = world(&[(9, mode::CURSOR, (0, 0, 0, 0), b"hp1 ")], Some(9));
+    let at = Point::new(154 + 4 * 29 + 3, 142 + 29 + 3);
+    let out = u.press_stash(&w, &files, &stash_grid(), at);
+    let want = ClientIntent::from_message(&items::insert(9, 4, 1, 4)).0;
+    assert_eq!(intents(&out), vec![want]);
+    // A stash item without a cursor item lifts (0x19); a page-0 item at
+    // the same cell is not under the stash mouse.
+    let w = world(
+        &[
+            (7, mode::STORED, (0, 2, 3, 5), b"hp1 "),
+            (8, mode::STORED, (0, 2, 3, 1), b"hp1 "),
+        ],
+        None,
+    );
+    let at = Point::new(154 + 2 * 29 + 3, 142 + 3 * 29 + 3);
+    let out = u.press_stash(&w, &files, &stash_grid(), at);
+    assert_eq!(intents(&out), vec![vec![0x19, 7, 0, 0, 0]]);
+    // Outside the grid: nothing.
+    assert!(u
+        .press_stash(&w, &files, &stash_grid(), Point::new(5, 5))
+        .is_empty());
+}
+
 mod belt {
     use super::*;
     use crate::ui::original::hud_belt::{BeltParts, HudBelt};

@@ -11,7 +11,7 @@
 //!
 //! d2rs-own, unverified (the open function `0x004A3FE0`, the slot
 //! positions `0x00723EA8` / `0x00723EAC` and the cel layout are not in a
-//! spec; REC-105 in `docs/HANDOFF.md` §7): C→S 0x40 on every open; the
+//! spec; REC-107 in `docs/HANDOFF.md` §7): C→S 0x40 on every open; the
 //! act tab is the loaded act; slots on a 3 × 2 grid; the text is one line
 //! (no wrap at 270 px, no measure); the just-completed animation and its
 //! C→S 0x58 acknowledge (§5 rule 1) are not run (the row draws as
