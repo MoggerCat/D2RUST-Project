@@ -105,10 +105,6 @@ pub struct SimGame<D = Unspecified, W = NoWorld> {
     transport_ids: BTreeMap<SimClient, ClientId>,
     players: BTreeMap<UnitId, PlayerFields>,
     units: BTreeMap<UnitId, UnitFacts>,
-    /// The units whose facts came from the world host
-    /// ([`WorldHost::live_facts`]) rather than the caller: refreshed
-    /// before each point / unit parse.
-    live: std::collections::BTreeSet<UnitId>,
     /// The host's seam refresh, if set.
     host_sync: Option<HostSync<D>>,
     /// The host's seam refresh that reads the world too, if set.
@@ -181,7 +177,6 @@ impl<D: EventDispatch, W> SimGame<D, W> {
             transport_ids: BTreeMap::new(),
             players: BTreeMap::new(),
             units: BTreeMap::new(),
-            live: Default::default(),
             host_sync: None,
             world_sync: None,
             resyncs: Vec::new(),
@@ -407,13 +402,20 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
                 }
             }
         }
+        // The world's facts win over a staged copy whenever the world has
+        // the unit: a staged copy is only moved by the tick
+        // (`unit_positions`), so between ticks (the join's (0, 0) before
+        // the first tick, a warp earlier in the same frame, an act
+        // change) it is stale, the range test of §2.4 rule 3 refuses
+        // in-range walks and after 25 frames S→C 0x15 snaps the player
+        // back (q-proto-audit, rubber-banding). A staged owner the world
+        // does not report is kept.
         for u in units {
-            if self.units.contains_key(&u) && !self.live.contains(&u) {
-                continue;
-            }
-            if let Some(f) = self.world.live_facts(&self.game, &mut self.events, u) {
+            if let Some(mut f) = self.world.live_facts(&self.game, &mut self.events, u) {
+                if f.owner.is_none() {
+                    f.owner = self.units.get(&u).and_then(|s| s.owner);
+                }
                 self.units.insert(u, f);
-                self.live.insert(u);
             }
         }
     }
