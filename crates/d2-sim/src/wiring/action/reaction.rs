@@ -222,9 +222,6 @@ pub fn kill<X: Pending>(cv: &mut CombatView<'_, X>, d: UnitId, a: UnitId) {
     cv.v.h.mode_target = None;
     if !cv.v.h.x.is_revived(d) {
         cv.v.h.x.kill_step(game, KillStep::QuestKill, d, a);
-        if flags & super::quest_events::UNIT_FLAG_NO_QUEST_KILL == 0 {
-            cv.v.h.queue_quest_kill(d, a);
-        }
     }
     cv.v.h.x.kill_step(game, KillStep::BarricadeDoors, d, a);
 }

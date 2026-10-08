@@ -137,7 +137,7 @@ use d2_sim::drlg::preset::{Ds1Input, Ds1Source};
 use super::rest::AppRest;
 use super::server_thread::{ThreadLink, ThreadStopped};
 use super::skill_rest::SkillStore;
-use super::synthetic_maze;
+use super::{synthetic_maze, synthetic_tower};
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
 use crate::bridge::world::{
@@ -486,6 +486,16 @@ pub struct LocalSeams {
     /// The players and monsters for the host rest's NPC and quest seams
     /// (`npc_seams`), written by [`sync_seams`].
     pub snap: super::npc_seams::SnapRef,
+    /// The character is hardcore (the save's status bit 0x4, or `play
+    /// --hardcore`): client flag 4 of the one local client
+    /// ([`super::hardcore`]).
+    pub hardcore: bool,
+    /// The clients the server dropped, with the reason
+    /// (`Pending::drop_client`): the hardcore resurrect drops with 3.
+    pub dropped: Vec<(UnitId, u32)>,
+    /// Monster chain links and deaths for the quest control, drained once
+    /// per tick (`q-a1-tower`, d2rs-own, unverified).
+    pub quest_events: Vec<d2_sim::wiring::action::QuestEvent>,
 }
 
 impl LocalSeams {
@@ -555,6 +565,41 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
 }
 
 impl Pending for LocalSeams {
+    /// Client flag 4 (`0x00538670`): the local character is hardcore.
+    fn client_hardcore(&self, _player: UnitId) -> bool {
+        self.hardcore
+    }
+
+    /// `0x0052CAF0`: the client is dropped; the preview records it
+    /// (`super::hardcore`).
+    fn drop_client(&mut self, player: UnitId, reason: u32) {
+        self.dropped.push((player, reason));
+    }
+
+    fn monster_quest_chain(&mut self, unit: UnitId, chain: u32) {
+        if let Ok(chain) = u8::try_from(chain) {
+            self.quest_events
+                .push(d2_sim::wiring::action::QuestEvent::Link { unit, chain });
+        }
+    }
+    fn take_quest_events(&mut self) -> Vec<d2_sim::wiring::action::QuestEvent> {
+        std::mem::take(&mut self.quest_events)
+    }
+    fn kill_step(
+        &mut self,
+        _: &mut Game,
+        step: d2_sim::wiring::action::KillStep,
+        defender: UnitId,
+        attacker: UnitId,
+    ) {
+        if step == d2_sim::wiring::action::KillStep::QuestKill {
+            self.quest_events
+                .push(d2_sim::wiring::action::QuestEvent::Kill {
+                    victim: defender,
+                    killer: Some(attacker),
+                });
+        }
+    }
     /// d2rs-own, unverified (REC-108): mode DT and the treasure drop
     /// ([`super::monster_drop::death_start`]).
     fn monster_death_start(
@@ -725,6 +770,15 @@ impl LevelTypes for Types {
             if id == BLOOD_MOOR {
                 drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0 << 1;
             }
+            // The Black Marsh pair: Blood Moor slot 2 ↔ Black Marsh slot 0;
+            // Black Marsh slot 1 ↔ the Tower (q-a1-tower).
+            if id == BLOOD_MOOR {
+                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0 << 2;
+            }
+            if id == synthetic_tower::BLACK_MARSH {
+                drlg.room_mut(r).flags |=
+                    d2_sim::drlg::room_flags::WARP_0 | (d2_sim::drlg::room_flags::WARP_0 << 1);
+            }
             if id == DEN_OF_EVIL {
                 drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
                 // The stairs down to Cave Level 1 (slot 1, q-act1-dungeons).
@@ -738,32 +792,28 @@ impl LevelTypes for Types {
     /// §12.1 rule 3 shape: unit type 5, class = the lvlwarp `Id`, room
     /// sub-tiles). d2rs-own, unverified.
     fn preset_units(&self, drlg: &Drlg, room: DrlgRoomId) -> Vec<PresetUnit> {
-        let class = match drlg.level(drlg.room(room).level).id {
-            BLOOD_MOOR => BLOOD_MOOR_TO_DEN,
-            DEN_OF_EVIL => {
-                return vec![
-                    PresetUnit {
-                        unit_type: 5,
-                        class: DEN_TO_BLOOD_MOOR,
-                        x: WARP_TILE_XY,
-                        y: WARP_TILE_XY,
-                    },
-                    PresetUnit {
-                        unit_type: 5,
-                        class: synthetic_maze::DEN_TO_CAVE,
-                        x: synthetic_maze::DEN_STAIRS_XY,
-                        y: synthetic_maze::DEN_STAIRS_XY,
-                    },
-                ]
-            }
-            _ => return Vec::new(),
-        };
-        vec![PresetUnit {
+        use synthetic_tower as t;
+        let tile = |class, xy| PresetUnit {
             unit_type: 5,
             class,
-            x: WARP_TILE_XY,
-            y: WARP_TILE_XY,
-        }]
+            x: xy,
+            y: xy,
+        };
+        match drlg.level(drlg.room(room).level).id {
+            t::BLACK_MARSH => vec![
+                tile(t::MARSH_TO_BLOOD_MOOR, t::MARSH_BACK_XY),
+                tile(t::MARSH_TO_TOWER, t::MARSH_TOWER_XY),
+            ],
+            BLOOD_MOOR => vec![
+                tile(BLOOD_MOOR_TO_DEN, WARP_TILE_XY),
+                tile(t::BLOOD_MOOR_TO_MARSH, t::MOOR_MARSH_XY),
+            ],
+            DEN_OF_EVIL => vec![
+                tile(DEN_TO_BLOOD_MOOR, WARP_TILE_XY),
+                tile(synthetic_maze::DEN_TO_CAVE, synthetic_maze::DEN_STAIRS_XY),
+            ],
+            _ => Vec::new(),
+        }
     }
     fn room_grids(
         &mut self,
@@ -865,9 +915,17 @@ impl WaypointTables {
         portal.framecnt1 = 15 << 8;
         portal.sizex = 1;
         portal.sizey = 1;
+        // Class 60: the Moldy Tome of the Forgotten Tower quest
+        // (`quests-act1.md` §10.7). d2rs-own, unverified (q-a1-tower).
+        let mut tome: Objects = blank();
+        tome.operatefn = synthetic_tower::TOME_OPERATE;
+        tome.initfn = synthetic_tower::TOME_INIT;
+        tome.framecnt1 = 15 << 8;
         let mut objects = vec![o, chest];
         objects.resize(SYNTHETIC_PORTAL_CLASS as usize, blank());
         objects.push(portal);
+        debug_assert_eq!(objects.len(), synthetic_tower::TOME_CLASS as usize);
+        objects.push(tome);
         WaypointTables {
             levels,
             objects,
@@ -1005,7 +1063,10 @@ impl LiveData {
             game: Some(d2s::GameContext {
                 client_name: save_name(bytes).to_vec(),
                 expansion: GAME_SETUP.expansion,
-                hardcore: false,
+                // The character's own mode: a hardcore character plays a
+                // hardcore game (a dead one is refused by the header
+                // check, `d2s.md` §2.2 r5: permanent death).
+                hardcore: super::hardcore::save_is_hardcore(bytes),
                 difficulty,
             }),
         };
@@ -1174,6 +1235,7 @@ fn synthetic_drlg_data() -> DrlgData {
         BLOOD_MOOR,
         COLD_PLAINS,
         STONY_FIELD,
+        synthetic_tower::BLACK_MARSH,
         DEN_OF_EVIL,
         CATACOMBS_4,
         ACT2_TOWN,
@@ -1206,21 +1268,57 @@ fn synthetic_drlg_data() -> DrlgData {
     drlg.levels[BLOOD_MOOR as usize].warp[1] = BLOOD_MOOR_TO_DEN as i32;
     drlg.levels[DEN_OF_EVIL as usize].vis[0] = BLOOD_MOOR;
     drlg.levels[DEN_OF_EVIL as usize].warp[0] = DEN_TO_BLOOD_MOOR as i32;
-    drlg.warps = [
+    // The Black Marsh and the Tower line (q-a1-tower): Blood Moor slot 2
+    // ↔ Black Marsh slot 0, Black Marsh slot 1 ↔ Tower slot 0, then each
+    // Tower level's slot 1 ↔ the next one's slot 0.
+    {
+        use synthetic_tower as t;
+        let l = &mut drlg.levels;
+        l[BLOOD_MOOR as usize].vis[2] = t::BLACK_MARSH;
+        l[BLOOD_MOOR as usize].warp[2] = t::BLOOD_MOOR_TO_MARSH as i32;
+        l[t::BLACK_MARSH as usize].vis[0] = BLOOD_MOOR;
+        l[t::BLACK_MARSH as usize].warp[0] = t::MARSH_TO_BLOOD_MOOR as i32;
+        l[t::BLACK_MARSH as usize].vis[1] = t::TOWER_LEVELS[0];
+        l[t::BLACK_MARSH as usize].warp[1] = t::MARSH_TO_TOWER as i32;
+        for (i, &id) in t::TOWER_LEVELS.iter().enumerate() {
+            let c = &mut l[id as usize];
+            c.drlg_type = 1;
+            c.level_type = 3;
+            c.size = [(200, 200); 3];
+            c.offset = (2000 + 300 * i as i32, 1000);
+            let (back, to) = if i == 0 {
+                (t::BLACK_MARSH, t::TOWER_TO_MARSH)
+            } else {
+                (t::TOWER_LEVELS[i - 1], t::up(i - 1))
+            };
+            c.vis[0] = back;
+            c.warp[0] = to as i32;
+            if let Some(&next) = t::TOWER_LEVELS.get(i + 1) {
+                c.vis[1] = next;
+                c.warp[1] = t::down(i) as i32;
+            }
+        }
+    }
+    let mut ids = vec![
         BLOOD_MOOR_TO_DEN,
         DEN_TO_BLOOD_MOOR,
         synthetic_maze::DEN_TO_CAVE,
         synthetic_maze::CAVE_TO_DEN,
-    ]
-    .iter()
-    .map(|&id| WarpDef {
-        id: id as i32,
-        direction: b'b',
-        ..WarpDef::default()
-    })
-    .collect();
+    ];
+    ids.extend(synthetic_tower::BLOOD_MOOR_TO_MARSH..=synthetic_tower::LAST_WARP);
+    drlg.warps = ids
+        .iter()
+        .map(|&id| WarpDef {
+            id: id as i32,
+            direction: b'b',
+            ..WarpDef::default()
+        })
+        .collect();
     // ExitWalkX/Y per row: the walk-out after the arrival.
-    drlg.warp_exits = vec![(0, 0), (3, 3), (0, 0), (3, 3)];
+    drlg.warp_exits = ids
+        .iter()
+        .map(|&id| if id % 2 == 0 { (3, 3) } else { (0, 0) })
+        .collect();
     drlg
 }
 
@@ -1235,7 +1333,8 @@ fn synthetic_types() -> Types {
         (COLD_PLAINS, TileRect::new(0, 0, 8, 8)),
         (STONY_FIELD, TileRect::new(0, 16, 8, 8)),
         (DEN_OF_EVIL, TileRect::new(0, 8, 8, 8)),
-        (CATACOMBS_4, TileRect::new(8, 16, 8, 8)),
+        (CATACOMBS_4, TileRect::new(0, 24, 8, 8)),
+        (synthetic_tower::BLACK_MARSH, TileRect::new(8, 16, 8, 8)),
         (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
     ]))
 }
@@ -1889,7 +1988,13 @@ pub fn build_with_objects(
     });
     let mut game = Game::new();
     let mut rooms = Vec::new();
-    for (act, level) in [(0u8, ACT1_TOWN), (0, COLD_PLAINS), (1, ACT2_TOWN)] {
+    let mut start_levels = vec![(0u8, ACT1_TOWN), (0, COLD_PLAINS), (1, ACT2_TOWN)];
+    // The Moldy Tome stands in the Black Marsh (synthetic data only;
+    // q-a1-tower, d2rs-own, unverified).
+    if matches!(data, GameData::Synthetic) {
+        start_levels.push((0, synthetic_tower::BLACK_MARSH));
+    }
+    for (act, level) in start_levels {
         game.lists
             .ensure_act(act)
             .map_err(|e| BuildError::Setup(format!("act {act}: {e:?}")))?;
@@ -1954,6 +2059,20 @@ pub fn build_with_objects(
         sim.action
             .with(&mut game, |g, v| v.allocate(g, &req, ox + dx, oy + dy))
             .ok_or_else(|| BuildError::Setup("allocating the stash failed".into()))?;
+    }
+    if let Some(&(marsh, rect)) = rooms.get(3) {
+        let tome = AllocRequest {
+            class: synthetic_tower::TOME_CLASS,
+            room: Some(marsh),
+            mode: 0,
+            ..req
+        };
+        let (tx, ty) = synthetic_tower::TOME_XY;
+        sim.action
+            .with(&mut game, |g, v| {
+                v.allocate(g, &tome, rect.x * 5 + tx, rect.y * 5 + ty)
+            })
+            .ok_or_else(|| BuildError::Setup("allocating the Moldy Tome failed".into()))?;
     }
     let waypoint_guid = game
         .lists

@@ -235,6 +235,8 @@ struct Shared {
     quest: quest_log_ui::QuestInputs,
     /// The inventory gold button and the drop-gold dialog ([`gold_dialog`]).
     gold: gold_dialog::GoldState,
+    /// The screen message list ([`game_messages`]).
+    messages: game_messages::GameMessages,
 }
 
 impl Shared {
@@ -360,6 +362,7 @@ impl OriginalUi {
             esc: esc_menu::EscState::default(),
             quest: quest_log_ui::QuestInputs::default(),
             gold: gold_dialog::GoldState::default(),
+            messages: Default::default(),
         };
         Ok(Self {
             shared: Rc::new(RefCell::new(shared)),
@@ -424,6 +427,8 @@ impl OriginalUi {
         root.open(super::npc_menu_ui::NPC_MENU_PANEL)?;
         root.add(Box::new(hud::HudUi { sh: sh.clone() }))?;
         root.add(Box::new(gold_dialog::GoldDialogUi { sh: sh.clone() }))?;
+        root.add(Box::new(game_messages::MessagesUi { sh: sh.clone() }))?;
+        root.open(game_messages::MESSAGES_PANEL)?;
         root.add(Box::new(esc_menu::EscMenuUi { sh: sh.clone() }))?;
         // Not a UI state: open for good.
         root.open(BORDER_PANEL)?;
@@ -899,6 +904,25 @@ impl FontMeasure {
         Ok(m)
     }
 
+    /// `Wrap(text, max)` (`ui/text.md` §10): the lines; `None` without
+    /// the font.
+    pub fn wrap(&self, font: u16, text: &[u16], max: i32) -> Option<Vec<Vec<u16>>> {
+        let g = super::text::GlyphLookup::new(self.tables.get(&font)?);
+        let lines = super::text::wrap(&g, text, max).ok()?;
+        Some(lines.into_iter().map(<[u16]>::to_vec).collect())
+    }
+
+    /// Width A of `text` (`ui/text.md` §6); `None` without the font.
+    pub fn width_a(&self, font: u16, text: &[u16]) -> Option<i32> {
+        TextMeasure::width(self, font, text)
+    }
+
+    /// Width C (`0x00501730`) of the whole `text`.
+    pub fn width_c(&self, font: u16, text: &[u16]) -> Option<i32> {
+        let g = super::text::GlyphLookup::new(self.tables.get(&font)?);
+        super::text::width_c(&g, text, 0, text.len()).ok()
+    }
+
     /// `0x00501840` max width of `text` in font `font` (§6); `None`
     /// without the font or for a code with no glyph record.
     pub fn max_width(&self, font: u16, text: &[u16]) -> Option<i32> {
@@ -1152,6 +1176,8 @@ impl Panel for BorderUi {
 
 #[path = "esc_menu.rs"]
 pub mod esc_menu;
+#[path = "game_messages.rs"]
+pub mod game_messages;
 #[path = "gold_dialog.rs"]
 pub mod gold_dialog;
 #[path = "hud.rs"]

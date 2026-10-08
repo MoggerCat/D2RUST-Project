@@ -66,6 +66,16 @@ pub trait NpcRest: super::HirelingRest {
     // items specs)
     /// The player's items in inventory order with their places.
     fn inventory_entries(&self, player: UnitId) -> Vec<InvEntry>;
+    /// A host whose inventory model is not the rest's hands the rest the
+    /// player's entries before an NPC call (default: ignored).
+    fn stage_inventory(&mut self, player: UnitId, entries: Vec<InvEntry>) {
+        let _ = (player, entries);
+    }
+    /// The items the NPC call identified since the last take, for the
+    /// host to apply on its inventory model (default: none).
+    fn take_identified(&mut self) -> Vec<UnitId> {
+        Vec::new()
+    }
     fn identify(&mut self, item: UnitId);
     fn cursor_item(&self, player: UnitId) -> Option<UnitId>;
     fn item_facts(&self, item: UnitId) -> ItemFacts;

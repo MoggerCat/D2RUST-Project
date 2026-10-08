@@ -120,6 +120,8 @@ pub struct WiredWorld<R, S = NoSkills> {
     /// What the inventory rules queued during vendor calls (receiving
     /// unit, bytes), sent after the rest's messages ([`WorldHost::take_sent`]).
     inv_sent: Vec<(UnitId, Vec<u8>)>,
+    /// The levels the quest events last saw the players in.
+    quest_levels: quest_events::QuestLevels,
 }
 
 impl<R, S> WiredWorld<R, S> {
@@ -184,6 +186,7 @@ impl<R, S> WiredWorld<R, S> {
             interact_classes: Vec::new(),
             now,
             inv_sent: Vec::new(),
+            quest_levels: Default::default(),
         }
     }
 
@@ -270,6 +273,8 @@ impl<R, S> WiredWorld<R, S> {
         })
     }
 }
+
+mod quest_events;
 
 /// 0x9C action of a store item shown to the client (`vendors.md` §3.1).
 const STORE_ITEM_ACTION: u8 = 11;
@@ -397,16 +402,6 @@ fn quest_objects<X: Pending, R: TradeRest>(
 ) -> Vec<(UnitId, Vec<u8>)> {
     let mut sent = Vec::new();
     loop {
-        // The kills and level changes the tick raised
-        // (`ActionHooks::quest_events`, PROVISIONAL: run when the tick
-        // returns).
-        let events = desk.econ.hooks.take_quest_events();
-        if !events.is_empty() {
-            let ((), s) = quest_call(desk, ctl, inv.as_deref_mut(), |q, w| {
-                d2_sim::wiring::action::quest_events::run(q, w, events)
-            });
-            sent.extend(s);
-        }
         let calls = desk
             .econ
             .hooks
@@ -660,8 +655,25 @@ where
     D::X: Outbox,
 {
     fn npc<C: NpcCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
-        let (out, sent) = self.desk(game, events, |desk, ctl, inv| {
+        let (out, sent) = self.desk(game, events, |desk, ctl, mut inv| {
+            let players = desk.econ.game.lists.units_of_type(UnitType::Player);
+            if let Some(p) = inv.as_deref_mut() {
+                let d = p.desk(&mut *desk.econ);
+                for &pl in &players {
+                    desk.rest.stage_inventory(pl, d.npc_entries(pl));
+                }
+            }
             let out = call.call(ctl, desk);
+            // Cain's identify (C→S 0x34) on the inventory model.
+            let done = desk.rest.take_identified();
+            if let (false, Some(p)) = (done.is_empty(), inv.as_deref_mut()) {
+                let mut d = p.desk(&mut *desk.econ);
+                for item in done {
+                    if let Some(&pl) = players.iter().find(|&&pl| d.state.holds(pl, item)) {
+                        d.identify_unit(pl, item);
+                    }
+                }
+            }
             (out, flush_shown(desk, inv))
         });
         self.inv_sent.extend(sent);
@@ -762,6 +774,7 @@ where
     fn after_tick(&mut self, game: &mut Game, events: &mut D) {
         let sent = self.desk(game, events, quest_objects);
         self.inv_sent.extend(sent);
+        self.run_quest_events(game, events);
         // A player with no life starts dying (`vitals.md` §4.8).
         events.action().player_deaths(game);
         self.pet_deaths(game, events);

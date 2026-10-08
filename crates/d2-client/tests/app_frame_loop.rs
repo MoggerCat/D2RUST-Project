@@ -209,13 +209,15 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // warp tile unit, `path-placement.md` §12.1: 20.)
     // Plus Akara, the synthetic town NPC (`q-quests`): two handled
     // messages of her add (her 0xAC and a stat/state message), her 0x6D
-    // waits on her unit's queue: 22.
-    assert_eq!(joined, 22);
+    // waits on her unit's queue: 22. Plus the Blood Moor's second warp
+    // tile, to the Black Marsh (`q-a1-tower`, d2rs-own): its 0x09: 23.
+    assert_eq!(joined, 23);
     // Plus two for the Blood Moor room bordering the synthetic town: its
     // 0x07 at the join and its 0x08 when the travel leaves the town.
     // Plus two for that room's cave entrance (a tile unit): its 0x09 at
     // the join and its removal when the travel leaves the town.
-    assert_eq!((b.log().handled, b.log().queued), (30, 2));
+    // Plus two for the Black Marsh tile (`q-a1-tower`): 32.
+    assert_eq!((b.log().handled, b.log().queued), (32, 2));
     assert!(b.log().unowned.is_empty(), "{:?}", b.log().unowned);
     assert!(b.log().dropped.is_empty(), "{:?}", b.log().dropped);
     let sight: Vec<_> = b
