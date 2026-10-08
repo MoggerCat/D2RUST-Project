@@ -36,6 +36,7 @@
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::visibility::RenderLayers;
 use bevy::core_pipeline::tonemapping::Tonemapping;
+use bevy::ecs::message::{MessageCursor, Messages};
 use bevy::image::ImageSampler;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages};
@@ -182,6 +183,12 @@ pub struct WorldViewUi {
     pub text: Option<TextAssetLoader>,
     /// Last cursor position sent, so moves are reported once.
     cursor: Option<FramePos>,
+    /// The last cursor position inside the frame: a button released
+    /// outside the frame is released there (`ui/controls.md` §6 r1).
+    last_at: crate::ui::Point,
+    /// The window lost the focus since the last pass (`ui/controls.md`
+    /// §4.3 r3): the held world buttons are released.
+    focus_lost: bool,
 }
 
 impl WorldViewUi {
@@ -195,6 +202,8 @@ impl WorldViewUi {
             art: None,
             text: None,
             cursor: None,
+            last_at: crate::ui::Point::new(0, 0),
+            focus_lost: false,
         }
     }
 }
@@ -479,6 +488,10 @@ fn init_gpu(mut commands: Commands, wanted: Res<GpuWanted>, mut tried: Local<boo
 /// buttons routed as-is (their meanings: `ui/controls.md` §7 r5,
 /// [`crate::ui::PointerButton`]).
 /// Keyboard actions come from the controls layer (C9), not wired here.
+/// A button released outside the frame is still released (at the last
+/// frame position), and a lost window focus is noted for the world
+/// release of `ui/controls.md` §4.3 r3.
+#[allow(clippy::too_many_arguments)]
 fn ui_input(
     ui: Option<NonSendMut<WorldViewUi>>,
     windows: Query<&Window, With<PrimaryWindow>>,
@@ -486,10 +499,17 @@ fn ui_input(
     keys: Option<Res<ButtonInput<KeyCode>>>,
     walk: Option<ResMut<PreviewWalk>>,
     time: Option<Res<Time>>,
+    focus: Option<Res<Messages<bevy::window::WindowFocused>>>,
+    mut focus_cursor: Local<MessageCursor<bevy::window::WindowFocused>>,
 ) -> Result {
     let (Some(mut ui), Ok(window)) = (ui, windows.single()) else {
         return Ok(());
     };
+    if let Some(m) = focus.as_deref() {
+        if focus_cursor.read(m).any(|e| !e.focused) {
+            ui.focus_lost = true;
+        }
+    }
     // d2rs-own, unverified (D2): Stand Still (command 36) is held while
     // a key bound to it is down (`ui/controls.md` §4.3 r1).
     if let (Some(mut walk), Some(bindings), Some(keys)) = (walk, &ui.bindings, keys.as_deref()) {
@@ -555,15 +575,23 @@ fn ui_input(
         ui.queue.0.push(e);
         ui.cursor = Some(pos);
     }
-    let FramePos::Inside(at) = pos else {
-        return Ok(());
+    // A press needs the cursor in the frame; a release outside it (a
+    // black bar, outside the window) still ends the button, at the last
+    // frame position (left up reads the current mouse anyway, §6 r1).
+    let inside = match pos {
+        FramePos::Inside(p) => {
+            ui.last_at = p;
+            true
+        }
+        FramePos::Outside => false,
     };
+    let at = ui.last_at;
     for (bevy, button) in [
         (MouseButton::Left, PointerButton::Left),
         (MouseButton::Right, PointerButton::Right),
         (MouseButton::Middle, PointerButton::Middle),
     ] {
-        if buttons.just_pressed(bevy) {
+        if inside && buttons.just_pressed(bevy) {
             ui.queue.0.push(UiEvent::Press { button, at });
         }
         if buttons.just_released(bevy) {
@@ -571,6 +599,29 @@ fn ui_input(
         }
     }
     Ok(())
+}
+
+/// The world releases of a lost focus (`ui/controls.md` §4.3 r3): left
+/// up (kind 2) while left is held, right up (kind 5) while right is held,
+/// each unless `events` already releases that button.
+pub fn focus_releases(
+    st: &crate::controls::click::ClickState,
+    events: &[UiEvent],
+    at: crate::ui::Point,
+) -> Vec<UiEvent> {
+    let released = |b: PointerButton| {
+        events
+            .iter()
+            .any(|e| matches!(e, UiEvent::Release { button, .. } if *button == b))
+    };
+    [
+        (st.left_held, PointerButton::Left),
+        (st.right_held, PointerButton::Right),
+    ]
+    .into_iter()
+    .filter(|&(held, b)| held && !released(b))
+    .map(|(_, button)| UiEvent::Release { button, at })
+    .collect()
 }
 
 fn rgba_image(rgba: Vec<u8>) -> Image {
@@ -589,10 +640,10 @@ fn rgba_image(rgba: Vec<u8>) -> Image {
     image
 }
 
-/// UI frame, draw list, composition, image update: once per presented
-/// server tick (camera §9). Before the first tick, and on Bevy frames
-/// whose bridge frame ran no tick, nothing is drawn and pending UI input
-/// waits for the next drawn frame.
+/// UI input and world clicks every client loop pass (`ui/controls.md` §6
+/// r2, r6: the held repeat and the per-pass latch run per pass, not per
+/// server tick); draw list, composition and image update once per
+/// presented server tick (camera §9). Before the first tick nothing runs.
 #[allow(clippy::too_many_arguments)]
 fn world_view_frame(
     mut commands: Commands,
@@ -609,18 +660,21 @@ fn world_view_frame(
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
 ) -> Result {
     let tick = bridge.0.world().server_ticks;
-    if tick == 0 || state.last.is_some_and(|l| l.server_tick == tick) {
+    if tick == 0 {
         return Ok(());
     }
-    // The previous GPU frame is the base of this one: commit its indices
-    // first, or wait for them.
-    if let Some(g) = gpu.as_deref_mut() {
+    // A new server tick is drawn; the previous GPU frame is the base of
+    // this one: commit its indices first, or draw on a later pass.
+    let mut draw = !state.last.is_some_and(|l| l.server_tick == tick);
+    if let (true, Some(g)) = (draw, gpu.as_deref_mut()) {
         if let Some((seq, plan)) = g.pending {
-            let Some(back) = indices.as_ref().and_then(|i| i.take(seq)) else {
-                return Ok(());
-            };
-            state.cycle.commit(plan, back)?;
-            g.pending = None;
+            match indices.as_ref().and_then(|i| i.take(seq)) {
+                Some(back) => {
+                    state.cycle.commit(plan, back)?;
+                    g.pending = None;
+                }
+                None => draw = false,
+            }
         }
     }
     let state = &mut *state;
@@ -668,10 +722,10 @@ fn world_view_frame(
                     original.set_belt_keys(b);
                 }
             }
-            if let Some(art) = &ui.art {
+            if let (true, Some(art)) = (draw, &ui.art) {
                 art.ensure(&frame.draws, &mut state.assets)?;
             }
-            if let Some(text) = &ui.text {
+            if let (true, Some(text)) = (draw, &ui.text) {
                 text.ensure(&frame.draws, &mut state.assets)?;
             }
             let mouse = match ui.cursor {
@@ -728,7 +782,7 @@ fn world_view_frame(
                     .object_labels
                     .draw(bridge.0.world(), c, hover, ui.strings.as_ref())
             }) {
-                if let Some(text) = &ui.text {
+                if let (true, Some(text)) = (draw, &ui.text) {
                     text.ensure(std::slice::from_ref(&label), &mut state.assets)?;
                 }
                 frame.draws.push(label);
@@ -739,6 +793,18 @@ fn world_view_frame(
                     .take_clicks(&mut bridge.0, cam.as_ref(), &frame.unhandled)?;
             let unhandled = state.ground_items.take_clicks(&mut bridge.0, &unhandled)?;
             crate::bridge::belt::send_keys(&mut bridge.0, &frame.unhandled)?;
+            // The input reset `0x0044DA40` (`client/msg-ui.md` §2 r2.2):
+            // held := 0 before this pass's clicks.
+            if ui.original.as_mut().is_some_and(|o| o.take_input_reset()) {
+                state.click.input_reset();
+            }
+            // Focus lost (`ui/controls.md` §4.3 r3): the left / right
+            // release of a held button, unless this pass releases it.
+            let mut unhandled = unhandled;
+            if std::mem::take(&mut ui.focus_lost) {
+                let at = crate::ui::Point::new(mouse.0, mouse.1);
+                unhandled.extend(focus_releases(&state.click, &unhandled, at));
+            }
             let outs = world_clicks(
                 &mut bridge.0,
                 &mut state.click,
@@ -750,13 +816,17 @@ fn world_view_frame(
             for o in &outs {
                 debug!("world click: {o:?}");
             }
-            if let Some(w) = walk.as_deref() {
-                // d2rs-own, unverified (D1, D2): the pending interaction.
-                let pressed = frame
-                    .unhandled
-                    .iter()
-                    .any(|e| matches!(e, UiEvent::Press { .. }));
+            let pressed = frame
+                .unhandled
+                .iter()
+                .any(|e| matches!(e, UiEvent::Press { .. }));
+            if walk.is_some() {
                 state.interact.note(&outs, pressed);
+            }
+            if let (true, Some(w)) = (draw, walk.as_deref()) {
+                // d2rs-own, unverified (D1, D2): the pending interaction
+                // (its frame counts drawn ticks; the note runs below on
+                // every pass).
                 let walking = w.predict.walking().is_some();
                 for o in state.interact.frame(&mut bridge.0, walking)? {
                     debug!("interact: {o:?}");
@@ -786,6 +856,9 @@ fn world_view_frame(
         }
         None => None,
     };
+    if !draw {
+        return Ok(());
+    }
     let draws = ui_frame.as_ref().map_or(&[][..], |f| &f.draws[..]);
     state.feed.prepare(bridge.0.world(), &mut state.assets)?;
     let built = build_frame(

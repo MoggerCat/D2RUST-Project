@@ -216,6 +216,9 @@ struct Shared {
     mouse: Point,
     /// Panel outputs of the event being routed, in order.
     outputs: Vec<PanelOutput>,
+    /// An input reset `0x0044DA40` was asked for since the host last took
+    /// it ([`OriginalUi::take_input_reset`]).
+    input_reset: bool,
     /// The fonts' glyph widths (character values and name line); none:
     /// no text is drawn.
     fonts: Option<FontMeasure>,
@@ -371,6 +374,7 @@ impl OriginalUi {
             },
             mouse: Point::new(0, 0),
             outputs: Vec::new(),
+            input_reset: false,
             fonts: None,
             resist_penalties: None,
             char_tables: Default::default(),
@@ -812,6 +816,13 @@ impl OriginalUi {
         let mut sh = self.shared.borrow_mut();
         sh.mouse.x = x;
         Some(sh.mouse)
+    }
+
+    /// Whether an input reset `0x0044DA40` was asked for since the last
+    /// call (`client/msg-ui.md` §2 r2.2, `control-panel.md` §9): the host
+    /// applies it to the world clicks (`ClickState::input_reset`).
+    pub fn take_input_reset(&mut self) -> bool {
+        std::mem::take(&mut self.shared.borrow_mut().input_reset)
     }
 
     /// The effects and sounds since the last call.
