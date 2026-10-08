@@ -69,7 +69,7 @@ pub fn fill_rect(out: &mut dyn UiDrawSink, files: &UiFiles, color: BeltColor, r:
                 BeltColor::Blue => 2,
                 BeltColor::Yellow => 3,
             };
-        crate::ui::esc_menu::push_fill(out, f, frame, r);
+        crate::ui::original::esc_menu::push_fill(out, f, frame, r);
     }
 }
 

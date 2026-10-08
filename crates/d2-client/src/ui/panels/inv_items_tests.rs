@@ -448,7 +448,8 @@ mod belt {
     fn a_hovered_belt_slot_paints_its_highlight_rect() {
         use crate::ui::original::hud::{BELT_FILL_BASE, FILL_FILE};
         use crate::ui::panels::control::belt::BeltColor;
-        let (u, files) = ui();
+        let (u, mut files) = ui();
+        files.add(FILL_FILE);
         let w = world(&[(7, mode::BELT, (0, 1, 0, 0), b"hp1 ")], None);
         let mut b = HudBelt {
             parts: parts(),
