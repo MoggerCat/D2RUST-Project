@@ -38,6 +38,16 @@ impl FrameSize {
         height: 480,
     };
 
+    /// The resolution mode of the frame (§1): 0 for 640 × 480, 2 for
+    /// 800 × 600.
+    pub fn resolution_mode(&self) -> u32 {
+        if *self == Self::LOW {
+            0
+        } else {
+            2
+        }
+    }
+
     /// Play-area height `H − 40` (§1).
     pub fn play_height(&self) -> i32 {
         self.height - PANEL_HEIGHT

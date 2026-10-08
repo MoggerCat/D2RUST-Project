@@ -1,4 +1,4 @@
-// Spec: specs/render/camera.md (§4–§7, §10), specs/render/sprite-placement.md (§5, §7, §8), specs/render/draw-order.md (§5, §10)
+// Spec: specs/render/camera.md (§4–§7, §10), specs/render/unit-composite.md (§4), specs/render/sprite-placement.md (§5, §7, §8), specs/render/draw-order.md (§5, §10)
 //! [`OriginalView`]: the world view's placement hooks answered by the
 //! original's rules. `tiles` places map tiles (camera §6, culled by §7,
 //! DT1 images by placement §7/§8), `unit_params` sets the frame clip
@@ -7,6 +7,7 @@
 //! frames, draw keys, shading, blend, UI) belongs to other owner specs and
 //! goes to the wrapped rules `R` or the [`ViewSource`].
 
+use d2_formats::cof::Cof;
 use d2_formats::dt1::Dt1Tile;
 
 use crate::bridge::world::ClientWorld;
@@ -14,7 +15,7 @@ use crate::bridge::ClientUnit;
 use crate::composite::{
     ComponentDraw, ComponentFrame, ComponentRequest, CompositeError, UnitParams,
 };
-use crate::frames::{FrameAnchor, IndexFrame};
+use crate::frames::{FrameAnchor, IndexFrame, DT1_BLOCK_FRAME0};
 use crate::scene::{BlendOp, DrawItem, DrawKey, LightGradient, Rect, ShadeChain};
 use crate::ui::{ImageRequest, TextRequest};
 use crate::world_view::{TileDraw, UiRules, UiSprite, UnitPose, ViewAssets, ViewError, ViewRules};
@@ -22,6 +23,7 @@ use crate::world_view::{TileDraw, UiRules, UiSprite, UnitPose, ViewAssets, ViewE
 use super::camera::{Camera, TileList, UnitPosition};
 use super::draw_order::{OrderKey, UnitSlot};
 use super::placement;
+use super::unit_composite::cof_box_visible;
 
 /// One DT1 block's rectangle in tile coordinates (`b.x`, `b.y`, size),
 /// for the per-block wall culling of camera §7.
@@ -230,10 +232,13 @@ impl<'a, R: ?Sized, S: ?Sized> OriginalView<'a, R, S> {
     }
 
     /// The draws of one tile: [`Self::tile`] when `blocks` is empty, else
-    /// one draw per block, clipped to the block's screen rectangle
-    /// (`placement::block_pixel`) inside the tile's clip, with the block's
-    /// shade (its gradient moved to the block) and blend. Blocks outside
-    /// the tile's clip (culled, camera §7) draw nothing.
+    /// one draw per block shade (in the tile's block order): the block's
+    /// own image (frame [`DT1_BLOCK_FRAME0`] + `i` of the tile's
+    /// set, so a block lights only its own pixels, `shading.md` §4 r4;
+    /// iso neighbours' rectangles overlap) at its screen position
+    /// (`placement::block_pixel`), clipped to the tile's clip, with the
+    /// block's shade (its gradient moved to the block) and blend. Blocks
+    /// outside the tile's clip (culled, camera §7) draw nothing.
     pub fn tile_draws(
         &self,
         tile: &MapTile,
@@ -252,7 +257,21 @@ impl<'a, R: ?Sized, S: ?Sized> OriginalView<'a, R, S> {
             cam.tile_handed(tile.list, tile.cell.0, tile.cell.1),
         );
         let mut out = Vec::with_capacity(blocks.len());
+        // Shades name the tile's blocks in block order (some may be left
+        // out): block `i` is the next block with the shade's rectangle.
+        let mut next = 0;
         for b in blocks {
+            let Some(i) = (next..tile.blocks.len()).find(|&j| tile.blocks[j] == b.block) else {
+                return Err(unresolved(
+                    "tile blocks",
+                    PLACEMENT,
+                    format!(
+                        "tile {:?}: block shade {:?} is not a block of the tile in order",
+                        tile.cell, b.block
+                    ),
+                ));
+            };
+            next = i + 1;
             let (x, y) = placement::block_pixel(origin, (b.block.x, b.block.y), (0, 0));
             let Some(clip) = whole
                 .clip
@@ -265,6 +284,12 @@ impl<'a, R: ?Sized, S: ?Sized> OriginalView<'a, R, S> {
                 None => b.shade,
             };
             out.push(TileDraw {
+                frame: ComponentFrame {
+                    set: tile.frame.set.clone(),
+                    index: DT1_BLOCK_FRAME0 + i,
+                },
+                x,
+                y,
                 clip,
                 shade,
                 blend: b.blend,
@@ -359,6 +384,38 @@ impl<R: ViewRules + ?Sized, S: ViewSource + ?Sized> ViewRules for OriginalView<'
             return Ok(None);
         }
         self.rules.unit_pose(world, unit)
+    }
+
+    /// `unit-composite.md` §4 (`0x004709A0`): the COF box at the final
+    /// position of `camera.md` §4 (unit position, §8 offsets, origins and
+    /// panel shift), for the composite types 0–2.
+    fn unit_box_visible(
+        &self,
+        unit: &ClientUnit,
+        pose: &UnitPose,
+        cof: &Cof,
+    ) -> Result<bool, ViewError> {
+        if unit.key.unit_type > 2 {
+            return Ok(true);
+        }
+        let at = self
+            .source
+            .unit_position(unit)
+            .map_err(|m| unresolved("unit position", CAMERA, m))?
+            .client();
+        let extra = self
+            .source
+            .unit_offset(unit, pose)
+            .map_err(|m| unresolved("unit offset", CAMERA, m))?;
+        let (x, y) = self.camera.unit_draw(at, extra);
+        let size = self.camera.size;
+        Ok(cof_box_visible(
+            cof,
+            x,
+            y,
+            size.width as u32,
+            size.height as u32,
+        ))
     }
 
     /// Draw keys from the draw order (`draw-order.md` §10) when the

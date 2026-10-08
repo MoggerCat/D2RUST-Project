@@ -1406,6 +1406,18 @@ fn monster_tc_choice() {
     );
 }
 
+// Covers: specs/items/treasure.md §3.1
+// (exact order: the bonewall test comes before the collision test, so a bone wall on a blocked spot is
+// fatal too)
+#[test]
+fn monster_gate_bonewall_before_collision() {
+    assert_eq!(
+        monster_drop_gate(0, 1, 344),
+        Err(TreasureError::BonewallDrop)
+    );
+    assert_eq!(monster_drop_gate(0x20000, 1, 344), Ok(false));
+}
+
 // Covers: specs/items/treasure.md §3.1, §3.4
 #[test]
 fn monster_gate_and_upgrade() {

@@ -76,6 +76,8 @@ fn near(rooms: Vec<Room>) -> NearRooms {
         rooms,
         player_tile: (0, 0),
         player_logical: 0,
+        player_subtile: (0, 0),
+        edge: None,
         level: LevelFacts::default(),
     }
 }
@@ -627,7 +629,7 @@ fn tiles(order: &FrameOrder) -> Vec<OrderedTile> {
 }
 
 fn order(n: &mut NearRooms, positions: &BTreeMap<UnitKey, ClientPos>) -> FrameOrder {
-    order_grid(&grid(), OpenMode::NONE, n, positions, CLOCK).unwrap()
+    order_grid(&grid(), n, positions, CLOCK).unwrap()
 }
 
 // Covers: specs/render/draw-order.md §6 r5
@@ -841,20 +843,79 @@ fn open_mode_3_and_level_backgrounds() {
     .unwrap();
     assert!(o.items.is_empty());
     n.level.id = 74;
-    let e = order_grid(&grid(), OpenMode::NONE, &mut n, &BTreeMap::new(), CLOCK).unwrap_err();
+    let e = order_grid(&grid(), &mut n, &BTreeMap::new(), CLOCK).unwrap_err();
     assert!(matches!(e, OrderError::Open { question: 1, .. }));
     n.level.id = 1;
     n.level.draw_edges = true;
-    let e = order_grid(&grid(), OpenMode::NONE, &mut n, &BTreeMap::new(), CLOCK).unwrap_err();
-    assert!(matches!(e, OrderError::Open { question: 10, .. }));
-    assert!(order_grid(
-        &grid(),
+    // Edge floors (`draw-order-2.md` §14) are the camera's part
+    // (`order_frame`): the grid order draws the rooms alone.
+    assert!(order_grid(&grid(), &mut n, &BTreeMap::new(), CLOCK).is_ok());
+}
+
+/// A `DrawEdges` level: one drawn floor at the camera's tile (31, 18),
+/// sub-tile extents (155, 90)–(155, 90), the player at sub-tile (160, 95).
+fn edge_level() -> NearRooms {
+    let mut r = room();
+    r.floors.push(record((11, 8), 1, 0));
+    let mut n = near(vec![r]);
+    n.level.draw_edges = true;
+    n.player_subtile = (160, 95);
+    n.edge = Some(record((0, 0), 0, 0));
+    n
+}
+
+fn edge_items(o: &FrameOrder) -> Vec<OrderedTile> {
+    tiles(o)
+        .into_iter()
+        .filter(|t| t.array == TileArray::Edge)
+        .collect()
+}
+
+// Covers: specs/render/draw-order-2.md §14
+#[test]
+fn edge_floors_follow_the_last_room_at_open_mode_0() {
+    let cam = camera();
+    let mut n = edge_level();
+    let o = order_frame(&cam, OpenMode::NONE, &mut n, &BTreeMap::new(), CLOCK).unwrap();
+    let e = edge_items(&o);
+    // px − min x = 5 < 30: the first strip starts at (155 − 5, 95), step
+    // (0, −5): sub-tiles (150, 95), (150, 90), (150, 85).
+    let cells: Vec<_> = e.iter().take(3).map(|t| t.cell).collect();
+    assert_eq!(cells, vec![(30, 19), (30, 18), (30, 17)]);
+    for (k, t) in e.iter().enumerate() {
+        assert_eq!(t.key, edges::edge_key(1, k));
+        assert_eq!(t.kind, TileKind::Floor { layer: 1 });
+    }
+    // Floor items keep pass order: the room's floor, then the edges.
+    let floors: Vec<_> = tiles(&o)
+        .into_iter()
+        .filter(|t| t.key.pass == pass::FLOORS)
+        .map(|t| t.array)
+        .collect();
+    assert_eq!(floors[0], TileArray::Floor);
+    assert!(floors[1..].iter().all(|a| *a == TileArray::Edge));
+    assert_eq!(n.edge.unwrap().flags & REC_DRAWN, REC_DRAWN);
+    // Another open mode: no edge floors (`0x004DE730`).
+    let mut n = edge_level();
+    let o = order_frame(
+        &cam,
         OpenMode::new(1).unwrap(),
         &mut n,
         &BTreeMap::new(),
-        CLOCK
+        CLOCK,
     )
-    .is_ok());
+    .unwrap();
+    assert!(edge_items(&o).is_empty());
+    // Resolution mode 0 (640 × 480): none either.
+    let low = Camera::new(FrameSize::LOW, OpenMode::NONE, pos(1000, 2000), (0, 0));
+    let mut n = edge_level();
+    let o = order_frame(&low, OpenMode::NONE, &mut n, &BTreeMap::new(), CLOCK).unwrap();
+    assert!(edge_items(&o).is_empty());
+    // Acts IV and V: the record holds no tile.
+    let mut n = edge_level();
+    n.edge = None;
+    let e = order_frame(&cam, OpenMode::NONE, &mut n, &BTreeMap::new(), CLOCK).unwrap_err();
+    assert_eq!(e, OrderError::Edge(edges::EdgeError::NoEdgeRecord));
 }
 
 // ------------------------------------------------------------- wiring
@@ -1321,19 +1382,21 @@ fn automap_reveal_distance_and_records() {
     let mut other = r.clone();
     other.level = 2;
     let n = near(vec![r, other]);
+    // Levels 1 and 2 on distinct leveldefs `Layer`s.
+    let own = |level: u32| level;
 
     let mut a = AutomapReveal {
         countdown: 0,
         last: (1000, 2000),
     };
     // d = 45 / 60: no reveal; the last position stays.
-    assert!(a.frame((1040, 2010), 1, &n).is_empty());
-    assert!(a.frame((1060, 2000), 1, &n).is_empty());
+    assert!(a.frame((1040, 2010), 1, &n, own).is_empty());
+    assert!(a.frame((1060, 2000), 1, &n, own).is_empty());
     assert_eq!(a.last, (1000, 2000));
     // d = 80 = 0x50: floors then walls of the player level's rooms,
     // drawn and not hidden.
     assert_eq!(
-        a.frame((1080, 2000), 1, &n),
+        a.frame((1080, 2000), 1, &n, own),
         [(0, TileArray::Floor, 0), (0, TileArray::Wall, 0)]
     );
     assert_eq!(a.last, (1080, 2000));
@@ -1342,12 +1405,38 @@ fn automap_reveal_distance_and_records() {
         countdown: 2,
         last: (0, 0),
     };
-    assert!(c.frame((5000, 0), 1, &n).is_empty());
+    assert!(c.frame((5000, 0), 1, &n, own).is_empty());
     assert_eq!((c.countdown, c.last), (1, (0, 0)));
     // The AutoMap preset path reveals every record.
     let mut all = Vec::new();
     reveal_room(0, &n.rooms[0], true, &mut all);
     assert_eq!(all.len(), 4);
+}
+
+// Covers: specs/render/draw-order.md §6 r7
+#[test]
+fn automap_reveal_takes_rooms_of_every_level_on_the_player_layer() {
+    // §6 r7: rooms whose level has the same leveldefs `Layer` as the
+    // player's level are revealed, not only the player level's rooms.
+    let mut r = room();
+    r.level = 1;
+    let mut drawn = record((0, 0), 1, 1);
+    drawn.flags |= REC_DRAWN;
+    r.walls.push(drawn);
+    let mut same = r.clone();
+    same.level = 2;
+    let mut apart = r.clone();
+    apart.level = 3;
+    let n = near(vec![r, same, apart]);
+    let layer = |level: u32| if level == 3 { 9 } else { 4 };
+    let mut a = AutomapReveal {
+        countdown: 0,
+        last: (0, 0),
+    };
+    assert_eq!(
+        a.frame((80, 0), 1, &n, layer),
+        [(0, TileArray::Wall, 0), (1, TileArray::Wall, 0)]
+    );
 }
 
 // Covers: specs/render/draw-order-2.md §11.5 r1; specs/render/draw-order.md §6 r2; specs/render/draw-order.md §6 r6

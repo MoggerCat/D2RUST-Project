@@ -472,6 +472,7 @@ impl Panel for HudUi {
                 state9_open: sh.states.is_open(9),
                 exp: exp_in,
                 strings: ctx.strings,
+                fonts: sh.fonts.as_ref(),
             },
             out,
         );
@@ -498,6 +499,7 @@ impl Panel for HudUi {
                 },
                 strings: ctx.strings,
                 width_a: &|t| fonts.and_then(|f| f.width_a(1, t)).unwrap_or(0),
+                fonts,
             },
             out,
         );
