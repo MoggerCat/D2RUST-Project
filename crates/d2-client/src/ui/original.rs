@@ -321,8 +321,8 @@ pub struct OriginalUi {
     pub(super) hire: super::hire_list::SharedHire,
     /// The NPC shop (`shop_ui`, `panels-2.md` §14 r4).
     shop: shop_ui::SharedShop,
-    /// The NPC menu (`ui/npc_menu_ui.rs`, `menus.md` §2).
-    pub(super) npcm: super::npc_menu_ui::SharedNpcMenu,
+    /// The NPC menu (`npc_box`, `menus.md` §2).
+    pub(super) npcm: npc_box::SharedNpcMenu,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -445,11 +445,11 @@ impl OriginalUi {
             st: self.hire.clone(),
         }))?;
         root.open(super::hire_list::HIRE_PANEL)?;
-        root.add(Box::new(super::npc_menu_ui::NpcMenuUi {
+        root.add(Box::new(npc_box::NpcMenuUi {
+            sh: sh.clone(),
             st: self.npcm.clone(),
             hire: self.hire.clone(),
         }))?;
-        root.open(super::npc_menu_ui::NPC_MENU_PANEL)?;
         root.add(Box::new(hud::HudUi { sh: sh.clone() }))?;
         root.add(Box::new(gold_dialog::GoldDialogUi { sh: sh.clone() }))?;
         root.add(Box::new(game_messages::MessagesUi { sh: sh.clone() }))?;
@@ -463,7 +463,13 @@ impl OriginalUi {
         root.open(gold_dialog::GOLD_PANEL)?;
         root.sync_states(&sh.borrow().states);
         let sc = sh.borrow().config.screen;
-        self.hire.borrow_mut().screen = (sc.w, sc.h);
+        {
+            let shr = sh.borrow();
+            let mut h = self.hire.borrow_mut();
+            h.screen = (sc.w, sc.h);
+            h.fill = shr.tables.files.id(hud::FILL_FILE);
+            h.fonts = shr.fonts.clone();
+        }
         self.npcm.borrow_mut().screen = (sc.w, sc.h);
         Ok(())
     }
@@ -479,6 +485,7 @@ impl OriginalUi {
     /// DC6 the frame's assets must then hold
     /// ([`crate::world_view::ui_bind::TextAssetLoader`]).
     pub fn set_fonts(&mut self, fonts: FontMeasure) {
+        self.hire.borrow_mut().fonts = Some(fonts.clone());
         self.shared.borrow_mut().fonts = Some(fonts);
     }
 
@@ -1436,6 +1443,8 @@ pub mod hud_tips;
 pub(super) mod cube_ui;
 #[path = "msg_ui.rs"]
 pub mod msg_ui;
+#[path = "npc_box.rs"]
+pub mod npc_box;
 #[path = "quest_log_ui.rs"]
 pub mod quest_log_ui;
 #[cfg(test)]

@@ -1,6 +1,6 @@
 // Spec: specs/ui/messages.md §11 (item-socket dialog, NPC mode 1: Charsi's imbue); specs/world/npc.md §8.1; preview fills: docs/handoff/q-imbue-ui.md
 //! Charsi's imbue dialog (UI state 0x0E, NPC mode) in the play preview,
-//! drawn and driven by the NPC menu panel (`npc_menu_ui.rs`): the menu's
+//! drawn and driven by the NPC menu panel (`original::npc_box`): the menu's
 //! Imbue row opens it, an item on the cursor is placed with a click in
 //! the item area, the imbue button sends C→S 0x38 `[0][NPC][item]` and
 //! the close button (or Esc-less press outside) ends the chat with 0x30.

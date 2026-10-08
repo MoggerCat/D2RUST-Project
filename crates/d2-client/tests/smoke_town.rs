@@ -629,6 +629,13 @@ impl Rig {
     /// Walks up to the NPC of `class` and clicks it (the walk, C→S 0x13
     /// on arrival) and waits for its menu.
     fn open_menu(&mut self, class: u16) -> Vec<Option<OptionKind>> {
+        let kinds = self.open_menu_unchecked(class);
+        self.check(&format!("menu of {class}"));
+        kinds
+    }
+
+    /// [`Self::open_menu`] without the step check (the sent log is kept).
+    fn open_menu_unchecked(&mut self, class: u16) -> Vec<Option<OptionKind>> {
         let key = self.npc(class);
         if self.walk_near(key) {
             let at = self.pick_point(key);
@@ -665,21 +672,19 @@ impl Rig {
             )
         });
         assert_eq!(menu.guid, key.guid);
-        self.check(&format!("menu of {class}"));
         menu.rows.iter().map(|r| r.kind).collect()
     }
 
-    /// The screen point of menu row `i` (R800: box x 300, y 150, rows
-    /// from y 170, 20 high).
-    fn row_at(i: usize) -> Point {
-        Point::new(400, 170 + 20 * i as i32 + 5)
+    /// The screen point of menu row `i` of the spec box (above the NPC).
+    fn row_at(&self, i: usize) -> Point {
+        app_support::npc_menu_row(&self.app, i)
     }
 
     /// Leaves the open menu through its last row (cancel: C→S 0x30).
     fn cancel(&mut self, class: u16) {
         let n = self.with_ui(|u| u.npc_menu().map_or(0, |m| m.rows.len()));
         assert!(n > 0, "a menu is open");
-        self.click(Self::row_at(n - 1));
+        self.click(self.row_at(n - 1));
         self.step(10);
         assert!(self.with_ui(|u| u.npc_menu().is_none()), "the menu closed");
         assert!(
@@ -704,6 +709,48 @@ fn act1_town_every_npc_talks_and_cancels() {
         rig.cancel(class);
     }
     let _ = class::AKARA;
+}
+
+// Play path of the spec NPC menu (q-fix-ui-npc-menu): S→C 0x28 opens ui
+// 8, Kashya's build sends the hire-list request C→S 0x38 [3][NPC][player]
+// (§2.2), the box sits above her (§2.6: anchor y = feet − 150, the box
+// spans the anchor), I is refused while it is up (C[8][1] = 2) and
+// Cancel sends 0x30 [1][NPC] and turns ui 8 off.
+// Covers: specs/ui/menus.md §2 r2, §2 r4, §2 r6; specs/ui/panels-2.md §14 r9; specs/ui/panels.md §3 r3
+#[test]
+fn kashyas_spec_menu_box_in_play() {
+    let mut rig = Rig::new();
+    let key = rig.npc(class::KASHYA);
+    rig.open_menu_unchecked(class::KASHYA);
+    assert!(rig.with_ui(|u| u.is_open(8)), "ui 8 is open");
+    let player = rig.bridge().world().local().unwrap().key.guid;
+    let mut want = vec![0x38, 3, 0, 0, 0];
+    want.extend_from_slice(&key.guid.to_le_bytes());
+    want.extend_from_slice(&player.to_le_bytes());
+    assert!(
+        rig.sent(&want),
+        "the hire-list request: {:02X?}",
+        rig.sent_ids()
+    );
+    rig.check("menu of Kashya");
+    let (r, _) = rig.with_ui(|u| u.npc_menu_box()).expect("the box");
+    // The anchor is (feet x, feet y − 150); the box spans it, so it sits
+    // above her feet, centred on her within the sub-tile the UI's camera
+    // can differ from the drawn view by (d2rs-own, `npc_box::camera`).
+    let feet = rig.on_screen(key);
+    let (fx, fy) = (feet.x, feet.y + 20);
+    let cx = (r.l + r.r) / 2;
+    assert!(
+        r.b < fy && (cx - fx).abs() <= 32,
+        "the box {r:?} sits above Kashya's feet ({fx}, {fy})"
+    );
+    rig.queue(UiEvent::Action(d2_client::ui::ActionId(
+        d2_client::controls::Action::ToggleInventory.index() as u16,
+    )));
+    rig.step(2);
+    assert!(!rig.with_ui(|u| u.is_open(1)), "I is refused under ui 8");
+    rig.cancel(class::KASHYA);
+    assert!(!rig.with_ui(|u| u.is_open(8)), "Cancel turned ui 8 off");
 }
 
 /// The town of each act after the act change, with its NPC classes.
@@ -752,7 +799,7 @@ impl Rig {
             .iter()
             .position(|k| *k == Some(kind))
             .unwrap_or_else(|| panic!("{class} offers {kind:?}: {kinds:?}"));
-        self.click(Self::row_at(i));
+        self.click(self.row_at(i));
         self.step(20);
         let sent = self.wire.lock().unwrap().sent.clone();
         self.check(&format!("{class} {kind:?}"));
@@ -1215,7 +1262,7 @@ fn asheara_hires_and_resurrects_a_mercenary_through_her_menu() {
         .unwrap_or_else(|| panic!("Resurrect is offered: {kinds:?}"));
     let cost = rig.with_ui(|u| u.npc_menu().unwrap().rows[i].cost);
     assert!(cost.is_some(), "the Resurrect caption has its cost");
-    rig.click(Rig::row_at(i));
+    rig.click(rig.row_at(i));
     for _ in 0..40 {
         rig.step(1);
         if rig.transactions().contains(&(0, 5)) {
@@ -1352,7 +1399,7 @@ fn kurast_docks_heals_gambles_and_identifies() {
     let cost = rig.with_ui(|u| u.npc_menu().unwrap().rows[i].cost);
     assert_eq!(cost, Some(100), "one item to identify");
     let gold = rig.gold();
-    rig.click(Rig::row_at(i));
+    rig.click(rig.row_at(i));
     for _ in 0..40 {
         rig.step(1);
         if flags(&rig).is_some_and(|f| f & 0x10 != 0) {

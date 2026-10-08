@@ -1011,16 +1011,16 @@ fn gamble_window_lists_prices_and_buys() {
         root.forward(&mut fx.bridge).unwrap()
     };
 
-    // The menu: Gheed's Gamble row (the box is centred, a quarter down;
-    // its rows start one row below the top).
-    ui.open_npc_menu(ng, u32::from(class::GHEED), 12);
+    // The menu: Gheed's Gamble row of the spec box.
+    ui.open_npc_menu(ng, u32::from(class::GHEED), 12, fx.bridge.world());
+    ui.npc_menu_poll(fx.bridge.world(), &mut root, &strings);
     let menu = ui.npc_menu().expect("Gheed's menu");
     let k = menu
         .rows
         .iter()
         .position(|r| r.kind == Some(OptionKind::Gamble))
         .expect("a Gamble row");
-    let at = Point::new(400, 150 + 20 + 20 * k as i32 + 5);
+    let at = ui.npc_menu_row_point(k).expect("the Gamble row");
     assert_eq!(
         click(&mut fx, &mut ui, &mut root, PointerButton::Left, at),
         1

@@ -64,3 +64,27 @@ pub fn synthetic_skill_rows(app: &mut bevy::prelude::App) {
         .0
         .set_skill_rows(vec![d2_client::bridge::world::SkillRow::default()]);
 }
+
+/// The centre of the NPC menu box's selectable row `i` (the spec box sits
+/// above the NPC, `ui/menus.md` §2.4–§2.6; `OriginalUi::npc_menu_row_point`).
+pub fn npc_menu_row(app: &bevy::prelude::App, i: usize) -> d2_client::ui::Point {
+    app.world()
+        .non_send::<d2_client::world_view::WorldViewUi>()
+        .original
+        .as_ref()
+        .expect("the original UI")
+        .npc_menu_row_point(i)
+        .unwrap_or_else(|| panic!("the NPC menu box has a row {i}"))
+}
+
+/// The NPC menu's selectable row count, 0 when no box is up.
+pub fn npc_menu_len(app: &bevy::prelude::App) -> usize {
+    app.world()
+        .non_send::<d2_client::world_view::WorldViewUi>()
+        .original
+        .as_ref()
+        .expect("the original UI")
+        .npc_menu()
+        .filter(|m| !m.talking)
+        .map_or(0, |m| m.rows.len())
+}

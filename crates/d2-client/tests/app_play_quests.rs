@@ -364,9 +364,9 @@ fn client_record(app: &App) -> [u8; 96] {
 /// client's 0x2F / 0x31.
 fn talk_to_akara(app: &mut App, ms: &AtomicU32, wire: &Arc<Mutex<Wire>>) -> u32 {
     let guid = open_akara_menu(app, ms, wire);
-    // Cancel (the last row of the NPC menu box, R800: box x 300, y 150,
-    // rows from y 170, 20 high) ends the chat: C→S 0x30.
-    click(app, ms, Point::new(400, 170 + 20 * 2 + 5));
+    // Cancel (the last row of the NPC menu box) ends the chat: C→S 0x30.
+    let p = app_support::npc_menu_row(app, 2);
+    click(app, ms, p);
     step(app, ms, 3);
     guid
 }
@@ -517,13 +517,19 @@ fn akaras_menu_offers_talk_trade_and_cancel() {
         "no C→S 0x30 yet: {:?}",
         ids(&wire)
     );
-    // Talk shows the speech.
-    click(&mut app, &ms, Point::new(400, 170 + 5));
+    // Talk closes the box and shows the speech (`panels-2.md` §14.9).
+    let p = app_support::npc_menu_row(&app, 0);
+    click(&mut app, &ms, p);
     step(&mut app, &ms, 2);
     let ui = app.world().non_send::<WorldViewUi>();
     assert!(ui.original.as_ref().unwrap().npc_menu().unwrap().talking);
+    // The talk's end builds Akara's menu again (§14.8: flag 1).
+    click(&mut app, &ms, Point::new(400, 300));
+    step(&mut app, &ms, 2);
+    assert_eq!(app_support::npc_menu_len(&app), 3, "the menu is back");
     // Trade: C→S 0x38 action 1 [GUID] and the menu closes.
-    click(&mut app, &ms, Point::new(400, 170 + 20 + 5));
+    let p = app_support::npc_menu_row(&app, 1);
+    click(&mut app, &ms, p);
     step(&mut app, &ms, 3);
     let mut want = vec![0x38, 1, 0, 0, 0];
     want.extend_from_slice(&guid.to_le_bytes());

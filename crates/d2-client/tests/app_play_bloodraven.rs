@@ -409,13 +409,20 @@ fn open_menu(app: &mut App, ms: &AtomicU32, wire: &Arc<Mutex<Wire>>, class: u16)
     guid
 }
 
-/// Talks to the NPC: the menu's Talk row (R800: box x 300, y 150, rows
-/// from y 170, 20 high), then Cancel ends the chat.
+/// Talks to the NPC: the menu's Talk row (row 0), a press ends the talk
+/// (`panels-2.md` §14.8: the menu is built again), then Cancel (the last
+/// row) ends the chat.
 fn talk(app: &mut App, ms: &AtomicU32, wire: &Arc<Mutex<Wire>>, class: u16) -> u32 {
     let guid = open_menu(app, ms, wire, class);
-    click(app, ms, Point::new(400, 170 + 5));
+    let p = app_support::npc_menu_row(app, 0);
+    click(app, ms, p);
     step(app, ms, 4);
-    click(app, ms, Point::new(400, 170 + 20 * 2 + 5));
+    click(app, ms, Point::new(400, 300));
+    step(app, ms, 3);
+    let n = app_support::npc_menu_len(app);
+    assert!(n > 0, "the talk's end built the menu again");
+    let p = app_support::npc_menu_row(app, n - 1);
+    click(app, ms, p);
     step(app, ms, 3);
     guid
 }

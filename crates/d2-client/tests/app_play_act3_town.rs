@@ -404,10 +404,10 @@ fn open_menu(
         .unwrap_or_else(|| panic!("the menu of NPC {class} is open"));
     assert_eq!(menu.guid, guid);
     let kinds = menu.rows.iter().map(|r| r.kind).collect();
-    // Leave through the last row (Cancel, R800: box x 300, y 150, rows
-    // from y 170, 20 high) so the next NPC starts clean.
+    // Leave through the last row (Cancel) so the next NPC starts clean.
     let rows = menu_rows(app);
-    click(app, ms, Point::new(400, 170 + 20 * (rows as i32 - 1) + 5));
+    let p = app_support::npc_menu_row(app, rows - 1);
+    click(app, ms, p);
     step(app, ms, 3);
     (guid, kinds)
 }
@@ -542,7 +542,8 @@ fn cains_identify_row_shows_the_cost_and_sends_0x34() {
         .npc_menu()
         .expect("menu open again");
     assert_eq!(menu.rows[1].cost, Some(200), "100 × 2 unidentified items");
-    click(&mut app, &ms, Point::new(400, 170 + 20 + 5));
+    let p = app_support::npc_menu_row(&app, 1);
+    click(&mut app, &ms, p);
     step(&mut app, &ms, 3);
     let mut want = vec![0x34];
     want.extend_from_slice(&guid.to_le_bytes());

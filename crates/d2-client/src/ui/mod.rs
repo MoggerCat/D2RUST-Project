@@ -32,7 +32,6 @@ pub mod item_tip_desc;
 pub mod item_tip_set;
 pub mod layout;
 pub mod messages;
-pub mod npc_menu_ui;
 pub mod original;
 pub mod panel;
 pub mod panels;

@@ -524,11 +524,9 @@ impl Run {
     }
 }
 
-/// The NPC menu row of `kind`, clicked (`npc_menu_ui.rs`: the box is
-/// centred, a quarter down the 800 × 600 frame, rows of 20).
-fn menu_row_point(rows: &[Option<OptionKind>], kind: Option<OptionKind>) -> Point {
-    let k = rows.iter().position(|r| *r == kind).expect("the row") as i32;
-    Point::new((800 - 200) / 2 + 20, 600 / 4 + 20 * (k + 1) + 10)
+/// The NPC menu row of `kind`: its index among the box's selectable rows.
+fn menu_row_index(rows: &[Option<OptionKind>], kind: Option<OptionKind>) -> usize {
+    rows.iter().position(|r| *r == kind).expect("the row")
 }
 
 #[test]
@@ -574,7 +572,10 @@ fn the_scripted_play_run() {
         .map(|r| r.kind)
         .collect();
     eprintln!("Akara's menu: {rows:?}");
-    run.click(menu_row_point(&rows, Some(OptionKind::Trade)));
+    // The box is the spec box above Akara (`menus.md` §2.6), as ui 8.
+    assert!(run.ui_open(8), "the menu is ui 8 (panels-2.md §14)");
+    let p = app_support::npc_menu_row(&run.app, menu_row_index(&rows, Some(OptionKind::Trade)));
+    run.click(p);
     run.step(10);
     run.check("trade with Akara");
     {

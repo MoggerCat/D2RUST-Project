@@ -532,7 +532,7 @@ impl Smoke {
         self.step(2);
     }
 
-    fn menu(&self) -> Option<d2_client::ui::npc_menu_ui::Open> {
+    fn menu(&self) -> Option<d2_client::ui::original::npc_box::Open> {
         let ui = self.app.world().non_send::<WorldViewUi>();
         ui.original.as_ref().unwrap().npc_menu()
     }
@@ -557,9 +557,10 @@ impl Smoke {
         key.guid
     }
 
-    /// Clicks the menu row `i` (R800: box rows from y 170, 20 high).
+    /// Clicks the menu row `i` of the spec box.
     fn menu_row(&mut self, i: usize) {
-        self.click(Point::new(400, 170 + 20 * i as i32 + 5));
+        let p = app_support::npc_menu_row(&self.app, i);
+        self.click(p);
         self.step(3);
     }
 
@@ -567,13 +568,17 @@ impl Smoke {
         self.menu()?.rows.iter().position(|r| r.kind == kind)
     }
 
-    /// Talks to the NPC of `class`: its menu, Talk, then Cancel.
+    /// Talks to the NPC of `class`: its menu, Talk, a press that ends the
+    /// talk (`panels-2.md` §14.8: the menu is built again, or the chat
+    /// ends), then Cancel.
     fn talk(&mut self, class: u32) -> u32 {
         let guid = self.open_menu(class);
         if let Some(t) = self.menu_row_of(Some(OptionKind::Talk)) {
             self.menu_row(t);
+            self.click(Point::new(400, 300));
+            self.step(3);
         }
-        if self.menu().is_some() {
+        if self.menu().is_some_and(|m| !m.talking) {
             let c = self.menu_row_of(None).expect("a Cancel row");
             self.menu_row(c);
         }

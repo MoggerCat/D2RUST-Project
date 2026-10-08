@@ -585,6 +585,10 @@ impl OriginalUi {
             // The start page of the class (`panels-2.md` §14 r12).
             st.page = shop_start_page(npc_class).0;
         }
+        // PROVISIONAL until q-fix-ui-shop: the shop still opens ui 1
+        // beside it, which ui 8 refuses (`ui-states.tsv` C[8][1] = 2), so
+        // the NPC menu's flag goes off first.
+        let _ = self.set_ui(u32::from(id::NPC_MENU), 1, false);
         // d2rs-own: a refused open (the gate) leaves the shop state up
         // and `shop_poll` closes it again.
         let _ = self.set_ui(u32::from(id::NPC_SHOP), 0, false);
