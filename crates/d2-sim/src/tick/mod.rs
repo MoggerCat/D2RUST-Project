@@ -164,6 +164,16 @@ pub trait TickHooks: EventDispatch {
 
 /// One tick (`0x0052D870`, §3): frame += 1, then steps 1–11 in order.
 pub fn tick<H: TickHooks + ?Sized>(game: &mut Game, hooks: &mut H) {
+    tick_through_timers(game, hooks);
+    tick_from_client_pass(game, hooks);
+}
+
+/// The first half of [`tick`]: frame += 1 and steps 1–4, ending with the
+/// timer queue. A host whose unit work runs inside step 4 but outside
+/// [`EventDispatch`] runs it between this and [`tick_from_client_pass`],
+/// so its messages reach the same tick's client pass
+/// (`flows/server-tick.md` §2 rule 2).
+pub fn tick_through_timers<H: TickHooks + ?Sized>(game: &mut Game, hooks: &mut H) {
     // Step 0. The debug trap switch on game +0x1DC8 is never set in
     // normal play and is not modelled.
     game.frame = game.frame.wrapping_add(1);
@@ -171,6 +181,11 @@ pub fn tick<H: TickHooks + ?Sized>(game: &mut Game, hooks: &mut H) {
     // Step 2 (frame-rate statistics) is wall-clock only (§8).
     room_pass(game, hooks);
     run_timer_events(game, hooks);
+}
+
+/// The second half of [`tick`]: steps 5–11, from the client pass to the
+/// periodic steps.
+pub fn tick_from_client_pass<H: TickHooks + ?Sized>(game: &mut Game, hooks: &mut H) {
     client_pass(game, hooks);
     room_update_queues(game, hooks);
     removal_records(game, hooks);

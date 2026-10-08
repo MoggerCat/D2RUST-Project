@@ -11,6 +11,7 @@ use d2_client::app::palette::{add_act_palettes, ActPalettes};
 use d2_client::app::play::{
     add_client_data, add_game, add_preview, add_walk, predict_link, send_create_game_for,
 };
+use d2_client::app::server_thread::ThreadLink;
 use d2_client::app::single_player::{self, GameData};
 use d2_client::app::ui::{add_original_ui_with, UiParts};
 use d2_client::assets::path::MemorySource;
@@ -209,8 +210,38 @@ fn queue(app: &mut App, e: UiEvent) {
         .push(e);
 }
 
+/// The server link the app holds, shared with the test.
+type Server = Arc<Mutex<ThreadLink<single_player::Link<StepClock>>>>;
+
+/// The shared link as the app's link.
+struct Shared(Server);
+
+impl ServerLink for Shared {
+    fn protocol_version(&self) -> u32 {
+        self.0.lock().unwrap().protocol_version()
+    }
+    fn send(&mut self, q: SendQueue, msg: &[u8]) -> Result<Sent, LinkError> {
+        self.0.lock().unwrap().send(q, msg)
+    }
+    fn pump(&mut self) -> Result<Pumped, LinkError> {
+        self.0.lock().unwrap().pump()
+    }
+    fn receive(&mut self) -> Vec<Vec<u8>> {
+        self.0.lock().unwrap().receive()
+    }
+}
+
 /// The play app over the synthetic game, joined, with a left skill.
 fn play_app(ms: &Arc<AtomicU32>, wire: &Arc<Mutex<Wire>>, npcs: Vec<(u16, i32)>) -> App {
+    play_app_shared(ms, wire, npcs).0
+}
+
+/// [`play_app`], with the server link it holds.
+fn play_app_shared(
+    ms: &Arc<AtomicU32>,
+    wire: &Arc<Mutex<Wire>>,
+    npcs: Vec<(u16, i32)>,
+) -> (App, Server) {
     let data = GameData::Synthetic;
     let character = single_player::new_character("sorceress", "Test").unwrap();
     let (link, _) = single_player::start_with_town(
@@ -228,8 +259,9 @@ fn play_app(ms: &Arc<AtomicU32>, wire: &Arc<Mutex<Wire>>, npcs: Vec<(u16, i32)>)
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
+    let server: Server = Arc::new(Mutex::new(link));
     let link = Recorder {
-        inner: Box::new(link),
+        inner: Box::new(Shared(server.clone())),
         wire: wire.clone(),
     };
     let (link, tap) = predict_link(Box::new(link));
@@ -294,7 +326,7 @@ fn play_app(ms: &Arc<AtomicU32>, wire: &Arc<Mutex<Wire>>, npcs: Vec<(u16, i32)>)
         .0
         .receive_chunk(&msgs)
         .unwrap();
-    app
+    (app, server)
 }
 
 /// The client's monster rows: Akara is an `npc` and `interact` class,
@@ -390,5 +422,62 @@ fn a_click_from_far_walks_up_and_talks_without_a_second_click() {
         let (open, sent) = talks_after_one_click(x);
         assert!(open, "NPC at offset {x}: the talk menu is open");
         assert!(sent >= 1, "NPC at offset {x}: C→S 0x13 sent");
+    }
+}
+
+/// The server's local player: (moving: mode walk / run / town walk,
+/// interact GUID).
+fn player_state(server: &Server) -> (bool, Option<u32>) {
+    server
+        .lock()
+        .unwrap()
+        .with(|l| {
+            let sim = &mut l.host_mut().game;
+            let (p, _) = single_player::local_player(sim).expect("joined");
+            let r = sim.events.action.sys.units.get(p).expect("player unit");
+            (
+                [2, 3, 6].contains(&r.mode),
+                r.interact.get().map(|(_, g)| g),
+            )
+        })
+        .unwrap()
+}
+
+/// The arrival runs in the tick whose step 4 stopped the run, after
+/// frame += 1 (`flows/server-tick.md` §2 rule 2): C→S 0x13 sent from the
+/// spawn to an NPC 7–8 sub-tiles away (offsets 29, 30 of this town)
+/// starts the server's approach run; the frame the server's player stops
+/// running is the frame its talk starts, not one tick later (the arrival
+/// used to run at the start of the next tick, before its frame += 1).
+// Covers: specs/flows/server-tick.md §2 r2; specs/world/npc.md §2 r3
+#[test]
+fn the_approach_arrival_talks_in_the_tick_the_run_stops() {
+    let class = d2_sim::world::npc::class::ORMUS;
+    for x in [29, 30] {
+        let ms = Arc::new(AtomicU32::new(1000));
+        let wire = Arc::new(Mutex::new(Wire::default()));
+        let (mut app, server) = play_app_shared(&ms, &wire, vec![(class, x)]);
+        let (guid, _) = npc_on_screen(&app, class);
+        let mut msg = vec![0x13, 1, 0, 0, 0];
+        msg.extend_from_slice(&guid.to_le_bytes());
+        server.lock().unwrap().send(SendQueue::Game, &msg).unwrap();
+        let (mut moved, mut stopped, mut talks) = (false, None, None);
+        for frame in 0..100 {
+            step(&mut app, &ms, 1);
+            let (moving, interact) = player_state(&server);
+            moved |= moving;
+            if moved && !moving && stopped.is_none() {
+                stopped = Some(frame);
+            }
+            if interact == Some(guid) && talks.is_none() {
+                talks = Some(frame);
+            }
+        }
+        assert!(moved, "offset {x}: the server ran the player");
+        assert!(talks.is_some(), "offset {x}: the talk started");
+        assert_eq!(
+            talks, stopped,
+            "offset {x}: the talk starts as the run stops"
+        );
     }
 }

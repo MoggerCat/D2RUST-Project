@@ -124,6 +124,9 @@ pub struct WiredWorld<R, S = NoSkills> {
     /// Pick-ups waiting for the player's run to the item to end
     /// (player, item GUID, cursor flag; [`Self::item_arrivals`], REC-281).
     pub(super) item_queued: Vec<(UnitId, u32, bool)>,
+    /// An approach arrival's 0x13 is running ([`WiredWorld::handler_work`]
+    /// starts no approach for it).
+    pub(super) arriving: bool,
     /// d2rs-own, unverified (REC-244): item codes a new character gets
     /// after its charstats start items, one each, to the inventory (the
     /// play preview names the Horadric Cube, `box `, which charstats
@@ -196,6 +199,7 @@ impl<R, S> WiredWorld<R, S> {
             now,
             inv_sent: Vec::new(),
             item_queued: Vec::new(),
+            arriving: false,
             start_extra: Vec::new(),
             quest_levels: Default::default(),
         }
@@ -585,6 +589,52 @@ impl<R: TradeRest + Default + 'static, S> WiredWorld<R, S> {
 }
 
 impl<R: TradeRest, S> WiredWorld<R, S> {
+    /// The host's unit work of one tick, run at the end of tick step 4
+    /// (after the timer queue, before the client pass): in 1.14d each of
+    /// these runs inside a timer event of step 4 (movement, the kill, the
+    /// death mode), so its messages go out with the same tick's client
+    /// pass (`flows/server-tick.md` §2 rule 2; `sim/tick.md` §5.7). In
+    /// order: the approach arrivals (a run that stopped in this tick's
+    /// step 4, so after frame += 1), the item pick-up arrivals, the
+    /// players' death starts (`vitals.md` §4.8), the corpses' items, the
+    /// pet deaths, the approach runs requested, the hireling calls (NPC
+    /// act changes included), the pet follows, the hirelings' stand-in
+    /// think. d2rs-own, unverified: the order within this block; that it
+    /// runs after the whole timer queue rather than inside the event that
+    /// raised it (the host's parts are not lent to the timer events).
+    pub(super) fn timer_step_work<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D)
+    where
+        Self: WorldHost<D>,
+    {
+        self.arrivals(game, events);
+        self.item_arrivals(game, events);
+        events.action().player_deaths(game);
+        self.corpse_fill(game, events);
+        self.pet_deaths(game, events);
+        self.approaches(game, events);
+        self.hireling_calls(game, events);
+        self.pet_follows(game, events);
+        self.drive_hirelings(game, events);
+    }
+
+    /// The unit work a C→S handler raised, run when the handler returns
+    /// (inside the drain, `flows/server-tick.md` §1 rule 1): pet deaths,
+    /// the approach runs requested, the hireling calls (NPC travel's act
+    /// change, `flows/act-change.md` §1, `world/npc.md` §8.3), the pet
+    /// follows. In 1.14d these run inside the handler itself.
+    /// An approach arrival's own 0x13 starts no new approach
+    /// ([`WiredWorld::arrivals`]).
+    pub(super) fn handler_work<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D) {
+        self.pet_deaths(game, events);
+        if self.arriving {
+            self.state.approaches.clear();
+        } else {
+            self.approaches(game, events);
+        }
+        self.hireling_calls(game, events);
+        self.pet_follows(game, events);
+    }
+
     /// The pet follows `0x005754B0` the placements queued
     /// (`path-placement.md` §10 rule 6, `ActionHooks::pet_follows`, on
     /// from the first frame): `hirelings.md` §6 rule 1 on the hireling
@@ -848,6 +898,7 @@ where
             ((), flush_shown(desk, inv))
         });
         self.inv_sent.extend(sent);
+        self.handler_work(game, events);
         Some(out)
     }
 
@@ -942,31 +993,30 @@ where
     /// ([`WiredWorld::lend_quests`]): quest object inits run inside their
     /// allocation and object event 7 inside its timer event, in the tick
     /// that runs them (`quests-act1-rest.md` §9 item 7; `tick.md` §3).
+    /// The host's unit work ([`WiredWorld::timer_step_work`]) runs at the
+    /// end of step 4, after the timer queue and before the client pass
+    /// (`flows/server-tick.md` §2 rule 2), so its messages reach the same
+    /// tick's client pass.
     fn run_tick(&mut self, game: &mut Game, events: &mut D)
     where
         D: d2_sim::tick::EventDispatch + d2_sim::tick::TickHooks,
     {
-        self.arrivals(game, events);
-        self.item_arrivals(game, events);
-        self.lend_quests(events, |_, ev| d2_sim::tick::tick(game, ev));
+        self.lend_quests(events, |_, ev| d2_sim::tick::tick_through_timers(game, ev));
+        self.timer_step_work(game, events);
+        self.lend_quests(events, |_, ev| {
+            d2_sim::tick::tick_from_client_pass(game, ev)
+        });
         let sent = self.take_inventory_sent(game, events);
         self.inv_sent.extend(sent);
     }
 
     /// The quest routes queued outside a lent call (a quest call's own
-    /// allocations, [`quest_objects`]), before the tick's sends are taken.
+    /// allocations, [`quest_objects`]), before the tick's sends are taken;
+    /// then the quest events (PROVISIONAL, REC-129).
     fn after_tick(&mut self, game: &mut Game, events: &mut D) {
         let sent = self.desk(game, events, quest_objects);
         self.inv_sent.extend(sent);
         self.run_quest_events(game, events);
-        // A player with no life starts dying (`vitals.md` §4.8).
-        events.action().player_deaths(game);
-        self.corpse_fill(game, events);
-        self.pet_deaths(game, events);
-        self.approaches(game, events);
-        self.hireling_calls(game, events);
-        self.pet_follows(game, events);
-        self.drive_hirelings(game, events);
     }
 
     /// The quest control on the desk's economy and rest

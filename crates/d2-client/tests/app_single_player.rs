@@ -550,3 +550,52 @@ fn the_first_tick_sends_the_stats_in_the_client_pass_before_0x04() {
         &ids[done..]
     );
 }
+
+/// A death's messages reach the same tick's client pass
+/// (`flows/server-tick.md` §2 rule 2: unit work runs inside step 4, before
+/// step 5): in the tick a player's death starts, its S→C 0x0D code 8
+/// (DT, `client/model.md` §8 r4) comes before that tick's per-client
+/// update messages (here the stat flush of a level change made in the
+/// same tick), not after the whole tick.
+// Covers: specs/flows/server-tick.md §2 r2; specs/sim/tick.md §6 r5
+#[test]
+fn a_death_reaches_the_client_pass_of_its_tick() {
+    use d2_client::bridge::link::SendQueue;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    let ms = std::sync::Arc::new(AtomicU32::new(1000));
+    let (mut link, _) =
+        single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+    link.send(SendQueue::System, &single_player::create_request().encode())
+        .unwrap();
+    link.send(SendQueue::System, &[0x6B]).unwrap();
+    for _ in 0..4 {
+        ms.fetch_add(40, Ordering::SeqCst);
+        link.pump().unwrap();
+        link.receive();
+    }
+    let guid = link
+        .with(|l| {
+            let sim = &mut l.host_mut().game;
+            let (p, _) = single_player::local_player(sim).expect("joined");
+            sim.events.action.start_death(&mut sim.game, p);
+            let s = &mut sim.events.action.sys;
+            let l = s.stats.unit_list(p).unwrap();
+            s.stats.set(&mut s.hooks, l, 12, 7, 0, Some(p));
+            s.units.get(p).unwrap().guid
+        })
+        .unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    assert!(link.pump().unwrap().ticked);
+    let got = link.receive();
+    let g = guid.to_le_bytes();
+    let dt = got
+        .iter()
+        .position(|m| m.len() > 6 && m[0] == 0x0D && m[2..6] == g && m[6] == 8)
+        .unwrap_or_else(|| panic!("0x0D code 8 in {got:02X?}"));
+    let stat = got
+        .iter()
+        .position(|m| m[..] == [0x1D, 12, 7])
+        .unwrap_or_else(|| panic!("the level's 0x1D in {got:02X?}"));
+    assert!(dt < stat, "{got:02X?}");
+}
