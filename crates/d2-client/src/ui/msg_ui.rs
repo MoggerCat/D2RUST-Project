@@ -54,7 +54,6 @@ pub mod skip {
         "0x5D: the client quest flags [0x007C0D43] of the Den counter path (msg-ui OQ 4)";
     pub const QUEST_LOG_TABLE: &str =
         "0x5D: the quest-log table 0x00723F30 (41 entries) is not in the specs (msg-ui §1 r6)";
-    pub const INPUT_RESET: &str = "0x63: the input reset 0x0044DA40";
     pub const WAYPOINT_TAB_GATE: &str =
         "0x63: the waypoint tab gate reads the client quest flags (msg-ui OQ 4)";
     pub const WAYPOINT_ROWS: &str = "0x63: the row rebuild 0x0049C7F0 (ui/panels.md §13 r5)";
@@ -433,7 +432,9 @@ impl OriginalUi {
         if !self.set_ui(UI_WAYPOINT, ON, true)? {
             return Ok(());
         }
-        self.skip(skip::INPUT_RESET);
+        // r2.2: the input reset `0x0044DA40`, applied by the host to the
+        // world clicks ([`OriginalUi::take_input_reset`]).
+        self.shared.borrow_mut().input_reset = true;
         // r2.3: the act index of the local player's room's level
         // (`0x006427F0`); none → tab 0. `0x0049C760(a)`: a ≥ 5 → 0;
         // tab 0 has no gate; the others read the client quest flags.

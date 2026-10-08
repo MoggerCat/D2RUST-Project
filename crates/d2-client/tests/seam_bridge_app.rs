@@ -45,7 +45,10 @@ fn audio_outputs_become_sound_requests_in_list_order_with_the_captured_position(
             at: Some((0x1241, 0x11C4)),
             event: 3,
         },
-        Output::UnitFreed { unit },
+        Output::UnitFreed {
+            unit,
+            client_only: false,
+        },
     ];
     let requests = deliver(&mut bridge, &list, None).unwrap();
     assert_eq!(
@@ -57,7 +60,10 @@ fn audio_outputs_become_sound_requests_in_list_order_with_the_captured_position(
                 at: Some((0x1241, 0x11C4)),
                 event: 3,
             },
-            SoundRequest::UnitFreed { unit },
+            SoundRequest::UnitFreed {
+                unit,
+                client_only: false,
+            },
         ]
     );
 }

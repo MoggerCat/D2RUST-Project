@@ -472,7 +472,7 @@ fn socket_effects(fx: Vec<SocketEffect>, npc: u32) -> Vec<PanelOutput> {
     for e in fx {
         match e {
             SocketEffect::Send(i) => out.push(PanelOutput::Intent(i)),
-            SocketEffect::Sound(_) => out.push(PanelOutput::ClickSound),
+            SocketEffect::Sound(id) => out.push(PanelOutput::Sound(id as i32)),
             SocketEffect::Ui(o) => out.push(o),
             // `0x004B3FE0` / `0x004B3FB0`: the interaction ends.
             SocketEffect::EndInteraction | SocketEffect::EndInteractionFull => {

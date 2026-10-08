@@ -30,11 +30,13 @@ use d2_proto::client::{RemoveBodyItem, SwapCursorBufferItem, SwapCursorWithBody}
 
 use super::super::draw::UiDrawSink;
 use super::super::geom::Point;
+use super::super::inv_grid::HoverState;
 use super::super::inv_grid::{
     equip_draw_point, grid_click, ClickCtx, EquipBox, GridMsg, GridRecord, ItemRef,
 };
 use super::super::layout::Screen;
-use super::super::panel::ClientIntent;
+use super::super::panel::{ClientIntent, WidgetId};
+use super::super::widget::CellGrid;
 use super::{cel, PanelOutput, UiFiles};
 use crate::bridge::items::{self, mode, ItemArtRows, ItemView};
 use crate::bridge::world::ClientWorld;
@@ -140,6 +142,10 @@ pub struct ItemsUi {
     pub tips: Option<super::super::item_tip::ItemTips>,
     /// The used item of the identify cursor (cursor state 6, `inv_items_tip`).
     pub identify: std::cell::Cell<Option<u32>>,
+    /// The hover state of §5 (`0x00487000`): one for every grid, as in
+    /// the original; updated on each mouse event over an open grid
+    /// ([`ItemsUi::track_hover`]) and read by the grid click (§10 r4).
+    pub hover: std::cell::Cell<HoverState>,
 }
 
 /// d2rs-own, unverified: whether an item code is a belt-able potion
@@ -354,6 +360,45 @@ impl ItemsUi {
         vec![PanelOutput::Intent(ClientIntent::from_message(&m))]
     }
 
+    /// The hover handler `0x00487000` (§5) for a mouse event at `at`
+    /// over grid `g` (page `page`): with a cursor item the cursor cell
+    /// (§5 r2–r3, kept when the footprint overhangs), else the item at
+    /// the mouse cell (§5 r1). Nothing outside the grid rectangle.
+    pub fn track_hover(
+        &self,
+        world: &ClientWorld,
+        files: &UiFiles,
+        g: &GridRecord,
+        page: u8,
+        at: Point,
+    ) {
+        if g.cell_w == 0 || g.cell_h == 0 || !g.contains_mouse(at) {
+            return;
+        }
+        let cell = (i32::from(g.cell_w), i32::from(g.cell_h));
+        let mut h = self.hover.get();
+        if let Some(cur) = items::cursor_item(world) {
+            let a = self.art(files, &cur, cell);
+            let (w, hh, gw, gh) = a.map_or((1, 1, cell.0, cell.1), |a| (a.w, a.h, a.gw, a.gh));
+            h.with_cursor_item(grid_cursor_cell(g, at, (w, hh), (gw, gh)));
+        } else {
+            let (c, r) = g.mouse_cell(at);
+            let (c, r) = (c as i32, r as i32);
+            let under = items::local_items(world).into_iter().find(|i| {
+                let (w, hh) = self.art.get(i.code.unwrap_or([0; 4])).map_or((1, 1), |a| {
+                    (i32::from(a.inv_w.max(1)), i32::from(a.inv_h.max(1)))
+                });
+                let (x, y) = (i32::from(i.x), i32::from(i.y));
+                i.mode == mode::STORED
+                    && i.page == page
+                    && (x..x + w).contains(&c)
+                    && (y..y + hh).contains(&r)
+            });
+            h.without_cursor_item(under.map(|i| i.key.guid));
+        }
+        self.hover.set(h);
+    }
+
     pub(super) fn grid_press(
         &self,
         world: &ClientWorld,
@@ -397,18 +442,22 @@ impl ItemsUi {
             let tips = self.tips.as_ref()?;
             socket::socket_intent(tips, world, c, u)
         });
-        // Cursor cell (§5 r3) and the overlap under the footprint.
+        // The kept cursor cell (§5 r3, `[0x00721E4C]` / `[0x00721E50]`)
+        // and the overlap under the footprint. The press point is a mouse
+        // event too: a footprint overhanging the right column or bottom
+        // row there keeps the last valid cell.
         let mut cursor_cell = (mc, mr);
         let mut overlap: Vec<&ItemView> = Vec::new();
         let mut fits = true;
         if let Some(cur) = cursor {
             let a = self.art(files, cur, cell);
-            let (w, h, gw, gh) = a.map_or((1, 1, cell.0, cell.1), |a| (a.w, a.h, a.gw, a.gh));
-            match cursor_cell_for(g, at, (w, h), (gw, gh)) {
-                Some(cc) => cursor_cell = cc,
-                None => fits = false,
-            }
+            let (w, h) = a.map_or((1, 1), |a| (a.w, a.h));
+            self.track_hover(world, files, g, page, at);
+            let (c, r) = self.hover.get().cursor_cell;
+            // d2rs-own: no cell was ever set (§4 r2 tests ≥ 0).
+            fits = c >= 0 && r >= 0;
             if fits {
+                cursor_cell = (c as u32, r as u32);
                 let (c0, r0) = (cursor_cell.0 as i32, cursor_cell.1 as i32);
                 for (i, x, y, iw, ih) in &grid {
                     if *x < c0 + w && c0 < x + iw && *y < r0 + h && r0 < y + ih {
@@ -480,40 +529,26 @@ impl ItemsUi {
     }
 }
 
-/// The cursor cell (§5 r3); `None` when the footprint leaves the grid
-/// (the original keeps the previous cell; the preview places nothing).
-pub fn cursor_cell_for(
+/// The cursor cell of a w × h cursor item with a gw × gh graphic over
+/// grid `g` (§5 r3, [`CellGrid::cursor_cell`]); `None`: the handler
+/// returns without change (the footprint would pass the grid's right or
+/// bottom edge), the caller keeps its previous cell.
+pub fn grid_cursor_cell(
     g: &GridRecord,
     at: Point,
     (w, h): (i32, i32),
     (gw, gh): (i32, i32),
-) -> Option<(u32, u32)> {
-    let (cw, ch) = (u32::from(g.cell_w), u32::from(g.cell_h));
-    let (mut c, mut r) = g.mouse_cell(at);
-    if w % 2 == 0 {
-        c = ((gw >> 2) - g.left + at.x) as u32 / cw;
-    }
-    if h % 2 == 0 {
-        r = ((gh >> 2) - g.top + at.y) as u32 / ch;
-    }
-    let (gx, gy) = (i32::from(g.grid_x), i32::from(g.grid_y));
-    if w == gx {
-        c = (gx >> 1) as u32;
-    }
-    if h == gy {
-        r = (gy >> 1) as u32;
-    }
-    let fix = |v: u32, n: i32, max: i32| -> Option<u32> {
-        let mut v = v as i32;
-        if n > 1 {
-            v -= n >> 1;
-            if v < 0 {
-                v = 0;
-            }
-        }
-        (n + v <= max).then_some(v as u32)
-    };
-    Some((fix(c, w, gx)?, fix(r, h, gy)?))
+) -> Option<(i32, i32)> {
+    let cg = CellGrid::new(
+        WidgetId(0),
+        Point::new(g.left, g.top),
+        u16::from(g.grid_x),
+        u16::from(g.grid_y),
+        u16::from(g.cell_w),
+        u16::from(g.cell_h),
+    )
+    .ok()?;
+    cg.cursor_cell(at, w as u16, h as u16, gw as u32, gh as u32)
 }
 
 /// d2rs-own, unverified: an equipment-box press (module doc).

@@ -660,7 +660,7 @@ fn menu_click_to_imbue_done() {
         fx.step(&[]);
     }
     // The fixture's client model has no item stream, so the placing click
-    // (covered by the unit test of `imbue_ui`) goes through its seam.
+    // (covered by the unit test of `npc_talk`) goes through its seam.
     ui.imbue_place(fx.guid(buckler));
     assert_eq!(
         click(&mut fx, &mut ui, &mut root, Point::new(130, 230)),

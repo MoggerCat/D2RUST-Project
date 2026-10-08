@@ -611,7 +611,7 @@ impl NpcMenuUi {
                 for e in effects {
                     match e {
                         ShopEffect::Send(i) => out.push(PanelOutput::Intent(i)),
-                        ShopEffect::Sound(_) => out.push(PanelOutput::ClickSound),
+                        ShopEffect::Sound(id) => out.push(PanelOutput::Sound(id as i32)),
                         ShopEffect::WaitingNote => shop.note = true,
                         ShopEffect::Confirm(_) | ShopEffect::Cancel => {}
                     }
@@ -848,7 +848,10 @@ impl OriginalUi {
                 PanelOutput::SetUi { ui, mode, jump } => {
                     let _ = self.set_ui(u32::from(ui), u32::from(mode), jump);
                 }
-                PanelOutput::ClickSound => {}
+                PanelOutput::Sound(id) => self
+                    .outcome
+                    .sounds
+                    .push(crate::audio::driver::SoundRequest::Ui(id)),
             }
         }
         self.sync_root(root);
