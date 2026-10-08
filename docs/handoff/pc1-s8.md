@@ -22,6 +22,7 @@ Branch `claude/local-pc1-s8` from `origin/claude/specs-staging-7`
 | REC-60, REC-91, REC-92 (withdrawn, binary); text OQ10; tbl OQ1, OQ3 (Patch_D2); mpq OQ2; animdata OQ1, OQ4 (u16); partly animdata OQ3, cof OQ1 | edit-box scroll refit `0x004FE7C0`; patchstring 103–105 correct; tbl hash signed chars, probe skips non-1 used bytes; Storm lookup only locale 0 / platform 0; animdata u16 unused; d2s token slot classes from `0x00744CA8` (old 57–124 reconstruction wrong for 75 of 659 items); empty alternategfx passed as is | `ui/text.md` §15 r6, OQ10; `formats/tbl.md` §Key lookup, OQ1, OQ3; `formats/mpq.md` §5 r5; `formats/animdata.md` OQ1/3/4; `formats/cof.md` OQ1; `formats/d2s-appearance.md` §Constants, OQ3/4 | appearance OQ4 matches; scroll, token table, tbl, mpq do not | `q-fix-edit-scroll`, `q-fix-d2s-token-ref`, `q-fix-format-lookups` |
 | REC-62 (binary; capture optional); camera OQ8, capture OQ8, draw-order OQ14, composition OQ3 | every caller of shake `0x00476A80` with trigger and parameters (missile client fns 29/31/36/37/38/54/66 via table `0x0072A398`, skill 301 Stomp via `0x00727BA8`); draws with no tick: paused passes and the catch-up hold `[0x007A04BC]` (10 s act load, 2 s act set-up, 3 s 0x15 move); world draw reaches no UI/text code; StartDraw callers mapped. Gap table for render was stale (most OQs already answered) | `render/camera.md` §8, §9, OQ8; `render/capture.md` OQ8; `render/draw-order.md` OQ14; `render/composition.md` OQ3 | shake does not match; no-tick draws deliberately not reproduced (model §17 r4) | `q-fix-shake-starts` |
 | original-hooks OQ4, OQ6, OQ7, OQ8, OQ12 (part); scenario OQ2, OQ4, OQ3 (part) | save-dir fallback; join codes table (`0x00569D80`: 0xD/0xE difficulty, 8/9 expansion, 0xA–0xC hardcore/dead); class from the save; `-act` has no effect; new hook points §7.1–§7.5 for the R-* list | `tools/original-hooks.md` §5.2–§5.4, §6.2 r3, §7 new, OQ13 new; `tools/scenario.md` OQ2–4 | recorder lacks the §7 hooks | `q-rec-hooks`, `q-rec-joinflags`, `q-rec-d2sitems` |
+| REC-239 (1)–(3) | shrine states via `0x0056E970` curse path (stat 109, state 57, first flag-0x20 list replaced, same state = refresh), flags 0x22, timer 12; remove callbacks `0x00583BD0` / `0x00583A40`; hover label `0x00454F30` text rules + pop-up draw; overhead "3683+id" bubble 157 draws, 0x76 clears | `world/objects-2.md` §26 new; `world/objects-client.md` §29 new, OQ3–4; `world/objects.md` §9.1–9.2 pointers | `create_hover` matches; state helper, label, overhead draw do not | `q-fix-shrine-states`, `q-fix-object-label`, `q-fix-object-overhead` |
 
 Follow-ups for a later worker (other owners; msg-stats-items labels, properties §13 callers and the OQ pointers are done): `client/stat-lists.md` §2 r8 should link the `skills/use.md` §2 item type test.
 
@@ -125,3 +126,12 @@ Recordability (tools/original-hooks.md §7): R-MIS-1/2, R-PAUSE-1, R-NOTICK-1, R
 - **R-NOTICK-1** [AUTO] Settles camera OQ8 / capture OQ8 against recordings.
   For runs 1–2 list frames after 0 ticks; each must be paused or inside the
   `[0x007A04BC]` hold (record it and GetTickCount per frame).
+- **R-SHRINE-1** [AUTO] Settles objects-2 §26.1–§26.3 (REC-239). Stat-list
+  trace (state, flags, expiry, source, stats) after each state shrine (codes
+  6–15); same shrine twice, a second shrine, a shrine while cursed (Amplify
+  Damage), expiry of the stamina and skill shrines.
+- **R-SHRINE-2** [MANUAL] Settles objects-client §29 r2–r5, OQ4. 800×600
+  hover screenshots: chest, locked chest, shrine before/after, a door per
+  mode, a waypoint, a town portal.
+- **R-SHRINE-3** [MANUAL] Settles objects-2 §26.4. Frame-stepped capture from
+  shrine operation until the bubble disappears.

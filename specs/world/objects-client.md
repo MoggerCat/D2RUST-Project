@@ -10,6 +10,9 @@
 - **Target version:** 1.14d
 - **Crate/module:** `d2-client` (client object update; the model is
   `client/model.md`), with the rows of `objects.txt` from `d2-data`
+- **Related specs (§29 label):** `ui/control-panel.md` §5 r14 (pop-up
+  slot), `ui/panels.md` §5 (UI pass), `render/camera.md` §2, §4,
+  `data/fixups.md` §11–§13, `world/objects-2.md` §26.4 (shrine texts).
 - **Related specs:** `world/objects.md` (part 1; §1 object data, §4
   animation at a mode change, §14 client messages), `world/objects-2.md`
   (part 2, §23 client side of 0x0E / 0x4D), `client/model.md` (§2 unit
@@ -27,20 +30,21 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 46–56 |
-| Inputs | 57–68 |
-| Outputs / state changes | 69–76 |
-| Rules | 77–78 |
-|   25. Client object function dispatch | 79–168 |
-|   26. The client object functions | 169–367 |
-|   27. Client latches of the zoo and the preloads | 368–378 |
-|   28. What d2rs must model for §25–§27 | 379–391 |
-| Constants & data dependencies | 392–413 |
-| Randomness | 414–427 |
-| Edge cases & original bugs | 428–445 |
-| Test vectors | 446–472 |
-| Provenance | 473–494 |
-| Open questions | 495–502 |
+| Summary | 50–61 |
+| Inputs | 62–73 |
+| Outputs / state changes | 74–81 |
+| Rules | 82–83 |
+|   25. Client object function dispatch | 84–173 |
+|   26. The client object functions | 174–372 |
+|   27. Client latches of the zoo and the preloads | 373–383 |
+|   28. What d2rs must model for §25–§27 | 384–396 |
+|   29. Object mouse-over label (`0x00454F30`, unit type 2; REC-239) | 397–475 |
+| Constants & data dependencies | 476–497 |
+| Randomness | 498–511 |
+| Edge cases & original bugs | 512–529 |
+| Test vectors | 530–564 |
+| Provenance | 565–598 |
+| Open questions | 599–614 |
 <!-- /index -->
 
 ## Summary
@@ -53,6 +57,7 @@ draws on the object's own client seed, overlays, graphics loads, sound
 requests, client unit spawns, the one C→S message), and the client-global
 latches two of them use (§27). Every timer here runs on the wall clock
 (`GetTickCount`, milliseconds); §25 r6 records the d2rs clock choice.
+§29 owns the mouse-over label of a hovered object (text, anchor, pop-up).
 
 ## Inputs
 
@@ -389,6 +394,85 @@ call). Two draws per firing, whether or not the sound is requested.
    create/remove and graphics loads as render outputs; C→S 0x13 into
    `outgoing`; client unit create/remove into the model's set C.
 
+### 29. Object mouse-over label (`0x00454F30`, unit type 2; REC-239)
+
+Read 2026-10-08. The hovered-unit draw `0x00454F30` has no UI owner
+(`ui/panels.md` §5 step 1 and open question 1); this section owns its
+object case. Its other unit types are open question 3. The pop-up it
+fills is owned by `ui/control-panel.md` §5 r14.
+
+1. **When.** Each UI pass (`ui/panels.md` §5 step 1) clears the pop-up
+   slot, then calls `0x00454F30(U)` with U = the hover target
+   (`0x00467A10`; which objects can be hovered: `client/model.md`, hover
+   selectability `0x00466870`). Nothing is drawn when U is none, the
+   open mode is 3, a store is open (`0x004B3230` ≠ 0) or the modal text
+   screen is up (`0x004A0000` = 1). The label shows on every frame the
+   object is hovered and is gone on the first frame it is not.
+2. **Anchor** (GDI path, `0x004F51D0` = 0): x = px − `0x0045AFC0`(),
+   y = py − `0x0045AFD0`() (`0x00454FF5`–`0x00455018`). (px, py) = the
+   object's client pixel point (`0x00620650` / `0x006206B0`,
+   `render/camera.md` §2), so x = px − cx_u + shiftX and y = py − cy_u
+   + 8 (`render/camera.md` §4): the object's draw point without its
+   `Xoffset` / `Yoffset`. Then y += `NameOffset` (record +0x168, i32,
+   `0x00622270`; `0x004551F8`). Live `NameOffset`: −250 … 0, −70 on 141
+   rows (portals, waypoints, doors, wells), −60 / −50 on chests, −60 …
+   −235 on shrines (class 2: −145). The 3D path (not used by d2rs) takes
+   the projected point (`0x004F6760`; not on screen → nothing), ∓ W/4 in
+   open modes 1 / 2, and y + 16.
+3. **Text**, by `SubClass` (record +0x167) in this order:
+   1. Bit 2 (portals 59, 60): the destination's name `0x00453E70`
+      (object data +4, the destination level): no `levels` record →
+      string 5389 "No Level Name"; level 8 → 5048 "Den of Evil" when
+      client quest byte 1 (`0x004B92E0(0, 1)`, `world/quests-status.md`
+      §12) ≠ 0, else 5047 "Cave Level 1"; else the level's wide
+      `LevelName` (`levels` +0x16E, `data/fixups.md` §11). Game type
+      `[0x007A0610]` ∉ {0, 1} (multiplayer) appends `" (%s) "` with the
+      owner's name; never in single player.
+   2. Bit 7 (9 rows: classes 129, 247, 248, 250, 256–258, 289, 364): no
+      label.
+   3. Bit 6 (the 16 `Waypoint` rows): the object's room (`0x00620BB0`)
+      none → no label; else name(U) (rule 4), string 3995 (" "), string
+      3998 (newline) and the wide text of `LevelName` (`levels` +0xF5,
+      `0x00524E20`, `data/fixups.md` §12) of the room's level
+      (`0x0061A1B0`, `0x0061DB70`), concatenated in that order.
+   4. Otherwise name(U).
+
+   The text goes to `0x00502280(text, x, y, colour 0, centre 1)`
+   (`0x004552EC`, `0x0045539C`, `0x004553BF`).
+4. **name(U)** (`0x00464A60`, object case), the first rule that applies:
+   1. `OpenWarp` (+0x1B8) ≠ 0 and mode 2 (classes 74, 194, 195, 386):
+      the first tile unit (type 5) in the unit list of the object's room
+      (room +0x74, link unit +0xE8; `0x00464A10`); none → the same search
+      in each room of the room's near list (`0x00619790`, list order,
+      the own room skipped). Found in room R → the wide `LevelWarp`
+      (`levels` +0x1BE) of the level R's warp of that tile class leads to
+      (`0x00464A30`: `0x0061A1D0(R, tile class)`, `0x0061DB70`); no such
+      level → a null text, which the pop-up clears (nothing drawn). No
+      tile in any room → rule 2.
+   2. `IsDoor` (+0x13A) ≠ 0: mode 0 → string 3225 "Closed Door"; 4 or 5
+      → 3228 "Blocked Door"; 6 → 3229 "Locked Door"; any other mode →
+      3227 "Open Door".
+   3. A shrine (`SubClass` bit 0, `0x00621B00`): string 10809 + the
+      interact byte (object data +4, the shrine id from S→C 0x51,
+      `client/msg-units.md` §1.3 r3). These are the `Patch_D2.mpq`
+      English `patchstring.tbl` keys `ShrId0`–`ShrId22`, e.g. 10810
+      "Refilling Shrine", 10816 "Combat Shrine", 10825 "Enirhs Shrine".
+      The `d2exp.mpq` copy has other strings at these ids; the game reads
+      the `Patch_D2` one (`ui/text.md` §2). The name stays the same after
+      the shrine is used.
+   4. `Lockable` (+0x171) ≠ 0 and object data +4 bit 0x80 (locked):
+      string 3262 "Locked Chest".
+   5. Otherwise the record's wide name (+0x40): the text of the `Name`
+      key, else the miss text (`data/fixups.md` §13). Examples: `chest`
+      → "Chest", `Waypoint` → "Waypoint", `Well` → "Well".
+5. **Draw.** The rules of the pop-up slot are `ui/control-panel.md` §5
+   r14. It has one slot, so any later `0x00502280` call in the same frame
+   replaces the label. It is drawn at UI pass step 10 in the font current
+   then (Font16 in the plain game view, r14 rule 1). The box is W = text
+   width + 8 wide, centred on x, with its bottom at y + 2, clamped to the
+   screen. It has a colour-0 mode-2 backing rectangle; the text is colour
+   0 and the lines are centred.
+
 ## Constants & data dependencies
 
 | Constant | Value | 1.14d |
@@ -469,6 +553,14 @@ and the next lo'' = 791,599,131 (`world/objects.md` test vectors).
 | ClientFn 17, latch on, no chicken, P seed {1, 666} | 1,791,398,751 mod 3 = 0 → n 2: chickens at (x, y), (x + 1, y + 1) | §26.17 |
 | ClientFn 18, U seed {1, 666}, now > T | lo' mod 100 = 51 → no sound; lo'' mod 60 = 51 → T := read + 51,000 | §26.18 |
 | ClientFn 2, U+0xC8 0, seed {1, 666} | T := 31, U+0xC8 := 1, no mode change, T := 32 | §26.2 |
+| hovered `chest` (class 5, `NameOffset` −50, unlocked) standing on the local player's subtile, 800 × 600, open mode 0, no shake | pop-up "Chest", colour 0, centred on x = 400, y = 300 − 16 + 8 − 50 = 242 (box bottom 244) | §29 r2, r4.5, r5 |
+| hovered shrine, interact 1 (any mode) | "Refilling Shrine" (string 10810) | §29 r4.3 |
+| hovered locked chest (interact bit 0x80, `Lockable` 1) | "Locked Chest" (3262) | §29 r4.4 |
+| hovered door (`IsDoor` 1), modes 0, 1, 2, 4, 6 | "Closed Door", "Open Door", "Open Door", "Blocked Door", "Locked Door" | §29 r4.2 |
+| hovered portal 59, destination level 8, quest byte 1 = 0 / ≠ 0, single player | "Cave Level 1" / "Den of Evil" | §29 r3.1 |
+| hovered waypoint in Blood Moor (level 2) | "Waypoint" + " " + newline + "Blood Moor" | §29 r3.3 |
+| hovered object with `SubClass` bit 7 (e.g. class 129) | no label | §29 r3.2 |
+| the hover target leaves the object | no label on that frame (slot cleared at UI pass step 1) | §29 r1 |
 
 ## Provenance
 
@@ -491,6 +583,18 @@ and the next lo'' = 791,599,131 (`world/objects.md` test vectors).
   the header, `data/fields.tsv` objects 150), `Start*`, `FrameCnt*`;
   `overlay.txt` row 72; `monstats.txt` `hcIdx` 149, 211, 537–539. Script
   kept outside the repo (`scratch-objclient`).
+- §29 (2026-10-08, `all.asm`): `0x00456EE0` (UI pass call site
+  `0x00456F58`–`0x00456F5F`), `0x00454F30` (`0x00454F30`–`0x0045548B`,
+  jump table `0x00455490`), `0x00464A60` (`0x00464A60`–`0x00464C1F`,
+  jump table `0x00464C20`), `0x00464A10`, `0x00464A30`, `0x00453E70`,
+  `0x00621B00`, `0x00622270`, `0x004B92E0`, `0x004B3230`; record field
+  offsets from `data/fields.tsv` (`objects` +0x13A `IsDoor`, +0x167
+  `SubClass`, +0x168 `NameOffset`, +0x171 `Lockable`, +0x1B8 `OpenWarp`;
+  `levels` +0xF5 `LevelName`). Live rows: `patch_d2` `objects.txt`
+  (`SubClass`, `NameOffset`, `OpenWarp`, `IsDoor`, `Lockable` columns).
+  Strings: English `string.tbl` (d2data), `patchstring.tbl` (Patch_D2,
+  1,179 entries; read with `d2-formats` `Archive::read`, as the archive
+  has no listfile) by element number (`ui/text.md` §2).
 
 ## Open questions
 
@@ -499,3 +603,11 @@ and the next lo'' = 791,599,131 (`world/objects.md` test vectors).
    PROVISIONAL: ClientFn 16 never fires; the generic step reaches mode 2 (because the frame has advanced past `Start1` × 256 before the test); settled by REC-45.
 2. What `0x0046F870`'s flag 1 (orifice preload) changes against 0
    (`client/msg-ui.md` open question 1, same point).
+3. §29: no owner yet for the other unit types of `0x00454F30`: player
+   (name at y − 0x48 through `0x005022F0`), monster (`0x00454AD0` hover
+   bar, `0x00454A70`), item (`0x004527D0`), tile (level warp text at the
+   tile's centre). This needs a UI spec for the hovered-unit draw.
+4. §29 r3.3: the line order on screen of the waypoint text "Waypoint ⏎
+   level" depends on how the pop-up draws a 2-line text (bottom-up,
+   `ui/control-panel.md` §5 r14 rule 6). REC-239 capture (a hovered
+   waypoint) checks it.

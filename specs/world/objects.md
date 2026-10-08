@@ -46,20 +46,20 @@
 |   6. Preset object classes 574–582 (`0x0054F490`) | 287–323 |
 |   7. Operate dispatch | 324–382 |
 |   8. Chests and breakables | 383–516 |
-|   9. Shrines | 517–625 |
-|   10. Doors, operate 8 (`0x00581D40`) | 626–649 |
-|   11. Wells, operate 22 (`0x005858A0`) | 650–681 |
-|   12. Portals, operate 15 (`0x00584870`) | 682–748 |
-|   13. Torch, operate 11 (`0x005843D0`) | 749–753 |
-|   14. Client messages | 754–781 |
-|   15. Not covered yet | 782–796 |
-|   16.–18. Moved | 797–803 |
-| Constants & data dependencies | 804–850 |
-| Randomness | 851–896 |
-| Edge cases & original bugs | 897–963 |
-| Test vectors | 964–1002 |
-| Provenance | 1003–1060 |
-| Open questions | 1061–1109 |
+|   9. Shrines | 517–630 |
+|   10. Doors, operate 8 (`0x00581D40`) | 631–654 |
+|   11. Wells, operate 22 (`0x005858A0`) | 655–686 |
+|   12. Portals, operate 15 (`0x00584870`) | 687–753 |
+|   13. Torch, operate 11 (`0x005843D0`) | 754–758 |
+|   14. Client messages | 759–786 |
+|   15. Not covered yet | 787–801 |
+|   16.–18. Moved | 802–808 |
+| Constants & data dependencies | 809–855 |
+| Randomness | 856–901 |
+| Edge cases & original bugs | 902–968 |
+| Test vectors | 969–1007 |
+| Provenance | 1008–1065 |
+| Open questions | 1066–1114 |
 <!-- /index -->
 
 ## Summary
@@ -537,6 +537,8 @@ outside 0 … count − 1 spawns nothing.
 queue, flag 0x1, mode 0, +0x0C := 0 (the shrine can be used again).
 **Event 6** (`0x00581620`): hover expired (expiry ≤ frame) → free it,
 queue, flag 0x100; else reschedule at its expiry.
+How clients show the hover text and the shrine's mouse-over name:
+`world/objects-2.md` §26.4.
 
 **No guards in 1.14d:** `0x00583C70` reads the shrine record
 (`0x00621B70`) only at rule 4, after rules 1–3, and uses it unchecked;
@@ -552,6 +554,9 @@ P = player (operator), S = shrine record. Stats: 6 life, 8 mana, 10
 stamina (8.8 fixed). "State(st, stat, v, cb)" = the timed-state helper
 `0x0056E970` (skills spec; via `0x00582800`) on P with source the
 object, duration `Duration in frames` (+0x0C), that stat and value.
+The request fields (skill 0, level 0), the helper's refusals and
+replacement for shrines, and the remove callbacks of codes 12 and 14:
+`world/objects-2.md` §26.
 
 | Code | Fn | Effect |
 |---|---|---|

@@ -17,26 +17,27 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 42–51 |
-| Inputs | 52–55 |
-| Outputs / state changes | 56–60 |
-| Rules | 61–62 |
-|   16. Operate functions, part 2 | 63–190 |
-|   17. Small init functions | 191–217 |
-|   18. Object events 0, 3, 8, 9, 10 | 218–285 |
-|   19. Obelisk completion (C→S 0x44, `0x00585240`) | 286–332 |
-|   20. Item drop helpers (open question 13) | 333–428 |
-|   21. Curable-state removal (`0x00578C20`, open question 15) | 429–441 |
-|   22. Object allocation modes (open question 8) | 442–490 |
-|   23. Client side of S→C 0x0E and 0x4D (open question 4) | 491–508 |
-|   24. Guards and corner cases of part 1 (read 2026-10-07) | 509–550 |
-|   25. Portal pair creation (`0x0056D130`, `0x0056CF40`) | 551–642 |
-| Constants & data dependencies | 643–646 |
-| Randomness | 647–661 |
-| Edge cases & original bugs | 662–686 |
-| Test vectors | 687–709 |
-| Provenance | 710–744 |
-| Open questions | 745–748 |
+| Summary | 43–52 |
+| Inputs | 53–56 |
+| Outputs / state changes | 57–61 |
+| Rules | 62–63 |
+|   16. Operate functions, part 2 | 64–191 |
+|   17. Small init functions | 192–218 |
+|   18. Object events 0, 3, 8, 9, 10 | 219–286 |
+|   19. Obelisk completion (C→S 0x44, `0x00585240`) | 287–333 |
+|   20. Item drop helpers (open question 13) | 334–429 |
+|   21. Curable-state removal (`0x00578C20`, open question 15) | 430–442 |
+|   22. Object allocation modes (open question 8) | 443–491 |
+|   23. Client side of S→C 0x0E and 0x4D (open question 4) | 492–509 |
+|   24. Guards and corner cases of part 1 (read 2026-10-07) | 510–551 |
+|   25. Portal pair creation (`0x0056D130`, `0x0056CF40`) | 552–643 |
+|   26. Shrine state lists and shrine texts (REC-239, read 2026-10-08) | 644–737 |
+| Constants & data dependencies | 738–741 |
+| Randomness | 742–756 |
+| Edge cases & original bugs | 757–781 |
+| Test vectors | 782–813 |
+| Provenance | 814–856 |
+| Open questions | 857–860 |
 <!-- /index -->
 
 ## Summary
@@ -640,6 +641,100 @@ point (mask 0xBE11, step 5) nearest its tile-12 spawn point (rule 11,
 because +0x3C is 1 during the call), destination 73. Travel through it
 is §12 of `world/objects.md` with partner L = object 2.
 
+### 26. Shrine state lists and shrine texts (REC-239, read 2026-10-08)
+
+The timed-state shrines (`world/objects.md` §9.2 codes 6–15) go through
+the state helper `apply_state` `0x0056E970` (`skills/bodies.md` §2.7,
+owner of its rules). This section gives the request the shrines pass and
+what the helper's rules then mean for them.
+
+#### 26.1 The request
+
+`0x00582800(ECX source, EDX target, duration, value, stat, state,
+callback)` fills the helper's request: source := the shrine object,
+target := P, **skill := 0, level := 0**, duration := the shrine's
+`Duration in frames` (+0x0C), stat, value, state, and callback (0 → the
+default `0x0056E900`).
+
+| Code | Caller | stat, value | state | callback | after the call |
+|---|---|---|---|---|---|
+| 6, 8–11, 13, 15 | `0x00583B30` | table stat, V(stat, `Arg0`) (table stat −1 → value 0; not live) | table | 0 | – |
+| 7 | `0x005839B0` | 25, `Arg1` (+0x08) | table (129) | 0 | stat 19 := V(19, `Arg0`) on the returned list |
+| 12 | `0x00583BF0` (builds the request itself) | 11, 0 | table (134) | `0x00583BD0` | `0x0056DE40(P)`, whether or not a list was made |
+| 14 | `0x00583A70` | 162, v = V(162, `Arg0`) | table (136) | `0x00583A40` | stamina was set to its maximum **before** the call; on the returned list stat 10 := 2v, stat 28 := 1000 |
+
+Table = `0x006E1850` (`world/objects.md` §9.2). A code ≥ `[0x00732EAC]`
+is fatal in `0x00583B30` / `0x005839B0` / `0x00583A70` (0x9F9 / 0x9C1 /
+0x9E7). §9.1 rule 4 already rules that out. A set on a returned none
+does nothing (`0x006270B0` returns 0 on a null list). A 0 value on a
+missing stat writes nothing, so code 12's list holds no stat.
+
+#### 26.2 The helper's rules applied to a shrine (live 1.14d data)
+
+1. **State check:** 128–137 are valid; never refuses.
+2. **Monster rules:** the target is the operating player; never apply.
+3. **Curse path.** All ten shrine states (128 `shrine_armor` … 137
+   `shrine_experience`) have `states.txt` `curse` = 1, so:
+   1. r := P's `curse_resistance` (stat 109). Its only live source is
+      the Assassin's Fade (skill 267, `aurastat5`, calc `dm34`). r ≥ 100
+      → no list; 0 < r < 100 → duration −= pct(duration, r, 100)
+      (`combat/damage.md`).
+   2. P has state 57 (`attract`) → no list.
+   3. Old := P's **first stat list with flag 0x20**: any curse list, so
+      another shrine's state or a monster's curse (e.g. Amplify Damage).
+      The new list's flags start at 0x20.
+4. **Old list.**
+   1. Same state (skill 0 and level 0 always match a shrine's own list):
+      **refresh only**. Expiry := F + duration (after rule 3.1), timer 12
+      re-armed, the old list returned. Its stats are **not** rewritten:
+      the V just computed is dropped. Only the caller's sets after the
+      call (code 7 stat 19; code 14 stats 10 and 28) write the old list.
+   2. Another state: the "request level < old level → none" refusal
+      needs the same state and skill, so it never fires for a shrine.
+      The old list is detached and freed, and its remove callback runs
+      (§26.3 for 134 / 136; curses: `skills/bodies.md` §2.8).
+   So a player holds at most one shrine state or curse at a time. A
+   shrine replaces the current curse or shrine state. A later curse
+   replaces the shrine state by the same rule (on the curse's request).
+5. **New list:** P is queued for update; state on. Every state shrine
+   has duration ≠ 0 (2,400–4,800), so e = F + duration, timer 12 at e,
+   flags 0x22 (none of 128–137 has `exp` or `aura`). Source := (type 2,
+   the shrine's GUID), state, skill 0, level 0; stat ≠ −1 → list stat :=
+   value; attached; remove callback := the request's, else `0x0056E900`.
+   Expiry and the type-12 timer: `sim/stat-lists.md` §10.4.
+
+#### 26.3 Remove callbacks
+
+Detach calls them (ECX unit, EDX state, stack list; `sim/stat-lists.md`
+§8.2 step 6) on expiry, on replacement (§26.2 r4.2) and on any other
+removal.
+
+- **`0x00583BD0`** (state 134, skill shrine): the default callback
+  `0x0056E900` (`skills/bodies.md` §2.8) with the same arguments, then
+  the skill refresh `0x0056DE40(unit)` (`skills/use.md` §7), which drops
+  the +2 of state 134 (`skills/levels.md`).
+- **`0x00583A40`** (state 136, stamina shrine): the default callback with
+  the same arguments, then stamina (stat 10) := the unit's maximum
+  stamina (`0x00625DB0`) through the unit set `0x00627260(unit, 10, max,
+  layer 0)`. This runs whether the unit is alive or not.
+
+#### 26.4 Shrine texts on the client
+
+- **Overhead message** (server: `world/objects.md` §9.1 rule 3 and event
+  6). The text is the decimal string of 3683 + shrine id: 4 characters
+  for every id 0–22 ("3683" … "3705"), so the record lives 8 · 4 + 125
+  = 157 frames. It is sent as S→C 0x26 type 5 (unit type 2, the object's
+  GUID, empty name; `sim/intents-events.md` §7.9 r3). Event 6 at +300
+  frees the server record and sends S→C 0x76.
+- **Client.** `client/msg-ui.md` §4 r4 stores an overhead record (d =
+  8 · 4 + 125 = 157 overhead draws). `ui/messages.md` §5 draws it as an
+  object: `atol` of the text → string 3683 + id (`ShrMsg0`–`ShrMsg22`,
+  e.g. 3684 "You feel refreshed.", 3689 "Your skin hardens."), in a
+  font-13 bubble above the object (py − 10). S→C 0x76 frees the record
+  if it is still there (`client/msg-ui.md` §21).
+- **Mouse-over label:** the shrine's name, string 10809 + shrine id
+  (`world/objects-client.md` §29 r4.3).
+
 ## Constants & data dependencies
 
 Listed in `world/objects.md` (Constants & data dependencies).
@@ -706,6 +801,15 @@ Listed in `world/objects.md` (Constants & data dependencies).
 | pair created | object 1 mode 1, object 2 mode 2, both class `class`; object 2 +0x04 = object 1's level; each +0x94/+0x98 = the other's type/GUID; each +0x20/+0x24 = the other's position; object 2 portal flags & 3 = 3; owner GUID −1 on both | §25 rules 6, 14, 15 |
 | Tyrael (msg 302) from level 73, chain 13 +0x3C = 1 | object 2 in level 40 at the free point (mask 0xBE11, step 5) nearest the tile-12 spawn point | §25 rule 11 |
 | spawn search of rule 9 returns none | object 1 removed and freed; result 0 | §25 rule 10 |
+| armor shrine (code 6, `Arg0` 100, duration 2,400) at frame F, P without a curse list | one list: state 128, flags 0x22, source (2, shrine GUID), skill 0, level 0, stat 171 = 100, expiry and timer 12 at F + 2,400 | §26.1, §26.2 r5 |
+| the same armor shrine type again at F + 100 | no new list; expiry and timer F + 2,500; stat 171 still the first value | §26.2 r4.1 |
+| resist fire shrine (code 8) at F + 200 while the armor list is on | armor list freed (state 128 off, default callback); new list state 131, stat 39 = 75, expiry F + 3,800 | §26.2 r4.2 |
+| armor shrine while P has a monster curse list (flag 0x20) | the curse list is freed (its callback runs); shrine list made | §26.2 r3.3, r4.2 |
+| resist cold shrine (3,600), P's `curse_resistance` 50 | expiry F + 3,600 − pct(3,600, 50, 100) = F + 1,800 | §26.2 r3.1 |
+| any shrine state, P's `curse_resistance` 100 | no list; code 14 still refilled stamina, code 12 still refreshed skills | §26.1, §26.2 r3.1 |
+| stamina shrine list expires | default callback, then stamina := max stamina | §26.3 |
+| skill shrine list replaced by a resist shrine | default callback, then skill refresh `0x0056DE40` | §26.3 |
+| shrine id 1 operated | S→C 0x26 type 5 text "3684"; client bubble "You feel refreshed." for 157 overhead draws; S→C 0x76 at server frame + 300 | §26.4 |
 
 ## Provenance
 
@@ -741,6 +845,14 @@ The §16–§18 bullet of `world/objects.md` Provenance; §18.6 from
   `0x0059CB7A`–`0x0059CBA8`; the town portal cast's owner writes at
   `0x005BE366`, `0x005BE380`. D2MOO 1.10f `D2GAME_CreatePortalObject_6FD13DF0`
   gave the name only.
+- §26 (read 2026-10-08, `all.asm`): `0x00582800` (request offsets),
+  `0x00583B30`, `0x005839B0`, `0x00583A70`, `0x00583BF0`, `0x00583BD0`,
+  `0x00583A40`, `0x006270B0` (null list → 0); the helper's rules from
+  `skills/bodies.md` §2.7 (`0x0056E970`). Live `patch_d2` `states.txt`
+  rows 128–137 (`curse` 1; `exp`, `aura` empty), `shrines.txt` (`Arg0`,
+  `Arg1`, durations), `skills.txt` row 267 (`aurastat5`
+  `curse_resistance`; no other row or property sets stat 109). Strings:
+  English `string.tbl` 3683–3705 (`ShrMsg0`–`ShrMsg22`).
 
 ## Open questions
 
