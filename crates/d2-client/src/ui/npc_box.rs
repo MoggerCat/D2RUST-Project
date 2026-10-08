@@ -11,8 +11,8 @@
 //!
 //! The adapter owns the interaction's state; the box, its captions, its
 //! layout and its draw are the spec modules'. Draws go through the
-//! present sink: the framed box (`0x0046EFD0(…, 0, 1)`) is the HUD's dark
-//! fill tiles (the sink has no rectangle yet, q-fix-ui-draw-sink).
+//! present sink: the framed box (`0x0046EFD0(x, y, w, h, 0, 1)`) is the
+//! sink's rectangle ([`RectRequest::sized`]).
 // d2rs-own, unverified (M22, each provisional until the spec of the menu
 // box window handlers 0x0E / 1 lands, `q-ui-audit.md` "Spec gaps"):
 // - an item's hit band is (pen y − height, pen y] across the box width;
@@ -30,13 +30,13 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use super::game_messages::{backing, Measure};
+use super::game_messages::Measure;
 use super::SharedRef;
 use crate::bridge::hover::feet;
 use crate::bridge::items;
 use crate::bridge::world::{ClientWorld, UnitKey};
 use crate::rules::camera::{moving_to_client, Camera, FrameSize, OpenMode};
-use crate::ui::draw::{TextRequest, TextStyle, UiDraw, UiDrawSink};
+use crate::ui::draw::{RectRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
 use crate::ui::geom::{Point, Rect, FRAME};
 use crate::ui::hire_list::hire_intent;
 use crate::ui::imbue_ui::{Imbue, NPC_CHARSI};
@@ -218,14 +218,12 @@ fn item_at<H: Clone + PartialEq>(bx: &MenuBox<H>, p: Point) -> Option<usize> {
 }
 
 /// The draws of a menu box through the present sink.
-pub(crate) fn push_menu_draws(draws: Vec<MenuDraw>, fill: Option<u32>, out: &mut dyn UiDrawSink) {
+pub(crate) fn push_menu_draws(draws: Vec<MenuDraw>, out: &mut dyn UiDrawSink) {
     for d in draws {
         match d {
-            MenuDraw::Frame(r) => {
-                if let Some(file) = fill {
-                    backing(file, &r, out);
-                }
-            }
+            MenuDraw::Frame(r) => out.push(UiDraw::Rect(RectRequest::sized(
+                r.x, r.y, r.w, r.h, r.color, r.mode,
+            ))),
             MenuDraw::Text {
                 text,
                 x,
@@ -706,17 +704,16 @@ impl Panel for NpcMenuUi {
             return;
         }
         let sh = self.sh.borrow();
-        let fill = sh.tables.files.id(super::hud::FILL_FILE);
         let m = Measure(sh.fonts.as_ref());
         let mut spin = 0;
         if let Some(bx) = &st.bx {
-            push_menu_draws(bx.draw(&mut spin, &m), fill, out);
+            push_menu_draws(bx.draw(&mut spin, &m), out);
         }
         if let Some(n) = &st.note {
-            push_menu_draws(n.bx.draw(&mut spin, &m), fill, out);
+            push_menu_draws(n.bx.draw(&mut spin, &m), out);
         }
         if let Some(c) = &self.shop.borrow().confirm {
-            push_menu_draws(c.bx.draw(&mut spin, &m), fill, out);
+            push_menu_draws(c.bx.draw(&mut spin, &m), out);
         }
         let Some(it) = st.up.as_ref().filter(|it| it.talking) else {
             return;

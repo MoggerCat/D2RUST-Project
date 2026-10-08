@@ -74,8 +74,7 @@ pub struct HireState {
     /// `[0x00725494]` (S→C 0x9B; 0xFFFF: no dead mercenary).
     pub merc_state: u16,
     pub screen: (i32, i32),
-    /// The fill file of the box backing and the fonts (set at install).
-    pub fill: Option<u32>,
+    /// The fonts the box measures (set at install).
     pub fonts: Option<FontMeasure>,
 }
 
@@ -91,7 +90,6 @@ impl Default for HireState {
             confirm: None,
             merc_state: 0xFFFF,
             screen: (0, 0),
-            fill: None,
             fonts: None,
         }
     }
@@ -235,7 +233,7 @@ impl Panel for HireListUi {
             &m,
         ) {
             let mut spin = 0;
-            push_menu_draws(bx.draw(&mut spin, &m), st.fill, out);
+            push_menu_draws(bx.draw(&mut spin, &m), out);
         }
         // §3.3: the list widget's rows (its scroll and columns are not
         // drawn: d2rs-own).

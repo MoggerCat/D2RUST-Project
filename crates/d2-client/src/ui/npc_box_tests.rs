@@ -408,3 +408,24 @@ fn hiring_over_a_hireling_asks_first() {
     assert_eq!(ui.npc_menu_state(), MENU_WAITING);
     assert!(ui.npc_waiting_note());
 }
+
+// The box background is `0x0046EFD0(x, y, w, h, 0, 1)`: the sink's
+// rectangle over the box, color 0, mode 1 (no cel).
+// Covers: specs/ui/menus.md §2 r5
+#[test]
+fn the_box_frame_is_the_dark_rectangle() {
+    let (mut ui, mut root) = setup();
+    let w = world(AKARA, 1);
+    open(&mut ui, &mut root, &w, AKARA, 1);
+    let (r, _) = ui.npc_menu_box().unwrap();
+    let s = Strs::new();
+    let ctx = UiCtx {
+        tick: 0,
+        world: &w,
+        strings: &s,
+    };
+    let mut out: Vec<UiDraw> = Vec::new();
+    root.draw(&ctx, &mut out);
+    let want = RectRequest::sized(r.l, r.t, r.r - r.l, r.b - r.t, 0, 1);
+    assert!(out.contains(&UiDraw::Rect(want)), "{out:?}");
+}

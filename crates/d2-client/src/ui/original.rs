@@ -476,7 +476,6 @@ impl OriginalUi {
             let shr = sh.borrow();
             let mut h = self.hire.borrow_mut();
             h.screen = (sc.w, sc.h);
-            h.fill = shr.tables.files.id(hud::FILL_FILE);
             h.fonts = shr.fonts.clone();
         }
         self.npcm.borrow_mut().screen = (sc.w, sc.h);
