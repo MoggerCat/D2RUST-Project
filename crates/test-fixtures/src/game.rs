@@ -245,6 +245,20 @@ impl GameData {
         self.drlg_world_in(data, types, creation, init_seed, 0, town)
     }
 
+    /// [`Self::drlg_world`] of act `act` (0..=4; `town` is that act's
+    /// town level).
+    pub fn drlg_world_act(
+        &self,
+        data: Arc<DrlgData>,
+        types: &SharedTypes,
+        creation: ActCreation,
+        init_seed: u32,
+        act: u8,
+        town: u32,
+    ) -> Result<DrlgWorld, GameError> {
+        self.drlg_world_full(data, types, creation, init_seed, 0, act, town)
+    }
+
     /// [`Self::drlg_world`] on a game `difficulty` (0 normal, 1
     /// nightmare, 2 hell; `Drlg::create`'s difficulty).
     pub fn drlg_world_in(
@@ -256,17 +270,41 @@ impl GameData {
         difficulty: u8,
         town: u32,
     ) -> Result<DrlgWorld, GameError> {
-        let drlg_err = |source| GameError::Drlg { act: 0, source };
+        self.drlg_world_full(data, types, creation, init_seed, difficulty, 0, town)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn drlg_world_full(
+        &self,
+        data: Arc<DrlgData>,
+        types: &SharedTypes,
+        creation: ActCreation,
+        init_seed: u32,
+        difficulty: u8,
+        act: u8,
+        town: u32,
+    ) -> Result<DrlgWorld, GameError> {
+        let drlg_err = |source| GameError::Drlg {
+            act,
+            source,
+        };
         let mut handle = types.clone();
         let drlg = match creation {
             ActCreation::Full => {
-                Drlg::create(0, init_seed, difficulty, town, false, &data, &mut handle)
+                Drlg::create(act, init_seed, difficulty, town, false, &data, &mut handle)
                     .map_err(drlg_err)?
             }
             ActCreation::TownOnly => {
-                let mut d =
-                    Drlg::create(0, init_seed, difficulty, 0, false, &data, &mut NoLevelTypes)
-                        .map_err(drlg_err)?;
+                let mut d = Drlg::create(
+                    act,
+                    init_seed,
+                    difficulty,
+                    0,
+                    false,
+                    &data,
+                    &mut NoLevelTypes,
+                )
+                .map_err(drlg_err)?;
                 let l = d
                     .get_or_alloc_level(&data, &mut handle, town)
                     .map_err(drlg_err)?;
@@ -275,7 +313,7 @@ impl GameData {
             }
         };
         let mut dungeon = Dungeon::default();
-        dungeon.acts[0] = Some(drlg);
+        dungeon.acts[usize::from(act)] = Some(drlg);
         Ok(DrlgWorld {
             dungeon,
             data,
@@ -299,8 +337,21 @@ impl GameData {
         game_seed: u32,
         x: X,
     ) -> Result<(WorldSim<X>, SharedTypes), GameError> {
+        self.world_sim_act(creation, init_seed, 0, town, game_seed, x)
+    }
+
+    /// [`Self::world_sim`] whose created act is `act`.
+    pub fn world_sim_act<X: WorldPending>(
+        &self,
+        creation: ActCreation,
+        init_seed: u32,
+        act: u8,
+        town: u32,
+        game_seed: u32,
+        x: X,
+    ) -> Result<(WorldSim<X>, SharedTypes), GameError> {
         let (data, types) = self.level_types();
-        let world = self.drlg_world(data, &types, creation, init_seed, town)?;
+        let world = self.drlg_world_act(data, &types, creation, init_seed, act, town)?;
         let mut hooks = ActionHooks::new(
             Arc::new(self.action_tables()?),
             world,

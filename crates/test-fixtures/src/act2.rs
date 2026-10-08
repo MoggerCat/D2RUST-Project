@@ -184,7 +184,16 @@ fn tables(t: &mut TableSet) {
 
 /// Lut Gholein: 56 × 56 floor tiles.
 pub fn town() -> Ds1 {
-    floor_preset(56, 56)
+    let mut d = floor_preset(56, 56);
+    let (kind, id, x, y) = crate::act1::TOWN_WAYPOINT;
+    d.objects.push(d2_formats::ds1::Ds1Object {
+        kind,
+        id,
+        x,
+        y,
+        flags: 0,
+    });
+    d
 }
 
 /// Every DRLG file of the Act II set.
