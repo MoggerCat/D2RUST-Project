@@ -1107,9 +1107,10 @@ impl<X: Pending> objects::populate::PopulateWorld for ObjectView<'_, X> {
 /// room" bound).
 impl<X: Pending> ChestWorld for ObjectView<'_, X> {
     /// `0x00585B90` with the operate record (`treasure.md` §4). Without
-    /// the path provider's field the free-spot search finds nothing
-    /// ([`crate::wiring::economy::NoSpot`]): the walk still draws, no item
-    /// is created.
+    /// the path provider's field the free-spot search takes the start
+    /// spot as is ([`crate::wiring::economy::StartSpot`], as the monster
+    /// drop of REC-108 and the quest drops of REC-235; PROVISIONAL
+    /// REC-281, `d2rs-own, unverified`).
     fn chest_drop(&mut self, op: &Operate, q: u8) -> Option<UnitId> {
         let mut d = self.v.h.object_drops.take()?;
         let t = self.tables.clone();
@@ -1125,7 +1126,7 @@ impl<X: Pending> ChestWorld for ObjectView<'_, X> {
                 &mut sim,
                 &mut d,
                 &t.levels,
-                &mut crate::wiring::economy::NoSpot,
+                &mut crate::wiring::economy::StartSpot,
                 op.object,
                 op.operator,
                 q,
