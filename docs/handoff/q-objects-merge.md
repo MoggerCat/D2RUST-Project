@@ -22,3 +22,10 @@ Merged `claude/stitch-objects` (90febd75) into the stitch-npc line.
 ## Local check
 `cargo run -p d2-client -- play ...` (see docs/local/2026-10-07/PLAYABLE.md): click the
 town waypoint or a chest; the player walks up and the object opens/operates once.
+
+## Checks
+fmt, clippy (d2-client/d2-server/d2-sim, -D warnings), coverage --check: clean. Both
+e2e tests pass. Full tests: all pass except 3 in d2-server `world_data_tables`
+(`patchstring.tbl: failed to fill whole buffer` building the synthetic install). No
+fixture/format code changed here; not re-run on the base commit, so treat as likely
+pre-existing.
