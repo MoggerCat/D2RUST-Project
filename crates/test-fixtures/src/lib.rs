@@ -12,6 +12,7 @@
 //!   preset town).
 //! - [`act1`]: an Act I-shaped variant of the set (the act placer's
 //!   levels and the lvlprest ids the Act I generator stamps).
+//! - [`acts`]: the five act variants merged into one set.
 //! - [`synth`]: the `.txt` table model (schema headers, rows).
 //! - [`content`]: the made-up rows, strings and animation records.
 //! - [`sprites`]: live-shaped DC6 / DCC files for the format benches.
@@ -30,6 +31,7 @@ pub mod act2;
 pub mod act3;
 pub mod act4;
 pub mod act5;
+pub mod acts;
 pub mod animdata;
 pub mod content;
 pub mod cube_item;

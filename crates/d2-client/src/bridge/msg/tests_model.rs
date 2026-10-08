@@ -292,6 +292,30 @@ fn position_check_vectors() {
     assert_eq!(w.units[&P1].position, Some((100, 100)));
     assert_eq!(w.units[&P1].server_point, (104, 100));
 
+    // The same while the play preview predicts the walk (REC-277): the
+    // server's point is taken, nothing is sent; a placement since the
+    // prediction was recorded (the model position moved) asks again.
+    let mut w = ClientWorld::default();
+    let mut u = ClientUnit::new(P1);
+    u.mode = 1;
+    u.position = Some((100, 100));
+    w.units.insert(P1, u);
+    w.local_player = Some(P1);
+    w.set_local_walk(Some((108, 100)));
+    assert_eq!(
+        check(&mut w, &none, P1, 104, 100, 0, 0, 0).unwrap(),
+        Checked::Followed
+    );
+    assert!(w.outgoing.is_empty());
+    assert_eq!(w.units[&P1].position, Some((100, 100)));
+    assert_eq!(w.units[&P1].server_point, (104, 100));
+    w.units.get_mut(&P1).unwrap().position = Some((101, 100));
+    assert_eq!(
+        check(&mut w, &none, P1, 106, 100, 0, 0, 0).unwrap(),
+        Checked::Asked
+    );
+    assert_eq!(w.outgoing, vec![hex("5f 65 00 64 00")]);
+
     // A monster, mode 1 (T 15): 10 ≤ 15 and y = cy (visible): nothing.
     let mut w = ClientWorld::default();
     let k = monster_at(&mut w, 1, 100, 100);

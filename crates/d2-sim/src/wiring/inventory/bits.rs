@@ -62,6 +62,13 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         for (slot, &s) in sets.iter_mut().zip(bitstream::SET_STATES.iter()) {
             *slot = list(s as u16, SET_FLAGS).or_else(|| list(s as u16, ListKey::ITEM.flags));
         }
+        // `bitstream.md` §4.1 r2–r3: x / y are the static path's +0x0C /
+        // +0x10, the ground sub-tile in modes 3 and 5 (the path
+        // provider's record), the grid cell otherwise (the item data).
+        let (x, y) = match r.mode {
+            3 | 5 => self.econ.hooks.static_position(u).unwrap_or((d.x, d.y)),
+            _ => (d.x, d.y),
+        };
         Some(StreamItem {
             flags: it.flags | flags,
             alt: false,
@@ -70,8 +77,8 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             // version field (§4.1 rule 1: 101 in 1.14d expansion games).
             version: it.format,
             mode: r.mode,
-            x: d.x,
-            y: d.y,
+            x,
+            y,
             body_loc: d.body_loc,
             page,
             code: rec.code,

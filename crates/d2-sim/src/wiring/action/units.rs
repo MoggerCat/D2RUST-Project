@@ -173,6 +173,14 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         self.path_has(unit)
     }
 
+    /// The provider's static path record (`path-placement.md` §2.1).
+    fn static_position(&self, unit: UnitId) -> Option<(i32, i32)> {
+        match self.paths.as_ref()?.record(unit)? {
+            crate::path::UnitPath::Static(s) => Some((s.x, s.y)),
+            crate::path::UnitPath::Dynamic(_) => None,
+        }
+    }
+
     /// Player event 0 in modes 2, 3, 6, 19: the player step `0x00580C20`
     /// (`pathing.md` §9.2) with the path provider; the step result (2:
     /// stopped, the ENDANIM handler follows). Without the provider: the
