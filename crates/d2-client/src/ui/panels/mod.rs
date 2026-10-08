@@ -16,6 +16,7 @@ pub mod control;
 pub mod cube_items;
 pub mod inv_gold;
 pub mod inv_items;
+mod inv_items_tint;
 pub mod inventory;
 pub mod menu_box;
 pub mod npc;

@@ -96,6 +96,20 @@ impl<H: LifecycleHooks, P: DropPlacer<H>> DropSink for ItemDrops<'_, '_, H, P> {
         let (mut rq, spawn) = drop_request(&req);
         match self.econ.create_item(&mut rq, false, spawn) {
             Ok(u) => {
+                // PROVISIONAL (REC-281, d2rs-own, unverified): a low or
+                // normal quality drop without affixes is identified
+                // (`generation.md` §1.4: the flag is "set by callers"; no
+                // quality or affix success cleared it); magic and better,
+                // and charms, stay unidentified.
+                if let Some(i) = self.econ.items.get_mut(u) {
+                    // A normal charm's affixes cleared it (`affixes.md`).
+                    let affixed = i.prefix.iter().chain(&i.suffix).any(|&a| a != 0);
+                    if matches!(i.quality, crate::items::q::LOW | crate::items::q::NORMAL)
+                        && !affixed
+                    {
+                        i.flags |= crate::items::flag::IDENTIFIED;
+                    }
+                }
                 self.placer.placed(self.econ, u, req.spot);
                 self.placed.push((u, req.spot));
                 Some(u)

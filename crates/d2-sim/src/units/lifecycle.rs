@@ -53,6 +53,27 @@ pub trait LifecycleHooks: UnitHooks {
     /// it right after the call; the default drops it.
     fn request_act_change(&mut self, player: UnitId, level: u32, arg: u32) {}
 
+    /// The unit's path position (static path +0x0C / +0x10), when it has
+    /// a path: a ground item placed by the path code (a treasure drop)
+    /// has its position there before the inventory model knows the item.
+    /// The default knows none.
+    fn path_xy(&self, unit: UnitId) -> Option<(i32, i32)> {
+        None
+    }
+
+    /// The inventory model put `item` on the ground of `room` at (x, y)
+    /// (`inventory-moves.md` §9.1 step 3): the item's static path follows
+    /// (+0x0C / +0x10 are its position, `bitstream.md` §4.1 rule 2), so
+    /// the path code (walks to the item, distances) sees where it lies.
+    /// The default keeps no paths.
+    fn ground_item_placed(&mut self, item: UnitId, room: RoomId, x: i32, y: i32) {}
+
+    /// The room lies in a town level (`0x0061AB00`). The default knows no
+    /// levels.
+    fn town_room(&self, game: &crate::game::Game, room: RoomId) -> bool {
+        false
+    }
+
     /// The free routine's other calls (§1 table) and `0x005C0A90`,
     /// `0x00571F40` at removal. Provider: the kind's spec.
     fn free_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}

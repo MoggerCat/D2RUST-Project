@@ -45,7 +45,7 @@ mod tests {
                         i.at.y,
                     )
                 }
-                UiDraw::Text(_) | UiDraw::Tint(_) => panic!("text"),
+                UiDraw::Text(_) => panic!("text"),
             })
             .collect();
         (t, v)

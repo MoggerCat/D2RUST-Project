@@ -278,6 +278,15 @@ fn synthetic_npc_classes() -> impl Iterator<Item = u16> {
     .chain(super::town_npcs::ACT5.iter().map(|&(c, _)| c))
     .chain(super::town_npcs::ACT3.iter().map(|&(c, _)| c))
 }
+/// [`synthetic_npc_classes`] in `monstats` row order, once each (the
+/// vendor tables' `interact` list, `vendors.md` §1 r2).
+fn synthetic_interact_classes() -> Vec<u16> {
+    let mut v: Vec<u16> = synthetic_npc_classes().collect();
+    v.sort_unstable();
+    v.dedup();
+    v
+}
+
 /// The player's character class (1, sorceress, as in the server tests).
 pub const PLAYER_CLASS: u32 = 1;
 /// The character's name (0x59 bytes 6..22, zero-padded).
@@ -939,6 +948,22 @@ impl Pending for LocalSeams {
             .get(&unit)
             .is_some_and(|s| s.0 == UnitType::Monster);
         self.monsters.used_skill(unit, monster)
+    }
+    // d2rs-own, unverified (preview, q-a2-charge-jab; REC-274): a monster
+    // has no skill list, so its used entry's flags and params (Charge's
+    // moving flag, target and hit mode, `skills/bodies-2.md` §5.3) are
+    // kept per unit in the skill store.
+    fn entry_param(&self, unit: UnitId, _: &d2_sim::skills::SkillEntry, i: u8) -> i32 {
+        self.unit_entry_param(unit, i)
+    }
+    fn set_entry_param_of(&mut self, unit: UnitId, _: &d2_sim::skills::SkillEntry, i: u8, v: i32) {
+        self.set_unit_entry_param(unit, i, v);
+    }
+    fn entry_flags(&self, unit: UnitId, _: &d2_sim::skills::SkillEntry) -> u32 {
+        d2_sim::wiring::interaction::UseRest::used_skill_flags(self, unit)
+    }
+    fn set_entry_flags(&mut self, unit: UnitId, _: &d2_sim::skills::SkillEntry, f: u32) {
+        d2_sim::wiring::interaction::UseRest::set_used_skill_flags(self, unit, f);
     }
     /// d2rs-own, unverified (preview, D1; `0x00622870`).
     fn melee_range(&self, _: UnitId) -> i32 {
@@ -2195,6 +2220,7 @@ fn synthetic_monstats() -> Vec<Monstats> {
     for c in synthetic_act4::BOSSES {
         v[c as usize].killable = true;
     }
+    super::synthetic_items::smoke::monster(&mut v);
     v
 }
 
@@ -2269,6 +2295,8 @@ pub fn synthetic_unit_rows() -> UnitRows {
     for c in MERC_CLASSES {
         monsters[c] = Some(class_row(false));
     }
+    // The item smoke test's monster (q-smoke-items, REC-281).
+    monsters[super::synthetic_items::smoke::MONSTER as usize] = Some(class_row(false));
     UnitRows {
         monsters,
         ..UnitRows::default()
@@ -2326,7 +2354,12 @@ impl GameParts {
             monstats: synthetic_monstats(),
             hire_rows: hire_rows.clone(),
             items: super::synthetic_items::item_tables(),
-            vendors: VendorTables::default(),
+            // The stores of the synthetic traders (q-smoke-town, REC-278).
+            vendors: super::synthetic_vendors::vendor_tables(
+                &super::synthetic_items::item_tables(),
+                synthetic_interact_classes(),
+                SYNTHETIC_MONSTATS,
+            ),
             anim: None,
             vitals: None,
             bodies: None,
@@ -2336,7 +2369,8 @@ impl GameParts {
             inventory: Some(super::synthetic_items::inv_tables(
                 &super::synthetic_items::item_tables(),
             )),
-            cube: None,
+            // No recipe; the stash and cube buttons need the parts (REC-281).
+            cube: Some(super::synthetic_items::cube_data()),
         })
     }
 
@@ -2846,6 +2880,23 @@ pub fn build_with_town(
                 .ok_or_else(|| {
                     BuildError::Setup("allocating the Act III waypoint failed".into())
                 })?;
+            // Its NPCs (`town_npcs::act3_docks`; q-smoke-town, REC-278).
+            for (class, (dx, dy)) in super::town_npcs::act3_docks() {
+                let req = AllocRequest {
+                    ty: UnitType::Monster,
+                    class: u32::from(class),
+                    room: Some(room3),
+                    add: true,
+                    fixed_guid: None,
+                    mode: 1,
+                    allied: true,
+                };
+                sim.action
+                    .with(&mut game, |g, v| {
+                        v.allocate(g, &req, rect3.x * 5 + dx, rect3.y * 5 + dy)
+                    })
+                    .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
+            }
         }
     }
     let interact_classes: Vec<u16> = parts
@@ -2975,7 +3026,12 @@ fn loader(
                 // are the join's item messages (rule 3.5), sent after the
                 // stat messages.
                 let (entry, report, items) = load_new_character_with_items(s, player, r.char_name);
-                super::save_gaps::seed_new_flags(s, player, GAME_SETUP.expansion);
+                super::save_gaps::seed_new_flags(
+                    s,
+                    player,
+                    GAME_SETUP.expansion,
+                    character.difficulty(),
+                );
                 let own: Vec<Vec<u8>> = items
                     .sent
                     .iter()
@@ -3018,6 +3074,7 @@ fn loader(
                 Ok((entry, report)) => {
                     // q-save-full: the save's items, made on the wired host.
                     let items_ok = super::save_full::join_items(s, player, save);
+                    let corpses_ok = super::save_full::join_corpses(s, player, save);
                     super::save_gaps::join_gaps(s, player, save);
                     let log = &mut s.events.action.hooks().x.log;
                     log.extend(
@@ -3025,6 +3082,7 @@ fn loader(
                             .unapplied
                             .iter()
                             .filter(|u| !(items_ok && u.step == "items"))
+                            .filter(|u| !(corpses_ok && u.step == "corpse"))
                             .map(|u| format!("join: save load: {u:?}")),
                     );
                     // Load §2 quests row (`0x0056A370` → `0x0065C4D0`,

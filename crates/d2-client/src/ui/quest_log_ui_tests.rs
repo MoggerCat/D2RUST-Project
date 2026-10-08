@@ -79,7 +79,6 @@ fn drawn(ui: &OriginalUi, root: &UiRoot, w: &ClientWorld) -> (Vec<(String, u32)>
                 images.push((files.name(i.image.file).unwrap().to_string(), i.image.frame))
             }
             UiDraw::Text(t) => texts.push(String::from_utf16_lossy(&t.text)),
-            UiDraw::Tint(_) => {}
         }
     }
     (images, texts)

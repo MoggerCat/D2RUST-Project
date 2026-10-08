@@ -310,7 +310,6 @@ mod tests {
                     x.style.font,
                     x.style.color,
                 ),
-                UiDraw::Tint(_) => panic!("tint"),
             })
             .collect()
     }

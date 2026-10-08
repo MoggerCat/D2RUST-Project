@@ -139,6 +139,24 @@ fn remove_unit_light(w: &mut ClientWorld, key: UnitKey) {
     }
 }
 
+/// Places U at (x, y): the room of the point (`model.md` §2 rule 7;
+/// none is fatal 0x168), the position, and the room list recache
+/// (`sim/unit-order.md` §5 rule 6). Without the client DRLG the point is
+/// taken as in a room.
+fn place(w: &mut ClientWorld, key: UnitKey, x: u16, y: u16) -> Result<(), HandlerError> {
+    let room = match &w.active_rooms {
+        Some(_) => Some(w.room_at(x, y).ok_or(HandlerError::Fatal(0x168))?),
+        None => None,
+    };
+    if let Some(u) = w.units.get_mut(&key) {
+        u.position = Some((x, y));
+    }
+    if w.active_rooms.is_some() {
+        w.room_units.place(key, room.map(|r| r.room));
+    }
+    Ok(())
+}
+
 /// The player machine `0x00461250` (§8 rule 4), with flag 1 (every
 /// queued message passes 1).
 fn player(
@@ -183,11 +201,21 @@ fn player(
             check(w, inputs, key, x, y, 1, 0, 0)?;
         }
         0x07 => {
-            // was-dead `0x00464820` and `0x004647D0` feed the corpse
-            // re-init `0x00480EF0`: client animation, no model field.
+            // was-dead `0x00464820` and `0x004647D0` feed the re-init
+            // `0x00480EF0(U, r0, r1, was-dead)`.
             let u = w.units.get_mut(&key).expect("present");
+            let was_dead = u.is_dead();
             u.flag_2 = Some(true);
             u.mode = neutral;
+            // PROVISIONAL (REC-279; d2rs-own, unverified): `0x00480EF0`
+            // places a unit that was dead at (r0, r1), as 0x15's place
+            // (`msg-units.md` §3 rule 4, without the free-point fallback).
+            // The respawn's 0x0D code 7 (C→S 0x41) is the only message
+            // that gives the client the town point: the 0x15 before it
+            // finds the player dead and leaves it (§3 rule 4.3).
+            if was_dead && (x, y) != (0, 0) {
+                place(w, key, x, y)?;
+            }
         }
         0x08 => {
             // The local player's UI resets (`0x00456300`, hover target)
