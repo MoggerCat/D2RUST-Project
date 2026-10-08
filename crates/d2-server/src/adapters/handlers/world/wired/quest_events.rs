@@ -29,6 +29,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
     /// tick on the quest control.
     pub(super) fn run_quest_events<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D) {
         let queued = events.action().sys.hooks.x.take_quest_events();
+        let frame = game.frame;
         let mut seen = std::mem::take(&mut self.quest_levels.0);
         seen = self.desk(game, events, |desk, ctl, inv| {
             let ((), _) = quest_call(desk, ctl, inv, |q, w| {
@@ -54,6 +55,12 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                     if let QuestEvent::Kill { victim, killer } = *e {
                         q.monster_killed(w, victim, killer);
                     }
+                }
+                // Tick step 8 `0x00543E10`: the quest updater (timers such
+                // as A1Q2's 15, `quests-act1.md` §10.5 r5) runs on every
+                // 20th frame (`quests.md` §5; REC-134).
+                if frame % 20 == 0 {
+                    q.update(w);
                 }
             });
             seen

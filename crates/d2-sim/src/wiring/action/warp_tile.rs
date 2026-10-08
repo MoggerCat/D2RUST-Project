@@ -23,6 +23,11 @@ use crate::wiring::path::{place, PathCtx};
 
 use super::{Pending, View};
 
+/// The unit type of a host-placed monster preset: a level types provider's
+/// own preset-list entry (class = monstats class) that population does not
+/// read (it takes type 1). PROVISIONAL (REC-124); d2rs-own, unverified.
+pub const HOST_MONSTER_PRESET: u32 = 6;
+
 /// The unit type of a tile preset (`levels.md` §10.4).
 const TILE_PRESET: u32 = crate::path::warp::TILE_UNIT_TYPE as u32;
 
@@ -67,6 +72,52 @@ impl<X: Pending> View<'_, X> {
             }
         }
         n
+    }
+
+    /// Allocates a monster for each [`HOST_MONSTER_PRESET`] entry of the
+    /// active `room`'s DRLG room that has none yet (same class), as the
+    /// tiles are. Returns the created (unit, class) pairs.
+    pub fn spawn_host_monsters(&mut self, game: &mut Game, room: RoomId) -> Vec<(UnitId, u32)> {
+        let Some(act) = game.lists.room(room).map(|r| r.act) else {
+            return Vec::new();
+        };
+        let found = self.h.drlg.with_act(act, &mut game.lists, |d, svc| {
+            let r = d.drlg_room_of(room)?;
+            let origin = d.active_room(r)?.subtiles;
+            Some((svc.types.preset_units(d, r), origin))
+        });
+        let Some(Some((units, origin))) = found else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        for p in units.iter().filter(|p| p.unit_type == HOST_MONSTER_PRESET) {
+            let exists = game.lists.room_units(room).into_iter().any(|u| {
+                game.lists
+                    .unit(u)
+                    .is_some_and(|e| e.ty == UnitType::Monster)
+                    && self.units.get(u).is_some_and(|r| r.class == p.class)
+            });
+            if exists {
+                continue;
+            }
+            let req = AllocRequest {
+                ty: UnitType::Monster,
+                class: p.class,
+                room: Some(room),
+                add: true,
+                fixed_guid: None,
+                mode: 1,
+                allied: false,
+            };
+            if let Some(u) = self.allocate(game, &req, origin.x + p.x, origin.y + p.y) {
+                if let Some(r) = self.units.get_mut(u) {
+                    r.flags |= crate::missiles::unit_flag::IS_VALID_TARGET
+                        | crate::missiles::unit_flag::CAN_BE_ATTACKED;
+                }
+                out.push((u, p.class));
+            }
+        }
+        out
     }
 
     /// The first tile unit of `class` in the active `room`'s unit list.
