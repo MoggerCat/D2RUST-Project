@@ -12,23 +12,22 @@ rules are `docs/handoff/build-loop.md`, the task rows are
 - `claude/specs-staging-7`: green, about 70 tasks merged (6,779 tests
   sim/server/client/test-fixtures). Everything after #47 is here only:
   open a PR from a snapshot branch (see "Ship" below) to land it.
-- Branches pushed but **not merged** into staging (sessions told to push
-  and stop at 06:25 UTC; merge each, one at a time, with the gate):
-  `claude/q-npc-approach` (merged locally, gate interrupted by a full
-  disk — re-merge it), `claude/q-a4` (sent back: keep DEFAULT_SEED in
-  `tests/app_play_monster_ai.rs`, find why the zombie idles),
-  `claude/q-barb`, `claude/q-paladin`, `claude/q-sorc`, `claude/q-druid`,
-  `claude/q-assassin`, `claude/q-mercs-acts` (just started, likely
-  partial).
+- Merged after PR #47 (in `claude/release-8b`): q-necro, q-npc-approach,
+  q-a4 (with a real monster-AI fix), q-druid, q-sorc, plus everything listed
+  in that PR.
+- Branches pushed but **not merged** (sessions stopped at 06:25 UTC; each
+  is partial — read its `docs/handoff/q-<task>.md` first):
+  `claude/q-barb` (test rig only, never compiled), `claude/q-assassin`
+  (3 tests compile, all fail, undiagnosed), `claude/q-paladin` and
+  `claude/q-mercs-acts` (state unknown at hand-over; check the branch).
 - Queue rows not started: `q-item-uniques`, `q-gamble`, `q-charms`,
   `q-levels-warps-all`, `q-light-radius-detail`, `q-render-polish`,
   `q-perf`, `q-config`.
 
 ## REC ids
 
-Highest used in staging: REC-151 (q-necro). Reserved for the unmerged
-branches: 143 q-a4, 149 q-npc-approach, 152 q-barb, 153 q-paladin,
-154 q-sorc, 155 q-druid, 156 q-assassin, 157 q-mercs-acts. Next free:
+Highest used in staging: REC-155. Reserved for the unmerged branches:
+152 q-barb, 153 q-paladin, 156 q-assassin, 157 q-mercs-acts. Next free:
 REC-158. Sessions often pick a taken id; on merge, renumber only the
 branch's new lines with `python3 tools/coord/renum.py REC-OLD REC-NEW`
 (run during an uncommitted merge, from the repo root).
