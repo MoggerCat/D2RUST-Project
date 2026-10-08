@@ -79,16 +79,13 @@ pub const CLICK_SOUND_ID: i32 = 0;
 /// the app does not hold yet (M02: named, not guessed).
 pub const PENDING: &[(&str, &str)] = &[
     (
-        "character labels, class line, resist effects, shift-spend (§8.6, §8.9; \
-         `panels-2.md` §17 r3, r5–r9)",
-        "the values and the name line are bound ([`ModelCharacter`]); the labels need the \
-         string table by id (`StringLookup::get_id`, `NoStrings` in play); the class line \
-         needs the `charstats` class name (record +0, not in `ClientTables`); next level \
-         (§8.11) needs `experience.txt` (not in the model: the panel shows stat 30); the \
-         resist and defense effects (`panels-3.md` §24 r1, r3) need the `states.txt` flag \
-         masks (not in `StateRow`); the damage block and popups need the skill list and \
-         `monstats`; Shift is not in the UI events (a spend is 1 point); the language is \
-         English (0, `ui/text.md` §1.2)",
+        "character shift-spend, popups and the skill-modified damage block (§8.6, §8.9; \
+         `panels-2.md` §17 r5–r9)",
+        "labels (string ids), the class line, next level, the resist / defense colours and a \
+         weapon-only damage / attack-rating block are bound ([`char_feed`], PROVISIONAL \
+         REC-269); the skill-specific `descdam` / `descatt` entries, the to-hit popups (need \
+         `monstats`) and Shift (not in the UI events: a spend is 1 point) are not; the language \
+         is English (0, `ui/text.md` §1.2)",
     ),
     (
         "inventory gold button press / release and the gold dialog (`panels-2.md` §21 r3–r9)",
@@ -221,6 +218,8 @@ struct Shared {
     /// `difficultylevels` `ResistPenalty` by difficulty (§8.9, `0x00611D30`);
     /// an expansion game draws no values without it.
     resist_penalties: Option<Vec<i32>>,
+    /// The character panel's extra tables ([`char_feed`]).
+    char_tables: super::char_feed::CharTables,
     /// The control panel overlays' state ([`hud`]).
     hud: hud::HudState,
     /// The inventory panel's item facts (`inv_items`).
@@ -364,6 +363,7 @@ impl OriginalUi {
             outputs: Vec::new(),
             fonts: None,
             resist_penalties: None,
+            char_tables: Default::default(),
             hud: hud::HudState::default(),
             items: ItemsUi::default(),
             waypoint_map: None,
@@ -474,6 +474,11 @@ impl OriginalUi {
     /// (§8.9 expansion penalty, `0x00611D30`; `panels-2.md` §24 r2).
     pub fn set_resist_penalties(&mut self, penalties: Vec<i32>) {
         self.shared.borrow_mut().resist_penalties = Some(penalties);
+    }
+
+    /// The character panel's class keys, state flags and skilldesc rows.
+    pub fn set_char_tables(&mut self, tables: super::char_feed::CharTables) {
+        self.shared.borrow_mut().char_tables = tables;
     }
 
     /// The HUD's skill icon and experience tables ([`hud::HudTables`]).
@@ -1034,6 +1039,9 @@ pub struct ModelCharacter<'a> {
     pub fonts: &'a FontMeasure,
     /// `difficultylevels` `ResistPenalty` by difficulty (expansion game).
     pub penalties: &'a [i32],
+    /// The extra tables and the `experience` rows ([`char_feed`]).
+    pub chars: &'a super::char_feed::CharTables,
+    pub experience: &'a [[u32; 7]],
 }
 
 impl CharacterView for ModelCharacter<'_> {
@@ -1069,10 +1077,24 @@ impl CharacterView for ModelCharacter<'_> {
         )
     }
 
-    /// The state tests (`0x0063A570` family) are not in the model
-    /// (`PENDING`): none active.
-    fn resist_effect(&self, _id: u16) -> ResistEffect {
-        ResistEffect::None
+    /// The state tests (`0x0063A570` family) by the `states` flags.
+    fn resist_effect(&self, id: u16) -> ResistEffect {
+        match self.world.units.get(&self.key) {
+            Some(u) => self.chars.resist_effect(&u.states, id),
+            None => ResistEffect::None,
+        }
+    }
+
+    fn defense_color(&self) -> Option<u16> {
+        self.chars
+            .defense_color(&self.world.units.get(&self.key)?.states)
+    }
+
+    fn next_level(&self) -> Option<u32> {
+        let u = self.world.units.get(&self.key)?;
+        let level = u32::try_from(self.base(12)).unwrap_or(0);
+        let stat30 = u32::try_from(self.stat(30)).unwrap_or(0);
+        super::char_feed::next_level(self.experience, u.class, level, stat30)
     }
 
     /// §8.8: the max width of the value in Font16.
@@ -1171,10 +1193,31 @@ impl Panel for CharacterUi {
             key,
             fonts,
             penalties,
+            chars: &sh.char_tables,
+            experience: &sh.hud.tables.experience,
         };
         let env = sh.env();
         self.panel
             .draw(&sh.tables, &env, &view, fonts, ctx.strings, out);
+        super::char_feed::damage_block(
+            ctx.world,
+            key,
+            &sh.char_tables,
+            ctx.strings,
+            &env.screen,
+            fonts,
+            out,
+        );
+        if let Some(u) = ctx.world.units.get(&key) {
+            super::char_feed::class_line(
+                u.class,
+                &sh.char_tables,
+                ctx.strings,
+                &env.screen,
+                fonts,
+                out,
+            );
+        }
         name_line(name, &env.screen, fonts, out);
     }
 
@@ -1314,6 +1357,10 @@ pub use waypoint_ui::WaypointOpen;
 #[cfg(test)]
 #[path = "original_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "char_feed_tests.rs"]
+mod char_feed_tests;
 
 #[cfg(test)]
 mod character_bind_tests {
