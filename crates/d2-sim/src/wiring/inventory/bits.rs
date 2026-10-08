@@ -157,9 +157,33 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
     /// `MovePending::item_bits` reads the world only); the overflow of
     /// rule 2 comes after them, so they are kept on overflow too.
     pub fn item_stream(&self, item: Guid, flags: u32, page: u8) -> Vec<u8> {
-        let Some(view) = self.stream_item(item, flags, page) else {
+        self.item_stream_alt(item, flags, page, false)
+    }
+
+    /// The store stream of `item` (`inventory-moves.md` §6.2, `0x0053EF30`
+    /// with 0x38; `bitstream.md` §4.1 r4): alt-code exactly when the item
+    /// has the vendor flag (unit +0xC8 bit 2), quality 4–9 and no item
+    /// flag 0x10.
+    pub fn store_stream(&self, item: Guid, page: u8) -> Vec<u8> {
+        let alt = self.item_unit(item).is_some_and(|u| {
+            let vendor = self
+                .econ
+                .units
+                .get(u)
+                .is_some_and(|r| r.flags2 & crate::items::moves::deferred::VENDOR_ITEM != 0);
+            let it = self.econ.items.get(u);
+            let q = it.map_or(0, |i| i.quality);
+            let ident = it.is_some_and(|i| i.flags & crate::items::moves::iflag::IDENTIFIED != 0);
+            vendor && (4..=9).contains(&q) && !ident
+        });
+        self.item_stream_alt(item, 0, page, alt)
+    }
+
+    fn item_stream_alt(&self, item: Guid, flags: u32, page: u8, alt: bool) -> Vec<u8> {
+        let Some(mut view) = self.stream_item(item, flags, page) else {
             return Vec::new();
         };
+        view.alt = alt;
         let mut w = bitstream::BitWriter::new(bitstream::BUFFER);
         let wb = bitstream::write_into(&mut w, &view, &self.econ.tables.isc);
         if wb.ilvl != view.ilvl || wb.quality != view.quality {

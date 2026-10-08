@@ -406,6 +406,20 @@ impl ItemTips {
     /// The tip text of `ui/item-tips.md` (§1) of decoded item `b` with
     /// `ctx`.
     pub fn tip_of(&self, b: &ItemBits, ctx: &TipCtx<'_>) -> TipText {
+        // `bitstream.md` §4.1 r4 reader: an alt-code record is the base
+        // code's item with item level 1 and quality 1; the flags lose
+        // 0x2000000 and 0x80000 (edge case 9: a gamble item shows its
+        // normal-tier base).
+        if let Some(code) = b.base_code {
+            let b = ItemBits {
+                code,
+                ilvl: 1,
+                quality: 1,
+                flags: b.flags & !(d2_proto::item_bits::hflag::ALT_CODE | 0x8_0000),
+                ..b.clone()
+            };
+            return Build::new(self, &b, ctx).tip();
+        }
         // PROVISIONAL (REC-242): a compact record carries no quality
         // (`bitstream.md` §3) and the client's quality for it is not
         // specified; read as normal (2), the only quality whose name

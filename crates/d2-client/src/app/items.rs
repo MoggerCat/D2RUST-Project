@@ -156,7 +156,10 @@ impl crate::bridge::item_lists::StreamProps for TableDecoder {
         let Ok(b) = decode(stream, &lookup) else {
             return (Vec::new(), false);
         };
-        let charm = lookup.code(b.code).is_some_and(|c| c.charm);
+        // An alt-code record carries its base code (`bitstream.md` §4.1 r4).
+        let charm = lookup
+            .code(b.base_code.unwrap_or(b.code))
+            .is_some_and(|c| c.charm);
         // The armor's defense (stat 31, `bitstream.md` §4.4) is one of
         // the item's own values the reader stores in its list
         // (`client/stat-lists.md` §2 r1); it reaches the wearer's total

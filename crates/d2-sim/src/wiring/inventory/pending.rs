@@ -13,7 +13,7 @@ use super::{InvDesk, InvError, InvRest};
 use crate::items::inventory::{
     active_inventory_item, belt_removal_allowed, corpse_slot_fit, InvWorld, UnitKind,
 };
-use crate::items::moves::{Guid, MovePending, MoveUnits, Owner, Spot};
+use crate::items::moves::{deferred, Guid, MovePending, MoveUnits, Owner, Spot};
 use crate::units::lifecycle::LifecycleHooks;
 use crate::units::UnitId;
 
@@ -560,7 +560,16 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn item_bits(&self, item: Guid, flags: u32, page: u8) -> Vec<u8> {
         self.item_stream(item, flags, page)
     }
+    fn store_item_bits(&self, item: Guid, page: u8) -> Vec<u8> {
+        self.store_stream(item, page)
+    }
+    /// `0x0053EF30` with 0x38 for a vendor item (unit +0xC8 bit 2;
+    /// `inventory-moves.md` §6.2); 0x39 (bit 4) stays with the rest.
     fn store_messages(&mut self, client: Owner, item: Guid) -> Vec<Vec<u8>> {
+        if self.update_bits(Owner::item(item)) & deferred::VENDOR_ITEM != 0 {
+            // A failed encode sends nothing (as the shown-store flush).
+            return deferred::store_item_message(self, item).unwrap_or_default();
+        }
         self.rest.store_messages(client, item)
     }
 }

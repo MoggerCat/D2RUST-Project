@@ -619,3 +619,21 @@ fn a_set_item_shows_only_received_bonus_lists() {
         "{lines:?}"
     );
 }
+
+// An alt-code record (a gamble item) reads as its base code with item
+// level 1 and quality 1: an unidentified white base name, whatever the
+// server item is.
+// Covers: specs/items/bitstream.md §4.1 r4
+// Covers: specs/items/bitstream.md §edge-cases-original-bugs r9
+#[test]
+fn an_alt_code_record_shows_a_white_base_name() {
+    let b = ItemBits {
+        flags: hflag::ALT_CODE,
+        base_code: Some(*b"cap "),
+        ..ItemBits::default()
+    };
+    assert_eq!(
+        got(&tips().lines_of(&b)),
+        pairs(&[("Cap", color::WHITE), ("Unidentified", color::RED)])
+    );
+}
