@@ -30,10 +30,7 @@ use d2_server::adapters::ProtoSizes;
 use d2_server::host::Host;
 use d2_server::seams::Clock;
 use d2_sim::bench_fixtures::combat as fx;
-use d2_sim::missiles::unit_flag as flags;
-use d2_sim::monsters::ai::{install, AiControl};
 use d2_sim::stats::{stat, StatLists};
-use d2_sim::tick::events::event;
 use d2_sim::units::hooks::{MonsterInfo, UnitData};
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::{UnitId, UnitType};
@@ -229,24 +226,6 @@ fn placed(server: &Server, ty: UnitType, class: u32) -> Option<(UnitId, u32, u32
     })
 }
 
-/// Gives the monster its AI (`ai.md` §3.3) and schedules its first think.
-fn start_ai(server: &Server, m: UnitId) {
-    app_support::with(server, move |l| {
-        let sim = &mut l.host_mut().game;
-        let a = &mut sim.events.action;
-        a.sys.units.get_mut(m).unwrap().flags |= flags::IS_VALID_TARGET | flags::CAN_BE_ATTACKED;
-        a.ai(&mut sim.game, |g, cx| {
-            cx.store.entry(m).control = Some(AiControl::default());
-            install(g, cx, m, 0);
-        })
-        .expect("ai");
-        let at = sim.game.frame + 1;
-        sim.game
-            .schedule_event(m, u32::from(event::AI_THINK), at, None, 0, 0)
-            .unwrap();
-    });
-}
-
 fn send(app: &mut App, m: &[u8]) {
     app.world_mut()
         .resource_mut::<BridgeResource>()
@@ -394,7 +373,8 @@ fn duriel_fights_tyrael_opens_the_portal_and_meshif_travels_east() {
         "the door is in the client's model"
     );
 
-    // Duriel's AI: he attacks the player.
+    // Duriel's AI starts from the world (REC-254): he attacks the
+    // player with no test hook.
     app_support::with(&server, move |l| {
         let sim = &mut l.host_mut().game;
         let (p, _) = single_player::local_player(sim).unwrap();
@@ -411,7 +391,6 @@ fn duriel_fights_tyrael_opens_the_portal_and_meshif_travels_east() {
         });
     });
     let before = life(&server);
-    start_ai(&server, duriel);
     for _ in 0..800 {
         step(&mut app);
     }
@@ -477,6 +456,29 @@ fn duriel_fights_tyrael_opens_the_portal_and_meshif_travels_east() {
     for _ in 0..30 {
         step(&mut app);
     }
+    // The arrival spot follows the portal check: the type-12 spawn, then
+    // the free spot of size 3, mask 0xBE11, step 7 (REC-254).
+    let (spawn_xy, at) = app_support::with(&server, |l| {
+        let sim = &mut l.host_mut().game;
+        let (p, _) = single_player::local_player(sim).unwrap();
+        let a = &mut sim.events.action;
+        let at = a.sys.hooks.path_position(p);
+        let act = d2_sim::drlg::act_of_level(ACT2_TOWN);
+        let s = a
+            .hooks()
+            .drlg
+            .with_act(act, &mut sim.game.lists, |d, svc| {
+                d.spawn_room(svc, ACT2_TOWN, 12)
+            })
+            .unwrap()
+            .unwrap();
+        ((s.x * 5 + 2, s.y * 5 + 2), at)
+    });
+    let d = (at.0 - spawn_xy.0).abs().max((at.1 - spawn_xy.1).abs());
+    assert!(
+        d <= 20,
+        "arrival {at:?} near the type-12 spawn {spawn_xy:?}"
+    );
 
     // Jerhyn (442) and Meshif (450): the quest moves on, Meshif travels.
     let (_, jerhyn) = spawn(&server, JERHYN);

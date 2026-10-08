@@ -119,6 +119,13 @@ pub trait WorldPending: Pending {
     /// A monster the host placed from a level's preset list
     /// (`HOST_MONSTER_PRESET`, REC-130) exists.
     fn host_monster_created(&mut self, unit: UnitId, class: u32) {}
+    /// A host-placed monster of `class` gets the creation-time AI setup
+    /// (`init.md` §5 step 5: control, `0x005B0E00(.., 0)`, first think).
+    /// PROVISIONAL (REC-254): the host picks the classes. d2rs-own,
+    /// unverified.
+    fn host_monster_ai(&self, class: u32) -> bool {
+        false
+    }
 
     // ---- monster creation pieces without a provider ----------------------
 

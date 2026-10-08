@@ -1355,10 +1355,12 @@ impl<X: Pending> MiscWorld for ObjectView<'_, X> {
         if let Some(p) = self.v.h.x.object_level_spawn(self.game, level) {
             return Some(p);
         }
-        // PROVISIONAL (REC-234): a portal without a partner (Tyrael's,
-        // `quests-act2.md` §8.3) arrives at the level's spawn location
-        // of type 12 (the first step of `q6::portal_destination`); the
-        // free spot is rule 10's, not that function's (3, 0xBE11, 7).
+        // A portal without a partner (Tyrael's, `quests-act2.md` §8.3
+        // portal check `0x0059DFD0`): the spawn location of type 12 of
+        // the level, then the free spot `0x0064E7E0(room, &pt, size 3,
+        // mask 0xBE11, step 7)` (`path-placement.md` §7.1). The portal
+        // check's gate (+0x3C = 1) is not asked here: PROVISIONAL
+        // (REC-254), every partnerless portal takes this rule.
         // d2rs-own, unverified.
         let act = crate::drlg::act_of_level(level);
         let p = self
@@ -1370,7 +1372,11 @@ impl<X: Pending> MiscWorld for ObjectView<'_, X> {
             })?
             .ok()?;
         let sub = crate::path::place::SPAWN_OFFSET;
-        Some((p.active?, p.x * 5 + sub, p.y * 5 + sub))
+        let mut pt = crate::path::coords::Point::new(p.x * 5 + sub, p.y * 5 + sub);
+        let rooms = crate::wiring::path::place::Rooms(&self.v.h.drlg);
+        let room = crate::path::search::free_point_step(&rooms, p.active, &mut pt, 3, 0xBE11, 7)
+            .ok()??;
+        Some((room, pt.x, pt.y))
     }
     fn quest_level_change(&mut self, player: UnitId, from: u32, to: u32) {
         self.v.h.x.object_quest_level_change(player, from, to);
