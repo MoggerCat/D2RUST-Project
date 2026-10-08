@@ -34,15 +34,15 @@
 |   7. Links and dependencies | 376–512 |
 |   8. Post-load checks (fatal in 1.14d) | 513–561 |
 |   9. Combined index spaces | 562–576 |
-|   10. Special cases | 577–635 |
-|   11. Txt vs bin cross-check | 636–676 |
-| Constants & data dependencies | 677–697 |
-| Randomness | 698–701 |
-| Edge cases & original bugs | 702–718 |
-| d2-data policy | 719–745 |
-| Test vectors | 746–779 |
-| Provenance | 780–868 |
-| Open questions | 869–952 |
+|   10. Special cases | 577–646 |
+|   11. Txt vs bin cross-check | 647–687 |
+| Constants & data dependencies | 688–708 |
+| Randomness | 709–712 |
+| Edge cases & original bugs | 713–729 |
+| d2-data policy | 730–756 |
+| Test vectors | 757–793 |
+| Provenance | 794–882 |
+| Open questions | 883–974 |
 <!-- /index -->
 
 ## Summary
@@ -629,9 +629,20 @@ Suffixes come before prefixes in both affix arrays.
 8. **Counts not kept.** `arena`, `composit`, `armtype`, `experience` and
    `leveldefs` discard their count; the code relies on fixed sizes or on
    another table (levels). d2rs checks, besides the file size: `leveldefs`
-   count = `levels` count; `arena` 1, `composit` 16, `armtype` 3,
-   `experience` 101, exactly (the 1.14d counts, until the limits the code
-   relies on are known: Open question 12).
+   count = `levels` count, and the lowest counts the code relies on
+   (Open question 12): `arena` ≥ 1 (only row 0 is read: the accessor
+   `0x00664AB0` is fatal for a type ≥ 1, error 0x41, and the game's arena
+   type +4 is zeroed at creation `0x0053F4D3` and never written);
+   `composit` ≥ 16 (the client composite init reads rows 0–15,
+   `0x004DA7A4`–`0x004DA7C2`, no bound in the accessor `0x0065B5E0`);
+   `armtype` ≥ 3 and > the largest `rArm`, `lArm`, `torso`, `legs`,
+   `rspad`, `lspad` byte of any weapons / armor / misc row (items
+   +0x116–+0x11B; rows 0–2 read at `0x004DA891`–`0x004DA8AB`, and the
+   item-graphics path `0x0063E5BC` indexes it with that byte through
+   `0x0064F500`, no bound in the accessor `0x0065B620`; 1.14d: largest
+   byte 2); `experience` ≥ max(MaxLvl) + 2 (MaxLvl = row 0's 7 class
+   values; Open question 12). Rows past these limits are loaded and never read. 1.14d
+   counts: 1, 16, 3, 101.
 
 ### 11. Txt vs bin cross-check
 
@@ -773,6 +784,9 @@ Decided 2026-10-05 and logged in the `docs/PLAN.md` decisions log.
 | `automap` row with LevelName `6 Town` | load error | §8 |
 | `chartemplate` rows with Level 9, then 3 | load error | §8 |
 | `experience` count 100, or `leveldefs` count ≠ `levels` count | load error | §10.8 |
+| `arena` 0 / 2, `composit` 15 / 17, `armtype` 2 / 4 records (size valid) | load error / valid | §10.8 |
+| `armtype` 3 records and an armor row with `torso` 3 | load error | §10.8 |
+| `experience` 102 records (row 0 MaxLvl 99 for all classes) / 101 with one class MaxLvl 100 | valid / load error | §10.8 |
 | P `monstats.bin` record 0 `TreasureClass1` (u16 +0x86) | 430 = 161 + 269 (`treasureclassex` row 269 `Act 1 H2H A`) | §10.6 |
 | P `uniqueitems.bin` record 5, after fix-up | u16 +0x00 = 5 (file: 0) | `fixups.md` §6 |
 | an archive set (or test lookup stub) in which `runessrv.txt` resolves | load error before `runes` | §3.3 |
@@ -935,6 +949,14 @@ the 1.14d data files. Addresses are virtual addresses in `Game.exe`.
     (`0x0057E53B`) or constants. Whether the level + 1 caller can run at
     level MaxLvl (row MaxLvl + 2, past 1.14d's 101 rows) is not traced;
     `arena`, `composit`, `armtype` still open.
+    *Answered* (static, 2026-10-08): the level + 1 caller (`0x0058C5C0`)
+    first compares the unit's level (stat 12, `0x00625480`) with its
+    class's MaxLvl (`0x00611830`) and skips the call when level ≥ MaxLvl
+    (signed, `0x0058C61E` / `0x0058C624`), so it reads at most row
+    MaxLvl + 1 (`threshold` row index L + 1, `0x00611814`). The highest
+    row is MaxLvl + 1 for both readers: `experience` needs
+    max(MaxLvl) + 2 rows. Limits of `arena`, `composit`, `armtype`:
+    §10.8.
 13. Answered: the §7.4 algorithms are `fixups.md` and `runtime-maps.md`,
     which also cover the further maps found in the loaders (states,
     montype, monseq, monpreset, hireling, leveldefs, lvlsub, items; a

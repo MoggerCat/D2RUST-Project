@@ -30,18 +30,18 @@
 |   3. Main builder: line shapes | 145–314 |
 |   4. Name colour | 315–325 |
 |   5. Item name (`0x0048C060(I, buffer, max)`) | 326–368 |
-|   6. Property lines (`0x004E6410` → `0x004E60A0`) | 369–399 |
-|   7. One stat line (`0x004E4D80`) | 400–456 |
-|   8. Damage groups (`0x004E49C0`, `0x004E5A20`) | 457–474 |
-|   9. Set item tip (`0x0048D1D0`) | 475–513 |
-|   10. Other tips | 514–527 |
-|   11. Store lines (`0x0048CEA0`, `0x004B2AD0`) | 528–547 |
-| Constants & data dependencies | 548–568 |
-| Randomness | 569–572 |
-| Edge cases & original bugs | 573–593 |
-| Test vectors | 594–628 |
-| Provenance | 629–650 |
-| Open questions | 651–660 |
+|   6. Property lines (`0x004E6410` → `0x004E60A0`) | 369–420 |
+|   7. One stat line (`0x004E4D80`) | 421–477 |
+|   8. Damage groups (`0x004E49C0`, `0x004E5A20`) | 478–495 |
+|   9. Set item tip (`0x0048D1D0`) | 496–534 |
+|   10. Other tips | 535–548 |
+|   11. Store lines (`0x0048CEA0`, `0x004B2AD0`) | 549–568 |
+| Constants & data dependencies | 569–589 |
+| Randomness | 590–593 |
+| Edge cases & original bugs | 594–614 |
+| Test vectors | 615–649 |
+| Provenance | 650–675 |
+| Open questions | 676–687 |
 <!-- /index -->
 
 ## Summary
@@ -372,7 +372,28 @@ leaves a leading SP, §Edge cases).
 `0x004E60A0(I, T, size, undead 1, state 0, rune state 171, flags 0x40,
 multi)` and appends it to out:
 
-1. Primary type 11 (`elix`) → `0x004E5E90` (Open question 1).
+1. Primary type 11 (`elix`, `0x0062B400`) → T is built by
+   `0x004E5E90(I, T)` instead, and rules 2–6 do not run (rule 7 does).
+   Table `0x0072D6C0`: 6 entries of 16 bytes (count `[0x0072D720]`):
+   stat, kind, string id, mode = (0, 1, 3498 `Elixir of Strength`, 2),
+   (1, 1, 3500 `Elixir of Energy`, 2), (2, 1, 3499 `Elixir of
+   Dexterity`, 2), (3, 1, 3501 `Elixir of Vitality`, 2), (9, 1, 3502
+   `Elixir of Mana`, 2), (7, 1, 3503 `Elixir of Life`, 2) (the string
+   is stored twice, for v > 0 and v < 0; both are equal). For each
+   entry in order whose stat = I's file index (item data +0x28,
+   `0x00629DA0`):
+   - v := I's stat 71 (`value`, layer 0, `0x00625480`); for entry stat
+     6–11 v >>= 8 (arithmetic; here stats 7 and 9). v = 0 → next entry.
+   - N := `%i` of v (`0x00413A40`, 10-byte buffer), widened to at most
+     8 units (`0x00526320`, limit 9).
+   - kind ≠ 1 → fatal (`0x004E6079`, error 0x141); mode ≠ 2 → fatal
+     (error 0x13D). Every 1.14d entry passes both.
+   - Line := the entry's string + SP (3995) + (`+` (4002) when v > 0) +
+     N + NL (3998), appended to T.
+   T starts empty, so with no matching entry or v = 0, T is empty. 1.14d:
+   only the `elixir` misc row is type 11; creation gives it a file index
+   from the same six stats and its `value` (`items/generation.md` §5.2).
+   Example: file index 7, stat 71 = 512 → `Elixir of Life +2` + LF.
 2. The shown list L = sum of: I's list of state 0 with flags 0x40
    (`0x006257D0`), I's list of state 171 (runeword list,
    `items/properties.md` §10) and, for each filler in I's inventory, its
@@ -645,13 +666,19 @@ the image: quality colours `0x0048EDD8`, gamble class `0x0048ED98` /
 / `0x00486578` / `0x00486584`. String ids resolved against the 1.14d ENG
 tables (Patch_D2 `patchstring.tbl` 1,179 entries). Data counts from patch
 `itemstatcost.txt`, `setitems.txt` (add func 2: 82 rows, 1: 1, empty: 45),
-`misc.txt` (one `elix` row, no `Transmogrify`). D2MOO has no D2Client
-item text; nothing here comes from it.
+`misc.txt` (one `elix` row, no `Transmogrify`). Elixir text (§6 r1,
+2026-10-08): `0x004E60DC` type test, `0x004E5E90`, table `0x0072D6C0` /
+count `0x0072D720` and format `%i` `0x006D6454` read from the image,
+string ids 3498–3503, 3995, 3998, 4002 from `d2data.mpq` ENG
+`string.tbl`. D2MOO has no D2Client item text; nothing here comes from
+it.
 
 ## Open questions
 
 1. `0x004E5E90` (primary type 11 `elix` property text) is not specified;
    only the unused `elixir` misc row reaches it.
+   *Answered* (static, 2026-10-08): §6 r1. Strings read from the 1.14d
+   ENG `string.tbl` (`d2data.mpq`).
 2. Whether the leading / trailing SP of §Edge cases 2 shifts the centred
    line by half a space in the capture (expected yes).
 3. Pop-up placement and box drawing of `0x00502280` belong to the pop-up
