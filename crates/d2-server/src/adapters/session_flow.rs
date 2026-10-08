@@ -1,4 +1,4 @@
-// Spec: specs/sim/intents-events.md §2.5, §8.1, §8.2; specs/sim/path-placement.md §13 rule 2
+// Spec: specs/sim/intents-events.md §2.5, §8.1, §8.2; specs/sim/path-placement.md §13 rule 2; specs/flows/save-exit.md §2; specs/formats/d2s.md §2.4 r5
 //! The single-player session sequence on the host's drain
 //! (`intents-events.md` §8): C→S 0x67 (game creation, `0x0052C330` →
 //! `0x00530BF0`) and C→S 0x6B (join, `0x0052C550` → `0x00530190`), both
@@ -51,8 +51,10 @@ use d2_sim::units::lists::client_state;
 use d2_sim::units::messages as msg;
 use d2_sim::units::UnitId;
 
+use super::handlers::player::HotKey;
 use super::handlers::world::ActionEvents;
 use super::session::{enter_game, Entry, GameSetup, JoinError};
+use super::storage::SaveFault;
 use super::SimGame;
 use crate::buffers::QueueError;
 use crate::seams::{ClientId, MessageSink};
@@ -135,8 +137,11 @@ pub enum SessionFault {
     /// A message could not be queued.
     Queue(QueueError),
     /// §2.5 rule 2: the leave's character save (`0x00532400`) of this
-    /// client's player has no writer in d2rs.
+    /// client's player ran with no storage installed
+    /// ([`SimGame::set_storage`]).
     NotSaved,
+    /// §2.5 rule 2: the character storage refused the save.
+    SaveFailed(String),
     /// §2.5 table: 0x6C with total ≥ 0x2000 (fatal assert).
     UploadTotal(u32),
     /// §2.5 rule 4: count + len > total (fatal 0xB2F).
@@ -376,9 +381,11 @@ impl<D: ActionEvents, W> SessionFlow<D, W> {
         if s.game.lists.client(id).map(|e| e.state) != Some(client_state::IN_GAME) {
             return false;
         }
-        for c in s.client_list() {
-            if s.player_of(c).is_some() {
-                self.faults.push((c, SessionFault::NotSaved));
+        for (c, r) in s.save_characters() {
+            match r {
+                Ok(()) => {}
+                Err(SaveFault::NoStorage) => self.faults.push((c, SessionFault::NotSaved)),
+                Err(SaveFault::Failed(e)) => self.faults.push((c, SessionFault::SaveFailed(e))),
             }
         }
         let mut sent = out.queue(client, &[0x05]);
@@ -516,6 +523,20 @@ impl<D: ActionEvents, W> SessionFlow<D, W> {
         };
         if let Some(e) = s.game.lists.client_mut(id) {
             e.player = Some(loaded.player);
+        }
+        // The load writes the client's hot-key slots (`formats/d2s.md`
+        // §2.4 rules 5–6, `0x0056A283`): the slots the save reads back and
+        // C→S 0x51 changes (`intents-events.md` §9 rule 12). Unbound slots
+        // (skill −1) stay as a new record holds them.
+        for (slot, k) in loaded.entry.hotkeys.iter().enumerate() {
+            if k.skill >= 0 {
+                let key = HotKey {
+                    skill: k.skill,
+                    left: k.flag,
+                    item: k.item,
+                };
+                s.set_hotkey(client, slot, key);
+            }
         }
         match enter_game(s, client, &loaded.entry) {
             Ok(p) => Some(p),
