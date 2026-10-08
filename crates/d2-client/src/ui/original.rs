@@ -37,8 +37,8 @@ use std::rc::Rc;
 use d2_formats::font::FontTable;
 
 use super::draw::UiDrawSink;
-use super::item_tip;
 use super::geom::{Point, Rect};
+use super::item_tip;
 use super::layout::{LayoutError, PanelKey, RowKind, Screen};
 use super::panel::{ActionId, Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
 use super::panels::border::draw_border_and_ctrlpnl;
@@ -1082,7 +1082,14 @@ impl Panel for BorderUi {
                 sh.mouse,
             );
             let (w, h) = (sh.config.screen.w, sh.config.screen.h);
-            item_tip::draw_tip(&lines, sh.mouse, (w, h), sh.fonts.as_ref(), &sh.tables.files, out);
+            item_tip::draw_tip(
+                &lines,
+                sh.mouse,
+                (w, h),
+                sh.fonts.as_ref(),
+                &sh.tables.files,
+                out,
+            );
         }
     }
 

@@ -421,9 +421,9 @@ impl ItemsUi {
             GridMsg::ToBelt { item } => Some(ClientIntent::from_message(
                 &d2_proto::client::ItemToBeltShift { item },
             )),
-            GridMsg::TargetUsed { target, used } => Some(ClientIntent::from_message(
-                &self.target_used(target, used),
-            )),
+            GridMsg::TargetUsed { target, used } => {
+                Some(ClientIntent::from_message(&self.target_used(target, used)))
+            }
             // Not produced by the facts above (no stack / socket / scroll
             // / cube / shop facts in the preview).
             _ => None,

@@ -87,13 +87,7 @@ impl ItemsUi {
 
     /// A right press in the panel: an identify item in the grid becomes
     /// the used item (cursor state 6); while the state is set it cancels.
-    pub fn right_press(
-        &self,
-        world: &ClientWorld,
-        files: &UiFiles,
-        layout: &InvLayout,
-        at: Point,
-    ) {
+    pub fn right_press(&self, world: &ClientWorld, files: &UiFiles, layout: &InvLayout, at: Point) {
         if self.identify.get().is_some() {
             self.identify.set(None);
             return;

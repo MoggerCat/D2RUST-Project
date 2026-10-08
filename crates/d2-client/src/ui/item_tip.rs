@@ -311,7 +311,10 @@ impl ItemTips {
             ));
         }
         if let (Some(m), Some(d)) = (b.max_durability, b.durability) {
-            let (m, d) = (m.raw.saturating_sub(m.save_add), d.raw.saturating_sub(d.save_add));
+            let (m, d) = (
+                m.raw.saturating_sub(m.save_add),
+                d.raw.saturating_sub(d.save_add),
+            );
             if m > 0 {
                 out.push(TipLine::new(
                     format!("Durability: {d} of {m}"),
@@ -350,11 +353,7 @@ impl ItemTips {
                 .filter_map(|s| self.property(s))
                 .collect();
             props.sort_by(|a, b| b.0.cmp(&a.0));
-            out.extend(
-                props
-                    .into_iter()
-                    .map(|(_, t)| TipLine::new(t, color::BLUE)),
-            );
+            out.extend(props.into_iter().map(|(_, t)| TipLine::new(t, color::BLUE)));
         }
         out
     }
@@ -425,10 +424,7 @@ pub fn draw_tip(
                 let cw = (x + w - tx).min(tw);
                 let ch = (y + h - ty).min(th);
                 out.push(UiDraw::Image(ImageRequest {
-                    image: ImageRef {
-                        file,
-                        frame: DARK,
-                    },
+                    image: ImageRef { file, frame: DARK },
                     at: Point::new(tx, ty),
                     clip: Rect::new(tx, ty, cw as u16, ch as u16),
                 }));
@@ -616,7 +612,14 @@ mod tests {
         let lines = tips().lines_of(&magic_cap(hflag::IDENTIFIED));
         let files = UiFiles::new(&[]);
         let mut out: Vec<UiDraw> = Vec::new();
-        draw_tip(&lines, Point::new(790, 5), (800, 600), None, &files, &mut out);
+        draw_tip(
+            &lines,
+            Point::new(790, 5),
+            (800, 600),
+            None,
+            &files,
+            &mut out,
+        );
         let texts: Vec<&TextRequest> = out
             .iter()
             .filter_map(|d| match d {
