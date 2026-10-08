@@ -438,7 +438,13 @@ fn play(o: Options) -> Result<()> {
             .save_dir
             .clone()
             .unwrap_or_else(d2_client::app::save::default_save_dir);
-        let host = FrontHost::new(expansion, Box::new(DirSaves(saves)), art, first);
+        let host = FrontHost::with_save_dir(
+            expansion,
+            Box::new(DirSaves(saves.clone())),
+            art,
+            first,
+            Some(saves),
+        );
         first = false;
         match run_front_end(host) {
             Outcome::Exit => return Ok(()),

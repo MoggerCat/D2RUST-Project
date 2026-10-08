@@ -15,7 +15,8 @@
 use crate::ui::front_end::control::{vk, Action, Control, ControlKind};
 use crate::ui::front_end::flow::Trigger;
 use crate::ui::front_end::screen::{FrontCtx, Screen};
-use crate::ui::front_end::{Registry, CREDITS};
+use crate::ui::front_end::{DrawItem, Registry, CREDITS};
+use crate::ui::geom::Point;
 
 /// Blank rows before the first line and before "The End" (C4 r3).
 const LEAD_BLANKS: usize = 50;
@@ -272,7 +273,7 @@ pub fn layout(
 /// archive reader (`Credits.txt` / `ExpansionCredits.txt`, C4 r1).
 pub type TextSource = Box<dyn Fn(bool) -> Option<Vec<u8>>>;
 
-fn loose_file(expansion: bool) -> Option<Vec<u8>> {
+pub fn loose_file(expansion: bool) -> Option<Vec<u8>> {
     let dir = std::env::var_os("D2_GAME_DIR")?;
     let name = if expansion {
         "ExpansionCredits.txt"
@@ -351,6 +352,20 @@ impl Screen for CreditsScreen {
             col(xb),
             col(xc),
         ]
+    }
+
+    fn overlay(&mut self, _now_ms: u64, adv: &dyn Fn(u16, &[u16]) -> i32) -> Vec<DrawItem> {
+        // d2rs-own, unverified: the colour `k` of a row is not carried by
+        // `DrawItem::Text` yet (REC-231).
+        self.visible_rows(&|t| adv(FONT, t))
+            .into_iter()
+            .map(|r| DrawItem::Text {
+                string_id: 0,
+                text: String::from_utf16_lossy(&r.text),
+                font: FONT,
+                at: Point::new(r.x, r.y),
+            })
+            .collect()
     }
 
     fn tick(&mut self, _ctx: &mut FrontCtx) -> Option<Trigger> {

@@ -19,7 +19,8 @@ use std::rc::Rc;
 use crate::ui::front_end::control::{vk, Action, Control, ControlKind};
 use crate::ui::front_end::flow::Trigger;
 use crate::ui::front_end::screen::{FrontCtx, Screen};
-use crate::ui::front_end::{Registry, CHAR_CREATE};
+use crate::ui::front_end::{DrawItem, Registry, CHAR_CREATE};
+use crate::ui::geom::Point;
 
 /// Creation flag bits `[+0x1EF]` (§F3.5).
 pub const FLAG_HARDCORE: u8 = 0x04;
@@ -545,6 +546,21 @@ pub struct CreateScreen {
     state: Option<CreateState>,
     taken: TakenFn,
     sink: NewCharacterSink,
+    /// Indices into the built control list, for [`Screen::sync`].
+    idx: Idx,
+    /// Pointer seen: the heroes follow it (else the legacy click rule).
+    under: Option<Option<Class>>,
+}
+
+/// Control positions in the built list that change with the state.
+#[derive(Default)]
+struct Idx {
+    name_box: Vec<usize>,
+    hardcore: Vec<usize>,
+    expansion: Vec<usize>,
+    grey: Vec<usize>,
+    ok: Option<usize>,
+    warn: Vec<usize>,
 }
 
 impl CreateScreen {
@@ -553,6 +569,8 @@ impl CreateScreen {
             state: None,
             taken,
             sink,
+            idx: Idx::default(),
+            under: None,
         }
     }
 
@@ -567,6 +585,8 @@ const BG_EXP: &str = "FrontEnd\\charactercreationscreenEXP";
 impl Screen for CreateScreen {
     fn build(&mut self, ctx: &mut FrontCtx) -> Vec<Control> {
         let st = CreateState::new(ctx.expansion, ctx.now_ms);
+        self.under = None;
+        self.idx = Idx::default();
         let mut v = vec![
             Control::new(ControlKind::Image, 0, 599, 800, 600).with_art(if ctx.expansion {
                 BG_EXP
@@ -589,11 +609,13 @@ impl Screen for CreateScreen {
                 e
             },
         ];
+        self.idx.name_box = vec![v.len() - 3, v.len() - 2, v.len() - 1];
         let (hx, hy, lx, ly) = if ctx.expansion {
             (319, 560, 339, 581)
         } else {
             (319, 540, 339, 561)
         };
+        self.idx.hardcore = vec![v.len(), v.len() + 1];
         v.push(
             Control::new(ControlKind::Button, hx, hy, 15, 16)
                 .with_art("FrontEnd\\clickbox")
@@ -601,6 +623,8 @@ impl Screen for CreateScreen {
         );
         v.push(Control::new(ControlKind::Text, lx, ly, 100, 32).with_string(5126));
         if ctx.expansion {
+            self.idx.expansion = vec![v.len(), v.len() + 1];
+            self.idx.grey = vec![v.len() + 2];
             v.push(
                 Control::new(ControlKind::Button, 319, 540, 15, 16)
                     .with_art("FrontEnd\\clickbox")
@@ -612,6 +636,7 @@ impl Screen for CreateScreen {
                     .with_art("FrontEnd\\joingameclickboxgrey"),
             );
         }
+        self.idx.ok = Some(v.len());
         v.push(
             Control::new(ControlKind::Button, 627, 572, 128, 35)
                 .with_art("FrontEnd\\MediumSelButtonBlank")
@@ -626,9 +651,10 @@ impl Screen for CreateScreen {
         };
         let slots: &[Slot] = if ctx.expansion { &EXPANSION } else { &CLASSIC };
         for &(class, x, y) in slots {
+            // Drawn by `overlay` (state-dependent file and frame); the
+            // control only takes the click.
             v.push(
-                Control::new(ControlKind::AnimImage, x, y, HERO_W, HERO_H)
-                    .with_art(anim_file(class, IDLE))
+                Control::new(ControlKind::Image, x, y, HERO_W, HERO_H)
                     .with_action(Action::Custom(act::CLASS + u32::from(class.id()))),
             );
         }
@@ -637,6 +663,20 @@ impl Screen for CreateScreen {
             vk::BACKSPACE,
             Action::Custom(act::BACKSPACE),
         ));
+        // Hardcore warning (5303): YES / NO, shown while it is up.
+        self.idx.warn = vec![v.len(), v.len() + 1];
+        v.push(
+            Control::new(ControlKind::Button, 270, 400, 128, 35)
+                .with_art("FrontEnd\\MediumSelButtonBlank")
+                .with_string(5166)
+                .with_action(Action::Custom(act::WARN_OK)),
+        );
+        v.push(
+            Control::new(ControlKind::Button, 410, 400, 128, 35)
+                .with_art("FrontEnd\\MediumSelButtonBlank")
+                .with_string(5167)
+                .with_action(Action::Custom(act::WARN_CANCEL)),
+        );
         self.state = Some(st);
         v
     }
@@ -680,14 +720,144 @@ impl Screen for CreateScreen {
     }
 
     fn tick(&mut self, ctx: &mut FrontCtx) -> Option<Trigger> {
-        // No pointer position reaches a screen yet: heroes keep their state
-        // and only the walks advance (hover is `CreateState::hover/update`).
         let st = self.state.as_mut()?;
-        for h in &mut st.heroes {
-            let inside = h.state == HOVER;
-            h.update(inside, ctx.now_ms);
+        match self.under {
+            // The pointer is known: `CreateState::update` (§F3.3 r4).
+            Some(under) => st.update(under, ctx.now_ms),
+            // No pointer yet: heroes keep their state and only the walks
+            // advance.
+            None => {
+                for h in &mut st.heroes {
+                    let inside = h.state == HOVER;
+                    h.update(inside, ctx.now_ms);
+                }
+            }
         }
         None
+    }
+
+    fn pointer(&mut self, ctx: &mut FrontCtx, p: Point) {
+        let slots: &[Slot] = if ctx.expansion { &EXPANSION } else { &CLASSIC };
+        // The 88×184 descriptor box, bottom-left at (x, y) (REC-181).
+        let under = slots
+            .iter()
+            .rev()
+            .find(|&&(_, x, y)| {
+                p.x >= x && p.x < x + i32::from(HERO_W) && p.y <= y && p.y > y - i32::from(HERO_H)
+            })
+            .map(|s| s.0);
+        self.under = Some(under);
+        if let Some(st) = self.state.as_mut() {
+            st.hover(under);
+        }
+    }
+
+    fn overlay(&mut self, now_ms: u64, _adv: &dyn Fn(u16, &[u16]) -> i32) -> Vec<DrawItem> {
+        let Some(st) = self.state.as_ref() else {
+            return Vec::new();
+        };
+        let slots: &[Slot] = if st.expansion_installed {
+            &EXPANSION
+        } else {
+            &CLASSIC
+        };
+        let mut out = Vec::new();
+        for &(class, x, y) in slots {
+            if let Some((state, frame)) = st.hero_frame(class, now_ms) {
+                out.push(DrawItem::Art {
+                    file: anim_file(class, state),
+                    frame,
+                    at: Point::new(x, y),
+                });
+            }
+        }
+        // Hover / selection texts (197 name, 198 description).
+        if let Some(((name, desc), _)) = st.texts() {
+            for (id, at) in [(name, Point::new(0, 180)), (desc, Point::new(250, 210))] {
+                out.push(DrawItem::Text {
+                    string_id: id,
+                    text: String::new(),
+                    font: 1,
+                    at,
+                });
+            }
+        }
+        // Check marks of the boxes.
+        for (on, bx, by) in [
+            (
+                st.flags & FLAG_HARDCORE != 0,
+                319,
+                if st.expansion_installed { 560 } else { 540 },
+            ),
+            (
+                st.flags & FLAG_EXPANSION != 0 && st.expansion_box_visible(),
+                319,
+                540,
+            ),
+        ] {
+            if on {
+                out.push(DrawItem::Art {
+                    file: "FrontEnd\\clickbox",
+                    frame: 1,
+                    at: Point::new(bx, by),
+                });
+            }
+        }
+        if st.name_box_visible() {
+            // d2rs-own, unverified: the caret is a trailing `_`.
+            out.push(DrawItem::Text {
+                string_id: 0,
+                text: format!(
+                    "{}{}",
+                    st.name,
+                    if (now_ms / 400).is_multiple_of(2) {
+                        "_"
+                    } else {
+                        ""
+                    }
+                ),
+                font: 5,
+                at: Point::new(322, 510),
+            });
+        }
+        let popup = if st.warning {
+            Some(STR_HARDCORE_WARNING)
+        } else if st.name_taken {
+            Some(STR_NAME_TAKEN)
+        } else {
+            None
+        };
+        if let Some(id) = popup {
+            out.push(DrawItem::Text {
+                string_id: id,
+                text: String::new(),
+                font: 1,
+                at: Point::new(270, 360),
+            });
+        }
+        out
+    }
+
+    fn sync(&mut self, controls: &mut [Control]) {
+        let Some(st) = self.state.as_ref() else {
+            return;
+        };
+        let show = |controls: &mut [Control], ix: &[usize], on: bool| {
+            for &i in ix {
+                if let Some(c) = controls.get_mut(i) {
+                    c.visible = on;
+                }
+            }
+        };
+        show(controls, &self.idx.name_box, st.name_box_visible());
+        show(controls, &self.idx.hardcore, st.hardcore_visible());
+        show(controls, &self.idx.expansion, st.expansion_box_visible());
+        show(controls, &self.idx.grey, st.expansion_grey_visible());
+        show(controls, &self.idx.warn, st.warning);
+        if let Some(c) = self.idx.ok.and_then(|i| controls.get_mut(i)) {
+            c.visible = st.name_box_visible();
+            c.enabled = st.ok_enabled();
+        }
     }
 
     fn char(&mut self, _ctx: &mut FrontCtx, unit: u16) {

@@ -8,7 +8,8 @@ use std::collections::BTreeMap;
 
 use super::control::{vk, Action, Control};
 use super::flow::{FlowCtx, Trigger};
-use super::ScreenId;
+use super::{DrawItem, ScreenId};
+use crate::ui::geom::Point;
 
 /// What a screen may read and change while it runs.
 pub struct FrontCtx<'a> {
@@ -41,6 +42,29 @@ pub trait Screen {
 
     /// A character typed (UTF-16 unit) while the screen is current.
     fn char(&mut self, _ctx: &mut FrontCtx, _unit: u16) {}
+
+    /// The pointer moved (800×600 frame coordinates).
+    fn pointer(&mut self, _ctx: &mut FrontCtx, _p: Point) {}
+
+    /// Mouse wheel, `delta` in units of 120 per notch.
+    fn wheel(&mut self, _ctx: &mut FrontCtx, _delta: i32) {}
+
+    /// A key went up (virtual-key code).
+    fn key_up(&mut self, _ctx: &mut FrontCtx, _vk: u16) {}
+
+    /// The middle mouse button went down.
+    fn middle_down(&mut self, _ctx: &mut FrontCtx) {}
+
+    /// Items drawn after the controls: per-tick content the control list
+    /// cannot hold (scrolling text, animated heroes). `adv` = text width in
+    /// a font.
+    fn overlay(&mut self, _now_ms: u64, _adv: &dyn Fn(u16, &[u16]) -> i32) -> Vec<DrawItem> {
+        Vec::new()
+    }
+
+    /// Adjust the controls to the screen's state (after build and every
+    /// tick): show / hide / enable.
+    fn sync(&mut self, _controls: &mut [Control]) {}
 
     /// Whether entering the screen loads the sky palette (§F1.6 r1:
     /// screens built through `0x0043C4F0`). The character screens draw

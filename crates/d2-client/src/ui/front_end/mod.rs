@@ -64,6 +64,12 @@ pub enum FrontInput {
     Key(u16),
     /// A typed UTF-16 unit.
     Char(u16),
+    /// Key-up, a virtual-key code.
+    KeyUp(u16),
+    /// Mouse wheel (120 per notch, positive away from the user).
+    Wheel(i32),
+    /// Middle button down.
+    Middle,
 }
 
 /// Whether the Save folder holds a character (`0x00430BC0`, §F2.2).
@@ -95,6 +101,10 @@ pub enum DrawItem {
         font: u16,
         at: Point,
     },
+    /// A dark filled box (menu panels).
+    Rect { at: Point, w: i32, h: i32 },
+    /// A box outline.
+    Border { at: Point, w: i32, h: i32 },
 }
 
 pub struct FrontEnd {
@@ -106,6 +116,7 @@ pub struct FrontEnd {
     /// Build time (ms) of each control, for timers and animation.
     built_ms: u64,
     pressed: Option<usize>,
+    pointer: Option<Point>,
     pending: Vec<FrontInput>,
     flow: FlowCtx,
     tick: u64,
@@ -129,6 +140,7 @@ impl FrontEnd {
             controls: Vec::new(),
             built_ms: 0,
             pressed: None,
+            pointer: None,
             pending: Vec::new(),
             flow: FlowCtx::default(),
             tick: 0,
@@ -220,6 +232,7 @@ impl FrontEnd {
                 break;
             }
             self.handle(ev);
+            self.registry.get_mut(self.current).sync(&mut self.controls);
         }
         self.run_timers();
         if self.outcome.is_none() {
@@ -231,6 +244,7 @@ impl FrontEnd {
             if let Some(t) = self.registry.get_mut(self.current).tick(&mut ctx) {
                 self.trigger(t);
             }
+            self.registry.get_mut(self.current).sync(&mut self.controls);
         }
     }
 
@@ -252,6 +266,12 @@ impl FrontEnd {
         }
     }
 
+    /// Jump to a screen without the flow (hosts and tests; screens the flow
+    /// table does not reach yet, such as Configure Controls).
+    pub fn goto(&mut self, id: ScreenId) {
+        self.enter(id);
+    }
+
     fn enter(&mut self, id: ScreenId) {
         self.current = id;
         self.pressed = None;
@@ -263,6 +283,7 @@ impl FrontEnd {
             now_ms: self.built_ms,
         };
         self.controls = screen.build(&mut ctx);
+        screen.sync(&mut self.controls);
         if screen.loads_sky_palette() {
             self.palette = Some(SKY_PALETTE);
         }
@@ -286,6 +307,11 @@ impl FrontEnd {
         }
     }
 
+    /// The pointer's last position (800×600), if it was seen.
+    pub fn pointer(&self) -> Option<Point> {
+        self.pointer
+    }
+
     /// The topmost clickable control under `p`.
     fn hit(&self, p: Point) -> Option<usize> {
         self.controls.iter().rposition(|c| {
@@ -302,7 +328,39 @@ impl FrontEnd {
 
     fn handle(&mut self, ev: FrontInput) {
         match ev {
-            FrontInput::Move(_) => {}
+            FrontInput::Move(p) => {
+                self.pointer = Some(p);
+                let mut ctx = FrontCtx {
+                    expansion: self.expansion,
+                    flow: &mut self.flow,
+                    now_ms: self.tick * TICK_MS,
+                };
+                self.registry.get_mut(self.current).pointer(&mut ctx, p);
+            }
+            FrontInput::Wheel(d) => {
+                let mut ctx = FrontCtx {
+                    expansion: self.expansion,
+                    flow: &mut self.flow,
+                    now_ms: self.tick * TICK_MS,
+                };
+                self.registry.get_mut(self.current).wheel(&mut ctx, d);
+            }
+            FrontInput::KeyUp(k) => {
+                let mut ctx = FrontCtx {
+                    expansion: self.expansion,
+                    flow: &mut self.flow,
+                    now_ms: self.tick * TICK_MS,
+                };
+                self.registry.get_mut(self.current).key_up(&mut ctx, k);
+            }
+            FrontInput::Middle => {
+                let mut ctx = FrontCtx {
+                    expansion: self.expansion,
+                    flow: &mut self.flow,
+                    now_ms: self.tick * TICK_MS,
+                };
+                self.registry.get_mut(self.current).middle_down(&mut ctx);
+            }
             FrontInput::Down(p) => self.pressed = self.hit(p),
             // PROVISIONAL (REC-168): a click fires on button-up over the
             // control that took the button-down.
@@ -349,6 +407,13 @@ impl FrontEnd {
         if let Some(a) = due {
             self.fire(a);
         }
+    }
+
+    /// The current screen's per-tick items (credits rows, hero frames, ...),
+    /// drawn after [`FrontEnd::draw`]. `adv`: text width in a font.
+    pub fn overlay(&mut self, adv: &dyn Fn(u16, &[u16]) -> i32) -> Vec<DrawItem> {
+        let now = self.now_ms();
+        self.registry.get_mut(self.current).overlay(now, adv)
     }
 
     /// The frame's draw items, in creation order.

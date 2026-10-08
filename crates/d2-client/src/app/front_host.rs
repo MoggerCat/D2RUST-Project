@@ -14,10 +14,12 @@
 //! screens do not yet report a choice).
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use bevy::asset::RenderAssetUsages;
 use bevy::input::keyboard::KeyboardInput;
+use bevy::input::mouse::MouseWheel;
 use bevy::input::ButtonState;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
@@ -25,9 +27,11 @@ use d2_formats::dc6::Dc6;
 use d2_formats::palette::Palette;
 
 use crate::assets::path::FileSource;
+use crate::ui::front_end::screens::create::{self, name_taken_in, NewCharacter, NewCharacterSink};
+use crate::ui::front_end::screens::{char_select, credits, register_all};
 use crate::ui::front_end::startup::{MemProgress, StubVideo};
 use crate::ui::front_end::{
-    DrawItem, FrontEnd, FrontInput, Outcome, SaveFolder, SKY_PALETTE, TICK_MS,
+    DrawItem, FrontEnd, FrontInput, Outcome, Registry, SaveFolder, SKY_PALETTE, TICK_MS,
 };
 use crate::ui::geom::Point;
 
@@ -121,6 +125,24 @@ pub fn compose(items: &[DrawItem], art: Option<&mut FrontArt>) -> Vec<u8> {
                     }
                 }
             }
+            // d2rs-own, unverified (REC-231): a dark box and a 1 px outline.
+            DrawItem::Rect { at, w, h } => {
+                for y in at.y..at.y + h {
+                    for x in at.x..at.x + w {
+                        put(x, y, [8, 8, 12]);
+                    }
+                }
+            }
+            DrawItem::Border { at, w, h } => {
+                for x in at.x..at.x + w {
+                    put(x, at.y, [120, 100, 60]);
+                    put(x, at.y + h - 1, [120, 100, 60]);
+                }
+                for y in at.y..at.y + h {
+                    put(at.x, y, [120, 100, 60]);
+                    put(at.x + w - 1, y, [120, 100, 60]);
+                }
+            }
             // PROVISIONAL (REC-178): no glyphs yet; a bar marks the text.
             DrawItem::Text { at, .. } => {
                 for x in 0..24 {
@@ -142,6 +164,82 @@ pub struct FrontHost {
     /// Set when the flow ended.
     pub outcome: Option<Outcome>,
     pub frames: u32,
+    /// Where the create screen leaves its choice.
+    sink: NewCharacterSink,
+    /// The Save folder (new characters are written here).
+    save_dir: Option<PathBuf>,
+    /// The stub `.d2s` written for the last created character, or why not.
+    pub created: Option<Result<PathBuf, String>>,
+}
+
+/// `// d2rs-own, unverified` (REC-231): until the glyph path (q-fe-draw)
+/// lands, a fixed advance of 8 per unit stands for the font's.
+pub fn provisional_adv(_font: u16, text: &[u16]) -> i32 {
+    8 * text.len() as i32
+}
+
+/// The screens with the host's data behind them: saved characters and the
+/// duplicate-name check from `save_dir`, the credits text from the archives.
+fn registry(save_dir: Option<&Path>, sink: NewCharacterSink, art: Option<&FrontArt>) -> Registry {
+    let mut reg = Registry::default();
+    register_all(&mut reg);
+    char_select::register_with(
+        &mut reg,
+        save_dir.map(Path::to_path_buf),
+        Arc::new(Mutex::new(None)),
+    );
+    let dir = save_dir.map(Path::to_path_buf);
+    create::register_with(
+        &mut reg,
+        sink,
+        Box::new(move |n| dir.as_deref().is_some_and(|d| name_taken_in(d, n))),
+    );
+    if let Some(src) = art.map(|a| a.source.clone()) {
+        credits::register_with(
+            &mut reg,
+            Box::new(move |expansion| {
+                let name = if expansion {
+                    "ExpansionCredits.txt"
+                } else {
+                    "Credits.txt"
+                };
+                // d2rs-own, unverified: loose file first, then the archives.
+                credits::loose_file(expansion)
+                    .or_else(|| src.read_file(&format!(r"data\local\ui\eng\{name}"))?.ok())
+            }),
+        );
+    }
+    reg
+}
+
+/// The 335-byte stub `.d2s` of a new character (`formats/d2s.md` §2.6),
+/// written to `<dir>/<name>.d2s`.
+pub fn write_stub(dir: &Path, c: &NewCharacter, time: u32) -> Result<PathBuf, String> {
+    use d2_formats::d2s::{self, D2s, SaveTables, StatSave};
+    // The stub has no body: no table is consulted.
+    struct NoTables;
+    impl SaveTables for NoTables {
+        fn stat_save(&self, _: u16) -> Option<StatSave> {
+            None
+        }
+        fn item_entry_len(&self, _: &[u8]) -> Result<usize, String> {
+            Err("stub has no items".into())
+        }
+    }
+    let mut flags = 0u16;
+    if c.hardcore {
+        flags |= d2s::status::HARDCORE;
+    }
+    if c.expansion {
+        flags |= d2s::status::EXPANSION;
+    }
+    let stub = D2s::new_stub(c.name.as_bytes(), c.class.id(), flags, time)
+        .ok_or_else(|| format!("name {:?} does not fit", c.name))?;
+    let bytes = d2s::write(&stub, &NoTables).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("{}.d2s", c.name));
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    Ok(path)
 }
 
 impl FrontHost {
@@ -153,9 +251,26 @@ impl FrontHost {
         art: Option<FrontArt>,
         first_entry: bool,
     ) -> Self {
-        let mut front = FrontEnd::with_screens(expansion, saves);
+        Self::with_save_dir(expansion, saves, art, first_entry, None)
+    }
+
+    /// As [`FrontHost::new`], with the Save folder behind the character
+    /// select and create screens.
+    pub fn with_save_dir(
+        expansion: bool,
+        saves: Box<dyn SaveFolder>,
+        art: Option<FrontArt>,
+        first_entry: bool,
+        save_dir: Option<PathBuf>,
+    ) -> Self {
+        let sink: NewCharacterSink = Default::default();
+        let reg = registry(save_dir.as_deref(), sink.clone(), art.as_ref());
+        let mut front = FrontEnd::new(expansion, saves, reg);
         front.start(first_entry, &mut MemProgress::default(), &mut StubVideo);
         Self {
+            sink,
+            save_dir,
+            created: None,
             front,
             art,
             acc_ms: 0,
@@ -163,6 +278,18 @@ impl FrontHost {
             outcome: None,
             frames: 0,
         }
+    }
+
+    /// The flow ended in a game load from character create: write the stub.
+    fn write_created(&mut self) {
+        let Some(c) = self.sink.borrow_mut().take() else {
+            return;
+        };
+        let time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs() as u32);
+        let dir = self.save_dir.clone().unwrap_or_default();
+        self.created = Some(write_stub(&dir, &c, time));
     }
 }
 
@@ -229,6 +356,7 @@ fn feed_input(
     windows: Query<&Window>,
     buttons: Option<Res<ButtonInput<MouseButton>>>,
     mut keys: MessageReader<KeyboardInput>,
+    mut wheel: MessageReader<MouseWheel>,
 ) {
     let at = windows.single().ok().and_then(|w| {
         Some(frame_point(
@@ -245,9 +373,20 @@ fn feed_input(
             if b.just_released(MouseButton::Left) {
                 host.front.input(FrontInput::Up(p));
             }
+            if b.just_pressed(MouseButton::Middle) {
+                host.front.input(FrontInput::Middle);
+            }
         }
     }
+    for w in wheel.read() {
+        host.front.input(FrontInput::Wheel((w.y * 120.0) as i32));
+    }
     for k in keys.read() {
+        if k.state == ButtonState::Released {
+            if let Some(code) = vk(k.key_code) {
+                host.front.input(FrontInput::KeyUp(code));
+            }
+        }
         if k.state == ButtonState::Pressed {
             if let Some(code) = vk(k.key_code) {
                 host.front.input(FrontInput::Key(code));
@@ -268,6 +407,9 @@ fn drive(mut host: NonSendMut<FrontHost>, time: Res<Time>) {
         host.acc_ms -= TICK_MS;
         host.front.tick();
         host.outcome = host.front.outcome();
+        if host.outcome.is_some() {
+            host.write_created();
+        }
     }
 }
 
@@ -279,6 +421,8 @@ fn draw(
     let host = &mut *host;
     host.frames += 1;
     host.drawn = host.front.draw();
+    let over = host.front.overlay(&provisional_adv);
+    host.drawn.extend(over);
     if let Some(img) = img {
         if let Some(mut i) = images.get_mut(&img.0) {
             i.data = Some(compose(&host.drawn, host.art.as_mut()));
