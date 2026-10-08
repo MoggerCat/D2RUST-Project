@@ -13,12 +13,12 @@
 //! (`0x00468830` is set by the use handler `0x005BF240`, unwritten), the
 //! state is client-local, and the belt is not hit-tested for the tip.
 
-use super::super::geom::Point;
-use super::super::item_tip::TipLine;
-use super::super::layout::Screen;
 use super::{InvLayout, ItemsUi};
 use crate::bridge::items::{self, mode, ItemView};
 use crate::bridge::world::ClientWorld;
+use crate::ui::geom::Point;
+use crate::ui::item_tip::TipLine;
+use crate::ui::layout::Screen;
 use crate::ui::panels::UiFiles;
 use d2_proto::client::UseItemAction;
 

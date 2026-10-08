@@ -27,6 +27,7 @@
 //! - affix, unique and set names are table indices as sent (prefix /
 //!   suffix id, file index) into the name tables, without the id offset
 //!   rules of `affixes.md`.
+//!
 //! Nothing here counts as done (rule 10).
 
 use std::collections::BTreeMap;
@@ -352,7 +353,7 @@ impl ItemTips {
                 .flatten()
                 .filter_map(|s| self.property(s))
                 .collect();
-            props.sort_by(|a, b| b.0.cmp(&a.0));
+            props.sort_by_key(|p| std::cmp::Reverse(p.0));
             out.extend(props.into_iter().map(|(_, t)| TipLine::new(t, color::BLUE)));
         }
         out

@@ -420,7 +420,7 @@ fn in_cell(c: i32, r: i32) -> Point {
     Point::new(100 + 29 * c + 5, 200 + 29 * r + 5)
 }
 
-// Covers: specs/ui/inventory.md §10 r1 (cursor state 6)
+// Covers: specs/ui/inventory.md §10 r1
 #[test]
 fn a_right_press_on_identify_then_a_grid_click_sends_0x27() {
     let (u, files) = ui();
