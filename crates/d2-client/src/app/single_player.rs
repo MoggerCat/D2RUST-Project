@@ -1470,8 +1470,8 @@ fn synthetic_drlg_data() -> DrlgData {
         synthetic_burial::BLOOD_MOOR_TO_BURIAL,
         synthetic_burial::BURIAL_TO_BLOOD_MOOR,
     ]);
-    ids.extend(synthetic_act4::on(0)..=synthetic_act4::LAST_WARP);
     ids.extend(synthetic_act2::FIRST_WARP..=synthetic_act2::last_warp());
+    ids.extend(synthetic_act4::first_warp()..=synthetic_act4::last_warp());
     drlg.warps = ids
         .iter()
         .map(|&id| WarpDef {

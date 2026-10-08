@@ -41,16 +41,23 @@ pub const IZUAL_XY: i32 = 8;
 /// class 409 is the highest Act IV class listed in the spec).
 pub const MONSTATS_ROWS: usize = 410;
 
-/// The `lvlwarp` `Id`s (= tile classes), after the Burial Grounds' 29 and
-/// 30: the way on from `LEVELS[i]` and the way back from `LEVELS[i + 1]`.
-pub const fn on(i: usize) -> u32 {
-    31 + 2 * i as u32
+/// The first `lvlwarp` `Id` (= tile class) of the line: right after Act
+/// II's dungeons (`synthetic_act2::last_warp`), which follow the Burial
+/// Grounds' 29 and 30.
+pub fn first_warp() -> u32 {
+    super::synthetic_act2::last_warp() + 1
 }
-pub const fn back(i: usize) -> u32 {
-    32 + 2 * i as u32
+/// The way on from `LEVELS[i]` and the way back from `LEVELS[i + 1]`.
+pub fn on(i: usize) -> u32 {
+    first_warp() + 2 * i as u32
+}
+pub fn back(i: usize) -> u32 {
+    on(i) + 1
 }
 /// The last synthetic warp id.
-pub const LAST_WARP: u32 = back(LEVELS.len() - 2);
+pub fn last_warp() -> u32 {
+    back(LEVELS.len() - 2)
+}
 /// Sub-tile of the way-back tile and of the way-on tile in a room.
 pub const BACK_XY: i32 = 20;
 pub const ON_XY: i32 = 30;
@@ -75,10 +82,10 @@ mod tests {
 
     #[test]
     fn the_line_links_are_a_chain() {
-        assert_eq!(links(103), Some((None, Some(31))));
+        assert_eq!(links(103), Some((None, Some(first_warp()))));
         assert_eq!(links(105), Some((Some(back(1)), Some(on(2)))));
-        assert_eq!(links(108), Some((Some(40), None)));
+        assert_eq!(links(108), Some((Some(last_warp()), None)));
         assert_eq!(links(7), None);
-        assert_eq!(LAST_WARP, 40);
+        assert_eq!(last_warp(), first_warp() + 9);
     }
 }

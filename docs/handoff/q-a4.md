@@ -9,8 +9,10 @@ Branch `claude/q-a4`. Nothing is verified against 1.14d (rule 10). Open point: R
 | Act index 3 in the synthetic game (`LevelSource.acts` is a `Vec`; live adds the Fortress as the act's town) | `app/single_player.rs` |
 | Fortress room: Tyrael, Jamella, Halbu, Cain and a waypoint (levels row `waypoint` 27) | `synthetic_act4.rs`; allocation next to Lut Gholein's |
 | NPC rows for the server's `interact_classes` and the client's unit rows | the one list `synthetic_npc_classes` (chained `synthetic_act4::NPCS`); `SYNTHETIC_MONSTATS` raised to 410 (Jamella is 405) |
-| Outer Steppes → Plains → City → River → Chaos Sanctuary as flat levels in a warp chain (lvlwarp 31–40, room flags, preset tiles) | `synthetic_act4.rs`, `Types`, `synthetic_drlg_data` |
+| Outer Steppes → Plains → City → River → Chaos Sanctuary as flat levels in a warp chain (lvlwarp ids after `synthetic_act2::last_warp()`, room flags, preset tiles) | `synthetic_act4.rs`, `Types`, `synthetic_drlg_data` |
 | Izual host-placed in the Plains, linked to chain 22; his kill reaches A4Q1 through `LocalSeams::kill_step` and the shared quest event path | `host_monster_created`, `synthetic_monstats` (killable) |
+
+Warp ids start after `synthetic_act2::last_warp()` (the coordinator's range rule). Act-generic host: `test-fixtures/src/act4.rs` (the Act IV set: 103 town, 104–106 outdoor via the real placer, 108 the A4C level) and `tests/act4_play.rs` (a `Session::new_in_act(.., 3)` walks Fortress → Outer Steppes → Plains → City of the Damned; Outer Steppes populated and the client told). Made-up data, no `Covers:` claim. The Chaos Sanctuary's generator (§10 stamps) is not walked by that test.
 
 Test: `crates/d2-client/tests/app_a4.rs` (NPCs and waypoint in the model, each NPC answers 0x28; warp line to the Plains, Izual's kill sets chain 22 to state 4; nothing rejected).
 
