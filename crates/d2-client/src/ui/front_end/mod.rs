@@ -13,6 +13,7 @@
 
 pub mod control;
 pub mod flow;
+pub mod glyphs;
 pub mod screen;
 pub mod screens;
 pub mod startup;
@@ -42,6 +43,21 @@ pub const SKY_PALETTE: [&str; 2] = [
 /// Logo frame (§F1.5 r3): `((now − created)/40) mod 29`; frame 29 is never shown.
 pub fn logo_frame(now_ms: u64, created_ms: u64) -> u32 {
     (now_ms.saturating_sub(created_ms) / 40 % 29) as u32
+}
+
+/// The create screen's fire cel (§F3.2): itself the additive layer.
+pub const FIRE: &str = r"FrontEnd\fire";
+/// Draw mode of every fire overlay (§F1.5 r2): additive.
+pub const FIRE_MODE: u8 = 3;
+
+/// The fire cel drawn additively over a logo half's black base (§F1.5 r1).
+/// // d2rs-own, unverified: file names (the base names are the main menu's).
+pub fn fire_overlay(base: &str) -> Option<&'static str> {
+    match base {
+        r"FrontEnd\BlackLeft" => Some(r"FrontEnd\FireLeft"),
+        r"FrontEnd\BlackRight" => Some(r"FrontEnd\FireRight"),
+        _ => None,
+    }
 }
 
 /// How the front end ended.
@@ -94,7 +110,27 @@ pub enum DrawItem {
         text: String,
         font: u16,
         at: Point,
+        /// A button label (§F1.1 r5): centered in the button, baseline
+        /// from its height; `None` for a plain text control.
+        label: Option<Label>,
     },
+    /// A blended layer: frame `frame` of `file` drawn with draw mode
+    /// `mode` (3 = additive) at (x, bottom y) plus the DC6 frame offsets
+    /// (§F1.5 r2): the logo and title fire.
+    Blend {
+        file: &'static str,
+        frame: u32,
+        at: Point,
+        mode: u8,
+    },
+}
+
+/// Where a button label sits (§F1.1 r5).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Label {
+    pub w: u16,
+    pub h: u16,
+    pub pressed: bool,
 }
 
 pub struct FrontEnd {
@@ -355,7 +391,8 @@ impl FrontEnd {
     pub fn draw(&self) -> Vec<DrawItem> {
         let mut out = Vec::new();
         let now = self.now_ms();
-        for c in self.controls.iter().filter(|c| c.visible) {
+        for (i, c) in self.controls.iter().enumerate().filter(|(_, c)| c.visible) {
+            let pressed = self.pressed == Some(i) && c.enabled;
             let at = Point::new(c.x, c.y);
             match c.kind {
                 ControlKind::Image => {
@@ -366,14 +403,31 @@ impl FrontEnd {
                 ControlKind::AnimImage => {
                     if let Some(file) = c.art {
                         let frame = logo_frame(now, self.built_ms);
-                        out.push(DrawItem::Art { file, frame, at });
+                        if file == FIRE {
+                            out.push(DrawItem::Blend {
+                                file,
+                                frame,
+                                at,
+                                mode: FIRE_MODE,
+                            });
+                        } else {
+                            out.push(DrawItem::Art { file, frame, at });
+                            if let Some(fire) = fire_overlay(file) {
+                                out.push(DrawItem::Blend {
+                                    file: fire,
+                                    frame,
+                                    at,
+                                    mode: FIRE_MODE,
+                                });
+                            }
+                        }
                     }
                 }
                 ControlKind::Button => {
                     if let Some(file) = c.art {
                         let tiles = control::button_tiles(c.w, c.h);
                         for t in 0..tiles {
-                            let frame = control::button_frame(t, tiles, false, c.enabled, false);
+                            let frame = control::button_frame(t, tiles, pressed, c.enabled, false);
                             out.push(DrawItem::Art { file, frame, at });
                         }
                     }
@@ -383,6 +437,11 @@ impl FrontEnd {
                             text: String::new(),
                             font: control::label_font(c.h),
                             at,
+                            label: Some(Label {
+                                w: c.w,
+                                h: c.h,
+                                pressed,
+                            }),
                         });
                     }
                 }
@@ -391,6 +450,7 @@ impl FrontEnd {
                     text: c.text.clone().unwrap_or_default(),
                     font: c.font,
                     at,
+                    label: None,
                 }),
                 ControlKind::EditBox | ControlKind::Timer => {}
             }
