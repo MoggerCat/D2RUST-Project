@@ -1,4 +1,4 @@
-// Spec: specs/sim/units.md §3, §4.1, §4.3, §4.5, §4.6, §5, §6; specs/monsters/init.md §5, §22; specs/monsters/umod-callbacks.md §2; specs/formats/animdata.md §3–§5; specs/sim/stat-lists.md §4, §8, §9; specs/monsters/ai.md §1; specs/missiles/missiles.md §R3
+// Spec: specs/formats/d2s.md §2.3; specs/combat/vitals.md §4.8 r1, §4.8 r2; specs/sim/units.md §3, §4.1, §4.3, §4.5, §4.6, §5, §6; specs/monsters/init.md §5, §22; specs/monsters/umod-callbacks.md §2; specs/formats/animdata.md §3–§5; specs/sim/stat-lists.md §4, §8, §9; specs/monsters/ai.md §1; specs/missiles/missiles.md §R3
 //! The unit side of the wiring: the unit hooks of [`ActionHooks`] (the
 //! missile class handler for missile events, the AI think and reset for
 //! monster events 2 and 10, the state-54 rule before a think is
@@ -31,6 +31,9 @@ use crate::units::{UnitId, UnitType};
 use super::combat::HIRELING_CLASSES;
 use super::monsters::umod_mode;
 use super::{ActionHooks, Pending, SkillEvent, View, WiringError};
+
+/// The client status word's dead bit (`formats/d2s.md` §2.3).
+pub const STATUS_DEAD: u16 = 0x08;
 
 /// Stat-list state of `justhit` (`missiles.md` §R5 step 6.1).
 pub const STATE_JUSTHIT: u16 = 86;
@@ -120,19 +123,25 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     }
     /// `0x00580EC0`: the death penalties at `0x00580F59`
     /// (`vitals.md` §4.6, [`super::death`]).
+    /// Then the client status bit 0x08 at `0x00580F83`, softcore too
+    /// (`formats/d2s.md` §2.3, `vitals.md` §4.8 rule 1.4).
     fn player_death(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         self.death_penalties(sim, unit);
+        sim.game.lists.set_player_status(unit, STATUS_DEAD);
     }
     /// `0x0057FCA0`: the corpse creation `0x0057F700` at `0x0057FD1C`
     /// (`vitals.md` §4.7 rule 1, [`super::death`]), then `0x00575BC0`
     /// at `0x0057FD25` in every game type (`hirelings-2.md` §15 rule 1):
     /// queued for the host that holds the hireling lists
     /// ([`ActionHooks::owner_deaths`]).
+    /// Then the client status bit 0x08 at `0x0057FD46` (`formats/d2s.md`
+    /// §2.3, `vitals.md` §4.8 rule 2).
     fn player_corpse(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         self.corpse_creation(sim, unit);
         if let Some(q) = self.owner_deaths.as_mut() {
             q.push(unit);
         }
+        sim.game.lists.set_player_status(unit, STATUS_DEAD);
     }
     /// `0x0057FB70` ([`super::death`]; the experience it returns is not
     /// read by the 0x16 caller).

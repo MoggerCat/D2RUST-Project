@@ -1084,6 +1084,7 @@ impl ViewFeed for MapFeed {
             update_count: 100,
             mud: false,
             sky: self.sky,
+            thunder: None,
         }))
     }
 }

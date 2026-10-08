@@ -501,9 +501,6 @@ impl MovePending for Rest {
         self.note(format!("send {} {bytes:?}", og(player)));
         self.sent.push((player, bytes));
     }
-    fn send_item_stat(&mut self, player: Owner, item: Guid, stat: u16) {
-        self.note(format!("send_item_stat {} {item} {stat}", og(player)));
-    }
     fn item_bits(&self, item: Guid, flags: u32, page: u8) -> Vec<u8> {
         self.note(format!("item_bits {item} {flags} {page}"));
         self.a.bits.clone()

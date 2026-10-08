@@ -90,6 +90,8 @@ pub struct SoundTableData {
     /// `Indoors` (+0x18) of each `soundenviron` record (§2), the input of
     /// the thunder occlusion (§6.4 r2).
     indoors: Vec<u8>,
+    /// The `soundenviron` records (§2), by row.
+    environ: Vec<SoundEnvironRow>,
 }
 
 impl SoundTableData {
@@ -137,7 +139,13 @@ impl SoundTableData {
             entries,
             song_range,
             indoors: environ.iter().map(|r| r.indoors).collect(),
+            environ: environ.to_vec(),
         }
+    }
+
+    /// The `soundenviron` records, by row (§2).
+    pub fn env_rows(&self) -> &[SoundEnvironRow] {
+        &self.environ
     }
 
     /// `Indoors` of each `soundenviron` record, by row (§2).

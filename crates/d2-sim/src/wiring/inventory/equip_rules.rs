@@ -291,9 +291,18 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> EquipWorld for InvDesk<'_, '_, H, R
         let o = self.owner_or_none(u);
         self.rest.learn_skill(o, skill)
     }
+    /// S→C 0x22 (`0x0053C520`, `client/msg-skills.md` §5 r1) to U's
+    /// client through the rest's transport: U's type and GUID, the skill,
+    /// the quantity's low byte, flag 1 when U has state 7 at send. A unit
+    /// without a record sends nothing.
     fn send_skill_quantity(&mut self, u: UnitId, skill: i32, q: i32) {
-        let o = self.owner_or_none(u);
-        self.rest.send_skill_quantity(o, skill, q)
+        let Some(o) = self.owner_of(u) else {
+            return;
+        };
+        let state7 = self.econ.stats.has_state(u, 7);
+        let msg =
+            crate::units::messages::update_item_skill(o.ty, o.guid, skill as u16, q as u8, state7);
+        self.rest.send(o, msg.to_vec())
     }
     fn mouse_skill(&self, u: UnitId, left: bool) -> Option<SkillRef> {
         self.rest.mouse_skill(self.owner_or_none(u), left)

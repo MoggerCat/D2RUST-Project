@@ -240,11 +240,14 @@ fn forward_pending(flag: bool) {
             "pick_object 1:55 56 1".to_string()
         );
         fwd!(d.send(m, vec![1, 2]), (), "send 1:55 [1, 2]".to_string());
-        fwd!(
-            d.send_item_stat(m, 58, 59),
-            (),
-            "send_item_stat 1:55 58 59".to_string()
-        );
+        // S→C 0x3E is the desk's own (`units::messages::update_item_stat`
+        // through `send`): a GUID without an item unit sends nothing and
+        // the rest is not asked.
+        {
+            let before = d.rest.last();
+            d.send_item_stat(m, 58, 59);
+            assert_eq!(d.rest.last(), before, "send_item_stat is not forwarded");
+        }
         // The item bit stream is the desk's own (`items/bitstream.md`,
         // `wiring::inventory::bits`): the rest is not asked, and a GUID
         // without an item unit has no stream.

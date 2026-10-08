@@ -198,8 +198,62 @@ impl QuestFlags {
 pub struct PlayerQuests {
     /// Flag record per difficulty.
     pub flags: [QuestFlags; 3],
-    /// NPC intro record per difficulty: NPC class ids heard.
+    /// NPC intro record per difficulty: NPC class ids introduced (record
+    /// +0x04, the save's field B; set `0x00572420`, test `0x00572470`,
+    /// §6.7).
     pub intro: [BTreeSet<u16>; 3],
+    /// The first-talk bits per difficulty (record +0x00, the save's field
+    /// A, `formats/d2s.md` §6 rule 3): set `0x00572360`
+    /// ([`PlayerQuests::hear`]), test `0x005723C0`
+    /// ([`PlayerQuests::heard`]); bit by NPC class through the table
+    /// `0x00732738` ([`d2_formats::d2s::npc_bit`]).
+    pub first_talk: [[u8; 8]; 3],
+}
+
+impl PlayerQuests {
+    /// `0x005723C0`: the first-talk bit of NPC `class` in difficulty `d`.
+    pub fn heard(&self, d: usize, class: u16) -> bool {
+        let n = d2_formats::d2s::npc_bit(i32::from(class));
+        self.first_talk
+            .get(d)
+            .is_some_and(|f| f[usize::from(n >> 3)] & (1 << (n & 7)) != 0)
+    }
+
+    /// `0x00572360`: sets the first-talk bit of NPC `class` in difficulty
+    /// `d` (the first matching pair's bit, else bit 0; `d2s.md` §6 rule 3).
+    pub fn hear(&mut self, d: usize, class: u16) {
+        let n = d2_formats::d2s::npc_bit(i32::from(class));
+        if let Some(f) = self.first_talk.get_mut(d) {
+            f[usize::from(n >> 3)] |= 1 << (n & 7);
+        }
+    }
+
+    /// The save writer's field B of difficulty `d` (`0x00572530`): the
+    /// bit of every introduced class.
+    pub fn intro_bits(&self, d: usize) -> [u8; 8] {
+        let mut f = [0u8; 8];
+        for &c in self.intro.get(d).into_iter().flatten() {
+            let n = d2_formats::d2s::npc_bit(i32::from(c));
+            f[usize::from(n >> 3)] |= 1 << (n & 7);
+        }
+        f
+    }
+
+    /// The save reader's field B of difficulty `d` (`0x00572550`): every
+    /// class of the act lists ([`INTRO_NPCS`], the only classes the
+    /// record is set for, §6.7) whose bit is set is introduced.
+    pub fn set_intro_bits(&mut self, d: usize, bits: [u8; 8]) {
+        let Some(set) = self.intro.get_mut(d) else {
+            return;
+        };
+        set.clear();
+        for &c in INTRO_NPCS.iter().copied().flatten() {
+            let n = d2_formats::d2s::npc_bit(i32::from(c));
+            if bits[usize::from(n >> 3)] & (1 << (n & 7)) != 0 {
+                set.insert(c);
+            }
+        }
+    }
 }
 
 // ------------------------------------------------------------------ §2
@@ -816,17 +870,19 @@ pub trait QuestWorld {
         self.unhandled(0xFF, 0x0064_E7E0);
         None
     }
-    /// `0x005723C0`: the player heard NPC `class`'s intro (chain 38;
-    /// quests-act2 open question 5).
+    /// `0x005723C0`: the player heard NPC `class`'s first-talk text
+    /// (chain 38; [`PlayerQuests::heard`], field A).
     fn npc_intro_heard(&mut self, player: UnitId, class: u16) -> bool {
-        let _ = (player, class);
-        self.unhandled(0xFF, 0x0057_23C0);
-        false
+        let d = usize::from(self.difficulty());
+        self.quests(player).is_some_and(|q| q.heard(d, class))
     }
-    /// `0x00572360`: set NPC `class`'s intro bit (chain 38).
+    /// `0x00572360`: set NPC `class`'s first-talk bit (chain 38;
+    /// [`PlayerQuests::hear`]).
     fn set_npc_intro(&mut self, player: UnitId, class: u16) {
-        let _ = (player, class);
-        self.unhandled(0xFF, 0x0057_2360);
+        let d = usize::from(self.difficulty());
+        if let Some(q) = self.quests(player) {
+            q.hear(d, class);
+        }
     }
     /// Object +0xB8 := `code`: the drop code `0x00559A30` reads on every
     /// call and never clears. The Act II chests store it once, before

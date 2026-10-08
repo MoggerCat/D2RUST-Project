@@ -138,13 +138,13 @@ impl<X: Pending> PlayerWorld for ActionPlayer<'_, '_, X> {
     fn skill_count(&self) -> u32 {
         self.v.h.tables.skills.skills.len() as u32
     }
-    /// An entry of `Pending::skill_list` with the skill and owner GUID
-    /// `item`.
+    /// An entry of the unit's skill list (`ActionHooks::skill_list_of`:
+    /// the wired list, else `Pending::skill_list`) with the skill and
+    /// owner GUID `item`.
     fn has_skill(&self, u: UnitId, skill: i32, item: u32) -> bool {
         self.v
             .h
-            .x
-            .skill_list(u)
+            .skill_list_of(u)
             .iter()
             .any(|e| e.skill == skill && e.owner_guid == item as i32)
     }

@@ -20,6 +20,8 @@
 //! the line color, `blend-modes.md` §8 r1); the flash is a rectangle
 //! frame of the clipped size, mode 5 (opaque).
 
+use crate::audio::driver::{SoundLink, WeatherSound};
+use crate::rules::draw_order::weather::ThunderSound;
 use std::sync::Arc;
 
 use d2_formats::dc6::Dc6;
@@ -106,6 +108,9 @@ pub struct WeatherView {
     color_maps: Option<Vec<MapId>>,
     /// Why the weather is off (logged once by the caller).
     failure: Option<String>,
+    /// The sound layer the thunder step requests from
+    /// (`audio/triggers.md` §12).
+    thunder: Option<SoundLink>,
 }
 
 impl std::fmt::Debug for WeatherView {
@@ -131,7 +136,14 @@ impl WeatherView {
             origin: None,
             color_maps: None,
             failure: None,
+            thunder: None,
         }
+    }
+
+    /// The sound layer for the thunder step's request of sound 202.
+    pub fn with_sound(mut self, link: SoundLink) -> Self {
+        self.thunder = Some(link);
+        self
     }
 
     pub fn weather(&self) -> &Weather {
@@ -170,6 +182,10 @@ impl WeatherView {
                 frame_rate: FRAME_RATE,
                 low_quality: false,
             }),
+            thunder: self
+                .thunder
+                .as_mut()
+                .map(|t| t as &mut (dyn ThunderSound + Send + Sync)),
         })
     }
 
@@ -183,6 +199,11 @@ impl WeatherView {
         mode: OpenMode,
         assets: &mut ViewAssets,
     ) {
+        // The rain rule's input (`audio/environment.md` §6, OQ 4): not
+        // active unless this frame's update ran with a rain level.
+        if let Some(l) = &self.thunder {
+            l.set_weather(WeatherSound::default());
+        }
         if self.failure.is_some() {
             return;
         }
@@ -231,6 +252,10 @@ impl WeatherView {
         };
         if let Err(e) = self.weather.update(Some(player), &input) {
             return self.fail(e.to_string());
+        }
+        if let Some(l) = &self.thunder {
+            let active = !self.weather.snow_mode && level.rain;
+            l.set_weather(WeatherSound::new(active, self.weather.intensity_256));
         }
         if self.weather.lightning_on {
             if let Err(m) = self.ensure_flash(mode, assets) {

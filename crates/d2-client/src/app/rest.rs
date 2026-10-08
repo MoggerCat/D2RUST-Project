@@ -321,9 +321,6 @@ impl VendorRest for AppRest {
     fn repair_broken(&mut self, item: UnitId) {
         self.note(format!("repair {}", item.0));
     }
-    fn send_item_stat(&mut self, p: UnitId, item: UnitId, stat: u16) {
-        self.note(format!("item stat {} {} {stat}", p.0, item.0));
-    }
     /// S→C 0x2A through its builder `0x0053D740` (`npc.md` §9).
     fn send_transaction(&mut self, p: UnitId, t: Transaction) {
         let m = npc::transaction(t.kind, t.code, t.guid, t.gold as u32);

@@ -964,8 +964,14 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         let game = &mut *self.cv.game;
         self.cv.v.h.x.quantity_timer(game, item);
     }
+    /// S→C 0x3E (`0x0053D130(client, item, 1, s, v, 0)`) to the unit's
+    /// client through the transport seam ([`Pending::send`]).
+    /// PROVISIONAL (`client/msg-stats-items.md` §5 r1.3; REC-400): field
+    /// widths, see `units::messages::update_item_stat`.
     fn send_item_stat(&mut self, u: UnitId, item: UnitId, s: u16, v: i32) {
-        self.xm().send_item_stat(u, item, s, v);
+        let guid = self.cv.v.units.get(item).map_or(0, |r| r.guid);
+        let msg = crate::units::messages::update_item_stat(guid, s, v, 0);
+        Pending::send(self.xm(), u, &msg);
     }
     fn attack_cleanup(&mut self, u: UnitId) {
         self.xm().attack_cleanup(u);
@@ -1046,8 +1052,28 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     fn blood_mana(&mut self, u: UnitId, cost: i32) {
         self.xm().blood_mana(u, cost);
     }
+    /// `0x00571AA0`: an 0xA3 record {n, k, lvl, unit, T, r, 0} on `u`
+    /// (`bodies.md` §2.14 step 5; x = the roll, y = 0), the unit queued for
+    /// update (`intents-events.md` §7.9 rule 2).
     fn queue_progressive(&mut self, u: UnitId, msg: bodies::ProgressiveMsg<UnitId>) {
-        self.xm().queue_progressive(u, msg);
+        use crate::wiring::action::event_records::EventRecord;
+        let units = &self.cv.v.units;
+        let of = |id: UnitId| {
+            units
+                .get(id)
+                .map_or((0, u32::MAX), |r| (r.ty.index() as u8, r.guid))
+        };
+        let r = EventRecord::Progressive {
+            charges: msg.charges,
+            skill: msg.skill,
+            level: msg.level,
+            unit: of(msg.unit),
+            target: of(msg.target),
+            x: msg.roll,
+            y: 0,
+        };
+        self.cv.v.h.event_records.push(u, r);
+        let _ = self.cv.game.lists.queue_update(u);
     }
     // ---- batch 2 and 3
 

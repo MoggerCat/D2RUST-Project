@@ -360,10 +360,6 @@ impl VendorRest for Probe {
     fn repair_broken(&mut self, item: UnitId) {
         self.log.push(format!("repair_broken {}", item.0));
     }
-    fn send_item_stat(&mut self, p: UnitId, item: UnitId, stat: u16) {
-        self.log
-            .push(format!("send_item_stat {} {} {stat}", p.0, item.0));
-    }
     fn send_transaction(&mut self, p: UnitId, t: Transaction) {
         self.log.push(format!("send_transaction {} {t:?}", p.0));
     }
@@ -827,7 +823,9 @@ fn inv_vendors_pass_other_calls_through() {
             w.recharge(one);
             w.repair_broken(one);
             w.identify(one);
-            w.send_item_stat(player, one, 3);
+            // S→C 0x3E is built from the item's base stat (no rest call).
+            w.set_stat(ring, 70, 0, 300);
+            w.send_item_stat(player, ring, 70);
             let tr = Transaction {
                 kind: 1,
                 code: 2,
@@ -859,9 +857,17 @@ fn inv_vendors_pass_other_calls_through() {
     assert!(t.world().state.errors.is_empty());
     // `quests.md` §6.7 for the town of act I (level 1): the act's intro
     // NPCs heard at the game's difficulty (2) in one 0x91.
-    assert_eq!(probe.sent.len(), 1);
+    assert_eq!(probe.sent.len(), 2);
     assert_eq!(probe.sent[0].0, player);
     assert_eq!(&probe.sent[0].1[..2], [0x91, 0]);
+    let rg = t.units().get(ring).unwrap().guid;
+    assert_eq!(
+        probe.sent[1],
+        (
+            player,
+            d2_sim::units::messages::update_item_stat(rg, 70, 300, 0)
+        )
+    );
     let p = player.0;
     assert_eq!(
         probe.log,
@@ -871,7 +877,6 @@ fn inv_vendors_pass_other_calls_through() {
             "recharge 1".into(),
             "repair_broken 1".into(),
             "identify 1".into(),
-            format!("send_item_stat {p} 1 3"),
             format!(
                 "send_transaction {p} {tr:?}",
                 tr = Transaction {

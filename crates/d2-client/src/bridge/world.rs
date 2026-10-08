@@ -550,8 +550,19 @@ pub struct LocalWalk {
     /// The model position when the cell was recorded: a placement since
     /// then wins over the cell.
     pub at: (u16, u16),
-    /// The predicted sub-tile.
-    pub cell: (u16, u16),
+    /// The predicted precise (16.16) position.
+    pub pos: (u32, u32),
+    /// The mode the prediction moves the player in (2 walk, 3 run);
+    /// `None`: standing, the model's mode stands.
+    pub mode: Option<u32>,
+}
+
+impl LocalWalk {
+    /// The predicted sub-tile: the high 16 bits of [`Self::pos`]
+    /// (`sim/path-placement.md` §1 r2).
+    pub fn cell(&self) -> (u16, u16) {
+        ((self.pos.0 >> 16) as u16, (self.pos.1 >> 16) as u16)
+    }
 }
 
 /// The client world model.
@@ -674,8 +685,8 @@ pub struct ClientWorld {
     pub objclient: ClientObjects,
     /// Units freed since the receive path last moved them out, in free
     /// order: each becomes one `UnitFreed` output (`client/bridge.md` §10
-    /// r3.1 (a)).
-    pub freed: Vec<UnitKey>,
+    /// r3.1 (a)), with whether it was a client-only unit (set C).
+    pub freed: Vec<(UnitKey, bool)>,
 }
 
 impl ClientWorld {
@@ -693,11 +704,12 @@ impl ClientWorld {
         self.units.get(&self.local_player?)
     }
 
-    /// Records the play preview's predicted sub-tile of the local player
-    /// ([`Self::local_walk`]); `None` clears it.
-    pub fn set_local_walk(&mut self, cell: Option<(u16, u16)>) {
+    /// Records the play preview's predicted precise position of the local
+    /// player and the mode it moves in ([`Self::local_walk`]); `None`
+    /// clears it.
+    pub fn set_local_walk(&mut self, pos: Option<(u32, u32)>, mode: Option<u32>) {
         let at = self.local().and_then(|u| u.position);
-        self.local_walk = at.zip(cell).map(|(at, cell)| LocalWalk { at, cell });
+        self.local_walk = at.zip(pos).map(|(at, pos)| LocalWalk { at, pos, mode });
     }
 
     /// The local player `unit`'s walk prediction, while the model
@@ -707,6 +719,29 @@ impl ClientWorld {
     pub fn predicted(&self, unit: &ClientUnit) -> Option<LocalWalk> {
         self.local_walk
             .filter(|w| self.local_player == Some(unit.key) && unit.position == Some(w.at))
+    }
+
+    /// The local player's own precise (16.16) position this frame
+    /// (`seams/movement-prediction.md` §2.9 r1–r2): the walk prediction
+    /// while it stands ([`Self::predicted`]), else the model cell's
+    /// centre (`client/model.md` §3 r3). Every reader of "the local
+    /// player's position" between placements reads this one value: the
+    /// draw, the click and hover cameras, labels, the automap, the near
+    /// rooms and the interaction distances (`seams/world-screen.md`
+    /// §2.2). `None`: no local player or no position.
+    pub fn local_position(&self) -> Option<(u32, u32)> {
+        let p = self.local()?;
+        if let Some(w) = self.predicted(p) {
+            return Some(w.pos);
+        }
+        let (x, y) = p.position?;
+        Some(((u32::from(x) << 16) | 0x8000, (u32::from(y) << 16) | 0x8000))
+    }
+
+    /// The sub-tile of [`Self::local_position`].
+    pub fn local_cell(&self) -> Option<(u16, u16)> {
+        self.local_position()
+            .map(|(x, y)| ((x >> 16) as u16, (y >> 16) as u16))
     }
 
     /// Adds `unit` (§2 rule 4): an existing unit with the same key is
@@ -723,7 +758,7 @@ impl ClientWorld {
     /// §10 r3.1). A key not in the set: nothing.
     pub fn remove(&mut self, key: UnitKey) -> Option<ClientUnit> {
         let unit = self.units.remove(&key)?;
-        self.freed.push(key);
+        self.freed.push((key, false));
         // The unit free leaves the room list (`unit-order.md` §5 rule 6).
         self.room_units.leave(key);
         if self.local_player == Some(key) {
@@ -1252,6 +1287,9 @@ pub struct LevelRow {
     pub rain: bool,
     /// `Mud` (+0x06, `render/draw-order-2.md` §11.5).
     pub mud: bool,
+    /// The level's `leveldefs` `Intensity`, `Red`, `Green`, `Blue`
+    /// (`render/lighting.md` §3.1 r2; the darkness base of §10 r3).
+    pub ambient: crate::rules::lighting::environment::Ambient,
 }
 
 /// Inputs of the message rules that are not model state.

@@ -535,12 +535,21 @@ pub trait MovePending {
 
     /// Queue a message to the player's client now.
     fn send(&mut self, player: Owner, bytes: Vec<u8>) {}
-    /// S→C 0x3E for an item stat (`0x0053D130`; layout not written).
+    /// S→C 0x3E for an item stat (`0x0053D130`): the wired desk builds it
+    /// with `units::messages::update_item_stat` and sends it through
+    /// [`MovePending::send`]. Default: nothing.
     fn send_item_stat(&mut self, player: Owner, item: Guid, stat: u16) {}
     /// Item bit stream (`0x006313E0`, OQ1) with item flags OR-ed with
     /// `flags` and the page shown as `page`. Default: empty.
     fn item_bits(&self, item: Guid, flags: u32, page: u8) -> Vec<u8> {
         Vec::new()
+    }
+    /// The bit stream of a store item shown to its trading client
+    /// (`0x0053EF30` with 0x38): the alt-code record (`bitstream.md`
+    /// §4.1 r4) exactly when the item's quality is 4–9 and it lacks item
+    /// flag 0x10. Default: the plain stream.
+    fn store_item_bits(&self, item: Guid, page: u8) -> Vec<u8> {
+        self.item_bits(item, 0, page)
     }
     /// Store messages 0x38 / 0x39 of the dispatcher's first step
     /// (`world/vendors.md`). Default: none.

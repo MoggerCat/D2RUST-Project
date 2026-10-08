@@ -150,7 +150,9 @@ fn the_session_flow_creates_the_game_then_loads_the_character_at_the_join() {
     assert_ne!(load.f8, 0);
     let got = ids(chunks);
     assert_eq!(got.first(), Some(&0x59), "{got:02X?}");
-    assert_eq!(got.last(), Some(&0x04), "{got:02X?}");
+    // 0x04, then the join sequence (`intents-events.md` §8.3: 0x5B, 0x65,
+    // the join 0x5A).
+    assert_eq!(got[got.len() - 4..], [0x04, 0x5B, 0x65, 0x5A], "{got:02X?}");
     // A new character has its player record (§8.2 rule 7): 0x5F after
     // 0x0B and the two 0x23 (no `StartSkill` without the vitals tables, so
     // no load 0x23).

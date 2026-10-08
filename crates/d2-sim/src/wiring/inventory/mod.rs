@@ -119,8 +119,8 @@ pub struct InvState {
     pub equip_rules: bool,
     /// The item-move effects run on the desk in place of the [`InvRest`]
     /// calls (q-fix-items-movepending-host-wiring): the gold rest pile
-    /// (`inventory-moves.md` §10.1), S→C 0x3E for an item stat and the
-    /// quest-chain notice 0x5D (§7.11 step 4). Off (the default): those
+    /// (`inventory-moves.md` §10.1) and the quest-chain notice 0x5D
+    /// (§7.11 step 4). Off (the default): those
     /// calls go to the rest, as before.
     pub move_effects: bool,
     /// An item moved onto a body slot attaches its stat list to the
@@ -291,8 +291,6 @@ pub trait InvRest: MovePending {
     fn set_skill_quantity(&mut self, unit: Owner, skill: i32, q: i32) {}
     /// `0x00570080`.
     fn learn_skill(&mut self, unit: Owner, skill: i32) {}
-    /// S→C 0x22 (`0x0053C520`).
-    fn send_skill_quantity(&mut self, unit: Owner, skill: i32, q: i32) {}
     /// The left / right mouse skill (`0x00620190` / `0x006201D0`).
     fn mouse_skill(&self, unit: Owner, left: bool) -> Option<(i32, i32)> {
         None

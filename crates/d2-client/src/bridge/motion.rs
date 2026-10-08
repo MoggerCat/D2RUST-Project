@@ -12,10 +12,16 @@
 //!   server's mode table (walk 1 / 0, run 23 / 24 to a point / a unit,
 //!   `sim/intents-events.md` §7.4) gets a track from its cell toward the
 //!   request's point, or the target unit's cell;
-//! - each server tick the track steps in a straight line by the
-//!   message's velocity × 16 in 16.16 sub-tiles (`sim/pathing.md` §9.4
-//!   r2.1, base 0x400, as [`super::predict::Speeds::step`]) and writes
-//!   the reached cell to the model, so hover, clicks and the draw follow;
+//! - each server tick the track steps in a straight line by the path
+//!   velocity × 16 in 16.16 sub-tiles (`sim/pathing.md` §9.4 r2.1, base
+//!   0x400, as [`super::predict::Speeds::step`]) and writes the reached
+//!   cell to the model, so hover, clicks and the draw follow. The
+//!   message's velocity field is stat 67 `velocitypercent`, not a path
+//!   velocity (`seams/movement-prediction.md` §2.4 r3): the path velocity
+//!   is the server's own computation (`sim/pathing.md` §8.1 r2,
+//!   `path::walk::velocity::mode_velocity`) on the class's `monstats`
+//!   `Velocity` and that percent; a class without the column does not
+//!   move;
 //! - any other request (stop 0x6D, attack, hit, death) or a placement by
 //!   a message ends the track.
 //!
@@ -26,8 +32,80 @@
 use std::collections::BTreeMap;
 
 use d2_sim::monsters::mode_message::{mode, MODE_ROWS};
+use d2_sim::path::walk::velocity::{mode_velocity, STAT_VELOCITYPERCENT};
+use d2_sim::path::walk::WalkUnits;
+use d2_sim::rng::Seed;
+use d2_sim::units::{UnitId, UnitType};
 
-use super::world::{ClientWorld, ModeRequest, UnitKey, MONSTER};
+use super::world::{ClientWorld, ModeRequest, MonsterClass, UnitKey, MONSTER};
+
+/// One monster as the server's velocity computation reads it: class,
+/// mode, the stat-67 total the message carried and the class's
+/// `monstats` `Velocity` / `npc`.
+struct Mover {
+    class: u32,
+    mode: u32,
+    percent: i32,
+    velocity: i32,
+    npc: bool,
+    seed: Seed,
+}
+
+impl WalkUnits for Mover {
+    fn unit_type(&self, _: UnitId) -> UnitType {
+        UnitType::Monster
+    }
+    fn class(&self, _: UnitId) -> u32 {
+        self.class
+    }
+    fn frame(&self) -> i32 {
+        0
+    }
+    fn mode(&self, _: UnitId) -> u32 {
+        self.mode
+    }
+    fn stat(&self, _: UnitId, stat: u16) -> i32 {
+        if stat == STAT_VELOCITYPERCENT {
+            self.percent
+        } else {
+            0
+        }
+    }
+    fn seed(&mut self, _: UnitId) -> &mut Seed {
+        &mut self.seed
+    }
+    fn monstats_velocity(&self, _: UnitId) -> (i32, bool) {
+        (self.velocity, self.npc)
+    }
+}
+
+/// The 16.16 distance of one server tick of a monster of `class` in
+/// `mode` at velocity percent `percent` (module doc): the server's path
+/// velocity (`sim/pathing.md` §8.1 r2) · 0x400 >> 6 (§9.4 r2.1). 0 when
+/// the class has no `monstats` row or the mode no velocity.
+pub fn monster_step(monsters: &[Option<MonsterClass>], class: u32, mode: u32, percent: i32) -> i64 {
+    let Some((row, t)) = monsters
+        .get(class as usize)
+        .copied()
+        .flatten()
+        .zip(super::predict::path_tables())
+    else {
+        return 0;
+    };
+    let Some(setup) = row.setup else {
+        return 0;
+    };
+    let u = Mover {
+        class,
+        mode,
+        percent,
+        velocity: i32::from(setup.velocity),
+        npc: row.npc,
+        seed: Seed::default(),
+    };
+    let v = mode_velocity(t, &u, UnitId(0), mode).unwrap_or(0);
+    (i64::from(v) * 0x400) >> 6
+}
 
 /// Where a monster walks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -86,18 +164,19 @@ impl MonsterMotion {
         self.tracks.len()
     }
 
-    /// One bridge frame: refresh the tracks from the model, then step
-    /// them once if the server ticked since the last frame.
-    pub fn frame(&mut self, world: &mut ClientWorld) {
+    /// One bridge frame: refresh the tracks from the model (speeds from
+    /// the `monstats` rows `monsters`), then step them once if the server
+    /// ticked since the last frame.
+    pub fn frame(&mut self, world: &mut ClientWorld, monsters: &[Option<MonsterClass>]) {
         let ticked = world.server_ticks != self.seen_ticks;
         self.seen_ticks = world.server_ticks;
-        self.refresh(world);
+        self.refresh(world, monsters);
         if ticked {
             self.step(world);
         }
     }
 
-    fn refresh(&mut self, world: &ClientWorld) {
+    fn refresh(&mut self, world: &ClientWorld, monsters: &[Option<MonsterClass>]) {
         let mut next = BTreeMap::new();
         for (key, u) in &world.units {
             if key.unit_type != MONSTER || !matches!(u.mode, mode::WL | mode::RN) {
@@ -109,7 +188,7 @@ impl MonsterMotion {
             let Some(goal) = goal_of(&r) else {
                 continue;
             };
-            let step = i64::from(r.record[4].max(0)) * 16;
+            let step = monster_step(monsters, u.class, u.mode, r.record[4]);
             let keep = self
                 .tracks
                 .get(key)
@@ -165,7 +244,19 @@ impl MonsterMotion {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bridge::world::{ClientUnit, PLAYER};
+    use crate::bridge::world::{ClientUnit, MonsterSetup, PLAYER};
+
+    /// `monstats` rows: class 0 with `Velocity` 16 (path velocity 0x1000
+    /// at 100 %: one sub-tile a tick).
+    fn classes() -> Vec<Option<MonsterClass>> {
+        vec![Some(MonsterClass {
+            setup: Some(MonsterSetup {
+                velocity: 16,
+                ..Default::default()
+            }),
+            ..Default::default()
+        })]
+    }
 
     fn monster(w: &mut ClientWorld, guid: u32, at: (u16, u16), mode: u32, r: ModeRequest) {
         let k = UnitKey::new(MONSTER, guid);
@@ -176,31 +267,26 @@ mod tests {
         w.units.insert(k, u);
     }
 
-    fn request(code: u8, a: i32, b: i32, velocity: i32) -> ModeRequest {
+    /// A move request; `percent` is the message's stat 67.
+    fn request(code: u8, a: i32, b: i32, percent: i32) -> ModeRequest {
         ModeRequest {
             code,
-            record: [a, b, 0, 0, velocity, 0, 0],
+            record: [a, b, 0, 0, percent, 0, 0],
         }
     }
 
     fn tick(m: &mut MonsterMotion, w: &mut ClientWorld) {
         w.server_ticks += 1;
-        m.frame(w);
+        m.frame(w, &classes());
     }
 
     #[test]
     fn a_walking_monster_steps_to_its_point_and_stops() {
         let mut w = ClientWorld::default();
-        // Walk to (110, 100) at velocity 0x1000: one sub-tile a tick.
-        monster(
-            &mut w,
-            5,
-            (100, 100),
-            mode::WL,
-            request(1, 110, 100, 0x1000),
-        );
+        // Walk to (110, 100) at 100 %: one sub-tile a tick.
+        monster(&mut w, 5, (100, 100), mode::WL, request(1, 110, 100, 100));
         let mut m = MonsterMotion::default();
-        m.frame(&mut w);
+        m.frame(&mut w, &classes());
         assert_eq!(m.walking(), 1);
         for i in 1..=3 {
             tick(&mut m, &mut w);
@@ -225,10 +311,10 @@ mod tests {
         let mut pu = ClientUnit::new(p);
         pu.position = Some((100, 108));
         w.units.insert(p, pu);
-        // Run (15) to the player, code 24, velocity 0x2000.
-        monster(&mut w, 5, (100, 100), mode::RN, request(24, 0, 1, 0x2000));
+        // Run (15) to the player, code 24, at 200 %.
+        monster(&mut w, 5, (100, 100), mode::RN, request(24, 0, 1, 200));
         let mut m = MonsterMotion::default();
-        m.frame(&mut w);
+        m.frame(&mut w, &classes());
         for _ in 0..20 {
             tick(&mut m, &mut w);
         }
@@ -242,15 +328,9 @@ mod tests {
     fn other_modes_and_placements_end_the_track() {
         let mut w = ClientWorld::default();
         let k = UnitKey::new(MONSTER, 5);
-        monster(
-            &mut w,
-            5,
-            (100, 100),
-            mode::WL,
-            request(1, 120, 100, 0x1000),
-        );
+        monster(&mut w, 5, (100, 100), mode::WL, request(1, 120, 100, 100));
         let mut m = MonsterMotion::default();
-        m.frame(&mut w);
+        m.frame(&mut w, &classes());
         tick(&mut m, &mut w);
         // A server placement (position check) moves it elsewhere: snap.
         w.units.get_mut(&k).unwrap().position = Some((50, 100));

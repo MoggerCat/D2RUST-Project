@@ -1,4 +1,4 @@
-// Spec: specs/drlg/levels.md §3 (act creation), specs/drlg/preset.md §5–§6, specs/drlg/rooms.md §4.1, §9.3–§9.5, specs/sim/units.md §3, specs/combat/vitals.md §1, specs/sim/tick.md §3, specs/sim/intents-events.md §1 (a game on synthetic data), specs/sim/path-placement.md §11, §13 (the session join)
+// Spec: specs/drlg/levels.md §3 (act creation), specs/drlg/preset.md §5–§6, specs/drlg/rooms.md §4.1, §9.3–§9.5, specs/sim/units.md §3, specs/combat/vitals.md §1, specs/sim/tick.md §3, specs/sim/intents-events.md §1 (a game on synthetic data), specs/sim/path-placement.md §11, §13 (the session join), specs/flows/save-exit.md §2, §3 (the server's saves)
 //! A game from the synthetic install, end to end and in CI: the
 //! archives (tables, strings, AnimData and the DRLG's DS1 / DT1 files,
 //! [`test_fixtures::drlg`]) → the loaded and fixed-up set →
@@ -22,6 +22,7 @@ use d2_server::adapters::session::{
 use d2_server::adapters::session_flow::{
     CharacterLoader, CreateGame, CreateRefusal, Loaded, SessionFault, SessionFlow,
 };
+use d2_server::adapters::storage::CharacterStore;
 use d2_server::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame, UnitFacts};
 use d2_server::host::Host;
 use d2_server::seams::{ClientId, Clock, MessageSink, PlayerGate, Pos, SessionHandler};
@@ -861,13 +862,181 @@ fn leave_sends_its_messages_and_removes_the_client() {
     // flushed 0x05 and 0x06; single player has nobody left for the 0x5A.
     assert_eq!(host.receive(CLIENT), [vec![0xB0], vec![0x05], vec![0x06]]);
     assert_eq!(host.game.sim_client(CLIENT), None);
-    // The character save has no writer (named).
+    // No character storage is installed: the save is named as not written.
     assert_eq!(faults(&host), [(CLIENT, SessionFault::NotSaved)]);
     // M08: a second leave without a record does nothing.
     host.send_system(CLIENT, &[0x69]).expect("queued");
     host.clock.0 += 40;
     host.frame().expect("frame");
     assert_eq!(host.receive(CLIENT), Vec::<Vec<u8>>::new());
+}
+
+/// The join sequence of the first tick in state 3 (§8.3): after 0x04,
+/// S→C 0x5B (the player's GUID, class, name, level, no party), 0x65
+/// (kill count 0) and the join 0x5A code 2 with the name, so the
+/// client's roster holds the player (`client/msg-units.md` §8 r3). When
+/// it leaves, another client in state 4 gets 0x5C (the leaver's GUID)
+/// then the leave 0x5A code 3; the leaver gets neither (§2.5 r2).
+// Covers: specs/sim/intents-events.md §8.3, §2.5 r2
+#[test]
+fn join_and_leave_send_the_roster_messages() {
+    use d2_sim::units::messages as msg;
+    let loads = std::rc::Rc::new(std::cell::Cell::new(0));
+    let (mut host, _t) = session_host(loads);
+    host.send_system(
+        CLIENT,
+        &create_request(CLASS as u8, EXPANSION_FLAGS).encode(),
+    )
+    .expect("queued");
+    host.frame().expect("frame 1");
+    host.clock.0 += 40;
+    host.frame().expect("frame 2");
+    host.send_system(CLIENT, &[0x6B]).expect("queued");
+    let mut got = Vec::new();
+    for _ in 0..4 {
+        host.clock.0 += 40;
+        host.frame().expect("frame");
+        got.extend(host.receive(CLIENT));
+    }
+    let p = host.game.player_of(CLIENT).expect("player");
+    let guid = host.game.game.lists.unit(p).unwrap().guid;
+    let level = host.game.events.action.sys.stats.unit_total(p, 12, 0) as u16;
+    let at = got.iter().position(|m| m == &[0x04]).expect("0x04");
+    assert_eq!(
+        got[at + 1..at + 4],
+        [
+            msg::player_joined(guid, CLASS as u8, &name(), level, 0xFFFF),
+            msg::player_kill_count(guid, 0).to_vec(),
+            msg::player_event(2, &name()).to_vec(),
+        ]
+    );
+    assert_eq!(&got[at + 1][8..14], b"werwer");
+
+    // A second client in game (state 4) watches the first leave.
+    let other: ClientId = 1;
+    host.connect(other);
+    let p2 = alloc_player(&mut host.game, CLASS);
+    host.game
+        .join(other, Some(p2), None, client_state::IN_GAME)
+        .unwrap();
+    host.send_system(CLIENT, &[0x69]).expect("queued");
+    host.clock.0 += 40;
+    host.frame().expect("frame");
+    assert_eq!(host.receive(CLIENT), [vec![0xB0], vec![0x05], vec![0x06]]);
+    let left: Vec<Vec<u8>> = host
+        .receive(other)
+        .into_iter()
+        .filter(|m| matches!(m[0], 0x5C | 0x5A))
+        .collect();
+    assert_eq!(
+        left,
+        [
+            msg::player_left(guid).to_vec(),
+            msg::player_event(3, &name()).to_vec()
+        ]
+    );
+}
+
+/// A character store that records each save: the client, the frame,
+/// and whether the client was still in game (state 4) when it ran.
+struct Recorder(std::sync::Arc<std::sync::Mutex<Vec<(ClientId, i32, bool)>>>);
+
+impl CharacterStore<WorldSim<Seams>, ActionWorld> for Recorder {
+    fn save(&mut self, sim: &mut Sim, client: ClientId) -> Result<(), String> {
+        let in_game = sim
+            .sim_client(client)
+            .and_then(|i| sim.game.lists.client(i))
+            .is_some_and(|e| e.state == client_state::IN_GAME);
+        self.0
+            .lock()
+            .unwrap()
+            .push((client, sim.game.frame, in_game));
+        Ok(())
+    }
+}
+
+type Saves = std::sync::Arc<std::sync::Mutex<Vec<(ClientId, i32, bool)>>>;
+
+fn with_recorder(host: &mut TestHost) -> Saves {
+    let saves = Saves::default();
+    host.game.set_storage(Box::new(Recorder(saves.clone())));
+    saves
+}
+
+// Covers: specs/flows/save-exit.md §2 r2; specs/sim/intents-events.md §2.5 r2
+#[test]
+fn leave_saves_the_character_before_its_messages() {
+    let mut host = in_game_host();
+    let saves = with_recorder(&mut host);
+    let frame = host.game.game.frame;
+    host.send_system(CLIENT, &[0x69]).expect("queued");
+    host.frame().expect("frame");
+    // Saved once, in the drain (no tick ran), while the client was still
+    // in game: before the 0x05, 0x06, 0xB0 and the removal.
+    assert_eq!(*saves.lock().unwrap(), [(CLIENT, frame, true)]);
+    assert_eq!(host.receive(CLIENT), [vec![0xB0], vec![0x05], vec![0x06]]);
+    assert_eq!(host.game.sim_client(CLIENT), None);
+    assert_eq!(faults(&host), []);
+}
+
+// Covers: specs/sim/tick.md §6 r3
+#[test]
+fn three_periods_of_ticks_save_three_times() {
+    let mut host = in_game_host();
+    let saves = with_recorder(&mut host);
+    let start = host.game.game.frame;
+    while host.game.game.frame < start + 3 * 8192 {
+        host.clock.0 += 40;
+        host.frame().expect("frame");
+        host.receive(CLIENT);
+    }
+    let frames: Vec<i32> = saves.lock().unwrap().iter().map(|s| s.1).collect();
+    assert_eq!(frames, [8192, 2 * 8192, 3 * 8192]);
+}
+
+// Covers: specs/flows/save-exit.md §2 r2
+#[test]
+fn a_refused_save_is_a_session_fault_and_the_leave_goes_on() {
+    struct Refuse;
+    impl CharacterStore<WorldSim<Seams>, ActionWorld> for Refuse {
+        fn save(&mut self, _: &mut Sim, _: ClientId) -> Result<(), String> {
+            Err("disk full".into())
+        }
+    }
+    let mut host = in_game_host();
+    host.game.set_storage(Box::new(Refuse));
+    host.send_system(CLIENT, &[0x69]).expect("queued");
+    host.frame().expect("frame");
+    assert_eq!(host.receive(CLIENT), [vec![0xB0], vec![0x05], vec![0x06]]);
+    assert_eq!(
+        faults(&host),
+        [(CLIENT, SessionFault::SaveFailed("disk full".into()))]
+    );
+}
+
+// Covers: specs/flows/save-exit.md §3 r1; specs/sim/tick.md §6 r3
+#[test]
+fn the_tick_saves_every_8192_frames() {
+    let mut host = in_game_host();
+    let saves = with_recorder(&mut host);
+    // Two frames short of the period: the save is on frame 8192 only.
+    host.game.game.frame = 8190;
+    for _ in 0..3 {
+        host.clock.0 += 40;
+        host.frame().expect("frame");
+    }
+    assert_eq!(host.game.game.frame, 8193);
+    assert_eq!(*saves.lock().unwrap(), [(CLIENT, 8192, true)]);
+    assert!(!host.game.game.character_save_due);
+    // Without a storage the save is recorded as not written (M08).
+    let mut host = in_game_host();
+    host.game.game.frame = 8191;
+    host.clock.0 += 40;
+    host.frame().expect("frame");
+    assert_eq!(
+        host.game.save_faults,
+        [(CLIENT, d2_server::adapters::storage::SaveFault::NoStorage)]
+    );
 }
 
 // Covers: specs/sim/intents-events.md §2.5 r2

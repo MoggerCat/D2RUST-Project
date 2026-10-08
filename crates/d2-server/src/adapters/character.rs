@@ -573,7 +573,10 @@ impl<X: Pending> CharacterWorld for ActionCharacter<'_, '_, X> {
         Ok(())
     }
     fn set_npc_fields(&mut self, _: &[[u8; 8]; 3], _: &[[u8; 8]; 3]) -> Result<(), Unapplied> {
-        unapplied("npc fields", "player data +0x60 is not in d2-sim")
+        unapplied(
+            "npc fields",
+            "the NPC record (player data +0x60) is the host's PlayerQuests: the host applies it",
+        )
     }
     fn set_base_stat(&mut self, id: u16, layer: u16, value: i32) -> Result<(), Unapplied> {
         let v = &mut *self.v;

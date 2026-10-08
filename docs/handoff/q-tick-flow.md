@@ -33,7 +33,7 @@ is missile, player, monster, object, item (§3). The client pass
 
 | # | Where | Flow step | Kind | Effect |
 |---|---|---|---|---|
-| T1 | `d2-sim/src/tick/mod.rs:282-284` (comment "the 8192-frame save … host-only"); no save in `d2-server` | server-tick §4 r4, save-exit §3 | missing | no character save every 8192 frames; `tick.md` §6 r3 was corrected 2026-10-08 (runs in single player), the code still follows the old reading. Also no inventory flag bit 1 clear that the save does |
+| T1 | `d2-sim/src/tick/mod.rs:282-284` (comment "the 8192-frame save … host-only"); no save in `d2-server` | server-tick §4 r4, save-exit §3 | missing — **fixed** (q-fix-flow-save; bit 1 clear still open, REC-291) | no character save every 8192 frames; `tick.md` §6 r3 was corrected 2026-10-08 (runs in single player), the code still follows the old reading. Also no inventory flag bit 1 clear that the save does |
 | T2 | `d2-server/src/adapters/handlers/world/wired.rs:945-947` (`arrivals`, `item_arrivals`: `npc_approach.rs:32`, `item_approach.rs:52`) | server-tick §1 r1, §2 r2 | out of order | d2rs-own approach arrivals replay C→S 0x13 / 0x16 at the start of `run_tick`, before frame += 1: outside the drain and outside step 4, so their messages and draws come before the tick's environment and room pass |
 | T3 | `wired.rs:958-971` (`after_tick`: quest events, `player_deaths`, corpses, pet deaths, approaches, `hireling_calls` incl. NPC act changes `hireling_host.rs:52-69`, pet follows, hirelings) | server-tick §2 r2 | out of order | unit work 1.14d does inside step 4 (timer events) or inside a C→S handler runs after step 11, after the client pass: its unit update messages miss this tick's client pass and go out a tick late; deaths and NPC act changes happen after the room bookkeeping |
 | T4 | `d2-server/src/adapters/sim.rs:586-587` (`update_pass`, `vitals_sync` after the tick); `tick/mod.rs:114` (`client_update_messages` default, empty) | server-tick §4 r2 | out of order | stat messages (0x1D / 0x1E, 0x95) and the bit-21 inventory refresh are sent after the whole tick, not in the per-client update between the unit updates and the room switch; at the join's first tick 1.14d sends them before 0x04 (`intents-events.md` §8.3), d2rs after |
@@ -83,15 +83,15 @@ only when ticked and `in_game`, outgoing answers last. `bridge_frame`
 | C5 | `app/death.rs:79-93`, `app/hardcore.rs:100`, `world_view/present.rs:537-545`; `app/hardcore.rs:57` vs `app/death.rs:80` | client-frame §1 r8 | ambiguous order | Esc on a dead player is read by three unordered systems (0x41, hardcore exit, Esc menu); `save_on_death` reads `DeathScreen` written by the unordered `death_screen` (one-frame lag possible) |
 | C6 | `app/visibility.rs:25-40`; camera written at `world_view/present.rs:804` | client-frame §1 r5, r7 | out of order | the visibility predicate the position check reads (`client/model.md` §6 r6) uses the previous frame's camera; 1.14d's update pass reads the camera of the last draw too, so the effect depends on 1.14d's camera write point (`render/camera.md` §3); listed for the camera owner |
 | C7 | `app/play.rs:108` and `:530` (`add_visibility`), `:104` and `:521` (`GameAudio`), `world_view/present.rs:269` and `app/ui.rs:154` (`UiSounds`) | client-frame §3 | doubled | registered twice; the later one overwrites; no behaviour effect found |
-| C8 | `bridge/msg/session.rs:109-113`, `bridge/msg/ui_quest.rs:59-63` | save-exit §4 r1 | missing reader | the model's `exit_requested` (0x06, 0x50 code 23) is never read by the app |
+| C8 | `bridge/msg/session.rs:109-113`, `bridge/msg/ui_quest.rs:59-63` | save-exit §4 r1 | missing reader — **fixed** (q-fix-flow-save: `app/save.rs` `end_of_game`) | the model's `exit_requested` (0x06, 0x50 code 23) is never read by the app |
 
 ### Save and exit (`flows/save-exit.md`)
 
 | # | Where | Flow step | Kind | Effect |
 |---|---|---|---|---|
-| E1 | `d2-client/src/app/save.rs:415-418` (`request_save_and_exit`: `AppExit` only), called at `world_view/present.rs:655-657` | save-exit §1 r2 | missing | Save and Exit sends no C→S 0x69: no leave handshake, the server never runs §2 |
-| E2 | `d2-server/src/adapters/session_flow.rs:387-391` (`SessionFault::NotSaved`) | save-exit §2 r2 | missing | the leave records "not saved" instead of writing the character before 0x05 |
-| E3 | `d2-client/src/app/play.rs:550-555` → `app/save.rs:351` | save-exit §2 r2, §3 | moved | the `.d2s` is written by the client app after `app.run()` returns, reading the server's live state through the link; correct bytes possibly, but not at the spec's point (before 0x05) and never periodically (T1) |
+| E1 | `d2-client/src/app/save.rs:415-418` (`request_save_and_exit`: `AppExit` only), called at `world_view/present.rs:655-657` | save-exit §1 r2 | missing — **fixed** (q-fix-flow-save) | Save and Exit sends no C→S 0x69: no leave handshake, the server never runs §2 |
+| E2 | `d2-server/src/adapters/session_flow.rs:387-391` (`SessionFault::NotSaved`) | save-exit §2 r2 | missing — **fixed** (q-fix-flow-save) | the leave records "not saved" instead of writing the character before 0x05 |
+| E3 | `d2-client/src/app/play.rs:550-555` → `app/save.rs:351` | save-exit §2 r2, §3 | moved — **fixed** (q-fix-flow-save) | the `.d2s` is written by the client app after `app.run()` returns, reading the server's live state through the link; correct bytes possibly, but not at the spec's point (before 0x05) and never periodically (T1) |
 
 ## 3. Fixed here
 

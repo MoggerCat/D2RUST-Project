@@ -85,8 +85,9 @@ pub fn skipped_art() -> TileArt {
 }
 
 // d2rs-own, unverified (D1): the unit facts the model lacks are zero, the
-// sight test answers visible. Flag-ex 0x80 is the last frame's sight test
-// (`MapState` keeps it, `draw-order.md` §5 r3).
+// sight test answers visible (with the unit tables the feed runs the test
+// of `draw-order-2.md` §15, `model_feed::preview_facts`). Flag-ex 0x80 is
+// the last frame's sight test (`MapState` keeps it, `draw-order.md` §5 r3).
 /// The facts of a room unit in the preview.
 pub fn unit_facts(world: &ClientWorld, unit: &ClientUnit) -> UnitFacts {
     UnitFacts {

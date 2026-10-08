@@ -295,7 +295,7 @@ fn clicking_an_object_walks_to_it_and_operates_it() {
     let cell = app.world().resource::<BridgeResource>().0.world().units[&key]
         .position
         .expect("object cell");
-    let (x, y) = hover::feet(&cam, cell);
+    let (x, y) = hover::unit_feet(&cam, key.unit_type, cell);
     let at = Point::new(x, y - 20);
     queue(
         &mut app,

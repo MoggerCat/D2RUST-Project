@@ -351,7 +351,6 @@ impl VendorRest for Rest {
     }
     fn recharge(&mut self, _: UnitId) {}
     fn repair_broken(&mut self, _: UnitId) {}
-    fn send_item_stat(&mut self, _: UnitId, _: UnitId, _: u16) {}
     fn send_transaction(&mut self, p: UnitId, t: Transaction) {
         let m = npc::transaction(t.kind, t.code, t.guid, t.gold as u32);
         self.sent.push((p, m.to_vec()));
