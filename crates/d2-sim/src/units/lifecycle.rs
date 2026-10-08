@@ -68,6 +68,12 @@ pub trait LifecycleHooks: UnitHooks {
     /// The default keeps no paths.
     fn ground_item_placed(&mut self, item: UnitId, room: RoomId, x: i32, y: i32) {}
 
+    /// The room lies in a town level (`0x0061AB00`). The default knows no
+    /// levels.
+    fn town_room(&self, game: &crate::game::Game, room: RoomId) -> bool {
+        false
+    }
+
     /// The free routine's other calls (§1 table) and `0x005C0A90`,
     /// `0x00571F40` at removal. Provider: the kind's spec.
     fn free_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}

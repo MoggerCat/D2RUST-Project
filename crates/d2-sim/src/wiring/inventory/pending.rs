@@ -289,8 +289,16 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     ) -> Option<Spot> {
         self.rest.free_spot(start, origin, size, mask, mask2, last)
     }
+    /// `0x0061AB00` on the player's room through the unit side's levels
+    /// (REC-281: the stash page needs a town, `inventory-moves.md` §7.3),
+    /// else the rest's answer.
     fn in_town(&self, player: Owner) -> bool {
-        self.rest.in_town(player)
+        let room = self
+            .unit_of(player)
+            .and_then(|u| self.econ.game.lists.unit(u))
+            .and_then(|e| e.room());
+        room.is_some_and(|r| self.econ.hooks.town_room(self.econ.game, r))
+            || self.rest.in_town(player)
     }
     fn room_delete_notice(&mut self, item: Guid) {
         self.rest.room_delete_notice(item)

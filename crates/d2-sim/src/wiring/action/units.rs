@@ -371,6 +371,9 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
     fn request_act_change(&mut self, player: UnitId, level: u32, arg: u32) {
         self.act_changes.push((player, level, arg));
     }
+    fn town_room(&self, game: &Game, room: crate::units::RoomId) -> bool {
+        self.drlg.in_town(game, room)
+    }
     fn path_xy(&self, unit: UnitId) -> Option<(i32, i32)> {
         self.path_has(unit).then(|| self.path_position(unit))
     }
