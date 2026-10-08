@@ -15,8 +15,7 @@
 //! them.
 //!
 //! The belt is `hud_belt`. Not drawn: the 640 × 480 variant of §8, the
-//! tool tips and the globe numbers (they need the string table by id,
-//! `NoStrings` in play).
+//! globe numbers (they need text widths); the tool tips are `hud_tips`.
 //!
 //! Preview fills (decision D1), each `// d2rs-own, unverified`:
 //! - the bars' lines and rectangle are cels of a synthetic one-colour file
@@ -449,6 +448,19 @@ impl Panel for HudUi {
                 }
             }
         }
+        // Tool tips (§4 r1, §6 r1/r4, §8 r1), last so they draw on top.
+        super::hud_tips::draw_tips(
+            &super::hud_tips::TipIn {
+                w,
+                h,
+                mouse,
+                mini_open,
+                state9_open: sh.states.is_open(9),
+                exp: exp_in,
+                strings: ctx.strings,
+            },
+            out,
+        );
         // The skill select panel (state 3, d2rs-own, unverified).
         if sh.states.is_open(UI_SKILL_SELECT) {
             for (skill, at) in select_icons(world, hud.select_left, w, h) {
