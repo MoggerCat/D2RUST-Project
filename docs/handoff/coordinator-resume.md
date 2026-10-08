@@ -46,6 +46,10 @@ rules are `docs/handoff/build-loop.md`, the task rows are
   replaces q-config's simple Esc Options page with the full menu tree).
   Use REC-187.
 
+## Merge log (third coordinator)
+
+Merged into staging: q-belt-stash, q-strings-bind, q-fe-start-flow, q-cube-gaps, q-shrines-labels, q-lighting-detail, q-client-collision, q-save-gaps, q-fe-draw (6,984 tests). Sent back: q-fe-host-screens (keep front_start's registry and q-fe-draw's glyph text; drop its duplicates). New follow-ups from these: lighting blocks-light flags / near-room fills (q-lighting-detail), shrine overhead text 0x26 type 5 (q-shrines-labels; maybe q-unit-fx), 0x61 act videos (q-fe-start-flow), HUD globe numbers (q-strings-bind).
+
 ## REC ids
 
 PC 1 loop (`docs/handoff/pc1-loop.md`, branch `claude/local-pc1-s8`): REC-300..349 are PC 1's; cloud ids stay below 300. Merge that branch into staging like a task branch (it changes specs/docs, plus `// Covers:` lines); turn its `q-fix-*` rows into sessions.
