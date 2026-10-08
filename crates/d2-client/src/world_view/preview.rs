@@ -304,7 +304,13 @@ impl Preview {
         if !matches!(tile.kind, TileKind::ShadowTile) {
             let grids = self.tiles.grids(&key).unwrap_or_default();
             let shades = self.light.block_shades(
-                tile.kind, &tile.dt1, tile.cell, tile.alpha, blend, blocks, grids,
+                tile.kind,
+                &tile.dt1,
+                tile.cell,
+                (tile.alpha, tile.fade_state),
+                blend,
+                blocks,
+                grids,
             );
             if !shades.is_empty() {
                 if let Ok(k) = DrawKey::new(tile.key.pass, tile.key.major, tile.key.minor, 0) {

@@ -812,6 +812,9 @@ fn wall_fade_runs_through_the_frame() {
     assert_eq!((w.fade.state, w.fade.end), (3, 10_500));
     assert_eq!(w.fade.alpha, 0xFF);
     assert_eq!(tiles(&o)[0].alpha, 0xFF);
+    // The draw gets the state the filing left: the faded light points from
+    // the first drawn frame on (`lighting.md` §11 r2).
+    assert_eq!(tiles(&o)[0].fade_state, 3);
     // Record flag 0x4: no target update.
     n.rooms[0].walls[0] = record((10, 10), 1, 1);
     n.rooms[0].walls[0].flags |= REC_NO_FADE;
@@ -1242,6 +1245,7 @@ fn ordered(kind: TileKind, cell: (i32, i32)) -> OrderedTile {
         cell,
         dt1: Dt1Facts::default(),
         alpha: 0xFF,
+        fade_state: 0,
         key: OrderKey {
             pass: 0,
             major: 0,

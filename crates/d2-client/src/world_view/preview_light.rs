@@ -409,14 +409,15 @@ impl PreviewLight {
     }
 
     /// The per-block shades of a tile (§11 r2–r4, `shading.md` §4); empty
-    /// in full bright or when the tile keeps its flat shade.
+    /// in full bright or when the tile keeps its flat shade. `fade`: the
+    /// record's alpha byte and fade state.
     #[allow(clippy::too_many_arguments)]
     pub fn block_shades(
         &self,
         kind: TileKind,
         dt1: &Dt1Facts,
         cell: (i32, i32),
-        alpha: u8,
+        fade: (u8, u8),
         blend: crate::scene::BlendOp,
         blocks: &[crate::rules::BlockRect],
         grids: &[(u8, u8)],
@@ -430,7 +431,7 @@ impl PreviewLight {
             kind,
             dt1,
             cell,
-            alpha,
+            fade,
             blend,
             blocks,
             grids,
