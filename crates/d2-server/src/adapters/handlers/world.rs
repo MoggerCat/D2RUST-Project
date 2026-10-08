@@ -961,6 +961,8 @@ pub struct PreviewMoveRest {
     /// writes made since ([`MoveRest::stage_quest_flags`]).
     quest_flags: BTreeMap<Owner, d2_sim::world::quests::QuestFlags>,
     quest_writes: Vec<(Owner, u8, u8, bool)>,
+    /// The skill seams over the players' lists (REC-266).
+    skills: super::items::moves::preview_skills::PreviewSkills,
 }
 
 impl MovePending for PreviewMoveRest {
@@ -1029,6 +1031,33 @@ impl PreviewMoveRest {
 }
 
 impl InvRest for PreviewMoveRest {
+    fn mouse_skill(&self, u: Owner, left: bool) -> Option<(i32, i32)> {
+        self.skills.mouse_skill(u, left)
+    }
+    fn select_skill(&mut self, u: Owner, left: bool, skill: (i32, i32)) {
+        self.skills.select_skill(u, left, skill)
+    }
+    fn has_skill_owned(&self, u: Owner, skill: (i32, i32)) -> bool {
+        self.skills.has_skill_owned(u, skill)
+    }
+    fn throw_skill_row(&self, skill: i32) -> bool {
+        self.skills.throw_skill_row(skill)
+    }
+    fn saved_mouse_skill(&self, u: Owner, left: bool) -> (i32, i32) {
+        self.skills.saved_mouse_skill(u, left)
+    }
+    fn set_saved_mouse_skill(&mut self, u: Owner, left: bool, skill: (i32, i32)) {
+        self.skills.set_saved_mouse_skill(u, left, skill)
+    }
+    fn skill_quantity(&self, u: Owner, skill: i32) -> Option<i32> {
+        self.skills.skill_quantity(u, skill)
+    }
+    fn set_skill_quantity(&mut self, u: Owner, skill: i32, q: i32) {
+        self.skills.set_skill_quantity(u, skill, q)
+    }
+    fn learn_skill(&mut self, u: Owner, skill: i32) {
+        self.skills.learn_skill(u, skill)
+    }
     /// d2rs-own, unverified (D1): the staged place of a unit.
     fn pos(&self, u: Owner) -> (i32, i32) {
         self.places.get(&u).map_or((0, 0), |p| p.pos)
@@ -1088,8 +1117,27 @@ impl InvRest for PreviewMoveRest {
 }
 
 impl MoveRest for PreviewMoveRest {
+    fn stage_skills(
+        &mut self,
+        stage: super::items::moves::preview_skills::SkillStage,
+        tables: &InvTables,
+    ) {
+        if self.skills.throw_rows.is_empty() {
+            self.skills.throw_rows =
+                super::items::moves::preview_skills::throw_rows(&stage.tables, &tables.equiv);
+        }
+        self.skills.stage = Some(stage);
+    }
+    fn take_skills(&mut self) -> Option<super::items::moves::preview_skills::SkillStage> {
+        self.skills.stage.take()
+    }
+    fn queue_sent(&mut self, sent: Vec<(Owner, Vec<u8>)>) {
+        self.sent.extend(sent);
+    }
     fn take_sent(&mut self) -> Vec<(Owner, Vec<u8>)> {
-        std::mem::take(&mut self.sent)
+        let mut sent = std::mem::take(&mut self.sent);
+        sent.append(&mut self.skills.sent);
+        sent
     }
     fn stage(&mut self, places: &[StagedPlace], item_format: u16) {
         self.places = places.iter().map(|p| (p.owner, *p)).collect();
@@ -1150,5 +1198,8 @@ pub fn preview_inv_parts(tables: InvTables) -> InvParts {
     // PROVISIONAL (REC-161, d2rs-own, unverified): worn items feed the
     // wearer's stats, set bonuses included (`wiring/inventory/item_link.rs`).
     parts.state.link_item_stats = true;
+    // PROVISIONAL (REC-266, d2rs-own, unverified): the weapon in use is the
+    // right-hand item (the play host has the skill lists it needs).
+    parts.state.weapon_hand_fallback = true;
     parts
 }

@@ -153,8 +153,14 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> EquipWorld for InvDesk<'_, '_, H, R
         self.state.inventories.get(&u)?.body_item(loc)
     }
     fn weapon_in_use(&self, u: UnitId) -> Option<UnitId> {
-        let g = self.state.inventories.get(&u)?.weapon_guid;
-        self.item_unit(g)
+        let inv = self.state.inventories.get(&u)?;
+        // d2rs-own, unverified (REC-266): `weapon_hand_fallback`.
+        self.item_unit(inv.weapon_guid).or_else(|| {
+            self.state
+                .weapon_hand_fallback
+                .then(|| inv.body_item(body::RIGHT_HAND))
+                .flatten()
+        })
     }
     fn add_unit_stat(&mut self, u: UnitId, stat: u16, d: i32) {
         self.econ

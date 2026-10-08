@@ -281,6 +281,25 @@ impl SkillList {
         Ok(())
     }
 
+    /// Remove the entry at `i` (`skills/levels.md` §7.1 step 6, assign
+    /// with remove 1): the hands that referenced it were re-pointed
+    /// first; the indices of later entries shift down. A hand still on
+    /// the entry is cleared (d2rs: the original frees it, `msg-skills.md`
+    /// §2 rule 6 refuses that case; callers select Attack first).
+    pub fn remove(&mut self, i: usize) {
+        if i >= self.entries.len() {
+            return;
+        }
+        self.entries.remove(i);
+        for h in [&mut self.left, &mut self.right, &mut self.current] {
+            *h = match *h {
+                Some(x) if x == i => None,
+                Some(x) if x > i => Some(x - 1),
+                o => o,
+            };
+        }
+    }
+
     /// The (skill, level) entries of the join's S→C 0x94 (`0x0053C5D0`,
     /// §3 rule 1 layout).
     ///
