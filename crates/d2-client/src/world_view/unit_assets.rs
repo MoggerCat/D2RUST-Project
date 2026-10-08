@@ -526,7 +526,7 @@ impl UnitArtLoader {
         codes: &ComponentCodes,
         format: FileFormat,
         assets: &mut ViewAssets,
-    ) -> Result<(CanonicalPath, FileFacts, Vec<Vec<CelBox>>), Option<String>> {
+    ) -> Result<StoredFile, Option<String>> {
         let file = codes.file(format);
         let src = self.source.as_ref();
         let loaded = match format {
@@ -550,7 +550,7 @@ impl UnitArtLoader {
         format: FileFormat,
         loaded: Loaded,
         assets: &mut ViewAssets,
-    ) -> Result<(CanonicalPath, FileFacts, Vec<Vec<CelBox>>), String> {
+    ) -> Result<StoredFile, String> {
         let path = codes.path(format).map_err(|e| e.to_string())?;
         let mut sets = Vec::new();
         let cels = cel_boxes(&loaded);
@@ -638,6 +638,10 @@ fn cel_boxes(loaded: &Loaded) -> Vec<Vec<CelBox>> {
             .collect(),
     }
 }
+
+/// A stored component file: its path, facts and cel fields by direction
+/// and frame.
+type StoredFile = (CanonicalPath, FileFacts, Vec<Vec<CelBox>>);
 
 /// A unit art file read through [`FileSource::read_native`].
 enum Loaded {

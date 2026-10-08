@@ -975,7 +975,10 @@ pub fn addressed_unit(msg: &[u8]) -> Option<UnitKey> {
 /// state (camera, COF and cel stores: `world_view::visibility`); the
 /// bridge only calls it.
 #[derive(Clone)]
-pub struct VisibleFn(Arc<dyn Fn(&ClientUnit, i32, i32) -> bool + Send + Sync>);
+pub struct VisibleFn(Arc<Visible>);
+
+/// The closure behind a [`VisibleFn`].
+type Visible = dyn Fn(&ClientUnit, i32, i32) -> bool + Send + Sync;
 
 impl VisibleFn {
     pub fn new(f: impl Fn(&ClientUnit, i32, i32) -> bool + Send + Sync + 'static) -> Self {
