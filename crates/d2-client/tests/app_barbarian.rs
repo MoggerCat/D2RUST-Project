@@ -139,17 +139,29 @@ fn whirlwind_spends_mana_and_moves_the_barbarian() {
 }
 
 // Covers: specs/skills/bodies-2.md §4.7
+// The landing of a player's Leap is a knockback (result 9) with a zeroed
+// damage record (`bodies-2.md` §4.7): the barbarian lands exactly on the
+// aimed point and the monster standing there loses no life.
 #[test]
-fn leap_landing_hurts_a_monster_at_the_landing_point() {
+fn leap_lands_on_the_aimed_point_and_deals_no_damage() {
     let mut r = Rig::new(&[LEAP]);
     r.leave_town();
     r.select_right(LEAP);
-    let m = r.spawn_monster(5);
-    let life0 = r.life(m);
+    let m = r.spawn_monster(4);
+    let (life0, from) = (
+        r.life(m),
+        r.with(|sim, p| sim.events.action.sys.hooks.path_position(p)),
+    );
     r.right_click_point(5, 0);
     r.step(40);
+    let to = r.with(|sim, p| sim.events.action.sys.hooks.path_position(p));
     let errors = r.errors();
-    assert!(r.life(m) < life0, "the landing hurt the monster ({errors})");
+    assert_eq!(
+        to,
+        (from.0 + 5, from.1),
+        "landed on the aimed point ({errors})"
+    );
+    assert_eq!(r.life(m), life0, "the landing is a knockback only");
 }
 
 // Covers: specs/skills/bodies-2b.md §6.11, §6.12
@@ -166,4 +178,32 @@ fn leap_attack_leaps_to_the_monster_and_strikes_it() {
     let errors = r.errors();
     assert!(r.mana() < mana0, "Leap Attack spent mana ({errors})");
     assert!(r.life(m) < life0, "the strike hurt the monster ({errors})");
+}
+
+// Covers: specs/skills/bodies-2.md §3.10, §3.11, §2.5, §2.6
+#[test]
+fn dragon_talon_kick_hurts_a_monster() {
+    let mut r = Rig::new(&[DRAGON_TALON]);
+    r.leave_town();
+    r.select_right(DRAGON_TALON);
+    let m = r.spawn_monster(1);
+    let life0 = r.life(m);
+    r.right_click_unit(m);
+    r.step(30);
+    let errors = r.errors();
+    assert!(r.life(m) < life0, "the kick hurt the monster ({errors})");
+}
+
+// Covers: specs/skills/bodies-2b.md §7.20
+#[test]
+fn dragon_flight_kick_hurts_a_monster() {
+    let mut r = Rig::new(&[DRAGON_FLIGHT]);
+    r.leave_town();
+    r.select_right(DRAGON_FLIGHT);
+    let m = r.spawn_monster(1);
+    let life0 = r.life(m);
+    r.right_click_unit(m);
+    r.step(30);
+    let errors = r.errors();
+    assert!(r.life(m) < life0, "the kick hurt the monster ({errors})");
 }
