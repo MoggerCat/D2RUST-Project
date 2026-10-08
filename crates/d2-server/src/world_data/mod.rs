@@ -32,7 +32,7 @@ use d2_sim::drlg::outdoor::{OutdoorData, SubFile, SubFileMap, SubFiles, SubGroup
 use d2_sim::drlg::preset::{
     Ds1File, Ds1Input, Ds1ObjectInput, Ds1PathInput, Ds1Source, PresetData, PresetError,
 };
-use d2_sim::drlg::tiles::{CellGrid, FIXED_LIBRARY};
+use d2_sim::drlg::tiles::{CellGrid, ACT_EDGE_TILE, FIXED_LIBRARY};
 use d2_sim::drlg::{DrlgData, TileInfo, TileSource};
 
 /// The tile prefix of `fixups.md` §12 (`DATA\GLOBAL\TILES\`).
@@ -225,8 +225,8 @@ pub struct WorldFiles {
 
 impl WorldFiles {
     /// Loads every DS1 named by a lvlprest `File1`–`File6` or lvlsub
-    /// `File` string and every DT1 named by a lvltypes `File` string or
-    /// the fixed library. `read` gets the archive name ([`archive_name`])
+    /// `File` string and every DT1 named by a lvltypes `File` string, the
+    /// fixed library or an act's base library. `read` gets the archive name ([`archive_name`])
     /// and returns the file's bytes.
     pub fn load(
         drlg: &DrlgData,
@@ -289,6 +289,21 @@ impl WorldFiles {
             out.dt1
                 .0
                 .insert(path.to_vec(), dt1.tiles.iter().map(tile_info).collect());
+        }
+        // The acts' base libraries (`levels.md` §3 step 5), read by the
+        // client's edge floor record (`render/draw-order-2.md` §14). A
+        // library the install lacks is left out: only a level drawing edge
+        // floors needs it, and the client reports it there.
+        for &(path, _) in ACT_EDGE_TILE.iter().flatten() {
+            match dt1(path) {
+                Ok(d) => {
+                    out.dt1
+                        .0
+                        .insert(path.to_vec(), d.tiles.iter().map(tile_info).collect());
+                }
+                Err(WorldDataError::Read { .. }) => {}
+                Err(e) => return Err(e),
+            }
         }
         Ok(out)
     }

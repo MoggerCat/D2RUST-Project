@@ -162,7 +162,7 @@ pub fn camera_for(w: &ClientWorld, open_mode: u8) -> Option<Camera> {
     let (x, y) = w.local()?.cell();
     let at = moving_to_client((u32::from(x) << 16) | 0x8000, (u32::from(y) << 16) | 0x8000);
     let mode = OpenMode::new(open_mode).unwrap_or(OpenMode::NONE);
-    Some(Camera::new(FrameSize::D2RS, mode, at, (0, 0)))
+    Some(Camera::new(FrameSize::play(), mode, at, (0, 0)))
 }
 
 #[cfg(test)]

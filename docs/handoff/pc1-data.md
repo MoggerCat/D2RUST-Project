@@ -103,3 +103,31 @@ newest-first, and set each row's status to `done <commit>`.
 - REC ids for any provisional note: REC-300..REC-349.
 - The coordinator polls `claude/local-pc1-facts` and the private repo's
   `main`; no message is needed.
+
+## Step 4 — binary reads and one recording only PC 1 can do (queued by the coordinator, 2026-10-08)
+
+Cloud sessions now record 1.14d themselves under Wine (REC-290 RNG half
+equal to PC 1's traces; `tools/cloud-game/`), so PC 1 keeps only what
+needs `re/` or a real Windows run. Each answer goes into its owner spec
+(prose / authored pseudocode, addresses); a code disagreement becomes a
+`q-fix-*` row.
+
+1. **Vitals dx/dy sign (top suspect for the remaining rubber-banding).**
+   S→C 0x18 / 0x95 / 0x96: the server side `0x00548760` vs the client
+   side `0x0045DC50` / `0x0045DB20`. `combat/vitals.md` §5.2/§5.4 and
+   `client/msg-units.md` §5 r3 contradict each other; the ignored test
+   of row `q-fix-proto-vitals-dx-sign` / `q-fix-seam-vitals-delta` is
+   ready.
+2. **Esc menu pause in single player** (`client/bridge.md` §8 r5; rows
+   `q-fix-ui-pause`, `q-fix-seam-pause`): does 1.14d stop the game loop
+   under the Esc menu, and from which call.
+3. **Hireling target search range**: 20 sub-tiles (REC-100) vs 35
+   (REC-279).
+4. **x87 precision at start-up (REC-21)**: the C runtime start-up's
+   control word; settles five provisional points.
+5. **REC-290 tick half**: `record_tick.py --auto ScnAma --seed 1234
+   --ticks 600` on PC 1, committed as a trace, so the cloud can compare
+   its Wine run (equal except ms between two Wine runs).
+6. UI spec gaps from `docs/handoff/q-ui-audit.md`: menu-box window
+   handlers 0x0E/1, drop cell `0x00486BD0`, gamble flag (panels-2 §14
+   r11 vs menus §4.2), waypoint level names.

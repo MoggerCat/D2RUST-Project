@@ -1044,6 +1044,29 @@ fn requirements_stats() {
     assert!(requirements_met(&w, &t, Some(s), PLAYER, false));
 }
 
+// Covers: specs/items/inventory.md §4.2 r3, §4.2 r4
+#[test]
+fn requirements_q1_dexterity_has_no_link_test() {
+    let (mut t, mut w, s) = req_setup();
+    // Q1: reqdex 50, dex 55, item not linked, a socketed +10 dex filler.
+    t.items[R_SWORD].reqdex = 50;
+    w.unit_stats.insert((PLAYER, stat::STRENGTH), 100);
+    w.unit_stats.insert((PLAYER, stat::DEXTERITY), 55);
+    w.p(s).active = false;
+    w.p(s).contribution.insert(stat::DEXTERITY, 10);
+    // Dexterity: no link test, 55 − 10 < 50 → fail (equipping only).
+    assert!(requirements_met(&w, &t, Some(s), PLAYER, false));
+    assert!(!requirements_met(&w, &t, Some(s), PLAYER, true));
+    // Strength (reqstr 50, str 55, filler str 10): unlinked → no
+    // subtraction → passes.
+    t.items[R_SWORD].reqdex = 0;
+    t.items[R_SWORD].reqstr = 50;
+    w.unit_stats.insert((PLAYER, stat::STRENGTH), 55);
+    w.p(s).contribution.clear();
+    w.p(s).contribution.insert(stat::STRENGTH, 10);
+    assert!(requirements_met(&w, &t, Some(s), PLAYER, true));
+}
+
 // Covers: specs/items/inventory.md §4.2 r6
 #[test]
 fn requirements_identified_book_class() {

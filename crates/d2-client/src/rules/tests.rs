@@ -644,6 +644,31 @@ fn cpu_golden_scene_through_original_view() {
     assert_eq!(got, want);
 }
 
+// Covers: specs/render/unit-composite.md §4
+#[test]
+fn units_failing_the_cof_box_pre_test_are_not_drawn() {
+    let (world, mut assets, scene) = golden_scene();
+    let view = OriginalView::new(camera(0, pos(1000, 2000)), &Fixture, &scene);
+    let path = CanonicalPath::new(COF).unwrap();
+    // Final (X, Y): player (400, 292), object (520, 340); W − 1 = 799.
+    // x_min 398: 798 < 799 for the player, 918 for the object.
+    assets.cofs.get_mut(&path).unwrap().x_min = 398;
+    let f = world_view::build(&world, &[], &view, &assets).unwrap();
+    assert_eq!((f.units_drawn, f.units_hidden), (1, 1));
+    // x_min 399: 799 is not < 799.
+    assets.cofs.get_mut(&path).unwrap().x_min = 399;
+    let f = world_view::build(&world, &[], &view, &assets).unwrap();
+    assert_eq!((f.units_drawn, f.units_hidden), (0, 2));
+    // y_max + Y ≥ 0: −292 keeps the player, −293 drops it.
+    let c = assets.cofs.get_mut(&path).unwrap();
+    (c.x_min, c.y_max) = (0, -292);
+    let f = world_view::build(&world, &[], &view, &assets).unwrap();
+    assert_eq!((f.units_drawn, f.units_hidden), (2, 0));
+    assets.cofs.get_mut(&path).unwrap().y_max = -293;
+    let f = world_view::build(&world, &[], &view, &assets).unwrap();
+    assert_eq!((f.units_drawn, f.units_hidden), (1, 1));
+}
+
 // M08: moving the player by one client pixel changes exactly the
 // non-player pixels.
 // Covers: specs/render/camera.md §3
@@ -785,13 +810,17 @@ fn roofs_and_floors_are_not_culled_per_block() {
     }
 }
 
-// Units have no view-rectangle test: a unit far outside the view is still
+// Units have no view-rectangle test: a unit far outside the view whose
+// COF box still reaches into the frame (`unit-composite.md` §4) is
 // placed; its pixels are cut by the frame clip only.
 // Covers: specs/render/camera.md §7, §10
 #[test]
 fn units_are_not_culled_by_the_view() {
-    let (world, assets, mut scene) = golden_scene();
+    let (world, mut assets, mut scene) = golden_scene();
     scene.tiles.clear();
+    // A COF box reaching 5,000 pixels left of the unit.
+    let path = CanonicalPath::new(COF).unwrap();
+    assets.cofs.get_mut(&path).unwrap().x_min = -5_000;
     // The object 2,000 client pixels right of the player.
     scene.units[1].1 = UnitPosition::Static {
         sx: 163 + 125,
@@ -843,7 +872,7 @@ fn the_preview_edge_clip_places_a_cut_cel() {
 // Per-block shade (shading §4, lighting §11 r2: each 32-pixel block has
 // its own light): one draw per block clipped to it, the gradient moved to
 // the block's screen position; a culled block (camera §7) draws nothing.
-// Covers: specs/render/shading.md §4 r4; specs/render/lighting.md §11 r2
+// Covers: specs/render/shading.md §4 r4; specs/render/lighting.md §11 r2, §11 r3
 #[test]
 fn tile_blocks_draw_one_item_per_block() {
     use crate::scene::{GradientKind, LightGradient, MapId};
@@ -894,9 +923,18 @@ fn tile_blocks_draw_one_item_per_block() {
     assert_eq!(draws[1].blend, BlendOp::IndexTableSrcRow(MapId(9)));
     let g = draws[1].shade.gradient().unwrap();
     assert_eq!((g.x, g.y), (whole.x + 32, 360));
-    assert!(draws
-        .iter()
-        .all(|d| (d.x, d.y, &d.frame) == (whole.x, whole.y, &whole.frame)));
+    // shading.md §4 r4: each block draws its own image (frame 1 + i of
+    // the tile's set) at its own position, so it lights only its pixels.
+    let at: Vec<_> = draws.iter().map(|d| (d.x, d.y, d.frame.index)).collect();
+    assert_eq!(at, vec![(whole.x, 360, 1), (whole.x + 32, 360, 2)]);
+    assert!(draws.iter().all(|d| d.frame.set == whole.frame.set));
+    // A shade of a block the tile does not have, in order: an error.
+    let mut wrong = shades;
+    wrong.reverse();
+    assert!(view.tile_draws(&tile, &image, &wrong).is_err());
+    // A left-out block (wall alpha) keeps the others' indexes.
+    let draws = view.tile_draws(&tile, &image, &shades[1..]).unwrap();
+    assert_eq!((draws[0].x, draws[0].frame.index), (whole.x + 32, 2));
     // No per-block shade: the whole tile, unchanged.
     assert_eq!(view.tile_draws(&tile, &image, &[]).unwrap(), vec![whole]);
     // Mode 2: block 0 culled (x 336 < 368), only block 1 drawn.
@@ -904,4 +942,5 @@ fn tile_blocks_draw_one_item_per_block() {
     let draws = view.tile_draws(&tile, &image, &shades).unwrap();
     assert_eq!(draws.len(), 1);
     assert_eq!(draws[0].clip, Rect::new(368, 360, 32, 32));
+    assert_eq!((draws[0].x, draws[0].frame.index), (368, 2));
 }

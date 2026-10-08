@@ -28,12 +28,14 @@ pub fn monster_drop_gate(flags: u32, collision: u32, class: u32) -> Result<bool,
     if flags & UNIT_FLAG_NO_DROP != 0 {
         return Ok(false);
     }
-    if collision != 0 {
-        return Ok(false);
-    }
-    // Spec order: flag, collision, then the bonewall check.
+    // Spec order (§3.1, `0x005A6830`): flag, then the bonewall check
+    // **before** the collision test (a bone wall on a blocked spot is
+    // fatal too), then collision.
     if class == CLASS_BONEWALL {
         return Err(TreasureError::BonewallDrop);
+    }
+    if collision != 0 {
+        return Ok(false);
     }
     Ok(true)
 }
