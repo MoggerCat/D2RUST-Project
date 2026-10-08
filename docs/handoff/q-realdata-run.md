@@ -100,7 +100,24 @@ needs `D2_SAVE`.
 
 ## Play smoke on the real install
 
-PLAY_SMOKE_PLACEHOLDER
+`target/release/d2-client play --frames 600` under `xvfb-run` with
+llvmpipe (Mesa 25.2.8, Vulkan, `device_type: Cpu`; needs
+`libxkbcommon-x11-0` besides the cloud-setup libraries, else winit panics
+at start):
+- data line: `play: game data from D2_GAME_DIR (137 levels, 573 objects,
+  waypoint object class 119; level files: 2043 DS1, 34 lvlsub DS1, 241
+  DT1)`, `single player: seed 1234, waypoint unit UnitId(0) (GUID 1)`:
+  equal to PC 1's round 2;
+- then, at the first frame, the render error `draw item 653: drawn area
+  Rect { x: 560, y: 296, width: 32, height: 32 } leaves the gradient block
+  Rect { x: 560, y: 296, width: 32, height: 15 }` (`world_view_frame`),
+  exit 101: the same as PC 1 round 2 on a real GPU, so **the live play
+  panic reproduces in the cloud** (`q-fix-play-gradient-block` can be
+  fixed and checked without the developer PC).
+- `play --synthetic --frames 500` for comparison: 500 frames, 210 server
+  ticks, node frames 207, refused 0, `gpu: true`, then exit 101 at
+  `crates/d2-client/src/app/play.rs:551` after `app.run()`
+  (`q-fix-play-exit-resource`, known).
 
 `d2-client` `play_smoke` has no real-install path: its live tests run on
 the five-act fixture install (`docs/handoff/q-play-smoke.md`, "the same
