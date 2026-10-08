@@ -41,6 +41,7 @@ pub mod monster_walk;
 pub mod near_rooms;
 pub mod node;
 pub mod object_click;
+pub mod object_label;
 pub mod overlay;
 pub mod panel_art;
 pub mod present;

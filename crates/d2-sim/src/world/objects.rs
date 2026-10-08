@@ -33,7 +33,7 @@ mod tests;
 pub use chests::ChestWorld;
 pub use mech::MechWorld;
 pub use misc::MiscWorld;
-pub use shrines::ShrineWorld;
+pub use shrines::{ShrineWorld, StateList, StateRequest};
 
 /// `objects.txt` rows the dispatchers accept (§3 rule 5).
 pub const CLASS_BOUND: u16 = 573;

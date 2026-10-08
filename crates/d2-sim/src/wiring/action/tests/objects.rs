@@ -961,3 +961,41 @@ fn shrine_hover_is_kept_sent_and_expires() {
     });
     assert_eq!(fx.sim.sys.units.get(o).unwrap().hover, None);
 }
+
+// Covers: specs/world/objects.md §9.2
+#[test]
+fn a_shrine_state_carries_its_stats_and_ends_on_its_tick() {
+    // Code 7 (armor shrine `0x005839B0`): state 129 on the player for the
+    // row's duration, stat 25 = arg1 and to-hit on the same list; the
+    // type-12 timer frees the list on the expiry frame.
+    let mut fx = fx();
+    let o = create(&mut fx, TORCH, 20);
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 22, 20);
+    let mut s: d2_data::tables::Shrines = blank();
+    s.code = 7;
+    s.arg0 = 50;
+    s.arg1 = 25;
+    s.duration_in_frames = 5;
+    let start = fx.game.frame;
+    let r = fx.sim.objects(&mut fx.game, |_, t, w| {
+        crate::world::objects::shrines::effect(t, w, o, p, &s)
+    });
+    assert_eq!(r, Some(Ok(())));
+    assert!(fx
+        .sim
+        .with(&mut fx.game, |_, v| v.state_list(p, 129).is_some()));
+    assert_eq!(fx.stat(p, 25), 25);
+    assert!(fx.timers(p).contains(&(12, start + 5)));
+    while fx.game.frame < start + 4 {
+        fx.frame();
+    }
+    assert_eq!(fx.stat(p, 25), 25);
+    fx.frame();
+    assert_eq!(fx.game.frame, start + 5);
+    assert!(fx
+        .sim
+        .with(&mut fx.game, |_, v| v.state_list(p, 129).is_none()));
+    assert_eq!(fx.stat(p, 25), 0);
+    fx.assert_clean();
+}
