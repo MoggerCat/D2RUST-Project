@@ -19,7 +19,11 @@
 //! The weapon in use is the right-hand item (body location 4) with a
 //! hand class; the skills, not combat, see it (`UseRest::skill_weapon`),
 //! because the preview's equipped items do not feed the player's damage
-//! stats.
+//! stats; q-weapon-combat links the worn items' stat lists to the wearer
+//! (`d2-sim` `InvDesk::link_item_stats`), so combat reads the same weapon
+//! ([`LocalSeams`]'s `Pending::current_weapon`, `wield_type`).
+//! d2rs-own, unverified (REC-158): the grip is 2 for a two-handed base
+//! item (`0x0063D340` is not written for the preview).
 
 use std::collections::BTreeMap;
 
@@ -53,6 +57,8 @@ pub struct ItemFacts {
     pub shoots: bool,
     pub stackable: bool,
     pub max_stack: i32,
+    /// The grip (`0x0063D340`): 2 for a two-handed base item, else 1.
+    pub grip: i32,
 }
 
 /// A player's hands.
@@ -141,6 +147,11 @@ fn facts_of(t: &InvTables, record: usize) -> ItemFacts {
     } else {
         (class::HAND_TO_HAND, false)
     };
+    let grip = if t.item(record).is_some_and(|r| r.twohanded != 0) {
+        2
+    } else {
+        1
+    };
     let (stackable, max_stack) = t
         .item(record)
         .map_or((false, 0), |r| (r.stackable != 0, r.maxstack as i32));
@@ -153,6 +164,7 @@ fn facts_of(t: &InvTables, record: usize) -> ItemFacts {
         shoots,
         stackable,
         max_stack,
+        grip,
     }
 }
 
@@ -288,5 +300,30 @@ mod tests {
         assert_eq!(w.item_at(p, body::HEAD), None);
         assert!(w.item_is(bow, 1) && !w.item_is(quiver, 1));
         assert_eq!(w.hand_class(UnitId(2)), class::HAND_TO_HAND);
+    }
+
+    // Covers: specs/combat/damage.md §3.2 r1
+    #[test]
+    fn combat_reads_the_weapon_in_use() {
+        use d2_sim::wiring::action::Pending;
+        let t = tables();
+        let (sword, p) = (UnitId(7), UnitId(1));
+        let mut seams = LocalSeams::default();
+        assert_eq!(seams.current_weapon(p), None, "bare hands");
+        let w = &mut seams.weapons;
+        w.items.insert(sword, facts_of(&t, 3));
+        w.hands.insert(
+            p,
+            Hands {
+                right: Some(sword),
+                left: None,
+                weapon: Some(sword),
+            },
+        );
+        assert_eq!(seams.current_weapon(p), Some(sword));
+        assert_eq!(seams.weapon(p), Some(sword));
+        assert_eq!(seams.item_at(p, body::RIGHT_HAND), Some(sword));
+        assert_eq!(seams.wield_type(sword), 1);
+        assert_eq!(seams.current_weapon(UnitId(2)), None);
     }
 }

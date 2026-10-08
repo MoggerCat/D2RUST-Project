@@ -142,3 +142,68 @@ fn swap_cursor_with_body() {
     assert_eq!((w.data(e).cmd_flags, w.data(n).cmd_flags), (0x20, 0x20));
     assert_eq!(item_msgs(&w.drain()), [(0x9D, 0x09, e), (0x9D, 0x09, n)]);
 }
+
+/// REC-161 (d2rs-own, unverified): a worn item's stat list is attached to
+/// the wearer, so its base damage reaches the wearer's stats (21 / 22),
+/// and goes with the item when it comes off.
+#[test]
+fn a_worn_weapon_gives_its_damage_to_the_wearer() {
+    const MIN: u16 = 21;
+    const MAX: u16 = 22;
+    let mut w = World::new();
+    w.state.link_item_stats = true;
+    let p = w.player;
+    let c = w.cursor_item(SWORD);
+    let u = w.unit(c).unwrap();
+    w.set_stat(u, MIN, 3);
+    w.set_stat(u, MAX, 9);
+    assert_eq!(w.stats.unit_total(p, MAX, 0), 0);
+    assert_eq!(w.handle(&body(0x1A, c, 4)), Ok(0));
+    assert_eq!(w.mode(c), 1);
+    assert_eq!(w.stats.unit_total(p, MIN, 0), 3);
+    assert_eq!(w.stats.unit_total(p, MAX, 0), 9);
+    assert_eq!(w.handle(&unequip(4)), Ok(0));
+    assert_eq!(w.stats.unit_total(p, MIN, 0), 0);
+    assert_eq!(w.stats.unit_total(p, MAX, 0), 0);
+}
+
+/// A gem socketed into a worn item reaches the wearer (the filler's list
+/// hangs on the item's list, which hangs on the wearer's).
+#[test]
+fn a_socketed_gem_reaches_the_wearer() {
+    use crate::items::tables::{GemRec, PropRec, PropSlot, PropertyRec};
+    const STAT: u16 = 31;
+    let mut w = World::new();
+    w.state.link_item_stats = true;
+    let p = w.player;
+    let sword = equipped(&mut w, SWORD, 4);
+    let su = w.unit(sword).unwrap();
+    w.items.get_mut(su).unwrap().flags |= 0x800;
+    w.set_stat(su, super::super::inv_world::STAT_SOCKETS, 1);
+    let mut pr = PropertyRec::default();
+    pr.slots[0] = PropSlot {
+        func: 1,
+        stat: STAT,
+        set: 0,
+        val: 0,
+    };
+    w.tables.properties = vec![pr];
+    let block = [
+        PropRec {
+            code: 0,
+            param: 0,
+            min: 5,
+            max: 5,
+        },
+        PropRec::NONE,
+        PropRec::NONE,
+    ];
+    w.tables.gems = vec![GemRec { mods: [block; 3] }];
+    let gem = w.cursor_item(GEM);
+    let before = w.stats.unit_total(p, STAT, 0);
+    assert_eq!(w.handle(&msg(0x28, &[gem, sword])), Ok(0));
+    assert_eq!(w.mode(gem), 6);
+    assert_eq!(w.stats.unit_total(p, STAT, 0), before + 5);
+    assert_eq!(w.handle(&unequip(4)), Ok(0));
+    assert_eq!(w.stats.unit_total(p, STAT, 0), before);
+}
