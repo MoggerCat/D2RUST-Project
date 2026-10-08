@@ -13,7 +13,7 @@ Branch `claude/q-esc-menu`. Everything is d2rs-own, unverified (rule 10).
 | Mini panel "Game Menu" button | `MiniAction::GameMenu` ignored | opens ui 9 (`ui/hud.rs`) |
 | World click while open | `game_menu_open: false` | `ClickView.game_menu_open` = ui 9 open (`present.rs`) |
 
-## PROVISIONAL (REC-QESC-1 in HANDOFF §7)
+## PROVISIONAL (REC-237 in HANDOFF §7)
 
 Art (dark tiles of the synthetic fill file, frame 4), layout, English strings, Options = no-op, the set of panels Esc closes.
 
