@@ -5,6 +5,17 @@ repo `MoggerCat/D2RUST-private-repo` (`main`).
 
 ## 2026-10-08
 
+- Plan for tonight (PC 1 closes ≈01:00; upload ≈0.6 MB/s): install
+  batches 2–4 + `install: complete` (≈00:00), then the **core** of
+  `extracted/` (d2data, d2exp, Patch_D2, d2char, d2sfx; ≈1.07 GB; ≈00:35).
+  **Deferred to 2026-10-09:** the extracted media folders (d2music,
+  D2xMusic, d2speech, d2xtalk, d2video, D2XVIDEO; ≈2.0 GB; their MPQs are
+  whole in `install/`), the `extracted: complete` marker, and Step 3.
+  Step 3 is prepared: `facts_render.py`, and seven fixed scene characters
+  `FactAma`…`FactAss` (`d2s-tool new --class C --expansion --level 1
+  --waypoints all --quests acts=4 --map-seed 1 --time 1760000000`) in the
+  PC's save folder.
+
 - Step 2 extract (local, not yet pushed): `mpq-tool` at `1d3a4576` over
   all 11 MPQs into `extracted/<archive>/`: 35095 files, 3066588211 bytes,
   none over 95 MiB; per-folder commands and counts in the private
