@@ -1,0 +1,232 @@
+// Spec: specs/ui/frontend-menus.md (§F1.1–§F1.3, §F1.6), specs/ui/frontend-credits.md (C1, C2)
+//! The front-end shell on synthetic input, no game files.
+
+use d2_client::ui::front_end::startup::{MemProgress, RecordVideo};
+use d2_client::ui::front_end::*;
+use d2_client::ui::geom::Point;
+
+fn fe(expansion: bool, saves: bool) -> FrontEnd {
+    FrontEnd::with_screens(expansion, Box::new(saves))
+}
+
+fn started(expansion: bool, saves: bool, n: Option<u8>) -> (FrontEnd, RecordVideo, MemProgress) {
+    let mut f = fe(expansion, saves);
+    let mut v = RecordVideo::default();
+    let mut s = MemProgress(n);
+    f.start(true, &mut s, &mut v);
+    (f, v, s)
+}
+
+fn ticks(f: &mut FrontEnd, n: u32) {
+    for _ in 0..n {
+        f.tick();
+    }
+}
+
+fn click(f: &mut FrontEnd, x: i32, y: i32) {
+    let p = Point::new(x, y);
+    f.input(FrontInput::Down(p));
+    f.input(FrontInput::Up(p));
+    f.tick();
+}
+
+#[test]
+fn startup_chain_logs_in_order() {
+    let (f, v, s) = started(true, true, None);
+    assert_eq!(
+        v.0,
+        [
+            r"Data\Local\Video\New_BLIZ640x480.bik",
+            r"Data\Local\Video\BlizNorth640x480.bik",
+            r"DATA\LOCAL\video\ENG\d2intro640x292.bik",
+        ]
+    );
+    assert_eq!(s.0, Some(0x22));
+    assert_eq!(f.current(), TRADEMARK);
+    // First run: the trademark screen is built twice (C1 r2.6).
+    assert_eq!(f.entered, [TRADEMARK, TRADEMARK]);
+    assert_eq!(f.flushes, 1);
+    assert_eq!(f.palette(), Some(SKY_PALETTE));
+
+    let (f, v, s) = started(true, true, Some(0x32));
+    assert_eq!(v.0.len(), 3);
+    assert_eq!(v.0[2], r"DATA\LOCAL\video\ENG\D2x_Intro_640x292.bik");
+    assert_eq!(s.0, Some(0xB2));
+    assert_eq!(f.entered, [TRADEMARK]);
+
+    let (_, v, s) = started(true, true, Some(0x22));
+    assert_eq!(v.0.len(), 2);
+    assert_eq!(s.0, Some(0x22));
+    // Classic install: no expansion intro.
+    let (_, v, s) = started(false, true, Some(0x32));
+    assert_eq!(v.0.len(), 2);
+    assert_eq!(s.0, Some(0x32));
+}
+
+#[test]
+fn later_entry_goes_to_main_menu() {
+    let mut f = fe(true, true);
+    let mut v = RecordVideo::default();
+    f.start(false, &mut MemProgress(Some(0x22)), &mut v);
+    assert!(v.0.is_empty());
+    assert_eq!(f.current(), MAIN_MENU);
+}
+
+#[test]
+fn trademark_click_goes_to_main_menu() {
+    let (mut f, ..) = started(true, true, Some(0x22));
+    click(&mut f, 400, 300);
+    assert_eq!(f.current(), MAIN_MENU);
+}
+
+#[test]
+fn trademark_keys() {
+    for (key, to_menu) in [
+        (b'Q' as u16, false),
+        (b'N' as u16, true),
+        (32, true),
+        (27, true),
+        (13, true),
+        (112, true),
+        (113, false),
+        (b'7' as u16, false),
+    ] {
+        let (mut f, ..) = started(true, true, Some(0x22));
+        f.input(FrontInput::Key(key));
+        f.tick();
+        assert_eq!(f.current() == MAIN_MENU, to_menu, "key {key}");
+    }
+}
+
+#[test]
+fn trademark_timer_fires_after_nine_whole_seconds() {
+    let (mut f, ..) = started(true, true, Some(0x22));
+    // Built at ms 0: first tick with floor(now/1000) > 9 is ms 10,000 = tick 250.
+    ticks(&mut f, 249);
+    assert_eq!(f.current(), TRADEMARK);
+    f.tick();
+    assert_eq!(f.current(), MAIN_MENU);
+}
+
+#[test]
+fn flow_table() {
+    let id = |f: &FrontEnd| f.current();
+    // Main menu → Single Player, saves found → character select.
+    let (mut f, ..) = started(true, true, Some(0x22));
+    f.trigger(Trigger::Continue);
+    f.trigger(Trigger::SinglePlayer);
+    assert_eq!(id(&f), CHAR_SELECT);
+    assert_eq!(f.game_kind, 0);
+    // Exit → main menu.
+    f.trigger(Trigger::Exit);
+    assert_eq!(id(&f), MAIN_MENU);
+    // No saves → character create; Exit → character select.
+    let (mut g, ..) = started(true, false, Some(0x22));
+    g.trigger(Trigger::Continue);
+    g.trigger(Trigger::SinglePlayer);
+    assert_eq!(id(&g), CHAR_CREATE);
+    g.trigger(Trigger::Exit);
+    assert_eq!(id(&g), CHAR_SELECT);
+    // Create New → create; OK → game load of a new character.
+    g.trigger(Trigger::CreateNew);
+    assert_eq!(id(&g), CHAR_CREATE);
+    g.trigger(Trigger::Ok);
+    assert_eq!(
+        g.outcome(),
+        Some(Outcome::GameLoad(GameLoad {
+            difficulty: None,
+            new_character: true
+        }))
+    );
+
+    // Credits / Cinematics and back.
+    let (mut f, ..) = started(true, true, Some(0x22));
+    f.trigger(Trigger::Continue);
+    f.trigger(Trigger::Credits);
+    assert_eq!(id(&f), CREDITS);
+    f.trigger(Trigger::Exit);
+    assert_eq!(id(&f), MAIN_MENU);
+    f.trigger(Trigger::Cinematics);
+    assert_eq!(id(&f), CINEMATICS);
+    f.trigger(Trigger::Exit);
+    assert_eq!(id(&f), MAIN_MENU);
+
+    // Character select OK: one difficulty open → game load, no popup.
+    f.trigger(Trigger::SinglePlayer);
+    assert_eq!(id(&f), CHAR_SELECT);
+    f.flow_mut().difficulties_open = 1;
+    f.trigger(Trigger::Ok);
+    assert_eq!(
+        f.outcome(),
+        Some(Outcome::GameLoad(GameLoad {
+            difficulty: None,
+            new_character: false
+        }))
+    );
+
+    // More than one open → popup; each button loads; Esc returns.
+    for d in 0..3u8 {
+        let (mut f, ..) = started(true, true, Some(0x22));
+        f.trigger(Trigger::Continue);
+        f.trigger(Trigger::SinglePlayer);
+        f.flow_mut().difficulties_open = 2;
+        f.trigger(Trigger::Ok);
+        assert_eq!(id(&f), DIFFICULTY);
+        if d == 0 {
+            f.trigger(Trigger::Exit);
+            assert_eq!(id(&f), CHAR_SELECT);
+            f.trigger(Trigger::Ok);
+        }
+        f.trigger(Trigger::Difficulty(d));
+        assert_eq!(
+            f.outcome(),
+            Some(Outcome::GameLoad(GameLoad {
+                difficulty: Some(d),
+                new_character: false
+            }))
+        );
+    }
+
+    // In-game exit → character select (PROVISIONAL, REC-168).
+    let (mut f, ..) = started(true, true, Some(0x22));
+    f.trigger(Trigger::GameExit);
+    assert_eq!(id(&f), CHAR_SELECT);
+}
+
+#[test]
+fn main_menu_enter_is_unbound_and_esc_exits() {
+    // Placeholder screens map Enter to OK; the main menu has no OK row.
+    let (mut f, ..) = started(true, true, Some(0x22));
+    f.trigger(Trigger::Continue);
+    f.input(FrontInput::Key(13));
+    f.tick();
+    assert_eq!(f.current(), MAIN_MENU);
+    assert_eq!(f.outcome(), None);
+    f.input(FrontInput::Key(27));
+    f.tick();
+    assert_eq!(f.outcome(), Some(Outcome::Exit));
+}
+
+#[test]
+fn hit_box_and_button_facts() {
+    use d2_client::ui::front_end::control::*;
+    // Single Player: (264, 324) 272×35, y = bottom edge.
+    let c = Control::new(ControlKind::Button, 264, 324, 272, 35);
+    assert!(c.contains(Point::new(264, 289)));
+    assert!(!c.contains(Point::new(264, 324)));
+    assert!(!c.contains(Point::new(264, 288)));
+    assert!(c.contains(Point::new(535, 323)));
+    assert!(!c.contains(Point::new(536, 323)));
+    assert_eq!(button_tiles(272, 35), 2);
+    assert_eq!(button_frame(1, 2, true, true, false), 3);
+    assert_eq!(label_font(25), 10);
+    assert_eq!(label_k(25), 2);
+    assert_eq!(label_font(35), 9);
+    assert_eq!(label_k(35), 4);
+}
+
+#[test]
+fn logo_frames() {
+    assert_eq!(logo_frame(1000, 0), 25);
+    assert_eq!(logo_frame(1160, 0), 0);
+}
