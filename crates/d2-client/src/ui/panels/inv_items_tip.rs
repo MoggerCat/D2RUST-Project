@@ -88,7 +88,9 @@ impl ItemsUi {
         let Some(it) = self.item_at(world, files, &layout, at) else {
             return Vec::new();
         };
-        items::stream(world, it.key).map_or_else(Vec::new, |s| tips.lines(s))
+        let mut lines = items::stream(world, it.key).map_or_else(Vec::new, |s| tips.lines(s));
+        lines.extend(super::socket::contents_lines(tips, world, &it));
+        lines
     }
 
     /// A right press in the panel: an identify item in the grid becomes

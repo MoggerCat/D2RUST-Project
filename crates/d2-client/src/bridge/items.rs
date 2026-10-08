@@ -35,6 +35,7 @@ pub mod mode {
     pub const GROUND: u8 = 3;
     pub const CURSOR: u8 = 4;
     pub const DROPPING: u8 = 5;
+    pub const SOCKETED: u8 = 6;
 }
 
 /// One item of the model, as its last record places it.

@@ -21,6 +21,7 @@ mod load;
 mod mutant_tests;
 mod queries;
 mod save_index;
+mod socket;
 mod stack;
 mod town_portal;
 
@@ -78,6 +79,7 @@ const T_WEAP: u16 = 45;
 const T_ARMO: u16 = 50;
 const T_MISC: u16 = 52;
 const T_HPOT: u16 = 76;
+const T_GEM: u16 = 20;
 
 /// Player class (barbarian: inventory record 4, 10 × 4).
 pub const CLASS: u32 = 4;
@@ -150,7 +152,7 @@ fn equiv() -> EquivMatrix {
 /// (code, type, invwidth, invheight, reqstr, autobelt, useable, stackable,
 /// maxstack, durability) per record.
 type Row = ([u8; 4], u16, u8, u8, u16, u8, u8, u8, u32, u8);
-const ROWS: [Row; 14] = [
+const ROWS: [Row; 15] = [
     (*b"cap ", T_HELM, 2, 2, 0, 0, 0, 0, 0, 12),
     (*b"gld ", T_GOLD, 1, 1, 0, 0, 0, 0, 0, 0),
     (*b"ssd ", T_SWOR, 1, 3, 0, 0, 0, 0, 0, 24),
@@ -165,7 +167,9 @@ const ROWS: [Row; 14] = [
     (*b"tsc ", T_SCRO, 1, 1, 0, 0, 1, 0, 0, 0),
     (*b"tbk ", T_BOOK, 1, 2, 0, 0, 1, 1, 20, 0),
     (*b"box ", T_MISC, 2, 2, 0, 0, 1, 0, 0, 0),
+    (*b"gsw ", T_GEM, 1, 1, 0, 0, 0, 0, 0, 0),
 ];
+pub const GEM: usize = 14;
 pub const TSC: usize = 11;
 pub const TBK: usize = 12;
 
