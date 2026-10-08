@@ -397,7 +397,7 @@ stat-list links, `weapon_set`, the runtime item table (§5). No outputs.
       two's complement; param: ≤ 0xFF → 8, else 16) and the item moves,
       vendor and skill-body callers pass param 0 (because no spec read of
       `0x0053D130`'s width choice exists and the client reads any width);
-      settled by REC-336.
+      settled by REC-400.
 2. **0x40** ItemFlags (`0x0045E240` → `0x004C2020`, 13 bytes): GUID
    u32@1, mask u32@5, value u32@9. Item (4, GUID) present → item flags
    (item data +0x18): value ≠ 0 → |= mask, else &= ~mask (`0x006280D0`).

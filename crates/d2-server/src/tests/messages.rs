@@ -301,7 +301,7 @@ fn chat_string_checks() {
     // No NUL at all → 2.
     assert_eq!(run(&mut g, &[0x14, 0, 0, b'a']), ResultCode::Invalid);
     // 0x15 (`0x0054A5D0`): strlen < 256 and strlen + 4 < size reach the
-    // handler; else rejected (2, PROVISIONAL REC-338).
+    // handler; else rejected (2, PROVISIONAL REC-402).
     let handled = g.handled.len();
     assert_eq!(
         run(&mut g, &[0x15, 1, 0, b'h', b'i', 0, 0]),

@@ -350,7 +350,7 @@ pub fn unit_states(
 /// The width field of S→C 0x3E (`client/msg-stats-items.md` §5 r1): 1 bit
 /// a; a = 0 → 8 bits; else 1 bit b, then 16 (b = 0) or 32 bits.
 ///
-/// PROVISIONAL (`client/msg-stats-items.md` §5 r1.3; REC-336): the
+/// PROVISIONAL (`client/msg-stats-items.md` §5 r1.3; REC-400): the
 /// sender picks the narrowest width that holds the value (≤ 0xFF → 8,
 /// ≤ 0xFFFF → 16, else 32); no spec gives `0x0053D130`'s choice.
 fn write_sized(w: &mut BitWriter, v: u32) {
@@ -374,7 +374,7 @@ fn write_sized(w: &mut BitWriter, v: u32) {
 /// (sized), set flag 1, stat 9 bits, value (sized, two's complement for a
 /// negative value), param (1 bit c: 8 (c = 0) or 16 bits).
 ///
-/// PROVISIONAL (`client/msg-stats-items.md` §5 r1.3; REC-336): widths are
+/// PROVISIONAL (`client/msg-stats-items.md` §5 r1.3; REC-400): widths are
 /// the narrowest that hold the field ([`write_sized`]); the param is 8
 /// bits when it is ≤ 0xFF.
 pub fn update_item_stat(guid: u32, stat: u16, value: i32, param: u16) -> Vec<u8> {

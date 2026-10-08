@@ -328,7 +328,7 @@ fn parse(
     } else if id == 0x15 {
         // `0x0054A5D0` (spec §2.4 rule 6): msg = cstr at +3 with strlen <
         // 256 and strlen + 4 < size (a missing NUL fails too), else
-        // rejected. PROVISIONAL (intents-events.md §2.4 r6; REC-338): the
+        // rejected. PROVISIONAL (intents-events.md §2.4 r6; REC-402): the
         // rejection returns 2, as 0x14's strlen ≥ 256 does.
         match msg.get(3..).and_then(strlen) {
             Some(n) if n < 256 && n + 4 < msg.len() => {}

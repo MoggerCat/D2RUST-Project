@@ -900,7 +900,7 @@ fn update_item_stats_0x3e_one_layout() {
 }
 
 /// The d2-sim builder (`units::messages::update_item_stat`, PROVISIONAL
-/// widths REC-336: the narrowest that holds each field) equals the spec
+/// widths REC-400: the narrowest that holds each field) equals the spec
 /// layout packed by hand, and the client sets every stat back (param
 /// unused off stat 204).
 // Covers: specs/client/msg-stats-items.md §5 r1

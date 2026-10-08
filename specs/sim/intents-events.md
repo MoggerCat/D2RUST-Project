@@ -282,7 +282,7 @@ of them has a consequence in 1.14d; d2rs keeps them as a diagnostic only.
    strlen + 4 < size, else rejected. PROVISIONAL: the rejection returns 2
    and a msg without a NUL in the message is rejected (because the
    result code of this rejection is not written; 0x14's strlen ≥ 256
-   returns 2); settled by REC-338.
+   returns 2); settled by REC-402.
 7. 0x3C: u32 at +1, bit 31 = left hand, bits 0–30 = skill id, must be <
    the skills count (data +0xBA0); item u32 at +5. 0x51: u32 at +1: bits
    0–14 skill (> count → unbind, −1), bit 15 left hand, bits 16–31 slot
@@ -1443,7 +1443,7 @@ recorded join). PROVISIONAL: with more than one client in state 4, each
 gets the joiner's 0x5B and 0x65, in client-list order, before the 0x5A
 (because this section names `0x0052C410`'s messages but not who gets
 the other players' 0x5B / 0x65; single player has one client, so it
-does not change a single-player join); settled by REC-337.
+does not change a single-player join); settled by REC-401.
 
 The first 0x48 is the per-client update's inventory refresh: in
 `0x005380D0` the order is removals (`0x0053A770`), unit updates

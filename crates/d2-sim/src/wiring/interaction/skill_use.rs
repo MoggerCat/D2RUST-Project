@@ -966,7 +966,7 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     }
     /// S→C 0x3E (`0x0053D130(client, item, 1, s, v, 0)`) to the unit's
     /// client through the transport seam ([`Pending::send`]).
-    /// PROVISIONAL (`client/msg-stats-items.md` §5 r1.3; REC-336): field
+    /// PROVISIONAL (`client/msg-stats-items.md` §5 r1.3; REC-400): field
     /// widths, see `units::messages::update_item_stat`.
     fn send_item_stat(&mut self, u: UnitId, item: UnitId, s: u16, v: i32) {
         let guid = self.cv.v.units.get(item).map_or(0, |r| r.guid);

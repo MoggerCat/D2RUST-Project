@@ -377,7 +377,7 @@ where
     /// item's base stat value (layer 0, `client/msg-stats-items.md` §5
     /// r1.2), through the rest's transport. An item without a record
     /// sends nothing. PROVISIONAL (`client/msg-stats-items.md` §5 r1.3;
-    /// REC-336): field widths, see `units::messages::update_item_stat`.
+    /// REC-400): field widths, see `units::messages::update_item_stat`.
     fn send_item_stat(&mut self, player: UnitId, item: UnitId, stat: u16) {
         let Some(guid) = self.desk.econ.units.get(item).map(|r| r.guid) else {
             return;

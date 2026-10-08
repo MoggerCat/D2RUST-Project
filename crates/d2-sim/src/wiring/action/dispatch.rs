@@ -483,7 +483,7 @@ impl<X: Pending> TickHooks for ActionSim<X> {
     /// the name has a NUL in its 16 bytes; each to every client in state
     /// 4 in client-list order, the joiner included. 0x8D (`0x0055B620`,
     /// parties) is out of scope. PROVISIONAL (`intents-events.md` §8.3;
-    /// REC-337): with more than one client, which 0x5B / 0x65 the
+    /// REC-401): with more than one client, which 0x5B / 0x65 the
     /// others get is not written; d2rs sends the joiner's to each.
     fn join_sequence(&mut self, game: &mut Game, client: ClientId) {
         use crate::units::messages as m;

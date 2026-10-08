@@ -556,7 +556,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     /// item's base stat value (layer 0, the value the client's base set
     /// writes, `client/msg-stats-items.md` §5 r1.2), sent through the
     /// rest's transport. An item without a unit sends nothing.
-    /// PROVISIONAL (`client/msg-stats-items.md` §5 r1.3; REC-336): field
+    /// PROVISIONAL (`client/msg-stats-items.md` §5 r1.3; REC-400): field
     /// widths, see `units::messages::update_item_stat`.
     fn send_item_stat(&mut self, player: Owner, item: Guid, stat: u16) {
         let Some(u) = self.item_unit(item) else {
