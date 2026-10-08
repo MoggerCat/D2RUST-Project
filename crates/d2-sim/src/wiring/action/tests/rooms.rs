@@ -167,7 +167,8 @@ fn room_switch_sends_add_and_leave_messages_and_the_join_completes() {
     // warp tile stand in A. A joining client (state 3) whose player is in
     // A: tick 1's per-client update switches to A (0x07 A, the object's
     // 0x51, the tile's 0x09, 0x07 B), the rooms are populated by step 3,
-    // so the room is ready and 0x04 follows, the client in game. Then the
+    // so the room is ready and 0x04 follows, the client in game, then the
+    // join sequence (§8.3: 0x5B, 0x65, the join 0x5A). Then the
     // player moves to C: 0x07 C, then A's leave: 0x0A for each unit of A,
     // 0x08 A.
     let mut fx = Fx::with_rooms(&[
@@ -183,6 +184,9 @@ fn room_switch_sends_add_and_leave_messages_and_the_join_completes() {
         .game
         .lists
         .add_client(Some(p), None, client_state::JOINING);
+    let mut name = [0u8; 16];
+    name[..4].copy_from_slice(b"Jade");
+    fx.sim.sys.hooks.session.names.insert(p, name);
     fx.sim.sys.hooks.x.sent.clear();
     fx.tick();
     let sent = |fx: &mut Fx| -> Vec<Vec<u8>> {
@@ -225,6 +229,12 @@ fn room_switch_sends_add_and_leave_messages_and_the_join_completes() {
     want.extend(adds);
     want.push(rev_b);
     want.push(vec![0x04]);
+    let gp = guid(&fx, p);
+    let level = fx.sim.sys.stats.unit_total(p, 12, 0) as u16;
+    use crate::units::messages::{player_event, player_joined, player_kill_count};
+    want.push(player_joined(gp, 0, &name, level, 0xFFFF));
+    want.push(player_kill_count(gp, 0).to_vec());
+    want.push(player_event(2, &name).to_vec());
     assert_eq!(sent(&mut fx), want);
     assert_eq!(
         fx.game.lists.client(c).unwrap().state,

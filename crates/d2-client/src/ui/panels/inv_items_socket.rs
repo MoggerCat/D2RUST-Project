@@ -1,7 +1,8 @@
 // Spec: specs/ui/inventory.md (§6 r5), specs/items/inventory-moves.md (§7.19), specs/items/properties.md (§9)
 //! Socketing from the inventory panel: whether the cursor item can go
-//! into the item under the mouse (`0x004843E0`, `inventory.md` §6 r5) and
-//! the socketed contents of an item's tool tip.
+//! into the item under the mouse (`0x004843E0`, `inventory.md` §6 r5).
+//! The fillers' properties in the tool tip are summed into the item's
+//! property block (`ui/item-tips.md` §6 r2, `ui::item_tip_world`).
 //!
 //! The decision uses only what the model holds: the header flags of the
 //! two items (0x800 socketed, 0x10 identified, 0x100), the socket count
@@ -14,7 +15,7 @@
 use crate::bridge::items::{self, mode, ItemView};
 use crate::bridge::world::ClientWorld;
 use crate::ui::inv_grid::{can_socket, SocketFacts};
-use crate::ui::item_tip::{color, ItemTips, TipLine};
+use crate::ui::item_tip::ItemTips;
 use d2_proto::client::SocketItem;
 use d2_proto::item_bits::hflag;
 
@@ -73,25 +74,6 @@ pub fn socket_intent(
         socketable: cursor.key.guid,
         target: target.key.guid,
     })
-}
-
-/// The lines for an item's socketed contents: per filler, its name
-/// line and its property lines (d2rs-own, unverified: the original's
-/// layout of the filled sockets is not specified).
-pub fn contents_lines(tips: &ItemTips, world: &ClientWorld, target: &ItemView) -> Vec<TipLine> {
-    let mut out = Vec::new();
-    for f in fillers(world, target) {
-        let Some(lines) = items::stream(world, f.key).map(|s| tips.lines(s)) else {
-            continue;
-        };
-        let mut lines = lines.into_iter();
-        if let Some(mut name) = lines.next() {
-            name.color = color::ORANGE;
-            out.push(name);
-        }
-        out.extend(lines.filter(|l| l.color == color::BLUE));
-    }
-    out
 }
 
 #[cfg(test)]

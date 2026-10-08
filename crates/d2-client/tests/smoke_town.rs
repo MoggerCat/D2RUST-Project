@@ -515,7 +515,7 @@ impl Rig {
             moving_to_client(at.0, at.1),
             (0, 0),
         );
-        let (x, y) = hover::feet(&cam, u.position.unwrap());
+        let (x, y) = hover::unit_feet(&cam, u.key.unit_type, u.position.unwrap());
         Point::new(x, y - 20)
     }
 

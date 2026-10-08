@@ -871,6 +871,72 @@ fn leave_sends_its_messages_and_removes_the_client() {
     assert_eq!(host.receive(CLIENT), Vec::<Vec<u8>>::new());
 }
 
+/// The join sequence of the first tick in state 3 (§8.3): after 0x04,
+/// S→C 0x5B (the player's GUID, class, name, level, no party), 0x65
+/// (kill count 0) and the join 0x5A code 2 with the name, so the
+/// client's roster holds the player (`client/msg-units.md` §8 r3). When
+/// it leaves, another client in state 4 gets 0x5C (the leaver's GUID)
+/// then the leave 0x5A code 3; the leaver gets neither (§2.5 r2).
+// Covers: specs/sim/intents-events.md §8.3, §2.5 r2
+#[test]
+fn join_and_leave_send_the_roster_messages() {
+    use d2_sim::units::messages as msg;
+    let loads = std::rc::Rc::new(std::cell::Cell::new(0));
+    let (mut host, _t) = session_host(loads);
+    host.send_system(
+        CLIENT,
+        &create_request(CLASS as u8, EXPANSION_FLAGS).encode(),
+    )
+    .expect("queued");
+    host.frame().expect("frame 1");
+    host.clock.0 += 40;
+    host.frame().expect("frame 2");
+    host.send_system(CLIENT, &[0x6B]).expect("queued");
+    let mut got = Vec::new();
+    for _ in 0..4 {
+        host.clock.0 += 40;
+        host.frame().expect("frame");
+        got.extend(host.receive(CLIENT));
+    }
+    let p = host.game.player_of(CLIENT).expect("player");
+    let guid = host.game.game.lists.unit(p).unwrap().guid;
+    let level = host.game.events.action.sys.stats.unit_total(p, 12, 0) as u16;
+    let at = got.iter().position(|m| m == &[0x04]).expect("0x04");
+    assert_eq!(
+        got[at + 1..at + 4],
+        [
+            msg::player_joined(guid, CLASS as u8, &name(), level, 0xFFFF),
+            msg::player_kill_count(guid, 0).to_vec(),
+            msg::player_event(2, &name()).to_vec(),
+        ]
+    );
+    assert_eq!(&got[at + 1][8..14], b"werwer");
+
+    // A second client in game (state 4) watches the first leave.
+    let other: ClientId = 1;
+    host.connect(other);
+    let p2 = alloc_player(&mut host.game, CLASS);
+    host.game
+        .join(other, Some(p2), None, client_state::IN_GAME)
+        .unwrap();
+    host.send_system(CLIENT, &[0x69]).expect("queued");
+    host.clock.0 += 40;
+    host.frame().expect("frame");
+    assert_eq!(host.receive(CLIENT), [vec![0xB0], vec![0x05], vec![0x06]]);
+    let left: Vec<Vec<u8>> = host
+        .receive(other)
+        .into_iter()
+        .filter(|m| matches!(m[0], 0x5C | 0x5A))
+        .collect();
+    assert_eq!(
+        left,
+        [
+            msg::player_left(guid).to_vec(),
+            msg::player_event(3, &name()).to_vec()
+        ]
+    );
+}
+
 /// A character store that records each save: the client, the frame,
 /// and whether the client was still in game (state 4) when it ran.
 struct Recorder(std::sync::Arc<std::sync::Mutex<Vec<(ClientId, i32, bool)>>>);

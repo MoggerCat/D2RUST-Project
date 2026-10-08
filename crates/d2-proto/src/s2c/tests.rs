@@ -120,7 +120,7 @@ fn audit_errors(rows: &[Audit]) -> Vec<u8> {
         let parsed = PARSED_IDS.contains(&a.id);
         let parsed_ok = match a.status {
             Status::Built | Status::Generated => parsed,
-            Status::Partial => parsed == (a.id == 0x50),
+            Status::Partial => !parsed,
             Status::Unspecified | Status::IdOnly | Status::Never => !parsed,
         };
         let builder_ok = match a.status {
@@ -129,7 +129,7 @@ fn audit_errors(rows: &[Audit]) -> Vec<u8> {
             Status::Generated => {
                 a.builder == Some(m.name) && (!m.layout.is_empty() || m.size.fixed() == Some(1))
             }
-            Status::Partial => a.builder == (a.id == 0x50).then_some("QuestSpecial"),
+            Status::Partial => a.builder.is_none(),
             Status::Unspecified | Status::IdOnly | Status::Never => a.builder.is_none(),
         };
         let ok = a.id as usize == i
@@ -482,13 +482,33 @@ fn recorded_messages_of_the_layout_batch_parse() {
         (m.type_, m.guid, m.count, m.kind0, m.str0),
         (1, 6, 1, 0, 0x25)
     );
-    // 0x50 mercenary form (u16 2 at 1): still unbuilt.
+    // 0x50 mercenary form (u16 2 at 1): the TSV layout, name u16@3.
     let mut b = vec![0x50, 2, 0, 0x2A, 0];
     b.resize(15, 0);
-    assert!(matches!(
+    assert_eq!(
         parse(&b),
-        Err(ParseError::Unbuilt { id: 0x50, .. })
-    ));
+        Ok(Message::QuestSpecialForm(
+            crate::generated::server::QuestSpecial {
+                code: 2,
+                v0: 0x2A,
+                ..Default::default()
+            }
+        ))
+    );
+    // Code 1 with a word past byte 9 set: not the code-1 view either.
+    let mut b = vec![0x50, 1, 0];
+    b.resize(15, 0);
+    b[9] = 7;
+    assert_eq!(
+        parse(&b),
+        Ok(Message::QuestSpecialForm(
+            crate::generated::server::QuestSpecial {
+                code: 1,
+                v3: 7,
+                ..Default::default()
+            }
+        ))
+    );
 }
 
 fn samples() -> Vec<Message> {

@@ -443,10 +443,9 @@ fn automap_facts(
     open_mode: u8,
 ) -> crate::ui::automap::FrameFacts {
     use crate::rules::camera::{moving_to_client, Camera, FrameSize, OpenMode};
-    let at = world.local().map_or(Default::default(), |p| {
-        let (x, y) = p.cell();
-        moving_to_client((u32::from(x) << 16) | 0x8000, (u32::from(y) << 16) | 0x8000)
-    });
+    let at = world
+        .local_position()
+        .map_or(Default::default(), |(x, y)| moving_to_client(x, y));
     let mode = OpenMode::new(open_mode).unwrap_or(OpenMode::NONE);
     let cam = Camera::new(FrameSize::play(), mode, at, (0, 0));
     crate::ui::automap::FrameFacts {
@@ -992,6 +991,12 @@ fn world_view_frame(
         state.feed.as_mut(),
         &state.assets,
     );
+    // `sim/unit-order.md` §5 rule 7: the fill's Y sort persists in the
+    // client's room lists, on every frame the fill ran, the frames whose
+    // image is not built included (`seams/bridge-app.md` §2.8).
+    for (room, order) in state.feed.take_unit_orders() {
+        bridge.0.set_room_order(room, &order);
+    }
     let mut frame = match built {
         Ok(f) => f,
         // d2rs-own, unverified (D1): the preview keeps running; the
@@ -1038,11 +1043,6 @@ fn world_view_frame(
         let world = bridge.0.world();
         let near = state.feed.near_rooms(world)?;
         a.frame(world, near)?;
-    }
-    // `sim/unit-order.md` §5 rule 7: the fill's Y sort persists in the
-    // client's room lists.
-    for (room, order) in state.feed.take_unit_orders() {
-        bridge.0.set_room_order(room, &order);
     }
     let blank_screen = state.feed.blank_screen(bridge.0.world())?;
     let loads = bridge.0.world().act_loads;
@@ -1176,7 +1176,9 @@ fn world_view_frame(
 }
 
 /// Integer presentation scale (§A9; same factor as `ui::Presentation`, so
-/// the cursor mapping matches), converted to logical units for Bevy.
+/// the cursor mapping matches), converted to logical units for Bevy; the
+/// image's top-left sits at the presentation's (left, top)
+/// (`Presentation::centre_offset`, `seams/bridge-app.md` §2.7).
 fn present_scale(
     windows: Query<&Window, With<PrimaryWindow>>,
     mut sprites: Query<&mut Transform, With<WorldViewSprite>>,
@@ -1188,8 +1190,11 @@ fn present_scale(
         return;
     };
     let s = p.scale as f32 / window.scale_factor();
+    let (dx, dy) = p.centre_offset();
     for mut t in &mut sprites {
         t.scale = Vec3::new(s, s, 1.0);
+        t.translation.x = dx / window.scale_factor();
+        t.translation.y = dy / window.scale_factor();
     }
 }
 

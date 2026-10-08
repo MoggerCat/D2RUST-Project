@@ -94,9 +94,11 @@ impl ItemsUi {
         let Some(it) = self.item_at(world, files, &layout, at) else {
             return Vec::new();
         };
-        let mut lines = items::stream(world, it.key).map_or_else(Vec::new, |s| tips.lines(s));
-        lines.extend(super::socket::contents_lines(tips, world, &it));
-        lines
+        // `item-tips.md` §6 r2: the fillers' properties are summed into
+        // the item's own block (no separate filler lines).
+        let me = crate::ui::item_tip_world::WorldUnit::local(world);
+        let ctx = crate::ui::item_tip_world::hover_ctx(tips, world, me.as_ref(), &it);
+        items::stream(world, it.key).map_or_else(Vec::new, |s| tips.tip_lines(s, &ctx))
     }
 
     /// A right press in the panel: an identify item in the grid becomes
