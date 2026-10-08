@@ -1,6 +1,7 @@
 # Spec: UI — Control panel overlays (globes, bars, belt, skill buttons, run / menu buttons, mini panel, new-stats / new-skills buttons)
 
-- **Status:** draft (2026-10-07, RE on the 1.14d `Game.exe`; no capture
+- **Status:** draft (2026-10-07, RE on the 1.14d `Game.exe`; 2026-10-08
+  REC-240 / REC-238: §5 r4, r5, r8, r13, r14, §3 r6, §6 r1; no capture
   yet). Answers UP-28 (`ui/panels.md` §6 r3, §Open questions 1, control
   panel part). `ui/panels.md` §6 owns the border and the base art; this
   spec owns everything drawn on top of it and the control panel input.
@@ -17,26 +18,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 42–55 |
-| Inputs | 56–69 |
-| Outputs / state changes | 70–77 |
-| Rules | 78–79 |
-|   1. Draw order (`0x00499450`) | 80–100 |
-|   2. Art files | 101–114 |
-|   3. Life and mana globes | 115–160 |
-|   4. Experience and stamina bars | 161–186 |
-|   5. Belt | 187–278 |
-|   6. Run / walk and menu buttons | 279–297 |
-|   7. Skill buttons | 298–320 |
-|   8. New-stats and new-skills buttons | 321–369 |
-|   9. Mini panel (state 0x15) | 370–430 |
-|   10. Control panel mouse input | 431–471 |
-| Constants & data dependencies | 472–480 |
-| Randomness | 481–484 |
-| Edge cases & original bugs | 485–497 |
-| Test vectors | 498–516 |
-| Provenance | 517–533 |
-| Open questions | 534–559 |
+| Summary | 43–56 |
+| Inputs | 57–70 |
+| Outputs / state changes | 71–78 |
+| Rules | 79–80 |
+|   1. Draw order (`0x00499450`) | 81–101 |
+|   2. Art files | 102–115 |
+|   3. Life and mana globes | 116–169 |
+|   4. Experience and stamina bars | 170–195 |
+|   5. Belt | 196–419 |
+|   6. Run / walk and menu buttons | 420–440 |
+|   7. Skill buttons | 441–463 |
+|   8. New-stats and new-skills buttons | 464–512 |
+|   9. Mini panel (state 0x15) | 513–573 |
+|   10. Control panel mouse input | 574–614 |
+| Constants & data dependencies | 615–625 |
+| Randomness | 626–629 |
+| Edge cases & original bugs | 630–642 |
+| Test vectors | 643–672 |
+| Provenance | 673–693 |
+| Open questions | 694–735 |
 <!-- /index -->
 
 ## Summary
@@ -70,7 +71,7 @@ the press, release and hover behavior.
 ## Outputs / state changes
 
 Draws; hover tool tips (`0x00502280(text, x, y, color, centre)`, drawn
-by `0x00503000` in UI pass step 10; centre = 1 → x is the text centre);
+by `0x00503000` in UI pass step 10, §5 r14; centre = 1 → x is the text centre);
 `SetUIState` calls (3, 0x15, mini-panel targets); run / walk toggle
 (`0x0044BE80`); registry `Show HP Text`, `Show MP Text`, `PopupHireling`
 (§9); UI sound 4 on presses.
@@ -157,6 +158,14 @@ draw mode 5 unless a rule says otherwise.
    m >> 8 (arithmetic shifts), `DrawText` at (65 − w / 2, H − 95), color
    0; mana likewise with `panelmana` (4166) at (W − 80 − w / 2, H − 95)
    (w = width A, C division).
+   Checked for REC-238 (`0x00498185`–`0x004982FB`): `0x00498120` sets
+   no font (Font16 in the plain game view, left by §5 r4); the text is
+   formatted into a 100-unit buffer (`0x005269D0(100, buffer, fmt,
+   …)`); w = width A (`0x00501820`) of the formatted text, halved by
+   C division (`cdq; sub; sar`); `DrawText(text, 65 − w / 2, H − 95,
+   color 0, not centred)` (`0x00502320`) for life, `(W − 80 − w / 2,
+   H − 95)` for mana. No backing box: these are plain text draws, not
+   pop-up text (§5 r14).
 
 ### 4. Experience and stamina bars
 
@@ -217,30 +226,69 @@ draw mode 5 unless a rule says otherwise.
      rectangle 29 × 29 at (left, top) (`0x0046EFD0(…, 29, 29, green,
      mode 0)`); else no rectangle;
    - any other item: a red rectangle 29 × 29 at (left, top), mode 0;
+   - rectangle primitive (`0x004992FD`): `0x0046EFD0(x, y, w, h,
+     color, mode)` = `DrawRectangle(x, y, x + w, y + h, color, mode)`
+     (`0x004F6300`, `render/blend-modes.md` §8 r2): pixels x … x + 28,
+     y … y + 28, the color a palette index (nearest match of the RGB
+     triple, `0x004FB180`, recomputed by `0x004972B0` at every slot),
+     draw mode 0 = blend kind 2, `T[256·d + color]` (the same tint
+     primitive and mode as the grid tints, `ui/inventory.md` §2 r2–r3). It is drawn **before** the item,
+     so the item covers it;
    - the item drawn with `0x0046EE80(item, left, top)`;
-   - boxes 0–3 of a usable item (`0x00628C20` ≠ 0): the name of the
-     key bound to belt slot i (binding `0x00722404`[i], primary
-     `0x00469AA0(b, 1)`, else secondary `(b, 0)`; none → no label),
-     `0x0046A530` text cut from the end until width A ≤ 28, `DrawText`
-     at (left + 2, bottom − 2), color 4.
+   - boxes 0–3 of a usable item (`0x00628C20` ≠ 0) get a key label
+     (`0x00499327`–`0x004993EF`): the command of slot i is
+     `0x00722404`[i] = 23, 24, 25, 26 (`CfgBelt1`–`4`, read from the
+     binary). No label when both its slot-1 key (`0x00469AA0(cmd, 1)`)
+     and its slot-0 key (`0x00469AA0(cmd, 0)`) are 0xFFFF. Else the
+     text is **always** the short key name of the slot-1 entry
+     (`0x0046A530(cmd, 1)`, r13), even when only slot 0 is bound (then
+     slot 1's key is 0xFFFF and the label is 3762 "None": reproduce).
+     The live binding table `0x007A6F90` is read at every draw, so a
+     rebound key shows its new name at once. The name is copied into a
+     100-unit buffer, then units are cut from the end (one per step)
+     until width A (`0x00501820`) ≤ 28; `DrawText` (`0x00502320`) at
+     (left + 2, bottom − 2), color 4, font 1 (set at the start of the
+     belt draw, `0x00499053`). Default keys `1`–`4` (VK 0x31–0x34,
+     slot 1; slot 0 unbound, `ui/controls.md` §3) → labels `1`–`4`.
 5. **Cursor-item highlight** (`0x00497920`, when type ≠ 2, state 0x1F is
    open or the belt is popped): with an item on the cursor and the belt
    hovered, the hovered box `[0x0072235C]` (0 ≤ it < count): empty and
    the item fits a belt (`0x0062BAD0`) → green; occupied and a swap is
    possible (`0x0063C830`) → (128, 128, 0); else red; rectangle 29 × 29
-   (`0x004978D0`, mode 0).
+   at the hovered box's (left, top) (`0x004978D0`, the same
+   `0x0046EFD0(…, 29, 29, color, 0)` primitive as r4), drawn after
+   every slot, so over the items.
 6. **Hit area** (`0x00498DC0`): popped: x from box (count − 4).left to
    box 3.right, y from box (count − 4).top to box 3.bottom; not popped:
    y > H − 48, x W/2 + 23…W/2 + 145, y H − 39…H − 10 (inclusive).
 7. Row count `0x004979F0` (types 0–5: 3, 2, 1, 4, 2, 3; else 4).
-8. **Item hover text** (`0x00497A40`): belt hovered, a hovered item, no
-   cursor item, and (box ≤ 3 or popped or `[0x007BEF9C]`): the item's
-   name (`0x0048C060`, 128 units) and, unless its quality is 3
-   (`0x00627E70`), its stat lines (`0x004E6410`), colored with
-   `Prefix(…, 3)` / `Prefix(…, 0)` (`ui/messages.md` §3); when the shop
-   sell price applies (`0x00489840`, `0x004B2AD0`) a space and the price
-   text are appended; queued at (`[0x00722360]`, `[0x00722364]`),
-   color 0, centred (positions must be ≥ 0).
+8. **Item hover text** (`0x00497A40`): belt hovered `[0x007BEF94]`, a
+   hovered item `[0x007BEFA8]`, no cursor item (`0x0063C1E0`), and
+   (hovered box `[0x0072235C]` < 4 (signed) or popped `[0x007BEF98]` or
+   `[0x007BEF9C]`). The item must resolve by its GUID (`0x006335F0`,
+   none → fatal 0x61D). This is **not** the inventory item tool tip
+   (`0x0048DD90`, `ui/inventory.md`): it is a short text of two parts.
+   1. Name N := `0x0048C060(item, buffer, 128)` (the client item name,
+      the same call as the shop name of `ui/menus.md` §4, 128 units).
+   2. Stats S := empty; unless the item's quality (`0x00627E70`) is 3
+      (superior, `items/quality.md`), S := `0x004E6410(buffer, item,
+      0x100, 1, 0)` (the item's property lines, 256 units).
+   3. Text T (384 units) := `Prefix(S, 3)` then `Prefix(N, 0)` appended
+      (`0x004521C0`, `0x005267E0` copy, `0x00526700` append;
+      `ui/messages.md` §3: an empty part gets no colour code). The
+      text is drawn from its first line at the bottom upward (LF
+      moves the pen up, `ui/text.md` §7), so the stat lines (colour 3,
+      blue) are the lower lines and the name (colour 0, white) is drawn
+      above them, as the stat-line builder leaves them (its line breaks
+      are `0x004E6410`'s, not specified here).
+   4. Only when the text position (`[0x00722360]`, `[0x00722364]`) is ≥
+      0 in both: when an NPC trade inventory mode is open
+      (`0x00489840`: `[0x007BCBF0]` ∈ {1, 2, 3}) and
+      `0x004B2AD0(item, sell 1, …, price buffer, 64)` returns non-zero
+      with a non-empty price text, T += 3998 `newline` ("\n") + the
+      price text (so the price is the top line, above the name). Then
+      `0x00502280(T, x, y, color 0, centre 1)`: the pop-up text of r14
+      (font, frame, placement).
 9. **Mouse move** (`0x00499BB0`, only in game `[0x007A061C]`, input not
    blocked `0x0044DA30` = 0, P alive, `0x0044BFE0` = 0): popped and over
    the belt → hover tracking `0x00498930` (consumed while state 0x1F is
@@ -275,6 +323,99 @@ draw mode 5 unless a rule says otherwise.
     (`0x00660D10` with `e`'s x position `0x0045ADF0`). Reset
     `0x00498D60`: hovered box and text position := −1, belt hovered,
     hovered, last := 0; `0x00498E80`: hovered, last := 0.
+13. **Key names** (answers REC-240 part 1). Both take (command ECX,
+    slot EDX), find the **first** live entry (`0x007A6F90`, 10-byte
+    entries, `ui/controls.md` §1 r1) with that command and slot, and
+    name its key k (no entry → k = 0xFFFF).
+    - **Long name** `0x00469DE0` (key-config screen, mini-panel tips
+      §9 r6): k = 0xFFFF → 3762 `KeyNone` "None"; k in the "long" column
+      of the table below → that string; any other k → a one-unit string
+      holding the low byte of k (static buffer `0x007A741C`, so VK 0x31
+      → "1", VK 0x41 → "A"; also every k ≥ 0xE0 other than 0x100–0x104).
+    - **Short name** `0x0046A530` (belt labels r4, run tip §6 r1): k in
+      the "short" column → that string; any other k (including 0xFFFF)
+      → the long name `0x00469DE0` of the same (command, slot).
+
+    Strings (ENG `string.tbl`; jump tables `0x0046A448` / `0x0046A2CC` /
+    `0x0046A2B8` long, `0x0046A73C` / `0x0046A6BC` short):
+
+    | VK | Long id, text | Short id, text |
+    |---|---|---|
+    | 0x01, 0x02, 0x03, 0x04 | 3763 "Mouse 1", 3764 "Mouse 2", 3765 "Cancel", 3766 "Mouse 3" | — |
+    | 0x08 | 3790 "Backspace" | 3884 "bks" |
+    | 0x09, 0x0C, 0x0D | 3791 "Tab", 3792 "Clear", 3793 "Enter" | — |
+    | 0x10, 0x11 | 3794 "Shift", 3795 "Ctrl" | 3887 "sft", 3888 "ctl" |
+    | 0x12, 0x13, 0x14 | 3796 "Alt", 3797 "Pause", 3798 "Caps Lock" | — |
+    | 0x15, 0x17, 0x18, 0x19 | 3771 "Kana", 3772 "Junja", 3773 "Final", 3774 "Kanji" | — |
+    | 0x1B | 3775 "Escape" | 3870 "esc" |
+    | 0x1C–0x1F | 3776 "Convert", 3777 "Non-Convert", 3778 "Accept", 3779 "Mode Change" | — |
+    | 0x20 | 3799 "Space" | — |
+    | 0x21, 0x22 | 3800 "Page Up", 3801 "Page Down" | 3892 "pup", 3893 "pdn" |
+    | 0x23, 0x24 | 3802 "End", 3803 "Home" | — |
+    | 0x25–0x28 | 3780 "Left", 3781 "Up", 3782 "Right", 3783 "Down" | — |
+    | 0x29, 0x2A, 0x2B | 3784 "Select", 3804 "P - Tell Ken", 3785 "Execute" | — |
+    | 0x2C, 0x2D, 0x2E | 3805 "Print Screen", 3806 "Insert", 3807 "Delete" | 3895 "psn", 3896 "ins", 3897 "del" |
+    | 0x2F | 3808 "Help" | — |
+    | 0x5B, 0x5C, 0x5D | 3786 "Left Windows", 3787 "Right Windows", 3788 "Apps Menu" | — |
+    | 0x60–0x69 | 3809–3818 "Num Pad 0"–"Num Pad 9" | 3899–3908 "np0"–"np9" |
+    | 0x6A, 0x6B | 3819 "Num Pad *", 3820 "Num Pad +" | 3909 "np*", 3910 "np+" |
+    | 0x6C | 3821 "Separator" | 3912 "np." |
+    | 0x6D | 3822 "Num Pad -" | 3911 "np-" |
+    | 0x6E | 3823 "Num Pad ." | — |
+    | 0x6F | 3824 "Num Pad /" | 3913 "np/" |
+    | 0x70–0x87 | 3825–3848 "F1"–"F24" | — |
+    | 0x90 | 3789 "Num Lock" | 3883 "nml" |
+    | 0x91 | 3849 "Scroll Lock" | 3914 "slk" |
+    | 0xBA–0xC0 | 3850–3856 ";", "=", ",", "-", ".", "/", "~" | — |
+    | 0xDB–0xDE | 3857–3860 "[", "\\", "]", "'" | — |
+    | 0x100 | 3766 "Mouse 3" | 3861 "m3" |
+    | 0x101, 0x102 | 3767 "Mouse 4", 3768 "Mouse 5" | 3862 "m4", 3863 "m5" |
+    | 0x103, 0x104 | 3769 "Mouse Wheel Up", 3770 "Mouse Wheel Down" | 3864 "mwu", 3865 "mwd" |
+
+    Quirk (reproduce): the short table gives VK 0x6C (Separator) "np."
+    and VK 0x6D (Subtract) "np-", while VK 0x6E (Decimal) has no short
+    name and shows "Num Pad ." — not a swap of 0x6D / 0x6E but the
+    table as compiled. Digits and letters (VK 0x30–0x39, 0x41–0x5A)
+    and every VK not listed are the one-unit low-byte string.
+14. **Pop-up text** (the hover tool tip of every `0x00502280` caller in
+    this spec; answers REC-238). `0x00502280(text ECX, x EDX, y, color,
+    centre)` copies the text (only when non-null and shorter than 1,024
+    units; else the buffer is cleared) to `0x00841EC8` and stores x
+    `[0x008426C8]`, y `[0x008426CC]`, color `[0x008426D0]`, centre
+    `[0x008426D4]` and bar `[0x008426D8]` := 0. **One slot**: a later
+    call in the same frame replaces an earlier one; the UI pass clears
+    it at step 1 (`ui/panels.md` §5). It is drawn once, by `0x00503000`
+    (UI pass step 10, after the control panel, step 8 and the NPC menu):
+    1. Nothing when the text is empty. **Font: the current font**
+       (`[0x0072DFFC]`; this call sets none at first). In a frame the
+       belt draw (§5 r4) sets font 1 (Font16) and no later draw of
+       steps 8–10 before `0x00503000` sets another without restoring it
+       in the plain game view, so the control-panel tips are Font16.
+    2. W = max width (`0x00501840`) + 8; Ht = text height
+       (`0x005019C0`); x0 = x − (W >> 1) (arithmetic) when centre = 1,
+       else x; y0 = y + 2; (Sw, Sh) = the screen size (`0x004F59B0`).
+    3. Too tall: when Ht > Sh − 10: font 1 → font 0 (Font8) and back
+       to 2; else when the current font is 0 → font 6 (Font6) and back
+       to 2; else (any other font) draw as is.
+    4. x' = 0 when x0 ≤ 0, else x0; x' = min(x', Sw − W).
+       b = max(y0, Ht − 5) when that is < Sh − 5, else b = Sh − 5.
+    5. Backing: bar = 0 (every `0x00502280` caller) →
+       `DrawRectangle(x', b − Ht, x' + W, b, color 0, mode 2)`
+       (`render/blend-modes.md` §8 r2: mode 2 is blend kind 2, each
+       pixel `T[256·d + 0]` with the mode-2 table `T`). (bar ≠ 0, only through `0x005022F0`: the first
+       bar · W >> 7 pixels are palette colour (80, 0, 0) in mode 1, the
+       rest colour 0 mode 2; not used by this spec.)
+    6. Text: `0x00501A80(text, x', b − (line-height byte +0x0A of the
+       font × [0x0072E008]) / 10, block width W, color, centred 1)`
+       (`ui/text.md` §7 with W as the block); `[0x0072E008]` = 3 for
+       English (`0x00502C60`), so b − 3 for Font16 (line-height byte
+       10). Lines are centred in the block and go up from the bottom.
+    7. The font of step 1 is restored if step 3 changed it.
+
+    So a centred tip's centre is x, its box is W wide (text width + 8)
+    and its bottom is y + 2 (when above Ht − 5, on screen); the colour
+    argument is the text colour of the first line (colour codes inside
+    the text override it).
 
 ### 6. Run / walk and menu buttons
 
@@ -282,9 +423,11 @@ draw mode 5 unless a rule says otherwise.
    (`0x0044BE90` ≠ 0), else 0; + 1 while pressed (`[0x007BEFD8]`) with
    the mouse inside x W/2 − 145…W/2 − 128, y H − 28…H − 8 (inclusive,
    `0x00497440`); `runbutton` at (W/2 − 145, H − 10). Hover in that
-   rectangle → tool tip (`0x00497300`): `RunOn` (4179, "Run") + for the
-   primary and secondary key of binding 0x23 ` (%s)` (4178) with the key
-   name, at (W/2 − 145, H − 23), color 0, centred.
+   rectangle → tool tip (`0x00497300`): `RunOn` (4179, "Run"), then for
+   slot 1 and then slot 0 of command 0x23, each only when that slot's
+   key (`0x00469AA0`) ≠ 0xFFFF, ` (%s)` (4178) formatted (30 units,
+   `0x005269D0`) with the **short** key name `0x0046A530(0x23, slot)`
+   (§5 r13), at (W/2 − 145, H − 23), color 0, centred; drawn as §5 r14.
 2. **Menu button** (`0x004977C0`): frame = 2 while state 0x15 (mini
    panel) is open, else 0; + 1 while pressed (`[0x007BEFD0]`) inside x
    W/2 − 8…W/2 + 5, y H − 39…H − 13 (`0x00497780`); `menubutton` at
@@ -471,11 +614,13 @@ draw mode 5 unless a rule says otherwise.
 
 ## Constants & data dependencies
 
-- Strings: 3986, 3987, 4163–4176, 4178, 4179.
+- Strings: 3986, 3987, 3998, 4163–4176, 4178, 4179; key names 3762–3860
+  (long) and 3861–3914 (short), §5 r13.
 - Tables: `belts.bin` (14 records of 0x108 bytes); binding table of the
   belt keys `0x00722404` (4 dwords); switch tables `0x00499434`
   (pop-up rows), `0x00497A1C` (row count), `0x0047ED6C` (mini panel),
-  `0x0047F630` (tool tips).
+  `0x0047F630` (tool tips); key-name jump tables `0x0046A448`,
+  `0x0046A2CC`, `0x0046A2B8` (long), `0x0046A73C`, `0x0046A6BC` (short).
 - States: 2, 24 (group), 100, 106, 136; stats 6–13, 26, 74.
 
 ## Randomness
@@ -513,6 +658,17 @@ Synthetic (rules as cited).
 | 640 × 480 belt type 0 popped | rows at y 439, 407 | §5 r3 |
 | belt click on box 2 (empty), 1 × 1 potion on the cursor | C→S 0x23 `[potion GUID][2]` and the put sound | §5 r11 |
 | belt click on box 0 holding a potion, no cursor item | C→S 0x24 `[potion GUID]` | §5 r11 |
+| belt slot 0, `CfgBelt1` slot 1 = VK 0x31, slot 0 unbound | label `1` | §5 r4, r13 |
+| `CfgBelt1` rebound: slot 1 = VK 0x70 (F1) | label `F1` | §5 r4, r13 |
+| `CfgBelt2` slot 1 = VK 0x6C | label `np.` | §5 r13 |
+| `CfgBelt3` slot 1 = 0xFFFF, slot 0 = VK 0x33 | label `None` (cut to width A ≤ 28) | §5 r4 |
+| `CfgBelt4` both slots 0xFFFF | no label | §5 r4 |
+| `CfgBelt1` slot 1 = 0x103 (wheel up) | label `mwu` | §5 r13 |
+| run tip, command 0x23 slot 1 = VK 0x52, slot 0 unbound | `Run (R)` | §6 r1, §5 r13 |
+| hovered belt potion (quality 2), no shop | `ÿc3` + stat lines + `ÿc0` + name, colour 0, centre at the text position | §5 r8 |
+| same, NPC trade mode 1, price text `P` | as above + `
+` + `P` | §5 r8 |
+| pop-up `Run` at (x 255, y 577), centre 1, 800 × 600, Font16, max width 26 (synthetic), one line | W = 34; box (238, 563)–(272, 579) when Ht = 16 (`DrawRectangle`, colour 0, mode 2); text block x 238, y 576 | §5 r14 |
 
 ## Provenance
 
@@ -527,7 +683,11 @@ Synthetic (rules as cited).
 `0x004A6630`, `0x004A65E0`, `0x004A6690`, `0x0047F0C0`, `0x0047F710`,
 `0x0047EA60`, `0x0047EB50`, `0x0047E8B0`, `0x0047E9A0`, `0x0047F650`,
 `0x0047F490`, `0x0047EC50`, `0x0047EF30`, `0x0047ED90`, `0x00499500`,
-`0x004996A0`, `0x00499BB0`, `0x00498E90`, `0x00660CB0`, `0x00660D10`.
+`0x004996A0`, `0x00499BB0`, `0x00498E90`, `0x00660CB0`, `0x00660D10`,
+`0x00469AA0`, `0x00469DE0`, `0x0046A530`, `0x004978D0`, `0x0046EFD0`,
+`0x00497A40`, `0x00489840`, `0x00502280`, `0x005022F0`, `0x00503000`,
+`0x00502C60` (2026-10-08: REC-240, REC-238; jump tables read from the
+image with `pefile`).
 Strings, `belts.txt`, `states.txt` and `itemstatcost.txt` rows read
 with Python scripts outside the repo. No capture yet.
 
@@ -556,3 +716,19 @@ with Python scripts outside the repo. No capture yet.
    menu-button release).
 6. **Needs recording.** Pixel proof of §3–§9 at 640 × 480 and 800 × 600
    (globes at several fills, belt popped, mini panel in layouts 1–3).
+7. **Answered** (2026-10-08, REC-240; §5 r4, r5, r8, r13): belt key
+   labels are the short name of the slot-1 key of commands 23–26 read
+   live from the binding table (`0x0046A530`, falling back to the long
+   name `0x00469DE0`); the hover text is the reduced name + stat-line
+   text of `0x00497A40` (not the inventory tip) with a newline + price
+   in NPC trade, drawn as pop-up text; the highlight rectangles are
+   `DrawRectangle` mode 0 with a nearest-palette colour. Was: key-label
+   source of a rebound key, the belt tip strings, the rectangle draw.
+8. **Answered** (2026-10-08, REC-238; §5 r14, §3 r6): the pop-up text
+   of `0x00502280` is drawn by `0x00503000` in the current font (Font16
+   in the plain game view) over a colour-0 mode-2 box W = text width + 8
+   wide, clamped to the screen; the globe numbers are plain `DrawText`
+   in the current font. Was: the tip font and the globe-number draw.
+9. **Needs recording.** Pixel check of §5 r14 (a hovered run button,
+   the experience bar tip) and of §5 r4 with a rebound belt key; owner
+   this spec.

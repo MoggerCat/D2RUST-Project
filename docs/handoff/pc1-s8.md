@@ -15,6 +15,7 @@ Branch `claude/local-pc1-s8` from `origin/claude/specs-staging-7`
 | REC-46, REC-50 (model part); model OQ17, ui OQ5; properties §13 callers; generation §12.2 | 0x67 u32@0x27 = 4 / 0x804 / 0x100004 / 0x100804 (hardcore bit 0x800); pet +0x1C always 100 (setter `0x00479010` dead); recharge walks runeword list (171) before main; skill fallback `0x00496CF0` runs only in tick passes and once per paused pass; `[0x007BC850]` = chat input line, gold dialog `0x00454150` | `client/model.md` §7 r9, §14 r3, §17 r4, OQ10, OQ17; `client/bridge.md` §8 r5; `client/ui.md` §B8.1, OQ5; `items/properties.md` §13; `items/inventory.md` OQ1; `items/generation.md` §12.2 | +0x1C matches; create flags, recharge order do not; fallback not implemented | `q-fix-create-flags`, `q-fix-recharge-order`, `q-skill-fallback` |
 | msg-units OQ6, OQ11; msg-ui OQ1, OQ2 (bit 0x10000), OQ9; msg-skills OQ1 (REC-09 check only); msg-stats-items OQ3, OQ7; 0x7D/0x92 set-update labels | pet pass t rule (`0x00478E70`); dead flag 0x10000 writers/clearer; chat ignore list filter; 0x0D f=1 preload only; charges only via stat callback `0x004609F0`; 0xA6 never sent; 0x16 check, 0x17 never dispatched | `client/msg-stats-items.md` §5 r4–r5, r7.1–r7.2; `client/msg-units.md` §4 r6, §7 r12–r13, §8 r10.1; `client/msg-ui.md` §1, §4 r3.2.1–r3.2.4; `client/msg-skills.md` §1 r5–r6. No PROVISIONAL left in `client/msg-*.md` | 5 markers match (row `q-drop-stale-provisional`); pet palette, dead flag, charges do not | `q-fix-pet-palette`, `q-fix-dead-flag`, `q-fix-client-stat-callback`, `q-drop-stale-provisional` |
 | intents-events OQ2, OQ10, OQ12 (0x23 part), OQ15; REC-95, REC-02 (binary; captures confirm only) | leave queues 0x05, 0x06, sends 0xB0, no 0x5C to the leaver; 0xAF only at server start; state-change bit writers/clear; legacy 0x23 only for saves < 0x5C; 0x3D = mode 2↔5 by footprint query; 0x4C/0x4D level byte = low byte of `skill_level(…,1)`; new character: no 0x7B. sim/stats, unit-order: no bin questions left | `sim/intents-events.md` §2.5 r2, §3.5 r6, §7.3 r2, §7.4 r3, §8.2 r3.6, §9 r4 + table; `combat/damage.md` §3.1 step 1 → bodies-2 §2.27 | leave sequence + hot keys match; level byte, 0x3D, monster update steps do not (dual-weapon switch already `q-fix-dual-weapon-damage`; also `wiring/action/combat.rs:358`) | `q-fix-skill-msg-level`, `q-fix-door-highlight`, `q-fix-monster-update-steps` |
+| REC-240 (1)–(4), REC-238 | belt labels: short name of the slot-1 key of commands 23–26 (`0x00722404`, `0x0046A530`), "None" when only slot 0 bound, key-name table 3762–3914; belt tip `0x00497A40` (stat lines colour 3 + name colour 0 + trade price); rectangles `0x0046EFD0` 29×29 mode 0; gold prompts 4049/4050, 0x4F 0x14/0x13, sound 0xDD; pop-up text `0x00502280`/`0x00503000` one slot per frame, Font16; globe numbers DrawText, no box | `ui/control-panel.md` §3 r6, §5 r4, r5, r8, r13–r14 new, §6 r1, OQ7–8 answered, OQ9 new | tip font matches; labels, tip, rects, prompts, pop-up box, globes do not | `q-fix-belt-ui`, `q-fix-gold-prompts`, `q-fix-hud-popup` |
 
 Follow-ups for a later worker (other owners; msg-stats-items labels, properties §13 callers and the OQ pointers are done): `client/stat-lists.md` §2 r8 should link the `skills/use.md` §2 item type test. `sim/path-placement.md` ~line 610 "the act-change spec" → `world/waypoints.md` §11.
 
@@ -81,3 +82,14 @@ HANDOFF REC lines to update when HANDOFF is free (Lane B is editing it): REC-237
   with a monster in the doorway: C→S 0x3D and the door's next mode (2 → 5).
 - Confirmation only: 0x4C level byte with a +skills item (REC-95); 0x7B
   count at a new-character join (REC-02).
+- **R-BELT-1** [MANUAL] Settles: control-panel §5 r4, r13. Set `CfgBelt1`
+  to F1, bind `CfgBelt3` in its secondary slot only; screenshot the belt
+  (expect "F1" and "None").
+- **R-HUD-1** [MANUAL] Settles: control-panel §5 r14, REC-238. Hovered run
+  button and experience bar at 800×600, screenshots.
+- **R-BELT-2** [MANUAL] Settles: control-panel §5 r8. Hovered belt potion
+  with and without an NPC shop open, screenshot.
+- **R-BELT-3** [MANUAL] Settles: control-panel §5 r4–r5. Highlight pixels:
+  hovered usable potion; cursor item over empty, swappable, invalid box.
+- **R-GOLD-1** [AUTO trace + MANUAL screenshot] Settles: panels-2 §21 r6,
+  r8. Stash gold withdraw and deposit dialogs, C→S 0x4F trace.
