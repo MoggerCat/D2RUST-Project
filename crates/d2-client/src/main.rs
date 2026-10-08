@@ -83,6 +83,7 @@ struct Options {
     source: Option<String>,
     /// `play --new`: the folder the new character's `<name>.d2s` goes in.
     save_dir: Option<PathBuf>,
+    hardcore: bool,
 }
 
 fn parse_view(s: &str) -> Result<cpu::View> {
@@ -121,6 +122,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
         native: None,
         source: None,
         save_dir: None,
+        hardcore: false,
     };
     let mut it = args.iter();
     while let Some(flag) = it.next() {
@@ -139,6 +141,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
             "--frames" => o.frames = Some(value()?.parse().context("--frames")?),
             "--seed" => o.seed = value()?.parse().context("--seed")?,
             "--synthetic" => o.synthetic = true,
+            "--hardcore" => o.hardcore = true,
             "--save" => o.save = Some(PathBuf::from(value()?)),
             "--native" => o.native = Some(PathBuf::from(value()?)),
             "--source" => o.source = Some(value()?.clone()),
@@ -429,6 +432,7 @@ fn play(o: Options) -> Result<()> {
         character,
         exit_after: o.frames,
         save_path: save_path.clone(),
+        hardcore: o.hardcore,
     })?;
     match result {
         bevy::app::AppExit::Success => Ok(()),

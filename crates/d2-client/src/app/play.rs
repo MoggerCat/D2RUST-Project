@@ -257,6 +257,9 @@ pub struct PlayConfig {
     /// Where the character is saved on exit (`app::save::save_path`);
     /// `None`: not saved.
     pub save_path: Option<std::path::PathBuf>,
+    /// A hardcore character (`play --new --hardcore`); a loaded save's own
+    /// status bit makes it hardcore too ([`super::hardcore`]).
+    pub hardcore: bool,
 }
 
 #[derive(Resource)]
@@ -312,18 +315,25 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         GameData::Synthetic => Vec::new(),
     };
     let speeds = single_player::walk_speeds(&config.data, &config.character)?;
-    let save_base = save::base_save(&config.character);
+    let mut save_base = save::base_save(&config.character);
+    let hardcore = config.hardcore || save_base.header.status & d2_formats::d2s::status::HARDCORE != 0;
+    if hardcore {
+        save_base.header.status |= d2_formats::d2s::status::HARDCORE;
+    }
     let save_tables: Option<std::sync::Arc<dyn d2_formats::d2s::SaveTables + Send + Sync>> =
         match &config.data {
             GameData::Live(d) => Some(std::sync::Arc::new(d.save.clone())),
             GameData::Synthetic => None,
         };
-    let (link, started) = single_player::start_with(
+    let (mut link, started) = single_player::start_with(
         config.data,
         config.seed,
         config.character,
         SystemClock::default(),
     )?;
+    if hardcore {
+        link.with(|l| l.host_mut().game.events.action.hooks().x.hardcore = true)?;
+    }
     // Before the app exists, so not through Bevy's log.
     println!(
         "single player: seed {}, waypoint unit {:?} (GUID {})",
@@ -417,6 +427,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     }
     add_walk(&mut app, tap, speeds);
     super::death::add_death(&mut app);
+    super::hardcore::add_hardcore(&mut app, hardcore);
     sound::add_output(&mut app);
     if let Some(frames) = config.exit_after {
         app.insert_resource(ExitAfter(frames))

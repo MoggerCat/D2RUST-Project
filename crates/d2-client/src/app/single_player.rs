@@ -433,6 +433,13 @@ pub struct LocalSeams {
     /// The players and monsters for the host rest's NPC and quest seams
     /// (`npc_seams`), written by [`sync_seams`].
     pub snap: super::npc_seams::SnapRef,
+    /// The character is hardcore (the save's status bit 0x4, or `play
+    /// --hardcore`): client flag 4 of the one local client
+    /// ([`super::hardcore`]).
+    pub hardcore: bool,
+    /// The clients the server dropped, with the reason
+    /// (`Pending::drop_client`): the hardcore resurrect drops with 3.
+    pub dropped: Vec<(UnitId, u32)>,
 }
 
 impl LocalSeams {
@@ -490,6 +497,17 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
 }
 
 impl Pending for LocalSeams {
+    /// Client flag 4 (`0x00538670`): the local character is hardcore.
+    fn client_hardcore(&self, _player: UnitId) -> bool {
+        self.hardcore
+    }
+
+    /// `0x0052CAF0`: the client is dropped; the preview records it
+    /// (`super::hardcore`).
+    fn drop_client(&mut self, player: UnitId, reason: u32) {
+        self.dropped.push((player, reason));
+    }
+
     /// d2rs-own, unverified (REC-108): mode DT and the treasure drop
     /// ([`super::monster_drop::death_start`]).
     fn monster_death_start(
@@ -940,7 +958,10 @@ impl LiveData {
             game: Some(d2s::GameContext {
                 client_name: save_name(bytes).to_vec(),
                 expansion: GAME_SETUP.expansion,
-                hardcore: false,
+                // The character's own mode: a hardcore character plays a
+                // hardcore game (a dead one is refused by the header
+                // check, `d2s.md` §2.2 r5: permanent death).
+                hardcore: super::hardcore::save_is_hardcore(bytes),
                 difficulty: GAME_SETUP.difficulty,
             }),
         };
