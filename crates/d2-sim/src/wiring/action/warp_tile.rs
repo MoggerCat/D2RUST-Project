@@ -27,6 +27,10 @@ use super::{Pending, View};
 /// own preset-list entry (class = monstats class) that population does not
 /// read (it takes type 1). PROVISIONAL (REC-124); d2rs-own, unverified.
 pub const HOST_MONSTER_PRESET: u32 = 6;
+/// Preset unit type for an object the host's level types provider lists
+/// (q-a2-duriel, REC-159; d2rs-own, unverified): created through the
+/// object state's `create_object` (allocation and the §3 init).
+pub const HOST_OBJECT_PRESET: u32 = 7;
 
 /// The unit type of a tile preset (`levels.md` §10.4).
 const TILE_PRESET: u32 = crate::path::warp::TILE_UNIT_TYPE as u32;
@@ -118,6 +122,31 @@ impl<X: Pending> View<'_, X> {
             }
         }
         out
+    }
+
+    /// Creates an object for each [`HOST_OBJECT_PRESET`] entry of the
+    /// active `room`'s DRLG room that has none yet (same class).
+    pub fn spawn_host_objects(&mut self, game: &mut Game, room: RoomId) {
+        let Some(act) = game.lists.room(room).map(|r| r.act) else {
+            return;
+        };
+        let found = self.h.drlg.with_act(act, &mut game.lists, |d, svc| {
+            let r = d.drlg_room_of(room)?;
+            let origin = d.active_room(r)?.subtiles;
+            Some((svc.types.preset_units(d, r), origin))
+        });
+        let Some(Some((units, origin))) = found else {
+            return;
+        };
+        for p in units.iter().filter(|p| p.unit_type == HOST_OBJECT_PRESET) {
+            let exists = game.lists.room_units(room).into_iter().any(|u| {
+                game.lists.unit(u).is_some_and(|e| e.ty == UnitType::Object)
+                    && self.units.get(u).is_some_and(|r| r.class == p.class)
+            });
+            if !exists {
+                self.create_object(game, room, p.class, origin.x + p.x, origin.y + p.y, 0);
+            }
+        }
     }
 
     /// The first tile unit of `class` in the active `room`'s unit list.

@@ -278,7 +278,7 @@ impl<F: LevelTypes> LevelTypes for SyntheticTypes<F> {
             // chose for it (q-a2-duriel, d2rs-own, unverified).
             if drlg.level(level).id == drlg.staff_tomb && drlg.staff_tomb != 0 {
                 units.push(PresetUnit {
-                    unit_type: 2,
+                    unit_type: d2_sim::wiring::action::warp_tile::HOST_OBJECT_PRESET,
                     class: super::synthetic_act2::ORIFICE_CLASS,
                     x: ORIFICE_XY.0,
                     y: ORIFICE_XY.1,
