@@ -124,6 +124,25 @@ pub trait MonsterWorld<X> {
         let _ = (sim, h, room, x, y, class, mode, spread, flags);
         None
     }
+    /// The preset spawn `0x0054E600(room, class, x, y, mode)` on the lent
+    /// world (`monsters/population.md` §11.2: a class past the monstats
+    /// rows is superunique `class - rows`, §11.4, with its init, minions
+    /// and quest links). `None`: the world cannot run it;
+    /// `Some(None)`: nothing made.
+    #[allow(clippy::too_many_arguments)]
+    fn spawn_preset(
+        &mut self,
+        sim: &mut Sim<'_>,
+        h: &mut ActionHooks<X>,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: i32,
+        mode: u8,
+    ) -> Option<Option<UnitId>> {
+        let _ = (sim, h, room, x, y, class, mode);
+        None
+    }
     /// The concrete state back (the lender downcasts it).
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
 }
@@ -189,6 +208,11 @@ impl<X> ActionHooks<X> {
         self.monster_world.as_ref()?.monster(unit)
     }
 
+    /// The monster data of `unit` in the lent world, mutable.
+    pub fn monster_data_mut(&mut self, unit: UnitId) -> Option<&mut MonsterData> {
+        self.monster_world.as_mut()?.monster_mut(unit)
+    }
+
     /// Runs the umod dispatcher in `mode` on `unit` when a world is lent;
     /// false when none is (the caller then takes its pending default).
     pub fn run_umods(
@@ -230,48 +254,54 @@ impl<X: Pending> ActionHooks<X> {
         }
     }
 
-    /// The AI state `0x005734E0` (`ai.md` §3.1): monster data
-    /// `dwAiState` (+0x54); a unit without monster data asks
-    /// [`Pending::ai_state`].
-    pub fn ai_state(&self, unit: UnitId) -> u32 {
-        match self.monster_data(unit) {
-            Some(m) => m.ai_state,
-            None => self.x.ai_state(unit),
-        }
+    /// `0x0061AFA0(room, GUID)` (`units.md` §4.6 rule 1.3): the unit's
+    /// room ring takes its GUID at the ring index, then the index steps
+    /// (mod 4); a unit without a room changes nothing.
+    pub fn push_last_dead(&mut self, game: &crate::game::Game, unit: UnitId) {
+        let Some(e) = game.lists.unit(unit) else {
+            return;
+        };
+        let (Some(room), guid) = (e.room(), e.guid) else {
+            return;
+        };
+        let ring = self.last_dead.entry(room).or_default();
+        ring.slots[usize::from(ring.index)] = Some((unit, guid));
+        ring.index = (ring.index + 1) & 3;
     }
 
-    /// The AI state setter `0x005734C0(unit, v)`; a unit without monster
-    /// data goes to [`Pending::set_monster_ai_state`].
-    pub fn set_ai_state(&mut self, unit: UnitId, v: u32) {
-        match self
-            .monster_world
-            .as_mut()
-            .and_then(|w| w.monster_mut(unit))
-        {
+    /// `0x005734C0(unit, v)`: the monster data's `dwAiState` (+0x54,
+    /// `monsters/ai.md` §3 "AI state"); a unit without monster data in
+    /// the lent world asks [`Pending::set_monster_ai_state`].
+    pub fn set_monster_ai_state(&mut self, unit: UnitId, v: u32) {
+        match self.monster_data_mut(unit) {
             Some(m) => m.ai_state = v,
             None => self.x.set_monster_ai_state(unit, v),
         }
     }
 
-    /// `0x005A68E0`, from the monster mode set `0x005A7C20` for every
-    /// mode but GH (`ai.md` §3.1 rule 2), when the mode being left `m`
-    /// is not 1 (NU): old state s ≥ 16 → s − 16 (19 becomes 3); s = 13
-    /// and m = 3 → kept; else s := m.
-    pub fn ai_state_on_mode_leave(&mut self, unit: UnitId, left: u32) {
-        if left == 1 {
+    /// `0x005A68E0(unit, m)`, the AI-state half of the monster mode set
+    /// `0x005A7C20` (`ai.md` §3 "AI state" rule 2): `m` is the mode being
+    /// left; nothing for mode 1; old state ≥ 16 → state − 16; state 13
+    /// leaving mode 3 stays; else the state is `m`.
+    pub fn leave_monster_mode(&mut self, unit: UnitId, m: u32) {
+        if m == 1 {
             return;
         }
-        if let Some(m) = self
-            .monster_world
-            .as_mut()
-            .and_then(|w| w.monster_mut(unit))
-        {
-            let s = m.ai_state;
-            m.ai_state = match s {
-                16.. => s - 16,
-                13 if left == 3 => 13,
-                _ => left,
-            };
+        let s = self.ai_state_of(unit);
+        let new = if s >= 16 {
+            s - 16
+        } else if s == 13 && m == 3 {
+            13
+        } else {
+            m
+        };
+        self.set_monster_ai_state(unit, new);
+    }
+
+    fn ai_state_of(&self, unit: UnitId) -> u32 {
+        match self.monster_data(unit) {
+            Some(d) => d.ai_state,
+            None => self.x.ai_state(unit),
         }
     }
 

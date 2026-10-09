@@ -79,9 +79,13 @@ milestone nihlathak-killed
   poke 5 warp 124
   sweep 20 2 400 40 grid
   find ut 1 cl 526
-  poke +2 pos @1:526 @x+3 @y
+  # Nihlathak stands in his 10-minion group (hcIdx 60, population.md
+  # §11.4) and the sweep ends in a blocked spot, where a missile dies at
+  # birth: he is moved to open ground south of the group (absolute level
+  # 124 sub-tiles) and the bolt starts 8 sub-tiles beyond him.
+  poke +2 pos @1:526 12705 5032
   poke +2 stat @1:526 6 0 256
-  poke +10 missile 58 @x @y @x+3 @y skill 36 1
+  poke +10 missile 58 12705 5040 12705 5032 skill 36 1
   need ever unit ut 1 cl 526 killed
 
 milestone arreat-summit
