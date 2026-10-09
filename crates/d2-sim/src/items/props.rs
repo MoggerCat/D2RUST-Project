@@ -95,6 +95,10 @@ pub struct PropCtx<'o> {
     pub mode: u8,
     pub list: ListKey,
     pub owner: Option<&'o mut dyn ItemStats>,
+    /// The dispatcher's extra unit (§2: second argument) when it is an
+    /// item: the socketed item of a rune's mode 5 (§9 rule 2); read by the
+    /// legacy function `0x0065D270` (§14).
+    pub extra: Option<&'o mut dyn ItemStats>,
 }
 
 impl PropCtx<'_> {
@@ -104,6 +108,7 @@ impl PropCtx<'_> {
             mode,
             list: ListKey::ITEM,
             owner: None,
+            extra: None,
         }
     }
 }
@@ -135,7 +140,9 @@ pub fn apply_property<S: ItemStats>(
         // §14: n is the wrapper's sixth argument, 0 for affixes (§12.1 of
         // `affixes.md`), §11 and §12.
         // PROVISIONAL (M22; REC-289): the other callers' value is not in
-        // the spec; 0 here too.
+        // the spec; 0 here too. Craft lists (mode 7) take this path as
+        // §14 names §12 among the wrapper's callers (§2 says mode 7 calls
+        // the dispatcher directly; `pc1-data.md` Step 4 item 12).
         if let Err(e) = super::props_legacy::apply(t, item, ctx, rec, 0) {
             item.fatal = Some(e);
         }
@@ -640,6 +647,17 @@ pub fn apply_set_item<S: ItemStats>(t: &ItemTables, item: &mut Item<S>) {
 /// own list. A quality-5 filler of another type is not specified
 /// (OQ 2): nothing happens.
 pub fn apply_socket_filler<S: ItemStats>(t: &ItemTables, filler: &mut Item<S>, apply_type: u8) {
+    apply_socket_filler_into(t, filler, apply_type, None);
+}
+
+/// [`apply_socket_filler`] with the socketed item's stats: a rune's
+/// mode 5 passes it as the extra unit (§9 rule 2).
+pub fn apply_socket_filler_into<S: ItemStats>(
+    t: &ItemTables,
+    filler: &mut Item<S>,
+    apply_type: u8,
+    socketed: Option<&mut dyn ItemStats>,
+) {
     let m = if t.is_type(filler.record, ty::GEM as i16) {
         mode::GEM
     } else if t.is_type(filler.record, ty::RUNE as i16) {
@@ -660,7 +678,13 @@ pub fn apply_socket_filler<S: ItemStats>(t: &ItemTables, filler: &mut Item<S>, a
     let Some(block) = gem.mods.get(usize::from(apply_type)).copied() else {
         return;
     };
-    run_until_none(t, filler, &mut PropCtx::item(m), &block);
+    let mut ctx = PropCtx {
+        mode: m,
+        list: ListKey::ITEM,
+        owner: None,
+        extra: if m == mode::RUNE { socketed } else { None },
+    };
+    run_until_none(t, filler, &mut ctx, &block);
 }
 
 /// §10.1: the first runes row the item and its fillers (items combined
@@ -756,6 +780,7 @@ pub fn activate_runeword<S: ItemStats>(
         mode: mode::RUNEWORD,
         list: key,
         owner: Some(socketed),
+        extra: None,
     };
     run_until_none(t, filler, &mut ctx, &props);
     true
@@ -800,6 +825,7 @@ pub fn set_bonuses<S: ItemStats>(
         mode: mode::SET,
         list,
         owner: Some(owner),
+        extra: None,
     };
     for rec in partial.iter().take(take).filter(|r| r.code >= 0) {
         apply_property(t, item, &mut ctx, rec);
