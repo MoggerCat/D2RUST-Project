@@ -257,6 +257,19 @@ rather than a hand-run recipe.
     other points that session lists there. Answer into
     `render/unit-composite.md` §8 and the client missile specs.
 
+- **[q-fix-pc1-combat] Evade's reaction (`combat/damage.md` §7.1 step
+  5.2)**: "state 68 list; s, E as above" — does the evade branch also
+  set E flags |= 4 and make the unit form request (E, mode 13, tA, gA,
+  0) like 5.1, or only the `stsound` sound event 12? d2rs
+  (`wiring/action/reaction.rs`) does the full 5.1 skill form plus the
+  sound. Answer into §7.1 step 5.2.
+- **[q-fix-pc1-combat] Missile damage setup weapon of a monster
+  (`missiles/damage.md` §1 step 6)**: d2rs serves `0x00622830` (a type-1
+  owner with an inventory) with the same seam as the player's attack
+  weapon `0x00623990(owner, 1)` (`Pending::attack_weapon`). Is
+  `0x00622830` the same pick (`sim/units.md` §4.7 "Attack weapon") or
+  plain `0x0063C9B0`? Answer into §1 step 6.
+
 ## Step 5 — spec gaps (107 provisional points no spec states)
 
 `docs/handoff/provisional-index.tsv` rows with `settle_kind` = `unstated`
