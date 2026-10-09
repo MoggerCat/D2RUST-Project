@@ -16,3 +16,15 @@ GROUPS = {
                    "a1-panel-belt-open": ("belt", 0)},
     },
 }
+
+for _a, _n in ((2, "lut-gholein"), (3, "kurast-docks"), (4, "pandemonium-fortress"), (5, "harrogath")):
+    GROUPS[f"act{_a}town"] = {
+        "char": f"SceAct{_a}", "seed": 1234,
+        "script": "waitticks 40; mark t; waitticks 10; end",
+        "scenes": {f"a{_a}-town-{_n}": ("t", 0)},
+    }
+GROUPS["a1town"] = {
+    "char": "SceSor", "seed": 1234,
+    "script": "waitticks 40; mark t; waitticks 10; end",
+    "scenes": {"a1-town-idle-sor": ("t", 0)},
+}

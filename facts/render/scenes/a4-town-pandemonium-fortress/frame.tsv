@@ -1,0 +1,22 @@
+# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py /home/user/D2RUST-Project/traces/raw/20261009-024751-frames.jsonl --scene a4-town-pandemonium-fortress --frame 25 --tile-light unknown --out /home/user/D2RUST-Project/facts/render; game: 1.14d
+key	value
+seq	25
+tick	43
+w	800
+h	600
+act	3
+level	103
+player_x	80
+player_y	80736
+tile_origin_x	-320
+tile_origin_y	80456
+unit_origin_x	-320
+unit_origin_y	80452
+open_mode	0
+shift_x	0
+light_quality	0
+rain	0
+snow	0
+draws	279
+index_sha256	25625d7906dfaf7e5824e073ecb590b5236610896f2eba4fa9b15a5ea2e86d94
+palette_sha256	c5244c1b5e14995c6053fc520af1210ae3f9cc78202b4bb5609846ce566d0404
