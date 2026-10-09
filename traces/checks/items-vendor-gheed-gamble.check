@@ -12,8 +12,8 @@ seconds 300
 channels items
 at 4 poke pos @player 4860 4236
 at 7 poke pos @player 4848 4250
-at 10 poke pos @player 4840 4264
-at 13 poke pos @player 4838 4272
+at 10 poke pos @player 4842 4262
+at 13 poke pos @player 4837 4274
 at 16 send InteractWithEntity type=1 id=@1:147
 at 18 send InitEntityChat id=@1:147
 at 20 send EntityAction action=2 npc=@1:147 item=0
