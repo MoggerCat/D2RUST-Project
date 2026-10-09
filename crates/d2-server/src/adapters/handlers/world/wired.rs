@@ -976,9 +976,7 @@ where
         // a quest object's init runs inside its allocation on the lent
         // quest parts (Lut Gholein's start Jerhyn, `quests-act2-2.md` §2
         // item 1; recorded `act-travel-lut-ama.check`), as in `objects`.
-        let out = self.lend_quests(events, |a, ev| {
-            WorldHost::<D>::waypoints(a, game, ev, run)
-        });
+        let out = self.lend_quests(events, |a, ev| WorldHost::<D>::waypoints(a, game, ev, run));
         let sent = self.desk(game, events, quest_objects);
         self.inv_sent.extend(sent);
         self.pet_deaths(game, events);
