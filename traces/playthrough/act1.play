@@ -113,8 +113,9 @@ milestone andariel-killed
   poke 5 warp 37
   poke 30 pos @1:156 @x+3 @y
   poke 30 stat @1:156 6 0 256
-  input frame 40; rclick 350 300
-  need unit ut 1 cl 156 dead
+  poke 40 missile 58 @x @y @x+3 @y skill 36 1
+  note the headless right click walks instead of casting (spec Open question 2): a Fire Bolt missile poke
+  need ever unit ut 1 cl 156 killed
 
 milestone to-act2
   use sor
