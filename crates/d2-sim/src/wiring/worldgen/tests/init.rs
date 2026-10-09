@@ -221,7 +221,9 @@ fn a_lent_world_spawns_like_population() {
                     data: &s.data,
                 };
                 s.hooks
-                    .with_monster_world(|w, h| w.spawn_at(&mut sim, h, a, 40010, 40010, 0, 1, -1, 0))
+                    .with_monster_world(|w, h| {
+                        w.spawn_at(&mut sim, h, a, 40010, 40010, 0, 1, -1, 0)
+                    })
                     .flatten()
                     .flatten()
             })

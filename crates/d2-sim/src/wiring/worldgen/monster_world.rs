@@ -121,7 +121,9 @@ impl<X: WorldPending> MonsterWorld<X> for WorldState {
         }
         let placed = h.as_world_holder(|h| {
             let mut wh = host(sim, h, self);
-            wh.population(|cx| placement::place_at(cx, room, None, x, y, class, mode, spread, flags))
+            wh.population(|cx| {
+                placement::place_at(cx, room, None, x, y, class, mode, spread, flags)
+            })
         });
         Some(placed.unit())
     }
