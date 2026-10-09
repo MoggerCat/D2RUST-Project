@@ -28,17 +28,17 @@
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–155 |
 |   3. Lifecycle | 156–420 |
-|   4. Modes and mode schedules | 421–949 |
-|   5. Event dispatch | 950–964 |
-|   6. Events per kind | 965–1087 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 1088–1109 |
-|   8. Collision line between two units | 1110–1114 |
-| Constants & data dependencies | 1115–1131 |
-| Randomness | 1132–1139 |
-| Edge cases & original bugs | 1140–1160 |
-| Test vectors | 1161–1220 |
-| Provenance | 1221–1307 |
-| Open questions | 1308–1387 |
+|   4. Modes and mode schedules | 421–952 |
+|   5. Event dispatch | 953–967 |
+|   6. Events per kind | 968–1090 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 1091–1112 |
+|   8. Collision line between two units | 1113–1117 |
+| Constants & data dependencies | 1118–1134 |
+| Randomness | 1135–1142 |
+| Edge cases & original bugs | 1143–1163 |
+| Test vectors | 1164–1223 |
+| Provenance | 1224–1310 |
+| Open questions | 1311–1390 |
 <!-- /index -->
 
 ## Summary
@@ -901,10 +901,13 @@ town walk (mode 6, w = 213, p = 100) is drawn at server tick T with frame
 `((T − c) · 213 >> 8) mod 8`, c = the tick of the walk request that
 started the walk; a new click while still walking keeps c (`a1-walk-n`
 … `-w`, 1.14d frames 0, 3, 7, 3, 6, 2 at ticks 32 … 102, c = 22).
-PROVISIONAL (REC-516): the run (mode 3, w = 101) does not fit c = the
-run click (`a1-run-n` frame 5 at tick 150, run click 140); the d2rs
-client applies the rule to walks only (settled by a run recording from
-a standing start).
+The run (mode 3) the same with speed w · p / 100, w = 101 and p = the
+run's velocity percent 100 · `RunVelocity` / `WalkVelocity` (150 for the
+sorceress' 9 / 6: speed 151), c = the run click that changed the mode
+(a walk ↔ run change restarts c): `a1-run-n` … `-nw`, frames 5, 6, 6,
+6, 6, 7, 7, 7 at ticks 150 … 248, c = 140. PROVISIONAL (REC-516): p as
+that ratio (because w = 101 at p = 100 fits no start; settled by a run
+of a class with another RunVelocity / WalkVelocity ratio).
 
 Steps 7 and 8 assert (fatal) for types 2 and 3; no 1.14d caller passes
 an object or missile (objects take `0x00624390`'s own branch,

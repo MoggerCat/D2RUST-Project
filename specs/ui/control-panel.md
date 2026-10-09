@@ -29,16 +29,16 @@
 |   4. Experience and stamina bars | 186–235 |
 |   5. Belt | 236–459 |
 |   6. Run / walk and menu buttons | 460–480 |
-|   7. Skill buttons | 481–503 |
-|   8. New-stats and new-skills buttons | 504–552 |
-|   9. Mini panel (state 0x15) | 553–626 |
-|   10. Control panel mouse input | 627–667 |
-| Constants & data dependencies | 668–679 |
-| Randomness | 680–683 |
-| Edge cases & original bugs | 684–696 |
-| Test vectors | 697–729 |
-| Provenance | 730–753 |
-| Open questions | 754–804 |
+|   7. Skill buttons | 481–511 |
+|   8. New-stats and new-skills buttons | 512–560 |
+|   9. Mini panel (state 0x15) | 561–634 |
+|   10. Control panel mouse input | 635–675 |
+| Constants & data dependencies | 676–687 |
+| Randomness | 688–691 |
+| Edge cases & original bugs | 692–704 |
+| Test vectors | 705–737 |
+| Provenance | 738–761 |
+| Open questions | 762–812 |
 <!-- /index -->
 
 ## Summary
@@ -490,8 +490,16 @@ draw mode 5 unless a rule says otherwise.
    1; right at (W − 165, H), flag 0. The icon file is the class file of
    the skill's `skilldesc` (`0x004A8C80`, `ui/panels.md` §10.3) and the
    frame its `IconCel` (byte +7 of the record, `0x004A9690`); state from
-   `0x004A8D30` (0, 1, 4), 1 also when the skill's flag
-   `[0x006CE268]` bit is clear and P stands in town; while the mouse is
+   `0x004A8D30(P, skill)` (2026-10-09, one read): u := the skill-use
+   check `0x004D9FC0(P, skill)` (`client/stat-lists.md` §3 r6.8:
+   `0x00647960` codes, plus 8 while the local cast lock runs); u = 0 → 0
+   (usable), u = 6 (`aura`) → 4, any other u (1, 2, 3, 4, 5, 7, 8) → 1.
+   Then (`0x00496C24`…`0x00496C42`) the state is forced to 1 when the
+   skills.txt record (`0x00644140(skill)`) lacks `InTown` (byte +5 &
+   byte `[0x006CE268]` = mask 1, i.e. flags bit 8) and P's room
+   (`0x00620BB0`) is in town (`0x0061AB00`):
+   `k = (u == 0 ? 0 : u == 6 ? 4 : 1); if (!rec.InTown && room(P) && is_town(room(P))) k = 1`.
+   While the mouse is
    in x…x + 48, y − 48…y the state 4 stays 4, 0 stays 0, other → 1;
    drawn with `CelDrawColor` (`0x004F64B0`, light 0xFF, mode 5, the
    state as color argument); charges / quantity overlays

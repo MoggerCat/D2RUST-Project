@@ -1,0 +1,21 @@
+check 1
+# The Amazon's arrow on a Quill Rat: a Quill Rat (monstats 63, normal)
+# poked 4,4 sub-tiles away in the Blood Moor (warp 2 at frame 4; town allows no combat), then arrows (missiles row 0, skill 0 level 1,
+# owner the player) aimed at it every 12 frames until it dies. Compare the
+# missiles (type 3), the rat's life, modes and death, and the draws they
+# make (PC1-B round 2: a missile kill).
+name combat-arrow-quillrat
+save ScnAma --class ama --expansion
+seed 1234
+ticks 130
+seconds 300
+channels state
+at 4 poke warp 2
+at 30 poke seed-game 0x00001234 666
+at 30 poke seed-unit @player 0x00000055 666
+at 30 poke spawn 63 @x+4 @y+4 normal
+at 38 poke missile 0 @x @y @x+4 @y+4 skill 0 1
+at 50 poke missile 0 @x @y @x+4 @y+4 skill 0 1
+at 62 poke missile 0 @x @y @x+4 @y+4 skill 0 1
+at 74 poke missile 0 @x @y @x+4 @y+4 skill 0 1
+at 86 poke missile 0 @x @y @x+4 @y+4 skill 0 1
