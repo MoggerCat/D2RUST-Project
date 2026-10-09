@@ -32,19 +32,19 @@
 |   R2. Creation | 141–358 |
 |   R3. Per-tick dispatch | 359–388 |
 |   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 389–519 |
-|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 520–572 |
-|   R6. Damage stage (missile-owned part) | 573–693 |
-|   R7. Lifetime and expiry | 694–747 |
-|   R8. Pierce | 748–774 |
-|   R9. Server-do and server-hit catalogues | 775–1005 |
-|   R10. Behaviour of the recorded missiles | 1006–1040 |
-|   R11. `missiles.txt` columns and their server use | 1041–1088 |
-| Constants & data dependencies | 1089–1115 |
-| Randomness | 1116–1148 |
-| Edge cases & original bugs | 1149–1175 |
-| Test vectors | 1176–1258 |
-| Provenance | 1259–1311 |
-| Open questions | 1312–1393 |
+|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 520–577 |
+|   R6. Damage stage (missile-owned part) | 578–722 |
+|   R7. Lifetime and expiry | 723–776 |
+|   R8. Pierce | 777–803 |
+|   R9. Server-do and server-hit catalogues | 804–1034 |
+|   R10. Behaviour of the recorded missiles | 1035–1069 |
+|   R11. `missiles.txt` columns and their server use | 1070–1117 |
+| Constants & data dependencies | 1118–1144 |
+| Randomness | 1145–1183 |
+| Edge cases & original bugs | 1184–1210 |
+| Test vectors | 1211–1293 |
+| Provenance | 1294–1346 |
+| Open questions | 1347–1428 |
 <!-- /index -->
 
 ## Summary
@@ -546,7 +546,12 @@ order:
    defender = unit, tohit = missile stat 19, missile = 1)` (skills
    spec; the chance is clamped to 5…95 and one `lo' % 100` is drawn on
    the owner's unit seed, `0x0057DB22`–`0x0057DB5A`; a missing owner
-   returns "miss" without a draw). On a miss: apply `justhit` (step 6.1), unit event 0, then if
+   returns "miss" without a draw; ECX = owner, EDX = unit at
+   `0x005AE06B`–`0x005AE06D`, so the owner's seed is drawn even when the
+   owner is dead). Recorded 2026-10-09 (`check-combat-arrow-quillrat`
+   f46): the quill rat's `spike1` reaches the player, one rat-seed step
+   {4094205064, 1004892389} → `lo'` 1069704589, 89 ≥ chance → miss,
+   removed, player life unchanged. On a miss: apply `justhit` (step 6.1), unit event 0, then if
    `AlwaysExplode` and `pSrvHitFunc` in 1…70: call it, result bit 2 →
    return 1. Return 2: **a missed to-hit missile is always removed**,
    whatever `CollideKill` and pierce say.
@@ -600,6 +605,30 @@ functions 3 and 14 keep their bits. The hit class merges: R +0x60 :=
 bit in 0xF0 (`0x005AD863`–`0x005AD87A`); §R6.3 functions 7 and 9's 0x60
 therefore survive as `HitClass` | 0x60 with +0x64 = 1. Confirmed
 2026-10-08 (impl-pc1-s5): OR; hit class corrected (not an overwrite).
+
+Full order of `0x005AD730(game, missile, unit, R)` (1.14d-read
+2026-10-09; owner O = `0x00552FD0`):
+
+1. R +0x04 |= 1; get-hit / soft-hit; knockback `roll(100)` on the
+   missile seed (`0x005AD7DF`).
+2. Block/dodge `0x0057DFB0` (ECX game, EDX O; stack unit, avoid 1,
+   block = physical (R +0x08) ≠ 0) at `0x005AD806`: draws only on the
+   **unit's** seed (`combat/hit.md` §6).
+3. Hit-class merge (above).
+4. **Monster critical hit** `0x005A5560` (ECX O, EDX unit, stack R) at
+   `0x005AD884` (`combat/damage.md` §3.1 step 13): O a monster with
+   `monstats.Crit` ≠ 0 → one inline `lo' % 100` on the **owner's** seed
+   whether or not the hit survived block/dodge; `r < Crit` doubles the
+   damage fields. Not reached on a to-hit miss (§R5 step 5).
+5. Missile data flags 1, 2 → hit flags 0x20, 0x80; R +0x54 := stat 327.
+6. R +0x04 has 1 → `apply(game, O, unit, missile 1, R)` (`0x0057C6C0`
+   at `0x005AD8C6`, `combat/damage.md` §5.2); then the reaction
+   `0x0057CEE0(game, O, unit, R)` at `0x005AD8D3` (§7.1), always.
+
+Recorded (`check-combat-arrow-kill`, quill rat `spike1` on the player,
+f46): rat seed {1069704589, 1707661690} → two steps: to-hit `lo' % 100`
+= 39 (hit), crit `lo' % 100` = 76 (≥ `Crit`, no double); player life
+12800 → 12415; player seed unchanged (no shield, no get-hit mask draw).
 
 #### R6.2 Damage rolls (`0x005A89A0`, 1.14d-confirmed)
 
@@ -1142,7 +1171,13 @@ one `roll(SubStop − SubStart)` on the missile seed at frame SubStart − 1).
 4. Server-damage function draws (skills spec).
 5. Knockback `roll(100)` on the **missile's** seed when `KnockBack` > 0
    and the unit lacks state 54.
-6. Block/dodge, critical damage, damage execution (skills spec).
+6. Block/dodge (unit's seed), then the monster critical hit: one
+   `lo' % 100` on the **owner's** seed when the owner is a monster with
+   `Crit` ≠ 0 (§R6.1 order step 4), then damage execution (skills
+   spec). A monster `ToHit` missile on a player without block / dodge
+   / get-hit draws therefore steps the owner's seed once on a miss and
+   twice on a hit (to-hit + crit), the damage itself on the missile's
+   seed.
 
 **Expiry / barrier**: only the server-hit function's draws.
 

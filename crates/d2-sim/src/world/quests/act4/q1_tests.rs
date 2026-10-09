@@ -185,7 +185,7 @@ fn wants_to_talk() {
     // Through 0x8A: the record answers for Act IV players.
     let mut ctl = act4_ctl();
     ctl.picked = true;
-    ctl.npc_wants_interact(&mut f, P3, TYRAEL_U, npc::TYRAEL2)
+    ctl.npc_wants_interact(&mut f, P3, TYRAEL_U, npc::TYRAEL2, true)
         .unwrap();
     assert_eq!(f.sent, [(P3, hex("8A 01 20000000"))]);
     assert!(f.log.is_empty());

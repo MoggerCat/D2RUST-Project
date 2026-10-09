@@ -2,9 +2,15 @@
 
 - **Status:** draft: a crude first version. Format `playthrough 1`, the
   predicates and the verdicts below are ours; `tools/playthrough/playthrough.py`
-  implements them and `traces/playthrough/act1.play` is the first
-  objective file (run 2026-10-09 on the 1.14d install: 12 of 14
-  milestones reached, first blocker `kill-zombie`). d2rs only: no 1.14d
+  implements them, with one objective file per act,
+  `traces/playthrough/act1.play` … `act5.play` (run 2026-10-09 on the
+  1.14d install, `--all --json`: I 12/14, II 11/15, III 12/14, IV 5/12,
+  V 8/13; first blockers `kill-zombie` (I) and `town-start` (II–V: the
+  player's act byte is 0 in the act's town)). Not yet described below:
+  the `find <filter>` probe with `poke +N` / `frame +N`, sweep mode
+  `cross`, the unit test `killed`, `--all` and the `--json` keys (`act`,
+  `reached`, `total`, `consecutive`, `first_blocker`, `milestones`); see
+  `playthrough.py --help` and its selftest. d2rs only: no 1.14d
   side, so a reached milestone is "the game gets there", never a
   fidelity check (CLAUDE.md rule 10).
 - **Target version:** 1.14d (the milestones); the format is d2rs-own.
@@ -86,6 +92,14 @@ hide the ones after it.
    gone). The death modes are DT 0 and DD 17 for players, DT 0 and DD 12
    for monsters.
 3. `need ever <pred>`: the predicate held at some snapshot.
+4. `quest <slot> <bit> set|clear`: bit `bit` (0–15) of quest slot
+   `slot` (0–41) in the player's quest flag record of the game's
+   difficulty (`world/quests.md` §1.1–§1.4: bit 16·slot + bit of the
+   96-byte record, LSB first), read from the player's `q`
+   (`state-snapshot.md` §2: `[slot, word]` per non-zero slot; a slot not
+   listed is 0). A player without `q` fails the predicate ("no quest
+   record"). With `ever`: the bit had that value at some snapshot. The
+   checkpoints to test are `world/quests.md` §1.9 (done = bit 0).
 
 ### 3. Verdict per milestone
 
@@ -127,6 +141,7 @@ pokes and input (`state-snapshot.md` test vector 5).
 | Input | Expected |
 |---|---|
 | `--selftest`: synthetic state file (header, 3 snaps, a spawn poke) | town → `wrong-level`; kill → `reached` at f3; revived unit → `stuck` "1 alive"; `unresolved` spawn → `missing-unit`; `ever` holds at f1; spiral and grid sweep points; exit codes 0 / 1 |
+| `--selftest`: a fixed 96-byte record (slot 1 = 0x2002, slot 6 = 1, slot 41 = 0x8000) as `q` | `quest_bit` set for 1.1, 1.13, 6.0, 41.15, clear for 1.0, 41.14, 0.0, 7.0; `quest 42 0`, `quest 1 16`, `quest 1 0 on` and wrong arity rejected; `quest 6 0 set` stuck with "quest 6.0 clear", `ever` reached at f2; no `q` → stuck "no 'q'"; `need ever quest …` parsed |
 | `act1.play` on the 1.14d install, 2026-10-09 | 12/14 reached; `kill-zombie` and `andariel-killed` stuck (see Open questions 1–2) |
 
 ## Provenance
@@ -147,7 +162,12 @@ install's tables with `mpq-tool extract`.
    same save casts in the Blood Moor. A `missile` poke (Fire Bolt) was
    also tried and did not hit. It is still open whether this is the
    headless input or the game.
-3. There are no quest flags in the state file yet. Milestones that need
-   them ("Den cleared", quest complete, Act II unlocked) are missing; the
-   minimal addition would be the player's quest record in `state-1`.
+3. *Answered* (2026-10-09): the player's quest record is `q` in
+   `state-1` and the `quest` predicate (§2 r4) reads it; `act1.play` has
+   `den-of-evil-done`, `andariel-done` and `act2-open`. Open: those three
+   need an NPC talk (Akara msg 76, Warriv msg 183, Warriv's "Go east"),
+   and the d2rs headless input has no hover pick, so a click on an NPC
+   walks instead of interacting (`scenario-diff.md` Open question 4).
+   Until an NPC-interaction input or poke exists they are expected
+   blockers whose evidence is the quest bit still clear.
 4. Acts II–V objective files are not written yet.

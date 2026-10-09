@@ -729,6 +729,7 @@ fn cel(file: u32, frame: u32, x: i32, y: i32, clip: Rect) -> UiDraw {
         at: Point::new(x, y),
         clip,
         look: CelLook::PLAIN,
+        call: crate::ui::draw::CelCall::Draw,
     })
 }
 

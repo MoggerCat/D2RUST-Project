@@ -9,7 +9,7 @@
 use d2_data::fixup::maps::EquivMatrix;
 use d2_data::fixup::FixedSet;
 use d2_data::tables::{
-    decode_all, Armor, Belts, Books, Inventory, Itemtypes, Misc, Record, Weapons,
+    decode_all, Armor, Belts, Books, Inventory, Itemstatcost, Itemtypes, Misc, Record, Weapons,
 };
 
 use super::equip::CLASS_NONE;
@@ -59,6 +59,13 @@ pub struct InvItemRec {
     /// `world/vendors.md` §7.1.1).
     pub wclass: [u8; 4],
     pub wclass2: [u8; 4],
+    /// The use fields of `items/use.md` §3.1 (items record +0x98…+0xB0):
+    /// `state` (i16), `stat1`–`stat3` (i16, −1 = none), `calc1`–`calc3`
+    /// and `len` (offsets into [`ItemUseTables::code`]).
+    pub use_state: i16,
+    pub use_stat: [i16; 3],
+    pub use_calc: [u32; 3],
+    pub use_len: u32,
 }
 
 macro_rules! inv_item_rec {
@@ -88,6 +95,10 @@ macro_rules! inv_item_rec {
                     maxdam: r.maxdam,
                     wclass: r.wclass,
                     wclass2: r.f_2handedwclass,
+                    use_state: r.state as i16,
+                    use_stat: [r.stat1 as i16, r.stat2 as i16, r.stat3 as i16],
+                    use_calc: [r.calc1, r.calc2, r.calc3],
+                    use_len: r.len,
                 }
             }
         }
@@ -183,6 +194,20 @@ pub struct InvTables {
     pub equiv: EquivMatrix,
     /// `books` rows (`items/use.md` §1); empty: no row.
     pub books: Vec<InvBookRec>,
+    /// What the item-use entries read besides the item records
+    /// (`items/use.md` §3.1).
+    pub item_use: ItemUseTables,
+}
+
+/// The item-use data of `items/use.md` §3.1 outside the items records.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ItemUseTables {
+    /// The items code buffer the use calcs point into
+    /// (`data/calc-expressions.md` §1.1); empty: every calc reads 0.
+    pub code: Vec<u8>,
+    /// `itemstatcost` `maxstat` (+0x32, i16; −1 = none) by stat id: the
+    /// cap of a direct add (§3.1 step 2, `len` ≤ 0).
+    pub maxstat: Vec<i16>,
 }
 
 fn typed<T: Record>(f: &FixedSet) -> Result<Vec<T>, TableError> {
@@ -209,6 +234,13 @@ impl InvTables {
             itemtypes: typed::<Itemtypes>(f)?.iter().map(Into::into).collect(),
             equiv: f.itemtypes_equiv.clone(),
             books: typed::<Books>(f)?.iter().map(Into::into).collect(),
+            item_use: ItemUseTables {
+                code: f.items_code.clone(),
+                maxstat: typed::<Itemstatcost>(f)?
+                    .iter()
+                    .map(|r| r.maxstat as i16)
+                    .collect(),
+            },
         })
     }
 

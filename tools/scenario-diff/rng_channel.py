@@ -26,17 +26,17 @@ def run(r, save, sides):
               "input (rng-trace.md §6 r3)")
         return 2
     if "orig" in sides:
-        r.recorder("record_rng.py", ["--frames"], orig)
+        # the DRLG inline sites are left unhooked: their draws are always
+        # other:drlg, never compared (rng-trace.md §6 r4)
+        r.recorder("record_rng.py", ["--frames", "--skip-inline", "drlg"], orig)
     if "d2rs" in sides and not (r.reuse and os.path.exists(d2rs)):
         args = ["state-dump"] + r.d2rs_common(save) + [
             "--ticks", str(c["ticks"]), "--out", r.path("d2rs.rng-state.jsonl"), "--rng", d2rs]
-        env = dict(os.environ, CARGO_PROFILE_RELEASE_DEBUG="0", D2_GAME_DIR=r.game_dir)
-        r.sh(["cargo", "run", "--release", "-q", "-p", "d2-client", "--features", "rng-trace",
-              "--"] + args, timeout=7200, env=env)
+        r.cargo("d2-client", args, features="rng-trace")
     if sides != {"orig", "d2rs"}:
         return None
     code = r.sh([sys.executable, os.path.join(rec, "rng_diff.py"), orig, d2rs,
-                 "--next", str(r.next)], check=False)
+                 "--next", str(r.next)] + r.json_args("rng"), check=False)
     if c["input"].get("d2rs") or c["input"].get("orig"):
         # state-dump runs no 'input d2rs' / wall-clock 'input orig' script
         print("[rng] the check's input ran on 1.14d only: partial at best")
@@ -62,10 +62,12 @@ def selftest(runner_cls, check):
     rec = next(x for x in r.log if "record_rng.py" in x)
     assert "--ticks 20" in rec and "--auto ScnAma --seed 1234" in rec, rec
     assert "--out /tmp/w/orig.rng.jsonl" in rec and "--frames" in rec, rec
+    assert "--skip-inline drlg" in rec, rec
     dump = next(x for x in r.log if "state-dump" in x)
     assert "--features rng-trace" in dump and "--rng /tmp/w/d2rs.rng.jsonl" in dump, dump
     assert "--seed 1234" in dump and "--ticks 20" in dump, dump
     assert "rng_diff.py /tmp/w/orig.rng.jsonl /tmp/w/d2rs.rng.jsonl" in r.log[-1], r.log[-1]
+    assert "--json /tmp/w/rng.summary.json" in r.log[-1], r.log[-1]
     assert code == 0
     r.log = []
     run(r, "/tmp/w/ScnAma.d2s", {"d2rs"})  # one side: no compare

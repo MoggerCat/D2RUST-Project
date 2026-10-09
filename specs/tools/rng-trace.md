@@ -5,19 +5,43 @@
   state-dump --rng`), the 1.14d side (`record_rng.py --frames`,
   `rng_owners.py`) and the comparator (`rng_diff.py`) implement it;
   first real run `traces/checks/rng-town-arrival-ama.check`
-  (Open questions 1).
+  (Open questions 1); the fast 1.14d side (DRLG sites unhooked, emulated
+  steps: §4 r6–r7, §6 r4) records the same compared draws 6× faster
+  (Open questions 3).
 - **Target version:** 1.14d (the original side); the format is
   `rng-raw-1`, the raw format `record_rng.py` already wrote, plus frames
   and owners.
 - **Crate/module:** `d2-sim::debug::rng_trace` (log, owners, lines),
   `d2-sim::rng` (the record calls), `d2-sim::tick` (frame marker);
   `d2-client` `app::rng_dump`, `bridge::rng_trace`;
-  `tools/trace-recorder/record_rng.py`, `rng_owners.py`, `rng_diff.py`;
+  `tools/trace-recorder/record_rng.py`, `x86emu.py`, `rng_owners.py`,
+  `rng_diff.py`;
   `tools/scenario-diff/rng_channel.py` (the `rng` channel).
 - **Related specs:** `sim/rng.md` (the generator, helpers, seed homes:
   game +0xD0 §5.2, unit +0x20 §5.3, DRLG §5.4), `sim/tick.md` §2–§3
   (frames, tick entry), `tools/state-snapshot.md` §2 (unit offsets),
   `tools/scenario-diff.md` (one-command run).
+
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 46–55 |
+| Inputs | 56–62 |
+| Outputs / state changes | 63–67 |
+| Rules | 68–69 |
+|   1. Format `rng-raw-1` with frames and owners | 70–92 |
+|   2. Owners | 93–122 |
+|   3. The d2rs log | 123–142 |
+|   4. The 1.14d recorder (`record_rng.py --frames`) | 143–179 |
+|   5. Comparison (`rng_diff.py`) | 180–204 |
+|   6. The `rng` channel of `scenario-diff` | 205–219 |
+| Constants & data dependencies | 220–223 |
+| Randomness | 224–227 |
+| Edge cases & original bugs | 228–237 |
+| Test vectors | 238–247 |
+| Provenance | 248–252 |
+| Open questions | 253–289 |
+<!-- /index -->
 
 ## Summary
 
@@ -132,8 +156,26 @@ and exit code (§5). Neither game changes (§3 rule 2).
    tick's draws are not written).
 6. `--skip-inline LO-HI,...` (preset `drlg`: the §2 rule 5 ranges) does
    not hook the inline sites in those ranges: faster, those draws are
-   missing; the header lists them and the comparison is at best
-   partial.
+   missing; the header lists them. Ranges inside the §2 rule 5 DRLG
+   ranges lose nothing the comparison uses: every inline draw there is
+   `other:drlg` and takes no part in the owner chains (§2 r5), so §5
+   compares the same draws with the same owners; any other skipped range
+   makes the comparison at best partial (§5 r5).
+7. `--emulate on` (default): at a breakpoint the instructions the
+   single steps would run are run by `x86emu.py` on the stopped thread's
+   registers and memory instead: an inline site's trace from the `mov`
+   to the add/adc pair (the same rules pick the `mul` and the pair), and
+   the one instruction under a helper, setter, tick or return breakpoint.
+   The result (registers, eip, status flags, buffered memory writes) is
+   committed only when every instruction was decoded (32-bit integer
+   moves, ALU ops, `mul`, `jcc`, `jmp`, `push`, `pop`, `lea`, `movzx`; no
+   prefix, call or return), no other breakpoint lies on the path, the
+   §4 step limits hold and every status flag is defined; otherwise the
+   thread is single-stepped as before. Return breakpoints stay armed
+   after their call returns (a hit without a pending call writes
+   nothing). `--emulate check` single-steps everything and compares
+   each emulated result with the real one (counts `emu_check:*_ok` /
+   `_diff` in the footer); `--emulate off` is the single-step recorder.
 
 ### 5. Comparison (`rng_diff.py`)
 
@@ -156,7 +198,8 @@ and exit code (§5). Neither game changes (§3 rule 2).
    longest), per owner the draw counts, the positions differing and the
    first divergence, and the counts not compared.
 5. Verdict: `DIVERGED` (exit 1) on any divergence; `PARTIAL` (2) when
-   nothing diverged but inline sites were skipped, inline draws lack a
+   nothing diverged but inline sites outside the DRLG ranges were
+   skipped (§4 r6; DRLG-only skips are a note), inline draws lack a
    state or no frame was compared; else `MATCH` (0); 3 on an error.
 
 ### 6. The `rng` channel of `scenario-diff`
@@ -170,6 +213,9 @@ and exit code (§5). Neither game changes (§3 rule 2).
 3. A check with `at ... poke` lines or a shared frame-anchored `input`
    is not compared (partial): `record_rng.py` has no poke layer and no
    tick-return stop.
+4. The channel records with `--skip-inline drlg` (§4 r6: nothing
+   compared is lost, the verdict is not downgraded) and the default
+   `--emulate on` (§4 r7).
 
 ## Constants & data dependencies
 
@@ -195,6 +241,8 @@ None. Both logs record draws the games make; neither draws.
 |---|---|
 | Fight fixture, 40 ticks, log off vs on | identical game; draws and 40 frame marks logged (`rng_trace::tests`) |
 | `rng_diff.py --selftest` | a synthetic pair matches; each perturbation (before, after, ret, op, n, owner, a dropped, added or moved draw) is reported first at its place; a one-step lag of the game seed gives shift +1; other seeds never compared; skipped inline ranges give PARTIAL; no frames is an error |
+| `x86emu.py --selftest` | one 64-bit step (`mov`, `mul`, `add`, `adc`) exact; jcc taken / not taken; add, adc, cmp flags against their definitions; memory, SIB, byte and stack operands; `mul`'s undefined flags refuse a jcc and an early commit; prefixes, call, ret, div refused |
+| `record_rng.py --emulate check` on `rng-town-arrival-ama` (Wine, 2026-10-09, all 846 sites) | 13,081 inline traces and 5,168 single instructions emulated, every one equal to the single-stepped registers, eip, flags and memory (`emu_check:*_diff` 0); 38 fell back (opcodes `66`, `C1`, `F7 /2`) |
 | `rng_owners.py --selftest` | game, unit (by address, forward, backward), other; an untrusted unit hint; a DRLG copy and a late copy of the game seed stay other |
 
 ## Provenance
@@ -221,3 +269,20 @@ d2rs-own tool. The 1.14d hooks and offsets restate `sim/rng.md`,
 2. 1.14d inline draws have no seed address (edge case 1); recording the
    address of the store that writes the new state back would remove the
    value-chain step for them.
+3. Speed (measured 2026-10-09, Wine 9.0, `rng-town-arrival-ama`: ScnAma,
+   seed 1234, 40 ticks, `D2_AUTO_AFTER=0`). Single-step recorder (all
+   846 sites, `--emulate off`): 70.5 s wall, the level at 63.2 s,
+   16,142 records, 103,419 debug events (about 1,500/s; ~7 per inline
+   draw, 11,074 of the 13,079 inline draws in the DRLG code). DRLG sites
+   unhooked only: 21.5 s, 24,697 events. Emulation only (all sites):
+   22.2 s (18,393 events). Both (the channel's default): 11.1 s wall (8.8 s recording,
+   the level at 7.2 s), 5,068 records, 7,289 debug events. Proof:
+   `rng_diff.py` between the single-step and the fast recording: MATCH
+   (either file as orig); every `game` and `unit` owner's draw sequence
+   (op, site, n, min, before, after, ret, frame) and all 40 tick records
+   are identical; besides the 11,074 DRLG draws only the client weather
+   draws differ (`0x00473090`, ±10: drawn-frame dependent, `sim/rng.md`
+   §7, `other`). Game creation is not a lever: the menu steps no seed
+   (`sim/rng.md` §5.5) and is left at 0.6 s. Left: one breakpoint event
+   per helper return (2,129) and per helper or setter entry; emulating
+   the helper bodies to their return would remove the return events.
