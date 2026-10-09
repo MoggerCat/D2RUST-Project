@@ -29,17 +29,17 @@
 |   4. Experience and stamina bars | 189–238 |
 |   5. Belt | 239–462 |
 |   6. Run / walk and menu buttons | 463–483 |
-|   7. Skill buttons | 484–506 |
-|   8. New-stats and new-skills buttons | 507–580 |
-|   9. Mini panel (state 0x15) | 581–695 |
-|   10. Control panel mouse input | 696–736 |
-|   11. Help button (state 0x22, `UI_HELPBUTTON`) | 737–821 |
-| Constants & data dependencies | 822–837 |
-| Randomness | 838–841 |
-| Edge cases & original bugs | 842–854 |
-| Test vectors | 855–898 |
-| Provenance | 899–936 |
-| Open questions | 937–987 |
+|   7. Skill buttons | 484–514 |
+|   8. New-stats and new-skills buttons | 515–588 |
+|   9. Mini panel (state 0x15) | 589–703 |
+|   10. Control panel mouse input | 704–744 |
+|   11. Help button (state 0x22, `UI_HELPBUTTON`) | 745–829 |
+| Constants & data dependencies | 830–845 |
+| Randomness | 846–849 |
+| Edge cases & original bugs | 850–862 |
+| Test vectors | 863–906 |
+| Provenance | 907–944 |
+| Open questions | 945–995 |
 <!-- /index -->
 
 ## Summary
@@ -493,8 +493,16 @@ draw mode 5 unless a rule says otherwise.
    1; right at (W − 165, H), flag 0. The icon file is the class file of
    the skill's `skilldesc` (`0x004A8C80`, `ui/panels.md` §10.3) and the
    frame its `IconCel` (byte +7 of the record, `0x004A9690`); state from
-   `0x004A8D30` (0, 1, 4), 1 also when the skill's flag
-   `[0x006CE268]` bit is clear and P stands in town; while the mouse is
+   `0x004A8D30(P, skill)` (2026-10-09, one read): u := the skill-use
+   check `0x004D9FC0(P, skill)` (`client/stat-lists.md` §3 r6.8:
+   `0x00647960` codes, plus 8 while the local cast lock runs); u = 0 → 0
+   (usable), u = 6 (`aura`) → 4, any other u (1, 2, 3, 4, 5, 7, 8) → 1.
+   Then (`0x00496C24`…`0x00496C42`) the state is forced to 1 when the
+   skills.txt record (`0x00644140(skill)`) lacks `InTown` (byte +5 &
+   byte `[0x006CE268]` = mask 1, i.e. flags bit 8) and P's room
+   (`0x00620BB0`) is in town (`0x0061AB00`):
+   `k = (u == 0 ? 0 : u == 6 ? 4 : 1); if (!rec.InTown && room(P) && is_town(room(P))) k = 1`.
+   While the mouse is
    in x…x + 48, y − 48…y the state 4 stays 4, 0 stays 0, other → 1;
    drawn with `CelDrawColor` (`0x004F64B0`, light 0xFF, mode 5, the
    state as color argument); charges / quantity overlays
