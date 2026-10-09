@@ -448,7 +448,8 @@ pub fn assign_object(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
         ..ObjectData::default()
     });
     // The object init's animation set-up in the mode byte
-    // (`world/objects-client.md` §25 r8, PROVISIONAL REC-440), on the
+    // (`world/objects-client.md` §25 r8; measured REC-440: 1.14d's
+    // `0x004BC720` runs `0x00624390` in the 0x51 mode, `facts/objects/objanim-a1-town.tsv`), on the
     // unit's client seed. Nothing without rows.
     if let Some(row) = msg.inputs.objclient.rows.get(class as usize) {
         crate::bridge::objects::anim_setup(u, row, u.mode)?;

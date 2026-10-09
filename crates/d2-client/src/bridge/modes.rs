@@ -282,7 +282,9 @@ fn object(
             u.mode = mode;
             let class = u.class;
             // The animation set-up of the new mode (`world/objects-client.md`
-            // §25 r8, PROVISIONAL REC-440). Nothing without rows.
+            // §25 r8; measured REC-440: 1.14d's `0x004BCF60` runs
+            // `0x00624390` itself after its `set_mode`, drawing again even
+            // in the same mode, `facts/objects/objanim-a1-town.tsv`). Nothing without rows.
             if let Some(row) = inputs.objclient.rows.get(class as usize) {
                 super::objects::anim_setup(u, row, mode)?;
             }

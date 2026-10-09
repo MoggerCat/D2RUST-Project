@@ -182,3 +182,10 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     the per-item conditions of the loader's S→C 0x22 (`0x0055C216`) and
     0x21 (`0x0057017B`) (`intents-events.md` §8.2 r3.1 (c)); the quest
     entry itself is wired (`world/quests.md` §3 names the caller).
+17. **Interact range test `0x00623660(P, O)`** (REC-94): its formula
+    (object size, which positions). Measured under Wine
+    (`facts/objects/objanim-a1-town.tsv` run r3): returns 1 for the
+    waypoint 119 with the player 4 sub-tiles off in x and 3 in y, 0 at 5;
+    for the stash 267 only at 3 / 1. Answer into `world/objects.md` §7.1
+    r3 (d2rs reads it as always in range for a player: true for every
+    0x13 the client sends).

@@ -26,6 +26,8 @@ code. Spec-role tool: the addresses it hooks are documented in
 | `autostart.py` | Unattended start for every `record_*.py`: `--auto CHAR [--seed N] [--input SCRIPT]` starts a single-player game with that expansion character (no player at the keyboard), optionally with a fixed map / game seed, then plays a scripted input (clicks, keys, screenshots) into the window; `--try CHAR` runs it alone; `--selftest` |
 | `check_drlg_acts.py` | Checks the `dumpdrlg` records of an `--auto` run against `specs/drlg/levels.md` §3–§4 (rules D1–D7); `--perturb N`; `--selftest` |
 | `dump_tables.py` | Launches `game/Game.exe` under the debugger, stops when the excel load and its fix-ups have finished, writes every loaded table and the runtime maps it knows to `traces/raw/<time>-tables/` (gitignored); compared by `data-tool dump-compare` |
+| `record_objanim.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick hook only): every call of the animation re-init `0x00624390` on an object (client or server) with seed, mode, frame and speed before / after and the caller addresses on the stack, the client object init `0x004BC720` and 0x0E mode change `0x004BCF60`; `--steps` the generic step `0x004BCBB0` (mode changes, wraps), `--range` the interact range test `0x00623660` (result) and the C→S 0x13 object case `0x00548B00`; format `objanim-raw-1`; `--selftest`. Specs: `world/objects.md` §4, §7, `world/objects-client.md` §25 |
+| `objanim_facts.py` | Turns `record_objanim.py` recordings into `facts/objects/*.tsv` (measurements only); `--selftest` |
 
 ## Use
 

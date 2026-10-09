@@ -44,22 +44,22 @@
 |   4. Object animation at a mode change | 180–211 |
 |   5. Init functions | 212–286 |
 |   6. Preset object classes 574–582 (`0x0054F490`) | 287–323 |
-|   7. Operate dispatch | 324–382 |
-|   8. Chests and breakables | 383–518 |
-|   9. Shrines | 519–632 |
-|   10. Doors, operate 8 (`0x00581D40`) | 633–656 |
-|   11. Wells, operate 22 (`0x005858A0`) | 657–688 |
-|   12. Portals, operate 15 (`0x00584870`) | 689–759 |
-|   13. Torch, operate 11 (`0x005843D0`) | 760–764 |
-|   14. Client messages | 765–792 |
-|   15. Not covered yet | 793–807 |
-|   16.–18. Moved | 808–814 |
-| Constants & data dependencies | 815–861 |
-| Randomness | 862–908 |
-| Edge cases & original bugs | 909–975 |
-| Test vectors | 976–1014 |
-| Provenance | 1015–1072 |
-| Open questions | 1073–1122 |
+|   7. Operate dispatch | 324–389 |
+|   8. Chests and breakables | 390–525 |
+|   9. Shrines | 526–639 |
+|   10. Doors, operate 8 (`0x00581D40`) | 640–663 |
+|   11. Wells, operate 22 (`0x005858A0`) | 664–695 |
+|   12. Portals, operate 15 (`0x00584870`) | 696–766 |
+|   13. Torch, operate 11 (`0x005843D0`) | 767–771 |
+|   14. Client messages | 772–799 |
+|   15. Not covered yet | 800–814 |
+|   16.–18. Moved | 815–821 |
+| Constants & data dependencies | 822–868 |
+| Randomness | 869–915 |
+| Edge cases & original bugs | 916–982 |
+| Test vectors | 983–1021 |
+| Provenance | 1022–1079 |
+| Open questions | 1080–1129 |
 <!-- /index -->
 
 ## Summary
@@ -334,11 +334,18 @@ case `0x00548B00` (player; range and walk rules in `world/waypoints.md`
 3. Operator present and not in interact range (`0x00623660`) → return 1.
 4. Else run §7.2 and return 1.
 
-PROVISIONAL: the interact range test `0x00623660` of rule 3 is read as
-always in range for a player operator (because no written spec gives
-its test, and the client sends C→S 0x13 only after its walk to the
-object ended; the play host's seam, `LocalSeams::object_in_range`);
-settled by REC-94. The player's interact info needs no staging before
+The interact range test `0x00623660` of rule 3 is read as always in
+range for a player operator (the play host's seam,
+`LocalSeams::object_in_range`). Measured (REC-94,
+`facts/objects/objanim-a1-town.tsv` run r3): 1.14d's client calls
+`0x00623660(P, O)` on every frame of its walk to the object and sends
+C→S 0x13 on the first frame it returns 1 (waypoint 119: player sub-tile
+(4895, 4212), waypoint (4899, 4209); stash 267: (4869, 4228) against
+(4866, 4229)); the server's two calls for that 0x13 (§7.3 r4 and this
+rule) then return 1. The test's own formula (it differs by object size:
+the waypoint answered at a distance of 4, the stash only at 3) is not
+written here; a Ghidra read of `0x00623660` is queued in
+`docs/handoff/pc1-data.md` Step 4. The player's interact info needs no staging before
 the operate: §7.2 rule 2 refuses an active one, and the waypoint's
 operate sets it itself (`waypoints.md` §5.2 step 3).
 
