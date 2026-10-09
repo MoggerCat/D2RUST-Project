@@ -64,6 +64,11 @@ pub enum Output {
         present: bool,
         object_class: u32,
     },
+    /// An `hst ` / `qf2 ` placed in page 3 of the local player by an S→C
+    /// 0x9C (actions 0x04, 0x0B, 0x0C; 0x15 with header mode 0): the
+    /// Horadric animation start `0x0048A540(code)` (`ui/panels-2.md` §20
+    /// r7) is the UI's.
+    HoradricItem { code: [u8; 4] },
     /// S→C 0x4E (`client/msg-ui.md` §6).
     HireOffer { name: u16, seed: u32 },
     /// S→C 0x4F (`client/msg-ui.md` §6).
@@ -340,7 +345,7 @@ use Consumer::{Audio, Effects, Ui};
 
 /// The variants in code, in the §10 table's order (checked against the
 /// table, §10 rule 8).
-pub const ROWS: [Row; 43] = [
+pub const ROWS: [Row; 44] = [
     row("ServerSound", 0x2C, Audio),
     row("QuestUi", 0x5D, Ui),
     row("WaypointMenu", 0x63, Ui),
@@ -384,6 +389,7 @@ pub const ROWS: [Row; 43] = [
     row("UnitFreed", 0x0A, Audio),
     update_row("ObjectSound", Audio),
     update_row("ObjectFx", Effects),
+    row("HoradricItem", 0x9C, Ui),
 ];
 
 impl Output {
@@ -433,6 +439,7 @@ impl Output {
             Output::UnitFreed { .. } => 40,
             Output::ObjectSound(_) => 41,
             Output::ObjectFx(_) => 42,
+            Output::HoradricItem { .. } => 43,
         };
         &ROWS[i]
     }
@@ -856,16 +863,17 @@ mod tests {
             },
             Output::ObjectSound(ObjSound::Request { id: 0, unit: obj }),
             Output::ObjectFx(ObjFx::GfxLoad { class: 0, flag: 0 }),
+            Output::HoradricItem { code: *b"hst " },
         ]
     }
 
-    // Covers: specs/client/bridge.md §10 r1, §10 row1, §10 row2, §10 row3, §10 row4, §10 row5, §10 row6, §10 row7, §10 row8, §10 row9, §10 row10, §10 row11, §10 row12, §10 row13, §10 row14, §10 row15, §10 row16, §10 row17, §10 row18, §10 row19, §10 row20, §10 row21, §10 row22, §10 row23, §10 row24, §10 row25, §10 row26, §10 row27, §10 row28, §10 row29, §10 row30, §10 row31, §10 row32, §10 row33, §10 row34, §10 row35, §10 row36, §10 row37, §10 row38, §10 row39, §10 row40, §10 row41, §10 row42, §10 row43
+    // Covers: specs/client/bridge.md §10 r1, §10 row1, §10 row2, §10 row3, §10 row4, §10 row5, §10 row6, §10 row7, §10 row8, §10 row9, §10 row10, §10 row11, §10 row12, §10 row13, §10 row14, §10 row15, §10 row16, §10 row17, §10 row18, §10 row19, §10 row20, §10 row21, §10 row22, §10 row23, §10 row24, §10 row25, §10 row26, §10 row27, §10 row28, §10 row29, §10 row30, §10 row31, §10 row32, §10 row33, §10 row34, §10 row35, §10 row36, §10 row37, §10 row38, §10 row39, §10 row40, §10 row41, §10 row42, §10 row43, §10 row44
     #[test]
     fn each_table_row_is_one_variant_with_its_producer_and_consumer() {
         let table = parse_table(SPEC).unwrap();
         let all = every_variant();
-        assert_eq!(all.len(), 43);
-        assert_eq!(table.len(), 43);
+        assert_eq!(all.len(), 44);
+        assert_eq!(table.len(), 44);
         for (i, (o, t)) in all.iter().zip(&table).enumerate() {
             // The variant's Debug name is the table's variant name.
             let dbg = format!("{o:?}");

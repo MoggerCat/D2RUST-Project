@@ -979,12 +979,18 @@ pub fn stack_items<W: MoveWorld>(w: &mut W, p: Owner, src: Guid, dst: Guid) -> u
             w.book_count_changed(p, dst, m.wrapping_sub(qd));
         }
         add_iflags(w, dst, iflag::STACK_FULL);
-    } else if w.merge_allowed(src) {
-        let ds = w.stat(s, stat::DURABILITY);
-        if ds < w.stat(d, stat::DURABILITY) {
-            // Stat 72 `durability`: throwing weapons keep the worse one.
-            w.set_stat(d, stat::DURABILITY, ds);
-            w.send_item_stat(p, dst, stat::DURABILITY);
+    } else {
+        // PROVISIONAL (§7.12, REC-289): `0x00629930(src)` ("has
+        // durability") read as gating only the stat-72 step, as §8.1's
+        // auto-stack states it; the whole merge under it would keep
+        // quivers and keys from ever merging.
+        if w.merge_allowed(src) {
+            let ds = w.stat(s, stat::DURABILITY);
+            if ds < w.stat(d, stat::DURABILITY) {
+                // Stat 72 `durability`: throwing weapons keep the worse one.
+                w.set_stat(d, stat::DURABILITY, ds);
+                w.send_item_stat(p, dst, stat::DURABILITY);
+            }
         }
         w.set_stat(d, stat::QUANTITY, qs.wrapping_add(qd));
         w.send_item_stat(p, dst, stat::QUANTITY);

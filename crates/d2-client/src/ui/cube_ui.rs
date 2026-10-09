@@ -10,10 +10,14 @@
 //! The transmute animation (§12.4, [`HoradricAnim`]) runs on the frame
 //! tick and the open clears the close latch (`StashCubeInput::cube_opened`).
 //!
-//! Preview fills (d2rs-own, unverified, REC-267): the animation starts at
-//! the transmute button release (the spec gives the start routine
-//! `0x0048A540` but not its caller), the client frame counts 40 ms (the
-//! 25 Hz client, as `game_messages`) for the 70 ms wall-clock step. The
+//! The animation starts when an `hst ` / `qf2 ` lands in the local
+//! player's page 3 (S→C 0x9C, `panels-2.md` §20 r7: `Output::HoradricItem`
+//! → `0x0048A540`'s quest-record check), at the cube's next draw; the
+//! transmute button starts nothing.
+//!
+//! Preview fills (d2rs-own, unverified, REC-267): the client frame counts
+//! 40 ms (the 25 Hz client, as `game_messages`) for the 70 ms wall-clock
+//! step. The
 //! cel draws in mode 3 (additive, [`HORADRIC_LOOK`]). The cube-gone close runs once per
 //! pass ([`OriginalUi::cube_poll`]).
 
@@ -89,7 +93,12 @@ impl Panel for CubeUi {
         // §12.4: step on the (wrapping, 32-bit) millisecond tick, draw the
         // cel, and hold the grid back for the first 14 steps.
         let mut anim = sh.cube_anim.get();
-        anim.step((ctx.tick.wrapping_mul(FRAME_MS)) as u32);
+        let now = (ctx.tick.wrapping_mul(FRAME_MS)) as u32;
+        // §20 r7 step 3: flag, n := 0, stamp := now.
+        if sh.horadric_start.replace(false) {
+            anim.start(now);
+        }
+        anim.step(now);
         sh.cube_anim.set(anim);
         if let (Some(n), Some(file)) = (anim.frame(), sh.tables.files.id(HORADRIC_FILE)) {
             let (x, y) = horadric_pos(&sh.config.screen);
@@ -150,7 +159,6 @@ impl Panel for CubeUi {
             self.input.cube_opened();
         }
         let s = sh.config.screen;
-        let was_transmute = self.input.transmute_pressed;
         let ptr = Pointer {
             at,
             in_inv_close: false,
@@ -164,12 +172,8 @@ impl Panel for CubeUi {
         if eff.sound4 {
             sh.outputs.push(PanelOutput::Sound(4));
         }
-        // §12.4 start (flag, n := 0, stamp := now); the close clears it (§12 r7).
-        if !down && was_transmute && !self.input.transmute_pressed {
-            let mut a = sh.cube_anim.get();
-            a.start((ctx.tick.wrapping_mul(FRAME_MS)) as u32);
-            sh.cube_anim.set(a);
-        }
+        // The transmute button starts nothing (`panels-2.md` §20 r7); the
+        // close clears the animation (§12 r7).
         if eff
             .outputs
             .iter()

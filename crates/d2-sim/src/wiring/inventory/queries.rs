@@ -31,7 +31,7 @@ const EVENT_REPLENISH: u32 = 3;
 
 impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
     /// The items class of an item unit (its item data's record).
-    fn class_of(&self, u: UnitId) -> Option<usize> {
+    pub(super) fn class_of(&self, u: UnitId) -> Option<usize> {
         self.econ.items.get(u).map(|i| i.record)
     }
 

@@ -146,7 +146,7 @@ fn item_rec(t: u16, code: &[u8; 4]) -> ItemRec {
 fn tables() -> ItemTables {
     let mut ratio = Itemratio::decode(&[0u8; Itemratio::SIZE]);
     ratio.version = 1;
-    let itemtypes = (0..N_TYPES)
+    let mut itemtypes: Vec<Itemtypes> = (0..N_TYPES)
         .map(|_| {
             let mut t = Itemtypes::decode(&[0u8; Itemtypes::SIZE]);
             t.class = 0xFF;
@@ -157,6 +157,8 @@ fn tables() -> ItemTables {
             t
         })
         .collect();
+    // The bow shoots the arrows' type (`inventory.md` §4.7 r2).
+    itemtypes[usize::from(T_BOW)].shoots = T_BOWQ;
     ItemTables {
         items: vec![
             item_rec(T_BOX, b"box "),

@@ -533,6 +533,27 @@ fn stack_items() {
     assert_eq!(f.inv().cursor, None);
 }
 
+/// Two arrow quivers (no durability: `0x00629930` = 0) whose total fits
+/// merge; only the stat-72 step needs durability (PROVISIONAL REC-289).
+// Covers: specs/items/inventory-moves.md §7.12
+#[test]
+fn stack_items_without_durability_merge() {
+    let mut f = Fake::new();
+    f.item(10, mode::CURSOR);
+    f.item(11, mode::STORED).max_stack = 500;
+    f.k.stack = true;
+    f.k.merge = false;
+    f.set_stat(Owner::item(10), 70, 100);
+    f.set_stat(Owner::item(11), 70, 250);
+    f.set_stat(Owner::item(10), 72, 3);
+    f.set_stat(Owner::item(11), 72, 9);
+    assert_eq!(run(&mut f, &m32(0x21, &[10, 11])), res::OK);
+    assert_eq!(f.stat(Owner::item(11), 70), 350);
+    assert_eq!(f.stat(Owner::item(11), 72), 9, "no durability step");
+    assert!(f.logged("free 10"));
+    assert_eq!(f.inv().cursor, None);
+}
+
 // Covers: specs/items/inventory-moves.md §7.12
 #[test]
 fn stack_books() {

@@ -275,6 +275,9 @@ struct Shared {
     cube_opened: bool,
     /// The transmute animation (`panels.md` §12 r4, [`cube_ui`]).
     cube_anim: std::cell::Cell<super::panels::stash_cube::HoradricAnim>,
+    /// `0x0048A540` ran (an `hst ` / `qf2 ` arrived in page 3): the
+    /// animation starts at the cube's next draw.
+    horadric_start: std::cell::Cell<bool>,
 }
 
 impl Shared {
@@ -418,6 +421,7 @@ impl OriginalUi {
             bubbles: Default::default(),
             cube_opened: false,
             cube_anim: Default::default(),
+            horadric_start: Default::default(),
         };
         Ok(Self {
             shared: Rc::new(RefCell::new(shared)),
