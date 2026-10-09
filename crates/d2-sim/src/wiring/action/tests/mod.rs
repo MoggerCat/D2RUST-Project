@@ -487,6 +487,19 @@ impl Fx {
         }
     }
 
+    /// A new client record (no player) added to `room`'s client array
+    /// (`rooms.md` §7, `0x0061A660`): the room's client count becomes
+    /// nonzero.
+    pub fn add_room_client(&mut self, room: RoomId) {
+        let c = self.game.lists.add_client(None, Some(room), 0);
+        let act = self.game.lists.room(room).expect("room").act;
+        let d = self.sim.hooks().drlg.dungeon.acts[usize::from(act)]
+            .as_mut()
+            .expect("act");
+        let id = d.drlg_room_of(room).expect("active room");
+        d.add_room_client(id, c);
+    }
+
     /// Allocates a unit (`units.md` §3.1) in `room` at (x, y).
     pub fn spawn(&mut self, ty: UnitType, class: u32, room: RoomId, x: i32, y: i32) -> UnitId {
         let req = AllocRequest {

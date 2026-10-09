@@ -1965,7 +1965,7 @@ fn spirit_wolf<W: AiHost + ?Sized>(
             set_velocity(cx, u, 0, v, 0);
             run_to(game, cx, u, Some(st), 0);
         } else if d > 10 {
-            cx.world.walk_in_radius(game, u, o, 8, 6);
+            walk_in_radius(game, cx, u, o, 8, 6);
         } else {
             idle(game, cx, u, 15);
         }

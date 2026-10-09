@@ -453,9 +453,17 @@ fn save_with_status(dir: &Path, name: &str, class: u8, status: u16) {
     };
     let path = write_stub(dir, &c, 1).unwrap();
     let mut b = std::fs::read(&path).unwrap();
+    // The stub keeps its "new character" flag (`formats/d2s.md` §2.6), or
+    // the load would look for the body sections a stub does not have.
+    let new = d2_formats::d2s::status::NEW;
+    let status = status | (u16::from(b[0x24]) & new);
     b[0x24..0x26].copy_from_slice(&status.to_le_bytes());
     b[0x28] = class;
-    // The header checksum is not checked by the select scan.
+    // The select scan ignores the checksum but the game's load checks it
+    // (`formats/d2s.md` §3 r1: the sum over the file with u32 at 0xC zeroed).
+    b[0xC..0x10].fill(0);
+    let sum = d2_formats::d2s::checksum(&b);
+    b[0xC..0x10].copy_from_slice(&sum.to_le_bytes());
     std::fs::write(&path, b).unwrap();
 }
 
@@ -601,8 +609,11 @@ fn esc_options_save_and_exit_then_reload_the_character() {
     game.press(KeyCode::Enter);
     assert!(game.exited(), "Save and Exit did not end the game");
 
-    // Back in the front end: character select, the character listed.
-    let mut f = Front::open(&dir, Entry::AfterGame);
+    // Back in the front end: the main menu (recorded, REC-200), then
+    // Single Player: character select, the character listed.
+    let mut f = Front::open(&dir, Entry::MainMenu);
+    assert_eq!(f.current(), MAIN_MENU);
+    f.click_trigger(Trigger::SinglePlayer);
     assert_eq!(f.current(), CHAR_SELECT);
     assert!(f.texts().iter().any(|t| t == "Tester"), "{:?}", f.texts());
     f.click_custom(d2_client::ui::front_end::screens::char_select::ids::SLOT_TEXT);
@@ -752,17 +763,30 @@ fn play_cli_new_and_save_paths() {
             difficulty: 2,
         })
     );
-    // The name is taken once the file exists.
-    std::fs::write(dir.join("Cli.d2s"), b"x").unwrap();
+    // The name is taken once the file exists (a character the front end
+    // would have written: the stub of a new Necromancer).
+    let taken = NewCharacter {
+        name: "Cli".into(),
+        class: Class::Necromancer,
+        hardcore: false,
+        expansion: true,
+    };
+    write_stub(&dir, &taken, 1).unwrap();
     let err = play_start::resolve(&cli, &app_support::game_data(), None, None, None).unwrap_err();
     assert!(err.to_string().contains("already exists"), "{err}");
-    // --save: synthetic data cannot read a save; inside the install refused.
+    // --save: the install's tables read the file; a save inside the
+    // install is refused.
     let save = CliStart {
         save: Some(dir.join("Cli.d2s")),
         ..CliStart::default()
     };
-    let err = play_start::resolve(&save, &app_support::game_data(), None, None, None).unwrap_err();
-    assert!(err.to_string().contains("D2_GAME_DIR"), "{err}");
+    let start = play_start::resolve(&save, &app_support::game_data(), None, None, None).unwrap();
+    assert_eq!(start.save_path, Some(dir.join("Cli.d2s")));
+    assert!(
+        start.origin.starts_with("character from "),
+        "{}",
+        start.origin
+    );
     let err =
         play_start::resolve(&save, &app_support::game_data(), Some(&dir), None, None).unwrap_err();
     assert!(err.to_string().contains("inside the game install"), "{err}");
@@ -779,10 +803,11 @@ fn play_cli_new_and_save_paths() {
 }
 
 /// `play` after a game (Save and Exit, or the window closed): the front
-/// end opens at character select with the saved character listed (§F1.3
-/// "in game" row, REC-200), not at the main menu.
+/// end opens at the main menu (§F1.3 "in game" row, recorded under Wine,
+/// REC-200), not at character select; Single Player lists the saved
+/// character.
 #[test]
-fn after_a_game_the_front_end_opens_at_character_select() {
+fn after_a_game_the_front_end_opens_at_the_main_menu() {
     let dir = temp_dir("after");
     let c = NewCharacter {
         name: "Back".into(),
@@ -791,7 +816,9 @@ fn after_a_game_the_front_end_opens_at_character_select() {
         expansion: true,
     };
     write_stub(&dir, &c, 1).unwrap();
-    let f = Front::open(&dir, Entry::AfterGame);
+    let mut f = Front::open(&dir, Entry::MainMenu);
+    assert_eq!(f.current(), MAIN_MENU);
+    f.click_trigger(Trigger::SinglePlayer);
     assert_eq!(f.current(), CHAR_SELECT);
     assert!(f.texts().iter().any(|t| t == "Back"), "{:?}", f.texts());
 }

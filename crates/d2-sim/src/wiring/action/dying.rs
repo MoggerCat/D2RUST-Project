@@ -69,6 +69,10 @@ impl<X: Pending> super::ActionHooks<X> {
         };
         let mut v = View::of(sim.units, sim.stats, sim.data, self);
         let c = v.allocate(sim.game, &req, x, y)?;
+        // `vitals.md` §4.7 r1.4: C's seed from the game seed (`0x00552DF0`),
+        // before its mode and state; a player allocation draws none
+        // (`units.md` §3.1 r4.1).
+        v.init_player_seed(c);
         v.set_state(c, STATE_PLAYERBODY as u16, true);
         if let Some(r) = v.units.get_mut(c) {
             r.mode = DD;

@@ -11,7 +11,7 @@
 //!                        (pokes, specs/tools/poke.md §5: F is the absolute
 //!                        server frame; file ticks are relative to the join)
 //!   d2-client facts-compare ORIGINAL_DIR D2RS_DIR [--ignore COL,...]
-//!   d2-client state-dump --save FILE.d2s [--seed N] [--difficulty D] --ticks T [--every n] --out FILE [--game-dir DIR] [--date YYYY-MM-DD]
+//!   d2-client state-dump --save FILE.d2s [--seed N] [--difficulty D] --ticks T [--every n] --out FILE [--game-dir DIR] [--date YYYY-MM-DD] [--poke "F DIRECTIVE ARGS"]...
 //!
 //! `play` (the default) opens a window running the local single-player game: the
 //! in-process server (`d2-server` host over the wired `d2-sim`) pumped
@@ -516,12 +516,8 @@ fn play(o: Options) -> Result<()> {
             .save_dir
             .clone()
             .unwrap_or_else(d2_client::app::save::default_save_dir);
-        // After a game: character select (§F1.3, REC-200).
-        let entry = if first {
-            Entry::First
-        } else {
-            Entry::AfterGame
-        };
+        // After a game: the main menu (§F1.3, REC-200, recorded).
+        let entry = if first { Entry::First } else { Entry::MainMenu };
         let (host, handles) = front_host(&saves, art, expansion, entry);
         first = false;
         match run_front_end(host) {

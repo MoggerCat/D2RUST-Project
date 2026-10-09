@@ -87,6 +87,29 @@ fn a_created_monster_gets_its_first_think_at_f_plus_2() {
     // schedules the think at f + aidel (0 → 15); the think restart
     // `0x00573780` deletes it and schedules f + 2 (the recorded
     // "+15, cancel, +2" pair, `ai.md` §1.5 r1).
+    // The room has a client: the gate `0x00553160` holds
+    // (`init.md` §4.1 step 1.2).
+    let mut fx = fx();
+    let a = fx.a;
+    fx.add_room_client(a);
+    let f = fx.game.frame;
+    let m = fx.spawn(UnitType::Monster, 0, a, 26, 10);
+    assert_eq!(mode(&fx, m), 1);
+    let thinks: Vec<_> = fx
+        .timers(m)
+        .into_iter()
+        .filter(|&(e, _)| e == event::AI_THINK)
+        .collect();
+    assert_eq!(thinks, [(event::AI_THINK, f + 2)]);
+    fx.assert_clean();
+}
+
+// Covers: specs/monsters/init.md §4.1 r1
+#[test]
+fn a_monster_created_where_no_client_is_gets_no_think() {
+    // `0x00553160` false (the room's client count is 0): no think restart;
+    // the room clean-up `0x00553220` runs instead, so the creation mode's
+    // think at f + aidel is the only one left.
     let mut fx = fx();
     let a = fx.a;
     let f = fx.game.frame;
@@ -97,7 +120,7 @@ fn a_created_monster_gets_its_first_think_at_f_plus_2() {
         .into_iter()
         .filter(|&(e, _)| e == event::AI_THINK)
         .collect();
-    assert_eq!(thinks, [(event::AI_THINK, f + 2)]);
+    assert!(thinks.iter().all(|&(_, at)| at != f + 2), "{thinks:?}");
     fx.assert_clean();
 }
 
@@ -976,4 +999,29 @@ fn path_step_count_is_the_stop_distance_and_stop_path_clears_the_points() {
         (d.target_x, d.target_y, d.path_type, d.repath_budget),
         (b.target_x, b.target_y, b.path_type, b.repath_budget)
     );
+}
+
+// Covers: specs/monsters/ai.md §5.3
+#[test]
+fn the_nearest_client_player_within_15_is_found() {
+    use crate::monsters::ai::seams::{AiTargets, AiUnits as _};
+    let mut fx = fx();
+    let a = fx.a;
+    let m = fx.spawn(UnitType::Monster, 0, a, 20, 10);
+    // Every monster has an interaction block (`npc.md` §2 r2).
+    assert!(fx.sim.with(&mut fx.game, |_, v| v.has_interaction_block(m)));
+    let far = fx.spawn(UnitType::Player, 0, a, 36, 10);
+    fx.game.lists.add_client(Some(far), Some(a), 0);
+    // 16 away: none, the unit itself.
+    let got = fx.sim.with(&mut fx.game, |g, v| v.nearest_player(g, m));
+    assert_eq!(got, (m, false));
+    let near = fx.spawn(UnitType::Player, 0, a, 23, 13);
+    fx.game.lists.add_client(Some(near), Some(a), 0);
+    // (3, 3): no-size distance 4, found, not "close" (< 4).
+    let got = fx.sim.with(&mut fx.game, |g, v| v.nearest_player(g, m));
+    assert_eq!(got, (near, false));
+    // A player unit without a client is not scanned.
+    let _ = fx.spawn(UnitType::Player, 0, a, 21, 10);
+    let got = fx.sim.with(&mut fx.game, |g, v| v.nearest_player(g, m));
+    assert_eq!(got, (near, false));
 }

@@ -10,6 +10,10 @@ use d2_server::adapters::character::LoadContext;
 mod app_support;
 
 fn run(character: Character, ticks: u32, every: u32) -> Vec<u8> {
+    run_with(character, ticks, every, &[])
+}
+
+fn run_with(character: Character, ticks: u32, every: u32, pokes: &[&str]) -> Vec<u8> {
     let args = DumpArgs {
         save: None,
         seed: Some(1234),
@@ -19,6 +23,10 @@ fn run(character: Character, ticks: u32, every: u32) -> Vec<u8> {
         out: "unused".into(),
         game_dir: None,
         date: Some("2026-10-09".into()),
+        pokes: pokes
+            .iter()
+            .map(|p| d2_client::app::poke::parse_poke_arg(p).unwrap())
+            .collect(),
     };
     let mut game = DumpGame::resolve(&args, app_support::game_data(), None).unwrap();
     game.character = character;
@@ -78,4 +86,55 @@ fn every_n_keeps_the_multiples_of_n() {
         .map(|l| l.split(',').nth(1).unwrap())
         .collect();
     assert_eq!(frames, [r#""f":3"#, r#""f":6"#]);
+}
+// Covers: specs/tools/poke.md §2 r6
+// (state-dump --poke: after frame f − 1's snapshot, before frame f)
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn a_poke_spawn_runs_before_its_frame_and_the_unit_is_in_that_snapshot() {
+    let pokes = [
+        "4 spawn 19 @x+3 @y+3 normal",
+        "4 seed-unit @1:19 0x12345678 666",
+    ];
+    let a = run_with(scn_ama(), 8, 1, &pokes);
+    assert_eq!(a, run_with(scn_ama(), 8, 1, &pokes), "two runs differ");
+    let text = String::from_utf8(a).unwrap();
+    let lines: Vec<&str> = text.lines().collect();
+    // header, snaps 1..3, two poke lines, snaps 4..8, footer
+    assert_eq!(lines.len(), 1 + 8 + 2 + 1, "{text}");
+    assert!(
+        lines[3].starts_with(r#"{"k":"snap","f":3,"#),
+        "{}",
+        lines[3]
+    );
+    let spawn = lines[4];
+    assert!(
+        spawn.starts_with(r#"{"k":"poke","f":4,"frame":3,"i":0,"d":"spawn","r":"ok","guid":"#),
+        "{spawn}"
+    );
+    assert!(
+        lines[5]
+            .starts_with(r#"{"k":"poke","f":4,"frame":3,"i":1,"d":"seed-unit","r":"ok","src":"#),
+        "{}",
+        lines[5]
+    );
+    let guid: u32 = spawn
+        .split(r#""guid":"#)
+        .nth(1)
+        .unwrap()
+        .split(',')
+        .next()
+        .unwrap()
+        .parse()
+        .unwrap();
+    let unit = format!(r#"{{"ut":1,"g":{guid},"cl":19,"#);
+    // Not in frame 3's snapshot; in frame 4's, with the poked seed (the
+    // spawn's own tick advanced it from there).
+    assert!(!lines[3].contains(&unit), "{}", lines[3]);
+    assert!(
+        lines[6].starts_with(r#"{"k":"snap","f":4,"#),
+        "{}",
+        lines[6]
+    );
+    assert!(lines[6].contains(&unit), "{}", lines[6]);
 }

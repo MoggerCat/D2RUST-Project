@@ -236,6 +236,15 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     holder), as offsets read from a server unit, so `record_state.py` can
     fill `own`. Write the answer into `sim/units.md` (or the owner spec)
     and the §2 row of `state-snapshot.md`.
+26. **Re-record sim-0009 without input** (q-prov-recording, REC-290): the Wine
+    run of the same command equals `traces/sim/tick/sim-0009.json` for ticks
+    0–60, then the Windows trace has a client message at tick 61 (drain: a
+    timer on unit (1, 7), player queue) and the player changes rooms at 121,
+    241, 351: the window got input. Run `record_tick.py --auto ScnAma --seed
+    1234 --ticks 600` again with the mouse outside the game window and replace
+    sim-0009. (Item 20 note: under Wine the front end does take X input,
+    `tools/cloud-game/xinput.sh`; in-game NPC menus were not tried.)
+
 - **[q-fix-pc1-combat] `0x0063E6B0(unit, 0)`: are the action-frame tests skipped?** (REC-700) `0x005A6D50` passes the moving flag r as `0x0063E6B0`'s second argument (`skills/use.md` §5.2 "Monsters"); `skills/bodies-3.md` §5.18 step 3 gives the tests (+0x4E = 0, or no action event in the frames ((cur − speed) >> 8, cur >> 8]) for the argument 1 only. Read: what the function does with 0 (d2rs: no tests, the column by mode). Write the answer into `bodies-3.md` §5.18 step 3.
 - **[q-fix-pc1-combat] Who writes unit +0x4E from a type-0 timer's frame code?** (REC-701) trigger(U) of `0x005A7670` reads +0x4E = 1 (`skills/use.md` §5.2); `sim/units.md` §4.2 schedules event 0 with args (E[i], k) and the field table names only `0x005533D0` (0 at mode start). Read: the writer of +0x4E on the event-0 path of a monster (the unit-type dispatcher or the timer run), and whether a code-0 event writes it. Write the answer into `sim/units.md` §4.2 / §4.6.
 
@@ -298,6 +307,15 @@ rather than a hand-run recipe.
     motion getters `0x004DA110`–`0x004DA150` (shifted or stored) and the
     other points that session lists there. Answer into
     `render/unit-composite.md` §8 and the client missile specs.
+25. **Potion state length and the end-when-full rule** (`q-fix-real-potion-effect`, REC-102): item-use entry 3 body (`0x005BE3F0`, `items/use.md` §3 OQ 1). Recording: hp1 at 10/50 life, state 100 from 0xA8 to 0xA9 = 170 frames, mp1 at 1 mana 51 frames (mana full), hp1 at full life ends the next frame; `misc.txt` says `len` 192 / `calc1` 30 (hp1) and `len` 128 / `calc1` 20 (mp1), so the rule that gives 170 and 51 is not `len`. Answer into `items/use.md` §3; then `wiring/inventory/potion.rs` loses its PROVISIONAL.
+
+27. **NPC nearest player and walk in radius** (q-fix-real-unit-seed-order)
+  (REC-500, REC-501, `specs/monsters/ai.md` §5.3, §7.2): read the scan-2
+  callback of `0x005DDF20` (distance function, `<` or `≤ 15`, ties) and
+  `0x005DE4E0` (target point geometry, rounding, path step count,
+  failure when the point is the unit's own). d2rs reads: no-size
+  distance ≤ 15; point = own + Δ·min(a, dist − b) / dist rounded to
+  nearest; it matches Warriv's three recorded arrival walks.
 
 - **[q-fix-pc1-combat] Evade's reaction (`combat/damage.md` §7.1 step
   5.2)**: "state 68 list; s, E as above" — does the evade branch also
