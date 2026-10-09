@@ -10,7 +10,7 @@ check that hires (11 of 15); `hire-kashya` and `hire-greiz` are EQUAL on
 all 90 frames (state PARTIAL: only the known `own` / client gaps).
 
 Two causes, both in the hireling creation path (none in shared placement
-code, so no note to q-scenes-compare / q-fix-d4-placement):
+code, so no note to q-fix-d4-placement):
 
 1. **Game seed lost.** d2rs did draw the allocation's unit-seed step
    (`rng.md` §5.3; the rng channel showed the game draws equal), but on
@@ -45,7 +45,7 @@ class row (the §9 placement reads monstats and monstats2 of the class).
 | hire-follow-warp-kashya | 14 EQUAL | frame 54 hireling warp follow: mode 2 vs 4, tile (5147,4260) vs (5144,4266) |
 | hire-follow-waypoint-kashya | 14 EQUAL | frame 93 player 0:1 mode 5 vs 6 (waypoint travel) |
 | hire-items-kashya | 14 EQUAL | frame 30 item 4:1 class 306 (cap) present in 1.14d, absent in d2rs |
-| merc-levelup-a1/a2/a3/a5 | no hire | frame 4 (unchanged): the saved hireling follows the `poke warp 2` one frame late in d2rs (1.14d frame 4 at (5145,4266), d2rs frame 5); same as merc-*-cow, routed q-scenes-compare |
+| merc-levelup-a1/a2/a3/a5 | no hire | frame 4 (unchanged): the saved hireling follows the `poke warp 2` one frame late in d2rs (1.14d frame 4 at (5145,4266), d2rs frame 5); same as merc-*-cow (was q-scenes-compare, ended; now q-fix-d4-placement) |
 
 `docs/handoff/checks-status.md` rows updated.
 
