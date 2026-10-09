@@ -32,17 +32,17 @@
 |   2. Think dispatch `0x005B1740` | 283–422 |
 |   3. AI control and AI tables | 423–594 |
 |   4. AI parameters | 595–613 |
-|   5. Target selection | 614–789 |
-|   6. Distances and line tests | 790–804 |
-|   7. Tactics helpers | 805–1044 |
-|   8. AI commands and minions | 1045–1071 |
-|   10. The catalogue `ai-functions.tsv` | 1072–1092 |
-| Constants & data dependencies | 1093–1116 |
-| Randomness | 1117–1138 |
-| Edge cases & original bugs | 1139–1180 |
-| Test vectors | 1181–1269 |
-| Provenance | 1270–1330 |
-| Open questions | 1331–1434 |
+|   5. Target selection | 614–813 |
+|   6. Distances and line tests | 814–828 |
+|   7. Tactics helpers | 829–1068 |
+|   8. AI commands and minions | 1069–1095 |
+|   10. The catalogue `ai-functions.tsv` | 1096–1116 |
+| Constants & data dependencies | 1117–1140 |
+| Randomness | 1141–1162 |
+| Edge cases & original bugs | 1163–1204 |
+| Test vectors | 1205–1293 |
+| Provenance | 1294–1354 |
+| Open questions | 1355–1458 |
 <!-- /index -->
 
 ## Summary
@@ -694,6 +694,16 @@ D2MOO `sub_6FCF2110`. Returns target, distance, combat:
    +0x24 := (it was 0). Combat := melee-range test `0x00622C40(unit,
    target, 0)` (`sim/units.md`). Distance := B.
 
+PROVISIONAL (REC-1698): the vision record (monster data +0x50) is the
+coordinate record of `population.md` §9.6 step 3 (the caller's record,
+else the one at the creation point, `0x0061AD30`), shared by identity
+(act, clipped rect, index) between the monsters that hold it; step 7
+writes 1 to its +0x24 and nothing clears it; a monster created without
+that call (no population placement) has none. Settled by: PC 1 item
+"[q-fix-seed-game] Monster "vision" record" and
+`a1-warp-tower-cellar-ama` frame 45 (the fallen3 leader 1:10 acquires
+the player once minion 1:12 has seen it).
+
 Draws: none here (except §5.1 k = 3). Ties keep the earlier node.
 
 **Target-node lists** (game +0x10F8 + 4·slot; node 0x10 bytes {unit,
@@ -751,6 +761,20 @@ e.g. a cow) takes the alternative at once in d2rs; the spec's
 order of those two rules is unread (an idle cow poked next to a trap was
 not shot by 1.14d in a one-off run on 2026-10-09, check file not kept; the cow
 had hp 0, so the dead test may be the cause instead). Not applied.
+
+PROVISIONAL (REC-1695): `0x005DDC30` as d2rs runs it (`d2-sim`
+`wiring/action/ai_scan.rs`): the forced target (§5.1 with a = 0, s = 1)
+first, else scan 6 over every unit of the scanner's near-room list (own
+room included, list order, §5.4 mode 0) with the callback rules above,
+then `0x005DD510` on the scan's main M and alternative A: a player
+scanner or no A → M; no M → A; A's distance > 5 → M; else the trial path
+and scan 7 (not read in detail; the host answers, keeping M by default).
+Returned: the pick, its distance (0x7FFFFFFF without one) and the
+melee-range test `0x00622C40(unit, pick)`. In rule 1 the `roll(100)` on a
+state-146 player's seed is drawn before the melee-range test (the order
+is not read). Settled by: the PC 1 read of `0x005DDC30` / `0x005DC970`
+(the REC-1270 item) and `milestone-baal-throne` frame 50 (SuccubusWitch's
+`Skill5` draw at `0x5e242e` follows a found S).
 
 So `0x005DDC30` sees targets closer than 49; each caller applies its
 own distance gate (the Hireable think: E < 25, `ai-bodies-6.md` §7

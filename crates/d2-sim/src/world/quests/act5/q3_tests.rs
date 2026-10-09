@@ -951,3 +951,30 @@ fn extra_data_at_init() {
     super::init(r);
     assert_eq!(r.extra.a5.q3, super::Extra::default());
 }
+
+// Covers: specs/world/quests-act5.md §5.8
+#[test]
+fn map_ai_store_keeps_the_record_and_applies_it_in_town() {
+    // `0x0058AD80` / `0x0058AE10`: +0x104 / +0x108 := the record; applied
+    // once when the NPC is in town and its unit exists.
+    let (mut ctl, _) = control();
+    let mut f = fake();
+    f.a5_map_ai = true;
+    super::store_map_ai(&mut ctl, &mut f, false, 7);
+    assert_eq!(x(&mut ctl).anya_map_ai, 7);
+    assert!(f.log.is_empty());
+    x(&mut ctl).anya_in_town = true;
+    x(&mut ctl).anya_guid = DREHYA_U.0;
+    super::store_map_ai(&mut ctl, &mut f, false, 8);
+    assert_eq!(f.log, [format!("map ai {} 0x8", DREHYA_U.0)]);
+    assert!(x(&mut ctl).anya_map_ai_applied);
+    f.log.clear();
+    super::store_map_ai(&mut ctl, &mut f, false, 9);
+    assert!(f.log.is_empty());
+    // No record: nothing.
+    super::store_map_ai(&mut ctl, &mut f, true, 0);
+    assert_eq!(x(&mut ctl).nihlathak_map_ai, 0);
+    super::store_map_ai(&mut ctl, &mut f, true, 5);
+    assert_eq!(x(&mut ctl).nihlathak_map_ai, 5);
+    assert!(f.log.is_empty());
+}
