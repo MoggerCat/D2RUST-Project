@@ -1,0 +1,24 @@
+check 1
+# A belt potion drunk mid-fight from one shared input script: a level-3
+# Barbarian with a short sword and minor healing potions in belt column 0
+# (slots 0 and 4) warped to the Blood Moor (level 2) before frame 4; a
+# fallen party (monstats 19, normal) spawned next to the player before
+# frame 30 with the seeds fixed (as combat-melee-fallen); before frame 60
+# the player's life (stat 6) is set to 10 points so the drink shows
+# whatever the fallens hit; before frame 70 `key 1` (belt column 0,
+# command 23: C->S 0x26 [item GUID][0][0]; ui/controls.md §3.2, §7 r3).
+# Compare the player's hp frame by frame and the belt item's removal
+# (state), and the C->S ids (packets).
+# Spec: specs/tools/scenario-diff.md.
+name combat-potion-midfight
+save CmbPot --class bar --expansion --level 3 --item ssd/body=4 --item hp1/belt=0 --item hp1/belt=4
+seed 1234
+ticks 150
+seconds 300
+channels state packets
+at 4 poke warp 2
+at 30 poke seed-game 0x00001234 666
+at 30 poke seed-unit @player 0x00000055 666
+at 30 poke spawn 19 @x+3 @y normal
+at 60 poke stat @player 6 0 2560
+input frame 70; key 1

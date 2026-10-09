@@ -575,6 +575,9 @@ impl<D: EventDispatch, W: WorldHost<D>> Intents for SimGame<D, W> {
         };
         let handled = flow.run(self, client, msg, out);
         self.session = Some(flow);
+        if handled {
+            self.world.session_work(&mut self.game, &mut self.events);
+        }
         handled
     }
 }

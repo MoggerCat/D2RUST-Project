@@ -67,6 +67,9 @@ pub struct HostQuests<'e, 'a, X, R> {
     /// `InteractionState::lists`); `None`: the chat-node calls are
     /// reported unhandled.
     pub chats: Option<&'e mut BTreeMap<UnitId, InteractionList>>,
+    /// The object under its quest init and its init point
+    /// ([`QuestWorld::set_init_point`]).
+    pub init_point: Option<(UnitId, i32, i32, RoomId)>,
 }
 
 impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
@@ -75,6 +78,7 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
             inner,
             inventory: None,
             chats: None,
+            init_point: None,
         }
     }
 
@@ -618,7 +622,14 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         let e = &*self.inner.econ;
         match e.game.lists.unit(unit) {
             Some(u) => {
-                let room = u.room()?;
+                // An object inside its quest init is not in its room's
+                // list yet (the init runs inside the allocation): its
+                // init point is its position.
+                let room = match (u.room(), self.init_point) {
+                    (Some(r), _) => r,
+                    (None, Some((o, x, y, r))) if o == unit => return Some((x, y, r)),
+                    (None, _) => return None,
+                };
                 let (x, y) = e.hooks.path_position(unit);
                 Some((x, y, room))
             }
@@ -857,6 +868,9 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     }
     fn unhandled(&mut self, chain: u8, function: u32) {
         self.inner.unhandled(chain, function)
+    }
+    fn set_init_point(&mut self, point: Option<(UnitId, i32, i32, RoomId)>) {
+        self.init_point = point;
     }
     fn client_in_act(&mut self, player: UnitId, act: u8) -> bool {
         self.inner.client_in_act(player, act)

@@ -424,8 +424,14 @@ where
     /// with a free position and "send" (the recorded purchase's copy
     /// appears as 0x9C action 4 the next frame, rule 10).
     fn place_in_backpack(&mut self, player: UnitId, item: UnitId) -> bool {
-        self.with_desk(|d| d.place(player, item, (0, 0), true, true))
-            .unwrap_or(false)
+        // "page := 0 and auto-place" (§7.1 rule 9.7): the store copy still
+        // names its store page.
+        self.with_desk(|d| {
+            let g = d.guid_of(item);
+            MoveUnits::set_page(d, g, d2_sim::items::inventory::page::INVENTORY);
+            d.place(player, item, (0, 0), true, true)
+        })
+        .unwrap_or(false)
     }
     /// `0x0055EEA0` on the inventory model (`InvDesk::take_cursor`,
     /// PROVISIONAL REC-278). Without inventory parts: the wrapped world's.
