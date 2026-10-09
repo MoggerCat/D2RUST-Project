@@ -92,8 +92,8 @@ impl Presentation {
     /// Non-zero (a half pixel) only with an odd leftover width or height.
     pub fn centre_offset(&self) -> (f32, f32) {
         let s = self.scale as f32;
-        let cx = self.left as f32 + f32::from(FRAME_W) * s / 2.0;
-        let cy = self.top as f32 + f32::from(FRAME_H) * s / 2.0;
+        let cx = self.left as f32 + self.frame_w as f32 * s / 2.0;
+        let cy = self.top as f32 + self.frame_h as f32 * s / 2.0;
         (
             cx - self.window_w as f32 / 2.0,
             self.window_h as f32 / 2.0 - cy,

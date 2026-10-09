@@ -1465,7 +1465,7 @@ fn border_file(
 
 /// The rules of `outdoor-tilesub.md` §2.2–§2.3 (Wild callbacks), applied
 /// to copies of grids 0 and 2 with the level seed; stamps use 1 × 1
-/// presets of one file (`outdoor.md` §5.1).
+/// presets, file 0, no build-list roll (§2.3).
 #[allow(clippy::too_many_arguments)]
 fn border_model(
     seed: &mut Seed,
@@ -1477,7 +1477,6 @@ fn border_model(
     rows: &[(SubRow, SubFile)],
 ) {
     let (gw, gh) = (g0.w, g0.h);
-    let mut built: Vec<u32> = Vec::new();
     for (row, file) in rows {
         let skip = SKIP_STYLE;
         let count = file.groups.len() as i32;
@@ -1538,11 +1537,9 @@ fn border_model(
                         if wv & 1 != 0 {
                             let s = (wv >> 8 & 0xFF) as i32 - 1;
                             let p = (ctx.base as i32 + s) as u32;
+                            // No build-list roll; file 0 (§2.3,
+                            // PROVISIONAL REC-404).
                             if s != skip {
-                                if !built.contains(&p) {
-                                    seed.roll(1);
-                                    built.push(p);
-                                }
                                 let border = matches!(p, 4..=15 | 364..=375);
                                 g2.op(cx, cy, Op::AndNot, cell::FILE_MASK);
                                 g2.op(

@@ -23,6 +23,7 @@
 
 use crate::game::Game;
 use crate::items::ItemTables;
+use crate::units::UnitId;
 use crate::wiring::action::{ObjectRoute, Pending, QuestObjectCall, QuestObjectHost, View};
 use crate::wiring::interaction::NpcRest;
 
@@ -92,6 +93,39 @@ impl<X: Pending, R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static>
         v: &mut View<'_, X>,
         call: QuestObjectCall,
     ) -> Option<ObjectRoute> {
+        let out = self.on_world(game, v, LoanCall::Route(&call));
+        match out {
+            QuestObjectRun::Ran => None,
+            QuestObjectRun::HandBack(r) => Some(r),
+        }
+    }
+
+    fn changed_level(
+        &mut self,
+        game: &mut Game,
+        v: &mut View<'_, X>,
+        player: UnitId,
+        from: u32,
+        to: u32,
+    ) {
+        self.on_world(game, v, LoanCall::ChangedLevel { player, from, to });
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
+    }
+}
+
+impl<R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static> QuestLoan<R, I> {
+    /// Runs `call` on the quest control and a [`HostQuests`] over the
+    /// game's parts (the economy of `v`, this loan's rest and tables),
+    /// with the lent inventory model when there is one.
+    fn on_world<X: Pending>(
+        &mut self,
+        game: &mut Game,
+        v: &mut View<'_, X>,
+        call: LoanCall<'_>,
+    ) -> QuestObjectRun {
         let h = &mut *v.h;
         let mut fields = GameFields::from_action(
             h.game_seed,
@@ -113,37 +147,45 @@ impl<X: Pending, R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static>
             };
             let (quests, rest) = (&mut self.quests, &mut self.rest);
             match self.inv.as_mut() {
-                Some(inv) => inv.lend::<X, _>(|q| run_on(&mut econ, rest, quests, Some(q), &call)),
-                None => run_on(&mut econ, rest, quests, None, &call),
+                Some(inv) => inv.lend::<X, _>(|q| on_host(&mut econ, rest, quests, Some(q), call)),
+                None => on_host(&mut econ, rest, quests, None, call),
             }
         };
         v.h.items = items;
         v.h.game_seed = fields.seed;
         v.h.uniques = fields.uniques;
-        match out {
-            QuestObjectRun::Ran => None,
-            QuestObjectRun::HandBack(r) => Some(r),
-        }
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
+        out
     }
 }
 
-/// One route on [`HostQuests`] over `econ` and `rest`, with the host's
+/// What a [`QuestLoan`] runs on the game's parts.
+#[derive(Clone, Copy)]
+enum LoanCall<'c> {
+    /// One queued object route.
+    Route(&'c QuestObjectCall),
+    /// Quest event 3 CHANGEDLEVEL (`world/quests.md` §4.1).
+    ChangedLevel { player: UnitId, from: u32, to: u32 },
+}
+
+/// `call` on [`HostQuests`] over `econ` and `rest`, with the host's
 /// inventory model when one is lent.
-fn run_on<'e, X: Pending, R: QuestRest>(
+fn on_host<'e, X: Pending, R: QuestRest>(
     econ: &'e mut Economy<'_, ActionHooks<X>>,
     rest: &'e mut R,
     quests: &mut QuestControl,
     inv: Option<&'e mut dyn QuestInventory<ActionHooks<X>>>,
-    call: &QuestObjectCall,
+    call: LoanCall<'_>,
 ) -> QuestObjectRun {
     let inner = EconomyQuests::new(econ, rest);
     let mut w = HostQuests::new(inner);
     w.inventory = inv;
-    run(quests, &mut w, call)
+    match call {
+        LoanCall::Route(c) => run(quests, &mut w, c),
+        LoanCall::ChangedLevel { player, from, to } => {
+            quests.changed_level(&mut w, player, from, to);
+            QuestObjectRun::Ran
+        }
+    }
 }
 
 /// Runs the queued routes in order; returns those handed back.

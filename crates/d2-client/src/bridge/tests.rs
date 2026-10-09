@@ -1228,3 +1228,68 @@ fn save_and_exit_sends_0x69_and_waits_for_the_server() {
     assert!(crate::app::play::leave_game(&mut b).unwrap());
     assert!(sent(&link).is_empty());
 }
+
+/// The paused pass (`flows/client-frame.md` §1 r2, spec §8 r5): with UI
+/// state 9 or 11 open and the local player in a room, a frame runs no
+/// pump and no receive, only the skill fallback, once; unpaused, the
+/// next frame pumps and receives what waited. Without a placed local
+/// player, or once Save and Exit was asked (`flows/save-exit.md` §1 r3),
+/// the frame runs as usual.
+// Covers: specs/flows/client-frame.md §1 r2; specs/client/bridge.md §8 r5
+#[test]
+fn a_paused_frame_runs_no_pump_and_only_the_skill_fallback() {
+    use super::skills::{SkillEntry, SkillList, NATIVE};
+    use super::world::{SkillRow, PLAYER};
+    let p = UnitKey::new(PLAYER, 1);
+    let native = |skill, base| SkillEntry {
+        skill,
+        base,
+        owner: NATIVE,
+        ..SkillEntry::default()
+    };
+    let (mut b, link) = bridge();
+    b.inputs.tables.skills = vec![SkillRow::default(); 37];
+    let mut u = ClientUnit::new(p);
+    u.skills = Some(SkillList {
+        entries: vec![native(0, 1), native(36, 0)],
+        left: Some(1),
+        right: Some(0),
+        ..SkillList::default()
+    });
+    b.world.units.insert(p, u);
+    b.world.local_player = Some(p);
+    b.world.in_game = true;
+    let left = |b: &Bridge<ScriptedLink>| {
+        let l = b.world.units[&p].skills.as_ref().unwrap();
+        l.left_entry().map(|e| e.skill)
+    };
+    let pumps = |link: &ScriptedLink| {
+        link.script()
+            .events
+            .iter()
+            .filter(|e| **e == Event::Pump)
+            .count()
+    };
+    b.set_paused(true);
+    // No room yet: an ordinary frame.
+    link.deliver(false, &[]);
+    let r = b.frame().unwrap();
+    assert!(!r.paused);
+    assert_eq!(pumps(&link), 1);
+    // In a room: paused, no pump, the fallback ran.
+    b.world.units.get_mut(&p).unwrap().position = Some((10, 10));
+    link.deliver(true, &[&[0x05]]);
+    let frames = b.world.frames;
+    let r = b.frame().unwrap();
+    assert!(r.paused && !r.ticked && r.chunks == 0, "{r:?}");
+    assert_eq!(pumps(&link), 1, "no pump");
+    assert_eq!(b.world.frames, frames + 1);
+    assert_eq!(left(&b), Some(0), "the fallback ran once");
+    assert!(b.world.in_game, "the waiting 0x05 is not received");
+    // Unpaused: the next frame pumps and receives.
+    b.set_paused(false);
+    let r = b.frame().unwrap();
+    assert!(!r.paused && r.chunks == 1);
+    assert_eq!(pumps(&link), 2);
+    assert!(!b.world.in_game);
+}
