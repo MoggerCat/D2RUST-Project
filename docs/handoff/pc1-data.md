@@ -199,6 +199,56 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     Blood Moor monsters at night; Den of Evil. Record with
     `tools/trace-recorder/record_frames.py` and `facts_render.py` as in
     Step 3, each twice, and commit the facts.
+21. **Owner of a unit, for the state snapshot** (`specs/tools/state-snapshot.md`
+    §2 `own`, OQ 1; q-tool-state-diff): where 1.14d keeps the owner GUID
+    of a pet / summon / hireling, a missile and an item (its container or
+    holder), as offsets read from a server unit, so `record_state.py` can
+    fill `own`. Write the answer into `sim/units.md` (or the owner spec)
+    and the §2 row of `state-snapshot.md`.
+
+## How to check a behaviour in one command
+
+A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)
+names the save, seed, ticks and input. One command builds the save with
+`d2s-tool`, runs 1.14d with the recorders and d2rs with the same save and
+seed, and prints the first difference per channel (game state first):
+
+```
+py tools/scenario-diff/scenario_diff.py traces/checks/a1-town-arrival-ama.check
+py tools/scenario-diff/scenario_diff.py <check> --orig-only        # only record 1.14d
+py tools/scenario-diff/scenario_diff.py <check> --reuse            # re-compare what is in the work dir
+```
+
+On PC 1 the recorders run with `py` directly (no Wine); the 1.14d save is
+copied to `%USERPROFILE%\Saved Games\Diablo II` (`D2_SAVE_DIR` overrides).
+The state channel's report starts with `FIRST DIVERGENCE: frame N <unit>
+field K: 1.14d A vs d2rs B`, then the next 20, then the first frame per
+field; read the state report before any draw list. Two snapshot files
+compare alone with `py tools/trace-recorder/state_diff.py ORIG D2RS`.
+For a new behaviour, add a `.check` file (copy `a1-town-arrival-ama.check`)
+rather than a hand-run recipe.
+22. **Poke call forms** (q-tool-poke, `specs/tools/poke.md` Open
+    questions 1–4; until answered these directives are gaps on 1.14d):
+    register / stack form and `ret` of (a) `0x00554EA0(game, unit, room,
+    x, y, exact, alt)` or the teleport path `0x00650BE0` (`pos`,
+    `path-placement.md` §10 / §6 r4); (b) the level warp
+    `0x0053AEC0(game, player, level, tile)` (`warp`, `waypoints.md` §7
+    r5); (c) a ground-item entry at a point: `0x00558D90(game, request,
+    use seed)` with request +0x18 = 3, +0x1C/+0x20 x, y, +0x24 room, and
+    the code → index lookup `0x00633640` (`item`, `items/generation.md`
+    §3); (d) `0x00627260(unit, s, value, layer)` and `0x00639DB0(unit,
+    s, on)` (`stat`, `state`, `stat-lists.md` §5 r2, §9.2). Answer into
+    the owning specs; then delete the gap rows in `poke.md` §1. (e) For
+    scenario `spawn` kinds `champion` / `random-boss` on 1.14d: the
+    register form of the champion / boss minions call `0x0054E1E0`
+    (`scenario.md` §3.1, `population.md` §6.4); `poke.py` writes them as
+    gaps until then (`normal` runs).
+23. **Poke runs on Windows** (REC-590): the cloud ran every runnable
+    directive on 1.14d under Wine (`specs/tools/poke.md` Status) and
+    settled the variant load (REC-591, `tools/test-variants.md` Status).
+    Left: run `traces/pokes/spawn-town.poke` once on PC 1 with a
+    screenshot (Wine screenshots are blank). Commands in "Set up any
+    state for a check" below.
 
 ## Step 5 — spec gaps (107 provisional points no spec states)
 
