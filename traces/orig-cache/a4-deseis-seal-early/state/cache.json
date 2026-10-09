@@ -1,38 +1,46 @@
 {
  "channel": "state",
- "check": "combat-pop-cold-plains",
+ "check": "a4-deseis-seal-early",
  "command": [
   "tools/trace-recorder/record_state.py",
   "--game",
   "<Game.exe>",
   "--seconds",
-  "900",
+  "600",
   "--ticks",
-  "400",
+  "200",
   "--auto",
-  "ScnAma",
+  "PtSorD",
   "--seed",
-  "1234",
+  "1",
   "--out",
   "orig.state.jsonl",
   "--snap-every",
   "1",
   "--poke",
-  "4 warp 3"
+  "5 warp 108",
+  "--poke",
+  "6 stat @player 7 0 7680000",
+  "--poke",
+  "7 stat @player 6 0 7680000",
+  "--poke",
+  "20 goto preset 108 2:394",
+  "--send",
+  "100 InteractWithEntity type=2 id=@2:394"
  ],
  "files": {
   "orig.state.jsonl": {
-   "sha256": "9908db85d50ffcbb2b028a32e283957a073fd90a82fc7604c619d3f976a37c51",
-   "size": 4557357
+   "sha256": "e44906fe910f9c894893c7a10ecefefb5ba9979d74653c4febfb91ebbdabf558",
+   "size": 6103645
   }
  },
  "format": "orig-cache-1",
  "key": {
-  "check": "c4dd07d27e3462f0a4792fc572d4b4b083b7a449a96c306a370596c00bbe309c",
+  "check": "3872c79a7f64954394c3dc9a1859bd53d30c42da881eb48a1edbc45f6bcca0db",
   "format": "orig-cache-key-1",
   "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
   "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
   "recorder": "cbb103980d71fdf823601c8a19f78a163a2e1a371472d6a6bcaf2073735b64e7",
-  "save": "c098d7905cb83f92fe70f1b392b1e08faf1dd04e1f6d9e100a0ca523eaafb1bd"
+  "save": "2f0338e6ea18322ecdef591a41481d0941746cccdf32649f0f1f1505ed003f4a"
  }
 }

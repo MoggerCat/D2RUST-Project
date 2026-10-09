@@ -390,3 +390,32 @@ fn ai_state_is_stored_and_follows_the_mode_set() {
     assert_eq!(ai_state_of(&mut fx, m), 4);
     fx.assert_clean();
 }
+
+/// `0x005B1990` (`ai.md` §5.2 target-node table): a good NPC's
+/// registration (NpcBarb, slot 8) puts it at the head of list 8 and sets
+/// unit +0xD0; the main search's lists then hold it after the host's own
+/// nodes, newest first, and a removed unit leaves its list.
+// Covers: specs/monsters/ai.md §5.2 r5
+#[test]
+fn registered_good_npcs_join_target_list_8_newest_first() {
+    use crate::monsters::ai::{AiSummons, AiTargets};
+    let mut fx = Fx::new();
+    let a = fx.spawn(UnitType::Monster, 0, fx.a, 10, 10);
+    let b = fx.spawn(UnitType::Monster, 0, fx.a, 12, 10);
+    let lists = |fx: &mut Fx| {
+        let s = &mut fx.sim.sys;
+        let v = View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks);
+        v.target_nodes(&fx.game)
+    };
+    for u in [a, b] {
+        let s = &mut fx.sim.sys;
+        let mut v = View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks);
+        assert_eq!(v.target_slot(u), 11);
+        v.register_target_node(&mut fx.game, u, 8);
+        assert_eq!(v.target_slot(u), 8);
+    }
+    assert_eq!(lists(&mut fx)[8], vec![b, a]);
+    assert!(lists(&mut fx)[9].is_empty());
+    fx.game.remove_unit(b).unwrap();
+    assert_eq!(lists(&mut fx)[8], vec![a]);
+}

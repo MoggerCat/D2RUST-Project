@@ -267,7 +267,8 @@ fn the_death_start_cancels_the_pending_think_and_regeneration() {
 /// (without the AI store a think would log a re-entrance error), the
 /// death ends in mode 12 and the monster is still in mode 12 a hundred
 /// frames later. The clean-up's fields (rule 1.2): the overhead freed
-/// (flag 0x100), flags 0x800C cleared, +0xD0 = 11; the room's dead-GUID
+/// (flag 0x100), flags 0x800C cleared, +0xD0 = 11 and the node gone from
+/// its target-node list (`0x005B1A90`); the room's dead-GUID
 /// ring holds the monster (rule 3.1).
 // Covers: specs/sim/units.md §4.6 r1, §4.6 r3
 #[test]
@@ -279,8 +280,9 @@ fn a_killed_monster_with_a_pending_think_stays_dead() {
         let r = fx.sim.sys.units.get_mut(m).unwrap();
         r.hover = Some(1000);
         r.flags |= 0x8000;
-        r.node_index = 3;
+        r.node_index = 8;
     }
+    fx.game.target_nodes.push_front(8, m);
     let f0 = fx.game.frame;
     fx.game
         .schedule_event(m, u32::from(event::AI_THINK), f0 + 15, None, 0, 0)
@@ -295,6 +297,7 @@ fn a_killed_monster_with_a_pending_think_stays_dead() {
     assert_ne!(r.flags & crate::units::record::flags::HOVER_FREED, 0);
     assert_eq!(r.flags & 0x800C, 0);
     assert_eq!(r.node_index, 11);
+    assert!(fx.game.target_nodes.slot(8).is_empty());
     let guid = fx.game.lists.unit(m).unwrap().guid;
     let room = fx.game.lists.room(fx.a).unwrap();
     assert_eq!((room.dead_guids[0], room.dead_next), (guid, 1));
