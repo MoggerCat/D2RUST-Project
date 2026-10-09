@@ -502,6 +502,18 @@ before it; `rng` and `packets` with pokes or frame input are partial on
 channel) rather than a hand-run recipe, and paste the report's first
 lines into the `q-fix-*` row.
 
+- [prov-data] **Monster think in a room with no clients** (q-prov-data,
+  `monsters/ai.md` §1.5, §2, `ai-bodies.md` §9.9 Map AI): after the
+  player warps away (same act, `a4-warp-plains-ama`, warp 105 at frame
+  6), the Fortress NPCs (classes 405, 257, 246; Npc AI `0x005E7130`)
+  think at frame 24 (idle 20 from the frame-4 home think). d2rs runs
+  the map AI (`lo' % 100` and `roll(count)`, 2 draws each) and their
+  seeds change; 1.14d's seeds never change from frame 6 to frame 80.
+  Read `0x005A7F80` / `0x005B1740` / `0x005E7130` for a room-client test
+  (active room +0x78 = 0) that skips the think or the map AI, and what
+  it schedules instead. The same think with a client in the level
+  matches (`a4-fortress-arrival-ama`). Evidence: `traces/checks/a4-warp-plains-ama.check`.
+
 ## Step 5 — spec gaps (107 provisional points no spec states)
 
 `docs/handoff/provisional-index.tsv` rows with `settle_kind` = `unstated`
