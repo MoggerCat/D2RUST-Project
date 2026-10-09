@@ -4,7 +4,7 @@
 use std::path::Path;
 
 use super::compare::{compare, compare_dirs, FactSet, Outcome, Stage};
-use super::export::{draw_rows, frame_rows, ExportContext, FrameState};
+use super::export::{add_cycle_rows, draw_rows, frame_rows, ExportContext, FrameState, Rows};
 use super::*;
 use crate::frames::{FrameAnchor, FramePart, FrameSet, FrameSetKey, FrameStore, IndexFrame};
 use crate::scene::{DrawItem, DrawKey, ItemTag};
@@ -244,6 +244,14 @@ fn store() -> FrameStore {
         FrameSet { frames: vec![tile] },
     )
     .unwrap();
+    let pixel = IndexFrame::new(1, 1, 0, 0, vec![1]).unwrap();
+    s.insert(
+        key("d2rs/weather/pixel", FramePart::Tile(0)),
+        FrameSet {
+            frames: vec![pixel],
+        },
+    )
+    .unwrap();
     s
 }
 
@@ -275,6 +283,7 @@ fn export_rows_invert_placement_and_merge_tile_blocks() {
         frames: &s,
         view_left: Some(5),
         unit_type: &unit_type,
+        sky: &[],
     };
     let rows = draw_rows(&[floor, floor_block, unit, ui], &cx).unwrap();
     let cols: Vec<String> = rows.draws.iter().map(|r| r[..8].join(" ")).collect();
@@ -333,5 +342,236 @@ fn exported_frame_rows_have_every_key_in_order() {
     assert_eq!(
         get("palette_sha256"),
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    );
+}
+
+/// §5 r9: StartDraw first (x = BlankScreen, y = 0), ClearScreen(0) last only
+/// when the plan clears after drawing; rows renumbered; the 1.14d draw log
+/// writes the same cells (`facts_render.py`, a1-town-arrival-ama row 0).
+#[test]
+fn cycle_rows_frame_the_items() {
+    let item = |i: &str| {
+        let mut r = vec!["-".to_owned(); 17];
+        r[0] = i.into();
+        r[1] = "CelDraw".into();
+        r
+    };
+    let mut rows = Rows {
+        draws: vec![item("0"), item("1")],
+        sprites: vec![],
+    };
+    add_cycle_rows(&mut rows, true, false);
+    let ops: Vec<_> = rows
+        .draws
+        .iter()
+        .map(|r| (r[0].as_str(), r[1].as_str()))
+        .collect();
+    assert_eq!(
+        ops,
+        [("0", "StartDraw"), ("1", "CelDraw"), ("2", "CelDraw")]
+    );
+    assert_eq!(
+        rows.draws[0].join("\t"),
+        "0\tStartDraw\t-\t-\t-\t-\t1\t0\t-\t-\t-\t-\t-\t-\t-\t-\t-"
+    );
+    let mut rows = Rows {
+        draws: vec![item("0")],
+        sprites: vec![],
+    };
+    add_cycle_rows(&mut rows, false, true);
+    assert_eq!(rows.draws[0][6], "0");
+    assert_eq!(
+        rows.draws[2].join("\t"),
+        "2\tClearScreen\t-\t-\t-\t-\t0\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-"
+    );
+}
+
+/// §5 r10: pass 9's calls are one row each (`DrawLine` x0, y0, color;
+/// the flash `DrawBox` color 255) where their pixels stood; the pixel
+/// items themselves write no row; with every pixel off-screen the rows
+/// stand before the first later pass, and with no later pass at the end.
+#[test]
+fn sky_calls_replace_their_pixel_items() {
+    use crate::rules::draw_order::weather::SkyDraw;
+    use crate::scene::order::pass;
+    use crate::scene::FrameId;
+    let s = store();
+    let item = |id: u32, p: u32| {
+        let mut i = DrawItem::new(FrameId(id), 0, 0);
+        i.key = DrawKey::new(p, 0, 0, 0).unwrap();
+        i
+    };
+    let line = |x0, y0, color| SkyDraw::Line {
+        x0,
+        y0,
+        x1: x0 + 1,
+        y1: y0 + 5,
+        color,
+        alpha: 127,
+    };
+    let sky = [
+        line(596, 151, 185),
+        line(355, -3, 198),
+        SkyDraw::Flash {
+            x0: 0,
+            y0: 0,
+            x1: 800,
+            y1: 553,
+        },
+    ];
+    let unit_type = |_: u32| None;
+    let cx = ExportContext {
+        frames: &s,
+        view_left: None,
+        unit_type: &unit_type,
+        sky: &sky,
+    };
+    // Item rows by op; call rows with x, y and mode.
+    let rows = |items: &[DrawItem]| -> Vec<String> {
+        draw_rows(items, &cx)
+            .unwrap()
+            .draws
+            .iter()
+            .map(|r| match r[1].as_str() {
+                "DrawLine" | "DrawBox" => format!("{} {} {} {} {}", r[0], r[1], r[6], r[7], r[12]),
+                _ => format!("{} {}", r[0], r[1]),
+            })
+            .collect()
+    };
+    let calls = |at: usize| {
+        vec![
+            format!("{} DrawLine 596 151 185", at),
+            format!("{} DrawLine 355 -3 198", at + 1),
+            format!("{} DrawBox 0 0 255", at + 2),
+        ]
+    };
+    let unit = item(1, pass::WALLS_UNITS);
+    let ui = item(0, pass::UI);
+    // Pixels present: the calls stand where the first pixel was.
+    let pixel = item(3, pass::UNIDENTIFIED_9);
+    let mut want = vec!["0 CelDraw".to_owned()];
+    want.extend(calls(1));
+    want.push("4 CelDraw".into());
+    assert_eq!(rows(&[unit, pixel, pixel, ui]), want);
+    // Every pixel off-screen: the same place, before the first later pass.
+    assert_eq!(rows(&[unit, ui]), want);
+    // No later pass: at the end.
+    let mut want = vec!["0 CelDraw".to_owned()];
+    want.extend(calls(1));
+    assert_eq!(rows(&[unit]), want);
+    // No calls: pixel-free lists are unchanged.
+    let cx = ExportContext { sky: &[], ..cx };
+    assert_eq!(draw_rows(&[unit, ui], &cx).unwrap().draws.len(), 2);
+}
+
+/// §5 r1: the blocks of one tile, each its own frame of the tile's set
+/// with the block's offsets, give one row; the next tile's blocks another.
+#[test]
+fn block_frames_of_one_tile_are_one_row() {
+    use crate::scene::order::pass;
+    let mut s = FrameStore::new();
+    let block = |x_off| IndexFrame::new(32, 15, x_off, 0, vec![1; 32 * 15]).unwrap();
+    s.insert(
+        FrameSetKey::new("x/f.dt1", FramePart::Tile(3)).unwrap(),
+        FrameSet {
+            frames: vec![block(0), block(32), block(64)],
+        },
+    )
+    .unwrap();
+    let ids: Vec<_> = (0..3)
+        .map(|i| {
+            s.id(&FrameSetKey::new("x/f.dt1", FramePart::Tile(3)).unwrap(), i)
+                .unwrap()
+        })
+        .collect();
+    let item = |id, x: i32, tile: (i32, i32)| {
+        let mut i = DrawItem::new(id, x, 40);
+        i.key = DrawKey::new(pass::WALLS_UNITS, 0, 0, 0).unwrap();
+        i.tag = ItemTag::Tile {
+            x: tile.0,
+            y: tile.1,
+        };
+        i
+    };
+    let unit_type = |_: u32| None;
+    let cx = ExportContext {
+        frames: &s,
+        view_left: Some(0),
+        unit_type: &unit_type,
+        sky: &[],
+    };
+    let rows = draw_rows(
+        &[
+            item(ids[0], 100, (1, 1)),
+            item(ids[1], 132, (1, 1)),
+            item(ids[2], 164, (1, 1)),
+            item(ids[0], 260, (2, 1)),
+            item(ids[1], 292, (2, 1)),
+        ],
+        &cx,
+    )
+    .unwrap();
+    let cols: Vec<String> = rows.draws.iter().map(|r| r[..8].join(" ")).collect();
+    assert_eq!(
+        cols,
+        [
+            "0 TileDrawLit x/f.dt1 - 3 ? 100 40",
+            "1 TileDrawLit x/f.dt1 - 3 ? 260 40",
+        ]
+    );
+}
+
+/// §5 r1, r6: a unit's shadow (pass 5) writes no unit row (1.14d's shadow
+/// pass has no unit draw) and names the unit's own cel and its size, not
+/// the derived sheared `#shadow` frame; its X, Y are not measured. The
+/// unit's own run (pass 6) still starts with its unit row.
+#[test]
+fn unit_shadows_name_the_cel_and_write_no_unit_row() {
+    use crate::scene::order::pass;
+    use crate::scene::FrameId;
+    let mut s = store();
+    let sheared = IndexFrame::new(7, 2, -5, 0, vec![1; 14]).unwrap();
+    s.insert(
+        FrameSetKey::new("x/unit.dcc#shadow", FramePart::Dir(3)).unwrap(),
+        FrameSet {
+            frames: vec![sheared],
+        },
+    )
+    .unwrap();
+    let shadow_id = s
+        .id(
+            &FrameSetKey::new("x/unit.dcc#shadow", FramePart::Dir(3)).unwrap(),
+            0,
+        )
+        .unwrap();
+    let mut shadow = DrawItem::new(shadow_id, 40, 50);
+    shadow.key = DrawKey::new(pass::SHADOWS, 0, 0, 0).unwrap();
+    shadow.tag = ItemTag::Unit(9);
+    let mut body = DrawItem::new(FrameId(1), 50, 60);
+    body.key = DrawKey::new(pass::WALLS_UNITS, 0, 0, 0).unwrap();
+    body.tag = ItemTag::Unit(9);
+    let unit_type = |g: u32| (g == 9).then_some(1u8);
+    let cx = ExportContext {
+        frames: &s,
+        view_left: Some(0),
+        unit_type: &unit_type,
+        sky: &[],
+    };
+    let rows = draw_rows(&[shadow, body], &cx).unwrap();
+    let cols: Vec<String> = rows.draws.iter().map(|r| r[..12].join(" ")).collect();
+    assert_eq!(
+        cols,
+        [
+            "0 CelDrawShadow x/unit.dcc 3 0 - ? ? 2 5 3 -2",
+            "1 unit - - - - ? ? - - - -",
+            &format!(
+                "2 CelDraw x/unit.dcc 3 0 - {} {} 2 5 3 -2",
+                rows.draws[2][6], rows.draws[2][7]
+            ),
+        ]
+    );
+    assert_eq!(
+        rows.sprites,
+        [vec!["x/unit.dcc", "3", "0", "2", "5", "3", "-2"]]
     );
 }

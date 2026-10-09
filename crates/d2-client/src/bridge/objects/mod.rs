@@ -132,6 +132,15 @@ impl ObjClientRow {
     pub fn rows(objects: &[d2_data::tables::Objects]) -> Vec<Self> {
         objects.iter().map(Self::from_row).collect()
     }
+
+    /// `data/fixups.md` §13 r2 on a row read from the raw table:
+    /// `FrameCnt` := value << 8 (wrapping), frames in 1/256 units.
+    pub fn frame_counts_fixed(mut self) -> Self {
+        for c in &mut self.frame_cnt {
+            *c = c.wrapping_shl(8);
+        }
+        self
+    }
 }
 
 /// What the client object functions read beside the model.

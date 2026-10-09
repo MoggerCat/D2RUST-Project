@@ -498,6 +498,7 @@ where
                 // Passes 4 and 9 (`draw-order-2.md` §11.6, §11.7) join the
                 // sorted list by their keys.
                 let sky = source.source.sky_items(&source.sky, assets)?;
+                frame.sky = source.sky.sky.clone();
                 if !sky.is_empty() {
                     frame.items.extend(sky);
                     crate::scene::order(&mut frame.items);

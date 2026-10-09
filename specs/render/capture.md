@@ -1,7 +1,10 @@
 # Spec: Render — Frame capture from 1.14d (design of link 1)
 
 - **Status:** draft (2026-10-06). Recorder `tools/trace-recorder/record_frames.py`
-  0.2.0 writes `frames-raw-2` (§5); `--selftest` passes (PNG round trip,
+  0.3.0 writes `frames-raw-3` (§5; first run 2026-10-08 under Wine, q-cloud-game:
+  134 of 134 tile draws named their DT1 file and index, 50 of 53 cel draws
+  their cel header, every checked DC6 header equal to the file's frame
+  header); `--selftest` passes (PNG round trip,
   hash sensitivity, 13 state fields each follow exactly their source bytes,
   stability counts only repeated keys and reports exactly the changed key).
   Two `frames-raw-1` runs (2026-10-06, 15,934 in-game frames) confirmed the
@@ -21,24 +24,24 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 44–54 |
-| Inputs | 55–62 |
-| Outputs / state changes | 63–68 |
-| Rules | 69–70 |
-|   1. Configuration | 71–77 |
-|   2. Hooks | 78–92 |
-|   3. What is read | 93–268 |
-|   4. Tie to ticks | 269–281 |
-|   5. Raw format `frames-raw-2` | 282–305 |
-|   6. Hashes and the comparison | 306–327 |
-|   7. Stability first | 328–365 |
-|   8. Capture cases | 366–381 |
-| Constants & data dependencies | 382–386 |
-| Randomness | 387–393 |
-| Edge cases & original bugs | 394–405 |
-| Test vectors | 406–416 |
-| Provenance | 417–436 |
-| Open questions | 437–495 |
+| Summary | 47–57 |
+| Inputs | 58–65 |
+| Outputs / state changes | 66–71 |
+| Rules | 72–73 |
+|   1. Configuration | 74–80 |
+|   2. Hooks | 81–97 |
+|   3. What is read | 98–293 |
+|   4. Tie to ticks | 294–306 |
+|   5. Raw format `frames-raw-2` (and `frames-raw-3`) | 307–338 |
+|   6. Hashes and the comparison | 339–360 |
+|   7. Stability first | 361–398 |
+|   8. Capture cases | 399–414 |
+| Constants & data dependencies | 415–419 |
+| Randomness | 420–426 |
+| Edge cases & original bugs | 427–438 |
+| Test vectors | 439–449 |
+| Provenance | 450–469 |
+| Open questions | 470–527 |
 <!-- /index -->
 
 ## Summary
@@ -84,6 +87,8 @@ are logged as refused, never captured.
 | cel file loaded | `0x00478946` in the loader `0x004788B0` (`8B 45 FC`) | after each cel file load by path | path at `EBP − 0x108`, cel file pointer `[EBP − 4]` (§3.6) |
 | unit draw | `0x00471EC0` entry (`55 8B EC 83 EC 70`) | selected frames only | §3.5 |
 | draw calls | the D2GFX wrappers of §3.5 (`55 8B EC`) | selected frames only | §3.5 |
+| cel rasterizer (raw-3) | `0x006014C0` entry (`55 8B EC 51 8B 4D 08`), stdcall, `[ESP+4]` = cel context | selected frames only | the cel the call draws: context `+0x3C` (§3.5) |
+| component path (raw-3) | in `0x005FE610` right after the path `sprintf`: `0x005FE77C` (`.dcc`, `83 4E 44 01`) and `0x005FE7A8` (`.dc6`, `B8 01 00 00 00`) | every component file path built | path at `EBX`, composed name at `[EBP+8]` (§3.6) |
 
 A frame start without a frame end exists: when `0x004F6070` returns
 non-zero the in-game draw jumps to `0x0044CB4F` without drawing; the next
@@ -244,9 +249,23 @@ wrappers (stdcall, all arguments on the stack; slot names from D2MOO
   layout with the tile count at `+0x10C` and the tile array pointer at
   `+0x110`, tiles 0x60 bytes each (`0x00609E90`). So a drawn header `t`
   belongs to the record whose library satisfies `tiles ≤ t < tiles +
-  0x60 × count`, tile index `(t − tiles) / 0x60` (recorder 0.2.0 does
-  not resolve it yet: Open question 3). Which tile list each call serves follows from the
+  0x60 × count`, tile index `(t − tiles) / 0x60` (resolved by recorder 0.3.0,
+  raw-3: `dt1`, `index`). Which tile list each call serves follows from the
   call site (`camera.md` §6; order: `draw-order.md`).
+- **Cel header** (raw-3): every software cel draw reaches the common
+  rasterizer `0x006014C0` (`sprite-placement.md` §1) with the cel context
+  as its first stack argument; the rasterizer reads the cel it draws from
+  context `+0x3C` (orientation word `+0x00`, w `+0x04`, h `+0x08`, xoff
+  `+0x0C`, yoff `+0x10`: the `dc6.md` §Frame layout). The recorder reads
+  those five values there and attaches them to the cel op just logged when
+  the context pointer is the same; any other rasterizer call is counted in
+  the frame's `raster_other`. A cel op with no rasterizer call (nothing to
+  draw, e.g. an empty component, or a wrapper that does not reach it,
+  `CelDrawEx` in the first run) has no header.
+- **DT1 file and tile index** (raw-3): at the frame's first tile draw the
+  recorder reads the loaded-DT1 list above once (path, tile array, count
+  per record); each tile draw's header pointer gives `dt1` (the path as
+  passed) and `index`, or both `null` when no library contains it.
 - **Cel context** (0x48 bytes, built by `0x004DBB50` / `0x004DB7B0` for
   units, by the caller for UI): recorded raw, plus frame `+0x00`, cel file
   pointer `+0x34`, direction `+0x40` and the 4-byte tokens at `+0x18`,
@@ -264,7 +283,13 @@ and primitive draws, named through §3.6.
 Every load through `0x004788B0` (UI and cursor files, 69 call sites)
 emits a `celfile` record: full path (as built: base, name, extension) and
 the cel file pointer, so cel contexts in the draw log name their file.
-Unit component files load elsewhere (Open question 4).
+Unit component files load elsewhere (Open question 4, answered): from raw-3
+every component path built by `0x005FE610` (`unit-composite.md` §6 r1–r2)
+emits `{"k": "compfile", "name", "path"}` (name as composed, path with
+`.dcc` or `.dc6`). A component cel context has a null `+0x34`; its five
+tokens `+0x18`–`+0x28` (unit, component, armor class, mode, weapon class)
+compose the same name (each token up to 3 characters, to the first
+space), which names its `compfile` record.
 
 ### 4. Tie to ticks
 
@@ -279,7 +304,7 @@ frames. Frames are therefore numbered by the recorder's own sequence
 `seq` (1, 2, … per captured frame), never by the draw counter. Every frame
 carries its own tick and state, so skipped draws lose no comparison.
 
-### 5. Raw format `frames-raw-2`
+### 5. Raw format `frames-raw-2` (and `frames-raw-3`)
 
 JSON lines, in this order: header `{"k": "header", "format":
 "frames-raw-2", "tool", "date", "game_exe_sha256", "args", ...}`; then
@@ -302,6 +327,14 @@ the draw counter, so 56 images of run 1 and 18 of run 2 were overwritten);
 the `capture` record; fields `seq`, `client_update`, `level`, `cursor`,
 `cursor_key`, `seed_start`, `seed_end`, `light`, `light_key`, `weather`,
 `draws`; `celfile` records. A raw-1 reader must refuse raw-2 and back.
+
+Changes from `frames-raw-2` to `frames-raw-3` (record_frames 0.3.0; every
+raw-2 field kept, so a raw-3 reader also reads raw-2 with these fields
+absent): `compfile` records (§3.6); in a cel draw's `cel`, `ctx` (the
+context pointer, hex) and `hdr` `{"flip", "w", "h", "xoff", "yoff"}` (§3.5
+cel header); in a tile draw's `tile`, `dt1` and `index` (§3.5); per frame
+with a draw log, `raster_other`; the frame's `player` gains `dir` (path
+`+0x64`, the direction byte of §3.5).
 
 ### 6. Hashes and the comparison
 
@@ -451,8 +484,7 @@ re-hashing and diffing the PNG indices. Recorder design follows
    recorder maps it through the room's 32 library slots (room +0x68): the
    slot whose file's tile array (+0x110, count +0x10C) contains it. Also
    §3.5 (the loaded-library list `[0x008ADBB4]`, file path per record).
-   The recorder does not do the lookup yet (`record_frames.py` change,
-   then a run).
+   Done in `record_frames.py` 0.3.0 (`frames-raw-3`, §3.5).
 4. Where unit component cel files load (not through `0x004788B0`): the
    composite path `0x004DB7B0` → `0x004DA720` (`unit-composite.md`); a
    `celfile`-style hook there names the DCC files.
