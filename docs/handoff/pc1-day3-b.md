@@ -69,6 +69,18 @@ REC block REC-815..829. Items from the PC1-B prompt (2026-10-09).
     queued server mode message. N is the same either way; a whirl whose
     arrival is not on a multiple of 4 would decide it.
 
+## Item 41 — skill button state `0x004A8D30` (answered, round 2)
+
+- `0x004A8D30(P, skill)` runs the use check `0x004D9FC0(P, skill)` → u.
+  The state is 0 when u = 0 (usable), 4 when u = 6 (aura), and 1 for any
+  other u.
+- The caller `0x00496BE0` (`0x00496C24`–`0x00496C42`) forces state 1
+  when the skills.txt row lacks `InTown` (byte +5 & `[0x006CE268]`, mask
+  1) and P's room is a town.
+- Spec: `ui/control-panel.md` §7 r2 (REC-720 settled).
+- d2rs differs (it draws the plain cel): new row
+  `q-fix-b41-skill-button-state`.
+
 ## Left / next
 
 - Pending: any new Step 4 items tagged `[combat-a1]`, `[skills-1]` or
