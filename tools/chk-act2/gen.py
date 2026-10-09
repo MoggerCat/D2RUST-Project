@@ -65,28 +65,38 @@ def quest_checks():
     # Q4 Arcane Sanctuary (slot 12): Drognan 373, Jerhyn 377, journal (object 357), msg 396
     t1, f = talk(14, 177, msgs=[373]); t2, f2 = talk(f + 4, 201, msgs=[377])
     C["a2-quest-arcane"] = mk("a2-quest-arcane", "Quest 12 Arcane Sanctuary (s6): Drognan 373, Jerhyn 377, warp to the Palace Cellar (52),\noperate Horazon's journal (object 357) and msg 396 (the portal).", f2 + 80,
-        ["at 4 poke goto unit 1:177"] + t1 + [f"at {f+2} poke goto unit 1:201"] + t2 + [f"at {f2+2} poke warp 52", f"at {f2+6} poke goto unit 2:357", f"at {f2+40} send InteractWithEntity type=2 id=@2:357", f"at {f2+46} send QuestMessage npc=@2:357 msg=396"], Q(" 11.0"))
+        ["at 4 poke goto unit 1:177"] + t1 + [f"at {f+2} poke goto unit 1:201"] + t2 + [f"at {f2+2} poke warp 52", f"at {f2+6} poke goto unit 2:357", f"at {f2+40} send InteractWithEntity type=2 id=@2:357", f"at {f2+46} send QuestMessage npc=@2:357 msg=396"], Q(" --quests 11.0"))
     # Q5 Summoner (slot 13): Arcane 74, kill Summoner 250
     k, f = kill(14, 250)
-    C["a2-quest-summoner"] = mk("a2-quest-summoner", "Quest 13 The Summoner (s7): warp to the Arcane Sanctuary (74), kill the Summoner by poke.", f + 20, ["at 4 poke warp 74"] + [x.replace("at 14 ", "at 14 ") for x in k], Q(" 12.0"))
+    C["a2-quest-summoner"] = mk("a2-quest-summoner", "Quest 13 The Summoner (s7): warp to the Arcane Sanctuary (74), kill the Summoner by poke.", f + 20, ["at 4 poke warp 74"] + [x.replace("at 14 ", "at 14 ") for x in k], Q(" --quests 12.0"))
     # Q6 Seven Tombs (slot 14): Jerhyn 430, orifice 152, Duriel 211, Tyrael 251 msg 302, Jerhyn 442, Meshif 450
     t1, f = talk(14, 201, msgs=[430])
     k, fk = kill(f + 50, 211)
     t2, f2 = talk(fk + 20, 251, msgs=[302]); t3, f3 = talk(f2 + 20, 201, msgs=[442]); t4, f4 = talk(f3 + 20, 210, msgs=[450])
     C["a2-quest-tombs"] = mk("a2-quest-tombs", "Quest 14 The Seven Tombs (s8.11): Jerhyn 430, kill Duriel (73) by poke, Tyrael 302, Jerhyn 442, Meshif 450.", f4 + 30,
-        ["at 4 poke goto unit 1:201"] + t1 + [f"at {f+10} poke warp 73"] + k + [f"at {fk+4} poke goto unit 1:251"] + t2 + [f"at {f2+4} poke warp 40", f"at {f2+8} poke goto unit 1:201"] + t3 + [f"at {f3+4} poke goto unit 1:210"] + t4, Q(" 13.0"))
+        ["at 4 poke goto unit 1:201"] + t1 + [f"at {f+10} poke warp 73"] + k + [f"at {fk+4} poke goto unit 1:251"] + t2 + [f"at {f2+4} poke warp 40", f"at {f2+8} poke goto unit 1:201"] + t3 + [f"at {f3+4} poke goto unit 1:210"] + t4, Q(" --quests 13.0"))
     return C
 WPS = [(40, 156), (42, 156), (43, 156), (44, 156), (46, 402), (48, 323), (52, 288), (57, 288), (74, 288)]
-SUPERS = [(12, 61, "fangskin"), (13, 43, "beetleburst"), (14, 46, "leatherarm"), (15, 64, "coldworm"), (16, 54, "fireeye"), (17, 44, "darkelder")]
+SUPERS = [(12, 61, "fangskin", 75), (13, 43, "beetleburst", 92), (14, 46, "leatherarm", 97), (15, 64, "coldworm", 284), (16, 54, "fireeye", 31), (17, 44, "darkelder", 9)]
+# spawn offsets tried per superunique (a failed attempt is harmless; the first that works is the one killed),
+# and the GUIDs the 1.14d poke record gave (fixed seed): tools/chk-act2/super-guids.json
+OFFS = {"fangskin": [("+4", "+4"), ("-4", "+4"), ("+4", "-4"), ("-4", "-4"), ("+8", "+8"), ("-8", "-8"), ("+10", "+0"), ("+0", "+10"), ("-10", "+0"), ("+0", "-10")],
+        "fireeye": [("+4", "+4"), ("-4", "+4"), ("+4", "-4"), ("-4", "-4"), ("+8", "+8"), ("-8", "-8"), ("+10", "+0"), ("+0", "+10"), ("-10", "+0"), ("+0", "-10")]}
+try:
+    import json as _j
+    GUIDS = _j.load(open(os.path.join(os.path.dirname(__file__), "super-guids.json")))
+except OSError:
+    GUIDS = {}
 def other_checks():
     C = {}
     for lvl, cls in WPS:
         C[f"a2-wp-{lvl}"] = mk(f"a2-wp-{lvl}", f"Act II waypoint on level {lvl} (object {cls}): warp, operate (0x13 type 2), open menu; take the waypoint to level 40 (0x49).", 50,
             [f"at 4 poke warp {lvl}", f"at 8 poke goto unit 2:{cls}", f"at 24 send InteractWithEntity type=2 id=@2:{cls}", f"at 30 send TakeOrCloseWp wp=@2:{cls} level=40"] if lvl != 40 else
             [f"at 4 poke goto unit 2:{cls}", f"at 24 send InteractWithEntity type=2 id=@2:{cls}", f"at 30 send TakeOrCloseWp wp=@2:{cls} level=42"], f"save ScnAm2 --class ama --expansion --act 1 --quests acts=1 --waypoints all")
-    for row, lvl, nm in SUPERS:
+    for row, lvl, nm, cls in SUPERS:
         C[f"a2-super-{nm}"] = mk(f"a2-super-{nm}", f"Act II superunique {nm} (superuniques row {row}): warp {lvl}, spawn beside the player, kill it by poke; the state channel carries minions and drops.", 120,
-            [f"at 4 poke warp {lvl}", f"at 10 poke superunique {row} @x+6 @y", "at 30 poke goto unit 1:0" if False else "at 30 poke missile 58 @x @y @x+6 @y"])
+            [f"at 4 poke warp {lvl}"] + [f"at {10+i+(40 if nm in ("fangskin", "fireeye") else 0)} poke superunique {row} @x{dx} @y{dy}".replace("+0", "") for i, (dx, dy) in enumerate(OFFS.get(nm, [("+4", "+4")]))] +
+            ([f"at 30 poke pos 1/{GUIDS[nm]} @x+3 @y", f"at 32 poke stat 1/{GUIDS[nm]} 6 0 256", "at 34 poke missile 58 @x @y @x+3 @y"] if nm in GUIDS else []))
     C["a2-npc-fara-heal"] = mk("a2-npc-fara-heal", "Fara (178) heals: life set low by poke, then the interaction (npc.md s8 services).", 50,
         ["at 4 poke goto unit 1:178", "at 8 poke stat @player 6 0 5120", "at 14 send InteractWithEntity type=1 id=@1:178", "at 16 send InitEntityChat id=@1:178", "at 20 send TerminateEntityChat id=@1:178"])
     C["a2-npc-greiz-hire"] = mk("a2-npc-greiz-hire", "Greiz (198) hires a Rogue-class mercenary of act 2 (0x36 after the hire list 0x38 action 3).", 60,

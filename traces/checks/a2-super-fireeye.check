@@ -7,5 +7,13 @@ ticks 120
 seconds 600
 channels state packets
 at 4 poke warp 54
-at 10 poke superunique 16 @x+6 @y
-at 30 poke missile 58 @x @y @x+6 @y
+at 50 poke superunique 16 @x+4 @y+4
+at 51 poke superunique 16 @x-4 @y+4
+at 52 poke superunique 16 @x+4 @y-4
+at 53 poke superunique 16 @x-4 @y-4
+at 54 poke superunique 16 @x+8 @y+8
+at 55 poke superunique 16 @x-8 @y-8
+at 56 poke superunique 16 @x+10 @y
+at 57 poke superunique 16 @x @y+10
+at 58 poke superunique 16 @x-10 @y
+at 59 poke superunique 16 @x @y-10

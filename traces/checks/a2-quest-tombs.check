@@ -1,7 +1,7 @@
 check 1
 # Quest 14 The Seven Tombs (s8.11): Jerhyn 430, kill Duriel (73) by poke, Tyrael 302, Jerhyn 442, Meshif 450.
 name a2-quest-tombs
-save ScnAm2 --class ama --expansion --act 1 --quests acts=1 13.0
+save ScnAm2 --class ama --expansion --act 1 --quests acts=1 --quests 13.0
 seed 1234
 ticks 228
 seconds 600

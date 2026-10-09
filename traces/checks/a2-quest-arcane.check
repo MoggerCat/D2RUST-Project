@@ -2,7 +2,7 @@ check 1
 # Quest 12 Arcane Sanctuary (s6): Drognan 373, Jerhyn 377, warp to the Palace Cellar (52),
 # operate Horazon's journal (object 357) and msg 396 (the portal).
 name a2-quest-arcane
-save ScnAm2 --class ama --expansion --act 1 --quests acts=1 11.0
+save ScnAm2 --class ama --expansion --act 1 --quests acts=1 --quests 11.0
 seed 1234
 ticks 114
 seconds 600
