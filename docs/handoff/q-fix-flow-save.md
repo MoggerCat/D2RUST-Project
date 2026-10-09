@@ -156,6 +156,19 @@ Branch `claude/q-fix-flow-save` (from `claude/q-tick-flow`, merged with
   step 5, which the fixture's empty answer turned into the fatal
   `NoMouseSkill` (three swap tests).
 
+- `q-fix-save-tool-appearance` (F10), the tool half: `d2-server`
+  `character::save::equipment_of_save` builds the appearance inputs from
+  a save's own items (read as the load reads them; the weapon in use from
+  the load's body links, §11.5 r1; weapon class REC-291 (5)).
+  `d2s-tool resave` rebuilds +0x88..+0xA7 with it (no more "kept" note;
+  a note only when an item does not read back); `save::appearance_of`.
+  Checks: `play_smoke::the_live_run` asserts the file's own rebuild equals
+  the running game's (both paths agree on the five-act install);
+  `d2s-tool` `resave_rebuilds_the_appearance_of_an_equipped_weapon`
+  (synthetic: `blad` is not under `weap` in that fixture, so the sword is
+  the left-hand owner, LH); queued real-save check
+  `real_saves_appearance_rebuilds_to_the_files_bytes` (HANDOFF §5).
+
 ## Open
 
 - The save's inventory flag bit 1 clear (`inventory-moves.md` §6.1 r4).

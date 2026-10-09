@@ -1522,6 +1522,24 @@ fn the_live_run() {
     let mut want = [0xFF; 16];
     want[d2_formats::d2s::appearance::part::RH] = 4;
     assert_eq!(saved.header.components, want, "appearance components");
+    // The file alone gives the same bytes (`d2s-tool resave`'s path,
+    // `equipment_of_save`: the load's reading of the items and its
+    // weapon-in-use links) as the running game's rebuild.
+    {
+        let tables = live.tables.item_tables().unwrap();
+        let a = d2_client::app::save::appearance_tables(&live.tables.fixed).unwrap();
+        let items = &saved.body.as_ref().unwrap().items;
+        let eq = d2_server::adapters::character::save::equipment_of_save(items, &tables, &a)
+            .expect("the saved items read back");
+        let mut again = (**saved).clone();
+        again.header.components = [1; 16];
+        again.header.rebuild_appearance(&eq, &a);
+        assert_eq!(
+            (again.header.components, again.header.colours),
+            (saved.header.components, saved.header.colours),
+            "the file's own rebuild"
+        );
+    }
     assert_eq!(saved.header.colours, [0xFF; 16], "appearance colours");
     assert_eq!(
         single_player::game_seed(&character, None),
