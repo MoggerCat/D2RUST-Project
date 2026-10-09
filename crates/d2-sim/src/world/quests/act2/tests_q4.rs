@@ -327,6 +327,13 @@ fn jerhyn_leaving_town() {
     ctl.records[i].extra.a2.q4.jerhyn_guid = JERHYN_U.0;
     level(&mut ctl, &mut f, i, 41, 40);
     assert!(f.log.is_empty() && x4(&ctl, i).jerhyn_start);
+    // PROVISIONAL (REC-1405): town -> Arcane Sanctuary (74) keeps him
+    // (a2-warp-arcane-ama: present on 1.14d to frame 143).
+    let (mut ctl, mut f, i) = setup();
+    ctl.records[i].extra.a2.q4.jerhyn_start = true;
+    ctl.records[i].extra.a2.q4.jerhyn_guid = JERHYN_U.0;
+    level(&mut ctl, &mut f, i, 40, 74);
+    assert!(!f.log.iter().any(|l| l.starts_with("remove unit")) && x4(&ctl, i).jerhyn_start);
 }
 
 /// The harem blocker at (50, 60) in R9, created (+0x11, +0x38).
