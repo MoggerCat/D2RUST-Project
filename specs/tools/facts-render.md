@@ -23,18 +23,18 @@
 | Outputs / state changes | 59–65 |
 | Rules | 66–67 |
 |   1. Files and header | 68–89 |
-|   2. `draws.tsv` | 90–133 |
-|   3. `frame.tsv` | 134–166 |
-|   4. `sprites.tsv` | 167–182 |
-|   5. d2rs export | 183–290 |
-|   6. Comparison | 291–313 |
-|   7. Requests | 314–325 |
-| Constants & data dependencies | 326–329 |
-| Randomness | 330–333 |
-| Edge cases & original bugs | 334–341 |
-| Test vectors | 342–350 |
-| Provenance | 351–355 |
-| Open questions | 356–370 |
+|   2. `draws.tsv` | 90–136 |
+|   3. `frame.tsv` | 137–169 |
+|   4. `sprites.tsv` | 170–189 |
+|   5. d2rs export | 190–297 |
+|   6. Comparison | 298–320 |
+|   7. Requests | 321–332 |
+| Constants & data dependencies | 333–336 |
+| Randomness | 337–340 |
+| Edge cases & original bugs | 341–348 |
+| Test vectors | 349–357 |
+| Provenance | 358–362 |
+| Open questions | 363–377 |
 <!-- /index -->
 
 ## Summary
@@ -117,8 +117,11 @@ frame record's `draws`, `capture.md` §3.5; d2rs: §5).
    question 3), `dir` = `-`, `tile` = `orientation.main.sub.rarity` of
    the tile header, `x`, `y` = the X, Y arguments, `w h xoff yoff` = `-`,
    `mode` = the alpha argument for `TileDrawTrans` else `-`, `light` =
-   the light digest the recorder logged (16 hex digits, no `0x`), `pal` =
-   `-`.
+   the light digest the recorder logged (16 hex digits, no `0x`), or `?`
+   when the converter runs with `--tile-light unknown` (the scene
+   recordings of `tools/cloud-game/scenes.py` do: the 768-byte floor light
+   read differs between two runs of the same frame, bytes the game does
+   not set; `docs/handoff/q-facts-scenes.md` finding 1), `pal` = `-`.
 5. `unit`: `unit` = `type:guid` of the unit (decimal), `x`, `y` = the
    first two stack arguments (client x, y), `light` = EDX as hex; every
    other column `-`.
@@ -179,6 +182,10 @@ then numbers), no duplicates.
 2. Two producers' rows for the same key must be equal; the 1.14d file
    merges every scene, so a key present twice with different values is
    an error of the producer.
+3. Two branches' 1.14d sprite tables are joined with the converter,
+   never by hand: `facts_render.py --merge-sprites A.tsv B.tsv` writes
+   their union by r2 (a key with two different rows is an error and
+   nothing is written); its command line goes in the header.
 
 ### 5. d2rs export
 
