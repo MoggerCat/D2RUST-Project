@@ -9,16 +9,18 @@
 //! §2 r1 ([`ItemsUi::tint_colors`]). Read for the requirement check:
 //! strength, dexterity and level from the tables (REC-242, requirement stat
 //! modifiers not applied). Not read: the shooter / quiver term of §6 r4,
-//! `0x004C2240`, `0x0062A4E0`, the quest-item term of §3 r3, the
-//! transmogrify cursor (state 8), and the placement tint for a cursor
-//! item (§4); with an item on the cursor nothing is hovered.
+//! `0x004C2240`, `0x0062A4E0`, the quest-item term of §3 r3 and the
+//! transmogrify cursor (state 8); with an item on the cursor nothing is
+//! hovered, and [`ItemsUi::draw_placement_tint`] paints §4 instead.
 
 use super::super::draw::{RectRequest, UiDraw, UiDrawSink};
 use super::super::geom::{Point, Rect};
 use super::super::inv_grid::{
-    equip_item_tint, grid_item_tint, hovered_tint, EquipItemFacts, GridItemFacts, GridRecord, Tint,
+    equip_item_tint, grid_item_tint, hovered_tint, placement_tint, EquipItemFacts, GridItemFacts,
+    GridRecord, Placement, Tint, Under,
 };
 use super::inv_items::{InvLayout, ItemsUi};
+use super::UiFiles;
 use crate::bridge::items::{self, mode, ItemView};
 use crate::bridge::world::ClientWorld;
 
@@ -147,5 +149,82 @@ impl ItemsUi {
             }
             _ => Vec::new(),
         }
+    }
+
+    /// PROVISIONAL (REC-721). The placement tint of `inventory.md` §4 for the cursor item over
+    /// grid `g` (page `page`): drawn when the kept cursor cell is >= 0 and
+    /// hover-in-grid is set (r2), not with the mouse at or below
+    /// `screen_h - 0x27`; tint 1 over the footprint when it fits, else
+    /// 0 / 3 by r3 (the item under: the single overlap, or a cube of
+    /// several). The mode 1 / 0x13 half-screen test of r2 is the
+    /// inventory panel's and not read here.
+    pub fn draw_placement_tint(
+        &self,
+        world: &ClientWorld,
+        files: &UiFiles,
+        g: &GridRecord,
+        page: u8,
+        mouse: Point,
+        screen_h: i32,
+        out: &mut dyn UiDrawSink,
+    ) {
+        let (Some(colors), Some(cur)) = (self.tint_colors, items::cursor_item(world)) else {
+            return;
+        };
+        let h = self.hover.get();
+        let (c, r) = h.cursor_cell;
+        if c < 0 || r < 0 || !h.in_grid || mouse.y >= screen_h - 0x27 || !g.contains_mouse(mouse) {
+            return;
+        }
+        let cell = (i32::from(g.cell_w), i32::from(g.cell_h));
+        let size = |i: &ItemView| {
+            self.art.get(i.code.unwrap_or([0; 4])).map_or((1, 1), |a| {
+                (i32::from(a.inv_w.max(1)), i32::from(a.inv_h.max(1)))
+            })
+        };
+        let (w, hh) = self.art(files, &cur, cell).map_or((1, 1), |a| (a.w, a.h));
+        let overlap: Vec<(ItemView, i32, i32)> = items::local_items(world)
+            .into_iter()
+            .filter(|i| i.mode == mode::STORED && i.page == page)
+            .filter_map(|i| {
+                let (iw, ih) = size(&i);
+                let (x, y) = (i32::from(i.x), i32::from(i.y));
+                (x < c + w && c < x + iw && y < r + hh && r < y + ih).then_some((i, iw, ih))
+            })
+            .collect();
+        let fits =
+            c + w <= i32::from(g.grid_x) && r + hh <= i32::from(g.grid_y) && overlap.is_empty();
+        let n = overlap.len();
+        let under = match n {
+            0 => None,
+            1 => Some(&overlap[0]),
+            _ => overlap.iter().find(|(i, ..)| i.code == Some(*b"box ")),
+        };
+        let p = placement_tint(
+            fits,
+            under.map(|(i, ..)| Under {
+                swap_ok: n == 1,
+                is_cube: i.code == Some(*b"box "),
+            }),
+        );
+        let (t, rect) = match (p, under) {
+            (Placement::Footprint(t), _) => {
+                let (x, y, cw, ch) = g.cell(c, r);
+                (t, Rect::new(x, y, (cw * w) as u16, (ch * hh) as u16))
+            }
+            (Placement::OverItem(t), Some((i, iw, ih))) => {
+                let (x, y, cw, ch) = g.cell(i32::from(i.x), i32::from(i.y));
+                (t, Rect::new(x, y, (cw * iw) as u16, (ch * ih) as u16))
+            }
+            _ => return,
+        };
+        out.push(UiDraw::Rect(RectRequest::sized(
+            rect.x,
+            rect.y,
+            i32::from(rect.w),
+            i32::from(rect.h),
+            colors[t as usize],
+            TINT_MODE,
+        )));
     }
 }
