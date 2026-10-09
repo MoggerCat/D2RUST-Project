@@ -53,12 +53,22 @@ python3 tools/soak/soak.py campaign --minutes 60 --out target/soak/camp --no-red
 python3 tools/soak/soak.py reduce target/soak/camp/logs/town1-3.log --sig room:outside:Item --out target/soak/camp
 ```
 
+## Round trips at every start and checkpoint
+
+`python3 tools/checkpoints/make.py && python3 tools/soak/soak.py roundtrip`
+(2026-10-09, 13 starts + 14 checkpoints): with no input every one
+round-trips twice with no difference; after random play 6 of the 14
+checkpoints differ, all from q-fix-soak-cursor-reload (an item on the
+cursor at Save and Exit). The belt gap (q-fix-soak-belt-model) shows on
+every checkpoint's belt too.
+
 ## Findings (rows in `build-queue.tsv`)
 
 | Row | What | Repro |
 |---|---|---|
 | q-fix-soak-belt-model | a new character's 4 belt potions are on the server, never in the model | `tools/soak/repro/desync-belt-model.log`, no input |
-| q-fix-soak-cursor-reload | an item saved on the cursor is reloaded into the inventory (`d2s.md` §8: back to the cursor) | `tools/soak/repro/roundtrip-item-place.log`, 2 lines |
+| q-fix-soak-cursor-reload | an item saved on the cursor is reloaded into the inventory (`d2s.md` §8: back to the cursor), or lost when its old cell is taken | `tools/soak/repro/roundtrip-item-place.log`, 2 lines; `roundtrip-item-lost.log` (a1-andariel checkpoint), 4 lines |
+| q-fix-soak-drop-room | a dropped item lies 2 sub-tiles outside the room it is linked to | `tools/soak/repro/drop-outside-room.log`, 9 lines |
 | q-fix-soak-static-leave-room | a static unit leaving its room keeps it (pick-up; the old act's ground items after an act change, whose room ids the new act reuses) | `tools/soak/repro/static-room-after-pickup.log`, 1 line |
 
 Withdrawn (tool errors, fixed in the tool): the player-position desync

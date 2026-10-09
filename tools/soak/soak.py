@@ -41,7 +41,10 @@ FORMAT = "soak-log 1"
 # Starts (spec §1 r2): name -> (save args for d2s-tool new, or None for a
 # fresh `--new` character; soak options).
 SAVE_BASE = ["--class", "sor", "--expansion", "--level", "30", "--waypoints", "all",
-             "--stat", "8=128000", "--stat", "9=128000", "--difficulty", "normal"]
+             "--stat", "8=128000", "--stat", "9=128000", "--difficulty", "normal",
+             # fixed seeds and times: the same start gives the same bytes
+             # (the committed repro logs name these saves)
+             "--seed", "1", "--map-seed", "1", "--time", "0x60000000"]
 STARTS = {
     "new-sor": (None, ["--new", "sorceress"]),
     "new-bar": (None, ["--new", "barbarian"]),

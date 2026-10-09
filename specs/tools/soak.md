@@ -37,7 +37,7 @@ still finds it.
 
 The report: one JSON line per finding `{kind, sig, step, frame, detail}`
 and a summary line `{summary, steps, server_frame, actions, refused,
-findings, wall_s}`; the input log (`--log-out`, flushed per line). Exit 0
+roundtrips, exits, findings, wall_s}`; the input log (`--log-out`, flushed per line). Exit 0
 no finding, 1 findings. The soak changes no game rule; the start pokes
 are the poke tool's.
 
@@ -75,6 +75,9 @@ are the poke tool's.
    queues them, the bridge's `interact`, or the C→S intents the client's
    panels send (`bridge::items`). A client refusal (bridge error) is
    counted (`refused`), not a finding.
+6. A Save and Exit the input reaches (the Esc menu's button) ends the
+   game as `play` ends it; the run goes on in the character reloaded
+   from that save (`exits` in the summary).
 
 ### 2. The input log `soak-log 1`
 
@@ -134,17 +137,23 @@ naming a unit the model does not hold is refused (rule 1.5).
 
 ### 5. Save/load round trip
 
-At each milestone of a scripted run (the join, after moving items, after
-a waypoint, after a level warp, after spending points) and from each act
-save: Save and Exit through the server's leave, read the `.d2s`, join
-again from it, compare the full state (header, stats, skills, waypoints,
+Where: `--roundtrip-at` steps of any run (a `roundtrip` log line), and
+`soak.py roundtrip` at every start and every checkpoint save
+(`tools/checkpoints/make.py`, `specs/tools/checkpoints.md`): once with
+no input (round trips at frames 30 and 80) and once after random input
+(at 300, 600, 900). For each: Esc (the pause), read the live state,
+Save and Exit through the server's leave, read the `.d2s`, join again
+from it, compare the full state (header, stats, skills, waypoints,
 quests, mercenary, items with their bytes and places: inventory, stash,
-cube, belt, body, corpse) and the `.d2s` bytes of a second save made
-right after the reload (save time and checksum excluded; `d2s.md` §8.2
-rule 7's load-cleared 0x2000 flag and `d2s-load.md` §9 r4's full stamina
-after a load are the spec's, not differences). Life and mana (stats 6
-and 8) regenerate during the reloaded game's join frames, before the
-comparison can pause it: a rise compares equal, a loss is a difference.
+cube, belt, body, corpse) and the `.d2s` of a second save made right
+after the reload, field by field. Save time and checksum are excluded;
+`d2s.md` §8.2 rule 7's load-cleared 0x2000 flag and `d2s-load.md` §9
+r4's full stamina after a load are the spec's, not differences; the
+status compares as saved (the live status with the game's status bits
+ORed in). Life and mana (stats 6 and 8) regenerate during the reloaded
+game's join frames, before the comparison can pause it: a rise compares
+equal, a loss is a difference. The run goes on in a third game loaded
+from the second save.
 
 ## Constants & data dependencies
 
