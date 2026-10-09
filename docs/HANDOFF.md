@@ -6184,6 +6184,7 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Fold: write the result into the cited `ui/frontend-loading.md` rule and drop its PROVISIONAL line.
 
 ##### REC-223 [MANUAL] Front end: screen after an act-start video
+- **Done 2026-10-09 (PC 1, Windows, pc1-day3-c):** after the video (windowed, so Bink returned at once) the S→C 0x04 preload (`0x0045C9A0` → `0x00470B10` → `0x00470070`) redraws the loading frame 8 times before the first game frame; `ui/frontend-loading.md` L10 r2 / L5. Full-screen pixel check still open.
 - **Cloud 2026-10-09:** not settleable under Wine: Bink videos do not play in this container (`frontend-0007.json`), and an act-start video needs quest progress no test character has.
 - Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
 - Settles: `ui/frontend-loading.md` PROVISIONAL REC-223.

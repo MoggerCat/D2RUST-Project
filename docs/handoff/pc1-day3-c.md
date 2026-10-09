@@ -232,3 +232,22 @@ The harness should test class and position, not GUID.
   - **Effect in the trace:** the Fortress NPCs' frame-24 think is cancelled at the frame-6 warp, so
     their seeds stay unchanged.
   - **d2rs differs:** `q-fix-p3-room-empty-think`.
+
+- **REC-223, the screen after an act-start video: settled from the call sequence** (`ui/frontend-loading.md` L10
+  rule 2, L5; edge case 8 corrected).
+  - **Run:** a first-time Warriv travel with a save whose quest word 6 bit 0 is set and word 7 is
+    clear, so the server sends 0x61 id 2. Windowed, sound on.
+  - **Video:** `0x00482EF0` ran (id 2 in ECX) at frame 296 and returned at once; Bink doesn't seem to
+    play in `-w`. Then 8 loading draws, then the first game frame at frame 296. So the loading frame
+    **is** redrawn after the video.
+  - **Who redraws it:** the room-graphics preload `0x00470070` (call `0x004700DD`, one draw per room
+    except k & 0x1F = 0). It runs from the S→C 0x04 handler `0x0045C9A0` through `0x00470B10`, which
+    holds `[0x007A8920]` = 1 for that pass only. The address is referenced only by bytes Ghidra had
+    not disassembled, so the spec had called this path dead. The no-video control (`warp 40`) shows
+    the same 8 preload draws, after the one 0x03 draw.
+  - **New PROVISIONAL:** the redrawn frames don't reload the Loading palette, so after a played video
+    they may show the palette the video player left.
+  - **d2rs differs:** it makes no preload draws and shows black after a video:
+    `q-fix-p6-loading-preload-draws`.
+  - **Pixels:** PrintWindow returns black at every loading draw, the control included, so the pixels
+    prove nothing. A full-screen pixel check of a played video remains open.
