@@ -27,18 +27,18 @@
 | Rules | 75–76 |
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–136 |
-|   3. Lifecycle | 137–379 |
-|   4. Modes and mode schedules | 380–805 |
-|   5. Event dispatch | 806–820 |
-|   6. Events per kind | 821–943 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 944–965 |
-|   8. Collision line between two units | 966–970 |
-| Constants & data dependencies | 971–987 |
-| Randomness | 988–995 |
-| Edge cases & original bugs | 996–1016 |
-| Test vectors | 1017–1076 |
-| Provenance | 1077–1151 |
-| Open questions | 1152–1231 |
+|   3. Lifecycle | 137–396 |
+|   4. Modes and mode schedules | 397–822 |
+|   5. Event dispatch | 823–837 |
+|   6. Events per kind | 838–960 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 961–982 |
+|   8. Collision line between two units | 983–987 |
+| Constants & data dependencies | 988–1004 |
+| Randomness | 1005–1012 |
+| Edge cases & original bugs | 1013–1033 |
+| Test vectors | 1034–1093 |
+| Provenance | 1094–1180 |
+| Open questions | 1181–1260 |
 <!-- /index -->
 
 ## Summary
@@ -150,6 +150,23 @@ fixed GUID):
    into +0x1C; quest chain := 0.
 4. Not a player: unit seed (`0x00552DF0`); item: `0x00627C90`, item seed
    (`0x00552E90`) (`rng.md` §5.3).
+   4.1. A player draws no seed here; its load does (recorded 2026-10-09,
+      q-fix-real-unit-seed-order). The character load of the join
+      (`intents-events.md` §8.2 rule 2, full save and stub alike) runs
+      `0x00552DF0` on the player it allocated: one game-seed step `lo'`,
+      unit seed `init_low(lo')`, `dwInitSeed` `lo'`. Nothing draws between
+      the allocation and this step: it is the first game-seed step after
+      the four of game creation (`rng.md` §5.2), before every item the
+      load makes (a save's items, a stub's start items) and before the
+      act's DRLG (§8.2 rule 4). Recorded under Wine, `-seed 1234`: the
+      step at seq 2349 (`0x00552E31`, unit record +0x20 at 0x2EF2520,
+      outside the town units' block) gives 4048349444; with `ScnAma` (full
+      save, no items) the town's first object takes the next step
+      (108806926, seq 7270), with `StubAma` (stub) the first of the eight
+      start items does (unit 108806926, item 4040195123, seq 2352–2355).
+      The call site inside the load is not identified; the order is.
+      The death corpse draws its seed the same way after its allocation
+      (`combat/vitals.md` §4.7 r1.4).
 5. Flags |= 0x10; node index := 11.
 6. GUID: a monster with flags bit 2 takes the fixed GUID; every other
    unit draws one (`0x00552EE0`, `unit-order.md` §1.3).
@@ -1076,6 +1093,18 @@ AI from AI functions, everything in "not yet observed" (open question 1).
 
 ## Provenance
 
+- §3.1 r4.1 (2026-10-09, revision, q-fix-real-unit-seed-order): added
+  from two Wine recordings of 1.14d (`tools/cloud-game/run.sh --python
+  -- tools/trace-recorder/record_rng.py --auto ScnAma --seed 1234
+  --input "wait 3; end"`, and the same with `--auto StubAma`). Before
+  this revision the spec named no player seed, d2rs drew none, and every
+  later unit of the game took the step 1.14d gives the next one (town
+  objects one step early: the 2026-10-09 report's "from object guid 7 on
+  no d2rs unit seed appears in 1.14d's draws"). The handoff's reading
+  that the start items took the in-between steps was a misreading: the
+  `ScnAma` save has no items. Checked by
+  `d2-client/tests/app_unit_seed_order.rs` (real data) and
+  `units::tests::the_player_load_draws_the_recorded_unit_seed_before_the_town`.
 - §3.1 steps 7.1–7.5 (2026-10-07): `all.asm` `0x00555230` jump-table
   cases (argument registers at `0x00555393`, `0x005553ED`), `0x00574250`,
   `0x0054F5D0`, `0x00554850`, `0x00620290`, `0x00623520`, `0x00620AE0`,

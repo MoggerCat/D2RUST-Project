@@ -767,6 +767,14 @@ impl<X: Pending> View<'_, X> {
         self.add_allocated(game, u, req, x, y).then_some(u)
     }
 
+    /// The player's unit seed `0x00552DF0` on the game seed
+    /// (`units.md` §3.1 r4.1): what the character load runs on the player
+    /// it allocated, before anything else of the load draws. `false`: no
+    /// such unit (no draw).
+    pub fn init_player_seed(&mut self, u: UnitId) -> bool {
+        crate::units::lifecycle::init_player_seed(self.units, u, &mut self.h.game_seed)
+    }
+
     /// [`View::allocate`] up to step 7 (the kind init included): the
     /// unit is not added yet. Its caller runs what the allocator runs
     /// before `SUNIT_Add` and then [`View::add_allocated`].

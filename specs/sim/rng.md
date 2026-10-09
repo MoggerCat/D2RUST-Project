@@ -25,15 +25,15 @@
 |   2. Step | 75–96 |
 |   3. Draw helpers | 97–126 |
 |   4. Setting and reading seeds | 127–143 |
-|   5. Where seeds come from | 144–214 |
-|   6. Inlined draws | 215–235 |
-|   7. Which systems draw from which seed | 236–266 |
-| Constants & data dependencies | 267–277 |
-| Randomness | 278–282 |
-| Edge cases & original bugs | 283–295 |
-| Test vectors | 296–344 |
-| Provenance | 345–382 |
-| Open questions | 383–418 |
+|   5. Where seeds come from | 144–218 |
+|   6. Inlined draws | 219–239 |
+|   7. Which systems draw from which seed | 240–270 |
+| Constants & data dependencies | 271–281 |
+| Randomness | 282–286 |
+| Edge cases & original bugs | 287–299 |
+| Test vectors | 300–348 |
+| Provenance | 349–386 |
+| Open questions | 387–422 |
 <!-- /index -->
 
 ## Summary
@@ -168,7 +168,11 @@ in this order, each from one game-seed step: monster-region seed and
 `dwMonSeed` (+0xEC, `0x00547D20`), object-control seed and `dwObjSeed`
 (+0x80, `0x00546C60`), NPC-control seed (`0x00536070`), quest seed
 (`0x00545D80`). After that every unit allocation takes one game-seed step
-and every item a second one (§5.3). Recorded (sim-0002): game-seed steps
+and every item a second one (§5.3); the first step after creation is the
+joining player's unit seed, drawn by its load (`sim/units.md` §3.1 r4.1,
+recorded 2026-10-09: `-seed 1234` gives 2972047412, 1542758918,
+1961566614, 2016663226 for the four creation steps and 4048349444 for
+the player). Recorded (sim-0002): game-seed steps
 at `0x0052C2C6`, then in `0x00547D20`, `0x00546C60`, `0x00536070`,
 `0x00545D80`, then `0x00552DF0` / `0x00552E90` per unit / item.
 
@@ -177,7 +181,7 @@ at `0x0052C2C6`, then in `0x00547D20`, `0x00546C60`, `0x00536070`,
 <!-- rows -->
 | Seed | Where | Initial value |
 |---|---|---|
-| server unit seed, unit +0x20; `dwInitSeed` +0x28 [`SUNIT_InitSeed`] | `0x00552DF0`, at every unit allocation (`0x00555230`) and the player-load / corpse paths | derived from the game seed; `dwInitSeed = lo'`. Without a parent seed: v := `time_value(2·c)` with c the counter `0x008846E8` before its increment (`0x00552E5C`–`0x00552E78`; c starts at 0: `.bss`, no other writer), `dwInitSeed` := v, seed := `init_low(v)`. |
+| server unit seed, unit +0x20; `dwInitSeed` +0x28 [`SUNIT_InitSeed`] | `0x00552DF0`, at every unit allocation (`0x00555230`) but a player's, and the player-load / corpse paths (`sim/units.md` §3.1 r4.1) | derived from the game seed; `dwInitSeed = lo'`. Without a parent seed: v := `time_value(2·c)` with c the counter `0x008846E8` before its increment (`0x00552E5C`–`0x00552E78`; c starts at 0: `.bss`, no other writer), `dwInitSeed` := v, seed := `init_low(v)`. |
 | item seed, item data +0x04 (data pointer at unit +0x14); start seed at data +0x10 [`ITEMS_InitItemSeed`] | `0x00552E90` | reset to `{1, 666}` (`0x00627DC0`), then derived from the game seed |
 | item seed re-init | `0x005572A0`–`0x00557450` (quality downgrade chain, after a failed quality routine) | `init_low(s)`, s = the item seed's low word saved by the dispatch before the failed routine; s is also written as the new start seed (`items/quality.md` §5) |
 | item seed forced | `0x00558D90` | the drop request's seed values (+0x48 / +0x4C) |
