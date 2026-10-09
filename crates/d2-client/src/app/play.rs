@@ -648,6 +648,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<PlayEnd> {
         }),
         ..default()
     }));
+    super::perf::add(&mut app);
     app.insert_resource(super::config::ConfigRes {
         dir: cfg_dir,
         settings,
