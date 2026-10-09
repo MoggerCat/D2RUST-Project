@@ -400,7 +400,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 - **[q-scenes-compare] Client footprints of walking monsters (REC-706)** The 1.14d client stamps mask 0x100 for each living monster (`client/msg-units.md` §3 r2); d2rs re-stamps it at the model position before each client path step. Record the client collision grid (mask 0x100 cells) around Warriv in the Rogue Encampment for 30 ticks while he walks, with the unit's client path position each tick, for `client/model.md` open question 2.
 - **[q-scenes-compare] Hover state after a use press (REC-707)** `a1-panel-cube` (right click on the cube, no move after) draws the cube with tint 2 and no tip, so `0x007BCBF4` / `0x007BCBE4` are 0 after the press. Name the callers of the hover handler `0x00487000` (move, press, release?) and which code clears the two globals after a right-click use (C→S 0x20), for `ui/inventory.md` §5 r4.
 
-- [prov-data] **Hratli's unit seed two steps at creation** (q-prov-data,
+- [prov-data] **Hratli's unit seed two steps at creation** answered → see `docs/handoff/pc1-day3-c.md`. (q-prov-data,
   `world/quests-act3-2.md` §3.3, `monsters/init.md` §4): in the Act III
   town (`a3-start-noquest-sor`, level-1 sorceress, town byte act III,
   seed 1234) Hratli (class 253), spawned by his dummy's init through
