@@ -244,6 +244,10 @@ pub struct ClientUnit {
     pub interact_ms: u32,
     /// +0x44: the animation frame (signed, 8.8 fixed point; §18 rule 1).
     pub frame: i32,
+    /// +0x4C: an object's animation speed (8.8 per update), set by the
+    /// animation set-up (`world/objects-client.md` §25 r8); `None`: no
+    /// set-up ran, the generic step uses `FrameDelta[mode]`.
+    pub speed: Option<i32>,
     /// +0xC8: flag-ex. Bit 0x2000000 := `expansion` ≠ 0 at creation
     /// (§2 rule 6); the other bits are written by the rules that own
     /// them (`world/objects-client.md` §26.2; `msg-units.md` §1.2 r3, r4:
@@ -292,6 +296,7 @@ impl ClientUnit {
             flag_200: false,
             interact_ms: 0,
             frame: 0,
+            speed: None,
             flag_ex: 0,
             flag_4: false,
             hit_class: 0,

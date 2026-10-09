@@ -281,6 +281,11 @@ fn object(
             let u = w.units.get_mut(&key).expect("checked by the caller");
             u.mode = mode;
             let class = u.class;
+            // The animation set-up of the new mode (`world/objects-client.md`
+            // §25 r8, PROVISIONAL REC-440). Nothing without rows.
+            if let Some(row) = inputs.objclient.rows.get(class as usize) {
+                super::objects::anim_setup(u, row, mode)?;
+            }
             // The object light of the new mode (`render/lighting.md` §8
             // object row: `Lit<mode>` / 2). Without the class's row the
             // light cannot be read: nothing.
