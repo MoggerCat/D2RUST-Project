@@ -471,6 +471,28 @@ impl<X: Pending, R: QuestRest> HostQuests<'_, '_, X, R> {
 }
 
 impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
+    /// `0x0058F000` then `0x00666120`: the stored path (handle = index +
+    /// 1 in the hooks' [`ActionHooks::map_ai_paths`]) becomes the unit's
+    /// map-AI nodes. False when the handle is unknown or its path empty
+    /// (the record's +4 is 0). PROVISIONAL (REC-1380): the handle table is
+    /// d2rs-own (1.14d keeps a pool copy, `0x006660B0`); the walk it gives
+    /// Larzuk matches 1.14d's (`a5-harrogath-arrival-ama`, frames 24+).
+    fn apply_map_ai(&mut self, unit: UnitId, map_ai: u32) -> bool {
+        let hooks = &mut *self.inner.econ.hooks;
+        let Some(nodes) = (map_ai as usize)
+            .checked_sub(1)
+            .and_then(|i| hooks.map_ai_paths.get(i))
+            .filter(|n| !n.is_empty())
+            .cloned()
+        else {
+            return false;
+        };
+        let Some(c) = hooks.ai.as_mut().and_then(|ai| ai.control_mut(unit)) else {
+            return false;
+        };
+        c.map_ai = Some(nodes);
+        true
+    }
     /// Unit +0x10 of an object with object data.
     fn object_mode(&self, object: UnitId) -> i32 {
         if self.known(object) {
