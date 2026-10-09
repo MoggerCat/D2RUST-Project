@@ -1415,6 +1415,8 @@ pub struct SkillRow {
     pub anim: u8,
     /// +0x11 `monanim`.
     pub monanim: u8,
+    /// +0x13 `seqnum` (`skills/sequences.md` §1 rule 2).
+    pub seqnum: u8,
     /// +0x94 `passivestate` (read signed; > 0 = a passive state).
     pub passivestate: u16,
     /// `maxlvl` (u16 at 300, read signed).
