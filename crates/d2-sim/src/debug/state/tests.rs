@@ -342,6 +342,9 @@ fn a_joined_player_snapshots_the_frame_count_and_speed_of_its_mode() {
     }
     let a = fx.a;
     let p = fx.spawn(UnitType::Player, 1, a, 3, 4);
+    // The rate stats every loaded player has (`d2s-load.md` §2
+    // post-load: stats 67–69 = 100), read by `units.md` §4.7 step 10.
+    fx.stats(p, &[(67, 100), (68, 100), (69, 100)]);
     // The allocator's mode 0 (`units.md` §2), then the join's neutral
     // start (§6.1): the mode set's re-init fills +0x48 / +0x4C.
     fx.sim.sys.units.get_mut(p).unwrap().mode = 0;
@@ -391,13 +394,16 @@ fn a_walking_monster_snapshots_the_velocity_mode_speed() {
         h.x.names.insert((UnitType::Monster, 2), *WL);
         h.x.names.insert((UnitType::Monster, 1), *WL);
     }
-    fx.stats(m, &[(67, 75)]);
+    // A monster's init rate stats (`monsters/init.md`: attackrate 100,
+    // velocitypercent 75, other_animrate 100).
+    fx.stats(m, &[(67, 75), (68, 100), (69, 100)]);
     fx.sim.sys.units.get_mut(m).unwrap().mode = 2;
     let sp = fx.sim.sys.with(&mut fx.game, |sim, hooks| {
         crate::units::hooks::UnitHooks::anim_rate(hooks, sim, m)
     });
     assert_eq!(sp, 192);
-    // Mode 1 (no velocity modifier) keeps the host's rate: the speed as is.
+    // Mode 1 (no velocity modifier): §4.7 step 10, other_animrate 100 →
+    // the AnimData speed.
     fx.sim.sys.units.get_mut(m).unwrap().mode = 1;
     let sp = fx.sim.sys.with(&mut fx.game, |sim, hooks| {
         crate::units::hooks::UnitHooks::anim_rate(hooks, sim, m)

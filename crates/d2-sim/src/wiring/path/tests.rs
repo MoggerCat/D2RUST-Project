@@ -192,6 +192,95 @@ fn a_wall_on_the_way_changes_the_walk() {
     fx.assert_clean();
 }
 
+/// Object tables for the footprint tests: row 0 a 1 × 1 object with
+/// `HasCollision1` set (mask 0x400, `path-placement.md` §3), row 1 the
+/// same without it.
+fn collision_objects() -> Arc<crate::world::objects::ObjectTables> {
+    let mut solid: Objects = blank();
+    (solid.sizex, solid.sizey, solid.hascollision1) = (1, 1, 1);
+    let mut open: Objects = blank();
+    (open.sizex, open.sizey) = (1, 1);
+    Arc::new(crate::world::objects::ObjectTables {
+        objects: vec![solid, open],
+        shrines: Vec::new(),
+        levels: vec![blank::<Levels>(); 150],
+        objgroup: Vec::new(),
+        leveldefs: Vec::new(),
+    })
+}
+
+// Covers: specs/sim/path-placement.md §2.5, §3, §5.2
+#[test]
+fn object_footprint_is_stamped_only_with_has_collision() {
+    // REC-750 (q-diff-combat-a1): the Rogue Encampment torch (class 37,
+    // 1 × 1, `HasCollision2` = 1) is in the grid from its creation; d2rs
+    // had left every object without a footprint. Mode 1 here (the
+    // fixture's allocation mode): row 0 stamps 0x400 on its cell, row 1
+    // (`HasCollision1` = 0) stamps nothing.
+    let mut fx = fx();
+    fx.sim.create_objects(collision_objects());
+    let a = fx.a;
+    let cells = [(20, 20), (19, 20), (21, 20), (20, 19), (20, 21), (24, 20)];
+    let before: Vec<u16> = cells.iter().map(|&(x, y)| cell(&mut fx, x, y)).collect();
+    fx.spawn(UnitType::Object, 0, a, 20, 20);
+    fx.spawn(UnitType::Object, 1, a, 24, 20);
+    for (&(x, y), b) in cells.iter().zip(before) {
+        let stamped = if (x, y) == (20, 20) { 0x400 } else { 0 };
+        assert_eq!(cell(&mut fx, x, y), b | stamped, "({x}, {y})");
+    }
+    fx.assert_clean();
+}
+
+/// A run (C→S 0x03) of a player with stamina from (10, 20) to (30, 20),
+/// optionally past a solid 1 × 1 object at (20, 20); charstats
+/// `WalkVelocity` 6, `RunVelocity` 9 (run list stat 67 = +50, §8.2).
+fn run_past_object(object: bool) -> (crate::path::DynamicPath, i16, u32) {
+    let mut fx = fx();
+    fx.sim.create_objects(collision_objects());
+    Arc::make_mut(&mut fx.sim.hooks().tables).combat.charstats[0].runvelocity = 9;
+    let a = fx.a;
+    if object {
+        fx.spawn(UnitType::Object, 0, a, 20, 20);
+    }
+    let p = player(&mut fx, 10, 20);
+    fx.stats(p, &[(crate::path::walk::step::STAT_STAMINA, 21504)]);
+    fx.sim.with(&mut fx.game, |g, v| {
+        super::walk::walk_message(v, g, p, 0x03, 30, 20)
+    });
+    let r = fx.sim.sys.units.get(p).unwrap();
+    let (speed, mode) = (r.anim.speed, r.mode);
+    (path(&mut fx, p), speed, mode)
+}
+
+// Covers: specs/sim/pathing.md §5.1 r4, §5.2, §8.2; specs/sim/path-placement.md §2.5
+#[test]
+fn a_run_stops_its_ray_before_an_object_footprint() {
+    // REC-750 (`pathing.md` vector R7, here on a straight line): the ray
+    // test from (10, 20) toward (30, 20) tests the player's plus at each
+    // cell; at (19, 20) the plus covers the object's cell, so P = (18,
+    // 20) is the first point (§5.2 step 3). Without the object the ray
+    // is clear and the path is the target alone (M08).
+    let (d, _, mode) = run_past_object(true);
+    assert_eq!(mode, 3);
+    assert_eq!((d.points[0].x, d.points[0].y), (18, 20));
+    let (d, _, _) = run_past_object(false);
+    assert_eq!(d.point_count, 1);
+    assert_eq!((d.points[0].x, d.points[0].y), (30, 20));
+}
+
+// Covers: specs/sim/pathing.md §8.2; specs/sim/units.md §4.7
+#[test]
+fn a_run_start_speed_reads_the_run_list() {
+    // REC-751 (`pathing.md` §8.2 revision): w = 101 (mode 3), p = 100 +
+    // 50 = 150 → speed 101 · 150 / 100 = 151 from the run start (1.14d
+    // `check-combat-cold-plains-wp` frame 10); velocity 0x600 · 150 / 100
+    // = 0x900 (vector V2).
+    let (d, speed, mode) = run_past_object(false);
+    assert_eq!(mode, 3);
+    assert_eq!(speed, 151);
+    assert_eq!(d.velocity, 0x900);
+}
+
 /// Waypoint tables: level 1 (town) has waypoint index 0, the fixture's
 /// level 2 index 1; one object class with operate function 23.
 fn waypoint_data() -> WaypointData {

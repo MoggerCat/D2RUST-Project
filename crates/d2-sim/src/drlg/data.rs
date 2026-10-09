@@ -75,6 +75,11 @@ pub struct WarpDef {
     pub direction: u8,
     pub lit_version: u32,
     pub tiles: u32,
+    /// `OffsetX`, `OffsetY` (lvlwarp +0x1C, +0x20, signed): the warp tile
+    /// unit's offset from 5 × its cell (`sim/path-placement.md` §12.1
+    /// rule 3).
+    pub offset_x: i32,
+    pub offset_y: i32,
 }
 
 impl WarpDef {
@@ -84,6 +89,8 @@ impl WarpDef {
             direction: r.direction[0],
             lit_version: r.litversion,
             tiles: r.tiles,
+            offset_x: r.offsetx as i32,
+            offset_y: r.offsety as i32,
         }
     }
 }
@@ -214,10 +221,6 @@ pub struct DrlgData {
     /// [`Self::warps`] (a missing entry reads as (0, 0)); the walk-out
     /// of a warp arrival (`sim/path-placement.md` §12.2 rule 5).
     pub warp_exits: Vec<(i32, i32)>,
-    /// `OffsetX`, `OffsetY` (`lvlwarp` +0x1C, +0x20) per row of
-    /// [`Self::warps`] (a missing entry reads as (0, 0)): the warp tile
-    /// unit's offset from its cell (`sim/path-placement.md` §12.1 rule 3).
-    pub warp_offsets: Vec<(i32, i32)>,
     /// `lvltypes` `File 1..32` per row (level type), NUL-trimmed.
     pub lvltypes: Vec<Vec<Vec<u8>>>,
     /// `objects` subclass per object class (row).
@@ -242,10 +245,6 @@ impl DrlgData {
             warp_exits: lvlwarp
                 .iter()
                 .map(|r| (r.exitwalkx as i32, r.exitwalky as i32))
-                .collect(),
-            warp_offsets: lvlwarp
-                .iter()
-                .map(|r| (r.offsetx as i32, r.offsety as i32))
                 .collect(),
             lvltypes: lvltypes.iter().map(lvltype_files).collect(),
             object_subclass: objects.iter().map(|o| o.subclass).collect(),

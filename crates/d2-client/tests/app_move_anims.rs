@@ -9,7 +9,6 @@ mod real_rig;
 
 mod app_support;
 
-use d2_client::app::play::add_walk;
 use d2_client::app::single_player;
 use d2_client::bridge::predict::Speeds;
 use d2_client::bridge::BridgeResource;
@@ -32,7 +31,6 @@ fn speeds() -> Speeds {
 
 fn rig_with_walk(skills: &[usize]) -> Rig {
     let mut r = Rig::new("barbarian", skills);
-    add_walk(&mut r.app, r.tap.clone(), Some(speeds()));
     r.leave_town();
     r.strengthen();
     r

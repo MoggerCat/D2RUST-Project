@@ -1,0 +1,19 @@
+check 1
+# An Act II desert guard (Jab, Defiance) hireling against an idle target: ScnBar (expansion Barbarian,
+# level 30) with hireling row Id 7 (name index 3, seed 0x12345678,
+# 100,000 experience), -seed 1234; warp to the Blood Moor (level 2;
+# variant blood-moor-empty: no monster population) before frame 4 (the
+# hireling follows, world/hirelings.md §6), a cow (class 179, AI Idle:
+# no draws, monsters/ai-bodies.md §9.2) 6 sub-tiles away along +x
+# before frame 10; no input. Compares the hireling's AI, its skills and
+# their damage on the cow. Area F2 (q-diff-skills-2).
+# Spec: specs/tools/scenario-diff.md.
+name merc-desert-cow
+save ScnBar --class bar --expansion --level 30 --merc 7,3,0x12345678,100000
+seed 1234
+ticks 120
+seconds 330
+channels state
+variant blood-moor-empty
+at 4 poke warp 2
+at 10 poke spawn 179 @x+6 @y normal

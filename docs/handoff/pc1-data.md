@@ -420,6 +420,31 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 42. **Control-panel help button `0x004A64C0`** answered → see `docs/handoff/pc1-day3-c.md`. (q-scenes-compare) Step 8 of the UI pass (`ui/panels.md` §5) calls it before the new-stats button; `a4-town-pandemonium-fortress` rows 258–267 draw the text "Help (H)" (CelDrawColor at (714, 403)), `Panel\Levelsocket` frame 0 at (725, 440) and `Panel\Level` frame 0 at (728, 436). Specify when it draws (character level? first game?), its positions and its press / release, for `ui/control-panel.md`.
 43. **Mini panel open at game start (REC-519)** answered → see `docs/handoff/pc1-day3-c.md`. (q-scenes-compare) Every recorded scene has state 0x15 open with no input; name the call that opens it at game entry (and whether a saved setting decides it), for `ui/control-panel.md` §9.
 44. **Shadow pre-test arguments `0x00471620` (REC-511, REC-518)** answered → see `docs/handoff/pc1-day3-c.md`. (q-scenes-compare) The measured shadows fit the §4 box test on the sheared shadow box, and objects need their mode's `BlocksLight`; read the arguments `0x00471620` passes to `0x004709A0` and the object branch, for `render/blend-modes.md` §5 r3.
+- **[q-diff-combat-a1] preparation probe at the start**
+    `sim/pathing.md` §4 rule 3 (REC-753). Measured: when the target
+    preparation `0x00648120`'s first probe p0 steps onto the start, the
+    compute returns 0 and the path target keeps the requested point
+    (Warriv, `combat-random-boss.check` frame 45). Read `0x00648120`:
+    is the start tested before the free test of each probe (so p1 / p2
+    on the start also stop with no write), is the write skipped only
+    when the found point equals the start, or does the free test see the
+    start as occupied (so the loop goes on)? d2rs: PROVISIONAL, any found
+    point equal to the start → result 0, target unchanged
+    (`d2-sim` `path/walk/find.rs` `prepare`).
+- **[q-diff-combat-a1] town NPC thinks while the player runs (REC-754)**
+    `combat-cold-plains-wp.check` (seed 1234, no seed pin; the player
+    runs from (4873, 4228) to (4884, 4221) from frame 10, then stands).
+    1.14d: at frame 24 Gheed (GUID 4, class 147, (4836, 4278)) and Charsi
+    (GUID 6, class 154, (4834, 4217)) neither draw nor move, and stay so
+    through frame 120; in `combat-random-boss` (player standing at (4873,
+    4228)) both think at frame 24 (Gheed one draw, Charsi a map-AI walk
+    to (4835, 4211)). d2rs (staging-7 merge, HEAD cd9c0dc9) runs both
+    thinks at 24 in either case; Kashya (GUID 3) and the player now
+    match through frame 120. Read why Gheed's and Charsi's pending thinks
+    (idle 20 from their first think) do not run, or run without a draw,
+    once the player has left the starting room: room client membership
+    (`drlg/rooms.md` §7), a think gate in `0x005B1740` / the Npc body, or
+    the timer itself. Not the REC-753 mechanism (no blocked target).
 - **[q-scenes-compare] Client footprints of walking monsters (REC-706)** The 1.14d client stamps mask 0x100 for each living monster (`client/msg-units.md` §3 r2); d2rs re-stamps it at the model position before each client path step. Record the client collision grid (mask 0x100 cells) around Warriv in the Rogue Encampment for 30 ticks while he walks, with the unit's client path position each tick, for `client/model.md` open question 2.
 - **[q-scenes-compare] Hover state after a use press (REC-707)** `a1-panel-cube` (right click on the cube, no move after) draws the cube with tint 2 and no tip, so `0x007BCBF4` / `0x007BCBE4` are 0 after the press. Name the callers of the hover handler `0x00487000` (move, press, release?) and which code clears the two globals after a right-click use (C→S 0x20), for `ui/inventory.md` §5 r4.
 
@@ -623,11 +648,17 @@ lines into the `q-fix-*` row.
 
 - [prov-data] **Monster think in a room with no clients** — answered → see `docs/handoff/pc1-day3-a.md` and `docs/handoff/pc1-day3-c.md` (same answer; fix row `q-fix-p3-room-empty-think`, `q-fix-p3-leave-cancels-thinks` is its duplicate) (q-prov-data,
 27. **Order of the property rolls of a magic item** (area G, `traces/checks/items-vendor-akara-buy.check`, 2026-10-09): the store's 7th item (guid 8, quality 4, prefix 1156, suffix 552, ilvl 6) has a charged-skill property (stat 204, skill 193, level 4, max 67). 1.14d current charges 67, d2rs 65: `properties.md` §5 rule 9 gives cur = (r + c/8 + 1) & 0xFF with r = roll(c − c/8) on the item seed, so r is 58 on 1.14d and 56 on d2rs, while the item seeds after creation are equal (`ik` equal). Same draws, different order. Read which property of the item rolls before the charged one (prefix and suffix properties, the 107 single-skill rows, the 45 row) and in which order the affix properties are applied (`affixes.md` §7: P0 S0 P1 S1 P2 S2?); answer into `items/affixes.md` §7 and `items/properties.md` §5.
+- **[q-fix-server-store-fill] Order of the property rolls of a magic item** (area G, `traces/checks/items-vendor-akara-buy.check`, 2026-10-09): the store's 7th item (guid 8, quality 4, prefix 1156, suffix 552, ilvl 6) has a charged-skill property (stat 204, skill 193, level 4, max 67). 1.14d current charges 67, d2rs 65: `properties.md` §5 rule 9 gives cur = (r + c/8 + 1) & 0xFF with r = roll(c − c/8) on the item seed, so r is 58 on 1.14d and 56 on d2rs, while the item seeds after creation are equal (`ik` equal). Same draws, different order. Read which property of the item rolls before the charged one (prefix and suffix properties, the 107 single-skill rows, the 45 row) and in which order the affix properties are applied (`affixes.md` §7: P0 S0 P1 S1 P2 S2?); answer into `items/affixes.md` §7 and `items/properties.md` §5.
 
-28. **Identified flag 0x10 of normal items** (area G, `traces/checks/items-ground-many.check`, 2026-10-09): the ten poked items with no quality (normal, misc: `tbk`, `rvl`, `gsw`, `gzv`, `r10`, `r30`, `key`, `ibk`, `hp5`, `mp4`, `sbk`) have item flags 0x80010 on 1.14d (identified set), d2rs 0x80000; the magic / rare / set / unique poked items are equal (0x10 clear). `generation.md` §1.4 row 0x10 says "set for quest-difficulty items and by callers", `quality.md` has no set for the normal routine. Read in `0x00558D90` and the quality dispatch `0x00557450` / normal routine `0x00556E80` where flag 0x10 is set for a normal item (and whether weapons and armor of quality 2 get it too); answer into `items/generation.md` §1.4 and §6.1.
+- **[q-fix-server-store-fill] Identified flag 0x10 of normal items** (area G, `traces/checks/items-ground-many.check`, 2026-10-09): the ten poked items with no quality (normal, misc: `tbk`, `rvl`, `gsw`, `gzv`, `r10`, `r30`, `key`, `ibk`, `hp5`, `mp4`, `sbk`) have item flags 0x80010 on 1.14d (identified set), d2rs 0x80000; the magic / rare / set / unique poked items are equal (0x10 clear). `generation.md` §1.4 row 0x10 says "set for quest-difficulty items and by callers", `quality.md` has no set for the normal routine. Read in `0x00558D90` and the quality dispatch `0x00557450` / normal routine `0x00556E80` where flag 0x10 is set for a normal item (and whether weapons and armor of quality 2 get it too); answer into `items/generation.md` §1.4 and §6.1.
 
 - [prov-data] **Monster think in a room with no clients** (q-prov-data,
 - [prov-data] **Monster think in a room with no clients** — answered → see `docs/handoff/pc1-day3-a.md` and `docs/handoff/pc1-day3-c.md` (same answer; fix row `q-fix-p3-room-empty-think`, `q-fix-p3-leave-cancels-thinks` is its duplicate) (q-prov-data,
+
+- [prov-data] **Monster think in a room with no clients** — answered → see `docs/handoff/pc1-day3-a.md` and `docs/handoff/pc1-day3-c.md` (same answer; fix row `q-fix-p3-room-empty-think`, `q-fix-p3-leave-cancels-thinks` is its duplicate) (q-prov-data,
+27. **Order of the property rolls of a magic item** (area G, `traces/checks/items-vendor-akara-buy.check`, 2026-10-09): the store's 7th item (guid 8, quality 4, prefix 1156, suffix 552, ilvl 6) has a charged-skill property (stat 204, skill 193, level 4, max 67). 1.14d current charges 67, d2rs 65: `properties.md` §5 rule 9 gives cur = (r + c/8 + 1) & 0xFF with r = roll(c − c/8) on the item seed, so r is 58 on 1.14d and 56 on d2rs, while the item seeds after creation are equal (`ik` equal). Same draws, different order. Read which property of the item rolls before the charged one (prefix and suffix properties, the 107 single-skill rows, the 45 row) and in which order the affix properties are applied (`affixes.md` §7: P0 S0 P1 S1 P2 S2?); answer into `items/affixes.md` §7 and `items/properties.md` §5.
+
+- [prov-data] **Monster think in a room with no clients** (q-prov-data,
   `monsters/ai.md` §1.5, §2, `ai-bodies.md` §9.9 Map AI): after the
   player warps away (same act, `a4-warp-plains-ama`, warp 105 at frame
   6), the Fortress NPCs (classes 405, 257, 246; Npc AI `0x005E7130`)

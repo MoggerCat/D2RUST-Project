@@ -111,3 +111,4 @@
   "setup": {"character": "TestSor (d2s-tool new --class sor --expansion --waypoints all --quests acts=4)", "input": "wait 2; goto 2 119; wait 2; click 115 75; wait 1; click 200 173; waitlevel 3 60; wait 8; click 600 300; wait 5; end", "seed": 1234},
   "spec": "specs/client/model.md",
   "summary": {"frame_pos_diff": 1, "frames": 765, "same_unit": 0, "tick_pos_diff": 1, "ticks": 540}
+}
