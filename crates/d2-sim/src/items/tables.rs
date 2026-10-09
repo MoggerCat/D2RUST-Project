@@ -94,6 +94,9 @@ pub struct ItemRec {
     /// `bitfield1` (+0xDC); bit 0 "may be magic" (`treasure.md` §9 rule 3,
     /// `world/vendors.md` §3 step 5).
     pub bitfield1: u32,
+    /// `dropsound` (+0x124, `sounds.txt` row; read inline by the Act V
+    /// reward `0x00589580`, `world/quests-act5.md` §5.7).
+    pub dropsound: u16,
 }
 
 macro_rules! item_rec {
@@ -140,6 +143,7 @@ macro_rules! item_rec {
                     spawnable: r.spawnable,
                     rarity: r.rarity,
                     bitfield1: r.bitfield1,
+                    dropsound: r.dropsound,
                 }
             }
         }

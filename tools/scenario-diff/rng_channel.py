@@ -16,15 +16,6 @@ def run(r, save, sides):
     c = r.c
     rec = _rec()
     orig, d2rs = r.path("orig.rng.jsonl"), r.path("d2rs.rng.jsonl")
-    if c["poke"]:
-        # record_rng.py has no poke layer
-        print("[rng] not compared: record_rng.py takes no --poke (rng-trace.md §6 r3)")
-        return 2
-    if c["input"].get("shared"):
-        # frame-anchored input needs a recorder that stops at the tick return
-        print("[rng] not compared: record_rng.py does not run the shared frame-anchored "
-              "input (rng-trace.md §6 r3)")
-        return 2
     if "orig" in sides:
         # the DRLG inline sites are left unhooked: their draws are always
         # other:drlg, never compared (rng-trace.md §6 r4)
@@ -32,6 +23,8 @@ def run(r, save, sides):
     if "d2rs" in sides and not (r.reuse and os.path.exists(d2rs)):
         args = ["state-dump"] + r.d2rs_common(save) + [
             "--ticks", str(c["ticks"]), "--out", r.path("d2rs.rng-state.jsonl"), "--rng", d2rs]
+        if c["input"].get("shared"):  # pokes and sends come with d2rs_common
+            args += ["--input", c["input"]["shared"]]
         r.cargo("d2-client", args, features="rng-trace")
     if sides != {"orig", "d2rs"}:
         return None
@@ -52,10 +45,15 @@ def _rec():
 def selftest(runner_cls, check):
     """Dry run: the recorder with --frames, the dump with --rng and the
     rng-trace feature, the comparator. Returns the number of checks passed."""
-    r = runner_cls(dict(check, poke=[(1, 5, "time 1 0")]), "/tmp/w", dry=True)
+    # pokes, sends and the shared input reach both sides (rng-trace.md §6 r3)
+    r = runner_cls(dict(check, poke=[(1, 5, "time 1 0")], send=[(2, 6, "hex 13 01 00 00 00")],
+                        input={"shared": "frame 10; click 600 300"}), "/tmp/w", dry=True)
     r.next = 5
-    assert run(r, "/tmp/w/ScnAma.d2s", {"orig", "d2rs"}) == 2
-    assert not r.log  # nothing run: record_rng.py has no poke layer
+    run(r, "/tmp/w/ScnAma.d2s", {"orig", "d2rs"})
+    for what in ("record_rng.py", "state-dump"):
+        line = next(x for x in r.log if what in x)
+        assert "--poke '5 time 1 0'" in line and "--send '6 hex 13 01 00 00 00'" in line, line
+        assert "--input 'frame 10; click 600 300'" in line, line
     r = runner_cls(dict(check, poke=[], input={}), "/tmp/w", dry=True)
     r.next = 5
     code = run(r, "/tmp/w/ScnAma.d2s", {"orig", "d2rs"})
@@ -72,4 +70,4 @@ def selftest(runner_cls, check):
     r.log = []
     run(r, "/tmp/w/ScnAma.d2s", {"d2rs"})  # one side: no compare
     assert not any("rng_diff" in x or "record_rng" in x for x in r.log)
-    return 3
+    return 4

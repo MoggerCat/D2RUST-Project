@@ -14,7 +14,7 @@
 |---|---|
 | Summary | 20–26 |
 | Rules | 27–28 |
-|   9. Per-AI behaviours | 29–943 |
+|   9. Per-AI behaviours | 29–951 |
 <!-- /index -->
 
 ## Summary
@@ -365,6 +365,14 @@ compare, `docs/handoff/q-scenes-compare.md`):
    node.
 4. *Draws per think.* Map AI: 2 (1 when the first is ≥ 66; 0 when the
    unit has no nodes). Command 4 and the walk itself draw nothing here.
+   An NPC whose room has no client draws nothing. Neither `0x005E7130`
+   nor `0x005E7080` tests the room's clients. The NPC has no think,
+   because the last client's room leave cancelled it (`ai.md` §1.5
+   rule 3, `0x0053AA0A` → `0x005738D0`). Recorded: the Fortress NPCs
+   after the frame-6 warp of `a4-warp-plains-ama` have no frame-24
+   think and their seeds stay unchanged to frame 80. Provenance:
+   2026-10-09 (pc1-day3-c, read in `0x005E7130`, `0x005E7080`,
+   `0x0053A9B0`).
 5. *Precedence.* The interaction handler (step 3) runs first: while it
    takes a player (`ai.md` §5.3 scan 2: within 15, and for `interact`
    NPCs only when the quest active test `world/quests.md` §6.4 holds),

@@ -264,6 +264,10 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
             continue;
         }
         row[2] = key.path().to_owned();
+        // §5 r10: a pass-4 pool cel is tagged for `--skip-weather`.
+        if item.key.pass() == pass::UNIDENTIFIED_4 {
+            row[16] = super::compare::POOLS_TAG.into();
+        }
         match key.part() {
             FramePart::Tile(t) => {
                 row[1] = op(true, item).into();

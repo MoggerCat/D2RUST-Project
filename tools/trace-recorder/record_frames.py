@@ -35,10 +35,11 @@ import zlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import autostart  # noqa: E402  (unattended start, input script)
 import poke  # noqa: E402  (--poke / --poke-file: state injection, specs/tools/poke.md §2 rule 6)
+import send  # noqa: E402  (--send: C->S message injection, specs/tools/original-hooks.md §1 rule 4)
 
 sys.dont_write_bytecode = True
 
-TOOL = "trace-recorder record_frames 0.3.0"
+TOOL = "trace-recorder record_frames 0.3.1"
 FORMAT = "frames-raw-3"
 
 # capture.md §2: hooks and the in-game caller
@@ -964,6 +965,7 @@ def main():
                         "front end ignores PostMessage there); auto = on under Wine")
     autostart.add_options(ap)
     poke.add_options(ap)
+    send.add_options(ap)
     a = ap.parse_args()
     if a.selftest:
         selftest()
@@ -1006,12 +1008,16 @@ def main():
     layer = poke.PokeLayer.from_args(a)
     if layer:
         layer.attach(r)  # arms 0x0052FD1E; {"k":"poke",...} records land in the frames file
+    sends = send.SendLayer.from_args(a)
+    if sends:
+        sends.attach(r)  # arms 0x0044F136; {"k":"send",...} records land in the frames file
     try:
         r.run()
     except KeyboardInterrupt:
         print("interrupted; game terminated", file=sys.stderr)
     for n in r.notes:
         print("note:", n)
+    send.print_results(sends)
     keys, frames, bad, verdict = stability(r.keys)
     print(f"wrote {out}: {r.frames} frames, {r.ticks} ticks; images: {img_dir or 'none'}")
     if fe is not None:
