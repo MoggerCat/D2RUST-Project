@@ -318,6 +318,42 @@ impl Play {
             1,
             &[u32::from(class)],
         );
+        self.talk_here(class)
+    }
+
+    /// [`Self::talk`] for an NPC the walk-room-by-room approach does not
+    /// reach: the `goto preset <level> <class>` poke places the player
+    /// next to the level's preset NPC (`tools/poke.md` §6).
+    fn talk_goto(&mut self, level: u32, class: u16) -> Vec<u32> {
+        let toks = ["goto", "preset", &level.to_string(), &class.to_string()].map(String::from);
+        let t = match d2_sim::poke::parse_op(&toks.each_ref().map(|s| s.as_str())) {
+            Ok(d2_sim::poke::PokeOp::Directive(d2_sim::poke::Directive::Goto(t))) => t,
+            other => panic!("goto parses: {other:?}"),
+        };
+        let mut walk = d2_sim::poke::GotoWalk::default();
+        for _ in 0..600 {
+            let (r, w) = app_support::with(&self.server, move |l| {
+                d2_client::app::poke::goto_now(&mut l.host_mut().game, t, walk)
+            });
+            walk = w;
+            match r {
+                d2_sim::poke::PokeResult::Pending => self.step(1),
+                d2_sim::poke::PokeResult::Ok(_) => break,
+                other => panic!("goto {class}: {other:?}"),
+            }
+        }
+        for _ in 0..100 {
+            self.step(1);
+            if self.npc_on_screen(class).is_some() {
+                break;
+            }
+        }
+        self.step(30);
+        self.talk_here(class)
+    }
+
+    /// The click and menu half of [`Self::talk`], the player next to the NPC.
+    fn talk_here(&mut self, class: u16) -> Vec<u32> {
         // The client refuses a repeat interact on the same monster within
         // 200 ms (`client/model.md` §8 r7).
         self.step(10);
@@ -351,8 +387,15 @@ impl Play {
         }
         assert!(
             count(self) > before,
-            "C→S 0x13 on NPC {class}: {:?}",
-            self.ids()
+            "C→S 0x13 on NPC {class} (guid {guid}): {:?}, 0x13 sent {:?}",
+            self.ids(),
+            self.wire
+                .lock()
+                .unwrap()
+                .sent
+                .iter()
+                .filter(|m| m[0] == 0x13)
+                .collect::<Vec<_>>()
         );
         for _ in 0..80 {
             self.step(1);
@@ -614,12 +657,47 @@ fn kurast_docks_arrival_and_every_town_npc_talks() {
         npc::ASHEARA,
         npc::HRATLI,
         npc::MESHIF2,
-        npc::NATALYA,
     ] {
         let msgs = p.talk(class);
         eprintln!("NPC {class}: quest messages {msgs:?}");
         p.assert_clean(&format!("talk to {class}"));
     }
+}
+
+// Covers: specs/world/npc.md §2 (start), specs/ui/npc-menus.tsv (Natalya)
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn natalya_opens_her_menu() {
+    let mut p = Play::start("");
+    let msgs = p.talk_goto(75, npc::NATALYA);
+    eprintln!("Natalya: quest messages {msgs:?}");
+    p.assert_clean("talk to Natalya");
+}
+
+// Covers: specs/world/npc.md §2 (start), specs/ui/npc-menus.tsv (Halbu, Jamella, Nihlathak)
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn act4_and_act5_town_npcs_the_pick_missed_open_their_menus() {
+    let mut p = Play::start("");
+    p.warp(103);
+    for class in [257, 405] {
+        let msgs = p.talk_goto(103, class);
+        eprintln!("NPC {class}: quest messages {msgs:?}");
+        p.assert_clean(&format!("talk to {class}"));
+        p.step(20);
+    }
+    p.warp(109);
+    let msgs = p.talk_goto(109, 515);
+    eprintln!("Nihlathak: quest messages {msgs:?}");
+    // The warp's preset units call `AppRest::or_unit_flags`, a host seam
+    // with no provider yet (not this task's: the flags of preset units,
+    // reported to the coordinator); nothing else may be unhandled.
+    let other: Vec<String> = p
+        .unhandled()
+        .into_iter()
+        .filter(|u| !u.starts_with("unit flags "))
+        .collect();
+    assert!(other.is_empty(), "talk to Nihlathak: {other:?}");
 }
 
 // Covers: specs/world/quests-act3.md §6.2; specs/world/quests-act3.md §6.5; specs/world/quests-act3.md §6.6
