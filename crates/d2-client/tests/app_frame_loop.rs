@@ -224,7 +224,7 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // many (`client/bridge.md` §6 rule 3: nothing is unowned).
     let recorded = app_support::recorded_new_sor()
         .into_iter()
-        .filter(|(frame, _, _)| frame.map_or(true, |f| f <= 2))
+        .filter(|(frame, _, _)| frame.is_none_or(|f| f <= 2))
         .count();
     assert_eq!(joined, recorded);
     // Plus two for the Blood Moor room bordering the synthetic town: its
