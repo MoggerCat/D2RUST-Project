@@ -19,7 +19,7 @@ use std::sync::Arc;
 use bevy::prelude::*;
 use d2_client::app::play::{add_client_data, add_game, add_preview, send_create_game_for};
 use d2_client::app::save::{self, Live, SaveHandle, SharedLink};
-use d2_client::app::single_player::{self, Character, GameData, Sim, DEFAULT_SEED};
+use d2_client::app::single_player::{self, Character, Sim, DEFAULT_SEED};
 use d2_client::app::ui::{add_original_ui, UiParts};
 use d2_client::assets::path::MemorySource;
 use d2_client::bridge::BridgeResource;
@@ -37,6 +37,8 @@ use d2_sim::items::ItemRequest;
 use d2_sim::skills::list::ListOwner;
 use d2_sim::units::UnitId;
 use d2_sim::wiring::economy::ItemSpawn;
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -58,7 +60,7 @@ struct Tables {
 impl Tables {
     fn new() -> Self {
         Self {
-            items: d2_client::app::synthetic_items::item_tables(),
+            items: app_support::live().tables.item_tables().unwrap(),
         }
     }
 }
@@ -169,7 +171,7 @@ impl Run {
     }
 
     fn start_hc(character: &Character, path: &std::path::Path, hardcore: bool) -> Run {
-        let data = GameData::Synthetic;
+        let data = app_support::game_data();
         let ms = Arc::new(AtomicU32::new(1000));
         let mut base = save::base_save(character);
         let hardcore = hardcore || base.header.status & d2s::status::HARDCORE != 0;
@@ -190,7 +192,7 @@ impl Run {
         })
         .unwrap();
         let (server, saver) =
-            save::share(link, base, Arc::new(Tables::new()), path.into()).unwrap();
+            save::share(link, base, Arc::new(Tables::new()), None, path.into()).unwrap();
         let mut app = App::new();
         app.add_plugins((MinimalPlugins, AssetPlugin::default()))
             .init_asset::<Image>()
@@ -574,6 +576,7 @@ fn round_trip(class: &str, name: &str, difficulty: u8, seed: i32) {
 
 // Covers: specs/formats/d2s.md §1 r4; specs/formats/d2s-load.md §2
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn every_class_round_trips_through_save_and_exit() {
     for (i, (class, name)) in [
         ("amazon", "Ama"),
@@ -593,6 +596,7 @@ fn every_class_round_trips_through_save_and_exit() {
 
 // Covers: specs/formats/d2s.md §2.5
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_nightmare_character_round_trips() {
     round_trip("barbarian", "NmBarb", 1, 3);
     round_trip("sorceress", "NmSorc", 1, 5);
@@ -604,6 +608,7 @@ fn a_nightmare_character_round_trips() {
 /// the same item on it.
 // Covers: specs/formats/d2s.md §2.5 r1, §8.4 r2
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_mercenary_with_gear_round_trips() {
     let dir = temp("merc");
     let file = dir.join("Merc.d2s");
@@ -652,6 +657,7 @@ fn a_mercenary_with_gear_round_trips() {
 /// it dead, and the load refuses the file (`d2s.md` §2.2 r5).
 // Covers: specs/formats/d2s.md §2.2 r5; specs/combat/vitals.md §4.8
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_dead_hardcore_character_is_saved_dead_and_refused() {
     let dir = temp("hc");
     let file = dir.join("Hc.d2s");
@@ -717,6 +723,7 @@ fn a_dead_hardcore_character_is_saved_dead_and_refused() {
 /// no temporary file is left; the `.bak` loads as the earlier character.
 // Covers: specs/formats/d2s.md §1 r4
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn each_save_keeps_the_previous_file_as_bak() {
     let dir = temp("bak");
     let file = dir.join("Bak.d2s");
@@ -755,6 +762,7 @@ fn each_save_keeps_the_previous_file_as_bak() {
 /// next save keeps it.
 // Covers: specs/formats/d2s.md §8.3 r4, §2.3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_corpse_with_its_items_survives_save_and_reload() {
     let dir = temp("corpse");
     let file = dir.join("Corpse.d2s");
@@ -832,6 +840,7 @@ fn a_corpse_with_its_items_survives_save_and_reload() {
 /// the file, and nothing panics.
 // Covers: specs/flows/save-exit.md §2 r2
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_window_close_leaves_through_the_server_first() {
     let dir = temp("close");
     let file = dir.join("Close.d2s");
@@ -861,6 +870,7 @@ fn the_window_close_leaves_through_the_server_first() {
 /// (§2.4 r4–r6); unbound slots save as `FF FF 00 00` (r7).
 // Covers: specs/formats/d2s.md §2.4 r1, §2.4 r4, §2.4 r5, §2.4 r7, §2.4 r8
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_hotkey_bound_in_play_round_trips() {
     let dir = temp("hotkey");
     let file = dir.join("Hotkey.d2s");
@@ -922,6 +932,7 @@ fn a_hotkey_bound_in_play_round_trips() {
 /// the measured save of §6 rule 3.
 // Covers: specs/formats/d2s.md §6 r1, §6 r2, §6 r3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn npc_fields_round_trip() {
     let dir = temp("npcs");
     let file = dir.join("Npcs.d2s");

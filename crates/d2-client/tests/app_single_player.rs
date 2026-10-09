@@ -16,6 +16,8 @@ use d2_server::adapters::ProtoSizes;
 use d2_server::host::{Host, SystemClock};
 use d2_sim::rng::Seed;
 
+mod app_support;
+
 fn send_sync<T: Send + Sync>() {}
 
 #[test]
@@ -32,42 +34,46 @@ fn a_failing_builder_is_an_error() {
 }
 
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_build_is_deterministic_and_runs_on_its_thread() {
-    let units = |seed| {
-        let g = single_player::build(&GameData::Synthetic, seed).unwrap();
-        (g.waypoint, g.waypoint_guid)
+    let seeds = |seed| {
+        let mut g = single_player::build(&app_support::game_data(), seed).unwrap();
+        let h = g.sim.events.action.hooks();
+        (h.game_seed, h.objects.as_ref().map(|o| o.obj_seed))
     };
-    assert_eq!(units(DEFAULT_SEED), units(DEFAULT_SEED));
+    assert_eq!(seeds(DEFAULT_SEED), seeds(DEFAULT_SEED));
 
-    let (mut link, started) =
-        single_player::start(GameData::Synthetic, DEFAULT_SEED, SystemClock::default()).unwrap();
+    let (mut link, _) = single_player::start(
+        app_support::game_data(),
+        DEFAULT_SEED,
+        SystemClock::default(),
+    )
+    .unwrap();
     assert_eq!(link.protocol_version(), PROTOCOL_VERSION);
-    let guid = started.waypoint_guid;
-    // The game behind the link is the one built: its waypoint unit has the
-    // GUID the start reported, the session flow is set, and no client
-    // record or player exists before the client's C→S 0x67 / 0x6B
-    // (`intents-events.md` §8).
+    // The game behind the link is the one built: the session flow is set,
+    // and no client record or player exists before the client's C→S 0x67
+    // / 0x6B (`intents-events.md` §8).
     let seen = link
         .with(move |l| {
             let sim = &l.host().game;
             (
-                sim.game.lists.unit(started.waypoint).map(|u| u.guid),
                 sim.session().is_some(),
                 sim.sim_client(d2_client::bridge::LOCAL_CLIENT).is_some(),
                 single_player::local_player(sim),
             )
         })
         .unwrap();
-    assert_eq!(seen, (Some(guid), true, false, None));
+    assert_eq!(seen, (true, false, None));
     // A pump on the server thread: the first frame starts the host clock.
     assert!(!link.pump().unwrap().ticked);
 }
 
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_link_built_elsewhere_runs_unchanged() {
     // Any `ServerLink` can live on the thread: here the bare local link.
     let mut link = ThreadLink::spawn(|| {
-        let g = single_player::build(&GameData::Synthetic, DEFAULT_SEED)?;
+        let g = single_player::build(&app_support::game_data(), DEFAULT_SEED)?;
         Ok::<_, single_player::BuildError>(LocalLink::new(Host::new(
             g.sim,
             ProtoSizes,
@@ -96,13 +102,18 @@ impl d2_server::seams::Clock for StepClock {
 /// fields; the join's 0x59 … 0x7E and 0x04 follow with tick 2's flush.
 // Covers: specs/sim/intents-events.md §8.1, §8.2 r2, §8.2 r3, §8.2 r7
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_session_flow_creates_the_game_then_loads_the_character_at_the_join() {
     use d2_client::bridge::link::SendQueue;
     use std::sync::atomic::{AtomicU32, Ordering};
 
     let ms = std::sync::Arc::new(AtomicU32::new(1000));
-    let (mut link, _) =
-        single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+    let (mut link, _) = single_player::start(
+        app_support::game_data(),
+        DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap();
     let ids = |chunks: Vec<Vec<u8>>| -> Vec<u8> { chunks.iter().map(|c| c[0]).collect() };
     let req = single_player::create_request();
     assert_eq!(req.encode()[0], 0x67);
@@ -150,9 +161,14 @@ fn the_session_flow_creates_the_game_then_loads_the_character_at_the_join() {
     assert_ne!(load.f8, 0);
     let got = ids(chunks);
     assert_eq!(got.first(), Some(&0x59), "{got:02X?}");
-    // 0x04, then the join sequence (`intents-events.md` §8.3: 0x5B, 0x65,
-    // the join 0x5A).
-    assert_eq!(got[got.len() - 4..], [0x04, 0x5B, 0x65, 0x5A], "{got:02X?}");
+    // 0x04, then the state-3 inventory refresh and the join sequence
+    // (`flows/game-join.md` §3 r2, `intents-events.md` §8.3, recorded
+    // frame 2 "0x04, 0x48, 0x5B, 0x65, 0x8D, 0x5A").
+    assert_eq!(
+        got[got.len() - 6..],
+        [0x04, 0x48, 0x5B, 0x65, 0x8D, 0x5A],
+        "{got:02X?}"
+    );
     // A new character has its player record (§8.2 rule 7): 0x5F after
     // 0x0B and the two 0x23 (no `StartSkill` without the vitals tables, so
     // no load 0x23).
@@ -211,13 +227,18 @@ fn the_session_flow_creates_the_game_then_loads_the_character_at_the_join() {
 /// sent, a 0x6B after it finds no record and no player is loaded.
 // Covers: specs/sim/intents-events.md §2.5, §8.2 r1
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_refused_create_request_starts_nothing() {
     use d2_client::bridge::link::SendQueue;
     use std::sync::atomic::{AtomicU32, Ordering};
 
     let ms = std::sync::Arc::new(AtomicU32::new(1000));
-    let (mut link, _) =
-        single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+    let (mut link, _) = single_player::start(
+        app_support::game_data(),
+        DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap();
     let mut req = single_player::create_request();
     req.flags &= !0x6;
     link.send(SendQueue::System, &req.encode()).unwrap();
@@ -294,7 +315,7 @@ fn client_skill_rows_from_the_install() {
 #[ignore = "needs the game files in D2_GAME_DIR"]
 fn live_data_generates_the_levels_from_the_users_files() {
     let dir = std::env::var("D2_GAME_DIR").expect("D2_GAME_DIR");
-    let data = GameData::select(Some(dir.as_ref()), false).unwrap();
+    let data = GameData::select(Some(dir.as_ref())).unwrap();
     assert!(matches!(data, GameData::Live(_)));
     let mut g = single_player::build(&data, DEFAULT_SEED).unwrap();
     assert!(g.sim.world.action.waypoints.is_some());
@@ -311,20 +332,14 @@ fn live_data_generates_the_levels_from_the_users_files() {
     }
 }
 
-/// Without a game directory, or with `--synthetic`, the data is synthetic;
-/// a directory that does not load is an error, never a fallback.
+/// Without a game directory there is no game (no invented fallback,
+/// M23); a directory that does not load is an error naming it.
 #[test]
-fn data_selection_falls_back_only_without_game_files() {
-    assert!(matches!(
-        GameData::select(None, false).unwrap(),
-        GameData::Synthetic
-    ));
+fn data_selection_needs_the_game_files() {
+    let e = GameData::select(None).unwrap_err();
+    assert!(e.to_string().contains("D2_GAME_DIR"), "{e}");
     let missing = std::path::Path::new("/nonexistent/d2rs-no-game-dir");
-    assert!(matches!(
-        GameData::select(Some(missing), true).unwrap(),
-        GameData::Synthetic
-    ));
-    let e = GameData::select(Some(missing), false).unwrap_err();
+    let e = GameData::select(Some(missing)).unwrap_err();
     assert!(e.to_string().contains("d2rs-no-game-dir"), "{e}");
 }
 
@@ -332,52 +347,29 @@ fn data_selection_falls_back_only_without_game_files() {
 /// `{N, 666}` (unstepped, the fixed-seed branch), the regions, the object
 /// control (`dwObjSeed` = the second step's lo', `objects.md` §2 rule 2),
 /// the NPC control and the quest control each take one step, before any
-/// unit; then the waypoint object's allocation takes one (§5.3). The
-/// controls are the wired host's. The synthetic game has no drop state
-/// and one unique-bit store (the hooks'); its hireling tables are the
-/// preview's made-up rows (q-mercs-acts, REC-157).
+/// unit. The build allocates no unit itself: the towns' units are their
+/// presets, placed by the room population after the join. The controls
+/// are the wired host's; the user's files give the drop state.
 // Covers: specs/sim/rng.md §5.2, §5.3; specs/world/objects.md §2
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn game_creation_derives_the_four_controls_in_order_before_the_first_unit() {
-    let mut g = single_player::build(&GameData::Synthetic, DEFAULT_SEED).unwrap();
+    let mut g = single_player::build(&app_support::game_data(), DEFAULT_SEED).unwrap();
     let mut want = Seed::init_low(DEFAULT_SEED);
     want.step();
     let obj_seed = want.step();
     want.step();
     want.step();
-    want.step(); // the waypoint object's allocation
-    want.step(); // Akara (the synthetic town NPC, d2rs-own)
-    want.step(); // Kashya (the second synthetic town NPC, q-a1-bloodraven)
-    want.step(); // Gheed (q-town-gaps, d2rs-own)
-    want.step(); // Charsi (q-town-gaps, d2rs-own)
-    want.step(); // Warriv (q-smoke-travel, REC-280, d2rs-own)
-                 // The Moldy Tome in the Black Marsh (q-a1-tower, d2rs-own): one
-                 // more object allocation, one more step (`rng.md` §5.3).
-    want.step();
-    for _ in 0..=single_player::ACT2_NPCS.len() {
-        want.step(); // Lut Gholein's NPCs and its waypoint (d2rs-own, q-a2-town)
-    }
-    for _ in 0..=d2_client::app::town_npcs::ACT5.len() {
-        want.step(); // Harrogath's NPCs and its waypoint (d2rs-own, q-a5-town)
-    }
-    for _ in 0..=d2_client::app::synthetic_act4::NPCS.len() {
-        want.step(); // the Fortress's NPCs and its waypoint (d2rs-own, q-a4)
-    }
-    want.step(); // Kurast Docks's waypoint (q-act3-act5-gaps, d2rs-own)
-    for _ in d2_client::app::town_npcs::act3_docks() {
-        want.step(); // Kurast Docks's NPCs (q-smoke-town, d2rs-own)
-    }
     let h = g.sim.events.action.hooks();
     assert_eq!(h.game_seed, want);
     assert_eq!(h.objects.as_ref().map(|o| o.obj_seed), Some(obj_seed));
-    // The synthetic game has the Hellforge's drop tables (q-a4-quest-items).
     assert!(h.object_drops.is_some());
     assert_eq!(h.uniques, Default::default());
     let w = &g.sim.world;
     assert!(w.quests.record(1).is_some(), "the quest control's records");
     assert!(w.state.hireling_tables.is_some());
     // M08: another seed gives another object seed.
-    let mut other = single_player::build(&GameData::Synthetic, DEFAULT_SEED + 1).unwrap();
+    let mut other = single_player::build(&app_support::game_data(), DEFAULT_SEED + 1).unwrap();
     let o = other
         .sim
         .events
@@ -395,9 +387,11 @@ fn game_creation_derives_the_four_controls_in_order_before_the_first_unit() {
 /// (`formats/d2s.md` §2.1: +0x14, up to the NUL; +0x23 not read).
 // Covers: specs/formats/d2s.md §2.1, §2.2 r4
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_save_needs_the_users_tables_and_names_its_character() {
-    let e = single_player::load_character(&GameData::Synthetic, "x.d2s".as_ref(), 0).unwrap_err();
-    assert!(e.to_string().contains("D2_GAME_DIR"), "{e}");
+    let e =
+        single_player::load_character(&app_support::game_data(), "x.d2s".as_ref(), 0).unwrap_err();
+    assert!(e.to_string().contains("x.d2s"), "{e}");
     let mut b = vec![0u8; 0x14F];
     b[0x14..0x18].copy_from_slice(b"Kara");
     assert_eq!(single_player::save_name(&b), b"Kara");
@@ -415,7 +409,7 @@ fn a_save_needs_the_users_tables_and_names_its_character() {
 #[ignore = "needs the game files in D2_GAME_DIR"]
 fn live_game_creation_installs_the_drops_and_the_hireling_tables() {
     let dir = std::env::var("D2_GAME_DIR").expect("D2_GAME_DIR");
-    let data = GameData::select(Some(dir.as_ref()), false).unwrap();
+    let data = GameData::select(Some(dir.as_ref())).unwrap();
     let mut g = single_player::build(&data, DEFAULT_SEED).unwrap();
     let h = g.sim.events.action.hooks();
     assert!(h.object_drops.is_some());
@@ -438,7 +432,7 @@ fn a_save_from_the_command_line_joins() {
 
     let dir = std::env::var("D2_GAME_DIR").expect("D2_GAME_DIR");
     let save = std::env::var("D2_SAVE").expect("D2_SAVE");
-    let data = GameData::select(Some(dir.as_ref()), false).unwrap();
+    let data = GameData::select(Some(dir.as_ref())).unwrap();
     let character = single_player::load_character(&data, save.as_ref(), 0).unwrap();
     let req = single_player::create_request_for(&character);
     let ms = std::sync::Arc::new(AtomicU32::new(1000));
@@ -495,4 +489,207 @@ fn the_create_request_has_the_builder_layout() {
         assert_eq!((r.class, &r.char_name[..6]), (2, &b"Necro\0"[..]));
         assert_eq!(r.flags, flags, "status {status:#x}");
     }
+}
+
+/// The join on the play path, up to the first tick's flush: the C→S 0x67
+/// and 0x6B of the app, two ticks; returns the second flush's message
+/// ids, in order.
+fn join_ids() -> Vec<Vec<u8>> {
+    use d2_client::bridge::link::SendQueue;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    let ms = std::sync::Arc::new(AtomicU32::new(1000));
+    let (mut link, _) = single_player::start(
+        app_support::game_data(),
+        DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap();
+    let req = single_player::create_request();
+    link.send(SendQueue::System, &req.encode()).unwrap();
+    link.pump().unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    link.pump().unwrap();
+    link.receive();
+    link.send(SendQueue::System, &[0x6B]).unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    assert!(link.pump().unwrap().ticked);
+    link.receive()
+}
+
+/// The first tick after the join (`flows/game-join.md` §3 r2,
+/// `intents-events.md` §8.3, `flows/server-tick.md` §4 r2): the
+/// per-client update sends the player's stat messages (the changed-stat
+/// array, still holding the join's stats) after the game entry's 0x7E
+/// and before the 0x04, not after the tick; then the flag-ex bit 21
+/// inventory refresh.
+// Covers: specs/flows/server-tick.md §4 r2; specs/sim/tick.md §6 r5
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_first_tick_sends_the_stats_in_the_client_pass_before_0x04() {
+    let got = join_ids();
+    let ids: Vec<u8> = got.iter().map(|m| m[0]).collect();
+    let entry = ids.iter().position(|&i| i == 0x7E).expect("0x7E");
+    let done = ids.iter().position(|&i| i == 0x04).expect("0x04");
+    let stats = ids[entry..done]
+        .iter()
+        .filter(|&&i| matches!(i, 0x1D..=0x1F))
+        .count();
+    assert!(stats > 0, "{:02X?}", &ids[entry..]);
+    // The join's item messages set flag-ex bit 21: the inventory refresh's
+    // 0x48 follows the stats, right before 0x04 (recorded `-022633`
+    // frame 2: units, 0x1D / 0x1E, 0x48, 0x04).
+    assert_eq!(ids[done - 1], 0x48, "{:02X?}", &ids[entry..]);
+    assert!(
+        matches!(ids[done - 2], 0x1D..=0x1F),
+        "{:02X?}",
+        &ids[entry..]
+    );
+    assert!(
+        !ids[done..].iter().any(|&i| matches!(i, 0x1D..=0x1F)),
+        "{:02X?}",
+        &ids[done..]
+    );
+}
+
+/// A death's messages reach the same tick's client pass
+/// (`flows/server-tick.md` §2 rule 2: unit work runs inside step 4, before
+/// step 5): in the tick a player's death starts, its S→C 0x0D code 8
+/// (DT, `client/model.md` §8 r4) comes before that tick's per-client
+/// update messages (here the stat flush of a level change made in the
+/// same tick), not after the whole tick.
+// Covers: specs/flows/server-tick.md §2 r2; specs/sim/tick.md §6 r5
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn a_death_reaches_the_client_pass_of_its_tick() {
+    use d2_client::bridge::link::SendQueue;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    let ms = std::sync::Arc::new(AtomicU32::new(1000));
+    let (mut link, _) = single_player::start(
+        app_support::game_data(),
+        DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap();
+    link.send(SendQueue::System, &single_player::create_request().encode())
+        .unwrap();
+    link.send(SendQueue::System, &[0x6B]).unwrap();
+    for _ in 0..4 {
+        ms.fetch_add(40, Ordering::SeqCst);
+        link.pump().unwrap();
+        link.receive();
+    }
+    let guid = link
+        .with(|l| {
+            let sim = &mut l.host_mut().game;
+            let (p, _) = single_player::local_player(sim).expect("joined");
+            sim.events.action.start_death(&mut sim.game, p);
+            let s = &mut sim.events.action.sys;
+            let l = s.stats.unit_list(p).unwrap();
+            s.stats.set(&mut s.hooks, l, 12, 7, 0, Some(p));
+            s.units.get(p).unwrap().guid
+        })
+        .unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    assert!(link.pump().unwrap().ticked);
+    let got = link.receive();
+    let g = guid.to_le_bytes();
+    let dt = got
+        .iter()
+        .position(|m| m.len() > 6 && m[0] == 0x0D && m[2..6] == g && m[6] == 8)
+        .unwrap_or_else(|| panic!("0x0D code 8 in {got:02X?}"));
+    let stat = got
+        .iter()
+        .position(|m| m[..] == [0x1D, 12, 7])
+        .unwrap_or_else(|| panic!("the level's 0x1D in {got:02X?}"));
+    assert!(dt < stat, "{got:02X?}");
+}
+
+/// The act change on the play path (`flows/act-change.md` §1,
+/// `world/waypoints.md` §11): NPC travel to Lut Gholein (level 40, tile
+/// 0) runs inside the tick's step-4 work; that tick's flush has 0x05,
+/// then 0x03, then 0x53, the new rooms (0x07) and the player's 0x15,
+/// no 0x04, no re-add (0x59 / 0x0B), and the client is in state 5. A
+/// later tick's client pass, the new room ready, sends 0x04 then the
+/// inventory refresh's 0x48 (no join sequence) and the state is 4.
+// Covers: specs/flows/act-change.md §1 r2, §1 r3, §1 r4; specs/world/waypoints.md §11
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn an_act_change_goes_through_state_5_and_the_client_pass_sends_0x04() {
+    use d2_client::bridge::link::SendQueue;
+    use d2_sim::units::lists::client_state;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    let ms = std::sync::Arc::new(AtomicU32::new(1000));
+    let (mut link, _) = single_player::start(
+        app_support::game_data(),
+        DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap();
+    link.send(SendQueue::System, &single_player::create_request().encode())
+        .unwrap();
+    link.send(SendQueue::System, &[0x6B]).unwrap();
+    for _ in 0..4 {
+        ms.fetch_add(40, Ordering::SeqCst);
+        link.pump().unwrap();
+        link.receive();
+    }
+    let guid = link
+        .with(|l| {
+            let sim = &mut l.host_mut().game;
+            let (p, g) = single_player::local_player(sim).expect("joined");
+            sim.events.action.hooks().act_changes.push((p, 40, 0));
+            g
+        })
+        .unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    assert!(link.pump().unwrap().ticked);
+    let got = link.receive();
+    let ids: Vec<u8> = got.iter().map(|m| m[0]).collect();
+    let at = |id: u8| ids.iter().position(|&i| i == id);
+    let (unload, load, env) = (at(0x05), at(0x03), at(0x53));
+    assert!(
+        unload.is_some() && load.is_some() && env.is_some(),
+        "{ids:02X?}"
+    );
+    assert!(unload < load && load < env, "0x05, 0x03, 0x53: {ids:02X?}");
+    assert!(at(0x07) > env, "the new rooms after 0x53: {ids:02X?}");
+    let g = guid.to_le_bytes();
+    let placed = got
+        .iter()
+        .position(|m| m[0] == 0x15 && m[2..6] == g)
+        .expect("the player's 0x15");
+    assert!(Some(placed) > env, "{ids:02X?}");
+    assert_eq!(at(0x04), None, "no 0x04 from the act change: {ids:02X?}");
+    assert!(
+        at(0x59).is_none() && at(0x0B).is_none(),
+        "no re-add: {ids:02X?}"
+    );
+    assert_eq!(
+        link.with(client_state_of).unwrap(),
+        client_state::CHANGING_ACT
+    );
+    let mut done = None;
+    for tick in 0..10 {
+        ms.fetch_add(40, Ordering::SeqCst);
+        link.pump().unwrap();
+        let ids: Vec<u8> = link.receive().iter().map(|m| m[0]).collect();
+        if let Some(i) = ids.iter().position(|&i| i == 0x04) {
+            assert_eq!(ids.get(i + 1), Some(&0x48), "{ids:02X?}");
+            assert!(!ids.contains(&0x5B), "no join sequence: {ids:02X?}");
+            done = Some(tick);
+            break;
+        }
+    }
+    assert!(done.is_some(), "0x04 from a later client pass");
+    assert_eq!(link.with(client_state_of).unwrap(), client_state::IN_GAME);
+}
+
+/// The local client's state (client +0x04).
+fn client_state_of(l: &mut single_player::Link<StepClock>) -> u32 {
+    let sim = &l.host().game;
+    let c = sim.sim_client(d2_client::bridge::LOCAL_CLIENT).unwrap();
+    sim.game.lists.client(c).unwrap().state
 }

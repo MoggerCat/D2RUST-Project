@@ -362,7 +362,7 @@ fn wired_travel() {
     want.extend_from_slice(&[0, 0]);
     assert_eq!(got, vec![want]);
     assert_eq!(fx.interact(), None);
-    assert_eq!(fx.sim.world.action.arrivals.0.len(), 1);
+    assert_eq!(fx.sim.events.sys.hooks.arrivals.0.len(), 1);
     assert!(fx.sim.world.action.faults.is_empty());
 }
 

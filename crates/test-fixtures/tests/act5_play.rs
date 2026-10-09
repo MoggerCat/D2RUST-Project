@@ -12,7 +12,7 @@ use std::sync::OnceLock;
 use d2_sim::units::UnitType;
 use test_fixtures::act5::{self, ARREAT_PLATEAU, BLOODY_FOOTHILLS, FRIGID_HIGHLANDS, TOWN};
 use test_fixtures::game::{ActCreation, GameData};
-use test_fixtures::host::{border_goals, Session, Setup};
+use test_fixtures::host::{Session, Setup};
 use test_fixtures::install;
 use test_fixtures::synth::Synthetic;
 
@@ -64,12 +64,10 @@ fn setup() -> Setup {
     }
 }
 
+/// Into level `to` along the collision route (the levels' preset objects
+/// stand in the way of a straight walk).
 fn walk_to(fx: &mut Session, from: u32, to: u32, what: &str) {
-    let a = fx.level_rect(from);
-    let b = fx.level_rect(to);
-    let p = fx.pos();
-    let goals = border_goals(a, b, p);
-    fx.walk(&goals, |f| f.unit_level(f.player) == Some(to), what);
+    fx.walk_route(from, to, what);
     fx.assert_clean(what);
 }
 
@@ -107,11 +105,7 @@ fn the_player_walks_from_harrogath_through_the_foothills_to_arreat_plateau() {
     );
 
     // Frigid Highlands' north rows are the barricade border (walled in the
-    // original): cross the level along its middle rows first, then to the
-    // edge shared with Arreat Plateau.
-    let west = fx.level_rect(FRIGID_HIGHLANDS).x * 5 + 170;
-    let rows: Vec<(i32, i32)> = [5000, 5100, 4900, 5200].map(|y| (west, y)).to_vec();
-    fx.walk(&rows, |f| f.pos().0 <= west + 5, "across the level");
+    // original): the collision route goes round it.
     walk_to(&mut fx, FRIGID_HIGHLANDS, ARREAT_PLATEAU, "Arreat Plateau");
     assert_eq!(fx.unit_level(fx.player), Some(ARREAT_PLATEAU));
 }

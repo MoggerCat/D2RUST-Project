@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use bevy::prelude::*;
 use d2_client::app::play::add_game;
-use d2_client::app::single_player::{self, GameData, DEFAULT_SEED};
+use d2_client::app::single_player::{self, DEFAULT_SEED};
 use d2_client::app::sound::{AudioParts, GameAudio};
 use d2_client::app::ui::{add_original_ui, UiParts};
 use d2_client::assets::path::MemorySource;
@@ -28,6 +28,8 @@ use d2_client::controls::Action;
 use d2_client::ui::{ActionId, UiEvent};
 use d2_client::world_view::{UiSounds, WorldViewState, WorldViewUi};
 use d2_server::seams::Clock;
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -97,10 +99,15 @@ fn sound_table() -> SoundTableData {
 
 // Covers: specs/ui/panels.md §2 r2, §4 r2, §4 r3, §5, §6 r1; specs/audio/sound-table.md §6.1
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn hotkey_opens_the_inventory_in_the_apps_frame() {
     let ms = Arc::new(AtomicU32::new(1000));
-    let (link, _) =
-        single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+    let (link, _) = single_player::start(
+        app_support::game_data(),
+        DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap();
     let mut app = App::new();
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()

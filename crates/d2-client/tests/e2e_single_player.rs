@@ -1729,7 +1729,7 @@ fn run_with(game_seed: u32) -> Transcript {
     let log = fx.pending().log.clone();
     assert_eq!(log.last(), Some(&format!("warp {} {GATE} 0", player.0)));
     assert_eq!(fx.sim_ref().game.lists.active_rooms(0).len(), 5);
-    let arrivals = &fx.sim_ref().world.action.arrivals.0;
+    let arrivals = &fx.sim_ref().events.action.sys.hooks.arrivals.0;
     assert_eq!(arrivals.len(), 1);
     assert_eq!((arrivals[0].x, arrivals[0].y), PLAYER_AT);
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());

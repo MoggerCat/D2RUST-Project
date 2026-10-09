@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use d2_client::app::server_thread::ThreadLink;
-use d2_client::app::single_player::{self, GameData, Link, DEFAULT_SEED, PLAYER_CLASS};
+use d2_client::app::single_player::{self, Link, DEFAULT_SEED, PLAYER_CLASS};
 use d2_client::bridge::link::{SendQueue, ServerLink};
 use d2_client::bridge::LOCAL_CLIENT;
 use d2_client::rules::unit_composite::code;
@@ -26,6 +26,8 @@ use d2_sim::skills::list::ListOwner;
 use d2_sim::stats::states::StateTable;
 use d2_sim::stats::{StatData, StatLists, StatTable};
 use d2_sim::wiring::path::{place, PathCtx};
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -239,8 +241,12 @@ impl Game {
     /// A joined game whose right skill is `right`.
     fn joined(right: usize) -> Self {
         let ms = Arc::new(AtomicU32::new(1000));
-        let (link, _) =
-            single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+        let (link, _) = single_player::start(
+            app_support::game_data(),
+            DEFAULT_SEED,
+            StepClock(ms.clone()),
+        )
+        .unwrap();
         let mut g = Self { link, ms };
         g.link
             .with(|l| {
@@ -395,6 +401,7 @@ impl Game {
 
 // Covers: specs/skills/use.md §5
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn fire_bolt_and_ice_bolt_cost_mana_and_fly() {
     for id in [FIRE_BOLT, ICE_BOLT] {
         let mut g = Game::joined(id);
@@ -407,6 +414,7 @@ fn fire_bolt_and_ice_bolt_cost_mana_and_fly() {
 
 // Covers: specs/skills/bodies-2.md §3.2
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn charged_bolt_makes_its_bolts() {
     let mut g = Game::joined(CHARGED_BOLT);
     let (most, _) = g.cast(12);
@@ -416,6 +424,7 @@ fn charged_bolt_makes_its_bolts() {
 
 // Covers: specs/skills/bodies.md §4.3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn frozen_armor_sets_its_state() {
     let mut g = Game::joined(FROZEN_ARMOR);
     let (_, got) = g.cast(12);
@@ -429,6 +438,7 @@ fn frozen_armor_sets_its_state() {
 
 // Covers: specs/skills/bodies-2b.md §6.3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn enchant_sets_its_state() {
     let mut g = Game::joined(ENCHANT);
     g.cast(12);
@@ -437,6 +447,7 @@ fn enchant_sets_its_state() {
 
 // Covers: specs/skills/bodies-2b.md §6.5
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn teleport_moves_the_caster() {
     let mut g = Game::joined(TELEPORT);
     let from = g.player_pos();
@@ -451,6 +462,7 @@ fn teleport_moves_the_caster() {
 
 // Covers: specs/skills/bodies.md §8.4
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn nova_makes_a_ring() {
     let mut g = Game::joined(NOVA);
     let (most, _) = g.cast(12);
@@ -459,6 +471,7 @@ fn nova_makes_a_ring() {
 
 // Covers: specs/skills/bodies.md §8.12
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn blizzard_and_meteor_make_a_missile_at_the_point() {
     for id in [BLIZZARD, METEOR] {
         let mut g = Game::joined(id);
@@ -469,6 +482,7 @@ fn blizzard_and_meteor_make_a_missile_at_the_point() {
 
 // Covers: specs/skills/bodies-2b.md §6.2
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn fire_wall_makes_its_wall() {
     let mut g = Game::joined(FIRE_WALL);
     let (most, _) = g.cast(12);
