@@ -54,6 +54,11 @@ pub struct SessionState {
     /// rule 3.5: 0x9C, 0x9D), queued by the loader and sent once by the
     /// join after the stat messages.
     pub join_items: BTreeMap<UnitId, Vec<Vec<u8>>>,
+    /// The quest entry's messages of the join (`intents-events.md` §8.2
+    /// rule 3.1 (e): 0x5E, 0x28, 0x29, 0x89 from `0x00546270`), queued by
+    /// the loader and sent by the join after the loader's other messages,
+    /// before rule 3.2.
+    pub join_quest: BTreeMap<UnitId, Vec<Vec<u8>>>,
 }
 
 /// S→C 0x59 AssignPlayer (`0x0053E8F0`, 26 bytes, §7.2 part A): GUID

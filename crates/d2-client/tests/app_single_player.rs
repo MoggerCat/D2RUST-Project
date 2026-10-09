@@ -693,3 +693,45 @@ fn client_state_of(l: &mut single_player::Link<StepClock>) -> u32 {
     let c = sim.sim_client(d2_client::bridge::LOCAL_CLIENT).unwrap();
     sim.game.lists.client(c).unwrap().state
 }
+
+// Covers: specs/sim/intents-events.md §8.2 r3; specs/world/quests.md §3
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_join_sends_the_quest_entry_messages_before_the_player_record() {
+    use d2_client::bridge::link::SendQueue;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    let ms = std::sync::Arc::new(AtomicU32::new(1000));
+    let (mut link, _) = single_player::start(
+        app_support::game_data(),
+        DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap();
+    link.send(SendQueue::System, &single_player::create_request().encode())
+        .unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    link.pump().unwrap();
+    link.pump().unwrap();
+    link.receive();
+    link.send(SendQueue::System, &[0x6B]).unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    assert!(link.pump().unwrap().ticked);
+    let chunks = link.receive();
+    let got: Vec<u8> = chunks.iter().map(|c| c[0]).collect();
+    // A new character: the stub load's mode 1 and the caller's mode 0
+    // each send 0x5E, 0x28 (type 6, GUID 0) and 0x29 (`quests.md` §3).
+    let first = |id: u8| got.iter().position(|&i| i == id);
+    let (q5e, q28, q29, h0b) = (first(0x5E), first(0x28), first(0x29), first(0x0B));
+    assert!(
+        q5e.is_some() && q28.is_some() && q29.is_some(),
+        "{got:02X?}"
+    );
+    assert!(q5e < q28 && q28 < q29 && q29 < h0b, "{got:02X?}");
+    for id in [0x5E, 0x28, 0x29] {
+        assert_eq!(got.iter().filter(|&&i| i == id).count(), 2, "{id:#X}");
+    }
+    let q28 = chunks.iter().find(|c| c[0] == 0x28).unwrap();
+    assert_eq!((q28[1], &q28[2..6]), (6, &[0u8, 0, 0, 0][..]));
+    assert_eq!(q28.len(), 103);
+}
