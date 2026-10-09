@@ -32,27 +32,27 @@
 |   2. Unit table | 139–188 |
 |   3. Local player | 189–211 |
 |   4. Receive and the unit message queue | 212–249 |
-|   5. Client update pass | 250–370 |
-|   6. Position check (`0x004804E0`) | 371–414 |
-|   7. Session messages | 415–590 |
-|   8. Mode requests | 591–676 |
-|   9. Room-in-sight messages | 677–711 |
-|   10. Bit reader | 712–726 |
-|   11. Current act and level (join and later) | 727–772 |
-|   12. Client DRLG and the room of a point | 773–814 |
-|   13. Visibility predicate (`0x004DBF20`) | 815–866 |
-|   14. Pet list and the hireling GUID | 867–920 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 921–1010 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 1011–1045 |
-|   17. Model writes made by 1.14d UI code | 1046–1192 |
-|   18. Audio driver inputs and the client object functions | 1193–1223 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1224–1452 |
-| Constants & data dependencies | 1453–1465 |
-| Randomness | 1466–1481 |
-| Edge cases & original bugs | 1482–1506 |
-| Test vectors | 1507–1564 |
-| Provenance | 1565–1668 |
-| Open questions | 1669–1827 |
+|   5. Client update pass | 250–383 |
+|   6. Position check (`0x004804E0`) | 384–427 |
+|   7. Session messages | 428–603 |
+|   8. Mode requests | 604–689 |
+|   9. Room-in-sight messages | 690–724 |
+|   10. Bit reader | 725–739 |
+|   11. Current act and level (join and later) | 740–785 |
+|   12. Client DRLG and the room of a point | 786–827 |
+|   13. Visibility predicate (`0x004DBF20`) | 828–879 |
+|   14. Pet list and the hireling GUID | 880–933 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 934–1023 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 1024–1058 |
+|   17. Model writes made by 1.14d UI code | 1059–1205 |
+|   18. Audio driver inputs and the client object functions | 1206–1236 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1237–1465 |
+| Constants & data dependencies | 1466–1478 |
+| Randomness | 1479–1494 |
+| Edge cases & original bugs | 1495–1519 |
+| Test vectors | 1520–1577 |
+| Provenance | 1578–1681 |
+| Open questions | 1682–1840 |
 <!-- /index -->
 
 ## Summary
@@ -324,14 +324,27 @@ position check of the local player.
       room at (x, y), §12 r5). Other types → `0x00465FD0(GUID, class,
       x, y, type, mode)` with flags |= 0x600000. The chickens of the Act 1
       arrival (GUIDs 93–95, `docs/handoff/pc1-data.md` Step 4 item 30)
-      are the 92nd–94th creations of the process. PROVISIONAL
-      (REC-660): which earlier creations (client missiles, client DS1
-      presets, other rooms' critters) take GUIDs 2–92 is not traced.
+      are the 92nd–94th creations of the process. Counted on 1.14d
+      (REC-660 settled 2026-10-09, `traces/client/a1-arrival-creations-ama.jsonl`,
+      `tools/trace-recorder/record_client_creations.py`, ScnAma seed
+      1234): the counter does not move in the front end; all 205
+      creations of the arrival come in the room pass of server frame 2,
+      room by room, each room's critters (r6.1, return `0x0046C316` in
+      `0x0046C1A0`, class 149, type 1, mode argument 0) before its
+      client presets (r6.2, return `0x00466862`, type 2, objects 40 /
+      41 / 42 River1–3 and 65 "invisible river sound1"): critters
+      2–7, presets 8–89, critters 90–95, presets 96–121, critters
+      122–124, presets 125–206. So GUIDs 2–92 are 9 chickens of the
+      two earlier rooms' critter passes and 82 river presets; no client
+      missile is created before the arrival chickens. A critter whose
+      10 tries all fail takes no GUID (`0x0046C1A0` calls the creator
+      only after a free point).
    4. **Critter AI** `0x0046D780(U)` (from `0x00463CC0`, once per update
       pass, after U's per-unit step). T = monster data +0x30 (think
-      timer, `0x004AE110`; starts 0, PROVISIONAL REC-661: not traced
-      through `0x004AE8D0`). `idle` = `0x0046CB40`: code 7 request at
-      U's own position (`0x004AFF60`, §19: |Δ| ≤ 1 → neutral fallback).
+      timer, `0x004AE110`; starts 0: every critter of the arrival reads
+      T = 0 at its first AI call, in the client update that created
+      it (frame 2); REC-661 settled 2026-10-09, same trace, `think0`
+      records). `idle` = `0x0046CB40`: code 7 request at U's own position (`0x004AFF60`, §19: |Δ| ≤ 1 → neutral fallback).
       `step(d, code, r4)` = `0x0046C960`: two draws of U's seed (+0x20),
       x' = x ± d by bit 0 of the first, y' = y ± d by the second, then
       request `code` with {x', y', 0, path type, r4, path byte}.

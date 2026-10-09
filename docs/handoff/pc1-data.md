@@ -349,7 +349,8 @@ rather than a hand-run recipe.
     (not yet run on 1.14d). Each form can be tried first with
     `poke.py --forms FILE` (README "Call forms") before it goes into
     `CALL_FORMS`.
-23. **Poke runs on Windows** (REC-590): the cloud ran every runnable
+
+23. **Poke runs on Windows** (REC-590) — answered → see `docs/handoff/pc1-day3-a.md`. The cloud ran every runnable
     directive on 1.14d under Wine (`specs/tools/poke.md` Status) and
     settled the variant load (REC-591, `tools/test-variants.md` Status).
     Left: run `traces/pokes/spawn-town.poke` once on PC 1 with a
@@ -654,6 +655,12 @@ Then the rest:
   - REC-670: local input path for mode 18; answered → see docs/handoff/pc1-day3-b.md
   - REC-671: whirl end rule; answered → see docs/handoff/pc1-day3-b.md
   - REC-680: Blood Golem life share. answered → see docs/handoff/pc1-day3-b.md
+  - REC-660: client GUIDs 2–92 (needs a runtime count); answered → see `docs/handoff/pc1-day3-a.md`;
+  - REC-661: critter think-timer start; answered → see `docs/handoff/pc1-day3-a.md`;
+  - REC-665: mode request to own position;
+  - REC-670: local input path for mode 18;
+  - REC-671: whirl end rule;
+  - REC-680: Blood Golem life share.
 - Not traced: the other critter handlers (rat, bat).
 
 **New q-fix rows (build-queue.tsv)**
