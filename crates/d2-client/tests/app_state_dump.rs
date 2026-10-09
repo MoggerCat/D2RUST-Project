@@ -156,7 +156,7 @@ fn a_poke_spawn_runs_before_its_frame_and_the_unit_is_in_that_snapshot() {
     assert!(lines[6].contains(&unit), "{}", lines[6]);
 }
 
-// Covers: specs/tools/scenario-diff.md §3 r11; specs/tools/scenario.md §3 r3, §3 r5, §4 r2
+// Covers: specs/tools/scenario-diff.md §3 r12; specs/tools/scenario.md §3 r3, §3 r5, §4 r2
 // (state-dump --send: after frame f − 1's snapshot, through the bridge, no duplicate filter)
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]

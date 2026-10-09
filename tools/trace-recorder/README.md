@@ -32,8 +32,13 @@ code. Spec-role tool: the addresses it hooks are documented in
 | `autostart.py` | Unattended start for every `record_*.py`: `--auto CHAR [--seed N] [--input SCRIPT]` starts a single-player game with that expansion character (no player at the keyboard), optionally with a fixed map / game seed, then plays a scripted input (clicks, keys, screenshots) into the window; `--try CHAR` runs it alone; `--selftest` |
 | `check_drlg_acts.py` | Checks the `dumpdrlg` records of an `--auto` run against `specs/drlg/levels.md` §3–§4 (rules D1–D7); `--perturb N`; `--selftest` |
 | `dump_tables.py` | Launches `game/Game.exe` under the debugger, stops when the excel load and its fix-ups have finished, writes every loaded table and the runtime maps it knows to `traces/raw/<time>-tables/` (gitignored); compared by `data-tool dump-compare` |
+| `record_objanim.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick hook only): every call of the animation re-init `0x00624390` on an object (client or server) with seed, mode, frame and speed before / after and the caller addresses on the stack, the client object init `0x004BC720` and 0x0E mode change `0x004BCF60`; `--steps` the generic step `0x004BCBB0` (mode changes, wraps), `--range` the interact range test `0x00623660` (result) and the C→S 0x13 object case `0x00548B00`; format `objanim-raw-1`; `--selftest`. Specs: `world/objects.md` §4, §7, `world/objects-client.md` §25 |
+| `objanim_facts.py` | Turns `record_objanim.py` recordings into `facts/objects/*.tsv` (measurements only); `--selftest` |
 | `poke.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick hook plus the tick return `0x0052FD1E`): runs poke directives (`specs/tools/poke.md`) between two server ticks, calling the game's own creation functions or writing the state field; `--poke-file FILE` (ticks relative to F0), `--poke "F D ..."` (absolute frame), `--forms FILE` (call forms, `CALL_FORMS`); writes `traces/raw/<time>-poke.jsonl` (format `poke-raw-1`, gitignored); `PokeLayer` / `add_options` for other recorders; `--selftest` |
-| `send.py` | Scripted C→S messages (`specs/tools/scenario-diff.md` §2 `at … send`, §3 rule 11): `--send "F NAME FIELD=VALUE..."` / `--send "F hex BYTES..."` (absolute frame F; typed messages of `specs/sim/client-messages.tsv` encoded as `specs/tools/scenario.md` §3 rule 2, references `@player`, `@x±N`, `@y±N`, `@T[:C][#n]` read from the live unit lists) injected by `specs/tools/original-hooks.md` §1 rule 4: at the first stop of the drain call `0x0044F136` after tick F − 1 (frame from the tick return `0x0052FD1E`), the bytes on a scratch page and a call of the transport send `0x0052AE50` on the stopped thread, EAX checked, context restored; a `{"k":"send",...}` record per message. `SendLayer` / `add_options` for `record_state.py`, `record_packets.py`, `record_frames.py`; `--encode NAME FIELD=VALUE...`; `--selftest` |
+| `send.py` | Scripted C→S messages (`specs/tools/scenario-diff.md` §2 `at … send`, §3 rule 12): `--send "F NAME FIELD=VALUE..."` / `--send "F hex BYTES..."` (absolute frame F; typed messages of `specs/sim/client-messages.tsv` encoded as `specs/tools/scenario.md` §3 rule 2, references `@player`, `@x±N`, `@y±N`, `@T[:C][#n]` read from the live unit lists) injected by `specs/tools/original-hooks.md` §1 rule 4: at the first stop of the drain call `0x0044F136` after tick F − 1 (frame from the tick return `0x0052FD1E`), the bytes on a scratch page and a call of the transport send `0x0052AE50` on the stopped thread, EAX checked, context restored; a `{"k":"send",...}` record per message. `SendLayer` / `add_options` for `record_state.py`, `record_packets.py`, `record_frames.py`; `--encode NAME FIELD=VALUE...`; `--selftest` |
+| `record_anim.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick hook only): per client unit update (`0x00480810`) the player / monster mode, frame +0x44, frame count +0x48, speed +0x4C, event +0x4E, footstep stamp +0x84, path position and motion record (flags, ticks left, ox / oy / oz); every footstep call (`0x004CAF60`) and leap start (`0x004C8670`); `--arm-level N` arms the hooks only in level N; writes `traces/raw/<time>-anim.jsonl` (format `anim-raw-1`). Specs: `client/model.md` §5, `render/unit-composite.md` §8, `audio/triggers.md` §5 |
+| `anim_facts.py` | Turns one `record_anim.py` recording into `facts/client/anim/<name>.tsv` (format `anim-facts-1`): the chosen units' update, footstep and leap rows; `--selftest` |
+| `panel_text.py` | Reads the text one `record_frames.py` frame draws (glyph `CelDrawColor` draws grouped by pen y, Latin glyph frame = character) into `facts/client/ui/<name>.tsv` (format `panel-text-1`); `--selftest` |
 
 ## Use
 
@@ -64,7 +69,11 @@ exits. Several sessions or worktrees on one PC therefore queue: the second
 prints `another 1.14d run holds the game lock; waiting`. With the lock
 held, it also waits until no `Game.exe` is running, in case a game was
 started by hand or by an older copy of these tools. The wait gives up
-after one hour. `D2_GAME_LOCK=0` turns the lock off.
+after one hour. It also follows the file rule in `docs/handoff/pc1-data.md`:
+it creates `%TEMP%\d2-game.lock` exclusively, waits while another holder
+has it, and deletes it at exit. A lock file older than 15 minutes with no
+`Game.exe` running is treated as left behind and removed. `D2_GAME_LOCK=0`
+turns all of it off.
 
 ## How it hooks the RNG
 
@@ -231,7 +240,7 @@ recording after S seconds, default 120), `goto TYPE CLASS[,CLASS…] [S
 [DX DY]]` (walk toward the nearest unit of set S `0x7A5E70` with that
 type and class by clicking toward it, wait until the player stands
 still, click it at its draw point + (DX, DY), default (0, −8); screen
-position from `render/camera.md` §2–§4), `dumpdrlg [LABEL]` (log the
+position from `render/camera.md` §2–§4), `dumpdrlg [LABEL]` (with LABEL `rooms<id>` it also lists that level's DRLG rooms: tile rect, type, lvlprest index, preset units; log the
 client act's DRLG and level list, `drlg/levels.md` §1 offsets: act no,
 init seed, DRLG seed, `dwStartSeed`, tombs, jungle bit, per level id,
 DRLG type, flags, rooms, rect, level type, seed, jungle fields, warp
@@ -437,6 +446,21 @@ entry), `footer`. A list dump: `L`, `ext`, `fl`, `st`, `ex`, `ot`, `og`,
 extended lists `last`, `setl`, `ow`, `F` (full), `m` (mod keys), `cb`,
 `sb` (state bits).
 
+## record_walk.py: the local player's client path against the server's
+
+`record_walk.py` (0.1.0, raw format `walk-raw-1`) reuses `record_tick.py`'s
+debugger with two hooks only, the server tick `0x52D870` and the in-game
+draw entry `0x44C990` (`render/capture.md` §2), and logs the client player
+(`0x7A6A70`) and the server player (game unit hash, same GUID): path
+16.16 position, mode, path target, index and count, at every tick start
+(`t`) and every draw entry (`fr`), the unit / path pointers when they
+change (`units`), and the camera globals `0x7A520C` / `0x7A5208` /
+`0x7A5214` at the first tick and the first draw entry (`cam0`). Fast under
+Wine (about 1,700 ticks in 4 minutes). `convert_walk.py RAW --id ID --out
+traces/client/model/ID.json` writes the committed trace (area `client`,
+behavior `model`: the camera records and the tick states where either
+path changed, with tick / frame difference counts). `--selftest` checks
+the readers.
 ## record_state.py: game-state snapshots
 
 ```

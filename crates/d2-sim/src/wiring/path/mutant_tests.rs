@@ -829,3 +829,75 @@ fn a_moving_missile_reads_the_collision_word_its_step_cached() {
     assert!(fx.sim.hooks().missile_store().get(m).is_some());
     fx.assert_clean();
 }
+
+/// The game entry writes the entry act into the player's unit record
+/// (+0x18): measured on 1.14d, `a4-fortress-arrival-ama` (act 3 at frame
+/// 2 of an Act IV start; an allocation without a room gives 0).
+// Covers: specs/sim/path-placement.md §11 r2
+#[test]
+fn game_entry_sets_the_players_act() {
+    let mut fx = fx_with(&[
+        (LEVEL, TileRect::new(0, 0, 8, 8)),
+        (TOWN, TileRect::new(0, 16, 8, 8)),
+    ]);
+    let req = AllocRequest {
+        ty: UnitType::Player,
+        class: 0,
+        room: None,
+        add: true,
+        fixed_guid: None,
+        mode: 1,
+        allied: true,
+    };
+    let p = fx
+        .sim
+        .with(&mut fx.game, |g, v| v.allocate(g, &req, 0, 0))
+        .unwrap();
+    fx.sim
+        .with(&mut fx.game, |_, v| v.units.get_mut(p).unwrap().act = 3);
+    assert!(fx.sim.with(&mut fx.game, |g, v| {
+        super::place::game_entry(PathCtx::of(v, g), p, 0)
+    }));
+    let act = fx
+        .sim
+        .with(&mut fx.game, |_, v| v.units.get(p).unwrap().act);
+    assert_eq!(act, 0);
+}
+
+/// `SUNIT_Add` (`path-placement.md` §2.5): an object gets its footprint
+/// when `HasCollision[mode]` is set, with the class's mask (§3), and its
+/// removal clears it. Found by `a4-warp-plains-ama`: the object footprints
+/// were never stamped at the add, so populated objects were placed on
+/// each other's cells.
+// Covers: specs/sim/path-placement.md §2.5, §5.2
+#[test]
+fn an_object_with_collision_stamps_its_footprint_at_the_add_and_removal_clears_it() {
+    use crate::world::objects::ObjectTables;
+    use d2_data::tables::Objects;
+    let mut fx = fx();
+    let mut o: Objects = crate::skills::fake::blank();
+    (o.sizex, o.sizey, o.hascollision0) = (2, 2, 1);
+    let mut quiet: Objects = crate::skills::fake::blank();
+    (quiet.sizex, quiet.sizey) = (2, 2);
+    fx.sim.create_objects(Arc::new(ObjectTables {
+        objects: vec![o, quiet],
+        shrines: Vec::new(),
+        levels: Vec::new(),
+        objgroup: Vec::new(),
+        leveldefs: Vec::new(),
+    }));
+    let a = fx.a;
+    let o0 = fx
+        .sim
+        .with(&mut fx.game, |g, v| v.create_object(g, a, 0, 20, 20, 0))
+        .expect("allocated");
+    // The object mask 0x400 over its 2 × 2 box.
+    assert_eq!(cell(&mut fx, 20, 20) & 0x400, 0x400);
+    // A class with `HasCollision0` 0 stamps nothing.
+    fx.sim
+        .with(&mut fx.game, |g, v| v.create_object(g, a, 1, 30, 20, 0))
+        .expect("allocated");
+    assert_eq!(cell(&mut fx, 30, 20), 0);
+    remove(&mut fx, o0);
+    assert_eq!(cell(&mut fx, 20, 20) & 0x400, 0);
+}

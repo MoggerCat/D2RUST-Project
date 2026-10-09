@@ -69,6 +69,19 @@ impl<X: Pending> ActionSim<X> {
         X::golem_resummon(&mut s.hooks, &mut sim, player)
     }
 
+    /// The save load's passive states of `unit`
+    /// ([`Pending::passive_refresh_all`]).
+    pub fn passive_refresh_all(&mut self, game: &mut Game, unit: UnitId) {
+        let s = &mut self.sys;
+        let mut sim = crate::units::hooks::Sim {
+            game,
+            units: &mut s.units,
+            stats: &mut s.stats,
+            data: &s.data,
+        };
+        X::passive_refresh_all(&mut s.hooks, &mut sim, unit)
+    }
+
     /// Runs `f` with the missile code's context (creation from skills,
     /// tests).
     pub fn missiles<R>(

@@ -140,7 +140,16 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         }
         let at_saved_place = match saved_mode {
             mode::EQUIPPED => self.equip_from_cursor(o, g, it.body_loc, true).0,
-            mode::BELT => self.belt_place(o, g, it.x as u32),
+            // The belt slot's placement leaves the item's mode to its
+            // caller (`inventory-moves.md` §7.14 sets 2); a loaded belt
+            // item is mode 2 (1.14d, `items-load-mixed` frame 2).
+            mode::BELT => {
+                let placed = self.belt_place(o, g, it.x as u32);
+                if placed {
+                    self.set_mode(g, mode::BELT);
+                }
+                placed
+            }
             _ if stale => false,
             _ => self.place(owner, unit, (it.x, it.y), false, true),
         };

@@ -1,0 +1,60 @@
+check 1
+# Placement target for the playthrough harness (pc1-day3-c round 2, 2026-10-09):
+# Hephasto (monster 409, superunique 41) in the River of Flame (level 107), Forge E block.
+# The player warps there before frame 4, then is moved along a path with
+# pos pokes every 3 frames, 10 sub-tiles apart, until the target's room is active.
+# 1.14d (PC 1, Windows, -seed 1234): ut 1 cl 409: GUID 81 at (7672, 6270), mode 1; created when its room
+# is populated (the player's room becomes adjacent), not at level load.
+# Table: docs/handoff/pc1-day3-c.md "Round 2 — placement". Spec: specs/tools/scenario-diff.md.
+name milestone-hephasto
+save MilA5 --class sor --expansion --act 2
+seed 1234
+ticks 177
+seconds 240
+channels state
+at 4 poke warp 107
+at 12 poke pos @player 7803 5928
+at 15 poke pos @player 7803 5938
+at 18 poke pos @player 7803 5948
+at 21 poke pos @player 7803 5958
+at 24 poke pos @player 7803 5968
+at 27 poke pos @player 7802 5978
+at 30 poke pos @player 7802 5988
+at 33 poke pos @player 7802 5998
+at 36 poke pos @player 7802 6009
+at 39 poke pos @player 7802 6019
+at 42 poke pos @player 7802 6029
+at 45 poke pos @player 7802 6039
+at 48 poke pos @player 7802 6049
+at 51 poke pos @player 7802 6059
+at 54 poke pos @player 7802 6069
+at 57 poke pos @player 7802 6079
+at 60 poke pos @player 7802 6089
+at 63 poke pos @player 7801 6099
+at 66 poke pos @player 7801 6109
+at 69 poke pos @player 7801 6119
+at 72 poke pos @player 7801 6129
+at 75 poke pos @player 7801 6139
+at 78 poke pos @player 7801 6149
+at 81 poke pos @player 7801 6159
+at 84 poke pos @player 7801 6169
+at 87 poke pos @player 7801 6180
+at 90 poke pos @player 7801 6190
+at 93 poke pos @player 7801 6200
+at 96 poke pos @player 7800 6210
+at 99 poke pos @player 7800 6220
+at 102 poke pos @player 7800 6230
+at 105 poke pos @player 7800 6240
+at 108 poke pos @player 7800 6250
+at 111 poke pos @player 7800 6260
+at 114 poke pos @player 7790 6260
+at 117 poke pos @player 7780 6260
+at 120 poke pos @player 7770 6260
+at 123 poke pos @player 7760 6260
+at 126 poke pos @player 7750 6260
+at 129 poke pos @player 7740 6260
+at 132 poke pos @player 7730 6260
+at 135 poke pos @player 7720 6260
+at 138 poke pos @player 7710 6260
+at 141 poke pos @player 7700 6260
+at 144 poke pos @player 7690 6260

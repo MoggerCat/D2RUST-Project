@@ -20,15 +20,15 @@
 | Outputs / state changes | 50–60 |
 | Rules | 61–62 |
 |   1. Files | 63–68 |
-|   2. Syntax | 69–139 |
-|   3. Run | 140–381 |
-|   4. Suite | 382–477 |
-| Constants & data dependencies | 478–481 |
-| Randomness | 482–485 |
-| Edge cases & original bugs | 486–504 |
-| Test vectors | 505–520 |
-| Provenance | 521–524 |
-| Open questions | 525–561 |
+|   2. Syntax | 69–140 |
+|   3. Run | 141–391 |
+|   4. Suite | 392–487 |
+| Constants & data dependencies | 488–491 |
+| Randomness | 492–495 |
+| Edge cases & original bugs | 496–514 |
+| Test vectors | 515–531 |
+| Provenance | 532–535 |
+| Open questions | 536–572 |
 <!-- /index -->
 
 ## Summary
@@ -89,8 +89,9 @@ state first. It is the default way to compare a behaviour with 1.14d.
 | `input orig <script>` | no | `autostart.py` input script (seconds, client pixels) |
 | `input d2rs <script>` | no | `d2-client play --input` script (server ticks; `state-dump` takes it only in rule 4's form) |
 | `ignore <field>...` | no, repeatable | state fields not compared (`state_diff.py --ignore`) |
+| `variant <name>` | no | both sides run on the test variant install `traces/variants/<name>/<name>.d2stack` (`tools/test-variants.md`), §3 rule 11 |
 | `at <frame> poke <directive> <args...>` | no, repeatable | state injection (`tools/poke.md` §1, §2 rule 6; `spawn` lines as §1 rule 3): `<frame>` ≥ 1 is the absolute game frame (the `f` of `tools/state-snapshot.md`); applied after frame `<frame>` − 1 and its snapshot, before frame `<frame>`'s drain; passed in file order to every 1.14d recorder and to d2rs `state-dump` / `play` as `--poke "<frame> <directive> <args...>"` |
-| `at <frame> send <Name> <field>=<value>...` / `at <frame> send hex <byte>...` | no, repeatable | a scripted C→S message (§3 rule 11): a typed message of `sim/client-messages.tsv` or raw bytes, written, encoded and resolved exactly as a scenario step's `msg` / `hex` (`tools/scenario.md` §3 rules 1–5, references included); `<frame>` as for `poke`; injected in the drain before tick `<frame>`, after that point's pokes and input; several sends of one frame in file order |
+| `at <frame> send <Name> <field>=<value>...` / `at <frame> send hex <byte>...` | no, repeatable | a scripted C→S message (§3 rule 12): a typed message of `sim/client-messages.tsv` or raw bytes, written, encoded and resolved exactly as a scenario step's `msg` / `hex` (`tools/scenario.md` §3 rules 1–5, references included); `<frame>` as for `poke`; injected in the drain before tick `<frame>`, after that point's pokes and input; several sends of one frame in file order |
 
 4. The shared input script (`input <script>`): steps separated by `;`,
    run in order; the first is `frame F`. Steps:
@@ -322,7 +323,7 @@ state first. It is the default way to compare a behaviour with 1.14d.
     compared (partial; `record_rng.py` has none of them); `input orig` /
     `input d2rs`: 1.14d only, partial at best. First run: `rng-town-arrival-ama.check`
     (`tools/rng-trace.md` Open questions 1).
-11. **send** (§2 `at … send`): each line goes in file order, after the
+12. **send** (§2 `at … send`): each line goes in file order, after the
     `--poke` options, as `--send "<frame> <canonical message>"` (the
     message re-written in `tools/scenario.md` §2 rule 6's canonical form:
     typed fields in layout order, hex bytes lower case) to every 1.14d
@@ -378,6 +379,15 @@ state first. It is the default way to compare a behaviour with 1.14d.
        appears in the inventory; store item 1 is removed), d2rs 0x2A
        kind 0, code 10 (`world/npc.md` §9: no room for the bought item),
        GUID −1, gold 5000, and nothing moves.
+11. **variant** (§2 `variant <name>`): before the save is built, the
+    variant install `<base>/../variants/<name>` (base: `D2_GAME_DIR`, the
+    default of `tools/test-variants.md`) is built with `cargo run
+    --release -p data-tool -- variant build
+    traces/variants/<name>/<name>.d2stack --game <base> --out <dir>`
+    unless it already holds `Game.exe`; then it is the game dir of
+    every step (d2s-tool's tables, the 1.14d recorders' `--game`, d2rs'
+    `D2_GAME_DIR`). Used to take a system out of a check (a level with
+    no monster population, `traces/variants/blood-moor-empty`).
 
 ### 4. Suite
 
@@ -509,6 +519,7 @@ None in the tool. Both games run on `seed`.
 | `--selftest` | the parser accepts the sample and every committed check; each malformed line kind is rejected; a dry run issues the recorder, state-dump and comparator commands with the check's save and seed |
 | `--selftest` (draws) | the dry run issues `record_frames.py --every 1 --draws-every 1 --no-save`, `facts_render.py --frame`, one `cargo build`, the binary's `play --dump-draws … --at-tick <draws-at>` and `facts-compare … --ignore tick`; a one-side run issues no compare; the frame pick returns the frame at the tick, else the last earlier one with a draw log; a scene's `frame.tsv` tick is read back |
 
+| `--selftest` (variant) | `variant only-fallen` builds `<base>/../variants/only-fallen` with `data-tool variant build traces/variants/only-fallen/only-fallen.d2stack --game <base>` and the recorder gets `--game <that dir>/Game.exe`; a name outside `[a-z0-9-]` and a repeated `variant` are rejected |
 | `--selftest` (input) | a shared `input` line reaches `record_state.py`, `state-dump`, `record_frames.py` and `play` as `--input '<script>'`; a script not starting with `frame`, with `wait` / `shot`, a frame 0 or going back, a `hold` without N or non-integer arguments, and a shared line next to `input orig` are rejected; an `input d2rs` in play's tick form goes to `play` only |
 | `suite.py --selftest` | discovery by glob and area, slowest first; the cache key misses on a change of the check, the save or Game.exe; the 1.14d outputs and key removed, d2rs' kept; a prefix copy hard-links the bulk and copies `*.reg` and saves, no lock; the rng build before the plain one; match % per channel (draws by rows), area and overall; playthrough acts from the `--all` keys or from milestones; text and Markdown tables |
 | comparators' `--selftest` (`--json`) | `state_diff`, `rng_diff`, `packets_diff`: the summary counts the frames with a difference and names the first; a match has every frame equal and no first |

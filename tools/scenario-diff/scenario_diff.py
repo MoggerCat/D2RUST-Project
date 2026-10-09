@@ -130,6 +130,14 @@ def parse(text):
             if side in c["input"]:
                 raise CheckError(f"line {n}: 'input {side}' repeated")
             c["input"][side] = script.strip()
+        elif kw == "variant":
+            # `variant <name>`: both sides run on the test variant install
+            # built from traces/variants/<name>/<name>.d2stack (§2, §3 rule 9)
+            once(kw)
+            if len(toks) != 1 or not all(ch.isalnum() and ch == ch.lower() or ch == "-"
+                                         for ch in toks[0]):
+                raise CheckError(f"line {n}: variant <name> (one token of [a-z0-9-])")
+            c["variant"] = toks[0]
         elif kw == "ignore":
             c["ignore"] += toks
         elif kw == "at":
@@ -211,6 +219,25 @@ class Runner:
         self.game_dir = os.environ.get("D2_GAME_DIR") or (
             os.path.join(REPO, "game") if WINDOWS else os.path.expanduser("~/game"))
         self.log = []
+        self.base_game_dir = self.game_dir
+
+    def use_variant(self):
+        """`variant <name>` (§3 rule 9): build the variant install next to
+        the base install (`data-tool variant build`, tools/test-variants.md;
+        reused when it is there) and run both sides on it."""
+        name = self.c.get("variant")
+        if not name:
+            return
+        out = os.path.join(os.path.dirname(os.path.normpath(self.base_game_dir)), "variants",
+                           name)
+        stack = os.path.join("traces", "variants", name, name + ".d2stack")
+        if self.dry or not os.path.exists(os.path.join(out, "Game.exe")):
+            env = dict(os.environ, CARGO_PROFILE_RELEASE_DEBUG="0",
+                       D2_GAME_DIR=self.base_game_dir)
+            self.sh(["cargo", "run", "--release", "-q", "-p", "data-tool", "--", "variant",
+                     "build", stack, "--game", self.base_game_dir, "--out", out], env=env)
+        print(f"variant: {name} -> {out}")
+        self.game_dir = out
 
     def poke_args(self):
         """--poke "<frame> <directive> <args>" per `at` line, file order (both sides)."""
@@ -630,6 +657,8 @@ def selftest():
         "poke": GOOD + "at 5 spawn 1 2 3\n",
         "poke frame": GOOD + "at 0 poke time 1 0\n",
         "name": GOOD.replace("name a1-town-arrival-ama", "name A_B"),
+        "variant": GOOD + "variant Only_Fallen\n",
+        "variant twice": GOOD + "variant a\nvariant b\n",
     }
     for what, text in bad.items():
         try:
@@ -693,6 +722,18 @@ def selftest():
         line = next(x for x in r.log if what in x)
         assert sq in line and line.index(poke) < line.index(sq), (what, line)
     assert "--send" not in next(x for x in r.log if " play " in x)
+    # variant: built next to the base install, then both sides run on it
+    cv = parse(GOOD + "variant only-fallen\n")
+    r = Runner(cv, "/tmp/w", dry=True)
+    r.game_dir = r.base_game_dir = "/g/game"
+    r.next = 5
+    r.use_variant()
+    assert r.log[-1] == ("cargo run --release -q -p data-tool -- variant build "
+                         "traces/variants/only-fallen/only-fallen.d2stack --game /g/game "
+                         "--out /g/variants/only-fallen"), r.log[-1]
+    assert r.game_dir == "/g/variants/only-fallen"
+    r.state("/tmp/w/ScnAma.d2s", {"orig", "d2rs"})
+    assert "--game /g/variants/only-fallen/Game.exe" in next(x for x in r.log if "record_state" in x)
     ok += 1
     # frame_seq_at: record_frames' frame records (seq, f, draws), odd ticks only
     import tempfile
@@ -873,6 +914,7 @@ def main(argv=None):
         r.next = a.next
         sides = {"orig", "d2rs"} - ({"d2rs"} if a.orig_only else set()) - (
             {"orig"} if a.d2rs_only else set())
+        r.use_variant()
         save = r.build_save()
         for ch in c["channels"]:
             print(f"\n=== channel {ch} ===", flush=True)

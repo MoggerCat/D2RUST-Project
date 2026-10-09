@@ -49,7 +49,11 @@
 //! the 0x15 placement after it (the placement's teleport sets the path's
 //! point count to 0, `sim/path-placement.md` §6 r4; whether the client
 //! then walks on to the request's target is OQ2), and the hold until the
-//! target is in the player's room. Used only by the `play` preview; the
+//! target is in the player's room. Measured on a waypoint arrival
+//! (`traces/client/model/client-0002.json`): the 1.14d client stands at
+//! the 0x15 point with the server and never walks to the 0x0D's x + 3,
+//! y + 3, where this module draws it: q-fix-arrival-walkout (warps and
+//! portals not recorded yet, REC-570). Used only by the `play` preview; the
 //! strict path never builds one.
 
 use std::sync::OnceLock;
@@ -285,7 +289,7 @@ pub struct Predict {
     /// The server tick the walk under way started on (kept while a new
     /// click re-targets it; cleared when it ends): the walk animation's
     /// start ([`Self::walk_since`]).
-    since: Option<u64>,
+    since: Option<(u64, u32)>,
     /// The player's own path over the client DRLG ([`ClientPath`]): the
     /// step of a walk when the client has a DRLG.
     path: ClientPath,
@@ -612,17 +616,19 @@ impl Predict {
         if ticked {
             self.tick(world, speeds);
         }
-        self.since = match (self.walk, self.since) {
+        // The animation restarts with the mode (walk ↔ run, `a1-run-*`:
+        // the run frames count from the first run click).
+        self.since = match (self.mode(), self.since) {
             (None, _) => None,
-            (Some(_), None) => Some(world.server_ticks),
-            (Some(_), since) => since,
+            (Some(m), Some((t, was))) if was == m => Some((t, m)),
+            (Some(m), _) => Some((world.server_ticks, m)),
         };
     }
 
     /// The server tick the walk under way started on (`sim/units.md`
     /// §4.7 step 7 revision: the walk frame counts from there).
     pub fn walk_since(&self) -> Option<u64> {
-        self.since
+        self.since.map(|(t, _)| t)
     }
 
     /// The predicted precise position (16.16 sub-tiles, the form

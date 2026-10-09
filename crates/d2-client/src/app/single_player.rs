@@ -88,7 +88,9 @@ use d2_server::adapters::handlers::world::{
     preview_cube_parts, preview_inv_parts, ActionEvents, ActionWorld, Outbox, QuestEnter,
     WiredWorld, WorldHost,
 };
-use d2_server::adapters::session::{load_new_character_with_items, load_save, GameSetup};
+use d2_server::adapters::session::{
+    initial_portal_flags, load_new_character_with_items, load_save, GameSetup,
+};
 use d2_server::adapters::session_flow::{
     create_flags, CharacterLoader, CreateGame, Loaded, SessionFlow,
 };
@@ -181,9 +183,11 @@ pub const DEFAULT_SEED: u32 = 1234;
 /// (game +0x84 := 1): it wins. Otherwise a loaded save whose town byte
 /// for the game's difficulty has 0x80 gives its saved map seed
 /// (`formats/d2s.md` §2.2 rule 8, +0xAB). Otherwise [`DEFAULT_SEED`].
-/// PROVISIONAL (REC-291): 1.14d draws a fresh seed for a new character
-/// (`time_value`, `rng.md` §5.2); d2rs keeps the fixed default so dev
-/// runs and draw dumps stay reproducible. d2rs-own, unverified.
+/// PROVISIONAL (REC-291 -> q-fix-new-char-seed): 1.14d draws a fresh
+/// seed for a new character (`time_value`, `rng.md` §5.2; measured: two
+/// new characters got 0x63a0b0fd and 0x07013cee,
+/// `traces/frontend/frontend-menus/frontend-0005.json`); d2rs keeps the
+/// fixed default so dev runs and draw dumps stay reproducible.
 pub fn game_seed(character: &Character, fixed: Option<u32>) -> u32 {
     if let Some(n) = fixed {
         return n;
@@ -857,6 +861,9 @@ impl Pending for LocalSeams {
     fn golem_resummon(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, player: UnitId) -> bool {
         skill_events::golem_resummon(h, sim, player)
     }
+    fn passive_refresh_all(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
+        skill_events::passive_refresh_all(h, sim, unit);
+    }
     // d2rs-own, unverified (q-amazon, REC-150): the hand class, the item
     // shoots / stack facts of the skill bodies ([`super::weapons`]).
     fn composit_weapon_class(&self, unit: UnitId) -> i32 {
@@ -1030,10 +1037,13 @@ impl Pending for LocalSeams {
     }
     /// `0x00623660`, the operate entry's interact range (`objects.md`
     /// §7.1 rule 3): no written spec gives its test.
-    // PROVISIONAL (world/objects.md §7.1 r3; REC-94): in range. The
-    // preview client sends C→S 0x13 only on arrival
-    // (`world_view/interact.rs`); the §7.3 r3–r4 approach is
-    // `Pending::object_approach`'s default (operate).
+    /// Measured (REC-94, `facts/objects/objanim-a1-town.tsv` run r3): 1.14d's client polls
+    /// `0x00623660(P, O)` every frame of the walk and sends C→S 0x13 on
+    /// the first frame it returns 1 (waypoint 119 at sub-tile offset
+    /// (4, 3), stash 267 at (3, 1)); both server calls of that 0x13
+    /// (`0x00548B7D`, `0x00584597`) then return 1. So "in range" holds
+    /// for every 0x13 the client sends; the test's own formula is not
+    /// modelled (`docs/handoff/pc1-data.md` Step 4).
     fn object_in_range(&self, _: &Game, _: UnitId, _: UnitId) -> bool {
         true
     }
@@ -1983,6 +1993,13 @@ pub fn build_with(
     )));
     hooks.vitals = parts.vitals;
     hooks.bodies = parts.bodies;
+    // The hireling calls (save restore, join follow, act change;
+    // `hirelings-2.md` §19) run on the wired host, which holds the
+    // hireling lists when the game has `hireling.txt`; without the queue
+    // a saved hireling is never restored (`hirelings.md` §10).
+    if parts.hirelings.is_some() {
+        hooks.hireling_calls = Some(Vec::new());
+    }
     // The client vitals sync (`combat/vitals.md` §5.1): life, mana,
     // stamina and position sent to the client at the end of each tick.
     hooks.enable_vitals_sync();
@@ -2161,6 +2178,11 @@ fn loader(
             // the save's or the start items and the act's DRLG.
             let p = v.allocate(g, &req, 0, 0)?;
             v.init_player_seed(p);
+            // `combat/hit.md` §7.1: a player is good (2), its state-105
+            // list there before its first 0xAA (`intents-events.md`
+            // §7.9 rule 1, recorded). PROVISIONAL (REC-750): the
+            // original's call site in the join is not identified.
+            v.set_alignment(g, p, 2);
             Some(p)
         }) else {
             s.events
@@ -2248,9 +2270,22 @@ fn loader(
             }
             Character::Save(save, ctx) => match load_save(s, player, save, ctx) {
                 Ok((mut entry, report)) => {
+                    // The skill section's assigns turn the passive states on
+                    // with their stat lists (`d2s-load.md` §2 "skills",
+                    // before the items).
+                    s.events.action.passive_refresh_all(&mut s.game, player);
                     // q-save-full: the save's items, made on the wired host.
                     let items_ok = super::save_full::join_items(s, player, save);
                     let corpses_ok = super::save_full::join_corpses(s, player, save);
+                    // The saved hireling (`d2s.md` §1 load order: the
+                    // player's items, the corpses, then the hireling,
+                    // `hirelings.md` §10): its roomless allocation draws
+                    // its unit seed before game entry populates the rooms
+                    // (`hirelings-2.md` §16 rule 3), and the monster init
+                    // of that allocation (`units.md` §3.1 step 7, its
+                    // component and stat rolls) needs the lent world.
+                    let (game, world) = (&mut s.game, &mut s.world);
+                    s.events.lend_world(|a| world.hireling_calls(game, a));
                     super::save_gaps::join_gaps(s, player, save);
                     // `d2s.md` §2.4 rules 4–6: the hot keys, their item
                     // indices resolved over the loaded inventory list.
@@ -2258,6 +2293,17 @@ fn loader(
                         &save.header.hotkeys,
                         &s.world.item_guids(player),
                     );
+                    // `d2s-load.md` §8 rules 1–2: a full save's record
+                    // (the join's 0x5F and 0x23 pair, `intents-events.md`
+                    // §8.2 rules 3.3, 3.7). A stub's is the loader's.
+                    if entry.record.is_none() {
+                        let portals = s.events.action.sys.hooks.drlg.data.portal_levels();
+                        entry.record = Some(super::save_gaps::loaded_record(
+                            &save.header.mouse[..2],
+                            &s.world.item_guids(player),
+                            initial_portal_flags(&portals),
+                        ));
+                    }
                     let log = &mut s.events.action.hooks().x.log;
                     log.extend(
                         report

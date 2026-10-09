@@ -262,7 +262,7 @@ mod tests {
         }
     }
 
-    // Covers: specs/tools/scenario-diff.md §3 r11
+    // Covers: specs/tools/scenario-diff.md §3 r12
     #[test]
     fn send_record_lines() {
         let ok = Injected::Sent {

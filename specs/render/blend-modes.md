@@ -24,16 +24,16 @@
 |   2. Blend-table orientation (per drawer) | 92–127 |
 |   3. Draw mode of a composite unit component | 128–173 |
 |   4. Single-cel units and overlays | 174–185 |
-|   5. Shadows (the darkening blend) | 186–276 |
-|   6. Translucent walls and roofs | 277–311 |
-|   7. d2rs answers | 312–322 |
-|   8. Lines and rectangles (GDI) | 323–357 |
-| Constants & data dependencies | 358–366 |
-| Randomness | 367–370 |
-| Edge cases & original bugs | 371–385 |
-| Test vectors | 386–419 |
-| Provenance | 420–448 |
-| Open questions | 449–475 |
+|   5. Shadows (the darkening blend) | 186–299 |
+|   6. Translucent walls and roofs | 300–334 |
+|   7. d2rs answers | 335–345 |
+|   8. Lines and rectangles (GDI) | 346–380 |
+| Constants & data dependencies | 381–389 |
+| Randomness | 390–393 |
+| Edge cases & original bugs | 394–408 |
+| Test vectors | 409–447 |
+| Provenance | 448–477 |
+| Open questions | 478–504 |
 <!-- /index -->
 
 ## Summary
@@ -214,8 +214,10 @@ non-zero is drawn through slot `+0x90` (`0x004F6540`; GDI `0x006C87E0` →
    Xoffset / Yoffset (`+0x148` / `+0x14C`) to X / Y with no `Draw` test.
    Compared with the unit draw (`camera.md` §4) the shadow is 2 pixels
    left and moves by half the height `oz` in both x and y instead of
-   taking `oz` in y. Then the COF box pre-test `0x004709A0` (as
-   `unit-composite.md` §4; but see the revision below) and the same draw identity, COF, direction
+   taking `oz` in y. In perspective mode the open-mode shift (±W/4,
+   below) is added to X before the test. Then the COF box pre-test
+   `0x004709A0(U, X, Y, 0, 1)` on this (X, Y) (the sheared form of
+   `unit-composite.md` §4: r3a below) and the same draw identity, COF, direction
    and frame as the unit (`0x00645270`, `0x0064F380`,
    `unit-composite.md` §2–§3; the linked-unit inventory rule of
    `unit-composite.md` §1.1 applies). Revision 2026-10-09
@@ -225,9 +227,16 @@ non-zero is drawn through slot `+0x90` (`0x004F6540`; GDI `0x006C87E0` →
    bodies of fortress brazier #1 (`98`, BlocksLight 1) and #2 (`99`,
    BlocksLight 0) and only #1's shadows; the same for `c7` (0, no
    shadow) against `to`, `wp`, `n2`, `rb`, `b6` … (1, shadows) in
-   every recorded scene. PROVISIONAL (REC-518): the test is applied
-   with the skips above (settled by the shadow path `0x00471620`'s
-   object branch, PC 1). Every layer `i` of the COF
+   every recorded scene. Settled (REC-518, 2026-10-09 read): the test
+   **is** the first skip above. `0x00471620` never reads `BlocksLight`;
+   its object branch only adds Xoffset / Yoffset (`0x00640E90(class)`
+   `+0x148` / `+0x14C`) with no `Draw` test. The bit is unit flags
+   `+0xC4` 0x20, which the object set-up `0x004BC720` and every object
+   mode change (`0x004BCA90`, `0x004BCBB0`, `0x004BCDE0`, `0x004BCF60`)
+   set to `BlocksLight[mode] = 0` (`client/msg-ui.md` flag table).
+   The test therefore follows the object's current mode, and an object
+   whose mode has `BlocksLight` 0 casts no shadow. (Monsters set the
+   same bit from `monstats2` `shadow` = 0.) Every layer `i` of the COF
    (`0x004DB110` order) with shadow byte ≠ 0 and component `< 16` builds
    its request (`0x004DBB50`) and is drawn at (X, Y); a failed request
    skips the layer. Perspective mode only (not GDI): the position comes
@@ -239,19 +248,33 @@ non-zero is drawn through slot `+0x90` (`0x004F6540`; GDI `0x006C87E0` →
    above: `a1-run-ne` / `a1-run-se` draw the waypoint's shadow at X = 980
    (`wponhth.cof` box x min −115: −115 + 980 ≥ W − 1), `a1-panel-inventory`
    the torch's at X = 918 (x min −75, open mode 1), each with no body
-   row. PROVISIONAL (REC-511): the shadow's pre-test is the box test of
-   `unit-composite.md` §4 on the sheared shadow box, independent of the
-   body's: with `(X, Y)` the shadow position above and `d = ⌊(y max −
-   y min) / 2⌋` (the shadow's row count, each row one pixel left of the
-   one below), the box is x from `X + x min − d` to `X + x max`, y from
-   `Y + y max − d` to `Y + y max`, drawn when `x lo < W − 1`, `x hi ≥ 0`,
-   `y hi ≥ 0`, `y lo < H − 1`. It fits every shadow of the recorded
-   scenes, e.g. `a1-panel-inventory` (open mode 1): torch (`toonhth`
+   row.
+   **r3a. Shadow pre-test** (settled, REC-511, 2026-10-09 read of the
+   call at `0x004717E5`–`0x004717EE` and of `0x004709A0`). The shadow
+   has its own pre-test, independent of the body's. It is
+   `0x004709A0(U, X = EDX, Y, 0, 1)` at the shadow position above (after
+   the object offsets and, in perspective mode, the open-mode shift).
+   The body test (`unit-composite.md` §4; `client/model.md` §13 r2)
+   calls the same function with last argument 0. The fourth argument
+   (the "centering" of those rules) is never read by `0x004709A0`.
+   A last argument ≠ 0 changes only the left bound: with `d = (y max −
+   y min) / 2` (C division; the shadow's row count), drawn when
+   `X + x min − d < W − 1`, `X + x max ≥ 0`, `Y + y max ≥ 0` and
+   `Y + y min < H − 1`. The y bounds stay the **whole COF box**, not
+   the sheared rows `y max − d … y max`. That vertical part of the
+   2026-10-09 revision was a guess, not part of the binary. Only the
+   x shift was measured. A COF without a loaded record fails the test
+   (returns 0), as for the body. This fits every shadow of the
+   recorded scenes, e.g. `a1-panel-inventory` (open mode 1): torch (`toonhth`
    box −75..13 × −108..5) at X = 918 drawn (918 − 75 − 56 = 787), rogue
    (`rgnuhth` −43..29 × −62..7) at X = 918 not drawn (841), torch at
    X = 1094 not drawn, torches at X = −26 and −170 not drawn (x max).
-   Because only the shear explains the torch / rogue pair at the same X;
-   settled by the pre-test's arguments at `0x00471620` (PC 1).
+   The `− d` on x min is what separates the torch / rogue pair at the
+   same X. None of these scenes puts a shadow near the bottom edge, so
+   the y form is the binary read alone. Example (synthetic, 800 × 600,
+   box −75..13 × −108..5, d = 56): at Y = 680 the test passes
+   (680 − 108 = 572 < 599), whereas the sheared-row form would fail
+   (680 + 5 − 56 = 629). The draw then clips the rows below H − 1 (r2).
 4. Single-cel shadow (`0x00471450`, types ≥ 3): same skips; objects need
    `Draw` (`+0x150`) ≠ 0 and `BlocksLight` of the object's mode
    (`+0x118 + mode`) ≠ 0, then add Xoffset / Yoffset;
@@ -415,6 +438,11 @@ Real values: act 1 `Pal.PL2` (`shading.md` Test vectors, SHA-256
 | GDI line (10, 10) → (8, 15) | y-major: (10, 10), (10, 11), (10, 12), (9, 13), (9, 14), (9, 15) | §8 r1 |
 | GDI line (4, 4) → (4, 0) | (4, 4), (4, 3), (4, 2), (4, 1), (4, 0) | §8 r1 |
 | GDI rectangle x0 = 5, x1 = 5 | nothing (before any y test) | §8 r2 |
+| shadow pre-test, 800 × 600, box −75..13 × −108..5 (d = 56), X = 918, Y = 300 | drawn: 918 − 75 − 56 = 787 < 799 | §5 r3a |
+| same box at X = 931 | not drawn: 931 − 131 = 800 ≥ 799 (the body test, 931 − 75 = 856, fails too) | §5 r3a |
+| same box at X = 400, Y = 680 | drawn: 680 − 108 = 572 < 599 (full-box y bound, not y max − d) | §5 r3a |
+| same box at X = 400, Y = 707 | not drawn: 707 − 108 = 599 | §5 r3a |
+| object in a mode with `BlocksLight` 0 (unit flags `+0xC4` 0x20 set) | no composite shadow | §5 r3 |
 | capture run 2 (`20261006-141725`), frames 566 → 590, inventory open, static camera, Town Portal opening (objects `TP`, `TPONHTH.COF`: layer HD override level 3, layer TR none) | 8,641 of the 9,445 pixels that were stable before and changed after hold a value of row `d` of `ADD` (the rest: the opaque TR layer, the portal's light, rain) | §1 mode 3, capture |
 
 ## Provenance
@@ -445,6 +473,7 @@ from their pushes), GDI slots `+0xB8` = `0x006C8A60`, `+0xC0` =
 unused). Major-axis test (`cmp |Δx|, |Δy|; jge` → x branch) and the
 rectangle's unchecked negative width read in the disassembly of
 `0x006C8C80` / `0x006C8A60`.
+2026-10-09 (pc1-day3-c item 44, read in all.asm / disasm.py; REC-511, REC-518): `0x00471620` (skips `0x0047162E`–`0x0047164F`, object offsets `0x0047178B`–`0x004717A8`, open-mode shift `0x004717AB`–`0x004717E2`, pre-test call `0x004717E5`–`0x004717EE`), `0x004709A0` (`ret 0xC`; argument 5 at `0x00470AA7`–`0x00470AC7`, bounds `0x00470AC9`–`0x00470AFB`), shadow-list kind 2 `0x004DF5E7`–`0x004DF5EF`, flag-ex 0x80 `0x004DC710`; the object flag 0x20 writers per `client/msg-ui.md`.
 
 ## Open questions
 

@@ -768,11 +768,12 @@ impl Weather {
             // §11.2 r3: intensity := 0.0, the target is kept.
             self.intensity_256 = 0;
         } else {
-            // PROVISIONAL (render/draw-order-2.md §11.2 r3 vs §11.9 r3; REC-??):
-            // the move runs only when particles are live (§11.2 r3), so `F`
-            // counts those calls; §11.9 r3's "even with an empty pool" is
-            // read as a pool emptied during the call. Settled by a weather
-            // capture with the rain / snow state per frame (capture.md §3.4).
+            // The move runs only when particles are live (§11.2 r3), so `F`
+            // counts those calls; §11.9 r3's "even with an empty pool" is a
+            // pool emptied during the call. Recorded 2026-10-09: the rain
+            // updates with no live particle call no `0x004732C0` and leave
+            // `F` at 0; it counts from the first update with one
+            // (`facts/client/weather/a1-town-rain-start.tsv`).
             if self.particles.live() != 0 {
                 self.move_particles(seed, input)?;
             }

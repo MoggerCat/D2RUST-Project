@@ -236,6 +236,56 @@ def _game_exe_running():
     return "game.exe" in out.lower()
 
 
+def _lock_file_path():
+    return os.path.join(os.environ.get("TEMP") or os.environ.get("TMP") or ".", "d2-game.lock")
+
+
+def _take_lock_file(start):
+    """The file half of the rule (docs/handoff/pc1-data.md, "One Game.exe open
+    at a time"): create %TEMP%\\d2-game.lock exclusively, wait while another
+    holder has it, delete it when this process exits. A lock file older than
+    LOCK_FILE_STALE s while no Game.exe runs is taken as left behind."""
+    import atexit
+    path = _lock_file_path()
+    noted = False
+    while True:
+        try:
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, ("pid %d %s\n" % (os.getpid(), " ".join(sys.argv))).encode())
+            os.close(fd)
+            break
+        except FileExistsError:
+            try:
+                age = time.time() - os.path.getmtime(path)
+            except OSError:
+                continue
+            if age > LOCK_FILE_STALE and not _game_exe_running():
+                print("note: removing a stale %s (%d s old, no Game.exe)" % (path, age),
+                      file=sys.stderr)
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+                continue
+            if not noted:
+                print("note: %s exists (another session runs 1.14d); waiting" % path,
+                      file=sys.stderr)
+                noted = True
+            if time.monotonic() - start > GAME_LOCK_MAX_WAIT:
+                raise RuntimeError("game lock: %s held for %d s" % (path, GAME_LOCK_MAX_WAIT))
+            time.sleep(5)
+
+    def _drop():
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+    atexit.register(_drop)
+
+
+LOCK_FILE_STALE = 900.0
+
+
 def acquire_game_lock():
     """Take the one-game-at-a-time lock (idempotent within a process)."""
     global _game_lock
@@ -258,6 +308,7 @@ def acquire_game_lock():
         if time.monotonic() - start > GAME_LOCK_MAX_WAIT:
             raise RuntimeError("game lock: waited %d s" % GAME_LOCK_MAX_WAIT)
     _game_lock = h
+    _take_lock_file(start)
     noted = False
     while _game_exe_running():
         if not noted:

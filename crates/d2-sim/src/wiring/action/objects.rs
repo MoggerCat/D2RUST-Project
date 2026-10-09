@@ -112,6 +112,24 @@ pub trait QuestObjectHost<X> {
     ) {
         let _ = (game, v, player, from, to);
     }
+    /// The quest active test `0x00544590(game, player, npc)`
+    /// (`world/quests.md` §6.4) for the NPC AI's interact gate
+    /// (`monsters/ai.md` §5.3 scan 2): `class` and `interact` are the
+    /// NPC's monstats class and flag. True after the 0x8A send. Default:
+    /// false.
+    #[allow(clippy::too_many_arguments)]
+    fn npc_wants_interact(
+        &mut self,
+        game: &mut Game,
+        v: &mut View<'_, X>,
+        player: UnitId,
+        npc: UnitId,
+        class: u16,
+        interact: bool,
+    ) -> bool {
+        let _ = (game, v, player, npc, class, interact);
+        false
+    }
     /// For the host taking its parts back.
     fn into_any(self: Box<Self>) -> Box<dyn std::any::Any>;
 }
