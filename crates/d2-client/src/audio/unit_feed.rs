@@ -541,7 +541,7 @@ impl UnitFeed {
                     t.frame = 0;
                     t.frame_count = f;
                     t.speed = if key.unit_type == PLAYER {
-                        player_rate(world, key, &shown, s as i32)
+                        player_rate(world, key, &shown, s)
                     } else {
                         s
                     };
