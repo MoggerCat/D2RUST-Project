@@ -31,14 +31,14 @@
 |   6. Run / walk and menu buttons | 460–480 |
 |   7. Skill buttons | 481–503 |
 |   8. New-stats and new-skills buttons | 504–552 |
-|   9. Mini panel (state 0x15) | 553–613 |
-|   10. Control panel mouse input | 614–654 |
-| Constants & data dependencies | 655–666 |
-| Randomness | 667–670 |
-| Edge cases & original bugs | 671–683 |
-| Test vectors | 684–716 |
-| Provenance | 717–740 |
-| Open questions | 741–782 |
+|   9. Mini panel (state 0x15) | 553–618 |
+|   10. Control panel mouse input | 619–659 |
+| Constants & data dependencies | 660–671 |
+| Randomness | 672–675 |
+| Edge cases & original bugs | 676–688 |
+| Test vectors | 689–721 |
+| Provenance | 722–745 |
+| Open questions | 746–796 |
 <!-- /index -->
 
 ## Summary
@@ -129,7 +129,7 @@ draw mode 5 unless a rule says otherwise.
    4. e = C − last change C; d = last change C − start C clamped to 7…15.
       If v > 0, e < d and last ≠ start: shown = start + `_ftol`(((e + 1)
       / d) · (last − start)) (x87: `fild`, `fidiv`, `fimul`, truncation
-      toward 0; §Open questions 1); else shown = v. Then clamp to 0…m.
+      toward 0, binary64 at PC = 53, not the integer product; §Open questions 1); else shown = v. Then clamp to 0…m.
 2. **Life** (`0x00496F80`): m = max life; m = 0 → nothing (no globe, no
    overlay). f = (80 · shown) / m (C division); f = 1 or 2 with P a
    living player (type 0, mode ≠ 0x11) → 2.
@@ -599,7 +599,12 @@ draw mode 5 unless a rule says otherwise.
 7. **Press** (`0x0047EF30`, no cursor item, `[0x007BC970]` = 0): region
    as r6 with o = (−118 when the belt has extra rows and a row count >
    1) + (−118 when `[0x007BC968]`) + (119 when `[0x007BC96C]`); button i
-   (strict x test): f = 7, or P a living player and (state 9 closed, or
+   (strict x test against the button x table `[0x007BC898 + 4i]`, the
+   positions of the layout last drawn — only the draw `0x0047F710`
+   calls the builder `0x0047E8B0`, so press, release (r8) and tool tips
+   (r6) all test the last drawn layout, whatever o is; before the
+   first draw the table is zero; no button under x → nothing, not
+   consumed): f = 7, or P a living player and (state 9 closed, or
    i ≥ 4 single / i ≥ 5 multi) → pressed i := 1; in every case UI sound
    4, the press latch `[0x007BC97C]` := 1, consumed.
 8. **Release** (`0x0047ED90`, only with the latch; latch := 0; no cursor
@@ -740,10 +745,19 @@ with Python scripts outside the repo. No capture yet.
 
 ## Open questions
 
-1. **Needs recording.** Globe smoothing: whether `(e + 1) / d · Δ` under
-   the process's x87 precision control truncates exactly like the
-   integer `(e + 1) · Δ / d` (cases like d = 3, Δ = 3); a recording of a
-   globe refilling (frame by frame) settles it.
+1. **Answered** (2026-10-09, pc1-data Step 4 item 4; REC-21's static
+   half). Globe smoothing: the precision is PC = 53 (CRT start-up,
+   `items/treasure.md` OQ5), so `0x00496F3F`–`0x00496F48` (`fild`
+   e + 1, `fidiv` d, `fimul` Δ, `0x00682FD0`: exact `fstp` to a double,
+   `cvttsd2si`) equals binary64 `trunc(fl(fl((e + 1) / d) · Δ))`. It is
+   **not** the integer `(e + 1) · Δ / d`: the smallest case is d = 11,
+   e + 1 = 3, Δ = ±55 (float 14.999… → 14, integer 15); over d 7…15 and
+   |Δ| ≤ 200000 they differ in 48,562 cases (exhaustive, Python
+   binary64). PROVISIONAL (REC-610) only for a video runtime DLL
+   changing PC on the game thread.
+   ```
+   shown = start + trunc_f64((e1 as f64 / d as f64) * delta as f64)
+   ```
 2. **Answered** (2026-10-07, §5 r10–r12; belt use by key
    `0x00498A90`: `ui/controls.md` §7 r3). Was: Belt hover tracking
    `0x00498930` / `0x00498A90` / `0x00498D60` / `0x00498E80` (hovered

@@ -41,20 +41,20 @@
 |   4. Adding units (`0x00458DC0`, room R) | 158–176 |
 |   5. Reveal | 177–208 |
 |   6. Town art (`0x004591A0`, DRLG callback +0x488) | 209–227 |
-|   7. Persistence (`.map`, `.ma0`–`.ma3`) | 228–263 |
-|   8. State, keys and options | 264–299 |
-|   9. View geometry | 300–322 |
-|   10. Cell draw pass | 323–361 |
-|   11. Unit markers (`0x0045AC90` → `0x0045A860`) | 362–403 |
-|   12. Party roster markers (`0x0045AB60`) | 404–415 |
-|   13. Header text | 416–432 |
-|   14. Lifetime | 433–439 |
-| Constants & data dependencies | 440–453 |
-| Randomness | 454–461 |
-| Edge cases & original bugs | 462–477 |
-| Test vectors | 478–513 |
-| Provenance | 514–534 |
-| Open questions | 535–553 |
+|   7. Persistence (`.map`, `.ma0`–`.ma3`) | 228–268 |
+|   8. State, keys and options | 269–304 |
+|   9. View geometry | 305–327 |
+|   10. Cell draw pass | 328–368 |
+|   11. Unit markers (`0x0045AC90` → `0x0045A860`) | 369–419 |
+|   12. Party roster markers (`0x0045AB60`) | 420–431 |
+|   13. Header text | 432–448 |
+|   14. Lifetime | 449–455 |
+| Constants & data dependencies | 456–469 |
+| Randomness | 470–477 |
+| Edge cases & original bugs | 478–493 |
+| Test vectors | 494–529 |
+| Provenance | 530–550 |
+| Open questions | 551–573 |
 <!-- /index -->
 
 ## Summary
@@ -241,24 +241,29 @@ plain save dir when the sub-dir file cannot be opened).
    four `.ma` files deleted, k = 0. The header is rewritten in both new
    cases. The open handle is `.ma<k>`.
 2. **Data file** (`.ma<k>`): a 400-byte table of 100 u32 offsets indexed
-   by layer id (0 = no records), then records: a 32-byte header of
-   eight u32 (layer id, town kind, act record second u32, byte sizes of
-   the floor, wall, unit, town blobs, link), then the four blobs. A
-   blob is a list of (cel, x, y) i16 triples, 6 bytes each.
+   by layer id (entry L at byte 4·L; 0 = no records), then records: a
+   32-byte header of eight u32 — +0 link (file offset of the layer's
+   next record, 0 = last), +4 layer id, +8 town kind, +0xC act record
+   second u32, +0x10 / +0x14 / +0x18 / +0x1C byte sizes of the floor,
+   wall, unit, town blobs — then the non-empty blobs in that order. A
+   blob is a list of (cel, x, y) i16 triples, 6 bytes each. (Writer
+   `0x00458200` and reader `0x00458750` both handle the link first.)
 3. **Save** (`0x004584C0`, on a layer switch and at teardown, §14): only
    cells with saved flag 0 are written, each tree in in-order (§10 r3);
-   a new record is appended and linked from the layer's chain (first
-   record: the table entry; later: the previous record's link).
-   PROVISIONAL: the link is the header's eighth u32 and the table entry
-   holds the first record's offset; settled by automap-0003 (hex dump of
-   a `.ma` file after two visits to one layer).
+   a new record is appended and linked from the layer's chain
+   (`0x00458200`): read the 400-byte table (a short read zeroes it and
+   writes the zero table at 0); `end` := the file size (GetFileSize);
+   table entry 0 → entry := `end`; else follow the links from the entry
+   (seek to the record, read its u32 at +0) to the last record and
+   write `end` into that record's +0. Then the table is rewritten at 0
+   and, at `end`, the header (link 0) and the blobs.
 4. **Load** (`0x00458750`, after a switch): follow the layer's chain;
    a record whose layer id ≠ L stops the load and clears the chain at
    that point (`0x004586E0`). Each blob's triples become cells with
    saved flag 1 in the matching tree. A cel ≥ the cel count of the
    file that will draw it (`[0x007A5178]` for floors/walls/units, the
    kind's town file for the town blob) stops that blob and clears the
-   chain. The unit blob is read only when the record's third u32 equals
+   chain. The unit blob is read only when the record's act u32 (+0xC) equals
    the current act record's second u32 (S→C 0x03 u32@8), else skipped.
 
 ### 8. State, keys and options
@@ -356,8 +361,10 @@ H − 40), div = `[0x00711254]`; divisions are C signed division.
      Hp/2 + 130 (s₂ = −W/4 in open mode 1, +W/4 in open mode 2, else
      0): e = (2·max + min) / 2 of |W/2 − sx + s₂| and |Hp/2 − 10 − sy|;
      m = 2 if e < 150, 1 if e < 100, 0 if e < 50; otherwise m = 5.
-   - v = 2: m = 1. v = 3: m = 1 in mini, 2 in full when the local
-     player's byte +0x18 is 0 or 2, else 5. Other v: m = 5.
+   - v = 2: m = 1. v = 3 (`0x00459440`): when the local player's act
+     byte (unit +0x18, 0-based act: Act I or Act III) is 0 or 2, m = 1
+     in mini and 2 in full; any other act → m = 5 in both sizes (the
+     mini test sits inside the act test). Other v: m = 5.
 
 ### 11. Unit markers (`0x0045AC90` → `0x0045A860`)
 
@@ -391,15 +398,24 @@ list (+0x74, next +0xE8):
    (4,−1), (2,0), (4,1), (2,2), (0,1), (−2,2), (−4,1), (−2,0), (−4,−1),
    (−2,−2), (0,−1), each pair (X + 2a, Y + 2b); mini: X − 1, Y + 5.
 5. Players: the cross is drawn unless the colour is B3 and `AutoMap
-   Party` = 0. A party member (B3) other than the local player gets its
-   name (§11 r7) when `AutoMap Party` and `AutoMap Party Names` are on.
+   Party` = 0. With `AutoMap Party Names` `[0x007113E8]` and `AutoMap
+   Party` `[0x007113E4]` both on, every player other than the local
+   player gets its name (`0x006221A0`, §11 r7): text colour 2 when its
+   marker colour is B3, else colour 1 (`0x0045A860` at `0x0045AB00` …
+   `0x0045AB53`; the colour is an immediate, not the marker byte).
 6. Monsters: cross; with `AutoMap Party Names` on, an `interact`
-   monster's name (`0x00464A60`) in font 6, colour 4, centred at (X,
-   Y + 8 − 18); a disguised one as in r5. Objects: object 267 with
-   names on → string 0xCF3 centred at (X, Y + 8 − 18) instead of a
-   cross; other objects a cross.
-7. **Name** (`0x0045A760`): empty → nothing; font 6, colour argument
-   (≥ 13 → 0), centred on x, top at y − 10, then the previous font.
+   monster (`0x00457490(class, 9)`) gets its name (`0x00464A60`) in
+   font 6, colour 4, centred at (X, Y + 8 − 18). Then, with both
+   options on (interact or not): a monster disguised as a player
+   (`0x00645270` gives player type, state 0x25, owner `0x004639D0`
+   a player) whose owner is not in the local player's party (the two
+   `0x00465400` ids differ, or the local one is −1) gets the owner's
+   name in colour 1; a same-party owner gets none. Objects: object 267
+   with names on → string 0xCF3 centred at (X, Y + 8 − 18) instead of
+   a cross; other objects a cross.
+7. **Name** (`0x0045A760`, name in EDI, colour in AL): empty → nothing;
+   font 6, colour (≥ 13 → 0), centred on x, top at y − 10, then the
+   previous font.
 
 ### 12. Party roster markers (`0x0045AB60`)
 
@@ -542,11 +558,15 @@ bit 9, `monstats2` +0x118, `objects` +0x1BC matched to
    (`ui/text.md` §2), so no label is needed by the rule; game types 6 /
    8 and `0x0040DF60` are out of scope (Phases 0–6), §13 r5.
 4. *Answered* (2026-10-08, static): every placed unit, §5 r4.
-5. PROVISIONAL: the `.ma` record header field order and chain link
-   (§7 r2–r3) are read from the save/load call sequence; settled by
-   automap-0003.
-6. PROVISIONAL: the byte at player +0x18 tested by fade 3 (§10 r4) is
-   read as-is with no meaning assigned; settled by automap-0001 (fade 3
-   frames in town vs field).
-7. PROVISIONAL: text colour of the names (§11 r7) is the AL value at the
-   call (marker colour byte); settled by automap-0004 (name pixels).
+5. *Answered* (2026-10-09, static): the link is the record's first u32
+   (+0), then layer, town kind, act u32, four sizes; the table entry
+   holds the first record's offset (`0x00458200` seek/read/write
+   sequence, `0x00458750` reads into the same order) — §7 r2–r3.
+   automap-0003 remains a byte-level check.
+6. *Answered* (2026-10-09, static): the byte at player +0x18 is the
+   unit's act index (D2MOO `nAct`, hint); `0x00459440` tests it before
+   the mini test, so fade 3 in Acts II, IV, V gives m = 5 in mini too
+   (§10 r4).
+7. *Answered* (2026-10-09, static): AL is an immediate at both calls —
+   2 for a B3 player, 1 for other players and disguised monsters
+   (§11 r5–r6); automap-0004 remains a pixel check.

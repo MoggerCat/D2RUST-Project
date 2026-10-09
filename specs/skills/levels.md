@@ -28,14 +28,14 @@
 |   3. Skill damage | 180–306 |
 |   4. Mana cost | 307–346 |
 |   5. To-hit | 347–354 |
-|   6. Learning a skill | 355–412 |
-|   7. Skill stat callbacks | 413–606 |
-| Constants & data dependencies | 607–629 |
-| Randomness | 630–641 |
-| Edge cases & original bugs | 642–664 |
-| Test vectors | 665–726 |
-| Provenance | 727–767 |
-| Open questions | 768–799 |
+|   6. Learning a skill | 355–416 |
+|   7. Skill stat callbacks | 417–610 |
+| Constants & data dependencies | 611–633 |
+| Randomness | 634–645 |
+| Edge cases & original bugs | 646–668 |
+| Test vectors | 669–730 |
+| Provenance | 731–771 |
+| Open questions | 772–803 |
 <!-- /index -->
 
 ## Summary
@@ -369,6 +369,10 @@ are below the maximum by at least one 1/256 point.
 1. Size 3; skill = u16 at +1.
 2. Validator `0x00549490`: id out of range → 2; not a class skill of the
    player (`0x0056C700`) → 3; §6 step 3 or 4 fails → 3.
+   `0x0056C700(unit, id)` is true iff the unit is a player (type 0),
+   0 ≤ id < the skills row count, the row exists, and the row's
+   `charclass` (i8 at +0xC, sign-extended; −1 for non-class rows)
+   equals the unit's class (+4).
 3. Native entry with `skill_level(…, 0) ≥ max_level` → 2.
 4. Spend `0x00570080`: cost 1 if `skpoints` = −1, else `eval(skpoints,
    unit, skill, skill_level(entry, 1) or 0)` (empty in every 1.14d

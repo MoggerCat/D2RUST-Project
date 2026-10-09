@@ -1,0 +1,5 @@
+d2stack 1
+# Test variant: Blood Moor (levels #2) spawns fallen1 only.
+# Build: data-tool variant build traces/variants/only-fallen/only-fallen.d2stack
+# (specs/tools/test-variants.md).
+layer 10-blood-moor.d2patch

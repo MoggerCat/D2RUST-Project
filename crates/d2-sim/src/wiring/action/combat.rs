@@ -8,6 +8,7 @@
 
 use crate::combat::{CombatEntry, CombatWorld, DamageRecord, RoomKind};
 use crate::game::Game;
+use crate::missiles::damage::SetupWorld;
 use crate::rng::Seed;
 use crate::skills::{SkillEntry, SkillUnits};
 use crate::stats::key_layer;
@@ -370,5 +371,31 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
     /// `damage.md` §7.1 ([`super::reaction::reaction`]).
     fn reaction(&mut self, a: UnitId, d: UnitId, record: &mut DamageRecord) {
         super::reaction::reaction(self, a, d, record);
+    }
+}
+
+/// `missiles/damage.md` §1 step 6 and §2 on the unit records; the item
+/// queries go to [`Pending`].
+impl<X: Pending> SetupWorld for CombatView<'_, X> {
+    /// A player's attack weapon `0x00623990(owner, 1)`; a monster with an
+    /// inventory: `0x00622830` (both [`Pending::attack_weapon`]).
+    fn setup_weapon(&self, owner: UnitId) -> Option<UnitId> {
+        match self.ty(owner) {
+            UnitType::Player => self.v.h.x.attack_weapon(owner),
+            UnitType::Monster if self.v.h.x.has_inventory(owner) => self.v.h.x.attack_weapon(owner),
+            _ => None,
+        }
+    }
+    fn has_inventory(&self, u: UnitId) -> bool {
+        self.v.h.x.has_inventory(u)
+    }
+    fn two_handed(&self, item: UnitId) -> bool {
+        self.v.h.x.item_two_handed(item)
+    }
+    fn set_layer_stat(&mut self, u: UnitId, stat: u16, layer: u16, value: i32) {
+        self.v.stats.unit_set(&mut *self.v.h, u, stat, value, layer);
+    }
+    fn dual_wield_toggle(&mut self, owner: UnitId) {
+        self.v.h.x.dual_wield_toggle(owner);
     }
 }

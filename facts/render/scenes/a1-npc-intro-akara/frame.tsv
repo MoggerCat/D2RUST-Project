@@ -1,0 +1,22 @@
+# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py game/captures/day/manual/scene1.jsonl --scene a1-npc-intro-akara --frame 11 --out facts/render; game: 1.14d
+key	value
+seq	11
+tick	367
+w	800
+h	600
+act	0
+level	1
+player_x	11584
+player_y	73128
+tile_origin_x	11184
+tile_origin_y	72848
+unit_origin_x	11184
+unit_origin_y	72844
+open_mode	0
+shift_x	0
+light_quality	0
+rain	1
+snow	0
+draws	585
+index_sha256	ea022cc41940363a9671986a08783c54b5a7ed2bf06482273fc273c19a3214ae
+palette_sha256	ba83219e51249002d7125a1a5a701d6abea94f04f44d6cfaa42becdfcff23337

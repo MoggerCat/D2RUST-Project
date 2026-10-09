@@ -38,6 +38,11 @@ pub trait NpcInventory<H> {
     /// Places `item` in the player's backpack at a free spot (§2.4);
     /// false when there is none.
     fn place(&mut self, econ: &mut Economy<'_, H>, player: UnitId, item: UnitId) -> bool;
+    /// Places a store item in the NPC's grid (`0x00560200`,
+    /// `vendors.md` §3.1 rule 4); false when its page has no room.
+    fn store_place(&mut self, econ: &mut Economy<'_, H>, npc: UnitId, item: UnitId) -> bool;
+    /// Unlinks a store item from the NPC grid that holds it.
+    fn store_unlink(&mut self, econ: &mut Economy<'_, H>, item: UnitId) -> bool;
 }
 
 /// [`NpcInventory`] on an [`InvDesk`] for each call.
@@ -48,6 +53,12 @@ pub struct NpcInv<'d, R: ?Sized> {
 }
 
 impl<H: LifecycleHooks, R: InvRest + ?Sized> NpcInventory<H> for NpcInv<'_, R> {
+    fn store_place(&mut self, econ: &mut Economy<'_, H>, npc: UnitId, item: UnitId) -> bool {
+        InvDesk::new(econ, self.tables, self.state, self.rest).store_place(npc, item)
+    }
+    fn store_unlink(&mut self, econ: &mut Economy<'_, H>, item: UnitId) -> bool {
+        InvDesk::new(econ, self.tables, self.state, self.rest).store_unlink(item)
+    }
     fn cursor_item(&self, player: UnitId) -> Option<UnitId> {
         self.state.cursor_of(player)
     }

@@ -121,23 +121,7 @@ impl<X: Pending> ActionSim<X> {
     /// player already in DT / DD is left alone. The clients hear of it
     /// in the next [`Self::player_deaths`] pass.
     pub fn start_death(&mut self, game: &mut Game, p: UnitId) {
-        let s = &mut self.sys;
-        if s.units.get(p).is_none_or(|r| r.mode == DT || r.mode == DD) {
-            return;
-        }
-        s.hooks.mode_target = None;
-        // Ours to announce (code 0: started, nothing sent yet).
-        s.hooks.death.announced.entry(p).or_insert(0);
-        s.hooks.death.died.insert(p);
-        let mut sim = crate::units::hooks::Sim {
-            game,
-            units: &mut s.units,
-            stats: &mut s.stats,
-            data: &s.data,
-        };
-        if let Err(e) = player_start(&mut sim, &mut s.hooks, p, DT) {
-            s.hooks.errors.push(super::WiringError::Unit(e));
-        }
+        self.with(game, |game, v| v.start_player_death(game, p, None));
     }
 
     /// [`Self::player_deaths`] for the given players (every one of them
@@ -257,4 +241,33 @@ impl<X: Pending> ActionSim<X> {
 
 fn s_fresh<X>(a: &mut ActionSim<X>) -> Vec<UnitId> {
     std::mem::take(&mut a.sys.hooks.death.fresh)
+}
+
+impl<X: Pending> View<'_, X> {
+    /// The DT start `0x00580EC0` for `p` with killer K (`vitals.md`
+    /// §4.8): [`ActionSim::start_death`] and the lethal hit's request
+    /// (`damage.md` §7.1 r5.4, K = the attacker).
+    pub fn start_player_death(&mut self, game: &mut Game, p: UnitId, killer: Option<UnitId>) {
+        if self
+            .units
+            .get(p)
+            .is_none_or(|r| r.mode == DT || r.mode == DD)
+        {
+            return;
+        }
+        self.h.mode_target = killer;
+        // Ours to announce (code 0: started, nothing sent yet).
+        self.h.death.announced.entry(p).or_insert(0);
+        self.h.death.died.insert(p);
+        let mut sim = crate::units::hooks::Sim {
+            game,
+            units: &mut *self.units,
+            stats: &mut *self.stats,
+            data: self.data,
+        };
+        if let Err(e) = player_start(&mut sim, &mut *self.h, p, DT) {
+            self.h.errors.push(super::WiringError::Unit(e));
+        }
+        self.h.mode_target = None;
+    }
 }

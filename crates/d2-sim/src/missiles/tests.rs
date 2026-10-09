@@ -299,8 +299,9 @@ impl MissileCombat for Fake {
         owner: UnitId,
         origin: Option<UnitId>,
         missile: UnitId,
+        _: i32,
         level: i32,
-    ) {
+    ) -> u32 {
         self.log.push("setup".into());
         let origin = origin.map(|o| o.0);
         self.calls.push(format!(
@@ -310,6 +311,7 @@ impl MissileCombat for Fake {
         if self.setup_sets_valid {
             self.set_unit_flag(missile, unit_flag::IS_VALID_TARGET, true);
         }
+        0
     }
     fn hit_test(&mut self, _: &mut Game, _: UnitId, _: UnitId, _: i32) -> bool {
         self.hits.pop_front().unwrap_or(true)
