@@ -1,0 +1,13 @@
+check 1
+# Level generation of the Cave Level 1 (level 9, a cave maze): ScnAma,
+# -seed 1234, idle in town until frame 20, then the level warp (poke
+# `warp 9`, tile 0) on both sides. Compare rooms, presets and the
+# populated units from the arrival on, and the draws (rng_poke.py).
+# Area C (level generation). Spec: specs/tools/scenario-diff.md.
+name a1-warp-cave-ama
+save ScnAma --class ama --expansion
+seed 1234
+ticks 160
+seconds 900
+channels state rng
+at 20 poke warp 9

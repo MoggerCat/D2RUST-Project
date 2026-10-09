@@ -219,8 +219,15 @@ what moved it.
    client sees their room; d2rs keeps them (map AI draws at 24, 32).
    Measured, no spec: `q-fix-real-npc-sleep-no-client`.
 
-So the Den of Evil's generation, presets and population are equal
-through frame 23 (state and rng channels; 160 frames compared). The rng
+4. `a1-warp-cave-ama` (Cave Level 1, `warp 9`), frame 21: a berserker
+   champion (1:8, umod 39) at hitpoints −6144 vs 3072. 1.14d reads maxhp
+   and hitpoints before writing either; d2rs re-read hitpoints after the
+   maxhp write had rescaled it (`stat-lists.md` §7.2). Fixed (`raise_hp`).
+
+So the Den of Evil's and Cave Level 1's generation, presets and
+population are equal for all 160 frames outside town (every non-player
+unit of the dungeon level), the first divergence of both checks being
+the town NPCs at frame 24; through frame 23 (state and rng channels; 160 frames compared). The rng
 channel also reports a false frame-2 divergence on every run
 (`q-fix-tool-rng-creation-draws`).
 
