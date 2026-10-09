@@ -44,16 +44,16 @@
 |   14. Pet list and the hireling GUID | 915–979 |
 |   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 980–1069 |
 |   16. C→S 0x4B after a teleport (the hireling case) | 1070–1104 |
-|   17. Model writes made by 1.14d UI code | 1105–1285 |
-|   18. Audio driver inputs and the client object functions | 1286–1316 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1317–1546 |
-|   20. Player mode steps (`0x00463390`) and the local player's next action | 1547–1707 |
-| Constants & data dependencies | 1708–1720 |
-| Randomness | 1721–1736 |
-| Edge cases & original bugs | 1737–1761 |
-| Test vectors | 1762–1819 |
-| Provenance | 1820–1925 |
-| Open questions | 1926–2121 |
+|   17. Model writes made by 1.14d UI code | 1105–1296 |
+|   18. Audio driver inputs and the client object functions | 1297–1327 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1328–1557 |
+|   20. Player mode steps (`0x00463390`) and the local player's next action | 1558–1718 |
+| Constants & data dependencies | 1719–1731 |
+| Randomness | 1732–1747 |
+| Edge cases & original bugs | 1748–1772 |
+| Test vectors | 1773–1830 |
+| Provenance | 1831–1936 |
+| Open questions | 1937–2132 |
 <!-- /index -->
 
 ## Summary
@@ -1282,6 +1282,17 @@ bit 0x2 is the bit of `client/msg-ui.md` §1 r4 and §16).
    interaction); settled by REC-1110 (Warriv's monster data +0x28, mode,
    +0x44 and client path +0x24 / +0x28 at ticks 50–60 of that scene, and
    whether the 0x67 at 56 reaches his queue).
+   *Run 2026-10-09 (PC 1, Windows, no debugger breakpoints, poll probe
+   every 30–50 ms):* SceSor `-seed 1234` with the scene's inputs in
+   seconds (I at 0.8 s after arrival, click (678, 330) at 2.0 s, (563,
+   250) at 2.4 s, I at 3.0 s) does **not** reproduce: the client walks
+   Warriv (mode 2, 7.43–9.15 s, three sub-tile walks to (4870, 4231)),
+   his monster data +0x28 reads 0 in every sample and the local
+   player stays in mode 5. So the bit is not set in this scene at
+   normal speed; the recorded NU is more likely a timing effect of the
+   scene's recorder (breakpoint-driven, the client falls behind the
+   server) than a rule. REC-1110 stays open for a frame-anchored rerun
+   under the same recorder reading +0x28 and the receive queue.
 
 ### 18. Audio driver inputs and the client object functions
 
