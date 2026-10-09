@@ -247,6 +247,29 @@ pub fn request_skip_gate<X: Pending>(
     }
 }
 
+/// Player mode request `0x005809D0` (point form) / `0x00580A70` (unit
+/// form) with re-entry 0 (`pathing.md` §1.2) for a caller outside the
+/// walk code (the damage reaction, `damage.md` §7.1 step 5). `None`: a
+/// fatal path (logged).
+pub fn player_request<X: Pending>(
+    v: &mut View<'_, X>,
+    game: &mut Game,
+    player: UnitId,
+    skill: Option<u16>,
+    mode: u32,
+    target: WalkTarget,
+) -> Option<Outcome> {
+    let mut c = PathCtx::of(v, game);
+    let t = c.tables();
+    match request(&t, &mut c, player, skill, mode, target, false) {
+        Ok(o) => Some(o),
+        Err(e) => {
+            c.walk_error(e);
+            None
+        }
+    }
+}
+
 /// Player event 0 of modes 2, 3, 6, 19: `0x00580C20` (`pathing.md`
 /// §9.2); the action result for `units.md` §4.5 (2 = stopped).
 pub fn player_step<X: Pending>(v: &mut View<'_, X>, game: &mut Game, unit: UnitId) -> u32 {
