@@ -299,3 +299,33 @@ spawn.
     d2rs → `q-fix-b45-createxgame-byte18`.
   - Then the Blood Moor warp population (known:
     `q-fix-b-bloodmoor-warp-population`).
+
+### [q-fix-b-monster-combat] Quill Rat at frame 59 (answered)
+- **Correction:** my earlier note ("the rat is placed elsewhere") was
+  wrong. In 1.14d the rat is at the poke point (5147, 4267), exactly as in
+  d2rs. The arrows (missile class 0) reach it at f41–42 and f53–54 and do
+  0 damage, because ScnAma has no bow.
+- **1.14d rat lines, f30–64** (from
+  `traces/raw/check-combat-arrow-quillrat/orig.state.jsonl`, the
+  `record_state.py` output; every row x 5147, y 4267, hp 1280):
+
+  | Frames | Mode | Seed s |
+  |---|---|---|
+  | 30 | 1 | [21370634, 838424606] |
+  | 31–35 | 5 | [2409280208, 8913528] (think, 1 draw) |
+  | 36–43 | 5 | [4094205064, 1004892389] (quill 1 created at f36) |
+  | 44–45 | 1 | same |
+  | 46–58 | 1 | [1069704589, 1707661690] (quill 1's to-hit at the player at f46: a miss, 1 owner step, REC-826) |
+  | 59–63 | **5** | **[1069704589, 1707661690], unchanged** |
+  | 64 | 5 | [3163442939, 446165621] (quill 2 created) |
+
+- **Answer:** the f59 think takes A2 with no draw on the rat's seed (the
+  same seed from f46 to f63). That is `monsters/ai-bodies.md` §9.7 r8 step
+  3: AI state 3 / 19 → A2, no draw. The arrow that reached the rat at
+  f54 set state 19 even with 0 damage (a hit with no get-hit mode), and
+  the 0x005A68E0 rule turns 19 into 3 when the next non-neutral mode is
+  left.
+- So the cloud's draw count is right: no extra draws make P(35) pass,
+  because 1.14d takes no draw there. d2rs walks because it never stores
+  the AI state (`q-fix-c3-quillrat-choice`). The arrows **do** cause it:
+  they set the state. A run without arrows would differ in 1.14d too.
