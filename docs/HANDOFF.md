@@ -3542,6 +3542,17 @@ the dev-dependency) and record results here.
     capture that records `[0x00712C50]`); with a shake running, a click
     walks to the point under the cursor.
 
+103. Level background first calls (spec-writing, local `re/`;
+    `render/draw-order-2.md` Open question 12, row
+    `q-fix-render-arcane-stars`): read `0x00476290`'s first-call branch
+    (flag `[0x007B955C]`) for the star tick `last` of §12 r3 (its global,
+    its initial value or first write, whether r3 runs on the first call)
+    and both first calls' `time_value` argument and seed form
+    (`[0x00712C4C]`, `[0x00712C50]`; settles REC-420). Write the answer
+    into §12 r1 / r3 and OQ 12; the cloud session then wires level 74
+    through `world_view::background_view` (BackgroundError::NoStarLast
+    goes away).
+
 Kept entries (unchanged):
 
 **Treasure** (`specs/items/treasure.md`, branch `claude/phase3-treasure`):
