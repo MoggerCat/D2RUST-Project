@@ -136,7 +136,8 @@ addresses the specs lack and possibly for the audio capture.
 | items | claude/q-ledger-items | 135 | merged |
 | integrator | claude/q-fidelity-ledger | 30 | rows for the specs and checks no part named (data layer, format readers, constant tables, continuation specs, 6 checks) |
 | coverage a1a2 | claude/q-ledger-cov-a1a2 | 2,122 never-exercised rows (act I–II playthrough + classes, 7 classes, normal) | merged: 578 set `exercised = no` on the entity row of the same thing (ids matched through `ledger.py` aliases: level id, quest slot, `monster-ai` → `monster.ai`, alphanumerics); 1,544 added as coverage rows (single monster classes, base items, object rows, monster skills, missiles the parts group) |
-| coverage a3a5, checks | claude/q-ledger-cov-* | — | pending |
+| coverage checks | claude/q-ledger-cov-checks | 198 rows (`cov.<category>.<id>`: what the d2rs side of the checks exercised, with those checks' verdicts) | merged: matched to entity rows by level id / quest slot / table row id; its `checks` lists were truncated (`...(+N)`), cut to the named checks by the integrator; unmatched rows (single monster classes, states, missiles) stay as coverage rows and carry their checks' verdicts, so DIVERGED counts include them |
+| coverage a3a5 | claude/q-ledger-cov-a3a5 | — | pending (no tsv on the branch at 19:06) |
 
 `tools/coord/ledger.py --fix` reconciled the parts with checks-status.md
 (last_verdict from the checks; a row naming a DIVERGED check is DIVERGED;
