@@ -1,20 +1,18 @@
 // Spec: specs/world/quests.md §4.3 (dispatch), §4.4 (kill parse), §4.5 (level change), §4.6 (add link)
 //! The quest events of the play host (tasks `q-a1-tower`, `q-a2-quests`): monster init's
 //! chain links and monster deaths, which the action wiring's seams queue
-//! ([`Pending::take_quest_events`]), and the players' level changes,
-//! which are read off the quest world once per tick. They run on the
-//! quest control after the tick (`after_tick`), as `0x005436B0`,
-//! `0x00543A30` and `0x00543B90` do.
+//! ([`Pending::take_quest_events`]). They run on the quest control
+//! after the tick (`after_tick`), as `0x005436B0` and `0x00543A30` do.
+//! The players' level changes (`0x00543B90`, quest event 3) run in the
+//! tick's per-client update (`sim/tick.md` §6 rule 5; the action
+//! wiring's `client_level_change` on the lent quest control).
 //!
 //! PROVISIONAL (REC-129; Act II hooks REC-136): the original calls these from inside monster
-//! init, the kill and the warp; here they run once per tick after the
-//! tick's steps, in the order links, level changes, kills. `// d2rs-own,
-//! unverified`.
-
-use std::collections::BTreeMap;
+//! init and the kill; here they run once per tick after the tick's
+//! steps, in the order links, kills. `// d2rs-own, unverified`.
 
 use d2_sim::game::Game;
-use d2_sim::units::{UnitId, UnitType};
+use d2_sim::units::UnitType;
 use d2_sim::wiring::action::{Pending, QuestEvent};
 use d2_sim::world::quests::{act2, act5, QuestWorld};
 
@@ -31,10 +29,6 @@ const MEPHISTO: u16 = d2_sim::world::quests::act3::npc::MEPHISTO;
 const DIABLO: u16 = 243;
 const HEPHASTO: u16 = d2_sim::world::quests::act4::q3::HEPHASTO_BASE;
 
-/// The level each player was last seen in.
-#[derive(Debug, Default)]
-pub struct QuestLevels(BTreeMap<UnitId, u32>);
-
 impl<R: TradeRest, S> WiredWorld<R, S> {
     /// Runs the queued quest events and the level changes since the last
     /// tick on the quest control.
@@ -49,29 +43,15 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
             }
         }
         let frame = game.frame;
-        let mut seen = std::mem::take(&mut self.quest_levels.0);
         let mut lair = None;
         let mut summit = None;
-        seen = self.desk(game, events, |desk, ctl, inv| {
+        self.desk(game, events, |desk, ctl, inv| {
             let ((), _) = quest_call(desk, ctl, inv, |q, w| {
                 for e in &queued {
                     if let QuestEvent::Link { unit, chain } = *e {
                         q.add_link(w, unit, chain, None);
                     }
                 }
-                let mut now = BTreeMap::new();
-                for p in w.players() {
-                    let Some(level) = w.unit_level(p) else {
-                        continue;
-                    };
-                    if let Some(&old) = seen.get(&p) {
-                        if old != level {
-                            q.changed_level(w, p, old, level);
-                        }
-                    }
-                    now.insert(p, level);
-                }
-                seen = now;
                 for e in &queued {
                     match *e {
                         QuestEvent::RadamentActivated { unit } => act2::q1::radament_ai(q, w, unit),
@@ -145,7 +125,6 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 // open them with, so a fresh game stays passable.
                 summit = Some(act5::q5::summit_warp_open(q) || !act5::q5::altar_used(q));
             });
-            seen
         });
         if let Some(open) = lair {
             events.action().sys.hooks.x.set_lair_open(open);
@@ -153,6 +132,5 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
         if let Some(open) = summit {
             events.action().sys.hooks.x.set_summit_open(open);
         }
-        self.quest_levels.0 = seen;
     }
 }

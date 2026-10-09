@@ -69,7 +69,7 @@ use crate::units::record::Units;
 use crate::units::UnitId;
 use crate::world::waypoints::{ArrivalList, WaypointData, WaypointRecords};
 
-pub use dispatch::ActionSim;
+pub use dispatch::{ActionSim, INVENTORY_REFRESH_EX};
 pub use hirelings::HirelingCall;
 pub use monsters::MonsterWorld;
 pub use objects::{

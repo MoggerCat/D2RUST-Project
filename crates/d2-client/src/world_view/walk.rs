@@ -23,7 +23,7 @@
 use bevy::prelude::*;
 
 use crate::bridge::click::RunMods;
-use crate::bridge::mirror::bridge_frame;
+
 use crate::bridge::predict::{Predict, Speeds, WalkTap};
 use crate::bridge::world::ClientWorld;
 use crate::bridge::BridgeResource;
@@ -101,11 +101,11 @@ pub fn preview_walk_frame(
 /// Adds `walk` and [`preview_walk_frame`] (after the bridge frame, before
 /// the unit mirror and the unit art loader).
 pub fn add_preview_walk(app: &mut App, walk: PreviewWalk) {
+    super::present::configure_preview_order(app);
     app.insert_resource(walk).add_systems(
         PreUpdate,
         preview_walk_frame
-            .after(bridge_frame)
-            .before(crate::bridge::mirror::mirror_units)
+            .in_set(super::present::PreviewOrder::PlayerWalk)
             .run_if(resource_exists::<BridgeResource>)
             .run_if(resource_exists::<WorldViewState>),
     );

@@ -6,9 +6,9 @@
 //! client sends no second 0x13.
 //!
 //! d2rs-own, unverified: the arrival is read from the player's mode
-//! leaving walk / run / town walk at the start of the next tick (after
-//! the host's seam refresh, so the distance is current), not from the
-//! step result of `0x00580C20`; the queue is dropped by the player's
+//! leaving walk / run / town walk at the end of tick step 4 (after the
+//! timer queue moved the player, `WiredWorld::timer_step_work`), not from
+//! the step result of `0x00580C20` inside its event; the queue is dropped by the player's
 //! next walk request (`clear_queued_action`, `pathing.md` §1.2 step 4).
 
 use d2_sim::game::Game;
@@ -28,7 +28,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
     }
 
     /// The queued interactions whose run has ended run the 0x13 handling
-    /// again (start of a tick).
+    /// again (end of tick step 4).
     pub(super) fn arrivals<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D)
     where
         Self: WorldHost<D>,
@@ -45,8 +45,10 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
             let mut msg = vec![0x13, 1, 0, 0, 0];
             msg.extend_from_slice(&guid.to_le_bytes());
             let call = NpcRun { player, msg: &msg };
-            WorldHost::<D>::npc(self, game, events, call);
             // The arrival does not queue another approach.
+            self.arriving = true;
+            WorldHost::<D>::npc(self, game, events, call);
+            self.arriving = false;
             self.state.approaches.clear();
         }
     }
