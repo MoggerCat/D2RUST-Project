@@ -489,13 +489,19 @@ impl Fx {
         };
         let u = self
             .sim
-            .with(&mut self.game, |g, v| v.allocate(g, &req, x, y))
+            .with(&mut self.game, |g, v| {
+                if ty != UnitType::Player {
+                    return v.allocate(g, &req, x, y);
+                }
+                // Players start in mode 0 (death, `units.md` §2 "dead");
+                // the player mode starts are not run here: neutral, set
+                // before `SUNIT_Add` so the dead-body path settings
+                // (`units.md` §3.1 step 8) do not apply.
+                let u = v.allocate_unadded(g, &req)?;
+                v.units.get_mut(u).unwrap().mode = 1;
+                v.add_allocated(g, u, &req, x, y).then_some(u)
+            })
             .expect("allocated");
-        if ty == UnitType::Player {
-            // Players start in mode 0 (death, `units.md` §2 "dead"); the
-            // player mode starts are not run here: neutral.
-            self.sim.sys.units.get_mut(u).unwrap().mode = 1;
-        }
         u
     }
 

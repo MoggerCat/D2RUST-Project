@@ -21,6 +21,8 @@ use super::{stat_data, N_STATES};
 const F_2: u32 = 0;
 const F_1: u32 = 4;
 const F_5: u32 = 8;
+/// `lvl` (skill special 16): the skill's level.
+const F_LVL: u32 = 12;
 
 /// Pet type 2, whose maximum is `petmax` (class `summon` 0).
 fn summoner(petmax: u32) -> (Fx, UnitId) {
@@ -38,6 +40,7 @@ fn summoner(petmax: u32) -> (Fx, UnitId) {
         code.extend(v.to_le_bytes());
         code.push(0x00);
     }
+    code.extend([0x04, 16, 0x00]);
     t.skills_code = code;
     let mut fx = Fx::with(stat_data(), t);
     fx.sim.sys.hooks.bodies = Some(Arc::new(BodyTables {
@@ -136,4 +139,55 @@ fn a_dead_pet_leaves_the_list() {
     fx.sim.with(game, |g, v| v.pet_sweep(g));
     assert!(pets(&fx, p).is_empty());
     assert!(pet_msgs(&mut fx).iter().any(|&(a, _, _)| a == 0));
+}
+
+/// A cast of skill 0 at level `base`.
+fn cast_at(fx: &mut Fx, p: UnitId, at: (i32, i32), base: i32) -> i32 {
+    let e = SkillEntry {
+        skill: 0,
+        base,
+        owner_guid: -1,
+        ..SkillEntry::default()
+    };
+    let x = &mut fx.sim.hooks().x;
+    x.skills.insert(p, vec![e]);
+    x.used.insert(p, e);
+    x.aim_at = at;
+    let t = fx.sim.sys.hooks.tables.skills.clone();
+    let game = &mut fx.game;
+    fx.sim.skill_use(game, |w| do_skill(w, &t, p, 0, base))
+}
+
+// Covers: specs/sim/pets.md §10 "Resync", §4, edge case 5
+#[test]
+fn a_lower_skill_level_resyncs_the_maximum_and_trims_the_list() {
+    use crate::skills::use_::bodies::BodyWorld;
+    let (mut fx, p) = summoner(F_LVL);
+    for x in 12..15 {
+        cast_at(&mut fx, p, (x, 10), 3);
+    }
+    let three = pets(&fx, p);
+    assert_eq!(three.len(), 3, "petmax = level 3");
+    assert_eq!(fx.sim.sys.hooks.pet_lists[&p].entries[2].max, 3);
+    // The level drops (an item bonus removed): the resync takes the
+    // maximum of the skills' petmax (1) and trims with kill 1.
+    fx.sim.hooks().x.skills.get_mut(&p).unwrap()[0].base = 1;
+    let game = &mut fx.game;
+    fx.sim.skill_use(game, |w| BodyWorld::skill_resync(w, p));
+    let e = &fx.sim.sys.hooks.pet_lists[&p].entries[2];
+    assert_eq!((e.max, e.count), (1, 1));
+    assert_eq!(pets(&fx, p), vec![three[2]], "the oldest two left");
+    let gone: Vec<i32> = pet_msgs(&mut fx)
+        .iter()
+        .filter(|&&(a, _, _)| a == 0)
+        .map(|&(_, _, g)| g as i32)
+        .collect();
+    assert!(gone.contains(&three[0]) && gone.contains(&three[1]));
+    // Raised again: the maximum grows, nothing is added.
+    fx.sim.hooks().x.skills.get_mut(&p).unwrap()[0].base = 4;
+    let game = &mut fx.game;
+    fx.sim.skill_use(game, |w| BodyWorld::skill_resync(w, p));
+    assert_eq!(fx.sim.sys.hooks.pet_lists[&p].entries[2].max, 4);
+    assert_eq!(pets(&fx, p).len(), 1);
+    fx.assert_clean();
 }
