@@ -248,7 +248,7 @@ class Runner:
 
     def send_args(self):
         """--send "<frame> <message>" per `at … send` line, file order (every 1.14d
-        recorder but record_rng.py, d2rs state-dump; scenario-diff.md §3 rule 10)."""
+        recorder, d2rs state-dump and play; scenario-diff.md §3 rule 12)."""
         out = []
         for _, frame, text in self.c["send"]:
             out += ["--send", f"{frame} {text}"]
@@ -696,7 +696,7 @@ def selftest():
     assert not any("facts-compare" in x or "record_frames" in x for x in r.log)
     ok += 1
     # `at … send` lines (§2, §3 rule 10): canonical text, --send to every 1.14d
-    # recorder, to state-dump and to play (draws), rng not compared
+    # recorder (record_rng.py included), to state-dump and to play (draws)
     cs = parse(GOOD + "at 6 send InteractWithEntity id=@1:148 type=1\n"
                "at 6 send hex 2f 00 00 00 00 0C 00 00 00\n")
     assert cs["send"] == [(12, 6, "InteractWithEntity type=1 id=@1:148"),
@@ -923,11 +923,6 @@ def main(argv=None):
                 codes[ch] = r.draws(save, sides)
             elif ch == "packets":
                 codes[ch] = packets_channel.run(r, save, sides, shared_script_error)
-            elif ch == "rng" and c["send"]:
-                # record_rng.py takes no --send (§3 rule 10)
-                print("[rng] not compared: record_rng.py takes no --send "
-                      "(scenario-diff.md §3 rule 10)")
-                codes[ch] = 2
             elif ch == "rng":
                 codes[ch] = rng_channel.run(r, save, sides)
             else:
