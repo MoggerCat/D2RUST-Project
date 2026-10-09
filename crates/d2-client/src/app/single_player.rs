@@ -1657,6 +1657,12 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
             always_explode: m.alwaysexplode != 0,
             explosion_missile: m.explosionmissile as i16,
             clt_hit_func: m.pclthitfunc as i16,
+            clt_sub: [
+                m.cltsubmissile1 as i16,
+                m.cltsubmissile2 as i16,
+                m.cltsubmissile3 as i16,
+            ],
+            clt_param: [m.cltparam1 as i32, m.cltparam2 as i32, m.cltparam3 as i32],
         })
         .collect();
     let states: Vec<d2_data::tables::States> = decode_all(table("states")?).map_err(err)?;

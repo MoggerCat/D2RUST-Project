@@ -415,3 +415,53 @@ fn functions_60_and_63_turn_around_their_centre() {
         }
     }
 }
+
+// Covers: specs/missiles/client.md §c13-function-bodies-specified-here
+// Covers: specs/missiles/client-bodies.md §b2-path-new-step-flag-path-0x34-bit-3
+#[test]
+fn function_8_leaves_a_trail_on_each_new_sub_tile() {
+    let mut parent = row(FN_TRAIL);
+    (parent.vel, parent.range, parent.clt_sub) = (16, 12, [2, -1, -1]);
+    let mut child = row(FN_DEFAULT_STEP);
+    child.light = 0;
+    let rows = vec![ClientMissileRow::default(), parent, child];
+    let mut w = ClientWorld::default();
+    let mut rec = at(100, 100);
+    rec.flags |= flag::TARGET_RELATIVE;
+    rec.tx = 20;
+    let k = create(&mut w, &rows, &rec, true).unwrap().unwrap();
+    // Each update reads the flag its previous step left (§B2 r4), then
+    // steps; count the steps that entered a new sub-tile.
+    let mut expected = 0;
+    let mut new_step = false;
+    for _ in 0..8 {
+        let before: Vec<UnitKey> = w.objclient.set_c.keys().copied().collect();
+        let at = w.objclient.missiles[&k].pos;
+        update(&mut w, &rows, k, true).unwrap();
+        let made: Vec<UnitKey> = w
+            .objclient
+            .set_c
+            .keys()
+            .copied()
+            .filter(|c| !before.contains(c))
+            .collect();
+        if new_step {
+            expected += 1;
+            assert_eq!(made.len(), 1);
+            let c = &w.objclient.set_c[&made[0]];
+            assert_eq!(c.class, 2);
+            assert_eq!(c.position, Some(((at.0 >> 16) as u16, (at.1 >> 16) as u16)));
+        } else {
+            assert!(made.is_empty());
+        }
+        new_step = w.objclient.missiles[&k].new_step;
+    }
+    assert!(expected >= 4, "{expected}");
+    // S1 < 0 → removed.
+    let mut r = row(FN_TRAIL);
+    r.clt_sub = [-1, -1, -1];
+    let rows = vec![ClientMissileRow::default(), r];
+    let (mut w, k) = made(&rows);
+    update(&mut w, &rows, k, true).unwrap();
+    assert!(!w.objclient.set_c.contains_key(&k));
+}

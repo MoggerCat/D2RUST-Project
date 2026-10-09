@@ -20,7 +20,7 @@
 //! town tests (§C6 r4, §C7 r8: no town flag in the client level rows),
 //! the second pass (§C7 r13), the client hit functions (§C9 r4.3: a
 //! handler error when a row names one), and every client function but
-//! 1, 5, 11, 23, 43, 60 and 63 (the missile is then left as it is). The aim nudge
+//! 1, 5, 8, 11, 23, 43, 60 and 63 (the missile is then left as it is). The aim nudge
 //! (§C2 r8) reads the owner's direction from the record
 //! ([`CreateRecord::owner_dir64`]; none given is a handler error).
 
@@ -68,6 +68,10 @@ pub struct ClientMissileRow {
     pub always_explode: bool,
     pub explosion_missile: i16,
     pub clt_hit_func: i16,
+    /// `CltSubMissile1`–`3` (i16) and `CltParam1`–`3` (i32)
+    /// (`client-bodies.md` §B1 S1–S3, P1–P3).
+    pub clt_sub: [i16; 3],
+    pub clt_param: [i32; 3],
 }
 
 /// The create record (`missiles.md` §R2.1, 0x5C bytes) as the client
@@ -165,6 +169,9 @@ pub struct ClientMissile {
     /// by the creator unless a body writes them.
     pub d28: i32,
     pub d2c: i32,
+    /// The path new-step flag (path +0x34 bit 3, `client-bodies.md` §B2):
+    /// the last path step entered a new sub-tile.
+    pub new_step: bool,
 }
 
 /// The path tables of `sim/pathing.md` (the direction-vector `tan`
@@ -529,6 +536,7 @@ pub const FN_SUB_LOOP_FIRE: u16 = 5;
 pub const FN_FOLLOW_OWNER: u16 = 43;
 pub const FN_ORBIT_EVEN: u16 = 60;
 pub const FN_ORBIT: u16 = 63;
+pub const FN_TRAIL: u16 = 8;
 
 /// The per-update dispatch `0x004D2C70` (§C6) of the set-C missile `key`.
 pub fn update(
@@ -575,6 +583,7 @@ pub fn update(
             }
             default_step(w, rows, key, &row, lights)
         }
+        FN_TRAIL => trail(w, rows, key, &row, lights),
         FN_SUB_LOOP_FIRE => {
             fire_frames(w, key, &row);
             default_step(w, rows, key, &row, lights)
@@ -590,6 +599,54 @@ pub fn update(
         // f ≤ 0: never stepped (§C6 r5); other functions: not modelled.
         _ => Ok(()),
     }
+}
+
+/// Function 8 `0x004D38D0` (`client.md` §C13, trails): S1 < 0 → remove.
+/// When elapsed ≥ `InitSteps` and the last path step entered a new
+/// sub-tile (§B2): S1 created with flags 1 at m's position, m's owner,
+/// skill and level, then its init callback `0x004CC870` (m): the child's
+/// P2 > 0 → rnd(P2) on **m's** seed (the child's motion z, − ⌊P2 / 2⌋;
+/// the motion record is not modelled, the draw is made); the child's
+/// direction := m's; its frame := rnd(`AnimLen`) on the child's seed <<
+/// 8. Then step.
+fn trail(
+    w: &mut ClientWorld,
+    rows: &[ClientMissileRow],
+    key: UnitKey,
+    row: &ClientMissileRow,
+    lights: bool,
+) -> Result<(), HandlerError> {
+    let s1 = row.clt_sub[0];
+    if s1 < 0 {
+        remove(w, key);
+        return Ok(());
+    }
+    let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
+    if m.total - m.current >= i32::from(row.init_steps) && m.new_step {
+        let rec = CreateRecord {
+            flags: flag::POSITION,
+            owner: m.owner,
+            class: s1 as u32,
+            x: (m.pos.0 >> 16) as i32,
+            y: (m.pos.1 >> 16) as i32,
+            skill: m.skill,
+            level: m.level,
+            ..CreateRecord::default()
+        };
+        if let Some(child) = create(w, rows, &rec, lights)? {
+            let crow = rows.get(s1 as usize).copied().unwrap_or_default();
+            let p2 = crow.clt_param[1];
+            if p2 > 0 {
+                rnd(w, key, p2);
+            }
+            let frame = rnd(w, child, i32::from(crow.anim_len)) << 8;
+            if let Some(c) = w.objclient.missiles.get_mut(&child) {
+                c.direction = m.direction;
+                c.frame = frame;
+            }
+        }
+    }
+    default_step(w, rows, key, row, lights)
 }
 
 /// Function 5 `0x004D3540` (`client-bodies.md` §B5 r1) before its step:
@@ -810,6 +867,8 @@ fn default_step(
 /// footprint move of a missile) is not run; the position moves by the
 /// step vector and the wall test of §C7 r10 reads the cell it lands on.
 fn path_step(m: &mut ClientMissile) {
+    // §B2 r1: cleared first on every call.
+    m.new_step = false;
     if m.dir_vec == (0, 0) {
         return;
     }
@@ -826,10 +885,13 @@ fn path_step(m: &mut ClientMissile) {
     let k = 0x400i32.wrapping_mul(m.velocity) >> 6;
     let vx = k.wrapping_mul(m.dir_vec.0) >> 12;
     let vy = k.wrapping_mul(m.dir_vec.1) >> 12;
+    let old = (m.pos.0 >> 16, m.pos.1 >> 16);
     m.pos = (
         m.pos.0.wrapping_add_signed(vx),
         m.pos.1.wrapping_add_signed(vy),
     );
+    // §B2 r2 (without the cell walk, REC-451): a new sub-tile entered.
+    m.new_step = (m.pos.0 >> 16, m.pos.1 >> 16) != old;
 }
 
 /// The collision word under a sub-tile (`0x00648EB0`) from the client
