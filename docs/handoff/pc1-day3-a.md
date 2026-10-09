@@ -84,3 +84,19 @@ points: 800–814.
   active fns found no RNG and no stores. d2rs differs: the test returns
   nothing, walks the records oldest first, and the AI never calls it.
   Row `q-fix-p3-npc-interact-gate`.
+- **Item 4 — act quest flags for the playthrough harness.** New
+  `specs/world/quests.md` §1.9 "Checkpoints per act". It has one table
+  of the 25 asked quests: slot, and what sets bit 0 with its
+  precondition bit. A second table lists the act gates, with what each
+  needs and what each sets:
+  - I → II: warriv1, needs 6.0, sets 7.0;
+  - II → III: meshif1, needs 14.0, sets 15.0;
+  - III → IV: the Hellgate opened by Mephisto's death; its Durance warp
+    sets 23.0;
+  - IV → V: tyrael2, expansion and 26.0, sets 28.0;
+  - Baal: 40.0.
+  "Done" = bit 0 (§1.8). The table is collected from the act files: the
+  Acts II–V bit-0 writers were extracted by an Explore agent and
+  spot-checked, and I removed the goal-bit cells I couldn't verify. The
+  harness can't read quest flags yet: row `q-tool-playthrough-quests`
+  adds the state field and the `quest <slot> <bit>` predicate.

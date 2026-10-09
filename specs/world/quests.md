@@ -236,6 +236,65 @@ What a "completed" quest is in 1.14d and what the save carries of it
    (`quests-act1-rest.md` §5, header progression in `formats/d2s.md`),
    which only the act-end quest code raises.
 
+#### 1.9 Checkpoints per act (playthrough harness)
+
+What a run through the acts can check in the player's quest record of
+the game difficulty (§1.4), and what opens the next act. Collected
+2026-10-09 from the act files and §8 / `world/npc.md` §8.3 (each row
+cites its owner; nothing new is read here). **Done = bit 0 of the
+slot** (§1.8 rules 1 and 4): every completion reader and act gate tests
+it. Bits 13 / 14 are set during the game that completes and cleared by
+the next load (§1.6); bit 1 is the pending reward, so "goal done, reward
+not taken" = bit 1 (or 13) without bit 0. Harness form (proposed,
+`tools/playthrough.md` §2): `need quest <slot> <bit> set|clear`.
+
+| Act | Quest | Chain / slot | Bit 0 set by (precondition) | Owner |
+|---|---|---|---|---|
+| I | Den of Evil | 1 / 1 | akara (148) msg 76, with 1.1; also 41.13, 41.1 | `quests-act1.md` §10.4 |
+| I | Sisters' Burial Grounds | 2 / 2 | kashya (150) msg 92, with 2.1 | `quests-act1.md` §10.5 |
+| I | Search for Cain (Tristram) | 4 / 4 | akara (148) msg 118, with 4.1 | `quests-act1.md` §10.6 |
+| I | Sisters to the Slaughter (Andariel) | 6 / 6 | warriv1 (155) msg 183, with 6.1 | `quests-act1.md` §10.8 |
+| II | Radament's Lair | 8 / 9 | atma (176) msg 334, with 9.1 | `quests-act2.md` §3.3 |
+| II | The Horadric Staff | 9 / 10 | the staff placed in the orifice (`0x0059DD80`; party in Act II too); else the Meshif travel (§8.1) | `quests-act2.md` §8.7 |
+| II | Tainted Sun | 10 / 11 | any NPC msg 362–372, with 11.1 | `quests-act2.md` §5.6 |
+| II | Arcane Sanctuary | 11 / 12 | Horazon's journal (operate 42), not-intro and state ≠ 5: players in level 74 lacking 12.0 / 12.1 (and their party in Act II) get 12.13, 12.1, 12.0 at once; the 397–407 talk only clears 12.1 | `quests-act2.md` §6.7 |
+| II | The Summoner | 12 / 13 | any NPC msg 419–429, with 13.1 | `quests-act2.md` §7.2 |
+| II | The Seven Tombs (Duriel) | 13 / 14 | meshif1 (210) msg 450, with 14.4 | `quests-act2.md` §8.11 |
+| III | Lam Esen's Tome | 15 / 17 | alkor (254) msg 564 for players in Act III lacking 17.0 / 17.1: 17.13, 17.0, 17.1 | `quests-act3.md` §3.3 |
+| III | Khalim's Will | 16 / 18 | Compelling Orb smashed with `qf2` (2nd valid hit; party in Act III); else the Durance warp (§8.1) | `quests-act3.md` §7.7 |
+| III | Blade of the Old Religion | 17 / 19 | ormus (255) msg 593 or asheara (252) msg 589, whichever completes 19.7 + 19.8; or game start with 19.6–19.8 | `quests-act3.md` §5.4, §5.8 |
+| III | The Golden Bird | 18 / 20 | alkor (254) msg 538, with 20.1 | `quests-act3.md` §6.5 |
+| III | The Blackened Temple | 19 / 21 | cain3 (245) msg 626 with 21.4; or the last council kill with 18.0; or the Orb smash with 21.4 | `quests-act3.md` §7.3, §7.6 |
+| III | The Guardian (Mephisto) | 20 / 22 | Mephisto's kill credit (killer; players in level 102; party in Act III): 22.13, 22.0, 22.11 | `quests-act3.md` §8.5 |
+| IV | The Fallen Angel (Izual) | 22 / 25 | tyrael2 (367) msg 676, with 25.1 | `quests-act4.md` §3.4 |
+| IV | Terror's End (Diablo) | 23 / 26 | Diablo's kill credit (players in the kill room or next to it; party in Act IV) | `quests-act4.md` §5.7 |
+| IV | Hell's Forge | 24 / 27 | cain4 (246) msg 680, with 27.1 | `quests-act4.md` §4.4 |
+| V | Siege on Harrogath | 31 / 35 | Larzuk's socket reward (`0x005877C0`), with 35.1 | `quests-act5.md` §3.9 |
+| V | Rescue on Mount Arreat | 32 / 36 | qual-kehk (515) msg 20110, with 36.1, at least one rune given | `quests-act5.md` §4.4 |
+| V | Prison of Ice | 33 / 37 | the second of malah (513) msg 20132 (scroll) and drehya (512) msg 20136 (Anya's item), each with 37.1 | `quests-act5.md` §5.7 |
+| V | Betrayal of Harrogath | 34 / 38 | Anya's personalize reward (`0x0058BC00`), with 38.1 | `quests-act5-2.md` §6.11 |
+| V | Rite of Passage | 35 / 39 | the last Ancient's death (killer, players in level 120, party in Act V): 39.13 and the experience | `quests-act5-2.md` §7.6 |
+| V | Eve of Destruction (Baal) | 36 / 40 | Baal's kill credit (players in level 132, party in Act V) | `quests-act5-2.md` §8.5 |
+
+The goal steps that set the precondition bits (1, 4, 13) are in each
+owner section. Slot 0 (Warriv gossip) is set by warriv1 msg 0 or 1 and
+gates nothing.
+
+**What opens the next act** (each needs bit 0 of the act's last quest;
+the travel then sets the act-completed slot):
+
+| From → to | Opened by | Needs | Sets | Owner |
+|---|---|---|---|---|
+| I → II | warriv1 (155) travel ("Go east"), to level 40 Lut Gholein | 6.0 | 7.0, 7.13; level 40's waypoint | `world/npc.md` §8.3, §8.1 here |
+| II → III | meshif1 (210) travel ("Sail east"), to level 75 Kurast Docks | 14.0 | 10.0 / 10.13 if 10.0 was clear; 15.0, 15.13; level 75's waypoint | same |
+| III → IV | the Hellgate (object 342) in Durance of Hate 3 (level 102), opened (mode 1) by Mephisto's death; its warp goes to level 103 Pandemonium Fortress | Mephisto dead in this game (record extra +0x0C = 2); no player bit | 18.0 / 18.13 if 18.0 was clear; 23.0, 23.13 | `quests-act3.md` §8.5–§8.6, §8.1 here |
+| IV → V | tyrael2 (367) travel, to level 109 Harrogath (expansion only) | 26.0 and an expansion game | 28.0, 28.13; level 109's waypoint | `world/npc.md` §8.3, §8.1 here |
+| V end | Baal killed in level 132 | — | 40.0 (table above); the Worldstone Chamber warp itself is `§8.2` chain 36 | `quests-act5-2.md` §8.5 |
+
+Waypoints: the three NPC travels activate the destination town's
+waypoint (`world/npc.md` §8.3); the Hellgate warp is an object warp
+(§8.1, `0x00546AC0`) and is not listed there with a waypoint step.
+
 ### 2. Quest control and quest records
 
 #### 2.1 Quest control (game +0x10F4)
