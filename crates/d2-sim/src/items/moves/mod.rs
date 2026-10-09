@@ -28,9 +28,9 @@ mod prop_tests;
 mod tests;
 
 pub use deferred::{
-    announce_item, category, dispatch, ground_update, item_reset, item_unit_update, mark,
-    owner_refresh, player_update, room_cleanup, update_list_pass, update_list_reset, Cond,
-    ItemAction, Test, To, ITEM_ACTIONS,
+    announce_item, announce_item_as, category, dispatch, ground_update, item_reset,
+    item_unit_update, mark, owner_refresh, player_update, room_cleanup, update_list_pass,
+    update_list_reset, Cond, ItemAction, Test, To, ITEM_ACTIONS,
 };
 pub use handlers::{handle, unequip_detached, HANDLED};
 pub use seams::{InventoryOps, MovePending, MoveUnits, MoveWorld, Spot};
