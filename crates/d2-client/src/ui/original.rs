@@ -1205,15 +1205,18 @@ impl Panel for InventoryUi {
             gold_pressed: sh.gold.buttons.inv_pressed,
             ..self.panel
         };
-        panel.draw(&sh.tables, &sh.env(), gold, out);
+        panel.draw_art(&sh.tables, &sh.env(), out);
         let class = Facts::of(ctx.world).class;
         // §9.4: the empty equipment slots' pictures, under the items.
         sh.items
             .draw_equip_backgrounds(ctx.world, &sh.tables.files, class, &sh.config.screen, out);
         if let Some(l) = sh.items.layout(class, &sh.config.screen) {
-            sh.items.draw_tints(ctx.world, &l, sh.mouse, out);
-            sh.items.draw_panel(ctx.world, &sh.tables.files, &l, out);
+            sh.items
+                .draw_items(ctx.world, &sh.tables.files, &l, sh.mouse, out);
         }
+        // §9 r6: the gold line, gold button and close button after the
+        // items (`a1-panel-cube` rows 41–45).
+        panel.draw_tail(&sh.tables, &sh.env(), gold, out);
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {
