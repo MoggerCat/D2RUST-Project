@@ -317,6 +317,21 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     and whether the unit is queued for update by the toggle
     (`0x00639DB0`) or by the entry itself. d2rs: PROVISIONAL REC-730 in
     `d2-sim/src/wiring/inventory/potion.rs`.
+- **[q-fix-pc1-day3-a-r2] Who gives a player its alignment (state 105, stat 172 = 2), and the frame-2 resend**
+    The Wine join of a new sorceress (`facts/join/a1-new-sor.tsv`) shows
+    the player already carrying state 105 with stat 172 = 2 in the
+    loader's 0xAA (n 8, `aa00010000000c6959f9ff1f`), then at frame 2 a
+    0xA8 resend of it (n 86, `a800010000000b69acfc0f`, the "resend s"
+    writer `0x0055448A` of `sim/intents-events.md` §3.5 rule 6) followed by
+    the player update's stat sends 12, 0, 2 (n 87–89, §7.3 rule 1 step
+    7). No spec names the `0x005543B0` caller for a player (allocation?
+    the loader?), nor which call sets the changed bit and queues the
+    player at frame 2. d2rs gives players no alignment state, so its join
+    has an 8-byte 0xAA and no frame-2 0xA8 / 0x1D: the last four of
+    `app_frame_loop`'s missing join messages (122 of 126). Read the
+    caller, its place in the loader / allocation, and the resend's
+    caller; answer into `sim/units.md` (allocation) or
+    `formats/d2s-load.md`, and `intents-events.md` §8.2.
 45. **Melee on a fallen from the shared script** answered → see docs/handoff/pc1-day3-b.md. (q-fix-b-headless-unit-click-keys;
     `specs/tools/scenario-diff.md` §2 r4.5, §3 r8.5):
     `py tools\scenario-diff\scenario_diff.py traces\checks\combat-melee-fallen.check --orig-only`.
