@@ -3,8 +3,10 @@
 //! link of the tile's class, the destination room's link back (its
 //! lvlwarp row gives the arrival tile's class and the walk-out), the
 //! destination room made active, and its first tile unit of that class
-//! (spawned from the room's presets when it has none yet:
-//! [`View::spawn_warp_tiles`], PROVISIONAL REC-99).
+//! (created from the room's presets when the room is not populated yet:
+//! [`View::spawn_missing_tile`], PROVISIONAL REC-99).
+//!
+//! [`View::spawn_missing_tile`]: crate::wiring::action::View::spawn_missing_tile
 
 use crate::path::coords::Point;
 use crate::path::place_seams::WarpDestination;
@@ -55,10 +57,8 @@ pub(super) fn destination<X: Pending>(
     })??;
     let tile = match c.v.room_tile(c.game, found.room, found.class) {
         Some(t) => t,
-        None => {
-            c.v.spawn_warp_tiles(c.game, found.room);
-            c.v.room_tile(c.game, found.room, found.class)?
-        }
+        // PROVISIONAL (REC-99): the room is not populated yet.
+        None => c.v.spawn_missing_tile(c.game, found.room, found.class)?,
     };
     let room = c.game.lists.unit(tile).and_then(|e| e.room())?;
     let (x, y) = c.v.h.path_position(tile);

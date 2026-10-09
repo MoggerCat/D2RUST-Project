@@ -1076,6 +1076,10 @@ pub trait Pending {
     fn object_remove_portal(&mut self, game: &mut Game, object: UnitId) {}
     /// `0x0058CF50(game, L)`. Default: nothing.
     fn object_portal_act5(&mut self, partner: UnitId) {}
+    /// `0x0058CF00(game, O)`: the Act V hook of a town portal the cast
+    /// opened (`world/objects-2.md` §27.1 step 8, `quests-act5-2.md`
+    /// §7.6). Default: nothing.
+    fn object_portal_opened(&mut self, portal: UnitId) {}
     /// State 102 on P until `expire` (§12 rule 13). Default: nothing.
     fn object_just_portaled(&mut self, game: &mut Game, player: UnitId, expire: i32) {}
     /// What the object module handed back without running it: quest,

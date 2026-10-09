@@ -59,22 +59,17 @@ milestone radament-present
 
 milestone radament-killed
   use sor
-  deadline 2800
+  deadline 1000
   poke 5 warp 49
   sweep 20 2 300 30 grid
   find ut 1 cl 229
-  poke +2 goto unit 1:229
-  poke +2 stat @1:229 6 0 256
-  poke +10 missile 58 @x @y @x+3 @y skill 36 1
-  poke +11 missile 58 @x @y @x-3 @y skill 36 1
-  poke +12 missile 58 @x @y @x @y+3 skill 36 1
-  poke +13 missile 58 @x @y @x @y-3 skill 36 1
-  poke +14 missile 58 @x @y @x+2 @y+2 skill 36 1
-  poke +15 missile 58 @x @y @x-2 @y-2 skill 36 1
-  poke +16 missile 58 @x @y @x+2 @y-2 skill 36 1
-  poke +17 missile 58 @x @y @x-2 @y+2 skill 36 1
-  note Radament is moved by goto (a free cell next to him), not pos: a pos target beside the lair's missile-blocking cells made the one missile die at the first step (wall bits 0x4). goto's cell has one open side, so Fire Bolts go out in all 8 directions
+  poke +2 goto unit 229
+  poke +40 pos @1:229 @x+2 @y
+  poke +40 stat @1:229 6 0 256
+  poke +48 missile 58 @x @y @x+2 @y skill 36 1
+  note goto first: the sweep's last hop leaves the player in a wall block (collision 0x5 all around), so Radament placed at @x+3 was out of the bolt's reach; @x+2, not +3: a Returned minion on Radament's sub-tile takes the bolt (q-fix-boss-damage)
   need ever unit ut 1 cl 229 dead
+  need unit ut 1 cl 229 dead
 
 milestone halls-of-dead-3
   use sor
