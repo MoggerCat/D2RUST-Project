@@ -38,16 +38,16 @@
 |   2. Act IV records | 160–181 |
 |   3. A4Q1 The Fallen Angel (chain 22, slot 25) | 182–302 |
 |   4. A4Q3 Hell's Forge (chain 24, slot 27) | 303–453 |
-|   5. A4Q2 Terror's End (chain 23, slot 26) | 454–703 |
-|   6. Act IV gossip records | 704–730 |
-|   7. Multiplayer and party rules | 731–743 |
-|   8. Hooks called from other systems | 744–781 |
-| Constants & data dependencies | 782–802 |
-| Randomness | 803–816 |
-| Edge cases & original bugs | 817–875 |
-| Test vectors | 876–893 |
-| Provenance | 894–931 |
-| Open questions | 932–1021 |
+|   5. A4Q2 Terror's End (chain 23, slot 26) | 454–722 |
+|   6. Act IV gossip records | 723–749 |
+|   7. Multiplayer and party rules | 750–762 |
+|   8. Hooks called from other systems | 763–800 |
+| Constants & data dependencies | 801–821 |
+| Randomness | 822–835 |
+| Edge cases & original bugs | 836–894 |
+| Test vectors | 895–912 |
+| Provenance | 913–950 |
+| Open questions | 951–1040 |
 <!-- /index -->
 
 ## Summary
@@ -552,6 +552,25 @@ player with 26.14, else the status byte.
     failed spawn is f + 10 (below).
 
   Column r is the unused radius argument (§1.1).
+
+  *Recorded, De Seis on a WingN1 game* (2026-10-09, PC 1, Windows,
+  `record_state.py --auto PtSorD --seed 1` (the save of
+  `traces/playthrough/act4.play`; seed 1 picks WingN1, whose seal is at
+  in-file x 33), pokes `5 warp 108`, `6`/`7 stat @player 7`/`6 0 7680000`,
+  `20 goto preset 108 2:394` (seal GUID 120, reached at frame 47), `60 msg
+  0x13 2 120`): the seal is at (7773, 5155); at frame 60 it goes to mode 1
+  and the dummy 131 (GUID 121) is created at **(7770, 5226)** in mode 1, so
+  the free spot from (7734, 5188) (seal + (−39, +33)) **is** found, (+36,
+  +38) away, and its room exists; at frame 86 (= 60 + 27 − 1 in the
+  snapshot after the event) Lord De Seis (class 312, GUID 105, hp 187392
+  = 732 points, level 33) appears at **(7773, 5207)** with five class 310
+  minions (GUIDs 106–110 at (7773, 5204), (7775, 5204), (7770, 5207),
+  (7776, 5205), (7776, 5208)); the seal is in mode 2 from frame 99. So
+  WingN1 does not leave the seal shut in 1.14d: the search reaches a cell
+  far south of the spot. d2rs's search (`quests-helpers.md` §1) accepts
+  (7780, 5160) after 48 rings and finds no room there; the ring order,
+  the accepting test or the cell's room lookup differs. Raw state
+  file kept on PC 1 (`game\captures\ds-state.jsonl`, 420 snapshots).
 
   | Seal | Pair | Offset | r | Boss (data tables +0xAE0 entry) |
   |---|---|---|---|---|
