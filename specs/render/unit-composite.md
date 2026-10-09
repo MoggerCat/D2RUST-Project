@@ -24,20 +24,20 @@
 | Rules | 74–75 |
 |   1. Which draw path | 76–122 |
 |   2. COF file | 123–183 |
-|   3. Direction and frame | 184–242 |
-|   4. Pre-test: COF box culling | 243–252 |
-|   5. The slot loop (`0x00470EC0`) | 253–373 |
-|   6. Component file and cel | 374–414 |
-|   7. Colormap source per component | 415–439 |
-|   8. Extra offsets (`0x004DA0B0`, `0x004DA0D0`, `0x004DA0F0`) | 440–535 |
-|   9. Single-cel units (missiles, items) | 536–550 |
-|   10. d2rs mapping | 551–565 |
-| Constants & data dependencies | 566–579 |
-| Randomness | 580–583 |
-| Edge cases & original bugs | 584–598 |
-| Test vectors | 599–619 |
-| Provenance | 620–667 |
-| Open questions | 668–731 |
+|   3. Direction and frame | 184–249 |
+|   4. Pre-test: COF box culling | 250–259 |
+|   5. The slot loop (`0x00470EC0`) | 260–380 |
+|   6. Component file and cel | 381–421 |
+|   7. Colormap source per component | 422–446 |
+|   8. Extra offsets (`0x004DA0B0`, `0x004DA0D0`, `0x004DA0F0`) | 447–542 |
+|   9. Single-cel units (missiles, items) | 543–557 |
+|   10. d2rs mapping | 558–572 |
+| Constants & data dependencies | 573–586 |
+| Randomness | 587–590 |
+| Edge cases & original bugs | 591–605 |
+| Test vectors | 606–626 |
+| Provenance | 627–674 |
+| Open questions | 675–738 |
 <!-- /index -->
 
 ## Summary
@@ -185,7 +185,14 @@ with every 0x20 turned into 0, so a part ends at its first space (the
 
 1. **Direction** `dir64` (0–63): dynamic path direction (`0x006487F0`)
    for types 0, 1, 3; static path +0x1C byte for types 2 and 4
-   (`0x00620100`).
+   (`0x00620100`). Measured (2026-10-09, `a1-walk-n`): the local
+   player walking to a clicked point is drawn at dir64 32, the direction
+   from its start subtile (4873, 4228) to the clicked (4867, 4222) (the
+   prepared target (4868, 4222) would give 34), kept while it walks.
+   PROVISIONAL (REC-517): the d2rs prediction faces the click target
+   from the walk's start and keeps it (because the path direction is
+   set at the walk request; settled by a recording of the dynamic path
+   direction during a walk that bends).
 2. **Frame**: unit +0x44 >> 8; frame count unit +0x48 >> 8, objects
    `FrameCnt[mode]` (`0x00621810`). The draw reads neither AnimData nor
    the COF rate: speed and frame advance belong to the animation code

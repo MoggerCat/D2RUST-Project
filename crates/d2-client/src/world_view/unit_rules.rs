@@ -72,6 +72,19 @@ impl<R> UnitRules<R> {
     }
 }
 
+/// The player's walk speed (`sim/units.md` §4.7 step 7: w = 213 for a
+/// player not running, p = 100 without item / skill velocity).
+pub const PLAYER_WALK_SPEED: u64 = 213;
+
+/// `sim/units.md` §4.7 step 7 revision (measured on `a1-walk-*`,
+/// PROVISIONAL REC-516): the walk frame at server tick `tick` of a walk
+/// that started on `since` (kept across re-targeting clicks):
+/// `((tick − since) · 213 >> 8) mod frames`.
+pub fn walk_frame(tick: u64, since: u64, frames: u8) -> usize {
+    let frames = u64::from(frames.max(1));
+    (((tick.saturating_sub(since) * PLAYER_WALK_SPEED) >> 8) % frames) as usize
+}
+
 /// §3 r2: the frame drawn at server tick `tick`, `((tick − 1) · rate
 /// >> 8) mod frames`.
 pub fn tick_frame(tick: u64, frames: u8, rate: u32) -> usize {
@@ -125,6 +138,12 @@ impl<R: ViewRules> ViewRules for UnitRules<R> {
                     cof.animation_rate,
                     usize::from(cof.frames),
                 )
+            } else if let Some(since) = art
+                .pose_since
+                .filter(|(k, _)| *k == unit.key && matches!(unit.mode, 2 | 6))
+                .map(|(_, s)| s)
+            {
+                walk_frame(world.server_ticks, since, cof.frames)
             } else {
                 Self::frame(world, unit, cof.frames, cof.animation_rate)
             },
