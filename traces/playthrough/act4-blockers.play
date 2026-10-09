@@ -47,7 +47,8 @@ milestone fallen-fire-bolt-105
   poke 30 spawn 19 @x+3 @y normal
   poke 32 stat @1:19 6 0 1
   poke 40 missile 58 @x @y @x+3 @y skill 36 1
-  need ever unit ut 1 cl 19 dead
+  note the spawn is a pack of four: `dead` needs every match dead, so name the spawned leader (@p1)
+  need ever unit ut 1 cl 19 g @p1 dead
 
 milestone izual-fire-bolt-near
   use a4
