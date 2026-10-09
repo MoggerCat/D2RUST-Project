@@ -11,7 +11,8 @@
 use crate::combat::{self, result, DamageRecord};
 use crate::game::Game;
 use crate::missiles::{
-    result_flag, stat, Damage, MissileCombat, MissileHooks, MissilePath, MissileRooms, MissileUnits,
+    result_flag, stat, Damage, MissileCombat, MissileData, MissileHooks, MissilePath, MissileRooms,
+    MissileUnits,
 };
 use crate::rng::Seed;
 use crate::tick::events::event;
@@ -367,9 +368,6 @@ impl<X: Pending> MissileCombat for View<'_, X> {
     /// missile's hit class (`HitClass`) and pierce percent (stat 327),
     /// then `apply(game, owner, unit, missile = 1, record)` (`damage.md`
     /// §5.2) and the reaction (§7.1). No owner: nothing (`0x005AD730`).
-    ///
-    /// TODO(missiles.md §R6.1 step 5): the hit flags made from missile
-    /// data flags 1 and 2 are not applied here.
     fn apply_damage(
         &mut self,
         game: &mut Game,
@@ -377,12 +375,13 @@ impl<X: Pending> MissileCombat for View<'_, X> {
         missile: UnitId,
         unit: UnitId,
         damage: &mut Damage,
+        data: Option<&MissileData>,
     ) {
         let Some(owner) = owner else {
             return;
         };
         let mut rec = damage_record(damage);
-        self.apply_missile_record(game, owner, missile, unit, &mut rec);
+        self.apply_missile_record(game, owner, missile, unit, &mut rec, data);
         damage.result = rec.result.into();
     }
     /// Unit event 0 (`0x005C0C30`), also with no unit.
@@ -427,8 +426,8 @@ impl<X: Pending> MissileCombat for View<'_, X> {
 
 impl<X: Pending> View<'_, X> {
     /// The damage part of `0x005ADCD0` (`missiles.md` §R6.1) on a
-    /// record: the missile's hit class (`HitClass`) and pierce percent
-    /// (stat 327), then `apply(game, owner, unit, missile = 1, record)`
+    /// record: the missile's hit class (`HitClass`), the hit flags from
+    /// its data flags 1, 2 and pierce percent (stat 327), then `apply(game, owner, unit, missile = 1, record)`
     /// (`damage.md` §5.2) and the reaction (§7.1).
     fn apply_missile_record(
         &mut self,
@@ -437,13 +436,9 @@ impl<X: Pending> View<'_, X> {
         missile: UnitId,
         unit: UnitId,
         rec: &mut DamageRecord,
+        data: Option<&MissileData>,
     ) {
-        let class = self
-            .h
-            .missiles
-            .as_ref()
-            .and_then(|s| s.get(missile))
-            .map(|d| d.class);
+        let (class, data_flags) = data.map_or((None, 0), |d| (Some(d.class), d.flags));
         let t = self.h.tables.clone();
         if let Some(row) = class.and_then(|c| t.missiles.get(usize::from(c))) {
             merge_hit_class(rec, u32::from(row.hitclass));
@@ -466,6 +461,14 @@ impl<X: Pending> View<'_, X> {
             rec.result &= !result::HIT;
         }
         combat::monster_crit(&mut w, &t.combat, owner, unit, rec);
+        // Step 5: missile data flags (+0x14) 1 → hit flag 0x20 ("rolled",
+        // so `domissiledamage` fires), 2 → 0x80 (no `domissiledamage`).
+        if data_flags & 1 != 0 {
+            rec.hit_flags |= combat::hitflag::ROLLED;
+        }
+        if data_flags & 2 != 0 {
+            rec.hit_flags |= combat::hitflag::NO_MISSILE_EVENT;
+        }
         if rec.result & result::HIT != 0 {
             combat::apply(&mut w, &t.combat, owner, unit, true, rec);
         }
@@ -478,9 +481,6 @@ impl<X: Pending> View<'_, X> {
     /// soft-hit, the knockback roll on the missile's seed) or-ed into a
     /// copy of the record, then the damage part of `0x005ADCD0`. The
     /// caller has checked the owner.
-    ///
-    /// TODO(missiles.md §R6.1 step 5): as in `apply_damage`, the hit
-    /// flags from missile data flags 1, 2 are not applied.
     pub fn missile_record_hit(
         &mut self,
         game: &mut Game,
@@ -502,9 +502,10 @@ impl<X: Pending> View<'_, X> {
             };
             crate::missiles::result_flags(game, &mut cx, missile, unit)
         };
+        let data = store.get(missile).cloned();
         self.h.missiles = Some(store);
         rec.result |= result_bits(flags);
-        self.apply_missile_record(game, owner, missile, unit, &mut rec);
+        self.apply_missile_record(game, owner, missile, unit, &mut rec, data.as_ref());
     }
 }
 

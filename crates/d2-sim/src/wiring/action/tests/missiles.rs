@@ -203,6 +203,41 @@ fn missile_expires_after_range_runs() {
     s.fx.assert_clean();
 }
 
+/// The event log of one hit (to-hit 10 < 83) by a missile with data
+/// flags `data` (+0x14).
+fn hit_log(data: u32) -> Vec<String> {
+    let mut s = shot();
+    s.fx.seed(s.owner, seed_giving(10));
+    let m = s.fire(13);
+    let store = s.fx.sim.hooks().missiles.as_mut().expect("not lent out");
+    store.get_mut(m).unwrap().flags |= data;
+    for _ in 0..3 {
+        s.fx.frame();
+    }
+    assert!(!s.alive(m));
+    assert_eq!(s.fx.stat(s.target, st::HITPOINTS), 25600 - 2560);
+    s.fx.assert_clean();
+    std::mem::take(&mut s.fx.sim.hooks().x.log)
+}
+
+// Covers: specs/missiles/missiles.md §r6-1-order-1-14d-0x005adf10-step-7 text
+#[test]
+fn missile_data_flags_set_the_domissiledamage_hit_flags() {
+    let s = shot();
+    let (o, t) = (s.owner.0, s.target.0);
+    let ev = |n: u8| format!("event {n} Some({t})");
+    // Flag 1 → hit flag 0x20: the owner's `domissiledamage` (6) runs
+    // before the target's `damagedbymissile` (2).
+    let l = hit_log(1);
+    assert_eq!(l[..4], [ev(0), ev(11), format!("event 6 Some({o})"), ev(2)]);
+    // Flag 2 → 0x80 suppresses it, with or without flag 1 (M08: flags 0
+    // and 2 alone give the same log as 3).
+    for data in [0, 2, 3] {
+        let l = hit_log(data);
+        assert_eq!(l[..3], [ev(0), ev(11), ev(2)], "data flags {data}");
+    }
+}
+
 // Covers: specs/missiles/missiles.md §r6-1-order-1-14d-0x005adf10-step-7 text, §r6-3-server-damage-functions-psrvdmgfunc-1-14d-confirmed-2026-10-08
 #[test]
 fn missile_hit_class_merges_the_element_nibble() {
