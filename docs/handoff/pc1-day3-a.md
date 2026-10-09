@@ -246,3 +246,18 @@ or waypoints, as of the last pull (2026-10-09). Staging is polled every
   - `a1-town-arrival-ama.check` (state, 40 frames): no difference in
     any compared field. PARTIAL only for d2rs's known gaps (`own`, `q`).
     Warriv still matches after `q-fix-p3-npc-interact-gate`.
+- **[q-play-act5] join act byte (REC-797)** (claimed with PC1-C first).
+  The player's act +0x18 (and act record +0x1C) at a join is written by
+  the placement `0x00554850` during game entry (`0x0055489C`, from the
+  spawn room's level via `0x0061A1B0` / `0x006427F0`). The allocation's
+  store `0x005552ED` has no room for a loaded player, so its value is
+  meaningless. Written into `sim/units.md` §2 (+0x18 row) and
+  `sim/intents-events.md` §8.2 rule 5. d2rs writes the same value at
+  rule 4 and nothing reads it in between: equivalent, REC-797 settled,
+  no row.
+- **REC-795, the Ancients' chain-35 link** (claimed with PC1-C first).
+  The statue spawn `0x0054E600` → preset superunique `0x005A49B0` → case
+  hcIdx 43–45 (`0x005A4DC3`, push 35) → `0x005436B0(game, U, 35)` at
+  `0x005A4C47`, then `0x00545B50`. So the link exists from creation.
+  Written into `quests-act5-2.md` §7.6. d2rs links by class just before
+  the kill: row `q-fix-p6-ancients-link`.
