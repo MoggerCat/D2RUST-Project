@@ -1,0 +1,39 @@
+{
+ "channel": "rng",
+ "check": "a1-warp-cave-ama",
+ "command": [
+  "tools/trace-recorder/record_rng.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "900",
+  "--ticks",
+  "160",
+  "--auto",
+  "ScnAma",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.rng.jsonl",
+  "--frames",
+  "--skip-inline",
+  "drlg",
+  "--poke",
+  "20 warp 9"
+ ],
+ "files": {
+  "orig.rng.jsonl": {
+   "sha256": "17a993cc5efc5c8b38591aec16739090d916821ff1b9a7b00ae8f69d5fced68a",
+   "size": 1506233
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "b8b8341e3f58b6c17d47c12a6b5ba6502a4ccb9440420ba3393d7a492ff78f64",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "b90b38bda97d62a35f2977ddf72fb8dcfd3ca7278a0a06e37f37f00090fd283f",
+  "save": "c098d7905cb83f92fe70f1b392b1e08faf1dd04e1f6d9e100a0ca523eaafb1bd"
+ }
+}
