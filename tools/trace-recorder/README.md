@@ -20,6 +20,7 @@ code. Spec-role tool: the addresses it hooks are documented in
 | `check_tick.py` | Replays a tick recording through a model of those specs: must predict every timer run and reproduce every snapshot; `--perturb-ex N`, `--perturb-snap N` must fail at the changed record; `--selftest` runs a hand-built recording of the specs' test vectors |
 | `record_stats.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick and step hooks only): logs every base write, attach, detach, free, dynamic toggle, by-time refresh, state toggle, expiry and value-change callback on server stat lists, the regeneration entry points, and snapshots of the players' and monsters' list trees; writes `traces/raw/<time>-stats.jsonl` (gitignored). Specs: `specs/sim/stats.md`, `specs/sim/stat-lists.md` |
 | `check_stats.py` | Replays a stats recording through a model of those specs: must predict every callback, expiry and regeneration value and reproduce every snapshot; `--perturb-snap N`, `--perturb-cb N` must fail at the changed record; `--selftest` runs a hand-built recording of the specs' test vectors; `--files game` checks the specs' itemstatcost facts on the 1.14d table |
+| `record_state.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick entry hook only, plus the tick return `0x0052FD1E`): after every server tick (or every N-th) writes the game seed and every server unit (type, GUID, class, mode, position, fraction, target, direction, animation frame / count / speed, unit seed, act, level id, life / mana / stamina and base stats) to `traces/raw/<time>-state.jsonl` (gitignored; format `state-1`); `--selftest` checks the reader on a synthetic game (exact records, every source byte perturbed). Spec: `specs/tools/state-snapshot.md` |
 | `check_units.py` | Checks the per-kind timer-event rules U1–U11 of `specs/sim/units.md` on a tick recording (tables from a `dump_tables.py` directory); `--perturb N` must fail at the changed record; `--selftest` runs a hand-built recording |
 | `record_frames.py` | Launches `game/Game.exe -w -ns` under the debugger (base: `record_tick.py`), and at each in-game `EndScene` (`0x4F6190`) reads the 8-bit index framebuffer and the GDI palette, ties the frame to the last server tick and logs the camera/player, level, cursor, seed, light-quality and weather state, and with `--draws-every N` every draw call of every N-th frame; writes `traces/raw/<time>-frames.jsonl` (format `frames-raw-3`: also per cel draw the cel header w/h/xoff/yoff from the rasterizer, per tile draw its DT1 file and index, `compfile` records naming unit component files, the player's direction) and palettized PNGs `frame-<seq>.png` to `game/captures/<time>/` (both gitignored); prints the stability verdict (`capture.md` §7); `--selftest` checks the PNG writer, the state readers (perturbation) and the stability count. Spec: `specs/render/capture.md` |
 | `facts_render.py` | Turns one `record_frames.py` capture (`frames-raw-3`; `frames-raw-2` with the raw-3 cells `?`) into rendering facts in the format of `specs/tools/facts-render.md` §1–§4 (read by `d2-client facts-compare`): `facts/render/scenes/<scene>/draws.tsv` (every draw call of one frame), `frame.tsv` (state and the index / palette digests) and `facts/render/sprites.tsv` (distinct cel file, direction, frame with the cel's w, h, xoff, yoff; merged). Measurements and digests only; `--selftest`. Plan: `docs/handoff/pc1-data.md` Step 3 |
@@ -28,6 +29,7 @@ code. Spec-role tool: the addresses it hooks are documented in
 | `dump_tables.py` | Launches `game/Game.exe` under the debugger, stops when the excel load and its fix-ups have finished, writes every loaded table and the runtime maps it knows to `traces/raw/<time>-tables/` (gitignored); compared by `data-tool dump-compare` |
 | `record_objanim.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick hook only): every call of the animation re-init `0x00624390` on an object (client or server) with seed, mode, frame and speed before / after and the caller addresses on the stack, the client object init `0x004BC720` and 0x0E mode change `0x004BCF60`; `--steps` the generic step `0x004BCBB0` (mode changes, wraps), `--range` the interact range test `0x00623660` (result) and the C→S 0x13 object case `0x00548B00`; format `objanim-raw-1`; `--selftest`. Specs: `world/objects.md` §4, §7, `world/objects-client.md` §25 |
 | `objanim_facts.py` | Turns `record_objanim.py` recordings into `facts/objects/*.tsv` (measurements only); `--selftest` |
+| `poke.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick hook plus the tick return `0x0052FD1E`): runs poke directives (`specs/tools/poke.md`) between two server ticks, calling the game's own creation functions or writing the state field; `--poke-file FILE` (ticks relative to F0), `--poke "F D ..."` (absolute frame); writes `traces/raw/<time>-poke.jsonl` (format `poke-raw-1`, gitignored); `PokeLayer` / `add_options` for other recorders; `--selftest` |
 
 ## Use
 
@@ -343,3 +345,82 @@ traces/client/model/ID.json` writes the committed trace (area `client`,
 behavior `model`: the camera records and the tick states where either
 path changed, with tick / frame difference counts). `--selftest` checks
 the readers.
+## record_state.py: game-state snapshots
+
+```
+py tools/trace-recorder/record_state.py --auto ScnAma --seed 1234 --ticks 200
+py tools/trace-recorder/record_state.py --snap-every 25 --seconds 240   # play by hand
+py tools/trace-recorder/record_state.py --selftest                     # no game, any OS
+```
+
+Imports `record_tick.py` unchanged and subclasses `TickRecorder`; keeps
+only its tick entry hook `0x0052D870` (the first game that ticks is the
+one recorded) and adds the tick driver's return `0x0052FD1E` (ESI =
+game, expected bytes `8B 76 18` as `record_packets.py`), the snapshot
+point of `specs/tools/original-hooks.md` §3 rule 3: the state after
+tick N, N = game +0xA8. Options: `--seconds` (default 120), `--ticks N`
+(stop after N recorded ticks), `--snap-every N` (default 1: every frame;
+the first recorded tick is always snapshotted), `--out`, `--game`, Game.exe
+arguments, and the `autostart.py` options (`--auto CHAR --seed N --input
+SCRIPT`).
+
+Format `state-1` (JSON lines, key `k`): `header` (`side` `orig`, the
+command line, `fields`, `gaps`, `Game.exe` SHA-256, game arguments),
+one `snap` per snapshot frame (`f`, game `seed`, `units` sorted by
+type and GUID), `footer` (`snaps`, notes: limits reached and reader
+notes such as a unit list that is not extended). Fields, their 1.14d
+reads and the comparison: `specs/tools/state-snapshot.md` §1–§2. Not
+written: `own` (no 1.14d address in a spec; listed in `gaps`). Each
+unit record and path is read once per snapshot (Wine-friendly), level
+ids are cached per room.
+## poke.py: set up state at tick N
+
+```
+py tools/trace-recorder/poke.py --poke-file traces/pokes/spawn-town.poke --auto ScnAma --seed 1234
+py tools/trace-recorder/poke.py --auto ScnAma --poke "400 spawn 19 @x+3 @y+3 normal" --poke "400 time 2 0"
+py tools/trace-recorder/poke.py --selftest                      # no game needed (Linux too)
+# under Wine (cloud):
+tools/cloud-game/run.sh --python --seconds 120 -- tools/trace-recorder/poke.py \
+  --game "$D2_GAME_DIR/Game.exe" --poke-file traces/pokes/spawn-town.poke --auto ScnAma --seed 1234
+```
+
+The 1.14d side of `specs/tools/poke.md` (§4). At each stop on the tick
+return `0x0052FD1E` (ESI = game, game +0xA8 = the frame just run) it runs
+the directives due there: a poke-file line `at t` at the stop whose +0xA8
+= F0 + t, a `--poke "F ..."` line at the stop whose +0xA8 = F − 1 (before
+frame F runs). F0 is the frame of the tick in which client 0 first
+reached state 4 (client list game +0x88, state +0x04;
+`original-hooks.md` §1 rule 5), or `--start-frame F0`. Calls follow
+`original-hooks-spawn.md` §5: one RWX scratch page with an INT3 return
+trap at +0, the full thread context (FPU and SSE included) saved, the
+arguments written above the return address, ECX / EDX set, EIP = the
+entry; at the trap the next call starts again from the saved context, and
+after the last one the saved context is restored and the hook's byte is
+stepped over as for any INT3. Debug events of other threads during a call
+go to the recorder's own handler.
+
+| Directive | 1.14d |
+|---|---|
+| `object` | allocator `0x00555230` (ECX 2, EDX class; x, y, game, room, 1, mode, 0) |
+| `superunique` | `0x005A49B0` (ECX game, EDX room; x, y, row) |
+| `missile` | `0x0059FA30` (ECX game, EDX = a 0x5C-byte record in the scratch page: flags 0x21, owner, origin = owner, class, x, y, tx, ty, skill, level) |
+| `spawn` | `normal`: entry 1 `0x005B2F20` (mode 1, spread −1, flags 0); `champion`: entry 1 then entry 5 `0x005A48C0` with the umod; `random-boss`: entry 3 `0x005A43E0` (champion allowed 1); `unique` with umods: gap |
+| `seed-game`, `seed-unit`, `time` | field writes: game +0xD0; unit +0x20/+0x24; environment record +0x00 / +0x08 of the player's act |
+| `freeze` | the debugger sleeps at the stop |
+| `pos`, `warp`, `item`, `stat`, `state` | gap (`poke.md` Open questions) |
+
+The room for `object`, `superunique` and `spawn` comes from entry 6
+`0x00463740` (ECX = the player's room, EDX = x; y); 0 gives `failed`.
+References (`@player`, `@<type>[:<class>][#n]`, `<type>/<guid>`, `@x±N`,
+`@y±N`) are resolved on the hash lists at the stop; `@wp` is a gap.
+Options: `--seconds`, `--after N` (stop N frames after the last poke,
+default 50), `--snap-every N` and `--tick-records` (keep `record_tick`
+snapshots / all its hooks; default off), `--out`, the autostart options.
+
+Raw format `poke-raw-1` (JSON lines, key `k`): `header` (format, tool,
+date, `Game.exe` SHA-256, args), `poke_file` (path, SHA-256, start frame,
+steps), `game`, `tick` (as `tick-raw-1`), `poke_f0` (F0 and how it was
+found), `poke` (one per directive: `f` = the frame the poke precedes,
+`frame` = game +0xA8 at the stop, `t` for poke-file lines, `i` (index in
+the stop), `d`, `r` (`ok`, `failed`, `unresolved`, `gap`), `guid` and
+`eax` for a created unit, `args` as resolved, `note`, `src`), `footer`.
