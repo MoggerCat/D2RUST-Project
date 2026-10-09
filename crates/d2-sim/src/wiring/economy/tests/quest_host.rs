@@ -424,7 +424,7 @@ fn killed_in_place_and_removed_ancients_leave_the_lists() {
     assert!(rest.log.is_empty(), "{:?}", rest.log);
 }
 
-// Covers: specs/world/quests-act5.md §5.7 (open question 3: lists stack)
+// Covers: specs/world/quests-act5.md §5.7
 #[test]
 fn the_resist_list_adds_the_four_resists_and_stacks() {
     let mut fx = Fx::new();
@@ -487,7 +487,7 @@ fn the_experience_reads_are_the_vitals_tables() {
     assert!(rest.log.is_empty(), "{:?}", rest.log);
 }
 
-// Covers: specs/world/quests-act5-2.md §8.8 (open question 4)
+// Covers: specs/world/quests-act5-2.md §8.8
 #[test]
 fn the_zoo_reads_the_monstats_zoo_column() {
     let mut fx = Fx::new();
