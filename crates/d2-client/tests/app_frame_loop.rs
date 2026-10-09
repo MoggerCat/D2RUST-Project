@@ -110,6 +110,7 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     let (link, _started) = game(&ms);
     let server = Arc::new(Mutex::new(link));
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
@@ -387,6 +388,7 @@ fn frame_loop_draws_each_tick_through_the_original_view() {
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = game(&ms);
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
@@ -468,6 +470,7 @@ fn frame_loop_shakes_on_the_tick_time_base() {
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = game(&ms);
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
@@ -739,6 +742,7 @@ fn gpu_node_composes_the_frame_into_the_presented_texture() {
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = game(&ms);
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins(
         DefaultPlugins
             .set(WindowPlugin {
@@ -1077,6 +1081,7 @@ fn frame_loop_uses_the_frame_store_text_layout_and_sound_pool() {
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = game(&ms);
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
@@ -1222,6 +1227,7 @@ fn frame_loop_runs_on_the_users_levels() {
     let (link, started) = single_player::start(data, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
     eprintln!("started: {started:?}");
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();

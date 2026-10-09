@@ -326,6 +326,7 @@ impl Game {
         .unwrap();
         let server = Arc::new(Mutex::new(link));
         let mut app = App::new();
+        app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
         app.add_plugins((MinimalPlugins, AssetPlugin::default()))
             .init_asset::<Image>()
             .init_resource::<ButtonInput<MouseButton>>()
