@@ -459,9 +459,12 @@ impl ItemTips {
     }
 
     /// The decoded record of an item stream (`None` when it does not
-    /// decode).
+    /// decode, or decodes as a failed record: no item is made of it,
+    /// `items/bitstream-legacy.md` §3 rule 12).
     pub fn bits(&self, stream: &[u8]) -> Option<ItemBits> {
-        decode(stream, &TablesLookup(&self.lookup)).ok()
+        decode(stream, &TablesLookup(&self.lookup))
+            .ok()
+            .filter(|b| !b.failed)
     }
 
     /// d2rs-own, unverified (REC-121; `0x0062BEB0` is not
@@ -510,9 +513,9 @@ impl ItemTips {
     /// The tip text of the item with last stream `stream`; empty when the
     /// stream does not decode.
     pub fn tip(&self, stream: &[u8], ctx: &TipCtx<'_>) -> TipText {
-        match decode(stream, &TablesLookup(&self.lookup)) {
-            Ok(b) => self.tip_of(&b, ctx),
-            Err(_) => TipText::default(),
+        match self.bits(stream) {
+            Some(b) => self.tip_of(&b, ctx),
+            None => TipText::default(),
         }
     }
 

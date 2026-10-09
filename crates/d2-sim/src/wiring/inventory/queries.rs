@@ -160,8 +160,11 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             .class_of(target)
             .and_then(|r| self.econ.tables.item(r))
             .map_or(0, |r| r.gemapplytype);
+        // A rune's mode 5 passes the socketed item as the extra unit
+        // (§9 rule 2).
         if let Err(e) = self.econ.with_item(filler, |s| {
-            props::apply_socket_filler(s.tables, s.item, apply)
+            let mut on = s.unit_stats(target);
+            props::apply_socket_filler_into(s.tables, s.item, apply, Some(&mut on))
         }) {
             self.state.errors.push(InvError::Economy(e));
         }

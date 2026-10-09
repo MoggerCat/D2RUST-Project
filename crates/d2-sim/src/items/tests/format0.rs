@@ -1050,3 +1050,44 @@ fn f0_legacy_property_table() {
         Err(Fatal::LegacyPropertyCrash(250))
     );
 }
+
+/// `0x0065D270` (code 242) acts on the extra unit when it is an item: a
+/// format-0 rune's mode 5 (`properties.md` §9 rule 2) zeroes the socketed
+/// item's base 73 and 72, not the rune's; a gem (mode 2, no extra unit)
+/// zeroes its own.
+// Covers: specs/items/properties.md §14, §9 r2
+#[test]
+fn f0_code_242_reaches_the_runes_socketed_item() {
+    use crate::items::props::apply_socket_filler_into;
+    use crate::items::tables::GemRec;
+    let mut t = tables268();
+    let mut g = item_rec(ty::RUNE, b"r01 ");
+    g.gemoffset = 0;
+    let rune = push_item(&mut t, g.clone());
+    g.code = *b"gem ";
+    g.type_ = ty::GEM as i16;
+    let gem = push_item(&mut t, g);
+    let block = [rec(242, 0, 0, 0), PropRec::NONE, PropRec::NONE];
+    t.gems = vec![GemRec {
+        mods: [block, block, block],
+    }];
+    let worn = |it: &mut Item<FakeStats>| {
+        it.stats.set_base(72, 0, 5);
+        it.stats.set_base(73, 0, 9);
+    };
+    let mut r = f0(rune, 1);
+    worn(&mut r);
+    let mut socketed = f0(rune, 2).stats;
+    socketed.set_base(72, 0, 7);
+    socketed.set_base(73, 0, 8);
+    apply_socket_filler_into(&t, &mut r, 0, Some(&mut socketed));
+    assert_eq!((socketed.base(72, 0), socketed.base(73, 0)), (0, 0));
+    assert_eq!((r.stats.base(72, 0), r.stats.base(73, 0)), (5, 9));
+    let mut gm = f0(gem, 1);
+    worn(&mut gm);
+    let mut other = f0(rune, 2).stats;
+    other.set_base(72, 0, 7);
+    apply_socket_filler_into(&t, &mut gm, 0, Some(&mut other));
+    assert_eq!((gm.stats.base(72, 0), gm.stats.base(73, 0)), (0, 0));
+    assert_eq!(other.base(72, 0), 7);
+}

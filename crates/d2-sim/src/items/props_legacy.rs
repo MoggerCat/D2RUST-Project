@@ -246,8 +246,8 @@ pub fn apply<S: ItemStats>(
         // Codes 244–267 read the §3 table's words as (function, stat):
         // 244 and 257–261 meet a null function; every other one calls a
         // non-legacy address and crashes.
-        // PROVISIONAL (M22; REC-289): codes ≥ 268 (beyond the 1.14d 268
-        // rows) are read as the same crash.
+        // Codes ≥ 268 exist only in a table with more rows than 1.14d's
+        // 268 (synthetic tables): d2rs-own, read as the same crash.
         return if ci == 244 || (257..=261).contains(&ci) {
             Ok(())
         } else {
@@ -432,12 +432,18 @@ fn run<S: ItemStats>(
             }
         }
         D270 => {
-            // PROVISIONAL (M22; REC-289): "the extra unit if it is an
-            // item": the property entry points do not carry the extra
-            // unit (a rune's socketed item, mode 5), so the item's own
-            // base stats are zeroed.
-            item.stats.set_base(stat::MAXDURABILITY, 0, 0);
-            item.stats.set_base(stat::DURABILITY, 0, 0);
+            // The extra unit if it is an item (a rune's socketed item,
+            // mode 5, §9 rule 2), else the item.
+            match ctx.extra.as_deref_mut() {
+                Some(x) => {
+                    x.set_base(stat::MAXDURABILITY, 0, 0);
+                    x.set_base(stat::DURABILITY, 0, 0);
+                }
+                None => {
+                    item.stats.set_base(stat::MAXDURABILITY, 0, 0);
+                    item.stats.set_base(stat::DURABILITY, 0, 0);
+                }
+            }
         }
         DBC0 => {
             charges(t, item, ctx, rec, s);

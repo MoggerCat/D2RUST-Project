@@ -47,7 +47,30 @@ pub fn state_on(
         u.state_lists.remove(&state);
     }
     u.states.insert(state);
-    Ok(())
+    // r6.1: colorshift ≠ 0 → the colour call (its model part: the local
+    // player's light colour, `render/shading.md` §6 r1.1).
+    colour_call(w, inputs, key, row)
+}
+
+/// The colour call of state on / off (r6.1, r6.3) when the state's
+/// `colorshift` ≠ 0; its row is read only when the call can change a
+/// light (the local player with a light).
+fn colour_call(
+    w: &mut ClientWorld,
+    inputs: &ModelInputs,
+    key: UnitKey,
+    row: Option<super::super::world::StateRow>,
+) -> Result<(), HandlerError> {
+    if !super::lighting::colour_call_lights(w, key) {
+        return Ok(());
+    }
+    let row = row.ok_or(HandlerError::Invalid(
+        "client/stat-lists.md §3 r6: no states row for the state's colorshift",
+    ))?;
+    if row.colorshift == 0 {
+        return Ok(());
+    }
+    super::lighting::state_colour_light(w, &inputs.tables.states, key)
 }
 
 /// State off `0x00639DB0(unit, state, 0)`: the bit only.
@@ -57,14 +80,23 @@ pub fn state_bit_off(w: &mut ClientWorld, key: UnitKey, state: u8) {
     }
 }
 
-/// State off with its list (0xA9: `0x004D9F40` then `0x004D9C30`; 0x7C:
-/// `0x00639DB0`, `0x006277E0`, `0x00626CD0`): the bit cleared, the
-/// state's list detached and freed.
-pub fn state_off(w: &mut ClientWorld, key: UnitKey, state: u8) {
-    if let Some(u) = w.units.get_mut(&key) {
-        u.states.remove(&state);
-        u.state_lists.remove(&state);
-    }
+/// State off with its list (0xA9: `0x004D9F40` then `0x004D9C30`): the
+/// bit cleared, the state's list detached and freed, then the colour call
+/// for a state with `colorshift` ≠ 0 (r6.3).
+pub fn state_off(
+    w: &mut ClientWorld,
+    inputs: &ModelInputs,
+    key: UnitKey,
+    state: u8,
+) -> Result<(), HandlerError> {
+    let Some(u) = w.units.get_mut(&key) else {
+        return Ok(());
+    };
+    u.states.remove(&state);
+    u.state_lists.remove(&state);
+    // r6.3: colorshift ≠ 0 → the colour call after the bit is cleared.
+    let row = inputs.tables.states.get(usize::from(state)).copied();
+    colour_call(w, inputs, key, row)
 }
 
 /// The state stat `0x004D9D70(unit, list, state, stat, value, param)`
@@ -177,8 +209,7 @@ pub fn delayed_or_end_state(w: &mut ClientWorld, msg: &Message<'_>) -> Result<()
     if msg.id == 0xA7 {
         state_on(w, msg.inputs, key, state)
     } else {
-        state_off(w, key, state);
-        Ok(())
+        state_off(w, msg.inputs, key, state)
     }
 }
 
