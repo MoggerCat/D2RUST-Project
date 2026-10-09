@@ -235,3 +235,27 @@ fn drlg_population_reads_are_the_act_drlgs() {
     });
     fx.assert_clean();
 }
+
+// umod-callbacks.md §1 rule 5 (exempt from claims): f1/f2 control flags
+#[test]
+fn owner_data_stores_the_f1_f2_control_flags() {
+    use crate::monsters::population::seams::MonsterInit;
+    use crate::monsters::population::OwnerKey;
+    let mut fx = Fx::new(isle_ds1s());
+    let (a, _) = isle(&mut fx);
+    fx.sim.create_regions();
+    fx.sim
+        .population(&mut fx.game, |cx| preset::place_presets(cx, a));
+    let u = monsters(&fx)[0];
+    let flags = |fx: &mut Fx, o: OwnerKey, a: i32, b: i32, c: i32| {
+        fx.sim
+            .population(&mut fx.game, |cx| cx.host.set_owner_data(u, o, a, b, c));
+        fx.sim.action.sys.hooks.ai_store().control(u).unwrap().flags & 3
+    };
+    // Leader with SetBoss + BossXfer (f1 1, f2 1) / SetBoss alone / minion.
+    assert_eq!(flags(&mut fx, OwnerKey::Guid(u), 1, 1, 1), 3);
+    let before = flags(&mut fx, OwnerKey::Guid(u), 1, 0, 0);
+    assert_eq!(before, 3, "a zero flag never clears its bit");
+    // The bits stand even when the owner lookup fails (type -1).
+    assert_eq!(flags(&mut fx, OwnerKey::Guid(u), -1, 1, 0), 3);
+}

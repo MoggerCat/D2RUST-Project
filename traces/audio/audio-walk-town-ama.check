@@ -1,0 +1,10 @@
+check 1
+# audio-diff (specs/tools/audio-diff.md §5): the player walks in the Rogue
+# Encampment (walk-town-ama's input): the player's footsteps.
+name audio-walk-town-ama
+save ScnAma --class ama --expansion
+seed 1234
+ticks 120
+seconds 300
+channels audio
+input frame 10; click 600 300

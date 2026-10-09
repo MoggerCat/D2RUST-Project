@@ -57,7 +57,13 @@ pub struct LocalLink<G, S = ProtoSizes, H = PendingSession, C = SystemClock> {
     host: Host<G, S, H, C>,
     /// The server part of the last pump (diagnostics and tests).
     last: HostFrame,
+    /// Run in each pump after the tick, before its flush
+    /// ([`Host::frame_with`]; `state-dump` pokes, `tools/poke.md` §5 r4).
+    tick_end: Option<TickEndHook<G, S, H, C>>,
 }
+
+/// A [`LocalLink`] tick-end hook.
+pub type TickEndHook<G, S, H, C> = Box<dyn FnMut(&mut Host<G, S, H, C>) + Send>;
 
 /// The single-player link of the app: `d2-proto` sizes, the real clock.
 pub type SinglePlayer<G> = LocalLink<G, ProtoSizes, PendingSession, SystemClock>;
@@ -92,7 +98,14 @@ where
         Self {
             host,
             last: HostFrame::default(),
+            tick_end: None,
         }
+    }
+
+    /// Installs `f` (replacing an earlier one), run in every pump that
+    /// ticks, after the tick and before its flush.
+    pub fn set_tick_end(&mut self, f: TickEndHook<G, S, H, C>) {
+        self.tick_end = Some(f);
     }
 
     pub fn host(&self) -> &Host<G, S, H, C> {
@@ -152,7 +165,15 @@ where
 
     /// `Host::frame`: drain → tick driver → flush if a tick ran.
     fn pump(&mut self) -> Result<Pumped, LinkError> {
-        self.last = self.host.frame().map_err(LocalError::from)?;
+        let hook = &mut self.tick_end;
+        self.last = self
+            .host
+            .frame_with(|h| {
+                if let Some(f) = hook.as_mut() {
+                    f(h)
+                }
+            })
+            .map_err(LocalError::from)?;
         Ok(Pumped {
             ticked: self.last.ticked,
         })

@@ -141,3 +141,70 @@ fn goto_a_missing_target_explores_then_fails() {
         "{r3:?}"
     );
 }
+
+// Covers: specs/tools/poke.md §1 r1
+#[test]
+fn pos_free_and_hop_land_on_missile_passable_cells() {
+    let mut s = session();
+    let player = s.player;
+    let (px, py) = s.pos();
+    let (tx, ty) = (px + 6, py);
+    let mask_at = |s: &mut Session, x, y| {
+        let sim = s.sim();
+        let room = sim.game.lists.unit(player).and_then(|e| e.room()).unwrap();
+        sim.events
+            .action
+            .sys
+            .hooks
+            .drlg
+            .collision(&sim.game, room, x, y)
+            .unwrap()
+    };
+    // Missile-blocking bit 0x4 on the target cell.
+    {
+        let sim = s.sim();
+        let room = sim.game.lists.unit(player).and_then(|e| e.room()).unwrap();
+        *sim.events
+            .action
+            .sys
+            .hooks
+            .drlg
+            .collision_mut(&sim.game, room, tx, ty)
+            .unwrap() |= 0x4;
+    }
+    assert_eq!(
+        line(&mut s, &format!("pos @player {tx} {ty} free")),
+        PokeResult::Ok(None)
+    );
+    let p = s.pos();
+    assert_ne!(p, (tx, ty), "the blocked cell itself");
+    assert!(cheb(p, (tx, ty)) <= 3, "landed at {p:?}");
+    assert_eq!(mask_at(&mut s, p.0, p.1) & poke::LAND_MASK, 0);
+    // A hop never ends on a cell with 0x4: block the full step's cell.
+    let (hx, hy) = s.pos();
+    let (fx, fy) = {
+        let sim = s.sim();
+        let room = sim.game.lists.unit(player).and_then(|e| e.room()).unwrap();
+        let hooks = &mut sim.events.action.sys.hooks;
+        let (dx, dy) = [(16, 0), (-16, 0), (0, 16), (0, -16)]
+            .into_iter()
+            .find(|&(dx, dy)| {
+                hooks
+                    .drlg
+                    .collision(&sim.game, room, hx + dx, hy + dy)
+                    .is_some()
+            })
+            .expect("a cell 16 away in the town grid");
+        let (fx, fy) = (hx + dx, hy + dy);
+        *hooks.drlg.collision_mut(&sim.game, room, fx, fy).unwrap() |= 0x4;
+        (fx, fy)
+    };
+    assert_eq!(
+        line(&mut s, &format!("hop @player {fx} {fy}")),
+        PokeResult::Ok(None)
+    );
+    let p = s.pos();
+    assert_ne!(p, (fx, fy));
+    assert_eq!(mask_at(&mut s, p.0, p.1) & poke::LAND_MASK, 0);
+    assert_eq!(s.sim().events.errors(), Vec::<String>::new());
+}

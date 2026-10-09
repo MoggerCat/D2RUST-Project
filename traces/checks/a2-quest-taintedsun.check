@@ -1,0 +1,17 @@
+check 1
+# Quest 11 Tainted Sun (s5): Drognan msg 348, warp 44, operate the altar (object 149), msg 362.
+name a2-quest-taintedsun
+save ScnAm2 --class ama --expansion --act 1 --quests acts=1
+seed 1234
+ticks 82
+seconds 600
+channels state packets
+at 4 poke goto unit 1:177
+at 14 send InteractWithEntity type=1 id=@1:177
+at 16 send InitEntityChat id=@1:177
+at 18 send QuestMessage npc=@1:177 msg=348
+at 20 send TerminateEntityChat id=@1:177
+at 24 poke warp 44
+at 28 poke goto unit 2:149
+at 52 send InteractWithEntity type=2 id=@2:149
+at 62 send QuestMessage npc=@2:149 msg=362

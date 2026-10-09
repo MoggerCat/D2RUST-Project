@@ -109,10 +109,11 @@ pub trait MissileRooms {
     fn collision_at(&self, game: &Game, room: RoomId, x: i32, y: i32, mask: u16) -> u16;
     /// `0x0064EBA0`: clear collision bit 0x40 under the unit with its size.
     fn clear_footprint(&mut self, game: &mut Game, unit: UnitId);
-    /// The units on subtile (x, y) in the search order of `0x00641CB0`
-    /// (D2MOO `D2Common_10407`); the missile code applies the collide
-    /// callback to each.
-    fn units_at(&self, game: &Game, room: RoomId, x: i32, y: i32) -> Vec<UnitId>;
+    /// The units hit by a query of size `r` (the missile's size) at
+    /// subtile (x, y), in the search order of `0x00641CB0` (D2MOO
+    /// `D2Common_10407`, `sim/path-placement.md` §4 rule 6); the missile
+    /// code applies the collide callback to each.
+    fn units_at(&self, game: &Game, room: RoomId, x: i32, y: i32, r: i32) -> Vec<UnitId>;
 }
 
 /// Damage and skill code. Provider: the combat/skills session.

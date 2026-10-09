@@ -60,7 +60,10 @@ screen point of every client unit of type T), `clickunit T C[,C..]|*
 [DX DY]` / `rclickunit ...` (click the unit of type T and one of the
 classes C, `*` = any class but not in mode 0 or 12, whose drawn point is
 nearest the window centre, at that point + (DX, DY), default (0, -8); no
-walking), `end` (stop the recording; the game is killed). X, Y are client pixels (800x600 window).
+walking; a point outside the window is refused with an `ERROR` log line and nothing is
+clicked), `end` (stop the recording; the game is killed). X, Y are client pixels (800x600 window).
+Note: `key ESC` with no panel open opens the single-player menu, which pauses 1.14d (no game
+tick after it); close a panel with it only when one is open.
 Frame-anchored steps (specs/tools/scenario-diff.md §2 rule 4): `frame F`
 waits for the tick-return stop 0x0052FD1E of game frame F - 1 (game
 +0xA8); the steps after it are posted while the game is stopped there, so
@@ -668,6 +671,13 @@ class AutoStart:
                     dx, dy = (a[2], a[3]) if len(a) == 4 else (0, -8)
                     x, y = x + dx, y + dy
                     self.log(f"autostart: {op} {a[0]}:{a[1]} clicks ({x}, {y})")
+                    if not (0 <= x < VIEW_W and 0 <= y < VIEW_H):
+                        # scenario-diff.md §2 r4.5: a point outside the frame clicks nothing
+                        # (1.14d would still act on a post outside the client area)
+                        self.log(f"autostart: ERROR {op} {a[0]}:{a[1]} refused: the unit is off "
+                                 f"screen at ({x}, {y}), outside the {VIEW_W}x{VIEW_H} window; "
+                                 f"nothing is clicked")
+                        continue
                     if framed:
                         # scenario-diff.md §2 rule 4.5: the hover frame. The cursor is posted at
                         # the stop of frame F - 1, the press and release at the stop of frame F
@@ -1058,6 +1068,18 @@ def selftest():
         (WM_MOUSEMOVE, 0), (WM_MOUSEMOVE, 0), (WM_LBUTTONDOWN, MK_LBUTTON), (WM_LBUTTONUP, 0)], sent
     assert s4.wait_frame == 4                                  # the click waited for frame 4
     assert sent[0][2] == lparam(400 + 2 * 16, 292 + 4 * 8 - 8)
+    # off-screen unit: refused, nothing posted, the error is logged
+    sent.clear()
+    logs = []
+    keep = (m.m[0x9004], m.m[0x9008])
+    m.m.update({0x9004: keep[0] + 2000, 0x9008: keep[1]})      # the unit far right of the window
+    s5 = AutoStart(after=0, script="frame 3; clickunit 2 119", log=logs.append, clock=Clock())
+    s5.send = lambda mem, msg, wp, lp: sent.append((msg, wp, lp))
+    s5.anchor, s5.stop_frame = 3, 2
+    assert not (0 <= screen_of(m, obj)[0] < VIEW_W), screen_of(m, obj)
+    list(s5.run(m, [("clickunit", [2, "119"])]))
+    assert not sent and any("refused" in l and "ERROR" in l for l in logs), (sent, logs)
+    m.m.update({0x9004: keep[0], 0x9008: keep[1]})
     m.m[obj + U_CLASS] = 120                                   # perturbation: wrong class is not found
     assert nearest(m, 2, (119,)) is None
     m.m[GAME_MODE] = 1                                         # not in the menu: never forced

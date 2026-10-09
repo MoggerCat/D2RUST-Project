@@ -576,6 +576,7 @@ impl Fx {
             levels: levels(),
             skill_modes: vec![[0; 8]],
             overlay_count: 0,
+            monequip: Vec::new(),
         };
         let book = Book::default();
         let gold_tables = gold_item_tables();
@@ -608,7 +609,14 @@ impl Fx {
         }));
         hooks.vitals = Some(Arc::new(vitals()));
         let wt = WorldTables {
-            pop: PopTables::from_records(&levels(), &[monster_class()], &monstats2(), &[]),
+            // Class 1 (the mercenary) too: its creation is `0x005B23C0`'s
+            // placement (`population.md` §9), which needs both rows.
+            pop: PopTables::from_records(
+                &levels(),
+                &[monster_class(), monster_class()],
+                &monstats2(),
+                &[],
+            ),
             monstats: vec![monster_class()],
             monstats2: monstats2(),
             monlvl: vec![blank::<Monlvl>(); 10],

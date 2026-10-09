@@ -1,0 +1,13 @@
+check 1
+# Fara (178) heals: life set low by poke, then the interaction (npc.md s8 services).
+name a2-npc-fara-heal
+save ScnAm2 --class ama --expansion --gold 10000 --act 1 --quests acts=1
+seed 1234
+ticks 50
+seconds 600
+channels state packets
+at 4 poke goto unit 1:178
+at 8 poke stat @player 6 0 5120
+at 14 send InteractWithEntity type=1 id=@1:178
+at 16 send InitEntityChat id=@1:178
+at 20 send TerminateEntityChat id=@1:178
