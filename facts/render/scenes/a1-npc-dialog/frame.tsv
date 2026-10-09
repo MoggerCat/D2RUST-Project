@@ -1,0 +1,22 @@
+# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py game/captures/day/manual/scene1b.jsonl --scene a1-npc-dialog --frame 69 --out facts/render; game: 1.14d
+key	value
+seq	69
+tick	616
+w	800
+h	600
+act	0
+level	1
+player_x	11616
+player_y	73128
+tile_origin_x	11216
+tile_origin_y	72848
+unit_origin_x	11216
+unit_origin_y	72844
+open_mode	0
+shift_x	0
+light_quality	1
+rain	1
+snow	0
+draws	517
+index_sha256	8b13cf5d1b3c460631a8dcbd5650c5c6b6628b817770a8323192b436a393eeaf
+palette_sha256	ba83219e51249002d7125a1a5a701d6abea94f04f44d6cfaa42becdfcff23337

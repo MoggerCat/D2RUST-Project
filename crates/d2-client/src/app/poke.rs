@@ -1,0 +1,207 @@
+// Spec: specs/tools/poke.md §5 rule 2 (the `d2-client play --poke` caller)
+//! `play --poke "<f> <directive> <args>..."` and `play --poke-file FILE`:
+//! pokes (`d2_sim::poke`) applied on the server thread between frames,
+//! through the link's before-pump hook ([`ThreadLink::set_before_pump`]).
+//!
+//! When a poke runs:
+//!
+//! - `--poke "<f> ..."`: `f` is the absolute server frame (`Game.frame`
+//!   after the tick): the poke runs once frame f − 1 has run, before
+//!   frame f's drain and tick (`poke.md` §2 rule 4's point).
+//! - `--poke-file`: the file's ticks are relative (`poke.md` §2 rule 4):
+//!   tick 0 is the first frame after the one in which the local client
+//!   reached state 4 (in game), so tick t runs when `Game.frame` = F0 + t,
+//!   F0 being that frame (seen by the hook before the next pump).
+//!
+//! References are resolved by `d2_sim::poke::apply` on the state the
+//! hook sees (every form of `poke.md` §1 rule 1; `@wp` from the waypoint
+//! table of the game). Each result is printed to stderr. Without either
+//! flag nothing is installed.
+
+use std::collections::BTreeSet;
+
+use d2_sim::poke::{self, PokeFile, PokeOp};
+use d2_sim::units::lists::client_state;
+
+use super::server_thread::{ThreadLink, ThreadStopped};
+use super::single_player::{local_player, Link, Sim};
+use crate::bridge::link::LOCAL_CLIENT;
+
+/// When an entry runs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum When {
+    /// Absolute server frame f: runs when `Game.frame` ≥ f − 1.
+    Frame(i32),
+    /// Relative tick t of a poke file: runs when `Game.frame` ≥ F0 + t.
+    Tick(u32),
+}
+
+/// One scheduled poke.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Entry {
+    pub when: When,
+    pub op: PokeOp,
+}
+
+/// Parses one `--poke` value: `<f> <directive> <args>...` (or `<f> spawn
+/// ...`).
+pub fn parse_poke_arg(s: &str) -> Result<Entry, String> {
+    let toks: Vec<&str> = s.split_ascii_whitespace().collect();
+    let Some((f, rest)) = toks.split_first() else {
+        return Err("--poke \"<frame> <directive> <args>...\"".into());
+    };
+    let f: i32 = f
+        .parse()
+        .ok()
+        .filter(|&f| f >= 1)
+        .ok_or_else(|| format!("--poke: frame {f:?}: a server frame ≥ 1"))?;
+    let op = poke::parse_op(rest).map_err(|e| format!("--poke {s:?}: {e}"))?;
+    Ok(Entry {
+        when: When::Frame(f),
+        op,
+    })
+}
+
+/// The entries of a poke file (`poke.md` §2).
+pub fn parse_poke_file(text: &str) -> Result<Vec<Entry>, String> {
+    let f = PokeFile::parse(text).map_err(|e| e.to_string())?;
+    Ok(f.lines
+        .into_iter()
+        .map(|l| Entry {
+            when: When::Tick(l.tick),
+            op: l.op,
+        })
+        .collect())
+}
+
+/// The frame after which `when` is due (`Game.frame` must have reached
+/// it), `None` while the anchor F0 is unknown.
+pub fn due_after(when: When, anchor: Option<i32>) -> Option<i32> {
+    match when {
+        When::Frame(f) => Some(f - 1),
+        When::Tick(t) => anchor.map(|a| a.saturating_add(i32::try_from(t).unwrap_or(i32::MAX))),
+    }
+}
+
+/// The pending pokes of a game.
+#[derive(Debug, Default)]
+pub struct Schedule {
+    pending: Vec<Entry>,
+    /// F0: the frame in which the local client was first seen in game.
+    anchor: Option<i32>,
+}
+
+impl Schedule {
+    pub fn new(entries: Vec<Entry>) -> Self {
+        Self {
+            pending: entries,
+            anchor: None,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.pending.is_empty()
+    }
+
+    /// Runs every due entry in order on `s` and prints its result.
+    pub fn run_due(&mut self, s: &mut Sim) {
+        if self.pending.is_empty() {
+            return;
+        }
+        let frame = s.game.frame;
+        if self.anchor.is_none()
+            && s.game
+                .lists
+                .client(d2_sim::units::ClientId(LOCAL_CLIENT))
+                .is_some_and(|c| c.state == client_state::IN_GAME)
+        {
+            self.anchor = Some(frame);
+        }
+        let Some((player, _)) = local_player(s) else {
+            return;
+        };
+        let waypoints: BTreeSet<u32> = s
+            .world
+            .action
+            .waypoints
+            .as_ref()
+            .map(|w| {
+                w.objects
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, o)| o.operate_fn == 23)
+                    .map(|(i, _)| i as u32)
+                    .collect()
+            })
+            .unwrap_or_default();
+        let anchor = self.anchor;
+        let (due, later): (Vec<Entry>, Vec<Entry>) = std::mem::take(&mut self.pending)
+            .into_iter()
+            .partition(|e| due_after(e.when, anchor).is_some_and(|f| frame >= f));
+        self.pending = later;
+        for e in due {
+            let env = poke::Env {
+                player,
+                waypoint_classes: &waypoints,
+                items: Some(&s.world.tables),
+            };
+            let r = poke::apply_op(&mut s.game, &mut s.events, &env, &e.op);
+            let late = match due_after(e.when, anchor) {
+                Some(f) if frame > f => format!(" (late: due after frame {f})"),
+                _ => String::new(),
+            };
+            eprintln!(
+                "poke: after frame {frame}{late}: {}: {}{}",
+                e.op,
+                r.code(),
+                match &r {
+                    poke::PokeResult::Ok(Some(g)) => format!(" guid {g}"),
+                    poke::PokeResult::Unresolved(u) => format!(" {u}"),
+                    poke::PokeResult::Gap(why) => format!(" ({why})"),
+                    _ => String::new(),
+                }
+            );
+        }
+    }
+}
+
+/// Installs `entries` on the game's server thread (no-op when empty).
+pub fn install<C: d2_server::seams::Clock + Send + 'static>(
+    link: &mut ThreadLink<Link<C>>,
+    entries: Vec<Entry>,
+) -> Result<(), ThreadStopped> {
+    if entries.is_empty() {
+        return Ok(());
+    }
+    let mut schedule = Schedule::new(entries);
+    link.set_before_pump(move |l: &mut Link<C>| schedule.run_due(&mut l.host_mut().game))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Covers: specs/tools/poke.md §5 r2
+    #[test]
+    fn poke_args_and_files_parse_and_schedule() {
+        let e = parse_poke_arg("40 time 2 0").unwrap();
+        assert_eq!(e.when, When::Frame(40));
+        assert_eq!(e.op.to_string(), "time 2 0");
+        let e = parse_poke_arg("3 spawn 19 @x+4 @y normal").unwrap();
+        assert!(matches!(e.op, PokeOp::Spawn(_)));
+        assert!(parse_poke_arg("0 time 2 0").is_err());
+        assert!(parse_poke_arg("x time 2 0").is_err());
+        assert!(parse_poke_arg("5 time 9 0")
+            .unwrap_err()
+            .contains("period 9"));
+        assert!(parse_poke_arg("").is_err());
+        let f = parse_poke_file("poke 1\nat 0 seed-game 1 2\nat 7 freeze 1\n").unwrap();
+        assert_eq!(f[1].when, When::Tick(7));
+        assert!(parse_poke_file("poke 2\n").is_err());
+        // Absolute frame f: after frame f − 1; relative tick t: after F0 + t.
+        assert_eq!(due_after(When::Frame(40), None), Some(39));
+        assert_eq!(due_after(When::Tick(7), None), None);
+        assert_eq!(due_after(When::Tick(7), Some(100)), Some(107));
+        assert!(Schedule::new(Vec::new()).is_empty());
+    }
+}

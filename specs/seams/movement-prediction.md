@@ -107,16 +107,19 @@ None of its own: the owner specs' state changes, as listed per rule.
 
 1. Bit layouts as `combat/vitals.md` §5.4 / `client/msg-units.md` §5 r1;
    stamina is the total `>> 8` (15 bits), x, y the server's cell.
-2. dx, dy encode the server path's target relative to x, y; the client
-   recovers the target as `client/msg-units.md` §5 r3 states and uses it
-   in the check's rule 5 (`client/model.md` §6 r5). Both sides must agree
-   on the sign: the server writes `(X − target) & 0xFF`
-   (`combat/vitals.md` §5.2), so the target is `X − sdx`. (Open question
-   1: the two owner specs disagree.)
+2. dx, dy = `(X − target) & 0xFF` (`combat/vitals.md` §5.2); the client
+   forms `(x + sdx, y + sdy)` = the target reflected through the server
+   point (`client/msg-units.md` §5 r3, 1.14d-confirmed both sides) and
+   uses it in the check's rule 5 (`client/model.md` §6 r5): a prediction
+   lagging behind the server point is kept, one more than the tolerance
+   ahead of it is corrected even when it is on the server's path.
 3. Stamina crosses at 1/256 of its server precision: the client's stat
    10 is `stamina << 8`, so the client's "stamina 0" means server raw
    stamina < 256, while the server's run turns into a walk at raw ≤ 0
-   (`sim/pathing.md` §1.5 step 2, §9.9 r3).
+   (`sim/pathing.md` §1.5 step 2, §9.9 r3). This mismatch is 1.14d's
+   own: the client does not drain stamina and ends its run on model
+   stat 10 = 0 (`client/model.md` OQ2, stamina answer); the client's
+   test stays on the model value, not on the server's scale.
 
 #### 2.6 Speed of the local player
 
@@ -198,12 +201,8 @@ Both sides' specs and code, read 2026-10-08 (implementation session; no
 
 ## Open questions
 
-1. The sign of 0x96 / 0x95 / 0x18 dx, dy: `combat/vitals.md` §5.2 writes
-   `X − target`, `client/msg-units.md` §5 r3 reads `target = x + sdx`.
-   One of the two readings of `0x00548760` / `0x0045DC50` is wrong, or
-   1.14d's client mirrors the target. Settled by a Ghidra read of both
-   and a trace of a 0x96 sent mid-walk (dx ≠ 0). Queue row
-   `q-fix-seam-vitals-delta`.
+1. (Settled, §2.5 r2.) The sign of 0x96 / 0x95 / 0x18 dx, dy: no
+   disagreement; 1.14d's client mirrors the target.
 2. How 1.14d's client sets its own player's mode while it predicts a walk
    (the tolerance of `client/model.md` §6 r4 reads it): `0x00463390`,
    `client/model.md` OQ2, REC-51.

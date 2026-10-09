@@ -6,10 +6,10 @@
 //! 0x0C). Plain decisions over the client model; the server checks every
 //! move (`items/inventory-moves.md` §7).
 //!
-//! d2rs-own, unverified: without `inventory.bin` rows the grid is the
-//! measured expansion record 12 / 28 (6 × 8, cell 29, left 74 / 154, top
-//! 82 / 142); the classic stash (record 8 / 24, 6 × 4) uses the same
-//! corner. PROVISIONAL, REC-104 in `docs/HANDOFF.md` §7.
+//! Without `inventory.bin` rows the grid is the install's record 12 / 28
+//! (expansion, 6 × 8) or 8 / 24 (classic, 6 × 4), as measured on 1.14d;
+//! the grid corner of REC-104 is settled by q-prov-data (its inventory-half
+//! point is not).
 
 use super::super::draw::UiDrawSink;
 use super::super::geom::Point;
@@ -34,20 +34,24 @@ pub fn stash_record(expansion: bool, screen: &Screen) -> usize {
     }
 }
 
-/// d2rs-own, unverified: the measured record 12 / 28 rectangle (module
-/// doc): (74, 244, 82, 313) / (154, 324, 142, 373), so right = left + 170
-/// and bottom = top + rows · 29 − 1 (`seams/item-grids.md` §2.5: every
-/// accepted pixel names a cell inside the grid).
+/// The install's `inventory.bin` rows, measured on 1.14d
+/// (`prov_data_tables` checks them): the expansion stash, record 12 / 28,
+/// is (74, 244, 82, 313) at 640 × 480; the classic stash, record 8 / 24,
+/// (74, 244, 273, 386); both +(80, 60) at 800 × 600.
 pub fn fallback_stash_grid(expansion: bool, screen: &Screen) -> GridRecord {
     let (dx, dy) = if screen.res2() { (80, 60) } else { (0, 0) };
-    let rows: u8 = if expansion { 8 } else { 4 };
+    let (rows, top, bottom): (u8, i32, i32) = if expansion {
+        (8, 82, 313)
+    } else {
+        (4, 273, 386)
+    };
     GridRecord {
         grid_x: 6,
         grid_y: rows,
         left: 74 + dx,
         right: 74 + dx + 170,
-        top: 82 + dy,
-        bottom: 82 + dy + i32::from(rows) * 29 - 1,
+        top: top + dy,
+        bottom: bottom + dy,
         cell_w: 29,
         cell_h: 29,
     }

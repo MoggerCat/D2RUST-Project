@@ -35,18 +35,18 @@
 |   F2.9 Control records and art | 510–546 |
 |   F3.1 Character-create screen build (`0x00435580`) | 547–582 |
 |   F3.2 Class line-up (positions, creation order) | 583–598 |
-|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 599–658 |
-|   F3.4 Name entry (edit box, descriptor 204) | 659–673 |
-|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 674–697 |
-|   F3.6 OK / Cancel behaviour and the new save | 698–732 |
-|   F3.7 Sounds (deferred) | 733–737 |
-|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 738–768 |
-| Constants & data dependencies | 769–805 |
-| Randomness | 806–809 |
-| Edge cases & original bugs | 810–841 |
-| Test vectors | 842–875 |
-| Provenance | 876–921 |
-| Open questions | 922–966 |
+|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 599–659 |
+|   F3.4 Name entry (edit box, descriptor 204) | 660–674 |
+|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 675–698 |
+|   F3.6 OK / Cancel behaviour and the new save | 699–733 |
+|   F3.7 Sounds (deferred) | 734–738 |
+|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 739–769 |
+| Constants & data dependencies | 770–806 |
+| Randomness | 807–810 |
+| Edge cases & original bugs | 811–842 |
+| Test vectors | 843–876 |
+| Provenance | 877–922 |
+| Open questions | 923–967 |
 <!-- /index -->
 
 ## Summary
@@ -652,9 +652,10 @@ Class ids (`[0x0070CB80]`, save +0x28): 0 Amazon, 1 Sorceress, 2 Necromancer, 3 
 | Druid | 10097 | 22518 "Commanding the forces of nature, he summons wild beasts and raging storms to his side." |
 | Assassin | 10098 | 22519 "Schooled in the Martial Arts, her mind and body are deadly weapons." |
 
-PROVISIONAL: 10097 shows "Druid" and 10098 "Assassin" (because the d2exp base `patchstring.tbl` maps
-10097 "Assassin" / 10098 "Druid", the reverse of the code's use, so the 1.14d `Patch_D2.mpq` table must
-differ); settled by REC-208.
+**Settled** (2026-10-09, q-prov-data, REC-208): 10097 shows "Druid" and 10098 "Assassin". The
+d2exp base `patchstring.tbl` maps 10097 "Assassin" / 10098 "Druid" (elements 97 / 98), but the 1.14d
+`Patch_D2.mpq` carries its own `data\local\LNG\ENG\patchstring.tbl` (found by name; 53,008 bytes) whose
+elements 97 / 98 are "Druid" / "Assassin" (keys `Druid` / `Assassin`), the code's use.
 
 ### F3.4 Name entry (edit box, descriptor 204)
 

@@ -157,10 +157,10 @@ Replace, per cell (xoff = variant offset):
   first use of P (recorded: Blood Moor's build-list draws `0x0067438F`
   are its ring's 10 then 52, 46, 47, 29, 30 at seq 2562–2571, 4464,
   6027, 6129, 6230, 6331, and Cold Plains' are its ring's 8 then 51, 48,
-  44, 29, 30 at seq 9481, 11622, 11752, 11881 and the next one, although
+  44, 29, 30 at seq 9480, 11621, 11751, 11880, 12009, although
   their type 1 replacements stamp the first 12 / 13 resp. 12–15; with a
   roll per first stamp the Cold Plains type 2 variant roll moves from
-  level-seed draw 1747, seq 8644, to 1751, and the build ends at 97
+  level-seed draw 1747, seq 8643, to 1751, and the build ends at 97
   rooms). The earlier text said "file −1" (a build-list file).
   PROVISIONAL: the stamp's file is 0 and the build list is not touched
   (because the recording fixes only that no draw happens; every

@@ -26,22 +26,22 @@
 | Rules | 79–80 |
 |   1. Client state the quest log reads | 81–112 |
 |   2. The quest-log entry table `0x00723F30` | 113–141 |
-|   3. Status tables and the tab build | 142–170 |
-|   4. Row derivation (`0x004A1950`) | 171–217 |
-|   5. Icon states (`0x004A34F0`, jump table `0x004A3E28`) | 218–239 |
-|   6. Per-quest special cases (summary) | 240–269 |
-|   7. Act I status tables | 270–374 |
-|   8. Act II status tables | 375–483 |
-|   9. Act III status tables | 484–597 |
-|   10. Act IV status tables | 598–649 |
-|   11. Act V status tables | 650–767 |
-|   12. Client quest check `0x004A4180(c)` (level-entry lines) | 768–814 |
-| Constants & data dependencies | 815–831 |
-| Randomness | 832–835 |
-| Edge cases & original bugs | 836–853 |
-| Test vectors | 854–880 |
-| Provenance | 881–895 |
-| Open questions | 896–902 |
+|   3. Status tables and the tab build | 142–176 |
+|   4. Row derivation (`0x004A1950`) | 177–225 |
+|   5. Icon states (`0x004A34F0`, jump table `0x004A3E28`) | 226–252 |
+|   6. Per-quest special cases (summary) | 253–282 |
+|   7. Act I status tables | 283–387 |
+|   8. Act II status tables | 388–496 |
+|   9. Act III status tables | 497–610 |
+|   10. Act IV status tables | 611–662 |
+|   11. Act V status tables | 663–780 |
+|   12. Client quest check `0x004A4180(c)` (level-entry lines) | 781–827 |
+| Constants & data dependencies | 828–844 |
+| Randomness | 845–848 |
+| Edge cases & original bugs | 849–866 |
+| Test vectors | 867–893 |
+| Provenance | 894–908 |
+| Open questions | 909–915 |
 <!-- /index -->
 
 ## Summary
@@ -160,8 +160,14 @@ therefore writes `S[34]`, never shown; a 0x5D for a chain with no entry
    −1), runs §4 on each shown entry to choose the selected slot
    `[0x007BF2B9]`: the first entry whose row has "changed" set or icon
    state 0 wins; else (only if some entry is in state 1, 2 or 3) the tab's last
-   clicked selection `[0x007BF2BD + 4·tab]`, else the first entry in
-   state 3. The scan visits all 41 entries. reset ≠ 0 clears the five remembered slots.
+   clicked selection `[0x007BF2BD + 4·tab]` when it is ≠ −1, else the
+   first entry in state 3 (if any), else none. The scan visits the 41
+   entries in order and stops at the first winner. Order of effects
+   (`0x004A3220`): selected := −1 first, always; a refused Act V tab
+   ends there (no cels, no reset); a remembered slot is taken as the
+   selection without a scan; reset ≠ 0 clears the five remembered slots
+   (`[0x007BF280]` … `[0x007BF290]` := −1) only after the selection was
+   made (so a remembered slot still wins on the call that resets).
 4. The selected row's title (unless 3724) is drawn in the description
    pane, and its text (wrapped at 270 px, `0x00502970(0x10E)`) unless
    a speech replay runs (`[0x007BF2B3]` ≠ 0). The replay button
@@ -211,8 +217,10 @@ empty, changed := 0, shown := L. T null → icon state 2, end.
       icon state 3; L = 13 → icon state 1 if P.12 else 0.
 8. **Z (status 0):** G.13 set: q = 21 with P.0 clear and P.4 set →
    text 989 (`qstsa3q53`); else P.13 or P.1 → icon state 2, end; else
-   text 3729 + (game type ≠ 0). G.13 clear: G.15 clear, P.13 or P.1 →
-   icon state 2, end; else text 3729 + (game type ≠ 0). Each text case:
+   text 3729 + (game type ≠ 0). G.13 clear (G absent counts as clear):
+   text 3729 + (game type ≠ 0) only when G.15 is set and P.13 and P.1
+   are both clear; any other case (G.15 clear, or P.13, or P.1) → icon
+   state 2, end (`0x004A218C` … `0x004A220A`). Each text case:
    speech 3725, icon state 3, title stays 3724 (no title drawn).
 
 ### 5. Icon states (`0x004A34F0`, jump table `0x004A3E28`)
@@ -220,13 +228,18 @@ empty, changed := 0, shown := L. T null → icon state 2, end.
 Row n of the tab (0–5), icon cel K of the entry, position from the slot
 table `0x00723EA8` (x) / `0x00723EAC` (y), 16 bytes per slot.
 
-1. **0, just completed:** frame = counter `[0x007C0225 + 4n]` (≤ 24);
-   the counter steps by 1 when more than 100 ms (`GetTickCount`) passed
-   since `[0x007C023D + 4n]`; reaching 1 plays UI sound 14
-   (`0x004B9A00`, expansion installed only). At counter ≥ 25: frame 24,
-   P.12 := 1 and C→S 0x58 with u16 q (`0x004785B0`, `world/quests.md`
-   §1.7). `0x004A2760` (callers `0x004A28D0`, `0x004A3E40`) does the
-   same set-and-send at once for every row in state 0.
+1. **0, just completed:** per draw, in this order (`0x004A34F0` case
+   0): (a) frame = counter `[0x007C0225 + 4n]` as it is before this
+   draw's step; counter ≥ 25 → frame 24, P.12 := 1 and C→S 0x58 with
+   u16 q (`0x004785B0`, `world/quests.md` §1.7); (b) the cel is drawn;
+   (c) now = `GetTickCount`; stamp `[0x007C023D + 4n]` = 0 → stamp :=
+   now; (d) now − stamp > 100 → stamp := now, counter += 1, and a
+   counter of 1 plays UI sound 14 (`0x004B9A00`, expansion installed
+   only). So the first draw only stamps, and the 0x58 goes out on the
+   draw after the step that reached 25. Counters and stamps of all six
+   rows are zeroed by `0x004A2220` / `0x004A2300`. `0x004A2760`
+   (callers `0x004A28D0`, `0x004A3E40`) does the same set-and-send at
+   once for every row in state 0.
 2. **1, completed:** frame 24; while its slot is the pressed slot
    `[0x007BF2B5]`, cel `questdone` frame = icon index instead.
 3. **2, not available:** frame 26; no title or text.
