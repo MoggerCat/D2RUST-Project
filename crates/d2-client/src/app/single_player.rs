@@ -994,10 +994,13 @@ impl Pending for LocalSeams {
     }
     /// `0x00623660`, the operate entry's interact range (`objects.md`
     /// §7.1 rule 3): no written spec gives its test.
-    // PROVISIONAL (world/objects.md §7.1 r3; REC-94): in range. The
-    // preview client sends C→S 0x13 only on arrival
-    // (`world_view/interact.rs`); the §7.3 r3–r4 approach is
-    // `Pending::object_approach`'s default (operate).
+    /// Measured (REC-94, `facts/objects/objanim-a1-town.tsv` run r3): 1.14d's client polls
+    /// `0x00623660(P, O)` every frame of the walk and sends C→S 0x13 on
+    /// the first frame it returns 1 (waypoint 119 at sub-tile offset
+    /// (4, 3), stash 267 at (3, 1)); both server calls of that 0x13
+    /// (`0x00548B7D`, `0x00584597`) then return 1. So "in range" holds
+    /// for every 0x13 the client sends; the test's own formula is not
+    /// modelled (`docs/handoff/pc1-data.md` Step 4).
     fn object_in_range(&self, _: &Game, _: UnitId, _: UnitId) -> bool {
         true
     }

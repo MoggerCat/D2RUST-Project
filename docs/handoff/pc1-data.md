@@ -200,6 +200,14 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     `tools/trace-recorder/record_frames.py` and `facts_render.py` as in
     Step 3, each twice, and commit the facts.
 
+21. **Interact range test `0x00623660(P, O)`** (REC-94): its formula
+    (object size, which positions). Measured under Wine
+    (`facts/objects/objanim-a1-town.tsv` run r3): returns 1 for the
+    waypoint 119 with the player 4 sub-tiles off in x and 3 in y, 0 at 5;
+    for the stash 267 only at 3 / 1. Answer into `world/objects.md` §7.1
+    r3 (d2rs reads it as always in range for a player: true for every
+    0x13 the client sends).
+
 ## Step 5 — spec gaps (107 provisional points no spec states)
 
 `docs/handoff/provisional-index.tsv` rows with `settle_kind` = `unstated`
