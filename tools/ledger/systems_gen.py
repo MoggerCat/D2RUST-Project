@@ -107,6 +107,7 @@ for pat in pick:
             else: note = 'no crate cites this spec (// Spec: line); ' + n
             add(area=area, kind=kind, src=f'{path} ' + (f'§{h}' if h else 'whole'), specs=path, spec_status=st, checks=chk, verdict=v,
                 prov=str(pc) if False else str(pc), pc1=pc1, owner=ow, state=state, size=size, note=note)
+add(area='system.perf.budget', src='docs/handoff/bench-baselines.md', note='bench baselines exist (docs/handoff/bench-baselines.md); no 1.14d-side budget to compare, original timing is tick-based (tick.md)', state='NO-CHECK', size='S', specs='-')
 seen = set(); out = []
 for r in rows:
     a = r['area']; k = a; j = 2
