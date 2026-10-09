@@ -266,14 +266,15 @@ fn expected(a: &Answers, msg: &[u8], size: usize) -> Option<ResultCode> {
             }
         }
         // §2.4 rule 6: strlen 0 is done with no effect; strlen ≥ 256 → 2.
-        0x14 => match msg[3..].iter().position(|&c| c == 0) {
+        0x14 => match msg.get(3..).unwrap_or(&[]).iter().position(|&c| c == 0) {
             Some(0) => return Some(Done),
             Some(n) if n < 256 => {}
             _ => return Some(Invalid),
         },
         // §2.4 rule 6 (0x15, `0x0054A5D0`): strlen < 256 and strlen + 4 <
         // size, else rejected with 2 (PROVISIONAL code, REC-402).
-        0x15 => match msg[3..].iter().position(|&c| c == 0) {
+        // A message shorter than its string's offset has no NUL: rejected.
+        0x15 => match msg.get(3..).unwrap_or(&[]).iter().position(|&c| c == 0) {
             Some(n) if n < 256 && n + 4 < size => {}
             _ => return Some(Invalid),
         },
@@ -333,6 +334,34 @@ fn duplicate_filter_store_tail() {
     // The store and time stay as they were after a drop.
     assert_eq!(f.pass(&[0x21, 1, 2, 3], 499), Ok(false));
     assert_eq!(f.pass(&[0x21, 1, 2, 3], 500), Ok(true));
+}
+
+/// Regression: a 0x15 shorter than its string's offset (+3) has no NUL,
+/// so both the oracle and the dispatcher reject it with 2 (§2.4 rule 6;
+/// the old oracle sliced `msg[3..]` and panicked on the random case
+/// `[0x15]`).
+#[test]
+fn chat_0x15_shorter_than_its_string() {
+    let a = Answers {
+        lookup: 0,
+        gate: PlayerGate {
+            mode: 1,
+            uninterruptable: false,
+        },
+        point: None,
+        frame: 0,
+        target: 1,
+        player: Pos { x: 0, y: 0 },
+        other: Pos { x: 0, y: 0 },
+    };
+    for m in [&[0x15][..], &[0x15, 0], &[0x15, 0, 0]] {
+        let mut game = Fake::new(a);
+        let mut out = ClientBuffers::new();
+        let code = dispatch(&mut game, &ProtoSizes, &mut out, 0, a.gate, m, m.len());
+        assert_eq!(expected(&a, m, m.len()), Some(ResultCode::Invalid), "{m:?}");
+        assert_eq!(code, ResultCode::Invalid, "{m:?}");
+        assert!(game.handled.is_empty());
+    }
 }
 
 /// Regression: the store and time start zeroed, so an all-zero message
