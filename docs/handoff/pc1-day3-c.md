@@ -264,3 +264,14 @@ The harness should test class and position, not GUID.
     path.
   - **d2rs differs:** the quest host's `spawn_monster` is a bare allocate:
     `q-fix-p3-quest-spawn-creation`. It is related to `q-fix-p3-quest-superunique-spawn`.
+
+## Round 4 — REC-576 Windows points (q-prov-recording-2)
+
+- **(6) Weather frame rate `[0x007BB390]`: settled** (`render/draw-order-2.md` §11.7 r2). Read with
+  no breakpoints, 4 times a second for 30 s in the Rogue Encampment:
+  - 0 in the menus;
+  - 30–44 for about 10 s after the arrival;
+  - then 21–26, 25 in most samples.
+
+  The 0–12 seen under the debugger came from the hooks slowing the client. The ≥ 10 flash gate always
+  passes in play, so d2rs's fixed 25 matches in effect. No q-fix.
