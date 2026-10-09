@@ -152,11 +152,12 @@ pub struct SeqRun {
     target: (i32, i32),
     /// The do ran (first event byte 1 crossed).
     done_do: bool,
-    /// The leap record, and whether it was made this update (it is first
-    /// stepped the update after: the leap facts show `mn` 13, `oz` 0 the
-    /// update after the do).
+    /// The leap record. The do's update makes it `pending`; it shows the
+    /// update after, unstepped, and is stepped from the one after that
+    /// (the leap facts: no record at frame 5, `mn` 13 / `oz` 0 at frame 6,
+    /// 12 / −20 at frame 7).
     leap: Option<MotionRecord>,
-    fresh: bool,
+    pending: Option<MotionRecord>,
     /// Whirl: mode-18 updates left after the do's.
     path_left: Option<u32>,
 }
@@ -171,7 +172,7 @@ impl SeqRun {
             target,
             done_do: false,
             leap: None,
-            fresh: false,
+            pending: None,
             path_left: None,
         }
     }
@@ -203,11 +204,12 @@ impl SeqRun {
         // The leap record: stepped from the update after the do; done
         // (flag 1, the update after ticks 0) is the landing.
         if let Some(rec) = &mut self.leap {
-            if self.fresh {
-                self.fresh = false;
-            } else if rec.update(false, None).is_err() || rec.flags & motion::DONE != 0 {
+            if rec.update(false, None).is_err() || rec.flags & motion::DONE != 0 {
                 self.leap = None;
             }
+        }
+        if let Some(rec) = self.pending.take() {
+            self.leap = Some(rec);
         }
         // The whirl path: the update that reaches its end leaves mode 18.
         if let Some(n) = &mut self.path_left {
@@ -246,8 +248,7 @@ impl SeqRun {
         match self.kind {
             Kind::Leap => {
                 let s = speeds.map_or(0, |s| i32::from(s.run));
-                self.leap = leap_record(d, s);
-                self.fresh = true;
+                self.pending = leap_record(d, s);
             }
             Kind::Whirl => {
                 let w = speeds.map_or(0, |s| i32::from(s.walk));
