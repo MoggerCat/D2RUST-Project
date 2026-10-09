@@ -1,18 +1,19 @@
 check 1
 # Area B (q-diff-combat-a1): a champion fallen pack (monstats 19, umod 16
-# champion) poked in the Rogue Encampment; the pack idles / wanders (no
-# target in town), then Fire Bolts (skill 36 level 5) hit the leader:
+# champion) poked in the Blood Moor (warp 2 at frame 4; town allows no combat); the pack approaches and attacks the
+# player, then Fire Bolts (skill 36 level 5) hit the leader:
 # hit reactions, champion life, minion reactions. Spec:
 # specs/tools/scenario-diff.md.
 name combat-champion-pack
 save ScnAma --class ama --expansion
 seed 1234
-ticks 150
+ticks 176
 seconds 360
 channels state
-at 4 poke seed-game 0x00001234 666
-at 4 poke seed-unit @player 0x00000055 666
-at 4 poke spawn 19 @x+4 @y+4 champion umod 16
-at 30 poke missile 58 @x @y @x+4 @y+4 skill 36 5
-at 50 poke missile 58 @x @y @x+4 @y+4 skill 36 5
-at 70 poke missile 58 @x @y @x+4 @y+4 skill 36 30
+at 4 poke warp 2
+at 30 poke seed-game 0x00001234 666
+at 30 poke seed-unit @player 0x00000055 666
+at 30 poke spawn 19 @x+4 @y+4 champion umod 16
+at 56 poke missile 58 @x @y @x+4 @y+4 skill 36 5
+at 76 poke missile 58 @x @y @x+4 @y+4 skill 36 5
+at 96 poke missile 58 @x @y @x+4 @y+4 skill 36 30

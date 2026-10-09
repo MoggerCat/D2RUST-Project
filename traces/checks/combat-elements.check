@@ -1,6 +1,6 @@
 check 1
 # Area B (q-diff-combat-a1): elemental missile damage on Act I monsters
-# poked in the Rogue Encampment (seeds pinned): Ice Bolt (missiles 59,
+# poked in the Blood Moor (warp 2 at frame 4; town allows no combat) (seeds pinned): Ice Bolt (missiles 59,
 # skill 39) chills a zombie (monstats 5), Charged Bolt (56, skill 38)
 # and a Cold Arrow (40, skill 11) hit a fallen (19), a Poison Javelin
 # (38, skill 15) poisons a quill rat (63); then the chill and poison
@@ -9,16 +9,17 @@ check 1
 name combat-elements
 save ScnAma --class ama --expansion
 seed 1234
-ticks 200
+ticks 226
 seconds 420
 channels state
-at 4 poke seed-game 0x00001234 666
-at 4 poke seed-unit @player 0x00000055 666
-at 4 poke spawn 5 @x-4 @y+4 normal
-at 5 poke spawn 19 @x+5 @y+3 normal
-at 6 poke spawn 63 @x+4 @y-5 normal
-at 10 poke missile 59 @x @y @x-4 @y+4 skill 39 3
-at 16 poke missile 56 @x @y @x+5 @y+3 skill 38 2
-at 22 poke missile 40 @x @y @x+5 @y+3 skill 11 2
-at 30 poke missile 38 @x @y @x+4 @y-5 skill 15 4
-at 60 poke missile 59 @x @y @x-4 @y+4 skill 39 1
+at 4 poke warp 2
+at 30 poke seed-game 0x00001234 666
+at 30 poke seed-unit @player 0x00000055 666
+at 30 poke spawn 5 @x-4 @y+4 normal
+at 31 poke spawn 19 @x+5 @y+3 normal
+at 32 poke spawn 63 @x+4 @y-5 normal
+at 36 poke missile 59 @x @y @x-4 @y+4 skill 39 3
+at 42 poke missile 56 @x @y @x+5 @y+3 skill 38 2
+at 48 poke missile 40 @x @y @x+5 @y+3 skill 11 2
+at 56 poke missile 38 @x @y @x+4 @y-5 skill 15 4
+at 86 poke missile 59 @x @y @x-4 @y+4 skill 39 1

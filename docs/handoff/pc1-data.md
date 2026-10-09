@@ -333,6 +333,31 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 42. **Control-panel help button `0x004A64C0`** (q-scenes-compare) Step 8 of the UI pass (`ui/panels.md` §5) calls it before the new-stats button; `a4-town-pandemonium-fortress` rows 258–267 draw the text "Help (H)" (CelDrawColor at (714, 403)), `Panel\Levelsocket` frame 0 at (725, 440) and `Panel\Level` frame 0 at (728, 436). Specify when it draws (character level? first game?), its positions and its press / release, for `ui/control-panel.md`.
 43. **Mini panel open at game start (REC-519)** (q-scenes-compare) Every recorded scene has state 0x15 open with no input; name the call that opens it at game entry (and whether a saved setting decides it), for `ui/control-panel.md` §9.
 44. **Shadow pre-test arguments `0x00471620` (REC-511, REC-518)** (q-scenes-compare) The measured shadows fit the §4 box test on the sheared shadow box, and objects need their mode's `BlocksLight`; read the arguments `0x00471620` passes to `0x004709A0` and the object branch, for `render/blend-modes.md` §5 r3.
+- **[q-diff-combat-a1] preparation probe at the start**
+    `sim/pathing.md` §4 rule 3 (REC-753). Measured: when the target
+    preparation `0x00648120`'s first probe p0 steps onto the start, the
+    compute returns 0 and the path target keeps the requested point
+    (Warriv, `combat-random-boss.check` frame 45). Read `0x00648120`:
+    is the start tested before the free test of each probe (so p1 / p2
+    on the start also stop with no write), is the write skipped only
+    when the found point equals the start, or does the free test see the
+    start as occupied (so the loop goes on)? d2rs: PROVISIONAL, any found
+    point equal to the start → result 0, target unchanged
+    (`d2-sim` `path/walk/find.rs` `prepare`).
+- **[q-diff-combat-a1] town NPC thinks while the player runs (REC-754)**
+    `combat-cold-plains-wp.check` (seed 1234, no seed pin; the player
+    runs from (4873, 4228) to (4884, 4221) from frame 10, then stands).
+    1.14d: at frame 24 Gheed (GUID 4, class 147, (4836, 4278)) and Charsi
+    (GUID 6, class 154, (4834, 4217)) neither draw nor move, and stay so
+    through frame 120; in `combat-random-boss` (player standing at (4873,
+    4228)) both think at frame 24 (Gheed one draw, Charsi a map-AI walk
+    to (4835, 4211)). d2rs (staging-7 merge, HEAD cd9c0dc9) runs both
+    thinks at 24 in either case; Kashya (GUID 3) and the player now
+    match through frame 120. Read why Gheed's and Charsi's pending thinks
+    (idle 20 from their first think) do not run, or run without a draw,
+    once the player has left the starting room: room client membership
+    (`drlg/rooms.md` §7), a think gate in `0x005B1740` / the Npc body, or
+    the timer itself. Not the REC-753 mechanism (no blocked target).
 
 ## How to check a behaviour in one command
 

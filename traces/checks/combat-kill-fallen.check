@@ -1,17 +1,18 @@
 check 1
 # Area B (q-diff-combat-a1): a fallen (monstats 19, normal) poked next to
-# the player in the Rogue Encampment (seeds pinned as poke-fallen-town),
+# the player in the Blood Moor (warp 2 at frame 4; town allows no combat) (seeds pinned as poke-fallen-town),
 # then two player Fire Bolts (skill 36 level 20) at it: hit, death
 # (mode 0), the corpse and the drop it rolls, then 80 more frames.
 # Spec: specs/tools/scenario-diff.md.
 name combat-kill-fallen
 save ScnAma --class ama --expansion
 seed 1234
-ticks 120
+ticks 146
 seconds 300
 channels state
-at 4 poke seed-game 0x00001234 666
-at 4 poke seed-unit @player 0x00000055 666
-at 4 poke spawn 19 @x+3 @y+3 normal
-at 8 poke missile 58 @x @y @x+3 @y+3 skill 36 20
-at 14 poke missile 58 @x @y @x+3 @y+2 skill 36 20
+at 4 poke warp 2
+at 30 poke seed-game 0x00001234 666
+at 30 poke seed-unit @player 0x00000055 666
+at 30 poke spawn 19 @x+3 @y+3 normal
+at 34 poke missile 58 @x @y @x+3 @y+3 skill 36 20
+at 40 poke missile 58 @x @y @x+3 @y+2 skill 36 20
