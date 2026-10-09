@@ -188,6 +188,8 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 (prose / authored pseudocode, addresses); a code disagreement becomes a
 `q-fix-*` row.
 
+- [q-fix-npc-menus] What closes ui 0x11 (UI_QUESTLOG, opened by the S→C quest-log tail `msg-ui.md` §1 r6) in 1.14d, and what does Esc do with it open? The flag table says Esc-closable 0, so d2rs's Esc closes it through the game-menu open and the next Esc restores it (keep = 1). Check on the Windows game: talk to Atma with a pending quest log, press Esc once.
+
 1. **Vitals dx/dy sign (top suspect for the remaining rubber-banding).**
    S→C 0x18 / 0x95 / 0x96: the server side `0x00548760` vs the client
    side `0x0045DC50` / `0x0045DB20`. `combat/vitals.md` §5.2/§5.4 and

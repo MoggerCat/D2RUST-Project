@@ -100,7 +100,7 @@ mod feet_tests {
         assert_eq!(unit_feet(&cam, 0, (103, 100)), (mx, my));
     }
 
-    // Covers: specs/world/npc.md §2 (start); REC-1040 (d2rs-own pick)
+    // Covers: specs/world/npc.md §2 text
     #[test]
     fn a_non_selectable_object_under_an_npc_is_not_picked() {
         use crate::bridge::world::ClientUnit;
