@@ -199,7 +199,6 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     Blood Moor monsters at night; Den of Evil. Record with
     `tools/trace-recorder/record_frames.py` and `facts_render.py` as in
     Step 3, each twice, and commit the facts.
-
 21. **Interact range test `0x00623660(P, O)`** (REC-94): its formula
     (object size, which positions). Measured under Wine
     (`facts/objects/objanim-a1-town.tsv` run r3): returns 1 for the
