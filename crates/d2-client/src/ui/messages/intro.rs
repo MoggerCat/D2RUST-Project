@@ -13,8 +13,12 @@ pub const INTRO_COUNT: usize = 46;
 /// Draws of the gossip index (§6 r5).
 pub const GOSSIP_DRAWS: u32 = 10;
 
-/// NPC classes whose no-introduction byte +0x14 is 1 (§13 r1).
-pub const NO_INTRO: [u32; 6] = [146, 175, 176, 210, 244, 265];
+/// NPC classes whose no-introduction byte +0x14 is 1 (§13 r1; not 210,
+/// corrected 2026-10-09 from the image).
+pub const NO_INTRO: [u32; 5] = [146, 175, 176, 244, 265];
+/// The class of the entry whose records are the array `0x00725CB0`
+/// (§6 r5: intro entry 15).
+pub const CLASS_725CB0: u32 = 201;
 /// NPC classes whose byte +0x13 is 1 (§13 r1).
 pub const FLAG_13: [u32; 4] = [155, 210, 367, 521];
 
@@ -69,11 +73,13 @@ pub struct IntroEntry {
     pub no_intro: bool,
     /// Greeting due u8 +0x15.
     pub greeting_due: bool,
+    /// The entry's records pointer is `0x00725CB0` (§6 r5: class 201).
+    pub records_are_725cb0: bool,
 }
 
 impl IntroEntry {
     /// An entry with the static values of §13 r1: +0x15 = 1 in all, +0x14
-    /// for 146, 175, 176, 210, 244, 265, +0x13 for 155, 210, 367, 521.
+    /// for 146, 175, 176, 244, 265, +0x13 for 155, 210, 367, 521.
     pub fn new(class: u32, act: u8, records: Vec<GossipRecord>) -> Self {
         Self {
             class,
@@ -85,6 +91,7 @@ impl IntroEntry {
             flag13: FLAG_13.contains(&class),
             no_intro: NO_INTRO.contains(&class),
             greeting_due: true,
+            records_are_725cb0: class == CLASS_725CB0,
         }
     }
 }
@@ -92,18 +99,16 @@ impl IntroEntry {
 /// The greeting kind of the menu open (§13 r3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GreetingMode {
-    /// PROVISIONAL (specs/ui/messages.md §13 r3; REC-ui-npc-greeting):
-    /// the mode with +0x12 clear is not stated; the plain greeting.
+    /// Mode 0, the plain greeting (confirmed, §13 r3): its handle is not
+    /// kept.
     Plain,
     /// Mode 2, "return".
     Return,
 }
 
-/// What the NPC menu open does (§13 r3).
+/// What a played greeting does (§13 r3).
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MenuOpenOutcome {
-    /// `0x004E0590(NPC, mode)` requested (skill voices detached first).
-    pub greeting: Option<GreetingMode>,
+pub struct GreetingPlayed {
     /// C→S 0x4D [class u16].
     pub send_4d: Option<ClientIntent>,
     /// `[0x007C0DB4]` := 1.
@@ -118,8 +123,6 @@ pub struct GossipCtx<'a> {
     pub quest_bit: &'a dyn Fn(u32, u32) -> u32,
     /// `0x0065C310([0x007C0D47], 12, 13)` = 1.
     pub game_quest12_bit13: bool,
-    /// The list `0x00725CB0` (text ids, terminated by 0xFF).
-    pub list_725cb0: &'a [u16],
 }
 
 /// Failure of §13 r4.
@@ -132,10 +135,8 @@ pub enum IntroError {
 
 /// Gossip index `0x004B1680(entry)` (§6 r5): up to 10 draws on the local
 /// player's unit seed; mask when the count is a power of two, else
-/// modulo; count 0 → index 0. Each draw is stored in +0x0D. PROVISIONAL
-/// (specs/ui/messages.md §6 r5; REC-ui-gossip-list): "a kept draw on the
-/// list 0x00725CB0 with text id 0xFF" is read as: the kept record's text
-/// id is on that 0xFF-terminated list.
+/// modulo; count 0 → index 0. Each draw is stored in +0x0D. `0x00725CB0`
+/// is a record array (the records of the class-201 entry), not a list.
 pub fn roll_gossip(entry: &mut IntroEntry, seed: &mut Seed, ctx: &GossipCtx<'_>) {
     let count = entry.records.len() as u32;
     for _ in 0..GOSSIP_DRAWS {
@@ -154,12 +155,12 @@ pub fn roll_gossip(entry: &mut IntroEntry, seed: &mut Seed, ctx: &GossipCtx<'_>)
         let quest_ok =
             rec.flag() == 0 || (ctx.quest_bit)(rec.quest_record(), 0) == rec.quest_value();
         if i >= 2 && class_ok && quest_ok {
-            let on_list = ctx
-                .list_725cb0
-                .iter()
-                .take_while(|&&t| t != 0xFF)
-                .any(|&t| t == rec.text());
-            if on_list && ctx.game_quest12_bit13 {
+            // Only on the quest path (byte +2 != 0 and the test passed).
+            if rec.flag() != 0
+                && entry.records_are_725cb0
+                && rec.text() == 0xFF
+                && ctx.game_quest12_bit13
+            {
                 entry.gossip_index = 2;
             }
             return;
@@ -189,6 +190,9 @@ pub struct IntroTable {
     pub talk_flag: bool,
     /// `[0x007C0DB4]`.
     pub flag_7c0db4: bool,
+    /// `[0x007C0DB8]` holds a greeting handle (a plain greeting's is
+    /// dropped again).
+    pub handle_7c0db8: bool,
 }
 
 impl IntroTable {
@@ -221,15 +225,11 @@ impl IntroTable {
     }
 
     /// The NPC menu open (`0x004B66B0(0)`, first open of a talk, after the
-    /// menu is built; §13 r3).
-    pub fn menu_open(&mut self, class: u32) -> MenuOpenOutcome {
-        let none = MenuOpenOutcome {
-            greeting: None,
-            send_4d: None,
-            flag_7c0db4: false,
-        };
+    /// menu is built; §13 r3): the greeting to request, `None` when the
+    /// entry's +0x15 is clear. A class with no entry greets in mode 0.
+    pub fn menu_open(&mut self, class: u32) -> Option<GreetingMode> {
         let Some(i) = self.index_of(class) else {
-            return none;
+            return Some(GreetingMode::Plain);
         };
         let e = &mut self.entries[i];
         let mut mode = GreetingMode::Plain;
@@ -238,18 +238,32 @@ impl IntroTable {
             mode = GreetingMode::Return;
         }
         if !e.greeting_due {
-            return none;
+            return None;
         }
         e.greeting_due = false;
-        let ret = mode == GreetingMode::Return;
-        if ret {
-            self.flag_7c0db4 = true;
-        }
-        MenuOpenOutcome {
-            greeting: Some(mode),
-            // `0x004785B0`: 3 bytes [0x4D][class u16].
-            send_4d: ret.then(|| ClientIntent(vec![0x4D, class as u8, (class >> 8) as u8])),
-            flag_7c0db4: ret,
+        Some(mode)
+    }
+
+    /// The greeting `0x004E0590(NPC, mode)` gave a sound and played
+    /// (§13 r3): mode 2 sends C→S 0x4D [class u16] (`0x004785B0`) and sets
+    /// `[0x007C0DB4]`; mode 0 drops its handle (`[0x007C0DB8]` := 0).
+    /// With no sound the caller does not call this: nothing is sent.
+    pub fn greeting_played(&mut self, mode: GreetingMode, class: u32) -> GreetingPlayed {
+        match mode {
+            GreetingMode::Return => {
+                self.flag_7c0db4 = true;
+                GreetingPlayed {
+                    send_4d: Some(ClientIntent(vec![0x4D, class as u8, (class >> 8) as u8])),
+                    flag_7c0db4: true,
+                }
+            }
+            GreetingMode::Plain => {
+                self.handle_7c0db8 = false;
+                GreetingPlayed {
+                    send_4d: None,
+                    flag_7c0db4: false,
+                }
+            }
         }
     }
 
@@ -410,7 +424,6 @@ mod tests {
             class: 1,
             quest_bit: q,
             game_quest12_bit13: false,
-            list_725cb0: &[],
         }
     }
 
@@ -425,7 +438,8 @@ mod tests {
         assert!(t.entries[2].no_intro && !t.entries[0].no_intro);
         assert!(t.entries[1].flag13 && !t.entries[2].flag13);
         assert!(IntroEntry::new(210, 0, vec![]).flag13);
-        assert!(IntroEntry::new(210, 0, vec![]).no_intro);
+        // Class 210 has +0x13 only: it gets the introduction topic.
+        assert!(!IntroEntry::new(210, 0, vec![]).no_intro);
     }
 
     // Test vectors "0x91 slot 148, +0x15 = 1" and "same, +0x15 = 0".
@@ -435,21 +449,28 @@ mod tests {
         let mut t = table();
         t.on_0x91(148);
         assert!(t.entries[0].return_due);
-        let o = t.menu_open(148);
-        assert_eq!(o.greeting, Some(GreetingMode::Return));
+        let m = t.menu_open(148);
+        assert_eq!(m, Some(GreetingMode::Return));
+        let o = t.greeting_played(GreetingMode::Return, 148);
         assert_eq!(o.send_4d, Some(ClientIntent(vec![0x4D, 0x94, 0x00])));
         assert!(o.flag_7c0db4 && t.flag_7c0db4);
         assert!(!t.entries[0].return_due && !t.entries[0].greeting_due);
         // +0x12 set but +0x15 clear: the flag is cleared, nothing plays.
         t.on_0x91(148);
-        let o = t.menu_open(148);
-        assert_eq!((o.greeting, o.send_4d), (None, None));
+        assert_eq!(t.menu_open(148), None);
         assert!(!t.entries[0].return_due);
-        // No entry of the class: nothing.
-        assert_eq!(t.menu_open(999).greeting, None);
+        // No entry of the class: the plain greeting (mode 0).
+        assert_eq!(t.menu_open(999), Some(GreetingMode::Plain));
         // +0x12 clear, +0x15 set: the plain greeting, no 0x4D.
-        let o = t.menu_open(155);
-        assert_eq!((o.greeting, o.send_4d), (Some(GreetingMode::Plain), None));
+        assert_eq!(t.menu_open(155), Some(GreetingMode::Plain));
+        let o = t.greeting_played(GreetingMode::Plain, 155);
+        assert_eq!((o.send_4d, o.flag_7c0db4), (None, false));
+        // Return with no sound: greeting_played is never called; the flag
+        // stays as it was.
+        let mut t = table();
+        t.on_0x91(148);
+        assert_eq!(t.menu_open(148), Some(GreetingMode::Return));
+        assert!(!t.flag_7c0db4);
         // Writers: the game start / exit reset clears +0x11 and +0x12.
         t.entries[2].gossip_heard = true;
         t.on_0x91(244);
@@ -550,16 +571,32 @@ mod tests {
             .unwrap_or(2);
         roll_gossip(&mut e, &mut s, &ctx(&quest));
         assert_eq!(e.gossip_index, want);
-        // A kept draw whose text is on the list becomes 2 with game quest
-        // 12 bit 13.
-        let mut e = IntroEntry::new(148, 1, vec![rec(0x77, 0, 0, 0, 7); 4]);
-        let mut s = Seed::init_low(1);
-        let mut c = ctx(&q);
-        let list = [0x66u16, 0x77, 0xFF, 0x88];
-        c.list_725cb0 = &list;
-        c.game_quest12_bit13 = true;
-        roll_gossip(&mut e, &mut s, &c);
-        assert_eq!(e.gossip_index, 2);
+        // Class 201 (records are 0x00725CB0): a kept record 2 (text 255,
+        // flag 1) gives index 2 with and without game quest 12 bit 13.
+        for bit in [false, true] {
+            let mut recs = vec![rec(1, 0, 0, 0, 7); 10];
+            recs[2] = rec(255, 1, 0, 9, 7);
+            let mut e = IntroEntry::new(201, 1, recs);
+            assert!(e.records_are_725cb0);
+            let mut s = Seed::init_low(1);
+            let mut c = ctx(&q);
+            c.game_quest12_bit13 = bit;
+            roll_gossip(&mut e, &mut s, &c);
+            assert!(e.gossip_index >= 2);
+            // Force the draw onto record 2: a one-record-eligible array.
+            let mut recs = vec![rec(1, 0, 0, 0, 3); 4];
+            recs[2] = rec(255, 1, 0, 9, 7);
+            let mut e = IntroEntry::new(201, 1, recs);
+            let quest = |r: u32, _b: u32| u32::from(r != 9);
+            let c2 = GossipCtx {
+                quest_bit: &quest,
+                game_quest12_bit13: bit,
+                ..ctx(&q)
+            };
+            let mut s = Seed::init_low(1);
+            roll_gossip(&mut e, &mut s, &c2);
+            assert_eq!(e.gossip_index, 2);
+        }
     }
 
     // Covers: specs/ui/messages.md §6 r4

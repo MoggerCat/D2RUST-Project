@@ -9,12 +9,18 @@
 //! the item-socket dialog ([`SocketDialog`], §11, ui 0x0E, NPC mode) with
 //! its own panel.
 // d2rs-own, unverified (M22; each named where it is used):
-// - the topic captions table `0x00722678` (527 pairs) and the intro
-//   table's gossip records `0x00726850` are `Game.exe` data not in the
-//   repository: a kind-2 topic is captioned 3724 "Invalid Quest Value" by
-//   the spec's not-found rule; "introduction" and "gossip" play the text
-//   list's kind-0 entries (first, then the next) until the records land;
-//   no greeting plays and C→S 0x4D is not sent (§13 r3: no table entry);
+// - the topic captions `0x00722678` and the intro table `0x00726850` with
+//   its text records come from `facts/ui/npc-talk-*.tsv`
+//   (`messages::npc_facts`); "gossip" plays the record the gossip index
+//   picks (§6 r4–r5) with a seed copied from the local player's unit seed
+//   at the first use and advanced here only (not written back to the
+//   unit), and game quest 12 bit 13 read as clear (no stock effect);
+//   "introduction" plays text record 0 of the entry (REC-727, PROVISIONAL:
+//   the handler `0x004B41E0` is not read; settled by a Ghidra read, see
+//   `docs/handoff/pc1-data.md` Step 4); the greeting of the menu open
+//   (§13 r3) is taken to give a sound in mode 2 (REC-728, PROVISIONAL:
+//   the sound existence `0x004E0590 != 0` is the audio layer's), so the
+//   C→S 0x4D goes out with it;
 // - the end callback `0x004B18C0` of an NPC topic opens the topic box
 //   again; the topic box's cancel `0x004B5810` is the talk end of §14.8;
 //   "about the merchants" and "Horadric Cube" do nothing (handlers not
@@ -27,6 +33,8 @@
 //   0x0E), the cursor item stays on the model's cursor while placed, the
 //   NPC accept check is the server's, and the placed item is not drawn.
 
+use d2_sim::rng::Seed;
+
 use super::game_messages::Measure;
 use super::npc_box::{push_menu_draws, NpcMenuState, NpcMenuUi, SharedNpcMenu};
 use super::{OriginalUi, SharedRef};
@@ -38,6 +46,8 @@ use crate::ui::geom::{Point, Rect};
 use crate::ui::messages::dialog::{
     panel_draw, DialogDraw, DialogEffect, DialogOpen, DialogUi, PassInput, SkipEvent, PANEL_FONT,
 };
+use crate::ui::messages::intro::{GossipCtx, GossipOutcome, IntroTable};
+use crate::ui::messages::npc_facts::{caption_pairs, intro_table};
 use crate::ui::messages::npc_text::{topic_box, TextList, TopicHandler, TopicInput};
 use crate::ui::messages::socket::{
     background_file, CursorItem, DrawEnv, Mode, SocketDialog, SocketDraw, SocketEffect,
@@ -56,7 +66,7 @@ use crate::ui::PointerButton;
 /// The item-socket dialog's panel id: its UI state (0x0E).
 pub const SOCKET_PANEL: PanelId = PanelId(UI_SOCKET as u16);
 /// The intro table's no-introduction classes (`messages.md` §13 r1).
-const NO_INTRO: [u32; 6] = crate::ui::messages::intro::NO_INTRO;
+const NO_INTRO: [u32; 5] = crate::ui::messages::intro::NO_INTRO;
 
 /// The talk of the open interaction.
 #[derive(Default)]
@@ -75,6 +85,18 @@ pub struct TalkState {
     pub reopen: bool,
     /// The item-socket dialog (§11).
     pub socket: Option<SocketDialog>,
+    /// The intro table `0x00726850` (§13), loaded from the facts at the
+    /// first use.
+    intro: Option<IntroTable>,
+    /// The local unit seed copied at the first gossip (d2rs-own).
+    seed: Option<Seed>,
+}
+
+impl TalkState {
+    /// The intro table, loaded from the facts on first use.
+    pub fn intro(&mut self) -> &mut IntroTable {
+        self.intro.get_or_insert_with(intro_table)
+    }
 }
 
 /// The client frame clock (d2rs-own, module doc).
@@ -102,24 +124,61 @@ fn build_topic(
         no_intro: NO_INTRO.contains(&class),
         npc_class: class,
         has_cube,
-        // `0x00722678` is not in the repository (module doc).
-        caption_table: &[],
+        caption_table: caption_pairs(),
         box_up: false,
     };
     let s = strings_of(strings);
     topic_box(&input, st.anchor_or_centre(), &s, st.screen, m).ok()
 }
 
-/// The text id a topic plays (module doc for introduction / gossip).
-fn topic_text(list: Option<&TextList>, h: TopicHandler) -> Option<u16> {
-    let list = list?;
+/// The text id a topic plays (§6 r3–r5): a replayed quest topic its list
+/// entry; "introduction" text record 0 of the NPC's intro entry (REC-727);
+/// "gossip" the record the gossip index picks (the first click re-rolls
+/// every entry's index).
+fn topic_text(
+    st: &mut NpcMenuState,
+    h: TopicHandler,
+    class: u32,
+    player: (u8, Option<(u32, u32)>),
+    quest: &[u8; 96],
+) -> Option<u16> {
+    let (player_class, seed) = player;
     match h {
-        TopicHandler::Replay(k) => list.nth_of_kind(2, k).map(|e| e.string),
-        TopicHandler::Introduction => list.nth_of_kind(0, 0).map(|e| e.string),
-        TopicHandler::Gossip => list
-            .nth_of_kind(0, 1)
-            .or_else(|| list.nth_of_kind(0, 0))
+        TopicHandler::Replay(k) => st
+            .talk
+            .list
+            .as_ref()?
+            .nth_of_kind(2, k)
             .map(|e| e.string),
+        TopicHandler::Introduction => {
+            let i = st.talk.intro().index_of(class)?;
+            st.talk.intro().entries[i].records.first().map(|r| r.text())
+        }
+        TopicHandler::Gossip => {
+            let talk = &mut st.talk;
+            let seed = talk.seed.get_or_insert_with(|| {
+                let (lo, hi) = seed.unwrap_or((1, 666));
+                Seed::new(lo, hi)
+            });
+            let gate = |record: u32, bit: u32| {
+                u32::from(crate::bridge::objects::quest_bit(
+                    quest,
+                    record as u8,
+                    bit as u8,
+                ))
+            };
+            let ctx = GossipCtx {
+                class: player_class,
+                quest_bit: &gate,
+                game_quest12_bit13: false,
+            };
+            let table = talk.intro.get_or_insert_with(intro_table);
+            let i = table.index_of(class)?;
+            match table.gossip_click(i, true, seed, &ctx) {
+                GossipOutcome::Play { text } => text,
+                GossipOutcome::Ended => None,
+            }
+        }
         _ => None,
     }
 }
@@ -220,7 +279,13 @@ impl NpcMenuUi {
         match h {
             TopicHandler::Cancel => self.talk_end(guid, ctx),
             TopicHandler::Introduction | TopicHandler::Gossip | TopicHandler::Replay(_) => {
-                let id = topic_text(self.st.borrow().talk.list.as_ref(), h);
+                let class = self.st.borrow().npc_class().unwrap_or(0);
+                let player = ctx
+                    .world
+                    .local()
+                    .map_or((0, None), |u| (u.class as u8, u.seed));
+                let quest = self.sh.borrow().client_quest;
+                let id = topic_text(&mut self.st.borrow_mut(), h, class, player, &quest);
                 let Some(id) = id else {
                     return;
                 };

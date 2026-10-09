@@ -23,14 +23,20 @@ fn w16(s: &str) -> Vec<u16> {
 
 impl Strs {
     fn new() -> Self {
-        Strs(vec![
+        let mut v = vec![
             (3381, w16("Talk")),
             (3399, w16("introduction")),
             (3395, w16("gossip")),
             (3400, w16("cancel")),
             (3724, w16("Invalid Quest Value")),
             (GOSSIP, w16("4\nHello\nThere")),
-        ])
+        ];
+        // Gossip plays a text record of Akara's intro entry (facts): every
+        // one of them reads as the same two lines here.
+        for r in &crate::ui::messages::npc_facts::intro_table().entries[0].records {
+            v.push((r.text(), w16("4\nHello\nThere")));
+        }
+        Strs(v)
     }
 }
 
@@ -159,7 +165,8 @@ fn talk_opens_the_topic_box_of_the_text_list() {
 #[test]
 fn a_topic_plays_in_the_dialog_panel_and_a_press_skips_it() {
     let (mut ui, mut root, mut w) = talk_to_akara();
-    // "gossip" (the second selectable item) plays the kind-0 entry.
+    // "gossip" (the second selectable item) plays a text record of the
+    // NPC's intro entry (§6 r4–r5), not the list's kind-0 entry.
     let p = ui.npc_topic_point(1).unwrap();
     click(&mut ui, &mut root, &w, p);
     assert!(ui.npc_topics().is_none(), "the topic box is freed");
