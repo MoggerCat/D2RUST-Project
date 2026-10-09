@@ -34,6 +34,9 @@ use super::{ActionHooks, Pending, SkillEvent, View, WiringError};
 
 /// The client status word's dead bit (`formats/d2s.md` §2.3).
 pub const STATUS_DEAD: u16 = 0x08;
+/// The spread of the mercenary's creation `0x005B23C0(…, 4, 0)`
+/// (`npc.md` §7.3 step 7).
+const HIRE_SPREAD: i32 = 4;
 
 /// Stat-list state of `justhit` (`missiles.md` §R5 step 6.1).
 pub const STATE_JUSTHIT: u16 = 86;
@@ -56,6 +59,21 @@ impl<X: Pending> StatHost for ActionHooks<X> {
         if matches!(callback.0, 0x0056_E900 | SKILL_REMOVE | STAMINA_REMOVE) {
             self.removed_lists.push((unit, state, callback.0));
         }
+    }
+    /// `0x0063A4A0`(unit, state) (`stat-lists.md` §8.8 rule 1): state in
+    /// range and flag `monstaydeath` for a monster, `plrstaydeath` for any
+    /// other unit.
+    fn stays_on_death(&self, lists: &StatLists, unit: UnitId, state: u32) -> bool {
+        use crate::stats::states::group;
+        let monster = lists
+            .unit_list(unit)
+            .is_some_and(|r| lists.owner_type(r) == crate::stats::lists::owner::MONSTER);
+        let g = if monster {
+            group::MON_STAY_DEATH
+        } else {
+            group::PLR_STAY_DEATH
+        };
+        lists.data().states.has_flag(state, g)
     }
 }
 
@@ -367,6 +385,7 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
                 speed: 256,
                 pos: 0,
                 events: frames.iter().map(|f| f.event).collect(),
+                drawn: frames.iter().map(|f| f.frame).collect(),
             });
         }
         if rec.ty != UnitType::Player {
@@ -385,6 +404,7 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
             speed: 256,
             pos: 0,
             events: frames.iter().map(|f| f.event).collect(),
+            drawn: frames.iter().map(|f| f.frame).collect(),
         })
     }
 
@@ -460,6 +480,10 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     /// the requested mode is kept for the start function.
     fn monster_mode_bookkeeping(&mut self, sim: &mut Sim<'_>, unit: UnitId, mode: u32) {
         self.monster_request = mode;
+        let left = sim.units.get(unit).map(|r| r.mode);
+        if let Some(m) = left {
+            self.leave_monster_mode(unit, m);
+        }
         self.monster_path_setup(sim, unit, mode);
     }
 
@@ -507,7 +531,9 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     /// Monster mode functions (`units.md` §4.6): the start and event
     /// functions of rules 5–14 ([`crate::wiring::path::monsters`]); the
     /// death start `0x005A6FF0` goes to [`Pending::monster_death_start`]
-    /// with the mode change's target; DT's event functions `0x005A7350` /
+    /// with the mode change's target and the death clean-up
+    /// ([`super::monster_death`]), the DD start `0x005A7390` runs rule 4
+    /// there; DT's event functions `0x005A7350` /
     /// `0x005A72B0` end the death in mode 12 (`intents-events.md` §7.7
     /// rule 3, [`super::unit_update::death_function`]); every other
     /// function keeps the default (started, nothing done).
@@ -517,16 +543,11 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         }
         if address == MONSTER_MODES[0].start {
             let target = self.mode_target;
-            let started = X::monster_death_start(self, sim, unit, target);
-            if started {
-                // The death clean-up's last call (`units.md` §4.6 rule
-                // 1.2): no think or regeneration of a dead monster stays
-                // pending. The treasure gate after it schedules nothing
-                // for the unit, so running it after the host's start
-                // keeps 1.14d's order of effects.
-                ai::cancel_think_and_regen(sim.game, unit);
-            }
-            return started;
+            return self.monster_death(sim, unit, target);
+        }
+        if address == MONSTER_MODES[12].start {
+            self.monster_dead_start(sim, unit);
+            return true;
         }
         super::unit_update::death_function(self, sim, unit, address);
         true
@@ -774,6 +795,14 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
     fn init_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId, req: &AllocRequest) {
         // The init's room is the allocation's (r7.2) until step 8.
         self.alloc_rooms.push((unit, req.room));
+        if req.ty == UnitType::Player {
+            // Player type init `0x005348C0`: unit flags |= 0x0E first
+            // (`units.md` §1 row 0), so the missile target filter
+            // (`missiles.md` §R4.2) accepts the player.
+            if let Some(r) = sim.units.get_mut(unit) {
+                r.flags |= 0x0E;
+            }
+        }
         if req.ty == UnitType::Monster {
             self.with_monster_world(|w, h| w.type_init(sim, h, unit));
         } else if req.ty == UnitType::Object {
@@ -787,30 +816,53 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
         }
     }
 
-    /// The mercenary's creation (`npc.md` §7.3 step 7): a monster of
-    /// `class` in the room of `near`, a few subtiles beside it.
-    // d2rs-own, unverified: the offset (+2, +2) stands in for the
-    // placement `hirelings.md` §3.1 leaves to the path code's free-spot
-    // search; the allocation's path part validates the spot.
+    /// The mercenary's creation (`npc.md` §7.3 step 7, `hirelings.md`
+    /// §3.1): `0x005B23C0(game, near, class, mode, 4, 0)`, the placement
+    /// and creation of `population.md` §9 around `near`'s path position
+    /// in its room (spread 4: rings 3 … 12 on the active-room seed),
+    /// with the call's game seed lent to the hooks for the allocation's
+    /// unit-seed step (`rng.md` §5.3). `None` when nothing was placed.
+    /// Without the lent monster world: a plain allocation at (+2, +2)
+    /// from the point (d2rs-own, unverified: hosts with no population
+    /// state).
     fn spawn_near(
         &mut self,
         sim: &mut Sim<'_>,
+        seed: &mut Seed,
         near: UnitId,
         class: u32,
         mode: u8,
     ) -> Option<UnitId> {
         let room = sim.game.lists.unit(near)?.room()?;
         let (x, y) = self.path_position(near);
-        let req = AllocRequest {
-            ty: UnitType::Monster,
-            class,
-            room: Some(room),
-            add: true,
-            fixed_guid: None,
-            mode: u32::from(mode),
-            allied: false,
+        self.game_seed = *seed;
+        let placed = self
+            .with_monster_world(|w, h| {
+                w.spawn_at(sim, h, room, x, y, class as i32, mode, HIRE_SPREAD, 0)
+            })
+            .flatten();
+        let u = match placed {
+            Some(placed) => placed,
+            None => {
+                let req = AllocRequest {
+                    ty: UnitType::Monster,
+                    class,
+                    room: Some(room),
+                    add: true,
+                    fixed_guid: None,
+                    mode: u32::from(mode),
+                    allied: false,
+                };
+                View::of(sim.units, sim.stats, sim.data, self).allocate(
+                    sim.game,
+                    &req,
+                    x + 2,
+                    y + 2,
+                )
+            }
         };
-        View::of(sim.units, sim.stats, sim.data, self).allocate(sim.game, &req, x + 2, y + 2)
+        *seed = self.game_seed;
+        u
     }
 
     /// The minion owner of the unit's AI control record (owner data

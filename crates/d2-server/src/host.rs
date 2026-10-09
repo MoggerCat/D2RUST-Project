@@ -8,10 +8,11 @@ use std::collections::BTreeMap;
 use std::time::Instant;
 
 use crate::buffers::{ClientBuffers, Inbox, QueueError, Tapped};
-use crate::dispatch::{process_game_message, ClientRecord, DispatchError, Outcome};
+use crate::dispatch::{dispatch, process_game_message, ClientRecord, DispatchError, Outcome};
 use crate::packets::{PacketEvent, PacketObserver};
 use crate::seams::{
-    ClientId, Clock, Intents, MessageSink, MessageSizes, PlayerLookup, SessionHandler, Tick,
+    ClientId, Clock, Intents, MessageSink, MessageSizes, PlayerLookup, ResultCode, SessionHandler,
+    Tick,
 };
 use crate::transport::{Classified, DuplicateFilter, Queue, SendError, ServerQueues};
 
@@ -251,6 +252,41 @@ where
         self.queues.send(&self.sizes, client, msg).map(Some)
     }
 
+    /// The dispatcher `0x0054D750` (`intents-events.md` §2.3) called now
+    /// for `client`'s player with `msg`, outside the queues: no sender, no
+    /// duplicate filter, no client record update (the debugger call of
+    /// `tools/poke.md` §4 rule 11, §5 rule 4). What the handler sends goes
+    /// to the client's buffers as in a drain. `None`: the client is in no
+    /// game or has no player (the dispatcher is not reached). The packet
+    /// recorder sees a `dispatch` and the S→C messages, as the 1.14d
+    /// recorder's dispatcher hook does; no `c2s` and no `result` (that
+    /// hook is in the queue entry `0x0053F3D0`, which is not run).
+    pub fn dispatch_now(&mut self, client: ClientId, msg: &[u8]) -> Option<ResultCode> {
+        let PlayerLookup::Player(player) = self.game.player(client) else {
+            return None;
+        };
+        if self.packets.is_some() && !msg.is_empty() {
+            let game_frame = self.game.frame();
+            self.note(PacketEvent::Dispatch {
+                client,
+                id: msg[0],
+                size: msg.len(),
+                game_frame,
+            });
+        }
+        let code = dispatch(
+            &mut self.game,
+            &self.sizes,
+            &mut self.buffers,
+            client,
+            player,
+            msg,
+            msg.len(),
+        );
+        self.note_tap();
+        Some(code)
+    }
+
     /// System-message senders (§2.1 rule 2): no filter.
     pub fn send_system(&mut self, client: ClientId, msg: &[u8]) -> Result<Classified, SendError> {
         self.note(PacketEvent::ClientOut { client, msg });
@@ -269,6 +305,17 @@ where
     /// `intents-events.md` §1 rule 1): drain → tick driver → flush if a
     /// tick ran. The clock is read once.
     pub fn frame(&mut self) -> Result<FrameReport, HostError> {
+        self.frame_with(|_| {})
+    }
+
+    /// [`Self::frame`] with `at_tick_end` run after the tick and before
+    /// its flush, when a tick ran: the point of the 1.14d tick-return
+    /// hook `0x0052FD1E` where pokes run (`tools/poke.md` §4 rules 1–2,
+    /// §5 rule 4). Not run in a frame without a tick.
+    pub fn frame_with(
+        &mut self,
+        at_tick_end: impl FnOnce(&mut Self),
+    ) -> Result<FrameReport, HostError> {
         let now = self.clock.now_ms();
         self.game.set_host_tick(now);
         // tools/perf: wall-clock timing of the parts, off unless enabled.
@@ -289,6 +336,11 @@ where
             self.game.tick(&mut self.buffers);
             if self.packets.is_some() {
                 self.note_tap();
+            }
+            // Before the `tick_end` record: the 1.14d recorder writes it
+            // at the 0x0052FD1E stop after the pokes run there.
+            at_tick_end(self);
+            if self.packets.is_some() {
                 let frame = self.game.frame();
                 self.note(PacketEvent::TickEnd { frame });
             }

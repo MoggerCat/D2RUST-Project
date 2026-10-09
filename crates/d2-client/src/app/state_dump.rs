@@ -47,7 +47,7 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use anyhow::{bail, Context, Result};
 use d2_server::seams::Clock;
@@ -109,11 +109,17 @@ pub struct DumpArgs {
     pub input: Option<Vec<input_script::Step>>,
     /// `--send "<f> <Name|hex> ..."` (repeatable): scripted C→S messages.
     pub sends: Vec<SendEntry>,
+    /// `--no-own-c2s <id>[,<id>]`: C→S ids the bridge's own sends drop.
+    pub no_own_c2s: Vec<u8>,
     /// `--packets FILE`: also record the packets (`specs/tools/packets-trace.md`).
     pub packets: Option<PathBuf>,
     /// `--rng FILE`: also record every RNG draw ([`super::rng_dump`];
     /// needs the `rng-trace` feature).
     pub rng: Option<PathBuf>,
+    /// `--save-out FILE`: install the character writer of `play` with this
+    /// path, so a `--send "<f> hex 69"` (Save and Exit) writes the `.d2s`
+    /// there (the `save` channel of `specs/tools/scenario-diff.md`).
+    pub save_out: Option<PathBuf>,
 }
 
 /// Parses the options after `state-dump`.
@@ -130,8 +136,10 @@ pub fn parse_args(args: &[String]) -> Result<DumpArgs> {
         pokes: Vec::new(),
         input: None,
         sends: Vec::new(),
+        no_own_c2s: Vec::new(),
         packets: None,
         rng: None,
+        save_out: None,
     };
     let (mut ticks, mut out) = (None, None);
     let mut it = args.iter();
@@ -152,12 +160,26 @@ pub fn parse_args(args: &[String]) -> Result<DumpArgs> {
             "--game-dir" => a.game_dir = Some(PathBuf::from(value()?)),
             "--packets" => a.packets = Some(PathBuf::from(value()?)),
             "--rng" => a.rng = Some(PathBuf::from(value()?)),
+            "--save-out" => a.save_out = Some(PathBuf::from(value()?)),
             "--poke" => a
                 .pokes
                 .push(pokes::parse_poke_arg(value()?).map_err(anyhow::Error::msg)?),
             "--send" => a
                 .sends
                 .push(sends::parse_send_arg(value()?).map_err(anyhow::Error::msg)?),
+            "--no-own-c2s" => {
+                for part in value()?.split(',') {
+                    let t = part.trim();
+                    let id = match t.strip_prefix("0x") {
+                        Some(h) => u8::from_str_radix(h, 16),
+                        None => t.parse::<u8>(),
+                    }
+                    .with_context(|| format!("--no-own-c2s {t}: a message id (0-255, 0x hex)"))?;
+                    if !a.no_own_c2s.contains(&id) {
+                        a.no_own_c2s.push(id);
+                    }
+                }
+            }
             "--input" => {
                 let steps = input_script::parse(value()?)
                     .and_then(|s| Headless::new(s.clone()).map(|_| s))
@@ -229,10 +251,15 @@ pub struct DumpGame {
     pub input: Option<Vec<input_script::Step>>,
     /// The `--send` entries, in command-line order.
     pub sends: Vec<SendEntry>,
+    /// `--no-own-c2s` ids.
+    pub no_own_c2s: Vec<u8>,
     /// `--packets FILE` ([`super::packet_dump`]).
     pub packets: Option<PathBuf>,
     /// `--rng FILE` ([`super::rng_dump`]).
     pub rng: Option<PathBuf>,
+    /// `--save-out FILE`: where the server's character writer puts the
+    /// `.d2s` (`play`'s [`super::save::FileStore`]).
+    pub save_out: Option<PathBuf>,
 }
 
 impl DumpGame {
@@ -268,8 +295,10 @@ impl DumpGame {
             pokes: args.pokes.clone(),
             input: args.input.clone(),
             sends: args.sends.clone(),
+            no_own_c2s: args.no_own_c2s.clone(),
             packets: args.packets.clone(),
             rng: args.rng.clone(),
+            save_out: args.save_out.clone(),
         })
     }
 }
@@ -316,6 +345,26 @@ pub fn dump<W: Write>(
     let ms = Arc::new(AtomicU32::new(START_MS));
     let client_data = ClientData::of(&game.data)?;
     let speeds = single_player::walk_speeds(&game.data, &game.character)?;
+    // `play`'s character writer (`play::run`), for a `--send "<f> hex 69"`.
+    let store = match &game.save_out {
+        Some(path) => {
+            let GameData::Live(live) = &game.data;
+            let mut base = super::save::base_save(&game.character);
+            if game.hardcore {
+                base.header.status |= d2_formats::d2s::status::HARDCORE;
+            }
+            Some(super::save::FileStore {
+                path: path.clone(),
+                base,
+                tables: Arc::new(live.save.clone()),
+                appearance: Some(Arc::new(
+                    super::save::appearance_tables(&live.tables.fixed)
+                        .map_err(anyhow::Error::msg)?,
+                )),
+            })
+        }
+        None => None,
+    };
     let mut rng = match &game.rng {
         Some(p) => Some(super::rng_dump::RngDump::create(p, info, game.seed)?),
         None => None,
@@ -329,6 +378,10 @@ pub fn dump<W: Write>(
     )?;
     if game.hardcore {
         link.with(|l| l.host_mut().game.events.action.hooks().x.hardcore = true)?;
+    }
+    let saving = store.is_some();
+    if let Some(store) = store {
+        link.with(move |l| l.host_mut().game.set_storage(Box::new(store)))?;
     }
     let mut packets = match &game.packets {
         Some(p) => Some(super::packet_dump::PacketDump::create(
@@ -352,6 +405,35 @@ pub fn dump<W: Write>(
     };
     writeln!(out, "{}", header.to_json_line())?;
 
+    // `poke.md` §5 rule 4: the frames with an `operate` / `talk` run at the
+    // tick end (the 1.14d hook's point), after that frame's snapshot.
+    let (tick_end_entries, rest) = pokes::split_tick_end(game.pokes).map_err(anyhow::Error::msg)?;
+    let tick_end = Arc::new(Mutex::new(TickEndOut::default()));
+    if !tick_end_entries.is_empty() {
+        tick_end.lock().unwrap_or_else(|e| e.into_inner()).pending = tick_end_entries.len();
+        let shared = tick_end.clone();
+        let mut entries = tick_end_entries;
+        link.with(move |l| {
+            l.set_tick_end(Box::new(move |h| {
+                let frame = h.game.game.frame;
+                let (due, later): (Vec<Entry>, Vec<Entry>) = std::mem::take(&mut entries)
+                    .into_iter()
+                    .partition(|e| pokes::due_after(e.when, None).is_some_and(|f| frame >= f));
+                entries = later;
+                if due.is_empty() {
+                    return;
+                }
+                let mut out = shared.lock().unwrap_or_else(|e| e.into_inner());
+                out.snapshot = Some((frame, snapshot_host(h)));
+                for (i, e) in due.iter().enumerate() {
+                    let When::Frame(f) = e.when else { continue };
+                    let r = pokes::apply_on_host(h, &e.op);
+                    out.lines.push(pokes::record_line(f, i, &e.op, &r));
+                }
+                out.pending = entries.len();
+            }))
+        })?;
+    }
     let link = PredictLink::new(link);
     let tap = link.tap();
     let mut bridge = Bridge::new(link)?;
@@ -361,11 +443,12 @@ pub fn dump<W: Write>(
         request.flags = f;
     }
     bridge.send(&request)?;
+    bridge.set_drop_own(game.no_own_c2s.clone());
     let (mut ran, mut snaps, mut idle) = (0u32, 0u64, 0u32);
     let mut first = true;
     // The frame the last tick ran (0: none yet) and the pokes still to run.
     let mut last_frame = 0i32;
-    let mut pending = game.pokes;
+    let mut pending = rest;
     let mut walking: Vec<(Entry, GotoWalk)> = Vec::new();
     let mut input = match game.input {
         Some(s) => Some(
@@ -378,6 +461,7 @@ pub fn dump<W: Write>(
     let mut input_notes = Vec::new();
     let mut to_send = game.sends;
     let mut send_notes = Vec::new();
+    let (mut joined, mut notes_left) = (false, None::<u32>);
     while ran < ticks {
         run_due_pokes(&mut bridge, &mut pending, &mut walking, last_frame, out)?;
         if let Some(h) = input.as_mut() {
@@ -397,6 +481,27 @@ pub fn dump<W: Write>(
             super::perf::record_bridge_frame(t0, report.ticked);
         }
         bridge.take_outputs();
+        for m in bridge.take_dropped() {
+            let hex: Vec<String> = m.iter().map(|b| format!("{b:02x}")).collect();
+            let line = format!(
+                "own c2s dropped: frame {}: {}",
+                last_frame + 1,
+                hex.join(" ")
+            );
+            eprintln!("{line}");
+            send_notes.push(line);
+        }
+        // Save and Exit (C→S 0x69) took the client out of the game: the
+        // server wrote the file in its leave (`flows/save-exit.md` §2 r2).
+        if saving {
+            let in_game = bridge.world().in_game;
+            if in_game {
+                joined = true;
+            } else if joined {
+                notes_left = Some(ran);
+                break;
+            }
+        }
         if let Some(h) = input.as_mut() {
             for l in h.after_frame(&mut bridge, report.ticked)? {
                 eprintln!("input: {l}");
@@ -418,7 +523,19 @@ pub fn dump<W: Write>(
         }
         idle = 0;
         ran += 1;
-        let s = bridge.state_snapshot()?;
+        // The tick-end pokes' records, and the snapshot taken before them.
+        let held = {
+            let mut t = tick_end.lock().unwrap_or_else(|e| e.into_inner());
+            for line in t.lines.drain(..) {
+                eprintln!("poke: at the tick end: {line}");
+                writeln!(out, "{line}")?;
+            }
+            t.snapshot.take()
+        };
+        let s = match held {
+            Some((_, s)) => s,
+            None => bridge.state_snapshot()?,
+        };
         last_frame = s.frame;
         if s.frame.rem_euclid(every as i32) == 0 {
             writeln!(out, "{}", s.to_json_line())?;
@@ -428,6 +545,9 @@ pub fn dump<W: Write>(
     let mut notes = vec![format!(
         "{ran} server ticks, clock {STEP_MS} ms per step from {START_MS} ms, every {every}"
     )];
+    if let Some(n) = notes_left {
+        notes.push(format!("left the game after {n} ticks (Save and Exit)"));
+    }
     notes.extend(input_notes);
     notes.extend(send_notes);
     for e in &to_send {
@@ -441,6 +561,11 @@ pub fn dump<W: Write>(
     if let Some(n) = input.as_ref().map(Headless::pending).filter(|&n| n > 0) {
         eprintln!("input: {n} step(s) not reached in {ran} ticks");
         notes.push(format!("input: {n} step(s) not reached"));
+    }
+    let unreached = tick_end.lock().map_or(0, |t| t.pending);
+    if unreached > 0 {
+        eprintln!("poke: {unreached} tick-end poke(s) not reached in {ran} ticks");
+        notes.push(format!("poke not reached: {unreached} tick-end poke(s)"));
     }
     for e in &pending {
         eprintln!("poke: not reached in {ran} ticks: {:?} {}", e.when, e.op);
@@ -539,21 +664,36 @@ fn run_due_sends<W: Write>(
 impl<C: Clock + Send + 'static> StateSource for ThreadLink<Link<C>> {
     type Error = super::server_thread::ThreadStopped;
     fn state_snapshot(&mut self) -> Result<state::StateSnapshot, Self::Error> {
-        self.with(|l| {
-            let sim = &l.host().game;
-            let mut s = state::snapshot_world(&sim.game, &sim.events);
-            if let Some(inv) = sim.world.inventory.as_ref() {
-                overlay_item_places(&mut s, &inv.state);
-            }
-            let d = usize::from(state::difficulty_world(&sim.events)).min(2);
-            for (id, q) in &sim.world.rest.quests {
-                if let Some(e) = sim.game.lists.unit(*id) {
-                    s.set_quests(e.guid, state::quest_words(&q.flags[d]));
-                }
-            }
-            s
-        })
+        self.with(|l| snapshot_host(l.host()))
     }
+}
+
+/// What the tick-end hook hands back to the dump loop: the poke records
+/// written at the tick end, the snapshot of that frame taken before them
+/// (1.14d `record_state.py` snapshots at the same hook before its pokes),
+/// and how many tick-end pokes are still to run.
+#[derive(Default)]
+struct TickEndOut {
+    lines: Vec<String>,
+    snapshot: Option<(i32, state::StateSnapshot)>,
+    pending: usize,
+}
+
+/// The snapshot of the host's game (the [`StateSource`] above, and the
+/// tick-end hook's).
+fn snapshot_host<C: Clock>(h: &pokes::ServerHost<C>) -> state::StateSnapshot {
+    let sim = &h.game;
+    let mut s = state::snapshot_world(&sim.game, &sim.events);
+    if let Some(inv) = sim.world.inventory.as_ref() {
+        overlay_item_places(&mut s, &inv.state);
+    }
+    let d = usize::from(state::difficulty_world(&sim.events)).min(2);
+    for (id, q) in &sim.world.rest.quests {
+        if let Some(e) = sim.game.lists.unit(*id) {
+            s.set_quests(e.guid, state::quest_words(&q.flags[d]));
+        }
+    }
+    s
 }
 
 /// An item in an inventory has a static path on 1.14d whose x, y are its
@@ -585,6 +725,7 @@ struct ClientData {
     class_skills: Vec<[u16; 10]>,
     skill_tables: d2_sim::skills::SkillTables,
     units: crate::bridge::world::UnitRows,
+    player_anims: super::anim_names::ClientPlayerAnims,
 }
 
 impl ClientData {
@@ -603,6 +744,7 @@ impl ClientData {
                 single_player::client_monster_anims(archives, &mut u)?;
                 u
             },
+            player_anims: single_player::client_player_anims(data)?,
         })
     }
 
@@ -614,6 +756,7 @@ impl ClientData {
         b.set_class_skills(self.class_skills);
         b.set_skill_tables(Arc::new(self.skill_tables));
         b.set_unit_rows(self.units);
+        b.set_player_anims(Arc::new(self.player_anims));
         b.set_high_light_quality(true);
     }
 }
@@ -677,6 +820,10 @@ mod tests {
             "2026-10-09",
             "--packets",
             "p.jsonl",
+            "--save-out",
+            "out.d2s",
+            "--no-own-c2s",
+            "0x5f,3,0x5f",
             "--poke",
             "4 spawn 19 @x+3 @y+3 normal",
             "--poke",
@@ -712,8 +859,10 @@ mod tests {
                 pokes,
                 input: Some(input_script::parse("frame 10; click 600 300").unwrap()),
                 sends,
+                no_own_c2s: vec![0x5f, 0x03],
                 packets: Some("p.jsonl".into()),
                 rng: None,
+                save_out: Some("out.d2s".into()),
             }
         );
         assert!(parse_args(&args(&[

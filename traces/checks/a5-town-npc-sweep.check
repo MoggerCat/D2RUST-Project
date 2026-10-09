@@ -1,0 +1,30 @@
+check 1
+# Act 5 NPC placement sweep (q-chk-act5, REC-14100): the player is moved over Harrogath (level 109)
+# on a 6-frame grid so every NPC room becomes active; the state channel lists which NPCs
+# 1.14d has and where (ut 1 cl 511 Larzuk .. 515 Qual-Kehk, 520 Cain, 513 Malah, 514 Nihlathak, 512 Drehya).
+name a5-town-npc-sweep
+save ScnAm5 --class ama --expansion --act 4 --quests acts=4
+seed 1234
+ticks 170
+seconds 400
+channels state
+at 4 poke pos @player 5030 4990
+at 10 poke pos @player 5070 4990
+at 16 poke pos @player 5110 4990
+at 22 poke pos @player 5150 4990
+at 28 poke pos @player 5190 4990
+at 34 poke pos @player 5030 5030
+at 40 poke pos @player 5070 5030
+at 46 poke pos @player 5110 5030
+at 52 poke pos @player 5150 5030
+at 58 poke pos @player 5190 5030
+at 64 poke pos @player 5030 5070
+at 70 poke pos @player 5070 5070
+at 76 poke pos @player 5110 5070
+at 82 poke pos @player 5150 5070
+at 88 poke pos @player 5190 5070
+at 94 poke pos @player 5030 5110
+at 100 poke pos @player 5070 5110
+at 106 poke pos @player 5110 5110
+at 112 poke pos @player 5150 5110
+at 118 poke pos @player 5190 5110

@@ -1163,8 +1163,62 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             }
             return;
         }
+        // Summon equipment `0x005D6B60` (`bodies.md` §6.5 step 9) on the
+        // game's drop state (the item tables); a game without it makes
+        // no equipment.
+        if let bodies::BodyEffect::Equipment {
+            owner,
+            m,
+            lvl,
+            ilvl,
+            ..
+        } = e
+        {
+            let cv = &mut self.cv;
+            if let Some(mut d) = cv.v.h.object_drops.take() {
+                let mut sim = crate::units::hooks::Sim {
+                    game: &mut *cv.game,
+                    units: &mut *cv.v.units,
+                    stats: &mut *cv.v.stats,
+                    data: cv.v.data,
+                };
+                crate::wiring::economy::summon_equipment(
+                    &mut *cv.v.h,
+                    &mut sim,
+                    &mut d,
+                    owner,
+                    m,
+                    lvl,
+                    ilvl,
+                );
+                cv.v.h.object_drops = Some(d);
+            }
+            return;
+        }
         // `0x00571B70` (`bodies-2.md` §2.13): the 0xA5 record on the unit,
         // the unit queued for update (`intents-events.md` §7.9 rule 2).
+        // Missile data +0x28 / +0x2C (`0x0064A710` / `0x0064A760`) on the
+        // missile store: the seed word Volcano's server-do 28 re-seeds
+        // from (`skills/bodies-2b.md` §7.18 step 6, `missiles/bodies.md`
+        // §2 step 4).
+        if let bodies::BodyEffect::MissileData28 { missile, v }
+        | bodies::BodyEffect::MissileData2C { missile, v } = e
+        {
+            let d28 = matches!(e, bodies::BodyEffect::MissileData28 { .. });
+            match self.cv.v.h.missiles.as_mut() {
+                Some(store) => {
+                    if let Some(d) = store.get_mut(missile) {
+                        if d28 {
+                            d.target.0 = v;
+                        } else {
+                            d.target.1 = v;
+                        }
+                    }
+                }
+                None => self.error(WiringError::Reentrant("missiles")),
+            }
+            return;
+        }
         if let bodies::BodyEffect::MsgA5 { u, skill } = e {
             use crate::wiring::action::event_records::EventRecord;
             let r = EventRecord::Landing {

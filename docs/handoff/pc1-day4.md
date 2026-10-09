@@ -1,0 +1,264 @@
+# Hand-back — PC 1 day 4, 2026-10-09 (branch `claude/local-pc1-day4`)
+
+One local session (no parallel PC1 sessions were running), with three
+analysis subagents for the binary reads. REC block 1100–1149 (A 1100–1109,
+B1 1110–1119, B2 1120–1129); used: REC-1110 only. Step 4 items are numbered
+47–58 in `pc1-data.md`.
+
+Several items in the day-4 brief were already answered by the day-3
+sessions: Hratli's unit seed (`pc1-day3-c.md`, row
+`q-fix-p3-quest-spawn-creation`), the Quill Rat lines (`pc1-day3-b.md`,
+row `q-fix-c3-quillrat-choice`), items 45–46 combat-melee-fallen /
+combat-potion-midfight (both sides, `pc1-day3-b.md`), REC-816 (settled) and
+REC-815 (narrowed to REC-900, needs the anim recorder tools, not in this
+tree). They were not redone.
+
+## Items answered
+
+| # | Item | Answer (owner spec) | Rows |
+|---|---|---|---|
+| 47, 48 | Player alignment at the join and the frame-2 resend (0xA8 state 105 + 0x1D 12, 0, 2) | Allocation `0x00555230` → player init `0x005348C0` → `0x005543B0(P, 2, 1)` at `0x0053495A`; the changed bit (`0x00639DB0`, resend `0x00639E30` at `0x0055448A`) survives to frame 2 because the queue insert `0x0064C040` is a no-op without a room; the game-entry placement `0x00554850` queues P at `0x005549F3`; frame 2's update `0x00580860` sends 0xA8 then single stats 12, 0, 2. Corpses get the alignment too (`sim/intents-events.md` §8.2 r9, `combat/hit.md` §7.1) | `q-fix-pc1d4-alignment-queue`, `q-fix-pc1d4-alignment-in-player-init` |
+| 50 | `0x00625870` mod-array test | Sends only when the key **is** in the mod array and present in the base array; absent from base → nothing (d2rs matches) (`sim/stat-lists.md` §11 r4) | — |
+| 49 | REC-734 Jerhyn | `0x0059F570` = `0x0059F510`; no palace Jerhyn → (a, b) = (1, 0); the think reaches the interaction step, whose walk in radius (3, 2) lands on own + (2, 2), no draw (`world/quests-act2.md` §10, `monsters/ai-bodies.md` §9.9 r201) | `q-fix-pc1d4-jerhyn-seams` |
+| 53 | REC-753 preparation probe | `0x00648120` writes the compute record's local target copy (`0x00649A5D`), never path +0x10; only p0 is start-tested; equal → result 0 (`sim/pathing.md` §4 r3). **Merge note:** `claude/q-diff-combat-a1` rewrote §4 r3 with PROVISIONAL REC-753 text; on merge keep this branch's text | `q-fix-pc1d4-prep-target-local` |
+| 54 | REC-754 Gheed / Charsi stop thinking | Room +0x78 counts clients that **see** the room (adjacency set, `0x0061A660` from `0x0053A8E0`); the run crosses x = 4880 and drops the x-960 rooms, so `0x0053A9B0` cancels their thinks (`drlg/rooms.md` §7 r1, `intents-events.md` §7.8 r3.2). Same fix as `q-fix-p3-room-empty-think` | — |
+| 55 | **Local player attack / cast mode end (blocker 1)** | Player update `0x00463390` with mode table `0x00711E00`: A1/A2/SC/TH/KK/S2–S4/SQ and GH/BL/S1 advance until complete (`0x006217C0`), then the end at `0x0046362D` (light off, `0x004611F0`, used skill none, mode 5 in town else 1); the server sends its own client nothing. The next click or held repeat acts in the loop pass after the ending update (`client/model.md` §20 r1–r8) | `q-fix-pc1d4-player-mode-end`, `q-fix-pc1d4-local-click-mode` |
+| 52 | Client NPC drops a server walk | The NPC-busy bit (+0x28 bit 0) has one setter, the interact sender's NPC tail `0x00461DC0` (`0x0046210B`) (`client/model.md` §17 r7). It does not explain the panel scene: PROVISIONAL REC-1110 | `q-fix-pc1d4-npc-hold` |
+| 56 | Andariel never dies / Radament at 256 hp | Not a damage bug: both milestones fire the Fire Bolt from or into a wall cell (`pos` / hop are exact teleports with no collision test), so the bolt is removed before it hits. Death test `0x0057C8E7` (life ≤ 0), sub-point floor `0x0057C865`; `DamageRegen` 0 for both; Andariel fire res −50. Fired on open floor, both die at f42 in d2rs. Radament's "mode 4" is A1 (`combat/damage.md` §5.2, `tools/playthrough.md` §1 r7) | `q-fix-pc1d4-andariel-kill-setup`, `q-fix-pc1d4-radament-kill-setup`, `q-fix-pc1d4-playthrough-windows` |
+
+Notes from item 55: `modes.rs` `player_mode` constant names are wrong (9 = BL,
+0xD = S1, 0x13 = KB); the values are right. Item 56: after the hit lands,
+the boss stands up again at hp 0 in this branch's build: the known
+`q-fix-p4-death-cleanup` (fixed on `claude/q-diff-combat-a1`, not yet in
+staging). Whether the two cells are walls in 1.14d too was not checked
+(that depends on the DRLG matching).
+
+## RECs still provisional
+
+- REC-1110 (`client/model.md` §17 r7): what makes the 1.14d client drop
+  Warriv's walk in the panel scene. Settled by recording Warriv's +0x28,
+  mode, frame and client path at ticks 50–60 of that scene, and whether the
+  0x67 at tick 56 reaches his queue.
+- REC-900 (from day 3): the whirl path's first step at update 3.
+
+## Live runs
+
+### Checkpoint quest log and waypoints (HANDOFF §5 q-tool-checkpoints)
+
+Saves built with `d2s-tool` from staging (`tools/checkpoints/make.py`'s
+build step; its `tools()` misses `.exe` on Windows, in row
+`q-fix-pc1d4-playthrough-windows`), copied as `CkAndariel`, `CkMephisto`,
+`CkHellforge`, `CkBaal`, loaded with `autostart.py --try` and a script
+(Q, a click on each act tab and each quest icon, then the town
+waypoint). Screenshots are local only:
+`C:\Users\pc\Documents\Claude code folder\shots\pc1-day4\ck\`.
+
+| Checkpoint | Quest log | Waypoints |
+|---|---|---|
+| CkAndariel (Act I) | Den of Evil, Sisters' Burial Grounds, Search for Cain done; the other three not open | all 9 Act I active |
+| CkMephisto (Act III) | Act I as the definition (+ Sisters to the Slaughter), Act II all 6 done, Act III 5 done, The Guardian not open | not shot: the docks waypoint is out of `goto`'s sight at the start; its list is a subset of CkHellforge's and CkBaal's, both all active |
+| CkHellforge (Act IV) | Acts I–III done, The Fallen Angel done, Hell's Forge in progress ("Take Mephisto's Soulstone to the Hellforge"), Terror's End not open | Act I 9, Act III 9, Act IV 3 all active (second run: the town waypoint took him to City of the Damned, whose menu was shot; the Act II tab click missed) |
+| CkBaal (Act V) | Acts I–IV done, Act V five done, Eve of Destruction open ("Find Baal's Throne Room") | all 39 active (5 tabs) |
+
+Every step the definitions set shows done; no finding for the
+definitions or `d2s-tool`.
+
+### REC-706 client footprints (item 51)
+
+Recorded with a scratch poll probe (`..\d2rs-probes\probe_footprint.py`,
+not in git; no breakpoints): Warriv's 0x100 footprint is the plus pattern
+on the sub-tile holding his client path position, moving as soon as that
+position crosses a sub-tile. Written into `client/model.md` (the REC-706
+PROVISIONAL now has the recorded answer; d2rs's choice matches when its
+model position is the client path position).
+
+### REC-1110 (item 52) at normal speed
+
+The same probe, SceSor `-seed 1234` with the panel scene's inputs in
+seconds: the client walks Warriv normally and his +0x28 stays 0, so the
+scene's NU does not reproduce without the breakpoint recorder. Noted in
+`client/model.md` §17 r7; REC-1110 stays open for a frame-anchored rerun.
+
+### Positions (Hephasto, Hellforge, Izual, Anya, Nihlathak)
+
+Already recorded by PC1-C on day 3 (`pc1-day3-c.md` Round 2, the seven
+`traces/checks/milestone-*.check`). Nothing left.
+
+### HANDOFF §5 queue
+
+Only the checkpoint quest-log entry was run (above). The rest of §5 is
+mostly front-end screenshot work that needs a person at the menus;
+combat-melee-fallen / combat-potion-midfight were done on day 3.
+
+## Playtest of `d2rs-windows-018587d2` (staging HEAD)
+
+Computer use is not on in this session, so there was no hands-on 10–15
+minute play. Instead the artifact (`gh run download 37959911940`) ran
+from the D2 folder with its own scripted input (`play --input`, image
+dumps per tick), and the same script ran on 1.14d (`poke.py --input
+--shots`, frame-anchored). New Barbarian (hand axe, buckler, 4 hp1),
+`-seed 1234`, `warp 2` at frame 4, a Fallen party at player + (3, 3) at
+frame 30, attack the nearest Fallen at 40 and again at 80, walk click
+(600, 300) at 120, I at 160 / 190, right click at 220.
+
+Screenshots and saves stay local:
+`C:\Users\pc\Documents\Claude code folder\shots\pc1-day4\play-d2rs\tick-*\frame.png`,
+`...\play-orig\t*.png`, the side-by-side montages `play-d2rs.png`,
+`play-orig.png`, `play-*-zoom.png`; the 1.14d save is `PtBar.d2s` in
+`%USERPROFILE%\Saved Games\Diablo II`.
+
+| What | 1.14d | d2rs `018587d2` |
+|---|---|---|
+| First swing (f40) | kills a Fallen (corpse and blood at f60); the rest of the pack scatters | swing animates; no Fallen visibly dies, the pack stays packed round the player to f230 |
+| Second attack (f80), walk click (f120) | both act; the player has walked away by f125 (camera moved) | neither acts: the player stands on the same spot to f230 (blocker 1, `q-fix-pc1d4-player-mode-end`) |
+| Player life | 66 → 63 by f90 (a Fallen hit) | no visible loss |
+| Level entry text | "Entering The Blood Moor" drawn f39–45 | none |
+| Life text over the orb | "Life: 66 / 66" | none |
+| Hover label | "Fallen / Demon" name box at the top at f45 | none (script clicks don't hover) |
+| "Help (H)" button over the right of the control panel | not drawn | drawn every frame |
+| Inventory open / close (I) | opens and closes | the same (panel looks alike) |
+| Exit | — | `play: the server never answered the leave`; **no `.d2s` written** (only `PtBar.map`): the new character was lost |
+| Log | — | dozens of `audio: cue at tick N queued after tick N was presented` warnings from f218 on |
+
+The kill, the scatter and the life loss need the state channel to say
+whether d2rs's server missed or only the client doesn't show it; the
+cleaner check is `traces/checks/combat-melee-fallen.check`, where day 3
+found the kill matching. Here the attack went to the nearest Fallen by
+the client's own pick, so a different target is possible.
+
+## Round 2 (same day, "check and do work if available")
+
+A triage of every unmarked Step 4 item against the earlier hand-backs
+and specs found 26 already answered (mostly in the "Hand-back — PC 1 day
+run" / "day 2" sections of `pc1-data.md`, never marked), and 5 open. Four
+were binary reads, done here; the fifth (item 20) is recordings.
+
+| Item | Answer (owner spec) | Rows |
+|---|---|---|
+| 28 Interact range `0x00623660` (REC-94 settled) | Whole-sub-tile positions; the object's `SizeX` × `SizeY` box (origin O − size / 2) widened by 2 on each side with the corners cut; unit distance 0 or a unit X size > 2 → in range. Out of range (or line-blocked) on C→S 0x13: the player walks to the object (`0x00548A50`) and operates on arrival. Fits run r3 (waypoint 4/5, stash 3/4) (`world/objects.md` §7.1 r3) | `q-fix-pc1d4-interact-range` |
+| 58 Hover after a use press (REC-707 settled) | `0x00487000` runs only from mouse-move handlers; the right-press use `0x00487740` clears only `[0x007BCBE4]` after the 0x20 send (`0x00487918`) (`ui/inventory.md` §5 r4) | `q-fix-pc1d4-hover-use-press` |
+| 27 Charges 67 vs 65 | Not the draw order (d2rs's order and `0x0065F6A0`'s formula match): a store / gamble item is repaired right after creation, and the repair `0x005761C0` always recharges (`0x0055FE80` at `0x00576231`), so 1.14d shows 67/67 for any seed. d2rs's recharge ends in a log-only stub (`AppRest::recharge`) (`items/properties.md` §5 r9, `items/affixes.md` §6, `items/generation.md` §12.2) | `q-fix-pc1d4-store-recharge` |
+| 28 Identified flag 0x10 | Every item is created with 0x10 by the item init `0x00555D20` (`0x00555D45`); only successful magic / unique / charm / rare / crafted / set routines clear it, so low, normal, superior and tempered items keep it. The old §1.4 row said superior clears it: wrong, corrected (`items/generation.md` §1.4, §3, §6.1) | `q-fix-pc1d4-item-identified-at-alloc` |
+
+Item 20, Windows recordings (`facts/requests.tsv`):
+- **a1-blood-moor-night: done.** `record_frames.py --auto SceSor --seed
+  1234 --poke "4 warp 2" --poke "10 time 5 34560"` (period 5 at 270°; a
+  tick jump over 16 degrees makes the next advance report, so the
+  client gets S→C 0x53: env 64 / 125, 144, 243 from then on; `time 5 0`
+  alone leaves the client in daylight). Frame tick 130. A second run is
+  equal except rain lines, torch-flicker tile light and 2 cel frames.
+  (A run capturing every frame slowed the client into light quality 0:
+  not comparable, discarded.)
+- **frontend-main-menu, -character-create, -loading-screen: done.**
+  `record_frames.py --front-end --front-end-script "wait 14; shot
+  main-menu; wait 3; click 400 307; wait 6; click 117 498; wait 8; click
+  626 330; wait 4; shot char-create; wait 2; click 97 555; wait 6; shot
+  loading change; key ENTER; wait 20; end"` (Windows needs ~14 s before
+  the menu; the copyright screen is up at 6 s). Run twice: loading equal,
+  menu differs only in logo-fire frames, create in the heroes' and the
+  fire's animation phases. All four pass `facts-compare` against
+  themselves (PARTIAL, no difference).
+- **frontend-character-select: still open.** It must show a save folder
+  holding only SceSor and SceAct2–5; the folder holds about 35 other test
+  saves, and moving them aside was refused in this session. Left for the
+  user: empty the folder down to those five (or point `NewSavePath` at a
+  folder holding only them) and run the same front-end script with `shot
+  char-select` after the Single Player click.
+
+Checkpoint waypoints: CkHellforge's menu was shot on a second try (all of
+Acts I, III and IV active); CkMephisto's is not (the docks waypoint is
+outside `goto`'s sight at the start), but its list is a subset of the two
+that were checked.
+
+Note for the coordinator: cloud sessions `q-fix-input-lock` and
+`q-fix-boss-damage` (launched 17:05) work the topics of items 55 and 56
+here; this branch has the 1.14d answers (`client/model.md` §20; the
+bosses' wall-cell setups). Merge it before they go far.
+
+## Round 3 — Step 5 (provisional points no spec stated)
+
+Two agents went through the 103 `unstated` rows of
+`docs/handoff/provisional-index.tsv` (client side and sim / server side).
+Most rows are stale code markers: the spec was settled earlier (often on
+day 2 / day 3) and only the `PROVISIONAL` comment in `crates/` is left.
+
+**Answered now (specs edited, addresses inside):**
+- REC-817 MonLvl at level 1, read from the install's `Patch_D2.mpq`
+  `monlvl.bin` (not in `extracted/`): L-TH 8 / 108 / 216, L-DM 2 / 3 / 4,
+  so the Fallen's to-hit is 8 (`combat/damage.md`); d2rs reads monlvl and
+  matches.
+- REC-513 (`items/inventory.md` §4.2 step 7), REC-731 (`skills/bodies.md`
+  §2.8), REC-792 (`world/quests-act5.md` §5), REC-793
+  (`items/inventory-moves.md` §10.2): d2rs matches. REC-516 settled from
+  the rate rule (`sim/units.md` §4.7 r7).
+- REC-514: the click mapping has no row constant (`render/camera.md` §4,
+  `ui/controls.md` §6 r2, `seams/world-screen.md`); d2rs subtracts 4.
+- REC-643 (`ui/messages.md` §7 r2, d2rs matches), REC-510
+  (`tools/facts-render.md` r5), REC-512 / REC-517 (pointers in
+  `render/unit-composite.md` §3); REC-519's stale spec marker removed.
+
+**Stale markers where the code differs** got rows; those where the code
+matches go into one clean-up row (`q-fix-pc1d4-stale-provisional-markers`).
+**Need a recording** (none possible headless here): REC-178/189 (menu vs
+screenshot), REC-742 (chicken positions from tick 8), the Fist of the
+Heavens bolt count, REC-295/296 (first scene with tile rows), REC-644
+(0x26 type 7 with a byte ≥ 0x80), REC-610 (x87 word under the real video
+DLL), REC-900, REC-1110. **d2rs-own** (no 1.14d counterpart): REC-724,
+REC-547, REC-860, the d2rs motion stand-in, test fixtures, native assets.
+**Not done:** REC-61 roof blocks (camera.md OQ1, nothing depends on it),
+REC-111 p3 (next read `0x005A75C0` → `0x00553570`), REC-242.
+
+Rows added: `q-fix-pc1d4-oskill-shrine-bonus`,
+`-mode-start-target-in-path`, `-nihlathak-kill-path-ai`,
+`-item-type-test-rules` (a bow skill fires with no arrows),
+`-stale-provisional-markers`, `-click-no-offset`, `-monster-frame-clock`,
+`-walk-facing-turn`, `-velocity-anim-rate`, `-client-hit-bodies`,
+`-item-tip-anchor`, `-npc-box-draw-guard`, `-walk-sends-path-end`.
+
+REC-1110 also got a rerun under the breakpoint recorder: the drop of
+Warriv's walk reproduces there (WL to tick 55, NU from 56), so it is a
+client-timing effect, not the panel (`client/model.md` §17 r7).
+
+## Round 4 — live recordings (user allowed moving the saves)
+
+- **frontend-character-select: done** (`facts/render/scenes/`, requests
+  row `done b6a5d831`). The save folder was reduced to SceSor and
+  SceAct2–5 for the two runs (the other 95 files moved to a subfolder and
+  moved back right after; 109 entries before and after). The two runs
+  are identical (343 draws).
+- **REC-610, DirectDraw half recorded:** the game thread's x87 control
+  word at every server-tick return is 0x027F (MXCSR 0x1FA0), so the drop
+  math is binary64 under DirectDraw (`items/treasure.md` OQ 5,
+  `ui/control-panel.md`). `-w -d3d` still loads DirectDraw; Direct3D
+  needs full screen (changes the display mode, not run) and Glide has no
+  DLL in this install. Probe `..\d2rs-probes\probe_fpu.py`.
+- **REC-742 recorded:** the town chickens' client walks
+  (`client/model.md` §5 r6.4): only the 2 nearest the player act; diagonal
+  2-sub-tile targets with a one-point path; some walks stop one sub-tile
+  short, after which every think writes a new target with count 0 (stuck
+  in NU). Probe `probe_critters.py`.
+- **REC-900 narrowed by recording** (`skills/sequences.md` §3): the
+  recorder's `px` is path +0x00 and the start is not late; the client
+  path steps in update 0 and is put back to the start twice between
+  updates, so the first point is reached three times. The writer is not
+  `0x004804E0`; a hardware write watch on path +0x00 would name it.
+  Probe `probe_whirl.py` (record_anim plus start / compute / step hooks).
+- **REC-644 measured:** under this PC's ACP 65001,
+  `MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, …)` decodes UTF-8 (lone
+  bytes ≥ 0x80 → U+FFFD), it does not fail (`ui/messages.md`). A live
+  0x26 type 7 with such a byte could not be staged (no S→C injection tool,
+  English tables have none).
+- **Fist of the Heavens bolt count: inconclusive.** RecFist (Paladin 30,
+  skill 121 level 20) on six poked Fallens in the Blood Moor: the client
+  creator `0x00466730` makes the delay missile 233 at frame 55 and no
+  `fistoftheheavensbolt` (234) by frame 260, so either the client bolts
+  come through another creator or the hit found no unit. Not written into
+  the spec. Probe `probe_fist.py`.
+- **REC-178 / 189:** nothing left to record: the new
+  `frontend-main-menu` facts give every button, label glyph and the logo
+  fire (`d2logofire{left,right}.dc6`, mode 3, same frame as the black
+  half) for the cloud's comparison.
+
+Saves made this round (`%USERPROFILE%\Saved Games\Diablo II`): RecWw
+(Barbarian 30, Whirlwind right), RecFist (Paladin 30, Fist of the
+Heavens right), PtBar, Ck{Andariel,Mephisto,Hellforge,Baal}.

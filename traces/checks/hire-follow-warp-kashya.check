@@ -1,0 +1,18 @@
+check 1
+# Act I hireling follows through a level warp (q-chk-hirelings, REC-1518): hire from Kashya, then
+# poke warp 2 (the Blood Moor, variant blood-moor-empty) at frame 40 and an idle cow (class 179) 6 sub-tiles
+# along +x at frame 50: the hireling follows (hirelings.md §6) and fights it (hirelings-ai.md).
+# Spec: specs/tools/scenario-diff.md.
+name hire-follow-warp-kashya
+save ScnHrF --class bar --expansion --level 30 --gold 100000
+seed 1234
+ticks 200
+seconds 500
+channels state
+variant blood-moor-empty
+at 4 poke goto unit 1:150
+at 8 send InteractWithEntity type=1 id=@1:150
+at 10 send InitEntityChat id=@1:150
+at 14 send HireMerc npc=@1:150 merc=3411
+at 40 poke warp 2
+at 50 poke spawn 179 @x+6 @y normal

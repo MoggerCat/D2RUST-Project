@@ -169,7 +169,7 @@ pub fn default_flight<W: MissileWorld + ?Sized>(
         }
         let found = cx
             .world
-            .units_at(game, room, x, y)
+            .units_at(game, room, x, y, size)
             .into_iter()
             .find(|&u| accepts(game, cx, m, accept, u));
         if let Some(u) = found {

@@ -15,7 +15,7 @@
 //!   d2-client autoplay-host (--save FILE.d2s | --new CLASS NAME) [--seed N] [--difficulty D] [--game-dir DIR]
 //!                        (the headless play client on a stdin/stdout line protocol,
 //!                        specs/tools/autoplay.md; tools/autoplay/ drives it)
-//!   d2-client state-dump --save FILE.d2s [--seed N] [--difficulty D] --ticks T [--every n] --out FILE [--game-dir DIR] [--date YYYY-MM-DD] [--poke "F DIRECTIVE ARGS"]... [--send "F NAME FIELD=VALUE..." | --send "F hex BYTES..."]... [--input SCRIPT] [--packets FILE]
+//!   d2-client state-dump --save FILE.d2s [--seed N] [--difficulty D] --ticks T [--every n] --out FILE [--game-dir DIR] [--date YYYY-MM-DD] [--poke "F DIRECTIVE ARGS"]... [--send "F NAME FIELD=VALUE..." | --send "F hex BYTES..."]... [--input SCRIPT] [--no-own-c2s ID[,ID]] [--packets FILE]
 //!
 //! `play` (the default) opens a window running the local single-player game: the
 //! in-process server (`d2-server` host over the wired `d2-sim`) pumped
@@ -123,6 +123,9 @@ struct Options {
     dump_image: bool,
     /// `play --sound-log FILE`: every sound request call (§5 r20).
     sound_log: Option<PathBuf>,
+    /// `play --audio-dump FILE [--audio-ticks N]` (`specs/tools/audio-diff.md` §3).
+    audio_dump: Option<PathBuf>,
+    audio_ticks: Option<u64>,
     /// `play --input SCRIPT`: scripted pointer input (`facts-render.md` §5 r11).
     input: Option<Vec<d2_client::world_view::input_script::Step>>,
     /// `play --res 800x600|640x480`: the play frame (default 800 × 600).
@@ -194,6 +197,8 @@ fn parse_options(args: &[String]) -> Result<Options> {
         at_tick: None,
         dump_image: false,
         sound_log: None,
+        audio_dump: None,
+        audio_ticks: None,
         input: None,
         pokes: Vec::new(),
         sends: Vec::new(),
@@ -222,6 +227,8 @@ fn parse_options(args: &[String]) -> Result<Options> {
             "--at-tick" => o.at_tick = Some(parse_ticks(value()?)?),
             "--dump-image" => o.dump_image = true,
             "--sound-log" => o.sound_log = Some(PathBuf::from(value()?)),
+            "--audio-dump" => o.audio_dump = Some(PathBuf::from(value()?)),
+            "--audio-ticks" => o.audio_ticks = Some(value()?.parse().context("--audio-ticks")?),
             "--input" => {
                 o.input = Some(
                     d2_client::world_view::input_script::parse(value()?)
@@ -775,11 +782,43 @@ fn play_once(
         pokes: o.pokes.clone(),
         sends: o.sends.clone(),
         sound_log: o.sound_log.clone(),
+        audio_dump: o.audio_dump.clone().map(|p| (p, o.audio_ticks)),
     })?;
     match result.exit {
         bevy::app::AppExit::Success => Ok(result.to_menu),
         bevy::app::AppExit::Error(code) => bail!("play exited with code {code}"),
     }
+}
+
+/// `audio-mix VOICES OUT --last-tick N` (`specs/tools/audio-diff.md` §4):
+/// a voice list (`audio-voices-1`) mixed through d2rs' mixer, one `mix`
+/// line per tick (the `d2rs-audio-dump-1` format, header first).
+fn audio_mix(args: &[String]) -> Result<()> {
+    use d2_client::app::audio_dump::{header_line, mix_list, parse_voice_list, record_line};
+    let [voices, out, flag, last] = args else {
+        bail!("usage: d2-client audio-mix VOICES OUT --last-tick N");
+    };
+    if flag != "--last-tick" {
+        bail!("usage: d2-client audio-mix VOICES OUT --last-tick N");
+    }
+    let last: u32 = last.parse().context("--last-tick")?;
+    let path = std::path::Path::new(voices);
+    let text = std::fs::read_to_string(path).with_context(|| voices.to_string())?;
+    let base = path.parent().unwrap_or(std::path::Path::new("."));
+    let list = parse_voice_list(&text, base).map_err(|e| anyhow::anyhow!("{voices}: {e}"))?;
+    let recs = mix_list(&list, last).map_err(|e| anyhow::anyhow!("{e}"))?;
+    let mut text = header_line() + "\n";
+    for r in &recs {
+        text += &record_line(r, None);
+        text.push('\n');
+    }
+    std::fs::write(out, text).with_context(|| out.to_string())?;
+    println!(
+        "audio-mix: {} voices, {} ticks -> {out}",
+        list.len(),
+        recs.len()
+    );
+    Ok(())
 }
 
 /// `facts-compare ORIGINAL D2RS [--ignore COL,...] [--skip-weather]`
@@ -882,6 +921,7 @@ fn run() -> Result<()> {
     }
     match args.first().map(String::as_str) {
         Some("facts-compare") => std::process::exit(facts_compare(&args[1..])),
+        Some("audio-mix") => audio_mix(&args[1..]),
         Some("state-dump") => state_dump(&args[1..]),
         Some("soak") => {
             let a = d2_client::app::soak::parse_args(&args[1..])?;
@@ -894,7 +934,7 @@ fn run() -> Result<()> {
         Some("view") => view(parse_options(&args[1..])?),
         // Proves the crash log (`launch`, windows-build.yml smoke step).
         Some("crash-test") => panic!("crash-test: a deliberate panic to check d2rs-crash.log"),
-        _ => bail!("usage: d2-client [view|verify|cpu-render|play|facts-compare|state-dump|soak|autoplay-host] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq] [--game-dir DIR] [--dump-draws DIR [--at-tick N[,M...]] [--dump-image]] [--sound-log FILE] [--res 800x600|640x480] [--input SCRIPT] [--poke \"F DIRECTIVE ARGS\"]... [--poke-file FILE]"),
+        _ => bail!("usage: d2-client [view|verify|cpu-render|play|facts-compare|audio-mix|state-dump|soak|autoplay-host] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq] [--game-dir DIR] [--dump-draws DIR [--at-tick N[,M...]] [--dump-image]] [--sound-log FILE] [--audio-dump FILE [--audio-ticks N]] [--res 800x600|640x480] [--input SCRIPT] [--poke \"F DIRECTIVE ARGS\"]... [--poke-file FILE]"),
     }
 }
 
