@@ -264,3 +264,33 @@ The harness should test class and position, not GUID.
     path.
   - **d2rs differs:** the quest host's `spawn_monster` is a bare allocate:
     `q-fix-p3-quest-spawn-creation`. It is related to `q-fix-p3-quest-superunique-spawn`.
+
+## Round 4 — REC-576 Windows points (q-prov-recording-2)
+
+- **(6) Weather frame rate `[0x007BB390]`: settled** (`render/draw-order-2.md` §11.7 r2). Read with
+  no breakpoints, 4 times a second for 30 s in the Rogue Encampment:
+  - 0 in the menus;
+  - 30–44 for about 10 s after the arrival;
+  - then 21–26, 25 in most samples.
+
+  The 0–12 seen under the debugger came from the hooks slowing the client. The ≥ 10 flash gate always
+  passes in play, so d2rs's fixed 25 matches in effect. No q-fix.
+- **(4) Hireling 0x81 fields: settled** (`client/model.md` §14 r3; `msg-units.md` OQ 7 answered).
+  - **Recording:** a scripted Kashya hire (`record_packets.py`). The save has quest word 2 bit 0 and
+    5000 gold; the script picks the first row of the hire list.
+  - **Frame 367:** C→S 0x36 (Kashya GUID 3, id 0x0D53), then S→C 0x81
+    `81 07 0f01 01000000 0d000000 083bd951 530d0000`. That is pet GUID 13, +0x24 = the list entry's
+    seed 0x51D93B08, +0x28 = hire id 0x0D53.
+  - **Frame 368:** the hireling's 0xAC. No 0x7A is sent.
+  - **d2rs matches;** only a PROVISIONAL note remains: `q-fix-p6-pet-record-settled`.
+- **(3) Audio ST-4, one-shot end tick: recorded** (`audio/sound-table.md` §6.6 r3, OQ 12).
+  - **Method:** sound on, a probe with breakpoints only at the start and the natural-end store, so
+    the client ran at full speed; 60 s of walking.
+  - **Result:** 73 footsteps (ids 2768–2771) end at start + ceil(frames / 882) + 1 ticks (+2 in a
+    third of the cases, +0 once). The end comes 30–125 ms after the sample's duration, which fits the
+    50 ms voice service thread.
+  - **d2rs** ends them 1 tick early: `q-fix-p6-oneshot-end-tick`.
+  - **ST-7 (`Async Only` completion): not recorded.** A probe on the async issue (`0x00482AFC`),
+    the pending check (`0x00482BE1`) and the collect (`0x00482BF0`) saw no hit in 60 s of town play.
+    The rows are evidently loaded before any start; a run that starts an unloaded `Async Only` id is
+    still needed (noted in OQ 13).
