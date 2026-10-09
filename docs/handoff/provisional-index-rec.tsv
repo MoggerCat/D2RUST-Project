@@ -300,7 +300,7 @@ REC-547	6677		A client hit body the model cannot run (PROVISIONAL, `d2-client` `
 REC-548	6676		Travel sound detach force (PROVISIONAL, `d2-client` `audio/driver.rs` `SoundRequest::Group	unstated	no		1	
 REC-549	6675		Umod 29's client hook target (PROVISIONAL, `d2-client` `bridge/client_missiles.rs` `umod_m	recording	no		1	
 REC-570	6667		Warp and Town Portal arrival walk-outs (follows REC-288; `d2-client` `bridge/predict.rs` `	unstated	no		3	
-REC-576	6711		Cloud recording round 2026-10-09 (q-prov-recording-2, items lane) for the d2-client PROVIS	recording	no		0	
+REC-576	6711		Cloud recording round 2026-10-09 (q-prov-recording-2, items lane) for the d2-client PROVIS	recording	no		1	
 REC-592	6724		Animation re-init of a player / monster mode change (PROVISIONAL, `d2-sim` `wiring/action/	recording	no		2	
 REC-593	6725		Monster walk / run speed at the animation rate (PROVISIONAL, `d2-sim` `wiring/action/units	recording	no		2	
 REC-602	6723		Client run end on stamina 0 (the scale is settled: `bridge/predict.rs` is faithful and sta	recording	no		1	
