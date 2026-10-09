@@ -7,13 +7,14 @@
 //! when the room is active, and [`View::warp_tile_message`] runs the walk
 //! into the warp (`0x005550B0`, §12.2) for a C→S 0x13 whose unit type is 5.
 //!
-//! PROVISIONAL (REC-99): no spec says where 1.14d allocates the tile
-//! units from the preset list (population `0x005559A0` places only
-//! type-1 presets), nor what the 0x13 handler checks before `0x005550B0`
-//! (`path-placement.md` §12.2 names only the caller `0x00548C32`). d2rs
-//! allocates a tile for every type-5 preset of an active room once, and
-//! runs the warp when the tile exists and the player's level is the
-//! tile's act; the result is 0 for a warp run, else 1.
+//! The tile units are allocated by the first walk of `0x005559A0` with
+//! the room's other non-monster presets, in list order
+//! ([`View::spawn_preset_units`], `drlg/rooms.md` §6 "First spawn").
+//! PROVISIONAL (REC-99): no spec says what the 0x13 handler checks before
+//! `0x005550B0` (`path-placement.md` §12.2 names only the caller
+//! `0x00548C32`). d2rs runs the warp when the tile exists and the
+//! player's level is the tile's act; the result is 0 for a warp run,
+//! else 1.
 // d2rs-own, unverified
 
 use crate::game::Game;
@@ -54,29 +55,90 @@ impl<X: Pending> View<'_, X> {
         let Some(Some((units, origin))) = found else {
             return 0;
         };
+        units
+            .iter()
+            .filter(|p| p.unit_type == TILE_PRESET)
+            .filter(|p| {
+                self.spawn_tile_preset(game, room, (origin.x + p.x, origin.y + p.y), p.class)
+            })
+            .count()
+    }
+
+    /// One type-5 preset: a tile unit at (x, y) unless the room has one
+    /// of that class there. True when allocated.
+    fn spawn_tile_preset(
+        &mut self,
+        game: &mut Game,
+        room: RoomId,
+        (x, y): (i32, i32),
+        class: u32,
+    ) -> bool {
+        let exists = game.lists.room_units(room).into_iter().any(|u| {
+            game.lists.unit(u).is_some_and(|e| e.ty == UnitType::Tile)
+                && self.units.get(u).is_some_and(|r| r.class == class)
+                && self.h.path_position(u) == (x, y)
+        });
+        if exists {
+            return false;
+        }
+        let req = AllocRequest {
+            ty: UnitType::Tile,
+            class,
+            room: Some(room),
+            add: true,
+            fixed_guid: None,
+            mode: 0,
+            allied: false,
+        };
+        self.allocate(game, &req, x, y).is_some()
+    }
+
+    /// One type-2 preset: an object at (x, y) through the object state's
+    /// `create_object`, unless the room has one of that class there. True
+    /// when created.
+    fn spawn_object_preset(
+        &mut self,
+        game: &mut Game,
+        room: RoomId,
+        (x, y): (i32, i32),
+        class: u32,
+    ) -> bool {
+        let exists = game.lists.room_units(room).into_iter().any(|u| {
+            game.lists.unit(u).is_some_and(|e| e.ty == UnitType::Object)
+                && self.units.get(u).is_some_and(|r| r.class == class)
+                && self.h.path_position(u) == (x, y)
+        });
+        !exists && self.create_object(game, room, class, x, y, 0).is_some()
+    }
+
+    /// The first walk of `0x005559A0` (`drlg/rooms.md` §6 "First spawn",
+    /// settles REC-99's "where"): every non-monster preset of the active
+    /// `room`'s DRLG room in list order (head first; warp tiles are
+    /// prepended, `path-placement.md` §12.1 rule 3, so the last-added
+    /// warp comes first): type 2 an object ([`Self::spawn_object_preset`]),
+    /// type 5 a tile ([`Self::spawn_tile_preset`]). Before the monster
+    /// walk. Returns the number created.
+    pub fn spawn_preset_units(&mut self, game: &mut Game, room: RoomId) -> usize {
+        let Some(act) = game.lists.room(room).map(|r| r.act) else {
+            return 0;
+        };
+        let found = self.h.drlg.with_act(act, &mut game.lists, |d, svc| {
+            let r = d.drlg_room_of(room)?;
+            let origin = d.active_room(r)?.subtiles;
+            Some((svc.types.preset_units(d, r), origin))
+        });
+        let Some(Some((units, origin))) = found else {
+            return 0;
+        };
         let mut n = 0;
-        for p in units.iter().filter(|p| p.unit_type == TILE_PRESET) {
-            let (x, y) = (origin.x + p.x, origin.y + p.y);
-            let exists = game.lists.room_units(room).into_iter().any(|u| {
-                game.lists.unit(u).is_some_and(|e| e.ty == UnitType::Tile)
-                    && self.units.get(u).is_some_and(|r| r.class == p.class)
-                    && self.h.path_position(u) == (x, y)
-            });
-            if exists {
-                continue;
-            }
-            let req = AllocRequest {
-                ty: UnitType::Tile,
-                class: p.class,
-                room: Some(room),
-                add: true,
-                fixed_guid: None,
-                mode: 0,
-                allied: false,
+        for p in &units {
+            let at = (origin.x + p.x, origin.y + p.y);
+            let made = match p.unit_type {
+                OBJECT_PRESET => self.spawn_object_preset(game, room, at, p.class),
+                TILE_PRESET => self.spawn_tile_preset(game, room, at, p.class),
+                _ => false,
             };
-            if self.allocate(game, &req, x, y).is_some() {
-                n += 1;
-            }
+            n += usize::from(made);
         }
         n
     }
@@ -150,103 +212,6 @@ impl<X: Pending> View<'_, X> {
                 self.create_object(game, room, p.class, origin.x + p.x, origin.y + p.y, 0);
             }
         }
-    }
-
-    /// The first pass of `0x005559A0` (`population.md` §11.1: "places
-    /// every non-monster preset (objects, etc.; objects spec)"), object
-    /// part: an object for each type-2 preset of the active `room`'s DRLG
-    /// room, through the object state's `create_object` (allocation and
-    /// the object's init), at the preset's room sub-tile plus the room
-    /// origin. Returns the number created.
-    ///
-    /// PROVISIONAL (q-fix-real-preset-objects, `docs/handoff/q-fixture-migrate.md`):
-    /// no spec writes the object pass (its mode, the order inside the
-    /// pass, the classes it skips or swaps). d2rs creates every type-2
-    /// preset once, mode 0, in list order; a room that already holds an
-    /// object of the class at that sub-tile gets none. Settled by a
-    /// trace of the Rogue Encampment's object adds (S→C 0x51 of a join).
-    /// d2rs-own, unverified.
-    pub fn spawn_preset_objects(&mut self, game: &mut Game, room: RoomId) -> usize {
-        let Some(act) = game.lists.room(room).map(|r| r.act) else {
-            return 0;
-        };
-        let found = self.h.drlg.with_act(act, &mut game.lists, |d, svc| {
-            let r = d.drlg_room_of(room)?;
-            let origin = d.active_room(r)?.subtiles;
-            Some((svc.types.preset_units(d, r), origin))
-        });
-        let Some(Some((units, origin))) = found else {
-            return 0;
-        };
-        let mut n = 0;
-        for p in units.iter().filter(|p| p.unit_type == OBJECT_PRESET) {
-            let (x, y) = (origin.x + p.x, origin.y + p.y);
-            let exists = game.lists.room_units(room).into_iter().any(|u| {
-                game.lists.unit(u).is_some_and(|e| e.ty == UnitType::Object)
-                    && self.units.get(u).is_some_and(|r| r.class == p.class)
-                    && self.h.path_position(u) == (x, y)
-            });
-            if !exists && self.create_object(game, room, p.class, x, y, 0).is_some() {
-                n += 1;
-            }
-        }
-        n
-    }
-
-    /// The first walk of `0x005559A0` (`drlg/rooms.md` §8 rule 6 "First
-    /// spawn", `monsters/population.md` §11.1): every non-monster preset
-    /// of the active `room`'s DRLG room in list order (head first, so the
-    /// last-added warp tile first), objects (type 2,
-    /// [`View::spawn_preset_objects`]'s rule) and warp tiles (type 5,
-    /// [`View::spawn_warp_tiles`]'s rule) interleaved as the list has
-    /// them. Returns the number created. The monster walk comes after.
-    pub fn spawn_preset_first_pass(&mut self, game: &mut Game, room: RoomId) -> usize {
-        let Some(act) = game.lists.room(room).map(|r| r.act) else {
-            return 0;
-        };
-        let found = self.h.drlg.with_act(act, &mut game.lists, |d, svc| {
-            let r = d.drlg_room_of(room)?;
-            let origin = d.active_room(r)?.subtiles;
-            Some((svc.types.preset_units(d, r), origin))
-        });
-        let Some(Some((units, origin))) = found else {
-            return 0;
-        };
-        let mut n = 0;
-        for p in &units {
-            let (x, y) = (origin.x + p.x, origin.y + p.y);
-            let ty = match p.unit_type {
-                OBJECT_PRESET => UnitType::Object,
-                TILE_PRESET => UnitType::Tile,
-                _ => continue,
-            };
-            let exists = game.lists.room_units(room).into_iter().any(|u| {
-                game.lists.unit(u).is_some_and(|e| e.ty == ty)
-                    && self.units.get(u).is_some_and(|r| r.class == p.class)
-                    && self.h.path_position(u) == (x, y)
-            });
-            if exists {
-                continue;
-            }
-            let made = if ty == UnitType::Object {
-                self.create_object(game, room, p.class, x, y, 0).is_some()
-            } else {
-                let req = AllocRequest {
-                    ty: UnitType::Tile,
-                    class: p.class,
-                    room: Some(room),
-                    add: true,
-                    fixed_guid: None,
-                    mode: 0,
-                    allied: false,
-                };
-                self.allocate(game, &req, x, y).is_some()
-            };
-            if made {
-                n += 1;
-            }
-        }
-        n
     }
 
     /// The first tile unit of `class` in the active `room`'s unit list.

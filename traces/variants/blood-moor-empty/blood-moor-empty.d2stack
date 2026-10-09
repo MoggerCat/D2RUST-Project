@@ -1,0 +1,8 @@
+d2stack 1
+# Test variant: the Blood Moor (levels #2) with no monster population in
+# Normal (density 0, no wanderers), so a check there compares only the
+# units it pokes (skill checks of q-diff-skills-2; scenario-diff.md section 3
+# rule 11). Build: data-tool variant build
+# traces/variants/blood-moor-empty/blood-moor-empty.d2stack
+# (specs/tools/test-variants.md).
+layer 10-blood-moor.d2patch

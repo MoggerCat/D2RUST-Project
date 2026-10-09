@@ -143,12 +143,12 @@ impl<X: WorldPending> TickHooks for WorldSim<X> {
     }
     /// Step 3 `0x005559A0` (`population.md` §11.1).
     fn spawn_presets(&mut self, game: &mut Game, r: RoomId) {
-        // The first walk: objects and warp tiles in list order
-        // (`drlg/rooms.md` §8 rule 6; the object part PROVISIONAL,
-        // q-fix-real-preset-objects; `View::spawn_preset_first_pass`).
+        // The first walk: every non-monster preset (objects, warp tiles)
+        // in list order (`drlg/rooms.md` §6 "First spawn";
+        // `View::spawn_preset_units`), then the monster walk.
         self.host(game, |h| {
             let WorldHost { game, v, .. } = h;
-            v.spawn_preset_first_pass(game, r);
+            v.spawn_preset_units(game, r);
         });
         self.population(game, |cx| preset::place_presets(cx, r));
         self.host(game, |h| {

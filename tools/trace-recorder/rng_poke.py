@@ -4,14 +4,14 @@ poked check (specs/tools/rng-trace.md §6 r3) and for finding the first
 draw that differs from d2rs at a scenario_diff divergence.
 
     wine python.exe tools/trace-recorder/rng_poke.py --game GAME.EXE --seconds N \
-        [--frames [--ticks N]] [--keep-frames A-B] [--poke "F directive ..."] [--forms FILE] \
+        [--frames [--ticks N]] [--skip-inline drlg] [--emulate on|off|check] [--keep-frames A-B] [--poke "F directive ..."] [--forms FILE] \
         [autostart options] [--out FILE]
 
 Uses record_rng.py's Recorder unchanged plus the tick-return stop
 0x0052FD1E (ESI = game): there the pokes of the next frame run (as in
 record_state.py) and a `frame_end` record {frame: game +0xA8} is written,
 so each draw belongs to the frame whose `frame_end` follows it.
---frames and --ticks are record_rng.py's (tick markers, owners).
+--frames, --ticks, --skip-inline and --emulate are record_rng.py's.
 --keep-frames A-B keeps the draw records of frames A..B only (the inline
 hooks stay armed; the others are dropped when written). Our own code.
 """
@@ -27,7 +27,7 @@ import record_rng as rr  # noqa: E402
 import autostart  # noqa: E402
 import poke  # noqa: E402
 
-TOOL = "trace-recorder rng_poke 0.2.0"
+TOOL = "trace-recorder rng_poke 0.3.0"
 
 
 def main():
@@ -38,6 +38,10 @@ def main():
                     help="record_rng.py --frames: tick markers, frames and owners")
     ap.add_argument("--ticks", type=int, default=0,
                     help="with --frames: stop at the entry of tick N + 1 (0 = no limit)")
+    ap.add_argument("--skip-inline", default="",
+                    help="record_rng.py --skip-inline: LO-HI[,...] or a preset ('drlg')")
+    ap.add_argument("--emulate", choices=("on", "off", "check"), default="on",
+                    help="record_rng.py --emulate (default on)")
     ap.add_argument("--keep-frames", default=None, help="A-B: keep draws of these frames only")
     ap.add_argument("--out", default=os.path.join(HERE, "..", "..", "traces", "raw", "rng-poke.jsonl"))
     autostart.add_options(ap)
@@ -93,6 +97,8 @@ def main():
     r.auto = auto
     r.poke_tid = None
     r.frames, r.max_ticks = a.frames, a.ticks
+    r.skip_ranges = rr.parse_ranges(a.skip_inline)
+    r.emulate = a.emulate
     try:
         r.run()
     except KeyboardInterrupt:

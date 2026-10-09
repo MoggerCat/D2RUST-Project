@@ -9,7 +9,7 @@ use d2_data::bin::TableFiles;
 use d2_data::tables::{decode_all, Charstats, Experience, Skilldesc, Skills, States};
 
 use crate::ui::char_feed::{CharTables, DescRow};
-use crate::ui::original::hud::HudTables;
+use crate::ui::original::hud::{HudTables, SkillButtonFlags};
 use crate::world_view::WorldViewUi;
 
 /// The HUD tables of a live install.
@@ -37,6 +37,21 @@ pub fn hud_tables(archives: &dyn TableFiles) -> Result<HudTables, String> {
             continue;
         };
         tables.icons.insert(id, (s.charclass, d.iconcel));
+    }
+    // §7 r2: the flags of the button state (`use.md` §2 tests 1, 3, 4 and
+    // `InTown`).
+    for (id, s) in skills.iter().enumerate() {
+        if let Ok(id) = u16::try_from(id) {
+            tables.flags.insert(
+                id,
+                SkillButtonFlags {
+                    in_game: s.ingame,
+                    aura: s.aura,
+                    passive: s.passive,
+                    in_town: s.intown,
+                },
+            );
+        }
     }
     tables.experience = exp
         .iter()
