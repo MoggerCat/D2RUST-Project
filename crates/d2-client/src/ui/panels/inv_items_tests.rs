@@ -297,6 +297,21 @@ fn the_cursor_cell_centres_an_even_item() {
     );
 }
 
+// Covers: specs/ui/inventory.md §10 r4.2 (drop cell 0x00486BD0)
+#[test]
+fn an_overflowing_drop_cell_sends_nothing_after_a_valid_move() {
+    let (u, files) = ui();
+    let w = world(&[(9, mode::CURSOR, (0, 0, 0, 0), b"qui ")], Some(9));
+    // A press inside the grid: drop cell (2, 0), 0x18 [item, 2, 0, page].
+    let out = u.press(&w, &files, &layout(), Point::new(200, 250));
+    let want = ClientIntent::from_message(&items::insert(9, 2, 0, 0)).0;
+    assert_eq!(intents(&out), vec![want]);
+    // The next press overhangs the right edge: the stored cell is stale
+    // (2, 0), but the drop cell is (9, 0) and fails the placement test.
+    let out = u.press(&w, &files, &layout(), Point::new(385, 250));
+    assert!(intents(&out).is_empty());
+}
+
 // Covers: specs/ui/panels-3.md §29 r1, §29 r3
 #[test]
 fn equipment_box_clicks_send_equip_swap_and_unequip() {

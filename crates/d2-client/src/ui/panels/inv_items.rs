@@ -589,14 +589,25 @@ impl ItemsUi {
         // row there keeps the last valid cell.
         let mut cursor_cell = (mc, mr);
         let mut overlap: Vec<&ItemView> = Vec::new();
-        let mut fits = true;
+        // The drop cell `0x00486BD0` (§10 r4.2) and its placement test.
+        let mut drop_cell = None;
         if let Some(cur) = cursor {
             let a = self.art(files, cur, cell);
             let (w, h) = a.map_or((1, 1), |a| (a.w, a.h));
+            let (gw, gh) = a.map_or((cell.0, cell.1), |a| (a.gw, a.gh));
+            if let Some((dc, dr)) = grid_drop_cell(g, at, (w, h), (gw, gh)) {
+                let inside = dc + w <= i32::from(g.grid_x) && dr + h <= i32::from(g.grid_y);
+                let free = !grid
+                    .iter()
+                    .any(|(_, x, y, iw, ih)| *x < dc + w && dc < x + iw && *y < dr + h && dr < y + ih);
+                if inside && free {
+                    drop_cell = Some((dc as u32, dr as u32));
+                }
+            }
             self.track_hover(world, files, g, page, at);
             let (c, r) = self.hover.get().cursor_cell;
             // d2rs-own: no cell was ever set (§4 r2 tests ≥ 0).
-            fits = c >= 0 && r >= 0;
+            let fits = c >= 0 && r >= 0;
             if fits {
                 cursor_cell = (c as u32, r as u32);
                 let (c0, r0) = (cursor_cell.0 as i32, cursor_cell.1 as i32);
@@ -641,8 +652,7 @@ impl ItemsUi {
                 .iter()
                 .find(|i| i.code == Some(*b"box "))
                 .map(|i| iref(i)),
-            // d2rs-own: the drop cell `0x00486BD0` is the cursor cell.
-            drop_cell: fits.then_some(cursor_cell),
+            drop_cell,
             swap_ok: overlap.len() == 1,
             cursor_cell,
             cube_has_room,
@@ -730,6 +740,26 @@ pub fn grid_cursor_cell(
     )
     .ok()?;
     cg.cursor_cell(at, w as u16, h as u16, gw as u32, gh as u32)
+}
+
+/// The drop cell (`0x00486BD0`, `ui/inventory.md` §10 r4.2): the cursor
+/// cell without the overflow returns.
+pub fn grid_drop_cell(
+    g: &GridRecord,
+    at: Point,
+    (w, h): (i32, i32),
+    (gw, gh): (i32, i32),
+) -> Option<(i32, i32)> {
+    let cg = CellGrid::new(
+        WidgetId(0),
+        Point::new(g.left, g.top),
+        u16::from(g.grid_x),
+        u16::from(g.grid_y),
+        u16::from(g.cell_w),
+        u16::from(g.cell_h),
+    )
+    .ok()?;
+    Some(cg.drop_cell(at, w as u16, h as u16, gw as u32, gh as u32))
 }
 
 /// The equipment box under `at` (`panels-3.md` §29 r1: boxes 1–10, first

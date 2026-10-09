@@ -1426,6 +1426,8 @@ fn cell_grid_inventory_geometry() {
     );
     // 2 wide over the right edge: (14 - 100 + 389) / 29 = 10 - 1 = 9; 9 + 2 > 10.
     assert_eq!(g.cursor_cell(Point::new(389, 200), 2, 1, 56, 28), None);
+    // The drop cell (§10 r4.2) keeps the overflowing cell: (9, 0).
+    assert_eq!(g.drop_cell(Point::new(389, 200), 2, 1, 56, 28), (9, 0));
     // Full-height item: r = gridY >> 1 = 2, minus 2 = 0.
     assert_eq!(
         g.cursor_cell(Point::new(100, 300), 1, 4, 28, 112),

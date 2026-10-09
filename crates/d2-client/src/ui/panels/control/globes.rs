@@ -55,9 +55,9 @@ pub struct Smoother {
 impl Smoother {
     /// The shown value (`0x00496DD0(stat)`, §3 r1): `v` = the player's
     /// stat, `m` its max, `c` the client update counter, `life` for stat
-    /// 6. PROVISIONAL (specs/ui/control-panel.md §3 r1; REC-ui-globe-x87):
-    /// the x87 product is computed as the integer `(e + 1) · Δ / d`
-    /// truncated toward 0.
+    /// 6. The ramp is binary64 (x87 at PC = 53, specs/ui/control-panel.md
+    /// §3 r1.4 and OQ1): trunc(fl(fl((e + 1) / d) · Δ)), not the integer
+    /// product.
     pub fn shown(&mut self, v: i32, m: i32, c: u32, life: bool) -> i32 {
         if m == 0 {
             return 0;
@@ -98,7 +98,7 @@ impl Smoother {
         let d = i64::from(self.last_c.wrapping_sub(self.start_c) as i32).clamp(7, 15);
         let shown = if v > 0 && e < d && self.last != self.start {
             let delta = i64::from(self.last) - i64::from(self.start);
-            i64::from(self.start) + (e + 1) * delta / d
+            i64::from(self.start) + ((e + 1) as f64 / d as f64 * delta as f64) as i64
         } else {
             i64::from(v)
         };
@@ -545,6 +545,35 @@ mod tests {
             _ => "?",
         };
         s.encode_utf16().collect()
+    }
+
+    // Covers: specs/ui/control-panel.md §3 r1.4, OQ1 (binary64 ramp)
+    #[test]
+    fn smoothing_ramp_is_binary64() {
+        let m = 25_600;
+        // d = 11 (last C 11, start C 0), e + 1 = 3, Δ = ±55: 14, not 15.
+        for (last, want) in [(55, 14), (-55, -14)] {
+            let mut s = Smoother {
+                last: last.max(0),
+                last_c: 11,
+                start: if last > 0 { 0 } else { 1000 },
+                start_c: 0,
+            };
+            if last < 0 {
+                s.last = 1000 + last;
+            }
+            let v = s.last;
+            let got = s.shown(v, m, 13, false) - s.start;
+            assert_eq!(got, want);
+        }
+        // Both agree: d = 10, e + 1 = 5, Δ = 30 -> 15.
+        let mut s = Smoother {
+            last: 30,
+            last_c: 10,
+            start: 0,
+            start_c: 0,
+        };
+        assert_eq!(s.shown(30, m, 14, false), 15);
     }
 
     // Covers: specs/ui/control-panel.md §3 r1

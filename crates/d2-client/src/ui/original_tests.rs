@@ -904,6 +904,10 @@ fn the_mini_panel_game_menu_button_opens_it() {
     let w = world(AMAZON, 1, true);
     u.ui.set_ui(0x15, 0, false).unwrap();
     u.root.sync_states(&u.ui.shared.borrow().states);
+    // The hit test reads the layout of the last draw (§9 r6-r8): the
+    // frame drew layout 2.
+    u.ui.shared.borrow_mut().hud.mini.last_layout =
+        Some(crate::ui::panels::control::minipanel::Layout::Two);
     // Row 7 of the mini panel; the exact rectangle is the spec's, so
     // find it by scanning the panel strip for a click that opens ui 9.
     let mut opened = false;
@@ -1385,9 +1389,12 @@ mod grid_hover {
 
     // The spec vector: record 16, 2 × 3 item, graphic 56 × 84. A move to
     // (500, 340) sets cell (2, 0); at (700, 340) the footprint overhangs
-    // the last column, the cell stays (2, 0), and the press there places
-    // the item at (2, 0) (0x18) instead of sending nothing.
-    // Covers: specs/ui/inventory.md §5 r3, §10 r4
+    // the last column, the kept cell stays (2, 0), but the drop cell
+    // `0x00486BD0` (§10 r4.2) is recomputed from the click without the
+    // overflow return, fails the placement test and sends nothing
+    // (changed 2026-10-09, q-fix-ui-drop-cell: it used to place at the
+    // kept cell with 0x18). A press inside the grid places.
+    // Covers: specs/ui/inventory.md §5 r3, §10 r4.2
     #[test]
     fn an_inventory_press_over_the_last_column_keeps_the_last_cell() {
         let mut u = grid_ui(&[crate::ui::states::id::INVENTORY]);
@@ -1395,15 +1402,19 @@ mod grid_hover {
         u.send(&w, UiEvent::CursorMoved(Point::new(500, 340)));
         u.send(&w, UiEvent::CursorMoved(Point::new(700, 340)));
         u.click(&w, Point::new(700, 340));
+        assert_eq!(u.root.take_intents(), Vec::<ClientIntent>::new());
+        u.click(&w, Point::new(500, 340));
         let want = ClientIntent::from_message(&crate::bridge::items::insert(9, 2, 0, 0));
         assert_eq!(u.root.take_intents(), vec![want]);
     }
 
     // The stash misclick (q-ui-audit.md §3): a 2 × 2 item moved over
     // stash cell (4, 2), then pressed over the right half of the last
-    // column (c = (14 − 154 + 319) / 29 − 1 = 5, 2 + 5 > 6) is placed at
-    // the kept cell (4, 2) on page 4.
-    // Covers: specs/ui/inventory.md §5 r3, §10 r4
+    // column (c = (14 − 154 + 319) / 29 − 1 = 5, 2 + 5 > 6) sends nothing:
+    // the drop cell fails the placement test (changed 2026-10-09,
+    // q-fix-ui-drop-cell: it used to place at the kept cell (4, 2)); the
+    // kept cell's own press still places on page 4.
+    // Covers: specs/ui/inventory.md §5 r3, §10 r4.2
     #[test]
     fn a_stash_press_over_the_last_column_places_at_the_kept_cell() {
         use crate::ui::states::id;
@@ -1411,6 +1422,8 @@ mod grid_hover {
         let w = cursor_world(b"gem2");
         u.send(&w, UiEvent::CursorMoved(Point::new(290, 239)));
         u.click(&w, Point::new(319, 239));
+        assert_eq!(u.root.take_intents(), Vec::<ClientIntent>::new());
+        u.click(&w, Point::new(290, 239));
         let want = ClientIntent::from_message(&crate::bridge::items::insert(9, 4, 2, 4));
         assert_eq!(u.root.take_intents(), vec![want]);
     }
@@ -1757,6 +1770,9 @@ mod hud_small {
     fn mini_open(u: &mut Ui) {
         u.ui.set_ui(0x15, 0, false).unwrap();
         u.ui.sync_root(&mut u.root);
+        // The hit test reads the layout of the last draw (§9 r6-r8).
+        u.ui.shared.borrow_mut().hud.mini.last_layout =
+            Some(crate::ui::panels::control::minipanel::Layout::Two);
     }
 
     /// The press point of mini-panel button i (inside x_i < x < x_i + 20,
