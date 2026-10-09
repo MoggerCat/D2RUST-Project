@@ -34,15 +34,15 @@
 |   4. AI parameters | 595–613 |
 |   5. Target selection | 614–772 |
 |   6. Distances and line tests | 773–787 |
-|   7. Tactics helpers | 788–1022 |
-|   8. AI commands and minions | 1023–1049 |
-|   10. The catalogue `ai-functions.tsv` | 1050–1070 |
-| Constants & data dependencies | 1071–1094 |
-| Randomness | 1095–1116 |
-| Edge cases & original bugs | 1117–1158 |
-| Test vectors | 1159–1247 |
-| Provenance | 1248–1308 |
-| Open questions | 1309–1412 |
+|   7. Tactics helpers | 788–1027 |
+|   8. AI commands and minions | 1028–1054 |
+|   10. The catalogue `ai-functions.tsv` | 1055–1075 |
+| Constants & data dependencies | 1076–1099 |
+| Randomness | 1100–1121 |
+| Edge cases & original bugs | 1122–1163 |
+| Test vectors | 1164–1252 |
+| Provenance | 1253–1313 |
+| Open questions | 1314–1417 |
 <!-- /index -->
 
 ## Summary
@@ -1001,13 +1001,18 @@ Rules 4–7 (1.14d-read 2026-10-08, gaps MV4–MV7 of
    §1.3). Mode 1 has no schedule flag, so nothing else is scheduled;
    the unit never enters walk and no event 0 / mode end (§1.4) runs.
    Message: the compute's flags |= 1 makes the update pass send the
-   neutral mode message (`sim/intents-events.md` §7.4: S→C 0x67, code
-   7, at U's cell) to each client of U's rooms; no 0x68. Draws: none
+   neutral mode message to each client of U's rooms: `0x00597E20`
+   with mode 1 (current skill already none, so not the skill branch)
+   takes the mode-1 case (`0x00598067`–`0x005980B0`) and sends **S→C
+   0x6D** (`0x0053BB70`: GUID, U's cell x, y, life byte
+   `0x005A5650(U)`), then stat 328 += 1, and returns before any 0x67 /
+   0x68 (`sim/intents-events.md` §7.4 rule 5; 1.14d-read 2026-10-09,
+   corrects the earlier "0x67 code 7"). Draws: none
    (the point, the request, both computes and the neutral start draw
    nothing). Next think: f + `aidel` (15 for the Act 1 classes of the
    recordings) unless the AI body schedules or deletes thinks itself.
    ```
-   point == U.cell: type 13 -> 0 pts -> type 15 -> 0 pts; WL start 0 -> NU; think f + aidel; 0x67 code 7
+   point == U.cell: type 13 -> 0 pts -> type 15 -> 0 pts; WL start 0 -> NU; think f + aidel; 0x6D, stat 328 += 1
    ```
 9. **Mode damage** (1.14d-read 2026-10-09, `0x005A7D34`–`0x005A7D39`):
    after rule 4 (`0x005A63F0` returns at `0x005A7D34`), still inside
