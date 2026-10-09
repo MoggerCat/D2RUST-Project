@@ -1780,6 +1780,7 @@ pub fn client_monster_anims(
                 d2_sim::units::UnitType::Monster,
                 class as u32,
                 mode as u32,
+                0,
             );
             *a = match key {
                 Some(k) => anim.record(&k).ok().map(|rec| (rec.frames, rec.speed)),
