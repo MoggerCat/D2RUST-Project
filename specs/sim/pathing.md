@@ -36,17 +36,17 @@
 |   6. Straight (type 7, `0x00679ED0`) | 453–462 |
 |   7. A* (type 1, `0x0067B850`) | 463–500 |
 |   8. Velocity, direction vector, facing | 501–606 |
-|   9. Per-tick movement | 607–798 |
-|   10. Messages | 799–861 |
-|   11. Missile paths (`0x00649760`) | 862–914 |
-|   12. Other path types (1.14d-read 2026-10-08) | 915–1128 |
-|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1129–1278 |
-| Constants & data dependencies | 1279–1315 |
-| Randomness | 1316–1326 |
-| Edge cases & original bugs | 1327–1374 |
-| Test vectors | 1375–1413 |
-| Provenance | 1414–1469 |
-| Open questions | 1470–1543 |
+|   9. Per-tick movement | 607–800 |
+|   10. Messages | 801–863 |
+|   11. Missile paths (`0x00649760`) | 864–916 |
+|   12. Other path types (1.14d-read 2026-10-08) | 917–1130 |
+|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1131–1280 |
+| Constants & data dependencies | 1281–1317 |
+| Randomness | 1318–1328 |
+| Edge cases & original bugs | 1329–1376 |
+| Test vectors | 1377–1415 |
+| Provenance | 1416–1471 |
+| Open questions | 1472–1545 |
 <!-- /index -->
 
 ## Summary
@@ -714,8 +714,10 @@ axis Δ − (size1/2 + size2/2) (not below 0), then 2·max + min.
    frames 30–31, which only Δ = R = (0, 0), index 1 and the §9.4 rule
    2.5 aim give; also the charged bolt and blessed hammer of
    `sor-charged-bolt.check` frame 27 / `pal-blessed-hammer.check` frame
-   31 land exactly on point centres, q-fix-skills-4cls REC-1643); settled
-   by a read of `0x00650660` (REC-1391).
+   31 land exactly on point centres, q-fix-skills-4cls REC-1643), except
+   on the straight missile path (type 4: an Inferno flame flies on past
+   its target point in `sor-inferno.check` frame 45, which a snap would
+   end); settled by a read of `0x00650660` (REC-1391).
 4. If position + Δ is in another cell: distance budget (+0x90) −= 1 when
    > 0 and the type is not 8 or 11; cell walk (rule 9.6.5); blocked →
    Q := the centre of the last free cell, and: "monster re-path" → re-path
