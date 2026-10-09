@@ -360,29 +360,31 @@ impl Cx<'_> {
     }
 
     /// `set_mode(U, m)` (`0x00624690`, §25 r5): a different mode is
-    /// written and the animation re-init sets the frame to 0 (frame bonus
-    /// 0 for objects); the same mode changes nothing the model holds.
+    /// written and the animation re-init [`anim_setup`] runs in it (a new
+    /// speed drawn on U's client seed when `Sync` = 0); the same mode
+    /// changes nothing the model holds (measured: the 0x0E same-mode
+    /// `set_mode` runs no re-init, `facts/objects/objanim-a1-town.tsv`).
     /// TODO(spec: sim/units.md §4.1): unit flag 1 and the temporary stat
     /// lists are not in the client model.
     pub fn set_mode(&mut self, m: u32) -> Result<(), HandlerError> {
+        let row = self.row;
         let u = self.u()?;
         if u.mode != m {
             u.mode = m;
-            u.frame = 0;
-            u.speed = None;
+            anim_setup(u, &row, m)?;
         }
         Ok(())
     }
 
-    /// `reinit(U)` (`0x00624390`): frame := 0.
-    /// TODO(spec: world/objects-client.md §25 r5, REC-440): whether this
-    /// re-init draws a new speed on the client ([`anim_setup`]) is not
-    /// measured; the speed falls back to `FrameDelta[mode]` meanwhile.
+    /// `reinit(U)` (`0x00624390`): the animation set-up [`anim_setup`] in
+    /// U's mode. Measured (REC-440, `facts/objects/objanim-a1-town.tsv`):
+    /// `0x00624390` draws `roll(d >> 3)` on the object's own seed for
+    /// client and server objects alike, whichever caller runs it.
     pub fn reinit(&mut self) -> Result<(), HandlerError> {
+        let row = self.row;
         let u = self.u()?;
-        u.frame = 0;
-        u.speed = None;
-        Ok(())
+        let m = u.mode;
+        anim_setup(u, &row, m)
     }
 
     /// `refresh(U)` (`0x00470610(U, 0)`): an effect call.
@@ -515,6 +517,10 @@ const END_OVERLAY_CLASSES: [u32; 7] = [354, 355, 356, 397, 405, 406, 407];
 /// r9; `render/lighting.md` §8). The speed is U's own (+0x4C,
 /// [`anim_setup`]); a unit without one (no setup ran) steps by the
 /// class's `FrameDelta[mode]`.
+///
+/// A cycling mode wraps by one subtraction of `FrameCnt` (Start 0):
+/// measured on 1.14d's `0x004BCBB0` for the Rogue Encampment torches and
+/// classes 35, 36, 39, 40–42 (`facts/objects/objanim-a1-town.tsv` run r2).
 pub fn generic_step(cx: &mut Cx<'_>) -> Result<(), HandlerError> {
     let m = cx.u()?.mode;
     let cnt = frame_cnt(&cx.row, m)?;
