@@ -66,5 +66,20 @@ to 500..599, ten per session:
 | q-fix-client-missiles-rest | 540–549 | Opus (rendering) |
 | q-prov-recording (settle `recording` points under Wine) | 550–559 | Opus |
 | q-prov-data (settle `data` points from the install) | 560–569 | Sonnet |
+| q-prov-recording-2 (the d2-client `recording` points; q-prov-recording takes the rest) | 570–579 | Opus |
+| q-tool-state-diff (per-tick unit state diff; one-command scenario diff) | 580–589 | Opus |
+| q-tool-poke (state injection on both sides; test-install patch variants) | 590–599 | Opus |
+| q-fix-pc1-combat (missile damage, hit reactions, attack event 0, hireling range, AI rows) | 700–709 | Opus |
+| q-fix-pc1-proto-items (PC 1 protocol, items/quests, hireling/pet rows) | 710–719 | Sonnet |
+| q-fix-pc1-client-ui (check-own-position, screen-to-world y, client and UI rows) | 720–729 | Sonnet |
 
-Next free cloud id: REC-570.
+Next free cloud id: REC-730 (PC 1 took REC-600..654 as its day block). Session cap raised to 13 for the PC 1 rows (2026-10-09 09:20).
+
+Speed (user, 2026-10-09 08:00): sessions work in parallel with subagents,
+run only the changed crate's tests while iterating and the full gate before
+each push, push every 2–4 fixes, report in one short message per push, and
+send binary-only questions to pc1-data.md instead of stopping.
+
+PC 1 items: sessions add new `pc1-data.md` Step 4 items without a number, as
+"- **[session] title**"; the coordinator numbers them at merge (two
+sessions picking the same next number collided twice on 2026-10-09).

@@ -199,8 +199,58 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     Blood Moor monsters at night; Den of Evil. Record with
     `tools/trace-recorder/record_frames.py` and `facts_render.py` as in
     Step 3, each twice, and commit the facts.
+21. **Owner of a unit, for the state snapshot** (`specs/tools/state-snapshot.md`
+    §2 `own`, OQ 1; q-tool-state-diff): where 1.14d keeps the owner GUID
+    of a pet / summon / hireling, a missile and an item (its container or
+    holder), as offsets read from a server unit, so `record_state.py` can
+    fill `own`. Write the answer into `sim/units.md` (or the owner spec)
+    and the §2 row of `state-snapshot.md`.
 
-21. **Client missile motion and body gaps** (`q-fix-client-missiles-rest`,
+## How to check a behaviour in one command
+
+A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)
+names the save, seed, ticks and input. One command builds the save with
+`d2s-tool`, runs 1.14d with the recorders and d2rs with the same save and
+seed, and prints the first difference per channel (game state first):
+
+```
+py tools/scenario-diff/scenario_diff.py traces/checks/a1-town-arrival-ama.check
+py tools/scenario-diff/scenario_diff.py <check> --orig-only        # only record 1.14d
+py tools/scenario-diff/scenario_diff.py <check> --reuse            # re-compare what is in the work dir
+```
+
+On PC 1 the recorders run with `py` directly (no Wine); the 1.14d save is
+copied to `%USERPROFILE%\Saved Games\Diablo II` (`D2_SAVE_DIR` overrides).
+The state channel's report starts with `FIRST DIVERGENCE: frame N <unit>
+field K: 1.14d A vs d2rs B`, then the next 20, then the first frame per
+field; read the state report before any draw list. Two snapshot files
+compare alone with `py tools/trace-recorder/state_diff.py ORIG D2RS`.
+For a new behaviour, add a `.check` file (copy `a1-town-arrival-ama.check`)
+rather than a hand-run recipe.
+22. **Poke call forms** (q-tool-poke, `specs/tools/poke.md` Open
+    questions 1–4; until answered these directives are gaps on 1.14d):
+    register / stack form and `ret` of (a) `0x00554EA0(game, unit, room,
+    x, y, exact, alt)` or the teleport path `0x00650BE0` (`pos`,
+    `path-placement.md` §10 / §6 r4); (b) the level warp
+    `0x0053AEC0(game, player, level, tile)` (`warp`, `waypoints.md` §7
+    r5); (c) a ground-item entry at a point: `0x00558D90(game, request,
+    use seed)` with request +0x18 = 3, +0x1C/+0x20 x, y, +0x24 room, and
+    the code → index lookup `0x00633640` (`item`, `items/generation.md`
+    §3); (d) `0x00627260(unit, s, value, layer)` and `0x00639DB0(unit,
+    s, on)` (`stat`, `state`, `stat-lists.md` §5 r2, §9.2). Answer into
+    the owning specs; then delete the gap rows in `poke.md` §1. (e) For
+    scenario `spawn` kinds `champion` / `random-boss` on 1.14d: the
+    register form of the champion / boss minions call `0x0054E1E0`
+    (`scenario.md` §3.1, `population.md` §6.4); `poke.py` writes them as
+    gaps until then (`normal` runs).
+23. **Poke runs on Windows** (REC-590): the cloud ran every runnable
+    directive on 1.14d under Wine (`specs/tools/poke.md` Status) and
+    settled the variant load (REC-591, `tools/test-variants.md` Status).
+    Left: run `traces/pokes/spawn-town.poke` once on PC 1 with a
+    screenshot (Wine screenshots are blank). Commands in "Set up any
+    state for a check" below.
+
+24. **Client missile motion and body gaps** (`q-fix-client-missiles-rest`,
     REC-540–549): `missiles/client.md` Open questions 9 onward: the
     timed arc `0x004DA5B0` (flag store vs set, the vz division), the
     motion getters `0x004DA110`–`0x004DA150` (shifted or stored) and the
@@ -216,3 +266,114 @@ outcomes before cosmetics), and write the answer into the owner spec
 (prose / authored pseudocode, addresses). Each answered point either
 confirms d2rs (mark the REC settled) or becomes a `q-fix-*` row. Re-run
 `py tools/provisional_index.py` after each batch.
+
+## Hand-back — PC 1 day run 2026-10-09 (branch `claude/local-pc1-day`)
+
+**Done**
+- Step 4 binary reads, all of items 1–4 and 6–19, into their owner specs
+  with addresses. Headlines:
+  - 1: the vitals dx/dy "sign" is 1.14d's mirror rule; d2rs already
+    matches, so rubber-banding is not from here. Next suspect:
+    `q-fix-seam-check-own-position`.
+  - 17: the think restart is gated on the room's client count; d2rs
+    always restarts.
+  - 18: new spec `missiles/damage.md`; d2rs has no missile damage setup,
+    so every missile does 0 damage.
+  - 3: hireling search is 49 scan / 25 engage, not 20 or 35.
+  - 4: the C runtime sets x87 precision PC = 53; the globe smoothing
+    differs.
+  - 2: Esc pauses the client loop in single player (`0x0044EFA0`).
+  - 19: the Arcane star `last` starts at 0; star and cloud seeds settled.
+  - 7–10, 12, 15, 16: S→C senders, 0xAB, 0x73, 0x92, the format-0
+    wrapper, progression sites, join loader.
+  - 11 needed nothing new; 6 covers the UI gaps (gamble flag is dead
+    code, drop cell, waypoint names, menu box).
+- Step 4 item 5: REC-290 tick half recorded on Windows, trace
+  `traces/sim/tick/sim-0009.json` (`record_tick.py --auto ScnAma --seed
+  1234 --ticks 600`; `convert_tick.py --check`, 0 errors).
+- Step 5: about 85 of the 107 `unstated` points read and written into
+  their owner specs. Many confirm d2rs; the settled lists are in the
+  HANDOFF §7 REC rows (REC-21, 100, 111, 115, 265, 289, 400, 401, 406,
+  410, 412, 414, 415, 416, 420, 442, 460). The code comments in `crates/`
+  still say PROVISIONAL (spec sessions do not edit `crates/`), so
+  `provisional_index.py` still counts them.
+- HANDOFF §5 local run queue:
+  - q-fix-cold-plains: `outdoor.md` / `outdoor-tilesub.md` seq labels
+    were one too high.
+  - q-fix-ui-npc-talk facts: `tools/facts/npc_talk.py` →
+    `facts/ui/npc-talk-*.tsv`; class 210 is not a no-intro NPC.
+  - q-fix-flow-save `real_saves`: 2 passed on game-written saves.
+
+**Left**
+- Step 4 item 20, recorded later the same day with the user at the game
+  (recorder running with no `--input`: `record_frames.py --every 5
+  --draws-every 1 --auto SceSor --seed 1234`, one frame per scene picked
+  by `facts_render.py --frame N`). The new scenes in `facts/render/scenes/`
+  are a1-npc-intro-akara, a1-npc-dialog, a1-npc-shop,
+  a1-npc-shop-tooltip, a1-npc-shop-gheed, a1-npc-gamble,
+  a1-npc-gamble-tooltip, a1-panel-stash, a1-panel-esc-menu,
+  a1-blood-moor-monsters (live monsters, 4 corpses, 1 ground item),
+  a1-blood-moor-automap and a1-den-of-evil. Each was recorded once, not
+  twice: the scenes are user-driven and so not repeatable frame for frame.
+  The open rows in q-facts-scenes' `facts/requests.tsv` are now answered
+  except Blood Moor at night and the 4 front-end scenes; set them done
+  when that branch merges.
+- Old note: scripted
+  `goto` to NPCs is unreliable on PC 1 (Akara wanders; one run captured
+  no menu). The user will drive these by hand with the recorder running
+  (no `--input`). `facts/requests.tsv` rows are still open.
+- Step 5 rows not read:
+  - item tooltip totals (REC-242);
+  - char damage block (REC-269);
+  - DCC frames > 256 (needs the gargoyle-trap capture);
+  - wall light for direction 0 / > 9;
+  - REC-02 hand items;
+  - automap `.ma` hex dump;
+  - the tooling-choice rows (REC-295 / 296, native-assets).
+- New provisional points: REC-602 (`0x00463260` branch at stamina
+  exhaustion; needs a recorded run), REC-610 (video DLL precision under
+  `-d3d`), REC-643 (dialog reader without a NUL test), REC-644 (recipe
+  scroll ACP bytes ≥ 0x80).
+- The rest of the HANDOFF §5 queue needs the player at the game
+  (front-end screenshots, idle rooms, `play` checks).
+- REC ids used today: REC-600..654 were taken as PC 1's day block; only
+  602, 610, 643 and 644 are used.
+
+**New q-fix rows (build-queue.tsv; 59 ids, first seven by impact)**
+- `q-fix-missile-damage-setup`
+- `q-fix-think-restart-gate`
+- `q-fix-monster-hit-reaction`
+- `q-fix-player-hit-reaction`
+- `q-fix-monster-attack-event0`
+- `q-fix-client-path-compute`
+- `q-fix-hireling-range`
+
+Then the rest:
+- **Protocol:** `q-fix-join-multiclient`, `q-fix-join-load-item-msgs`,
+  `q-fix-proto-0x20-sender`, `q-fix-proto-0x73-fields`,
+  `q-fix-proto-0x92-all-items`, `q-fix-proto-0xab-gate`,
+  `q-fix-player-mode-rows`, `q-fix-game-id-counter`.
+- **Items / quests:** `q-fix-load-taken-cell`, `q-fix-quest-reward-no-spot`,
+  `q-fix-quest-item-delete-modes`, `q-fix-code-drop-20-7`,
+  `q-fix-progression-sites`, `q-fix-trade-lock-test`,
+  `q-fix-legacy-bytime-param`.
+- **Hirelings / pets:** `q-fix-mercitem-room-order`,
+  `q-fix-merc-swap-update-list`, `q-fix-pet-resync`, `q-fix-pet-palette`,
+  `q-fix-dead-body-path-settings`.
+- **Client:** `q-fix-click-seq-mode`, `q-fix-screen-to-world-y`
+  (= `q-fix-click-no-minus-8`), `q-fix-preview-use-state`,
+  `q-fix-preview-class-skill`, `q-fix-ai-plain-attack-skill`,
+  `q-fix-monster-mode-machine`, `q-fix-range-statemask`,
+  `q-fix-object-generic-step`, `q-fix-hire-list-stats`,
+  `q-fix-anim-key-weapon-class`.
+- **UI:** `q-fix-ui-globe-x87`, `q-fix-ui-drop-cell`,
+  `q-fix-shop-gamble-flag-dead`, `q-fix-shop-repair-all-refuse`,
+  `q-fix-socket-left-down`, `q-fix-automap-ma-link-first`,
+  `q-fix-automap-fade3-mini`, `q-fix-automap-name-colours`,
+  `q-fix-quest-tab-open-order`, `q-fix-quest-icon-anim-order`,
+  `q-fix-dialog-pass-abort`, `q-fix-dialog-text-100-lf`,
+  `q-fix-npc-greeting-open`, `q-fix-gossip-725cb0`,
+  `q-fix-minipanel-last-drawn-layout`, `q-fix-chat-filter-utf8`,
+  `q-fix-ui-npc-talk-facts`, `q-fix-render-bg-seed`.
+- **Closures (no code change, tests only):** `q-fix-proto-vitals-dx-sign`,
+  `q-fix-proto-state-param-sign`, `q-fix-seam-stamina-scale`.

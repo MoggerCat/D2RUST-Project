@@ -24,15 +24,15 @@
 | Outputs / state changes | 63–69 |
 | Rules | 70–71 |
 |   1. Files | 72–81 |
-|   2. Script syntax | 82–175 |
-|   3. Typed messages and references | 176–231 |
-|   4. Run model | 232–290 |
-|   5. Comparison | 291–321 |
-|   6. Masks | 322–356 |
-| Edge cases & original bugs | 357–368 |
-| Test vectors | 369–384 |
-| Provenance | 385–394 |
-| Open questions | 395–430 |
+|   2. Script syntax | 82–177 |
+|   3. Typed messages and references | 178–233 |
+|   4. Run model | 234–292 |
+|   5. Comparison | 293–323 |
+|   6. Masks | 324–358 |
+| Edge cases & original bugs | 359–370 |
+| Test vectors | 371–386 |
+| Provenance | 387–396 |
+| Open questions | 397–432 |
 <!-- /index -->
 
 ## Summary
@@ -104,7 +104,7 @@ except the cited masks (§6); what the original-side runner needs from
    hex digits) and hex steps (two lower-case hex digits per byte).
    Parsing the canonical form gives the same scenario.
 
-Header (each line once, all required):
+Header (each line once, all required except `variant`):
 
 | Line | Meaning |
 |---|---|
@@ -115,6 +115,7 @@ Header (each line once, all required):
 | `difficulty normal\|nightmare\|hell` | game difficulty |
 | `expansion yes\|no` | LoD game |
 | `end <tick>` | last tick run, 0 ≤ tick ≤ 1,000,000 |
+| `variant <name>` | optional: the test variant install both sides run on (`tools/test-variants.md` §4 rule 3); absent = the base install |
 
 Character: `char save <name>` and/or inline `char` lines; at least
 one. `<name>` is a character name (2–15 letters, `_` or `-`, starting
@@ -172,6 +173,7 @@ Steps:
 | `at <tick> hex <byte>...` | a raw C→S message: 1 to 516 bytes, two hex digits each |
 | `at <tick> msg <Name> <field>=<value>...` | a typed C→S message (§3) |
 | `at <tick> spawn <class> <x> <y> <kind> [umod <id>...]` | a monster spawned by the server (§3.1) |
+| `at <tick> poke <directive> <arg>...` | a state change made directly, not through a message (`tools/poke.md` §1, §3) |
 
 ### 3. Typed messages and references
 
@@ -299,8 +301,8 @@ so in its trace header's `gaps` (FORMAT.md) instead of approximating.
    `rng-draws` when both list it. A requested stream missing on a side
    is reported as not compared.
 3. **Order.** Tick by tick from 0; within a tick the streams in the
-   order `c2s`, `spawn`, `s2c`, `rng`, `draw`, `unit`, `stats` (`spawn`
-   belongs to the `c2s` stream); within a stream
+   order `c2s`, `spawn`, `poke`, `s2c`, `rng`, `draw`, `unit`, `stats`
+   (`spawn` and `poke` belong to the `c2s` stream); within a stream
    record by record. The first difference ends the comparison.
 4. **Records.** A record present on one side only is a difference
    (`missing` / `extra`). `s2c`: client, then length, then the bytes

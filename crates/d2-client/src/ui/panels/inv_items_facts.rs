@@ -29,6 +29,11 @@ pub trait GridInfo {
     fn stackable(&self, code: [u8; 4]) -> bool;
     /// The item with `code` is of type `ty` (equivalence included).
     fn is_type(&self, code: [u8; 4], ty: u16) -> bool;
+    /// The sell test `0x0062A130` as far as the client knows it
+    /// (`world/vendors.md` §7.2 rule 5): the items `quest` column is 0 and
+    /// the type is not 39. The item flag 0x1000 is not in the stream; the
+    /// server refuses such a sale (d2rs-own).
+    fn sellable(&self, code: [u8; 4]) -> bool;
 }
 
 impl GridInfo for ItemTips {
@@ -44,6 +49,12 @@ impl GridInfo for ItemTips {
     fn is_type(&self, code: [u8; 4], ty: u16) -> bool {
         let t = self.tables();
         t.find_code(code).is_some_and(|i| t.is_type(i, ty as i16))
+    }
+    fn sellable(&self, code: [u8; 4]) -> bool {
+        let t = self.tables();
+        t.find_code(code)
+            .and_then(|i| Some((i, t.item(i)?)))
+            .is_some_and(|(i, r)| r.quest == 0 && !t.is_type(i, 39))
     }
 }
 
@@ -170,6 +181,9 @@ mod tests {
                 18 => self.books.contains(&code),
                 _ => false,
             }
+        }
+        fn sellable(&self, _: [u8; 4]) -> bool {
+            true
         }
     }
 

@@ -22,17 +22,17 @@
 | Outputs / state changes | 60–65 |
 | Rules | 66–67 |
 |   11. Weather (passes 4 and 9; water floors) | 68–344 |
-|   12. Level backgrounds (pass 1) | 345–384 |
-|   13. Pass 8 (`0x00475B20`) | 385–393 |
-|   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 394–419 |
-|   15. Sight test (`draw-order.md` §5 r3) | 420–466 |
-|   16. Line test (`0x0064E260`) | 467–496 |
-| Constants & data dependencies | 497–507 |
-| Randomness | 508–519 |
-| Edge cases & original bugs | 520–536 |
-| Test vectors | 537–558 |
-| Provenance | 559–590 |
-| Open questions | 591–660 |
+|   12. Level backgrounds (pass 1) | 345–398 |
+|   13. Pass 8 (`0x00475B20`) | 399–407 |
+|   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 408–433 |
+|   15. Sight test (`draw-order.md` §5 r3) | 434–480 |
+|   16. Line test (`0x0064E260`) | 481–510 |
+| Constants & data dependencies | 511–521 |
+| Randomness | 522–533 |
+| Edge cases & original bugs | 534–550 |
+| Test vectors | 551–572 |
+| Provenance | 573–604 |
+| Open questions | 605–680 |
 <!-- /index -->
 
 ## Summary
@@ -352,7 +352,12 @@ or the case is not reproducible.
 
 **Level 74, Arcane Sanctuary (`0x00476290`): stars.**
 
-1. First call (flag `[0x007B955C]`): seed := time value; 8 colors: for
+1. First call (flag `[0x007B955C]`, set to 1 at `0x004763D3` and never
+   cleared: once per process): seed `[0x00712C4C]` := `init_low(
+   time_value(shake start))` (`0x004762A5`–`0x004762C4`; the `init()`
+   before it is overwritten), the argument being the screen-shake start
+   tick `[0x007B8D10]` (`render/camera.md` §8; 0 when no shake has
+   started since the process began); 8 colors: for
    `i` = 0…7, `base` = 128 + (128·`i`) / 7; `r`, `g`, `b` := min(255,
    `base` + (step & 63) − 32), one step each in that order; color[`i`] :=
    `nearest(r, g, b)`. Then 256 stars `j` (`0x00476190(j, 0)`): x :=
@@ -363,7 +368,14 @@ or the case is not reproducible.
 3. Then, if `GetTickCount() − last` > 40 (unsigned): every star x +=
    speed; a star with x < 0 is re-made (`0x00476190(j, 1)`): x := `W` −
    1 + (step & 7), then y, speed, color as in r1; last := now (unchanged
-   otherwise).
+   otherwise). `last` is `[0x007B57E0]`, a zero-filled `.data` global
+   (past the file's raw data) written only at `0x00476453`; the
+   first-call branch does not touch it and r3 runs on the first call
+   too, so the first call moves the stars once (`now − 0 > 40` unless
+   the tick count is ≤ 40). Answers OQ 12 (2026-10-09).
+   ```
+   if now - last > 40 { for j in 0..256 { x[j] += speed[j]; if x[j] < 0 { remake(j) } }; last = now }
+   ```
 
 **Level 120, Arreat Summit (`0x00476460`): mountains and clouds.**
 Skipped while the client's exit flag `[0x007A0620]` is set.
@@ -376,8 +388,10 @@ Skipped while the client's exit flag `[0x007A0620]` is set.
    (`t` + k) & 3 at x0 + 256k for k = 0…3, and, when x0 > 0, frame
    (`t` + 3) & 3 at x0 − 256; row y = 512 the same frames + 4; row y = 768
    the same + 8 only in resolution mode 2. Light −1, draw mode 5.
-3. Clouds `data\global\ui\cloud01` (10 clouds, first use: seed := time
-   value; x16 := `roll(16·W)`, y := step mod 250, speed := (step & 15) +
+3. Clouds `data\global\ui\cloud01` (10 clouds, first use, flag
+   `[0x007B9560]`, once per process: seed `[0x00712C50]` := `init_low(
+   time_value(GetTickCount()))` (`0x0047680F`–`0x0047682F`; the mix
+   input is `time() + 2·GetTickCount()`); x16 := `roll(16·W)`, y := step mod 250, speed := (step & 15) +
    8). Every call: x16 += speed; x16 > 16·(`W` + 368) → x16 := −5,888,
    y := step mod 300. Draw frame 0 at (x16 / 16, y) and frame 1 at
    (x16 / 16 + 256, y), light `0xDDDDDDDD`, draw mode 3.
@@ -647,8 +661,14 @@ Encampment): splash ripples on the river, drop lines.
 11. *Answered* (W7): phase, length, countdown, `last_s`, `last_b` are 0
     at program start and never reset, so the rain cycle continues across
     games (§11.1).
-12. (Added 2026-10-09, `q-fix-render-rest`; blocks level 74 in d2rs.)
-    §12 r3's star tick `last`: its global, its value before the first
+12. **Answered** (2026-10-09, asm read, pc1-data Step 4 item 19; §12
+    l74 r1 / r3, l120 r3): `last` = `[0x007B57E0]`, 0 before the first
+    call (zero-filled), r3 runs on the first call; seeds are `init_low`
+    of `time_value(v)` with v = the shake start `[0x007B8D10]` (74) and
+    `GetTickCount()` (120). Settles REC-420's argument / form; the cloud
+    and star layouts stay time-seeded (compare only with the recorded
+    seed). Was: (Added 2026-10-09, `q-fix-render-rest`; blocks level 74
+    in d2rs.) §12 r3's star tick `last`: its global, its value before the first
     call of `0x00476290` (a `.bss` 0, or a write in the first-call branch
     of r1), and whether the r3 test runs on the first call. Also §12's
     two "seed := time value": the argument of `time_value`

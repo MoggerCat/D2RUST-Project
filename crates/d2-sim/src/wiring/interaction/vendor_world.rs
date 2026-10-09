@@ -126,7 +126,25 @@ where
 
     /// The NPC unit of the call (the trade open's NPC, `vendors.md` §3.1
     /// rule 2 "owner NPC"), when it belongs to `npc_class`.
-    fn record_npc(&self, npc_class: u16) -> Option<UnitId> {
+    /// The NPC whose grid holds the class's store: the call's NPC when it
+    /// is of the class, else the first monster of the class (a sale's
+    /// placement `vendors.md` §7.2 rule 8 runs without the open call).
+    pub fn grid_npc(&self, npc_class: u16) -> Option<UnitId> {
+        self.record_npc(npc_class).or_else(|| {
+            let e = &self.desk.econ;
+            e.game
+                .lists
+                .units_of_type(UnitType::Monster)
+                .into_iter()
+                .find(|&u| {
+                    e.units
+                        .get(u)
+                        .is_some_and(|r| r.class == u32::from(npc_class))
+                })
+        })
+    }
+
+    pub fn record_npc(&self, npc_class: u16) -> Option<UnitId> {
         self.npc.filter(|&n| {
             self.desk
                 .econ
@@ -416,14 +434,25 @@ where
     fn new_store_inventory(&mut self, npc_class: u16, npc: Option<UnitId>) {
         self.desk.rest.new_store_inventory(npc_class, npc);
     }
+    /// `0x00560200` on the lent inventory model (the trade open's NPC);
+    /// without one the rest's.
     fn place_in_store(&mut self, npc_class: u16, item: UnitId) -> bool {
+        if let (Some(npc), Some(inv)) = (self.record_npc(npc_class), self.desk.inv.as_deref_mut()) {
+            return inv.store_place(&mut *self.desk.econ, npc, item);
+        }
         self.desk.rest.place_in_store(npc_class, item)
     }
     fn remove_store_item(&mut self, npc_class: u16, item: UnitId) {
+        if let Some(inv) = self.desk.inv.as_deref_mut() {
+            inv.store_unlink(&mut *self.desk.econ, item);
+        }
         self.desk.rest.remove_store_item(npc_class, item);
     }
     fn take_from_store(&mut self, npc_class: u16, item: UnitId) {
         self.desk.state.taken.push(item);
+        if let Some(inv) = self.desk.inv.as_deref_mut() {
+            inv.store_unlink(&mut *self.desk.econ, item);
+        }
         self.desk.rest.take_from_store(npc_class, item);
     }
     fn place_in_gamble(&mut self, npc_class: u16, player: u32, item: UnitId) -> bool {
