@@ -16,6 +16,11 @@ pub const SKIP_STYLE: i32 = 62;
 /// Style-map result meaning "any" / "no stamp".
 pub const STYLE_ANY: i32 = -5;
 
+/// File of a replacement's stamp (§2.3): the stamp makes no build-list
+/// roll (recorded: Blood Moor and Cold Plains). PROVISIONAL (§2.3,
+/// REC-404): file 0, the build list untouched.
+pub const SUB_STAMP_FILE: i32 = 0;
+
 /// One lvlsub row (§1.2), file order.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SubRow {
@@ -317,7 +322,10 @@ impl Gen<'_> {
                         // (48, 30, 30) gives 0) would stamp lvlprest row 0 or
                         // a negative id; skipped.
                         if p > 0 {
-                            self.stamp(cx, cy, p as u32, -1, true)?;
+                            // No build-list roll (recorded, §2.3); the
+                            // file is PROVISIONAL (outdoor-tilesub.md §2.3,
+                            // REC-404).
+                            self.stamp(cx, cy, p as u32, SUB_STAMP_FILE, true)?;
                         }
                     }
                 } else if f & 2 != 0 {
