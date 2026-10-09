@@ -1,0 +1,17 @@
+check 1
+# Lightning Sentry kills a Fallen pack: as ass-lightning-sentry (ScnAss, right skill 271,
+# Blood Moor without population) plus a Fallen pack poked 4 sub-tiles from the player at frame 10
+# (poke spawn 19), one right click at client pixel (290, 310), 3 sub-tiles from the nearest Fallen
+# (no one adjacent to the trap: a monster in the trap's melee range is not picked, ai.md 5.3);
+# the trap's lightning bolts hit and kill them. Area F2 (q-fix-ass-traps, REC-1270..).
+# Spec: specs/tools/scenario-diff.md.
+name ass-lightning-sentry-kill
+save ScnAss --class ass --expansion --level 30 --all-skills 20 --right-skill 271
+seed 1234
+ticks 160
+seconds 400
+channels state
+variant blood-moor-empty
+at 4 poke warp 2
+at 10 poke spawn 19 @x+4 @y normal
+input frame 20; rclick 290 310

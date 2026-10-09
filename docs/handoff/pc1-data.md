@@ -443,6 +443,9 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 60. **[q-fix-room-links]** answered → `drlg/rooms.md` §8 (recorded: 1.14d also leaves far town rooms unpopulated; old level freed 122 frames after the return). After a waypoint return to a town, does 1.14d populate only the rooms near the player (far NPCs/objects appear on approach), as d2rs does? Drive town -> waypoint -> back, snapshot units at +50 and +600 frames (`docs/handoff/q-fix-room-links.md`).
 61. **[q-fix-npc-menus] What closes ui 0x11 (UI_QUESTLOG), and Esc with it open** answered → `ui/panels.md` §2 r10, `ui/frontend-options.md` §O1 r2 (from the binary: ui 17 is the quest-log alert button; Esc remembers, closes and restores it with the latch 0; d2rs never clears the latch: `q-fix-pc1eve-questlog-alert`).
 
+- [q-fix-ass-traps] 0x005DC970 melee-range rule (REC-1270): `monsters/ai.md` §5.3 rule 1 skips a monster C in the scanner's melee range only when C has state 146; 1.14d's Lightning Sentry never targeted a Fallen at distance 1 (state 0 on it) but did at distance 2. Read the filter: which unit's state 146 / flag is tested, and the melee test it calls (range, line).
+- [q-fix-ass-traps] 0x005DD510 alternative order (REC-1271): does a main-less scan (only nThreat < 2 candidates) refuse an alternative farther than 5 before or after the "no main target: take it" rule? A hp-0 poked cow 6 sub-tiles from a sentry was not shot.
+
 ## How to check a behaviour in one command
 
 A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)
