@@ -829,3 +829,37 @@ fn a_moving_missile_reads_the_collision_word_its_step_cached() {
     assert!(fx.sim.hooks().missile_store().get(m).is_some());
     fx.assert_clean();
 }
+
+/// The game entry writes the entry act into the player's unit record
+/// (+0x18): measured on 1.14d, `a4-fortress-arrival-ama` (act 3 at frame
+/// 2 of an Act IV start; an allocation without a room gives 0).
+// Covers: specs/sim/path-placement.md §11 r2
+#[test]
+fn game_entry_sets_the_players_act() {
+    let mut fx = fx_with(&[
+        (LEVEL, TileRect::new(0, 0, 8, 8)),
+        (TOWN, TileRect::new(0, 16, 8, 8)),
+    ]);
+    let req = AllocRequest {
+        ty: UnitType::Player,
+        class: 0,
+        room: None,
+        add: true,
+        fixed_guid: None,
+        mode: 1,
+        allied: true,
+    };
+    let p = fx
+        .sim
+        .with(&mut fx.game, |g, v| v.allocate(g, &req, 0, 0))
+        .unwrap();
+    fx.sim
+        .with(&mut fx.game, |_, v| v.units.get_mut(p).unwrap().act = 3);
+    assert!(fx.sim.with(&mut fx.game, |g, v| {
+        super::place::game_entry(PathCtx::of(v, g), p, 0)
+    }));
+    let act = fx
+        .sim
+        .with(&mut fx.game, |_, v| v.units.get(p).unwrap().act);
+    assert_eq!(act, 0);
+}

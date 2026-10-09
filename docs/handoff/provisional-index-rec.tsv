@@ -307,9 +307,9 @@ REC-720	6497		HUD skill-button icon state (PROVISIONAL, `d2-client` `ui/hud.rs` 
 REC-721	6498		Placement tint scope (PROVISIONAL, `d2-client` `ui/panels/inv_items_tint.rs` `draw_placeme	recording	no		1	
 REC-722	6499		Skill tree icon remap `k` (PROVISIONAL, `d2-client` `ui/panels/skilltree.rs` `icon_remap`;	recording	no		0	
 REC-724	6496		Preview `use_state` (PROVISIONAL, `app/skill_rest.rs`; q-fix-preview-use-state): tests 1-4	unstated	no		1	
-REC-725	6500		Object door step (PROVISIONAL, `bridge/objects/mod.rs`; q-fix-object-generic-step): `IsDoo	binary	no	yes	2	
+REC-725	6500		Object door step (PROVISIONAL, `bridge/objects/mod.rs`; q-fix-object-generic-step): `IsDoo	binary	no	yes	0	
 REC-726	6502		Key mode filter in play (PROVISIONAL, `d2-client` `ui/edge.rs` `key_actions_in_mode`, `con	data	yes		4	
-REC-727	6501		NPC "introduction" topic text (PROVISIONAL, `d2-client` `ui/npc_talk.rs` `topic_text`; q-f	unstated	no	yes	1	
-REC-728	6505		NPC menu-open greeting sound (PROVISIONAL, `d2-client` `ui/npc_box.rs` `open_npc_menu_with	recording	no		2	
+REC-727	6501		NPC "introduction" topic text (PROVISIONAL, `d2-client` `ui/npc_talk.rs` `topic_text`; q-f	unstated	no	yes	0	
+REC-728	6505		NPC menu-open greeting sound (PROVISIONAL, `d2-client` `ui/npc_box.rs` `open_npc_menu_with	recording	no		1	
 REC-740	6524		Item tip anchor (PROVISIONAL, `ui/item_tip.rs` `TipAnchor::at_point`, `draw_tip`; q-fix-ui	unstated	no		1	
 REC-745	6506		Grid drop cell `0x00486BD0` (PROVISIONAL, `d2-client` `ui/panels/inv_items.rs` `grid_drop_	recording	no		1	
