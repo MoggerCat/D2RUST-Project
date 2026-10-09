@@ -212,3 +212,42 @@ spawn.
   quill hits the player at f46 (12800 → 12415).
 - The d2rs side is not run here; the check runs both sides with
   `scenario_diff.py`.
+
+### REC-815 / REC-816 (whirl details)
+- **REC-816 settled:** the mode change at update N is machine step 5
+  (`0x006217C0`: +0x30 ≠ 0 and +0x48 < 1 → `0x004611F0`), not a server
+  message.
+  - The 213 in the facts is the speed +0x4C. It is written by the
+    velocity branch of the rate function `0x00623F50` (selected in
+    `0x006214A0`: a V-skill mode with E-flags bit 0).
+  - +0x3C stays 256. The facts columns `f` / `F` / `s` are +0x44 / +0x48
+    / +0x4C.
+  - Spec: `skills/sequences.md` §3 Whirlwind r3.
+- **REC-815 narrowed, still PROVISIONAL as REC-900:** the 2-update
+  delay before the first path step is not in `0x00463390`, `0x004C9120`
+  or `0x00650840`. Every gate passes from update 1, and a failing gate
+  would end the path. So either the start runs after the click (the
+  target not ready yet), or the recorder's `px` is not path +0x00. The
+  anim recorder tools are not in this tree, so the second is unchecked.
+  N still uses the measured a.
+- No new rows. d2rs needs only `q-fix-b-whirl-end-rule`.
+
+### REC-826: the Quill Rat seed step when its quill reaches the player (settled)
+- That step is the quill's to-hit roll drawn from the owner's seed (the
+  rat): hit handler `0x005ADF10` → hit test `0x0057D9B0` at `0x005AE06F`
+  (ECX owner, EDX player).
+  - A miss is 1 owner step: the missile is removed, no damage.
+  - A hit is 2 owner steps: the to-hit roll, then the monster crit
+    `0x005A5560` from `0x005AD730`.
+  - Damage is rolled on the missile's own seed.
+- Recorded:
+  - quillrat run: f46 a miss (roll 89).
+  - kill run: f46 a hit (roll 39, crit roll 76), 12800 → 12415.
+- Specs: `missiles/missiles.md` §R5 step 5 and §R6.1 (full hit order),
+  `combat/damage.md` §10 (monster missiles), `sim/units.md` §1 (the
+  player gets unit flags |= 0x0E at `0x005348EC`), `monsters/ai-bodies.md`
+  §9.7.
+- **d2rs: every monster missile passes through players.** The player
+  never gets unit flags 0x0E, so `missiles/flight.rs` `accepts()` rejects
+  it. Also, d2rs's missile damage skips block / dodge and the monster
+  crit. Row: `q-fix-c6-player-flags`.

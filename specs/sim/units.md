@@ -78,7 +78,7 @@ cancelled through §5.4), mode and animation fields, update-queue entries
 
 | Type | Kind | Timer class | Per-kind init (`0x00555230` table `0x005554E8`) | Free (`0x00555600`) | Event dispatcher (`tick.md` §5.6) |
 |---|---|---|---|---|---|
-| 0 | player | 0 | `0x005348C0`, then `0x005B1880(…, 0)` unless mode 17 | `0x005B1A20`, `0x00535430`, `0x005407A0`, `0x005349D0`, path | `0x00581220` |
+| 0 | player | 0 | `0x005348C0` (first: unit flags +0xC4 \|= 0x0E at `0x005348EC`, bits 1–3; bits 2 and 3 make the player a missile target, `missiles.md` §R4.2 shared filter), then `0x005B1880(…, 0)` unless mode 17 | `0x005B1A20`, `0x00535430`, `0x005407A0`, `0x005349D0`, path | `0x00581220` |
 | 1 | monster | 1 | mode := arg; `0x00574250` | `0x005B1A90`, path, `0x005736A0` | `0x005A7F80` |
 | 2 | object | 3 | 0x38-byte object data at +0x14 (field 0 = objects.txt row, `0x00640E90`), mode := arg, `0x00623520`, `0x0054F5D0` | `0x00552A00`, `0x00623570`, data | `0x00586AD0` |
 | 3 | missile | 2 | mode := arg; `0x0059F8A0` | path, `0x0059F8E0` | `0x005ADCC0` |
