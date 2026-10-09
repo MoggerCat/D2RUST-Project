@@ -36,22 +36,22 @@
 | Inputs | 76–87 |
 | Outputs / state changes | 88–94 |
 | Rules | 95–96 |
-|   1. Quest flag records | 97–238 |
-|   2. Quest control and quest records | 239–345 |
-|   3. Game entry: picking the quest set | 346–393 |
-|   4. Events and dispatch | 394–478 |
-|   5. Quest updater and timers (tick step 8) | 479–500 |
-|   6. Status reporting | 501–610 |
-|   7. NPC dialog hooks | 611–643 |
-|   8. Act transitions, warps and portals | 644–731 |
-|   9. Quest items, rewards and helpers | 732–924 |
-|   11. Acts II–V | 925–941 |
-| Constants & data dependencies | 942–956 |
-| Randomness | 957–984 |
-| Edge cases & original bugs | 985–1003 |
-| Test vectors | 1004–1035 |
-| Provenance | 1036–1064 |
-| Open questions | 1065–1137 |
+|   1. Quest flag records | 97–297 |
+|   2. Quest control and quest records | 298–404 |
+|   3. Game entry: picking the quest set | 405–452 |
+|   4. Events and dispatch | 453–537 |
+|   5. Quest updater and timers (tick step 8) | 538–559 |
+|   6. Status reporting | 560–734 |
+|   7. NPC dialog hooks | 735–767 |
+|   8. Act transitions, warps and portals | 768–855 |
+|   9. Quest items, rewards and helpers | 856–1048 |
+|   11. Acts II–V | 1049–1065 |
+| Constants & data dependencies | 1066–1080 |
+| Randomness | 1081–1108 |
+| Edge cases & original bugs | 1109–1127 |
+| Test vectors | 1128–1159 |
+| Provenance | 1160–1188 |
+| Open questions | 1189–1261 |
 <!-- /index -->
 
 ## Summary
