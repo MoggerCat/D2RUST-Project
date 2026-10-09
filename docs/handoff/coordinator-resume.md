@@ -18,7 +18,20 @@ Fix sessions launched 17:05 UTC (each branch carries `docs/handoff/<branch>-task
 | q-fix-depcheck | session_01Bw9umZerDFScSEkXWhvchg | Sonnet | 1070–1079 | rng_trace thread_local behind a feature |
 | q-fix-pt-sweep | session_01BU2ZCAxsiRDowTgb9cTSki | Sonnet | 1080–1089 | sweep hops ≤16 + fallback ring, goto cells; A3–V matrix |
 
-Next free REC block: 1090. pc1-data Step 4: last number 46.
+| q-fix-monster-death | session_01Paf5PKDcW6k9hvqKunfebM | Opus | 1090–1099 | dead monsters stand up (p4-death-cleanup), drop spot |
+| q-fix-player-hit | session_01U91VHQHBy7Xp4uXJjJ3AC4 | Sonnet | 1100–1109 | player never a missile target (c6), owner flags (c7) |
+| q-fix-monster-ai | session_01URviZERs7KxnRnDD9NkMyi | Sonnet | 1110–1119 | Fallen / Quill Rat AI (c2, c3), Fallen think seed step |
+| q-fix-seed-order | session_01JhQc4nNShp9YNmxNXpqAdx | Opus | 1120–1129 | unit seed order, Blood Moor population, rng creation draws |
+| q-fix-save-input | session_01TU8gxrozxP5xiyq7rEDW1L | Sonnet | 1130–1139 | belt key send, save item seed, 0x67 byte 18, cursor reload |
+| q-fix-room-links | session_016xcFMkKoz6pTSqDuPJRwm3 | Sonnet | 1140–1149 | town objects after WP return, static/drop room links |
+| q-fix-act2-play | session_01NaR6yMxmEgnEfm3Fj9DK3D | Sonnet | 1150–1159 | Act II playthrough blockers |
+| q-fix-act4-play | session_013J2Srxix169AQQjRUYSHvj | Sonnet | 1160–1169 | Act IV playthrough blockers |
+| q-fix-act5-play | session_015YNGBGrwtHjFyby4tCDZR6 | Sonnet | 1170–1179 | Act V: Ancients link, quest superuniques, milestones |
+| q-fix-check-triage | session_01B2eB5Q2V444GgPtPfrhLNK | Sonnet | 1180–1189 | all 88 scenario-diff checks vs 1.14d → checks-status.md |
+| q-fix-difficulty-a1a2 | session_01LiMn42LTayZFyizFKwHzQo | Sonnet | 1200–1209 | Nightmare / Hell, Acts I–II |
+
+Batch 2 launched 17:29 UTC. Branch `claude/q-fix-realdata-baseline` (REC 1190–1199, brief pushed) is held, not launched. Next free REC block: 1210.
+pc1-data Step 4: last number 46.
 
 ## State at pause (2026-10-09 ~15:50 UTC, end of the day run)
 
