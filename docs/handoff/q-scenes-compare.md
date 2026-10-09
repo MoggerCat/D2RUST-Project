@@ -34,8 +34,9 @@ under Xvfb + lavapipe; compare: `d2-client facts-compare SCENE DIR --ignore tick
 15. The client path sees the model's living monsters as footprints, mask 0x100 (`client/model.md` open question 2 revision, REC-706; `ClientPath::stamp_others`): walk-n, s, ne, e reach the critter / NPC rows; walk-se / nw match when d2rs's Warriv stands where 1.14d's does (NPC position: q-fix-real-unit-seed-order); runs drift ~50 px (was 90–240).
 16. The grid hover tint and item tip follow the §5 hover state, not the raw mouse (`ui/inventory.md` §3 r2, already specified); a use press clears that state until the next move or press, and a release does not re-track it (§5 r4, PROVISIONAL REC-707). a1-panel-cube is now equal except the cursor row 73, which animates on wall-clock time (`facts-render.md` edge cases: known divergence).
 17. `--skip-weather` also drops pass 4's environment-pool cels: 1.14d `CelDraw` rows from the pool draw [`0x00473A70`, `0x00473C00`), and d2rs rows exported with `at` = `pools` (`facts-render.md` §6 r5 revision, PROVISIONAL REC-708). Their spawns draw on the player seed, which the wall-clock cursor steps (`panels-3.md` §23 r8). a3 now reaches its NPC rows.
+18. q-fix-p6-shadow-pretest (REC-511 settled, `blend-modes.md` §5 r3a): the shadow box test keeps the left-bound shift `d` but its y bounds are the whole COF box. It runs at the shadow position: a motion record's height `oz` counts half on both axes (`unit_shadow_offset`, `SkillMotion::shadow_offsets`). The REC-511 / REC-518 PROVISIONAL markers are dropped. Scene sweep unchanged (no recorded shadow near the bottom edge).
 
-## First difference per scene (after fixes 1–17)
+## First difference per scene (after fixes 1–18)
 | Scene | First difference |
 |---|---|
 | a1-town-idle-sor, a1-walk-n, a1-walk-s | r110 NPC `wa` WL dir 47 vs 0: d2rs's `wa` already stands on its walk target (4866, 4235), 1.14d's still walks east past it (NPC path node: q-fix-real-unit-seed-order) |
