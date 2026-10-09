@@ -230,9 +230,14 @@ impl<C: PathWorld + WalkUnits + ?Sized> Walk<'_, C> {
             return Ok(centre_of(path));
         }
         // Rule 3.
+        // PROVISIONAL (sim/pathing.md §9.6 rule 3, REC-1643): the point
+        // test is skipped for the straight missile path (type 4) only; a
+        // missile on a point path (charged bolt 13, blessed hammer 14)
+        // reaches its points like a walker (1.14d `pal-blessed-hammer` /
+        // `sor-charged-bolt` checks: the missile lands on point centres).
         let (mut dx, mut dy) = (path.vel_vec_x, path.vel_vec_y);
         let mut reaches = false;
-        if !missile {
+        if !missile || path.path_type != path_types::MISSILE {
             let i = index(path).clamp(0, PATH_POINTS as i32 - 1) as usize;
             let p = path.point(i);
             let rx = to_fp16_center(p.x).wrapping_sub(path.precise_x) as i32;

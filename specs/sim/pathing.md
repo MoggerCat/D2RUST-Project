@@ -36,17 +36,17 @@
 |   6. Straight (type 7, `0x00679ED0`) | 453–462 |
 |   7. A* (type 1, `0x0067B850`) | 463–500 |
 |   8. Velocity, direction vector, facing | 501–606 |
-|   9. Per-tick movement | 607–790 |
-|   10. Messages | 791–853 |
-|   11. Missile paths (`0x00649760`) | 854–906 |
-|   12. Other path types (1.14d-read 2026-10-08) | 907–1120 |
-|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1121–1270 |
-| Constants & data dependencies | 1271–1307 |
-| Randomness | 1308–1318 |
-| Edge cases & original bugs | 1319–1366 |
-| Test vectors | 1367–1405 |
-| Provenance | 1406–1461 |
-| Open questions | 1462–1535 |
+|   9. Per-tick movement | 607–798 |
+|   10. Messages | 799–861 |
+|   11. Missile paths (`0x00649760`) | 862–914 |
+|   12. Other path types (1.14d-read 2026-10-08) | 915–1128 |
+|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1129–1278 |
+| Constants & data dependencies | 1279–1315 |
+| Randomness | 1316–1326 |
+| Edge cases & original bugs | 1327–1374 |
+| Test vectors | 1375–1413 |
+| Provenance | 1414–1469 |
+| Open questions | 1470–1543 |
 <!-- /index -->
 
 ## Summary
@@ -708,6 +708,14 @@ axis Δ − (size1/2 + size2/2) (not below 0), then 2·max + min.
 3. Δ := velocity vector. Not a missile: R := point[index] centre −
    position; if |R.x| ≤ M and |R.y| ≤ M with M = max(|Δx|, |Δy|): Δ := R
    and "reaches the point".
+   PROVISIONAL: "not a missile" reads as "not the straight missile path
+   (type 4)": missiles on the point paths of §11.2 / §11.3 (charged bolt,
+   blessed hammer) reach their points too (because in 1.14d, Wine
+   2026-10-09, `pal-blessed-hammer.check` frame 31 and
+   `sor-charged-bolt.check` frame 27, the missile lands exactly on a
+   point's centre, xf = yf = 0x8000, and the next step heads for the
+   following point; without the test it overshoots and turns back);
+   settled by REC-1643 (read the test at `0x00650660`).
 4. If position + Δ is in another cell: distance budget (+0x90) −= 1 when
    > 0 and the type is not 8 or 11; cell walk (rule 9.6.5); blocked →
    Q := the centre of the last free cell, and: "monster re-path" → re-path
