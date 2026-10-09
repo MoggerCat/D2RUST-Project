@@ -699,7 +699,7 @@ missile creation's own); the siege-beast skill use per its spec.
 `0x005541B0`, `0x005A73E0`, `0x005A75C0`, `0x005A7F80`, `0x005B1740`;
 the playthrough's "returns to mode 1 with hp 0" question):
 
-1. *Sequence.* The kill requests mode 0 through the mode set
+- *Sequence.* The kill requests mode 0 through the mode set
    `0x005A7C20` → DT start (rule 1): mode 0, the death clean-up, the
    treasure gate. DT schedules its animation events (mode table:
    schedules = yes). DT event 0 sets mode 12 at once (every monster but
@@ -708,7 +708,7 @@ the playthrough's "returns to mode 1 with hp 0" question):
    plain mode set `0x00553570`, never by a request, and DD schedules
    nothing (mode table: schedules = no), so no event of U runs after
    it unless something else schedules one.
-2. *Why the AI stops.* There is **no** dead test in the think: the
+- *Why the AI stops.* There is **no** dead test in the think: the
    class event handler `0x005A7F80` drops a type-2 event only for a
    frozen **live** unit (`0x005541B0` = 0), and the think body
    `0x005B1740` runs whatever AI the control names. What stops it is
@@ -721,7 +721,7 @@ the playthrough's "returns to mode 1 with hp 0" question):
    tactic run only from a mode start or a think, which a dead U no
    longer gets; the damage path refuses a dead defender
    (`combat/damage.md` §5.2, `0x005541B0`).
-3. *A mode request to a dead monster.* `0x005A7C20` does **not** refuse
+- *A mode request to a dead monster.* `0x005A7C20` does **not** refuse
    it. With U dead (`0x005541B0`(U) = 1: U null, flag 0x10000 (+0xC6
    bit 0), or a monster in mode 0 or 12): it skips the path stop
    `0x00649400`; for a mode ≠ 3 it still writes the path target and
@@ -736,10 +736,10 @@ the playthrough's "returns to mode 1 with hp 0" question):
      (modes 4, 5, 7, 8, 9) sets its mode whenever it does not return 0
      (rule 7); the other starts as their rules state. So a mode-1 or attack request on a dead monster
      *does* bring it out of mode 12 with hp 0; 1.14d never makes one,
-     because of point 2.
+     because of the previous point.
    A request for mode 0 or 12 on a dead unit runs DT start / DD start
    again (DD start skips the clean-up when U is in mode 0, rule 4).
-4. *The symptom's shape.* A think left pending at death fires
+- *The symptom's shape.* A think left pending at death fires
    `aidel` frames later (15 for the Act I monsters, `ai.md` §1.3); the
    AI's first idle (`0x005DE080`, `ai.md` §1.2: "if the anim mode is
    not neutral, first a mode change to neutral") requests mode 1 →
