@@ -1986,19 +1986,34 @@ impl QuestControl {
         Ok(())
     }
 
-    /// `0x00544590` (§6.4): S→C 0x8A when an active function wants the
-    /// player to talk to `npc`.
+    /// `0x00544590` (§6.4 "The active test as a seam"): the NPC AI's
+    /// interact gate. `interact`: the monstats `interact` flag of the
+    /// NPC's class; without it, false (no walk, no send). Else the
+    /// records of the player's act are walked in list order (newest →
+    /// oldest: chains 40 … 37, then 36 … 0, §2.3); the first whose
+    /// active fn is true sends S→C `8A 01 <npc GUID>` to the player and
+    /// the result is true. None true: false.
+    ///
+    /// PROVISIONAL (`quests.md` §6.4 step 4, REC-860): the act is the
+    /// player unit's act (`unit_act`), not the act byte of the player's
+    /// client: d2rs's sim has no client act. They differ only during an
+    /// act change; settled when the client record's act is modelled.
     pub fn npc_wants_interact<W: QuestWorld>(
         &self,
         w: &mut W,
         player: UnitId,
         npc: UnitId,
         npc_class: u16,
-    ) -> Result<(), QuestError> {
+        interact: bool,
+    ) -> Result<bool, QuestError> {
+        if !interact {
+            return Ok(false);
+        }
         if !self.picked {
             return Err(QuestError::NotPicked);
         }
         let act = w.unit_act(player);
+        // `records` is in list order (newest first, §2.3).
         for i in 0..self.records.len() {
             let r = &self.records[i];
             let Some(f) = r.active_fn else { continue };
@@ -2011,10 +2026,10 @@ impl QuestControl {
                 m[1] = 1;
                 m[2..6].copy_from_slice(&w.guid(npc).to_le_bytes());
                 w.send(player, &m);
-                return Ok(());
+                return Ok(true);
             }
         }
-        Ok(())
+        Ok(false)
     }
 
     /// `0x00545760` (§6.5): store b, then 0x28 and `89 b` to every player.

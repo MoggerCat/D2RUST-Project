@@ -185,7 +185,11 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
             .unwrap_or([0; 16])
     }
 
+    /// `0x005543B0`: the unit's state-105 list
+    /// ([`crate::wiring::action::View::set_alignment`]),
+    /// then the host's copy.
     fn set_alignment(&mut self, unit: UnitId, alignment: u8) {
+        self.v.set_alignment(self.game, unit, alignment);
         self.v.h.x.set_alignment(unit, alignment);
     }
 

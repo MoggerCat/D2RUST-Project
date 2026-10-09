@@ -88,7 +88,9 @@ use d2_server::adapters::handlers::world::{
     preview_cube_parts, preview_inv_parts, ActionEvents, ActionWorld, Outbox, QuestEnter,
     WiredWorld, WorldHost,
 };
-use d2_server::adapters::session::{load_new_character_with_items, load_save, GameSetup};
+use d2_server::adapters::session::{
+    initial_portal_flags, load_new_character_with_items, load_save, GameSetup,
+};
 use d2_server::adapters::session_flow::{
     create_flags, CharacterLoader, CreateGame, Loaded, SessionFlow,
 };
@@ -2218,6 +2220,11 @@ fn loader(
             // the save's or the start items and the act's DRLG.
             let p = v.allocate(g, &req, 0, 0)?;
             v.init_player_seed(p);
+            // `combat/hit.md` §7.1: a player is good (2), its state-105
+            // list there before its first 0xAA (`intents-events.md`
+            // §7.9 rule 1, recorded). PROVISIONAL (REC-750): the
+            // original's call site in the join is not identified.
+            v.set_alignment(g, p, 2);
             Some(p)
         }) else {
             s.events
@@ -2315,6 +2322,17 @@ fn loader(
                         &save.header.hotkeys,
                         &s.world.item_guids(player),
                     );
+                    // `d2s-load.md` §8 rules 1–2: a full save's record
+                    // (the join's 0x5F and 0x23 pair, `intents-events.md`
+                    // §8.2 rules 3.3, 3.7). A stub's is the loader's.
+                    if entry.record.is_none() {
+                        let portals = s.events.action.sys.hooks.drlg.data.portal_levels();
+                        entry.record = Some(super::save_gaps::loaded_record(
+                            &save.header.mouse[..2],
+                            &s.world.item_guids(player),
+                            initial_portal_flags(&portals),
+                        ));
+                    }
                     let log = &mut s.events.action.hooks().x.log;
                     log.extend(
                         report

@@ -18,6 +18,7 @@ use d2_formats::mpq::ArchiveSet;
 
 use crate::bin::{cstr, item_code_map, u32_at, BinSet, BinTable};
 use crate::compile::{code4, special_linker, CodeLinker, NameLinker};
+use crate::schema::CalcBuffer;
 use crate::strings::StringTables;
 use maps::{ActRanges, Automap, EquivKind, EquivMatrix, Gamble, SeqEntry, SkillLists, StateMaps};
 
@@ -76,6 +77,10 @@ pub struct FixedSet {
     pub lvlsub_types: Vec<u32>,
     /// automap converted records and ranges (§10).
     pub automap: Automap,
+    /// The items code buffer (`itemscode`, `calc-expressions.md` §1.1),
+    /// as loaded: the `calc` fields of weapons, armor and misc are byte
+    /// offsets into it. Empty when the set has none.
+    pub items_code: Vec<u8>,
 }
 
 impl FixedSet {
@@ -191,6 +196,11 @@ pub fn apply(data: &BinSet, anim: &AnimData) -> Result<FixedSet, FixupError> {
             records: Vec::new(),
             ranges: Vec::new(),
         },
+        items_code: data
+            .code
+            .get(&CalcBuffer::ItemsCode)
+            .map(|c| c.bytes.clone())
+            .unwrap_or_default(),
     };
     for i in 0..tables.len() {
         let (earlier, rest) = tables.split_at_mut(i);

@@ -1,9 +1,9 @@
-# Spec: UI — Control panel overlays (globes, bars, belt, skill buttons, run / menu buttons, mini panel, new-stats / new-skills buttons)
+# Spec: UI — Control panel overlays (globes, bars, belt, skill buttons, run / menu buttons, mini panel, new-stats / new-skills buttons, help button)
 
 - **Status:** draft (2026-10-07, RE on the 1.14d `Game.exe`; 2026-10-08
   REC-240 / REC-238: §5 r4, r5, r8, r13, r14, §3 r6, §6 r1; REC-252:
   §3 r6 font and 640 × 480, §4 r2 stamina tip as pop-up text and the
-  `stambarblue` flag; no capture yet). Answers UP-28 (`ui/panels.md` §6 r3, §Open questions 1, control
+  `stambarblue` flag; 2026-10-09: §8 r6, §9 r9, §11 help button; no capture yet). Answers UP-28 (`ui/panels.md` §6 r3, §Open questions 1, control
   panel part). `ui/panels.md` §6 owns the border and the base art; this
   spec owns everything drawn on top of it and the control panel input.
 - **Target version:** 1.14d, English install
@@ -19,26 +19,27 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 44–57 |
-| Inputs | 58–71 |
-| Outputs / state changes | 72–79 |
-| Rules | 80–81 |
-|   1. Draw order (`0x00499450`) | 82–102 |
-|   2. Art files | 103–116 |
-|   3. Life and mana globes | 117–185 |
-|   4. Experience and stamina bars | 186–235 |
-|   5. Belt | 236–459 |
-|   6. Run / walk and menu buttons | 460–480 |
-|   7. Skill buttons | 481–503 |
-|   8. New-stats and new-skills buttons | 504–552 |
-|   9. Mini panel (state 0x15) | 553–626 |
-|   10. Control panel mouse input | 627–667 |
-| Constants & data dependencies | 668–679 |
-| Randomness | 680–683 |
-| Edge cases & original bugs | 684–696 |
-| Test vectors | 697–729 |
-| Provenance | 730–753 |
-| Open questions | 754–804 |
+| Summary | 45–58 |
+| Inputs | 59–72 |
+| Outputs / state changes | 73–80 |
+| Rules | 81–82 |
+|   1. Draw order (`0x00499450`) | 83–105 |
+|   2. Art files | 106–119 |
+|   3. Life and mana globes | 120–188 |
+|   4. Experience and stamina bars | 189–238 |
+|   5. Belt | 239–462 |
+|   6. Run / walk and menu buttons | 463–483 |
+|   7. Skill buttons | 484–514 |
+|   8. New-stats and new-skills buttons | 515–588 |
+|   9. Mini panel (state 0x15) | 589–703 |
+|   10. Control panel mouse input | 704–744 |
+|   11. Help button (state 0x22, `UI_HELPBUTTON`) | 745–829 |
+| Constants & data dependencies | 830–845 |
+| Randomness | 846–849 |
+| Edge cases & original bugs | 850–862 |
+| Test vectors | 863–906 |
+| Provenance | 907–944 |
+| Open questions | 945–995 |
 <!-- /index -->
 
 ## Summary
@@ -73,9 +74,9 @@ the press, release and hover behavior.
 
 Draws; hover tool tips (`0x00502280(text, x, y, color, centre)`, drawn
 by `0x00503000` in UI pass step 10, §5 r14; centre = 1 → x is the text centre);
-`SetUIState` calls (3, 0x15, mini-panel targets); run / walk toggle
+`SetUIState` calls (3, 6, 7, 0x15, 0x21, 0x22, mini-panel targets); run / walk toggle
 (`0x0044BE80`); registry `Show HP Text`, `Show MP Text`, `PopupHireling`
-(§9); UI sound 4 on presses.
+(§9), `Mini Panel` (§9 r9), `Help Menu` (§11); UI sound 4 on presses.
 
 ## Rules
 
@@ -94,7 +95,9 @@ by `0x00503000` in UI pass step 10, §5 r14; centre = 1 → x is the text centre
    `[0x007BEFEC]` := 60 (§Open questions 4).
 5. Mini-panel menu button tool tip `0x00498340` (§6 r4).
 
-Step 8 of the UI pass (`ui/panels.md` §5) then draws, in its order: the
+Step 8 of the UI pass (`ui/panels.md` §5) then runs, in its order: the
+level-up button sync `0x004A64C0` (§8 r6, draws nothing), the help
+button (`[0x22]` → `0x00495180`, §11), the
 new-stats button (`[6]` → `0x004A6B30`, else `0x004A6A70`), the
 new-skills button (`[7]` → `0x004A6E60`, else `0x004A6DA0`) (§8), the
 life / mana numbers `0x00498120` (§3 r6) and, with state 0x15 open, the
@@ -490,8 +493,16 @@ draw mode 5 unless a rule says otherwise.
    1; right at (W − 165, H), flag 0. The icon file is the class file of
    the skill's `skilldesc` (`0x004A8C80`, `ui/panels.md` §10.3) and the
    frame its `IconCel` (byte +7 of the record, `0x004A9690`); state from
-   `0x004A8D30` (0, 1, 4), 1 also when the skill's flag
-   `[0x006CE268]` bit is clear and P stands in town; while the mouse is
+   `0x004A8D30(P, skill)` (2026-10-09, one read): u := the skill-use
+   check `0x004D9FC0(P, skill)` (`client/stat-lists.md` §3 r6.8:
+   `0x00647960` codes, plus 8 while the local cast lock runs); u = 0 → 0
+   (usable), u = 6 (`aura`) → 4, any other u (1, 2, 3, 4, 5, 7, 8) → 1.
+   Then (`0x00496C24`…`0x00496C42`) the state is forced to 1 when the
+   skills.txt record (`0x00644140(skill)`) lacks `InTown` (byte +5 &
+   byte `[0x006CE268]` = mask 1, i.e. flags bit 8) and P's room
+   (`0x00620BB0`) is in town (`0x0061AB00`):
+   `k = (u == 0 ? 0 : u == 6 ? 4 : 1); if (!rec.InTown && room(P) && is_town(room(P))) k = 1`.
+   While the mouse is
    in x…x + 48, y − 48…y the state 4 stays 4, 0 stays 0, other → 1;
    drawn with `CelDrawColor` (`0x004F64B0`, light 0xFF, mode 5, the
    state as color argument); charges / quantity overlays
@@ -549,6 +560,31 @@ draw mode 5 unless a rule says otherwise.
    off, 0)` then `SetUIState(4, on, 0)`; consumed. Otherwise pressed :=
    0, not consumed. No press check beyond the flag (a press elsewhere
    never set it).
+6. **Level-up button sync** (`0x004A64C0`, every UI pass, step 8,
+   before the help button; 2026-10-09 read). It opens and closes the
+   states 6 / 7 that select the button variants of r1–r2. It draws
+   nothing. (q-scenes-compare took it for the help button; that is §11.)
+   - State 0x0B (key configuration) open → nothing.
+   - P := the local player (`0x00463DD0`); `statpts` = stat 4,
+     `newskills` = stat 5 (`0x006253B0(P, s, 0)`, signed).
+   - State 6 open and `statpts` = 0 → `SetUIState(6, off, 0)`. State 6
+     closed, `statpts` ≠ 0 and state 2 (character) closed →
+     `SetUIState(6, on, 0)`.
+   - Then state 7 open and `newskills` ≤ 0 → `SetUIState(7, off, 0)`.
+     State 7 closed, `newskills` > 0 and state 4 (skill tree) closed →
+     `SetUIState(7, on, 0)`.
+   So the glowing button appears in the pass after the points arrive.
+   It does not appear while the matching panel is open. Once open, it
+   stays open (also over the panel) until the points are spent.
+   ```
+   level_up_sync():
+     if ui_open(0x0B): return
+     p = local_player()
+     if ui_open(6): if stat(p, 4) == 0: set_ui(6, OFF)
+     elif stat(p, 4) != 0 and not ui_open(2): set_ui(6, ON)
+     if ui_open(7): if stat(p, 5) <= 0: set_ui(7, OFF)
+     elif stat(p, 5) > 0 and not ui_open(4): set_ui(7, ON)
+   ```
 
 ### 9. Mini panel (state 0x15)
 
@@ -623,6 +659,47 @@ sets it at game entry, PC 1, or a scene that closes it and re-joins).
    `0x0044DA40`, `0x0044DA70`, consumed. Outside the region:
    `[0x007BC974]` := 0, not consumed. (The function runs whatever button
    was pressed: a release over another button runs that one.)
+9. **Open at game entry** (2026-10-09 read; REC-519). The in-game UI
+   set-up `0x00456970` (game join: S→C 0x01, `client/model.md` §7 r2) zeroes all 38
+   UI flags, opens state 0 and then calls `0x004567F0`. This is the
+   only opener at entry, and a saved setting decides it:
+   - It reads `Diablo II\Mini Panel` (`0x00414F10("Diablo II", "Mini
+     Panel", 1, &v)`, `ui/frontend-options.md` §O7 r1). If the value
+     exists and v ≠ 0, nothing more happens: the mini panel starts
+     closed. If the value is absent or 0, the panel opens.
+   - Open is an inline copy of `SetUIState(0x15, toggle)` that does not
+     call `0x00455F20`. Nothing happens while a modal text screen is up
+     (`0x004A0000`). With the flag clear, the gate column 0x15 of every
+     open state applies (`ui/panels.md` §3 r3): 1 closes, 4 ends an NPC
+     interaction, 2 or 3 abandon the open. Then the flag flips when
+     there is no P or P is alive (`ui/panels.md` §2 r5). If it went
+     0 → 1, the handler table `0x006D6204` (2 entries: press
+     `0x0047EF30`, release `0x0047ED90`, r7–r8) is registered.
+     Right after the reset only state 0 is open, and its gate row is
+     all 0, so the panel opens.
+   - The setting is written at game exit (`0x00456D80` →
+     `0x0047F130`): `Mini Panel` := 1 when the "was open" record of
+     ui 0x15 in the Esc-menu save table is 0, else 0.
+     The record is `[0x0071315C]` = `0x00713060 + 12·0x15`
+     (`ui/frontend-options.md` §O1 r2; 0 in the image). Only an Esc-menu
+     open with save ≠ 0 (Esc, mini-panel function 7) rewrites it, and
+     it is not reset at game entry. So the stored value is "mini
+     panel open when the game menu was last opened in this process",
+     not the live flag at exit: Save and Exit through the menu keeps
+     the panel's state for the next game. A game left without ever
+     opening the menu writes 1 (closed next time).
+   - The other opener is the help screen. Its draw `0x004966C0`
+     (state 0x21) opens 0x15 when it is closed and sets `[0x007BEF00]`.
+     `0x00494FC0` closes it again, and clears that flag, when the help
+     screen closes (close hook `0x00455E10`, UI pass `0x0045723C`,
+     help click `0x00496766`).
+   ```
+   mini_panel_at_entry():
+     if registry_read("Mini Panel") is Some(v) and v != 0: return
+     open_inline(0x15)              # gate column 0x15, alive test, handlers
+   at_game_exit():
+     registry_write("Mini Panel", 1 if esc_saved_open[0x15] == 0 else 0)
+   ```
 
 ### 10. Control panel mouse input
 
@@ -665,15 +742,104 @@ sets it at game entry, PC 1, or a scene that closes it and re-joins).
    r2 (scan of every reference); it changes nothing observable and d2rs
    may omit it.
 
+### 11. Help button (state 0x22, `UI_HELPBUTTON`)
+
+2026-10-09 read. The "Help (H)" caption with a socketed level button
+above the right globe. It shows in every game until the player opens
+help once. No character level, act, difficulty or first-game test
+applies. The only gate is the registry value `Help Menu`.
+
+1. **Open.** Only at game entry. The set-up `0x00456970` (§9 r9) opens
+   0x22 inline right after the mini panel: nothing while a modal text
+   screen is up, then the gate column 0x22 of the open states (as §9
+   r9), then flag := 1 when there is no P or P is alive (an
+   assignment, not a toggle). If it went 0 → 1, the handler table
+   `0x006D6300` is registered (2 entries: WM_LBUTTONDOWN `0x004952B0`,
+   WM_LBUTTONUP `0x00495320`). No other `SetUIState` site opens 0x22
+   (scan of all 136 calls; the two at `0x00495295` / `0x00495377`
+   close it). Esc does not close it (Esc flag 0, `ui/panels.md` §2
+   r9). The gate closes it when ui 0x0E, 0x14, 0x17, 0x19–0x1E, 0x20
+   or 0x21 opens (`ui-states.tsv` row 0x22, action 1).
+2. **Setting** (`0x004942D0`): a process-wide cache `[0x00722310]`,
+   −1 in the image. On the first call it is set to 0 and then filled
+   by the registry read `Diablo II\Help Menu` (`0x00414F10`), so an
+   absent value stays 0. Later calls return the cache.
+3. **Draw** (`0x00495180`, step 8 with `[0x22]`; one layout for both
+   resolutions):
+   - If any of states 4, 3, 1, 0x0C, 0x17, 0x19 is open: hidden flag
+     `[0x007BEF08]` := 1, nothing drawn.
+   - Else hidden := 0. If the setting (r2) is ≠ 0:
+     `SetUIState(0x22, off, 0)`, nothing drawn (the button closes in
+     the first pass of a game once help has been used).
+   - Else the caption (`0x00495030`). Start with string 4177 ("Help",
+     the recorded glyphs). Command 6 is `CfgHelp`
+     (`ui/controls.md` §3). For its slot 1, then its slot 0, when the
+     slot is bound (`0x00469AA0` ≠ 0xFFFF), append ` (%s)` (4178)
+     formatted with that key's name (`0x0046A530`: short name, long
+     fallback, §5 r13; formatted with a 30-character limit). The
+     text is drawn with `DrawText` (`0x00502320`) at
+     (W − 58 − w / 2, H − 197), color 0, not centred, in the current
+     font (font 1 after the belt, §Edge cases). Here w is width A
+     (`0x00501820`) and the halving truncates.
+   - `Panel\Levelsocket` frame 0 at (W − 75, H − 160). Then
+     `Panel\Level` at (W − 72, H − 164), frame 1 while the pressed
+     flag `[0x007BEF04]` ≠ 0, else 0. Both are plain cel draws (mode
+     5, light 0xFFFFFFFF, palette 0) of the new-stats cels
+     `[0x007C02E0]` / `[0x007C02DC]` (§8).
+   At 800 × 600, with H bound only: caption y 403, socket (725, 440),
+   button (728, 436). At 640 × 480: y 283, (565, 320), (568, 316).
+4. **Press** (`0x004952B0`): if hidden is set at the last draw,
+   nothing. Otherwise hit when the *current* mouse (`0x00468730` /
+   `0x00468740`, not the event) is at W − 75 ≤ x ≤ W − 40 and
+   H − 196 ≤ y ≤ H − 160 (inclusive). A hit sets pressed := 1 and
+   consumes the event (message +0x18 := 1, +0x1C := 0, `0x00420290`).
+   It plays no sound and runs no cursor press. A miss is not
+   consumed.
+5. **Release** (`0x00495320`): same guard and same hit test. The
+   pressed flag is **not** checked. A hit runs, in order:
+   `SetUIState(0x22, off, 0)`; `SetUIState(0x21, toggle, 0)` (the help
+   screen); `Help Menu` := 1 (`0x004150E0`, REG_DWORD); cache := 1;
+   pressed := 0. The event is consumed. A miss does nothing, so
+   pressed stays set and the button keeps frame 1 until a release over
+   it (reproduce).
+6. **Help key** (command 6, `0x004689D0`, `ui/controls.md` §3) also
+   writes `Help Menu` := 1 when the value is absent or 0. It does not
+   touch the cache. Its toggle of 0x21 closes 0x22 through the gate
+   (r1) for the rest of that game. But a game started later in the
+   same process shows the button again, because the cache read
+   earlier is still 0. The button stays away only from the next
+   process start.
+   ```
+   help_button_draw():
+     if any_open(4, 3, 1, 0x0C, 0x17, 0x19): hidden = 1; return
+     hidden = 0
+     if help_menu_setting() != 0: set_ui(0x22, OFF); return
+     text = str(4177)
+     for slot in (1, 0):
+       if key(6, slot) != NONE: text += fmt(str(4178), key_name(6, slot))
+     draw_text(text, W - 58 - width_a(text) / 2, H - 197, 0, centred = 0)
+     cel(LEVELSOCKET, 0, W - 75, H - 160)
+     cel(LEVEL, 1 if pressed else 0, W - 72, H - 164)
+   help_button_release():
+     if hidden or not inside(mouse): return NOT_CONSUMED
+     set_ui(0x22, OFF); set_ui(0x21, TOGGLE)
+     registry_write("Help Menu", 1); cache = 1; pressed = 0
+     return CONSUMED
+   ```
+
 ## Constants & data dependencies
 
-- Strings: 3986, 3987, 3998, 4163–4176, 4178, 4179; key names 3762–3860
+- Strings: 3986, 3987, 3998, 4163–4179 (4177 the help caption, §11); key names 3762–3860
   (long) and 3861–3914 (short), §5 r13.
 - Tables: `belts.bin` (14 records of 0x108 bytes); binding table of the
   belt keys `0x00722404` (4 dwords); switch tables `0x00499434`
   (pop-up rows), `0x00497A1C` (row count), `0x0047ED6C` (mini panel),
   `0x0047F630` (tool tips); key-name jump tables `0x0046A448`,
   `0x0046A2CC`, `0x0046A2B8` (long), `0x0046A73C`, `0x0046A6BC` (short).
+- Registry values under `Diablo II`: `Show HP Text`, `Show MP Text`
+  (§3 r5), `Mini Panel` (§9 r9), `Help Menu` (§11).
+- Handler tables: `0x006D6204` (mini panel, 2 entries), `0x006D6300`
+  (help button, 2 entries).
 - States: 2, 100, 106, 136; `states` flag bit 24 (`stambarblue`, §4
   r2); stats 6–13, 26, 74.
 
@@ -725,6 +891,17 @@ Synthetic (rules as cited).
 | hovered belt potion (quality 2), no shop | `ÿc3` + stat lines + `ÿc0` + name, colour 0, centre at the text position | §5 r8 |
 | same, NPC trade mode 1, price text `P` | as above + `
 ` + `P` | §5 r8 |
+| 800 × 600, state 0x22 open, `Help Menu` absent, `CfgHelp` slot 1 = VK 0x48, slot 0 unbound, caption width A 56, no blocking state | `Help (H)` `DrawText` at (714, 403) colour 0; `Levelsocket` f0 at (725, 440); `Level` f0 at (728, 436) (scene `a4-town-pandemonium-fortress` rows 258–267) | §11 r3 |
+| same, state 1 (inventory) open | nothing drawn; press and release ignored | §11 r3–r5 |
+| same, `Help Menu` = 1 at process start | first pass: `SetUIState(0x22, off, 0)`, nothing drawn | §11 r2–r3 |
+| 800 × 600, button shown, mouse (725, 404) down then up | press consumed, frame 1; release: 0x22 off, 0x21 toggled, `Help Menu` := 1 | §11 r4–r5 |
+| press at (761, 440), release at (761, 441) (outside: x > W − 40) | not consumed, nothing | §11 r4–r5 |
+| game entry, `Mini Panel` absent or 0 | state 0x15 open before the first pass | §9 r9 |
+| game entry, `Mini Panel` = 1 | state 0x15 closed | §9 r9 |
+| game left by Save and Exit with the mini panel open when Esc opened the menu | `Mini Panel` := 0 | §9 r9 |
+| statpts 5, state 6 closed, state 2 closed, state 0x0B closed | `SetUIState(6, on, 0)` in that pass | §8 r6 |
+| statpts 5, state 2 open | state 6 stays closed | §8 r6 |
+| state 7 open, newskills 0 | `SetUIState(7, off, 0)` | §8 r6 |
 | pop-up `Run` at (x 255, y 577), centre 1, 800 × 600, Font16, max width 26 (synthetic), one line | W = 34; box (238, 563)–(272, 579) when Ht = 16 (`DrawRectangle`, colour 0, mode 2); text block x 238, y 576 | §5 r14 |
 
 ## Provenance
@@ -750,6 +927,20 @@ image with `pefile`); REC-252 (2026-10-08, disassembled): `0x004975B0`
 font-setter `0x00502EF0` call sites.
 Strings, `belts.txt`, `states.txt` and `itemstatcost.txt` rows read
 with Python scripts outside the repo. No capture yet.
+2026-10-09 (pc1-day3-c items 42–43, read in all.asm / disasm.py;
+q-scenes-compare, REC-519): `0x004A64C0` (whole; caller `0x004570BD`),
+help button `0x00495180`, `0x00495030`, `0x004952B0`, `0x00495320`,
+`0x004942D0` (cache `[0x00722310]`), help key `0x004689D0`, UI pass
+`0x004570BD`–`0x004570CA`; game-entry set-up `0x00456970`
+(`0x00456BAD` mini panel, `0x00456BB2`–`0x00456CA6` help button, gate
+jump tables `0x00456958`, `0x00456D6C` read from the image),
+`0x004567F0`, exit `0x00456D80` → `0x0047F130`, Esc save table
+`0x0047E090` (`0x00713058`, 12-byte records), help-screen mini panel
+`0x004966C0` / `0x00494FC0`; handler tables `0x006D6204`,
+`0x006D6300` and the strings `Diablo II`, `Mini Panel`, `Help Menu`
+read from the image with `pefile`; `SetUIState` call-site scan (136
+sites) for ui 0x15 / 0x22. Measured: scene
+`a4-town-pandemonium-fortress` draw rows 258–267 (`facts/render/scenes`).
 
 ## Open questions
 

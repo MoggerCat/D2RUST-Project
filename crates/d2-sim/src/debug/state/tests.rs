@@ -46,7 +46,33 @@ fn full_unit() -> UnitState {
         vit: Some(26),
         lvl: Some(27),
         own: Some(28),
+        q: None,
     }
+}
+
+// Covers: specs/tools/state-snapshot.md §2
+#[test]
+fn quest_record_words_on_the_player_line() {
+    use crate::world::quests::QuestFlags;
+    let mut f = QuestFlags::default();
+    f.set(1, 13);
+    f.set(1, 0);
+    f.set(7, 0);
+    f.set(41, 15);
+    assert_eq!(quest_words(&f), vec![[1, 0x2001], [7, 1], [41, 0x8000]]);
+    assert!(quest_words(&QuestFlags::default()).is_empty());
+    let mut s = StateSnapshot {
+        frame: 1,
+        seed: [0, 0],
+        units: vec![unit(0, 1), unit(1, 1)],
+    };
+    s.set_quests(1, quest_words(&f));
+    s.set_quests(9, vec![[2, 2]]);
+    assert_eq!(
+        s.to_json_line(),
+        r#"{"k":"snap","f":1,"seed":[0,0],"units":[{"ut":0,"g":1,"q":[[1,8193],[7,1],[41,32768]]},{"ut":1,"g":1}]}"#
+    );
+    assert!(!FIELDS.contains(&"q") && HOST_FIELDS == ["q"]);
 }
 
 // Covers: specs/tools/state-snapshot.md §1 r2, §1 r4, §2

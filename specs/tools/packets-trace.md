@@ -128,7 +128,8 @@ on stdout and its exit code (§4). Nothing in either game changes.
    messages packed by §3.2 rules 1–2, which `check_packets.py` R6 checks
    per side).
 5. **Masks** (`tools/scenario.md` §6): the rows of
-   `scenario-masks.tsv` apply to `s2c` records of their id; keys and NUL
+   `scenario-masks.tsv` apply to `s2c` records of their id, the rows of
+   `scenario-masks-c2s.tsv` (`scenario.md` §6 rule 4) to `c2s` records; keys and NUL
    positions are read from the 1.14d record; key bytes and the size are
    still compared. The table is read strictly (`scenario.md` §6 rule 3).
 6. A record on one side only is a divergence (`missing in d2rs` /
@@ -176,7 +177,7 @@ None.
 
 | Input | Expected | Source |
 |---|---|---|
-| `packets_diff.py --selftest` | a synthetic 1.14d recording against its d2rs form matches; every byte of every compared message perturbed is reported at its window, stream, index and offset, except masked bytes (ignored); a size change, a dropped and an extra record, a buffer size and a keyed mask's key byte are reported; fewer ticks on one side is partial; bad mask rows are rejected | this tool |
+| `packets_diff.py --selftest` | a synthetic 1.14d recording against its d2rs form matches; every byte of every compared message perturbed is reported at its window, stream, index and offset, except masked bytes (ignored); a size change, a dropped and an extra record, a buffer size and a keyed mask's key byte are reported; fewer ticks on one side is partial; bad mask rows are rejected (C→S rows: an id with no `client-messages.tsv` row); two C→S 0x67 records equal except the bytes after the game-name NUL (through 16) and after the character-name NUL (through 36) match, a difference at the game type byte 0x11 or inside the character name is reported, and without the C→S table the stack bytes are reported | this tool |
 | `cargo nextest run -p d2-server packets` | the game is unchanged with the recorder on; record order and fields of §1–§2 on a fixed host session | this tool |
 | `check_packets.py` on both recordings of `packets-town-arrival-ama` | R1–R7 hold on each side (2026-10-09: OK, OK); d2rs `state-dump` state lines identical with and without `--packets` | this tool |
 | `scenario_diff.py --selftest` | the packets channel's dry run issues `record_packets.py --ticks`, `state-dump --packets` and `packets_diff.py` with the check's save and seed | this tool |

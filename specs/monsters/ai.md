@@ -28,21 +28,21 @@
 | Inputs | 72–83 |
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
-|   1. Think scheduling | 97–245 |
-|   2. Think dispatch `0x005B1740` | 246–382 |
-|   3. AI control and AI tables | 383–554 |
-|   4. AI parameters | 555–573 |
-|   5. Target selection | 574–732 |
-|   6. Distances and line tests | 733–747 |
-|   7. Tactics helpers | 748–972 |
-|   8. AI commands and minions | 973–997 |
-|   10. The catalogue `ai-functions.tsv` | 998–1018 |
-| Constants & data dependencies | 1019–1042 |
-| Randomness | 1043–1064 |
-| Edge cases & original bugs | 1065–1106 |
-| Test vectors | 1107–1195 |
-| Provenance | 1196–1252 |
-| Open questions | 1253–1356 |
+|   1. Think scheduling | 97–247 |
+|   2. Think dispatch `0x005B1740` | 248–384 |
+|   3. AI control and AI tables | 385–556 |
+|   4. AI parameters | 557–575 |
+|   5. Target selection | 576–734 |
+|   6. Distances and line tests | 735–749 |
+|   7. Tactics helpers | 750–984 |
+|   8. AI commands and minions | 985–1011 |
+|   10. The catalogue `ai-functions.tsv` | 1012–1032 |
+| Constants & data dependencies | 1033–1056 |
+| Randomness | 1057–1078 |
+| Edge cases & original bugs | 1079–1120 |
+| Test vectors | 1121–1209 |
+| Provenance | 1210–1266 |
+| Open questions | 1267–1370 |
 <!-- /index -->
 
 ## Summary
@@ -103,7 +103,9 @@ args 0, 0, default handler. The monster class handler `0x005A7F80`
 dispatches it to `0x005B1740` through table `0x006E2490` entry 2, but
 drops it without running when the monster has state 1 (D2MOO
 `STATE_FREEZE`) and is not dead (`0x005541B0`); `tick.md` §5.6. A dropped
-think is not rescheduled by the dispatcher. The freeze itself schedules
+think is not rescheduled by the dispatcher. A dead monster's think is **not** dropped here; it has none
+because the death clean-up cancels its type-2 events (`sim/units.md`
+§4.6 "What keeps a dead monster dead"). The freeze itself schedules
 the next think twice:
 
 1. Freeze apply `0x0057B230` (combat spec owns the length): delete the
@@ -969,6 +971,16 @@ Rules 4–7 (1.14d-read 2026-10-08, gaps MV4–MV7 of
    ```
    point == U.cell: type 13 -> 0 pts -> type 15 -> 0 pts; WL start 0 -> NU; think f + aidel; 0x67 code 7
    ```
+9. **Mode damage** (1.14d-read 2026-10-09, `0x005A7D34`–`0x005A7D39`):
+   after rule 4 (`0x005A63F0` returns at `0x005A7D34`), still inside
+   the m ≠ 3 branch, `0x005A4F50(U, m)` with m = the requested mode
+   (record +0x00, kept at [ebp − 4]) rewrites U's base `tohit`,
+   `mindamage`, `maxdamage` and element stats for m
+   (`skills/bodies-2.md` §2.1), then umod mode 0 (`0x005A4350` at
+   `0x005A7D42`) and the start function. Every non-GH request (also
+   one whose start then fails, and the creation mode) runs it; a
+   monster's melee to-hit and damage are those of its last such
+   request (`combat/damage.md` §10, checked by a 1.14d recording).
 
 ### 8. AI commands and minions
 
@@ -986,7 +998,9 @@ last). Param 0 is the command type.
 | `0x0058EEF0(type, set)` | `GetAiCommandFromParam` | no current (ring empty) → 0. Else the first command of that type in the order current's next, its next, …, current (current is tested last; a one-node ring tests only it); set ≠ 0 makes it current; 0 if none |
 | `0x0058EFA0` | `SetCurrentAiCommand(type, set)` | find by type (`0x0058EEF0`), create it with params (type, 0, 0, 0, 0) if absent (it becomes current), then return `0x0058EEF0(type, set)` |
 | `0x0058F730` | `AllocCommandsForMinions` | copy the command to every minion of this unit's minion owner (control +0x2C/+0x30), in minion-list order |
-| `0x0058F0D0` | `GetMinionOwner` | minion owner unit, or 0 |
+| `0x0058F0D0` | `GetMinionOwner` | minion owner unit, or 0: 0 when control +0x28 is 0; else the unit of type +0x30, GUID +0x2C (`0x00552F60`) |
+| `0x0058F030(game, unit, GUID, type, a, b)` | — (set owner data) | monsters only: b ≠ 0 → `0x005DD230(control, 2, 1)`; a ≠ 0 → `0x005DD230(control, 1, 1)`; then control +0x2C := GUID, +0x30 := type, +0x28 := game (this is what makes `0x0058F0D0` answer). Party leaders get their own GUID (`population.md` §10.2.1), so `0x0058F0D0(leader)` = leader (`ai-bodies.md` §9.4 rule 6) |
+| `0x0058F100(game, leader, minion)` | — (add minion) | new 8-byte node {minion GUID (+0x0C, −1 for none), next}, pushed at the **head** of control +0x34, so the list runs newest first |
 
 Command types used by Act 1 AIs: 1 = "attack now" (Fallen, FallenShaman
 minions), 10 = home position (NPCs, BloodRaven: params 1, 2 = x, y), 4
