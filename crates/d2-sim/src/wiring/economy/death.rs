@@ -17,7 +17,8 @@
 //! the game's one item store (`ActionHooks::items`, the store every
 //! other item system reads: a dropped item can be picked up, sold and
 //! cubed). Seams
-//! ([`Pending`]): superunique index, champion / unique flags, minion
+//! ([`Pending`]): superunique index, champion / unique flags (monster
+//! data type flags first, [`ActionHooks::monster_flag`]), minion
 //! owner, party, the quest TC test. Position: the path record's
 //! ([`ActionHooks::path_position`]; [`Pending::position`] without the
 //! path provider). The free-spot search `0x0064E810`: with the path
@@ -307,8 +308,8 @@ fn drop_of<X: Pending, F: FreeSpot>(
     let t = d.tables.clone();
     let rank = match h.x.superunique(unit) {
         Some(i) => MonsterRank::Superunique(t.superuniques.get(usize::from(i))),
-        None if h.x.monster_flag(unit, FLAG_CHAMPION) => MonsterRank::Champion,
-        None if h.x.monster_flag(unit, FLAG_UNIQUE) => MonsterRank::Unique,
+        None if h.monster_flag(unit, FLAG_CHAMPION) => MonsterRank::Champion,
+        None if h.monster_flag(unit, FLAG_UNIQUE) => MonsterRank::Unique,
         None => MonsterRank::Normal,
     };
     let drop_by = dropper(sim.units, sim.stats, Some(unit), 0, x, y);

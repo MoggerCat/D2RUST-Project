@@ -1134,3 +1134,30 @@ fn death_start_faces_the_killer() {
     fx.sim.hooks().death_face(m, Some(far));
     assert_ne!(dir(&mut fx).0, 32);
 }
+
+/// `treasure.md` §3.2 rule 2: a champion (monster data type flag 4,
+/// `0x005A0180`) drops from column 2. The flag is read from the monster
+/// data in the lent world (recorded: `check-combat-champion-pack` f85,
+/// the champion fallen's drop takes 10 draws on its seed and makes three
+/// items). M08: without the flag, column 1 (the empty TC) drops nothing.
+// Covers: specs/items/treasure.md §3.2 r2
+#[test]
+fn a_champion_drops_from_column_2_by_its_monster_data() {
+    let run = |champion: bool| {
+        let mut fx = Fx::new();
+        let (mut d, p, mon) = drop_setup(&mut fx);
+        let mut t = (*fx.sim.hooks().tables).clone();
+        t.combat.monstats[0].treasureclass1 = 0;
+        t.combat.monstats[0].treasureclass2 = 1;
+        fx.sim.hooks().tables = Arc::new(t);
+        let data = crate::monsters::init::MonsterData {
+            type_flags: if champion { 4 } else { 0 },
+            ..Default::default()
+        };
+        let world = super::sound::DataOnly([(mon, data)].into_iter().collect());
+        fx.sim.sys.hooks.monster_world = Some(Box::new(world));
+        run_drop(&mut fx, &mut d, mon, p).len()
+    };
+    assert_eq!(run(true), 1);
+    assert_eq!(run(false), 0);
+}
