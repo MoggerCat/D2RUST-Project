@@ -187,10 +187,10 @@ fn flow_table() {
         );
     }
 
-    // In-game exit → character select (PROVISIONAL, REC-168).
+    // In-game exit → main menu (measured, REC-200).
     let (mut f, ..) = started(true, true, Some(0x22));
     f.trigger(Trigger::GameExit);
-    assert_eq!(id(&f), CHAR_SELECT);
+    assert_eq!(id(&f), MAIN_MENU);
 }
 
 #[test]

@@ -24,7 +24,7 @@ pub enum Trigger {
     Ok,
     /// Difficulty popup button: 0 Normal, 1 Nightmare, 2 Hell.
     Difficulty(u8),
-    /// The in-game exit (`0x50` code 23 path).
+    /// The in-game exit (`0x50` code 23 path): back to the main menu.
     GameExit,
     /// Options menu: Configure Controls (`0x0047F400`, §O9 r1).
     ConfigureControls,
@@ -101,13 +101,15 @@ pub fn next(from: ScreenId, t: Trigger, ctx: FlowCtx) -> Next {
             new_character: false,
         }),
         (f, Exit) if f == DIFFICULTY => Next::Screen(CHAR_SELECT),
-        // PROVISIONAL (REC-168): 1.14d returns to character select after
-        // Save and Exit; settled by REC-200.
         // Configure Controls: Cancel / Accept return to the Options menu
         // (q-menu-controls, REC-184).
         (f, ConfigureControls) if f == OPTIONS => Next::Screen(CONTROLS),
         (f, Exit | Ok) if f == CONTROLS => Next::Screen(OPTIONS),
-        (_, GameExit) => Next::Screen(CHAR_SELECT),
+        // In-game exit: the main menu. Measured (REC-200): Save and Exit
+        // from a single-player game leaves to the main menu (launcher mode
+        // 4 at once, the Single Player button screen 0.5 s later), not to
+        // character select; `traces/frontend/rec200-save-exit.json`.
+        (_, GameExit) => Next::Screen(MAIN_MENU),
         _ => Next::Stay,
     }
 }

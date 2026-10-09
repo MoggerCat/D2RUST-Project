@@ -62,8 +62,8 @@ pub enum Entry {
     First,
     /// A later entry: the main menu.
     MainMenu,
-    /// Back from a game (Save and Exit, or its window closed): character
-    /// select (§F1.3 "in game" row, PROVISIONAL REC-200).
+    /// Back from a game (Save and Exit): the main menu (§F1.3 "in game"
+    /// row; measured, REC-200: `traces/frontend/rec200-save-exit.json`).
     AfterGame,
 }
 

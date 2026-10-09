@@ -224,7 +224,7 @@ function or in `0x004326F0` (character-create art, per class).
 | character create | OK or **Enter** (descriptor 176, 5102) | `0x004369F0` | game load (new character) |
 | difficulty popup | Normal / Nightmare / Hell | `0x00439B80` / `0x00439BA0` / `0x00439BC0` → `0x00439AF0` | game load |
 | difficulty popup | **Esc** (descriptor 173: invisible 10×10 button at (900,900), hotkey 27) | `0x00432EE0` → `0x0042F3F0` (pops list A) | character select |
-| in game | exit (0x50 code 23 path) | `0x0044B8A0` returns 4 for single player (`client/msg-ui.md` OQ8) | PROVISIONAL: character select (because 1.14d returns to it after Save and Exit); settled by REC-200 |
+| in game | exit (0x50 code 23 path) | `0x0044B8A0` returns 4 for single player (`client/msg-ui.md` OQ8) | **main menu** (measured, REC-200: Save and Exit lands on the main menu, `traces/frontend/frontend-menus/frontend-0003.json`); the window close ends the program after saving (`traces/frontend/frontend-options/frontend-0004.json`) |
 
 Rows 1–2 (the `blizno` picture and its 8 s timer): never shown in 1.14d. The start-up chain
 `0x00435230` plays the Blizzard videos and goes straight to the trademark screen, and no caller
@@ -655,9 +655,9 @@ differ); settled by REC-208.
    `length > [+0x48] − 1` (`0x004FEAE0`) → **at most 15 characters**.
 2. Character filter (`0x00430590`, set by `0x004FDAD0`): accept `A–Z`, `a–z`; accept `-` or `_` only if
    the filter's second argument ≠ 0 and the current text holds no `-` and no `_`; reject everything else
-   (digits, space, accented letters, other punctuation). PROVISIONAL: the second argument is the caret
-   position, so a separator cannot be typed as the first character (because only that reading fits the
-   later first-char rule); settled by REC-209.
+   (digits, space, accented letters, other punctuation). The second argument is the caret position:
+   measured (REC-209, `traces/frontend/frontend-menus/frontend-0001.json`), a separator is refused at
+   caret 0 even when text follows (Home, then `-` on "ab" leaves "ab") and accepted inside ("a_b").
 3. Change callback `0x00433BD0` (set by `0x004FDB00`) → `0x00430620` after every edit.
 4. OK enable (`0x00430620`): OK (176) enabled iff `2 ≤ len ≤ 15`, first char ∉ {`-`,`_`}, last char ∉
    {`-`,`_`}, and count(`-`) + count(`_`) < 2; else disabled. A disabled OK ignores clicks and Enter.
