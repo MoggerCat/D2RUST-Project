@@ -528,7 +528,13 @@ impl Predict {
             .unwrap_or(1);
         let own = Own { stamina, moves };
         if self.path_for != Some((walk, at)) {
-            if !self.path.place(t, drlg, cell.0, cell.1) {
+            // A re-target while the path moves (no snap since its last
+            // step) recomputes from the current precise position, the
+            // fraction kept (`sim/pathing.md` §1.5, edge case 8;
+            // `a1-walk-s`: re-placing at the cell centre drifted 3 px).
+            // A walk from rest or after a snap places the path anew.
+            let moving_here = self.path_for.is_some_and(|(_, a)| a == at);
+            if !moving_here && !self.path.place(t, drlg, cell.0, cell.1) {
                 self.path_for = None;
                 return false;
             }
@@ -752,6 +758,22 @@ impl<L: ServerLink> ServerLink for PredictLink<L> {
 
     fn receive(&mut self) -> Vec<Vec<u8>> {
         self.inner.receive()
+    }
+}
+
+/// Pokes pass through (`state-dump` runs its bridge on a [`PredictLink`]).
+impl<L: super::poke::PokeTarget> super::poke::PokeTarget for PredictLink<L> {
+    type Error = L::Error;
+    fn poke(&mut self, op: &d2_sim::poke::PokeOp) -> Result<d2_sim::poke::PokeResult, L::Error> {
+        self.inner.poke(op)
+    }
+}
+
+/// Snapshots pass through (`state-dump`).
+impl<L: super::state::StateSource> super::state::StateSource for PredictLink<L> {
+    type Error = L::Error;
+    fn state_snapshot(&mut self) -> Result<d2_sim::debug::state::StateSnapshot, L::Error> {
+        self.inner.state_snapshot()
     }
 }
 

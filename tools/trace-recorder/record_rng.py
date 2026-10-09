@@ -39,7 +39,7 @@ import sys
 import time
 from ctypes import wintypes as W
 
-TOOL = "trace-recorder 0.1.0"
+TOOL = "trace-recorder 0.2.0"
 RAW_FORMAT = "rng-raw-1"
 GAME_EXE_SHA256 = "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf"
 IMAGE_BASE = 0x400000
@@ -62,6 +62,19 @@ SETTERS = {
     0x650E40: "init_low",  # {EDX, 666}
     0x650E60: "set",       # {EDX, [ESP+4]}
 }
+
+# Frames and owners (--frames; specs/tools/rng-trace.md §4). Tick entry
+# 0x0052D870, ECX = game (sim/tick.md §3; record_tick.py); frame = game +0xA8
+# + 1. Game seed at game +0xD0 (sim/rng.md §5.2); unit seed at unit +0x20,
+# server-unit flag unit +0xC8 bit 0x04000000, type +0x00, GUID +0x0C, the
+# five server hash lists at game +0x1120 (128 buckets per type, next
+# unit +0xE4) (tools/state-snapshot.md §2, sim/unit-order.md §2).
+TICK = 0x52D870
+TICK_BYTES = b"\x53\x56\x57"
+G_FRAME, G_SEED, G_HASH = 0xA8, 0xD0, 0x1120
+HASH_TYPES = ((0, 0x000), (1, 0x200), (2, 0x400), (3, 0x800), (4, 0x600))
+U_TYPE, U_GUID, U_SEED, U_FLAGS2, U_HASH_NEXT = 0x00, 0x0C, 0x20, 0xC8, 0xE4
+SERVER_UNIT = 0x04000000
 
 # --- Win32 -----------------------------------------------------------------
 
@@ -180,9 +193,70 @@ def _proto(name, res, *args):
     return f
 
 
-CreateProcessW = _proto("CreateProcessW", W.BOOL, W.LPCWSTR, W.LPWSTR, C.c_void_p,
-                        C.c_void_p, W.BOOL, W.DWORD, C.c_void_p, W.LPCWSTR,
-                        C.POINTER(STARTUPINFOW), C.POINTER(PROCESS_INFORMATION))
+_CreateProcessW = _proto("CreateProcessW", W.BOOL, W.LPCWSTR, W.LPWSTR, C.c_void_p,
+                         C.c_void_p, W.BOOL, W.DWORD, C.c_void_p, W.LPCWSTR,
+                         C.POINTER(STARTUPINFOW), C.POINTER(PROCESS_INFORMATION))
+_CreateMutexW = _proto("CreateMutexW", W.HANDLE, C.c_void_p, W.BOOL, W.LPCWSTR)
+_WaitForSingleObject = _proto("WaitForSingleObject", W.DWORD, W.HANDLE, W.DWORD)
+
+# One 1.14d at a time on this machine (several sessions / worktrees record on
+# one PC; two games under the debugger break each other's runs). Every
+# recorder launches the game through CreateProcessW below, which first takes
+# the named mutex GAME_LOCK_NAME (held until this Python process exits: a
+# recorder runs its games one after the other) and then waits until no
+# Game.exe is running (a game started without the lock: by hand or by an older
+# copy of these tools). D2_GAME_LOCK=0 turns both off.
+GAME_LOCK_NAME = "Local\\d2rs-original-game-1.14d"
+GAME_LOCK_MAX_WAIT = 3600.0
+_game_lock = None
+
+
+def _game_exe_running():
+    import subprocess
+    try:
+        out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq Game.exe", "/NH"],
+                             capture_output=True, text=True, timeout=30).stdout
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return "game.exe" in out.lower()
+
+
+def acquire_game_lock():
+    """Take the one-game-at-a-time lock (idempotent within a process)."""
+    global _game_lock
+    if _game_lock is not None or os.environ.get("D2_GAME_LOCK") == "0":
+        return
+    h = _CreateMutexW(None, False, GAME_LOCK_NAME)
+    if not h:
+        raise winerr("CreateMutexW")
+    start = time.monotonic()
+    noted = False
+    while True:
+        r = _WaitForSingleObject(h, 5000)
+        if r in (0, 0x80):            # WAIT_OBJECT_0, WAIT_ABANDONED (holder died)
+            break
+        if r != 0x102:                # not WAIT_TIMEOUT
+            raise winerr("WaitForSingleObject")
+        if not noted:
+            print("note: another 1.14d run holds the game lock; waiting", file=sys.stderr)
+            noted = True
+        if time.monotonic() - start > GAME_LOCK_MAX_WAIT:
+            raise RuntimeError("game lock: waited %d s" % GAME_LOCK_MAX_WAIT)
+    _game_lock = h
+    noted = False
+    while _game_exe_running():
+        if not noted:
+            print("note: a Game.exe is already running (not ours); waiting for it to exit",
+                  file=sys.stderr)
+            noted = True
+        if time.monotonic() - start > GAME_LOCK_MAX_WAIT:
+            raise RuntimeError("game lock: a Game.exe kept running for %d s" % GAME_LOCK_MAX_WAIT)
+        time.sleep(5)
+
+
+def CreateProcessW(*args):
+    acquire_game_lock()
+    return _CreateProcessW(*args)
 WaitForDebugEvent = _proto("WaitForDebugEvent", W.BOOL, C.POINTER(DEBUG_EVENT), W.DWORD)
 ContinueDebugEvent = _proto("ContinueDebugEvent", W.BOOL, W.DWORD, W.DWORD, W.DWORD)
 ReadProcessMemory = _proto("ReadProcessMemory", W.BOOL, W.HANDLE, C.c_void_p, C.c_void_p,
@@ -269,6 +343,9 @@ def find_inline_sites(exe_bytes):
 
 class Recorder:
     auto = None  # autostart.AutoStart (unattended start, input script)
+    frames = False   # --frames: tick markers, frame and owner hints (rng-trace.md §4)
+    max_ticks = 0    # --ticks N: stop at the entry of tick N + 1
+    skip_ranges = ()  # --skip-inline: [lo, hi) code ranges whose inline sites are not hooked
 
     def __init__(self, exe, args, out, seconds, with_inline, max_events):
         self.exe, self.args, self.out_path = exe, args, out
@@ -293,6 +370,10 @@ class Recorder:
         self.dbg = {}            # debug event code -> count
         self.exc = {}            # foreign exception code -> count
         self.notes = []
+        self.game = None         # --frames: the first game that ticks
+        self.frame = 0           # its frame (0 before the first tick)
+        self.ticks = 0
+        self.done = False
 
     # memory / context
     def read(self, addr, n):
@@ -367,6 +448,12 @@ class Recorder:
         rec["ms"] = round((time.perf_counter() - self.t0) * 1000, 1)
         self.seq += 1
         self.count(":".join(x for x in (rec["type"], rec.get("via"), rec.get("op")) if x))
+        if self.frames:
+            rec["frame"] = self.frame
+            if "seed" in rec:
+                hint = self.owner_hint(int(rec["seed"], 16))
+                if hint:
+                    rec["unit" if hint != "game" else "game_seed"] = hint if hint != "game" else True
         self.out.write(json.dumps(rec, separators=(",", ":")) + "\n")
 
     # thread suspension around single steps
@@ -398,6 +485,8 @@ class Recorder:
                 self.finish_trace(tid, st, None, "interrupted")
         roles = set(self.roles.get(addr, ()))
         trace = None
+        if "tick" in roles:
+            self.on_tick(ctx)
         if "ret" in roles:
             self.on_return(tid, addr, ctx)
         if "helper" in roles:
@@ -525,6 +614,57 @@ class Recorder:
                 del self.ret_refs[addr]
                 self.drop_role(addr, "ret")
 
+    # --- frames and owners (--frames) ---------------------------------------
+    def on_tick(self, ctx):
+        """Tick entry: the frame, the game seed and every server unit's seed
+        at the start of the tick (rng-trace.md §4 r1-r3)."""
+        game = ctx.Ecx
+        if self.game is None:
+            self.game = game
+        if game != self.game:
+            return
+        self.ticks += 1
+        if self.max_ticks and self.ticks > self.max_ticks:
+            if not self.done:
+                self.notes.append(f"tick limit {self.max_ticks} reached")
+            self.done = True
+            return
+        self.frame = (self.read_u32(game + G_FRAME) + 1) & M32
+        gseed = list(struct.unpack("<II", self.read(game + G_SEED, 8)))
+        units = []
+        heads = self.read(game + G_HASH, 0xA00)
+        for t, off in HASH_TYPES:
+            for b in range(128):
+                u = struct.unpack_from("<I", heads, off + 4 * b)[0]
+                n = 0
+                while u and n < 100000:
+                    raw = self.read(u, U_HASH_NEXT + 4)
+                    ut, = struct.unpack_from("<I", raw, U_TYPE)
+                    g, = struct.unpack_from("<I", raw, U_GUID)
+                    lo, hi = struct.unpack_from("<II", raw, U_SEED)
+                    units.append([ut, g, lo, hi])
+                    u = struct.unpack_from("<I", raw, U_HASH_NEXT)[0]
+                    n += 1
+        units.sort()
+        self.emit({"type": "tick", "f": self.frame, "game": f"{game:#x}",
+                   "gseed": gseed, "units": units})
+
+    def owner_hint(self, addr):
+        """'game' for game +0xD0, 'T:G' when addr - 0x20 is a server unit,
+        else None (read now: the unit may be freed later)."""
+        if self.game is not None and addr == self.game + G_SEED:
+            return "game"
+        try:
+            raw = self.read(addr - U_SEED, U_FLAGS2 + 4)
+        except OSError:
+            return None
+        ut, = struct.unpack_from("<I", raw, U_TYPE)
+        g, = struct.unpack_from("<I", raw, U_GUID)
+        fl, = struct.unpack_from("<I", raw, U_FLAGS2)
+        if ut <= 5 and fl & SERVER_UNIT:
+            return f"{ut}:{g}"
+        return None
+
     def call_site(self, ret_addr):
         b = self.orig_code(ret_addr - 5, 5)
         return ret_addr - 5 if b[0] == 0xE8 else ret_addr
@@ -554,9 +694,15 @@ class Recorder:
             self.add_role(a, "helper")
         for a in SETTERS:
             self.add_role(a, "setter")
+        if self.frames:
+            if self.read(TICK, 3) != TICK_BYTES:
+                raise RuntimeError(f"unexpected code at {TICK:#x}: not the 1.14d Game.exe?")
+            self.add_role(TICK, "tick")
         n_inline = 0
         if self.with_inline:
             for a in self.inline_sites:
+                if any(lo <= a < hi for lo, hi in self.skip_ranges):
+                    continue
                 code = self.read(a, 5)
                 if code[0] not in MUL_FOR_MOV or code[1:] != struct.pack("<I", MULTIPLIER):
                     raise RuntimeError(f"inline site {a:#x} does not match Game.exe")
@@ -589,7 +735,9 @@ class Recorder:
         header = {"type": "header", "format": RAW_FORMAT, "tool": TOOL,
                   "date": datetime.date.today().isoformat(), "game_exe_sha256": sha,
                   "args": self.args, "pid": self.pid, "seconds": self.seconds,
-                  "inline": self.with_inline}
+                  "inline": self.with_inline, "side": "orig", "frames": self.frames,
+                  "max_ticks": self.max_ticks,
+                  "skip_inline": [[f"{a:#x}", f"{b:#x}"] for a, b in self.skip_ranges]}
         self.out.write(json.dumps(header) + "\n")
         try:
             self.loop(deadline)
@@ -642,6 +790,8 @@ class Recorder:
                 return
             if self.max_events and self.seq >= self.max_events:
                 self.notes.append(f"event limit {self.max_events} reached")
+                return
+            if self.done:
                 return
             if not WaitForDebugEvent(C.byref(ev), 100):
                 continue
@@ -702,6 +852,27 @@ class Recorder:
         return DBG_EXCEPTION_NOT_HANDLED
 
 
+# --skip-inline presets: code ranges whose inline draws step no game or unit
+# seed in the measured runs (specs/tools/rng-trace.md §4 r6).
+SKIP_PRESETS = {
+    "drlg": ((0x642000, 0x643000), (0x66B000, 0x682000)),  # rng_owners.DRLG_SITES
+}
+
+
+def parse_ranges(text):
+    out = []
+    for part in (text or "").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if part in SKIP_PRESETS:
+            out.extend(SKIP_PRESETS[part])
+            continue
+        lo, _, hi = part.partition("-")
+        out.append((int(lo, 16), int(hi, 16)))
+    return tuple(out)
+
+
 def main():
     import autostart  # unattended start, input script
     here = os.path.dirname(os.path.abspath(__file__))
@@ -714,22 +885,44 @@ def main():
     ap.add_argument("--no-inline", action="store_true",
                     help="hook only the helpers and setters, not the inlined steps")
     ap.add_argument("--out", default=None, help="output .jsonl (default traces/raw/<time>-rng.jsonl)")
+    ap.add_argument("--frames", action="store_true",
+                    help="tick markers with every server unit's seed, a frame on every record, "
+                         "owner hints, and the owner post-pass (specs/tools/rng-trace.md §4)")
+    ap.add_argument("--ticks", type=int, default=0,
+                    help="with --frames: stop at the entry of tick N + 1 (0 = no limit)")
+    ap.add_argument("--skip-inline", default="",
+                    help="LO-HI[,LO-HI...]: inline sites in these code ranges are not hooked "
+                         "(e.g. 'drlg' = %s); faster, those draws are missing" % (
+                             ",".join(f"{a:#x}-{b:#x}" for a, b in SKIP_PRESETS["drlg"])))
     ap.add_argument("game_args", nargs="*", default=["-w", "-ns"],
                     help="Game.exe arguments (default: -w -ns)")
     autostart.add_options(ap)
     a = ap.parse_args()
+    if a.ticks and not a.frames:
+        ap.error("--ticks needs --frames")
     gargs, auto = autostart.setup(a, a.game_args or ["-w", "-ns"])
     out = a.out or os.path.join(
         repo, "traces", "raw", datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + "-rng.jsonl")
     r = Recorder(os.path.abspath(a.game), gargs, out, a.seconds,
                  not a.no_inline, a.max_events)
     r.auto = auto
+    r.frames, r.max_ticks = a.frames, a.ticks
+    r.skip_ranges = parse_ranges(a.skip_inline)
+    t0 = time.perf_counter()
     try:
         counts = r.run()
     except KeyboardInterrupt:
         print("interrupted; game terminated", file=sys.stderr)
         counts = r.counts
+    secs = time.perf_counter() - t0
+    if a.frames:
+        import rng_owners
+        summary = rng_owners.assign_file(out)
+        print("owners:", "  ".join(f"{k}={v}" for k, v in sorted(summary.items())))
     print(f"wrote {out}")
+    print(f"speed: {r.seq} records in {secs:.1f} s ({r.seq / max(secs, 0.001):.0f}/s), "
+          f"debug events {sum(r.dbg.values())} ({sum(r.dbg.values()) / max(secs, 0.001):.0f}/s), "
+          f"ticks {r.ticks}")
     print(f"events: {r.seq}  " + "  ".join(f"{k}={v}" for k, v in sorted(counts.items())))
     for n in r.notes:
         print("note:", n)

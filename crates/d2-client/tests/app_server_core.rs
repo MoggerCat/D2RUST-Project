@@ -222,11 +222,11 @@ fn a_left_skill_on_a_monster_next_to_the_player_starts_the_attack() {
         })
         .unwrap();
     // In melee reach: the skill's mode starts at once (`use.md` §3), no
-    // run to the target. The synthetic game has no animdata, so the
-    // attack animation itself fails here (`Anim(NoRecord)`); with the
-    // user's files it runs (local check, docs/handoff/stitch-server-core.md).
+    // run to the target. The install has the animdata rows, so the attack
+    // animation itself runs (the synthetic game failed it with
+    // `Anim(NoRecord)`).
     assert!(log.iter().all(|l| !l.starts_with("run to")), "{log:?}");
-    assert!(errors.contains("NoRecord"), "{errors}");
+    assert!(!errors.contains("NoRecord"), "{errors}");
 }
 
 // Covers: specs/sim/intents-events.md §2.4 r3, §9 r10; specs/sim/pathing.md §10 r2

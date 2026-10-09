@@ -181,6 +181,10 @@ pub struct HudState {
     pub new_btns: NewButtons,
     /// The play bindings, for the tips' key names ([`key_names`]).
     pub bindings: Option<crate::controls::Bindings>,
+    /// The stamina bar's red, gold and blue: the act palette's nearest
+    /// indices (`control-panel.md` §4 r2, `0x004FB180`); `None` until the
+    /// host sets the palette (the bar then falls back to the fill cel).
+    pub stamina_colors: Option<[u8; 3]>,
 }
 
 impl Default for HudState {
@@ -197,6 +201,7 @@ impl Default for HudState {
             belt: Default::default(),
             new_btns: NewButtons::default(),
             bindings: None,
+            stamina_colors: None,
         }
     }
 }
@@ -244,7 +249,19 @@ fn image(files: &UiFiles, name: &str, frame: u32, x: i32, y: i32, clip: Rect) ->
         at: Point::new(x, y),
         clip,
         look: crate::ui::CelLook::PLAIN,
+        call: crate::ui::draw::CelCall::Draw,
     }))
+}
+
+/// `d` with the cel wrapper `call` (`tools/facts-render.md` §5 r18).
+fn with_call(d: Option<UiDraw>, call: crate::ui::draw::CelCall) -> Option<UiDraw> {
+    d.map(|d| match d {
+        UiDraw::Image(mut r) => {
+            r.call = call;
+            UiDraw::Image(r)
+        }
+        other => other,
+    })
 }
 
 fn globe_file(f: GlobeFile) -> &'static str {
@@ -274,7 +291,12 @@ fn globe_draw(files: &UiFiles, d: &GlobeDraw) -> Option<UiDraw> {
         } => {
             let top = y - skip - lines + 1;
             let clip = Rect::new(0, top, screen_clip().w, u16::try_from(lines).ok()?);
-            image(files, globe_file(file), frame, x, y, clip)
+            // The row window is the `Ex` cel draw (`a4-town-pandemonium-
+            // fortress` row 249: `hlthmana` `CelDrawEx`).
+            with_call(
+                image(files, globe_file(file), frame, x, y, clip),
+                crate::ui::draw::CelCall::Ex,
+            )
         }
         GlobeDraw::Cel { file, frame, x, y } => {
             image(files, globe_file(file), frame, x, y, screen_clip())
@@ -329,9 +351,17 @@ impl HudUi {
         skill: u16,
         at: (i32, i32),
     ) -> Option<UiDraw> {
+        // PROVISIONAL (REC-720): `control-panel.md` §7 r2 draws the icon with
+        // the colored cel draw and the state of `0x004A8D30` as `k`; that
+        // routine is not specified, so `image` gives the plain draw (k 0).
         let (class, cel) = *tables.icons.get(&skill)?;
         let name = skill_icon_file(if class > 6 { 7 } else { class }).to_ascii_lowercase();
-        image(files, &name, u32::from(cel), at.0, at.1, screen_clip())
+        // The skill buttons' icons are the colour (palette) cel draw
+        // (`a4-town-pandemonium-fortress` rows 69–70: `CelDrawColor`).
+        with_call(
+            image(files, &name, u32::from(cel), at.0, at.1, screen_clip()),
+            crate::ui::draw::CelCall::Color,
+        )
     }
 }
 
@@ -437,7 +467,20 @@ impl Panel for HudUi {
             StaminaColor::Gold => 1,
             StaminaColor::Blue => 2,
         };
-        out.extend_one(fill(files, frame, bar.x, bar.y, bar.w, bar.h));
+        // §4 r2: the rectangle `0x0046EFD0(x, y, w, 18, colour, mode 2)`
+        // (`a4-town-pandemonium-fortress` row 254: `DrawBox` colour 109).
+        match hud.stamina_colors {
+            Some(c) if bar.w > 0 => out.push(UiDraw::Rect(crate::ui::draw::RectRequest::sized(
+                bar.x,
+                bar.y,
+                bar.w,
+                bar.h,
+                c[frame as usize],
+                bar.mode,
+            ))),
+            Some(_) => {}
+            None => out.extend_one(fill(files, frame, bar.x, bar.y, bar.w, bar.h)),
+        }
         // §6 r2 menu button.
         let mini_open = sh.states.is_open(UI_MINI);
         let menu = menu_button(w, h, mini_open, hud.input.menu_pressed, mouse);
@@ -446,7 +489,20 @@ impl Panel for HudUi {
         let (res2, items_ui) = (sh.config.screen.res2(), &sh.items);
         hud.belt
             .draw(world, items_ui, files, (w, h), res2, mouse, living, out);
-        // §8 r1 new-stats / new-skills buttons.
+        // §7 r2 skill buttons.
+        let list = unit.and_then(|u| u.skills.as_ref());
+        for (side, entry) in [
+            (SkillSide::Left, list.and_then(|l| l.left_entry())),
+            (SkillSide::Right, list.and_then(|l| l.right_entry())),
+        ] {
+            if let Some(e) = entry {
+                let at = skill_icon_pos(side, w, h);
+                out.extend_one(HudUi::icon_draw(files, &hud.tables, e.skill, at));
+            }
+        }
+        // §8 r1 new-stats / new-skills buttons: step 8 of the UI pass, after
+        // the control panel's skill buttons (§1 r3; `a4-town-pandemonium-
+        // fortress` rows 256–269).
         let benv = BtnEnv {
             w,
             h,
@@ -459,17 +515,6 @@ impl Panel for HudUi {
         ] {
             let c = draw_800(&benv, which, points > 0, pressed, mouse);
             out.extend_one(cel(files, "panel\\level", c));
-        }
-        // §7 r2 skill buttons.
-        let list = unit.and_then(|u| u.skills.as_ref());
-        for (side, entry) in [
-            (SkillSide::Left, list.and_then(|l| l.left_entry())),
-            (SkillSide::Right, list.and_then(|l| l.right_entry())),
-        ] {
-            if let Some(e) = entry {
-                let at = skill_icon_pos(side, w, h);
-                out.extend_one(HudUi::icon_draw(files, &hud.tables, e.skill, at));
-            }
         }
         // §9 the mini panel with state 0x15 open.
         let mut mini_layout = None;

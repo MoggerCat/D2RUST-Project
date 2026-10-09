@@ -24,6 +24,12 @@
 //! drain; its result is a `poke` line between the two snapshots (the
 //! record `poke.py` writes on 1.14d) and a line on stderr.
 //!
+//! Input (`specs/tools/scenario-diff.md` §2 r4, §3 r8): `--input SCRIPT`,
+//! the shared frame-anchored form (`frame F; click X Y; hold X Y N; move X
+//! Y`), runs at the same point as the pokes, after them: each due step's
+//! pointer events go through the bridge's world-click dispatcher
+//! ([`Headless`]); its log lines go to stderr and the footer notes.
+//!
 //! Output: header, snaps (and poke lines), footer (§1). Two runs with the same arguments
 //! write the same bytes but for the header's `date`. Not game logic: the
 //! clock and the date are this binary's (CLAUDE.md rule 6 binds
@@ -42,8 +48,10 @@ use super::play_start::{self, CliStart};
 use super::poke::{self as pokes, Entry, When};
 use super::server_thread::ThreadLink;
 use super::single_player::{self, Character, GameData, Link};
+use crate::bridge::predict::PredictLink;
 use crate::bridge::state::StateSource;
 use crate::bridge::Bridge;
+use crate::world_view::input_script::{self, Headless};
 
 /// Milliseconds the clock advances per step: one server tick (25 Hz).
 pub const STEP_MS: u32 = 40;
@@ -86,6 +94,13 @@ pub struct DumpArgs {
     pub date: Option<String>,
     /// `--poke "<f> <directive> <args>..."` (repeatable): absolute frames.
     pub pokes: Vec<Entry>,
+    /// `--input SCRIPT`: the shared frame-anchored input (scenario-diff.md §2 r4).
+    pub input: Option<Vec<input_script::Step>>,
+    /// `--packets FILE`: also record the packets (`specs/tools/packets-trace.md`).
+    pub packets: Option<PathBuf>,
+    /// `--rng FILE`: also record every RNG draw ([`super::rng_dump`];
+    /// needs the `rng-trace` feature).
+    pub rng: Option<PathBuf>,
 }
 
 /// Parses the options after `state-dump`.
@@ -100,6 +115,9 @@ pub fn parse_args(args: &[String]) -> Result<DumpArgs> {
         game_dir: None,
         date: None,
         pokes: Vec::new(),
+        input: None,
+        packets: None,
+        rng: None,
     };
     let (mut ticks, mut out) = (None, None);
     let mut it = args.iter();
@@ -118,9 +136,17 @@ pub fn parse_args(args: &[String]) -> Result<DumpArgs> {
             "--every" => a.every = value()?.parse().context("--every")?,
             "--out" => out = Some(PathBuf::from(value()?)),
             "--game-dir" => a.game_dir = Some(PathBuf::from(value()?)),
+            "--packets" => a.packets = Some(PathBuf::from(value()?)),
+            "--rng" => a.rng = Some(PathBuf::from(value()?)),
             "--poke" => a
                 .pokes
                 .push(pokes::parse_poke_arg(value()?).map_err(anyhow::Error::msg)?),
+            "--input" => {
+                let steps = input_script::parse(value()?)
+                    .and_then(|s| Headless::new(s.clone()).map(|_| s))
+                    .map_err(|e| anyhow::anyhow!("--input: {e}"))?;
+                a.input = Some(steps);
+            }
             "--date" => {
                 let v = value()?.clone();
                 if !is_date(&v) {
@@ -182,6 +208,12 @@ pub struct DumpGame {
     pub start_flags: Option<u32>,
     /// The `--poke` entries, in command-line order.
     pub pokes: Vec<Entry>,
+    /// The `--input` steps.
+    pub input: Option<Vec<input_script::Step>>,
+    /// `--packets FILE` ([`super::packet_dump`]).
+    pub packets: Option<PathBuf>,
+    /// `--rng FILE` ([`super::rng_dump`]).
+    pub rng: Option<PathBuf>,
 }
 
 impl DumpGame {
@@ -215,6 +247,9 @@ impl DumpGame {
             hardcore,
             start_flags: start.start_flags,
             pokes: args.pokes.clone(),
+            input: args.input.clone(),
+            packets: args.packets.clone(),
+            rng: args.rng.clone(),
         })
     }
 }
@@ -240,9 +275,11 @@ pub struct RunInfo {
 /// What the dump knows it does not match, beyond the unit fields: the
 /// client side is the bridge alone.
 pub const RUN_GAPS: [&str; 1] = [
-    "client: headless bridge (no UI, input, prediction or visibility art); the only C->S \
-     messages are 0x67 and the model's own answers (0x6B, 0x5F), so a run where the 1.14d \
-     client sends anything else differs from the first such tick",
+    "client: headless bridge (no UI or visibility art); the only C->S messages are 0x67, \
+     the model's own answers (0x6B, 0x5F) and the --input clicks (world-click dispatcher \
+     with no hover model, the local player at the play preview's walk prediction, held \
+     repeat once per server frame, no keys), so a run \
+     where the 1.14d client sends anything else differs from the first such tick",
 ];
 
 /// Runs `game` for `ticks` server ticks and writes the `state-1` lines to
@@ -257,15 +294,27 @@ pub fn dump<W: Write>(
     let every = every.max(1);
     let ms = Arc::new(AtomicU32::new(START_MS));
     let client_data = ClientData::of(&game.data)?;
-    let (mut link, _started) = single_player::start_with(
+    let speeds = single_player::walk_speeds(&game.data, &game.character)?;
+    let mut rng = match &game.rng {
+        Some(p) => Some(super::rng_dump::RngDump::create(p, info, game.seed)?),
+        None => None,
+    };
+    let (mut link, _started) = super::rng_dump::start_with(
         game.data,
         game.seed,
         game.character.clone(),
         StepClock(ms.clone()),
+        rng.is_some(),
     )?;
     if game.hardcore {
         link.with(|l| l.host_mut().game.events.action.hooks().x.hardcore = true)?;
     }
+    let mut packets = match &game.packets {
+        Some(p) => Some(super::packet_dump::PacketDump::create(
+            &mut link, p, info, game.seed,
+        )?),
+        None => None,
+    };
     let (fields, mut gaps) = link.with(|l| state::coverage_world(&l.host().game.events))?;
     gaps.extend(RUN_GAPS.iter().map(|g| (*g).to_owned()));
     let header = state::Header {
@@ -280,6 +329,8 @@ pub fn dump<W: Write>(
     };
     writeln!(out, "{}", header.to_json_line())?;
 
+    let link = PredictLink::new(link);
+    let tap = link.tap();
     let mut bridge = Bridge::new(link)?;
     client_data.install(&mut bridge);
     let mut request = single_player::create_request_for(&game.character);
@@ -292,14 +343,38 @@ pub fn dump<W: Write>(
     // The frame the last tick ran (0: none yet) and the pokes still to run.
     let mut last_frame = 0i32;
     let mut pending = game.pokes;
+    let mut input = match game.input {
+        Some(s) => Some(
+            Headless::new(s)
+                .map_err(anyhow::Error::msg)?
+                .with_prediction(tap, speeds),
+        ),
+        None => None,
+    };
+    let mut input_notes = Vec::new();
     while ran < ticks {
         run_due_pokes(&mut bridge, &mut pending, last_frame, out)?;
+        if let Some(h) = input.as_mut() {
+            for l in h.apply(&mut bridge, last_frame)? {
+                eprintln!("input: {l}");
+                input_notes.push(format!("input: {l}"));
+            }
+        }
         if !std::mem::replace(&mut first, false) {
             ms.fetch_add(STEP_MS, Ordering::SeqCst);
         }
         bridge.set_now(ms.load(Ordering::SeqCst));
         let report = bridge.frame()?;
         bridge.take_outputs();
+        if let Some(h) = input.as_mut() {
+            h.observe(bridge.world(), report.ticked);
+        }
+        if let Some(p) = packets.as_mut() {
+            p.drain()?;
+        }
+        if let Some(r) = rng.as_mut() {
+            r.drain(&mut bridge)?;
+        }
         if !report.ticked {
             idle += 1;
             if idle > MAX_IDLE_STEPS {
@@ -319,9 +394,20 @@ pub fn dump<W: Write>(
     let mut notes = vec![format!(
         "{ran} server ticks, clock {STEP_MS} ms per step from {START_MS} ms, every {every}"
     )];
+    notes.extend(input_notes);
+    if let Some(n) = input.as_ref().map(Headless::pending).filter(|&n| n > 0) {
+        eprintln!("input: {n} step(s) not reached in {ran} ticks");
+        notes.push(format!("input: {n} step(s) not reached"));
+    }
     for e in &pending {
         eprintln!("poke: not reached in {ran} ticks: {:?} {}", e.when, e.op);
         notes.push(format!("poke not reached: {:?} {}", e.when, e.op));
+    }
+    if let Some(p) = packets {
+        p.finish(&notes)?;
+    }
+    if let Some(r) = rng {
+        r.finish(&notes)?;
     }
     writeln!(out, "{}", state::footer_line(snaps, &notes))?;
     out.flush()?;
@@ -433,8 +519,9 @@ pub fn run(args: &DumpArgs, command: &str) -> Result<DumpReport> {
     dump(game, args.ticks, args.every, &info, &mut w)
 }
 
-/// The link the dump's bridge runs on.
-pub type DumpLink = ThreadLink<Link<StepClock>>;
+/// The link the dump's bridge runs on: the server thread inside the
+/// walk-recording [`PredictLink`] (`--input`'s click position).
+pub type DumpLink = PredictLink<ThreadLink<Link<StepClock>>>;
 
 #[cfg(test)]
 mod tests {
@@ -463,10 +550,14 @@ mod tests {
             "g",
             "--date",
             "2026-10-09",
+            "--packets",
+            "p.jsonl",
             "--poke",
             "4 spawn 19 @x+3 @y+3 normal",
             "--poke",
             "4 seed-unit @1:19 0x12345678 666",
+            "--input",
+            "frame 10; click 600 300",
         ]))
         .unwrap();
         let pokes = a.pokes.clone();
@@ -485,6 +576,9 @@ mod tests {
                 game_dir: Some("g".into()),
                 date: Some("2026-10-09".into()),
                 pokes,
+                input: Some(input_script::parse("frame 10; click 600 300").unwrap()),
+                packets: Some("p.jsonl".into()),
+                rng: None,
             }
         );
         assert!(parse_args(&args(&[
@@ -502,6 +596,13 @@ mod tests {
         assert!(parse_args(&args(&["--ticks", "1", "--out", "o", "--every", "0"])).is_err());
         assert!(parse_args(&args(&["--ticks", "1", "--out", "o", "--date", "9.10.26"])).is_err());
         assert!(parse_args(&args(&["--ticks", "1", "--out", "o", "--frames", "3"])).is_err());
+        // the shared input form only (scenario-diff.md §3 r8)
+        for bad in ["click 1 2", "frame 2; wait 3", "frame 2; key r", "frame 0"] {
+            assert!(
+                parse_args(&args(&["--ticks", "1", "--out", "o", "--input", bad])).is_err(),
+                "{bad}"
+            );
+        }
     }
 
     // Covers: specs/tools/poke.md §2 r6

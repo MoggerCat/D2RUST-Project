@@ -19,15 +19,15 @@
 | Inputs | 43–56 |
 | Outputs / state changes | 57–61 |
 | Rules | 62–63 |
-|   1. Shared definitions | 64–82 |
-|   2. Functions | 83–348 |
-|   3. Item cast | 349–397 |
-| Constants & data dependencies | 398–416 |
-| Randomness | 417–433 |
-| Edge cases & original bugs | 434–448 |
-| Test vectors | 449–459 |
-| Provenance | 460–474 |
-| Open questions | 475–485 |
+|   1. Shared definitions | 64–87 |
+|   2. Functions | 88–353 |
+|   3. Item cast | 354–402 |
+| Constants & data dependencies | 403–421 |
+| Randomness | 422–438 |
+| Edge cases & original bugs | 439–453 |
+| Test vectors | 454–464 |
+| Provenance | 465–479 |
+| Open questions | 480–490 |
 <!-- /index -->
 
 ## Summary
@@ -72,6 +72,11 @@ S→C 0x99 / 0x9A queue entries, a revive. Listed per function.
 - "Heal(U, x)" `0x005C5F10` (EBX U, EAX x): x ≤ 0 → 0. life := U's
   life (6, total) + x; above max life (`0x00625D10`) → x −= excess,
   life := max. Set stat 6 := life. Returns x (the amount applied).
+  Callers: §2.4, §2.17 here, and the Blood Golem potion share
+  `0x005C6870` (`items/use.md` §3.1: a player's class-290 type-3 pet
+  takes `Param6` % of each life potion / rejuvenation amount through
+  Heal, the player gets the rest). Those three plus §2.19 (damage
+  taken, which bypasses Heal) are all of the Blood Golem life link.
 - "Elemental record" = zeroed 0x70-byte record with result flags
   (+0x04) 0x4021 (hit, no events, soft hit), one element field, hit
   class (+0x60); then `apply(game, H, O, missile 1, R')` (§5.2) and

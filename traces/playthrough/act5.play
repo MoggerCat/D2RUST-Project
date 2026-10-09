@@ -1,0 +1,131 @@
+# Act V objectives for tools/playthrough/playthrough.py (spec:
+# specs/tools/playthrough.md). Crude, as act1.play: pokes (warp, pos,
+# stat, missile) jump between milestones; each milestone is its own
+# state-dump run. A boss kill is a Fire Bolt `missile` poke at the boss
+# (moved next to the player, life set to 1): the headless right click
+# walks instead of casting (spec Open question 2). A boss outside the
+# start's active rooms is found by a sweep (`find`) first. The act ends
+# at Baal killed in the Worldstone Chamber.
+# Quests: specs/world/quests-act5.md, quests-act5-2.md (slots 35 Siege on
+# Harrogath, 36 Rescue on Mount Arreat, 37 Prison of Ice, 38 Betrayal of
+# Harrogath, 39 Rite of Passage, 40 Eve of Destruction; quests.md §1.3).
+# Ids from the 1.14d tables (levels.txt rows, monstats rows, objects.txt
+# rows): Harrogath 109, Bloody Foothills 110, Frigid Highlands 111,
+# Arreat Plateau 112, Frozen River 114, Halls of Vaught 124, Arreat
+# Summit 120, Worldstone Keep 1 = 128, Throne of Destruction 131,
+# Worldstone Chamber 132; Larzuk 511, Anya (town) 512, Malah 513,
+# Nihlathak (town) 514, Qual-Kehk 515, Deckard Cain (Act V) 520,
+# Nihlathak (Halls of Vaught) 526, Anya (frozen) 527, Ancient
+# Barbarians 540,541,542, Baal (throne) 543, Baal (Worldstone Chamber)
+# 544; Ancients' altar 546, Ancient statues 474,475,476, waypoint objects 119,145,156,157,237,238,
+# 288,323,324,398,402,429,494,496,511,539.
+playthrough 1
+act 5
+
+# Act V town (town byte act 4), Acts I-IV done (acts=4: slots 7, 15, 23, 28 bit 0).
+save sor --name PtSorE --class sor --expansion --level 70 --skill 8=20 --right-skill 44 --stat 8=128000 --stat 9=128000 --waypoints all --quests acts=4 --act 4 --difficulty normal
+
+milestone town-start
+  use sor
+  deadline 40
+  note NPCs outside the start's active rooms are left out (as act1 Akara)
+  need player lv == 109
+  need player act == 4
+  need unit ut 1 cl 511,512,513,514,515,520 count >= 2
+
+milestone town-wp
+  use sor
+  deadline 1000
+  sweep 20 2 300 30
+  need ever player lv == 109
+  need unit ut 2 cl 119,145,156,157,237,238,288,323,324,398,402,429,494,496,511,539 lv 109 seen
+
+milestone bloody-foothills
+  use sor
+  deadline 80
+  poke 5 warp 110
+  need player lv == 110
+  need unit ut 1 lv 110 count >= 3
+
+milestone frigid-highlands-wp
+  use sor
+  deadline 1000
+  poke 5 warp 111
+  sweep 20 2 400 40
+  need ever player lv == 111
+  need unit ut 2 cl 119,145,156,157,237,238,288,323,324,398,402,429,494,496,511,539 lv 111 seen
+
+milestone frozen-anya
+  use sor
+  deadline 1000
+  poke 5 warp 114
+  sweep 20 2 400 40 grid
+  need ever player lv == 114
+  need unit ut 1 cl 527 lv 114 seen
+
+milestone nihlathak-present
+  use sor
+  deadline 1000
+  poke 5 warp 124
+  sweep 20 2 400 40 grid
+  need ever player lv == 124
+  need unit ut 1 cl 526 lv 124 seen
+
+milestone nihlathak-killed
+  use sor
+  deadline 1000
+  poke 5 warp 124
+  sweep 20 2 400 40 grid
+  find ut 1 cl 526
+  poke +2 pos @1:526 @x+3 @y
+  poke +2 stat @1:526 6 0 256
+  poke +10 missile 58 @x @y @x+3 @y skill 36 1
+  need ever unit ut 1 cl 526 killed
+
+milestone arreat-summit
+  use sor
+  deadline 1000
+  poke 5 warp 120
+  sweep 20 2 400 40
+  need ever player lv == 120
+  need unit ut 2 cl 546 lv 120 seen
+
+milestone ancient-statues
+  use sor
+  deadline 1000
+  note the Ancient Barbarians (540-542) appear only once the altar is used (not poked here)
+  poke 5 warp 120
+  sweep 20 2 400 40
+  need ever player lv == 120
+  need unit ut 2 cl 474,475,476 lv 120 seen
+
+milestone worldstone-keep
+  use sor
+  deadline 80
+  poke 5 warp 128
+  need player lv == 128
+  need unit ut 1 lv 128 count >= 3
+
+milestone baal-throne
+  use sor
+  deadline 1000
+  poke 5 warp 131
+  sweep 20 2 400 40
+  need ever player lv == 131
+  need unit ut 1 cl 543 lv 131 seen
+
+milestone worldstone-chamber
+  use sor
+  deadline 80
+  poke 5 warp 132
+  need player lv == 132
+  need unit ut 1 cl 544 present
+
+milestone baal-killed
+  use sor
+  deadline 200
+  poke 5 warp 132
+  poke 30 pos @1:544 @x+3 @y
+  poke 30 stat @1:544 6 0 256
+  poke 40 missile 58 @x @y @x+3 @y skill 36 1
+  need ever unit ut 1 cl 544 killed

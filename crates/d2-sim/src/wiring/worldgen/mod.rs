@@ -76,6 +76,9 @@ pub enum WorldgenError {
     Preset(PresetError),
     Maze(MazeError),
     Outdoor(OutdoorError),
+    /// The warp tile preset found no lvlwarp record (fatal in the
+    /// original, `sim/path-placement.md` §12.1 rule 1).
+    Warp(crate::path::place_seams::PlaceError),
     /// A maze level allocated while the maze generator runs (level id).
     MazeBusy(u32),
     /// The population state was needed while population held it.

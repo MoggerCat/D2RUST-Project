@@ -81,6 +81,11 @@ length; +0x6C demon %, +0x70 undead %, +0x74 target AC; +0x78 damage %.
 6. **S ≠ 0** (owner-sourced): flags |= 1. Weapon W: owner type 0 →
    attack weapon `0x00623990(owner, 1)`; type 1 with an inventory →
    `0x00622830` (the weapon pick `0x0063C9B0`); else none.
+   `0x00622830` is the plain first-weapon pick: `0x0063C9B0(inventory)`
+   and its item, 0 when it fails; **not** the attack weapon of
+   `sim/units.md` §4.7. The two agree for every monster except the
+   classes 417, 418 (`0x006235A0` true: the slot choice by the used
+   skill's +0x168 there never runs here). 2026-10-09.
    `bonus(owner, W)` (§3) true → flags |= 2. Then:
    1. W is an item (type 4): if `Half2HSrc` (bit 14) and W is
       two-handed (`0x006289C0`): `S = S / 2` (unsigned). `b =
