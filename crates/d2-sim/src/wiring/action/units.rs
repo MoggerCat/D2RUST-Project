@@ -760,6 +760,17 @@ impl<X: Pending> View<'_, X> {
         x: i32,
         y: i32,
     ) -> Option<UnitId> {
+        let u = self.allocate_unadded(game, req)?;
+        if req.ty == UnitType::Object && self.h.objects_out {
+            return Some(u);
+        }
+        self.add_allocated(game, u, req, x, y).then_some(u)
+    }
+
+    /// [`View::allocate`] up to step 7 (the kind init included): the
+    /// unit is not added yet. Its caller runs what the allocator runs
+    /// before `SUNIT_Add` and then [`View::add_allocated`].
+    pub fn allocate_unadded(&mut self, game: &mut Game, req: &AllocRequest) -> Option<UnitId> {
         let mut seed = self.h.game_seed;
         let outer = self.h.deferred_inits.replace(Vec::new());
         let r = {
@@ -780,12 +791,7 @@ impl<X: Pending> View<'_, X> {
             self.object_init(game, u);
         }
         match r {
-            Ok(Some(u)) => {
-                if req.ty == UnitType::Object && self.h.objects_out {
-                    return Some(u);
-                }
-                self.add_allocated(game, u, req, x, y).then_some(u)
-            }
+            Ok(Some(u)) => Some(u),
             Ok(None) => None,
             Err(e) => {
                 self.unit_error(e);
@@ -819,7 +825,57 @@ impl<X: Pending> View<'_, X> {
             return false;
         }
         self.path_place(game, u, x, y);
+        if self.h.paths.is_some() {
+            self.monster_added(game, u);
+        }
         true
+    }
+
+    /// The monster branch of `SUNIT_Add` after the path
+    /// (`monsters/init.md` §4.1 step 1): `0x005735A0` (path velocity :=
+    /// monstats `Velocity` · 256, `0x00648690`; then the monster mode set
+    /// `0x005A7C20` of the creation mode, whose start function
+    /// schedules the first think, `ai.md` §1.3), then the think restart
+    /// `0x00573780` (`ai.md` §1.5 r1: the recorded "+aidel, cancel, +2"
+    /// pairs). Not a monster: nothing.
+    ///
+    /// PROVISIONAL (REC-442): the gate `0x00553160(unit)` of step 1.2
+    /// (else the room clean-up `0x00553220`) is not specified; d2rs
+    /// always restarts the think, as every recorded creation did. The
+    /// request's target point (x, y) is not passed: the creation modes'
+    /// start functions d2rs reaches (NU) do not read it.
+    fn monster_added(&mut self, game: &mut Game, u: UnitId) {
+        let Some((class, mode)) = self
+            .units
+            .get(u)
+            .filter(|r| r.ty == UnitType::Monster)
+            .map(|r| (r.class, r.mode))
+        else {
+            return;
+        };
+        let velocity = self
+            .h
+            .tables
+            .combat
+            .monstats
+            .get(class as usize)
+            .map_or(0, |m| i32::from(m.velocity))
+            << 8;
+        self.h.path_set_velocity(u, velocity);
+        let r = {
+            let mut sim = Sim {
+                game: &mut *game,
+                units: self.units,
+                stats: self.stats,
+                data: self.data,
+            };
+            crate::units::modes::monster_set_mode(&mut sim, &mut *self.h, u, mode)
+        };
+        if let Err(e) = r {
+            self.unit_error(e);
+            return;
+        }
+        self.think_restart(game, u);
     }
 
     /// The allocation room of a unit between steps 7 and 8 (`units.md`

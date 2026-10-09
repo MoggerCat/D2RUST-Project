@@ -12,6 +12,7 @@
 //! per-kind hook (`LifecycleHooks::init_kind`) is its last step, so
 //! nothing the allocator does follows it.
 
+use crate::monsters::ai::MapNode;
 use crate::monsters::init;
 use crate::monsters::population::{Alloc, CoordRect, MonsterInit, OwnerKey, PopState, PresetUnit};
 use crate::units::lifecycle::AllocRequest;
@@ -42,11 +43,16 @@ impl<X: WorldPending> MonsterInit for WorldHost<'_, X> {
             mode: u32::from(a.mode),
             allied: false,
         };
-        let unit = self.v.allocate(self.game, &req, a.x, a.y)?;
+        // `0x00555230`: the type init `0x00574250` runs inside the
+        // allocator, before `SUNIT_Add` (`init.md` §4.1), whose monster
+        // branch schedules the first think.
+        let unit = self.v.allocate_unadded(self.game, &req)?;
         self.with_state(state, |h| {
             h.init(|cx, h| init::type_init(cx, h, unit));
         });
-        Some(unit)
+        self.v
+            .add_allocated(self.game, unit, &req, a.x, a.y)
+            .then_some(unit)
     }
 
     fn set_monster_flag(&mut self, unit: UnitId, flag: u32) {
@@ -183,6 +189,36 @@ impl<X: WorldPending> MonsterInit for WorldHost<'_, X> {
                 self.v.create_object(self.game, room, c, x, y, 0);
             }
             _ => self.v.h.x.create_object(room, class, x, y),
+        }
+    }
+
+    /// `monsters/ai.md` open question 8: the preset path's points (level
+    /// sub-tiles, `drlg/preset.md` §7, §9) become the map-AI nodes
+    /// (action, x, y) of the monster's AI control. A monster without an
+    /// AI control gets none; the preset's path is cleared either way.
+    fn move_preset_path(&mut self, unit: UnitId, room: RoomId, index: usize) {
+        let Some((act, r)) = self.drlg_room(room) else {
+            return;
+        };
+        let path = self
+            .w
+            .types
+            .borrow_mut()
+            .act_presets_mut(act)
+            .and_then(|p| p.take_unit_path(r, index));
+        let (Some(path), Some(ai)) = (path, self.v.h.ai.as_mut()) else {
+            return;
+        };
+        if let Some(c) = ai.control_mut(unit) {
+            c.map_ai = Some(
+                path.iter()
+                    .map(|p| MapNode {
+                        action: p.action as i32,
+                        x: p.x,
+                        y: p.y,
+                    })
+                    .collect(),
+            );
         }
     }
 

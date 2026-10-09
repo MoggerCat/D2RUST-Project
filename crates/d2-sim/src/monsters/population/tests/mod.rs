@@ -1406,6 +1406,10 @@ fn preset_pass_and_ranges() {
     assert_eq!((f.units[0].x, f.units[0].y), (103, 204));
     assert_eq!(f.units[0].unit_flags, 0x300_0000);
     assert!(f.log.contains(&"preset 0 true".to_string()));
+    // The preset's path (list index 2) moves to the monster's map AI
+    // before the rest of the preset hooks (`ai.md` open question 8).
+    let at = |l: &str| f.log.iter().position(|x| x == l);
+    assert!(at("path 0 2").unwrap() < at("preset 0 true").unwrap());
     // Order: presets, restore, objects, population (§1.1).
     let i = |p: &str| f.log.iter().position(|l| l.starts_with(p)).unwrap();
     assert!(i("preset") < i("restore") && i("restore") < i("objects"));

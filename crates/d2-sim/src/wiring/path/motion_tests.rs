@@ -73,7 +73,32 @@ fn monster(fx: &mut Fx, x: i32, y: i32) -> UnitId {
     let a = fx.a;
     let m = fx.spawn(UnitType::Monster, 0, a, x, y);
     fx.stats(m, &[(STAT_VELOCITY, 100)]);
+    // The creation's first think (`monsters/init.md` §4.1, covered by
+    // `a_created_monster_gets_its_first_think_at_f_plus_2`) is not under
+    // test here: the tests start from a monster with no pending think.
+    fx.game.timers.cancel_unit_events(m, event::AI_THINK, None);
     m
+}
+
+// Covers: specs/monsters/ai.md §1.5
+#[test]
+fn a_created_monster_gets_its_first_think_at_f_plus_2() {
+    // `0x005735A0`: the creation mode (NU) through the monster mode set
+    // schedules the think at f + aidel (0 → 15); the think restart
+    // `0x00573780` deletes it and schedules f + 2 (the recorded
+    // "+15, cancel, +2" pair, `ai.md` §1.5 r1).
+    let mut fx = fx();
+    let a = fx.a;
+    let f = fx.game.frame;
+    let m = fx.spawn(UnitType::Monster, 0, a, 26, 10);
+    assert_eq!(mode(&fx, m), 1);
+    let thinks: Vec<_> = fx
+        .timers(m)
+        .into_iter()
+        .filter(|&(e, _)| e == event::AI_THINK)
+        .collect();
+    assert_eq!(thinks, [(event::AI_THINK, f + 2)]);
+    fx.assert_clean();
 }
 
 /// An AI mode change (`ai.md` §7.1, `0x005A7E60` + `0x005A7C20`).

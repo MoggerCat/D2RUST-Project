@@ -149,6 +149,12 @@ pub trait MonsterInit {
     fn create_object(&mut self, room: RoomId, class: i32, x: i32, y: i32);
     /// `0x0058F000`, then `0x00666120` when the preset has data.
     fn preset_created(&mut self, unit: UnitId, preset: &PresetUnit);
+    /// `0x0058F000` then `0x00666120` (`monsters/ai.md` open question 8):
+    /// the path (+0x10) of the room's preset unit `index` moves to the
+    /// created monster's AI control +0x38 (the Npc map-AI nodes,
+    /// `ai-bodies.md` §9.9), and the preset's is cleared. Default:
+    /// nothing.
+    fn move_preset_path(&mut self, _unit: UnitId, _room: RoomId, _index: usize) {}
     /// `0x005417D0`: event 7 at frame + 250 + `roll(50)` on the
     /// monster's own seed (§11.5 r4; `unit-events.tsv` `0x0054ea84`).
     fn schedule_monumod(&mut self, unit: UnitId);

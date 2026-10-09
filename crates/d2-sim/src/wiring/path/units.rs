@@ -308,12 +308,11 @@ impl<X: Pending> View<'_, X> {
     /// see [`View::path_shape`]); item in another mode: no path.
     ///
     /// The three dynamic allocations pass `set0x10` = 0 (§2.5).
-    // PROVISIONAL (path-placement.md §2.5): the monster calls after the
-    // allocation (`0x005735A0`, then `0x00573780` or `0x00553220`) are
-    // only named, and the corpse path settings of `units.md` §3.1 step 8
-    // (player mode 0 / 17, monsters with `0x0063EA40`) have no rules:
-    // not run here; settled by a bin read of `0x005735A0` / `0x00553220`
-    // (spec work).
+    // The monster calls after the allocation (`0x005735A0`, then
+    // `0x00573780`; `init.md` §4.1) run in [`View::add_allocated`]
+    // (`monster_added`). PROVISIONAL (path-placement.md §2.5): the corpse
+    // path settings of `units.md` §3.1 step 8 (player mode 0 / 17,
+    // monsters with `0x0063EA40`) have no rules: not run here.
     pub fn path_place(&mut self, game: &Game, unit: UnitId, x: i32, y: i32) {
         if self.h.paths.is_none() {
             self.h.x.place(unit, x, y);
