@@ -33,6 +33,7 @@ pub mod mirror;
 pub mod modes;
 #[cfg(test)]
 mod modes_tests;
+pub mod monster_anim;
 pub mod motion;
 pub mod msg;
 pub mod objects;

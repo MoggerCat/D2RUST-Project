@@ -22,7 +22,7 @@ use super::msg::lighting::{lighting_update, object_light_of};
 use super::objects::{self, ObjFx, ObjUnit};
 use super::output::{move_freed, Output, Outputs};
 use super::receive::{ReceiveLog, Rejected};
-use super::world::{update_order, ClientWorld, ModelInputs, OBJECT};
+use super::world::{update_order, ClientWorld, ModelInputs, MONSTER, OBJECT};
 
 /// Drains every unit's queue (§5 rules 2–4). Returns the number of
 /// messages applied. A handler error is recorded as a rejection; the
@@ -82,6 +82,11 @@ pub fn update_pass(
             }
             apply_object_lights(world, &outputs[start..]);
             move_freed(world, outputs);
+        }
+        // The monster update `0x004B13A0`'s anim step (`model.md` §19
+        // r8.5), before the drain.
+        if key.unit_type == MONSTER {
+            super::monster_anim::step(world, key);
         }
         // Looked up again: an earlier unit's messages or its own update
         // may have removed it (§5 rule 2).

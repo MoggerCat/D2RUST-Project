@@ -25,7 +25,7 @@
 
 use std::sync::Arc;
 
-use crate::bridge::world::{ClientWorld, OBJECT};
+use crate::bridge::world::{ClientWorld, MONSTER, OBJECT};
 use crate::bridge::ClientUnit;
 use d2_formats::cof::Cof;
 
@@ -58,6 +58,10 @@ impl<R> UnitRules<R> {
         // animates the unit: objects (the client object update,
         // `world/objects-client.md` §26 generic step).
         if unit.key.unit_type == OBJECT {
+            return frame_index(unit.frame as u32);
+        }
+        // Monsters: the model's own frame (`bridge::monster_anim`).
+        if unit.key.unit_type == MONSTER && unit.frame_count > 0 {
             return frame_index(unit.frame as u32);
         }
         // d2rs-own, unverified (D1): 8.8 animation rate per tick.
