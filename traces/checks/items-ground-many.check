@@ -9,7 +9,9 @@ check 1
 # 0x2000 is set at creation and cleared by the room clean-up at the end of
 # the tick (generation.md §1.4, §3 step 5); a file index never written stays
 # 0 from allocation (quality.md §1). Both are compared again; d2rs fails them
-# until q-fix-p5-item-new-flag-file-index lands.
+# until q-fix-p5-item-new-flag-file-index lands (done: file index 0 and the
+# 0x2000 clear in the update pass). Left: the identified flag 0x10 of normal
+# items (pc1-data Step 4 item 28).
 name items-ground-many
 save ScnAma --class ama --expansion
 seed 1234
