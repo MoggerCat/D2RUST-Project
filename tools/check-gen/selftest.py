@@ -44,6 +44,12 @@ def synthetic(d):
            ["Magic Arrow", 6, "ama", ""], ["Wolf", 223, "dru", ""]])
     table(os.path.join(d, "shrines.txt"), ["Shrine Type", "Shrine name", "Code"],
           [["None", "None", 0], ["Recharge", "Refill", 1], ["Recharge", "Health Boost", 2]])
+    # an Id of 7 twice (the second row is dropped), an empty Id, a NEL (0x85) in a description
+    table(os.path.join(d, "objects.txt"),
+          ["Name", "description - not loaded", "Id", "OperateFn", "PopulateFn", "InitFn"],
+          [["Casket", "Casket #5", 1, 1, 1, 0], ["Shrine", "Shrine", 2, 2, 2, 1],
+           ["a trap", "exploding cow \x85\x85Very Rare", 250, 30, 9, 0],
+           ["Dup", "second Id 2", 2, 0, 0, 0], ["Expansion", "", "", "", "", ""]])
 
 
 def wp_tsv(path):
@@ -103,6 +109,9 @@ def run():
         t.ok(by["skill"] == ["gen-skill-ama-6", "gen-skill-sor-36", "gen-skill-sor-37",
                              "gen-skill-dru-223"], by["skill"])
         t.ok(by["shrine"] == ["gen-shrine-1"], by["shrine"])
+        t.ok(by["obj"] == ["gen-obj-1", "gen-obj-2", "gen-obj-250"], by["obj"])
+        t.ok("\x85" not in next(c for c in checks if c.name == "gen-obj-250").render(),
+             "NEL kept in a header comment")
         parse_all(checks, t)
         # the lowest enabled non-boss class of an AI is the spawn
         sk = next(c for c in checks if c.name == "gen-ai-skeleton")

@@ -684,3 +684,574 @@ gen-shrine-19	shrine	shrines.txt row 19	shrine.19.storm-shrine	shrine Storm Shri
 gen-shrine-20	shrine	shrines.txt row 20	shrine.20.warping-shrine	shrine Warping Shrine (Magic)
 gen-shrine-21	shrine	shrines.txt row 21	shrine.21.exploding-shrine	shrine Exploding Shrine (Magic)
 gen-shrine-22	shrine	shrines.txt row 22	shrine.22.poison-shrine	shrine Poison Shrine (Magic)
+gen-obj-0	obj	objects.txt Id 0	-	object Dummy (0) created and operated
+gen-obj-1	obj	objects.txt Id 1	object.1-casket	object Casket (1) created and operated
+gen-obj-2	obj	objects.txt Id 2	object.2-shrine	object Shrine (2) created and operated
+gen-obj-3	obj	objects.txt Id 3	object.3-casket	object Casket (3) created and operated
+gen-obj-4	obj	objects.txt Id 4	object.4-largeurn	object LargeUrn (4) created and operated
+gen-obj-5	obj	objects.txt Id 5	object.5-chest	object chest (5) created and operated
+gen-obj-6	obj	objects.txt Id 6	object.6-chest	object chest (6) created and operated
+gen-obj-7	obj	objects.txt Id 7	object.7-barrel	object Barrel (7) created and operated
+gen-obj-8	obj	objects.txt Id 8	object.8-towertome	object TowerTome (8) created and operated
+gen-obj-9	obj	objects.txt Id 9	object.9-urn	object Urn (9) created and operated
+gen-obj-10	obj	objects.txt Id 10	-	object Dummy (10) created and operated
+gen-obj-11	obj	objects.txt Id 11	object.11-barrel	object Barrel (11) created and operated
+gen-obj-12	obj	objects.txt Id 12	-	object Dummy (12) created and operated
+gen-obj-13	obj	objects.txt Id 13	object.13-door	object Door (13) created and operated
+gen-obj-14	obj	objects.txt Id 14	object.14-door	object Door (14) created and operated
+gen-obj-15	obj	objects.txt Id 15	object.15-door	object Door (15) created and operated
+gen-obj-16	obj	objects.txt Id 16	object.16-door	object Door (16) created and operated
+gen-obj-17	obj	objects.txt Id 17	object.17-stonealpha	object StoneAlpha (17) created and operated
+gen-obj-18	obj	objects.txt Id 18	object.18-stonebeta	object StoneBeta (18) created and operated
+gen-obj-19	obj	objects.txt Id 19	object.19-stonegamma	object StoneGamma (19) created and operated
+gen-obj-20	obj	objects.txt Id 20	object.20-stonedelta	object StoneDelta (20) created and operated
+gen-obj-21	obj	objects.txt Id 21	object.21-stonelambda	object StoneLambda (21) created and operated
+gen-obj-22	obj	objects.txt Id 22	-	object StoneTheta (22) created and operated
+gen-obj-23	obj	objects.txt Id 23	object.23-door	object Door (23) created and operated
+gen-obj-24	obj	objects.txt Id 24	object.24-door	object Door (24) created and operated
+gen-obj-25	obj	objects.txt Id 25	object.25-door	object Door (25) created and operated
+gen-obj-26	obj	objects.txt Id 26	object.26-gibbet	object Gibbet (26) created and operated
+gen-obj-27	obj	objects.txt Id 27	object.27-door	object Door (27) created and operated
+gen-obj-28	obj	objects.txt Id 28	object.28-holeanim	object HoleAnim (28) created and operated
+gen-obj-29	obj	objects.txt Id 29	object.29-dummy	object Dummy (29) created and operated
+gen-obj-30	obj	objects.txt Id 30	object.30-inifuss	object Inifuss (30) created and operated
+gen-obj-31	obj	objects.txt Id 31	-	object Dummy (31) created and operated
+gen-obj-32	obj	objects.txt Id 32	-	object Dummy (32) created and operated
+gen-obj-33	obj	objects.txt Id 33	-	object Dummy (33) created and operated
+gen-obj-34	obj	objects.txt Id 34	-	object Dummy (34) created and operated
+gen-obj-35	obj	objects.txt Id 35	-	object Dummy (35) created and operated
+gen-obj-36	obj	objects.txt Id 36	-	object Dummy (36) created and operated
+gen-obj-37	obj	objects.txt Id 37	object.37-dummy	object Dummy (37) created and operated
+gen-obj-38	obj	objects.txt Id 38	object.38-dummy	object Dummy (38) created and operated
+gen-obj-39	obj	objects.txt Id 39	-	object fire (39) created and operated
+gen-obj-40	obj	objects.txt Id 40	-	object Dummy (40) created and operated
+gen-obj-41	obj	objects.txt Id 41	-	object Dummy (41) created and operated
+gen-obj-42	obj	objects.txt Id 42	-	object Dummy (42) created and operated
+gen-obj-43	obj	objects.txt Id 43	-	object Dummy (43) created and operated
+gen-obj-44	obj	objects.txt Id 44	-	object Dummy (44) created and operated
+gen-obj-45	obj	objects.txt Id 45	-	object AmbientSound (45) created and operated
+gen-obj-46	obj	objects.txt Id 46	object.46-crate	object Crate (46) created and operated
+gen-obj-47	obj	objects.txt Id 47	object.47-door	object Door (47) created and operated
+gen-obj-48	obj	objects.txt Id 48	-	object Dummy (48) created and operated
+gen-obj-49	obj	objects.txt Id 49	-	object Dummy (49) created and operated
+gen-obj-50	obj	objects.txt Id 50	object.50-casket	object Casket (50) created and operated
+gen-obj-51	obj	objects.txt Id 51	object.51-casket	object Casket (51) created and operated
+gen-obj-52	obj	objects.txt Id 52	object.52-urn	object Urn (52) created and operated
+gen-obj-53	obj	objects.txt Id 53	object.53-casket	object Casket (53) created and operated
+gen-obj-54	obj	objects.txt Id 54	object.54-roguecorpse	object RogueCorpse (54) created and operated
+gen-obj-55	obj	objects.txt Id 55	object.55-roguecorpse	object RogueCorpse (55) created and operated
+gen-obj-56	obj	objects.txt Id 56	object.56-roguecorpse	object RogueCorpse (56) created and operated
+gen-obj-57	obj	objects.txt Id 57	object.57-corpseonstick	object CorpseOnStick (57) created and operated
+gen-obj-58	obj	objects.txt Id 58	object.58-corpseonstick	object CorpseOnStick (58) created and operated
+gen-obj-59	obj	objects.txt Id 59	object.59-portal	object Portal (59) created and operated
+gen-obj-60	obj	objects.txt Id 60	object.60-portal	object Portal (60) created and operated
+gen-obj-61	obj	objects.txt Id 61	-	object Dummy (61) created and operated
+gen-obj-62	obj	objects.txt Id 62	object.62-door	object Door (62) created and operated
+gen-obj-63	obj	objects.txt Id 63	object.63-door	object Door (63) created and operated
+gen-obj-64	obj	objects.txt Id 64	object.64-door	object Door (64) created and operated
+gen-obj-65	obj	objects.txt Id 65	-	object Dummy (65) created and operated
+gen-obj-66	obj	objects.txt Id 66	-	object Dummy (66) created and operated
+gen-obj-67	obj	objects.txt Id 67	-	object Dummy (67) created and operated
+gen-obj-68	obj	objects.txt Id 68	-	object Dummy (68) created and operated
+gen-obj-69	obj	objects.txt Id 69	-	object Dummy (69) created and operated
+gen-obj-70	obj	objects.txt Id 70	-	object Dummy (70) created and operated
+gen-obj-71	obj	objects.txt Id 71	-	object Dummy (71) created and operated
+gen-obj-72	obj	objects.txt Id 72	-	object Dummy (72) created and operated
+gen-obj-73	obj	objects.txt Id 73	-	object Dummy (73) created and operated
+gen-obj-74	obj	objects.txt Id 74	object.74-trappdoor	object TrappDoor (74) created and operated
+gen-obj-75	obj	objects.txt Id 75	object.75-door	object Door (75) created and operated
+gen-obj-76	obj	objects.txt Id 76	-	object Dummy (76) created and operated
+gen-obj-77	obj	objects.txt Id 77	object.77-shrine	object Shrine (77) created and operated
+gen-obj-78	obj	objects.txt Id 78	-	object Dummy (78) created and operated
+gen-obj-79	obj	objects.txt Id 79	object.79-casket	object Casket (79) created and operated
+gen-obj-80	obj	objects.txt Id 80	object.80-obelisk	object Obelisk (80) created and operated
+gen-obj-81	obj	objects.txt Id 81	object.81-shrine	object Shrine (81) created and operated
+gen-obj-82	obj	objects.txt Id 82	-	object Dummy (82) created and operated
+gen-obj-83	obj	objects.txt Id 83	object.83-shrine	object Shrine (83) created and operated
+gen-obj-84	obj	objects.txt Id 84	object.84-shrine	object Shrine (84) created and operated
+gen-obj-85	obj	objects.txt Id 85	object.85-shrine	object Shrine (85) created and operated
+gen-obj-86	obj	objects.txt Id 86	object.86-dummy	object Dummy (86) created and operated
+gen-obj-87	obj	objects.txt Id 87	object.87-chest3	object Chest3 (87) created and operated
+gen-obj-88	obj	objects.txt Id 88	object.88-chest3	object Chest3 (88) created and operated
+gen-obj-89	obj	objects.txt Id 89	object.89-sarcophagus	object Sarcophagus (89) created and operated
+gen-obj-90	obj	objects.txt Id 90	object.90-obelisk	object Obelisk (90) created and operated
+gen-obj-91	obj	objects.txt Id 91	object.91-door	object Door (91) created and operated
+gen-obj-92	obj	objects.txt Id 92	object.92-door	object Door (92) created and operated
+gen-obj-93	obj	objects.txt Id 93	object.93-shrine	object Shrine (93) created and operated
+gen-obj-94	obj	objects.txt Id 94	object.94-largeurn	object LargeUrn (94) created and operated
+gen-obj-95	obj	objects.txt Id 95	object.95-largeurn	object LargeUrn (95) created and operated
+gen-obj-96	obj	objects.txt Id 96	object.96-shrine	object Shrine (96) created and operated
+gen-obj-97	obj	objects.txt Id 97	object.97-shrine	object Shrine (97) created and operated
+gen-obj-98	obj	objects.txt Id 98	object.98-door	object Door (98) created and operated
+gen-obj-99	obj	objects.txt Id 99	object.99-door	object Door (99) created and operated
+gen-obj-100	obj	objects.txt Id 100	object.100-duriel-s-lair	object Duriel's Lair (100) created and operated
+gen-obj-101	obj	objects.txt Id 101	object.101-dummy	object Dummy (101) created and operated
+gen-obj-102	obj	objects.txt Id 102	object.102-dummy	object Dummy (102) created and operated
+gen-obj-103	obj	objects.txt Id 103	-	object Dummy (103) created and operated
+gen-obj-104	obj	objects.txt Id 104	object.104-armorstand	object ArmorStand (104) created and operated
+gen-obj-105	obj	objects.txt Id 105	object.105-armorstand	object ArmorStand (105) created and operated
+gen-obj-106	obj	objects.txt Id 106	object.106-weaponrack	object WeaponRack (106) created and operated
+gen-obj-107	obj	objects.txt Id 107	object.107-weaponrack	object WeaponRack (107) created and operated
+gen-obj-108	obj	objects.txt Id 108	object.108-malus	object Malus (108) created and operated
+gen-obj-109	obj	objects.txt Id 109	object.109-shrine	object Shrine (109) created and operated
+gen-obj-110	obj	objects.txt Id 110	-	object not used (110) created and operated
+gen-obj-111	obj	objects.txt Id 111	object.111-well	object well (111) created and operated
+gen-obj-112	obj	objects.txt Id 112	-	object not used (112) created and operated
+gen-obj-113	obj	objects.txt Id 113	object.113-well	object well (113) created and operated
+gen-obj-114	obj	objects.txt Id 114	-	object not used (114) created and operated
+gen-obj-115	obj	objects.txt Id 115	object.115-well	object well (115) created and operated
+gen-obj-116	obj	objects.txt Id 116	object.116-shrine	object Shrine (116) created and operated
+gen-obj-117	obj	objects.txt Id 117	object.117-dummy	object Dummy (117) created and operated
+gen-obj-118	obj	objects.txt Id 118	object.118-well	object Well (118) created and operated
+gen-obj-119	obj	objects.txt Id 119	object.119-waypoint	object Waypoint (119) created and operated
+gen-obj-120	obj	objects.txt Id 120	object.120-dummy	object Dummy (120) created and operated
+gen-obj-121	obj	objects.txt Id 121	-	object jerhyn (121) created and operated
+gen-obj-122	obj	objects.txt Id 122	-	object jerhyn (122) created and operated
+gen-obj-123	obj	objects.txt Id 123	object.123-shrine	object Shrine (123) created and operated
+gen-obj-124	obj	objects.txt Id 124	object.124-shrine	object Shrine (124) created and operated
+gen-obj-125	obj	objects.txt Id 125	object.125-hidden-stash	object hidden stash (125) created and operated
+gen-obj-126	obj	objects.txt Id 126	object.126-skull-pile	object skull pile (126) created and operated
+gen-obj-127	obj	objects.txt Id 127	object.127-hidden-stash	object hidden stash (127) created and operated
+gen-obj-128	obj	objects.txt Id 128	object.128-hidden-stash	object hidden stash (128) created and operated
+gen-obj-129	obj	objects.txt Id 129	object.129-door	object Door (129) created and operated
+gen-obj-130	obj	objects.txt Id 130	object.130-well	object Well (130) created and operated
+gen-obj-131	obj	objects.txt Id 131	-	object Dummy (131) created and operated
+gen-obj-132	obj	objects.txt Id 132	object.132-well	object Well (132) created and operated
+gen-obj-133	obj	objects.txt Id 133	object.133-shrine	object shrine (133) created and operated
+gen-obj-134	obj	objects.txt Id 134	object.134-shrine	object shrine (134) created and operated
+gen-obj-135	obj	objects.txt Id 135	object.135-shrine	object shrine (135) created and operated
+gen-obj-136	obj	objects.txt Id 136	object.136-shrine	object shrine (136) created and operated
+gen-obj-137	obj	objects.txt Id 137	object.137-well	object Well (137) created and operated
+gen-obj-138	obj	objects.txt Id 138	object.138-well	object Well (138) created and operated
+gen-obj-139	obj	objects.txt Id 139	object.139-chest	object chest (139) created and operated
+gen-obj-140	obj	objects.txt Id 140	object.140-chest	object chest (140) created and operated
+gen-obj-141	obj	objects.txt Id 141	object.141-chest	object chest (141) created and operated
+gen-obj-142	obj	objects.txt Id 142	object.142-jug	object jug (142) created and operated
+gen-obj-143	obj	objects.txt Id 143	object.143-jug	object jug (143) created and operated
+gen-obj-144	obj	objects.txt Id 144	object.144-chest	object chest (144) created and operated
+gen-obj-145	obj	objects.txt Id 145	object.145-waypoint	object Waypoint (145) created and operated
+gen-obj-146	obj	objects.txt Id 146	object.146-chest	object chest (146) created and operated
+gen-obj-147	obj	objects.txt Id 147	object.147-chest	object chest (147) created and operated
+gen-obj-148	obj	objects.txt Id 148	object.148-chest	object chest (148) created and operated
+gen-obj-149	obj	objects.txt Id 149	object.149-taintedsunaltar	object taintedsunaltar (149) created and operated
+gen-obj-150	obj	objects.txt Id 150	object.150-shrine	object shrine (150) created and operated
+gen-obj-151	obj	objects.txt Id 151	object.151-shrine	object shrine (151) created and operated
+gen-obj-152	obj	objects.txt Id 152	object.152-orifice	object orifice (152) created and operated
+gen-obj-153	obj	objects.txt Id 153	-	object Door (153) created and operated
+gen-obj-154	obj	objects.txt Id 154	object.154-corpse	object corpse (154) created and operated
+gen-obj-155	obj	objects.txt Id 155	object.155-hidden-stash	object hidden stash (155) created and operated
+gen-obj-156	obj	objects.txt Id 156	object.156-waypoint	object Waypoint (156) created and operated
+gen-obj-157	obj	objects.txt Id 157	object.157-waypoint	object Waypoint (157) created and operated
+gen-obj-158	obj	objects.txt Id 158	object.158-skeleton	object skeleton (158) created and operated
+gen-obj-159	obj	objects.txt Id 159	object.159-hidden-stash	object hidden stash (159) created and operated
+gen-obj-160	obj	objects.txt Id 160	object.160-fire	object fire (160) created and operated
+gen-obj-161	obj	objects.txt Id 161	object.161-fire	object fire (161) created and operated
+gen-obj-162	obj	objects.txt Id 162	object.162-fire	object fire (162) created and operated
+gen-obj-163	obj	objects.txt Id 163	object.163-hiding-spot	object hiding spot (163) created and operated
+gen-obj-164	obj	objects.txt Id 164	object.164-shrine	object Shrine (164) created and operated
+gen-obj-165	obj	objects.txt Id 165	object.165-shrine	object Shrine (165) created and operated
+gen-obj-166	obj	objects.txt Id 166	object.166-shrine	object Shrine (166) created and operated
+gen-obj-167	obj	objects.txt Id 167	object.167-shrine	object Shrine (167) created and operated
+gen-obj-168	obj	objects.txt Id 168	object.168-shrine	object Shrine (168) created and operated
+gen-obj-169	obj	objects.txt Id 169	object.169-hollow-log	object hollow log (169) created and operated
+gen-obj-170	obj	objects.txt Id 170	object.170-shrine	object Shrine (170) created and operated
+gen-obj-171	obj	objects.txt Id 171	object.171-skeleton	object skeleton (171) created and operated
+gen-obj-172	obj	objects.txt Id 172	object.172-shrine	object Shrine (172) created and operated
+gen-obj-173	obj	objects.txt Id 173	object.173-shrine	object Shrine (173) created and operated
+gen-obj-174	obj	objects.txt Id 174	object.174-loose-rock	object loose rock (174) created and operated
+gen-obj-175	obj	objects.txt Id 175	object.175-loose-boulder	object loose boulder (175) created and operated
+gen-obj-176	obj	objects.txt Id 176	object.176-chest	object chest (176) created and operated
+gen-obj-177	obj	objects.txt Id 177	object.177-chest	object chest (177) created and operated
+gen-obj-178	obj	objects.txt Id 178	object.178-guardcorpse	object GuardCorpse (178) created and operated
+gen-obj-179	obj	objects.txt Id 179	object.179-bookshelf	object bookshelf (179) created and operated
+gen-obj-180	obj	objects.txt Id 180	object.180-bookshelf	object bookshelf (180) created and operated
+gen-obj-181	obj	objects.txt Id 181	object.181-chest	object chest (181) created and operated
+gen-obj-182	obj	objects.txt Id 182	object.182-coffin	object coffin (182) created and operated
+gen-obj-183	obj	objects.txt Id 183	object.183-chest	object chest (183) created and operated
+gen-obj-184	obj	objects.txt Id 184	object.184-shrine	object Shrine (184) created and operated
+gen-obj-185	obj	objects.txt Id 185	object.185-stash	object stash (185) created and operated
+gen-obj-186	obj	objects.txt Id 186	object.186-stash	object stash (186) created and operated
+gen-obj-187	obj	objects.txt Id 187	object.187-stash	object stash (187) created and operated
+gen-obj-188	obj	objects.txt Id 188	object.188-stash	object stash (188) created and operated
+gen-obj-189	obj	objects.txt Id 189	-	object Dummy (189) created and operated
+gen-obj-190	obj	objects.txt Id 190	object.190-shrine	object Shrine (190) created and operated
+gen-obj-191	obj	objects.txt Id 191	object.191-shrine	object Shrine (191) created and operated
+gen-obj-192	obj	objects.txt Id 192	object.192-teleport-pad	object teleport pad (192) created and operated
+gen-obj-193	obj	objects.txt Id 193	object.193-lamtome	object LamTome (193) created and operated
+gen-obj-194	obj	objects.txt Id 194	object.194-stair	object stair (194) created and operated
+gen-obj-195	obj	objects.txt Id 195	object.195-stair	object stair (195) created and operated
+gen-obj-196	obj	objects.txt Id 196	object.196-a-trap	object a trap (196) created and operated
+gen-obj-197	obj	objects.txt Id 197	object.197-shrine	object Shrine (197) created and operated
+gen-obj-198	obj	objects.txt Id 198	object.198-chest	object chest (198) created and operated
+gen-obj-199	obj	objects.txt Id 199	object.199-shrine	object Shrine (199) created and operated
+gen-obj-200	obj	objects.txt Id 200	object.200-shrine	object Shrine (200) created and operated
+gen-obj-201	obj	objects.txt Id 201	object.201-shrine	object Shrine (201) created and operated
+gen-obj-202	obj	objects.txt Id 202	object.202-shrine	object Shrine (202) created and operated
+gen-obj-203	obj	objects.txt Id 203	object.203-stash	object stash (203) created and operated
+gen-obj-204	obj	objects.txt Id 204	object.204-stash	object stash (204) created and operated
+gen-obj-205	obj	objects.txt Id 205	object.205-stash	object stash (205) created and operated
+gen-obj-206	obj	objects.txt Id 206	object.206-shrine	object Shrine (206) created and operated
+gen-obj-207	obj	objects.txt Id 207	object.207-dummy	object dummy (207) created and operated
+gen-obj-208	obj	objects.txt Id 208	object.208-basket	object Basket (208) created and operated
+gen-obj-209	obj	objects.txt Id 209	object.209-basket	object Basket (209) created and operated
+gen-obj-210	obj	objects.txt Id 210	object.210-dummy	object Dummy (210) created and operated
+gen-obj-211	obj	objects.txt Id 211	object.211-dummy	object Dummy (211) created and operated
+gen-obj-212	obj	objects.txt Id 212	object.212-dummy	object Dummy (212) created and operated
+gen-obj-213	obj	objects.txt Id 213	object.213-dummy	object Dummy (213) created and operated
+gen-obj-214	obj	objects.txt Id 214	object.214-dummy	object Dummy (214) created and operated
+gen-obj-215	obj	objects.txt Id 215	object.215-dummy	object Dummy (215) created and operated
+gen-obj-216	obj	objects.txt Id 216	object.216-dummy	object Dummy (216) created and operated
+gen-obj-217	obj	objects.txt Id 217	object.217-dummy	object Dummy (217) created and operated
+gen-obj-218	obj	objects.txt Id 218	-	object Dummy (218) created and operated
+gen-obj-219	obj	objects.txt Id 219	-	object Dummy (219) created and operated
+gen-obj-220	obj	objects.txt Id 220	-	object Dummy (220) created and operated
+gen-obj-221	obj	objects.txt Id 221	-	object Dummy (221) created and operated
+gen-obj-222	obj	objects.txt Id 222	object.222-pillar	object pillar (222) created and operated
+gen-obj-223	obj	objects.txt Id 223	object.223-cocoon	object cocoon (223) created and operated
+gen-obj-224	obj	objects.txt Id 224	object.224-cocoon	object cocoon (224) created and operated
+gen-obj-225	obj	objects.txt Id 225	object.225-skullpile	object skullpile (225) created and operated
+gen-obj-226	obj	objects.txt Id 226	object.226-shrine	object Shrine (226) created and operated
+gen-obj-227	obj	objects.txt Id 227	-	object dummy (227) created and operated
+gen-obj-228	obj	objects.txt Id 228	-	object dummy (228) created and operated
+gen-obj-229	obj	objects.txt Id 229	object.229-door	object door (229) created and operated
+gen-obj-230	obj	objects.txt Id 230	object.230-door	object door (230) created and operated
+gen-obj-231	obj	objects.txt Id 231	object.231-shrine	object Shrine (231) created and operated
+gen-obj-232	obj	objects.txt Id 232	object.232-shrine	object Shrine (232) created and operated
+gen-obj-233	obj	objects.txt Id 233	object.233-pillar	object pillar (233) created and operated
+gen-obj-234	obj	objects.txt Id 234	-	object dummy (234) created and operated
+gen-obj-235	obj	objects.txt Id 235	-	object dummy (235) created and operated
+gen-obj-236	obj	objects.txt Id 236	object.236-shrine	object Shrine (236) created and operated
+gen-obj-237	obj	objects.txt Id 237	object.237-waypoint	object Waypoint (237) created and operated
+gen-obj-238	obj	objects.txt Id 238	object.238-waypoint	object Waypoint (238) created and operated
+gen-obj-239	obj	objects.txt Id 239	object.239-body	object body (239) created and operated
+gen-obj-240	obj	objects.txt Id 240	object.240-chest	object chest (240) created and operated
+gen-obj-241	obj	objects.txt Id 241	object.241-chest	object chest (241) created and operated
+gen-obj-242	obj	objects.txt Id 242	object.242-chest	object chest (242) created and operated
+gen-obj-243	obj	objects.txt Id 243	object.243-chest	object chest (243) created and operated
+gen-obj-244	obj	objects.txt Id 244	object.244-ratnest	object ratnest (244) created and operated
+gen-obj-245	obj	objects.txt Id 245	-	object body (245) created and operated
+gen-obj-246	obj	objects.txt Id 246	object.246-ratnest	object ratnest (246) created and operated
+gen-obj-247	obj	objects.txt Id 247	object.247-bed	object bed (247) created and operated
+gen-obj-248	obj	objects.txt Id 248	object.248-bed	object bed (248) created and operated
+gen-obj-249	obj	objects.txt Id 249	object.249-manashrine	object manashrine (249) created and operated
+gen-obj-250	obj	objects.txt Id 250	object.250-a-trap	object a trap (250) created and operated
+gen-obj-251	obj	objects.txt Id 251	-	object gidbinn altar (251) created and operated
+gen-obj-252	obj	objects.txt Id 252	object.252-gidbinn	object gidbinn (252) created and operated
+gen-obj-253	obj	objects.txt Id 253	-	object Dummy (253) created and operated
+gen-obj-254	obj	objects.txt Id 254	-	object Dummy (254) created and operated
+gen-obj-255	obj	objects.txt Id 255	-	object Dummy (255) created and operated
+gen-obj-256	obj	objects.txt Id 256	object.256-dummy	object Dummy (256) created and operated
+gen-obj-257	obj	objects.txt Id 257	object.257-dummy	object Dummy (257) created and operated
+gen-obj-258	obj	objects.txt Id 258	object.258-dummy	object Dummy (258) created and operated
+gen-obj-259	obj	objects.txt Id 259	object.259-dummy	object Dummy (259) created and operated
+gen-obj-260	obj	objects.txt Id 260	object.260-shrine	object Shrine (260) created and operated
+gen-obj-261	obj	objects.txt Id 261	object.261-a-trap	object a trap (261) created and operated
+gen-obj-262	obj	objects.txt Id 262	object.262-shrine	object Shrine (262) created and operated
+gen-obj-263	obj	objects.txt Id 263	object.263-shrine	object Shrine (263) created and operated
+gen-obj-264	obj	objects.txt Id 264	object.264-shrine	object Shrine (264) created and operated
+gen-obj-265	obj	objects.txt Id 265	object.265-shrine	object Shrine (265) created and operated
+gen-obj-266	obj	objects.txt Id 266	object.266-goo-pile	object goo pile (266) created and operated
+gen-obj-267	obj	objects.txt Id 267	object.267-bank	object bank (267) created and operated
+gen-obj-268	obj	objects.txt Id 268	object.268-wirt-s-body	object wirt's body (268) created and operated
+gen-obj-269	obj	objects.txt Id 269	object.269-dummy	object dummy (269) created and operated
+gen-obj-270	obj	objects.txt Id 270	object.270-corpse	object corpse (270) created and operated
+gen-obj-271	obj	objects.txt Id 271	object.271-corpse	object corpse (271) created and operated
+gen-obj-272	obj	objects.txt Id 272	object.272-corpse	object corpse (272) created and operated
+gen-obj-273	obj	objects.txt Id 273	object.273-dummy	object Dummy (273) created and operated
+gen-obj-274	obj	objects.txt Id 274	object.274-hidden-stash	object hidden stash (274) created and operated
+gen-obj-275	obj	objects.txt Id 275	object.275-shrine	object Shrine (275) created and operated
+gen-obj-276	obj	objects.txt Id 276	object.276-shrine	object Shrine (276) created and operated
+gen-obj-277	obj	objects.txt Id 277	object.277-shrine	object Shrine (277) created and operated
+gen-obj-278	obj	objects.txt Id 278	object.278-shrine	object Shrine (278) created and operated
+gen-obj-279	obj	objects.txt Id 279	object.279-shrine	object Shrine (279) created and operated
+gen-obj-280	obj	objects.txt Id 280	object.280-shrine	object Shrine (280) created and operated
+gen-obj-281	obj	objects.txt Id 281	object.281-shrine	object Shrine (281) created and operated
+gen-obj-282	obj	objects.txt Id 282	object.282-shrine	object Shrine (282) created and operated
+gen-obj-283	obj	objects.txt Id 283	object.283-dummy	object dummy (283) created and operated
+gen-obj-284	obj	objects.txt Id 284	object.284-sarcophagus	object sarcophagus (284) created and operated
+gen-obj-285	obj	objects.txt Id 285	object.285-dummy	object dummy (285) created and operated
+gen-obj-286	obj	objects.txt Id 286	object.286-dummy	object Dummy (286) created and operated
+gen-obj-287	obj	objects.txt Id 287	object.287-dummy	object Dummy (287) created and operated
+gen-obj-288	obj	objects.txt Id 288	object.288-waypoint	object Waypoint (288) created and operated
+gen-obj-289	obj	objects.txt Id 289	object.289-bed	object bed (289) created and operated
+gen-obj-290	obj	objects.txt Id 290	object.290-door	object door (290) created and operated
+gen-obj-291	obj	objects.txt Id 291	object.291-door	object door (291) created and operated
+gen-obj-292	obj	objects.txt Id 292	object.292-door	object door (292) created and operated
+gen-obj-293	obj	objects.txt Id 293	object.293-door	object door (293) created and operated
+gen-obj-294	obj	objects.txt Id 294	object.294-door	object door (294) created and operated
+gen-obj-295	obj	objects.txt Id 295	object.295-door	object door (295) created and operated
+gen-obj-296	obj	objects.txt Id 296	object.296-dummy	object Dummy (296) created and operated
+gen-obj-297	obj	objects.txt Id 297	object.297-dummy	object Dummy (297) created and operated
+gen-obj-298	obj	objects.txt Id 298	object.298-portal	object portal (298) created and operated
+gen-obj-299	obj	objects.txt Id 299	object.299-magic-shrine	object magic shrine (299) created and operated
+gen-obj-300	obj	objects.txt Id 300	object.300-magic-shrine	object magic shrine (300) created and operated
+gen-obj-301	obj	objects.txt Id 301	object.301-dummy	object Dummy (301) created and operated
+gen-obj-302	obj	objects.txt Id 302	object.302-manashrine	object manashrine (302) created and operated
+gen-obj-303	obj	objects.txt Id 303	object.303-magic-shrine	object magic shrine (303) created and operated
+gen-obj-304	obj	objects.txt Id 304	object.304-teleportation-pad	object teleportation pad (304) created and operated
+gen-obj-305	obj	objects.txt Id 305	object.305-teleportation-pad	object teleportation pad (305) created and operated
+gen-obj-306	obj	objects.txt Id 306	object.306-teleportation-pad	object teleportation pad (306) created and operated
+gen-obj-307	obj	objects.txt Id 307	-	object Dummy (307) created and operated
+gen-obj-308	obj	objects.txt Id 308	-	object Dummy (308) created and operated
+gen-obj-309	obj	objects.txt Id 309	-	object Dummy (309) created and operated
+gen-obj-310	obj	objects.txt Id 310	-	object Dummy (310) created and operated
+gen-obj-311	obj	objects.txt Id 311	-	object Dummy (311) created and operated
+gen-obj-312	obj	objects.txt Id 312	-	object Dummy (312) created and operated
+gen-obj-313	obj	objects.txt Id 313	-	object Dummy (313) created and operated
+gen-obj-314	obj	objects.txt Id 314	object.314-dead-guard	object dead guard (314) created and operated
+gen-obj-315	obj	objects.txt Id 315	object.315-dead-guard	object dead guard (315) created and operated
+gen-obj-316	obj	objects.txt Id 316	object.316-dead-guard	object dead guard (316) created and operated
+gen-obj-317	obj	objects.txt Id 317	object.317-dead-guard	object dead guard (317) created and operated
+gen-obj-318	obj	objects.txt Id 318	-	object eunuch (318) created and operated
+gen-obj-319	obj	objects.txt Id 319	object.319-dummy	object Dummy (319) created and operated
+gen-obj-320	obj	objects.txt Id 320	object.320-manashrine	object manashrine (320) created and operated
+gen-obj-321	obj	objects.txt Id 321	object.321-dummy	object Dummy (321) created and operated
+gen-obj-322	obj	objects.txt Id 322	object.322-well	object Well (322) created and operated
+gen-obj-323	obj	objects.txt Id 323	object.323-waypoint	object Waypoint (323) created and operated
+gen-obj-324	obj	objects.txt Id 324	object.324-waypoint	object Waypoint (324) created and operated
+gen-obj-325	obj	objects.txt Id 325	object.325-magic-shrine	object magic shrine (325) created and operated
+gen-obj-326	obj	objects.txt Id 326	object.326-dead-body	object dead body (326) created and operated
+gen-obj-327	obj	objects.txt Id 327	-	object dummy (327) created and operated
+gen-obj-328	obj	objects.txt Id 328	-	object dummy (328) created and operated
+gen-obj-329	obj	objects.txt Id 329	object.329-chest	object chest (329) created and operated
+gen-obj-330	obj	objects.txt Id 330	object.330-chest	object chest (330) created and operated
+gen-obj-331	obj	objects.txt Id 331	object.331-chest	object chest (331) created and operated
+gen-obj-332	obj	objects.txt Id 332	object.332-chest	object chest (332) created and operated
+gen-obj-333	obj	objects.txt Id 333	object.333-chest	object chest (333) created and operated
+gen-obj-334	obj	objects.txt Id 334	object.334-chest	object chest (334) created and operated
+gen-obj-335	obj	objects.txt Id 335	object.335-chest	object chest (335) created and operated
+gen-obj-336	obj	objects.txt Id 336	object.336-chest	object chest (336) created and operated
+gen-obj-337	obj	objects.txt Id 337	object.337-steeg-stone	object Steeg Stone (337) created and operated
+gen-obj-338	obj	objects.txt Id 338	object.338-guild-vault	object Guild Vault (338) created and operated
+gen-obj-339	obj	objects.txt Id 339	object.339-trophy-case	object Trophy Case (339) created and operated
+gen-obj-340	obj	objects.txt Id 340	object.340-message-board	object Message Board (340) created and operated
+gen-obj-341	obj	objects.txt Id 341	object.341-dummy	object Dummy (341) created and operated
+gen-obj-342	obj	objects.txt Id 342	object.342-portal	object portal (342) created and operated
+gen-obj-343	obj	objects.txt Id 343	object.343-shrine	object Shrine (343) created and operated
+gen-obj-344	obj	objects.txt Id 344	object.344-shrine	object Shrine (344) created and operated
+gen-obj-345	obj	objects.txt Id 345	-	object Dummy (345) created and operated
+gen-obj-346	obj	objects.txt Id 346	-	object Dummy (346) created and operated
+gen-obj-347	obj	objects.txt Id 347	-	object Dummy (347) created and operated
+gen-obj-348	obj	objects.txt Id 348	-	object Dummy (348) created and operated
+gen-obj-349	obj	objects.txt Id 349	-	object Dummy (349) created and operated
+gen-obj-350	obj	objects.txt Id 350	-	object Dummy (350) created and operated
+gen-obj-351	obj	objects.txt Id 351	-	object Dummy (351) created and operated
+gen-obj-352	obj	objects.txt Id 352	-	object Dummy (352) created and operated
+gen-obj-353	obj	objects.txt Id 353	-	object Dummy (353) created and operated
+gen-obj-354	obj	objects.txt Id 354	object.354-chest	object chest (354) created and operated
+gen-obj-355	obj	objects.txt Id 355	object.355-chest	object chest (355) created and operated
+gen-obj-356	obj	objects.txt Id 356	object.356-chest	object chest (356) created and operated
+gen-obj-357	obj	objects.txt Id 357	object.357-tome	object Tome (357) created and operated
+gen-obj-358	obj	objects.txt Id 358	object.358-fire	object fire (358) created and operated
+gen-obj-359	obj	objects.txt Id 359	object.359-fire	object fire (359) created and operated
+gen-obj-360	obj	objects.txt Id 360	object.360-rockpile	object RockPIle (360) created and operated
+gen-obj-361	obj	objects.txt Id 361	object.361-magic-shrine	object magic shrine (361) created and operated
+gen-obj-362	obj	objects.txt Id 362	object.362-basket	object basket (362) created and operated
+gen-obj-363	obj	objects.txt Id 363	object.363-hungskeleton	object HungSkeleton (363) created and operated
+gen-obj-364	obj	objects.txt Id 364	object.364-dummy	object Dummy (364) created and operated
+gen-obj-365	obj	objects.txt Id 365	object.365-casket	object casket (365) created and operated
+gen-obj-366	obj	objects.txt Id 366	object.366-sewer-stairs	object sewer stairs (366) created and operated
+gen-obj-367	obj	objects.txt Id 367	object.367-sewer-lever	object sewer lever (367) created and operated
+gen-obj-368	obj	objects.txt Id 368	-	object darkwanderer (368) created and operated
+gen-obj-369	obj	objects.txt Id 369	-	object dummy (369) created and operated
+gen-obj-370	obj	objects.txt Id 370	-	object Dummy (370) created and operated
+gen-obj-371	obj	objects.txt Id 371	-	object chest (371) created and operated
+gen-obj-372	obj	objects.txt Id 372	object.372-bonechest	object BoneChest (372) created and operated
+gen-obj-373	obj	objects.txt Id 373	object.373-dummy	object Dummy (373) created and operated
+gen-obj-374	obj	objects.txt Id 374	object.374-dummy	object Dummy (374) created and operated
+gen-obj-375	obj	objects.txt Id 375	-	object Dummy (375) created and operated
+gen-obj-376	obj	objects.txt Id 376	object.376-hellforge	object Hellforge (376) created and operated
+gen-obj-377	obj	objects.txt Id 377	object.377-guild-portal	object Guild Portal (377) created and operated
+gen-obj-378	obj	objects.txt Id 378	-	object Dummy (378) created and operated
+gen-obj-379	obj	objects.txt Id 379	-	object Dummy (379) created and operated
+gen-obj-380	obj	objects.txt Id 380	object.380-trappedsoul	object TrappedSoul (380) created and operated
+gen-obj-381	obj	objects.txt Id 381	object.381-trappedsoul	object TrappedSoul (381) created and operated
+gen-obj-382	obj	objects.txt Id 382	-	object Dummy (382) created and operated
+gen-obj-383	obj	objects.txt Id 383	object.383-trappedsoul	object TrappedSoul (383) created and operated
+gen-obj-384	obj	objects.txt Id 384	object.384-trappedsoul	object TrappedSoul (384) created and operated
+gen-obj-385	obj	objects.txt Id 385	object.385-dummy	object Dummy (385) created and operated
+gen-obj-386	obj	objects.txt Id 386	object.386-dummy	object Dummy (386) created and operated
+gen-obj-387	obj	objects.txt Id 387	object.387-chest	object chest (387) created and operated
+gen-obj-388	obj	objects.txt Id 388	object.388-casket	object casket (388) created and operated
+gen-obj-389	obj	objects.txt Id 389	object.389-chest	object chest (389) created and operated
+gen-obj-390	obj	objects.txt Id 390	object.390-chest	object chest (390) created and operated
+gen-obj-391	obj	objects.txt Id 391	object.391-chest	object chest (391) created and operated
+gen-obj-392	obj	objects.txt Id 392	object.392-seal	object Seal (392) created and operated
+gen-obj-393	obj	objects.txt Id 393	object.393-seal	object Seal (393) created and operated
+gen-obj-394	obj	objects.txt Id 394	object.394-seal	object Seal (394) created and operated
+gen-obj-395	obj	objects.txt Id 395	object.395-seal	object Seal (395) created and operated
+gen-obj-396	obj	objects.txt Id 396	object.396-seal	object Seal (396) created and operated
+gen-obj-397	obj	objects.txt Id 397	object.397-chest	object chest (397) created and operated
+gen-obj-398	obj	objects.txt Id 398	object.398-waypoint	object Waypoint (398) created and operated
+gen-obj-399	obj	objects.txt Id 399	-	object fissure (399) created and operated
+gen-obj-400	obj	objects.txt Id 400	object.400-dummy	object Dummy (400) created and operated
+gen-obj-401	obj	objects.txt Id 401	-	object Dummy (401) created and operated
+gen-obj-402	obj	objects.txt Id 402	object.402-waypoint	object Waypoint (402) created and operated
+gen-obj-403	obj	objects.txt Id 403	object.403-fire	object fire (403) created and operated
+gen-obj-404	obj	objects.txt Id 404	object.404-compellingorb	object compellingorb (404) created and operated
+gen-obj-405	obj	objects.txt Id 405	object.405-chest	object chest (405) created and operated
+gen-obj-406	obj	objects.txt Id 406	object.406-chest	object chest (406) created and operated
+gen-obj-407	obj	objects.txt Id 407	object.407-chest	object chest (407) created and operated
+gen-obj-408	obj	objects.txt Id 408	object.408-siege-control	object Dummy (408) created and operated
+gen-obj-409	obj	objects.txt Id 409	-	object Dummy (409) created and operated
+gen-obj-410	obj	objects.txt Id 410	-	object pyox (410) created and operated
+gen-obj-413	obj	objects.txt Id 413	object.413-chestr	object chestR (413) created and operated
+gen-obj-414	obj	objects.txt Id 414	object.414-shrine3wilderness	object Shrine3wilderness (414) created and operated
+gen-obj-415	obj	objects.txt Id 415	object.415-shrine2wilderness	object Shrine2wilderness (415) created and operated
+gen-obj-416	obj	objects.txt Id 416	object.416-hiddenstash	object hiddenstash (416) created and operated
+gen-obj-417	obj	objects.txt Id 417	-	object flag wilderness (417) created and operated
+gen-obj-418	obj	objects.txt Id 418	object.418-barrel-wilderness	object barrel wilderness (418) created and operated
+gen-obj-419	obj	objects.txt Id 419	object.419-barrel-wilderness	object barrel wilderness (419) created and operated
+gen-obj-420	obj	objects.txt Id 420	object.420-woodchestl	object woodchestL (420) created and operated
+gen-obj-421	obj	objects.txt Id 421	object.421-shrine3wilderness	object Shrine3wilderness (421) created and operated
+gen-obj-422	obj	objects.txt Id 422	object.422-manashrine	object manashrine (422) created and operated
+gen-obj-423	obj	objects.txt Id 423	object.423-healthshrine	object healthshrine (423) created and operated
+gen-obj-424	obj	objects.txt Id 424	object.424-burialchestl	object burialchestL (424) created and operated
+gen-obj-425	obj	objects.txt Id 425	object.425-burialchestr	object burialchestR (425) created and operated
+gen-obj-426	obj	objects.txt Id 426	object.426-well	object well (426) created and operated
+gen-obj-427	obj	objects.txt Id 427	object.427-shrine2wilderness	object Shrine2wilderness (427) created and operated
+gen-obj-428	obj	objects.txt Id 428	object.428-shrine2wilderness	object Shrine2wilderness (428) created and operated
+gen-obj-429	obj	objects.txt Id 429	object.429-waypoint	object Waypoint (429) created and operated
+gen-obj-430	obj	objects.txt Id 430	object.430-chestl	object ChestL (430) created and operated
+gen-obj-431	obj	objects.txt Id 431	object.431-woodchestr	object woodchestR (431) created and operated
+gen-obj-432	obj	objects.txt Id 432	object.432-chestsl	object ChestSL (432) created and operated
+gen-obj-433	obj	objects.txt Id 433	object.433-chestsr	object ChestSR (433) created and operated
+gen-obj-434	obj	objects.txt Id 434	-	object etorch1 (434) created and operated
+gen-obj-435	obj	objects.txt Id 435	-	object ecfra (435) created and operated
+gen-obj-436	obj	objects.txt Id 436	-	object ettr (436) created and operated
+gen-obj-437	obj	objects.txt Id 437	-	object etorch2 (437) created and operated
+gen-obj-438	obj	objects.txt Id 438	-	object burningbodies (438) created and operated
+gen-obj-439	obj	objects.txt Id 439	-	object burningpit (439) created and operated
+gen-obj-440	obj	objects.txt Id 440	-	object tribal flag (440) created and operated
+gen-obj-441	obj	objects.txt Id 441	-	object eflg (441) created and operated
+gen-obj-442	obj	objects.txt Id 442	-	object chan (442) created and operated
+gen-obj-443	obj	objects.txt Id 443	object.443-jar1	object jar1 (443) created and operated
+gen-obj-444	obj	objects.txt Id 444	object.444-jar2	object jar2 (444) created and operated
+gen-obj-445	obj	objects.txt Id 445	object.445-jar3	object jar3 (445) created and operated
+gen-obj-446	obj	objects.txt Id 446	-	object swingingheads (446) created and operated
+gen-obj-447	obj	objects.txt Id 447	-	object pole (447) created and operated
+gen-obj-448	obj	objects.txt Id 448	object.448-animated-skulland-rockpile	object animated skulland rockpile (448) created and operated
+gen-obj-449	obj	objects.txt Id 449	object.449-gate	object gate (449) created and operated
+gen-obj-450	obj	objects.txt Id 450	object.450-pileofskullsandrocks	object pileofskullsandrocks (450) created and operated
+gen-obj-451	obj	objects.txt Id 451	-	object hellgate (451) created and operated
+gen-obj-452	obj	objects.txt Id 452	-	object banner 1 (452) created and operated
+gen-obj-453	obj	objects.txt Id 453	-	object banner 2 (453) created and operated
+gen-obj-454	obj	objects.txt Id 454	object.454-explodingchest	object explodingchest (454) created and operated
+gen-obj-455	obj	objects.txt Id 455	object.455-chest	object chest (455) created and operated
+gen-obj-456	obj	objects.txt Id 456	-	object deathpole (456) created and operated
+gen-obj-457	obj	objects.txt Id 457	-	object Ldeathpole (457) created and operated
+gen-obj-458	obj	objects.txt Id 458	-	object Altar (458) created and operated
+gen-obj-459	obj	objects.txt Id 459	-	object dummy (459) created and operated
+gen-obj-460	obj	objects.txt Id 460	-	object dummy (460) created and operated
+gen-obj-461	obj	objects.txt Id 461	-	object dummy (461) created and operated
+gen-obj-462	obj	objects.txt Id 462	-	object dummy (462) created and operated
+gen-obj-463	obj	objects.txt Id 463	object.463-hidden-stash	object hidden stash (463) created and operated
+gen-obj-464	obj	objects.txt Id 464	object.464-healthshrine	object healthshrine (464) created and operated
+gen-obj-465	obj	objects.txt Id 465	object.465-manashrine	object manashrine (465) created and operated
+gen-obj-466	obj	objects.txt Id 466	object.466-evilurn	object evilurn (466) created and operated
+gen-obj-467	obj	objects.txt Id 467	object.467-icecavejar1	object icecavejar1 (467) created and operated
+gen-obj-468	obj	objects.txt Id 468	object.468-icecavejar2	object icecavejar2 (468) created and operated
+gen-obj-469	obj	objects.txt Id 469	object.469-icecavejar3	object icecavejar3 (469) created and operated
+gen-obj-470	obj	objects.txt Id 470	object.470-icecavejar4	object icecavejar4 (470) created and operated
+gen-obj-471	obj	objects.txt Id 471	object.471-icecavejar4	object icecavejar4 (471) created and operated
+gen-obj-472	obj	objects.txt Id 472	object.472-icecaveshrine2	object icecaveshrine2 (472) created and operated
+gen-obj-473	obj	objects.txt Id 473	-	object cagedwussie1 (473) created and operated
+gen-obj-474	obj	objects.txt Id 474	object.474-ancient-statue-3	object Ancient Statue 3 (474) created and operated
+gen-obj-475	obj	objects.txt Id 475	object.475-ancient-statue-1	object Ancient Statue 1 (475) created and operated
+gen-obj-476	obj	objects.txt Id 476	object.476-ancient-statue-2	object Ancient Statue 2 (476) created and operated
+gen-obj-477	obj	objects.txt Id 477	object.477-deadbarbarian	object deadbarbarian (477) created and operated
+gen-obj-478	obj	objects.txt Id 478	-	object clientsmoke (478) created and operated
+gen-obj-479	obj	objects.txt Id 479	object.479-icecaveshrine2	object icecaveshrine2 (479) created and operated
+gen-obj-480	obj	objects.txt Id 480	-	object icecave_torch1 (480) created and operated
+gen-obj-481	obj	objects.txt Id 481	-	object icecave_torch2 (481) created and operated
+gen-obj-482	obj	objects.txt Id 482	-	object ttor (482) created and operated
+gen-obj-483	obj	objects.txt Id 483	object.483-manashrine	object manashrine (483) created and operated
+gen-obj-484	obj	objects.txt Id 484	object.484-healthshrine	object healthshrine (484) created and operated
+gen-obj-485	obj	objects.txt Id 485	object.485-tomb1	object tomb1 (485) created and operated
+gen-obj-486	obj	objects.txt Id 486	object.486-tomb2	object tomb2 (486) created and operated
+gen-obj-487	obj	objects.txt Id 487	object.487-tomb3	object tomb3 (487) created and operated
+gen-obj-488	obj	objects.txt Id 488	object.488-magic-shrine	object magic shrine (488) created and operated
+gen-obj-489	obj	objects.txt Id 489	-	object torch1 (489) created and operated
+gen-obj-490	obj	objects.txt Id 490	-	object torch2 (490) created and operated
+gen-obj-491	obj	objects.txt Id 491	object.491-manashrine	object manashrine (491) created and operated
+gen-obj-492	obj	objects.txt Id 492	object.492-healthshrine	object healthshrine (492) created and operated
+gen-obj-493	obj	objects.txt Id 493	object.493-well	object well (493) created and operated
+gen-obj-494	obj	objects.txt Id 494	object.494-waypoint	object Waypoint (494) created and operated
+gen-obj-495	obj	objects.txt Id 495	object.495-magic-shrine	object magic shrine (495) created and operated
+gen-obj-496	obj	objects.txt Id 496	object.496-waypoint	object Waypoint (496) created and operated
+gen-obj-497	obj	objects.txt Id 497	object.497-magic-shrine	object magic shrine (497) created and operated
+gen-obj-498	obj	objects.txt Id 498	object.498-well	object well (498) created and operated
+gen-obj-499	obj	objects.txt Id 499	object.499-magic-shrine2	object magic shrine2 (499) created and operated
+gen-obj-500	obj	objects.txt Id 500	object.500-object1	object object1 (500) created and operated
+gen-obj-501	obj	objects.txt Id 501	object.501-woodchestl	object woodchestL (501) created and operated
+gen-obj-502	obj	objects.txt Id 502	object.502-woodchestr	object woodchestR (502) created and operated
+gen-obj-503	obj	objects.txt Id 503	object.503-magic-shrine	object magic shrine (503) created and operated
+gen-obj-504	obj	objects.txt Id 504	object.504-woodchest2l	object woodchest2L (504) created and operated
+gen-obj-505	obj	objects.txt Id 505	object.505-woodchest2r	object woodchest2R (505) created and operated
+gen-obj-506	obj	objects.txt Id 506	-	object swingingheads (506) created and operated
+gen-obj-507	obj	objects.txt Id 507	-	object debris (507) created and operated
+gen-obj-508	obj	objects.txt Id 508	object.508-pene	object pene (508) created and operated
+gen-obj-509	obj	objects.txt Id 509	object.509-magic-shrine	object magic shrine (509) created and operated
+gen-obj-510	obj	objects.txt Id 510	-	object mrpole (510) created and operated
+gen-obj-511	obj	objects.txt Id 511	object.511-waypoint	object Waypoint (511) created and operated
+gen-obj-512	obj	objects.txt Id 512	object.512-magic-shrine	object magic shrine (512) created and operated
+gen-obj-513	obj	objects.txt Id 513	object.513-well	object well (513) created and operated
+gen-obj-514	obj	objects.txt Id 514	-	object torch1 (514) created and operated
+gen-obj-515	obj	objects.txt Id 515	-	object torch1 (515) created and operated
+gen-obj-516	obj	objects.txt Id 516	object.516-object1	object object1 (516) created and operated
+gen-obj-517	obj	objects.txt Id 517	object.517-object2	object object2 (517) created and operated
+gen-obj-518	obj	objects.txt Id 518	object.518-mrbox	object mrbox (518) created and operated
+gen-obj-519	obj	objects.txt Id 519	object.519-well	object well (519) created and operated
+gen-obj-520	obj	objects.txt Id 520	object.520-magic-shrine	object magic shrine (520) created and operated
+gen-obj-521	obj	objects.txt Id 521	object.521-healthshrine	object healthshrine (521) created and operated
+gen-obj-522	obj	objects.txt Id 522	object.522-manashrine	object manashrine (522) created and operated
+gen-obj-523	obj	objects.txt Id 523	-	object red light (523) created and operated
+gen-obj-524	obj	objects.txt Id 524	object.524-tomb1l	object tomb1L (524) created and operated
+gen-obj-525	obj	objects.txt Id 525	object.525-tomb2l	object tomb2L (525) created and operated
+gen-obj-526	obj	objects.txt Id 526	object.526-tomb3l	object tomb3L (526) created and operated
+gen-obj-527	obj	objects.txt Id 527	-	object ubub (527) created and operated
+gen-obj-528	obj	objects.txt Id 528	-	object sbub (528) created and operated
+gen-obj-529	obj	objects.txt Id 529	object.529-tomb1	object tomb1 (529) created and operated
+gen-obj-530	obj	objects.txt Id 530	object.530-tomb1l	object tomb1L (530) created and operated
+gen-obj-531	obj	objects.txt Id 531	object.531-tomb2	object tomb2 (531) created and operated
+gen-obj-532	obj	objects.txt Id 532	object.532-tomb2l	object tomb2L (532) created and operated
+gen-obj-533	obj	objects.txt Id 533	object.533-tomb3	object tomb3 (533) created and operated
+gen-obj-534	obj	objects.txt Id 534	object.534-tomb3l	object tomb3L (534) created and operated
+gen-obj-535	obj	objects.txt Id 535	object.535-mrbox	object mrbox (535) created and operated
+gen-obj-536	obj	objects.txt Id 536	-	object torch1 (536) created and operated
+gen-obj-537	obj	objects.txt Id 537	-	object torch2 (537) created and operated
+gen-obj-538	obj	objects.txt Id 538	-	object candles (538) created and operated
+gen-obj-539	obj	objects.txt Id 539	object.539-waypoint	object Waypoint (539) created and operated
+gen-obj-540	obj	objects.txt Id 540	object.540-deadperson	object deadperson (540) created and operated
+gen-obj-541	obj	objects.txt Id 541	object.541-groundtomb	object groundtomb (541) created and operated
+gen-obj-542	obj	objects.txt Id 542	-	object Dummy (542) created and operated
+gen-obj-543	obj	objects.txt Id 543	-	object Dummy (543) created and operated
+gen-obj-544	obj	objects.txt Id 544	object.544-groundtombl	object groundtombL (544) created and operated
+gen-obj-545	obj	objects.txt Id 545	object.545-deadperson2	object deadperson2 (545) created and operated
+gen-obj-546	obj	objects.txt Id 546	object.546-ancientsaltar	object ancientsaltar (546) created and operated
+gen-obj-547	obj	objects.txt Id 547	object.547-to-the-worldstone-keep-level-1	object To The Worldstone Keep Level 1 (547) created and operated
+gen-obj-548	obj	objects.txt Id 548	object.548-eweaponrackr	object eweaponrackR (548) created and operated
+gen-obj-549	obj	objects.txt Id 549	object.549-eweaponrackl	object eweaponrackL (549) created and operated
+gen-obj-550	obj	objects.txt Id 550	object.550-earmorstandr	object earmorstandR (550) created and operated
+gen-obj-551	obj	objects.txt Id 551	object.551-earmorstandl	object earmorstandL (551) created and operated
+gen-obj-552	obj	objects.txt Id 552	-	object torch2 (552) created and operated
+gen-obj-553	obj	objects.txt Id 553	-	object funeralpire (553) created and operated
+gen-obj-554	obj	objects.txt Id 554	-	object burninglogs (554) created and operated
+gen-obj-555	obj	objects.txt Id 555	-	object stma (555) created and operated
+gen-obj-556	obj	objects.txt Id 556	object.556-deadperson2	object deadperson2 (556) created and operated
+gen-obj-557	obj	objects.txt Id 557	-	object Dummy (557) created and operated
+gen-obj-558	obj	objects.txt Id 558	object.558-fana	object fana (558) created and operated
+gen-obj-559	obj	objects.txt Id 559	-	object BBQB (559) created and operated
+gen-obj-560	obj	objects.txt Id 560	-	object btor (560) created and operated
+gen-obj-561	obj	objects.txt Id 561	object.561-dummy	object Dummy (561) created and operated
+gen-obj-562	obj	objects.txt Id 562	-	object Dummy (562) created and operated
+gen-obj-563	obj	objects.txt Id 563	object.563-the-worldstone-chamber	object The Worldstone Chamber (563) created and operated
+gen-obj-564	obj	objects.txt Id 564	object.564-glacial-caves-level-1	object Glacial Caves Level 1 (564) created and operated
+gen-obj-565	obj	objects.txt Id 565	object.565-strlastcinematic	object strlastcinematic (565) created and operated
+gen-obj-566	obj	objects.txt Id 566	object.566-harrogath	object Harrogath (566) created and operated
+gen-obj-567	obj	objects.txt Id 567	-	object Zoo (567) created and operated
+gen-obj-568	obj	objects.txt Id 568	-	object Keeper (568) created and operated
+gen-obj-569	obj	objects.txt Id 569	object.569-throne-of-destruction	object Throne of Destruction (569) created and operated
+gen-obj-570	obj	objects.txt Id 570	-	object Dummy (570) created and operated
+gen-obj-571	obj	objects.txt Id 571	-	object Dummy (571) created and operated
+gen-obj-572	obj	objects.txt Id 572	-	object Dummy (572) created and operated

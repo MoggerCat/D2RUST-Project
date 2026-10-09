@@ -15,6 +15,7 @@ Families (one check per table row, written under traces/checks/gen/):
   umod  one unique spawn per monumod row          (boss-kinds.poke)
   skill one right-click cast per class skill      (dru-* / bar-* / ass-*)
   shrine one shrine operated per reachable shrines.txt row
+  obj   one object created and operated per objects.txt row (interact-operate-*)
 
 Every generated file starts with a header naming this generator, its
 format version, the family and the table row; the files are never edited
@@ -35,7 +36,7 @@ import sys
 
 GEN_VERSION = 1
 GEN_NAME = "tools/check-gen/check_gen.py"
-FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine"]
+FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "obj"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CLASSES = ["ama", "sor", "nec", "pal", "bar", "dru", "ass"]
@@ -344,8 +345,45 @@ def fam_shrine(ctx):
     return out
 
 
+def fam_obj(ctx):
+    """One object of every objects.txt row (the Id column; the 143 rows
+    without a ledger area are generated too, area `-`): created next to the
+    player (same position: inside every operate box, world/objects.md section 7.1) in the Rogue Encampment with `poke object <Id>` at frame 10 and
+    operated at once with `poke operate @2:<Id>` at frame 20 (the server's
+    dispatcher, no range; specs/tools/poke.md, interact-operate-waypoint).
+    Channels: the state of the object and of everything its operate function
+    creates or changes, the items it drops, and the draws of the RNG."""
+    t = excel(ctx.excel, "objects.txt",
+              ["Name", "description - not loaded", "Id", "OperateFn", "PopulateFn", "InitFn"])
+    out, seen = [], set()
+    for r in t.rows:
+        oid = t.get(r, "Id")
+        if not oid.isdigit() or int(oid) in seen:
+            continue
+        oid = int(oid)
+        seen.add(oid)
+        name, desc = (re.sub(r"[^\x20-\x7e]+", " ", t.get(r, x)).strip()
+                      for x in ("Name", "description - not loaded"))
+        c = Check(
+            f"gen-obj-{oid}", "obj", f"objects.txt Id {oid}",
+            f"object {name} ({oid}) created and operated",
+            "ScnAma --class ama --expansion", 80, 300, "state items rng",
+            [f"at 10 poke object {oid} @x @y",
+             f"at 20 poke operate @2:{oid}"],
+            comment=[f"Object {oid} {name} ({desc}; OperateFn {t.get(r, 'OperateFn')}, "
+                     f"PopulateFn {t.get(r, 'PopulateFn')}, InitFn {t.get(r, 'InitFn')}): "
+                     "created at the player's position in the Rogue Encampment at frame 10 (inside every object's operate box, world/objects.md section 7.1) "
+                     "(the allocator with the per-kind init, world/objects.md section 3), "
+                     "operated at once at frame 20 (0x13 {2, GUID} through the dispatcher). "
+                     "The check compares the object's state after the operate, what it "
+                     "creates (items, missiles, monsters, shrine effects) and the RNG draws."])
+        c.extra = {"object": oid}
+        out.append(c)
+    return out
+
+
 FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss,
-             "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine}
+             "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "obj": fam_obj}
 
 
 # ----------------------------------------------------------- ledger join
@@ -387,6 +425,8 @@ def resolve_area(c, areas):
                 and f"({x['skill']})" in s]
     elif f == "shrine":
         pick = [a for a, _ in areas if a.startswith(f"shrine.{x['shrine']}.")]
+    elif f == "obj":
+        pick = [a for a, _ in areas if re.fullmatch(rf"object\.{x['object']}-.*", a)]
     if len(pick) > 1:
         raise GenError(f"{c.name}: {len(pick)} ledger areas {pick}")
     c.area = pick[0] if pick else "-"
