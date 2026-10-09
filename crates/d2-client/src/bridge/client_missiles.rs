@@ -1,4 +1,4 @@
-// Spec: specs/missiles/client.md (§C1–§C4 the client create `0x004CD540`; §C6, §C7, §C9, §C10, §C13), specs/missiles/client-bodies.md (§B1, §B2, §B3 r2, §B4 4, 25, 49, §B5 r1, r3), specs/missiles/missiles.md (§R2.1 the create record), specs/render/lighting.md (§8 missile row)
+// Spec: specs/missiles/client.md (§C1–§C4 the client create `0x004CD540`; §C6, §C7, §C9, §C10, §C13), specs/missiles/client-bodies.md (§B1, §B2, §B3 r2, §B4 4, 6, 25, 49, §B5 r1, r3), specs/missiles/missiles.md (§R2.1 the create record), specs/render/lighting.md (§8 missile row)
 //! Client missile creation: the client create `0x004CD540` fills a
 //! client-only type-3 unit in set C (`client/model.md` §2 r1) from a
 //! 0x5C-byte create record ([`CreateRecord`]) and its `missiles` row
@@ -20,7 +20,7 @@
 //! town tests (§C6 r4, §C7 r8: no town flag in the client level rows),
 //! the second pass (§C7 r13), the client hit functions (§C9 r4.3: read
 //! as returning non-zero, PROVISIONAL REC-452), and every client function but
-//! 1, 4, 5, 8, 11, 23, 25, 43, 49, 60 and 63 (the missile is then left
+//! 1, 4, 5, 6, 8, 11, 23, 25, 43, 49, 60 and 63 (the missile is then left
 //! as it is; 3 needs the missiles calc evaluator `0x0064B7C0`). The aim nudge
 //! (§C2 r8) reads the owner's direction from the record
 //! ([`CreateRecord::owner_dir64`]; none given is a handler error).
@@ -541,6 +541,7 @@ pub const FN_TRAIL: u16 = 8;
 pub const FN_SCATTER: u16 = 4;
 pub const FN_MIST: u16 = 25;
 pub const FN_SPAWN_FACING: u16 = 49;
+pub const FN_WALL_MAKER: u16 = 6;
 
 /// The per-update dispatch `0x004D2C70` (§C6) of the set-C missile `key`.
 pub fn update(
@@ -613,6 +614,7 @@ pub fn update(
             default_step(w, rows, key, &row, lights)
         }
         FN_MIST => mist(w, rows, key, &row, lights),
+        FN_WALL_MAKER => wall_maker(w, rows, key, &row, lights),
         FN_SUB_LOOP_FIRE => {
             fire_frames(w, key, &row);
             default_step(w, rows, key, &row, lights)
@@ -787,6 +789,75 @@ fn mist(
             ..CreateRecord::default()
         };
         create(w, rows, &rec, lights)?;
+    }
+    default_step(w, rows, key, row, lights)
+}
+
+/// Function 6 `0x004D3630` (`client-bodies.md` §B4, `firewallmaker`):
+/// the last path step entered no new sub-tile → step. S1 < 0 or out of
+/// range → remove. Else a create with flags 0x21 (0x8021 with frames :=
+/// S1's `Range` when that is ≠ 0), owner O, start = target = (x, y), m's
+/// skill and level, of a class picked on m's seed (S2 and S3 ≥ 0: rnd(3)
+/// 0 → S2, 1 → S3, 2 → S1; only S2: rnd(2) 0 → S2, else S1; else S1),
+/// without a light (flag 0x4000) when P1 = 0 or rnd(P1) ≠ 0; the child
+/// takes m's precise position. Step.
+fn wall_maker(
+    w: &mut ClientWorld,
+    rows: &[ClientMissileRow],
+    key: UnitKey,
+    row: &ClientMissileRow,
+    lights: bool,
+) -> Result<(), HandlerError> {
+    let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
+    if !m.new_step {
+        return default_step(w, rows, key, row, lights);
+    }
+    let [s1, s2, s3] = row.clt_sub;
+    if s1 < 0 || s1 as usize >= rows.len() {
+        remove(w, key);
+        return Ok(());
+    }
+    let (x, y) = ((m.pos.0 >> 16) as i32, (m.pos.1 >> 16) as i32);
+    let mut rec = CreateRecord {
+        flags: flag::POSITION | flag::TARGET_ABSOLUTE,
+        owner: m.owner,
+        x,
+        y,
+        tx: x,
+        ty: y,
+        skill: m.skill,
+        level: m.level,
+        ..CreateRecord::default()
+    };
+    let range = i32::from(rows[s1 as usize].range);
+    if range != 0 {
+        rec.flags |= flag::RANGE;
+        rec.range = range;
+    }
+    let c = if s2 >= 0 && s3 >= 0 {
+        match rnd(w, key, 3) {
+            0 => s2,
+            1 => s3,
+            _ => s1,
+        }
+    } else if s2 >= 0 {
+        if rnd(w, key, 2) == 0 {
+            s2
+        } else {
+            s1
+        }
+    } else {
+        s1
+    };
+    rec.class = c as u32;
+    let p1 = row.clt_param[0];
+    if p1 == 0 || rnd(w, key, p1) != 0 {
+        rec.flags |= flag::NO_LIGHT;
+    }
+    if let Some(child) = create(w, rows, &rec, lights)? {
+        if let Some(cm) = w.objclient.missiles.get_mut(&child) {
+            cm.pos = m.pos;
+        }
     }
     default_step(w, rows, key, row, lights)
 }

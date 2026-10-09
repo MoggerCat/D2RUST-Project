@@ -562,7 +562,7 @@ fn client_missile_function_counts_on_the_users_rows() {
 
 // Covers: specs/missiles/client.md §c12-client-function-table-0x0072a398
 /// Every user `missiles` row whose client function the model runs (1,
-/// 4, 5, 8, 11, 23, 25, 43, 49, 60, 63): created at a point with a
+/// 4, 5, 6, 8, 11, 23, 25, 43, 49, 60, 63): created at a point with a
 /// player owner and a target 6 sub-tiles east, then 60 client updates
 /// of every client missile; no handler error.
 #[test]
@@ -573,7 +573,7 @@ fn the_users_client_missiles_run_their_functions() {
     let d = app_support::live();
     let rows = single_player::client_unit_rows(d.archives.as_ref()).unwrap();
     let missiles = &rows.missiles;
-    let run = [1u16, 4, 5, 8, 11, 23, 25, 43, 49, 60, 63];
+    let run = [1u16, 4, 5, 6, 8, 11, 23, 25, 43, 49, 60, 63];
     let mut w = ClientWorld::default();
     let p = UnitKey::new(0, 1);
     let mut u = ClientUnit::new(p);
