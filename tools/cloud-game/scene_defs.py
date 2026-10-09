@@ -51,3 +51,13 @@ GROUPS["walk"] = {
     "scenes": {**{f"a1-walk-{n}": (f"w_{n}", 0) for n, _, _ in _DIRS},
                **{f"a1-run-{n}": (f"r_{n}", 0) for n, _, _ in _DIRS}},
 }
+
+# Cold Plains by waypoint, fixed clicks only (no unit lookup), so every input lands on the same tick:
+# walk to the Act I waypoint, open it, take Cold Plains, cast Fire Bolt into the Fallen group
+GROUPS["fight"] = {
+    "char": "SceSor", "seed": 1234,
+    "script": "waitticks 20; click 700 300; waitticks 60; click 650 300; waitticks 40; click 590 262; waitticks 50; "
+              "click 207 176; waitticks 80; mark cp; "
+              + "".join(f"click 330 190; waitticks 12; click 300 200; waitticks 13; mark f{i}; " for i in range(1, 15)) + "end",
+    "scenes": {"a1-cold-plains-monsters": ("cp", 0), "a1-cold-plains-corpse": ("f3", 0), "a1-cold-plains-drop": ("f9", 0)},
+}

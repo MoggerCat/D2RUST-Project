@@ -139,7 +139,7 @@ def vk_code(k):
 
 SCRIPT_OPS = {"wait": (1, 1), "move": (2, 2), "click": (2, 2), "rclick": (2, 2), "hold": (3, 3),
               "key": (1, 2), "text": (1, 99), "shot": (0, 1), "waitlevel": (1, 2),
-              "goto": (2, 5), "dumpdrlg": (0, 1), "waitticks": (1, 1), "mark": (1, 1), "clickunit": (2, 4),
+              "goto": (2, 5), "dumpdrlg": (0, 1), "waitticks": (1, 1), "mark": (1, 1), "clickunit": (2, 4), "rclickunit": (2, 4),
               "end": (0, 0)}
 
 
@@ -161,7 +161,7 @@ def parse_script(text):
             a = [raw.strip()[4:].strip()]
         elif op == "key":
             a = [vk_code(a[0])] + [float(x) for x in a[1:]]
-        elif op == "clickunit":
+        elif op in ("clickunit", "rclickunit"):
             a = [int(a[0], 0), a[1]] + [int(x, 0) for x in a[2:]]
         elif op == "goto":
             a = ([int(a[0], 0), tuple(int(c, 0) for c in a[1].split(","))]
@@ -192,6 +192,12 @@ def screen_of(mem, unit):
     pp, up = (client_px(mem, p) if p else None), client_px(mem, unit)
     if pp is None or up is None:
         return None
+    # the drawn camera: the frame's unit origin (record_frames UNIT_ORIGIN_X / _Y), when the
+    # process has it; else the player-centred projection of camera.md
+    ox = struct.unpack("<i", struct.pack("<I", mem.read_u32(0x7A520C)))[0]
+    oy = struct.unpack("<i", struct.pack("<I", mem.read_u32(0x7A5208)))[0]
+    if (ox, oy) != (0, 0) and abs(ox - pp[0]) < 1000 and abs(oy - pp[1]) < 1000:
+        return (up[0] - ox, up[1] - oy)
     return (up[0] - pp[0] + VIEW_W // 2, up[1] - pp[1] + VIEW_H // 2 - 8)
 
 
@@ -250,7 +256,9 @@ def drlg_dump(mem, label=""):
 def nearest(mem, utype, cls):
     best = None
     for u in units_of(mem, utype):
-        if mem.read_u32(u + U_CLASS) not in cls:
+        if cls is not None and mem.read_u32(u + U_CLASS) not in cls:
+            continue
+        if cls is None and mem.read_u32(u + 0x10) in (0, 12):   # any class: only living monsters (mode 0 death, 12 dead)
             continue
         s = screen_of(mem, u)
         if s is None:
@@ -410,16 +418,17 @@ class AutoStart:
                          f"position {player_pos(mem)}")
             elif op == "goto":
                 yield from self.goto(mem, *a)
-            elif op == "clickunit":
-                # click the nearest unit (utype, cls) where it is drawn now (no walking)
-                best = nearest(mem, a[0], tuple(int(c, 0) for c in a[1].split(",")))
+            elif op in ("clickunit", "rclickunit"):
+                # click the nearest unit (utype, cls; `*` = any class) where it is drawn now (no
+                # walking); rclickunit with the right button
+                best = nearest(mem, a[0], None if a[1] == "*" else tuple(int(c, 0) for c in a[1].split(",")))
                 if best is None:
                     self.log(f"autostart: clickunit {a[0]}:{a[1]} not found")
                 else:
                     x, y = screen_of(mem, best[1])
                     dx, dy = (a[2], a[3]) if len(a) == 4 else (0, -8)
-                    self.log(f"autostart: clickunit {a[0]}:{a[1]} clicks ({x + dx}, {y + dy})")
-                    yield from self.click(mem, x + dx, y + dy)
+                    self.log(f"autostart: {op} {a[0]}:{a[1]} clicks ({x + dx}, {y + dy})")
+                    yield from self.click(mem, x + dx, y + dy, op == "rclickunit")
             elif op == "dumpdrlg":
                 rec = drlg_dump(mem, a[0] if a else "")
                 self.dumps.append(rec)

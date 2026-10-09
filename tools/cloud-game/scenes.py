@@ -103,14 +103,32 @@ def main():
             print(f"{sc}: MISSING (mark or frame not found): {ps}")
             ok = False
             continue
-        files = [("draws.tsv", None), ("frame.tsv", None)]
-        diffs = []
-        for fn, _ in files:
-            bs = [body(f"{a.tmp}/{a.group}-run{k}/scenes/{sc}/{fn}") for k in range(len(caps))]
-            if any(b != bs[0] for b in bs[1:]):
-                d = [i for i, (x, y) in enumerate(zip(bs[0].split("\n"), bs[1].split("\n"))) if x != y]
-                diffs.append(f"{fn}: {len(d)} rows differ (first {d[:3]})")
-        print(f"{sc}: frames (seq,f) per run {ps}: " + ("STABLE" if not diffs else "; ".join(diffs)))
+        runs = [(f"{a.tmp}/{a.group}-run{k}/scenes/{sc}") for k in range(len(caps))]
+        d0 = [body(r + "/draws.tsv").rstrip("\n").split("\n") for r in runs]
+        f0 = [dict(l.split("\t") for l in body(r + "/frame.tsv").rstrip("\n").split("\n")[1:]) for r in runs]
+        # `frame.tsv` body starts at the column row; the rain is drawn with DrawLine / DrawBox rows
+        # whose positions differ between two runs of the same frame (weather is not reproducible)
+        def norm(rows):
+            # the row number `i` shifts when the weather rows differ in number: not compared
+            return [r.split("\t", 1)[1] for r in rows if r.split("\t")[1] not in ("DrawLine", "DrawBox")]
+        def row_eq(x, y):
+            # equal, or every differing cell is `?` (unmeasured) on one side: not a conflict
+            return x == y or all(p == q or "?" in (p, q) for p, q in zip(x.split("\t"), y.split("\t")))
+
+        def lists_eq(x, y):
+            return len(x) == len(y) and all(row_eq(p, q) for p, q in zip(x, y))
+        all_eq = all(x == d0[0] for x in d0[1:]) and all(x == f0[0] for x in f0[1:])
+        solid = all(lists_eq(norm(x), norm(d0[0])) for x in d0[1:])
+        keys = [k for k in f0[0] if any(f[k] != f0[0][k] for f in f0[1:])]
+        if all_eq:
+            verdict = "STABLE"
+        elif solid and set(keys) <= {"index_sha256", "draws"}:
+            nl = [len(x) - len(norm(x)) for x in d0]
+            verdict = f"STABLE except weather lines (DrawLine/DrawBox rows {nl}; frame.tsv differs in {keys})"
+        else:
+            nd = [i for i, (x, y) in enumerate(zip(norm(d0[0]), norm(d0[1]))) if not row_eq(x, y)]
+            verdict = f"DIFFERENT: {len(nd)} non-weather draw rows differ (first {nd[:3]}); frame.tsv keys {keys}"
+        print(f"{sc}: frames (seq,f) per run {ps}: {verdict}")
         if a.install:
             facts(caps[0], sc, ps[0][0], os.path.join(REPO, "facts", "render"))
 

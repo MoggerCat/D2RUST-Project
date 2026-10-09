@@ -1,4 +1,4 @@
-# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py traces/raw/20261009-023422-frames.jsonl --scene a1-panel-automap --frame 141 --tile-light unknown --out /home/user/D2RUST-Project/facts/render; game: 1.14d
+# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py /home/user/D2RUST-Project/traces/raw/20261009-050324-frames.jsonl --scene a1-panel-automap --frame 141 --tile-light unknown --out /home/user/D2RUST-Project/facts/render; game: 1.14d
 key	value
 seq	141
 tick	274
@@ -17,6 +17,6 @@ shift_x	0
 light_quality	0
 rain	1
 snow	0
-draws	1173
-index_sha256	f6999d58011a55a9c185f2e01743f2c7f04b2da33d527b91b5b58ac87ddd82f7
+draws	1172
+index_sha256	bbe9d8412a85d4ce69a80da403590ee4b492afd7402b3a1ba7273f17527be849
 palette_sha256	ba83219e51249002d7125a1a5a701d6abea94f04f44d6cfaa42becdfcff23337

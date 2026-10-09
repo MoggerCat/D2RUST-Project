@@ -15,7 +15,7 @@ tool="$repo/target/release/d2s-tool"
 common=(--expansion --map-seed 1 --time 1700000000)
 # SceSor: level 1 sorceress with Fire Bolt, 400 life, gold, a Horadric Cube, a Sash, a few
 # normal items in the inventory, the cube grid and the stash; every Act I waypoint.
-"$tool" new --name SceSor --class sor "${common[@]}" --skill 0=1 --gold 500 --waypoints all \
+"$tool" new --name SceSor --class sor "${common[@]}" --skill 0=1 --left-skill 36 --gold 500 --waypoints all \
   --stat 6=102400 --stat 7=102400 \
   --item box@0,0 --item cap@4,0 --item lgl@6,0 --item lbl@8,0 --item cap@0,0:4 --item lgl@2,0:4 \
   --item cap@0,0:3 -o "$saves/SceSor.d2s"

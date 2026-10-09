@@ -30,7 +30,7 @@ use std::collections::BTreeMap;
 use anyhow::{anyhow, bail, Context, Result};
 use d2_formats::d2s::ItemEntry;
 use d2_formats::d2s::{
-    clamp_stat, status, Body, D2s, Golem, Header, Npcs, Quests, SaveTables, StatEntry, Stats,
+    clamp_stat, status, Body, D2s, Golem, Header, Npcs, Quests, SaveTables, Slot, StatEntry, Stats,
     Waypoints, ITEM_FLAG_INSTORE,
 };
 use d2_proto::item_bits::SaveEntry;
@@ -178,6 +178,9 @@ pub struct Edits {
     pub stats: Vec<(u16, i32)>,
     pub skills: Vec<(usize, u8)>,
     pub all_skills: Option<u8>,
+    /// Left / right mouse skill ids (header slots 0 and 1, d2s.md §2.4).
+    pub left_skill: Option<i32>,
+    pub right_skill: Option<i32>,
     pub gold: Option<i32>,
     pub quests: Option<QuestSpec>,
     pub waypoints: Option<WpSpec>,
@@ -482,6 +485,16 @@ pub fn apply(save: &mut D2s, e: &Edits, t: &Tables) -> Result<()> {
             bail!("skill index {i}: the class list has {n} entries");
         }
         b.skills[i] = l;
+    }
+
+    // Mouse skills (§2.4): slot 0 left, slot 1 right.
+    if let Some(sk) = e.left_skill {
+        h.mouse[0] =
+            Slot::encode(sk, true, 0).ok_or_else(|| anyhow!("--left-skill {sk}: too large"))?;
+    }
+    if let Some(sk) = e.right_skill {
+        h.mouse[1] =
+            Slot::encode(sk, false, 0).ok_or_else(|| anyhow!("--right-skill {sk}: too large"))?;
     }
 
     // Quests (§4, `world/quests.md` §1).
