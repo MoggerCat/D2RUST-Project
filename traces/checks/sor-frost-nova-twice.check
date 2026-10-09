@@ -1,0 +1,19 @@
+check 1
+# Two casts in a row (q-fix-pt-cast-input-lock): ScnSor (expansion
+# Sorceress, level 30, every skill at 20, right skill 44 Frost Nova),
+# -seed 1234; warp to the Blood Moor (level 2; variant blood-moor-empty)
+# before frame 4, then a right click at client pixel (330, 300) before
+# frame 20's drain and the same click before frame 60's. Frost Nova
+# needs no target. Compares the player (mode per frame: the second cast
+# must start on the same frame on both sides, i.e. the client ended its
+# first cast mode and sent the second C→S 0x0C). Spec:
+# specs/tools/scenario-diff.md.
+name sor-frost-nova-twice
+save ScnSor --class sor --expansion --level 30 --all-skills 20 --right-skill 44
+seed 1234
+ticks 100
+seconds 300
+channels state
+variant blood-moor-empty
+at 4 poke warp 2
+input frame 20; rclick 330 300; frame 60; rclick 330 300

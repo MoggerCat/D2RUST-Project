@@ -1539,4 +1539,8 @@ pub struct ModelInputs {
     /// evaluates (`client/msg-skills.md` §2 r4); `None`: a passive skill
     /// is a handler error.
     pub skill_tables: Option<std::sync::Arc<super::passive::Tables>>,
+    /// The players' animation lookup of the client player update
+    /// ([`super::player_anim`]); `None`: a player mode has no frames and
+    /// an attack, cast or hit mode ends on the next update.
+    pub player_anims: Option<std::sync::Arc<dyn super::player_anim::PlayerAnims>>,
 }
