@@ -925,6 +925,7 @@ fn set_bonus_full_set() {
     full[0] = rec(15, 0, 1, 1);
     t.sets = vec![SetRec {
         count: 3,
+        version: 0,
         partial,
         full,
     }];

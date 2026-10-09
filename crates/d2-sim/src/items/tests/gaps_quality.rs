@@ -135,10 +135,12 @@ fn terms_clear_save_d2() {
     };
     assert_eq!(d2(&t, 101), (30, 255));
     // Format 0: no D2 (the format-0 roll runs: give it a version-0 row
-    // that returns at once).
+    // that returns at once). The format-0 set routine doubles the
+    // durability itself (§10.4 step 2: 72 := min(15 × 2, 255), 73 :=
+    // min(200 × 2, 255)); a D2 after it would give (35 × 2, 255).
     let mut t0 = t.clone();
     t0.itemratio = vec![ratio(0, [(0, 1); 6])];
-    assert_eq!(d2(&t0, 0), (10, 200));
+    assert_eq!(d2(&t0, 0), (30, 255));
     // No durability: no D2.
     t.items[helm].durability = 0;
     assert_eq!(d2(&t, 101), (10, 200));

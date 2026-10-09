@@ -419,7 +419,9 @@ impl ItemTips {
 
     /// §3.6: the list a gem / rune of `code` gives through its gems-row
     /// mods block `slot` (`0x0065FEC0` on a temporary list; the mods are
-    /// fixed values, so the roll seed does not matter).
+    /// fixed values, so the roll seed does not matter). The probe is a
+    /// 1.14d expansion item (format 101, `generation.md` §1.2): a format-0
+    /// item would take the legacy property table (`properties.md` §14).
     pub(super) fn filler_list(&self, code: [u8; 4], slot: usize) -> StatList {
         let mut l = StatList::default();
         let Some(record) = self.lookup.find_code(code) else {
@@ -427,7 +429,7 @@ impl ItemTips {
         };
         let mut item = d2_sim::items::Item {
             record,
-            format: 0,
+            format: d2_sim::items::FORMAT_EXPANSION,
             ilvl: 0,
             quality: 2,
             file_index: -1,
@@ -446,6 +448,7 @@ impl ItemTips {
             name: [0; 16],
             ear_level: 0,
             realm_data: [0; 2],
+            fatal: None,
             stats: Recorder::default(),
         };
         d2_sim::items::props::apply_socket_filler(&self.lookup, &mut item, slot as u8);

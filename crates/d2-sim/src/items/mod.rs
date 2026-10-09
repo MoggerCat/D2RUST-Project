@@ -21,6 +21,7 @@ pub mod create;
 pub mod inventory;
 pub mod moves;
 pub mod props;
+pub mod props_legacy;
 pub mod quality;
 pub mod recharge;
 pub mod set_state;
@@ -137,6 +138,12 @@ pub mod stat {
     pub const QUESTITEMDIFFICULTY: u16 = 356;
 }
 
+/// Item format of generated items in an expansion game (game +0x78,
+/// `generation.md` §1.2).
+pub const FORMAT_EXPANSION: u16 = 101;
+/// Item format of generated items in a classic game (§1.2).
+pub const FORMAT_CLASSIC: u16 = 2;
+
 /// Flags of the item's property stat list (`generation.md` §5.3, §6.2,
 /// `properties.md` §2).
 pub const LIST_FLAGS: u32 = 0x40;
@@ -220,9 +227,9 @@ pub trait ItemGame {
     /// 2 classic (`generation.md` §1.2).
     fn item_format(&self) -> u16 {
         if self.expansion() {
-            101
+            FORMAT_EXPANSION
         } else {
-            2
+            FORMAT_CLASSIC
         }
     }
 }
@@ -312,6 +319,12 @@ pub struct Item<S> {
     /// §5 rule 2): set only by the save reader (setter `0x00629EA0`), so
     /// 0 unless the item was read from a save carrying them.
     pub realm_data: [u32; 2],
+    /// A fatal error raised by a legacy property function
+    /// (`properties.md` §14: the format-0 crash codes and the by-time
+    /// checks), which the property entry points cannot return; the
+    /// quality dispatch and the pipeline return it (the original exits).
+    /// Once set, later property records do nothing.
+    pub fatal: Option<Fatal>,
     pub stats: S,
 }
 
@@ -357,6 +370,7 @@ impl<S> Item<S> {
             name: [0; 16],
             ear_level: 0,
             realm_data: [0; 2],
+            fatal: None,
             stats,
         }
     }
@@ -404,4 +418,14 @@ pub enum Fatal {
     /// Crafted: the group of affix id 0 (`affixes.md` edge case 3).
     #[error("crafted affix 0 with a filled slot (read at 0x5C)")]
     NullAffixGroup,
+    /// `properties.md` §14: a format-0 property code 245–267 (other than
+    /// 257–261) calls a word of the §3 table as a legacy function, which
+    /// corrupts the stack: the original crashes. d2rs returns this.
+    #[error("format-0 property code {0} calls a non-legacy function (crash)")]
+    LegacyPropertyCrash(i32),
+    /// `properties.md` §14 `0x0065DD80`: a by-time record out of range
+    /// (ERROR 0x444 min > max, 0x44C param > 3, 0x44D min + 256 > 0x3FF,
+    /// 0x44E max + 256 > 0x3FF).
+    #[error("format-0 by-time property out of range (0x{0:X})")]
+    LegacyByTime(u16),
 }

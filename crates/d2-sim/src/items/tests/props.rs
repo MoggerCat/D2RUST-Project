@@ -109,6 +109,7 @@ fn func7_set_bonus_on_item() {
     partial[0] = rec(0, 0, 10, 10);
     t.sets = vec![SetRec {
         count: 3,
+        version: 0,
         partial,
         full: [PropRec::NONE; 8],
     }];
@@ -275,6 +276,7 @@ fn set_bonus_records() {
     full[0] = rec(15, 0, 1, 1);
     t.sets = vec![SetRec {
         count: 6,
+        version: 0,
         partial,
         full,
     }];

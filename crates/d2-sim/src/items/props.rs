@@ -3,7 +3,9 @@
 //! rune, unique, set), the dispatcher, the property functions
 //! (`property-functions.tsv`, mirrored in [`FUNCS`] and checked against
 //! the TSV by a test), socket fillers, runewords, set bonuses and craft
-//! property lists. All value draws use the item seed (§4.1).
+//! property lists. All value draws use the item seed (§4.1). A format-0
+//! item's records go to the legacy table instead (§14,
+//! [`super::props_legacy`]).
 
 use super::create::{apply_ethereal, has_durability, max_sockets};
 use super::tables::{ItemTables, PropRec};
@@ -116,13 +118,29 @@ pub fn roll_value(seed: &mut Seed, min: i32, max: i32) -> i32 {
     (seed.roll(hi.wrapping_sub(lo).wrapping_add(1)) as i32).wrapping_add(lo)
 }
 
-/// Runs one property record through the dispatcher (§3).
+/// Runs one property record through the wrapper `0x0065FE10`: the
+/// dispatcher (§3), or for a format-0 item in every mode except 6 the
+/// legacy table (§14). A legacy fatal is kept in [`Item::fatal`] and
+/// stops every later record.
 pub fn apply_property<S: ItemStats>(
     t: &ItemTables,
     item: &mut Item<S>,
     ctx: &mut PropCtx,
     rec: &PropRec,
 ) {
+    if item.fatal.is_some() {
+        return;
+    }
+    if item.format < 1 && ctx.mode != mode::RUNEWORD {
+        // §14: n is the wrapper's sixth argument, 0 for affixes (§12.1 of
+        // `affixes.md`), §11 and §12.
+        // PROVISIONAL (M22; REC-289): the other callers' value is not in
+        // the spec; 0 here too.
+        if let Err(e) = super::props_legacy::apply(t, item, ctx, rec, 0) {
+            item.fatal = Some(e);
+        }
+        return;
+    }
     let Some(row) = usize::try_from(rec.code)
         .ok()
         .and_then(|c| t.properties.get(c))
@@ -180,7 +198,13 @@ fn add_stat<S: ItemStats>(
 /// Functions 18 and 19 (Open question 5): the owner-or-item list of §4.2,
 /// written with the plain list set: no `valshift`, no itemstatcost range
 /// test, no stat-58 rule, and a value 0 is set like any other.
-fn set_raw<S: ItemStats>(item: &mut Item<S>, ctx: &mut PropCtx, id: u16, layer: u16, v: i32) {
+pub(super) fn set_raw<S: ItemStats>(
+    item: &mut Item<S>,
+    ctx: &mut PropCtx,
+    id: u16,
+    layer: u16,
+    v: i32,
+) {
     let key = ctx.list;
     let target: &mut dyn ItemStats = match ctx.owner.as_deref_mut() {
         Some(o) => o,
@@ -190,7 +214,7 @@ fn set_raw<S: ItemStats>(item: &mut Item<S>, ctx: &mut PropCtx, id: u16, layer: 
 }
 
 /// §4.3: base reset for a slot's stat.
-fn base_reset<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, id: u16) {
+pub(super) fn base_reset<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, id: u16) {
     let Some(r) = t.item(item.record).cloned() else {
         return;
     };
@@ -312,7 +336,7 @@ fn damage<S: ItemStats>(
 
 /// The skill of functions 11 and 19 (§5 r4, r9; §14 `0x0065E170`):
 /// `param`, or 0 when it is outside the skills table.
-fn skill_or_zero(t: &ItemTables, param: i32) -> usize {
+pub(super) fn skill_or_zero(t: &ItemTables, param: i32) -> usize {
     usize::try_from(param)
         .ok()
         .filter(|&s| s < t.skills.len())
@@ -425,36 +449,7 @@ fn call<S: ItemStats>(
             set_raw(item, ctx, id, 0, p + (b * 1024 + a) * 4);
             b
         }
-        19 => {
-            // §5 r9: an invalid `param` → skill 0.
-            let skill = skill_or_zero(t, rec.param);
-            let Some(sk) = t.skills.get(skill).copied() else {
-                return 0;
-            };
-            let level = skill_level(ilvl, sk.reqlevel, sk.maxlvl, rec.max);
-            let mut c = rec.min;
-            if c == 0 {
-                c = 5;
-            } else if c < 0 {
-                c = -c + (-c * level) / 8;
-            }
-            if c <= 1 {
-                c = 1;
-            } else if c > 254 {
-                c = 255;
-            }
-            let r = item.item_seed.roll(c - c / 8) as i32;
-            let layer = ((skill as u32) << t.stat_shift).wrapping_add(level as u32 & t.stat_mask);
-            // OQ 5: as function 18.
-            set_raw(
-                item,
-                ctx,
-                id,
-                layer as u16,
-                c * 256 + ((r + c / 8 + 1) & 0xFF),
-            );
-            c
-        }
+        19 => charges(t, item, ctx, rec, id),
         20 => {
             if t.valshift.len() > usize::from(stat::INDESTRUCTIBLE) {
                 add_stat(t, item, ctx, false, stat::INDESTRUCTIBLE, 0, 1);
@@ -489,6 +484,46 @@ fn call<S: ItemStats>(
             add_stat(t, item, ctx, set, id, layer, v)
         }
     }
+}
+
+/// Function 19 (§5 rule 9; also the legacy `0x0065DBC0`, §14): charges
+/// of skill `param` into stat `id`. Returns c (0: no skills row).
+pub(super) fn charges<S: ItemStats>(
+    t: &ItemTables,
+    item: &mut Item<S>,
+    ctx: &mut PropCtx,
+    rec: &PropRec,
+    id: u16,
+) -> i32 {
+    let ilvl = item.item_level();
+    // §5 r9: an invalid `param` → skill 0.
+    let skill = skill_or_zero(t, rec.param);
+    let Some(sk) = t.skills.get(skill).copied() else {
+        return 0;
+    };
+    let level = skill_level(ilvl, sk.reqlevel, sk.maxlvl, rec.max);
+    let mut c = rec.min;
+    if c == 0 {
+        c = 5;
+    } else if c < 0 {
+        c = -c + (-c * level) / 8;
+    }
+    if c <= 1 {
+        c = 1;
+    } else if c > 254 {
+        c = 255;
+    }
+    let r = item.item_seed.roll(c - c / 8) as i32;
+    let layer = ((skill as u32) << t.stat_shift).wrapping_add(level as u32 & t.stat_mask);
+    // OQ 5: as function 18.
+    set_raw(
+        item,
+        ctx,
+        id,
+        layer as u16,
+        c * 256 + ((r + c / 8 + 1) & 0xFF),
+    );
+    c
 }
 
 /// Function 14 (§5 rule 6): sockets, set directly on the item.
@@ -566,7 +601,8 @@ pub fn apply_unique<S: ItemStats>(t: &ItemTables, item: &mut Item<S>) {
     }
 }
 
-/// Mode 4: the setitems row = file index (§8.1).
+/// Mode 4: the setitems row = file index (§8.1). A format-0 item runs
+/// only `prop1`–`prop2` and no partial records (§2, `0x0065FF6C`).
 pub fn apply_set_item<S: ItemStats>(t: &ItemTables, item: &mut Item<S>) {
     let Some(r) = usize::try_from(item.file_index)
         .ok()
@@ -576,8 +612,12 @@ pub fn apply_set_item<S: ItemStats>(t: &ItemTables, item: &mut Item<S>) {
     };
     let (props, aprops, add_func) = (r.props, r.aprops, r.add_func);
     let mut ctx = PropCtx::item(mode::SET);
-    for rec in props.iter().filter(|r| r.code >= 0) {
+    let n_props = if item.format < 1 { 2 } else { props.len() };
+    for rec in props.iter().take(n_props).filter(|r| r.code >= 0) {
         apply_property(t, item, &mut ctx, rec);
+    }
+    if item.format < 1 {
+        return;
     }
     for (k, rec) in aprops.iter().enumerate() {
         if rec.code < 0 {
