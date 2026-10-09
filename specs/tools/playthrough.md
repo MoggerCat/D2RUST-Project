@@ -21,6 +21,25 @@
   `tools/scenario-diff.md` §2 r4 (the `input` script), `world/quests.md`
   and `world/quests-act1*.md` (where the milestones come from).
 
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 43–54 |
+| Inputs | 55–62 |
+| Outputs / state changes | 63–74 |
+| Rules | 75–76 |
+|   1. Objective file `playthrough 1` | 77–98 |
+|   2. Predicates | 99–122 |
+|   3. Verdict per milestone | 123–138 |
+|   4. Class × difficulty matrix | 139–206 |
+| Constants & data dependencies | 207–212 |
+| Randomness | 213–217 |
+| Edge cases & original bugs | 218–225 |
+| Test vectors | 226–233 |
+| Provenance | 234–245 |
+| Open questions | 246–267 |
+<!-- /index -->
+
 ## Summary
 
 The goal is a game a player can finish, Acts I–V. The harness gives a
