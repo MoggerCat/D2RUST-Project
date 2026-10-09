@@ -224,6 +224,11 @@ what moved it.
    and hitpoints before writing either; d2rs re-read hitpoints after the
    maxhp write had rescaled it (`stat-lists.md` §7.2). Fixed (`raise_hp`).
 
+5. `a2-warp-sewers-ama` (Lut Gholein Sewers Level 1, `warp 47` from
+   Lut Gholein): state equal on all 160 frames (PARTIAL only through the
+   declared gaps; the Lut Gholein NPCs did not diverge either); rng
+   differs only by the creation attribution of `q-fix-tool-rng-creation-draws`.
+
 So the Den of Evil's and Cave Level 1's generation, presets and
 population are equal for all 160 frames outside town (every non-player
 unit of the dungeon level), the first divergence of both checks being
