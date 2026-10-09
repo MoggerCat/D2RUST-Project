@@ -1161,6 +1161,11 @@ fn world_view_frame(
         Some(_) => placed,
         None => super::feed::camera_at(bridge.0.world(), state.feed.as_ref(), anchor)?,
     };
+    // `missiles/client.md` §C13 function 2 reads the drawn frame's unit
+    // origin (`render/camera.md` §4) at the next client update.
+    if let (true, Some((cam, _))) = (draw, placed.as_ref()) {
+        bridge.0.set_unit_origin(cam);
+    }
     let built = build_frame_placed(
         bridge.0.world(),
         draws,
