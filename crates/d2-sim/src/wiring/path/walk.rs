@@ -54,6 +54,27 @@ impl<'a, X: Pending> PathCtx<'a, X> {
             .expect("path provider on")
     }
 
+    /// The speed +0x4C of a run start after its run list is attached
+    /// (`pathing.md` §8.2, revision REC-751): the rate `0x00623F50`
+    /// (`units.md` §4.7 step 7) reads stat 67 with the run list, so a
+    /// level-1 Amazon's run speed is 101 · 150 / 100 = 151. The mode set
+    /// ([`crate::units::mode_set`]) computed it before the attach; this
+    /// recomputes it with the list in place.
+    fn refresh_run_rate(&mut self, unit: UnitId) {
+        let rate = {
+            let sim = crate::units::hooks::Sim {
+                game: &mut *self.game,
+                units: &mut *self.v.units,
+                stats: &mut *self.v.stats,
+                data: self.v.data,
+            };
+            self.v.h.movement_rate(&sim, unit)
+        };
+        if let (Some(s), Some(r)) = (rate, self.v.units.get_mut(unit)) {
+            r.anim.speed = s;
+        }
+    }
+
     fn walk_error(&mut self, e: WalkError) {
         self.v.h.errors.push(WiringError::Walk(e));
     }
@@ -700,6 +721,7 @@ impl<X: Pending> WalkUnits for PathCtx<'_, X> {
                 self.v.set_list_stat(l, VELOCITYPERCENT, value);
                 let v = &mut self.v;
                 v.stats.attach(&mut *v.h, unit, l, true);
+                self.refresh_run_rate(unit);
             }
         }
     }

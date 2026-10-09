@@ -60,8 +60,8 @@
 |   Synthetic (CI-safe) | 1172–1194 |
 |   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1195–1225 |
 |   Recorded checks (monster assign 0xAC) | 1226–1238 |
-| Provenance | 1239–1317 |
-| Open questions | 1318–1398 |
+| Provenance | 1239–1328 |
+| Open questions | 1329–1409 |
 <!-- /index -->
 
 ## Summary
@@ -684,8 +684,8 @@ multiplier / divisor, 1, 99); the skill is given and assigned
 |---|---|
 | 36 ghostly | type flag 0x40; damageresist = 80; champion function; at the new level: coldmindam += DM × K[d+22] / 100, coldmaxdam += DM × K[d+25] / 100, coldlength += 150 |
 | 37 fanatic | item_armor_percent = −70; champion function (velocity rule of 37) |
-| 38 possessed | type flag 0x20; maxhp and hitpoints += 100 %; champion function |
-| 39 berserk | maxhp and hitpoints += pct(maxhp, −75); damagepercent += 300 × B / 100 (halved for BaseId 118); item_tohit_percent += 300 × B / 100; no champion function |
+| 38 possessed | type flag 0x20; maxhp := hitpoints := maxhp + pct(maxhp, 100, 100) (both written with the new value, as umod 2; revision 2026-10-09, REC-752); champion function |
+| 39 berserk | maxhp := hitpoints := maxhp + pct(maxhp, −75, 100) (as 38); damagepercent += 300 × B / 100 (halved for BaseId 118); item_tohit_percent += 300 × B / 100; no champion function |
 | 26 teleport | unique only: skill MonTeleport (184) level 1, skill mode 4, AI flag 0x20 (`monsters/umod-init-bodies.md` §4) |
 | 41 always_run_ai | schedule a type-7 event at frame + 75 (`0x005417D0`), any unique value |
 
@@ -1237,6 +1237,17 @@ Bosses, Normal, Blood Moor (L-flag 1):
 | components | zombie1 [2,2,1,1,0,0,0,0,1,1,…] within counts [3,3,3,3,3,0,0,0,3,3,3]; brute1 / quillrat1 none (all counts ≤ 1) |
 
 ## Provenance
+
+- §19.6 umods 38 / 39 life (revision 2026-10-09, q-diff-combat-a1,
+  REC-752): `traces/checks/combat-umod-life.check` on 1.14d under Wine
+  (seed 1234, pinned seeds): a possessed champion fallen 3072 → 6144
+  life with hitpoints 6144, a berserk unique quill rat 4096 → 1024 with
+  hitpoints 1024, a berserk extra-strong unique zombie 10240 → 2560
+  with hitpoints 2560 (stats 6 / 7 at the first frame). The earlier
+  reading "maxhp and hitpoints += d" gives hitpoints 9216, −2048 and
+  −5120 through the maxhp value-change callback (`sim/stat-lists.md`
+  §7.2); "hitpoints first, then maxhp" gives 256 for berserk. Only
+  "write the new value to both" fits all three.
 
 - §27 class reinit from the 1.14d asm: `0x00574370` (`ret 8`, unit
   type test, bounds and `enabled` test against the bit table

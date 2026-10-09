@@ -104,11 +104,13 @@ def compare(a, b, ignore=(), types=None, frame_offset=0, lo=None, hi=None, pertu
             hit[pk] = 0
     divs, total = [], 0
     first_by_field, count_by_field = {}, {}
+    bad_frames = set()
     units_compared = 0
 
     def add(d):
         nonlocal total
         total += 1
+        bad_frames.add(d["f"])
         name = d["field"]
         count_by_field[name] = count_by_field.get(name, 0) + 1
         if name not in first_by_field:
@@ -141,7 +143,8 @@ def compare(a, b, ignore=(), types=None, frame_offset=0, lo=None, hi=None, pertu
                          "a": p, "b": q})
     return {"divs": divs, "total": total, "first_by_field": first_by_field,
             "count_by_field": count_by_field, "frames": frames, "fields": fields,
-            "one_sided": one_sided, "units_compared": units_compared}
+            "one_sided": one_sided, "units_compared": units_compared,
+            "clean_frames": len([f for f in frames if f not in bad_frames])}
 
 
 def where(d):
@@ -189,6 +192,9 @@ def report(r, ha, hb, out=sys.stdout):
     fr = r["frames"]
     w(f"\nframes compared: {len(fr)} ({fr[0]}..{fr[-1]}), unit records compared: "
       f"{r['units_compared']}, fields: {' '.join(r['fields'])}\n")
+    if fr:
+        w(f"frames with zero divergence: {r['clean_frames']}/{len(fr)} "
+          f"({100 * r['clean_frames'] // len(fr)}%)\n")
     if r["one_sided"]:
         w(f"not compared (one side only): {' '.join(r['one_sided'])}\n")
     for side, h in (("1.14d", ha), ("d2rs", hb)):

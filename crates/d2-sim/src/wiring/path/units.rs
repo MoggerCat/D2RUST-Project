@@ -213,12 +213,8 @@ pub(crate) fn footprint_of(
 impl<X: Pending> View<'_, X> {
     /// The §3 inputs of a unit: monstats / monstats2 of a monster
     /// (`SizeX` signed, `BaseId`, `flying`, `opendoors`, `npc`, `inTown`,
-    /// `interact`, unit flag bit 31), missiles `Size`. Objects: `None`.
-    ///
-    /// TODO(objects.txt not in `ActionTables`): object sizes and
-    /// footprint masks (`SizeX`, `SizeY`, `IsDoor`, `BlocksVis`,
-    /// `BlockMissile`, `SubClass`, `HasCollision0..7`) have no table
-    /// here; objects get a static path without a footprint.
+    /// `interact`, unit flag bit 31), missiles `Size`, the objects.txt
+    /// row of an object ([`View::object_path_shape`]).
     pub fn path_shape(&self, unit: UnitId) -> Option<UnitShape> {
         let r = self.units.get(unit)?;
         Some(match r.ty {
@@ -229,8 +225,18 @@ impl<X: Pending> View<'_, X> {
             },
             UnitType::Item => UnitShape::Item,
             UnitType::Tile => UnitShape::Tile,
-            UnitType::Object => return None,
+            UnitType::Object => UnitShape::Object(self.object_path_shape(unit)?),
         })
+    }
+
+    /// An object's §3 / §5.2 inputs from its objects.txt row (`SizeX`,
+    /// `SizeY`, `IsDoor`, `BlocksVis`, `BlockMissile`, `SubClass`,
+    /// `HasCollision0..7`); `None` without the object state or row.
+    pub fn object_path_shape(&self, unit: UnitId) -> Option<crate::path::ObjectShape> {
+        let r = self.units.get(unit).filter(|r| r.ty == UnitType::Object)?;
+        let st = self.h.objects.as_ref()?;
+        let o = st.tables.object(r.class as u16).ok()?;
+        Some(crate::wiring::action::objects::object_shape(o))
     }
 
     /// A monster's §2.4 / §3 inputs.
@@ -306,8 +312,9 @@ impl<X: Pending> View<'_, X> {
     ///
     /// Per type: player, monster, missile: dynamic path allocation
     /// (§2.4, stamps the footprint when a room is given); item in mode 3
-    /// and tile: static set and footprint; object: static set (footprint:
-    /// see [`View::path_shape`]); item in another mode: no path.
+    /// and tile: static set and footprint; object: static set and its
+    /// box footprint when `HasCollision[mode]` ≠ 0; item in another mode:
+    /// no path.
     ///
     /// The three dynamic allocations pass `set0x10` = 0 (§2.5).
     // The monster calls after the allocation (`0x005735A0`, then
@@ -355,6 +362,7 @@ impl<X: Pending> View<'_, X> {
             }
             _ => false,
         };
+        let object = self.object_path_shape(unit);
         let h = &mut *self.h;
         let p = h.paths.as_mut().expect("checked above");
         let rec = match (ty, kind) {
@@ -372,8 +380,13 @@ impl<X: Pending> View<'_, X> {
                 let mut s = StaticPath::default();
                 s.set(room, x, y);
                 let rec = UnitPath::Static(s);
-                if let Some((fp, _)) = footprint_of(Some(&rec), Some(ty), mode, None) {
-                    add_footprint(&mut h.drlg, &fp);
+                // An object is stamped only when `HasCollision[mode]` ≠ 0
+                // (§2.5), in the mode its init left (`objects.md` §3).
+                let stamp = object.is_none_or(|o| o.collides_in(mode));
+                if let Some((fp, _)) = footprint_of(Some(&rec), Some(ty), mode, object) {
+                    if stamp {
+                        add_footprint(&mut h.drlg, &fp);
+                    }
                 }
                 rec
             }
@@ -394,7 +407,12 @@ impl<X: Pending> View<'_, X> {
     pub(crate) fn path_footprint(&self, unit: UnitId) -> Option<(Footprint, RemoveRule)> {
         let r = self.units.get(unit)?;
         let p = self.h.paths.as_ref()?;
-        footprint_of(p.record(unit), Some(r.ty), r.mode, None)
+        footprint_of(
+            p.record(unit),
+            Some(r.ty),
+            r.mode,
+            self.object_path_shape(unit),
+        )
     }
 
     /// Footprint add `0x00649400` at the unit's stored position.

@@ -1388,7 +1388,7 @@ fn champion_types_and_others() {
     f.set_stat(u, stat::HITPOINTS, 1000);
     f.set_stat(u, stat::EXPERIENCE, 100);
     run_umod_init(&cx, &mut f, u, 39, true);
-    assert_eq!(f.s(u, stat::MAXHP), 250);
+    assert_eq!((f.s(u, stat::MAXHP), f.s(u, stat::HITPOINTS)), (250, 250));
     assert_eq!(f.s(u, stat::DAMAGEPERCENT), 270);
     assert_eq!(f.s(u, stat::ITEM_TOHIT_PERCENT), 270);
     assert_eq!(f.s(u, stat::EXPERIENCE), 100);

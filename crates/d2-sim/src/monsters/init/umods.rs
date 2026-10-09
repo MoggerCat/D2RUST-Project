@@ -590,12 +590,13 @@ pub fn run_umod_init<H: InitHost + ?Sized>(
     }
 }
 
-/// maxhp and hitpoints += pct(maxhp, p, 100) (umods 38, 39).
+/// maxhp := hitpoints := maxhp + pct(maxhp, p, 100) (umods 38, 39;
+/// §19.6: both written with the new value, as umod 2, REC-752).
 fn raise_hp<H: InitHost + ?Sized>(h: &mut H, unit: UnitId, p: i32) {
     let hp = h.stat(unit, stat::MAXHP);
-    let delta = pct(hp, p, 100);
-    add(h, unit, stat::MAXHP, delta);
-    add(h, unit, stat::HITPOINTS, delta);
+    let v = hp.wrapping_add(pct(hp, p, 100));
+    h.set_stat(unit, stat::MAXHP, v);
+    h.set_stat(unit, stat::HITPOINTS, v);
 }
 
 /// damagepercent += v, halved (signed / 2) for `BaseId` 118.

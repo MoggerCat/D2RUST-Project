@@ -845,6 +845,9 @@ pub fn run(s: &Scenario, data: &Data) -> Result<RunOutput, RunError> {
                     poke::PokeResult::Failed => {
                         notes.push(format!("tick {t} step {i}: poke {d}: failed"))
                     }
+                    poke::PokeResult::FailedWith(why) => {
+                        notes.push(format!("tick {t} step {i}: poke {d}: failed: {why}"))
+                    }
                     poke::PokeResult::Unresolved(u) => {
                         notes.push(format!("tick {t} step {i}: poke {d}: unresolved {u}"))
                     }

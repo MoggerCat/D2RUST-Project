@@ -133,8 +133,10 @@ Unit = the unit record; path = unit +0x2C.
    full records at that frame. Then the next `--next N` divergences
    (default 20) in the same order. Then, per field, the first frame and
    unit where it differs and how many (frame, unit) pairs differ. Then a
-   summary: frames compared, units compared, fields not compared, both
-   sides' `gaps`.
+   summary: frames compared, units compared, frames with zero
+   divergence (count of compared frames with no difference, and their
+   share in whole percent rounded down: the progress measure of a
+   diff-driven session), fields not compared, both sides' `gaps`.
 5. **Verdict.** `MATCH` (exit 0): no divergence, every field of either
    side compared, no gaps. `PARTIAL` (2): no divergence otherwise.
    `DIVERGED` (1): any divergence.

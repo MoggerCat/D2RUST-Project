@@ -127,10 +127,15 @@ d2rs-own tool; no 1.14d fact.
    `poke` directives run on both sides as a repeatable `--poke "<frame>
    <directive> <args>"` (`record_state.py`, `record_frames.py` through
    `poke.py`; d2rs `state-dump`, `play`), §2 and §3 rule 5.
-2. d2rs `state-dump` takes no input script (`play --input` drives the
-   Bevy pointer, which the headless run does not have): a check whose
-   behaviour needs C→S input beyond the bridge's own answers (a skill
-   cast, a click on a unit) has no d2rs side yet
-   (`traces/checks/poke-firebolt.check`).
-   Until it does, the state channel runs d2rs without the `input d2rs`
-   line and reports at best partial (never a match).
+2. Partly resolved (2026-10-09): input that can be expressed as C→S
+   game messages (walk, run, skills on a point or a unit, skill select,
+   and every other fixed-size id `poke.md` §1 `msg` takes) goes through
+   `at <f> poke msg <id> <value>...` on both sides: 1.14d calls the
+   client sender `0x00478350` with the bytes, d2rs `state-dump` hands
+   them to the host's sender for client 0; both are drained in frame f
+   (`poke.md` §1 `msg`, §4 rule 9, §5 rule 3; the duplicate filter's
+   clocks differ, `poke.md` Edge cases 4). Still open: input that is
+   not a C→S message (`play --input` drives the Bevy pointer, which the
+   headless run does not have; UI-only clicks): such a check runs d2rs
+   without the `input d2rs` line and reports at best partial (never a
+   match).
