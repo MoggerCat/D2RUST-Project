@@ -402,7 +402,7 @@ impl<X: Pending> TickHooks for ActionSim<X> {
                     v.h.x.send(receiver, &m);
                 }
                 // §7.3 rule 3: always `0x00571CD0` (§7.9 rule 2).
-                v.send_event_records(receiver, unit);
+                v.send_event_records(game, receiver, unit);
             }
             return;
         }

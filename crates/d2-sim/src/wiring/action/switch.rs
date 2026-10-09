@@ -19,8 +19,9 @@
 //! Every message goes to the client's player ([`Pending::send`]).
 //!
 //! Not sent, because no spec gives them (named, not guessed):
-//! - missile 0x73 (`0x0059FEE0`), item 0x9C (the item world is not
-//!   reachable from the action wiring, as for §7.1);
+//! - item 0x9C (the item world is not reachable from the action wiring,
+//!   as for §7.1); missile 0x73 (`0x0059FEE0`) is sent with PROVISIONAL
+//!   field sources (REC-414, [`View::missile_add`]);
 //! - player part B for another player (`0x005489F0`, `0x005484B0`,
 //!   multiplayer only, §7.9 rule 5) and the inventory messages
 //!   `0x00534F80`; the corpse 0x74 is sent with PROVISIONAL fields
@@ -223,9 +224,60 @@ impl<X: Pending> View<'_, X> {
                 self.h.x.send(receiver, &m);
             }
             UnitType::Monster => self.monster_add(game, receiver, unit),
+            UnitType::Missile => self.missile_add(game, receiver, unit),
             // Module docs: not specified far enough.
-            UnitType::Missile | UnitType::Item => {}
+            UnitType::Item => {}
         }
+    }
+
+    /// The missile add message 0x73 (`0x0059FEE0`, §7.2 part A,
+    /// `missiles/missiles.md` §R2.4): only for a `ClientSend` row, an
+    /// existing owner and a moving path (`0x006486C0(path)` ≠ 0, the
+    /// path velocity).
+    // PROVISIONAL (REC-414): "moving" is read as a non-zero dynamic-path
+    // velocity; the first point is `points[0]` when the path has points;
+    // see [`messages::client_missile`].
+    fn missile_add(&mut self, game: &Game, receiver: UnitId, unit: UnitId) {
+        let Some(d) = self.h.missiles.as_ref().and_then(|s| s.get(unit)).cloned() else {
+            return;
+        };
+        if !self
+            .h
+            .tables
+            .missiles
+            .get(usize::from(d.class))
+            .is_some_and(|r| r.clientsend)
+        {
+            return;
+        }
+        let Some(owner) = d.owner else {
+            return;
+        };
+        if game.lists.find_unit(owner.ty, owner.guid).is_none() {
+            return;
+        }
+        let Some(p) = self.h.paths.as_ref().and_then(|p| p.dynamic(unit)) else {
+            return;
+        };
+        if p.velocity == 0 {
+            return;
+        }
+        let first = if p.point_count > 0 {
+            (u32::from(p.points[0].x), u32::from(p.points[0].y))
+        } else {
+            (0, 0)
+        };
+        let pierce = self.stats.unit_total(unit, 328, 0) as u8;
+        let m = messages::client_missile(
+            d.class,
+            (p.precise_x, p.precise_y),
+            first,
+            d.current as u16,
+            (owner.ty as u8, owner.guid),
+            d.level as u8,
+            pierce,
+        );
+        self.h.x.send(receiver, &m);
     }
 
     /// Player part B as far as it is specified (§7.2, §7.9): the unit's
@@ -242,7 +294,7 @@ impl<X: Pending> View<'_, X> {
         }
         let states = self.unit_states_message(ty, guid, unit);
         self.h.x.send(receiver, &states);
-        self.send_event_records(receiver, unit);
+        self.send_event_records(game, receiver, unit);
         self.overhead_message(receiver, unit, ty, guid);
     }
 

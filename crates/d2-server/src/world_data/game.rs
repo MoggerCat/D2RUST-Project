@@ -88,6 +88,7 @@ impl GameTables {
             combat: CombatTables::from_bin(&self.bins).map_err(|e| err("combat", e))?,
             levels: self.rows::<Levels>()?,
             skill_modes: skill_modes(self.table("monstats")?),
+            overlay_count: i32::try_from(self.table("overlay")?.count).unwrap_or(i32::MAX),
         })
     }
 
