@@ -1118,6 +1118,7 @@ pub fn dispatch<W: ObjectHost>(
     if REFUSED_CLASSES.contains(&class) {
         return Ok(Dispatch::Done(0));
     }
+    crate::cov!(Object, class, n);
     let op = Operate {
         object: obj,
         operator,

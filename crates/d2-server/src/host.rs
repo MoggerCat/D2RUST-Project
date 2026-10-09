@@ -271,12 +271,17 @@ where
     pub fn frame(&mut self) -> Result<FrameReport, HostError> {
         let now = self.clock.now_ms();
         self.game.set_host_tick(now);
+        // tools/perf: wall-clock timing of the parts, off unless enabled.
+        let timed = crate::perf::enabled();
+        let t0 = Instant::now();
         let mut report = FrameReport {
             messages: self.drain(now)?,
             ..FrameReport::default()
         };
         if self.driver.poll(now, self.catch_up) {
             report.ticked = true;
+            let drain_us = crate::perf::us_since(t0);
+            let t1 = Instant::now();
             if self.packets.is_some() {
                 let frame = self.game.frame().wrapping_add(1);
                 self.note(PacketEvent::Tick { frame });
@@ -287,9 +292,19 @@ where
                 let frame = self.game.frame();
                 self.note(PacketEvent::TickEnd { frame });
             }
+            let tick_us = crate::perf::us_since(t1);
+            let t2 = Instant::now();
             let (buffers, discarded) = self.flush(true, now)?;
             report.flushed_buffers = buffers;
             report.discarded_bytes = discarded;
+            if timed {
+                crate::perf::record(crate::perf::TickTime {
+                    frame: self.game.frame() as u32,
+                    drain_us,
+                    tick_us,
+                    flush_us: crate::perf::us_since(t2),
+                });
+            }
         }
         Ok(report)
     }

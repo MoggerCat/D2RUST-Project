@@ -113,6 +113,7 @@ pub fn create_missile<W: MissileWorld + ?Sized>(
     if !matches!(owner_ty, UnitType::Player | UnitType::Monster) {
         return None;
     }
+    crate::cov!(Missile, p.class, 0);
     // Step 2.
     let (x, y) = if p.flags & pf::POSITION != 0 {
         (p.x, p.y)

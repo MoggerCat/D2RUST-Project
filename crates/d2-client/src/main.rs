@@ -701,7 +701,13 @@ fn state_dump(args: &[String]) -> Result<()> {
 fn main() -> Result<()> {
     use d2_client::launch;
     launch::install_crash_log();
+    // tools/perf: D2_PERF_OUT turns the timing on (server ticks, frames).
+    d2_client::app::perf::enable_from_env();
     let result = run();
+    // tools/coverage-map: this thread's counters (a no-op unless d2-sim
+    // has the `coverage-map` feature and D2_COVERAGE_DIR is set).
+    d2_sim::debug::coverage::flush();
+    d2_client::app::perf::write_report();
     if let Err(e) = &result {
         launch::write_error(e);
         pause_if_console();
