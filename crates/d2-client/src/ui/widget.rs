@@ -7,7 +7,8 @@
 //! come from the §B owner specs through the caller.
 
 use super::draw::{ImageRef, ImageRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
-use super::geom::{Point, Rect, FRAME};
+use super::geom::{Point, Rect};
+use super::layout::Screen;
 use super::panel::WidgetId;
 use super::text::{width_a, width_b, GlyphLookup, TextError, TextOpts};
 
@@ -65,7 +66,7 @@ impl Widget for Button {
             out.push(UiDraw::Image(ImageRequest {
                 image,
                 at: self.rect.origin(),
-                clip: FRAME,
+                clip: Screen::play().rect(),
                 look: crate::ui::CelLook::PLAIN,
             }));
         }
@@ -91,7 +92,7 @@ impl Widget for FrameImage {
         out.push(UiDraw::Image(ImageRequest {
             image: self.image,
             at: self.rect.origin(),
-            clip: FRAME,
+            clip: Screen::play().rect(),
             look: crate::ui::CelLook::PLAIN,
         }));
     }
@@ -124,7 +125,7 @@ impl Widget for Label {
             at: self.pen,
             style: self.style,
             opts: TextOpts::default(),
-            clip: FRAME,
+            clip: Screen::play().rect(),
         }));
     }
 }
@@ -499,7 +500,7 @@ impl TextInput {
             at: Point::new(at.x + before, at.y),
             style: self.style,
             opts: TextOpts::default(),
-            clip: FRAME,
+            clip: Screen::play().rect(),
         }));
         Ok(())
     }
@@ -526,7 +527,7 @@ impl Widget for TextInput {
             at: self.rect.origin(),
             style: self.style,
             opts: TextOpts::default(),
-            clip: FRAME,
+            clip: Screen::play().rect(),
         }));
     }
 }

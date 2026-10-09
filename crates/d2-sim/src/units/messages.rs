@@ -33,6 +33,18 @@ pub fn game_flags(difficulty: u8, arena_flags: u32, expansion: bool, ladder: boo
     ]
 }
 
+/// S→C 0x8D AssignPlayerToParty (`0x0053DF00`, 7 bytes,
+/// `server-messages.tsv`): GUID u32@1, party u16@5.
+pub fn assign_player_to_party(guid: u32, party: u16) -> [u8; 7] {
+    let g = guid.to_le_bytes();
+    let p = party.to_le_bytes();
+    [0x8D, g[0], g[1], g[2], g[3], p[0], p[1]]
+}
+
+/// No party (`0x00554630`'s answer for a player in none; recorded in
+/// 0x5B and 0x75 as 0xFFFF).
+pub const NO_PARTY: u16 = 0xFFFF;
+
 /// The 6-byte (id, unit type u8@1, GUID u32@2) layout of `0x0053B3D0`:
 /// 0x0B GameHandshake (§8.2 rule 3.2), 0x76 PlayerInProximity (§7.9
 /// rule 3).
