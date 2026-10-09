@@ -294,6 +294,20 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     code 8 copies and whether that monster's target was cleared (an AI
     request) before its death; answer into §7.4 rule 7. d2rs tests
     `monster_death.rs` / `e2e_night_world.rs` now expect the spawn point.
+- **[q-fix-real-item-replay-belt-use] Potion use: what entry 3 does to the state (`items/use.md` §3, `0x005BE3F0`)**
+    The spec is silent (open question 1); d2rs now does what the
+    recording shows (`facts/items/a1-town-potions-low.tsv` n 9–31,
+    `a1-town-item-moves.tsv` n 40–51): a potion used from the grid (0x20)
+    is drunk by U and consumed (0x9D action 5, flag 0x20), not refused; the
+    state (100 / 106) goes on with an **empty** stat stream in 0xA8
+    (`ff 01`: either its per-tick stats are not on the state list, or they
+    have no send bits); at full life / mana the state ends in the same
+    frame (0xA9, no 0xA8). Read entry 3 and answer into `items/use.md`:
+    which list it attaches (stats, length: 170 frames at 10 of 50 life,
+    51 frames for an mp1 at 1 mana), what ends it when the vital is full,
+    and whether the unit is queued for update by the toggle
+    (`0x00639DB0`) or by the entry itself. d2rs: PROVISIONAL REC-730 in
+    `d2-sim/src/wiring/inventory/potion.rs`.
 
 35. **`0x0063E6B0(unit, 0)`: are the action-frame tests skipped?** (REC-700) `0x005A6D50` passes the moving flag r as `0x0063E6B0`'s second argument (`skills/use.md` §5.2 "Monsters"); `skills/bodies-3.md` §5.18 step 3 gives the tests (+0x4E = 0, or no action event in the frames ((cur − speed) >> 8, cur >> 8]) for the argument 1 only. Read: what the function does with 0 (d2rs: no tests, the column by mode). Write the answer into `bodies-3.md` §5.18 step 3.
 36. **Who writes unit +0x4E from a type-0 timer's frame code?** (REC-701) trigger(U) of `0x005A7670` reads +0x4E = 1 (`skills/use.md` §5.2); `sim/units.md` §4.2 schedules event 0 with args (E[i], k) and the field table names only `0x005533D0` (0 at mode start). Read: the writer of +0x4E on the event-0 path of a monster (the unit-type dispatcher or the timer run), and whether a code-0 event writes it. Write the answer into `sim/units.md` §4.2 / §4.6.
