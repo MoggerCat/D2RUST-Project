@@ -668,7 +668,7 @@ Then the rest:
 - Still PROVISIONAL:
   - REC-660: client GUIDs 2–92 (needs a runtime count);
   - REC-661: critter think-timer start;
-  - REC-665: mode request to own position;
+  - REC-665: mode request to own position; answered → see docs/handoff/pc1-day3-b.md
   - REC-670: local input path for mode 18;
   - REC-671: whirl end rule;
   - REC-680: Blood Golem life share. answered → see docs/handoff/pc1-day3-b.md
