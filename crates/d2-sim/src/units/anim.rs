@@ -299,8 +299,8 @@ pub fn every_tick_movement(game: &mut Game, unit: UnitId) -> Result<(), GameErro
 /// setup with b = the old +0x38 stores in +0x4E the event byte of frame
 /// p (p = b), else the last non-zero event byte of frames (b >> 8) + 1 …
 /// p >> 8 (0 when none or the range is empty). False (nothing done)
-/// without a sequence. The drawn mode and frame (+0x40, +0x44) are not
-/// kept: the sequence holds only the event bytes.
+/// without a sequence. The drawn mode (+0x40) is not kept; the drawn frame
+/// (+0x44) is, when the sequence holds the drawn frames.
 pub fn advance_sequence(anim: &mut Anim) -> bool {
     let Some(seq) = anim.sequence.as_mut() else {
         return false;
@@ -320,6 +320,11 @@ pub fn advance_sequence(anim: &mut Anim) -> bool {
             .unwrap_or(0)
     };
     let (a, b) = (p >> 8, old >> 8);
+    // Frame setup `0x00621210`: +0x44 := the drawn frame of frame p · 256
+    // (`skills/sequences.md` §3).
+    if let Some(&d) = usize::try_from(p >> 8).ok().and_then(|i| seq.drawn.get(i)) {
+        anim.frame = i32::from(d) << 8;
+    }
     anim.action_frame = if p == old {
         byte(a)
     } else {

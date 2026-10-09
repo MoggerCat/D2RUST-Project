@@ -23,9 +23,8 @@ struct Shot {
 
 /// A monster owner at (10, 10) (AR 300, level 10) and a player at
 /// (13, 10) (defense 100, level 8, life 100): to-hit chance 83
-/// (`hit.md` vector). The player's flags 2 and 3 (`missiles.md` §R4.2)
-/// and its collision bit are what the unwritten kind init and movement
-/// specs will set.
+/// (`hit.md` vector). The player's collision bit is what the movement
+/// spec will set.
 fn shot() -> Shot {
     let mut fx = Fx::new();
     let owner = fx.spawn(UnitType::Monster, 0, fx.a, 10, 10);
@@ -40,8 +39,8 @@ fn shot() -> Shot {
             (st::HITPOINTS, 25600),
         ],
     );
-    fx.sim.sys.units.get_mut(target).unwrap().flags |=
-        unit_flag::IS_VALID_TARGET | unit_flag::CAN_BE_ATTACKED;
+    // Flags 1-3 come from the player type init `0x005348C0`.
+    assert_eq!(fx.sim.sys.units.get(target).unwrap().flags & 0x0E, 0x0E);
     fx.mark(target, bits::PLAYER);
     Shot { fx, owner, target }
 }

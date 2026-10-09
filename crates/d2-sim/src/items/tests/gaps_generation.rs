@@ -434,7 +434,7 @@ fn not_forced_skips_forced_steps() {
         0,
     )
     .unwrap();
-    assert_eq!(c.item.flags, flag::INIT | flag::INSTORE);
+    assert_eq!(c.item.flags, flag::INIT | flag::INSTORE | flag::IDENTIFIED);
     assert_eq!(c.item.stats.base(stat::QUANTITY, 0), 0);
     assert_eq!((rq.min_dur, rq.max_dur), (300, 400));
     assert!(c.item.stats.base(stat::DURABILITY, 0) <= 12);
@@ -787,7 +787,8 @@ fn quest_step_and_dispatch_result() {
     let mut it = item(j, 1);
     init_item_stats(&t, &mut game(), &mut it, Some(&mut rq), true).unwrap();
     assert!(it.stats.lists.is_empty());
-    assert_eq!(it.flags & flag::IDENTIFIED, 0);
+    // Identified only by the normal routine (REC-1400), not by the quest step.
+    assert_ne!(it.flags & flag::IDENTIFIED, 0);
 }
 
 /// A body part whose itemtype forces normal quality is handled by the

@@ -1,0 +1,23 @@
+# Task: q-tool-audio-diff (from the coordinator, 2026-10-09)
+
+You are session q-tool-audio-diff of the D2RUST-Project cloud build loop (Rust reimplementation of Diablo II LoD 1.14d, held to exact match, CLAUDE.md rule 10). BRANCH = q-tool-audio-diff. REC ids: REC-1360..1369 only. Part of the fidelity plan (docs/handoff/fidelity-gaps.md on claude/q-fidelity-ledger).
+
+Build `audio-diff` (gaps §4): rule 10 asks identical decoded samples and trigger ticks. Step 1 (prove feasibility first, report in 1 hour): capture 1.14d's audio under Wine — the DirectSound secondary-buffer writes or the Wine audio driver output (e.g. a null/file ALSA/PulseAudio sink) — with the server tick per write. Step 2: d2rs mixer output per tick (d2-client audio; specs/audio/). Step 3: compare per voice (sound id, start tick, decoded samples) and mixed. Spec: specs/tools/audio-diff.md. Author checks: town ambience, a footstep walk, a spell cast, a monster hit. If Wine capture is impossible, say so with evidence and propose the PC 1 capture. Opus.
+
+Done means: the deliverable pushed, its own selftest/check green, a docs/handoff/q-tool-audio-diff.md hand-back, and the ledger rows you settled updated in a part file docs/handoff/ledger/q-tool-audio-diff.tsv (format: docs/handoff/q-ledger-monsters-task.md on claude/q-ledger-monsters; validate with the ledger.py from claude/q-fidelity-ledger). Other sessions own other areas (tools/coord/owners.tsv, docs/handoff/coordinator-resume.md on claude/coord-resume-3): route their bugs, don't fix them.
+
+RULES:
+Coordinator: session_01KcnkwCTXbuv5ZbToEUpBSj (message it with send_message).
+
+Setup (one command, ~5-15 min, do it first and read while it runs): `git fetch origin claude/specs-staging-7 claude/integ-r3 claude/coord-resume-3 claude/q-fidelity-ledger claude/q-tool-audio-diff && git checkout -B claude/q-tool-audio-diff origin/claude/q-tool-audio-diff && sh tools/coord/sync.sh && git merge -q origin/claude/integ-r3 && git show origin/claude/coord-resume-3:tools/coord/session-setup.sh > /tmp/session-setup.sh && sh /tmp/session-setup.sh` (attach MoggerCat/D2RUST-private-repo with add_repo first; it gives Bevy libs, cargo-nextest, the 1.14d install in $HOME/game + excel view, Wine + recorder saves; `--no-wine` if you never run 1.14d). The plan you belong to: `git show origin/claude/q-fidelity-ledger:docs/handoff/fidelity-gaps.md` (read only your section) and the ledger rows `git show origin/claude/q-fidelity-ledger:docs/handoff/fidelity-ledger.tsv`. Read CLAUDE.md, then only what you need (docs/METHODS.md M01, M22, M23, M25). Never copy private files into the public repo.
+
+Session rules:
+- Just push to claude/q-tool-audio-diff (git push -u origin claude/q-tool-audio-diff); the coordinator merges. No PRs.
+- Message the coordinator only when a blocker is fixed (with the playthrough count: `python3 tools/playthrough/playthrough.py <file> --build` reached/total), when blocked, or when done.
+- Stay in your area (tools/coord/owners.tsv; `python3 tools/coord/route.py <path>` names the owner of a file outside your area: send a note to that session or the coordinator instead of editing).
+- Run `sh tools/coord/sync.sh` every 30 minutes.
+- Read only what you need (specs by section index, M11).
+- Exact match with 1.14d stays the bar (CLAUDE.md rule 10): fix the first divergence a check shows; never weaken a test or expect a bug. Unsettled choices are PROVISIONAL with your REC ids (M22).
+- Before each push: `cargo fmt --all`, `cargo clippy -p <crates you touched> --all-targets -- -D warnings`, `cargo nextest run -p <those crates>`, `python3 tools/coverage.py --check`, `python3 tools/spec_index.py --check`. Disk is limited: `rm -rf target/debug/incremental` after big builds.
+- PC 1 questions (need the Windows game or Ghidra): add unnumbered items "- [q-tool-audio-diff] title" to docs/handoff/pc1-data.md Step 4; the coordinator numbers them.
+- At the end write docs/handoff/q-tool-audio-diff.md (done / open / repro commands), push, send "done" once to the coordinator, then stop.

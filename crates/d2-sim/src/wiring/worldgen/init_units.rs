@@ -213,6 +213,16 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
         self.v.h.x.monster_quest_chain(unit, chain);
     }
 
+    /// `0x00545CD0` (`quests.md` §4.6): a link for the chain in the level
+    /// row's `Quest` (1.14d: Den of Evil 1, Arcane Sanctuary 11).
+    fn attach_quest_chain(&mut self, unit: UnitId) {
+        let level = self.unit_room_level(unit);
+        let quest = self.w.tables.pop.level(level).map_or(0, |l| l.quest);
+        if quest != 0 {
+            self.v.h.x.monster_quest_chain(unit, u32::from(quest));
+        }
+    }
+
     fn quest_preset_boss(&mut self, unit: UnitId) {
         self.v.h.x.quest_preset_boss(unit);
     }
@@ -432,6 +442,66 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
         if let (true, Some(item)) = (announce, item) {
             self.v.h.x.umod_recharge(item);
         }
+    }
+    /// `init.md` §6 step 13: the monster's inventory (`0x0063ABD0`) is a
+    /// holdings entry ([`ActionHooks::monster_equip`], PROVISIONAL,
+    /// REC-1030); the NPC store inventory is the vendors'.
+    ///
+    /// [`ActionHooks::monster_equip`]: crate::wiring::action::ActionHooks
+    fn new_inventory(&mut self, unit: UnitId, npc_store: bool) {
+        if !npc_store {
+            self.v.h.monster_equip.entry(unit).or_default();
+        }
+    }
+    /// Unit +0x60 is set.
+    fn has_inventory(&mut self, unit: UnitId) -> bool {
+        self.v.h.monster_equip.contains_key(&unit)
+    }
+    /// `init.md` §12: the monster's inventory holds an item at `loc`
+    /// (PROVISIONAL, REC-1030: [`ActionHooks::monster_equip`]).
+    ///
+    /// [`ActionHooks::monster_equip`]: crate::wiring::action::ActionHooks
+    fn has_item_at(&mut self, unit: UnitId, loc: u8) -> bool {
+        let sim = Sim {
+            game: &mut *self.game,
+            units: &mut *self.v.units,
+            stats: &mut *self.v.stats,
+            data: self.v.data,
+        };
+        crate::wiring::economy::monster_item_at(&*self.v.h, &sim, unit, loc).is_some()
+    }
+    /// `0x00573B20` (`init.md` §12) when the game holds the drop state
+    /// (the item tables); without it no item is made.
+    fn create_equip_item(
+        &mut self,
+        unit: UnitId,
+        code: [u8; 4],
+        loc: u8,
+        modifier: u8,
+        level: i32,
+    ) {
+        let Some(mut d) = self.v.h.object_drops.take() else {
+            return;
+        };
+        {
+            let mut sim = Sim {
+                game: &mut *self.game,
+                units: &mut *self.v.units,
+                stats: &mut *self.v.stats,
+                data: self.v.data,
+            };
+            crate::wiring::economy::create_monster_equip(
+                &mut *self.v.h,
+                &mut sim,
+                &mut d,
+                unit,
+                code,
+                loc,
+                modifier,
+                level,
+            );
+        }
+        self.v.h.object_drops = Some(d);
     }
     fn steal_belt_item(&mut self, unit: UnitId, target: UnitId) {
         self.v.h.x.steal_belt_item(unit, target);
