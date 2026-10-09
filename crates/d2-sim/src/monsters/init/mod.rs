@@ -40,8 +40,8 @@ pub use calc::{
     stats_by_level, LevelStats, PlayerBonus,
 };
 pub use create::{
-    assign_umod, boss_mods, components, create, monequip, monprop, normal_mods, normal_mods_for,
-    reinit, stats_and_skills, type_init,
+    assign_umod, boss_mods, components, create, monequip, monequip_rows, monprop, normal_mods,
+    normal_mods_for, reinit, stats_and_skills, type_init,
 };
 pub use message::{
     assign_mode, component_bits, components_field, unique_name, write_boss_section,
