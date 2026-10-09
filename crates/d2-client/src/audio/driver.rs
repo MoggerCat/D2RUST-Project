@@ -239,8 +239,24 @@ impl SoundWorld for ModelSoundWorld<'_> {
                 let p = unit_position(u).ok()?.client();
                 Some((p.x, p.y))
             }
-            None => self.captured?.borrow().get(&unit).copied(),
+            // Set C, the client-only units (`model.md` §2 r1): the
+            // river objects the client makes for its level.
+            None => match self.world.objclient.set_c.get(&unit) {
+                Some(u) => {
+                    u.position?;
+                    let p = unit_position(u).ok()?.client();
+                    Some((p.x, p.y))
+                }
+                None => self.captured?.borrow().get(&unit).copied(),
+            },
         }
+    }
+
+    fn client_only_position(&self, unit: UnitKey) -> Option<(i32, i32)> {
+        let u = self.world.objclient.set_c.get(&unit)?;
+        u.position?;
+        let p = unit_position(u).ok()?.client();
+        Some((p.x, p.y))
     }
 
     /// `0x00622AA0(player, unit, 2)` needs the client collision rooms (no
@@ -528,7 +544,10 @@ impl SoundDriver {
         let now = world.server_ticks;
         let ticks = match self.last_server_tick {
             _ if now == 0 => 0,
-            None => 1,
+            // The first server tick has no client update, so no sound
+            // tick (`sound-table.md` §6.1, REC-1684, measured: 1.14d's
+            // T 0 runs in the second frame).
+            None => now.saturating_sub(1),
             Some(last) => now.saturating_sub(last),
         };
         self.unit_sounds.retain(|&(k, c), _| {
@@ -555,8 +574,11 @@ impl SoundDriver {
         }
         self.had_player = has_player;
         if !requests.is_empty() {
-            // C: one client update per server tick (§1 r5).
-            let c = now as u32;
+            // C: one client update per server tick, the first server tick
+            // has none (§1 r5); requests arrive before the frame's update,
+            // so they read the count before it (REC-1684, measured:
+            // C = frame − 2).
+            let c = now.saturating_sub(2) as u32;
             let mut ctx = self.system.with(&mut sw);
             for r in requests {
                 if let SoundRequest::Server {
@@ -591,8 +613,15 @@ impl SoundDriver {
         {
             let mut pw = ModelSoundWorld::new(world);
             pw.local_at = self.local_at;
-            let updates: Vec<u32> = (0..ticks).map(|i| (now - ticks + i + 1) as u32).collect();
-            let c = updates.first().copied().unwrap_or(now as u32);
+            // An update reads C before its increment (measured: footsteps
+            // of frame f carry C = f − 2).
+            let updates: Vec<u32> = (0..ticks)
+                .map(|i| (now - ticks + i).saturating_sub(1) as u32)
+                .collect();
+            let c = updates
+                .first()
+                .copied()
+                .unwrap_or(now.saturating_sub(2) as u32);
             let material1 = env_row.map_or(0, |r| r.material1);
             let mut ctx = self.system.with(&mut sw);
             let mut cx = Ctx::new(&mut ctx, &mut self.globals, c);
@@ -619,7 +648,7 @@ impl SoundDriver {
         });
         for i in 0..ticks {
             // C of the client update this sound tick follows (§1 r5).
-            let c = (now - ticks + i + 1) as u32;
+            let c = (now - ticks + i) as u32;
             if let Some(env) = self.env.as_mut() {
                 let inp = TickInput {
                     level,
@@ -652,7 +681,7 @@ impl SoundDriver {
             }
             self.system.run_tick(&mut sw, &mut self.cues);
         }
-        if ticks > 0 {
+        if now > 0 {
             self.last_server_tick = Some(now);
         }
         self.pending.extend(sw.asked.borrow().iter().copied());
@@ -1079,10 +1108,12 @@ mod tests {
         d.frame(&at_tick(0), &[], &[]).unwrap();
         assert_eq!(d.tick(), 0, "no server tick, no sound tick");
         d.frame(&at_tick(1), &[], &[]).unwrap();
+        assert_eq!(d.tick(), 0, "the first server tick has no client update");
+        d.frame(&at_tick(2), &[], &[]).unwrap();
         assert_eq!(d.tick(), 1);
-        d.frame(&at_tick(1), &[], &[]).unwrap();
+        d.frame(&at_tick(2), &[], &[]).unwrap();
         assert_eq!(d.tick(), 1, "a frame without a server tick");
-        d.frame(&at_tick(4), &[], &[]).unwrap();
+        d.frame(&at_tick(5), &[], &[]).unwrap();
         assert_eq!(d.tick(), 4);
     }
 
@@ -1090,7 +1121,7 @@ mod tests {
     #[test]
     fn ui_sounds_are_requested_and_their_cues_reach_the_core() {
         let mut d = driver();
-        d.frame(&at_tick(1), &[], &[SoundRequest::Ui(1)]).unwrap();
+        d.frame(&at_tick(2), &[], &[SoundRequest::Ui(1)]).unwrap();
         let mut q = TriggerQueue::new();
         d.drain_cues(&mut q);
         assert!(!q.is_empty(), "the request's channel start is a cue");
@@ -1230,7 +1261,7 @@ mod tests {
         // Id 2 heads a group: the variant roll needs the client seed (a
         // local player exists: a draw without one is an internal error,
         // `sound-table.md` §4 r6).
-        let mut w = at_tick(1);
+        let mut w = at_tick(2);
         w.local_player = Some(UnitKey::new(PLAYER, 1));
         assert_eq!(d.frame(&w, &[], &[SoundRequest::Ui(2)]), Ok(()));
         let asked = d.take_pending();
@@ -1302,8 +1333,8 @@ mod tests {
         let mut e = Seed::new(0x1234_5678, 0x9ABC);
         let mut hist = [0; 2];
         let (mut picks, mut want) = (Vec::new(), Vec::new());
-        for t in 1..=12u64 {
-            if t == 7 {
+        for t in 2..=13u64 {
+            if t == 8 {
                 // The model steps its copy three times (an S→C 0x59 for
                 // the local player and two client object draws,
                 // `sound-table-2.md` §14.3): the sound draws continue
@@ -1404,7 +1435,7 @@ mod tests {
     fn the_levels_song_and_bed_start_on_the_sound_tick() {
         let mut d = env_driver();
         assert!(d.environment().is_some(), "a song row: the machines run");
-        let (w, levels, _) = in_level_1(1);
+        let (w, levels, _) = in_level_1(2);
         d.frame(&w, &levels, &[]).unwrap();
         let ids: Vec<i32> = d.system().requests().map(|r| r.id).collect();
         // Day (phase 2 before any 0x53): bed 50; the song (cur was 0, so
@@ -1414,7 +1445,7 @@ mod tests {
         assert_eq!(d.environment().unwrap().music.cur, 4660);
         // No level (no room): neither machine runs (§1 r1).
         let mut d = env_driver();
-        let mut w = in_level_1(1).0;
+        let mut w = in_level_1(2).0;
         w.active_rooms = None;
         d.frame(&w, &levels, &[]).unwrap();
         assert_eq!(d.system().requests().count(), 0);
@@ -1534,7 +1565,7 @@ mod tests {
         assert_eq!(r.dist2, 640.0 * 640.0 * 2.0);
         // Falloff 0 reaches 400: the one-shot is out of range and dropped
         // at its first tick (§6.3 r4).
-        w.server_ticks = 1;
+        w.server_ticks = 2;
         d.frame(&w, &[], &[]).unwrap();
         assert!(d.system().unit_requests(m).is_empty());
     }

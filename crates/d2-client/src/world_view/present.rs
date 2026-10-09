@@ -486,6 +486,19 @@ pub fn deliver_with<L: ServerLink>(
                 Some(ui) => {
                     ui.apply_output(o, bridge.borrow().world())?;
                     requests.borrow_mut().extend(ui.take_sounds());
+                    // S→C 0x5A: the codes whose line goes to the screen
+                    // message list `0x0049E3A0`, which requests UI sound 6
+                    // (`ui/messages.md` §2 r3) even for the empty line of
+                    // the local player's own join (code 2, `client/msg-ui.md`
+                    // §19 r3). The original UI does not build these lines
+                    // yet, so the sound is requested here. PROVISIONAL
+                    // (REC-1681): codes other than 0–5 and 0xD are taken
+                    // as lines too.
+                    if let Output::EventText { bytes, .. } = o {
+                        if event_text_adds_line(bytes[1]) {
+                            requests.borrow_mut().push(SoundRequest::Ui(6));
+                        }
+                    }
                     for s in ui.take_skipped() {
                         debug!("ui output {o:?}: skipped {s}");
                     }
@@ -596,6 +609,13 @@ pub fn audio_request(o: &Output) -> Option<SoundRequest> {
         }
         _ => return None,
     })
+}
+
+/// Whether a 0x5A code ends in a screen message (`client/msg-ui.md` §19
+/// r3: 0–5 and 0xD build a line, 6, 8–11, 0xF–0x11 other forms; 7, 0xC,
+/// 0xE and above 0x12 add none).
+pub(crate) fn event_text_adds_line(code: u8) -> bool {
+    matches!(code, 0..=6 | 8..=11 | 0xD | 0xF..=0x11)
 }
 
 /// The player event sounds of a world click's results (`ClickOut::Sound`,
