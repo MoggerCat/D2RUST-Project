@@ -2,9 +2,15 @@
 
 - **Status:** draft: a crude first version. Format `playthrough 1`, the
   predicates and the verdicts below are ours; `tools/playthrough/playthrough.py`
-  implements them and `traces/playthrough/act1.play` is the first
-  objective file (run 2026-10-09 on the 1.14d install: 12 of 14
-  milestones reached, first blocker `kill-zombie`). d2rs only: no 1.14d
+  implements them, with one objective file per act,
+  `traces/playthrough/act1.play` … `act5.play` (run 2026-10-09 on the
+  1.14d install, `--all --json`: I 12/14, II 11/15, III 12/14, IV 5/12,
+  V 8/13; first blockers `kill-zombie` (I) and `town-start` (II–V: the
+  player's act byte is 0 in the act's town)). Not yet described below:
+  the `find <filter>` probe with `poke +N` / `frame +N`, sweep mode
+  `cross`, the unit test `killed`, `--all` and the `--json` keys (`act`,
+  `reached`, `total`, `consecutive`, `first_blocker`, `milestones`); see
+  `playthrough.py --help` and its selftest. d2rs only: no 1.14d
   side, so a reached milestone is "the game gets there", never a
   fidelity check (CLAUDE.md rule 10).
 - **Target version:** 1.14d (the milestones); the format is d2rs-own.
