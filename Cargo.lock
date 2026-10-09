@@ -2425,6 +2425,7 @@ dependencies = [
  "d2-server",
  "d2-sim",
  "d2-verify",
+ "d2s-tool",
  "image",
  "png",
  "proptest",

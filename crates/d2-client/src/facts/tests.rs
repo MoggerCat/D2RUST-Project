@@ -216,8 +216,11 @@ fn directories_compare_with_the_shared_sprites_file() {
     write(&ours, DRAWS_FILE, draws_text(&[ROW0, ROW1]));
     write(&ours, FRAME_FILE, frame_text(&[]));
     write(&ours, SPRITES_FILE, sprites_text(&[SPRITE]));
-    assert_eq!(compare_dirs(&scene, &ours, &[]).unwrap(), Outcome::Match);
-    assert!(compare_dirs(&scene, &root.join("missing"), &[]).is_err());
+    assert_eq!(
+        compare_dirs(&scene, &ours, &[], false).unwrap(),
+        Outcome::Match
+    );
+    assert!(compare_dirs(&scene, &root.join("missing"), &[], false).is_err());
     std::fs::remove_dir_all(&root).unwrap();
 }
 
@@ -669,4 +672,42 @@ fn unit_calls_are_rows_at_their_keys() {
         ]
     );
     assert_eq!(rows.sprites.len(), 1);
+}
+
+// Covers: specs/tools/facts-render.md §6 r5, §5 r10
+/// `--skip-weather`: 1.14d's pass-9 rows (by call site) and d2rs's
+/// (`at` = `pass9`) drop out on both sides; other lines and boxes stay.
+#[test]
+fn skip_weather_drops_pass9_rows_only() {
+    use super::compare::{is_weather_row, PASS9_TAG};
+    let row = |op: &str, at: &str| -> Vec<String> {
+        let mut r = vec!["-".to_owned(); DRAW_COLUMNS.len()];
+        r[1] = op.into();
+        r[16] = at.into();
+        r
+    };
+    assert!(is_weather_row(&row("DrawLine", "0x47368e")));
+    assert!(is_weather_row(&row("DrawLine", "0x473585")));
+    assert!(is_weather_row(&row("DrawBox", "0x473a00")));
+    assert!(is_weather_row(&row("DrawLine", PASS9_TAG)));
+    // M08: the range's edges, another op, other call sites
+    assert!(!is_weather_row(&row("DrawLine", "0x47346f")));
+    assert!(!is_weather_row(&row("DrawBox", "0x473f50")));
+    assert!(!is_weather_row(&row("CelDraw", "0x47368e")));
+    assert!(!is_weather_row(&row("DrawBox", "0x46efe9")));
+    assert!(!is_weather_row(&row("DrawLine", "0x45a841")));
+    assert!(!is_weather_row(&row("DrawLine", "-")));
+
+    let rain = "9 DrawLine - - - - 51 336 - - - - 200 - - - 0x47368e";
+    let ours = "9 DrawLine - - - - 99 1 - - - - 7 - - - pass9";
+    let a = set(&[ROW0, rain, ROW1], &[], Some(&[SPRITE]));
+    let b = set(&[ROW0, ROW1, ours, ours], &[], Some(&[SPRITE]));
+    assert!(matches!(compare(&a, &b, &[]), Outcome::Diverged(_)));
+    let (a, b) = (a.without_weather(), b.without_weather());
+    assert_eq!(compare(&a, &b, &[]), Outcome::Match);
+    // a non-weather box stays and is compared
+    let bx = "9 DrawBox - - - - 273 573 - - - - 109 - - - 0x46efe9";
+    let a = set(&[ROW0, bx, ROW1], &[], Some(&[SPRITE])).without_weather();
+    let b = set(&[ROW0, ROW1], &[], Some(&[SPRITE])).without_weather();
+    assert!(matches!(compare(&a, &b, &[]), Outcome::Diverged(d) if d.row == 1));
 }

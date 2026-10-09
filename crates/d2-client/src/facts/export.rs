@@ -95,7 +95,8 @@ fn tile_xy(f: &IndexFrame, item: &DrawItem, view_left: Option<i32>) -> Option<(i
 
 /// §5 r10: one row per pass-9 call. `DrawLine` (x0, y0, x1, y1, color,
 /// alpha) and the flash's `DrawBox` (x0, y0, x1, y1, color, mode),
-/// `blend-modes.md` §8 r1–r2: `x`, `y` = x0, y0, `mode` = the color.
+/// `blend-modes.md` §8 r1–r2: `x`, `y` = x0, y0, `mode` = the color,
+/// `at` = [`PASS9_TAG`](super::compare::PASS9_TAG) (§6 r5).
 fn sky_rows(sky: &[SkyDraw]) -> Vec<Vec<String>> {
     sky.iter()
         .map(|d| {
@@ -108,6 +109,7 @@ fn sky_rows(sky: &[SkyDraw]) -> Vec<Vec<String>> {
             row[6] = x.to_string();
             row[7] = y.to_string();
             row[12] = color.to_string();
+            row[16] = super::compare::PASS9_TAG.into();
             row
         })
         .collect()

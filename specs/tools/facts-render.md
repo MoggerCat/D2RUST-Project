@@ -26,15 +26,15 @@
 |   2. `draws.tsv` | 90–136 |
 |   3. `frame.tsv` | 137–169 |
 |   4. `sprites.tsv` | 170–189 |
-|   5. d2rs export | 190–297 |
-|   6. Comparison | 298–320 |
-|   7. Requests | 321–332 |
-| Constants & data dependencies | 333–336 |
-| Randomness | 337–340 |
-| Edge cases & original bugs | 341–348 |
-| Test vectors | 349–357 |
-| Provenance | 358–362 |
-| Open questions | 363–377 |
+|   5. d2rs export | 190–303 |
+|   6. Comparison | 304–341 |
+|   7. Requests | 342–353 |
+| Constants & data dependencies | 354–357 |
+| Randomness | 358–361 |
+| Edge cases & original bugs | 362–369 |
+| Test vectors | 370–378 |
+| Provenance | 379–383 |
+| Open questions | 384–398 |
 <!-- /index -->
 
 ## Summary
@@ -247,7 +247,8 @@ composition, through `d2-client` only (game logic untouched).
    in place of the 1×1 line-pixel and flash items d2rs composes them
    with (those items write no row): `DrawLine` for a line, `DrawBox` for
    the flash (`DrawRectangle` `0x004F6300`), `x`, `y` = x0, y0 and `mode`
-   = the color (`blend-modes.md` §8 r1–r2), every other column `-`. The
+   = the color (`blend-modes.md` §8 r1–r2), `at` = `pass9` (§6 r5),
+   every other column `-`. The
    rows stand where the first such item is, else (every pixel
    off-screen) before the first item of a later pass, else at the end.
    Other primitives (`DrawBox`, `DrawBoxAlpha`, `Util*`) are written only
@@ -268,7 +269,12 @@ composition, through `d2-client` only (game logic untouched).
    `autostart.py --input` brought it: steps separated by `;`, `wait N`
    (N server ticks; autostart's `wait` counts seconds), `move X Y`,
    `click X Y`, `rclick X Y` (800 × 600 frame pixels; a click is cursor,
-   press, and the release on the next tick). The steps are the window's
+   press, and the release on the next tick), `key K` (revision
+   2026-10-09, q-scenes-compare: the panel scenes open panels by key; K
+   as autostart's `key`: a letter or digit, `ESC`, `TAB`, `ENTER`,
+   `SPACE`, or a virtual key in hex; the window's key press on that tick,
+   its bound world action then its typed character, without using up
+   the tick). The steps are the window's
    pointer events (the window's own pointer is ignored while a script
    runs), delivered once per new server tick. Scenes match by place, not
    by timing: a script waits until the walk is over before the dumped
@@ -297,7 +303,8 @@ composition, through `d2-client` only (game logic untouched).
 
 ### 6. Comparison
 
-`d2-client facts-compare <original dir> <d2rs dir> [--ignore COL,...]`.
+`d2-client facts-compare <original dir> <d2rs dir> [--ignore COL,...]
+[--skip-weather]`.
 The original's `sprites.tsv` is `<original dir>/sprites.tsv`, else
 `<original dir>/../../sprites.tsv` (`facts/render/sprites.tsv`).
 
@@ -317,6 +324,20 @@ The original's `sprites.tsv` is `<original dir>/sprites.tsv`, else
    full rows); 2 partial (no difference, some cells unmeasured: prints
    the counts per column); 3 error (a file missing or malformed: prints
    which and why).
+5. `--skip-weather` (REC-510): pass 9's rows are left out on both
+   sides before r2, for scenes whose 1.14d rain is not reproducible
+   (`docs/handoff/q-facts-scenes.md`: two runs of the same tick draw
+   other particles). A pass-9 row is a `DrawLine` or `DrawBox` row
+   whose `at` is in [`0x00473470`, `0x00473F50`) on the 1.14d side (the
+   particle draw `0x00473470` and pass 9 `0x00473910`,
+   `draw-order-2.md` §11.7), and a row whose `at` is `pass9` on the d2rs
+   side (§5 r10). A difference's `row` then counts the remaining rows;
+   its printed rows keep their `i`. The presented frame holds the
+   particles too: such a compare also passes `--ignore index_sha256`.
+   PROVISIONAL: the call sites
+   measured so far are `0x0047368E` (rain lines) and `0x00473585`
+   (snow lines, Harrogath), both in the particle draw; settled by a
+   scene recorded with the lightning flash (REC-510).
 
 ### 7. Requests
 
