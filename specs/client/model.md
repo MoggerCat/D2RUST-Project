@@ -52,7 +52,7 @@
 | Edge cases & original bugs | 1391–1415 |
 | Test vectors | 1416–1473 |
 | Provenance | 1474–1577 |
-| Open questions | 1578–1716 |
+| Open questions | 1578–1726 |
 <!-- /index -->
 
 ## Summary
@@ -1602,6 +1602,16 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    check, path step: REC-288, REC-277), which do predict the local walk; this
    point still holds for a client without a client DRLG
    (q-provisional-audit).
+   Measured 2026-10-09 (`record_walk.py`, single player under Wine;
+   `traces/client/model/client-0001.json`, `client-0002.json`): the
+   client player unit has its own path record, and its 16.16 position
+   equals the server player's at every server tick and every in-game draw
+   entry of town walk and run legs into the palisade (1,721 ticks, 1,923
+   frames, 0 differences: the client neither leads nor lags), stopping on
+   the server's sub-tile also when its own path target differs; after a
+   waypoint arrival the client takes the 0x15 point one client update
+   after the server and neither walks on (no step to the 0x0D's x + 3,
+   y + 3). Warp and portal arrivals: REC-570.
    PROVISIONAL (play preview's walk prediction): an S→C 0x0D code 1 for
    the local player (the arrival walk-outs of `sim/path-placement.md`
    §12.2 r5–6, `world/objects.md` §12 r11, `world/waypoints.md` §7 r7)
