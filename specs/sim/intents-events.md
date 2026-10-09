@@ -44,15 +44,15 @@
 |   4. d2rs mapping and scope | 636–667 |
 |   5. Machine-readable tables | 668–704 |
 |   6. Exact-match comparison | 705–813 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 814–1293 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1294–1559 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1560–1732 |
-| Constants & data dependencies | 1733–1751 |
-| Randomness | 1752–1757 |
-| Edge cases & original bugs | 1758–1803 |
-| Test vectors | 1804–1890 |
-| Provenance | 1891–2017 |
-| Open questions | 2018–2170 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 814–1304 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1305–1572 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1573–1745 |
+| Constants & data dependencies | 1746–1764 |
+| Randomness | 1765–1770 |
+| Edge cases & original bugs | 1771–1816 |
+| Test vectors | 1817–1903 |
+| Provenance | 1904–2030 |
+| Open questions | 2031–2183 |
 <!-- /index -->
 
 ## Summary
@@ -981,8 +981,8 @@ class is 291, 417 or 418; item → `0x0055BED0` (§7.3 rule 4); others nothing.
 4. The unit must have a path (fatal 0xE6). With T: id 0x68, code := E
    code to unit, (a, b) := (T type, T GUID); modes 2 and 15 with path
    type 5 or 6 (`0x00648E30`) instead id 0x67, code to point, (a, b) :=
-   the path target. Without T: id 0x67, code to point, (a, b) := the
-   path target (`0x00648A40`, `0x00648A60`) when "target from path",
+   the path end. Without T: id 0x67, code to point, (a, b) := the
+   path end (`0x00648A40`, `0x00648A60`) when "target from path",
    else the unit's cell (`0x006488C0`, `0x00648900`).
 5. Per-mode bytes d (direction-like) and e: mode 0 and 12: d := path
    direction (`0x006487F0`), e := unit +0xB0 for mode 0 and 0 for 12;
@@ -1003,17 +1003,28 @@ class is 291, 417 or 418; item → `0x0055BED0` (§7.3 rule 4); others nothing.
    a, b, d) or 0x69 (`0x0053BA40`: GUID u32@1, code u8@5, a u16@6, b
    u16@8, d u8@10, e u8@11).
 7. **Death**: the kill sets mode 0 (flag 0x1), so the next client pass
-   sends 0x69 code 8 with (a, b) = the path target (mode 0 has "target
-   from path": a monster's creation writes its spawn point as the
-   target, `monsters/init.md` §4.1 step 1.1, read so by 1.14d state
-   snapshots of idle spawned monsters; the recorded `69 1b000000 08 0000
-   0000 38 06` at frame 2882 shows (0, 0), a target cleared later.
-   PROVISIONAL: spawn point until cleared (because the snapshots and
-   init.md agree); settled by REC-594) and d, e (mode 0 has no
+   sends 0x69 code 8 with (a, b) = the path end and d, e (mode 0 has no
    target); when mode 12 is set (§7.7 rule 3) 0x69 code 9 at the unit's
    cell with e = 0 follows. Recorded: `69 13000000 08 9512 5515 38 06`
    (frame 2724) and `69 13000000 09 9412 5515 38 00` (frame 2748) in
    `20261006-015956`; 0x69 code 6 (mode 3, get-hit) 15 times.
+   **Path end** (`0x00648A40` x, `0x00648A60` y; 1.14d-confirmed
+   2026-10-09, settles REC-594): with point count n = path +0x28 ≠ 0,
+   the last computed path point, u16 x / y at path +0x98 + 4·n (point
+   n − 1 of the list at +0x9C, `sim/pathing.md`); n = 0 → (0, 0). It
+   never reads the path target +0x10 / +0x12, so the spawn point
+   written there by `monsters/init.md` §4.1 step 1.1 (and read as `tx`,
+   `ty` by state snapshots) does not reach this message: a monster that
+   never computed a path, or whose count was reset (`pathing.md` §9.7,
+   path-placement `0x00650BE0`), sends (0, 0) — the recorded
+   `69 1b000000 08 0000 0000 38 06` (frame 2882) — and one that walked
+   sends its last point — `69 13000000 08 9512 5515` (frame 2724), next
+   to its cell (0x1294, 0x1555) of the code 9 that follows. No AI
+   request clears anything for this: (0, 0) at the kill means a point
+   count of 0 (the mode-0 set does not reset it, frame 2724).
+   ```
+   (a, b) = if path.count != 0 { path.points[path.count - 1] } else { (0, 0) }
+   ```
 
 #### 7.5 Room clean-up (`0x00553220(game, unit)`)
 
@@ -1524,6 +1535,8 @@ for C in client list:                       // any state
     for each corpse GUID g of P(C) (pcdata corpse list, 0x0063D570 /
         0x0063D610; g ≠ −1):
         send to J: 0x8E CorpseAssign(P(C), unit g)   // 0x0053DFB0
+            // flag byte = constant 1 (push 1 at 0x0052C4AB): 10 bytes
+            // 8E 01, P(C)'s GUID u32 (EDX), g u32 (stack 1)
 send to J: 0x5B of P(J)
 // 0x0053FC70(game, J) → 0x0053FB90(game, 1) with EBX = J
 for C in client list with state 4 and P(C):

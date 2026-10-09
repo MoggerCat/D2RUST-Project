@@ -39,16 +39,16 @@
 |   8. Spawn point in a coordinate rectangle (`0x0054DC40`) | 469–504 |
 |   9. Placement search and creation call (`0x005B2A00`) | 505–619 |
 |   10. Party minions (monstats minion columns, `0x005B2830`) | 620–671 |
-|   11. Preset monsters (DS1 presets) | 672–815 |
-|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 816–840 |
-|   13. Region bookkeeping | 841–873 |
-|   14. Other table-driven and AI spawns | 874–898 |
-| Constants & data dependencies | 899–969 |
-| Randomness | 970–1013 |
-| Edge cases & original bugs | 1014–1054 |
-| Test vectors | 1055–1126 |
-| Provenance | 1127–1150 |
-| Open questions | 1151–1209 |
+|   11. Preset monsters (DS1 presets) | 672–867 |
+|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 868–892 |
+|   13. Region bookkeeping | 893–925 |
+|   14. Other table-driven and AI spawns | 926–950 |
+| Constants & data dependencies | 951–1021 |
+| Randomness | 1022–1065 |
+| Edge cases & original bugs | 1066–1106 |
+| Test vectors | 1107–1178 |
+| Provenance | 1179–1202 |
+| Open questions | 1203–1261 |
 <!-- /index -->
 
 ## Summary
@@ -704,7 +704,9 @@ Let M = monstats count and S = superuniques count.
    level 110 are not placed.
 2. `0x0054E490`: class 434 (prisondoor) → x − 1, and mode 12 (dead)
    unless quest flag 0x20 is set. Classes with the monstats2 `critter`
-   flag (index 13) are **not placed**. Flags = 8 if `neverCount`, else 0.
+   flag (index 13) are **not placed** (the client makes critters from
+   Levels.txt `cmon`, §11.7; a DS1 preset with its flag bit 0 set is
+   made by the client instead, `client/model.md` §5 r6.2). Flags = 8 if `neverCount`, else 0.
    §9 with r = −1; on failure, unless the class is in the no-retry set
    {229 radament, 284–288 maggotqueen1–5, 392–393 window1–2}
    (`0x0054E3A0`, table `0x0054E3E0`), again with r = 4.
@@ -812,6 +814,56 @@ row:
    `Level` (+0xAA) ≤ L `MonLvl1Ex` (+0x16) + 1. Stop at the first invalid
    or too-high class and return the last accepted one; the input class if
    none was accepted.
+
+#### 11.7 Client-made critters (Levels.txt `cmon`, `0x0046C460`)
+
+Read 2026-10-09 from the 1.14d disassembly. The server never places a
+critter (§11.3 r2); the **client** makes them, once per client active
+room, from the Levels.txt critter columns (not from DS1 presets). When
+the pass runs, the GUIDs and the set-up: `client/model.md` §5 rule 6.
+
+1. **Columns** (levels record, 1.14d parser table at `0x0061D7xx`–
+   `0x0061D94F`): `cmon1`–`4` +0xCC (i16 monstats ids, an empty cell is
+   negative), `cpct1`–`4` +0xD4 (i16 percent), `camt1`–`4` → **all four
+   are parsed into +0xDC** (each field record carries offset 0xDC; the
+   last, `camt4`, wins). So the amount of slot 0 is `camt4` and slots
+   1–3 read +0xDE/+0xE0/+0xE2, which are always 0 (original bug, also in
+   1.10f). 1.14d data: every `camt` cell is empty, so the multiplier is
+   never applied. Act 1 town: `cmon1` = chicken (149), `cpct1` = 30.
+2. **Pass** `0x0046C460(room)`; R = the room's seed (active room +0x6C,
+   `drlg/rooms.md` §2), `rand(n)` = `0x0045C3E0` (n < 1 → 0, **no
+   draw**; else one step, then `lo & (n − 1)` for a power of two, else
+   `lo % n`), `pct()` = one step, `lo % 100` (unsigned):
+
+   ```text
+   L = levels[level_of(room)]                     // 0x0061A1B0, 0x0061DB70
+   for i in 0..4:
+       c = L.cmon[i]; if c < 0: return             // first empty slot ends
+       if pct(R) >= L.cpct[i]: continue            // drawn for every slot
+       m = monstats[c]                              // invalid c → null record
+       n = rand(R, m.MaxGrp - m.MinGrp) + m.MinGrp  // +0x30, +0x2F (u8)
+       if L.camt[i] != 0: n *= L.camt[i]            // +0xDC + 2i
+       repeat n times: place_critter(room, c)
+   ```
+
+   `rand(MaxGrp − MinGrp)` gives MinGrp … MaxGrp − 1: MaxGrp itself is
+   never reached unless MaxGrp = MinGrp (then n = MinGrp, no draw).
+   chicken 3/3 → always 3; rat 4/4 → 4; bat 1/3 → 1 or 2.
+3. **place_critter** `0x0046C1A0(room, c)`: (x0, y0, w, h) = the room's
+   subtile rect (`0x00619730`); size = `monstats2` `SizeX` (+0x08) of
+   c's row (c or its `monstats2` row invalid → nothing). Up to 10 tries:
+
+   ```text
+   x = x0 + rand(R, w - 1); y = y0 + rand(R, h - 1)   // x drawn first
+   if size_query(room, x, y, size, 0x3F11) == 0:       // 0x0064D9B0
+       create_client_unit(class c, x, y, type 1, 0)    // 0x00466730
+       return
+   // 10 occupied points → this critter is skipped
+   ```
+
+   The creation steps one more room seed (the unit seed at a point,
+   `client/model.md` §12 r5), so per critter R advances x, y (per try)
+   then 1. Critter AI: `client/model.md` §5 rule 6.4.
 
 ### 12. Ambient (wandering) spawns (`0x0054F060(game, room)`)
 

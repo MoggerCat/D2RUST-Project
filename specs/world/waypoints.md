@@ -35,17 +35,17 @@
 |   4. Which waypoints are known without operating one | 171–190 |
 |   5. Waypoint objects | 191–280 |
 |   6. C→S 0x49 TakeOrCloseWp (`0x0054C5D0`) | 281–330 |
-|   7. Travel (`0x00584F60`) | 331–386 |
-|   8. Timing and message order | 387–408 |
-|   9. Town portals | 409–414 |
-|   10. Object mode change (consequence used above) | 415–422 |
-|   11. Act change (`0x0053ACC0`) | 423–511 |
-| Constants & data dependencies | 512–539 |
-| Randomness | 540–563 |
-| Edge cases & original bugs | 564–615 |
-| Test vectors | 616–660 |
-| Provenance | 661–706 |
-| Open questions | 707–792 |
+|   7. Travel (`0x00584F60`) | 331–389 |
+|   8. Timing and message order | 390–411 |
+|   9. Town portals | 412–417 |
+|   10. Object mode change (consequence used above) | 418–425 |
+|   11. Act change (`0x0053ACC0`) | 426–514 |
+| Constants & data dependencies | 515–542 |
+| Randomness | 543–566 |
+| Edge cases & original bugs | 567–618 |
+| Test vectors | 619–663 |
+| Provenance | 664–709 |
+| Open questions | 710–795 |
 <!-- /index -->
 
 ## Summary
@@ -341,7 +341,10 @@ roomless unit passes step 2 against any Act I unit.
    74, 46, 75, 103, 109 (`waypoints.tsv` `tile_calc`); 133–136 have no
    waypoint.
 5. Warp `0x0053AEC0(game, player, level, tile code)` (D2MOO
-   `LEVEL_WarpUnit`):
+   `LEVEL_WarpUnit`). Call form (asm): ECX game, EDX player; stack
+   [ESP+4] level, tile code; `ret 8`. EAX is no result: same act, the
+   placement's 1 / 0 (0 also when the spawn search found no room);
+   another act, whatever `0x0053ACC0` leaves (not a status):
    - destination act ≠ the client's act (`0x005382B0`): act change,
      `0x00537340` then `0x0053ACC0(level, tile code)` (D2MOO
      `LEVEL_ChangeAct`; §11; message order recorded, open question 1);
