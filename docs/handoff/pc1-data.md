@@ -317,6 +317,26 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     and whether the unit is queued for update by the toggle
     (`0x00639DB0`) or by the entry itself. d2rs: PROVISIONAL REC-730 in
     `d2-sim/src/wiring/inventory/potion.rs`.
+45. **Melee on a fallen from the shared script** (q-fix-b-headless-unit-click-keys;
+    `specs/tools/scenario-diff.md` §2 r4.5, §3 r8.5):
+    `py tools\scenario-diff\scenario_diff.py traces\checks\combat-melee-fallen.check --orig-only`.
+    Look for: the footer notes `autostart: frame 39: clickunit 1 19 368 300
+    posted at the stop of frame 38` and `frame 40: click 368 300 posted at
+    the stop of frame 39` (the hover frame); in the state the player in
+    mode 7 from frame 40 to 54 and fallen GUID 21's `hp` 256 -> 0 at frame
+    46 (Wine and d2rs both do this); in `orig.packets.jsonl` a C->S
+    `06 01000000 15000000` (left skill on the fallen), not a walk (0x01 /
+    0x03) — only once `record_packets.py` applies `frame` input
+    (`AutoStart.attach`; today it notes "they never run here"). Then run
+    without `--orig-only` (both sides) and record the first difference.
+46. **A belt potion mid-fight from the shared script** (same row):
+    `py tools\scenario-diff\scenario_diff.py traces\checks\combat-potion-midfight.check --orig-only`.
+    Look for: the footer note `autostart: frame 70: key 49 posted at the
+    stop of frame 69`; in the state the player's `hp` 2560 -> 2640 at
+    frame 70, +80 a frame, and item GUID 2 (slot 0) gone (Wine: so); in
+    `orig.packets.jsonl` (once it takes `frame` input) the join's S->C
+    0x9C action 0x0E for the two hp1 (d2rs sends none: its load leaves
+    belt items in mode 4) and a C->S `26 02000000 00000000 00000000`.
 - **[q-fix-pc1-proto-items] Where the join sets the player's alignment (state 105, stat 172 = 2)**
     `combat/hit.md` §7.1 says players carry it, and the recording shows
     it in the player's first 0xAA (`packets-town-arrival-ama.check` seq
@@ -326,13 +346,22 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     `0x005543B0(player, 2, v)` call: where it runs relative to the unit
     seed and the stats, its v argument, and whether a corpse (player
     unit in mode 17) gets it too. Answer into `combat/hit.md` §7.1.
-    d2rs: PROVISIONAL REC-750, set right after the unit seed
+    d2rs: PROVISIONAL REC-732, set right after the unit seed
     (`d2-client` `app/single_player.rs` loader, `View::set_alignment`).
+- **[q-fix-pc1-proto-items] `0x00625870`: the mod-array test and a key absent from the base array**
+    `sim/stat-lists.md` §11 rule 4 was corrected from the recording
+    (`packets-town-arrival-ama.check` frame 2: the player update sends
+    12, 0, 2, keys in the mod array, and not 67 / 68, base 100 outside
+    it): the single-stat send runs when the key **is** in the mod array.
+    Read `0x00625870` to confirm the test's sense and say what it sends
+    for a key in the array but absent from the base array (0, as the
+    flush `0x006258D0` does, or nothing; d2rs: nothing). Answer into
+    §11 rule 4.
 
 
-42. **Control-panel help button `0x004A64C0`** (q-scenes-compare) Step 8 of the UI pass (`ui/panels.md` §5) calls it before the new-stats button; `a4-town-pandemonium-fortress` rows 258–267 draw the text "Help (H)" (CelDrawColor at (714, 403)), `Panel\Levelsocket` frame 0 at (725, 440) and `Panel\Level` frame 0 at (728, 436). Specify when it draws (character level? first game?), its positions and its press / release, for `ui/control-panel.md`.
-43. **Mini panel open at game start (REC-519)** (q-scenes-compare) Every recorded scene has state 0x15 open with no input; name the call that opens it at game entry (and whether a saved setting decides it), for `ui/control-panel.md` §9.
-44. **Shadow pre-test arguments `0x00471620` (REC-511, REC-518)** (q-scenes-compare) The measured shadows fit the §4 box test on the sheared shadow box, and objects need their mode's `BlocksLight`; read the arguments `0x00471620` passes to `0x004709A0` and the object branch, for `render/blend-modes.md` §5 r3.
+42. **Control-panel help button `0x004A64C0`** answered → see `docs/handoff/pc1-day3-c.md`. (q-scenes-compare) Step 8 of the UI pass (`ui/panels.md` §5) calls it before the new-stats button; `a4-town-pandemonium-fortress` rows 258–267 draw the text "Help (H)" (CelDrawColor at (714, 403)), `Panel\Levelsocket` frame 0 at (725, 440) and `Panel\Level` frame 0 at (728, 436). Specify when it draws (character level? first game?), its positions and its press / release, for `ui/control-panel.md`.
+43. **Mini panel open at game start (REC-519)** answered → see `docs/handoff/pc1-day3-c.md`. (q-scenes-compare) Every recorded scene has state 0x15 open with no input; name the call that opens it at game entry (and whether a saved setting decides it), for `ui/control-panel.md` §9.
+44. **Shadow pre-test arguments `0x00471620` (REC-511, REC-518)** answered → see `docs/handoff/pc1-day3-c.md`. (q-scenes-compare) The measured shadows fit the §4 box test on the sheared shadow box, and objects need their mode's `BlocksLight`; read the arguments `0x00471620` passes to `0x004709A0` and the object branch, for `render/blend-modes.md` §5 r3.
 
 ## How to check a behaviour in one command
 
@@ -509,6 +538,19 @@ before it; `rng` and `packets` with pokes or frame input are partial on
 1.14d. For a new behaviour, add a `.check` file (copy the example of the
 channel) rather than a hand-run recipe, and paste the report's first
 lines into the `q-fix-*` row.
+26. **Item flag 0x2000 and the default file index of a poked item** (area G, `traces/checks/items-ground-many.check`, 2026-10-09): 36 items made with the poke `item` (`poke.py` request: `0x00558D90`, spawn mode 3, force 0, use seed 0) have, on 1.14d, item flags 0x80000 only (0x2000 clear) and item data +0x28 = 0 for items with no unique / set / superior index; d2rs sets 0x2000 (`generation.md` §3 step 5, "not forced") and file index −1 (`quality.md` §1 "Clear"). The recorded kill drops carry 0x2000 in their 0x9C flags (`facts/items/a1-cold-plains-poke-kills.tsv`: 0x00A02010), so the poke request differs from the treasure request in something that clears it. Read in the creation function `0x00558D90`: what clears 0x2000 (and with which request field or caller state), and what writes the file index of a normal / magic / rare item (0 or −1, and when). Answer into `items/generation.md` §3 and `items/quality.md` §1; then drop `ignore if fi` from the check.
+
+- [prov-data] **Monster think in a room with no clients** (q-prov-data,
+  `monsters/ai.md` §1.5, §2, `ai-bodies.md` §9.9 Map AI): after the
+  player warps away (same act, `a4-warp-plains-ama`, warp 105 at frame
+  6), the Fortress NPCs (classes 405, 257, 246; Npc AI `0x005E7130`)
+  think at frame 24 (idle 20 from the frame-4 home think). d2rs runs
+  the map AI (`lo' % 100` and `roll(count)`, 2 draws each) and their
+  seeds change; 1.14d's seeds never change from frame 6 to frame 80.
+  Read `0x005A7F80` / `0x005B1740` / `0x005E7130` for a room-client test
+  (active room +0x78 = 0) that skips the think or the map AI, and what
+  it schedules instead. The same think with a client in the level
+  matches (`a4-fortress-arrival-ama`). Evidence: `traces/checks/a4-warp-plains-ama.check`.
 
 ## Step 5 — spec gaps (107 provisional points no spec states)
 

@@ -1702,11 +1702,11 @@ impl StatLists {
     }
 
     /// Single stat `0x00625870` (§11.4): the base value (layer 0) when the
-    /// key is not in the mod array and is present in the base array.
+    /// key is in the mod array and present in the base array.
     pub fn single_stat(&self, unit: UnitId, s: u16) -> Option<i32> {
         let r = self.unit_list(unit)?;
         let k = key(s, 0);
-        if self.ext(r)?.mods.binary_search(&k).is_ok() {
+        if self.ext(r)?.mods.binary_search(&k).is_err() {
             return None;
         }
         self.raw_base(r, k)
