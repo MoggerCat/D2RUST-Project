@@ -597,6 +597,7 @@ impl Fx {
             },
             levels: Vec::new(),
             skill_modes: Vec::new(),
+            overlay_count: 0,
         };
         let drlg = DrlgWorld {
             dungeon: Dungeon::default(),

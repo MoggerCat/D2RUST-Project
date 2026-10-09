@@ -23,17 +23,17 @@
 | Inputs | 56–62 |
 | Outputs / state changes | 63–68 |
 | Rules | 69–70 |
-|   1. Local player stats: 0x19–0x1F (`0x0045D780`) | 71–111 |
-|   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 112–241 |
-|   3. Other item messages | 242–342 |
-|   4. Hireling stats: 0x9E–0xA2 (`0x0045D540`) | 343–358 |
-|   5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6 | 359–480 |
-| Constants & data dependencies | 481–489 |
-| Randomness | 490–493 |
-| Edge cases & original bugs | 494–513 |
-| Test vectors | 514–552 |
-| Provenance | 553–588 |
-| Open questions | 589–629 |
+|   1. Local player stats: 0x19–0x1F (`0x0045D780`) | 71–114 |
+|   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 115–244 |
+|   3. Other item messages | 245–345 |
+|   4. Hireling stats: 0x9E–0xA2 (`0x0045D540`) | 346–361 |
+|   5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6 | 362–491 |
+| Constants & data dependencies | 492–500 |
+| Randomness | 501–504 |
+| Edge cases & original bugs | 505–524 |
+| Test vectors | 525–563 |
+| Provenance | 564–599 |
+| Open questions | 600–640 |
 <!-- /index -->
 
 Owned ids: 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x3F, 0x42,
@@ -90,7 +90,10 @@ stat-list links, `weapon_set`, the runtime item table (§5). No outputs.
 3. Then the hook (rule 5) with (s, new value).
 4. **0x20** StatUpdate (`0x0045D880`): GUID u32@1, stat u8@5, value
    u32@6. Look up (0, GUID) (players only); none → nothing; else set
-   (stat, value) and run the hook on that unit.
+   (stat, value) and run the hook on that unit. d2rs:
+   `units::messages::stat_update` builds it; no spec names a caller of
+   the sender `0x0053C1D0`, so nothing sends it yet. PROVISIONAL: the
+   layout is the TSV's; settled by REC-415 (a static caller search).
 5. **Hook** (`0x0045D4B0(stat, unit, value)`; unit null → nothing;
    stats > 12 → nothing; byte table `0x0045D524`, jump table
    `0x0045D514`, read from the image 2026-10-08): stat 6 (life) with
@@ -446,6 +449,14 @@ stat-list links, `weapon_set`, the runtime item table (§5). No outputs.
    `0x006277F0(U, item)`; `0x004C1350`. A node without an item is
    fatal 0xD4F. Finally `0x0063E0B0(inventory)`. Model: U's inventory
    and stat links (helpers: `items/inventory.md`).
+   d2rs (`bridge/msg/items.rs::remove_items_display`): the model holds
+   no inventory nodes, so the nodes are U's items by their last record
+   (body mode, or a charm on page 0 that is not broken and has flag
+   0x4000 clear), and the effect is `ItemData::unlinked`: the item's
+   properties stop counting (`bridge/item_lists.rs::attached_to`) until
+   its next record. PROVISIONAL: node order, the fatal 0xD4F / 0xD5A /
+   0xD5B asserts and the set-list detach have no model to run on;
+   settled by REC-416.
 6. **0x97** WeaponSwitch (`0x0045EAD0`, 1 byte; id byte ≠ 0x97 is fatal
    0xF46, unreachable): `0x0048A700`: when the `d2exp.mpq` check
    (`0x00408F20`) and the expansion flag `[0x007A04F4]` (`0x0044DCC0`)

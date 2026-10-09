@@ -291,6 +291,7 @@ fn fixture(class: u32, dx: i32) -> Fx {
         },
         levels: Vec::new(),
         skill_modes: Vec::new(),
+        overlay_count: 0,
     };
     let hooks = ActionHooks::new(
         Arc::new(tables),
