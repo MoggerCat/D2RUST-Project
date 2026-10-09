@@ -243,7 +243,7 @@ rather than a hand-run recipe.
     register form of the champion / boss minions call `0x0054E1E0`
     (`scenario.md` §3.1, `population.md` §6.4); `poke.py` writes them as
     gaps until then (`normal` runs).
-22. **Poke and variant runs** (REC-590, REC-591): run
+23. **Poke and variant runs** (REC-590, REC-591): run
     `traces/scenarios/poke-spawn-town.scenario` on 1.14d (`poke.py`) and
     d2rs and compare; build `traces/variants/only-fallen` with
     `data-tool variant build` and confirm 1.14d loads it
