@@ -2054,10 +2054,9 @@ pub fn build_with(
     world.inventory = parts.inventory.map(preview_inv_parts);
     // The cube (d2rs-own, unverified, REC-119): the user's `cubemain`.
     world.cube = parts.cube.map(preview_cube_parts);
-    // A new character carries the Horadric Cube (d2rs-own, unverified,
-    // REC-244): charstats gives none, and the preview has no Act II quest
-    // reward path yet.
-    world.start_extra = vec![*b"box "];
+    // No extra start items: a new character gets the charstats slots only
+    // (REC-244 settled: 1.14d gives an Amazon stub 8 start items, Wine
+    // recording `--auto StubAma`, q-fix-real-start-cube).
     let mut s: Sim = SimGame::with_world(game, sim, world);
     s.announce_ground = true;
     s.set_host_sync(sync_seams);
