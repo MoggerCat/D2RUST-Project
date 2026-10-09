@@ -1,0 +1,13 @@
+check 1
+# Census: difficulty (nightmare): the town of act 1 in nightmare, a monster
+# spawned beside the player; state and rng channels.
+name sys-difficulty-nightmare
+save ScnAma --class ama --expansion --difficulty-unlocked nightmare --difficulty 1
+seed 1234
+ticks 100
+seconds 300
+difficulty nightmare
+channels state rng
+variant blood-moor-empty
+at 4 poke warp 2
+at 30 poke spawn 19 @x+4 @y+4 normal

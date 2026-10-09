@@ -1,0 +1,20 @@
+check 1
+# Census: base stats and derived values (sim/stats.md, sim/stat-lists.md §3-§6):
+# ScnAma level 30 in the Rogue Encampment; strength, energy, dexterity,
+# vitality, gold and the three resistances are set by pokes (the stat
+# write path of stat-lists §5); hp/mana/stamina are recomputed as
+# 1.14d does. State and rng channels.
+name sys-stats-base
+save ScnAma --class ama --expansion --level 30
+seed 1234
+ticks 80
+seconds 300
+channels state rng
+at 10 poke stat @player 0 0 120
+at 12 poke stat @player 1 0 90
+at 14 poke stat @player 2 0 200
+at 16 poke stat @player 3 0 150
+at 20 poke stat @player 14 0 7777
+at 24 poke stat @player 39 0 55
+at 26 poke stat @player 41 0 -30
+at 28 poke stat @player 43 0 40

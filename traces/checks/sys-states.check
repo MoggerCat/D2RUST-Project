@@ -1,0 +1,23 @@
+check 1
+# Census: states (sim/stat-lists.md §9): a set of player states switched on
+# and off by pokes (1 freeze, 2 poison, 5 slow, 9 shout, 16 stun, 21
+# berserk, 28 inferno, 65 hardcore-free ids too), then the same again
+# overlapping. State and rng channels.
+name sys-states
+save ScnAma --class ama --expansion --level 30
+seed 1234
+ticks 100
+seconds 300
+channels state rng
+at 10 poke state @player 1 on
+at 14 poke state @player 2 on
+at 18 poke state @player 5 on
+at 22 poke state @player 9 on
+at 26 poke state @player 16 on
+at 30 poke state @player 1 off
+at 34 poke state @player 21 on
+at 38 poke state @player 2 off
+at 42 poke state @player 5 off
+at 46 poke state @player 16 off
+at 50 poke state @player 9 off
+at 54 poke state @player 21 off

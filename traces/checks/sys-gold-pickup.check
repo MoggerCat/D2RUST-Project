@@ -1,0 +1,15 @@
+check 1
+# Census: gold on the ground, pickup and the gold stat (ground item flow):
+# two piles dropped next to the player, then the player walks onto them.
+# State and rng channels.
+name sys-gold-pickup
+save ScnAma --class ama --expansion --gold 500
+seed 1234
+ticks 120
+seconds 300
+channels state rng items
+at 4 poke seed-game 0x00001234 666
+at 4 poke item gld @x+3 @y
+at 4 poke item gld @x-3 @y ilvl 30
+at 20 send Walk x=@x+3 y=@y
+at 60 send Walk x=@x-3 y=@y

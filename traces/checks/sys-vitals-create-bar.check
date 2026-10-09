@@ -1,0 +1,13 @@
+check 1
+# Census: creation values and regeneration (combat/vitals.md §1, §5): a
+# barbarian at level 1 hurt to half life, mana and stamina at frame 10,
+# idle for 200 ticks (regeneration per tick). State and rng channels.
+name sys-vitals-create-bar
+save ScnBar --class bar --expansion
+seed 1234
+ticks 220
+seconds 300
+channels state rng
+at 10 poke stat @player 6 0 2560
+at 10 poke stat @player 8 0 1024
+at 10 poke stat @player 10 0 5120

@@ -1,0 +1,10 @@
+check 1
+# Census: the tick loop in Harrogath (sim/tick.md, flows/server-tick.md), 300
+# ticks idle, a barbarian (act 5 town, different NPC set and timers). State
+# and rng channels.
+name sys-tick-idle-a5
+save ScnBa5 --class bar --expansion --act 4 --quests acts=4
+seed 1234
+ticks 300
+seconds 400
+channels state rng

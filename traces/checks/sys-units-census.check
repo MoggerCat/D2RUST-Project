@@ -1,0 +1,21 @@
+check 1
+# Census: unit creation, lifecycle and modes (sim/units.md §1-§6) in the empty
+# Blood Moor: a monster, a super unique, an object, a ground item and a
+# missile are created by pokes, each class of unit type 0-5 once. State and
+# rng channels.
+name sys-units-census
+save ScnAma --class ama --expansion
+seed 1234
+ticks 140
+seconds 360
+channels state rng
+variant blood-moor-empty
+at 4 poke warp 2
+at 30 poke seed-game 0x00001234 666
+at 30 poke seed-unit @player 0x00000055 666
+at 30 poke spawn 19 @x+4 @y+4 normal
+at 34 poke object 119 @x-4 @y+4
+at 38 poke item hp1 @x+2 @y+2
+at 42 poke missile 12 @x @y @x+5 @y+5 skill 7 5
+at 46 poke spawn 63 @x+5 @y-5 unique
+at 60 poke spawn 5 @x-5 @y-5 champion

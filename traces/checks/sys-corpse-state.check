@@ -1,0 +1,11 @@
+check 1
+# Census: death and the player's corpse on the state channel (combat/vitals.md
+# §4.7-§4.8): hitpoints to zero at frame 10, 200 ticks idle through the death
+# animation, the corpse unit and the respawn timer.
+name sys-corpse-state
+save ScnAma --class ama --expansion --level 15 --gold 900
+seed 1234
+ticks 220
+seconds 300
+channels state rng
+at 10 poke stat @player 6 0 0

@@ -1,0 +1,14 @@
+check 1
+# Census: a town portal (object created in the field, operated back to the
+# town, and the return trip): Blood Moor to the Rogue Encampment and back.
+# State and rng channels.
+name sys-town-portal
+save ScnAma --class ama --expansion
+seed 1234
+ticks 180
+seconds 400
+channels state rng
+variant blood-moor-empty
+at 4 poke warp 2
+at 30 poke object 59 @x+3 @y
+at 40 send InteractWithEntity type=2 id=@2:59

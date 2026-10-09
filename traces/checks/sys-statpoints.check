@@ -1,0 +1,17 @@
+check 1
+# Census: spending stat points (combat/vitals.md §2, message 0x3A): level 10
+# with 25 unspent points; one point to each of strength (0), energy (1),
+# dexterity (2), vitality (3), then a repeat of 5 on vitality and a point
+# on an invalid stat. State and rng channels.
+name sys-statpoints
+save ScnAma --class ama --expansion --level 10 --stat 4=25
+seed 1234
+ticks 70
+seconds 300
+channels state rng
+at 10 send AddStatPoint stat=0 repeat=1
+at 14 send AddStatPoint stat=1 repeat=1
+at 18 send AddStatPoint stat=2 repeat=1
+at 22 send AddStatPoint stat=3 repeat=1
+at 26 send AddStatPoint stat=3 repeat=5
+at 30 send AddStatPoint stat=7 repeat=1
