@@ -32,28 +32,28 @@
 |   2. Unit table | 140–189 |
 |   3. Local player | 190–212 |
 |   4. Receive and the unit message queue | 213–250 |
-|   5. Client update pass | 251–396 |
-|   6. Position check (`0x004804E0`) | 397–440 |
-|   7. Session messages | 441–638 |
-|   8. Mode requests | 639–724 |
-|   9. Room-in-sight messages | 725–759 |
-|   10. Bit reader | 760–774 |
-|   11. Current act and level (join and later) | 775–820 |
-|   12. Client DRLG and the room of a point | 821–862 |
-|   13. Visibility predicate (`0x004DBF20`) | 863–914 |
-|   14. Pet list and the hireling GUID | 915–979 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 980–1069 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 1070–1104 |
-|   17. Model writes made by 1.14d UI code | 1105–1310 |
-|   18. Audio driver inputs and the client object functions | 1311–1341 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1342–1571 |
-|   20. Player mode steps (`0x00463390`) and the local player's next action | 1572–1732 |
-| Constants & data dependencies | 1733–1745 |
-| Randomness | 1746–1761 |
-| Edge cases & original bugs | 1762–1786 |
-| Test vectors | 1787–1844 |
-| Provenance | 1845–1950 |
-| Open questions | 1951–2146 |
+|   5. Client update pass | 251–416 |
+|   6. Position check (`0x004804E0`) | 417–460 |
+|   7. Session messages | 461–658 |
+|   8. Mode requests | 659–744 |
+|   9. Room-in-sight messages | 745–779 |
+|   10. Bit reader | 780–794 |
+|   11. Current act and level (join and later) | 795–840 |
+|   12. Client DRLG and the room of a point | 841–882 |
+|   13. Visibility predicate (`0x004DBF20`) | 883–934 |
+|   14. Pet list and the hireling GUID | 935–999 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 1000–1089 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 1090–1124 |
+|   17. Model writes made by 1.14d UI code | 1125–1330 |
+|   18. Audio driver inputs and the client object functions | 1331–1361 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1362–1591 |
+|   20. Player mode steps (`0x00463390`) and the local player's next action | 1592–1752 |
+| Constants & data dependencies | 1753–1765 |
+| Randomness | 1766–1781 |
+| Edge cases & original bugs | 1782–1806 |
+| Test vectors | 1807–1864 |
+| Provenance | 1865–1970 |
+| Open questions | 1971–2166 |
 <!-- /index -->
 
 ## Summary
@@ -393,6 +393,26 @@ position check of the local player.
       and its walk end (positions of the recorded chickens from tick 8).
       The 0xAC set-up of a critter (r6.3: `0x004AE8D0`, the first frame,
       the light) is not run on set C either (same REC).
+      *Recorded, REC-742 (2026-10-09, PC 1, Windows; scratch poll probe of
+      set C `0x007A5270`, no breakpoints, ScnAma `-seed 1234`, 25 s after
+      arrival):* 15 chickens (class 149: GUIDs 2–7, 90–95, 122–124), all
+      created in mode 1 with path count 0 and target (0, 0). Only the two
+      nearest the player, 93 at (4871, 4242) and 94 at (4877, 4254),
+      ever change mode or target; the other 13 keep mode 1, cell and
+      target for the whole run. A walk is mode 2 with a one-point path
+      (+0x24 / +0x28 = 0 / 1) to a target **2 sub-tiles away on a
+      diagonal** (e.g. (4871, 4242) → (4869, 4244) → (4871, 4246) →
+      (4869, 4244) → (4871, 4246) → (4873, 4248) → (4875, 4246) → (4877,
+      4244)); it ends in mode 1 with count 0 either on the target (4
+      walks, ~1.2 s each) or **one sub-tile short** of it (94: (4877,
+      4254) → target (4875, 4252), stopped at (4876, 4253) after 0.6 s;
+      93: (4875, 4246) → (4877, 4244), stopped at (4876, 4245)). After a
+      stop short, every later think writes a new diagonal ±2 target into
+      path +0x10 / +0x12 but leaves count 0 and mode 1 (no walk): 94 from
+      1.5 s and 93 from 12.1 s stay in their cell to the end (about 4 new
+      targets per 10 s each). So the C monster's walk does use the path
+      (target, one point, compute that can fail or stop on collision),
+      and d2rs's "keep the unit in its cell" matches only the idle ones.
 
 ### 6. Position check (`0x004804E0`)
 
