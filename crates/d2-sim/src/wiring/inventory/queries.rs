@@ -243,13 +243,30 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
                     .is_some_and(|(e, _, _)| u32::from(e) == EVENT_REPLENISH)
             });
         let frame = self.econ.game.frame as u32;
-        let ran = self.econ.with_item(target, |s| {
-            let ran = props::activate_runeword(s.tables, s.item, row, ladder);
-            (
-                ran,
-                ran.then(|| replenish_timer(&s.item.stats, scheduled, frame))
-                    .flatten(),
-            )
+        // `properties.md` §10.2: I is the filler just inserted (the last
+        // of the socketed item's inventory list), O the socketed item.
+        let Some(filler) = self
+            .state
+            .inventories
+            .get(&target)
+            .and_then(|inv| inv.items().last().copied())
+        else {
+            return (false, Vec::new());
+        };
+        let ran = self.econ.with_item(filler, |s| {
+            let mut socketed = s.unit_stats(target);
+            props::activate_runeword(s.tables, s.item, &mut socketed, row, ladder)
+        });
+        let ran = ran.and_then(|ran| {
+            if !ran {
+                return Ok((false, None));
+            }
+            if let Some(i) = self.econ.items.get_mut(target) {
+                i.flags |= crate::items::flag::RUNEWORD;
+            }
+            self.econ.with_item(target, |s| {
+                (true, replenish_timer(&s.item.stats, scheduled, frame))
+            })
         });
         self.sync_in();
         let ran = match ran {

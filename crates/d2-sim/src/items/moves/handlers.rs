@@ -639,11 +639,14 @@ pub fn swap_1h_2h_body<W: MoveWorld>(
         return Ok(Outcome::REFUSED);
     }
     // Step 3: `0x0063CB00` = a free position of page 0 for X (§2.3).
+    // X missing is fatal (unreachable after §4.3 = 7, which needs X).
     let o = other_hand(loc);
-    let x = w.body_item(p, o);
-    let Some(x) = x.filter(|&x| w.find_free(p, x, page::INVENTORY).is_some()) else {
-        return Ok(Outcome::REFUSED);
+    let Some(x) = w.body_item(p, o) else {
+        return Err(MoveFatal::Missing);
     };
+    if w.find_free(p, x, page::INVENTORY).is_none() {
+        return Ok(Outcome::REFUSED);
+    }
     // Step 4.
     if w.mode(x) == mode::EQUIPPED {
         leave_body_quiet(w, p, x)?;
@@ -1485,8 +1488,10 @@ pub fn merc_take<W: MoveWorld>(
     merc: Owner,
     loc: u16,
 ) -> Result<u32, MoveFatal> {
-    if !valid_loc(u32::from(loc)) {
-        return Ok(res::BAD);
+    // `0x0054D141`–`0x0054D15E`: classic, a hireling without an
+    // inventory, or a location outside 1..10 → 3.
+    if !w.expansion() || !w.has_inventory(merc) || !valid_loc(u32::from(loc)) {
+        return Ok(res::REFUSED);
     }
     let loc = loc as u8;
     let Some(it) = w
@@ -1495,8 +1500,9 @@ pub fn merc_take<W: MoveWorld>(
     else {
         return Ok(res::BAD);
     };
+    // The unlink must return the item, else 2.
     if !w.unlink(merc, it) {
-        return Err(MoveFatal::Unlink);
+        return Ok(res::BAD);
     }
     w.clear_body_slot(merc, loc);
     w.stat_refresh_unlink(merc, 0);

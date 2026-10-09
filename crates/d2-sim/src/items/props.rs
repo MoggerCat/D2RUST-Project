@@ -310,6 +310,15 @@ fn damage<S: ItemStats>(
     v
 }
 
+/// The skill of functions 11 and 19 (§5 r4, r9; §14 `0x0065E170`):
+/// `param`, or 0 when it is outside the skills table.
+fn skill_or_zero(t: &ItemTables, param: i32) -> usize {
+    usize::try_from(param)
+        .ok()
+        .filter(|&s| s < t.skills.len())
+        .unwrap_or(0)
+}
+
 /// One property function (§5). Returns the function's value.
 #[allow(clippy::too_many_arguments)]
 fn call<S: ItemStats>(
@@ -350,16 +359,14 @@ fn call<S: ItemStats>(
             v
         }
         11 => {
-            let Some(sk) = usize::try_from(rec.param)
-                .ok()
-                .and_then(|s| t.skills.get(s))
-                .copied()
-            else {
+            // §5 r4: `param` outside the skills table → skill 0.
+            let skill = skill_or_zero(t, rec.param);
+            let Some(sk) = t.skills.get(skill).copied() else {
                 return 0;
             };
             let chance = if rec.min < 1 { 5 } else { rec.min };
             let level = skill_level(ilvl, sk.reqlevel, sk.maxlvl, rec.max);
-            let layer = (rec.param as u16)
+            let layer = (skill as u16)
                 .wrapping_mul(64)
                 .wrapping_add((level & 63) as u16);
             add_stat(t, item, ctx, set, id, layer, chance)
@@ -419,11 +426,9 @@ fn call<S: ItemStats>(
             b
         }
         19 => {
-            let Some(sk) = usize::try_from(rec.param)
-                .ok()
-                .and_then(|s| t.skills.get(s))
-                .copied()
-            else {
+            // §5 r9: an invalid `param` → skill 0.
+            let skill = skill_or_zero(t, rec.param);
+            let Some(sk) = t.skills.get(skill).copied() else {
                 return 0;
             };
             let level = skill_level(ilvl, sk.reqlevel, sk.maxlvl, rec.max);
@@ -439,8 +444,7 @@ fn call<S: ItemStats>(
                 c = 255;
             }
             let r = item.item_seed.roll(c - c / 8) as i32;
-            let layer =
-                ((rec.param as u32) << t.stat_shift).wrapping_add(level as u32 & t.stat_mask);
+            let layer = ((skill as u32) << t.stat_shift).wrapping_add(level as u32 & t.stat_mask);
             // OQ 5: as function 18.
             set_raw(
                 item,
@@ -680,12 +684,17 @@ pub fn runeword_row(
     })
 }
 
-/// §10.2: activates runes row `row` on the item. `ladder` is game +0x74.
-/// Returns whether the runeword properties ran; the caller then re-runs
-/// the replenish timers ([`super::replenish_timer`]).
+/// §10.2: activates runes row `row` with the filler just inserted as I
+/// (`filler`: its item seed draws every §4.1 roll, its items row every
+/// §4.3 reset) and the socketed item's stats as O (`socketed`: its
+/// state-171 list, flags 0x40, receives the stats). `ladder` is game
+/// +0x74. Returns whether the runeword properties ran; the caller then
+/// sets item flag 0x4000000 ([`flag::RUNEWORD`]) on the socketed item
+/// and re-runs its replenish timers ([`super::replenish_timer`]).
 pub fn activate_runeword<S: ItemStats>(
     t: &ItemTables,
-    item: &mut Item<S>,
+    filler: &mut Item<S>,
+    socketed: &mut dyn ItemStats,
     row: usize,
     ladder: bool,
 ) -> bool {
@@ -699,17 +708,16 @@ pub fn activate_runeword<S: ItemStats>(
         state: STATE_RUNEWORD,
         flags: LIST_FLAGS,
     };
-    if item.stats.has_list(key) {
+    if socketed.has_list(key) {
         return false;
     }
     let props = w.props;
-    item.flags |= flag::RUNEWORD;
     let mut ctx = PropCtx {
         mode: mode::RUNEWORD,
         list: key,
-        owner: None,
+        owner: Some(socketed),
     };
-    run_until_none(t, item, &mut ctx, &props);
+    run_until_none(t, filler, &mut ctx, &props);
     true
 }
 
