@@ -120,3 +120,58 @@ points), path target = its position.
   - REC-511: d2rs differs, `q-fix-p6-shadow-pretest`.
   - Side note: `render/unit-composite.md` §4 and `client/model.md` §13 r2
     call the fourth argument "centering off". It is never read.
+
+## Round 2 — placement of the Act IV / V bosses and quest objects (item 1)
+
+Measured on 1.14d (PC 1, Windows, `-seed 1234`, saves `d2s-tool new --class
+sor --expansion --act 2` (Act IV targets, from the Pandemonium Fortress) or
+`--act 4` (Act V, from Harrogath)). Method: `poke warp <level>`, then
+`pos @player` steps toward the target, with `record_state.py` snapshots every
+frame. Rooms and presets come from `autostart.py` `dumpdrlg rooms<id>` (new:
+the level's DRLG rooms with tile rect, type and lvlprest index). The DS1
+positions come from the extracted DS1 files. Level origin = level rect × 5.
+
+| Target | Level | Room (tile x, y, 8×8) / preset | x, y | Class, GUID, mode | Created |
+|---|---|---|---|---|---|
+| Izual | 105 Plains of Despair (rect 1064, 912, 64×80) | (1112, 960), lvlprest 822 `Act4/Mesa/Mid08X08Izual.ds1`, type-1 preset id 13 at (18, 18) | (5578, 4818) = room origin + (18, 18) | monster 256, GUID 91, mode 1 | on approach (room activation); first seen at Chebyshev 57 in a 30-step sweep |
+| Hellforge | 107 River of Flame (maze, rect 1500, 1120, 144×192) | (1532, 1248) in the Forge E block (1524..1548, 1240..1264), lvlprest 854 `Act4/Lava/ForgeE.ds1` | (7661, 6255) | object 376, GUID 106, mode 0 | on approach: frame 89, the player in room (1540, 1248) next to it, Chebyshev 77 |
+| Hephasto | 107 | same room; ForgeE type-1 preset id 27 at (65, 60) → (7685, 6260) | (7672, 6270) | monster 409 (superunique 41), GUID 81, mode 1 | on approach, the same frame as the forge, Chebyshev 66 |
+| Anya (frozen) | 114 Frozen River (rect 2000, 1300, 64×64) | (2008, 1308), lvlprest 1038 (RiverIce01..04 by seed; this seed's matches RiverIce03, whose type-1 id 46 is at (50, 58)) | (10056, 6551) | object 558 `fana`, GUID 72, mode 0; **no** monster 512 / 527 | on approach, Chebyshev 30 (10-step path) |
+| Nihlathak | 124 Halls of Vaught (rect 2500, 1000, 84×84) | (2540, 1072), lvlprest 864, `NihlN.ds1` (type-1 id 49 at (207, 393)) | (12706, 5391) | monster 526, GUID 66, mode 1 | on approach; first seen at Chebyshev 51 in a 30-step sweep |
+| Baal (throne) | 131 Throne of Destruction (rect 3000, 1000, 40×52) | (3016, 1000), lvlprest 1086 `wthrone.ds1`, type-1 id 28 at (90, 11) | (15090, 5011) = level origin + (90, 11) | monster 543, GUID 53, mode 1 | on approach, Chebyshev 60 (from the south entrance at (15103, 5213)) |
+| Worldstone Chamber portal | 131 | same room | (15090, 5005) | object 563, GUID 71, mode 1 | on approach with Baal, Chebyshev 66; present with no quest progress |
+
+Arrival points of the warps (tile 0): 105 (5456, 4731), 107 (7803, 5918),
+114 (10303, 6603), 124 (12727, 5223), 131 (15103, 5213).
+
+Approach rule: none of the targets exists when the level loads. Each is
+created when its room is populated, which happens when the player's room
+becomes one of its near rooms (Hellforge and Hephasto: the player stepped
+into the neighbouring room (1540, 1248)). The distances above therefore
+depend on the room grid and the approach path, not on a fixed radius.
+
+Recording notes:
+- `pos` reaches only rooms near the player's room (the room comes from
+  `0x00463740`), so a blind sweep stalls in mazes and voids. Use the room
+  dump to plan a path through rooms.
+- A frozen-Anya monster is never created at this point. Only the object
+  exists.
+
+Check files (1.14d side recorded with `scenario_diff.py <check> --orig-only`):
+`traces/checks/milestone-{izual,hellforge,hephasto,anya,nihlathak,baal-throne,worldstone-portal}.check`.
+
+The check runs reproduce every position, class and mode above. The GUIDs
+depend on the order in which rooms are populated, so they follow the path
+taken. The values for the check files' own paths:
+
+| Check | GUID | First seen | Player then | Chebyshev |
+|---|---|---|---|---|
+| milestone-izual | 24 | f 28 | (5520, 4780) | 58 |
+| milestone-hellforge | 89 | f 133 | (7730, 6260) | 69 |
+| milestone-hephasto | 80 | f 133 | (7730, 6260) | 58 |
+| milestone-anya | 68 | f 92 | (10070, 6560) | 14 |
+| milestone-nihlathak | 38 | f 40 | (12721, 5329) | 62 |
+| milestone-baal-throne | 53 | f 52 | (15100, 5070) | 59 |
+| milestone-worldstone-portal | 71 | f 52 | (15100, 5070) | 65 |
+
+The harness should test class and position, not GUID.
