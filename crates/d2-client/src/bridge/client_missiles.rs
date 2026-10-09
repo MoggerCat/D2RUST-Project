@@ -90,6 +90,13 @@ pub struct ClientMissileRow {
     /// `Size` (+0x18A), the missile's unit size (`sim/path-placement.md`
     /// §3).
     pub size: u8,
+    /// `RandStart` (the disc's frame offset, `client-bodies.md` §B3 r3).
+    pub rand_start: i32,
+    /// `ProgSound` (i16; function 47, `client-bodies-2.md` §B11).
+    pub prog_sound: i16,
+    /// The server columns `Param1`, `Param2` (+0x38, +0x3C; function 58
+    /// reads `Param1`, `client-bodies-2.md` Edge case 7).
+    pub param: [i32; 2],
 }
 
 /// The create record (`missiles.md` §R2.1, 0x5C bytes) as the client
@@ -189,6 +196,10 @@ pub struct ClientMissile {
     /// by the creator unless a body writes them.
     pub d28: i32,
     pub d2c: i32,
+    /// Missile data +0x04 / +0x06 (`client-bodies.md` §B1 d04, d06; i16):
+    /// written only by client skill functions, 0 otherwise.
+    pub d04: i16,
+    pub d06: i16,
     /// The path new-step flag (path +0x34 bit 3, `client-bodies.md` §B2):
     /// the last path step entered a new sub-tile.
     pub new_step: bool,
@@ -493,6 +504,29 @@ pub fn create(
     Ok(Some(key))
 }
 
+/// A create made by the client missile `parent` (its bodies, §C9 r4.5):
+/// [`create`] with the record's owner direction, when the record names
+/// none, read as the parent missile's direction.
+///
+/// PROVISIONAL (REC-543): the aim nudge (§C2 r8) reads the owner's
+/// direction `0x00620100`, which the model does not hold (unit
+/// directions live in the view's poses); a child created by a missile
+/// takes its parent's direction instead. Found on the user's rows (a
+/// child with velocity aimed at its own start, `app_client_drlg`
+/// `the_users_client_missiles_run_their_functions`).
+fn create_from(
+    w: &mut ClientWorld,
+    env: &Env,
+    parent: UnitKey,
+    rec: &CreateRecord,
+) -> Result<Option<UnitKey>, HandlerError> {
+    let mut rec = *rec;
+    if rec.owner_dir64.is_none() {
+        rec.owner_dir64 = w.objclient.missiles.get(&parent).map(|m| m.direction);
+    }
+    create(w, env.rows, &rec, env.lights)
+}
+
 /// The room of a point through the client DRLG (`0x00619DA0`).
 fn point_room(w: &ClientWorld, x: i32, y: i32) -> Option<super::world::ActiveRoom> {
     let rooms = w.active_rooms.as_deref()?;
@@ -599,6 +633,25 @@ pub const FN_HEIGHT_WINDOW: u16 = 59;
 pub const FN_SPIRIT: u16 = 65;
 pub const FN_GUIDED: u16 = 7;
 pub const FN_METEOR: u16 = 9;
+pub const FN_CURSE_CENTRE: u16 = 17;
+pub const FN_SPEAR_TRAIL: u16 = 18;
+pub const FN_WANDER_MAKER: u16 = 27;
+pub const FN_DIABLO_APPEARS: u16 = 37;
+pub const FN_FRAME_ZERO: u16 = 39;
+pub const FN_JAVELIN_TRAIL: u16 = 46;
+pub const FN_RECYCLER: u16 = 51;
+pub const FN_WAKE_MAKER: u16 = 52;
+pub const FN_MON_BLIZZARD: u16 = 10;
+pub const FN_BLIZZARD: u16 = 13;
+pub const FN_FROZEN_ORB: u16 = 19;
+pub const FN_ORB_NOVA: u16 = 20;
+pub const FN_DISTRACTION: u16 = 44;
+pub const FN_DISTRACTION_FOG: u16 = 45;
+pub const FN_MOLTEN_BOULDER: u16 = 47;
+pub const FN_ERUPTION: u16 = 48;
+pub const FN_TIGER_FURY: u16 = 53;
+pub const FN_CHAOS_ICE: u16 = 58;
+pub const FN_SUC_FIREBALL: u16 = 68;
 
 /// The per-update dispatch `0x004D2C70` (§C6) of the set-C missile `key`.
 pub fn update(
@@ -729,6 +782,38 @@ pub fn update_with(w: &mut ClientWorld, env: &Env, key: UnitKey) -> Result<(), H
         FN_SPIRIT => bodies::spirit(w, env, key, &row),
         FN_GUIDED => bodies::guided(w, env, key, &row),
         FN_METEOR => bodies::meteor(w, env, key, &row),
+        FN_CURSE_CENTRE => bodies::curse_centre(w, env, key, &row),
+        FN_SPEAR_TRAIL => bodies::spear_trail(w, env, key, &row),
+        FN_WANDER_MAKER => bodies::wander_maker(w, env, key, &row),
+        FN_FRAME_ZERO => bodies::frame_zero(w, env, key, &row),
+        FN_JAVELIN_TRAIL | FN_WAKE_MAKER => bodies::pair_trail(w, env, key, &row),
+        FN_RECYCLER => bodies::recycler(w, env, key, &row),
+        FN_MON_BLIZZARD => bodies::mon_blizzard(w, env, key, &row),
+        FN_BLIZZARD => bodies::blizzard(w, env, key, &row),
+        FN_FROZEN_ORB => bodies::frozen_orb(w, env, key, &row),
+        FN_ORB_NOVA => bodies::orb_nova(w, env, key, &row),
+        FN_DISTRACTION => bodies::distraction(w, env, key, &row),
+        FN_DISTRACTION_FOG => {
+            // `client-bodies-2.md` §B11 45: S1 < 0 → remove; scatter(m,
+            // P1, P2, P3, S1); step.
+            let s1 = row.clt_sub[0];
+            if s1 < 0 {
+                remove(w, key);
+                return Ok(());
+            }
+            let [p1, p2, p3, ..] = row.clt_param;
+            scatter(w, env, key, p1, p2, p3, i32::from(s1))?;
+            default_step(w, env, key, &row)
+        }
+        FN_MOLTEN_BOULDER => bodies::molten_boulder(w, env, key, &row),
+        FN_ERUPTION => bodies::eruption(w, env, key, &row),
+        FN_TIGER_FURY => bodies::tiger_fury(w, env, key, &row),
+        FN_CHAOS_ICE => bodies::chaos_ice(w, env, key, &row),
+        FN_SUC_FIREBALL => bodies::suc_fireball(w, env, key, &row),
+        // §C13 37: frames left 150 → the shake (`render/camera.md` §8,
+        // row `q-fix-shake-starts`), 50 → sound 4,638 (audio); both not
+        // modelled; every branch steps.
+        FN_DIABLO_APPEARS => default_step(w, env, key, &row),
         // f ≤ 0: never stepped (§C6 r5); other functions: not modelled.
         _ => Ok(()),
     }
@@ -765,7 +850,7 @@ fn trail(
             level: m.level,
             ..CreateRecord::default()
         };
-        if let Some(child) = create(w, env.rows, &rec, env.lights)? {
+        if let Some(child) = create_from(w, env, key, &rec)? {
             let crow = env.rows.get(s1 as usize).copied().unwrap_or_default();
             let p2 = crow.clt_param[1];
             if p2 > 0 {
@@ -820,7 +905,7 @@ fn scatter(
             level: m.level,
             ..CreateRecord::default()
         };
-        create(w, env.rows, &rec, env.lights)?;
+        create_from(w, env, key, &rec)?;
     }
     Ok(())
 }
@@ -847,7 +932,7 @@ fn spawn(
         level: m.level,
         ..CreateRecord::default()
     };
-    create(w, env.rows, &rec, env.lights)
+    create_from(w, env, key, &rec)
 }
 
 /// Function 25 `0x004D4DC0` (`client-bodies.md` §B4, `towermist`): S1 <
@@ -886,7 +971,7 @@ fn mist(
             level: m.level,
             ..CreateRecord::default()
         };
-        create(w, env.rows, &rec, env.lights)?;
+        create_from(w, env, key, &rec)?;
     }
     default_step(w, env, key, row)
 }
@@ -951,7 +1036,7 @@ fn wall_maker(
     if p1 == 0 || rnd(w, key, p1) != 0 {
         rec.flags |= flag::NO_LIGHT;
     }
-    if let Some(child) = create(w, env.rows, &rec, env.lights)? {
+    if let Some(child) = create_from(w, env, key, &rec)? {
         if let Some(cm) = w.objclient.missiles.get_mut(&child) {
             cm.pos = m.pos;
         }
@@ -1277,7 +1362,7 @@ pub fn end_with(
                     level: m.level,
                     ..CreateRecord::default()
                 };
-                x = create(w, env.rows, &rec, env.lights)?;
+                x = create_from(w, env, key, &rec)?;
                 if let Some(xk) = x {
                     // X's motion position := m's (x, y, z), done,
                     // restart. PROVISIONAL (REC-541; Open question 10):

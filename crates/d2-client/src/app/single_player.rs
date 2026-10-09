@@ -1691,6 +1691,9 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
             town: m.town,
             clt_src_town: m.cltsrctown,
             size: m.size,
+            rand_start: m.randstart as i32,
+            prog_sound: m.progsound as i16,
+            param: [m.param1 as i32, m.param2 as i32],
         })
         .collect();
     let states: Vec<d2_data::tables::States> = decode_all(table("states")?).map_err(err)?;
