@@ -158,6 +158,11 @@ with the mouse outside the window**; until then REC-290 ticks are equal over 60 
 | `wiring/inventory/units.rs:226` (REC-121) | **settled (confirmed)** (`facts/items/a1-town-socket-fill.tsv`) |
 | REC-188 server half (not an index row) | confirmed: the join's 0x1D–0x1F carry base stats only (dex 25 with a +1 dex charm), and moving a charm or an equipped magic ring sends no stat message (`facts/items/a1-town-charm-ring.tsv`, raw g2charm); the client's list attach (`item_lists.rs:14`) and REC-163's server link are not visible on the wire: open |
 
+Chests by poke (`object 5 @x+4 @y+4`, Cold Plains): created and opened (C→S 0x13 → S→C 0x0E
+mode change), but nothing drops: the `object` directive's allocator path does not run the chest's
+init (`objects.md` init 3), so a poked chest is not a real chest. REC-260 / REC-93 need a preset
+chest (a route to one, or a poke that runs the object init).
+
 ## Where the rest is blocked (2026-10-09, end of this session)
 
 Remaining `recording` rows after the runs above: see the last
