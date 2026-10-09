@@ -566,6 +566,14 @@ pub fn audio_request(o: &Output) -> Option<SoundRequest> {
             id: sound as i32,
             unit: player,
         },
+        &Output::MissileSound(m) => {
+            use crate::bridge::client_missiles::MissileSound as M;
+            match m {
+                M::Request { id, missile } => SoundRequest::UnitRequest { id, unit: missile },
+                M::StopOwnerGroup { owner, id } => SoundRequest::GroupStop { unit: owner, id },
+                M::DetachTravel { missile, id } => SoundRequest::GroupDetach { unit: missile, id },
+            }
+        }
         _ => return None,
     })
 }

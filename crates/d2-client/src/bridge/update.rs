@@ -135,6 +135,8 @@ pub fn update_pass(
     if let Err(error) = lighting_update(world, inputs) {
         log.rejected.push(Rejected { id: 0, error });
     }
+    // The Den lights' creates (`render/lighting.md` §10 r5).
+    missile_sounds(world, outputs);
     move_freed(world, outputs);
     applied
 }
@@ -167,7 +169,20 @@ fn c_missiles(
             log.rejected.push(Rejected { id: 0, error });
         }
     }
+    missile_sounds(world, outputs);
     move_freed(world, outputs);
+}
+
+/// The client missiles' sound calls (`audio/triggers.md` §8 r3) in
+/// update order, before the frees of the same walk.
+fn missile_sounds(world: &mut ClientWorld, outputs: &mut Vec<Output>) {
+    outputs.extend(
+        world
+            .objclient
+            .missile_sounds
+            .drain(..)
+            .map(Output::MissileSound),
+    );
 }
 
 fn c_objects(
