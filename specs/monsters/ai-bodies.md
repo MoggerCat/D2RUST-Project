@@ -14,7 +14,7 @@
 |---|---|
 | Summary | 20–26 |
 | Rules | 27–28 |
-|   9. Per-AI behaviours | 29–871 |
+|   9. Per-AI behaviours | 29–879 |
 <!-- /index -->
 
 ## Summary
@@ -309,11 +309,19 @@ compare, `docs/handoff/q-scenes-compare.md`):
    that think.
 
 d2rs (`monsters/ai/npc.rs` `npc_map_ai`, `rng.rs` `roll`) follows rules
-1–4. The Act I scene difference (d2rs's Warriv standing on (4866, 4235)
-at r110 while 1.14d's walks east) is therefore not in the node choice;
-it is the seed state or the think in which the pick happens (unit seed
-order, `q-fix-real-unit-seed-order`), or the step-3 gate (§6.4). Which
-one is a live run (PC1-C, `docs/handoff/pc1-day3-a.md` "Live runs").
+1–4. Recorded 2026-10-09 (Windows, SceSor, `-seed 1234`, 120 ticks):
+at the Act I arrival Warriv (1:7) takes no map-AI path at all. His
+unit seed draws once (frame 2, `0x00573F8F`, `roll(1)`), the active
+test passes for the player at every think (S→C `8a 01 07000000` at
+frames 24, 45, 56, 67, 87, 107; `world/quests.md` §6.4), and his walks
+are step 7's walk in radius: (4866, 4235) → (4868, 4233) at frame 24,
+→ (4869, 4232) at 45, → (4870, 4231) at 56, stop at 67. A d2rs
+state-dump of the same save (release build of 2026-10-09) equals the
+1.14d state recording for Warriv in mode, position, sub-tile fraction
+and target on every frame 22–47, and has the same four walk / stop
+frames to 120. So the scene note "d2rs's `wa` stands on (4866, 4235)
+at r110" (`docs/handoff/q-scenes-compare.md`, scene tick 42) came from
+an older build.
 
 1.14d-confirmed (all functions above); D2MOO differs: it tests the
 interaction block the other way round (returns 0 when one exists) and

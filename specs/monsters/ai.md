@@ -28,21 +28,21 @@
 | Inputs | 72–83 |
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
-|   1. Think scheduling | 97–245 |
-|   2. Think dispatch `0x005B1740` | 246–382 |
-|   3. AI control and AI tables | 383–554 |
-|   4. AI parameters | 555–573 |
-|   5. Target selection | 574–732 |
-|   6. Distances and line tests | 733–747 |
-|   7. Tactics helpers | 748–972 |
-|   8. AI commands and minions | 973–997 |
-|   10. The catalogue `ai-functions.tsv` | 998–1018 |
-| Constants & data dependencies | 1019–1042 |
-| Randomness | 1043–1064 |
-| Edge cases & original bugs | 1065–1106 |
-| Test vectors | 1107–1195 |
-| Provenance | 1196–1252 |
-| Open questions | 1253–1356 |
+|   1. Think scheduling | 97–247 |
+|   2. Think dispatch `0x005B1740` | 248–384 |
+|   3. AI control and AI tables | 385–556 |
+|   4. AI parameters | 557–575 |
+|   5. Target selection | 576–734 |
+|   6. Distances and line tests | 735–749 |
+|   7. Tactics helpers | 750–974 |
+|   8. AI commands and minions | 975–999 |
+|   10. The catalogue `ai-functions.tsv` | 1000–1020 |
+| Constants & data dependencies | 1021–1044 |
+| Randomness | 1045–1066 |
+| Edge cases & original bugs | 1067–1108 |
+| Test vectors | 1109–1197 |
+| Provenance | 1198–1254 |
+| Open questions | 1255–1358 |
 <!-- /index -->
 
 ## Summary
@@ -103,7 +103,9 @@ args 0, 0, default handler. The monster class handler `0x005A7F80`
 dispatches it to `0x005B1740` through table `0x006E2490` entry 2, but
 drops it without running when the monster has state 1 (D2MOO
 `STATE_FREEZE`) and is not dead (`0x005541B0`); `tick.md` §5.6. A dropped
-think is not rescheduled by the dispatcher. The freeze itself schedules
+think is not rescheduled by the dispatcher. A dead monster's think is **not** dropped here; it has none
+because the death clean-up cancels its type-2 events (`sim/units.md`
+§4.6 "What keeps a dead monster dead"). The freeze itself schedules
 the next think twice:
 
 1. Freeze apply `0x0057B230` (combat spec owns the length): delete the
