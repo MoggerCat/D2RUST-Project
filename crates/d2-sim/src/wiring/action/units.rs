@@ -25,7 +25,7 @@ use crate::units::hooks::{Sim, UnitHooks};
 use crate::units::lifecycle::{AllocRequest, LifecycleHooks};
 use crate::units::modes::UnitError;
 use crate::units::modes::MONSTER_MODES;
-use crate::units::record::{flags2, AnimRecord, ANIM_EVENTS};
+use crate::units::record::{flags2, AnimRecord, Sequence, ANIM_EVENTS};
 use crate::units::{UnitId, UnitType};
 
 use super::combat::HIRELING_CLASSES;
@@ -152,6 +152,32 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     /// (`units.md` §4.1, `animdata.md` §5).
     fn anim_record(&mut self, sim: &Sim<'_>, unit: UnitId) -> Option<AnimRecord> {
         self.anim_lookup(sim, unit).map(|r| anim_record(&r))
+    }
+
+    /// `0x00621260` with the lookup `0x00663310` (`skills/sequences.md`
+    /// §1–§2) for a player in mode 18: the used skill's `seqnum` and the
+    /// unit's COF weapon class ([`Pending::composit_weapon_class`], the
+    /// class the animation names use) pick the frame list; its event bytes,
+    /// length · 256 and speed 256. `None` (the plain mode-18 animation):
+    /// no used skill, `seqnum` 0, a null list. Monsters in mode 14
+    /// (`monseq`, §1 rule 5) have no provider yet: `None`.
+    fn load_sequence(&mut self, sim: &Sim<'_>, unit: UnitId) -> Option<Sequence> {
+        if sim.units.get(unit)?.ty != UnitType::Player {
+            return None;
+        }
+        let used = self.used_skill_of(unit)?;
+        let row = self
+            .tables
+            .skills
+            .skills
+            .get(usize::try_from(used.skill).ok()?)?;
+        let class = usize::try_from(self.x.composit_weapon_class(unit)).ok()?;
+        let frames = crate::skills::sequences::lookup(row.seqnum, class)?;
+        Some(Sequence {
+            frame_count: (frames.len() as i32) * 256,
+            speed: 256,
+            events: frames.iter().map(|f| f.event).collect(),
+        })
     }
 
     /// `0x00623F50` (`units.md` §4.3) from the record's speed (+0x0C).

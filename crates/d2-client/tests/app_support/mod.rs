@@ -117,3 +117,79 @@ pub fn warp_id(from: u32, to: u32) -> u32 {
         .unwrap_or_else(|| panic!("level {from} has no way to level {to}"));
     u32::try_from(l.warp[slot]).expect("a warp id")
 }
+
+/// The server player's level (`None` before the join).
+pub fn server_level<C: Clock + Send + 'static>(server: &Server<C>) -> Option<u32> {
+    with(server, |l| {
+        let (p, _) = single_player::local_player(&l.host().game)?;
+        let g = &mut l.host_mut().game;
+        let room = g.game.lists.unit(p)?.room()?;
+        g.events.action.hooks().drlg.level_id(&g.game, room)
+    })
+}
+
+/// Run legs (C→S 0x03 through the app's bridge) from level `from` into
+/// level `to` of act 0 along the collision route of the server's active
+/// rooms (`test_fixtures::host::route`), stepping `app` one frame (40 ms
+/// on `ms`) at a time, until the server player is in `to`.
+pub fn walk_into<C: Clock + Send + 'static>(
+    app: &mut bevy::prelude::App,
+    server: &Server<C>,
+    ms: &std::sync::atomic::AtomicU32,
+    from: u32,
+    to: u32,
+) {
+    use std::sync::atomic::Ordering;
+    let step = |app: &mut bevy::prelude::App| {
+        app.update();
+        ms.fetch_add(40, Ordering::SeqCst);
+    };
+    let moving = |server: &Server<C>| {
+        with(server, |l| {
+            let g = &l.host().game;
+            let (p, _) = single_player::local_player(g)?;
+            g.events.action.sys.units.get(p).map(|u| u.mode)
+        })
+        .is_some_and(|m| test_fixtures::host::MOVING.contains(&m))
+    };
+    for _ in 0..12 {
+        if server_level(server) == Some(to) {
+            return;
+        }
+        let legs = with(server, move |l| {
+            let g = &mut l.host_mut().game;
+            let (p, _) = single_player::local_player(g).expect("joined");
+            let start = g.events.action.hooks().path_position(p);
+            let h = g.events.action.hooks();
+            let d = h.drlg.dungeon.acts[0].as_ref().expect("Act I");
+            let rect = |id| {
+                d.find_level(id)
+                    .map(|l| d.level(l).rect)
+                    .expect("level allocated")
+            };
+            test_fixtures::host::route(d, start, rect(from), rect(to), 12)
+        });
+        for (x, y) in legs {
+            let mut m = vec![0x03];
+            m.extend_from_slice(&(x as u16).to_le_bytes());
+            m.extend_from_slice(&(y as u16).to_le_bytes());
+            app.world_mut()
+                .resource_mut::<d2_client::bridge::BridgeResource>()
+                .0
+                .send_bytes(&m)
+                .unwrap();
+            step(app);
+            step(app);
+            for _ in 0..400 {
+                if !moving(server) {
+                    break;
+                }
+                step(app);
+            }
+            if server_level(server) == Some(to) {
+                break;
+            }
+        }
+    }
+    assert_eq!(server_level(server), Some(to), "walked into level {to}");
+}
