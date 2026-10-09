@@ -45,14 +45,14 @@
 |   5. Machine-readable tables | 668–704 |
 |   6. Exact-match comparison | 705–813 |
 |   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 814–1289 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1290–1553 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1554–1726 |
-| Constants & data dependencies | 1727–1745 |
-| Randomness | 1746–1751 |
-| Edge cases & original bugs | 1752–1797 |
-| Test vectors | 1798–1884 |
-| Provenance | 1885–2011 |
-| Open questions | 2012–2164 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1290–1555 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1556–1728 |
+| Constants & data dependencies | 1729–1747 |
+| Randomness | 1748–1753 |
+| Edge cases & original bugs | 1754–1799 |
+| Test vectors | 1800–1886 |
+| Provenance | 1887–2013 |
+| Open questions | 2014–2166 |
 <!-- /index -->
 
 ## Summary
@@ -1343,6 +1343,8 @@ rule 3), drained in a later frame (recorded: after tick 1).
    0x4, 0x8, 0x20: results 0x13, 0x14, 0x15, 0x17, 0x18). A non-zero
    result → **S→C 0xB4** (direct, `0x0053B260`, §3.3 rule 5) with the
    code, the client is removed (`0x00539DA0`), stop.
+   The load draws the player's unit seed (`sim/units.md` §3.1 r4.1)
+   before any item it makes; it is the join's first game-seed step.
 3. Messages of a successful load, in order:
    1. From the loader (the player is allocated nowhere, position
       (0, 0)): the player's own add messages `0x00571F90(game, P,

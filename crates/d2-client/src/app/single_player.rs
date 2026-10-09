@@ -2038,11 +2038,14 @@ fn loader(
             mode: 1,
             allied: true,
         };
-        let Some(player) = s
-            .events
-            .action
-            .with(&mut s.game, |g, v| v.allocate(g, &req, 0, 0))
-        else {
+        let Some(player) = s.events.action.with(&mut s.game, |g, v| {
+            // `units.md` §3.1 r4.1: the load draws the player's unit
+            // seed (`0x00552DF0`) right after the allocation, before
+            // the save's or the start items and the act's DRLG.
+            let p = v.allocate(g, &req, 0, 0)?;
+            v.init_player_seed(p);
+            Some(p)
+        }) else {
             s.events
                 .action
                 .hooks()

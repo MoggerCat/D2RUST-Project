@@ -153,7 +153,8 @@ pub trait AiModes {
     /// class 160.
     fn knockback_to_gethit(&mut self, game: &mut Game, unit: UnitId);
     /// `0x005DE6D0` → `0x005DE4E0` walk in radius: the point geometry is
-    /// D2MOO's (§7.2); the provider computes it and walks.
+    /// D2MOO's (§7.2); the provider computes it and walks, consuming the
+    /// staged velocity request as [`AiModes::change_mode_with`] does.
     fn walk_in_radius(
         &mut self,
         game: &mut Game,
@@ -161,6 +162,7 @@ pub trait AiModes {
         target: UnitId,
         a: i32,
         b: i32,
+        velocity: &mut super::VelocityRequest,
     ) -> bool;
     /// Operates a door (`0x00584540`, object spec).
     fn operate_door(&mut self, game: &mut Game, unit: UnitId, door: UnitId);
