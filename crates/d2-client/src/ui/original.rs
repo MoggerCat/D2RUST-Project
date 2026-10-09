@@ -492,6 +492,7 @@ impl OriginalUi {
         root.add(Box::new(quest_log_ui::QuestLogUi {
             sh: sh.clone(),
             log: Default::default(),
+            shown: Default::default(),
         }))?;
         root.add(Box::new(InventoryUi {
             sh: sh.clone(),
