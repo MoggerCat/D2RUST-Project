@@ -181,9 +181,11 @@ pub const DEFAULT_SEED: u32 = 1234;
 /// (game +0x84 := 1): it wins. Otherwise a loaded save whose town byte
 /// for the game's difficulty has 0x80 gives its saved map seed
 /// (`formats/d2s.md` §2.2 rule 8, +0xAB). Otherwise [`DEFAULT_SEED`].
-/// PROVISIONAL (REC-291): 1.14d draws a fresh seed for a new character
-/// (`time_value`, `rng.md` §5.2); d2rs keeps the fixed default so dev
-/// runs and draw dumps stay reproducible. d2rs-own, unverified.
+/// PROVISIONAL (REC-291 -> q-fix-new-char-seed): 1.14d draws a fresh
+/// seed for a new character (`time_value`, `rng.md` §5.2; measured: two
+/// new characters got 0x63a0b0fd and 0x07013cee,
+/// `traces/frontend/frontend-menus/frontend-0005.json`); d2rs keeps the
+/// fixed default so dev runs and draw dumps stay reproducible.
 pub fn game_seed(character: &Character, fixed: Option<u32>) -> u32 {
     if let Some(n) = fixed {
         return n;

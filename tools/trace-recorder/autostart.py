@@ -46,7 +46,12 @@ SCRIPT [--seed N] [--input SCRIPT]`; standalone:
 Input script: `;`-separated commands, run in order once the player is in
 a level: `wait S`, `move X Y`, `click X Y`, `rclick X Y`, `hold X Y S`
 (left button down S seconds), `key K [S]` (K: a letter or digit, or
-ESC, TAB, ENTER, SPACE, SHIFT, CTRL, ALT, F1..F12, or a number), `shot
+ESC, TAB, ENTER, SPACE, SHIFT, CTRL, ALT, F1..F12, or a number), `text T`
+(WM_CHAR for each character of T), `char N` (one WM_CHAR with code N),
+`state [LABEL]` (log the launcher mode 0x74C704 and the player level),
+`close` (post WM_CLOSE to the game window), `wstr PTR OFF [LABEL]` (log
+the UTF-16 text at [PTR] + OFF, e.g. the create screen's name box: `wstr
+0x77934C 0x5C`, `ui/text.md` §15 r5), `shot
 NAME` (PNG of the client area into the shot directory), `goto T C[,C..]
 [S DX DY]` (walk to the nearest unit of type T and one of the classes C,
 −1 = any class, and click it), `units T` (log GUID, class, client and
@@ -70,7 +75,7 @@ if os.name == "nt":
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-TOOL = "trace-recorder autostart 0.2.0"
+TOOL = "trace-recorder autostart 0.3.0"
 GAME_MODE = 0x74C704      # launcher mode: 4 menu, 1 client
 MENU_LOOP = 0x72DDD4      # menu message-loop flag
 NEXT_MODE = 0x7795E8      # mode the menu routine returns
@@ -148,7 +153,8 @@ def vk_code(k):
 
 SCRIPT_OPS = {"wait": (1, 1), "move": (2, 2), "click": (2, 2), "rclick": (2, 2), "hold": (3, 3),
               "key": (1, 2), "text": (1, 99), "shot": (0, 1), "waitlevel": (1, 2),
-              "goto": (2, 5), "dumpdrlg": (0, 1), "units": (1, 1), "end": (0, 0)}
+              "goto": (2, 5), "dumpdrlg": (0, 1), "units": (1, 1), "char": (1, 1),
+              "state": (0, 1), "close": (0, 0), "wstr": (2, 3), "end": (0, 0)}
 
 
 def parse_script(text):
@@ -172,10 +178,31 @@ def parse_script(text):
         elif op == "goto":
             a = ([int(a[0], 0), tuple(int(c, 0) for c in a[1].split(","))]
                  + [float(x) for x in a[2:3]] + [int(x, 0) for x in a[3:]])
-        elif op not in ("shot", "dumpdrlg"):
+        elif op == "wstr":
+            a = [int(a[0], 0), int(a[1], 0)] + a[2:]
+        elif op not in ("shot", "dumpdrlg", "state", "close"):
             a = [float(x) if "." in x else int(x, 0) for x in a]
         out.append((op, a))
     return out
+
+
+def read_wstr(mem, ptr, off, limit=64):
+    """The NUL-ended UTF-16 text at [ptr] + off (at most `limit` units):
+    (text, True), or ("", False) when [ptr] is null or unreadable."""
+    try:
+        base = mem.read_u32(ptr)
+        if not base:
+            return "", False
+        units = []
+        while len(units) < limit:
+            w = mem.read_u32(base + off + 2 * len(units))
+            for u in (w & 0xFFFF, w >> 16):
+                if u == 0 or len(units) >= limit:
+                    return "".join(map(chr, units)), True
+                units.append(u)
+        return "".join(map(chr, units)), True
+    except OSError:
+        return "", False
 
 
 def client_px(mem, unit):
@@ -431,6 +458,23 @@ class AutoStart:
                 rec = drlg_dump(mem, a[0] if a else "")
                 self.dumps.append(rec)
                 self.log("autostart: dumpdrlg " + json.dumps(rec, separators=(",", ":")))
+            elif op == "char":
+                self.send(mem, WM_CHAR, a[0], 1)
+                yield 0.03
+            elif op == "wstr":
+                txt, ok = read_wstr(mem, a[0], a[1])
+                self.log(f"autostart: wstr {a[2] if len(a) > 2 else ''} [{a[0]:#x}]+{a[1]:#x} = "
+                         f"{json.dumps(txt) if ok else None}")
+            elif op == "close":
+                self.send(mem, WM_CLOSE, 0, 0)
+                self.log(f"autostart: WM_CLOSE posted at {self.clock() - self.t0:.1f}s")
+            elif op == "state":
+                try:
+                    mode = mem.read_u32(GAME_MODE)
+                except OSError:
+                    mode = None
+                self.log(f"autostart: state {a[0] if a else ''} at {self.clock() - self.t0:.1f}s: "
+                         f"launcher mode {mode}, player level {player_level(mem)}")
             elif op == "end":
                 limit = self.clock() + 5     # let pending screenshots finish (never join:
                 while any(t.is_alive() for t in self.shots) and self.clock() < limit:
@@ -510,7 +554,7 @@ def setup(a, game_args_list):
 
 WM_MOUSEMOVE, WM_LBUTTONDOWN, WM_LBUTTONUP = 0x200, 0x201, 0x202
 WM_RBUTTONDOWN, WM_RBUTTONUP = 0x204, 0x205
-WM_KEYDOWN, WM_KEYUP, WM_CHAR = 0x100, 0x101, 0x102
+WM_KEYDOWN, WM_KEYUP, WM_CHAR, WM_CLOSE = 0x100, 0x101, 0x102, 0x10
 MK_LBUTTON, MK_RBUTTON = 1, 2
 
 if os.name == "nt":  # import stays possible elsewhere (CI runs the selftest)
@@ -535,6 +579,8 @@ if os.name == "nt":  # import stays possible elsewhere (CI runs the selftest)
     gdi32.SelectObject.argtypes = [W.HDC, W.HGDIOBJ]
     gdi32.DeleteObject.argtypes = [W.HGDIOBJ]
     gdi32.DeleteDC.argtypes = [W.HDC]
+    gdi32.BitBlt.argtypes = [W.HDC, C.c_int, C.c_int, C.c_int, C.c_int, W.HDC, C.c_int, C.c_int,
+                             W.DWORD]
     gdi32.GetDIBits.argtypes = [W.HDC, W.HBITMAP, W.UINT, W.UINT, C.c_void_p, C.c_void_p, W.UINT]
     kernel32.GetProcessId.argtypes = [W.HANDLE]
     kernel32.GetProcessId.restype = W.DWORD
@@ -594,6 +640,9 @@ def screenshot_png(hwnd, path):
     bih = _BIH(C.sizeof(_BIH), w, -h, 1, 24, 0, stride * h, 0, 0, 0, 0)
     buf = (C.c_ubyte * (stride * h))()
     gdi32.GetDIBits(mdc, bmp, 0, h, buf, C.byref(bih), 0)
+    if not any(bytes(buf)):              # Wine: PrintWindow of the DirectDraw window is black;
+        gdi32.BitBlt(mdc, 0, 0, w, h, hdc, 0, 0, 0x00CC0020)   # copy the window's pixels
+        gdi32.GetDIBits(mdc, bmp, 0, h, buf, C.byref(bih), 0)
     gdi32.DeleteObject(bmp)
     gdi32.DeleteDC(mdc)
     user32.ReleaseDC(hwnd, hdc)
@@ -756,6 +805,17 @@ def selftest():
     s3 = AutoStart(after=0, script="waitlevel 9 1", log=lambda x: None, clock=Clock())
     s3.clock.t = 0
     drive(s3, m, s3.clock, 0.5)                                # forced? mode is 1: no
+    class WMem:
+        def __init__(self, m):
+            self.m = m
+
+        def read_u32(self, a):
+            return self.m.get(a, 0)
+    wm = WMem({0x77934C: 0x6000, 0x6000 + 0x5C: ord("a") | ord("b") << 16, 0x6000 + 0x60: ord("-")})
+    assert read_wstr(wm, 0x77934C, 0x5C) == ("ab-", True)
+    assert read_wstr(wm, 0x1234, 0) == ("", False)
+    assert parse_script("char 45; state x; close; wstr 0x77934C 0x5C n") == [
+        ("char", [45]), ("state", ["x"]), ("close", []), ("wstr", [0x77934C, 0x5C, "n"])]
     assert png_rgb(1, 1, [b"\1\2\3"]).startswith(b"\x89PNG")
     print("selftest ok: arguments, script parsing, menu force only in mode 4 and after the delay, "
           "arrival from the player chain, click / text timing, waitlevel, goto projection "
