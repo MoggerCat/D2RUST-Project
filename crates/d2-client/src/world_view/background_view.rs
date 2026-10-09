@@ -6,17 +6,22 @@
 //! their screen positions with their light and draw mode through the
 //! act's blend tables ([`cel_ops`]).
 //!
-//! Level 74 (the Arcane Sanctuary stars) stays undrawn: §12 r3 names no
-//! initial star tick `last` (`BackgroundError::NoStarLast`), and the
-//! draw order refuses the level (`order_grid`, Open 1).
+//! Level 74 (the Arcane Sanctuary stars) is drawn too: the star tick
+//! `last` is 0 before the first call (§12 l74 r3), the star seed is
+//! `init_low(time_value(time() + GetTickCount() + shake start))`
+//! (§12 l74 r1; [`stars_seed_at`]); the summit's is
+//! `init_low(time_value(time() + 2 * GetTickCount()))`
+//! ([`summit_seed_at`]). Both backgrounds initialise once per process.
+//! Their layouts are time-seeded in 1.14d too, so only a capture that
+//! records `[0x00712C4C]` / `[0x00712C50]` can compare them.
+//!
+//! The star lines have no scene item yet: level 74's state advances (so
+//! the moves keep their ticks) but nothing is added to the frame.
 //!
 //! `d2rs-own, unverified`:
-//! - PROVISIONAL (REC-420): the summit's first-use seed is
-//!   `init_low(time_value(0))` of the host clock (§12: "seed := time
-//!   value"; `sim/rng.md` §5.5 names neither the argument of
-//!   `time_value` nor the seed form); [`summit_seed_now`]. The clouds'
-//!   placement is time-seeded in 1.14d too, so only a capture that
-//!   records `[0x00712C50]` can compare it;
+//! - the screen-shake start tick of the star seed is 0 until a caller
+//!   sets it ([`BackgroundView::set_shake_start`]); the feed keeps shake
+//!   starts as server ticks, not `GetTickCount` values;
 //! - the cel light byte is the low byte of the light argument (−1 →
 //!   0xFF unlit, `0xDDDDDDDD` → 0xDD; `shading.md` §3 takes one byte);
 //! - without the act's shade tables a mode-5 cel draws opaque and a
@@ -33,7 +38,7 @@ use crate::bridge::world::ClientWorld;
 use crate::frames::{FramePart, FrameSet, FrameSetKey};
 use crate::rules::blend::cel_ops;
 use crate::rules::draw_order::background::{
-    BackgroundDraw, BackgroundFrame, Backgrounds, ARREAT_SUMMIT,
+    BackgroundDraw, BackgroundFrame, Backgrounds, ARCANE_SANCTUARY, ARREAT_SUMMIT,
 };
 use crate::rules::placement::draw_position;
 use crate::scene::{BlendOp, DrawItem, DrawKey, ItemTag, ShadeChain};
@@ -51,6 +56,11 @@ pub struct BackgroundView {
     state: Backgrounds,
     /// The recorded / host seed of the summit's first use.
     summit_seed: Option<Seed>,
+    /// The recorded seed of the stars' first use (`None`: the host
+    /// clock's, [`stars_seed_at`]).
+    stars_seed: Option<Seed>,
+    /// The last screen-shake start tick (`[0x007B8D10]`, 0 if none).
+    shake_start: u32,
     files: BTreeMap<&'static str, Option<FrameSetKey>>,
 }
 
@@ -63,16 +73,36 @@ impl std::fmt::Debug for BackgroundView {
     }
 }
 
-/// PROVISIONAL (REC-420, module doc): the summit's first-use seed from
-/// the host clock: `init_low(time_value(0))` with `time()` the Unix
-/// seconds and `GetTickCount()` the milliseconds of the same clock.
-pub fn summit_seed_now() -> Seed {
+/// The host clock as `(time(), GetTickCount())`: the Unix seconds and the
+/// milliseconds of the same clock.
+pub fn host_clock() -> (u32, u32) {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default();
-    let base = (now.as_secs() as u32).wrapping_add(now.as_millis() as u32);
-    // `time_value(v)` adds `v` to `time() + GetTickCount()`.
-    Seed::init_low(d2_sim::rng::time_value(base))
+    (now.as_secs() as u32, now.as_millis() as u32)
+}
+
+/// §12 l120 r1: the summit's seed, `init_low(time_value(x))` with x =
+/// `time() + GetTickCount() + GetTickCount()` (the call's `v` is the tick
+/// count).
+pub fn summit_seed_at(time: u32, tick: u32) -> Seed {
+    Seed::init_low(d2_sim::rng::time_value(
+        time.wrapping_add(tick).wrapping_add(tick),
+    ))
+}
+
+/// §12 l74 r1: the stars' seed, `init_low(time_value(time() +
+/// GetTickCount() + shake_start))`.
+pub fn stars_seed_at(time: u32, tick: u32, shake_start: u32) -> Seed {
+    Seed::init_low(d2_sim::rng::time_value(
+        time.wrapping_add(tick).wrapping_add(shake_start),
+    ))
+}
+
+/// The summit's first-use seed from the host clock.
+pub fn summit_seed_now() -> Seed {
+    let (t, tick) = host_clock();
+    summit_seed_at(t, tick)
 }
 
 impl BackgroundView {
@@ -83,8 +113,23 @@ impl BackgroundView {
             source,
             state: Backgrounds::default(),
             summit_seed,
+            stars_seed: None,
+            shake_start: 0,
             files: BTreeMap::new(),
         }
+    }
+
+    /// Fixes the stars' first-use seed (a recorded one); by default the
+    /// host clock's at first use.
+    pub fn with_stars_seed(mut self, seed: Seed) -> Self {
+        self.stars_seed = Some(seed);
+        self
+    }
+
+    /// The last screen-shake start tick, read by the stars' first-use
+    /// seed (`render/camera.md` §8; 0 when none started).
+    pub fn set_shake_start(&mut self, tick: u32) {
+        self.shake_start = tick;
     }
 
     /// The kept §12 state.
@@ -126,25 +171,30 @@ impl BackgroundView {
     ) -> Vec<String> {
         let mut log = Vec::new();
         let level = world.player_level().map_or(0, u32::from);
-        if level != ARREAT_SUMMIT || open_mode == 3 {
+        if !matches!(level, ARREAT_SUMMIT | ARCANE_SANCTUARY) || open_mode == 3 {
             return log;
         }
         let Some(cam) = frame.camera else {
             return log;
         };
+        let (time, tick) = host_clock();
         let f = BackgroundFrame {
             level,
             w: cam.size.width,
             h: cam.size.height,
             resolution_mode: cam.size.resolution_mode(),
             // Read by level 74 only.
-            now: 0,
+            now: tick,
             exiting: world.exit_requested,
             player_x,
-            stars_seed: None,
+            stars_seed: Some(
+                self.stars_seed
+                    .unwrap_or_else(|| stars_seed_at(time, tick, self.shake_start)),
+            ),
             summit_seed: self.summit_seed,
-            stars_last: None,
-            palette: None,
+            // The star tick is 0 before the first call (§12 l74 r3).
+            stars_last: Some(0),
+            palette: Some(&assets.palette),
         };
         let items = match self.state.pass1(&f) {
             Ok(items) => items,

@@ -60,8 +60,8 @@ pub struct QuestLog {
     pub remembered: [Option<u8>; TAB_COUNT],
     /// The tab's last clicked selection (`[0x007BF2BD + 4·tab]`).
     pub clicked: [Option<u8>; TAB_COUNT],
-    /// Selected slot `[0x007BF2B9]`.
-    pub selected: u8,
+    /// Selected slot `[0x007BF2B9]` (`None` = −1, set at every tab open).
+    pub selected: Option<u8>,
     /// `[0x007BF2B0]`, zeroed by every 0x52.
     pub flag_2b0: u8,
 }
@@ -77,7 +77,7 @@ impl Default for QuestLog {
             latch: 0,
             remembered: [None; TAB_COUNT],
             clicked: [None; TAB_COUNT],
-            selected: 0,
+            selected: Some(0),
             flag_2b0: 0,
         }
     }
@@ -148,7 +148,7 @@ impl QuestLog {
         self.latch = 0;
         self.remembered = [None; TAB_COUNT];
         self.clicked = [None; TAB_COUNT];
-        self.selected = 0;
+        self.selected = Some(0);
     }
 
     fn ctx<'a>(&self, p: &'a QuestFlags, g: Option<&'a QuestFlags>, mp: bool) -> RowCtx<'a> {
@@ -202,8 +202,8 @@ impl QuestLog {
     }
 
     /// Tab open `0x004A3220(tab, reset)` (§3 rule 3): returns the selected
-    /// slot, `None` when the tab is not built (Act V without the expansion)
-    /// or nothing selects.
+    /// slot (also stored in `selected`), `None` when the tab is not built
+    /// (Act V without the expansion) or nothing selects.
     pub fn open_tab(
         &mut self,
         tab: u8,
@@ -213,14 +213,30 @@ impl QuestLog {
         multiplayer: bool,
         gate: &TabGate<'_>,
     ) -> Option<u8> {
-        if reset {
-            self.remembered = [None; TAB_COUNT];
-        }
+        // §3 r3 order (0x004A3220): selected := none first, always; a
+        // refused tab ends there; the selection is chosen (a remembered
+        // slot without a scan); only then does `reset` clear the slots.
+        self.selected = None;
         if !Self::tab_open(tab, gate) {
             return None;
         }
+        let pick = self.choose(tab, p, g, multiplayer, gate);
+        self.selected = pick;
+        if reset {
+            self.remembered = [None; TAB_COUNT];
+        }
+        pick
+    }
+
+    fn choose(
+        &mut self,
+        tab: u8,
+        p: &QuestFlags,
+        g: Option<&QuestFlags>,
+        multiplayer: bool,
+        gate: &TabGate<'_>,
+    ) -> Option<u8> {
         if let Some(slot) = self.remembered[tab as usize] {
-            self.selected = slot;
             return Some(slot);
         }
         let ctx = self.ctx(p, g, multiplayer);
@@ -234,7 +250,6 @@ impl QuestLog {
             }
             let row = derive_row(i, self.status[i as usize], &ctx, &mut self.last[i as usize]);
             if row.changed || row.icon == IconState::JustCompleted {
-                self.selected = e.slot;
                 return Some(e.slot);
             }
             if matches!(
@@ -250,13 +265,9 @@ impl QuestLog {
         if !any_state_1_to_3 {
             return None;
         }
-        // PROVISIONAL (specs/world/quests-status.md §3 rule 3; REC-nn): "the
-        // tab's last clicked selection, else the first entry in state 3" is
-        // read as: the clicked slot when one was recorded, otherwise the
-        // first state-3 entry.
-        let pick = self.clicked[tab as usize].or(first_state3)?;
-        self.selected = pick;
-        Some(pick)
+        // §3 r3: the clicked slot when one was recorded, otherwise the first
+        // state-3 entry (the reading is confirmed).
+        self.clicked[tab as usize].or(first_state3)
     }
 }
 
