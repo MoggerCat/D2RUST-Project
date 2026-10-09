@@ -224,11 +224,13 @@ fn the_session_flow_creates_the_game_then_loads_the_character_at_the_join() {
     assert_eq!(
         steps,
         [
-            // No `skills` rows: `client/msg-skills.md` §2 r8 selects skill
-            // 0 outside the table. (The synthetic vitals tables, q-smoke-town,
-            // give the start stats, items and skill their provider.)
-            "player skills",
+            // The steps the load names as unapplied on the install
+            // (found by q-fixture-migrate-2): "has skill" stands where
+            // the synthetic game named "player skills" (the install has
+            // the `skills` rows). A step with no provider is a gap, not
+            // a behavior; row q-fix-real-load-steps.
             "new character set-up",
+            "has skill",
             "mouse skills",
             "quest entry"
         ]

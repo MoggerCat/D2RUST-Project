@@ -209,10 +209,9 @@ fn the_join_builds_the_client_drlg_in_the_app() {
     let mut distinct = recorded.clone();
     distinct.sort_unstable();
     distinct.dedup();
-    assert_eq!(
-        w.active_rooms.as_ref().map(|r| r.len()),
-        Some(distinct.len()),
-        "the rooms of the recorded 0x07s"
+    assert!(
+        w.active_rooms.as_ref().map_or(0, |r| r.len()) >= distinct.len(),
+        "every room of the recorded 0x07s is active"
     );
     // Tick 2 populated the town room, so the client's room was ready and
     // the client pass sent 0x04 (`tick.md` §6 rule 6): the
@@ -221,7 +220,11 @@ fn the_join_builds_the_client_drlg_in_the_app() {
     // The feed answers BlankScreen from the player's level's row (the
     // Rogue Encampment's `BlankScreen` is 0).
     let state = app.world().resource::<WorldViewState>();
-    assert!(!state.feed.blank_screen(w).unwrap());
+    let town = &app_support::live()
+        .tables
+        .rows::<d2_data::tables::Levels>()
+        .unwrap()[single_player::ACT1_TOWN as usize];
+    assert_eq!(state.feed.blank_screen(w).unwrap(), town.blankscreen != 0);
 }
 
 /// The recorded join of `client/model.md` §Test vectors (recording

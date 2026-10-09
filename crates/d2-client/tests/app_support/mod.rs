@@ -229,7 +229,7 @@ pub fn walk_into<C: Clock + Send + 'static>(
     assert_eq!(server_level(server), Some(to), "walked into level {to}");
 }
 
-/// The server unit of type `ty` (1 monster, else object) and a class of
+/// The server unit of type `ty` (1 monster, 5 tile, else object) and a class of
 /// `classes` nearest to the local player: its GUID and position.
 pub fn server_unit<C: Clock + Send + 'static>(
     server: &Server<C>,
@@ -243,6 +243,7 @@ pub fn server_unit<C: Clock + Send + 'static>(
         let at = g.events.action.hooks().path_position(p);
         let st = match ty {
             1 => d2_sim::units::UnitType::Monster,
+            5 => d2_sim::units::UnitType::Tile,
             _ => d2_sim::units::UnitType::Object,
         };
         let units: Vec<UnitId> = g
