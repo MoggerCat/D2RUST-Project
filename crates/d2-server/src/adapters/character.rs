@@ -514,7 +514,14 @@ impl<X: Pending> CharacterWorld for ActionCharacter<'_, '_, X> {
         let Some(t) = self.v.h.vitals.as_ref() else {
             return unapplied("start skill", "no vitals tables on the action wiring");
         };
-        Ok(t.charstats(self.class()).map_or(0, |c| c.startskill))
+        let s = t.charstats(self.class()).map_or(0, |c| c.startskill);
+        // A blank `StartSkill` (the Amazon's, Barbarian's, ... read as
+        // 0xFFFF) names no `skills` row: `0x006439F0` finds no entry for
+        // it, so no right skill is selected (load §1 rule 1).
+        if usize::from(s) >= self.v.h.tables.skills.skills.len() {
+            return Ok(0);
+        }
+        Ok(s)
     }
     /// `0x006439F0` on the player's list: an entry → true. No entry is
     /// not an answer: the entries items grant (the start items' stat 107,

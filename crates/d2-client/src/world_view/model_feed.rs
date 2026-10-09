@@ -59,6 +59,14 @@ pub fn unit_position(unit: &ClientUnit) -> Result<UnitPosition, String> {
         )),
         (false, p) => {
             let (x, y) = p.unwrap_or((0, 0));
+            // A walking monster's precise track position, while it is in
+            // the model's cell (`bridge::motion`).
+            if let Some((x16, y16)) = unit
+                .precise
+                .filter(|&(px, py)| p == Some(((px >> 16) as u16, (py >> 16) as u16)))
+            {
+                return Ok(UnitPosition::Moving { x16, y16 });
+            }
             Ok(UnitPosition::Moving {
                 x16: centre(x),
                 y16: centre(y),

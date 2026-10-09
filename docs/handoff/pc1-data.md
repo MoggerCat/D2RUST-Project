@@ -365,6 +365,18 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 - **[q-scenes-compare] Client footprints of walking monsters (REC-706)** The 1.14d client stamps mask 0x100 for each living monster (`client/msg-units.md` §3 r2); d2rs re-stamps it at the model position before each client path step. Record the client collision grid (mask 0x100 cells) around Warriv in the Rogue Encampment for 30 ticks while he walks, with the unit's client path position each tick, for `client/model.md` open question 2.
 - **[q-scenes-compare] Hover state after a use press (REC-707)** `a1-panel-cube` (right click on the cube, no move after) draws the cube with tint 2 and no tip, so `0x007BCBF4` / `0x007BCBE4` are 0 after the press. Name the callers of the hover handler `0x00487000` (move, press, release?) and which code clears the two globals after a right-click use (C→S 0x20), for `ui/inventory.md` §5 r4.
 
+- [prov-data] **Hratli's unit seed two steps at creation** (q-prov-data,
+  `world/quests-act3-2.md` §3.3, `monsters/init.md` §4): in the Act III
+  town (`a3-start-noquest-sor`, level-1 sorceress, town byte act III,
+  seed 1234) Hratli (class 253), spawned by his dummy's init through
+  `0x005B2F20(game, room, x, y, 253, mode 1, -1, 0)`, has the unit seed
+  [3975998680, 1369742535] at frame 2: the fresh draw (4040195123, 666)
+  stepped **twice**. d2rs has it unstepped, and so do the NPCs made by
+  presets (294, 264), which match 1.14d. Find the two draws on Hratli's
+  own seed between the allocation and frame 2: a spawn-wrapper step
+  (flags 0, spread -1), the dummy init `0x005B...` (init 49 / 50) or a
+  think; `monsters/init.md` §4 lists none.
+
 ## How to check a behaviour in one command
 
 A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)
@@ -490,6 +502,15 @@ rather than a hand-run recipe.
   `0x00622830` the same pick (`sim/units.md` §4.7 "Attack weapon") or
   plain `0x0063C9B0`? Answer into §1 step 6.
 
+- **[q-play-act5] join act byte**: which 1.14d function writes the
+  player unit's act (+0x18) on a join into a save's act? The recording
+  `traces/checks/a5-town-arrival-bar.check` shows 4 from frame 2 (a
+  barbarian saved in Act V); `sim/units.md` §2 names only the allocation
+  (`0x005552ED`, the allocation room's act; the player is allocated in no
+  room) and the act change (`0x0053AE4E`). d2rs writes it at the join's
+  act step (rule 4, REC-797). Answer into `sim/units.md` §2 and
+  `sim/intents-events.md` §8.2.
+
 ## How to check a behaviour in one command
 
 A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)
@@ -540,9 +561,10 @@ before it; `rng` and `packets` with pokes or frame input are partial on
 1.14d. For a new behaviour, add a `.check` file (copy the example of the
 channel) rather than a hand-run recipe, and paste the report's first
 lines into the `q-fix-*` row.
-26. **Item flag 0x2000 and the default file index of a poked item** (area G, `traces/checks/items-ground-many.check`, 2026-10-09): 36 items made with the poke `item` (`poke.py` request: `0x00558D90`, spawn mode 3, force 0, use seed 0) have, on 1.14d, item flags 0x80000 only (0x2000 clear) and item data +0x28 = 0 for items with no unique / set / superior index; d2rs sets 0x2000 (`generation.md` §3 step 5, "not forced") and file index −1 (`quality.md` §1 "Clear"). The recorded kill drops carry 0x2000 in their 0x9C flags (`facts/items/a1-cold-plains-poke-kills.tsv`: 0x00A02010), so the poke request differs from the treasure request in something that clears it. Read in the creation function `0x00558D90`: what clears 0x2000 (and with which request field or caller state), and what writes the file index of a normal / magic / rare item (0 or −1, and when). Answer into `items/generation.md` §3 and `items/quality.md` §1; then drop `ignore if fi` from the check.
+26. **Item flag 0x2000 and the default file index of a poked item** answered → see `docs/handoff/pc1-day3-c.md`. (area G, `traces/checks/items-ground-many.check`, 2026-10-09): 36 items made with the poke `item` (`poke.py` request: `0x00558D90`, spawn mode 3, force 0, use seed 0) have, on 1.14d, item flags 0x80000 only (0x2000 clear) and item data +0x28 = 0 for items with no unique / set / superior index; d2rs sets 0x2000 (`generation.md` §3 step 5, "not forced") and file index −1 (`quality.md` §1 "Clear"). The recorded kill drops carry 0x2000 in their 0x9C flags (`facts/items/a1-cold-plains-poke-kills.tsv`: 0x00A02010), so the poke request differs from the treasure request in something that clears it. Read in the creation function `0x00558D90`: what clears 0x2000 (and with which request field or caller state), and what writes the file index of a normal / magic / rare item (0 or −1, and when). Answer into `items/generation.md` §3 and `items/quality.md` §1; then drop `ignore if fi` from the check.
 
-- [prov-data] **Monster think in a room with no clients** (q-prov-data,
+- [prov-data] **Monster think in a room with no clients** — answered → see `docs/handoff/pc1-day3-a.md` (q-prov-data,
+- [prov-data] **Monster think in a room with no clients** answered → see `docs/handoff/pc1-day3-c.md`. (q-prov-data,
   `monsters/ai.md` §1.5, §2, `ai-bodies.md` §9.9 Map AI): after the
   player warps away (same act, `a4-warp-plains-ama`, warp 105 at frame
   6), the Fortress NPCs (classes 405, 257, 246; Npc AI `0x005E7130`)
@@ -553,6 +575,18 @@ lines into the `q-fix-*` row.
   (active room +0x78 = 0) that skips the think or the map AI, and what
   it schedules instead. The same think with a client in the level
   matches (`a4-fortress-arrival-ama`). Evidence: `traces/checks/a4-warp-plains-ama.check`.
+
+- **[q-fix-real-unit-seed-order] Client NPC stops a walk the server makes**
+  (`client/model.md` §19 r4 "NPC busy", monster data +0x28 bit 0):
+  scenes-compare's panel run (SceSor, `-seed 1234`, inventory open at
+  tick 22, an item taken to the cursor at 52, put down at 62): the 1.14d
+  server walks Warriv (1:7) from tick 56 to 67 (state recording), but
+  the 1.14d client draws him in NU from tick 56 (frame 0.5·(t − 56)), so
+  the client ignored the 0x67 at 56. Without the panel input the client
+  walks it. Read who sets the client's NPC-busy bit (+0x28 bit 0; only
+  its clear, §17 r1.7, is specified) or what else makes the client's
+  walk dispatch fall back to neutral here. Blocks a1-panel-character /
+  skilltree / automap / esc-menu-wine (Warriv NU frame) in d2rs.
 
 ## Step 5 — spec gaps (107 provisional points no spec states)
 

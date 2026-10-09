@@ -218,3 +218,17 @@ or waypoints, as of the last pull (2026-10-09). Staging is polled every
 - **Item 5 (round 3).** No Step 4 items with `[seed-order]`,
   `[recording-2]`, `[proto-items]`, `[q-fix-pc1-day3-a-r2]` or
   `[prov-data]` on staging yet; polling every 30 minutes.
+
+## Later (2026-10-09 evening)
+
+- **[prov-data] Monster think in a room with no clients.** The gate is
+  not in the think path: `0x005A7F80` and `0x005B1740` have no room
+  test. It is the room leave `0x0053A9B0`: when the leaving client was
+  the room's last (room +0x78 = 0), every monster in the room gets
+  `0x005738D0`, which cancels its thinks (type 2) and type-3 events and
+  schedules nothing. The next think comes only when a client joins the
+  room again (`0x00573780`, f + 2). So after the frame-6 warp, the
+  Fortress NPCs' frame-24 think is gone and their seeds stay put, as
+  1.14d shows. Written into `specs/sim/intents-events.md` §7.8 rule 3.2.
+  d2rs's `wiring/action/switch.rs` leaves the cancel out (its doc lists
+  it as unspecified). Row `q-fix-p3-leave-cancels-thinks`.

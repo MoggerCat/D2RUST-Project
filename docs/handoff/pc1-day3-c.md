@@ -197,3 +197,38 @@ The harness should test class and position, not GUID.
   The quest helper `preset_superunique_spawn` only allocates the unit and
   skips the superunique path: placement search, mods, minions. The Act III
   council uses the same helper.
+
+## Round 3 — Windows runs Wine could not make
+
+- **REC-222 keys during loading: settled** (`ui/frontend-loading.md` L8 rule 3). Method: a scratch
+  debugger probe on `record_state.py` (not committed). Breakpoints: loading draw `0x004565E0`, key-down
+  `0x0046A840`, Esc command `0x004690B0`, the server tick. The probe posts the key from the first
+  loading-draw stop; the act change is `poke 50 warp 40` from ScnAma `-seed 1234`.
+  - **Act change, Esc:** the handler ran at frame 49 and ui 9 became 1. The server ran one more tick
+    (50) and then none for 50 s, and the loading draws stopped too: the load waits for the menu.
+  - **Act change, F1:** dispatched to `0x0046A840`, and the load continued.
+  - **Game start, Esc at the first loading draw (before 0x01):** reached no handler; the game started
+    normally.
+  - d2rs takes no input while loading: `q-fix-p6-loading-keys`.
+
+- **Item flag 0x2000 / file index of a poked item (pc1-data area-G item 26): answered**
+  (`items/generation.md` §1.4, §3 steps 2 and 5; `items/quality.md` §1).
+  - **Flag 0x2000:** `0x00558D90` sets it when request force = 0 (`0x00558E95`), so both poke and
+    treasure items get it. The room clean-up `0x00553220` item case (`0x00553345`, tick step 6) clears
+    it after the client pass. So a drop's 0x9C carries 0x2000, while state read after the tick does not.
+  - **File index:** item data is zero-filled by `0x00627C90`, so it starts at 0. It becomes −1 only
+    through a downgrade helper (`0x00557250`), or just before superior / set / unique.
+  - **Check:** `ignore if fi` was removed from `items-ground-many.check`.
+  - **d2rs differs on both points:** `q-fix-p5-item-new-flag-file-index`.
+
+- **[prov-data] Monster think in a room with no clients: answered** (`monsters/ai.md` §1.5 r3, §2.1;
+  `ai-bodies.md` §9.9).
+  - **Where the test is:** none of `0x005A7F80`, `0x005B1740`, `0x005E7130` or the map AI tests the
+    room's clients. The test is in the room-leave `0x0053A9B0`, at `0x0053AA0A` (room +0x78 = 0 after
+    the client is removed).
+  - **What it does:** for every monster in the room, `0x005738D0` deletes the type-2 think and the
+    type-3 regen events. Nothing is rescheduled and no RNG is drawn. A client entering the room
+    restarts the think through `0x0053A8E0` → `0x00573780`.
+  - **Effect in the trace:** the Fortress NPCs' frame-24 think is cancelled at the frame-6 warp, so
+    their seeds stay unchanged.
+  - **d2rs differs:** `q-fix-p3-room-empty-think`.
