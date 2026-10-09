@@ -305,3 +305,55 @@ fn attack_event0_with_a_used_skill_runs_its_branch_on_every_event() {
     assert_eq!(logged(&fx, "attack skill", m).len(), 3);
     assert!(logged(&fx, "attack strike", m).is_empty());
 }
+
+/// The AI monster with its monster data (`dwAiState` 0 at creation) in a
+/// data-only monster world.
+fn monster_with_data(fx: &mut Fx) -> UnitId {
+    let m = monster(fx);
+    let d = crate::monsters::init::MonsterData::default();
+    let world = super::sound::DataOnly([(m, d)].into_iter().collect());
+    fx.sim.sys.hooks.monster_world = Some(Box::new(world));
+    m
+}
+
+// Covers: specs/monsters/ai.md §3.1 "AI state" (q-fix-c3-quillrat-choice)
+#[test]
+fn ai_state_set_by_a_reactionless_hit_and_the_mode_leave() {
+    use crate::combat::{result, DamageRecord};
+    let mut fx = Fx::new();
+    let m = monster_with_data(&mut fx);
+    let p = fx.spawn(UnitType::Player, 0, fx.a, 12, 10);
+    let ai_state = |fx: &mut Fx| fx.sim.hooks().ai_state(m);
+    assert_eq!(ai_state(&mut fx), 0);
+    // `damage.md` §7.1 step 4.7: a soft hit starts no mode → 19
+    // (`0x005734C0` at `0x0057D119`), read back by the AI's getter.
+    let mut rec = DamageRecord {
+        result: result::HIT | result::SOFT_HIT,
+        ..Default::default()
+    };
+    fx.sim.combat(&mut fx.game, |w, _| {
+        crate::wiring::action::reaction::reaction(w, p, m, &mut rec);
+    });
+    assert_eq!(ai_state(&mut fx), 19);
+    assert!(fx.sim.with(&mut fx.game, |_, v| {
+        crate::monsters::ai::AiUnits::ai_state(v, m) == 19
+    }));
+    // `0x005A68E0`: leaving NU (1) keeps it; leaving A2 (5) turns 19
+    // into 3; leaving A2 again with 3 stores the mode left (5).
+    let leave = |fx: &mut Fx, from: u8, to: u8| {
+        fx.sim.sys.units.get_mut(m).unwrap().mode = u32::from(from);
+        let ok = fx.sim.with(&mut fx.game, |g, v| {
+            v.change_mode(g, m, to, ModeTarget::Unit(m))
+        });
+        assert!(ok);
+        fx.sim.hooks().ai_state(m)
+    };
+    assert_eq!(leave(&mut fx, mode::NEUTRAL, mode::WALK), 19);
+    assert_eq!(leave(&mut fx, mode::ATTACK2, mode::NEUTRAL), 3);
+    assert_eq!(leave(&mut fx, mode::ATTACK2, mode::NEUTRAL), 5);
+    // State 13 survives leaving GH (3) (M08: any other mode left
+    // replaces it).
+    fx.sim.hooks().set_ai_state(m, 13);
+    assert_eq!(leave(&mut fx, mode::GETHIT, mode::NEUTRAL), 13);
+    assert_eq!(leave(&mut fx, mode::WALK, mode::NEUTRAL), 2);
+}

@@ -204,6 +204,51 @@ impl<X> ActionHooks<X> {
 }
 
 impl<X: Pending> ActionHooks<X> {
+    /// The AI state `0x005734E0` (`ai.md` §3.1): monster data
+    /// `dwAiState` (+0x54); a unit without monster data asks
+    /// [`Pending::ai_state`].
+    pub fn ai_state(&self, unit: UnitId) -> u32 {
+        match self.monster_data(unit) {
+            Some(m) => m.ai_state,
+            None => self.x.ai_state(unit),
+        }
+    }
+
+    /// The AI state setter `0x005734C0(unit, v)`; a unit without monster
+    /// data goes to [`Pending::set_monster_ai_state`].
+    pub fn set_ai_state(&mut self, unit: UnitId, v: u32) {
+        match self
+            .monster_world
+            .as_mut()
+            .and_then(|w| w.monster_mut(unit))
+        {
+            Some(m) => m.ai_state = v,
+            None => self.x.set_monster_ai_state(unit, v),
+        }
+    }
+
+    /// `0x005A68E0`, from the monster mode set `0x005A7C20` for every
+    /// mode but GH (`ai.md` §3.1 rule 2), when the mode being left `m`
+    /// is not 1 (NU): old state s ≥ 16 → s − 16 (19 becomes 3); s = 13
+    /// and m = 3 → kept; else s := m.
+    pub fn ai_state_on_mode_leave(&mut self, unit: UnitId, left: u32) {
+        if left == 1 {
+            return;
+        }
+        if let Some(m) = self
+            .monster_world
+            .as_mut()
+            .and_then(|w| w.monster_mut(unit))
+        {
+            let s = m.ai_state;
+            m.ai_state = match s {
+                16.. => s - 16,
+                13 if left == 3 => 13,
+                _ => left,
+            };
+        }
+    }
+
     /// `0x005A0180(unit, mask)`: monster data type flags (+0x16) & mask
     /// (`init.md` Outputs); a unit without monster data asks
     /// [`Pending::monster_flag`].

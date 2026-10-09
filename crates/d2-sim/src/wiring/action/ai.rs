@@ -137,7 +137,7 @@ impl<X: Pending> AiUnits for View<'_, X> {
         self.set_base(unit, stat::HITPOINTS, life);
     }
     fn ai_state(&self, unit: UnitId) -> u32 {
-        self.h.x.ai_state(unit)
+        self.h.ai_state(unit)
     }
     fn alignment(&self, unit: UnitId) -> u8 {
         self.h.x.alignment(unit)

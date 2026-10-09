@@ -183,6 +183,9 @@ pub struct MonsterData {
     pub umods: [u8; MAX_UMODS],
     /// +0x26 wBossHcIdx (superunique row, §20).
     pub boss_hc_idx: u16,
+    /// +0x54 dwAiState (`ai.md` §3.1 "AI state"): 0 at creation, set by
+    /// `0x005734C0` (the hit reaction) and `0x005A68E0` (the mode set).
+    pub ai_state: u32,
     /// +0x58 dwTxtLevelNo.
     pub level_id: i32,
     /// +0x5C bit 2: summoner "not counted" (§4 step 2).

@@ -459,6 +459,9 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     /// The path part of `0x005A7C20` ([`crate::wiring::path::monsters`]);
     /// the requested mode is kept for the start function.
     fn monster_mode_bookkeeping(&mut self, sim: &mut Sim<'_>, unit: UnitId, mode: u32) {
+        if let Some(left) = sim.units.get(unit).map(|r| r.mode) {
+            self.ai_state_on_mode_leave(unit, left);
+        }
         self.monster_request = mode;
         self.monster_path_setup(sim, unit, mode);
     }
