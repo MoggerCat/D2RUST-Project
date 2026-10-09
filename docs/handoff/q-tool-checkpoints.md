@@ -83,3 +83,29 @@ python3 tools/checkpoints/make.py a4-hellforge --orig      # 1.14d, same start (
 
 In a `.play` file: `checkpoint a4-hellforge` instead of `use`, then
 `goto <f> unit <class>` / `poke …` steps (`act4-forge.play`).
+
+## State at wrap-up
+
+Done: all three items (checkpoints, `goto` on both sides, playthrough
+forms and `act4-forge.play`), including the 1.14d run under Wine. In
+progress: nothing.
+
+## Next steps (open asks)
+
+1. **Missile-passable cells.** `goto`'s hop cell avoids the player's move
+   bits 0x1C09, and its final placement uses the game's own free-point
+   search (also 0x1C09). Neither excludes missile-blocking bit 0x4, so a
+   landing cell can still stop missiles (the act sessions saw collision
+   0x5 under a raw `pos` in level 105). Proposal: a `goto` option (or
+   rule) that, after landing, moves the player to the nearest cell
+   with neither 0x1C09 nor 0x4, through the same placement with exact 1,
+   on both sides; and the same for `pos` behind an explicit flag (the
+   plain `pos` stays a raw teleport, `poke.md` §1). Spec it first.
+2. **Sweeps → goto.** The act files' `sweep` milestones can become
+   `checkpoint` + `goto` steps (q-tool-state-diff is changing the sweep
+   hops; syntax sent to that session).
+3. **Class / difficulty.** The checkpoints are normal-difficulty
+   sorceresses. q-tool-class-difficulty can layer its class profile on
+   a checkpoint's `d2s-tool` args (`make.py`'s `d2s_args`), or new
+   definitions per class can be added.
+4. The quest-log check queued in HANDOFF §5.
