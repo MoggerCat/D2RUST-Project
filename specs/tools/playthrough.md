@@ -117,6 +117,74 @@ hide the ones after it.
    with no gap. The first blocker is the first milestone in file order
    that was not reached.
 
+### 4. Class × difficulty matrix
+
+1. `--class L` (comma list of `ama sor nec pal bar dru ass`, or `all`)
+   and / or `--difficulty L` (`normal nightmare hell`, or `all`) turn
+   the run into a matrix: every objective file runs once per (class,
+   difficulty) cell. A missing `--class` means all seven, a missing
+   `--difficulty` means `normal`. `--jobs N` runs N cells at once. Each
+   cell has its own work dir `act<N>-<file>-<class>-<difficulty>/`.
+2. `only class <list>` and `only difficulty <list>` in a milestone block
+   (repeatable, one per kind) drop the milestone from the cells they
+   exclude; then the saves no remaining milestone uses are dropped.
+   Outside a matrix the milestone's class is its save's `--class` and its
+   difficulty its `difficulty` line (default `normal`).
+3. **Cell saves.** In a matrix each `save` line's `d2s-tool new`
+   arguments are rewritten: `--class --name --level --skill --all-skills
+   --stat --item --left-skill --right-skill --difficulty
+   --difficulty-unlocked` are replaced by the class profile and the
+   difficulty tier; `--quests --waypoints --act --gold --expansion
+   --hardcore` are kept. The profile (`PROFILES`, `TIERS` in
+   `playthrough.py`): level 30 / 60 / 85; base strength, energy,
+   dexterity, vitality and life / mana (stats 0–3, 6–9) per tier; every
+   role skill of the class at 20; right skill = the role a
+   `--right-skill {role}` names, else `main`; left skill 0; a tiered
+   weapon (and quiver, shield or class helm) per class and a tiered body
+   armour, equipped. Difficulty d > 0 adds `--difficulty-unlocked d`
+   and, for every lower difficulty, `acts=4` (3 in a classic save) and
+   bit 0 of each quest slot `world/quests.md` §1.9 lists (§1.8 rule 4:
+   the smallest record every completion reader accepts). Every cell adds
+   `--difficulty d` (the town byte, with the save's `--act`), and each
+   milestone's state-dump runs with `--difficulty d`.
+4. **Roles.** `{role}` in any line is replaced by the cell's profile
+   value before parsing: skill ids `{main}` (the class's main attack),
+   `{summon}`, `{aura}`, `{buff}`, `{shift}`, `{trap}`, `{move}`,
+   `{fire}`; unit classes `{pet}` (what `{summon}` creates) and
+   `{trapunit}`. A role the class lacks is an error unless an `only
+   class` line drops the milestone.
+5. `player <field> delta <op> <n>`: the field's value minus its value in
+   the player's first snapshot with a position. `player moved …` and
+   `… delta …` take `since F`: measured from the player's first
+   snapshot at frame ≥ F instead.
+6. **Report.** Per difficulty a table of act (file) rows × class
+   columns with reached / total; then the distinct blockers: each (file,
+   milestone, status) that is not reached in some cell, with the cells,
+   one cell's evidence and its command. A save `d2s-tool` refuses is the
+   cell's `no-save` blocker. `--json` writes `playthrough-matrix-1`
+   (`classes`, `difficulties`, `cells`: the per-act summary keys plus
+   `class`, `difficulty`, `work`, `milestones`; `blockers`), `--markdown`
+   the tables. `--profiles` prints each cell's `d2s-tool new` arguments
+   for a save with only `--expansion`. Exit 0 when nothing is blocked,
+   else 1.
+7. `unit … lvl L,…` filters on the unit's level stat (`lvl`, stat 12;
+   monsters: `monsters/init.md` §7).
+8. `@pI` in a poke (any argument): the unit the milestone's poke I
+   (0-based, file order) created. A probe run up to the frame before the
+   first poke naming one reads the GUIDs from its poke records; `@pI`
+   becomes `<type>/<guid>` (`poke.md` §1 r1; type 1 for `spawn` and
+   `superunique`, 2 `object`, 3 `missile`, 4 `item`). The earlier pokes
+   must be in file and frame order. A poke that created nothing gives
+   `missing-unit`.
+9. `traces/playthrough/classes.play` holds the class milestones: the
+   main skill kills a Quill Rat set to 1 hp (no Quill Rat resistance
+   reaches 100 on any difficulty; a Hell Zombie is cold immune); summons appear and follow the player
+   through a waypoint warp (`world/hirelings.md` §6 rule 1); Holy Fire
+   kills a 1-hp Zombie; Battle Orders and Werewolf raise the player's
+   `hpx`; a Lightning Sentry appears and kills; Teleport moves the
+   player 8+ sub-tiles in under 10 frames; per difficulty a Blood Moor
+   Zombie's level (`monsters/init.md` §7).
+
 ## Constants & data dependencies
 
 Ids in objective files are row indices of the user's tables
@@ -145,6 +213,12 @@ pokes and input (`state-snapshot.md` test vector 5).
 | `act1.play` on the 1.14d install, 2026-10-09 | 12/14 reached; `kill-zombie` and `andariel-killed` stuck (see Open questions 1–2) |
 
 ## Provenance
+
+§4 profile ids: skills.txt `Id` / `charclass` / `summon`, monstats.txt
+`hcIdx`, weapons.txt / armor.txt `code`, levels.txt `MonLvl*`, read
+2026-10-09 from the private data repo's `extracted/Patch_D2.mpq` and
+`extracted/d2exp.mpq` tables (`python3 -I` csv reads); the role choice
+(which skill is a class's main attack) is ours.
 
 d2rs-own tool. The milestone choice comes from `world/quests.md` and the
 Act I quest specs. Level, monster and object ids were read from the
