@@ -6066,6 +6066,7 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Compare: S→C 0x96 / 0x95 stamina per tick against the PROVISIONAL list and the tick the run turns into a walk; fold the real amount and duration into the item-use spec.
 
 ##### REC-200 [MANUAL] Front end: Game exit target
+- RECORDED 2026-10-09 (q-prov-recording, Wine + `tools/cloud-game/xinput.sh`): Save and Exit in single player shows the **main menu**, not character select → specs updated, `q-fix-real-exit-target`.
 - Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
 - Settles: `ui/frontend-menus.md` PROVISIONAL REC-200.
 - Steps and compare: Game exit target. Capture: in single player, Save and Exit from a game. Steps: hook `0x0044B8A0` return and the next screen builder called (`0x0043B080` vs `0x004336C0`). Settles: which screen return value 4 maps to (expected character select).
@@ -6096,12 +6097,14 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Fold: write the result into the cited `ui/frontend-menus.md` rule and drop its PROVISIONAL line.
 
 ##### REC-206 [MANUAL] Front end: Legacy `Save Path` migration
+- RECORDED 2026-10-09 (q-prov-recording, Wine registry): a legacy folder holding a save is kept (its character listed); an empty one gives the default path, written as `NewSavePath`. The legacy case left no `NewSavePath` value: a new PROVISIONAL line in `frontend-menus.md` §F2 r2 (PC 1 read of `0x00415070`). d2rs has no legacy-path code yet.
 - Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
 - Settles: `ui/frontend-menus.md` PROVISIONAL REC-206.
 - Steps and compare: Legacy `Save Path` migration. Capture: registry with `Save Path` → a folder with saves, no `NewSavePath`; start the game; read `NewSavePath` after; repeat with an empty folder. Hook `0x00406DE0` return. Settles: which folder is kept.
 - Fold: write the result into the cited `ui/frontend-menus.md` rule and drop its PROVISIONAL line.
 
 ##### REC-207 [MANUAL] Front end: Slot level line text
+- SETTLED (confirmed) 2026-10-09 (q-prov-recording): the slot line reads `Level 30 Amazon` / `Level 1 Sorceress` (X screenshot of the character select under Wine); text only.
 - Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
 - Settles: `ui/frontend-menus.md` PROVISIONAL REC-207.
 - Steps and compare: Slot level line text. Capture: screenshot one slot per class; or read the string id pushed to the `D2Lang_GetStringByIndex` call after `" %d "` in `0x004380F0` (`disasm.py fn 0x004380F0`). Settles: the exact level / class line text and colour.
@@ -6114,6 +6117,7 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Fold: write the result into the cited `ui/frontend-menus.md` rule and drop its PROVISIONAL line.
 
 ##### REC-209 [MANUAL] Front end: filter argument 2
+- SETTLED (confirmed) 2026-10-09 (q-prov-recording): `-` typed into the empty name box is rejected; `a-` is accepted (X input under Wine).
 - Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
 - Settles: `ui/frontend-menus.md` PROVISIONAL REC-209.
 - Steps and compare: filter argument 2. Capture: on the create screen, select a class, type `-` into the empty box, then `a-`; hook `0x00430590` and log its 3 arguments. Settles whether a leading separator is rejected (arg = caret position) or the argument means something else.
@@ -6174,6 +6178,7 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Fold: write the result into the cited `ui/frontend-credits.md` rule and drop its PROVISIONAL line.
 
 ##### REC-226 [MANUAL] Front end: 640×480 frame
+- SETTLED (confirmed) 2026-10-09 (q-prov-recording): `Resolution` = 0 keeps the 800 × 600 front end; button areas pixel-equal to the default run; Credits and Cinematics in the same frame.
 - Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
 - Settles: `ui/frontend-credits.md` PROVISIONAL REC-226.
 - Steps and compare: set the 640×480 video option and restart; screenshot the main menu, Credits and Cinematics. Settles whether the front end stays 800×600 with the C3/C8 positions, or shows what changes.

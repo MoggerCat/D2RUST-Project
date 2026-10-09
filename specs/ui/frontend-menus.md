@@ -24,29 +24,29 @@
 |   F1.4 Main menu (`0x004336C0`) | 240–268 |
 |   F1.5 Title animation (logo fire) | 269–300 |
 |   F1.6 Palette and sounds | 301–323 |
-|   F2.1 Save folder (`0x00407050`) | 324–342 |
-|   F2.2 Scan and entry filter (`0x00438F70`, `0x0043C8A0`, `0x00438AD0`) | 343–369 |
-|   F2.3 Sort order (`0x00438AD0`) | 370–375 |
-|   F2.4 Layout (`0x0043AE30`, draw `0x004380F0`) | 376–399 |
-|   F2.5 Selection, scrolling and keys | 400–444 |
-|   F2.6 OK / Enter (`0x00439840`) | 445–457 |
-|   F2.7 Other buttons | 458–482 |
-|   F2.8 Difficulty box (`0x00439780`) | 483–502 |
-|   F2.9 Control records and art | 503–539 |
-|   F3.1 Character-create screen build (`0x00435580`) | 540–575 |
-|   F3.2 Class line-up (positions, creation order) | 576–591 |
-|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 592–651 |
-|   F3.4 Name entry (edit box, descriptor 204) | 652–666 |
-|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 667–690 |
-|   F3.6 OK / Cancel behaviour and the new save | 691–725 |
-|   F3.7 Sounds (deferred) | 726–730 |
-|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 731–761 |
-| Constants & data dependencies | 762–798 |
-| Randomness | 799–802 |
-| Edge cases & original bugs | 803–834 |
-| Test vectors | 835–868 |
-| Provenance | 869–914 |
-| Open questions | 915–959 |
+|   F2.1 Save folder (`0x00407050`) | 324–347 |
+|   F2.2 Scan and entry filter (`0x00438F70`, `0x0043C8A0`, `0x00438AD0`) | 348–374 |
+|   F2.3 Sort order (`0x00438AD0`) | 375–380 |
+|   F2.4 Layout (`0x0043AE30`, draw `0x004380F0`) | 381–406 |
+|   F2.5 Selection, scrolling and keys | 407–451 |
+|   F2.6 OK / Enter (`0x00439840`) | 452–464 |
+|   F2.7 Other buttons | 465–489 |
+|   F2.8 Difficulty box (`0x00439780`) | 490–509 |
+|   F2.9 Control records and art | 510–546 |
+|   F3.1 Character-create screen build (`0x00435580`) | 547–582 |
+|   F3.2 Class line-up (positions, creation order) | 583–598 |
+|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 599–658 |
+|   F3.4 Name entry (edit box, descriptor 204) | 659–673 |
+|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 674–697 |
+|   F3.6 OK / Cancel behaviour and the new save | 698–732 |
+|   F3.7 Sounds (deferred) | 733–737 |
+|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 738–768 |
+| Constants & data dependencies | 769–805 |
+| Randomness | 806–809 |
+| Edge cases & original bugs | 810–841 |
+| Test vectors | 842–875 |
+| Provenance | 876–921 |
+| Open questions | 922–966 |
 <!-- /index -->
 
 ## Summary
@@ -224,7 +224,7 @@ function or in `0x004326F0` (character-create art, per class).
 | character create | OK or **Enter** (descriptor 176, 5102) | `0x004369F0` | game load (new character) |
 | difficulty popup | Normal / Nightmare / Hell | `0x00439B80` / `0x00439BA0` / `0x00439BC0` → `0x00439AF0` | game load |
 | difficulty popup | **Esc** (descriptor 173: invisible 10×10 button at (900,900), hotkey 27) | `0x00432EE0` → `0x0042F3F0` (pops list A) | character select |
-| in game | exit (0x50 code 23 path) | `0x0044B8A0` returns 4 for single player (`client/msg-ui.md` OQ8) | PROVISIONAL: character select (because 1.14d returns to it after Save and Exit); settled by REC-200 |
+| in game | exit (0x50 code 23 path) | `0x0044B8A0` returns 4 for single player (`client/msg-ui.md` OQ8) | **main menu**: recorded 2026-10-09 (REC-200, Wine, X input): Single Player → character select → OK → town → Esc → Save and Exit Game shows the main menu, not character select. Which builder return 4 reaches is still to read (PC 1); d2rs → `q-fix-real-exit-target` |
 
 Rows 1–2 (the `blizno` picture and its 8 s timer): never shown in 1.14d. The start-up chain
 `0x00435230` plays the Blizzard videos and goes straight to the trademark screen, and no caller
@@ -329,8 +329,13 @@ the pop-up layer; record layout in §F2.9).
 2. `NewSavePath` missing (`GetLastError() == 2`): read the legacy value `Save Path`, drop one trailing `\`;
    if it names an existing directory, the default path is computed (rule 3) and `0x00406DE0` decides between
    them: result 1 → keep the legacy path, else → the default path with a trailing `\`. The choice is written
-   back as `NewSavePath` (`0x00415070`). PROVISIONAL: `0x00406DE0` returns 1 when the legacy folder holds
-   entries other than `.` / `..` (because the function compares those two names); settled by REC-206.
+   back as `NewSavePath` (`0x00415070`). `0x00406DE0` returns 1 when the legacy folder holds
+   entries other than `.` / `..`. Recorded 2026-10-09 (REC-206, Wine registry, no `NewSavePath`,
+   `Save Path` = `C:\legacyA\` holding one `.d2s`, then = an empty `C:\legacyB\`; Single Player
+   clicked): with the save the character select lists the legacy folder's character; with the empty
+   folder it lists the default folder's and `NewSavePath` = the default path with a trailing `\`.
+   PROVISIONAL (new, REC-206): in the legacy case no `NewSavePath` value was found afterwards (HKCU,
+   HKLM), against "written back" above; to read in `0x00415070` (PC 1).
 3. The path read does not exist (`GetFileAttributesA` = −1) or is empty → default path
    (`0x00406D30`): `SHGetKnownFolderPath(FOLDERID_SavedGames {4C5C32FF-BB9D-43B0-B5B4-2D72E54EAAA4})` +
    `Diablo II` (`0x004067D0`); if that API is missing or fails, `SHGetFolderPathA(CSIDL_PERSONAL)` +
@@ -387,8 +392,10 @@ Positions are 800 × 600 frame pixels; control `y` in the table is the **bottom*
    - the title prefix (`world/quests-act1-rest.md` "Character title", `0x005068A0(class, p, hardcore,
      expansion)`, p = status bits 8–12) followed by the name (and ` {tag}` when a guild tag exists: never in
      single player); colour 1 (red) when hardcore, else 4 (gold) (`ui/text.md` colours);
-   - level line: `" %d "` with the level and the class name (`0x00437F60`); PROVISIONAL text "Level N
-     ClassName" (because the string id is passed in a register lost by the export); settled by REC-207;
+   - level line: `" %d "` with the level and the class name (`0x00437F60`); text "Level N
+     ClassName", e.g. `Level 30 Amazon`, `Level 1 Sorceress` (recorded 2026-10-09, REC-207: X
+     screenshot of the 1.14d character select under Wine, `tools/cloud-game/run.sh` with
+     `xinput.sh`; text only, colour not compared);
    - when status & 0x20: string 22731 `EXPANSION CHARACTER` in colour 2 (green).
    Dead hardcore has no extra text: it shows only through the dead figure (§F2.2 rule 6) and draw flags
    from `0x006CE278` / `0x006CE27C` (hardcore, dead) versus `0x006CE2F8` / `0x006CE2FC`.
@@ -655,9 +662,9 @@ differ); settled by REC-208.
    `length > [+0x48] − 1` (`0x004FEAE0`) → **at most 15 characters**.
 2. Character filter (`0x00430590`, set by `0x004FDAD0`): accept `A–Z`, `a–z`; accept `-` or `_` only if
    the filter's second argument ≠ 0 and the current text holds no `-` and no `_`; reject everything else
-   (digits, space, accented letters, other punctuation). PROVISIONAL: the second argument is the caret
-   position, so a separator cannot be typed as the first character (because only that reading fits the
-   later first-char rule); settled by REC-209.
+   (digits, space, accented letters, other punctuation). The second argument acts as the caret
+   position: a separator cannot be typed as the first character. Recorded 2026-10-09 (REC-209, Wine, X
+   input `text -` then `text a-` into the empty box): the leading `-` is rejected, `a-` is accepted.
 3. Change callback `0x00433BD0` (set by `0x004FDB00`) → `0x00430620` after every edit.
 4. OK enable (`0x00430620`): OK (176) enabled iff `2 ≤ len ≤ 15`, first char ∉ {`-`,`_`}, last char ∉
    {`-`,`_`}, and count(`-`) + count(`_`) < 2; else disabled. A disabled OK ignores clicks and Enter.

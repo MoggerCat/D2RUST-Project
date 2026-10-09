@@ -105,3 +105,19 @@ stacks). Facts (`facts_join.py` 0.2.0 with `--from 2 --frames 0 --skip`):
 | `tests/app_town_portal.rs:9`, `town_portal.rs:192` (REC-117) | partly: links and the pair's removal on the way back confirmed; positions and the removal notice need a d2rs replay |
 | REC-281 drop / pick-up (`moves.rs:525`, `item_approach.rs`, …) | recorded (one 0x9C action 2 on the drop, nothing while it lies, a potion picked up goes to the belt, 0x9C action 0xE); the d2rs replay (`traces/scenarios/belt-potion-drop.scenario`) is still to run (a draft scenario of the steps is not committed until `scenario-run check` passes on it) |
 | REC-113 identify, REC-121 sockets, REC-163 charms, REC-188 | open: `d2s-tool` writes identified normal items only |
+
+### G10 — front end, first pass (2026-10-09)
+
+Plain `run.sh` (no recorder) with `tools/cloud-game/xinput.sh`, X
+screenshots (`--shot-at`); the first click is repeated (8, 10, 12 s)
+because the menu appears between 7 and 11 s.
+
+| Point | Result |
+|---|---|
+| `frontend-menus.md` §F3.4 r2 (REC-209) | **settled (confirmed)**: a leading `-` is rejected, `a-` accepted |
+| `frontend-menus.md` §F2 slot text (REC-207) | **settled (confirmed)**, text only: `Level 30 Amazon`, `Level 1 Sorceress` |
+| `frontend-menus.md` §F1.3, `save-exit.md` §4 r2, `app/front_start.rs:66`, `app/save.rs:579` (REC-200) | **differs**: Save and Exit shows the main menu → specs updated, `q-fix-real-exit-target` |
+| `frontend-credits.md` (REC-226) | **settled (confirmed)**: with registry `Resolution` = 0 the front end, Credits and Cinematics stay in the 800 × 600 frame; main-menu buttons pixel-equal (AE 0) to the default run |
+| `frontend-menus.md` §F2 r2 (REC-206) | **settled (confirmed)** for the folder choice (a legacy folder with a save is kept; an empty one → default, written as `NewSavePath`); new PROVISIONAL: no `NewSavePath` written in the legacy case |
+| REC-205 dead hardcore figure | observed (two `d2s-tool` hardcore saves with status bit 0x08, Amazon and Barbarian): both slots show a grey hooded figure that looks alike; the backgrounds differ, so pixel equality of the two figures is not established: open |
+| REC-212 Esc menu | screenshot taken; the pentagram pixels need the cel geometry for an exact check: open |
