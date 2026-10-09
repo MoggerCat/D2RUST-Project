@@ -200,6 +200,13 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     `tools/trace-recorder/record_frames.py` and `facts_render.py` as in
     Step 3, each twice, and commit the facts.
 
+21. **Client missile motion and body gaps** (`q-fix-client-missiles-rest`,
+    REC-540–549): `missiles/client.md` Open questions 9 onward: the
+    timed arc `0x004DA5B0` (flag store vs set, the vz division), the
+    motion getters `0x004DA110`–`0x004DA150` (shifted or stored) and the
+    other points that session lists there. Answer into
+    `render/unit-composite.md` §8 and the client missile specs.
+
 ## Step 5 — spec gaps (107 provisional points no spec states)
 
 `docs/handoff/provisional-index.tsv` rows with `settle_kind` = `unstated`

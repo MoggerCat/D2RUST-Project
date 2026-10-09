@@ -151,12 +151,13 @@ fn c_missiles(
     outputs: &mut Vec<Output>,
 ) {
     for key in objects::c_order(world, super::world::MISSILE) {
-        let r = super::client_missiles::update(
-            world,
-            &inputs.tables.missiles,
-            key,
-            inputs.high_light_quality,
-        );
+        let env = super::client_missiles::Env {
+            rows: &inputs.tables.missiles,
+            lights: inputs.high_light_quality,
+            skills: inputs.skill_tables.as_deref(),
+            monsters: &inputs.tables.monsters,
+        };
+        let r = super::client_missiles::update_with(world, &env, key);
         if let Err(error) = r {
             log.rejected.push(Rejected { id: 0, error });
         }
