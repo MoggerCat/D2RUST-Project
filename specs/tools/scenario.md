@@ -24,15 +24,15 @@
 | Outputs / state changes | 63–69 |
 | Rules | 70–71 |
 |   1. Files | 72–81 |
-|   2. Script syntax | 82–177 |
-|   3. Typed messages and references | 178–233 |
-|   4. Run model | 234–292 |
-|   5. Comparison | 293–323 |
-|   6. Masks | 324–358 |
-| Edge cases & original bugs | 359–370 |
-| Test vectors | 371–386 |
-| Provenance | 387–396 |
-| Open questions | 397–432 |
+|   2. Script syntax | 82–180 |
+|   3. Typed messages and references | 181–236 |
+|   4. Run model | 237–295 |
+|   5. Comparison | 296–326 |
+|   6. Masks | 327–361 |
+| Edge cases & original bugs | 362–373 |
+| Test vectors | 374–389 |
+| Provenance | 390–399 |
+| Open questions | 400–439 |
 <!-- /index -->
 
 ## Summary
@@ -123,7 +123,10 @@ with a letter): the save `<save dir><name>.d2s` the original side loads
 (original-hooks §5.3–§5.4). Inline lines describe the same character
 for a runner without a save loader (d2rs, until `formats/d2s.md`
 exists); that they match the save is the script author's claim, which
-a run checks only through the comparison.
+a run checks only through the comparison. The d2rs runner given
+`--save-dir DIR` (2026-10-09) also loads `DIR/<name>.d2s` after the
+inline set-up (`formats/d2s-load.md` through `d2-server`'s `load_save`);
+each load step its host cannot apply is written as a gap.
 
 | Line | Once | Default | Meaning |
 |---|---|---|---|
@@ -422,10 +425,14 @@ rule 5, §3), game type 3 (§5.2), the unit snapshot fields (§4). Open:
    from the save (`char save`, original-hooks §5.3: class, act,
    progression, quest and waypoint flags, items all come from the
    `.d2s`; the 0x67 message carries none of them). `d2s-tool` writes
-   quest flags (`--quests`), waypoints, stats, skills and normal
-   identified items only (`--item CODE`); items of another quality,
-   affixes, unique / set / runeword ids and sockets need an item writer
-   for `items/bitstream.md` (tool gap). Until then `char item` lines
-   other than normal items are a gap on the original side.
+   quest flags (`--quests`), waypoints, stats, skills and items
+   (`--item CODE[#Q][@X,Y][:PAGE][/q=QUALITY/idx=ROW/ilvl=N/sock=N/unid/eth/body=L/belt=S]`,
+   2026-10-09: qualities by the creation's own draws, a forced set /
+   unique row, unidentified, sockets up to `gemsockets`, equipped and
+   belt placement; checked byte for byte against a 1.14d re-save,
+   `facts/saves/gear-roundtrip.tsv`). Still a gap: chosen affixes,
+   runewords and socket fillers (children), so `char item` lines with
+   `prefix`, `suffix`, `runeword` or a `socket` place are a gap on the
+   original side.
 4. *Answered*: original-hooks §4 rule 5 (base array: list +0x24, count
    +0x28, for plain and extended lists).
