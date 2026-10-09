@@ -1,14 +1,14 @@
 {
  "channel": "rng",
- "check": "sys-stats-clamp",
+ "check": "sys-units-census",
  "command": [
   "tools/trace-recorder/record_rng.py",
   "--game",
   "<Game.exe>",
   "--seconds",
-  "300",
+  "360",
   "--ticks",
-  "80",
+  "140",
   "--auto",
   "ScnAma",
   "--seed",
@@ -19,33 +19,37 @@
   "--skip-inline",
   "drlg",
   "--poke",
-  "10 stat @player 6 0 99999999",
+  "4 warp 2",
   "--poke",
-  "12 stat @player 8 0 99999999",
+  "30 seed-game 0x00001234 666",
   "--poke",
-  "14 stat @player 10 0 99999999",
+  "30 seed-unit @player 0x00000055 666",
   "--poke",
-  "18 stat @player 0 0 -5",
+  "30 spawn 19 @x+4 @y+4 normal",
   "--poke",
-  "22 stat @player 7 0 -256",
+  "34 object 119 @x-4 @y+4",
   "--poke",
-  "26 stat @player 9 0 0",
+  "38 item hp1 @x+2 @y+2",
   "--poke",
-  "30 stat @player 11 0 0"
+  "42 missile 12 @x @y @x+5 @y+5 skill 7 5",
+  "--poke",
+  "46 spawn 19 @x+5 @y-5 unique umod 3",
+  "--poke",
+  "60 spawn 19 @x-5 @y-5 champion umod 16"
  ],
  "files": {
   "orig.rng.jsonl": {
-   "sha256": "4947b10eddf558753c9ecc3c21dc0e19df67d41cf151861d961a5b0b30751c01",
-   "size": 1290666
+   "sha256": "be6a38881fdfe81e84dbd42f60dc9cc84afa281da6a0972dc593a0307a1e2e02",
+   "size": 1944374
   }
  },
  "format": "orig-cache-1",
  "key": {
-  "check": "4a66abb5c07b37b50a15183cbfe58218c1b3a103a7a23978b848c1cea9718f6a",
+  "check": "cba853d829d943665d16d267722ebc68d928a4fb1c4b098fc1498336c51123a6",
   "format": "orig-cache-key-1",
   "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
   "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
   "recorder": "163279ff197d8ac1c0fb5ea9daedfb396a382280151c03826e560666747f2efd",
-  "save": "b50242c4e89e29e9d44eeb4d5bdbdb55d1f9d347d95af384e2e8c0c2cfde1832"
+  "save": "c098d7905cb83f92fe70f1b392b1e08faf1dd04e1f6d9e100a0ca523eaafb1bd"
  }
 }

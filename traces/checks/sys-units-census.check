@@ -19,4 +19,4 @@ at 34 poke object 119 @x-4 @y+4
 at 38 poke item hp1 @x+2 @y+2
 at 42 poke missile 12 @x @y @x+5 @y+5 skill 7 5
 at 46 poke spawn 19 @x+5 @y-5 unique umod 3
-at 60 poke spawn 19 @x-5 @y-5 champion
+at 60 poke spawn 19 @x-5 @y-5 champion umod 16
