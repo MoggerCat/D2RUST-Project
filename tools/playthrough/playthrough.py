@@ -19,6 +19,7 @@ d2rs only; no 1.14d side (spec Summary). Python stdlib only.
 import argparse
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -81,6 +82,7 @@ def parse_play(text, name="<play>"):
                 "input": None,
                 "need": [],
                 "sweep": None,
+                "find": None,
                 "note": "",
             }
             play["milestones"].append(cur)
@@ -99,7 +101,7 @@ def parse_play(text, name="<play>"):
                 cur["difficulty"] = rest
             elif word == "poke":
                 f, _, d = rest.partition(" ")
-                _int(f, where)
+                _int(f[1:] if f.startswith("+") else f, where)
                 if not d.strip():
                     raise PlayError(f"{where}: poke <frame> <directive>")
                 cur["pokes"].append(f"{f} {d.strip()}")
@@ -107,8 +109,11 @@ def parse_play(text, name="<play>"):
                 if cur["sweep"]:
                     raise PlayError(f"{where}: one sweep per milestone")
                 t = rest.split()
-                mode = t.pop() if t and t[-1] in ("spiral", "grid") else "spiral"
-                cur["sweep"] = [_int(x, where) for x in _nargs(" ".join(t), 4, where, "sweep <frame> <every> <radius> <step> [spiral|grid]")] + [mode]
+                mode = t.pop() if t and t[-1] in ("spiral", "grid", "cross") else "spiral"
+                cur["sweep"] = [_int(x, where) for x in _nargs(" ".join(t), 4, where, "sweep <frame> <every> <radius> <step> [spiral|grid|cross]")] + [mode]
+            elif word == "find":
+                pred = parse_pred(f"unit {rest} present", where)
+                cur["find"] = pred
             elif word == "input":
                 cur["input"] = rest
             elif word == "need":
@@ -135,6 +140,11 @@ def parse_play(text, name="<play>"):
             raise PlayError(f"{w}: no 'deadline <frames>'")
         if not m["need"]:
             raise PlayError(f"{w}: no 'need' predicate")
+        rel = [p for p in m["pokes"] if p.startswith("+")] or ("frame +" in (m["input"] or ""))
+        if m["find"] and not m["sweep"]:
+            raise PlayError(f"{w}: 'find' needs a 'sweep'")
+        if rel and not m["find"]:
+            raise PlayError(f"{w}: relative '+N' frames need a 'find'")
     return play
 
 
@@ -163,6 +173,13 @@ def sweep_pokes(f0, every, radius, step, cx, cy, mode="spiral"):
     if every < 1 or step < 1 or radius < step:
         raise PlayError("sweep: every >= 1, step >= 1, radius >= step")
     n = radius // step
+    if mode == "cross":
+        # out and back along +x, +y, -x, -y (world axes: the iso diagonals)
+        pts = []
+        for dx, dy in ((1, 0), (0, 1), (-1, 0), (0, -1)):
+            arm = [(cx + dx * i * step, cy + dy * i * step) for i in range(1, n + 1)]
+            pts += arm + arm[-2::-1] + [(cx, cy)]
+        return [f"{f0 + k * every} pos @player {px} {py}" for k, (px, py) in enumerate(pts) if px >= 0 and py >= 0]
     if mode == "grid":
         # rows of the square, serpentine, from the (-R, -R) corner
         pts = []
@@ -214,12 +231,12 @@ def parse_pred(text, where):
                 filt[t[i]] = [_int(x, where) for x in v.split(",")]
             i += 2
         rest = t[i:]
-        if rest in (["present"], ["absent"], ["dead"], ["seen"]):
+        if rest in (["present"], ["absent"], ["dead"], ["seen"], ["killed"]):
             return {"kind": "unit", "filter": filt, "test": rest[0], "src": text}
         if len(rest) == 3 and rest[0] == "count" and rest[1] in OPS:
             return {"kind": "unit", "filter": filt, "test": "count", "op": rest[1],
                     "value": _int(rest[2], where), "src": text}
-        raise PlayError(f"{where}: unit [ut|cl|lv|g V]... present|absent|seen|dead|count <op> <n>")
+        raise PlayError(f"{where}: unit [ut|cl|lv|g V]... present|absent|seen|dead|killed|count <op> <n>")
     raise PlayError(f"{where}: predicate must start with player or unit")
 
 
@@ -316,6 +333,9 @@ def eval_pred(pred, snaps, idx, guids, first_player=None):
         return not hit, f"{len(hit)} matching"
     if test == "count":
         return _cmp(len(hit), pred["op"], pred["value"]), f"{len(hit)} matching"
+    if test == "killed":
+        dead = [u for u in hit if u.get("m") in DEAD_MODES.get(u.get("ut"), (0,))]
+        return bool(dead), f"{len(dead)} of {len(hit)} matching in a death mode"
     # dead: seen alive-or-dead before, and now every match in a death mode or gone
     seen = any(_matches(u, filt, guids) for s in snaps[: idx + 1] for u in s["units"])
     if not seen:
@@ -413,7 +433,8 @@ def run_milestone(m, play, client, d2s, work, game_dir):
         r = subprocess.run(cmd, capture_output=True, text=True, env=_env(game_dir))
         if r.returncode != 0:
             raise PlayError(f"save {m['save']}: {first_error_line(r.stderr + r.stdout)}")
-    pokes = list(m["pokes"])
+    pokes = [p for p in m["pokes"] if not p.startswith("+")]
+    script = m["input"]
     if m["sweep"]:
         f0, every, radius, step, mode = m["sweep"]
         probe = os.path.join(work, f"{m['name']}.probe.jsonl")
@@ -429,12 +450,17 @@ def run_milestone(m, play, client, d2s, work, game_dir):
             return {"status": "stuck", "frame": f0 - 1, "evidence": "sweep probe: no player position"}
         pokes += sweep_pokes(f0, every, radius, step, pl["x"], pl["y"], mode)
         pokes.sort(key=lambda p: int(p.split()[0]))
+        if m["find"]:
+            found = find_probe(m, pokes, save, client, work, game_dir)
+            if isinstance(found, dict):
+                return found
+            pokes, script = shift_after_find(m, pokes, found)
     out = os.path.join(work, f"{m['name']}.state.jsonl")
     cmd = [client, "state-dump", "--save", save, "--seed", str(m["seed"]),
-           "--ticks", str(m["ticks"]), "--out", out, "--date", "2026-01-01"]
+           "--ticks", str(m.get("run_ticks", m["ticks"])), "--out", out, "--date", "2026-01-01"]
     cmd += _flags(m, pokes)
-    if m["input"]:
-        cmd += ["--input", m["input"]]
+    if script:
+        cmd += ["--input", script]
     m["cmd"] = " ".join(shlex.quote(c) for c in cmd)
     if len(m["cmd"]) > 600:
         script = os.path.join(work, f"{m['name']}.sh")
@@ -450,6 +476,48 @@ def run_milestone(m, play, client, d2s, work, game_dir):
                 "evidence": f"exit {r.returncode}: {first_error_line(r.stderr)}"}
     _, snaps, pokes, _ = read_state(out)
     return evaluate(m, snaps, pokes)
+
+
+def find_probe(m, pokes, save, client, work, game_dir):
+    """`find` (spec §1 r5): runs the whole sweep to the deadline and
+    returns the first frame at which a unit matching the filter is
+    present, or a blocker verdict when none ever is."""
+    probe = os.path.join(work, f"{m['name']}.find.jsonl")
+    cmd = [client, "state-dump", "--save", save, "--seed", str(m["seed"]), "--ticks", str(m["ticks"]),
+           "--out", probe, "--date", "2026-01-01"] + _flags(m, pokes)
+    m["cmd"] = " ".join(shlex.quote(c) for c in cmd)
+    r = subprocess.run(cmd, capture_output=True, text=True, env=_env(game_dir), timeout=900)
+    if r.returncode != 0:
+        return {"status": "crash", "frame": None, "evidence": f"find probe exit {r.returncode}: {first_error_line(r.stderr)}"}
+    _, snaps, ppokes, _ = read_state(probe)
+    guids = poke_guids(ppokes)
+    for i, s in enumerate(snaps):
+        if eval_pred(m["find"], snaps, i, guids)[0]:
+            return s["f"]
+    pl = (player_of(snaps[-1]) if snaps else None) or {}
+    return {"status": "missing-unit", "frame": snaps[-1]["f"] if snaps else None,
+            "evidence": f"find {m['find']['src']}: never present in the sweep; "
+                        f"player lv {pl.get('lv')} m {pl.get('m')} at ({pl.get('x')},{pl.get('y')})"}
+
+
+def shift_after_find(m, pokes, found):
+    """The run after a `find` at frame F: the sweep stops at F (its later
+    `pos` pokes are dropped), `poke +N` runs at F + N and `frame +N` of
+    the input script is frame F + N."""
+    keep = [p for p in pokes if not (p.split()[1:3] == ["pos", "@player"] and int(p.split()[0]) > found)]
+    for p in m["pokes"]:
+        if p.startswith("+"):
+            n, _, d = p.partition(" ")
+            keep.append(f"{found + int(n[1:])} {d}")
+    keep.sort(key=lambda p: int(p.split()[0]))
+    rel = [int(p.split()[0][1:]) for p in m["pokes"] if p.startswith("+")]
+    rel += [int(x) for x in re.findall(r"frame \+(\d+)", m["input"] or "")]
+    # the deadline covers every relative step plus 60 frames to see its effect
+    m["run_ticks"] = max(m["ticks"], found + max(rel, default=0) + 60)
+    script = m["input"]
+    if script:
+        script = re.sub(r"frame \+(\d+)", lambda g: f"frame {found + int(g.group(1))}", script)
+    return keep, script
 
 
 def _flags(m, pokes):
@@ -616,6 +684,10 @@ milestone walk
     assert r["status"] == "stuck" and "failed" in r["evidence"], r
     r = evaluate(kill, snaps, [dict(pokes[0], r="unresolved", guid=None)])
     assert r["status"] == "missing-unit", r
+    # killed: one of the matches in a death mode
+    kd = dict(kill, need=[parse_pred("unit ut 1 cl 5 killed", "t")])
+    assert evaluate(kd, snaps, pokes)["status"] == "reached"
+    assert evaluate(kd, snaps[:2], pokes)["status"] == "stuck"
     # walk: moved 4 >= 3, two lv-2 monsters
     r = evaluate(walk, snaps, pokes)
     assert r["status"] == "reached", r
@@ -652,6 +724,10 @@ milestone walk
     assert sw[1] == "12 pos @player 1030 2030" and sw[-1] == "58 pos @player 1000 2000", sw
     gr = sweep_pokes(10, 2, 60, 30, 1000, 2000, "grid")
     assert gr[0] == "10 pos @player 940 1940" and gr[5] == "20 pos @player 1060 1970", gr
+    cr = sweep_pokes(10, 1, 60, 30, 1000, 2000, "cross")
+    assert [q.split(None, 1)[1] for q in cr[:4]] == ["pos @player 1030 2000", "pos @player 1060 2000",
+                                                     "pos @player 1030 2000", "pos @player 1000 2000"], cr
+    assert len(cr) == 16 and cr[-1] == "25 pos @player 1000 2000", cr
     pts = {tuple(map(int, q.split()[3:])) for q in sw}
     assert pts == {(1000 + 30 * i, 2000 + 30 * j) for i in range(-2, 3) for j in range(-2, 3)}, pts
     print("playthrough selftest: ok")
