@@ -718,6 +718,19 @@ mod belt {
         assert_eq!(intents(&out), vec![vec![0x63, 7, 0, 0, 0]]);
     }
 
+    // Covers: specs/ui/inventory.md §10 r3
+    #[test]
+    fn a_ctrl_click_never_lifts_a_grid_item() {
+        let (mut u, files) = ui();
+        let w = world(&[(7, mode::STORED, (0, 2, 3, 1), b"hp1 ")], None);
+        // Without Ctrl the click lifts (0x19); with it, no store: nothing.
+        let out = u.press(&w, &files, &layout(), Point::new(160, 290));
+        assert_eq!(intents(&out), vec![vec![0x19, 7, 0, 0, 0]]);
+        u.ctrl = true;
+        let out = u.press(&w, &files, &layout(), Point::new(160, 290));
+        assert!(intents(&out).is_empty());
+    }
+
     // Covers: specs/seams/item-grids.md §2.8
     #[test]
     fn the_belt_test_reads_the_tables_not_a_code_list() {

@@ -156,6 +156,10 @@ pub struct ItemsUi {
     /// Shift is held (set by the host each frame): a shift-click on a
     /// belt-able grid item sends 0x63 (`inventory.md` §10 r3.4).
     pub shift: bool,
+    /// Ctrl is held (set by the host each frame): a Ctrl-click on a grid
+    /// item never lifts it (`inventory.md` §10 r3.3; the sell itself is
+    /// the shop panel's).
+    pub ctrl: bool,
     /// The item tool tips' data (`inv_items_tip`); none: no tips.
     pub tips: Option<super::super::item_tip::ItemTips>,
     /// The inventory tables of the equip check (`items/inventory.md`
@@ -623,7 +627,7 @@ impl ItemsUi {
             },
             page,
             shift: self.shift,
-            ctrl: false,
+            ctrl: self.ctrl,
             store_open: false,
             overlap_item: overlap.first().map(|i| iref(i)),
             overlap_count: overlap.len() as u32,

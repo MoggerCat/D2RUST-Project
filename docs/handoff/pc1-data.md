@@ -164,3 +164,21 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     the craft list (`0x00660240`, mode 7) call `0x0065FE10` or
     `0x0065FD70` directly (§2 says directly, §14 lists §12 among the
     wrapper's callers). Answer into `items/properties.md` §2 / §14.
+13. **State param sign in S→C 0xA8 / 0xAA** (`q-fix-proto-state-param-sign`):
+    the sim writes the param unsigned (`units/messages.rs`), the client
+    reads it signed (`client/stat-lists.md` §3 r1); settle the read sign
+    with `0x0045EE20` / `0x00470E30` (`stat-lists.md` OQ5).
+14. **Stamina scale on the client** (`q-fix-seam-stamina-scale`): the wire
+    carries stamina >> 8, the client's exhaustion test reads raw 1..255;
+    does 1.14d's client drain stamina locally (`client/model.md` OQ2,
+    REC-51)? Spec decision first, then `bridge/predict.rs`.
+15. **The other four progression call sites** (`q-fix-save-gaps`, REC-265
+    (2)): `0x00538680(client, step, difficulty)` at `0x0058DCE2`,
+    `0x0058DD65`, `0x0058E4F1` (Act II) and `0x0059C848` (Act III): which
+    quest event and which `step` each passes. Act I (`0x00596210`), Act IV
+    (`0x005B4D77`, step 4, classic only) and Act III's Mephisto credit
+    (`0x005BC182`) are wired.
+16. **Loader messages 0x22 / 0x21 at the join** (`q-fix-flow-join-load`):
+    the per-item conditions of the loader's S→C 0x22 (`0x0055C216`) and
+    0x21 (`0x0057017B`) (`intents-events.md` §8.2 r3.1 (c)); the quest
+    entry itself is wired (`world/quests.md` §3 names the caller).
