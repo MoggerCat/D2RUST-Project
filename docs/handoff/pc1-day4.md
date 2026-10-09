@@ -125,3 +125,52 @@ whether d2rs's server missed or only the client doesn't show it; the
 cleaner check is `traces/checks/combat-melee-fallen.check`, where day 3
 found the kill matching. Here the attack went to the nearest Fallen by
 the client's own pick, so a different target is possible.
+
+## Round 2 (same day, "check and do work if available")
+
+A triage of every unmarked Step 4 item against the earlier hand-backs
+and specs found 26 already answered (mostly in the "Hand-back — PC 1 day
+run" / "day 2" sections of `pc1-data.md`, never marked), and 5 open. Four
+were binary reads, done here; the fifth (item 20) is recordings.
+
+| Item | Answer (owner spec) | Rows |
+|---|---|---|
+| 28 Interact range `0x00623660` (REC-94 settled) | Whole-sub-tile positions; the object's `SizeX` × `SizeY` box (origin O − size / 2) widened by 2 on each side with the corners cut; unit distance 0 or a unit X size > 2 → in range. Out of range (or line-blocked) on C→S 0x13: the player walks to the object (`0x00548A50`) and operates on arrival. Fits run r3 (waypoint 4/5, stash 3/4) (`world/objects.md` §7.1 r3) | `q-fix-pc1d4-interact-range` |
+| 58 Hover after a use press (REC-707 settled) | `0x00487000` runs only from mouse-move handlers; the right-press use `0x00487740` clears only `[0x007BCBE4]` after the 0x20 send (`0x00487918`) (`ui/inventory.md` §5 r4) | `q-fix-pc1d4-hover-use-press` |
+| 27 Charges 67 vs 65 | Not the draw order (d2rs's order and `0x0065F6A0`'s formula match): a store / gamble item is repaired right after creation, and the repair `0x005761C0` always recharges (`0x0055FE80` at `0x00576231`), so 1.14d shows 67/67 for any seed. d2rs's recharge ends in a log-only stub (`AppRest::recharge`) (`items/properties.md` §5 r9, `items/affixes.md` §6, `items/generation.md` §12.2) | `q-fix-pc1d4-store-recharge` |
+| 28 Identified flag 0x10 | Every item is created with 0x10 by the item init `0x00555D20` (`0x00555D45`); only successful magic / unique / charm / rare / crafted / set routines clear it, so low, normal, superior and tempered items keep it. The old §1.4 row said superior clears it: wrong, corrected (`items/generation.md` §1.4, §3, §6.1) | `q-fix-pc1d4-item-identified-at-alloc` |
+
+Item 20, Windows recordings (`facts/requests.tsv`):
+- **a1-blood-moor-night: done.** `record_frames.py --auto SceSor --seed
+  1234 --poke "4 warp 2" --poke "10 time 5 34560"` (period 5 at 270°; a
+  tick jump over 16 degrees makes the next advance report, so the
+  client gets S→C 0x53: env 64 / 125, 144, 243 from then on; `time 5 0`
+  alone leaves the client in daylight). Frame tick 130. A second run is
+  equal except rain lines, torch-flicker tile light and 2 cel frames.
+  (A run capturing every frame slowed the client into light quality 0:
+  not comparable, discarded.)
+- **frontend-main-menu, -character-create, -loading-screen: done.**
+  `record_frames.py --front-end --front-end-script "wait 14; shot
+  main-menu; wait 3; click 400 307; wait 6; click 117 498; wait 8; click
+  626 330; wait 4; shot char-create; wait 2; click 97 555; wait 6; shot
+  loading change; key ENTER; wait 20; end"` (Windows needs ~14 s before
+  the menu; the copyright screen is up at 6 s). Run twice: loading equal,
+  menu differs only in logo-fire frames, create in the heroes' and the
+  fire's animation phases. All four pass `facts-compare` against
+  themselves (PARTIAL, no difference).
+- **frontend-character-select: still open.** It must show a save folder
+  holding only SceSor and SceAct2–5; the folder holds about 35 other test
+  saves, and moving them aside was refused in this session. Left for the
+  user: empty the folder down to those five (or point `NewSavePath` at a
+  folder holding only them) and run the same front-end script with `shot
+  char-select` after the Single Player click.
+
+Checkpoint waypoints: CkHellforge's menu was shot on a second try (all of
+Acts I, III and IV active); CkMephisto's is not (the docks waypoint is
+outside `goto`'s sight at the start), but its list is a subset of the two
+that were checked.
+
+Note for the coordinator: cloud sessions `q-fix-input-lock` and
+`q-fix-boss-damage` (launched 17:05) work the topics of items 55 and 56
+here; this branch has the 1.14d answers (`client/model.md` §20; the
+bosses' wall-cell setups). Merge it before they go far.
