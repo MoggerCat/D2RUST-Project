@@ -10,6 +10,7 @@
 //! [`server_thread`]) through the bridge and the world view.
 
 pub mod anim_names;
+pub mod audio_dump;
 pub mod automap;
 pub mod autoplay_host;
 pub mod config;

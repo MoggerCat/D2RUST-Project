@@ -20,7 +20,7 @@ FORMAT = "state-1"
 # Unit fields in the order of the spec's §2 table (comparison order).
 FIELDS = ["ut", "g", "cl", "m", "x", "y", "xf", "yf", "tx", "ty", "d", "fr", "fc", "sp",
           "s", "act", "lv", "hp", "hpx", "mp", "mpx", "st", "stx", "str", "ene", "dex",
-          "vit", "lvl", "own", "iq", "if", "fi", "il", "aa", "pf", "sf", "rp", "rs", "ik", "ss",
+          "vit", "lvl", "own", "q", "iq", "if", "fi", "il", "aa", "pf", "sf", "rp", "rs", "ik", "ss",
           "is"]
 TYPE_NAMES = {0: "player", 1: "monster", 2: "object", 3: "missile", 4: "item", 5: "tile"}
 
@@ -100,7 +100,10 @@ def compare(a, b, ignore=(), types=None, frame_offset=0, lo=None, hi=None, pertu
             snap["seed"] = [snap["seed"][0] ^ 1, snap["seed"][1]]
         elif pk in hit:
             v = hit[pk]
-            hit[pk] = [v[0] ^ 1, v[1]] if isinstance(v, list) else v + 1
+            if pk == "q":   # a list of [slot, word]: flip bit 0 of the first word, or add one
+                hit[pk] = [[v[0][0], v[0][1] ^ 1]] + v[1:] if v else [[0, 1]]
+            else:
+                hit[pk] = [v[0] ^ 1, v[1]] if isinstance(v, list) else v + 1
         else:
             hit[pk] = 0
     divs, total = [], 0
@@ -252,7 +255,8 @@ def synthetic(gaps=()):
         for t, g in ((0, 1), (1, 3), (1, 4), (2, 7), (4, 9)):
             u = {"ut": t, "g": g}
             for i, k in enumerate(FIELDS[2:-1]):
-                u[k] = [f * 100 + g, i] if k == "s" else f * 1000 + g * 10 + i
+                u[k] = ([[i, f * 100 + g], [41, 1]] if k == "q" else
+                         [f * 100 + g, i] if k == "s" else f * 1000 + g * 10 + i)
             units.append(u)
         snaps[f] = {"k": "snap", "f": f, "seed": [f, 666], "units": units}
     return hdr, snaps, {"k": "footer"}
@@ -285,6 +289,17 @@ def selftest():
         b = clone_file(a)
         r = compare(a, b, perturb=(f, 0, 1, "seed"))
         assert (r["divs"][0]["f"], r["divs"][0]["field"]) == (f, "seed")
+        ok += 1
+    # quest record `q`: one changed word, a word added, a record emptied: all found at the player
+    for edit in (lambda q: q[:-1] + [[q[-1][0], q[-1][1] ^ 0x10]], lambda q: q + [[41, 1]],
+                 lambda q: []):
+        b = clone_file(a)
+        for u in b[1][2]["units"]:
+            if (u["ut"], u["g"]) == (0, 1):
+                u["q"] = edit(u["q"])
+        r = compare(a, b)
+        d = r["divs"][0]
+        assert (d["f"], d["unit"], d["field"]) == (2, (0, 1), "q"), d
         ok += 1
     # a unit removed on the d2rs side: missing at its first frame
     b = clone_file(a)
