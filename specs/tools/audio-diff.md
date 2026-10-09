@@ -23,16 +23,16 @@
 | Outputs / state changes | 62–69 |
 | Rules | 70–71 |
 |   1. What is compared | 72–92 |
-|   2. The 1.14d side | 93–157 |
-|   3. The d2rs side | 158–181 |
-|   4. Comparison | 182–206 |
-|   5. Checks and the one-command run | 207–226 |
-| Constants & data dependencies | 227–233 |
-| Randomness | 234–239 |
-| Edge cases & original bugs | 240–251 |
-| Test vectors | 252–260 |
-| Provenance | 261–269 |
-| Open questions | 270–280 |
+|   2. The 1.14d side | 93–159 |
+|   3. The d2rs side | 160–186 |
+|   4. Comparison | 187–218 |
+|   5. Checks and the one-command run | 219–238 |
+| Constants & data dependencies | 239–245 |
+| Randomness | 246–251 |
+| Edge cases & original bugs | 252–263 |
+| Test vectors | 264–272 |
+| Provenance | 273–281 |
+| Open questions | 282–292 |
 <!-- /index -->
 
 ## Summary
@@ -93,8 +93,9 @@ sizes, ticks and device integers leave the work folder.
 ### 2. The 1.14d side
 
 1. **Device.** Under Wine the game needs an audio device; `capture.sh`
-   writes `~/.asoundrc` with a default ALSA device `type file` → `null`
-   (Wine 9.0 `winealsa.drv`, `libasound2:i386`) and runs the recorder
+   writes `~/.asoundrc` with a default ALSA device `type null` (with
+   `AUDIO_DIFF_KEEP_MIX=1` `type file` → `null`; Wine 9.0 `winealsa.drv`,
+   `libasound2:i386`) and runs the recorder
    through `tools/cloud-game/run.sh --python`. The game runs without
    `-ns`. Measured 2026-10-09: `DirectSoundCreate` succeeds, 28 buffers are
    created, the game plays.
@@ -152,8 +153,9 @@ sizes, ticks and device integers leave the work folder.
    PROVISIONAL (REC-1361): the conversion is f64 with truncation; settled
    by more captures (any device value off the f64 curve) or a reading of
    `0x005165F0`'s x87 sequence.
-7. Wine's mixed output lands in `wine-mix.raw` (float32 at the device
-   rate, after Wine's resampler): for listening only.
+7. With `AUDIO_DIFF_KEEP_MIX=1`, Wine's mixed output lands in
+   `wine-mix.raw` (float32 at the device rate, after Wine's resampler,
+   about 150 MB a minute): for listening only.
 
 ### 3. The d2rs side
 
@@ -168,7 +170,10 @@ sizes, ticks and device integers leave the work folder.
    i16 LE, `dev_vol`, `dev_pan` = §2 r6's curves applied to
    `device_occluded(vol, occ)` and `pan`), `stop` / `param` /
    `start-failed` (the voice log records, `client/audio.md` §A5), `mix`
-   (`tick`, `frames`, `sha256` of that tick's mixed i16 LE output).
+   (`tick`, `frames`, `sha256` of that tick's mixed i16 LE output). Each
+   started sound's decoded samples are also written once, as
+   `FILE.pcm/<sha256>.pcm` (i16 LE; the user's game data, kept in the work
+   folder like the 1.14d blobs).
 3. **Tick stepper** (`app::audio_dump::Stepper`): for each sound tick
    `t` from the last one stepped + 1 to the presented tick, present `t`
    (`client/audio.md` §A3) and mix whole 512-frame blocks while the frames
@@ -187,16 +192,23 @@ sizes, ticks and device integers leave the work folder.
    `vol`, `pan` (§2 r6 integers), `params` ([tick, vol, pan] after the
    start), `stop` (tick or null), and for diagnosis `buffer`, `f`, `C`,
    `play`, `dev_vol`, `dev_pan`, `bytes`, `sha256`.
-2. **Pairing.** d2rs starts in dump order; for each, the first unpaired
-   1.14d voice at the same `T` with the same channel count whose stream
-   matches (§1 r1). A capture that ends inside the file pairs as
-   `partial` (compared up to its end).
-3. **Per pair:** `dev_vol` and `dev_pan` equal (integers). The tail rule
-   of §1 r1 (zeros / loop region) is checked on the captured part.
-4. **Differences** are listed in tick order: `voice` (unpaired on either
-   side, with where 1.14d starts the same samples if it does, or the
-   1.14d stream's digest and length when d2rs starts nothing),
-   `samples`, `partial`, `dev_vol`, `dev_pan`; plus d2rs' failed starts.
+2. **Naming.** Each 1.14d voice is named by the first sound d2rs decoded
+   in the same run whose samples its stream matches (§1 r1, byte for
+   byte over the overlap); a 1.14d voice no d2rs sound matches stays
+   unnamed (reported by digest and length).
+3. **Pairing**, d2rs starts in dump order, each against the unpaired
+   1.14d voices: (a) same `T`, same channel count, matching stream →
+   paired; then `dev_vol` and `dev_pan` must be equal and the tail rule
+   of §1 r1 hold (a capture shorter than the file is compared as far
+   as it goes and listed as `partial`, not a difference); (b) same `T`, a 1.14d voice of the same variant
+   family (file name without trailing digits) → `variant` (the seeded
+   pick, `client/audio.md` §A3); (c) the same file at another `T` →
+   `tick` (both ticks given); (d) one unnamed 1.14d voice at that `T` →
+   `samples` (the first differing sample); (e) else `voice` (d2rs starts
+   a sound 1.14d does not). Every 1.14d voice left is a `voice`
+   difference (1.14d starts a sound d2rs does not); d2rs' failed starts
+   too.
+4. **Differences** are listed in tick order with a count per kind.
    `mixed`: the number of ticks both mixes cover, how many are equal, the
    first unequal tick.
 5. **Verdict:** `MATCH` when there is no difference, every mix tick is

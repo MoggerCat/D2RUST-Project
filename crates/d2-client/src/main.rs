@@ -803,7 +803,7 @@ fn audio_mix(args: &[String]) -> Result<()> {
     }
     let last: u32 = last.parse().context("--last-tick")?;
     let path = std::path::Path::new(voices);
-    let text = std::fs::read_to_string(path).with_context(|| format!("{voices}"))?;
+    let text = std::fs::read_to_string(path).with_context(|| voices.to_string())?;
     let base = path.parent().unwrap_or(std::path::Path::new("."));
     let list = parse_voice_list(&text, base).map_err(|e| anyhow::anyhow!("{voices}: {e}"))?;
     let recs = mix_list(&list, last).map_err(|e| anyhow::anyhow!("{e}"))?;
@@ -812,7 +812,7 @@ fn audio_mix(args: &[String]) -> Result<()> {
         text += &record_line(r, None);
         text.push('\n');
     }
-    std::fs::write(out, text).with_context(|| format!("{out}"))?;
+    std::fs::write(out, text).with_context(|| out.to_string())?;
     println!(
         "audio-mix: {} voices, {} ticks -> {out}",
         list.len(),

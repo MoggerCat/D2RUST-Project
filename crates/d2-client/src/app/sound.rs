@@ -336,6 +336,7 @@ impl SoundLog {
 /// One audio frame: pool frame, the sound layer's ticks (when it runs:
 /// the UI's sound requests first), cues, present the tick (the sound
 /// tick with the sound layer, else the frame's server tick).
+#[allow(clippy::too_many_arguments)] // Bevy system parameters
 fn audio_frame(
     bridge: Res<BridgeResource>,
     mut audio: ResMut<GameAudio>,

@@ -112,6 +112,11 @@ pub struct Stepper {
     last: Option<u32>,
     mixed: u64,
     log_at: usize,
+    /// Keep each started sound's samples once (by digest) for
+    /// [`take_pcm`](Self::take_pcm) (§3 rule 2).
+    pub keep_pcm: bool,
+    pcm_seen: std::collections::BTreeSet<String>,
+    pcm: Vec<(String, Vec<i16>)>,
 }
 
 impl Stepper {
@@ -151,6 +156,12 @@ impl Stepper {
         Ok(out)
     }
 
+    /// Samples of the sounds first started since the last call (digest,
+    /// samples), when [`keep_pcm`](Self::keep_pcm) is set.
+    pub fn take_pcm(&mut self) -> Vec<(String, Vec<i16>)> {
+        std::mem::take(&mut self.pcm)
+    }
+
     /// The voices started in the last block (their device state read from
     /// the live voice when it still plays), then the log records since the
     /// last call that are not successful starts.
@@ -160,6 +171,10 @@ impl Stepper {
             let v = live.unwrap_or(&started);
             let p = v.params();
             let s = v.sound();
+            let sha256 = samples_sha256(s.samples());
+            if self.keep_pcm && self.pcm_seen.insert(sha256.clone()) {
+                self.pcm.push((sha256.clone(), s.samples().to_vec()));
+            }
             out.push(Record::Start {
                 tick,
                 file: v.file().to_owned(),
@@ -170,7 +185,7 @@ impl Stepper {
                 loop_start: v.loop_start(),
                 channels: s.channels(),
                 frames: s.frames(),
-                sha256: samples_sha256(s.samples()),
+                sha256,
                 dev_vol: device_volume(p.vol, v.occlusion()),
                 dev_pan: device_pan(p.pan),
             });
@@ -236,6 +251,9 @@ pub fn header_line() -> String {
 #[derive(Resource)]
 pub struct AudioDump {
     out: std::io::BufWriter<std::fs::File>,
+    /// `FILE.pcm/`: each started sound's samples, `<sha256>.pcm` (the
+    /// user's game data: a work folder only, never the repository).
+    pcm_dir: std::path::PathBuf,
     pub stepper: Stepper,
     /// Exit once the server tick reaches this.
     pub until: Option<u64>,
@@ -246,9 +264,17 @@ impl AudioDump {
         let mut out = std::io::BufWriter::new(std::fs::File::create(path)?);
         writeln!(out, "{}", header_line())?;
         out.flush()?;
+        let mut pcm_dir = path.as_os_str().to_owned();
+        pcm_dir.push(".pcm");
+        let pcm_dir = std::path::PathBuf::from(pcm_dir);
+        std::fs::create_dir_all(&pcm_dir)?;
         Ok(AudioDump {
             out,
-            stepper: Stepper::default(),
+            pcm_dir,
+            stepper: Stepper {
+                keep_pcm: true,
+                ..Stepper::default()
+            },
             until,
         })
     }
@@ -256,6 +282,10 @@ impl AudioDump {
     pub fn write(&mut self, records: &[Record], server_tick: u64) -> std::io::Result<()> {
         for r in records {
             writeln!(self.out, "{}", record_line(r, Some(server_tick)))?;
+        }
+        for (sha, samples) in self.stepper.take_pcm() {
+            let bytes: Vec<u8> = samples.iter().flat_map(|s| s.to_le_bytes()).collect();
+            std::fs::write(self.pcm_dir.join(format!("{sha}.pcm")), bytes)?;
         }
         self.out.flush()
     }
@@ -344,8 +374,10 @@ pub fn mix_list(voices: &[ListVoice], last: u32) -> Result<Vec<Record>, String> 
     for v in voices {
         let bytes = std::fs::read(&v.pcm).map_err(|e| format!("{}: {e}", v.pcm.display()))?;
         let samples: Vec<i16> = bytes
-            .chunks_exact(2)
-            .map(|c| i16::from_le_bytes([c[0], c[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| i16::from_le_bytes(*c))
             .collect();
         let sound =
             Sound::new(22_050, v.channels, samples).map_err(|e| format!("{}: {e}", v.label))?;
@@ -505,6 +537,7 @@ mod tests {
             })
             .collect();
         assert_eq!(starts, vec![(5, "a.wav".to_owned(), 4000, 0)]);
+        assert!(st.take_pcm().is_empty(), "keep_pcm is off");
         let mixes: Vec<_> = r
             .iter()
             .filter_map(|r| match r {
@@ -515,6 +548,17 @@ mod tests {
         // budget 4 × 1764 = 7056 → total 13 blocks (6656): ticks 4, 5, 6
         assert_eq!(mixes, vec![(4, 1536), (5, 2048), (6, 1536)]);
         assert_eq!(st.advance(&mut e, 6).unwrap(), Vec::new());
+        let mut e = engine();
+        e.queue_mut().push(start(1));
+        e.queue_mut().push(start(2));
+        let mut st = Stepper {
+            keep_pcm: true,
+            ..Stepper::default()
+        };
+        st.advance(&mut e, 4).unwrap();
+        let pcm = st.take_pcm();
+        assert_eq!(pcm.len(), 1, "one entry per distinct sound");
+        assert_eq!(pcm[0].0, samples_sha256(&[1000; 4000]));
     }
 
     #[test]

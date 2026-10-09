@@ -183,89 +183,198 @@ def write_voices(voices, out_dir):
 
 # --- comparison (§4) --------------------------------------------------------------
 
-def expected_tail(n_bytes, frames, channels, looped, loop_start):
-    """What the device buffer holds after the file's samples, as a function of
-    the bytes index (§4 rule 2): zeros, or the loop region again."""
-    return None if not looped else (loop_start * channels * 2, frames * channels * 2)
-
-
-def voice_matches(orig_pcm, d):
-    """(equal samples, tail note) for an orig voice stream against a d2rs start."""
-    n = d["frames"] * d["channels"] * 2
-    head = orig_pcm[:n]
-    if len(head) < n:
-        # the capture ended before the file did: compare what is there
-        return None, f"capture holds {len(head)} of {n} bytes"
-    if hashlib.sha256(head).hexdigest() != d["sha256"]:
-        return False, None
-    tail = orig_pcm[n:]
-    if not d["looped"]:
-        bad = len(tail) - len(tail.lstrip(b"\0")) if tail.strip(b"\0") else None
+def stream_matches(orig, pcm, looped, loop_start, channels):
+    """(equal, note) of a 1.14d voice stream against a file's decoded samples
+    (§1 r1): the overlap equal byte for byte (False and the first differing
+    sample otherwise), then the tail after the samples: zeros, or the loop
+    region again. A capture shorter than the file is `partial`."""
+    n = len(pcm)
+    k = min(n, len(orig))
+    if orig[:k] != pcm[:k]:
+        i = next(j for j in range(k) if orig[j] != pcm[j])
+        return False, f"samples differ from sample {i // 2} (frame {i // 2 // channels})"
+    if len(orig) < n:
+        return True, f"partial: the capture holds {len(orig)} of {n} bytes (equal so far)"
+    tail = orig[n:]
+    if not looped:
         if tail.strip(b"\0"):
-            return True, f"non-zero bytes after the samples (first at +{bad})"
+            j = len(tail) - len(tail.lstrip(b"\0"))
+            return True, f"non-zero bytes after the samples (first at +{j})"
         return True, None
-    lo = d["loop_start"] * d["channels"] * 2
-    region = head[lo:]
+    region = pcm[loop_start * channels * 2:]
     if region and tail:
         want = (region * (len(tail) // len(region) + 1))[:len(tail)]
         if tail != want:
-            k = next(i for i in range(len(tail)) if tail[i] != want[i])
-            return True, f"loop wrap differs at +{k} after the samples"
+            j = next(i for i in range(len(tail)) if tail[i] != want[i])
+            return True, f"loop wrap differs at +{j} after the samples"
     return True, None
 
 
-def compare(orig_voices, d2rs_recs, orig_mix=None):
-    """The summary (§4 rule 4): voices paired by tick and samples, then per pair
-    device volume and pan; mixed per tick when both mixes are given."""
+def family(file):
+    """A sound file's variant family: its name without trailing digits
+    (`MedDirt3.wav` -> `meddirt`), for telling a variant pick apart."""
+    base = file.replace("/", "\\").rsplit("\\", 1)[-1].lower()
+    stem = base[:-4] if base.endswith(".wav") else base
+    return stem.rstrip("0123456789 ")
+
+
+def name_voices(orig_voices, sounds):
+    """Each 1.14d voice's file: the first sound whose samples its stream
+    starts with (§4 r2; the overlap byte for byte, at least 64 bytes or the
+    whole file). sounds: [(file, channels, pcm, looped, loop_start)]."""
+    for v in orig_voices:
+        v["file"] = None
+        for file, ch, pcm, looped, ls in sounds:
+            k = min(len(pcm), len(v["pcm"]))
+            if ch == v["channels"] and (k >= 64 or k == len(pcm)) and v["pcm"][:k] == pcm[:k]:
+                v["file"] = file
+                break
+
+
+def wav_data(b):
+    """The `data` bytes of a WAV (formats/wav.md §2 walk, no pad bytes), or None."""
+    if len(b) < 12 or b[:4] != b"RIFF" or b[8:12] != b"WAVE":
+        return None
+    i, rem = 12, len(b) - 12
+    while rem >= 8:
+        cid, n = b[i:i + 4], int.from_bytes(b[i + 4:i + 8], "little")
+        rem -= 8
+        if cid == b"data":
+            return b[i + 8:i + 8 + min(n, rem)]
+        if rem < n:
+            return None
+        rem -= n
+        i += 8 + n
+    return None
+
+
+def sound_index(d):
+    """[(name, channels, data)] of every .wav under d (files extracted from the
+    user's archives into a work folder, `mpq-tool extract-names`), for naming
+    1.14d voices d2rs never plays (§4 r2)."""
+    out = []
+    for root, _, files in os.walk(d):
+        for f in sorted(files):
+            if not f.lower().endswith(".wav"):
+                continue
+            path = os.path.join(root, f)
+            with open(path, "rb") as fh:
+                b = fh.read()
+            data = wav_data(b)
+            if data is None or len(b) < 24:
+                continue
+            ch = int.from_bytes(b[22:24], "little") if b[12:16] == b"fmt " else 1
+            rel = os.path.relpath(path, d).replace(os.sep, "\\")
+            out.append((rel, ch, data, False, 0))
+    return out
+
+
+def compare(orig_voices, d2rs_recs, orig_mix=None, pcm_of=None, extra_sounds=()):
+    """The summary (§4 r4). pcm_of(sha256) gives d2rs' decoded samples (the
+    dump's `.pcm` folder); without it the samples compare by digest only.
+    extra_sounds (sound_index) name 1.14d voices no d2rs sound matches."""
     d_starts = [r for r in d2rs_recs if r.get("k") == "start"]
     d_failed = [r for r in d2rs_recs if r.get("k") == "start-failed"]
-    by_tick = {}
-    for v in orig_voices:
-        by_tick.setdefault(v["tick"], []).append(v)
-    diffs, matched, used = [], 0, set()
+
+    def pcm(d):
+        return pcm_of(d["sha256"]) if pcm_of else None
+
+    def same(v, d):
+        p = pcm(d)
+        if p is not None:
+            return stream_matches(v["pcm"], p, d["looped"], d["loop_start"], d["channels"])
+        n = d["frames"] * d["channels"] * 2
+        if len(v["pcm"]) < n:
+            return None, f"partial: the capture holds {len(v['pcm'])} of {n} bytes (no d2rs samples to compare)"
+        return hashlib.sha256(v["pcm"][:n]).hexdigest() == d["sha256"], None
+
+    sounds, seen = [], set()
     for d in d_starts:
-        cands = [v for v in by_tick.get(d["tick"], []) if v["n"] not in used
-                 and v["channels"] == d["channels"]]
-        hit = None
-        for v in cands:
-            eq, note = voice_matches(v["pcm"], d)
-            if eq or eq is None:
-                hit = (v, note, eq)
-                break
-        if hit is None:
-            other = [v for v in orig_voices if v["n"] not in used
-                     and voice_matches(v["pcm"], d)[0]]
-            where = (f"; 1.14d starts these samples at T {other[0]['tick']}" if other else
-                     "; 1.14d never starts these samples")
-            diffs.append({"tick": d["tick"], "what": "voice",
-                          "text": f"d2rs starts {d['file']} at T {d['tick']}{where}"})
-            continue
-        v, note, eq = hit
-        used.add(v["n"])
-        matched += 1
-        if note:
-            diffs.append({"tick": d["tick"], "what": "samples" if eq is not None else "partial",
+        p = pcm(d)
+        if p is not None and d["sha256"] not in seen:
+            seen.add(d["sha256"])
+            sounds.append((d["file"], d["channels"], p, d["looped"], d["loop_start"]))
+    name_voices(orig_voices, sounds)
+    if extra_sounds:
+        rest = [v for v in orig_voices if not v["file"]]
+        name_voices(rest, list(extra_sounds))
+        for v in rest:
+            if v["file"]:
+                v["file"] = "(not played by d2rs) " + v["file"]
+    diffs, matched, used = [], 0, set()
+
+    def free(cond):
+        return [v for v in orig_voices if v["n"] not in used and cond(v)]
+
+    partial = []
+
+    def check_pair(v, d, note):
+        if note and note.startswith("partial"):
+            partial.append(f"{d['file']} at T {d['tick']}: {note}")
+        elif note:
+            diffs.append({"tick": d["tick"], "what": "samples",
                           "text": f"{d['file']} at T {d['tick']}: {note}"})
         for key in ("dev_vol", "dev_pan"):
             if v[key] != d[key]:
                 diffs.append({"tick": d["tick"], "what": key,
                               "text": f"{d['file']} at T {d['tick']}: {key} 1.14d {v[key]}, d2rs {d[key]}"})
+
+    for d in d_starts:
+        at = free(lambda v: v["tick"] == d["tick"] and v["channels"] == d["channels"])
+        hit = next(((v, r) for v in at for r in [same(v, d)] if r[0] is not False), None)
+        if hit:
+            v, (eq, note) = hit
+            used.add(v["n"])
+            matched += 1
+            check_pair(v, d, note)
+            continue
+        fam = [v for v in at if v["file"] and family(v["file"]) == family(d["file"])]
+        if fam:
+            v = fam[0]
+            used.add(v["n"])
+            diffs.append({"tick": d["tick"], "what": "variant",
+                          "text": f"T {d['tick']}: 1.14d plays {v['file']}, d2rs {d['file']} "
+                                  f"(variant pick, client/audio.md §A3 seeded choices)"})
+            continue
+        named = free(lambda v: v["file"] == d["file"])
+        if named:
+            v = min(named, key=lambda v: abs(v["tick"] - d["tick"]))
+            used.add(v["n"])
+            diffs.append({"tick": min(v["tick"], d["tick"]), "what": "tick",
+                          "text": f"{d['file']}: 1.14d starts it at T {v['tick']}, d2rs at T {d['tick']}"})
+            check_pair(v, d, same(v, d)[1])
+            continue
+        unnamed = [v for v in at if not v["file"]]
+        if len(unnamed) == 1 and pcm(d) is not None:
+            v = unnamed[0]
+            used.add(v["n"])
+            diffs.append({"tick": d["tick"], "what": "samples",
+                          "text": f"{d['file']} at T {d['tick']}: "
+                                  + stream_matches(v["pcm"], pcm(d), d["looped"], d["loop_start"],
+                                                   d["channels"])[1]})
+            continue
+        diffs.append({"tick": d["tick"], "what": "voice",
+                      "text": f"d2rs starts {d['file']} at T {d['tick']}; 1.14d starts no voice with "
+                              f"these samples"})
     for v in orig_voices:
         if v["n"] not in used:
             nz = len(v["pcm"].rstrip(b"\0"))
+            what = v["file"] or (f"an unknown sound ({v['channels']} ch, {nz} bytes before the zero "
+                                 f"tail, sha256 {hashlib.sha256(v['pcm'][:nz]).hexdigest()[:16]})")
             diffs.append({"tick": v["tick"], "what": "voice",
-                          "text": f"1.14d starts a voice at T {v['tick']} (buffer {v['buffer']}, "
-                                  f"{v['channels']} ch, {nz} bytes before the zero tail, sha256 "
-                                  f"{hashlib.sha256(v['pcm'][:nz]).hexdigest()[:16]}) that d2rs "
-                                  f"does not start"})
+                          "text": f"1.14d starts {what} at T {v['tick']} (buffer {v['buffer']}); "
+                                  f"d2rs starts nothing like it"})
     for r in d_failed:
         diffs.append({"tick": r["tick"], "what": "voice",
                       "text": f"d2rs fails to start {r['file']} at T {r['tick']}"})
     diffs.sort(key=lambda x: (x["tick"], x["what"]))
     out = {"format": SUMMARY_FORMAT, "voices": {"orig": len(orig_voices), "d2rs": len(d_starts),
                                                 "matched": matched, "differences": len(diffs),
-                                                "first": diffs[0] if diffs else None},
+                                                "first": diffs[0] if diffs else None,
+                                                "by_kind": {}, "partial": partial},
            "mixed": None}
+    for d in diffs:
+        out["voices"]["by_kind"][d["what"]] = out["voices"]["by_kind"].get(d["what"], 0) + 1
     if orig_mix is not None:
         om = {r["tick"]: r for r in orig_mix if r.get("k") == "mix"}
         dm = {r["tick"]: r for r in d2rs_recs if r.get("k") == "mix"}
@@ -282,7 +391,7 @@ def compare(orig_voices, d2rs_recs, orig_mix=None):
 def print_summary(s, diffs, limit=20):
     v = s["voices"]
     print(f"[audio] voices: 1.14d {v['orig']}, d2rs {v['d2rs']}, paired {v['matched']}, "
-          f"{v['differences']} difference(s)")
+          f"{v['differences']} difference(s) {v['by_kind']}")
     for d in diffs[:limit]:
         print(f"  T {d['tick']}: {d['what']}: {d['text']}")
     if len(diffs) > limit:
@@ -341,7 +450,8 @@ def run_check(a):
     r.sh([exe, "audio-mix", vpath, mix_path, "--last-tick", str(min(last, d_last) or last)],
          check=False)
     orig_mix = load_jsonl(mix_path) if os.path.exists(mix_path) else None
-    s, diffs = compare(voices, d2rs, orig_mix)
+    s, diffs = compare(voices, d2rs, orig_mix, pcm_reader(dump + ".pcm"),
+                       sound_index(a.sounds) if a.sounds else ())
     s.update(check=c["name"], capture_problems=problems)
     for p in problems:
         print(f"[audio] capture: {p}")
@@ -350,6 +460,20 @@ def run_check(a):
     with open(out, "w", encoding="utf-8") as f:
         json.dump(dict(s, differences=diffs[:200]), f, indent=1)
     return 0 if s["verdict"] == "MATCH" else 1
+
+
+def pcm_reader(d):
+    """d2rs' decoded samples by digest (the dump's `.pcm` folder), or None."""
+    if not os.path.isdir(d):
+        return None
+
+    def read(h):
+        p = os.path.join(d, h + ".pcm")
+        if not os.path.exists(p):
+            return None
+        with open(p, "rb") as f:
+            return f.read()
+    return read
 
 
 def blob_reader(d):
@@ -401,18 +525,43 @@ def selftest():
     d[0]["dev_vol"] = -129
     s, diffs = compare(voices, d)
     assert s["verdict"] == "DIVERGED" and diffs[0]["what"] == "dev_vol", diffs
+    store = {d[0]["sha256"]: a, d[1]["sha256"]: blobs["B"]}
+    pcm_of = store.get
     d[0]["dev_vol"], d[0]["tick"] = -128, 2
-    s, diffs = compare(voices, d)
-    assert any(x["text"].endswith("1.14d starts these samples at T 1") for x in diffs), diffs
-    assert any("that d2rs does not start" in x["text"] for x in diffs), diffs
+    s, diffs = compare(voices, d, pcm_of=pcm_of)
+    assert [x["what"] for x in diffs] == ["tick"], diffs
+    assert diffs[0]["text"] == "x.wav: 1.14d starts it at T 1, d2rs at T 2", diffs
     d[0]["tick"] = 1
     om = [{"k": "mix", "tick": 1, "sha256": "x"}, {"k": "mix", "tick": 2, "sha256": "y"}]
     s, _ = compare(voices, d + [{"k": "mix", "tick": 1, "sha256": "x"},
-                                {"k": "mix", "tick": 2, "sha256": "z"}], om)
+                                {"k": "mix", "tick": 2, "sha256": "z"}], om, pcm_of)
     assert s["mixed"] == {"ticks": 2, "equal": 1, "first_tick": 2} and s["verdict"] == "DIVERGED", s
-    # a non-looped voice with sound after its samples
-    eq, note = voice_matches(a + b"\1\0", d[0])
+    # a variant pick: 1.14d plays step1 (known to the run), d2rs step2 at the same tick
+    s1, s2 = struct.pack("<2h", 7, 7), struct.pack("<2h", 9, 9)
+    v1 = [{"n": 0, "tick": 3, "channels": 1, "buffer": 2, "pcm": s1 + b"\0" * 4, "dev_vol": 0,
+           "dev_pan": 0}]
+    dd = [{"k": "start", "tick": 3, "file": "fx\\step2.wav", "channels": 1, "frames": 2,
+           "sha256": "s2", "looped": False, "loop_start": 0, "dev_vol": 0, "dev_pan": 0},
+          {"k": "start", "tick": 9, "file": "fx\\step1.wav", "channels": 1, "frames": 2,
+           "sha256": "s1", "looped": False, "loop_start": 0, "dev_vol": 0, "dev_pan": 0}]
+    s, diffs = compare(v1, dd, pcm_of={"s1": s1, "s2": s2}.get)
+    assert [x["what"] for x in diffs] == ["variant", "voice"], diffs
+    assert "1.14d plays fx\\step1.wav, d2rs fx\\step2.wav" in diffs[0]["text"], diffs
+    # a decode difference: one unnamed voice at the tick
+    s, diffs = compare(v1, [dict(dd[0], sha256="s3")], pcm_of={"s3": struct.pack("<2h", 7, 8)}.get)
+    assert diffs[0]["what"] == "samples" and "sample 1" in diffs[0]["text"], diffs
+    # a capture shorter than the file: compared as far as it goes
+    eq, note = stream_matches(a[:4], a, False, 0, 1)
+    assert eq and note.startswith("partial"), note
+    assert stream_matches(a[:2] + b"\x09\0", a, False, 0, 1)[0] is False
+    # a non-looped voice with sound after its samples; a loop wrap
+    eq, note = stream_matches(a + b"\1\0", a, False, 0, 1)
     assert eq and "non-zero" in note
+    assert stream_matches(a + a[2:6], a, True, 1, 1) == (True, None)
+    w = b"RIFF\0\0\0\0WAVEfmt " + (16).to_bytes(4, "little") + bytes(16) + b"data" + \
+        (4).to_bytes(4, "little") + a[:4]
+    assert wav_data(w) == a[:4] and wav_data(b"RIFX") is None
+    assert family("DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav") == "meddirt"
     # a gap in the ring writes
     recs2 = recs[:6] + [{"k": "write", "b": 1, "off": 8, "len": 8, "sha256": "A", "f": 3, "T": 1, "C": 2}]
     _, problems = build_voices(recs2, blobs.__getitem__)
@@ -437,6 +586,7 @@ def main():
     g.add_argument("--orig-only", action="store_true")
     g.add_argument("--d2rs-only", action="store_true")
     p.add_argument("--json")
+    p.add_argument("--sounds", help="folder of .wav files extracted from the archives (naming)")
     p = sub.add_parser("voices")
     p.add_argument("capture")
     p.add_argument("blobs")
@@ -446,6 +596,7 @@ def main():
     p.add_argument("d2rs_dump")
     p.add_argument("--orig-mix")
     p.add_argument("--json")
+    p.add_argument("--sounds", help="folder of .wav files extracted from the archives (naming)")
     a = ap.parse_args()
     if a.cmd == "run":
         return run_check(a)
@@ -466,7 +617,9 @@ def main():
         r["n"] = i - 1
         voices.append(r)
     s, diffs = compare(voices, load_jsonl(a.d2rs_dump),
-                       load_jsonl(a.orig_mix) if a.orig_mix else None)
+                       load_jsonl(a.orig_mix) if a.orig_mix else None,
+                       pcm_reader(a.d2rs_dump + ".pcm"),
+                       sound_index(a.sounds) if a.sounds else ())
     print_summary(s, diffs)
     if a.json:
         with open(a.json, "w", encoding="utf-8") as f:
