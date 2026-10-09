@@ -262,3 +262,105 @@ fn coverage_lists_every_key_but_the_gaps() {
     assert!(PATH_FIELDS.iter().all(|k| !fields.iter().any(|f| f == k)));
     assert_eq!(gaps.len(), 2);
 }
+
+/// AnimData with one record per name: (name, frames, speed), no events.
+fn anim_data(rows: &[(&[u8; 8], u32, u32)]) -> d2_formats::animdata::AnimData {
+    use d2_formats::animdata::{self, AnimData, AnimRecord};
+    let mut a = AnimData {
+        buckets: vec![Vec::new(); animdata::BUCKETS],
+    };
+    for &(name, frames, speed) in rows {
+        let len = name.iter().position(|&b| b == 0).unwrap_or(8);
+        a.buckets[animdata::hash(&name[..len])].push(AnimRecord {
+            name: *name,
+            frames,
+            speed,
+            events: [0; animdata::EVENTS],
+        });
+    }
+    a
+}
+
+// Covers: specs/tools/state-snapshot.md §2; specs/sim/units.md §4.1
+#[test]
+fn a_joined_player_snapshots_the_frame_count_and_speed_of_its_mode() {
+    // The 1.14d Amazon's town and field neutral records (AMTNHTH 16
+    // frames at speed 80, AMNUHTH 8 at 128): a player standing in town
+    // reads +0x48 = 4096, +0x4C = 80 with no animated start run.
+    const TN: &[u8; 8] = b"AMTNHTH\0";
+    const NU: &[u8; 8] = b"AMNUHTH\0";
+    let mut fx = Fx::new();
+    fx.sim.hooks().enable_paths().expect("embedded tables");
+    {
+        let h = fx.sim.hooks();
+        h.anim_data = Some(std::sync::Arc::new(anim_data(&[
+            (TN, 16, 80),
+            (NU, 8, 128),
+        ])));
+        h.x.names.insert((UnitType::Player, 5), *TN);
+        h.x.names.insert((UnitType::Player, 1), *NU);
+    }
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 1, a, 3, 4);
+    // The allocator's mode 0 (`units.md` §2), then the join's neutral
+    // start (§6.1): the mode set's re-init fills +0x48 / +0x4C.
+    fx.sim.sys.units.get_mut(p).unwrap().mode = 0;
+    fx.sim
+        .sys
+        .with(&mut fx.game, |sim, hooks| {
+            crate::units::modes::player_join(sim, hooks, p)
+        })
+        .unwrap();
+    let mode = fx.sim.sys.units.get(p).unwrap().mode;
+    let (fc, sp) = if mode == 5 {
+        (16 << 8, 80)
+    } else {
+        (8 << 8, 128)
+    };
+    let s = snapshot(&fx.game, &fx.sim.sys);
+    let g = fx.game.lists.unit(p).unwrap().guid;
+    let u = s.units.iter().find(|u| (u.ut, u.g) == (0, g)).unwrap();
+    assert_eq!((u.m, u.fc, u.sp), (Some(mode), Some(fc), Some(sp)));
+}
+
+// Covers: specs/tools/state-snapshot.md §2; specs/monsters/init.md §4.1 r1
+#[test]
+fn a_spawned_monster_snapshots_its_spawn_point_as_the_path_target() {
+    // 1.14d: a fallen spawned at (4876, 4231), idle in mode 1, reads
+    // path +0x10 / +0x12 = (4876, 4231): the creation mode request's
+    // target point is the spawn point (`0x005735A0`).
+    let (fx, _, m) = small_game();
+    let s = snapshot(&fx.game, &fx.sim.sys);
+    let g = fx.game.lists.unit(m).unwrap().guid;
+    let u = s.units.iter().find(|u| (u.ut, u.g) == (1, g)).unwrap();
+    assert_eq!((u.x, u.y), (Some(6), Some(5)));
+    assert_eq!((u.tx, u.ty), (Some(6), Some(5)));
+}
+
+// Covers: specs/tools/state-snapshot.md §2; specs/sim/units.md §4.7 r7
+#[test]
+fn a_walking_monster_snapshots_the_velocity_mode_speed() {
+    // 1.14d Charsi (class 154, its own base, CIWLHTH speed 256) walking
+    // in town reads +0x4C = 192: w (the walk speed +0x36, 256) · p / 100
+    // with p = 75, not the AnimData speed.
+    const WL: &[u8; 8] = b"M0WLHTH\0";
+    let (mut fx, _, m) = small_game();
+    {
+        let h = fx.sim.hooks();
+        h.anim_data = Some(std::sync::Arc::new(anim_data(&[(WL, 8, 256)])));
+        h.x.names.insert((UnitType::Monster, 2), *WL);
+        h.x.names.insert((UnitType::Monster, 1), *WL);
+    }
+    fx.stats(m, &[(67, 75)]);
+    fx.sim.sys.units.get_mut(m).unwrap().mode = 2;
+    let sp = fx.sim.sys.with(&mut fx.game, |sim, hooks| {
+        crate::units::hooks::UnitHooks::anim_rate(hooks, sim, m)
+    });
+    assert_eq!(sp, 192);
+    // Mode 1 (no velocity modifier) keeps the host's rate: the speed as is.
+    fx.sim.sys.units.get_mut(m).unwrap().mode = 1;
+    let sp = fx.sim.sys.with(&mut fx.game, |sim, hooks| {
+        crate::units::hooks::UnitHooks::anim_rate(hooks, sim, m)
+    });
+    assert_eq!(sp, 256);
+}

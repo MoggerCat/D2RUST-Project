@@ -335,13 +335,16 @@ fn every_directive_runs_on_d2rs_or_is_a_listed_gap() {
         ("warp", "ok"),
         ("seed-unit", "unresolved"),
         ("item", "failed"),
-        ("warp", "gap"),
+        // Another act: the act change runs (§1 `warp` row); the base
+        // synthetic set has no Act II levels, so its spawn search finds
+        // no room (`waypoints.md` §11 steps 8–9).
+        ("warp", "failed"),
     ];
     let got: Vec<(&str, &str)> = p.iter().map(|(d, r)| (d.as_str(), r.as_str())).collect();
     assert_eq!(got, want);
-    // The gap is in the header (§3 rule 4).
+    // No poke is a gap now (§3 rule 4: gaps are in the header).
     assert!(
-        t.header.gaps.contains(&"poke warp at 6".to_owned()),
+        t.header.gaps.iter().all(|g| !g.starts_with("poke")),
         "{:?}",
         t.header.gaps
     );
@@ -363,6 +366,67 @@ fn every_directive_runs_on_d2rs_or_is_a_listed_gap() {
     });
     assert_eq!(moved.zip(me).map(|(m, p)| m - p), Some(6));
     assert_eq!(t.to_text(), trace_of(&s, data()).to_text());
+}
+
+/// The synthetic install with all five acts (`test_fixtures::acts`).
+fn all_acts_data() -> &'static Data {
+    static D: OnceLock<Data> = OnceLock::new();
+    D.get_or_init(|| {
+        let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+            .join(format!("scenario-run-acts-{}", std::process::id()));
+        let i = test_fixtures::install::build(&dir, &test_fixtures::acts::all_acts())
+            .unwrap_or_else(|e| panic!("{e}"));
+        Data {
+            game: test_fixtures::game::GameData::from_install(&i).unwrap_or_else(|e| panic!("{e}")),
+            kind: scenario_run::DataKind::Synthetic,
+        }
+    })
+}
+
+// Covers: specs/tools/poke.md §1; specs/world/waypoints.md §11
+#[test]
+fn poke_warp_to_act_two_runs_the_act_change() {
+    let s = Scenario::parse(concat!(
+        "scenario 1\nname warp-act2\ngame 1.14d\nseed 0x1234\ninit 644409375\n",
+        "difficulty normal\nexpansion yes\nend 6\nchar class 1\nchar area 0 1\n",
+        "record s2c units\nsnapshot every 1\n",
+        "at 3 poke warp 40\n",
+    ))
+    .unwrap();
+    let t = trace_of(&s, all_acts_data());
+    let p: Vec<(u32, String, String)> = pokes(&t)
+        .into_iter()
+        .map(|(t, _, d, r, _)| (t, d, r))
+        .collect();
+    assert_eq!(p, vec![(3, "warp".to_owned(), "ok".to_owned())]);
+    // §11 steps 13 and 16: 0x05, then 0x03 LoadAct with act 1 (Act II)
+    // and its town level 40, then 0x53; 0x04 after them, from the tick's
+    // client pass (`flows/act-change.md` §1 r4; the poke runs before
+    // tick 3, so that pass is tick 3's).
+    let s2c: Vec<(u32, Vec<u8>)> = t
+        .records
+        .iter()
+        .filter_map(|r| match r {
+            Record::S2c { t, bytes, .. } => Some((*t, bytes.clone())),
+            _ => None,
+        })
+        .collect();
+    let at = |id: u8| s2c.iter().position(|(_, b)| b[0] == id);
+    let (u, l, e) = (at(0x05), at(0x03), at(0x53));
+    assert!(u.is_some() && u < l && l < e, "{s2c:x?}");
+    let load = &s2c[l.unwrap()];
+    assert_eq!(load.0, 3);
+    assert_eq!(load.1[1], 1, "LoadAct act");
+    assert_eq!(u16::from_le_bytes([load.1[6], load.1[7]]), 40, "town level");
+    assert!(at(0x04) > e, "{s2c:x?}");
+    // Step 17: the new act's rooms are added (0x07 of level 40).
+    assert!(
+        s2c[e.unwrap()..]
+            .iter()
+            .any(|(_, b)| b[0] == 0x07 && b[5] == 40),
+        "{s2c:x?}"
+    );
+    assert_eq!(t.to_text(), trace_of(&s, all_acts_data()).to_text());
 }
 
 /// `champion-pack` with the synthetic monster class 1 (ghoul1) for the

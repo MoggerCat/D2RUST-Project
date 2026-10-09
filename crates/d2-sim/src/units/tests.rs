@@ -1480,3 +1480,48 @@ fn the_sequence_advance_counts_down_and_reads_the_crossed_event_bytes() {
     assert!(!advance_sequence(&mut a));
     assert_eq!(a.action_frame, 7);
 }
+
+// Covers: specs/sim/units.md §4.1
+#[test]
+fn the_inner_mode_write_queues_and_flags_the_unit() {
+    // `0x00624690`, run alone by the inline think of a walk end
+    // (`monsters/ai.md` §1.4): the client hears of it through flag 0x1
+    // (the Rogue Encampment arrival's 0x6D for Warriv at tick 67).
+    let mut game = Game::new();
+    let mut sys = system();
+    let mut seed = Seed::init();
+    let req = AllocRequest {
+        ty: UnitType::Monster,
+        class: 0,
+        room: None,
+        add: false,
+        fixed_guid: None,
+        mode: 1,
+        allied: false,
+    };
+    let m = sys
+        .with(&mut game, |sim, hooks| {
+            allocate(sim, hooks, &mut seed, &req)
+        })
+        .unwrap()
+        .unwrap();
+    sys.units.get_mut(m).unwrap().mode = 2;
+    sys.units.get_mut(m).unwrap().flags &= !super::record::flags::CHANGED;
+    sys.with(&mut game, |sim, hooks| {
+        super::modes::write_mode(sim, hooks, m, 1)
+    })
+    .unwrap();
+    let r = sys.units.get(m).unwrap();
+    assert_eq!(r.mode, 1);
+    assert_ne!(r.flags & super::record::flags::CHANGED, 0);
+    // A monster staying in mode 1: nothing.
+    sys.units.get_mut(m).unwrap().flags &= !super::record::flags::CHANGED;
+    sys.with(&mut game, |sim, hooks| {
+        super::modes::write_mode(sim, hooks, m, 1)
+    })
+    .unwrap();
+    assert_eq!(
+        sys.units.get(m).unwrap().flags & super::record::flags::CHANGED,
+        0
+    );
+}

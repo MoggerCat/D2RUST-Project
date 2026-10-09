@@ -218,7 +218,10 @@ pub fn mode_message(i: &ModeInput) -> ModeMessage {
             })
             .to_vec(),
             None => {
-                let (x, y) = if typed { i.path_target } else { i.cell };
+                // Rule 4: without T, (a, b) := the path target when the
+                // row takes it from the path (WL, RN), else the cell; a
+                // dropped T of path type 5 / 6 takes the path target.
+                let (x, y) = if typed { i.path_target } else { point };
                 monster_move(Move {
                     guid: i.guid,
                     code: e.code_to_point,
@@ -285,7 +288,8 @@ fn t_point(t: u32) -> u8 {
 pub struct Move {
     pub guid: u32,
     pub code: u8,
-    /// The unit's cell, or the path target for path type 5 / 6.
+    /// (a, b) of §7.4 rule 4: the path target (rows that take it from
+    /// the path, or path type 5 / 6), else the unit's cell.
     pub x: u16,
     pub y: u16,
     pub s: u8,

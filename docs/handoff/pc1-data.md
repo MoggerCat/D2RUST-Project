@@ -246,6 +246,17 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     sim-0009. (Item 20 note: under Wine the front end does take X input,
     `tools/cloud-game/xinput.sh`; in-game NPC menus were not tried.)
 
+29. **Monster path target at the death message** (q-tool-poke, REC-594): 1.14d state
+    snapshots read an idle spawned monster's path target (+0x10/+0x12) as
+    its spawn point (`monsters/init.md` §4.1 step 1.1; check
+    `traces/checks/poke-fallen-town.check`), so d2rs now writes it there;
+    but `sim/intents-events.md` §7.4 rule 7 says the 0x69 code-8 target
+    is (0, 0) "when the path never had a target", from the recorded
+    `69 1b000000 08 0000 0000 38 06` (frame 2882). Read which field 0x69
+    code 8 copies and whether that monster's target was cleared (an AI
+    request) before its death; answer into §7.4 rule 7. d2rs tests
+    `monster_death.rs` / `e2e_night_world.rs` now expect the spawn point.
+
 - **[q-fix-pc1-combat] `0x0063E6B0(unit, 0)`: are the action-frame tests skipped?** (REC-700) `0x005A6D50` passes the moving flag r as `0x0063E6B0`'s second argument (`skills/use.md` §5.2 "Monsters"); `skills/bodies-3.md` §5.18 step 3 gives the tests (+0x4E = 0, or no action event in the frames ((cur − speed) >> 8, cur >> 8]) for the argument 1 only. Read: what the function does with 0 (d2rs: no tests, the column by mode). Write the answer into `bodies-3.md` §5.18 step 3.
 - **[q-fix-pc1-combat] Who writes unit +0x4E from a type-0 timer's frame code?** (REC-701) trigger(U) of `0x005A7670` reads +0x4E = 1 (`skills/use.md` §5.2); `sim/units.md` §4.2 schedules event 0 with args (E[i], k) and the field table names only `0x005533D0` (0 at mode start). Read: the writer of +0x4E on the event-0 path of a monster (the unit-type dispatcher or the timer run), and whether a code-0 event writes it. Write the answer into `sim/units.md` §4.2 / §4.6.
 - **[q-fix-pc1-combat] The client's mode-18 leap / whirl: hold, path end, code 0x16** (REC-702..704, `d2-client` `world_view/skill_motion.rs`; measured leap / whirl in `facts/client/anim/a1-cold-plains-*-bar.tsv`) Read: (1) which client code holds the Leap sequence at frame 11 while the motion record lives, and whether Leap Attack (`seqnum` 14) holds at its frame 11 the same way (REC-704); (2) the client whirl path: its step per update (d2rs: class `WalkVelocity` << 12, 0x6000 measured for the barbarian) and the update mode 18 ends on (d2rs: the one whose step reaches the end, `((d << 16) − 1) / step` after the do, `d` by `0x006417F0`; REC-703); (3) the skill mode request's first mode-18 update and code 0x16's record 2 / 3 as unit type / GUID (REC-702). Write the answers into `render/unit-composite.md` §8 or `skills/sequences.md` §3.
@@ -291,11 +302,12 @@ rather than a hand-run recipe.
     the code → index lookup `0x00633640` (`item`, `items/generation.md`
     §3); (d) `0x00627260(unit, s, value, layer)` and `0x00639DB0(unit,
     s, on)` (`stat`, `state`, `stat-lists.md` §5 r2, §9.2). Answer into
-    the owning specs; then delete the gap rows in `poke.md` §1. (e) For
-    scenario `spawn` kinds `champion` / `random-boss` on 1.14d: the
-    register form of the champion / boss minions call `0x0054E1E0`
-    (`scenario.md` §3.1, `population.md` §6.4); `poke.py` writes them as
-    gaps until then (`normal` runs).
+    the owning specs; then delete the gap rows in `poke.md` §1. (e) *answered* by
+    `monsters/init.md` §25.1 / §25.3 (boss spawn, minions, umod init,
+    umod list): `poke.py` runs `spawn champion`, `random-boss`, `unique`
+    (not yet run on 1.14d). Each form can be tried first with
+    `poke.py --forms FILE` (README "Call forms") before it goes into
+    `CALL_FORMS`.
 23. **Poke runs on Windows** (REC-590): the cloud ran every runnable
     directive on 1.14d under Wine (`specs/tools/poke.md` Status) and
     settled the variant load (REC-591, `tools/test-variants.md` Status).
@@ -318,6 +330,17 @@ rather than a hand-run recipe.
   failure when the point is the unit's own). d2rs reads: no-size
   distance ≤ 15; point = own + Δ·min(a, dist − b) / dist rounded to
   nearest; it matches Warriv's three recorded arrival walks.
+
+30. **Client-made critters (set C monsters)** (q-fix-real-unit-seed-order)
+  (`q-fix-real-town-critters`, `client/model.md` §5 r3 "C monsters",
+  `monsters/population.md` §11.3 r2): the Rogue Encampment arrival has
+  three chickens (ck, class 149) with GUIDs 93–95 that the server never
+  allocates (25 server unit seeds in 90 s under Wine, none for them;
+  critter presets are not placed by the server). Read the client path
+  that makes them: which client pass reads the DS1 critter presets (or
+  another source), the GUID counter (why 93), the client set-up
+  (`0x004AE8D0`-like: stats, seed, first frame), and their client-side
+  AI / motion (the recorded ck frames walk: WL at tick 8 and on).
 
 - **[q-fix-pc1-combat] Evade's reaction (`combat/damage.md` §7.1 step
   5.2)**: "state 68 list; s, E as above" — does the evade branch also

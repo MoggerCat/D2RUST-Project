@@ -24,24 +24,25 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 47–57 |
-| Inputs | 58–65 |
-| Outputs / state changes | 66–71 |
-| Rules | 72–73 |
-|   1. Configuration | 74–80 |
-|   2. Hooks | 81–97 |
-|   3. What is read | 98–293 |
-|   4. Tie to ticks | 294–306 |
-|   5. Raw format `frames-raw-2` (and `frames-raw-3`) | 307–338 |
-|   6. Hashes and the comparison | 339–360 |
-|   7. Stability first | 361–398 |
-|   8. Capture cases | 399–414 |
-| Constants & data dependencies | 415–419 |
-| Randomness | 420–426 |
-| Edge cases & original bugs | 427–438 |
-| Test vectors | 439–449 |
-| Provenance | 450–469 |
-| Open questions | 470–527 |
+| Summary | 48–58 |
+| Inputs | 59–66 |
+| Outputs / state changes | 67–72 |
+| Rules | 73–74 |
+|   1. Configuration | 75–81 |
+|   2. Hooks | 82–98 |
+|   2a. Front end (`record_frames.py --front-end`) | 99–121 |
+|   3. What is read | 122–317 |
+|   4. Tie to ticks | 318–330 |
+|   5. Raw format `frames-raw-2` (and `frames-raw-3`) | 331–366 |
+|   6. Hashes and the comparison | 367–388 |
+|   7. Stability first | 389–426 |
+|   8. Capture cases | 427–442 |
+| Constants & data dependencies | 443–447 |
+| Randomness | 448–454 |
+| Edge cases & original bugs | 455–466 |
+| Test vectors | 467–477 |
+| Provenance | 478–497 |
+| Open questions | 498–555 |
 <!-- /index -->
 
 ## Summary
@@ -94,6 +95,29 @@ A frame start without a frame end exists: when `0x004F6070` returns
 non-zero the in-game draw jumps to `0x0044CB4F` without drawing; the next
 frame start replaces the pending state. The memory read at the frame end
 equals the presented frame.
+
+### 2a. Front end (`record_frames.py --front-end`)
+
+Out-of-game screens present through the same `EndScene` `0x004F6190`
+(`composition.md` §3: every out-of-game `StartDraw` caller), so in this
+mode every `EndScene` entry is a frame, whatever its caller; the in-game
+frame start `0x0044C990` is not used. A frame is everything drawn between
+two `EndScene` calls: a shot arms the draw hooks of §3.5 at one
+`EndScene` and captures the next, so a draw before the frame's
+`StartDraw` (the loading screen's `ClearScreen`) is in the log.
+
+| Item | Where | Notes |
+|---|---|---|
+| frame index | `present`: `EndScene` calls since launch | no server tick before a game (`f` null) |
+| caller | `ret` = `[ESP]` at `EndScene` entry; `in_game` = (`ret` = `0x0044CB4F`) | measured 2026-10-09 (Wine): menus `0x004F9A67` (after `StartDraw` `0x004F9934` of the D2Win control drawer `0x004F98E0`), loading `0x004567D4` (in `0x004565E0`, `frontend-loading.md` L4) |
+| launcher mode | `[0x0074C704]` (4 menu, 1 client: `tools/original-hooks.md` §5.4) | |
+| D2Win cel files | `D2Win_LoadCelFile` `0x004FA9B0` (`ui/text.md` §3): path in `ECX` at entry (found per call: the first of `ECX`, `EDX`, `[ESP+4]`, `[ESP+8]` pointing at path text; 112 of 112 loads used `ECX`), cel file = `EAX` at the return address | `celfile` records with `"via": "0x4fa9b0"`; the menus load no cel through `0x004788B0`. Entry bytes (measured) `55 8B EC 81 EC 08 01 00`, checked at start like the other hooks |
+
+Game state (§3.1–§3.4) is read only for in-game frames; a front-end frame
+has none, and `facts_render.py` writes those `frame.tsv` keys as `-` and
+`tick` as `?` (`tools/facts-render.md` §1 r2). The menus draw animated
+fire, snow and cursor on wall-clock time: front-end stability (§7) is not
+established.
 
 ### 3. What is read
 
@@ -335,6 +359,10 @@ context pointer, hex) and `hdr` `{"flip", "w", "h", "xoff", "yoff"}` (§3.5
 cel header); in a tile draw's `tile`, `dt1` and `index` (§3.5); per frame
 with a draw log, `raster_other`; the frame's `player` gains `dir` (path
 `+0x64`, the direction byte of §3.5).
+With `--front-end` (§2a; same format): the `capture` record gains
+`front_end`; a frame gains `present`, `ret`, `in_game`, `launcher_mode`
+and, for a shot, `scene`; `celfile` records from `0x004FA9B0` add `via`
+and `arg`; a load whose path was not found is a `celload` record.
 
 ### 6. Hashes and the comparison
 

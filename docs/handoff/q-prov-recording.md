@@ -144,11 +144,56 @@ with the mouse outside the window**; until then REC-290 ticks are equal over 60 
    `d2_server::adapters::session::load_save`, so both sides start from the same save; steps the
    scenario host cannot apply are gaps. Today: `header`, `quests`, `npc fields`, `items`, `item
    indices`, `quest entry` are unapplied, because the host is `ActionWorld`; the items need
-   `WiredWorld::load_items` (the play app's host). Next: run the scenario host on `WiredWorld`.
+   `WiredWorld::load_items` (the play app's host). **Done (2026-10-09):** the scenario host is
+   `WiredWorld<ScenarioRest>` (`tools/scenario-run/src/rest.rs`, no-op seams; quest / NPC
+   controls on a scratch seed so existing traces keep their draws); `--save-dir` now loads the
+   save's items and quest records. Still gaps: `header`, `item indices`, `quest entry`.
+   First replay, `belt-potion-drop` (below) on ItmAmc, against 1.14d: belt placement equal; four
+   differences → `q-fix-real-item-replay-belt-use`.
+
+```
+scenario 1
+name belt-potion-drop
+game 1.14d
+seed 0x000004d2
+init 1234
+difficulty normal
+expansion yes
+end 520
+char save ItmAmc
+char class 0
+char area 0 1
+char at default
+char stat 6 2560
+char stat 8 256
+char item hp1 inv 7 0
+char item hp1 inv 8 0
+char item mp1 inv 9 0
+record s2c
+at 76 hex 19 01 00 00 00
+at 107 hex 23 01 00 00 00 00 00 00 00
+at 162 hex 26 01 00 00 00 00 00 00 00 00 00 00 00
+at 400 hex 20 03 00 00 00 09 13 00 00 84 10 00 00
+at 460 hex 19 02 00 00 00
+at 480 hex 17 02 00 00 00
+```
 3. **Pokes in `record_packets.py`** (0.2.0, `--poke` / `--poke-file`, at its 0x0052FD1E hook): the
    first poke run on 1.14d: `spawn 19` next to the player in Cold Plains works (5 of 10, the others'
    spots taken). G4 then gave REC-108: drops land beside the death point →
    `q-fix-real-monster-drop-spot`.
+
+### G2 with the new item writer (2026-10-09)
+
+| Point | Result |
+|---|---|
+| `wiring/inventory/identify.rs:6`, `pending.rs:174`, `pending.rs:510` (REC-113) | **settled (confirmed)** (`facts/items/a1-town-identify.tsv`) |
+| `wiring/inventory/units.rs:226` (REC-121) | **settled (confirmed)** (`facts/items/a1-town-socket-fill.tsv`) |
+| REC-188 server half (not an index row) | confirmed: the join's 0x1D–0x1F carry base stats only (dex 25 with a +1 dex charm), and moving a charm or an equipped magic ring sends no stat message (`facts/items/a1-town-charm-ring.tsv`, raw g2charm); the client's list attach (`item_lists.rs:14`) and REC-163's server link are not visible on the wire: open |
+
+Chests by poke (`object 5 @x+4 @y+4`, Cold Plains): created and opened (C→S 0x13 → S→C 0x0E
+mode change), but nothing drops: the `object` directive's allocator path does not run the chest's
+init (`objects.md` init 3), so a poked chest is not a real chest. REC-260 / REC-93 need a preset
+chest (a route to one, or a poke that runs the object init).
 
 ## Where the rest is blocked (2026-10-09, end of this session)
 

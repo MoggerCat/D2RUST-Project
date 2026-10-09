@@ -349,6 +349,10 @@ pub struct UnitArt {
     /// (`world_view::skill_motion`, `skills/sequences.md` §3: the drawn
     /// mode goes in [`Self::pose_mode`]).
     pub sequence: Option<(UnitKey, usize)>,
+    /// The server tick the local player's predicted walk started on
+    /// (`Predict::walk_since`): its walk frames count from there
+    /// (`sim/units.md` §4.7 step 7 revision, REC-516).
+    pub pose_since: Option<(UnitKey, u64)>,
     /// The model facing of every unit (module doc), by
     /// [`Self::observe_facing`].
     pub facing: BTreeMap<UnitKey, Facing>,
