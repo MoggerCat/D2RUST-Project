@@ -114,14 +114,10 @@ impl<R: ViewRules> ViewRules for UnitRules<R> {
             cof: path,
             dir: usize::from(dir.cof_dir),
             dir64: dir.dir64,
-            frame: if art.spin == Some(unit.key) {
-                super::skill_motion::spin_frame(
-                    world.server_ticks,
-                    cof.animation_rate,
-                    usize::from(cof.frames),
-                )
-            } else {
-                Self::frame(world, unit, cof.frames, cof.animation_rate)
+            frame: match art.sequence {
+                // `skills/sequences.md` §3: the sequence frame's drawn frame.
+                Some((key, f)) if key == unit.key => f % usize::from(cof.frames.max(1)),
+                _ => Self::frame(world, unit, cof.frames, cof.animation_rate),
             },
         }))
     }
