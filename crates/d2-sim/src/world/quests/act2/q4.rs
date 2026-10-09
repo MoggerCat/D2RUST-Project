@@ -13,6 +13,7 @@ use super::{
     remove_guid, set_bit, status_all, status_silent, table_state, TOWN,
 };
 use crate::units::{RoomId, UnitId};
+use crate::world::quests::act3::InitPoint;
 use crate::world::quests::{bit, event, EventArgs, QuestControl, QuestWorld, TextList};
 
 /// Chain id.
@@ -561,8 +562,10 @@ fn palace_spawn<W: QuestWorld>(
 }
 
 /// Init 18, the start Jerhyn object 121 (`0x005448B0` → `0x0059F380`,
-/// `quests-act2-2.md` §2 item 1): the only writer of +0x3C.
-pub fn start_jerhyn_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId) {
+/// `quests-act2-2.md` §2 item 1): the only writer of +0x3C. The object's
+/// room and (x, y) are the InitFn record's (`at`): the init runs inside
+/// the allocation, before the unit has a room (`sim/units.md` §3.1 r7.2).
+pub fn start_jerhyn_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, at: InitPoint) {
     let Some(i) = ctl.find(CHAIN) else { return };
     if ctl.records[i].extra.a2.q4.jerhyn_palace
         || ctl.game.get(8, bit::PRIMARY_GOAL_DONE)
@@ -571,9 +574,7 @@ pub fn start_jerhyn_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, objec
     {
         return;
     }
-    let Some((ox, oy, room)) = w.unit_position(object) else {
-        return;
-    };
+    let (ox, oy, room) = (at.x, at.y, at.room);
     // `0x00545340`: size 2, mask 0x100, sixth argument 10 (never read),
     // limit 100.
     // No free spot: the spawn is still made with room 0 at the object's
@@ -593,12 +594,16 @@ pub fn start_jerhyn_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, objec
 
 /// Init 19, the palace Jerhyn object 122 (`0x005448E0` → `0x0059F440`,
 /// `quests-act2-2.md` §2 item 2): Kaelan, the harem blocker's event 7,
-/// then the palace spawn.
-pub fn palace_jerhyn_init<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, object: UnitId) {
+/// then the palace spawn. Room and (x, y): the InitFn record's (`at`, as
+/// [`start_jerhyn_init`]).
+pub fn palace_jerhyn_init<W: QuestWorld>(
+    ctl: &mut QuestControl,
+    w: &mut W,
+    object: UnitId,
+    at: InitPoint,
+) {
     let Some(i) = ctl.find(CHAIN) else { return };
-    let Some((ox, oy, room)) = w.unit_position(object) else {
-        return;
-    };
+    let (ox, oy, room) = (at.x, at.y, at.room);
     if !ctl.game.get(14, bit::PRIMARY_GOAL_DONE) {
         let e = x4(ctl, i);
         e.guard_x = ox + 1;

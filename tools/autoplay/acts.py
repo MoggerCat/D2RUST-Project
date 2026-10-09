@@ -23,6 +23,8 @@ LEG_REACH = 10          # sub-tiles ahead along the path per walk click
 REMAP_EVERY = 3         # walk legs between map reads
 BODY_LIFT = 24          # px above the feet: where a unit's body is clicked
 
+ALWAYS_OPEN_UI = {21}   # the mini panel (ui/ui-states.tsv)
+
 PICKUP_CODES = ("gld", "hp", "mp", "rv")
 
 # Monster classes that are not hostile outside town (monstats rows).
@@ -212,7 +214,7 @@ WAYPOINT_OBJECTS = {119, 145, 156, 157, 237, 238, 288, 323, 324, 398, 402, 429, 
 
 def _screen(bot, x, y):
     from autoplay import to_screen
-    return to_screen(*bot.v.pos, x, y)
+    return to_screen(*bot.v.cam, x, y)
 
 
 # ---- Act I
@@ -257,7 +259,85 @@ def _take_wp(bot, level):
     _wp_taken[level] = True
 
 
-def plan(act):
+def _talked(npc):
+    return lambda v: npc in _BOT[0].talked
+
+
+_BOT = [None]
+
+
+def _probe_talk(npc, what):
+    def play(bot):
+        _BOT[0] = bot
+        bot.talk(npc, lambda v: npc in bot.talked, what)
+    return play
+
+
+def _probe_town_wp(bot):
+    """Opens the town waypoint menu and closes it (ui 0x14)."""
+    _BOT[0] = bot
+    touch_waypoint(bot, bot.v.level)
+    _wp_taken[("menu", bot.v.level)] = True
+
+
+def _wp_travel(bot, to_level):
+    """Clicks the waypoint, then the menu row of `to_level`."""
+    bot.reset_progress()
+    for _ in range(40):
+        v = bot.look()
+        if v.level == to_level:
+            return
+        if v.open(0x14):
+            rows = v.client["waypoint_rows"]
+            idx = next((i for i, r in enumerate(rows) if r["level"] == to_level), None)
+            if idx is None or not rows[idx]["known"]:
+                raise_stuck(f"waypoint menu has no known row for level {to_level}: {rows}")
+            # ui/panels.md §13 hit rows: x' in (17, 297), y' in (ROW_HY, +30); 800x600: sx 80, sy -60
+            row_hy = [60, 96, 132, 168, 205, 241, 277, 313, 349][idx]
+            bot.act(f"waypoint row {idx} level {to_level}")
+            bot.click((80 + 150, row_hy + 15 + 60))
+            bot.wait(40)
+            continue
+        wps = [u for u in v.units if u["ut"] == 2 and u.get("cl") in WAYPOINT_OBJECTS and "x" in u]
+        if not wps:
+            if not bot.explore_step(v.level):
+                raise_stuck(f"no waypoint found in level {v.level}")
+            continue
+        w = wps[0]
+        if abs(w["x"] - v.pos[0]) + abs(w["y"] - v.pos[1]) > 8:
+            bot.walk_to((w["x"], w["y"]), near=5, budget_s=30)
+            continue
+        bot.click(_screen(bot, w["x"], w["y"]))
+        bot.wait(30)
+    raise_stuck(f"waypoint travel to level {to_level} did not happen")
+
+
+def act1_probe():
+    """No-fight probe of Act I (bot-only workaround while attacking
+    freezes the client): town NPC talks, the waypoint menu, walking
+    routes and waypoint travel."""
+    m = [Milestone("town-start", "in the Rogue Encampment", lambda v: v.level == 1, lambda b: None)]
+    for npc, name in ((AKARA, "akara"), (KASHYA, "kashya"), (CHARSI, "charsi"), (GHEED, "gheed"), (WARRIV, "warriv")):
+        m.append(Milestone(f"talk-{name}", f"talk to {name} ({npc}): Talk opens a dialog", _talked(npc),
+                           _probe_talk(npc, "open a dialog")))
+    m += [
+        Milestone("town-wp-menu", "the town waypoint menu opens", lambda v: _wp_taken.get(("menu", 1)), _probe_town_wp),
+        Milestone("blood-moor", "walk into Blood Moor (2)", lambda v: v.level == 2, lambda b: b.goto_level(2)),
+        Milestone("cold-plains", "walk into Cold Plains (3)", lambda v: v.level == 3, lambda b: b.goto_level(3)),
+        Milestone("cold-plains-wp", "Cold Plains (3) waypoint menu", lambda v: _wp_taken.get(3), lambda b: _take_wp(b, 3)),
+        Milestone("wp-to-town", "waypoint travel Cold Plains -> Rogue Encampment", lambda v: v.level == 1 and _wp_taken.get(3),
+                  lambda b: _wp_travel(b, 1)),
+        Milestone("wp-to-cold-plains", "waypoint travel Rogue Encampment -> Cold Plains", lambda v: v.level == 3 and _wp_taken.get("back"),
+                  lambda b: (_wp_travel(b, 3), _wp_taken.__setitem__("back", True))),
+        Milestone("stony-field", "walk into Stony Field (4)", lambda v: v.level == 4, lambda b: b.goto_level(4)),
+        Milestone("burial-grounds", "walk into Burial Grounds (17)", lambda v: v.level == 17, lambda b: b.goto_level(17)),
+    ]
+    return {"class": "amazon", "name": "AutoProbe", "no_fight": True, "milestones": m}
+
+
+def plan(act, kind="story"):
+    if act == 1 and kind == "probe":
+        return act1_probe()
     if act == 1:
         return act1()
     raise SystemExit(f"autoplay: no plan for act {act} yet")
