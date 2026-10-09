@@ -129,17 +129,13 @@ fn frames(w: i32) -> i32 {
     (w + 255) / 256
 }
 
-/// Every frame of `name` from cel position (x, y).
-fn art(files: &UiFiles, out: &mut dyn UiDrawSink, clip: Rect, name: &str, w: i32, x: i32, y: i32) {
-    art_mode(files, out, clip, name, w, x, y, DRAW_MODE_ENABLED);
-}
-
 /// The draw mode of an enabled row (§O4 r1: mode 5, normal).
 const DRAW_MODE_ENABLED: u8 = 5;
 /// The draw mode of a disabled row (§O4 r1: mode 1, 50 % blend).
 const DRAW_MODE_DISABLED: u8 = 1;
 
-/// [`art`] with the row's draw `mode` (§O4 r1).
+/// Every frame of `name` from cel position (x, y) with the row's draw
+/// `mode` (§O4 r1).
 #[allow(clippy::too_many_arguments)]
 fn art_mode(
     files: &UiFiles,

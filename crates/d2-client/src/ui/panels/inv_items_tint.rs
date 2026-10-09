@@ -158,6 +158,7 @@ impl ItemsUi {
     /// 0 / 3 by r3 (the item under: the single overlap, or a cube of
     /// several). The mode 1 / 0x13 half-screen test of r2 is the
     /// inventory panel's and not read here.
+    #[allow(clippy::too_many_arguments)]
     pub fn draw_placement_tint(
         &self,
         world: &ClientWorld,
