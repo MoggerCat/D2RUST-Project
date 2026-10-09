@@ -1651,6 +1651,12 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
             pierce: m.pierce,
             last_collide: m.lastcollide,
             clt_do_func: m.pcltdofunc,
+            loop_anim: m.loopanim != 0,
+            flicker: m.flicker,
+            collide_type: m.collidetype,
+            always_explode: m.alwaysexplode != 0,
+            explosion_missile: m.explosionmissile as i16,
+            clt_hit_func: m.pclthitfunc as i16,
         })
         .collect();
     let states: Vec<d2_data::tables::States> = decode_all(table("states")?).map_err(err)?;
