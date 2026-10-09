@@ -17,7 +17,7 @@ python3 tools/sidebyside/build.py --out ~/sbs/run [--groups walk,panels] [--scen
 | 1.14d | per group of `tools/cloud-game/scene_defs.py` (plus `arrival`: the scene of `traces/checks/draws-town-arrival-ama.check`), one `record_frames.py` run with that input, every drawn frame's PNG in `OUT/orig/<group>/img` (`--img-dir`) |
 | d2rs | per scene one `d2-client play --dump-draws --at-tick <every 1.14d frame tick up to the scene frame> --dump-image` (`specs/tools/facts-render.md` §5 r19), with the steps acting up to the scene tick T (a paused scene: the steps before its mark) |
 | compare | per tick: RGB pixels after each side's palette, equal or not; the scene frame's `facts-compare --ignore tick,index_sha256 --skip-weather` for the first difference line |
-| page | `OUT/side-by-side.html`: index (badge, match % of the scene frame, first differing tick, first difference line), per scene the first frame, the first differing frame, fixed ticks 12 / 40 / 100 / 200 and the scene frame, with a slider, a toggle and a diff overlay; `OUT/summary.json` |
+| page | `OUT/side-by-side.html`: index (badge, match % of the scene frame, first differing tick, first difference line), per scene the first frame, the first differing frame, fixed ticks 40 / 100 / 200 and the scene frame, with a slider, a toggle and a diff overlay; `OUT/summary.json` |
 
 **Rule 1:** the frames are rendered game art. `--out` must lie outside the
 repository (the tool refuses a folder inside it). The page goes to the

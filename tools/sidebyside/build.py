@@ -47,7 +47,7 @@ from scene_defs import GROUPS as SCENE_GROUPS  # noqa: E402
 
 VERSION = "sidebyside 0.1.0"
 GAME = os.environ.get("D2_GAME_DIR", os.path.expanduser("~/game"))
-FIXED = (12, 40, 100, 200)  # fixed ticks shown per scene (snapped to a 1.14d frame), below its tick
+FIXED = (40, 100, 200)  # fixed ticks shown per scene (snapped to a 1.14d frame), below its tick
 
 # the arrival scene of traces/checks/draws-town-arrival-ama.check: ScnAma, no input, tick 73
 GROUPS = dict(SCENE_GROUPS)
@@ -221,17 +221,19 @@ def load_rgb(path):
 
 
 def pixel_compare(a, b):
-    """(equal pixels, total, diff mask image or None) of two RGB images."""
-    from PIL import Image, ImageChops
+    """(equal pixels, total, diff mask or None) of two RGB images; the mask is a two-colour
+    palettized image: magenta where they differ, transparent elsewhere."""
+    from PIL import ImageChops
     if a.size != b.size:
         return 0, a.size[0] * a.size[1], None
-    d = ImageChops.difference(a, b).convert("L").point(lambda v: 255 if v else 0)
+    d = ImageChops.difference(a, b).convert("L").point(lambda v: 1 if v else 0)
     n = a.size[0] * a.size[1]
-    bad = d.histogram()[255]
+    bad = d.histogram()[1]
     if not bad:
         return n, n, None
-    mask = Image.new("RGBA", a.size, (255, 0, 255, 0))
-    mask.putalpha(d)
+    mask = d.convert("P")
+    mask.putpalette([0, 0, 0, 255, 0, 255])
+    mask.info["transparency"] = 0
     return n - bad, n, mask
 
 
@@ -241,13 +243,17 @@ class Blobs:
     def __init__(self):
         self.data, self.ids = {}, {}
 
-    def add(self, img, lossless=True):
+    def add(self, path_or_img, lossless=True):
+        """A frame file (palettized PNG: kept palettized when lossless, else WebP q80) or a
+        mask image (PNG)."""
+        from PIL import Image
+        img = Image.open(path_or_img) if isinstance(path_or_img, str) else path_or_img
         b = io.BytesIO()
         if lossless:
             img.save(b, "PNG", optimize=True)
             mime = "image/png"
         else:
-            img.save(b, "WEBP", quality=85)
+            img.convert("RGB").save(b, "WEBP", quality=80)
             mime = "image/webp"
         raw = b.getvalue()
         h = hashlib.sha256(raw).hexdigest()[:16]
@@ -394,10 +400,10 @@ def badge(res):
 
 
 def first_line(text):
-    for line in text.splitlines():
-        if line.strip():
-            return line.strip()
-    return ""
+    """facts-compare's verdict and its first difference line ("DIVERGED: first difference:
+    draws.tsv, row 168, column y")."""
+    lines = [x.strip() for x in text.splitlines() if x.strip()]
+    return ": ".join(lines[:2])
 
 
 def page(results, meta, blobs):
@@ -423,13 +429,11 @@ def page(results, meta, blobs):
         for c in chosen(r):
             row = c["row"]
             final = row["tick"] == r["tick"] or "first differing frame" in c["labels"]
-            o = load_rgb(row["orig"])
-            fo = blobs.add(o, lossless=final)
+            fo = blobs.add(row["orig"], lossless=final)
             fd = fm = None
             if row["d2rs"]:
-                d = load_rgb(row["d2rs"])
-                fd = blobs.add(d, lossless=final)
-                _, _, mask = pixel_compare(o, d)
+                fd = blobs.add(row["d2rs"], lossless=final)
+                _, _, mask = pixel_compare(load_rgb(row["orig"]), load_rgb(row["d2rs"]))
                 fm = blobs.add(mask) if mask is not None else None
             pct = 100 * row["eq"] / row["n"]
             info = (f'tick {row["tick"]} (1.14d frame seq {row["seq"]}): {", ".join(c["labels"])}; '
