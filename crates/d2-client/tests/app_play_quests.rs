@@ -125,7 +125,7 @@ fn play_app(ms: &Arc<AtomicU32>, wire: &Arc<Mutex<Wire>>) -> (App, Server<StepCl
     }
     step(&mut app, ms, 10);
     let akara = u32::from(d2_sim::world::npc::class::AKARA);
-    app_support::approach(&mut app, &server, ms, 1, akara);
+    app_support::approach(&mut app, &server, ms, 1, &[akara]);
     (app, server)
 }
 

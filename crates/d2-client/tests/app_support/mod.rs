@@ -194,13 +194,14 @@ pub fn walk_into<C: Clock + Send + 'static>(
     assert_eq!(server_level(server), Some(to), "walked into level {to}");
 }
 
-/// The server unit of type `ty` (1 monster, else object) and class
-/// `class` nearest to the local player: its GUID and position.
+/// The server unit of type `ty` (1 monster, else object) and a class of
+/// `classes` nearest to the local player: its GUID and position.
 pub fn server_unit<C: Clock + Send + 'static>(
     server: &Server<C>,
     ty: u8,
-    class: u32,
+    classes: &[u32],
 ) -> Option<(u32, (i32, i32))> {
+    let classes = classes.to_vec();
     with(server, move |l| {
         let g = &mut l.host_mut().game;
         let (p, _) = single_player::local_player(g)?;
@@ -220,7 +221,7 @@ pub fn server_unit<C: Clock + Send + 'static>(
                     .sys
                     .units
                     .get(u)
-                    .is_some_and(|r| r.class == class)
+                    .is_some_and(|r| classes.contains(&r.class))
             })
             .collect();
         units
@@ -233,6 +234,20 @@ pub fn server_unit<C: Clock + Send + 'static>(
     })
 }
 
+/// The install's waypoint tables (`levels` `Waypoint` / `Act`, the
+/// waypoint object classes).
+pub fn waypoints() -> d2_sim::world::waypoints::WaypointData {
+    let w = &live().waypoints;
+    d2_sim::world::waypoints::WaypointData::new(&w.levels, &w.objects)
+}
+
+/// The server player's level and its act (`levels` `Act`).
+pub fn level_act<C: Clock + Send + 'static>(server: &Server<C>) -> (u32, usize) {
+    let level = server_level(server).expect("the player in a level");
+    let act = waypoints().map.act(level).expect("the level's act");
+    (level, usize::from(act))
+}
+
 /// The server player's position.
 pub fn server_pos<C: Clock + Send + 'static>(server: &Server<C>) -> (i32, i32) {
     with(server, |l| {
@@ -242,9 +257,9 @@ pub fn server_pos<C: Clock + Send + 'static>(server: &Server<C>) -> (i32, i32) {
     })
 }
 
-/// Run legs (C→S 0x03 through the app's bridge) inside the Rogue
-/// Encampment toward `goal` (`test_fixtures::host::route_near`, within
-/// `reach` sub-tiles), each until the player stops.
+/// Run legs (C→S 0x03 through the app's bridge) inside the server
+/// player's level toward `goal` (`test_fixtures::host::route_near`,
+/// within `reach` sub-tiles), each until the player stops.
 pub fn walk_town_to<C: Clock + Send + 'static>(
     app: &mut bevy::prelude::App,
     server: &Server<C>,
@@ -266,16 +281,17 @@ pub fn walk_town_to<C: Clock + Send + 'static>(
         .is_some_and(|m| test_fixtures::host::MOVING.contains(&m))
     };
     let start = server_pos(server);
+    let (level, act) = level_act(server);
     let legs = with(server, move |l| {
         let g = &mut l.host_mut().game;
-        let d = g.events.action.hooks().drlg.dungeon.acts[0]
+        let d = g.events.action.hooks().drlg.dungeon.acts[act]
             .as_ref()
-            .expect("Act I");
-        let town = d
-            .find_level(single_player::ACT1_TOWN)
+            .expect("the act");
+        let area = d
+            .find_level(level)
             .map(|l| d.level(l).rect)
-            .expect("the Rogue Encampment");
-        test_fixtures::host::route_near(d, start, town, goal, reach, 12)
+            .expect("the player's level");
+        test_fixtures::host::route_near(d, start, area, goal, reach, 12)
     });
     for (x, y) in legs {
         let mut m = vec![0x03];
@@ -300,8 +316,8 @@ pub fn walk_town_to<C: Clock + Send + 'static>(
     }
 }
 
-/// Walks the Rogue Encampment until the server unit of type `ty` and
-/// class `class` stands within 10 sub-tiles of the player and the client
+/// Walks the server player's level (a town) until the server unit of type `ty` and a
+/// class of `classes` stands within 10 sub-tiles of the player and the client
 /// model holds it: toward it once the server has it, else through the
 /// town's rooms nearest first (a preset is placed when the player brings
 /// its room into play). Its GUID.
@@ -310,7 +326,7 @@ pub fn approach<C: Clock + Send + 'static>(
     server: &Server<C>,
     ms: &std::sync::atomic::AtomicU32,
     ty: u8,
-    class: u32,
+    classes: &[u32],
 ) -> u32 {
     let in_model = |app: &bevy::prelude::App, guid: u32| {
         app.world()
@@ -322,12 +338,13 @@ pub fn approach<C: Clock + Send + 'static>(
             .any(|k| k.unit_type == ty && k.guid == guid)
     };
     let p = server_pos(server);
-    let mut rooms: Vec<(i32, i32)> = with(server, |l| {
+    let (level, act) = level_act(server);
+    let mut rooms: Vec<(i32, i32)> = with(server, move |l| {
         let g = &mut l.host_mut().game;
-        let d = g.events.action.hooks().drlg.dungeon.acts[0]
+        let d = g.events.action.hooks().drlg.dungeon.acts[act]
             .as_ref()
-            .expect("Act I");
-        let town = d.find_level(single_player::ACT1_TOWN).expect("town");
+            .expect("the act");
+        let town = d.find_level(level).expect("the player's level");
         d.level_rooms(town)
             .into_iter()
             .map(|r| {
@@ -339,7 +356,7 @@ pub fn approach<C: Clock + Send + 'static>(
     rooms.sort_by_key(|&c| test_fixtures::host::cheb(c, p));
     let mut rooms = rooms.into_iter();
     for _ in 0..40 {
-        match server_unit(server, ty, class) {
+        match server_unit(server, ty, classes) {
             Some((guid, at)) => {
                 if test_fixtures::host::cheb(server_pos(server), at) <= 10 && in_model(app, guid) {
                     return guid;
@@ -352,5 +369,70 @@ pub fn approach<C: Clock + Send + 'static>(
             }
         }
     }
-    panic!("unit {ty}/{class} not reached");
+    panic!("unit {ty}/{classes:?} not reached");
+}
+
+/// Runs to the unit `key` as the client does before an interact (C→S
+/// 0x04), until the server player stops.
+pub fn run_to_unit<C: Clock + Send + 'static>(
+    app: &mut bevy::prelude::App,
+    server: &Server<C>,
+    ms: &std::sync::atomic::AtomicU32,
+    key: d2_client::bridge::world::UnitKey,
+) {
+    use std::sync::atomic::Ordering;
+    let mut m = vec![0x04];
+    m.extend_from_slice(&u32::from(key.unit_type).to_le_bytes());
+    m.extend_from_slice(&key.guid.to_le_bytes());
+    app.world_mut()
+        .resource_mut::<d2_client::bridge::BridgeResource>()
+        .0
+        .send_bytes(&m)
+        .unwrap();
+    for i in 0..300 {
+        app.update();
+        ms.fetch_add(40, Ordering::SeqCst);
+        let mode = with(server, |l| {
+            let g = &l.host().game;
+            let (p, _) = single_player::local_player(g)?;
+            g.events.action.sys.units.get(p).map(|u| u.mode)
+        });
+        if i > 2 && !mode.is_some_and(|m| test_fixtures::host::MOVING.contains(&m)) {
+            break;
+        }
+    }
+    for _ in 0..4 {
+        app.update();
+        ms.fetch_add(40, Ordering::SeqCst);
+    }
+}
+
+/// The waypoint of the server player's town (an `objects` row with
+/// operate function 23, `waypoints.md` §5.1): walked to (the town's
+/// preset places it when its room comes into play) and operated (C→S 0x13 through the
+/// bridge's interact sender). Its key.
+pub fn operate_town_waypoint<C: Clock + Send + 'static>(
+    app: &mut bevy::prelude::App,
+    server: &Server<C>,
+    ms: &std::sync::atomic::AtomicU32,
+) -> d2_client::bridge::world::UnitKey {
+    use std::sync::atomic::Ordering;
+    let classes: Vec<u32> = waypoints()
+        .waypoint_classes()
+        .into_iter()
+        .map(u32::from)
+        .collect();
+    let guid = approach(app, server, ms, 2, &classes);
+    let key = d2_client::bridge::world::UnitKey::new(2, guid);
+    run_to_unit(app, server, ms, key);
+    app.world_mut()
+        .resource_mut::<d2_client::bridge::BridgeResource>()
+        .0
+        .interact(key)
+        .unwrap();
+    for _ in 0..10 {
+        app.update();
+        ms.fetch_add(40, Ordering::SeqCst);
+    }
+    key
 }
