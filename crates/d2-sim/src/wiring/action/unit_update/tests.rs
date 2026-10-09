@@ -734,7 +734,10 @@ fn a_zero_length_walk_goes_neutral_and_sends_code_7() {
     assert_eq!(b[0], 0x6D);
     assert_eq!(b[1..5], guid(&fx, m).to_le_bytes());
     assert_eq!(
-        (u16::from_le_bytes([b[5], b[6]]), u16::from_le_bytes([b[7], b[8]])),
+        (
+            u16::from_le_bytes([b[5], b[6]]),
+            u16::from_le_bytes([b[7], b[8]])
+        ),
         (at.0 as u16, at.1 as u16)
     );
     assert_eq!(fx.sim.hooks().errors, vec![]);

@@ -357,6 +357,21 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     d2rs writes the minion owner (+0x2C / +0x30) and nothing for f1 / f2
     (the Fallen leader `SetBoss`, `BossXfer` call is (GUID, 1, 1, 1)).
     State what `0x005DD230` does with each flag.
+- **[q-fix-b-monster-combat] Quill Rat at frame 59 (q-fix-b-quillrat-shoot)**
+    d2rs (`traces/checks/combat-arrow-quillrat.check`, staging + this
+    branch): the rat is placed exactly at the poke point (5147, 4267),
+    4,4 from the player at (5143, 4263); its think at 31 has D = 6, no
+    command, C = 0, P(aip2 35) passes (lo' 8) → A2; one more draw on its
+    seed before 59 (the quill); at 59 the draw gives 89 → escape (walk).
+    The same run without the arrows is identical, so the arrows do not
+    cause it. No number of extra draws between 31 and 59 makes P(35)
+    pass (0 → 64, 2 → 39), so 1.14d took A2 by another branch (D ≤ 3
+    after a failed escape, AI state 3/19, a command) or from another
+    position: PC1-B notes the 1.14d rat "is placed elsewhere". Please
+    commit (or paste here) the 1.14d rat lines of
+    `traces/raw/check-combat-arrow-quillrat/orig.state.jsonl` for frames
+    30–64 (x, y, m, s), or answer which §9.7 step the 1.14d think at 59
+    takes and the rat's position.
 
 
 42. **Control-panel help button `0x004A64C0`** (q-scenes-compare) Step 8 of the UI pass (`ui/panels.md` §5) calls it before the new-stats button; `a4-town-pandemonium-fortress` rows 258–267 draw the text "Help (H)" (CelDrawColor at (714, 403)), `Panel\Levelsocket` frame 0 at (725, 440) and `Panel\Level` frame 0 at (728, 436). Specify when it draws (character level? first game?), its positions and its press / release, for `ui/control-panel.md`.
