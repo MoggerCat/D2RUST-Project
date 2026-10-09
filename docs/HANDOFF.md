@@ -6176,6 +6176,7 @@ Folded 2026-10-08 into one list: the former spec-writer lines of this section (t
 - Fold: write the result into the cited `ui/frontend-loading.md` rule and drop its PROVISIONAL line.
 
 ##### REC-222 [MANUAL] Front end: keys during loading
+- **Done 2026-10-09 (PC 1, Windows, pc1-day3-c):** settled into `ui/frontend-loading.md` L8 rule 3: keys are dispatched during an act-change load; Esc opens ui 9 and stops the server ticks until it closes; before 0x01 keys do nothing. d2rs differs: q-fix-p6-loading-keys.
 - **Cloud 2026-10-09:** not settleable under Wine: the loading screen lasts under a second and posted keys cannot be placed inside it (the 'I' key does not reach the game by PostMessage either); needs a debugger hook on the loading draw or a Windows run.
 - Priority 3 (front-end screens; a capture of the 1.14d menus, no game run needed for most).
 - Settles: `ui/frontend-loading.md` PROVISIONAL REC-222.

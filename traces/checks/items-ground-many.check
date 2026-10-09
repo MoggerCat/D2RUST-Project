@@ -4,12 +4,12 @@ check 1
 # Spec: specs/tools/scenario-diff.md, specs/tools/poke.md.
 # Result (2026-10-09, 36 items made on both sides): quality, item level,
 # affix ids (magic, rare, auto), item seeds, start seed and the item stat
-# lists are EQUAL on every item. Two fields differ for every poked item and
-# are ignored here until the binary question is answered
-# (docs/handoff/pc1-data.md Step 4 item 26): item flag 0x2000 (1.14d clear,
-# d2rs set per generation.md §3 step 5) and the file index of items without
-# one (1.14d 0, d2rs -1).
-ignore if fi
+# lists are EQUAL on every item. Item flags (if) and file index (fi) were
+# ignored until pc1-data.md Step 4 item 26 was answered (2026-10-09):
+# 0x2000 is set at creation and cleared by the room clean-up at the end of
+# the tick (generation.md §1.4, §3 step 5); a file index never written stays
+# 0 from allocation (quality.md §1). Both are compared again; d2rs fails them
+# until q-fix-p5-item-new-flag-file-index lands.
 name items-ground-many
 save ScnAma --class ama --expansion
 seed 1234
