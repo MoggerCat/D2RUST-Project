@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sh tools/coord/sync.sh)",
+      "Bash(sh tools/coord/sync.sh:*)",
+      "Bash(sh tools/cloud-setup.sh)",
+      "Bash(sh tools/cloud-setup.sh:*)",
+      "Bash(sh tools/cloud-game/setup_winpy.sh:*)",
+      "Bash(sh tools/cloud-game/prepare_saves.sh:*)",
+      "Bash(tools/cloud-game/setup_winpy.sh:*)",
+      "Bash(tools/cloud-game/prepare_saves.sh:*)",
+      "Bash(git fetch:*)",
+      "Bash(git merge:*)"
+    ]
+  }
+}
