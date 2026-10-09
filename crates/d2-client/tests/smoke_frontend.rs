@@ -601,8 +601,11 @@ fn esc_options_save_and_exit_then_reload_the_character() {
     game.press(KeyCode::Enter);
     assert!(game.exited(), "Save and Exit did not end the game");
 
-    // Back in the front end: character select, the character listed.
-    let mut f = Front::open(&dir, Entry::AfterGame);
+    // Back in the front end: the main menu (recorded, REC-200), then
+    // Single Player: character select, the character listed.
+    let mut f = Front::open(&dir, Entry::MainMenu);
+    assert_eq!(f.current(), MAIN_MENU);
+    f.click_trigger(Trigger::SinglePlayer);
     assert_eq!(f.current(), CHAR_SELECT);
     assert!(f.texts().iter().any(|t| t == "Tester"), "{:?}", f.texts());
     f.click_custom(d2_client::ui::front_end::screens::char_select::ids::SLOT_TEXT);
@@ -779,10 +782,11 @@ fn play_cli_new_and_save_paths() {
 }
 
 /// `play` after a game (Save and Exit, or the window closed): the front
-/// end opens at character select with the saved character listed (§F1.3
-/// "in game" row, REC-200), not at the main menu.
+/// end opens at the main menu (§F1.3 "in game" row, recorded under Wine,
+/// REC-200), not at character select; Single Player lists the saved
+/// character.
 #[test]
-fn after_a_game_the_front_end_opens_at_character_select() {
+fn after_a_game_the_front_end_opens_at_the_main_menu() {
     let dir = temp_dir("after");
     let c = NewCharacter {
         name: "Back".into(),
@@ -791,7 +795,9 @@ fn after_a_game_the_front_end_opens_at_character_select() {
         expansion: true,
     };
     write_stub(&dir, &c, 1).unwrap();
-    let f = Front::open(&dir, Entry::AfterGame);
+    let mut f = Front::open(&dir, Entry::MainMenu);
+    assert_eq!(f.current(), MAIN_MENU);
+    f.click_trigger(Trigger::SinglePlayer);
     assert_eq!(f.current(), CHAR_SELECT);
     assert!(f.texts().iter().any(|t| t == "Back"), "{:?}", f.texts());
 }

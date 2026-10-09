@@ -101,8 +101,9 @@ pub fn next(from: ScreenId, t: Trigger, ctx: FlowCtx) -> Next {
             new_character: false,
         }),
         (f, Exit) if f == DIFFICULTY => Next::Screen(CHAR_SELECT),
-        // PROVISIONAL (REC-168): 1.14d returns to character select after
-        // Save and Exit; settled by REC-200.
+        // After Save and Exit 1.14d shows the main menu (REC-200,
+        // recorded): the host opens `Entry::MainMenu`; `GameExit` is the
+        // character select's own re-entry (below).
         // Configure Controls: Cancel / Accept return to the Options menu
         // (q-menu-controls, REC-184).
         (f, ConfigureControls) if f == OPTIONS => Next::Screen(CONTROLS),
