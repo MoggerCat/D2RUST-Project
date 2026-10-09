@@ -1,0 +1,51 @@
+check 1
+# Ground items, many classes and qualities (area G, drops): seeds fixed, then at frame 4 forty items made through the game's own creation path;
+# the item seeds, classes and places are compared frame by frame (equal item seeds mean the same RNG draws).
+# Spec: specs/tools/scenario-diff.md, specs/tools/poke.md.
+name items-ground-many
+save ScnAma --class ama --expansion
+seed 1234
+ticks 30
+seconds 240
+channels state
+at 4 poke seed-game 0x00001234 666
+at 4 poke item hax @x+2 @y+0 quality magic ilvl 20
+at 4 poke item 2ax @x+3 @y+0 quality rare ilvl 35
+at 4 poke item bsw @x+4 @y+0 quality unique ilvl 40
+at 4 poke item lsd @x+5 @y+0 quality set ilvl 40
+at 4 poke item glv @x+6 @y+0 quality rare ilvl 50
+at 4 poke item jav @x+7 @y+0 quality magic ilvl 60
+at 4 poke item 9ar @x+8 @y+0 quality unique ilvl 75
+at 4 poke item ful @x+9 @y+0 quality magic ilvl 30
+at 4 poke item plt @x+2 @y+2 quality rare ilvl 55
+at 4 poke item lg2 @x+3 @y+2 quality set ilvl 40
+at 4 poke item rin @x+4 @y+2 quality rare ilvl 60
+at 4 poke item amu @x+5 @y+2 quality unique ilvl 60
+at 4 poke item jew @x+6 @y+2 quality rare ilvl 70
+at 4 poke item cm1 @x+7 @y+2 quality magic ilvl 30
+at 4 poke item cm2 @x+8 @y+2 quality magic ilvl 60
+at 4 poke item cm3 @x+9 @y+2 quality unique ilvl 80
+at 4 poke item mbl @x+2 @y+4 quality magic ilvl 45
+at 4 poke item vbt @x+3 @y+4 quality rare ilvl 50
+at 4 poke item hbt @x+4 @y+4 quality magic ilvl 30
+at 4 poke item tbk @x+5 @y+4
+at 4 poke item rvl @x+6 @y+4
+at 4 poke item gsw @x+7 @y+4
+at 4 poke item gzv @x+8 @y+4
+at 4 poke item r10 @x+9 @y+4
+at 4 poke item r30 @x+2 @y+6
+at 4 poke item key @x+3 @y+6
+at 4 poke item ibk @x+4 @y+6
+at 4 poke item hp5 @x+5 @y+6
+at 4 poke item mp4 @x+6 @y+6
+at 4 poke item axf @x+7 @y+6 quality rare ilvl 85
+at 4 poke item buc @x+8 @y+6 quality magic ilvl 40
+at 4 poke item sml @x+9 @y+6 quality magic ilvl 25
+at 4 poke item pa6 @x+2 @y+8 quality set ilvl 50
+at 4 poke item tow @x+3 @y+8 quality unique ilvl 70
+at 4 poke item ssp @x+4 @y+8 quality rare ilvl 30
+at 4 poke item wnd @x+5 @y+8 quality magic ilvl 20
+at 4 poke item sbk @x+6 @y+8
+at 4 poke item orb @x+7 @y+8 quality magic ilvl 40
+at 4 poke item bow @x+8 @y+8 quality magic ilvl 50
+at 4 poke item lbb @x+9 @y+8 quality rare ilvl 60
