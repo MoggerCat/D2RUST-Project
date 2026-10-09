@@ -352,6 +352,8 @@ pub fn update_messages<X: Pending>(
     if flags & crate::units::record::flags::CHANGED != 0 {
         if let Some(msg) = mode_update(mode, ty, guid, &path, own) {
             v.h.x.send(receiver, &msg);
+        } else if let Some(row) = stop_row(mode) {
+            stop_row_messages(v, receiver, unit, (ty, guid), &path, row, own);
         } else if player_skill_mode(mode) {
             // PROVISIONAL (sim/pathing.md §10 rule 2): the skill rows of
             // `0x007319E8` read as `0x00548090` (the skill message with
@@ -372,6 +374,89 @@ pub fn update_messages<X: Pending>(
                 target,
                 (path.target_x, path.target_y),
             );
+        }
+    }
+}
+
+/// The non-walk, non-skill rows of the player mode-update table
+/// `0x007319E8` (`sim/pathing.md` §10 rule 2).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum StopRow {
+    /// NU 1 / TN 5 (`0x00548400`, code 7): 0x0D with b = 0, other
+    /// clients only.
+    Neutral,
+    /// GH 4 (6), BL 9 (0x12), DD 17 (9) (`0x00548350`): 0x0D, b = unit
+    /// byte +0xB0, every client.
+    Stop(u8),
+    /// DT 0 (`0x0054DA10`, code 8): as `Stop`, then the own client gets
+    /// the stat 175 message.
+    Death,
+    /// KB 19 (`0x005482A0`, code 0x14): 0x0F with byte @11 = unit byte
+    /// +0xB0, every client.
+    Knockback,
+}
+
+fn stop_row(mode: u32) -> Option<StopRow> {
+    Some(match mode {
+        1 | 5 => StopRow::Neutral,
+        4 => StopRow::Stop(6),
+        9 => StopRow::Stop(0x12),
+        17 => StopRow::Stop(9),
+        0 => StopRow::Death,
+        19 => StopRow::Knockback,
+        _ => return None,
+    })
+}
+
+/// The life percent `0x00621F20`: trunc(100 * (life >> 8) / (max >> 8)),
+/// 0 when the maximum is below 256.
+fn life_percent<X: Pending>(v: &View<'_, X>, unit: UnitId) -> u8 {
+    let m = v.stats.max_life(unit) >> 8;
+    if m <= 0 {
+        return 0;
+    }
+    ((v.stats.unit_total(unit, 6, 0) >> 8).wrapping_mul(100) / m) as u8
+}
+
+/// One client's message of a [`StopRow`] (§10 rule 2).
+fn stop_row_messages<X: Pending>(
+    v: &mut View<'_, X>,
+    receiver: UnitId,
+    unit: UnitId,
+    (ty, guid): (u8, u32),
+    path: &crate::path::record::DynamicPath,
+    row: StopRow,
+    own: bool,
+) {
+    use crate::path::walk::messages::{player_move, player_stop};
+    let pos = path.cell();
+    let (x, y) = (pos.x as u16, pos.y as u16);
+    let b0 = v.h.x.unit_b0(unit);
+    let life = life_percent(v, unit);
+    let (code, b) = match row {
+        StopRow::Neutral if own => return,
+        StopRow::Neutral => (7, 0),
+        StopRow::Stop(c) => (c, b0),
+        StopRow::Death => (8, b0),
+        StopRow::Knockback => {
+            let m = player_move(ty, guid, 0x14, path.target_x, path.target_y, x, y);
+            let mut m = m;
+            m[11] = b0;
+            v.h.x.send(receiver, &m);
+            return;
+        }
+    };
+    // The death announcer (`wiring::action::dying`) already tells the
+    // clients of a DT / DD it started, and owns the corpse's.
+    let announced = v.h.death.announced.contains_key(&unit) || v.h.death.owners.contains_key(&unit);
+    if !(matches!(row, StopRow::Death) || code == 9) || !announced {
+        v.h.x
+            .send(receiver, &player_stop(ty, guid, code, x, y, b, life));
+    }
+    if row == StopRow::Death && own {
+        let g = v.stats.unit_total(unit, 175, 0);
+        if let Some(m) = crate::wiring::action::vitals_sync::stat_message(175, g) {
+            v.h.x.send(receiver, &m);
         }
     }
 }

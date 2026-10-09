@@ -15,11 +15,9 @@
 //! hireling records are sent at once by `world::hirelings::level` (§7.9
 //! rule 2 is the same bytes); 0x23 has no d2rs writer yet.
 
+use super::reaction::UNIT_FLAG_SOFT_HIT;
 use crate::game::Game;
 use crate::units::UnitId;
-
-/// Unit flag 0x80000000: revived (`0x00451F30`).
-const REVIVED: u32 = 0x8000_0000;
 
 /// One pending record, its fields resolved when written (the record
 /// bytes the senders pass through).
@@ -221,15 +219,15 @@ impl<X: super::Pending> super::View<'_, X> {
         let Some(r) = self.units.get(unit) else {
             return;
         };
-        let (ty, guid, revived) = (r.ty as u8, r.guid, r.flags & REVIVED != 0);
+        let (ty, guid, soft) = (r.ty as u8, r.guid, r.flags & UNIT_FLAG_SOFT_HIT != 0);
         for rec in self.h.event_records.of(unit).to_vec() {
             let m = match rec {
-                // `0x00571CD0`: 0xAB only when `0x00451F30(unit)` is 0
-                // (the revived flag) and the client has a player.
-                // PROVISIONAL (REC-412): the third test `0x00554200(unit)`
-                // is not spelled out (its arguments) and is not applied;
-                // settled by a spec read of the call at `0x00571CD0`.
-                EventRecord::NpcHeal { .. } if revived => continue,
+                // `0x00571CD0` (`0x00571DF6`-`0x00571E38`, §7.9 r2 (b)): 0xAB
+                // only when the unit lacks flag 0x8000 and the receiver may
+                // attack it (hostility, `combat/hit.md` §7.1).
+                EventRecord::NpcHeal { .. } if soft || !self.h.x.may_attack(receiver, unit) => {
+                    continue
+                }
                 // `0x0053D530` with flag 1: the receiver-dependent form.
                 EventRecord::CastOnUnit {
                     skill,

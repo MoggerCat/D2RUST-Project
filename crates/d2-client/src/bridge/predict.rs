@@ -264,7 +264,10 @@ pub struct Predict {
     dir: Option<u8>,
     /// The local player's stamina (stat 10) is zero: the server walks
     /// instead of running (`pathing.md` §9.9, `units.md` §4.5), so the
-    /// prediction does too. d2rs-own, unverified (client prediction).
+    /// prediction does too. The 1.14d client ends its run on model stat
+    /// 10 = 0, i.e. server raw stamina < 256 (`client/model.md` OQ2,
+    /// `seams/movement-prediction.md` §2.5 r3); the server runs while raw
+    /// is 1..255, a gap the position check corrects.
     exhausted: bool,
     /// The local player's level at the last observation.
     level: Option<u16>,
@@ -1193,6 +1196,22 @@ mod tests {
         assert_eq!(p.mode(), Some(2));
         let walked = p.position().unwrap().0 - run_at;
         assert_eq!(walked, 6 * 0x1000);
+    }
+
+    // Covers: specs/seams/movement-prediction.md §2.5 r3; specs/client/model.md §6
+    #[test]
+    fn a_raw_stamina_below_256_walks_on_the_client() {
+        // Server raw stamina 100 reaches the model as 0x96 stamina
+        // 100 >> 8 = 0: the client walks while the server (raw > 0)
+        // still runs. The gap is 1.14d's own.
+        let raw: i32 = 100;
+        let (mut w, key) = world_at(100, 100);
+        w.units.get_mut(&key).unwrap().stats.insert(10, raw >> 8);
+        let mut p = Predict::new();
+        p.observe(&w);
+        p.walk(walk_point(110, 100, true));
+        p.tick(&w, SPEEDS);
+        assert_eq!(p.mode(), Some(2));
     }
 
     fn walk_point(x: u16, y: u16, run: bool) -> Walk {

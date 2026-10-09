@@ -399,6 +399,33 @@ fn set_state_0xa8_one_layout() {
     }
 }
 
+// Covers: specs/client/stat-lists.md §3 r1
+#[test]
+fn set_state_0xa8_param_with_the_top_bit_is_signed_and_keeps_16_bits() {
+    // Stat 2 sends 4 param bits: raw 0xF reads as -1, kept as its low 16
+    // bits, 0x10000 - 2^4 + 0xF; raw 0x8 reads as -8 (0xFFF8).
+    let key = UnitKey::new(PLAYER, 5);
+    let mut m = Model::default();
+    m.inputs.tables.stats = client_stats();
+    m.inputs.tables.states = vec![StateRow::default(); 256];
+    m.put(key);
+    let sim = set_state(
+        PLAYER,
+        5,
+        9,
+        &[(0xF, 2, 7), (0x8, 2, 9), (0x7, 2, 11)],
+        send_row,
+    );
+    m.recv(&sim);
+    assert!(m.log.rejected.is_empty(), "{:?}", m.rejected());
+    let l = m.unit(key).state_lists.get(&9).cloned().unwrap_or_default();
+    let key = |low: u32| (2u16, (0x10000u32 - 16 + low) as u16);
+    assert_eq!(l.get(&key(0xF)), Some(&7));
+    assert_eq!(l.get(&key(0x8)), Some(&9));
+    assert_eq!(l.get(&(2, 7)), Some(&11));
+    assert_eq!(l.len(), 3);
+}
+
 // Covers: specs/sim/intents-events.md §7.9 r1; specs/client/msg-units.md §6 r2, §6 r3; specs/client/stat-lists.md §3 r2
 #[test]
 fn add_unit_states_0xaa_one_layout() {
@@ -1271,7 +1298,7 @@ fn skill_bonus_0x93_one_layout() {
 
 // Covers: specs/client/msg-stats-items.md §5 r5; specs/client/stat-lists.md §2 r4
 #[test]
-fn remove_items_display_0x92_unlinks_the_owners_body_items() {
+fn remove_items_display_0x92_unlinks_every_item_of_the_owner() {
     use super::super::item_lists::ItemProp;
     let t = isc_table();
     let p1 = UnitKey::new(PLAYER, 1);
@@ -1285,11 +1312,13 @@ fn remove_items_display_0x92_unlinks_the_owners_body_items() {
     m.put(UnitKey::new(PLAYER, 2)).kind = KindData::Player(PlayerData::default());
     m.w.local_player = Some(p1);
     // (guid, owner, mode, body, page): P1's two body items, P1's grid
-    // item, another player's body item.
-    let rows: [(u32, u32, u32, u8, u8); 4] = [
+    // item (page 0, not a charm), P1's belt item, another player's body
+    // item.
+    let rows: [(u32, u32, u32, u8, u8); 5] = [
         (10, 1, 1, 4, 0xFF),
         (11, 1, 1, 5, 0xFF),
         (12, 1, 0, 0, 0),
+        (14, 1, 2, 0, 0xFF),
         (13, 2, 1, 4, 0xFF),
     ];
     let record = |m: &mut Model, (guid, owner, mode, body, page): (u32, u32, u32, u8, u8)| {
@@ -1320,20 +1349,25 @@ fn remove_items_display_0x92_unlinks_the_owners_body_items() {
     one_size(&b);
     m.recv(&b);
     assert!(m.log.rejected.is_empty(), "{:?}", m.rejected());
-    // P1's body items are unlinked; P2's are not; no unit leaves S.
+    // Every item of P1's inventory is unlinked (`0x0063E0B0` empties it:
+    // body, grid and belt); P2's are not; no unit leaves S.
     assert_eq!((total(&m, 1), total(&m, 2)), (0, 20));
-    assert_eq!(m.w.units.len(), 6);
+    assert_eq!(m.w.units.len(), 7);
     let unlinked = |m: &Model, g: u32| match &m.w.units[&UnitKey::new(ITEM, g)].kind {
         KindData::Item(d) => d.unlinked,
         _ => panic!("item data"),
     };
     assert_eq!(
-        [10, 11, 12, 13].map(|g| unlinked(&m, g)),
-        [true, true, false, false]
+        [10, 11, 12, 14, 13].map(|g| unlinked(&m, g)),
+        [true, true, true, true, false]
     );
-    // The next record about an item re-adds it.
+    // The next record about an item re-adds only that one.
     record(&mut m, rows[0]);
     assert_eq!(total(&m, 1), 20);
+    assert_eq!(
+        [10, 11, 12, 14].map(|g| unlinked(&m, g)),
+        [false, true, true, true]
+    );
     // An absent unit and a non-inventory type change nothing; a wrong
     // size is invalid.
     m.recv(&[0x92, PLAYER, 9, 0, 0, 0]);

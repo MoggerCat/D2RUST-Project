@@ -26,15 +26,15 @@
 |   2. `draws.tsv` | 90–136 |
 |   3. `frame.tsv` | 137–169 |
 |   4. `sprites.tsv` | 170–189 |
-|   5. d2rs export | 190–306 |
-|   6. Comparison | 307–344 |
-|   7. Requests | 345–356 |
-| Constants & data dependencies | 357–360 |
-| Randomness | 361–364 |
-| Edge cases & original bugs | 365–372 |
-| Test vectors | 373–381 |
-| Provenance | 382–386 |
-| Open questions | 387–401 |
+|   5. d2rs export | 190–312 |
+|   6. Comparison | 313–350 |
+|   7. Requests | 351–362 |
+| Constants & data dependencies | 363–366 |
+| Randomness | 367–370 |
+| Edge cases & original bugs | 371–378 |
+| Test vectors | 379–387 |
+| Provenance | 388–392 |
+| Open questions | 393–407 |
 <!-- /index -->
 
 ## Summary
@@ -255,7 +255,7 @@ composition, through `d2-client` only (game logic untouched).
    rows stand where the first such item is, else (every pixel
    off-screen) before the first item of a later pass, else at the end.
    Other primitives (`DrawBox`, `DrawBoxAlpha`, `Util*`) are written only
-   for primitives d2rs draws; it draws no other yet (the 1.14d arrival
+   for primitives d2rs draws (r16: the UI rectangles); it drew no other (the 1.14d arrival
    scene also has the stamina bar box `0x0046EFE9` of
    `ui/control-panel.md` §4 and a hover-label box `0x005031C1`), so those
    rows are real divergences, not export gaps.
@@ -303,6 +303,12 @@ composition, through `d2-client` only (game logic untouched).
    never composed; the export writes it at its key like an item (the
    unit row of §5 r1 included): `file`, `dir` (r14), `frame`; every
    measured column `?`; no `sprites.tsv` row.
+16. A UI rectangle (`ui/inventory.md` §2 r2: `0x0046EFD0` →
+   `DrawRectangle`, call site `0x0046EFE9`; d2rs: an item of a
+   `d2rs/ui/rect/WxH` frame set) is a `DrawBox` row: `x`, `y` = its
+   left, top, `mode` = its colour (the item's colour row; `?` without
+   the colour rows), every other column `-`; one row per rectangle
+   (revision 2026-10-09, `a1-panel-cube`: the item tints).
 
 ### 6. Comparison
 

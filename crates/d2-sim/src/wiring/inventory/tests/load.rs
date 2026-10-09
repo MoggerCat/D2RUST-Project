@@ -82,10 +82,11 @@ fn a_stored_item_returns_to_its_cell() {
     assert!(w.state.errors.is_empty());
 }
 
-/// The saved cell is taken: the item takes a free position instead of
-/// being lost (d2rs-own, PROVISIONAL).
+/// The saved cell is taken: the item is freed (`d2s.md` §8.2 rule 3,
+/// `0x00531210` mode 0: exact cell, no free-position fallback).
+// Covers: specs/formats/d2s.md §8.2 r3
 #[test]
-fn a_taken_cell_falls_back_to_a_free_position() {
+fn a_taken_cell_frees_the_item() {
     let mut w = world();
     let p = w.player;
     let k = w.cursor_item(CAP);
@@ -94,10 +95,8 @@ fn a_taken_cell_falls_back_to_a_free_position() {
     assert!(w.desk(|d| d.place(p, u, (0, 0), false, true)));
     let e = entry_of(&mut w, u);
     // The original stays at (0, 0): the copy cannot take its cell.
-    let n = w.desk(|d| d.load_entry(p, &e)).expect("loaded");
-    assert_eq!(w.state.items_of(p).len(), 2);
-    let g = w.units.get(n).unwrap().guid;
-    assert_ne!((w.data(g).x, w.data(g).y), (0, 0));
+    assert_eq!(w.desk(|d| d.load_entry(p, &e)), Err(LoadFault::NoRoom));
+    assert_eq!(w.state.items_of(p), [u]);
 }
 
 /// An owner without an inventory in the model loads nothing.
@@ -177,6 +176,9 @@ fn an_item_without_the_runeword_flag_is_not_refreshed() {
     w.items.get_mut(u).unwrap().inv_page = 0;
     assert!(w.desk(|d| d.place(p, u, (4, 2), false, true)));
     let e = entry_of(&mut w, u);
+    // The saved cell must be free (rule 3: exact placement).
+    assert!(w.desk(|d| d.remove(p, u)));
+    w.desk(|d| d.free(u));
     assert!(w.desk(|d| d.load_entry(p, &e)).is_ok());
 }
 

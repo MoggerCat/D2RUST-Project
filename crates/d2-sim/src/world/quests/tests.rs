@@ -1064,10 +1064,6 @@ impl QuestWorld for Fake {
         self.log.push(format!("missile at {} {class}", at.0));
         self.a5_created
     }
-    fn character_progression(&mut self, player: UnitId, act: u8, difficulty: u8) {
-        self.log
-            .push(format!("progression {} {act} {difficulty}", player.0));
-    }
     fn drop_gold_amount(&mut self, at: UnitId, amount: u32) {
         self.log.push(format!("gold {} {amount}", at.0));
     }

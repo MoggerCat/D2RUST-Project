@@ -373,10 +373,10 @@ pub fn monster_table_mode(code: u8) -> Option<u32> {
 
 /// The neutral fallback "F" `0x004AE1D0` (§19 r4): a monster in mode
 /// 1…15 other than 12 is set to mode 1; any other mode: nothing.
-fn neutral_fallback(w: &mut ClientWorld, key: UnitKey) {
-    let u = w.units.get_mut(&key).expect("checked by the caller");
-    if (1..=15).contains(&u.mode) && u.mode != monster_mode::DEAD {
-        u.mode = monster_mode::NEUTRAL;
+fn neutral_fallback(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey) {
+    let mode = w.units.get(&key).expect("checked by the caller").mode;
+    if (1..=15).contains(&mode) && mode != monster_mode::DEAD {
+        super::monster_anim::mode_set(w, inputs, key, monster_mode::NEUTRAL);
     }
 }
 
@@ -412,8 +412,9 @@ fn monster(
     {
         return Ok(());
     }
+    // The mode set restarts the unit's animation (`monster_anim`).
     let set = |w: &mut ClientWorld, mode: u32| {
-        w.units.get_mut(&key).expect("present").mode = mode;
+        super::monster_anim::mode_set(w, inputs, key, mode);
     };
     match code {
         // Path to the unit (r0 type, r1 GUID): an absent unit → F.
@@ -422,7 +423,7 @@ fn monster(
             if w.units.contains_key(&target) {
                 set(w, if code == 0x00 { m::WALK } else { m::RUN });
             } else {
-                neutral_fallback(w, key);
+                neutral_fallback(w, inputs, key);
             }
         }
         0x01 | 0x17 => set(w, if code == 0x01 { m::WALK } else { m::RUN }),
@@ -439,7 +440,7 @@ fn monster(
             let near = (i32::from(cx) - i32::from(x)).abs() <= 1
                 && (i32::from(cy) - i32::from(y)).abs() <= 1;
             if near || u.states.contains(&143) {
-                neutral_fallback(w, key);
+                neutral_fallback(w, inputs, key);
             } else {
                 set(w, m::WALK);
             }
@@ -461,7 +462,12 @@ fn monster(
             }
         }
         // 0x02, 0x03, 0x19 and unknown codes.
-        _ => neutral_fallback(w, key),
+        _ => neutral_fallback(w, inputs, key),
+    }
+    // The tail (`model.md` §19 r6) of a pathed request (a record and a
+    // code other than 0x13, 0x15, 0x16, §19 r3): stat 67 from r4.
+    if !matches!(code, 0x13 | 0x15 | 0x16) {
+        super::monster_anim::velocity_tail(w, inputs, key, r[4]);
     }
     Ok(())
 }
