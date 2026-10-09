@@ -377,7 +377,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     d2rs writes the minion owner (+0x2C / +0x30) and nothing for f1 / f2
     (the Fallen leader `SetBoss`, `BossXfer` call is (GUID, 1, 1, 1)).
     State what `0x005DD230` does with each flag.
-- **[q-fix-b-monster-combat] Quill Rat at frame 59 (q-fix-b-quillrat-shoot)**
+- **[q-fix-b-monster-combat] Quill Rat at frame 59 (q-fix-b-quillrat-shoot)** answered → see docs/handoff/pc1-day3-b.md.
     d2rs (`traces/checks/combat-arrow-quillrat.check`, staging + this
     branch): the rat is placed exactly at the poke point (5147, 4267),
     4,4 from the player at (5143, 4263); its think at 31 has D = 6, no
