@@ -23,13 +23,13 @@
 |   1. Rows and files | 64–87 |
 |   2. Border substitution (`0x00670750`, D2MOO `DRLGTILESUB_AddSecondaryBorder`) | 88–181 |
 |   3. Sub-theme pick (`0x006706A0`, D2MOO `DRLGTILESUB_PickSubThemes`) | 182–189 |
-|   4. Room substitution (`0x006707A0`, D2MOO `sub_6FD8AA80`) | 190–256 |
-| Constants & data dependencies | 257–273 |
-| Randomness | 274–281 |
-| Edge cases & original bugs | 282–293 |
-| Test vectors | 294–309 |
-| Provenance | 310–328 |
-| Open questions | 329–367 |
+|   4. Room substitution (`0x006707A0`, D2MOO `sub_6FD8AA80`) | 190–261 |
+| Constants & data dependencies | 262–278 |
+| Randomness | 279–286 |
+| Edge cases & original bugs | 287–298 |
+| Test vectors | 299–314 |
+| Provenance | 315–333 |
+| Open questions | 334–372 |
 <!-- /index -->
 
 ## Summary
@@ -253,6 +253,11 @@ At room cell (x, y) with x offset o into the pattern:
    between G.y and G.y + G.h — of the **match pattern** box, not the
    chosen variant — becomes a room preset unit at (x + ux − G.x, y + uy −
    G.y) (`0x0066BF30`, `preset.md` owns the unit records).
+   `0x0066BF30` **prepends**: the file's unit list is already in reverse
+   file order, so the room's list ends up in file order reversed again,
+   i.e. the last unit of the file's list first. Measured: Stony Field
+   arrival room, 1.14d creates (27,12), (12,27), then the waypoint
+   (check `combat-pop-stony-field`, frame 4, object GUIDs 18–20).
 
 ## Constants & data dependencies
 
