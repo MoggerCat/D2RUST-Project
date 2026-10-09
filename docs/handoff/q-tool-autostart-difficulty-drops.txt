@@ -1,0 +1,28 @@
+hel-00 | items: 1.14d 1, d2rs 1 created up to fra | first divergence: item #0 frame: 1.14d 124 vs d2rs 130
+hel-01 | items: 1.14d 0, d2rs 0 created up to fra | 
+hel-02 | items: 1.14d 1, d2rs 1 created up to fra | first divergence: item #0 frame: 1.14d 53 vs d2rs 54
+hel-03 | items: 1.14d 0, d2rs 0 created up to fra | 
+hel-04 | items: 1.14d 1, d2rs 1 created up to fra | first divergence: item #0 frame: 1.14d 201 vs d2rs 97
+hel-05 | items: 1.14d 1, d2rs 0 created up to fra | first divergence: item #0 missing in d2rs
+hel-06 | items: 1.14d 0, d2rs 0 created up to fra | 
+hel-07 | items: 1.14d 0, d2rs 1 created up to fra | first divergence: item #0 missing in 1.14d
+hel-08 | items: 1.14d 0, d2rs 0 created up to fra | 
+hel-09 | items: 1.14d 0, d2rs 0 created up to fra | 
+hel-10 | items: 1.14d 0, d2rs 0 created up to fra | 
+hel-11 | items: 1.14d 0, d2rs 0 created up to fra | 
+hel-12 | items: 1.14d 0, d2rs 0 created up to fra | 
+hel-13 | items: 1.14d 0, d2rs 0 created up to fra | 
+nig-00 | items: 1.14d 2, d2rs 1 created up to fra | first divergence: item #0 frame: 1.14d 77 vs d2rs 78
+nig-01 | items: 1.14d 2, d2rs 2 created up to fra | first divergence: item #0 frame: 1.14d 78 vs d2rs 79
+nig-02 | items: 1.14d 5, d2rs 3 created up to fra | first divergence: item #0 frame: 1.14d 35 vs d2rs 36
+nig-03 | items: 1.14d 2, d2rs 1 created up to fra | first divergence: item #0 frame: 1.14d 42 vs d2rs 43
+nig-04 | items: 1.14d 4, d2rs 4 created up to fra | first divergence: item #0 frame: 1.14d 40 vs d2rs 53
+nig-05 | items: 1.14d 2, d2rs 0 created up to fra | first divergence: item #0 missing in d2rs
+nig-06 | items: 1.14d 3, d2rs 2 created up to fra | first divergence: item #0 frame: 1.14d 52 vs d2rs 49
+nig-07 | items: 1.14d 2, d2rs 1 created up to fra | first divergence: item #0 frame: 1.14d 87 vs d2rs 88
+nig-08 | items: 1.14d 1, d2rs 2 created up to fra | first divergence: item #0 frame: 1.14d 72 vs d2rs 121
+nig-09 | items: 1.14d 1, d2rs 1 created up to fra | 
+nig-10 | items: 1.14d 0, d2rs 1 created up to fra | first divergence: item #0 missing in 1.14d
+nig-11 | items: 1.14d 7, d2rs 1 created up to fra | first divergence: item #0 frame: 1.14d 49 vs d2rs 151
+nig-12 | items: 1.14d 3, d2rs 3 created up to fra | first divergence: item #0 stream byte 5, x (bit 0 of 16): 1.14d 288000654c83421562 vs d2rs 288000652c83421562
+nig-13 | items: 1.14d 0, d2rs 0 created up to fra | 

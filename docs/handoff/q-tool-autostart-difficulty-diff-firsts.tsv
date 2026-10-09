@@ -1,0 +1,36 @@
+diff-a3-hell-champion-bm	frame 4 monster 1:4 class 63, field x: 1.14d 5192 vs d2rs 5180
+diff-a3-hell-champion	frame 5 game, field seed: 1.14d [456929325, 627936105] vs d2rs [418125439, 650105237]
+diff-a3-hell-normal-bm	frame 4 monster 1:4 class 63, field x: 1.14d 5192 vs d2rs 5180
+diff-a3-hell-normal	frame 5 game, field seed: 1.14d [456929325, 627936105] vs d2rs [418125439, 650105237]
+diff-a3-hell-unique-bm	frame 4 monster 1:4 class 63, field x: 1.14d 5192 vs d2rs 5180
+diff-a3-hell-unique	frame 5 game, field seed: 1.14d [456929325, 627936105] vs d2rs [418125439, 650105237]
+diff-a3-nm-champion-bm	frame 4 monster 1:4 class 63, field x: 1.14d 5192 vs d2rs 5180
+diff-a3-nm-champion	frame 5 game, field seed: 1.14d [456929325, 627936105] vs d2rs [418125439, 650105237]
+diff-a3-nm-normal-bm	frame 4 monster 1:4 class 63, field x: 1.14d 5192 vs d2rs 5180
+diff-a3-nm-normal	frame 5 game, field seed: 1.14d [456929325, 627936105] vs d2rs [418125439, 650105237]
+diff-a3-nm-unique-bm	frame 4 monster 1:4 class 63, field x: 1.14d 5192 vs d2rs 5180
+diff-a3-nm-unique	frame 5 game, field seed: 1.14d [456929325, 627936105] vs d2rs [418125439, 650105237]
+diff-a4-hell-champion-bm	frame 4 game, field seed: 1.14d [2376552861, 701695505] vs d2rs [2067007670, 932285725]
+diff-a4-hell-champion	frame 58 player 0:1 class 0, field m: 1.14d 0 vs d2rs 5
+diff-a4-hell-normal-bm	frame 4 game, field seed: 1.14d [2376552861, 701695505] vs d2rs [2067007670, 932285725]
+diff-a4-hell-normal	
+diff-a4-hell-unique-bm	frame 4 game, field seed: 1.14d [2376552861, 701695505] vs d2rs [2067007670, 932285725]
+diff-a4-hell-unique	frame 38 player 0:1 class 0, field m: 1.14d 0 vs d2rs 5
+diff-a4-nm-champion-bm	frame 4 game, field seed: 1.14d [2376552861, 701695505] vs d2rs [2067007670, 932285725]
+diff-a4-nm-champion	frame 58 player 0:1 class 0, field m: 1.14d 0 vs d2rs 5
+diff-a4-nm-normal-bm	frame 4 game, field seed: 1.14d [2376552861, 701695505] vs d2rs [2067007670, 932285725]
+diff-a4-nm-normal	
+diff-a4-nm-unique-bm	frame 4 game, field seed: 1.14d [2376552861, 701695505] vs d2rs [2067007670, 932285725]
+diff-a4-nm-unique	frame 38 player 0:1 class 0, field m: 1.14d 0 vs d2rs 5
+diff-a5-hell-champion-bm	frame 4 game, field seed: 1.14d [2332013954, 458509380] vs d2rs [2196040282, 1039074028]
+diff-a5-hell-champion	frame 62 monster 1:22 class 446, field hp: 1.14d 5355941 vs d2rs 5367804
+diff-a5-hell-normal-bm	frame 4 game, field seed: 1.14d [2332013954, 458509380] vs d2rs [2196040282, 1039074028]
+diff-a5-hell-normal	frame 60 monster 1:22 class 446, field hp: 1.14d 2671173 vs d2rs 2683904
+diff-a5-hell-unique-bm	frame 4 game, field seed: 1.14d [2332013954, 458509380] vs d2rs [2196040282, 1039074028]
+diff-a5-hell-unique	frame 60 player 0:2 class 0, field fc: 1.14d 256 vs d2rs 0
+diff-a5-nm-champion-bm	frame 4 game, field seed: 1.14d [2332013954, 458509380] vs d2rs [2196040282, 1039074028]
+diff-a5-nm-champion	frame 62 monster 1:24 class 446, field hp: 1.14d 1503017 vs d2rs 1514880
+diff-a5-nm-normal-bm	frame 4 game, field seed: 1.14d [2332013954, 458509380] vs d2rs [2196040282, 1039074028]
+diff-a5-nm-normal	frame 60 monster 1:24 class 446, field hp: 1.14d 593221 vs d2rs 605952
+diff-a5-nm-unique-bm	frame 4 game, field seed: 1.14d [2332013954, 458509380] vs d2rs [2196040282, 1039074028]
+diff-a5-nm-unique	frame 60 player 0:2 class 0, field fc: 1.14d 256 vs d2rs 0

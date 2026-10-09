@@ -770,7 +770,7 @@ def main():
                           a.snap_every, " ".join(sys.argv))
     r.auto = auto
     r.save_watch = a.save_watch
-    if auto and auto.has_frames():
+    if auto and (auto.has_frames() or auto.difficulty is not None):
         auto.attach(r)  # `frame F` input steps at the tick-return stop of F - 1 (after the snapshot)
     if layer:
         layer.attach(r, before=False)  # snapshot of frame f - 1 first, then the pokes of f
