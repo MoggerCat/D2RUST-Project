@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Spec: specs/tools/scenario-diff.md, specs/tools/poke.md
 """Writes the Nightmare / Hell Acts III-V monster checks of q-chk-difficulty-a3a5
-to traces/checks/diff/. One check per (act, difficulty, kind): the act's
+to traces/checks/. One check per (act, difficulty, kind): the act's
 save at that difficulty, warp to a native level, spawn one act-native
 monster (normal / champion / unique), state channel (hp, damage, resists,
 level through the unit records), plus an items channel and a Fire Bolt
@@ -33,7 +33,7 @@ def qs(base, diff):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--excel", default=os.path.join(os.environ.get("D2_GAME_DIR", os.path.expanduser("~/game")), "extracted/patch_d2/data/global/excel"))
-    ap.add_argument("--out", default=os.path.join(REPO, "traces/checks/diff"))
+    ap.add_argument("--out", default=os.path.join(REPO, "traces/checks"))
     a = ap.parse_args()
     lh, lr = tsv(os.path.join(a.excel, "levels.txt"))
     mh, mr = tsv(os.path.join(a.excel, "monstats.txt"))
