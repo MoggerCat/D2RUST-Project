@@ -15,8 +15,8 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | save-channel | 7 | 1 | 0 | 0 | 0 | 6 | 0 | 1 | 0 | 2–8 | 0 | 7 / 0 / 0 |
 | skills | 588 | 69 | 0 | 519 | 0 | 0 | 245 | 343 | 0 | 808.5–3234 | 6 | 184 / 207 / 197 |
 | systems | 902 | 121 | 57 | 700 | 0 | 24 | 243 | 632 | 3 | 1409.5–5542+ | 292 | 92 / 0 / 810 |
-| world | 820 | 218 | 0 | 602 | 0 | 0 | 507 | 308 | 5 | 909.5–3478+ | 307 | 692 / 41 / 87 |
-| **all** | 4300 | 577 | 57 | 3366 | 269 | 31 | 2142 | 2116 | 11 | 5391–21212+ | 726 | 1584 / 1265 / 1451 |
+| world | 820 | 221 | 0 | 599 | 0 | 0 | 514 | 301 | 5 | 899–3436+ | 298 | 701 / 41 / 78 |
+| **all** | 4300 | 580 | 57 | 3363 | 269 | 31 | 2149 | 2109 | 11 | 5380.5–21170+ | 717 | 1593 / 1265 / 1442 |
 
 ## By family
 
@@ -639,7 +639,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `net.c2s` | 113 | 7 | 19 | 82 | 0 | 5 | 3 | 79 | 29 | 0 | 27 | 0 |
 | `net.s2c` | 182 | 42 | 22 | 99 | 0 | 19 | 3 | 160 | 3 | 0 | 1 | 0 |
 | `npc` | 47 | 18 | 0 | 29 | 0 | 0 | 0 | 8 | 39 | 0 | 43 | 34 |
-| `object` | 523 | 40 | 0 | 483 | 0 | 0 | 464 | 503 | 20 | 0 | 19 | 0 |
+| `object` | 523 | 43 | 0 | 480 | 0 | 0 | 469 | 510 | 13 | 0 | 10 | 0 |
 | `quest` | 51 | 12 | 0 | 39 | 0 | 0 | 0 | 8 | 38 | 5 | 41 | 19 |
 | `render` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
 | `shrine` | 23 | 0 | 0 | 23 | 0 | 0 | 0 | 0 | 23 | 0 | 23 | 0 |
@@ -692,7 +692,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 1213
 - Rows set exercised = yes from the coverage reports' seen lists: 189
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 853
+- Duplicate areas between parts: 862
   - `vendor.drognan`: items.tsv:113 kept, q-chk-act2.tsv:13 dropped
   - `vendor.elzix`: items.tsv:115 kept, q-chk-act2.tsv:14 dropped
   - `vendor.fara`: items.tsv:114 kept, q-chk-act2.tsv:15 dropped
@@ -1516,6 +1516,15 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `object.operate.71.summitdoor`: q-run-objects.tsv:502 kept, world.tsv:250 dropped
   - `object.operate.72.lastportal`: q-run-objects.tsv:503 kept, world.tsv:251 dropped
   - `object.operate.73.lastlastportal`: q-run-objects.tsv:504 kept, world.tsv:252 dropped
+  - `object.populate.1.casketjarsarcophagusurn`: q-run-objects.tsv:507 kept, world.tsv:253 dropped
+  - `object.populate.2.waypointshrine`: q-run-objects.tsv:508 kept, world.tsv:254 dropped
+  - `object.populate.3.commonobjects`: q-run-objects.tsv:509 kept, world.tsv:255 dropped
+  - `object.populate.4.barrel`: q-run-objects.tsv:510 kept, world.tsv:256 dropped
+  - `object.populate.5.crate`: q-run-objects.tsv:511 kept, world.tsv:257 dropped
+  - `object.populate.6.rogueguardcorpse`: q-run-objects.tsv:512 kept, world.tsv:258 dropped
+  - `object.populate.7.rogueonstick`: q-run-objects.tsv:513 kept, world.tsv:259 dropped
+  - `object.populate.8.well`: q-run-objects.tsv:514 kept, world.tsv:260 dropped
+  - `object.populate.9.trappedsoul`: q-run-objects.tsv:515 kept, world.tsv:261 dropped
   - `object.init.functions`: q-run-objects.tsv:434 kept, world.tsv:271 dropped
   - `npc.akara`: q-tool-interact-pokes.tsv:5 kept, world.tsv:297 dropped
   - `npc.kashya`: q-chk-hirelings.tsv:7 kept, world.tsv:298 dropped
@@ -5253,6 +5262,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `object.operate.57.khalimchest1` | entity | DIVERGED | S | DIVERGED@19 | yes | 20 | n | claude/q-fix-seed-order | specs/world/objects.md,specs/world/objects-2.md | checks gen-obj-405 (traces/checks/gen): 1 of 1 object rows diverge (first: object 405); the rest equal where compared |
 | `object.operate.58.khalimchest2` | entity | DIVERGED | S | DIVERGED@19 | yes | 20 | n | claude/q-fix-seed-order | specs/world/objects.md,specs/world/objects-2.md | checks gen-obj-407 (traces/checks/gen): 1 of 1 object rows diverge (first: object 407); the rest equal where compared |
 | `object.operate.59.khalimchest3` | entity | DIVERGED | S | DIVERGED@19 | yes | 20 | n | claude/q-fix-seed-order | specs/world/objects.md,specs/world/objects-2.md | checks gen-obj-406 (traces/checks/gen): 1 of 1 object rows diverge (first: object 406); the rest equal where compared |
+| `object.populate.1.casketjarsarcophagusurn` | entity | DIVERGED | S | DIVERGED | yes | 20 | n | - | specs/world/object-population.md | gen-lvl-* state runs: 3 class/level pairs present on one side only, first 79 in gen-lvl-37 only on d2rs; 17 classes seen |
+| `object.populate.2.waypointshrine` | entity | DIVERGED | S | DIVERGED | yes | 20 | n | - | specs/world/object-population.md | gen-lvl-* state runs: 1 class/level pairs present on one side only, first 402 in gen-lvl-134 only on d2rs; 49 classes seen |
+| `object.populate.3.commonobjects` | entity | DIVERGED | M | DIVERGED | yes | 20 | n | - | specs/world/object-population.md | gen-lvl-* state runs: 11 class/level pairs present on one side only, first 144 in gen-lvl-4 only on 1.14d; 142 classes seen |
 | `quest.a2q1-radament-s-lair` | entity | DIVERGED | L | DIVERGED@61 | yes | 36 | y | q-fix-real-unit-seed-order | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act2.md,specs/world/quest-messages.tsv | Atma 304 -> warp 49 -> kill Radament -> Atma 334: first 0x5D 5D 08 00 01 00 00 equal at f20; state diverges at the warp: frame 61 game seed 1.14d [2980465496,293248760] vs d2rs [1774858267,1306796452] (unit seed order); the kill and 334 are behind it, unproven |
 | `quest.a2q2-the-horadric-staff` | entity | DIVERGED | M | DIVERGED@3 | yes | 36 | y | claude/q-prov-recording-2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act2.md,specs/world/quest-messages.tsv | Cain msgs 335, 336: state PARTIAL 44/44, 0x5D/0x28 equal; items (tr1/cube chests) not exercised; join stream: s2c frame 3 MapReveal 0x07 missing in d2rs (shared by every check, unrouted) |
 | `quest.a2q3-tainted-sun` | entity | DIVERGED | L | DIVERGED@24 | yes | 36 | y | claude/q-prov-recording | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act2.md,specs/world/quest-messages.tsv | Drognan 348, warp 44, altar (object 149), 362: state frame 24 object 2:40 class 1.14d 37 vs d2rs 156 (object creation order differs in Far Oasis/Lost City: waypoint created first in d2rs); altar operate unproven |
@@ -5795,15 +5807,12 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `object.operate.73.lastlastportal` | entity | NO-CHECK | S | PARTIAL | yes | 20 | n | - | specs/world/objects.md,specs/world/objects-2.md | checks gen-obj-566 (traces/checks/gen): all 1 object rows equal where compared (state PARTIAL) |
 | `object.operate.8.door` | entity | NO-CHECK | S | PARTIAL | yes | 20 | n | - | specs/world/objects.md,specs/world/objects-2.md | checks gen-obj-13 .. gen-obj-295 (23) (traces/checks/gen): all 23 object rows equal where compared (state PARTIAL) |
 | `object.operate.9.monolith` | entity | NO-CHECK | S | PARTIAL | yes | 20 | n | - | specs/world/objects.md,specs/world/objects-2.md | checks gen-obj-17, gen-obj-18, gen-obj-19, gen-obj-20, gen-obj-21 (traces/checks/gen): all 5 object rows equal where compared (state PARTIAL) |
-| `object.populate.1.casketjarsarcophagusurn` | entity | NO-CHECK | M | - | ? | 20 | y | - | specs/world/object-population.md | populate function CasketJarSarcophagusUrn; only 23 rows share it; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `object.populate.2.waypointshrine` | entity | NO-CHECK | M | - | ? | 20 | y | - | specs/world/object-population.md | populate function WaypointShrine; only 96 rows share it; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `object.populate.3.commonobjects` | entity | NO-CHECK | M | - | ? | 20 | y | - | specs/world/object-population.md | populate function CommonObjects; only 261 rows share it; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `object.populate.4.barrel` | entity | NO-CHECK | M | - | ? | 20 | y | - | specs/world/object-population.md | populate function Barrel; only 1 rows share it; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `object.populate.5.crate` | entity | NO-CHECK | M | - | ? | 20 | y | - | specs/world/object-population.md | populate function Crate; only 1 rows share it; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `object.populate.6.rogueguardcorpse` | entity | NO-CHECK | M | - | ? | 20 | y | - | specs/world/object-population.md | populate function RogueGuardCorpse; only 5 rows share it; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `object.populate.7.rogueonstick` | entity | NO-CHECK | M | - | ? | 20 | y | - | specs/world/object-population.md | populate function RogueOnStick; only 2 rows share it; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `object.populate.8.well` | entity | NO-CHECK | M | - | ? | 20 | y | - | specs/world/object-population.md | populate function Well; only 17 rows share it; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `object.populate.9.trappedsoul` | entity | NO-CHECK | M | - | ? | 20 | y | - | specs/world/object-population.md | populate function TrappedSoul; only 2 rows share it; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
+| `object.populate.4.barrel` | entity | NO-CHECK | S | PARTIAL | yes | 20 | n | - | specs/world/object-population.md | gen-lvl-* state runs (traces/checks/gen): 1 classes of this PopulateFn present identically in every level, equal where compared (34 levels diverge on the game seed from frame 20, D1) |
+| `object.populate.5.crate` | entity | NO-CHECK | M | - | yes | 20 | n | - | specs/world/object-population.md | no level of the 136 warp runs holds an object of this PopulateFn; populate function Crate; only 1 rows share it; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
+| `object.populate.6.rogueguardcorpse` | entity | NO-CHECK | S | PARTIAL | yes | 20 | n | - | specs/world/object-population.md | gen-lvl-* state runs (traces/checks/gen): 5 classes of this PopulateFn present identically in every level, equal where compared (34 levels diverge on the game seed from frame 20, D1) |
+| `object.populate.7.rogueonstick` | entity | NO-CHECK | S | PARTIAL | yes | 20 | n | - | specs/world/object-population.md | gen-lvl-* state runs (traces/checks/gen): 2 classes of this PopulateFn present identically in every level, equal where compared (34 levels diverge on the game seed from frame 20, D1) |
+| `object.populate.8.well` | entity | NO-CHECK | S | PARTIAL | yes | 20 | n | - | specs/world/object-population.md | gen-lvl-* state runs (traces/checks/gen): 3 classes of this PopulateFn present identically in every level, equal where compared (34 levels diverge on the game seed from frame 20, D1) |
+| `object.populate.9.trappedsoul` | entity | NO-CHECK | S | PARTIAL | yes | 20 | n | - | specs/world/object-population.md | gen-lvl-* state runs (traces/checks/gen): 2 classes of this PopulateFn present identically in every level, equal where compared (34 levels diverge on the game seed from frame 20, D1) |
 | `object.preset.574.presetshrine` | entity | NO-CHECK | M | - | ? | 20 | y | - | specs/world/object-population.md | preset function PresetShrine; only - rows share it; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `object.preset.575.presetshrine` | entity | NO-CHECK | M | - | ? | 20 | y | - | specs/world/object-population.md | preset function PresetShrine; only - rows share it; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `object.preset.576.presetshrine` | entity | NO-CHECK | M | - | ? | 20 | y | - | specs/world/object-population.md | preset function PresetShrine; only - rows share it; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |

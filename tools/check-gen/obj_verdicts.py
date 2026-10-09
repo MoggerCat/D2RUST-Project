@@ -119,11 +119,50 @@ def short(text, n=170):
     return t if len(t) <= n else t[:n - 3] + "..."
 
 
+def populate_rows(ledger, objs, lv):
+    """object.populate.N.* from the level runs: the classes of PopulateFn N present in a level on
+    one side only are population divergences (the pick is rolled on the level's seeds)."""
+    out = []
+    for r in ledger.values():
+        m = re.fullmatch(r"object\.populate\.(\d+)\..*", r["area"])
+        if not m:
+            continue
+        fn = m.group(1)
+        mine = {c for c, o in objs.items() if o["PopulateFn"] == fn}
+        seen, bad = set(), []
+        for lvl, (o1, o2, v, first) in sorted(lv.items(), key=lambda kv: int(kv[0].split("-")[-1])):
+            for c in sorted(set(o1) | set(o2)):
+                if c in mine:
+                    seen.add(c)
+                    if (c in o1) != (c in o2):
+                        bad.append((lvl, c, "1.14d" if c in o1 else "d2rs"))
+        row = dict(r)
+        row.update(kind="entity", group="world", checks="-", exercised="yes", needs_pc1="n")
+        if not seen:
+            row["note"] = "no level of the 136 warp runs holds an object of this PopulateFn; " + r["note"]
+            out.append(row)
+            continue
+        if bad:
+            row.update(last_verdict="DIVERGED", state="DIVERGED", size="M" if len(bad) > 3 else "S",
+                       owner="-")
+            row["note"] = (f"gen-lvl-* state runs: {len(bad)} class/level pairs present on one side only, "
+                           f"first {bad[0][1]} in {bad[0][0]} only on {bad[0][2]}; {len(seen)} classes seen")
+        else:
+            row.update(last_verdict="PARTIAL", state="NO-CHECK", size="S", owner="-")
+            row["note"] = (f"gen-lvl-* state runs (traces/checks/gen): {len(seen)} classes of this "
+                           "PopulateFn present identically in every level, equal where compared "
+                           "(34 levels diverge on the game seed from frame 20, D1)")
+        out.append(row)
+    return out
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--suite", default=os.path.join(ROOT, "traces", "raw", "suite"))
     ap.add_argument("--excel", default=os.path.join(os.environ.get("D2_GAME_DIR", os.path.expanduser("~/game")),
                                                     "extracted", "patch_d2", "data", "global", "excel"))
+    ap.add_argument("--levels", help="JSON {gen-lvl-N: [classes 1.14d, classes d2rs, state verdict "
+                    "(types 2, q ignored), first]} from the state-only level runs")
     ap.add_argument("--out")
     ap.add_argument("--results")
     a = ap.parse_args(argv)
@@ -203,6 +242,8 @@ def main(argv=None):
             row["note"] = f"all {len(members)} object rows equal where compared (state PARTIAL)"
         row["note"] = row.pop("note_prefix") + row["note"]
         out.append(row)
+    if a.levels:
+        out += populate_rows(ledger, objs, json.load(open(a.levels)))
     with open(a.out, "w", encoding="utf-8", newline="\n") as f:
         f.write("#ledger 1\n" + "\t".join(COLS) + "\n")
         for r in out:
