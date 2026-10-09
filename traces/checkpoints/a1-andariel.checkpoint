@@ -1,0 +1,57 @@
+# Checkpoint definition (specs/tools/checkpoints.md); tools/checkpoints/make.py
+# builds the save with d2s-tool. Ids are rows of the 1.14d tables
+# (levels, monstats, objects), as the traces/playthrough/act*.play
+# comments name them. Gear and stats are our choice for the point.
+# Catacombs 4 is level 37, Andariel monstats 156. Den of Evil +1 skill point (bonus).
+# Quests done: Den of Evil 1.0, Burial Grounds 2.0, Cain 4.0 (quests.md §1.9).
+checkpoint 1
+name CkAndariel
+title Andariel: Catacombs 4 (Act I boss, quest 6)
+class sor
+level 24
+expansion
+difficulty normal
+act 0
+stat 0 35   # strength
+stat 1 65   # energy
+stat 2 35   # dexterity
+stat 3 60   # vitality
+stat 4 0     # unspent stat points
+stat 5 0     # unspent skill points
+stat 6 41728   # life 163 (x256)
+stat 7 41728
+stat 8 36096   # mana 141
+stat 9 36096
+stat 10 37632   # stamina 147
+stat 11 37632
+skill 0 4   # fb (skill 36)
+skill 3 4   # ib (skill 39)
+skill 4 1   # fa (skill 40)
+skill 6 4   # static (skill 42)
+skill 7 1   # tk (skill 43)
+skill 8 5   # nova (skill 44)
+skill 9 4   # blast (skill 45)
+skill 1 1   # warmth (skill 37)
+right-skill 44
+left-skill 36
+gold 120000
+quests 1.0 2.0 4.0
+waypoints lv=1 lv=3 lv=4 lv=5 lv=6 lv=27 lv=29 lv=32 lv=35
+item hlm/body=1
+item stu/body=3
+item cst/body=4
+item vgl/body=10
+item vbt/body=9
+item vbl/body=8
+item rin/body=6
+item rin/body=7
+item amu/body=2
+item hp4/belt=0
+item hp4/belt=1
+item mp4/belt=2
+item mp4/belt=3
+item rvs/belt=4
+item rvs/belt=5
+start 5 warp 37
+start 20 goto unit 156
+need player lv 37

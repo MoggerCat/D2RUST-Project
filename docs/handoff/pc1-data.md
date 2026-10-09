@@ -317,6 +317,21 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     and whether the unit is queued for update by the toggle
     (`0x00639DB0`) or by the entry itself. d2rs: PROVISIONAL REC-730 in
     `d2-sim/src/wiring/inventory/potion.rs`.
+- **[q-fix-pc1-day3-a-r2] Who gives a player its alignment (state 105, stat 172 = 2), and the frame-2 resend**
+    The Wine join of a new sorceress (`facts/join/a1-new-sor.tsv`) shows
+    the player already carrying state 105 with stat 172 = 2 in the
+    loader's 0xAA (n 8, `aa00010000000c6959f9ff1f`), then at frame 2 a
+    0xA8 resend of it (n 86, `a800010000000b69acfc0f`, the "resend s"
+    writer `0x0055448A` of `sim/intents-events.md` §3.5 rule 6) followed by
+    the player update's stat sends 12, 0, 2 (n 87–89, §7.3 rule 1 step
+    7). No spec names the `0x005543B0` caller for a player (allocation?
+    the loader?), nor which call sets the changed bit and queues the
+    player at frame 2. d2rs gives players no alignment state, so its join
+    has an 8-byte 0xAA and no frame-2 0xA8 / 0x1D: the last four of
+    `app_frame_loop`'s missing join messages (122 of 126). Read the
+    caller, its place in the loader / allocation, and the resend's
+    caller; answer into `sim/units.md` (allocation) or
+    `formats/d2s-load.md`, and `intents-events.md` §8.2.
 45. **Melee on a fallen from the shared script** answered → see docs/handoff/pc1-day3-b.md. (q-fix-b-headless-unit-click-keys;
     `specs/tools/scenario-diff.md` §2 r4.5, §3 r8.5):
     `py tools\scenario-diff\scenario_diff.py traces\checks\combat-melee-fallen.check --orig-only`.
@@ -348,6 +363,14 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     unit in mode 17) gets it too. Answer into `combat/hit.md` §7.1.
     d2rs: PROVISIONAL REC-732, set right after the unit seed
     (`d2-client` `app/single_player.rs` loader, `View::set_alignment`).
+- **[q-fix-pc1-proto-items] `0x0059F570` (ACT2Q4 "Jerhyn palace activated") and the Jerhyn AI case**
+    `monsters/ai-bodies.md` §9.9 step 2 row 201 calls `0x0059F570`; no
+    spec gives its body. Recorded (`act-travel-lut-ama.check`,
+    `join-act2-quests-ama.check`): start Jerhyn's first think (frame 24)
+    walks to his own position + (2, 2) with no unit-seed draw, so the
+    "= 0 → idle 40" branch is not what runs for a fresh or act-1-done
+    character. Read `0x0059F570` (and confirm `0x0059F580`'s outputs a,
+    b for these states) into `world/quests-act2.md` §10. d2rs: REC-734.
 - **[q-fix-pc1-proto-items] `0x00625870`: the mod-array test and a key absent from the base array**
     `sim/stat-lists.md` §11 rule 4 was corrected from the recording
     (`packets-town-arrival-ama.check` frame 2: the player update sends
@@ -604,6 +627,11 @@ lines into the `q-fix-*` row.
 
 - [prov-data] **Monster think in a room with no clients** (q-prov-data,
 - [prov-data] **Monster think in a room with no clients** — answered → see `docs/handoff/pc1-day3-a.md` and `docs/handoff/pc1-day3-c.md` (same answer; fix row `q-fix-p3-room-empty-think`, `q-fix-p3-leave-cancels-thinks` is its duplicate) (q-prov-data,
+
+- [prov-data] **Monster think in a room with no clients** — answered → see `docs/handoff/pc1-day3-a.md` and `docs/handoff/pc1-day3-c.md` (same answer; fix row `q-fix-p3-room-empty-think`, `q-fix-p3-leave-cancels-thinks` is its duplicate) (q-prov-data,
+27. **Order of the property rolls of a magic item** (area G, `traces/checks/items-vendor-akara-buy.check`, 2026-10-09): the store's 7th item (guid 8, quality 4, prefix 1156, suffix 552, ilvl 6) has a charged-skill property (stat 204, skill 193, level 4, max 67). 1.14d current charges 67, d2rs 65: `properties.md` §5 rule 9 gives cur = (r + c/8 + 1) & 0xFF with r = roll(c − c/8) on the item seed, so r is 58 on 1.14d and 56 on d2rs, while the item seeds after creation are equal (`ik` equal). Same draws, different order. Read which property of the item rolls before the charged one (prefix and suffix properties, the 107 single-skill rows, the 45 row) and in which order the affix properties are applied (`affixes.md` §7: P0 S0 P1 S1 P2 S2?); answer into `items/affixes.md` §7 and `items/properties.md` §5.
+
+- [prov-data] **Monster think in a room with no clients** (q-prov-data,
   `monsters/ai.md` §1.5, §2, `ai-bodies.md` §9.9 Map AI): after the
   player warps away (same act, `a4-warp-plains-ama`, warp 105 at frame
   6), the Fortress NPCs (classes 405, 257, 246; Npc AI `0x005E7130`)

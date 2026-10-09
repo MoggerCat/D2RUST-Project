@@ -73,49 +73,63 @@ pub fn skill_level<W: SkillUnits>(
 /// Panics when a class skill of the player's class has no skilldesc
 /// record: the original faults there (Edge case 4).
 pub fn bonus_level<W: SkillUnits>(w: &W, t: &SkillTables, u: W::Unit, entry: &SkillEntry) -> i32 {
-    let skill = entry.skill;
+    let player = (w.unit_type(u) == UnitType::Player).then(|| w.class_id(u));
+    bonus_level_of(
+        t,
+        (entry.skill, entry.base, entry.level_bonus),
+        player,
+        w.has_state(u, STATE_SHRINE_SKILL),
+        |stat, layer| w.stat(u, stat, layer),
+    )
+}
+
+/// [`bonus_level`] on the unit's facts: the entry's (skill, base level,
+/// +0x2C level bonus), `player` the class of a player unit (`None` for
+/// another unit), `shrine` state 134 on, `stat` the unit's stat total
+/// (stat, layer).
+pub fn bonus_level_of(
+    t: &SkillTables,
+    (skill, base, level_bonus): (i32, i32, i32),
+    player: Option<i32>,
+    shrine: bool,
+    stat: impl Fn(u16, u16) -> i32,
+) -> i32 {
     let Some(rec) = t.skill(skill) else {
         return 0;
     };
     let layer = skill as u16;
-    let shrine = if w.has_state(u, STATE_SHRINE_SKILL) {
-        2
-    } else {
-        0
-    };
-    let mut b = entry
-        .level_bonus
+    let shrine = if shrine { 2 } else { 0 };
+    let mut b = level_bonus
         .wrapping_add(shrine)
-        .wrapping_add(w.stat(u, ALLSKILLS, 0));
+        .wrapping_add(stat(ALLSKILLS, 0));
     let charclass = i32::from(rec.charclass as i8);
-    if w.unit_type(u) == UnitType::Player {
-        let class = w.class_id(u);
+    if let Some(class) = player {
         if class == charclass {
-            b = b.wrapping_add(w.stat(u, ADDCLASSSKILLS, class as u16));
+            b = b.wrapping_add(stat(ADDCLASSSKILLS, class as u16));
             let desc = t
                 .skilldesc_of(rec)
                 .expect("class skill without a skilldesc record (levels.md Edge case 4)");
             let page = i32::from(desc.skillpage as i8);
             if page != 0 {
                 let tab = page.wrapping_add(8 * class).wrapping_sub(1);
-                b = b.wrapping_add(w.stat(u, ADDSKILL_TAB, tab as u16));
+                b = b.wrapping_add(stat(ADDSKILL_TAB, tab as u16));
             }
-            b = b.wrapping_add(w.stat(u, NONCLASSSKILL, layer).min(3));
+            b = b.wrapping_add(stat(NONCLASSSKILL, layer).min(3));
         } else {
-            b = b.wrapping_add(w.stat(u, NONCLASSSKILL, layer));
+            b = b.wrapping_add(stat(NONCLASSSKILL, layer));
         }
-    } else if entry.base <= 0 {
-        b = b.wrapping_add(w.stat(u, NONCLASSSKILL, layer));
+    } else if base <= 0 {
+        b = b.wrapping_add(stat(NONCLASSSKILL, layer));
     } else {
-        let n = w.stat(u, NONCLASSSKILL, layer);
+        let n = stat(NONCLASSSKILL, layer);
         if n != 0 {
             b = b.wrapping_add(n.min(3));
         }
     }
     if rec.etype != 0 {
-        b = b.wrapping_add(w.stat(u, ELEMSKILL, u16::from(rec.etype)));
+        b = b.wrapping_add(stat(ELEMSKILL, u16::from(rec.etype)));
     }
-    b.wrapping_add(w.stat(u, SINGLESKILL, layer))
+    b.wrapping_add(stat(SINGLESKILL, layer))
 }
 
 /// `highest_entry(unit, skill)` = `0x00643810` (§1): the entry the

@@ -294,3 +294,46 @@ The harness should test class and position, not GUID.
     the pending check (`0x00482BE1`) and the collect (`0x00482BF0`) saw no hit in 60 s of town play.
     The rows are evidently loaded before any start; a run that starts an unloaded `Async Only` id is
     still needed (noted in OQ 13).
+
+## Resume here (session paused 2026-10-09)
+
+**State:** everything is committed and pushed on `claude/local-pc1-day3-c` (worktree
+`..\d2rs-c`; `game\` there is a junction to `..\d2rs\game`). Staging was merged before each push.
+Both checks passed at the last push.
+
+**Done in this session:**
+- **Runs and placements:**
+  - item 23;
+  - the act-entry milestones (III, IV, V, Baal's chamber);
+  - the Act IV/V boss and quest-object placements (7 checks).
+- **Items:** 42–44, the item flag 0x2000, the two `[prov-data]` items.
+- **Windows runs:** REC-222, REC-223, REC-576 (3) ST-4, (4) and (6).
+- **Tools:** the game lock (mutex + `%TEMP%\d2-game.lock`) and `dumpdrlg rooms<id>`.
+
+**Open for this session:**
+- **REC-576 (3) ST-7:** the `Async Only` completion tick. It needs a run that starts an `Async
+  Only` id that is not yet loaded. Probe: `probe_async.py`.
+- **REC-223 pixels:** a full-screen check with the Bink video actually playing; in `-w` the video
+  returns at once. Run full screen only with the user's OK, because it changes the display mode.
+- **Next:** pull staging for new `[play-act3]` / `[play-act5]` / `[prov-data]` / `[prov-recording]`
+  / `[store-fill]` items. Before starting one, check that its pc1-data line is unmarked and claim it
+  with PC1-A / PC1-B by message; all three sessions agreed to this.
+
+**Scratch probes (not in git, rule: probes stay out of the repo):** `..\d2rs-probes\`:
+- `probe_loadkeys.py`: keys during loading (REC-222);
+- `probe_video.py` / `probe_control.py`: video and loading-draw callers (REC-223);
+- `probe_fps.py`: a global polled with no breakpoints;
+- `probe_sound.py` / `probe_async.py`: sound start / end and async ticks;
+- `sweep.py`, `spiral.py`, `path.py`: `pos` poke-file generators;
+- `seen.py`: first sighting of a class in a state file;
+- `mkcheck.py`: path `.check` generator;
+- `ds1obj.py`: DS1 preset-unit reader.
+
+They import `tools\trace-recorder` from `..\d2rs-c`; adjust the `REC` path if the worktree moves.
+
+**Saves made** (in `%USERPROFILE%\Saved Games\Diablo II`, all from `d2s-tool new --class sor
+--expansion --map-seed 1`):
+- `MilA3` / `MilA4` / `MilA5` / `MilBaal`: town bytes 1–4;
+- `MilWarriv`: quest word 6 bit 0 only, for the first Warriv travel with video;
+- `MilHire`: quest word 2 bit 0, 5000 gold;
+- `Mil*none` / `Mil*q`: the load tests.

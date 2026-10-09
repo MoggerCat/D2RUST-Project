@@ -457,6 +457,16 @@ impl SoundDriver {
         &self.system
     }
 
+    /// `play --sound-log` (`specs/tools/facts-render.md` §5 r20).
+    pub fn log_requests(&mut self, on: bool) {
+        self.system.log_requests(on);
+    }
+
+    /// The request calls since the last take.
+    pub fn take_request_log(&mut self) -> Vec<crate::audio::sound_table::system::RequestCall> {
+        self.system.take_request_log()
+    }
+
     /// The settings the sound layer reads (`sound-table.md` §9, written
     /// by the options menu, `sound-table-2.md` §15 r6): in force from the
     /// next sound tick.
