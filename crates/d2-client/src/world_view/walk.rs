@@ -63,6 +63,9 @@ impl PreviewWalk {
         let ticked = world.server_ticks != self.seen_ticks;
         self.seen_ticks = world.server_ticks;
         let walks = self.tap.take();
+        if self.tap.take_waypoint() {
+            self.predict.waypoint_sent();
+        }
         match self.speeds {
             Some(speeds) => self.predict.frame(world, walks, ticked, speeds),
             // No speeds: snaps only (no step).

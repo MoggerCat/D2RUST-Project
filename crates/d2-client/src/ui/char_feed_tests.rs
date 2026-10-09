@@ -74,6 +74,7 @@ fn tables() -> CharTables {
             name_id: 5000,
             descdam: 1,
             descatt: 2,
+            src_dam: 128,
         },
     );
     t
@@ -82,13 +83,21 @@ fn tables() -> CharTables {
 type Text = (String, i32, i32, u16, u16);
 
 fn draw(w: &ClientWorld, strings: &Strs, exp: Vec<[u32; 7]>) -> Vec<Text> {
+    draw_tables(w, strings, exp, tables())
+}
+
+fn draw_with(w: &ClientWorld, strings: &Strs, t: CharTables) -> Vec<Text> {
+    draw_tables(w, strings, vec![], t)
+}
+
+fn draw_tables(w: &ClientWorld, strings: &Strs, exp: Vec<[u32; 7]>, t: CharTables) -> Vec<Text> {
     let config = UiConfig {
         screen: Screen::R800,
         expansion_installed: true,
     };
     let mut ui = OriginalUi::new(config, None).unwrap();
     ui.set_fonts(fonts());
-    ui.set_char_tables(tables());
+    ui.set_char_tables(t);
     ui.set_hud_tables(hud::HudTables {
         experience: exp,
         ..Default::default()
@@ -199,13 +208,112 @@ fn the_damage_block_prints_name_damage_and_attack_rating() {
     assert_eq!((name.2, name.3, name.4), (base + 93, 6, 0));
     // e1: "Damage".
     assert_eq!(find(&t, "S4061").map(|x| x.2), Some(base + 101));
-    // e2: min 10 + 50 % = 15, max 20: "15-20" is too wide for its span at
-    // Font16 (30 × 11 / 7 > 44): Font6, one up.
-    let dmg = find(&t, "15-20").expect("damage");
+    // e2 (`descriptions.md` §2.3, bare hand): b = 10 + 1, B = 20 + 2, P =
+    // strength 0; min (100 + 50) × 11 / 100 = 16, max 100 × 22 / 100 =
+    // 22: "16-22" is too wide for its span at Font16 (30 × 11 / 7 > 44):
+    // Font6, one up.
+    let dmg = find(&t, "16-22").expect("damage");
     assert_eq!((dmg.1, dmg.2, dmg.3), (sx + 263 + 7, base + 98 - 1, 6));
-    // e3: the label split at its LF; e5: AR 100 + 10 % = 110, Font16.
+    // e3: the label split at its LF; e5: `attack_rating` = 100 + 5 × (0 −
+    // 7) + 0 = 65, + 10 % = 71, Font16.
     assert_eq!(find(&t, "Bash").map(|x| x.2), Some(base + 160 - 4));
     assert_eq!(find(&t, "Attack Rating").map(|x| x.2), Some(base + 160 + 4));
-    let ar = find(&t, "110").expect("attack rating");
+    let ar = find(&t, "71").expect("attack rating");
     assert_eq!((ar.2, ar.3, ar.4), (base + 160, 1, 0));
+}
+
+/// The 1.14d character panel of a level-1 Amazon (Attack in both hands),
+/// `facts/client/ui/char-panel-ama-l1.tsv`, `char-panel-ama-str50-dex60.tsv`
+/// and `char-panel-ama-ssd.tsv` (REC-269): damage `1-2`, `1-3`, `3-10`
+/// (Font16, y 158 / 182), attack rating `95`, `270`, `270`.
+// Covers: specs/skills/descriptions.md §2.3 r2, §2.3 r3, §2.3 r4, §2.3 r6, §4 row2
+#[test]
+fn the_damage_block_matches_the_recorded_amazon() {
+    use crate::bridge::items::ITEM;
+    let measured = [
+        (20, 25, None, "1-2", "95"),
+        (50, 60, None, "1-3", "270"),
+        // Short sword: the unit's 21 / 22 include its 2-7; StrBonus 100.
+        (50, 60, Some((2, 7)), "3-10", "270"),
+    ];
+    for (st, dx, sword, dmg, ar) in measured {
+        let mut stats = vec![(0, st), (2, dx)];
+        if let Some((a, b)) = sword {
+            stats.extend([(21, a), (22, b)]);
+        }
+        let mut w = world(&stats);
+        let key = UnitKey::new(PLAYER, 1);
+        let u = w.units.get_mut(&key).unwrap();
+        u.class = 0;
+        u.skills = Some(SkillList {
+            entries: vec![SkillEntry {
+                skill: 3,
+                ..Default::default()
+            }],
+            left: Some(0),
+            right: Some(0),
+            ..Default::default()
+        });
+        let mut t = tables();
+        t.tohit_factor = vec![5];
+        if sword.is_some() {
+            t.weapons.insert(
+                *b"ssd ",
+                crate::ui::char_feed::WeaponRow {
+                    str_bonus: 100,
+                    dex_bonus: 0,
+                },
+            );
+            let ik = UnitKey::new(ITEM, 9);
+            let mut i = ClientUnit::new(ik);
+            i.kind = KindData::Item(crate::bridge::world::ItemData {
+                last: Some(crate::bridge::world::ItemRecord {
+                    id: 0x9C,
+                    action: 0x04,
+                    category: 0,
+                    owner: None,
+                    seq: 0,
+                    stream: body_stream(4, b"ssd "),
+                }),
+                ..Default::default()
+            });
+            w.units.insert(ik, i);
+        }
+        let strings = Strs::new(&[(5000, "Attack"), (4063, "%s\nAttack Rating")]);
+        let out = draw_with(&w, &strings, t);
+        let d: Vec<_> = out.iter().filter(|x| x.0 == dmg).collect();
+        assert_eq!(d.len(), 2, "{dmg} in both hands: {out:?}");
+        assert!(d.iter().all(|x| x.3 == 1), "Font16");
+        let a: Vec<_> = out.iter().filter(|x| x.0 == ar).collect();
+        assert_eq!(a.len(), 2, "AR {ar} in both hands: {out:?}");
+    }
+}
+
+/// An item stream head (`items/bitstream.md` §2) of an item in body
+/// location `loc` (mode 1).
+fn body_stream(loc: u8, code: &[u8; 4]) -> Vec<u8> {
+    let bits: [(u32, u32); 8] = [
+        (0x10, 32),
+        (0x65, 10),
+        (1, 3),
+        (u32::from(loc), 4),
+        (0, 4),
+        (0, 4),
+        (0, 3),
+        (u32::from_le_bytes(*code), 32),
+    ];
+    let (mut out, mut acc, mut n) = (Vec::new(), 0u64, 0u32);
+    for (v, w) in bits {
+        acc |= u64::from(v) << n;
+        n += w;
+        while n >= 8 {
+            out.push(acc as u8);
+            acc >>= 8;
+            n -= 8;
+        }
+    }
+    if n > 0 {
+        out.push(acc as u8);
+    }
+    out
 }

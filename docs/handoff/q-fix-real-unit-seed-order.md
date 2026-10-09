@@ -119,6 +119,6 @@ the server allocates none (25 unit seeds in 90 s). No spec covers their
 creation: `pc1-data.md` Step 4 "[q-fix-real-unit-seed-order]
 Client-made critters". Stopped there.
 
-Still open on the state side: the monster path target at rest (`tx`,
-`ty`: 1.14d = own position from the add, d2rs 0) and the player's `fc`,
-`sp` (path fields).
+State side: after the staging merge of 9608da5 (others' path-target and
+player-path fixes), `state_diff.py` over 90 frames reports no
+difference in any compared field (PARTIAL: only the documented gaps).
