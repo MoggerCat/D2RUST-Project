@@ -23,7 +23,8 @@ tool's limit (playthrough.md OQ 3), not the Den code; q-fix-quest-load
 - Open: the server's own `Pending` (d2-server) does not call `count_death`; only the
   client's death start does.
 
-## Open: Cold Plains waypoint (+15, +5)
+## Cold Plains waypoint (+15, +5): resolved on staging by another session
+q-fix-d4-placement reports (after merging staging at 0b03e942) that `warp-cold-plains-ama` arrival equals 1.14d, (5168, 4658), frames 1-12; I made no change for it. My notes from before that follow.
 `traces/checks/warp-cold-plains-ama.check` with `--d2rs-only`: ours waypoint
 (5184, 4664), player (5183, 4663); 1.14d (5169, 4659) = exactly 3 tiles x, 1 tile y.
 Hypothesis (unconfirmed): the waypoint-room tile substitution (outdoor-tilesub.md
