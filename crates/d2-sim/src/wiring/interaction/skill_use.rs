@@ -950,8 +950,26 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
                 .collect(),
         )
     }
+    /// `0x00554DE0` (`bodies.md` §2.12 filter 0x10000): a monster
+    /// stands for its minion owner (`0x0058F0D0`, the AI control's owner
+    /// link looked up by GUID; none: the monster itself); the same unit
+    /// after that → allies (an Oak Sage's aura reaches its druid). Two
+    /// different players (the party test) and the rest: the seam's.
     fn allied(&self, a: UnitId, b: UnitId) -> bool {
-        self.x().allied(a, b)
+        let owner = |u: UnitId| {
+            let link = self
+                .cv
+                .v
+                .h
+                .ai
+                .as_ref()
+                .and_then(|s| s.control(u))
+                .and_then(|c| c.minion_owner);
+            link.and_then(|r| self.cv.game.lists.find_unit(r.ty, r.guid))
+                .unwrap_or(u)
+        };
+        let (ra, rb) = (owner(a), owner(b));
+        ra == rb || self.x().allied(ra, rb)
     }
     /// The missile store's owner (`0x00552FD0`).
     fn missile_owner(&self, u: UnitId) -> Option<UnitId> {

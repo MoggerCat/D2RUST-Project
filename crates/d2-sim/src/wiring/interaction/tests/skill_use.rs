@@ -771,3 +771,40 @@ fn missile_data_words_reach_the_missile_store() {
     assert_eq!(data.target, (174, -3));
     fx.assert_clean();
 }
+
+// Covers: specs/skills/bodies.md §2.12
+#[test]
+fn use_allied_resolves_a_monster_to_its_minion_owner() {
+    use crate::monsters::ai::{AiControl, AiStore, UnitRef};
+    use crate::skills::use_::bodies::BodyWorld;
+    // Filter 0x10000's `0x00554DE0`: a monster stands for its minion
+    // owner (`0x0058F0D0`); the same unit after that → allies. An Oak
+    // Sage's aura (filter 0x10103) reaches its druid this way.
+    let mut fx = Fx::new();
+    let p = fx.spawn(UnitType::Player, 10, 10);
+    let pet = fx.spawn(UnitType::Monster, 11, 10);
+    let wild = fx.spawn(UnitType::Monster, 12, 10);
+    let guid = fx.sim.sys.units.get(p).unwrap().guid;
+    let mut ai = AiStore::new();
+    ai.entry(pet).control = Some(AiControl {
+        minion_owner: Some(UnitRef {
+            ty: UnitType::Player,
+            guid,
+        }),
+        ..AiControl::default()
+    });
+    ai.entry(wild).control = Some(AiControl::default());
+    fx.sim.sys.hooks.ai = Some(ai);
+    let (a, b, c, d) = fx.sim.skill_use(&mut fx.game, |w| {
+        (
+            BodyWorld::allied(w, pet, p),
+            BodyWorld::allied(w, p, pet),
+            BodyWorld::allied(w, wild, p),
+            BodyWorld::allied(w, wild, wild),
+        )
+    });
+    assert!(a && b, "the pet and its owner");
+    assert!(!c, "a monster without the link");
+    assert!(d, "the same unit");
+    fx.assert_clean();
+}
