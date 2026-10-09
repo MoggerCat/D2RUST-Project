@@ -167,14 +167,19 @@ pub struct NpcMenuState {
 
 pub type SharedNpcMenu = Rc<RefCell<NpcMenuState>>;
 
-/// The camera of the local player's cell: the walk prediction's while it
-/// holds, else the model's (d2rs-own: the view's sub-tile offset is not
-/// in the model, so the anchor can be up to a sub-tile off the drawn
-/// view).
+/// The camera of the local player: the walk prediction's precise position
+/// while it holds, else the model's cell centre (d2rs-own: the view's
+/// shake is not in the model).
 fn camera(w: &ClientWorld, open_mode: u8) -> Option<Camera> {
     let me = w.local()?;
-    let (x, y) = w.predicted(me).map_or(me.cell(), |p| p.cell);
-    let at = moving_to_client((u32::from(x) << 16) | 0x8000, (u32::from(y) << 16) | 0x8000);
+    let (px, py) = w.predicted(me).map_or_else(
+        || {
+            let (x, y) = me.cell();
+            ((u32::from(x) << 16) | 0x8000, (u32::from(y) << 16) | 0x8000)
+        },
+        |p| p.pos,
+    );
+    let at = moving_to_client(px, py);
     let mode = OpenMode::new(open_mode).unwrap_or(OpenMode::NONE);
     Some(Camera::new(FrameSize::D2RS, mode, at, (0, 0)))
 }
