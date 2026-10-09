@@ -121,3 +121,21 @@ because the menu appears between 7 and 11 s.
 | `frontend-menus.md` §F2 r2 (REC-206) | **settled (confirmed)** for the folder choice (a legacy folder with a save is kept; an empty one → default, written as `NewSavePath`); new PROVISIONAL: no `NewSavePath` written in the legacy case |
 | REC-205 dead hardcore figure | observed (two `d2s-tool` hardcore saves with status bit 0x08, Amazon and Barbarian): both slots show a grey hooded figure that looks alike; the backgrounds differ, so pixel equality of the two figures is not established: open |
 | REC-212 Esc menu | screenshot taken; the pentagram pixels need the cel geometry for an exact check: open |
+
+## Where the rest is blocked (2026-10-09, end of this session)
+
+Remaining `recording` rows after the runs above: see the last
+`prov_recording_groups.py` count in the coordinator report. What stops
+each group in the cloud, and the tool work that would unblock it:
+
+| Group | Blocker | Unblocks it |
+|---|---|---|
+| G1 rest, G2 rest (REC-188, REC-113, REC-121, REC-163, REC-241, REC-282, hireling) | `d2s-tool` writes identified normal items on storage pages only: no magic / set / unidentified items, sockets, body or belt slots, corpses, hirelings | an item writer for `items/bitstream.md` in `d2s-tool` (`scenario.md` OQ 3) |
+| d2rs side of every item comparison (REC-281, REC-117 positions) | `scenario-run run` reports `char item: … not created` and stages waypoint objects only | item creation from a code in the d2rs scenario runner |
+| G4 field (REC-108, REC-260, REC-141, REC-124, REC-96, REC-93) | kills work (`goto 1 -1`, level-30 character with high life in Cold Plains) but drops are rare with fists, chests / shrines are not near the waypoint, and a death needs a weak character far from the portal | `poke.py` directives inside `record_packets.py` (spawn a monster / object next to the player after arrival; REC-590 proves poke on 1.14d first) |
+| G5 warp tiles (REC-99, REC-94 range) | no type-5 client unit and no S→C 0x09 near the arrival points tried (Cold Plains waypoint, Lut Gholein start); the client sends 0x02 every 6 frames then 0x13 on arrival for a waypoint (recorded in `facts/items/a1-town-portal-cold-plains.tsv` frames 85–105) | a route script to a known tile (Den of Evil entrance) or `poke` `warp`; the `0x00548C32` / `0x00623660` hooks in `record_packets.py` |
+| G6 (REC-51 and the prediction rows) | needs hooks on `0x004AFF60`, `0x00464810`, `0x004647D0`, `0x00463390` in `record_frames.py` | those hooks (addresses in HANDOFF REC-51) |
+| G7 (R-* hooks), G8 (DRLG hooks) | new hooks per REC entry; REC-95 needs two clients | the hooks; a two-client TCP/IP run under Wine is unproved |
+| G9 later acts | quest-state saves need `--quests` slot bits per quest and long scripted play | per-quest `d2s-tool` set-ups + `poke` |
+| G10 rest (REC-212, REC-228, REC-205, REC-221–225, REC-201) | pixel checks need the cels drawn (not eye reads); timing points need hooks | `facts_render.py` captures of the menus (`record_frames.py` in the front end) |
+| G11 audio | `-ns` and no sound device under Wine | an ALSA dummy device or a sound-call hook |
