@@ -91,9 +91,12 @@ impl Act {
                 .parse::<u32>()
                 .map_err(|_| format!("`{text}`: argument {i} is not a number"))
         };
+        // Signed: the generator clicks just outside the frame (`click L 561 -4`).
         let i = |k: usize| -> Result<i32, String> {
-            let v = n(k)?;
-            i32::try_from(v).map_err(|_| format!("`{text}`: argument {k} too large"))
+            w.get(k)
+                .ok_or_else(|| format!("`{text}`: missing argument {k}"))?
+                .parse::<i32>()
+                .map_err(|_| format!("`{text}`: argument {k} is not a number"))
         };
         let want = |k: usize| -> Result<(), String> {
             if w.len() == k {
@@ -385,6 +388,20 @@ mod tests {
         };
         let back = SoakLog::parse(&log.to_text()).unwrap();
         assert_eq!(back, log);
+    }
+
+    #[test]
+    fn clicks_outside_the_frame_round_trip() {
+        let a = Act::parse("click L 561 -4").unwrap();
+        assert_eq!(
+            a,
+            Act::Click {
+                right: false,
+                x: 561,
+                y: -4
+            }
+        );
+        assert_eq!(Act::parse(&a.to_string()).unwrap(), a);
     }
 
     #[test]
