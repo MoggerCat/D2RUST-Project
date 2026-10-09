@@ -203,7 +203,7 @@ recording after S seconds, default 120), `goto TYPE CLASS[,CLASS…] [S
 [DX DY]]` (walk toward the nearest unit of set S `0x7A5E70` with that
 type and class by clicking toward it, wait until the player stands
 still, click it at its draw point + (DX, DY), default (0, −8); screen
-position from `render/camera.md` §2–§4), `dumpdrlg [LABEL]` (log the
+position from `render/camera.md` §2–§4), `dumpdrlg [LABEL]` (with LABEL `rooms<id>` it also lists that level's DRLG rooms: tile rect, type, lvlprest index, preset units; log the
 client act's DRLG and level list, `drlg/levels.md` §1 offsets: act no,
 init seed, DRLG seed, `dwStartSeed`, tombs, jungle bit, per level id,
 DRLG type, flags, rooms, rect, level type, seed, jungle fields, warp

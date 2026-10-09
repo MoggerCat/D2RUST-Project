@@ -280,6 +280,8 @@ def drlg_dump(mem, label=""):
                        "jungle_clearings": mem.read_u32(lv + 0x1B8),
                        "jungle_blocks": mem.read_u32(lv + 0x1BC),
                        "warp_centres": mem.read_u32(lv + 0x228)})
+        if label.startswith("rooms") and label[5:].isdigit() and int(label[5:]) == levels[-1]["id"]:
+            levels[-1]["room_list"] = room_list(mem, lv)
         ids = mem.read_u32(lv + 0x1BC)      # Act III jungles: pointer to the block ids
         if ids and 76 <= levels[-1]["id"] <= 78:   # (outdoor-act3-act5.md §2.8; 2 x 6 blocks)
             levels[-1]["jungle_blocks"] = [mem.read_u32(ids + 4 * i) for i in range(12)]
@@ -287,6 +289,34 @@ def drlg_dump(mem, label=""):
         n += 1
     r["levels"] = sorted(levels, key=lambda x: x["id"])
     return r
+
+
+def room_list(mem, lv):
+    """`dumpdrlg rooms<id>`: the level's DRLG rooms (`drlg/rooms.md` §1: first
+    room level +0x10, next +0x24, tile x / y / w / h +0x34..+0x40, type +0x48,
+    preset data +0x20 whose +0x00 is the lvlprest index, preset units +0x5C;
+    unit record `drlg/preset.md` §1: +0x00 mode, +0x04 class, +0x08 x, +0x0C
+    next, +0x14 type, +0x18 y, room-relative sub-tiles). Client copy: rooms
+    the client never built may have no preset units yet."""
+    out, room, n = [], mem.read_u32(lv + 0x10), 0
+    while room and n < 2000:
+        rt = mem.read_u32(room + 0x48)
+        rec = {"rect": [mem.read_u32(room + o) for o in (0x34, 0x38, 0x3C, 0x40)], "type": rt}
+        pm = mem.read_u32(room + 0x20)
+        if rt == 2 and pm:
+            rec["lvlprest"] = mem.read_u32(pm)
+        units, u, k = [], mem.read_u32(room + 0x5C), 0
+        while u and k < 200:
+            units.append([mem.read_u32(u + 0x14), mem.read_u32(u + 4), mem.read_u32(u + 8),
+                          mem.read_u32(u + 0x18), mem.read_u32(u)])
+            u = mem.read_u32(u + 0x0C)
+            k += 1
+        if units:
+            rec["units"] = units      # [type, class, x, y, mode]
+        out.append(rec)
+        room = mem.read_u32(room + 0x24)
+        n += 1
+    return out
 
 
 def nearest(mem, utype, cls):
