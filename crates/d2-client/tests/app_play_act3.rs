@@ -77,14 +77,14 @@ struct Play {
 /// sorceress, Acts I and II done (every quest's bit 0 and the act
 /// transitions), the waypoints of Acts I–II and Kurast Docks, standing in
 /// Act III.
+const ACT3_QUESTS: &str =
+    "0:acts=2,0:1.0,0:2.0,0:3.0,0:4.0,0:5.0,0:6.0,0:9.0,0:10.0,0:11.0,0:12.0,0:13.0,0:14.0";
 const ACT3_SAVE: &[&str] = &[
     "--class",
     "sor",
     "--level",
     "25",
     "--expansion",
-    "--quests",
-    "0:acts=2,0:1.0,0:2.0,0:3.0,0:4.0,0:5.0,0:6.0,0:9.0,0:10.0,0:11.0,0:12.0,0:13.0,0:14.0",
     "--waypoints",
     "0:0,0:1,0:2,0:3,0:4,0:5,0:6,0:7,0:8,0:9,0:10,0:11,0:12,0:13,0:14,0:15,0:16,0:17,0:18",
     "--act",
@@ -97,9 +97,10 @@ const ACT3_SAVE: &[&str] = &[
     "36",
 ];
 
-/// Writes the Act III start save with `d2s-tool` (`extra` edit flags
-/// appended) and loads it as `play --save` does.
-fn act3_character(extra: &[&str]) -> single_player::Character {
+/// Writes the Act III start save with `d2s-tool` (`quests`: more quest
+/// bits, `d2s-tool --quests` items, after [`ACT3_QUESTS`]) and loads it
+/// as `play --save` does.
+fn act3_character(quests: &str) -> single_player::Character {
     let dir = std::env::temp_dir().join(format!(
         "d2rs-play-act3-{}-{}",
         std::process::id(),
@@ -113,9 +114,14 @@ fn act3_character(extra: &[&str]) -> single_player::Character {
     let mut args: Vec<String> = ["new", "--name", "ActThree"]
         .iter()
         .chain(ACT3_SAVE)
-        .chain(extra)
         .map(|s| s.to_string())
         .collect();
+    args.push("--quests".into());
+    args.push(if quests.is_empty() {
+        ACT3_QUESTS.to_string()
+    } else {
+        format!("{ACT3_QUESTS},{quests}")
+    });
     args.push("-o".into());
     args.push(path.display().to_string());
     assert_eq!(d2s_tool::cli::run(&args, &mut std::io::sink()).unwrap(), 0);
@@ -125,13 +131,14 @@ fn act3_character(extra: &[&str]) -> single_player::Character {
 }
 
 impl Play {
-    /// The play app on the user's install, joined with the Act III save.
-    fn start(extra: &[&str]) -> Self {
+    /// The play app on the user's install, joined with the Act III save
+    /// (`quests`: as [`act3_character`]).
+    fn start(quests: &str) -> Self {
         let ms = Arc::new(AtomicU32::new(1000));
         let wire = Arc::new(Mutex::new(Wire::default()));
         let data = app_support::game_data();
         let GameData::Live(live) = data.clone();
-        let character = act3_character(extra);
+        let character = act3_character(quests);
         let speeds = single_player::walk_speeds(&data, &character).unwrap();
         let (link, started) = single_player::start_with(
             data,
@@ -330,6 +337,9 @@ impl Play {
                 .filter(|m| **m == want)
                 .count()
         };
+        let npc_at = app_support::server_unit(&self.server, 1, &[u32::from(class)]).map(|u| u.1);
+        let me = app_support::server_pos(&self.server);
+        eprintln!("talk {class}: player {me:?} NPC {npc_at:?}");
         let before_msgs = self.quest_messages().len();
         let before = count(self);
         self.click(at);
@@ -561,13 +571,36 @@ impl Play {
         }
         done(self)
     }
+
+    /// The server object of `class` in the player's level nearest the
+    /// player (the level's rooms toured until one exists): its GUID.
+    fn find_object(&mut self, class: u32) -> u32 {
+        let found = |p: &Play| app_support::server_unit(&p.server, 2, &[class]);
+        assert!(
+            self.tour(|p| found(p).is_some()),
+            "object {class} in the level"
+        );
+        found(self).unwrap().0
+    }
+
+    /// Operates object `guid` (C→S 0x13 type 2) from beside it.
+    fn operate(&mut self, guid: u32) {
+        let at = self.unit_pos(2, guid).expect("the object");
+        self.poke(&format!("pos @player {} {}", at.0 + 2, at.1 + 2));
+        self.step(5);
+        let mut m = vec![0x13];
+        m.extend_from_slice(&2u32.to_le_bytes());
+        m.extend_from_slice(&guid.to_le_bytes());
+        self.send(&m);
+        self.step(40);
+    }
 }
 
 // Covers: specs/world/npc.md §2, §3; specs/world/quests-act3.md §9
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn kurast_docks_arrival_and_every_town_npc_talks() {
-    let mut p = Play::start(&[]);
+    let mut p = Play::start("");
     assert_eq!(p.level(), Some(75), "the save joins in Kurast Docks");
     {
         let b = &p.app.world().resource::<BridgeResource>().0;
@@ -592,7 +625,7 @@ fn kurast_docks_arrival_and_every_town_npc_talks() {
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_golden_bird_from_the_jungle_boss_to_the_potion_of_life() {
-    let mut p = Play::start(&[]);
+    let mut p = Play::start("");
     p.warp(76);
     assert!(
         p.tour(|p| p.bird_boss().is_some()),
@@ -641,4 +674,46 @@ fn the_golden_bird_from_the_jungle_boss_to_the_potion_of_life() {
     assert!(!p.bit(20, 5));
     assert!(!p.holds(b"xyz "), "the potion is used up");
     p.assert_clean("the Golden Bird");
+}
+
+/// The Gidbinn decoy object (`objects.txt` row 252, `quests-act3.md` §1.4).
+const GIDBINN_DECOY: u32 = 252;
+
+// Covers: specs/world/quests-act3.md §5.3–§5.8
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_blade_of_the_old_religion_from_hratli_to_ormus_and_asheara() {
+    // The Golden Bird done: the sequence starts the Blade (§1.3).
+    let mut p = Play::start("0:20.0");
+    let hratli = p.talk(npc::HRATLI);
+    assert!(hratli.contains(&571), "Hratli starts the Blade: {hratli:?}");
+    p.step(10);
+    assert_eq!(p.chain(17).map(|c| c.1), Some(2), "status 2 after the chat");
+    p.warp(78);
+    let decoy = p.find_object(GIDBINN_DECOY);
+    p.operate(decoy);
+    let boss = app_support::with(&p.server, |l| {
+        let r = l.host().game.world.quests.record(17)?;
+        let e = &r.extra.act3.q3;
+        e.boss_spawned.then_some(e.boss_guid)
+    });
+    let boss = boss.expect("the decoy spawns the Gidbinn guardian");
+    p.kill(boss);
+    p.assert_clean("the guardian's death");
+    p.pick_up(b"g33 ");
+    assert!(p.bit(19, 5), "19.5: holds the Gidbinn");
+    p.warp(75);
+    let ormus = p.talk(npc::ORMUS);
+    assert!(ormus.contains(&587), "Ormus takes the Gidbinn: {ormus:?}");
+    assert!(p.bit(19, 6));
+    assert!(!p.holds(b"g33 "));
+    p.step(50);
+    let ormus = p.talk(npc::ORMUS);
+    assert!(ormus.contains(&593), "Ormus' ring: {ormus:?}");
+    p.step(10);
+    assert!(p.holds(b"rin "), "the ring");
+    let asheara = p.talk(npc::ASHEARA);
+    assert!(asheara.contains(&589), "Asheara's mercenary: {asheara:?}");
+    assert!(p.bit(19, 0), "the quest done");
+    p.assert_clean("the Blade");
 }

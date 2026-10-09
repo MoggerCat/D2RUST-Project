@@ -102,6 +102,15 @@ pub enum QuestEvent {
     /// A special monster was created (`0x005A09E0` → `0x00544E80`,
     /// `quests-act3.md` §6.2: the Golden Bird's boss choice).
     BossCreated { unit: UnitId },
+    /// A preset superunique's quest hook `0x00545B50` (`monsters/init.md`
+    /// §20.1; `quests-act3.md` §7.5: the Travincal council).
+    PresetBoss { unit: UnitId },
+    /// Alkor's map AI cleared the Golden Bird's +0x00 (`0x005BAD40`,
+    /// `ai-bodies.md` §9.9).
+    AlkorReset,
+    /// Ormus' map AI activates the Gidbinn altar (`0x005B9CD0`,
+    /// `quests-act3.md` §5.7).
+    OrmusAltar,
 }
 
 /// Seams without a provider (see the module doc). Grouped by the spec
@@ -1730,6 +1739,14 @@ pub trait Pending {
     /// `quests.md` §8.2: leaving the summit for 118 or 128), published by
     /// the quest control once per tick. Default: nothing.
     fn set_summit_open(&mut self, open: bool) {}
+    /// The Durance of Hate warp check's answer (`0x005BBFA0`, `quests.md`
+    /// §8.2: into level 100 from anywhere but level 101), published by
+    /// the quest control once per tick. Default: nothing.
+    fn set_durance_open(&mut self, open: bool) {}
+    /// The Act III answers the town NPCs' map AI reads (`ai-bodies.md`
+    /// §9.9: alkor `0x005BAD20`, ormus `0x005B9CA0`), published by the
+    /// quest control once per tick. Default: nothing.
+    fn set_act3_npc_answers(&mut self, alkor_bird: bool, ormus_altar: Option<(i32, i32)>) {}
     /// `0x00574EC0(game, player, 7, 0)`: the player's hireling (§9 rule
     /// 8; `hirelings.md` §5 rule 4; the wired host answers it from the
     /// hireling list). Default: none.
