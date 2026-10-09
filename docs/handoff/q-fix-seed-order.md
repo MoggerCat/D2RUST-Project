@@ -50,9 +50,12 @@ measured: a tie |dx| = |dy| (y-major chosen, `PROVISIONAL`, REC-1120).
   the unit as "reached the next tick" and the backward pass never took
   the inline step. A chain that starts at a hinted draw of an owner with
   no known value is no longer "anchored". Selftest case added.
-- `rng_diff.py` (`rng-trace.md` §5 r3): `roll_range(min, n)` (d2rs) vs
-  `roll(n)` + inline `min` (1.14d, `0x00573F8F`) compare as the same draw
-  (`ret − min`). Selftest cases added (both sides, wrong ret, wrong n).
+- `rng_diff.py` (`rng-trace.md` §5 r3): against a 1.14d `roll(n)`,
+  n ≥ 1, a d2rs `roll_range(min, n)` (1.14d adds `min` inline,
+  `0x00573F8F`) compares as `roll(n)` with `ret − min`, and a d2rs
+  `step` whose `lo'` the caller takes mod n (the AI chance `0x005F05A6`
+  = `roll(100)`, d2rs `monsters/ai/mod.rs` `chance`) as `roll(n)` with
+  `ret mod n`. Selftest cases added (both sides, wrong ret, wrong n).
 
 ### 3. Unit seed order at game start (`q-fix-real-unit-seed-order`)
 
@@ -67,6 +70,14 @@ the town arrival's rng check now matches draw for draw.
 | `combat-pop-blood-moor` | state | frame 5 (game seed, then monsters 1:8, 1:9 class 63 positions, 1:10 class 19 vs 5, Quill Rats 1:17, 1:18 missing) | no difference in 400 frames (PARTIAL: only the documented `own` / client gaps) |
 | `combat-pop-blood-moor` | rng | frame 2 (false: units 1:3, 1:4, 1:6, 1:7; roll vs roll_range of 1:1), then frame 5 (real) | MATCH (the 1.14d recording reaches frame 132 in its 900 s) |
 | `rng-town-arrival-ama` | rng | frame 2 (the same false divergences) | MATCH (40 frames) |
+| `a1-warp-den-ama` | state, rng | not run before | state no difference (PARTIAL), rng MATCH |
+| `combat-pop-cold-plains` | state | frame 4 (player arrival x 5168 vs 5183, q-diff-combat-a1) | frame 7: monster 1:28 (class 58, Fallen Shaman) unit seed |
+| `combat-pop-cold-plains` | rng | not run before | frame 7 (false: AI chance `roll(100)` vs d2rs `step`, fixed in `rng_diff`) → frame 7, unit 1:28, draw #3 missing (real, below) |
+| `warp-cold-plains-ama` | state | not run before | frame 13: the same monster 1:28 seed |
+| `combat-pop-stony-field` | state | frame 4: object 2:18 class 37 vs 119 | unchanged (object creation order, objects area) |
+
+d2rs binaries for the rows after the Blood Moor ones: this branch before
+the staging merge `1a65f5e9` (the merge brought no DRLG / AI change).
 
 The Fallen think "one unit-seed step short" seen by q-diff-skills-2 on
 this path does not show here: unit seeds are equal on all 400 frames
@@ -74,6 +85,15 @@ this path does not show here: unit seeds are equal on all 400 frames
 `variant blood-moor-empty` on its own branch if it still differs.
 
 ## Open
+
+- **Monster AI, not this area** (for q-fix-monster-ai): Cold Plains
+  frame 7, Fallen Shaman 1:28 (class 58): 1.14d's think draws four
+  inline unit-seed steps (`0x005F1516`, `0x005F169A`, `0x005F16E1`,
+  `0x005DF7DB`), d2rs three (`ai/mod.rs:412` ×2, `ai/tactics.rs:321`):
+  the step at `0x005DF7DB` is missing. Then its walk is mirrored (xf / yf
+  swapped from frame 8). Likely the same "one unit-seed step short per
+  think" q-diff-skills-2 saw on Fallen. Repro: `scenario_diff.py
+  traces/checks/combat-pop-cold-plains.check --channels rng`.
 
 - REC-1120 PROVISIONAL: a diagonal path segment (|dx| = |dy|) is drawn
   y-major. Settle with the scratch probe below on a seed whose path has a

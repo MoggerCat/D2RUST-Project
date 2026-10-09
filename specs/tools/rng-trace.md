@@ -33,14 +33,14 @@
 |   2. Owners | 93–131 |
 |   3. The d2rs log | 132–151 |
 |   4. The 1.14d recorder (`record_rng.py --frames`) | 152–188 |
-|   5. Comparison (`rng_diff.py`) | 189–216 |
-|   6. The `rng` channel of `scenario-diff` | 217–238 |
-| Constants & data dependencies | 239–242 |
-| Randomness | 243–246 |
-| Edge cases & original bugs | 247–256 |
-| Test vectors | 257–266 |
-| Provenance | 267–271 |
-| Open questions | 272–308 |
+|   5. Comparison (`rng_diff.py`) | 189–218 |
+|   6. The `rng` channel of `scenario-diff` | 219–240 |
+| Constants & data dependencies | 241–244 |
+| Randomness | 245–248 |
+| Edge cases & original bugs | 249–258 |
+| Test vectors | 259–268 |
+| Provenance | 269–273 |
+| Open questions | 274–310 |
 <!-- /index -->
 
 ## Summary
@@ -198,10 +198,12 @@ and exit code (§5). Neither game changes (§3 rule 2).
 3. Per frame ascending, per owner (`game` first, then units by type and
    GUID), position by position: `before`, `after`; when the 1.14d draw
    went through a helper, also `op`, `n`, `min`, `ret` (`--state-only`
-   skips them). `roll_range(min, n)` with n ≥ 1 on one side against
-   `roll(n)` on the other is the same draw (`sim/rng.md` §3: 1.14d may
-   add `min` inline after the helper, as at `0x00573F8F`): compared as
-   `roll(n)` with `ret − min`. A position one side lacks is `missing` (1.14d has it) or
+   skips them). Against a `roll(n)` with n ≥ 1 on the other side
+   (`sim/rng.md` §3: `roll(n)` = `lo' mod n`), two other forms are the
+   same draw: `roll_range(min, n)` (1.14d may add `min` inline after the
+   helper, as at `0x00573F8F`), compared as `roll(n)` with `ret − min`;
+   and a d2rs `step` whose `lo'` the caller takes mod n (the AI chance
+   `0x005F05A6` = `roll(100)`), compared as `roll(n)` with `ret mod n`. A position one side lacks is `missing` (1.14d has it) or
    `extra`.
 4. Report: the first divergence (frame, owner, index, field, both
    records with their sites), the next `--next N`, the game seed's draws

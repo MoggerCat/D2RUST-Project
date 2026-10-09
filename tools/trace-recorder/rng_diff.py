@@ -117,14 +117,19 @@ def group(draws):
 
 
 def as_roll(x, other):
-    """`roll_range(min, n)` with n >= 1 is `roll(n) + min` (sim/rng.md §3):
-    when the other side logged the same draw as `roll(n)` (1.14d adds min
-    inline after the helper, d2rs calls roll_range), x is rewritten as that
-    roll: op `roll`, no `min`, ret - min (rng-trace.md §5 r3)."""
-    if (x.get("op") == "roll_range" and other.get("op") == "roll"
-            and x.get("n") is not None and 1 <= x["n"] < 0x80000000):
+    """When the other side logged the draw as `roll(n)`, n >= 1 (sim/rng.md
+    §3), x is rewritten as that roll (rng-trace.md §5 r3): a `roll_range(min,
+    n)` is `roll(n) + min` (ret - min; 1.14d adds min inline after the
+    helper); a `step` whose `lo'` the caller takes mod n is `roll(n)` (ret
+    mod n, n from the other side)."""
+    n = other.get("n")
+    if other.get("op") != "roll" or n is None or not 1 <= n < 0x80000000:
+        return x
+    if x.get("op") == "roll_range" and x.get("n") is not None and 1 <= x["n"] < 0x80000000:
         x = dict(x, op="roll", ret=((x.get("ret") or 0) - (x.get("min") or 0)) & M32)
         x.pop("min", None)
+    elif x.get("op") == "step":
+        x = dict(x, op="roll", n=n, ret=((x.get("ret") or 0) & M32) % n)
     return x
 
 
@@ -467,6 +472,15 @@ def selftest():
     b = copy.deepcopy(d2rs)
     b[i].update(op="roll_range", min=1, n=o["n"] + 1, ret=o["ret"] + 1)
     assert run(orig, b)["diffs"][0]["field"] == "n"
+    ok += 1
+    # a d2rs step whose lo' the caller takes mod n is the 1.14d roll(n)
+    b = copy.deepcopy(d2rs)
+    b[i].update(op="step", ret=b[i]["after"][0])
+    b[i].pop("n", None)
+    assert not run(orig, b)["diffs"], run(orig, b)["diffs"][:1]
+    a = copy.deepcopy(orig)
+    a[k]["ret"] = (o["ret"] + 1) % o["n"] if o["n"] > 1 else o["ret"] + 1
+    assert run(a, b)["diffs"][0]["field"] == "ret"
     ok += 1
     # a dropped d2rs draw: missing; an extra one: extra
     b = copy.deepcopy(d2rs)
