@@ -154,3 +154,34 @@ comparison with the previous commit below.
    15; Warriv is `interact`, so he now takes the player only when the
    Act I gossip test passes, which sends 8A to a fresh character as the
    recording shows from frame 24).
+
+## Wrap-up state (2026-10-09)
+
+- **Done:** rows `q-fix-tool-c2s-masks`, `q-fix-p3-npc-nearest-player`,
+  `q-fix-p3-npc-interact-gate`, `q-tool-playthrough-quests` (marked DONE
+  in `build-queue.tsv`); `q-fix-real-join-missing-msgs` done as far as
+  the specs go (§4 above).
+- **In progress:** nothing uncommitted.
+- **Open:** `app_frame_loop` red at 122 / 126 until the PC 1 item
+  "[q-fix-pc1-day3-a-r2] Who gives a player its alignment" is answered
+  (then: give players state 105 / stat 172 = 2 at the named place with
+  the resend, add the player update's step-7 stat sends
+  `intents-events.md` §7.3 r1 step 7 if still missing, and update the
+  test's `(handled, queued)` counts).
+- **RECs:** REC-860 (quest active test act = `unit_act`), REC-862
+  (0x21 bonus without state 134).
+- **Live runs for PC1-C:** the two above (packets and a1 town arrival).
+
+Repro (cloud: private data repo assembled to `$HOME/game`, see
+`tools/realdata-gate.sh`):
+
+```
+python3 tools/trace-recorder/packets_diff.py --selftest
+python3 tools/playthrough/playthrough.py --selftest
+cargo test -p d2-sim -- nearest_client_player interact_npc npc_wants_interact
+D2_GAME_DIR=$HOME/game cargo test --release -p d2-client --test app_frame_loop --test app_single_player --test app_items --test smoke_save -- --ignored
+```
+
+Known red on this machine before these changes too (no GPU, other
+owners): the GPU lib tests, `a_save_from_the_command_line_joins` and the
+class-skill app tests (`app_amazon`, `app_assassin`, … 21 binaries).
