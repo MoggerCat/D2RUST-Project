@@ -287,11 +287,12 @@ rather than a hand-run recipe.
     the code → index lookup `0x00633640` (`item`, `items/generation.md`
     §3); (d) `0x00627260(unit, s, value, layer)` and `0x00639DB0(unit,
     s, on)` (`stat`, `state`, `stat-lists.md` §5 r2, §9.2). Answer into
-    the owning specs; then delete the gap rows in `poke.md` §1. (e) For
-    scenario `spawn` kinds `champion` / `random-boss` on 1.14d: the
-    register form of the champion / boss minions call `0x0054E1E0`
-    (`scenario.md` §3.1, `population.md` §6.4); `poke.py` writes them as
-    gaps until then (`normal` runs).
+    the owning specs; then delete the gap rows in `poke.md` §1. (e) *answered* by
+    `monsters/init.md` §25.1 / §25.3 (boss spawn, minions, umod init,
+    umod list): `poke.py` runs `spawn champion`, `random-boss`, `unique`
+    (not yet run on 1.14d). Each form can be tried first with
+    `poke.py --forms FILE` (README "Call forms") before it goes into
+    `CALL_FORMS`.
 23. **Poke runs on Windows** (REC-590): the cloud ran every runnable
     directive on 1.14d under Wine (`specs/tools/poke.md` Status) and
     settled the variant load (REC-591, `tools/test-variants.md` Status).

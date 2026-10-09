@@ -39,14 +39,14 @@
 |   1. Directives | 83–117 |
 |   2. Poke files | 118–140 |
 |   3. In scenarios | 141–155 |
-|   4. The 1.14d side (`poke.py`) | 156–179 |
-|   5. The d2rs side (`d2-sim::poke`) | 180–194 |
-| Constants & data dependencies | 195–207 |
-| Randomness | 208–214 |
-| Edge cases & original bugs | 215–224 |
-| Test vectors | 225–236 |
-| Provenance | 237–242 |
-| Open questions | 243–263 |
+|   4. The 1.14d side (`poke.py`) | 156–206 |
+|   5. The d2rs side (`d2-sim::poke`) | 207–221 |
+| Constants & data dependencies | 222–234 |
+| Randomness | 235–241 |
+| Edge cases & original bugs | 242–251 |
+| Test vectors | 252–263 |
+| Provenance | 264–269 |
+| Open questions | 270–290 |
 <!-- /index -->
 
 ## Summary
@@ -164,7 +164,8 @@ cannot run the directive, §4). Results are written as `poke` records
    (`original-hooks.md` §1 rule 5).
 3. **Calls:** the procedure of `original-hooks-spawn.md` §5 rules 3–8
    (scratch page with an INT3 return trap, saved context, arguments on
-   the stack above the return address, ECX/EDX as the row says). After
+   the stack above the return address, registers as the function's
+   call form says, rule 8). After
    the return trap the saved context is restored before the next call,
    so a callee's `ret N` need not be known.
 4. **Field writes:** `WriteProcessMemory` at the hook, on the
@@ -176,6 +177,32 @@ cannot run the directive, §4). Results are written as `poke` records
 6. **Results:** EAX of the call (0 → `failed`), or `ok` for a field
    write. Created units: the GUID at unit +0x0C.
 7. A directive whose 1.14d column says gap is not run: result `gap`.
+8. **Call forms.** Every function a directive calls is one entry of a
+   table in `poke.py` (`CALL_FORMS`): its address and the arguments
+   `poke.py` supplies by name, both cited from the owning spec, and its
+   form: which argument goes in which register (any of EAX, EBX, ECX,
+   EDX, ESI, EDI) and which on the stack, in order from [ESP+4], each
+   placed exactly once (literals allowed), plus the callee's `ret N` and
+   what EAX means (created unit, 1/0, or ignored) where the entry leaves
+   it open. An entry without a form is a gap: every directive that calls
+   it returns `gap` naming the function, its address and the
+   `docs/handoff/pc1-data.md` item that asks for it, and nothing is
+   called. Record offsets and table addresses the directives use
+   (item request format source, combined items array, umod list) are a
+   second table (`FIELDS`), with the same rule for a missing value.
+   Filling a form once its owning spec states it is the whole change:
+   the directive then runs as rule 3 says. A run may override both
+   tables from a JSON file (`--forms`, format `poke-forms-1`) to try a
+   form before it is committed; the run's output records the forms in
+   force. Today without a form: `0x00650BE0` / `0x00554EA0` (`pos`, the
+   teleport preferred as d2rs' path), `0x0053AEC0` (`warp`),
+   `0x00558D90` (`item`), `0x00627260` (`stat`), `0x00639DB0`
+   (`state`); the spawn kinds' `0x005A09E0`, `0x0054E1E0`, `0x005A2120`
+   and the umod list (monster data +0x1C) are stated in
+   `monsters/init.md` §25.1, §25.3. `item` finds the item index in the
+   combined items array (`items/treasure.md` §9.1: header `0x0096CA58`,
+   count, records; code at record +0x80, `data/loading.md` §6–§9), not
+   through `0x00633640`.
 
 ### 5. The d2rs side (`d2-sim::poke`)
 
