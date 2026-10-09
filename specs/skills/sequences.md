@@ -22,15 +22,15 @@
 | Rules | 62–63 |
 |   1. Lookup `0x00663310` | 64–90 |
 |   2. Load `0x00621260` | 91–111 |
-|   3. Frame queries | 112–289 |
-|   4. The table (`sequences.tsv`) | 290–321 |
-|   5. Users in 1.14d | 322–338 |
-| Constants & data dependencies | 339–347 |
-| Randomness | 348–351 |
-| Edge cases & original bugs | 352–371 |
-| Test vectors | 372–386 |
-| Provenance | 387–401 |
-| Open questions | 402–407 |
+|   3. Frame queries | 112–305 |
+|   4. The table (`sequences.tsv`) | 306–337 |
+|   5. Users in 1.14d | 338–354 |
+| Constants & data dependencies | 355–363 |
+| Randomness | 364–367 |
+| Edge cases & original bugs | 368–387 |
+| Test vectors | 388–402 |
+| Provenance | 403–417 |
+| Open questions | 418–423 |
 <!-- /index -->
 
 ## Summary
@@ -199,6 +199,22 @@ message:
        send(code, a, b) }
    next client update: machine step 1 (rules 1-5 above)
    ```
+
+PROVISIONAL: the client player update ends the non-sequence attack,
+cast and hit modes (GH 4, A1 7, A2 8, BL 9, SC 10, TH 11, KK 12, S1–S4
+13–16) with the mode-18 row's steps 3 and 5 on the AnimData animation:
+advance unless complete (`0x006217C0`, no sequence: frame + speed ≥
+count), then the neutral end when complete; the start (the click's mode
+request, or a server mode message for another unit) sets frame := frame
+bonus · 256, count := AnimData frames · 256 and speed := the rate
+(`sim/units.md` §4.1, §4.7) (because the local player gets no server
+message when its mode ends, local-player rule 3, and table `0x00711E00`'s
+rows for these modes are not read; the two-cast check
+`traces/checks/sor-frost-nova-twice.check` matches 1.14d with it); settled
+by REC-1000 (rate inputs: REC-1001). PROVISIONAL: d2rs does not run the
+gate `0x00480BA0` of rule 1 (because the client skill rows hold no
+`interrupt` byte; the click dispatcher refuses modes 7–12 before it);
+settled by REC-1002.
 
 Leap (`cltstfunc` 30 `0x004C8D90`, `cltdofunc` 43 `0x004C8C60`) and
 Leap Attack (`cltstfunc` 30, `cltdofunc` 44 `0x004C8ED0`) share start
