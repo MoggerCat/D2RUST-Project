@@ -199,6 +199,24 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     Blood Moor monsters at night; Den of Evil. Record with
     `tools/trace-recorder/record_frames.py` and `facts_render.py` as in
     Step 3, each twice, and commit the facts.
+21. **Poke call forms** (q-tool-poke, `specs/tools/poke.md` Open
+    questions 1–4; until answered these directives are gaps on 1.14d):
+    register / stack form and `ret` of (a) `0x00554EA0(game, unit, room,
+    x, y, exact, alt)` or the teleport path `0x00650BE0` (`pos`,
+    `path-placement.md` §10 / §6 r4); (b) the level warp
+    `0x0053AEC0(game, player, level, tile)` (`warp`, `waypoints.md` §7
+    r5); (c) a ground-item entry at a point: `0x00558D90(game, request,
+    use seed)` with request +0x18 = 3, +0x1C/+0x20 x, y, +0x24 room, and
+    the code → index lookup `0x00633640` (`item`, `items/generation.md`
+    §3); (d) `0x00627260(unit, s, value, layer)` and `0x00639DB0(unit,
+    s, on)` (`stat`, `state`, `stat-lists.md` §5 r2, §9.2). Answer into
+    the owning specs; then delete the gap rows in `poke.md` §1.
+22. **Poke and variant runs** (REC-590, REC-591): run
+    `traces/scenarios/poke-spawn-town.scenario` on 1.14d (`poke.py`) and
+    d2rs and compare; build `traces/variants/only-fallen` with
+    `data-tool variant build` and confirm 1.14d loads it
+    (`dump_tables.py --game <variant>/Game.exe` + `data-tool
+    dump-compare`). Commands in "Set up any state for a check" below.
 
 ## Step 5 — spec gaps (107 provisional points no spec states)
 
