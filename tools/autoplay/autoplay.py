@@ -28,6 +28,8 @@ import time
 from collections import deque
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# acts.py imports this module as `autoplay`: one module, one Stuck class
+sys.modules.setdefault("autoplay", sys.modules[__name__])
 import acts  # noqa: E402
 import nav  # noqa: E402
 

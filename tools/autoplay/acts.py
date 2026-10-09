@@ -300,7 +300,9 @@ def _wp_travel(bot, to_level):
             continue
         wps = [u for u in v.units if u["ut"] == 2 and u.get("cl") in WAYPOINT_OBJECTS and "x" in u]
         if not wps:
-            raise_stuck("no waypoint in sight")
+            if not bot.explore_step(v.level):
+                raise_stuck(f"no waypoint found in level {v.level}")
+            continue
         w = wps[0]
         if abs(w["x"] - v.pos[0]) + abs(w["y"] - v.pos[1]) > 8:
             bot.walk_to((w["x"], w["y"]), near=5, budget_s=30)
