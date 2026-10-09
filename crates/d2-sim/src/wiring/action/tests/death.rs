@@ -103,6 +103,9 @@ fn a_name_not_in_the_file_gets_the_default_record() {
         .names
         .insert((UnitType::Player, 7), *b"SOA1HTH\0");
     let p = fx.spawn(UnitType::Player, 1, fx.a, 10, 10);
+    // A loaded player's attack rate (`d2s-load.md` §2 post-load: stat 68
+    // = 100; `units.md` §4.7 step 8 reads it in mode 7).
+    fx.stats(p, &[(68, 100)]);
     animate(&mut fx, p, 7);
     // §3: frames 2048, speed 256, no events → only the end, at
     // f + 2048.
