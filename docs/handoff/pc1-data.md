@@ -328,8 +328,10 @@ field; read the state report before any draw list. Two snapshot files
 compare alone with `py tools/trace-recorder/state_diff.py ORIG D2RS`.
 For a new behaviour, add a `.check` file (copy `a1-town-arrival-ama.check`)
 rather than a hand-run recipe.
-22. **Poke call forms** (q-tool-poke, `specs/tools/poke.md` Open
-    questions 1–4; until answered these directives are gaps on 1.14d):
+22. **Poke call forms** (q-tool-poke): (a)–(d) *answered* 2026-10-09
+    from the asm into the owning specs and `poke.py` `CALL_FORMS`; first
+    1.14d run of the five directives is REC-655 (HANDOFF §7). Was
+    (`specs/tools/poke.md` Open questions 1–4):
     register / stack form and `ret` of (a) `0x00554EA0(game, unit, room,
     x, y, exact, alt)` or the teleport path `0x00650BE0` (`pos`,
     `path-placement.md` §10 / §6 r4); (b) the level warp

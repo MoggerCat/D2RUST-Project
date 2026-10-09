@@ -27,8 +27,8 @@ argument goes in which register (EAX, EBX, ECX, EDX, ESI, EDI) and which on the
 stack; `form=None` = not stated by a spec yet, and every directive calling that
 function returns "gap" naming it and its pc1-data.md item. Record fields the
 directives use are FIELDS (None = gap). `--forms FILE` (JSON, poke-forms-1)
-overrides both for one run. Gaps until PC 1 fills them (pc1-data.md Step 4
-item 22 (a)-(d); poke.md Open questions 1-4): pos, warp, item, stat, state.
+overrides both for one run. Every directive has its forms (pos, warp, item,
+stat, state: pc1-data.md Step 4 item 22 (a)-(d), stated in the owning specs).
 Any `@wp` reference is a gap too (this tool does not read the objects table's
 operate function).
 
@@ -235,19 +235,25 @@ CALL_FORMS = {
     "boss_minions": Fn(0x005A2120, ("min", "cl", "max", "game", "unit", "minions"), "none",
                        "monsters/init.md §18, §25.1", "22 (e)",
                        Form({"ecx": "min", "edx": "cl", "eax": "max"}, ["game", "unit", "minions"], 0xC)),
-    # --- gaps until PC 1 answers pc1-data.md Step 4 item 22 (poke.md Open questions 1-4)
-    "teleport": Fn(0x00650BE0, ("path", "room", "x", "y"), "none",
-                   "sim/path-placement.md §6 r4 (args as 0x00650910)", "22 (a)", None),
+    # pc1-data.md Step 4 item 22 (a)-(d) (poke.md Open questions 1-4), forms from the asm
+    "teleport": Fn(0x00650BE0, ("path", "unit", "room", "x", "y"), "bool",
+                   "sim/path-placement.md §6 r4", "22 (a)",
+                   Form({}, ["path", "unit", "room", "x", "y"], 0x14)),
     "place": Fn(0x00554EA0, ("game", "unit", "room", "x", "y", "exact", "alt"), "bool",
-                "sim/path-placement.md §10", "22 (a)", None),
+                "sim/path-placement.md §10", "22 (a)",
+                Form({"ecx": "game", "edx": "unit"}, ["room", "x", "y", "exact", "alt"], 0x14)),
     "warp": Fn(0x0053AEC0, ("game", "player", "level", "tile"), None,
-               "world/waypoints.md §7 r5", "22 (b)", None),
+               "world/waypoints.md §7 r5", "22 (b)",
+               Form({"ecx": "game", "edx": "player"}, ["level", "tile"], 8, "none")),
     "item_create": Fn(0x00558D90, ("game", "request", "use_seed"), "unit",
-                      "items/generation.md §3; world/objects-2.md §20.7", "22 (c)", None),
+                      "items/generation.md §3; world/objects-2.md §20.7", "22 (c)",
+                      Form({"ecx": "game", "edx": "request"}, ["use_seed"], 4)),
     "stat_set": Fn(0x00627260, ("unit", "stat", "value", "layer"), "none",
-                   "sim/stat-lists.md §5 r2", "22 (d)", None),
+                   "sim/stat-lists.md §5 r2", "22 (d)",
+                   Form({}, ["unit", "stat", "value", "layer"], 0x10)),
     "state_set": Fn(0x00639DB0, ("unit", "state", "on"), "none",
-                    "sim/stat-lists.md §9.2", "22 (d)", None),
+                    "sim/stat-lists.md §9.2", "22 (d)",
+                    Form({}, ["unit", "state", "on"], 0xC)),
 }
 
 OPEN_QUESTION = {"teleport": 1, "place": 1, "warp": 2, "item_create": 3, "stat_set": 4,
@@ -1162,7 +1168,8 @@ class PokeLayer:
                 return {"r": "failed", "note": "no loaded room holds the point (entry 6 returned 0)"}
             via = next(n for n in POS_VIA if self.forms[n].form is not None)
             if via == "teleport":
-                eax = self.invoke(rec, tid, saved, "teleport", path=path, room=room, x=a["x"], y=a["y"])
+                eax = self.invoke(rec, tid, saved, "teleport", path=path, unit=u, room=room,
+                                  x=a["x"], y=a["y"])
             else:
                 eax = self.invoke(rec, tid, saved, "place", game=game, unit=u, room=room, x=a["x"],
                                   y=a["y"], exact=POS_EXACT, alt=POS_ALT)
@@ -1597,6 +1604,20 @@ def selftest(repo):
         # init.md §25.1: ECX min, EDX cl, EAX max; game, unit, spawn minions
         ("boss_minions", (("min", 3), ("cl", 0), ("max", 6), ("game", G), ("unit", U), ("minions", 1))):
             ({"ecx": 3, "edx": 0, "eax": 6}, [G, U, 1]),
+        # path-placement.md §6 r4: path, unit, room, x, y all on the stack
+        ("teleport", (("path", U), ("unit", G), ("room", R), ("x", 5), ("y", 6))): ({}, [U, G, R, 5, 6]),
+        # path-placement.md §10: ECX game, EDX unit; room, x, y, exact, alt
+        ("place", (("game", G), ("unit", U), ("room", R), ("x", 5), ("y", 6), ("exact", 1),
+                   ("alt", 0))): ({"ecx": G, "edx": U}, [R, 5, 6, 1, 0]),
+        # waypoints.md §7 r5: ECX game, EDX player; level, tile
+        ("warp", (("game", G), ("player", U), ("level", 3), ("tile", 13))):
+            ({"ecx": G, "edx": U}, [3, 13]),
+        # items/generation.md §3: ECX game, EDX request; use seed
+        ("item_create", (("game", G), ("request", U), ("use_seed", 0))): ({"ecx": G, "edx": U}, [0]),
+        # stat-lists.md §5 r2: unit, stat, value, layer on the stack
+        ("stat_set", (("unit", U), ("stat", 13), ("value", 7), ("layer", 0))): ({}, [U, 13, 7, 0]),
+        # stat-lists.md §9.2: unit, state, on on the stack
+        ("state_set", (("unit", U), ("state", 11), ("on", 1))): ({}, [U, 11, 1]),
     }
 
     def check(exp):
@@ -1673,7 +1694,9 @@ def selftest(repo):
     rec.m = dict(m.m)
     lay = PokeLayer(parse_poke("poke 1\nat 0 seed-game 1 2\nat 2 seed-unit @1:19 3 4\n"
                                "at 2 pos @player 1 2\nat 2 seed-unit @1:77 0 0\n"),
-                    [parse_poke_option("12 seed-game 5 6")])
+                    [parse_poke_option("12 seed-game 5 6")],
+                    forms=load_forms({"format": FORMS_FORMAT, "forms": {"teleport": None,
+                                                                        "place": None}})[0])
     lay.run_steps = lambda r, g, f, tid, steps: [  # no thread context here
         lay._emit(r, s, f, i, lay.apply(r, g, tid, None, s)) for i, s in enumerate(steps)
         if not lay.done.add(id(s))]
@@ -1746,7 +1769,7 @@ def selftest(repo):
 TEST_FORMS = {
     "format": FORMS_FORMAT,
     "forms": {
-        "teleport": {"regs": {"ecx": "path", "edx": "room"}, "stack": ["x", "y"], "ret": 8},
+        "teleport": {"regs": {"ecx": "path", "edx": "room"}, "stack": ["unit", "x", "y"], "ret": 12},
         "place": {"regs": {"ecx": "game", "edx": "unit"}, "stack": ["room", "x", "y", "exact", "alt"],
                   "ret": 0x14},
         "warp": {"regs": {"esi": "game", "edi": "player"}, "stack": ["level", "tile"], "ret": 8,
@@ -1792,7 +1815,7 @@ def selftest_forms(m, game, Rec):
         lay.page = lambda r: S
         calls = []
         ret = {ROOM_AT: RA, 0x005A09E0: NEW, BOSS: NEW, SPAWN: NEW, ALLOC: NEW, SUPERUNIQUE: NEW,
-               MISSILE: NEW, 0x00558D90: ITEM, 0x00554EA0: 1, 0x0053AEC0: 1}
+               MISSILE: NEW, 0x00558D90: ITEM, 0x00554EA0: 1, 0x0053AEC0: 1, 0x00650BE0: 1}
         ret.update(eax or {})
 
         def call(r, tid, saved, entry, regs, stack):
@@ -1804,9 +1827,10 @@ def selftest_forms(m, game, Rec):
 
     lines = ["pos @player 5003 4001", "warp 3 tile 2", "item hp5 @x+1 @y quality unique ilvl 30",
              "stat @1:19 13 0 -5", "state 1/9 11 on"]
-    # a. the default table: these five are gaps, naming the function and the pc1-data item
+    # a. without these five forms the directives are gaps, naming the function and the item
+    gap5, _ = load_forms({"format": FORMS_FORMAT, "forms": {k: None for k in OPEN_QUESTION}})
     for line, fn in zip(lines, ("teleport", "warp", "item_create", "stat_set", "state_set")):
-        r, calls, _ = run(line)
+        r, calls, _ = run(line, gap5)
         assert r["r"] == "gap" and calls == [], (line, r)
         assert f"{CALL_FORMS[fn].addr:#010x}" in r["note"] and "item 22 (" in r["note"], r
         n += 1
@@ -1835,7 +1859,7 @@ def selftest_forms(m, game, Rec):
         assert lay.forms["warp"].form == Form({"esi": "game", "edi": "player"}, ["level", "tile"], 8,
                                               "bool")
         assert lay.forms_source[0] == fp and lay.header()["forms"]["warp"]["regs"]["esi"] == "game"
-        assert CALL_FORMS["warp"].form is None  # the table itself is untouched
+        assert CALL_FORMS["warp"].form.regs == {"ecx": "game", "edx": "player"}  # table untouched
     forms, fields = load_forms(TEST_FORMS)
     for bad in ({"forms": {}}, {"format": "poke-forms-2"},
                 {"format": FORMS_FORMAT, "other": 1},
@@ -1877,7 +1901,7 @@ def selftest_forms(m, game, Rec):
     minions = (0x0054E1E0, {"esi": NEW, "edi": game}, [0, 19])
     cases = [
         ("pos @player 5003 4001", forms, {"r": "ok", "via": "teleport"},
-         [(ROOM_AT, {"ecx": R0, "edx": 5003}, [4001]), (0x00650BE0, {"ecx": PATH, "edx": RA}, [5003, 4001])]),
+         [(ROOM_AT, {"ecx": R0, "edx": 5003}, [4001]), (0x00650BE0, {"ecx": PATH, "edx": RA}, [P, 5003, 4001])]),
         ("pos @player 5003 4001", load_forms({"format": FORMS_FORMAT, "forms": {"teleport": None}},
                                              forms, fields)[0], {"r": "ok", "via": "place"},
          [(ROOM_AT, {"ecx": R0, "edx": 5003}, [4001]),

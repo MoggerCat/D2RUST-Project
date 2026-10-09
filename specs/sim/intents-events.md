@@ -45,14 +45,14 @@
 |   5. Machine-readable tables | 668–704 |
 |   6. Exact-match comparison | 705–813 |
 |   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 814–1293 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1294–1559 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1560–1732 |
-| Constants & data dependencies | 1733–1751 |
-| Randomness | 1752–1757 |
-| Edge cases & original bugs | 1758–1803 |
-| Test vectors | 1804–1890 |
-| Provenance | 1891–2017 |
-| Open questions | 2018–2170 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1294–1561 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1562–1734 |
+| Constants & data dependencies | 1735–1753 |
+| Randomness | 1754–1759 |
+| Edge cases & original bugs | 1760–1805 |
+| Test vectors | 1806–1892 |
+| Provenance | 1893–2019 |
+| Open questions | 2020–2172 |
 <!-- /index -->
 
 ## Summary
@@ -1524,6 +1524,8 @@ for C in client list:                       // any state
     for each corpse GUID g of P(C) (pcdata corpse list, 0x0063D570 /
         0x0063D610; g ≠ −1):
         send to J: 0x8E CorpseAssign(P(C), unit g)   // 0x0053DFB0
+            // flag byte = constant 1 (push 1 at 0x0052C4AB): 10 bytes
+            // 8E 01, P(C)'s GUID u32 (EDX), g u32 (stack 1)
 send to J: 0x5B of P(J)
 // 0x0053FC70(game, J) → 0x0053FB90(game, 1) with EBX = J
 for C in client list with state 4 and P(C):

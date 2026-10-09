@@ -416,11 +416,11 @@ of other threads during a call go to the recorder's own handler.
 | `spawn` | `scenario.md` §3.1 sequences. `normal`: `spawn` entry 1 `0x005B2F20` (mode 1, spread −1, flags 0); `random-boss`: `random_boss` `0x005A43E0` (no list, champion allowed, no warp check), then `champion_minions` `0x0054E1E0` (ESI boss, EDI game; cl 0, class); `champion`: `boss_spawn` `0x005A09E0` (EDI game, EBX class; room, cl 0, x, y, GUID −1, warp 0), `champion_mark` `0x005A48C0` with the umod, `champion_minions`; `unique`: `boss_spawn`, the umods appended to monster data (unit +0x14) +0x1C while fewer than 9, then `boss_minions` `0x005A2120` (ECX 3, EDX cl 0, EAX 6; game, boss, 1). Forms: `monsters/init.md` §25.1, §25.3 |
 | `seed-game`, `seed-unit`, `time` | field writes: game +0xD0; unit +0x20/+0x24; environment record +0x00 / +0x08 of the player's act |
 | `freeze` | the debugger sleeps at the stop |
-| `pos` | `teleport` `0x00650BE0`(unit path, room, x, y), else `place` `0x00554EA0`(game, unit, room, x, y, exact 1, alt 0); room by entry 6 from the unit's room; only unit types 0, 1, 3. Gap until a form is filled (item 22 (a)) |
-| `warp` | `warp` `0x0053AEC0`(game, player, level, tile; tile default 0). Gap (item 22 (b)) |
-| `item` | index = the first combined items record whose code (+0x80) matches (array header `0x0096CA58`: count, records; 424-byte records; `items/treasure.md` §9.1, `data/loading.md` §6–§9; no `0x00633640` call); then `item_create` `0x00558D90`(game, request, 0) with a 0x84-byte request at scratch +0x200: unit 0, game, ilvl (default 1), item, mode 3, x, y, room (entry 6), init flags 1, format (game +0x78), quality (0 or 1–8), rest 0. Gap (item 22 (c)) |
-| `stat` | `stat_set` `0x00627260`(unit, stat, value, layer); a unit with +0x5C = 0 → `failed`. Gap (item 22 (d)) |
-| `state` | `state_set` `0x00639DB0`(unit, state, 1/0): toggle and update-queue insert. Gap (item 22 (d)) |
+| `pos` | `teleport` `0x00650BE0` (stack: unit path, unit, room, x, y; `ret 0x14`; 1/0), else `place` `0x00554EA0` (ECX game, EDX unit; room, x, y, exact 1, alt 0; `ret 0x14`; 1/0); room by entry 6 from the unit's room; only unit types 0, 1, 3. Forms: `path-placement.md` §6 r4, §10 |
+| `warp` | `warp` `0x0053AEC0` (ECX game, EDX player; level, tile, default 0; `ret 8`; EAX not a status, result `ok`). Form: `waypoints.md` §7 r5 |
+| `item` | index = the first combined items record whose code (+0x80) matches (array header `0x0096CA58`: count, records; 424-byte records; `items/treasure.md` §9.1, `data/loading.md` §6–§9; no `0x00633640` call); then `item_create` `0x00558D90` (ECX game, EDX request; use seed 0; `ret 4`; EAX the item) with a 0x84-byte request at scratch +0x200: unit 0, game, ilvl (default 1), item, mode 3, x, y, room (entry 6), init flags 1, format (game +0x78), quality (0 or 1–8), rest 0. Form: `items/generation.md` §3 |
+| `stat` | `stat_set` `0x00627260` (stack: unit, stat, value, layer; `ret 0x10`); a unit with +0x5C = 0 → `failed`. Form: `stat-lists.md` §5 r2 |
+| `state` | `state_set` `0x00639DB0` (stack: unit, state, 1/0; `ret 0xC`): toggle and update-queue insert. Form: `stat-lists.md` §9.2 |
 
 The room for `object`, `superunique`, `spawn` and `item` comes from entry 6
 `0x00463740` (ECX = the player's room, EDX = x; y); 0 gives `failed`.
@@ -435,7 +435,7 @@ item, form)`. The argument names are what `poke.py` supplies (e.g.
 `warp`: `game`, `player`, `level`, `tile`); the form says where each goes:
 
 ```python
-Form(regs={"ecx": "game", "edx": "player"}, stack=["level", "tile"], ret=8, result="bool")
+Form(regs={"ecx": "game", "edx": "player"}, stack=["level", "tile"], ret=8, result="none")
 ```
 
 `regs` maps EAX/EBX/ECX/EDX/ESI/EDI to an argument; `stack` lists the
@@ -449,10 +449,10 @@ address and its pc1-data item. `FIELDS` holds the record offsets and table
 addresses the directives read (item format, items array, umod list); None
 there is a gap too.
 
-Gaps today: `teleport`, `place` (`pos`), `warp`, `item_create`, `stat_set`,
-`state_set` (`docs/handoff/pc1-data.md` Step 4 item 22 (a)–(d)). The spawn
-kinds' functions (item 22 (e)) are already stated in `monsters/init.md`
-§25.1 and filled.
+Every entry has its form: `teleport`, `place` (`pos`), `warp`,
+`item_create`, `stat_set`, `state_set` from `docs/handoff/pc1-data.md`
+Step 4 item 22 (a)–(d) (read from the asm, not yet run on 1.14d); the
+spawn kinds' functions (item 22 (e)) from `monsters/init.md` §25.1.
 
 PC 1, for each answered function:
 
