@@ -141,6 +141,8 @@ pub struct ModelFeed<F = NoFeed> {
     /// facts the model needs them for refuse.
     pub unit_tables: Option<UnitFactTables>,
     /// The skill-move draw offsets of the preview (`skill_motion`).
+    /// The shadow offsets of the same units (`set_motion_shadow_offsets`).
+    pub motion_shadow_offsets: std::collections::BTreeMap<UnitKey, (i32, i32)>,
     pub motion_offsets: std::collections::BTreeMap<UnitKey, (i32, i32)>,
     /// The play preview's weather (`weather_view`, `d2rs-own,
     /// unverified`): water floors keep their bit, passes 4 and 9 draw.
@@ -159,6 +161,7 @@ impl<F> ModelFeed<F> {
             local_at: None,
             unit_tables: None,
             motion_offsets: Default::default(),
+            motion_shadow_offsets: Default::default(),
             weather: None,
         }
     }
@@ -216,6 +219,21 @@ impl<F: ViewSource> ViewSource for ModelFeed<F> {
             return Ok((x + mx, y + my));
         }
         self.inner.unit_offset(unit, pose)
+    }
+
+    /// Preview: as [`Self::unit_offset`] with the motion record's shadow
+    /// offset (`blend-modes.md` §5 r3); else the inner feed's.
+    fn unit_shadow_offset(&self, unit: &ClientUnit, pose: &UnitPose) -> Result<(i32, i32), String> {
+        if self.preview.is_some() {
+            let (x, y) = preview::unit_offset();
+            let (mx, my) = self
+                .motion_shadow_offsets
+                .get(&unit.key)
+                .copied()
+                .unwrap_or((0, 0));
+            return Ok((x + mx, y + my));
+        }
+        self.inner.unit_shadow_offset(unit, pose)
     }
 
     fn map_tiles(
@@ -276,6 +294,13 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
 
     fn set_motion_offsets(&mut self, offsets: std::collections::BTreeMap<UnitKey, (i32, i32)>) {
         self.motion_offsets = offsets;
+    }
+
+    fn set_motion_shadow_offsets(
+        &mut self,
+        offsets: std::collections::BTreeMap<UnitKey, (i32, i32)>,
+    ) {
+        self.motion_shadow_offsets = offsets;
     }
 
     fn set_hover(&mut self, unit: Option<UnitKey>) {
