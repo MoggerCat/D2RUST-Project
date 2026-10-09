@@ -306,17 +306,62 @@ impl Default for WorldViewPlugin {
 #[derive(Resource)]
 struct GpuWanted(bool);
 
+/// The order of the `PreUpdate` systems that take the bridge after
+/// [`bridge_frame`] and before [`mirror_units`] (`flows/client-frame.md`
+/// §3 r1; q-tick-flow C4): the frame's outputs first (their C→S answers,
+/// 0x31, leave in the frame that made them), then the local player's
+/// walk prediction, then the monster tracks (players before monsters, the
+/// client update pass's order, `client/model.md` §5 r3). Pinned so the
+/// order of sends within a frame is not left to Bevy's executor.
+#[derive(SystemSet, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum PreviewOrder {
+    Outputs,
+    PlayerWalk,
+    MonsterWalk,
+}
+
+/// Configures [`PreviewOrder`] in `PreUpdate` (idempotent).
+pub fn configure_preview_order(app: &mut App) {
+    app.configure_sets(
+        PreUpdate,
+        (
+            PreviewOrder::Outputs,
+            PreviewOrder::PlayerWalk,
+            PreviewOrder::MonsterWalk,
+        )
+            .chain()
+            .after(bridge_frame)
+            .before(mirror_units),
+    );
+}
+
+/// The paused pass's input (`flows/client-frame.md` §1 r2, `client/bridge.md`
+/// §8 r5): the bridge is paused while the original UI has state 9 (the
+/// Esc menu) or 11 open.
+pub fn pause_frame(mut bridge: ResMut<BridgeResource>, ui: Option<NonSend<WorldViewUi>>) {
+    let paused = ui
+        .as_ref()
+        .and_then(|u| u.original.as_ref())
+        .is_some_and(|o| o.is_open(9) || o.is_open(11));
+    bridge.0.set_paused(paused);
+}
+
 impl Plugin for WorldViewPlugin {
     fn build(&self, app: &mut App) {
         let node = self.gpu && add_node(app);
+        configure_preview_order(app);
         app.insert_resource(GpuWanted(node))
             .init_resource::<UiSounds>()
             .add_systems(
                 PreUpdate,
-                deliver_outputs
-                    .after(bridge_frame)
-                    .before(mirror_units)
-                    .run_if(resource_exists::<BridgeResource>),
+                (
+                    pause_frame
+                        .before(bridge_frame)
+                        .run_if(resource_exists::<BridgeResource>),
+                    deliver_outputs
+                        .in_set(PreviewOrder::Outputs)
+                        .run_if(resource_exists::<BridgeResource>),
+                ),
             )
             .add_systems(
                 Update,
@@ -1225,5 +1270,45 @@ mod act_load_tests {
         // Two loads before one frame: one cleared frame.
         note_act_loads(&mut c, &mut seen, 3);
         assert_eq!(c.post_clear(), 1);
+    }
+}
+
+#[cfg(test)]
+mod order_tests {
+    use super::*;
+
+    #[derive(Resource, Default)]
+    struct Order(Vec<&'static str>);
+
+    fn outputs(mut o: ResMut<Order>) {
+        o.0.push("outputs");
+    }
+    fn player_walk(mut o: ResMut<Order>) {
+        o.0.push("player walk");
+    }
+    fn monster_walk(mut o: ResMut<Order>) {
+        o.0.push("monster walk");
+    }
+
+    /// q-tick-flow C4 (`flows/client-frame.md` §3 r1): the three
+    /// `PreUpdate` systems that take the bridge after the bridge frame run
+    /// in a pinned order, whatever their registration order: the frame's
+    /// outputs, the player walk, the monster tracks.
+    // Covers: specs/flows/client-frame.md §3 r1; specs/client/model.md §5 r3
+    #[test]
+    fn the_bridge_systems_after_the_frame_run_in_a_pinned_order() {
+        for _ in 0..8 {
+            let mut app = App::new();
+            app.init_resource::<Order>();
+            app.add_systems(PreUpdate, monster_walk.in_set(PreviewOrder::MonsterWalk));
+            app.add_systems(PreUpdate, player_walk.in_set(PreviewOrder::PlayerWalk));
+            app.add_systems(PreUpdate, outputs.in_set(PreviewOrder::Outputs));
+            configure_preview_order(&mut app);
+            app.update();
+            assert_eq!(
+                app.world().resource::<Order>().0,
+                ["outputs", "player walk", "monster walk"]
+            );
+        }
     }
 }
