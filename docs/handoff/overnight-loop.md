@@ -66,5 +66,11 @@ to 500..599, ten per session:
 | q-fix-client-missiles-rest | 540–549 | Opus (rendering) |
 | q-prov-recording (settle `recording` points under Wine) | 550–559 | Opus |
 | q-prov-data (settle `data` points from the install) | 560–569 | Sonnet |
+| q-prov-recording-2 (the d2-client `recording` points; q-prov-recording takes the rest) | 570–579 | Opus |
 
-Next free cloud id: REC-570.
+Next free cloud id: REC-580.
+
+Speed (user, 2026-10-09 08:00): sessions work in parallel with subagents,
+run only the changed crate's tests while iterating and the full gate before
+each push, push every 2–4 fixes, report in one short message per push, and
+send binary-only questions to pc1-data.md instead of stopping.
