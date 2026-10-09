@@ -1,0 +1,14 @@
+check 1
+# audio-diff (specs/tools/audio-diff.md §5): a Fallen spawned next to the
+# player in the Blood Moor attacks (combat-fallen-hits-player's scenario):
+# monster attack, hit and player get-hit sounds.
+name audio-monster-hit-ama
+save ScnAma --class ama --expansion
+seed 1234
+ticks 200
+seconds 300
+channels audio
+at 4 poke warp 2
+at 30 poke seed-game 0x00001234 666
+at 30 poke seed-unit @player 0x00000055 666
+at 30 poke spawn 19 @x+2 @y normal

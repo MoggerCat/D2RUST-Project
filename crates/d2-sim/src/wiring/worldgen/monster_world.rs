@@ -40,6 +40,21 @@ impl<X: WorldPending> MonsterWorld<X> for WorldState {
         let n = usize::from(r.mon_count).min(r.entries.len());
         Some(r.entries[..n].iter().map(|e| i32::from(e.class)).collect())
     }
+    fn count_death(&mut self, unit: UnitId, alignment: u8) {
+        let Some(m) = self.monsters.get(unit) else {
+            return;
+        };
+        let (level, flag2) = (m.level_id, m.not_counted);
+        self.pop.regions.count_kill(level, flag2, alignment, true);
+    }
+    fn den_counts(&self) -> Option<(u32, u32, u32)> {
+        let r = self.pop.regions.get(8)?;
+        Some((
+            r.evil_spawned as u32,
+            r.evil_killed as u32,
+            r.rooms_visited as u32,
+        ))
+    }
     fn monstats_count(&self) -> u32 {
         self.tables.monstats.len() as u32
     }

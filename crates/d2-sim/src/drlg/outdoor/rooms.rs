@@ -9,6 +9,7 @@ use super::super::room::{LinkAt, RoomKind};
 use super::super::tiles::{CellGrid, GridPass, RoomGrids};
 use super::super::{room_flags, DrlgRoomId, LevelIdx, TileRect};
 use super::grid::{cell, Gen, Grid};
+use super::path_floor::path_floor;
 use super::tilesub::{pick_sub_themes, room_substitution, RoomSub};
 use super::{
     dispatch_act, Outdoor, OutdoorData, OutdoorError, OutdoorLevel, OutdoorPresets, OutdoorRoom,
@@ -186,6 +187,8 @@ impl Outdoor {
         let (id, lt) = (drlg.level(level).id, drlg.level(level).level_type);
         let sd = od.sub_defs(id);
         let n = (ROOM_TILES + 1) as usize;
+        let act1 = drlg.act == 0;
+        let paths = self.levels.get(&level).map(|l| &l.paths);
         let data = self.rooms.entry(room).or_default();
         data.tile_type = CellGrid::new(n, n);
         data.wall = CellGrid::new(n, n);
@@ -198,9 +201,13 @@ impl Outdoor {
                 data.floor.set(x, y, 0x40002);
             }
         }
-        // TODO(outdoor.md §7.5.3, OQ 6): the Act I path floor needs the
-        // 256-byte style table `0x006F2860` and its neighbour-bit order,
-        // not transcribed; path floors are not drawn (no draws involved).
+        // Act I: path floor (§7.5.3), before the substitutions (its floor
+        // cells fail their fixed test, `outdoor-tilesub.md` §4.3).
+        if act1 {
+            if let Some(paths) = paths {
+                path_floor(paths, rect, &mut data.floor);
+            }
+        }
         let (sub_type, sub_theme, picked) = (data.sub_type, data.sub_theme, data.picked);
         let seed = &mut drlg.room_mut(room).seed;
         let mut rs = RoomSub {

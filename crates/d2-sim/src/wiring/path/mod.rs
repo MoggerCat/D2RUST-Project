@@ -49,6 +49,9 @@ mod motion_tests;
 mod init_cb_tests;
 
 #[cfg(test)]
+mod frames_tests;
+
+#[cfg(test)]
 mod mutant_tests;
 
 use std::collections::BTreeMap;
