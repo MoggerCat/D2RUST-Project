@@ -1598,6 +1598,7 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
             let m2 = monstats2.record(link as usize);
             let mut c = MonsterClass::from_record(m2, m.npc, m.interact)?;
             c.setup = Some(monster_setup(m, monstats_table.record(i), m2));
+            c.no_aura = m.noaura;
             if let Some(x) = monstats2_rows.get(link as usize) {
                 c.light = x.light;
                 c.light_rgb = (x.light_r, x.light_g, x.light_b);
@@ -1707,6 +1708,7 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
                 m.clthitsubmissile4 as i16,
             ],
             c_hit_par: [m.chitpar1 as i32, m.chitpar2 as i32, m.chitpar3 as i32],
+            hit_sub1_server: m.hitsubmissile1 as i16,
         })
         .collect();
     let states: Vec<d2_data::tables::States> = decode_all(table("states")?).map_err(err)?;
