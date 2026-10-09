@@ -442,7 +442,7 @@ impl MoveCall for UpdateRun {
         let mut d = parts.desk(econ);
         // The items placed on the ground since the last pass: their unit
         // flag 0x1000 was cleared by the tick's room clean-up (PROVISIONAL,
-        // REC-740: d2rs-own bookkeeping for the pass's place in the tick).
+        // REC-730: d2rs-own bookkeeping for the pass's place in the tick).
         let dropped = d.take_dropped();
         let (mut sent, mut fatal) = (Vec::new(), Vec::new());
         let mut announced = Vec::new();

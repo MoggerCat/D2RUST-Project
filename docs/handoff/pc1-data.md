@@ -325,7 +325,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     which list it attaches (stats, length: 170 frames at 10 of 50 life,
     51 frames for an mp1 at 1 mana), what ends it when the vital is full,
     and whether the unit is queued for update by the toggle
-    (`0x00639DB0`) or by the entry itself. d2rs: PROVISIONAL REC-740 in
+    (`0x00639DB0`) or by the entry itself. d2rs: PROVISIONAL REC-730 in
     `d2-sim/src/wiring/inventory/potion.rs`.
 
 35. **`0x0063E6B0(unit, 0)`: are the action-frame tests skipped?** (REC-700) `0x005A6D50` passes the moving flag r as `0x0063E6B0`'s second argument (`skills/use.md` §5.2 "Monsters"); `skills/bodies-3.md` §5.18 step 3 gives the tests (+0x4E = 0, or no action event in the frames ((cur − speed) >> 8, cur >> 8]) for the argument 1 only. Read: what the function does with 0 (d2rs: no tests, the column by mode). Write the answer into `bodies-3.md` §5.18 step 3.

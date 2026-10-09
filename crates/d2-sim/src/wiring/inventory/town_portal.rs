@@ -108,7 +108,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
     fn use_unwritten(&mut self, player: Owner, item: Guid, target: Owner, x: i32, y: i32) -> bool {
         if target == Owner::item(item) {
             // A potion used from the grid (0x20) is drunk by U, the player
-            // (PROVISIONAL, REC-740: entry 3's body `0x005BE3F0` is
+            // (PROVISIONAL, REC-730: entry 3's body `0x005BE3F0` is
             // unwritten). Recorded 2026-10-09: an mp1 right-clicked in the
             // inventory is used (`facts/items/a1-town-potions-low.tsv`
             // n 28–31: 0x3F, 0x9D action 5 with flag 0x20, next frame

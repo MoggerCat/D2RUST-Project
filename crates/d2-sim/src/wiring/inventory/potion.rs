@@ -159,7 +159,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         // Recorded 2026-10-09: an hp1 from the belt at full life and an
         // mp1 at full mana give 0xA9 100 / 106 and no 0xA8
         // (`facts/items/a1-town-item-moves.tsv` n 41–43, n 49–51).
-        // PROVISIONAL (REC-740): where 1.14d ends it is unread (entry 3,
+        // PROVISIONAL (REC-730): where 1.14d ends it is unread (entry 3,
         // `items/use.md` open question 1).
         let (vital, max) = if state == STATE_HEALTHPOT {
             (STAT_LIFE, s.max_life(u))

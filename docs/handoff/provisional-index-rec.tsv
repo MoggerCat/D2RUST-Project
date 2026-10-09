@@ -310,5 +310,6 @@ REC-725	6498		Object door step (PROVISIONAL, `bridge/objects/mod.rs`; q-fix-obje
 REC-726	6500		Key mode filter in play (PROVISIONAL, `d2-client` `ui/edge.rs` `key_actions_in_mode`, `con	data	yes		4	
 REC-727	6499		NPC "introduction" topic text (PROVISIONAL, `d2-client` `ui/npc_talk.rs` `topic_text`; q-f	unstated	no		1	
 REC-728	6501		NPC menu-open greeting sound (PROVISIONAL, `d2-client` `ui/npc_box.rs` `open_npc_menu_with	recording	no		2	
-REC-740	6502		Belt / grid potion use and the cursor drop (PROVISIONAL, `d2-sim` `wiring/inventory/potion	recording	no	yes	4	
+REC-730	6502		Belt / grid potion use and the cursor drop (PROVISIONAL, `d2-sim` `wiring/inventory/potion	recording	no		3	
+REC-740	6521		Item tip anchor (PROVISIONAL, `ui/item_tip.rs` `TipAnchor::at_point`, `draw_tip`; q-fix-ui	unstated	no		1	
 REC-745	6503		Grid drop cell `0x00486BD0` (PROVISIONAL, `d2-client` `ui/panels/inv_items.rs` `grid_drop_	recording	no		1	
