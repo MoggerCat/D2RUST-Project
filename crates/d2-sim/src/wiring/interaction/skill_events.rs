@@ -1,4 +1,4 @@
-// Spec: specs/skills/use.md §5.2, §7; specs/sim/stat-lists.md §10.2, §10.3; specs/sim/units.md §4.6 r7, r10, r13, §5, §6.1
+// Spec: specs/skills/use.md §5.2 (players; monsters `0x005A7670`), §7; specs/missiles/missiles.md §R2.2; specs/combat/damage.md §5.1; specs/sim/stat-lists.md §10.2, §10.3; specs/sim/units.md §4.6 r7, r10, r13, §5, §6.1
 //! The skill timer events of the unit dispatch on the skill use
 //! pipeline: event 5 (active state), 8 (periodic skills and auras) and 9
 //! (item auras) reach [`crate::skills::use_`] through [`UseView`].
@@ -23,7 +23,10 @@
 //! Event 14 (callback `0x00554570`) is not routed: `use.md` §6 states it
 //! is never scheduled in 1.14d and its body is not specified.
 
+use crate::combat::apply_melee;
 use crate::skills::levels::skill_level;
+use crate::skills::use_::bodies::b4_mon::monster_mode_missile;
+use crate::skills::use_::bodies::{melee_setup, BodyWorld};
 use crate::skills::use_::{
     active_state_event, attack_frame_event, do_skill, item_aura_event, periodic_event, start,
     UseWorld, FLAG_MISSILE_FIRED, SKILL_ARRIVED, SKILL_MOVING,
@@ -168,6 +171,87 @@ pub fn monster_sequence_frame<X: Pending + UseRest>(
             .map_or((0, 0), |r| (r.anim.action_frame, r.flags));
     if code == 4 || (do_left && flags & FLAG_MISSILE_FIRED == 0 && matches!(code, 1 | 2)) {
         do_it(&mut w);
+    }
+}
+
+/// trigger(U) of the monster attack event (`use.md` §5.2 "Monsters"):
+/// U's mode is 14 ? unit flag 0x40 (+0xC4) set : frame code (+0x4E) = 1.
+pub fn monster_trigger(units: &crate::units::record::Units, unit: UnitId) -> bool {
+    units.get(unit).is_some_and(|r| {
+        if r.mode == 14 {
+            r.flags & FLAG_MISSILE_FIRED != 0
+        } else {
+            r.anim.action_frame == 1
+        }
+    })
+}
+
+/// The used-skill branch of the monster attack-family event 0
+/// `0x005A7670` (`use.md` §5.2 "Monsters") on the skill use pipeline: E
+/// flags bit 0 (a moving skill): the target check and step (`0x00553490`,
+/// `0x00554CA0`); stopped → E flags |= 2, the do `0x0056FC50`, and a
+/// second do when trigger(U); done. Otherwise (and for a moving skill
+/// still on its way) the do, on every event: no frame-code test. The
+/// animation refresh that follows is the caller's.
+pub fn monster_attack_skill<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    unit: UnitId,
+) {
+    let t = h.tables.clone();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    let do_it = |w: &mut UseView<'_, X>| {
+        if let Some(e) = w.used_skill(unit) {
+            let l = skill_level(w, &t.skills, Some(unit), Some(&e), true);
+            do_skill(w, &t.skills, unit, e.skill, l);
+        }
+    };
+    if w.used_skill(unit).is_none() {
+        return;
+    }
+    let f = w.used_skill_flags(unit);
+    if f & SKILL_MOVING != 0 && w.step_path(unit) == 2 {
+        w.set_used_skill_flags(unit, f | SKILL_ARRIVED);
+        do_it(&mut w);
+        // trigger(U) is read after the first do (which may set flag 0x40).
+        if monster_trigger(w.cv.v.units, unit) {
+            do_it(&mut w);
+        }
+        return;
+    }
+    do_it(&mut w);
+}
+
+/// The strike of the monster attack-family event 0 `0x005A7670` with no
+/// used skill (`use.md` §5.2 "Monsters"): the mode missile `0x005A6D50`
+/// (`missiles.md` §R2.2, its argument the moving flag); none → the melee
+/// set-up `0x005A5490` and `apply_melee` `0x0057D4F0` (`combat/damage.md`
+/// §5.1) on the path target unit `0x00553540`, when there is one.
+pub fn monster_attack_strike<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    unit: UnitId,
+    moving: bool,
+) {
+    let t = h.tables.clone();
+    let ct = h.tables.combat.clone();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    if monster_mode_missile(&mut w, &ct, unit, moving) != 0 {
+        return;
+    }
+    melee_setup(&mut w, &t.skills, &ct, unit);
+    if let Some(tg) = crate::wiring::path::monsters::path_target(&*w.cv.v.h, unit) {
+        apply_melee(w.combat(), &ct, unit, tg);
     }
 }
 
