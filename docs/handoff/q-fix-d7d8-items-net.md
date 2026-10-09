@@ -38,3 +38,20 @@ python3 tools/scenario-diff/scenario_diff.py traces/checks/items-vendor-akara-bu
 ```
 Note: `tools/coord/session-setup.sh` run from /tmp fails (it derives the repo root from
 its own path); run it from `tools/coord/`.
+
+## Pick-up blocker (C->S 0x16 not applied; coordinator request after D7/D8)
+Check `traces/checks/items-pickup-ama.check` (potion on the ground, scripted `send PickItem`):
+state PARTIAL (no difference), packets MATCH against 1.14d (was DIVERGED at frame 10).
+Causes, all fixed:
+- A player loaded from an item-less save had no inventory in the model (`load_list` and
+  `join_player_items` returned early on an empty list), so `can_pick` failed and the pick-up
+  did nothing (REC-1402; the original makes it at unit allocation `0x0063ABD0`).
+- One S->C 0x0A per pick-up: `leave_room` announces only while `in_room` (the grid / belt
+  placement already left the room), REC-1403.
+- The pickup sound (S->C 0x2C, event 1) was never queued: `InvDesk::pickup_sound` queues it
+  in the player's sound slot. REC-1404 PROVISIONAL: event 1 is the one recorded value (a
+  healing potion); what picks the event is not written. PC 1 question for gold and other items.
+- State dump: an item that left the ground reports its inventory place and no `lv`.
+Not fixed (not mine): `save-items-ama` still diverges at c2s frame 11 because d2rs' headless
+client never sends the Walk / PickItem for `clickunit 4 *` (input owner, q-tool-state-diff).
+Gold pick-up (0x19 at f43) is not covered by the new check.
