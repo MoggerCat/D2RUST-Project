@@ -190,6 +190,9 @@ pub struct MonsterData {
     /// +0x5C bit 0: set by the summoner's boss mods (§14.3,
     /// `0x00573570(unit, 1, set)`).
     pub data_flag1: bool,
+    /// +0x54 dwAiState (`monsters/ai.md` §3 "AI state"): 0 at creation;
+    /// set by `0x005734C0` and the mode set's `0x005A68E0`.
+    pub ai_state: u32,
 }
 
 impl MonsterData {

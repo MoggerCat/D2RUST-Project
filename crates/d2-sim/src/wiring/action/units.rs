@@ -460,6 +460,10 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     /// the requested mode is kept for the start function.
     fn monster_mode_bookkeeping(&mut self, sim: &mut Sim<'_>, unit: UnitId, mode: u32) {
         self.monster_request = mode;
+        let left = sim.units.get(unit).map(|r| r.mode);
+        if let Some(m) = left {
+            self.leave_monster_mode(unit, m);
+        }
         self.monster_path_setup(sim, unit, mode);
     }
 
@@ -525,6 +529,7 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
                 // for the unit, so running it after the host's start
                 // keeps 1.14d's order of effects.
                 ai::cancel_think_and_regen(sim.game, unit);
+                self.push_last_dead(sim.game, unit);
             }
             return started;
         }
