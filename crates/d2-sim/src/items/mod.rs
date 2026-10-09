@@ -308,6 +308,10 @@ pub struct Item<S> {
     pub start_seed: u32,
     pub name: [u8; 16],
     pub ear_level: i32,
+    /// Item data +0x1C / +0x20 (`dwRealmData[0..1]`, `items/bitstream.md`
+    /// §5 rule 2): set only by the save reader (setter `0x00629EA0`), so
+    /// 0 unless the item was read from a save carrying them.
+    pub realm_data: [u32; 2],
     pub stats: S,
 }
 
@@ -352,6 +356,7 @@ impl<S> Item<S> {
             start_seed: 0,
             name: [0; 16],
             ear_level: 0,
+            realm_data: [0; 2],
             stats,
         }
     }

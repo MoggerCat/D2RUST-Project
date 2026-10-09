@@ -35,6 +35,9 @@ fn codes() -> Codes {
     t.items[hp1].stackable = 0;
     let rin = t.items.iter().position(|r| &r.code == b"rin ").unwrap();
     t.items[rin].stackable = 1;
+    // `bitstream-legacy.md` §3 rule 8: a set record names a `setitems`
+    // row (80 rows; the round trips use row 77).
+    t.setitems.resize(80, Default::default());
     Codes { t }
 }
 
@@ -344,4 +347,131 @@ fn decoder_rebuilds_level_quality_and_unique_index() {
             want
         );
     }
+}
+
+/// The bit position just past the record read from `bytes`.
+fn end_of(c: &Codes, bytes: &[u8]) -> usize {
+    let mut r = BitReader::new(bytes);
+    read::read_save_record(&mut r, &c.t).unwrap();
+    r.pos()
+}
+
+/// §5 rule 2 (current version, > 0x5D): a and b are kept, the third u32
+/// is read and dropped whatever it holds.
+// Covers: specs/items/bitstream.md §5 r2; specs/items/bitstream-legacy.md §2 r2
+#[test]
+fn the_third_trailer_word_is_read_and_dropped() {
+    let c = codes();
+    let mut cap = full(&c, b"cap ");
+    cap.save_trailer = Some((7, 9));
+    let (mut bytes, _) = write_save(&cap, &c.t.isc).unwrap();
+    let end = end_of(&c, &bytes);
+    // The third word is the record's last 32 bits: make it 0x80000001.
+    for at in [end - 32, end - 1] {
+        bytes[at / 8] |= 1 << (at % 8);
+    }
+    let e = read_save_entry(&bytes, &c.t).unwrap();
+    assert_eq!(e.len, bytes.len());
+    assert!(!e.item.failed);
+    assert_eq!(e.item.item.save_trailer, Some((7, 9)));
+}
+
+/// `bitstream-legacy.md` §3 rule 6.7, edge case 6: a quality outside 1–9
+/// reads nothing in the quality step, is read on to its end and fails;
+/// the bytes used are the whole record (`d2s.md` §8.2 rule 2).
+// Covers: specs/items/bitstream-legacy.md §3 r6.7, §3 r12, §edge-cases-original-bugs r6
+#[test]
+fn a_quality_outside_1_to_9_reads_on_and_fails() {
+    let c = codes();
+    let cap = full(&c, b"cap ");
+    let (bytes, _) = write_save(&cap, &c.t.isc).unwrap();
+    // Marker 16, flags 32, format 10, mode 3, location 15, code 32,
+    // filled 3, unit +0x28 32, item level 7: quality at bit 150.
+    const Q: usize = 150;
+    for q in [0u8, 10, 15] {
+        let mut b = bytes.clone();
+        for i in 0..4 {
+            let at = Q + i;
+            b[at / 8] &= !(1 << (at % 8));
+            b[at / 8] |= ((q >> i) & 1) << (at % 8);
+        }
+        let e = read_save_entry(&b, &c.t).unwrap();
+        assert_eq!((e.item.item.quality, e.item.failed), (q, true), "q {q}");
+        assert_eq!(e.len, bytes.len(), "read on to the end");
+    }
+    assert!(!read_save_entry(&bytes, &c.t).unwrap().item.failed);
+}
+
+/// `bitstream-legacy.md` §3 rule 8 (v ≥ 0x5D): the 12 bits name a
+/// `setitems` row; no row fails the record.
+// Covers: specs/items/bitstream-legacy.md §3 r8
+#[test]
+fn a_set_index_without_a_row_fails() {
+    let c = codes();
+    let mut set = full(&c, b"cap ");
+    set.quality = 5;
+    set.file_index = 79;
+    let (bytes, _) = write_save(&set, &c.t.isc).unwrap();
+    let e = read_save_entry(&bytes, &c.t).unwrap();
+    assert_eq!((e.item.failed, e.item.item.file_index), (false, 79));
+    set.file_index = 80;
+    let (bytes, _) = write_save(&set, &c.t.isc).unwrap();
+    assert!(read_save_entry(&bytes, &c.t).unwrap().item.failed);
+}
+
+/// `bitstream-legacy.md` §4 rule 1, edge cases 1 and 2: id 0 alone is
+/// strength; id 0 after id 0 fails the record; an id with no
+/// `itemstatcost` row ends the list without a failure.
+// Covers: specs/items/bitstream-legacy.md §4 r1, §edge-cases-original-bugs r1, §edge-cases-original-bugs r2
+#[test]
+fn list_ids_0_0_fail_and_an_id_without_a_row_ends_the_list() {
+    let mut c = codes();
+    // Synthetic columns for stat 0 (those of row 19).
+    c.t.isc[0] = c.t.isc[19];
+    let mut cap = full(&c, b"cap ");
+    cap.main = Some(vec![e(0, 0, 5), e(19, 0, 1)]);
+    let (bytes, _) = write_save(&cap, &c.t.isc).unwrap();
+    let r = read_save_entry(&bytes, &c.t).unwrap();
+    assert!(!r.item.failed);
+    assert_eq!(r.item.item.main, cap.main);
+    cap.main = Some(vec![e(0, 0, 5), e(0, 0, 6)]);
+    let (bytes, _) = write_save(&cap, &c.t.isc).unwrap();
+    let r = read_save_entry(&bytes, &c.t).unwrap();
+    assert!(r.item.failed);
+    assert_eq!(r.item.item.main, Some(vec![e(0, 0, 5)]));
+    // Id 380 written with a table that has its row, read with one that
+    // ends at 360: the list ends at the id (its value bits are then left
+    // unread).
+    let mut wide = c.t.isc.clone();
+    wide.resize(381, Default::default());
+    wide[380] = c.t.isc[19];
+    cap.main = Some(vec![e(380, 0, 3)]);
+    let (bytes, _) = write_save(&cap, &wide).unwrap();
+    let mut rd = BitReader::new(&bytes);
+    let r = read::read_save_record(&mut rd, &c.t).unwrap();
+    assert!(!r.failed);
+    assert_eq!(r.item.main, Some(Vec::new()));
+}
+
+/// `bitstream.md` Outputs, §2 rule 5: the save writer returns every
+/// written item's write-back, children too, in write order.
+// Covers: specs/items/bitstream.md §2 r5, §4.1 r8, §4.3 r7
+#[test]
+fn the_save_writer_returns_every_items_write_back() {
+    let c = codes();
+    let mut cap = full(&c, b"cap ");
+    cap.ilvl = 0;
+    cap.filled = 2;
+    let mut a = full(&c, b"rin ");
+    a.quality = 0;
+    let mut b = full(&c, b"rin ");
+    b.quality = 12;
+    b.ilvl = 5;
+    let mut inner = full(&c, b"hp1 ");
+    inner.quality = 3;
+    a.children = vec![inner];
+    cap.children = vec![a, b];
+    let (_, wbs) = write_save(&cap, &c.t.isc).unwrap();
+    let got: Vec<(i32, u8)> = wbs.iter().map(|w| (w.ilvl, w.quality)).collect();
+    assert_eq!(got, [(1, 2), (12, 2), (12, 3), (5, 2)]);
 }

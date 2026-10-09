@@ -118,6 +118,8 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             main: list(ListKey::ITEM.state, ListKey::ITEM.flags),
             sets,
             runeword_list: list(bitstream::RUNEWORD_STATE as u16, ListKey::ITEM.flags),
+            // §5 rule 2: the trailer bit is 1 exactly when +0x20 ≠ 0.
+            save_trailer: (it.realm_data[1] != 0).then_some((it.realm_data[0], it.realm_data[1])),
             ..Default::default()
         })
     }
@@ -186,12 +188,23 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         view.alt = alt;
         let mut w = bitstream::BitWriter::new(bitstream::BUFFER);
         let wb = bitstream::write_into(&mut w, &view, &self.econ.tables.isc);
-        if wb.ilvl != view.ilvl || wb.quality != view.quality {
-            if let Some(u) = self.item_unit(item) {
-                self.state.write_backs.borrow_mut().push((u, wb));
-            }
+        if let Some(u) = self.item_unit(item) {
+            self.queue_write_back(u, wb);
         }
         w.finish().unwrap_or_default()
+    }
+
+    /// Queues the writer's change of `u` (`bitstream.md` Outputs) when it
+    /// changes anything; [`Self::apply_write_backs`] writes it.
+    pub fn queue_write_back(&self, u: UnitId, wb: bitstream::WriteBack) {
+        let changed = self
+            .econ
+            .items
+            .get(u)
+            .is_some_and(|it| it.ilvl != wb.ilvl || it.quality != wb.quality);
+        if changed {
+            self.state.write_backs.borrow_mut().push((u, wb));
+        }
     }
 
     /// Writes the queued writer changes (item level, quality) to the item

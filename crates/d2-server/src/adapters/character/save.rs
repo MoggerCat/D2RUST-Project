@@ -1,4 +1,4 @@
-// Spec: specs/formats/d2s.md §2.8 r1, §2.8 r3, §8.1 r2, §8.1 r3, §8.1 r4, §8.1 r10, §8.4 r1; specs/formats/d2s-appearance.md §3 r1, §4 r1; specs/world/hirelings.md §10 r8
+// Spec: specs/items/bitstream.md §2 r5; specs/formats/d2s.md §2.8 r1, §2.8 r3, §8.1 r2, §8.1 r3, §8.1 r4, §8.1 r10, §8.4 r1; specs/formats/d2s-appearance.md §3 r1, §4 r1; specs/world/hirelings.md §10 r8
 //! Character storage, write side: the parts of a save the writer
 //! (`0x00568F20`) rebuilds from the game at save time rather than from
 //! the loaded file: the appearance bytes (`formats/d2s.md` §2.8, the fill
@@ -15,7 +15,7 @@
 
 use d2_formats::d2s::appearance::{self, AppearanceTables, Equipment, EquippedItem, BODY_SLOTS};
 use d2_formats::d2s::{D2s, ItemEntry};
-use d2_sim::items::bitstream::{write_save, IscTable, StreamItem};
+use d2_sim::items::bitstream::{write_save, IscTable, StreamItem, WriteBack};
 use d2_sim::items::inventory::node;
 use d2_sim::items::ItemTables;
 use d2_sim::units::lifecycle::LifecycleHooks;
@@ -47,6 +47,10 @@ pub trait SaveItems {
     /// The item's appearance inputs (`d2s-appearance.md` Inputs), with
     /// `first_child` unset (the caller fills it from [`SaveItems::items`]).
     fn appearance(&self, item: UnitId) -> Option<EquippedItem>;
+    /// Queues the writer's change of `item` (`items/bitstream.md`
+    /// Outputs: item level < 1 → 1, quality outside 1–9 → 2); the owner
+    /// of the model applies it (`InvDesk::apply_write_backs`).
+    fn write_back(&self, _item: UnitId, _wb: WriteBack) {}
 }
 
 /// Why a save section could not be written.
@@ -72,13 +76,15 @@ pub struct SaveContext {
 }
 
 /// One item entry (§8.1 rule 2): the item's stream, then each item of its
-/// own inventory, recursively (rule 10).
-fn stream_tree(src: &dyn SaveItems, item: UnitId) -> Option<StreamItem> {
+/// own inventory, recursively (rule 10); `units` gets the written items in
+/// write order (the order of [`write_save`]'s write-backs).
+fn stream_tree(src: &dyn SaveItems, item: UnitId, units: &mut Vec<UnitId>) -> Option<StreamItem> {
     let mut s = src.stream(item)?;
+    units.push(item);
     s.children = src
         .items(item)
         .into_iter()
-        .filter_map(|c| stream_tree(src, c))
+        .filter_map(|c| stream_tree(src, c, units))
         .collect();
     Some(s)
 }
@@ -120,8 +126,15 @@ pub fn item_list(
         if src.flags2(u) & FLAGS2_NO_SAVE != 0 {
             continue;
         }
-        let s = stream_tree(src, u).ok_or(SaveError::Model("item without a stream view"))?;
-        let (bytes, _) = write_save(&s, isc).map_err(|_| SaveError::Overflow)?;
+        let mut units = Vec::new();
+        let s = stream_tree(src, u, &mut units)
+            .ok_or(SaveError::Model("item without a stream view"))?;
+        let (bytes, wbs) = write_save(&s, isc).map_err(|_| SaveError::Overflow)?;
+        // `items/bitstream.md` Outputs: the writer's changes stay on every
+        // written item, children too (§2 rule 5).
+        for (u, wb) in units.into_iter().zip(wbs) {
+            src.write_back(u, wb);
+        }
         out.push(ItemEntry { bytes });
     }
     Ok(out)
@@ -227,6 +240,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> SaveItems for InvDesk<'_, '_, H, R>
         // (`bitstream.md` §4.1 rule 7; as `InvDesk::save_view`).
         s.unit28 = self.econ.units.get(item)?.init_seed;
         Some(s)
+    }
+    fn write_back(&self, item: UnitId, wb: WriteBack) {
+        self.queue_write_back(item, wb);
     }
     fn appearance(&self, item: UnitId) -> Option<EquippedItem> {
         let d = self.state.items.get(&item)?;

@@ -319,10 +319,15 @@ pub fn has_durability<S: ItemStats>(t: &ItemTables, item: &Item<S>) -> bool {
 
 /// Max sockets (`0x0062BC20`, §7.2).
 pub fn max_sockets<S: ItemStats>(t: &ItemTables, item: &Item<S>) -> i32 {
-    let (Some(r), Some(it)) = (t.item(item.record), t.itype_of(item.record)) else {
+    max_sockets_at(t, item.record, item.ilvl)
+}
+
+/// [`max_sockets`] of the items row `record` at item level `ilvl`.
+pub fn max_sockets_at(t: &ItemTables, record: usize, ilvl: i32) -> i32 {
+    let (Some(r), Some(it)) = (t.item(record), t.itype_of(record)) else {
         return 0;
     };
-    let ilvl = item.ilvl.max(1);
+    let ilvl = ilvl.max(1);
     let m = if ilvl <= 25 {
         it.maxsock1
     } else if ilvl <= 40 {
