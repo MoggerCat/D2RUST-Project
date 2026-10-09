@@ -1,0 +1,6 @@
+# The three boss spawn kinds of scenario.md §3.1 next to the player in the
+# Rogue Encampment (fallen, monstats 19; monsters/init.md §25 call forms).
+poke 1
+at 1 spawn 19 @x+4 @y+4 champion umod 16
+at 2 spawn 19 @x-4 @y+4 random-boss
+at 3 spawn 19 @x+4 @y-4 unique umod 5 7
