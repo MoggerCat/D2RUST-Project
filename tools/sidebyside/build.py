@@ -134,7 +134,7 @@ def record_orig(name, g, out, reuse):
     os.makedirs(img)
     code = run(["tools/cloud-game/run.sh", "--python", "--seconds", "480", "--out", os.path.join(out, "run"),
                 "--", "tools/trace-recorder/record_frames.py", "--game", os.path.join(GAME, "Game.exe"),
-                "--seconds", "420", "--every", "1", "--draws-every", "1", "--img-dir", img,
+                "--seconds", "420", "--every", "1", "--draws-every", "1", "--sounds", "--img-dir", img,
                 "--out", cap, "--auto", g["char"], "--seed", str(g["seed"]), "--input", framed(g["script"])[0]],
                timeout=600, out=os.path.join(out, "run.log"))
     if not os.path.exists(cap):
@@ -143,17 +143,24 @@ def record_orig(name, g, out, reuse):
 
 
 def read_capture(cap):
-    frames, marks = [], {}
+    """Frames with draws and an image (seq, tick, image, player mode), the marks, and the
+    sound request records (facts-render.md §5 r20) as rows of SOUND_KEY."""
+    frames, marks, sounds = [], {}, []
     for line in open(cap):
         r = json.loads(line)
-        if r.get("k") == "frame" and r.get("draws") and r.get("image"):
-            frames.append({"seq": r["seq"], "tick": r["f"], "image": r["image"]})
+        if r.get("k") == "sound":
+            u = r["unit"]
+            sounds.append((r["f"], r["id"], u[0] if u else None, u[1] if u else None,
+                           r["delay"], r["flags"], r["offset"]))
+        elif r.get("k") == "frame" and r.get("draws") and r.get("image"):
+            frames.append({"seq": r["seq"], "tick": r["f"], "image": r["image"],
+                           "mode": (r.get("player") or {}).get("mode")})
         elif r.get("k") == "footer":
             for n in r.get("notes", []):
                 if "mark " in n:
                     w = n.split("mark ")[1].split()
                     marks[w[0]] = int(w[1].split("=")[1])
-    return frames, marks
+    return frames, marks, sounds
 
 
 def pick(frames, tick, mode):
@@ -199,7 +206,8 @@ def d2rs_dump(exe, g, ticks, script, out, display, reuse):
         shutil.rmtree(out)
     os.makedirs(out)
     argv = [exe, "play", "--save", save_path(g["char"]), "--seed", str(g["seed"]),
-            "--dump-draws", os.path.join(out, "dump"), "--at-tick", ",".join(map(str, ticks)), "--dump-image"]
+            "--dump-draws", os.path.join(out, "dump"), "--at-tick", ",".join(map(str, ticks)), "--dump-image",
+            "--sound-log", os.path.join(out, "sounds.tsv")]
     if script:
         argv += ["--input", script]
     env = dict(os.environ, DISPLAY=display, D2_GAME_DIR=GAME)
@@ -276,6 +284,88 @@ class Blobs:
         return h
 
 
+# --- sounds and input feel ------------------------------------------------------------
+
+SOUND_KEY = ("tick", "id", "unit_type", "guid", "delay", "flags", "offset")
+# player mode tokens by mode number (PlrMode.txt order)
+PLAYER_MODES = ("DT", "NU", "WL", "RN", "GH", "TN", "TW", "A1", "A2", "BL", "SC", "TH", "KK", "S1", "S2",
+                "S3", "S4", "DD", "SQ", "KB")
+
+
+def read_sound_log(path):
+    """d2rs `--sound-log` rows (facts-render.md §5 r20) as SOUND_KEY tuples."""
+    rows = []
+    if not os.path.exists(path):
+        return None
+    for line in open(path):
+        if line.startswith("#") or line.startswith("tick\t"):
+            continue
+        t, _st, i, ut, g, d, f, o = line.rstrip("\n").split("\t")
+        rows.append((int(t), int(i), None if ut == "-" else int(ut), None if g == "-" else int(g),
+                     int(d), int(f), int(o)))
+    return rows
+
+
+def sound_compare(orig, d2rs, T):
+    """Both sides' request calls up to tick T: (rows per side, index of the first differing
+    call or None, a one-line description)."""
+    o = [r for r in orig if r[0] <= T]
+    d = [r for r in (d2rs or []) if r[0] <= T]
+    if d2rs is None:
+        return o, d, 0, "no d2rs sound log"
+    for i, (a, b) in enumerate(zip(o, d)):
+        if a != b:
+            cols = [k for k, x, y in zip(SOUND_KEY, a, b) if x != y]
+            return o, d, i, f"call {i}: 1.14d {fmt_sound(a)} vs d2rs {fmt_sound(b)} ({', '.join(cols)})"
+    if len(o) != len(d):
+        i = min(len(o), len(d))
+        extra = ("1.14d", o[i]) if len(o) > len(d) else ("d2rs", d[i])
+        return o, d, i, f"call {i}: only {extra[0]} has {fmt_sound(extra[1])} ({len(o)} vs {len(d)} calls)"
+    return o, d, None, f"equal: {len(o)} calls"
+
+
+def fmt_sound(r):
+    unit = "-" if r[2] is None else f"{r[2]}:{r[3]}"
+    extra = "" if r[4:] == (0, 0, 0) else f" d{r[4]} f{r[5]} o{r[6]}"
+    return f"tick {r[0]} id {r[1]} unit {unit}{extra}"
+
+
+def d2rs_mode(dump_dir):
+    """The local player's mode in a d2rs dump: the mode token of the first player cel row
+    (data/global/chars/<cls>/<comp>/<cls><comp><armor><MODE><wclass>.dcc)."""
+    p = os.path.join(dump_dir, "draws.tsv")
+    if not os.path.exists(p):
+        return None
+    for line in open(p):
+        for cell in line.split("\t"):
+            if cell.startswith("data/global/chars/"):
+                tok = os.path.basename(cell)[7:9].upper()
+                return PLAYER_MODES.index(tok) if tok in PLAYER_MODES else None
+    return None
+
+
+def input_feel(steps, ticks, orig_modes, d2rs_modes):
+    """Per pointer / key step: drawn ticks from the step's tick (F - 1) to the first drawn
+    tick whose player mode differs from the mode before the step, on each side; None when
+    the mode did not change before the next step or the scene's end."""
+    out = []
+    for k, (f, w, _i) in enumerate(steps):
+        start = f - 1
+        end = steps[k + 1][0] - 1 if k + 1 < len(steps) else ticks[-1] + 1
+        if start > ticks[-1]:
+            break
+        row = {"tick": start, "step": " ".join(w)}
+        for side, modes in (("orig", orig_modes), ("d2rs", d2rs_modes)):
+            before = [t for t in ticks if t < start]
+            m0 = modes.get(before[-1]) if before else None
+            hit = next((t for t in ticks if start <= t < end and modes.get(t) is not None
+                        and modes.get(t) != m0), None)
+            row[side] = None if hit is None else (hit - start, PLAYER_MODES[modes[hit]]
+                                                  if modes[hit] < len(PLAYER_MODES) else modes[hit])
+        out.append(row)
+    return out
+
+
 # --- per scene -------------------------------------------------------------------------
 
 def facts_line(exe, cap, seq, scene, work, d2rs_scene_dir):
@@ -290,7 +380,8 @@ def facts_line(exe, cap, seq, scene, work, d2rs_scene_dir):
     return p.returncode, text
 
 
-def scene_result(exe, name, scene, g, cap, frames, marks, steps, work, display, reuse):
+def scene_result(exe, name, scene, g, cap, frames, marks, steps_sounds, work, display, reuse):
+    steps, orig_sounds = steps_sounds
     mark, off, *mode = g["scenes"][scene]
     mode = mode[0] if mode else "first"
     nominal, mark_index = steps[1][mark]
@@ -329,9 +420,14 @@ def scene_result(exe, name, scene, g, cap, frames, marks, steps, work, display, 
     fc_code, fc_text = (3, "no d2rs dump of the scene frame")
     if last and last["d2rs"]:
         fc_code, fc_text = facts_line(exe, cap, f["seq"], scene, out, d2rs_dir(out, ticks, T))
+    so, sd, sdiff, stext = sound_compare(orig_sounds, read_sound_log(os.path.join(out, "sounds.tsv")), T)
+    feel = input_feel([x for x in steps[0] if (x[2] <= mark_index if mode == "last" else x[0] <= T)],
+                      ticks, {t: per_tick[t].get("mode") for t in ticks},
+                      {t: d2rs_mode(d2rs_dir(out, ticks, t)) for t in ticks})
     return {"scene": scene, "group": name, "char": g["char"], "seed": g["seed"], "tick": T, "seq": f["seq"],
             "script": script, "play_exit": code, "rows": rows, "first_diff": first_diff,
-            "match": (last["eq"] / last["n"]) if last else 0.0, "facts_exit": fc_code, "facts": fc_text}
+            "match": (last["eq"] / last["n"]) if last else 0.0, "facts_exit": fc_code, "facts": fc_text,
+            "sounds": {"orig": so, "d2rs": sd, "first_diff": sdiff, "text": stext}, "feel": feel}
 
 
 def chosen(res):
@@ -384,6 +480,8 @@ pre{white-space:pre-wrap;word-break:break-word;background:var(--bg);padding:8px;
 .ctl{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:8px 0;max-width:800px}.ctl input[type=range]{flex:1;min-width:160px}
 .ctl button{border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:6px;padding:4px 10px;cursor:pointer}
 a{color:var(--accent)}
+table.small{font-size:12px;max-width:800px;margin-bottom:8px}table.small td,table.small th{padding:2px 6px}
+tr.bad td{background:color-mix(in srgb,var(--bad) 14%,transparent)}
 """
 
 PAGE_JS = """
@@ -409,7 +507,7 @@ document.querySelectorAll('section.scene').forEach(sec=>{
 def badge(res):
     if res.get("error"):
         return '<span class="badge err">error</span>'
-    ok = res["first_diff"] is None and res["facts_exit"] == 0
+    ok = res["first_diff"] is None and res["facts_exit"] == 0 and res["sounds"]["first_diff"] is None
     return f'<span class="badge {"pass" if ok else "differs"}">{"pass" if ok else "differs"}</span>'
 
 
@@ -423,6 +521,57 @@ def first_line(text):
     return ": ".join(lines[verdict:verdict + 2])
 
 
+def sound_html(r):
+    """The sound request calls up to the scene tick, side by side, around the first difference."""
+    e, sd = html.escape, r["sounds"]
+    o, d, i = sd["orig"], sd["d2rs"], sd["first_diff"]
+    lo = 0 if i is None else max(0, i - 6)
+    hi = min(max(len(o), len(d)), (i if i is not None else 0) + 12 if i is not None else 40)
+    rows = []
+    for k in range(lo, hi):
+        a = fmt_sound(o[k]) if k < len(o) else ""
+        b = fmt_sound(d[k]) if k < len(d) else ""
+        cls = ' class="bad"' if i is not None and k == i else ""
+        rows.append(f"<tr{cls}><td class=\"num\">{k}</td><td>{e(a)}</td><td>{e(b)}</td></tr>")
+    more = max(len(o), len(d)) - hi
+    return (f'<p><b>Sounds</b> (request calls up to tick {r["tick"]}; 1.14d {len(o)}, d2rs {len(d)}): '
+            f'{e(sd["text"])}</p><table class="small"><thead><tr><th>#</th><th>1.14d</th><th>d2rs</th></tr>'
+            f'</thead><tbody>{"".join(rows)}</tbody></table>'
+            + (f'<p class="meta">{more} more calls not shown</p>' if more > 0 else ""))
+
+
+def feel_text(x):
+    return "no change" if x is None else f"{x[0]} ticks ({x[1]})"
+
+
+def feel_html(r):
+    """Input feel: ticks from each input step to the player's first mode change."""
+    e = html.escape
+    rows = [f'<tr{"" if row["orig"] == row["d2rs"] else " class=\"bad\""}><td class="num">{row["tick"]}</td>'
+            f'<td>{e(row["step"])}</td><td>{feel_text(row["orig"])}</td><td>{feel_text(row["d2rs"])}</td></tr>'
+            for row in r["feel"] if row["orig"] is not None or row["d2rs"] is not None]
+    if not rows:
+        return '<p><b>Input feel</b>: no input step changed the player\'s mode before this frame.</p>'
+    return ('<p><b>Input feel</b> (drawn ticks from the input to the player\'s first mode change, and the '
+            'new mode; 1.14d draws every second tick from about tick 13, both sides are read at its drawn '
+            f'ticks):</p><table class="small"><thead><tr><th>Tick</th><th>Input</th><th>1.14d</th><th>d2rs</th></tr>'
+            f'</thead><tbody>{"".join(rows)}</tbody></table>')
+
+
+def feel_summary(r):
+    rows = [x for x in r["feel"] if x["orig"] is not None or x["d2rs"] is not None]
+    if not rows:
+        return "-"
+    return f'{sum(1 for x in rows if x["orig"] == x["d2rs"])} / {len(rows)} equal'
+
+
+def sound_summary(r):
+    sd = r["sounds"]
+    if sd["first_diff"] is None:
+        return f'equal ({len(sd["orig"])})'
+    return f'differs at call {sd["first_diff"]} of {len(sd["orig"])} / {len(sd["d2rs"])}'
+
+
 def page(results, meta, blobs):
     from PIL import Image
     e = html.escape
@@ -430,11 +579,12 @@ def page(results, meta, blobs):
     for r in results:
         if r.get("error"):
             idx.append(f'<tr><td><a href="#{e(r["scene"])}">{e(r["scene"])}</a></td><td>{badge(r)}</td>'
-                       f'<td class="num">-</td><td class="num">-</td><td>{e(r["error"])}</td></tr>')
+                       f'<td class="num">-</td><td class="num">-</td><td>-</td><td>-</td><td>{e(r["error"])}</td></tr>')
             continue
         fd = "-" if r["first_diff"] is None else str(r["first_diff"])
         idx.append(f'<tr><td><a href="#{e(r["scene"])}">{e(r["scene"])}</a></td><td>{badge(r)}</td>'
                    f'<td class="num">{100 * r["match"]:.2f} %</td><td class="num">{r["tick"]} / {fd}</td>'
+                   f'<td>{e(sound_summary(r))}</td><td>{e(feel_summary(r))}</td>'
                    f'<td>{e(first_line(r["facts"]))}</td></tr>')
     secs = []
     for r in results:
@@ -470,17 +620,20 @@ group {e(r["group"])}, {e(r["char"])}, seed {r["seed"]}</span></div>
 <button class="tog">toggle</button><label><input class="diff" type="checkbox" checked> diff overlay (magenta)</label></div>
 <div class="meta finfo"></div>
 <p><b>First difference</b> (facts-compare, exit {r["facts_exit"]}):</p><pre>{e(r["facts"])}</pre>
+{sound_html(r)}
+{feel_html(r)}
 <p class="meta">d2rs input: {e(r["script"] or "(none)")}; play exit {r["play_exit"]}</p>
 <script type="application/json" class="frames">{json.dumps(frames)}</script>
 </section>''')
-    npass = sum(1 for r in results if not r.get("error") and r["first_diff"] is None and r["facts_exit"] == 0)
+    npass = sum(1 for r in results if not r.get("error") and r["first_diff"] is None and r["facts_exit"] == 0
+                and r["sounds"]["first_diff"] is None)
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>D2 side by side</title><style>{PAGE_CSS}</style></head><body><main>
 <h1>1.14d vs d2rs, side by side</h1>
 <p class="meta">{e(meta["date"])}; {e(meta["tool"])}; public repo {e(meta["commit"])}; d2-client sha256 {e(meta["d2_client_sha256"])}; command: {e(meta["command"])}</p>
-<p>{npass} of {len(results)} scenes pass (every compared tick pixel-identical and facts-compare equal).
+<p>{npass} of {len(results)} scenes pass (every compared tick pixel-identical, facts-compare equal and the same sound request calls).
 Pixels compare as colours after each side's palette. Pass means exact; the match % is the scene frame's equal pixels.</p>
-<table><thead><tr><th>Scene</th><th></th><th>Match</th><th>Tick / first diff</th><th>First difference (facts-compare)</th></tr></thead>
+<table><thead><tr><th>Scene</th><th></th><th>Match</th><th>Tick / first diff</th><th>Sounds</th><th>Input feel</th><th>First difference (facts-compare)</th></tr></thead>
 <tbody>{"".join(idx)}</tbody></table>
 {"".join(secs)}
 <script type="application/json" id="blobs">{json.dumps(blobs.data)}</script>
@@ -517,10 +670,10 @@ def main():
         if not scenes:
             continue
         cap = record_orig(name, g, os.path.join(out, "orig", name), a.reuse)
-        frames, marks = read_capture(cap)
+        frames, marks, sounds = read_capture(cap)
         _, st, nominal = framed(g["script"])
         steps = (st, nominal)
-        jobs += [(name, s, g, cap, frames, marks, steps) for s in scenes]
+        jobs += [(name, s, g, cap, frames, marks, (steps, sounds)) for s in scenes]
     exe = d2_client_bin()
     with Xvfb(a.display, os.path.join(out, "xvfb.txt")), ThreadPoolExecutor(a.jobs) as pool:
         results = list(pool.map(lambda j: scene_result(exe, j[0], j[1], j[2], j[3], j[4], j[5], j[6], out,
@@ -530,7 +683,11 @@ def main():
     meta = {"date": datetime.date.today().isoformat(), "tool": VERSION, "commit": commit,
             "d2_client_sha256": bin_sha(exe)[:16],
             "command": "python3 tools/sidebyside/build.py " + " ".join(sys.argv[1:])}
-    summary = [{k: v for k, v in r.items() if k != "rows"} | {"compared": len(r.get("rows", []))} for r in results]
+    summary = [{k: v for k, v in r.items() if k not in ("rows", "sounds")}
+               | {"compared": len(r.get("rows", []))}
+               | ({"sounds": {"text": r["sounds"]["text"], "first_diff": r["sounds"]["first_diff"],
+                              "orig": len(r["sounds"]["orig"]), "d2rs": len(r["sounds"]["d2rs"])}}
+                  if "sounds" in r else {}) for r in results]
     json.dump({"meta": meta, "scenes": summary}, open(os.path.join(out, "summary.json"), "w"), indent=1)
     path = os.path.join(out, "side-by-side.html")
     with open(path, "w", encoding="utf-8") as f:
@@ -538,7 +695,8 @@ def main():
     log(f"wrote {path} ({os.path.getsize(path) // 1024} KiB)")
     for r in summary:
         log(f'{r["scene"]}: ' + (r["error"] if r.get("error") else
-                                 f'{100 * r["match"]:.2f} %, first diff {r["first_diff"]}; {first_line(r["facts"])}'))
+                                 f'{100 * r["match"]:.2f} %, first diff {r["first_diff"]}; {first_line(r["facts"])}; '
+                                 f'sounds {r["sounds"]["text"]}; input {feel_summary(r)}'))
 
 
 if __name__ == "__main__":

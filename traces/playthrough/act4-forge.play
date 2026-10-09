@@ -1,0 +1,54 @@
+# Act IV Hell's Forge from its checkpoint, for tools/playthrough/playthrough.py
+# (spec: specs/tools/playthrough.md §1 r5-r6): River of Flame -> Hephasto ->
+# the Hellforge. Each milestone starts from traces/checkpoints/a4-hellforge
+# (a level 40 sorceress in Act IV, quests to 25.0 plus 27.2 / 27.3, the
+# soulstone in her inventory) and its start pokes: `5 warp 107`, then
+# `20 goto preset 107 2:376` (the walk to the Hellforge, poke.md §6), so
+# the checkpoint's pokes are @p0 (warp) and @p1 (goto: its GUID is the
+# Hellforge's).
+# Ids from the 1.14d tables (as act4.play): River of Flame 107, Hellforge
+# object 376, Hephasto monstats 409. Quest: specs/world/quests-act4.md §4
+# (slot 27: 27.1 forge smashed, reward pending; 27.0 done, Cain msg 680).
+# A boss kill is a Fire Bolt `missile` poke at the boss (moved next to the
+# player, life set to 1), as act4.play.
+playthrough 1
+act 4
+
+milestone river-of-flame
+  checkpoint a4-hellforge
+  deadline 40
+  need player lv == 107
+  need player act == 3
+
+milestone forge-reached
+  checkpoint a4-hellforge
+  deadline 450
+  note the goto walks room by room from the warp-in to the Hellforge; its result GUID is the forge
+  need player lv == 107
+  need unit ut 2 cl 376 g @p1 present
+
+milestone hephasto-present
+  checkpoint a4-hellforge
+  deadline 450
+  need ever unit ut 1 cl 409 lv 107 seen
+
+milestone hephasto-killed
+  checkpoint a4-hellforge
+  deadline 600
+  goto 420 unit 409
+  poke 430 pos @1:409 @x+3 @y
+  poke 430 stat @1:409 6 0 256
+  poke 440 missile 58 @x @y @x+3 @y skill 36 1
+  need ever unit ut 1 cl 409 killed
+
+milestone forge-smashed
+  checkpoint a4-hellforge
+  deadline 450
+  note needs the soulstone placed on the forge and the hammer's hits (quests-act4.md §4.6): no headless input for it yet; expected blocker with 27.1 clear
+  need ever quest 27 1 set
+
+milestone forge-done
+  checkpoint a4-hellforge
+  deadline 450
+  note needs Cain (246) msg 680 in town with 27.1: an NPC talk (playthrough.md Open question 3); expected blocker with 27.0 clear
+  need ever quest 27 0 set

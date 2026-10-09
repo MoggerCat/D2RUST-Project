@@ -567,8 +567,24 @@ class Bot:
             i -= 1
         p = path[i]
         self.act(f"{why}: walk {v.pos} -> {p} (path {len(path)})")
+        walks0 = v.client["sent"].get("01", 0)
         self.click(toward(*v.cam, *p, reach=acts.LEG_REACH + 2), hold=1)
         self.wait(acts.WALK_STEP)
+        w = self.look()
+        walked = w.client["sent"].get("01", 0) > walks0 and not w.client.get("npc_menu")
+        if walked and cheb(w.pos, v.pos) == 0:
+            # the walk went nowhere: the point is not reachable (an unseen
+            # obstacle); remember it so the next plan goes around
+            self.no_move += 1
+            if self.no_move >= 2:
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        self.known.learned.add((p[0] + dx, p[1] + dy))
+                self.no_move = 0
+        else:
+            self.no_move = 0
+
+    no_move = 0
 
     def walk_to(self, target, near=3, budget_s=None, fight=True):
         """Walks to world sub-tile `target` by clicks along a planned path
@@ -690,6 +706,7 @@ class Bot:
         self.say(f"  talk to npc {npc_class} ({what})")
         attempt = 0
         self.reset_progress()
+        interacts0 = self.h.state()["client"]["sent"].get("13", 0)
         while attempt < 8:
             v = self.look()
             if until(v):
@@ -701,7 +718,12 @@ class Bot:
                 continue
             n = npcs[0]
             if dist(v.pos, (n["x"], n["y"])) > 8:
-                self.walk_to((n["x"], n["y"]), near=6, budget_s=40, fight=False)
+                try:
+                    self.walk_to((n["x"], n["y"]), near=6, budget_s=20, fight=False)
+                except Stuck as e:
+                    if "no path" not in e.reason:
+                        raise
+                    attempt += 1
                 continue
             attempt += 1
             v = self.look()
@@ -745,7 +767,16 @@ class Bot:
             if until(v):
                 self.close_panels()
                 return
-        raise Stuck(f"talking to npc {npc_class} did not {what}")
+        if self.h.state()["client"]["sent"].get("13", 0) == interacts0:
+            # no click on it ever became an interact (C->S 0x13): not a
+            # talking NPC (townsfolk, guards); noted, not a stuck point
+            self.say(f"  npc {npc_class}: clicks never interact (not a talking NPC?)")
+            self.not_npc.add(npc_class)
+            self.talked.add(npc_class)
+            return
+        raise Stuck(f"talking to npc {npc_class} did not {what} (C->S 0x13 sent, no menu)")
+
+    not_npc = set()
 
     talked = set()
     menus_seen = {}
@@ -773,6 +804,14 @@ class Bot:
                 self.click(m["rows"][-1]["at"])
                 self.wait(10)
                 continue
+            if 17 in panels:
+                # WORKAROUND (bot only): Esc on the quest log opens the Esc
+                # menu, whose Esc reopens the log (finding esc-questlog);
+                # the log's own key closes it
+                self.act("close quest log")
+                self.key("q")
+                self.wait(6)
+                continue
             self.act(f"close panels {panels}")
             self.key("esc")
             self.wait(6)
@@ -789,7 +828,8 @@ class Bot:
         results = []
         stuck = None
         t0 = None
-        for m in milestones:
+        self.milestones = milestones = list(milestones)
+        for m in milestones:  # a play may append milestones (town probes)
             if only and m.name != only:
                 continue
             v = self.look()
@@ -865,7 +905,18 @@ def main(argv=None):
     plan = acts.plan(a.act, a.plan)
     work = a.work or os.path.join(REPO, "target", "autoplay", f"act{a.act}-{time.strftime('%Y%m%d-%H%M%S')}")
     os.makedirs(work, exist_ok=True)
-    args = ["--save", a.save] if a.save else ["--new", plan["class"], plan["name"]]
+    save = a.save
+    if not save and plan.get("save_args"):
+        # a d2s-tool save made for the plan (e.g. a character in Act II)
+        d2s = os.path.join(REPO, "target", "release", "d2s-tool")
+        save = os.path.join(work, plan["name"] + ".d2s")
+        r = subprocess.run([d2s, "new", "--name", plan["name"]] + plan["save_args"] + ["-o", save],
+                           capture_output=True, text=True,
+                           env=dict(os.environ, **({"D2_GAME_DIR": a.game_dir} if a.game_dir else {})))
+        if r.returncode != 0:
+            print(f"autoplay: d2s-tool new failed: {r.stderr.strip() or r.stdout.strip()}", file=sys.stderr)
+            return 3
+    args = ["--save", save] if save else ["--new", plan["class"], plan["name"]]
     if a.seed is not None:
         args += ["--seed", str(a.seed)]
     t_start = time.time()
@@ -917,7 +968,7 @@ def main(argv=None):
         "act": a.act,
         "command": " ".join(host.cmdline),
         "reached": reached,
-        "total": len(ms) if not a.only else 1,
+        "total": len(getattr(bot, "milestones", ms)) if not a.only else 1,
         "milestones": results,
         "ticks": frames,
         "game_seconds": round(frames / TICKS_PER_SECOND, 1),
@@ -926,6 +977,8 @@ def main(argv=None):
         "stuck": {k: v for k, v in stuck.items() if k != "state"} if stuck else None,
     }
     print()
+    if bot.not_npc:
+        result["not_talking"] = sorted(bot.not_npc)
     print(f"act {a.act}: {reached}/{result['total']} milestones, {result['game_seconds']} s game time, "
           f"{bot.deaths} deaths, {result['wall_seconds']} s wall")
     if stuck:

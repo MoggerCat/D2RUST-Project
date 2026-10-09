@@ -1,59 +1,71 @@
-# q-prov-data: provisional points the game data alone can settle
+# q-prov-data hand-back (branch claude/q-prov-data)
 
-Session `q-prov-data`, branch `claude/q-prov-data`, cloud, 2026-10-09,
-REC block 560–569 (none used). Methods: M23 (real data before green), M25.
-Data: private repo `MoggerCat/D2RUST-private-repo` `install/` assembled
-into `$HOME/game` (23 files, 0 mismatches); tools `mpq-tool`, `data-tool
-excel-dir`. No table contents were copied into the repo; the numbers
-below are measured values of a few cells.
+Session `q-prov-data`, cloud, 2026-10-09. REC ids 560-569: none used.
 
-## Batch 1 (rows with `settle_kind = data` / `data_alone_may_settle = yes`)
+## Done (all pushed)
 
-The index's `data` / `yes` flags are keyword sorts, not verdicts: of the
-61 rows, most name a routine whose body is unwritten (REC-278/279/287/161,
-binary), a recording (REC-291) or a behavior choice (quest links, AI
-skill pick); the install's tables cannot choose those. What the data did
-settle:
+- **Data points settled on the real install** (batch 1): REC-208 (Patch_D2
+  `patchstring.tbl` 97/98 = Druid/Assassin), REC-220 (Patch_D2 has no
+  loading-screen override), native-assets OQ6 (21 string tables, C-TBL and
+  hash rebuild equal), REC-166 `FrameCnt1` = txt x 256. Tests: `d2-native`
+  `real_tbl`, `d2-client` `prov_data_tables`, `front_host_real`.
+- **Fixed from the data**: front-end logo and button file names, draw
+  mode 3 as the PL2 additive table in index space, art frame offsets,
+  stash (classic top 273/333) and cube (118,139) grid fallbacks.
+- **Comment cleanup** for REC points settled by PC 1 specs: REC-289 (5),
+  410, 415 (0x93), 400, 460, 406 (single client). The rest differ in d2rs
+  and belong to q-fix rows.
+- **q-fix-p6-object-door-step** (door step 0x004BCB20) and
+  **q-fix-p6-npc-intro-record** (Malah, Nihlathak, Qual-Kehk).
+- **Act IV**: player act set at game entry (save-start in Acts II-V now has
+  the right act); object footprints stamped at the unit add when
+  `HasCollision[mode]` (found by `a4-warp-plains-ama`: populated objects
+  were placed on each other); `HostQuests::view` keeps seed, items and
+  uniques (Act III save-start game seed now equals 1.14d).
+- Checks added: `a4-fortress-arrival-ama`, `a4-warp-plains-ama`,
+  `a4-start-noquest-sor`, `a3-start-noquest-sor`, `a5-harrogath-arrival-ama`
+  (not run). Playthrough: `act4.play` izual-present sweep step 40;
+  `act4-blockers.play` probes.
 
-| Row (location) | REC | Result | How checked |
-|---|---|---|---|
-| `specs/ui/frontend-menus.md:648` | 208 | **settled**: `Patch_D2.mpq` `patchstring.tbl` el. 97 / 98 = Druid / Assassin (the d2exp table is the reverse); spec folded | tbl parse of both archives' tables |
-| `specs/ui/frontend-loading.md:130` | 220 | **settled**: `Patch_D2.mpq` has neither loading-screen path; both d2data DC6 are v6, 10 frames 256×256, 666,014 bytes; spec folded | `mpq-tool extract-names`, header read |
-| `specs/formats/native-assets.md:704` (OQ6) | – | **settled**: 21 string tables, C-TBL passes on all and the hash rebuild equals the stored slots in every one | new `d2-native/tests/real_tbl.rs` (ignored) |
-| `d2-client/src/app/front_host.rs:183` | 189 | **fixed**: per-channel `min(255, d+s)` equals the PL2 additive table for only ~10 % of (d, s) pairs (sky PL2: 6,495 of 65,536), so mode 3 is now `ADD[256·d + s]` in index space, as `blend-modes.md` §1–§2 says | new `front_host_real.rs` compares the composed pixels with the table over the whole logo cel |
-| `d2-client/src/app/front_host.rs:10` | 178/189 | **fixed (found by the same test)**: the logo files `FrontEnd\BlackLeft`/`BlackRight`/`FireLeft`/`FireRight` do not exist (real: `D2logo…`, spec §F1.5 r1), `FrontEnd\ShortButtonBlank` does not exist (real: `CharSelect\ShortButtonBlank`), Battle.net uses `WideButtonBlank02` (§F1.4 r3); the Art draw ignored DC6 frame offsets (the logo halves have x −169 / y 47 …) | `every_art_file_the_main_menu_draws_is_in_the_archives` |
-| `d2-client/src/ui/panels/cube_items.rs:10` | 119 | **fixed (corner)**: `inventory.bin` record 9 / 25 = (118, 205, 139, 253) / +(80, 60); the estimated fallback (116, 130 …) was off | `prov_data_tables.rs` |
-| `d2-client/src/ui/panels/stash_items.rs:12` | 104 | **fixed (corner)**: the classic stash (records 8 / 24, 6×4) is at top 273 / 333, not the expansion corner; expansion record 12 / 28 matched | `prov_data_tables.rs` |
-| `d2-sim/src/wiring/economy/quest_host.rs:919` | 166 | **settled**: live `objects` `FrameCnt1` = txt × 256 (fixup `fixups.md` §13), so `>> 8` reads the txt value | `prov_data_tables.rs` (rows 1, 2); full-table scan: bin = txt for all rows before the fixup |
+## State
 
-The live rows are used whenever the install's `inventory.bin` loads; the
-fallbacks only matter for tests without tables, which now equal the real
-rows.
+act4.play: 7 of 12 milestones reached (3 consecutive) as of the last run.
 
-## Left (with the reason)
+## Open (next steps)
 
-- Binary-body or choice points, not data: REC-278/279/287/161/150/143/130/
-  132/142/166 (quest links by class)/167/174/230 and the `d2-sim`
-  wiring rows; REC-111 monster attack skill (monstats gives the
-  `Skill1…8` / `Sk1mode` columns, but which entry an attack mode picks is
-  the AI routine, `skills/use.md` OQ6); `hireling_drive.rs` (REC-100).
-- Recording: REC-291 rows, REC-185 credits, `native-assets.md` OQ5 (the
-  DT1 assembled layout needs the §7.2 full conversion run), OQ7 (a
-  policy: monstats 707 `NameStr`, `field-types.md` OQ7 says 1.14d cannot
-  settle it).
-- `specs/render/camera.md:503/571` (REC-61): binary reads.
-- Owned by running sessions: seed order, scenes compare, store fill,
-  fixture migration, client missiles, q-prov-recording.
+1. `izual-killed` (and the same kill recipe): harness issue, not d2rs. The
+   `pos` poke is a raw teleport; the sweep leaves the player in a wall cell
+   (collision bits 0x5 at (5143,5263), level 105), so the Fire Bolt's first
+   step returns Stopped. Fix in the harness: after `find`, move the player
+   to a walkable cell at the found unit (q-tool-checkpoints `goto`).
+2. `hellforge`, `hephasto-present`: need River of Flame preset positions
+   (`goto preset`, PC1-C recording); sweeps cannot reach them (level is
+   200x200 tiles, `pos` refused on lava).
+3. `a4-warp-plains-ama` first divergence is frame 24: three Fortress NPCs
+   (405, 257, 246) run the Npc map AI (2 draws each) after the player left
+   the level; 1.14d does not. PC 1 Step 4 item "Monster think in a room
+   with no clients".
+4. Hratli's unit seed is two steps behind 1.14d at f2 (`a3-start-noquest-sor`):
+   PC 1 Step 4 item "Hratli's unit seed two steps at creation".
+5. Town-start predicates in act2/3/5.play expect too many NPCs (only the
+   NPCs in the player's active rooms exist at f40 on both sides).
 
-## Checks run
+## Open RECs / PC 1 items
 
-`cargo fmt --check`; `cargo clippy -p d2-sim -p d2-server -p d2-client -p
-test-fixtures -p d2-native --all-targets -- -D warnings`; `cargo nextest
-run` on the same crates; `tools/coverage.py --check`;
-`tools/spec_index.py --check`; `tools/provisional_index.py` regenerated.
-Real-data runs (`D2_GAME_DIR=$HOME/game … --run-ignored`):
-`front_host_real` 2/2, `prov_data_tables` 2/2, `d2-native real_tbl` 1/1.
+- Two `[prov-data]` items in `docs/handoff/pc1-data.md` Step 4 (above, 3 and 4).
+- Points left in the provisional index for q-fix rows: REC-100, 111, 115,
+  265, 401, 412, 414, 415 (0x20), 416, 420, rest of 289.
+- Spec gap: 0x3E null item GUID (spec 0xFFFFFFFF; `skill_use.rs` sends 0).
 
-Gate hints: d2-client needs `libasound2-dev libudev-dev libwayland-dev
-libxkbcommon-dev pkg-config` (the cloud image needs `apt-get update`
-first; `mesa-vulkan-drivers` has no candidate there).
+## Repro
+
+```
+export D2_GAME_DIR=$HOME/game CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0
+python3 tools/scenario-diff/scenario_diff.py traces/checks/a4-warp-plains-ama.check
+python3 tools/scenario-diff/scenario_diff.py traces/checks/a3-start-noquest-sor.check
+python3 tools/playthrough/playthrough.py traces/playthrough/act4.play
+cargo nextest run -p d2-sim -p d2-server -p d2-client -p test-fixtures
+```
+Disk note: the cloud container has little free space; delete
+`target/debug/incremental` and large test binaries in `target/debug/deps`
+between full runs.

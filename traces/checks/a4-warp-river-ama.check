@@ -1,0 +1,13 @@
+check 1
+# Level generation of River of Flame (level 107): ScnAm4 starts in the Pandemonium Fortress,
+# -seed 1234, idle until frame 20, then the level warp (poke `warp 107`,
+# tile 0) on both sides. Compare the level's rooms, presets and populated
+# units, and the draws (record_rng.py with the poke). Area C (level
+# generation). Spec: specs/tools/scenario-diff.md.
+name a4-warp-river-ama
+save ScnAm4 --class ama --expansion --act 3 --quests acts=3
+seed 1234
+ticks 160
+seconds 900
+channels state rng
+at 20 poke warp 107

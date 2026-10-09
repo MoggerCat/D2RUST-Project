@@ -329,3 +329,47 @@ spawn.
   because 1.14d takes no draw there. d2rs walks because it never stores
   the AI state (`q-fix-c3-quillrat-choice`). The arrows **do** cause it:
   they set the state. A run without arrows would differ in 1.14d too.
+
+### [q-fix-b-monster-combat] REC-890, REC-891, REC-892 (answered)
+- **REC-890:** the neutral start after a zero-length walk sends **0x6D**
+  (`0x00597E20` mode-1 case `0x00598067`–`0x005980B0` → `0x0053BB70`:
+  GUID, cell, life byte; stat 328 += 1), not 0x67 code 7.
+  `monsters/ai.md` §7.5 r8 is corrected (my REC-665 text was wrong there).
+  d2rs already matches. Correction row: `q-fix-c7-b665-correction`.
+- **REC-891:** the monster base list (`0x00574072`–`0x00574086`) is
+  `0x006251F0` with flags 1, expire 0, owner type 1 / owner GUID = the
+  unit, then `0x00626E10(unit, list, reset 1)`. It is not DYNAMIC, so
+  mindamage / maxdamage / tohit go into the totals. Spec:
+  `monsters/init.md` §6 step 12. d2rs matches.
+- **REC-892:** `0x0058F030` (ECX game, EDX unit; stack GUID, type, f1,
+  f2): f2 ≠ 0 sets control flags bit 0x2, f1 ≠ 0 sets 0x1
+  (`0x005DD230` only sets bits; it does not restart the AI). Then
+  +0x2C / +0x30 / +0x28.
+  - The death handover `0x0058F6C0` uses the bits: 0x1 alone releases
+    the pack; 0x1 + 0x2 makes the first minion the leader (`0x0058F530`).
+  - Spec: `monsters/umod-callbacks.md` §1 r5.
+  - d2rs differs: row `q-fix-c7-owner-flags`.
+
+## Resume (session paused 2026-10-09)
+
+- **State:** branch `claude/local-pc1-day3-b` is pushed and clean,
+  merged with staging. Worktree `../d2rs-b` (re/, game/ read from
+  `../d2rs`). Scratch worktrees `../d2rs-tools` and `../d2rs-check` can
+  be removed.
+- **Done:** rounds 1–3, items 41 / 45 / 46, and the four
+  `[q-fix-b-monster-combat]` items. Every answered line in pc1-data.md
+  is marked "answered → see docs/handoff/pc1-day3-b.md".
+- **Open PROVISIONAL:**
+  - REC-817: MonLvl `L-TH` at level 1; MonLvl.txt is not extracted.
+  - REC-900: why the whirl path first steps on update 3; needs the anim
+    recorder tools.
+- **On resume:**
+  1. Pull staging and merge.
+  2. Take new unanswered `[combat-a1]` / `[skills-1]` / `[skills-2]` /
+     `[q-fix-b-monster-combat]` items. Check that the line is not already
+     marked, and tell PC1-C (and PC1-A) before starting.
+  3. Append q-fix rows only as NEW ids at the end of build-queue.tsv.
+     Never re-apply old row files: that once overwrote rows the cloud had
+     edited.
+  4. 1.14d runs: the recorders take `%TEMP%\d2-game.lock` themselves.
+     Do not hold it around `scenario_diff.py`.
