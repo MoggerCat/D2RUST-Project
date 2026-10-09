@@ -270,7 +270,15 @@ fn record_outputs() {
             },
         ]
     );
-    assert_eq!(m.w, ClientWorld::default());
+    // 0x5E's bytes are the one client copy the light rules read
+    // (`client/msg-ui.md` §14 r1, `render/lighting.md` §13); nothing else.
+    assert_eq!(
+        m.w,
+        ClientWorld {
+            quest_availability: Some(avail),
+            ..ClientWorld::default()
+        }
+    );
 }
 
 /// `28 t guid r` + 96 bytes of quest flags.
@@ -527,4 +535,16 @@ fn trade_action_captures_dead_or_absent() {
         })
         .collect();
     assert_eq!(flags, [true, false, true]);
+}
+
+// Covers: specs/client/msg-ui.md §14 r2
+// Covers: specs/render/lighting.md §10 r1
+#[test]
+fn the_client_keeps_the_last_0x5e_for_quest_byte_reads() {
+    let mut m = Model::default();
+    assert_eq!(m.w.client_quest_byte(1), None);
+    m.recv(&bytes("5e 00 01", 38));
+    assert_eq!(m.w.client_quest_byte(1), Some(1));
+    m.recv(&bytes("5e 00 00", 38));
+    assert_eq!(m.w.client_quest_byte(1), Some(0));
 }
