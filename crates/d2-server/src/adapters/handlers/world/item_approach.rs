@@ -67,7 +67,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
             msg.extend_from_slice(&guid.to_le_bytes());
             msg.extend_from_slice(&u32::from(cursor).to_le_bytes());
             let call = MoveRun { player, msg: &msg };
-            let Some((_, sent, _, _)) = WorldHost::<D>::moves(self, game, events, call) else {
+            let Some((_, sent, _)) = WorldHost::<D>::moves(self, game, events, call) else {
                 continue;
             };
             // The arrival does not walk again (a second out-of-reach

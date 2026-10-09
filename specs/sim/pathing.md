@@ -31,22 +31,22 @@
 |   1. Walk and run requests | 87–234 |
 |   2. Path types | 235–274 |
 |   3. Path compute (`0x00649970(path, unit, town access)`) | 275–341 |
-|   4. Target preparation (flag 0x1000, `0x00648120`) | 342–358 |
-|   5. Toward (type 2, `0x00679C80`) | 359–426 |
-|   6. Straight (type 7, `0x00679ED0`) | 427–436 |
-|   7. A* (type 1, `0x0067B850`) | 437–474 |
-|   8. Velocity, direction vector, facing | 475–571 |
-|   9. Per-tick movement | 572–755 |
-|   10. Messages | 756–818 |
-|   11. Missile paths (`0x00649760`) | 819–871 |
-|   12. Other path types (1.14d-read 2026-10-08) | 872–1085 |
-|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1086–1235 |
-| Constants & data dependencies | 1236–1272 |
-| Randomness | 1273–1283 |
-| Edge cases & original bugs | 1284–1331 |
-| Test vectors | 1332–1369 |
-| Provenance | 1370–1425 |
-| Open questions | 1426–1499 |
+|   4. Target preparation (flag 0x1000, `0x00648120`) | 342–384 |
+|   5. Toward (type 2, `0x00679C80`) | 385–452 |
+|   6. Straight (type 7, `0x00679ED0`) | 453–462 |
+|   7. A* (type 1, `0x0067B850`) | 463–500 |
+|   8. Velocity, direction vector, facing | 501–606 |
+|   9. Per-tick movement | 607–790 |
+|   10. Messages | 791–853 |
+|   11. Missile paths (`0x00649760`) | 854–906 |
+|   12. Other path types (1.14d-read 2026-10-08) | 907–1120 |
+|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1121–1270 |
+| Constants & data dependencies | 1271–1307 |
+| Randomness | 1308–1318 |
+| Edge cases & original bugs | 1319–1366 |
+| Test vectors | 1367–1405 |
+| Provenance | 1406–1461 |
+| Open questions | 1462–1535 |
 <!-- /index -->
 
 ## Summary
@@ -351,6 +351,32 @@ start, target, start room, target room, slack r (step 4), max distance
    5. d0 := `altdir`[o(p0 → start)] first entry (d1, d2 unchanged); repeat.
 3. Found p: target := p; p = start → result 0. Player (unit type 0):
    orthogonal push (rule 4). Result 1.
+   Read 2026-10-09 (asm `0x00648120`–`0x006482FA`, caller
+   `0x00649B5C`; settles REC-753). "Target" here is the compute
+   record's copy I+0x04 / I+0x06 (a local of `0x00649970`, filled from
+   path +0x10 / +0x12 at `0x00649A5D`), not the path's: rules 2–4
+   never write path +0x10 / +0x12. The only start test is rule 2.1, at
+   the loop head, on p0 alone; no probe is compared with the start
+   before its free test. A free probe is written to I's target first
+   (`0x006482A1` for p0, `0x006482C7` for p1 / p2) and then compared
+   with the start: equal → result 0 with I's target = the start. The
+   free test (`0x0064D910` with the path's pattern +0x28 and move mask
+   +0x2C) runs after §3 step 6 took the mover's own footprint off, so
+   the start is "free" unless the pattern at the start meets another
+   collision (a neighbour's footprint inside the mover's pattern);
+   then the loop goes on and a later p0 = start ends at rule 2.1 with
+   I's target still the request. After the call (§3 steps 8–12):
+   final target +0x18 / +0x1A := I's target whatever the result;
+   result 0 → no path function, count 0, and path +0x10 / +0x12 keep
+   the requested point (they are rewritten only by step 10, when points
+   remain, flag 0x10 clear and no target unit: target := the last
+   point, previous target +0x14 := the old +0x10). So the measured
+   Warriv case (`traces/checks/combat-random-boss.check` frame 45, path
+   target staying (4869, 4232) after p0 steps onto the start) holds for
+   either start outcome; the start-equal case differs from the
+   loop-head exit only in +0x18 (start vs request). With result 1 too,
+   path +0x10 is not the found point until step 10 (and never with
+   flag 0x10 or a target unit).
 4. Push (`0x00648050`): (dx, dy) = target − start; if |dx| < 5, |dy| < 5
    and not both 0: ox = `snap9`[40 + dx + 9·dy], oy = `snap9`[40 + dy +
    9·dx]; c = max(|dx|, |dy|); while c < 5: candidate := target + (ox,
@@ -521,6 +547,15 @@ a monster in mode 1) and returns 0; the temporary-list free
 mode (read 2026-10-09). Each attach allocates a new list (flag 4,
 `0x006251F0`), so only a mode change can add one; the velocity stays
 0x900.
+
+Measured (revision 2026-10-09, q-diff-combat-a1, REC-751): the speed
+(unit +0x4C) that the run start's rate call `0x00623F50` writes
+(`sim/units.md` §4.7 step 7) already reads the run list: a level-1
+Amazon (stat 67 = 100 + 50, stat 96 = 0) starting a run from town
+neutral has speed 101 · 150 / 100 = **151** from the first run frame
+(`check-combat-cold-plains-wp`, 1.14d frames 10–32), not 101. So the
+attach comes before the speed is computed; the velocity (0x900) reads
+the same total.
 
 #### 8.3 Direction vector (`0x0064FC60`)
 
@@ -1366,6 +1401,7 @@ Real (recordings; message side):
 | R4 | `20261006-015956-packets.jsonl` | 121 × 0x01, 215 × 0x03, 47 × 0x02, 2 × 0x04 accepted (result 0); 0 × S→C 0x0F / 0x10 (single player: §10 rule 2) |
 | R5 | `20261006-022633-packets.jsonl` | 49 × 0x01, 72 × 0x03, 9 × 0x02, all result 0; no 0x15 resync (§1.1, `intents-events.md` §2.4 rule 3) |
 | R6 | both | requests repeat every 7 frames while the button is held (e.g. 0x01 at frames 24, 31, 38, 45, 52), each recomputing the path (§1.5) |
+| R7 | `check-combat-cold-plains-wp` (q-diff-combat-a1, REC-750) | seed 1234, Amazon at (4873, 4228) in the Rogue Encampment, 0x03 to (4895, 4215): Straight (§6) runs Toward; the ray test (§5.1 rule 4) is blocked at (4885, 4221), whose plus (pattern 1) covers the torch object (class 37, 1 × 1, `HasCollision2` = 1, mode 2 after its init) at (4886, 4221), stamped at creation (`sim/path-placement.md` §2.5); P = (4884, 4221), the greedy walk adds nothing, 22² + 13² > 324 → path [(4884, 4221)]; mode 3 at frame 10, speed 151 (§8.2), mode 5 at frame 33 at (4884, 4221) |
 
 ## Provenance
 

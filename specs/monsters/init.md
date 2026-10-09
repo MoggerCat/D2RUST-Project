@@ -29,39 +29,39 @@
 |   1. Entry points | 124–146 |
 |   2. The create request | 147–164 |
 |   3. Placement | 165–173 |
-|   4. Creation sequence after placement (`0x005B2A00`) | 174–285 |
-|   5. Monster type init (`0x00574250`) | 286–303 |
-|   6. Stats and skills (`0x00573CB0`) | 304–356 |
-|   7. Monster level | 357–372 |
-|   8. Base values from monlvl | 373–407 |
-|   9. Player-count bonus (`0x00573930`) | 408–419 |
-|   10. Components (`0x005739D0`) | 420–430 |
-|   11. monprop (`monprop.txt`) | 431–439 |
-|   12. monequip (`0x005D6B60`) | 440–456 |
-|   13. Classic scaling (`0x0063EEF0`) | 457–464 |
-|   14. Normal mods and boss mods | 465–566 |
-|   15. Party minions | 567–571 |
-|   16. Boss spawns | 572–607 |
-|   17. Choosing umods (`0x005A0760`) | 608–651 |
-|   18. Boss minions and umod init (`0x005A2120`) | 652–669 |
-|   19. Umod init functions | 670–756 |
-|   20. Superuniques (`0x005A49B0`) | 757–805 |
-|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 806–820 |
-|   22. Umod callbacks and the type-7 event | 821–872 |
-|   23. Unique names (client) | 873–882 |
-|   24. Monster assign message | 883–934 |
-|   25. Calling the spawn functions outside population (tools) | 935–1025 |
-|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1026–1085 |
-|   27. Class reinit (`0x00574370`) | 1086–1131 |
-| Constants & data dependencies | 1132–1153 |
-| Randomness | 1154–1196 |
-| Edge cases & original bugs | 1197–1228 |
-| Test vectors | 1229–1230 |
-|   Synthetic (CI-safe) | 1231–1253 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1254–1284 |
-|   Recorded checks (monster assign 0xAC) | 1285–1297 |
-| Provenance | 1298–1376 |
-| Open questions | 1377–1457 |
+|   4. Creation sequence after placement (`0x005B2A00`) | 174–329 |
+|   5. Monster type init (`0x00574250`) | 330–347 |
+|   6. Stats and skills (`0x00573CB0`) | 348–400 |
+|   7. Monster level | 401–416 |
+|   8. Base values from monlvl | 417–451 |
+|   9. Player-count bonus (`0x00573930`) | 452–463 |
+|   10. Components (`0x005739D0`) | 464–474 |
+|   11. monprop (`monprop.txt`) | 475–483 |
+|   12. monequip (`0x005D6B60`) | 484–500 |
+|   13. Classic scaling (`0x0063EEF0`) | 501–508 |
+|   14. Normal mods and boss mods | 509–610 |
+|   15. Party minions | 611–615 |
+|   16. Boss spawns | 616–651 |
+|   17. Choosing umods (`0x005A0760`) | 652–695 |
+|   18. Boss minions and umod init (`0x005A2120`) | 696–713 |
+|   19. Umod init functions | 714–800 |
+|   20. Superuniques (`0x005A49B0`) | 801–849 |
+|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 850–864 |
+|   22. Umod callbacks and the type-7 event | 865–916 |
+|   23. Unique names (client) | 917–926 |
+|   24. Monster assign message | 927–978 |
+|   25. Calling the spawn functions outside population (tools) | 979–1069 |
+|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1070–1129 |
+|   27. Class reinit (`0x00574370`) | 1130–1175 |
+| Constants & data dependencies | 1176–1197 |
+| Randomness | 1198–1242 |
+| Edge cases & original bugs | 1243–1274 |
+| Test vectors | 1275–1276 |
+|   Synthetic (CI-safe) | 1277–1299 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1300–1330 |
+|   Recorded checks (monster assign 0xAC) | 1331–1343 |
+| Provenance | 1344–1433 |
+| Open questions | 1434–1514 |
 <!-- /index -->
 
 ## Summary
@@ -282,6 +282,50 @@ Provenance: 2026-10-09 (pc1-day3-c, read in `0x005B2F20`, `0x005B70B0`,
 `0x0054E490`, `0x005557D0`, `0x005B2A00`, `0x005739D0`, `0x006647C0`,
 `0x00573CB0`, `0x0045C3E0`; seeds stepped with `sim/rng.md`;
 q-prov-data).
+
+#### 4.3 Unit-seed draw sites of any creation, in order (1.14d)
+
+The general form of §4.2 (Randomness 3–8 with their sites). U is fresh
+{lo, 666} from the allocator's game-seed step (seed set at `0x00552E50`)
+before the GUID is written (§5 step 1). Inside the type init
+`0x00574250`, in this order:
+
+| # | Site | Helper | Condition (no step otherwise) | Draw |
+|---|---|---|---|---|
+| a | `0x005BDB20` (`0x005BDBF1`, `0x005BDC57`, `0x005BDC74`, inline `0x005BDCEE` / `0x005BDD48`), called from `0x00547BC0` in §5 step 4 | `0x0045C390` / inline | the class's first appearance entry in this level's region (`population.md` §2.5: not classes 195 / 196 / 294 / 296, `TotalPieces` > 2, fewer than 13 entries) | appearance variants per `population.md` §2.4 (`roll(c[i])` only for c[i] > 1) |
+| b | `0x005739D0` → `0x00573A03` | `0x0045C3E0` | the class's region entry has variant count v > 0 | one `roll(v)` |
+| b' | `0x005739D0` loop, inline at `0x00573A8E` (multiply `0x00573AA7` for a power-of-two n, `0x00573A95` otherwise) | inline | else, for i = 0…15 in order, n = monstats2 +0x15 + i (`0x006647C0`, zero-extended u8) ≥ 1 | one step each; value `lo' & (n−1)` or `lo' mod n` = `roll(n)`; n = 1 steps |
+| c | `0x00573D9B` / `0x00573D6E` | `0x0045C390` | class 311 / class 312 | `roll(4)` |
+| d | `0x00573F8F` | `0x0045C3E0` | n = maxHP − minHP + 1 ≥ 1, from `0x006538A0`'s out block (+0 minHP, +4 maxHP) | `roll(n)`; n = 1 steps and gives 0 |
+| e | inline `0x005741C5` | inline | per monprop slot (`0x00573470` row, stop at prop < 0) with chance byte > 0 | step, `lo' mod 100` (§11) |
+| f | `0x00574235` → `0x005D6B60` | | an inventory (§12) | monequip rolls, item creations |
+
+Nothing between b/b' and d draws: player bonus `0x00573930`, the
+hireling test `0x0063EE90`, the level `0x0061DCA0`, the stat sets
+`0x00627260` and stats-by-level `0x006538A0` take no step (the only
+calls between `0x00573D43` and `0x00573F8F`). A monster without a
+region entry and without monstats2 has no b/b' draw. Then §5 step 5
+onward, the allocator's add (§4.1) and the mods (§4 steps 3–5), with
+their own Randomness rows.
+
+Recorded (`d2rs/traces/raw/20261005-232125-rng.jsonl`, Rogue
+Encampment, 11 town creations): every creation shows its b or b' draw
+directly before d on the same seed, e.g. U fresh {3783191474, 666} →
+b' (`0x00573A8E`, one component with n ≥ 1) {3941302932, 1577940294} →
+d `roll(1)` = 0 {3845402922, 1643887377}; region-entry units show a
+(`0x005BDBF1`…) then b `roll(3)` at `0x00573A03` then d `roll(2)`.
+Reproduced with `tools/trace-recorder/d2rng.py`. The b' step is an
+inline draw, which the raw record carries without a seed address, and
+U's setter at `0x00552E50` precedes the GUID: the owner pass
+(`rng_owners.py`) gives the HP roll d to the unit, sees that unit's
+forward chain reach the next tick, and leaves b' as `other:inline`. So
+a 1.14d RNG check lists d (`0x00573F8F`) as a new monster's draw #0
+where d2rs (which owns b' by unit) lists b' (`create.rs` component
+loop): the same draws, a recording-tool attribution difference
+(`tools/rng-trace.md` §2), not a draw-order difference. Provenance:
+2026-10-09, read in `0x00573CB0`, `0x005739D0`, `0x006647C0`,
+`0x00451FE0`, `0x00547BC0`; rng_owners.py run on the recorded values
+(pc1-eve).
 
 ### 5. Monster type init (`0x00574250`)
 
@@ -743,8 +787,8 @@ multiplier / divisor, 1, 99); the skill is given and assigned
 |---|---|
 | 36 ghostly | type flag 0x40; damageresist = 80; champion function; at the new level: coldmindam += DM × K[d+22] / 100, coldmaxdam += DM × K[d+25] / 100, coldlength += 150 |
 | 37 fanatic | item_armor_percent = −70; champion function (velocity rule of 37) |
-| 38 possessed | type flag 0x20; maxhp and hitpoints += 100 %; champion function |
-| 39 berserk | maxhp and hitpoints += pct(maxhp, −75); damagepercent += 300 × B / 100 (halved for BaseId 118); item_tohit_percent += 300 × B / 100; no champion function |
+| 38 possessed | type flag 0x20; d := pct(maxhp, 100, 100); maxhp and hitpoints both read first, then maxhp := maxhp + d and hitpoints := (hitpoints read before) + d, so the maxhp write's callback rescale (`sim/stat-lists.md` §7.2) is overwritten (revision 2026-10-09, REC-752; `a1-warp-cave-ama.check`); champion function |
+| 39 berserk | as 38 with d := pct(maxhp, −75, 100); damagepercent += 300 × B / 100 (halved for BaseId 118); item_tohit_percent += 300 × B / 100; no champion function |
 | 26 teleport | unique only: skill MonTeleport (184) level 1, skill mode 4, AI flag 0x20 (`monsters/umod-init-bodies.md` §4) |
 | 41 always_run_ai | schedule a type-7 event at frame + 75 (`0x005417D0`), any unique value |
 
@@ -1160,8 +1204,10 @@ seed (room +0x6C); G = game seed (game +0xD0). For one call of
 1. Placement: active room seed draws, order in `monsters/population.md`
    §9.
 2. Allocation: G one step → U (`sim/rng.md` §5.3).
-3. Components (§10): U `roll(variant count)`, or 16 × U `roll(count i)`
-   (no step when count ≤ 0).
+3. Appearance variants on the class's first region entry
+   (`population.md` §2.4–2.5), then components (§10): U `roll(variant
+   count)`, or 16 × U `roll(count i)` (no step when count ≤ 0). Sites
+   and conditions of 3–7: §4.3.
 4. Class 311 / 312: U `roll(4)`.
 5. HP: U `roll(maxHP − minHP + 1)`.
 6. monprop: per property with chance > 0, U step, lo' % 100.
@@ -1296,6 +1342,17 @@ Bosses, Normal, Blood Moor (L-flag 1):
 | components | zombie1 [2,2,1,1,0,0,0,0,1,1,…] within counts [3,3,3,3,3,0,0,0,3,3,3]; brute1 / quillrat1 none (all counts ≤ 1) |
 
 ## Provenance
+
+- §19.6 umods 38 / 39 life (revision 2026-10-09, q-diff-combat-a1,
+  REC-752): `traces/checks/combat-umod-life.check` on 1.14d under Wine
+  (seed 1234, pinned seeds): a possessed champion fallen 3072 → 6144
+  life with hitpoints 6144, a berserk unique quill rat 4096 → 1024 with
+  hitpoints 1024, a berserk extra-strong unique zombie 10240 → 2560
+  with hitpoints 2560 (stats 6 / 7 at the first frame). The earlier
+  reading "maxhp and hitpoints += d" gives hitpoints 9216, −2048 and
+  −5120 through the maxhp value-change callback (`sim/stat-lists.md`
+  §7.2); "hitpoints first, then maxhp" gives 256 for berserk. Only
+  "write the new value to both" fits all three.
 
 - §27 class reinit from the 1.14d asm: `0x00574370` (`ret 8`, unit
   type test, bounds and `enabled` test against the bit table

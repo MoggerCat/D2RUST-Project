@@ -72,6 +72,12 @@ pub trait Screen {
     fn loads_sky_palette(&self) -> bool {
         true
     }
+
+    /// The palette files entering the screen loads (`None`: keep the
+    /// current one): the sky palette when [`Screen::loads_sky_palette`].
+    fn palette(&self) -> Option<[&'static str; 2]> {
+        self.loads_sky_palette().then_some(super::SKY_PALETTE)
+    }
 }
 
 /// A screen nobody implemented yet: Esc → [`Trigger::Exit`], Enter →

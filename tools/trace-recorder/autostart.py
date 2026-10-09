@@ -168,7 +168,8 @@ def vk_code(k):
 SCRIPT_OPS = {"wait": (1, 1), "move": (2, 2), "click": (2, 2), "rclick": (2, 2), "hold": (3, 3),
               "key": (1, 2), "text": (1, 99), "shot": (0, 1), "waitlevel": (1, 2),
               "goto": (2, 5), "dumpdrlg": (0, 1), "waitticks": (1, 1), "mark": (1, 1), "clickunit": (2, 4), "rclickunit": (2, 4),
-              "units": (1, 1), "char": (1, 1), "state": (0, 1), "close": (0, 0), "wstr": (2, 3), "end": (0, 0), "frame": (1, 1)}
+              "units": (1, 1), "char": (1, 1), "state": (0, 1), "close": (0, 0), "wstr": (2, 3),
+              "end": (0, 0), "frame": (1, 1)}
 TICK_RET = 0x0052FD1E            # tick return, ESI = game (poke.py, original-hooks-spawn.md §5 r2)
 TICK_RET_BYTES = bytes.fromhex("8B7618")
 G_FRAME = 0xA8                   # game frame (tick.md §2)

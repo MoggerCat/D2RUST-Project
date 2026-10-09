@@ -57,6 +57,21 @@ impl<X: Pending> StatHost for ActionHooks<X> {
             self.removed_lists.push((unit, state, callback.0));
         }
     }
+    /// `0x0063A4A0`(unit, state) (`stat-lists.md` §8.8 rule 1): state in
+    /// range and flag `monstaydeath` for a monster, `plrstaydeath` for any
+    /// other unit.
+    fn stays_on_death(&self, lists: &StatLists, unit: UnitId, state: u32) -> bool {
+        use crate::stats::states::group;
+        let monster = lists
+            .unit_list(unit)
+            .is_some_and(|r| lists.owner_type(r) == crate::stats::lists::owner::MONSTER);
+        let g = if monster {
+            group::MON_STAY_DEATH
+        } else {
+            group::PLR_STAY_DEATH
+        };
+        lists.data().states.has_flag(state, g)
+    }
 }
 
 impl<X: Pending> ActionHooks<X> {
@@ -65,14 +80,168 @@ impl<X: Pending> ActionHooks<X> {
     /// class and mode, looked up by §4; a name the file lacks gets the
     /// default record (§3). `None` when no table is loaded, the unit has
     /// no record, or the composer gives no name.
+    /// The draw identity `0x00645270` (`render/unit-composite.md` §1.1)
+    /// of `unit`'s (type, class, mode +0x10): its own unless flag-ex bit 3
+    /// ([`flags2::DISGUISE`]) is set; then the first state of
+    /// [`crate::stats::states::StateTable::gfx_states`] the unit has gives
+    /// the type and class, and a player shown as a monster (`gfxtype` 1)
+    /// or a monster shown as a player (2) has its mode mapped. The
+    /// animation lookup and rate read it (`units.md` §4.7).
+    pub(crate) fn draw_identity(
+        &self,
+        sim: &Sim<'_>,
+        unit: UnitId,
+    ) -> Option<(UnitType, u32, u32)> {
+        let r = sim.units.get(unit)?;
+        let own = (r.ty, r.class, r.mode);
+        if r.flags2 & flags2::DISGUISE == 0 {
+            return Some(own);
+        }
+        let states = &sim.stats.data().states;
+        let Some(&(_, gfx, class)) = states
+            .gfx_states()
+            .iter()
+            .find(|&&(s, ..)| sim.stats.has_state(unit, s))
+        else {
+            return Some(own);
+        };
+        let class = u32::from(class);
+        Some(match (gfx, r.ty) {
+            (1, UnitType::Player) => {
+                let combat = &self.tables.combat;
+                let row = combat
+                    .monstats
+                    .get(class as usize)
+                    .and_then(|m| combat.monstats2.get(usize::from(m.monstatsex)));
+                let has = |m: u32| {
+                    row.is_some_and(|r| {
+                        [
+                            r.mdt, r.mnu, r.mwl, r.mgh, r.ma1, r.ma2, r.mbl, r.msc, r.ms1, r.ms2,
+                            r.ms3, r.ms4, r.mdd, r.mkb, r.msq, r.mrn,
+                        ]
+                        .get(m as usize)
+                        .copied()
+                        .unwrap_or(false)
+                    })
+                };
+                let mut m = PLAYER_TO_MONSTER.get(r.mode as usize).copied().unwrap_or(1);
+                while m != 1 && !has(m) {
+                    m = mode_fallback(m);
+                }
+                (UnitType::Monster, class, m)
+            }
+            (1, _) => (UnitType::Monster, class, r.mode),
+            (_, UnitType::Monster) => {
+                let m = if class == 6 && r.mode == 4 {
+                    12
+                } else {
+                    MONSTER_TO_PLAYER.get(r.mode as usize).copied().unwrap_or(1)
+                };
+                (UnitType::Player, class, m)
+            }
+            _ => (UnitType::Player, class, r.mode),
+        })
+    }
+
+    /// Steps 3–5 and 8–10 of `0x00623F50` (`units.md` §4.7, through
+    /// [`crate::units::anim_rate::anim_rate`]) on the draw identity, with
+    /// `record` the AnimData record of that identity (s = its speed;
+    /// its frames · 256 are the +0x48 the were-form speed reads, the
+    /// record the mode start stores). Steps 6–7 are
+    /// [`Self::movement_rate`]'s; a velocity mode without the path
+    /// provider, or a type other than player and monster, is `None` (the
+    /// host's [`Pending::anim_rate`]). The item/skill getter
+    /// `0x00625500` is the unit total (`sim/stats.md`).
+    // TODO(units.md §4.7 step 8.3): the dual-wield average is not
+    // applied: the items at body locations 4 and 5 and their stat 68 are
+    // not reachable from the action wiring.
+    fn spec_anim_rate(
+        &self,
+        sim: &Sim<'_>,
+        unit: UnitId,
+        record: &d2_formats::animdata::AnimRecord,
+        frame_count: i32,
+    ) -> Option<i16> {
+        use crate::units::anim_rate::{anim_rate, mode_row, Rate, RateInput};
+        let r = sim.units.get(unit)?;
+        let (ty, class, mode) = self.draw_identity(sim, unit)?;
+        let t = match ty {
+            UnitType::Player => 0,
+            UnitType::Monster => 1,
+            _ => return None,
+        };
+        if mode_row(t, class, mode).v && self.paths.is_none() {
+            return None;
+        }
+        let total = |k: u16| sim.stats.unit_total(unit, k, 0);
+        let used = self
+            .used_skill_of(unit)
+            .and_then(|e| self.tables.skills.skill(e.skill));
+        // Step 8.6: `0x00646170`, a player in a were-form (`0x0063A400`:
+        // flag-ex bit 3) with a state of group 38 `meleeonly`.
+        let were_speed = (r.ty == UnitType::Player
+            && r.flags2 & flags2::DISGUISE != 0
+            && sim.stats.has_group(unit, MELEE_ONLY))
+        .then(|| {
+            let n = match self.x.attack_weapon(unit) {
+                Some(w) => self.x.attack_frames(unit, w).unwrap_or(0),
+                None => 19,
+            };
+            if n <= 0 {
+                0
+            } else {
+                (frame_count & !0xFF) / n
+            }
+        });
+        let input = RateInput {
+            applies: true,
+            is_object_or_missile: false,
+            t,
+            c: class,
+            m: mode,
+            s: record.speed as i32,
+            item: [total(93), total(99), total(105), total(102), total(96)],
+            velocitypercent: total(67),
+            attackrate: total(68),
+            other_animrate: total(69),
+            used_seqtrans: used.map(|row| i32::from(row.seqtrans as i8)),
+            use_attack_rate: used.is_some_and(|row| row.useattackrate),
+            holyshield: sim.stats.has_state(unit, HOLY_SHIELD),
+            has_path: self.path_has(unit),
+            w: 0,
+            velocity_mode: false,
+            dual: None,
+            player_mode_18: r.ty == UnitType::Player && r.mode == 18,
+            were_speed,
+        };
+        match anim_rate(&input) {
+            Ok(Rate::Set { speed, .. }) => Some(speed as i16),
+            _ => None,
+        }
+    }
+
+    /// The anim refresh `0x00623F50(unit)` outside a mode start
+    /// (`skills/bodies.md` §2.6 "anim refresh", a state's stat fill):
+    /// the rate of the unit's current mode on its draw identity, with the
+    /// frame count (+0x48) as the mode start left it. `None`: no rate
+    /// (nothing written).
+    pub(crate) fn rate_refresh(&mut self, sim: &Sim<'_>, unit: UnitId) -> Option<i16> {
+        if let Some(v) = self.movement_rate(sim, unit) {
+            return Some(v);
+        }
+        let record = self.anim_lookup(sim, unit)?;
+        let fc = sim.units.get(unit)?.anim.frame_count;
+        self.spec_anim_rate(sim, unit, &record, fc)
+    }
+
     fn anim_lookup(
         &mut self,
         sim: &Sim<'_>,
         unit: UnitId,
     ) -> Option<d2_formats::animdata::AnimRecord> {
         let data = self.anim_data.clone()?;
-        let r = sim.units.get(unit)?;
-        let name = self.x.anim_name(unit, r.ty, r.class, r.mode)?;
+        let (ty, class, mode) = self.draw_identity(sim, unit)?;
+        let name = self.x.anim_name(unit, ty, class, mode)?;
         match data.record(&name) {
             Ok(rec) => Some(rec.clone()),
             Err(e) => {
@@ -80,6 +249,34 @@ impl<X: Pending> ActionHooks<X> {
                 None
             }
         }
+    }
+}
+
+/// State flag group 38 `meleeonly` (`units.md` §4.7 step 8.6).
+const MELEE_ONLY: usize = 38;
+/// State 101 `holyshield` (§4.7 step 4).
+const HOLY_SHIELD: u32 = 101;
+
+/// Player mode (0…19) → monster mode (`0x006EB348`,
+/// `render/unit-composite.md` §1.1).
+const PLAYER_TO_MONSTER: [u32; 20] = [
+    0, 1, 2, 15, 3, 1, 2, 4, 5, 6, 7, 4, 11, 8, 9, 10, 11, 12, 14, 13,
+];
+/// Monster mode (0…15) → player mode (`0x006EB308`).
+const MONSTER_TO_PLAYER: [u32; 16] = [0, 1, 2, 4, 7, 8, 9, 10, 13, 14, 15, 16, 17, 19, 18, 3];
+
+/// The monster-mode fallback of the player → monster map
+/// (`render/unit-composite.md` §1.1): WL, GH, A1 → NU; A2 → A1; BL → GH;
+/// SC → A1; S1 → NU; S2, S3, S4 → S1; DD, KB, SQ → NU; RN → WL; DT and
+/// anything else → NU.
+fn mode_fallback(m: u32) -> u32 {
+    match m {
+        5 => 4,
+        6 => 3,
+        7 => 4,
+        9..=11 => 8,
+        15 => 2,
+        _ => 1,
     }
 }
 
@@ -256,8 +453,16 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         if let Some(v) = self.movement_rate(sim, unit) {
             return v;
         }
-        let speed = self.anim_lookup(sim, unit).map(|r| r.speed);
-        self.x.anim_rate(unit, speed)
+        let record = self.anim_lookup(sim, unit);
+        // The mode start stores the new record and its frame count before
+        // the rate reads +0x48.
+        if let Some(v) = record.as_ref().and_then(|r| {
+            let fc = (r.frames as i32).wrapping_mul(256);
+            self.spec_anim_rate(sim, unit, r, fc)
+        }) {
+            return v;
+        }
+        self.x.anim_rate(unit, record.map(|r| r.speed))
     }
 
     /// The velocity half of `0x00623F50` for monsters with the path
@@ -270,6 +475,10 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     /// the requested mode is kept for the start function.
     fn monster_mode_bookkeeping(&mut self, sim: &mut Sim<'_>, unit: UnitId, mode: u32) {
         self.monster_request = mode;
+        let left = sim.units.get(unit).map(|r| r.mode);
+        if let Some(m) = left {
+            self.leave_monster_mode(unit, m);
+        }
         self.monster_path_setup(sim, unit, mode);
     }
 
@@ -317,7 +526,9 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     /// Monster mode functions (`units.md` §4.6): the start and event
     /// functions of rules 5–14 ([`crate::wiring::path::monsters`]); the
     /// death start `0x005A6FF0` goes to [`Pending::monster_death_start`]
-    /// with the mode change's target; DT's event functions `0x005A7350` /
+    /// with the mode change's target and the death clean-up
+    /// ([`super::monster_death`]), the DD start `0x005A7390` runs rule 4
+    /// there; DT's event functions `0x005A7350` /
     /// `0x005A72B0` end the death in mode 12 (`intents-events.md` §7.7
     /// rule 3, [`super::unit_update::death_function`]); every other
     /// function keeps the default (started, nothing done).
@@ -327,7 +538,11 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         }
         if address == MONSTER_MODES[0].start {
             let target = self.mode_target;
-            return X::monster_death_start(self, sim, unit, target);
+            return self.monster_death(sim, unit, target);
+        }
+        if address == MONSTER_MODES[12].start {
+            self.monster_dead_start(sim, unit);
+            return true;
         }
         super::unit_update::death_function(self, sim, unit, address);
         true
@@ -551,6 +766,20 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
             }
         }
     }
+    /// [`View::town_portal_cast`] with the call's game seed lent to the
+    /// hooks; no object state: `None`.
+    fn town_portal_cast(
+        &mut self,
+        sim: &mut Sim<'_>,
+        seed: &mut crate::rng::Seed,
+        player: UnitId,
+    ) -> Option<(u32, bool)> {
+        self.objects.as_ref()?;
+        self.game_seed = *seed;
+        let r = View::of(sim.units, sim.stats, sim.data, self).town_portal_cast(sim.game, player);
+        *seed = self.game_seed;
+        Some(r)
+    }
     /// The monster type init `0x00574250` (`init.md` §5, `units.md` §3.1
     /// table: the allocator's per-kind init of a monster) on the lent
     /// monster world ([`super::monsters`]); the object data and init
@@ -561,6 +790,14 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
     fn init_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId, req: &AllocRequest) {
         // The init's room is the allocation's (r7.2) until step 8.
         self.alloc_rooms.push((unit, req.room));
+        if req.ty == UnitType::Player {
+            // Player type init `0x005348C0`: unit flags |= 0x0E first
+            // (`units.md` §1 row 0), so the missile target filter
+            // (`missiles.md` §R4.2) accepts the player.
+            if let Some(r) = sim.units.get_mut(unit) {
+                r.flags |= 0x0E;
+            }
+        }
         if req.ty == UnitType::Monster {
             self.with_monster_world(|w, h| w.type_init(sim, h, unit));
         } else if req.ty == UnitType::Object {
@@ -1100,8 +1337,7 @@ impl<X: Pending> ActionHooks<X> {
     pub(crate) fn movement_rate(&self, sim: &Sim<'_>, unit: UnitId) -> Option<i16> {
         use crate::path::walk::velocity::{velocity_percent, VelocityFacts, STAT_VELOCITYPERCENT};
         let paths = self.paths.as_ref()?;
-        let r = sim.units.get(unit)?;
-        let (ty, class, mode) = (r.ty, r.class, r.mode);
+        let (ty, class, mode) = self.draw_identity(sim, unit)?;
         let knockback = matches!((ty, mode), (UnitType::Player, 19) | (UnitType::Monster, 13));
         let w = |h: &Self| -> i32 {
             match ty {
@@ -1139,7 +1375,9 @@ impl<X: Pending> ActionHooks<X> {
             used_flags: self
                 .used_skill_of(unit)
                 .map(|e| self.x.entry_flags(unit, &e)),
-            item_fastermove: self.x.item_stat(unit, scale_stat as u16, 0),
+            // The item/skill getter `0x00625500` is the unit total
+            // (`sim/stats.md`): Burst of Speed's state list counts.
+            item_fastermove: sim.stats.unit_total(unit, scale_stat as u16, 0),
             velocitypercent: sim.stats.unit_total(unit, STAT_VELOCITYPERCENT, 0),
         };
         let p = velocity_percent(&paths.tables, &facts, mode)?;

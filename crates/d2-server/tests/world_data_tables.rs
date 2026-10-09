@@ -15,9 +15,12 @@ use d2_sim::items::bitstream::{write_save, StreamItem};
 use test_fixtures::{content, install, synth};
 
 fn synthetic() -> (install::Install, GameTables) {
-    // One directory per test process (nextest runs each test in its own).
+    // One directory per call: nextest runs each test in its own process,
+    // `cargo test` runs them as threads of one.
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
-        .join(format!("synthetic-world-data-{}", std::process::id()));
+        .join(format!("synthetic-world-data-{}-{n}", std::process::id()));
     let i = install::build(&dir, &synth::synthetic()).unwrap_or_else(|e| panic!("{e}"));
     let t = GameTables::load(&i.archives).expect("the synthetic install loads");
     (i, t)

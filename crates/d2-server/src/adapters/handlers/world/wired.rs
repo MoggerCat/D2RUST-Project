@@ -408,6 +408,8 @@ fn flush_taken<X: Pending, R: TradeRest>(
     inv: Option<&mut InvParts>,
 ) -> Vec<(UnitId, Vec<u8>)> {
     let taken = std::mem::take(&mut desk.state.taken);
+    // A freed unit is no longer shown in the store.
+    desk.state.shown.retain(|u| !taken.contains(u));
     let (Some(parts), Some(player)) = (inv, desk.state.shown_player) else {
         return Vec::new();
     };
@@ -1031,11 +1033,6 @@ where
     /// The run to a ground item (§7.1 step 2, REC-281).
     fn item_walk(&mut self, game: &mut Game, events: &mut D, walk: (UnitId, UnitId, bool)) {
         self.start_item_walk(game, events, walk);
-    }
-
-    /// The Town Portal pair on the action wiring (REC-117).
-    fn town_portal(&mut self, game: &mut Game, events: &mut D, player: UnitId) -> bool {
-        WorldHost::<D>::town_portal(&mut self.action, game, events, player)
     }
 
     /// The tick with this world's quest parts lent to the action hooks

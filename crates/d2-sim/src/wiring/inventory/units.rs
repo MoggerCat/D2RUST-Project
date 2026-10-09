@@ -24,7 +24,10 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         self.econ.units.get(self.unit_of(u)?)
     }
 
-    fn item_rec(&self, item: Guid) -> Option<&crate::items::inventory::tables::InvItemRec> {
+    pub(super) fn item_rec(
+        &self,
+        item: Guid,
+    ) -> Option<&crate::items::inventory::tables::InvItemRec> {
         let u = self.item_unit(item)?;
         self.tables.item(self.state.items.get(&u)?.record)
     }

@@ -89,6 +89,7 @@ impl GameTables {
             levels: self.rows::<Levels>()?,
             skill_modes: skill_modes(self.table("monstats")?),
             overlay_count: i32::try_from(self.table("overlay")?.count).unwrap_or(i32::MAX),
+            monequip: self.rows::<Monequip>()?,
         })
     }
 

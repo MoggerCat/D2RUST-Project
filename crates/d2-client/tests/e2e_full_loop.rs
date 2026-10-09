@@ -1165,6 +1165,7 @@ impl Fx {
             levels: levels(),
             skill_modes: vec![[0; 8]],
             overlay_count: 0,
+            monequip: Vec::new(),
         };
         let book = Book::default();
         let mut hooks = ActionHooks::new(
@@ -1983,8 +1984,9 @@ fn run_with(game_seed: u32) -> Transcript {
     // The death animation: 4 frames → event 1 four frames on. Tick 1's
     // room switch woke the monster created by that tick's room pass
     // (`intents-events.md` §7.8 rule 2.3, `0x00573780`: think at frame
-    // 1 + 2; Idle → the next think at 203), which is still pending.
-    assert_eq!(fx.timers(monster), [(1, f_hit + 4), (2, 203)]);
+    // 1 + 2; Idle → the next think at 203); the death clean-up's
+    // `0x005738D0` cancelled that think (`units.md` §4.6 rule 1.2).
+    assert_eq!(fx.timers(monster), [(1, f_hit + 4)]);
     // The drop (`treasure.md` §3): TC 1 picks gold on the monster's
     // seed; the item is created on the game seed (`generation.md` §3),
     // placed at the start spot (x + 2, y + 3, §7 step 2) in mode 3, its

@@ -44,6 +44,7 @@ fn run_sends(
             .collect(),
         packets: None,
         rng: None,
+        save_out: None,
     };
     let mut game = DumpGame::resolve(&args, app_support::game_data(), None).unwrap();
     game.character = character;
@@ -286,4 +287,47 @@ fn a_send_is_injected_before_its_frame_and_an_unresolved_one_sends_nothing() {
         "{}",
         lines[11]
     );
+}
+
+/// The `x` (or another number field) of the player object of a snap line.
+fn player_field(snap: &str, field: &str) -> i64 {
+    let p = snap.split(r#"{"ut":0,"#).nth(1).expect("a player");
+    let key = format!(r#""{field}":"#);
+    p.split(&key).nth(1).expect(field)[..]
+        .split([',', '}'])
+        .next()
+        .unwrap()
+        .parse()
+        .unwrap()
+}
+
+// Covers: specs/tools/poke.md §5 r3
+// (state-dump --poke "<f> msg ...": the bytes go through the local
+// client's sender, duplicate filter included, and frame f's drain
+// handles them)
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn a_poke_msg_walk_reaches_the_server_and_the_duplicate_is_filtered() {
+    let pokes = ["4 msg 0x01 @x+5 @y", "4 msg 0x01 @x+5 @y"];
+    let a = run_with(scn_ama(), 12, 1, &pokes);
+    assert_eq!(a, run_with(scn_ama(), 12, 1, &pokes), "two runs differ");
+    let text = String::from_utf8(a).unwrap();
+    let lines: Vec<&str> = text.lines().collect();
+    // header, snaps 1..3, two poke lines, snaps 4..12, footer
+    assert_eq!(lines.len(), 1 + 12 + 2 + 1, "{text}");
+    assert!(
+        lines[4].starts_with(
+            r#"{"k":"poke","f":4,"frame":3,"i":0,"d":"msg","r":"ok","src":"msg 1 @x+5 @y"}"#
+        ),
+        "{}",
+        lines[4]
+    );
+    assert_eq!(
+        lines[5],
+        r#"{"k":"poke","f":4,"frame":3,"i":1,"d":"msg","r":"failed","note":"duplicate filter","src":"msg 1 @x+5 @y"}"#
+    );
+    // Frame 4's drain handles the walk; by frame 12 the player has
+    // walked east.
+    let x3 = player_field(lines[3], "x");
+    assert!(player_field(lines[14], "x") > x3, "{}", lines[14]);
 }

@@ -1,467 +1,155 @@
 // Spec: specs/skills/bodies.md (§2.3–§2.5, §3.4 srvst 4), specs/skills/use.md (§5)
-//! A bow skill on the play host (q-amazon), headless, on the synthetic
-//! single-player game: C→S 0x0C (the right skill at a point) → the
-//! ammo start check (`srvst 4`) reads the weapon in use and the quiver
-//! through the app's weapon seams ([`d2_client::app::weapons`]) → the
-//! arrow is taken → the missile in the server's store → S→C 0x4D.
-//!
-//! Test-local fills: the synthetic game has no `skills`, `missiles` or
-//! items. The joined game gets one Magic Arrow row (id 3: `mana` 1,
-//! `anim` 7 = A1, `range` 2, `srvstfunc` 4, `srvmissile` 1, `decquant`)
-//! and one missile row; a bow (type 27) and a stack of arrows are two
-//! item units placed in the player's hands in the app's weapon copy.
-
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
-
-use d2_client::app::server_thread::ThreadLink;
-use d2_client::app::single_player::{self, Link, DEFAULT_SEED, PLAYER_CLASS};
-use d2_client::app::weapons::{class, Hands, ItemFacts};
-use d2_client::bridge::link::{SendQueue, ServerLink};
-use d2_client::bridge::LOCAL_CLIENT;
-use d2_client::rules::unit_composite::code;
-use d2_client::world_view::unit_assets::UnitLooks;
-use d2_data::bin::BinTable;
-use d2_data::fixup::records::stat_ops;
-use d2_data::tables::{Charstats, Itemstatcost, Missiles, Monstats, Monstats2, Record, Skills};
-use d2_formats::animdata::{self, AnimData, AnimRecord};
-use d2_server::seams::{Clock, Pos};
-use d2_sim::skills::list::ListOwner;
-use d2_sim::stats::{StatData, StatLists, StatTable};
-use d2_sim::units::lifecycle::AllocRequest;
-use d2_sim::units::{UnitId, UnitType};
+//! A bow skill and a spear skill in the play host (q-amazon), headless,
+//! on the user's install (`real_rig`): C→S 0x0C / 0x0D → the item and
+//! ammo start check reads the weapon in use and the quiver through the
+//! app's weapon seams ([`d2_client::app::weapons`]) → the arrow is taken
+//! → the missile in the server's store. The amazon's start kit (a
+//! javelin and a buckler) is the install's; the bow, the quiver and the
+//! spear are the install's item rows, worn with `Rig::wear` (their codes
+//! looked up by name in `weapons.txt` / `misc.txt`).
 
 mod app_support;
+mod real_rig;
 
-struct StepClock(Arc<AtomicU32>);
+use d2_sim::units::{UnitId, UnitType};
+use real_rig::{skill_named, skill_row, ExcelTable, Rig};
 
-impl Clock for StepClock {
-    fn now_ms(&mut self) -> u32 {
-        self.0.load(Ordering::SeqCst)
-    }
+/// Body locations (`bodylocs`): right arm, left arm.
+const RIGHT: u8 = 4;
+const LEFT: u8 = 5;
+
+/// The `code` of the item named `name` in the install's `file`.
+fn item_code(file: &str, name: &str) -> [u8; 4] {
+    let t = ExcelTable::load(file);
+    let code = t.cell(t.row(name), "code").to_owned();
+    let mut c = *b"    ";
+    c[..code.len()].copy_from_slice(code.as_bytes());
+    c
 }
 
-const FIRE_BOLT: usize = 3;
-const JAB: usize = 4;
-/// The attack animation: 8 frames at speed 256, the missile event (2)
-/// on frame 4 (`animdata.md` §2).
-fn anim_data() -> AnimData {
-    let mut a = AnimData {
-        buckets: vec![Vec::new(); animdata::BUCKETS],
-    };
-    let mut events = [0u8; animdata::EVENTS];
-    events[4] = 2;
-    let name = *b"SOA1HTH\0";
-    a.buckets[animdata::hash(&name[..7])].push(AnimRecord {
-        name,
-        frames: 8,
-        speed: 256,
-        events,
+/// The amazon with `skills` learned in the Blood Moor, both hands
+/// emptied of the start kit.
+fn amazon(skills: &[&str]) -> Rig {
+    let ids: Vec<usize> = skills.iter().map(|n| skill_named(n)).collect();
+    let mut r = Rig::new("amazon", &ids);
+    r.leave_town();
+    r.strengthen();
+    r.take_off(RIGHT);
+    r.take_off(LEFT);
+    r.select_right(ids[0]);
+    r
+}
+
+/// The quiver unit: the left hand of the app's weapon copy.
+fn quiver(r: &mut Rig) -> Option<UnitId> {
+    r.with(|sim, p| sim.events.action.sys.hooks.x.weapons.hands.get(&p)?.left)
+}
+
+fn arrows(r: &mut Rig, q: UnitId) -> i32 {
+    r.stat_of(q, 70)
+}
+
+/// A short bow in the right hand, and a quiver of the install's arrows in
+/// the left hand holding `count` arrows.
+fn bow_and_arrows(r: &mut Rig, count: i32) -> UnitId {
+    r.wear(item_code("weapons.txt", "Short Bow"), RIGHT);
+    r.wear(item_code("misc.txt", "Arrows"), LEFT);
+    let q = quiver(r).expect("the quiver is in the left hand");
+    r.with(move |sim, _| {
+        sim.events
+            .action
+            .with(&mut sim.game, |_, v| v.set_base(q, 70, count));
     });
-    a
+    q
 }
 
-/// The unit tables of the name rules: every class token `SO`, mode 7
-/// token `A1`.
-fn looks() -> UnitLooks {
-    let mut modes = vec![code(b"NU"); 20];
-    modes[7] = code(b"A1");
-    UnitLooks {
-        player_tokens: vec![code(b"SO"); 7],
-        player_modes: modes,
-        ..UnitLooks::default()
-    }
-}
-
-/// A synthetic itemstatcost (359 stats, no ops, fixed up): the
-/// synthetic game has none, so no stat could be set.
-fn stat_data() -> Arc<StatData> {
-    let (n, size) = (359, Itemstatcost::SIZE);
-    let mut records = vec![0u8; n * size];
-    for (s, r) in records.chunks_mut(size).enumerate() {
-        for o in [0x32, 0x48, 0x4A, 0x56, 0x58, 0x5A, 0x5C] {
-            r[o..o + 2].copy_from_slice(&0xFFFFu16.to_le_bytes());
-        }
-        r[0..2].copy_from_slice(&(s as u16).to_le_bytes());
-    }
-    let mut t = BinTable {
-        name: "itemstatcost".into(),
-        source: "synthetic".into(),
-        count: n,
-        record_size: size,
-        records,
-    };
-    stat_ops(&mut t);
-    Arc::new(StatData {
-        stats: StatTable::from_fixed(&t).expect("itemstatcost"),
-        ..StatData::default()
-    })
-}
-
-const MANA: i32 = 100 << 8;
-
-struct Game {
-    link: ThreadLink<Link<StepClock>>,
-    ms: Arc<AtomicU32>,
-}
-
-impl Game {
-    fn joined() -> Self {
-        let ms = Arc::new(AtomicU32::new(1000));
-        let (link, _) = single_player::start(
-            app_support::game_data(),
-            DEFAULT_SEED,
-            StepClock(ms.clone()),
-        )
-        .unwrap();
-        let mut g = Self { link, ms };
-        g.link
-            .with(|l| {
-                let h = l.host_mut().game.events.action.hooks();
-                let mut t = (*h.tables).clone();
-                t.skills.skills = vec![Skills::decode(&[0u8; Skills::SIZE]); 8];
-                let fb = &mut t.skills.skills[FIRE_BOLT];
-                fb.anim = 7;
-                fb.range = 2;
-                fb.mana = 1;
-                fb.manashift = 8;
-                fb.minmana = 1;
-                fb.intown = true;
-                fb.srvstfunc = 4;
-                fb.decquant = true;
-                fb.srvmissile = 1;
-                t.skills.level_cap = d2_sim::skills::LEVEL_CAP_114D;
-                let jab = &mut t.skills.skills[JAB];
-                jab.anim = 7;
-                jab.range = 1;
-                jab.mana = 0;
-                jab.minmana = 0;
-                jab.intown = true;
-                jab.srvstfunc = 5;
-                jab.srvdofunc = 7;
-                jab.srvmissile = 0xFFFF;
-                jab.hitshift = 8;
-                jab.srcdam = 128;
-                let mut m = Missiles::decode(&[0u8; Missiles::SIZE]);
-                m.range = 20;
-                m.vel = 16;
-                m.maxvel = 16;
-                m.town = true;
-                m.srctown = true;
-                t.missiles = vec![Missiles::decode(&[0u8; Missiles::SIZE]), m];
-                t.skills.missiles = t.missiles.clone();
-                h.tables = Arc::new(t);
-                h.anim_data = Some(Arc::new(anim_data()));
-                h.x.looks = Some(Arc::new(looks()));
-                l.host_mut().game.events.action.sys.stats = StatLists::new(stat_data());
-                // The test sets the weapon copy by hand (`equip`); the
-                // synthetic game now has an inventory model, whose sync
-                // would replace it (q-a4-quest-items).
-                l.host_mut().game.world.inventory = None;
-            })
-            .unwrap();
-        let req = single_player::create_request();
-        g.link.send(SendQueue::System, &req.encode()).unwrap();
-        g.ticks(1);
-        g.link.send(SendQueue::System, &[0x6B]).unwrap();
-        g.ticks(3);
-        g.link
-            .with(|l| {
-                let sim = &mut l.host_mut().game;
-                let p = sim.player_of(LOCAL_CLIENT).expect("joined");
-                let h = &mut sim.events.action.sys.hooks;
-                let mut t = (*h.tables).clone();
-                let mut c = Charstats::decode(&[0u8; Charstats::SIZE]);
-                c.walkvelocity = 6;
-                c.runvelocity = 9;
-                t.combat.charstats = (0..7).map(|_| c.clone()).collect();
-                let mut ms = Monstats::decode(&[0u8; Monstats::SIZE]);
-                ms.killable = true;
-                t.combat.monstats = vec![ms];
-                t.combat.monstats2 = vec![Monstats2::decode(&[0u8; Monstats2::SIZE])];
-                h.tables = Arc::new(t);
-                let rows = h.tables.skills.skills.clone();
-                let list = h.skill_lists.entry(p).or_default();
-                // The join ran the native skills on the synthetic `charstats`
-                // (`client/msg-skills.md` §2 rule 8); this game's class skills
-                // are the fixture's.
-                *list = Default::default();
-                list.init_player(
-                    &rows,
-                    ListOwner::player(PLAYER_CLASS as i32),
-                    Some(&[
-                        FIRE_BOLT as u16,
-                        JAB as u16,
-                        0xFFFF,
-                        0xFFFF,
-                        0xFFFF,
-                        0xFFFF,
-                        0xFFFF,
-                        0xFFFF,
-                        0xFFFF,
-                        0xFFFF,
-                    ]),
-                )
-                .unwrap();
-                let i = list.view().iter().position(|e| e.skill == FIRE_BOLT as i32);
-                list.right = i;
-                sim.events.action.with(&mut sim.game, |_, v| {
-                    v.set_base(p, 9, MANA);
-                    v.set_base(p, 8, MANA);
-                });
-            })
-            .unwrap();
-        g
-    }
-
-    fn ticks(&mut self, n: usize) -> Vec<Vec<u8>> {
-        let mut got = Vec::new();
-        for _ in 0..n {
-            self.link.pump().unwrap();
-            self.ms.fetch_add(40, Ordering::SeqCst);
-            self.link.pump().unwrap();
-            got.extend(self.link.receive());
-        }
-        got
-    }
-
-    fn player_pos(&mut self) -> Pos {
-        self.link
-            .with(|l| {
-                let s = &mut l.host_mut().game;
-                let p = s.player_of(LOCAL_CLIENT).unwrap();
-                let (x, y) = s.events.action.hooks().path_position(p);
-                Pos { x, y }
-            })
-            .unwrap()
-    }
-
-    fn mana(&mut self) -> i32 {
-        self.link
-            .with(|l| {
-                let s = &mut l.host_mut().game;
-                let p = s.player_of(LOCAL_CLIENT).unwrap();
-                s.events.action.with(&mut s.game, |_, v| v.stat(p, 8))
-            })
-            .unwrap()
-    }
-
-    /// A bow (type 27) in the right hand and `arrows` arrows in the left
-    /// hand, as the app's weapon copy holds them after a sync.
-    fn equip(&mut self, arrows: i32) -> (UnitId, UnitId) {
-        self.link
-            .with(move |l| {
-                let sim = &mut l.host_mut().game;
-                let p = sim.player_of(LOCAL_CLIENT).unwrap();
-                let item = |sim: &mut single_player::Sim| {
-                    let req = AllocRequest {
-                        ty: UnitType::Item,
-                        class: 0,
-                        room: None,
-                        add: false,
-                        fixed_guid: None,
-                        mode: 1,
-                        allied: false,
-                    };
-                    sim.events
-                        .action
-                        .with(&mut sim.game, |g, v| v.allocate(g, &req, 0, 0))
-                        .expect("an item unit")
-                };
-                let (bow, quiver) = (item(sim), item(sim));
-                sim.events.action.with(&mut sim.game, |_, v| {
-                    v.set_base(quiver, 70, arrows);
-                });
-                let w = &mut sim.events.action.sys.hooks.x.weapons;
-                w.hands.insert(
-                    p,
-                    Hands {
-                        right: Some(bow),
-                        left: Some(quiver),
-                        weapon: Some(bow),
-                        // The COF weapon class `bow` (`unit-composite.md`
-                        // §2.1).
-                        cof: 1,
-                    },
-                );
-                w.items.insert(
-                    bow,
-                    ItemFacts {
-                        types: vec![27],
-                        class: class::BOW,
-                        shoots: true,
-                        ..ItemFacts::default()
-                    },
-                );
-                w.items.insert(
-                    quiver,
-                    ItemFacts {
-                        stackable: true,
-                        max_stack: 500,
-                        ..ItemFacts::default()
-                    },
-                );
-                (bow, quiver)
-            })
-            .unwrap()
-    }
-
-    fn select_right(&mut self, skill: usize) {
-        self.link
-            .with(move |l| {
-                let sim = &mut l.host_mut().game;
-                let p = sim.player_of(LOCAL_CLIENT).unwrap();
-                let list = sim.events.action.hooks().skill_lists.get_mut(&p).unwrap();
-                list.right = list.view().iter().position(|e| e.skill == skill as i32);
-            })
-            .unwrap();
-    }
-
-    /// A monster of class 0 beside the player with `life` life; its GUID.
-    fn monster(&mut self, life: i32) -> (UnitId, u32) {
-        self.link
-            .with(move |l| {
-                let sim = &mut l.host_mut().game;
-                let p = sim.player_of(LOCAL_CLIENT).unwrap();
-                let (x, y) = sim.events.action.hooks().path_position(p);
-                let room = sim.game.lists.unit(p).and_then(|e| e.room());
-                let req = AllocRequest {
-                    ty: UnitType::Monster,
-                    class: 0,
-                    room,
-                    add: true,
-                    fixed_guid: None,
-                    mode: 1,
-                    allied: false,
-                };
-                let m = sim
-                    .events
-                    .action
-                    .with(&mut sim.game, |g, v| v.allocate(g, &req, x + 2, y))
-                    .expect("a monster");
-                // Monster init sets the targetable flag (`use.md` §5.3 step 2).
-                sim.events.action.sys.units.get_mut(m).unwrap().flags |= 2;
-                sim.events.action.with(&mut sim.game, |_, v| {
-                    v.set_base(m, 12, 10);
-                    v.set_base(p, 12, 10);
-                    v.set_base(p, 19, 1000);
-                    v.set_base(p, 21, 20);
-                    v.set_base(p, 22, 30);
-                    v.set_base(m, 7, life << 8);
-                    v.set_base(m, 6, life << 8);
-                });
-                (m, sim.events.action.sys.units.get(m).unwrap().guid)
-            })
-            .unwrap()
-    }
-
-    fn player_mode(&mut self) -> u32 {
-        self.link
-            .with(|l| {
-                let s = &mut l.host_mut().game;
-                let p = s.player_of(LOCAL_CLIENT).unwrap();
-                s.events.action.sys.units.get(p).map_or(0, |u| u.mode)
-            })
-            .unwrap()
-    }
-
-    fn quantity(&mut self, item: UnitId) -> i32 {
-        self.link
-            .with(move |l| {
-                let s = &mut l.host_mut().game;
-                s.events.action.with(&mut s.game, |_, v| v.stat(item, 70))
-            })
-            .unwrap()
-    }
-
-    fn missiles(&mut self) -> usize {
-        self.link
-            .with(|l| {
-                let h = l.host_mut().game.events.action.hooks();
-                h.missiles.as_ref().map_or(0, |m| m.missiles().count())
-            })
-            .unwrap()
-    }
-}
-
-fn shoot(g: &mut Game) -> (Vec<Vec<u8>>, usize, String) {
-    let at = g.player_pos();
-    let mut msg = vec![0x0C];
-    msg.extend(((at.x + 6) as u16).to_le_bytes());
-    msg.extend((at.y as u16).to_le_bytes());
-    g.link.send(SendQueue::Game, &msg).unwrap();
-    g.link.pump().unwrap();
-    let mut got = Vec::new();
+/// Right-clicks a point east of the player; the most server missiles
+/// alive in a frame over the next frames.
+fn shoot(r: &mut Rig) -> usize {
+    r.right_click_point(6, 0);
     let mut most = 0;
-    for _ in 0..12 {
-        got.extend(g.ticks(1));
-        most = most.max(g.missiles());
+    for _ in 0..30 {
+        r.step(1);
+        most = most.max(r.with(|sim, _| sim.game.lists.units_of_type(UnitType::Missile).len()));
     }
-    let errors = g
-        .link
-        .with(|l| format!("{:?}", l.host_mut().game.events.action.hooks().errors))
-        .unwrap();
-    (got, most, errors)
+    most
 }
 
 // Covers: specs/skills/bodies.md §3.4, §2.5; specs/skills/use.md §5
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_bow_skill_takes_an_arrow_and_shoots_the_missile() {
-    let mut g = Game::joined();
-    let (_, quiver) = g.equip(30);
-    let (got, most, errors) = shoot(&mut g);
+    let mut r = amazon(&["Fire Arrow"]);
+    let q = bow_and_arrows(&mut r, 30);
+    let mana0 = r.mana();
+    let mark = r.s2c_mark();
+    let most = shoot(&mut r);
+    let errors = r.errors();
     // Before: the ammo check found no weapon (`current_weapon` was a
     // default), so the start refused and no missile existed.
     assert!(most > 0, "the arrow flew; errors: {errors}");
-    assert_eq!(g.quantity(quiver), 29, "one arrow taken; errors: {errors}");
-    assert!(g.mana() < MANA, "mana spent at the start");
-    assert!(got.iter().any(|m| m.contains(&0x4D)), "{got:?}");
+    assert_eq!(arrows(&mut r, q), 29, "one arrow taken; errors: {errors}");
+    assert!(r.mana() < mana0, "mana spent at the start");
+    assert!(r.s2c_contains_since(mark, 0x4D), "{errors}");
 }
 
 // Covers: specs/skills/bodies.md §3.4
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_bow_skill_without_arrows_does_not_start() {
-    let mut g = Game::joined();
-    let (_, quiver) = g.equip(0);
-    let (_, most, errors) = shoot(&mut g);
+    let mut r = amazon(&["Fire Arrow"]);
+    let q = bow_and_arrows(&mut r, 0);
+    let mana0 = r.mana();
+    let most = shoot(&mut r);
+    let errors = r.errors();
     assert_eq!(most, 0, "no arrow, no missile; errors: {errors}");
-    assert_eq!(g.quantity(quiver), 0);
-    assert_eq!(g.mana(), MANA, "no mana spent");
+    assert_eq!(arrows(&mut r, q), 0);
+    assert_eq!(r.mana(), mana0, "no mana spent");
 }
 
 // Covers: specs/skills/bodies.md §3.4
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_bow_skill_with_bare_hands_does_not_start() {
-    let mut g = Game::joined();
-    let (_, most, _) = shoot(&mut g);
+    let mut r = amazon(&["Fire Arrow"]);
+    let mana0 = r.mana();
+    let most = shoot(&mut r);
     assert_eq!(most, 0);
-    assert_eq!(g.mana(), MANA);
+    assert_eq!(r.mana(), mana0);
 }
 
 // No rule claim: the Jab body (bodies-2.md §3.1) is not checked here.
-// The synthetic game is the camp, where the rules cut the hit before the
-// damage (`combat/damage.rs`, town room): this checks the cast path of a
-// unit-target skill (the start function `srvst 5` reads the kept target
-// of a targetable monster; the attack mode runs and ends), not the damage.
+// This checks the cast path of a unit-target skill: the start function
+// (`srvst 5`) reads the kept target of a targetable monster and the
+// spear its row wants (`itypea1` spea); the row's own `anim` mode (the
+// sequence mode, `SQ`) runs and ends (in the field, neutral is mode 1
+// where the camp's was 5).
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn jab_on_a_monster_starts_the_attack_mode_and_ends_it() {
-    let mut g = Game::joined();
-    g.select_right(JAB);
-    let (_, guid) = g.monster(500);
-    let mut msg = vec![0x0D];
-    msg.extend(1u32.to_le_bytes());
-    msg.extend(guid.to_le_bytes());
-    g.link.send(SendQueue::Game, &msg).unwrap();
-    g.link.pump().unwrap();
-    let mut seen = vec![g.player_mode()];
-    for _ in 0..14 {
-        g.ticks(1);
-        seen.push(g.player_mode());
+    let mut r = amazon(&["Jab"]);
+    r.wear(item_code("weapons.txt", "Spear"), RIGHT);
+    let m = r.spawn_monster(1);
+    r.with(move |sim, _| {
+        sim.events.action.with(&mut sim.game, |_, v| {
+            v.set_base(m, d2_sim::stats::stat::MAXHP, 100_000 << 8);
+            v.set_base(m, d2_sim::stats::stat::HITPOINTS, 100_000 << 8);
+        });
+    });
+    r.right_click_unit(m);
+    let mut seen = vec![];
+    for _ in 0..40 {
+        r.step(1);
+        let mode = r.with(|sim, p| sim.events.action.sys.units.get(p).map_or(0, |u| u.mode));
+        seen.push(mode);
     }
-    assert!(seen.contains(&7), "the attack mode ran: {seen:?}");
-    assert_eq!(seen.last(), Some(&5), "and ended in town neutral: {seen:?}");
+    let errors = r.errors();
+    let jab = skill_named("Jab");
+    let mode = u32::from(skill_row(jab).anim);
+    assert!(
+        seen.contains(&mode),
+        "the row's mode ran: {seen:?} {errors}"
+    );
+    assert_eq!(seen.last(), Some(&1), "and ended in neutral: {seen:?}");
+    assert_eq!(r.used_skill(), Some(jab as i32));
 }
