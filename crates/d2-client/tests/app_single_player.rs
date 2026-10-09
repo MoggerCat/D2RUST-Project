@@ -741,3 +741,79 @@ fn the_join_sends_the_quest_entry_messages_before_the_player_record() {
     assert_eq!((q28[1], &q28[2..6]), (6, &[0u8, 0, 0, 0][..]));
     assert_eq!(q28.len(), 103);
 }
+
+/// A save standing in the town of Act III, IV or V joins: the server
+/// builds the act's slot at the join (`intents-events.md` §8.2 step 4:
+/// only acts I and II exist from the game's creation), so the join runs
+/// on to the player's placement instead of stopping after S→C 0x03
+/// (the `a3`..`a5-town-*` scenes drew no world before).
+// Covers: specs/sim/intents-events.md §8.2
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn a_save_in_act_three_to_five_is_placed_at_the_join() {
+    use d2_client::bridge::link::SendQueue;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    for act in 2u8..=4 {
+        // The save of `prepare_scene_chars.sh`'s SceAct3..5: the §8.1 act
+        // transitions done, standing in the act's town.
+        let dir = std::env::temp_dir().join(format!("d2rs-far-act-{}-{act}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("Far.d2s");
+        let args: Vec<String> = [
+            "new",
+            "--name",
+            "Far",
+            "--class",
+            "sor",
+            "--expansion",
+            "--map-seed",
+            "1",
+            "--time",
+            "1700000000",
+            "--waypoints",
+            "all",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .chain([
+            "--quests".into(),
+            format!("acts={act}"),
+            "--act".into(),
+            act.to_string(),
+            "-o".into(),
+            path.display().to_string(),
+        ])
+        .collect();
+        assert_eq!(d2s_tool::cli::run(&args, &mut std::io::sink()).unwrap(), 0);
+        let data = app_support::game_data();
+        let character = single_player::load_character(&data, &path, 0).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+        let ms = std::sync::Arc::new(AtomicU32::new(1000));
+        let (mut link, _) =
+            single_player::start_with(data, DEFAULT_SEED, character.clone(), StepClock(ms.clone()))
+                .unwrap();
+        let req = single_player::create_request_for(&character);
+        link.send(SendQueue::System, &req.encode()).unwrap();
+        link.pump().unwrap();
+        ms.fetch_add(40, Ordering::SeqCst);
+        link.pump().unwrap();
+        link.receive();
+        link.send(SendQueue::System, &[0x6B]).unwrap();
+        ms.fetch_add(40, Ordering::SeqCst);
+        assert!(link.pump().unwrap().ticked);
+        let chunks = link.receive();
+        let load = chunks
+            .iter()
+            .find(|c| c[0] == LoadAct::ID)
+            .map(|c| LoadAct::decode(c).unwrap())
+            .expect("0x03 at the join");
+        assert_eq!(load.act, act, "act {act}");
+        let ids: Vec<u8> = chunks.iter().map(|c| c[0]).collect();
+        assert!(ids.contains(&0x04), "act {act}: {ids:02X?}");
+        let placed = link
+            .with(|l| single_player::local_player(&l.host().game).is_some())
+            .unwrap();
+        assert!(placed, "act {act}: no player after the join");
+    }
+}

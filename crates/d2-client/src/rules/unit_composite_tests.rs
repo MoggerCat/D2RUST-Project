@@ -1173,3 +1173,33 @@ fn single_cel_units_missiles_and_items() {
     assert_eq!(flippy_file("own", QUALITY_UNIQUE, Some(""), None), own);
     assert_eq!(flippy_file("own", QUALITY_SET, None, Some("")), own);
 }
+
+// Covers: specs/render/blend-modes.md §5 r3
+/// The shadow pre-test on the sheared box (REC-511), from the recorded
+/// `a1-panel-inventory` / `a1-run-ne` shadows: the boxes of the real COFs.
+#[test]
+fn shadow_box_culling_follows_the_recorded_shadows() {
+    use super::shadow_box_visible;
+    let torch = cof_box(-75, 13, -108, 5); // toonhth
+    let rogue = cof_box(-43, 29, -62, 7); // rgnuhth
+    let waypoint = cof_box(-115, 76, -76, 99); // wponhth
+                                               // Drawn although the body fails `cof_box_visible`.
+    assert!(shadow_box_visible(&torch, 918, 212, 800, 600));
+    assert!(!cof_box_visible(&torch, 920, 212, 800, 600));
+    assert!(shadow_box_visible(&waypoint, 978, 377, 800, 600));
+    assert!(shadow_box_visible(&torch, 358, 636, 800, 600));
+    // Not drawn: the rogue at the torch's X, the far torch, the left ones.
+    assert!(!shadow_box_visible(&rogue, 918, 618, 800, 600));
+    assert!(!shadow_box_visible(&torch, 1094, 444, 800, 600));
+    assert!(!shadow_box_visible(&torch, -26, -100, 800, 600));
+    assert!(!shadow_box_visible(&torch, -170, 196, 800, 600));
+    // M08: each edge, one pixel either side (d = 56 for the torch).
+    assert!(shadow_box_visible(&torch, 929, 300, 800, 600));
+    assert!(!shadow_box_visible(&torch, 930, 300, 800, 600));
+    assert!(shadow_box_visible(&torch, -13, 300, 800, 600));
+    assert!(!shadow_box_visible(&torch, -14, 300, 800, 600));
+    assert!(shadow_box_visible(&torch, 400, -5, 800, 600));
+    assert!(!shadow_box_visible(&torch, 400, -6, 800, 600));
+    assert!(shadow_box_visible(&torch, 400, 649, 800, 600));
+    assert!(!shadow_box_visible(&torch, 400, 650, 800, 600));
+}

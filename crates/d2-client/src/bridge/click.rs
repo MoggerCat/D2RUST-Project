@@ -166,14 +166,16 @@ impl ModelClick<'_> {
     }
 }
 
-/// Screen → world subtile (`0x0045AFF0`, `render/camera.md` §4 "Screen →
-/// world"): client (sx + cx_u − shift_x, sy + cy_u), no −8 (not the exact
-/// inverse of the unit draw), then subtile ((px + 2·py) >> 5,
-/// (2·py − px) >> 5), floored. d2rs renders no perspective.
+/// Screen → world subtile (`0x0045AFF0`): the inverse of the unit draw
+/// (`render/camera.md` §4) and of the static projection (§2).
+/// PROVISIONAL (ui/controls.md §6 r2, REC-514: measured on the
+/// `a1-walk-*` scenes): screen (sx, sy) → client (sx + cx_u − shift_x,
+/// sy + cy_u − 4) → subtile ((px + 2·py) / 32, (2·py − px) / 32)
+/// floored: the unit draw's inverse (`sy + cy_u − 8`) four rows down.
 pub fn screen_to_world(cam: &Camera, sx: i32, sy: i32) -> (i32, i32) {
     let p = ClientPos {
         x: sx + cam.unit.x - cam.view.shift_x,
-        y: sy + cam.unit.y,
+        y: sy + cam.unit.y - 4,
     };
     (
         (p.x + 2 * p.y).div_euclid(32),
@@ -540,6 +542,25 @@ pub fn held_repeat_at(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Covers: specs/ui/controls.md §6 r2
+    /// `a1-walk-n` (1.14d): the player at client (10320, 72816), a click
+    /// at (400, 184) walks to subtile (4868, 4222), the preparation's
+    /// probe of the blocked (4867, 4222): the click maps to (4867, 4222).
+    #[test]
+    fn a_click_maps_to_the_rounded_subtile() {
+        let cam = Camera::new(
+            FrameSize::D2RS,
+            OpenMode::NONE,
+            ClientPos { x: 10320, y: 72816 },
+            (0, 0),
+        );
+        assert_eq!(screen_to_world(&cam, 400, 184), (4867, 4222));
+        // The player's draw point (400, 292) picks its own subtile.
+        assert_eq!(screen_to_world(&cam, 400, 292), (4873, 4228));
+        // M08: the unit draw's plain inverse picked the blocked (4866, 4221).
+        assert_ne!(screen_to_world(&cam, 400, 184 - 4), (4867, 4222));
+    }
     use crate::bridge::predict::{walk_of, Walk, WalkTo};
     use crate::bridge::skills::{SkillEntry, SkillList};
     use crate::bridge::world::ClientUnit;
@@ -679,7 +700,9 @@ mod tests {
 
     // Covers: specs/render/camera.md §4
     #[test]
-    fn screen_to_world_has_no_minus_8() {
+    fn screen_to_world_is_the_unit_draw_inverse_four_rows_down() {
+        // REC-514 (measured on 1.14d, supersedes camera.md §4's "no -8"
+        // reading): client (sx + cx_u - shift_x, sy + cy_u - 4).
         let cam = |x, y| {
             Camera::new(
                 FrameSize::D2RS,
@@ -691,21 +714,13 @@ mod tests {
         let (w, h) = (FrameSize::D2RS.width, FrameSize::D2RS.height);
         let shift = cam(0, 0).view.shift_x;
         let want = |x: i32, y: i32| ((x + 2 * y) >> 5, (2 * y - x) >> 5);
-        // The drawn foot point (W/2 + shift, H/2 - 8) maps to client
-        // (P_x, P_y + 8): +1/2 subtile on both axes before the floor.
         for (px, py) in [(0, 0), (16, 0), (-40, -24), (7, -3)] {
             let c = cam(px, py);
             assert_eq!(
                 screen_to_world(&c, w / 2 + shift, h / 2 - 8),
-                want(px, py + 8)
+                want(px, py + 4)
             );
         }
-        // A negative-floor case: client (-40, -16) -> (-72 >> 5, 8 >> 5).
-        assert_eq!(want(-40, -16), (-3, 0));
-        assert_eq!(
-            screen_to_world(&cam(-40, -24), w / 2 + shift, h / 2 - 8),
-            (-3, 0)
-        );
     }
 
     // Covers: specs/ui/controls.md §6 r4

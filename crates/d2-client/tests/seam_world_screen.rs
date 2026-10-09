@@ -75,9 +75,10 @@ fn static_unit_draw_point_picks_back_to_its_subtile() {
 // Covers: specs/seams/world-screen.md §2.3
 #[test]
 fn every_pixel_of_a_subtile_diamond_picks_that_subtile() {
-    // The subtile diamond with its top vertex at the static point is 32
-    // wide and 16 high (`camera.md` §2: × 16, × 8): the pick floors, so
-    // the pixels of one diamond map to one subtile and no pixel is lost.
+    // The subtile diamond whose top vertex is 4 rows above the static
+    // point (§2.1 revision, measured on the `a1-walk-*` scenes) is 32 wide
+    // and 16 high (`camera.md` §2: × 16, × 8): the pixels of one diamond
+    // map to one subtile and no pixel is lost.
     let cam = Camera::new(
         FrameSize::D2RS,
         OpenMode::NONE,
@@ -87,11 +88,11 @@ fn every_pixel_of_a_subtile_diamond_picks_that_subtile() {
     let (sx, sy) = (7, 3);
     let (x0, y0) = cam.unit_draw(static_to_client(sx, sy), (0, 0));
     let mut hits = 0;
-    for dy in 0i32..16 {
+    for dy in -4i32..12 {
         for dx in -16i32..16 {
-            if (0..32).contains(&(dx + 2 * dy)) && (0..32).contains(&(2 * dy - dx)) {
-                // The pick has no -8 (camera.md §4): sample 8 rows above.
-                assert_eq!(screen_to_world(&cam, x0 + dx, y0 + dy - 8), (sx, sy));
+            let (a, b) = (dx + 2 * (dy + 4), 2 * (dy + 4) - dx);
+            if (0..32).contains(&a) && (0..32).contains(&b) {
+                assert_eq!(screen_to_world(&cam, x0 + dx, y0 + dy), (sx, sy));
                 hits += 1;
             }
         }
