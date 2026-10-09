@@ -1,0 +1,10 @@
+check 1
+# Harrogath arrival, idle: ScnAm5 (expansion, act V start, acts 1-4 done),
+# -seed 1234, no input. Area E of the day-run diff loop (q-prov-data).
+# Spec: specs/tools/scenario-diff.md.
+name a5-harrogath-arrival-ama
+save ScnAm5 --class ama --expansion --act 4 --quests acts=4
+seed 1234
+ticks 60
+seconds 300
+channels state
