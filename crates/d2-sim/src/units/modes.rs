@@ -504,6 +504,26 @@ pub fn monster_set_mode<H: UnitHooks>(
     unit: UnitId,
     mode: u32,
 ) -> Result<(), UnitError> {
+    monster_set_mode_started(sim, hooks, unit, mode).map(|_| ())
+}
+
+/// [`monster_set_mode`] with its result: whether the requested mode's
+/// start ran without falling back to the neutral start.
+///
+/// PROVISIONAL (units.md §4.6, REC-1390): §4.6 gives no result for a
+/// live unit; a start that returns 0 (e.g. a walk whose path has no
+/// point, `ai.md` §7.5 rule 8) makes `0x005A7C20` return 0, so the AI's
+/// "mode change failed" branches run (`ai.md` §7.2 `0x005DEB60`). Read
+/// from the 1.14d recording `merc-rogue-cow` frame 33: the hireling's
+/// wander (`0x005DF530`) to a point one sub-tile away is followed by
+/// the escape of `ai-bodies-6.md` §7 step 11 (no draws between, target
+/// (5137, 4269)). Settled by a read of `0x005A7C20`'s return path.
+pub fn monster_set_mode_started<H: UnitHooks>(
+    sim: &mut Sim<'_>,
+    hooks: &mut H,
+    unit: UnitId,
+    mode: u32,
+) -> Result<bool, UnitError> {
     if mode >= monster_mode::COUNT {
         return Err(UnitError::BadMode {
             ty: UnitType::Monster,
@@ -552,7 +572,7 @@ pub fn monster_set_mode<H: UnitHooks>(
             anim::run(sim.game, unit, &mut rec.anim, Form::Main { bonus })?;
         }
     }
-    Ok(())
+    Ok(started)
 }
 
 /// The neutral AI delay of §4.6: `aidel` (Normal column, or the

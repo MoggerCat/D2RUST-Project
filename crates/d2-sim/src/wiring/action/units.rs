@@ -1279,9 +1279,9 @@ impl<X: Pending> View<'_, X> {
             stats: self.stats,
             data: self.data,
         };
-        let r = crate::units::modes::monster_set_mode(&mut sim, &mut *self.h, u, mode);
+        let r = crate::units::modes::monster_set_mode_started(&mut sim, &mut *self.h, u, mode);
         match r {
-            Ok(()) => true,
+            Ok(started) => started,
             Err(e) => {
                 self.unit_error(e);
                 false

@@ -462,6 +462,9 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 
 - [q-fix-room-links] After a waypoint return to a town, does 1.14d populate only the rooms near the player (far NPCs/objects appear on approach), as d2rs does? Drive town -> waypoint -> back, snapshot units at +50 and +600 frames (`docs/handoff/q-fix-room-links.md`).
 
+- [q-fix-d4-placement] **Result of the monster mode set `0x005A7C20` (REC-1390)**: read its return path for a live unit whose requested mode's start returns 0 (e.g. WL `0x005A7520` with no path point, `monsters/ai.md` §7.5 rule 8) and the neutral start runs instead: 0 or 1? d2rs: PROVISIONAL 0 (`sim/units.md` §4.6), from `merc-rogue-cow` frame 33 (the hireling's wander `0x005DF530` to (5139, 4266) from (5140, 4266), then the escape, target (5137, 4269)).
+- [q-fix-d4-placement] **Missile snap in one step `0x00650660` (REC-1391)**: does rule 3 of `sim/pathing.md` §9.6 (Δ := point[index] centre − position when within the step, index += 1) run for missiles? d2rs: PROVISIONAL yes, from `dru-tornado` frames 30–31 (the tornado keeps its exact start position on its first tick, faces point 1, then flies to it). If it does, say also whether a type-4 straight missile then stops at its target point (Fire Blast in `ass-fire-blast` explodes at its target cell centre, frame 41).
+
 ## How to check a behaviour in one command
 
 A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)

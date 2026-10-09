@@ -28,17 +28,17 @@
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–155 |
 |   3. Lifecycle | 156–420 |
-|   4. Modes and mode schedules | 421–952 |
-|   5. Event dispatch | 953–967 |
-|   6. Events per kind | 968–1090 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 1091–1112 |
-|   8. Collision line between two units | 1113–1117 |
-| Constants & data dependencies | 1118–1134 |
-| Randomness | 1135–1142 |
-| Edge cases & original bugs | 1143–1163 |
-| Test vectors | 1164–1223 |
-| Provenance | 1224–1310 |
-| Open questions | 1311–1390 |
+|   4. Modes and mode schedules | 421–961 |
+|   5. Event dispatch | 962–976 |
+|   6. Events per kind | 977–1099 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 1100–1121 |
+|   8. Collision line between two units | 1122–1126 |
+| Constants & data dependencies | 1127–1143 |
+| Randomness | 1144–1151 |
+| Edge cases & original bugs | 1152–1172 |
+| Test vectors | 1173–1232 |
+| Provenance | 1233–1319 |
+| Open questions | 1320–1399 |
 <!-- /index -->
 
 ## Summary
@@ -564,6 +564,15 @@ neutral start `0x005A73E0` runs instead; flags |= 0x80000, animation
 prepared (`0x005533D0`), cancel 0/1, then, if the record of the mode the
 unit is now in has its schedule flag: every-tick (§4.4) when
 `0x005A6B10` says the mode moves, else §4.2.
+
+PROVISIONAL: the result of `0x005A7C20` for a live unit is 1 when the
+requested mode's start returned non-zero and 0 when the neutral start
+ran in its place (so the AI's failure branches of `monsters/ai.md` §7.2
+run after a walk with no path point) (because the 1.14d recording
+`merc-rogue-cow` frame 33 shows the hireling's wander to a point one
+sub-tile away followed, with no draw between, by the escape of
+`monsters/ai-bodies-6.md` §7 step 11); settled by a read of
+`0x005A7C20`'s return path (REC-1390).
 
 Mode table (`0x005A78A0`): 16-byte records {start, event-0 function,
 event-1 function, schedule flag} at `0x006E2260` + 16·mode; classes
