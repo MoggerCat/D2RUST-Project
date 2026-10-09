@@ -621,7 +621,7 @@ fn kurast_docks_arrival_and_every_town_npc_talks() {
     }
 }
 
-// Covers: specs/world/quests-act3.md §6.2–§6.7
+// Covers: specs/world/quests-act3.md §6.2; specs/world/quests-act3.md §6.5; specs/world/quests-act3.md §6.6
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_golden_bird_from_the_jungle_boss_to_the_potion_of_life() {
@@ -685,7 +685,7 @@ fn the_golden_bird_from_the_jungle_boss_to_the_potion_of_life() {
 /// The Gidbinn decoy object (`objects.txt` row 252, `quests-act3.md` §1.4).
 const GIDBINN_DECOY: u32 = 252;
 
-// Covers: specs/world/quests-act3.md §5.3–§5.8
+// Covers: specs/world/quests-act3.md §5.4; specs/world/quests-act3.md §5.6; specs/world/quests-act3.md §5.8
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_blade_of_the_old_religion_from_hratli_to_ormus_and_asheara() {
