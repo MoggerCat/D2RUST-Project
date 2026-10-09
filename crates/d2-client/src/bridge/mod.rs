@@ -18,6 +18,7 @@ pub mod bits;
 pub mod chat_end;
 pub mod check;
 pub mod click;
+pub mod client_missiles;
 pub mod client_path;
 pub mod combat;
 pub mod dispatch;
@@ -457,6 +458,7 @@ impl<L: ServerLink> Bridge<L> {
         t.objects = rows.objects;
         t.shrines = rows.shrines;
         t.states = rows.states;
+        t.missiles = rows.missiles;
     }
 
     /// The host's wall-clock seconds `0x00410A80` (`render/lighting.md`

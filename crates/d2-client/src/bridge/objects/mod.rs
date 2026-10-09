@@ -209,6 +209,9 @@ pub struct ClientObjects {
     pub latches: Latches,
     /// The client GUID counter `[0x00711F30]` of `0x00466730`.
     pub next_guid: u32,
+    /// The missile fields of the set-C missiles
+    /// (`super::client_missiles`, `missiles/client.md` §C1).
+    pub missiles: super::client_missiles::ClientMissiles,
 }
 
 /// A unit and the set it is in.
@@ -637,6 +640,7 @@ pub fn create_client_unit(
 /// (a): every unit free, set C too).
 pub fn remove_client_unit(w: &mut ClientWorld, key: UnitKey) -> Option<ClientUnit> {
     let u = w.objclient.set_c.remove(&key)?;
+    w.objclient.missiles.remove(&key);
     w.freed.push((key, true));
     Some(u)
 }

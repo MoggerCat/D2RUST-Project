@@ -1261,6 +1261,8 @@ pub struct UnitRows {
     /// One entry per `states` row, by state id (`client/stat-lists.md`
     /// §3).
     pub states: Vec<StateRow>,
+    /// One entry per `missiles` row (`missiles/client.md` §C2–§C4).
+    pub missiles: Vec<super::client_missiles::ClientMissileRow>,
 }
 
 impl MonsterClass {
@@ -1303,6 +1305,9 @@ pub struct ClientTables {
     pub skilldesc: Vec<SkillDescRow>,
     /// One entry per `objects.txt` row, by class (`model.md` §15).
     pub objects: Vec<ObjectRow>,
+    /// One entry per `missiles` row, by class (the client create,
+    /// `missiles/client.md` §C2–§C4).
+    pub missiles: Vec<super::client_missiles::ClientMissileRow>,
     /// The `Code` byte (+0) of each `shrines.txt` row, by index
     /// (`msg-units.md` §1.3 r3: table `[0x0096D468]`, count
     /// `[0x0096D46C]`).

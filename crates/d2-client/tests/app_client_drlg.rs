@@ -475,3 +475,29 @@ fn effect_rows_carry_the_users_client_missile_functions() {
         println!("pCltDoFunc {f}: {n} rows");
     }
 }
+
+// Covers: specs/missiles/client.md §c4-create-tail
+/// The client create on the user's `missiles` rows: missile 287
+/// `denofevillight` (`render/lighting.md` §8: `Light` 10;
+/// `missiles/client.md` §C12: client function 23) created at a point
+/// gets its kind-1 light of radius 10.
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_den_light_missile_creates_from_the_users_rows() {
+    use d2_client::bridge::client_missiles::{create, flag, CreateRecord};
+    let d = app_support::live();
+    let rows = single_player::client_unit_rows(d.archives.as_ref()).unwrap();
+    assert_eq!(rows.missiles[287].clt_do_func, 23);
+    assert_eq!(rows.missiles[287].light, 10);
+    let mut w = ClientWorld::default();
+    let rec = CreateRecord {
+        flags: flag::POSITION,
+        class: 287,
+        x: 100,
+        y: 100,
+        ..CreateRecord::default()
+    };
+    let k = create(&mut w, &rows.missiles, &rec, true).unwrap().unwrap();
+    let (_, light) = w.lights.iter().next().unwrap();
+    assert_eq!((light.owner_guid, light.radius), (k.guid, 80));
+}
