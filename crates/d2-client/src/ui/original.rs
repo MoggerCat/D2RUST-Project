@@ -484,7 +484,10 @@ impl OriginalUi {
         root.open(game_messages::MESSAGES_PANEL)?;
         root.add(Box::new(overhead_ui::OverheadUi { sh: sh.clone() }))?;
         root.open(overhead_ui::OVERHEAD_PANEL)?;
-        root.add(Box::new(esc_menu::EscMenuUi { sh: sh.clone() }))?;
+        root.add(Box::new(esc_menu::EscMenuUi {
+            sh: sh.clone(),
+            pent: Default::default(),
+        }))?;
         // Step 10 and the cursor draw: over the control panel overlays
         // (step 7–8) and every panel (`panels.md` §5, `panels-3.md` §23 r9).
         root.add(Box::new(TopUi { sh: sh.clone() }))?;

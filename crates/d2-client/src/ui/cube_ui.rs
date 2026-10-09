@@ -47,7 +47,7 @@ pub const HORADRIC_LOOK: crate::ui::CelLook = crate::ui::CelLook {
     remap: crate::ui::Remap::None,
 };
 /// Milliseconds per client frame (d2rs-own, unverified; see the module).
-const FRAME_MS: u64 = 40;
+const FRAME_MS: u64 = crate::rules::camera::CLIENT_TICK_MS as u64;
 
 pub(super) fn cube_files() -> [String; 1] {
     [HORADRIC_FILE.to_string()]

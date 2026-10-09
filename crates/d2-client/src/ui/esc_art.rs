@@ -13,7 +13,7 @@
 //! d2rs-own, unverified (REC-257): the disabled look (draw mode 1) and
 //! the dark slider rectangles of §O4 r2 have no field in the image
 //! request and are not drawn; the `pentspin` frame follows the client
-//! tick (one step per two ticks, the original's > 50 ms); Window Mode has
+//! clock ([`PentClock`]: the original's > 50 ms rule); Window Mode has
 //! no art and stays text; `textslid` is the key-config screen's, not
 //! this menu's.
 
@@ -151,10 +151,37 @@ fn local(name: &str) -> String {
     format!("{LOCAL_PREFIX}{name}")
 }
 
-/// The `pentspin` counter for a client tick: one step per 50 ms
-/// (two 25 Hz ticks), d2rs-own.
-pub fn pent_frame(tick: u64) -> u32 {
-    ((tick / 2) % 8) as u32
+/// The `pentspin` counter (§O4 r3, `0x00454850`): it advances by one,
+/// modulo 8, once per draw at which more than 50 ms have passed since the
+/// last advance (the first draw advances at once). The clock is the
+/// client tick times [`CLIENT_TICK_MS`](crate::rules::camera::CLIENT_TICK_MS)
+/// (d2rs-own, unverified); a 25 Hz draw sequence steps every 2nd draw, a
+/// 60 Hz one every 4th.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PentClock {
+    frame: u32,
+    last_ms: Option<u64>,
+}
+
+impl PentClock {
+    /// One draw at `now_ms`: advances when > 50 ms passed; returns the
+    /// frame to draw.
+    pub fn draw(&mut self, now_ms: u64) -> u32 {
+        match self.last_ms {
+            None => self.last_ms = Some(now_ms),
+            Some(last) if now_ms.saturating_sub(last) > 50 => {
+                self.frame = (self.frame + 1) % 8;
+                self.last_ms = Some(now_ms);
+            }
+            Some(_) => {}
+        }
+        self.frame
+    }
+
+    /// The client tick's milliseconds.
+    pub fn ms_of_tick(tick: u64) -> u64 {
+        tick * u64::from(crate::rules::camera::CLIENT_TICK_MS)
+    }
 }
 
 /// Draws the art of row `i` (label, value or slider); `false`: the row
@@ -194,12 +221,11 @@ pub fn draw_row(files: &UiFiles, m: &OptionsMenu, i: usize, out: &mut dyn UiDraw
 
 /// The pentagrams at the selected row (§O4 r3): the left one spins the
 /// other way, drawn right-aligned in its 52 px cell.
-pub fn draw_pents(files: &UiFiles, m: &OptionsMenu, tick: u64, out: &mut dyn UiDrawSink) {
+pub fn draw_pents(files: &UiFiles, m: &OptionsMenu, f: u32, out: &mut dyn UiDrawSink) {
     let Some(file) = files.id(PENTSPIN) else {
         return;
     };
     let (half, clip) = (m.half(), m.screen.rect());
-    let f = pent_frame(tick);
     let left = if f == 0 { 0 } else { 8 - f };
     let y = m.pentagram_y();
     for (frame, x) in [(left, half - 52 - 249), (f, half + 249)] {
@@ -224,12 +250,12 @@ mod tests {
     }
 
     /// (name, frame, x, y) of every image drawn.
-    fn draws(f: &UiFiles, m: &OptionsMenu, tick: u64) -> Vec<(String, u32, i32, i32)> {
+    fn draws(f: &UiFiles, m: &OptionsMenu, frame: u32) -> Vec<(String, u32, i32, i32)> {
         let mut out: Vec<UiDraw> = Vec::new();
         for i in 0..m.rows().len() {
             assert!(draw_row(f, m, i, &mut out) || m.rows()[i].row == Row::WindowMode);
         }
-        draw_pents(f, m, tick, &mut out);
+        draw_pents(f, m, frame, &mut out);
         out.iter()
             .filter_map(|d| match d {
                 UiDraw::Image(r) => Some((
@@ -260,7 +286,7 @@ mod tests {
         assert_eq!(d[5], ("cursor\\pentspin".into(), 0, 99, 336));
         assert_eq!(d[6], ("cursor\\pentspin".into(), 0, 649, 336));
         // Later frame: the left one spins the other way.
-        let d = draws(&f, &m, 6);
+        let d = draws(&f, &m, 3);
         assert_eq!((d[5].1, d[6].1), (5, 3));
     }
 
@@ -327,5 +353,21 @@ mod tests {
             assert_eq!(y, left_y);
             assert_eq!(at, [(h - 301, y), (h + 249, y)]);
         }
+    }
+
+    // Covers: specs/ui/frontend-options.md §O4 r3
+    #[test]
+    fn the_pentagram_steps_when_more_than_50_ms_passed() {
+        // 25 Hz draws (40 ms): the first draw steps at once, then every 2nd.
+        let mut c = PentClock::default();
+        let frames: Vec<u32> = (0..7).map(|i| c.draw(PentClock::ms_of_tick(i))).collect();
+        assert_eq!(frames, [0, 0, 1, 1, 2, 2, 3]);
+        // 60 Hz draws (16.67 ms): every 4th.
+        let mut c = PentClock::default();
+        let frames: Vec<u32> = (0..9).map(|i| c.draw(i * 50 / 3)).collect();
+        assert_eq!(frames, [0, 0, 0, 0, 1, 1, 1, 1, 2]);
+        // The counter wraps at 8.
+        let mut c = PentClock::default();
+        assert_eq!((0..40).map(|i| c.draw(i * 60)).last(), Some(7));
     }
 }
