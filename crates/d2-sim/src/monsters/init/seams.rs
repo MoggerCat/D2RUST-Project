@@ -91,6 +91,11 @@ pub trait InitHost {
     fn has_item_at(&mut self, unit: UnitId, loc: u8) -> bool {
         false
     }
+    /// `skills/bodies.md` §6.5 step 9: the base code of the owner's item
+    /// at body location `loc` (`0x00628590`); `None` when it has none.
+    fn owner_item_code(&mut self, owner: UnitId, loc: u8) -> Option<[u8; 4]> {
+        None
+    }
     /// §12: create item `code` at `loc` with modifier `modifier`, item
     /// level `level` (`0x00573B20`, treasure spec; its draws use the unit
     /// seed).
