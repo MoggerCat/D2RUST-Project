@@ -169,11 +169,15 @@ fn the_session_flow_creates_the_game_then_loads_the_character_at_the_join() {
         [0x04, 0x48, 0x5B, 0x65, 0x8D, 0x5A],
         "{got:02X?}"
     );
-    // A new character has its player record (§8.2 rule 7): 0x5F after
-    // 0x0B and the two 0x23 (no `StartSkill` without the vitals tables, so
-    // no load 0x23).
+    // A new sorceress has its player record (§8.2 rule 7): 0x5F after
+    // 0x0B and three 0x23, as the Wine recording of a character made in
+    // the create screen (`facts/join/a1-new-sor.tsv`): the load's own
+    // `StartSkill` select before 0x0B (the install has the vitals tables),
+    // then the two hands after 0x5F.
     assert!(got.windows(2).any(|w| w == [0x0B, 0x5F]), "{got:02X?}");
-    assert_eq!(got.iter().filter(|&&i| i == 0x23).count(), 2, "{got:02X?}");
+    assert_eq!(got.iter().filter(|&&i| i == 0x23).count(), 3, "{got:02X?}");
+    let pos = |id: u8| got.iter().position(|&i| i == id).unwrap();
+    assert!(pos(0x23) < pos(0x0B), "the select's 0x23 comes first");
     let (class, fields, knows, faults, log) = link
         .with(|l| {
             let sim = &mut l.host_mut().game;
@@ -211,11 +215,13 @@ fn the_session_flow_creates_the_game_then_loads_the_character_at_the_join() {
     assert_eq!(
         steps,
         [
-            // No `skills` rows: `client/msg-skills.md` §2 r8 selects skill
-            // 0 outside the table. (The synthetic vitals tables, q-smoke-town,
-            // give the start stats, items and skill their provider.)
-            "player skills",
+            // On the install the `skills` rows exist, so the player
+            // skills are applied; `StartSkill` comes with the start items'
+            // stat 107, which has no provider ("has skill", as
+            // `synthetic_game.rs`). The one-rows 0x23 reading is the
+            // recorded join's (above).
             "new character set-up",
+            "has skill",
             "mouse skills",
             "quest entry"
         ]
