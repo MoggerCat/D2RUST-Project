@@ -11,5 +11,5 @@ seed 1234
 ticks 24
 seconds 300
 channels state packets items
-at 4 send UseGridItem item=@4 x=0 y=0
+at 4 send UseGridItem item=@1 x=@x y=@y
 at 8 send ClickButton button=0x18 p1=0 p2=0
