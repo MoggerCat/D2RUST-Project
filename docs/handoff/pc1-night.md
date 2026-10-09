@@ -59,7 +59,7 @@ messages.
 |---|---|---|---|
 | 62 | [q-fix-d9-arcane] A2Q4 event 3 with new level 74 | From the binary (`0x0059F0D2`–`0x0059F17C`): the level-74 branch returns on every path, so the old-level-40 block never runs for a move into 74; level 50 falls through. REC-1405 settled, d2rs right (`world/quests-act2.md` §6.6, `quests-act2-2.md` §2 item 3) | — |
 
-## D — REC-1150 and binary-settleable PROVISIONALs
+## E — REC-1150 and binary-settleable PROVISIONALs
 
 - **REC-1150 settled by recording** (`tools/poke.md` §4 rule 10): direct
   operate `0x00584420` at the tick-return stop vs C→S 0x13 sent for the
