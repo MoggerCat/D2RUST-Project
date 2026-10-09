@@ -41,9 +41,9 @@
 | Constants & data dependencies | 916–937 |
 | Randomness | 938–970 |
 | Edge cases & original bugs | 971–1005 |
-| Test vectors | 1006–1083 |
-| Provenance | 1084–1109 |
-| Open questions | 1110–1159 |
+| Test vectors | 1006–1088 |
+| Provenance | 1089–1114 |
+| Open questions | 1115–1164 |
 <!-- /index -->
 
 ## Summary
@@ -1064,15 +1064,20 @@ Every hit is exactly 4 steps of the attacker's seed and every miss 1
   steps 4, 10, 13): with crit before burn the 124 hit would crit (3 <
   5) and deal 938;
 - min = 256, max = 512: `mindamage` 1, `maxdamage` 2 after mode damage
-  (pct(monlvl `L-DM` level 1, 51 / 101, 100) with `L-DM` 1 or 2, then
-  the 1 / 2 floors of §3.2); no other range reproduces all five rolls;
+  (pct(monlvl `L-DM` level 1, 51 / 101, 100) with `L-DM` = 2, read from
+  the shipped `monlvl.bin`, then the 1 / 2 floors of §3.2); no other
+  range reproduces all five rolls;
 - no DR, no resist, damage percent 100, no regeneration between hits:
   life drops by the physical roll exactly;
 - hit chance 46 … 65 (hits at r = 20 … 45, misses at r = 65, 92, 96):
   `chance = 100 × T / (T + 6)` (alvl = dlvl = 1) → to-hit T ∈ 6 … 11,
-  i.e. pct(`L-TH` level 1, 101, 100) ∈ 6 … 11 (PROVISIONAL REC-817:
-  the exact monlvl `L-TH` value was not read; any value in the bracket
-  reproduces this record);
+  i.e. pct(`L-TH` level 1, 101, 100) ∈ 6 … 11. The shipped table
+  (`Patch_D2.mpq` `data\global\excel\monlvl.bin`, 111 records of 120
+  bytes after the u32 count; record n = level n) holds `L-TH` 8 / 108 /
+  216 and `L-DM` 2 / 3 / 4 (Normal / NM / Hell) at level 1, so T =
+  pct(8, 101, 100) = 8 and the hit chance is 100 × 8 / 14 = 57 (read
+  2026-10-09, settles REC-817; matches the hits at r ≤ 45 and the
+  misses at r ≥ 65);
 - reaction: the player's seed (85, 666) and mode 5 never change, so the
   get-hit test passed its size test without a mask draw (total < M /
   div: 358 … 479 < 12800 / div → div ≤ 16, i.e. hit class not

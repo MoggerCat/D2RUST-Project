@@ -28,17 +28,17 @@
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–155 |
 |   3. Lifecycle | 156–420 |
-|   4. Modes and mode schedules | 421–952 |
-|   5. Event dispatch | 953–967 |
-|   6. Events per kind | 968–1090 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 1091–1112 |
-|   8. Collision line between two units | 1113–1117 |
-| Constants & data dependencies | 1118–1134 |
-| Randomness | 1135–1142 |
-| Edge cases & original bugs | 1143–1163 |
-| Test vectors | 1164–1223 |
-| Provenance | 1224–1310 |
-| Open questions | 1311–1390 |
+|   4. Modes and mode schedules | 421–955 |
+|   5. Event dispatch | 956–970 |
+|   6. Events per kind | 971–1093 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 1094–1115 |
+|   8. Collision line between two units | 1116–1120 |
+| Constants & data dependencies | 1121–1137 |
+| Randomness | 1138–1145 |
+| Edge cases & original bugs | 1146–1166 |
+| Test vectors | 1167–1226 |
+| Provenance | 1227–1313 |
+| Open questions | 1314–1393 |
 <!-- /index -->
 
 ## Summary
@@ -905,9 +905,12 @@ The run (mode 3) the same with speed w · p / 100, w = 101 and p = the
 run's velocity percent 100 · `RunVelocity` / `WalkVelocity` (150 for the
 sorceress' 9 / 6: speed 151), c = the run click that changed the mode
 (a walk ↔ run change restarts c): `a1-run-n` … `-nw`, frames 5, 6, 6,
-6, 6, 7, 7, 7 at ticks 150 … 248, c = 140. PROVISIONAL (REC-516): p as
-that ratio (because w = 101 at p = 100 fits no start; settled by a run
-of a class with another RunVelocity / WalkVelocity ratio).
+6, 6, 7, 7, 7 at ticks 150 … 248, c = 140. p is §4.7 step 7's
+max(E(4) + total(67), 25): total(67) = the base 100 plus the run list's
+100 · `RunVelocity` / `WalkVelocity` − 100 (`sim/pathing.md` §8.2), so
+without movement items p is that ratio, truncated (settles REC-516 by
+the rate rule; every 1.14d class has 6 / 9, so no class can show
+another ratio).
 
 Steps 7 and 8 assert (fatal) for types 2 and 3; no 1.14d caller passes
 an object or missile (objects take `0x00624390`'s own branch,
