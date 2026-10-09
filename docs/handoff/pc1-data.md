@@ -104,6 +104,37 @@ newest-first, and set each row's status to `done <commit>`.
 - The coordinator polls `claude/local-pc1-facts` and the private repo's
   `main`; no message is needed.
 
+## Set up any state for a check (q-tool-poke, 2026-10-09)
+
+Never walk through the game to reach a state. Three layers, the same on
+1.14d and d2rs, so a comparison starts from identical state:
+
+| Need | Tool | Spec |
+|---|---|---|
+| the character (class, level, stats, skills, waypoints, quests, items) | `d2s-tool new` / `set` → a `.d2s` | `formats/d2s.md` |
+| units and world state at a tick (monster, superunique, object, missile, game / unit seed, time of day; d2rs also pos, warp, item, stat, state) | a poke: `traces/pokes/<name>.poke`, `at <t> poke ...` scenario steps, or `--poke "<frame> <directive> ..."` | `tools/poke.md` |
+| table data (a level with one monster class, a fixed damage range, ...) | a test variant: `traces/variants/<name>/<name>.d2stack` → `data-tool variant build` | `tools/test-variants.md` |
+
+```
+# 1.14d (Windows; in the cloud: tools/cloud-game/run.sh --python --seconds 150 -- <the same command>)
+py tools/trace-recorder/poke.py --poke-file traces/pokes/spawn-town.poke --auto ScnAma --seed 1234 --seconds 60
+py tools/trace-recorder/poke.py --poke "4 spawn 19 4876 4231 normal" --auto ScnAma --seed 1234
+#   other recorders: import poke; poke.add_options(ap); poke.PokeLayer.from_args(a).attach(rec)
+# d2rs
+cargo run -p scenario-run -- run traces/scenarios/poke-spawn-town.scenario --game-dir %D2_GAME_DIR%
+cargo run -p d2-client -- play --save ScnAma.d2s --seed 1234 --poke-file traces/pokes/spawn-town.poke
+# test variant (output outside the repo; never commit it)
+cargo run --release -p data-tool -- variant build traces/variants/only-fallen/only-fallen.d2stack --out ..\variants\only-fallen
+py tools/trace-recorder/record_tick.py --game ..\variants\only-fallen\Game.exe --auto ScnAma --seed 1234
+```
+
+Rules: pokes run between two server ticks (after frame t, before the next
+drain) and draw no RNG of their own; a directive with no spec'd 1.14d
+call form reports `gap` on 1.14d (item 22 below lists them) and the
+comparison is `partial`, never silently skipped. A variant is a patch
+stack (rule 9): commit the `.d2stack` / `.d2patch`, never the built
+install.
+
 ## Step 4 — binary reads and one recording only PC 1 can do (queued by the coordinator, 2026-10-08)
 
 Cloud sessions now record 1.14d themselves under Wine (REC-290 RNG half
@@ -205,6 +236,14 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     holder), as offsets read from a server unit, so `record_state.py` can
     fill `own`. Write the answer into `sim/units.md` (or the owner spec)
     and the §2 row of `state-snapshot.md`.
+22. **Re-record sim-0009 without input** (q-prov-recording, REC-290): the Wine
+    run of the same command equals `traces/sim/tick/sim-0009.json` for ticks
+    0–60, then the Windows trace has a client message at tick 61 (drain: a
+    timer on unit (1, 7), player queue) and the player changes rooms at 121,
+    241, 351: the window got input. Run `record_tick.py --auto ScnAma --seed
+    1234 --ticks 600` again with the mouse outside the game window and replace
+    sim-0009. (Item 20 note: under Wine the front end does take X input,
+    `tools/cloud-game/xinput.sh`; in-game NPC menus were not tried.)
 
 ## How to check a behaviour in one command
 
@@ -256,6 +295,7 @@ rather than a hand-run recipe.
     motion getters `0x004DA110`–`0x004DA150` (shifted or stored) and the
     other points that session lists there. Answer into
     `render/unit-composite.md` §8 and the client missile specs.
+25. **Potion state length and the end-when-full rule** (`q-fix-real-potion-effect`, REC-102): item-use entry 3 body (`0x005BE3F0`, `items/use.md` §3 OQ 1). Recording: hp1 at 10/50 life, state 100 from 0xA8 to 0xA9 = 170 frames, mp1 at 1 mana 51 frames (mana full), hp1 at full life ends the next frame; `misc.txt` says `len` 192 / `calc1` 30 (hp1) and `len` 128 / `calc1` 20 (mp1), so the rule that gives 170 and 51 is not `len`. Answer into `items/use.md` §3; then `wiring/inventory/potion.rs` loses its PROVISIONAL.
 
 - **[q-fix-real-unit-seed-order] NPC nearest player and walk in radius**
   (REC-500, REC-501, `specs/monsters/ai.md` §5.3, §7.2): read the scan-2

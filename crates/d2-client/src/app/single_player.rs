@@ -244,8 +244,8 @@ pub const CREATE_FLAGS_EXPANSION: u32 = create_flags::EXPANSION | 0x4;
 
 /// The 0x67 u32@0x27 of a classic character.
 ///
-/// PROVISIONAL (client/model.md §7 r9; REC-46): bit 2 alone, without the
-/// expansion bit 20.
+/// Bit 2 alone, without the expansion bit 20 (`client/model.md` §7 r9;
+/// recorded, REC-46: `facts/join/a1-new-classic-ama.tsv`).
 pub const CREATE_FLAGS_CLASSIC: u32 = 0x4;
 
 /// The local client's C→S 0x67 for `character` (`client/model.md` §7
@@ -1598,6 +1598,7 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
             let m2 = monstats2.record(link as usize);
             let mut c = MonsterClass::from_record(m2, m.npc, m.interact)?;
             c.setup = Some(monster_setup(m, monstats_table.record(i), m2));
+            c.no_aura = m.noaura;
             if let Some(x) = monstats2_rows.get(link as usize) {
                 c.light = x.light;
                 c.light_rgb = (x.light_r, x.light_g, x.light_b);
@@ -1694,6 +1695,20 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
             rand_start: m.randstart as i32,
             prog_sound: m.progsound as i16,
             param: [m.param1 as i32, m.param2 as i32],
+            client_col: m.clientcol != 0,
+            collide_kill: m.collidekill != 0,
+            collide_friend: m.collidefriend != 0,
+            next_hit: m.nexthit != 0,
+            next_delay: m.nextdelay,
+            can_destroy: m.candestroy,
+            clt_hit_sub: [
+                m.clthitsubmissile1 as i16,
+                m.clthitsubmissile2 as i16,
+                m.clthitsubmissile3 as i16,
+                m.clthitsubmissile4 as i16,
+            ],
+            c_hit_par: [m.chitpar1 as i32, m.chitpar2 as i32, m.chitpar3 as i32],
+            hit_sub1_server: m.hitsubmissile1 as i16,
         })
         .collect();
     let states: Vec<d2_data::tables::States> = decode_all(table("states")?).map_err(err)?;

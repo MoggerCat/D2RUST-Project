@@ -7,8 +7,11 @@
 //!   d2-client verify     [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out DIR] [--perturb N]
 //!   d2-client cpu-render [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out FILE]
 //!   d2-client play       ... --dump-draws DIR [--at-tick N] [--input SCRIPT]
+//!   d2-client play       ... [--poke "F DIRECTIVE ARGS"]... [--poke-file FILE]
+//!                        (pokes, specs/tools/poke.md §5: F is the absolute
+//!                        server frame; file ticks are relative to the join)
 //!   d2-client facts-compare ORIGINAL_DIR D2RS_DIR [--ignore COL,...]
-//!   d2-client state-dump --save FILE.d2s [--seed N] [--difficulty D] --ticks T [--every n] --out FILE [--game-dir DIR] [--date YYYY-MM-DD]
+//!   d2-client state-dump --save FILE.d2s [--seed N] [--difficulty D] --ticks T [--every n] --out FILE [--game-dir DIR] [--date YYYY-MM-DD] [--poke "F DIRECTIVE ARGS"]...
 //!
 //! `play` (the default) opens a window running the local single-player game: the
 //! in-process server (`d2-server` host over the wired `d2-sim`) pumped
@@ -109,6 +112,9 @@ struct Options {
     input: Option<Vec<d2_client::world_view::input_script::Step>>,
     /// `play --res 800x600|640x480`: the play frame (default 800 × 600).
     res: Option<d2_client::rules::camera::FrameSize>,
+    /// `play --poke "<f> <directive> ..."` (repeatable) and `--poke-file
+    /// FILE` (`specs/tools/poke.md` §5 rule 2), in the order given.
+    pokes: Vec<d2_client::app::poke::Entry>,
 }
 
 /// `800x600` or `640x480`, the two frames of resolution modes 2 and 0.
@@ -162,6 +168,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
         dump_draws: None,
         at_tick: None,
         input: None,
+        pokes: Vec::new(),
     };
     let mut it = args.iter();
     while let Some(flag) = it.next() {
@@ -187,6 +194,18 @@ fn parse_options(args: &[String]) -> Result<Options> {
                     d2_client::world_view::input_script::parse(value()?)
                         .map_err(|e| anyhow::anyhow!("--input: {e}"))?,
                 )
+            }
+            "--poke" => o
+                .pokes
+                .push(d2_client::app::poke::parse_poke_arg(value()?).map_err(anyhow::Error::msg)?),
+            "--poke-file" => {
+                let path = value()?;
+                let text =
+                    std::fs::read_to_string(path).with_context(|| format!("--poke-file {path}"))?;
+                o.pokes.extend(
+                    d2_client::app::poke::parse_poke_file(&text)
+                        .map_err(|e| anyhow::anyhow!("--poke-file {path}: {e}"))?,
+                );
             }
             "--save" => o.save = Some(PathBuf::from(value()?)),
             "--native" => o.native = Some(PathBuf::from(value()?)),
@@ -569,6 +588,7 @@ fn play_once(
                 command: std::env::args().collect::<Vec<_>>().join(" "),
             }),
         input: o.input.clone(),
+        pokes: o.pokes.clone(),
     })?;
     match result {
         bevy::app::AppExit::Success => Ok(()),
@@ -635,7 +655,7 @@ fn main() -> Result<()> {
         Some("verify") => verify(parse_options(&args[1..])?),
         Some("play") | None => play(parse_options(args.get(1..).unwrap_or(&[]))?),
         Some("view") => view(parse_options(&args[1..])?),
-        _ => bail!("usage: d2-client [view|verify|cpu-render|play|facts-compare|state-dump] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq] [--dump-draws DIR [--at-tick N]] [--res 800x600|640x480] [--input SCRIPT]"),
+        _ => bail!("usage: d2-client [view|verify|cpu-render|play|facts-compare|state-dump] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq] [--dump-draws DIR [--at-tick N]] [--res 800x600|640x480] [--input SCRIPT] [--poke \"F DIRECTIVE ARGS\"]... [--poke-file FILE]"),
     }
 }
 

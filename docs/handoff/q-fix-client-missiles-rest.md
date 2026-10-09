@@ -22,6 +22,10 @@ functions 1/4/5/6/8/11/23/25/43/49/60/63). REC block 540–549.
 | two-row functions | client-bodies.md §B3 r3, §B4 17, 27, 46, 52; client-bodies-2.md §B11 51; client.md §C13 18, 37, 39 | 17 (curse centre: d04 / d06, the disc helper with `RandStart`), 18 (bone spear trail: facing, precise position, motion z), 27 (fire wall maker: flags-0 child, wander on one seed step), 37 (steps; its shake and sound not modelled), 39 (rewind when owned), 46 / 52 (pairs at ±(d28, d2C); 46 removes directly, light left: Edge case 2), 51 (burst on P1 with P3 extras, owner hidden on P2). `ClientMissile::d04` / `d06`, `ClientMissileRow::rand_start`. | `function_17_and_the_disc`, `function_18_lays_its_trail_with_the_spears_facing_and_height`, `function_27_drops_fire_and_wanders`, `function_39_rewinds_an_owned_missile`, `functions_46_and_52_lay_children_on_both_sides`, `function_51_bursts_then_hides_its_owner` |
 | §B11 single-row bodies | client-bodies-2.md §B10 r3, §B11 10, 13, 19, 20, 44, 45, 47, 48, 53, 58, 68 | 19 / 20 (orb tables OX / OY, quarter-step nova), 10 / 13 (class pick, reseeded shard, point test mask 4, fall), 44 (follows the owner while it uses m's skill; direct removal), 45 (scatter), 47 (d28 := bounces left, then 6), 48 (reseeded eruption points, mask 0x45, dead flag), 53 (child then function 7), 58 (reseeded wander), 68 (loops P1). `ClientMissileRow::prog_sound`, `param` (server `Param1`–`2`). | `functions_19_and_20_the_orb_and_its_nova`, `functions_10_and_13_drop_falling_shards`, `functions_44_45_53_and_68`, `function_48_erupts_at_reseeded_points`, `function_58_turns_on_its_reseeded_draw`, `function_47_keeps_its_bounces_then_lays_fire` |
 | body children's owner direction | missiles/client.md §C2 r8 | `create_from`: a child made by a missile body takes the parent's direction for the aim nudge (the model holds no unit direction). PROVISIONAL REC-543; found by the install run (a handler error on a user row). | `a_bodys_child_nudges_by_its_parents_direction` |
+| cell walk (REC-451 resolved) | sim/pathing.md §9.4, §9.6; sim/path-placement.md §4, §6 r3; missiles.md §R4 r6; client.md §C7 r5, r10 | The default step's path step is the §9.4 movement with the §9.6 cell walk: steps halved to ≤ 0x10000, each cell change a missile move (`d2_sim::path::footprint::missile_move` over the client DRLG, read only: a missile's footprint mask is 0) with the §C8 move mask, refused on 0x1 / 0x4 (Q := the last free cell's centre), up to 10 saved steps, the new-step flag only on an unrefused walk with a saved step; set position stops the path when the cell has no room; §C7 r10 reads the cached collided mask (velocity 0: the size query with all bits). `ClientMissile::room`, `collided`, `steps`, `step_count`, `stopped`. A WALL-only cell (0x1) no longer stops a `CollideType` 3 missile (only 0x4 or no room): the wall fixtures now stamp WALL with the missile barrier. | `tests_drlg` `a_fast_client_missile_walks_its_cells_and_stops_before_a_thin_wall`, `a_still_client_missile_reads_the_wall_under_it`, `a_client_missile_ends_on_a_wall_of_the_client_drlg` (fixture: real wall bits) |
+| unit hits | client.md §C7 r11–r12, §C8, §C9 r2, r4.1, r5, r8; sim/path-placement.md §4 r6 | the unit at a point over the room adjacency and room unit lists with the collide tests (common test, hostility, alignment, `CanDestroy`), on each saved step when the word has a unit bit; the end with a unit: NextHit / LastCollide / flag / hostility gates, pierce (r = 2 keeps m), state 86 (`ClientObjects::just_hit`, counted down per client update), `CollideKill`. PROVISIONAL REC-544 (flags 0x4 / 0x8; and: no unit footprints are stamped on the client grid, so in play the search is not reached yet), REC-545 (state 86 expiry; `client.md` Open question 11). | `a_client_missile_hits_the_monster_on_its_walk`, `piercing_and_next_hit_on_a_client_missile` |
+| hit functions | client-bodies.md §B3 r4, §B7; client-bodies-2.md §B10 r4, r6, §B12 | `bridge/client_missiles_hits.rs`: 1 (fire disc), 2 (ring), 3, 10 (no model overlays), 14 (seeded shard pattern, facing), 18 (meteor), 19, 24 (returns 0 on a unit), 28 (ring of 8), 29, 30 (orb novas), 31, 44, 52 (rocks; a unit hit is a handler error until OQ1), 54, 55, 56. REC-452 narrowed to 9, 12, 13, 16, 25, 26, 53 and the open ones. | `client_missiles::hits_tests` (7) |
+| client unit search, hits 13, 16, 25, 26 | client-bodies-2.md §B9, §B10 r1, §B12 | `search` (C's room adjacency, town skip, room unit lists, squared distance, the filter of §B9 with hostility, the line walk `0x0064E260` over the client DRLG, state 86), next-GUID pick, bolt to each; 13 (lock / retarget), 16 (chain to the next GUID), 25 (skip `noaura`: monstats flag 27 read from `data/fields.tsv`, `MonsterClass::no_aura`; `client-bodies-2.md` OQ1 part answered), 26 (V by (d28, d2C), no cap). Filter bits the model cannot test are handler errors. | `tests_drlg` `hit_16_chains_to_the_next_guid_in_range`, `hits_25_and_26_bolt_the_units_in_range`, `hit_13_retargets_the_lowest_guid` |
 | real install | — | `app_client_drlg` `the_users_client_missiles_run_their_functions` runs every user row of the 37 functions of its `RUN` list (1–11, 13, 17–20, 23, 25, 27, 37, 39, 43–49, 51–53, 58–60, 63, 65, 68) for 60 updates with the user's skills tables and a drawn frame's origin; every function has a row made. | install: 4 passed |
 
 ## Not done
@@ -31,7 +35,41 @@ functions 1/4/5/6/8/11/23/25/43/49/60/63). REC block 540–549.
   client path for units), 38 and 66 (call the open helpers `0x004D19D0`
   / `0x004D2520`), 29 (open helpers); the open bodies of §C12 wait on
   the spec.
-- Unit hits (§C7 r12), the client hit functions (§B6–§B7, REC-452),
-  the §9.4 cell walk (REC-451), missile sounds (audio).
+- Hit functions 9 (ally / demon / undead tests the model lacks), 12
+  (fire patch), 53 (`0x004DA340` unspecified), 52 with a unit (monstats2
+  flag 11, `client-bodies-2.md` OQ1); the open ones of §B6 (REC-452).
+- A handler error in a missile's end (an untestable filter bit, hit 52
+  on a unit) leaves the missile in place, erroring on each later update
+  (the countdown has already passed 0).
+- Unit footprints on the client grid (REC-277 / REC-544): without them
+  the unit search of §C7 r12 is not reached in play.
+- Missile sounds (audio), the init and umod callbacks, the client event
+  hooks, the second pass (§C7 r13).
 - Screen shakes of functions 12, 29, 31, 36, 37, 38, 54, 66: the row
   `q-fix-shake-starts` (REC-62).
+
+## Provisional points (REC 540–545)
+
+REC-540 (timed arc flags / vz), REC-541 (motion getter shifts), REC-542
+(hostility parts the model lacks), REC-543 (a body's child takes its
+parent's direction for the aim nudge), REC-544 (unit flags 0x4 / 0x8; no
+unit footprints on the client grid), REC-545 (client state 86 expiry).
+REC-451 resolved, REC-452 narrowed. Spec gaps: `missiles/client.md` Open
+questions 9–11 (PC 1 Step 4 item 24); `client-bodies-2.md` OQ1 flag 27
+answered from `data/fields.tsv`.
+
+## Gate and real data
+
+Each push: `cargo fmt --check`; `cargo clippy -p d2-sim -p d2-server -p
+d2-client -p test-fixtures --all-targets -- -D warnings`; `cargo nextest
+run` on those crates (7479 passed after the staging-7 merge);
+`tools/coverage.py --check`, `--selftest`; `tools/spec_index.py
+--check`; `tools/methods.py check`. Real install (`D2_GAME_DIR` from
+`tools/cloud-game/fetch.sh`): `cargo test -p d2-client --test
+app_client_drlg client_missile -- --ignored`, 4 passed.
+
+Disk: the d2-client integration test binaries outgrow the cloud disk
+allowance; build with `CARGO_INCREMENTAL=0
+CARGO_PROFILE_DEV_STRIP=symbols CARGO_PROFILE_TEST_STRIP=symbols` (and
+`CARGO_PROFILE_{DEV,TEST}_DEBUG=0`), and delete the private repo clone
+once the install is assembled.

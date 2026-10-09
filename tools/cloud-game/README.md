@@ -13,6 +13,8 @@ code. State and open points: `docs/handoff/q-cloud-game.md`.
 | `setup_winpy.sh [DEST]` | Windows CPython 3.12.7 x64 from NuGet (python.org is blocked here) into `$HOME/winpy`, sha256-pinned |
 | `prepare_saves.sh` | The recorders' `--auto` characters (`ScnAma`, `ScnSor`, `TestSor`, expansion) made by `d2s-tool` in the prefix's `Saved Games\Diablo II` (needs the full install: d2s-tool reads the tables) |
 | `standin/standin.c`, `standin/build.sh` | Stand-in for `Game.exe`: a 32-bit mingw program at image base 0x400000 with a window, click/key echo, and RNG steps of the `specs/sim/rng.md` shape (two helpers, a setter, one inline site) |
+| `xinput.sh "T X Y; T key K; T text S"` | X-level input on the Xvfb display at second T after its start (window client point X, Y; the window sits at 112, 98): drives the 1.14d front end, which ignores `PostMessage` clicks under Wine (run it in the background next to `run.sh`, with the recorder's `--menu`) |
+| `prov_recording_groups.py [G..]` | the `recording` provisional points grouped by settling scenario (`docs/handoff/q-prov-recording.md`) → `docs/handoff/q-prov-recording.tsv` |
 | `wine_probe.py` | Under Windows Python: `record_rng.py` unchanged, pointed at the stand-in, then `check_rng.py`; then autostart's window side (find window by pid, PrintWindow, PostMessageW click/key, WM_CLOSE) |
 
 ## Setup (once per container)
