@@ -286,6 +286,14 @@ def merge(parts, repo, status):
     return out, notes
 
 
+TWO_PART = ("system", "net", "skill", "item")
+
+
+def family(area):
+    p = area.split(".")
+    return ".".join(p[:2]) if p[0] in TWO_PART and len(p) > 1 else p[0]
+
+
 def esc_md(s):
     return s.replace("|", "\\|")
 
@@ -338,6 +346,23 @@ def render_md(rows, notes, inputs, status_label):
         a(f"| {g} | {len(rs)} | " + " | ".join(str(st[s]) for s in STATES)
           + f" | {sz['S']} | {sz['M']} | {sz['L']} | {hours(sz)} | {pc} | "
           f"{ex['yes']} / {ex['no']} / {ex['?']} |")
+    a("")
+    a("## By family")
+    a("")
+    a("Family = the first part of the area id (two parts for `system.*`, `net.*`, `skill.*`, `item.*`).")
+    a("")
+    a("| Family | Rows | " + " | ".join(STATES) + " | S | M | L | Needs PC 1 | Exercised no |")
+    a("|---|---" + "|---" * len(STATES) + "|---|---|---|---|---|")
+    fams = collections.defaultdict(list)
+    for r in rows:
+        fams[family(r["area"])].append(r)
+    for f in sorted(fams):
+        rs = fams[f]
+        st = collections.Counter(r["state"] for r in rs)
+        sz = collections.Counter(r["size"] for r in rs)
+        a(f"| `{f}` | {len(rs)} | " + " | ".join(str(st[s]) for s in STATES)
+          + f" | {sz['S']} | {sz['M']} | {sz['L']} | {sum(r['needs_pc1'] == 'y' for r in rs)} | "
+          f"{sum(r['exercised'] == 'no' for r in rs)} |")
     a("")
     a("## Not covered by any row")
     a("")

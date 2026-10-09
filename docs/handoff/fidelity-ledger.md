@@ -12,6 +12,38 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | world | 385 | 26 | 0 | 359 | 0 | 0 | 0 | 385 | 0 | 770–3080 | 0 | 0 / 0 / 385 |
 | **all** | 1319 | 81 | 59 | 1179 | 0 | 0 | 295 | 1024 | 0 | 2195.5–8782 | 0 | 0 / 0 / 1319 |
 
+## By family
+
+Family = the first part of the area id (two parts for `system.*`, `net.*`, `skill.*`, `item.*`).
+
+| Family | Rows | DIVERGED | NOT-IMPLEMENTED | NO-CHECK | UNKNOWN | EQUAL | S | M | L | Needs PC 1 | Exercised no |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `drlg` | 6 | 4 | 0 | 2 | 0 | 0 | 0 | 6 | 0 | 0 | 0 |
+| `hireling` | 4 | 3 | 0 | 1 | 0 | 0 | 0 | 4 | 0 | 0 | 0 |
+| `level` | 132 | 10 | 0 | 122 | 0 | 0 | 0 | 132 | 0 | 0 | 0 |
+| `net.c2s` | 113 | 0 | 20 | 93 | 0 | 0 | 113 | 0 | 0 | 0 | 0 |
+| `net.s2c` | 181 | 0 | 23 | 158 | 0 | 0 | 181 | 0 | 0 | 0 | 0 |
+| `npc` | 43 | 1 | 0 | 42 | 0 | 0 | 0 | 43 | 0 | 0 | 0 |
+| `object` | 92 | 0 | 0 | 92 | 0 | 0 | 0 | 92 | 0 | 0 | 0 |
+| `quest` | 41 | 4 | 0 | 37 | 0 | 0 | 0 | 41 | 0 | 0 | 0 |
+| `shrine` | 23 | 0 | 0 | 23 | 0 | 0 | 0 | 23 | 0 | 0 | 0 |
+| `system.act` | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
+| `system.audio` | 47 | 0 | 0 | 47 | 0 | 0 | 0 | 47 | 0 | 0 | 0 |
+| `system.client` | 86 | 0 | 0 | 86 | 0 | 0 | 0 | 86 | 0 | 0 | 0 |
+| `system.combat` | 26 | 26 | 0 | 0 | 0 | 0 | 0 | 26 | 0 | 0 | 0 |
+| `system.death` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
+| `system.difficulty` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
+| `system.flows` | 19 | 4 | 4 | 11 | 0 | 0 | 0 | 19 | 0 | 0 | 0 |
+| `system.formats` | 74 | 0 | 12 | 62 | 0 | 0 | 0 | 74 | 0 | 0 | 0 |
+| `system.hireling` | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
+| `system.perf` | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
+| `system.render` | 105 | 0 | 0 | 105 | 0 | 0 | 0 | 105 | 0 | 0 | 0 |
+| `system.seams` | 10 | 0 | 0 | 10 | 0 | 0 | 0 | 10 | 0 | 0 | 0 |
+| `system.sim` | 98 | 25 | 0 | 73 | 0 | 0 | 0 | 98 | 0 | 0 | 0 |
+| `system.townportal` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
+| `system.ui` | 174 | 0 | 0 | 174 | 0 | 0 | 0 | 174 | 0 | 0 | 0 |
+| `waypoint` | 39 | 2 | 0 | 37 | 0 | 0 | 0 | 39 | 0 | 0 | 0 |
+
 ## Not covered by any row
 
 Every area of 1.14d must be a row; these names appear in no row yet (an empty list is the goal).
