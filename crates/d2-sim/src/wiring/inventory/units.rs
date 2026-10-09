@@ -223,10 +223,12 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MoveUnits for InvDesk<'_, '_, H, R>
     fn socket_filled(&self, item: Guid) -> bool {
         self.rest.socket_filled(item)
     }
-    /// `0x0062BEB0`: PROVISIONAL (REC-121): the test is not
-    /// written in the specs; a gem (20), rune (74) or jewel (58) is a
-    /// filler (`items/properties.md` §9 names gem and rune; the jewel
-    /// is the third filler of the game).
+    /// `0x0062BEB0`: a gem (20), rune (74) or jewel (58) is a filler
+    /// (`items/properties.md` §9 names gem and rune). Recorded (REC-121,
+    /// `facts/items/a1-town-socket-fill.tsv`): a chipped ruby, El and a
+    /// magic jewel each go into a 3-socket shield with C→S 0x28; a ring
+    /// is not offered (the client, which runs the same test,
+    /// `inventory.md` §6 r5, sends a swap 0x1F, also onto free sockets).
     fn socket_filler(&self, item: Guid) -> bool {
         use crate::items::ty;
         [ty::GEM, ty::RUNE, ty::JEWL]

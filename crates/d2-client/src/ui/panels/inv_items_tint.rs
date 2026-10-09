@@ -16,7 +16,7 @@
 use super::super::draw::{RectRequest, UiDraw, UiDrawSink};
 use super::super::geom::{Point, Rect};
 use super::super::inv_grid::{
-    equip_item_tint, grid_item_tint, hovered_tint, EquipItemFacts, GridItemFacts, Tint,
+    equip_item_tint, grid_item_tint, hovered_tint, EquipItemFacts, GridItemFacts, GridRecord, Tint,
 };
 use super::inv_items::{InvLayout, ItemsUi};
 use crate::bridge::items::{self, mode, ItemView};
@@ -57,53 +57,95 @@ impl ItemsUi {
         mouse: Point,
         out: &mut dyn UiDrawSink,
     ) {
+        for it in items::local_items(world) {
+            for d in self.item_tints(world, layout, mouse, &it) {
+                out.push(d);
+            }
+        }
+    }
+
+    /// A grid item's tint (§3 r2–r3) over every cell of its footprint in
+    /// grid `g` (the inventory page, the cube page: `0x00483FF0` draws
+    /// them all), one rectangle per cell.
+    pub(crate) fn grid_item_tints(
+        &self,
+        world: &ClientWorld,
+        g: &GridRecord,
+        mouse: Point,
+        it: &ItemView,
+    ) -> Vec<UiDraw> {
         let Some(colors) = self.tint_colors else {
-            return;
+            return Vec::new();
         };
-        let g = &layout.grid;
         let hover_ok = items::cursor_item(world).is_none();
-        let mut paint = |t: Tint, r: Rect| {
-            out.push(UiDraw::Rect(RectRequest::sized(
+        let (w, h) = self.art.get(it.code.unwrap_or([0; 4])).map_or((1, 1), |a| {
+            (i32::from(a.inv_w.max(1)), i32::from(a.inv_h.max(1)))
+        });
+        let (x, y, cw, ch) = g.cell(i32::from(it.x), i32::from(it.y));
+        let r = Rect::new(x, y, (cw * w) as u16, (ch * h) as u16);
+        let t = if hover_ok && contains(&r, mouse) {
+            hovered_tint(0, false)
+        } else {
+            grid_item_tint(&self.grid_facts(world, it))
+        };
+        let mut out = Vec::new();
+        // Row by row, left to right (`a1-panel-cube` rows 5–8).
+        for row in 0..h {
+            for c in 0..w {
+                out.push(UiDraw::Rect(RectRequest::sized(
+                    x + cw * c,
+                    y + ch * row,
+                    cw,
+                    ch,
+                    colors[t as usize],
+                    TINT_MODE,
+                )));
+            }
+        }
+        out
+    }
+
+    /// One item's tint rectangles: every cell of a grid item's footprint
+    /// (§3 r2–r3: "every cell of the w × h footprint is tinted",
+    /// `a1-panel-cube` rows 25–28: four 29 × 29 boxes for a 2 × 2 item),
+    /// the body box of an equipped item (§6 r4).
+    pub(crate) fn item_tints(
+        &self,
+        world: &ClientWorld,
+        layout: &InvLayout,
+        mouse: Point,
+        it: &ItemView,
+    ) -> Vec<UiDraw> {
+        let Some(colors) = self.tint_colors else {
+            return Vec::new();
+        };
+        let hover_ok = items::cursor_item(world).is_none();
+        let paint = |t: Tint, r: Rect| {
+            UiDraw::Rect(RectRequest::sized(
                 r.x,
                 r.y,
                 i32::from(r.w),
                 i32::from(r.h),
                 colors[t as usize],
                 TINT_MODE,
-            )));
+            ))
         };
-        for it in items::local_items(world) {
-            match it.mode {
-                mode::STORED if it.page == 0 => {
-                    let (w, h) = self.art.get(it.code.unwrap_or([0; 4])).map_or((1, 1), |a| {
-                        (i32::from(a.inv_w.max(1)), i32::from(a.inv_h.max(1)))
-                    });
-                    let (x, y, cw, ch) = g.cell(i32::from(it.x), i32::from(it.y));
-                    let r = Rect::new(x, y, (cw * w) as u16, (ch * h) as u16);
-                    let t = if hover_ok && contains(&r, mouse) {
-                        hovered_tint(0, false)
-                    } else {
-                        grid_item_tint(&self.grid_facts(world, &it))
-                    };
-                    paint(t, r);
+        match it.mode {
+            mode::STORED if it.page == 0 => self.grid_item_tints(world, &layout.grid, mouse, it),
+            mode::BODY if (1..=10).contains(&it.body) => {
+                let b = layout.equip[usize::from(it.body)];
+                if b.w == 0 || b.h == 0 {
+                    return Vec::new();
                 }
-                mode::BODY if (1..=10).contains(&it.body) => {
-                    let b = layout.equip[usize::from(it.body)];
-                    if b.w == 0 || b.h == 0 {
-                        continue;
-                    }
-                    let r = Rect::new(b.left, b.top, b.w as u16, b.h as u16);
-                    let t = equip_item_tint(&EquipItemFacts {
-                        hovered: hover_ok && contains(&r, mouse),
-                        grid: self.grid_facts(world, &it),
-                        ..EquipItemFacts::default()
-                    });
-                    if let Some(t) = t {
-                        paint(t, r);
-                    }
-                }
-                _ => {}
+                let r = Rect::new(b.left, b.top, b.w as u16, b.h as u16);
+                let t = equip_item_tint(&EquipItemFacts {
+                    hovered: hover_ok && contains(&r, mouse),
+                    grid: self.grid_facts(world, it),
+                    ..EquipItemFacts::default()
+                });
+                t.map(|t| paint(t, r)).into_iter().collect()
             }
+            _ => Vec::new(),
         }
     }
 }

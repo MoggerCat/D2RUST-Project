@@ -24,20 +24,20 @@
 | Rules | 74–75 |
 |   1. Which draw path | 76–122 |
 |   2. COF file | 123–183 |
-|   3. Direction and frame | 184–232 |
-|   4. Pre-test: COF box culling | 233–242 |
-|   5. The slot loop (`0x00470EC0`) | 243–363 |
-|   6. Component file and cel | 364–404 |
-|   7. Colormap source per component | 405–429 |
-|   8. Extra offsets (`0x004DA0B0`, `0x004DA0D0`, `0x004DA0F0`) | 430–525 |
-|   9. Single-cel units (missiles, items) | 526–540 |
-|   10. d2rs mapping | 541–555 |
-| Constants & data dependencies | 556–569 |
-| Randomness | 570–573 |
-| Edge cases & original bugs | 574–588 |
-| Test vectors | 589–609 |
-| Provenance | 610–657 |
-| Open questions | 658–721 |
+|   3. Direction and frame | 184–242 |
+|   4. Pre-test: COF box culling | 243–252 |
+|   5. The slot loop (`0x00470EC0`) | 253–373 |
+|   6. Component file and cel | 374–414 |
+|   7. Colormap source per component | 415–439 |
+|   8. Extra offsets (`0x004DA0B0`, `0x004DA0D0`, `0x004DA0F0`) | 440–535 |
+|   9. Single-cel units (missiles, items) | 536–550 |
+|   10. d2rs mapping | 551–565 |
+| Constants & data dependencies | 566–579 |
+| Randomness | 580–583 |
+| Edge cases & original bugs | 584–598 |
+| Test vectors | 599–619 |
+| Provenance | 620–667 |
+| Open questions | 668–731 |
 <!-- /index -->
 
 ## Summary
@@ -191,6 +191,16 @@ with every 0x20 turned into 0, so a part ends at its first space (the
    the COF rate: speed and frame advance belong to the animation code
    (`animdata.md` OQ1). The frame is used as is for the COF row (r4) and
    for each component's cel (§6).
+   Measured (revision 2026-10-09, q-scenes-compare): a player standing
+   from the join on (town neutral, no input) is drawn at server tick T
+   with frame `((T − 1) · s >> 8) mod F` (s the 8.8 speed, 80 for
+   `sotnhth` / `amtn1ht`; F the frame count, 16): 12 recorded scenes
+   (`facts/render/scenes/a1-town-idle-sor`, `a2..a5-town-*`,
+   `a1-panel-*`, `a1-town-arrival-ama`), i.e. T − 1 advances by the
+   draw of tick T. PROVISIONAL (REC-512): monsters and missiles take
+   the same clock in d2rs (because their client advance is not
+   modelled; settled by a scene with a monster standing from its
+   appearance on).
 3. **Expected direction count** `n` (`0x004DAF70`): players 8, or 16 for
    the local player while `[0x007A8928]` = 0; monsters monstats2 `d<mode>`
    (+0xF4 + mode), but 4 when that is 8 and the class's graphics-ready

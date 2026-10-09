@@ -25,8 +25,12 @@
 //! collide tests of §C8 and end the missile on the unit (§C9 r2, r4–r8);
 //! the client hit functions are in `hits` (§B6–§B7, §B12).
 //!
-//! Not modelled (each named where it would run): the init callback (§C4
-//! r27), sounds (r28, §C9 r4.4, r6: audio), the umod callback (r29), the
+//! Sounds (§C4 r28, §C9 r4.4, r6) are [`MissileSound`] calls handed to
+//! the audio layer; the owner's umod callbacks run at the create (§C4
+//! r29, umod 29's hook).
+//!
+//! Not modelled (each named where it would run): the init callbacks of
+//! the callers outside the model (§C4 r27; function 8's is run), the
 //! client event hooks (§C9 r4.2), the second pass (§C7 r13), the hit
 //! functions not in `hits` (read as returning non-zero, PROVISIONAL
 //! REC-452), and the client functions not listed in [`update_with`]'s
@@ -124,6 +128,12 @@ pub struct ClientMissileRow {
     /// The server column `HitSubMissile1` (i16; hit 26 gates on it,
     /// `client-bodies-2.md` Edge case 3).
     pub hit_sub1_server: i16,
+    /// `TravelSound`, `HitSound` (i16; §C4 r28, §C9 r4.4, r6).
+    pub travel_sound: i16,
+    pub hit_sound: i16,
+    /// `NoMultiShot` (flags bit 12; the umod 29 hook,
+    /// `monsters/umod-callbacks.md` §28.2).
+    pub no_multishot: bool,
 }
 
 /// The create record (`missiles.md` §R2.1, 0x5C bytes) as the client
@@ -296,6 +306,25 @@ fn straight_path(pos: (u32, u32), target: (i32, i32)) -> Option<((i32, i32), u8)
         (centre(target.0), centre(target.1)),
     ))
 }
+
+/// A client missile's sound call (`audio/triggers.md` §8 r3), handed
+/// to the audio layer as [`super::output::Output::MissileSound`] in
+/// update order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MissileSound {
+    /// A request of `id` on the missile (`0x004B9A00`): `TravelSound` at
+    /// the create (§C4 r28), `HitSound` at the end (§C9 r4.4).
+    Request { id: i32, missile: UnitKey },
+    /// The create's `0x004CA900(owner, 314)` → `0x004BA840`: the owner's
+    /// first request in sound 314's group is stopped (§C4 r28).
+    StopOwnerGroup { owner: UnitKey, id: i32 },
+    /// The end's `0x004CA900(m, TravelSound)` → `0x004BA790`: m's first
+    /// request in the travel sound's group is detached from m (§C9 r6).
+    DetachTravel { missile: UnitKey, id: i32 },
+}
+
+/// The sound 314 whose group the create stops on the owner (§C4 r28).
+const OWNER_STOP_SOUND: i32 = 314;
 
 /// The client missiles of set C, by key.
 pub type ClientMissiles = BTreeMap<UnitKey, ClientMissile>;
@@ -539,7 +568,111 @@ pub fn create(
     w.objclient.missiles.insert(key, m);
     // r26: the light (`render/lighting.md` §8 missile row).
     missile_light(w, key, &row, rec, lights);
+    // r27: the init callback is the caller's (function 8's draws).
+    // r28: `TravelSound` ≠ 0 → a request on m; with an owner, its first
+    // request in sound 314's group stops.
+    if row.travel_sound != 0 {
+        w.objclient.missile_sounds.push(MissileSound::Request {
+            id: i32::from(row.travel_sound),
+            missile: key,
+        });
+    }
+    if let Some(owner) = rec.owner {
+        w.objclient
+            .missile_sounds
+            .push(MissileSound::StopOwnerGroup {
+                owner,
+                id: OWNER_STOP_SOUND,
+            });
+    }
+    // r29: the owner's umod callbacks of phase 4 (`0x004ADE80`).
+    if let Some(owner) = rec.owner {
+        umod_missile(w, rows, owner, key, lights)?;
+    }
     Ok(Some(key))
+}
+
+/// Umod 29 `multishot`'s client hook.
+const UMOD_MULTISHOT: u8 = 29;
+
+/// The umod dispatcher's phase 4 `0x004ADE80(owner, missile)`
+/// (`monsters/umod-callbacks.md` §28.1 r2–r3): an owner of type 1 with
+/// monster data runs, for each of its 9 umod bytes in order (bytes after
+/// a 0 included), the byte's phase-4 hook; only umod 29 has one
+/// (`0x004AD970`, §28.2): unique (type flag 8); m = the missile's class,
+/// in the table and without `NoMultiShot`; O = its owner without the
+/// guard flag (+0x16 0x80); target (tx, ty) = O's target unit's position,
+/// else the missile's path target point; (sx, sy) = the signs of O − (tx,
+/// ty) (0 for m in 63 … 66); with the guard set, two client missiles of
+/// m (`0x004CDBA0`: flags 0x20, owner and origin O) at (tx − sy, ty + sx)
+/// and (tx + sy, ty − sx), the missile's skill and level.
+///
+/// PROVISIONAL (REC-549): the model holds no monster target unit
+/// (`0x004648F0`), so the path target point is used.
+fn umod_missile(
+    w: &mut ClientWorld,
+    rows: &[ClientMissileRow],
+    owner: UnitKey,
+    key: UnitKey,
+    lights: bool,
+) -> Result<(), HandlerError> {
+    if owner.unit_type != MONSTER {
+        return Ok(());
+    }
+    let Some(data) = w.units.get(&owner).and_then(|u| match &u.kind {
+        super::world::KindData::Monster(d) => Some((d.umods, d.flags)),
+        _ => None,
+    }) else {
+        return Ok(());
+    };
+    let (umods, flags) = data;
+    for umod in umods {
+        if umod != UMOD_MULTISHOT || flags & 8 == 0 {
+            continue;
+        }
+        let Some(class) = w.objclient.set_c.get(&key).map(|u| u.class) else {
+            return Ok(());
+        };
+        if rows.get(class as usize).is_none_or(|r| r.no_multishot) {
+            continue;
+        }
+        if w.objclient.multishot_guard.contains(&owner) {
+            continue;
+        }
+        let Some(m) = w.objclient.missiles.get(&key).copied() else {
+            return Ok(());
+        };
+        let Some((ox, oy)) = w.units.get(&owner).map(|u| u.cell()) else {
+            continue;
+        };
+        let (tx, ty) = m.target_point;
+        let (mut sx, mut sy) = ((i32::from(ox) - tx).signum(), (i32::from(oy) - ty).signum());
+        if (63..=66).contains(&class) {
+            (sx, sy) = (0, 0);
+        }
+        w.objclient.multishot_guard.insert(owner);
+        for (cx, cy) in [(tx - sy, ty + sx), (tx + sy, ty - sx)] {
+            let rec = CreateRecord {
+                flags: flag::TARGET_ABSOLUTE,
+                owner: Some(owner),
+                origin: Some(owner),
+                class,
+                tx: cx,
+                ty: cy,
+                skill: m.skill,
+                level: m.level,
+                owner_dir64: Some(m.direction),
+                ..CreateRecord::default()
+            };
+            let made = create(w, rows, &rec, lights);
+            if made.is_err() {
+                w.objclient.multishot_guard.remove(&owner);
+            }
+            made?;
+        }
+        w.objclient.multishot_guard.remove(&owner);
+    }
+    Ok(())
 }
 
 /// A create made by the client missile `parent` (its bodies, §C9 r4.5):
@@ -848,10 +981,10 @@ pub fn update_with(w: &mut ClientWorld, env: &Env, key: UnitKey) -> Result<(), H
         FN_TIGER_FURY => bodies::tiger_fury(w, env, key, &row),
         FN_CHAOS_ICE => bodies::chaos_ice(w, env, key, &row),
         FN_SUC_FIREBALL => bodies::suc_fireball(w, env, key, &row),
-        // §C13 37: frames left 150 → the shake (`render/camera.md` §8,
-        // row `q-fix-shake-starts`), 50 → sound 4,638 (audio); both not
-        // modelled; every branch steps.
-        FN_DIABLO_APPEARS => default_step(w, env, key, &row),
+        // The shake starts of `render/camera.md` §8, then the step.
+        12 | 29 | 31 | 36 | FN_DIABLO_APPEARS | 38 | 54 => bodies::shaker(w, env, key, &row),
+        // Rule W.
+        66 => bodies::worldstone_shake(w, key),
         // f ≤ 0: never stepped (§C6 r5); other functions: not modelled.
         _ => Ok(()),
     }
@@ -1753,7 +1886,13 @@ pub fn end_with(
                 return Err(e);
             }
         }
-        // r4.4: `HitSound` (audio, not modelled).
+        // r4.4: `HitSound` ≥ 0 → a request on m.
+        if row.hit_sound >= 0 {
+            w.objclient.missile_sounds.push(MissileSound::Request {
+                id: i32::from(row.hit_sound),
+                missile: key,
+            });
+        }
         // r4.5: `0x004CDBA0(m, E, 0, 0, skill, level)`: flags 0x20, the
         // owner m's owner (none → none), origin m.
         if row.explosion_missile >= 0 {
@@ -1801,7 +1940,13 @@ pub fn end_with(
     if unit.is_some() && !row.collide_kill {
         return Ok(x);
     }
-    // r6: `TravelSound` stop (audio, not modelled).
+    // r6: `TravelSound` ≥ 0 → its request on m detached.
+    if row.travel_sound >= 0 {
+        w.objclient.missile_sounds.push(MissileSound::DetachTravel {
+            missile: key,
+            id: i32::from(row.travel_sound),
+        });
+    }
     // r7: m's light dies (`0x00474470`, `render/lighting.md` §6.2 r6).
     if let Some(id) = light_of(w, key) {
         let _ = w.lights.die(id);

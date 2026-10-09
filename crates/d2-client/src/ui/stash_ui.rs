@@ -31,6 +31,13 @@ pub(super) struct StashUi {
 }
 
 impl Panel for StashUi {
+    /// `ui/panels.md` §9 r1 revision: drawn before the inventory.
+    fn draw_before(&self) -> Option<PanelId> {
+        Some(PanelId(u16::from(
+            crate::ui::panels::inventory::UI_INVENTORY,
+        )))
+    }
+
     fn id(&self) -> PanelId {
         PanelId(u16::from(UI_STASH))
     }

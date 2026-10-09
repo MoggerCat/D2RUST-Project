@@ -1158,51 +1158,9 @@ where
             }
             let format = d2_sim::items::ItemGame::item_format(&*econ.fields);
             inv.rest.stage(&places, format);
-            // The players' skill lists are lent to the rest for the call
-            // and the item-granted entries synced after it (REC-266).
-            let mut staged = std::collections::BTreeMap::new();
-            for u in econ
-                .game
-                .lists
-                .units_of_type(d2_sim::units::UnitType::Player)
-            {
-                let Some(r) = econ.units.get(u) else { continue };
-                let (guid, class) = (r.guid, r.class as i32);
-                if let Some(list) = econ.hooks.skill_lists.remove(&u) {
-                    staged.insert(
-                        d2_sim::items::moves::Owner::player(guid),
-                        super::super::items::moves::preview_skills::StagedList {
-                            list,
-                            unit: u,
-                            class,
-                        },
-                    );
-                }
-            }
-            inv.rest.stage_skills(
-                super::super::items::moves::preview_skills::SkillStage {
-                    tables: econ.hooks.tables.clone(),
-                    lists: staged,
-                },
-                &inv.tables,
-            );
+            lend_skills(econ, &mut inv);
             let out = call.call(econ, &mut inv);
-            if let Some(mut st) = inv.rest.take_skills() {
-                let mut sent = Vec::new();
-                let owners: Vec<_> = st.lists.keys().copied().collect();
-                for o in owners {
-                    super::super::items::moves::preview_skills::sync_oskills(
-                        &mut st,
-                        o,
-                        |sl, stat, skill| econ.stats.unit_total(sl.unit, stat, skill as u16),
-                        &mut sent,
-                    );
-                }
-                inv.rest.queue_sent(sent);
-                for (_, sl) in st.lists {
-                    econ.hooks.skill_lists.insert(sl.unit, sl.list);
-                }
-            }
+            return_skills(econ, &mut inv, true);
             for (owner, quest, flag, on) in inv.rest.take_quest_flag_writes() {
                 let Some(&(_, u)) = by_owner.iter().find(|(o, _)| *o == owner) else {
                     continue;
@@ -1367,5 +1325,63 @@ where
 
     fn fault(&mut self, fault: WorldFault) {
         self.action.faults.push(fault);
+    }
+}
+
+/// The players' skill lists lent to the inventory rest for a call and the
+/// item-granted entries synced after it (REC-266, [`return_skills`];
+/// `sync` false: the caller synced already).
+pub(super) fn lend_skills<X: Pending>(econ: &mut Economy<'_, ActionHooks<X>>, inv: &mut InvParts) {
+    let mut staged = std::collections::BTreeMap::new();
+    for u in econ
+        .game
+        .lists
+        .units_of_type(d2_sim::units::UnitType::Player)
+    {
+        let Some(r) = econ.units.get(u) else { continue };
+        let (guid, class) = (r.guid, r.class as i32);
+        if let Some(list) = econ.hooks.skill_lists.remove(&u) {
+            staged.insert(
+                d2_sim::items::moves::Owner::player(guid),
+                super::super::items::moves::preview_skills::StagedList {
+                    list,
+                    unit: u,
+                    class,
+                },
+            );
+        }
+    }
+    inv.rest.stage_skills(
+        super::super::items::moves::preview_skills::SkillStage {
+            tables: econ.hooks.tables.clone(),
+            lists: staged,
+        },
+        &inv.tables,
+    );
+}
+
+/// Takes the lent skill lists back: the stat 97 / 107 callback
+/// (`levels.md` §7.1) for the items worn, its 0x21 queued with the rest's
+/// messages, the lists returned to the action hooks.
+pub(super) fn return_skills<X: Pending>(
+    econ: &mut Economy<'_, ActionHooks<X>>,
+    inv: &mut InvParts,
+    sync: bool,
+) {
+    if let Some(mut st) = inv.rest.take_skills() {
+        let mut sent = Vec::new();
+        let owners: Vec<_> = st.lists.keys().copied().collect();
+        for o in owners.into_iter().filter(|_| sync) {
+            super::super::items::moves::preview_skills::sync_oskills(
+                &mut st,
+                o,
+                |sl, stat, skill| econ.stats.unit_total(sl.unit, stat, skill as u16),
+                &mut sent,
+            );
+        }
+        inv.rest.queue_sent(sent);
+        for (_, sl) in st.lists {
+            econ.hooks.skill_lists.insert(sl.unit, sl.list);
+        }
     }
 }

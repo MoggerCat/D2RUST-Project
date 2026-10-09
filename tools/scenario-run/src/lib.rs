@@ -100,6 +100,11 @@ pub enum DataKind {
 pub struct Data {
     pub game: GameData,
     pub kind: DataKind,
+    /// `--save-dir`: the folder holding `char save <name>.d2s`. When the
+    /// file is there the d2rs side loads it too (`d2-server` `load_save`),
+    /// so both sides start from the same save; else the inline `char`
+    /// lines stand for it.
+    pub save_dir: Option<std::path::PathBuf>,
 }
 
 impl Data {
@@ -110,6 +115,7 @@ impl Data {
         Ok(Self {
             game: GameData::from_install(&i).map_err(|e| RunError::Data(e.to_string()))?,
             kind: DataKind::Synthetic,
+            save_dir: None,
         })
     }
 
@@ -122,6 +128,7 @@ impl Data {
         Ok(Self {
             game: GameData::load(bins, &set).map_err(|e| data(e.to_string()))?,
             kind: DataKind::Live,
+            save_dir: None,
         })
     }
 
@@ -530,7 +537,8 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
             c.quests.len()
         ));
     }
-    if !c.items.is_empty() {
+    let save_loaded = matches!((&data.save_dir, &s.save), (Some(d), Some(n)) if d.join(format!("{n}.d2s")).is_file());
+    if !c.items.is_empty() && !save_loaded {
         gaps.push(format!(
             "char item: {} item(s) not created (TODO(spec: item creation from a code and inventory placement))",
             c.items.len()
@@ -561,6 +569,16 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
             data: Some(PlayerData { last_accept: 0 }),
         },
     );
+    // `char save` with `--save-dir`: the save's own load on the action
+    // wiring (character stats, skills, items), as the original side.
+    if let (Some(dir), Some(name)) = (&data.save_dir, &s.save) {
+        let path = dir.join(format!("{name}.d2s"));
+        if path.is_file() {
+            load_char_save(&mut g, player, &path, s, &data.game, &mut gaps)?;
+        } else {
+            gaps.push(format!("char save {name}: {} not found", path.display()));
+        }
+    }
     for (unit, x, y) in placed {
         g.set_unit(
             unit,
@@ -578,6 +596,52 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
         items: ItemTables::from_fixed(&d.fixed).map_err(|e| e.to_string()),
         gaps,
     })
+}
+
+/// Loads `path` (`formats/d2s.md`, `d2s::read` with the scenario's game)
+/// onto `player` through `d2_server::adapters::session::load_save`; each
+/// step the scenario host has no provider for is a gap.
+fn load_char_save(
+    g: &mut Sim,
+    player: UnitId,
+    path: &Path,
+    s: &Scenario,
+    game: &GameData,
+    gaps: &mut Vec<String>,
+) -> Result<(), RunError> {
+    use d2_formats::d2s;
+    let bad = |e: String| RunError::Data(format!("{}: {e}", path.display()));
+    let bytes = std::fs::read(path).map_err(|e| bad(e.to_string()))?;
+    let expansion = s.expansion;
+    let tables = d2_server::world_data::tables::SaveData::from_fixed(&game.fixed, expansion)
+        .map_err(|e| bad(e.to_string()))?;
+    let name: Vec<u8> = bytes
+        .get(0x14..0x24)
+        .map(|n| n.iter().copied().take_while(|&c| c != 0).collect())
+        .unwrap_or_default();
+    let opts = d2s::ReadOptions {
+        expansion,
+        game: Some(d2s::GameContext {
+            client_name: name,
+            expansion,
+            hardcore: bytes.get(0x24).is_some_and(|b| b & 0x04 != 0),
+            difficulty: s.difficulty.index(),
+        }),
+    };
+    let save = d2s::read(&bytes, &opts, &tables).map_err(|e| bad(format!("{e:?}")))?;
+    let ctx = d2_server::adapters::character::LoadContext {
+        difficulty: s.difficulty.index(),
+        map_seed_applies: false,
+    };
+    let (_, report) = d2_server::adapters::session::load_save(g, player, &save, &ctx)
+        .map_err(|e| bad(format!("load: {e:?}")))?;
+    for u in report.unapplied {
+        gaps.push(format!(
+            "char save: load step {:?} not applied (no provider in the scenario host)",
+            u.step
+        ));
+    }
+    Ok(())
 }
 
 /// A spawn step (`scenario.md` §3.1 rule 2) at (x, y) in act 0; the
