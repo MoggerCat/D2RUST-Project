@@ -422,9 +422,12 @@ impl ShopUi {
         let price = move |_t: u8| prices.get(guid).unwrap_or(0);
         let env = ClickEnv {
             cursor_item: items::cursor_item(world).is_some(),
-            // The global [0x007C0DB0] is only ever written with 0
-            // (specs/ui/menus.md §4.2 r2), also in a Gamble window.
-            gamble_shop: false,
+            // PROVISIONAL (REC-729): menus.md §4.2 r2 says [0x007C0DB0] is
+            // only ever written with 0, yet the server (vendors.md §7.1
+            // rule 2) accepts a gamble buy only with transaction 2. Until
+            // a recorded Gamble buy shows the C->S 0x32 u32@9 (pc1-data
+            // Step 4), the window keeps sending the OR 2.
+            gamble_shop: st.gamble,
             repair_all_button_on: repair_all,
             repair_button_on: st.repair_mode,
             repair_all_price: st.prices.get(REPAIR_ALL_KEY).unwrap_or(0),

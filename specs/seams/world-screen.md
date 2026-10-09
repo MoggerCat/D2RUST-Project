@@ -67,11 +67,12 @@ centre (`<< 16 | 0x8000`) and a static unit at the same subtile differ by
 Every world → client conversion on either side calls `camera.md` §2
 (`moving_to_client`, `static_to_client`, `cell_origin`) and every client
 → screen conversion calls the frame's `Camera` (`camera.md` §3–§6). The
-pick inverts §2 and §4 exactly: screen (X, Y) → client
-`(X + cx_u − shiftX, Y + cy_u − 8)` → subtile
+pick inverts §2 and §4 except for 8 rows (`camera.md` §4 "Screen →
+world", OQ 1): screen (X, Y) → client
+`(X + cx_u − shiftX, Y + cy_u)` (no −8) → subtile
 `(⌊(px + 2·py) / 32⌋, ⌊(2·py − px) / 32⌋)` (floor, not truncation, as §2
-floors). So a unit drawn at subtile s picks back as s, moving or static,
-in every open mode and with any shake (tests:
+floors). So a unit drawn at client (x, y) picks the subtile of client
+(x, y + 8), moving or static, in every open mode and with any shake (tests:
 `moving_unit_drawn_feet_pick_back_to_its_subtile`,
 `static_unit_draw_point_picks_back_to_its_subtile`).
 
@@ -172,7 +173,7 @@ the floor rounding are `camera.md`'s RE results.
    `render/camera.md` §4 "Screen → world": the unit origin, minus
    `shiftX`, with **no −8** on y, then `0x00643510` (floor shifts);
    perspective first when on. d2rs's `bridge::click::screen_to_world`
-   subtracts 8 from y: q-fix-click-no-minus-8.
+   had subtracted 8 from y (fixed: q-fix-click-no-minus-8).
 2. The hover model `0x00467A10` (the original hit-tests drawn sprites):
    when specified, §2.5 becomes "the pick reads the drawn cel's
    rectangle", and the d2rs-own box goes.

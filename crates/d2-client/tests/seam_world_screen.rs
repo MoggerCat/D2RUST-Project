@@ -17,6 +17,15 @@ fn centre(c: i32) -> u32 {
     ((c as u32) << 16) | 0x8000
 }
 
+/// The click mapping has no -8 (`render/camera.md` §4 "Screen -> world",
+/// `seams/world-screen.md` OQ 1, `0x0045AFF0`): the unit draw uses
+/// `cy_u - 8`, so the drawn point picks the subtile of client `(x, y + 8)`,
+/// not the exact inverse. Spec: specs/render/camera.md §4.
+fn picked(at: ClientPos) -> (i32, i32) {
+    let (x, y) = (at.x, at.y + 8);
+    ((x + 2 * y) >> 5, (2 * y - x) >> 5)
+}
+
 fn cameras() -> Vec<Camera> {
     let mut out = Vec::new();
     for mode in 0..=3 {
@@ -42,7 +51,7 @@ fn moving_unit_drawn_feet_pick_back_to_its_subtile() {
             for sy in 90..110 {
                 let at = moving_to_client(centre(sx), centre(sy));
                 let (x, y) = cam.unit_draw(at, (0, 0));
-                assert_eq!(screen_to_world(&cam, x, y), (sx, sy), "{cam:?}");
+                assert_eq!(screen_to_world(&cam, x, y), picked(at), "{cam:?}");
             }
         }
     }
@@ -55,8 +64,9 @@ fn static_unit_draw_point_picks_back_to_its_subtile() {
     for cam in cameras() {
         for sx in 90..110 {
             for sy in 90..110 {
-                let (x, y) = cam.unit_draw(static_to_client(sx, sy), (0, 0));
-                assert_eq!(screen_to_world(&cam, x, y), (sx, sy), "{cam:?}");
+                let at = static_to_client(sx, sy);
+                let (x, y) = cam.unit_draw(at, (0, 0));
+                assert_eq!(screen_to_world(&cam, x, y), picked(at), "{cam:?}");
             }
         }
     }
@@ -80,7 +90,8 @@ fn every_pixel_of_a_subtile_diamond_picks_that_subtile() {
     for dy in 0i32..16 {
         for dx in -16i32..16 {
             if (0..32).contains(&(dx + 2 * dy)) && (0..32).contains(&(2 * dy - dx)) {
-                assert_eq!(screen_to_world(&cam, x0 + dx, y0 + dy), (sx, sy));
+                // The pick has no -8 (camera.md §4): sample 8 rows above.
+                assert_eq!(screen_to_world(&cam, x0 + dx, y0 + dy - 8), (sx, sy));
                 hits += 1;
             }
         }
@@ -97,7 +108,7 @@ fn local_player_draws_mid_play_area_and_picks_its_own_subtile() {
         let cam = Camera::new(FrameSize::D2RS, mode, at, (0, 0));
         let (x, y) = cam.unit_draw(at, (0, 0));
         assert_eq!((x, y), (400 + cam.view.shift_x, 292));
-        assert_eq!(screen_to_world(&cam, x, y), (5000, 4000));
+        assert_eq!(screen_to_world(&cam, x, y), picked(at));
     }
 }
 
