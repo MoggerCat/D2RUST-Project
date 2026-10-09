@@ -115,7 +115,7 @@ REC-151	6593		Necromancer casts in the play host (PROVISIONAL, `d2-client` `test
 REC-152	6594		Barbarian skills in the play preview (PROVISIONAL, `d2-client` `app/skill_rest.rs`, `app/s	data	yes		1	
 REC-153	6621		Paladin skills in the preview (PROVISIONAL, `d2-sim` `wiring/interaction/body_path.rs`, `d	recording	no		0	
 REC-154	6620		Sorceress skills in the play preview (PROVISIONAL, `d2-sim` `wiring/interaction/skill_room	data	yes		2	
-REC-155	6617		Druid skills in the play host (PROVISIONAL, `d2-client` `app/skill_rest.rs` `sync_shapes`,	data	yes		1	
+REC-155	6617		Druid skills in the play host (PROVISIONAL, `d2-client` `app/skill_rest.rs` `sync_shapes`,	data	yes		2	
 REC-156	6622		Assassin skills in the play host (PROVISIONAL, `d2-client` `tests/app_assassin.rs`; M22; q	data	yes		0	
 REC-157	6580		Act 2 / 3 / 5 mercenaries in the play preview (PROVISIONAL, `d2-client` `app/merc_rows.rs`	data	yes		0	
 REC-158	6619		Worn items in combat (PROVISIONAL, d2-client `app/single_player.rs` `Pending::current_weap	recording	no		1	
@@ -328,5 +328,5 @@ REC-793	6724		Baal's gold piles (PROVISIONAL, `quest_host.rs` `drop_gold_amount`
 REC-795	6725		The Ancients' chain-35 link (PROVISIONAL, `d2-server` `wired/quest_events.rs`, M22; q-play	binary	no		1	
 REC-796	6726		Tyrael's spawn after the tick (PROVISIONAL, `d2-sim` `wiring/action/missiles.rs` `spawn_ty	unstated	no		0	
 REC-797	6727		The player's act byte at the join (PROVISIONAL, `d2-server` `adapters/session.rs`, M22): u	recording	no		1	
-REC-798	6728		Quest monster spawn without the spread (PROVISIONAL, `d2-sim` `wiring/economy/quest_host.r	unstated	no		1	
+REC-798	6728		*settled 2026-10-09 (q-play-act5)*: quest monster spawns `0x005B2F20` now run population's	recording	no		0	
 REC-799	6729		The prisoner AI's quest hooks after the tick (PROVISIONAL, `d2-sim` `wiring/action/ai.rs` 	recording	no		0	
