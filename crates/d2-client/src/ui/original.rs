@@ -608,15 +608,12 @@ impl OriginalUi {
         self.shared.borrow_mut().items.layouts = Some(layouts);
     }
 
-    /// The equipment rectangles by `inventory.bin` record and the
-    /// two-handed weapon codes: the empty equipment-slot pictures
-    /// (`panels.md` §9.4). Call before handing the files to the art
-    /// loader (the pictures' files are registered here).
-    pub fn set_equip_rects(
-        &mut self,
-        rects: Vec<super::panels::inventory::EquipRects>,
-        two_handed: std::collections::BTreeSet<[u8; 4]>,
-    ) {
+    /// The equipment rectangles by `inventory.bin` record: the empty
+    /// equipment-slot pictures (`panels.md` §9.4; a hand's two-handed test
+    /// reads the inventory tables, [`Self::set_inv_tables`]). Call before
+    /// handing the files to the art loader (the pictures' files are
+    /// registered here).
+    pub fn set_equip_rects(&mut self, rects: Vec<super::panels::inventory::EquipRects>) {
         let mut sh = self.shared.borrow_mut();
         if !rects.is_empty() {
             for f in super::panels::inventory::background_files() {
@@ -624,7 +621,6 @@ impl OriginalUi {
             }
         }
         sh.items.equip_rects = Some(rects);
-        sh.items.two_handed = two_handed;
     }
 
     /// The `belts.bin` records and the belts' types (`hud_belt`).
@@ -660,7 +656,9 @@ impl OriginalUi {
 
     /// The inventory tables of the equip-box click (`inv_items` `equip`).
     pub fn set_inv_tables(&mut self, t: std::sync::Arc<d2_sim::items::inventory::InvTables>) {
-        self.shared.borrow_mut().items.inv_tables = Some(t);
+        let mut sh = self.shared.borrow_mut();
+        sh.hud.belt.tables = Some(t.clone());
+        sh.items.inv_tables = Some(t);
     }
 
     /// Shift is held (set by the host each frame, `inv_items`).

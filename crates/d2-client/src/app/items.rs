@@ -30,9 +30,6 @@ pub struct ItemParts {
     pub belts: BeltParts,
     /// The item tool tips' tables ([`item_tips`]); none on synthetic data.
     pub tips: Option<crate::ui::item_tip::ItemTips>,
-    /// The `weapons` codes with `2handed` set (the empty-slot pictures,
-    /// `panels.md` §9.4).
-    pub two_handed: std::collections::BTreeSet<[u8; 4]>,
     /// The measured frame size of each inventory graphic ([`inv_frame_sizes`]).
     pub frame_sizes: BTreeMap<String, (u32, u32)>,
     /// The inventory tables of the equip-box click (`ui::panels::inv_items`
@@ -106,15 +103,6 @@ pub fn item_parts(archives: &dyn TableFiles) -> Result<ItemParts, String> {
     let set = d2_data::bin::load_from(archives, "eng").map_err(|e| e.to_string())?;
     let mut rows = BTreeMap::new();
     add_rows::<Weapons>(&set, &mut rows, |r| art!(r))?;
-    let weapons = set
-        .table(Weapons::TABLE)
-        .ok_or_else(|| format!("{} not loaded", Weapons::TABLE))?;
-    let weapons: Vec<Weapons> = decode_all(weapons).map_err(|e| e.to_string())?;
-    let two_handed = weapons
-        .iter()
-        .filter(|w| w.f_2handed != 0)
-        .map(|w| w.code)
-        .collect();
     add_rows::<Armor>(&set, &mut rows, |r| art!(r))?;
     add_rows::<Misc>(&set, &mut rows, |r| art!(r))?;
     let table = set.table("inventory").ok_or("inventory not loaded")?;
@@ -127,7 +115,6 @@ pub fn item_parts(archives: &dyn TableFiles) -> Result<ItemParts, String> {
             BeltParts::default()
         }),
         tips: None,
-        two_handed,
         frame_sizes: BTreeMap::new(),
         inv_tables: None,
     })
@@ -184,10 +171,7 @@ pub fn prepare_ui(app: &App, original: &mut OriginalUi) {
     };
     original.set_item_art(parts.art.clone());
     original.set_inv_layouts(parts.inventory.iter().map(inv_layout).collect());
-    original.set_equip_rects(
-        parts.inventory.iter().map(equip_rects).collect(),
-        parts.two_handed.clone(),
-    );
+    original.set_equip_rects(parts.inventory.iter().map(equip_rects).collect());
     original.set_item_frame_sizes(parts.frame_sizes.clone());
     original.set_belt_parts(parts.belts.clone());
     if let Some(tips) = &parts.tips {

@@ -417,6 +417,27 @@ mod belt {
     use super::*;
     use crate::ui::original::hud_belt::{BeltParts, HudBelt};
     use crate::ui::panels::control::belt::{BeltBox, BeltRecord};
+    use d2_sim::items::inventory::tables::{InvItemRec, InvTypeRec};
+    use std::sync::Arc;
+
+    /// The equip fixture's tables plus a beltable potion type (76 `hpot`)
+    /// with `hp1`, and a scroll type (22 `scro`, not beltable here) with
+    /// `isc` (`seams/item-grids.md` §2.8).
+    pub(crate) fn belt_tables() -> Arc<d2_sim::items::inventory::InvTables> {
+        let mut t = super::super::equip::tests::tables();
+        t.itemtypes.resize(80, InvTypeRec::default());
+        t.itemtypes[76].beltable = 1;
+        for (code, ty) in [(b"hp1 ", 76i16), (b"isc ", 22)] {
+            t.items.push(InvItemRec {
+                code: *code,
+                type_: ty,
+                invwidth: 1,
+                invheight: 1,
+                ..InvItemRec::default()
+            });
+        }
+        Arc::new(t)
+    }
 
     fn parts() -> BeltParts {
         // Four boxes in the strip (y 562..590, x 430 + 31 i), record
@@ -589,6 +610,7 @@ mod belt {
                 records: vec![BeltRecord { boxes }; 14],
                 types: BTreeMap::from([(*b"lbl ", 0)]),
             },
+            tables: Some(belt_tables()),
             ..Default::default()
         };
         let w = world(
@@ -684,6 +706,7 @@ mod belt {
     fn clicking_the_belt_takes_and_puts_potions() {
         let b = HudBelt {
             parts: parts(),
+            tables: Some(belt_tables()),
             ..Default::default()
         };
         // No cursor item: 0x24 [guid] on the occupied box 1.
@@ -706,10 +729,35 @@ mod belt {
         assert!(b.click(&w, false, (10, 10)).is_empty());
     }
 
+    // The client's belt test is the sim's `beltable` on every items row
+    // (`seams/item-grids.md` §2.8); a scroll whose type is made beltable
+    // goes to the belt on Shift-click (0x63), as the sim would take it.
+    // Covers: specs/seams/item-grids.md §2.8; specs/ui/inventory.md §10 r3
+    #[test]
+    fn fits_belt_is_the_sim_beltable() {
+        use d2_sim::items::inventory::belt::beltable;
+        let t = belt_tables();
+        for (i, r) in t.items.iter().enumerate() {
+            assert_eq!(fits_belt(Some(&t), Some(r.code)), beltable(&t, i));
+        }
+        assert!(fits_belt(Some(&t), Some(*b"hp1 ")));
+        assert!(!fits_belt(Some(&t), Some(*b"isc ")));
+        assert!(!fits_belt(None, Some(*b"hp1 ")), "no tables: no fit");
+        let mut scroll = (*t).clone();
+        scroll.itemtypes[22].beltable = 1;
+        let (mut u, files) = ui();
+        u.shift = true;
+        u.inv_tables = Some(Arc::new(scroll));
+        let w = world(&[(7, mode::STORED, (0, 2, 3, 1), b"isc ")], None);
+        let out = u.press(&w, &files, &layout(), Point::new(160, 290));
+        assert_eq!(intents(&out), vec![vec![0x63, 7, 0, 0, 0]]);
+    }
+
     #[test]
     fn shift_click_sends_0x63() {
         let (mut u, files) = ui();
         u.shift = true;
+        u.inv_tables = Some(belt_tables());
         let w = world(&[(7, mode::STORED, (0, 2, 3, 1), b"hp1 ")], None);
         let out = u.press(&w, &files, &layout(), Point::new(160, 290));
         assert_eq!(intents(&out), vec![vec![0x63, 7, 0, 0, 0]]);

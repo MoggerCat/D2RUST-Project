@@ -2104,7 +2104,10 @@ mod equip_backgrounds_play {
         let r = inventory_record(AMAZON, &Screen::R800).unwrap();
         let mut all = vec![EquipRects::default(); r + 1];
         all[r] = rects();
-        u.ui.set_equip_rects(all, std::collections::BTreeSet::from([*b"lbw "]));
+        u.ui.set_equip_rects(all);
+        u.ui.set_inv_tables(std::sync::Arc::new(
+            crate::ui::panels::inv_items::equip::tests::tables(),
+        ));
         let mut w = item_world(&[], None);
         let me = w.local_player.unwrap();
         w.units.get_mut(&me).unwrap().mode = 1;
@@ -2117,7 +2120,7 @@ mod equip_backgrounds_play {
         let mut w = item_world(
             &[
                 (5, mode::BODY, (3, 0, 0, 0), b"qui "),
-                (6, mode::BODY, (4, 0, 0, 0), b"lbw "),
+                (6, mode::BODY, (4, 0, 0, 0), b"2hs "),
             ],
             None,
         );

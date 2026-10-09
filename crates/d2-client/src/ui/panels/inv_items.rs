@@ -174,9 +174,6 @@ pub struct ItemsUi {
     /// The equipment rectangles by `inventory.bin` record (§9.4 empty-slot
     /// pictures); `None`: none drawn.
     pub equip_rects: Option<Vec<super::inventory::EquipRects>>,
-    /// The two-handed weapon codes (`weapons` `2handed`; d2rs-own,
-    /// unverified stand-in for `0x0063D340` = 2).
-    pub two_handed: std::collections::BTreeSet<[u8; 4]>,
 }
 
 /// Item flag 0x400000: ethereal (`ui/inventory.md` §8 r4).
@@ -184,38 +181,18 @@ pub const ETHEREAL: u32 = 0x0040_0000;
 /// The draw mode of an ethereal item graphic (§8 r4): 50 % alpha.
 pub const ETHEREAL_MODE: u8 = 1;
 
-/// d2rs-own, unverified: whether an item code is a belt-able potion
-/// (`hp1`–`hp5`, `mp1`–`mp5`, `rvs`, `rvl`, `vps`, `yps`, `wms`, the
-/// throwing potions `gps`/`gpm`/`gpl`/`ops`/`opm`/`opl`); the server
-/// still checks the move (`inventory-moves.md` §7.24).
-pub fn fits_belt(code: Option<[u8; 4]>) -> bool {
-    let Some(c) = code else {
+/// Whether an item fits the belt (`0x0062BAD0`, `seams/item-grids.md`
+/// §2.8): itemtypes `beltable` of the code's item type on the client's
+/// tables, the sim's test ([`d2_sim::items::inventory::belt::beltable`]).
+/// No tables, no code or no items row: no.
+pub fn fits_belt(t: Option<&d2_sim::items::inventory::InvTables>, code: Option<[u8; 4]>) -> bool {
+    let (Some(t), Some(c)) = (t, code) else {
         return false;
     };
-    matches!(
-        &c[..3],
-        b"hp1"
-            | b"hp2"
-            | b"hp3"
-            | b"hp4"
-            | b"hp5"
-            | b"mp1"
-            | b"mp2"
-            | b"mp3"
-            | b"mp4"
-            | b"mp5"
-            | b"rvs"
-            | b"rvl"
-            | b"vps"
-            | b"yps"
-            | b"wms"
-            | b"gps"
-            | b"gpm"
-            | b"gpl"
-            | b"ops"
-            | b"opm"
-            | b"opl"
-    )
+    t.items
+        .iter()
+        .position(|r| r.code == c)
+        .is_some_and(|rec| d2_sim::items::inventory::belt::beltable(t, rec))
 }
 
 /// An item's graphic: file id, footprint in cells, frame size.
@@ -288,7 +265,14 @@ impl ItemsUi {
                 continue;
             }
             eq.occupied[usize::from(i.body)] = true;
-            let two = i.code.is_some_and(|c| self.two_handed.contains(&c));
+            // d2rs-own, unverified: `0x0063D340` = 2 read as the items
+            // `2handed` column (the equip check's two-handed test).
+            let two = i.code.is_some_and(|c| {
+                self.inv_tables
+                    .as_deref()
+                    .and_then(|t| t.items.iter().find(|r| r.code == c))
+                    .is_some_and(|r| r.twohanded != 0)
+            });
             match i.body {
                 body_loc::RIGHT_HAND => eq.right_two_handed = two,
                 body_loc::LEFT_HAND => eq.left_two_handed = two,
@@ -549,7 +533,7 @@ impl ItemsUi {
             stackable_onto: false,
             book_kind: None,
             sellable: false,
-            fits_belt: fits_belt(i.code),
+            fits_belt: fits_belt(self.inv_tables.as_deref(), i.code),
         };
         let (mc, mr) = g.mouse_cell(at);
         let under_view = at_cell(mc as i32, mr as i32);
