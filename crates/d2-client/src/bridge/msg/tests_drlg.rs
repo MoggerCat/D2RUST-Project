@@ -1145,9 +1145,11 @@ fn a_client_missile_ends_on_a_wall_of_the_client_drlg() {
         ty: 10,
         ..CreateRecord::default()
     };
-    // A wall (collision bit 0x1) four sub-tiles south.
+    // A wall four sub-tiles south: WALL with the missile barrier 0x4, as
+    // tile walls carry (the walk's missile move tests the move mask
+    // 0x184, `sim/path-placement.md` §6 r3, so 0x4 is what stops it).
     let drlg = &mut m.w.drlg.as_mut().unwrap().drlg;
-    *drlg.collision_at_mut(46, 12).unwrap() |= bits::WALL;
+    *drlg.collision_at_mut(46, 12).unwrap() |= bits::WALL | bits::MISSILE_BARRIER;
     let k = create(&mut m.w, &rows, &rec, true).unwrap().expect("made");
     let mut n = 0;
     while m.w.objclient.set_c.contains_key(&k) {
@@ -1161,4 +1163,255 @@ fn a_client_missile_ends_on_a_wall_of_the_client_drlg() {
         }
     }
     assert!(n < 40);
+}
+
+// Covers: specs/sim/pathing.md §9.6
+// Covers: specs/missiles/client-bodies.md §b2-path-new-step-flag-path-0x34-bit-3
+#[test]
+fn a_fast_client_missile_walks_its_cells_and_stops_before_a_thin_wall() {
+    use crate::bridge::client_missiles::{create, flag, update, ClientMissileRow, CreateRecord};
+    use d2_sim::drlg::collision::bits;
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    // `Vel` 50: (50 << 8) × 75 / 100 = 9600 per step, ((0x400 × 9600) >>
+    // 6) × 4096 >> 12 = 153,600 = 2.34 sub-tiles per update due south.
+    let rows = vec![ClientMissileRow {
+        vel: 50,
+        range: 40,
+        collide_type: 3,
+        clt_do_func: 1,
+        ..ClientMissileRow::default()
+    }];
+    let rec = CreateRecord {
+        flags: flag::POSITION | flag::TARGET_RELATIVE,
+        x: 46,
+        y: 8,
+        ty: 20,
+        ..CreateRecord::default()
+    };
+    // Free path: the first update crosses (46, 9) and (46, 10), two saved
+    // steps, the new-step flag set.
+    let k = create(&mut m.w, &rows, &rec, true).unwrap().expect("made");
+    assert!(m.w.objclient.missiles[&k].room.is_some());
+    update(&mut m.w, &rows, k, true).unwrap();
+    let mm = m.w.objclient.missiles[&k];
+    assert_eq!(
+        (mm.step_count, &mm.steps[..2], mm.new_step),
+        (2, &[(46, 9), (46, 10)][..], true)
+    );
+    assert_eq!(mm.collided & 5, 0);
+    // WALL alone (0x1) is outside the move mask 0x184: no stop.
+    let drlg = &mut m.w.drlg.as_mut().unwrap().drlg;
+    *drlg.collision_at_mut(46, 12).unwrap() |= bits::WALL;
+    let k = create(&mut m.w, &rows, &rec, true).unwrap().expect("made");
+    update(&mut m.w, &rows, k, true).unwrap();
+    update(&mut m.w, &rows, k, true).unwrap();
+    assert!(m.w.objclient.set_c.contains_key(&k));
+    assert_eq!(m.w.objclient.missiles[&k].pos.1 >> 16, 13, "passed y = 12");
+    // A one-cell missile wall at y = 12, which the second step (10.8 →
+    // 13.2) would jump: the walk is refused entering it, the missile
+    // holds the centre of (46, 11) and the cached collided mask ends it
+    // (§C7 r10).
+    let drlg = &mut m.w.drlg.as_mut().unwrap().drlg;
+    *drlg.collision_at_mut(46, 12).unwrap() |= bits::MISSILE_BARRIER;
+    let k = create(&mut m.w, &rows, &rec, true).unwrap().expect("made");
+    update(&mut m.w, &rows, k, true).unwrap();
+    assert!(m.w.objclient.set_c.contains_key(&k));
+    update(&mut m.w, &rows, k, true).unwrap();
+    assert!(!m.w.objclient.set_c.contains_key(&k), "ended on the wall");
+}
+
+// Covers: specs/missiles/client.md §c7-default-step-0x004d30c0-function-1
+#[test]
+fn a_still_client_missile_reads_the_wall_under_it() {
+    use crate::bridge::client_missiles::{create, flag, update, ClientMissileRow, CreateRecord};
+    use d2_sim::drlg::collision::bits;
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    // Velocity 0 (no target): the collision word is the size query at
+    // its position (`Size` 2: the plus) with all bits.
+    let rows = vec![ClientMissileRow {
+        range: 40,
+        collide_type: 3,
+        size: 2,
+        clt_do_func: 1,
+        ..ClientMissileRow::default()
+    }];
+    let rec = CreateRecord {
+        flags: flag::POSITION,
+        x: 46,
+        y: 8,
+        ..CreateRecord::default()
+    };
+    let k = create(&mut m.w, &rows, &rec, true).unwrap().expect("made");
+    update(&mut m.w, &rows, k, true).unwrap();
+    assert!(m.w.objclient.set_c.contains_key(&k));
+    // A wall on the plus cell east of it.
+    let drlg = &mut m.w.drlg.as_mut().unwrap().drlg;
+    *drlg.collision_at_mut(47, 8).unwrap() |= bits::WALL;
+    update(&mut m.w, &rows, k, true).unwrap();
+    assert!(!m.w.objclient.set_c.contains_key(&k));
+}
+
+/// The model with the local player at (46, 6) and monster 7 at (46, 12)
+/// (class 0, size 2 from `monstats2`), the monster's cell stamped with
+/// the MONSTER bit (the model stamps no unit footprints; the 1.14d
+/// client grid carries them, `sim/pathing.md` §13.3 r5).
+fn hit_model() -> Model {
+    use d2_sim::drlg::collision::bits;
+    let mut m = model();
+    m.inputs.tables.monsters[0] = Some(MonsterClass {
+        size_x: 2,
+        ..MonsterClass::default()
+    });
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    m.recv(&assign_monster(7, 46, 12));
+    let drlg = &mut m.w.drlg.as_mut().unwrap().drlg;
+    *drlg.collision_at_mut(46, 12).unwrap() |= bits::MONSTER;
+    m
+}
+
+// Covers: specs/missiles/client.md §c7-default-step-0x004d30c0-function-1
+// Covers: specs/missiles/client.md §c8-client-collide-table-0x0072a350
+// Covers: specs/missiles/client.md §c9-end-0x004d2d70-m-u-forced
+// Covers: specs/sim/path-placement.md §4 r6
+#[test]
+fn a_client_missile_hits_the_monster_on_its_walk() {
+    use crate::bridge::client_missiles::{
+        create, flag, update_with, ClientMissileRow, CreateRecord, Env,
+    };
+    use crate::bridge::world::UnitKey;
+    let mut m = hit_model();
+    let mon = UnitKey::new(1, 7);
+    assert!(m.w.units.contains_key(&mon));
+    let p = m.w.local_player.unwrap();
+    let row = ClientMissileRow {
+        vel: 16,
+        range: 40,
+        collide_type: 3,
+        client_col: true,
+        collide_kill: true,
+        size: 1,
+        last_collide: true,
+        clt_do_func: 1,
+        ..ClientMissileRow::default()
+    };
+    let rows = vec![row];
+    let monsters = m.inputs.tables.monsters.clone();
+    let env = Env {
+        rows: &rows,
+        lights: true,
+        skills: None,
+        monsters: &monsters,
+    };
+    let rec = CreateRecord {
+        flags: flag::POSITION | flag::TARGET_RELATIVE,
+        owner: Some(p),
+        x: 46,
+        y: 8,
+        ty: 10,
+        ..CreateRecord::default()
+    };
+    // `CollideKill`: the walk enters (46, 12), where the point query of
+    // size 1 meets the monster's plus (size 2: dx + dy ≤ 1): ended.
+    let k = create(&mut m.w, &rows, &rec, true).unwrap().expect("made");
+    let mut n = 0;
+    let mut last = None;
+    while m.w.objclient.set_c.contains_key(&k) {
+        last = m.w.objclient.set_c[&k].position;
+        update_with(&mut m.w, &env, k).unwrap();
+        n += 1;
+        assert!(n < 10, "hit before its frames run out");
+    }
+    // The search runs only when the walk's collided mask has a unit bit:
+    // the stamped cell (46, 12), entered from (46, 11) (0.75 sub-tile per
+    // update), far before its frames or the target (46, 18).
+    assert_eq!(last, Some((46, 11)));
+    // Without `CollideKill` it flies on, the monster its last-collided
+    // unit (not hit again).
+    let rows = vec![ClientMissileRow {
+        collide_kill: false,
+        ..row
+    }];
+    let env = Env { rows: &rows, ..env };
+    let k = create(&mut m.w, &rows, &rec, true).unwrap().expect("made");
+    for _ in 0..6 {
+        update_with(&mut m.w, &env, k).unwrap();
+    }
+    assert!(m.w.objclient.set_c.contains_key(&k));
+    assert_eq!(m.w.objclient.missiles[&k].last_collided, Some(mon));
+    // A dead monster (mode 12) is not a candidate: no hit.
+    m.w.units.get_mut(&mon).unwrap().mode = 12;
+    let rows = vec![row];
+    let env = Env { rows: &rows, ..env };
+    let k = create(&mut m.w, &rows, &rec, true).unwrap().expect("made");
+    for _ in 0..6 {
+        update_with(&mut m.w, &env, k).unwrap();
+    }
+    assert!(m.w.objclient.set_c.contains_key(&k));
+    assert_eq!(m.w.objclient.missiles[&k].last_collided, Some(p));
+}
+
+// Covers: specs/missiles/client.md §c9-end-0x004d2d70-m-u-forced
+#[test]
+fn piercing_and_next_hit_on_a_client_missile() {
+    use crate::bridge::client_missiles::{
+        create, end_with, flag, ClientMissileRow, CreateRecord, Env,
+    };
+    use crate::bridge::world::UnitKey;
+    let mut m = hit_model();
+    let mon = UnitKey::new(1, 7);
+    let p = m.w.local_player.unwrap();
+    let row = ClientMissileRow {
+        range: 40,
+        collide_type: 3,
+        collide_kill: true,
+        pierce: true,
+        next_hit: true,
+        next_delay: 3,
+        light: 4,
+        clt_do_func: 1,
+        ..ClientMissileRow::default()
+    };
+    let rows = vec![row];
+    let monsters = m.inputs.tables.monsters.clone();
+    let env = Env {
+        rows: &rows,
+        lights: true,
+        skills: None,
+        monsters: &monsters,
+    };
+    let rec = CreateRecord {
+        flags: flag::POSITION,
+        owner: Some(p),
+        x: 46,
+        y: 8,
+        ..CreateRecord::default()
+    };
+    let k = create(&mut m.w, &rows, &rec, true).unwrap().expect("made");
+    // The owner in state 69 `pierce` with one pierce left: r = 2, the
+    // missile stays (its light dies; Edge case 2), U gets state 86.
+    m.w.units.get_mut(&p).unwrap().states.insert(69);
+    m.w.objclient.missiles.get_mut(&k).unwrap().pierce = 1;
+    end_with(&mut m.w, &env, k, Some(mon), false).unwrap();
+    assert!(m.w.objclient.set_c.contains_key(&k));
+    assert_eq!(m.w.objclient.missiles[&k].pierce, 0);
+    assert_eq!(m.w.objclient.just_hit.get(&mon), Some(&3));
+    // `NextHit`: U in state 86 → no hit at all.
+    end_with(&mut m.w, &env, k, Some(mon), false).unwrap();
+    assert!(m.w.objclient.set_c.contains_key(&k));
+    // The state runs out after `NextDelay` client updates.
+    for _ in 0..3 {
+        crate::bridge::client_missiles::tick_just_hit(&mut m.w);
+    }
+    assert!(m.w.objclient.just_hit.is_empty());
+    // No pierce left: r = 3, removed.
+    end_with(&mut m.w, &env, k, Some(mon), false).unwrap();
+    assert!(!m.w.objclient.set_c.contains_key(&k));
 }
