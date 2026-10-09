@@ -1265,6 +1265,10 @@ pub struct StateRow {
     pub colorpri: u8,
     pub colorshift: u8,
     pub light_rgb: (u8, u8, u8),
+    /// `meleeonly` (`states.txt` flag bit 38 = 0x26, `data/fields.tsv`):
+    /// the state is in the state-mask group 0x26 that `range(P, skill)`
+    /// tests (`skills/use.md` §3 r6).
+    pub meleeonly: bool,
 }
 
 /// One `skilldesc` row as 0x93 reads it (`msg-skills.md` §9 r3).

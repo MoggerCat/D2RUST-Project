@@ -255,7 +255,7 @@ impl ClickWorld for ModelClick<'_> {
             .or_else(|| self.view.pick.then(SkillRowFacts::default))
     }
     fn range(&self, skill: SkillRef) -> u8 {
-        super::combat::range_of(self.inputs, skill.id)
+        super::combat::range_of(self.inputs, self.world.local(), skill.id)
     }
     fn use_state(&self, _skill: SkillRef) -> u32 {
         // TODO(spec: skills/use.md §2 `0x00647960`): the client use state

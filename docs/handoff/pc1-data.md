@@ -239,6 +239,15 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 - **[q-fix-pc1-combat] `0x0063E6B0(unit, 0)`: are the action-frame tests skipped?** (REC-700) `0x005A6D50` passes the moving flag r as `0x0063E6B0`'s second argument (`skills/use.md` §5.2 "Monsters"); `skills/bodies-3.md` §5.18 step 3 gives the tests (+0x4E = 0, or no action event in the frames ((cur − speed) >> 8, cur >> 8]) for the argument 1 only. Read: what the function does with 0 (d2rs: no tests, the column by mode). Write the answer into `bodies-3.md` §5.18 step 3.
 - **[q-fix-pc1-combat] Who writes unit +0x4E from a type-0 timer's frame code?** (REC-701) trigger(U) of `0x005A7670` reads +0x4E = 1 (`skills/use.md` §5.2); `sim/units.md` §4.2 schedules event 0 with args (E[i], k) and the field table names only `0x005533D0` (0 at mode start). Read: the writer of +0x4E on the event-0 path of a monster (the unit-type dispatcher or the timer run), and whether a code-0 event writes it. Write the answer into `sim/units.md` §4.2 / §4.6.
 
+- **[q-fix-pc1-combat] Range state mask 0x26 = `meleeonly`?** `range(P,
+  skill)` `0x00645460` (`skills/use.md` §3 r6) tests "state mask 0x26".
+  d2rs (`d2-client` `bridge/combat.rs` `in_melee_only_state`) reads it as
+  `0x0063A130` with the per-flag mask at data +0xCC + 4·0x26, i.e. the
+  `states.txt` flag bit 38 `meleeonly` (`data/fields.tsv`; the
+  `ui/panels-3.md` §24 r1 scheme). Confirm the argument `0x00645460`
+  passes is that flag index (not a data offset or a precomputed group),
+  and write it into `use.md` §3 r6.
+
 ## How to check a behaviour in one command
 
 A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)

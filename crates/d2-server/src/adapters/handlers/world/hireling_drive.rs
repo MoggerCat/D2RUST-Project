@@ -5,7 +5,8 @@
 //! host does not have yet (`docs/handoff/stitch-combat.md` §1 row 12), so
 //! each frame this driver gives every living hireling one decision:
 //!
-//! 1. a hostile monster within [`SIGHT`] of the hireling: walk to it, and
+//! 1. a hostile monster at full-size distance below [`ENGAGE`] of the
+//!    hireling (`monsters/ai-bodies-6.md` §7 step 8): walk to it, and
 //!    when within [`MELEE`] attack it (mode 4) and take its life by the
 //!    hireling's mean damage every [`SWING`] frames;
 //! 2. else farther than [`LEASH`] from the owner: walk to the owner
@@ -31,8 +32,11 @@ use d2_sim::wiring::action::{Pending, View};
 use super::wired::{TradeRest, WiredWorld};
 use super::ActionEvents;
 
+/// The Hireable think's engage gate (`monsters/ai-bodies-6.md` §7 step
+/// 8, `monsters/ai.md` §5.3): a target at full-size distance (`ai.md` §6
+/// `0x005DC380`) below 25.
+const ENGAGE: i32 = 25;
 /// Squared sub-tile distances (path positions).
-const SIGHT: i64 = 20 * 20;
 const MELEE: i64 = 3 * 3;
 const LEASH: i64 = 6 * 6;
 const RUN_FROM: i64 = 14 * 14;
@@ -48,10 +52,10 @@ const AI_ASSASSIN_SENTRY: u16 = 101;
 
 /// Which think a hireling gets in play (`q-fix-prov-hireling-search`): one
 /// whose AI control holds the owner link takes the real Hireable think,
-/// whose target search is the host's `good_target_search` (35 sub-tiles,
-/// `monsters/ai.md` §5.2 step 4; the client host's `GOOD_SEARCH_RANGE`);
-/// only a hireling or pet without the link is left to this stand-in
-/// (and its [`SIGHT`] of 20).
+/// whose target search is the host's `secondary_target` (`0x005DDC30`,
+/// full-size distance < 49, `monsters/ai.md` §5.3) gated at 25; only a
+/// hireling or pet without the link is left to this stand-in (and its
+/// [`ENGAGE`] gate of 25).
 pub(super) fn stand_in_drives(control: Option<&d2_sim::monsters::ai::AiControl>) -> bool {
     control.is_none_or(|c| c.minion_owner.is_none())
 }
@@ -187,10 +191,10 @@ pub(super) fn think<X: Pending>(
     let me = AiUnits::position(v, merc);
     let boss = AiUnits::position(v, owner);
     let slot = frame.wrapping_add(merc.0 as i32);
-    let target = nearest_hostile(v, g, merc, friends, SIGHT);
-    if let Some((dist, t)) = target {
+    let target = nearest_hostile(v, g, merc, friends);
+    if let Some((_, t)) = target {
         let tp = AiUnits::position(v, t);
-        if dist <= MELEE {
+        if d2(me, tp) <= MELEE {
             let cur = AiUnits::anim_mode(v, merc);
             if cur != mode::ATTACK1 {
                 AiModes::change_mode(v, g, merc, mode::ATTACK1, ModeTarget::Unit(t));
@@ -227,18 +231,19 @@ pub(super) fn think<X: Pending>(
     }
 }
 
-/// The nearest living hostile monster within squared distance `sight` of
-/// `from` (never a friend, a hireling, a seller, or in a town room), as
-/// (squared distance, unit), for the followers' think.
+/// The nearest living hostile monster of `from` at full-size distance
+/// below [`ENGAGE`] (never a friend, a hireling, a seller, or in a town
+/// room), as (full-size distance, unit), for the followers' think.
 pub(super) fn nearest_hostile<X: Pending>(
     v: &mut View<'_, X>,
     g: &Game,
     from: UnitId,
     friends: &BTreeSet<UnitId>,
-    sight: i64,
-) -> Option<(i64, UnitId)> {
+) -> Option<(i32, UnitId)> {
     let me = AiUnits::position(v, from);
-    g.lists
+    let size = AiUnits::size(v, from);
+    let candidates: Vec<(UnitId, (i32, i32))> = g
+        .lists
         .units_of_type(UnitType::Monster)
         .into_iter()
         .filter(|&m| m != from && !AiUnits::is_dead(v, m))
@@ -254,8 +259,23 @@ pub(super) fn nearest_hostile<X: Pending>(
                     .and_then(|e| e.room())
                     .is_some_and(|r| !v.h.drlg.in_town(g, r))
         })
-        .map(|m| (d2(me, AiUnits::position(v, m)), m))
-        .filter(|&(d, _)| d <= sight)
+        .map(|m| (m, AiUnits::position(v, m)))
+        .collect();
+    nearest_engaged(me, size, candidates)
+}
+
+/// The candidate nearest to `me` (a unit of size `size`) by the full-size
+/// distance (`monsters/ai.md` §6 `0x005DC380`), engaged only below
+/// [`ENGAGE`] (`ai-bodies-6.md` §7 step 8); ties: the lower unit id.
+fn nearest_engaged(
+    me: (i32, i32),
+    size: i32,
+    candidates: impl IntoIterator<Item = (UnitId, (i32, i32))>,
+) -> Option<(i32, UnitId)> {
+    candidates
+        .into_iter()
+        .map(|(m, p)| (d2_sim::monsters::ai::distance_full_size(me, size, p), m))
+        .filter(|&(d, _)| d < ENGAGE)
         .min()
 }
 
@@ -271,11 +291,44 @@ mod tests {
         assert!(stand_in_drives(None));
         let mut c = AiControl::default();
         assert!(stand_in_drives(Some(&c)));
-        // The owner link set: the real think (search radius 35, not 20).
+        // The owner link set: the real think.
         c.minion_owner = Some(UnitRef {
             ty: UnitType::Player,
             guid: 1,
         });
         assert!(!stand_in_drives(Some(&c)));
+    }
+
+    // Covers: specs/monsters/ai-bodies-6.md §7 r8; specs/monsters/ai.md §6
+    #[test]
+    fn a_hireling_engages_below_full_size_distance_25() {
+        let m = UnitId(7);
+        // Hireling at (100, 100), size 0: 24 engages, 25 does not.
+        assert_eq!(
+            nearest_engaged((100, 100), 0, [(m, (124, 100))]),
+            Some((24, m))
+        );
+        assert_eq!(nearest_engaged((100, 100), 0, [(m, (125, 100))]), None);
+        // Diagonal (2·max + min) / 2: (16, 16) → 24; (17, 16) → 25.
+        assert_eq!(
+            nearest_engaged((100, 100), 0, [(m, (116, 116))]),
+            Some((24, m))
+        );
+        assert_eq!(nearest_engaged((100, 100), 0, [(m, (117, 116))]), None);
+        // The hireling's size comes off each axis (clamped at 0).
+        assert_eq!(
+            nearest_engaged((100, 100), 2, [(m, (126, 100))]),
+            Some((24, m))
+        );
+        assert_eq!(
+            nearest_engaged((100, 100), 2, [(m, (101, 100))]),
+            Some((0, m))
+        );
+        // The nearest wins.
+        let n = UnitId(8);
+        assert_eq!(
+            nearest_engaged((100, 100), 0, [(m, (110, 100)), (n, (105, 100))]),
+            Some((5, n))
+        );
     }
 }
