@@ -67,7 +67,7 @@ state first. It is the default way to compare a behaviour with 1.14d.
 | `input orig <script>` | no | `autostart.py` input script (seconds, client pixels) |
 | `input d2rs <script>` | no | `d2-client play --input` script (server ticks) |
 | `ignore <field>...` | no, repeatable | state fields not compared (`state_diff.py --ignore`) |
-| `poke <...>` | no, repeatable | reserved for state injection (q-tool-poke): parsed and kept, reported as not run |
+| `at <frame> poke <directive> <args...>` | no, repeatable | state injection, syntax owned by q-tool-poke (`tools/scenario.md`): applied at the drain before tick `<frame>` (absolute game frame, the `f` of `tools/state-snapshot.md`); kept verbatim and reported as not run until both sides take it |
 
 ### 3. Run
 
@@ -116,5 +116,6 @@ d2rs-own tool; no 1.14d fact.
 
 ## Open questions
 
-1. The `poke` directive's syntax is agreed with q-tool-poke (state
-   injection on both sides).
+1. The `poke` directives (agreed with q-tool-poke, 2026-10-09): both
+   sides take them as a repeatable `--poke "<frame> <directive> <args>"`
+   once q-tool-poke lands them.

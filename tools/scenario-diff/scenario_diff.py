@@ -114,9 +114,12 @@ def parse(text):
             c["input"][side] = script.strip()
         elif kw == "ignore":
             c["ignore"] += toks
-        elif kw == "poke":
-            # reserved for state injection (q-tool-poke): kept, not run yet
-            c["poke"].append((n, rest))
+        elif kw == "at":
+            # `at <frame> poke <directive> <args...>` (state injection, q-tool-poke):
+            # kept verbatim, passed to both sides once they take --poke
+            if len(toks) < 3 or toks[1] != "poke":
+                raise CheckError(f"line {n}: at <frame> poke <directive> <args...>")
+            c["poke"].append((n, num(toks[0], 0, 1_000_000), " ".join(toks[2:])))
         else:
             raise CheckError(f"line {n}: unknown keyword '{kw}'")
     for req in ("name", "save", "seed", "ticks"):
@@ -287,6 +290,7 @@ channels state draws
 draws-at 13
 input orig wait 1; end
 ignore fr
+at 5 poke pos @player 4880 4230
 """
 
 
@@ -297,6 +301,7 @@ def selftest():
     assert c["save_args"] == ["--class", "ama", "--expansion"] and c["seed"] == 1234
     assert c["channels"] == ["state", "draws"] and c["draws_at"] == 13
     assert c["input"] == {"orig": "wait 1; end"} and c["ignore"] == ["fr"]
+    assert c["poke"] == [(11, 5, "pos @player 4880 4230")]
     ok += 1
     bad = {
         "first line": GOOD.replace("check 1", "check 2"),
@@ -309,6 +314,7 @@ def selftest():
         "draws-at missing": GOOD.replace("draws-at 13\n", ""),
         "draws-at late": GOOD.replace("draws-at 13", "draws-at 99"),
         "input side": GOOD.replace("input orig", "input both"),
+        "poke": GOOD + "at 5 spawn 1 2 3\n",
         "name": GOOD.replace("name a1-town-arrival-ama", "name A_B"),
     }
     for what, text in bad.items():
@@ -371,6 +377,9 @@ def main(argv=None):
             {"orig"} if a.d2rs_only else set())
         if c["poke"]:
             print(f"note: {len(c['poke'])} poke line(s) not run (state injection not wired yet)")
+            pending_poke = True
+        else:
+            pending_poke = False
         save = r.build_save()
         codes = {}
         for ch in c["channels"]:
@@ -381,6 +390,8 @@ def main(argv=None):
                 codes[ch] = r.draws(save, sides)
             else:
                 codes[ch] = r.not_available(ch)
+        if pending_poke:
+            codes["poke"] = 2  # the run is not the check as written: partial at best
     except (CheckError, OSError, subprocess.TimeoutExpired) as e:
         print(f"error: {e}", file=sys.stderr)
         return 3
