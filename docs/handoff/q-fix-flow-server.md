@@ -46,3 +46,19 @@ without the pass's item steps 1–7), REC-292 (the join's 0x8D party word).
   load's 0xB4): `q-fix-flow-join-load` row's other half, not done here.
 - The host unit work runs after the whole timer queue, not inside the
   event that raised it (d2rs-own order within step 4).
+
+## Real-data run (M23)
+
+Install from the private repo (`9710830`, `tools/cloud-game/fetch.sh`,
+23 files, 0 mismatches), `D2_GAME_DIR=/root/game`, debug build:
+`cargo nextest run -p d2-client --test app_single_player --test
+smoke_frontend --run-ignored ignored-only` on this branch's tests:
+
+| Test | Result |
+|---|---|
+| `app_single_player::the_first_tick_sends_the_stats_in_the_client_pass_before_0x04` | pass |
+| `app_single_player::a_death_reaches_the_client_pass_of_its_tick` | pass |
+| `app_single_player::an_act_change_goes_through_state_5_and_the_client_pass_sends_0x04` | pass |
+| `smoke_frontend::the_esc_menu_pauses_the_single_player_game` | pass |
+| `smoke_frontend::esc_options_save_and_exit_then_reload_the_character` (Save and Exit from the Esc menu with the pause in) | pass |
+| `app_single_player::the_session_flow_creates_the_game_then_loads_the_character_at_the_join` | fails on its 0x23 count (3: the real `StartSkill` 0x23; the test expects the synthetic 2): q-fixture-migrate's known G4, not this branch. Its tail check passes: the real join's frame 2 ends `… 1D 1D 1D 1D 1E 1E 1E 1D 48 04 48 5B 65 8D 5A`, the recorded order of `intents-events.md` §8.3 |
