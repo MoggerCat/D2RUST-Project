@@ -137,12 +137,10 @@ pub fn apply_property<S: ItemStats>(
         return;
     }
     if item.format < 1 && ctx.mode != mode::RUNEWORD {
-        // §14: n is the wrapper's sixth argument, 0 for affixes (§12.1 of
-        // `affixes.md`), §11 and §12.
-        // PROVISIONAL (M22; REC-289): the other callers' value is not in
-        // the spec; 0 here too. Craft lists (mode 7) take this path as
-        // §14 names §12 among the wrapper's callers (§2 says mode 7 calls
-        // the dispatcher directly; `pc1-data.md` Step 4 item 12).
+        // §14: n is the wrapper's sixth argument, 0 for every caller
+        // (`properties.md` §2 "Apply type"). Craft lists (mode 7) take
+        // this path too (§2: mode 7 goes through the wrapper).
+        // Settled by specs/items/properties.md §2.
         if let Err(e) = super::props_legacy::apply(t, item, ctx, rec, 0) {
             item.fatal = Some(e);
         }
