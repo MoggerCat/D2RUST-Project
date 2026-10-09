@@ -163,9 +163,13 @@ def run(args):
     if b.returncode != 0:
         print(f"realdata: BUILD FAILED (build {t1 - t0:.0f}s): every baseline pass counts as a new failure")
         return None, (t1 - t0, 0.0), "build"
-    junit = os.path.join(args.target_dir, "nextest", "coord", "junit.xml")
-    if os.path.exists(junit):
-        os.remove(junit)
+    # nextest keeps its store under the workspace target dir or CARGO_TARGET_DIR,
+    # depending on version: look in both
+    junits = [os.path.join(d, "nextest", "coord", "junit.xml")
+              for d in (args.target_dir, os.path.join(REPO, "target"))]
+    for j in junits:
+        if os.path.exists(j):
+            os.remove(j)
     cmd = (["cargo", "nextest", "run"] + common + ["--run-ignored", "only", "--no-fail-fast", "--no-tests=pass",
            "--config-file", cfg, "--profile", "coord", "--color", "never", "--status-level", "fail",
            "--final-status-level", "fail", "--hide-progress-bar"]
@@ -174,7 +178,8 @@ def run(args):
         print("+", " ".join(cmd))
     r = subprocess.run(cmd, cwd=REPO, env=env)
     t2 = time.monotonic()
-    if not os.path.exists(junit):
+    junit = next((j for j in junits if os.path.exists(j)), None)
+    if junit is None:
         print(f"realdata: nextest wrote no JUnit (exit {r.returncode})")
         return None, (t1 - t0, t2 - t1), "run"
     return parse_junit(junit), (t1 - t0, t2 - t1), None
