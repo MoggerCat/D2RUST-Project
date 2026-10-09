@@ -1,0 +1,11 @@
+check 1
+# Level travel inside act 1 (the waypoint's effect, world/waypoints.md §7 r5):
+# ScnAma in the Rogue Encampment, warped to the Cold Plains (level 3) at
+# frame 10 by the warp poke, then idle; state channel.
+name warp-cold-plains-ama
+save ScnAma --class ama --expansion
+seed 1234
+ticks 60
+seconds 240
+channels state
+at 10 poke warp 3

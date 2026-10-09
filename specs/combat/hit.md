@@ -25,13 +25,13 @@
 |   4. Melee result flags | 195–219 |
 |   5. Block chance | 220–242 |
 |   6. Block, weapon block, dodge, avoid, evade | 243–300 |
-|   7. Hostility and melee range | 301–370 |
-| Constants & data dependencies | 371–387 |
-| Randomness | 388–399 |
-| Edge cases & original bugs | 400–420 |
-| Test vectors | 421–445 |
-| Provenance | 446–471 |
-| Open questions | 472–493 |
+|   7. Hostility and melee range | 301–389 |
+| Constants & data dependencies | 390–406 |
+| Randomness | 407–418 |
+| Edge cases & original bugs | 419–439 |
+| Test vectors | 440–464 |
+| Provenance | 465–490 |
+| Open questions | 491–512 |
 <!-- /index -->
 
 ## Summary
@@ -331,9 +331,28 @@ character load of the join, before its add messages: its first 0xAA
 already carries the list (`sim/intents-events.md` §7.9 rule 1, recorded
 `-022633` seq 103 and `traces/checks/packets-town-arrival-ama.check`
 seq 39), and the next frame sends 0xA8 of state 105 (the setter's
-"resend", §3.5 rule 6 `0x0055448A`). The call site inside the load is
-not identified (`docs/handoff/pc1-data.md` Step 4); d2rs sets it right
-after the player's unit seed (PROVISIONAL, REC-732).
+"resend", §3.5 rule 6 `0x0055448A`). Call site (2026-10-09, read from
+the asm; settles REC-732): the unit allocation `0x00555230` runs the
+player-unit init `0x005348C0` (at `0x00555374`, type 0 only), whose
+last call is `0x005543B0(P, 2, 1)` (`0x0053495A`: ECX = P, DL = 2,
+push 1). So it runs at the player's allocation inside the load's header
+read, before the load's seed step (`sim/units.md` §3.1 r4.1) and before
+the add messages; it draws nothing. `0x005543B0(U, v, f)`: v > 2 →
+fatal; for any v when U's class is 351–353, or v ≠ 0, or `0x00451F30`
+= 0: U's state-105 list (`0x006256B0(U, 0x69)`); none → a new list
+(`0x006251F0`, state 0x69 `0x006252D0`, attached `0x00626E10(U, list,
+1)`) and state 105 on (`0x00639DB0`, which also sets the changed bit);
+else stat 172 cleared in it (`0x00625D00`); then stat 172 := v
+(`0x00627150`); the "resend" `0x00639E30(U, 0x69, 1)` (changed bit,
+unit queued); then `0x00554340(f)`. The changed bit is cleared only by
+the room clean-up `0x00553220` after a tick's sends
+(`sim/intents-events.md` §3.5 rule 6); the loaded player is in no room
+until game entry, so the bit survives to the first tick with the player
+in a room (frame 2), whose update sends the 0xA8
+(`a8 00 01000000 0b 69 ac fc 0f`, the s2c record #66 of frame 2 in
+`traces/checks/packets-town-arrival-ama.check`, run 2026-10-09 on
+Windows). d2rs sets the list after the seed (no draw, so equal) but
+sends no 0xA8 at frame 2: row `q-fix-p5-alignment-resend`.
 
 #### 7.2 In melee range `0x00622C40(a, b, extra)`
 

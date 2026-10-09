@@ -11,6 +11,9 @@
 //!                        (pokes, specs/tools/poke.md §5: F is the absolute
 //!                        server frame; file ticks are relative to the join)
 //!   d2-client facts-compare ORIGINAL_DIR D2RS_DIR [--ignore COL,...]
+//!   d2-client autoplay-host (--save FILE.d2s | --new CLASS NAME) [--seed N] [--difficulty D] [--game-dir DIR]
+//!                        (the headless play client on a stdin/stdout line protocol,
+//!                        specs/tools/autoplay.md; tools/autoplay/ drives it)
 //!   d2-client state-dump --save FILE.d2s [--seed N] [--difficulty D] --ticks T [--every n] --out FILE [--game-dir DIR] [--date YYYY-MM-DD] [--poke "F DIRECTIVE ARGS"]... [--send "F NAME FIELD=VALUE..." | --send "F hex BYTES..."]... [--input SCRIPT] [--packets FILE]
 //!
 //! `play` (the default) opens a window running the local single-player game: the
@@ -736,13 +739,14 @@ fn run() -> Result<()> {
     match args.first().map(String::as_str) {
         Some("facts-compare") => std::process::exit(facts_compare(&args[1..])),
         Some("state-dump") => state_dump(&args[1..]),
+        Some("autoplay-host") => d2_client::app::autoplay_host::serve(&args[1..]),
         Some("cpu-render") => cpu_render(parse_options(&args[1..])?),
         Some("verify") => verify(parse_options(&args[1..])?),
         Some("play") | None => play(parse_options(args.get(1..).unwrap_or(&[]))?),
         Some("view") => view(parse_options(&args[1..])?),
         // Proves the crash log (`launch`, windows-build.yml smoke step).
         Some("crash-test") => panic!("crash-test: a deliberate panic to check d2rs-crash.log"),
-        _ => bail!("usage: d2-client [view|verify|cpu-render|play|facts-compare|state-dump] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq] [--game-dir DIR] [--dump-draws DIR [--at-tick N[,M...]] [--dump-image]] [--res 800x600|640x480] [--input SCRIPT] [--poke \"F DIRECTIVE ARGS\"]... [--poke-file FILE]"),
+        _ => bail!("usage: d2-client [view|verify|cpu-render|play|facts-compare|state-dump|autoplay-host] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq] [--game-dir DIR] [--dump-draws DIR [--at-tick N[,M...]] [--dump-image]] [--res 800x600|640x480] [--input SCRIPT] [--poke \"F DIRECTIVE ARGS\"]... [--poke-file FILE]"),
     }
 }
 
