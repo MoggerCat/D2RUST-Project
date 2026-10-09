@@ -1,0 +1,13 @@
+# owners 1 — area -> session -> branch, for tools/coord/route.py (longest path prefix wins).
+# Seeded 2026-10-09 from docs/handoff/overnight-loop.md "Day run" (session names; ids from the
+# coordinator). Keep it current: the coordinator edits it when sessions start or finish.
+area	paths	session	branch
+rng-order	specs/sim/rng.md,specs/sim/unit-order.md,crates/d2-sim/src/rng	q-fix-real-unit-seed-order	claude/q-fix-real-unit-seed-order
+render-scenes	specs/render/,specs/client/render-pipeline.md,specs/tools/facts-render.md,crates/d2-client/src/render	q-scenes-compare	claude/q-scenes-compare
+server-store	specs/world/vendors.md,specs/world/vendors-2.md,specs/world/vendors.tsv	q-fix-server-store-fill	claude/q-fix-server-store-fill
+client-missiles	specs/missiles/	q-fix-client-missiles-rest	claude/q-fix-client-missiles-rest
+combat-ai	specs/combat/,specs/monsters/,crates/d2-sim/src/combat,crates/d2-sim/src/monster	q-fix-pc1-combat	claude/q-fix-pc1-combat
+proto-items-quests	specs/items/,specs/world/quests,specs/sim/client-messages.tsv,specs/sim/server-messages.tsv,specs/sim/intents-events.md,crates/d2-proto/,crates/d2-sim/src/item	q-fix-pc1-proto-items	claude/q-fix-pc1-proto-items
+client-ui	specs/ui/,specs/client/,crates/d2-client/src/ui	q-fix-pc1-client-ui	claude/q-fix-pc1-client-ui
+state-diff-tools	specs/tools/state-snapshot.md,specs/tools/scenario-diff.md,specs/tools/packets-trace.md,specs/tools/rng-trace.md,tools/scenario-diff/,tools/trace-recorder/	q-tool-state-diff	claude/q-tool-state-diff
+poke	specs/tools/poke.md	q-tool-poke	claude/q-tool-poke
