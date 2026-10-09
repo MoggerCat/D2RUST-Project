@@ -26,15 +26,15 @@
 |   2. `draws.tsv` | 90–136 |
 |   3. `frame.tsv` | 137–169 |
 |   4. `sprites.tsv` | 170–189 |
-|   5. d2rs export | 190–327 |
-|   6. Comparison | 328–377 |
-|   7. Requests | 378–389 |
-| Constants & data dependencies | 390–393 |
-| Randomness | 394–397 |
-| Edge cases & original bugs | 398–405 |
-| Test vectors | 406–414 |
-| Provenance | 415–419 |
-| Open questions | 420–434 |
+|   5. d2rs export | 190–338 |
+|   6. Comparison | 339–388 |
+|   7. Requests | 389–400 |
+| Constants & data dependencies | 401–404 |
+| Randomness | 405–408 |
+| Edge cases & original bugs | 409–416 |
+| Test vectors | 417–425 |
+| Provenance | 426–430 |
+| Open questions | 431–445 |
 <!-- /index -->
 
 ## Summary
@@ -324,6 +324,17 @@ composition, through `d2-client` only (game logic untouched).
    automap cels export as `CelDraw`), else `CelDraw` (revision
    2026-10-09, measured: the wrapper names of the recorded scenes'
    `ui/`, `font`, `spells` and `automap` cels). World cels keep r3.
+19. `--at-tick N,M,...` (strictly increasing) dumps several frames in
+   one run, each the first drawn frame at or after its tick (r13), into
+   `DIR/tick-<N>`; one tick keeps `DIR` itself. `--dump-image` also
+   writes the composed index frame of r8 as `frame.png`: an 8-bit
+   palettized PNG, the index bytes as they are, the frame palette as
+   `PLTE` (the form of `record_frames.py`'s captures), so a pixel view
+   compares indices, not converted colours. The image is rendered game
+   art: it is written only where the caller points `DIR`
+   (`tools/sidebyside/build.py` points it outside the repository,
+   CLAUDE.md rule 1), never under `facts/` (revision 2026-10-09,
+   q-tool-side-by-side).
 
 ### 6. Comparison
 
