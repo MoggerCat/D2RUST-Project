@@ -92,3 +92,31 @@ points), path target = its position.
   there is no d2rs difference to row yet.
 - No `[play-act3]` / `[play-act5]` / `[prov-*]` / `[store-fill]` items had
   arrived by the last staging pull.
+
+## Round 2 — items 42–44 (rendering session's items, numbered 41–43 on `claude/q-scenes-compare`)
+
+- **42 Help button.** `0x004A64C0` is not the help button. It is the
+  new-stats / new-skills sync: it opens and closes states 6 and 7 from
+  stats 4 and 5 while panels 2 and 4 are closed, and does nothing while
+  0x0B is open (`ui/control-panel.md` §8 r6).
+  - The help button is state 0x22, drawn by `0x00495180`, with press
+    `0x004952B0` and release `0x00495320` (new §11).
+  - Opened at every game entry by `0x00456970`. On its first pass it
+    closes itself when the registry value `Help Menu` ≠ 0. There is no
+    level or first-game test.
+  - The positions reproduce the scene's (714, 403), (725, 440) and
+    (728, 436).
+  - d2rs differs: `q-fix-p6-levelup-sync`, `q-fix-p6-help-button`.
+- **43 Mini panel at entry (REC-519 settled).** Opened by `0x00456970` →
+  `0x004567F0` unless the registry value `Mini Panel` ≠ 0. That value is
+  written at game exit from the Esc-menu "was open" record
+  (`ui/control-panel.md` §9 r9). d2rs differs: `q-fix-p6-minipanel-entry`.
+- **44 Shadow pre-test (REC-511, REC-518 settled).** `0x00471620` calls
+  `0x004709A0(U, X, Y, 0, 1)`. The last argument moves only the left
+  bound, and the y bounds are the whole COF box, not sheared rows
+  (`render/blend-modes.md` §5 r3, r3a). The object branch adds only the
+  offsets; the `BlocksLight` gate is unit flag +0xC4 0x20.
+  - REC-518: d2rs matches.
+  - REC-511: d2rs differs, `q-fix-p6-shadow-pretest`.
+  - Side note: `render/unit-composite.md` §4 and `client/model.md` §13 r2
+    call the fourth argument "centering off". It is never read.
