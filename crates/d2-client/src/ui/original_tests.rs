@@ -1307,6 +1307,8 @@ fn ui_with_fonts(w: &ClientWorld) -> Ui {
     u
 }
 
+// 1.14d sends the same three messages for a Shift click on Vitality with
+// 70 points (recorded 2026-10-09 under Wine, `record_packets.py`; REC-268).
 // Covers: specs/ui/panels-2.md §17 r2; specs/ui/panels.md §8 r5
 #[test]
 fn a_stat_button_spends_one_point_and_shift_spends_all_in_chunks_of_32() {

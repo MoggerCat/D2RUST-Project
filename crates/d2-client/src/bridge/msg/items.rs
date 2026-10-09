@@ -82,8 +82,8 @@ pub fn update_item_stats(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), H
         // item's flag-0x40 list entry keyed by the layer. PROVISIONAL
         // (client/msg-stats-items.md OQ 3): the model holds no item stat
         // lists (they come from the item stream), so nothing is written;
-        // settled by a Ghidra read of 0x0062E410 plus a join / trade
-        // packet recording with items (HIGH-PRIORITY CAPTURE).
+        // OQ 3 is answered (2026-10-08, the save-0 record peek): writing
+        // it is queued as `q-fix-client-item-oq3`.
         return Ok(());
     }
     // Rule 1.2.

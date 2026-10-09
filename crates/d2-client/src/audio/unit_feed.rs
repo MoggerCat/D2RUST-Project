@@ -25,8 +25,11 @@
 //!   animation). The pass starts f at 0 on every mode change and adds the
 //!   `AnimData` speed per client update, wrapping at the frame count F
 //!   (frames × 256), for the animation `<token><mode><weapon class>` of
-//!   the unit's COF. Settles: a recording of +0x44 / +0x48 / +0x4C per
-//!   update of a walking monster (`client/audio.md` §B7 hook).
+//!   the unit's COF. Recorded 2026-10-09
+//!   (`facts/client/anim/a1-town-walk-ama.tsv`): f := 0 at a mode change
+//!   and the wrap are right; the speed is the `sim/units.md` §4.7 rate,
+//!   a player's footstep reads f before the advance and a monster first
+//!   seen starts at rnd(F): fix queued as `q-fix-client-anim-rate`.
 //! - **REC-431** (floor material k): the DT1 tile flags under the unit
 //!   need the client room tile lists; k is the `soundenviron` `Material
 //!   1` default (`footstep_material`, `Floor::NotFound`). Settles: a

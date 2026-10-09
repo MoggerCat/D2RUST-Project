@@ -9,7 +9,10 @@
 //! knows the plain weapon-physical `descdam` entries and the
 //! attack-rating `descatt` entries 1 and 2, from the unit's stats
 //! (min / max damage with the percent bonuses; attack rating with the
-//! to-hit percent); other entries draw the skill name only.
+//! to-hit percent); other entries draw the skill name only. The
+//! recorded 1.14d values differ (`facts/client/ui/char-panel-ama-*.tsv`:
+//! `1-2` / 95 unarmed at level 1): fix queued as `q-fix-char-damage-block`
+//! (`skills/descriptions.md` §2–§4).
 
 use std::collections::{BTreeMap, BTreeSet};
 
