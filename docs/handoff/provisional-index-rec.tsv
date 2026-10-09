@@ -325,7 +325,7 @@ REC-790	6733		Act V removals on the wired host (PROVISIONAL, `d2-sim` `wiring/ec
 REC-791	6734		Nihlathak killed in town (PROVISIONAL, `quest_host.rs` `kill_in_town`, M22): `0x00589340` 	unstated	no		1	
 REC-792	6735		Scroll of Resistance stat send (PROVISIONAL, `quest_host.rs` `add_resist_list`, M22): the 	unstated	no		1	
 REC-793	6736		Baal's gold piles (PROVISIONAL, `quest_host.rs` `drop_gold_amount`, `quest_reward.rs` `Que	unstated	no		2	
-REC-795	6737		The Ancients' chain-35 link (PROVISIONAL, `d2-server` `wired/quest_events.rs`, M22; q-play	binary	no		1	
+REC-795	6737		The Ancients' chain-35 link (PROVISIONAL, `d2-server` `wired/quest_events.rs`, M22; q-play	binary	no		0	
 REC-796	6738		Tyrael's spawn after the tick (PROVISIONAL, `d2-sim` `wiring/action/missiles.rs` `spawn_ty	unstated	no		0	
 REC-797	6739		The player's act byte at the join (PROVISIONAL, `d2-server` `adapters/session.rs`, M22): u	recording	no		1	
 REC-798	6740		*settled 2026-10-09 (q-play-act5)*: quest monster spawns `0x005B2F20` now run population's	recording	no		0	
