@@ -199,6 +199,34 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     Blood Moor monsters at night; Den of Evil. Record with
     `tools/trace-recorder/record_frames.py` and `facts_render.py` as in
     Step 3, each twice, and commit the facts.
+21. **Owner of a unit, for the state snapshot** (`specs/tools/state-snapshot.md`
+    §2 `own`, OQ 1; q-tool-state-diff): where 1.14d keeps the owner GUID
+    of a pet / summon / hireling, a missile and an item (its container or
+    holder), as offsets read from a server unit, so `record_state.py` can
+    fill `own`. Write the answer into `sim/units.md` (or the owner spec)
+    and the §2 row of `state-snapshot.md`.
+
+## How to check a behaviour in one command
+
+A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)
+names the save, seed, ticks and input. One command builds the save with
+`d2s-tool`, runs 1.14d with the recorders and d2rs with the same save and
+seed, and prints the first difference per channel (game state first):
+
+```
+py tools/scenario-diff/scenario_diff.py traces/checks/a1-town-arrival-ama.check
+py tools/scenario-diff/scenario_diff.py <check> --orig-only        # only record 1.14d
+py tools/scenario-diff/scenario_diff.py <check> --reuse            # re-compare what is in the work dir
+```
+
+On PC 1 the recorders run with `py` directly (no Wine); the 1.14d save is
+copied to `%USERPROFILE%\Saved Games\Diablo II` (`D2_SAVE_DIR` overrides).
+The state channel's report starts with `FIRST DIVERGENCE: frame N <unit>
+field K: 1.14d A vs d2rs B`, then the next 20, then the first frame per
+field; read the state report before any draw list. Two snapshot files
+compare alone with `py tools/trace-recorder/state_diff.py ORIG D2RS`.
+For a new behaviour, add a `.check` file (copy `a1-town-arrival-ama.check`)
+rather than a hand-run recipe.
 
 ## Step 5 — spec gaps (107 provisional points no spec states)
 
