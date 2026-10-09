@@ -1,0 +1,34 @@
+check 1
+# Quest 14 The Seven Tombs (s8.11): Jerhyn 430, kill Duriel (73) by poke, Tyrael 302, Jerhyn 442, Meshif 450.
+name a2-quest-tombs
+save ScnAm2 --class ama --expansion --act 1 --quests acts=1 --quests 13.0
+seed 1234
+ticks 228
+seconds 600
+channels state packets
+at 4 poke goto unit 1:201
+at 14 send InteractWithEntity type=1 id=@1:201
+at 16 send InitEntityChat id=@1:201
+at 18 send QuestMessage npc=@1:201 msg=430
+at 20 send TerminateEntityChat id=@1:201
+at 32 poke warp 73
+at 72 poke goto unit 1:211
+at 84 poke pos @1:211 @x+3 @y
+at 86 poke stat @1:211 6 0 256
+at 88 poke missile 58 @x @y @x+3 @y
+at 118 poke goto unit 1:251
+at 134 send InteractWithEntity type=1 id=@1:251
+at 136 send InitEntityChat id=@1:251
+at 138 send QuestMessage npc=@1:251 msg=302
+at 140 send TerminateEntityChat id=@1:251
+at 146 poke warp 40
+at 150 poke goto unit 1:201
+at 162 send InteractWithEntity type=1 id=@1:201
+at 164 send InitEntityChat id=@1:201
+at 166 send QuestMessage npc=@1:201 msg=442
+at 168 send TerminateEntityChat id=@1:201
+at 174 poke goto unit 1:210
+at 190 send InteractWithEntity type=1 id=@1:210
+at 192 send InitEntityChat id=@1:210
+at 194 send QuestMessage npc=@1:210 msg=450
+at 196 send TerminateEntityChat id=@1:210
