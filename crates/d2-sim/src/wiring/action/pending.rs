@@ -90,6 +90,15 @@ pub enum QuestEvent {
     BaalToStairs,
     /// Anya's AI asks for the temple portal (`0x0058BC80`, §6.7).
     AnyaOpenPortal { unit: UnitId },
+    /// The baalfx control missile asks for Tyrael (`0x0058E920` from
+    /// server-do 36 / server-hit 57, `quests-act5-2.md` §8.8), with the
+    /// missile's room and position at the call.
+    SpawnTyrael {
+        room: Option<RoomId>,
+        missile: UnitId,
+        x: i32,
+        y: i32,
+    },
     /// C→S 0x44 reached `0x005852E0` (`quests-act2-2.md` §3.2): `player`
     /// puts `item` (GUID, 0: none) into the object with GUID `object`
     /// (`action` 2 cancel, 3 insert).
@@ -1727,6 +1736,19 @@ pub trait Pending {
     /// `quests.md` §8.2: leaving the summit for 118 or 128), published by
     /// the quest control once per tick. Default: nothing.
     fn set_summit_open(&mut self, open: bool) {}
+    /// The not-intro test `0x005444B0(game, chain)` (`quests.md` §2.3:
+    /// no record with the chain → true, else its not-intro byte +0x09):
+    /// the quest control publishes its records' answers once per tick.
+    /// Default: false (no quest control).
+    fn quest_not_intro(&self, chain: u8) -> bool {
+        false
+    }
+    /// The quest control's not-intro bytes `(chain, not_intro)` of every
+    /// record (for [`Self::quest_not_intro`]). Default: nothing.
+    fn publish_not_intro(&mut self, records: &[(u8, bool)]) {}
+    /// `0x0058E920(game, room, missile)` from a missile body (Tyrael's
+    /// spawn, `quests-act5-2.md` §8.8). Default: nothing.
+    fn missile_spawn_tyrael(&mut self, room: Option<RoomId>, missile: UnitId, x: i32, y: i32) {}
     /// `0x00574EC0(game, player, 7, 0)`: the player's hireling (§9 rule
     /// 8; `hirelings.md` §5 rule 4; the wired host answers it from the
     /// hireling list). Default: none.

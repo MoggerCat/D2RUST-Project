@@ -191,7 +191,7 @@ impl Rig {
             .unwrap()
     }
 
-    fn send(&mut self, msg: &[u8]) {
+    pub fn send(&mut self, msg: &[u8]) {
         self.tap.record(msg);
         self.link
             .lock()
@@ -204,7 +204,7 @@ impl Rig {
         self.with(|sim, p| sim.events.action.sys.hooks.path_position(p))
     }
 
-    fn mode(&mut self) -> u32 {
+    pub fn mode(&mut self) -> u32 {
         self.with(|sim, p| sim.events.action.sys.units.get(p).map_or(0, |u| u.mode))
     }
 

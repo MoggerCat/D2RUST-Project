@@ -28,6 +28,9 @@ const MEPHISTO: u16 = d2_sim::world::quests::act3::npc::MEPHISTO;
 /// base id is the class here, as `quests-act4.md` §4).
 const DIABLO: u16 = 243;
 const HEPHASTO: u16 = d2_sim::world::quests::act4::q3::HEPHASTO_BASE;
+/// The three Ancients' classes (`monstats.txt` 540–542, `quests-act5-2.md`
+/// §7.6: superuniques 43–45 spawned by the statues).
+const ANCIENTS: std::ops::RangeInclusive<u16> = 540..=542;
 
 impl<R: TradeRest, S> WiredWorld<R, S> {
     /// Runs the queued quest events and the level changes since the last
@@ -45,6 +48,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
         let frame = game.frame;
         let mut lair = None;
         let mut summit = None;
+        let mut not_intro = Vec::new();
         self.desk(game, events, |desk, ctl, inv| {
             let ((), _) = quest_call(desk, ctl, inv, |q, w| {
                 for e in &queued {
@@ -66,6 +70,16 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                         QuestEvent::AncientsDisarm => act5::q5::disarm(q),
                         QuestEvent::BaalToStairs => act5::q6::chamber_open(q, w),
                         QuestEvent::AnyaOpenPortal { unit } => act5::q4::anya_ai_portal(q, w, unit),
+                        // REC-796: Tyrael's spawn from the baalfx missile,
+                        // at the missile's position of the call.
+                        QuestEvent::SpawnTyrael {
+                            room: Some(room),
+                            x,
+                            y,
+                            ..
+                        } => {
+                            act5::q6::spawn_tyrael_at(w, room, x, y);
+                        }
                         // C→S 0x44 (REC-167): the staff in the orifice.
                         QuestEvent::InsertItem {
                             player,
@@ -108,6 +122,13 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                             Some(HEPHASTO) => {
                                 q.add_link(w, victim, 24, None);
                             }
+                            // PROVISIONAL (REC-795, d2rs-own, unverified):
+                            // the Ancients reach A5Q5's kill "through their
+                            // superunique link" (`quests-act5-2.md` §7.6),
+                            // which no spec places; linked by class here.
+                            Some(c) if ANCIENTS.contains(&c) => {
+                                q.add_link(w, victim, 35, None);
+                            }
                             _ => {}
                         }
                         q.monster_killed(w, victim, killer);
@@ -124,6 +145,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 // only once the altar was used; the preview has no fight to
                 // open them with, so a fresh game stays passable.
                 summit = Some(act5::q5::summit_warp_open(q) || !act5::q5::altar_used(q));
+                not_intro = q.records.iter().map(|r| (r.chain, r.not_intro)).collect();
             });
         });
         if let Some(open) = lair {
@@ -131,6 +153,9 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
         }
         if let Some(open) = summit {
             events.action().sys.hooks.x.set_summit_open(open);
+        }
+        if !not_intro.is_empty() {
+            events.action().sys.hooks.x.publish_not_intro(&not_intro);
         }
     }
 }

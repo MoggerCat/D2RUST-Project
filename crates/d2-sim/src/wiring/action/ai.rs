@@ -18,6 +18,7 @@ use crate::rng::Seed;
 use crate::stats::stat;
 use crate::units::record::flags;
 use crate::units::{RoomId, UnitId};
+use crate::units::hooks::Sim;
 
 use super::objects::ObjectRoute;
 use super::units::clear_uninterruptable;
@@ -764,8 +765,21 @@ impl<X: Pending> AiActs for View<'_, X> {
     fn link_clone(&mut self, game: &mut Game, unit: UnitId, clone: UnitId) {
         self.h.x.ai_link_clone(game, unit, clone);
     }
+    /// `0x00574370` on the lent monster world (`init.md` §27); without
+    /// one, the host's answer.
     fn reinit_class(&mut self, game: &mut Game, unit: UnitId, class: i32, mode: u8) {
-        self.h.x.ai_reinit_class(game, unit, class, mode);
+        let mut sim = Sim {
+            game,
+            units: self.units,
+            stats: self.stats,
+            data: self.data,
+        };
+        let done = self
+            .h
+            .with_monster_world(|w, h| w.reinit(&mut sim, h, unit, class, u32::from(mode)));
+        if done.is_none() {
+            self.h.x.ai_reinit_class(sim.game, unit, class, mode);
+        }
     }
     fn change_class_list(&mut self, game: &mut Game, unit: UnitId, class: i32) {
         self.h.x.ai_change_class_list(game, unit, class);
@@ -785,8 +799,21 @@ impl<X: Pending> AiActs for View<'_, X> {
     fn wisp_find(&mut self, game: &mut Game, unit: UnitId) -> Vec<UnitId> {
         self.h.x.ai_wisp_find(game, unit)
     }
+    /// Wave `w` (0..=4) is superunique 61 + w (Baal Subject 1..5, the
+    /// table `0x006E3528`; hcIdx map `0x00586B30` = identity, as
+    /// `quests-act4.md` §5.4): its class from the drop tables'
+    /// `superuniques` row, the mapped id `0x00659B80(2, ·)` = row +
+    /// the `monstats` count (`quests-helpers.md` §2 r1). No drop tables
+    /// or row: the host's answer (`Pending::ai_wave`).
     fn wave(&self, w: i32) -> Option<(i32, i32)> {
-        self.h.x.ai_wave(w)
+        let row = 61 + w;
+        let found = (0..=4).contains(&w).then_some(()).and_then(|_| {
+            let d = self.h.object_drops.as_ref()?;
+            let su = d.tables.superuniques.get(row as usize)?;
+            let count = self.h.tables.combat.monstats.len() as i32;
+            Some((row + count, su.class as i32))
+        });
+        found.or_else(|| self.h.x.ai_wave(w))
     }
     fn clear_room_portal_flag(&mut self, game: &mut Game, room: Option<RoomId>) {
         self.h.x.ai_clear_room_portal_flag(game, room);

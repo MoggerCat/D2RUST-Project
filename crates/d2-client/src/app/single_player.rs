@@ -531,6 +531,10 @@ pub struct LocalSeams {
     /// The Arreat Summit warp check's answer (`Pending::set_summit_open`,
     /// q-act3-act5-gaps); the exits stay closed while it is `true`.
     pub summit_closed: bool,
+    /// The quest records' not-intro bytes by chain, published by the quest
+    /// control once per tick (`Pending::publish_not_intro`): the not-intro
+    /// test `0x005444B0` of population and the missile bodies.
+    pub not_intro: BTreeMap<u8, bool>,
     /// The players' hands and the facts of the items in them
     /// ([`super::weapons`], q-amazon).
     pub weapons: super::weapons::Weapons,
@@ -770,6 +774,27 @@ impl Pending for LocalSeams {
     }
     fn set_summit_open(&mut self, open: bool) {
         self.summit_closed = !open;
+    }
+    /// `0x005444B0` (`quests.md` §2.3): no record with the chain → true.
+    fn quest_not_intro(&self, chain: u8) -> bool {
+        self.not_intro.get(&chain).copied().unwrap_or(true)
+    }
+    fn publish_not_intro(&mut self, records: &[(u8, bool)]) {
+        self.not_intro = records.iter().copied().collect();
+    }
+    /// d2rs-own, unverified (REC-796): Tyrael's spawn runs on the quest
+    /// control after the tick, not inside the missile body.
+    fn missile_spawn_tyrael(
+        &mut self,
+        room: Option<d2_sim::units::RoomId>,
+        missile: UnitId, x: i32, y: i32) {
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::SpawnTyrael {
+                room,
+                missile,
+                x,
+                y,
+            });
     }
     fn set_lair_open(&mut self, open: bool) {
         self.lair_open = open;
@@ -1050,6 +1075,11 @@ impl Pending for LocalSeams {
 }
 
 impl WorldPending for LocalSeams {
+    /// `0x005444B0` (population's preset swaps, `population.md` §11.3):
+    /// the quest control's published answer.
+    fn quest_flag(&self, flag: u8) -> bool {
+        Pending::quest_not_intro(self, flag)
+    }
     /// A host-placed monster of a level's preset list
     /// ([`HOST_MONSTER_PRESET`]): Blood Raven carries chain 2 (`init.md`
     /// §14.3), as her boss mods link it when population creates her.
