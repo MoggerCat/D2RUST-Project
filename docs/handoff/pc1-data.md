@@ -8,11 +8,14 @@ our measurements (`facts/`, `traces/`). This loop **replaces**
 `pc1-autotest.md` and `pc1-loop.md` while it runs: stop any session
 running those.
 
-**One 1.14d at a time (user rule, 2026-10-09):** when several PC 1
-sessions run in parallel, exactly one of them (named in its prompt) runs
-1.14d (`Game.exe`, `poke.py`, `scenario_diff.py`'s 1.14d side,
-recordings); the others read the binary and list live runs under
-"Live runs for <that session>" in their hand-back file.
+**One `Game.exe` open at a time (user rule, 2026-10-09):** at most one
+1.14d `Game.exe` process may be open on PC 1 at any moment. Any PC 1
+session may run it (directly, through `poke.py`, `scenario_diff.py`'s
+1.14d side or a recorder), but only when none is open: check first
+(`tasklist | findstr /i game.exe`), hold the lock file
+`%TEMP%\d2-game.lock` (create it before starting, delete it once
+`Game.exe` has exited), and wait if the lock exists. Reading the binary
+(Ghidra, `re/`) is not limited.
 
 Effort: speed first, no token limit; stay within PC 1's hardware (one
 `Game.exe` at a time, one cargo build at a time, keep 15 GB disk free).
