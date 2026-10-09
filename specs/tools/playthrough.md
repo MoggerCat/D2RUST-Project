@@ -76,6 +76,18 @@ hide the ones after it.
    to the last one. `grid` goes row by row from the (−R, −R) corner,
    serpentine. A sweep exists because units only exist in active rooms
    near a player. A refused `pos` is expected and is not a blocker.
+5. **checkpoint** (2026-10-09). `checkpoint <name>` in a milestone
+   replaces `use <save>`: the save is built from
+   `traces/checkpoints/<name>.checkpoint` (`tools/checkpoints.md` §3),
+   the milestone's difficulty defaults to the checkpoint's, and the
+   checkpoint's start pokes run first, so they are `@p0`, `@p1`, … and
+   the milestone's own pokes follow. A milestone has exactly one of
+   `use` and `checkpoint`.
+6. **goto.** `goto <frame> unit [<type>:]<class>` or `goto <frame>
+   preset <level> [<type>:]<class>` is `poke <frame> goto …`
+   (`poke.md` §6): the walk to the target. Its record is written when
+   it lands (GUID = the target's, so `g @pI` names the target) or fails
+   (a refused poke: `stuck`).
 
 ### 2. Predicates
 
@@ -170,4 +182,6 @@ install's tables with `mpq-tool extract`.
    walks instead of interacting (`scenario-diff.md` Open question 4).
    Until an NPC-interaction input or poke exists they are expected
    blockers whose evidence is the quest bit still clear.
-4. Acts II–V objective files are not written yet.
+4. Acts II–V objective files are written (`act2.play` … `act5.play`);
+   `act4-forge.play` (2026-10-09) starts every milestone from the
+   `a4-hellforge` checkpoint.

@@ -133,6 +133,20 @@ UMOD_MAX = 9                     # umod list length (monsters/init.md §25.3 rul
 ITEM_MODE_GROUND = 3             # request spawn mode 3 = ground (items/generation.md Inputs)
 ITEM_INIT_FLAGS = 1              # request init flags 1 (world/objects-2.md §20.7 rule 3)
 ITEM_ILVL_DEFAULT = 1            # `item` without ilvl: 1, as d2rs' request (d2-sim::poke)
+# `goto` (poke.md §6): the walk's room records
+GOTO_MAX_STEPS = 400             # steps after which the walk ends failed (§6 rule 3.4)
+GOTO_EXACT, GOTO_ALT = 0, 0      # 0x00554EA0 exact 0: the free-point search, mask 0x1C09 (path-placement.md §10 r3)
+AR_DRLG = 0x10                   # active room +0x10 -> DRLG room (drlg/rooms.md §1; tools/state-snapshot.md §2 `lv`)
+AR_SUB = 0x4C                    # active room +0x4C sub-tile x, y, w, h (u32 each; sim/pathing.md §13.3)
+AR_COLL = 0x20                   # active room +0x20 collision record (drlg/rooms.md §10.3, Open question 11)
+CR_X, CR_Y, CR_W, CR_H, CR_MASKS = 0x00, 0x04, 0x08, 0x0C, 0x20  # record x0, y0, w, h, u16 masks
+#                                  (drlg/rooms.md §10.3; items/treasure.md §8: index (y-y0)*w + (x-x0))
+PLAYER_MOVE = 0x1C09             # the player's move mask (sim/path-placement.md §3)
+DR_NEAR, DR_NEAR_N = 0x08, 0x2C  # DRLG room near array, its count (drlg/rooms.md §1)
+DR_ACTIVE = 0x30                 # DRLG room +0x30 active room, 0 = none (drlg/rooms.md §1)
+DR_TX, DR_TY = 0x34, 0x38        # DRLG room tile x, y (drlg/rooms.md §1)
+DR_LEVEL, L_ID = 0x58, 0x1D0     # DRLG room +0x58 level -> +0x1D0 level id (drlg/rooms.md §1; drlg/levels.md)
+SP_ROOM, SP_X, SP_Y = 0x00, 0x0C, 0x10  # static path: room, u32 x, y (tools/state-snapshot.md §2)
 ITEM_REQ_SIZE = 0x84             # D2ItemDropStrc (items/generation.md Inputs)
 ITEM_REQUEST = {                 # field -> (offset, width) (items/generation.md Inputs table)
     "unit": (0x00, 4), "game": (0x08, 4), "ilvl": (0x0C, 4), "item": (0x14, 4),
@@ -498,6 +512,8 @@ def needs(d, a):
         return room + [POS_VIA], []
     if d == "warp":
         return ["warp"], []
+    if d == "goto":
+        return (["warp"] if a["level"] is not None else []) + ["place"], []
     if d == "item":
         return room + ["item_create"], ["item_format", "items_header", "item_record_size",
                                          "item_code"]
@@ -561,6 +577,8 @@ def parse_directive(toks, line):
     d, rest = toks[0], toks[1:]
     if d == "spawn":
         return d, _parse_spawn(rest, line)
+    if d == "goto":
+        return d, _parse_goto(rest, line)
     if d not in POSITIONAL:
         raise PokeError(line, f"unknown directive {d!r}")
     pos = POSITIONAL[d]
@@ -584,6 +602,19 @@ def parse_directive(toks, line):
     if d == "object":
         args.setdefault("mode", 0)  # default mode 0 (poke.md §1)
     return d, args
+
+
+def _parse_goto(rest, line):
+    """goto unit [<type>:]<class> | goto preset <level> [<type>:]<class> (poke.md §1, §6)."""
+    if len(rest) == 2 and rest[0] == "unit":
+        level, tok = None, rest[1]
+    elif len(rest) == 3 and rest[0] == "preset":
+        level, tok = parse_num(rest[1], 0, 0xFFFF, line, "goto level"), rest[2]
+    else:
+        raise PokeError(line, "goto unit [<type>:]<class> | goto preset <level> [<type>:]<class>")
+    ty, _, cl = tok.rpartition(":")
+    return {"level": level, "type": parse_num(ty, 1, 2, line, "goto unit type (1 monster, 2 object)") if ty else 1,
+            "class": parse_num(cl, 0, 0xFFFF, line, "goto class")}
 
 
 def _parse_spawn(rest, line):
@@ -686,6 +717,9 @@ def _fmt(v):
 def canonical(d, args):
     """Canonical text of a directive (poke.md §3 rule 2): numbers decimal,
     optional arguments in the table order."""
+    if d == "goto":
+        t = f"{args['type']}:{args['class']}"
+        return f"goto unit {t}" if args["level"] is None else f"goto preset {args['level']} {t}"
     if d == "spawn":
         s = f"spawn {args['class']} {_fmt(args['x'])} {_fmt(args['y'])} {args['kind']}"
         return s + ("" if not args["umods"] else " umod " + " ".join(map(str, args["umods"])))
@@ -792,6 +826,93 @@ def player_pos(mem, unit):
     if not path:
         return None
     return u16(mem, path + P_X), u16(mem, path + P_Y), mem.read_u32(path + P_ROOM)
+
+
+def unit_room_pos(mem, unit):
+    """(room, x, y) of any unit: dynamic path for types 0, 1, 3, static path
+    otherwise (tools/state-snapshot.md §2), or None without a path."""
+    path = mem.read_u32(unit + U_PATH)
+    if not path:
+        return None
+    if mem.read_u32(unit + U_TYPE) in DYNAMIC_PATH_TYPES:
+        return mem.read_u32(path + P_ROOM), u16(mem, path + P_X), u16(mem, path + P_Y)
+    return mem.read_u32(path + SP_ROOM), mem.read_u32(path + SP_X), mem.read_u32(path + SP_Y)
+
+
+def drlg_level(mem, dr):
+    """Level id of a DRLG room (+0x58 level, +0x1D0 id), or None."""
+    lv = mem.read_u32(dr + DR_LEVEL) if dr else 0
+    return mem.read_u32(lv + L_ID) if lv else None
+
+
+def room_level(mem, room):
+    """Level id of an active room, or None."""
+    return drlg_level(mem, mem.read_u32(room + AR_DRLG)) if room else None
+
+
+def drlg_near(mem, dr):
+    """The DRLG rooms of dr's near array, in stored order."""
+    arr, n = mem.read_u32(dr + DR_NEAR), mem.read_u32(dr + DR_NEAR_N)
+    return [mem.read_u32(arr + 4 * i) for i in range(min(n, 1024))] if arr else []
+
+
+def goto_hop(mem, dr, goal, seen, blocked=frozenset()):
+    """poke.md §6 rule 3.3: marks dr and its near rooms with an active room as
+    seen, then a breadth-first search over near arrays from dr for the first
+    room of level `goal` not seen, never entering a blocked room. Returns
+    (hop DRLG room, its key) or None."""
+    def key(r):
+        return (drlg_level(mem, r), struct.unpack("<i", mem.read(r + DR_TX, 4))[0],
+                struct.unpack("<i", mem.read(r + DR_TY, 4))[0])
+    seen.add(key(dr))
+    for n in drlg_near(mem, dr):
+        if mem.read_u32(n + DR_ACTIVE):
+            seen.add(key(n))
+    parent, queue, done = {}, [dr], {dr}
+    target = None
+    while queue:
+        r = queue.pop(0)
+        k = key(r)
+        if k[0] == goal and k not in seen:
+            target = r
+            break
+        for n in drlg_near(mem, r):
+            if n and n not in done and key(n) not in blocked:
+                done.add(n)
+                parent[n] = r
+                queue.append(n)
+    if target is None:
+        return None
+    h = target
+    while parent.get(h) not in (None, dr):
+        h = parent[h]
+    return h, key(h)
+
+
+def free_cell(mem, ar):
+    """poke.md §6 rule 3.3: the cell of active room `ar` whose collision mask has
+    none of PLAYER_MOVE, nearest the centre of its sub-tile rect (row by row from
+    the top-left, first found on a tie), or None."""
+    x, y, wd, ht = struct.unpack("<iiii", mem.read(ar + AR_SUB, 16))
+    cx, cy = x + wd // 2, y + ht // 2
+    rec_ = mem.read_u32(ar + AR_COLL)
+    if not rec_:
+        return None
+    x0, y0, cw, ch = struct.unpack("<iiii", mem.read(rec_ + CR_X, 16))
+    masks = mem.read_u32(rec_ + CR_MASKS)
+    if not masks or cw <= 0 or ch <= 0:
+        return None
+    grid = mem.read(masks, 2 * cw * ch)
+    best = None
+    for yy in range(y, y + ht):
+        for xx in range(x, x + wd):
+            if not (x0 <= xx < x0 + cw and y0 <= yy < y0 + ch):
+                continue
+            m = struct.unpack_from("<H", grid, 2 * ((yy - y0) * cw + (xx - x0)))[0]
+            d2 = (xx - cx) ** 2 + (yy - cy) ** 2
+            if not m & PLAYER_MOVE and (best is None or d2 < best[0]):
+                best = (d2, xx, yy)
+    return best[1:] if best else None
 
 
 class Unresolved(Exception):
@@ -903,6 +1024,7 @@ class PokeLayer:
         self.source = source            # (path, sha256) of the poke file
         self.scratch = None
         self.done = set()               # id(step)
+        self.walking = []               # (step, walk state) of goto walks still stepping (poke.md §6)
         self.results = []
         self.last_frame = None          # stop at which the last step ran
         self.vproc = None
@@ -937,7 +1059,13 @@ class PokeLayer:
         return cls(rel, absolute, getattr(a, "start_frame", None), src, forms, fields, fsrc)
 
     def pending(self):
-        return [s for s in self.abs + self.rel if id(s) not in self.done]
+        return [s for s in self.abs + self.rel if id(s) not in self.done] + [s for s, _ in self.walking]
+
+    def finish(self, rec, frame):
+        """End of run: each goto still walking is written failed (poke.md §6 rule 4)."""
+        for i, (s, w) in enumerate(self.walking):
+            self._emit(rec, s, frame, i, {"r": "failed", "note": "not finished", "steps": w["steps"]})
+        self.walking = []
 
     def header(self):
         return {"k": "poke_file", "path": self.source[0] if self.source else None,
@@ -1011,7 +1139,7 @@ class PokeLayer:
         for s in missed:
             self.done.add(id(s))
             res.append(self._emit(rec, s, frame, -1, {"r": "failed", "note": "stop already passed"}))
-        if due:
+        if due or self.walking:
             res += self.run_steps(rec, game, frame, tid, due)
         return res
 
@@ -1031,10 +1159,21 @@ class PokeLayer:
             raise rr.winerr("Wow64GetThreadContext")
         saved.Eip = TICK_RET  # rewound (original-hooks-spawn.md §5 rule 4)
         out = []
+        walking, self.walking = self.walking, []
+        items = walking + [(s, None) for s in steps]  # goto walks step first (poke.md §6)
         try:
-            for i, s in enumerate(steps):
+            for i, (s, w) in enumerate(items):
                 self.done.add(id(s))
-                out.append(self._emit(rec, s, frame, i, self.apply(rec, game, tid, saved, s)))
+                if s.d == "goto":
+                    w = w if w is not None else {"goal": None, "seen": set(), "blocked": set(), "steps": 0}
+                    r = self.apply(rec, game, tid, saved, s, w)
+                    if r.get("r") == "pending":
+                        self.walking.append((s, w))
+                        continue
+                    r["steps"] = w["steps"]
+                else:
+                    r = self.apply(rec, game, tid, saved, s)
+                out.append(self._emit(rec, s, frame, i, r))
         finally:
             # restore the saved context exactly (§5 rule 6); the recorder then
             # steps over the hooked instruction as for any INT3
@@ -1054,7 +1193,7 @@ class PokeLayer:
         return rec_
 
     # --- one directive ---------------------------------------------------
-    def apply(self, rec, game, tid, saved, s):
+    def apply(self, rec, game, tid, saved, s, walk=None):
         d, a = s.d, s.args
         fns, flds = missing(d, a, self.forms, self.fields)
         if fns or flds:  # poke.md §4 rules 7-8: a function without a form is not called
@@ -1067,7 +1206,11 @@ class PokeLayer:
             return {"r": "unresolved", "note": str(e)}
         r = {"args": args}
         try:
-            r.update(self._apply(rec, game, tid, saved, d, args, ptrs))
+            if d == "goto":
+                r.update(self._goto(rec, game, tid, saved, args, walk if walk is not None else
+                                    {"goal": None, "seen": set(), "blocked": set(), "steps": 0}))
+            else:
+                r.update(self._apply(rec, game, tid, saved, d, args, ptrs))
         except Unresolved as e:
             r.update({"r": "unresolved", "note": str(e)})
         except CallFault as e:
@@ -1103,6 +1246,52 @@ class PokeLayer:
                 raise Unresolved("no player room")
             from_room = p[2]
         return self.invoke(rec, tid, saved, "room_at", room=from_room, x=x, y=y)
+
+    def _goto(self, rec, game, tid, saved, a, w):
+        """One step of a goto walk (poke.md §6 rule 3); w is the walk state."""
+        w["steps"] += 1
+        if w["steps"] > GOTO_MAX_STEPS:
+            return {"r": "failed", "note": "step limit"}
+        pl = player_of(rec, game)
+        p = player_pos(rec, pl) if pl else None
+        if not p or not p[2]:
+            raise Unresolved("@player has no room")
+        here = room_level(rec, p[2])
+        if w["goal"] is None:
+            w["goal"] = a["level"] if a["level"] is not None else here
+        goal = w["goal"]
+        if w["steps"] == 1 and here != goal:  # rule 3.1: the warp, first step only
+            eax = self.invoke(rec, tid, saved, "warp", game=game, player=pl, level=goal, tile=0)
+            r = self._result(rec, "warp", eax)
+            return {"r": "pending"} if r["r"] == "ok" else dict(r, note="warp refused")
+        for guid, cls, u in units_of(rec, game, a["type"]):  # rule 3.2: ascending GUID
+            if cls != a["class"]:
+                continue
+            rp = unit_room_pos(rec, u)
+            if not rp or room_level(rec, rp[0]) != goal:
+                continue
+            eax = self.invoke(rec, tid, saved, "place", game=game, unit=pl, room=rp[0], x=rp[1], y=rp[2],
+                              exact=GOTO_EXACT, alt=GOTO_ALT)
+            return {"r": "ok", "guid": guid, "eax": f"{eax:#x}"} if eax else {"r": "failed", "eax": "0x0"}
+        hop = goto_hop(rec, rec.read_u32(p[2] + AR_DRLG), goal, w["seen"], w.setdefault("blocked", set()))
+        if hop is None:
+            return {"r": "failed", "note": f"explored, {len(w['seen'])} rooms seen"}
+        h, hkey = hop
+        ar = rec.read_u32(h + DR_ACTIVE)
+        if not ar:
+            return {"r": "failed", "note": "the next room has no active room"}
+        cell = free_cell(rec, ar)
+        if cell is None:  # no free cell in H: seen and blocked
+            w["seen"].add(hkey)
+            w["blocked"].add(hkey)
+            return {"r": "pending"}
+        placed = self.invoke(rec, tid, saved, "place", game=game, unit=pl, room=ar, x=cell[0],
+                             y=cell[1], exact=GOTO_EXACT, alt=GOTO_ALT)
+        now = player_pos(rec, pl)
+        if not placed or not now or now[2] != ar:  # refused, or landed outside H: seen and blocked
+            w["seen"].add(hkey)
+            w["blocked"].add(hkey)
+        return {"r": "pending"}
 
     def _item_index(self, rec, code):
         if code not in self.item_codes:
@@ -1406,6 +1595,8 @@ def main():
         r.run()
     except KeyboardInterrupt:
         print("interrupted; game terminated", file=sys.stderr)
+    if layer.walking:
+        layer.finish(r, layer.last_frame if layer.last_frame is not None else -1)
     for n in r.notes:
         print("note:", n)
     by = {}
@@ -1760,10 +1951,12 @@ def selftest(repo):
         else:
             sys.modules["record_tick"] = saved_rt
     n += selftest_forms(m, game, Rec)
+    n += selftest_goto(Rec)
     print(f"selftest ok: {len(files)} poke file(s), {n} checks (malformed lines, references, "
           "--poke lines, missile record bytes, call layouts with perturbation, fake-game "
           "resolution and scheduling, call forms: gaps, --forms loading, register/stack "
-          "layouts, item request bytes and umod list against a fake process, with perturbation)")
+          "layouts, item request bytes and umod list against a fake process, with perturbation, "
+          "goto walks on a fake DRLG)")
 
 
 # a filled-in forms file as PC 1 would write it (invented forms: the test checks
@@ -1976,6 +2169,195 @@ def selftest_forms(m, game, Rec):
         raise AssertionError("ebp accepted")
     except ValueError:
         n += 2
+    return n
+
+
+def selftest_goto(Rec):
+    """goto (poke.md §6) on a fake game: three DRLG rooms of level 5 in a row
+    (D0 - D1 - D2, near arrays), the player in D0's active room; the placement
+    moves the player, the warp puts it in D0."""
+    n = 0
+    G, P, PATH = 0x100000, 0x200000, 0x300000
+    D = [0x500000, 0x500100, 0x500200]       # DRLG rooms
+    A = [0x600000, 0x600100, 0x600200]       # their active rooms
+    LV5, LV1, D_TOWN, A_TOWN = 0x700000, 0x700400, 0x500300, 0x600300
+    MON, OBJ = 0x210000, 0x220000
+
+    def fake(active2=False, town=False):
+        r = Rec()
+        r.w32(LV5 + L_ID, 5)
+        r.w32(LV1 + L_ID, 1)
+        for i, (d, ar) in enumerate(zip(D + [D_TOWN], A + [A_TOWN])):
+            r.w32(d + DR_LEVEL, LV1 if d == D_TOWN else LV5)
+            r.w32(d + DR_TX, 8 * i)
+            r.w32(d + DR_TY, 0)
+            r.write(ar + AR_SUB, struct.pack("<iiii", 40 * i, 0, 40, 40))
+            r.w32(ar + AR_DRLG, d)
+            cr = 0x680000 + 0x10000 * i            # collision record, masks all 0 (free)
+            r.write(cr + CR_X, struct.pack("<iiii", 40 * i, 0, 40, 40))
+            r.w32(cr + CR_MASKS, cr + 0x100)
+            r.w32(ar + AR_COLL, cr)
+            r.w32(d + DR_ACTIVE, 0 if (d == D[2] and not active2) else ar)
+        near = {D[0]: [D[0], D[1]], D[1]: [D[0], D[1], D[2]], D[2]: [D[1], D[2]], D_TOWN: [D_TOWN]}
+        for k, (d, lst) in enumerate(near.items()):
+            arr = 0x580000 + 0x100 * k
+            for j, x in enumerate(lst):
+                r.w32(arr + 4 * j, x)
+            r.w32(d + DR_NEAR, arr)
+            r.w32(d + DR_NEAR_N, len(lst))
+        r.w32(P + U_TYPE, 0)
+        r.w32(P + U_GUID, 1)
+        r.w32(P + U_PATH, PATH)
+        r.w32(G + HASH_BASE + HASH_OFFSETS[0] + 4, P)
+        put_player(r, A_TOWN if town else A[0], 20, 20)
+        return r
+
+    def put_player(r, room, x, y):
+        r.w32(PATH + P_ROOM, room)
+        r.write(PATH + P_X, struct.pack("<H", x))
+        r.write(PATH + P_Y, struct.pack("<H", y))
+
+    def add_unit(r, u, t, guid, cls, room, x, y):
+        r.w32(u + U_TYPE, t)
+        r.w32(u + U_GUID, guid)
+        r.w32(u + U_CLASS, cls)
+        up = u + 0x1000
+        r.w32(u + U_PATH, up)
+        if t == 1:
+            r.w32(up + P_ROOM, room)
+            r.write(up + P_X, struct.pack("<H", x))
+            r.write(up + P_Y, struct.pack("<H", y))
+        else:
+            r.w32(up + SP_ROOM, room)
+            r.w32(up + SP_X, x)
+            r.w32(up + SP_Y, y)
+        head = G + HASH_BASE + HASH_OFFSETS[t] + 4 * (guid & 0x7F)
+        r.w32(u + U_HASH_NEXT, r.read_u32(head))
+        r.w32(head, u)
+
+    def layer(r, calls, place_ok=True):
+        lay = PokeLayer()
+
+        def call(rr_, tid, saved, entry, regs, stack):
+            calls.append((entry, dict(regs), list(stack)))
+            if entry == 0x00554EA0:            # place: ECX game, EDX unit; room, x, y, exact, alt
+                if place_ok:
+                    put_player(r, stack[0], stack[1], stack[2])
+                return 1 if place_ok else 0
+            if entry == 0x0053AEC0:            # warp: the player lands in D0
+                put_player(r, A[0], 20, 20)
+                return 1
+            return 0
+        lay.call = call
+        return lay
+
+    def step(lay, r, line, w):
+        d, args = parse_directive(line.split(), 1)
+        return lay.apply(r, G, 1, None, Step(d, args, 1), w)
+
+    def walk():
+        return {"goal": None, "seen": set(), "blocked": set(), "steps": 0}
+
+    # parse and canonical text
+    for text, want in (("goto unit 5", "goto unit 1:5"), ("goto preset 107 2:376", "goto preset 107 2:376"),
+                       ("goto preset 107 376", "goto preset 107 1:376")):
+        assert canonical(*parse_directive(text.split(), 1)) == want, text
+        n += 1
+    for bad in ("goto unit 3:5", "goto preset 2", "goto here 5", "goto unit 1:x", "goto unit", "goto preset x 5"):
+        try:
+            parse_directive(bad.split(), 1)
+            raise AssertionError(f"accepted {bad!r}")
+        except PokeError:
+            n += 1
+    # a. target in an active room: one step, placed at the target's point with exact 0
+    r, calls = fake(), []
+    add_unit(r, MON, 1, 0x40, 156, A[1], 55, 12)
+    w = walk()
+    res = step(layer(r, calls), r, "goto unit 156", w)
+    assert res["r"] == "ok" and res["guid"] == 0x40 and w["steps"] == 1, res
+    assert calls == [(0x00554EA0, {"ecx": G, "edx": P}, [A[1], 55, 12, 0, 0])], calls
+    n += 1
+    # an object target reads the static path; another class or level is not a target
+    r, calls = fake(), []
+    add_unit(r, OBJ, 2, 0x41, 376, A[0], 7, 9)
+    add_unit(r, MON, 1, 0x40, 376, A[1], 55, 12)
+    res = step(layer(r, calls), r, "goto unit 2:376", walk())
+    assert res["r"] == "ok" and res["guid"] == 0x41 and calls[0][2] == [A[0], 7, 9, 0, 0], (res, calls)
+    n += 1
+    # b. the walk: D2 not active yet -> hop into D1 (centre 60, 20), pending; then D2
+    # active with the target in it -> found
+    r, calls = fake(), []
+    lay, w = layer(r, calls), walk()
+    res = step(lay, r, "goto unit 156", w)
+    assert res["r"] == "pending" and calls == [(0x00554EA0, {"ecx": G, "edx": P}, [A[1], 60, 20, 0, 0])], (res, calls)
+    assert w["seen"] == {(5, 0, 0), (5, 8, 0)}, w["seen"]
+    r.w32(D[2] + DR_ACTIVE, A[2])
+    add_unit(r, MON, 1, 0x40, 156, A[2], 95, 30)
+    res = step(lay, r, "goto unit 156", w)
+    assert res["r"] == "ok" and res["guid"] == 0x40 and w["steps"] == 2, res
+    n += 2
+    # c. nothing anywhere: hop, then every room of the level seen -> failed "explored"
+    r, calls = fake(), []
+    lay, w = layer(r, calls), walk()
+    assert step(lay, r, "goto unit 156", w)["r"] == "pending"
+    r.w32(D[2] + DR_ACTIVE, A[2])
+    res = step(lay, r, "goto unit 156", w)
+    assert res["r"] == "failed" and "explored" in res["note"] and len(w["seen"]) == 3, (res, w)
+    n += 1
+    # a refused placement marks the hop room seen
+    r, calls = fake(), []
+    w = walk()
+    assert step(layer(r, calls, place_ok=False), r, "goto unit 156", w)["r"] == "pending"
+    assert (5, 16, 0) not in w["seen"] and len(w["seen"]) == 2
+    n += 1
+    # lava at D1's centre: the hop aims at D1's free cell nearest the centre
+    r, calls = fake(), []
+    cr1 = 0x690000
+    for yy in range(0, 40):
+        for xx in range(40, 80):
+            if abs(xx - 60) <= 3 and abs(yy - 20) <= 3 and (xx, yy) != (63, 23):
+                r.write(cr1 + 0x100 + 2 * (yy * 40 + xx - 40), struct.pack("<H", 0x0001))
+    assert free_cell(r, A[1]) == (60, 16), free_cell(r, A[1])
+    w = walk()
+    assert step(layer(r, calls), r, "goto unit 156", w)["r"] == "pending"
+    assert calls == [(0x00554EA0, {"ecx": G, "edx": P}, [A[1], 60, 16, 0, 0])], calls
+    # no free cell at all: H seen, no placement
+    r = fake()
+    for yy in range(0, 40):
+        for xx in range(40, 80):
+            r.write(cr1 + 0x100 + 2 * (yy * 40 + xx - 40), struct.pack("<H", 0x0400))
+    r2, calls2, w2 = r, [], walk()
+    assert step(layer(r2, calls2), r2, "goto unit 156", w2)["r"] == "pending" and calls2 == [] \
+        and len(w2["seen"]) == 2 and w2["blocked"] == {(5, 8, 0)}, (calls2, w2)
+    # the next search does not pass through the blocked D1: D2 is unreachable -> failed
+    res = step(layer(r2, calls2), r2, "goto unit 156", w2)
+    assert res["r"] == "failed" and "explored" in res["note"] and calls2 == [], res
+    n += 2
+    # a placement that lands outside the hop room (its centre blocked) marks it seen
+    r, calls = fake(), []
+    lay, w = layer(r, calls), walk()
+    lay.call = lambda rr_, tid, saved, entry, regs, stack: (calls.append(entry), 1)[1]
+    assert step(lay, r, "goto unit 156", w)["r"] == "pending" and (5, 8, 0) in w["seen"], w["seen"]
+    n += 1
+    # d. preset from another level: the warp first (pending), then the walk in level 5
+    r, calls = fake(town=True), []
+    lay, w = layer(r, calls), walk()
+    res = step(lay, r, "goto preset 5 2:376", w)
+    assert res["r"] == "pending" and calls == [(0x0053AEC0, {"ecx": G, "edx": P}, [5, 0])], (res, calls)
+    add_unit(r, OBJ, 2, 0x41, 376, A[0], 7, 9)
+    res = step(lay, r, "goto preset 5 2:376", w)
+    assert res["r"] == "ok" and res["guid"] == 0x41 and w["goal"] == 5, res
+    n += 2
+    # e. the step limit
+    r, calls = fake(), []
+    w = walk()
+    w["steps"] = GOTO_MAX_STEPS
+    assert step(layer(r, calls), r, "goto unit 156", w) == {"args": {"level": None, "type": 1, "class": 156},
+                                                            "r": "failed", "note": "step limit"}
+    n += 1
+    # f. needs: the warp form only for a preset
+    assert needs("goto", {"level": None})[0] == ["place"] and needs("goto", {"level": 5})[0] == ["warp", "place"]
+    n += 1
     return n
 
 

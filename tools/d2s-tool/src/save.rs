@@ -139,7 +139,17 @@ pub enum WpSpec {
     /// Every index a `levels` row carries, every difficulty.
     All,
     /// Indices to set (`None` difficulty = all three).
-    List(Vec<(Option<u8>, u8)>),
+    List(Vec<(Option<u8>, WpRef)>),
+}
+
+/// One item of a `--waypoints` list.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WpRef {
+    /// A waypoint index.
+    Index(u8),
+    /// `lv=ID`: the waypoint of level ID (its `levels` row's index,
+    /// `world/waypoints.md` §1 rule 1); a level without one is an error.
+    Level(u16),
 }
 
 impl std::str::FromStr for WpSpec {
@@ -154,13 +164,18 @@ impl std::str::FromStr for WpSpec {
         let mut out = Vec::new();
         for part in s.split(',').filter(|p| !p.is_empty()) {
             let (diff, rest) = split_diff(part)?;
+            if let Some(lv) = rest.strip_prefix("lv=") {
+                let id: u16 = lv.parse().map_err(|_| anyhow!("waypoint level {part:?}"))?;
+                out.push((diff, WpRef::Level(id)));
+                continue;
+            }
             let n: u8 = rest
                 .parse()
                 .map_err(|_| anyhow!("waypoint index {part:?}"))?;
             if Waypoints::bit(n).is_none() {
                 bail!("waypoint index {n}: must be < 112 (world/waypoints.md §1 rule 3)");
             }
-            out.push((diff, n));
+            out.push((diff, WpRef::Index(n)));
         }
         Ok(WpSpec::List(out))
     }
@@ -503,7 +518,7 @@ pub fn apply(save: &mut D2s, e: &Edits, t: &Tables) -> Result<()> {
     }
     // Waypoints (§5, `world/waypoints.md` §2).
     if let Some(w) = &e.waypoints {
-        apply_waypoints(&mut b.waypoints, w, t);
+        apply_waypoints(&mut b.waypoints, w, t)?;
     }
     // Progression (§2.3 bits 8–12; §2.2 rule 5.4 thresholds).
     if let Some(d) = e.unlocked {
@@ -614,7 +629,7 @@ fn apply_quests(q: &mut Quests, spec: &QuestSpec, expansion: bool) -> Result<()>
     Ok(())
 }
 
-fn apply_waypoints(w: &mut Waypoints, spec: &WpSpec, t: &Tables) {
+fn apply_waypoints(w: &mut Waypoints, spec: &WpSpec, t: &Tables) -> Result<()> {
     let set = |w: &mut Waypoints, d: usize, n: u8| {
         if let Some((byte, mask)) = Waypoints::bit(n) {
             w.records[d][byte] |= mask;
@@ -630,7 +645,15 @@ fn apply_waypoints(w: &mut Waypoints, spec: &WpSpec, t: &Tables) {
             }
         }
         WpSpec::List(l) => {
-            for &(diff, n) in l {
+            for &(diff, r) in l {
+                let n = match r {
+                    WpRef::Index(n) => n,
+                    WpRef::Level(id) => match t.level_waypoint.get(usize::from(id)) {
+                        Some(&n) if n != 255 && Waypoints::bit(n).is_some() => n,
+                        Some(_) => bail!("level {id} has no waypoint (levels Waypoint 255)"),
+                        None => bail!("level {id}: no such levels row"),
+                    },
+                };
                 for d in 0..3u8 {
                     if diff.is_none_or(|x| x == d) {
                         set(w, usize::from(d), n);
@@ -639,6 +662,7 @@ fn apply_waypoints(w: &mut Waypoints, spec: &WpSpec, t: &Tables) {
             }
         }
     }
+    Ok(())
 }
 
 /// The record offsets of an entry's item and its children, depth first

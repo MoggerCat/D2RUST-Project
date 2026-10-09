@@ -769,6 +769,13 @@ impl<L: super::poke::PokeTarget> super::poke::PokeTarget for PredictLink<L> {
     fn poke(&mut self, op: &d2_sim::poke::PokeOp) -> Result<d2_sim::poke::PokeResult, L::Error> {
         self.inner.poke(op)
     }
+    fn goto_step(
+        &mut self,
+        target: d2_sim::poke::GotoTarget,
+        walk: d2_sim::poke::GotoWalk,
+    ) -> Result<(d2_sim::poke::PokeResult, d2_sim::poke::GotoWalk), L::Error> {
+        self.inner.goto_step(target, walk)
+    }
 }
 
 /// Snapshots pass through (`state-dump`).

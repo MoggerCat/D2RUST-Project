@@ -52,6 +52,7 @@ use crate::bridge::predict::PredictLink;
 use crate::bridge::state::StateSource;
 use crate::bridge::Bridge;
 use crate::world_view::input_script::{self, Headless};
+use d2_sim::poke::{Directive, GotoWalk, PokeOp, PokeResult};
 
 /// Milliseconds the clock advances per step: one server tick (25 Hz).
 pub const STEP_MS: u32 = 40;
@@ -345,6 +346,7 @@ pub fn dump<W: Write>(
     // The frame the last tick ran (0: none yet) and the pokes still to run.
     let mut last_frame = 0i32;
     let mut pending = game.pokes;
+    let mut walking: Vec<(Entry, GotoWalk)> = Vec::new();
     let mut input = match game.input {
         Some(s) => Some(
             Headless::new(s)
@@ -355,7 +357,7 @@ pub fn dump<W: Write>(
     };
     let mut input_notes = Vec::new();
     while ran < ticks {
-        run_due_pokes(&mut bridge, &mut pending, last_frame, out)?;
+        run_due_pokes(&mut bridge, &mut pending, &mut walking, last_frame, out)?;
         if let Some(h) = input.as_mut() {
             for l in h.apply(&mut bridge, last_frame)? {
                 eprintln!("input: {l}");
@@ -405,6 +407,15 @@ pub fn dump<W: Write>(
         eprintln!("poke: not reached in {ran} ticks: {:?} {}", e.when, e.op);
         notes.push(format!("poke not reached: {:?} {}", e.when, e.op));
     }
+    // A `goto` still walking at the end is `failed` (`poke.md` §6 r4).
+    for (i, (e, w)) in walking.iter().enumerate() {
+        let f = last_frame + 1;
+        let r = d2_sim::poke::PokeResult::Failed;
+        let line = pokes::record_line_steps(f, i, &e.op, &r, Some(w.steps));
+        eprintln!("poke: goto not finished in {ran} ticks: {line}");
+        notes.push(format!("goto not finished: {}", e.op));
+        writeln!(out, "{line}")?;
+    }
     if let Some(p) = packets {
         p.finish(&notes)?;
     }
@@ -422,6 +433,7 @@ pub fn dump<W: Write>(
 fn run_due_pokes<W: Write>(
     bridge: &mut Bridge<DumpLink>,
     pending: &mut Vec<Entry>,
+    walking: &mut Vec<(Entry, GotoWalk)>,
     last_frame: i32,
     out: &mut W,
 ) -> Result<()> {
@@ -429,11 +441,28 @@ fn run_due_pokes<W: Write>(
         .into_iter()
         .partition(|e| pokes::due_after(e.when, None).is_some_and(|f| last_frame >= f));
     *pending = later;
-    for (i, e) in due.iter().enumerate() {
+    // `goto` walks step first, then the pokes due now (`poke.md` §6).
+    let due = std::mem::take(walking)
+        .into_iter()
+        .map(|(e, w)| (e, Some(w)))
+        .chain(due.into_iter().map(|e| (e, None)));
+    for (i, (e, walk)) in due.enumerate() {
         // state-dump takes absolute --poke frames only (never a Tick entry)
-        let When::Frame(f) = e.when else { continue };
-        let r = bridge.poke(&e.op)?;
-        let line = pokes::record_line(f, i, &e.op, &r);
+        let When::Frame(at) = e.when else { continue };
+        let (r, steps) = match (&e.op, walk) {
+            (PokeOp::Directive(Directive::Goto(t)), w) => {
+                let (r, w) = bridge.goto_step(*t, w.unwrap_or_default())?;
+                if r == PokeResult::Pending {
+                    walking.push((e, w));
+                    continue;
+                }
+                (r, Some(w.steps))
+            }
+            _ => (bridge.poke(&e.op)?, None),
+        };
+        // a walk's record carries the frame of its last step
+        let f = if steps.is_some() { last_frame + 1 } else { at };
+        let line = pokes::record_line_steps(f, i, &e.op, &r, steps);
         eprintln!("poke: before frame {f}: {}: {line}", e.op);
         writeln!(out, "{line}")?;
     }

@@ -34,7 +34,7 @@ edit flags:
   --all-skills LEVEL           every skill byte
   --left-skill ID / --right-skill ID   the mouse skill (skill id, e.g. 36 Fire Bolt)
   --quests none|all|LIST       LIST: comma-separated [diff:]acts=N or [diff:]SLOT.BIT ('all' is Pending)
-  --waypoints none|all|LIST    LIST: comma-separated [diff:]INDEX
+  --waypoints none|all|LIST    LIST: comma-separated [diff:]INDEX or [diff:]lv=LEVEL
   --difficulty-unlocked normal|nightmare|hell   progression bits (d2s.md §2.2 rule 5.4)
   --act A --difficulty D       town byte: act 0..4 of difficulty D (default 0, normal)
   --item CODE[#Q][@X,Y][:PAGE] a normal identified item (page 0 inventory, 3 cube, 4 stash;
