@@ -15,19 +15,20 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 33–41 |
-| Inputs | 42–48 |
-| Outputs / state changes | 49–59 |
-| Rules | 60–61 |
-|   1. Files | 62–67 |
-|   2. Syntax | 68–112 |
-|   3. Run | 113–239 |
-| Constants & data dependencies | 240–243 |
-| Randomness | 244–247 |
-| Edge cases & original bugs | 248–266 |
-| Test vectors | 267–277 |
-| Provenance | 278–281 |
-| Open questions | 282–310 |
+| Summary | 34–42 |
+| Inputs | 43–49 |
+| Outputs / state changes | 50–60 |
+| Rules | 61–62 |
+|   1. Files | 63–68 |
+|   2. Syntax | 69–113 |
+|   3. Run | 114–240 |
+|   4. Suite | 241–331 |
+| Constants & data dependencies | 332–335 |
+| Randomness | 336–339 |
+| Edge cases & original bugs | 340–358 |
+| Test vectors | 359–371 |
+| Provenance | 372–375 |
+| Open questions | 376–404 |
 <!-- /index -->
 
 ## Summary
@@ -237,6 +238,97 @@ state first. It is the default way to compare a behaviour with 1.14d.
     1.14d only, partial at best. First run: `rng-town-arrival-ama.check`
     (`tools/rng-trace.md` Open questions 1).
 
+### 4. Suite
+
+`tools/scenario-diff/suite.py`: every check (or `--filter GLOB` on the
+name, `--area A[,B]`, the area being the name's first dash token)
+through `scenario_diff.py`, in parallel, with a match % and the
+playthrough's playability next to it.
+
+1. Build once up front (`cargo build --release`, `CARGO_PROFILE_RELEASE_DEBUG=0`):
+   `-p d2-client --features rng-trace` when a check runs `rng`, then
+   `-p d2-client -p d2s-tool` (last, so `target/release/d2-client` stays
+   the plain build). The binaries are hard-linked into
+   `target/suite-bin/` (`d2-client`, `d2-client-rng`, `d2s-tool`) and
+   given to `scenario_diff.py` as `D2RS_BIN_DIR`: with it every d2rs step
+   runs the binary, never `cargo` (no worker waits on cargo's lock).
+   `--no-build` uses the binaries already there.
+2. Workers: `--workers N` (default min(cores − 1, 3)) threads, slowest
+   checks first (draws, then rng, then ticks × channels). Worker k has its
+   own Wine prefix `~/.wine-d2-suite-<k>` (made once: `cp -al` of
+   `WINEPREFIX` or `~/.wine-d2`; the `*.reg` files and the `Saved Games`
+   folder real copies, no `.run.lock`, so nothing writes through a hard
+   link and no lock inode is shared), `D2_DISPLAY=:<90+k>` (1.14d) and
+   `D2_DRAWS_DISPLAY=:<100+k>` (d2rs' draws window). The save step
+   unlinks the prefix's `<Char>.d2s` before copying (rule 1).
+3. Per check: work dir `traces/raw/suite/<name>/`, `scenario_diff.py
+   <check> --work <dir> --json <dir>/result.json --next 5`, its output in
+   `suite.log`. **Reuse of 1.14d**: the key (`suite.key`, format
+   `suite-key-1`) is the sha256 of the check file, of the save that
+   `d2s-tool` makes from the check's `save` line with `--time 1` (d2s-tool
+   otherwise stamps the current time), and of `Game.exe`. Same key and
+   no `--fresh`: `scenario_diff.py --reuse-orig` (keeps `orig.*`
+   recordings, re-runs d2rs and the comparators); otherwise the 1.14d
+   outputs and the key are removed and recorded again. The key is written
+   after a run that left a 1.14d output.
+4. Comparator summaries: `state_diff.py`, `rng_diff.py` and
+   `packets_diff.py` take `--json FILE` (format `diff-summary-1`:
+   `channel`, `code`, `verdict`, `frames_compared`, `frames_equal`,
+   `differences`, `first` {`frame`, `text`} or null) without changing
+   their report or exit code; `scenario_diff.py` passes `--json
+   <work>/<channel>.summary.json` and removes a stale one first. Ticks
+   compared and equal: **state** the common frames, equal when no unit
+   field, unit presence or game seed differs; **rng** every frame of the
+   compared range (a frame without draws on both sides is equal), equal
+   without a divergence; **packets** the frame windows, equal without a
+   divergence in any stream (the first per stream and window is all the
+   comparator looks at); **draws** one frame (equal on a facts-compare
+   match), and the match % is the rows equal by position over the rows
+   (columns `i`, `at`, `seq`, `tick` not compared, a `?` cell equal),
+   computed by `scenario_diff.py` into `draws.summary.json`.
+   `scenario_diff.py --json FILE` writes `scenario-diff-result-1`:
+   `check`, `channels` {ch: {`code`, `verdict`, `summary`}}, `error`.
+5. Report: per check and channel ticks, equal, match % and the first
+   divergence (one line; an error's message); per area and overall:
+   checks, channel runs, ticks compared, ticks equal, % (draws counts its
+   one frame here, not rows) and verdict counts. A run that errored
+   counts 0 ticks.
+6. Playability: `playthrough.py traces/playthrough/act*.play --json`
+   (`D2_GAME_DIR` defaulted as here) in a thread next to the checks; per
+   act reached / total, furthest consecutive and the first blocker
+   (milestone, kind, frame, evidence), from the act's own keys
+   (`reached`, `total`, `consecutive`, `first_blocker`) when present,
+   else counted from its milestones. A missing script or no `.play` file
+   is reported as "not available". `--no-playthrough` / `--no-checks`
+   skip either.
+7. Output: the text report on stdout; `--json F` (format
+   `suite-result-1`, every record and timing) and `--md F` (the two
+   tables in Markdown, for handoff docs). Exit 0 whatever the checks
+   found; 3 when the suite failed (build, prefix, no check matches).
+8. 1.14d start cost (measured 2026-10-09, Wine 9.0, `record_state.py`
+   40 ticks): the run was 9.1 s, of which 6.0 s autostart's menu delay
+   (`--auto-after`, default 6), 0.5 s from leaving the menu to the
+   player in the level, ~1.6 s the 40 ticks, the rest Wine and Python
+   start and shutdown; the recorders stop the game at `--ticks`
+   (`record_state` / `record_frames` / `record_packets` at the tick
+   limit, `record_rng` at the entry of tick N + 1). Autostart leaves the
+   menu only once the launcher mode is 4 (the menu is up), so the delay
+   can be 0: `D2_AUTO_AFTER` sets autostart's default; with 0, six runs
+   in a row reached the level (menu left at 0.2–0.3 s) and wrote 40
+   snapshots byte-identical to the 6 s run; one run is then 3.4–3.9 s.
+   suite.py sets `D2_AUTO_AFTER=0` (`--auto-after S` overrides).
+   `record_rng.py` stays the slow one: arming its 846 inline sites takes
+   about 60 s before the level is reached.
+9. `run.sh`'s prefix lock (fd 9) was held after a run by the screenshot
+   subshell's `sleep` (up to `--seconds`), which serialized every run on
+   a prefix behind the previous one's sleep; the subshell and Xvfb now
+   close fd 9 and the sleep is killed with its subshell.
+10. Measured 2026-10-09 (8 checks, 4 cores, a d2rs build already up to
+    date): `--fresh --workers 1` 153.6 s; `--fresh --workers 3` 64.1 s
+    (the rng check, 63 s, bounds it); a second run with the recordings
+    reused: the checks 9.5 s (8 of 8 reused); the playthrough (act1 and
+    act2, d2rs only) took about 6 min next to them.
+
 ## Constants & data dependencies
 
 None beyond the tools named.
@@ -272,6 +364,8 @@ None in the tool. Both games run on `seed`.
 | `--selftest` (draws) | the dry run issues `record_frames.py --every 1 --draws-every 1 --no-save`, `facts_render.py --frame`, one `cargo build`, the binary's `play --dump-draws … --at-tick <draws-at>` and `facts-compare … --ignore tick`; a one-side run issues no compare; the frame pick returns the frame at the tick, else the last earlier one with a draw log; a scene's `frame.tsv` tick is read back |
 
 | `--selftest` (input) | a shared `input` line reaches `record_state.py`, `state-dump`, `record_frames.py` and `play` as `--input '<script>'`; a script not starting with `frame`, with `wait` / `shot`, a frame 0 or going back, a `hold` without N or non-integer arguments, and a shared line next to `input orig` are rejected; an `input d2rs` in play's tick form goes to `play` only |
+| `suite.py --selftest` | discovery by glob and area, slowest first; the cache key misses on a change of the check, the save or Game.exe; the 1.14d outputs and key removed, d2rs' kept; a prefix copy hard-links the bulk and copies `*.reg` and saves, no lock; the rng build before the plain one; match % per channel (draws by rows), area and overall; playthrough acts from the `--all` keys or from milestones; text and Markdown tables |
+| comparators' `--selftest` (`--json`) | `state_diff`, `rng_diff`, `packets_diff`: the summary counts the frames with a difference and names the first; a match has every frame equal and no first |
 | `autostart.py --selftest` | `frame` / framed `hold` parsing and rejections; at simulated tick-return stops the click, hold press, key and move are posted at the stop of F − 1, the hold's release at the stop of F + N − 1; a late stop runs the step there |
 | d2rs unit tests (`world_view::input_script`, `app::state_dump`) | the same parse and rejections; `Headless` events at frame F − 1, the hold release at F + N − 1, a late frame noted; `state-dump --input` refuses `wait`, `key` and a script not starting with `frame` |
 

@@ -128,7 +128,8 @@ on stdout and its exit code (§4). Nothing in either game changes.
    messages packed by §3.2 rules 1–2, which `check_packets.py` R6 checks
    per side).
 5. **Masks** (`tools/scenario.md` §6): the rows of
-   `scenario-masks.tsv` apply to `s2c` records of their id; keys and NUL
+   `scenario-masks.tsv` apply to `s2c` records of their id, the rows of
+   `scenario-masks-c2s.tsv` (`scenario.md` §6 rule 4) to `c2s` records; keys and NUL
    positions are read from the 1.14d record; key bytes and the size are
    still compared. The table is read strictly (`scenario.md` §6 rule 3).
 6. A record on one side only is a divergence (`missing in d2rs` /

@@ -84,7 +84,9 @@ MENU_LOOP = 0x72DDD4      # menu message-loop flag
 NEXT_MODE = 0x7795E8      # mode the menu routine returns
 PLAYER = 0x7A6A70         # client player unit
 U_PATH = 0x2C
-DEFAULT_AFTER = 6.0       # seconds before leaving the menu (the main menu must be up)
+# seconds before leaving the menu (the main menu must be up); D2_AUTO_AFTER
+# overrides the default (scenario-diff.md §4: suite.py sets the measured minimum)
+DEFAULT_AFTER = float(os.environ.get("D2_AUTO_AFTER") or 6.0)
 
 
 def game_args(char, seed=None, extra=("-w", "-ns")):
