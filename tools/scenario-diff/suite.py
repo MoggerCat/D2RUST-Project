@@ -2,7 +2,7 @@
 in parallel, a match % per check, area and overall, and the playthrough's
 playability per act next to it (specs/tools/scenario-diff.md §4).
 
-    python3 tools/scenario-diff/suite.py [--filter GLOB] [--area A[,B]] [--workers N]
+    python3 tools/scenario-diff/suite.py [--dir DIR] [--filter GLOB] [--area A[,B]] [--workers N]
         [--orig-cache [DIR] [--fill-cache]] [--fresh] [--no-checks] [--no-playthrough] [--json F] [--md F]
         [--no-build] [--auto-after S] [--dry-run]
     python3 tools/scenario-diff/suite.py --selftest
@@ -76,8 +76,8 @@ def discover(checks_dir=CHECKS_DIR, pattern=None, areas=None):
     out = []
     for p in sorted(glob.glob(os.path.join(checks_dir, "*.check"))):
         name = os.path.basename(p)[:-len(".check")]
-        if pattern and not (fnmatch.fnmatch(name, pattern) or
-                            fnmatch.fnmatch(os.path.basename(p), pattern)):
+        if pattern and not any(fnmatch.fnmatch(name, g) or fnmatch.fnmatch(os.path.basename(p), g)
+                               for g in pattern.split(",")):
             continue
         if areas and area_of(name) not in areas:
             continue
@@ -546,7 +546,10 @@ def md_report(res):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--filter", default=None, help="glob on the check name")
+    ap.add_argument("--filter", default=None, help="glob on the check name (comma list: any)")
+    ap.add_argument("--dir", default=CHECKS_DIR, metavar="DIR",
+                    help="the folder of the .check files (default traces/checks; "
+                         "traces/checks/gen for the generated ones)")
     ap.add_argument("--area", default=None, help="areas (first dash token of the name), comma list")
     ap.add_argument("--workers", type=int, default=max(1, min((os.cpu_count() or 2) - 1, 3)))
     ap.add_argument("--orig-cache", nargs="?", const=sd.DEFAULT_CACHE, default=None, metavar="DIR",
@@ -578,7 +581,7 @@ def main(argv=None):
     t0 = time.time()
     try:
         jobs = [] if a.no_checks else discover(
-            pattern=a.filter, areas=set(x for x in (a.area or "").split(",") if x) or None)
+            checks_dir=a.dir, pattern=a.filter, areas=set(x for x in (a.area or "").split(",") if x) or None)
         if not a.no_checks and not jobs:
             raise SuiteError("no check matches")
         game_sha = None
