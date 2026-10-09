@@ -559,3 +559,50 @@ fn client_missile_function_counts_on_the_users_rows() {
     }
     assert_eq!(v.iter().map(|(_, c)| c).sum::<usize>(), rows.missiles.len());
 }
+
+// Covers: specs/missiles/client.md §c12-client-function-table-0x0072a398
+/// Every user `missiles` row whose client function the model runs (1,
+/// 4, 5, 6, 8, 11, 23, 25, 43, 49, 60, 63): created at a point with a
+/// player owner and a target 6 sub-tiles east, then 60 client updates
+/// of every client missile; no handler error.
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_users_client_missiles_run_their_functions() {
+    use d2_client::bridge::client_missiles::{create, flag, update, CreateRecord};
+    use d2_client::bridge::world::{ClientUnit, UnitKey};
+    let d = app_support::live();
+    let rows = single_player::client_unit_rows(d.archives.as_ref()).unwrap();
+    let missiles = &rows.missiles;
+    let run = [1u16, 4, 5, 6, 8, 11, 23, 25, 43, 49, 60, 63];
+    let mut w = ClientWorld::default();
+    let p = UnitKey::new(0, 1);
+    let mut u = ClientUnit::new(p);
+    u.position = Some((100, 100));
+    w.units.insert(p, u);
+    let mut made = 0;
+    for (class, row) in missiles.iter().enumerate() {
+        if !run.contains(&row.clt_do_func) {
+            continue;
+        }
+        let rec = CreateRecord {
+            flags: flag::POSITION | flag::TARGET_RELATIVE,
+            owner: Some(p),
+            class: class as u32,
+            x: 100,
+            y: 100,
+            tx: 6,
+            level: 1,
+            ..CreateRecord::default()
+        };
+        if create(&mut w, missiles, &rec, true).unwrap().is_some() {
+            made += 1;
+        }
+    }
+    assert!(made > 500, "{made}");
+    for _ in 0..60 {
+        let keys: Vec<_> = w.objclient.missiles.keys().copied().collect();
+        for k in keys {
+            update(&mut w, missiles, k, true).unwrap();
+        }
+    }
+}

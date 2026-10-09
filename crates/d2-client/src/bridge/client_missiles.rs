@@ -1,4 +1,4 @@
-// Spec: specs/missiles/client.md (§C1–§C4 the client create `0x004CD540`; §C6, §C7, §C9, §C10, §C13), specs/missiles/client-bodies.md (§B1, §B5 r1, r3), specs/missiles/missiles.md (§R2.1 the create record), specs/render/lighting.md (§8 missile row)
+// Spec: specs/missiles/client.md (§C1–§C4 the client create `0x004CD540`; §C6, §C7, §C9, §C10, §C13), specs/missiles/client-bodies.md (§B1, §B2, §B3 r2, §B4 4, 6, 25, 49, §B5 r1, r3), specs/missiles/missiles.md (§R2.1 the create record), specs/render/lighting.md (§8 missile row)
 //! Client missile creation: the client create `0x004CD540` fills a
 //! client-only type-3 unit in set C (`client/model.md` §2 r1) from a
 //! 0x5C-byte create record ([`CreateRecord`]) and its `missiles` row
@@ -18,9 +18,10 @@
 //! r19, r21; §C7 r3), unit hits (§C7 r12), the init callback (§C4
 //! r27), sounds (r28, §C9 r4.4, r6: audio), the umod callback (r29), the
 //! town tests (§C6 r4, §C7 r8: no town flag in the client level rows),
-//! the second pass (§C7 r13), the client hit functions (§C9 r4.3: a
-//! handler error when a row names one), and every client function but
-//! 1, 5, 11, 23, 43, 60 and 63 (the missile is then left as it is). The aim nudge
+//! the second pass (§C7 r13), the client hit functions (§C9 r4.3: read
+//! as returning non-zero, PROVISIONAL REC-452), and every client function but
+//! 1, 4, 5, 6, 8, 11, 23, 25, 43, 49, 60 and 63 (the missile is then left
+//! as it is; 3 needs the missiles calc evaluator `0x0064B7C0`). The aim nudge
 //! (§C2 r8) reads the owner's direction from the record
 //! ([`CreateRecord::owner_dir64`]; none given is a handler error).
 
@@ -68,6 +69,10 @@ pub struct ClientMissileRow {
     pub always_explode: bool,
     pub explosion_missile: i16,
     pub clt_hit_func: i16,
+    /// `CltSubMissile1`–`3` (i16) and `CltParam1`–`3` (i32)
+    /// (`client-bodies.md` §B1 S1–S3, P1–P3).
+    pub clt_sub: [i16; 3],
+    pub clt_param: [i32; 3],
 }
 
 /// The create record (`missiles.md` §R2.1, 0x5C bytes) as the client
@@ -165,6 +170,9 @@ pub struct ClientMissile {
     /// by the creator unless a body writes them.
     pub d28: i32,
     pub d2c: i32,
+    /// The path new-step flag (path +0x34 bit 3, `client-bodies.md` §B2):
+    /// the last path step entered a new sub-tile.
+    pub new_step: bool,
 }
 
 /// The path tables of `sim/pathing.md` (the direction-vector `tan`
@@ -529,6 +537,11 @@ pub const FN_SUB_LOOP_FIRE: u16 = 5;
 pub const FN_FOLLOW_OWNER: u16 = 43;
 pub const FN_ORBIT_EVEN: u16 = 60;
 pub const FN_ORBIT: u16 = 63;
+pub const FN_TRAIL: u16 = 8;
+pub const FN_SCATTER: u16 = 4;
+pub const FN_MIST: u16 = 25;
+pub const FN_SPAWN_FACING: u16 = 49;
+pub const FN_WALL_MAKER: u16 = 6;
 
 /// The per-update dispatch `0x004D2C70` (§C6) of the set-C missile `key`.
 pub fn update(
@@ -575,6 +588,33 @@ pub fn update(
             }
             default_step(w, rows, key, &row, lights)
         }
+        FN_TRAIL => trail(w, rows, key, &row, lights),
+        FN_SCATTER => {
+            // §B4 4: scatter(m, P1, P2, P3, S1), then step.
+            let [p1, p2, p3] = row.clt_param;
+            scatter(w, rows, key, p1, p2, p3, i32::from(row.clt_sub[0]), lights)?;
+            default_step(w, rows, key, &row, lights)
+        }
+        FN_SPAWN_FACING => {
+            // §B4 49: no row or S1 < 0 → remove; elapsed mod max(P1, 1)
+            // = 0 → spawn facing(m, S1); step.
+            let s1 = row.clt_sub[0];
+            if s1 < 0 {
+                remove(w, key);
+                return Ok(());
+            }
+            let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
+            if (m.total - m.current) % row.clt_param[0].max(1) == 0 {
+                if let Some(x) = spawn(w, rows, key, s1 as u32, lights)? {
+                    if let Some(xm) = w.objclient.missiles.get_mut(&x) {
+                        xm.direction = m.direction;
+                    }
+                }
+            }
+            default_step(w, rows, key, &row, lights)
+        }
+        FN_MIST => mist(w, rows, key, &row, lights),
+        FN_WALL_MAKER => wall_maker(w, rows, key, &row, lights),
         FN_SUB_LOOP_FIRE => {
             fire_frames(w, key, &row);
             default_step(w, rows, key, &row, lights)
@@ -590,6 +630,236 @@ pub fn update(
         // f ≤ 0: never stepped (§C6 r5); other functions: not modelled.
         _ => Ok(()),
     }
+}
+
+/// Function 8 `0x004D38D0` (`client.md` §C13, trails): S1 < 0 → remove.
+/// When elapsed ≥ `InitSteps` and the last path step entered a new
+/// sub-tile (§B2): S1 created with flags 1 at m's position, m's owner,
+/// skill and level, then its init callback `0x004CC870` (m): the child's
+/// P2 > 0 → rnd(P2) on **m's** seed (the child's motion z, − ⌊P2 / 2⌋;
+/// the motion record is not modelled, the draw is made); the child's
+/// direction := m's; its frame := rnd(`AnimLen`) on the child's seed <<
+/// 8. Then step.
+fn trail(
+    w: &mut ClientWorld,
+    rows: &[ClientMissileRow],
+    key: UnitKey,
+    row: &ClientMissileRow,
+    lights: bool,
+) -> Result<(), HandlerError> {
+    let s1 = row.clt_sub[0];
+    if s1 < 0 {
+        remove(w, key);
+        return Ok(());
+    }
+    let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
+    if m.total - m.current >= i32::from(row.init_steps) && m.new_step {
+        let rec = CreateRecord {
+            flags: flag::POSITION,
+            owner: m.owner,
+            class: s1 as u32,
+            x: (m.pos.0 >> 16) as i32,
+            y: (m.pos.1 >> 16) as i32,
+            skill: m.skill,
+            level: m.level,
+            ..CreateRecord::default()
+        };
+        if let Some(child) = create(w, rows, &rec, lights)? {
+            let crow = rows.get(s1 as usize).copied().unwrap_or_default();
+            let p2 = crow.clt_param[1];
+            if p2 > 0 {
+                rnd(w, key, p2);
+            }
+            let frame = rnd(w, child, i32::from(crow.anim_len)) << 8;
+            if let Some(c) = w.objclient.missiles.get_mut(&child) {
+                c.direction = m.direction;
+                c.frame = frame;
+            }
+        }
+    }
+    default_step(w, rows, key, row, lights)
+}
+
+/// Scatter `0x004CE140(m, chance, count, spread, c)` (`client-bodies.md`
+/// §B3 r2): c out of range → nothing; frames left ≠ 0 and rnd(chance) ≠
+/// 0 → nothing (left 0: no draw); else `count` creates (flags 0x20,
+/// owner O, origin m, class c, m's skill and level), each aimed at (x +
+/// dx + σ(dx)·spread, y + dy + σ(dy)·spread), dx, dy := rnd(2·spread) −
+/// spread, σ(v) = −1 for v < 0, else +1.
+#[allow(clippy::too_many_arguments)]
+fn scatter(
+    w: &mut ClientWorld,
+    rows: &[ClientMissileRow],
+    key: UnitKey,
+    chance: i32,
+    count: i32,
+    spread: i32,
+    c: i32,
+    lights: bool,
+) -> Result<(), HandlerError> {
+    if c < 0 || c as usize >= rows.len() {
+        return Ok(());
+    }
+    let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
+    if m.current != 0 && rnd(w, key, chance) != 0 {
+        return Ok(());
+    }
+    let (x, y) = ((m.pos.0 >> 16) as i32, (m.pos.1 >> 16) as i32);
+    let sigma = |v: i32| if v < 0 { -1 } else { 1 };
+    for _ in 0..count {
+        let dx = rnd(w, key, 2 * spread) - spread;
+        let dy = rnd(w, key, 2 * spread) - spread;
+        let rec = CreateRecord {
+            flags: flag::TARGET_ABSOLUTE,
+            owner: m.owner,
+            origin: Some(key),
+            class: c as u32,
+            tx: x + dx + sigma(dx) * spread,
+            ty: y + dy + sigma(dy) * spread,
+            skill: m.skill,
+            level: m.level,
+            ..CreateRecord::default()
+        };
+        create(w, rows, &rec, lights)?;
+    }
+    Ok(())
+}
+
+/// spawn(c) `0x004CDBA0(m, c, 0, 0, skill, level)` (`client-bodies.md`
+/// §B1, `client.md` §C5): flags 0x20, origin m, owner m's owner (none →
+/// none), target (0, 0) absolute.
+fn spawn(
+    w: &mut ClientWorld,
+    rows: &[ClientMissileRow],
+    key: UnitKey,
+    c: u32,
+    lights: bool,
+) -> Result<Option<UnitKey>, HandlerError> {
+    let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
+    let Some(owner) = m.owner else {
+        return Ok(None);
+    };
+    let rec = CreateRecord {
+        flags: flag::TARGET_ABSOLUTE,
+        owner: Some(owner),
+        origin: Some(key),
+        class: c,
+        skill: m.skill,
+        level: m.level,
+        ..CreateRecord::default()
+    };
+    create(w, rows, &rec, lights)
+}
+
+/// Function 25 `0x004D4DC0` (`client-bodies.md` §B4, `towermist`): S1 <
+/// 0 → remove; elapsed mod max(P3, 1) = 0 → u, v := rnd(2·P1 + 1) − P1,
+/// sx, sy := x / y + rnd(2·P2 + 1) − P2 (in this order); a create with
+/// flags 0x21, owner O, start (sx, sy), target (sx + u, sy + v), class
+/// S1, skill, level. Step.
+fn mist(
+    w: &mut ClientWorld,
+    rows: &[ClientMissileRow],
+    key: UnitKey,
+    row: &ClientMissileRow,
+    lights: bool,
+) -> Result<(), HandlerError> {
+    let s1 = row.clt_sub[0];
+    if s1 < 0 {
+        remove(w, key);
+        return Ok(());
+    }
+    let [p1, p2, p3] = row.clt_param;
+    let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
+    if (m.total - m.current) % p3.max(1) == 0 {
+        let (x, y) = ((m.pos.0 >> 16) as i32, (m.pos.1 >> 16) as i32);
+        let u = rnd(w, key, 2 * p1 + 1) - p1;
+        let v = rnd(w, key, 2 * p1 + 1) - p1;
+        let sx = x + rnd(w, key, 2 * p2 + 1) - p2;
+        let sy = y + rnd(w, key, 2 * p2 + 1) - p2;
+        let rec = CreateRecord {
+            flags: flag::POSITION | flag::TARGET_ABSOLUTE,
+            owner: m.owner,
+            class: s1 as u32,
+            x: sx,
+            y: sy,
+            tx: sx + u,
+            ty: sy + v,
+            skill: m.skill,
+            level: m.level,
+            ..CreateRecord::default()
+        };
+        create(w, rows, &rec, lights)?;
+    }
+    default_step(w, rows, key, row, lights)
+}
+
+/// Function 6 `0x004D3630` (`client-bodies.md` §B4, `firewallmaker`):
+/// the last path step entered no new sub-tile → step. S1 < 0 or out of
+/// range → remove. Else a create with flags 0x21 (0x8021 with frames :=
+/// S1's `Range` when that is ≠ 0), owner O, start = target = (x, y), m's
+/// skill and level, of a class picked on m's seed (S2 and S3 ≥ 0: rnd(3)
+/// 0 → S2, 1 → S3, 2 → S1; only S2: rnd(2) 0 → S2, else S1; else S1),
+/// without a light (flag 0x4000) when P1 = 0 or rnd(P1) ≠ 0; the child
+/// takes m's precise position. Step.
+fn wall_maker(
+    w: &mut ClientWorld,
+    rows: &[ClientMissileRow],
+    key: UnitKey,
+    row: &ClientMissileRow,
+    lights: bool,
+) -> Result<(), HandlerError> {
+    let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
+    if !m.new_step {
+        return default_step(w, rows, key, row, lights);
+    }
+    let [s1, s2, s3] = row.clt_sub;
+    if s1 < 0 || s1 as usize >= rows.len() {
+        remove(w, key);
+        return Ok(());
+    }
+    let (x, y) = ((m.pos.0 >> 16) as i32, (m.pos.1 >> 16) as i32);
+    let mut rec = CreateRecord {
+        flags: flag::POSITION | flag::TARGET_ABSOLUTE,
+        owner: m.owner,
+        x,
+        y,
+        tx: x,
+        ty: y,
+        skill: m.skill,
+        level: m.level,
+        ..CreateRecord::default()
+    };
+    let range = i32::from(rows[s1 as usize].range);
+    if range != 0 {
+        rec.flags |= flag::RANGE;
+        rec.range = range;
+    }
+    let c = if s2 >= 0 && s3 >= 0 {
+        match rnd(w, key, 3) {
+            0 => s2,
+            1 => s3,
+            _ => s1,
+        }
+    } else if s2 >= 0 {
+        if rnd(w, key, 2) == 0 {
+            s2
+        } else {
+            s1
+        }
+    } else {
+        s1
+    };
+    rec.class = c as u32;
+    let p1 = row.clt_param[0];
+    if p1 == 0 || rnd(w, key, p1) != 0 {
+        rec.flags |= flag::NO_LIGHT;
+    }
+    if let Some(child) = create(w, rows, &rec, lights)? {
+        if let Some(cm) = w.objclient.missiles.get_mut(&child) {
+            cm.pos = m.pos;
+        }
+    }
+    default_step(w, rows, key, row, lights)
 }
 
 /// Function 5 `0x004D3540` (`client-bodies.md` §B5 r1) before its step:
@@ -810,6 +1080,8 @@ fn default_step(
 /// footprint move of a missile) is not run; the position moves by the
 /// step vector and the wall test of §C7 r10 reads the cell it lands on.
 fn path_step(m: &mut ClientMissile) {
+    // §B2 r1: cleared first on every call.
+    m.new_step = false;
     if m.dir_vec == (0, 0) {
         return;
     }
@@ -826,10 +1098,13 @@ fn path_step(m: &mut ClientMissile) {
     let k = 0x400i32.wrapping_mul(m.velocity) >> 6;
     let vx = k.wrapping_mul(m.dir_vec.0) >> 12;
     let vy = k.wrapping_mul(m.dir_vec.1) >> 12;
+    let old = (m.pos.0 >> 16, m.pos.1 >> 16);
     m.pos = (
         m.pos.0.wrapping_add_signed(vx),
         m.pos.1.wrapping_add_signed(vy),
     );
+    // §B2 r2 (without the cell walk, REC-451): a new sub-tile entered.
+    m.new_step = (m.pos.0 >> 16, m.pos.1 >> 16) != old;
 }
 
 /// The collision word under a sub-tile (`0x00648EB0`) from the client
@@ -860,12 +1135,11 @@ pub fn end(
     let mut x = None;
     // r3: no unit, not forced, no `AlwaysExplode` → r5.
     if forced || row.always_explode {
-        // r4.3.
-        if row.clt_hit_func > 0 && row.clt_hit_func < 81 {
-            return Err(HandlerError::Invalid(
-                "missiles/client.md §C9 r4.3: client hit functions are not modelled",
-            ));
-        }
+        // r4.3: PROVISIONAL (REC-452): the client hit functions
+        // (`client-bodies.md` §B6–§B7) are not modelled; a row that names
+        // one ends as if the function returned non-zero (the end goes on:
+        // explosion, light, removal), so the missile does not stay.
+        let _hit_func = row.clt_hit_func;
         // r4.5: `0x004CDBA0(m, E, 0, 0, skill, level)`: flags 0x20, the
         // owner m's owner (none → none), origin m.
         if row.explosion_missile >= 0 {

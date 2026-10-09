@@ -415,3 +415,204 @@ fn functions_60_and_63_turn_around_their_centre() {
         }
     }
 }
+
+// Covers: specs/missiles/client.md §c13-function-bodies-specified-here
+// Covers: specs/missiles/client-bodies.md §b2-path-new-step-flag-path-0x34-bit-3
+#[test]
+fn function_8_leaves_a_trail_on_each_new_sub_tile() {
+    let mut parent = row(FN_TRAIL);
+    (parent.vel, parent.range, parent.clt_sub) = (16, 12, [2, -1, -1]);
+    let mut child = row(FN_DEFAULT_STEP);
+    child.light = 0;
+    let rows = vec![ClientMissileRow::default(), parent, child];
+    let mut w = ClientWorld::default();
+    let mut rec = at(100, 100);
+    rec.flags |= flag::TARGET_RELATIVE;
+    rec.tx = 20;
+    let k = create(&mut w, &rows, &rec, true).unwrap().unwrap();
+    // Each update reads the flag its previous step left (§B2 r4), then
+    // steps; count the steps that entered a new sub-tile.
+    let mut expected = 0;
+    let mut new_step = false;
+    for _ in 0..8 {
+        let before: Vec<UnitKey> = w.objclient.set_c.keys().copied().collect();
+        let at = w.objclient.missiles[&k].pos;
+        update(&mut w, &rows, k, true).unwrap();
+        let made: Vec<UnitKey> = w
+            .objclient
+            .set_c
+            .keys()
+            .copied()
+            .filter(|c| !before.contains(c))
+            .collect();
+        if new_step {
+            expected += 1;
+            assert_eq!(made.len(), 1);
+            let c = &w.objclient.set_c[&made[0]];
+            assert_eq!(c.class, 2);
+            assert_eq!(c.position, Some(((at.0 >> 16) as u16, (at.1 >> 16) as u16)));
+        } else {
+            assert!(made.is_empty());
+        }
+        new_step = w.objclient.missiles[&k].new_step;
+    }
+    assert!(expected >= 4, "{expected}");
+    // S1 < 0 → removed.
+    let mut r = row(FN_TRAIL);
+    r.clt_sub = [-1, -1, -1];
+    let rows = vec![ClientMissileRow::default(), r];
+    let (mut w, k) = made(&rows);
+    update(&mut w, &rows, k, true).unwrap();
+    assert!(!w.objclient.set_c.contains_key(&k));
+}
+
+/// Gives `k` the seed `{lo, 666}`.
+fn seeded(w: &mut ClientWorld, k: UnitKey, lo: u32) -> Seed {
+    w.objclient.set_c.get_mut(&k).unwrap().seed = Some((lo, 666));
+    Seed::new(lo, 666)
+}
+
+fn children(w: &ClientWorld, class: u32) -> Vec<UnitKey> {
+    w.objclient
+        .set_c
+        .iter()
+        .filter(|(_, u)| u.class == class)
+        .map(|(k, _)| *k)
+        .collect()
+}
+
+// Covers: specs/missiles/client-bodies.md §b4-do-bodies-emitters
+// Covers: specs/missiles/client-bodies.md §b3-shared-create-helpers
+#[test]
+fn function_4_scatters_its_sub_missiles() {
+    let mut r = row(FN_SCATTER);
+    // chance 1 (rnd(1) = 0 always passes), 2 per update, spread 3, S1 2.
+    (r.clt_param, r.clt_sub) = ([1, 2, 3], [2, -1, -1]);
+    let mut child = row(FN_DEFAULT_STEP);
+    child.light = 0;
+    let rows = vec![ClientMissileRow::default(), r, child];
+    let (mut w, k) = made(&rows);
+    let mut seed = seeded(&mut w, k, 1234);
+    let p1 = w.objclient.missiles[&k].owner;
+    assert_eq!(p1, None);
+    update(&mut w, &rows, k, true).unwrap();
+    // rnd(chance 1) draws one step, then dx, dy per create.
+    seed.roll(1);
+    let mut want = Vec::new();
+    for _ in 0..2 {
+        let dx = seed.roll(6) as i32 - 3;
+        let dy = seed.roll(6) as i32 - 3;
+        let s = |v: i32| if v < 0 { -1 } else { 1 };
+        want.push((100 + dx + s(dx) * 3, 100 + dy + s(dy) * 3));
+    }
+    let mut got: Vec<_> = children(&w, 2)
+        .iter()
+        .map(|c| w.objclient.missiles[c].target_point)
+        .collect();
+    got.sort();
+    want.sort();
+    assert_eq!(got, want);
+    assert_eq!(w.objclient.set_c[&k].seed, Some((seed.lo, seed.hi)));
+}
+
+// Covers: specs/missiles/client-bodies.md §b4-do-bodies-emitters
+#[test]
+fn functions_25_and_49_emit_on_their_period() {
+    let mut mist = row(FN_MIST);
+    (mist.range, mist.clt_param, mist.clt_sub) = (10, [2, 4, 3], [2, -1, -1]);
+    let mut child = row(FN_DEFAULT_STEP);
+    child.light = 0;
+    let rows = vec![ClientMissileRow::default(), mist, child];
+    let (mut w, k) = made(&rows);
+    let mut seed = seeded(&mut w, k, 77);
+    // Elapsed 0, 3, 6: one mist each; the draws u, v, sx, sy in order.
+    for _ in 0..7 {
+        update(&mut w, &rows, k, true).unwrap();
+    }
+    assert_eq!(children(&w, 2).len(), 3);
+    let u = seed.roll(5) as i32 - 2;
+    let v = seed.roll(5) as i32 - 2;
+    let sx = 100 + seed.roll(9) as i32 - 4;
+    let sy = 100 + seed.roll(9) as i32 - 4;
+    assert!(children(&w, 2).iter().any(|c| {
+        let m = w.objclient.missiles[c];
+        let at = w.objclient.set_c[c].position;
+        at == Some((sx as u16, sy as u16)) && m.target_point == (sx + u, sy + v)
+    }));
+    // 49: spawn facing every max(P1, 1) elapsed, owner required.
+    let mut vines = row(FN_SPAWN_FACING);
+    (vines.range, vines.clt_param, vines.clt_sub) = (10, [2, 0, 0], [2, -1, -1]);
+    let rows = vec![ClientMissileRow::default(), vines, child];
+    let mut w = ClientWorld::default();
+    let p = UnitKey::new(PLAYER, 1);
+    let mut u = ClientUnit::new(p);
+    u.position = Some((100, 100));
+    w.units.insert(p, u);
+    let mut rec = at(100, 100);
+    rec.owner = Some(p);
+    let k = create(&mut w, &rows, &rec, true).unwrap().unwrap();
+    w.objclient.missiles.get_mut(&k).unwrap().direction = 17;
+    for _ in 0..4 {
+        update(&mut w, &rows, k, true).unwrap();
+    }
+    let kids = children(&w, 2);
+    assert_eq!(kids.len(), 2, "elapsed 0 and 2");
+    assert!(kids.iter().all(
+        |c| w.objclient.missiles[c].direction == 17 && w.objclient.missiles[c].owner == Some(p)
+    ));
+}
+
+// Covers: specs/missiles/client-bodies.md §b4-do-bodies-emitters
+#[test]
+fn function_6_lays_its_wall_on_each_new_sub_tile() {
+    let mut maker = row(FN_WALL_MAKER);
+    (maker.vel, maker.range, maker.clt_sub, maker.clt_param) = (16, 12, [2, 3, -1], [2, 0, 0]);
+    let mut fire = row(FN_DEFAULT_STEP);
+    (fire.range, fire.light) = (30, 5);
+    let rows = vec![ClientMissileRow::default(), maker, fire, fire];
+    let mut w = ClientWorld::default();
+    let mut rec = at(100, 100);
+    rec.flags |= flag::TARGET_RELATIVE;
+    rec.tx = 20;
+    let k = create(&mut w, &rows, &rec, true).unwrap().unwrap();
+    let mut seed = seeded(&mut w, k, 4321);
+    let mut want = Vec::new();
+    let mut new_step = false;
+    for _ in 0..6 {
+        let at = w.objclient.missiles[&k].pos;
+        update(&mut w, &rows, k, true).unwrap();
+        if new_step {
+            // rnd(2) picks S2 (3) or S1 (2); rnd(P1 = 2) ≠ 0 → no light.
+            let c = if seed.roll(2) == 0 { 3 } else { 2 };
+            let lit = seed.roll(2) == 0;
+            want.push((c, at, lit));
+        }
+        new_step = w.objclient.missiles[&k].new_step;
+    }
+    assert!(!want.is_empty());
+    let mut got: Vec<_> = w
+        .objclient
+        .missiles
+        .iter()
+        .filter(|(c, _)| **c != k)
+        .map(|(c, m)| {
+            let class = w.objclient.set_c[c].class;
+            let lit = w
+                .lights
+                .iter()
+                .any(|(_, l)| l.owner_guid == c.guid && l.lookup_flag);
+            (class, m.pos, lit)
+        })
+        .collect();
+    got.sort();
+    want.sort();
+    assert_eq!(got, want);
+    assert_eq!(
+        w.objclient
+            .missiles
+            .values()
+            .filter(|m| m.total == 30)
+            .count(),
+        want.len()
+    );
+}
