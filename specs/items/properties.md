@@ -23,25 +23,25 @@
 | Outputs / state changes | 67–72 |
 | Rules | 73–74 |
 |   1. Property record and slots | 75–83 |
-|   2. Modes (`0x0065FEC0`, D2MOO `ITEMMODS_AssignProperty`) | 84–103 |
-|   3. Dispatcher (`0x0065FD70`; wrapper `0x0065FE10` for format ≥ 1) | 104–113 |
-|   4. Shared helpers | 114–167 |
-|   5. Property functions | 168–222 |
-|   6. Superior (mode 1) and affixes (mode 0) | 223–227 |
-|   7. Uniques (mode 3) | 228–231 |
-|   8. Set items | 232–242 |
-|   9. Socket fillers (`0x0055C2C0`) | 243–262 |
-|   10. Runewords | 263–321 |
-|   11. Set bonuses (`0x00660120`) | 322–334 |
-|   12. Craft property lists (`0x00660240`) | 335–340 |
-|   13. Set-item state update (`0x00663CC0`) | 341–403 |
-|   14. Format-0 property functions (legacy table `0x00745B58`) | 404–471 |
-| Constants & data dependencies | 472–481 |
-| Randomness | 482–487 |
-| Edge cases & original bugs | 488–497 |
-| Test vectors | 498–516 |
-| Provenance | 517–536 |
-| Open questions | 537–626 |
+|   2. Modes (`0x0065FEC0`, D2MOO `ITEMMODS_AssignProperty`) | 84–117 |
+|   3. Dispatcher (`0x0065FD70`; wrapper `0x0065FE10` for format ≥ 1) | 118–127 |
+|   4. Shared helpers | 128–181 |
+|   5. Property functions | 182–236 |
+|   6. Superior (mode 1) and affixes (mode 0) | 237–241 |
+|   7. Uniques (mode 3) | 242–245 |
+|   8. Set items | 246–256 |
+|   9. Socket fillers (`0x0055C2C0`) | 257–276 |
+|   10. Runewords | 277–335 |
+|   11. Set bonuses (`0x00660120`) | 336–348 |
+|   12. Craft property lists (`0x00660240`) | 349–355 |
+|   13. Set-item state update (`0x00663CC0`) | 356–418 |
+|   14. Format-0 property functions (legacy table `0x00745B58`) | 419–486 |
+| Constants & data dependencies | 487–496 |
+| Randomness | 497–502 |
+| Edge cases & original bugs | 503–512 |
+| Test vectors | 513–531 |
+| Provenance | 532–551 |
+| Open questions | 552–641 |
 <!-- /index -->
 
 ## Summary
@@ -98,8 +98,22 @@ Mode 3/4 do nothing when the file index is outside the table. Every
 mode targets the item's own stat list with state 0 and flags 0x40
 (owner none), except the set partial records (§8.1). Mode 4 on a format-0
 item runs only `prop1`–`prop2` (`0x0065FF6C`: format 0 → two records,
-no partial records), each through §14. Modes 6
-(runeword, §10) and 7 (craft list, §12) call the dispatcher directly.
+no partial records), each through §14. Mode 6 (runeword, §10) calls
+the dispatcher directly; mode 7 (craft list, §12) goes through the
+wrapper `0x0065FE10` (call `0x00660260`), so a format-0 item takes §14
+there too.
+
+Apply type (the sixth argument; read 2026-10-09): every mode passes it
+unchanged to the wrapper as §14's n, and §3 never reads it. All 20
+static callers of `0x0065FEC0` pass 0: the affix roller and the other
+item-generation callers (`0x005C14D7`, `0x005C18B3`, `0x005C1E04`,
+`0x005C1E27`, `0x005C2126`, `0x005C2149`, `0x005C24C2`, `0x005C24E5`,
+modes 0 / 1 / 3 / 4 at `0x005C2729`, `0x005C292B`, `0x005C2A9B`), the
+unique / quality / gem socket paths (`0x00556865`, `0x00556A38`,
+`0x00557A0C`, `0x0055C346`, `0x0055C397`) and the client's
+(`0x004C0D99`, `0x004C0DF9`, `0x004E673A`, `0x004E67E4`). The gem
+socket callers' `push 0` before `0x00629A40` is this argument
+(`0x00629A40` takes one, `ret 4`). So n = 0 everywhere in 1.14d.
 
 ### 3. Dispatcher (`0x0065FD70`; wrapper `0x0065FE10` for format ≥ 1)
 
@@ -334,7 +348,8 @@ first < 0).
 
 ### 12. Craft property lists (`0x00660240`)
 
-Mode 7 for one record list (owner none, flags 0x40); then, if the item
+Mode 7 for one record list through the wrapper `0x0065FE10` (§2,
+`0x00660260`; n = 0, owner none, flags 0x40); then, if the item
 is flagged ethereal (0x400000), re-apply ethereal (`items/generation.md`
 §8.2). The list and when it runs belong to the cube spec.
 
@@ -410,8 +425,8 @@ fatal 0x66D. `code` = −1, < 0 or ≥ the properties count (table +0xAC,
 268 rows in 1.14d) → nothing. Else (f, s) := the 8-byte entry `code` of
 the legacy table (function, stat); f = 0 → nothing; else f(ECX mode,
 EDX owner; item, record, s, n, state, flags, extra), where n is the
-wrapper's sixth argument (`0x0065FEC0`'s apply-type argument; 0 from
-§11 and §12) and owner, state, flags as in §4.2. One function per property code: there are no slots
+wrapper's sixth argument (`0x0065FEC0`'s apply-type argument, 0 at
+every caller, §2; 0 from §11 and §12 too) and owner, state, flags as in §4.2. One function per property code: there are no slots
 and no prev value.
 
 The legacy table has 244 entries (codes 0–243); entry 244 is the first
@@ -448,7 +463,7 @@ Functions (code → stat as stored in the table):
 | `0x0065DB90` | 104 → 127 | `0x0065CF40`(127, kind 0) |
 | `0x0065E450` | 55–57→93, 76–78→96, 79–81→99, 82–84→102, 85–87→105 | A(s, R) |
 | `0x0065D110` | 141–177→214–250, 179→252, 180→253 | v := `param` (0 → return 0); base reset when s is 16–18 or mode = 1; A(s, v) |
-| `0x0065DD80` | 195–230 → 268–303 | as function 18 (§5 rule 8) but min > max, `param` > 3, min + 256 or max + 256 > 0x3FF (unsigned) are fatal (0x444, 0x44C, 0x44D, 0x44E) instead of clamped; list set; returns 1 |
+| `0x0065DD80` | 195–230 → 268–303 | as function 18 (§5 rule 8) but min > max (signed), `param` > 3 (unsigned: a negative `param` is fatal too, never clamped or used), min + 256 or max + 256 > 0x3FF (unsigned) are fatal (0x444, 0x44C, 0x44D, 0x44E) instead of clamped; no stat list (`0x0065CBF0`) → fatal 0x44A; value ((max + 256) << 10 \| (min + 256)) · 4 + `param` set (`0x00627150`); returns 1 |
 | `0x0065E2D0` | 67–71→83–87, 121→179, 122→180 | v := R (0 → return 0); add stat **83** with layer 0–4 for s 83–87, 5 for 179, 6 for 180 |
 | `0x0065E230` | 103 → 126 | v := R (0 → 0); add stat 126, layer 1 |
 | `0x0065E170` | 123 → 107 | v := R; skill := `param` (outside skills → 0); add stat 107, layer skill |

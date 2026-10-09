@@ -15,13 +15,13 @@
 |---|---|
 | Summary | 27–33 |
 | Rules | 34–35 |
-|   6. Deferred item messages | 36–129 |
-|   7. Intents | 130–691 |
-|   8. Pickup from the ground | 692–873 |
-|   9. Drop to the ground | 874–921 |
-|   10. Gold | 922–961 |
-|   11. Message layouts | 962–991 |
-|   12. Corpse take-back (`0x0057FB70` → `0x00562F30`) | 992–1119 |
+|   6. Deferred item messages | 36–135 |
+|   7. Intents | 136–701 |
+|   8. Pickup from the ground | 702–883 |
+|   9. Drop to the ground | 884–931 |
+|   10. Gold | 932–971 |
+|   11. Message layouts | 972–1001 |
+|   12. Corpse take-back (`0x0057FB70` → `0x00562F30`) | 1002–1129 |
 <!-- /index -->
 
 ## Summary
@@ -91,6 +91,12 @@ the walk passes the bit-stream flag argument 0 (§11), except the 0x7D
 rows, whose state = item flags & the row's flag (`0x006280A0`).
 Only the store checks end the walk for every client (item +0xC8 bit 2
 or 4 set: 0x38 / 0x39 to the trading client, nothing to others, done).
+The store sends (`0x0053EF30` → `0x0053EAE0`, action 0x0B for 0x38
+with the "unidentified gamble" bit, 0x0C for 0x39 with the item shown
+at its stored page) never skip an item: the stream is built into a
+0xF4-byte area and a size (stream + 8) ≥ 0xFD is fatal 0x78C; a client
+without a player is fatal 0x77B (read 2026-10-09). There is no
+"encode failed" outcome in 1.14d.
 Columns: `order`; `test` (`cmd` = command flags, `item` = item flags);
 `flags` (any of); `to` (`owner` = only the owner's client, `all` = every
 client that processes this player; `owner|mode1` = owner, or item mode
@@ -536,8 +542,12 @@ gold − pile gold (`0x00530EA0`). Result 0.
 1. Classic game → 3. Busy and trading → 3.
 2. Ends with 0 (no effect) unless: the player has no used skill (`0x00620250`(player): skill list +0x10,
    `skills/levels.md`; register argument pushed at `0x0054D47A`), the player is alive (`0x005541B0` = 0), a hireling
-   exists (`0x00574EC0(7, 0)`), it is alive, and it belongs to the player
-   (`0x0065A590`).
+   exists (`0x00574EC0(7, 0)`), it is alive, and it is near the player
+   (`0x0065A590(hireling, player)`, pushed at `0x0054D4B6`: 1 when the
+   hireling's room is in the room list `0x00619790` of the **player's**
+   room; either room missing → 0; a null first / second argument is
+   fatal 0x18 / 0x19. The 0x4B test, `sim/intents-events.md` §9 rule 10,
+   is the same function with (player, unit)).
 3. No player inventory → 3. Cursor item C present: C's items `quest` = 0
    → `0x0054D230` (give to the hireling; result ignored), 0. No cursor:
    location (u16 @1) ≠ 0 → `0x0054D130` (take from the hireling) and its

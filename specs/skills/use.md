@@ -28,17 +28,17 @@
 |   1. Messages | 77–108 |
 |   2. `use_at_point(game, unit, skill, x, y)` = `0x00549AD0` | 109–191 |
 |   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 192–210 |
-|   4. Mode change gates | 211–250 |
-|   5. Start and do | 251–409 |
-|   6. Cooldown | 410–423 |
-|   7. Periodic skills and auras | 424–473 |
-|   8. Function tables | 474–493 |
-| Constants & data dependencies | 494–514 |
-| Randomness | 515–524 |
-| Edge cases & original bugs | 525–546 |
-| Test vectors | 547–567 |
-| Provenance | 568–587 |
-| Open questions | 588–639 |
+|   4. Mode change gates | 211–268 |
+|   5. Start and do | 269–459 |
+|   6. Cooldown | 460–473 |
+|   7. Periodic skills and auras | 474–523 |
+|   8. Function tables | 524–543 |
+| Constants & data dependencies | 544–564 |
+| Randomness | 565–574 |
+| Edge cases & original bugs | 575–596 |
+| Test vectors | 597–617 |
+| Provenance | 618–637 |
+| Open questions | 638–690 |
 <!-- /index -->
 
 ## Summary
@@ -248,6 +248,24 @@ unit's type-0/1 timers (`0x00553990`), schedule frame events
 (`0x005539B0`, §5.2), clear unit flag 0x40 (+0xC4), then **start**
 (§5) in the same tick.
 
+Where the target goes (read 2026-10-09, settles REC-460): both forms
+store it in the unit's path (unit +0x2C), nowhere else.
+
+```
+point form 0x0057FE90(game, U, mode, x, y):
+    path.target_xy (+0x10, +0x12) := (x, y); path.target_unit (+0x58) := none
+                                            // 0x00648AD0, before the mode set
+    set mode; 0x00620C10(U, none)           // target unit := none again
+unit form 0x0057FEF0(game, U, mode, T):
+    set mode; T = none → fatal 0x4BF
+    0x00620C10(U, T) → 0x00648B90(path, T)  // path target unit := T
+```
+
+`0x00620C10` accepts only unit types 0, 1, 3 (player, monster,
+missile); a null unit is fatal 0x8AC, another type fatal 0x8AE. The
+skill then reads the target back through `0x0056D2C0`
+(`sim/pathing.md` §13.2).
+
 ### 5. Start and do
 
 #### 5.1 Mode of a skill
@@ -308,8 +326,40 @@ On arrival the Whirlwind do ends the move (`bodies-2b.md` §8.11 step
 sequences: `skills/sequences.md` §4 (`seqnum` 10 and 13 have one record
 for every class that has one; 14 has four).
 
-Monsters: start `0x005A75C0`, per-frame `0x005A7670` (monsters branch;
-Open question 6).
+Monsters: start `0x005A75C0`, attack-family event 0 `0x005A7670(game,
+U)` (A1, A2, SC, S1, S2; `sim/units.md` §4.6), read 2026-10-09 (asm
+`0x005A7670`–`0x005A77B4`). trigger(U) := U's mode is 14 ? unit flag
+0x40 (+0xC4) set : frame code (U +0x4E) = 1.
+
+```
+E := U's used skill (0x00620250)
+if E:
+    f := E flags (0x006446A0)
+    if f & 1:                                  // moving skill
+        target check 0x00553490(game, U)
+        if step 0x00554CA0(game, U) == 2:      // stopped
+            E flags := f | 2 (0x00644660); do 0x0056FC50(game, U)
+            if trigger(U): do again
+            refresh 0x00623E00(U); return 1
+    do 0x0056FC50(game, U); refresh; return 1  // every event, no frame test
+r := moves(U, U.mode) (0x005A6B10: table 0x006E23D0 by mode, 12-byte
+     rows; else the monstats2 A1mv… bit, +0x104)
+if r ≠ 0:
+    step 0x00554CA0; refresh; animation complete (0x006217C0) → return 2
+    trigger(U) false → return 1
+// r = 0, or a moving mode at its trigger frame
+if mode missile 0x005A6D50(game, U, r) == 0 (`missiles.md` "Monster
+        mode missile"; its third argument is r, the moving flag, not
+        the mode):
+    melee set-up 0x005A5490(U, game)
+    T := U's path target unit (0x00553540); T → apply_melee
+        0x0057D4F0(game, U, T, 0) (`combat/damage.md` §5.1)
+return 1
+```
+
+With no used skill, a non-moving mode strikes on every event 0 it
+gets (one per frame-code timer of `0x005539B0`) and has no refresh
+here.
 
 #### 5.3 Start `0x0056FAF0` → core `0x0056F640`
 
@@ -608,8 +658,9 @@ their own (`combat/*`, `skills/levels.md`). The unit-seed reseeder
    level ≥ 25 with < 1 mana: is the cast free?
 5. Injection or recording: two 0x06 messages two frames apart: does the
    second restart A1?
-6. Monster per-frame `0x005A7670` tests unit +0x4E = 1 or mode 14, not
-   the event argument: hook it, log arg1/arg2 and +0x4E (monsters branch).
+6. Answered (2026-10-09, asm): `0x005A7670` is written out in §5.2
+   ("Monsters"); it reads +0x4E = 1 (or flag 0x40 in mode 14) only on
+   the moving branches.
 7. Frame codes 1–4 of `0x005539B0`: log arg1 per type-0 timer for a
    multi-hit animation (Strafe, Zeal) (`sim/units.md`).
 8. Answered from `traces/raw/20261006-022304-tick.jsonl`: a shrine. In

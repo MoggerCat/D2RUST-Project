@@ -1680,7 +1680,20 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
                 m.cltsubmissile2 as i16,
                 m.cltsubmissile3 as i16,
             ],
-            clt_param: [m.cltparam1 as i32, m.cltparam2 as i32, m.cltparam3 as i32],
+            clt_param: [
+                m.cltparam1 as i32,
+                m.cltparam2 as i32,
+                m.cltparam3 as i32,
+                m.cltparam4 as i32,
+                m.cltparam5 as i32,
+            ],
+            clt_calc1: m.cltcalc1,
+            town: m.town,
+            clt_src_town: m.cltsrctown,
+            size: m.size,
+            rand_start: m.randstart as i32,
+            prog_sound: m.progsound as i16,
+            param: [m.param1 as i32, m.param2 as i32],
         })
         .collect();
     let states: Vec<d2_data::tables::States> = decode_all(table("states")?).map_err(err)?;

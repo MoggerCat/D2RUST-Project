@@ -31,13 +31,13 @@
 |   2. Spending stat points (message 0x3A) | 104–156 |
 |   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 157–178 |
 |   4. Experience | 179–475 |
-|   5. Client vitals sync (`0x00548760`) | 476–612 |
-| Constants & data dependencies | 613–629 |
-| Randomness | 630–633 |
-| Edge cases & original bugs | 634–645 |
-| Test vectors | 646–666 |
-| Provenance | 667–702 |
-| Open questions | 703–739 |
+|   5. Client vitals sync (`0x00548760`) | 476–614 |
+| Constants & data dependencies | 615–631 |
+| Randomness | 632–635 |
+| Edge cases & original bugs | 636–647 |
+| Test vectors | 648–668 |
+| Provenance | 669–704 |
+| Open questions | 705–741 |
 <!-- /index -->
 
 ## Summary
@@ -562,7 +562,9 @@ Current values (stat totals, `0x00625480`; `>>` arithmetic):
   total(8) >> 8; stamina = total(10) >> 8.
 - X, Y = the unit's sub-tile position (`0x0045ADF0` / `0x0045AE20`);
   with a path: dx = (X − path target x, path +0x10) & 0xFF, dy = (Y −
-  path target y, +0x12) & 0xFF; without a path dx = dy = 0.
+  path target y, +0x12) & 0xFF; without a path dx = dy = 0 (byte
+  subtraction X − target at `0x00548834` / `0x00548842`, 1.14d-confirmed;
+  the client adds it back, `client/msg-units.md` §5 r3).
 - Life prediction lp (`0x005485B0`): with a state 100 (`healthpot`) list
   and M ≠ 0: q = (total_list(74) · (list expire frame − game frame) +
   total(6)) >> 8; v = q · 100 / M (signed, truncated); lp = the **low
@@ -710,7 +712,7 @@ stat points: three spends succeed, the fourth fails, result 2.
    `0x005405A0`, `0x0057E510`, `0x0057E860`. The hireling part (86/256
    share, 1/64-level cap, 1.14d adds 2·gain) is confirmed in
    `world/hirelings.md` §7. Open: the x87 party share's
-   precision-control word in force (PROVISIONAL: 53-bit, because `Game.exe` sets it once at start-up; settled by REC-21) (§4.4 rule 6, as
+   precision-control word in force (53-bit: settled for Game.exe 2026-10-09 by the CRT start-up read, `items/treasure.md` OQ5; PROVISIONAL REC-610 only for a video runtime DLL changing it) (§4.4 rule 6, as
    `sim/stat-lists.md` open question 1); settle with a party recording
    (multiplayer, Phase 7). Out of Phase 0–6 scope (a party needs two
    players). The hireling level-up body (`0x00572840`) is the mercenary
