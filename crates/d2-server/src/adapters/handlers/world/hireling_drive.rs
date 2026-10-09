@@ -43,6 +43,16 @@ const MAXDAMAGE: u16 = 22;
 const SWING: i32 = 20;
 const REPATH: i32 = 10;
 
+/// Which think a hireling gets in play (`q-fix-prov-hireling-search`): one
+/// whose AI control holds the owner link takes the real Hireable think,
+/// whose target search is the host's `good_target_search` (35 sub-tiles,
+/// `monsters/ai.md` §5.2 step 4; the client host's `GOOD_SEARCH_RANGE`);
+/// only a hireling or pet without the link is left to this stand-in
+/// (and its [`SIGHT`] of 20).
+pub(super) fn stand_in_drives(control: Option<&d2_sim::monsters::ai::AiControl>) -> bool {
+    control.is_none_or(|c| c.minion_owner.is_none())
+}
+
 fn d2(a: (i32, i32), b: (i32, i32)) -> i64 {
     let (dx, dy) = (i64::from(a.0 - b.0), i64::from(a.1 - b.1));
     dx * dx + dy * dy
@@ -75,14 +85,15 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
         // §3.2 rule 8) is driven by the real Hireable think
         // (`ai-bodies-6.md` §7, REC-279): the stand-in leaves it.
         mercs.retain(|&(m, _)| {
-            events
-                .action()
-                .sys
-                .hooks
-                .ai
-                .as_ref()
-                .and_then(|s| s.control(m))
-                .is_none_or(|c| c.minion_owner.is_none())
+            stand_in_drives(
+                events
+                    .action()
+                    .sys
+                    .hooks
+                    .ai
+                    .as_ref()
+                    .and_then(|s| s.control(m)),
+            )
         });
         // The summoned pets (`ActionHooks::pet_lists`, `q-summons`) follow
         // and fight by the same think.
@@ -234,4 +245,25 @@ pub(super) fn nearest_hostile<X: Pending>(
         .map(|m| (d2(me, AiUnits::position(v, m)), m))
         .filter(|&(d, _)| d <= sight)
         .min()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use d2_sim::monsters::ai::{AiControl, UnitRef};
+
+    // Covers: specs/monsters/ai-bodies-6.md §7
+    #[test]
+    fn a_hireling_with_the_owner_link_is_left_to_the_real_think() {
+        // No control yet (not hired through 0x0058F030): the stand-in.
+        assert!(stand_in_drives(None));
+        let mut c = AiControl::default();
+        assert!(stand_in_drives(Some(&c)));
+        // The owner link set: the real think (search radius 35, not 20).
+        c.minion_owner = Some(UnitRef {
+            ty: UnitType::Player,
+            guid: 1,
+        });
+        assert!(!stand_in_drives(Some(&c)));
+    }
 }
