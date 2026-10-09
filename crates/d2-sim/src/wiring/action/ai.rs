@@ -452,8 +452,82 @@ impl<X: Pending> AiTargets for View<'_, X> {
     ) -> bool {
         self.h.x.choose_alternative(game, unit, main, alt)
     }
+    /// `0x005DDC30` (`ai.md` §5.3) with the host's candidate list: the
+    /// scan 6 callback `0x005DCBD0` (full-size distance < 49, `nThreat`
+    /// class slots, the mask 4 line test) and the pick between main and
+    /// alternative (`0x005DD510`: no main → the alternative).
+    /// PROVISIONAL (q-fix-ass-traps, REC-1270): the filter `0x005DC970`
+    /// beyond alive / hostile and `0x005DD510`'s other branches are not
+    /// applied; settled by the ass-lightning-sentry-hit check.
     fn secondary_target(&mut self, game: &mut Game, unit: UnitId) -> (Option<UnitId>, i32, bool) {
-        self.h.x.secondary_target(game, unit)
+        let Some(cands) = self.h.x.secondary_candidates(game, unit) else {
+            return self.h.x.secondary_target(game, unit);
+        };
+        let at = self.h.path_position(unit);
+        let size = self.path_size(unit);
+        let mut main = (None, 0x7FFF_FFFF);
+        let mut alt = (None, 0x7FFF_FFFF);
+        for c in cands {
+            let d = crate::monsters::ai::distance_full_size(at, size, self.h.path_position(c));
+            if d >= 49 {
+                continue;
+            }
+            let is_player = self
+                .units
+                .get(c)
+                .is_some_and(|r| r.ty == crate::units::UnitType::Player);
+            let threat = match self.units.get(c) {
+                Some(_) if is_player => 14,
+                Some(r) => self
+                    .h
+                    .tables
+                    .combat
+                    .monstats
+                    .get(r.class as usize)
+                    .map_or(0, |m| i32::from(m.threat)),
+                None => continue,
+            };
+            // PROVISIONAL (specs/monsters/ai.md §5.3 step 1, REC-1270): a
+            // monster candidate in the scanner's melee range (`0x00622C40`
+            // step 3: d ≤ 0, or d ≤ `MeleeRng` + 1; the line a → c is not
+            // tested) is skipped, whatever its states; 1.14d: a Lightning
+            // Sentry (MeleeRng 0) never picks a Fallen at distance 1.
+            if !is_player {
+                let reach = self
+                    .h
+                    .tables
+                    .combat
+                    .monstats
+                    .get(self.units.get(unit).map_or(0, |r| r.class as usize))
+                    .and_then(|m| {
+                        self.h
+                            .tables
+                            .combat
+                            .monstats2
+                            .get(usize::from(m.monstatsex))
+                    })
+                    .map_or(0, |m2| match m2.meleerng {
+                        255 => 0,
+                        r => i32::from(r),
+                    });
+                if d <= 0 || d <= reach + 1 {
+                    continue;
+                }
+            }
+            let slot = if threat >= 2 { &mut main } else { &mut alt };
+            if d >= slot.1 {
+                continue;
+            }
+            if self.line_blocked(game, unit, c) {
+                continue;
+            }
+            *slot = (Some(c), d);
+        }
+        let (t, d) = if main.0.is_some() { main } else { alt };
+        match t {
+            Some(t) => (Some(t), d, self.h.x.in_melee_range(unit, t, 0)),
+            None => (None, 0x7FFF_FFFF, false),
+        }
     }
     /// `0x005DDF20` (`ai.md` §5.3): scan 2 (mode 1, §5.4: the client
     /// players of the unit's room's near-room list, own room included, in

@@ -664,6 +664,8 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
             }
         }
     }
+    let levels = hooks.monster_skills.clone();
+    hooks.x.monsters.set_levels(levels);
     hooks.x.sides = sides;
     hooks.x.sizes = sizes;
     let mut units = BTreeMap::new();
@@ -1085,6 +1087,24 @@ impl Pending for LocalSeams {
             Some((t, d)) => (Some(t), d, self.in_melee_range(unit, t, 0)),
             None => (None, 0x7FFF_FFFF, false),
         }
+    }
+    /// The live foes of `unit` in unit-key order (the scan 6 candidates;
+    /// the distance, threat class and line gates run in the sim's
+    /// `secondary_target`).
+    fn secondary_candidates(&mut self, _: &mut Game, unit: UnitId) -> Option<Vec<UnitId>> {
+        let side = self.player_side(unit)?;
+        Some(
+            self.sides
+                .iter()
+                .filter(|&(&u, &(ty, ..))| {
+                    u != unit
+                        && ty == UnitType::Monster
+                        && self.player_side(u) != Some(side)
+                        && !self.down.contains(&u)
+                })
+                .map(|(&u, _)| u)
+                .collect(),
+        )
     }
     /// d2rs-own, unverified (preview, D1; `0x00622870`).
     fn melee_range(&self, _: UnitId) -> i32 {

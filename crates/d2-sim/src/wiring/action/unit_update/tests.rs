@@ -178,6 +178,7 @@ fn anim_complete_reads_frame_speed_and_count() {
         speed: 0,
         pos: 0,
         events: Vec::new(),
+        drawn: Vec::new(),
     });
     a.frame_count = 0;
     assert!(anim_complete(&a));

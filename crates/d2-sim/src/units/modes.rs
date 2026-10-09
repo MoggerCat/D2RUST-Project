@@ -154,6 +154,11 @@ pub fn prepare_animation<H: UnitHooks>(
     a.action_frame = 0;
     if let Some(seq) = sequence {
         a.frame_count = seq.frame_count;
+        // Load step 3 (`0x00621210(unit, 0)`): +0x44 := the drawn frame of
+        // frame 0 · 256 when the list carries the drawn frames.
+        if let Some(&d) = seq.drawn.first() {
+            a.frame = i32::from(d) << 8;
+        }
         a.sequence = Some(seq);
     } else {
         a.sequence = None;

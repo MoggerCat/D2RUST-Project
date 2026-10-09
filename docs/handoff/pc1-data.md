@@ -460,6 +460,9 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
   (flags 0, spread -1), the dummy init `0x005B...` (init 49 / 50) or a
   think; `monsters/init.md` §4 lists none.
 
+- [q-fix-ass-traps] 0x005DC970 melee-range rule (REC-1270): `monsters/ai.md` §5.3 rule 1 skips a monster C in the scanner's melee range only when C has state 146; 1.14d's Lightning Sentry never targeted a Fallen at distance 1 (state 0 on it) but did at distance 2. Read the filter: which unit's state 146 / flag is tested, and the melee test it calls (range, line).
+- [q-fix-ass-traps] 0x005DD510 alternative order (REC-1271): does a main-less scan (only nThreat < 2 candidates) refuse an alternative farther than 5 before or after the "no main target: take it" rule? A hp-0 poked cow 6 sub-tiles from a sentry was not shot.
+
 - [q-fix-room-links] After a waypoint return to a town, does 1.14d populate only the rooms near the player (far NPCs/objects appear on approach), as d2rs does? Drive town -> waypoint -> back, snapshot units at +50 and +600 frames (`docs/handoff/q-fix-room-links.md`).
 
 ## How to check a behaviour in one command
