@@ -86,7 +86,13 @@ So far no blocker depends on the difficulty.
 
 - Run acts III–V, act4-blockers, milestones-a3-baal and the 5 missing
   act2 cells in the matrix (command above).
-- When q-tool-checkpoints' saves land, use them (replace
-  `cell_save_args`).
+- Use q-tool-checkpoints' saves (now in staging): a checkpoint name,
+  `traces/checkpoints/<name>.checkpoint`, built with `python3
+  tools/checkpoints/make.py <name>`. In Python, `make.parse()` then
+  `make.d2s_args()` give the `d2s-tool new` arguments: a sorceress with
+  her level, stats, skills, gear, quest bits, waypoints and act, all on
+  Normal. Layer `cell_save_args` on top of them: it already replaces the
+  class, skills, gear and difficulty, and keeps the quest, waypoint and
+  act flags.
 - Step 3 (the matrix with the autoplay bot) was dropped by the
   coordinator.
