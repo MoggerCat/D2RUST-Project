@@ -8,6 +8,7 @@
 use d2_formats::d2s::ItemEntry;
 use d2_sim::items::bitstream::read::read_save_entry;
 use d2_sim::items::inventory::UnitKind;
+use d2_sim::items::moves::MoveUnits;
 use d2_sim::units::{UnitId, UnitType};
 use d2_sim::wiring::inventory::load::LoadFault;
 
@@ -217,6 +218,28 @@ impl<R, S> WiredWorld<R, S> {
                     }
                 }
             }
+            // The placements put the items on the player's update list
+            // (`inventory-moves.md` §6.1 rule 1). The join sends that list
+            // as the player's item messages (`intents-events.md` §8.2 rule
+            // 3.5, `0x00597890`: 0x9C / 0x9D) and resets it (rule 3.10,
+            // `0x00597B00`), so the first tick's unit update does not send
+            // them after the join sequence. Run here at the list's end, as
+            // the start items do (REC-278): the load's later steps (corpse,
+            // hireling, quest entry, mouse skills) never touch the player's
+            // list. d2rs-own placement of the two calls, equal in effect:
+            // the join streams of `traces/checks/combat-potion-midfight.check`
+            // (frame 2: 0x9D, 0x9C × 2 before the 0x23 pair) and
+            // `cube-005-3-small-rejuvs-one-large.check` match 1.14d byte
+            // for byte (q-fix-join-items, 2026-10-09).
+            let owner = d2_sim::items::moves::Owner::player(guid);
+            let mut listed = Vec::new();
+            if !corpse && ty == UnitType::Player && d.update_bits(owner) & 1 != 0 {
+                match d2_sim::items::moves::update_list_pass(&mut d, guid, guid) {
+                    Ok(m) => listed = m,
+                    Err(e) => r.faults.push(format!("update list: {e:?}")),
+                }
+                d.update_done(owner);
+            }
             d.sync_out();
             if !corpse {
                 for (s, v) in [HITPOINTS, MANA].into_iter().zip(remembered) {
@@ -227,6 +250,7 @@ impl<R, S> WiredWorld<R, S> {
                 .into_iter()
                 .filter_map(|(u, b)| Some((u?, b)))
                 .collect();
+            r.sent.extend(listed.into_iter().map(|m| (player, m)));
             if !corpse {
                 super::wired::return_skills(econ, &mut inv, false);
             }
