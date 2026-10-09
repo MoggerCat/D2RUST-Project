@@ -599,3 +599,27 @@ pub fn recorded_rooms() -> Vec<(bool, u8, u16, u16)> {
         })
         .collect()
 }
+
+/// One server→client message of the Wine recording of a new Rogue
+/// Encampment sorceress (`facts/join/a1-new-sor.tsv`): the server frame
+/// (`None` before the first), the message id and its size.
+pub fn recorded_new_sor() -> Vec<(Option<u32>, u8, usize)> {
+    const FACTS: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../facts/join/a1-new-sor.tsv"
+    ));
+    FACTS
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.starts_with("n\t"))
+        .filter_map(|l| {
+            let f: Vec<&str> = l.split('\t').collect();
+            (f.get(2) == Some(&"s2c")).then(|| {
+                (
+                    f[1].parse().ok(),
+                    u8::from_str_radix(f[3], 16).expect("id"),
+                    f[4].parse().expect("size"),
+                )
+            })
+        })
+        .collect()
+}
