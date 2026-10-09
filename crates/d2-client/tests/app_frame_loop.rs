@@ -161,7 +161,7 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     assert_eq!((b.world().frames, b.world().server_ticks), (3, 2));
     assert!(b.world().in_game, "0x04 received");
     assert_eq!(b.world().local_player.map(|k| k.guid), Some(player_guid));
-    let joined = b.log().handled;
+    let joined = (b.log().handled + b.log().queued) as usize;
 
     // The waypoint menu of the player open (staged as the bridge's
     // end-to-end test does), then an intent sent between frames 3 and 4
@@ -216,44 +216,17 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     app.update();
     let b = &bridge(&app).0;
     assert_eq!((b.world().frames, b.world().server_ticks), (4, 3));
-    // Twenty-three applied at receive over frames 2–4: the three of game
-    // creation, fifteen of the join (0x76, 0x7E and 0xAA have owner specs
-    // and handlers now: `msg-ui.md` §22, `msg-units.md` §7, §6; the join's
-    // 0x53 after 0x03, `intents-events.md` §8.2 rule 4, goes to its
-    // handler too; a new character's 0x5F and two 0x23, §8.2 rule 7),
-    // five of the travel; the 0x0D waits on its unit's queue for the
-    // update pass (`client/model.md` §4, §5); nothing is unowned
-    // (`client/bridge.md` §6 rule 3).
-    // (Plus the room switch's 0x07 for the Blood Moor room bordering
-    // the synthetic town: 19; plus its cave entrance's 0x09, a level
-    // warp tile unit, `path-placement.md` §12.1: 20.)
-    // Plus Akara, the synthetic town NPC (`q-quests`): two handled
-    // messages of her add (her 0xAC and a stat/state message), her 0x6D
-    // waits on her unit's queue: 22. Plus the Blood Moor's second warp
-    // tile, to the Black Marsh (`q-a1-tower`, d2rs-own): its 0x09: 23. Kashya
-    // (`q-a1-bloodraven`) adds the same three as Akara: 26. Gheed and
-    // Charsi (`q-town-gaps`) add two each (their 0x6D is not counted): 30.
-    // (q-a1-vis-links: the Blood Moor's tiles to the Black Marsh and the
-    // Burial Grounds are gone, the fixture now follows the 1.14d links: 28.)
-    // Warriv (q-smoke-travel, REC-280) adds two as Gheed and Charsi: 30.
-    // (q-smoke-town: the new character has its creation stats, so the
-    // join's vitals call sends S→C 0x95, `intents-events.md` §8.2 rule
-    // 3.9, and its eight stat messages twice, rules 3.4 and 3.8, now that
-    // the synthetic `itemstatcost` marks stats 0–15 `Saved`, as the
-    // recorded join's "8 stat messages" both times: 30 + 1 + 16 = 47.
-    // With creation stats the start items run too (`charstats` present):
-    // the new character's Horadric Cube (`start_extra`, REC-244), sent as
-    // the join's item messages (rule 3.5): its S→C 0x9C PutInContainer
-    // (`msg-stats-items.md` §2): 47 + 1 = 48.)
-    // (q-fix-proto: the join sequence after 0x04, `intents-events.md`
-    // §8.3: 0x5B, 0x65 and the join 0x5A: 48 + 3 = 51.)
-    // (q-fix-flow-server: the first tick's per-client update flushes the
-    // changed-stat array, still holding the join's eight stats, and the
-    // flag-ex bit 21 set by the item messages runs the inventory refresh's
-    // 0x48, before the 0x04: `sim/tick.md` §6 rule 5, recorded frame 2
-    // "0x1D / 0x1E, 0x48, 0x04"; after 0x04 the state-3 refresh's 0x48 and
-    // the join's 0x8D, `sim/tick.md` §6 rule 4: 51 + 8 + 1 + 1 + 1 = 62.)
-    assert_eq!(joined, 62);
+    // Every message of the join reaches a handler: the Wine recording of a
+    // new Rogue Encampment sorceress (`facts/join/a1-new-sor.tsv`, REC in
+    // `facts/join`) has 127 server→client messages up to the first tick
+    // (game creation, the loader and join sequence of `game-join.md`, the
+    // first tick's flush); the client applies (or queues on the unit) as
+    // many (`client/bridge.md` §6 rule 3: nothing is unowned).
+    let recorded = app_support::recorded_new_sor()
+        .into_iter()
+        .filter(|(frame, _, _)| frame.is_none_or(|f| f <= 2))
+        .count();
+    assert_eq!(joined, recorded);
     // Plus two for the Blood Moor room bordering the synthetic town: its
     // 0x07 at the join and its 0x08 when the travel leaves the town.
     // Plus two for that room's cave entrance (a tile unit): its 0x09 at
