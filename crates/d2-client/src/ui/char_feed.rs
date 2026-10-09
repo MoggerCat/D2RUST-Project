@@ -11,7 +11,7 @@
 //! `AR` / §4 entry 2 with `attack_rating` (`combat/hit.md` §1). Measured
 //! against 1.14d (REC-269: `facts/client/ui/char-panel-ama-*.tsv`).
 //!
-//! PROVISIONAL (REC-702, d2rs-own, unverified): the skill-side terms
+//! PROVISIONAL (REC-705, d2rs-own, unverified): the skill-side terms
 //! these entries add (`ddam calc1` / `calc2`, `phys_min` / `elem_min`
 //! of the skill, `to_hit(U, id, L)`, the `finishing` charges), the
 //! weapon mastery, `item_normaldamage`, the grip-2 secondary damage and
@@ -289,7 +289,7 @@ fn hand(
 
 /// The weapon in use `0x0063BEF0` as the client model knows it: the
 /// `weapons.txt` row of the item at body location 4 (right arm), else 5.
-/// d2rs-own, unverified (REC-702): the weapon-switch slot and a shield in
+/// d2rs-own, unverified (REC-705): the weapon-switch slot and a shield in
 /// location 4 are not told apart.
 fn weapon_in_use(world: &ClientWorld, key: UnitKey, tables: &CharTables) -> Option<WeaponRow> {
     use crate::bridge::items::{items, mode};
