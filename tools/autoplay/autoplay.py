@@ -395,8 +395,18 @@ class Bot:
 
     def click(self, p, button="L", hold=2):
         x, y = clamp_screen(p)
+        st = self.h.state()
+        if 9 in st["client"]["open"]:
+            # the Esc menu is up (an Esc that closed a panel opened it):
+            # never click into it; Esc closes it first
+            self.act("close the Esc menu")
+            self.h.cmd("key esc")
+            self.h.step(4)
+            st = self.h.state()
+        if st["client"].get("exit_requested") or st.get("local") is None:
+            raise Stuck("the player left the game (exit requested)")
         self.act(f"click {button} {x} {y}")
-        before = self.sent_total()
+        before = sum(st["client"]["sent"].values())
         self.h.cmd(f"press {button} {x} {y}")
         self.h.step(hold)
         self.h.cmd(f"release {button} {x} {y}")
@@ -824,6 +834,8 @@ class Bot:
 
     # ---- the plan
 
+    keep_going = False
+
     def run(self, milestones, only=None):
         results = []
         stuck = None
@@ -852,6 +864,7 @@ class Bot:
                 if isinstance(e, HostError):
                     e.reason = f"host failure: {e}"
                 v = self.v
+                first = stuck
                 stuck = {
                     "milestone": m.name,
                     "reason": e.reason,
@@ -861,8 +874,17 @@ class Bot:
                     "actions": list(self.actions),
                 }
                 self.say(f"{m.name}: STUCK at frame {stuck['frame']} level {stuck['level']} pos {stuck['pos']}: {e.reason}")
-                results.append({"name": m.name, "reached": False, "frame": stuck["frame"]})
-                break
+                results.append({"name": m.name, "reached": False, "frame": stuck["frame"],
+                                "reason": e.reason})
+                if first is not None:
+                    stuck = first  # the report keeps the first stuck point
+                if not self.keep_going or isinstance(e, HostError):
+                    break
+                # --keep-going: clear the screen and try the next milestone
+                try:
+                    self.close_panels()
+                except Stuck:
+                    break
         frames = (self.v.frame - t0) if (self.v and t0 is not None) else 0
         return results, stuck, frames
 
@@ -893,6 +915,7 @@ def main(argv=None):
     ap.add_argument("--work", help="work dir (default target/autoplay/act<N>-<time>)")
     ap.add_argument("--json", help="also write the result (autoplay-result-1) here")
     ap.add_argument("--build", action="store_true")
+    ap.add_argument("--keep-going", action="store_true", help="after a stuck milestone, try the next ones (probe plans)")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
     if a.selftest:
@@ -928,6 +951,7 @@ def main(argv=None):
     print(f"autoplay {VERSION}: act {a.act}, {' '.join(host.cmdline)}")
     print(f"work dir {work}")
     bot = Bot(host, plan)
+    bot.keep_going = a.keep_going
     ms = plan["milestones"]
     if a.start:
         names = [m.name for m in ms]
@@ -968,6 +992,8 @@ def main(argv=None):
         "act": a.act,
         "command": " ".join(host.cmdline),
         "reached": reached,
+        "reached_any": sum(1 for r in results if r["reached"]),
+        "stuck_all": [r for r in results if not r["reached"]],
         "total": len(getattr(bot, "milestones", ms)) if not a.only else 1,
         "milestones": results,
         "ticks": frames,
@@ -979,6 +1005,10 @@ def main(argv=None):
     print()
     if bot.not_npc:
         result["not_talking"] = sorted(bot.not_npc)
+    if len(result["stuck_all"]) > 1:
+        print("all stuck milestones (--keep-going):")
+        for r in result["stuck_all"]:
+            print(f"  {r['name']} frame {r['frame']}: {r.get('reason')}")
     print(f"act {a.act}: {reached}/{result['total']} milestones, {result['game_seconds']} s game time, "
           f"{bot.deaths} deaths, {result['wall_seconds']} s wall")
     if stuck:
