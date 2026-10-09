@@ -280,6 +280,41 @@ Rhythm (settles question 8): a map-AI walk leaves command 4 with 12
 tries and delay 10; the walk ends inline (`ai.md` §1.4), and from then on each
 think within 3 of the node is "idle 10" until the tries run out. So
 idle 10 is command 4's delay, and idle 8 is the fallback of step 6.
+**Path node choice, summary** (2026-10-09, re-read `0x005E7080`,
+`0x0045C3E0`, `0x005E6DE0`; the questions of the Act I arrival
+compare, `docs/handoff/q-scenes-compare.md`):
+
+1. *Order.* None. A think that reaches the map AI (steps 3 and 4
+   returned 0) draws the unit seed (+0x20) once, `lo' % 100`
+   (unsigned); ≥ 66 → no node, step 6 idle 8. Else a second draw picks
+   the node uniformly, i = `roll(count)`: count a power of two → `lo' &
+   (count − 1)`, else `lo' % count`; **count 1 still draws**. The same
+   node can come again; there is no next / previous index, no wrap and
+   no reverse, and nothing remembers the last node.
+2. *Walk target.* The node's own (x, y) (DS1 path point plus the preset
+   offset, `ai.md` §3.1, `drlg/preset.md` §7), not a point near it. At
+   the node already (path distance 0) the handler returns 0 → idle 8.
+3. *Wait.* After a walk starts, command 4 holds (x, y, 12, 10) (20
+   tries for action 2): each later think while it has tries walks again
+   when farther than 3, else idles 10; the map AI is not reached until
+   the tries run out. Then every think: 34 % idle 8, 66 % a new random
+   node.
+4. *Draws per think.* Map AI: 2 (1 when the first is ≥ 66; 0 when the
+   unit has no nodes). Command 4 and the walk itself draw nothing here.
+5. *Precedence.* The interaction handler (step 3) runs first: while it
+   takes a player (`ai.md` §5.3 scan 2: within 15, and for `interact`
+   NPCs only when the quest active test `world/quests.md` §6.4 holds),
+   a player 3–23 away gives walk in radius (step 7) and the map AI is
+   not reached. A path-node walk therefore means no player was taken
+   that think.
+
+d2rs (`monsters/ai/npc.rs` `npc_map_ai`, `rng.rs` `roll`) follows rules
+1–4. The Act I scene difference (d2rs's Warriv standing on (4866, 4235)
+at r110 while 1.14d's walks east) is therefore not in the node choice;
+it is the seed state or the think in which the pick happens (unit seed
+order, `q-fix-real-unit-seed-order`), or the step-3 gate (§6.4). Which
+one is a live run (PC1-C, `docs/handoff/pc1-day3-a.md` "Live runs").
+
 1.14d-confirmed (all functions above); D2MOO differs: it tests the
 interaction block the other way round (returns 0 when one exists) and
 reconstructs G as a local that is always 0 (so always method 5).

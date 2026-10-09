@@ -55,3 +55,15 @@ points: 800–814.
   `specs/tools/scenario-masks-c2s.tsv` (`tools/scenario.md` §6 rule 4,
   `packets-trace.md` rule 5). d2rs's zeros stay; the comparator has to
   learn the c2s masks: row `q-fix-tool-c2s-masks`.
+- **Item 2 — town NPC path choice.** Re-read the map AI `0x005E7080`, the
+  roll `0x0045C3E0` and the walk handler `0x005E6DE0`; the rule in
+  `specs/monsters/ai-bodies.md` §9.9 was already exact. A summary is now
+  written there ("Path node choice"): no order, no wrap or reverse;
+  per think `lo' % 100` < 66, then i = `roll(count)` (count 1 still
+  draws); the walk target is the node itself; command 4 (12 tries, idle
+  10, walks again past 3) holds the NPC before the next pick; the
+  interaction step runs first. d2rs's `npc_map_ai` and `roll` follow it,
+  so the Warriv difference at r110 of the Act I scenes comes from the
+  seed state or think timing, or from the interaction gate (item 3).
+  No q-fix row for the node choice. Which cause it is: live run 1 below
+  (`traces/checks/rng-town-idle-sor.check`).
