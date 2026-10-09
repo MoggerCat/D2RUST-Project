@@ -1,0 +1,6 @@
+# Missile and superunique pokes next to the player (Rogue Encampment).
+# missiles row 58 = firebolt, superuniques row 3 = Rakanishu (rows of the
+# 1.14d tables, read with `data-tool patch render --base`).
+poke 1
+at 1 superunique 3 @x+4 @y+4
+at 2 missile 58 @x @y @x+10 @y+10 skill 36 1
