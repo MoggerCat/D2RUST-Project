@@ -29,6 +29,7 @@
 //! reads the model.
 
 pub mod automap_view;
+pub mod background_view;
 pub mod corpse_click;
 pub mod disguise;
 pub mod feed;
@@ -238,6 +239,9 @@ pub struct UnitPose {
     pub cof: CanonicalPath,
     pub dir: usize,
     pub frame: usize,
+    /// `dir64` after the §3 r4 snap (`render/unit-composite.md`): the
+    /// cel context's direction (`specs/tools/facts-render.md` §2 r3).
+    pub dir64: u8,
 }
 
 /// One map tile draw, fully answered by [`ViewRules::tiles`].
@@ -254,6 +258,33 @@ pub struct TileDraw {
     pub key: DrawKey,
     /// Debug label (`ItemTag::Tile`).
     pub cell: (i32, i32),
+}
+
+/// A composite slot whose file is in no archive ([`ViewRules::unit_slot_calls`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SlotCall {
+    /// The slot index (the draw key's `sub`).
+    pub slot: u8,
+    /// The COF layer of the slot's component.
+    pub layer: usize,
+    /// The component file the call names.
+    pub path: CanonicalPath,
+}
+
+/// A cel draw call that puts no pixel in the frame: a [`SlotCall`] keyed
+/// in the unit's pass (or its shadow pass). Logged in
+/// [`WorldFrame::unit_calls`], never composed (`tools/facts-render.md` §5
+/// r15).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnitCall {
+    pub key: DrawKey,
+    pub tag: ItemTag,
+    pub path: CanonicalPath,
+    /// The cel context's direction ([`UnitPose::dir64`]).
+    pub dir64: u8,
+    pub frame: usize,
+    /// The shadow pass call (`CelDrawShadow`).
+    pub shadow: bool,
 }
 
 impl TileDraw {
@@ -330,6 +361,26 @@ pub trait ViewRules {
         _assets: &ViewAssets,
     ) -> Result<Vec<DrawItem>, ViewError> {
         Ok(Vec::new())
+    }
+
+    /// The slots of `unit`'s composite whose component request succeeds
+    /// but whose file is in no archive (`render/unit-composite.md` §6 r4):
+    /// they draw nothing, but 1.14d still makes the cel draw call (and the
+    /// shadow call), which the rendering facts log
+    /// (`tools/facts-render.md` §5 r15). The default has none.
+    fn unit_slot_calls(
+        &self,
+        _unit: &ClientUnit,
+        _pose: &UnitPose,
+        _cof: &Cof,
+    ) -> Result<Vec<SlotCall>, ViewError> {
+        Ok(Vec::new())
+    }
+
+    /// The unit's shadow pass slot (`draw-order.md` §6 r3), the key of
+    /// its shadow calls; `None` (the default) draws no shadow call.
+    fn unit_shadow_key(&self, _unit: &ClientUnit) -> Option<crate::rules::draw_order::OrderKey> {
+        None
     }
 
     /// The component's frame, or `None` when the slot draws nothing
@@ -467,6 +518,13 @@ pub struct WorldFrame {
     /// ([`TileDraw::is_call_only`]), as items with an empty clip, sorted
     /// by key; not composed. Read by the facts export (§5 r12).
     pub calls: Vec<DrawItem>,
+    /// Each drawn unit's cel context direction ([`UnitPose::dir64`]) by
+    /// GUID, for the rendering facts (`specs/tools/facts-render.md` §5
+    /// r14).
+    pub unit_dirs: BTreeMap<u32, u8>,
+    /// Cel draw calls without pixels (a component file in no archive),
+    /// sorted by key; not composed. Read by the facts export (§5 r15).
+    pub unit_calls: Vec<UnitCall>,
     /// The units' draw slots of the frame's draw order (`draw-order.md`
     /// §3 r4, §5, §10); `None` when no order was computed (no map feed).
     /// The layers drawn after the build (ground items) take their keys
@@ -561,6 +619,8 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
     }
 
     let (mut units_drawn, mut units_hidden) = (0, 0);
+    let mut unit_dirs = BTreeMap::new();
+    let mut unit_calls = Vec::new();
     for unit in world.units.values() {
         let Some(pose) = rules.unit_pose(world, unit)? else {
             units_hidden += 1;
@@ -597,6 +657,24 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
         let shadows = rules.unit_shadows(world, unit, &pose, None, &draws, assets)?;
         items.extend(draws.into_iter().map(|d| d.item));
         items.extend(shadows);
+        unit_dirs.insert(unit.key.guid, pose.dir64);
+        let shadow_at = rules.unit_shadow_key(unit);
+        for c in rules.unit_slot_calls(unit, &pose, cof)? {
+            let call = |pass, major, minor, shadow| -> Result<UnitCall, ViewError> {
+                Ok(UnitCall {
+                    key: DrawKey::new(pass, major, minor, c.slot).map_err(ViewError::Scene)?,
+                    tag: params.tag,
+                    path: c.path.clone(),
+                    dir64: pose.dir64,
+                    frame: pose.frame,
+                    shadow,
+                })
+            };
+            unit_calls.push(call(params.pass, params.major, params.minor, false)?);
+            if let (Some(at), true) = (shadow_at, cof.layers[c.layer].shadow != 0) {
+                unit_calls.push(call(at.pass, at.major, at.minor, true)?);
+            }
+        }
         units_drawn += 1;
     }
 
@@ -612,6 +690,11 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
         calls: {
             scene::order(&mut calls);
             calls
+        },
+        unit_dirs,
+        unit_calls: {
+            unit_calls.sort_by_key(|c| c.key);
+            unit_calls
         },
         slots: None,
     })

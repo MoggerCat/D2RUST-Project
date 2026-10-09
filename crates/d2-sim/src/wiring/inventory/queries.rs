@@ -31,7 +31,7 @@ const EVENT_REPLENISH: u32 = 3;
 
 impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
     /// The items class of an item unit (its item data's record).
-    fn class_of(&self, u: UnitId) -> Option<usize> {
+    pub(super) fn class_of(&self, u: UnitId) -> Option<usize> {
         self.econ.items.get(u).map(|i| i.record)
     }
 
@@ -160,8 +160,11 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             .class_of(target)
             .and_then(|r| self.econ.tables.item(r))
             .map_or(0, |r| r.gemapplytype);
+        // A rune's mode 5 passes the socketed item as the extra unit
+        // (§9 rule 2).
         if let Err(e) = self.econ.with_item(filler, |s| {
-            props::apply_socket_filler(s.tables, s.item, apply)
+            let mut on = s.unit_stats(target);
+            props::apply_socket_filler_into(s.tables, s.item, apply, Some(&mut on))
         }) {
             self.state.errors.push(InvError::Economy(e));
         }
@@ -243,13 +246,30 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
                     .is_some_and(|(e, _, _)| u32::from(e) == EVENT_REPLENISH)
             });
         let frame = self.econ.game.frame as u32;
-        let ran = self.econ.with_item(target, |s| {
-            let ran = props::activate_runeword(s.tables, s.item, row, ladder);
-            (
-                ran,
-                ran.then(|| replenish_timer(&s.item.stats, scheduled, frame))
-                    .flatten(),
-            )
+        // `properties.md` §10.2: I is the filler just inserted (the last
+        // of the socketed item's inventory list), O the socketed item.
+        let Some(filler) = self
+            .state
+            .inventories
+            .get(&target)
+            .and_then(|inv| inv.items().last().copied())
+        else {
+            return (false, Vec::new());
+        };
+        let ran = self.econ.with_item(filler, |s| {
+            let mut socketed = s.unit_stats(target);
+            props::activate_runeword(s.tables, s.item, &mut socketed, row, ladder)
+        });
+        let ran = ran.and_then(|ran| {
+            if !ran {
+                return Ok((false, None));
+            }
+            if let Some(i) = self.econ.items.get_mut(target) {
+                i.flags |= crate::items::flag::RUNEWORD;
+            }
+            self.econ.with_item(target, |s| {
+                (true, replenish_timer(&s.item.stats, scheduled, frame))
+            })
         });
         self.sync_in();
         let ran = match ran {

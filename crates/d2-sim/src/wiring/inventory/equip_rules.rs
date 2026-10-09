@@ -79,6 +79,29 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         self.note_equip(r);
     }
 
+    /// Book count change `0x0055C070(n)` on the rules
+    /// ([`bk::item_skill_add`]).
+    pub fn run_item_skill_add(&mut self, owner: UnitId, book: UnitId, n: i32) {
+        let r = bk::item_skill_add(self, owner, book, n);
+        self.note_equip(r);
+    }
+
+    /// `0x0055E0D0(S)` on the rules ([`bk::skill_decrement`]).
+    pub fn run_skill_decrement(&mut self, owner: UnitId, skill: i32) {
+        let r = bk::skill_decrement(self, owner, skill);
+        self.note_equip(r);
+    }
+
+    /// The player has skill S (`0x006439B0`): its quantity slot exists.
+    pub fn owns_skill(&self, owner: UnitId, skill: i32) -> bool {
+        bk::EquipWorld::skill_quantity(self, owner, skill).is_some()
+    }
+
+    /// `0x00576E40` on the rules ([`bk::item_skill_remove`]).
+    pub fn run_item_skill_remove(&mut self, owner: UnitId, item: UnitId, n: i32) {
+        bk::item_skill_remove(self, owner, item, n);
+    }
+
     /// §5.5 cube recount `0x0055FA40` on the rules.
     pub fn run_cube_recount(&mut self, owner: UnitId) {
         let r = bk::cube_recount(self, owner);

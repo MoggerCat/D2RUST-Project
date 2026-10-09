@@ -163,6 +163,7 @@ impl ViewRules for TestRules {
             cof: cof_path(),
             dir: (u.key.guid % 2) as usize,
             frame: 0,
+            dir64: 0,
         }))
     }
 

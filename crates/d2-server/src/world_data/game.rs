@@ -141,6 +141,17 @@ impl GameTables {
         })
     }
 
+    /// The monsters' skill sequences (`skills/sequences.md` §1 rule 5):
+    /// monstats slot sequences and `monseq` rows.
+    pub fn monster_sequences(
+        &self,
+    ) -> Result<d2_sim::skills::sequences::MonsterSequences, WorldDataError> {
+        Ok(d2_sim::skills::sequences::MonsterSequences::from_tables(
+            self.table("monstats")?,
+            &self.rows::<d2_data::tables::Monseq>()?,
+        ))
+    }
+
     pub fn vitals(&self) -> Result<VitalsTables, WorldDataError> {
         VitalsTables::from_bin(&self.bins).map_err(|e| err("vitals", e))
     }

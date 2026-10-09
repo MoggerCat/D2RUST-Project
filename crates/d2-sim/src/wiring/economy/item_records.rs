@@ -1,4 +1,4 @@
-// Spec: specs/world/vendors-2.md §7.3 step 3 (an item from a save record, `0x00558CB0`); specs/formats/d2s.md §8.2 rules 2, 7; specs/items/generation.md §1.4, §9 step 6
+// Spec: specs/world/vendors-2.md §7.3 step 3 (an item from a save record, `0x00558CB0`); specs/formats/d2s.md §8.2 rules 2, 7; specs/items/generation.md §1.4, §9 step 6; specs/items/bitstream-legacy.md §3 rule 9.5; specs/items/bitstream.md §5 rule 2
 //! An item unit made from one save record read back
 //! (`items::bitstream::read`): the allocation (`0x00555230`, `units.md`
 //! §3.1, a new GUID) at the record's mode, the decode into it
@@ -22,6 +22,7 @@ use super::item_stats::{StatCtx, UnitStats};
 use super::{Economy, EconomyError};
 use crate::items::bitstream::read::ReadItem;
 use crate::items::bitstream::{hflag, StatEntry, RUNEWORD_STATE, SET_STATES};
+use crate::items::create::max_sockets_at;
 use crate::items::tables::ItemRec;
 use crate::items::{flag, replenish_timer, stat, ty, Item, ItemStats, ListKey};
 use crate::rng::Seed;
@@ -89,6 +90,11 @@ impl<H: LifecycleHooks> Economy<'_, H> {
         item.gfx = it.gfx;
         item.name = it.name;
         item.ear_level = it.ear_level;
+        // `bitstream.md` §5 rule 2: a and b of the trailer to +0x1C /
+        // +0x20 (setter `0x00629EA0`).
+        if let Some((a, b)) = it.save_trailer {
+            item.realm_data = [a, b];
+        }
         item.flags = (it.flags | flag::INIT) & !flag::INSTORE;
         let r = self
             .units
@@ -113,6 +119,7 @@ impl<H: LifecycleHooks> Economy<'_, H> {
                 weapon: t.is_type(rec.record, ty::WEAP as i16),
                 armor: t.is_type(rec.record, ty::ARMO as i16),
                 throwable: t.itype_of(rec.record).is_some_and(|y| y.throwable != 0),
+                max_sockets: max_sockets_at(t, rec.record, it.ilvl),
             });
             set_record_stats(&mut s, it, rebuild.as_ref());
             replenish_timer(&s, false, frame)
@@ -135,6 +142,8 @@ struct Rebuild {
     weapon: bool,
     armor: bool,
     throwable: bool,
+    /// Max sockets at the record's item level (`0x0062BC20`).
+    max_sockets: i32,
 }
 
 /// §7.3.1 rule 1: the weapon's base speed and damage of the decoder
@@ -224,8 +233,17 @@ fn set_record_stats(
     if it.stackable {
         s.set_base(stat::QUANTITY, 0, it.total_quantity);
     }
+    // `bitstream-legacy.md` §3 rule 9.5: the socket setter `0x0062BE00`:
+    // count := min(max(v, 1), min(w × h, 6), max sockets); w × h = 0 →
+    // nothing (flag 0x800 is already the record's).
     if it.flags & hflag::SOCKETED != 0 {
-        s.set_base(stat::NUMSOCKETS, 0, it.base_sockets);
+        if let Some(rb) = rebuild {
+            let cells = i32::from(rb.rec.invwidth) * i32::from(rb.rec.invheight);
+            if cells != 0 {
+                let n = it.base_sockets.max(1).min(cells.min(6)).min(rb.max_sockets);
+                s.set_base(stat::NUMSOCKETS, 0, n);
+            }
+        }
     }
     // §7.3.1 rules 1–2: the base values the stream does not carry.
     if let Some(rb) = rebuild {

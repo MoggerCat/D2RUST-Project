@@ -744,6 +744,42 @@ fn the_preview_runs_the_sight_test_over_the_client_drlg() {
     assert_eq!(hidden(&mut feed, &m.w), Some(false));
 }
 
+// Covers: specs/render/draw-order.md §5 r3
+#[test]
+fn missiles_take_the_sight_test() {
+    use crate::world_view::missiles::missile_hidden;
+    use crate::world_view::model_feed::ModelFeed;
+    use crate::world_view::preview::Preview;
+    use crate::world_view::unit_facts::UnitFactTables;
+    use crate::world_view::ViewFeed;
+    use d2_sim::drlg::collision::bits;
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    let mut feed = ModelFeed::new(ZeroFacts)
+        .with_map()
+        .with_preview(Preview::default());
+    feed.levels = Some(vec![LevelRow::default(); 4]);
+    let mut los_draw = vec![false; 4];
+    los_draw[2] = true;
+    // Missile row 0 has `Size` 1 (`path-placement.md` §3).
+    feed.set_unit_fact_tables(UnitFactTables {
+        missile_size: vec![1],
+        los_draw,
+        ..UnitFactTables::default()
+    });
+    // A missile on sub-tile (46, 20), 0.5 into it.
+    let at = ((46 << 16) + 0x8000, (20 << 16) + 0x8000);
+    assert!(!missile_hidden(&m.w, &feed, 0, at), "open line: drawn");
+    let drlg = &mut m.w.drlg.as_mut().unwrap().drlg;
+    *drlg.collision_at_mut(46, 14).unwrap() |= bits::VISIBLE;
+    assert!(missile_hidden(&m.w, &feed, 0, at), "behind a wall: hidden");
+    // `LOSDraw` 0: every missile passes.
+    feed.unit_tables.as_mut().unwrap().los_draw[2] = false;
+    assert!(!missile_hidden(&m.w, &feed, 0, at));
+}
+
 // Covers: specs/seams/bridge-app.md §2.10
 #[test]
 fn a_new_client_drlg_drops_the_tile_draw_state() {
@@ -987,4 +1023,101 @@ fn the_fade_player_tile_is_the_predicted_sub_tile() {
     m.w.frames += 1;
     let near = feed.near_rooms(&m.w).unwrap().unwrap();
     assert_eq!(near.player_tile, (10, 2));
+}
+
+// Covers: specs/render/lighting.md §10 r1
+// Covers: specs/render/lighting.md §10 r5
+#[test]
+fn the_den_counter_places_the_den_lights_and_later_rooms_get_them() {
+    use crate::bridge::client_missiles::ClientMissileRow;
+    use crate::bridge::msg::lighting::lighting_update;
+    use crate::rules::lighting::overrides::den_light_points;
+    use crate::rules::lighting::records::LightKind;
+    use d2_sim::rng::Seed;
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    // The fixture's rooms stand in for the Den of Evil (level 8).
+    for r in m.w.active_rooms.as_mut().unwrap() {
+        r.level = 8;
+    }
+    m.inputs.tables.missiles = vec![ClientMissileRow::default(); 288];
+    m.inputs.tables.missiles[287] = ClientMissileRow {
+        light: 10,
+        rgb: (255, 255, 255),
+        clt_do_func: 23,
+        ..ClientMissileRow::default()
+    };
+    m.inputs.high_light_quality = true;
+    let p = m.w.local_player.unwrap();
+    // The same draws by hand (§10 r1): per room in list order, the local
+    // player's seed, the point test with mask 5.
+    let rooms = m.w.active_rooms.clone().unwrap();
+    let (lo, hi) = m.w.units[&p].seed.unwrap();
+    let mut seed = Seed::new(lo, hi);
+    let drlg = &m.w.drlg.as_ref().unwrap().drlg;
+    let mut want = Vec::new();
+    for r in &rooms {
+        want.extend(den_light_points(
+            (r.x0, r.y0, r.w, r.h),
+            &mut seed,
+            |x, y| drlg.collision_at(x, y).map_or(0x27, u32::from) & 5,
+        ));
+    }
+    assert!(!want.is_empty());
+    // Counter 29 → 30 on this update: the flag and the lights.
+    m.w.overrides.den_counter = 29;
+    lighting_update(&mut m.w, &m.inputs).unwrap();
+    assert!(m.w.overrides.den_flag);
+    let mut got: Vec<(i32, i32)> =
+        m.w.objclient
+            .set_c
+            .values()
+            .filter(|u| u.class == 287)
+            .map(|u| {
+                let (x, y) = u.cell();
+                (i32::from(x), i32::from(y))
+            })
+            .collect();
+    got.sort();
+    want.sort();
+    assert_eq!(got, want);
+    assert_eq!(
+        m.w.units[&p].seed,
+        Some((seed.lo, seed.hi)),
+        "the player's seed stepped"
+    );
+    let den_lights =
+        m.w.lights
+            .iter()
+            .filter(|(_, r)| r.owner_type == 3 && r.lookup_flag)
+            .inspect(|(_, r)| assert_eq!((r.kind, r.radius), (LightKind::Plain, 80)))
+            .count();
+    assert_eq!(den_lights, want.len());
+    // Once the flag is set, a level-8 room loaded later gets its lights
+    // (`0x0046BE60`); nothing else on later updates.
+    let n = m.w.objclient.set_c.len();
+    lighting_update(&mut m.w, &m.inputs).unwrap();
+    assert_eq!(m.w.objclient.set_c.len(), n);
+    m.w.rooms_loaded.push(rooms[0].room);
+    let (lo, hi) = m.w.units[&p].seed.unwrap();
+    let mut seed = Seed::new(lo, hi);
+    let more = den_light_points(
+        (rooms[0].x0, rooms[0].y0, rooms[0].w, rooms[0].h),
+        &mut seed,
+        |x, y| drlg_point(&m.w, x, y),
+    );
+    lighting_update(&mut m.w, &m.inputs).unwrap();
+    assert_eq!(m.w.objclient.set_c.len(), n + more.len());
+}
+
+fn drlg_point(w: &super::super::world::ClientWorld, x: i32, y: i32) -> u32 {
+    w.drlg
+        .as_ref()
+        .unwrap()
+        .drlg
+        .collision_at(x, y)
+        .map_or(0x27, u32::from)
+        & 5
 }

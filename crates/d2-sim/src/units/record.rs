@@ -67,6 +67,8 @@ pub struct Sequence {
     pub frame_count: i32,
     /// +0x3C.
     pub speed: i32,
+    /// +0x38, the position in the list, 8.8 (0 at the load).
+    pub pos: i32,
     /// Event byte per frame index.
     pub events: Vec<u8>,
 }

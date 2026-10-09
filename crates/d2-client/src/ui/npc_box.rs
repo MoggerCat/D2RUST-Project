@@ -864,6 +864,14 @@ impl OriginalUi {
                     .outcome
                     .sounds
                     .push(crate::audio::driver::SoundRequest::Ui(id)),
+                PanelOutput::PlayerEvent(event) => {
+                    let local = self.shared.borrow().facts.local;
+                    if let Some(unit) = local {
+                        self.outcome
+                            .sounds
+                            .push(crate::audio::driver::SoundRequest::PlayerEvent { unit, event });
+                    }
+                }
             }
         }
         self.sync_root(root);

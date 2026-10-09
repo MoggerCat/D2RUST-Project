@@ -204,6 +204,20 @@ fn cof_and_component_names_from_the_looks() {
     // D1 preview: no items, so the torso is `lit`.
     let c = component_codes(&l, &p, &name, &layer).unwrap();
     assert_eq!(c.name(), "QAQTlitQNhth");
+    // The file names the layer's own weapon class (REC-441); an empty
+    // layer class keeps the unit's.
+    let one_hand = d2_formats::cof::CofLayer {
+        weapon_class: *b"1ht\0",
+        ..layer
+    };
+    let c = component_codes(&l, &p, &name, &one_hand).unwrap();
+    assert_eq!(c.name(), "QAQTlitQN1ht");
+    let empty = d2_formats::cof::CofLayer {
+        weapon_class: [0; 4],
+        ..layer
+    };
+    let c = component_codes(&l, &p, &name, &empty).unwrap();
+    assert_eq!(c.name(), "QAQTlitQNhth");
     // A monster's weapon class is its BaseW (§2.1).
     let m = unit(MONSTER, 2, 7, 1);
     assert_eq!(
@@ -295,6 +309,22 @@ fn missing_files_are_skipped_with_one_log_line() {
     let built = build(&world, &[], &rules, &a).unwrap();
     assert_eq!((built.units_drawn, built.units_hidden), (1, 1));
     assert!(built.items.is_empty());
+    // Each slot whose file is in no archive is still a draw call
+    // (tools/facts-render.md §5 r15), in slot order; no shadow call
+    // without the shadow slot of a draw order.
+    let calls: Vec<(u8, &str, bool)> = built
+        .unit_calls
+        .iter()
+        .map(|c| (c.key.sub(), c.path.as_str(), c.shadow))
+        .collect();
+    assert_eq!(
+        calls,
+        [
+            (0, "data/global/chars/qa/qh/qaqhlitqnhth.dcc", false),
+            (1, "data/global/chars/qa/qt/qaqtlitqnhth.dcc", false),
+        ]
+    );
+    assert!(built.unit_calls.iter().all(|c| c.tag == ItemTag::Unit(1)));
 }
 
 // Covers: specs/render/unit-composite.md §5.1 r3, §6 r4

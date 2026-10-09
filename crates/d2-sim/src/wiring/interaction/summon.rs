@@ -1,4 +1,4 @@
-// Spec: specs/sim/pets.md §2–§8; specs/skills/bodies.md §6.2
+// Spec: specs/sim/pets.md §2–§8; specs/skills/bodies.md §6.2; specs/monsters/umod-callbacks.md §1 rule 5
 //! Summoned units on the skill pipeline's real providers: the summon
 //! spawn's monster creation (`0x005B2F20`, [`BodyWorld::create_monster`])
 //! and its pet list add ([`BodyEffect::PetAdd`], `0x00575D90`) run here
@@ -176,32 +176,39 @@ impl<X: Pending + UseRest> UseView<'_, X> {
         self.cv.v.allocate(game, &req, at.0, at.1)
     }
 
-    /// [`BodyEffect::PetAdd`] on the lists; every other effect comes back
-    /// for [`Pending::body_effect`].
+    /// [`BodyEffect::PetAdd`] on the lists, [`BodyEffect::OwnerData`] on
+    /// the AI control and [`BodyEffect::SetSkill`] on
+    /// [`crate::wiring::action::ActionHooks::monster_skills`]; every other
+    /// effect (and the seam parts of these two) comes back for
+    /// [`Pending::body_effect`].
     pub(super) fn pet_effect(
         &mut self,
         e: BodyEffect<UnitId, UnitId, RoomId>,
     ) -> Option<BodyEffect<UnitId, UnitId, RoomId>> {
-        if let BodyEffect::SentryLaid {
-            m,
-            owner,
-            skill,
-            level,
-            shots,
-        } = e
-        {
-            // d2rs-own, unverified (REC-233).
-            self.cv.v.h.sentries.insert(
-                m,
-                crate::wiring::action::Sentry {
-                    owner,
-                    skill,
-                    level,
-                    shots,
-                    next: 0,
-                },
-            );
-            return None;
+        if let BodyEffect::SetSkill { m, skill, lvl } = e {
+            // `0x0056DEB0` (`bodies.md` §6.5 step 6) on a monster: its
+            // entry's base level; the refreshes go on to the seam.
+            if self
+                .cv
+                .v
+                .units
+                .get(m)
+                .is_some_and(|r| r.ty == UnitType::Monster)
+            {
+                self.cv
+                    .v
+                    .h
+                    .monster_skills
+                    .entry(m)
+                    .or_default()
+                    .insert(skill, lvl);
+            }
+            return Some(e);
+        }
+        if let BodyEffect::OwnerData { m, owner, a, b } = e {
+            self.owner_data(m, owner);
+            // f1 / f2 ≠ 0 also restart the AI (`0x005DD230`): the seam's.
+            return (a != 0 || b != 0).then_some(e);
         }
         let BodyEffect::PetAdd { owner, pet, t, max } = e else {
             return Some(e);
@@ -214,6 +221,24 @@ impl<X: Pending + UseRest> UseView<'_, X> {
                 .push(crate::wiring::action::WiringError::Pet(err));
         }
         None
+    }
+}
+
+impl<X: Pending + UseRest> UseView<'_, X> {
+    /// Owner data `0x0058F030(game, m, owner GUID, owner type, …)`
+    /// (`monsters/umod-callbacks.md` §1 rule 5): the minion owner link
+    /// of m's AI control record (+0x2C GUID, +0x30 type), looked up by
+    /// GUID at every use (`0x0058F0D0`). No owner (GUID −1) drops the
+    /// link. A unit without AI control keeps none.
+    fn owner_data(&mut self, m: UnitId, owner: Option<UnitId>) {
+        let link = owner.and_then(|o| {
+            let ty = self.cv.v.units.get(o)?.ty;
+            let guid = self.cv.game.lists.unit(o)?.guid;
+            Some(crate::monsters::ai::UnitRef { ty, guid })
+        });
+        if let Some(c) = self.cv.v.h.ai.as_mut().and_then(|s| s.control_mut(m)) {
+            c.minion_owner = link;
+        }
     }
 }
 

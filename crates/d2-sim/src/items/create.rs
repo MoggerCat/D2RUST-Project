@@ -1,7 +1,8 @@
 // Spec: specs/items/generation.md
 //! The creation pipeline (§3), base stats (§4), elixirs and quest items
 //! (§5), the normal-quality routine and class skill mods (§6), sockets
-//! (§7), ethereal (§8), forced requests, ears and replenish timers (§9).
+//! (§7), ethereal (§8), forced requests, ears and replenish timers (§9),
+//! and the format-0 normal routine and class skill mods (§11).
 
 use super::quality::dispatch;
 use super::tables::ItemTables;
@@ -89,6 +90,9 @@ pub fn create_item<S: ItemStats>(
     item.inv_page = 0xFF;
     if !init_item_stats(t, game, &mut item, Some(rq), true)? {
         return Err(CreateError::Failed);
+    }
+    if let Some(f) = item.fatal {
+        return Err(f.into());
     }
     if rq.force {
         forced(t, &mut item, rq);
@@ -319,10 +323,15 @@ pub fn has_durability<S: ItemStats>(t: &ItemTables, item: &Item<S>) -> bool {
 
 /// Max sockets (`0x0062BC20`, §7.2).
 pub fn max_sockets<S: ItemStats>(t: &ItemTables, item: &Item<S>) -> i32 {
-    let (Some(r), Some(it)) = (t.item(item.record), t.itype_of(item.record)) else {
+    max_sockets_at(t, item.record, item.ilvl)
+}
+
+/// [`max_sockets`] of the items row `record` at item level `ilvl`.
+pub fn max_sockets_at(t: &ItemTables, record: usize, ilvl: i32) -> i32 {
+    let (Some(r), Some(it)) = (t.item(record), t.itype_of(record)) else {
         return 0;
     };
-    let ilvl = item.ilvl.max(1);
+    let ilvl = ilvl.max(1);
     let m = if ilvl <= 25 {
         it.maxsock1
     } else if ilvl <= 40 {
@@ -331,6 +340,51 @@ pub fn max_sockets<S: ItemStats>(t: &ItemTables, item: &Item<S>) -> i32 {
         it.maxsock40
     };
     i32::from(r.gemsockets.min(m))
+}
+
+/// The quality dispatch's normal case (`0x00556F30`): §6.1 for format ≥
+/// 1, §11.1 for format 0.
+pub fn normal_by_format<S: ItemStats>(
+    t: &ItemTables,
+    game: &dyn ItemGame,
+    item: &mut Item<S>,
+    rq: &ItemRequest,
+) -> Result<(), Fatal> {
+    if item.format < 1 {
+        normal_legacy(t, game, item, rq)
+    } else {
+        normal(t, item, rq)
+    }
+}
+
+/// Normal-quality routine, format 0 (`0x00556D80`, §11.1): one branch by
+/// the primary type (no equivalence); any other type gets class skill
+/// mods and then the socket roll.
+pub fn normal_legacy<S: ItemStats>(
+    t: &ItemTables,
+    game: &dyn ItemGame,
+    item: &mut Item<S>,
+    rq: &ItemRequest,
+) -> Result<(), Fatal> {
+    let Some(primary) = t.item(item.record).map(|r| r.type_) else {
+        return Ok(());
+    };
+    let code = t.item(item.record).map(|r| r.code);
+    match u16::try_from(primary).unwrap_or(u16::MAX) {
+        ty::PLAY => {
+            item.file_index = rq.unit.as_ref().map_or(rq.index, |u| u.class);
+            item.flags |= flag::EAR;
+        }
+        ty::CHAR => super::affixes::charm(t, item, rq)?,
+        ty::BOOK => item.suffix[0] = book_row(t, code, false),
+        ty::SCRO => item.suffix[0] = book_row(t, code, true),
+        ty::BODY => item.file_index = rq.unit.as_ref().map_or(rq.index, |u| u.class),
+        _ => {
+            class_skill_mods(t, item, rq);
+            socket_roll(t, game, item, rq);
+        }
+    }
+    Ok(())
 }
 
 /// Normal-quality routine (`0x00556E80`, §6.1).
@@ -383,7 +437,8 @@ fn pct(seed: &mut Seed) -> i32 {
     (seed.step() % 100) as i32
 }
 
-/// Class skill mods (staffmods; `0x005C1260`, `0x005C0F90`, §6.2).
+/// Class skill mods (staffmods; `0x005C1260`, `0x005C0F90`, §6.2;
+/// format 0: `0x005C0D70`, §11.2).
 pub fn class_skill_mods<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, rq: &ItemRequest) {
     let Some(c) = t.itype_of(item.record).map(|it| it.staffmods) else {
         return;
@@ -395,6 +450,10 @@ pub fn class_skill_mods<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, rq: &I
     let Some(first) = first.filter(|_| count > 0) else {
         return;
     };
+    if item.format < 1 {
+        class_skill_mods_legacy(item, rq.ilvl, first);
+        return;
+    }
     let ilvl = rq.ilvl;
     let bonus = if rq.flags2 & req::STAFFMODS_ILVL != 0 {
         rq.ilvl
@@ -465,6 +524,67 @@ pub fn class_skill_mods<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, rq: &I
             } else {
                 1
             }
+        } else {
+            1
+        };
+        item.stats
+            .list_set(ListKey::ITEM, stat::ITEM_SINGLESKILL, skill, value);
+    }
+}
+
+/// Class skill mods, format 0 (`0x005C0D70`, §11.2): no request bonus, no
+/// tier 5, no low-quality cap, redraws (without a limit) until the skill
+/// is not 73 and not chosen, no `itypea1` test.
+fn class_skill_mods_legacy<S: ItemStats>(item: &mut Item<S>, ilvl: i32, first: u16) {
+    let p = pct(&mut item.item_seed);
+    let n = if p >= 91 {
+        3
+    } else if p >= 71 {
+        2
+    } else if p >= 31 {
+        1
+    } else {
+        return;
+    };
+    let tier = if ilvl >= 25 {
+        4
+    } else if ilvl >= 19 {
+        3
+    } else if ilvl >= 12 {
+        2
+    } else {
+        1
+    };
+    let mut chosen: Vec<u16> = Vec::new();
+    for _ in 0..n {
+        let p = pct(&mut item.item_seed);
+        let tr = if p >= 81 {
+            tier + 1
+        } else if p >= 31 {
+            tier
+        } else if p >= 11 {
+            tier - 1
+        } else {
+            tier - 2
+        }
+        .max(1);
+        // At most 3 skills are chosen and one is 73, so one of the five
+        // candidates is always free: the loop ends.
+        let skill = loop {
+            let x = item.item_seed.step() % 5;
+            let skill = first
+                .wrapping_add((5 * (tr - 1)) as u16)
+                .wrapping_add(x as u16);
+            if skill != 73 && !chosen.contains(&skill) {
+                break skill;
+            }
+        };
+        chosen.push(skill);
+        let v = pct(&mut item.item_seed);
+        let value = if v >= 90 {
+            3
+        } else if v >= 60 {
+            2
         } else {
             1
         };

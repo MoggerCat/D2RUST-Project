@@ -495,3 +495,131 @@ fn assign_monster_hireling_reinit_and_source_link() {
     assert_eq!(u.state_lists[&98].get(&(354, 0)), Some(&5));
     assert_eq!(u.flag_ex & 0x400, 0x400);
 }
+
+// Covers: specs/render/lighting.md §8
+// Covers: specs/client/msg-units.md §1.3 r2
+#[test]
+fn units_get_their_lights_at_creation() {
+    use super::super::world::ObjectRow;
+    use crate::rules::lighting::records::{LightKind, LightRecord};
+    let head = |m: &Model| m.w.lights.iter().next().unwrap().1.clone();
+    let fields = |r: &LightRecord| {
+        (
+            (r.owner_type, r.owner_guid),
+            r.kind,
+            r.radius,
+            (r.i, r.r, r.g, r.b),
+        )
+    };
+    let mut m = with_monsters();
+    // 0x59 (B102): the player init's light, kind 0 while no local player
+    // exists, radius 13, white.
+    let mut b = hex("59 01 00 00 00 01 77 65 72 77 65 72 00");
+    b.resize(26, 0);
+    m.recv(&b);
+    assert_eq!(
+        fields(&head(&m)),
+        ((0, 1), LightKind::Shadowed, 8 * 13, (255, 255, 255, 255))
+    );
+    // Another player once the local one exists: kind 1.
+    m.w.local_player = Some(P1);
+    let mut b = hex("59 02 00 00 00 01 61 00");
+    b.resize(26, 0);
+    m.recv(&b);
+    assert_eq!(
+        fields(&head(&m)),
+        ((0, 2), LightKind::Plain, 8 * 13, (255, 255, 255, 255))
+    );
+    // 0xAC (B157), class 154 with `monstats2` `Light` 5 and its colour:
+    // kind 0, radius 5.
+    m.inputs.tables.monsters[154] = Some(MonsterClass {
+        light: 5,
+        light_rgb: (230, 168, 255),
+        ..MonsterClass::default()
+    });
+    m.hex("ac 06 00 00 00 9a 00 1a 12 b9 11 80 0e 01");
+    assert_eq!(
+        fields(&head(&m)),
+        ((1, 6), LightKind::Shadowed, 8 * 5, (255, 230, 168, 255))
+    );
+    // `Light` 0: none.
+    m.inputs.tables.monsters[153] = Some(MonsterClass::default());
+    let n = m.w.lights.len();
+    m.hex("ac 07 00 00 00 99 00 1a 12 b9 11 80 0e 01");
+    assert_eq!(m.w.lights.len(), n);
+    // 0x51: the object init's light, `Lit<mode>` / 2, kind 2.
+    m.inputs.tables.objects = vec![ObjectRow::default(); 4];
+    m.inputs.tables.objects[3] = ObjectRow {
+        lit: [0, 0, 12, 0, 0, 0, 0, 0],
+        rgb: (9, 8, 7),
+        ..ObjectRow::default()
+    };
+    m.hex("51 02 07 00 00 00 03 00 10 00 10 00 02 00");
+    assert_eq!(
+        fields(&head(&m)),
+        ((2, 7), LightKind::Cached, 8 * 6, (255, 9, 8, 7))
+    );
+    assert!(m.log.rejected.is_empty(), "{:?}", m.log.rejected);
+}
+
+// Covers: specs/render/shading.md §6 r1
+// Covers: specs/client/stat-lists.md §3 r6
+// Covers: specs/render/lighting.md §8
+#[test]
+fn the_local_players_light_colour_follows_its_states_and_stats() {
+    use super::super::world::StateRow;
+    use crate::rules::lighting::records::LightRecord;
+    // `shading.md` §6 r1.1, live rows: 2 `poison` (colorpri 95,
+    // colorshift 104, light 128, 255, 128), 90 `blue` (100, 108, 150,
+    // 215, 255).
+    let mut m = Model::default();
+    m.inputs.tables.states = vec![StateRow::default(); 91];
+    m.inputs.tables.states[2] = StateRow {
+        colorpri: 95,
+        colorshift: 104,
+        light_rgb: (128, 255, 128),
+        ..StateRow::default()
+    };
+    m.inputs.tables.states[90] = StateRow {
+        colorpri: 100,
+        colorshift: 108,
+        light_rgb: (150, 215, 255),
+        ..StateRow::default()
+    };
+    let mut b = hex("59 01 00 00 00 01 77 65 72 77 65 72 00");
+    b.resize(26, 0);
+    m.recv(&b);
+    m.w.local_player = Some(P1);
+    let light = |m: &Model| -> LightRecord {
+        let id = super::lighting::unit_light(&m.w, P1).unwrap();
+        m.w.lights.get(id).unwrap().clone()
+    };
+    let rgb = |m: &Model| {
+        let l = light(m);
+        (l.r, l.g, l.b)
+    };
+    // 0xA7 state on, 0xA9 state off.
+    m.hex("a7 00 01 00 00 00 02");
+    assert_eq!(rgb(&m), (128, 255, 128));
+    m.hex("a7 00 01 00 00 00 5a");
+    assert_eq!(rgb(&m), (150, 215, 255), "the greater colorpri wins");
+    m.hex("a9 00 01 00 00 00 5a");
+    assert_eq!(rgb(&m), (128, 255, 128));
+    m.hex("a9 00 01 00 00 00 02");
+    assert_eq!(rgb(&m), (255, 255, 255), "no state wins: white");
+    // Stat 90 (0x20) sets the colour when it changes; a later state call
+    // writes over it (the last writer stands).
+    m.hex("20 01 00 00 00 5a 00 00 ff 00");
+    assert_eq!(rgb(&m), (255, 0, 0));
+    m.hex("a7 00 01 00 00 00 02");
+    assert_eq!(rgb(&m), (128, 255, 128));
+    // Stat 89: radius 13 + 3.
+    m.hex("20 01 00 00 00 59 03 00 00 00");
+    assert_eq!(light(&m).radius, 8 * 16);
+    // A state with colorshift 0 runs no colour call.
+    m.w.lights
+        .set_color(super::lighting::unit_light(&m.w, P1).unwrap(), 255, 1, 2, 3);
+    m.hex("a7 00 01 00 00 00 03");
+    assert_eq!(rgb(&m), (1, 2, 3));
+    assert!(m.log.rejected.is_empty(), "{:?}", m.log.rejected);
+}

@@ -191,6 +191,8 @@ struct Facts {
     player: Option<PlayerLife>,
     /// An expansion game (`[0x007A04F4]`).
     expansion_game: bool,
+    /// The local player (`0x00463DD0`), for player events.
+    local: Option<UnitKey>,
     /// A local player with a room (`0x00620BB0`; d2rs-own: read as a
     /// position), for the waypoint close hook.
     player_room: bool,
@@ -211,6 +213,7 @@ impl Facts {
                 dead: u.mode == 0x11,
             }),
             expansion_game: world.expansion != 0,
+            local: local.map(|u| u.key),
             player_room: local.is_some_and(|u| u.position.is_some()),
             has_hireling: local.is_some_and(|u| world.hireling_guid(Some(u.key)) != u32::MAX),
         }
@@ -281,6 +284,9 @@ struct Shared {
     /// `levels` `LevelName` keys by level id (the waypoint rows' text,
     /// `waypoint_ui`).
     level_names: Vec<String>,
+    /// `0x0048A540` ran (an `hst ` / `qf2 ` arrived in page 3): the
+    /// animation starts at the cube's next draw.
+    horadric_start: std::cell::Cell<bool>,
 }
 
 impl Shared {
@@ -402,6 +408,7 @@ impl OriginalUi {
                 class: None,
                 player: None,
                 expansion_game: false,
+                local: None,
                 player_room: false,
                 has_hireling: false,
             },
@@ -435,6 +442,7 @@ impl OriginalUi {
             cursor_seed: std::cell::Cell::new(None),
             client_quest: [0; 96],
             level_names: Vec::new(),
+            horadric_start: Default::default(),
         };
         Ok(Self {
             shared: Rc::new(RefCell::new(shared)),
@@ -650,6 +658,11 @@ impl OriginalUi {
         self.shared.borrow_mut().items.tips = Some(tips);
     }
 
+    /// The inventory tables of the equip-box click (`inv_items` `equip`).
+    pub fn set_inv_tables(&mut self, t: std::sync::Arc<d2_sim::items::inventory::InvTables>) {
+        self.shared.borrow_mut().items.inv_tables = Some(t);
+    }
+
     /// Shift is held (set by the host each frame, `inv_items`).
     pub fn set_shift(&mut self, shift: bool) {
         self.shared.borrow_mut().items.shift = shift;
@@ -749,6 +762,14 @@ impl OriginalUi {
                     }
                 }
                 PanelOutput::Sound(id) => self.outcome.sounds.push(SoundRequest::Ui(id)),
+                PanelOutput::PlayerEvent(event) => {
+                    let local = self.shared.borrow().facts.local;
+                    if let Some(unit) = local {
+                        self.outcome
+                            .sounds
+                            .push(SoundRequest::PlayerEvent { unit, event });
+                    }
+                }
             }
         }
         if let (Routed::Unhandled, UiEvent::Action(a)) = (routed, e) {

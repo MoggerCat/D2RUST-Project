@@ -29,18 +29,24 @@ pub(crate) fn periods() -> Result<PeriodTables, HandlerError> {
 /// level id (0 when none):
 /// 1. the scripted overrides (`0x0046BEB0`, §10 r5): the darkness step
 ///    (§10 r3, base = the room ambient without override, §3.1 r2–r3),
-///    then the Den and levels 107/108 counters;
-/// 2. the environment record (`0x0061BFC0`, §9.2 r1).
+///    then the Den and levels 107/108 counters; the Den counter passing
+///    29 places the Den lights in every loaded level-8 room
+///    (`0x0046B0D0`, [`den_lights`]);
+/// 2. the Den lights of level-8 rooms loaded since the last update once
+///    the Den flag is set (`0x0046BE60`);
+/// 3. the environment record (`0x0061BFC0`, §9.2 r1).
 ///
 /// The spec places `0x0046BEB0` at `0x0044C7B0` and does not order
 /// `0x0061BFC0` against it or the unit walk; neither reads the other's
-/// state. The Den lights the Den counter starts at 30 (§10 r1:
-/// client missile 287, two player-seed draws per try) are not placed:
-/// the bridge has no client missile creation yet.
+/// state. d2rs-own, unverified: `0x0046BE60` runs at the room load
+/// (`0x0044C77D`); here the rooms loaded since the previous client
+/// update get their lights in this update's lighting part (nothing reads
+/// the lights in between).
 pub fn lighting_update(
     w: &mut ClientWorld,
-    levels: &[super::super::world::LevelRow],
+    inputs: &super::super::world::ModelInputs,
 ) -> Result<(), HandlerError> {
+    let levels = &inputs.tables.levels;
     let level = w.player_level().map_or(0, u32::from);
     if w.overrides.darkness.is_some() {
         let defs = levels
@@ -55,10 +61,88 @@ pub fn lighting_update(
         };
         w.overrides.update_darkness(base, level);
     }
-    // TODO(spec: render/lighting.md §10 r1): the Den lights of a `true`.
-    let _den_lights = w.overrides.update_counters();
+    let loaded = std::mem::take(&mut w.rooms_loaded);
+    if w.overrides.update_counters() {
+        // `0x0046B0D0`: every loaded level-8 room.
+        let rooms: Vec<_> = w
+            .active_rooms
+            .iter()
+            .flatten()
+            .filter(|r| u32::from(r.level) == LEVEL_DEN_OF_EVIL)
+            .copied()
+            .collect();
+        for r in rooms {
+            den_lights(w, inputs, &r)?;
+        }
+    } else {
+        // `0x0046BE60`: a level-8 room loaded once the flag is set.
+        for room in loaded {
+            let Some(r) = w
+                .active_rooms
+                .iter()
+                .flatten()
+                .find(|r| r.room == room)
+                .copied()
+            else {
+                continue;
+            };
+            if w.overrides.room_load_gets_den_lights(u32::from(r.level)) {
+                den_lights(w, inputs, &r)?;
+            }
+        }
+    }
     if let Some(env) = w.environment.as_mut() {
         env.update(&periods()?, level);
+    }
+    Ok(())
+}
+
+/// The level whose rooms get Den lights (§10 r1).
+const LEVEL_DEN_OF_EVIL: u32 = crate::rules::lighting::overrides::LEVEL_DEN_OF_EVIL;
+
+/// The Den lights of one room (`0x0046AF70`, §10 r1): up to 25 tries
+/// until 3 are placed, each try two steps of the local player unit's
+/// seed (x = room x + rnd(w), y = room y + rnd(h)); a point whose
+/// collision point test with mask 5 is 0 becomes client missile 287
+/// `denofevillight` ([`super::super::client_missiles::create`]). No local
+/// player or seed: nothing (the draws need the seed).
+///
+/// PROVISIONAL (REC-450): the create record is flags 1 (start at the
+/// point), class 287, no owner, origin, target, skill or level; §10 r1
+/// names only the missile. A point in no room of the client DRLG tests
+/// as blocked (the point test's no-room answer, §4 r2).
+pub fn den_lights(
+    w: &mut ClientWorld,
+    inputs: &super::super::world::ModelInputs,
+    room: &super::super::world::ActiveRoom,
+) -> Result<(), HandlerError> {
+    use super::super::client_missiles::{create, flag, CreateRecord};
+    use crate::rules::lighting::overrides::{den_light_points, DEN_LIGHT_MISSILE};
+    let Some(key) = w.local_player else {
+        return Ok(());
+    };
+    let Some((lo, hi)) = w.units.get(&key).and_then(|u| u.seed) else {
+        return Ok(());
+    };
+    let mut seed = d2_sim::rng::Seed::new(lo, hi);
+    let drlg = w.drlg.as_ref();
+    let points = den_light_points((room.x0, room.y0, room.w, room.h), &mut seed, |x, y| {
+        drlg.and_then(|d| d.drlg.collision_at(x, y))
+            .map_or(0x27, u32::from)
+            & 5
+    });
+    if let Some(u) = w.units.get_mut(&key) {
+        u.seed = Some((seed.lo, seed.hi));
+    }
+    for (x, y) in points {
+        let rec = CreateRecord {
+            flags: flag::POSITION,
+            class: DEN_LIGHT_MISSILE,
+            x,
+            y,
+            ..CreateRecord::default()
+        };
+        create(w, &inputs.tables.missiles, &rec, inputs.high_light_quality)?;
     }
     Ok(())
 }
@@ -323,4 +407,163 @@ pub fn darkness(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerErr
     // r4.5: the requirement refresh of 0x47 on P sets no model field
     // (`client/msg-stats-items.md` §3 rule 3).
     Ok(())
+}
+
+/// The set-S owner of a model unit (§6.1 `+0x00..+0x08`).
+fn owner_of(key: UnitKey) -> Owner {
+    Owner {
+        unit_type: u32::from(key.unit_type),
+        guid: key.guid,
+        client_only: false,
+    }
+}
+
+/// The unit's light (unit `+0x64`): the record its owner fields name.
+pub fn unit_light(
+    w: &ClientWorld,
+    key: UnitKey,
+) -> Option<crate::rules::lighting::records::LightId> {
+    let owner = owner_of(key);
+    w.lights
+        .iter()
+        .find(|(_, r)| r.owner() == Some(owner))
+        .map(|(id, _)| id)
+}
+
+/// Creates `req` as the light of `key` (`0x00474160`, §6.2 r1; position
+/// from the unit's sub-tile, §6.1 static path), replacing the light it
+/// had (§6.2 r5), then sets `req`'s target (§6.2 r3).
+fn replace_unit_light(w: &mut ClientWorld, key: UnitKey, req: sources::LightRequest) {
+    if let Some(id) = unit_light(w, key) {
+        let _ = w.lights.remove(id);
+    }
+    let Some(u) = w.units.get(&key) else {
+        return;
+    };
+    let (x, y) = u.cell();
+    let pos = (
+        unit_light_pos(i32::from(x) << 16),
+        unit_light_pos(i32::from(y) << 16),
+    );
+    let kind = match req.kind {
+        0 => LightKind::Shadowed,
+        2 => LightKind::Cached,
+        _ => LightKind::Plain,
+    };
+    let id = w.lights.create(
+        Some(owner_of(key)),
+        pos,
+        kind,
+        req.radius,
+        req.i,
+        req.r,
+        req.g,
+        req.b,
+    );
+    if let (Some(id), Some(t)) = (id, req.target) {
+        w.lights.set_target(id, t);
+    }
+}
+
+/// The player light of the player init (`0x00460BF0` → `0x00460CF0`,
+/// §8 player row): kind 0 for the local player or while no local player
+/// exists, else 1; radius 13, white.
+pub fn player_light(w: &mut ClientWorld, key: UnitKey) {
+    let local = w.local_player.is_none_or(|l| l == key);
+    replace_unit_light(w, key, sources::player_light(local));
+}
+
+/// The monster light (`0x004AE210` → `0x004AE2EE`, §8 monster row) of a
+/// created monster: kind 0, radius `max(L_c, Light)`, 3 in level 8 (the
+/// monster's room's level) with client quest byte 1 set and `Align` ∉
+/// {1, 2}; none when 0; replaces the unit's light.
+///
+/// `d2rs-own, unverified`: `L_c` (§8 r1, the `lightradius` of the
+/// component items) is 0, the client tables hold no item rows; a quest
+/// byte read before any 0x5E reads 0 (the spec names the fatal 0x60 only
+/// for the §10 r1 read).
+pub fn monster_light(w: &mut ClientWorld, key: UnitKey, class: &super::super::world::MonsterClass) {
+    let input = sources::MonsterLightInput {
+        l_c: 0,
+        light: i32::from(class.light),
+        rgb: class.light_rgb,
+        level: w.unit_level(key).map_or(0, u32::from),
+        quest_byte1: w.client_quest_byte(1).is_some_and(|b| b != 0),
+        client_only: false,
+        align: class.setup.map_or(0, |s| i32::from(s.align)),
+    };
+    if let Some(req) = sources::monster_light(&input) {
+        replace_unit_light(w, key, req);
+    }
+}
+
+/// Whether the colour call's light part can change anything for `key`:
+/// the local player with a light (`render/shading.md` §6 r1.1).
+pub fn colour_call_lights(w: &ClientWorld, key: UnitKey) -> bool {
+    w.local_player == Some(key) && unit_light(w, key).is_some()
+}
+
+/// The colour call's light part (`0x004D97F0`, `render/shading.md` §6
+/// r1.1, run by state on / off for a state with `colorshift` ≠ 0,
+/// `client/stat-lists.md` §3 r6.1, r6.3): for the local player with a
+/// light, R, G, B (§6.2 r4) := the winning state's `light-r`, `light-g`,
+/// `light-b`, or white when no state wins. Over the on states by id, a
+/// state wins when its `colorpri` is greater than the best so far (which
+/// starts at 0): `colorpri` 0 never wins, ties keep the lowest id. An on
+/// state without a `states` row is a handler error (the tables are an
+/// input).
+pub fn state_colour_light(
+    w: &mut ClientWorld,
+    rows: &[super::super::world::StateRow],
+    key: UnitKey,
+) -> Result<(), super::super::dispatch::HandlerError> {
+    if !colour_call_lights(w, key) {
+        return Ok(());
+    }
+    let id = unit_light(w, key).expect("checked above");
+    let mut best = None;
+    let mut pri = 0;
+    for &s in &w.units[&key].states {
+        let row = rows
+            .get(usize::from(s))
+            .ok_or(super::super::dispatch::HandlerError::Invalid(
+                "render/shading.md §6 r1.1: no states row for an on state",
+            ))?;
+        if row.colorpri > pri {
+            pri = row.colorpri;
+            best = Some(row.light_rgb);
+        }
+    }
+    let (r, g, b) = best.unwrap_or((255, 255, 255));
+    let i = w
+        .lights
+        .get(id)
+        .map_or(sources::SOURCE_INTENSITY, |rec| rec.i);
+    w.lights.set_color(id, i, r, g, b);
+    Ok(())
+}
+
+/// The player stat callback's light part (`0x004609F0`, §8 player row;
+/// `sim/stat-lists.md` §7.1: run when the stat's value changes): stat
+/// 89 `item_lightradius` sets the player's light radius (§6.2 r2) to the
+/// new value plus 13; stat 90 `item_lightcolor` sets its R, G, B (0 →
+/// white). Other stats, other units, a player without a light or an
+/// unchanged value: nothing.
+pub fn player_light_stat(w: &mut ClientWorld, key: UnitKey, stat: u16, old: i32, new: i32) {
+    if key.unit_type != super::super::world::PLAYER || old == new || !matches!(stat, 89 | 90) {
+        return;
+    }
+    let Some(id) = unit_light(w, key) else {
+        return;
+    };
+    if stat == 89 {
+        w.lights.set_radius(id, sources::player_light_radius(new));
+    } else {
+        let (r, g, b) = sources::player_light_color(new as u32);
+        let i = w
+            .lights
+            .get(id)
+            .map_or(sources::SOURCE_INTENSITY, |rec| rec.i);
+        w.lights.set_color(id, i, r, g, b);
+    }
 }

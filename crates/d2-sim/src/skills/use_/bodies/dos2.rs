@@ -111,22 +111,9 @@ pub fn sentry_do<W: BodyWorld>(
     let Some(at) = tpos(w, u) else {
         return 0;
     };
-    let Some(m) = sentry(w, t, ct, u, at, skill, lvl) else {
-        return 0;
-    };
-    // d2rs-own, unverified (REC-233): the trap's shot count is the laying
-    // skill's `calc4` (`ai-bodies-6.md` §14 reads it from the trap's
-    // `Skill1`).
-    let calc4 = rec(t, skill).map_or(0, |r| r.calc4);
-    let shots = eval(w, t, u, calc4, skill, lvl);
-    w.effect(BodyEffect::SentryLaid {
-        m,
-        owner: u,
-        skill,
-        level: lvl,
-        shots,
-    });
-    1
+    // The trap's think, shots and death: its AI (`monsters/ai-bodies-6.md`
+    // §14, the `Skill1` entry's `calc4`).
+    i32::from(sentry(w, t, ct, u, at, skill, lvl).is_some())
 }
 
 // ---------------------------------------------------------------- §8.4

@@ -35,6 +35,9 @@ pub struct ItemParts {
     pub two_handed: std::collections::BTreeSet<[u8; 4]>,
     /// The measured frame size of each inventory graphic ([`inv_frame_sizes`]).
     pub frame_sizes: BTreeMap<String, (u32, u32)>,
+    /// The inventory tables of the equip-box click (`ui::panels::inv_items`
+    /// `equip`); none on synthetic data.
+    pub inv_tables: Option<Arc<d2_sim::items::inventory::InvTables>>,
 }
 
 /// The size of frame 0 of each art row's inventory graphic by `invfile`
@@ -126,6 +129,7 @@ pub fn item_parts(archives: &dyn TableFiles) -> Result<ItemParts, String> {
         tips: None,
         two_handed,
         frame_sizes: BTreeMap::new(),
+        inv_tables: None,
     })
 }
 
@@ -189,6 +193,9 @@ pub fn prepare_ui(app: &App, original: &mut OriginalUi) {
     if let Some(tips) = &parts.tips {
         original.set_item_tips(tips.clone());
     }
+    if let Some(t) = &parts.inv_tables {
+        original.set_inv_tables(t.clone());
+    }
 }
 
 /// The item-stream decoder of the model over the game's item tables
@@ -200,7 +207,8 @@ impl crate::bridge::item_lists::StreamProps for TableDecoder {
         use d2_proto::item_bits::{decode, ItemLookup};
         let t = &*self.0;
         let lookup = d2_server::adapters::item_bits::TablesLookup(t);
-        let Ok(b) = decode(stream, &lookup) else {
+        // A failed record makes no item (`bitstream-legacy.md` §3 r12).
+        let Some(b) = decode(stream, &lookup).ok().filter(|b| !b.failed) else {
             return (Vec::new(), false);
         };
         // An alt-code record carries its base code (`bitstream.md` §4.1 r4).

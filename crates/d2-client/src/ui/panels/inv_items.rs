@@ -1,9 +1,10 @@
-// Spec: specs/ui/inventory.md (§1 r1–r4, §3 r1, §5 r3, §6 r1–r2, §8 r2–r4, §10 r3–r4), specs/ui/panels.md (§9.2, §9.6, §9.7), specs/ui/panels-3.md (§23 r9)
+// Spec: specs/ui/inventory.md (§1 r1–r4, §3 r1, §5 r3, §6 r1–r2, §8 r2–r4, §10 r3–r4), specs/ui/panels.md (§9.2, §9.6, §9.7), specs/ui/panels-3.md (§23 r9, §29)
 //! The local player's items in the inventory panel (ui 1): the page-0
 //! grid items (`inventory.md` §3 r1) and the equipped items (§6 r2)
 //! drawn with their inventory graphic (§8), the cursor item at the mouse
 //! (`panels-3.md` §23 r9), and a left press on the grid (§10) or on an
-//! equipment box sent as a C→S item intent through the root's outbox.
+//! equipment box (`panels-3.md` §29, [`equip`]) sent as a C→S item intent
+//! through the root's outbox.
 //!
 //! Plain decisions over the client model ([`crate::bridge::items`]);
 //! the server checks every move (`items/inventory-moves.md` §7).
@@ -16,9 +17,6 @@
 //! - the layout without `inventory.bin` rows: the grid of the spec's
 //!   measured record 0 / 16 (`panels.md` §Test vectors), no equipment
 //!   boxes;
-//! - the equipment click (`0x00490780` family is not specified,
-//!   `panels.md` §15): inside a box, cursor item + empty → 0x1A, cursor
-//!   item + occupied → 0x1D, no cursor item + occupied → 0x1C;
 //! - the drop cell `0x00486BD0` (not specified) is the cursor cell;
 //! - tints (§3 r2–r3, §6 r4), sockets, ethereal draw mode and the
 //!   item's colour remap are not drawn ([`super::super::ImageRequest`]
@@ -26,7 +24,7 @@
 
 use std::collections::BTreeMap;
 
-use d2_proto::client::{RemoveBodyItem, SwapCursorBufferItem, SwapCursorWithBody};
+use d2_proto::client::SwapCursorBufferItem;
 
 use super::super::draw::{CelLook, Remap, UiDraw, UiDrawSink, DRAW_MODE_OPAQUE};
 use super::super::geom::Point;
@@ -160,6 +158,9 @@ pub struct ItemsUi {
     pub shift: bool,
     /// The item tool tips' data (`inv_items_tip`); none: no tips.
     pub tips: Option<super::super::item_tip::ItemTips>,
+    /// The inventory tables of the equip check (`items/inventory.md`
+    /// §4.3, [`equip`]); none: an equipment box press does nothing.
+    pub inv_tables: Option<std::sync::Arc<d2_sim::items::inventory::InvTables>>,
     /// The used item of the identify cursor (cursor state 6, `inv_items_tip`).
     pub identify: std::cell::Cell<Option<u32>>,
     /// The five tint palette indices of `inventory.md` §2 r1 (the act
@@ -413,7 +414,7 @@ impl ItemsUi {
     }
 
     /// Left mouse down in the inventory panel: the grid click (§10) or an
-    /// equipment-box click (d2rs-own, module doc). The intents only.
+    /// equipment-box click (`panels-3.md` §29).
     pub fn press(
         &self,
         world: &ClientWorld,
@@ -425,15 +426,15 @@ impl ItemsUi {
         if g.cell_w == 0 || g.cell_h == 0 {
             return Vec::new();
         }
-        let all = items::local_items(world);
         let cursor = items::cursor_item(world);
-        let intent = if g.contains_mouse(at) {
-            self.grid_press(world, files, g, cursor.as_ref(), at, 0)
-        } else {
-            self.equip_socket(world, layout, &all, cursor.as_ref(), at)
-                .or_else(|| equip_press(layout, &all, cursor.as_ref(), at))
-        };
-        intent.map(PanelOutput::Intent).into_iter().collect()
+        if g.contains_mouse(at) {
+            return self
+                .grid_press(world, files, g, cursor.as_ref(), at, 0)
+                .map(PanelOutput::Intent)
+                .into_iter()
+                .collect();
+        }
+        self.body_press(world, layout, cursor.as_ref(), at)
     }
 
     /// Right mouse down in the inventory panel (d2rs-own, REC-117): on a
@@ -673,8 +674,8 @@ pub fn grid_cursor_cell(
     cg.cursor_cell(at, w as u16, h as u16, gw as u32, gh as u32)
 }
 
-/// d2rs-own, unverified: an equipment-box press (module doc).
-/// The equipment box under `at`.
+/// The equipment box under `at` (`panels-3.md` §29 r1: boxes 1–10, first
+/// hit in location order).
 fn equip_loc(layout: &InvLayout, at: Point) -> Option<u8> {
     (1u8..=10).find(|&l| {
         let b = layout.equip[usize::from(l)];
@@ -685,46 +686,52 @@ fn equip_loc(layout: &InvLayout, at: Point) -> Option<u8> {
     })
 }
 
-fn equip_press(
-    layout: &InvLayout,
-    all: &[ItemView],
-    cursor: Option<&ItemView>,
-    at: Point,
-) -> Option<ClientIntent> {
-    let loc = equip_loc(layout, at)?;
-    let worn = all.iter().find(|i| i.mode == mode::BODY && i.body == loc);
-    match (cursor, worn) {
-        (Some(c), None) => Some(ClientIntent::from_message(&items::equip(c.key.guid, loc))),
-        (Some(c), Some(_)) => Some(ClientIntent::from_message(&SwapCursorWithBody {
-            item: c.key.guid,
-            bodyloc: loc,
-        })),
-        (None, Some(_)) => Some(ClientIntent::from_message(&RemoveBodyItem {
-            bodyloc: u16::from(loc),
-        })),
-        (None, None) => None,
-    }
-}
-
 impl ItemsUi {
-    /// A filler on the cursor over a worn socketed item: C→S 0x28
-    /// (`inventory.md` §6 r5 counts the equipment boxes too).
-    fn equip_socket(
+    /// `panels-3.md` §29 r1 on a box hit: the socket test (r1.2, not under
+    /// the use cursor), then the location's handler ([`equip::body_press`]).
+    fn body_press(
         &self,
         world: &ClientWorld,
         layout: &InvLayout,
-        all: &[ItemView],
         cursor: Option<&ItemView>,
         at: Point,
-    ) -> Option<ClientIntent> {
-        let (tips, c) = (self.tips.as_ref()?, cursor?);
-        let loc = equip_loc(layout, at)?;
-        let worn = all.iter().find(|i| i.mode == mode::BODY && i.body == loc)?;
-        let m = socket::socket_intent(tips, world, c, worn)?;
-        Some(ClientIntent::from_message(&m))
+    ) -> Vec<PanelOutput> {
+        let Some(loc) = equip_loc(layout, at) else {
+            return Vec::new();
+        };
+        let used = self.identify.get();
+        if used.is_none() {
+            if let (Some(tips), Some(c)) = (self.tips.as_ref(), cursor) {
+                let all = items::local_items(world);
+                let worn = all.iter().find(|i| i.mode == mode::BODY && i.body == loc);
+                if let Some(m) = worn.and_then(|t| socket::socket_intent(tips, world, c, t)) {
+                    return vec![PanelOutput::Intent(ClientIntent::from_message(&m))];
+                }
+            }
+        }
+        let (Some(t), Some(tips)) = (self.inv_tables.as_deref(), self.tips.as_ref()) else {
+            return Vec::new();
+        };
+        let lookup = tips.tables();
+        let decode = |s: &[u8]| tips.bits(s);
+        let Some((view, inv, _)) = equip::ClientInv::build(world, t, &lookup, &decode) else {
+            return Vec::new();
+        };
+        let state = match used {
+            Some(u) => equip::Cursor::Use(u),
+            None if cursor.is_some() => equip::Cursor::Item,
+            None => equip::Cursor::Plain,
+        };
+        let p = equip::body_press(&view, &inv, loc, state);
+        if p.end_use {
+            self.identify.set(None);
+        }
+        p.out
     }
 }
 
+#[path = "inv_items_equip.rs"]
+pub mod equip;
 #[path = "inv_items_repair.rs"]
 mod repair;
 #[path = "inv_items_socket.rs"]

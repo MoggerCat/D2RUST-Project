@@ -10,7 +10,6 @@
 use super::super::bits::BitReader;
 use super::super::dispatch::{HandlerError, Message};
 use super::super::world::{ClientWorld, KindData, UnitKey, ITEM, MONSTER, PLAYER};
-use super::states::state_off;
 use super::Bytes;
 
 /// 0x9E–0xA2 (§4): stat u8@1, GUID u32@2, value @6 (u8, u16, u32 set;
@@ -120,7 +119,12 @@ pub fn clear_scroll_state(w: &mut ClientWorld, key: UnitKey) {
         .get(&key)
         .is_some_and(|u| u.state_lists.contains_key(&54))
     {
-        state_off(w, key, 54);
+        // `0x00639DB0`, `0x006277E0`, `0x00626CD0`: the bit and the
+        // list, no colour call (that is 0xA9's `0x004D9C30`).
+        if let Some(u) = w.units.get_mut(&key) {
+            u.states.remove(&54);
+            u.state_lists.remove(&54);
+        }
     }
 }
 

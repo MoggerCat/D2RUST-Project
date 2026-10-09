@@ -364,10 +364,14 @@ fn func11_skill_on_event() {
         );
         assert_eq!(it.item_seed, Seed::init_low(1), "no draw");
     }
-    // Skill out of the table: nothing.
+    // Skill out of the table: skill 0 (§5 r4 "out of skills → 0"), its
+    // row's level rules (max 5 → level 5), layer 0 × 64 + 5.
     let mut it = item(i, 1);
     run(&t, &mut it, 0, rec(0, 9, 5, 5));
-    assert!(it.stats.lists.is_empty());
+    assert_eq!(
+        it.stats.lists[&ListKey::ITEM],
+        BTreeMap::from([((195, 5), 5)])
+    );
 }
 
 /// Slot 1 = function 8 on stat 9 with the same record (min = max = 0):

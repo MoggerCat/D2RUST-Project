@@ -1,0 +1,51 @@
+# q-fix-render-rest: kept light list, quest byte, summit background, missile sight, pick shake
+
+Session `q-fix-render-rest`, 2026-10-09, branch `claude/q-fix-render-rest`
+(from staging, merged with `claude/specs-staging-7`). Cloud, with the
+private data repo (1.14d install assembled under `$HOME/game`). Rows left
+open by `q-fix-render-light` (commits `8699e293`, `31c7ab27`),
+`q-fix-render-world.md` and `q-fix-render-overlay.md`.
+
+## Done
+
+| Row | Spec | Change | Tests |
+|---|---|---|---|
+| 1. persistent LightList | lighting.md §6.3, §6.4 r1–r5, §7.4, §8 | The model's `ClientWorld::lights` is the one kept list: 0x59 creates the player light (kind 0 local / no local yet, else 1, radius 13), 0xAC the monster light (kind 0, `MonsterClass::light` from `monstats2`, level-8 override), 0x51 the object init's light (`msg-units.md` §1.3 r2 `0x004BC720`: `Lit<mode>` / 2, kind 2). Each drawn frame `present.rs` lends the list to the feed (`Bridge::light_frame` → `ViewFeed::light_frame` → `PreviewLight::refresh`), which runs §6.4 on it: owner positions, radius walks (r2), dying records removed (r4), kind-2 caches kept until a radius step or a new room. Set-C owners are found by the light lookups (§6.4 r1). `light_sources` keeps only the level ambients. | `preview_light` `the_kept_list_walks_radii_keeps_caches_and_drops_the_dead`; `tests_units` `units_get_their_lights_at_creation` (recorded B102 / B157); install: `app_client_drlg` `monster_light_rows_come_from_the_users_monstats2` |
+| 2. client quest byte | lighting.md §10 r1, §13; msg-ui.md §14 | `ClientWorld::quest_availability` (the last 0x5E's 37 bytes), `client_quest_byte(i)`; the Den glow reads byte 1; a level-8 read before any 0x5E is the 1.14d fatal 0x60 (no light map, `PreviewLight::error`). Spec edit: `msg-ui.md` §14 r1 now names the model copy. | `the_den_glow_reads_the_clients_quest_byte`; `tests_ui_more` `the_client_keeps_the_last_0x5e_for_quest_byte_reads` |
+| 4. level background 120 | draw-order-2.md §12 l2 r1–r3 | `world_view::background_view`: `Backgrounds::pass1` for level 120, `summit01` / `cloud01` DC6 from the archives, light byte + `cel_ops` (modes 5 / 3), pass-1 keys; `order_grid` refuses only level 74 now. PROVISIONAL REC-420 (time seed). | `background_view_tests` (the §12 vector), `open_mode_3_and_level_backgrounds`; install: `app_client_drlg` `the_summit_background_draws_from_the_users_archives` |
+| 5. missiles sight-tested | draw-order.md §5 r3; draw-order-2.md §15 | `missiles::missile_hidden`: a missile effect hidden by the feed's sight test (probe missile unit on its sub-tile, `missiles` `Size`) is not drawn. | `tests_drlg` `missiles_take_the_sight_test` |
+| `q-fix-render-player-light-colour` (audit F9) | shading.md §6 r1.1; stat-lists.md §3 r6.1, r6.3; lighting.md §8 player row; sim/stat-lists.md §7.1 | The model loads the user's `states` rows (`UnitRows::states`: `notondead`, `noclear`, `colorpri`, `colorshift`, `light-r/g/b`); state on (0xA7 / 0xA8) and 0xA9 state off run the colour call's light part for a state with `colorshift` ≠ 0 (local player with a light: the winning state's light colour, white with none); the stat 89 / 90 callback runs at the model's player stat writes (0x19–0x1F, 0x20) when the value changes, no longer per drawn frame. 0x7C's scroll clear stays the bit-and-list path (no colour call). | `tests_units` `the_local_players_light_colour_follows_its_states_and_stats`; install: `app_client_drlg` `state_colour_rows_come_from_the_users_states` |
+| `q-fix-render-missile-flat` | missiles/client.md §C4 r4, §C13 (functions 2, 11); draw-order.md §3 r4 | `MissileRow::clt_do_func` (`pCltDoFunc`); an effect of function 2 or 11 at its animation end (frame + speed ≥ `AnimLen` << 8) is flat (unit flag 0x10000) and files in its cell's shadow list (pass 5, after the cell's entries, d2rs-own: it is in no room unit list). Lifetime unchanged (the §C13 "stays" is not modelled). | `missiles_tests` `flat_missiles_file_in_their_cells_shadow_list`; install: `app_client_drlg` `effect_rows_carry_the_users_client_missile_functions` (6 rows of function 2, 16 of 11) |
+| client missile creation | missiles/client.md §C1–§C4; missiles.md §R2.1; lighting.md §8 missile row | `bridge::client_missiles::create` (`0x004CD540`): row, start, room test, target, velocity (slow, 75 %), owner aim check, set-C allocation through `objects::create_client_unit`, frames (range, loops, slow, start frame, activate, frames from distance), `InitSteps` not-drawn flag, random direction, arc direction, owner, pierce count, the light (kind 1, high quality only). The missile's fields are `ClientObjects::missiles`; rows `ClientTables::missiles` from the user's `missiles`. Not modelled: path / motion record, init callback, sounds, umod callback, per-update dispatch and functions (§C6–§C13), removals; the owner aim nudge (needs the owner's direction) is a handler error. | `client_missiles_tests` (4); install: `app_client_drlg` `the_den_light_missile_creates_from_the_users_rows` (287: function 23, `Light` 10) |
+| client missile per-update dispatch | missiles/client.md §C6, §C7, §C9, §C10, §C13 (11, 23); lighting.md §8 flicker | `client_missiles::update` per client update for every set-C missile (`update.rs` `c_missiles`, before the C objects, `model.md` §5 r3): no row → default removal; the light flicker; function 1 = the default step (activity, `InitSteps` drawn flag, animation with hold / wrap / sub-loop, countdown → `end`), 11 (flat at the animation end, light removed, no countdown), 23 (frames left < 100 → 500, step); `end` (§C9 with no unit: `AlwaysExplode` / forced → the explosion missile through the create with the owner and m's direction, 146 rnd(64); the light dies; the unit removed). The aim nudge (§C2 r8) reads the owner's `dir64` from the record (`CreateRecord::owner_dir64`, the caller's `UnitPose::dir64`). Not modelled: path step, walls and units (no path), town tests, the second pass, client hit functions (handler error), sounds, functions other than 1 / 11 / 23 (left as they are). | `client_missiles_tests` (5 new); install: `app_client_drlg` `client_missiles_update_on_the_users_rows` (287 stays; `arrow` ends after `Range`) |
+| `q-fix-render-den-lights` (3.) | lighting.md §10 r1, r5.2 | `lighting_update` (client update): when the Den counter passes 29, every loaded level-8 room gets its Den lights (`den_lights`: `den_light_points` on the local player's seed, point test mask 5, each a client missile 287 through `client_missiles::create`, whose light is the §8 missile light); level-8 rooms loaded after the flag (queued by `refresh_active_rooms` in `ClientWorld::rooms_loaded`) get theirs at the next client update. `ModelInputs::high_light_quality` (play: on). PROVISIONAL REC-450 (create record, no-room point, timing of later rooms). | `tests_drlg` `the_den_counter_places_the_den_lights_and_later_rooms_get_them` |
+| 6. pick camera shake | seams/world-screen.md §2.6 | `ClickView::shake` from the frame anchor: the world click inverts the shaken camera. | `click` `the_pick_inverts_the_shaken_camera` |
+
+Changed expectations (spec-driven): `tests_ui_more::record_outputs` (the
+0x5E bytes are in the model, msg-ui.md §14 r1 / lighting.md §13);
+`preview_light` tests create the player / monster lights through the
+model as 0x59 / 0xAC do (setup only); `light_sources`' per-frame rebuild
+test is replaced by `units_get_their_lights_at_creation` (no model
+missile units, so no missile lights).
+
+## Not done (rows in `build-queue.tsv`)
+
+- **Client missiles**: no path, so they neither move nor collide; only
+  functions 1, 11 and 23 run (rows above).
+- **5. flat missiles**: done in the effect layer (row above); the real
+  flag on a model missile unit waits for client missile creation.
+- **Level 74 stars** (`q-fix-render-arcane-stars`): §12 r3 names no
+  initial `last`; filed as `draw-order-2.md` Open question 12 with the
+  local RE task (HANDOFF §5 entry 103), which also settles REC-420.
+- The stat 89 / 90 callback runs at the model's player stat messages;
+  item-list aggregation of stat 89 (equipped items) reaches it only as
+  far as the server's stat messages carry the total.
+- Monster `L_c` (§8 r1, component items' `lightradius`) is 0: the client
+  tables hold no item rows.
+
+## Real data
+
+The ignored `d2-client` suite on the install fails the same tests on
+this branch and on its base `40e4eb76` (GPU tests without an adapter,
+and app tests failing at their own fixtures); see the commit message of
+the push for the comparison. Local run: HANDOFF §5 entry 102.

@@ -1098,6 +1098,19 @@ fn attack_frame_events() {
     f.units[p].path = 1;
     attack_frame_event(&mut f, &t, p, 1, 0);
     assert!(f.take_log().is_empty());
+    // Not finished: rule 3 still runs (REC-232): with flag 0x40 clear,
+    // arg1 1 / 2 do on the way (Leap's frame-11 Land, Whirlwind's
+    // strikes); 3 / 4 don't; the arrived flag stays clear.
+    f.units[p].flags &= !FLAG_MISSILE_FIRED;
+    for (a1, ran) in [(1, true), (2, true), (3, false), (4, false)] {
+        attack_frame_event(&mut f, &t, p, a1, 0);
+        assert_eq!(
+            f.take_log().iter().any(|l| l.starts_with("srvdo 1")),
+            ran,
+            "moving, arg1 {a1}"
+        );
+        assert_eq!(f.units[p].used_flags, SKILL_MOVING);
+    }
     f.units[p].path = 2;
     attack_frame_event(&mut f, &t, p, 3, 0);
     assert_eq!(f.units[p].used_flags, SKILL_MOVING | SKILL_ARRIVED);

@@ -40,21 +40,21 @@
 |   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 599–611 |
 |   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 612–621 |
 |   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 622–634 |
-|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 635–643 |
-|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 644–654 |
-|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 655–781 |
-|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 782–794 |
-|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 795–805 |
-|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 806–825 |
-|   20. 0x61 act video (`0x0045E660`) | 826–833 |
-|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 834–841 |
-|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 842–851 |
-| Constants & data dependencies | 852–863 |
-| Randomness | 864–868 |
-| Edge cases & original bugs | 869–885 |
-| Test vectors | 886–933 |
-| Provenance | 934–1001 |
-| Open questions | 1002–1137 |
+|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 635–646 |
+|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 647–657 |
+|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 658–784 |
+|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 785–797 |
+|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 798–808 |
+|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 809–828 |
+|   20. 0x61 act video (`0x0045E660`) | 829–836 |
+|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 837–844 |
+|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 845–854 |
+| Constants & data dependencies | 855–866 |
+| Randomness | 867–871 |
+| Edge cases & original bugs | 872–888 |
+| Test vectors | 889–936 |
+| Provenance | 937–1004 |
+| Open questions | 1005–1140 |
 <!-- /index -->
 
 Owned ids: 0x26, 0x27, 0x29, 0x4E, 0x4F, 0x50, 0x52, 0x58, 0x5D, 0x5E,
@@ -635,7 +635,10 @@ layer.
 ### 14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`)
 
 1. Layout (38 bytes; server `0x0053D830`): 37 bytes @1. Model state
-   written: none. One `QuestAvailability` output {37 bytes}.
+   written: the 37 bytes (d2rs: the client's copy of r2's
+   `[0x007C0EA4..]`, read as client quest bytes by `render/lighting.md`
+   §8 monster row and §10 r1, §13 "override state"). One
+   `QuestAvailability` output {37 bytes}.
 2. The UI layer: `[0x007C0EA4..0x007C0EC8]` := the 37 bytes,
    `[0x007C0ECC]` := 1. The 37 bytes are the not-intro quest bytes in
    init-table row order (`world/quests.md` §3 step 5); their only reader
