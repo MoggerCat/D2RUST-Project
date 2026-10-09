@@ -1,0 +1,3 @@
+soak-log 1 seed=200 save=target/checkpoints/a1-andariel.d2s difficulty=0 kit=1
+135 click L 17 171
+144 pick 24 1

@@ -69,6 +69,7 @@ every checkpoint's belt too.
 | q-fix-soak-belt-model | a new character's 4 belt potions are on the server, never in the model | `tools/soak/repro/desync-belt-model.log`, no input |
 | q-fix-soak-cursor-reload | an item saved on the cursor is reloaded into the inventory (`d2s.md` §8: back to the cursor), or lost when its old cell is taken | `tools/soak/repro/roundtrip-item-place.log`, 2 lines; `roundtrip-item-lost.log` (a1-andariel checkpoint), 4 lines |
 | q-fix-soak-drop-room | a dropped item lies 2 sub-tiles outside the room it is linked to | `tools/soak/repro/drop-outside-room.log`, 9 lines |
+| q-fix-soak-walk-pick-desync | a pick-up during a walk stops the server's player; the client walks on, 15-20 sub-tiles off, never corrected | `tools/soak/repro/desync-walk-then-pick.log` (a1-andariel checkpoint), 2 lines |
 | q-fix-soak-static-leave-room | a static unit leaving its room keeps it (pick-up; the old act's ground items after an act change, whose room ids the new act reuses) | `tools/soak/repro/static-room-after-pickup.log`, 1 line |
 
 Withdrawn (tool errors, fixed in the tool): the player-position desync
@@ -77,3 +78,8 @@ client moves the local player by, `seams/movement-prediction.md` §2.9
 r2); the hang during the Esc menu (the single-player pause); dropped
 S→C 0x6D / 0x67 / 0x6B (a unit message for a unit the model lacks at
 receive: 1.14d drops it too, `client/model.md` §4 r6).
+
+Not reproduced: `room:list-vs-path:Object` (Object 69 mode 2, a4-hellforge
+seed 200 of campaign 3) came from a run on the binary before the
+staging merge at 870a539f; its log does not replay it on the current
+build. Rerun the campaign to see whether it comes back.
