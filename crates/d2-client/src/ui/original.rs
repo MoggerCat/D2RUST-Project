@@ -610,6 +610,11 @@ impl OriginalUi {
         self.shared.borrow_mut().items.shift = shift;
     }
 
+    /// Ctrl is held (set by the host each frame, `inv_items`).
+    pub fn set_ctrl(&mut self, ctrl: bool) {
+        self.shared.borrow_mut().items.ctrl = ctrl;
+    }
+
     /// Measured item graphic frame sizes by `invfile` (lower case).
     pub fn set_item_frame_sizes(&mut self, sizes: BTreeMap<String, (u32, u32)>) {
         self.shared.borrow_mut().items.frame_sizes = sizes;

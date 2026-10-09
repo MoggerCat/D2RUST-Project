@@ -689,6 +689,7 @@ fn ui_input(
     // d2rs-own, unverified: Shift held, for the shift-click to the belt.
     if let (Some(o), Some(keys)) = (ui.original.as_mut(), keys.as_deref()) {
         o.set_shift(keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight));
+        o.set_ctrl(keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight));
     }
     // Keys in `KEY_CODES` order, so one frame's actions are ordered the
     // same on every run.
