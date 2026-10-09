@@ -16,17 +16,15 @@ def run(r, save, sides):
     c = r.c
     rec = _rec()
     orig, d2rs = r.path("orig.rng.jsonl"), r.path("d2rs.rng.jsonl")
-    if c["poke"]:
-        # record_rng.py has no poke layer
-        print("[rng] not compared: record_rng.py takes no --poke (rng-trace.md §6 r3)")
-        return 2
     if c["input"].get("shared"):
         # frame-anchored input needs a recorder that stops at the tick return
         print("[rng] not compared: record_rng.py does not run the shared frame-anchored "
               "input (rng-trace.md §6 r3)")
         return 2
     if "orig" in sides:
-        r.recorder("record_rng.py", ["--frames"], orig)
+        # record_rng.py has no poke layer: rng_poke.py is it plus poke.py's
+        # (rng-trace.md §6 r3)
+        r.recorder("rng_poke.py" if c["poke"] else "record_rng.py", ["--frames"], orig)
     if "d2rs" in sides and not (r.reuse and os.path.exists(d2rs)):
         args = ["state-dump"] + r.d2rs_common(save) + [
             "--ticks", str(c["ticks"]), "--out", r.path("d2rs.rng-state.jsonl"), "--rng", d2rs]
@@ -50,10 +48,13 @@ def _rec():
 def selftest(runner_cls, check):
     """Dry run: the recorder with --frames, the dump with --rng and the
     rng-trace feature, the comparator. Returns the number of checks passed."""
-    r = runner_cls(dict(check, poke=[(1, 5, "time 1 0")]), "/tmp/w", dry=True)
+    r = runner_cls(dict(check, poke=[(1, 5, "time 1 0")], input={}), "/tmp/w", dry=True)
     r.next = 5
-    assert run(r, "/tmp/w/ScnAma.d2s", {"orig", "d2rs"}) == 2
-    assert not r.log  # nothing run: record_rng.py has no poke layer
+    run(r, "/tmp/w/ScnAma.d2s", {"orig", "d2rs"})
+    rec = next(x for x in r.log if "rng_poke.py" in x)  # the poke layer's recorder
+    assert "--frames" in rec and "--poke '5 time 1 0'" in rec, rec
+    dump = next(x for x in r.log if "state-dump" in x)
+    assert "--poke '5 time 1 0'" in dump, dump
     r = runner_cls(dict(check, poke=[], input={}), "/tmp/w", dry=True)
     r.next = 5
     code = run(r, "/tmp/w/ScnAma.d2s", {"orig", "d2rs"})
@@ -69,4 +70,4 @@ def selftest(runner_cls, check):
     r.log = []
     run(r, "/tmp/w/ScnAma.d2s", {"d2rs"})  # one side: no compare
     assert not any("rng_diff" in x or "record_rng" in x for x in r.log)
-    return 3
+    return 4

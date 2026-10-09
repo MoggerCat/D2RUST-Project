@@ -193,6 +193,62 @@ impl<X: Pending> View<'_, X> {
         n
     }
 
+    /// The first walk of `0x005559A0` (`drlg/rooms.md` §8 rule 6 "First
+    /// spawn", `monsters/population.md` §11.1): every non-monster preset
+    /// of the active `room`'s DRLG room in list order (head first, so the
+    /// last-added warp tile first), objects (type 2,
+    /// [`View::spawn_preset_objects`]'s rule) and warp tiles (type 5,
+    /// [`View::spawn_warp_tiles`]'s rule) interleaved as the list has
+    /// them. Returns the number created. The monster walk comes after.
+    pub fn spawn_preset_first_pass(&mut self, game: &mut Game, room: RoomId) -> usize {
+        let Some(act) = game.lists.room(room).map(|r| r.act) else {
+            return 0;
+        };
+        let found = self.h.drlg.with_act(act, &mut game.lists, |d, svc| {
+            let r = d.drlg_room_of(room)?;
+            let origin = d.active_room(r)?.subtiles;
+            Some((svc.types.preset_units(d, r), origin))
+        });
+        let Some(Some((units, origin))) = found else {
+            return 0;
+        };
+        let mut n = 0;
+        for p in &units {
+            let (x, y) = (origin.x + p.x, origin.y + p.y);
+            let ty = match p.unit_type {
+                OBJECT_PRESET => UnitType::Object,
+                TILE_PRESET => UnitType::Tile,
+                _ => continue,
+            };
+            let exists = game.lists.room_units(room).into_iter().any(|u| {
+                game.lists.unit(u).is_some_and(|e| e.ty == ty)
+                    && self.units.get(u).is_some_and(|r| r.class == p.class)
+                    && self.h.path_position(u) == (x, y)
+            });
+            if exists {
+                continue;
+            }
+            let made = if ty == UnitType::Object {
+                self.create_object(game, room, p.class, x, y, 0).is_some()
+            } else {
+                let req = AllocRequest {
+                    ty: UnitType::Tile,
+                    class: p.class,
+                    room: Some(room),
+                    add: true,
+                    fixed_guid: None,
+                    mode: 0,
+                    allied: false,
+                };
+                self.allocate(game, &req, x, y).is_some()
+            };
+            if made {
+                n += 1;
+            }
+        }
+        n
+    }
+
     /// The first tile unit of `class` in the active `room`'s unit list.
     pub fn room_tile(&self, game: &Game, room: RoomId, class: u32) -> Option<UnitId> {
         game.lists.room_units(room).into_iter().find(|&u| {

@@ -167,9 +167,13 @@ and exit code (§5). Neither game changes (§3 rule 2).
    d2rs.rng.jsonl`; then `rng_diff.py`.
 2. A check with an `input orig` / `input d2rs` line runs that input on
    1.14d only: the verdict is at best partial.
-3. A check with `at ... poke` lines or a shared frame-anchored `input`
-   is not compared (partial): `record_rng.py` has no poke layer and no
-   tick-return stop.
+3. A check with `at ... poke` lines records 1.14d with `rng_poke.py
+   --frames` instead: `record_rng.py` unchanged plus `poke.py`'s layer at
+   the tick-return stop `0x0052FD1E` (the pokes of frame F run at the
+   return of frame F − 1, as in `record_state.py`) and a `frame_end`
+   record per frame, which `rng_diff.py` skips; d2rs takes the same
+   `--poke` lines. A shared frame-anchored `input` is not compared
+   (partial): `record_rng.py` does not run it.
 
 ## Constants & data dependencies
 
