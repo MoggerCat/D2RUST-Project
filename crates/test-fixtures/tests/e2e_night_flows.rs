@@ -667,6 +667,44 @@ fn opening_a_chest() {
     fx.assert_clean();
 }
 
+// Covers: specs/tools/poke.md §1 r2, §5 r4
+#[test]
+fn a_poked_operate_is_the_clients_0x13() {
+    // The same chest operated twice from the same state: once by the
+    // client's 0x13 through the queue and the frame's drain, once by
+    // `operate` (`d2_sim::poke::interact_calls`, the dispatcher run now
+    // by `Host::dispatch_now`) before the frame. Same result code, same
+    // object state, same control seed, same S→C messages.
+    let run = |poked: bool| {
+        let mut fx = Fx::new();
+        let at = fx.spot(0);
+        let chest = fx.object(CHEST, at);
+        let g = fx.guid(chest);
+        let (codes, got) = if poked {
+            let d = d2_sim::poke::parse_directive_text(&format!("operate 2/{g}")).unwrap();
+            let calls = d2_sim::poke::interact_calls_with(&d, 2, g, fx.guid(fx.player));
+            assert_eq!(calls.len(), 1);
+            let mut m = vec![calls[0].id];
+            for v in &calls[0].values {
+                m.extend(v.to_le_bytes());
+            }
+            assert_eq!(m, interact(g));
+            fx.stage(fx.player);
+            let code = fx.host.dispatch_now(CLIENT, &m).expect("a player");
+            let (none, got) = fx.step(&[]);
+            assert!(none.is_empty());
+            (vec![code], got)
+        } else {
+            fx.step(&[interact(g)])
+        };
+        (codes, got, fx.mode(chest), fx.control_seed())
+    };
+    let (sent, poked) = (run(false), run(true));
+    assert_eq!(sent.0, [ResultCode::Done]);
+    assert_eq!(sent.2, 2, "the chest opened");
+    assert_eq!(poked, sent);
+}
+
 // Covers: specs/world/objects.md §5.1 r2, §5.1 r5, §9.1 r1, §9.1 r2, §9.1 r4, §9.1 r5, §14 r1
 #[test]
 fn using_a_shrine() {
