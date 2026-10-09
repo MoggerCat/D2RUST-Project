@@ -31,14 +31,14 @@
 |   6. Run / walk and menu buttons | 460–480 |
 |   7. Skill buttons | 481–511 |
 |   8. New-stats and new-skills buttons | 512–560 |
-|   9. Mini panel (state 0x15) | 561–626 |
-|   10. Control panel mouse input | 627–667 |
-| Constants & data dependencies | 668–679 |
-| Randomness | 680–683 |
-| Edge cases & original bugs | 684–696 |
-| Test vectors | 697–729 |
-| Provenance | 730–753 |
-| Open questions | 754–804 |
+|   9. Mini panel (state 0x15) | 561–634 |
+|   10. Control panel mouse input | 635–675 |
+| Constants & data dependencies | 676–687 |
+| Randomness | 688–691 |
+| Edge cases & original bugs | 692–704 |
+| Test vectors | 705–737 |
+| Provenance | 738–761 |
+| Open questions | 762–812 |
 <!-- /index -->
 
 ## Summary
@@ -559,6 +559,14 @@ draw mode 5 unless a rule says otherwise.
    never set it).
 
 ### 9. Mini panel (state 0x15)
+
+Measured (revision 2026-10-09, q-scenes-compare): state 0x15 is open
+from the game's start: every recorded in-game scene (PC 1's Windows
+recordings and the Wine ones, `facts/render/scenes`) draws
+`minipanel_s` and the menu button at frame 2 with no input that opened
+it. PROVISIONAL (REC-519): d2rs opens it when the game UI is built
+(because no recorded start shows it closed; settled by the call that
+sets it at game entry, PC 1, or a scene that closes it and re-joins).
 
 1. **Variant** (`0x0047F0C0`, game start): multiplayer (game type ≠ 0)
    → `Panel\minipanel`, 8 buttons, `[0x007BC978]` := 0; single player →

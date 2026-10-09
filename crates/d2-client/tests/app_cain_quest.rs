@@ -6,8 +6,13 @@
 //! Before `HostQuests` answered them they went to `AppRest`, which only
 //! logged and returned nothing.
 
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
+
 use d2_client::app::single_player;
+use d2_client::bridge::link::{SendQueue, ServerLink};
 use d2_server::adapters::handlers::world::{QuestCall, WorldHost};
+use d2_server::seams::Clock;
 use d2_sim::units::{RoomId, UnitId};
 use d2_sim::world::npc::class;
 use d2_sim::world::quests::{QuestControl, QuestWorld};
@@ -57,14 +62,46 @@ impl QuestCall for Probe {
     }
 }
 
+struct StepClock(Arc<AtomicU32>);
+
+impl Clock for StepClock {
+    fn now_ms(&mut self) -> u32 {
+        self.0.load(Ordering::SeqCst)
+    }
+}
+
 // Covers: specs/world/quests-act1-rest.md §1.2, §2.3
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn cains_spawn_the_red_portal_and_his_removal_run_on_real_units() {
-    let mut g =
-        single_player::build(&app_support::game_data(), single_player::DEFAULT_SEED).unwrap();
-    let s = &mut g.sim;
-    // A free sub-tile of the Rogue Encampment's streamed room with a free
+    // The install's game with its player in the Rogue Encampment: the
+    // join (C→S 0x67, 0x6B) and a few ticks, so the town's rooms are in
+    // play (the build alone has no player and no active room).
+    let ms = Arc::new(AtomicU32::new(1000));
+    let (mut link, _) = single_player::start(
+        app_support::game_data(),
+        single_player::DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap();
+    let req = single_player::create_request();
+    link.send(SendQueue::System, &req.encode()).unwrap();
+    link.send(SendQueue::System, &[0x6B]).unwrap();
+    for _ in 0..8 {
+        link.pump().unwrap();
+        ms.fetch_add(40, Ordering::SeqCst);
+        link.pump().unwrap();
+        link.receive();
+    }
+    link.with(|l| {
+        let s = &mut l.host_mut().game;
+        run(s);
+    })
+    .unwrap();
+}
+
+fn run(s: &mut d2_client::app::single_player::Sim) {
+    // A free sub-tile of the Rogue Encampment's room in play with a free
     // one 6 east of it (the real town's collision, move mask 0x1C09).
     let (room, at) = {
         let rooms = s.game.lists.active_rooms(0);

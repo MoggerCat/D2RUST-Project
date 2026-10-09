@@ -88,6 +88,7 @@ fn cel(r: &Real, name: &str, frame: u32, x: i32, y: i32, look: CelLook) -> UiDra
         at: Point::new(x, y),
         clip: FRAME,
         look,
+        call: d2_client::ui::draw::CelCall::Draw,
     })
 }
 

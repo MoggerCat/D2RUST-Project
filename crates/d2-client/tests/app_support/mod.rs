@@ -514,6 +514,74 @@ pub fn approach<C: Clock + Send + 'static>(
     panic!("unit {ty}/{classes:?} not reached");
 }
 
+/// Walks the server player's level room by room (nearest first) until the
+/// client model holds a tile unit (S→C 0x09) of `class`: a warp tile is
+/// created when its room comes into play. Its key.
+pub fn approach_tile<C: Clock + Send + 'static>(
+    app: &mut bevy::prelude::App,
+    server: &Server<C>,
+    ms: &std::sync::atomic::AtomicU32,
+    class: u32,
+) -> d2_client::bridge::world::UnitKey {
+    let find = |app: &bevy::prelude::App| {
+        app.world()
+            .resource::<d2_client::bridge::BridgeResource>()
+            .0
+            .world()
+            .units
+            .iter()
+            .find(|(k, u)| k.unit_type == d2_client::bridge::world::TILE && u.class == class)
+            .map(|(k, _)| *k)
+    };
+    // The level's rooms are made as the player moves: recount them every
+    // round and walk to the nearest one not yet visited.
+    let (level, act) = level_act(server);
+    let mut visited: Vec<(i32, i32)> = Vec::new();
+    for _ in 0..60 {
+        if let Some(k) = find(app) {
+            return k;
+        }
+        let p = server_pos(server);
+        let mut rooms: Vec<(i32, i32)> = with(server, move |l| {
+            let g = &mut l.host_mut().game;
+            let d = g.events.action.hooks().drlg.dungeon.acts[act]
+                .as_ref()
+                .expect("the act");
+            let lv = d.find_level(level).expect("the player's level");
+            d.level_rooms(lv)
+                .into_iter()
+                .map(|r| {
+                    let t = d.room(r).rect;
+                    ((t.x * 2 + t.w) * 5 / 2, (t.y * 2 + t.h) * 5 / 2)
+                })
+                .collect()
+        });
+        rooms.retain(|c| !visited.contains(c));
+        rooms.sort_by_key(|&c| test_fixtures::host::cheb(c, p));
+        let Some(c) = rooms.first().copied() else {
+            break;
+        };
+        visited.push(c);
+        walk_town_to(app, server, ms, c, 4);
+    }
+    find(app).unwrap_or_else(|| {
+        let tiles: Vec<_> = app
+            .world()
+            .resource::<d2_client::bridge::BridgeResource>()
+            .0
+            .world()
+            .units
+            .iter()
+            .filter(|(k, _)| k.unit_type == d2_client::bridge::world::TILE)
+            .map(|(_, u)| (u.class, u.position))
+            .collect();
+        panic!(
+            "no tile of class {class} reached the client; tiles {tiles:?}; player at {:?} in level {level}",
+            server_pos(server)
+        )
+    })
+}
+
 /// Runs to the unit `key` as the client does before an interact (C→S
 /// 0x04), until the server player stops.
 pub fn run_to_unit<C: Clock + Send + 'static>(
@@ -577,4 +645,88 @@ pub fn operate_town_waypoint<C: Clock + Send + 'static>(
         ms.fetch_add(40, Ordering::SeqCst);
     }
     key
+}
+
+/// One server→client message of the recorded join (`traces/sim/join/
+/// sim-0530.json`, REC-530: an expansion sorceress joining a game of the
+/// original 1.14d, `docs/handoff/q-fixture-migrate-2.md`).
+#[derive(Debug, Clone)]
+pub struct RecMsg {
+    /// The server frame (0: before the first tick).
+    pub tick: u32,
+    pub id: u8,
+    pub size: usize,
+    /// The bytes, kept for the position and seed messages (0x03, 0x07,
+    /// 0x0B, 0x15).
+    pub bytes: Option<Vec<u8>>,
+}
+
+/// The recorded join, in the order the original sent it.
+pub fn recorded_join() -> Vec<RecMsg> {
+    const TRACE: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../traces/sim/join/sim-0530.json"
+    ));
+    let v: serde_json::Value = serde_json::from_str(TRACE).expect("the join trace is JSON");
+    v["expected"]
+        .as_array()
+        .expect("expected[]")
+        .iter()
+        .map(|e| {
+            let d = &e["data"];
+            RecMsg {
+                tick: e["tick"].as_u64().unwrap() as u32,
+                id: d["id"].as_u64().unwrap() as u8,
+                size: d["size"].as_u64().unwrap() as usize,
+                bytes: d["bytes"].as_str().map(|h| {
+                    (0..h.len())
+                        .step_by(2)
+                        .map(|i| u8::from_str_radix(&h[i..i + 2], 16).unwrap())
+                        .collect()
+                }),
+            }
+        })
+        .collect()
+}
+
+/// The recorded join's 0x07 room messages (S→C RoomShow: x u16, y u16,
+/// level u8 after the id) as `(show, level, x, y)`, in order.
+pub fn recorded_rooms() -> Vec<(bool, u8, u16, u16)> {
+    recorded_join()
+        .into_iter()
+        .filter(|m| m.id == 0x07)
+        .map(|m| {
+            let b = m.bytes.expect("0x07 bytes");
+            (
+                true,
+                b[5],
+                u16::from_le_bytes([b[1], b[2]]),
+                u16::from_le_bytes([b[3], b[4]]),
+            )
+        })
+        .collect()
+}
+
+/// One server→client message of the Wine recording of a new Rogue
+/// Encampment sorceress (`facts/join/a1-new-sor.tsv`): the server frame
+/// (`None` before the first), the message id and its size.
+pub fn recorded_new_sor() -> Vec<(Option<u32>, u8, usize)> {
+    const FACTS: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../facts/join/a1-new-sor.tsv"
+    ));
+    FACTS
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.starts_with("n\t"))
+        .filter_map(|l| {
+            let f: Vec<&str> = l.split('\t').collect();
+            (f.get(2) == Some(&"s2c")).then(|| {
+                (
+                    f[1].parse().ok(),
+                    u8::from_str_radix(f[3], 16).expect("id"),
+                    f[4].parse().expect("size"),
+                )
+            })
+        })
+        .collect()
 }

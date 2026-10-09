@@ -4,7 +4,7 @@ print the first divergence, then the next N, the game-seed sequence and a
 summary per owner (specs/tools/rng-trace.md §5).
 
     python3 rng_diff.py ORIG.rng.jsonl D2RS.rng.jsonl [--next 20]
-        [--owners game,unit] [--from F] [--to F] [--state-only]
+        [--owners game,unit] [--from F] [--to F] [--state-only] [--json FILE]
     python3 rng_diff.py --selftest
 
 Alignment: by frame. Within a frame, each owner's ordered draws (the game
@@ -281,6 +281,34 @@ def report(r, ha, hb, nxt=20, out=sys.stdout):
     return code
 
 
+VERDICTS = {0: "MATCH", 1: "DIVERGED", 2: "PARTIAL", 3: "ERROR"}
+
+
+def summary(r, code):
+    """The machine-readable summary (`--json FILE`, format diff-summary-1;
+    specs/tools/scenario-diff.md §4). Ticks compared: every frame of the
+    compared range (a frame without draws on either side is equal); equal:
+    the frames without a divergence."""
+    lo, hi = r["frames"]
+    n = max(0, hi - lo + 1)
+    bad = {d["frame"] for d in r["diffs"]}
+    first = None
+    if r["diffs"]:
+        d = r["diffs"][0]
+        first = {"frame": d["frame"], "text": where(d) + (
+            f": 1.14d site {(d['orig'] or {}).get('site')} vs d2rs site "
+            f"{(d['d2rs'] or {}).get('site')}")}
+    return {"format": "diff-summary-1", "channel": "rng", "tool": "rng_diff.py", "code": code,
+            "verdict": VERDICTS[code], "frames_compared": n, "frames_equal": n - len(bad),
+            "frame_range": [lo, hi], "differences": len(r["diffs"]), "first": first}
+
+
+def write_json(path, obj):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, indent=1)
+        f.write("\n")
+
+
 # --- self-test -----------------------------------------------------------------
 
 K = 0x6AC690C5
@@ -381,7 +409,13 @@ def selftest():
         got = (d["frame"], d["owner"], d["index"], d["field"])
         assert got == want, (k, v, got, want)
         assert report(r, orig[0], b[0], out=sink) == 1
+        sm = summary(r, 1)
+        assert sm["first"]["frame"] == 2 and sm["frames_compared"] == 4, sm
+        assert sm["frames_equal"] == 3 and sm["verdict"] == "DIVERGED", sm
         ok += 1
+    sm = summary(run(orig, d2rs), 0)
+    assert (sm["frames_compared"], sm["frames_equal"], sm["first"]) == (4, 4, None), sm
+    ok += 1
     # the inline unit draw's ret is not compared (1.14d gives lo')
     b = copy.deepcopy(d2rs)
     b[idx[2]]["ret"] = 12345
@@ -455,6 +489,8 @@ def main(argv=None):
     ap.add_argument("--to", dest="hi", type=int, default=None)
     ap.add_argument("--state-only", action="store_true",
                     help="compare seed states only (not op / n / min / ret)")
+    ap.add_argument("--json", default=None, metavar="FILE",
+                    help="also write a machine-readable summary (diff-summary-1) here")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
     if a.selftest:
@@ -468,8 +504,14 @@ def main(argv=None):
         r = compare((ha, ra), (hb, rb), owners, a.lo, a.hi, a.state_only)
     except (RngError, OSError, KeyError, ValueError) as e:
         print(f"error: {e}", file=sys.stderr)
+        if a.json:
+            write_json(a.json, {"format": "diff-summary-1", "channel": "rng", "code": 3,
+                                "verdict": "ERROR", "error": str(e)})
         return 3
-    return report(r, ha, hb, a.next)
+    code = report(r, ha, hb, a.next)
+    if a.json:
+        write_json(a.json, summary(r, code))
+    return code
 
 
 if __name__ == "__main__":
