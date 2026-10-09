@@ -43,7 +43,7 @@ pub(super) fn blood(
         m.current = 128;
         default_step(w, env, key, row)
     } else {
-        end_with(w, env, key, false).map(|_| ())
+        end_with(w, env, key, None, false).map(|_| ())
     }
 }
 
@@ -696,7 +696,7 @@ const ORB_OY: [i32; 64] = [
     -29, -30, -29, -29, -28, -27, -26, -24, -23, -21, -19, -16, -14, -11, -8, -5, -2,
 ];
 
-fn orb_offset(i: usize) -> (i32, i32) {
+pub(super) fn orb_offset(i: usize) -> (i32, i32) {
     (ORB_OY[(i + 16) % 64], ORB_OY[i % 64])
 }
 
@@ -785,11 +785,12 @@ fn seed_lo(w: &ClientWorld, key: UnitKey) -> u32 {
         .map_or(0, |(lo, _)| lo)
 }
 
-/// The point test `0x0064CB30(room, x, y, mask)` (`sim/path-placement.md`
-/// §2 r2) on the client DRLG: the collision word & mask (0x27 & mask in
-/// no room; no client DRLG: 0).
-fn point_test(w: &ClientWorld, x: i32, y: i32, mask: u32) -> u32 {
-    super::collision_word(w, x, y) & mask
+/// The point test `0x0064CB30(m's room, x, y, mask)`
+/// (`sim/path-placement.md` §4 r2) on the client DRLG (no room: 0x27
+/// unmasked; no client DRLG: 0).
+fn point_test(w: &ClientWorld, key: UnitKey, x: i32, y: i32, mask: u16) -> u32 {
+    let room = w.objclient.missiles.get(&key).and_then(|m| m.room);
+    super::point_value_from(w, room, x, y, mask)
 }
 
 /// m's room (`0x00620BB0`): the active room of its sub-tile; with no
@@ -842,7 +843,7 @@ fn shard(
     reseed(w, key, (x + elapsed) as u32);
     let sx = x + r - 1 - rnd(w, key, 2 * (r - 1));
     let sy = y + r - 1 - rnd(w, key, 2 * (r - 1));
-    if point_test(w, sx, sy, 4) != 0 {
+    if point_test(w, key, sx, sy, 4) != 0 {
         return Ok(());
     }
     let rec = CreateRecord {
@@ -1028,7 +1029,7 @@ pub(super) fn eruption(
         reseed(w, key, (x + elapsed) as u32);
         let px = x + rnd(w, key, 2 * (r - 1)) - (r - 1);
         let py = y + rnd(w, key, 2 * (r - 1)) - (r - 1);
-        if point_test(w, px, py, 0x45) == 0 {
+        if point_test(w, key, px, py, 0x45) == 0 {
             let mut rec = CreateRecord {
                 flags: flag::POSITION | flag::RANDOM_DIRECTION,
                 owner: m.owner,
@@ -1156,7 +1157,12 @@ pub(super) fn distraction(
     if m.new_step {
         super::spawn(w, env, key, s1 as u32)?;
     }
+    let room = w
+        .drlg
+        .as_ref()
+        .and_then(|d| super::drlg_room_at(&d.drlg, i32::from(ox), i32::from(oy)));
     if let Some(m) = w.objclient.missiles.get_mut(&key) {
+        m.room = room;
         let old = cell_of(m);
         m.pos = (
             (u32::from(ox) << 16) | 0x8000,
