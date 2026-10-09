@@ -20,7 +20,7 @@ import json
 import os
 import sys
 
-TOOL = "trace-recorder anim_facts 0.1.0"
+TOOL = "trace-recorder anim_facts 0.2.0"
 FORMAT = "anim-facts-1"
 COLS = ["k", "C", "tick", "t", "c", "g", "m", "f", "F", "s", "e", "st", "px", "py",
         "mfl", "mn", "ox", "oy", "oz"]
@@ -53,7 +53,17 @@ def rows(records, me=False, units=(), lo=None, hi=None):
     return out
 
 
-def write(path, header, cmd, note, table):
+WCOLS = ["k", "C", "mark", "F", "live", "rain", "target"]
+
+
+def weather_rows(records, lo=None, hi=None):
+    """`--weather`: the `wu` / `wm` records (record_anim.py --weather)."""
+    return [[r[c] for c in WCOLS] for r in records if r.get("k") in ("wu", "wm")
+            and (lo is None or r["C"] >= lo) and (hi is None or r["C"] <= hi)]
+
+
+def write(path, header, cmd, note, table, cols=None):
+    cols = cols or COLS
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(f"# format {FORMAT}\n# tool {TOOL}\n")
         f.write(f"# recorder {header.get('tool')} ({header.get('format')}), Game.exe sha256 "
@@ -61,7 +71,7 @@ def write(path, header, cmd, note, table):
         f.write(f"# command: {cmd}\n")
         if note:
             f.write(f"# note: {note}\n")
-        f.write("\t".join(COLS) + "\n")
+        f.write("\t".join(cols) + "\n")
         for r in table:
             f.write("\t".join(str(x) for x in r) + "\n")
 
@@ -80,6 +90,8 @@ def selftest():
     assert got[0][1:3] == [9, 7] and got[0][-3:] == [0, 0, -20] and got[0][14:16] == [2, 13]
     assert rows(recs, units={(1, 9)})[0][5] == 9
     assert rows(recs, me=True, lo=10)[0][0] == "fs"
+    w = [{"k": "wu", "C": 2, "mark": 1, "F": 0, "live": 0, "rain": 1, "target": 0}, {"k": "tick", "f": 1}]
+    assert weather_rows(w) == [["wu", 2, 1, 0, 0, 1, 0]] and weather_rows(w, lo=3) == []
     print("selftest ok")
 
 
@@ -92,6 +104,8 @@ def main():
     ap.add_argument("--from", dest="lo", type=int)
     ap.add_argument("--to", dest="hi", type=int)
     ap.add_argument("--note", default="")
+    ap.add_argument("--weather", action="store_true",
+                    help="the weather records (k, C, mark, F, live, rain, target) instead")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
     if a.selftest:
@@ -99,11 +113,14 @@ def main():
         return
     recs = [json.loads(line) for line in open(a.raw, encoding="utf-8")]
     units = {tuple(int(x) for x in u.split(":")) for u in a.unit}
-    table = rows(recs, a.me, units, a.lo, a.hi)
+    if a.weather:
+        table, cols = weather_rows(recs, a.lo, a.hi), WCOLS
+    else:
+        table, cols = rows(recs, a.me, units, a.lo, a.hi), COLS
     cmd = "python3 tools/trace-recorder/anim_facts.py <raw> " + " ".join(
         a for a in sys.argv[2:] if not a.startswith("<"))
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
-    write(a.out, recs[0], cmd, a.note, table)
+    write(a.out, recs[0], cmd, a.note, table, cols)
     print(f"wrote {a.out}: {len(table)} rows")
 
 

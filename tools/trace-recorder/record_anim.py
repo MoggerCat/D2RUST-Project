@@ -22,6 +22,11 @@ Records:
   and its check table): U, +0x44, +0x48, +0x4C, +0x84, C.
 - `leap`: entry of `0x004C8670(unit, point)` (`unit-composite.md` §8,
   creator `0x004C8726`): the raw ECX, EDX and the first 3 stack words.
+- `wu` / `wm` (`--weather`): entries of the weather update `0x00473F50`
+  and the particle move `0x004732C0` (`render/draw-order-2.md` §11.2,
+  §11.9): C, the update mark `[0x007A8A0C]`, the move counter F
+  `[0x007A8A34]`, the particle pool's live count (`[0x007A8A04]` +0x114),
+  the stored rain flag `[0x007A8A44]` and the target `[0x007A89E0]`.
 - `adv`: entry of the frame advance `0x00623E00` (`audio/triggers-2.md`
   §15 r1) for a client player or monster: the raw candidates and the
   unit's frame fields before.
@@ -41,7 +46,7 @@ sys.dont_write_bytecode = True
 import record_tick as rt  # noqa: E402
 import autostart  # noqa: E402
 
-TOOL = "trace-recorder record_anim 0.1.0"
+TOOL = "trace-recorder record_anim 0.2.0"
 FORMAT = "anim-raw-1"
 
 CLIENT_UPDATES = 0x7A0498   # C (render/capture.md §3.1, audio/triggers.md checks)
@@ -54,6 +59,12 @@ H_UPDATE = 0x480810    # client/model.md §5 rule 2
 H_FOOT = 0x4CAF60      # audio/triggers.md §5
 H_LEAP = 0x4C8670      # render/unit-composite.md §8 creators
 H_ADV = 0x623E00       # audio/triggers-2.md §15 r1
+H_WUPD = 0x473F50      # render/draw-order-2.md §11.2
+H_WMOVE = 0x4732C0     # render/draw-order-2.md §11.9
+# render/draw-order-2.md §11.1: update mark, move counter F, particle pool, stored rain flag, target
+W_MARK, W_F, W_POOL, W_RAIN, W_TARGET = 0x7A8A0C, 0x7A8A34, 0x7A8A04, 0x7A8A44, 0x7A89E0
+POOL_LIVE = 0x114
+WEATHER_EXPECT = {H_WUPD: b"\x55\x8B\xEC\x51\x53\x56\x57", H_WMOVE: b"\x55\x8B\xEC\x83\xEC\x08"}
 
 ANIM_EXPECT = {  # first bytes (the 1.14d file image)
     H_UPDATE: b"\x55\x8B\xEC\x51\x56\x8B\xF1", H_FOOT: b"\x55\x8B\xEC\x83\xEC\x2C",
@@ -137,6 +148,12 @@ class AnimRecorder(rt.TickRecorder):
                     r["u"] = self.extra(u, self.fields(u))
                     break
             self.emit(r)
+        elif addr in (H_WUPD, H_WMOVE):
+            pool = self.u32(W_POOL)
+            self.emit({"k": "wu" if addr == H_WUPD else "wm", "C": self.u32(CLIENT_UPDATES),
+                       "mark": self.u32(W_MARK), "F": self.u32(W_F),
+                       "live": self.i32(pool + POOL_LIVE) if pool else None,
+                       "rain": self.u32(W_RAIN), "target": self.i32(W_TARGET)})
         elif addr == H_ADV and self.adv:
             st = struct.unpack("<2I", self.read(ctx.Esp + 4, 8))
             u = st[0]
@@ -158,6 +175,8 @@ def main():
     ap.add_argument("--ticks", type=int, default=0, help="stop after N server ticks (0: no limit)")
     ap.add_argument("--types", default="0,1", help="unit types logged (default players, monsters)")
     ap.add_argument("--adv", action="store_true", help="also log the frame advance 0x623E00")
+    ap.add_argument("--weather", action="store_true",
+                    help="also log the weather update 0x473F50 and the particle move 0x4732C0")
     ap.add_argument("--arm-level", type=int, default=None,
                     help="arm the animation hooks only once the player is in this level")
     ap.add_argument("--out", default=None, help="output file (default traces/raw/<time>-anim.jsonl)")
@@ -169,6 +188,8 @@ def main():
         repo, "traces", "raw", datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + "-anim.jsonl")
     rt.EXPECT = {k: v for k, v in rt.EXPECT.items() if k == rt.TICK}
     rt.EXPECT.update(ANIM_EXPECT if a.adv else {k: v for k, v in ANIM_EXPECT.items() if k != H_ADV})
+    if a.weather:
+        rt.EXPECT.update(WEATHER_EXPECT)
     rt.FORMAT, rt.TOOL = FORMAT, TOOL
     types = {int(x) for x in a.types.split(",")}
     r = AnimRecorder(os.path.abspath(a.game), gargs, out, a.seconds, a.ticks, types, a.adv, a.arm_level)
