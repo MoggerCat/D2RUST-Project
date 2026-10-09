@@ -29,7 +29,11 @@ impl Act5 {
     fn new() -> Act5 {
         let mut rig = Rig::new("barbarian", &[]);
         rig.with(|sim, p| {
-            sim.events.action.hooks().act_changes.push((p, HARROGATH, 0));
+            sim.events
+                .action
+                .hooks()
+                .act_changes
+                .push((p, HARROGATH, 0));
         });
         for _ in 0..400 {
             if rig.level() == Some(HARROGATH) {
@@ -37,7 +41,11 @@ impl Act5 {
             }
             rig.step(1);
         }
-        assert_eq!(rig.level(), Some(HARROGATH), "the act change reaches Harrogath");
+        assert_eq!(
+            rig.level(),
+            Some(HARROGATH),
+            "the act change reaches Harrogath"
+        );
         rig.step(30);
         let mut a = Act5 { rig };
         a.strengthen();
@@ -142,7 +150,9 @@ impl Act5 {
             if self.dead(m) {
                 break;
             }
-            let at = self.rig.with(move |sim, _| sim.events.action.sys.hooks.path_position(m));
+            let at = self
+                .rig
+                .with(move |sim, _| sim.events.action.sys.hooks.path_position(m));
             self.stand_by(at);
             let mut msg = vec![0x06];
             msg.extend(1u32.to_le_bytes());
@@ -155,7 +165,12 @@ impl Act5 {
 
     fn dead(&mut self, m: UnitId) -> bool {
         self.rig.with(move |sim, _| {
-            sim.events.action.sys.units.get(m).is_none_or(|u| u.mode == 0 || u.mode == 12)
+            sim.events
+                .action
+                .sys
+                .units
+                .get(m)
+                .is_none_or(|u| u.mode == 0 || u.mode == 12)
                 || sim.game.lists.unit(m).is_none()
         })
     }
@@ -174,7 +189,12 @@ impl Act5 {
     }
 
     fn rejected(&self) -> Vec<String> {
-        let b = &self.rig.app.world().resource::<d2_client::bridge::BridgeResource>().0;
+        let b = &self
+            .rig
+            .app
+            .world()
+            .resource::<d2_client::bridge::BridgeResource>()
+            .0;
         b.log().rejected.iter().map(|r| format!("{r:?}")).collect()
     }
 }
@@ -234,14 +254,19 @@ fn shenk_dies_and_the_siege_completes() {
             }
         }
     }
-    let &(shenk, guid, at) = found.first().expect("Shenk spawned in the Bloody Foothills");
+    let &(shenk, guid, at) = found
+        .first()
+        .expect("Shenk spawned in the Bloody Foothills");
     a.stand_by(at);
     a.rig.step(10);
     assert!(a.client_has(1, guid), "the client sees Shenk");
     a.kill(shenk, guid);
     a.rig.step(30);
     let c = a.chain(31);
-    assert!(a.flag(35, 1) || a.flag(35, 0), "Siege quest flags after Shenk: {c:?}");
+    assert!(
+        a.flag(35, 1) || a.flag(35, 0),
+        "Siege quest flags after Shenk: {c:?}"
+    );
     // Back to Larzuk: the reward (35.0) is given at his chat.
     a.warp(HARROGATH);
     assert!(a.rejected().is_empty(), "{:?}", a.rejected());

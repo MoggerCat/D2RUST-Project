@@ -787,7 +787,10 @@ impl Pending for LocalSeams {
     fn missile_spawn_tyrael(
         &mut self,
         room: Option<d2_sim::units::RoomId>,
-        missile: UnitId, x: i32, y: i32) {
+        missile: UnitId,
+        x: i32,
+        y: i32,
+    ) {
         self.quest_events
             .push(d2_sim::wiring::action::QuestEvent::SpawnTyrael {
                 room,

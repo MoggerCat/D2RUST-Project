@@ -16,9 +16,9 @@ use crate::monsters::ai::{
 };
 use crate::rng::Seed;
 use crate::stats::stat;
+use crate::units::hooks::Sim;
 use crate::units::record::flags;
 use crate::units::{RoomId, UnitId};
-use crate::units::hooks::Sim;
 
 use super::objects::ObjectRoute;
 use super::units::clear_uninterruptable;

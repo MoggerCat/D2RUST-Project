@@ -580,12 +580,7 @@ pub fn spawn_tyrael<W: QuestWorld>(w: &mut W, room: RoomId, unit: UnitId) -> Opt
 }
 
 /// [`spawn_tyrael`] with the unit's position (ux, uy) read by the caller.
-pub fn spawn_tyrael_at<W: QuestWorld>(
-    w: &mut W,
-    room: RoomId,
-    ux: i32,
-    uy: i32,
-) -> Option<UnitId> {
+pub fn spawn_tyrael_at<W: QuestWorld>(w: &mut W, room: RoomId, ux: i32, uy: i32) -> Option<UnitId> {
     let (sx, sy, r) = w.free_spot_at(room, ux - 5, uy - 5, 5, 0x400, 19, 100)?;
     w.spawn_monster_flags(r, sx, sy, TYRAEL3, 1, 4, 0x42)
 }
