@@ -259,7 +259,7 @@ impl OriginalUi {
             Output::NpcText {
                 ref bytes, present, ..
             } => self.npc_text_record(bytes, present),
-            Output::NpcDialog(ref d) => self.npc_dialog(d, world),
+            Output::NpcDialog(ref d) => self.npc_dialog(d),
             // Not UI outputs (`client/bridge.md` §10 rule 5).
             Output::ServerSound { .. } | Output::ShrineSound { .. } => Ok(()),
             _ if o.consumer() != Consumer::Ui => Ok(()),
@@ -326,16 +326,17 @@ impl OriginalUi {
 
     /// §16 r4 at delivery: the UI-only calls are skipped; the branch case
     /// is chosen and kept for the bridge.
-    fn npc_dialog(&mut self, d: &NpcDialog, world: &ClientWorld) -> Result<(), OriginalUiError> {
+    fn npc_dialog(&mut self, d: &NpcDialog) -> Result<(), OriginalUiError> {
         // r4.2: `[0x007C0D43]` := Q (§16 r7).
         self.more.client_quest = d.quest_flags;
         self.skip(skip::NPC_DIALOG_UI);
         // d2rs-own, unverified (`npc_menu_ui`): the menu box opens here.
-        let level = world.local().map_or(1, |u| world.base(u.key, 12, 0));
-        let n = crate::ui::npc_menu_ui::unidentified_count(world);
+        // The facts are captured at receive (`client/bridge.md` §10 r3, r9),
+        // not read from the end-of-frame model.
+        let (level, n) = (d.level, d.unidentified);
         // `panels-2.md` §14.2: the Resurrect edit while the mercenary is
         // dead (`[0x00725494]` ≠ −1, S→C 0x9B) in an expansion game.
-        let expansion = world.expansion != 0 && self.shared.borrow().config.expansion_installed;
+        let expansion = d.expansion && self.shared.borrow().config.expansion_installed;
         self.npcm.borrow_mut().resurrect = (expansion && self.more.merc_state != 0xFFFF)
             .then_some(u32::from(self.more.merc_7c0dd0));
         self.open_npc_menu_with(d.guid, d.class, level, n);

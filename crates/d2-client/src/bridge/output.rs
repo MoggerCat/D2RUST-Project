@@ -292,6 +292,14 @@ pub struct NpcDialog {
     pub f4b1a10: Option<u32>,
     /// The local player has a cursor item.
     pub cursor_item: bool,
+    /// The local player's level (base stat 12) at receive (`client/bridge.md`
+    /// §10 r3, r9): the menu uses it even when a later message of the same
+    /// chunk changes the stat.
+    pub level: i32,
+    /// The number of unidentified items of the local player at receive.
+    pub unidentified: u32,
+    /// The game is an expansion game (`ClientWorld::expansion` ≠ 0) at receive.
+    pub expansion: bool,
     /// The S monsters whose monstats `npc` flag (bit 8) is set, in key
     /// order.
     pub npc_monsters: Vec<UnitKey>,
@@ -824,6 +832,9 @@ mod tests {
                 interact: false,
                 f4b1a10: None,
                 cursor_item: false,
+                level: 1,
+                unidentified: 0,
+                expansion: false,
                 npc_monsters: vec![],
             })),
             Output::NpcDialogEnd { kind: 0 },

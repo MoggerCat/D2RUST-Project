@@ -158,39 +158,15 @@ pub const ETHEREAL: u32 = 0x0040_0000;
 /// The draw mode of an ethereal item graphic (§8 r4): 50 % alpha.
 pub const ETHEREAL_MODE: u8 = 1;
 
-/// d2rs-own, unverified: whether an item code is a belt-able potion
-/// (`hp1`–`hp5`, `mp1`–`mp5`, `rvs`, `rvl`, `vps`, `yps`, `wms`, the
-/// throwing potions `gps`/`gpm`/`gpl`/`ops`/`opm`/`opl`); the server
-/// still checks the move (`inventory-moves.md` §7.24).
-pub fn fits_belt(code: Option<[u8; 4]>) -> bool {
-    let Some(c) = code else {
-        return false;
-    };
-    matches!(
-        &c[..3],
-        b"hp1"
-            | b"hp2"
-            | b"hp3"
-            | b"hp4"
-            | b"hp5"
-            | b"mp1"
-            | b"mp2"
-            | b"mp3"
-            | b"mp4"
-            | b"mp5"
-            | b"rvs"
-            | b"rvl"
-            | b"vps"
-            | b"yps"
-            | b"wms"
-            | b"gps"
-            | b"gpm"
-            | b"gpl"
-            | b"ops"
-            | b"opm"
-            | b"opl"
-    )
+/// Whether an item code fits a belt box: the type's itemtypes `beltable`
+/// and a 1 x 1 size, as the server reads it (`seams/item-grids.md` §2.8,
+/// `inventory-moves.md` §3.3). The server still checks the move.
+pub fn fits_belt(art: &ItemArtRows, code: Option<[u8; 4]>) -> bool {
+    code.and_then(|c| art.get(c)).is_some_and(|r| r.beltable)
 }
+
+/// The cube's grid, `inventory.bin` record 9 (`inventory.md` §1.3).
+const CUBE_GRID: (i32, i32) = (3, 4);
 
 /// An item's graphic: file id, footprint in cells, frame size.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -475,14 +451,48 @@ impl ItemsUi {
                 .find(|(_, x, y, w, h)| (*x..x + w).contains(&c) && (*y..y + h).contains(&r))
                 .map(|(i, ..)| *i)
         };
+        // The facts of §10 r4.3 from the tables and the items' streams
+        // (`seams/item-grids.md` §2.5; `inv_items_facts`).
+        let tips = self.tips.as_ref().map(|t| t as &dyn facts::GridInfo);
+        let stream_of = |i: &ItemView| items::stream(world, i.key);
+        let cursor_stream = cursor.and_then(stream_of);
         let iref = |i: &ItemView| ItemRef {
             id: i.key.guid,
             is_cube: i.code == Some(*b"box "),
-            stackable_onto: false,
-            book_kind: None,
+            stackable_onto: tips
+                .zip(cursor_stream)
+                .zip(stream_of(i))
+                .is_some_and(|((t, a), b)| facts::stack_test(t, a, b)),
+            book_kind: tips
+                .zip(stream_of(i))
+                .and_then(|(t, s)| facts::book_kind(t, s)),
             sellable: false,
-            fits_belt: fits_belt(i.code),
+            fits_belt: fits_belt(&self.art, i.code),
         };
+        // The cube's grid (`inventory.bin` record 9: 3 x 4) and what lies
+        // on its page 3, for the room test `0x0063B850` (§10 r4.4).
+        let cube_grid = if page == 3 {
+            (i32::from(g.grid_x), i32::from(g.grid_y))
+        } else {
+            CUBE_GRID
+        };
+        let cube_taken: Vec<(i32, i32, i32, i32)> = all
+            .iter()
+            .filter(|i| i.mode == mode::STORED && i.page == 3)
+            .map(|i| {
+                let (w, h) = self.art.get(i.code.unwrap_or([0; 4])).map_or((1, 1), |r| {
+                    (i32::from(r.inv_w.max(1)), i32::from(r.inv_h.max(1)))
+                });
+                (i32::from(i.x), i32::from(i.y), w, h)
+            })
+            .collect();
+        let cube_has_room = cursor.is_some_and(|c| {
+            let size = self
+                .art
+                .get(c.code.unwrap_or([0; 4]))
+                .map_or((1, 1), |r| (i32::from(r.inv_w), i32::from(r.inv_h)));
+            facts::has_room(cube_grid, &cube_taken, size)
+        });
         let (mc, mr) = g.mouse_cell(at);
         let under_view = at_cell(mc as i32, mr as i32);
         let under_mouse = under_view.map(iref);
@@ -525,7 +535,9 @@ impl ItemsUi {
             },
             used_item: self.identify.get(),
             cursor_item: cursor.map(iref),
-            cursor_scroll_kind: None,
+            cursor_scroll_kind: tips
+                .zip(cursor_stream)
+                .and_then(|(t, s)| facts::scroll_kind(t, s)),
             under_mouse,
             ready: true,
             own_player: true,
@@ -551,7 +563,7 @@ impl ItemsUi {
             drop_cell: fits.then_some(cursor_cell),
             swap_ok: overlap.len() == 1,
             cursor_cell,
-            cube_has_room: false,
+            cube_has_room,
             cursor_can_socket: socket.is_some(),
         };
         match grid_click(&ctx).msg? {
@@ -577,8 +589,26 @@ impl ItemsUi {
                 Some(ClientIntent::from_message(&self.target_used(target, used)))
             }
             GridMsg::Socket { .. } => socket.map(|m| ClientIntent::from_message(&m)),
-            // Not produced by the facts above (no stack / scroll
-            // / cube / shop facts in the preview).
+            GridMsg::Stack { cursor, under } => {
+                Some(ClientIntent::from_message(&d2_proto::client::StackItems {
+                    src: cursor,
+                    dst: under,
+                }))
+            }
+            GridMsg::ScrollBook { cursor, under } => Some(ClientIntent::from_message(
+                &d2_proto::client::ScrollToBook {
+                    scroll: cursor,
+                    book: under,
+                },
+            )),
+            GridMsg::ToCube { item, cube } => {
+                Some(ClientIntent::from_message(&d2_proto::client::ItemToCube {
+                    item,
+                    cube,
+                }))
+            }
+            // The sell needs the open store's NPC (`vendors.md` §8): the
+            // shop panel's own sell stays the way to sell.
             _ => None,
         }
     }
@@ -664,6 +694,8 @@ impl ItemsUi {
 
 #[path = "inv_items_equip.rs"]
 pub mod equip;
+#[path = "inv_items_facts.rs"]
+mod facts;
 #[path = "inv_items_repair.rs"]
 mod repair;
 #[path = "inv_items_socket.rs"]

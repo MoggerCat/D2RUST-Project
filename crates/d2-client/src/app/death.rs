@@ -68,7 +68,7 @@ fn spawn_text(mut commands: Commands) {
 }
 
 /// Shows the screen while the player is down; Esc while dead sends 0x41.
-fn death_screen(
+pub(super) fn death_screen(
     mut bridge: ResMut<BridgeResource>,
     keys: Option<Res<ButtonInput<KeyCode>>>,
     mut screen: ResMut<DeathScreen>,

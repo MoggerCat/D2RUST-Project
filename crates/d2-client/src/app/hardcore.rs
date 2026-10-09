@@ -108,10 +108,15 @@ fn leave_dead(
 pub fn add_hardcore(app: &mut App, hardcore: bool) {
     app.insert_resource(HardcoreRun(hardcore)).add_systems(
         Update,
+        // `client-frame.md` §1 r8 (q-fix-flow-client-order C5): the death
+        // screen's state is written first; the save at death and the
+        // hardcore leave read it the same frame.
         (
-            save_on_death,
+            save_on_death.after(super::death::death_screen),
             save_at_dd,
-            leave_dead.run_if(resource_exists::<BridgeResource>),
+            leave_dead
+                .after(super::death::death_screen)
+                .run_if(resource_exists::<BridgeResource>),
         ),
     );
 }

@@ -361,6 +361,31 @@ fn dialog(class: u32, interact: bool) -> (Model, NpcDialog) {
     (m, d)
 }
 
+// Covers: specs/client/bridge.md §10 r3; specs/client/bridge.md §10 r9
+#[test]
+fn the_dialog_captures_the_menu_facts_at_receive() {
+    let mut m = Model::default();
+    let mut rows = vec![Some(MonsterClass::default()); 160];
+    rows[148] = Some(MonsterClass {
+        interact: true,
+        npc: true,
+        ..MonsterClass::default()
+    });
+    m.inputs.tables.monsters = rows;
+    m.put(UnitKey::new(MONSTER, 6)).class = 148;
+    m.put(P1).stats.insert(12, 30);
+    m.w.local_player = Some(P1);
+    m.w.expansion = 1;
+    m.recv(&quest_info(1, 6));
+    // A stat 12 change later in the same chunk (a level-up, 0x1D) does
+    // not reach the menu: the payload holds the level at receive.
+    m.put(P1).stats.insert(12, 31);
+    let Output::NpcDialog(d) = &m.out[0] else {
+        panic!("{:?}", m.out)
+    };
+    assert_eq!((d.level, d.unidentified, d.expansion), (30, 0, true));
+}
+
 // Covers: specs/client/msg-ui.md §16 r4, §16 r5
 #[test]
 fn dialog_branch_writes_and_0x31_in_order() {
