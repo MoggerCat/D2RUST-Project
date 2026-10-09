@@ -231,7 +231,7 @@ or waypoints, as of the last pull (2026-10-09). Staging is polled every
   Fortress NPCs' frame-24 think is gone and their seeds stay put, as
   1.14d shows. Written into `specs/sim/intents-events.md` §7.8 rule 3.2.
   d2rs's `wiring/action/switch.rs` leaves the cancel out (its doc lists
-  it as unspecified). Row `q-fix-p3-leave-cancels-thinks`.
+  it as unspecified). Row `q-fix-p3-leave-cancels-thinks`, a duplicate of PC1-C's `q-fix-p3-room-empty-think` (same answer, `docs/handoff/pc1-day3-c.md`); the row is marked so.
 - **Live runs, done** (Windows, release build of staging at 17:38, the
   recorders' own lock):
   - `packets-town-arrival-ama.check`: the c2s stream is now equal (28

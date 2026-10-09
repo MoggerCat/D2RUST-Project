@@ -1679,6 +1679,17 @@ pub trait Pending {
         Self: Sized,
     {
     }
+    /// The monster mode damage `0x005A4F50(unit, mode)` of the mode set
+    /// (`skills/bodies-2.md` §2.1, `umod-callbacks.md` §2 rule 1): the
+    /// base list's damage and to-hit for the requested mode. A
+    /// [`crate::wiring::interaction::UseRest`] value routes it to
+    /// [`crate::wiring::interaction::skill_events::monster_mode_damage`].
+    /// Default: nothing.
+    fn monster_mode_damage(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId, mode: u32)
+    where
+        Self: Sized,
+    {
+    }
 
     // ---- client intents (`sim/intents-events.md` §9; d2-server's
     // `handlers::player`) -------------------------------------------------
