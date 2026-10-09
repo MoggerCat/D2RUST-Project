@@ -1,4 +1,4 @@
-# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py game/captures/day/manual/scene1b.jsonl --scene a1-panel-esc-menu --frame 72 --out facts/render; game: 1.14d
+# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py game/captures/day/manual/scene3.jsonl --scene a1-panel-stash --frame 140 --out facts/render; game: 1.14d
 file	dir	frame	w	h	xoff	yoff
 data/global/chars/am/hd/amhdlittn1ht.dcc	0	6	9	18	-9	-50
 data/global/chars/am/hd/amhdlittn1ht.dcc	47	0	15	15	-10	-46
@@ -87,6 +87,10 @@ data/global/ui/cursor/orotate.dc6	0	0	31	30	-2	24
 data/global/ui/cursor/pentspin.dc6	0	3	9	53	21	0
 data/global/ui/cursor/pentspin.dc6	0	5	40	53	7	0
 data/global/ui/cursor/protate.dc6	0	0	30	27	-1	24
+data/global/ui/cursor/protate.dc6	0	1	31	27	-1	24
+data/global/ui/cursor/protate.dc6	0	2	31	26	-1	24
+data/global/ui/cursor/protate.dc6	0	3	31	26	-1	24
+data/global/ui/cursor/protate.dc6	0	4	31	26	-1	24
 data/global/ui/cursor/protate.dc6	0	5	31	26	-1	24
 data/global/ui/cursor/protate.dc6	0	7	30	27	-1	24
 data/global/ui/menu/boxpieces.dc6	0	0	14	15	0	0
@@ -135,8 +139,10 @@ data/global/ui/panel/buysellbtn.dc6	0	0	32	32	0	0
 data/global/ui/panel/buysellbtn.dc6	0	2	32	32	0	0
 data/global/ui/panel/buysellbtn.dc6	0	4	32	32	0	0
 data/global/ui/panel/buysellbtn.dc6	0	10	32	32	0	0
+data/global/ui/panel/buyselltabs.dc6	0	0	79	31	0	0
 data/global/ui/panel/buyselltabs.dc6	0	3	79	31	0	0
 data/global/ui/panel/buyselltabs.dc6	0	5	79	31	0	0
+data/global/ui/panel/buyselltabs.dc6	0	7	79	31	0	0
 data/global/ui/panel/goldcoinbtn.dc6	0	0	20	18	0	0
 data/global/ui/panel/inv_armor.dc6	0	0	54	82	0	0
 data/global/ui/panel/inv_belt.dc6	0	0	52	25	0	0
@@ -167,6 +173,10 @@ data/global/ui/panel/overlap.dc6	0	0	82	88	0	0
 data/global/ui/panel/overlap.dc6	0	1	82	88	0	0
 data/global/ui/panel/runbutton.dc6	0	0	16	20	0	0
 data/global/ui/panel/runbutton.dc6	0	2	16	20	0	0
+data/global/ui/panel/tradestash.dc6	0	0	256	256	0	0
+data/global/ui/panel/tradestash.dc6	0	1	64	256	0	0
+data/global/ui/panel/tradestash.dc6	0	2	256	176	0	0
+data/global/ui/panel/tradestash.dc6	0	3	64	176	0	0
 data/global/ui/spells/skillicon.dc6	0	2	48	48	0	0
 data/global/ui/spells/soskillicon.dc6	0	0	48	48	0	0
 data/local/ui/eng/exit.dc6	0	0	256	36	0	0

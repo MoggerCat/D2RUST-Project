@@ -1,0 +1,22 @@
+# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py game/captures/day/manual/scene3.jsonl --scene a1-npc-gamble --frame 106 --out facts/render; game: 1.14d
+key	value
+seq	106
+tick	980
+w	800
+h	600
+act	0
+level	1
+player_x	8928
+player_y	72984
+tile_origin_x	8528
+tile_origin_y	72704
+unit_origin_x	8528
+unit_origin_y	72700
+open_mode	3
+shift_x	0
+light_quality	0
+rain	1
+snow	0
+draws	160
+index_sha256	9192855b4391d1c3a2fa24ef6d1f487dc6f8725d2be97579210f242808d383ee
+palette_sha256	ba83219e51249002d7125a1a5a701d6abea94f04f44d6cfaa42becdfcff23337
