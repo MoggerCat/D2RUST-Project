@@ -49,7 +49,11 @@
 //! the 0x15 placement after it (the placement's teleport sets the path's
 //! point count to 0, `sim/path-placement.md` §6 r4; whether the client
 //! then walks on to the request's target is OQ2), and the hold until the
-//! target is in the player's room. Used only by the `play` preview; the
+//! target is in the player's room. Measured on a waypoint arrival
+//! (`traces/client/model/client-0002.json`): the 1.14d client stands at
+//! the 0x15 point with the server and never walks to the 0x0D's x + 3,
+//! y + 3, where this module draws it: q-fix-arrival-walkout (warps and
+//! portals not recorded yet, REC-570). Used only by the `play` preview; the
 //! strict path never builds one.
 
 use std::sync::OnceLock;
@@ -286,6 +290,9 @@ pub struct Predict {
     /// click re-targets it; cleared when it ends): the walk animation's
     /// start ([`Self::walk_since`]).
     since: Option<(u64, u32)>,
+    /// The model's living monsters, stamped on the client path's grids
+    /// ([`Self::set_others`]).
+    others: Vec<super::client_path::OtherUnit>,
     /// The player's own path over the client DRLG ([`ClientPath`]): the
     /// step of a walk when the client has a DRLG.
     path: ClientPath,
@@ -362,6 +369,7 @@ impl Predict {
                 held: None,
                 waypoint: self.waypoint,
                 since: None,
+                others: std::mem::take(&mut self.others),
                 path: ClientPath::default(),
                 path_for: None,
             };
@@ -538,6 +546,7 @@ impl Predict {
                 self.path_for = None;
                 return false;
             }
+            self.path.stamp_others(t, drlg, &self.others);
             if !self.path.request(t, drlg, speeds, own, to, walk.run) {
                 // No path: the server's request stands still too.
                 self.walk = None;
@@ -545,6 +554,7 @@ impl Predict {
                 return true;
             }
         }
+        self.path.stamp_others(t, drlg, &self.others);
         let moving = self.path.tick(t, drlg, speeds, own, Some(to));
         if let Some((x, y)) = self.path.position() {
             let now = (i64::from(x), i64::from(y));
@@ -614,11 +624,20 @@ impl Predict {
         }
         // The animation restarts with the mode (walk ↔ run, `a1-run-*`:
         // the run frames count from the first run click).
-        self.since = match (self.mode(), self.since) {
+        // Keyed on walk vs run (the path's 2 → 6 town-walk change the
+        // tick after the request is the same walk).
+        let kind = self.mode().map(|m| u32::from(m == 3));
+        self.since = match (kind, self.since) {
             (None, _) => None,
             (Some(m), Some((t, was))) if was == m => Some((t, m)),
             (Some(m), _) => Some((world.server_ticks, m)),
         };
+    }
+
+    /// The model's living monsters whose footprints the client path
+    /// sees (`msg-units.md` §3 r2), set before each [`Self::frame`].
+    pub fn set_others(&mut self, others: Vec<super::client_path::OtherUnit>) {
+        self.others = others;
     }
 
     /// The server tick the walk under way started on (`sim/units.md`
@@ -768,6 +787,17 @@ impl<L: super::poke::PokeTarget> super::poke::PokeTarget for PredictLink<L> {
     type Error = L::Error;
     fn poke(&mut self, op: &d2_sim::poke::PokeOp) -> Result<d2_sim::poke::PokeResult, L::Error> {
         self.inner.poke(op)
+    }
+}
+
+/// Scripted messages pass through (`state-dump --send`).
+impl<L: super::inject::InjectTarget> super::inject::InjectTarget for PredictLink<L> {
+    type Error = L::Error;
+    fn inject(
+        &mut self,
+        msg: &conformance::scenario::script::StepMsg,
+    ) -> Result<super::inject::Injected, L::Error> {
+        self.inner.inject(msg)
     }
 }
 

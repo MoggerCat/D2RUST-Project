@@ -1,0 +1,13 @@
+check 1
+# A saved Act I rogue hireling restored at the join (world/hirelings.md
+# §10, formats/d2s.md §2.5): ScnBar (expansion, level 30) with hireling
+# row Id 0 (Rogue Scout, Fire - Normal), name index 21, seed 0x12345678,
+# 39,482 experience; no input. Compares the hireling's creation (GUID,
+# class, position, seed, level stats, life) and its follow AI in town
+# (hirelings.md §6) frame by frame. Spec: specs/tools/scenario-diff.md.
+name merc-rogue-town-bar
+save ScnBar --class bar --expansion --level 30 --merc 0,21,0x12345678,39482
+seed 1234
+ticks 80
+seconds 240
+channels state

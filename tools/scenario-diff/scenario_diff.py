@@ -30,6 +30,8 @@ import sys
 
 sys.dont_write_bytecode = True  # no __pycache__ next to the scripts
 import packets_channel  # noqa: E402  (the packets channel, scenario-diff.md §3)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "trace-recorder"))
+import send as send_msg  # noqa: E402  (`at … send` lines: the message syntax, scenario.md §3)
 import rng_channel  # noqa: E402  (the rng channel, scenario-diff.md §3)
 import time
 
@@ -50,7 +52,7 @@ class CheckError(Exception):
 def parse(text):
     """A check file -> dict. Strict: unknown keywords, repeats, missing
     required lines are errors naming the line."""
-    c = {"input": {}, "ignore": [], "poke": [], "difficulty": "normal", "seconds": 300,
+    c = {"input": {}, "ignore": [], "poke": [], "send": [], "difficulty": "normal", "seconds": 300,
          "channels": ["state"], "save_args": [], "draws_at": None}
     seen = set()
     lines = [(n, ln.split("#", 1)[0].strip() if not ln.lstrip().startswith("input ")
@@ -128,14 +130,34 @@ def parse(text):
             if side in c["input"]:
                 raise CheckError(f"line {n}: 'input {side}' repeated")
             c["input"][side] = script.strip()
+        elif kw == "variant":
+            # `variant <name>`: both sides run on the test variant install
+            # built from traces/variants/<name>/<name>.d2stack (§2, §3 rule 9)
+            once(kw)
+            if len(toks) != 1 or not all(ch.isalnum() and ch == ch.lower() or ch == "-"
+                                         for ch in toks[0]):
+                raise CheckError(f"line {n}: variant <name> (one token of [a-z0-9-])")
+            c["variant"] = toks[0]
         elif kw == "ignore":
             c["ignore"] += toks
         elif kw == "at":
             # `at <frame> poke <directive> <args...>` (specs/tools/poke.md §2 rule 6):
-            # passed to both sides as --poke "<frame> <directive> <args...>"
-            if len(toks) < 3 or toks[1] != "poke":
-                raise CheckError(f"line {n}: at <frame> poke <directive> <args...>")
-            c["poke"].append((n, num(toks[0], 1, 1_000_000), " ".join(toks[2:])))
+            # passed to both sides as --poke "<frame> <directive> <args...>";
+            # `at <frame> send <Name> <field>=<value>...` / `at <frame> send hex <bytes>`
+            # (§2 `at … send`, scenario.md §3): passed to both sides as --send
+            if len(toks) < 3 or toks[1] not in ("poke", "send"):
+                raise CheckError(f"line {n}: at <frame> poke <directive> <args...> | "
+                                 f"at <frame> send <Name> <field>=<value>... | "
+                                 f"at <frame> send hex <bytes>")
+            f = num(toks[0], 1, 1_000_000)
+            if toks[1] == "send":
+                try:
+                    msg = send_msg.parse_message(toks[2:])
+                except send_msg.SendError as e:
+                    raise CheckError(f"line {n}: send: {e}")
+                c["send"].append((n, f, msg.text()))
+            else:
+                c["poke"].append((n, f, " ".join(toks[2:])))
         else:
             raise CheckError(f"line {n}: unknown keyword '{kw}'")
     for req in ("name", "save", "seed", "ticks"):
@@ -150,7 +172,8 @@ def parse(text):
     return c
 
 
-SHARED_OPS = {"frame": 1, "move": 2, "click": 2, "rclick": 2, "hold": 3, "key": 1}
+SHARED_OPS = {"frame": 1, "move": 2, "click": 2, "rclick": 2, "hold": 3, "key": 1,
+              "clickunit": (2, 4), "rclickunit": (2, 4)}
 
 
 def shared_script_error(text):
@@ -165,10 +188,14 @@ def shared_script_error(text):
         op, a = w[0], w[1:]
         if op not in SHARED_OPS:
             return f"'{op}' is not a shared step ({', '.join(SHARED_OPS)})"
-        if len(a) != SHARED_OPS[op]:
-            return f"'{' '.join(w)}': {op} takes {SHARED_OPS[op]} argument(s)"
+        n = SHARED_OPS[op]
+        if len(a) not in (n if isinstance(n, tuple) else (n,)):
+            return f"'{' '.join(w)}': {op} takes {' or '.join(map(str, n if isinstance(n, tuple) else (n,)))} argument(s)"
         if op == "key":
             continue
+        if op in ("clickunit", "rclickunit"):
+            # T C[,C..]|* [DX DY] (autostart.py's form)
+            a = a[:1] + ([] if a[1] == "*" else a[1].split(",")) + a[2:]
         try:
             v = [int(x, 0) for x in a]
         except ValueError:
@@ -192,12 +219,39 @@ class Runner:
         self.game_dir = os.environ.get("D2_GAME_DIR") or (
             os.path.join(REPO, "game") if WINDOWS else os.path.expanduser("~/game"))
         self.log = []
+        self.base_game_dir = self.game_dir
+
+    def use_variant(self):
+        """`variant <name>` (§3 rule 9): build the variant install next to
+        the base install (`data-tool variant build`, tools/test-variants.md;
+        reused when it is there) and run both sides on it."""
+        name = self.c.get("variant")
+        if not name:
+            return
+        out = os.path.join(os.path.dirname(os.path.normpath(self.base_game_dir)), "variants",
+                           name)
+        stack = os.path.join("traces", "variants", name, name + ".d2stack")
+        if self.dry or not os.path.exists(os.path.join(out, "Game.exe")):
+            env = dict(os.environ, CARGO_PROFILE_RELEASE_DEBUG="0",
+                       D2_GAME_DIR=self.base_game_dir)
+            self.sh(["cargo", "run", "--release", "-q", "-p", "data-tool", "--", "variant",
+                     "build", stack, "--game", self.base_game_dir, "--out", out], env=env)
+        print(f"variant: {name} -> {out}")
+        self.game_dir = out
 
     def poke_args(self):
         """--poke "<frame> <directive> <args>" per `at` line, file order (both sides)."""
         out = []
         for _, frame, text in self.c["poke"]:
             out += ["--poke", f"{frame} {text}"]
+        return out
+
+    def send_args(self):
+        """--send "<frame> <message>" per `at … send` line, file order (every 1.14d
+        recorder, d2rs state-dump and play; scenario-diff.md §3 rule 12)."""
+        out = []
+        for _, frame, text in self.c["send"]:
+            out += ["--send", f"{frame} {text}"]
         return out
 
     def sh(self, argv, timeout=None, check=True, env=None):
@@ -262,7 +316,7 @@ class Runner:
         game = os.path.join(self.game_dir, "Game.exe")
         rec = [os.path.join(REC, script), "--game", game, "--seconds", str(c["seconds"]),
                "--ticks", str(c["ticks"]), "--auto", c["char"], "--seed", str(c["seed"]),
-               "--out", out] + args + self.poke_args()
+               "--out", out] + args + self.poke_args() + self.send_args()
         if self.orig_input():
             rec += ["--input", self.orig_input()]
         if (self.reuse or self.reuse_orig) and os.path.exists(out):
@@ -288,10 +342,12 @@ class Runner:
         state-dump takes it only when it is in the shared form)."""
         return self.c["input"].get("shared") or self.c["input"].get("d2rs")
 
-    def d2rs_common(self, save):
+    def d2rs_common(self, save, play=False):
+        """The d2rs options both commands share (`state-dump` and `play`:
+        pokes, then sends, §3 rule 12)."""
         c = self.c
         a = ["--save", save, "--seed", str(c["seed"]), "--difficulty", c["difficulty"]]
-        return a + self.poke_args()
+        return a + self.poke_args() + self.send_args()
 
     # channels --------------------------------------------------------------
     def state(self, save, sides):
@@ -361,7 +417,7 @@ class Runner:
             else:
                 if not self.dry and os.path.isdir(scene_d):
                     shutil.rmtree(scene_d)  # a stale dump never counts as this run's
-                args = [exe, "play"] + self.d2rs_common(save) + [
+                args = [exe, "play"] + self.d2rs_common(save, play=True) + [
                     "--dump-draws", scene_d, "--at-tick", str(at)]
                 if self.d2rs_input():
                     args += ["--input", self.d2rs_input()]
@@ -597,6 +653,8 @@ def selftest():
         "poke": GOOD + "at 5 spawn 1 2 3\n",
         "poke frame": GOOD + "at 0 poke time 1 0\n",
         "name": GOOD.replace("name a1-town-arrival-ama", "name A_B"),
+        "variant": GOOD + "variant Only_Fallen\n",
+        "variant twice": GOOD + "variant a\nvariant b\n",
     }
     for what, text in bad.items():
         try:
@@ -637,6 +695,42 @@ def selftest():
     r.draws("/tmp/w/ScnAma.d2s", {"d2rs"})  # one side: no compare
     assert not any("facts-compare" in x or "record_frames" in x for x in r.log)
     ok += 1
+    # `at … send` lines (§2, §3 rule 10): canonical text, --send to every 1.14d
+    # recorder (record_rng.py included), to state-dump and to play (draws)
+    cs = parse(GOOD + "at 6 send InteractWithEntity id=@1:148 type=1\n"
+               "at 6 send hex 2f 00 00 00 00 0C 00 00 00\n")
+    assert cs["send"] == [(12, 6, "InteractWithEntity type=1 id=@1:148"),
+                          (13, 6, "hex 2f 00 00 00 00 0c 00 00 00")], cs["send"]
+    for bad in ("at 6 send", "at 6 send Nope a=1", "at 6 send Walk x=1", "at 6 send hex 1",
+                "at 0 send Walk x=1 y=2", "at 6 send Chat", "at 6 sned Walk x=1 y=2"):
+        try:
+            parse(GOOD + bad + "\n")
+            raise AssertionError(f"accepted {bad!r}")
+        except CheckError:
+            ok += 1
+    r = Runner(cs, "/tmp/w", dry=True)
+    r.next = 5
+    r.state("/tmp/w/ScnAma.d2s", {"orig", "d2rs"})
+    r.draws("/tmp/w/ScnAma.d2s", {"orig", "d2rs"})
+    sq = ("--send '6 InteractWithEntity type=1 id=@1:148' "
+          "--send '6 hex 2f 00 00 00 00 0c 00 00 00'")
+    for what in ("record_state.py", "state-dump", "record_frames.py"):
+        line = next(x for x in r.log if what in x)
+        assert sq in line and line.index(poke) < line.index(sq), (what, line)
+    assert sq in next(x for x in r.log if " play " in x)  # play takes the sends too
+    # variant: built next to the base install, then both sides run on it
+    cv = parse(GOOD + "variant only-fallen\n")
+    r = Runner(cv, "/tmp/w", dry=True)
+    r.game_dir = r.base_game_dir = "/g/game"
+    r.next = 5
+    r.use_variant()
+    assert r.log[-1] == ("cargo run --release -q -p data-tool -- variant build "
+                         "traces/variants/only-fallen/only-fallen.d2stack --game /g/game "
+                         "--out /g/variants/only-fallen"), r.log[-1]
+    assert r.game_dir == "/g/variants/only-fallen"
+    r.state("/tmp/w/ScnAma.d2s", {"orig", "d2rs"})
+    assert "--game /g/variants/only-fallen/Game.exe" in next(x for x in r.log if "record_state" in x)
+    ok += 1
     # frame_seq_at: record_frames' frame records (seq, f, draws), odd ticks only
     import tempfile
     with tempfile.TemporaryDirectory() as td:
@@ -656,6 +750,7 @@ def selftest():
     walk = "frame 10; click 600 300; hold 400 200 3; key r"
     cs = parse(GOOD.replace("input orig wait 1; end", "input " + walk))
     assert cs["input"] == {"shared": walk}
+    assert shared_script_error("frame 3; clickunit 1 19,0x14; rclickunit 2 * 0 -8; key 1") is None
     r = Runner(cs, "/tmp/w", dry=True)
     r.next = 5
     r.state("/tmp/w/ScnAma.d2s", {"orig", "d2rs"})
@@ -666,7 +761,8 @@ def selftest():
     ok += 1
     for bad in ("input wait 1; click 1 2", "input click 1 2", "input frame 0; click 1 2",
                 "input frame 5; frame 4", "input frame 5; hold 1 2", "input frame 5; click a b",
-                "input frame 5; shot x"):
+                "input frame 5; shot x", "input frame 5; clickunit 1", "input frame 5; clickunit 1 x",
+                "input frame 5; clickunit 1 19 2"):
         try:
             parse(GOOD.replace("input orig wait 1; end", bad))
         except CheckError:
@@ -814,6 +910,7 @@ def main(argv=None):
         r.next = a.next
         sides = {"orig", "d2rs"} - ({"d2rs"} if a.orig_only else set()) - (
             {"orig"} if a.d2rs_only else set())
+        r.use_variant()
         save = r.build_save()
         for ch in c["channels"]:
             print(f"\n=== channel {ch} ===", flush=True)

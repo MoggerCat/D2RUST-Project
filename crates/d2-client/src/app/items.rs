@@ -217,28 +217,54 @@ impl crate::bridge::item_lists::StreamProps for TableDecoder {
         let charm = lookup
             .code(b.base_code.unwrap_or(b.code))
             .is_some_and(|c| c.charm);
-        // The armor's defense (stat 31, `bitstream.md` §4.4) is one of
-        // the item's own values the reader stores in its list
-        // (`client/stat-lists.md` §2 r1); it reaches the wearer's total
-        // with the property lists. PROVISIONAL (REC-281, stat-lists.md
-        // open question 2): durability, quantity and sockets are left
-        // out (no total reads them).
-        // `bitstream.md` §4.6 r4.3: grouped partners are sent unshifted.
         let shift = |s: u16| t.valshift.get(usize::from(s)).copied().unwrap_or(0);
-        let props = b
-            .defense
-            .iter()
-            .map(|d| vec![*d])
-            .chain(b.lists.iter().flatten().cloned())
-            .flat_map(|list| crate::ui::item_tip_props::stream_values(&list, shift))
-            .map(|(stat, layer, value)| crate::bridge::item_lists::ItemProp {
-                stat,
-                layer: layer as u16,
-                value,
-            })
-            .collect();
-        (props, charm)
+        (stream_props(&b, shift), charm)
     }
+}
+
+/// `quantity` (`client/stat-lists.md` §2 r1.1).
+const STAT_QUANTITY: u16 = 70;
+/// `item_numsockets` (`client/stat-lists.md` §2 r1.1).
+const STAT_SOCKETS: u16 = 194;
+
+/// The values one item stream puts in the item's list: the item's own
+/// §4.5 values (defense 31, durability 72 / max durability 73, quantity
+/// 70, sockets 194: its base array, `client/stat-lists.md` §2 r1.1 table
+/// row 1) and its §4.6 property lists, each stored as (field − `Save
+/// Add`) << `ValShift`; grouped partners are sent unshifted
+/// (`bitstream.md` §4.6 r4.3).
+pub fn stream_props(
+    b: &d2_proto::item_bits::ItemBits,
+    shift: impl Fn(u16) -> u8 + Copy,
+) -> Vec<crate::bridge::item_lists::ItemProp> {
+    use crate::bridge::item_lists::ItemProp;
+    let own = [b.defense, b.max_durability, b.durability];
+    let mut props: Vec<ItemProp> = own
+        .iter()
+        .flatten()
+        .map(|d| vec![*d])
+        .chain(b.lists.iter().flatten().cloned())
+        .flat_map(|list| crate::ui::item_tip_props::stream_values(&list, shift))
+        .map(|(stat, layer, value)| ItemProp {
+            stat,
+            layer: layer as u16,
+            value,
+        })
+        .collect();
+    let plain = [
+        (STAT_QUANTITY, b.quantity.map(i32::from)),
+        (STAT_SOCKETS, b.sockets.map(i32::from)),
+    ];
+    for (stat, v) in plain {
+        if let Some(v) = v {
+            props.push(ItemProp {
+                stat,
+                layer: 0,
+                value: v << shift(stat),
+            });
+        }
+    }
+    props
 }
 
 #[cfg(test)]
@@ -269,6 +295,37 @@ mod tests {
         d.extend_from_slice(&rows);
         d.extend_from_slice(&[0xEE; 3]);
         d
+    }
+
+    // The item's own values (durability, max durability, quantity,
+    // sockets, defense) land in its list beside the property list.
+    // Covers: specs/client/stat-lists.md §2 r1
+    #[test]
+    fn the_items_own_values_are_in_its_list() {
+        use d2_proto::item_bits::{ItemBits, Stat};
+        let st = |stat: u16, raw: u32, save_add: u32| Stat {
+            stat,
+            param: 0,
+            raw,
+            save_add,
+        };
+        let b = ItemBits {
+            defense: Some(st(31, 30, 10)),
+            max_durability: Some(st(73, 20, 0)),
+            durability: Some(st(72, 17, 0)),
+            quantity: Some(250),
+            sockets: Some(2),
+            lists: vec![Some(vec![st(0, 5, 0)])],
+            ..ItemBits::default()
+        };
+        let got: Vec<(u16, i32)> = stream_props(&b, |s| if s == 70 { 1 } else { 0 })
+            .iter()
+            .map(|p| (p.stat, p.value))
+            .collect();
+        assert_eq!(
+            got,
+            vec![(31, 20), (73, 20), (72, 17), (0, 5), (70, 500), (194, 2)]
+        );
     }
 
     // The item cel is drawn at (x, top + h) with its frame's own height

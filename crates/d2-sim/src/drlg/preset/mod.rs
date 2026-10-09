@@ -266,6 +266,22 @@ impl Presets {
             .collect()
     }
 
+    /// The room's units with flag bit 0 set, in list order (the client
+    /// presets, `client/model.md` §5 r6.2).
+    pub fn client_presets(&self, room: DrlgRoomId) -> Vec<super::ClientPreset> {
+        self.room_units(room)
+            .iter()
+            .filter(|u| u.flags & 1 != 0)
+            .map(|u| super::ClientPreset {
+                unit_type: u.unit_type,
+                class: u.class,
+                mode: u.mode,
+                x: u.x,
+                y: u.y,
+            })
+            .collect()
+    }
+
     /// `0x00666A80` (§10): a type-2 room's tombstones, else none.
     pub fn tombstones(&self, room: DrlgRoomId) -> Option<&[(i32, i32)]> {
         self.rooms.get(&room)?.tombstones.as_deref()

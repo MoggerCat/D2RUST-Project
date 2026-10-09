@@ -77,6 +77,19 @@ pub trait MonsterWorld<X> {
         let _ = level;
         None
     }
+    /// Class reinit `0x00574370(game, unit, class, mode)` (`init.md`
+    /// §27). Default: nothing (false).
+    fn reinit(
+        &mut self,
+        sim: &mut Sim<'_>,
+        h: &mut ActionHooks<X>,
+        unit: UnitId,
+        class: i32,
+        mode: u32,
+    ) -> bool {
+        let _ = (sim, h, unit, class, mode);
+        false
+    }
     /// The `monstats` row count. Default 0.
     fn monstats_count(&self) -> u32 {
         0

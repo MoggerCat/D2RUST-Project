@@ -15,7 +15,7 @@
 # Summit 120, Worldstone Keep 1 = 128, Throne of Destruction 131,
 # Worldstone Chamber 132; Larzuk 511, Anya (town) 512, Malah 513,
 # Nihlathak (town) 514, Qual-Kehk 515, Deckard Cain (Act V) 520,
-# Nihlathak (Halls of Vaught) 526, Anya (frozen) 527, Ancient
+# Nihlathak (Halls of Vaught) 526, Anya (iced, after the thaw) 527, frozen Anya object 558, Ancient
 # Barbarians 540,541,542, Baal (throne) 543, Baal (Worldstone Chamber)
 # 544; Ancients' altar 546, Ancient statues 474,475,476, waypoint objects 119,145,156,157,237,238,
 # 288,323,324,398,402,429,494,496,511,539.
@@ -28,10 +28,11 @@ save sor --name PtSorE --class sor --expansion --level 70 --skill 8=20 --right-s
 milestone town-start
   use sor
   deadline 40
-  note NPCs outside the start's active rooms are left out (as act1 Akara)
+  note the NPCs 1.14d has at frame 40 (only the start's active rooms; q-prov-data)
   need player lv == 109
   need player act == 4
-  need unit ut 1 cl 511,512,513,514,515,520 count >= 2
+  need unit ut 1 cl 513 count >= 1
+  need unit ut 1 cl 567,568,569 count >= 1
 
 milestone town-wp
   use sor
@@ -58,10 +59,11 @@ milestone frigid-highlands-wp
 milestone frozen-anya
   use sor
   deadline 1000
+  note frozen Anya is object 558 (fana) from dummy 460; monster 527 exists only after the thaw (population.md 11 item 3)
   poke 5 warp 114
   sweep 20 2 400 40 grid
   need ever player lv == 114
-  need unit ut 1 cl 527 lv 114 seen
+  need unit ut 2 cl 558 lv 114 seen
 
 milestone nihlathak-present
   use sor

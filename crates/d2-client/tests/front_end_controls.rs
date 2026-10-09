@@ -301,3 +301,53 @@ fn screen_click_key_accept_persists_and_cancel_does_not() {
     assert_eq!(key(&mut s2, &ctrls, &mut ctx, 27), Some(Trigger::Exit));
     std::fs::remove_dir_all(&dir).ok();
 }
+
+/// The recorded 1.14d layout (`traces/frontend/frontend-options/
+/// frontend-0006.json`, REC-184): 21 track frames, and the button labels
+/// light up exactly over Cancel x 161..=225, Default 364..=434, Accept
+/// 573..=637, y 399..=437.
+#[test]
+fn recorded_track_and_button_hover() {
+    let mut c = open();
+    let tracks = c
+        .draw_list(0, None)
+        .iter()
+        .filter(|i| matches!(i, CfgDraw::Slider { frame: 13, .. }))
+        .count();
+    assert_eq!(tracks, 21);
+    let lit = |c: &mut ConfigureControls, x: i32, y: i32| -> Vec<bool> {
+        c.draw_list(0, Some((x, y)))
+            .iter()
+            .filter_map(|i| match i {
+                CfgDraw::Text {
+                    string_id: 3972..=3974,
+                    y: 421,
+                    color,
+                    ..
+                } => Some(*color != color::GOLD),
+                _ => None,
+            })
+            .collect()
+    };
+    // Draw order: Cancel, Default, Accept.
+    for (x, want) in [
+        (160, [false, false, false]),
+        (161, [true, false, false]),
+        (225, [true, false, false]),
+        (226, [false, false, false]),
+        (363, [false, false, false]),
+        (364, [false, true, false]),
+        (434, [false, true, false]),
+        (435, [false, false, false]),
+        (572, [false, false, false]),
+        (573, [false, false, true]),
+        (637, [false, false, true]),
+        (638, [false, false, false]),
+    ] {
+        assert_eq!(lit(&mut c, x, 400), want, "x {x}");
+    }
+    assert_eq!(lit(&mut c, 193, 398), [false; 3]);
+    assert_eq!(lit(&mut c, 193, 399), [true, false, false]);
+    assert_eq!(lit(&mut c, 193, 437), [true, false, false]);
+    assert_eq!(lit(&mut c, 193, 438), [false; 3]);
+}

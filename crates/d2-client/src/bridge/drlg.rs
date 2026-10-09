@@ -1,4 +1,4 @@
-// Spec: specs/client/model.md (§7 rule 4, §9 rules 1–2, §12 rules 1, 2, 5), specs/drlg/levels.md (§2 rule 3, §9 rule 2), specs/drlg/rooms.md (§4.2, §4.6, §5 rules 5, 9), specs/render/draw-order-2.md (§14, open question 2)
+// Spec: specs/client/model.md (§5 rule 6.1–6.2, §7 rule 4, §9 rules 1–2, §12 rules 1, 2, 5), specs/drlg/levels.md (§2 rule 3, §9 rule 2), specs/drlg/rooms.md (§4.2, §4.6, §5 rules 5, 9), specs/render/draw-order-2.md (§14, open question 2)
 //! The client DRLG copy (`model.md` §12 rule 1): the `d2-sim` DRLG act
 //! built from S→C 0x03's fields with the client flag, owned by the bridge
 //! and never shared with the server's. 0x07 / 0x08 set and unset its
@@ -68,12 +68,18 @@ pub struct ActList {
     /// Records created since the last [`ClientDrlg::take_created`], in
     /// creation order (the act callback's calls, `rooms.md` §5 rule 9).
     created: Vec<RoomId>,
+    /// The records whose flags (+0x34) have bit 0 set: populated by the
+    /// client room pass (`model.md` §5 r6.1) or created with it.
+    pub populated: std::collections::BTreeSet<RoomId>,
 }
 
 impl ActRooms for ActList {
-    fn create_active_room(&mut self, _act: u8, _flags: u32) -> RoomId {
+    fn create_active_room(&mut self, _act: u8, flags: u32) -> RoomId {
         let id = RoomId(self.next);
         self.next += 1;
+        if flags & 1 != 0 {
+            self.populated.insert(id);
+        }
         self.rooms.insert(0, id);
         self.created.push(id);
         id
@@ -85,7 +91,7 @@ impl ActRooms for ActList {
 
     fn remove_active_room(&mut self, room: RoomId) -> u32 {
         self.rooms.retain(|&r| r != room);
-        0
+        u32::from(self.populated.remove(&room))
     }
 }
 
@@ -324,6 +330,36 @@ impl ClientDrlg {
         self.drlg
             .active_room(room)
             .map_or_else(Vec::new, |a| a.adjacency.clone())
+    }
+
+    /// The client presets of an active DRLG room (`model.md` §5 r6.2:
+    /// its DS1 preset units with flag bit 0, in list order,
+    /// room-relative). None without the level-type state (a snapshot).
+    pub fn client_presets(&self, room: DrlgRoomId) -> Vec<d2_sim::drlg::ClientPreset> {
+        self.types
+            .as_ref()
+            .map_or_else(Vec::new, |t| t.client_presets(&self.drlg, room))
+    }
+
+    /// The active room `room` populated by the client room pass
+    /// (active-room flags +0x34 bit 0, `model.md` §5 r6.1).
+    pub fn populated(&self, room: DrlgRoomId) -> bool {
+        self.drlg
+            .active_room(room)
+            .is_some_and(|a| self.list.populated.contains(&a.id))
+    }
+
+    /// Sets bit 0 of the active room's flags (`model.md` §5 r6.1).
+    pub fn set_populated(&mut self, room: DrlgRoomId) {
+        if let Some(a) = self.drlg.active_room(room) {
+            self.list.populated.insert(a.id);
+        }
+    }
+
+    /// The active room's seed (+0x6C), the critter pass's R
+    /// (`monsters/population.md` §11.7 r2).
+    pub fn room_seed(&mut self, room: DrlgRoomId) -> Option<&mut Seed> {
+        self.drlg.active_room_seed_mut(room)
     }
 
     /// The unit seed of a unit created in `room` (`model.md` §2 rule 6,
