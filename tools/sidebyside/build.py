@@ -417,7 +417,10 @@ def first_line(text):
     """facts-compare's verdict and its first difference line ("DIVERGED: first difference:
     draws.tsv, row 168, column y")."""
     lines = [x.strip() for x in text.splitlines() if x.strip()]
-    return ": ".join(lines[:2])
+    verdict = next((i for i, x in enumerate(lines) if x.split()[0].rstrip(":") in ("MATCH", "DIVERGED", "PARTIAL")), None)
+    if verdict is None:
+        return lines[-1] if lines else ""
+    return ": ".join(lines[verdict:verdict + 2])
 
 
 def page(results, meta, blobs):
