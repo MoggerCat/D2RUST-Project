@@ -1,0 +1,16 @@
+check 1
+# Battle Orders (self cast): ScnBar (expansion Barbarian, level 30, every skill at 20, right
+# skill 149), -seed 1234; warp to the Blood Moor (level 2) before frame 4,
+# a Fallen (class 19) 4 sub-tiles away along +x (client pixel about 496, 296) before frame 10, then one right
+# click at client pixel (330, 300), away from the Fallen, before frame 20's drain. Compares the cast
+# (mode, states, stats), its missiles' effects on the Fallen and the
+# draws. Area F2 (q-diff-skills-2). Spec: specs/tools/scenario-diff.md.
+name bar-battle-orders
+save ScnBar --class bar --expansion --level 30 --all-skills 20 --right-skill 149
+seed 1234
+ticks 70
+seconds 300
+channels state
+at 4 poke warp 2
+at 10 poke spawn 19 @x+4 @y normal
+input frame 20; rclick 330 300

@@ -857,6 +857,9 @@ impl Pending for LocalSeams {
     fn golem_resummon(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, player: UnitId) -> bool {
         skill_events::golem_resummon(h, sim, player)
     }
+    fn passive_refresh_all(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
+        skill_events::passive_refresh_all(h, sim, unit);
+    }
     // d2rs-own, unverified (q-amazon, REC-150): the hand class, the item
     // shoots / stack facts of the skill bodies ([`super::weapons`]).
     fn composit_weapon_class(&self, unit: UnitId) -> i32 {
@@ -2255,6 +2258,10 @@ fn loader(
             }
             Character::Save(save, ctx) => match load_save(s, player, save, ctx) {
                 Ok((mut entry, report)) => {
+                    // The skill section's assigns turn the passive states on
+                    // with their stat lists (`d2s-load.md` §2 "skills",
+                    // before the items).
+                    s.events.action.passive_refresh_all(&mut s.game, player);
                     // q-save-full: the save's items, made on the wired host.
                     let items_ok = super::save_full::join_items(s, player, save);
                     let corpses_ok = super::save_full::join_corpses(s, player, save);

@@ -96,7 +96,8 @@ fn unit(text: &str, f: u32, ty: u32, guid: u32) -> Option<&str> {
     Some(&rest[..=rest.find('}')?])
 }
 
-// Covers: specs/world/hirelings.md §10 r3, specs/world/hirelings-2.md §16 r3
+// Covers: specs/world/hirelings.md §10 r3
+// Covers: specs/world/hirelings-2.md §16 r3
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_saved_hireling_is_the_first_monster_and_follows_from_frame_3() {
