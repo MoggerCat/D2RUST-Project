@@ -162,13 +162,13 @@ Replace, per cell (xoff = variant offset):
   roll per first stamp the Cold Plains type 2 variant roll moves from
   level-seed draw 1747, seq 8643, to 1751, and the build ends at 97
   rooms). The earlier text said "file −1" (a build-list file).
-  PROVISIONAL: the stamp's file is 0 and the build list is not touched
-  (because the recording fixes only that no draw happens; every
-  replacement-stamped piece 12–15 has `Files` 1, where any reading gives
-  file 0; it differs only for a multi-file piece, 4–7, stamped by a
-  replacement); settled by REC-404 (the file argument the replace
-  callback `0x0066F520` passes to `0x006743C0`, and that function's path
-  for it);
+  The stamp's file is the literal 0 and the build list is not touched,
+  for any piece including the multi-file 4–7 (1.14d-read 2026-10-09,
+  settles REC-404): the replace call `0x0066F62D`–`0x0066F63B` passes
+  (ctx, x, y, P, file 0, border 1) to the record's +0x34, which both
+  record builders (`0x006752A0` at `0x00675304`, Act V `0x0067E0E0` at
+  `0x0067E130`) set to `0x006743C0`; that stamp rolls the build list
+  (`0x00674320`) only for file −1 (`0x006743FB`);
 - else f & 2: keep cell; else: blank cell.
 
 Act V style map (`0x0067E000`; style must be 48 or 49, else fatal): the

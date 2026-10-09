@@ -23,19 +23,19 @@
 |   1. Frame size and play area | 71–92 |
 |   2. World coordinates → client pixels | 93–117 |
 |   3. Camera origins (once per drawn frame) | 118–133 |
-|   4. Units | 134–169 |
-|   5. Panel shift for floors | 170–175 |
-|   6. Tiles | 176–215 |
-|   7. View culling | 216–266 |
-|   8. Screen shake | 267–344 |
-|   9. Time base: no interpolation | 345–419 |
-|   10. What d2rs hooks get | 420–428 |
-| Constants & data dependencies | 429–435 |
-| Randomness | 436–443 |
-| Edge cases & original bugs | 444–453 |
-| Test vectors | 454–478 |
-| Provenance | 479–508 |
-| Open questions | 509–611 |
+|   4. Units | 134–187 |
+|   5. Panel shift for floors | 188–193 |
+|   6. Tiles | 194–233 |
+|   7. View culling | 234–284 |
+|   8. Screen shake | 285–362 |
+|   9. Time base: no interpolation | 363–437 |
+|   10. What d2rs hooks get | 438–446 |
+| Constants & data dependencies | 447–453 |
+| Randomness | 454–461 |
+| Edge cases & original bugs | 462–471 |
+| Test vectors | 472–496 |
+| Provenance | 497–526 |
+| Open questions | 527–629 |
 <!-- /index -->
 
 ## Summary
@@ -166,6 +166,24 @@ So the local player (offsets 0, no shake) is drawn at
 So a click on the local player's drawn foot point (400, 292) maps to
 client `(P_x, P_y + 8)`, +½ subtile on both world axes before the
 floor.
+
+Re-read 2026-10-09 (pc1-day4 Step 5; settles REC-514 against the
+measured "−4" of `ui/controls.md` §6 r2's 2026-10-09 revision): the
+input is the raw window-message point. `0x0045AFF0`'s only caller is
+the click dispatcher `0x00462D00` (`0x00462D48`), whose (x, y) every
+caller loads from the mouse message, u16 +0x0C / +0x0E, unchanged
+(`0x0044BFA8`–`0x0044BFAC`, `0x0044C26A`–`0x0044C26E`; the four other
+callers `0x0044C05A`, `0x0044C0DE`, `0x0044C32E`, `0x0044C3CE` the
+same way). Inside, the only y term is `[0x007A5208]` (`0x0045B053`:
+`add ecx, [0x007A5208]`), the `cy_u` of §3 as written by `0x0045B440`
+(`0x0045B4B0`: `+ 0x10`, then the shake `0x0045B4DC`). No constant 4
+or 8 is subtracted anywhere on the path. So the rule above stands
+exactly: py = sy' + cy_u. Consequences: a pick diamond lies 8 screen
+rows above the drawn diamond of the same subtile; a static unit's draw
+point (the diamond's top vertex) picks its own subtile; a moving
+unit's drawn foot point (the subtile centre) picks the subtile one
+step down on screen (+1 on both world axes). The scenes that fit "−4"
+fit this too (`ui/controls.md` §6 r2: both fit the walk scenes).
 
 ### 5. Panel shift for floors
 

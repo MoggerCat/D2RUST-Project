@@ -33,22 +33,22 @@
 | Rules | 122–123 |
 |   1. Conventions | 124–231 |
 |   2. Seeds | 232–250 |
-|   3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`) | 251–286 |
-|   4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`) | 287–334 |
-|   5. Special item kinds | 335–345 |
-|   6. Normal quality and class skill mods | 346–392 |
-|   7. Sockets | 393–424 |
-|   8. Ethereal | 425–445 |
-|   9. Forced requests, ears, names, timers | 446–479 |
-|   10. Items from a code: the create wrapper and start items | 480–553 |
-|   11. Format-0 branches (legacy items) | 554–599 |
-|   12. Repair, recharge and runeword removal | 600–686 |
-| Constants & data dependencies | 687–709 |
-| Randomness | 710–728 |
-| Edge cases & original bugs | 729–743 |
-| Test vectors | 744–759 |
-| Provenance | 760–802 |
-| Open questions | 803–893 |
+|   3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`) | 251–288 |
+|   4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`) | 289–336 |
+|   5. Special item kinds | 337–347 |
+|   6. Normal quality and class skill mods | 348–396 |
+|   7. Sockets | 397–428 |
+|   8. Ethereal | 429–449 |
+|   9. Forced requests, ears, names, timers | 450–483 |
+|   10. Items from a code: the create wrapper and start items | 484–557 |
+|   11. Format-0 branches (legacy items) | 558–603 |
+|   12. Repair, recharge and runeword removal | 604–690 |
+| Constants & data dependencies | 691–713 |
+| Randomness | 714–732 |
+| Edge cases & original bugs | 733–747 |
+| Test vectors | 748–763 |
+| Provenance | 764–806 |
+| Open questions | 807–897 |
 <!-- /index -->
 
 ## Summary
@@ -184,7 +184,7 @@ socket step), `items/quality.md` §10 (quality roll, low quality
 
 | Bit | Name | Set by |
 |---|---|---|
-| 0x10 | identified | cleared by every affix/unique/set/superior/rare success; set for quest-difficulty items (§5) and by callers |
+| 0x10 | identified | **set on every item unit at allocation**: the item kind's init `0x00555D20` (allocator `0x00555230` table `0x005554E8`, `sim/units.md` §1) sets it at `0x00555D45`–`0x00555D4A`, after the item data was zero-filled (`0x00627C90` from `0x0055531D`), so every item of §3 starts identified. **Cleared** only by a quality routine that succeeds: magic `0x005565E0` (`0x0055668B`), unique `0x005566B0` (`0x00556852`, `0x00556A25`), charm affixes `0x00556A60` (`0x00556B44`), rare `0x005C1BF0` / `0x005C1E80`, crafted `0x005C21D0`, set `0x005C25C0` / `0x005C276A` (read 2026-10-09: the full list of `push 0x10` before the flag setter `0x006280D0` in `Game.exe`). Low quality (`0x005C2D40`, `0x005C2AF0`), superior (`0x005C2970`), normal (§6.1, §11.1), tempered (dispatch case 9), the automagic step and the downgrades (`items/quality.md` §5) write no 0x10, so items of quality 1, 2, 3 and 9 (also one downgraded to them) keep it: weapons, armor and misc alike, with or without an auto affix. Set again by the create wrapper §10.2, the quest-difficulty items (§4 end, `0x00557ECC`), the store mark (`world/vendors.md` §3.1 step 5); cleared for a gamble item (`world/vendors.md` §5.1 step 7); copied from the request when forced (§9). Recorded: `traces/checks/items-ground-many.check` normal misc items `tbk` … `sbk` show 0x80010, its magic / rare / set / unique items 0x80000 |
 | 0x100 | broken | forced (§9) |
 | 0x800 | socketed | §7 |
 | 0x1000 | nosell | forced |
@@ -262,7 +262,8 @@ is this call with request spawn mode 3, x, y, room set (§Inputs).
    data (0x74 bytes, `0x00627C90`) is zero-filled (`0x00627CE4`) and
    only its owner GUID (+0x0C) is set, to −1: the **file index (+0x28)
    starts at 0**, and only the quality routines change it
-   (`items/quality.md` §1). Set flag 0x80000 (init). Set the format from
+   (`items/quality.md` §1). The allocation's item init has set flag 0x10
+   (identified, §1.4). Set flag 0x80000 (init). Set the format from
    the request.
 3. If "use seed" or `force`: unit seed := `{seed, 666}` and the unit's
    init seed := `seed`; start seed := `item seed`; item seed :=
@@ -274,7 +275,8 @@ is this call with request spawn mode 3, x, y, room set (§Inputs).
    and the poke `item` request (force 0) both take this branch; neither
    path clears the flag during creation. The clear is the room clean-up
    at the end of the tick (§1.4 row 0x2000), which is why recorded item
-   state shows 0x80000 only (`traces/checks/items-ground-many.check`)
+   state shows 0x80000 without 0x2000 (`traces/checks/items-ground-many.check`;
+   plus 0x10 on items no quality routine unidentified, §1.4)
    while a recorded drop's 0x9C shows 0x00A02010
    (`facts/items/a1-cold-plains-poke-kills.tsv`).
 6. **Base stats and quality:** §4 with "quest" = true (it calls the
@@ -359,7 +361,9 @@ are independent and run in this order:
 5. type `book` → suffix slot 0 := the row whose `bookspellcode` equals it;
 6. class skill mods (§6.2).
 
-No draw except in 1 and 6.
+No draw except in 1 and 6. No step writes flag 0x10: a normal item keeps
+the identified flag of its allocation (§1.4), whatever its type (misc,
+weapon, armor); only a charm's affixes in step 1 clear it.
 
 #### 6.2 Class skill mods (staffmods; `0x005C1260`, `0x005C0F90`)
 

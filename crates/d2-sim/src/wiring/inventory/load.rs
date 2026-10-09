@@ -113,7 +113,13 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             d.x = it.x;
             d.y = it.y;
             d.body_loc = it.body_loc;
-            d.page = page;
+            // A cursor item keeps the saved page as it is (0xFF stays 0xFF:
+            // the next save writes it back).
+            d.page = if saved_mode == mode::CURSOR {
+                it.page
+            } else {
+                page
+            };
             d.mode = mode::CURSOR;
         }
         self.sync_out();
@@ -147,6 +153,12 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             mode::BELT => {
                 crate::items::moves::handlers::to_belt(self, o, g, it.x as u32)
                     == crate::items::moves::Outcome::DONE
+            }
+            // Mode 4: the owner's cursor (`0x0063C180`, `0x0055FB10`); the
+            // saved cell is not used (`d2s.md` §8.2 rule 3, REC-1131).
+            mode::CURSOR if !stale => {
+                crate::items::moves::handlers::load_to_cursor(self, o, g);
+                true
             }
             _ if stale => false,
             _ => self.place(owner, unit, (it.x, it.y), false, true),
