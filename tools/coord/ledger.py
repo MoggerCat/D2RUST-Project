@@ -263,6 +263,16 @@ def merge(parts, repo, status):
             if v != "-" or r["last_verdict"] in ("", "-"):
                 r["last_verdict"] = v
             v = r["last_verdict"]
+            # A row that names a check is not NO-CHECK / UNKNOWN once that check ran.
+            if v.startswith("DIVERGED") and r["state"] in ("NO-CHECK", "UNKNOWN"):
+                r["note"] += f" [ledger.py: {r['state']} -> DIVERGED from its checks]"
+                r["state"] = "DIVERGED"
+            elif v == "PARTIAL" and r["state"] == "UNKNOWN":
+                r["note"] += " [ledger.py: UNKNOWN -> NO-CHECK: its checks are PARTIAL]"
+                r["state"] = "NO-CHECK"
+            if r["state"] != "EQUAL" and r["size"] == "-":
+                r["size"] = "M"
+                r["note"] += " [ledger.py: size M assumed]"
             if r["state"] == "EQUAL" and v != "MATCH":
                 disagree.append(f"`{r['area']}`: EQUAL but checks say {v}")
             if v.startswith("DIVERGED") and r["state"] not in ("DIVERGED", "NOT-IMPLEMENTED"):
@@ -508,10 +518,12 @@ def selftest():
         bad = [x for r in read_part(os.path.join(root, "parts", "b.tsv"))[0] for x in check_row(r, Repo(root))]
         assert any("check 'nope'" in x for x in bad), bad
         with open(os.path.join(root, "parts", "b.tsv"), "w") as fh:
-            fh.write(hdr + row(area="m.two"))
+            fh.write(hdr + row(area="m.two") + row(area="m.three", checks="c-one", state="UNKNOWN", note="n/a"))
         with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
             run(root, os.path.join(root, "parts"), out_tsv, out_md, status, False)
             assert run(root, os.path.join(root, "parts"), out_tsv, out_md, status, True) == 0
+        three = [ln for ln in open(out_tsv).read().splitlines() if ln.startswith("m.three\t")][0].split("\t")
+        assert three[COLS.index("state")] == "DIVERGED", three
         with open(os.path.join(root, "parts", "z.tsv"), "w") as fh:
             fh.write("#ledger 2\n")
         assert read_part(os.path.join(root, "parts", "z.tsv"))[1]
