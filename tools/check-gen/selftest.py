@@ -69,6 +69,20 @@ def mkctx(excel, wp, shrines=None):
     c.ledger = os.path.join(HERE, "ledger-areas.tsv")
     c.waypoint_towns = os.path.join(HERE, "waypoint-towns.tsv")
     c.shrine_seeds = shrines or {1: (1234, 2, "d2rs")}
+    d = os.path.dirname(wp)
+    c.client_messages, c.census = os.path.join(d, "cm.tsv"), os.path.join(d, "census.tsv")
+    with open(c.client_messages, "w", encoding="utf-8") as f:
+        f.write("id\tname\ttransport_size\tlayout\tkind\n"
+                "0x01\tWalk\t5\tx:u16@1 y:u16@3\thandler\n"
+                "0x02\tWalkToUnit\t9\ttype:u32@1 id:u32@5\thandler\n"
+                "0x2C\tUnused2C\t0\t\tstub3\n"
+                "0x3A\tAddStatPoint\t3\tstat:u8@1 repeat:u8@2\thandler\n"
+                "0x45\tChangeTpLocation\t9\t\tstub3\n"
+                "0x6D\tPing\t13\ttick:u32@1 value:u32@5\tsystem\n")
+    with open(c.census, "w", encoding="utf-8") as f:
+        f.write("stream\tid\tname\tstate\n"
+                "c2s\t0x01\tWalk\tEQUAL\nc2s\t0x02\tWalkToUnit\tNOT-CARRIED\n"
+                "c2s\t0x3A\tAddStatPoint\tNOT-CARRIED\nc2s\t0x45\tChangeTpLocation\tDIVERGED\n")
     return c
 
 
@@ -103,6 +117,9 @@ def run():
         t.ok(by["skill"] == ["gen-skill-ama-6", "gen-skill-sor-36", "gen-skill-sor-37",
                              "gen-skill-dru-223"], by["skill"])
         t.ok(by["shrine"] == ["gen-shrine-1"], by["shrine"])
+        t.ok(by["netc2s"] == ["gen-netc2s-02", "gen-netc2s-3a"], by["netc2s"])
+        t.ok("at 20 send WalkToUnit type=0 id=@player" in
+             next(c for c in checks if c.name == "gen-netc2s-02").render(), "netc2s send")
         parse_all(checks, t)
         # the lowest enabled non-boss class of an AI is the spawn
         sk = next(c for c in checks if c.name == "gen-ai-skeleton")
