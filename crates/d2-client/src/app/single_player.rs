@@ -183,9 +183,11 @@ pub const DEFAULT_SEED: u32 = 1234;
 /// (game +0x84 := 1): it wins. Otherwise a loaded save whose town byte
 /// for the game's difficulty has 0x80 gives its saved map seed
 /// (`formats/d2s.md` §2.2 rule 8, +0xAB). Otherwise [`DEFAULT_SEED`].
-/// PROVISIONAL (REC-291): 1.14d draws a fresh seed for a new character
-/// (`time_value`, `rng.md` §5.2); d2rs keeps the fixed default so dev
-/// runs and draw dumps stay reproducible. d2rs-own, unverified.
+/// PROVISIONAL (REC-291 -> q-fix-new-char-seed): 1.14d draws a fresh
+/// seed for a new character (`time_value`, `rng.md` §5.2; measured: two
+/// new characters got 0x63a0b0fd and 0x07013cee,
+/// `traces/frontend/frontend-menus/frontend-0005.json`); d2rs keeps the
+/// fixed default so dev runs and draw dumps stay reproducible.
 pub fn game_seed(character: &Character, fixed: Option<u32>) -> u32 {
     if let Some(n) = fixed {
         return n;
@@ -1032,10 +1034,13 @@ impl Pending for LocalSeams {
     }
     /// `0x00623660`, the operate entry's interact range (`objects.md`
     /// §7.1 rule 3): no written spec gives its test.
-    // PROVISIONAL (world/objects.md §7.1 r3; REC-94): in range. The
-    // preview client sends C→S 0x13 only on arrival
-    // (`world_view/interact.rs`); the §7.3 r3–r4 approach is
-    // `Pending::object_approach`'s default (operate).
+    /// Measured (REC-94, `facts/objects/objanim-a1-town.tsv` run r3): 1.14d's client polls
+    /// `0x00623660(P, O)` every frame of the walk and sends C→S 0x13 on
+    /// the first frame it returns 1 (waypoint 119 at sub-tile offset
+    /// (4, 3), stash 267 at (3, 1)); both server calls of that 0x13
+    /// (`0x00548B7D`, `0x00584597`) then return 1. So "in range" holds
+    /// for every 0x13 the client sends; the test's own formula is not
+    /// modelled (`docs/handoff/pc1-data.md` Step 4).
     fn object_in_range(&self, _: &Game, _: UnitId, _: UnitId) -> bool {
         true
     }

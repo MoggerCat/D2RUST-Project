@@ -416,6 +416,14 @@ rather than a hand-run recipe.
     code 8 copies and whether that monster's target was cleared (an AI
     request) before its death; answer into §7.4 rule 7. d2rs tests
     `monster_death.rs` / `e2e_night_world.rs` now expect the spawn point.
+28. **Interact range test `0x00623660(P, O)`** (REC-94): its formula
+    (object size, which positions). Measured under Wine
+    (`facts/objects/objanim-a1-town.tsv` run r3): returns 1 for the
+    waypoint 119 with the player 4 sub-tiles off in x and 3 in y, 0 at 5;
+    for the stash 267 only at 3 / 1. Answer into `world/objects.md` §7.1
+    r3 (d2rs reads it as always in range for a player: true for every
+    0x13 the client sends).
+
 30. **Client-made critters (set C monsters)** (q-fix-real-unit-seed-order)
   (`q-fix-real-town-critters`, `client/model.md` §5 r3 "C monsters",
   `monsters/population.md` §11.3 r2): the Rogue Encampment arrival has
