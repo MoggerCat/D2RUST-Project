@@ -627,10 +627,16 @@ fn kurast_docks_arrival_and_every_town_npc_talks() {
 fn the_golden_bird_from_the_jungle_boss_to_the_potion_of_life() {
     let mut p = Play::start("");
     p.warp(76);
+    // A champion made by the boss spawn `0x005A09E0` (`tools/poke.md`
+    // §1 `spawn … champion`) is a special monster: the boss choice takes
+    // it (§6.2). Class 19 stands in for the forest's own monsters.
+    let r = p.poke("spawn 19 @x+6 @y champion umod 16");
     assert!(
-        p.tour(|p| p.bird_boss().is_some()),
-        "a Spider Forest boss carries the figurine"
+        matches!(r, d2_sim::poke::PokeResult::Ok(Some(_))),
+        "champion spawn: {r:?}"
     );
+    p.step(5);
+    assert!(p.bird_boss().is_some(), "the champion carries the figurine");
     let boss = p.bird_boss().unwrap();
     p.kill(boss);
     p.assert_clean("the bird boss's death");
