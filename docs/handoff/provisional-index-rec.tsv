@@ -125,7 +125,7 @@ REC-163	6543		Charms and item bonuses in the panel (PROVISIONAL, `d2-sim` `wirin
 REC-165	6564		Render polish in the play preview (PROVISIONAL, d2-client `world_view/unit_shadow`, `previ	recording	no		0	
 REC-166	6523		Act IV endgame in the play preview (PROVISIONAL, `d2-sim` `wiring/economy/quest_objects.rs	data	yes		2	
 REC-167	6544		Duriel's Lair and the staff hand-in in the play preview (PROVISIONAL, `d2-client` `app/syn	data	yes		3	
-REC-168	6558		Front-end shell (PROVISIONAL, `d2-client` `ui/front_end/`; M22; q-menu-shell): (1) a click	binary	no		6	
+REC-168	6558		Front-end shell (PROVISIONAL, `d2-client` `ui/front_end/`; M22; q-menu-shell): (1) a click	binary	no		4	
 REC-170	6203	MANUAL	Lighting detail: other light sources in the play preview	recording	no		0	
 REC-172	6571		Settings and controls files, Esc-menu Options page (PROVISIONAL, `d2-client` `app/config.r	recording	no		0	
 REC-173	6574		Skill moves in play: Leap, Whirlwind, Dragon Flight (PROVISIONAL, `d2-sim` `wiring/interac	recording	no		0	q-fix-dual-weapon-damage,q-fix-item-type-test,q-fix-moving-skill-do,q-fix-sentry-ai,q-fix-smite-shield
@@ -139,13 +139,13 @@ REC-180	6557		Character select (PROVISIONAL, `d2-client` `ui/front_end/screens/c
 REC-181	6561		Character create screen (PROVISIONAL, `d2-client` `ui/front_end/screens/create.rs`; M22; q	recording	no		3	
 REC-182	6556		Difficulty box encoding and title colour (PROVISIONAL, `d2-client` `ui/front_end/screens/d	data	yes		0	
 REC-183	6572		Loading screen state machine (PROVISIONAL, `d2-client` `ui/front_end/screens/loading.rs`, 	data	yes		0	q-fix-charselect-wheel,q-fix-esc-menu,q-fix-sp-pause
-REC-184	6562		Configure Controls screen (PROVISIONAL, `d2-client` `ui/front_end/screens/controls.rs`; M2	recording	no		3	
+REC-184	6562		Configure Controls screen (PROVISIONAL, `d2-client` `ui/front_end/screens/controls.rs`; M2	recording	no		2	
 REC-185	6576		Credits screen (PROVISIONAL, `d2-client` `ui/front_end/screens/credits.rs`; M22; q-menu-cr	recording	yes		1	
 REC-186	6573		Cinematics menu (PROVISIONAL, `d2-client` `ui/front_end/screens/cinematics.rs`; M22; q-men	recording	no		1	
 REC-187	6584		Esc options menu (PROVISIONAL, `d2-client` `ui/options_menu.rs`, `ui/esc_menu.rs`, `app/co	recording	no		0	q-controls-ingame,q-fe-text-widths,q-fix-controls-ingame,q-fix-create-popups,q-fix-esc-menu,q-fix-fe-buttons,q-fix-options-effects,q-options-art
 REC-188	6585		Item bonuses on the original wire (PROVISIONAL; M22; q-item-bonus-wire): S→C 0x1D-0x1F car	recording	no		1	q-fix-client-set-lists
 REC-189	6560		Front-end shared draw (PROVISIONAL, `d2-client` `ui/front_end/mod.rs` `draw()`, `ui/front_	data	yes		1	q-controls-ingame,q-fe-text-widths,q-fix-controls-ingame,q-fix-create-popups,q-fix-esc-menu,q-fix-fe-buttons,q-fix-options-effects,q-options-art
-REC-200	6070	MANUAL	Front end: Game exit target	recording	no		3	
+REC-200	6070	MANUAL	Front end: Game exit target	recording	no		0	
 REC-201	6077	MANUAL	Front end: Control draw order	recording	no		1	
 REC-203	6083	MANUAL	Front end: Character-select OK condition	recording	no		0	
 REC-204	6089	MANUAL	Front end: Mouse wheel on character select	recording	no		0	q-fix-charselect-wheel,q-fix-esc-menu,q-fix-sp-pause
