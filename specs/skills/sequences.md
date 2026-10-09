@@ -22,15 +22,15 @@
 | Rules | 62–63 |
 |   1. Lookup `0x00663310` | 64–90 |
 |   2. Load `0x00621260` | 91–111 |
-|   3. Frame queries | 112–209 |
-|   4. The table (`sequences.tsv`) | 210–241 |
-|   5. Users in 1.14d | 242–258 |
-| Constants & data dependencies | 259–267 |
-| Randomness | 268–271 |
-| Edge cases & original bugs | 272–291 |
-| Test vectors | 292–306 |
-| Provenance | 307–321 |
-| Open questions | 322–327 |
+|   3. Frame queries | 112–271 |
+|   4. The table (`sequences.tsv`) | 272–303 |
+|   5. Users in 1.14d | 304–320 |
+| Constants & data dependencies | 321–329 |
+| Randomness | 330–333 |
+| Edge cases & original bugs | 334–353 |
+| Test vectors | 354–368 |
+| Provenance | 369–383 |
+| Open questions | 384–389 |
 <!-- /index -->
 
 ## Summary
@@ -159,8 +159,46 @@ its update loads the sequence at frame 0 (§2) and runs the client start
 next update is the first step (do test on frame 0's byte, then the
 advance to frame 1). Code 0x16's record: r2 = target unit type (EDX),
 r3 = GUID (ECX) of `0x00463990` at `0x004C6ECF` (`0x004C6EB0`), r4 =
-level. PROVISIONAL (REC-670): whether the local player's own input
-path sets mode 18 earlier than the server's 0x4C / 0x4D is not read.
+level. That request path is for units other than the local player.
+
+Local player (2026-10-09, REC-670 settled; 1.14d asm): the local
+client starts mode 18 itself, at the click, and never from a server
+message:
+
+1. The click's skill code (`ui/controls.md` §6 r7) goes to
+   `0x00481030(code, P, a, b)`. Gate `0x00480BA0`: P's used skill
+   lacks `interrupt` (row byte +7 & `[0x006CE284]` = 0x80) and P's mode
+   is not 1 / 5 → nothing (no request, no send). Else it builds a
+   record r0 := the side's skill id (`0x00643CE0` of `0x00620190` left /
+   `0x006201D0` right), r1 := its owner GUID (`0x00643AD0`), r2 / r3 :=
+   a / b, r4–r6 := 0, and maps the code: 5, 8, 0xC, 0xF → mode request
+   **0x15** (point); 6, 7, 9, 0xA, 0xD, 0xE, 0x10, 0x11 → **0x16**
+   (unit: a / b = type / GUID) (`0x0048114E`, `0x00481186`,
+   `0x004811BE`, `0x004811F6`).
+2. `0x00480C10(0x15 | 0x16, P, record, flag 0)` (`0x004810B5`) runs
+   at once: the player machine's code 0x15 / 0x16 (`client/model.md` §8
+   r4) → the client skill start `0x004C6140` (§8 r7 there): mode set
+   18 and sequence frame 0 (§2), `cltstfunc`. Only then (request
+   returned non-zero) stat 0x148 += 1 and the C→S message
+   (`0x00480B40`).
+3. The server sends the own client no skill message: the skill-mode
+   row `0x00548090` of the per-mode table skips the unit's own client
+   unless E flags bit 0x4 (dodge / avoid only; `sim/pathing.md` §10
+   r2).
+4. Timing: the click runs in the input part of the client loop pass
+   (button handlers, held repeat `0x0044F039`), before the receive
+   `0x0044F167` and the client update `0x0044C790`, and outside any
+   update. So the click is the start (frame 0, no machine step, as the
+   queued request's update for other units), and the **first mode-18
+   machine step is the first client update after the click** (do test
+   on frame 0's byte, advance to frame 1).
+
+   ```
+   on click(code): if gate(P) { r = {skill, owner, a, b, 0, 0, 0};
+       mode_request(code_map(code), P, r, 0) /* mode 18, frame 0 */;
+       send(code, a, b) }
+   next client update: machine step 1 (rules 1-5 above)
+   ```
 
 Leap (`cltstfunc` 30 `0x004C8D90`, `cltdofunc` 43 `0x004C8C60`) and
 Leap Attack (`cltstfunc` 30, `cltdofunc` 44 `0x004C8ED0`) share start
@@ -195,17 +233,41 @@ Whirlwind (`cltstfunc` 31 `0x004C9120`, `cltdofunc` 45 `0x004C9320`):
    monster (`0x00648690` at `0x004C9291`); path computed; E flags := 1,
    E point := the path's last point. One path step is then (0x400 ·
    speed) >> 6 = walk << 12 (16.16 sub-tiles) along the Euclidean
-   direction (`sim/pathing.md` §9.4), from the first machine update on.
+   direction (`sim/pathing.md` §9.4). Measured: the first step is on
+   update 3 (request update = 0; the update whose advance reaches
+   sequence position 3), the last (partial) step on update
+   a = 2 + ⌈(path length << 16) / step⌉. PROVISIONAL (REC-815): why
+   updates 1 and 2 do not step is not read (r1 above would step from
+   update 1).
 2. Do while moving (flags & 3 = 1): +0x38 := 3·256, +0x48 := 0x500
-   (loop A1 3–6).
-3. Do on arrival (flags & 3 = 3): path stop, E flags := 0, sound stop
-   (`0x004BA840`). No rewind after this: mode 18 ends on the update whose
-   advance takes +0x48 below 1 (end kind 3), i.e. after the rest of the
-   current A1 3–6 loop. PROVISIONAL (REC-671): the measured 24 / 40
-   updates (`facts/client/anim/a1-cold-plains-whirlwind-bar.tsv`) are
-   fitted by d2rs as "ends on the arrival update"; the binary rule above
-   gives arrival + the loop's remaining frames, so a recorded arrival
-   phase is needed to tell them apart.
+   (loop A1 3–6). Rate 256: +0x48 runs 2048 − 256·i to 256 at update 7,
+   then 1024, 768, 512, 256 per loop; it is 256 after the advance of
+   updates 7, 11, 15, … (event 7:1, +0x4E = 1).
+3. Do on arrival (flags & 3 = 3; `0x004C9320`: `0x0064EC10` /
+   `0x00648C30` collision moves, `0x00644660` E flags := 0, sound stop
+   `0x004BA840`, returns 1): no rewind and no mode change. Later do calls
+   (+0x4E = 1, flags & 3 = 0) do nothing. The end is the machine's
+   step 5 only (`0x006217C0`: +0x48 < 1 after the advance). End rule:
+   mode 18 lasts **N = max(8, 4·⌈a / 4⌉)** client updates (request
+   update included; the unit shows the next mode on update N): the
+   arrival update if +0x48 was 256 before its advance, else the end of
+   the current A1 3–6 loop.
+   ```
+   a = 2 + ceil((d << 16) / (walk << 12))
+   N = max(8, 4 * ceil(a / 4))
+   ```
+   Check (`facts/client/anim/a1-cold-plains-whirlwind-bar.tsv`, step
+   0x6000): whirl 1 d 8 (x −8·65536): steps on updates 3..24 (21 full +
+   8192), a = 24, N = 24 (measured 24); whirl 2 d √197 ≈ 14.04 (x +1, y
+   +14): steps on 3..40, a = 40, N = 40 (measured 40). Both arrivals fall
+   on a loop end, so these facts equally fit "ends on the arrival
+   update" (N = a); the binary read above (no end in `0x004C9320`) gives
+   the rounding. Settles REC-671. PROVISIONAL (REC-816): in both
+   recordings +0x3C reads 213 after update N − 1 (`s` column), so the
+   update-N advance by +0x3C would leave +0x48 = 43; the mode change on
+   update N may then come from a server mode message (queued, `client/
+   model.md` §4 r5) rather than step 5 — same N either way while server
+   and client run the same loop; a whirl with a mod 4 ≠ 0 decides it.
 
 ### 4. The table (`sequences.tsv`)
 

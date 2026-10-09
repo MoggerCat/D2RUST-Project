@@ -503,8 +503,16 @@ pub fn dispatch<W: MoveWorld>(
                 // 0x9C action 1 first sets the item's x, y to 0 (§8.2).
                 w.set_pos(Owner::item(item), 0, 0);
             }
-            // The dispatcher's sends pass the flag argument 0 (§6.2).
-            let page = w.page(item);
+            // The dispatcher's sends pass the flag argument 0 (§6.2). Row
+            // 4's sender `0x0053D010` shows the stored page (§6.4);
+            // recorded 2026-10-09: a 0x19 pick-up's 0x9D action 5 carries
+            // page 0 (stream page + 1 = 1), `facts/items/a1-town-potions-low.tsv`
+            // n 1, `a1-town-item-moves.tsv` n 32.
+            let page = if r.sender == 0x0053D010 {
+                w.stored_page(item)
+            } else {
+                w.page(item)
+            };
             out.extend(item_message(
                 w,
                 r.message,
@@ -676,9 +684,23 @@ pub fn item_unit_update<W: MoveWorld>(w: &W, item: Guid) -> Result<Option<Vec<u8
 /// mode 3 with unit flag 0x1000 → 0x9C action 2 (dropped, `0x0053EC90`);
 /// otherwise → 0x9C action 0 (new, `0x0053EC00`).
 pub fn announce_item<W: MoveWorld>(w: &W, item: Guid) -> Result<Vec<u8>, MoveFatal> {
-    let dropped =
-        w.mode(item) == mode::GROUND && w.unit_flags(Owner::item(item)) & uflag::DROPPED != 0;
-    let action = if dropped { 2 } else { 0 };
+    let dropped = w.unit_flags(Owner::item(item)) & uflag::DROPPED != 0;
+    announce_item_as(w, item, dropped)
+}
+
+/// [`announce_item`] with the unit flag 0x1000 given by the caller
+/// (`dropped`): a host whose pass runs after the room clean-up has
+/// cleared the flag keeps it itself.
+pub fn announce_item_as<W: MoveWorld>(
+    w: &W,
+    item: Guid,
+    dropped: bool,
+) -> Result<Vec<u8>, MoveFatal> {
+    let action = if dropped && w.mode(item) == mode::GROUND {
+        2
+    } else {
+        0
+    };
     let bits = w.item_bits(item, 0, w.page(item));
     layouts::item_world(action, category(w, item), item, &bits)
 }

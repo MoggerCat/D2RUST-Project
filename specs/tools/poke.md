@@ -11,7 +11,12 @@
   `missile-superunique.poke`); scenario `spawn` kinds `champion`
   (GUID 8), `random-boss` (GUID 13), `unique` with umods 5, 7 (GUID 17)
   returned `ok` with minions (`boss-kinds.poke`, monsters/init.md §25
-  forms). The comparison with d2rs is REC-590. The d2rs side (§3, §5) is implemented
+  forms). Run on 1.14d on Windows (PC 1, 2026-10-09, same command,
+  `--after 125`): `spawn-town.poke` all five `ok` (spawn GUID 8, object
+  GUID 18); screenshots at 40 and 100 ticks show the fallen party of 4
+  beside the player, the lit brazier 3 sub-tiles left, Warriv walking;
+  the PNGs stay off the public repo (rule 1; `docs/handoff/pc1-day3-a.md`).
+  The comparison with d2rs is REC-590. The d2rs side (§3, §5) is implemented
   (`d2-sim::poke`, scenario `poke` steps, `scenario-run`, `d2-client
   play --poke`): every directive runs on the synthetic install; `warp`
   to another act runs the act change (§1 table); `item` without item
@@ -34,21 +39,21 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 54–66 |
-| Inputs | 67–73 |
-| Outputs / state changes | 74–82 |
-| Rules | 83–84 |
-|   1. Directives | 85–119 |
-|   2. Poke files | 120–142 |
-|   3. In scenarios | 143–157 |
-|   4. The 1.14d side (`poke.py`) | 158–206 |
-|   5. The d2rs side (`d2-sim::poke`) | 207–221 |
-| Constants & data dependencies | 222–234 |
-| Randomness | 235–241 |
-| Edge cases & original bugs | 242–251 |
-| Test vectors | 252–263 |
-| Provenance | 264–269 |
-| Open questions | 270–277 |
+| Summary | 59–71 |
+| Inputs | 72–78 |
+| Outputs / state changes | 79–87 |
+| Rules | 88–89 |
+|   1. Directives | 90–124 |
+|   2. Poke files | 125–147 |
+|   3. In scenarios | 148–162 |
+|   4. The 1.14d side (`poke.py`) | 163–211 |
+|   5. The d2rs side (`d2-sim::poke`) | 212–226 |
+| Constants & data dependencies | 227–239 |
+| Randomness | 240–246 |
+| Edge cases & original bugs | 247–256 |
+| Test vectors | 257–268 |
+| Provenance | 269–274 |
+| Open questions | 275–282 |
 <!-- /index -->
 
 ## Summary

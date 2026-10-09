@@ -24,16 +24,16 @@
 |   2. Blend-table orientation (per drawer) | 92–127 |
 |   3. Draw mode of a composite unit component | 128–173 |
 |   4. Single-cel units and overlays | 174–185 |
-|   5. Shadows (the darkening blend) | 186–267 |
-|   6. Translucent walls and roofs | 268–302 |
-|   7. d2rs answers | 303–313 |
-|   8. Lines and rectangles (GDI) | 314–348 |
-| Constants & data dependencies | 349–357 |
-| Randomness | 358–361 |
-| Edge cases & original bugs | 362–376 |
-| Test vectors | 377–410 |
-| Provenance | 411–439 |
-| Open questions | 440–466 |
+|   5. Shadows (the darkening blend) | 186–276 |
+|   6. Translucent walls and roofs | 277–311 |
+|   7. d2rs answers | 312–322 |
+|   8. Lines and rectangles (GDI) | 323–357 |
+| Constants & data dependencies | 358–366 |
+| Randomness | 367–370 |
+| Edge cases & original bugs | 371–385 |
+| Test vectors | 386–419 |
+| Provenance | 420–448 |
+| Open questions | 449–475 |
 <!-- /index -->
 
 ## Summary
@@ -218,7 +218,16 @@ non-zero is drawn through slot `+0x90` (`0x004F6540`; GDI `0x006C87E0` →
    `unit-composite.md` §4; but see the revision below) and the same draw identity, COF, direction
    and frame as the unit (`0x00645270`, `0x0064F380`,
    `unit-composite.md` §2–§3; the linked-unit inventory rule of
-   `unit-composite.md` §1.1 applies); every layer `i` of the COF
+   `unit-composite.md` §1.1 applies). Revision 2026-10-09
+   (q-scenes-compare, measured): an object (type 2) casts this shadow
+   only when its `BlocksLight` of the current mode is ≠ 0, as the
+   single-cel shadow of r4: `a4-town-pandemonium-fortress` draws the
+   bodies of fortress brazier #1 (`98`, BlocksLight 1) and #2 (`99`,
+   BlocksLight 0) and only #1's shadows; the same for `c7` (0, no
+   shadow) against `to`, `wp`, `n2`, `rb`, `b6` … (1, shadows) in
+   every recorded scene. PROVISIONAL (REC-518): the test is applied
+   with the skips above (settled by the shadow path `0x00471620`'s
+   object branch, PC 1). Every layer `i` of the COF
    (`0x004DB110` order) with shadow byte ≠ 0 and component `< 16` builds
    its request (`0x004DBB50`) and is drawn at (X, Y); a failed request
    skips the layer. Perspective mode only (not GDI): the position comes
