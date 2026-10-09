@@ -39,8 +39,11 @@ pub fn local_stat(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerE
         _ => return Err(HandlerError::Invalid("not 0x19..=0x1F")),
     };
     let u = w.units.get_mut(&key).expect("checked above");
-    u.stats.insert(stat, value);
+    let old = u.stats.insert(stat, value).unwrap_or(0);
     hook(u, stat, value);
+    // The player list's value-change callback (`0x004609F0`,
+    // `render/lighting.md` §8 player row).
+    super::lighting::player_light_stat(w, key, stat, old, value);
     Ok(())
 }
 
@@ -53,8 +56,9 @@ pub fn stat_update(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handler
     let key = UnitKey::new(PLAYER, b.u32(1)?);
     let (stat, value) = (u16::from(b.u8(5)?), b.u32(6)? as i32);
     if let Some(u) = w.units.get_mut(&key) {
-        u.stats.insert(stat, value);
+        let old = u.stats.insert(stat, value).unwrap_or(0);
         hook(u, stat, value);
+        super::lighting::player_light_stat(w, key, stat, old, value);
     }
     Ok(())
 }

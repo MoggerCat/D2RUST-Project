@@ -14,6 +14,7 @@ open by `q-fix-render-light` (commits `8699e293`, `31c7ab27`),
 | 2. client quest byte | lighting.md §10 r1, §13; msg-ui.md §14 | `ClientWorld::quest_availability` (the last 0x5E's 37 bytes), `client_quest_byte(i)`; the Den glow reads byte 1; a level-8 read before any 0x5E is the 1.14d fatal 0x60 (no light map, `PreviewLight::error`). Spec edit: `msg-ui.md` §14 r1 now names the model copy. | `the_den_glow_reads_the_clients_quest_byte`; `tests_ui_more` `the_client_keeps_the_last_0x5e_for_quest_byte_reads` |
 | 4. level background 120 | draw-order-2.md §12 l2 r1–r3 | `world_view::background_view`: `Backgrounds::pass1` for level 120, `summit01` / `cloud01` DC6 from the archives, light byte + `cel_ops` (modes 5 / 3), pass-1 keys; `order_grid` refuses only level 74 now. PROVISIONAL REC-420 (time seed). | `background_view_tests` (the §12 vector), `open_mode_3_and_level_backgrounds`; install: `app_client_drlg` `the_summit_background_draws_from_the_users_archives` |
 | 5. missiles sight-tested | draw-order.md §5 r3; draw-order-2.md §15 | `missiles::missile_hidden`: a missile effect hidden by the feed's sight test (probe missile unit on its sub-tile, `missiles` `Size`) is not drawn. | `tests_drlg` `missiles_take_the_sight_test` |
+| `q-fix-render-player-light-colour` (audit F9) | shading.md §6 r1.1; stat-lists.md §3 r6.1, r6.3; lighting.md §8 player row; sim/stat-lists.md §7.1 | The model loads the user's `states` rows (`UnitRows::states`: `notondead`, `noclear`, `colorpri`, `colorshift`, `light-r/g/b`); state on (0xA7 / 0xA8) and 0xA9 state off run the colour call's light part for a state with `colorshift` ≠ 0 (local player with a light: the winning state's light colour, white with none); the stat 89 / 90 callback runs at the model's player stat writes (0x19–0x1F, 0x20) when the value changes, no longer per drawn frame. 0x7C's scroll clear stays the bit-and-list path (no colour call). | `tests_units` `the_local_players_light_colour_follows_its_states_and_stats`; install: `app_client_drlg` `state_colour_rows_come_from_the_users_states` |
 | 6. pick camera shake | seams/world-screen.md §2.6 | `ClickView::shake` from the frame anchor: the world click inverts the shaken camera. | `click` `the_pick_inverts_the_shaken_camera` |
 
 Changed expectations (spec-driven): `tests_ui_more::record_outputs` (the
@@ -31,9 +32,9 @@ missile units, so no missile lights).
   lives on the client missile unit.
 - **Level 74 stars** (`q-fix-render-arcane-stars`): §12 r3 names no
   initial `last`.
-- **Player light colour from states** (`q-fix-render-player-light-colour`,
-  audit F9); the stat 89 / 90 callback runs before each drawn frame, not
-  at the stat write (d2rs-own, `preview_light::player_stats`).
+- The stat 89 / 90 callback runs at the model's player stat messages;
+  item-list aggregation of stat 89 (equipped items) reaches it only as
+  far as the server's stat messages carry the total.
 - Monster `L_c` (§8 r1, component items' `lightradius`) is 0: the client
   tables hold no item rows.
 

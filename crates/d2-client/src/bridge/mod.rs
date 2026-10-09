@@ -449,6 +449,7 @@ impl<L: ServerLink> Bridge<L> {
         t.stats = rows.stats;
         t.objects = rows.objects;
         t.shrines = rows.shrines;
+        t.states = rows.states;
     }
 
     /// The host's wall-clock seconds `0x00410A80` (`render/lighting.md`
