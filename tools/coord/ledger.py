@@ -30,6 +30,7 @@ Python 3 stdlib only. Our own code.
 import argparse
 import collections
 import glob
+import json
 import os
 import re
 import subprocess
@@ -277,7 +278,70 @@ def reconcile(r, repo, status):
     return issues
 
 
-def merge(parts, repo, status):
+SRC_ID = re.compile(r"(?i)^(skills|levels|states|monstats)\.txt\b.*?\((\d+)\)")
+# coverage-map categories whose counter, when 0 in every run, means "not instrumented"
+# for these area families (the coverage parts write 'no' for every row then).
+UNINSTRUMENTED = {"object": ("object", "shrine", "waypoint"), "npc-topic": ("npc",)}
+
+
+def load_coverage(parts_dir):
+    """Seen keys from the coverage parts' report JSON (tools/coverage-map/report.py
+    --json, format coverage-report 1): ({('canon', key) | ('src', table, id)}, set of
+    categories that read 0 in every report)."""
+    seen, zero, any_report = set(), None, False
+    for f in sorted(glob.glob(os.path.join(parts_dir, "*.json"))):
+        try:
+            with open(f, encoding="utf-8") as fh:
+                j = json.load(fh)
+        except (OSError, ValueError):
+            continue
+        if not isinstance(j, dict) or j.get("format") != "coverage-report 1":
+            continue
+        any_report = True
+        s = j["sections"]
+        here = set()
+        for cat, sec in s.items():
+            n = len(sec.get("seen", [])) if "seen" in sec else sec.get("seen_count", 0)
+            if n == 0 and sec.get("table"):
+                here.add(cat)
+        zero = here if zero is None else zero & here
+        for e in s.get("level", {}).get("seen", []):
+            seen.add(("canon", f"level#{e[0]}"))
+            seen.add(("src", "levels", e[0]))
+        for e in s.get("quest", {}).get("seen", []):
+            seen.add(("canon", f"quest#{e[0]}"))
+        for e in s.get("monster-ai", {}).get("seen", []):
+            seen.add(("canon", canon("monster.ai." + str(e[1]).lower())))
+        for cat, table, fam in (("skill", "skills", None), ("state", "states", "state"),
+                                ("monster", "monstats", "monster"), ("missile", None, "missile")):
+            for e in s.get(cat, {}).get("seen", []):
+                if table:
+                    seen.add(("src", table, e[0]))
+                if fam:
+                    seen.add(("canon", canon(f"{fam}.{str(e[1]).lower()}")))
+    return seen, (zero or set()) if any_report else set()
+
+
+def apply_seen(rows, seen, zero):
+    """exercised = yes for rows a coverage report saw; '?' (not 'no') for rows of a
+    category whose counter read 0 everywhere. Returns (yes count, downgraded count)."""
+    yes = down = 0
+    fams = {f for c in zero for f in UNINSTRUMENTED.get(c, ())}
+    for r in rows:
+        m = SRC_ID.match(r["source_1.14d"])
+        hit = ("canon", canon(r["area"])) in seen or (
+            m and ("src", m.group(1).lower(), int(m.group(2))) in seen)
+        if hit and r["exercised"] != "yes":
+            r["exercised"] = "yes"
+            yes += 1
+        elif r["exercised"] == "no" and r["area"].split(".")[0] in fams:
+            r["exercised"] = "?"
+            r["note"] += " [ledger.py: its coverage counter read 0 in every run: may be uninstrumented]"
+            down += 1
+    return yes, down
+
+
+def merge(parts, repo, status, coverage=(set(), set())):
     """parts: [(name, rows)] in name order. Returns (rows, notes dict)."""
     rank = {"yes": 2, "no": 1, "?": 0}
     out, by_area = [], {}
@@ -310,6 +374,7 @@ def merge(parts, repo, status):
             if rank[r["exercised"]] > rank[tgt["exercised"]]:
                 tgt["exercised"] = r["exercised"]
             cov_applied += 1
+    seen_yes, seen_down = apply_seen(out, *coverage)
     disagree = []
     if status:
         for r in out:
@@ -327,6 +392,9 @@ def merge(parts, repo, status):
     notes = {
         "conflicts": conflicts,
         "coverage_applied": cov_applied,
+        "seen_yes": seen_yes,
+        "seen_down": seen_down,
+        "uninstrumented": sorted(coverage[1]),
         "disagree": disagree,
         "specs_uncovered": [s for s in repo.specs if s not in named_specs],
         "checks_uncovered": [c for c in repo.checks if c not in named_checks],
@@ -431,6 +499,9 @@ def render_md(rows, notes, inputs, status_label):
     a("## Merge notes")
     a("")
     a(f"- Coverage rows applied to entity rows (exercised): {notes['coverage_applied']}")
+    a(f"- Rows set exercised = yes from the coverage reports' seen lists: {notes['seen_yes']}")
+    a(f"- Coverage categories that read 0 in every report (may be uninstrumented): "
+      f"{', '.join(notes['uninstrumented']) or 'none'}; rows set from no to ?: {notes['seen_down']}")
     a(f"- Duplicate areas between parts: {len(notes['conflicts'])}")
     for c in notes["conflicts"]:
         a(f"  - {c}")
@@ -484,7 +555,7 @@ def run(root, parts_dir, out_tsv, out_md, status_path, check, fix=False):
                 errs.append(f"{r['_file']}:{r['_line']}: {r['area']}: duplicate area in this part")
             seen.add(r["area"])
         parts.append((os.path.basename(f), rows))
-    rows, notes = merge(parts, repo, status)
+    rows, notes = merge(parts, repo, status, load_coverage(parts_dir))
     inputs = [os.path.relpath(f, root).replace(os.sep, "/") for f in files]
     tsv = render_tsv(rows, inputs, label)
     md = render_md(rows, notes, inputs, label)
@@ -549,6 +620,13 @@ def selftest():
             fh.write(hdr + row(area="m.one", group="coverage", exercised="yes")
                      + row(area="level.5-dark-wood", group="coverage", exercised="no")
                      + row(area="never.seen", group="coverage", exercised="no"))
+        with open(os.path.join(root, "parts", "c.json"), "w") as fh:
+            json.dump({"format": "coverage-report 1", "sections": {
+                "level": {"seen": [[2, "Blood Moor", 9, ["r"]]], "table": 3},
+                "object": {"seen": [], "table": 4}}}, fh)
+        with open(os.path.join(root, "parts", "d.tsv"), "w") as fh:
+            fh.write(hdr + row(area="level.a1.2.blood", group="d", exercised="no")
+                     + row(area="object.1-casket", group="coverage", exercised="no"))
         out_tsv, out_md = os.path.join(root, "o.tsv"), os.path.join(root, "o.md")
         import contextlib
         import io
@@ -559,8 +637,10 @@ def selftest():
         assert text[0] == OUT_MAGIC and text[2].split("\t") == COLS
         rows = {ln.split("\t")[0]: dict(zip(COLS, ln.split("\t"))) for ln in text[3:]}
         assert set(rows) == {"m.one", "net.c2s.0x01", "net.c2s.0x02", "m.bad", "never.seen",
-                             "level.a1.5.act-1-wilderness-4"}
+                             "level.a1.5.act-1-wilderness-4", "level.a1.2.blood", "object.1-casket"}
         assert rows["level.a1.5.act-1-wilderness-4"]["exercised"] == "no"
+        assert rows["level.a1.2.blood"]["exercised"] == "yes", rows["level.a1.2.blood"]
+        assert rows["object.1-casket"]["exercised"] == "?"
         assert canon("quest.a5q1-siege") == canon("quest.slot35-siege-on-harrogath")
         assert canon("quest.a2q1-radament") == canon("quest.slot9-radament-s-lair")
         assert canon("monster-ai.foulcrownest") == canon("monster.ai.foulcrownest")
