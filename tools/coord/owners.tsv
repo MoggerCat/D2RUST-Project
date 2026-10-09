@@ -1,6 +1,6 @@
 # owners 1 — area -> session -> branch, for tools/coord/route.py: the first routed spec/module a row
 # covers wins, longest path prefix among rows. A message row is "<table>.tsv#0xNN".
-# From the coordinator's list, 2026-10-09 14:28 UTC; the coordinator keeps it current.
+# From the coordinator's list, 2026-10-09 14:28 UTC; rows from 17:06 UTC (fifth coordinator, session_01KcnkwCTXbuv5ZbToEUpBSj) appended; the coordinator keeps it current.
 area	paths	session	branch
 act1-town, seed order, client critters, NPC tracks	specs/sim/rng.md,specs/sim/unit-order.md,specs/monsters/population.md,crates/d2-sim/src/rng	session_01BQSDGiWHKAbHXoWk7HThvM	claude/q-fix-real-unit-seed-order
 act1-combat, monster death, dead units	specs/combat/vitals.md,specs/combat/events.md	session_01JYSLguvvisuJdpwNdAbRNK	claude/q-diff-combat-a1
@@ -19,3 +19,12 @@ client UI panels, HUD	specs/ui/,specs/client/ui.md,crates/d2-client/src/ui	sessi
 quests, NPC interact, join messages	specs/world/quests,specs/world/npc.md,specs/ui/npc-menus.tsv	session_01YUEYT5yNEuAz4g2iTGsaVX	claude/q-fix-pc1-day3-a-r2
 scenario-diff, state-dump, recorders, input	specs/tools/,tools/scenario-diff/,tools/trace-recorder/	session_019spHN3NFfPQsq6m1Cjqotm	claude/q-tool-state-diff
 real-data test rigs	crates/test-fixtures/	session_011La9MM6QvvK1vTna5BiSRM	claude/q-fixture-migrate-2
+cast/attack input lock, client action state	crates/d2-client/src/bridge/click.rs,crates/d2-client/src/bridge/predict.rs	session_01JQwtFjADMhRsW7QNGqCiie	claude/q-fix-input-lock
+client crash (geom direction_vector), walk desync / re-target	crates/d2-sim/src/path/walk,crates/d2-client/src/bridge/motion.rs,specs/seams/movement-prediction.md	session_01RdQgHcwijQxkvdvx6nPuAW	claude/q-fix-client-crash
+boss damage / death (Andariel, Radament)	specs/combat/damage.md	session_01QjgkBNuhD5xisApMttxSB8	claude/q-fix-boss-damage
+shop buy room, belt load, monster item creation	specs/items/inventory-moves.md,specs/world/vendors	session_01BBQcb5iXAv9CoWsyhDqVge	claude/q-fix-items-shop
+NPC menus (Natalya, Halbu, Nihlathak), Esc in panels	specs/world/npc.md,specs/ui/npc-menus.tsv,specs/ui/panels.md	session_01VzxhMLTVzSSr24GoMX684d	claude/q-fix-npc-menus
+Den of Evil flag, Cold Plains waypoint	specs/world/quests-act1,specs/world/waypoints.md	session_011nm8wnAZ8dXwKuehwW9a8D	claude/q-fix-a1-den-wp
+class rows (whirlwind, right aura, pet warp follow, blessed hammer)	specs/skills/	session_017Zjk6EsU1ooMqhtmpz54ih	claude/q-fix-class-rows
+depcheck, rng_trace feature	crates/d2-sim/src/debug,tools/depcheck	session_01Bw9umZerDFScSEkXWhvchg	claude/q-fix-depcheck
+playthrough sweep, goto cells, class x difficulty matrix	tools/playthrough/,specs/tools/playthrough.md	session_01BU2ZCAxsiRDowTgb9cTSki	claude/q-fix-pt-sweep

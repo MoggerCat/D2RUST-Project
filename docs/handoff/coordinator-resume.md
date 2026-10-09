@@ -1,5 +1,38 @@
 # Coordinator resume — playable-build loop (2026-10-08)
 
+## Coordinator run 2026-10-09 evening (session_01KcnkwCTXbuv5ZbToEUpBSj)
+
+Merged onto integ-local (gate r1): q-diff-skills-2 (room-cancel rule done twice: both tests kept), q-play-act5 (0x005B2F20 quest spawn done twice: kept `MonsterWorld::spawn_at`, dropped `place_monster`), q-diff-combat-a1 (poke `goto` + `msg` both kept; `Schedule::run_due` takes the link), q-prov-recording-2 (kept staging's bridge/objects GUID counter), q-fixture-migrate-2, coord-resume-2, q-fix-server-store-fill, q-tool-soak; then local-pc1-test (docs) and local-pc1-play (45-file merge, its own gate).
+
+Fix sessions launched 17:05 UTC (each branch carries `docs/handoff/<branch>-task.md` with its brief and the session rules; REC blocks from 1000):
+
+| Branch | Session | Model | REC | Area |
+|---|---|---|---|---|
+| q-fix-input-lock | session_01JQwtFjADMhRsW7QNGqCiie | Opus | 1000–1009 | cast/attack input lock (#1) |
+| q-fix-client-crash | session_01RdQgHcwijQxkvdvx6nPuAW | Opus | 1010–1019 | geom.rs:197 crash; walk desync / re-target |
+| q-fix-boss-damage | session_01QjgkBNuhD5xisApMttxSB8 | Opus | 1020–1029 | Andariel never dies, Radament at 256 hp |
+| q-fix-items-shop | session_01BBQcb5iXAv9CoWsyhDqVge | Sonnet | 1030–1039 | shop "no room", belt after load, monster items 0x00573B20 |
+| q-fix-npc-menus | session_01VzxhMLTVzSSr24GoMX684d | Sonnet | 1040–1049 | Natalya, Halbu, Nihlathak; Esc in quest log |
+| q-fix-a1-den-wp | session_011nm8wnAZ8dXwKuehwW9a8D | Sonnet | 1050–1059 | Den of Evil flag; Cold Plains waypoint (+15,+5) |
+| q-fix-class-rows | session_017Zjk6EsU1ooMqhtmpz54ih | Sonnet | 1060–1069 | q-fix-pt-whirlwind / right-aura / pet-warp-follow / blessed-hammer |
+| q-fix-depcheck | session_01Bw9umZerDFScSEkXWhvchg | Sonnet | 1070–1079 | rng_trace thread_local behind a feature |
+| q-fix-pt-sweep | session_01BU2ZCAxsiRDowTgb9cTSki | Sonnet | 1080–1089 | sweep hops ≤16 + fallback ring, goto cells; A3–V matrix |
+
+| q-fix-monster-death | session_01Paf5PKDcW6k9hvqKunfebM | Opus | 1090–1099 | dead monsters stand up (p4-death-cleanup), drop spot |
+| q-fix-player-hit | session_01U91VHQHBy7Xp4uXJjJ3AC4 | Sonnet | 1100–1109 | player never a missile target (c6), owner flags (c7) |
+| q-fix-monster-ai | session_01URviZERs7KxnRnDD9NkMyi | Sonnet | 1110–1119 | Fallen / Quill Rat AI (c2, c3), Fallen think seed step |
+| q-fix-seed-order | session_01JhQc4nNShp9YNmxNXpqAdx | Opus | 1120–1129 | unit seed order, Blood Moor population, rng creation draws |
+| q-fix-save-input | session_01TU8gxrozxP5xiyq7rEDW1L | Sonnet | 1130–1139 | belt key send, save item seed, 0x67 byte 18, cursor reload |
+| q-fix-room-links | session_016xcFMkKoz6pTSqDuPJRwm3 | Sonnet | 1140–1149 | town objects after WP return, static/drop room links |
+| q-fix-act2-play | session_01NaR6yMxmEgnEfm3Fj9DK3D | Sonnet | 1150–1159 | Act II playthrough blockers |
+| q-fix-act4-play | session_013J2Srxix169AQQjRUYSHvj | Sonnet | 1160–1169 | Act IV playthrough blockers |
+| q-fix-act5-play | session_015YNGBGrwtHjFyby4tCDZR6 | Sonnet | 1170–1179 | Act V: Ancients link, quest superuniques, milestones |
+| q-fix-check-triage | session_01B2eB5Q2V444GgPtPfrhLNK | Sonnet | 1180–1189 | all 88 scenario-diff checks vs 1.14d → checks-status.md |
+| q-fix-difficulty-a1a2 | session_01LiMn42LTayZFyizFKwHzQo | Sonnet | 1200–1209 | Nightmare / Hell, Acts I–II |
+
+Batch 2 launched 17:29 UTC; q-fix-realdata-baseline (REC 1190–1199) session_01Hv1NPtDa5KwdQ56KbYdTYm launched 17:41 at the user's request (21 sessions). Next free REC block: 1210.
+pc1-data Step 4: last number 46.
+
 ## State at pause (2026-10-09 ~15:50 UTC, end of the day run)
 
 The user paused every session to continue later. Each session was told to

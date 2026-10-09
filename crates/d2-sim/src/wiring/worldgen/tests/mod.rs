@@ -14,6 +14,7 @@ mod levels;
 mod maze;
 mod outdoor;
 mod population;
+mod warp_tiles;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -432,8 +433,20 @@ impl Fx {
 
     /// As [`Fx::new`], with population / init tables changed by `tweak`.
     pub fn with_tables(ds1s: Ds1s, tweak: impl FnOnce(&mut WorldTables)) -> Self {
-        let data = Arc::new(drlg_data());
-        let pd = preset_data();
+        Self::with_data(ds1s, |_, _| {}, tweak)
+    }
+
+    /// As [`Fx::with_tables`], with the DRLG and lvlprest views changed
+    /// by `drlg` first.
+    pub fn with_data(
+        ds1s: Ds1s,
+        drlg: impl FnOnce(&mut DrlgData, &mut PresetData),
+        tweak: impl FnOnce(&mut WorldTables),
+    ) -> Self {
+        let mut dd = drlg_data();
+        let mut pd = preset_data();
+        drlg(&mut dd, &mut pd);
+        let data = Arc::new(dd);
         let types = SharedTypes::new(WorldTypes::new(
             data.clone(),
             Maze::new(maze_data()),
