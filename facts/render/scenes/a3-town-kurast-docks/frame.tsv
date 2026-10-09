@@ -1,0 +1,22 @@
+# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py /home/user/D2RUST-Project/traces/raw/20261009-024633-frames.jsonl --scene a3-town-kurast-docks --frame 25 --tile-light unknown --out /home/user/D2RUST-Project/facts/render; game: 1.14d
+key	value
+seq	25
+tick	42
+w	800
+h	600
+act	2
+level	75
+player_x	-800
+player_y	82296
+tile_origin_x	-1200
+tile_origin_y	82016
+unit_origin_x	-1200
+unit_origin_y	82012
+open_mode	0
+shift_x	0
+light_quality	0
+rain	1
+snow	1
+draws	271
+index_sha256	0f557774eaac6912741554736fdeb58a8b3e873ae4df584fce884b0eaa8b6fd6
+palette_sha256	c517a024f06572d831110597e19c39a275c2f872d81b682a645c121950cc8ede

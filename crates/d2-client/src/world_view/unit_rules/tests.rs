@@ -426,3 +426,29 @@ fn a_spinning_unit_loops_its_frames_from_frame_three() {
         assert!(frame(&world) >= 3, "tick {t} frame {}", frame(&world));
     }
 }
+
+// Covers: specs/render/unit-composite.md §3 r2
+/// The measured phase: the draw of tick T has had T − 1 advances
+/// (`facts/render/scenes`: rate 80, 16 frames: tick 42 → 12, 52 → 15,
+/// 128 → 7, 174 → 6, 224 → 5, 43 → 13).
+#[test]
+fn tick_frame_has_one_advance_less_than_the_tick() {
+    for (tick, frame) in [
+        (42, 12),
+        (43, 13),
+        (52, 15),
+        (128, 7),
+        (174, 6),
+        (224, 5),
+        (274, 5),
+        (354, 14),
+    ] {
+        assert_eq!(super::tick_frame(tick, 16, 80), frame, "tick {tick}");
+    }
+    // M08: the old phase (T advances) gives 13 at tick 42.
+    assert_eq!((42 * 80) >> 8, 13, "the old phase");
+    assert_ne!(super::tick_frame(42, 16, 80), 13);
+    assert_eq!(super::tick_frame(0, 16, 80), 0);
+    assert_eq!(super::tick_frame(1, 16, 256), 0);
+    assert_eq!(super::tick_frame(2, 16, 256), 1);
+}
