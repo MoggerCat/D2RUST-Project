@@ -113,7 +113,13 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             d.x = it.x;
             d.y = it.y;
             d.body_loc = it.body_loc;
-            d.page = page;
+            // A cursor item keeps the saved page as it is (0xFF stays 0xFF:
+            // the next save writes it back).
+            d.page = if saved_mode == mode::CURSOR {
+                it.page
+            } else {
+                page
+            };
             d.mode = mode::CURSOR;
         }
         self.sync_out();

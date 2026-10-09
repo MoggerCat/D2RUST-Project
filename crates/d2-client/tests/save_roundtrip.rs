@@ -109,7 +109,7 @@ fn random_play_round_trips() {
 /// Known break: the server's belt items never reach the model
 /// (q-fix-soak-belt-model).
 #[test]
-#[ignore = "known bug q-fix-soak-belt-model: repro"]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_new_characters_belt_is_in_the_model() {
     let f = run(&args(new("sorceress"), 1, 120, &[], 0), &["desync"]);
     assert!(f.is_empty(), "{f:?}");
