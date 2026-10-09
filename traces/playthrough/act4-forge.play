@@ -44,11 +44,28 @@ milestone hephasto-killed
 milestone forge-smashed
   checkpoint a4-hellforge
   deadline 450
-  note needs the soulstone placed on the forge and the hammer's hits (quests-act4.md §4.6): no headless input for it yet; expected blocker with 27.1 clear
+  note quests-act4.md §4.6: the soulstone on the forge (operate, mode 0 -> 1 -> 2 after FrameCnt1), then a hammer (an item poke, picked up to the cursor 0x16 and swapped onto the wand's hand 0x1D) and three hits
+  poke 80 operate @2:376
+  poke 160 item hfh @x+2 @y
+  poke 170 msg 0x16 4 @p3 1
+  poke 175 msg 0x1D @p3 4
+  poke 190 operate @2:376
+  poke 200 operate @2:376
+  poke 210 operate @2:376
   need ever quest 27 1 set
 
 milestone forge-done
   checkpoint a4-hellforge
-  deadline 450
-  note needs Cain (246) msg 680 in town with 27.1: an NPC talk (playthrough.md Open question 3); expected blocker with 27.0 clear
+  deadline 420
+  note the smash as forge-smashed, then town (103) and Cain (246): talk msg 680 with 27.1 sets 27.0 (quests-act4.md §4.4)
+  poke 80 operate @2:376
+  poke 160 item hfh @x+2 @y
+  poke 170 msg 0x16 4 @p3 1
+  poke 175 msg 0x1D @p3 4
+  poke 190 operate @2:376
+  poke 200 operate @2:376
+  poke 210 operate @2:376
+  poke 260 warp 103
+  poke 300 goto unit 1:246
+  poke 340 talk @1:246 quest:680 close
   need ever quest 27 0 set
