@@ -45,14 +45,14 @@
 |   5. Machine-readable tables | 668–704 |
 |   6. Exact-match comparison | 705–813 |
 |   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 814–1304 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1305–1572 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1573–1745 |
-| Constants & data dependencies | 1746–1764 |
-| Randomness | 1765–1770 |
-| Edge cases & original bugs | 1771–1816 |
-| Test vectors | 1817–1903 |
-| Provenance | 1904–2030 |
-| Open questions | 2031–2183 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1305–1611 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1612–1784 |
+| Constants & data dependencies | 1785–1803 |
+| Randomness | 1804–1809 |
+| Edge cases & original bugs | 1810–1855 |
+| Test vectors | 1856–1942 |
+| Provenance | 1943–2069 |
+| Open questions | 2070–2222 |
 <!-- /index -->
 
 ## Summary
