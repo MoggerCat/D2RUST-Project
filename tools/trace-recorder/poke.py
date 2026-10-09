@@ -142,6 +142,7 @@ AR_COLL = 0x20                   # active room +0x20 collision record (drlg/room
 CR_X, CR_Y, CR_W, CR_H, CR_MASKS = 0x00, 0x04, 0x08, 0x0C, 0x20  # record x0, y0, w, h, u16 masks
 #                                  (drlg/rooms.md §10.3; items/treasure.md §8: index (y-y0)*w + (x-x0))
 PLAYER_MOVE = 0x1C09             # the player's move mask (sim/path-placement.md §3)
+LAND_MASK = PLAYER_MOVE | 0x4    # a landing cell has none of these: move bits + missile-blocking 0x4 (poke.md §1 `pos`; REC-1080)
 DR_NEAR, DR_NEAR_N = 0x08, 0x2C  # DRLG room near array, its count (drlg/rooms.md §1)
 DR_ACTIVE = 0x30                 # DRLG room +0x30 active room, 0 = none (drlg/rooms.md §1)
 DR_TX, DR_TY = 0x34, 0x38        # DRLG room tile x, y (drlg/rooms.md §1)
@@ -492,6 +493,7 @@ POSITIONAL = {
 OPTIONAL = {  # keyword -> its argument kinds, in the table (canonical) order
     "object": {"mode": [_n("mode")]},
     "missile": {"skill": [_n("skill"), _n("level")], "owner": [("owner", "ref")]},
+    "pos": {"free": []},  # a flag: land on the nearest LAND_MASK-free cell (poke.md §1)
     "warp": {"tile": [_n("tile")]},
     "item": {"quality": [("quality", "enum", QUALITIES)], "ilvl": [_n("ilvl", 1, 99)]},
 }
@@ -595,6 +597,10 @@ def parse_directive(toks, line):
         if kw in args or any(s[0] in args for s in opts[kw]):
             raise PokeError(line, f"{d}: {kw} given twice")
         need = opts[kw]
+        if not need:
+            args[kw] = True
+            rest = rest[1:]
+            continue
         if len(rest) < 1 + len(need):
             raise PokeError(line, f"{d} {kw}: missing argument {need[len(rest) - 1][0]}")
         for s, t in zip(need, rest[1:1 + len(need)]):
@@ -726,7 +732,10 @@ def canonical(d, args):
         return s + ("" if not args["umods"] else " umod " + " ".join(map(str, args["umods"])))
     out = [d] + [_fmt(args[s[0]]) for s in POSITIONAL[d]]
     for kw, specs in OPTIONAL.get(d, {}).items():
-        if specs[0][0] in args:
+        if not specs:
+            if args.get(kw):
+                out.append(kw)
+        elif specs[0][0] in args:
             out += [kw] + [_fmt(args[s[0]]) for s in specs]
     return " ".join(out)
 
@@ -890,12 +899,13 @@ def goto_hop(mem, dr, goal, seen, blocked=frozenset()):
     return h, key(h)
 
 
-def free_cell(mem, ar):
-    """poke.md §6 rule 3.3: the cell of active room `ar` whose collision mask has
-    none of PLAYER_MOVE, nearest the centre of its sub-tile rect (row by row from
-    the top-left, first found on a tie), or None."""
+def free_cell(mem, ar, target=None):
+    """poke.md §6 rule 3.3 / §1 `pos`: the cell of active room `ar` whose collision
+    mask has none of LAND_MASK, nearest `target` (default the centre of its
+    sub-tile rect; squared distance; row by row from the top-left, first found on
+    a tie), or None."""
     x, y, wd, ht = struct.unpack("<iiii", mem.read(ar + AR_SUB, 16))
-    cx, cy = x + wd // 2, y + ht // 2
+    cx, cy = target if target else (x + wd // 2, y + ht // 2)
     rec_ = mem.read_u32(ar + AR_COLL)
     if not rec_:
         return None
@@ -911,9 +921,22 @@ def free_cell(mem, ar):
                 continue
             m = struct.unpack_from("<H", grid, 2 * ((yy - y0) * cw + (xx - x0)))[0]
             d2 = (xx - cx) ** 2 + (yy - cy) ** 2
-            if not m & PLAYER_MOVE and (best is None or d2 < best[0]):
+            if not m & LAND_MASK and (best is None or d2 < best[0]):
                 best = (d2, xx, yy)
     return best[1:] if best else None
+
+
+def mask_at(mem, ar, x, y):
+    """The collision mask at sub-tile (x, y) in active room `ar`'s record, or None
+    (no record, or outside it)."""
+    rec_ = mem.read_u32(ar + AR_COLL) if ar else 0
+    if not rec_:
+        return None
+    x0, y0, cw, ch = struct.unpack("<iiii", mem.read(rec_ + CR_X, 16))
+    masks = mem.read_u32(rec_ + CR_MASKS)
+    if not masks or not (x0 <= x < x0 + cw and y0 <= y < y0 + ch):
+        return None
+    return struct.unpack("<H", mem.read(masks + 2 * ((y - y0) * cw + (x - x0)), 2))[0]
 
 
 class Unresolved(Exception):
@@ -1288,6 +1311,10 @@ class PokeLayer:
                 continue
             eax = self.invoke(rec, tid, saved, "place", game=game, unit=pl, room=rp[0], x=rp[1], y=rp[2],
                               exact=GOTO_EXACT, alt=GOTO_ALT)
+            if eax:
+                self._settle(rec, tid, saved, game, pl)
+            if eax:
+                self._settle(rec, tid, saved, game, pl)
             return {"r": "ok", "guid": guid, "eax": f"{eax:#x}"} if eax else {"r": "failed", "eax": "0x0"}
         hop = goto_hop(rec, rec.read_u32(p[2] + AR_DRLG), goal, w["seen"], w.setdefault("blocked", set()))
         if hop is None:
@@ -1308,6 +1335,20 @@ class PokeLayer:
             w["seen"].add(hkey)
             w["blocked"].add(hkey)
         return {"r": "pending"}
+
+    def _settle(self, rec, tid, saved, game, pl):
+        """poke.md §6 rule 3.2: when the player's cell has a LAND_MASK bit, place
+        again, exact 1, on the nearest free cell of its room."""
+        now = player_pos(rec, pl)
+        if not now or not now[2]:
+            return
+        m = mask_at(rec, now[2], now[0], now[1])
+        if m is not None and not m & LAND_MASK:
+            return
+        cell = free_cell(rec, now[2], (now[0], now[1]))
+        if cell and cell != (now[0], now[1]):
+            self.invoke(rec, tid, saved, "place", game=game, unit=pl, room=now[2], x=cell[0],
+                        y=cell[1], exact=1, alt=GOTO_ALT)
 
     def _item_index(self, rec, code):
         if code not in self.item_codes:
@@ -1368,6 +1409,13 @@ class PokeLayer:
             path = rec.read_u32(u + U_PATH)
             if not path:
                 return {"r": "failed", "note": "the unit has no path"}
+            if d == "pos" and a.get("free"):
+                # the nearest LAND_MASK-free cell of the room holding the point
+                room = self._room(rec, game, tid, saved, a["x"], a["y"], rec.read_u32(path + P_ROOM))
+                cell = free_cell(rec, room, (a["x"], a["y"])) if room else None
+                if cell is None:
+                    return {"r": "failed", "note": "no free missile-passable cell in the room"}
+                return self._pos(rec, game, tid, saved, u, path, *cell)
             if d == "pos":
                 return self._pos(rec, game, tid, saved, u, path, a["x"], a["y"])
             # hop (poke.md §1): the first spot of hop_candidates the unit moves to
@@ -1380,6 +1428,10 @@ class PokeLayer:
             tries = 0
             for x, y in hop_candidates(start, step):
                 tries += 1
+                room = self._room(rec, game, tid, saved, x, y, rec.read_u32(path + P_ROOM))
+                m = mask_at(rec, room, x, y) if room else None
+                if m is None or m & LAND_MASK:  # only a free, missile-passable cell (LAND_MASK)
+                    continue
                 r = self._pos(rec, game, tid, saved, u, path, x, y)
                 if here() != start:
                     r.update({"r": "ok", "to": [x, y], "tries": tries})
@@ -2316,6 +2368,26 @@ def selftest_goto(Rec):
     assert res["r"] == "ok" and res["guid"] == 0x40 and w["steps"] == 1, res
     assert calls == [(0x00554EA0, {"ecx": G, "edx": P}, [A[1], 55, 12, 0, 0])], calls
     n += 1
+    # a landing cell with the missile-blocking bit 0x4: placed again, exact 1, on the nearest free cell
+    r, calls = fake(), []
+    add_unit(r, MON, 1, 0x40, 156, A[1], 55, 12)
+    r.write(0x690000 + 0x100 + 2 * (12 * 40 + 55 - 40), struct.pack("<H", 0x0004))
+    res = step(layer(r, calls), r, "goto unit 156", walk())
+    assert res["r"] == "ok" and len(calls) == 2, (res, calls)
+    assert calls[1] == (0x00554EA0, {"ecx": G, "edx": P}, [A[1], 55, 11, 1, 0]), calls[1]
+    assert mask_at(r, A[1], 55, 12) == 4 and mask_at(r, A[1], 55, 11) == 0 and mask_at(r, A[1], 200, 0) is None
+    assert free_cell(r, A[1], (55, 12)) == (55, 11) and free_cell(r, A[1], (0, 0)) == (40, 0)
+    n += 1
+    # `pos … free`: parse, canonical text, duplicates and extras
+    assert canonical(*parse_directive("pos @player 5 6 free".split(), 1)) == "pos @player 5 6 free"
+    assert canonical(*parse_directive("pos @player 5 6".split(), 1)) == "pos @player 5 6"
+    for bad in ("pos @player 5 6 free free", "pos @player 5 6 near", "hop @player 5 6 free"):
+        try:
+            parse_directive(bad.split(), 1)
+            raise AssertionError(f"accepted {bad!r}")
+        except PokeError:
+            n += 1
+    n += 2
     # an object target reads the static path; another class or level is not a target
     r, calls = fake(), []
     add_unit(r, OBJ, 2, 0x41, 376, A[0], 7, 9)
