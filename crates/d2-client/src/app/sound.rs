@@ -291,6 +291,48 @@ fn start_output(
     }
 }
 
+/// `play --sound-log FILE` (`specs/tools/facts-render.md` §5 r20): every
+/// sound request call, one row each, tagged with the server tick of the
+/// audio frame that made it.
+#[derive(Resource)]
+pub struct SoundLog {
+    out: std::io::BufWriter<std::fs::File>,
+}
+
+/// The log's header lines (format version 1).
+pub const SOUND_LOG_HEADER: &str =
+    "# sound-log v1; d2-client play --sound-log\ntick\tsound_tick\tid\tunit_type\tguid\tdelay\tflags\toffset\n";
+
+impl SoundLog {
+    pub fn create(path: &std::path::Path) -> std::io::Result<Self> {
+        use std::io::Write;
+        let mut out = std::io::BufWriter::new(std::fs::File::create(path)?);
+        out.write_all(SOUND_LOG_HEADER.as_bytes())?;
+        out.flush()?;
+        Ok(SoundLog { out })
+    }
+
+    /// One row per call; `-` for no unit.
+    pub fn write(
+        &mut self,
+        tick: u64,
+        calls: &[crate::audio::sound_table::system::RequestCall],
+    ) -> std::io::Result<()> {
+        use std::io::Write;
+        for c in calls {
+            let (t, g) = c.unit.map_or(("-".to_owned(), "-".to_owned()), |u| {
+                (u.unit_type.to_string(), u.guid.to_string())
+            });
+            writeln!(
+                self.out,
+                "{tick}\t{}\t{}\t{t}\t{g}\t{}\t{}\t{}",
+                c.sound_tick, c.id, c.delay, c.flags, c.offset
+            )?;
+        }
+        self.out.flush()
+    }
+}
+
 /// One audio frame: pool frame, the sound layer's ticks (when it runs:
 /// the UI's sound requests first), cues, present the tick (the sound
 /// tick with the sound layer, else the frame's server tick).
@@ -301,6 +343,7 @@ fn audio_frame(
     walk: Option<Res<PreviewWalk>>,
     config: Option<Res<ConfigRes>>,
     link: Option<Res<SoundLink>>,
+    mut log: Option<ResMut<SoundLog>>,
 ) -> std::result::Result<(), BevyError> {
     let audio = &mut *audio;
     let weather = link.as_deref().map(|l| {
@@ -345,12 +388,20 @@ fn audio_frame(
             walk.as_deref()
                 .and_then(|w| Some((w.predict.player()?, w.predict.mode()?))),
         );
+        if log.is_some() {
+            d.log_requests(true);
+        }
         d.frame(
             world,
             &bridge.0.inputs().tables.levels,
             requests.as_deref().unwrap_or_default(),
         )
         .map_err(AudioFrameError::from)?;
+        if let Some(l) = log.as_deref_mut() {
+            if let Err(e) = l.write(world.server_ticks, &d.take_request_log()) {
+                warn!("sound log: {e}");
+            }
+        }
         // A model question the sound layer could not answer is not an
         // error (`seams/bridge-app.md` §2.9): answered neutrally, logged
         // once per question.

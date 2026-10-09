@@ -508,3 +508,37 @@ fn resave_clears_instore_and_resets_appearance() {
         RoundTrip::Same(_)
     ));
 }
+
+/// `lv=ID` sets the waypoint of a level's row; a level without one, or
+/// past the rows, is refused.
+// Covers: specs/world/waypoints.md §1 r1
+#[test]
+fn waypoints_by_level() {
+    let t = tables();
+    let (lv, n) = t
+        .level_waypoint
+        .iter()
+        .enumerate()
+        .find(|&(i, &n)| i > 0 && n != 255 && n != 0)
+        .map(|(i, &n)| (i, n))
+        .expect("a level with a waypoint");
+    let mut e = edits();
+    e.waypoints = Some(format!("1:lv={lv}").parse().unwrap());
+    let s = read(&write(&new_save(&e, t).unwrap()));
+    let b = s.body.as_ref().unwrap();
+    let (by, m) = Waypoints::bit(n).unwrap();
+    for d in 0..3 {
+        assert_eq!(
+            b.waypoints.records[d][by] & m != 0,
+            d == 1,
+            "level {lv} index {n}"
+        );
+    }
+    if let Some(none) = t.level_waypoint.iter().position(|&n| n == 255) {
+        e.waypoints = Some(format!("lv={none}").parse().unwrap());
+        assert!(new_save(&e, t).is_err());
+    }
+    e.waypoints = Some(format!("lv={}", t.level_waypoint.len()).parse().unwrap());
+    assert!(new_save(&e, t).is_err());
+    assert!("lv=x".parse::<WpSpec>().is_err());
+}
