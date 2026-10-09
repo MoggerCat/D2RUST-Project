@@ -86,7 +86,7 @@ def owner_of(label, text):
     return "claude/coord-resume-3"
 
 
-def clip(text, n=150):
+def clip(text, n=240):
     text = re.sub(r"\s+", " ", text).strip()
     return text if len(text) <= n else text[:n - 1] + "…"
 
@@ -117,7 +117,8 @@ def report(a):
             checks = [state_by_id[sid]] if sid in state_by_id else []
         have = [recs[c] for c in checks if c in recs]
         out = dict(r)
-        out["checks"] = ",".join(checks) if checks else "-"
+        out["checks"] = "-"  # ledger.py only knows traces/checks/*.check, not gen/: the names go in the note
+        gen = ",".join(checks)
         if not have:
             out.update(last_verdict="-", state="NO-CHECK", exercised=r["exercised"],
                        note="no census record (check missing or run failed)")
@@ -136,14 +137,14 @@ def report(a):
             label = v[3].split(" ", 1)[0]
             out.update(last_verdict=v[0], state="DIVERGED", size="M",
                        owner=owner_of(label, v[3].split(" ", 1)[1]),
-                       note=clip(f"{h['name']}: {v[3]}" + (f" (+{len(div) - 1} more rows diverge)" if len(div) > 1 else "")))
+                       note=clip(f"[{gen}] {v[3]}" + (f" (+{len(div) - 1} more rows diverge)" if len(div) > 1 else ""), 220))
         elif none and len(none) == len(vs):
-            out.update(last_verdict="-", state="NO-CHECK", note=clip(f"{none[0][1]['name']}: {none[0][0][3]}"))
+            out.update(last_verdict="-", state="NO-CHECK", note=clip(f"[{gen}] {none[0][0][3]}"))
         else:
             n = len(have)
             out.update(last_verdict="PARTIAL", state="NO-CHECK", size="S",
-                       note=clip(f"{n} check(s): state, rng and packets equal from the poke on "
-                                 "(PARTIAL: own / client fields not compared)"
+                       note=clip(f"[{gen}] {n} check(s): state, rng and packets equal from the poke on "
+                                 "(PARTIAL: own/client not compared)"
                                  + (f"; {len(none)} row(s) without a verdict" if none else "")))
         exs = {v[4] for v in vs}
         out["exercised"] = "yes" if "yes" in exs else ("no" if "no" in exs else "?")
