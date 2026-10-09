@@ -33,7 +33,7 @@ step "cargo-nextest"
 command -v cargo-nextest >/dev/null 2>&1 || cargo +"$TOOLCHAIN" install cargo-nextest --locked -q || step "WARN nextest failed"
 
 step "Windows Python $WINPY_VER under Wine"
-if [ ! -x "$HOME/winpy/tools/python.exe" ] && command -v wine >/dev/null 2>&1; then
+if [ ! -f "$HOME/winpy/tools/python.exe" ] && command -v wine >/dev/null 2>&1; then
   tmp=$(mktemp -d)
   if curl -sSfL -o "$tmp/p.nupkg" "https://api.nuget.org/v3-flatcontainer/python/$WINPY_VER/python.$WINPY_VER.nupkg" \
      && echo "$WINPY_SHA  $tmp/p.nupkg" | sha256sum -c - >/dev/null; then
@@ -51,6 +51,6 @@ step "summary: libs=$(pkg-config --exists wayland-client alsa libudev && echo ok
   "toolchain=$(rustup toolchain list | grep -q "^$TOOLCHAIN" && echo ok || echo MISSING)" \
   "nextest=$(command -v cargo-nextest >/dev/null && echo ok || echo MISSING)" \
   "wine=$(command -v wine >/dev/null && echo ok || echo MISSING)" \
-  "winpy=$([ -x "$HOME/winpy/tools/python.exe" ] && echo ok || echo MISSING)" \
+  "winpy=$([ -f "$HOME/winpy/tools/python.exe" ] && echo ok || echo MISSING)" \
   "prefix=$([ -f "$HOME/.wine-d2/system.reg" ] && echo ok || echo MISSING)"
 exit 0
