@@ -152,10 +152,13 @@ None. The d2rs export reads seeds without stepping them.
 
 ## Edge cases & original bugs
 
-1. A unit whose path is 0 (an item in an inventory, a unit in transit)
-   has none of the path fields (`x`, `y`, `xf`, `yf`, `tx`, `ty`,
-   `d`, `lv`) on 1.14d; d2rs must leave the same fields out for the
-   same units (`sim/path-placement.md` §2.1). A static path whose room
+1. A unit whose path is 0 (a unit in transit) has none of the path
+   fields (`x`, `y`, `xf`, `yf`, `tx`, `ty`, `d`, `lv`) on 1.14d; d2rs
+   must leave the same fields out for the same units
+   (`sim/path-placement.md` §2.1). An item in an inventory is not such a
+   unit: it has a static path whose `x`, `y` are its place (page cell,
+   belt slot, body location) and `d` is 0 (recorded, `items-load-mixed`,
+   2026-10-09); d2rs reads the place from the inventory model. A static path whose room
    (+0x00) is 0 has no `lv`.
 4. `fc`, `sp` are the stored unit +0x48 / +0x4C even when a sequence
    animation (unit +0x30 ≠ 0) runs from +0x34 / +0x3C (`sim/units.md`

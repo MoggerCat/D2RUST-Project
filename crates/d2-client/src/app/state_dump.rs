@@ -359,8 +359,31 @@ impl<C: Clock + Send + 'static> StateSource for ThreadLink<Link<C>> {
     fn state_snapshot(&mut self) -> Result<state::StateSnapshot, Self::Error> {
         self.with(|l| {
             let sim = &l.host().game;
-            state::snapshot_world(&sim.game, &sim.events)
+            let mut snap = state::snapshot_world(&sim.game, &sim.events);
+            if let Some(inv) = sim.world.inventory.as_ref() {
+                overlay_item_places(&mut snap, &inv.state);
+            }
+            snap
         })
+    }
+}
+
+/// An item in an inventory has a static path on 1.14d whose x, y are its
+/// place (the cell of a page, the belt slot, the body location) and whose
+/// direction is 0 (`items-load-mixed` against 1.14d, frame 2; `state-
+/// snapshot.md` §2). d2rs keeps the place in the inventory model, not in
+/// a path record, so the export reads it there.
+fn overlay_item_places(snap: &mut state::StateSnapshot, inv: &d2_sim::wiring::inventory::InvState) {
+    use d2_sim::items::moves::mode;
+    for u in snap.units.iter_mut().filter(|u| u.ut == 4 && u.x.is_none()) {
+        let placed = inv.items.values().find(|d| {
+            d.guid == u.g && matches!(d.mode, mode::STORED | mode::EQUIPPED | mode::BELT)
+        });
+        if let Some(d) = placed {
+            u.x = u32::try_from(d.x).ok();
+            u.y = u32::try_from(d.y).ok();
+            u.d = Some(0);
+        }
     }
 }
 
