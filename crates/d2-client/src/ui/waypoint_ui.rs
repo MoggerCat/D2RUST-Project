@@ -292,12 +292,12 @@ impl OriginalUi {
         self.shared.borrow_mut().waypoint_map = Some(map);
     }
 
-    /// The rows of the open waypoint menu's current tab; empty when
-    /// closed.
+    /// The rows of the open waypoint menu's tab (the one the open chose,
+    /// [`WaypointOpen::tab`]); empty when closed.
     pub fn waypoint_rows(&self) -> Vec<WpRow> {
         let sh = self.shared.borrow();
         match sh.waypoint_open {
-            Some(open) => rows_of(sh.waypoint_map.as_ref(), &open, 0),
+            Some(open) => rows_of(sh.waypoint_map.as_ref(), &open, open.tab),
             None => Vec::new(),
         }
     }

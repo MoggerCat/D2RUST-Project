@@ -335,7 +335,90 @@ def act1_probe():
     return {"class": "amazon", "name": "AutoProbe", "no_fight": True, "milestones": m}
 
 
+TOWN = {1: 1, 2: 40, 3: 75, 4: 103, 5: 109}
+TOWN_SAVE = {
+    # a level-30 sorceress in the act's town with every earlier act done
+    # and every waypoint (d2s-tool new; the same form as
+    # traces/playthrough/act<N>.play)
+    n: ["--class", "sor", "--expansion", "--level", "30", "--waypoints", "all",
+        "--quests", f"acts={n - 1}", "--act", str(n - 1), "--difficulty", "normal"]
+    for n in (2, 3, 4, 5)
+}
+
+
+def _town_npcs(bot):
+    """Walks every room of the town, then adds a talk milestone per town
+    NPC class seen (data-driven: whoever stands in town)."""
+    town = bot.v.level
+    seen = {}
+    bot.reset_progress()
+    while True:
+        v = bot.look()
+        for u in v.monsters():
+            seen.setdefault(u["cl"], (u["x"], u["y"]))
+        if not bot.explore_step(town):
+            break
+    bot.say(f"  town {town} NPC classes: {sorted(seen)}")
+    at = bot.milestones.index(next(m for m in bot.milestones if m.name == "town-npcs")) + 1
+    for k, cl in enumerate(sorted(seen)):
+        bot.milestones.insert(at + k, Milestone(
+            f"talk-{cl}", f"talk to npc {cl}: Talk opens a dialog", _talked(cl),
+            _probe_talk(cl, "open a dialog")))
+    _wp_taken["npcs"] = True
+
+
+def _wp_first(bot):
+    """Takes the town waypoint to the first other row of its menu."""
+    v = bot.look()
+    touch_waypoint_open(bot)
+    rows = bot.look().client["waypoint_rows"]
+    target = next((r["level"] for r in rows if r["known"] and not r["current"]), None)
+    if target is None:
+        raise_stuck(f"town waypoint menu has no other known row: {rows}")
+    _wp_taken["first"] = target
+    _wp_travel(bot, target)
+    _ = v
+
+
+def touch_waypoint_open(bot):
+    """Walks to the waypoint and clicks it until its menu is open."""
+    for _ in range(60):
+        v = bot.look()
+        if v.open(0x14):
+            return
+        wps = [u for u in v.units if u["ut"] == 2 and u.get("cl") in WAYPOINT_OBJECTS and "x" in u]
+        if not wps:
+            if not bot.explore_step(v.level):
+                raise_stuck(f"no waypoint found in level {v.level}")
+            continue
+        w = wps[0]
+        if abs(w["x"] - v.pos[0]) + abs(w["y"] - v.pos[1]) > 8:
+            bot.walk_to((w["x"], w["y"]), near=5, budget_s=30)
+            continue
+        bot.click(_screen(bot, w["x"], w["y"]))
+        bot.wait(30)
+    raise_stuck("the waypoint menu does not open")
+
+
+def town_probe(act):
+    town = TOWN[act]
+    m = [
+        Milestone("town-start", f"in the Act {act} town ({town})", lambda v: v.level == town, lambda b: None),
+        Milestone("town-npcs", "walk the town, list its NPCs", lambda v: _wp_taken.get("npcs"), _town_npcs),
+        Milestone("town-wp-menu", "the town waypoint menu opens", lambda v: _wp_taken.get(("menu", town)),
+                  _probe_town_wp),
+        Milestone("wp-out", "waypoint travel to the menu's first other level",
+                  lambda v: _wp_taken.get("first") is not None and v.level == _wp_taken.get("first"), _wp_first),
+        Milestone("wp-back", "waypoint travel back to town", lambda v: v.level == town and _wp_taken.get("first"),
+                  lambda b: _wp_travel(b, town)),
+    ]
+    return {"class": "sorceress", "name": f"AutoTown{act}", "no_fight": True,
+            "save_args": TOWN_SAVE[act], "milestones": m}
+
+
 def plan(act, kind="story"):
+    if act in TOWN_SAVE and kind == "probe":
+        return town_probe(act)
     if act == 1 and kind == "probe":
         return act1_probe()
     if act == 1:

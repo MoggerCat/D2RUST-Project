@@ -22,6 +22,7 @@ class Known:
 
     def __init__(self):
         self.cells = {}   # room id -> (x, y, w, h, cells str)
+        self.learned = set()  # sub-tiles a walk click could not reach
 
     def merge(self, m):
         for r in m.rooms.values():
@@ -53,6 +54,8 @@ class Space:
 
     def cell(self, x, y):
         """'#', 'D', '.', '?' (unseen) or None (outside every room)."""
+        if (x, y) in self.known.learned:
+            return "#"
         r = self.room_of(x, y)
         if r is None:
             return None
