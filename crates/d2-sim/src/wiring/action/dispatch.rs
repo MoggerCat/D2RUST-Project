@@ -435,7 +435,7 @@ impl<X: Pending> TickHooks for ActionSim<X> {
     /// whose send ends with S→C 0x48 (type 0, arg 0, the player's GUID;
     /// `inventory.md` §5.7 step 8). `0x0055F4F0` is empty in 1.14d.
     ///
-    /// PROVISIONAL (REC-291; d2rs-own, unverified): the refresh's item and
+    /// PROVISIONAL (REC-405; d2rs-own, unverified): the refresh's item and
     /// skill steps (§5.7 steps 1–7) are not run here: they belong to the
     /// host's inventory model, which the tick hooks do not hold. Its 0x48
     /// is sent at the spec's place.
@@ -526,7 +526,7 @@ impl<X: Pending> TickHooks for ActionSim<X> {
     /// Step 5, after state 4 (`tick.md` §6 rule 4): the inventory refresh
     /// `0x0055DF00` → `0x0055DBC0` (`intents-events.md` §8.3, the second
     /// recorded 0x48), whose send ends with S→C 0x48 (type 0, arg 0, the
-    /// player's GUID; `inventory.md` §5.7 step 8). PROVISIONAL (REC-291):
+    /// player's GUID; `inventory.md` §5.7 step 8). PROVISIONAL (REC-405):
     /// the pass's item steps are not run here.
     fn refresh_inventory(&mut self, game: &mut Game, client: ClientId) {
         let Some(p) = game.lists.client(client).and_then(|c| c.player) else {
@@ -561,7 +561,7 @@ impl<X: Pending> TickHooks for ActionSim<X> {
     /// 2 order "0x5B, 0x65, 0x8D, 0x5A"). PROVISIONAL (`intents-events.md`
     /// §8.3; REC-401): with more than one client, which 0x5B / 0x65 the
     /// others get is not written; d2rs sends the joiner's to each.
-    /// PROVISIONAL (REC-292): the 0x8D's party word (no spec gives
+    /// PROVISIONAL (REC-406): the 0x8D's party word (no spec gives
     /// `0x0055B620`'s arguments) is the 0x5B's, no party.
     fn join_sequence(&mut self, game: &mut Game, client: ClientId) {
         use crate::units::messages as m;

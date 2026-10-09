@@ -28,8 +28,8 @@ install; the arrival test belongs in that rewrite (an NPC 7–8 sub-tiles
 from the player, C→S 0x13, the talk starts in the tick the server's run
 stops).
 
-PROVISIONAL: REC-291 (the per-client inventory refresh sends its 0x48
-without the pass's item steps 1–7), REC-292 (the join's 0x8D party word).
+PROVISIONAL: REC-405 (the per-client inventory refresh sends its 0x48
+without the pass's item steps 1–7), REC-406 (the join's 0x8D party word).
 
 ## Left open
 
