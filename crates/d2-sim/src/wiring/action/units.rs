@@ -760,6 +760,14 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
     fn init_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId, req: &AllocRequest) {
         // The init's room is the allocation's (r7.2) until step 8.
         self.alloc_rooms.push((unit, req.room));
+        if req.ty == UnitType::Player {
+            // Player type init `0x005348C0`: unit flags |= 0x0E first
+            // (`units.md` §1 row 0), so the missile target filter
+            // (`missiles.md` §R4.2) accepts the player.
+            if let Some(r) = sim.units.get_mut(unit) {
+                r.flags |= 0x0E;
+            }
+        }
         if req.ty == UnitType::Monster {
             self.with_monster_world(|w, h| w.type_init(sim, h, unit));
         } else if req.ty == UnitType::Object {
