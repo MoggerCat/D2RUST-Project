@@ -231,4 +231,33 @@ or waypoints, as of the last pull (2026-10-09). Staging is polled every
   Fortress NPCs' frame-24 think is gone and their seeds stay put, as
   1.14d shows. Written into `specs/sim/intents-events.md` §7.8 rule 3.2.
   d2rs's `wiring/action/switch.rs` leaves the cancel out (its doc lists
-  it as unspecified). Row `q-fix-p3-leave-cancels-thinks`.
+  it as unspecified). Row `q-fix-p3-leave-cancels-thinks`, a duplicate of PC1-C's `q-fix-p3-room-empty-think` (same answer, `docs/handoff/pc1-day3-c.md`); the row is marked so.
+- **Live runs, done** (Windows, release build of staging at 17:38, the
+  recorders' own lock):
+  - `packets-town-arrival-ama.check`: the c2s stream is now equal (28
+    masked bytes of C→S 0x67 skipped), so `q-fix-tool-c2s-masks` works.
+    New first divergence: frame 2, s2c #66, 1.14d 0xA8 (state 105
+    `alignment`, player 1) where d2rs sends the next 0xAC. Read from the
+    asm: the setter `0x005543B0(P, 2, 1)` runs in the player-unit init
+    `0x005348C0` at the allocation, and its resend marks state 105
+    changed until frame 2's sends. That settles REC-732 (call site and
+    v = 2) in `combat/hit.md` §7.1. d2rs doesn't send it: row
+    `q-fix-p5-alignment-resend`.
+  - `a1-town-arrival-ama.check` (state, 40 frames): no difference in
+    any compared field. PARTIAL only for d2rs's known gaps (`own`, `q`).
+    Warriv still matches after `q-fix-p3-npc-interact-gate`.
+- **[q-play-act5] join act byte (REC-797)** (claimed with PC1-C first).
+  The player's act +0x18 (and act record +0x1C) at a join is written by
+  the placement `0x00554850` during game entry (`0x0055489C`, from the
+  spawn room's level via `0x0061A1B0` / `0x006427F0`). The allocation's
+  store `0x005552ED` has no room for a loaded player, so its value is
+  meaningless. Written into `sim/units.md` §2 (+0x18 row) and
+  `sim/intents-events.md` §8.2 rule 5. d2rs writes the same value at
+  rule 4 and nothing reads it in between: equivalent, REC-797 settled,
+  no row.
+- **REC-795, the Ancients' chain-35 link** (claimed with PC1-C first).
+  The statue spawn `0x0054E600` → preset superunique `0x005A49B0` → case
+  hcIdx 43–45 (`0x005A4DC3`, push 35) → `0x005436B0(game, U, 35)` at
+  `0x005A4C47`, then `0x00545B50`. So the link exists from creation.
+  Written into `quests-act5-2.md` §7.6. d2rs links by class just before
+  the kill: row `q-fix-p6-ancients-link`.

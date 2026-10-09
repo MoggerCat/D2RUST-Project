@@ -1175,7 +1175,7 @@ fn single_cel_units_missiles_and_items() {
 }
 
 // Covers: specs/render/blend-modes.md §5 r3
-/// The shadow pre-test on the sheared box (REC-511), from the recorded
+/// The shadow pre-test (§5 r3a, REC-511), from the recorded
 /// `a1-panel-inventory` / `a1-run-ne` shadows: the boxes of the real COFs.
 #[test]
 fn shadow_box_culling_follows_the_recorded_shadows() {
@@ -1200,6 +1200,9 @@ fn shadow_box_culling_follows_the_recorded_shadows() {
     assert!(!shadow_box_visible(&torch, -14, 300, 800, 600));
     assert!(shadow_box_visible(&torch, 400, -5, 800, 600));
     assert!(!shadow_box_visible(&torch, 400, -6, 800, 600));
-    assert!(shadow_box_visible(&torch, 400, 649, 800, 600));
-    assert!(!shadow_box_visible(&torch, 400, 650, 800, 600));
+    // §5 r3a: the y bounds are the whole COF box (y min −108), not the
+    // sheared rows: the spec's Y = 680 passes; the edge is Y = 706.
+    assert!(shadow_box_visible(&torch, 400, 680, 800, 600));
+    assert!(shadow_box_visible(&torch, 400, 706, 800, 600));
+    assert!(!shadow_box_visible(&torch, 400, 707, 800, 600));
 }

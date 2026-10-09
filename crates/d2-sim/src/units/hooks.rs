@@ -226,6 +226,12 @@ pub trait UnitHooks: StatHost {
     /// (every mode but GH). Provider: monster spec.
     fn monster_mode_bookkeeping(&mut self, sim: &mut Sim<'_>, unit: UnitId, mode: u32) {}
 
+    /// `0x005A7C20`: the monster mode damage `0x005A4F50(unit, mode)`
+    /// (`skills/bodies-2.md` §2.1), after the bookkeeping and before umod
+    /// mode 0, every mode but GH (`umod-callbacks.md` §2 rule 1).
+    /// Provider: skills spec.
+    fn monster_mode_damage(&mut self, sim: &mut Sim<'_>, unit: UnitId, mode: u32) {}
+
     /// Per-class mode records (`0x006E22D0`–`0x006E23A0`, classes with
     /// monstats +0x1A5): the record to use instead of the table's.
     /// Provider: monster spec.

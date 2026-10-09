@@ -1,0 +1,5 @@
+# format: probe-call-1 (tools/cloud-game/probe_call.py 0.1.0)
+# command: tools/cloud-game/run.sh --python -- tools/cloud-game/probe_call.py --game Game.exe --at 0x53AEC0 --args 6 --auto TpAmb --seed 1234 --input "wait 1; goto 2 119 30; wait 3; click 200 172; waitlevel 3 30; wait 3; end" (TpAmb: d2s-tool --level 30 --waypoints all; the Rogue Encampment waypoint to Cold Plains, level 3)
+# game pointer 0x324007c = the tick hook's game (record_packets.py, same seed); EDX = ESI = the player unit
+{"type":"entry","at":"0x53aec0","tid":280,"ret":"0x585065","eax":"0x0","ecx":"0x324007c","edx":"0x2ef2500","ebx":"0x324007c","esi":"0x2ef2500","edi":"0x3","esp":"0xabf660","stack":["0x3","0x0","0x2ef2500","0x324007c","0xa","0xab0001"],"seq":0,"ms":16174.4}
+{"type":"return","at":"0x53aec0","tid":280,"ret":"0x585065","eax":"0x1","esp_moved":12,"seq":1,"ms":16192.9}

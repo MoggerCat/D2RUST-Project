@@ -326,8 +326,10 @@ impl<X: Pending> AiModes for View<'_, X> {
         self.monster_set_mode(game, unit, MODE_GETHIT);
     }
     /// `0x005DE4E0`: mode 2 (walk) to [`crate::monsters::ai::radius_point`]
-    /// with path step count 1, as the walks to coordinates (`ai.md` §7.2);
-    /// no point → no request, false.
+    /// with path step count 1, as the walks to coordinates (`ai.md` §7.2).
+    /// No point (k ≤ 0 or t on the unit) → the request is still made, at
+    /// the unit's own cell (§7.5 rule 8, REC-665): no path, neutral, and
+    /// the think at f + `aidel`.
     fn walk_in_radius(
         &mut self,
         game: &mut Game,
@@ -339,9 +341,7 @@ impl<X: Pending> AiModes for View<'_, X> {
     ) -> bool {
         let at = self.h.path_position(unit);
         let to = self.h.path_position(target);
-        let Some((x, y)) = crate::monsters::ai::radius_point(at, to, a, b) else {
-            return false;
-        };
+        let (x, y) = crate::monsters::ai::radius_point(at, to, a, b).unwrap_or(at);
         AiModes::set_path_steps(self, unit, 1);
         self.change_mode_with(game, unit, 2, ModeTarget::Point(x, y), None, velocity)
     }
