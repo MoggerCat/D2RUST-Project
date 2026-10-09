@@ -6,7 +6,23 @@ rules are `docs/handoff/build-loop.md`, the task rows are
 `docs/handoff/build-queue.tsv`, and each finished task left
 `docs/handoff/q-<task>.md` (done / left / local check).
 
-## State at hand-over (2026-10-08 ~09:20 UTC, second account switch)
+## State at hand-over (2026-10-09 06:00 UTC, end of the overnight run)
+
+- Read `docs/handoff/overnight-report.md` first (what merged, what was
+  found against 1.14d, remaining work with sizes, what waits on PC 1).
+- `claude/specs-staging-7` = `c50da245` + this doc: green (7,433 tests on
+  d2-sim / d2-server / d2-client / test-fixtures). Release snapshot
+  `claude/release-8m` was cut from it for `main`.
+- Gate: run the gate and push in one step, pushing only on `GATE fail=0`
+  and a fast-forward; the gate also fails on leftover conflict markers.
+  Never push a merge whose gate result you have not read.
+- Next run, in order: merge q-facts-scenes (`e86302ac`, exporter conflict
+  with q-cloud-game; regenerate `facts/render/sprites.tsv` with the tool);
+  `q-fix-real-unit-seed-order`; server store fill; fixture-migrate G4–G7.
+- Overnight rules and REC blocks: `docs/handoff/overnight-loop.md` (next
+  free cloud id REC-490).
+
+## Earlier state (2026-10-08 ~09:20 UTC, second account switch)
 
 - `main`: includes PR #50 (everything merged in this file; staging = main + this doc).
 - `claude/specs-staging-7`: green (6,855 tests sim/server/client/
