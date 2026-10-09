@@ -15,9 +15,8 @@
 //   picks (§6 r4–r5) with a seed copied from the local player's unit seed
 //   at the first use and advanced here only (not written back to the
 //   unit), and game quest 12 bit 13 read as clear (no stock effect);
-//   "introduction" plays text record 0 of the entry (REC-727, PROVISIONAL:
-//   the handler `0x004B41E0` is not read; settled by a Ghidra read, see
-//   `docs/handoff/pc1-data.md` Step 4); the greeting of the menu open
+//   "introduction" picks its record by the NPC and the player's class and
+//   runs the gossip body (REC-727 settled, `ui/messages.md` §6 r4); the greeting of the menu open
 //   (§13 r3) is taken to give a sound in mode 2 (REC-728, PROVISIONAL:
 //   the sound existence `0x004E0590 != 0` is the audio layer's), so the
 //   C→S 0x4D goes out with it;
@@ -132,24 +131,20 @@ fn build_topic(
 }
 
 /// The text id a topic plays (§6 r3–r5): a replayed quest topic its list
-/// entry; "introduction" text record 0 of the NPC's intro entry (REC-727);
+/// entry; "introduction" the record `introduction_index` picks (REC-727 settled);
 /// "gossip" the record the gossip index picks (the first click re-rolls
 /// every entry's index).
 fn topic_text(
     st: &mut NpcMenuState,
     h: TopicHandler,
     class: u32,
-    player: (u8, Option<(u32, u32)>),
+    player: (i32, Option<(u32, u32)>),
     quest: &[u8; 96],
 ) -> Option<u16> {
     let (player_class, seed) = player;
     match h {
         TopicHandler::Replay(k) => st.talk.list.as_ref()?.nth_of_kind(2, k).map(|e| e.string),
-        TopicHandler::Introduction => {
-            let i = st.talk.intro().index_of(class)?;
-            st.talk.intro().entries[i].records.first().map(|r| r.text())
-        }
-        TopicHandler::Gossip => {
+        TopicHandler::Introduction | TopicHandler::Gossip => {
             let talk = &mut st.talk;
             let seed = talk.seed.get_or_insert_with(|| {
                 let (lo, hi) = seed.unwrap_or((1, 666));
@@ -163,13 +158,17 @@ fn topic_text(
                 ))
             };
             let ctx = GossipCtx {
-                class: player_class,
+                class: player_class.max(0) as u8,
                 quest_bit: &gate,
                 game_quest12_bit13: false,
             };
             let table = talk.intro.get_or_insert_with(intro_table);
             let i = table.index_of(class)?;
-            match table.gossip_click(i, true, seed, &ctx) {
+            // "introduction" picks its index (`0x004B41E0`, §6 r4) and runs the
+            // gossip body with it; "gossip" uses the entry's re-rolled +0x0D.
+            let index = matches!(h, TopicHandler::Introduction)
+                .then(|| table.introduction_index(i, Some(class), player_class));
+            match table.click_with_index(i, index, true, seed, &ctx) {
                 GossipOutcome::Play { text } => text,
                 GossipOutcome::Ended => None,
             }
@@ -278,7 +277,7 @@ impl NpcMenuUi {
                 let player = ctx
                     .world
                     .local()
-                    .map_or((0, None), |u| (u.class as u8, u.seed));
+                    .map_or((-1, None), |u| (u.class as i32, u.seed));
                 let quest = self.sh.borrow().client_quest;
                 let id = topic_text(&mut self.st.borrow_mut(), h, class, player, &quest);
                 let Some(id) = id else {

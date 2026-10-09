@@ -173,6 +173,23 @@ pub fn key_actions(bindings: &Bindings, pressed: &[KeyCode]) -> Vec<UiEvent> {
     input_actions(bindings, &keys)
 }
 
+/// [`key_actions`] under key mode `mode` (`ui/controls.md` §4.1 r4–r5):
+/// mode 0 registers no key-down handler, mode 2 runs only the commands
+/// with the M2 flag; mode 1 runs all. Actions that are no key command
+/// (the fixed buttons, chat and panel inputs) are not filtered, nor is
+/// Esc (command 56): the panels' own Esc close runs through it
+/// (PROVISIONAL, REC-726).
+pub fn key_actions_in_mode(bindings: &Bindings, pressed: &[KeyCode], mode: u8) -> Vec<UiEvent> {
+    let mut v = key_actions(bindings, pressed);
+    v.retain(|e| match e {
+        UiEvent::Action(a) => Action::ALL
+            .get(usize::from(a.0))
+            .is_none_or(|&act| crate::controls::keymap::runs_in_key_mode(act, mode)),
+        _ => true,
+    });
+    v
+}
+
 /// The world actions of portable inputs, in order: keys, the middle / X
 /// buttons and the wheel steps (`ui/controls.md` §4.2: they call the
 /// bound command's handler, no panel takes them). VK 0x10–0x12 cover
@@ -385,5 +402,24 @@ mod key_tests {
         assert_eq!(wheel_key(&mut acc, -200), Some(Key::MouseWheelDown));
         let down = input_actions(&b, &[Key::MouseWheelDown]);
         assert_eq!(down, vec![act(Action::SkillDown)]);
+    }
+
+    // Mode 0 runs no key command, mode 2 only the M2 ones (cmd 1 no, cmd
+    // 41 clear text messages yes), mode 1 all; Esc and the non-command
+    // inputs always pass (PROVISIONAL, REC-726).
+    // Covers: specs/ui/controls.md §4.1 r4, §4.1 r5
+    #[test]
+    fn key_modes_filter_the_key_actions() {
+        let b = Preset::Original.bindings().unwrap();
+        let keys = [KeyCode::KeyI, KeyCode::KeyV, KeyCode::Escape];
+        let all = key_actions_in_mode(&b, &keys, 1);
+        assert_eq!(all, key_actions(&b, &keys));
+        assert!(all.contains(&act(Action::ToggleInventory)));
+        let m0 = key_actions_in_mode(&b, &keys, 0);
+        assert_eq!(m0, vec![act(Action::GameMenu)]);
+        let m2 = key_actions_in_mode(&b, &keys, 2);
+        assert!(!m2.contains(&act(Action::ToggleInventory)));
+        assert!(m2.contains(&act(Action::GameMenu)));
+        assert!(m2.contains(&act(Action::ToggleMinimap)));
     }
 }

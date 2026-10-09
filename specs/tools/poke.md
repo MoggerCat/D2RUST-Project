@@ -2,9 +2,8 @@
 
 - **Status:** draft: format `poke 1` and the directive table are ours;
   every 1.14d address and argument form below is cited from the owning
-  spec; directives whose 1.14d call form no spec states are gaps on the
-  original side (§4, Open questions) and are queued for PC 1
-  (`docs/handoff/pc1-data.md` Step 4). Run on 1.14d under Wine
+  spec (the forms of `pos`, `warp`, `item`, `stat`, `state` read from
+  the asm, not yet run: REC-655). Run on 1.14d under Wine
   (2026-10-09, `poke.py` 0.1.0, `--auto ScnAma --seed 1234`, F0 = 2):
   `spawn` normal (GUID 8), `seed-unit`, `object` (GUID 18), `time`,
   `seed-game`, `superunique` (GUID 8), `missile` (GUID 1) all returned
@@ -12,7 +11,12 @@
   `missile-superunique.poke`); scenario `spawn` kinds `champion`
   (GUID 8), `random-boss` (GUID 13), `unique` with umods 5, 7 (GUID 17)
   returned `ok` with minions (`boss-kinds.poke`, monsters/init.md §25
-  forms). The comparison with d2rs is REC-590. The d2rs side (§3, §5) is implemented
+  forms). Run on 1.14d on Windows (PC 1, 2026-10-09, same command,
+  `--after 125`): `spawn-town.poke` all five `ok` (spawn GUID 8, object
+  GUID 18); screenshots at 40 and 100 ticks show the fallen party of 4
+  beside the player, the lit brazier 3 sub-tiles left, Warriv walking;
+  the PNGs stay off the public repo (rule 1; `docs/handoff/pc1-day3-a.md`).
+  The comparison with d2rs is REC-590. The d2rs side (§3, §5) is implemented
   (`d2-sim::poke`, scenario `poke` steps, `scenario-run`, `d2-client
   play --poke`): every directive runs on the synthetic install; `warp`
   to another act runs the act change (§1 table); `item` without item
@@ -35,21 +39,21 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 55–67 |
-| Inputs | 68–74 |
-| Outputs / state changes | 75–83 |
-| Rules | 84–85 |
-|   1. Directives | 86–120 |
-|   2. Poke files | 121–143 |
-|   3. In scenarios | 144–158 |
-|   4. The 1.14d side (`poke.py`) | 159–209 |
-|   5. The d2rs side (`d2-sim::poke`) | 210–224 |
-| Constants & data dependencies | 225–237 |
-| Randomness | 238–244 |
-| Edge cases & original bugs | 245–254 |
-| Test vectors | 255–266 |
-| Provenance | 267–272 |
-| Open questions | 273–293 |
+| Summary | 59–71 |
+| Inputs | 72–78 |
+| Outputs / state changes | 79–87 |
+| Rules | 88–89 |
+|   1. Directives | 90–124 |
+|   2. Poke files | 125–147 |
+|   3. In scenarios | 148–162 |
+|   4. The 1.14d side (`poke.py`) | 163–211 |
+|   5. The d2rs side (`d2-sim::poke`) | 212–226 |
+| Constants & data dependencies | 227–239 |
+| Randomness | 240–246 |
+| Edge cases & original bugs | 247–256 |
+| Test vectors | 257–268 |
+| Provenance | 269–274 |
+| Open questions | 275–282 |
 <!-- /index -->
 
 ## Summary
@@ -103,11 +107,11 @@ cannot run the directive, §4). Results are written as `poke` records
 | `seed-game` | `<lo> <hi>` | set the game seed | write u32 lo, hi at game +0xD0 (`rng.md` §5.2; `original-hooks-spawn.md` Constants) | `ActionHooks.game_seed.set(lo, hi)` |
 | `seed-unit` | `<ref> <lo> <hi>` | set a unit's seed | write u32 lo, hi at unit +0x20, +0x24 (`rng.md` §5.3; `original-hooks.md` §4) | the unit record's `seed.set(lo, hi)` |
 | `time` | `<period 0..5> <ticks>` | set the time of day of the player's act | write the environment record (act +0x04; acts at game +0xBC + 4·act): +0x00 period, +0x08 ticks (`render/lighting.md` §9.1) | `ActEntry.environment` `period`, `ticks` |
-| `pos` | `<ref> <x> <y>` | teleport a unit | gap (Open question 1) | `WalkCtx::teleport` (`path-placement.md` §6 r4 teleport path) |
-| `warp` | `<level> [tile <n>]` | move the player to a level (tile index default 0) | gap (Open question 2) | `wiring::path::place::level_warp` (`path-placement.md` §11); another act: the act change `wiring::path::act_change::run` (`world/waypoints.md` §11 steps 1–19, `flows/act-change.md` §1; step 3 builds the act's DRLG when missing), as waypoint travel to another act; the client's 0x04 follows on the next tick's client pass |
-| `item` | `<code> <x> <y> [quality <q>] [ilvl <n>]` | create an item on the ground | gap (Open question 3) | `ItemUnits::create_item` (spawn mode ground) then `items::moves::ground::ground_place` |
-| `stat` | `<ref> <stat> <layer> <i32>` | set a base stat | gap (Open question 4) | `StatLists::unit_set` (`stat-lists.md` §5 r2) |
-| `state` | `<ref> <state> on\|off` | set or clear a state | gap (Open question 4) | `toggle_state` + `set_state_changed` (`stat-lists.md` §9.2 toggle with update-queue insert) |
+| `pos` | `<ref> <x> <y>` | teleport a unit | `0x00650BE0` (stack: unit path, unit, room, x, y; `ret 0x14`; 1/0; `path-placement.md` §6 r4), else `0x00554EA0` (ECX game, EDX unit; room, x, y, exact 1, alt 0; `ret 0x14`; 1/0; §10); room by entry 6 from the unit's room | `WalkCtx::teleport` (`path-placement.md` §6 r4 teleport path) |
+| `warp` | `<level> [tile <n>]` | move the player to a level (tile index default 0) | `0x0053AEC0` (ECX game, EDX player; level, tile; `ret 8`; EAX not a status: `ok`; `world/waypoints.md` §7 r5) | `wiring::path::place::level_warp` (`path-placement.md` §11); another act: the act change `wiring::path::act_change::run` (`world/waypoints.md` §11 steps 1–19, `flows/act-change.md` §1; step 3 builds the act's DRLG when missing), as waypoint travel to another act; the client's 0x04 follows on the next tick's client pass |
+| `item` | `<code> <x> <y> [quality <q>] [ilvl <n>]` | create an item on the ground | `0x00558D90` (ECX game, EDX request; use seed 0; `ret 4`; EAX the item; `items/generation.md` §3) with request spawn mode 3, x, y, room (entry 6), item = the combined index of the code (§4 rule 8) | `ItemUnits::create_item` (spawn mode ground) then `items::moves::ground::ground_place` |
+| `stat` | `<ref> <stat> <layer> <i32>` | set a base stat | `0x00627260` (stack: unit, s, value, layer; `ret 0x10`; `sim/stat-lists.md` §5 r2) | `StatLists::unit_set` (`stat-lists.md` §5 r2) |
+| `state` | `<ref> <state> on\|off` | set or clear a state | `0x00639DB0` (stack: unit, s, 1/0; `ret 0xC`; `stat-lists.md` §9.2) | `toggle_state` + `set_state_changed` (`stat-lists.md` §9.2 toggle with update-queue insert) |
 | `freeze` | `<seconds>` | hold the game between ticks for wall time (screenshots, a human look) | the debugger keeps the thread stopped at the hook (§4 rule 2) | no-op, `ok` (the runner owns the clock) |
 
 3. Monsters keep the scenario `spawn` step (`scenario.md` §3.1); a poke
@@ -197,10 +201,8 @@ cannot run the directive, §4). Results are written as `poke` records
    the directive then runs as rule 3 says. A run may override both
    tables from a JSON file (`--forms`, format `poke-forms-1`) to try a
    form before it is committed; the run's output records the forms in
-   force. Today without a form: `0x00650BE0` / `0x00554EA0` (`pos`, the
-   teleport preferred as d2rs' path), `0x0053AEC0` (`warp`),
-   `0x00558D90` (`item`), `0x00627260` (`stat`), `0x00639DB0`
-   (`state`); the spawn kinds' `0x005A09E0`, `0x0054E1E0`, `0x005A2120`
+   force. `pos` calls the teleport `0x00650BE0` (d2rs' path) when it
+   has a form, else the placement `0x00554EA0`; the spawn kinds' `0x005A09E0`, `0x0054E1E0`, `0x005A2120`
    and the umod list (monster data +0x1C) are stated in
    `monsters/init.md` §25.1, §25.3. `item` finds the item index in the
    combined items array (`items/treasure.md` §9.1: header `0x0096CA58`,
@@ -262,7 +264,7 @@ same on both sides.
 | `traces/checks/poke-fallen-town.check` (ScnAma, seed 1234; frame 4: `spawn 19 @x+3 @y+3 normal`, `seed-unit @1:19 0x12345678 666`), 1.14d against d2rs, 54 frames | both pokes `ok`; the same party (GUIDs 8–11, same class, positions, mode 1 for all 50 ticks) and the poked seed equal | REC-590, run 2026-10-09 (cloud, Wine): equal as stated; differs: minion seeds and every creation hp, because d2rs's game seed is one step behind 1.14d from frame 2 (the joining player's unit seed: 1.14d {lo of one game-seed step, 666}, d2rs {1, 666}), a join finding outside this spec |
 | same check with the seeds pinned first (`seed-game 0x1234 666`, `seed-unit @player 0x55 666`, then the spawn) | the party and the game seed equal for 50 ticks | REC-590, 2026-10-09: equal (the party's every compared field and the game seed, frames 4–54); left: fields d2rs's snapshot does not fill (monster `tx`/`ty`, player `fc`/`sp`), outside this spec |
 | `traces/checks/poke-fallen-town-unpinned.check` (no seed pins) on b0850e52 (join seed fix, staging 9aa0b329; path target, fc/sp, walk speed) | every unit and the game seed equal for 54 frames | REC-590, 2026-10-09 (cloud, Wine): no difference in any compared field of any unit or the game seed, frames 1–54; verdict PARTIAL only for the snapshot's own gaps (owner, headless client) |
-| `traces/checks/poke-firebolt.check`: as above, then before frame 8 `missile 58 @x @y @x+3 @y+3 skill 36 1` (Fire Bolt, owner the player) | missile created on both sides, game seed after it equal, the target's hp equal | REC-590, 2026-10-09: missile `ok` (GUID 1) on both, game seed equal every frame after it, leader hp 1024 on both (no damage in town on either side); missiles are not in `state-snapshot.md` records. Damage outside town needs `warp` on 1.14d (Open question 2) |
+| `traces/checks/poke-firebolt.check`: as above, then before frame 8 `missile 58 @x @y @x+3 @y+3 skill 36 1` (Fire Bolt, owner the player) | missile created on both sides, game seed after it equal, the target's hp equal | REC-590, 2026-10-09: missile `ok` (GUID 1) on both, game seed equal every frame after it, leader hp 1024 on both (no damage in town on either side); missiles are not in `state-snapshot.md` records. Damage outside town needs `warp` on 1.14d (form stated, REC-655) |
 
 ## Provenance
 
@@ -272,21 +274,8 @@ same on both sides.
 
 ## Open questions
 
-Each is queued for PC 1 in `docs/handoff/pc1-data.md` Step 4; until it
-is answered the directive is a gap on the 1.14d side.
-
-1. **`pos`:** register / stack form and `ret` of `0x00554EA0(game,
-   unit, room, x, y, exact, alt)` (`path-placement.md` §10), or of the
-   teleport path `0x00650BE0` (§6 r4).
-2. **`warp`:** register / stack form and `ret` of the level warp
-   `0x0053AEC0(game, player, level, tile)` (`waypoints.md` §7 r5). The
-   act change `0x0053ACC0` has a stated form (§11) but its only caller
-   runs the town-leave refresh `0x00537340` first, so calling it alone
-   is not the game's warp.
-3. **`item`:** an entry that creates an item on the ground at a given
-   point: the form of `0x00558D90(game, request, use seed)`
-   (`items/generation.md` §3) with request +0x18 = 3, +0x1C/+0x20 x, y,
-   +0x24 room; and how the code → index lookup `0x00633640` is called.
-4. **`stat`, `state`:** register / stack form and `ret` of
-   `0x00627260(unit, s, value, layer)` (`stat-lists.md` §5 r2) and
-   `0x00639DB0(unit, s, on)` (§9.2).
+None. (Questions 1–4, the call forms of `pos`, `warp`, `item`, `stat`
+and `state`, are answered in `path-placement.md` §6 r4 / §10,
+`world/waypoints.md` §7 r5, `items/generation.md` §3 / §10.1 and
+`sim/stat-lists.md` §5 r2 / §9.2, read from the asm; their first 1.14d
+run is REC-655.)

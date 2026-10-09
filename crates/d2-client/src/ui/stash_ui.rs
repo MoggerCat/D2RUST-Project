@@ -60,6 +60,16 @@ impl Panel for StashUi {
         // The cap is the fixed stash gold limit (`0x00623460`).
         panel.draw(&sh.tables, &env, ctx.strings, STASH_CAP, GOLD_MAX_FONT, out);
         let g = sh.items.stash_grid(env.exp, &sh.config.screen);
+        let screen_h = sh.config.screen.h;
+        sh.items.draw_placement_tint(
+            ctx.world,
+            &sh.tables.files,
+            &g,
+            crate::ui::panels::stash_items::STASH_PAGE,
+            sh.mouse,
+            screen_h,
+            out,
+        );
         sh.items.draw_stash(ctx.world, &sh.tables.files, &g, out);
         // `panels-2.md` §20 r1: in the inclusive close rectangle,
         // `strClose` queued at (X + 12 − w / 2, Y − 35), pop-up text in

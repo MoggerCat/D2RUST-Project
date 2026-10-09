@@ -24,13 +24,13 @@
 |   1. Waypoint menu input (ui 0x14) | 68–124 |
 |   2. NPC menu box | 125–233 |
 |   3. Hire list (`0x004B5C60`, NPC option "hire") | 234–286 |
-|   4. Shop transactions | 287–376 |
-| Constants & data dependencies | 377–384 |
-| Randomness | 385–388 |
-| Edge cases & original bugs | 389–400 |
-| Test vectors | 401–412 |
-| Provenance | 413–429 |
-| Open questions | 430–445 |
+|   4. Shop transactions | 287–382 |
+| Constants & data dependencies | 383–390 |
+| Randomness | 391–394 |
+| Edge cases & original bugs | 395–406 |
+| Test vectors | 407–418 |
+| Provenance | 419–435 |
+| Open questions | 436–451 |
 <!-- /index -->
 
 ## Summary
@@ -299,11 +299,17 @@ menus: its client sender is `client/model.md` §7 rule 9.
 2. **Kind and price** `[0x007C0D7F]` (cost `0x0062FDC0(player, item,
    difficulty, quest flags, c, t)`, `world/vendors.md` §9):
    - a1 ≠ 1 (store item): refused while the player has a cursor item;
-     kind 1 (buy), t = 0 (the "t = 2 when `[0x007C0DB0]` ≠ 0" branch is
-     dead: every write of `[0x007C0DB0]` stores 0, `panels-2.md` §14
-     r11; read 2026-10-09, writes `0x004B6FD7`, `0x004B703D`,
-     `0x004B70B1`, `0x004B70D7` all with EBX = 0, no indexed write
-     reaches it: the word array at `0x007C0D9A` stops at 9 entries);
+     kind 1 (buy), t = 2 when the gamble flag `[0x007C0DB0]` ≠ 0, else
+     t = 0 (`0x004B3A89`). The flag is 1 only between the NPC menu's
+     gamble option (`0x004B3D40`, `panels-2.md` §14 r1: `[0x007C0DB0]`
+     := 1 at `0x004B3D95`, then C→S 0x38 action 2) and the next trade
+     option (`0x004B42B0`: := 0 at `0x004B433F`, then 0x38 action 1) or
+     interaction start / end (`0x004B6DD0`: := 0 at `0x004B6FD7`,
+     `0x004B703D`, `0x004B70B1`, `0x004B70D7`). Both option handlers
+     are reached only through the option table's pointers, which is why
+     an export that lists only analysed functions shows the four zero
+     writes alone (settled 2026-10-09, REC-729, by a whole-image scan for
+     the address);
    - a1 = 1 (player item), by `c`: 147, 148, 177, 199, 202, 252, 254,
      255, 405, 512, 513, 514 → sell (t = 1); 154, 178, 253, 257, 511 →
      with the repair button on (`0x00489860`): repair (kind 3, t = 3) if
@@ -332,7 +338,7 @@ menus: its client sender is `client/model.md` §7 rule 9.
 
    | Msg | u32 @9 | u32 @13 |
    |---|---|---|
-   | 0x32 buy | `m << 16` (the OR 2 of `[0x007C0DB0]` ≠ 0 is dead, as rule 2), OR 0x80000000 when `flags` bit 2 is set and the item's `items.txt` record (`0x006335F0`) byte +0x1A5 ≠ 0 | price |
+   | 0x32 buy | `m << 16`, OR 2 when the gamble flag `[0x007C0DB0]` ≠ 0 (rule 2; this is the transaction 2 that `world/vendors.md` §7.1 rule 2 needs for a gamble item), OR 0x80000000 when `flags` bit 2 is set and the item's `items.txt` record (`0x006335F0`) byte +0x1A5 ≠ 0 | price |
    | 0x33 sell | `m` | price |
    | 0x35 one item | `m` | the item's stat 72 (durability) value, not a price |
    | 0x35 repair all | 0 | 0x80000000 (item GUID 0) |

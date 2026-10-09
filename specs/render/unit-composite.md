@@ -29,15 +29,15 @@
 |   5. The slot loop (`0x00470EC0`) | 260–380 |
 |   6. Component file and cel | 381–421 |
 |   7. Colormap source per component | 422–446 |
-|   8. Extra offsets (`0x004DA0B0`, `0x004DA0D0`, `0x004DA0F0`) | 447–542 |
-|   9. Single-cel units (missiles, items) | 543–557 |
-|   10. d2rs mapping | 558–572 |
-| Constants & data dependencies | 573–586 |
-| Randomness | 587–590 |
-| Edge cases & original bugs | 591–605 |
-| Test vectors | 606–626 |
-| Provenance | 627–674 |
-| Open questions | 675–738 |
+|   8. Extra offsets (`0x004DA0B0`, `0x004DA0D0`, `0x004DA0F0`) | 447–549 |
+|   9. Single-cel units (missiles, items) | 550–564 |
+|   10. d2rs mapping | 565–579 |
+| Constants & data dependencies | 580–593 |
+| Randomness | 594–597 |
+| Edge cases & original bugs | 598–612 |
+| Test vectors | 613–633 |
+| Provenance | 634–681 |
+| Open questions | 682–745 |
 <!-- /index -->
 
 ## Summary
@@ -502,6 +502,11 @@ Created (`0x004DA000`, zeroed) and freed (`0x004DA080`) by client effect
 code: 16 creation sites (`0x00465716` … `0x004F0BCC`), fields set through
 `0x004DA1D0` (position, `<< 11`), `0x004DA200` (velocity), `0x004DA250`,
 `0x004DA2A0` (others). With no record every offset is 0.
+Getters (unit on the stack, `ret 4`; 0 without a record): x, y, z
+`>> 11` (arithmetic; 1/32 subtile, the setter's unit) `0x004DA110`,
+`0x004DA130`, `0x004DA150`; the stored 16.16 values `0x004DA170`,
+`0x004DA190`, `0x004DA1B0`. So a getter → `0x004DA1D0` copy keeps the
+position with its low 11 bits cleared.
 
 Creation `0x004DA000`: reuses the unit's record when it has one, else
 allocates **0x48** bytes; then zeroes **0x4C** bytes and attaches it
@@ -512,9 +517,11 @@ the last argument is non-zero): position `0x004DA1D0(x, y, z)` (always
 ≪), velocity `0x004DA200`, acceleration `0x004DA250`, limits
 `0x004DA2A0`; flag 0x20 `0x004DA6E0` (EDX ≠ 0 sets, 0 clears), flag
 0x10 `0x004DA620` (same), bounce `0x004DA2F0(count, factor)` (flag 4),
-timed arc `0x004DA5B0` (EDX = height `h`, stack `n`: flag 2, ticks :=
-max(`n`, 1), x = y = 0, z := `h` ≪, vx = vy = 0, az := −0x1000 when 0,
-vz := (−`h`·2048 − az·`n`²/2) / `n`, C division), done `0x004DA640`
+timed arc `0x004DA5B0` (EDX = height `h`, stack `n`: flags |= 2 (an
+OR: other bits, a restart's flag 8 too, stay), t := ticks := max(`n`,
+1), x = y = 0, z := `h` ≪, vx = vy = 0, az := −0x1000 when 0, vz :=
+(−(`h` << 11) − trunc(az·t·t / 2)) / t, 32-bit products, both divisions
+C (toward zero), by the clamped t; 1.14d asm 2026-10-09), done `0x004DA640`
 (flag 1), restart `0x004DA690` (clears flag 1, sets flag 8; flag 8 has
 no other reader than `0x004DA6B0`, which reports "still moving" unless
 flag 1 is set and flag 8 clear).

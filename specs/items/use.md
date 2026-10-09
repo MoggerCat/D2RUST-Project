@@ -3,7 +3,9 @@
 - **Status:** draft: the dispatcher, its failure reset and the table
   were read from the 1.14d `Game.exe` disassembly and the table words
   from the file image (2026-10-08, REC-117); entry 2 (Town Portal) is
-  `world/objects-2.md` §27, entry 7 (cube) `world/cube.md` §1. The
+  `world/objects-2.md` §27, entry 7 (cube) `world/cube.md` §1, entry 3
+  (potions) §3.1 (2026-10-09, checked against the recording
+  `facts/items/a1-town-potions-low.tsv`). The
   other entries' bodies are not covered (open question 1). No recording.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::items::moves` (item use seam)
@@ -17,20 +19,20 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 36–44 |
-| Inputs | 45–64 |
-| Outputs / state changes | 65–70 |
-| Rules | 71–72 |
-|   1. Dispatcher `0x005BF240(ECX game, EDX U; I, T, x, y)` (`ret 0x10`) | 73–95 |
-|   2. Failure reset `0x005BE1C0` (U in EBX) | 96–104 |
-|   3. Use table (`0x00741790`, read from the image) | 105–125 |
-|   4. Town Portal (entry 2) | 126–137 |
-| Constants & data dependencies | 138–144 |
-| Randomness | 145–148 |
-| Edge cases & original bugs | 149–161 |
-| Test vectors | 162–171 |
-| Provenance | 172–185 |
-| Open questions | 186–192 |
+| Summary | 38–46 |
+| Inputs | 47–66 |
+| Outputs / state changes | 67–72 |
+| Rules | 73–74 |
+|   1. Dispatcher `0x005BF240(ECX game, EDX U; I, T, x, y)` (`ret 0x10`) | 75–97 |
+|   2. Failure reset `0x005BE1C0` (U in EBX) | 98–106 |
+|   3. Use table (`0x00741790`, read from the image) | 107–202 |
+|   4. Town Portal (entry 2) | 203–214 |
+| Constants & data dependencies | 215–221 |
+| Randomness | 222–225 |
+| Edge cases & original bugs | 226–238 |
+| Test vectors | 239–248 |
+| Provenance | 249–262 |
+| Open questions | 263–269 |
 <!-- /index -->
 
 ## Summary
@@ -109,7 +111,7 @@ FF`; `world/cube.md` §1 bytes). Unlike the targeting reset
 | 0 | 0 | 0 | — | never reached (n ≥ 1) |
 | 1 | `0x005BE130` | `0x005BE230` | `isc`, `ibk` | open question 1 (identify, REC-113) |
 | 2 | 0 | `0x005BE290` | `tsc`, `tbk` | `world/objects-2.md` §27 |
-| 3 | 0 | `0x005BE3F0` | `hp1`–`hp5`, `mp1`–`mp5` | open question 1 |
+| 3 | 0 | `0x005BE3F0` | `hp1`–`hp5`, `mp1`–`mp5` | §3.1 |
 | 4 | 0 | `0x005BE7B0` | none | open question 1 |
 | 5 | 0 | `0x005BEAC0` | `rvs`, `rvl` | open question 1 |
 | 6 | 0 | `0x005BEF90` | `yps`, `wms` | open question 1 |
@@ -122,6 +124,81 @@ FF`; `world/cube.md` §1 bytes). Unlike the targeting reset
 
 `books.txt` rows: "of Town Portal" `pSpell` 2, "of Identify" 1, "of
 Ressurect" (unused, no codes) 0.
+
+#### 3.1 Entry 3 body `0x005BE3F0` (potions; ECX game, EDX U; I, …; `ret 0x14`)
+
+Items record R of I (`0x006335F0`); none → 0. Fields: state +0x98
+(i16), stats +0x9E[3] (i16), calcs +0xA4[3], `len` calc +0xB0; every
+calc is evaluated by `0x00627C20(U, I, calc)` (`data/calc-expressions.md`).
+
+1. L := eval(`len`), s := R.state, list := none, rem := 0. If L > 0:
+   s < 1 or s ≥ state count → return 0; list := U's list of state s
+   (`0x006256B0`); a list found → rem := its expire frame − game frame
+   (+0xA8).
+2. For k = 0..2, stopping at the first stat id < 0 or ≥ the stat count:
+   v := eval(calc k), by stat id:
+   - 74 `hpregen`: v <<= 8, then 6 `hitpoints`: v := life factor
+     (`0x0062A5D0`), c := 3 (vitality). 26 `manarecovery`: v <<= 8, then
+     8 `mana`: v := mana factor (`0x0062A620`), c := 1 (energy). For
+     these four: if U's stat c (`0x00625480`) = a > 0: r1 := rnd(U's
+     seed +0x20, a), r2 := rnd(seed, 100); r2 < r1 >> 1 → v := 2v. Other
+     stat ids: no factor, no draw.
+   - v <<= the stat's `itemstatcost` byte +0x18 (`ValShift`); v ≤ 0 →
+     next k (not counted as used).
+   - Stat 6 or 74 and U a player: v := **golem share** `0x005C6870`
+     (ECX game, EDX U, v; `ret 4`; settled 2026-10-09, was REC-680):
+     G := U's first type-3 pet (`0x00574EC0(game, U, 3, 0)`); no G, G
+     not a monster (type ≠ 1) or class ≠ 290 (`bloodgolem`) → v
+     unchanged. v ≠ 0: M := monstats row 290 (`0x00451F80`, record
+     0x1A8); M's `Skill1` (+0x170, i16) < 0 → v unchanged; p := that
+     skill's `Param6` (+0x15C, `0x004F4110`; 1.14d BloodGolem = 25);
+     x := (p · v) / 100 (32-bit signed, toward zero); v −= Heal(G, x)
+     (`0x005C5F10`, `combat/events.md` §1 "Heal": G's life += x up to its
+     max, returns what was applied; x ≤ 0 → 0). So G takes p % of the
+     whole potion amount at once (in the same 8.8 units as v, after
+     the ValShift), only what fits its missing life, and U gets the
+     rest (over the list's duration for stat 74). v = 0 → G's life :=
+     its max (`0x00625D10`), v stays 0 (unreachable here: v ≤ 0 skips
+     above). The same call is in entries 4 and 5 (`0x005BE8E4`,
+     `0x005BEC10`). Stat 6 also marks "fraction update".
+   - L ≤ 0 (`rvs` / `rvl`, no state): cur := U's stat; if the stat's
+     `maxstat` (+0x32) is a valid id and cur + v > that max: v := max −
+     cur. Add stat += v (`0x006272B0`).
+   - L > 0: e := game frame + rem + L. No list yet: allocate one
+     (`0x006251F0`(pool, flags 2, e, U's type, U's GUID)), its state :=
+     s, U's state bit s on (`0x00639DB0`), for a non-player U cancel its
+     event 3 and schedule it at frame + 1, free callback `0x0056E900`,
+     attach to U (`0x00626E10`, 1). Then expire := e (`0x006260B0`); for
+     k = 0 schedule event 12 at e (`0x005417D0`); old := the list's
+     stat; L + rem > 0 → the list's stat := (old · rem + v) / (L + rem)
+     (integer, `0x00627150`, set not add).
+   - counted as used (result 1).
+3. Fraction update (stat 6 and U a player): as `sim/stat-lists.md`
+   §10.1 step 3 (|f − stat 352| > 4 → `0x00571A10`, stat 352 := f).
+
+Factors: life `0x0062A5D0` for a player of class 0 / 3 / 6: v + (v >>
+1); class 4: 2v; other classes: v; a non-player: 2v. Mana `0x0062A620`
+for a player of class 0 / 3 / 6: v + (v >> 1); class 1 / 2 / 5: 2v;
+others and non-players: v.
+
+**Length and the end-when-full rule.** The state lasts L frames
+(`len`, `misc.txt`), extended by what is left of a running one, and
+the per-frame stat is the amount over that length. It ends earlier
+when the bar fills, by the regeneration tick (`sim/stat-lists.md`
+§10.1): life — the tick whose add takes hp above max life frees the
+state-100 list; mana — a tick that starts with mana ≥ max and a
+positive increment frees the state-106 list. The free callback turns
+the state off (S→C 0xA9). So a potion at full life ends on the next
+tick. Recorded check (`facts/items/a1-town-potions-low.tsv`, Amazon,
+50 life, 15 mana): hp1 (`calc1` 30, `len` 192): v = 7680 · 1.5 =
+11520, stat 74 = 60 per frame; from 10 life 10240 / 60 → 171 ticks,
+the 0xA8 → 0xA9 gap is 170 frames (0xA8 at 166 for the use at 165, the
+free at frame 335, 0xA9 at 336; the 0x95 life values 14, 19, 23, …
+fit 60 per frame). mp1 (`calc1` 20, `len` 128): stat 26 = 60, plus the
+natural 1 per frame = 61; mana was ≈ 2.7 at the use (natural regen
+since the join; the 0x95 values 7 / 11 / 14 at 515 / 535 / 545 fit 61),
+so full in ≈ 51 frames, not from 1. `len` 192 / 128 is the full
+length; 170 / 51 are the fill times.
 
 ### 4. Town Portal (entry 2)
 
@@ -185,7 +262,7 @@ The dispatcher draws nothing. Entries: their owners.
 
 ## Open questions
 
-1. The bodies of entries 1 and 3–11 (`0x005BE130`, `0x005BE230`,
-   `0x005BE3F0`, `0x005BE7B0`, `0x005BEAC0`, `0x005BEF90`, `0x005BF060`,
+1. The bodies of entries 1 and 4–11 (entry 3 is §3.1) (`0x005BE130`, `0x005BE230`,
+   `0x005BE7B0`, `0x005BEAC0`, `0x005BEF90`, `0x005BF060`,
    `0x005BEDA0`, `0x005BF170`, `0x005BF1F0`): settled by reading each
    (static); potions are partly in `data/calc-expressions.md`.
