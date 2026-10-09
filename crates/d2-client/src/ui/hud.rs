@@ -34,6 +34,7 @@ use super::{class_u8, left, SharedRef, EMPTY};
 use crate::bridge::world::{ClientWorld, UnitKey, PLAYER};
 use crate::ui::draw::{ImageRef, ImageRequest, UiDraw, UiDrawSink};
 use crate::ui::geom::{Point, Rect};
+use crate::ui::layout::Screen;
 use crate::ui::panel::{ClientIntent, Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
 use crate::ui::panels::control::belt::BeltColor;
 use crate::ui::panels::control::buttons::{
@@ -47,7 +48,6 @@ use crate::ui::panels::control::globes::{
 use crate::ui::panels::control::input::{CtrlEffect, CtrlInput, InputEnv, UpFacts};
 use crate::ui::panels::control::minipanel::{self, MiniAction, MiniPanel, PlayerFacts, UI_MINI};
 use crate::ui::panels::{PanelOutput, UiFiles};
-use crate::ui::FRAME;
 
 /// The HUD adapter's id: not a UI state, open for good (like the border).
 pub const HUD_PANEL: PanelId = PanelId(0x101);
@@ -228,6 +228,11 @@ fn globe_file(f: GlobeFile) -> &'static str {
 
 /// A globe request as an image draw: a window is the cel clipped to its
 /// rows (counted from the cel's bottom row y).
+/// The play screen as the clip of a full-screen draw.
+fn screen_clip() -> Rect {
+    Screen::play().rect()
+}
+
 fn globe_draw(files: &UiFiles, d: &GlobeDraw) -> Option<UiDraw> {
     match *d {
         GlobeDraw::Window {
@@ -240,10 +245,12 @@ fn globe_draw(files: &UiFiles, d: &GlobeDraw) -> Option<UiDraw> {
             ..
         } => {
             let top = y - skip - lines + 1;
-            let clip = Rect::new(0, top, FRAME.w, u16::try_from(lines).ok()?);
+            let clip = Rect::new(0, top, screen_clip().w, u16::try_from(lines).ok()?);
             image(files, globe_file(file), frame, x, y, clip)
         }
-        GlobeDraw::Cel { file, frame, x, y } => image(files, globe_file(file), frame, x, y, FRAME),
+        GlobeDraw::Cel { file, frame, x, y } => {
+            image(files, globe_file(file), frame, x, y, screen_clip())
+        }
     }
 }
 
@@ -296,7 +303,7 @@ impl HudUi {
     ) -> Option<UiDraw> {
         let (class, cel) = *tables.icons.get(&skill)?;
         let name = skill_icon_file(if class > 6 { 7 } else { class }).to_ascii_lowercase();
-        image(files, &name, u32::from(cel), at.0, at.1, FRAME)
+        image(files, &name, u32::from(cel), at.0, at.1, screen_clip())
     }
 }
 
@@ -414,7 +421,7 @@ impl Panel for HudUi {
         let benv = BtnEnv {
             w,
             h,
-            res2: true,
+            res2: sh.config.screen.res2(),
             open_mode: 0,
         };
         for (which, points, pressed) in [
@@ -449,7 +456,7 @@ impl Panel for HudUi {
                     0,
                     ax,
                     ay,
-                    FRAME,
+                    screen_clip(),
                 ));
                 for b in buttons {
                     out.extend_one(image(
@@ -458,7 +465,7 @@ impl Panel for HudUi {
                         b.frame,
                         b.x,
                         b.y,
-                        FRAME,
+                        screen_clip(),
                     ));
                 }
             }
@@ -469,6 +476,7 @@ impl Panel for HudUi {
                 w,
                 h,
                 mouse,
+                res2,
                 mini_open,
                 state9_open: sh.states.is_open(9),
                 exp: exp_in,
@@ -621,7 +629,7 @@ impl Panel for HudUi {
         let benv = BtnEnv {
             w,
             h,
-            res2: true,
+            res2: sh.config.screen.res2(),
             open_mode: 0,
         };
         let unspent = local(world).map(|k| (world.total(k, 4, 0), world.total(k, 5, 0)));
@@ -690,7 +698,7 @@ impl Panel for HudUi {
 }
 
 fn cel(files: &UiFiles, name: &str, b: ButtonCel) -> Option<UiDraw> {
-    image(files, name, b.frame, b.x, b.y, FRAME)
+    image(files, name, b.frame, b.x, b.y, screen_clip())
 }
 
 /// Pushes an optional draw.

@@ -154,8 +154,12 @@ fn a_belt_release_without_a_belt_press_does_not_click() {
 }
 
 fn ui(inv: Option<Vec<InvArea>>, installed: bool) -> Ui {
+    ui_at(Screen::R800, inv, installed)
+}
+
+fn ui_at(screen: Screen, inv: Option<Vec<InvArea>>, installed: bool) -> Ui {
     let config = UiConfig {
-        screen: Screen::R800,
+        screen,
         expansion_installed: installed,
     };
     let ui = OriginalUi::new(config, inv).unwrap();
@@ -911,6 +915,77 @@ fn the_mini_panel_game_menu_button_opens_it() {
         }
     }
     assert!(opened);
+}
+
+// Covers: specs/ui/panels-2.md §21 r3
+// Covers: specs/ui/frontend-options.md §o4-draw-0x0047e3d0-while-ui-9-is-open-from-the-ui-draw-0x00456f46 r4
+#[test]
+fn gold_dialog_and_esc_menu_draw_by_the_screen_at_640_and_800() {
+    // §21 r3: the gold button x in [W − sx − 237, W − sx − 217], y in
+    // [H + sy − 87, H + sy − 69]: (493, 462) at 800 × 600 (sx 80, sy −60),
+    // (413, 400) at 640 × 480 (sx 0, sy 0).
+    for (screen, button, half) in [
+        (Screen::R800, Point::new(493, 462), 400),
+        (Screen::R640, Point::new(413, 400), 320),
+    ] {
+        let mut u = ui_at(screen, Some(areas()), true);
+        let mut w = world(AMAZON, 1, true);
+        let key = w.local_player.unwrap();
+        w.units.get_mut(&key).unwrap().stats.insert(14, 5000);
+        u.key(&w, Action::ToggleInventory);
+        let b = PointerButton::Left;
+        u.send(
+            &w,
+            UiEvent::Press {
+                button: b,
+                at: button,
+            },
+        );
+        u.send(
+            &w,
+            UiEvent::Release {
+                button: b,
+                at: button,
+            },
+        );
+        let ctx = UiCtx {
+            tick: 0,
+            world: &w,
+            strings: &NoStrings,
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        u.root.draw(&ctx, &mut out);
+        let clips: Vec<_> = out
+            .iter()
+            .filter_map(|d| match d {
+                UiDraw::Text(t) if t.style.font == 1 => Some(t.clip),
+                _ => None,
+            })
+            .collect();
+        assert!(!clips.is_empty(), "the dialog opened at {screen:?}");
+        assert!(clips.iter().all(|c| *c == screen.rect()), "{screen:?}");
+        // The Esc menu: Return to Game centred on h (§O4 r1) at 640 / 800.
+        // Esc closes the dialog, then the panel, then opens the menu.
+        for _ in 0..4 {
+            if !u.ui.is_open(9) {
+                u.key(&w, Action::GameMenu);
+            }
+        }
+        assert!(u.ui.is_open(9));
+        let mut out: Vec<UiDraw> = Vec::new();
+        u.root.draw(&ctx, &mut out);
+        let pents: Vec<i32> = out
+            .iter()
+            .filter_map(|d| match d {
+                UiDraw::Image(i) if u.ui.files().name(i.image.file) == Some("cursor\\pentspin") => {
+                    assert_eq!(i.clip, screen.rect());
+                    Some(i.at.x)
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(pents, [half - 301, half + 249], "{screen:?}");
+    }
 }
 
 // d2rs-own, unverified: the drop-gold dialog (REC-103); the button
