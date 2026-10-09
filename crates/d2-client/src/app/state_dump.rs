@@ -58,6 +58,7 @@ use super::poke::{self as pokes, Entry, When};
 use super::send::{self as sends, SendEntry};
 use super::server_thread::ThreadLink;
 use super::single_player::{self, Character, GameData, Link};
+use crate::bridge::output::{Consumer, Output};
 use crate::bridge::predict::PredictLink;
 use crate::bridge::state::StateSource;
 use crate::bridge::Bridge;
@@ -325,7 +326,7 @@ pub struct RunInfo {
 /// client side is the bridge alone.
 pub const RUN_GAPS: [&str; 1] = [
     "client: headless bridge (no UI or visibility art); the only C->S messages are 0x67, \
-     the model's own answers (0x6B, 0x5F), the --send messages and the --input clicks (world-click dispatcher \
+     the model's own answers (0x6B, 0x5F, 0x28's 0x2F and its dialog branch's 0x31 from the headless original UI), the --send messages and the --input clicks (world-click dispatcher \
      with the play preview's hover pick, the local player at the play preview's walk \
      prediction, held repeat once per server frame; keys: belt 1-4, run lock, weapon swap, \
      speech only), so a run \
@@ -444,6 +445,7 @@ pub fn dump<W: Write>(
     }
     bridge.send(&request)?;
     bridge.set_drop_own(game.no_own_c2s.clone());
+    let mut ui = DialogUi::new()?;
     let (mut ran, mut snaps, mut idle) = (0u32, 0u64, 0u32);
     let mut first = true;
     // The frame the last tick ran (0: none yet) and the pokes still to run.
@@ -480,7 +482,8 @@ pub fn dump<W: Write>(
         if let Some(t0) = t0 {
             super::perf::record_bridge_frame(t0, report.ticked);
         }
-        bridge.take_outputs();
+        let outputs = bridge.take_outputs();
+        ui.deliver(&mut bridge, &outputs)?;
         for m in bridge.take_dropped() {
             let hex: Vec<String> = m.iter().map(|b| format!("{b:02x}")).collect();
             let line = format!(
@@ -550,6 +553,7 @@ pub fn dump<W: Write>(
     }
     notes.extend(input_notes);
     notes.extend(send_notes);
+    notes.extend(ui.notes);
     for e in &to_send {
         eprintln!(
             "send: not reached in {ran} ticks: frame {} {}",
@@ -785,6 +789,55 @@ pub fn run(args: &DumpArgs, command: &str) -> Result<DumpReport> {
         .with_context(|| format!("creating {}", args.out.display()))?;
     let mut w = std::io::BufWriter::new(file);
     dump(game, args.ticks, args.every, &info, &mut w)
+}
+
+/// The UI layer's part of the client the dump runs: the original UI
+/// (`ui/original.rs`, headless: no panels drawn, nothing shown) takes the
+/// bridge's outputs in list order, as `play`'s output dispatcher does
+/// (`world_view::present::deliver`, `client/bridge.md` §10 rules 4-5), so
+/// the answer of 0x28's dialog branch (`client/msg-ui.md` §16 r4.3, case B2:
+/// C→S 0x31 right after the model's 0x2F) is sent as 1.14d's client sends
+/// it. Audio and effects outputs have no consumer here.
+struct DialogUi {
+    ui: crate::ui::original::OriginalUi,
+    /// The UI errors met, once each (footer notes).
+    notes: Vec<String>,
+}
+
+impl DialogUi {
+    fn new() -> Result<Self> {
+        // `expansion_installed` (`0x00408F20`, d2exp.mpq present): the
+        // checks run against the 1.14d LoD install (PROVISIONAL REC-1686:
+        // `play` reads it from the archives, `app/ui.rs` `UiParts::live`).
+        let config = crate::ui::original::UiConfig {
+            screen: crate::ui::layout::Screen::play(),
+            expansion_installed: true,
+        };
+        let ui = crate::ui::original::OriginalUi::new(config, None)
+            .map_err(|e| anyhow::anyhow!("original UI: {e:?}"))?;
+        Ok(Self {
+            ui,
+            notes: Vec::new(),
+        })
+    }
+
+    fn deliver(&mut self, bridge: &mut Bridge<DumpLink>, outputs: &[Output]) -> Result<()> {
+        for o in outputs.iter().filter(|o| o.consumer() == Consumer::Ui) {
+            if let Err(e) = self.ui.apply_output(o, bridge.world()) {
+                let note = format!("ui: {e}");
+                if !self.notes.contains(&note) {
+                    eprintln!("{note}");
+                    self.notes.push(note);
+                }
+            }
+            self.ui.take_sounds();
+            self.ui.take_skipped();
+            if let Some((d, case)) = self.ui.take_dialog_answer() {
+                bridge.npc_dialog_branch(&d, case)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 /// The link the dump's bridge runs on: the server thread inside the
