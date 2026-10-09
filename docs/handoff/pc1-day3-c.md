@@ -210,3 +210,13 @@ The harness should test class and position, not GUID.
   - **Game start, Esc at the first loading draw (before 0x01):** reached no handler; the game started
     normally.
   - d2rs takes no input while loading: `q-fix-p6-loading-keys`.
+
+- **Item flag 0x2000 / file index of a poked item (pc1-data area-G item 26): answered**
+  (`items/generation.md` §1.4, §3 steps 2 and 5; `items/quality.md` §1).
+  - **Flag 0x2000:** `0x00558D90` sets it when request force = 0 (`0x00558E95`), so both poke and
+    treasure items get it. The room clean-up `0x00553220` item case (`0x00553345`, tick step 6) clears
+    it after the client pass. So a drop's 0x9C carries 0x2000, while state read after the tick does not.
+  - **File index:** item data is zero-filled by `0x00627C90`, so it starts at 0. It becomes −1 only
+    through a downgrade helper (`0x00557250`), or just before superior / set / unique.
+  - **Check:** `ignore if fi` was removed from `items-ground-many.check`.
+  - **d2rs differs on both points:** `q-fix-p5-item-new-flag-file-index`.
