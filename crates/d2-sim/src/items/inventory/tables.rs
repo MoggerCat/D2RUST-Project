@@ -46,15 +46,18 @@ pub struct InvItemRec {
     pub onetwohanded: u8,
     /// `pSpell` (+0x94): the item-use entry (`items/use.md` §1 step 2.2).
     pub pspell: u32,
-    /// `wclass` (the hand class `0x00623C60`: `bow `, `xbw `, …;
-    /// `world/vendors.md` §7.1.1).
-    pub wclass: [u8; 4],
     /// `levelreq` (`0x006335F0`, §4.8).
     pub levelreq: u8,
     /// `mindam` / `maxdam` (+0xFE / +0xFF): a shield's smite damage
     /// (`bodies-2.md` §3.4).
     pub mindam: u8,
     pub maxdam: u8,
+    /// `wclass` / `2handedwclass` (weapons +0xC0 / +0xC4): COF weapon
+    /// class codes (`render/unit-composite.md` §2.1); `wclass` is also the
+    /// hand class `0x00623C60` reads (`bow `, `xbw `, …;
+    /// `world/vendors.md` §7.1.1).
+    pub wclass: [u8; 4],
+    pub wclass2: [u8; 4],
 }
 
 macro_rules! inv_item_rec {
@@ -78,11 +81,12 @@ macro_rules! inv_item_rec {
                     maxstack: r.maxstack,
                     twohanded: r.f_2handed,
                     onetwohanded: r.f_1or2handed,
-                    wclass: r.wclass,
                     pspell: r.pspell,
                     levelreq: r.levelreq,
                     mindam: r.mindam,
                     maxdam: r.maxdam,
+                    wclass: r.wclass,
+                    wclass2: r.f_2handedwclass,
                 }
             }
         }

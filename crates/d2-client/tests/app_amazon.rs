@@ -279,6 +279,9 @@ impl Game {
                         right: Some(bow),
                         left: Some(quiver),
                         weapon: Some(bow),
+                        // The COF weapon class `bow` (`unit-composite.md`
+                        // §2.1).
+                        cof: 1,
                     },
                 );
                 w.items.insert(

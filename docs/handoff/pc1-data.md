@@ -149,7 +149,13 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 10. **Node order and asserts of the client 0x92 handler `0x004C23E0`**
     (REC-416): the order of the inventory nodes it walks and what `0x0063E0B0`
     does at its end; `client/msg-stats-items.md` §5 r5.
-11. **Format-0 property wrapper `0x0065FE10` (REC-289 (5),
+11. **Command 1 slot order in the controls table** (`q-fix-real-controls-default-order`):
+    Game.exe at 0x312220 holds (cmd 1, 'B', slot 0) before (cmd 1, 'I', slot 1);
+    `specs/ui/key-commands.tsv` with the §3.4 / §B4 r1 rule gives them the other
+    way round. Spec decision: a slot-order column in the TSV or an exception
+    for command 1, and whether first-match lookup makes the order matter; then
+    `BindingTable::defaults` and the test builder change together.
+12. **Format-0 property wrapper `0x0065FE10` (REC-289 (5),
     q-fix-items-play)**: (a) the sixth argument of `0x0065FEC0` (the
     apply type, `items/properties.md` §2) at each static caller other
     than the affix roller (`0x005C12F0`), §11 and §12: which value each

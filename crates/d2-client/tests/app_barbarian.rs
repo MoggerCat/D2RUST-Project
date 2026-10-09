@@ -1,19 +1,37 @@
 // Spec: specs/skills/bodies.md §3.8; specs/skills/bodies-2.md §4.8; specs/skills/use.md §5
-//! The Barbarian's skills in the play preview, headless over the synthetic
-//! single-player game: a barbarian (class 4) joins, walks out of town by
-//! the cave warp (a monster in a town room is not a legal target of
-//! Bash, `bodies.md` §3.8 step 1) and casts through C→S 0x0D / 0x0C.
-//!
-//! Synthetic fills (no game file, `// d2rs-own, unverified`): the skill
-//! rows keep the shapes of the real ones (ids 126 Bash, 130 Howl, 132 Leap,
-//! 133 Double Swing, 138 Shout, 149 Battle Orders, 151 Whirlwind) but the
-//! numbers are made up; the AnimData record of the barbarian's A1.
-//! Provisional parts: REC-152 in `docs/HANDOFF.md` §7.
+//! The Barbarian's skills in the play preview, headless on the user's
+//! install (`real_rig`): a barbarian joins, walks out of the Rogue
+//! Encampment into the Blood Moor (a monster in a town room is not a
+//! legal target of Bash, `bodies.md` §3.8 step 1) and casts through
+//! C→S 0x0D / 0x0C. Skill ids and every expected number are the
+//! install's `skills` rows; the kicks are the Assassin's (an assassin
+//! casts them). Provisional parts: REC-152 in `docs/HANDOFF.md` §7.
 
-#[path = "app_barbarian/rig.rs"]
-mod rig;
+mod real_rig;
 
-use rig::*;
+use real_rig::{skill_row, Rig};
+
+/// The install's `skills.txt` `Id`s.
+const BASH: usize = 126;
+const LEAP: usize = 132;
+const DOUBLE_SWING: usize = 133;
+const SHOUT: usize = 138;
+const LEAP_ATTACK: usize = 143;
+const BATTLE_ORDERS: usize = 149;
+const WHIRLWIND: usize = 151;
+const NATURAL_RESISTANCE: usize = 153;
+const DRAGON_TALON: usize = 255;
+const DRAGON_FLIGHT: usize = 275;
+
+/// Body location (`bodylocs`) of the left arm.
+const LEFT: u8 = 5;
+
+fn barbarian(skills: &[usize]) -> Rig {
+    let mut r = Rig::new("barbarian", skills);
+    r.leave_town();
+    r.strengthen();
+    r
+}
 
 mod app_support;
 
@@ -22,16 +40,15 @@ mod app_support;
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn bash_on_a_monster_costs_mana_and_hurts_it() {
-    let mut r = Rig::new(&[BASH]);
-    r.leave_town();
+    let mut r = barbarian(&[BASH]);
     let m = r.spawn_monster(1);
     r.select_right(BASH);
     let (mana0, life0) = (r.mana(), r.life(m));
     r.right_click_unit(m);
-    r.step(30);
+    let low = r.lowest_life(m, 30);
     let errors = r.errors();
     assert!(r.mana() < mana0, "Bash spent mana ({errors})");
-    assert!(r.life(m) < life0, "Bash hurt the monster ({errors})");
+    assert!(low < life0, "Bash hurt the monster ({errors})");
 }
 
 // Covers: specs/skills/bodies.md §8.2
@@ -40,10 +57,11 @@ fn bash_on_a_monster_costs_mana_and_hurts_it() {
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn shout_and_battle_orders_put_their_state_on_the_barbarian() {
-    let mut r = Rig::new(&[SHOUT, BATTLE_ORDERS]);
-    r.leave_town();
+    let mut r = barbarian(&[SHOUT, BATTLE_ORDERS]);
     let me = r.player();
-    for (skill, state) in [(SHOUT, SHOUT_STATE), (BATTLE_ORDERS, BATTLE_ORDERS_STATE)] {
+    for skill in [SHOUT, BATTLE_ORDERS] {
+        // The warcry's state: its row's `aurastate`.
+        let state = skill_row(skill).aurastate;
         r.select_right(skill);
         let mana0 = r.mana();
         assert!(!r.has_state(me, state), "no state before");
@@ -54,7 +72,12 @@ fn shout_and_battle_orders_put_their_state_on_the_barbarian() {
             r.has_state(me, state),
             "skill {skill}: state {state} ({errors})"
         );
-        assert!(r.mana() < mana0, "skill {skill} spent mana ({errors})");
+        // Battle Orders' own state raises current mana with the maximum
+        // (its `aurastat` max mana %), so only Shout's cost shows in the
+        // total.
+        if skill == SHOUT {
+            assert!(r.mana() < mana0, "skill {skill} spent mana ({errors})");
+        }
     }
 }
 
@@ -62,18 +85,29 @@ fn shout_and_battle_orders_put_their_state_on_the_barbarian() {
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn double_swing_hits_two_monsters_in_two_swings() {
-    let mut r = Rig::new(&[DOUBLE_SWING]);
-    r.leave_town();
+    let mut r = barbarian(&[DOUBLE_SWING]);
+    // Double Swing's sets a and b are both `mele` (`use.md` §2): the
+    // start kit's buckler leaves the left hand for a second hand axe
+    // (staging; with one weapon its `AttackNoMana` makes it an Attack).
+    if r.worn(LEFT).is_some() {
+        r.take_off(LEFT);
+    }
+    r.wear(*b"hax ", LEFT);
     let (a, b) = (r.spawn_monster(1), r.spawn_monster(2));
     r.select_right(DOUBLE_SWING);
     let (mana0, la, lb) = (r.mana(), r.life(a), r.life(b));
     r.right_click_unit(a);
-    r.step(30);
+    let (mut lowa, mut lowb) = (la, lb);
+    for _ in 0..30 {
+        r.step(1);
+        lowa = lowa.min(r.life(a));
+        lowb = lowb.min(r.life(b));
+    }
     let errors = r.errors();
     assert!(r.mana() < mana0, "Double Swing spent mana ({errors})");
-    assert!(r.life(a) < la, "the first swing hurt the target ({errors})");
+    assert!(lowa < la, "the first swing hurt the target ({errors})");
     assert!(
-        r.life(b) < lb,
+        lowb < lb,
         "the second swing hurt the next monster ({errors})"
     );
 }
@@ -83,20 +117,25 @@ fn double_swing_hits_two_monsters_in_two_swings() {
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_learned_mastery_puts_its_passive_stats_in_its_state() {
-    let mut r = Rig::with_rows(&[NATURAL_RESISTANCE], &[]);
-    r.leave_town();
+    // Learning it needs its row's prerequisite (`reqskill1`, Iron Skin)
+    // and level 30 (`reqlevel`; the rig stages 30).
+    let req = usize::from(skill_row(NATURAL_RESISTANCE).reqskill1);
+    let mut r = barbarian(&[req]);
+    // The passive's state and first stat, and its level-1 value: the
+    // install's row is `dm12` on (Param1, Param2) = (0, 80), the
+    // diminishing curve of `levels.md` (q = 110·1 / 7, a + q·(b − a) / 100).
+    let row = skill_row(NATURAL_RESISTANCE);
+    let (state, st) = (row.passivestate, row.passivestat1);
+    let (a, b) = (row.param1 as i32, row.param2 as i32);
+    let want = a + (110 / 7) * (b - a) / 100;
     r.give_skill_points(1);
-    assert_eq!(
-        r.state_stat(PASSIVE_STATE, FIRE_RESIST),
-        None,
-        "not learned"
-    );
+    assert_eq!(r.state_stat(state, st), None, "not learned");
     r.add_skill_point(NATURAL_RESISTANCE);
     r.step(5);
     let errors = r.errors();
     assert_eq!(
-        r.state_stat(PASSIVE_STATE, FIRE_RESIST),
-        Some(25),
+        r.state_stat(state, st),
+        Some(want),
         "the passive state holds passivestat1 = passivecalc1 ({errors})"
     );
 }
@@ -106,8 +145,7 @@ fn a_learned_mastery_puts_its_passive_stats_in_its_state() {
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn leap_spends_mana_and_moves_the_barbarian() {
-    let mut r = Rig::new(&[LEAP]);
-    r.leave_town();
+    let mut r = barbarian(&[LEAP]);
     r.select_right(LEAP);
     let (mana0, from) = (
         r.mana(),
@@ -128,8 +166,7 @@ fn leap_spends_mana_and_moves_the_barbarian() {
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn whirlwind_spends_mana_and_moves_the_barbarian() {
-    let mut r = Rig::new(&[WHIRLWIND]);
-    r.leave_town();
+    let mut r = barbarian(&[WHIRLWIND]);
     r.select_right(WHIRLWIND);
     let (mana0, from) = (
         r.mana(),
@@ -149,20 +186,21 @@ fn whirlwind_spends_mana_and_moves_the_barbarian() {
 // Covers: specs/skills/bodies-2.md §4.7
 // The landing of a player's Leap is a knockback (result 9) with a zeroed
 // damage record (`bodies-2.md` §4.7): the barbarian lands exactly on the
-// aimed point and the monster standing there loses no life.
+// aimed point and the monster standing beside it loses no life.
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn leap_lands_on_the_aimed_point_and_deals_no_damage() {
-    let mut r = Rig::new(&[LEAP]);
-    r.leave_town();
+    let mut r = barbarian(&[LEAP]);
     r.select_right(LEAP);
-    let m = r.spawn_monster(4);
+    // Beside the aimed point (a zombie's footprint on the point itself
+    // would end the leap short of it).
+    let m = r.spawn_monster_at(4, 2);
     let (life0, from) = (
         r.life(m),
         r.with(|sim, p| sim.events.action.sys.hooks.path_position(p)),
     );
     r.right_click_point(5, 0);
-    r.step(40);
+    let low = r.lowest_life(m, 40);
     let to = r.with(|sim, p| sim.events.action.sys.hooks.path_position(p));
     let errors = r.errors();
     assert_eq!(
@@ -170,7 +208,7 @@ fn leap_lands_on_the_aimed_point_and_deals_no_damage() {
         (from.0 + 5, from.1),
         "landed on the aimed point ({errors})"
     );
-    assert_eq!(r.life(m), life0, "the landing is a knockback only");
+    assert_eq!(low, life0, "the landing is a knockback only");
 }
 
 // Covers: specs/skills/bodies-2b.md §6.11, §6.12
@@ -178,44 +216,45 @@ fn leap_lands_on_the_aimed_point_and_deals_no_damage() {
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn leap_attack_leaps_to_the_monster_and_strikes_it() {
-    let mut r = Rig::new(&[LEAP_ATTACK]);
-    r.leave_town();
+    let mut r = barbarian(&[LEAP_ATTACK]);
     r.select_right(LEAP_ATTACK);
     let m = r.spawn_monster(6);
     let (mana0, life0) = (r.mana(), r.life(m));
     r.right_click_unit(m);
-    r.step(60);
+    let low = r.lowest_life(m, 60);
     let errors = r.errors();
     assert!(r.mana() < mana0, "Leap Attack spent mana ({errors})");
-    assert!(r.life(m) < life0, "the strike hurt the monster ({errors})");
+    assert!(low < life0, "the strike hurt the monster ({errors})");
 }
 
 // Covers: specs/skills/bodies-2.md §3.10, §3.11, §2.5, §2.6
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn dragon_talon_kick_hurts_a_monster() {
-    let mut r = Rig::new(&[DRAGON_TALON]);
+    let mut r = Rig::new("assassin", &[DRAGON_TALON]);
     r.leave_town();
+    r.strengthen();
     r.select_right(DRAGON_TALON);
     let m = r.spawn_monster(1);
     let life0 = r.life(m);
     r.right_click_unit(m);
-    r.step(30);
+    let low = r.lowest_life(m, 30);
     let errors = r.errors();
-    assert!(r.life(m) < life0, "the kick hurt the monster ({errors})");
+    assert!(low < life0, "the kick hurt the monster ({errors})");
 }
 
 // Covers: specs/skills/bodies-2b.md §7.20
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn dragon_flight_kick_hurts_a_monster() {
-    let mut r = Rig::new(&[DRAGON_FLIGHT]);
+    let mut r = Rig::new("assassin", &[DRAGON_FLIGHT]);
     r.leave_town();
+    r.strengthen();
     r.select_right(DRAGON_FLIGHT);
     let m = r.spawn_monster(1);
     let life0 = r.life(m);
     r.right_click_unit(m);
-    r.step(30);
+    let low = r.lowest_life(m, 30);
     let errors = r.errors();
-    assert!(r.life(m) < life0, "the kick hurt the monster ({errors})");
+    assert!(low < life0, "the kick hurt the monster ({errors})");
 }

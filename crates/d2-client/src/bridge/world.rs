@@ -1217,6 +1217,12 @@ pub struct StateRow {
     pub dead_bit_only: bool,
     /// The flag `[0x006CE278]`: state on keeps an existing list.
     pub keep_list: bool,
+    /// `colorpri` (+0x20), `colorshift` (+0x21) and `light-r`,
+    /// `light-g`, `light-b` (+0x22…+0x24): the colour call `0x004D97F0`
+    /// (§3 r6.1, r6.3; `render/shading.md` §6 r1.1).
+    pub colorpri: u8,
+    pub colorshift: u8,
+    pub light_rgb: (u8, u8, u8),
 }
 
 /// One `skilldesc` row as 0x93 reads it (`msg-skills.md` §9 r3).
@@ -1247,6 +1253,9 @@ pub struct UnitRows {
     pub stats: Vec<StatSend>,
     pub objects: Vec<ObjectRow>,
     pub shrines: Vec<u8>,
+    /// One entry per `states` row, by state id (`client/stat-lists.md`
+    /// §3).
+    pub states: Vec<StateRow>,
 }
 
 impl MonsterClass {

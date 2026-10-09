@@ -615,9 +615,46 @@ pub fn route(
     to: TileRect,
     step: usize,
 ) -> Vec<(i32, i32)> {
-    use std::collections::{BTreeMap, VecDeque};
     let sub = |r: TileRect| (r.x * SUB, r.y * SUB, (r.x + r.w) * SUB, (r.y + r.h) * SUB);
-    let (a, b) = (sub(from), sub(to));
+    search(drlg, start, &[sub(from), sub(to)], sub(to), step)
+}
+
+/// A walking route of sub-tiles from `start` inside the tile rect `area`
+/// to a free cell within `reach` sub-tiles of `goal` (else to the reached
+/// cell nearest to it), as [`route`].
+pub fn route_near(
+    drlg: &Drlg,
+    start: (i32, i32),
+    area: TileRect,
+    goal: (i32, i32),
+    reach: i32,
+    step: usize,
+) -> Vec<(i32, i32)> {
+    let a = (
+        area.x * SUB,
+        area.y * SUB,
+        (area.x + area.w) * SUB,
+        (area.y + area.h) * SUB,
+    );
+    let b = (
+        goal.0 - reach,
+        goal.1 - reach,
+        goal.0 + reach + 1,
+        goal.1 + reach + 1,
+    );
+    search(drlg, start, &[a], b, step)
+}
+
+/// The breadth-first search of [`route`] over the sub-tile boxes `areas`
+/// (x0, y0, x1, y1; end exclusive) to the box `b`.
+fn search(
+    drlg: &Drlg,
+    start: (i32, i32),
+    areas: &[(i32, i32, i32, i32)],
+    b: (i32, i32, i32, i32),
+    step: usize,
+) -> Vec<(i32, i32)> {
+    use std::collections::{BTreeMap, VecDeque};
     let inside =
         |(x, y): (i32, i32), r: (i32, i32, i32, i32)| x >= r.0 && y >= r.1 && x < r.2 && y < r.3;
     let free = |c: (i32, i32)| {
@@ -651,7 +688,10 @@ pub fn route(
             (-1, -1),
         ] {
             let n = (c.0 + dx, c.1 + dy);
-            if prev.contains_key(&n) || !(inside(n, a) || inside(n, b)) || !free(n) {
+            if prev.contains_key(&n)
+                || !(areas.iter().any(|&r| inside(n, r)) || inside(n, b))
+                || !free(n)
+            {
                 continue;
             }
             prev.insert(n, c);
