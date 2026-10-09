@@ -8,6 +8,12 @@ our measurements (`facts/`, `traces/`). This loop **replaces**
 `pc1-autotest.md` and `pc1-loop.md` while it runs: stop any session
 running those.
 
+**One 1.14d at a time (user rule, 2026-10-09):** when several PC 1
+sessions run in parallel, exactly one of them (named in its prompt) runs
+1.14d (`Game.exe`, `poke.py`, `scenario_diff.py`'s 1.14d side,
+recordings); the others read the binary and list live runs under
+"Live runs for <that session>" in their hand-back file.
+
 Effort: speed first, no token limit; stay within PC 1's hardware (one
 `Game.exe` at a time, one cargo build at a time, keep 15 GB disk free).
 Subagents (up to 6) for analysis and writing only; the main session runs
@@ -309,18 +315,6 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     (`0x00639DB0`) or by the entry itself. d2rs: PROVISIONAL REC-730 in
     `d2-sim/src/wiring/inventory/potion.rs`.
 
-35. **`0x0063E6B0(unit, 0)`: are the action-frame tests skipped?** (REC-700) `0x005A6D50` passes the moving flag r as `0x0063E6B0`'s second argument (`skills/use.md` §5.2 "Monsters"); `skills/bodies-3.md` §5.18 step 3 gives the tests (+0x4E = 0, or no action event in the frames ((cur − speed) >> 8, cur >> 8]) for the argument 1 only. Read: what the function does with 0 (d2rs: no tests, the column by mode). Write the answer into `bodies-3.md` §5.18 step 3.
-36. **Who writes unit +0x4E from a type-0 timer's frame code?** (REC-701) trigger(U) of `0x005A7670` reads +0x4E = 1 (`skills/use.md` §5.2); `sim/units.md` §4.2 schedules event 0 with args (E[i], k) and the field table names only `0x005533D0` (0 at mode start). Read: the writer of +0x4E on the event-0 path of a monster (the unit-type dispatcher or the timer run), and whether a code-0 event writes it. Write the answer into `sim/units.md` §4.2 / §4.6.
-37. **The client's mode-18 leap / whirl: hold, path end, code 0x16** (REC-702..704, `d2-client` `world_view/skill_motion.rs`; measured leap / whirl in `facts/client/anim/a1-cold-plains-*-bar.tsv`) Read: (1) which client code holds the Leap sequence at frame 11 while the motion record lives, and whether Leap Attack (`seqnum` 14) holds at its frame 11 the same way (REC-704); (2) the client whirl path: its step per update (d2rs: class `WalkVelocity` << 12, 0x6000 measured for the barbarian) and the update mode 18 ends on (d2rs: the one whose step reaches the end, `((d << 16) − 1) / step` after the do, `d` by `0x006417F0`; REC-703); (3) the skill mode request's first mode-18 update and code 0x16's record 2 / 3 as unit type / GUID (REC-702). Write the answers into `render/unit-composite.md` §8 or `skills/sequences.md` §3.
-
-38. **Range state mask 0x26 = `meleeonly`?** `range(P,
-  skill)` `0x00645460` (`skills/use.md` §3 r6) tests "state mask 0x26".
-  d2rs (`d2-client` `bridge/combat.rs` `in_melee_only_state`) reads it as
-  `0x0063A130` with the per-flag mask at data +0xCC + 4·0x26, i.e. the
-  `states.txt` flag bit 38 `meleeonly` (`data/fields.tsv`; the
-  `ui/panels-3.md` §24 r1 scheme). Confirm the argument `0x00645460`
-  passes is that flag index (not a data offset or a precomputed group),
-  and write it into `use.md` §3 r6.
 
 ## How to check a behaviour in one command
 
