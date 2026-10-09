@@ -317,6 +317,17 @@ rather than a hand-run recipe.
   distance ≤ 15; point = own + Δ·min(a, dist − b) / dist rounded to
   nearest; it matches Warriv's three recorded arrival walks.
 
+- **[q-fix-real-unit-seed-order] Client-made critters (set C monsters)**
+  (`q-fix-real-town-critters`, `client/model.md` §5 r3 "C monsters",
+  `monsters/population.md` §11.3 r2): the Rogue Encampment arrival has
+  three chickens (ck, class 149) with GUIDs 93–95 that the server never
+  allocates (25 server unit seeds in 90 s under Wine, none for them;
+  critter presets are not placed by the server). Read the client path
+  that makes them: which client pass reads the DS1 critter presets (or
+  another source), the GUID counter (why 93), the client set-up
+  (`0x004AE8D0`-like: stats, seed, first frame), and their client-side
+  AI / motion (the recorded ck frames walk: WL at tick 8 and on).
+
 ## Step 5 — spec gaps (107 provisional points no spec states)
 
 `docs/handoff/provisional-index.tsv` rows with `settle_kind` = `unstated`

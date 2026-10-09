@@ -695,7 +695,7 @@ pub fn mode_end<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: 
         return;
     }
     if INLINE.get(ended as usize) == Some(&1) {
-        cx.world.set_anim_mode(unit, mode::NEUTRAL);
+        cx.world.set_anim_mode(game, unit, mode::NEUTRAL);
         if !frozen(cx, unit) {
             think(game, cx, unit);
         }
