@@ -321,6 +321,7 @@ def make_recorder(rt):
             self.every, self.command = max(1, every), command
             self.snaps = 0
             self.reader_notes = {}
+            self.save_watch = None   # --save-watch FILE: stop once the game rewrote it
 
         def handle(self, addr, ctx):
             if addr == rt.TICK:
@@ -357,6 +358,8 @@ def make_recorder(rt):
                 raise rr.winerr("CreateProcessW")
             self.h_process = pi.hProcess
             rr.DebugSetProcessKillOnExit(True)
+            if self.save_watch:
+                watch_save(self)
             os.makedirs(os.path.dirname(self.out_path), exist_ok=True)
             self.out = open(self.out_path, "w", encoding="utf-8", newline="\n")
             self.out.write(json.dumps(header(self.command, self.sha, self.args, self.every),
@@ -372,6 +375,31 @@ def make_recorder(rt):
                 self.out.close()
 
     return StateRecorder
+
+
+def watch_save(rec, grace=2.0):
+    """--save-watch: a thread that ends the recording `grace` seconds after the
+    game rewrote the file (a Save and Exit ends the game's ticks, so no tick
+    limit may follow; the `.d2s` is written with fopen / fwrite, `flows/save-exit.md`)."""
+    import threading
+
+    def stamp():
+        try:
+            st = os.stat(rec.save_watch)
+            return (st.st_mtime_ns, st.st_size)
+        except OSError:
+            return None
+    before = stamp()
+
+    def poll():
+        while not rec.done:
+            time.sleep(0.2)
+            if stamp() != before:
+                time.sleep(grace)
+                rec.notes.append(f"save written: {rec.save_watch}")
+                rec.done = True
+                return
+    threading.Thread(target=poll, daemon=True).start()
 
 
 def header(command, sha, args, every):
@@ -645,7 +673,13 @@ def selftest_poke_options(ap):
     assert [(s.f, s.text()) for s in sends.steps] == [
         (7, "InteractWithEntity type=1 id=@1:148"), (8, "hex 2f 00 00 00 00 09 00 00 00")]
     assert send.SendLayer.from_args(ap.parse_args([])) is None
-    print("selftest ok: --poke lines make a poke layer, --send lines a send layer")
+    a = ap.parse_args(["--auto", "X", "--write-save", "--save-watch", "/s/X.d2s"])
+    assert a.write_save and a.save_watch == "/s/X.d2s"
+    assert [g for g in autostart.setup(a, ["-w", "-ns"])[0] if g != "-nosave"] == [
+        "-w", "-ns", "-name", "X"]
+    assert not ap.parse_args([]).write_save
+    print("selftest ok: --poke lines make a poke layer, --send lines a send layer, "
+          "--write-save drops -nosave")
 
 
 # --- main ---------------------------------------------------------------------
@@ -660,6 +694,11 @@ def main():
     ap.add_argument("--snap-every", type=int, default=1,
                     help="snapshot the first recorded tick and every N-th frame (default 1)")
     ap.add_argument("--out", default=None, help="output file (default traces/raw/<time>-state.jsonl)")
+    ap.add_argument("--write-save", action="store_true",
+                    help="without -nosave: the game writes the character's .d2s (the save channel, "
+                         "specs/tools/scenario-diff.md §3 rule 13); needs a Save and Exit --send")
+    ap.add_argument("--save-watch", default=None, metavar="FILE",
+                    help="end the recording shortly after the game rewrote FILE")
     ap.add_argument("--selftest", action="store_true", help="check the snapshot reader on a synthetic game, exit")
     ap.add_argument("game_args", nargs="*", default=["-w", "-ns"], help="Game.exe arguments (default: -w -ns)")
     autostart.add_options(ap)
@@ -673,6 +712,8 @@ def main():
     layer = poke.PokeLayer.from_args(a)
     sends = send.SendLayer.from_args(a)
     gargs, auto = autostart.setup(a, a.game_args or ["-w", "-ns"])
+    if a.write_save:
+        gargs = [g for g in gargs if g != "-nosave"]
     import record_tick as rt  # noqa: E402  (the shared tick recorder; Windows only; not modified)
     out = a.out or os.path.join(
         repo, "traces", "raw", datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + "-state.jsonl")
@@ -682,6 +723,7 @@ def main():
     r = make_recorder(rt)(os.path.abspath(a.game), gargs, out, a.seconds, a.ticks,
                           a.snap_every, " ".join(sys.argv))
     r.auto = auto
+    r.save_watch = a.save_watch
     if auto and auto.has_frames():
         auto.attach(r)  # `frame F` input steps at the tick-return stop of F - 1 (after the snapshot)
     if layer:

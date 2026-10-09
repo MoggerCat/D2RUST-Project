@@ -251,6 +251,10 @@ pub struct ClientObjects {
     /// Monster type flag 0x80 (+0x16) while the umod 29 hook makes its
     /// copies (`monsters/umod-callbacks.md` §28.2).
     pub multishot_guard: std::collections::BTreeSet<UnitKey>,
+    /// `Selectable0`–`7` by object class: the hover pick skips an object
+    /// whose current mode is not selectable (the "Dummy" markers under
+    /// town NPCs). d2rs-own, unverified (REC-1040); empty: all picked.
+    pub selectable: Vec<[u8; 8]>,
 }
 
 impl Default for ClientObjects {
@@ -264,6 +268,7 @@ impl Default for ClientObjects {
             unit_grids: BTreeMap::new(),
             missile_sounds: Vec::new(),
             multishot_guard: Default::default(),
+            selectable: Vec::new(),
         }
     }
 }

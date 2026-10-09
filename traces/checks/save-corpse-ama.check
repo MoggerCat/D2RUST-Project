@@ -1,0 +1,13 @@
+check 1
+# Save channel with a corpse: death-town-ama (hitpoints set to 0 at frame
+# 10), idle through the death animation to tick 120, then Save and Exit.
+# Compares the written .d2s byte for byte: the corpse header after the
+# player item list, the dead character's stats.
+# Spec: specs/tools/scenario-diff.md, specs/formats/d2s.md §8.
+name save-corpse-ama
+save SavAma --class ama --expansion
+seed 1234
+ticks 120
+seconds 300
+channels save
+at 10 poke stat @player 6 0 0

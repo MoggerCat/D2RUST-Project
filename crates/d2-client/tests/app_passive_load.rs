@@ -84,6 +84,7 @@ fn a_loaded_increased_stamina_raises_the_maximum_stamina_from_the_join() {
         input: None,
         packets: None,
         rng: None,
+        save_out: None,
     };
     let mut game = DumpGame::resolve(&args, app_support::game_data(), None).unwrap();
     game.character = scn_bar();
