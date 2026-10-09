@@ -1,0 +1,38 @@
+{
+ "channel": "state",
+ "check": "gen-lvl-16",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "900",
+  "--ticks",
+  "160",
+  "--auto",
+  "ScnAma",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "20 warp 16"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "e1e666f7293247b822c58876e61165799dd8b15c4b326b31758384d4a502d72f",
+   "size": 1358459
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "463a7559b4bb97e38aa847bd684d8b555166f2f22f7858973279591a555b985f",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "013f9d66a9e517ed1b72b7084b4906fc74aa8edfba7e0c875c3705f8912a33b5",
+  "save": "c098d7905cb83f92fe70f1b392b1e08faf1dd04e1f6d9e100a0ca523eaafb1bd"
+ }
+}

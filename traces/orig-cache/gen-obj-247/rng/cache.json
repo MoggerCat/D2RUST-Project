@@ -1,0 +1,41 @@
+{
+ "channel": "rng",
+ "check": "gen-obj-247",
+ "command": [
+  "tools/trace-recorder/record_rng.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "80",
+  "--auto",
+  "ScnAma",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.rng.jsonl",
+  "--frames",
+  "--skip-inline",
+  "drlg",
+  "--poke",
+  "10 object 247 @x @y",
+  "--poke",
+  "20 operate @2:247"
+ ],
+ "files": {
+  "orig.rng.jsonl": {
+   "sha256": "3472cc12595f3ee906a8393282dfad79c89b6ab60e2e146e7bd5b9297a327692",
+   "size": 1350491
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "1b5e3fcb6acdc554e6dcd6fe57d91f8f2e351ee2d2d5594cb05703944dc6f014",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "163279ff197d8ac1c0fb5ea9daedfb396a382280151c03826e560666747f2efd",
+  "save": "c098d7905cb83f92fe70f1b392b1e08faf1dd04e1f6d9e100a0ca523eaafb1bd"
+ }
+}
