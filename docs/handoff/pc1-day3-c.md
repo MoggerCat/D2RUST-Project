@@ -275,3 +275,11 @@ The harness should test class and position, not GUID.
 
   The 0–12 seen under the debugger came from the hooks slowing the client. The ≥ 10 flash gate always
   passes in play, so d2rs's fixed 25 matches in effect. No q-fix.
+- **(4) Hireling 0x81 fields: settled** (`client/model.md` §14 r3; `msg-units.md` OQ 7 answered).
+  - **Recording:** a scripted Kashya hire (`record_packets.py`). The save has quest word 2 bit 0 and
+    5000 gold; the script picks the first row of the hire list.
+  - **Frame 367:** C→S 0x36 (Kashya GUID 3, id 0x0D53), then S→C 0x81
+    `81 07 0f01 01000000 0d000000 083bd951 530d0000`. That is pet GUID 13, +0x24 = the list entry's
+    seed 0x51D93B08, +0x28 = hire id 0x0D53.
+  - **Frame 368:** the hireling's 0xAC. No 0x7A is sent.
+  - **d2rs matches;** only a PROVISIONAL note remains: `q-fix-p6-pet-record-settled`.

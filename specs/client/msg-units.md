@@ -918,7 +918,7 @@ r12–r13 from `0x0045D2E0`, `0x0045D260`, `0x0045C900`
 6. *Answered (2026-10-08)*: §7 r12 (0x16) and §7 r13 (0x17; never
    sent, its unit handler faults). Original question: 0x16 UnitPositions (`0x0045D2E0`, also a position check) and 0x17:
    not seen in the single-player recordings; left TBD.
-7. A recording with a hireling (0x7A / 0x81, 0xAC of the hireling)
+7. *Answered (2026-10-09, pc1-day3-c)*: a recorded hire sends 0x81 then the hireling's 0xAC in the next frame and no 0x7A (`client/model.md` §14 rule 3). Original question: a recording with a hireling (0x7A / 0x81, 0xAC of the hireling)
    confirms §1.2 rules 2–3 and §2 rule 2 with a real pet list
    (`client/model.md` open question 10).
 8. *Answered (2026-10-08)*: §7 r4 (portal flags; the only client
