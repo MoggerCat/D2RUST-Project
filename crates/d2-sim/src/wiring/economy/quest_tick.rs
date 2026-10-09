@@ -30,6 +30,17 @@ use super::{Economy, EconomyQuests, GameFields, ItemStore, QuestRest};
 pub trait UnitSide {
     type Hooks: LifecycleHooks;
     fn unit_side(&mut self) -> (&mut Units, &mut StatLists, &UnitData, &mut Self::Hooks);
+    /// Runs `f` on the unit side with whatever the side lends its hooks
+    /// for the call (a world side lends its monster world, so a monster a
+    /// quest function allocates gets its type init, `init.md` §5).
+    /// Default: [`Self::unit_side`].
+    fn with_unit_side<T>(
+        &mut self,
+        f: impl FnOnce(&mut Units, &mut StatLists, &UnitData, &mut Self::Hooks) -> T,
+    ) -> T {
+        let (u, s, d, h) = self.unit_side();
+        f(u, s, d, h)
+    }
     /// The object module's queued quest routes (`ActionSim::take_quest_calls`;
     /// none without an object state).
     fn take_quest_calls(&mut self) -> Vec<QuestObjectCall> {
@@ -71,6 +82,15 @@ impl<X: WorldPending> UnitSide for WorldSim<X> {
     fn unit_side(&mut self) -> (&mut Units, &mut StatLists, &UnitData, &mut ActionHooks<X>) {
         self.action.sys.unit_side()
     }
+    fn with_unit_side<T>(
+        &mut self,
+        f: impl FnOnce(&mut Units, &mut StatLists, &UnitData, &mut ActionHooks<X>) -> T,
+    ) -> T {
+        self.lend(|a| {
+            let (u, s, d, h) = a.sys.unit_side();
+            f(u, s, d, h)
+        })
+    }
     fn take_quest_calls(&mut self) -> Vec<QuestObjectCall> {
         self.action.take_quest_calls()
     }
@@ -101,21 +121,27 @@ impl<S: UnitSide, R: QuestRest> QuestTick<'_, S, R> {
             if calls.is_empty() {
                 return;
             }
-            let back = {
-                let (units, stats, data, hooks) = self.sim.unit_side();
+            let (fields, tables, items, quests, rest) = (
+                &mut *self.fields,
+                self.tables,
+                &mut *self.items,
+                &mut *self.quests,
+                &mut *self.rest,
+            );
+            let back = self.sim.with_unit_side(|units, stats, data, hooks| {
                 let mut econ = Economy {
                     game: &mut *game,
                     units,
                     stats,
                     data,
                     hooks,
-                    fields: &mut *self.fields,
-                    tables: self.tables,
-                    items: &mut *self.items,
+                    fields,
+                    tables,
+                    items,
                 };
-                let mut w = EconomyQuests::new(&mut econ, &mut *self.rest);
-                super::quest_objects::run_all(self.quests, &mut w, calls)
-            };
+                let mut w = EconomyQuests::new(&mut econ, rest);
+                super::quest_objects::run_all(quests, &mut w, calls)
+            });
             for r in back {
                 self.sim.hand_back(game, r);
             }

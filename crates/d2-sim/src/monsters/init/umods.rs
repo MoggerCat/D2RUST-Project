@@ -510,7 +510,9 @@ pub fn boss_minions_and_init<H: InitHost + ?Sized>(
             .and_then(|c| u32::try_from(c).ok())
             .filter(|&c| (c as usize) < cx.tables.monstats.len())
             .unwrap_or(own);
-        let count = seed(h, unit).roll_range(min, max.wrapping_sub(min).wrapping_add(1));
+        // count = min + roll(max − min + 1) (the plain roll helper).
+        let count =
+            min.wrapping_add(seed(h, unit).roll(max.wrapping_sub(min).wrapping_add(1)) as i32);
         for _ in 0..count.max(0) {
             if let Some(m) = h.spawn_boss_minion(unit, class, coord_list) {
                 xfer_umods(cx, h, unit, m);
