@@ -156,3 +156,15 @@ spawn.
 - Spec: `monsters/ai-bodies.md` §9.7 r8–r9. Row: `q-fix-c3-quillrat-choice`.
 - PROVISIONAL REC-826: the 1.14d rat-seed step at f46 when its quill
   reaches the player without damage.
+
+### Item 4: a missile kill (recorded, 1.14d side)
+- New check `traces/checks/combat-arrow-kill.check`: Fire Arrow
+  (missiles row 12, skill 7 level 20) aimed at the Quill Rat's recorded
+  cell (player + 4, 4) every 8 frames from f34.
+- The earlier plain arrows did 0 because ScnAma has no bow, and arrow
+  damage comes from the owner's weapon (`missiles/damage.md` §1).
+- 1.14d: the first Fire Arrow (f34) kills the rat. It enters mode 0
+  (death) with hp 0 at f38, and mode 12 (dead) at f52. The rat's first
+  quill hits the player at f46 (12800 → 12415).
+- The d2rs side is not run here; the check runs both sides with
+  `scenario_diff.py`.
