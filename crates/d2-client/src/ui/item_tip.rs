@@ -445,6 +445,7 @@ impl ItemTips {
             start_seed: 0,
             name: [0; 16],
             ear_level: 0,
+            realm_data: [0; 2],
             stats: Recorder::default(),
         };
         d2_sim::items::props::apply_socket_filler(&self.lookup, &mut item, slot as u8);

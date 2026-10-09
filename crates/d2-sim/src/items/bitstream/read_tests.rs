@@ -358,7 +358,7 @@ fn end_of(c: &Codes, bytes: &[u8]) -> usize {
 
 /// §5 rule 2 (current version, > 0x5D): a and b are kept, the third u32
 /// is read and dropped whatever it holds.
-// Covers: specs/items/bitstream.md §5 r2; specs/items/bitstream-legacy.md §2 r2
+// Covers: specs/items/bitstream.md §5 r2; specs/items/bitstream-legacy.md §2 row7
 #[test]
 fn the_third_trailer_word_is_read_and_dropped() {
     let c = codes();
@@ -379,7 +379,7 @@ fn the_third_trailer_word_is_read_and_dropped() {
 /// `bitstream-legacy.md` §3 rule 6.7, edge case 6: a quality outside 1–9
 /// reads nothing in the quality step, is read on to its end and fails;
 /// the bytes used are the whole record (`d2s.md` §8.2 rule 2).
-// Covers: specs/items/bitstream-legacy.md §3 r6.7, §3 r12, §edge-cases-original-bugs r6
+// Covers: specs/items/bitstream-legacy.md §3 r6, §3 r12, §edge-cases-original-bugs r6
 #[test]
 fn a_quality_outside_1_to_9_reads_on_and_fails() {
     let c = codes();

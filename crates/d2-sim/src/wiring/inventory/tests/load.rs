@@ -44,12 +44,11 @@ fn world() -> World {
 /// Lets `record` take `n` sockets (synthetic `gemsockets` and the type's
 /// `maxsock` columns; the socket setter clamps to them on read).
 pub(super) fn allow_sockets(t: &mut crate::items::ItemTables, record: usize, n: u8) {
-    t.items[record].gemsockets = n.into();
+    t.items[record].gemsockets = n;
     let ty_ = t.items[record].type_ as usize;
     let it = &mut t.itemtypes[ty_];
-    (it.maxsock1, it.maxsock25, it.maxsock40) = (n.into(), n.into(), n.into());
+    (it.maxsock1, it.maxsock25, it.maxsock40) = (n, n, n);
 }
-
 
 /// A stored item comes back on its page at its cell, in mode 0, with the
 /// record's fields and the load's flags (0x80000 set, 0x2000 clear).
@@ -232,7 +231,7 @@ fn the_trailer_values_stay_on_the_item() {
 
 /// `bitstream-legacy.md` §3 rule 9.5: the socket count goes through the
 /// setter `0x0062BE00`: at least 1, at most min(w × h, 6) and max sockets.
-// Covers: specs/items/bitstream-legacy.md §3 r9.5
+// Covers: specs/items/bitstream-legacy.md §3 r9
 #[test]
 fn the_socket_count_is_clamped_on_read() {
     let mut w = world();
