@@ -124,6 +124,25 @@ pub trait MonsterWorld<X> {
         let _ = (sim, h, room, x, y, class, mode, spread, flags);
         None
     }
+    /// The preset spawn `0x0054E600(room, class, x, y, mode)` on the lent
+    /// world (`monsters/population.md` §11.2: a class past the monstats
+    /// rows is superunique `class - rows`, §11.4, with its init, minions
+    /// and quest links). `None`: the world cannot run it;
+    /// `Some(None)`: nothing made.
+    #[allow(clippy::too_many_arguments)]
+    fn spawn_preset(
+        &mut self,
+        sim: &mut Sim<'_>,
+        h: &mut ActionHooks<X>,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: i32,
+        mode: u8,
+    ) -> Option<Option<UnitId>> {
+        let _ = (sim, h, room, x, y, class, mode);
+        None
+    }
     /// The concrete state back (the lender downcasts it).
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
 }

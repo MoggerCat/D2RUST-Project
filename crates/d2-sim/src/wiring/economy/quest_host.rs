@@ -133,6 +133,29 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
         })
     }
 
+    /// `0x0054E600` through the lent monster world
+    /// (`MonsterWorld::spawn_preset`): `None` when no world is lent (or
+    /// population's state is out).
+    fn preset_unit(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: i32,
+        mode: u8,
+    ) -> Option<Option<UnitId>> {
+        self.view(|g, v| {
+            let mut sim = crate::units::hooks::Sim {
+                game: g,
+                units: &mut *v.units,
+                stats: &mut *v.stats,
+                data: v.data,
+            };
+            v.h.with_monster_world(|w, h| w.spawn_preset(&mut sim, h, room, x, y, class, mode))
+                .flatten()
+        })
+    }
+
     /// Runs a drop helper (`objects-2.md` §20) with the game's drop state
     /// (`ActionHooks::object_drops`) lent out and the action tables'
     /// `levels`; the economy's item store, game seed and unique bits go
@@ -1144,9 +1167,13 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     fn superunique_id(&mut self, n: u8) -> u16 {
         u16::from(n)
     }
-    /// `0x0054E600`: the superunique's class from the drop tables'
-    /// `superuniques` rows (else the id as a class, for a game without
-    /// them), allocated plain and linked to chain 23 (§8: hcIdx 36–38).
+    /// `0x0054E600(game, room, M + superunique, x, y, 1)`
+    /// (`monsters/population.md` §11.2, §11.4): the superunique path
+    /// through the lent monster world, whose creation (`0x005A49B0`)
+    /// gives the quest links (`quests-act5-2.md` §7.6, `quests-act4.md`
+    /// §8). A game without a lent world (the synthetic one): the class
+    /// from the drop tables' `superuniques` rows (else the id), allocated
+    /// plain, hcIdx 36–38 linked to chain 23.
     fn preset_superunique_spawn(
         &mut self,
         room: RoomId,
@@ -1154,6 +1181,10 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         y: i32,
         superunique: u16,
     ) -> Option<UnitId> {
+        let rows = self.inner.econ.hooks.tables.combat.monstats.len() as i32;
+        if let Some(made) = self.preset_unit(room, x, y, rows + i32::from(superunique), 1) {
+            return made;
+        }
         let class = self
             .inner
             .econ
