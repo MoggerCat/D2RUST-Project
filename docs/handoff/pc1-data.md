@@ -445,9 +445,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 
 - [q-fix-ass-traps] 0x005DC970 melee-range rule (REC-1270): `monsters/ai.md` §5.3 rule 1 skips a monster C in the scanner's melee range only when C has state 146; 1.14d's Lightning Sentry never targeted a Fallen at distance 1 (state 0 on it) but did at distance 2. Read the filter: which unit's state 146 / flag is tested, and the melee test it calls (range, line).
 - [q-fix-ass-traps] 0x005DD510 alternative order (REC-1271): does a main-less scan (only nThreat < 2 candidates) refuse an alternative farther than 5 before or after the "no main target: take it" rule? A hp-0 poked cow 6 sub-tiles from a sentry was not shot.
-
-
-- [q-fix-room-links] After a waypoint return to a town, does 1.14d populate only the rooms near the player (far NPCs/objects appear on approach), as d2rs does? Drive town -> waypoint -> back, snapshot units at +50 and +600 frames (`docs/handoff/q-fix-room-links.md`).
+- [q-fix-monster-ai-2] Scan 5 callback `0x005DCA70` (the not-evil main search, `monsters/ai.md` §5.2 step 4 and §5.4; no spec gives its test): what does it filter, which distance does it compare, and does a tie keep the earlier or the later unit (and in which room-list order)? 1.14d `a5-warp-l110-siege-1-ama` frame 23: Barbarian 1:15 (act5barb1, NpcBarb) at (4328,5094) picks Death Mauler 1:17 at (4321,5089) over 1:16 (4321,5092) and 1:18 (4321,5095), all at no-size distance 7; d2rs (client preview `nearest_foe`) picks 1:18. Write the rule into `ai.md` §5.4 so d2-sim can run scan 5 itself.
 
 ## How to check a behaviour in one command
 

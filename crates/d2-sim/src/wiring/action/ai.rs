@@ -440,8 +440,14 @@ impl<X: Pending> AiWorld for View<'_, X> {
 }
 
 impl<X: Pending> AiTargets for View<'_, X> {
+    /// The host's lists (slot heads) followed by the nodes inserted
+    /// through `0x005B1990` / `0x005B1900` ([`Game::target_nodes`]).
     fn target_nodes(&self, game: &Game) -> [Vec<UnitId>; 10] {
-        self.h.x.target_nodes(game)
+        let mut nodes = self.h.x.target_nodes(game);
+        for (slot, list) in nodes.iter_mut().enumerate() {
+            list.extend(game.target_nodes.slot(slot).iter().copied());
+        }
+        nodes
     }
     fn forced_target(&mut self, game: &mut Game, unit: UnitId) -> Option<(UnitId, i32)> {
         self.h.x.forced_target(game, unit)
@@ -1056,6 +1062,18 @@ impl<X: Pending> AiSummons for View<'_, X> {
     }
     fn target_slot(&self, unit: UnitId) -> i32 {
         self.units.get(unit).map_or(11, |r| r.node_index as i32)
+    }
+    /// `0x005B1990(game, unit, 0, slot)`: the node at the head of list
+    /// `slot`; unit +0xD0 := slot (`ai.md` §5.2).
+    fn register_target_node(&mut self, game: &mut Game, unit: UnitId, slot: i32) {
+        let Some(r) = self.units.get_mut(unit) else {
+            return;
+        };
+        let Ok(index) = u8::try_from(slot) else {
+            return;
+        };
+        r.node_index = index.into();
+        game.target_nodes.push_front(slot, unit);
     }
     /// `0x00574BD0` from the published hireling facts: the `Id` of the
     /// unit's node when `owner` holds it.
