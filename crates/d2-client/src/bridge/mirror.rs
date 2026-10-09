@@ -74,6 +74,14 @@ impl ScriptedClock {
     }
 }
 
+/// The last server tick the world view drew, when the app paces the
+/// bridge to its draws (`play --dump-draws`, `specs/tools/facts-render.md`
+/// §5 r13): while the bridge's tick is newer, [`bridge_frame`] runs a
+/// held frame ([`Bridge::held_frame`]), so every server tick is drawn
+/// once and none is skipped while the GPU still holds the previous frame.
+#[derive(Resource, Debug, Clone, Copy, Default)]
+pub struct DrawnTick(pub u64);
+
 /// One bridge frame (§8 rule 1), then its outputs are handed over (§10
 /// rule 4). Errors go to Bevy's error handler.
 pub fn bridge_frame(
@@ -81,7 +89,13 @@ pub fn bridge_frame(
     mut outputs: ResMut<FrameOutputs>,
     scripted: Option<Res<ScriptedClock>>,
     time: Option<Res<Time<Real>>>,
+    drawn: Option<Res<DrawnTick>>,
 ) -> Result {
+    if drawn.is_some_and(|d| bridge.0.world().server_ticks > d.0) {
+        bridge.0.held_frame();
+        outputs.0 = bridge.0.take_outputs();
+        return Ok(());
+    }
     // The host clock as `GetTickCount` (`world/objects-client.md` §25 r6):
     // a scripted value when the app sets one ([`ScriptedClock`]), else
     // wrapping milliseconds since the app started. An app with neither

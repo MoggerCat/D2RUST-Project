@@ -308,8 +308,11 @@ fn client_world_holds_only_stated_fields() {
         flag_4,
         // `client/model.md` §18 rule 1, §8 rule 4 (+0xB0).
         hit_class,
+        // `world/objects-client.md` §25 r8 (+0x4C).
+        speed,
     } = ClientUnit::new(key);
     assert_eq!((interact_ms, frame, flag_ex, flag_4), (0, 0, 0, false));
+    assert_eq!(speed, None);
     assert_eq!(hit_class, 0);
     assert!(skills.is_none() && !quest_untargetable);
     assert!(turned_toward.is_none() && !path_stopped);

@@ -185,6 +185,13 @@ impl<L: ServerLink> Bridge<L> {
         self.paused = paused;
     }
 
+    /// A pass held by the app's draw pacing (`specs/tools/facts-render.md`
+    /// §5 r13, `play --dump-draws` only): it counts as a frame and does
+    /// nothing else: no pump, no receive, no update pass.
+    pub fn held_frame(&mut self) {
+        self.world.frames += 1;
+    }
+
     /// One bridge frame: pump the server, receive and dispatch every
     /// delivered chunk (spec §8 rule 1), then, if the server ticked and
     /// the model is in game, the update pass (`model.md` §5 rule 1), and

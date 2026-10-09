@@ -643,7 +643,8 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         app.insert_resource(crate::world_view::input_script::InputScript::new(steps));
     }
     if let Some(request) = config.dump {
-        app.insert_resource(crate::world_view::present::DrawDump::new(request));
+        app.insert_resource(crate::world_view::present::DrawDump::new(request))
+            .insert_resource(crate::bridge::mirror::DrawnTick::default());
     }
     if let Some(frames) = config.exit_after {
         app.insert_resource(ExitAfter(frames))

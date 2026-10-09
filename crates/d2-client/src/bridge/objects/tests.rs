@@ -692,6 +692,62 @@ fn generic_step_clamps_a_non_cycling_mode() {
     assert_eq!(obj(&w).frame, 900 - 768);
 }
 
+// Covers: specs/world/objects-client.md §25 r8; specs/world/objects.md §4 text
+#[test]
+fn anim_setup_rolls_the_speed_on_the_client_seed() {
+    let mut row = row(0);
+    row.frame_delta = [200, 128, 0, 0xFFF0, 0, 0, 0, 0];
+    row.start[1] = 3;
+    let mut u = ClientUnit::new(OBJ);
+    u.seed = Some(INIT_SEED);
+    // d = 200: roll(25) = lo' mod 25 = 1; speed 1 + 200 − 12 = 189.
+    anim_setup(&mut u, &row, 0).unwrap();
+    assert_eq!((u.speed, u.frame), (Some(189), 0));
+    let after_one = u.seed;
+    assert_ne!(after_one, Some(INIT_SEED));
+    // d = 128 on the next draw; frame := Start[1] · 256.
+    let mut v = ClientUnit::new(OBJ);
+    v.seed = Some(INIT_SEED);
+    anim_setup(&mut v, &row, 1).unwrap();
+    assert_eq!((v.speed, v.frame), (Some(15 + 128 - 8), 3 * 256));
+    // d = 0: roll(0) draws nothing; speed 0.
+    let mut z = ClientUnit::new(OBJ);
+    z.seed = Some(INIT_SEED);
+    anim_setup(&mut z, &row, 2).unwrap();
+    assert_eq!((z.speed, z.seed), (Some(0), Some(INIT_SEED)));
+    // A negative delta (i16 −16): roll(−2) draws nothing; −16 + 1 ≤ 0 → 0.
+    anim_setup(&mut z, &row, 3).unwrap();
+    assert_eq!((z.speed, z.seed), (Some(0), Some(INIT_SEED)));
+    // Sync ≠ 0: the delta, no draw.
+    row.sync = 1;
+    let mut s = ClientUnit::new(OBJ);
+    s.seed = Some(INIT_SEED);
+    anim_setup(&mut s, &row, 0).unwrap();
+    assert_eq!((s.speed, s.seed), (Some(200), Some(INIT_SEED)));
+    // No client seed in the model: no speed (the generic step's delta).
+    let mut n = ClientUnit::new(OBJ);
+    n.seed = None;
+    row.sync = 0;
+    anim_setup(&mut n, &row, 1).unwrap();
+    assert_eq!(n.speed, None);
+    assert!(anim_setup(&mut n, &row, 8).is_err());
+}
+
+// Covers: specs/world/objects-client.md §25 r8
+#[test]
+fn generic_step_adds_the_units_own_speed() {
+    let mut w = world((0, 0));
+    let mut i = inputs(0, 0);
+    i.objclient.rows[0].frame_delta = [200; 8];
+    obj_mut(&mut w).speed = Some(189);
+    object_update(&mut w, &i, S, &mut Vec::new()).unwrap();
+    assert_eq!(obj(&w).frame, 189);
+    // A client function's mode change drops it: back to the delta.
+    obj_mut(&mut w).speed = None;
+    object_update(&mut w, &i, S, &mut Vec::new()).unwrap();
+    assert_eq!(obj(&w).frame, 389);
+}
+
 // Covers: specs/client/model.md §8 r7
 #[test]
 fn interact_sender_cases() {

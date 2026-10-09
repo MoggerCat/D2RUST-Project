@@ -26,15 +26,15 @@
 |   2. `draws.tsv` | 90–133 |
 |   3. `frame.tsv` | 134–166 |
 |   4. `sprites.tsv` | 167–182 |
-|   5. d2rs export | 183–269 |
-|   6. Comparison | 270–292 |
-|   7. Requests | 293–304 |
-| Constants & data dependencies | 305–308 |
-| Randomness | 309–312 |
-| Edge cases & original bugs | 313–320 |
-| Test vectors | 321–329 |
-| Provenance | 330–334 |
-| Open questions | 335–349 |
+|   5. d2rs export | 183–274 |
+|   6. Comparison | 275–297 |
+|   7. Requests | 298–309 |
+| Constants & data dependencies | 310–313 |
+| Randomness | 314–317 |
+| Edge cases & original bugs | 318–325 |
+| Test vectors | 326–334 |
+| Provenance | 335–339 |
+| Open questions | 340–354 |
 <!-- /index -->
 
 ## Summary
@@ -266,6 +266,11 @@ composition, through `d2-client` only (game logic untouched).
    runs), delivered once per new server tick. Scenes match by place, not
    by timing: a script waits until the walk is over before the dumped
    tick.
+13. `--dump-draws --at-tick N` dumps server tick N itself: the bridge
+   is paced to the draws (`DrawnTick`), so it runs no frame past a server
+   tick the world view has not drawn yet (a draw waiting on the GPU's
+   previous frame would otherwise skip a tick: the dump of N = 73 landed
+   on 74 on a slow software GPU).
 
 ### 6. Comparison
 
