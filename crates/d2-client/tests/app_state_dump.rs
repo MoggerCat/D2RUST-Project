@@ -27,6 +27,9 @@ fn run_with(character: Character, ticks: u32, every: u32, pokes: &[&str]) -> Vec
             .iter()
             .map(|p| d2_client::app::poke::parse_poke_arg(p).unwrap())
             .collect(),
+        input: None,
+        packets: None,
+        rng: None,
     };
     let mut game = DumpGame::resolve(&args, app_support::game_data(), None).unwrap();
     game.character = character;

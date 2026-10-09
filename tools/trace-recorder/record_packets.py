@@ -21,7 +21,10 @@ What it hooks (addresses and rules: specs/sim/intents-events.md):
     (0x00478350: EDI = size, [ESP+4] = message) and what leaves the client
     (0x0052AE50: [ESP+4] = size, [ESP+0xC] = message).
 
-Every record carries the last tick's frame number and the loop phase. The
+Every record carries the last tick's frame number (null before the first
+tick) and the loop phase; `--ticks N` ends the recording at the first
+queue drain after tick N's flush (that drain is not written), as d2rs
+`state-dump --ticks N --packets FILE` ends (specs/tools/packets-trace.md). The
 game process is always terminated when this script ends (time limit,
 Ctrl+C, any error, and kill-on-exit if the debugger dies).
 
@@ -38,7 +41,7 @@ sys.dont_write_bytecode = True  # no __pycache__ next to the scripts
 import record_rng as rr  # noqa: E402  (the shared Win32 debugger)
 import autostart  # noqa: E402  (unattended start, input script)
 
-TOOL = "trace-recorder record_packets 0.1.0"
+TOOL = "trace-recorder record_packets 0.2.0"
 RAW_FORMAT = "packets-raw-1"
 MAX_BYTES = 0x204  # largest message the net layer accepts (spec §3)
 
@@ -71,12 +74,13 @@ class _Notes(list):
 
 
 class PacketRecorder(rr.Recorder):
-    def __init__(self, exe, args, out, seconds, max_events):
+    def __init__(self, exe, args, out, seconds, max_events, max_ticks=0):
         super().__init__(exe, args, out, seconds, False, max_events)
         self.notes = _Notes()
         self.frame = None
         self.phase = "start"
         self.last_kind = None
+        self.max_ticks, self.ticks = max_ticks, 0
 
     def install(self, base):
         if base != rr.IMAGE_BASE:
@@ -101,10 +105,16 @@ class PacketRecorder(rr.Recorder):
 
     def on_hook(self, tid, addr, ctx):
         kind = HOOKS[addr][0]
+        if kind == "drain" and self.max_ticks and self.ticks >= self.max_ticks:
+            if not self.max_events or self.max_events > self.seq:
+                self.notes.append(f"tick limit {self.max_ticks} reached")
+                self.max_events = max(1, self.seq)  # the debug loop stops before the next event
+            return
         esp = ctx.Esp
         arg = lambda k: self.read_u32(esp + 4 * k)  # noqa: E731  ([ESP+4k])
         rec = {"type": kind, "tid": tid}
         if kind == "tick":
+            self.ticks += 1
             self.frame = (self.read_u32(ctx.Ecx + 0xA8) + 1) & rr.M32
             rec["game"] = f"{ctx.Ecx:#x}"
             rec["game_type"] = self.read(ctx.Ecx + 0x6A, 1)[0]  # spec §3.2 rule 5
@@ -159,6 +169,8 @@ def main():
     ap.add_argument("--seconds", type=float, default=120.0,
                     help="stop and kill the game after this many seconds (default 120)")
     ap.add_argument("--max-events", type=int, default=0, help="stop after N events (0 = no limit)")
+    ap.add_argument("--ticks", type=int, default=0,
+                    help="stop at the first queue drain after N server ticks (0 = no limit)")
     ap.add_argument("--out", default=None,
                     help="output .jsonl (default traces/raw/<time>-packets.jsonl)")
     ap.add_argument("game_args", nargs="*", default=["-w", "-ns"],
@@ -170,7 +182,7 @@ def main():
         repo, "traces", "raw", datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + "-packets.jsonl")
     rr.TOOL, rr.RAW_FORMAT = TOOL, RAW_FORMAT  # header written by the shared run()
     r = PacketRecorder(os.path.abspath(a.game), gargs, out, a.seconds,
-                       a.max_events)
+                       a.max_events, a.ticks)
     r.auto = auto
     try:
         counts = r.run()
