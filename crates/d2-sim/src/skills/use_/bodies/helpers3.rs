@@ -690,6 +690,20 @@ pub fn leap_clamp<W: BodyWorld>(
     None
 }
 
+/// Melee set-up `0x005A5490(unit, game)` (§2.13 "Monster pre-hit"): T'
+/// := `target(game, unit)`, a zeroed record whose result is
+/// `melee_result(game, unit, T', 0, 0)`, then `start_combat(game, unit,
+/// T', record, 128)`. Also the monster attack event's melee
+/// (`skills/use.md` §5.2 "Monsters").
+pub fn melee_setup<W: BodyWorld>(w: &mut W, t: &SkillTables, ct: &CombatTables, u: W::Unit) {
+    let t2 = target(w, u);
+    let mut record = DamageRecord {
+        result: melee_result(w.combat(), t, ct, Some(u), t2, 0, 0),
+        ..DamageRecord::default()
+    };
+    start_combat(w.combat(), t, ct, Some(u), t2, &mut record, 128);
+}
+
 /// Monster pre-hit `0x005D9C80(game)` (§2.13).
 pub fn monster_prehit<W: BodyWorld>(
     w: &mut W,
@@ -700,13 +714,7 @@ pub fn monster_prehit<W: BodyWorld>(
     e: &SkillEntry,
 ) -> i32 {
     mode_damage(w, t, ct, u, 4);
-    // `0x005A5490(unit, game)`.
-    let t2 = target(w, u);
-    let mut record = DamageRecord {
-        result: melee_result(w.combat(), t, ct, Some(u), t2, 0, 0),
-        ..DamageRecord::default()
-    };
-    start_combat(w.combat(), t, ct, Some(u), t2, &mut record, 128);
+    melee_setup(w, t, ct, u);
     apply_melee(w.combat(), ct, u, tg);
     let (ty, g) = (type_index(w, tg), guid(w, tg));
     w.set_entry_param_of(u, e, 3, ty);

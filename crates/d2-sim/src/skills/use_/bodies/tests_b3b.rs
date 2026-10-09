@@ -864,6 +864,94 @@ fn quick_strike_do_takes_the_mode_missile_only_after_an_action_event() {
     assert_eq!(b4_mon::quick_strike(&mut g, &t, &ct0, p, 1, 1), 0);
 }
 
+// Covers: specs/missiles/missiles.md §r2-2-entry-points r1, §r2-2-entry-points r2, §r2-2-entry-points r3
+#[test]
+fn monster_mode_missile_levels_and_the_melee_fallback() {
+    // `missiles.md` §R2.2 `0x005A6D50`; test vector "quillrat1 A2, Hell,
+    // no flag 0x200 → spike at level 7 + 1 = 8; skill 0".
+    let mut ct = ctn(1);
+    ct.monstats[0].missa2 = 0;
+    ct.monstats[0].missa1 = 0xFFFF;
+    ct.difficultylevels[2].monsterskillbonus = 7;
+    let mut f = BodyFake::new();
+    f.c.difficulty = 2;
+    let u = caster(&mut f, (0, 0));
+    let k = monster(&mut f, (5, 6));
+    f.targets.insert(u, k);
+    f.c.units[u].mode = 5;
+    // Not moving: the column by mode with no action-frame test (REC-700).
+    f.action.insert(u, 0);
+    assert_eq!(b4_mon::monster_mode_missile(&mut f, &ct, u, false), 1);
+    assert_eq!(f.missiles.len(), 1);
+    let q = f.missiles[0];
+    assert_eq!((q.flags, q.class, q.target_x, q.target_y), (0x21, 0, 5, 6));
+    assert_eq!((q.skill, q.level), (0, 8));
+    // Moving: the action-frame tests of `0x0063E6B0(unit, 1)` apply.
+    assert_eq!(b4_mon::monster_mode_missile(&mut f, &ct, u, true), 0);
+    assert_eq!(f.missiles.len(), 1);
+    // A hireling (flag 0x200) uses its own stat 12.
+    f.c.units[u].flags |= 0x200;
+    f.c.set(u, 12, 30);
+    assert_eq!(b4_mon::monster_mode_missile(&mut f, &ct, u, false), 1);
+    assert_eq!(f.missiles[1].level, 30);
+    // No missile for the mode (A1 −1): 0, the caller's melee fallback.
+    f.c.units[u].mode = 4;
+    assert_eq!(b4_mon::monster_mode_missile(&mut f, &ct, u, false), 0);
+    assert_eq!(f.missiles.len(), 2);
+}
+
+// Covers: specs/missiles/missiles.md §r2-2-entry-points r4
+#[test]
+fn quill_volley_adds_aip3_spikes_on_the_guid_seed_and_keeps_the_target() {
+    let mut ct = ctn(1);
+    ct.monstats[0].missa1 = 0;
+    ct.monstats[0].baseid = 63;
+    ct.monstats[0].aip3_n = 3;
+    ct.difficultylevels[1].monsterskillbonus = 3;
+    let mut f = BodyFake::new();
+    f.c.difficulty = 1;
+    let u = caster(&mut f, (0, 0));
+    let k = monster(&mut f, (20, 30));
+    f.targets.insert(u, k);
+    // The fake keeps no path target point: a fixed target position lets
+    // every spike be made.
+    f.tpos.insert(u, (9, 9));
+    f.c.units[u].mode = 4;
+    f.take_log();
+    assert_eq!(b4_mon::monster_mode_missile(&mut f, &ct, u, false), 1);
+    // Around T's position (20, 30): the signs carry over between spikes.
+    let g = f.c.units[u].guid;
+    let mut seed = Seed::new(0x5345_4953, g);
+    let (mut sx, mut sy) = (5, 5);
+    let mut want = vec![format!("path {u} TargetUnit(None)")];
+    for _ in 0..3 {
+        if seed.step() & 1 != 0 {
+            sx = -sx;
+        }
+        if seed.step() & 1 != 0 {
+            sy = -sy;
+        }
+        want.push(format!("path {u} TargetPoint({}, {})", 20 + sx, 30 + sy));
+    }
+    want.push(format!("path {u} TargetUnit(Some({k}))"));
+    assert_eq!(lines(&mut f, "path"), want);
+    assert_eq!(f.targets.get(&u), Some(&k));
+    // The mode missile at Nightmare's bonus 3 + 1, then 3 spikes at level 1.
+    let levels: Vec<_> = f
+        .missiles
+        .iter()
+        .map(|q| (q.class, q.skill, q.level))
+        .collect();
+    assert_eq!(levels, [(0, 0, 4), (0, 0, 1), (0, 0, 1), (0, 0, 1)]);
+    // Any other BaseId: no volley.
+    ct.monstats[0].baseid = 62;
+    f.missiles.clear();
+    f.take_log();
+    assert_eq!(b4_mon::monster_mode_missile(&mut f, &ct, u, false), 1);
+    assert_eq!(f.missiles.len(), 1);
+    assert!(lines(&mut f, "path").is_empty());
+}
+
 // ---------------------------------------------------------------- §5.19
 
 // Covers: specs/skills/bodies-3.md §5.19 r1, §5.19 r2, §5.19 r3, §5.19 r4, §edge-cases-original-bugs r14

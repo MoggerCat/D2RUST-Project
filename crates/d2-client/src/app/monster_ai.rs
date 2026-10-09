@@ -2,14 +2,13 @@
 //! The monster side of the play preview's skill seams (`q-monster-ai`):
 //! the target a mode request hands the unit, and the skill a monster's
 //! attack mode uses. `LocalSeams` keeps one [`MonsterAi`] and answers the
-//! monster calls of `Pending` / `UseRest` from it, so a monster's A1
-//! runs the player's own skill pipeline (`use.md` §5.3 start, the Attack
-//! do function `skills/bodies.md` §4.1) and the hit takes the server's
-//! damage path.
+//! monster calls of `Pending` / `UseRest` from it, so a monster's skill
+//! mode runs the player's own skill pipeline (`use.md` §5.3 start) and
+//! the hit takes the server's damage path. A plain A1 / A2 (`ai.md` §7.1
+//! `0x005DDF90`) has no used skill entry.
 //!
-//! Everything here is a preview fill (decision D1), marked
-//! `// d2rs-own, unverified`; the open points are PROVISIONAL (REC-111 in
-//! `docs/HANDOFF.md` §7).
+//! The open point is PROVISIONAL (REC-111 part 3 in `docs/HANDOFF.md`
+//! §7).
 
 use std::collections::BTreeMap;
 
@@ -17,13 +16,6 @@ use d2_data::tables::{Monstats, Monstats2};
 use d2_sim::monsters::ai::ModeTarget;
 use d2_sim::skills::SkillEntry;
 use d2_sim::units::UnitId;
-
-/// The skill id of a monster's melee attack (skills.txt row 0, "Attack").
-// PROVISIONAL (skills/use.md OQ6; REC-111): the monster's attack modes use
-// skill 0 at level 1; monstats `Skill1`…`Skill8` / `Sk1mode`… (which skill
-// an attack mode picks) are not specified for the preview. d2rs-own,
-// unverified.
-pub const ATTACK_SKILL: i32 = 0;
 
 /// Per-unit monster fields of the skill seams.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -92,18 +84,14 @@ impl MonsterAi {
         true
     }
 
-    /// The used skill (`0x00620250`) of a monster: the one the request set
-    /// ([`Self::set_current`]), else Attack.
-    // PROVISIONAL (monsters/ai.md §7.1, skills/use.md OQ6; REC-111): the AI's
-    // plain attack request (`0x005DDF90`) sets no skill, and the spec does
-    // not say which entry the unit then uses; the preview takes Attack
-    // (skill 0, level 1). d2rs-own, unverified.
-    pub fn used_skill(&self, unit: UnitId, monster: bool) -> Option<SkillEntry> {
-        let skill = match self.current.get(&unit) {
-            Some(&skill) => skill,
-            None if monster && self.targets.contains_key(&unit) => ATTACK_SKILL,
-            None => return None,
-        };
+    /// The used skill (`0x00620250`) of a unit: the one the request set
+    /// ([`Self::set_current`], `0x005DEAD0` / `0x005DE000`), else none. A
+    /// mode from the plain request `0x005DDF90` has **no** used skill
+    /// entry (`monsters/ai.md` §7.1 row `0x005DDF90`: the builder clears
+    /// list +0x10; Attack is not substituted), so its readers take their
+    /// "no used skill entry" branch.
+    pub fn used_skill(&self, unit: UnitId) -> Option<SkillEntry> {
+        let &skill = self.current.get(&unit)?;
         Some(SkillEntry {
             skill,
             base: 1,
@@ -112,5 +100,28 @@ impl MonsterAi {
             charges: 0,
             has_charges: false,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Covers: specs/monsters/ai.md §7.1
+    #[test]
+    fn a_plain_request_leaves_no_used_skill() {
+        let (m, p) = (UnitId(5), UnitId(1));
+        let mut ai = MonsterAi::default();
+        // `0x005DDF90(A1, target)`: a target, no skill.
+        ai.set_target(m, ModeTarget::Unit(p));
+        assert_eq!(ai.target(m), Some(p));
+        assert_eq!(ai.used_skill(m), None);
+        // `0x005DEAD0(mode, k, target)`: the skill k is the used entry.
+        assert!(ai.set_current(m, 47));
+        let e = ai.used_skill(m).unwrap();
+        assert_eq!((e.skill, e.owner_guid), (47, -1));
+        // A skill id below 0 sets nothing.
+        assert!(!ai.set_current(UnitId(6), -1));
+        assert_eq!(ai.used_skill(UnitId(6)), None);
     }
 }
