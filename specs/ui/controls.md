@@ -27,15 +27,15 @@
 |   3. Commands and default keys | 124–227 |
 |   4. Dispatch | 228–297 |
 |   5. Key-config screen assignment | 298–313 |
-|   6. World clicks (left / right button; answers OQ 2 in part) | 314–629 |
-|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 630–671 |
-|   B4. Original-defaults check (`client/ui.md` §B4) | 672–697 |
-| Constants & data dependencies | 698–704 |
-| Randomness | 705–708 |
-| Edge cases & original bugs | 709–721 |
-| Test vectors | 722–749 |
-| Provenance | 750–768 |
-| Open questions | 769–816 |
+|   6. World clicks (left / right button; answers OQ 2 in part) | 314–637 |
+|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 638–679 |
+|   B4. Original-defaults check (`client/ui.md` §B4) | 680–705 |
+| Constants & data dependencies | 706–712 |
+| Randomness | 713–716 |
+| Edge cases & original bugs | 717–729 |
+| Test vectors | 730–757 |
+| Provenance | 758–776 |
+| Open questions | 777–824 |
 <!-- /index -->
 
 ## Summary
@@ -340,7 +340,15 @@ check reads it.
    click record `C`: +0 flags, +4 P, +8 the hovered unit `U`
    (`0x00467A10`, `client/model.md` hover), +0xC / +0x10 the click's
    world position (`0x0045AFF0` maps the screen x, y in place,
-   `render/camera.md`), replaced by `U`'s position (`0x0045ADF0`,
+   `render/camera.md`; measured 2026-10-09, q-scenes-compare: client
+   (sx + cx_u − shiftX, sy + cy_u − 4), subtile ((px + 2·py) / 32,
+   (2·py − px) / 32) floored, i.e. the unit draw's inverse four rows
+   down: `a1-walk-n` walks to 1.14d's subtile; PROVISIONAL (REC-514):
+   four rows, not eight (the rounding to the nearest subtile; both fit
+   the walk scenes, four keeps a unit's feet picking its own subtile,
+   `seams/world-screen.md` §2.1; settled by a click whose subtile
+   fraction lies in 0.25–0.5, or `0x0045AFF0` itself, PC 1)),
+   replaced by `U`'s position (`0x0045ADF0`,
    `0x0045AE20`) when `U` is an object (type 2) or an item (type 4),
    +0x14 / +0x18 the walk codes (r4), +0x1C the skill. Flags: kind 0, 1,
    2 → 1 (left), kinds 3, 4, 5 → 2 (right); kind 0, 3 → 4 (press), 1, 4
