@@ -194,6 +194,9 @@ pub struct Edits {
     /// Town act (0–4) and difficulty of the town byte (+0xA8).
     pub act: Option<u8>,
     pub difficulty: Option<u8>,
+    /// Hireling block (+0xAF, d2s.md §2.5): row `Id`, name index, seed,
+    /// experience.
+    pub merc: Option<(u16, u16, u32, u32)>,
 }
 
 // ------------------------------------------------------------- vitals seam
@@ -432,6 +435,23 @@ pub fn apply(save: &mut D2s, e: &Edits, t: &Tables) -> Result<()> {
         h.status |= status::EXPANSION;
         b.hireling_items.get_or_insert(None);
         b.golem.get_or_insert_with(Golem::default);
+    }
+    if let Some((id, name_index, seed, experience)) = e.merc {
+        if seed == 0 && name_index == 0 && experience == 0 {
+            bail!("--merc: seed, name index and experience all 0 read as no hireling (d2s.md §2.5 rule 2)");
+        }
+        h.hireling = d2_formats::d2s::Hireling {
+            flags: 0,
+            seed,
+            name_index,
+            id,
+            experience,
+            rest: [0; 16],
+        };
+        // §8.4 rule 1: an expansion save lists the hireling's items (none).
+        if h.status & status::EXPANSION != 0 {
+            b.hireling_items = Some(Some(Vec::new()));
+        }
     }
     match e.hardcore {
         Some(true) => h.status |= status::HARDCORE,

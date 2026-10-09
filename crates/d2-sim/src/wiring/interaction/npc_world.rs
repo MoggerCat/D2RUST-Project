@@ -170,11 +170,19 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
     fn tristram_cain_busy(&self, player: UnitId, npc: UnitId) -> bool {
         self.rest.tristram_cain_busy(player, npc)
     }
+    /// The game's path provider ([`crate::units::hooks::UnitHooks::stop_path_now`]),
+    /// else the rest.
     fn clear_path(&mut self, unit: UnitId) {
-        self.rest.clear_path(unit);
+        if !self.econ.hooks.stop_path_now(unit) {
+            self.rest.clear_path(unit);
+        }
     }
+    /// The game's AI store ([`crate::units::hooks::UnitHooks::set_ai_param0`]),
+    /// else the rest.
     fn npc_ai_param(&mut self, npc: UnitId, param: u32) {
-        self.rest.npc_ai_param(npc, param);
+        if !self.econ.hooks.set_ai_param0(npc, param as i32) {
+            self.rest.npc_ai_param(npc, param);
+        }
     }
     /// Cancel the NPC's type-2 events (`tick.md` §5.4), then one at the
     /// next frame (§5.2), after the state-54 check of §5.2 rule 4 (as

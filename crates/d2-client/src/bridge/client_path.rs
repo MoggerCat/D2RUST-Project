@@ -30,6 +30,15 @@
 //! model, no state, no used skill, no drain), and that a walking
 //! monster's footprint stands at its model position (REC-706; settled by
 //! a recording of the 1.14d client grid under a walking NPC).
+//!
+//! Measured (REC-51 / REC-277 (d), `traces/client/model/client-0001.json`,
+//! `record_walk.py`, Rogue Encampment walk and run legs into the palisade):
+//! the 1.14d client unit has its own path record (not the server's), and
+//! its 16.16 position equals the server player's at every server tick and
+//! every drawn frame (0 differences in 1,721 ticks / 1,923 frames; no lead,
+//! no lag), including where a run stops at an obstacle on a sub-tile short
+//! of the client path's own target. d2rs allows 2 sub-tiles (`play_smoke`)
+//! and drifts up to 6 (q-fix-real-client-path): q-fix-client-path-exact.
 
 use std::collections::BTreeMap;
 

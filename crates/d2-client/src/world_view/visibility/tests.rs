@@ -162,7 +162,8 @@ fn no_cof_no_torso_layer_or_no_torso_cel_is_not_visible() {
 // Covers: specs/client/model.md §13 r1, §13 r6
 #[test]
 fn before_the_first_drawn_frame_the_origin_is_zero() {
-    // PROVISIONAL (REC-286): no camera → origin (0, 0), shiftX 0: screen
+    // No camera → origin (0, 0), shiftX 0 (the globals read 0 before the
+    // first drawn frame, `traces/client/model/client-0001.json`): screen
     // (a, b + 8).
     let (v, u) = predicate(&[(COF, cof_bytes(&[1])), (TR_FILE, dc6())], None);
     assert!(v.visible(&u, 400, 292));

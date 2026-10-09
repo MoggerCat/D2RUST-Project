@@ -424,6 +424,7 @@ fn init<W: QuestWorld>(
         x: c.x,
         y: c.y,
     });
+    w.set_init_point(c.room.map(|room| (object, c.x, c.y, room)));
     match n {
         4 => act1::q5::object_init(ctl, w, object),
         23 => act3::tome_init(ctl, w, object),
@@ -498,6 +499,7 @@ fn init<W: QuestWorld>(
         // 31–33 and 70: `ret`.
         _ => {}
     }
+    w.set_init_point(None);
     QuestObjectRun::Ran
 }
 
