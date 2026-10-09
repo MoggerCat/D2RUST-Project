@@ -1,0 +1,12 @@
+check 1
+# Census: the tick loop, timers and frame counter (sim/tick.md §1-§7,
+# flows/server-tick.md): a character standing in Lut Gholein for 300 ticks
+# (the busiest town of the early acts: NPC idle timers, regeneration, ambient
+# objects). State and rng channels.
+name sys-tick-idle-a2
+save ScnAm2 --class ama --expansion --act 1 --quests acts=1
+seed 1234
+ticks 300
+seconds 400
+channels state rng
+ignore q

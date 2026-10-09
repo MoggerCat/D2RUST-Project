@@ -1,0 +1,13 @@
+check 1
+# Census: difficulty (hell): as sys-difficulty-nightmare in hell.
+name sys-difficulty-hell
+save ScnAma --class ama --expansion --difficulty-unlocked hell --difficulty 2
+seed 1234
+ticks 100
+seconds 300
+difficulty hell
+channels state rng
+ignore q
+variant blood-moor-empty
+at 4 poke warp 2
+at 30 poke spawn 19 @x+4 @y+4 normal

@@ -1,0 +1,12 @@
+check 1
+# Census: creation values and regeneration of the sorceress (combat/vitals.md
+# §1): level 1 and level 40 at half mana. State and rng channels.
+name sys-vitals-create-sor
+save ScnSor --class sor --expansion --level 40
+seed 1234
+ticks 220
+seconds 300
+channels state rng
+ignore q
+at 10 poke stat @player 8 0 2560
+at 10 poke stat @player 6 0 5120
