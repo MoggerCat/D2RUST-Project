@@ -12,12 +12,16 @@ for l in status:
         verd.setdefault(p[1], []).append((p[2], p[3], p[5]))
 prov = open('docs/handoff/provisional-index.tsv', encoding='utf-8').read().splitlines()[1:]
 owners = [l.split('\t') for l in open('tools/coord/owners.tsv') if not l.startswith('#')][1:]
-def prov_count(key): return sum(1 for l in prov if key in l)
+def prov_stats(path):
+    rows = [l.split('\t') for l in prov if path in l]
+    return len(rows), any(len(r) > 6 and r[6].strip() == 'no' for r in rows)
 checks_all = sorted(os.path.basename(f)[:-6] for f in glob.glob('traces/checks/*.check'))
-def verdict_for(pats):
+def verdict_for(pats, chans=None):
     cs = [c for c in checks_all if any(re.search(p, c) for p in pats)]
     if not cs: return '-', '-'
-    vs = [v for c in cs for v in verd.get(c, [])]
+    vs = [v for c in cs for v in verd.get(c, []) if not chans or v[0] in chans]
+    if chans: cs = [c for c in cs if any(v[0] in chans for v in verd.get(c, []))]
+    if not cs: return '-', '-'
     if not vs: return ','.join(cs[:6]), '-'
     d = [v for v in vs if v[1].startswith('DIVERGED')]
     if d: return ','.join(cs[:6]), 'DIVERGED@' + (re.search(r'(?:frame|tick) (\d+)', d[0][2]).group(1) if re.search(r'(?:frame|tick) (\d+)', d[0][2]) else '?')
@@ -34,17 +38,23 @@ def add(**k):
              exercised='?', prov='0', pc1='n', owner='-', state='UNKNOWN', size='M', note='')
     d.update(k); rows.append(d)
 def owner_of(path):
-    best = ('-', 0)
+    best = ('-', 0)  # branch name as in owners.tsv col 4
     for a, p, s, b in [(o[0], o[1], o[2], o[3].strip()) if len(o) >= 4 else (o[0], '', '', '') for o in owners]:
         for q in p.split(','):
-            if q and path.startswith(q) and len(q) > best[1]: best = (b.replace('claude/', ''), len(q))
+            if q and path.startswith(q) and len(q) > best[1]: best = (b, len(q))
     return best[0]
 def slug(s): return re.sub(r'[^a-z0-9]+', '-', s.lower()).strip('-')[:48]
 def status_of(path):
     for l in open(path, encoding='utf-8'):
         m = re.search(r'\*\*Status:\*\*\s*(.*)', l)
-        if m: return m.group(1).strip().rstrip(':;,.')[:40].replace('\t', ' ')
+        if m: return re.split(r'[:;(,.]', m.group(1).strip().replace('`',''))[0].strip()[:40] or 'none'
     return 'none'
+pk_div = {}
+for l in status:
+    p = [x.strip() for x in l.split('|')]
+    if len(p) > 6 and p[2] == 'packets' and p[3].startswith('DIVERGED'):
+        m = re.search(r'stream (c2s|s2c).*\(id 0x([0-9a-fA-F]+)\)', p[5]); f = re.search(r'frame (\d+)', p[5])
+        if m: pk_div[(m.group(1), '0x' + m.group(2).upper())] = p[1] + '@' + (f.group(1) if f else '?')
 # ---- messages
 for tbl, dirn, kindname in (('client-messages.tsv', 'c2s', 'c2s'), ('server-messages.tsv', 's2c', 's2c')):
     rd = csv.DictReader(open('specs/sim/' + tbl, encoding='utf-8'), delimiter='\t')
@@ -52,14 +62,12 @@ for tbl, dirn, kindname in (('client-messages.tsv', 'c2s', 'c2s'), ('server-mess
         name = r['name']; i = r['id'].lower()
         h = r.get('handler') or r.get('client_handler') or '-'
         used = sh(f"grep -rl --include=*.rs -w '{name}' crates/d2-server/src crates/d2-sim/src crates/d2-client/src 2>/dev/null | head -2").split() if name not in ('-', '') else []
-        if name in ('-', ''):
-            st, note, sz = 'NO-CHECK', 'id rejected/unused in 1.14d; nothing compares it', 'S'
-        elif used:
-            st, sz, note = 'NO-CHECK', 'S', 'used in ' + used[0].split('crates/')[-1] + '; verdict is for the whole packet stream (packets-town-arrival-ama), no per-id compare'
-        else:
-            st, sz, note = 'NOT-IMPLEMENTED', 'S', 'layout parsed by d2-proto codegen only; no sim/server/client use found'
-        if r.get('kind') in ('none',) and name != '-': pass
-        chk, v = verdict_for(['^packets-', '^join-']) if dirn == 's2c' else verdict_for(['^walk-'] if name in ('Walk', 'Run') else [r'^zzz'])
+        div = pk_div.get((dirn, '0x' + i[2:].upper()))
+        if name in ('-', ''): st, note, sz = 'NO-CHECK', 'id unused/rejected in 1.14d; implemented: nothing; no packets check contains it', 'S'
+        elif div: st, sz, note = 'DIVERGED', 'S', f'packets check {div} diverges on this id (checks-status.md first divergence)'
+        elif used: st, sz, note = 'NO-CHECK', 'S', 'implemented (' + used[0].split('crates/')[-1] + '); no packets check shown to contain this id on both sides (recorded 1.14d packet logs are not in the repo, not scanned)'
+        else: st, sz, note = 'NOT-IMPLEMENTED', 'S', 'decided by grep: name unused in d2-server/d2-sim/d2-client (d2-proto codegen only parses the layout)'
+        chk, v = (div.split('@')[0], 'DIVERGED@' + div.split('@')[1]) if div else ('-', '-')
         add(area=f'net.{dirn}.{i}', kind='message', src=f'{tbl[:-4]} {i} {name} handler {h}', specs=f'specs/sim/{tbl}',
             spec_status='confirmed=' + (r.get('confirmed') or '?'), checks=chk, verdict=v, owner=owner_of(f'specs/sim/{tbl}#{i}'),
             state=st, size=sz, note=note, pc1='n')
@@ -71,12 +79,11 @@ areas = {
 pick = ['specs/sim/*.md', 'specs/combat/*.md', 'specs/flows/*.md', 'specs/seams/*.md', 'specs/client/*.md', 'specs/render/*.md',
         'specs/audio/*.md', 'specs/ui/*.md', 'specs/formats/d2s*.md', 'specs/formats/font-tbl.md', 'specs/formats/palette.md',
         'specs/formats/cof.md', 'specs/formats/animdata.md', 'specs/formats/dcc.md', 'specs/formats/dc6.md', 'specs/formats/dt1.md', 'specs/formats/wav.md']
-chk_map = [(r'rng|unit-order|tick|flows/server-tick', ['^rng-', '^draws-']), (r'path|movement', ['^walk-']), (r'combat/', ['^combat-']),
-           (r'save|d2s', ['^zzz']), (r'render|ui/|client/', ['^zzz'])]
+chk_map = [(r'sim/rng|unit-order', (['^rng-'], {'rng'})), (r'draw-order', (['^draws-'], {'draws'})), (r'path|movement', (['^walk-'], {'state'}))]
 def spec_checks(p):
     for pat, c in chk_map:
         if re.search(pat, p): return c
-    return ['^zzz']
+    return (['^zzz'], None)
 for pat in pick:
     for path in sorted(glob.glob(pat)):
         txt = open(path, encoding='utf-8').read()
@@ -84,27 +91,24 @@ for pat in pick:
         kind = 'ui' if top == 'ui' else 'system'
         st = status_of(path)
         code = spec_in_code(path)
-        chk, v = verdict_for(spec_checks(path))
+        chk, v = verdict_for(*spec_checks(path))
         if chk == '-' and False: pass
-        pc = prov_count(os.path.basename(path)[:-3])
+        pc, pcn = prov_stats(path)
         ow = owner_of(path)
         m = re.search(r'\n## Rules\n(.*?)(?=\n## )', txt, re.S)
         body = m.group(1) if m else ''
         heads = re.findall(r'^### (.+)$', body, re.M)
-        pc1 = 'y' if re.search(r'\bunverified\b|needs a recording|PC ?1', st, re.I) else 'n'
-        if st.startswith('conformance-passing'): state, size = ('EQUAL' if v in ('MATCH', '-') else 'DIVERGED'), '-'
-        elif code: state, size = ('DIVERGED' if v.startswith('DIVERGED') else 'NO-CHECK'), 'M'
-        else: state, size = 'NOT-IMPLEMENTED', 'M'
-        if v.startswith('DIVERGED'): state = 'DIVERGED'
-        if st.startswith('conformance-passing') and v.startswith('DIVERGED'): state = 'DIVERGED'
+        pc1 = 'y' if pcn else 'n'
+        if v == 'MATCH': state, size, why = 'EQUAL', '-', 'mapped check MATCH'
+        elif v != '-': state, size, why = 'DIVERGED', 'M', f'mapped check {v}'
+        elif code: state, size, why = 'NO-CHECK', 'M', 'a crate cites the spec (// Spec: line) but no check compares it'
+        else: state, size, why = 'NOT-IMPLEMENTED', 'M', 'no crate cites this spec (// Spec: grep)'
         unit = [(None, path)] if not heads else [(h, path) for h in heads]
         for h, _ in unit:
             base = path[len('specs/'):-3].replace('/', '.')
             area = f'system.{base}' + (f'.{slug(h)}' if h else '')
             n = 'whole spec (no ### rule groups)' if not h else 'rule group row; state is per spec file'
-            if state == 'EQUAL': note = 'status says conformance-passing; ' + n
-            elif code: note = f'implemented ({code[0].split("crates/")[-1]}); no passing 1.14d check compares it; ' + n
-            else: note = 'no crate cites this spec (// Spec: line); ' + n
+            note = why + (f' ({code[0].split("crates/")[-1]})' if code else '') + '; spec status "' + st + '"; ' + n
             add(area=area, kind=kind, src=f'{path} ' + (f'§{h}' if h else 'whole'), specs=path, spec_status=st, checks=chk, verdict=v,
                 prov=str(pc) if False else str(pc), pc1=pc1, owner=ow, state=state, size=size, note=note)
 add(area='system.perf.budget', src='docs/handoff/bench-baselines.md', note='bench baselines exist (docs/handoff/bench-baselines.md); no 1.14d-side budget to compare, original timing is tick-based (tick.md)', state='NO-CHECK', size='S', specs='-')

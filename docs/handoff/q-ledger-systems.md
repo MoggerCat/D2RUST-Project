@@ -1,6 +1,6 @@
 # q-ledger-systems (done)
 
-Done: `docs/handoff/ledger/systems.tsv` (ledger 1 format): 934 rows = one per C2S id (specs/sim/client-messages.tsv),
+Done: `docs/handoff/ledger/systems.tsv` (ledger 1 format): 934 rows (validated with tools/coord/ledger.py --check: 0 errors) = one per C2S id (specs/sim/client-messages.tsv),
 one per S2C id (server-messages.tsv), one per `###` rule group of every spec under specs/{sim,combat,flows,seams,client,render,audio,ui}
 and the d2s/format specs, plus system.perf.budget.
 Method: generated, not hand-judged. State comes from (a) spec status "conformance-passing" -> EQUAL unless its checks DIVERGE,
