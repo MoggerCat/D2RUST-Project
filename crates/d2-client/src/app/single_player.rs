@@ -209,6 +209,9 @@ pub fn game_seed(character: &Character, fixed: Option<u32>) -> u32 {
 pub const GAME_TYPE: u8 = 3;
 /// Duriel's Lair (`levels` row 73, act 1).
 pub const DURIELS_LAIR: u32 = 73;
+/// Durance of Hate levels 1 and 2 (`quests.md` §8.2).
+pub const DURANCE_1: u32 = 100;
+pub const DURANCE_2: u32 = 101;
 /// Duriel's `monstats` row.
 pub const DURIEL_CLASS: u32 = 211;
 /// Izual's `monstats` row and the quest chain his death links
@@ -468,7 +471,7 @@ pub enum BuildError {
     Archives { dir: String, message: String },
     /// No game directory given: the game plays only on the user's own
     /// files (`$D2_GAME_DIR`, or `--native DIR`).
-    #[error("no game files: set D2_GAME_DIR to a Diablo II 1.14d install")]
+    #[error("no game files: put d2-client.exe in the Diablo II 1.14d folder (next to d2data.mpq), pass --game-dir <folder>, or set D2_GAME_DIR")]
     NoGameDir,
     #[error("no objects row has operate function 23 and init function 17")]
     NoWaypointObject,
@@ -535,6 +538,14 @@ pub struct LocalSeams {
     /// The Arreat Summit warp check's answer (`Pending::set_summit_open`,
     /// q-act3-act5-gaps); the exits stay closed while it is `true`.
     pub summit_closed: bool,
+    /// The Durance of Hate warp check's answer
+    /// (`Pending::set_durance_open`, q-play-act3); level 100 stays closed
+    /// while it is `true`.
+    pub durance_closed: bool,
+    /// The Golden Bird's +0x00 and the Gidbinn altar's point while Ormus
+    /// may activate it (`Pending::set_act3_npc_answers`, q-play-act3).
+    pub alkor_bird: bool,
+    pub ormus_altar: Option<(i32, i32)>,
     /// The players' hands and the facts of the items in them
     /// ([`super::weapons`], q-amazon).
     pub weapons: super::weapons::Weapons,
@@ -769,7 +780,10 @@ impl Pending for LocalSeams {
                 // unverified, REC-246: the made-up chain has both exits).
                 || (source == d2_sim::world::quests::act5::q5::SUMMIT
                     && matches!(level, 118 | 128)
-                    && self.summit_closed),
+                    && self.summit_closed)
+                // `0x005BBFA0` (`quests.md` §8.2): Durance of Hate 1 waits
+                // for the Compelling Orb, except from Durance 2.
+                || (level == DURANCE_1 && source != DURANCE_2 && self.durance_closed),
         )
     }
     fn set_summit_open(&mut self, open: bool) {
@@ -777,6 +791,35 @@ impl Pending for LocalSeams {
     }
     fn set_lair_open(&mut self, open: bool) {
         self.lair_open = open;
+    }
+    fn set_durance_open(&mut self, open: bool) {
+        self.durance_closed = !open;
+    }
+    fn set_act3_npc_answers(&mut self, alkor_bird: bool, ormus_altar: Option<(i32, i32)>) {
+        self.alkor_bird = alkor_bird;
+        self.ormus_altar = ormus_altar;
+    }
+    /// `0x005BAD20` (`ai-bodies.md` §9.9 alkor): the published answer.
+    fn alkor_bird(&mut self, _: &mut Game) -> bool {
+        self.alkor_bird
+    }
+    /// `0x005BAD40`: queued for the quest control (REC-781, d2rs-own,
+    /// unverified: after the tick, as REC-129); the published answer
+    /// drops at once so the same tick reads it cleared.
+    fn alkor_reset(&mut self, _: &mut Game) {
+        self.alkor_bird = false;
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::AlkorReset);
+    }
+    /// `0x005B9CA0` (§9.9 ormus): the published altar point.
+    fn ormus_altar(&mut self, _: &mut Game) -> Option<(i32, i32)> {
+        self.ormus_altar
+    }
+    /// `0x005B9CD0`: queued as [`Self::alkor_reset`] (REC-781).
+    fn ormus_set_altar_mode(&mut self, _: &mut Game) {
+        self.ormus_altar = None;
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::OrmusAltar);
     }
     /// C→S 0x44 (`quests-act2-2.md` §3.2): queued for the quest control
     /// (REC-167, d2rs-own, unverified: it runs after the tick, not inside
@@ -1060,6 +1103,20 @@ impl Pending for LocalSeams {
 }
 
 impl WorldPending for LocalSeams {
+    /// `0x00544E80` from special monster creation: queued for the quest
+    /// control (the Golden Bird's boss choice, `quests-act3.md` §6.2).
+    /// PROVISIONAL (REC-780, d2rs-own, unverified): it runs after the tick,
+    /// as the other queued quest events (REC-129), not inside the creation.
+    fn boss_quest_hook(&mut self, boss: UnitId) {
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::BossCreated { unit: boss });
+    }
+    /// `0x00545B50` (`monsters/init.md` §20.1): queued as
+    /// [`Self::boss_quest_hook`] (REC-780).
+    fn quest_preset_boss(&mut self, unit: UnitId) {
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::PresetBoss { unit });
+    }
     /// A host-placed monster of a level's preset list
     /// ([`HOST_MONSTER_PRESET`]): Blood Raven carries chain 2 (`init.md`
     /// §14.3), as her boss mods link it when population creates her.
@@ -2180,7 +2237,7 @@ fn loader(
             v.init_player_seed(p);
             // `combat/hit.md` §7.1: a player is good (2), its state-105
             // list there before its first 0xAA (`intents-events.md`
-            // §7.9 rule 1, recorded). PROVISIONAL (REC-750): the
+            // §7.9 rule 1, recorded). PROVISIONAL (REC-732): the
             // original's call site in the join is not identified.
             v.set_alignment(g, p, 2);
             Some(p)
