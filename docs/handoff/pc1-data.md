@@ -671,7 +671,7 @@ Then the rest:
   - REC-665: mode request to own position;
   - REC-670: local input path for mode 18;
   - REC-671: whirl end rule;
-  - REC-680: Blood Golem life share.
+  - REC-680: Blood Golem life share. answered → see docs/handoff/pc1-day3-b.md
 - Not traced: the other critter handlers (rat, bat).
 
 **New q-fix rows (build-queue.tsv)**
