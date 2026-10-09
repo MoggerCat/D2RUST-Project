@@ -545,6 +545,7 @@ fn levels() -> Vec<LevelRow> {
         draw_edges: false,
         rain: false,
         mud: false,
+        critters: Default::default(),
         ambient: Default::default(),
     };
     (v[40].pal, v[40].act) = (1, 1);

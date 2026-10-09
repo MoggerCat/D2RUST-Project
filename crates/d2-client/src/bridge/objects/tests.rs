@@ -1,4 +1,4 @@
-// Spec: specs/world/objects-client.md (Test vectors), specs/client/model.md (§5 rules 2–3, §8 rules 4 and 7)
+// Spec: specs/world/objects-client.md (Test vectors), specs/client/model.md (§5 rules 2–3, §5 rule 6.3, §8 rules 4 and 7)
 //! The spec's synthetic vectors: seed {1, 666} for U (or P), so lo' =
 //! 1,791,398,751 and lo'' = 791,599,131.
 
@@ -1120,4 +1120,20 @@ fn door_step_closes_backwards_then_returns_to_mode_0() {
     // Any other mode is fatal (0x155).
     obj_mut(&mut w).mode = 4;
     assert!(object_update(&mut w, &i, S, &mut Vec::new()).is_err());
+}
+
+/// `model.md` §5 r6.3: the counter starts at 1 and each create takes
+/// counter + 1, so a fresh client's first two client GUIDs are 2 and 3;
+/// a failed create still uses its GUID, and −1 wraps to 0.
+#[test]
+fn the_client_guid_counter_starts_at_one_and_gives_the_value_after_the_add() {
+    let mut w = ClientWorld::default();
+    assert_eq!(w.objclient.next_guid, 1);
+    let a = create_client_unit(&mut w, OBJECT, 0, 0, 0).unwrap();
+    let b = create_client_unit(&mut w, OBJECT, 0, 0, 0).unwrap();
+    assert_eq!((a.guid, b.guid), (2, 3));
+    assert_eq!(w.objclient.next_guid, 3);
+    w.objclient.next_guid = u32::MAX;
+    let c = create_client_unit(&mut w, MONSTER, CHICKEN, 0, 0).unwrap();
+    assert_eq!(c.guid, 0);
 }

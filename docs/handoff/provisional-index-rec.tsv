@@ -295,7 +295,7 @@ REC-542	6675		Hostility between client units (PROVISIONAL, `d2-client` `bridge/c
 REC-543	6674		Owner direction of a missile body's child (PROVISIONAL, `d2-client` `bridge/client_missile	recording	no		2	
 REC-544	6673		Unit flags 0x4 / 0x8 of client units (PROVISIONAL, `d2-client` `bridge/client_missiles.rs`	unstated	no		1	
 REC-545	6672		Client state 86 of a missile hit (PROVISIONAL, `d2-client` `bridge/client_missiles.rs` `en	recording	no		2	
-REC-546	6671		Unit footprints for the client missiles (PROVISIONAL, `d2-client` `bridge/client_missiles.	recording	no		3	
+REC-546	6671		Unit footprints for the client missiles (PROVISIONAL, `d2-client` `bridge/client_missiles.	recording	no		5	
 REC-547	6670		A client hit body the model cannot run (PROVISIONAL, `d2-client` `bridge/client_missiles.r	unstated	no		1	
 REC-548	6669		Travel sound detach force (PROVISIONAL, `d2-client` `audio/driver.rs` `SoundRequest::Group	unstated	no		1	
 REC-549	6668		Umod 29's client hook target (PROVISIONAL, `d2-client` `bridge/client_missiles.rs` `umod_m	recording	no		1	

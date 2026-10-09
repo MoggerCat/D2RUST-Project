@@ -122,3 +122,21 @@ Client-made critters". Stopped there.
 State side: after the staging merge of 9608da5 (others' path-target and
 player-path fixes), `state_diff.py` over 90 frames reports no
 difference in any compared field (PARTIAL: only the documented gaps).
+
+## Round 4 — Act I scenes (coordinator's ask)
+
+Runner: the absolute panel schedule of `q-scenes-compare.md` (play
+`--input`), `facts-compare --ignore tick,index_sha256 --skip-weather`.
+
+| Fix | Where | Check |
+|---|---|---|
+| Client monster track: §9.4 velocity vector per axis (was the larger-axis length: diagonal walks 1.41× too fast), first step on the tick after the request, a point goal stops where the next step would pass the centre (no snap), precise position kept on the unit and drawn while in its cell | `d2-client` `bridge/motion.rs`, `world_view/model_feed.rs` | `a_diagonal_npc_walk_follows_the_recorded_server_positions` (Warriv's recorded 16.16 positions) |
+
+Scenes now: arrival-ama r113 and idle-sor r111 (chickens, PC 1 items
+30/34); panel-inventory r174 (an extra 1.14d draw at `0x46e539` after
+Warriv's body, rendering: q-scenes-compare); character / skilltree /
+automap / esc-menu-wine: Warriv's NU frame, because the 1.14d client
+drops his third walk in that run while its server makes it (pc1-data
+Step 4 "[q-fix-real-unit-seed-order] Client NPC stops a walk").
+The a1-npc-*, blood-moor and den-of-evil scenes are hand-played (no
+input log): not replayable frame for frame.

@@ -573,6 +573,18 @@ lines into the `q-fix-*` row.
   it schedules instead. The same think with a client in the level
   matches (`a4-fortress-arrival-ama`). Evidence: `traces/checks/a4-warp-plains-ama.check`.
 
+- **[q-fix-real-unit-seed-order] Client NPC stops a walk the server makes**
+  (`client/model.md` §19 r4 "NPC busy", monster data +0x28 bit 0):
+  scenes-compare's panel run (SceSor, `-seed 1234`, inventory open at
+  tick 22, an item taken to the cursor at 52, put down at 62): the 1.14d
+  server walks Warriv (1:7) from tick 56 to 67 (state recording), but
+  the 1.14d client draws him in NU from tick 56 (frame 0.5·(t − 56)), so
+  the client ignored the 0x67 at 56. Without the panel input the client
+  walks it. Read who sets the client's NPC-busy bit (+0x28 bit 0; only
+  its clear, §17 r1.7, is specified) or what else makes the client's
+  walk dispatch fall back to neutral here. Blocks a1-panel-character /
+  skilltree / automap / esc-menu-wine (Warriv NU frame) in d2rs.
+
 ## Step 5 — spec gaps (107 provisional points no spec states)
 
 `docs/handoff/provisional-index.tsv` rows with `settle_kind` = `unstated`

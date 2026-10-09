@@ -1590,6 +1590,11 @@ pub fn client_level_rows(data: &GameData) -> Vec<LevelRow> {
                     b: d.blue,
                 }
             }),
+            critters: crate::bridge::world::Critters {
+                cmon: [l.cmon1, l.cmon2, l.cmon3, l.cmon4].map(|c| c as i16),
+                cpct: [l.cpct1, l.cpct2, l.cpct3, l.cpct4].map(|c| c as i16),
+                camt: [l.camt4, 0, 0, 0],
+            },
             pal: l.pal,
             act: l.act,
             blank_screen: l.blankscreen != 0,
@@ -1771,6 +1776,8 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
             let mut c = MonsterClass::from_record(m2, m.npc, m.interact)?;
             c.setup = Some(monster_setup(m, monstats_table.record(i), m2));
             c.no_aura = m.noaura;
+            c.min_grp = m.mingrp;
+            c.max_grp = m.maxgrp;
             c.in_town = m.intown;
             if let Some(x) = monstats2_rows.get(link as usize) {
                 c.light = x.light;

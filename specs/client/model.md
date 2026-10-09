@@ -32,27 +32,27 @@
 |   2. Unit table | 139–188 |
 |   3. Local player | 189–211 |
 |   4. Receive and the unit message queue | 212–249 |
-|   5. Client update pass | 250–383 |
-|   6. Position check (`0x004804E0`) | 384–427 |
-|   7. Session messages | 428–625 |
-|   8. Mode requests | 626–711 |
-|   9. Room-in-sight messages | 712–746 |
-|   10. Bit reader | 747–761 |
-|   11. Current act and level (join and later) | 762–807 |
-|   12. Client DRLG and the room of a point | 808–849 |
-|   13. Visibility predicate (`0x004DBF20`) | 850–901 |
-|   14. Pet list and the hireling GUID | 902–955 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 956–1045 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 1046–1080 |
-|   17. Model writes made by 1.14d UI code | 1081–1227 |
-|   18. Audio driver inputs and the client object functions | 1228–1258 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1259–1487 |
-| Constants & data dependencies | 1488–1500 |
-| Randomness | 1501–1516 |
-| Edge cases & original bugs | 1517–1541 |
-| Test vectors | 1542–1599 |
-| Provenance | 1600–1703 |
-| Open questions | 1704–1872 |
+|   5. Client update pass | 250–395 |
+|   6. Position check (`0x004804E0`) | 396–439 |
+|   7. Session messages | 440–637 |
+|   8. Mode requests | 638–723 |
+|   9. Room-in-sight messages | 724–758 |
+|   10. Bit reader | 759–773 |
+|   11. Current act and level (join and later) | 774–819 |
+|   12. Client DRLG and the room of a point | 820–861 |
+|   13. Visibility predicate (`0x004DBF20`) | 862–913 |
+|   14. Pet list and the hireling GUID | 914–967 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 968–1057 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 1058–1092 |
+|   17. Model writes made by 1.14d UI code | 1093–1239 |
+|   18. Audio driver inputs and the client object functions | 1240–1270 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1271–1499 |
+| Constants & data dependencies | 1500–1512 |
+| Randomness | 1513–1528 |
+| Edge cases & original bugs | 1529–1553 |
+| Test vectors | 1554–1611 |
+| Provenance | 1612–1715 |
+| Open questions | 1716–1884 |
 <!-- /index -->
 
 ## Summary
@@ -380,6 +380,18 @@ position check of the local player.
       Code 1 = walk to point (§19 r4, mode 2 WL); code 0x0C = mode 8
       S1 with the move test. The recorded chickens' WL from tick 8 is
       the code-1 step.
+
+      PROVISIONAL (REC-741): the zoo body `0x0046D660` and the class
+      bodies other than `chicken_ai` are not read; d2rs runs nothing for
+      them (the zoo test needs `monstats` flag 22 in the client tables).
+      PROVISIONAL (REC-742): a C monster's client path (§19 r4 with the
+      path helpers of a set-C unit) is not specified; d2rs draws the
+      step's two seed values, sets the mode the code sets (1 → 2 WL,
+      0x0C → 8 S1, code 7 at the own position → the neutral fallback)
+      and keeps the unit in its cell. Needed: the C monster's path record
+      and its walk end (positions of the recorded chickens from tick 8).
+      The 0xAC set-up of a critter (r6.3: `0x004AE8D0`, the first frame,
+      the light) is not run on set C either (same REC).
 
 ### 6. Position check (`0x004804E0`)
 
