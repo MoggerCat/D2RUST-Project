@@ -124,6 +124,11 @@ pub struct WiredWorld<R, S = NoSkills> {
     /// The store items a purchase took, their 0x9C action 12 sent with
     /// the next tick's unit work (`vendors.md` §7.1 rule 10: "next frame").
     pub(super) taken_sent: Vec<(UnitId, Vec<u8>)>,
+    /// The store items a trade open added to the NPC's trade inventory,
+    /// their 0x9C action 11 sent by the next tick's client pass
+    /// ([`WorldHost::take_client_pass_sent`]; recorded:
+    /// `interact-talk-akara` frame 16, after the NPC's 0x8A and 0x6D).
+    pub(super) shown_sent: Vec<(UnitId, Vec<u8>)>,
     /// The messages the systems sent so far, in production order
     /// ([`Self::collect_sent`]; `seams/sim-server.md` §2.2,
     /// `sim/intents-events.md` §1 r3).
@@ -131,6 +136,12 @@ pub struct WiredWorld<R, S = NoSkills> {
     /// Pick-ups waiting for the player's run to the item to end
     /// (player, item GUID, cursor flag; [`Self::item_arrivals`], REC-281).
     pub(super) item_queued: Vec<(UnitId, u32, bool)>,
+    /// Object cases waiting for the player's run to the object to end
+    /// (player, object GUID; [`Self::object_arrivals`], `objects.md` §7.3
+    /// rule 4).
+    pub(super) object_queued: Vec<(UnitId, u32)>,
+    /// An object arrival's 0x13 is running (it walks no further).
+    pub(super) object_arriving: bool,
     /// An approach arrival's 0x13 is running ([`WiredWorld::handler_work`]
     /// starts no approach for it).
     pub(super) arriving: bool,
@@ -204,8 +215,11 @@ impl<R, S> WiredWorld<R, S> {
             now,
             inv_sent: Vec::new(),
             taken_sent: Vec::new(),
+            shown_sent: Vec::new(),
             outbox: Vec::new(),
             item_queued: Vec::new(),
+            object_queued: Vec::new(),
+            object_arriving: false,
             arriving: false,
             start_extra: Vec::new(),
         }
@@ -627,6 +641,8 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
         self.collect_sent(events);
         self.item_arrivals(game, events);
         self.collect_sent(events);
+        self.object_arrivals(game, events);
+        self.collect_sent(events);
         events.action().player_deaths(game);
         self.collect_sent(events);
         self.corpse_fill(game, events);
@@ -940,7 +956,7 @@ where
             }
             ((), flush_shown(desk, inv))
         });
-        self.inv_sent.extend(sent);
+        self.shown_sent.extend(sent);
         self.handler_work(game, events);
         Some(out)
     }
@@ -1009,13 +1025,21 @@ where
         player: UnitId,
         guid: u32,
     ) -> Option<ObjectCase> {
-        let out = self.lend_quests(events, |a, ev| {
+        let mut out = self.lend_quests(events, |a, ev| {
             WorldHost::<D>::objects(a, game, ev, player, guid)
         });
         let sent = self.desk(game, events, quest_objects);
         self.inv_sent.extend(sent);
         let sent = self.take_inventory_sent(game, events);
         self.inv_sent.extend(sent);
+        // §7.3 rule 4: the walk, then result 0 (an arrival walks no
+        // further).
+        if out == Some(ObjectCase::Walk) {
+            if !self.object_arriving {
+                self.start_object_walk(game, events, player, guid);
+            }
+            out = Some(ObjectCase::Code(0));
+        }
         out
     }
 
@@ -1267,6 +1291,7 @@ where
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
         self.drop_queued(call.player);
         self.item_queued.retain(|q| q.0 != call.player);
+        self.object_queued.retain(|q| q.0 != call.player);
         let out = self.lend_quests(events, |a, ev| WorldHost::<D>::walk(a, game, ev, call));
         self.pet_deaths(game, events);
         self.hireling_calls(game, events);
@@ -1318,6 +1343,10 @@ where
     fn take_sent(&mut self, events: &mut D) -> Vec<(UnitId, Vec<u8>)> {
         self.collect_sent(events);
         std::mem::take(&mut self.outbox)
+    }
+
+    fn take_client_pass_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
+        std::mem::take(&mut self.shown_sent)
     }
 
     /// The action wiring's object host tick, and [`WiredWorld::now`] (the

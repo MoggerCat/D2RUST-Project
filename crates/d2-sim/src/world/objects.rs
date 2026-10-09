@@ -1320,3 +1320,38 @@ pub fn update_messages<W: ObjectWorld>(
 
 #[cfg(test)]
 mod mutant_tests;
+
+/// Interact range `R(U, O)` (`0x00623660`, §7.1 rule 3): `u` the unit's
+/// whole-sub-tile position and its X size, `o` the object's position and
+/// `objects.txt` `SizeX` / `SizeY`, `dist` the unit distance
+/// `0x00641530(U, O)`. The widened footprint less its four outer corner
+/// cells; a unit wider than 2 skips the corner cut.
+pub fn interact_range(
+    u: (i32, i32),
+    u_size_x: i32,
+    o: (i32, i32),
+    size: (i32, i32),
+    dist: i32,
+) -> bool {
+    // Rule 2.
+    if dist == 0 {
+        return true;
+    }
+    // Rule 3: the halves truncate.
+    let (sx, sy) = size;
+    let (bx, by) = (o.0 - sx / 2, o.1 - sy / 2);
+    // Rule 4.
+    if sx < 1 || sy < 1 {
+        return (bx - 1..=bx + 1).contains(&u.0) && (by - 1..=by + 1).contains(&u.1);
+    }
+    // Rule 5.
+    if !(bx - 2..=bx + sx + 2).contains(&u.0) || !(by - 2..=by + sy + 2).contains(&u.1) {
+        return false;
+    }
+    // Rule 6 (unsigned compare).
+    if u_size_x as u32 > 2 {
+        return true;
+    }
+    // Rules 7, 8.
+    (by - 1..=by + sy + 1).contains(&u.1) || (bx - 1..=bx + sx + 1).contains(&u.0)
+}

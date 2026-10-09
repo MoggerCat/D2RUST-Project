@@ -1148,10 +1148,9 @@ impl Pending for LocalSeams {
     fn object_quest_record(&self, _: UnitId) -> bool {
         true
     }
-    /// d2rs-own, unverified (stitch-objects): the preview's interact reach.
-    fn object_preview_range(&self) -> Option<i32> {
-        Some(crate::world_view::object_click::INTERACT_RANGE)
-    }
+    // No preview reach: the 0x13 object case takes the interact range
+    // `0x00623660` and the server's walk on the path provider
+    // (`objects.md` §7.3; `interact-operate-stash`).
 }
 
 impl WorldPending for LocalSeams {

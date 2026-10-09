@@ -649,6 +649,15 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
                 }
             }
         }
+        // The trade open's store items (0x9C action 11): the client pass,
+        // after the monster updates (`world/vendors.md` §4 step 3).
+        for (unit, bytes) in self.world.take_client_pass_sent() {
+            if let Some(c) = self.client_of(unit) {
+                if let Err(e) = out.queue(c, &bytes) {
+                    self.tick_faults.push((c, WorldError::from(e)));
+                }
+            }
+        }
         handlers::items::moves::update_pass(self, out);
     }
 

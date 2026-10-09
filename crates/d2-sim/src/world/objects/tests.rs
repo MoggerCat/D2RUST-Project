@@ -1176,3 +1176,30 @@ fn chest_and_urn_read_classic_normal_monlvl() {
     }
     assert!(differs, "MonLvl1 itself is read");
 }
+
+// Covers: specs/world/objects.md §7.1
+#[test]
+fn interact_range_vectors() {
+    use super::interact_range;
+    // Waypoint 119 (5 × 5) at (4899, 4209): x band [4895, 4904], y band
+    // [4205, 4214]; the player (size 2) at offset (4, 3) is in a middle
+    // row, at offset 5 outside rule 5's box (REC-94 run r3).
+    let wp = (4899, 4209);
+    assert!(interact_range((4895, 4212), 2, wp, (5, 5), 9));
+    assert!(!interact_range((4894, 4212), 2, wp, (5, 5), 9));
+    // The outer rows cut the corners: (bx − 2, by − 2) is out, (bx − 1,
+    // by − 2) in.
+    assert!(!interact_range((4895, 4205), 2, wp, (5, 5), 9));
+    assert!(interact_range((4896, 4205), 2, wp, (5, 5), 9));
+    // A unit wider than 2 keeps the corners.
+    assert!(interact_range((4895, 4205), 3, wp, (5, 5), 9));
+    // Stash 267 (1 × 1) at (4866, 4229): offset (3, 1) in, (4, 1) out.
+    let st = (4866, 4229);
+    assert!(interact_range((4869, 4228), 2, st, (1, 1), 5));
+    assert!(!interact_range((4870, 4228), 2, st, (1, 1), 5));
+    // Unit distance 0 is in range whatever the box.
+    assert!(interact_range((4900, 4300), 2, st, (1, 1), 0));
+    // A size below 1: the 3 × 3 cells around the origin.
+    assert!(interact_range((4867, 4230), 2, st, (0, 1), 5));
+    assert!(!interact_range((4868, 4230), 2, st, (0, 1), 5));
+}

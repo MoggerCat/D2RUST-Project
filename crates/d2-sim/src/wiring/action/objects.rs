@@ -209,6 +209,10 @@ pub enum ObjectCase {
     /// Operate 23: the caller runs `waypoints.md` §5.2 (the waypoint
     /// tables live with the host); then result 0.
     Waypoint(Operate),
+    /// §7.3 rule 4: out of interact range or behind the line test; the
+    /// caller starts the run to the object (`0x00548A50`) and queues the
+    /// 0x13 handling for its end; result 0.
+    Walk,
 }
 
 /// The object code's view of a game.
@@ -658,6 +662,7 @@ impl<X: Pending> View<'_, X> {
             return Some(ObjectCase::Code(3));
         }
         let reach = match self.h.x.object_preview_range() {
+            None if self.h.paths.is_some() => self.object_reach(game, player, object),
             Some(r) => {
                 // d2rs-own, unverified: the preview's reach test.
                 let d = {
@@ -677,6 +682,13 @@ impl<X: Pending> View<'_, X> {
         };
         match reach {
             ObjectReach::TooFar => return Some(ObjectCase::Code(1)),
+            // The walk is the server's only when the reach was the spec's
+            // (not the preview's, whose client walks).
+            ObjectReach::Walk
+                if self.h.paths.is_some() && self.h.x.object_preview_range().is_none() =>
+            {
+                return Some(ObjectCase::Walk)
+            }
             ObjectReach::Walk => return Some(ObjectCase::Code(0)),
             ObjectReach::Operate => {}
         }
@@ -695,6 +707,68 @@ impl<X: Pending> View<'_, X> {
             }
             Some(Dispatch::Done(_)) | None => ObjectCase::Code(0),
         })
+    }
+
+    /// §7.3 rules 3–5 with the path provider: unit distance `0x00641530`
+    /// > 50 → too far; not in interact range ([`View::object_in_reach`])
+    /// or the line test `0x00622B50(P, O, 0x804)` blocked → walk; else
+    /// P's path is stopped (`0x00648730`) and the operate runs.
+    fn object_reach(&mut self, game: &Game, player: UnitId, object: UnitId) -> ObjectReach {
+        if self.object_unit_distance(player, object) > 50 {
+            return ObjectReach::TooFar;
+        }
+        let blocked = self
+            .units_line_blocked(game, player, object, 0x804)
+            .unwrap_or(false);
+        if !self.object_in_reach(player, object) || blocked {
+            return ObjectReach::Walk;
+        }
+        let _ = crate::wiring::path::monsters::stop_path(self.h, player);
+        ObjectReach::Operate
+    }
+
+    /// Unit distance `0x00641530` on the path records (`pathing.md` §9.5).
+    fn object_unit_distance(&self, a: UnitId, b: UnitId) -> i32 {
+        let Some(paths) = self.h.paths.as_ref() else {
+            return i32::MAX;
+        };
+        let pt = |u: UnitId| {
+            let (x, y) = self.h.path_position(u);
+            crate::path::Point { x, y }
+        };
+        crate::path::walk::geom::unit_distance(
+            &paths.tables,
+            pt(a),
+            self.path_size(a),
+            pt(b),
+            self.path_size(b),
+        )
+    }
+
+    /// Interact range `0x00623660` (§7.1, [`objects::interact_range`]) on
+    /// the path positions, the operator's size and the object's
+    /// `objects.txt` `SizeX` / `SizeY`. `None` without the path provider
+    /// or an object row.
+    pub fn object_range(&self, operator: UnitId, object: UnitId) -> Option<bool> {
+        self.h.paths.as_ref()?;
+        let class = self
+            .units
+            .get(object)
+            .filter(|r| r.ty == UnitType::Object)?
+            .class;
+        let row = self.h.objects.as_ref()?.tables.object(class as u16).ok()?;
+        Some(objects::interact_range(
+            self.h.path_position(operator),
+            self.path_size(operator),
+            self.h.path_position(object),
+            (row.sizex as i32, row.sizey as i32),
+            self.object_unit_distance(operator, object),
+        ))
+    }
+
+    /// [`View::object_range`], false when it has no answer.
+    fn object_in_reach(&self, operator: UnitId, object: UnitId) -> bool {
+        self.object_range(operator, object).unwrap_or(false)
     }
 
     /// The object update pass `0x00581AD0` (§14) for one queued object and
@@ -987,7 +1061,10 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
     fn in_interact_range(&self, operator: UnitId, object: UnitId) -> bool {
         match self.v.h.x.object_preview_range() {
             Some(r) => preview_distance(&self.v, operator, object) <= r,
-            None => self.v.h.x.object_in_range(self.game, operator, object),
+            None => self
+                .v
+                .object_range(operator, object)
+                .unwrap_or_else(|| self.v.h.x.object_in_range(self.game, operator, object)),
         }
     }
     /// `0x00554100`: the interact info on the player's unit record.

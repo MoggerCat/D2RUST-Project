@@ -32,6 +32,7 @@ mod hireling_host;
 mod item_approach;
 mod item_save;
 mod npc_approach;
+mod object_approach;
 mod wired;
 
 #[cfg(test)]
@@ -436,6 +437,12 @@ pub trait WorldHost<D> {
     ) -> Option<Vec<Vec<u8>>> {
         None
     }
+    /// The item messages the tick's client pass sends (S→C 0x9C of items
+    /// queued for the update pass since the last tick, `sim/tick.md` §6
+    /// rule 5), in queue order. Default: none.
+    fn take_client_pass_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
+        Vec::new()
+    }
     /// The messages the seams sent since the last take, in send order:
     /// (receiving player unit, bytes).
     fn take_sent(&mut self, events: &mut D) -> Vec<(UnitId, Vec<u8>)> {
@@ -532,6 +539,8 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
             let guid = u32::from_le_bytes([msg[5], msg[6], msg[7], msg[8]]);
             match sim.world.objects(game, events, player, guid)? {
                 ObjectCase::Code(c) => Some(Ok(Some(c))),
+                // A host without the walk (`objects.md` §7.3 rule 4): 0.
+                ObjectCase::Walk => Some(Ok(Some(0))),
                 // Operate 23 (`waypoints.md` §5.2) on the host's
                 // waypoints; without them the id stays a stub.
                 ObjectCase::Waypoint(_) => {
@@ -678,9 +687,9 @@ impl WaypointCall for WaypointRun<'_> {
 ///
 /// TODO(waypoints.md §5.2): the 0x13 result after the operate is not
 /// stated; read as 0.
-struct WaypointOperate {
-    player: UnitId,
-    guid: u32,
+pub(super) struct WaypointOperate {
+    pub(super) player: UnitId,
+    pub(super) guid: u32,
 }
 
 impl WaypointCall for WaypointOperate {

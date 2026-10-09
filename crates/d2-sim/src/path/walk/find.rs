@@ -158,7 +158,8 @@ pub fn compute<C: PathWorld + WalkUnits + ?Sized>(
         // Step 8.
         path.cur_point = 0;
         path.point_count = 0;
-        path.put_final_target(path.target());
+        // Final target +0x18 := the compute record's target (§4 rule 3).
+        path.put_final_target(info.target);
         let n = if run {
             run_function(t, c, owner_ty, path, &info)?
         } else {
@@ -310,18 +311,16 @@ pub fn prepare<W: PathWorld + ?Sized>(
         }
         d0 = t.altdir[octant(p0, start)][0] as u8;
     };
-    // PROVISIONAL (§4 rule 3, q-diff-combat-a1 REC-753): a found point
-    // equal to the start returns 0 with the target unchanged. Measured on
-    // 1.14d (Warriv's straight walk-in-radius onto a cell a zombie holds:
-    // p0's first step lands on the start; +0x10/+0x12 keep the request's
-    // point). Whether a p1 / p2 probe at the start does the same or keeps
-    // searching is `pc1-data.md` Step 4 "[q-diff-combat-a1] preparation
-    // probe at the start".
+    // §4 rule 3 (REC-753 settled, 2026-10-09): the found probe is written
+    // to the compute record's target first, then compared with the start
+    // (equal → result 0 with that target = the start); rules 2–4 never
+    // write the path's +0x10 / +0x12. Recorded: `interact-operate-stash`
+    // frame 4, the run to the stash keeps path target (4866, 4229), the
+    // stash's own cell.
+    info.target = found;
     if found == start {
         return Ok(false);
     }
-    info.target = found;
-    path.put_target(found);
     if owner_ty == UnitType::Player {
         push(t, w, path, info);
     }
@@ -344,7 +343,6 @@ fn push<W: PathWorld + ?Sized>(t: &PathTables, w: &W, path: &mut DynamicPath, in
             info.target = cand;
             c += 1;
         }
-        path.put_target(info.target);
     }
 }
 
