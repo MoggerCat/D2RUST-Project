@@ -649,8 +649,12 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
     /// change, `flows/act-change.md` §1, `world/npc.md` §8.3), the pet
     /// follows. In 1.14d these run inside the handler itself.
     /// An approach arrival's own 0x13 starts no new approach
-    /// ([`WiredWorld::arrivals`]).
-    pub(super) fn handler_work<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D) {
+    /// ([`WiredWorld::arrivals`]). A poke directive (`tools/poke.md`
+    /// §2 rule 6: the debugger calls the 1.14d function, which runs its
+    /// unit work inline) runs it when the directive returns, so a
+    /// `warp`'s pet follow (`path-placement.md` §10 rule 6) lands before
+    /// the next tick's movement, as in 1.14d.
+    pub fn handler_work<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D) {
         self.pet_deaths(game, events);
         if self.arriving {
             self.state.approaches.clear();

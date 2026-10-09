@@ -123,6 +123,12 @@ impl Weapons {
         self.items.get(&l)?.shield.then_some(l)
     }
 
+    /// The type class `0x00629FE0` of `item` (0 for an item the copy
+    /// does not hold).
+    pub fn type_class(&self, item: UnitId) -> u32 {
+        self.items.get(&item).map_or(0, |f| type_class(f) as u32)
+    }
+
     pub fn facts(&self, item: UnitId) -> ItemFacts {
         self.items.get(&item).cloned().unwrap_or_default()
     }

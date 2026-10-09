@@ -107,6 +107,35 @@ pub fn local_cell(w: &ClientWorld) -> Option<(u16, u16)> {
     w.predicted(u).map(|p| p.cell()).or(u.position)
 }
 
+/// The client's interact distance for an item (`ui/controls.md` §6
+/// r9.2: d ≤ 4 sends the pick-up at once).
+const PICK_REACH: i32 = 4;
+/// The unit sizes of the distance (`sim/path-placement.md` §3).
+const ITEM_SIZE: i32 = 1;
+const PLAYER_SIZE: i32 = 2;
+
+/// The interact sender (`client/model.md` §8 r7, the bridge's
+/// `interact`) runs where the client would send at once (unit distance
+/// `0x00641530`, the client's and the server's test), without the walk
+/// to the unit (`ui/controls.md` §6 r9.2): an item at d ≤ 4, an NPC at
+/// its reach 2 and an object the player stands at (read as d ≤ 2, the
+/// object's size unknown here). From farther the server walks the player
+/// to the unit (`world/objects.md` §7.3 r4, `world/npc.md` §2 r3,
+/// `items/inventory-moves.md` §7.1) and the client, which sent no walk,
+/// stands: a false desync. Farther units are reached by the clicks on a
+/// unit, through the client's own decision.
+fn interact_reach(ty: u8, at: Option<(u16, u16)>, me: Option<(u16, u16)>) -> bool {
+    let (Some(at), Some(me)) = (at, me) else {
+        return false;
+    };
+    let (size, reach) = if ty == ITEM {
+        (ITEM_SIZE, PICK_REACH)
+    } else {
+        (0, 2)
+    };
+    crate::bridge::objects::unit_distance_at(at, size, me, PLAYER_SIZE) <= reach
+}
+
 /// The generator: one action or none per step.
 pub struct Gen {
     pub rng: Rng,
@@ -133,20 +162,18 @@ impl Gen {
         let r = &mut self.rng;
         let roll = r.below(100);
         let my_pos = local_cell(w);
-        let near = |pos: Option<(u16, u16)>, d: i32| match (pos, my_pos) {
-            (Some(a), Some(b)) => {
-                (i32::from(a.0) - i32::from(b.0))
-                    .abs()
-                    .max((i32::from(a.1) - i32::from(b.1)).abs())
-                    <= d
-            }
-            _ => false,
-        };
         let items = citems::local_items(w);
         let cursor = citems::cursor_item(w);
+        // A ground pick-up (C→S 0x16) is sent by the client only within
+        // its interact distance: d ≤ 4 (`ui/controls.md` §6 r9.2, item;
+        // `client/model.md` §8 r7). A farther item is walked to first
+        // (code 2 / 4 and a pending interaction), which the clicks on a
+        // unit below drive through the client; a 0x16 from farther makes
+        // the server walk the player (`items/inventory-moves.md` §7.1)
+        // while the client, as 1.14d's, stands (a false desync).
         let ground: Vec<_> = citems::ground_items(w)
             .into_iter()
-            .filter(|i| near(Some((i.x, i.y)), 30))
+            .filter(|i| interact_reach(ITEM, Some((i.x, i.y)), my_pos))
             .collect();
         let act = match roll {
             // Left clicks: anywhere (UI panels, ground), or near the
@@ -198,7 +225,8 @@ impl Gen {
                     .units
                     .iter()
                     .filter(|(k, u)| {
-                        matches!(k.unit_type, MONSTER | OBJECT | ITEM) && near(u.position, 25)
+                        matches!(k.unit_type, MONSTER | OBJECT | ITEM)
+                            && interact_reach(k.unit_type, u.position, my_pos)
                     })
                     .map(|(k, _)| *k)
                     .collect();

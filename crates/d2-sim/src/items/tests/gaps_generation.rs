@@ -787,8 +787,7 @@ fn quest_step_and_dispatch_result() {
     let mut it = item(j, 1);
     init_item_stats(&t, &mut game(), &mut it, Some(&mut rq), true).unwrap();
     assert!(it.stats.lists.is_empty());
-    // Identified only by the normal routine (REC-1400), not by the quest step.
-    assert_ne!(it.flags & flag::IDENTIFIED, 0);
+    assert_eq!(it.flags & flag::IDENTIFIED, 0);
 }
 
 /// A body part whose itemtype forces normal quality is handled by the

@@ -41,6 +41,11 @@ pub const HOST_OBJECT_PRESET: u32 = 7;
 /// The unit type of an object preset (DS1 object entries).
 pub const OBJECT_PRESET: u32 = 2;
 
+/// The object classes whose preset path the quests keep as a map AI
+/// (`quests-act5.md` §5.8: 459 Anya's dummy, 461 Nihlathak's, 543
+/// Larzuk's).
+const MAP_AI_STORE_CLASSES: [u32; 3] = [459, 461, 543];
+
 /// The unit type of a tile preset (`levels.md` §10.4).
 const TILE_PRESET: u32 = crate::path::warp::TILE_UNIT_TYPE as u32;
 
@@ -131,6 +136,16 @@ impl<X: Pending> View<'_, X> {
         true
     }
 
+    /// `0x00545C90` (`quests-act5.md` §5.8): the quest map-AI store of a
+    /// preset object with a path, on the lent quest host.
+    fn map_ai_store(&mut self, game: &mut Game, class: u16, path: Vec<(u32, i32, i32)>) {
+        let Some(mut host) = self.h.quest_host.take() else {
+            return;
+        };
+        host.map_ai_store(game, self, class, path);
+        self.h.quest_host = Some(host);
+    }
+
     /// One type-2 preset: an object at (x, y) through the object state's
     /// `create_object`, unless the room has one of that class there. True
     /// when created.
@@ -174,16 +189,34 @@ impl<X: Pending> View<'_, X> {
         let found = self.h.drlg.with_act(act, &mut game.lists, |d, svc| {
             let r = d.drlg_room_of(room)?;
             let origin = d.active_room(r)?.subtiles;
-            Some((svc.types.preset_units(d, r), origin))
+            let units = svc.types.preset_units(d, r);
+            let paths: Vec<_> = units
+                .iter()
+                .enumerate()
+                .map(|(i, u)| {
+                    if u.unit_type == OBJECT_PRESET && MAP_AI_STORE_CLASSES.contains(&u.class) {
+                        svc.types.unit_path(d, r, i)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            Some((units, paths, origin))
         });
-        let Some(Some((units, origin))) = found else {
+        let Some(Some((units, paths, origin))) = found else {
             return 0;
         };
         let mut n = 0;
-        for p in &units {
+        for (p, path) in units.iter().zip(paths) {
             let at = (origin.x + p.x, origin.y + p.y);
             let made = match p.unit_type {
-                OBJECT_PRESET => self.spawn_object_preset(game, room, at, p.class),
+                OBJECT_PRESET => {
+                    let made = self.spawn_object_preset(game, room, at, p.class);
+                    if let (true, Some(path)) = (made, path) {
+                        self.map_ai_store(game, p.class as u16, path);
+                    }
+                    made
+                }
                 TILE_PRESET => self.spawn_tile_preset(game, room, at, p.class),
                 _ => false,
             };

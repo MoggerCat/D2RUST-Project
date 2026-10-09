@@ -9,7 +9,6 @@
 mod app_support;
 mod real_rig;
 
-use d2_client::bridge::BridgeResource;
 use d2_data::bin::TableFiles;
 use d2_sim::units::UnitType;
 use real_rig::{skill_row, Rig};
@@ -78,10 +77,7 @@ fn a_right_skill_at_a_point_costs_mana_and_creates_the_missile() {
         let m = r.mana();
         drop = drop.max(prev - m);
         prev = m;
-        let w = r.app.world().resource::<BridgeResource>().0.world();
-        if let Some(u) = w.local_player.and_then(|k| w.units.get(&k)) {
-            modes.push(u.mode);
-        }
+        modes.push(r.mode());
     }
     let errors = r.errors();
     // `use.md` Test vectors: Fire Bolt L1 pays `mana << manashift`.
@@ -92,8 +88,13 @@ fn a_right_skill_at_a_point_costs_mana_and_creates_the_missile() {
     );
     assert!(most > 0, "the server made the missile; errors: {errors}");
     assert!(r.s2c_contains_since(mark, 0x4D), "{errors}");
+    // The cast mode is the server player's. The client's own player
+    // enters it at its click (`client/model.md` §20; `skills/sequences.md`
+    // local player rule 1), not from a server message: 1.14d's server
+    // sends its own client nothing (`docs/handoff/pc1-day4.md` item 55,
+    // answered), and this rig sends the 0x0C bytes without a click.
     assert!(
         modes.contains(&u32::from(row.anim)),
-        "the cast mode reaches the client: {modes:?}; {errors}"
+        "the server player's cast mode: {modes:?}; {errors}"
     );
 }

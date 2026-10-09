@@ -1,0 +1,36 @@
+{
+ "channel": "packets",
+ "check": "milestone-act5-entry",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "240",
+  "--ticks",
+  "40",
+  "--auto",
+  "MilA5",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--poke",
+  "4 warp 109"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "f31b047e2bc59a251a8af99ec8d24a23ab9995e8dcb206d09ace042f1b357d27",
+   "size": 98983
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "a44c76e81c8de83b0c4276253c35c899a88cef8fece6a2614380a06dea20d887",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "5a13a3799d3a33110b7bbf698f79d351c78f628101b3cd96388437c5f65ec986"
+ }
+}

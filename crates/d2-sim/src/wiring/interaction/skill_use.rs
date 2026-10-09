@@ -985,7 +985,10 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     }
 
     fn frame_bonus(&self, u: UnitId) -> i32 {
-        self.x().frame_bonus(u)
+        self.cv
+            .v
+            .h
+            .frame_bonus_in(self.cv.v.units, self.cv.v.stats, u)
     }
     fn set_anim_frame(&mut self, u: UnitId, v: i32) {
         if let Some(r) = self.cv.v.units.get_mut(u) {

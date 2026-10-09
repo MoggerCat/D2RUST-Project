@@ -311,6 +311,20 @@ fn monster_walks_to_a_point_sub_tile_by_sub_tile() {
     fx.assert_clean();
 }
 
+// Covers: specs/sim/units.md §4.6; specs/monsters/ai.md §7.5 r8
+#[test]
+fn a_walk_without_a_path_point_reports_a_failed_mode_change() {
+    // A walk to the monster's own cell computes no point; the WL start
+    // returns 0, the neutral start runs instead and `0x005A7C20` reports
+    // failure (PROVISIONAL REC-1390), so the AI's failure branch runs.
+    let mut fx = fx();
+    let m = monster(&mut fx, 26, 10);
+    assert!(!change(&mut fx, m, WALK, ModeTarget::Point(26, 10)));
+    assert_eq!(mode(&fx, m), 1);
+    assert_eq!(dynamic(&mut fx, m).point_count, 0);
+    fx.assert_clean();
+}
+
 // Covers: specs/sim/units.md §4.6
 #[test]
 fn without_the_provider_the_monster_does_not_move() {
@@ -319,7 +333,9 @@ fn without_the_provider_the_monster_does_not_move() {
     let mut fx = fx_paths(false);
     let m = monster(&mut fx, 26, 10);
     let before = fx.sim.hooks().path_position(m);
-    assert!(change(&mut fx, m, WALK, ModeTarget::Point(31, 10)));
+    // The walk start fails, so the mode change reports failure
+    // (`units.md` §4.6, PROVISIONAL REC-1390).
+    assert!(!change(&mut fx, m, WALK, ModeTarget::Point(31, 10)));
     for _ in 0..20 {
         fx.tick();
     }
@@ -518,6 +534,53 @@ fn zigzag_init_rebuilds_a_charged_bolt_path_on_the_provider() {
         (0..26).map(|k| d.point(k)).collect::<Vec<_>>(),
         (0..26).map(|k| d2.point(k)).collect::<Vec<_>>()
     );
+}
+
+// Covers: specs/sim/pathing.md §9.6 r3, §9.4 r2
+#[test]
+fn a_charged_bolt_path_snaps_to_its_start_point_on_the_first_step() {
+    // PROVISIONAL REC-1391: point 0 is the start cell, so the first step
+    // snaps onto it (Δ = (0, 0)), takes index 1 and aims at point 1; the
+    // next step moves toward point 1 (1.14d `dru-tornado` frames 30–31).
+    let mut fx = fx();
+    let a = fx.a;
+    let owner = fx.spawn(UnitType::Monster, 0, a, 41, 30);
+    let p = MissileParams {
+        owner: Some(owner),
+        origin: Some(owner),
+        class: 0,
+        flags: param_flags::TARGET_ABSOLUTE,
+        target_x: 79,
+        target_y: 30,
+        init: Some((crate::missiles::bodies_ext::ZIGZAG_CALLBACK, 0)),
+        ..MissileParams::default()
+    };
+    let m = fx
+        .sim
+        .missiles(&mut fx.game, |g, cx| create_missile(g, cx, &p))
+        .unwrap()
+        .expect("created");
+    let start = dynamic(&mut fx, m);
+    assert_eq!(start.cur_point, 0);
+    fx.tick();
+    let d = dynamic(&mut fx, m);
+    assert_eq!(
+        (d.precise_x, d.precise_y),
+        (start.precise_x, start.precise_y)
+    );
+    assert_eq!(d.cur_point, 1);
+    let p1 = d.point(1);
+    fx.tick();
+    let e = dynamic(&mut fx, m);
+    let toward = |from: u32, to: i32| (i64::from(to) * 0x10000 + 0x8000 - i64::from(from)).signum();
+    assert_eq!(
+        (
+            (i64::from(e.precise_x) - i64::from(d.precise_x)).signum(),
+            (i64::from(e.precise_y) - i64::from(d.precise_y)).signum()
+        ),
+        (toward(d.precise_x, p1.x), toward(d.precise_y, p1.y))
+    );
+    fx.assert_clean();
 }
 
 // Covers: specs/sim/path-placement.md §6 r4; specs/missiles/bodies-2.md §46 r2

@@ -32,17 +32,17 @@
 |   2. Think dispatch `0x005B1740` | 292–431 |
 |   3. AI control and AI tables | 432–603 |
 |   4. AI parameters | 604–622 |
-|   5. Target selection | 623–806 |
-|   6. Distances and line tests | 807–821 |
-|   7. Tactics helpers | 822–1061 |
-|   8. AI commands and minions | 1062–1088 |
-|   10. The catalogue `ai-functions.tsv` | 1089–1109 |
-| Constants & data dependencies | 1110–1133 |
-| Randomness | 1134–1155 |
-| Edge cases & original bugs | 1156–1197 |
-| Test vectors | 1198–1286 |
-| Provenance | 1287–1347 |
-| Open questions | 1348–1451 |
+|   5. Target selection | 623–830 |
+|   6. Distances and line tests | 831–845 |
+|   7. Tactics helpers | 846–1085 |
+|   8. AI commands and minions | 1086–1112 |
+|   10. The catalogue `ai-functions.tsv` | 1113–1133 |
+| Constants & data dependencies | 1134–1157 |
+| Randomness | 1158–1179 |
+| Edge cases & original bugs | 1180–1221 |
+| Test vectors | 1222–1310 |
+| Provenance | 1311–1371 |
+| Open questions | 1372–1475 |
 <!-- /index -->
 
 ## Summary
@@ -703,6 +703,16 @@ D2MOO `sub_6FCF2110`. Returns target, distance, combat:
    +0x24 := (it was 0). Combat := melee-range test `0x00622C40(unit,
    target, 0)` (`sim/units.md`). Distance := B.
 
+PROVISIONAL (REC-1698): the vision record (monster data +0x50) is the
+coordinate record of `population.md` §9.6 step 3 (the caller's record,
+else the one at the creation point, `0x0061AD30`), shared by identity
+(act, clipped rect, index) between the monsters that hold it; step 7
+writes 1 to its +0x24 and nothing clears it; a monster created without
+that call (no population placement) has none. Settled by: PC 1 item
+"[q-fix-seed-game] Monster "vision" record" and
+`a1-warp-tower-cellar-ama` frame 45 (the fallen3 leader 1:10 acquires
+the player once minion 1:12 has seen it).
+
 Draws: none here (except §5.1 k = 3). Ties keep the earlier node.
 
 **Target-node lists** (game +0x10F8 + 4·slot; node 0x10 bytes {unit,
@@ -768,6 +778,20 @@ alignment, four sub-tiles away: a Clay Golem and a Valkyrie in
 `nec-clay-golem.check` / `ama-valkyrie.check` follow and wander for
 50 frames, q-fix-skills-4cls 2026-10-09); settled by reading
 `0x005DCA70`.
+
+PROVISIONAL (REC-1695): `0x005DDC30` as d2rs runs it (`d2-sim`
+`wiring/action/ai_scan.rs`): the forced target (§5.1 with a = 0, s = 1)
+first, else scan 6 over every unit of the scanner's near-room list (own
+room included, list order, §5.4 mode 0) with the callback rules above,
+then `0x005DD510` on the scan's main M and alternative A: a player
+scanner or no A → M; no M → A; A's distance > 5 → M; else the trial path
+and scan 7 (not read in detail; the host answers, keeping M by default).
+Returned: the pick, its distance (0x7FFFFFFF without one) and the
+melee-range test `0x00622C40(unit, pick)`. In rule 1 the `roll(100)` on a
+state-146 player's seed is drawn before the melee-range test (the order
+is not read). Settled by: the PC 1 read of `0x005DDC30` / `0x005DC970`
+(the REC-1270 item) and `milestone-baal-throne` frame 50 (SuccubusWitch's
+`Skill5` draw at `0x5e242e` follows a found S).
 
 So `0x005DDC30` sees targets closer than 49; each caller applies its
 own distance gate (the Hireable think: E < 25, `ai-bodies-6.md` §7

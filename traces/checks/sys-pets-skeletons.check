@@ -1,0 +1,19 @@
+check 1
+# Census: pets, the maximum and group eviction (sim/pets.md §1-§7, §10): a
+# necromancer with Raise Skeleton at 1 raises from four corpses in a row;
+# the pet cap (skeleton count) evicts the oldest. Blood Moor, no population.
+# State and rng channels.
+name sys-pets-skeletons
+save ScnNec --class nec --expansion --level 30 --skill 0=1 --right-skill 70
+seed 1234
+ticks 220
+seconds 400
+channels state rng
+ignore q
+variant blood-moor-empty
+at 4 poke warp 2
+at 10 poke spawn 179 @x+4 @y normal
+at 10 poke spawn 179 @x+5 @y+2 normal
+at 10 poke spawn 179 @x+5 @y-2 normal
+at 10 poke spawn 179 @x+6 @y normal
+input frame 20; rclick 544 336; frame 60; rclick 544 336; frame 100; rclick 544 336; frame 140; rclick 544 336

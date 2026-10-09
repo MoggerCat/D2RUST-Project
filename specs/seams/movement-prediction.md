@@ -167,6 +167,20 @@ None of its own: the owner specs' state changes, as listed per rule.
 3. The check's correction moves the prediction only when it takes the
    server's point (`client/model.md` §6 r8, the play preview's
    `Checked::Followed`).
+4. A player mode request that sets a non-walking mode (every code but
+   0x00, 0x01, 0x02, 0x17, 0x18: hit, death, a skill) ends the
+   prediction's walk, as the server's mode change ends its walk
+   (`client/model.md` §8 r4, PROVISIONAL REC-1250).
+5. The prediction's path sees the same blockers as the server's: the
+   client DRLG's grids, the living monsters (`client/msg-units.md` §3
+   r2) and the objects whose mode has collision (§1.3 r2, PROVISIONAL
+   REC-1251).
+6. The click decisions that act on a unit at once or walk to it first
+   (`ui/controls.md` §6 r9.2) measure with the unit distance
+   `0x00641530` (`sim/pathing.md` §9.5), the server's test for the same
+   message (`items/inventory-moves.md` §7.1, `world/npc.md` §2 r3); with
+   another distance the client sends a pick-up or interact the server
+   answers with a walk the client does not see.
 
 ## Constants & data dependencies
 

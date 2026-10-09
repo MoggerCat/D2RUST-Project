@@ -1,0 +1,44 @@
+{
+ "channel": "packets",
+ "check": "items-vendor-lysander-stock",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "400",
+  "--ticks",
+  "140",
+  "--auto",
+  "ScnBuy",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--poke",
+  "4 warp 40",
+  "--poke",
+  "12 goto unit 202",
+  "--send",
+  "62 InteractWithEntity type=1 id=@1:202",
+  "--send",
+  "64 InitEntityChat id=@1:202",
+  "--send",
+  "66 EntityAction action=1 npc=@1:202 item=0"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "dec021c6df6d325775189de224438a3285607a67c3e4478f4e89eeea4e8aff64",
+   "size": 205225
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "f1a1b47c7ab851611b26c92a5ce903fd9bcae500a01772e5631440edef490ce1",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "07bef22def593cb31d444f383466ce2c28ba60d6024a315bca7735b30e2c1716"
+ }
+}

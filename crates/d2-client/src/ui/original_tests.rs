@@ -1887,8 +1887,10 @@ mod hud_small {
     fn a_belt_with_extra_rows_moves_the_mini_panel_left() {
         use crate::bridge::items::mode;
         use crate::ui::panels::inv_items::tests::world as item_world;
-        // A worn belt of `belts` type 0 (3 rows, §5 r7) whose extra rows
-        // were shown (`[0x007BEFA0]` = 1, §5 r3).
+        // A worn belt of `belts` type 0 (3 rows, §5 r7) whose rows are
+        // shown by the belt key (state 0x1F open; `a1-panel-belt-open`:
+        // 1.14d draws the mini panel at x 195). With the rows folded again
+        // the panel is back at layout 2 (REC-1435).
         let mut w = item_world(&[(7, mode::BODY, (8, 0, 0, 0), b"lbl ")], None);
         let me = w.local_player.unwrap();
         w.units.get_mut(&me).unwrap().mode = 1;
@@ -1898,13 +1900,19 @@ mod hud_small {
             types: BTreeMap::from([(*b"lbl ", 0)]),
             beltable: Default::default(),
         });
-        u.ui.shared.borrow_mut().hud.belt.state.extra_boxes = true;
+        u.ui.shared.borrow_mut().states.force(0x1F, true);
         mini_open(&mut u);
         let art: Vec<(i32, i32)> = panel_images(&u.images(&w), "panel\\minipanel_s")
             .into_iter()
             .map(|(_, x, y)| (x, y))
             .collect();
         assert_eq!(art, vec![(195, 553)]);
+        // The next frame draws the rows (the state 0x1F draw sets the pop-up
+        // flag after the belt draw), which sets `[0x007BEFA0]` (§5 r3).
+        // (The test's belt has no `belts.bin` records, so its rows are not
+        // drawn: set the flag the draw would.)
+        let _ = u.images(&w);
+        u.ui.shared.borrow_mut().hud.belt.state.extra_boxes = true;
         // Button 5 (Quest Log) at x0 = 198: x 303 … 323.
         u.click(&w, Point::new(198 + 105 + 10, 540));
         assert!(u.ui.is_open(0x0F));

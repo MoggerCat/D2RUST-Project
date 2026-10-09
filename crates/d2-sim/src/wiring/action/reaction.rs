@@ -387,6 +387,18 @@ pub const UNIT_FLAG_NO_EXPERIENCE: u32 = 0x0400_0000;
 /// 3. A monster victim: the death mode request toward A, the quest kill
 ///    parse unless D has unit flag 0x80000000, the barricade doors.
 pub fn kill<X: Pending>(cv: &mut CombatView<'_, X>, d: UnitId, a: UnitId) {
+    kill_by(cv, d, Some(a));
+}
+
+/// [`kill`] with the killer A optional (`damage.md` §7.2: "A present"
+/// gates step 2; step 3 faces D's current direction without A). The
+/// monster death by regeneration (`stat-lists.md` §10.1 step 6) passes
+/// the poison / open-wounds owner, which may be gone.
+///
+/// TODO(damage.md §7.2 steps 1, 3): without A, the [`KillStep`] seams
+/// (pet credit, quest kill parse, barricade doors) take a unit and are
+/// not called.
+pub fn kill_by<X: Pending>(cv: &mut CombatView<'_, X>, d: UnitId, a: Option<UnitId>) {
     let Some(r) = cv.v.units.get(d) else {
         return;
     };
@@ -419,38 +431,48 @@ pub fn kill<X: Pending>(cv: &mut CombatView<'_, X>, d: UnitId, a: UnitId) {
                 q.push(d);
             }
             let game = &mut *cv.game;
-            cv.v.h.x.kill_step(game, KillStep::PetCredit, d, a);
+            if let Some(a) = a {
+                cv.v.h.x.kill_step(game, KillStep::PetCredit, d, a);
+            }
         }
         _ => return,
     }
-    // Step 2: A is present at every caller here.
-    if flags & UNIT_FLAG_NO_EXPERIENCE == 0 {
-        if let Some(t) = cv.v.h.vitals.clone() {
-            distribute(cv, &t, a, d);
+    // Step 2.
+    if let Some(a) = a {
+        if flags & UNIT_FLAG_NO_EXPERIENCE == 0 {
+            if let Some(t) = cv.v.h.vitals.clone() {
+                distribute(cv, &t, a, d);
+            }
         }
+        let game = &mut *cv.game;
+        cv.v.h
+            .x
+            .kill_step(game, KillStep::AttackerBookkeeping, d, a);
     }
-    let game = &mut *cv.game;
-    cv.v.h
-        .x
-        .kill_step(game, KillStep::AttackerBookkeeping, d, a);
     if ty != UnitType::Monster {
         return;
     }
     // Step 3.
-    // The death request's direction toward A (`0x00621DC0(D, A x, A y)`),
-    // applied by the mode set's snap `0x006488A0` (`sim/pathing.md` §8.5).
-    let at = cv.v.h.path_position(a);
-    if let Some(dir) = cv.v.path_dir64(d, at) {
-        cv.v.path_snap_direction(d, dir);
+    let game = &mut *cv.game;
+    if let Some(a) = a {
+        // The death request's direction toward A (`0x00621DC0(D, A x, A
+        // y)`), applied by the mode set's snap `0x006488A0`
+        // (`sim/pathing.md` §8.5).
+        let at = cv.v.h.path_position(a);
+        if let Some(dir) = cv.v.path_dir64(d, at) {
+            cv.v.path_snap_direction(d, dir);
+        }
+        cv.v.h.x.kill_step(game, KillStep::FaceAttacker, d, a);
     }
-    cv.v.h.x.kill_step(game, KillStep::FaceAttacker, d, a);
-    cv.v.h.mode_target = Some(a);
+    cv.v.h.mode_target = a;
     cv.v.monster_set_mode(game, d, monster_mode::DT);
     cv.v.h.mode_target = None;
-    if !cv.v.h.x.is_revived(d) {
-        cv.v.h.x.kill_step(game, KillStep::QuestKill, d, a);
+    if let Some(a) = a {
+        if !cv.v.h.x.is_revived(d) {
+            cv.v.h.x.kill_step(game, KillStep::QuestKill, d, a);
+        }
+        cv.v.h.x.kill_step(game, KillStep::BarricadeDoors, d, a);
     }
-    cv.v.h.x.kill_step(game, KillStep::BarricadeDoors, d, a);
 }
 
 /// The distribution's world calls (`vitals.md` §4.4) on the action

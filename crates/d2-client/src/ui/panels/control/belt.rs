@@ -272,6 +272,11 @@ impl BeltState {
     pub fn clear_popped(&mut self, state_1f_open: bool, state_9_open: bool) {
         if (!state_1f_open && !self.ef9c) || state_9_open {
             self.popped = false;
+            // PROVISIONAL (specs/ui/control-panel.md §5 r2; REC-1435): the rows
+            // folded, so `[0x007BEFA0]` reads 0 again for the mini panel's
+            // sides (§9 r2); settled by a1-panel-character .. cube, where 1.14d
+            // draws the mini panel at layout 2 after the belt key closed the rows.
+            self.extra_boxes = false;
         }
     }
 
@@ -502,6 +507,7 @@ impl BeltState {
             self.hovered = false;
             if !gates.state_1f_open {
                 self.popped = false;
+                self.extra_boxes = false; // PROVISIONAL (REC-1435), see `clear_popped`
             }
             return false;
         }
@@ -767,6 +773,12 @@ mod tests {
             ]
         );
         assert!(s.extra_boxes);
+        // The rows fold (state 0x1F closed): `[0x007BEFA0]` reads 0 again
+        // (PROVISIONAL, REC-1435; a1-panel-character: mini panel at layout 2).
+        s.clear_popped(false, false);
+        assert!(!s.popped && !s.extra_boxes);
+        s.popped = true;
+        s.extra_boxes = true;
         // Not popped: no rows.
         s.popped = false;
         assert!(s.popup_draws(640, 480).is_empty());

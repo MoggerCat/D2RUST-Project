@@ -133,6 +133,42 @@ fn damage_reschedules_monster_regen_and_kills_at_zero_life() {
     fx.assert_clean();
 }
 
+/// `stat-lists.md` §10.1 step 6: poison (a state-2 list with stat 74
+/// below 0) takes a monster's life to 0 in its regeneration event; the
+/// monster is killed (`0x0057CCB0`, death mode) by the list's owner, and
+/// the death events follow (PROVISIONAL REC-1260: killed 10 on the unit,
+/// kill 9 on the owner). Recorded: `check-combat-elements` f78, the quill
+/// rat poisoned by the player's javelin dies at life 0.
+// Covers: specs/sim/stat-lists.md §10.1 text
+#[test]
+fn poison_kills_a_monster_at_zero_life_by_its_owner() {
+    let mut fx = Fx::new();
+    let p = fx.spawn(UnitType::Player, 0, fx.a, 10, 10);
+    let m = fx.spawn(UnitType::Monster, 0, fx.a, 12, 10);
+    fx.stats(m, &[(st::MAXHP, 5120), (st::HITPOINTS, 100)]);
+    const POISON: u16 = 2;
+    fx.sim.combat(&mut fx.game, |w, _| {
+        w.create_state_list(m, POISON, p, 50);
+        w.set_state_list_stat(m, POISON, st::HPREGEN, -87);
+        w.set_state(m, POISON, true);
+    });
+    fx.game
+        .schedule_event(m, u32::from(event::STAT_REGEN), 1, None, 0, 0)
+        .unwrap();
+    fx.sim.hooks().x.log.clear();
+    fx.frame();
+    assert_eq!(fx.stat(m, st::HITPOINTS), 13);
+    assert_ne!(fx.sim.sys.units.get(m).unwrap().mode, 0);
+    fx.frame();
+    assert_eq!(fx.stat(m, st::HITPOINTS), 0);
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().mode, 0);
+    let log = &fx.sim.hooks().x.log;
+    let killed = format!("event 10 Some({})", m.0);
+    let kill = format!("event 9 Some({})", p.0);
+    let i = log.iter().position(|l| *l == killed).expect("killed event");
+    assert_eq!(log.get(i + 1), Some(&kill));
+}
+
 #[test]
 fn state_lists_expire_through_the_type_12_event() {
     // Combat's state-list effects on the real stat lists, expired by the

@@ -21,6 +21,7 @@
 //! an adapter only maps one seam call to the provider's call.
 
 pub mod ai;
+pub mod ai_scan;
 pub mod combat;
 pub mod death;
 pub mod dispatch;
@@ -172,6 +173,10 @@ pub struct ActionHooks<X> {
     pub missiles: Option<MissileStore>,
     /// Lent to the AI code during a think (`None` then).
     pub ai: Option<AiStore>,
+    /// The +0x24 word of the coordinate records monsters hold as their
+    /// vision record (monster data +0x50, `monsters/ai.md` §5.2 steps 2
+    /// and 7), by record identity; absent = 0.
+    pub vision_seen: BTreeMap<crate::monsters::init::VisionRecord, u32>,
     /// Game fields the AI reads (game +0x6A, +0x74, +0x6D).
     pub ai_info: GameInfo,
     /// Combat lists (unit +0xAC, `damage.md` §3 step 3), first = newest.
@@ -302,6 +307,9 @@ pub struct ActionHooks<X> {
     /// The quest host is running a route: routes it raises are queued and
     /// run right after it.
     quest_host_out: bool,
+    /// The preset paths the quest map-AI stores keep (`quests-act5.md`
+    /// §5.8 "Map-AI stores"); a handle is the index + 1.
+    pub map_ai_paths: Vec<Vec<crate::monsters::ai::MapNode>>,
     /// Objects allocated by [`View::allocate`] whose per-kind init waits
     /// for the allocation's game-seed step to be written back (`None`
     /// outside such an allocation).
@@ -441,8 +449,10 @@ impl<X> ActionHooks<X> {
             monster_request: 0,
             monster_world: None,
             monster_world_out: false,
+            vision_seen: BTreeMap::new(),
             quest_host: None,
             quest_host_out: false,
+            map_ai_paths: Vec::new(),
             deferred_inits: None,
             alloc_rooms: Vec::new(),
             paths: None,

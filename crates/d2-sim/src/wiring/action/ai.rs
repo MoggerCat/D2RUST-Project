@@ -156,11 +156,30 @@ impl<X: Pending> AiUnits for View<'_, X> {
     fn is_boss(&self, unit: UnitId) -> bool {
         self.h.x.is_boss(unit)
     }
+    /// Monster data +0x50 (the coordinate record of `population.md`
+    /// §9.6 step 3) and its +0x24 word: a monster of the lent monster
+    /// world reads [`super::ActionHooks::vision_seen`]; other units ask
+    /// [`Pending`].
     fn vision_seen(&self, unit: UnitId) -> Option<u32> {
-        self.h.x.vision_seen(unit)
+        match self.h.monster_data(unit) {
+            Some(m) => m
+                .vision
+                .map(|r| self.h.vision_seen.get(&r).copied().unwrap_or(0)),
+            None => self.h.x.vision_seen(unit),
+        }
     }
+    /// §5.2 step 7 on the record: +0x24 := 1.
+    ///
+    /// PROVISIONAL (`ai.md` §5.2 step 7 "vision +0x24 := (it was 0)";
+    /// REC-1698): the word is set to 1 and never cleared.
     fn mark_seen(&mut self, unit: UnitId) {
-        self.h.x.mark_seen(unit);
+        match self.h.monster_data(unit).map(|m| m.vision) {
+            Some(Some(r)) => {
+                self.h.vision_seen.insert(r, 1);
+            }
+            Some(None) => {}
+            None => self.h.x.mark_seen(unit),
+        }
     }
     fn ai_reset(&mut self, unit: UnitId) {
         self.h.x.ai_reset(unit);
@@ -440,8 +459,14 @@ impl<X: Pending> AiWorld for View<'_, X> {
 }
 
 impl<X: Pending> AiTargets for View<'_, X> {
+    /// The host's lists (slot heads) followed by the nodes inserted
+    /// through `0x005B1990` / `0x005B1900` ([`Game::target_nodes`]).
     fn target_nodes(&self, game: &Game) -> [Vec<UnitId>; 10] {
-        self.h.x.target_nodes(game)
+        let mut nodes = self.h.x.target_nodes(game);
+        for (slot, list) in nodes.iter_mut().enumerate() {
+            list.extend(game.target_nodes.slot(slot).iter().copied());
+        }
+        nodes
     }
     fn forced_target(&mut self, game: &mut Game, unit: UnitId) -> Option<(UnitId, i32)> {
         self.h.x.forced_target(game, unit)
@@ -463,82 +488,9 @@ impl<X: Pending> AiTargets for View<'_, X> {
     ) -> bool {
         self.h.x.choose_alternative(game, unit, main, alt)
     }
-    /// `0x005DDC30` (`ai.md` §5.3) with the host's candidate list: the
-    /// scan 6 callback `0x005DCBD0` (full-size distance < 49, `nThreat`
-    /// class slots, the mask 4 line test) and the pick between main and
-    /// alternative (`0x005DD510`: no main → the alternative).
-    /// PROVISIONAL (q-fix-ass-traps, REC-1270): the filter `0x005DC970`
-    /// beyond alive / hostile and `0x005DD510`'s other branches are not
-    /// applied; settled by the ass-lightning-sentry-hit check.
+    /// `0x005DDC30` on the wired units ([`super::ai_scan`]).
     fn secondary_target(&mut self, game: &mut Game, unit: UnitId) -> (Option<UnitId>, i32, bool) {
-        let Some(cands) = self.h.x.secondary_candidates(game, unit) else {
-            return self.h.x.secondary_target(game, unit);
-        };
-        let at = self.h.path_position(unit);
-        let size = self.path_size(unit);
-        let mut main = (None, 0x7FFF_FFFF);
-        let mut alt = (None, 0x7FFF_FFFF);
-        for c in cands {
-            let d = crate::monsters::ai::distance_full_size(at, size, self.h.path_position(c));
-            if d >= 49 {
-                continue;
-            }
-            let is_player = self
-                .units
-                .get(c)
-                .is_some_and(|r| r.ty == crate::units::UnitType::Player);
-            let threat = match self.units.get(c) {
-                Some(_) if is_player => 14,
-                Some(r) => self
-                    .h
-                    .tables
-                    .combat
-                    .monstats
-                    .get(r.class as usize)
-                    .map_or(0, |m| i32::from(m.threat)),
-                None => continue,
-            };
-            // PROVISIONAL (specs/monsters/ai.md §5.3 step 1, REC-1270): a
-            // monster candidate in the scanner's melee range (`0x00622C40`
-            // step 3: d ≤ 0, or d ≤ `MeleeRng` + 1; the line a → c is not
-            // tested) is skipped, whatever its states; 1.14d: a Lightning
-            // Sentry (MeleeRng 0) never picks a Fallen at distance 1.
-            if !is_player {
-                let reach = self
-                    .h
-                    .tables
-                    .combat
-                    .monstats
-                    .get(self.units.get(unit).map_or(0, |r| r.class as usize))
-                    .and_then(|m| {
-                        self.h
-                            .tables
-                            .combat
-                            .monstats2
-                            .get(usize::from(m.monstatsex))
-                    })
-                    .map_or(0, |m2| match m2.meleerng {
-                        255 => 0,
-                        r => i32::from(r),
-                    });
-                if d <= 0 || d <= reach + 1 {
-                    continue;
-                }
-            }
-            let slot = if threat >= 2 { &mut main } else { &mut alt };
-            if d >= slot.1 {
-                continue;
-            }
-            if self.line_blocked(game, unit, c) {
-                continue;
-            }
-            *slot = (Some(c), d);
-        }
-        let (t, d) = if main.0.is_some() { main } else { alt };
-        match t {
-            Some(t) => (Some(t), d, self.h.x.in_melee_range(unit, t, 0)),
-            None => (None, 0x7FFF_FFFF, false),
-        }
+        self.secondary_search(game, unit)
     }
     /// `0x005DDF20` (`ai.md` §5.3): scan 2 (mode 1, §5.4: the client
     /// players of the unit's room's near-room list, own room included, in
@@ -1087,6 +1039,18 @@ impl<X: Pending> AiSummons for View<'_, X> {
     }
     fn target_slot(&self, unit: UnitId) -> i32 {
         self.units.get(unit).map_or(11, |r| r.node_index as i32)
+    }
+    /// `0x005B1990(game, unit, 0, slot)`: the node at the head of list
+    /// `slot`; unit +0xD0 := slot (`ai.md` §5.2).
+    fn register_target_node(&mut self, game: &mut Game, unit: UnitId, slot: i32) {
+        let Some(r) = self.units.get_mut(unit) else {
+            return;
+        };
+        let Ok(index) = u8::try_from(slot) else {
+            return;
+        };
+        r.node_index = index.into();
+        game.target_nodes.push_front(slot, unit);
     }
     /// `0x00574BD0` from the published hireling facts: the `Id` of the
     /// unit's node when `owner` holds it.

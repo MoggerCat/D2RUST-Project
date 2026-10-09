@@ -1,0 +1,38 @@
+{
+ "channel": "packets",
+ "check": "cube-060-3-perfect-gems-1-magic-item-ma",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "24",
+  "--auto",
+  "ScnCube",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--send",
+  "4 UseGridItem item=@1 x=@x y=@y",
+  "--send",
+  "8 ClickButton button=24 p1=0 p2=0"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "f27ac3386c2cd77df049443d76b0e91df45eacfd1fb44bbd8d7fe6afbda4a6b8",
+   "size": 45932
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "55f5564d78038c08974013acd9dd61a44f1a752a2bdb4ba933ac184d31e8ebe9",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "b6f01161696332e66bee9cbca26a3f10600b48ac8e5031f07571ea7db5b8efa5"
+ }
+}

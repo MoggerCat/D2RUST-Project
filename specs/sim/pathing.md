@@ -36,17 +36,17 @@
 |   6. Straight (type 7, `0x00679ED0`) | 453–462 |
 |   7. A* (type 1, `0x0067B850`) | 463–500 |
 |   8. Velocity, direction vector, facing | 501–613 |
-|   9. Per-tick movement | 614–797 |
-|   10. Messages | 798–860 |
-|   11. Missile paths (`0x00649760`) | 861–913 |
-|   12. Other path types (1.14d-read 2026-10-08) | 914–1127 |
-|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1128–1277 |
-| Constants & data dependencies | 1278–1314 |
-| Randomness | 1315–1325 |
-| Edge cases & original bugs | 1326–1373 |
-| Test vectors | 1374–1412 |
-| Provenance | 1413–1468 |
-| Open questions | 1469–1542 |
+|   9. Per-tick movement | 614–802 |
+|   10. Messages | 803–865 |
+|   11. Missile paths (`0x00649760`) | 866–918 |
+|   12. Other path types (1.14d-read 2026-10-08) | 919–1132 |
+|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1133–1282 |
+| Constants & data dependencies | 1283–1319 |
+| Randomness | 1320–1330 |
+| Edge cases & original bugs | 1331–1378 |
+| Test vectors | 1379–1417 |
+| Provenance | 1418–1473 |
+| Open questions | 1474–1547 |
 <!-- /index -->
 
 ## Summary
@@ -714,7 +714,12 @@ axis Δ − (size1/2 + size2/2) (not below 0), then 2·max + min.
    before calling with a (0, 0) vector.)
 3. Δ := velocity vector. Not a missile: R := point[index] centre −
    position; if |R.x| ≤ M and |R.y| ≤ M with M = max(|Δx|, |Δy|): Δ := R
-   and "reaches the point".
+   and "reaches the point". PROVISIONAL: missiles snap too (because the
+   1.14d recording `dru-tornado` shows the tornado, path type 10 with
+   point 0 = its start cell, keep its exact position on its first tick
+   while its facing turns to point 1, then fly straight to point 1:
+   frames 30–31, which only Δ = R = (0, 0), index 1 and the §9.4 rule
+   2.5 aim give); settled by a read of `0x00650660` (REC-1391).
 4. If position + Δ is in another cell: distance budget (+0x90) −= 1 when
    > 0 and the type is not 8 or 11; cell walk (rule 9.6.5); blocked →
    Q := the centre of the last free cell, and: "monster re-path" → re-path

@@ -73,6 +73,17 @@ pub trait LevelTypes {
         Vec::new()
     }
 
+    /// The path of the room's preset unit `index` (`preset.md` §5.2 step
+    /// 10), as (action, x, y) points in level sub-tiles, if it has one.
+    fn unit_path(
+        &self,
+        _drlg: &Drlg,
+        _room: DrlgRoomId,
+        _index: usize,
+    ) -> Option<Vec<(u32, i32, i32)>> {
+        None
+    }
+
     /// The client presets of a room (`client/model.md` §5 r6.2,
     /// `0x00466820`): its preset units whose flag word (+0x1C) has bit 0
     /// set, in list order, room-relative.

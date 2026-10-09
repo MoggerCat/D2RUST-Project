@@ -1,0 +1,18 @@
+check 1
+# A click while walking re-targets the walk (q-fix-walk-desync; the
+# a1-walk-s divergence of docs/handoff/q-tool-side-by-side.md): ScnSor,
+# -seed 1234, Rogue Encampment; left clicks 200 px from the frame centre
+# 14 frames apart, each one while the walk of the one before is under
+# way: north (400, 184) before frame 22's drain, then south (400, 384) at
+# 36, north-east (541, 213) at 50, south-west (259, 355) at 64. Compares
+# the player (mode, path target and position per frame). Spec:
+# specs/tools/scenario-diff.md §2 rule 4.
+name walk-click-walk-sor
+save ScnSor --class sor --expansion
+seed 1234
+ticks 110
+seconds 300
+channels state
+input frame 22; click 400 184; frame 36; click 400 384; frame 50; click 541 213; frame 64; click 259 355
+# as walk-town-ama: the game seed order and fc / sp are not the walk's
+ignore seed s fc sp

@@ -16,7 +16,8 @@ hours) | M (2-8) | L (>8), `-` exactly for EQUAL. Fixed by the coordinator
 Merge: rows of the coverage parts (group `coverage`) whose area is also in an
 entity part only set that row's `exercised` (yes wins over no over ?); the
 other coverage rows are added as rows. A duplicate area between entity parts
-keeps the first (part files in name order) and is listed as a conflict.
+keeps the session part over a base inventory part (BASE_PARTS); between two
+session parts it keeps the first (name order) and lists a conflict.
 Completeness: every spec file under specs/, every traces/checks/*.check and
 every message id of specs/sim/client-messages.tsv / server-messages.tsv must
 be named by some row (specs / checks columns; area net.c2s.0xNN /
@@ -70,7 +71,12 @@ class Repo:
             # specs/tools/ describe our own measuring tools, not 1.14d behaviour
             and not os.path.relpath(p, root).replace(os.sep, "/").startswith("specs/tools/"))
         self.checks = sorted(os.path.basename(p)[:-6] for p in
-                             glob.glob(os.path.join(root, "traces", "checks", "*.check")))
+                             glob.glob(os.path.join(root, "traces", "checks", "*.check"))
+                             + glob.glob(os.path.join(root, "traces", "checks", "gen", "*.check")))
+        # generated checks (tools/check-gen) may be named in `checks`; they are not
+        # part of the completeness rule above
+        self.gen_checks = sorted(os.path.basename(p)[:-6] for p in
+                                 glob.glob(os.path.join(root, "traces", "checks", "gen", "*.check")))
         self.messages = []
         for d, f in (("c2s", "client-messages.tsv"), ("s2c", "server-messages.tsv")):
             p = os.path.join(root, "specs", "sim", f)
@@ -136,7 +142,7 @@ def check_row(r, repo):
         if p and not os.path.exists(os.path.join(repo.root, p)):
             e.append(f"{at}: spec '{p}' does not exist")
     for c in split_list(r["checks"]):
-        if not any(fnmatch_name(c, k) for k in repo.checks):
+        if not any(fnmatch_name(c, k) for k in repo.checks + repo.gen_checks):
             e.append(f"{at}: check '{c}' matches no traces/checks/*.check")
     if not VERDICT_RE.match(r["last_verdict"]):
         e.append(f"{at}: last_verdict '{r['last_verdict']}' not MATCH|PARTIAL|DIVERGED@N|-")
@@ -347,6 +353,10 @@ def apply_seen(rows, seen, zero):
     return yes, down
 
 
+# the inventory parts of the first ledger build; a session part overrides their rows
+BASE_PARTS = {"items.tsv", "monsters.tsv", "skills.tsv", "systems.tsv", "world.tsv"}
+
+
 def merge(parts, repo, status, coverage=(set(), set())):
     """parts: [(name, rows)] in name order. Returns (rows, notes dict)."""
     rank = {"yes": 2, "no": 1, "?": 0}
@@ -359,6 +369,12 @@ def merge(parts, repo, status, coverage=(set(), set())):
                 continue
             if r["area"] in by_area:
                 first = by_area[r["area"]]
+                if os.path.basename(first["_file"]) in BASE_PARTS and \
+                        os.path.basename(r["_file"]) not in BASE_PARTS:
+                    # a session's part (a check run) supersedes the base inventory row
+                    out[out.index(first)] = r
+                    by_area[r["area"]] = r
+                    continue
                 conflicts.append(f"`{r['area']}`: {first['_file']}:{first['_line']} kept, "
                                  f"{r['_file']}:{r['_line']} dropped")
                 continue

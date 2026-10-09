@@ -63,10 +63,15 @@ are the poke tool's.
    tool's RNG, never the game's): 22 % left click (half anywhere, half
    near the centre), 8 % right click, 2 % cursor move, 10 % a click on a
    unit in view (its sub-tile projected 32 × 16 around the frame centre),
-   18 % a key action, 6 % `interact` with a unit within 25 sub-tiles, 21 %
+   18 % a key action, 6 % `interact` with a unit the client would
+   interact with at once (unit distance ≤ 4 for an item, ≤ 2 otherwise:
+   `ui/controls.md` §6 r9.2; from farther the server walks the player
+   and the client, which sent no walk, stands), 21 %
    an item move (cursor item: drop, insert into page 0/1/3/4, equip to a
    body location 1–12, belt slot 0–15; no cursor item: pick a ground
-   item within 30 sub-tiles, remove, use from the belt, use from the
+   item within the client's own pick-up distance (unit distance ≤ 4,
+   `ui/controls.md` §6 r9.2: the client sends C→S 0x16 only there and
+   walks to a farther item first, which the unit clicks cover), remove, use from the belt, use from the
    grid), 4 % a portal scroll / book from the grid, 5 % a waypoint
    (interact, or C→S 0x49 to a waypoint level, 1 in 5 to any level
    0–136), else `wait 1–20`. Unit and item choices come from the client

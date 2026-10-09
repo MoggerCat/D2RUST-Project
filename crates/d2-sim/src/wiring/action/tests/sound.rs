@@ -143,7 +143,9 @@ fn monster_update_flushes_the_sound() {
 }
 
 /// A monster world holding only monster data (the step-10 read).
-struct DataOnly(std::collections::BTreeMap<UnitId, crate::monsters::init::MonsterData>);
+pub(super) struct DataOnly(
+    pub(super) std::collections::BTreeMap<UnitId, crate::monsters::init::MonsterData>,
+);
 
 impl<X> crate::wiring::action::monsters::MonsterWorld<X> for DataOnly {
     fn type_init(
@@ -173,6 +175,9 @@ impl<X> crate::wiring::action::monsters::MonsterWorld<X> for DataOnly {
     fn forget(&mut self, _: UnitId) {}
     fn monster(&self, unit: UnitId) -> Option<&crate::monsters::init::MonsterData> {
         self.0.get(&unit)
+    }
+    fn monster_mut(&mut self, unit: UnitId) -> Option<&mut crate::monsters::init::MonsterData> {
+        self.0.get_mut(&unit)
     }
     fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
         self

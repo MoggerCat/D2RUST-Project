@@ -1,0 +1,36 @@
+{
+ "channel": "packets",
+ "check": "gen-netc2s-35",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "240",
+  "--ticks",
+  "40",
+  "--auto",
+  "ScnAma",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--send",
+  "20 Repair npc=@player item=0 unread=0 repair_flags=0"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "5a20ec147a08fcbf8b6da61fdf6d8ec6cafafdcf7fad0337ab9df73ceecf5f7b",
+   "size": 61302
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "592ad6daa60520503eec3301bce832223dc4e60dc77309ed069855bf920004cf",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "c098d7905cb83f92fe70f1b392b1e08faf1dd04e1f6d9e100a0ca523eaafb1bd"
+ }
+}

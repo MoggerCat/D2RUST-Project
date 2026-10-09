@@ -1940,3 +1940,20 @@ fn not_intro_test_0x005444b0() {
     assert_eq!(ctl.not_intro_test(1), Ok(false));
     assert_eq!(ctl.seed, seed);
 }
+
+// Covers: specs/world/quests-act3.md §7.7
+#[test]
+fn spawn_at_unit_is_the_flags_spawn_with_spread_minus_1() {
+    // `0x005B3090`: `0x005B2F20` at the unit's room and position, spread
+    // −1, flags 0 (REC-1696); a unit without a position spawns nothing.
+    let mut f = Fake::new();
+    let orb = UnitId(0x70);
+    assert_eq!(f.spawn_monster_at_unit(orb, 366, 1), None);
+    assert!(f.log.is_empty());
+    f.pos.insert(orb, (4496, 1811, RoomId(3)));
+    f.spawn_monster_at_unit(orb, 366, 1);
+    assert_eq!(
+        f.log,
+        ["spawn 366 4496 1811 room 3 mode 1 spread -1 flags 0x0"]
+    );
+}
