@@ -410,3 +410,130 @@ fn a_quest_spawn_draws_the_economys_game_seed() {
     assert!(made.is_some());
     assert_ne!(fields.seed, start, "the spawn's step is the economy's");
 }
+
+// -- Act IV / V seams (`quests-act4.md`, `quests-act5.md`,
+// `quests-act5-2.md`) on the action wiring.
+
+// Covers: specs/world/quests-act5.md §4.6, §4.7
+#[test]
+fn the_act5_unit_reads_come_from_the_lists() {
+    let mut fx = Fx::new();
+    let a = fx.a;
+    let m1 = fx.spawn(UnitType::Monster, 0, a, 10, 10);
+    let m2 = fx.spawn(UnitType::Monster, 0, a, 13, 10);
+    fx.sim.sys.units.get_mut(m1).unwrap().mode = 12;
+    let mut rest = Rest::new();
+    let (mode, dist, back, units) = host(&mut fx, &mut rest, None, None, |w| {
+        (
+            w.unit_mode(m1),
+            w.distance_between(m1, m2),
+            w.distance_between(m2, m1),
+            w.adjacent_units(a),
+        )
+    });
+    assert_eq!(mode, 12);
+    assert!(dist.is_some_and(|d| d >= 0), "{dist:?}");
+    assert_eq!(dist, back);
+    // The room itself is in its adjacency array; list order kept.
+    let i1 = units.iter().position(|&u| u == m1).expect("m1 listed");
+    let i2 = units.iter().position(|&u| u == m2).expect("m2 listed");
+    assert_ne!(i1, i2);
+    assert!(rest.log.is_empty(), "{:?}", rest.log);
+}
+
+// Covers: specs/world/quests-act5.md §1.1, §5.7; specs/world/quests-act5-2.md §7.6
+#[test]
+fn killed_in_place_and_removed_ancients_leave_the_lists() {
+    let mut fx = Fx::new();
+    let a = fx.a;
+    let m = fx.spawn(UnitType::Monster, 0, a, 10, 10);
+    let n = fx.spawn(UnitType::Monster, 0, a, 12, 12);
+    let mut rest = Rest::new();
+    host(&mut fx, &mut rest, None, None, |w| {
+        w.kill_in_place(m);
+        w.remove_ancient(n);
+    });
+    assert!(fx.game.lists.unit(m).is_none());
+    assert!(fx.game.lists.unit(n).is_none());
+    assert!(rest.log.is_empty(), "{:?}", rest.log);
+}
+
+// Covers: specs/world/quests-act5.md §5.7
+#[test]
+fn the_resist_list_adds_the_four_resists_and_stacks() {
+    let mut fx = Fx::new();
+    let p = player(&mut fx);
+    let mut rest = Rest::new();
+    let after = |fx: &Fx| [39u16, 41, 43, 45].map(|s| fx.sim.sys.stats.unit_total(p, s, 0));
+    host(&mut fx, &mut rest, None, None, |w| w.add_resist_list(p, 10));
+    assert_eq!(after(&fx), [10; 4]);
+    host(&mut fx, &mut rest, None, None, |w| w.add_resist_list(p, 20));
+    assert_eq!(after(&fx), [30; 4]);
+    assert!(rest.log.is_empty(), "{:?}", rest.log);
+}
+
+// Covers: specs/world/quests-act5-2.md §6.8
+#[test]
+fn a_waypoint_is_active_once_activated() {
+    let mut fx = Fx::new();
+    let p = player(&mut fx);
+    let mut rest = Rest::new();
+    let (before, after) = host(&mut fx, &mut rest, None, None, |w| {
+        let before = w.waypoint_active(p, 123);
+        let d = w.difficulty();
+        w.activate_waypoint(p, 123, d);
+        (before, w.waypoint_active(p, 123))
+    });
+    // No records yet: not active.
+    assert!(!before);
+    assert!(after);
+    assert!(rest.log.is_empty(), "{:?}", rest.log);
+}
+
+// Covers: specs/world/quests-act5-2.md §7.7; specs/combat/vitals.md §3, §4.1
+#[test]
+fn the_experience_reads_are_the_vitals_tables() {
+    let mut fx = Fx::new();
+    let p = player(&mut fx);
+    let mut rest = Rest::new();
+    // Without the vitals tables: the rest's.
+    host(&mut fx, &mut rest, None, None, |w| w.max_level(p));
+    assert_eq!(rest.log, ["unhandled 254 0x611830"]);
+    rest.log.clear();
+    fx.sim.sys.hooks.vitals = Some(std::sync::Arc::new(
+        crate::wiring::action::tests::fight::vitals(),
+    ));
+    let (max, t1, t2) = host(&mut fx, &mut rest, None, None, |w| {
+        (
+            w.max_level(p),
+            w.experience_threshold(p, 1),
+            w.experience_threshold(p, 2),
+        )
+    });
+    assert_eq!((max, t1, t2), (3, 100, 1500));
+    // 100 experience reaches level 2 (`vitals.md` §3).
+    fx.sim
+        .sys
+        .stats
+        .unit_set(&mut fx.sim.sys.hooks, p, 13, 100, 0);
+    host(&mut fx, &mut rest, None, None, |w| w.level_up(p));
+    assert_eq!(fx.sim.sys.stats.unit_base(p, 12, 0), 2);
+    assert!(rest.log.is_empty(), "{:?}", rest.log);
+}
+
+// Covers: specs/world/quests-act5-2.md §8.8
+#[test]
+fn the_zoo_reads_the_monstats_zoo_column() {
+    let mut fx = Fx::new();
+    let mut rest = Rest::new();
+    let (rows, zoo0, past) = host(&mut fx, &mut rest, None, None, |w| {
+        (w.monstats_rows(), w.zoo_eligible(0), w.zoo_eligible(99))
+    });
+    assert_eq!((rows, zoo0, past), (1, false, false));
+    std::sync::Arc::make_mut(&mut fx.sim.sys.hooks.tables)
+        .combat
+        .monstats[0]
+        .zoo = true;
+    assert!(host(&mut fx, &mut rest, None, None, |w| w.zoo_eligible(0)));
+    assert!(rest.log.is_empty(), "{:?}", rest.log);
+}

@@ -17,6 +17,10 @@ use d2_formats::d2s::appearance::Equipment;
 
 use crate::adapters::character::save::{equipment, item_list, SaveContext};
 
+/// Stats 6 and 8 (`stats.md`): hitpoints and mana.
+const HITPOINTS: u16 = 6;
+const MANA: u16 = 8;
+
 /// What the load of a save's item list did ([`WiredWorld::load_items`]).
 #[derive(Debug, Default)]
 pub struct LoadedItems {
@@ -141,6 +145,11 @@ impl<R, S> WiredWorld<R, S> {
                 super::wired::lend_skills(econ, &mut inv);
             }
             let mut d = inv.desk(econ);
+            // `formats/d2s.md` §9 rules 2 and 4: the loader remembers
+            // hitpoints and mana before the items and restores them after
+            // (item bonuses do not change them: the max-rescale of
+            // `stat-lists.md` §7.2 must not move the stored values).
+            let remembered = [HITPOINTS, MANA].map(|s| d.econ.stats.unit_total(player, s, 0));
             for (i, e) in entries.iter().enumerate() {
                 let rec = match read_save_entry(&e.bytes, d.econ.tables) {
                     Ok(rec) => rec,
@@ -181,6 +190,11 @@ impl<R, S> WiredWorld<R, S> {
                 }
             }
             d.sync_out();
+            if !corpse {
+                for (s, v) in [HITPOINTS, MANA].into_iter().zip(remembered) {
+                    d.econ.stats.unit_set(&mut *d.econ.hooks, player, s, v, 0);
+                }
+            }
             r.sent = inv_take_sent(&mut d)
                 .into_iter()
                 .filter_map(|(u, b)| Some((u?, b)))

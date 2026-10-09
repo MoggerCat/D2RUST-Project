@@ -1,4 +1,4 @@
-// Spec: specs/world/objects-client.md (Test vectors), specs/client/model.md (§5 rules 2–3, §8 rules 4 and 7)
+// Spec: specs/world/objects-client.md (Test vectors), specs/client/model.md (§5 rules 2–3, §5 rule 6.3, §8 rules 4 and 7)
 //! The spec's synthetic vectors: seed {1, 666} for U (or P), so lo' =
 //! 1,791,398,751 and lo'' = 791,599,131.
 
@@ -847,6 +847,52 @@ fn anim_setup_rolls_the_speed_on_the_client_seed() {
     assert!(anim_setup(&mut n, &row, 8).is_err());
 }
 
+// Covers: specs/world/objects-client.md §25 r8, §25 r5
+#[test]
+fn anim_setup_matches_the_1_14d_torch_draws() {
+    // Measured (facts/objects/objanim-a1-town.tsv, REC-440): torch class
+    // 37, mode 2, `FrameDelta` 200, `Sync` 0.
+    let mut row = row(0);
+    row.frame_delta = [200; 8];
+    row.frame_cnt = [20 * 256; 8];
+    // S→C 0x51 set-up (caller 0x4BC7E6) of GUID 1: seed {1749877446,
+    // 666} → speed 205, seed {3052831992, 729860529}.
+    let mut u = ClientUnit::new(OBJ);
+    u.seed = Some((1_749_877_446, 666));
+    anim_setup(&mut u, &row, 2).unwrap();
+    assert_eq!(u.speed, Some(205));
+    assert_eq!(u.seed, Some((3_052_831_992, 729_860_529)));
+    // The 0x0E code 3 to the same mode 2 (caller 0x4BD06D) draws again:
+    // speed 199, seed {1691393161, 1273312928}; frame back to 0.
+    u.frame = 205;
+    anim_setup(&mut u, &row, 2).unwrap();
+    assert_eq!((u.speed, u.frame), (Some(199), 0));
+    assert_eq!(u.seed, Some((1_691_393_161, 1_273_312_928)));
+    // `set_mode` to a different mode runs the same set-up (the server
+    // torch GUID 1, mode 0 → 2: seed {108806926, 666} → speed 191); the
+    // same mode runs none (the 0x0E's own `set_mode`, caller 0x4BCF8F).
+    let mut w = world((0, 0));
+    let mut i = inputs(0, 0);
+    i.objclient.rows[0] = row;
+    obj_mut(&mut w).seed = Some((108_806_926, 666));
+    let mut out = Vec::new();
+    let mut cx = Cx {
+        w: &mut w,
+        inputs: &i,
+        unit: S,
+        row,
+        out: &mut out,
+    };
+    cx.set_mode(2).unwrap();
+    assert_eq!(cx.u().unwrap().speed, Some(191));
+    assert_eq!(cx.u().unwrap().seed, Some((2_351_660_128, 45_382_538)));
+    cx.set_mode(2).unwrap();
+    assert_eq!(cx.u().unwrap().seed, Some((2_351_660_128, 45_382_538)));
+    // `reinit` draws in the unit's mode.
+    cx.reinit().unwrap();
+    assert_ne!(cx.u().unwrap().seed, Some((2_351_660_128, 45_382_538)));
+}
+
 // Covers: specs/world/objects-client.md §25 r8
 #[test]
 fn generic_step_adds_the_units_own_speed() {
@@ -856,7 +902,7 @@ fn generic_step_adds_the_units_own_speed() {
     obj_mut(&mut w).speed = Some(189);
     object_update(&mut w, &i, S, &mut Vec::new()).unwrap();
     assert_eq!(obj(&w).frame, 189);
-    // A client function's mode change drops it: back to the delta.
+    // A unit without a speed (no set-up ran, no client seed): the delta.
     obj_mut(&mut w).speed = None;
     object_update(&mut w, &i, S, &mut Vec::new()).unwrap();
     assert_eq!(obj(&w).frame, 389);
@@ -1074,4 +1120,20 @@ fn door_step_closes_backwards_then_returns_to_mode_0() {
     // Any other mode is fatal (0x155).
     obj_mut(&mut w).mode = 4;
     assert!(object_update(&mut w, &i, S, &mut Vec::new()).is_err());
+}
+
+/// `model.md` §5 r6.3: the counter starts at 1 and each create takes
+/// counter + 1, so a fresh client's first two client GUIDs are 2 and 3;
+/// a failed create still uses its GUID, and −1 wraps to 0.
+#[test]
+fn the_client_guid_counter_starts_at_one_and_gives_the_value_after_the_add() {
+    let mut w = ClientWorld::default();
+    assert_eq!(w.objclient.next_guid, 1);
+    let a = create_client_unit(&mut w, OBJECT, 0, 0, 0).unwrap();
+    let b = create_client_unit(&mut w, OBJECT, 0, 0, 0).unwrap();
+    assert_eq!((a.guid, b.guid), (2, 3));
+    assert_eq!(w.objclient.next_guid, 3);
+    w.objclient.next_guid = u32::MAX;
+    let c = create_client_unit(&mut w, MONSTER, CHICKEN, 0, 0).unwrap();
+    assert_eq!(c.guid, 0);
 }

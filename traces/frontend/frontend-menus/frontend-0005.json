@@ -1,0 +1,130 @@
+{
+ "area": "frontend",
+ "behavior": "frontend-menus",
+ "compare": {
+  "ignore": [],
+  "mode": "exact"
+ },
+ "expected": [
+  {
+   "data": {
+    "label": "name_a",
+    "off": "0x5c",
+    "ptr": "0x77934c",
+    "text": "Seeda"
+   },
+   "kind": "wstr",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "game_a",
+    "launcher_mode": 1,
+    "player_level": 1
+   },
+   "kind": "state",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "menu_a",
+    "launcher_mode": 4,
+    "player_level": null
+   },
+   "kind": "state",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "name_b",
+    "off": "0x5c",
+    "ptr": "0x77934c",
+    "text": "Seedb"
+   },
+   "kind": "wstr",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "game_b",
+    "launcher_mode": 1,
+    "player_level": 1
+   },
+   "kind": "state",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "menu_b",
+    "launcher_mode": 4,
+    "player_level": null
+   },
+   "kind": "state",
+   "tick": 0
+  },
+  {
+   "data": {
+    "file": "Seeda.d2s",
+    "map_seed": "0x63a0b0fd",
+    "size": 980,
+    "status": 32,
+    "towns": [
+     128,
+     0,
+     0
+    ]
+   },
+   "kind": "d2s",
+   "tick": 0
+  },
+  {
+   "data": {
+    "file": "Seedb.d2s",
+    "map_seed": "0x07013cee",
+    "size": 980,
+    "status": 32,
+    "towns": [
+     128,
+     0,
+     0
+    ]
+   },
+   "kind": "d2s",
+   "tick": 0
+  }
+ ],
+ "format_version": 1,
+ "game_version": "1.14d",
+ "id": "frontend-0005",
+ "inputs": [
+  {
+   "data": {
+    "text": "wait 7; click 400 300; wait 3; click 400 307; wait 4; click 117 500; wait 4; click 440 250; wait 3; text Seeda; wstr 0x77934C 0x5C name_a; key ENTER; wait 10; state game_a; key ESC; wait 1.5; click 400 262; wait 3; state menu_a;click 400 307; wait 4; click 117 500; wait 4; click 440 250; wait 3; text Seedb; wstr 0x77934C 0x5C name_b; key ENTER; wait 10; state game_b; key ESC; wait 1.5; click 400 262; wait 3; state menu_b; end"
+   },
+   "kind": "script",
+   "tick": 0
+  }
+ ],
+ "notes": "REC-291 (4) and REC-200: two new characters made through Create New (Barbarian, expansion checked by default), each played and left by Save and Exit 27 s apart. The saved map seeds (+0xAB) differ (0x63a0b0fd, 0x07013cee): 1.14d draws a fresh map seed for every new character (rng.md 5.2 time_value), d2rs uses DEFAULT_SEED 1234 (q-fix-new-char-seed). Each Save and Exit lands on the main menu (launcher mode 4, and the next Single Player click at (400,307) reaches character select).",
+ "recorded": {
+  "by": "claude (cloud, Wine)",
+  "command": "tools/cloud-game/run.sh --python --seconds 180 --out RUN -- tools/trace-recorder/autostart.py --menu --game $D2_GAME_DIR/Game.exe --seconds 150 --input SCRIPT; python3 tools/trace-recorder/menu_trace.py --log RUN/stdout.clean.txt --d2s SAVES/Seeda.d2s SAVES/Seedb.d2s ...",
+  "date": "2026-10-09",
+  "method": "memory-read",
+  "tool": "trace-recorder menu_trace 0.2.0 / autostart 0.2.0"
+ },
+ "setup": {
+  "band": null,
+  "band_ref": null,
+  "game_args": [
+   "-w",
+   "-ns"
+  ],
+  "menu_mode": true,
+  "size": [
+   800,
+   600
+  ]
+ },
+ "spec": "specs/ui/frontend-menus.md"
+}

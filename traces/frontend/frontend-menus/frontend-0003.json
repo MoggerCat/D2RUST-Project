@@ -1,0 +1,220 @@
+{
+ "area": "frontend",
+ "behavior": "frontend-menus",
+ "compare": {
+  "ignore": [],
+  "mode": "exact"
+ },
+ "expected": [
+  {
+   "data": {
+    "label": "main",
+    "launcher_mode": 4,
+    "player_level": null
+   },
+   "kind": "state",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "charselect",
+    "launcher_mode": 4,
+    "player_level": null
+   },
+   "kind": "state",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "load",
+    "launcher_mode": 1,
+    "player_level": null
+   },
+   "kind": "state",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "t1",
+    "launcher_mode": 1,
+    "player_level": 1
+   },
+   "kind": "state",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "saveexit",
+    "launcher_mode": 4,
+    "player_level": null
+   },
+   "kind": "state",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "x1",
+    "launcher_mode": 4,
+    "player_level": null
+   },
+   "kind": "state",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "x2",
+    "launcher_mode": 4,
+    "player_level": null
+   },
+   "kind": "state",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "x3",
+    "launcher_mode": 4,
+    "player_level": null
+   },
+   "kind": "state",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 6257,
+    "mean_luma_x1000": 7694,
+    "shot": "charselect"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 4933,
+    "mean_luma_x1000": 39652,
+    "shot": "escmenu"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 6220,
+    "mean_luma_x1000": 5348,
+    "shot": "load0"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 6220,
+    "mean_luma_x1000": 5348,
+    "shot": "load1"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 68804,
+    "shot": "main"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 5161,
+    "mean_luma_x1000": 30709,
+    "shot": "t1"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 5164,
+    "mean_luma_x1000": 30727,
+    "shot": "t2"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 5164,
+    "mean_luma_x1000": 30651,
+    "shot": "t3"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 169,
+    "mean_luma_x1000": 68430,
+    "shot": "x1"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 169,
+    "mean_luma_x1000": 68430,
+    "shot": "x2"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 169,
+    "mean_luma_x1000": 68430,
+    "shot": "x3"
+   },
+   "kind": "band",
+   "tick": 0
+  }
+ ],
+ "format_version": 1,
+ "game_version": "1.14d",
+ "id": "frontend-0003",
+ "inputs": [
+  {
+   "data": {
+    "text": "wait 7; click 400 300; wait 3; shot main; state main; click 400 307; wait 4; shot charselect; state charselect; click 691 555; wait 0.05; shot load0; key I; shot load1; state load; wait 6; shot t1; state t1; key I; wait 1; shot t2; key I; wait 1; shot t3;key ESC; wait 1.5; shot escmenu; click 400 262; state saveexit; wait 0.5; shot x1; state x1; wait 1; shot x2; state x2; wait 3; shot x3; state x3; end"
+   },
+   "kind": "script",
+   "tick": 0
+  }
+ ],
+ "notes": "REC-200: Save and Exit Game from a single-player game started through Single Player -> character select -> OK. Launcher mode 0x74C704 goes 1 -> 4 at the click; the shots 0.5 s, 1.5 s and 4.5 s later (x1-x3) match the main menu's Single Player button band (diff_px 169 against 'main', the menu's own animation), while character select, the game and the Esc menu differ by 4,900-6,300 px. So the in-game exit returns to the MAIN MENU, not to character select.",
+ "recorded": {
+  "by": "claude (cloud, Wine)",
+  "command": "tools/cloud-game/run.sh --python --seconds 150 --out RUN -- tools/trace-recorder/autostart.py --menu --game $D2_GAME_DIR/Game.exe --seconds 120 --shots RUN/shots --input \"$(cat SCRIPT)\"; python3 tools/trace-recorder/menu_trace.py --shots RUN/shots --band 264 289 536 324 --band-ref main ...",
+  "date": "2026-10-09",
+  "method": "memory-read",
+  "tool": "trace-recorder menu_trace 0.1.0 / autostart 0.2.0"
+ },
+ "setup": {
+  "band": [
+   264,
+   289,
+   536,
+   324
+  ],
+  "band_ref": "main",
+  "game_args": [
+   "-w",
+   "-ns"
+  ],
+  "menu_mode": true,
+  "size": [
+   800,
+   600
+  ]
+ },
+ "spec": "specs/ui/frontend-menus.md"
+}

@@ -992,22 +992,7 @@ impl Parser {
                     }
                 }
                 let msg = match rest[1] {
-                    "hex" => {
-                        let b = rest[2..]
-                            .iter()
-                            .map(|t| {
-                                if t.len() == 2 && t.bytes().all(|b| b.is_ascii_hexdigit()) {
-                                    u8::from_str_radix(t, 16).map_err(|e| e.to_string())
-                                } else {
-                                    Err(format!("hex byte {t:?}: two hex digits"))
-                                }
-                            })
-                            .collect::<Result<Vec<u8>, _>>()?;
-                        if b.is_empty() || b.len() > MAX_HEX {
-                            return Err(format!("hex message of {} bytes: 1..={MAX_HEX}", b.len()));
-                        }
-                        StepMsg::Hex(b)
-                    }
+                    "hex" => hex(&rest[2..])?,
                     "msg" => typed(&rest[2..])?,
                     "spawn" => spawn(&rest[2..])?,
                     "poke" => StepMsg::Poke(d2_sim::poke::parse_directive(&rest[2..])?),
@@ -1344,6 +1329,61 @@ fn spawn(toks: &[&str]) -> Result<StepMsg, String> {
     }))
 }
 
+/// `hex <byte>...`: 1 to [`MAX_HEX`] bytes, two hex digits each.
+fn hex(toks: &[&str]) -> Result<StepMsg, String> {
+    let b = toks
+        .iter()
+        .map(|t| {
+            if t.len() == 2 && t.bytes().all(|b| b.is_ascii_hexdigit()) {
+                u8::from_str_radix(t, 16).map_err(|e| e.to_string())
+            } else {
+                Err(format!("hex byte {t:?}: two hex digits"))
+            }
+        })
+        .collect::<Result<Vec<u8>, _>>()?;
+    if b.is_empty() || b.len() > MAX_HEX {
+        return Err(format!("hex message of {} bytes: 1..={MAX_HEX}", b.len()));
+    }
+    Ok(StepMsg::Hex(b))
+}
+
+/// One message outside a script (the tools' `send` steps,
+/// `tools/scenario-diff.md` §2): `hex <byte>...` (a raw message, as an
+/// `at … hex` step) or `<Name> <field>=<value>...` (a typed message, as
+/// an `at … msg` step; §3 rules 1–3). The same strict errors as a step.
+pub fn parse_message(toks: &[&str]) -> Result<StepMsg, String> {
+    match toks.split_first() {
+        Some((&"hex", bytes)) => hex(bytes),
+        Some(_) => typed(toks),
+        None => Err("a message: `hex <byte>...` or `<Name> <field>=<value>...`".into()),
+    }
+}
+
+/// The canonical text of a message step's body (§2 rule 6): `hex …` or
+/// `<Name> <field>=<value>...` in layout order; `None` for a spawn or
+/// poke step.
+pub fn message_text(msg: &StepMsg) -> Option<String> {
+    match msg {
+        StepMsg::Hex(b) => Some(
+            std::iter::once("hex".to_owned())
+                .chain(b.iter().map(|x| format!("{x:02x}")))
+                .collect::<Vec<_>>()
+                .join(" "),
+        ),
+        StepMsg::Typed { id, fields } => {
+            let mut t = message(*id).name.to_owned();
+            for (n, a) in fields {
+                match a {
+                    Arg::Num(v) => t.push_str(&format!(" {n}={v}")),
+                    Arg::Ref(r) => t.push_str(&format!(" {n}={r}")),
+                }
+            }
+            Some(t)
+        }
+        StepMsg::Spawn(_) | StepMsg::Poke(_) => None,
+    }
+}
+
 /// `msg <Name> <field>=<value>...` (§3 rules 1–2).
 fn typed(toks: &[&str]) -> Result<StepMsg, String> {
     let Some((&name, assigns)) = toks.split_first() else {
@@ -1470,6 +1510,44 @@ mod tests {
         let e = encode(&s.steps[0].msg, &W).unwrap_err();
         assert_eq!(e.reference, "@x-101");
         assert!(e.why.contains("does not fit"), "{e:?}");
+    }
+
+    // Covers: specs/tools/scenario.md §3 r1, §3 r2, §3 r3
+    /// A message outside a script (`send` steps): the step's own parser
+    /// and encoder, and its canonical text.
+    #[test]
+    fn single_messages_parse_as_steps() {
+        let one = |t: &str| {
+            let toks: Vec<&str> = t.split_whitespace().collect();
+            parse_message(&toks)
+        };
+        let m = one("Walk y=20 x=10").unwrap();
+        assert_eq!(encode(&m, &W).unwrap(), [1, 10, 0, 20, 0]);
+        assert_eq!(message_text(&m).unwrap(), "Walk x=10 y=20");
+        let m = one("SelectSkill skill=36 left=0 item=0xFFFFFFFF").unwrap();
+        assert_eq!(
+            encode(&m, &W).unwrap(),
+            [0x3C, 36, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF]
+        );
+        let m = one("hex 13 01 00 00 00 0c 00 00 00").unwrap();
+        assert_eq!(encode(&m, &W).unwrap(), [0x13, 1, 0, 0, 0, 12, 0, 0, 0]);
+        assert_eq!(message_text(&m).unwrap(), "hex 13 01 00 00 00 0c 00 00 00");
+        let m = one("BuyItem npc=@1:148 item=@4#1 transaction=0 client_price=0").unwrap();
+        assert_eq!(
+            message_text(&m).unwrap(),
+            "BuyItem npc=@1:148 item=@4#1 transaction=0 client_price=0"
+        );
+        for bad in [
+            "",
+            "hex",
+            "hex 1",
+            "Walk x=1",
+            "Nope a=1",
+            "Walk x=70000 y=0",
+            "Chat",
+        ] {
+            assert!(one(bad).is_err(), "{bad:?}");
+        }
     }
 
     // Covers: specs/tools/scenario.md §2 r2, §2 r3, §2 r5, §3 r1

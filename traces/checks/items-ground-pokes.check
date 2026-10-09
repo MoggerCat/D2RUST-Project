@@ -1,0 +1,23 @@
+check 1
+# Ground items (area G, drops and pickup): seeds fixed, then at frame 4 a
+# set of items made on the ground near the player through the game's own
+# creation path (poke `item`: 1.14d 0x00558D90, d2rs create_item +
+# ground_place) at different qualities and item levels. The state channel
+# compares each item unit (class, mode 3, place, seed, quality stats) and
+# the draws they make frame by frame.
+# Spec: specs/tools/scenario-diff.md, specs/tools/poke.md.
+name items-ground-pokes
+save ScnAma --class ama --expansion
+seed 1234
+ticks 40
+seconds 240
+channels state
+at 4 poke seed-game 0x00001234 666
+at 4 poke item hp1 @x+2 @y
+at 4 poke item tsc @x+3 @y
+at 4 poke item cap @x+4 @y quality magic ilvl 30
+at 4 poke item lea @x+2 @y+2 quality rare ilvl 40
+at 4 poke item ssd @x+3 @y+2 quality unique ilvl 30
+at 4 poke item r05 @x+4 @y+2
+at 4 poke item gld @x+2 @y+4
+at 4 poke item amu @x+3 @y+4 quality magic ilvl 50

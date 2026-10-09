@@ -16,6 +16,7 @@ use crate::monsters::ai::{
 };
 use crate::rng::Seed;
 use crate::stats::stat;
+use crate::units::hooks::Sim;
 use crate::units::record::flags;
 use crate::units::{RoomId, UnitId};
 
@@ -28,6 +29,24 @@ use crate::world::objects::Dispatch;
 const MODE_GETHIT: u32 = 3;
 
 impl<X: Pending> View<'_, X> {
+    /// `0x00588E10` (`quests-act5.md` §4.10): a dead (mode 12) prison
+    /// door (class 434) among the units of the rooms adjacent to `u`'s
+    /// room (the room itself included).
+    fn dead_prison_door_near(&self, game: &Game, u: UnitId) -> bool {
+        use crate::path::collision::CollisionRooms;
+        let Some(room) = game.lists.unit(u).and_then(|e| e.room()) else {
+            return false;
+        };
+        let d = &self.h.drlg;
+        (0..d.adjacent_count(room))
+            .filter_map(|i| d.adjacent(room, i))
+            .flat_map(|r| game.lists.room_units(r))
+            .any(|m| {
+                self.units.get(m).is_some_and(|r| {
+                    r.ty == crate::units::UnitType::Monster && r.class == 434 && r.mode == 12
+                })
+            })
+    }
     /// A monster's class and its monstats `interact` flag (flags byte
     /// +0xD bit 1, `ai.md` §5.3); `None` for a non-monster.
     fn npc_interact(&self, unit: UnitId) -> Option<(u16, bool)> {
@@ -785,14 +804,37 @@ impl<X: Pending> AiActs for View<'_, X> {
     fn kill(&mut self, game: &mut Game, unit: UnitId, killer: Option<UnitId>) {
         self.h.x.ai_kill(game, unit, killer);
     }
+    /// The unit leaves its room and is removed (`0x00555600`, `units.md`
+    /// §3.2: the caged barbarians at their portal, Baal at the stairs);
+    /// every player is told (S→C 0x0A), as the quest host's removal.
     fn remove_unit(&mut self, game: &mut Game, unit: UnitId) {
-        self.h.x.ai_remove_unit(game, unit);
+        let Some((ty, guid)) = game.lists.unit(unit).map(|u| (u.ty as u8, u.guid)) else {
+            return self.h.x.ai_remove_unit(game, unit);
+        };
+        let msg = crate::units::messages::remove_unit(ty, guid);
+        for p in game.lists.units_of_type(crate::units::UnitType::Player) {
+            self.h.x.send(p, &msg);
+        }
+        self.remove(game, unit);
     }
     fn link_clone(&mut self, game: &mut Game, unit: UnitId, clone: UnitId) {
         self.h.x.ai_link_clone(game, unit, clone);
     }
+    /// `0x00574370` on the lent monster world (`init.md` §27); without
+    /// one, the host's answer.
     fn reinit_class(&mut self, game: &mut Game, unit: UnitId, class: i32, mode: u8) {
-        self.h.x.ai_reinit_class(game, unit, class, mode);
+        let mut sim = Sim {
+            game,
+            units: self.units,
+            stats: self.stats,
+            data: self.data,
+        };
+        let done = self
+            .h
+            .with_monster_world(|w, h| w.reinit(&mut sim, h, unit, class, u32::from(mode)));
+        if done.is_none() {
+            self.h.x.ai_reinit_class(sim.game, unit, class, mode);
+        }
     }
     fn change_class_list(&mut self, game: &mut Game, unit: UnitId, class: i32) {
         self.h.x.ai_change_class_list(game, unit, class);
@@ -812,8 +854,21 @@ impl<X: Pending> AiActs for View<'_, X> {
     fn wisp_find(&mut self, game: &mut Game, unit: UnitId) -> Vec<UnitId> {
         self.h.x.ai_wisp_find(game, unit)
     }
+    /// Wave `w` (0..=4) is superunique 61 + w (Baal Subject 1..5, the
+    /// table `0x006E3528`; hcIdx map `0x00586B30` = identity, as
+    /// `quests-act4.md` §5.4): its class from the drop tables'
+    /// `superuniques` row, the mapped id `0x00659B80(2, ·)` = row +
+    /// the `monstats` count (`quests-helpers.md` §2 r1). No drop tables
+    /// or row: the host's answer (`Pending::ai_wave`).
     fn wave(&self, w: i32) -> Option<(i32, i32)> {
-        self.h.x.ai_wave(w)
+        let row = 61 + w;
+        let found = (0..=4).contains(&w).then_some(()).and_then(|_| {
+            let d = self.h.object_drops.as_ref()?;
+            let su = d.tables.superuniques.get(row as usize)?;
+            let count = self.h.tables.combat.monstats.len() as i32;
+            Some((row + count, su.class as i32))
+        });
+        found.or_else(|| self.h.x.ai_wave(w))
     }
     fn clear_room_portal_flag(&mut self, game: &mut Game, room: Option<RoomId>) {
         self.h.x.ai_clear_room_portal_flag(game, room);
@@ -827,6 +882,52 @@ impl<X: Pending> AiActs for View<'_, X> {
 /// and the target-node slot (+0xD0) are real (`units.md` §2); everything
 /// else keeps the narrow default of [`AiSummons`] until its owner wires it.
 impl<X: Pending> AiSummons for View<'_, X> {
+    /// The Act V prisoner AI's hooks (`quests-act5.md` §4.10): the reads
+    /// from the quest control's published states
+    /// ([`Pending::quest_rescue`]); the calls with an effect queued for
+    /// it ([`Pending::queue_quest_event`]); `0x00588E10` read here. Other
+    /// hooks keep the default.
+    fn quest_hook(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        player: Option<UnitId>,
+        hook: crate::monsters::ai::QuestHook,
+    ) -> bool {
+        use super::QuestEvent;
+        use crate::monsters::ai::QuestHook;
+        let guid = game.lists.unit(unit).map_or(0, |e| e.guid);
+        match hook {
+            QuestHook::WussieLeaving => self.h.x.quest_rescue(guid).0,
+            QuestHook::WussieLeave => {
+                self.h.x.queue_quest_event(QuestEvent::WussieLeft { guid });
+                false
+            }
+            QuestHook::WussieCanRescue => self.dead_prison_door_near(game, player.unwrap_or(unit)),
+            QuestHook::WussieRescue => {
+                if let Some(player) = player {
+                    self.h
+                        .x
+                        .queue_quest_event(QuestEvent::WussieRescue { player, unit });
+                }
+                false
+            }
+            QuestHook::WussieWait => {
+                self.h.x.queue_quest_event(QuestEvent::WussieWait);
+                false
+            }
+            _ => false,
+        }
+    }
+    /// `0x00588D60`: the group's portal when spawned and existing.
+    fn rescue_portal(&mut self, game: &mut Game, unit: UnitId) -> Option<Option<UnitId>> {
+        let guid = game.lists.unit(unit)?.guid;
+        let portal = self.h.x.quest_rescue(guid).1?;
+        let o = game
+            .lists
+            .find_unit(crate::units::UnitType::Object, portal)?;
+        Some(Some(o))
+    }
     /// The quest active test `0x00544590(game, player, npc)`
     /// (`world/quests.md` §6.4) on the game's quest control, lent to the
     /// hooks while the tick runs ([`super::ActionHooks::quest_host`]):

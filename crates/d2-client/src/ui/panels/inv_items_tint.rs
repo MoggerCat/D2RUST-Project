@@ -85,7 +85,11 @@ impl ItemsUi {
         });
         let (x, y, cw, ch) = g.cell(i32::from(it.x), i32::from(it.y));
         let r = Rect::new(x, y, (cw * w) as u16, (ch * h) as u16);
-        let t = if hover_ok && contains(&r, mouse) {
+        // §3 r2: the hovered item of the §5 state (`0x007BCBF4`,
+        // `0x007BCBE4`), under the mouse.
+        let hs = self.hover.get();
+        let hovered = hs.in_grid && hs.item == Some(it.key.guid);
+        let t = if hover_ok && hovered && contains(&r, mouse) {
             hovered_tint(0, false)
         } else {
             grid_item_tint(&self.grid_facts(world, it))

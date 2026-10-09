@@ -1053,6 +1053,16 @@ where
     /// The quest routes queued outside a lent call (a quest call's own
     /// allocations, [`quest_objects`]), before the tick's sends are taken;
     /// then the quest events (PROVISIONAL, REC-129).
+    fn session_work(&mut self, game: &mut Game, events: &mut D) {
+        // The monster init of a hireling the calls allocate needs the
+        // lent world (`units.md` §3.1 step 7).
+        events.lend_world(|a| {
+            self.hireling_calls(game, a);
+            self.pet_follows(game, a);
+            self.collect_sent(a);
+        });
+    }
+
     fn after_tick(&mut self, game: &mut Game, events: &mut D) {
         // Each step's sends join the outbox before the next step runs
         // (production order, `seams/sim-server.md` §2.2).

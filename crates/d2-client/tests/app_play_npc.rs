@@ -227,7 +227,7 @@ fn clicking_the_waypoint_walks_there_and_interacts() {
         .is_none());
     drop(w);
     // The server operates the waypoint (`waypoints.md` §5.2 step 3, the
-    // interact range PROVISIONAL REC-94) and answers S→C 0x63: the menu
+    // interact range in range on arrival, measured REC-94) and answers S→C 0x63: the menu
     // (UI 0x14) opens on the waypoint's GUID.
     step(&mut app, &ms, 4);
     assert_eq!(waypoint_open(&app), Some(guid));
