@@ -29,6 +29,7 @@ functions 1/4/5/6/8/11/23/25/43/49/60/63). REC block 540–549.
 | unit footprints (REC-546) | sim/path-placement.md §3, §5.1; sim/pathing.md §13.3 r5; client/msg-units.md §3 r2 | `stamp_unit_footprints` each client update: living players and monsters stamped on grid copies read only by the missiles. | `tests_drlg` `client_missiles_see_the_units_footprints` |
 | error in a hit body (REC-547) | client.md §C9 r7–r8 | the error is reported and the missile removed (light dies), not left to fail each update. | `a_hit_body_the_model_cannot_run_still_ends_the_missile` |
 | screen shakes (q-fix-shake-starts) | render/camera.md §8 (rows, rule W); client/msg-ui.md §19 r3 | `ClientWorld::shake` (`start_shake`, one running shake on the server tick), read by `ModelFeed::shake`; started by S→C 0x5A code 0x12 and client functions 12, 29, 31, 36, 37, 38, 54 (`bodies::shaker`) and 66 (rule W, `worldstone_shake`; its `0x004D2520` call open). Not done: the skill 301 client do (no client skill-do layer). The feed's PROVISIONAL note is gone; the per-frame player-seed draws stay REC-62. | `client_functions_start_their_shakes`, `rule_w_shakes_in_the_worldstone_levels`, `tests_ui_more` `event_text_cuts_the_name_and_code_0x12_sets_the_eclipse`, `model_feed` `the_shake_is_the_models` |
+| missile sounds, umod callback | client.md §C4 r28–r29, §C9 r4.4, r6; audio/triggers.md §8 r3, triggers-2.md §19 r3; monsters/umod-callbacks.md §28 | `Output::MissileSound` (new `client/bridge.md` §10 row 45: request / owner group 314 stop / travel detach) → audio `UnitRequest` / `GroupStop` / `GroupDetach` (`first_in_group`); the umod dispatcher's phase 4 with umod 29's multishot copies (guard flag). PROVISIONAL REC-548 (detach force), REC-549 (no monster target unit). | `missile_sounds_at_the_create_and_the_end`, `audio::triggers` `the_group_walk_finds_the_first_handle_newest_first`, `a_multishot_unique_monster_doubles_its_client_missiles`, `output` `each_table_row_is_one_variant_with_its_producer_and_consumer` |
 | real install | — | `app_client_drlg` `the_users_client_missiles_run_their_functions` runs every user row of the 37 functions of its `RUN` list (1–11, 13, 17–20, 23, 25, 27, 37, 39, 43–49, 51–53, 58–60, 63, 65, 68) for 60 updates with the user's skills tables and a drawn frame's origin; every function has a row made. | install: 4 passed |
 
 ## Not done
@@ -41,7 +42,9 @@ functions 1/4/5/6/8/11/23/25/43/49/60/63). REC block 540–549.
 - Hit functions 9 (ally / demon / undead tests the model lacks), 12
   (fire patch), 53 (`0x004DA340` unspecified), 52 with a unit (monstats2
   flag 11, `client-bodies-2.md` OQ1); the open ones of §B6 (REC-452).
-- Missile sounds (audio), the init and umod callbacks, the client event
+- `ProgSound` of functions 9, 47, 51 (conditions: `audio/triggers.md`
+  OQ 6), the default removal's travel sound stop (the unit free detaches
+  it), the init callbacks of callers outside the model, the client event
   hooks, the second pass (§C7 r13).
 - The skill 301 shake (client skill do, not in the model).
 
@@ -51,7 +54,8 @@ REC-540 (timed arc flags / vz), REC-541 (motion getter shifts), REC-542
 (hostility parts the model lacks), REC-543 (a body's child takes its
 parent's direction for the aim nudge), REC-544 (unit flags 0x4 / 0x8), REC-545 (client state 86 expiry), REC-546
 (unit footprints on grid copies for the missiles), REC-547 (a hit body
-error still ends the missile).
+error still ends the missile), REC-548 (travel sound detach force),
+REC-549 (umod 29 copies aim at the path target).
 REC-451 resolved, REC-452 narrowed. Spec gaps: `missiles/client.md` Open
 questions 9–11 (PC 1 Step 4 item 24); `client-bodies-2.md` OQ1 flag 27
 answered from `data/fields.tsv`.

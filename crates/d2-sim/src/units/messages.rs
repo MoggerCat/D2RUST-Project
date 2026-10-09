@@ -118,9 +118,6 @@ pub fn update_oskill(
 
 /// S→C 0x20 StatUpdate (`0x0053C1D0`, 10 bytes, `client/msg-stats-items.md`
 /// §1 r4): player GUID u32@1, stat u8@5, value u32@6.
-// PROVISIONAL (REC-415): no spec names a caller of `0x0053C1D0`, so no
-// d2rs code sends it; the builder is the TSV layout; settled by the
-// static caller search on PC 1 (`docs/handoff/pc1-data.md` Step 4).
 pub fn stat_update(guid: u32, stat: u8, value: u32) -> [u8; 10] {
     let mut m = [0u8; 10];
     m[0] = 0x20;
@@ -152,11 +149,6 @@ pub fn skill_bonus(guid: u32, bonus: u8, element: u8, page: u8) -> [u8; 8] {
 /// and y u32@0x13 (0 when none), the current frame u16@0x17, owner type
 /// u8@0x19 and GUID u32@0x1A, level u8@0x1E, pierce index u8@0x1F;
 /// bytes 1–4 are not written.
-// PROVISIONAL (REC-414): which unit fields fill the u32 positions
-// (read as the path's 16.16 position and the first point's cell), and
-// that the level is the missile data's level cut to a byte; the spec
-// names the fields but not their units; settled by a 1.14d recording of
-// a `ClientSend` missile's add message.
 #[allow(clippy::too_many_arguments)]
 pub fn client_missile(
     class: u16,

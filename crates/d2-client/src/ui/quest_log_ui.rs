@@ -178,7 +178,12 @@ impl Panel for QuestLogUi {
         let selected = self.log.borrow().selected;
         for r in &rows {
             let at = slot_at(r.slot, h);
-            out.push(cel(sockets, u32::from(r.slot == selected), at.x, at.y));
+            out.push(cel(
+                sockets,
+                u32::from(Some(r.slot) == selected),
+                at.x,
+                at.y,
+            ));
             let name = format!("menu\\{}", ICON_NAMES[usize::from(r.icon)]);
             if let Some(icon) = files.id(&name) {
                 out.push(cel(icon, icon_frame(r.row.icon), at.x, at.y));
@@ -186,7 +191,10 @@ impl Panel for QuestLogUi {
         }
         // The selected row: title, then the text (`quests-status.md` §3
         // rule 4; no wrap).
-        let pick = rows.iter().find(|r| r.slot == selected).or(rows.first());
+        let pick = rows
+            .iter()
+            .find(|r| Some(r.slot) == selected)
+            .or(rows.first());
         let Some(r) = pick else {
             return;
         };
@@ -228,7 +236,7 @@ impl Panel for QuestLogUi {
             let p = slot_at(r.slot, h);
             // The icon cels are about 70 × 70 (unmeasured).
             if (p.x..p.x + 70).contains(&at.x) && (p.y - 70..p.y).contains(&at.y) {
-                self.log.borrow_mut().selected = r.slot;
+                self.log.borrow_mut().selected = Some(r.slot);
                 return UiResponse::Consumed;
             }
         }

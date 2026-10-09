@@ -186,9 +186,8 @@ impl MaFile {
                 )));
             }
             out.push((at, off));
-            // PROVISIONAL (§7 r3; automap-0003): the link is the header's
-            // eighth u32.
-            at = off + 28;
+            // §7 r3: the link is the record's first u32.
+            at = off;
         }
     }
 
@@ -199,9 +198,10 @@ impl MaFile {
         let off = self.bytes.len();
         let off32 = u32::try_from(off).map_err(|_| bad("file past 4 GiB".into()))?;
         let size = |b: &Vec<Cell>| (b.len() * TRIPLE) as u32;
-        // PROVISIONAL (§7 r2; automap-0003): header field order layer,
-        // town kind, act u32, floor/wall/unit/town sizes, link.
+        // §7 r2: header = link, layer, town kind, act u32, floor / wall /
+        // unit / town sizes.
         let header = [
+            0,
             r.layer,
             r.town_kind,
             r.act2,
@@ -209,7 +209,6 @@ impl MaFile {
             size(&r.blobs[1]),
             size(&r.blobs[2]),
             size(&r.blobs[3]),
-            0,
         ];
         for v in header {
             self.bytes.extend_from_slice(&v.to_le_bytes());
@@ -221,11 +220,11 @@ impl MaFile {
                 }
             }
         }
-        // PROVISIONAL (§7 r3; automap-0003): the table entry holds the
-        // first record's offset, each record's link the next one's.
+        // §7 r3: the table entry holds the first record's offset, each
+        // record's link (its first u32) the next one's.
         let link_at = match chain.last() {
             None => Self::table_slot(r.layer)?,
-            Some(&(_, last)) => last + 28,
+            Some(&(_, last)) => last,
         };
         put_u32(&mut self.bytes, link_at, off32);
         Ok(off32)
@@ -247,16 +246,16 @@ impl MaFile {
                 .collect();
             // A record of another layer stops the load and clears the
             // chain at that point (`0x004586E0`).
-            if h[0] != layer {
+            if h[1] != layer {
                 put_u32(&mut self.bytes, link, 0);
                 out.cut = true;
                 return Ok(out);
             }
-            let town_kind = h[1];
+            let town_kind = h[2];
             let mut at = off + RECORD_HEADER;
             let mut cut = false;
             for (i, tree) in TreeKind::ALL.into_iter().enumerate() {
-                let size = h[3 + i] as usize;
+                let size = h[4 + i] as usize;
                 let end = at
                     .checked_add(size)
                     .filter(|&e| e <= self.bytes.len() && size.is_multiple_of(TRIPLE))
@@ -266,7 +265,7 @@ impl MaFile {
                         ))
                     })?;
                 // The unit blob only for the same act record.
-                if tree == TreeKind::Unit && h[2] != act2 {
+                if tree == TreeKind::Unit && h[3] != act2 {
                     at = end;
                     continue;
                 }

@@ -201,14 +201,32 @@ impl CubePanel {
                 click_button(0x17),
             ];
         }
-        let key = PanelKey::Ui(UI_CUBE);
+        self.draw_art(t, env, out);
+        self.draw_buttons(t, env, out);
+        Vec::new()
+    }
+
+    /// The art quads alone (§12 r3), before the cube grid.
+    pub fn draw_art(&self, t: &PanelTables, env: &PanelEnv, out: &mut dyn UiDrawSink) {
         let c = env.cond(false, &no_extra);
-        emit_static_draws(t, key, &c, None, &|r| r.item.starts_with("art"), out);
+        emit_static_draws(
+            t,
+            PanelKey::Ui(UI_CUBE),
+            &c,
+            None,
+            &|r| r.item.starts_with("art"),
+            out,
+        );
+    }
+
+    /// §12 r3: after the cube grid, the close button then the transmute
+    /// button (`a1-panel-cube` rows 10–11).
+    pub fn draw_buttons(&self, t: &PanelTables, env: &PanelEnv, out: &mut dyn UiDrawSink) {
+        let key = PanelKey::Ui(UI_CUBE);
         let c = env.cond(self.close_pressed, &no_extra);
         emit_static_draws(t, key, &c, None, &|r| r.item == "close", out);
         let c = env.cond(self.transmute_pressed, &no_extra);
         emit_static_draws(t, key, &c, None, &|r| r.item == "transmute", out);
-        Vec::new()
     }
 }
 

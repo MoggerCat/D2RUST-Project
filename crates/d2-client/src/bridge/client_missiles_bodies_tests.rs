@@ -1184,3 +1184,102 @@ fn rule_w_shakes_in_the_worldstone_levels() {
     update(&mut w, &rows, k, true).unwrap();
     assert!(!w.objclient.set_c.contains_key(&k) && w.shake.is_none());
 }
+
+// Covers: specs/missiles/client.md §c4-create-tail
+// Covers: specs/missiles/client.md §c9-end-0x004d2d70-m-u-forced
+// Covers: specs/audio/triggers.md §8 r3
+#[test]
+fn missile_sounds_at_the_create_and_the_end() {
+    let mut r = row(FN_DEFAULT_STEP);
+    (r.travel_sound, r.hit_sound, r.explosion_missile) = (5, 7, -1);
+    let rows = vec![ClientMissileRow::default(), r];
+    let (mut w, p, k) = owned(&rows);
+    // §C4 r28: the travel sound on m, then the owner's sound-314 group
+    // stop.
+    assert_eq!(
+        w.objclient.missile_sounds,
+        vec![
+            MissileSound::Request { id: 5, missile: k },
+            MissileSound::StopOwnerGroup { owner: p, id: 314 },
+        ]
+    );
+    w.objclient.missile_sounds.clear();
+    // §C9 r4.4 the hit sound, r6 the travel sound detached.
+    end(&mut w, &rows, k, true, true).unwrap();
+    assert_eq!(
+        w.objclient.missile_sounds,
+        vec![
+            MissileSound::Request { id: 7, missile: k },
+            MissileSound::DetachTravel { missile: k, id: 5 },
+        ]
+    );
+    // No owner, travel sound 0, hit sound −1: none.
+    let mut r = row(FN_DEFAULT_STEP);
+    (r.travel_sound, r.hit_sound, r.explosion_missile) = (0, -1, -1);
+    let rows = vec![ClientMissileRow::default(), r];
+    let mut w = ClientWorld::default();
+    let k = create(&mut w, &rows, &at(100, 100, 1), true)
+        .unwrap()
+        .unwrap();
+    end(&mut w, &rows, k, true, true).unwrap();
+    assert_eq!(
+        w.objclient.missile_sounds,
+        vec![MissileSound::DetachTravel { missile: k, id: 0 }]
+    );
+}
+
+// Covers: specs/monsters/umod-callbacks.md §28.2
+// Covers: specs/missiles/client.md §c4-create-tail
+#[test]
+fn a_multishot_unique_monster_doubles_its_client_missiles() {
+    use crate::bridge::world::{ClientUnit, KindData, MonsterData, MONSTER};
+    let mut r = row(FN_DEFAULT_STEP);
+    r.vel = 8;
+    let mut no_ms = r;
+    no_ms.no_multishot = true;
+    let rows = vec![ClientMissileRow::default(), r, no_ms];
+    let world_with = |flags: u8| {
+        let mut w = ClientWorld::default();
+        let o = UnitKey::new(MONSTER, 3);
+        let mut u = ClientUnit::new(o);
+        u.position = Some((100, 100));
+        u.kind = KindData::Monster(Box::new(MonsterData {
+            flags,
+            umods: [5, 29, 0, 0, 0, 0, 0, 0, 0],
+            ..MonsterData::default()
+        }));
+        w.units.insert(o, u);
+        (w, o)
+    };
+    let shot = |class: u32, o: UnitKey| CreateRecord {
+        flags: flag::POSITION | flag::TARGET_ABSOLUTE,
+        owner: Some(o),
+        class,
+        x: 100,
+        y: 100,
+        tx: 110,
+        ty: 104,
+        ..CreateRecord::default()
+    };
+    // Unique (flag 8): two copies at (tx − sy, ty + sx), (tx + sy, ty −
+    // sx), (sx, sy) = signs of (100 − 110, 100 − 104) = (−1, −1); the
+    // copies run the hook too but the guard stops them.
+    let (mut w, o) = world_with(8);
+    create(&mut w, &rows, &shot(1, o), true).unwrap().unwrap();
+    let mut targets: Vec<_> = w
+        .objclient
+        .missiles
+        .values()
+        .map(|m| m.target_point)
+        .collect();
+    targets.sort();
+    assert_eq!(targets, vec![(109, 105), (110, 104), (111, 103)]);
+    assert!(w.objclient.multishot_guard.is_empty());
+    // Not unique, or `NoMultiShot`: none.
+    let (mut w, o) = world_with(0);
+    create(&mut w, &rows, &shot(1, o), true).unwrap().unwrap();
+    assert_eq!(w.objclient.missiles.len(), 1);
+    let (mut w, o) = world_with(8);
+    create(&mut w, &rows, &shot(2, o), true).unwrap().unwrap();
+    assert_eq!(w.objclient.missiles.len(), 1);
+}

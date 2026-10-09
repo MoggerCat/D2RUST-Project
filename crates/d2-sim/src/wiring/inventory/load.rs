@@ -5,13 +5,11 @@
 //! inserted ([`InvDesk::insert_filler`], rule 4), then the item is placed
 //! by the mode and position it was saved with.
 //!
-//! PROVISIONAL (REC-115): the placement routine `0x00531210` has no spec
-//! (`d2s.md` §8.2 rule 3 is blocked). d2rs-own, unverified: the unit is
-//! set to cursor mode and goes through the same inventory calls the start
-//! items use (`equip_from_cursor` at its body location; the belt at slot x;
-//! the page its record names at (x, y)); a stored item that does not fit
-//! at its saved cell takes a free position; an item that cannot be
-//! placed at all is freed (rule 3).
+//! Placement is `0x00531210` (`d2s.md` §8.2 rule 3): the unit is set to
+//! cursor mode and goes through the same inventory calls the start items
+//! use (`equip_from_cursor` at its body location; the belt at slot x; the
+//! page its record names at the exact (x, y), no free-position search); an
+//! item that cannot be placed there is freed.
 
 use super::{InvDesk, InvError, InvRest};
 use crate::items::bitstream::hflag;
@@ -33,7 +31,7 @@ pub enum LoadFault {
     RecordFailed,
     /// The owner has no inventory in the model.
     NoInventory,
-    /// Neither the saved place nor a free position took it; the unit is freed.
+    /// The saved place did not take it; the unit is freed.
     NoRoom,
     /// Rule 5: the item carries the runeword flag but matches no runeword
     /// row any more; stored and cursor items are freed.
@@ -146,7 +144,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             _ if stale => false,
             _ => self.place(owner, unit, (it.x, it.y), false, true),
         };
-        if at_saved_place || self.place(owner, unit, (0, 0), true, true) {
+        if at_saved_place {
             return Ok(unit);
         }
         self.free(unit);

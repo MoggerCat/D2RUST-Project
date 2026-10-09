@@ -297,6 +297,21 @@ fn the_cursor_cell_centres_an_even_item() {
     );
 }
 
+// Covers: specs/ui/inventory.md §10 r4
+#[test]
+fn an_overflowing_drop_cell_sends_nothing_after_a_valid_move() {
+    let (u, files) = ui();
+    let w = world(&[(9, mode::CURSOR, (0, 0, 0, 0), b"qui ")], Some(9));
+    // A press inside the grid: drop cell (2, 0), 0x18 [item, 2, 0, page].
+    let out = u.press(&w, &files, &layout(), Point::new(200, 250));
+    let want = ClientIntent::from_message(&items::insert(9, 2, 0, 0)).0;
+    assert_eq!(intents(&out), vec![want]);
+    // The next press overhangs the right edge: the stored cell is stale
+    // (2, 0), but the drop cell is (9, 0) and fails the placement test.
+    let out = u.press(&w, &files, &layout(), Point::new(385, 250));
+    assert!(intents(&out).is_empty());
+}
+
 // Covers: specs/ui/panels-3.md §29 r1, §29 r3
 #[test]
 fn equipment_box_clicks_send_equip_swap_and_unequip() {
@@ -901,7 +916,7 @@ fn the_cube_grid_draws_page_3_and_sends_the_page_3_intents() {
     );
     assert!(cube_present(&w));
     let mut out = Vec::new();
-    u.draw_cube(&w, &files, &g, &mut out);
+    u.draw_cube(&w, &files, &g, Point::new(0, 0), &mut out);
     let file = files.id(&item_file_name("invhp1")).unwrap();
     // Cell (1, 2): (left + 29, top + 58), drawn at top + frame height 29.
     assert_eq!(images(&out), vec![(file, 0, g.left + 29, g.top + 58 + 29)]);
@@ -1041,4 +1056,61 @@ fn the_red_fill_frame_is_the_palette_entry_nearest_to_0x80_0_0() {
     let frames = fill_frames(&pal);
     let red = &frames[BELT_FILL_BASE as usize];
     assert!(red.pixels.iter().all(|&p| p == 9));
+}
+
+// Covers: specs/ui/inventory.md §3 r2, §3 r3
+/// Per item, every cell of the footprint is tinted (one cell box each,
+/// row by row, left to right), then the item is drawn; the next item
+/// follows (`a1-panel-cube` rows 5–9 and 25–40).
+#[test]
+fn each_item_tints_its_cells_row_by_row_then_draws() {
+    let (mut u, mut files) = ui();
+    u.art.0.insert(
+        *b"cap ",
+        ItemArtRow {
+            inv_w: 2,
+            inv_h: 2,
+            inv_file: "invcap".into(),
+            flippy_file: String::new(),
+            beltable: false,
+        },
+    );
+    u.tips = Some(crate::ui::item_tip::tests::tips());
+    u.tint_colors = Some(TINTS);
+    u.register_files(&mut files);
+    let mut w = world(
+        &[
+            (7, mode::STORED, (0, 2, 3, 1), b"cap "),
+            (8, mode::STORED, (0, 0, 0, 1), b"hp1 "),
+        ],
+        None,
+    );
+    w.units.get_mut(&PLAYER).unwrap().stats.insert(12, 3);
+    let l = layout();
+    let mut out: Vec<UiDraw> = Vec::new();
+    u.draw_items(&w, &files, &l, Point::new(0, 0), &mut out);
+    let kinds: Vec<String> = out
+        .iter()
+        .map(|d| match d {
+            UiDraw::Rect(r) => format!("box {} {}", r.x0, r.y0),
+            UiDraw::Image(i) => format!("cel {}", i.at.x),
+            UiDraw::Text(_) => "text".into(),
+        })
+        .collect();
+    assert_eq!(
+        kinds,
+        [
+            "box 158 287",
+            "box 187 287",
+            "box 158 316",
+            "box 187 316",
+            "cel 158",
+            "box 100 200",
+            "cel 100",
+        ]
+    );
+    // `draw_tints` alone paints the same cell boxes, without the cels.
+    let mut old = Vec::new();
+    u.draw_tints(&w, &l, Point::new(0, 0), &mut old);
+    assert_eq!(tiles(&old, TINTS[2]).len(), 5);
 }

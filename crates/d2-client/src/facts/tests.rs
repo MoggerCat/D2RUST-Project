@@ -216,8 +216,11 @@ fn directories_compare_with_the_shared_sprites_file() {
     write(&ours, DRAWS_FILE, draws_text(&[ROW0, ROW1]));
     write(&ours, FRAME_FILE, frame_text(&[]));
     write(&ours, SPRITES_FILE, sprites_text(&[SPRITE]));
-    assert_eq!(compare_dirs(&scene, &ours, &[]).unwrap(), Outcome::Match);
-    assert!(compare_dirs(&scene, &root.join("missing"), &[]).is_err());
+    assert_eq!(
+        compare_dirs(&scene, &ours, &[], false).unwrap(),
+        Outcome::Match
+    );
+    assert!(compare_dirs(&scene, &root.join("missing"), &[], false).is_err());
     std::fs::remove_dir_all(&root).unwrap();
 }
 
@@ -286,6 +289,7 @@ fn export_rows_invert_placement_and_merge_tile_blocks() {
         sky: &[],
         unit_dirs: &std::collections::BTreeMap::new(),
         unit_calls: &[],
+        color_rows: None,
     };
     let rows = draw_rows(&[floor, floor_block, unit, ui], &cx).unwrap();
     let cols: Vec<String> = rows.draws.iter().map(|r| r[..8].join(" ")).collect();
@@ -429,6 +433,7 @@ fn sky_calls_replace_their_pixel_items() {
         sky: &sky,
         unit_dirs: &std::collections::BTreeMap::new(),
         unit_calls: &[],
+        color_rows: None,
     };
     // Item rows by op; call rows with x, y and mode.
     let rows = |items: &[DrawItem]| -> Vec<String> {
@@ -505,6 +510,7 @@ fn block_frames_of_one_tile_are_one_row() {
         sky: &[],
         unit_dirs: &std::collections::BTreeMap::new(),
         unit_calls: &[],
+        color_rows: None,
     };
     let rows = draw_rows(
         &[
@@ -523,6 +529,32 @@ fn block_frames_of_one_tile_are_one_row() {
         [
             "0 TileDrawLit x/f.dt1 - 3 ? 100 40",
             "1 TileDrawLit x/f.dt1 - 3 ? 260 40",
+        ]
+    );
+    // Two records of one cell with the same tile (two draw keys, the
+    // record's list position) are two calls (`a4-town-pandemonium-fortress`
+    // rows 12–13: one lower wall called twice).
+    let twice = |id, x: i32, minor| {
+        let mut i = item(id, x, (1, 1));
+        i.key = DrawKey::new(pass::WALLS_UNITS, 0, minor, 0).unwrap();
+        i
+    };
+    let rows = draw_rows(
+        &[
+            twice(ids[0], 100, 0),
+            twice(ids[1], 132, 0),
+            twice(ids[0], 100, 1),
+            twice(ids[1], 132, 1),
+        ],
+        &cx,
+    )
+    .unwrap();
+    let cols: Vec<String> = rows.draws.iter().map(|r| r[..8].join(" ")).collect();
+    assert_eq!(
+        cols,
+        [
+            "0 TileDrawLit x/f.dt1 - 3 ? 100 40",
+            "1 TileDrawLit x/f.dt1 - 3 ? 100 40",
         ]
     );
 }
@@ -564,6 +596,7 @@ fn unit_shadows_name_the_cel_and_write_no_unit_row() {
         sky: &[],
         unit_dirs: &std::collections::BTreeMap::new(),
         unit_calls: &[],
+        color_rows: None,
     };
     let rows = draw_rows(&[shadow, body], &cx).unwrap();
     let cols: Vec<String> = rows.draws.iter().map(|r| r[..12].join(" ")).collect();
@@ -597,8 +630,10 @@ fn unit_cel_dir_is_the_context_dir64() {
     body.tag = ItemTag::Unit(9);
     let mut other = body;
     other.tag = ItemTag::Unit(8);
+    other.key = DrawKey::new(pass::WALLS_UNITS, 0, 1, 0).unwrap();
     let unit_type = |_: u32| Some(1u8);
-    let dirs = std::collections::BTreeMap::from([(9, 62u8)]);
+    // Keyed by the unit's draw slot (a GUID repeats across unit types).
+    let dirs = std::collections::BTreeMap::from([(body.key.slot(), 62u8)]);
     let cx = ExportContext {
         frames: &s,
         view_left: Some(0),
@@ -606,6 +641,7 @@ fn unit_cel_dir_is_the_context_dir64() {
         sky: &[],
         unit_dirs: &dirs,
         unit_calls: &[],
+        color_rows: None,
     };
     let rows = draw_rows(&[body, other], &cx).unwrap();
     let dirs: Vec<&str> = rows
@@ -636,7 +672,7 @@ fn unit_calls_are_rows_at_their_keys() {
     let call = |pass, sub, shadow| UnitCall {
         key: DrawKey::new(pass, 0, 0, sub).unwrap(),
         tag: ItemTag::Unit(9),
-        path: CanonicalPath::new("x/sh.dcc").unwrap(),
+        path: Some(CanonicalPath::new("x/sh.dcc").unwrap()),
         dir64: 0,
         frame: 6,
         shadow,
@@ -653,6 +689,7 @@ fn unit_calls_are_rows_at_their_keys() {
         sky: &[],
         unit_dirs: &std::collections::BTreeMap::new(),
         unit_calls: &calls,
+        color_rows: None,
     };
     let rows = draw_rows(&[body], &cx).unwrap();
     let cols: Vec<String> = rows.draws.iter().map(|r| r[..12].join(" ")).collect();
@@ -669,4 +706,124 @@ fn unit_calls_are_rows_at_their_keys() {
         ]
     );
     assert_eq!(rows.sprites.len(), 1);
+}
+
+// Covers: specs/tools/facts-render.md §6 r5, §5 r10
+/// `--skip-weather`: 1.14d's pass-9 rows (by call site) and d2rs's
+/// (`at` = `pass9`) drop out on both sides; other lines and boxes stay.
+#[test]
+fn skip_weather_drops_pass9_rows_only() {
+    use super::compare::{is_weather_row, PASS9_TAG};
+    let row = |op: &str, at: &str| -> Vec<String> {
+        let mut r = vec!["-".to_owned(); DRAW_COLUMNS.len()];
+        r[1] = op.into();
+        r[16] = at.into();
+        r
+    };
+    assert!(is_weather_row(&row("DrawLine", "0x47368e")));
+    assert!(is_weather_row(&row("DrawLine", "0x473585")));
+    assert!(is_weather_row(&row("DrawBox", "0x473a00")));
+    assert!(is_weather_row(&row("DrawLine", PASS9_TAG)));
+    // M08: the range's edges, another op, other call sites
+    assert!(!is_weather_row(&row("DrawLine", "0x47346f")));
+    assert!(!is_weather_row(&row("DrawBox", "0x473f50")));
+    assert!(!is_weather_row(&row("CelDraw", "0x47368e")));
+    assert!(!is_weather_row(&row("DrawBox", "0x46efe9")));
+    assert!(!is_weather_row(&row("DrawLine", "0x45a841")));
+    assert!(!is_weather_row(&row("DrawLine", "-")));
+
+    let rain = "9 DrawLine - - - - 51 336 - - - - 200 - - - 0x47368e";
+    let ours = "9 DrawLine - - - - 99 1 - - - - 7 - - - pass9";
+    let a = set(&[ROW0, rain, ROW1], &[], Some(&[SPRITE]));
+    let b = set(&[ROW0, ROW1, ours, ours], &[], Some(&[SPRITE]));
+    assert!(matches!(compare(&a, &b, &[]), Outcome::Diverged(_)));
+    let (a, b) = (a.without_weather(), b.without_weather());
+    assert_eq!(compare(&a, &b, &[]), Outcome::Match);
+    // a non-weather box stays and is compared
+    let bx = "9 DrawBox - - - - 273 573 - - - - 109 - - - 0x46efe9";
+    let a = set(&[ROW0, bx, ROW1], &[], Some(&[SPRITE])).without_weather();
+    let b = set(&[ROW0, ROW1], &[], Some(&[SPRITE])).without_weather();
+    assert!(matches!(compare(&a, &b, &[]), Outcome::Diverged(d) if d.row == 1));
+}
+
+// Covers: specs/tools/facts-render.md §5 r16
+/// A UI rectangle (`0x0046EFD0`, a d2rs `d2rs/ui/rect/WxH` item) is
+/// 1.14d's `DrawBox` row: left, top and the colour (its colour row minus
+/// the first one); without the colour rows the colour is `?`.
+#[test]
+fn ui_rectangles_are_drawbox_rows() {
+    use crate::scene::{MapId, ShadeChain};
+    let mut s = FrameStore::new();
+    let key = crate::world_view::ui_bind::rect_key(29, 29);
+    s.insert(
+        key.clone(),
+        FrameSet {
+            frames: vec![IndexFrame::new(29, 29, 0, 0, vec![1; 29 * 29]).unwrap()],
+        },
+    )
+    .unwrap();
+    let mut item = DrawItem::new(s.id(&key, 0).unwrap(), 198, 199);
+    item.shade = ShadeChain::new(&[MapId(10 + 234)]).unwrap();
+    item.tag = ItemTag::Ui(0);
+    let unit_type = |_: u32| None;
+    let cx = ExportContext {
+        frames: &s,
+        view_left: None,
+        unit_type: &unit_type,
+        sky: &[],
+        unit_dirs: &std::collections::BTreeMap::new(),
+        unit_calls: &[],
+        color_rows: Some(MapId(10)),
+    };
+    let mut next = item;
+    next.x = 227;
+    let rows = draw_rows(&[item, next], &cx).unwrap();
+    let cols: Vec<String> = rows.draws.iter().map(|r| r.join(" ")).collect();
+    assert_eq!(
+        cols,
+        [
+            "0 DrawBox - - - - 198 199 - - - - 234 - - - -",
+            "1 DrawBox - - - - 227 199 - - - - 234 - - - -",
+        ]
+    );
+    assert!(rows.sprites.is_empty());
+    let cx = ExportContext {
+        color_rows: None,
+        ..cx
+    };
+    assert_eq!(draw_rows(&[item], &cx).unwrap().draws[0][12], "?");
+}
+
+// Covers: specs/tools/facts-render.md §5 r17
+/// A listed unit whose body fails the pre-test is the unit draw call
+/// alone: its `unit` row and no cel row (`a1-panel-inventory` row 128).
+#[test]
+fn a_culled_body_is_its_unit_row_alone() {
+    use crate::scene::order::pass;
+    let s = store();
+    let calls = [crate::world_view::UnitCall {
+        key: DrawKey::new(pass::WALLS_UNITS, 3, 0, 0).unwrap(),
+        tag: ItemTag::Unit(9),
+        path: None,
+        dir64: 0,
+        frame: 0,
+        shadow: false,
+    }];
+    let unit_type = |_: u32| Some(2u8);
+    let cx = ExportContext {
+        frames: &s,
+        view_left: Some(0),
+        unit_type: &unit_type,
+        sky: &[],
+        unit_dirs: &std::collections::BTreeMap::new(),
+        unit_calls: &calls,
+        color_rows: None,
+    };
+    let rows = draw_rows(&[], &cx).unwrap();
+    let ops: Vec<(&str, &str)> = rows
+        .draws
+        .iter()
+        .map(|r| (r[1].as_str(), r[15].as_str()))
+        .collect();
+    assert_eq!(ops, [("unit", "2:9")]);
 }

@@ -97,6 +97,15 @@ impl ClientPath {
         self.mode
     }
 
+    /// A path whose mode request gave `mode` (tests of the drawn mode).
+    #[cfg(test)]
+    pub(crate) fn with_mode(mode: u32) -> Self {
+        ClientPath {
+            mode,
+            ..Default::default()
+        }
+    }
+
     /// Allocates the player's path at sub-tile (x, y) in the active room
     /// of `drlg` that contains it (`path-placement.md` §2.4, kind player;
     /// footprint stamped on the private grids). `false`: no active room

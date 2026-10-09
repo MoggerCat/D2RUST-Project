@@ -96,7 +96,10 @@ pub enum MarkerSubject {
         /// `0x00478D90` relation code (§11 r3: roster relation; in
         /// single player the local player's own pets and hireling give 1).
         relation: u8,
+        /// The monster's own name (`0x00464A60`, the interact name).
         name: Vec<u16>,
+        /// The owner's name of a disguised monster (§11 r6).
+        owner_name: Vec<u16>,
     },
     Object {
         class: u32,
@@ -277,17 +280,16 @@ pub fn unit_markers(units: &[MarkerUnit], ctx: &MarkerCtx, out: &mut Vec<Automap
             continue;
         }
         let idx = ctx.palette.get(c);
-        // PROVISIONAL (§11 r7, open question 7; automap-0004): a name's
-        // colour argument is the marker's palette byte.
-        let own = u16::from(idx);
         match &u.subject {
             // r5.
             MarkerSubject::Player { local, name: n, .. } => {
                 if !(c == MarkerColor::B3 && !ctx.party) {
                     cross(x, y, ctx.mini, idx, out);
                 }
-                if c == MarkerColor::B3 && !local && ctx.party && ctx.names {
-                    name(n, x, y, own, out);
+                // §11 r5: the colour is an immediate (2 for a party member
+                // marker, else 1), not the marker's palette byte.
+                if !local && ctx.party && ctx.names {
+                    name(n, x, y, if c == MarkerColor::B3 { 2 } else { 1 }, out);
                 }
             }
             // r6.
@@ -295,6 +297,7 @@ pub fn unit_markers(units: &[MarkerUnit], ctx: &MarkerCtx, out: &mut Vec<Automap
                 interact,
                 disguised,
                 name: n,
+                owner_name,
                 ..
             } => {
                 cross(x, y, ctx.mini, idx, out);
@@ -302,10 +305,11 @@ pub fn unit_markers(units: &[MarkerUnit], ctx: &MarkerCtx, out: &mut Vec<Automap
                     // Font 6, colour 4, centred at (X, Y + 8 − 18): the
                     // r7 placement with y = Y.
                     name(n, x, y, 4, out);
-                } else if disguised.is_some() && c == MarkerColor::B4 && ctx.party && ctx.names {
-                    // Reading: "a disguised one as in r5" names an owner
-                    // of the local party like a party member.
-                    name(n, x, y, own, out);
+                }
+                // Then, independently: a disguised monster whose owner is
+                // not in the local party gets the owner's name, colour 1.
+                if *disguised == Some(false) && ctx.party && ctx.names {
+                    name(owner_name, x, y, 1, out);
                 }
             }
             MarkerSubject::Object { class: 267, .. } if ctx.names => {

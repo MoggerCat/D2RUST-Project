@@ -1,0 +1,22 @@
+# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py /home/user/D2RUST-Project/traces/raw/20261009-044255-frames.jsonl --scene a1-cold-plains-drop --frame 248 --tile-light unknown --out /home/user/D2RUST-Project/facts/render; game: 1.14d
+key	value
+seq	248
+tick	487
+w	800
+h	600
+act	0
+level	3
+player_x	8176
+player_y	78570
+tile_origin_x	7776
+tile_origin_y	78290
+unit_origin_x	7776
+unit_origin_y	78286
+open_mode	0
+shift_x	0
+light_quality	0
+rain	1
+snow	0
+draws	433
+index_sha256	e5bec27330e6e7f7daacb1d792dcb1b61b04cb6c0dbc169e3a7e98ec94f0c791
+palette_sha256	ba83219e51249002d7125a1a5a701d6abea94f04f44d6cfaa42becdfcff23337

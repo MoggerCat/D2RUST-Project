@@ -302,7 +302,7 @@ impl AiModes for Fake {
         self.anim.insert(unit, m);
         true
     }
-    fn set_anim_mode(&mut self, unit: UnitId, m: u8) {
+    fn set_anim_mode(&mut self, _: &mut Game, unit: UnitId, m: u8) {
         self.anim.insert(unit, m);
     }
     fn set_path_steps(&mut self, _: UnitId, steps: i32) {

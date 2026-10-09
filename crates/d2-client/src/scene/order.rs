@@ -47,6 +47,12 @@ impl DrawKey {
         (self.0 >> 8) as u32 & Self::MINOR_MAX
     }
 
+    /// The key without its sub-slot: (pass, major, minor), one drawn
+    /// unit's slot (its component cels differ by `sub` only).
+    pub fn slot(&self) -> u64 {
+        self.0 >> 8
+    }
+
     pub fn sub(&self) -> u8 {
         self.0 as u8
     }

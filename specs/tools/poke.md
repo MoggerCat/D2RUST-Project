@@ -9,10 +9,14 @@
   `spawn` normal (GUID 8), `seed-unit`, `object` (GUID 18), `time`,
   `seed-game`, `superunique` (GUID 8), `missile` (GUID 1) all returned
   `ok` with no fault (`traces/pokes/spawn-town.poke`,
-  `missile-superunique.poke`). The comparison with d2rs is REC-590. The d2rs side (§3, §5) is implemented
+  `missile-superunique.poke`); scenario `spawn` kinds `champion`
+  (GUID 8), `random-boss` (GUID 13), `unique` with umods 5, 7 (GUID 17)
+  returned `ok` with minions (`boss-kinds.poke`, monsters/init.md §25
+  forms). The comparison with d2rs is REC-590. The d2rs side (§3, §5) is implemented
   (`d2-sim::poke`, scenario `poke` steps, `scenario-run`, `d2-client
   play --poke`): every directive runs on the synthetic install; `warp`
-  to another act and `item` without item tables are d2rs gaps.
+  to another act runs the act change (§1 table); `item` without item
+  tables is a d2rs gap.
 - **Target version:** 1.14d (the original side); the format is d2rs-own.
 - **Crate/module:** `d2-sim::poke` (directives, parser, d2rs apply);
   `conformance::scenario` (`poke` steps); `tools/scenario-run`;
@@ -31,21 +35,21 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 51–63 |
-| Inputs | 64–70 |
-| Outputs / state changes | 71–79 |
-| Rules | 80–81 |
-|   1. Directives | 82–116 |
-|   2. Poke files | 117–139 |
-|   3. In scenarios | 140–154 |
-|   4. The 1.14d side (`poke.py`) | 155–178 |
-|   5. The d2rs side (`d2-sim::poke`) | 179–193 |
-| Constants & data dependencies | 194–206 |
-| Randomness | 207–213 |
-| Edge cases & original bugs | 214–223 |
-| Test vectors | 224–234 |
-| Provenance | 235–240 |
-| Open questions | 241–261 |
+| Summary | 55–67 |
+| Inputs | 68–74 |
+| Outputs / state changes | 75–83 |
+| Rules | 84–85 |
+|   1. Directives | 86–120 |
+|   2. Poke files | 121–143 |
+|   3. In scenarios | 144–158 |
+|   4. The 1.14d side (`poke.py`) | 159–209 |
+|   5. The d2rs side (`d2-sim::poke`) | 210–224 |
+| Constants & data dependencies | 225–237 |
+| Randomness | 238–244 |
+| Edge cases & original bugs | 245–254 |
+| Test vectors | 255–266 |
+| Provenance | 267–272 |
+| Open questions | 273–293 |
 <!-- /index -->
 
 ## Summary
@@ -93,14 +97,14 @@ cannot run the directive, §4). Results are written as `poke` records
 <!-- rows -->
 | Directive | Arguments | Effect | 1.14d | d2rs |
 |---|---|---|---|---|
-| `object` | `<class> <x> <y> [mode <m>]` | create an object (objects row), mode default 0 | allocator `0x00555230` with type 2, flags 1 (`sim/units.md` §3.1 steps 1–8; `world/objects-2.md` §22 r4: mode is the sixth stack argument) | `View::allocate` with `UnitType::Object` (the allocator path `scenario-run` uses for waypoints) |
+| `object` | `<class> <x> <y> [mode <m>]` | create an object (objects row), mode default 0 | allocator `0x00555230` with type 2, flags 1 (`sim/units.md` §3.1 steps 1–8; `world/objects-2.md` §22 r4: mode is the sixth stack argument) | `View::create_object` (the creation the game's own objects take: population, quests): the allocator with the per-kind init (`world/objects.md` §3: control record, InitFn on the control seed, at the allocation's room and (x, y)) before the add (`sim/units.md` §3.1 steps 7–8); without object state, or a class past the `objects` rows, `View::allocate` |
 | `superunique` | `<row> <x> <y>` | create a superunique (superuniques row) and its minions | entry 4 `0x005A49B0` (`original-hooks-spawn.md` §1, §3) | `monsters::population::preset::superunique` (`population.md` §11.4) |
 | `missile` | `<class> <x> <y> <tx> <ty> [skill <id> <level>] [owner <ref>]` | create a missile at (x, y) aimed at (tx, ty); owner default `@player` | `0x0059FA30` (ECX game, EDX record; `original-hooks.md` §7.1): record +0x00 flags = 0x21 (position given, target absolute), +0x04 owner, +0x08 origin = owner, +0x10 class, +0x14/+0x18 x, y, +0x1C/+0x20 tx, ty, +0x2C skill, +0x30 level (`missiles.md` §R2.1); other fields 0 | `missiles::create::create_missile` with the same flags and fields |
 | `seed-game` | `<lo> <hi>` | set the game seed | write u32 lo, hi at game +0xD0 (`rng.md` §5.2; `original-hooks-spawn.md` Constants) | `ActionHooks.game_seed.set(lo, hi)` |
 | `seed-unit` | `<ref> <lo> <hi>` | set a unit's seed | write u32 lo, hi at unit +0x20, +0x24 (`rng.md` §5.3; `original-hooks.md` §4) | the unit record's `seed.set(lo, hi)` |
 | `time` | `<period 0..5> <ticks>` | set the time of day of the player's act | write the environment record (act +0x04; acts at game +0xBC + 4·act): +0x00 period, +0x08 ticks (`render/lighting.md` §9.1) | `ActEntry.environment` `period`, `ticks` |
 | `pos` | `<ref> <x> <y>` | teleport a unit | gap (Open question 1) | `WalkCtx::teleport` (`path-placement.md` §6 r4 teleport path) |
-| `warp` | `<level> [tile <n>]` | move the player to a level (tile index default 0) | gap (Open question 2) | `wiring::path::place::level_warp` (`path-placement.md` §11); another act: gap (`level_warp` returns `None` across acts) |
+| `warp` | `<level> [tile <n>]` | move the player to a level (tile index default 0) | gap (Open question 2) | `wiring::path::place::level_warp` (`path-placement.md` §11); another act: the act change `wiring::path::act_change::run` (`world/waypoints.md` §11 steps 1–19, `flows/act-change.md` §1; step 3 builds the act's DRLG when missing), as waypoint travel to another act; the client's 0x04 follows on the next tick's client pass |
 | `item` | `<code> <x> <y> [quality <q>] [ilvl <n>]` | create an item on the ground | gap (Open question 3) | `ItemUnits::create_item` (spawn mode ground) then `items::moves::ground::ground_place` |
 | `stat` | `<ref> <stat> <layer> <i32>` | set a base stat | gap (Open question 4) | `StatLists::unit_set` (`stat-lists.md` §5 r2) |
 | `state` | `<ref> <state> on\|off` | set or clear a state | gap (Open question 4) | `toggle_state` + `set_state_changed` (`stat-lists.md` §9.2 toggle with update-queue insert) |
@@ -163,7 +167,8 @@ cannot run the directive, §4). Results are written as `poke` records
    (`original-hooks.md` §1 rule 5).
 3. **Calls:** the procedure of `original-hooks-spawn.md` §5 rules 3–8
    (scratch page with an INT3 return trap, saved context, arguments on
-   the stack above the return address, ECX/EDX as the row says). After
+   the stack above the return address, registers as the function's
+   call form says, rule 8). After
    the return trap the saved context is restored before the next call,
    so a callee's `ret N` need not be known.
 4. **Field writes:** `WriteProcessMemory` at the hook, on the
@@ -175,6 +180,32 @@ cannot run the directive, §4). Results are written as `poke` records
 6. **Results:** EAX of the call (0 → `failed`), or `ok` for a field
    write. Created units: the GUID at unit +0x0C.
 7. A directive whose 1.14d column says gap is not run: result `gap`.
+8. **Call forms.** Every function a directive calls is one entry of a
+   table in `poke.py` (`CALL_FORMS`): its address and the arguments
+   `poke.py` supplies by name, both cited from the owning spec, and its
+   form: which argument goes in which register (any of EAX, EBX, ECX,
+   EDX, ESI, EDI) and which on the stack, in order from [ESP+4], each
+   placed exactly once (literals allowed), plus the callee's `ret N` and
+   what EAX means (created unit, 1/0, or ignored) where the entry leaves
+   it open. An entry without a form is a gap: every directive that calls
+   it returns `gap` naming the function, its address and the
+   `docs/handoff/pc1-data.md` item that asks for it, and nothing is
+   called. Record offsets and table addresses the directives use
+   (item request format source, combined items array, umod list) are a
+   second table (`FIELDS`), with the same rule for a missing value.
+   Filling a form once its owning spec states it is the whole change:
+   the directive then runs as rule 3 says. A run may override both
+   tables from a JSON file (`--forms`, format `poke-forms-1`) to try a
+   form before it is committed; the run's output records the forms in
+   force. Today without a form: `0x00650BE0` / `0x00554EA0` (`pos`, the
+   teleport preferred as d2rs' path), `0x0053AEC0` (`warp`),
+   `0x00558D90` (`item`), `0x00627260` (`stat`), `0x00639DB0`
+   (`state`); the spawn kinds' `0x005A09E0`, `0x0054E1E0`, `0x005A2120`
+   and the umod list (monster data +0x1C) are stated in
+   `monsters/init.md` §25.1, §25.3. `item` finds the item index in the
+   combined items array (`items/treasure.md` §9.1: header `0x0096CA58`,
+   count, records; code at record +0x80, `data/loading.md` §6–§9), not
+   through `0x00633640`.
 
 ### 5. The d2rs side (`d2-sim::poke`)
 
@@ -230,6 +261,7 @@ same on both sides.
 | `traces/scenarios/poke-spawn-town.scenario` twice on the synthetic install | byte-identical traces | synthetic |
 | `traces/checks/poke-fallen-town.check` (ScnAma, seed 1234; frame 4: `spawn 19 @x+3 @y+3 normal`, `seed-unit @1:19 0x12345678 666`), 1.14d against d2rs, 54 frames | both pokes `ok`; the same party (GUIDs 8–11, same class, positions, mode 1 for all 50 ticks) and the poked seed equal | REC-590, run 2026-10-09 (cloud, Wine): equal as stated; differs: minion seeds and every creation hp, because d2rs's game seed is one step behind 1.14d from frame 2 (the joining player's unit seed: 1.14d {lo of one game-seed step, 666}, d2rs {1, 666}), a join finding outside this spec |
 | same check with the seeds pinned first (`seed-game 0x1234 666`, `seed-unit @player 0x55 666`, then the spawn) | the party and the game seed equal for 50 ticks | REC-590, 2026-10-09: equal (the party's every compared field and the game seed, frames 4–54); left: fields d2rs's snapshot does not fill (monster `tx`/`ty`, player `fc`/`sp`), outside this spec |
+| `traces/checks/poke-fallen-town-unpinned.check` (no seed pins) on b0850e52 (join seed fix, staging 9aa0b329; path target, fc/sp, walk speed) | every unit and the game seed equal for 54 frames | REC-590, 2026-10-09 (cloud, Wine): no difference in any compared field of any unit or the game seed, frames 1–54; verdict PARTIAL only for the snapshot's own gaps (owner, headless client) |
 | `traces/checks/poke-firebolt.check`: as above, then before frame 8 `missile 58 @x @y @x+3 @y+3 skill 36 1` (Fire Bolt, owner the player) | missile created on both sides, game seed after it equal, the target's hp equal | REC-590, 2026-10-09: missile `ok` (GUID 1) on both, game seed equal every frame after it, leader hp 1024 on both (no damage in town on either side); missiles are not in `state-snapshot.md` records. Damage outside town needs `warp` on 1.14d (Open question 2) |
 
 ## Provenance

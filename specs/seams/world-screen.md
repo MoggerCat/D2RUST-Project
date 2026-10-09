@@ -67,10 +67,13 @@ centre (`<< 16 | 0x8000`) and a static unit at the same subtile differ by
 Every world → client conversion on either side calls `camera.md` §2
 (`moving_to_client`, `static_to_client`, `cell_origin`) and every client
 → screen conversion calls the frame's `Camera` (`camera.md` §3–§6). The
-pick inverts §2 and §4 exactly: screen (X, Y) → client
-`(X + cx_u − shiftX, Y + cy_u − 8)` → subtile
+pick inverts §2 and §4 four rows down: screen (X, Y) →
+client `(X + cx_u − shiftX, Y + cy_u − 4)` → subtile
 `(⌊(px + 2·py) / 32⌋, ⌊(2·py − px) / 32⌋)` (floor, not truncation, as §2
-floors). So a unit drawn at subtile s picks back as s, moving or static,
+floors). Revision 2026-10-09 (q-scenes-compare, `ui/controls.md` §6 r2,
+PROVISIONAL REC-514): measured on the `a1-walk-*` scenes; the plain
+inverse (`Y + cy_u − 8`) sent a1-walk-n's click to a blocked subtile
+one to the left of 1.14d's. So a unit drawn at subtile s picks back as s, moving or static,
 in every open mode and with any shake (tests:
 `moving_unit_drawn_feet_pick_back_to_its_subtile`,
 `static_unit_draw_point_picks_back_to_its_subtile`).
@@ -93,7 +96,8 @@ player draws at `(W / 2 + shiftX, H / 2 − 8)` and picks its own subtile
 
 The world click position is a subtile (`ui/controls.md` §6 r2,
 C→S point codes `[x u16][y u16]`). Every pixel of one subtile diamond
-(256 pixels) picks that subtile and no other (test
+(256 pixels, the 32 × 16 diamond whose top vertex is 4 rows above the
+subtile's draw point, §2.1 revision) picks that subtile and no other (test
 `every_pixel_of_a_subtile_diamond_picks_that_subtile`).
 
 #### 2.4 The local player's position has one owner per frame
@@ -155,7 +159,7 @@ to make them once and use the result everywhere.
 | camera at player client (1000, 2000), any mode, any shake; moving unit at subtile centre (sx, sy), sx, sy ∈ 90 … 109 | `screen_to_world(unit_draw(·))` = (sx, sy) | §2.1 |
 | static unit (sx, sy) | same | §2.1 |
 | player at subtile (5000, 4000), modes 0–3 | drawn at (400 + shiftX, 292), picks (5000, 4000) | §2.2 |
-| static subtile (7, 3), the 32 × 16 diamond under its top vertex | 256 pixels, all pick (7, 3) | §2.3 |
+| static subtile (7, 3), the 32 × 16 diamond with its top vertex 4 rows above its draw point | 256 pixels, all pick (7, 3) | §2.3 |
 | model subtile (100, 100), prediction (103, 100) centre | hover / label / corpse camera = frame camera (fails today, F1) | §2.2 |
 | object at (7, 3), player at client (0, 0) | `feet` = (464, 372), the draw point (today (464, 380), F2) | §2.5 |
 
@@ -172,7 +176,9 @@ the floor rounding are `camera.md`'s RE results.
    `render/camera.md` §4 "Screen → world": the unit origin, minus
    `shiftX`, with **no −8** on y, then `0x00643510` (floor shifts);
    perspective first when on. d2rs's `bridge::click::screen_to_world`
-   subtracts 8 from y: q-fix-click-no-minus-8.
+   had subtracted 8 from y. CONFLICT with REC-514 (measured, §2.1):
+   the recording wins, so d2rs subtracts 4 (q-fix-click-no-minus-8 is
+   superseded; re-read `0x0045AFF0` to settle which constant it adds).
 2. The hover model `0x00467A10` (the original hit-tests drawn sprites):
    when specified, §2.5 becomes "the pick reads the drawn cel's
    rectangle", and the d2rs-own box goes.

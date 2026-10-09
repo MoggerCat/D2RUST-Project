@@ -330,11 +330,39 @@ fn pass1_only_in_levels_74_and_120_with_recorded_seeds() {
     let p = gray_palette();
     let mut f = frame(74);
     f.stars_seed = Some(seed);
-    assert_eq!(b.pass1(&f), Err(BackgroundError::NoStarLast));
+    // `last` is 0 before the first call (§12 l74 r3): no error for it.
+    assert_eq!(b.pass1(&f), Err(BackgroundError::NoPalette));
     f.stars_last = Some(0);
     assert_eq!(b.pass1(&f), Err(BackgroundError::NoPalette));
     f.palette = Some(&p);
     assert_eq!(b.pass1(&f).unwrap().len(), STARS);
+}
+
+// Covers: specs/render/draw-order-2.md §12
+#[test]
+fn star_tick_starts_at_zero_and_the_first_call_moves_the_stars() {
+    let p = gray_palette();
+    let mut b = Backgrounds::default();
+    let mut f = frame(74);
+    f.stars_seed = Some(Seed::new(5, 666));
+    f.stars_last = Some(0);
+    f.palette = Some(&p);
+    f.now = 1_000;
+    b.pass1(&f).unwrap();
+    let after_first = b.stars.as_ref().unwrap().clone();
+    assert_eq!(after_first.last, 1_000);
+    // Every star moved by its speed (or was re-made past the left edge).
+    let mut fresh = Stars::new(Seed::new(5, 666), 0, &p, 800, 600);
+    fresh.draw(1_000, 800, 600);
+    assert_eq!(after_first, fresh);
+    // 30 ms later: no move.
+    f.now = 1_030;
+    b.pass1(&f).unwrap();
+    assert_eq!(b.stars.as_ref().unwrap(), &after_first);
+    // More than 40 ms: moves, last := now.
+    f.now = 1_041;
+    b.pass1(&f).unwrap();
+    assert_eq!(b.stars.as_ref().unwrap().last, 1_041);
 }
 
 // Covers: specs/render/draw-order-2.md §13

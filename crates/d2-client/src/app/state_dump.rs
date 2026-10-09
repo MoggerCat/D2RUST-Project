@@ -387,7 +387,11 @@ impl ClientData {
             skills: single_player::client_skill_rows(archives)?,
             class_skills: single_player::client_class_skills(archives)?,
             skill_tables: single_player::client_skill_tables(archives)?,
-            units: single_player::client_unit_rows(archives)?,
+            units: {
+                let mut u = single_player::client_unit_rows(archives)?;
+                single_player::client_monster_anims(archives, &mut u)?;
+                u
+            },
         })
     }
 

@@ -422,6 +422,11 @@ impl ShopUi {
         let price = move |_t: u8| prices.get(guid).unwrap_or(0);
         let env = ClickEnv {
             cursor_item: items::cursor_item(world).is_some(),
+            // PROVISIONAL (REC-729): menus.md §4.2 r2 says [0x007C0DB0] is
+            // only ever written with 0, yet the server (vendors.md §7.1
+            // rule 2) accepts a gamble buy only with transaction 2. Until
+            // a recorded Gamble buy shows the C->S 0x32 u32@9 (pc1-data
+            // Step 4), the window keeps sending the OR 2.
             gamble_shop: st.gamble,
             repair_all_button_on: repair_all,
             repair_button_on: st.repair_mode,
@@ -491,7 +496,8 @@ fn store_tip_ctx<'a>(
     crate::ui::item_tip_build::TipCtx {
         mode: if st.repair_mode { 4 } else { 1 },
         own_item: false,
-        gamble: st.gamble,
+        // The same global [0x007C0DB0] (ui/item-tips.md inputs): always 0.
+        gamble: false,
         price,
         ..base
     }
@@ -506,6 +512,13 @@ fn item_name(sh: &super::Shared, world: &ClientWorld, it: &ItemView) -> Option<V
 }
 
 impl Panel for ShopUi {
+    /// `ui/panels.md` §9 r1 revision: drawn before the inventory.
+    fn draw_before(&self) -> Option<PanelId> {
+        Some(PanelId(u16::from(
+            crate::ui::panels::inventory::UI_INVENTORY,
+        )))
+    }
+
     fn id(&self) -> PanelId {
         PanelId(u16::from(UI_SHOP))
     }

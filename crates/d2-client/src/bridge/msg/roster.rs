@@ -214,24 +214,45 @@ pub fn player_party_info(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), H
     Ok(())
 }
 
-/// The pet pass `0x00478FA0` (§8 r10). PROVISIONAL (msg-units.md §8 r10,
-/// open question 11): for each type-4 pet record whose monster is
-/// present, the palette level is 1 when the pet is not the local
-/// player's (stand-in for `0x00478E70(local player, U)` = 0), else 0;
-/// it is render state, kept in `pet_palette`.
+/// `0x00478E70(A, U)` (`msg-units.md` §8 r10.1): h = 0 when the pet of
+/// monster GUID `g` is A's own, a party member's, or a listed player's
+/// without relation bit 8. `q` is the FIRST pet record with pet GUID `g`
+/// (any type). A none -> 1. The relation list node of `0x004DC440` is
+/// never present: the relation messages (0x8B / 0x8C) are out of scope
+/// (`msg-units.md` §8 r11), so "no node" -> 0 -> h = 0 after the party
+/// test.
+fn pet_hostile(w: &ClientWorld, a: Option<u32>, g: u32) -> bool {
+    let Some(a) = a else {
+        return true;
+    };
+    let Some(q) = w.pets.iter().find(|p| p.pet == g) else {
+        // q none: both would have to be monsters (A is a player): 1.
+        return true;
+    };
+    if q.owner == a {
+        return false;
+    }
+    // `0x0047A070(A, owner)`.
+    let (Some(ra), Some(rb)) = (w.roster_find(a), w.roster_find(q.owner)) else {
+        return true;
+    };
+    let (pa, pb) = (w.roster[ra].f22, w.roster[rb].f22);
+    pa != pb || pa == 0xFFFF
+}
+
+/// The pet pass `0x00478FA0` (§8 r10.1): for each type-4 pet record (in
+/// list order) whose monster is present, the palette shift index t = 1
+/// when `0x00478E70(A, U)` = 0 (A = the local player, read once), else
+/// 0; render state, kept in `pet_palette`.
 fn pet_pass(w: &mut ClientWorld) {
     let local = w.local_player.map(|k| k.guid);
     let levels: Vec<(UnitKey, u8)> = w
         .pets
         .iter()
         .filter(|p| p.pet_type == PET_TYPE_PASS)
-        .map(|p| {
-            (
-                UnitKey::new(MONSTER, p.pet),
-                u8::from(Some(p.owner) != local),
-            )
-        })
+        .map(|p| (UnitKey::new(MONSTER, p.pet), p.pet))
         .filter(|(k, _)| w.units.contains_key(k))
+        .map(|(k, g)| (k, u8::from(!pet_hostile(w, local, g))))
         .collect();
     w.pet_palette.extend(levels);
 }

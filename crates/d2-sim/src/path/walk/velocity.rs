@@ -19,16 +19,31 @@ pub const VELOCITY_PERCENT_FLOOR: i32 = 25;
 /// First monster class of `velmod_monster_x`.
 pub const MONSTER_CLASS_X: u32 = 410;
 
+/// The facts §8.1 rule 2 reads of a unit (resolved by the caller).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct VelocityFacts {
+    pub ty: UnitType,
+    pub class: u32,
+    /// monstats `npc` (monsters).
+    pub npc: bool,
+    /// The used skill entry's E-flags word (`0x006446A0`), when a skill
+    /// is in use.
+    pub used_flags: Option<u32>,
+    /// Stat 96 from the item/skill getter `0x00625500`.
+    pub item_fastermove: i32,
+    /// Unit total of stat 67.
+    pub velocitypercent: i32,
+}
+
 /// Whether the mode has the velocity modifier (`0x006214A0`, §8.1 rule 2).
-fn has_modifier<U: WalkUnits + ?Sized>(t: &PathTables, u: &U, unit: UnitId, mode: u32) -> bool {
-    let ty = u.unit_type(unit);
-    let row = match ty {
+fn has_modifier(t: &PathTables, f: &VelocityFacts, mode: u32) -> bool {
+    let row = match f.ty {
         UnitType::Player => t.velmod_player.get(mode as usize),
         UnitType::Monster => {
-            if u.monstats_velocity(unit).1 {
+            if f.npc {
                 return mode == 2 || mode == 15;
             }
-            if u.class(unit) < MONSTER_CLASS_X {
+            if f.class < MONSTER_CLASS_X {
                 t.velmod_monster.get(mode as usize)
             } else {
                 t.velmod_monster_x.get(mode as usize)
@@ -42,11 +57,47 @@ fn has_modifier<U: WalkUnits + ?Sized>(t: &PathTables, u: &U, unit: UnitId, mode
         return true;
     }
     if row[0] != 0 {
-        if let Some(s) = u.used_skill(unit) {
-            return s.skill_flags & 0x1 != 0 && s.skill_flags & 0x1000 == 0;
+        if let Some(flags) = f.used_flags {
+            return flags & 0x1 != 0 && flags & 0x1000 == 0;
         }
     }
     false
+}
+
+/// p of §8.1 rule 2 (`units.md` §4.7 step 7) for a mode with the
+/// velocity modifier: stat 96 scaled by `animstat` row 4, plus stat 67,
+/// at least 25. `None`: knockback (rule 1) or a mode without the
+/// modifier.
+pub fn velocity_percent(t: &PathTables, f: &VelocityFacts, mode: u32) -> Option<i32> {
+    if (f.ty == UnitType::Player && mode == 19) || (f.ty == UnitType::Monster && mode == 13) {
+        return None;
+    }
+    if !has_modifier(t, f, mode) {
+        return None;
+    }
+    // animstat row 4: (has base, base, stat).
+    let [_, scale_base, _] = t.animstat[4];
+    let raw = f.item_fastermove;
+    let e = if raw != 0 {
+        scale_base.wrapping_mul(raw) / (scale_base + raw)
+    } else {
+        0
+    };
+    Some((e + f.velocitypercent).max(VELOCITY_PERCENT_FLOOR))
+}
+
+/// The facts of [`velocity_percent`] read through the walk seams.
+fn facts<U: WalkUnits + ?Sized>(t: &PathTables, u: &U, unit: UnitId) -> VelocityFacts {
+    let ty = u.unit_type(unit);
+    let [_, _, scale_stat] = t.animstat[4];
+    VelocityFacts {
+        ty,
+        class: u.class(unit),
+        npc: ty == UnitType::Monster && u.monstats_velocity(unit).1,
+        used_flags: u.used_skill(unit).map(|s| s.skill_flags),
+        item_fastermove: u.item_stat(unit, scale_stat as u16),
+        velocitypercent: u.stat(unit, STAT_VELOCITYPERCENT),
+    }
 }
 
 /// The velocity half of `0x00623F50` (§8.1 rules 1–2, 4) for a player or
@@ -63,18 +114,7 @@ pub fn mode_velocity<U: WalkUnits + ?Sized>(
     if (ty == UnitType::Player && mode == 19) || (ty == UnitType::Monster && mode == 13) {
         return Some(KNOCKBACK_VELOCITY);
     }
-    if !has_modifier(t, u, unit, mode) {
-        return None;
-    }
-    // animstat row 4: (has base, base, stat).
-    let [_, scale_base, scale_stat] = t.animstat[4];
-    let raw = u.item_stat(unit, scale_stat as u16);
-    let f = if raw != 0 {
-        scale_base.wrapping_mul(raw) / (scale_base + raw)
-    } else {
-        0
-    };
-    let p = (f + u.stat(unit, STAT_VELOCITYPERCENT)).max(VELOCITY_PERCENT_FLOOR);
+    let p = velocity_percent(t, &facts(t, u, unit), mode)?;
     let base = match ty {
         UnitType::Player => u.charstats_velocity(unit).0 * 256,
         _ => u.monstats_velocity(unit).0 * 256,

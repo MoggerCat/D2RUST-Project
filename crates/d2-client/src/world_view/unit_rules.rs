@@ -25,7 +25,7 @@
 
 use std::sync::Arc;
 
-use crate::bridge::world::{ClientWorld, OBJECT};
+use crate::bridge::world::{ClientWorld, MONSTER, OBJECT};
 use crate::bridge::ClientUnit;
 use d2_formats::cof::Cof;
 
@@ -60,10 +60,36 @@ impl<R> UnitRules<R> {
         if unit.key.unit_type == OBJECT {
             return frame_index(unit.frame as u32);
         }
-        // d2rs-own, unverified (D1): 8.8 animation rate per tick.
-        let frames = u64::from(frames.max(1));
-        ((world.server_ticks.wrapping_mul(u64::from(rate)) >> 8) % frames) as usize
+        // Monsters: the model's own frame (`bridge::monster_anim`, measured
+        // against 1.14d for the Act I town NPCs).
+        if unit.key.unit_type == MONSTER && unit.frame_count > 0 {
+            return frame_index(unit.frame as u32);
+        }
+        // §3 r2 (measured for players; PROVISIONAL (REC-512) for monsters
+        // without a model frame and for missiles): the draw of tick T has
+        // had T − 1 advances of the 8.8 rate.
+        tick_frame(world.server_ticks, frames, rate)
     }
+}
+
+/// The player's walk speed (`sim/units.md` §4.7 step 7: w = 213 for a
+/// player not running, p = 100 without item / skill velocity).
+pub const PLAYER_WALK_SPEED: u64 = 213;
+
+/// `sim/units.md` §4.7 step 7 revision (measured on `a1-walk-*`,
+/// PROVISIONAL REC-516): the walk frame at server tick `tick` of a walk
+/// that started on `since` (kept across re-targeting clicks):
+/// `((tick − since) · 213 >> 8) mod frames`.
+pub fn walk_frame(tick: u64, since: u64, frames: u8) -> usize {
+    let frames = u64::from(frames.max(1));
+    (((tick.saturating_sub(since) * PLAYER_WALK_SPEED) >> 8) % frames) as usize
+}
+
+/// §3 r2: the frame drawn at server tick `tick`, `((tick − 1) · rate
+/// >> 8) mod frames`.
+pub fn tick_frame(tick: u64, frames: u8, rate: u32) -> usize {
+    let frames = u64::from(frames.max(1));
+    ((tick.saturating_sub(1).wrapping_mul(u64::from(rate)) >> 8) % frames) as usize
 }
 
 fn unresolved(req: &ComponentRequest<'_>, what: &'static str, message: String) -> CompositeError {
@@ -112,6 +138,12 @@ impl<R: ViewRules> ViewRules for UnitRules<R> {
                     cof.animation_rate,
                     usize::from(cof.frames),
                 )
+            } else if let Some(since) = art
+                .pose_since
+                .filter(|(k, _)| *k == unit.key && matches!(unit.mode, 2 | 6))
+                .map(|(_, s)| s)
+            {
+                walk_frame(world.server_ticks, since, cof.frames)
             } else {
                 Self::frame(world, unit, cof.frames, cof.animation_rate)
             },

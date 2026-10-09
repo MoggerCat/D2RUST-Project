@@ -42,15 +42,29 @@ pub struct AddOutcome {
     pub refresh_log: bool,
 }
 
-/// The wide → 8-bit conversion of the filter text (`0x005263E0`, 256
-/// bytes). PROVISIONAL (specs/ui/messages.md §2 r2; REC-ui-chat-filter):
-/// the code page is not given; units below 0x100 map to their byte,
-/// others to `?`.
+/// The wide → 8-bit conversion of the filter text (`0x005263E0` →
+/// `0x00526190`, table `0x007309B8`, specs/ui/messages.md §2 r2): UTF-8
+/// per u16 unit (1 byte < 0x80, 2 < 0x800, else 3; surrogates are plain
+/// 3-byte units), while fewer than 255 bytes are written (a unit that
+/// starts at byte 253 or 254 may run past 255).
 pub fn to_8bit(line: &[u16]) -> Vec<u8> {
-    line.iter()
-        .take(255)
-        .map(|&u| u8::try_from(u).unwrap_or(b'?'))
-        .collect()
+    let mut out = Vec::new();
+    for &u in line {
+        if out.len() >= 255 {
+            break;
+        }
+        if u < 0x80 {
+            out.push(u as u8);
+        } else if u < 0x800 {
+            out.push(0xC0 | (u >> 6) as u8);
+            out.push(0x80 | (u & 0x3F) as u8);
+        } else {
+            out.push(0xE0 | (u >> 12) as u8);
+            out.push(0x80 | ((u >> 6) & 0x3F) as u8);
+            out.push(0x80 | (u & 0x3F) as u8);
+        }
+    }
+    out
 }
 
 /// The screen message list `[0x007BF1E4]` (head = oldest) and the message
@@ -430,6 +444,16 @@ impl RecipeScroll {
 
 #[cfg(test)]
 mod tests {
+    // Covers: specs/ui/messages.md §2 r2
+    #[test]
+    fn the_filter_text_is_utf8() {
+        assert_eq!(
+            super::to_8bit(&[0x41, 0xE9, 0x20AC]),
+            vec![0x41, 0xC3, 0xA9, 0xE2, 0x82, 0xAC]
+        );
+        assert_eq!(super::to_8bit(&[b'a' as u16; 300]).len(), 255);
+    }
+
     use super::super::testutil::{w, Fixed};
     use super::*;
 

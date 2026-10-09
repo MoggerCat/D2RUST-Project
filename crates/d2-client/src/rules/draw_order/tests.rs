@@ -845,11 +845,10 @@ fn open_mode_3_and_level_backgrounds() {
     )
     .unwrap();
     assert!(o.items.is_empty());
-    n.level.id = 74;
-    let e = order_grid(&grid(), &mut n, &BTreeMap::new(), CLOCK).unwrap_err();
-    assert!(matches!(e, OrderError::Open { question: 1, .. }));
-    // Level 120's background is the world view's pass-1 layer
+    // Levels 74 and 120: the backgrounds are the world view's pass-1 layer
     // (`world_view::background_view`): the rooms order as usual.
+    n.level.id = 74;
+    assert!(order_grid(&grid(), &mut n, &BTreeMap::new(), CLOCK).is_ok());
     n.level.id = 120;
     assert!(order_grid(&grid(), &mut n, &BTreeMap::new(), CLOCK).is_ok());
     n.level.id = 1;

@@ -136,6 +136,13 @@ pub trait Panel {
     fn id(&self) -> PanelId;
     fn rect(&self) -> Rect;
     fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink);
+    /// A panel drawn right before another open panel rather than at its
+    /// own place in the root (the routing order is unchanged): the
+    /// inventory family's mode panels before the inventory
+    /// (`ui/panels.md` §9 r1 revision).
+    fn draw_before(&self) -> Option<PanelId> {
+        None
+    }
     fn hit(&self, p: Point) -> Option<WidgetId>;
     fn event(&mut self, e: UiEvent, ctx: &UiCtx) -> UiResponse;
 }
