@@ -6,8 +6,10 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
-use d2_client::app::single_player::{self, GameData, DEFAULT_SEED};
+use d2_client::app::single_player::{self, DEFAULT_SEED};
 use d2_client::bridge::link::{SendQueue, ServerLink};
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -21,11 +23,12 @@ impl d2_server::seams::Clock for StepClock {
 /// `--new` barbarian named "Conan".
 // Covers: specs/sim/intents-events.md §8.2 r2, §8.2 r7
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_join_creates_the_named_character() {
     let ms = Arc::new(AtomicU32::new(1000));
     let character = single_player::new_character("barbarian", "Conan").unwrap();
     let (mut link, _) = single_player::start_with(
-        GameData::Synthetic,
+        app_support::game_data(),
         DEFAULT_SEED,
         character.clone(),
         StepClock(ms.clone()),
@@ -61,6 +64,7 @@ fn the_join_creates_the_named_character() {
 /// character's save town is Hell's.
 // Covers: specs/sim/intents-events.md §8.1 r3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_join_runs_the_game_on_the_chosen_difficulty() {
     let ms = Arc::new(AtomicU32::new(1000));
     let character = single_player::new_character("amazon", "Hel")
@@ -68,7 +72,7 @@ fn the_join_runs_the_game_on_the_chosen_difficulty() {
         .with_difficulty(2);
     assert_eq!(character.difficulty(), 2);
     let (mut link, _) = single_player::start_with(
-        GameData::Synthetic,
+        app_support::game_data(),
         DEFAULT_SEED,
         character.clone(),
         StepClock(ms.clone()),

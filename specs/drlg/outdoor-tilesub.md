@@ -21,15 +21,15 @@
 | Outputs / state changes | 56–61 |
 | Rules | 62–63 |
 |   1. Rows and files | 64–87 |
-|   2. Border substitution (`0x00670750`, D2MOO `DRLGTILESUB_AddSecondaryBorder`) | 88–166 |
-|   3. Sub-theme pick (`0x006706A0`, D2MOO `DRLGTILESUB_PickSubThemes`) | 167–174 |
-|   4. Room substitution (`0x006707A0`, D2MOO `sub_6FD8AA80`) | 175–241 |
-| Constants & data dependencies | 242–258 |
-| Randomness | 259–266 |
-| Edge cases & original bugs | 267–278 |
-| Test vectors | 279–294 |
-| Provenance | 295–313 |
-| Open questions | 314–352 |
+|   2. Border substitution (`0x00670750`, D2MOO `DRLGTILESUB_AddSecondaryBorder`) | 88–181 |
+|   3. Sub-theme pick (`0x006706A0`, D2MOO `DRLGTILESUB_PickSubThemes`) | 182–189 |
+|   4. Room substitution (`0x006707A0`, D2MOO `sub_6FD8AA80`) | 190–256 |
+| Constants & data dependencies | 257–273 |
+| Randomness | 274–281 |
+| Edge cases & original bugs | 282–293 |
+| Test vectors | 294–309 |
+| Provenance | 310–328 |
+| Open questions | 329–367 |
 <!-- /index -->
 
 ## Summary
@@ -152,8 +152,23 @@ level cell:
 
 Replace, per cell (xoff = variant offset):
 - w & 1: s := (w >> 8 & 0xFF) − 1; P := style map(…) if present, else
-  B + s; if P ≠ −5 and s ≠ S: stamp P at the cell with file −1 and the
-  border flag set (`outdoor.md` §5.1; build-list roll on first use of P);
+  B + s; if P ≠ −5 and s ≠ S: stamp P at the cell with the border flag
+  set (`outdoor.md` §5.1 steps 2–3). **No build-list roll**, also on the
+  first use of P (recorded: Blood Moor's build-list draws `0x0067438F`
+  are its ring's 10 then 52, 46, 47, 29, 30 at seq 2562–2571, 4464,
+  6027, 6129, 6230, 6331, and Cold Plains' are its ring's 8 then 51, 48,
+  44, 29, 30 at seq 9481, 11622, 11752, 11881 and the next one, although
+  their type 1 replacements stamp the first 12 / 13 resp. 12–15; with a
+  roll per first stamp the Cold Plains type 2 variant roll moves from
+  level-seed draw 1747, seq 8644, to 1751, and the build ends at 97
+  rooms). The earlier text said "file −1" (a build-list file).
+  PROVISIONAL: the stamp's file is 0 and the build list is not touched
+  (because the recording fixes only that no draw happens; every
+  replacement-stamped piece 12–15 has `Files` 1, where any reading gives
+  file 0; it differs only for a multi-file piece, 4–7, stamped by a
+  replacement); settled by REC-404 (the file argument the replace
+  callback `0x0066F520` passes to `0x006743C0`, and that function's path
+  for it);
 - else f & 2: keep cell; else: blank cell.
 
 Act V style map (`0x0067E000`; style must be 48 or 49, else fatal): the
@@ -260,7 +275,7 @@ Act 5 scatter, 12 Barricade (BordType 2, GridSize 2). Leveldefs
 
 | When | Seed | Draws in order |
 |---|---|---|
-| border substitution (level build) | level seed | per row: [BordType 0: roll(groups)]; per group: A pairs roll(A), roll(A); per replacement roll(N) |
+| border substitution (level build) | level seed | per row: [BordType 0: roll(groups)]; per group: A pairs roll(A), roll(A); per replacement roll(N) (its stamps draw nothing, §2.3) |
 | outdoor room creation | room seed (after its init step, `rooms.md` §2) | one `lo' mod 100` per row of the sub type |
 | room tile build, after the reset | room seed | waypoint rows, shrine rows, own rows (§4): CheckAll random: per passing cell `lo' mod 100` [+ roll(N)]; scattered: per repetition roll(groups) [+ shuffle pairs, or ≤ Trials × (roll(aw), roll(ah))] |
 

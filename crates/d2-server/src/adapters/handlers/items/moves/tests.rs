@@ -346,6 +346,12 @@ impl MovePending for MRest {
 }
 
 impl InvRest for MRest {
+    /// Every player has a left and a right skill (Attack, skill 0, class
+    /// entry, at the least): the weapon bookkeeping reads them once a
+    /// weapon is in use (`inventory.md` §5.8 step 5).
+    fn mouse_skill(&self, _: Owner, _: bool) -> Option<(i32, i32)> {
+        Some((0, -1))
+    }
     fn pos(&self, u: Owner) -> (i32, i32) {
         self.with(|r| r.pos.get(&u).copied().unwrap_or((0, 0)))
     }

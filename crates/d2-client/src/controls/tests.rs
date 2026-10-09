@@ -325,8 +325,11 @@ fn tsv_table() -> Vec<u8> {
         let c: Vec<&str> = line.split('\t').collect();
         let cmd: i32 = c[0].parse().unwrap();
         let pos: usize = c[8].parse().unwrap();
-        entries[2 * pos] = (cmd, key(c[3]), 1);
-        entries[2 * pos + 1] = (cmd, key(c[4]), 0);
+        let (one, zero) = ((cmd, key(c[3]), 1), (cmd, key(c[4]), 0));
+        // command 1: slot 0 first (controls.md §3.4, measured on Game.exe)
+        let (first, second) = if cmd == 1 { (zero, one) } else { (one, zero) };
+        entries[2 * pos] = first;
+        entries[2 * pos + 1] = second;
     }
     let mut out = Vec::new();
     for (cmd, k, slot) in entries {

@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
 use d2_client::app::play::{add_client_data, add_game, add_walk, predict_link, send_create_game};
-use d2_client::app::single_player::{self, GameData};
+use d2_client::app::single_player::{self};
 use d2_client::bridge::predict::Speeds;
 use d2_client::bridge::world::UnitKey;
 use d2_client::bridge::BridgeResource;
@@ -41,6 +41,7 @@ fn server_level(server: &app_support::Server<StepClock>) -> Option<u32> {
 
 // Covers: specs/world/waypoints.md §6.3 r2; specs/world/waypoints.md §7 r5
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_act_iii_waypoint_takes_the_player_to_spider_forest() {
     // Spider Forest is waypoint 19 (`waypoints.tsv`).
     travel(75, 19, 76, 2);
@@ -48,13 +49,14 @@ fn the_act_iii_waypoint_takes_the_player_to_spider_forest() {
 
 // Covers: specs/world/waypoints.md §6.3 r2; specs/world/waypoints.md §7 r5
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_act_v_waypoint_takes_the_player_to_rigid_highlands() {
     // Rigid Highlands is waypoint 31 (`waypoints.tsv`).
     travel(single_player::ACT5_TOWN, 31, 111, 4);
 }
 
 fn travel(town: u32, wp_index: u32, field: u32, act: u8) {
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = single_player::start(
         data.clone(),
@@ -76,7 +78,7 @@ fn travel(town: u32, wp_index: u32, field: u32, act: u8) {
         single_player::client_drlg_source(&data),
         single_player::client_level_rows(&data),
     );
-    app_support::synthetic_skill_rows(&mut app);
+    app_support::live_tables(&mut app);
     app.update();
     let mut steps = 0;
     let mut step = |app: &mut App| {

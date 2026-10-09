@@ -143,6 +143,12 @@ impl<X: WorldPending> TickHooks for WorldSim<X> {
     }
     /// Step 3 `0x005559A0` (`population.md` §11.1).
     fn spawn_presets(&mut self, game: &mut Game, r: RoomId) {
+        // The first pass: the object presets (PROVISIONAL,
+        // q-fix-real-preset-objects; `View::spawn_preset_objects`).
+        self.host(game, |h| {
+            let WorldHost { game, v, .. } = h;
+            v.spawn_preset_objects(game, r);
+        });
         self.population(game, |cx| preset::place_presets(cx, r));
         // PROVISIONAL (REC-99): the warp tile units of the room's presets.
         self.host(game, |h| {
@@ -178,9 +184,13 @@ impl<X: WorldPending> TickHooks for WorldSim<X> {
             });
         }
     }
-    /// Step 3 `0x00552610`.
+    /// Step 3 `0x00552610` (`object-population.md`): on the action
+    /// wiring's object state when the game has one, else the
+    /// [`WorldPending`] answer (the host's `populate_objects`; calling the
+    /// pending seam directly left every room of a game with object state
+    /// unpopulated, q-fixture-migrate).
     fn populate_objects(&mut self, game: &mut Game, r: RoomId) {
-        self.host(game, |h| h.v.h.x.populate_objects(r));
+        self.host(game, |h| pop::MonsterInit::populate_objects(h, r));
     }
     /// Step 3 `0x0054EC90` (`population.md` §3).
     fn populate_monsters(&mut self, game: &mut Game, r: RoomId) {

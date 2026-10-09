@@ -8,10 +8,12 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
-use d2_client::app::single_player::{self, GameData, DEFAULT_SEED};
+use d2_client::app::single_player::{self, DEFAULT_SEED};
 use d2_client::bridge::Bridge;
 use d2_sim::items::bitstream::{write, Isc, StatEntry, StreamItem};
 use d2_sim::items::ItemTables;
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -91,10 +93,15 @@ fn record(isc: &Vec<Isc>, owner: u32, mode: u32, body: u8, page: u8) -> Vec<u8> 
 
 // Covers: specs/client/stat-lists.md §1 r3, §2 r2, §2 r4
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn equipped_item_lists_add_to_the_total_and_the_base_stays() {
     let ms = Arc::new(AtomicU32::new(1000));
-    let (link, _) =
-        single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+    let (link, _) = single_player::start(
+        app_support::game_data(),
+        DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap();
     let mut bridge = Bridge::new(link).unwrap();
     let frame = |b: &mut Bridge<_>| {
         ms.fetch_add(40, Ordering::SeqCst);

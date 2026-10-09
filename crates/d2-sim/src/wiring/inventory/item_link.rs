@@ -1,4 +1,4 @@
-// Spec: specs/items/properties.md §9, §11, §13; specs/sim/stat-lists.md §8.2, §8.4
+// Spec: specs/items/properties.md §9, §11, §13; specs/sim/stat-lists.md §8.2, §8.4; specs/world/quests-act3-2.md §11.5 r1, §11.5 r2
 //! An equipped item's stats reach its wearer: the stat link `0x0063D1D0`
 //! attaches the item's stat list to the owner (`stat-lists.md` §8.4,
 //! reset 1), the leaving of a body slot detaches it (§8.2), and a set
@@ -16,13 +16,30 @@
 
 use super::equip_rules::EquipCall;
 use super::{InvDesk, InvError, InvRest};
-use crate::items::inventory::{active_inventory_item, body, iflag, node, InvWorld};
+use crate::items::inventory::{active_inventory_item, body, iflag, node, weapon, InvWorld};
 use crate::items::set_state::{self, QUALITY_SET};
 use crate::items::{props, ListKey};
 use crate::units::lifecycle::LifecycleHooks;
 use crate::units::UnitId;
 
 impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
+    /// The weapon-in-use link (`link`) or unlink of `item` on `owner`'s
+    /// inventory (`world/quests-act3-2.md` §11.5 rules 1–2, writes only
+    /// +0x1C), when the desk holds it. An inventory lent out to an
+    /// inventory function is that function's to update (`inventory.md`
+    /// §4.8 step 5, §4.9 step 3 run the link themselves).
+    pub(super) fn weapon_link_on(&mut self, owner: UnitId, item: UnitId, link: bool) {
+        let t = self.tables;
+        if let Some(mut inv) = self.state.inventories.remove(&owner) {
+            if link {
+                weapon::weapon_link(&mut inv, self, t, item);
+            } else {
+                weapon::weapon_unlink(&mut inv, self, t, item);
+            }
+            self.state.inventories.insert(owner, inv);
+        }
+    }
+
     /// The stat link of `item` onto `owner`; false when the switch is off.
     pub(super) fn link_item_stats(&mut self, owner: UnitId, item: UnitId) -> bool {
         if !self.state.link_item_stats {

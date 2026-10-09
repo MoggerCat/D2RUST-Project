@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use bevy::prelude::*;
 use d2_client::app::play::{add_client_data, add_game, add_preview, send_create_game_for};
 use d2_client::app::server_thread::ThreadLink;
-use d2_client::app::single_player::{self, BuildError, GameData, Link};
+use d2_client::app::single_player::{self, BuildError, Link};
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::local::{LocalLink, PendingSession};
 use d2_client::bridge::mirror::DynLink;
@@ -142,7 +142,7 @@ impl Rig {
         let (class_id, learned) = (cfg.class_id, cfg.learned.clone());
         let link = ThreadLink::spawn(move || {
             let mut g = single_player::build_with(
-                &GameData::Synthetic,
+                &crate::app_support::game_data(),
                 single_player::DEFAULT_SEED,
                 spawn_character,
             )?;
@@ -164,7 +164,7 @@ impl Rig {
             .init_resource::<ButtonInput<KeyCode>>();
         add_game(&mut app, dyn_link, false).unwrap();
         send_create_game_for(&mut app, &character).unwrap();
-        let data = GameData::Synthetic;
+        let data = crate::app_support::game_data();
         let levels = single_player::client_level_rows(&data);
         add_client_data(
             &mut app,
@@ -333,7 +333,14 @@ impl Rig {
             .world()
             .units
             .iter()
-            .find(|(k, u)| k.unit_type == TILE && u.class == single_player::BLOOD_MOOR_TO_DEN)
+            .find(|(k, u)| {
+                k.unit_type == TILE
+                    && u.class
+                        == crate::app_support::warp_id(
+                            single_player::BLOOD_MOOR,
+                            single_player::DEN_OF_EVIL,
+                        )
+            })
             .map(|(k, _)| *k)
             .expect("the cave entrance reached the client");
         self.app
