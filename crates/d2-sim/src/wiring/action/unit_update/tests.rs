@@ -110,7 +110,9 @@ fn kill_sends_code_8_then_the_death_end_code_9() {
     fx.tick();
     let mut want = vec![0x69];
     want.extend(g.to_le_bytes());
-    want.extend([0x08, 0x95, 0x12, 0x55, 0x15, 0x38, 0x00]);
+    // The direction byte: the death request faces the killer
+    // (`damage.md` §7.2 step 3), 23 from this fixture's two positions.
+    want.extend([0x08, 0x95, 0x12, 0x55, 0x15, 23, 0x00]);
     assert_eq!(sent(&mut fx), vec![(p, want)]);
     assert_eq!(
         fx.sim.sys.units.get(m).unwrap().flags & (flags::CHANGED | flags::MODE_CHANGING),
@@ -131,7 +133,7 @@ fn kill_sends_code_8_then_the_death_end_code_9() {
     want.push(0x09);
     want.extend((d.x() as u16).to_le_bytes());
     want.extend((d.y() as u16).to_le_bytes());
-    want.extend([0x38, 0x00]);
+    want.extend([23, 0x00]);
     assert_eq!(sent(&mut fx), vec![(p, want)]);
     for _ in 0..30 {
         fx.tick();
