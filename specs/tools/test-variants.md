@@ -75,11 +75,13 @@ link, else copy), except `patch_d2.mpq`, which is rewritten (§2), and
 
 ### 3. `variant.json`
 
-`{"format": "test-variant", "version": 1, "name", "stack_sha256" (of
-the stack file and each layer, in order), "base_patch_d2_sha256",
-"variant_patch_d2_sha256", "tables": [{"table", "bin_sha256",
-"source": "patch_d2"|"d2exp"|"d2data" (where the live `.bin` came
-from)}], "tool"}`. It is a description of game files and stays beside
+`{"format": "test-variant", "version": 1, "name", "stack_sha256":
+[{"file", "sha256"}] (the stack file first, then each layer in order),
+"base_patch_d2_sha256", "variant_patch_d2_sha256", "tables": [{"table"
+(the `.bin` name without `.bin`), "bin_sha256", "source":
+"patch_d2"|"d2exp"|"d2data" (where the live `.bin` came from)}],
+"tool"}`. `data-tool variant check <out> [--game DIR]` repeats the §2
+rule 4 check from it (the base archive is needed for the other blocks). It is a description of game files and stays beside
 them (never committed).
 
 ### 4. Use
