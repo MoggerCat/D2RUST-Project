@@ -153,6 +153,16 @@ pub trait QuestObjectHost<X> {
         false
     }
     fn jerhyn_placed(&mut self) {}
+    /// The palace guard AI hooks of `ai-bodies-7.md` §7
+    /// (`world/quests-act2.md` §10): `0x0059B8B0` (the guard at its end
+    /// position, the door open) and `0x0059AEC0` (the blocker open).
+    /// Defaults: false.
+    fn palace_door_open(&mut self) -> bool {
+        false
+    }
+    fn palace_guard_aside(&mut self) -> bool {
+        false
+    }
     /// For the host taking its parts back.
     fn into_any(self: Box<Self>) -> Box<dyn std::any::Any>;
 }

@@ -915,8 +915,9 @@ impl<X: Pending> AiActs for View<'_, X> {
 /// and the target-node slot (+0xD0) are real (`units.md` §2); everything
 /// else keeps the narrow default of [`AiSummons`] until its owner wires it.
 impl<X: Pending> AiSummons for View<'_, X> {
-    /// The Act V prisoner AI's hooks (`quests-act5.md` §4.10): the reads
-    /// from the quest control's published states
+    /// The palace guard's door hooks from the lent quest control. The Act
+    /// V prisoner AI's hooks (`quests-act5.md` §4.10): the reads from the
+    /// quest control's published states
     /// ([`Pending::quest_rescue`]); the calls with an effect queued for
     /// it ([`Pending::queue_quest_event`]); `0x00588E10` read here. Other
     /// hooks keep the default.
@@ -931,6 +932,20 @@ impl<X: Pending> AiSummons for View<'_, X> {
         use crate::monsters::ai::QuestHook;
         let guid = game.lists.unit(unit).map_or(0, |e| e.guid);
         match hook {
+            // The palace guard's A2Q4 hooks (`world/quests-act2.md` §10)
+            // on the lent quest control; none: false. PROVISIONAL
+            // (REC-1633): `0x0059B8F0` ([`AiSummons::palace_guard_point`])
+            // keeps its default, its return value is not stated.
+            QuestHook::PalaceDoorOpen => self
+                .h
+                .quest_host
+                .as_mut()
+                .is_some_and(|q| q.palace_door_open()),
+            QuestHook::PalaceGuardAside => self
+                .h
+                .quest_host
+                .as_mut()
+                .is_some_and(|q| q.palace_guard_aside()),
             QuestHook::WussieLeaving => self.h.x.quest_rescue(guid).0,
             QuestHook::WussieLeave => {
                 self.h.x.queue_quest_event(QuestEvent::WussieLeft { guid });

@@ -1,0 +1,42 @@
+{
+ "channel": "packets",
+ "check": "a2-npc-atma-talk",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "50",
+  "--auto",
+  "ScnAm2",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--poke",
+  "4 goto unit 1:176",
+  "--send",
+  "14 InteractWithEntity type=1 id=@1:176",
+  "--send",
+  "16 InitEntityChat id=@1:176",
+  "--send",
+  "18 TerminateEntityChat id=@1:176"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "281a73285a402069176cd55ce32c2e5233c7c8ba70eb460e688cdb23a9e88460",
+   "size": 96490
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "fa7a8ece0278f3bff43784a4007c105dadb4f4654e74d1692dd410f22c194df6",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "game-exe:631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "recorder": "cdb34be43fbbad3d6b4dde997201cf9ac810447ec77c1b633ddcd85d46e51a47",
+  "save": "6333f21d55093f5eb23c7af8ae38032a14c8439fecc2218a7674a4846b8b7e68"
+ }
+}

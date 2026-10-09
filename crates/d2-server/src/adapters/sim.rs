@@ -594,8 +594,8 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
     /// receivers' clients in send order (§3.2 rule 1: a player without a
     /// client receives nothing); a queueing failure is recorded in
     /// [`SimGame::tick_faults`]. Then the deferred item messages
-    /// (`handlers::items::moves::update_pass`, `inventory-moves.md` §6.1), then
-    /// the client vitals sync ([`SimGame::vitals_sync`]).
+    /// (`handlers::items::moves::update_pass`, `inventory-moves.md` §6.1).
+    /// The client vitals sync runs in the flush ([`Tick::flush_sync`]).
     fn tick(&mut self, out: &mut dyn MessageSink) {
         self.run_host_sync();
         self.world.run_tick(&mut self.game, &mut self.events);
@@ -650,6 +650,10 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
             }
         }
         handlers::items::moves::update_pass(self, out);
+    }
+
+    /// The client vitals sync ([`SimGame::vitals_sync`]) of the flush.
+    fn flush_sync(&mut self, out: &mut dyn MessageSink) {
         self.vitals_sync(out);
     }
 }
@@ -658,8 +662,9 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> SimGame<D, W> {
     /// The client vitals sync (`combat/vitals.md` §5.1 rule 1): every
     /// flush with argument 1 runs `0x0052D980` for each client in game,
     /// before its buffers are sent, so these messages end the tick's
-    /// batch. Single player flushes once after each tick that ran, so it
-    /// runs here, at the end of the tick, in client list order. A player
+    /// batch; run by the host's flush ([`Tick::flush_sync`]), in client
+    /// list order. Recorded: `a2-npc-fara-heal` frame 15, the 0x95 is
+    /// queued after the `flush` record on 1.14d. A player
     /// without a path record is at its staged position ([`UnitFacts`];
     /// (0, 0) when none is staged). Off unless the host's world turns it
     /// on (`WorldHost::vitals_sync`).

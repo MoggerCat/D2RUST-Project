@@ -160,6 +160,9 @@ pub struct InvState {
     /// owner test and swap, [`merc`]); read only here. `None` (the
     /// default): those seams stay the rest's.
     pub hirelings: Option<crate::world::hirelings::HirelingState>,
+    /// The gamble lists' inventories (`world/vendors.md` §5.1 step 7: the
+    /// node's own inventory, owned by the NPC), by (NPC, player GUID).
+    pub gambles: BTreeMap<(UnitId, u32), Inventory>,
 }
 
 impl InvState {

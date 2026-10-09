@@ -5,7 +5,8 @@
   hand-played recording `traces/raw/20261006-015956-packets.jsonl`
   (Charsi, Akara, Warriv, Flavie; Test vectors); a hire at Kashya is
   recorded (`traces-raw-buddy/merc1-spawn-packets.jsonl`, Test vectors);
-  resurrect, heal and the service actions have no recording yet.
+  a heal at Fara is recorded (`a2-npc-fara-heal`, §5); resurrect and
+  the service actions have no recording yet.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::world::npc`
 - **Related specs:** `world/vendors.md` (store inventories, gamble lists,
@@ -27,26 +28,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 52–65 |
-| Inputs | 66–76 |
-| Outputs / state changes | 77–84 |
-| Rules | 85–86 |
-|   1. NPC control and records | 87–141 |
-|   2. Starting an interaction (C→S 0x13) | 142–235 |
-|   3. Chat open and close (C→S 0x2F, 0x30) | 236–274 |
-|   4. Menu actions (C→S 0x38) | 275–333 |
-|   5. Healing on chat open | 334–361 |
-|   6. Cain identify (C→S 0x34) | 362–390 |
-|   7. Mercenaries | 391–513 |
-|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 514–593 |
-|   9. S→C 0x2A NPC transaction (15 bytes) | 594–627 |
-|   10. Dead code in 1.14d (no caller, no pointer reference) | 628–639 |
-| Constants & data dependencies | 640–652 |
-| Randomness | 653–665 |
-| Edge cases & original bugs | 666–741 |
-| Test vectors | 742–764 |
-| Provenance | 765–815 |
-| Open questions | 816–874 |
+| Summary | 53–66 |
+| Inputs | 67–77 |
+| Outputs / state changes | 78–85 |
+| Rules | 86–87 |
+|   1. NPC control and records | 88–142 |
+|   2. Starting an interaction (C→S 0x13) | 143–236 |
+|   3. Chat open and close (C→S 0x2F, 0x30) | 237–275 |
+|   4. Menu actions (C→S 0x38) | 276–334 |
+|   5. Healing on chat open | 335–370 |
+|   6. Cain identify (C→S 0x34) | 371–399 |
+|   7. Mercenaries | 400–522 |
+|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 523–602 |
+|   9. S→C 0x2A NPC transaction (15 bytes) | 603–636 |
+|   10. Dead code in 1.14d (no caller, no pointer reference) | 637–648 |
+| Constants & data dependencies | 649–661 |
+| Randomness | 662–674 |
+| Edge cases & original bugs | 675–750 |
+| Test vectors | 751–773 |
+| Provenance | 774–824 |
+| Open questions | 825–883 |
 <!-- /index -->
 
 ## Summary
@@ -358,6 +359,14 @@ nothing unless the player's interact unit is that NPC. Then, in order:
 
 Heal is free and happens on every 0x2F that moves the node from state 0
 to 1, i.e. once per interaction.
+
+Recorded (2026-10-09, `a2-npc-fara-heal`, 1.14d under Wine, life poked
+to 20 of 50): the 0x2F's handling sends `1e 06 00 32` (step 1, SetStat
+0x1E, stat 6 := 12800) at once, before the client's C→S 0x31 of the
+same drain; the next tick's client pass sends the sound `2c 01 0a000000
+0a00` (step 6, sound 10 on Fara, type 1 GUID 10); the 0x95 of the
+vitals sync follows in that tick's flush (`combat/vitals.md` §5.1).
+d2rs equal on every byte and phase (q-fix-npc-interact).
 
 ### 6. Cain identify (C→S 0x34)
 

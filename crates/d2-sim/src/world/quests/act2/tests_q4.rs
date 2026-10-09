@@ -864,8 +864,8 @@ fn palace_hooks() {
     assert_eq!(q4::guard_target(&ctl), None);
 }
 
-// Covers: specs/world/quests-act2.md §10 (`0x0059F570` → `0x0059F510`,
-// `0x0059DFB0`)
+// Covers: specs/world/quests-act2.md §10
+// (`0x0059F570` → `0x0059F510`, `0x0059DFB0`)
 #[test]
 fn jerhyn_palace_active_hook() {
     let (mut ctl, _f, i) = setup();
@@ -900,7 +900,8 @@ fn jerhyn_palace_active_hook() {
     assert!(q4::jerhyn_palace_active(&ctl));
 }
 
-// Covers: specs/world/quests-act2.md §10 (`0x0059F580`)
+// Covers: specs/world/quests-act2.md §10
+// (`0x0059F580`)
 #[test]
 fn jerhyn_npc_state_hook() {
     use q4::JerhynStep;

@@ -279,10 +279,23 @@ where
         self.with_desk(|d| d.store_unlink(item));
         self.inner.take_from_store(npc_class, item)
     }
+    /// The gamble node's inventory (`InvDesk::gamble_place`, §5.1 step 7)
+    /// when the call has one; else the wrapped world's.
     fn place_in_gamble(&mut self, npc_class: u16, player: u32, item: UnitId) -> bool {
-        self.inner.place_in_gamble(npc_class, player, item)
+        let Some(npc) = self
+            .inner
+            .record_npc(npc_class)
+            .filter(|_| self.inv.is_some())
+        else {
+            return self.inner.place_in_gamble(npc_class, player, item);
+        };
+        self.with_desk(|d| d.gamble_place(npc, player, item))
+            .unwrap_or(false)
     }
+    /// The item leaves the gamble inventory, then the wrapped world's
+    /// removal.
     fn remove_gamble_item(&mut self, npc_class: u16, player: u32, item: UnitId) {
+        self.with_desk(|d| d.gamble_unlink(item));
         self.inner.remove_gamble_item(npc_class, player, item)
     }
     fn refresh_npc_inventory(&mut self, npc: UnitId) {

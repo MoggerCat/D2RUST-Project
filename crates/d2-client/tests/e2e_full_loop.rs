@@ -2335,10 +2335,13 @@ fn run_with(game_seed: u32) -> Transcript {
         store_rows.push((guid, it.record, it.item_seed, ac));
     }
     assert_eq!(store_rows.last().unwrap().1, CAP, "permanent codes last");
-    // One 0x9C action 11 per store item, in store order (§4 step 3).
+    // One 0x9C action 11 per store item, in store order (§4 step 3). The
+    // frame also carries the 0x2F's heal SetStat (Akara heals,
+    // `npc.md` §5 step 1).
     let shown: Vec<(u8, u8, u32)> = frames[trade_frame]
         .2
         .iter()
+        .filter(|m| m[0] == 0x9C)
         .map(|m| (m[0], m[1], u32::from_le_bytes(m[4..8].try_into().unwrap())))
         .collect();
     let want: Vec<(u8, u8, u32)> = store_rows.iter().map(|r| (0x9C, 11, r.0)).collect();
@@ -2567,7 +2570,8 @@ fn run_with(game_seed: u32) -> Transcript {
     assert!(log.unowned.is_empty(), "{:?}", log.unowned);
     // + the trade open's 0x9C action 11, one per store item.
     // + the picked gold pile's removal 0x0A (REC-281).
-    assert_eq!(log.handled, 26 + store.len() as u64);
+    // + the 0x2F's heal at Akara (`npc.md` §5): its sound 0x2C.
+    assert_eq!(log.handled, 27 + store.len() as u64);
     assert_eq!(
         log.dropped,
         // + the player's own 0x4D echo (REC-95), dropped like 0x0D.
@@ -2582,6 +2586,10 @@ fn run_with(game_seed: u32) -> Transcript {
         .collect();
     let mut want = vec![(0x07, "fatal assert 0x58A".to_owned()); 11];
     want.extend(vec![(0x08, "fatal assert 0x59E".to_owned()); 4]);
+    // The heal's SetStat 0x1E at Akara (`npc.md` §5 step 1), after the
+    // join's four 0x07: no local player in this staged game
+    // (`msg-stats-items.md` §1 rule 1, fatal 0x9AA).
+    want.insert(4, (0x1E, "fatal assert 0x9AA".to_owned()));
     assert_eq!(rejected, want);
     assert!(log.discarded.is_empty());
     // No local player: the world view has no camera (`model.md` §3 rule 3).

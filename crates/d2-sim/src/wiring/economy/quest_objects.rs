@@ -153,6 +153,14 @@ impl<X: Pending, R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static>
         q4::jerhyn_placed(&mut self.quests);
     }
 
+    fn palace_door_open(&mut self) -> bool {
+        q4::guard_at_end(&self.quests)
+    }
+
+    fn palace_guard_aside(&mut self) -> bool {
+        q4::blocker_open(&self.quests)
+    }
+
     fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
         self
     }

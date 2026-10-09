@@ -38,13 +38,13 @@
 |   7. A2Q5 The Summoner (chain 12, slot 13) | 658–693 |
 |   8. A2Q6 The Seven Tombs (chain 13, slot 14) | 694–967 |
 |   9. Act II gossip and intro records | 968–976 |
-|   10. Hooks called from other systems | 977–994 |
-| Constants & data dependencies | 995–1008 |
-| Randomness | 1009–1023 |
-| Edge cases & original bugs | 1024–1057 |
-| Test vectors | 1058–1080 |
-| Provenance | 1081–1112 |
-| Open questions | 1113–1200 |
+|   10. Hooks called from other systems | 977–995 |
+| Constants & data dependencies | 996–1009 |
+| Randomness | 1010–1024 |
+| Edge cases & original bugs | 1025–1058 |
+| Test vectors | 1059–1081 |
+| Provenance | 1082–1113 |
+| Open questions | 1114–1201 |
 <!-- /index -->
 
 ## Summary
@@ -984,6 +984,7 @@ hash lookup); rules read from the binary.
 | palace guard AI `0x005E7590` | `0x0059B8B0`, `0x0059B8F0`, `0x0059AEC0` | guard at end position (+0x18, +0x19 clear and +0x40 = 2; true without chain 11); guard target (+0x30, +0x34, y − 4 with +0x19); blocker open (+0x40 = 2) |
 | Jerhyn / palace NPC logic `0x0059F580(game, unit, &a, &b)` | `0x0059D7C0`, `0x0059D7E0`, `0x0059B820` | Outputs (2026-10-09, asm; a = the AI's [ebp−8], b = [ebp−4]): R11 (chain 11) absent or not-intro 0 → (a, b) = (1, 0); X = R11 extra; X +0x0D = 0 → (1, 0) (fresh and act-1-done characters: no palace Jerhyn); game 12.13 or game 14.13 (`0x00544760`) or `0x0059D7C0` ≠ 0 → (1, 0); X +0x14 ≠ 0 → (1, 0). Else: `0x0059D7E0` ≠ 0 → X +0x12 := 1; X +0x12 ≠ 1 → (1, 0). X +0x12 = 1: if X +0x13 = 0 or X +0x0F ≠ 0 → the player walk below; a player stored (+0x1A ≠ 0) → walk to (X +0x20, X +0x24) (`0x005DED90`), X +0x13 := 1, X +0x12 := 0, (0, 0); none → (0, 1). Else (0, 1), and when X +0x11 = 1: path distance to (X +0x20, X +0x24) > 2 → X +0x19 := 1, X +0x18 := 0, walk there, (0, 0); else the blocker unit (GUID X +0x38) found: point = its position with x + 4, free test (`0x0064E7B0`, mask 0x3C01, sizes 1, 2, 3 in turn) succeeds and placing Jerhyn (the AI unit) there (`0x00554EA0`, `sim/path-placement.md` §10) succeeds → X +0x0F := 1, X +0x14 := 1; result (0, 1) in every such case. No draw anywhere. Helpers: chain 13 not-intro with state < 2 → 0 else 1; not-intro with state 1; a player without 14.0, 14.1 within 30 of the blocker (`0x005DC5C0` < 31): +0x1A := 1, +0x1C := GUID. Exactly: +0x1A := 0 and +0x1C := 0 first (`0x0059F75F`), then the player walk `0x005537D0` (`sim/unit-order.md` §2 r5) with `0x0059B820`, which returns 1 for the first qualifying player (distance unsigned ≤ 30 to the stored blocker point +0x20 / +0x24) and so stops the walk: the **first** such player in walk order is stored |
 | Jerhyn AI `0x005E7130` (`0x005E71AB`) | `0x0059F570` → `0x0059F510` | "Jerhyn held at the palace" (2026-10-09, asm; settles the body asked by REC-734). `0x0059F570` returns 1 exactly when `0x0059F510` returns 1 (`sub al, 1; neg; sbb; add 1`). `0x0059F510(game)` returns **0** only when all hold: chain 11 record R11 exists and its extra +0x0D (Jerhyn spawned at the palace) ≠ 0; chain 8 record exists, not-intro (+0x09) ≠ 0 and state (+0x0C) ≠ 5; `0x0059DFB0` = 0 (chain 13 record exists, not-intro, state < 4); R11 not-intro = 1 and R11 state < 2. Any test failing → 1. No draw. So with no palace Jerhyn (+0x0D = 0: a fresh character, or one past Act I but without the palace spawn of `quests-act2-2.md` §2 item 2.3) it is 1 and the AI goes on to `0x0059F580`; the AI's "= 0 → idle 40" needs a palace Jerhyn while A2Q1 is unfinished and A2Q4 is at state 0–1 |
+| (d2rs readings, q-fix-npc-interact) | — | PROVISIONAL (REC-1631): the helper `0x0059D7E0` "not-intro with state 1" is read as chain 13's record, like its neighbour `0x0059D7C0`. PROVISIONAL (REC-1632): "free test sizes 1, 2, 3 in turn" is read as: the first size whose search finds a point is placed. PROVISIONAL (REC-1633): `0x0059B8F0`'s return value (the guard's "stay" test, `ai-bodies-7.md` §7 step 2.1) is not stated; d2rs keeps the default (0, point unchanged). `0x0059B8B0` and `0x0059AEC0` are wired (`a2-quest-arcane`: Kaelan walks aside at frame 30 after Jerhyn's message 377, as 1.14d) |
 | `0x0059F510` | `0x0059DFB0` | chain 13 not-intro with state < 4 → 0, else 1 (one caller, `0x0059F570`) |
 | Tyrael AI `0x005E73A0` | `0x0059DF50`, `0x0059C750` | +0x3D → true; +0x0F → true when no living player is within 12 (`0x006416D0`); else false. Exactly (2026-10-07): chain 13 record absent → false; +0x3D ≠ 0 → true; +0x0F ≠ 0 → +0x40 := Tyrael, +0x44 := 0, then for every player without state 7 (`0x005538D0`, callback `0x0059DF30`): d := `0x006416D0(player, Tyrael)` < 12 → +0x44 := 1; result = (+0x44 = 0). `0x006416D0` is the size-adjusted distance of two units (`missiles/missiles.md` §R9.5 item 4) and takes no radius: a host seam bound to it is a distance (`distance_between(a, b)`), and the "< 12" and the living-player loop belong to the caller (a `living_player_within(unit, radius)` seam must be built from both, not bound to `0x006416D0` alone). `0x0059C750` runs the §8.11 flag iterate for all |
 | monster class hook `0x005447A0` | `0x0059B6C0`, `0x0059B6D0` | jerhyn / act2guard2: bare `ret` |

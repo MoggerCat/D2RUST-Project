@@ -34,17 +34,17 @@
 |   2. Store item level | 142–147 |
 |   3. Store generation (`0x00576980(npc, player, record)`) | 148–262 |
 |   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 263–292 |
-|   5. Gambling | 293–360 |
-|   6. Refresh | 361–392 |
-|   7. Buying and selling | 393–586 |
-|   8. Repair | 587–641 |
-|   9. Prices | 642–841 |
-| Constants & data dependencies | 842–861 |
-| Randomness | 862–880 |
-| Edge cases & original bugs | 881–920 |
-| Test vectors | 921–943 |
-| Provenance | 944–982 |
-| Open questions | 983–1066 |
+|   5. Gambling | 293–369 |
+|   6. Refresh | 370–401 |
+|   7. Buying and selling | 402–595 |
+|   8. Repair | 596–650 |
+|   9. Prices | 651–850 |
+| Constants & data dependencies | 851–870 |
+| Randomness | 871–889 |
+| Edge cases & original bugs | 890–929 |
+| Test vectors | 930–952 |
+| Provenance | 953–991 |
+| Open questions | 992–1075 |
 <!-- /index -->
 
 ## Summary
@@ -324,6 +324,13 @@ list (+0x08). L_p = player level. c := 0. Loop:
    stop.
 8. Stop after c reaches 14.
 
+Recorded (2026-10-09, `a2-npc-elzix-gamble`, 1.14d under Wine): after
+action 2 the 14 list items are in mode 0 (stored) at grid positions of
+the node's inventory (page 0, first free position in creation order:
+`rin` at (9, 0), `amu` at (9, 1), then (0, 0), (0, 2), …), i.e. step 7's
+placement is the page placement `0x00560200` (`items/inventory.md`
+§2.4) into an inventory owned by the NPC.
+
 Exact (handoff `impl-vendors` V9, `0x00578790`): the gamble index
 `0x00638CC0` is the fixed block `0x0096CAB0` and is never none; with a
 gamble count of 0 every threshold is 0, idx = 0 and the read of index
@@ -349,6 +356,8 @@ the list item is taken out of the list (§7.1 step 12).
 - `0x00537190(player)`: when the player's 0x30 empties the NPC's
   interaction list (`npc.md` §3): unlink the player's node, remove its
   items, free it. The next gamble open makes a new list (§5.1 draws).
+  Recorded (`a2-npc-elzix-gamble` frame 21): after the 0x30 the 14 list
+  items are gone from the unit lists (removed and destroyed).
 - Clearing the record's data (§6 rule 4) drops every player's list.
 
 #### 5.5 C→S 0x37 IdentifyGamble
