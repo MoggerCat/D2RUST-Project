@@ -43,6 +43,11 @@ messages.
   settleable by a binary read: `drlg/outdoor-tilesub.md` (heap history),
   `formats/d2s-legacy.md` REC-44 (needs 1.07/1.08 saves, deferred),
   `ui/control-panel.md` REC-610 (D3D/Glide run, full-screen OK needed).
+- `tools/provisional_index.py` classes 32 lines as "binary": all are
+  crate comments or spec history of RECs already settled (REC-80/81,
+  REC-415, REC-235, REC-742 recorded on day 4) or front-end shell
+  markers (REC-168/180, d2rs-own choices). None needs a new read; the
+  crate markers are cleanup for the owning fix sessions.
 
 ## Recordings (local, `traces/raw/`, not committed)
 
