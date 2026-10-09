@@ -209,6 +209,38 @@ fn missile_path_is_built_and_flown_on_the_provider() {
     fx.assert_clean();
 }
 
+// Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r19
+#[test]
+fn frames_from_distance_reads_the_path_target_distance() {
+    // Flag 0x400 (the lob flags 0x420 of `skill_missile`): the current
+    // frame is (d << 16) / (v << 4) with d = `0x006417F0` from the path
+    // position (41, 30) to the target (49, 34): max 8 + min 4 / 2 = 10;
+    // v = 0xC0 (as above): 0xA0000 / 0xC00 = 213. Before the provider's
+    // distance d read 0 (→ 1): 21 frames, the lob missile died at once.
+    let mut fx = fx();
+    let a = fx.a;
+    let owner = fx.spawn(UnitType::Monster, 0, a, 41, 30);
+    let p = MissileParams {
+        owner: Some(owner),
+        origin: Some(owner),
+        class: 0,
+        flags: param_flags::TARGET_ABSOLUTE | param_flags::FRAMES_FROM_DISTANCE,
+        target_x: 49,
+        target_y: 34,
+        ..MissileParams::default()
+    };
+    let current = fx
+        .sim
+        .missiles(&mut fx.game, |g, cx| {
+            let m = create_missile(g, cx, &p)?;
+            Some(cx.store.get(m)?.current)
+        })
+        .unwrap()
+        .expect("created");
+    assert_eq!(current, 213);
+    fx.assert_clean();
+}
+
 // Covers: specs/missiles/missiles.md §r2-3-steps-in-order-0x0059fa30-1-14d-confirmed r8
 #[test]
 fn missile_out_of_range_gets_no_point() {
