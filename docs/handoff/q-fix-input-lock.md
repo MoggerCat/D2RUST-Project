@@ -51,9 +51,17 @@ no used skill, no item rate stats), REC-1002 (gate `0x00480BA0` not run).
   sends all five casts (C→S 0x0D on the Quill Rat, the hover pick; frames
   39, 69, 99, 129, 159) and the server player casts each time (mode 7 /
   10 at 40, 70, 100, 130, 160, neutral between). The milestone itself
-  still fails on another blocker: the rat dies (mode 0, hp 0, frame 48)
-  and comes back to modes 1 / 4 with hp 0; that is `q-fix-p4-death-cleanup`
-  (already queued).
+  failed on the branch's first commit because the rat came back from death
+  with hp 0 (`q-fix-p4-death-cleanup`); after merging staging `0a297048`
+  it is reached for ama, sor, nec, dru. Still stuck (rat untouched, hp 256,
+  every cast sent): pal Blessed Hammer (`q-fix-pt-blessed-hammer`), bar
+  Whirlwind (`q-fix-pt-whirlwind`), ass Lightning Sentry (the sentry at
+  the click point does not reach the rat; `trap-kills` is reached).
+- Gate on the merged tree: d2-client nextest 2,532 passed; before the
+  merge d2-sim / d2-server / d2-client / test-fixtures 7,691 of 7,692 (the
+  one failure, `d2-server::prop_unified_items item_moves_keep_one_place`,
+  `seed = 0`, is deterministic and outside this diff, which touches no
+  d2-server or d2-sim file).
 - 1.14d: `python3 tools/scenario-diff/scenario_diff.py traces/checks/sor-frost-nova-twice.check`
   (new; two Frost Nova clicks at frames 20 and 60): PARTIAL, "no
   difference in what was compared" over 100 frames; both sides cast at 20
