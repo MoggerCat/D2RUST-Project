@@ -822,6 +822,13 @@ impl<R, S> WiredWorld<R, S> {
             }));
             let skills = econ.hooks.tables.skills.skills.len();
             let start_skill = Some(cs.startskill).filter(|&k| usize::from(k) < skills);
+            // The players' skill lists lent to the rest for the call, as
+            // every wired item call does (`wired::lend_skills`): the
+            // scrolls' item-skill link (`inventory.md` §5.5, S→C 0x22) and,
+            // on the way back, the stat 97 / 107 callback of the worn items
+            // (`levels.md` §7.1: the start weapon's `StartSkill`, S→C
+            // 0x21).
+            wired::lend_skills(econ, &mut inv);
             let mut w = WiredStart {
                 econ,
                 inv: &mut inv,
@@ -831,6 +838,7 @@ impl<R, S> WiredWorld<R, S> {
             };
             r.items = character::start_items(&mut w, &slots, start_skill);
             r.faults.append(&mut w.faults);
+            wired::return_skills(econ, &mut inv, true);
             let mut d = inv.desk(econ);
             // The placements put the items on the player's update list
             // (`inventory-moves.md` §6.1 rule 1). The join sends that list
@@ -884,7 +892,9 @@ impl<H: LifecycleHooks> WiredStart<'_, '_, H> {
     }
 }
 
-impl<H: LifecycleHooks> StartItemWorld for WiredStart<'_, '_, H> {
+impl<X: d2_sim::wiring::action::Pending> StartItemWorld
+    for WiredStart<'_, '_, d2_sim::wiring::action::ActionHooks<X>>
+{
     fn create(&mut self, code: [u8; 4]) -> Option<UnitId> {
         // `create_reward`: level 0 → the player's base level (≥ 1),
         // quality 2, spawn mode 4, no sockets, not ethereal, no seeds, then
@@ -936,21 +946,18 @@ impl<H: LifecycleHooks> StartItemWorld for WiredStart<'_, '_, H> {
         InventoryOps::beltable(&self.inv.desk(self.econ), g)
     }
     fn place_belt(&mut self, item: UnitId) -> bool {
-        // d2rs-own, unverified: `0x0055E9B0(item, slot = item x, find 1)`
-        // (`inventory-moves.md` §7.14) read as the free-slot search (§3.5)
-        // then the slot placement (§3.7); the item's x is not read.
+        // `0x0055E9B0(item, slot, find 1)` (`inventory-moves.md` §7.14):
+        // `inventory.md` §3.5 picks the slot, then the 0x23 body (the
+        // slot placement, link, mode 2, page 0xFF, command flag 0x400 →
+        // 0x9C action 0x0E, the update list), as the vendor's auto-belt
+        // does (`vendor_inv.rs` `put_in_belt`). The item was made on the
+        // cursor (mode 4).
         let (o, g) = (self.owner, self.guid(item));
         let mut d = self.inv.desk(self.econ);
         match d.belt_free_slot(o, g) {
             Some(s) => {
-                let placed = d.belt_place(o, g, u32::from(s));
-                if placed {
-                    // The slot placement leaves the mode to its caller
-                    // (the item moves set it); the item was made on the
-                    // cursor (mode 4).
-                    d.set_mode(g, d2_sim::items::inventory::mode::BELT);
-                }
-                placed
+                d2_sim::items::moves::handlers::to_belt(&mut d, o, g, u32::from(s))
+                    == d2_sim::items::moves::Outcome::DONE
             }
             None => false,
         }
@@ -964,10 +971,19 @@ impl<H: LifecycleHooks> StartItemWorld for WiredStart<'_, '_, H> {
     }
     fn equip(&mut self, item: UnitId, loc: u8) -> bool {
         let (o, g) = (self.owner, self.guid(item));
-        self.inv
+        let done = self
+            .inv
             .desk(self.econ)
             .equip_from_cursor(o, g, loc, true)
-            .0
+            .0;
+        // The equip's stat refresh runs the stat 97 / 107 callback inline
+        // (`levels.md` §7.1): the start weapon's `StartSkill` sends its
+        // 0x21 now, before a later slot's 0x22 (the 1.14d join's order,
+        // `facts/join/a1-new-sor.tsv`). The lent lists are taken back
+        // with that sync and lent again for the next slots.
+        wired::return_skills(self.econ, self.inv, true);
+        wired::lend_skills(self.econ, self.inv);
+        done
     }
     fn quiver(&mut self, item: UnitId) -> bool {
         let g = self.guid(item);

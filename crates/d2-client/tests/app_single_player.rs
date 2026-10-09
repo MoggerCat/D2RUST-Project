@@ -817,3 +817,61 @@ fn a_save_in_act_three_to_five_is_placed_at_the_join() {
         assert!(placed, "act {act}: no player after the join");
     }
 }
+
+/// The new sorceress's start items (`items/generation.md` §10.3) reach
+/// the client as in the Wine recording of a character made in the create
+/// screen (`facts/join/a1-new-sor.tsv`): the staff's `StartSkill` o-skill
+/// 0x21 when it is equipped, the two scrolls' item-skill counts 0x22
+/// (`inventory.md` §5.5, books `scrollskill`), then the join's item
+/// messages: the staff's 0x9D, the four belt potions' 0x9C action 0x0E
+/// (`inventory-moves.md` §7.14) and the two scrolls' 0x9C action 4.
+/// Byte for byte, except the bytes the builders do not write
+/// (`tools/scenario-masks.tsv`: 0x21 byte 11, 0x22 bytes 2 and 10).
+// Covers: specs/items/generation.md §10.3; specs/items/inventory.md §5.5; specs/items/inventory-moves.md §7.14
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_start_items_messages_follow_the_recorded_join() {
+    use d2_client::bridge::link::SendQueue;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    const ITEM_IDS: [u8; 4] = [0x21, 0x22, 0x9C, 0x9D];
+    let masked = |id: u8, k: usize| matches!((id, k), (0x21, 11) | (0x22, 2) | (0x22, 10));
+    let ms = std::sync::Arc::new(AtomicU32::new(1000));
+    let (mut link, _) = single_player::start(
+        app_support::game_data(),
+        DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap();
+    link.send(SendQueue::System, &single_player::create_request().encode())
+        .unwrap();
+    link.pump().unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    link.pump().unwrap();
+    link.receive();
+    link.send(SendQueue::System, &[0x6B]).unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    link.pump().unwrap();
+    let got: Vec<Vec<u8>> = link
+        .receive()
+        .into_iter()
+        .filter(|m| ITEM_IDS.contains(&m[0]))
+        .collect();
+    let want: Vec<Vec<u8>> = app_support::recorded_new_sor_bytes()
+        .into_iter()
+        .filter(|(f, m)| f.is_some_and(|f| f <= 1) && ITEM_IDS.contains(&m[0]))
+        .map(|(_, m)| m)
+        .collect();
+    let ids = |v: &[Vec<u8>]| v.iter().map(|m| m[0]).collect::<Vec<u8>>();
+    assert_eq!(
+        ids(&want),
+        [0x21, 0x22, 0x22, 0x9D, 0x9C, 0x9C, 0x9C, 0x9C, 0x9C, 0x9C]
+    );
+    assert_eq!(ids(&got), ids(&want));
+    for (g, w) in got.iter().zip(&want) {
+        assert_eq!(g.len(), w.len(), "{g:02x?} vs {w:02x?}");
+        for k in (0..w.len()).filter(|&k| !masked(w[0], k)) {
+            assert_eq!(g[k], w[k], "byte {k}: {g:02x?} vs {w:02x?}");
+        }
+    }
+}
