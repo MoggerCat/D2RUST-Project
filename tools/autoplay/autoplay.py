@@ -235,11 +235,15 @@ class Host:
         self.passes = hello["passes"]
 
     def _read(self):
-        line = self.p.stdout.readline()
-        if not line:
-            self.p.wait(timeout=30)
-            raise HostError(f"host exited ({self.p.returncode}): {self.stderr_tail()}")
-        return json.loads(line)
+        while True:
+            line = self.p.stdout.readline()
+            if not line:
+                self.p.wait(timeout=30)
+                raise HostError(f"host exited ({self.p.returncode}): {self.stderr_tail()}")
+            # protocol lines are JSON objects; the game's own stdout
+            # notes (e.g. "game folder: ...") are skipped
+            if line.startswith("{"):
+                return json.loads(line)
 
     def stderr_tail(self, n=8):
         self.err.flush()
