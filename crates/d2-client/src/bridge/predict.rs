@@ -276,6 +276,10 @@ pub struct Predict {
     /// A server walk (S→C 0x0D code 1) whose target is not yet in the
     /// player's client room ([`Self::server_walk`]).
     held: Option<(u16, u16)>,
+    /// The server tick the walk under way started on (kept while a new
+    /// click re-targets it; cleared when it ends): the walk animation's
+    /// start ([`Self::walk_since`]).
+    since: Option<u64>,
     /// The player's own path over the client DRLG ([`ClientPath`]): the
     /// step of a walk when the client has a DRLG.
     path: ClientPath,
@@ -347,6 +351,7 @@ impl Predict {
                 act: world.act.as_ref().map(|a| a.act),
                 requests: p.mode_requests,
                 held: None,
+                since: None,
                 path: ClientPath::default(),
                 path_for: None,
             };
@@ -554,13 +559,40 @@ impl Predict {
     ) {
         self.observe(world);
         self.server_walk(world);
+        let mut new_walk = false;
         for w in walks {
             self.walk(w);
+            new_walk = true;
         }
-        self.face(world);
+        // A walk to a point faces its target from where it started and
+        // keeps that facing (`a1-walk-n`: 1.14d dir 32, the start subtile
+        // (4873, 4228) to the clicked (4867, 4222); PROVISIONAL REC-517);
+        // a walk to a unit follows the unit.
+        if new_walk
+            || matches!(
+                self.walk,
+                Some(Walk {
+                    to: WalkTo::Unit(_),
+                    ..
+                })
+            )
+        {
+            self.face(world);
+        }
         if ticked {
             self.tick(world, speeds);
         }
+        self.since = match (self.walk, self.since) {
+            (None, _) => None,
+            (Some(_), None) => Some(world.server_ticks),
+            (Some(_), since) => since,
+        };
+    }
+
+    /// The server tick the walk under way started on (`sim/units.md`
+    /// §4.7 step 7 revision: the walk frame counts from there).
+    pub fn walk_since(&self) -> Option<u64> {
+        self.since
     }
 
     /// The predicted precise position (16.16 sub-tiles, the form
@@ -691,6 +723,30 @@ impl<L: ServerLink> ServerLink for PredictLink<L> {
 mod tests {
     use super::*;
     use crate::bridge::world::ClientUnit;
+
+    // Covers: specs/render/unit-composite.md §3 r1
+    /// A walk to a point faces the clicked subtile from the walk's start
+    /// (`Predict::frame` aims it only when the walk arrives).
+    #[test]
+    fn a_point_walk_faces_the_click_from_its_start() {
+        let mut p = Predict {
+            at: Some(((4873 << 16) + 0x8000, (4228 << 16) + 0x8000)),
+            ..Predict::default()
+        };
+        let w = ClientWorld {
+            server_ticks: 22,
+            ..ClientWorld::default()
+        };
+        let walk = Walk {
+            to: WalkTo::Point(4867, 4222),
+            run: false,
+        };
+        p.walk = Some(walk);
+        p.face(&w);
+        // `a1-walk-n`: 1.14d draws dir64 32 (start (4873, 4228) to the
+        // clicked (4867, 4222)).
+        assert_eq!(p.facing(), Some(32));
+    }
 
     // Covers: specs/sim/pathing.md §1.5 r2
     /// The drawn mode of a predicted walk: the town walk 6 when the client

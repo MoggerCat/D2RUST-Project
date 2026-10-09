@@ -20,7 +20,7 @@ code. State and open points: `docs/handoff/q-cloud-game.md`.
 ## Setup (once per container)
 
 ```sh
-sh tools/cloud-setup.sh                      # apt: wine, wine32:i386, xvfb, mingw-w64, ... (D2_NO_WINE=1 skips)
+sh tools/cloud-setup.sh                      # apt: wine, wine32:i386, xvfb, mingw-w64, mesa-vulkan-drivers, ... (D2_NO_WINE=1 skips)
 tools/cloud-game/setup_winpy.sh              # Windows Python under Wine
 tools/cloud-game/fetch.sh                    # install -> $HOME/game
 export D2_GAME_DIR=$HOME/game
@@ -42,6 +42,16 @@ Outputs land in `$HOME/cloud-game-runs/<time>/` (or `--out`); recorder
 traces in `traces/raw/` and captures in `game/captures/` as on PC 1 (both
 gitignored).
 
+One check against 1.14d, both sides and the comparison
+(`specs/tools/scenario-diff.md`); the `draws` channel also runs d2rs'
+window on its own Xvfb (`:98`) with `WGPU_BACKEND=vulkan` on Mesa
+lavapipe (`mesa-vulkan-drivers`, `libxkbcommon-x11-0`, from
+`cloud-setup.sh`):
+
+```sh
+python3 tools/scenario-diff/scenario_diff.py traces/checks/draws-town-arrival-ama.check
+```
+
 ## Wine notes (measured 2026-10-08, wine-9.0 Ubuntu 9.0~repack-4build3)
 
 - Windows CPython exits at start-up with `init_sys_streams: Invalid handle`
@@ -54,3 +64,7 @@ gitignored).
 - `wine: Read access denied for device Z:\` lines on stderr are harmless.
 - There is no window manager: windows have no frame and sit at their
   creation position.
+- Runs sharing one prefix are serialized: `run.sh` takes a lock on
+  `$WINEPREFIX/.run.lock` (each run ends with `wineserver -k`, which used
+  to kill a concurrent run on the same prefix). For parallel runs give each
+  its own `WINEPREFIX` (a `cp -al` copy works) and `D2_DISPLAY`.

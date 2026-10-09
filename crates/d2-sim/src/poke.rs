@@ -1013,17 +1013,38 @@ fn run<X: WorldPending>(
             };
             // Allocator 0x00555230 with type 2, flags 1 (add), mode as
             // given (default 0), with the monster state lent (an InitFn
-            // may spawn monsters, edge case 2).
-            let req = crate::units::lifecycle::AllocRequest {
-                ty: UnitType::Object,
-                class: *class,
-                room: Some(room),
-                add: true,
-                fixed_guid: None,
-                mode: mode.unwrap_or(0),
-                allied: false,
-            };
-            let u = sim.lend(|a| a.with(game, |g, v| v.allocate(g, &req, x, y)));
+            // may spawn monsters, edge case 2): the creation the game's
+            // own objects go through (`View::create_object`, as the
+            // population and the quests), so the per-kind init
+            // (`objects.md` §3: control record, InitFn) runs on the
+            // allocation's room and (x, y) before `SUNIT_Add`
+            // (`units.md` §3.1 steps 7–8). A game without object state,
+            // a mode beyond a byte or a class past the objects rows: the
+            // bare allocation (the init dispatch's own checks decide).
+            let class = *class;
+            let mode = mode.unwrap_or(0);
+            let u = sim.lend(|a| {
+                a.with(game, |g, v| match u8::try_from(mode) {
+                    Ok(m)
+                        if v.h.objects.is_some()
+                            && class <= u32::from(crate::world::objects::CLASS_BOUND) =>
+                    {
+                        v.create_object(g, room, class, x, y, m)
+                    }
+                    _ => {
+                        let req = crate::units::lifecycle::AllocRequest {
+                            ty: UnitType::Object,
+                            class,
+                            room: Some(room),
+                            add: true,
+                            fixed_guid: None,
+                            mode,
+                            allied: false,
+                        };
+                        v.allocate(g, &req, x, y)
+                    }
+                })
+            });
             created(game, u)
         }
         Directive::Superunique { row, x, y } => {

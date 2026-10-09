@@ -4,6 +4,7 @@ format of specs/tools/facts-render.md §1-§4 (docs/handoff/pc1-data.md
 Step 3):
 
     py tools/trace-recorder/facts_render.py CAPTURE.jsonl --scene NAME [--frame SEQ] [--out facts/render]
+    py tools/trace-recorder/facts_render.py CAPTURE.jsonl --shot NAME [--scene NAME]   # record_frames --front-end
     py tools/trace-recorder/facts_render.py --merge-sprites A.tsv B.tsv ... [--out facts/render]
     py tools/trace-recorder/facts_render.py --selftest
 
@@ -14,7 +15,11 @@ Step 3):
   the same key is an error and nothing is written).
 
 The frame is chosen by its capture sequence number `seq` (default: the last
-frame with a draw log). A frames-raw-2 capture has no cel headers, unit
+frame with a draw log), or with --shot by the scene name a `record_frames.py --front-end`
+shot gave it. A front-end frame (`in_game` false: menus, loading screen) has no server tick,
+player, level, camera, light or weather: those frame.tsv keys are `-` (not applicable) and
+`tick` is `?` (the capture numbers it by EndScene call, `present`, which is not a tick).
+A frames-raw-2 capture has no cel headers, unit
 component paths or tile files: those cells are `?` (measured by raw-3).
 Rule 1 (CLAUDE.md): measurements and digests only; no pixels, no image
 content, no raw memory blobs. What a cell does not measure is `?`, never
@@ -33,7 +38,7 @@ sys.dont_write_bytecode = True
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, "..", ".."))
-TOOL = "trace-recorder facts_render 0.2.0"
+TOOL = "trace-recorder facts_render 0.3.0"
 FORMATS = ("frames-raw-2", "frames-raw-3")
 TILE_OPS = {"FloorTileDraw", "TileDrawLit", "TileDrawTrans", "ShadowTileDraw"}
 RECT_OPS = {"UtilDiamond", "UtilRect"}
@@ -47,6 +52,9 @@ FRAME_KEYS = ["seq", "tick", "w", "h", "act", "level", "player_x", "player_y", "
               "tile_origin_y", "unit_origin_x", "unit_origin_y", "open_mode", "shift_x",
               "light_quality", "rain", "snow", "draws", "index_sha256", "palette_sha256"]
 SPRITE_COLS = ["file", "dir", "frame", "w", "h", "xoff", "yoff"]
+# frame.tsv keys a front-end frame has no source for (not applicable: §1 r2 `-`)
+GAME_KEYS = {"act", "level", "player_x", "player_y", "tile_origin_x", "tile_origin_y", "unit_origin_x",
+             "unit_origin_y", "open_mode", "shift_x", "light_quality", "rain", "snow"}
 
 
 class FactsError(Exception):
@@ -164,20 +172,30 @@ def frame_rows(f, draws, png_dir):
          "unit_origin_x": uo[0], "unit_origin_y": uo[1], "open_mode": f.get("open_mode"),
          "shift_x": f.get("shift_x"), "light_quality": li.get("quality"), "rain": we.get("rain"),
          "snow": we.get("snow"), "draws": len(draws), "index_sha256": idx, "palette_sha256": pal}
-    return [[k, val(v[k])] for k in FRAME_KEYS]
+    rows = [[k, val(v[k])] for k in FRAME_KEYS]
+    if f.get("in_game") is False:  # front end (record_frames --front-end): no game state
+        rows = [[k, NA if k in GAME_KEYS else (UNK if k == "tick" else x)] for k, x in rows]
+    return rows
 
 
-def read_capture(path, seq):
+def read_capture(path, seq, shot=None):
     """(frame record, celfile map, compfile map, image directory name) of the chosen frame."""
     with open(path, encoding="utf-8") as fh:
         recs = [json.loads(line) for line in fh if line.strip()]
+    return pick_frame(recs, seq, shot, path)
+
+
+def pick_frame(recs, seq, shot=None, path="capture"):
     if not recs or recs[0].get("k") != "header" or recs[0].get("format") not in FORMATS:
         raise FactsError(f"{path}: not a {' / '.join(FORMATS)} capture")
     cap = next((r for r in recs if r.get("k") == "capture"), {})
     frames = [(i, r) for i, r in enumerate(recs) if r.get("k") == "frame" and "refused" not in r]
+    if shot is not None:
+        frames = [x for x in frames if x[1].get("scene") == shot]
     frames = [x for x in frames if (x[1].get("draws") if seq is None else x[1]["seq"] == seq)]
     if not frames:
-        raise FactsError("no frame with a draw log" if seq is None else f"no captured frame seq {seq}")
+        raise FactsError((f"no shot {shot!r} with a draw log" if shot is not None else "no frame with a draw log")
+                         if seq is None else f"no captured frame seq {seq}")
     at, f = frames[-1]
     if not f.get("draws"):
         raise FactsError(f"frame seq {f['seq']} has no draw log (record with --draws-every N)")
@@ -337,6 +355,30 @@ def selftest():
     _, _, conflicts = build(g, celfiles, compfiles, {k: v for k, v in
                                                      ((tuple([s[0], int(s[1]), int(s[2])]), s) for s in sprites)})
     assert len(conflicts) == 1, conflicts
+    # front end (record_frames --front-end): no game state -> `-`, tick `?`; frames chosen by shot
+    fe = {"k": "frame", "seq": 2, "f": None, "present": 611, "ret": "0x4f9a67", "in_game": False, "launcher_mode": 4,
+          "scene": "main-menu", "w": 800, "h": 600, "index_sha256": "c" * 64, "palette_sha256": "d" * 64,
+          "draws": [{"op": "StartDraw", "a": [0, 0, 0, 0], "at": "0x4f9934"},
+                    {"op": "CelDraw", "a": [0, 256, -1, 5, 0], "at": "0x4fd2c8",
+                     "cel": {"ctx": "0x40", "file": "0x37adfac", "dir": 0, "frame": 0, "tokens": [None] * 5,
+                             "hdr": {"flip": 0, "w": 256, "h": 256, "xoff": 0, "yoff": 0}}}]}
+    recs = [{"k": "header", "format": "frames-raw-3"}, {"k": "capture", "images": "x"},
+            {"k": "celfile", "ptr": "0x37adfac", "path": "data\\global\\ui\\FrontEnd\\gameselectscreenEXP",
+             "via": "0x4fa9b0"}, fe, dict(fe, seq=3, scene="char-select")]
+    g, cf, pf, _ = pick_frame(recs, None, "main-menu")
+    assert g["seq"] == 2 and pick_frame(recs, None, None)[0]["seq"] == 3
+    try:
+        pick_frame(recs, None, "nope")
+        raise AssertionError("a missing shot was accepted")
+    except FactsError:
+        pass
+    d3, s3, _ = build(g, cf, pf, {})
+    assert d3[1][2] == "data/global/ui/frontend/gameselectscreenexp.dc6" and len(s3) == 1, d3
+    fr = dict(frame_rows(g, d3, None))
+    assert fr["tick"] == "?" and fr["level"] == "-" and fr["player_x"] == "-" and fr["rain"] == "-", fr
+    assert (fr["seq"], fr["w"], fr["draws"], fr["index_sha256"]) == ("2", "800", "2", "c" * 64), fr
+    assert [k for k, _ in frame_rows(g, d3, None)] == FRAME_KEYS
+    assert dict(frame_rows(dict(g, in_game=True), d3, None))["level"] == "?"   # in game, unread: `?`
     # --merge-sprites: a union of two files; a key with two rows is reported, nothing written
     import tempfile
     with tempfile.TemporaryDirectory() as tmp:
@@ -354,7 +396,8 @@ def selftest():
             raise AssertionError("conflicting merge passed")
         except SystemExit as e:
             assert e.code == 1 and not os.path.exists(out)
-    print("selftest ok: rows of every draw kind follow facts-render.md §2-§4; "
+    print("selftest ok: rows of every draw kind follow facts-render.md §2-§4; front-end frames (`-` game "
+          "keys, tick `?`, chosen by shot); "
           f"{len(cases)} source fields each change exactly their cell; a sprite conflict is reported (build and --merge-sprites)")
 
 
@@ -363,6 +406,8 @@ def main():
     ap.add_argument("capture", nargs="?", help="a frames-raw-3 (or -2) .jsonl from record_frames.py")
     ap.add_argument("--scene", help="scene name: the directory under scenes/")
     ap.add_argument("--frame", type=int, default=None, help="frame seq (default: last with draws)")
+    ap.add_argument("--shot", default=None,
+                    help="the frame a record_frames --front-end `shot NAME` captured (default --scene: NAME)")
     ap.add_argument("--out", default=os.path.join(REPO, "facts", "render"))
     ap.add_argument("--images", default=os.path.join(REPO, "game", "captures"),
                     help="PNG root, used only when a frame lacks its digests")
@@ -382,12 +427,13 @@ def main():
     if a.merge_sprites:
         merge_sprites(a.merge_sprites, os.path.join(a.out, "sprites.tsv"))
         return
+    a.scene = a.scene or a.shot
     if not a.capture or not a.scene:
-        ap.error("CAPTURE and --scene are required")
+        ap.error("CAPTURE and --scene (or --shot) are required")
     header = f"# facts v1; tool: {TOOL}; command: {command_line()}; game: 1.14d"
     sprites_path = os.path.join(a.out, "sprites.tsv")
     try:
-        f, celfiles, compfiles, images = read_capture(a.capture, a.frame)
+        f, celfiles, compfiles, images = read_capture(a.capture, a.frame, a.shot)
         draws, sprites, conflicts = build(f, celfiles, compfiles, read_sprites(sprites_path))
     except (FactsError, OSError, ValueError, KeyError) as e:
         print(f"error: {e}", file=sys.stderr)
@@ -403,7 +449,8 @@ def main():
     write_tsv(os.path.join(scene, "frame.tsv"), header, ["key", "value"], frame_rows(f, draws, png_dir))
     write_tsv(sprites_path, header, SPRITE_COLS, sprites)
     unk = {c: sum(1 for r in draws if r[j] == UNK) for j, c in enumerate(DRAW_COLS)}
-    print(f"frame seq {f['seq']} (tick {f.get('f')}): {len(draws)} draws; sprites.tsv {len(sprites)} rows; "
+    when = f"present {f['present']}" if f.get("in_game") is False else f"tick {f.get('f')}"
+    print(f"frame seq {f['seq']} ({when}): {len(draws)} draws; sprites.tsv {len(sprites)} rows; "
           f"wrote {scene}")
     print("unmeasured (?) cells per column: " + ", ".join(f"{c} {n}" for c, n in unk.items() if n))
 

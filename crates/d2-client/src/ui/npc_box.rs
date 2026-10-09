@@ -785,6 +785,14 @@ impl OriginalUi {
         let mut st = self.npcm.borrow_mut();
         st.anchor = npc_anchor(world, guid, open_mode);
         st.start(guid, class, level, identify_n);
+        // The greeting of the menu open (§13 r3): in mode 2 (return) it
+        // gives a sound (REC-728, `npc_talk` module doc) and C→S 0x4D goes.
+        if let Some(mode) = st.talk.intro().menu_open(class) {
+            let played = st.talk.intro().greeting_played(mode, class);
+            if let Some(i) = played.send_4d {
+                st.push_pending(vec![PanelOutput::Intent(i)]);
+            }
+        }
     }
 
     /// Per UI frame, before the events: builds an asked-for box with the

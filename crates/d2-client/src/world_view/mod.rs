@@ -279,7 +279,9 @@ pub struct SlotCall {
 pub struct UnitCall {
     pub key: DrawKey,
     pub tag: ItemTag,
-    pub path: CanonicalPath,
+    /// The cel file; `None`: the unit draw call alone, its body culled by
+    /// the COF box pre-test (`tools/facts-render.md` §5 r17).
+    pub path: Option<CanonicalPath>,
     /// The cel context's direction ([`UnitPose::dir64`]).
     pub dir64: u8,
     pub frame: usize,
@@ -531,9 +533,10 @@ pub struct WorldFrame {
     /// by key; not composed. Read by the facts export (§5 r12).
     pub calls: Vec<DrawItem>,
     /// Each drawn unit's cel context direction ([`UnitPose::dir64`]) by
-    /// GUID, for the rendering facts (`specs/tools/facts-render.md` §5
-    /// r14).
-    pub unit_dirs: BTreeMap<u32, u8>,
+    /// its draw slot ([`DrawKey::slot`] of its pass key and of its shadow
+    /// key; a GUID is unique per unit type only), for the rendering facts
+    /// (`specs/tools/facts-render.md` §5 r14).
+    pub unit_dirs: BTreeMap<u64, u8>,
     /// Cel draw calls without pixels (a component file in no archive),
     /// sorted by key; not composed. Read by the facts export (§5 r15).
     pub unit_calls: Vec<UnitCall>,
@@ -647,11 +650,26 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
         let body = rules.unit_box_visible(unit, &pose, cof)?;
         let shadow_ok = rules.unit_shadow_box_visible(unit, &pose, cof)?;
         let shadow_at = rules.unit_shadow_key(unit).filter(|_| shadow_ok);
+        let params = rules.unit_params(world, unit, &pose)?;
+        // `draw-order.md` §5 r4: the unit draw `0x00471EC0` is called for
+        // a listed unit whose body then fails the COF box pre-test inside
+        // it (`unit-composite.md` §4): the call alone, no cel
+        // (`a1-panel-inventory` row 128: the torch 2:9 at X = 920).
+        if !body {
+            unit_calls.push(UnitCall {
+                key: DrawKey::new(params.pass, params.major, params.minor, 0)
+                    .map_err(ViewError::Scene)?,
+                tag: params.tag,
+                path: None,
+                dir64: pose.dir64,
+                frame: pose.frame,
+                shadow: false,
+            });
+        }
         if !body && shadow_at.is_none() {
             units_hidden += 1;
             continue;
         }
-        let params = rules.unit_params(world, unit, &pose)?;
         let resolver = UnitResolver {
             rules,
             unit,
@@ -680,13 +698,18 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
             items.extend(draws.into_iter().map(|d| d.item));
         }
         items.extend(shadows);
-        unit_dirs.insert(unit.key.guid, pose.dir64);
+        if let Ok(k) = DrawKey::new(params.pass, params.major, params.minor, 0) {
+            unit_dirs.insert(k.slot(), pose.dir64);
+        }
+        if let Some(Ok(k)) = shadow_at.map(|a| DrawKey::new(a.pass, a.major, a.minor, 0)) {
+            unit_dirs.insert(k.slot(), pose.dir64);
+        }
         for c in rules.unit_slot_calls(unit, &pose, cof)? {
             let call = |pass, major, minor, shadow| -> Result<UnitCall, ViewError> {
                 Ok(UnitCall {
                     key: DrawKey::new(pass, major, minor, c.slot).map_err(ViewError::Scene)?,
                     tag: params.tag,
-                    path: c.path.clone(),
+                    path: Some(c.path.clone()),
                     dir64: pose.dir64,
                     frame: pose.frame,
                     shadow,

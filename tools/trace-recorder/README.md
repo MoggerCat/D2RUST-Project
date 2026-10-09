@@ -22,9 +22,9 @@ code. Spec-role tool: the addresses it hooks are documented in
 | `check_stats.py` | Replays a stats recording through a model of those specs: must predict every callback, expiry and regeneration value and reproduce every snapshot; `--perturb-snap N`, `--perturb-cb N` must fail at the changed record; `--selftest` runs a hand-built recording of the specs' test vectors; `--files game` checks the specs' itemstatcost facts on the 1.14d table |
 | `record_state.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick entry hook only, plus the tick return `0x0052FD1E`): after every server tick (or every N-th) writes the game seed and every server unit (type, GUID, class, mode, position, fraction, target, direction, animation frame / count / speed, unit seed, act, level id, life / mana / stamina and base stats) to `traces/raw/<time>-state.jsonl` (gitignored; format `state-1`); `--selftest` checks the reader on a synthetic game (exact records, every source byte perturbed). Spec: `specs/tools/state-snapshot.md` |
 | `check_units.py` | Checks the per-kind timer-event rules U1–U11 of `specs/sim/units.md` on a tick recording (tables from a `dump_tables.py` directory); `--perturb N` must fail at the changed record; `--selftest` runs a hand-built recording |
-| `record_frames.py` | Launches `game/Game.exe -w -ns` under the debugger (base: `record_tick.py`), and at each in-game `EndScene` (`0x4F6190`) reads the 8-bit index framebuffer and the GDI palette, ties the frame to the last server tick and logs the camera/player, level, cursor, seed, light-quality and weather state, and with `--draws-every N` every draw call of every N-th frame; writes `traces/raw/<time>-frames.jsonl` (format `frames-raw-3`: also per cel draw the cel header w/h/xoff/yoff from the rasterizer, per tile draw its DT1 file and index, `compfile` records naming unit component files, the player's direction) and palettized PNGs `frame-<seq>.png` to `game/captures/<time>/` (both gitignored); prints the stability verdict (`capture.md` §7); `--selftest` checks the PNG writer, the state readers (perturbation) and the stability count. Spec: `specs/render/capture.md` |
+| `record_frames.py` | Launches `game/Game.exe -w -ns` under the debugger (base: `record_tick.py`), and at each in-game `EndScene` (`0x4F6190`) reads the 8-bit index framebuffer and the GDI palette, ties the frame to the last server tick and logs the camera/player, level, cursor, seed, light-quality and weather state, and with `--draws-every N` every draw call of every N-th frame; writes `traces/raw/<time>-frames.jsonl` (format `frames-raw-3`: also per cel draw the cel header w/h/xoff/yoff from the rasterizer, per tile draw its DT1 file and index, `compfile` records naming unit component files, the player's direction) and palettized PNGs `frame-<seq>.png` to `game/captures/<time>/` (both gitignored); prints the stability verdict (`capture.md` §7); `--selftest` checks the PNG writer, the state readers (perturbation), the stability count and the front-end mode. `--front-end --front-end-script SCRIPT`: no game start; every `EndScene` call is a frame (any caller: menu `0x4F9A67`, loading `0x4567D4`, in game `0x44CB4F`; numbered `present`, no tick, no game state unless in game), D2Win cel files named through `0x4FA9B0`; SCRIPT is autostart's input script with `shot NAME [change|0xRET]` (capture the next presented frame with its draw log as scene NAME; `change`: the next frame from another caller, e.g. the loading screen), mouse and keys as X input under Wine (`--x-input`). Spec: `specs/render/capture.md` (§2a) |
 | `facts_join.py` | Turns one `record_packets.py` raw file (`packets-raw-1`) into message facts (`join-facts-1`): every C→S message the client sent and every S→C message queued, with frame, id, size, caller and bytes, from the start through `--frames N` (default 2: the join) or a later window (`--from F --frames 0`, `--skip` ids), into `facts/join/<name>.tsv` (or `--out-dir`) with the command and the run in the header. q-prov-recording |
-| `facts_render.py` | Turns one `record_frames.py` capture (`frames-raw-3`; `frames-raw-2` with the raw-3 cells `?`) into rendering facts in the format of `specs/tools/facts-render.md` §1–§4 (read by `d2-client facts-compare`): `facts/render/scenes/<scene>/draws.tsv` (every draw call of one frame), `frame.tsv` (state and the index / palette digests) and `facts/render/sprites.tsv` (distinct cel file, direction, frame with the cel's w, h, xoff, yoff; merged). Measurements and digests only; `--selftest`. Plan: `docs/handoff/pc1-data.md` Step 3 |
+| `facts_render.py` | Turns one `record_frames.py` capture (`frames-raw-3`; `frames-raw-2` with the raw-3 cells `?`) into rendering facts in the format of `specs/tools/facts-render.md` §1–§4 (read by `d2-client facts-compare`): `facts/render/scenes/<scene>/draws.tsv` (every draw call of one frame), `frame.tsv` (state and the index / palette digests) and `facts/render/sprites.tsv` (distinct cel file, direction, frame with the cel's w, h, xoff, yoff; merged). Measurements and digests only; `--shot NAME` picks a `--front-end` shot (game keys `-`, `tick` `?`); `--selftest`. Plan: `docs/handoff/pc1-data.md` Step 3 |
 | `autostart.py` | Unattended start for every `record_*.py`: `--auto CHAR [--seed N] [--input SCRIPT]` starts a single-player game with that expansion character (no player at the keyboard), optionally with a fixed map / game seed, then plays a scripted input (clicks, keys, screenshots) into the window; `--try CHAR` runs it alone; `--selftest` |
 | `check_drlg_acts.py` | Checks the `dumpdrlg` records of an `--auto` run against `specs/drlg/levels.md` §3–§4 (rules D1–D7); `--perturb N`; `--selftest` |
 | `dump_tables.py` | Launches `game/Game.exe` under the debugger, stops when the excel load and its fix-ups have finished, writes every loaded table and the runtime maps it knows to `traces/raw/<time>-tables/` (gitignored); compared by `data-tool dump-compare` |
@@ -97,6 +97,30 @@ game runs far slower (entering Act 1 takes over 40 s instead of ~2 s);
 new event kind, `rng_draw`, whose data fields are listed in the converter
 and in `specs/sim/rng.md` (Test vectors). `tick` is 0 (untimed), and the
 1.14d `site` is kept for reference and listed in `compare.ignore`.
+
+## record_frames.py --front-end: the front-end scenes
+
+The 4 front-end scenes in one run (cloud: under `tools/cloud-game/run.sh --python
+--seconds 150 -- ...` with `--game 'Z:\root\game\Game.exe'`; the menu is up about 20 s
+after launch under the recorder; times are for Wine, PC 1 is faster):
+
+```
+py tools/trace-recorder/record_frames.py --seconds 140 --front-end --front-end-script \
+  "wait 25; shot main-menu; wait 5; click 400 307; wait 10; shot char-select; wait 5; click 117 498; \
+   wait 12; shot char-create; wait 5; click 97 555; wait 10; shot loading change; key ENTER; wait 25; end"
+for s in main-menu char-select char-create loading; do
+  py tools/trace-recorder/facts_render.py traces/raw/<time>-frames.jsonl --shot $s; done
+```
+
+`shot NAME` arms the draw hooks at the next `EndScene` and captures the frame after it
+(a frame is everything drawn between two `EndScene` calls, so the loading frame's
+`ClearScreen` before its `StartDraw` is logged); `shot NAME change` keeps logging until a
+frame comes from another `EndScene` caller than the one it was armed at (the loading
+screen after OK / Enter). Character select needs a save (`prepare_saves.sh`: ScnAma is
+the selected slot); `key ENTER` there starts the game. Under Wine the clicks and keys go
+as X input (`xdotool`, the steps of `tools/cloud-game/xinput.sh`; `--x-input auto`), on
+Windows by `PostMessage`. The footer notes list every `EndScene` caller with its first
+present.
 
 ## autostart.py: unattended start and scripted input
 

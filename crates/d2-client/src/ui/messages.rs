@@ -20,6 +20,7 @@ pub mod chat;
 pub mod dialog;
 pub mod hire;
 pub mod intro;
+pub mod npc_facts;
 pub mod npc_text;
 pub mod overhead;
 pub mod socket;
