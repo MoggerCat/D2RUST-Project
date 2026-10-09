@@ -11,7 +11,12 @@
   `missile-superunique.poke`); scenario `spawn` kinds `champion`
   (GUID 8), `random-boss` (GUID 13), `unique` with umods 5, 7 (GUID 17)
   returned `ok` with minions (`boss-kinds.poke`, monsters/init.md §25
-  forms). The comparison with d2rs is REC-590. The d2rs side (§3, §5) is implemented
+  forms). Run on 1.14d on Windows (PC 1, 2026-10-09, same command,
+  `--after 125`): `spawn-town.poke` all five `ok` (spawn GUID 8, object
+  GUID 18); screenshots at 40 and 100 ticks show the fallen party of 4
+  beside the player, the lit brazier 3 sub-tiles left, Warriv walking;
+  the PNGs stay off the public repo (rule 1; `docs/handoff/pc1-day3-a.md`).
+  The comparison with d2rs is REC-590. The d2rs side (§3, §5) is implemented
   (`d2-sim::poke`, scenario `poke` steps, `scenario-run`, `d2-client
   play --poke`): every directive runs on the synthetic install; `warp`
   to another act runs the act change (§1 table); `item` without item
