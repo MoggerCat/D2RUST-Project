@@ -1118,8 +1118,47 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         bodies::passive::refresh(self, &t.skills, u, e.skill);
         self.xm().passive_state_apply(u, e);
     }
+    /// `0x005B0E00(game, m, m's AI control, k)` (`bodies.md` §6.2 step
+    /// 8, `monsters/ai.md` §3.3) through the AI module on the wiring's
+    /// store, for a unit with an AI control: the summon's AI is installed
+    /// again after its creation installed it, so its init runs twice
+    /// (1.14d: dru-raven's raven draws its orbit side twice, site
+    /// `0x005ECB9C`). Without the store or a control: the seam's.
     fn set_ai_state(&mut self, u: UnitId, k: i32) {
-        self.xm().set_ai_state(u, k);
+        use crate::monsters::ai;
+        let has_control = self
+            .cv
+            .v
+            .h
+            .ai
+            .as_ref()
+            .is_some_and(|s| s.control(u).is_some());
+        if !has_control {
+            self.xm().set_ai_state(u, k);
+            return;
+        }
+        let Some(mut store) = self.cv.v.h.ai.take() else {
+            return;
+        };
+        let t = self.cv.v.h.tables.clone();
+        let info = self.cv.v.h.ai_info;
+        {
+            let mut cx = ai::Ctx {
+                tables: ai::AiTables {
+                    monstats: &t.combat.monstats,
+                    monstats2: &t.combat.monstats2,
+                    levels: &t.levels,
+                    skill_modes: &t.skill_modes,
+                    skills: &t.skills.skills,
+                    missiles: &t.skills.missiles,
+                },
+                info,
+                store: &mut store,
+                world: &mut self.cv.v,
+            };
+            ai::install(&mut *self.cv.game, &mut cx, u, k as u32);
+        }
+        self.cv.v.h.ai = Some(store);
     }
     fn blood_mana(&mut self, u: UnitId, cost: i32) {
         self.xm().blood_mana(u, cost);
