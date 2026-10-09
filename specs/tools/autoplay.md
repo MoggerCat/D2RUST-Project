@@ -1,55 +1,54 @@
-# Spec: Tools — Autoplay bot (plays d2rs through the real client input)
+# Spec: Tools — Autoplay host and real-input smoke routes
 
-- **Status:** draft: the host protocol (§1, §2) is implemented by
-  `d2-client autoplay-host` (`crates/d2-client/src/app/autoplay_host.rs`)
-  and driven by `tools/autoplay/autoplay.py` (§3, §4). d2rs only: no
-  1.14d side. A reached milestone means "a player could get there in
-  d2rs", never a fidelity check (CLAUDE.md rule 10).
-- **Target version:** 1.14d (the quest steps it plays); the protocol and
-  the bot are d2rs-own.
+- **Status:** draft: `d2-client autoplay-host`
+  (`crates/d2-client/src/app/autoplay_host.rs`) implements §1–§2; the
+  route replayer `tools/autoplay/replay.py` and the routes in
+  `tools/autoplay/routes/` implement §3. d2rs only: no 1.14d side. A
+  passing route means "these clicks still do this in d2rs", never a
+  fidelity check (CLAUDE.md rule 10). The autoplay bot that recorded
+  the routes was dropped (2026-10-09); its findings are in
+  `docs/handoff/q-tool-autoplay.md`.
+- **Target version:** 1.14d (the NPCs, levels and waypoints the routes
+  visit); the protocol and the route format are d2rs-own.
 - **Crate/module:** `d2-client::app::autoplay_host`; `tools/autoplay/`
   (Python stdlib).
-- **Related specs:** `tools/playthrough.md` (milestones and the
-  `playthrough-result-1` keys reused in §4), `tools/state-snapshot.md`
-  (the `snap` object of `state`), `world/quests.md` §1.9 (the quest
-  steps and the done bits), `ui/controls.md` §6–§7 (the world clicks the
-  pointer events become), `ui/menus.md` (NPC menus), `ui/panels.md` §13
-  (waypoint menu).
+- **Related specs:** `tools/state-snapshot.md` (the `snap` object of
+  `state`), `ui/controls.md` §6–§7 (the world clicks the pointer events
+  become), `ui/menus.md` (NPC menus), `ui/panels.md` §13 (waypoint menu).
 
 ## Summary
 
-The honest "playable start to finish" test. A bot plays a d2rs game from
-a save the way a player would: it moves the mouse, clicks and presses
-keys; nothing else. No pokes, no warps, no stat edits, no C→S message
-written by hand. It reads the game state each step to decide (where it
-is, where the next quest target is, what is hostile and near), and
-reports where a real player would get stuck: the frame, the level, the
-position, its last 20 actions and the state.
+A real-input smoke test. `autoplay-host` runs the `play` client
+headless (Bevy's `MinimalPlugins` with the app `d2-client play` builds,
+`play::add_live_client`, as the `play_smoke` test runs it) and takes
+mouse and key events on stdin, put into the UI queue where the window's
+input goes: a click passes the panels, the hover pick and the
+world-click dispatcher exactly as a mouse click. Nothing else changes
+the game: no pokes, no warps, no hand-written C→S message.
 
-The game side is the `play` client, headless (`autoplay-host`): Bevy's
-`MinimalPlugins` with the app `d2-client play` builds
-(`play::add_live_client`), the in-process server thread, and the bot's
-input put into the UI queue where the window's input goes. A click
-therefore passes the panels, the hover pick and the world-click
-dispatcher (`ui/controls.md` §6), exactly as a mouse click.
+A route is a fixed list of those events with state checks between
+them, recorded once from a run that reached its milestones (town NPC
+talks, waypoint menus, walks between levels, waypoint travel). The
+same build, save and seed give the same game, so replaying the route
+gives the same clicks on the same things; a check that stops holding
+is a real-input regression.
 
 ## Inputs
 
 | Name | Type | Source |
 |---|---|---|
 | install | `D2_GAME_DIR` / `--game-dir` | the user's 1.14d files |
-| character | `.d2s` (`--save`) or `--new CLASS NAME` | `d2s-tool new`, a checkpoint save |
-| plan | the act's objective list (§3) | `tools/autoplay/acts.py` |
+| character | `.d2s` (`--save`) or `--new CLASS NAME` | `d2s-tool new` (the route's `save` line) |
+| route | text, §3 | `tools/autoplay/routes/*.route` |
 
 ## Outputs / state changes
 
-- The host reads the game only. The `state` and `map` reads run on the
+- The host reads the game only: the `state` and `map` reads run on the
   server thread between two passes and change nothing (no RNG draw, no
-  list change): running them or not gives the same game.
-- The bot writes a work dir (`target/autoplay/<act>-<time>/`): a
-  `run.jsonl` of every command and reply summary, the stuck report
-  (`stuck.json`: frame, level, position, the last 20 actions, the state)
-  and a result file `autoplay-result-1` (§4).
+  list change); running them or not gives the same game.
+- The replayer prints, per route, the milestones whose checks held and
+  the first failing check (line, milestone, why); exit 0 all held, 1 a
+  check failed or the host died, 3 error.
 
 ## Rules
 
@@ -73,7 +72,9 @@ dispatcher (`ui/controls.md` §6), exactly as a mouse click.
    then the press or release; the click view reads that cursor. A key is
    delivered as `play --input`'s `key` step: its bound action in the
    UI's key mode (the `original` controls preset, not the user's saved
-   controls), then its typed character.
+   controls), then its typed character; the key is also held in the raw
+   key state for one pass (the window's input plugin keeps it; the death
+   and hardcore screens read it).
 
 ### 2. Reads
 
@@ -86,53 +87,43 @@ dispatcher (`ui/controls.md` §6), exactly as a mouse click.
    talk topic box: texts, centre points, cancel point), `dialog_lines`
    (the dialog panel's line count while it is up), `waypoint_rows`
    (level, known, current of the open menu's tab), `belt` (slot, code),
-   `ground` (ground items: GUID, code, cell, gold).
+   `ground` (ground items: GUID, code, cell, gold), `camera` (the drawn
+   frame's anchor: the local player position the screen and the hover
+   pick use, 16.16 and whole sub-tiles; clicks aim from it, not from the
+   server position), `sent` (C→S message ids sent so far, with counts).
 2. `map`: the levels the DRLG of the player's act has allocated, each
    with id, DRLG type, rect and warp-room centres (sub-tiles), and its
    rooms: id, rect (sub-tiles), near list, warp links (target room,
-   enabled, lvlwarp row). The bot uses it as a player's knowledge of the
-   map (where the exits are), never to move: it still walks there.
+   enabled, lvlwarp row), and each active room's collision grid (`#`
+   blocked for a walking player, `D` door, `.` free) and the levels' vis
+   arrays. A driver may read it as a player's knowledge of the map,
+   never to move: movement is still its clicks.
 
-### 3. The bot loop (`tools/autoplay/autoplay.py`)
+### 3. Routes `autoplay-route 1`
 
-1. **Objective**: the act's next quest step (`world/quests.md` §1.9 for
-   the done bits) gives a target: a level to reach, a unit to kill, an
-   NPC to talk to, a waypoint to take. The route to a level is a path
-   over the `map` rooms (near lists and warp links) from the player's
-   room; the next room on it gives the next point to walk to.
-2. **Walk**: a left click on a frame point about 8 sub-tiles ahead along
-   the route (the client's own pathing walks there); a warp tile is
-   clicked on its unit.
-3. **Fight**: the nearest hostile monster within a radius is attacked by
-   a left click on it (or the class's main skill with a right click); a
-   belt potion key is pressed under 40 % life or mana; potions and gold
-   on the ground near the player are clicked.
-4. **Town**: the quest NPC is clicked, its menu row `Talk` chosen, the
-   dialog skipped with clicks; a waypoint is clicked and its menu row
-   chosen.
-5. **Stuck**: no progress toward the objective (route distance not
-   shrinking) for N seconds of game time, a death loop (three deaths
-   without progress), the host exiting or panicking. The report holds
-   the frame, the level, the position, the last 20 actions and the
-   state.
-
-### 4. Result `autoplay-result-1`
-
-Per act: `act`, the milestones of `tools/playthrough` reached in order
-(`reached`, `total`), `ticks` (game time taken), `deaths`, and the first
-stuck point (`stuck`: milestone, frame, level, position, reason) or
-`null`.
+1. Line 1 is `autoplay-route 1`. `#` lines are comments;
+   `# milestone NAME: TEXT` names the milestone the following checks
+   belong to.
+2. `host ARGS`: extra `autoplay-host` options (`--new CLASS NAME`,
+   `--seed N`). `save ARGS`: the character, `d2s-tool new ARGS -o FILE`,
+   passed as `--save FILE` (fixed `--time` and `--map-seed`, so the save
+   is the same on every run).
+3. `step N`, `move X Y`, `press L|R X Y`, `release L|R X Y`, `key K`
+   are sent to the host as they are (§1 r2).
+4. `check level N`: the local player's `lv` is N. `check sent ID >= N`:
+   the client has sent C→S message ID (hex) at least N times (`state`
+   `client.sent`; 0x2F counts NPC menus opened, 0x30 their closes).
+5. The replayer makes no decision: it sends every line in order and
+   stops at the first check that does not hold.
 
 ## Constants & data dependencies
 
-Ids of the act plans: levels.txt rows, monstats rows, the quest slots of
-`world/quests.md` §1.9 (the same ids `traces/playthrough/act1.play`
-names).
+None: a route holds frame pixels and levels.txt ids only.
 
 ## Randomness
 
-None in the host. The bot is deterministic for a given save and seed
-(its choices read only the state).
+None in the host or the replayer. The game's own draws are fixed by
+the save and the seed, which is what makes a route replayable.
 
 ## Edge cases & original bugs
 
@@ -143,7 +134,8 @@ None (a d2rs tool).
 | Input / seed | Expected output | Source |
 |---|---|---|
 | `parse_command` lines | `autoplay_host` unit test | this spec §1 r2 |
-| `autoplay.py --selftest` | the route, projection and stuck logic on fixed inputs | this spec §3 |
+| `replay.py --selftest` | the route parser and the checks on fixed inputs; every committed route parses | this spec §3 |
+| `replay.py --all` (1.14d install) | act1 7, act2 20, act3 12, act4 6, act5 12 milestones held (2026-10-09) | this spec §3 |
 
 ## Provenance
 
