@@ -1,0 +1,22 @@
+# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py game/captures/day/manual/scene5.jsonl --scene a1-den-of-evil --frame 196 --out facts/render; game: 1.14d
+key	value
+seq	196
+tick	1868
+w	800
+h	600
+act	0
+level	8
+player_x	38352
+player_y	101504
+tile_origin_x	37952
+tile_origin_y	101224
+unit_origin_x	37952
+unit_origin_y	101220
+open_mode	0
+shift_x	0
+light_quality	0
+rain	0
+snow	0
+draws	212
+index_sha256	509351c2d374c919030c482974578db7af57d3d9f930e5663cc6ef9c0e0c0aab
+palette_sha256	ba83219e51249002d7125a1a5a701d6abea94f04f44d6cfaa42becdfcff23337

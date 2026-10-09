@@ -298,7 +298,20 @@ confirms d2rs (mark the REC settled) or becomes a `q-fix-*` row. Re-run
   - q-fix-flow-save `real_saves`: 2 passed on game-written saves.
 
 **Left**
-- Step 4 item 20 and Step 3 (Windows scene recordings). Scripted
+- Step 4 item 20, recorded later the same day with the user at the game
+  (recorder running with no `--input`: `record_frames.py --every 5
+  --draws-every 1 --auto SceSor --seed 1234`, one frame per scene picked
+  by `facts_render.py --frame N`). The new scenes in `facts/render/scenes/`
+  are a1-npc-intro-akara, a1-npc-dialog, a1-npc-shop,
+  a1-npc-shop-tooltip, a1-npc-shop-gheed, a1-npc-gamble,
+  a1-npc-gamble-tooltip, a1-panel-stash, a1-panel-esc-menu,
+  a1-blood-moor-monsters (live monsters, 4 corpses, 1 ground item),
+  a1-blood-moor-automap and a1-den-of-evil. Each was recorded once, not
+  twice: the scenes are user-driven and so not repeatable frame for frame.
+  The open rows in q-facts-scenes' `facts/requests.tsv` are now answered
+  except Blood Moor at night and the 4 front-end scenes; set them done
+  when that branch merges.
+- Old note: scripted
   `goto` to NPCs is unreliable on PC 1 (Akara wanders; one run captured
   no menu). The user will drive these by hand with the recorder running
   (no `--input`). `facts/requests.tsv` rows are still open.
