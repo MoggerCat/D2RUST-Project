@@ -7,7 +7,7 @@ from the parts in `docs/handoff/ledger/`). Inputs: the merged ledger,
 108 channel results, suite run 2026-10-09 17:34 UTC at 739dd943), the
 existing tools under `tools/` and `specs/tools/`.
 
-**Merged ledger (8 parts, 4,104 rows, of which about 1,650 coverage-only rows):**
+**Merged ledger (8 parts, 4,104 rows, of which 1,758 coverage-only rows):**
 DIVERGED 289, NOT-IMPLEMENTED 59, NO-CHECK 3,671, UNKNOWN 85, **EQUAL 0**;
 exercised yes 487 / no 1,984 / unknown 1,633 (yes from the coverage reports' seen
 lists: act I–II playthrough, the checks' d2rs side, soak). Every spec file (outside
