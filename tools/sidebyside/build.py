@@ -34,6 +34,7 @@ import html
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -146,11 +147,15 @@ def record_orig(name, g, out, reuse):
         shutil.rmtree(out)
     os.makedirs(img)
     reset_game_settings()
-    code = run(["tools/cloud-game/run.sh", "--python", "--seconds", "480", "--out", os.path.join(out, "run"),
+    # Wine runs about 1.1 server ticks per second with a PNG per frame: a long group (an outdoor
+    # level by the town waypoint, ~500 ticks) needs more than the fixed 420 s (q-chk-render-world)
+    total = sum(int(m) for m in re.findall(r"waitticks (\d+)", g["script"]))
+    secs = max(420, int(total * 1.2) + 90)
+    code = run(["tools/cloud-game/run.sh", "--python", "--seconds", str(secs + 60), "--out", os.path.join(out, "run"),
                 "--", "tools/trace-recorder/record_frames.py", "--game", os.path.join(GAME, "Game.exe"),
-                "--seconds", "420", "--every", "1", "--draws-every", "1", "--sounds", "--img-dir", img,
+                "--seconds", str(secs), "--every", "1", "--draws-every", "1", "--sounds", "--img-dir", img,
                 "--out", cap, "--auto", g["char"], "--seed", str(g["seed"]), "--input", framed(g["script"])[0]],
-               timeout=600, out=os.path.join(out, "run.log"))
+               timeout=secs + 180, out=os.path.join(out, "run.log"))
     if not os.path.exists(cap):
         raise SystemExit(f"[{name}] 1.14d wrote no capture (exit {code}, see {out}/run)")
     return cap
