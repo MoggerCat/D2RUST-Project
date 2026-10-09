@@ -226,8 +226,6 @@ class Runner:
         if "d2rs" in sides and not (self.reuse and os.path.exists(d2rs)):
             args = ["state-dump"] + self.d2rs_common(save) + ["--ticks", str(self.c["ticks"]),
                                                               "--out", d2rs]
-            if self.c["input"].get("d2rs"):
-                args += ["--input", self.c["input"]["d2rs"]]
             self.cargo("d2-client", args)
         if sides != {"orig", "d2rs"}:
             return None
@@ -235,7 +233,14 @@ class Runner:
                 "--next", str(self.next)]
         if self.c["ignore"]:
             argv += ["--ignore", ",".join(self.c["ignore"])]
-        return self.sh(argv, check=False)
+        code = self.sh(argv, check=False)
+        if self.c["input"].get("d2rs"):
+            # state-dump has no input (scenario-diff.md OQ 2): the d2rs side ran
+            # without the check's input, so a match is only partial
+            print("[state] d2rs ran without 'input d2rs' (state-dump takes no input): "
+                  "partial at best")
+            code = max(code, 2) if code != 1 else 1
+        return code
 
     def draws(self, save, sides):
         c = self.c
