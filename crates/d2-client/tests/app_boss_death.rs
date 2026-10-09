@@ -31,6 +31,7 @@ fn run_with(ticks: u32, pokes: &[&str]) -> Vec<u8> {
             .collect(),
         input: None,
         sends: Vec::new(),
+        no_own_c2s: Vec::new(),
         packets: None,
         rng: None,
         save_out: None,

@@ -42,6 +42,7 @@ fn run_sends(
             .iter()
             .map(|s| d2_client::app::send::parse_send_arg(s).unwrap())
             .collect(),
+        no_own_c2s: Vec::new(),
         packets: None,
         rng: None,
         save_out: None,
