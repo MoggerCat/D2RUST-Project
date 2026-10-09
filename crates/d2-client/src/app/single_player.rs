@@ -471,7 +471,7 @@ pub enum BuildError {
     Archives { dir: String, message: String },
     /// No game directory given: the game plays only on the user's own
     /// files (`$D2_GAME_DIR`, or `--native DIR`).
-    #[error("no game files: set D2_GAME_DIR to a Diablo II 1.14d install")]
+    #[error("no game files: put d2-client.exe in the Diablo II 1.14d folder (next to d2data.mpq), pass --game-dir <folder>, or set D2_GAME_DIR")]
     NoGameDir,
     #[error("no objects row has operate function 23 and init function 17")]
     NoWaypointObject,

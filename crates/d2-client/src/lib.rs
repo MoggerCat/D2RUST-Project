@@ -19,6 +19,7 @@ pub mod controls;
 pub mod facts;
 pub mod frames;
 pub mod gpu_compositor;
+pub mod launch;
 pub mod map;
 pub mod render;
 pub mod rules;
