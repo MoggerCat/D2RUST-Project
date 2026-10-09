@@ -44,22 +44,22 @@
 |   4. Object animation at a mode change | 180–211 |
 |   5. Init functions | 212–286 |
 |   6. Preset object classes 574–582 (`0x0054F490`) | 287–323 |
-|   7. Operate dispatch | 324–423 |
-|   8. Chests and breakables | 424–559 |
-|   9. Shrines | 560–675 |
-|   10. Doors, operate 8 (`0x00581D40`) | 676–699 |
-|   11. Wells, operate 22 (`0x005858A0`) | 700–731 |
-|   12. Portals, operate 15 (`0x00584870`) | 732–802 |
-|   13. Torch, operate 11 (`0x005843D0`) | 803–807 |
-|   14. Client messages | 808–835 |
-|   15. Not covered yet | 836–850 |
-|   16.–18. Moved | 851–857 |
-| Constants & data dependencies | 858–904 |
-| Randomness | 905–951 |
-| Edge cases & original bugs | 952–1018 |
-| Test vectors | 1019–1057 |
-| Provenance | 1058–1121 |
-| Open questions | 1122–1171 |
+|   7. Operate dispatch | 324–448 |
+|   8. Chests and breakables | 449–584 |
+|   9. Shrines | 585–700 |
+|   10. Doors, operate 8 (`0x00581D40`) | 701–724 |
+|   11. Wells, operate 22 (`0x005858A0`) | 725–756 |
+|   12. Portals, operate 15 (`0x00584870`) | 757–827 |
+|   13. Torch, operate 11 (`0x005843D0`) | 828–832 |
+|   14. Client messages | 833–860 |
+|   15. Not covered yet | 861–875 |
+|   16.–18. Moved | 876–882 |
+| Constants & data dependencies | 883–929 |
+| Randomness | 930–976 |
+| Edge cases & original bugs | 977–1043 |
+| Test vectors | 1044–1082 |
+| Provenance | 1083–1146 |
+| Open questions | 1147–1196 |
 <!-- /index -->
 
 ## Summary
@@ -417,6 +417,31 @@ The handler's result (`sim/intents-events.md`), in order:
    `sim/pathing.md`) → 0.
 5. Else stop P's path (`0x00648730`) and run §7.1 (`0x00584540(game,
    P, 2, GUID)`): its result 0 (object gone) → 3, else → 0.
+
+#### 7.4 Call forms (2026-10-09, static asm; `tools/poke.md` §4 rule 10)
+
+| Function | Registers | Stack from [ESP+4] | `ret` | EAX | Proof |
+|---|---|---|---|---|---|
+| C→S 0x13 handler `0x0054AA90` | ECX game, EDX player | message (id, u32 type @1, u32 GUID @5), size 9 | 8 | §7.3 code; 2 for type > 5 | `0x0054AA93`, `0x0054AAA6`–`0x0054AAAF`, `ret 8` at `0x0054AACB` |
+| §7.3 `0x00548B00` | ECX player, EDX unit type (2) | GUID, walk flag (0x13: 0), game | 0xC | §7.3 code | `0x0054AABE`–`0x0054AAC4`; object case `0x00548B19` (table `0x00548E8C`); `ret 0xC` at `0x00548BB6`, `0x00548BD9` |
+| §7.1 `0x00584540` | ECX game, EDX operator (0 = none: no range test) | unit type (low 16 bits read, `0x0058454B`), GUID | 8 | 0 no unit; 1 refused or done (§7.2's out word) | `0x00548B9A`–`0x00548BA2` call site; `0x00584549` / `0x00584551`; `ret 8` at `0x00584564`, `0x005845C0` |
+| §7.2 `0x00584420` | ECX game, EDX operator | unit type (low 16 bits), GUID, pointer to a u32 out word (set to 1 first, `0x0058443A`) | 0xC | 0 refused or no operate function; else the operate function's own result | call site `0x0058459B`–`0x005845B2`; `0x0058442C` EBX := ECX, `0x00584431` EDI := EDX; `ret 0xC` at `0x005844AA`, `0x00584516` |
+
+The operate function is called (`0x0058450E`) with ECX = a 0x14-byte
+record on §7.2's stack {game, object, operator, control
+(`0x00546FA0`), class} and EDX = the `OperateFn` number.
+
+**Operating at once.** §7.2 `0x00584420` with the player as operator
+is the deepest entry that keeps the player tests: it skips §7.3's
+distance > 50, object mode ≥ 8 and range / line tests and the walk,
+and §7.1's range test. Needs: the object exists (GUID in the object
+list); the player's interact info inactive (`0x00554100` = 0), player
+data +0x4C = 0 and no cursor item unless class 267 (§7.2 rule 2); the
+out word writable. §7.3 also stops the player's path (`0x00648730`)
+first; a direct call leaves it moving. §7.1 with operator 0 skips the
+range test as well but hands the operate function no operator (the
+waypoint's operate sets the operator's interact info,
+`world/waypoints.md` §5.2 step 3), so it is no substitute.
 
 So an operate or a walk gives 0; the operate function's own result
 never reaches this value.

@@ -437,7 +437,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
   (flags 0, spread -1), the dummy init `0x005B...` (init 49 / 50) or a
   think; `monsters/init.md` §4 lists none.
 
-60. **[q-fix-room-links]** After a waypoint return to a town, does 1.14d populate only the rooms near the player (far NPCs/objects appear on approach), as d2rs does? Drive town -> waypoint -> back, snapshot units at +50 and +600 frames (`docs/handoff/q-fix-room-links.md`).
+60. **[q-fix-room-links]** answered → `drlg/rooms.md` §8 (recorded: 1.14d also leaves far town rooms unpopulated; old level freed 122 frames after the return). After a waypoint return to a town, does 1.14d populate only the rooms near the player (far NPCs/objects appear on approach), as d2rs does? Drive town -> waypoint -> back, snapshot units at +50 and +600 frames (`docs/handoff/q-fix-room-links.md`).
 
 ## How to check a behaviour in one command
 

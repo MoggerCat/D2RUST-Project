@@ -34,15 +34,15 @@
 |   5. Active room creation (`0x006422A0`, `0x00619890`) | 397–430 |
 |   6. Adjacency array order (owner of `unit-order.md` §9) | 431–446 |
 |   7. Room clients and the inactivity counter | 447–471 |
-|   8. Deactivation (tick step 9) | 472–589 |
-|   9. Room tile grid | 590–1233 |
-|   10. Collision map from tiles | 1234–1320 |
-| Constants & data dependencies | 1321–1335 |
-| Randomness | 1336–1353 |
-| Edge cases & original bugs | 1354–1371 |
-| Test vectors | 1372–1422 |
-| Provenance | 1423–1474 |
-| Open questions | 1475–1597 |
+|   8. Deactivation (tick step 9) | 472–605 |
+|   9. Room tile grid | 606–1249 |
+|   10. Collision map from tiles | 1250–1336 |
+| Constants & data dependencies | 1337–1351 |
+| Randomness | 1352–1369 |
+| Edge cases & original bugs | 1370–1387 |
+| Test vectors | 1388–1438 |
+| Provenance | 1439–1490 |
+| Open questions | 1491–1613 |
 <!-- /index -->
 
 ## Summary
@@ -586,6 +586,22 @@ A populated room that is removed and built again starts with flag bit 0:
    tile (class = lvlwarp `Id` of the vis slot), deactivate and
    reactivate → one type-5 unit of that class at the same sub-tile, GUID
    ≠ the old one, created in the restore step (not the preset step).
+
+*Recorded, a waypoint round trip* (2026-10-09, PC 1, Windows;
+`record_state.py --auto CkAndariel --seed 1 --ticks 1250`, `--poke "5 pos
+@player 5684 5796"`, `--send` InteractWithEntity type 2 id 11 at 20,
+TakeOrCloseWp wp 11 level 3 at 30, InteractWithEntity type 2 id 25 at 600,
+TakeOrCloseWp wp 25 level 1 at 610; the player then stands at the Rogue
+Encampment waypoint): before leaving (f25) the town lists 14 monsters (NPC
+classes 147, 148, 150, 152, 154, 155, 179, 265) and 24 objects; after the
+return (f615 to the end, f1249) only the rooms near the waypoint are
+populated: NPC classes 148, 150, 152, 155, 179, 265, **no Gheed (147) and
+no Charsi (154)**, and 12 town objects (classes 36, 37, 78 among the
+missing ones). The Cold Plains units stay in the unit lists after the
+return (17 monsters, 12 objects) and are gone at **f732, 122 frames after
+the return** (the old level's rooms reach the §7 inactivity limit and are
+deactivated here). So the far town rooms stay unpopulated until a client
+comes near, as d2rs does (`docs/handoff/q-fix-room-links.md`).
 
 ### 9. Room tile grid
 
