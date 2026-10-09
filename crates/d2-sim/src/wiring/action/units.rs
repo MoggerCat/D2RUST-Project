@@ -45,8 +45,9 @@ pub const STATE_DEATH_DELAY: u16 = 92;
 
 impl<X: Pending> StatHost for ActionHooks<X> {
     /// §8.2 rule 6: queue the callbacks this wiring runs after the expiry
-    /// walk ([`UnitHooks::lists_expired`]): the default one and the shrine
-    /// ones. The others are run by their skill bodies.
+    /// walk ([`UnitHooks::lists_expired`]): the default one, the shrine
+    /// ones and the channel ones (Inferno, Blade Fury). The others are run
+    /// by their skill bodies.
     fn list_removed(
         &mut self,
         _lists: &mut StatLists,
@@ -55,8 +56,12 @@ impl<X: Pending> StatHost for ActionHooks<X> {
         _list: ListId,
         callback: RemoveCallback,
     ) {
+        use crate::skills::use_::bodies::callback::{BLADE_FURY, INFERNO};
         use crate::world::objects::shrines::{SKILL_REMOVE, STAMINA_REMOVE};
-        if matches!(callback.0, 0x0056_E900 | SKILL_REMOVE | STAMINA_REMOVE) {
+        if matches!(
+            callback.0,
+            0x0056_E900 | SKILL_REMOVE | STAMINA_REMOVE | INFERNO | BLADE_FURY
+        ) {
             self.removed_lists.push((unit, state, callback.0));
         }
     }
@@ -329,6 +334,20 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
             }
             if cb == STAMINA_REMOVE {
                 sim.stats.clamp_to_max(self, u);
+            }
+            // The channel callbacks `0x005C8BF0` / `0x005D69B0`
+            // (`skills/bodies.md` §6.16, `bodies-2b.md` §6.16): state off,
+            // then unit flags |= 0x40, so the channel's frame events stop
+            // running the do (`skills/use.md` §5.2; 1.14d `sor-inferno`:
+            // no missile after the state-12 list expires at F + 20).
+            if matches!(
+                cb,
+                crate::skills::use_::bodies::callback::INFERNO
+                    | crate::skills::use_::bodies::callback::BLADE_FURY
+            ) {
+                if let Some(r) = sim.units.get_mut(u) {
+                    r.flags |= crate::skills::use_::FLAG_MISSILE_FIRED;
+                }
             }
         }
         let _ = unit;

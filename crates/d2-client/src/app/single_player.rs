@@ -979,6 +979,37 @@ impl Pending for LocalSeams {
     fn golem_resummon(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, player: UnitId) -> bool {
         skill_events::golem_resummon(h, sim, player)
     }
+    fn missile_summon_class(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        owner: UnitId,
+        skill: i32,
+        level: i32,
+    ) -> (i32, i32) {
+        skill_events::missile_summon_class(h, sim, owner, skill, level)
+    }
+    fn missile_summon_spawn(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        owner: UnitId,
+        class: i32,
+        mode: i32,
+        at: (i32, i32),
+        pet_type: i32,
+    ) -> Option<UnitId> {
+        skill_events::missile_summon_spawn(h, sim, owner, class, mode, at, pet_type)
+    }
+    fn missile_bone_wall_piece(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        owner: UnitId,
+        anchor: UnitId,
+        piece: UnitId,
+        skill: i32,
+        level: i32,
+    ) {
+        skill_events::missile_bone_wall_piece(h, sim, owner, anchor, piece, skill, level);
+    }
     fn right_aura_select(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, player: UnitId) {
         skill_events::right_aura_select(h, sim, player);
     }
