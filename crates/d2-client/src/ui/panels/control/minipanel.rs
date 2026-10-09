@@ -108,6 +108,9 @@ pub struct MiniPanel {
     pub latch: bool,
     /// `[0x007BC974]`.
     pub flag_974: bool,
+    /// The layout of the last draw (§9 r6-r8): the x table `[0x007BC898]`
+    /// is written only by the draw; `None` before the first draw (all x 0).
+    pub last_layout: Option<Layout>,
 }
 
 /// Why a press or release is not acted on.
@@ -196,6 +199,7 @@ impl MiniPanel {
             hidden: false,
             latch: false,
             flag_974: false,
+            last_layout: None,
         }
     }
 
@@ -259,6 +263,7 @@ impl MiniPanel {
         let l = layout(left_blocked, right_blocked);
         self.hidden = l.is_none();
         let l = l?;
+        self.last_layout = Some(l);
         Some((self.art_pos(l, w, h), self.buttons(l, w, h)))
     }
 
@@ -359,22 +364,19 @@ impl MiniPanel {
         o
     }
 
-    /// PROVISIONAL (specs/ui/control-panel.md §9 r7; REC-ui-mini-layout):
-    /// the layout whose buttons a press or release tests is read from the
-    /// sign of the region offset.
-    fn layout_for(o: i32) -> Layout {
-        match o.cmp(&0) {
-            std::cmp::Ordering::Less => Layout::One,
-            std::cmp::Ordering::Equal => Layout::Two,
-            std::cmp::Ordering::Greater => Layout::Three,
+    /// The button under x (strict x test) and its function, from the x
+    /// table of the last draw (§9 r6-r8); before any draw every x is 0.
+    fn button_at(&self, w: i32, h: i32, x: i32) -> Option<MiniButton> {
+        match self.last_layout {
+            Some(l) => self.buttons(l, w, h),
+            None => {
+                let mut v = self.buttons(Layout::Two, w, h);
+                v.iter_mut().for_each(|b| b.x = 0);
+                v
+            }
         }
-    }
-
-    /// The button under x (strict x test) and its function.
-    fn button_at(&self, o: i32, w: i32, h: i32, x: i32) -> Option<MiniButton> {
-        self.buttons(Self::layout_for(o), w, h)
-            .into_iter()
-            .find(|b| b.x < x && x < b.x + 20)
+        .into_iter()
+        .find(|b| b.x < x && x < b.x + 20)
     }
 
     /// Press (`0x0047EF30`, §9 r7): no cursor item and `[0x007BC970]` = 0.
@@ -398,7 +400,7 @@ impl MiniPanel {
         if !region(w, h, o, mouse.0, mouse.1) {
             return (Vec::new(), false);
         }
-        if let Some(b) = self.button_at(o, w, h, mouse.0) {
+        if let Some(b) = self.button_at(w, h, mouse.0) {
             let late = if self.single { 4 } else { 5 };
             if b.f == 7 || (p.living && (!state9_open || b.i >= late)) {
                 self.pressed[b.i] = true;
@@ -441,7 +443,7 @@ impl MiniPanel {
             self.flag_974 = false;
             return (eff, false);
         }
-        if let Some(b) = self.button_at(o, w, h, mouse.0) {
+        if let Some(b) = self.button_at(w, h, mouse.0) {
             // The function runs whatever button was pressed.
             if b.f == 7 || (!p.blocked && !p.dead) {
                 eff.extend(function_actions(b.f, self.single, open));
@@ -712,11 +714,54 @@ mod tests {
         }
     }
 
+    /// A panel that has drawn layout 2 (the x table is written by the draw).
+    fn drawn(game_type: u32) -> MiniPanel {
+        let mut m = MiniPanel::new(game_type);
+        m.last_layout = Some(Layout::Two);
+        m
+    }
+
+    // Covers: specs/ui/control-panel.md §9 r6, §9 r7
+    #[test]
+    fn hit_test_uses_the_last_drawn_layout() {
+        // State 0x1F open with belt row count 2: right blocked, the draw
+        // chose layout 1, press offset o = 0 (the region is centred).
+        let s = sides(&|x| x == 0x1F, false, 2);
+        let mut m = MiniPanel::new(1);
+        m.set_sides(&s);
+        assert!(m.draw(s.left_blocked, s.right_blocked, 800, 600).is_some());
+        assert_eq!(m.last_layout, Some(Layout::One));
+        assert_eq!(m.press_offset(false, 1), 0);
+        // Buttons are at W/2 - 202 + 21 i (layout 1): x = W/2 - 60 is
+        // inside button 6 (324..344), not button 1 of layout 2 (337..357).
+        // (The queue row's "hits no button" does not follow from the x
+        // table: 198 + 21 * 6 < 340 < 198 + 21 * 6 + 20.)
+        let (e, c) = m.press(
+            800,
+            600,
+            (800 / 2 - 60, 600 - 55),
+            false,
+            false,
+            1,
+            false,
+            &player(),
+        );
+        assert!(c && e == vec![MiniAction::Sound(4)]);
+        assert_eq!(
+            m.pressed,
+            [false, false, false, false, false, false, true, false]
+        );
+        // Before the first draw every x is 0: x 5 hits button 0.
+        let mut m = MiniPanel::new(1);
+        assert_eq!(m.button_at(800, 600, 5).map(|b| b.i), Some(0));
+        assert_eq!(m.button_at(800, 600, 316 + 25), None);
+    }
+
     // Covers: specs/ui/control-panel.md §9 r7
     #[test]
     fn press_region_and_pressed_flags() {
         // Multiplayer, o = 0: x0 316, button i at 316 + 21 i.
-        let mut m = MiniPanel::new(1);
+        let mut m = drawn(1);
         // The press offset: −118 belt extra rows with a count > 1, −118
         // [7BC968], +119 [7BC96C].
         assert_eq!(m.press_offset(false, 1), 0);
@@ -735,13 +780,13 @@ mod tests {
         assert!(c && m.latch && m.pressed[1]);
         // State 9 open: only buttons i ≥ 5 (multi) / ≥ 4 (single) and the
         // game menu (f = 7) press.
-        let mut m = MiniPanel::new(1);
+        let mut m = drawn(1);
         let (_, c) = m.press(800, 600, (340, 540), false, false, 1, true, &player());
         assert!(c && m.latch && m.pressed == [false; 8]);
         let x5 = 316 + 21 * 5 + 5;
         m.press(800, 600, (x5, 540), false, false, 1, true, &player());
         assert!(m.pressed[5]);
-        let mut m = MiniPanel::new(1);
+        let mut m = drawn(1);
         m.press(
             800,
             600,
@@ -753,7 +798,7 @@ mod tests {
             &player(),
         );
         assert!(!m.pressed[4]);
-        let mut m = MiniPanel::new(0);
+        let mut m = drawn(0);
         m.press(
             800,
             600,
@@ -767,7 +812,7 @@ mod tests {
         assert!(m.pressed[4]);
         // The game menu (f = 7: single button 6) presses even in state 9 and
         // for a dead player.
-        let mut m = MiniPanel::new(0);
+        let mut m = drawn(0);
         let dead = PlayerFacts::default();
         m.press(
             800,
@@ -781,12 +826,12 @@ mod tests {
         );
         assert!(m.pressed[6]);
         // A non-living player: no pressed flag, still sound and latch.
-        let mut m = MiniPanel::new(1);
+        let mut m = drawn(1);
         let (e, c) = m.press(800, 600, (340, 540), false, false, 1, false, &dead);
         assert!(c && m.latch && m.pressed == [false; 8] && e.len() == 1);
         // A cursor item, or the panel hidden: nothing. Outside the region:
         // not consumed.
-        let mut m = MiniPanel::new(1);
+        let mut m = drawn(1);
         assert_eq!(
             m.press(800, 600, (340, 540), true, false, 1, false, &player()),
             (vec![], false)
@@ -812,7 +857,7 @@ mod tests {
                 jump: false,
             })
         };
-        let mut m = MiniPanel::new(1);
+        let mut m = drawn(1);
         m.press(800, 600, (320, 540), false, false, 1, false, &player());
         assert!(m.latch && m.pressed[0]);
         // Released over button 1 (x 337…357): that one runs (the function
@@ -825,7 +870,7 @@ mod tests {
         );
         assert!(c && !m.latch && m.pressed == [false; 8]);
         // Cursor mode 7: no reset.
-        let mut m = MiniPanel::new(1);
+        let mut m = drawn(1);
         m.latch = true;
         let (e, _) = m.release(800, 600, (340, 540), false, 7, false, 1, &player(), &open);
         assert_eq!(e, vec![set(1, 2), MiniAction::InputReset]);
@@ -836,7 +881,7 @@ mod tests {
             blocked: true,
             ..Default::default()
         };
-        let mut m = MiniPanel::new(1);
+        let mut m = drawn(1);
         m.latch = true;
         let (e, c) = m.release(800, 600, (340, 540), false, 7, false, 1, &blocked, &open);
         assert_eq!(e, vec![MiniAction::InputReset]);
@@ -854,7 +899,7 @@ mod tests {
         assert_eq!(e, vec![MiniAction::GameMenu, MiniAction::InputReset]);
         // Outside the region: [7BC974] := 0, not consumed. Without the
         // latch: nothing.
-        let mut m = MiniPanel::new(1);
+        let mut m = drawn(1);
         m.flag_974 = true;
         assert_eq!(
             m.release(800, 600, (340, 540), false, 7, false, 1, &player(), &open),

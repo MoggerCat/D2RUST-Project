@@ -422,7 +422,9 @@ impl ShopUi {
         let price = move |_t: u8| prices.get(guid).unwrap_or(0);
         let env = ClickEnv {
             cursor_item: items::cursor_item(world).is_some(),
-            gamble_shop: st.gamble,
+            // The global [0x007C0DB0] is only ever written with 0
+            // (specs/ui/menus.md §4.2 r2), also in a Gamble window.
+            gamble_shop: false,
             repair_all_button_on: repair_all,
             repair_button_on: st.repair_mode,
             repair_all_price: st.prices.get(REPAIR_ALL_KEY).unwrap_or(0),
@@ -491,7 +493,8 @@ fn store_tip_ctx<'a>(
     crate::ui::item_tip_build::TipCtx {
         mode: if st.repair_mode { 4 } else { 1 },
         own_item: false,
-        gamble: st.gamble,
+        // The same global [0x007C0DB0] (ui/item-tips.md inputs): always 0.
+        gamble: false,
         price,
         ..base
     }
