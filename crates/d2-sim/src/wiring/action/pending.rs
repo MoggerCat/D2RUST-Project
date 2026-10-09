@@ -1640,6 +1640,24 @@ pub trait Pending {
         Self: Sized,
     {
     }
+    /// The pet follow `0x005754B0` of the summoned pet types
+    /// (`hirelings.md` §6 rule 1): routed to
+    /// [`crate::wiring::interaction::summon::summon_follow`] by a
+    /// [`crate::wiring::interaction::UseRest`] value. Default: nothing.
+    fn summon_follow(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, player: UnitId)
+    where
+        Self: Sized,
+    {
+    }
+    /// The save load's right-skill aura (`use.md` §7 "0x3C SelectSkill",
+    /// the assign `0x005701B0`): routed to
+    /// [`crate::wiring::interaction::skill_events::assign_right_aura`] by a
+    /// [`crate::wiring::interaction::UseRest`] value. Default: nothing.
+    fn assign_right_aura(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId)
+    where
+        Self: Sized,
+    {
+    }
     /// The skill part of the monster sequence event 0 `0x005A8670`
     /// (`units.md` §4.6 rule 13, before the animation refresh): E flags,
     /// the moving skill's step and the do `0x0056FC50` by frame code. A

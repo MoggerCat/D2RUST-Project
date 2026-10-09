@@ -270,6 +270,28 @@ pub fn player_request<X: Pending>(
     }
 }
 
+/// Player mode request, unit form `0x00580A70` with re-entry 1
+/// (`pathing.md` §1.2, rule 3 skipped): the Swing of the skill bodies
+/// (`bodies-2.md` §2.15). `None`: a fatal path (logged).
+pub fn player_request_reentry<X: Pending>(
+    v: &mut View<'_, X>,
+    game: &mut Game,
+    player: UnitId,
+    skill: Option<u16>,
+    mode: u32,
+    target: WalkTarget,
+) -> Option<Outcome> {
+    let mut c = PathCtx::of(v, game);
+    let t = c.tables();
+    match request(&t, &mut c, player, skill, mode, target, true) {
+        Ok(o) => Some(o),
+        Err(e) => {
+            c.walk_error(e);
+            None
+        }
+    }
+}
+
 /// Player event 0 of modes 2, 3, 6, 19: `0x00580C20` (`pathing.md`
 /// §9.2); the action result for `units.md` §4.5 (2 = stopped).
 pub fn player_step<X: Pending>(v: &mut View<'_, X>, game: &mut Game, unit: UnitId) -> u32 {

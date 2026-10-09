@@ -560,6 +560,16 @@ pub struct LocalSeams {
 }
 
 impl LocalSeams {
+    /// The melee reach `0x00622870` (`combat/hit.md` §7.3): a player's is
+    /// the weapon in use's `rangeadder` (0 without one; q-fix-pt-whirlwind);
+    /// every other unit keeps the preview reach.
+    fn reach(&self, u: UnitId) -> i32 {
+        match self.sides.get(&u) {
+            Some(&(UnitType::Player, ..)) => self.weapons.range_adder(u),
+            _ => PREVIEW_MELEE_RANGE,
+        }
+    }
+
     /// Player side: a player or an allied (good-aligned) monster.
     fn player_side(&self, unit: UnitId) -> Option<bool> {
         self.sides
@@ -953,6 +963,12 @@ impl Pending for LocalSeams {
     fn passive_refresh_all(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
         skill_events::passive_refresh_all(h, sim, unit);
     }
+    fn assign_right_aura(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
+        skill_events::assign_right_aura(h, sim, unit);
+    }
+    fn summon_follow(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
+        d2_sim::wiring::interaction::summon::summon_follow(h, sim, unit);
+    }
     // d2rs-own, unverified (q-amazon, REC-150): the hand class, the item
     // shoots / stack facts of the skill bodies ([`super::weapons`]).
     fn composit_weapon_class(&self, unit: UnitId) -> i32 {
@@ -1087,8 +1103,8 @@ impl Pending for LocalSeams {
         }
     }
     /// d2rs-own, unverified (preview, D1; `0x00622870`).
-    fn melee_range(&self, _: UnitId) -> i32 {
-        PREVIEW_MELEE_RANGE
+    fn melee_range(&self, u: UnitId) -> i32 {
+        self.reach(u)
     }
     /// d2rs-own, unverified (preview, D1; `combat/range.md` §7.2 step 3
     /// with the preview reach and no line test): the larger axis
@@ -1098,6 +1114,25 @@ impl Pending for LocalSeams {
         else {
             return false;
         };
+        if matches!(self.sides.get(&a), Some(&(UnitType::Player, ..))) {
+            // `combat/range.md` §7.2 step 3 for a player attacker (no line
+            // test): the unit distance `0x00641530` against reach + extra
+            // + 1, so a Fallen 3 sub-tiles away (both sizes 2: distance
+            // 0) is in an axe's reach (q-fix-pt-whirlwind).
+            static TABLES: std::sync::OnceLock<Option<d2_sim::path::tables::PathTables>> =
+                std::sync::OnceLock::new();
+            if let Some(t) = TABLES.get_or_init(|| d2_sim::path::tables::PathTables::spec().ok()) {
+                let size = |u| self.sizes.get(&u).copied().unwrap_or(2);
+                let d = d2_sim::path::walk::geom::unit_distance(
+                    t,
+                    d2_sim::path::Point::new(pa.0, pa.1),
+                    size(a),
+                    d2_sim::path::Point::new(pd.0, pd.1),
+                    size(d),
+                );
+                return d <= 0 || self.reach(a).wrapping_add(extra).wrapping_add(1) >= d;
+            }
+        }
         let dist = (pa.0 - pd.0).abs().max((pa.1 - pd.1).abs());
         dist <= PREVIEW_MELEE_RANGE + extra + 1
     }
@@ -2402,6 +2437,9 @@ fn loader(
                     let (game, world) = (&mut s.game, &mut s.world);
                     s.events.lend_world(|a| world.hireling_calls(game, a));
                     super::save_gaps::join_gaps(s, player, save);
+                    // `use.md` §7 "0x3C SelectSkill": the selected right skill, an aura,
+                    // starts (q-fix-pt-right-aura).
+                    s.events.action.assign_right_aura(&mut s.game, player);
                     // `d2s.md` §2.4 rules 4–6: the hot keys, their item
                     // indices resolved over the loaded inventory list.
                     entry.hotkeys = super::save_gaps::loaded_hotkeys(
@@ -2720,5 +2758,57 @@ mod target_search_tests {
             seams(135, 0).good_target_search(&mut g, UnitId(1), false),
             None
         );
+    }
+}
+
+#[cfg(test)]
+mod player_melee_range_tests {
+    use super::*;
+    use crate::app::weapons::{Hands, ItemFacts};
+
+    /// A player at (100, 100) with a weapon of `rangeadder` `adder` and a
+    /// hostile monster at (x, 100); both size 2 (the default).
+    fn seams(x: i32, adder: i32) -> LocalSeams {
+        let mut s = LocalSeams::default();
+        s.sides
+            .insert(UnitId(1), (UnitType::Player, true, (100, 100)));
+        s.sides
+            .insert(UnitId(2), (UnitType::Monster, false, (x, 100)));
+        let item = UnitId(9);
+        s.weapons.items.insert(
+            item,
+            ItemFacts {
+                class: 2,
+                range_adder: adder,
+                ..ItemFacts::default()
+            },
+        );
+        s.weapons.hands.insert(
+            UnitId(1),
+            Hands {
+                right: Some(item),
+                weapon: Some(item),
+                ..Hands::default()
+            },
+        );
+        s
+    }
+
+    // Covers: specs/combat/hit.md §7.2 step 3, §7.3 step 1 (player reach
+    // = the weapon's rangeadder; the size-adjusted unit distance
+    // `0x00641530`: 3 sub-tiles between two size-2 units is distance 0).
+    #[test]
+    fn a_player_reaches_by_unit_distance_and_rangeadder() {
+        // An axe (adder 0): 3 sub-tiles apart is distance 0, in reach.
+        assert!(seams(103, 0).in_melee_range(UnitId(1), UnitId(2), 0));
+        // 4 sub-tiles is distance 2: out of reach for adder 0, in for 1.
+        assert!(!seams(104, 0).in_melee_range(UnitId(1), UnitId(2), 0));
+        assert!(seams(104, 1).in_melee_range(UnitId(1), UnitId(2), 0));
+        // Far away is out whatever the adder.
+        assert!(!seams(120, 1).in_melee_range(UnitId(1), UnitId(2), 0));
+        // No weapon: adder 0.
+        let mut s = seams(104, 1);
+        s.weapons = Default::default();
+        assert!(!s.in_melee_range(UnitId(1), UnitId(2), 0));
     }
 }

@@ -134,6 +134,24 @@ fn periodic_aura_event_without_an_aura_right_skill_is_not_rescheduled() {
     fx.assert_clean();
 }
 
+// Covers: specs/skills/use.md §7 ("0x3C SelectSkill": a new `aura` right skill
+// schedules the aura form; the save load's assign does the same)
+#[test]
+fn the_loaded_right_aura_schedules_the_aura_form_and_a_plain_skill_does_not() {
+    let (mut fx, p) = fx();
+    fx.sim.sys.hooks.x.right.insert(p, entry(AURA));
+    fx.sim.sys.hooks.x.skills.insert(p, vec![entry(AURA)]);
+    fx.sim.assign_right_aura(&mut fx.game, p);
+    // The aura form (−1, 0) at `period` (perdelay ≤ 5 → 5: frames ≡ 1 mod 5).
+    assert_eq!(timers(&fx, p, event::PERIODIC_SKILLS), [(1, u32::MAX, 0)]);
+    fx.assert_clean();
+    let (mut plain, q) = self::fx();
+    plain.sim.sys.hooks.x.right.insert(q, entry(0));
+    plain.sim.assign_right_aura(&mut plain.game, q);
+    assert!(timers(&plain, q, event::PERIODIC_SKILLS).is_empty());
+    plain.assert_clean();
+}
+
 // Covers: specs/sim/stat-lists.md §10.3; specs/skills/use.md §7
 #[test]
 fn item_aura_event_reads_stat_151_and_runs_the_do_core() {

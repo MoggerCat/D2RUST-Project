@@ -116,6 +116,43 @@ pub fn monster_skill_start<X: Pending + UseRest>(
     start(&mut w, &t.skills, unit)
 }
 
+/// The right skill's aura part of the save load's assign (`0x005701B0`,
+/// `use.md` §7 "0x3C SelectSkill"): the loaded right skill is an `aura`
+/// skill → `immediate` (Might, Resist Fire, ...) runs the do core once,
+/// else its aura state is switched on (stats 350 / 351); then the aura
+/// form of `schedule_periodic` (q-fix-pt-right-aura). The load selects
+/// the hand before the unit has a room, so the first periodic do runs on
+/// the first tick after game entry.
+pub fn assign_right_aura<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    unit: UnitId,
+) {
+    let t = h.tables.clone();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    let Some(e) = w.right_skill(unit) else {
+        return;
+    };
+    let Some(r) = t.skills.skill(e.skill).filter(|r| r.aura) else {
+        return;
+    };
+    let l = skill_level(&mut w, &t.skills, Some(unit), Some(&e), true);
+    if l == 0 {
+        return;
+    }
+    if r.immediate {
+        crate::skills::use_::do_core(&mut w, &t.skills, unit, e.skill, l, true, false, false);
+    } else {
+        w.set_aura_state(unit, r.aurastate, e.skill, l);
+    }
+    crate::skills::use_::schedule_periodic(&mut w, &t.skills, unit, e.skill, l, true);
+}
+
 /// The skill part of the monster sequence event 0 `0x005A8670`
 /// (`units.md` §4.6 rule 13) on the skill use pipeline: E := the used
 /// skill, f := its E flags (`0x006446A0`; 0 without a used skill), "do

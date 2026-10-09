@@ -82,6 +82,32 @@ impl<X: Pending> ActionSim<X> {
         X::passive_refresh_all(&mut s.hooks, &mut sim, unit)
     }
 
+    /// The pet follow of the summoned pet types
+    /// ([`Pending::summon_follow`]).
+    pub fn summon_follow(&mut self, game: &mut Game, player: UnitId) {
+        let s = &mut self.sys;
+        let mut sim = crate::units::hooks::Sim {
+            game,
+            units: &mut s.units,
+            stats: &mut s.stats,
+            data: &s.data,
+        };
+        X::summon_follow(&mut s.hooks, &mut sim, player)
+    }
+
+    /// The aura of the loaded right skill ([`Pending::assign_right_aura`]),
+    /// after the load selected the hands.
+    pub fn assign_right_aura(&mut self, game: &mut Game, unit: UnitId) {
+        let s = &mut self.sys;
+        let mut sim = crate::units::hooks::Sim {
+            game,
+            units: &mut s.units,
+            stats: &mut s.stats,
+            data: &s.data,
+        };
+        X::assign_right_aura(&mut s.hooks, &mut sim, unit)
+    }
+
     /// Runs `f` with the missile code's context (creation from skills,
     /// tests).
     pub fn missiles<R>(

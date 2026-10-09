@@ -1,0 +1,17 @@
+check 1
+# Blessed Hammer toward the Fallen: ScnPal (expansion Paladin, level 30, every skill at 20, right
+# skill 112), -seed 1234; warp to the Blood Moor (level 2; variant blood-moor-empty) before frame 4,
+# a Fallen (class 19) 4 sub-tiles away along +x before frame 10, then one right click at client pixel
+# (544, 336), past the Fallen (+8, +1), before frame 20's drain. Compares the cast, the hammer
+# missile's spiral and its hits on the Fallen over 100 frames. Area (q-fix-class-rows,
+# q-fix-pt-blessed-hammer). Spec: specs/tools/scenario-diff.md.
+name pal-blessed-hammer
+save ScnPal --class pal --expansion --level 30 --all-skills 20 --right-skill 112
+seed 1234
+ticks 100
+seconds 300
+channels state
+variant blood-moor-empty
+at 4 poke warp 2
+at 10 poke spawn 19 @x+4 @y normal
+input frame 20; rclick 544 336
