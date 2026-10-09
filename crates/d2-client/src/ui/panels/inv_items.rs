@@ -571,7 +571,18 @@ impl ItemsUi {
             x: u32::from(px),
             y: u32::from(py),
         };
+        self.clear_hover();
         vec![PanelOutput::Intent(ClientIntent::from_message(&m))]
+    }
+
+    /// d2rs-own (PROVISIONAL, REC-707): a use press clears the hover
+    /// state (`0x007BCBE4`, `0x007BCBF4` := 0, as the equipment press of
+    /// `panels-3.md` §29 r1 does), so the used item keeps its own tint until
+    /// the mouse moves (`a1-panel-cube` row 25: tint 2, not 1).
+    pub(crate) fn clear_hover(&self) {
+        let mut h = self.hover.get();
+        h.without_cursor_item(None);
+        self.hover.set(h);
     }
 
     /// The hover handler `0x00487000` (§5) for a mouse event at `at`

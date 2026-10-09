@@ -90,6 +90,23 @@ pub enum QuestEvent {
     BaalToStairs,
     /// Anya's AI asks for the temple portal (`0x0058BC80`, §6.7).
     AnyaOpenPortal { unit: UnitId },
+    /// The baalfx control missile asks for Tyrael (`0x0058E920` from
+    /// server-do 36 / server-hit 57, `quests-act5-2.md` §8.8), with the
+    /// missile's room and position at the call.
+    SpawnTyrael {
+        room: Option<RoomId>,
+        missile: UnitId,
+        x: i32,
+        y: i32,
+    },
+    /// A caged barbarian left through its group's portal (`0x00588880`
+    /// from the prisoner AI, `quests-act5.md` §4.10), by GUID (the unit is
+    /// removed in the same call).
+    WussieLeft { guid: u32 },
+    /// The prisoner AI's rescue `0x005888D0(game, P, unit)` (§4.7).
+    WussieRescue { player: UnitId, unit: UnitId },
+    /// The prisoner AI's wait hook `0x00588DD0` (§4.10).
+    WussieWait,
     /// C→S 0x44 reached `0x005852E0` (`quests-act2-2.md` §3.2): `player`
     /// puts `item` (GUID, 0: none) into the object with GUID `object`
     /// (`action` 2 cancel, 3 insert).
@@ -99,6 +116,18 @@ pub enum QuestEvent {
         item: u32,
         action: u16,
     },
+    /// A special monster was created (`0x005A09E0` → `0x00544E80`,
+    /// `quests-act3.md` §6.2: the Golden Bird's boss choice).
+    BossCreated { unit: UnitId },
+    /// A preset superunique's quest hook `0x00545B50` (`monsters/init.md`
+    /// §20.1; `quests-act3.md` §7.5: the Travincal council).
+    PresetBoss { unit: UnitId },
+    /// Alkor's map AI cleared the Golden Bird's +0x00 (`0x005BAD40`,
+    /// `ai-bodies.md` §9.9).
+    AlkorReset,
+    /// Ormus' map AI activates the Gidbinn altar (`0x005B9CD0`,
+    /// `quests-act3.md` §5.7).
+    OrmusAltar,
 }
 
 /// Seams without a provider (see the module doc). Grouped by the spec
@@ -1650,6 +1679,17 @@ pub trait Pending {
         Self: Sized,
     {
     }
+    /// The monster mode damage `0x005A4F50(unit, mode)` of the mode set
+    /// (`skills/bodies-2.md` §2.1, `umod-callbacks.md` §2 rule 1): the
+    /// base list's damage and to-hit for the requested mode. A
+    /// [`crate::wiring::interaction::UseRest`] value routes it to
+    /// [`crate::wiring::interaction::skill_events::monster_mode_damage`].
+    /// Default: nothing.
+    fn monster_mode_damage(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId, mode: u32)
+    where
+        Self: Sized,
+    {
+    }
 
     // ---- client intents (`sim/intents-events.md` §9; d2-server's
     // `handlers::player`) -------------------------------------------------
@@ -1737,6 +1777,40 @@ pub trait Pending {
     /// `quests.md` §8.2: leaving the summit for 118 or 128), published by
     /// the quest control once per tick. Default: nothing.
     fn set_summit_open(&mut self, open: bool) {}
+    /// The not-intro test `0x005444B0(game, chain)` (`quests.md` §2.3:
+    /// no record with the chain → true, else its not-intro byte +0x09):
+    /// the quest control publishes its records' answers once per tick.
+    /// Default: false (no quest control).
+    fn quest_not_intro(&self, chain: u8) -> bool {
+        false
+    }
+    /// The quest control's not-intro bytes `(chain, not_intro)` of every
+    /// record (for [`Self::quest_not_intro`]). Default: nothing.
+    fn publish_not_intro(&mut self, records: &[(u8, bool)]) {}
+    /// A quest event for the quest control (`take_quest_events`).
+    /// Default: dropped.
+    fn queue_quest_event(&mut self, e: QuestEvent) {}
+    /// A caged barbarian's group state by GUID (`quests-act5.md` §4.10):
+    /// (`0x00588830` the group counter ≠ 0 in a not-intro record, the
+    /// group's portal GUID when `0x00588D60` would find it spawned).
+    /// Default: (false, none).
+    fn quest_rescue(&self, guid: u32) -> (bool, Option<u32>) {
+        (false, None)
+    }
+    /// The quest control's caged-barbarian states (GUID, counting,
+    /// portal) of every group, once per tick. Default: nothing.
+    fn publish_rescue(&mut self, barbarians: &[(u32, bool, Option<u32>)]) {}
+    /// `0x0058E920(game, room, missile)` from a missile body (Tyrael's
+    /// spawn, `quests-act5-2.md` §8.8). Default: nothing.
+    fn missile_spawn_tyrael(&mut self, room: Option<RoomId>, missile: UnitId, x: i32, y: i32) {}
+    /// The Durance of Hate warp check's answer (`0x005BBFA0`, `quests.md`
+    /// §8.2: into level 100 from anywhere but level 101), published by
+    /// the quest control once per tick. Default: nothing.
+    fn set_durance_open(&mut self, open: bool) {}
+    /// The Act III answers the town NPCs' map AI reads (`ai-bodies.md`
+    /// §9.9: alkor `0x005BAD20`, ormus `0x005B9CA0`), published by the
+    /// quest control once per tick. Default: nothing.
+    fn set_act3_npc_answers(&mut self, alkor_bird: bool, ormus_altar: Option<(i32, i32)>) {}
     /// `0x00574EC0(game, player, 7, 0)`: the player's hireling (§9 rule
     /// 8; `hirelings.md` §5 rule 4; the wired host answers it from the
     /// hireling list). Default: none.

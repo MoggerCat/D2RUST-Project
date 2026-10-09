@@ -22,10 +22,10 @@ save sor --name PtSorB --class sor --expansion --level 30 --skill 8=20 --right-s
 milestone town-start
   use sor
   deadline 40
-  note NPCs outside the start's active rooms are left out (as act1 Akara)
+  note the NPCs 1.14d has at frame 40 (only the start's active rooms; q-prov-data)
   need player lv == 40
   need player act == 1
-  need unit ut 1 cl 175,176,177,178,198,199,201,202,210,244 count >= 3
+  need unit ut 1 cl 175,195,196 count >= 3
 
 milestone town-wp
   use sor

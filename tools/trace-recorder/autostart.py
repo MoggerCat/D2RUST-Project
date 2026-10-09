@@ -56,13 +56,17 @@ the UTF-16 text at [PTR] + OFF, e.g. the create screen's name box: `wstr
 NAME` (PNG of the client area into the shot directory), `goto T C[,C..]
 [S DX DY]` (walk to the nearest unit of type T and one of the classes C,
 −1 = any class, and click it), `units T` (log GUID, class, client and
-screen point of every client unit of type T), `end` (stop the
-recording; the game is killed). X, Y are client pixels (800x600 window).
+screen point of every client unit of type T), `clickunit T C[,C..]|*
+[DX DY]` / `rclickunit ...` (click the unit of type T and one of the
+classes C, `*` = any class but not in mode 0 or 12, whose drawn point is
+nearest the window centre, at that point + (DX, DY), default (0, -8); no
+walking), `end` (stop the recording; the game is killed). X, Y are client pixels (800x600 window).
 Frame-anchored steps (specs/tools/scenario-diff.md §2 rule 4): `frame F`
 waits for the tick-return stop 0x0052FD1E of game frame F - 1 (game
 +0xA8); the steps after it are posted while the game is stopped there, so
 the window takes them before frame F's drain. After a `frame` step,
-click / rclick / key post all their messages at once and `hold X Y N`
+click / rclick / key post all their messages at once, `clickunit` / `rclickunit` post the cursor
+at the stop of F - 1 and the click at the stop of F (the hover frame), and `hold X Y N`
 holds N frames (up posted at the stop of frame F + N - 1). Needs a
 recorder that calls `AutoStart.attach` (record_state, record_frames, poke).
 """
@@ -260,8 +264,10 @@ def screen_of(mem, unit):
     # process has it; else the player-centred projection of camera.md
     ox = struct.unpack("<i", struct.pack("<I", mem.read_u32(0x7A520C)))[0]
     oy = struct.unpack("<i", struct.pack("<I", mem.read_u32(0x7A5208)))[0]
+    # (camera.md §4: drawn at X = px - cx_u, Y = py - cy_u + 8 in open mode 0; the same
+    # point as the player-centred projection below)
     if (ox, oy) != (0, 0) and abs(ox - pp[0]) < 1000 and abs(oy - pp[1]) < 1000:
-        return (up[0] - ox, up[1] - oy)
+        return (up[0] - ox, up[1] - oy + 8)
     return (up[0] - pp[0] + VIEW_W // 2, up[1] - pp[1] + VIEW_H // 2 - 8)
 
 
@@ -659,8 +665,26 @@ class AutoStart:
                 else:
                     x, y = screen_of(mem, best[1])
                     dx, dy = (a[2], a[3]) if len(a) == 4 else (0, -8)
-                    self.log(f"autostart: {op} {a[0]}:{a[1]} clicks ({x + dx}, {y + dy})")
-                    yield from self.click(mem, x + dx, y + dy, op == "rclickunit")
+                    x, y = x + dx, y + dy
+                    self.log(f"autostart: {op} {a[0]}:{a[1]} clicks ({x}, {y})")
+                    if framed:
+                        # scenario-diff.md §2 rule 4.5: the hover frame. The cursor is posted at
+                        # the stop of frame F - 1, the press and release at the stop of frame F
+                        # (the client picks the hovered unit while drawing, 0x00467A10: a press
+                        # posted with its move is a point click, measured 2026-10-09)
+                        down, up, mk = ((WM_RBUTTONDOWN, WM_RBUTTONUP, MK_RBUTTON)
+                                        if op == "rclickunit"
+                                        else (WM_LBUTTONDOWN, WM_LBUTTONUP, MK_LBUTTON))
+                        self.send(mem, WM_MOUSEMOVE, 0, lparam(x, y))
+                        self.posted(op, a + [x, y])
+                        self.wait_frame = self.anchor + 1
+                        yield 0
+                        self.send(mem, WM_MOUSEMOVE, 0, lparam(x, y))
+                        self.send(mem, down, mk, lparam(x, y))
+                        self.send(mem, up, 0, lparam(x, y))
+                        self.posted("rclick" if op == "rclickunit" else "click", [x, y])
+                    else:
+                        yield from self.click(mem, x, y, op == "rclickunit")
             elif op == "units":
                 rows = []
                 for u in units_of(mem, a[0]):
@@ -1015,6 +1039,24 @@ def selftest():
     x, y = sent[-1][3] & 0xFFFF, sent[-1][3] >> 16
     # player client px: ((5000-4000)*32, (5000+4000)*16) / camera.md §2 shifts
     assert (x, y) == (400 + (3 - 1) * 16, 292 + (3 + 1) * 8 - 8), (x, y)
+    # the drawn camera (unit origin cx_u = P_x - 400, cy_u = P_y - 300 + 16): the same point
+    pcx, pcy = (5000 - 4000) * 16, (5000 + 4000) * 8
+    before = screen_of(m, obj)
+    m.m.update({0x7A520C: pcx - 400, 0x7A5208: pcy - 300 + 16})
+    assert screen_of(m, obj) == before, (screen_of(m, obj), before)
+    m.m.update({0x7A520C: 0, 0x7A5208: 0})
+    assert parse_script("frame 3; clickunit 1 19,0x14; rclickunit 2 * 3 -12") == [
+        ("frame", [3]), ("clickunit", [1, "19,0x14"]), ("rclickunit", [2, "*", 3, -12])]
+    # framed clickunit: posted at once at the stop of frame F - 1
+    sent.clear()
+    s4 = AutoStart(after=0, script="frame 3; clickunit 2 119", log=lambda x: None, clock=Clock())
+    s4.send = lambda mem, msg, wp, lp: sent.append((msg, wp, lp))
+    s4.anchor, s4.stop_frame = 3, 2
+    list(s4.run(m, [("clickunit", [2, "119"])]))
+    assert [(msg, wp) for msg, wp, _ in sent] == [
+        (WM_MOUSEMOVE, 0), (WM_MOUSEMOVE, 0), (WM_LBUTTONDOWN, MK_LBUTTON), (WM_LBUTTONUP, 0)], sent
+    assert s4.wait_frame == 4                                  # the click waited for frame 4
+    assert sent[0][2] == lparam(400 + 2 * 16, 292 + 4 * 8 - 8)
     m.m[obj + U_CLASS] = 120                                   # perturbation: wrong class is not found
     assert nearest(m, 2, (119,)) is None
     m.m[GAME_MODE] = 1                                         # not in the menu: never forced

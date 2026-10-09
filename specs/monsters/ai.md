@@ -28,21 +28,21 @@
 | Inputs | 72–83 |
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
-|   1. Think scheduling | 97–247 |
-|   2. Think dispatch `0x005B1740` | 248–384 |
-|   3. AI control and AI tables | 385–556 |
-|   4. AI parameters | 557–575 |
-|   5. Target selection | 576–734 |
-|   6. Distances and line tests | 735–749 |
-|   7. Tactics helpers | 750–984 |
-|   8. AI commands and minions | 985–1011 |
-|   10. The catalogue `ai-functions.tsv` | 1012–1032 |
-| Constants & data dependencies | 1033–1056 |
-| Randomness | 1057–1078 |
-| Edge cases & original bugs | 1079–1120 |
-| Test vectors | 1121–1209 |
-| Provenance | 1210–1266 |
-| Open questions | 1267–1370 |
+|   1. Think scheduling | 97–282 |
+|   2. Think dispatch `0x005B1740` | 283–422 |
+|   3. AI control and AI tables | 423–594 |
+|   4. AI parameters | 595–613 |
+|   5. Target selection | 614–772 |
+|   6. Distances and line tests | 773–787 |
+|   7. Tactics helpers | 788–1022 |
+|   8. AI commands and minions | 1023–1049 |
+|   10. The catalogue `ai-functions.tsv` | 1050–1070 |
+| Constants & data dependencies | 1071–1094 |
+| Randomness | 1095–1116 |
+| Edge cases & original bugs | 1117–1158 |
+| Test vectors | 1159–1247 |
+| Provenance | 1248–1308 |
+| Open questions | 1309–1412 |
 <!-- /index -->
 
 ## Summary
@@ -221,6 +221,41 @@ So a monster that walks or runs re-thinks the frame its path ends.
    `0x0053A8E0`), every monster in that room's unit list gets
    `0x00573780` (+2 if neutral). Recorded: all 61 "step clients"
    schedules are +2.
+3. **Last client leaves a room: the think is cancelled.** The room
+   leave `0x0053A9B0` (`sim/intents-events.md` §7.8 rule 3) removes the
+   client (`0x0061A700`), then tests the room's client count
+   (`cmp [room + 0x78], 0` at `0x0053AA0A`); when it is 0, every unit of
+   the room's unit list (room +0x74, next +0xE8) of type 1 gets
+   `0x005738D0(game, unit)` (call at `0x0053AA2A`): delete the unit's
+   type-2 events (AI think) and then its type-3 events (stat
+   regeneration), any argument (`0x00540E60(2, 0)`, `0x00540E60(3, 0)`).
+   Nothing is scheduled in their place, and nothing is drawn. The
+   monster has no pending think until a client enters its room again
+   (rule 2: +2 if neutral). The same "no client, no think" holds at
+   creation (`init.md` §4.1, gate `0x00553160`: `room.clients ≠ 0`, else
+   clean-up and no think), so a monster in a room no client sees never
+   thinks from a timer.
+   - The test is in the room leave only. The think path has none: the
+     class handler `0x005A7F80` (freeze gate only, §1.1), the runner
+     `0x00541060` (`sim/tick.md` §5.5), the dispatch `0x005B1740` (§2)
+     and the Npc AI `0x005E7130` (`ai-bodies.md` §9.9) never read room
+     +0x78. A think that is still pending runs normally.
+   - Only types 2 and 3 are cancelled. Mode events (types 0 and 1) stay,
+     so a monster that is mid-mode when the last client leaves still
+     reaches its mode end, and the mode end can schedule or run a think
+     (§1.3, §1.4). This is a static reading; no recording has it. An
+     idle monster has no mode end to wait for, so it stops thinking.
+   - Recorded (`traces/checks/a4-warp-plains-ama.check`, ScnAm4,
+     `-seed 1234`): the warp at frame 6 takes the client out of every
+     Pandemonium Fortress room. The Fortress NPCs (classes 405, 257,
+     246) had think +20 pending from their frame-4 home think
+     (`ai-bodies.md` §9.9 step 1). That think is cancelled, so there is
+     no frame-24 think and no map-AI draw. Their unit seeds do not
+     change from frame 6 to frame 80. With a client in the level, the
+     same think runs (`a4-fortress-arrival-ama` matches).
+   Provenance: 2026-10-09 (pc1-day3-c, read in `0x0053A9B0`,
+   `0x005738D0`, `0x00540E60`, `0x0053A8E0`, `0x005A7F80`,
+   `0x00541060`, `0x005B1740`, `0x005E7130`; q-prov-data).
 
 #### 1.6 AI reset (event type 10)
 
@@ -273,7 +308,10 @@ If either record is missing nothing runs. Otherwise:
    unit, record). A bad code pointer is a fatal assert.
 
 1.14d-confirmed (`0x005B1740`). The 1.14d handler does not test state
-54 (D2MOO only warns).
+54 (D2MOO only warns). It does not test the room's client count either
+(room +0x78). A monster in a room with no client has no think to
+dispatch, because the room leave cancelled it (§1.5 rule 3); 2026-10-09
+(pc1-day3-c, read in `0x005B1740`).
 
 #### 2.2 Precheck A `0x005B10E0`: stun, doors, leash
 
@@ -1263,6 +1301,10 @@ Other recorded checks:
 - Recordings: `traces/raw/20261006-015554-tick.jsonl`,
   `-021854-tick.jsonl`, `-022304-tick.jsonl` (`tick-raw-1`); counts by
   a script over `hin`, `set`, `ex`, `cancel` records (Test vectors).
+- 2026-10-09 (pc1-day3-c, read in `0x0053A9B0`, `0x005738D0`,
+  `0x00540E60`, `0x005B1740`, `0x005E7130`): §1.5 rule 3. When the last
+  client leaves a room, the think is cancelled. Evidence:
+  `traces/checks/a4-warp-plains-ama.check`.
 
 ## Open questions
 

@@ -547,7 +547,7 @@ impl<R: TradeRest + Default + 'static, S> WiredWorld<R, S> {
     /// parts come back after `f`; `f` must not use them through `self`
     /// (it gets only the action world). Hooks that already hold a quest
     /// host keep it.
-    fn lend_quests<D: ActionEvents, T>(
+    pub fn lend_quests<D: ActionEvents, T>(
         &mut self,
         events: &mut D,
         f: impl FnOnce(&mut ActionWorld<S>, &mut D) -> T,
@@ -972,7 +972,13 @@ where
     ) -> Option<C::Out> {
         let difficulty = events.action().hooks().ai_info.difficulty;
         let run = HostWaypointRun { call, difficulty };
-        let out = WorldHost::<D>::waypoints(&mut self.action, game, events, run);
+        // The act change of a travel builds the new act and its objects:
+        // a quest object's init runs inside its allocation on the lent
+        // quest parts (Lut Gholein's start Jerhyn, `quests-act2-2.md` §2
+        // item 1; recorded `act-travel-lut-ama.check`), as in `objects`.
+        let out = self.lend_quests(events, |a, ev| WorldHost::<D>::waypoints(a, game, ev, run));
+        let sent = self.desk(game, events, quest_objects);
+        self.inv_sent.extend(sent);
         self.pet_deaths(game, events);
         self.hireling_calls(game, events);
         self.pet_follows(game, events);
