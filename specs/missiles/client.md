@@ -690,7 +690,7 @@ the owners named there. §C14 r9: the body reads listed in
    the store. Is the vz division by `n` or by the clamped ticks max(n,
    1), and is az·n² halved before the subtraction? PROVISIONAL: flags :=
    2, ticks, halved first (because the landing rule of §C7 r3 needs flag
-   8 cleared); settled by REC-540 (PC 1 Step 4 item 21: the asm of
+   8 cleared); settled by REC-540 (PC 1 Step 4 item 24: the asm of
    `0x004DA5B0`).
 10. §C9 r4.5 copies m's motion position to X through the getters
     `0x004DA110` / `0x004DA130` / `0x004DA150` and the setter
