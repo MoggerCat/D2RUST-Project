@@ -143,6 +143,12 @@ pub trait Panel {
     fn draw_before(&self) -> Option<PanelId> {
         None
     }
+    /// Drawn before every other open panel (the routing order is
+    /// unchanged): the Esc game menu, UI pass step 1 (`ui/panels.md` §5
+    /// r1: `[9]` → `0x0047E3D0`).
+    fn draw_first(&self) -> bool {
+        false
+    }
     fn hit(&self, p: Point) -> Option<WidgetId>;
     fn event(&mut self, e: UiEvent, ctx: &UiCtx) -> UiResponse;
 }

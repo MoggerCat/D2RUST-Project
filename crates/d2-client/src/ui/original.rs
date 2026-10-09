@@ -199,6 +199,9 @@ struct Facts {
     /// The local player has a hireling (`0x00478F20(P, 7)` ≠ −1), for the
     /// hireling key (`ui/controls.md` §3 cmd 54).
     has_hireling: bool,
+    /// An item worn at body location 8 (a belt, item type 0x13), for the
+    /// belt key (`ui/controls.md` §3 cmd 22).
+    has_belt: bool,
 }
 
 impl Facts {
@@ -216,6 +219,9 @@ impl Facts {
             local: local.map(|u| u.key),
             player_room: local.is_some_and(|u| u.position.is_some()),
             has_hireling: local.is_some_and(|u| world.hireling_guid(Some(u.key)) != u32::MAX),
+            has_belt: crate::bridge::items::local_items(world)
+                .iter()
+                .any(|i| i.mode == crate::bridge::items::mode::BODY && i.body == 8),
         }
     }
 }
@@ -421,6 +427,7 @@ impl OriginalUi {
                 local: None,
                 player_room: false,
                 has_hireling: false,
+                has_belt: false,
             },
             mouse: Point::new(0, 0),
             outputs: Vec::new(),
@@ -841,6 +848,12 @@ impl OriginalUi {
                 };
                 if ok {
                     self.set_ui(u32::from(super::states::id::MERC_INV), 2, true)?;
+                }
+            } else if a == ActionId(Action::ToggleBelt.index() as u16) {
+                // Command 22 (`0x00468F00`): a worn belt, then
+                // SetUIState(0x1F, toggle, 0) (`ui/controls.md` §3).
+                if self.shared.borrow().facts.has_belt {
+                    self.set_ui(0x1F, 2, false)?;
                 }
             } else if let Some(ui) = hotkey_state(a) {
                 // §4.3: the Character, Inventory, Party, Skill Tree and
