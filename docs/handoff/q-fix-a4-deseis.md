@@ -39,6 +39,13 @@ reached; the act4.play Diablo milestones ran on seed 5 only
 - `pc1-data.md` Step 4: the q-fix-act4-play De Seis item is marked
   answered (cloud, Wine); a Windows rerun is optional.
 
+- **PC 1 recording (pc1-eve item 59, row `q-fix-pc1eve-deseis-wingn1`)**:
+  operate at f60 on seed 1. d2rs on the merged branch reproduces it: seal
+  mode 1 at f60, dummy 131 GUID 121 at (7770,5226), De Seis GUID 105 at
+  (7773,5207) with minions 106-110 at the recorded cells at f86, seal mode
+  2 at f99. The row's "d2rs accepts (7780,5160)" was the late operate of
+  the old milestone (unloaded room), where 1.14d stays shut as well.
+
 ## Open
 
 1. Spec note for the act4 owner (`specs/world/quests-act4.md` §5.4, owner
@@ -49,7 +56,12 @@ reached; the act4.play Diablo milestones ran on seed 5 only
    lava room; the search reaches the arm's room south of the seal only
    while it is active, so the seal stays shut when that room is unloaded
    (1.14d, `a4-deseis-seal-*.check`)."
-2. The milestones still hardcode GUIDs per seed (`goto` results cannot be
+2. De Seis's life differs (1.14d 187392 / 202752 vs d2rs 193536 /
+   212992 in the early / loaded Wine runs; PC 1 f60: 187392 vs 212992):
+   the hp roll uses the RNG, and the runs already diverge at f36 (monster
+   AI), so this is downstream of that, not of the seal. For the monsters
+   owner once the f36 divergence is fixed.
+3. The milestones still hardcode GUIDs per seed (`goto` results cannot be
    named by `@pI`; q-fix-act4-play Open 2, for q-fix-pt-sweep).
 
 ## Repro

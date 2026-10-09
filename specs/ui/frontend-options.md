@@ -22,21 +22,21 @@
 | Inputs | 54–66 |
 | Outputs / state changes | 67–76 |
 | Rules | 77–78 |
-|   O1. Where options live; opening and closing the game menu | 79–135 |
-|   O2. Menu records and the tree | 136–205 |
-|   O3. Save and Exit Game (`0x0047F2D0`) | 206–211 |
-|   O4. Draw (`0x0047E3D0`, while ui 9 is open, from the UI draw `0x00456F46`) | 212–302 |
-|   O5. Input (handler table `0x006D6030`, 7 entries, registered while ui 9 is open) | 303–347 |
-|   O6. Row effects (apply = +0x114, init = +0x118; registry writes are REG_DWORD) | 348–392 |
-|   O7. Settings storage and the d2rs config mapping | 393–426 |
-|   O8. d2rs stubs (rows drawn and navigated like the original, value kept in `settings.toml`, no effect) | 427–451 |
-|   O9. Configure Controls (ui 11, `UI_CONFIG`) | 452–545 |
-| Constants & data dependencies | 546–565 |
-| Randomness | 566–569 |
-| Edge cases & original bugs | 570–594 |
-| Test vectors | 595–625 |
-| Provenance | 626–665 |
-| Open questions | 666–673 |
+|   O1. Where options live; opening and closing the game menu | 79–146 |
+|   O2. Menu records and the tree | 147–216 |
+|   O3. Save and Exit Game (`0x0047F2D0`) | 217–222 |
+|   O4. Draw (`0x0047E3D0`, while ui 9 is open, from the UI draw `0x00456F46`) | 223–313 |
+|   O5. Input (handler table `0x006D6030`, 7 entries, registered while ui 9 is open) | 314–358 |
+|   O6. Row effects (apply = +0x114, init = +0x118; registry writes are REG_DWORD) | 359–403 |
+|   O7. Settings storage and the d2rs config mapping | 404–437 |
+|   O8. d2rs stubs (rows drawn and navigated like the original, value kept in `settings.toml`, no effect) | 438–462 |
+|   O9. Configure Controls (ui 11, `UI_CONFIG`) | 463–556 |
+| Constants & data dependencies | 557–576 |
+| Randomness | 577–580 |
+| Edge cases & original bugs | 581–605 |
+| Test vectors | 606–636 |
+| Provenance | 637–676 |
+| Open questions | 677–684 |
 <!-- /index -->
 
 ## Summary
@@ -99,6 +99,17 @@ the settings mapping and the d2rs stubs; the effects of each setting are owned b
    that returns 0. So a first Esc with the inventory open closes the inventory; a second opens
    the menu. Open states that are not Esc-closable (e.g. the automap 10, the mini panel 21) do
    not block the menu: r2 closes them and r3 reopens the keep = 1 ones.
+   **With only the quest-log alert (ui 17, `ui/panels.md` §2 r10) open** (read 2026-10-09):
+   the first Esc runs the close-all, which skips ui 17 (Esc-closable flag 0) and returns 0;
+   `0x0047E090(1, 0)` then records "was open" for ui 17 (record `0x00713124` = close 1, keep
+   1), closes it with the full call (close hook `0x004A3000`: quest-log latch `[0x007BF298]`
+   1 → 0) and opens ui 9; the gate does not touch ui 17 for the ui 9 request (C[17][9] = 0)
+   and ui 17 is already closed. The second Esc runs r3: ui 9 off, then `SetUIState(17, on, 0)`
+   (gate: nothing open blocks column 17), so the alert button is back, but the latch stays 0.
+   With latch 0 and ui 17 open, the next quest-log tail's `SetUIState(17, on, 0)` is refused
+   by the diagonal (C[17][17] = 3) and does nothing (`client/msg-ui.md` §1 r6.1: no selected
+   slot set, latch stays 0); a click on the restored button still closes it and opens the
+   quest panel through `0x004A3FE0(0)` from latch 0.
 3. **Close and restore** `0x0047E200(restore)`: ui 9 open → `SetUIState(9, off, 0)`; restore ≠ 0
    → `SetUIState(i, on, 0)` for every i remembered in r2. Used by Return to Game, Esc, Save and
    Exit Game and Accept (§O9).

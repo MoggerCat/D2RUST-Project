@@ -19,9 +19,9 @@
 |   7. Intents | 136–705 |
 |   8. Pickup from the ground | 706–887 |
 |   9. Drop to the ground | 888–935 |
-|   10. Gold | 936–975 |
-|   11. Message layouts | 976–1005 |
-|   12. Corpse take-back (`0x0057FB70` → `0x00562F30`) | 1006–1133 |
+|   10. Gold | 936–983 |
+|   11. Message layouts | 984–1013 |
+|   12. Corpse take-back (`0x0057FB70` → `0x00562F30`) | 1014–1141 |
 <!-- /index -->
 
 ## Summary
@@ -963,6 +963,14 @@ on with the rest, and the caller (§7.22) subtracts only the piles in
 the list, so that gold stays with the player. (A per-pile cap through
 `0x00622E70` applies only when the new unit's type is 0, never for an
 item: dead code.)
+
+`0x0055B030(game, unit, amount)` (the rest pile of §10.1, Baal's gold
+of `world/quests-act5-2.md` §8.7) is this routine with a local 32-entry
+list and max 32 (`0x0055B039`–`0x0055B047`); the list is dropped and
+nothing else runs. The count (zeroed at `0x0055A0AB`) reuses the
+amount argument's slot, which the routine has already copied. One pile
+per 2,000,000,000 gold, so any amount below that makes exactly one pile
+(1.14d-read 2026-10-09, settles REC-793).
 
 #### 10.3 Gold messages
 

@@ -25,14 +25,14 @@
 | Rules | 64–65 |
 |   1. The list of a client unit | 66–101 |
 |   2. Items | 102–265 |
-|   3. States (S→C 0xA7, 0xA8, 0xA9) | 266–579 |
-|   4. Skills | 580–611 |
-| Constants & data dependencies | 612–622 |
-| Randomness | 623–627 |
-| Edge cases & original bugs | 628–650 |
-| Test vectors | 651–667 |
-| Provenance | 668–687 |
-| Open questions | 688–741 |
+|   3. States (S→C 0xA7, 0xA8, 0xA9) | 266–585 |
+|   4. Skills | 586–617 |
+| Constants & data dependencies | 618–628 |
+| Randomness | 629–633 |
+| Edge cases & original bugs | 634–656 |
+| Test vectors | 657–673 |
+| Provenance | 674–693 |
+| Open questions | 694–747 |
 <!-- /index -->
 
 ## Summary
@@ -442,13 +442,19 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
         U, record, 0)`** (`client/model.md` §8); **direction
         `0x00648820(path, 0)`** (`sim/pathing.md`).
       - 15 `0x004D9450`: **mode set `0x00480E70(U, 1)`; U +0xC4 |=
-        0x80000000** (PROVISIONAL: no client reader, the bit is model
-        state only (because the generic flag test `0x00451F30` is called
-        with mask 0x80000000 only from server code, `0x005543B0`,
-        `0x0057C060`, and no immediate-operand test of that mask on
-        +0xC4 lies in client code; register-form tests were not
-        scanned); settled by REC-50); **path reset
-        `0x00649CA0(U)`**.
+        0x80000000** (state 96 `revive` is the only `states.bin` row
+        with setfunc 15); **path reset `0x00649CA0(U)`**, which reads
+        the bit at once: path +0x48 := `0x00648580(U, size +0x44)`, whose
+        "can be in town" test `0x0063E860` returns bit 31 (`shr eax,
+        0x1F` at `0x0063E8B7`) when monstats `npc` / `inTown` are clear,
+        so a revived monster without `interact` takes the pet pattern 3
+        / 4 instead of 1 / 2 (`sim/path-placement.md` §3) and, in a
+        room, is re-stamped with it (`0x00649560` / `0x00649400`); the
+        path compute's town refusal `0x006483A0` reads it the same way.
+        The full scan (1.14d-read 2026-10-09, settles REC-50: every
+        load of unit +0xC4 followed by a sign, shift or register-mask
+        test) finds only `0x00451F37` (the generic test), `0x005431F0`,
+        `0x0057CCB0` (server) and `0x0063E8B7`.
       - 16 `0x004D9480` (progressive overlays): L, k = stat(350) valid,
         m := `0x00646CA0(U, calc2 +0x13C, k, stat(351))` > 0; c :=
         stat(169). For each range (ov1 … ov2), then (ov3 … ov4), lower
