@@ -165,7 +165,7 @@ impl Schedule {
 }
 
 /// The `objects` rows with operate function 23 (`@wp`, `world/waypoints.md` §5).
-fn waypoint_classes(s: &Sim) -> BTreeSet<u32> {
+pub(crate) fn waypoint_classes(s: &Sim) -> BTreeSet<u32> {
     s.world
         .action
         .waypoints

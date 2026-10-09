@@ -1,27 +1,27 @@
 check 1
-# Area B (q-diff-combat-a1): the player's melee attack. Blood Moor (warp 2
-# at frame 4; town allows no combat), seeds pinned and a fallen
-# (monstats 19, normal; its party gets GUIDs 19 and up after the level's
-# own monsters) poked 3 sub-tiles east at frame 30; from frame 34 the
-# player's left skill (attack, skill 0) on GUID 19 every 20 frames as
-# C->S 0x06 (poke `msg`, specs/tools/poke.md §1): approach, swing,
-# to-hit roll, damage, hit reaction or block, the fallen's counterattack
-# and flee, death and drop. Spec: specs/tools/scenario-diff.md.
+# Melee on a poked fallen from one shared input script: a level-3
+# Barbarian with a short sword (right hand) warped to the Blood Moor
+# (level 2) before frame 4; before frame 30 the game seed and the player's
+# unit seed are fixed and a fallen party (monstats 19, normal) is spawned
+# 3 sub-tiles east of the player; `clickunit 1 19` at frame 39: the
+# cursor on the nearest fallen's drawn point before frame 39's drain, the
+# left click before frame 40's (the hover frame: 1.14d picks the hovered
+# unit while drawing; autostart.py's `nearest` on 1.14d, the d2rs model
+# camera on d2rs; scenario-diff.md §2 rule 4.5). The click sends the
+# attack on the unit (C->S 0x06 [type 1][GUID]; ui/controls.md §6 r8),
+# not a walk. Compare the player's mode and the party's hp / mode frame
+# by frame (state; the party's GUIDs differ: 19-21 on 1.14d, 17-19 on
+# d2rs), and the C->S ids (packets: d2rs only until record_packets.py
+# applies framed input).
+# Spec: specs/tools/scenario-diff.md.
 name combat-melee-fallen
-save ScnAma --class ama --expansion
+save CmbBar --class bar --expansion --level 3 --item ssd/body=4
 seed 1234
-ticks 260
-seconds 600
-channels state
+ticks 150
+seconds 300
+channels state packets
 at 4 poke warp 2
 at 30 poke seed-game 0x00001234 666
 at 30 poke seed-unit @player 0x00000055 666
 at 30 poke spawn 19 @x+3 @y normal
-at 34 poke msg 0x06 1 19
-at 54 poke msg 0x06 1 19
-at 74 poke msg 0x06 1 19
-at 94 poke msg 0x06 1 19
-at 114 poke msg 0x06 1 19
-at 134 poke msg 0x06 1 19
-at 154 poke msg 0x06 1 19
-at 174 poke msg 0x06 1 19
+input frame 39; clickunit 1 19
