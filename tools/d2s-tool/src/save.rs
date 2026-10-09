@@ -14,25 +14,26 @@
 //!   pattern per quest (`world/quests.md` §1.8 rule 3, its Open question
 //!   14); `--quests all` is refused. `acts=N` sets only the bits the act transitions of §8.1
 //!   set (bit 0; bit 13 is cleared on load, §1.6).
+//! - the appearance bytes +0x88..+0xA7 (§2.8): the writer fills them
+//!   with 0xFF and each equipped item (mode 1) changes some; the mapping
+//!   is Open question 17. With no equipped item (every file `new`
+//!   writes) they are 32 × 0xFF, as the game writes them; `set` on a
+//!   save with an equipped item keeps the file's bytes and says so.
 //!
 //! Game-equivalent re-save (`set`, [`resave`]): a save the game writes
 //! after loading a file holds every item without flag 0x2000 (§8.2 rule
-//! 7, edge case 17) and the appearance bytes of §2.8 (32 × 0xFF without
-//! an equipped item, else rebuilt from the equipped items,
-//! `formats/d2s-appearance.md`); `new` and `set` write the same.
+//! 7, edge case 17) and the appearance bytes of §2.8; `new` and `set`
+//! write the same.
 
 use std::collections::BTreeMap;
 
 use anyhow::{anyhow, bail, Context, Result};
-use d2_formats::d2s::appearance::{AppearanceTables, Equipment, IsA, ReferenceSlots};
 use d2_formats::d2s::ItemEntry;
 use d2_formats::d2s::{
     clamp_stat, status, Body, D2s, Golem, Header, Npcs, Quests, SaveTables, StatEntry, Stats,
     Waypoints, ITEM_FLAG_INSTORE,
 };
 use d2_proto::item_bits::SaveEntry;
-use d2_server::adapters::character::save::equipment_of_save;
-use d2_server::world_data::tables::appearance_tables;
 use d2_sim::combat::vitals::{self, VitalsTables, VitalsUnits};
 use d2_sim::units::UnitType;
 
@@ -659,25 +660,12 @@ fn clear_instore(entry: &mut ItemEntry, t: &Tables) -> Result<bool> {
     Ok(e.item.mode == 1)
 }
 
-/// The appearance inputs of a save's player items and the appearance
-/// tables of `t` (the image's reference table, `d2s-appearance.md` §1).
-pub fn appearance_of(
-    items: &[ItemEntry],
-    t: &Tables,
-) -> std::result::Result<(Equipment, AppearanceTables), String> {
-    let eq = &t.fixed.itemtypes_equiv;
-    let m = IsA::from_fn(eq.n, |i, j| eq.get(i, j));
-    let a = appearance_tables(&t.fixed, &ReferenceSlots::game(&m)).map_err(|e| e.to_string())?;
-    let e = equipment_of_save(items, &t.items, &a)?;
-    Ok((e, a))
-}
-
 /// What the game's next save of a loaded file holds where it differs from
 /// the file without any change in play: every item record (player list,
 /// corpse, hireling and golem item, children) without flag 0x2000 (§8.2
 /// rule 7, edge case 17), and the appearance bytes rebuilt (§2.8): 32 ×
-/// 0xFF when no player item is equipped, else rebuilt from the equipped
-/// items ([`appearance_of`]; a note when they do not read back).
+/// 0xFF when no player item is equipped. With an equipped item the bytes
+/// are kept (their mapping is Open question 17) and a note says so.
 /// Returns the notes.
 pub fn resave(save: &mut D2s, t: &Tables) -> Result<Vec<String>> {
     let mut notes = Vec::new();
@@ -702,16 +690,11 @@ pub fn resave(save: &mut D2s, t: &Tables) -> Result<Vec<String>> {
         clear_instore(it, t)?;
     }
     if equipped {
-        // §2.8 rules 1, 3 (`d2s-appearance.md`): the bytes the game's save
-        // rebuilds from the equipped items, read from the file as the load
-        // reads them (`equipment_of_save`).
-        let items = b.items.clone();
-        match appearance_of(&items, t) {
-            Ok((eq, a)) => save.header.rebuild_appearance(&eq, &a),
-            Err(e) => notes.push(format!(
-                "appearance bytes +0x88..+0xA7 kept: the equipped items do not read back ({e})"
-            )),
-        }
+        notes.push(
+            "appearance bytes +0x88..+0xA7 kept: an item is equipped and the per-item mapping \
+             is not specified (d2s.md §2.8 rule 3, Open question 17)"
+                .into(),
+        );
     } else {
         save.header.reset_appearance();
     }

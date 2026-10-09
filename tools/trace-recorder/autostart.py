@@ -38,7 +38,8 @@ Recorders take `--auto CHAR [--seed N] [--input SCRIPT]`; standalone:
 
 Input script: `;`-separated commands, run in order once the player is in
 a level: `wait S`, `move X Y`, `click X Y`, `rclick X Y`, `hold X Y S`
-(left button down S seconds), `key K [S]` (K: a letter or digit, or
+(left button down S seconds), `waitticks N` (wait N server ticks of the recorder, not seconds),
+`mark NAME` (note `autostart: mark NAME ticks=N` in the recording's notes), `key K [S]` (K: a letter or digit, or
 ESC, TAB, ENTER, SPACE, SHIFT, CTRL, ALT, F1..F12, or a number), `shot
 NAME` (PNG of the client area into the shot directory), `end` (stop the
 recording; the game is killed). X, Y are client pixels (800x600 window).
@@ -138,7 +139,8 @@ def vk_code(k):
 
 SCRIPT_OPS = {"wait": (1, 1), "move": (2, 2), "click": (2, 2), "rclick": (2, 2), "hold": (3, 3),
               "key": (1, 2), "text": (1, 99), "shot": (0, 1), "waitlevel": (1, 2),
-              "goto": (2, 5), "dumpdrlg": (0, 1), "end": (0, 0)}
+              "goto": (2, 5), "dumpdrlg": (0, 1), "waitticks": (1, 1), "mark": (1, 1),
+              "end": (0, 0)}
 
 
 def parse_script(text):
@@ -162,7 +164,7 @@ def parse_script(text):
         elif op == "goto":
             a = ([int(a[0], 0), tuple(int(c, 0) for c in a[1].split(","))]
                  + [float(x) for x in a[2:]])
-        elif op not in ("shot", "dumpdrlg"):
+        elif op not in ("shot", "dumpdrlg", "mark"):
             a = [float(x) if "." in x else int(x, 0) for x in a]
         out.append((op, a))
     return out
@@ -350,6 +352,15 @@ class AutoStart:
             self.played.append((round(self.clock() - self.t0, 2), op, a))
             if op == "wait":
                 yield a[0]
+            elif op == "waitticks":
+                # server ticks of the recorder (its `ticks` counter), not wall-clock seconds:
+                # under Wine the game runs about 5x slower than real time, so scripted input
+                # lands on the same ticks only when it waits on ticks
+                until = getattr(mem, "ticks", 0) + a[0]
+                while getattr(mem, "ticks", 0) < until:
+                    yield 0.01
+            elif op == "mark":
+                self.log(f"autostart: mark {a[0]} ticks={getattr(mem, 'ticks', 0)}")
             elif op == "move":
                 self.send(mem, WM_MOUSEMOVE, 0, lparam(*a))
             elif op in ("click", "rclick"):
@@ -415,14 +426,18 @@ class AutoStart:
                 continue
             _, u, (x, y) = best
             if 60 <= x <= VIEW_W - 60 and 60 <= y <= VIEW_H - 120:
-                still = self.clock() + 3
-                last = player_pos(mem)
+                # stand-still test on the recorder's ticks when it has them (under Wine the
+                # game runs about 5x slower than real time: 3 s are 15 ticks, not 75)
+                tk = getattr(mem, "ticks", None)
+                still = self.clock() + 3 if tk is None else self.clock() + 40
+                last, since = player_pos(mem), tk
                 while self.clock() < still:
                     yield 0.25
                     now = player_pos(mem)
-                    if now == last:
+                    if now != last:
+                        last, since = now, getattr(mem, "ticks", None)
+                    elif tk is None or getattr(mem, "ticks", 0) - since >= 8:
                         break
-                    last = now
                 x, y = screen_of(mem, u)
                 self.log(f"autostart: goto {utype}:{cls} clicks ({x + dx}, {y + dy}), "
                          f"unit guid {mem.read_u32(u + 0x0C)}, player {player_pos(mem)}")
@@ -637,6 +652,7 @@ def selftest():
     assert parse_script("wait 1; click 10 20; key r 0.5; text hi there; goto 2 119") == [
         ("wait", [1]), ("click", [10, 20]), ("key", [ord("R"), 0.5]), ("text", ["hi there"]),
         ("goto", [2, (119,)])]
+    assert parse_script("waitticks 25; mark a1") == [("waitticks", [25]), ("mark", ["a1"])]
     for bad in ("jump 1", "click 1", "wait"):
         try:
             parse_script(bad)
@@ -711,6 +727,25 @@ def selftest():
     s3.clock.t = 0
     drive(s3, m, s3.clock, 0.5)                                # forced? mode is 1: no
     assert png_rgb(1, 1, [b"\1\2\3"]).startswith(b"\x89PNG")
+    # waitticks waits on the recorder's tick counter (not the clock); mark notes the tick
+    notes = []
+    s4 = AutoStart(after=0, script="waitticks 3; mark m1; end", log=notes.append, clock=Clock())
+    m.m[GAME_MODE] = 4
+    m.ticks = 10
+    s4.send = lambda *a: None
+    for i in range(40):
+        s4.clock.t += 0.1
+        s4.poll(m)
+    assert not s4.done and not any("mark" in n for n in notes), notes
+    m.ticks = 12
+    s4.clock.t += 0.1
+    s4.poll(m)
+    assert not s4.done, "waitticks 3 ended at 2 ticks"
+    m.ticks = 13
+    for i in range(5):
+        s4.clock.t += 0.1
+        s4.poll(m)
+    assert any(n == "autostart: mark m1 ticks=13" for n in notes) and s4.done, notes
     print("selftest ok: arguments, script parsing, menu force only in mode 4 and after the delay, "
           "arrival from the player chain, click / text timing, waitlevel, goto projection "
           "(camera.md), wrong class not found, end")
