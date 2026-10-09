@@ -199,6 +199,9 @@ fn w5_preparation_reaches_start() {
     assert_eq!(n, 0);
     assert_eq!((p.cur_point, p.point_count), (0, 0));
     assert_eq!(p.flags & flags::ACTIVE, 0);
+    // §4 r3 (REC-753): the probe found the start, so the target keeps
+    // the requested point.
+    assert_eq!(p.target(), Point::new(15, 10));
     // Through the request: count 0 → neutral start.
     let o = request(
         &t,
@@ -987,4 +990,19 @@ fn zero_velocity_probe_and_origin_start() {
     let (t, mut c) = setup(40, 40, 0, 0);
     let (n, p) = compute_to(&t, &mut c, Point::new(5, 5));
     assert_eq!((n, p.point_count), (0, 0));
+}
+
+// REC-753 (q-diff-combat-a1): a straight path onto an occupied
+// neighbouring cell. The first probe steps back onto the start, the
+// compute returns 0 and the target keeps the requested cell (measured on
+// 1.14d: Warriv's walk in radius onto a zombie's cell).
+// Covers: specs/sim/pathing.md §4 r3
+#[test]
+fn preparation_onto_start_keeps_the_target() {
+    let (t, mut c) = setup(40, 40, 14, 10);
+    c.w.wall(15, 9);
+    let (n, p) = compute_to(&t, &mut c, Point::new(15, 9));
+    assert_eq!(n, 0);
+    assert_eq!(p.target(), Point::new(15, 9));
+    assert_eq!(p.flags & flags::ACTIVE, 0);
 }

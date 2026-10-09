@@ -89,6 +89,9 @@ def main():
                 f.write("  ]" + end + "\n")
             else:
                 f.write(f"  {json.dumps(k)}: {json.dumps(trace[k], sort_keys=True)}{end}\n")
+        f.write("}\n")
+    with open(a.out, encoding="utf-8") as f:
+        json.load(f)                  # the written trace must parse
     print(f"wrote {a.out}: {len(expected)} events, {stats}")
 
 

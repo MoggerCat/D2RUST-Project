@@ -765,6 +765,16 @@ mod tests {
             pokes::record_line(5, 1, &op, &PokeResult::Unresolved("@1:19".into())),
             r#"{"k":"poke","f":5,"frame":4,"i":1,"d":"seed-unit","r":"unresolved","note":"@1:19","src":"seed-unit @1:19 1 2"}"#
         );
+        let op = pokes::parse_poke_arg("6 msg 0x01 @x+2 @y").unwrap().op;
+        assert_eq!(
+            pokes::record_line(
+                6,
+                0,
+                &op,
+                &PokeResult::FailedWith("duplicate filter".into())
+            ),
+            r#"{"k":"poke","f":6,"frame":5,"i":0,"d":"msg","r":"failed","note":"duplicate filter","src":"msg 1 @x+2 @y"}"#
+        );
     }
 
     #[test]

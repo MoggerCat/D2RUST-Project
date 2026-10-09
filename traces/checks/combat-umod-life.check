@@ -1,0 +1,17 @@
+check 1
+# Area B (q-diff-combat-a1): the life umods on spawn (monsters/init.md
+# §19.6): a possessed champion fallen (umod 38, +100 %), a berserk
+# unique quill rat (umod 39, -75 %) and a berserk + extra-strong unique
+# zombie (umods 39 4), each compared on hp / hpx from its first frame.
+# Spec: specs/tools/scenario-diff.md.
+name combat-umod-life
+save ScnAma --class ama --expansion
+seed 1234
+ticks 24
+seconds 200
+channels state
+at 4 poke seed-game 0x00001234 666
+at 4 poke seed-unit @player 0x00000055 666
+at 4 poke spawn 19 @x+4 @y+4 champion umod 38
+at 8 poke spawn 63 @x+5 @y-4 unique umod 39
+at 12 poke spawn 5 @x-4 @y+4 unique umod 4 39
