@@ -13,3 +13,10 @@
   `python3 tools/checks/gen_cube.py --excel $D2_GAME_DIR/extracted/patch_d2/data/global/excel --out DIR`.
 - Drops, vendors, gamble, imbue from the task are not started.
 - Run: `python3 tools/scenario-diff/scenario_diff.py traces/checks/<name>.check --channels state,packets,items`.
+
+## Update (after fixing the checks)
+First version opened the cube with the wrong GUID (@4) and x=y=0 (the 0x20 handler needs the point within 50 subtiles of the player), so nothing transmuted on either side. Fixed in gen_cube.py (`item=@1 x=@x y=@y`).
+- 16 representative recipes (quest, portal, potions, crafting, convert, misc, gem and rune upgrades, socket, reroll, repair) run: **items channel MATCH on all 16** (1.14d recording in traces/orig-cache, d2rs live).
+- Packets channel still diverges at join frame 2 (0x9C vs 0x23 order), independent of the cube; the state channel is PARTIAL (state-field parity).
+- Not run: the other 124 generated recipes (traces/checks-gen/cube), 6 rows needing unique/set inputs, the 0x2A put-in message, op-gated recipes (day-of-month, ops 28), Cow level portal use, drops, vendors, gamble, imbue.
+- Repro: `python3 tools/scenario-diff/scenario_diff.py traces/checks/<name>.check --orig-cache --channels items`.

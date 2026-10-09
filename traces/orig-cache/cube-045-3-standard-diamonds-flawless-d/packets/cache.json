@@ -16,19 +16,19 @@
   "--out",
   "orig.packets.jsonl",
   "--send",
-  "4 UseGridItem item=@4 x=0 y=0",
+  "4 UseGridItem item=@1 x=@x y=@y",
   "--send",
   "8 ClickButton button=24 p1=0 p2=0"
  ],
  "files": {
   "orig.packets.jsonl": {
-   "sha256": "a0fb06d81d456559af116fce09e44fb7d327ce0c57c3375edab66b0adedf6bf4",
-   "size": 38415
+   "sha256": "e71d858477674ec00604aa247f09142c403f0450adc7e5280a24600d745183c1",
+   "size": 40264
   }
  },
  "format": "orig-cache-1",
  "key": {
-  "check": "1efc7d6881fc9ae0f7e948f42e8d17dc9755a47547a6b97d4bdaf423d09f770a",
+  "check": "d2b987179aa247cab56c3522173540073f2e96e9652323031466c056056041d5",
   "format": "orig-cache-key-1",
   "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
   "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
