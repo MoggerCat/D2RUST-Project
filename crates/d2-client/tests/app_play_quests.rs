@@ -373,26 +373,42 @@ fn talk_to_akara(app: &mut App, ms: &AtomicU32, wire: &Arc<Mutex<Wire>>) -> u32 
 
 /// Clicks Akara and waits for her menu (S→C 0x28).
 fn open_akara_menu(app: &mut App, ms: &AtomicU32, wire: &Arc<Mutex<Wire>>) -> u32 {
+    // The client refuses a repeat interact on the same monster within
+    // 200 ms (`client/model.md` §8 r7): let an earlier talk's pass.
+    step(app, ms, 10);
     let (guid, at) = akara_on_screen(app);
     assert!(
         (0..800).contains(&at.x) && (0..560).contains(&at.y),
         "Akara is on screen: {at:?}"
     );
-    click(app, ms, at);
     let mut want = vec![0x13, 1, 0, 0, 0];
     want.extend_from_slice(&guid.to_le_bytes());
+    // This click's 0x13: a new one (an earlier talk's is in the log).
+    let sent = |wire: &Arc<Mutex<Wire>>| {
+        wire.lock()
+            .unwrap()
+            .sent
+            .iter()
+            .filter(|m| **m == want)
+            .count()
+    };
+    let before = sent(wire);
+    click(app, ms, at);
     for _ in 0..200 {
         step(app, ms, 1);
-        if wire.lock().unwrap().sent.contains(&want) {
+        if sent(wire) > before {
             break;
         }
     }
-    assert!(
-        wire.lock().unwrap().sent.contains(&want),
-        "C→S 0x13 on Akara: {:?}",
-        ids(wire)
-    );
-    step(app, ms, 6);
+    assert!(sent(wire) > before, "C→S 0x13 on Akara: {:?}", ids(wire));
+    // The 0x28 and the menu box (built at the next UI frame).
+    for _ in 0..50 {
+        step(app, ms, 1);
+        if app_support::npc_menu_len(app) > 0 {
+            break;
+        }
+    }
+    step(app, ms, 2);
     guid
 }
 
