@@ -10,14 +10,16 @@ use crate::ui::front_end::{Registry, MAIN_MENU};
 
 pub const BACKGROUND: &str = r"FrontEnd\gameselectscreenEXP";
 pub const BACKGROUND_CLASSIC: &str = r"FrontEnd\gameselectscreen";
-/// Button cels (§F1.4 r3 art column). // d2rs-own, unverified: file names.
+/// Button cels (§F1.4 r3 art column; all exist in the install).
 pub const WIDE: &str = r"FrontEnd\WideButtonBlank";
 pub const NARROW: &str = r"FrontEnd\NarrowButtonBlank";
-pub const SHORT: &str = r"FrontEnd\ShortButtonBlank";
+pub const SHORT: &str = r"CharSelect\ShortButtonBlank";
+/// The Battle.net button's art (§F1.4 r3 row 17, `d2exp.mpq`).
+pub const WIDE2: &str = r"FrontEnd\WideButtonBlank02";
 /// Logo halves (§F1.5 r1): the black base cel (the fire overlay is drawn
-/// additively over it by the host). // d2rs-own, unverified: file names.
-pub const LOGO_LEFT: &str = r"FrontEnd\BlackLeft";
-pub const LOGO_RIGHT: &str = r"FrontEnd\BlackRight";
+/// additively over it by the host). File names: §F1.5 r1.
+pub const LOGO_LEFT: &str = r"FrontEnd\D2logoBlackLeft";
+pub const LOGO_RIGHT: &str = r"FrontEnd\D2logoBlackRight";
 /// "v %d.%d%c" with 1, 14, 'd' (r4).
 pub const VERSION_TEXT: &str = "v 1.14d";
 /// Font16 (descriptor 0x115). // d2rs-own, unverified: font id.
@@ -82,7 +84,7 @@ impl Screen for MainMenu {
                 STR_SINGLE_PLAYER,
                 Action::Trigger(Trigger::SinglePlayer),
             ),
-            button(WIDE, 264, 366 - up, 272, 35, STR_BATTLE_NET, Action::None),
+            button(WIDE2, 264, 366 - up, 272, 35, STR_BATTLE_NET, Action::None),
             // The gateway label is set at run time (0x00431AF0): none here.
             button(NARROW, 264, 391 - up, 272, 25, 0, Action::None),
             button(

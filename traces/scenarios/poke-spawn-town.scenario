@@ -1,0 +1,29 @@
+# A fallen (monstats 19, fallen1, specs/monsters/ai.md §9 table) spawned
+# next to the character in the Rogue Encampment at tick 1, then pokes
+# (specs/tools/poke.md): its unit seed set at tick 2, a brazier (objects
+# row 39, specs/audio/triggers.md Test vectors, as traces/pokes/
+# spawn-town.poke) created beside the character at tick 3, the act's
+# time of day set at tick 4. Every tick is a snapshot: the check of poke.md (test
+# vectors) is the poke and spawn records and the fallen's first 50 ticks
+# of unit records, 1.14d against d2rs.
+scenario 1
+name poke-spawn-town
+game 1.14d
+seed 0x00001234
+init 644409375         # game +0x7C (tools/original-hooks.md §2): the DRLG seed
+difficulty normal
+expansion yes
+end 52
+
+char save ScnSor     # the save the original side loads (handoff §3)
+char class 1
+char area 0 1
+char at default
+
+record s2c rng units
+snapshot every 1
+
+at 1 spawn 19 @x+4 @y normal
+at 2 poke seed-unit @1:19 0x12345678 666
+at 3 poke object 39 @x-6 @y
+at 4 poke time 2 0
