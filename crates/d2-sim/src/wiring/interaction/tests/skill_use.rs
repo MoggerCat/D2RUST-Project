@@ -134,6 +134,12 @@ impl Pending for Open {
     fn skill_event(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, ev: SkillEvent) {
         crate::wiring::interaction::skill_events::route(h, sim, ev);
     }
+    fn monster_attack_skill(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId) {
+        crate::wiring::interaction::skill_events::monster_attack_skill(h, sim, unit);
+    }
+    fn monster_attack_strike(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId, m: bool) {
+        crate::wiring::interaction::skill_events::monster_attack_strike(h, sim, unit, m);
+    }
     fn item_at(&self, unit: UnitId, loc: u8) -> Option<UnitId> {
         self.items.get(&(unit, loc)).copied()
     }

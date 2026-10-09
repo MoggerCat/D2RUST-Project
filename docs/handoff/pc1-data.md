@@ -104,7 +104,7 @@ newest-first, and set each row's status to `done <commit>`.
 - The coordinator polls `claude/local-pc1-facts` and the private repo's
   `main`; no message is needed.
 
-## Set up any state for a check (q-tool-poke, 2026-10-09)
+## Set up any state for a check (q-tool-poke, final 2026-10-09)
 
 Never walk through the game to reach a state. Three layers, the same on
 1.14d and d2rs, so a comparison starts from identical state:
@@ -112,28 +112,64 @@ Never walk through the game to reach a state. Three layers, the same on
 | Need | Tool | Spec |
 |---|---|---|
 | the character (class, level, stats, skills, waypoints, quests, items) | `d2s-tool new` / `set` → a `.d2s` | `formats/d2s.md` |
-| units and world state at a tick (monster, superunique, object, missile, game / unit seed, time of day; d2rs also pos, warp, item, stat, state) | a poke: `traces/pokes/<name>.poke`, `at <t> poke ...` scenario steps, or `--poke "<frame> <directive> ..."` | `tools/poke.md` |
+| units and world state at a frame | a poke (directives below) | `tools/poke.md` |
 | table data (a level with one monster class, a fixed damage range, ...) | a test variant: `traces/variants/<name>/<name>.d2stack` → `data-tool variant build` | `tools/test-variants.md` |
+| the front-end screens | `record_frames.py --front-end --front-end-script "..."` | `render/capture.md` §2a |
+
+Directives (`tools/poke.md` §1; refs `@player`, `@x±N`, `@y±N`,
+`@<type>[:<class>][#n]`, `<type>/<guid>`):
+
+| Directive | 1.14d (`poke.py`) | d2rs |
+|---|---|---|
+| `spawn <class> <x> <y> normal\|champion umod <u>\|random-boss\|unique umod <u>...` | runs (all four kinds checked on 1.14d) | runs |
+| `superunique <row> <x> <y>` | runs | runs |
+| `object <class> <x> <y> [mode <m>]` (the object init runs at the point: a chest operates and drops as the seed rolls) | runs | runs |
+| `missile <class> <x> <y> <tx> <ty> [skill <id> <lvl>] [owner <ref>]` | runs | runs |
+| `seed-game <lo> <hi>`, `seed-unit <ref> <lo> <hi>` | runs | runs |
+| `time <period 0..5> <ticks>` | runs | runs |
+| `freeze <seconds>` | holds the game | no-op |
+| `pos <ref> <x> <y>` | **item 22 (a)**: fill `CALL_FORMS["teleport"]` or `["place"]` | runs |
+| `warp <level> [tile <n>]` | **item 22 (b)**: `CALL_FORMS["warp"]` | runs (any act) |
+| `item <code> <x> <y> [quality <q>] [ilvl <n>]` | **item 22 (c)**: `CALL_FORMS["item_create"]` | runs |
+| `stat <ref> <stat> <layer> <value>`, `state <ref> <state> on\|off` | **item 22 (d)**: `CALL_FORMS["stat_set"]`, `["state_set"]` | runs |
+
+A directive whose form is missing reports `gap`, and the comparison is
+`partial`, never silently skipped. Filling a form (item 22): answer into
+the owning spec, try it with `poke.py --forms FILE` (format
+`poke-forms-1`, `tools/trace-recorder/README.md` "Call forms"), copy it
+into `CALL_FORMS`, `py tools\trace-recorder\poke.py --selftest`, run once
+on the game.
+
+Commands (Windows, PC 1; in the cloud prefix each 1.14d command with
+`tools/cloud-game/run.sh --python --seconds 150 --`):
 
 ```
-# 1.14d (Windows; in the cloud: tools/cloud-game/run.sh --python --seconds 150 -- <the same command>)
-py tools/trace-recorder/poke.py --poke-file traces/pokes/spawn-town.poke --auto ScnAma --seed 1234 --seconds 60
-py tools/trace-recorder/poke.py --poke "4 spawn 19 4876 4231 normal" --auto ScnAma --seed 1234
-#   other recorders: import poke; poke.add_options(ap); poke.PokeLayer.from_args(a).attach(rec)
-# d2rs
-cargo run -p scenario-run -- run traces/scenarios/poke-spawn-town.scenario --game-dir %D2_GAME_DIR%
-cargo run -p d2-client -- play --save ScnAma.d2s --seed 1234 --poke-file traces/pokes/spawn-town.poke
-# test variant (output outside the repo; never commit it)
-cargo run --release -p data-tool -- variant build traces/variants/only-fallen/only-fallen.d2stack --out ..\variants\only-fallen
-py tools/trace-recorder/record_tick.py --game ..\variants\only-fallen\Game.exe --auto ScnAma --seed 1234
+:: 1.14d: a poke file (relative ticks) or absolute frames
+py tools\trace-recorder\poke.py --poke-file traces\pokes\spawn-town.poke --auto ScnAma --seed 1234 --seconds 60
+py tools\trace-recorder\poke.py --poke "4 spawn 19 @x+3 @y+3 normal" --poke "8 missile 58 @x @y @x+3 @y+3 skill 36 1" --auto ScnAma --seed 1234
+py tools\trace-recorder\poke.py --forms my-forms.json --poke "4 warp 2" --auto ScnAma --seed 1234
+:: any recorder takes the same --poke / --poke-file (record_state, record_frames)
+:: one-command 1.14d vs d2rs comparison of a .check file (at <frame> poke ... lines)
+py tools\scenario-diff\scenario_diff.py traces\checks\poke-fallen-town.check
+:: d2rs
+cargo run -p scenario-run -- run traces\scenarios\poke-spawn-town.scenario --game-dir %D2_GAME_DIR%
+cargo run -p d2-client -- play --save ScnAma.d2s --seed 1234 --poke-file traces\pokes\spawn-town.poke
+cargo run -p d2-client -- state-dump --save ScnAma.d2s --seed 1234 --ticks 54 --poke "4 spawn 19 @x+3 @y+3 normal" --out traces\raw\x.jsonl
+:: test variant (output outside the repo; never commit it)
+cargo run --release -p data-tool -- variant build traces\variants\only-fallen\only-fallen.d2stack --out ..\variants\only-fallen
+py tools\trace-recorder\record_tick.py --game ..\variants\only-fallen\Game.exe --auto ScnAma --seed 1234
+:: front end (main menu, character select, create, loading)
+py tools\trace-recorder\record_frames.py --seconds 140 --front-end --front-end-script "wait 8; shot main-menu; wait 5; click 400 307; wait 10; shot char-select; wait 5; click 117 498; wait 12; shot char-create; wait 5; click 97 555; wait 10; shot loading change; key ENTER; wait 25; end"
+py tools\trace-recorder\facts_render.py traces\raw\<time>-frames.jsonl --shot main-menu
 ```
 
-Rules: pokes run between two server ticks (after frame t, before the next
-drain) and draw no RNG of their own; a directive with no spec'd 1.14d
-call form reports `gap` on 1.14d (item 22 below lists them) and the
-comparison is `partial`, never silently skipped. A variant is a patch
-stack (rule 9): commit the `.d2stack` / `.d2patch`, never the built
-install.
+Rules: pokes run between two server frames (after frame f − 1, before
+frame f's drain) and draw no RNG of their own. Checked on 1.14d vs d2rs
+(REC-590): `traces/checks/poke-fallen-town-unpinned.check` equal in
+every compared field for 54 frames. The front-end script's waits were
+tuned under Wine (menu up after ~20 s); on Windows shorten the first
+wait. A variant is a patch stack (rule 9): commit the `.d2stack` /
+`.d2patch`, never the built install.
 
 ## Step 4 — binary reads and one recording only PC 1 can do (queued by the coordinator, 2026-10-08)
 
@@ -237,6 +273,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     fill `own`. Write the answer into `sim/units.md` (or the owner spec)
     and the §2 row of `state-snapshot.md`.
 28. **0x8E flag byte at the join** (q-fix-pc1-proto-items) The join's 0x8E CorpseAssign per corpse of another client's player (`0x0053DFB0` from `0x0052C410`, `sim/intents-events.md` §8.3) is sent with flag byte 1 (assign); the flag source at that call is not read. Needed: the byte `0x0052C410` passes to `0x0053DFB0`.
+34. **Town critters are a client-side spawn from `Levels.txt` C1 / CA1** (q-fix-real-critters-drops; same topic as item 30) The Rogue Encampment chickens (ck, class 149) are not server units: the server's unit lists have none (state snapshots to frame 90, both sides equal at 25 units). 1.14d's client creates them with `0x00466730(class 149, x, y, 1, ..)` (type 1, client set C, GUID from the client counter `[0x00711F30]`), three per group, from return address `0x0046C316`; the caller chain is `0x0046C54D` <- `0x0044C774` (the client room function `0x0044C750`, which also runs the preset pass `0x00466820`). Levels.txt row 1 has `C1` = 149, `CA1` = 30 (the level record dump at `[arg5]` shows 0x95 and 0x1E). Per group the draws are: 3 steps at `0x0046C4AC` on three different `{lo, 666}` seeds, a `roll(0)` via `0x0045C3E0` at `0x0046C516` on the room's client seed, then per chicken one step at `0x0046C257` and one at `0x0046C29C` (x and y). First groups in frame 2 of `a1-town-arrival-ama`: (4827, 4195) (4820, 4198) (4832, 4191) and (4927, 4198) (4939, 4198) (4956, 4195); later rooms (frames 89-95): (4814, 4256) (4827, 4269) (4834, 4275) and (4871, 4242) (4877, 4254) (4849, 4267). Needed (a spec for a new `world/` or `client/` section): the body of the function holding `0x0046C257`-`0x0046C54D`: what makes a group (CA chance? MinGrp / MaxGrp 3 / 3 of the chicken row), the centre point and offset formula from the draws, the seed each step uses, and when the room function runs it (client room entry and exit; the GUIDs 93-95 of the scene need the 190 river-object creations at `0x00466862` before them). Probe: a scratch subclass of `record_state.py` hooking `0x00466730` / `0x00466360` (not committed); the facts are in `docs/handoff/q-fix-real-critters-drops.md`. `population.md` §11.3 (critters are not placed by the server) is confirmed.
 26. **Re-record sim-0009 without input** (q-prov-recording, REC-290): the Wine
     run of the same command equals `traces/sim/tick/sim-0009.json` for ticks
     0–60, then the Windows trace has a client message at tick 61 (drain: a
@@ -256,6 +293,20 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     code 8 copies and whether that monster's target was cleared (an AI
     request) before its death; answer into §7.4 rule 7. d2rs tests
     `monster_death.rs` / `e2e_night_world.rs` now expect the spawn point.
+
+35. **`0x0063E6B0(unit, 0)`: are the action-frame tests skipped?** (REC-700) `0x005A6D50` passes the moving flag r as `0x0063E6B0`'s second argument (`skills/use.md` §5.2 "Monsters"); `skills/bodies-3.md` §5.18 step 3 gives the tests (+0x4E = 0, or no action event in the frames ((cur − speed) >> 8, cur >> 8]) for the argument 1 only. Read: what the function does with 0 (d2rs: no tests, the column by mode). Write the answer into `bodies-3.md` §5.18 step 3.
+36. **Who writes unit +0x4E from a type-0 timer's frame code?** (REC-701) trigger(U) of `0x005A7670` reads +0x4E = 1 (`skills/use.md` §5.2); `sim/units.md` §4.2 schedules event 0 with args (E[i], k) and the field table names only `0x005533D0` (0 at mode start). Read: the writer of +0x4E on the event-0 path of a monster (the unit-type dispatcher or the timer run), and whether a code-0 event writes it. Write the answer into `sim/units.md` §4.2 / §4.6.
+37. **The client's mode-18 leap / whirl: hold, path end, code 0x16** (REC-702..704, `d2-client` `world_view/skill_motion.rs`; measured leap / whirl in `facts/client/anim/a1-cold-plains-*-bar.tsv`) Read: (1) which client code holds the Leap sequence at frame 11 while the motion record lives, and whether Leap Attack (`seqnum` 14) holds at its frame 11 the same way (REC-704); (2) the client whirl path: its step per update (d2rs: class `WalkVelocity` << 12, 0x6000 measured for the barbarian) and the update mode 18 ends on (d2rs: the one whose step reaches the end, `((d << 16) − 1) / step` after the do, `d` by `0x006417F0`; REC-703); (3) the skill mode request's first mode-18 update and code 0x16's record 2 / 3 as unit type / GUID (REC-702). Write the answers into `render/unit-composite.md` §8 or `skills/sequences.md` §3.
+
+38. **Range state mask 0x26 = `meleeonly`?** `range(P,
+  skill)` `0x00645460` (`skills/use.md` §3 r6) tests "state mask 0x26".
+  d2rs (`d2-client` `bridge/combat.rs` `in_melee_only_state`) reads it as
+  `0x0063A130` with the per-flag mask at data +0xCC + 4·0x26, i.e. the
+  `states.txt` flag bit 38 `meleeonly` (`data/fields.tsv`; the
+  `ui/panels-3.md` §24 r1 scheme). Confirm the argument `0x00645460`
+  passes is that flag index (not a data offset or a precomputed group),
+  and write it into `use.md` §3 r6.
+
 ## How to check a behaviour in one command
 
 A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)
@@ -316,6 +367,30 @@ rather than a hand-run recipe.
   failure when the point is the unit's own). d2rs reads: no-size
   distance ≤ 15; point = own + Δ·min(a, dist − b) / dist rounded to
   nearest; it matches Warriv's three recorded arrival walks.
+
+30. **Client-made critters (set C monsters)** (q-fix-real-unit-seed-order)
+  (`q-fix-real-town-critters`, `client/model.md` §5 r3 "C monsters",
+  `monsters/population.md` §11.3 r2): the Rogue Encampment arrival has
+  three chickens (ck, class 149) with GUIDs 93–95 that the server never
+  allocates (25 server unit seeds in 90 s under Wine, none for them;
+  critter presets are not placed by the server). Read the client path
+  that makes them: which client pass reads the DS1 critter presets (or
+  another source), the GUID counter (why 93), the client set-up
+  (`0x004AE8D0`-like: stats, seed, first frame), and their client-side
+  AI / motion (the recorded ck frames walk: WL at tick 8 and on).
+
+39. **Evade's reaction (`combat/damage.md` §7.1 step
+  5.2)**: "state 68 list; s, E as above" — does the evade branch also
+  set E flags |= 4 and make the unit form request (E, mode 13, tA, gA,
+  0) like 5.1, or only the `stsound` sound event 12? d2rs
+  (`wiring/action/reaction.rs`) does the full 5.1 skill form plus the
+  sound. Answer into §7.1 step 5.2.
+40. **Missile damage setup weapon of a monster
+  (`missiles/damage.md` §1 step 6)**: d2rs serves `0x00622830` (a type-1
+  owner with an inventory) with the same seam as the player's attack
+  weapon `0x00623990(owner, 1)` (`Pending::attack_weapon`). Is
+  `0x00622830` the same pick (`sim/units.md` §4.7 "Attack weapon") or
+  plain `0x0063C9B0`? Answer into §1 step 6.
 
 ## Step 5 — spec gaps (107 provisional points no spec states)
 
@@ -437,3 +512,6 @@ Then the rest:
   `q-fix-ui-npc-talk-facts`, `q-fix-render-bg-seed`.
 - **Closures (no code change, tests only):** `q-fix-proto-vitals-dx-sign`,
   `q-fix-proto-state-param-sign`, `q-fix-seam-stamina-scale`.
+31. **Door step 0x004BCB20** (q-fix-pc1-client-ui) Specify the object door step (REC-725): what it does per update for an `IsDoor` non-cycling mode (frame advance, mode change, collision / sound calls), for `world/objects-client.md` §25 r9.2.1.
+32. **NPC introduction handler 0x004B41E0** (q-fix-pc1-client-ui) Read which text record the "introduction" topic plays (REC-727; d2rs plays record 0 of the intro entry) and whether it sets +0x11 or the talk flag like "gossip" (`messages.md` §6 r3 / OQ4).
+33. **Gamble buy 0x32 u32@9** (q-fix-pc1-client-ui) menus.md §4.2 r2 says `[0x007C0DB0]` is only ever written with 0, so a buy in a Gamble window would send transaction 0; the server read (vendors.md §7.1 rule 2) accepts a gamble item only with transaction 2. Record or read what a real Gamble buy sends (C→S 0x32 u32@9) so q-fix-shop-gamble-flag-dead can be settled either way (REC-729; the click env keeps the OR 2 meanwhile).

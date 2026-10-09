@@ -231,10 +231,19 @@ impl<X: Pending> AiModes for View<'_, X> {
             None => self.change_mode(game, unit, mode, target),
         }
     }
-    /// The anim mode (unit +0x10) without a mode change.
-    fn set_anim_mode(&mut self, unit: UnitId, mode: u8) {
-        if let Some(r) = self.units.get_mut(unit) {
-            r.mode = u32::from(mode);
+    /// `0x00624690(unit, mode)` (`units.md` §4.1): no mode start.
+    fn set_anim_mode(&mut self, game: &mut Game, unit: UnitId, mode: u8) {
+        let r = {
+            let mut sim = crate::units::hooks::Sim {
+                game,
+                units: self.units,
+                stats: self.stats,
+                data: self.data,
+            };
+            crate::units::modes::write_mode(&mut sim, &mut *self.h, unit, u32::from(mode))
+        };
+        if let Err(e) = r {
+            self.unit_error(e);
         }
     }
     /// The path step count: the stop distance `0x00649070` (`ai.md`

@@ -117,15 +117,19 @@ pub trait MissileRooms {
 
 /// Damage and skill code. Provider: the combat/skills session.
 pub trait MissileCombat {
-    /// Damage setup `0x0059F900` (§R2.3 step 23), with its draws.
+    /// Damage setup `0x0059F900` (§R2.3 step 23, `missiles/damage.md`),
+    /// with its draws. `skill` is the missile's stored skill (data
+    /// +0x0A). Returns the missile data flag bits (+0x14) it sets
+    /// (`damage.md` §2).
     fn damage_setup(
         &mut self,
         game: &mut Game,
         owner: UnitId,
         origin: Option<UnitId>,
         missile: UnitId,
+        skill: i32,
         level: i32,
-    );
+    ) -> u32;
     /// To-hit `0x0057D9B0(owner, defender, tohit, missile = 1)`: one draw
     /// on the owner's seed. Only called with an owner (a missing owner
     /// misses without a draw, R5 step 5).

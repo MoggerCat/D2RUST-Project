@@ -133,8 +133,10 @@ pub trait AiModes {
             None => self.change_mode(game, unit, mode, target),
         }
     }
-    /// Sets the anim mode without a mode change (inline thinks, §1.4).
-    fn set_anim_mode(&mut self, unit: UnitId, mode: u8);
+    /// `0x00624690(unit, mode)` (inline thinks, §1.4; `sim/units.md`
+    /// §4.1): the mode written with the unit queued and flag 0x1, no
+    /// mode start.
+    fn set_anim_mode(&mut self, game: &mut Game, unit: UnitId, mode: u8);
     /// The path step count.
     fn set_path_steps(&mut self, unit: UnitId, steps: i32);
     /// Path flag 0x800 (blocked step).

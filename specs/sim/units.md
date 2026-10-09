@@ -28,17 +28,17 @@
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–136 |
 |   3. Lifecycle | 137–401 |
-|   4. Modes and mode schedules | 402–848 |
-|   5. Event dispatch | 849–863 |
-|   6. Events per kind | 864–986 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 987–1008 |
-|   8. Collision line between two units | 1009–1013 |
-| Constants & data dependencies | 1014–1030 |
-| Randomness | 1031–1038 |
-| Edge cases & original bugs | 1039–1059 |
-| Test vectors | 1060–1119 |
-| Provenance | 1120–1206 |
-| Open questions | 1207–1286 |
+|   4. Modes and mode schedules | 402–858 |
+|   5. Event dispatch | 859–873 |
+|   6. Events per kind | 874–996 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 997–1018 |
+|   8. Collision line between two units | 1019–1023 |
+| Constants & data dependencies | 1024–1040 |
+| Randomness | 1041–1048 |
+| Edge cases & original bugs | 1049–1069 |
+| Test vectors | 1070–1129 |
+| Provenance | 1130–1216 |
+| Open questions | 1217–1296 |
 <!-- /index -->
 
 ## Summary
@@ -804,6 +804,16 @@ composer (because the typed monstats rows carry no +0x36 / +0x38);
 settled by REC-593 (a walking town NPC's `sp`, e.g. Charsi 192 in
 `poke-fallen-town-unpinned`, and a run of a monster with `BaseId` ≠ its
 row, in `record_state.py` against `d2-client state-dump`).
+
+Measured (revision 2026-10-09, q-scenes-compare): the local player's
+town walk (mode 6, w = 213, p = 100) is drawn at server tick T with frame
+`((T − c) · 213 >> 8) mod 8`, c = the tick of the walk request that
+started the walk; a new click while still walking keeps c (`a1-walk-n`
+… `-w`, 1.14d frames 0, 3, 7, 3, 6, 2 at ticks 32 … 102, c = 22).
+PROVISIONAL (REC-516): the run (mode 3, w = 101) does not fit c = the
+run click (`a1-run-n` frame 5 at tick 150, run click 140); the d2rs
+client applies the rule to walks only (settled by a run recording from
+a standing start).
 
 Steps 7 and 8 assert (fatal) for types 2 and 3; no 1.14d caller passes
 an object or missile (objects take `0x00624390`'s own branch,

@@ -22,6 +22,32 @@ use test_fixtures::synth::synthetic;
 
 const SHEET: &str = r"data\global\ui\panel\n4test.dc6";
 
+/// A walk-back field (`path-placement.md` §7.3): 256 × 256 cells, each the
+/// direction one step toward the centre (128, 128), 8 at the centre. The
+/// play app's data load reads it for the floor drop.
+fn expfield() -> Vec<u8> {
+    let mut v = vec![0x0A, 0x01];
+    v.extend_from_slice(&256u32.to_le_bytes());
+    v.extend_from_slice(&256u32.to_le_bytes());
+    for y in 0..256i32 {
+        for x in 0..256i32 {
+            // 0 (0,-1), 1 (1,-1), 2 (1,0), 3 (1,1), 4 (0,1), 5 (-1,1), 6 (-1,0), 7 (-1,-1)
+            v.push(match ((128 - x).signum(), (128 - y).signum()) {
+                (0, -1) => 0,
+                (1, -1) => 1,
+                (1, 0) => 2,
+                (1, 1) => 3,
+                (0, 1) => 4,
+                (-1, 1) => 5,
+                (-1, 0) => 6,
+                (-1, -1) => 7,
+                _ => 8,
+            });
+        }
+    }
+    v
+}
+
 fn scratch(name: &str) -> PathBuf {
     let p = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(name);
     let _ = fs::remove_dir_all(&p);
@@ -85,6 +111,8 @@ fn play_data_on_native_equals_play_data_on_the_archives() {
     };
     data.files
         .push((SHEET.into(), dc6_file(&dc6_frames(shape, 7), 1, 2)));
+    data.files
+        .push((r"data\global\ExpField.D2".into(), expfield()));
     for act in 1..=5 {
         data.files.push((
             format!(r"data\global\palette\act{act}\pal.pl2"),
@@ -116,6 +144,8 @@ fn play_data_on_native_equals_play_data_on_the_archives() {
     );
     assert!(!nat.files.ds1.0.is_empty() && !nat.files.dt1.0.is_empty());
     assert_eq!(format!("{:?}", mpq.files), format!("{:?}", nat.files));
+    assert_eq!(*mpq.expfield, *nat.expfield);
+    assert_eq!(mpq.expfield.byte(128, 128), Some(8));
     // The fixed-up tables: same names, counts and record bytes (the
     // origin label differs by design).
     let cells = |d: &d2_client::app::single_player::LiveData| {

@@ -35,30 +35,30 @@ pub struct IconAnim {
 }
 
 impl IconAnim {
-    /// One draw of an icon in state 0 (§5 rule 1). `now_ms` is the tick
-    /// count; the counter steps by 1 when more than 100 ms passed since the
-    /// stamp.
-    // PROVISIONAL (specs/world/quests-status.md §5 rule 1; REC-nn): the
-    // stamp is rewritten at each step (the spec names the stamp but not its
-    // write).
+    /// One draw of an icon in state 0 (§5 rule 1, `0x004A34F0` case 0):
+    /// the frame and the acknowledge come from the counter as it is
+    /// before this draw's step; then a zero stamp takes `now_ms`; then
+    /// more than 100 ms since the stamp restamps and steps the counter
+    /// (sound at counter 1, expansion installed only).
     pub fn step(&mut self, q: u8, now_ms: u32, expansion_installed: bool) -> IconEffect {
+        let (frame, acknowledge) = if self.counter >= END_COUNTER {
+            (COMPLETED_FRAME, Some(q))
+        } else {
+            (self.counter, None)
+        };
+        if self.stamp == 0 {
+            self.stamp = now_ms;
+        }
         let mut sound = false;
         if now_ms.wrapping_sub(self.stamp) > STEP_MS {
-            self.counter += 1;
             self.stamp = now_ms;
+            self.counter += 1;
             sound = self.counter == 1 && expansion_installed;
         }
-        if self.counter >= END_COUNTER {
-            return IconEffect {
-                frame: COMPLETED_FRAME,
-                sound,
-                acknowledge: Some(q),
-            };
-        }
         IconEffect {
-            frame: self.counter,
+            frame,
             sound,
-            acknowledge: None,
+            acknowledge,
         }
     }
 }

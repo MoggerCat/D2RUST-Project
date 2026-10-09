@@ -99,13 +99,26 @@ own position, d2rs 0) and the player's `fc`, `sp`.
 raw file in `traces/raw/`, not committed), split with `facts_render.py
 --frame N`.
 
+## Round 3 — start cube, walk message point, walk end
+
+| Fix | Where | Check |
+|---|---|---|
+| q-fix-real-start-cube: no extra start cube (REC-244 settled by the StubAma recording) | `d2-client` play host | `app_unit_seed_order` stub test pins player + 8 items + 19 town units |
+| 0x67 (a, b) = path target for WL / RN (`intents-events.md` §7.4 r4; recorded 0x67 of Kashya at tick 32 carries (4898, 4233)) | `d2-sim` `monsters/mode_message.rs` | `a_walk_to_a_point_sends_the_path_target`; `builder_vectors` input corrected |
+| Walk / run end writes NU through `0x00624690` (`ai.md` §1.4): unit queued, flag 0x1 → 0x6D (recorded at tick 67 for Warriv) | `units::modes::write_mode`, `wiring/action/ai.rs` | `the_inner_mode_write_queues_and_flags_the_unit` |
+
+Packets: `record_packets.py --auto ScnAma --seed 1234 --input "wait 40;
+end"` under Wine; d2rs's walk messages are now byte-equal at ticks 24,
+32, 45, 56.
+
 ## Next difference (a1-town-arrival-ama)
 
-Row 108, shadow pass order: d2rs draws Kashya's shadow (now the right
-WL frame 6) before the torch at (30, 196); 1.14d draws the torch, then
-Warriv, then Kashya (screen y order). The d2rs dump has 10 unit rows
-against 25 and `?` positions and unit keys for most: the exporter /
-draw-order side of `q-fix-render-real-npc-pose` (unit draw count).
-Also: the d2rs client never ends a monster walk (Warriv stays WL after
-his last walk; 1.14d's client mode end sets NU at frame 67: REC-503's
-end tests).
+Equal through `draws.tsv` row 112. Row 113: the first chicken (ck,
+1.14d monster GUID 93). The chickens are client-made (set C) monsters:
+the server allocates none (25 unit seeds in 90 s). No spec covers their
+creation: `pc1-data.md` Step 4 "[q-fix-real-unit-seed-order]
+Client-made critters". Stopped there.
+
+State side: after the staging merge of 9608da5 (others' path-target and
+player-path fixes), `state_diff.py` over 90 frames reports no
+difference in any compared field (PARTIAL: only the documented gaps).
