@@ -5,9 +5,9 @@
 //! `inventory.md` §10, with page 3). The server checks every move
 //! (`items/inventory-moves.md` §7, `world/cube.md` §2).
 //!
-//! d2rs-own, unverified: without `inventory.bin` rows the grid is an
-//! estimated 3 × 4 grid of 29-pixel cells centred in the left half, above
-//! the transmute button. PROVISIONAL, REC-119 in `docs/HANDOFF.md` §7.
+//! Without `inventory.bin` rows the grid is record 9 / 25 as measured on
+//! the 1.14d install (the fallback; REC-119's corner point is settled by
+//! q-prov-data, the rest of REC-119 is not).
 
 use super::super::draw::UiDrawSink;
 use super::super::geom::Point;
@@ -31,16 +31,18 @@ pub fn cube_record(screen: &Screen) -> usize {
     }
 }
 
-/// d2rs-own, unverified: the estimated corner (module doc).
+/// The install's `inventory.bin` record 9 / 25, measured on 1.14d
+/// (`prov_data_tables` checks it): (118, 205, 139, 253) at 640 × 480,
+/// +(80, 60) at 800 × 600.
 pub fn fallback_cube_grid(screen: &Screen) -> GridRecord {
     let (dx, dy) = if screen.res2() { (80, 60) } else { (0, 0) };
     GridRecord {
         grid_x: 3,
         grid_y: 4,
-        left: 116 + dx,
-        right: 116 + dx + 3 * 29,
-        top: 130 + dy,
-        bottom: 130 + dy + 4 * 29,
+        left: 118 + dx,
+        right: 205 + dx,
+        top: 139 + dy,
+        bottom: 253 + dy,
         cell_w: 29,
         cell_h: 29,
     }
