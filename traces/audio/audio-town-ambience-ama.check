@@ -1,0 +1,9 @@
+check 1
+# audio-diff (specs/tools/audio-diff.md §5): Rogue Encampment arrival, idle:
+# town music, the ambience bed and its fade-in, NPC footsteps.
+name audio-town-ambience-ama
+save ScnAma --class ama --expansion
+seed 1234
+ticks 250
+seconds 300
+channels audio

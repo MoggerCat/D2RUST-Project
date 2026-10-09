@@ -213,6 +213,16 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
         self.v.h.x.monster_quest_chain(unit, chain);
     }
 
+    /// `0x00545CD0` (`quests.md` §4.6): a link for the chain in the level
+    /// row's `Quest` (1.14d: Den of Evil 1, Arcane Sanctuary 11).
+    fn attach_quest_chain(&mut self, unit: UnitId) {
+        let level = self.unit_room_level(unit);
+        let quest = self.w.tables.pop.level(level).map_or(0, |l| l.quest);
+        if quest != 0 {
+            self.v.h.x.monster_quest_chain(unit, u32::from(quest));
+        }
+    }
+
     fn quest_preset_boss(&mut self, unit: UnitId) {
         self.v.h.x.quest_preset_boss(unit);
     }

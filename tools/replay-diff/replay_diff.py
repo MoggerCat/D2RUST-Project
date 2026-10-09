@@ -47,14 +47,15 @@ VERDICTS = {0: "MATCH", 1: "DIVERGED", 2: "PARTIAL", 3: "ERROR"}
 FIELDS = state_diff.FIELDS
 TYPE_NAMES = state_diff.TYPE_NAMES
 
-# PROVISIONAL (specs/tools/replay-diff.md §3 r2, REC-1370): the C->S ids the
-# d2rs headless bridge sends on its own (state-dump: 0x67 create before the
-# first pump, 0x6B the answer to S->C 0x02, 0x5F the position resync, 0x2F
-# the talk sent on the server's NPC interaction); they are not replayed, the
-# input channel compares them where each side sent them. Settled by a
-# state-dump switch that silences the bridge (then only 0x67 stays here) or
-# by a replay whose input channel shows these ids in the same frames.
-BRIDGE_OWN = frozenset({0x2F, 0x5F, 0x67, 0x6B})
+# The C->S ids the replay leaves to the d2rs bridge (specs/tools/replay-diff.md
+# §3 r2, REC-1370): 0x67 (the create request, before the first pump) and 0x6B
+# (its answer to S->C 0x02; measured in the same frame window as 1.14d's,
+# 2026-10-09). Every other recorded message is replayed, and the bridge's own
+# sends of the ids in SILENCED are dropped (state-dump --no-own-c2s,
+# scenario-diff.md §3 r13): 0x5F (position resync), 0x2F / 0x31 (the talk and
+# dialog reply on the server's NPC interaction).
+BRIDGE_OWN = frozenset({0x67, 0x6B})
+SILENCED = (0x2F, 0x31, 0x5F)
 
 
 class ReplayError(Exception):
@@ -605,7 +606,8 @@ def run(a):
           + ", ".join(f"{k} {v}" for k, v in skipped.items()))
     if not (a.reuse and os.path.exists(d2rs) and os.path.exists(packets)):
         args = ["state-dump", "--save", save, "--seed", str(c["seed"]), "--difficulty",
-                c["difficulty"]] + r.poke_args()
+                c["difficulty"], "--no-own-c2s", ",".join(f"0x{i:02X}" for i in SILENCED)
+                ] + r.poke_args()
         for s in sends:
             args += ["--send", s]
         args += ["--ticks", str(c["ticks"]), "--out", d2rs, "--packets", packets]
