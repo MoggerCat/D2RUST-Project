@@ -227,9 +227,14 @@ fn monster<H: UnitHooks>(
         event::MODE_CHANGE => {
             // PROVISIONAL (skills/use.md OQ6; REC-111): the frame code of
             // the type-0 timer is unit +0x4E, which the monster per-frame
-            // `0x005A7670` reads; the store itself is not specified.
-            if let Some(r) = sim.units.get_mut(unit) {
-                r.anim.action_frame = a1 as u8;
+            // `0x005A7670` reads; the store itself is not specified. The
+            // every-tick event of a moving mode (§4.4, args 0) is no frame
+            // event: +0x4E stays the frame advance's (SQ, `skills/
+            // sequences.md` §3).
+            if a1 != 0 {
+                if let Some(r) = sim.units.get_mut(unit) {
+                    r.anim.action_frame = a1 as u8;
+                }
             }
             modes::monster_event(sim, hooks, unit, false)?
         }

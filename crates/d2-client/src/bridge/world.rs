@@ -684,6 +684,10 @@ pub struct ClientWorld {
     /// client quest byte 1 (`render/lighting.md` §8 monster row, §10 r1,
     /// §13 "override state"). `None` until the first 0x5E.
     pub quest_availability: Option<[u8; 37]>,
+    /// Active rooms created since the last client update's lighting part,
+    /// for the Den lights of a level-8 room loaded after the Den flag
+    /// (`render/lighting.md` §10 r1, `0x0046BE60`).
+    pub rooms_loaded: Vec<DrlgRoomId>,
     /// The active player roster `[0x007BB5C0]`, head first
     /// (`msg-units.md` §8 r1, r9).
     pub roster: Vec<RosterRecord>,
@@ -927,6 +931,7 @@ impl ClientWorld {
             .drlg
             .as_mut()
             .map_or_else(Vec::new, ClientDrlg::take_created);
+        self.rooms_loaded.extend(created.iter().copied());
         let mut lights = std::mem::take(&mut self.lights);
         let mut result = Ok(());
         for room in created {
@@ -1261,6 +1266,8 @@ pub struct UnitRows {
     /// One entry per `states` row, by state id (`client/stat-lists.md`
     /// §3).
     pub states: Vec<StateRow>,
+    /// One entry per `missiles` row (`missiles/client.md` §C2–§C4).
+    pub missiles: Vec<super::client_missiles::ClientMissileRow>,
 }
 
 impl MonsterClass {
@@ -1303,6 +1310,9 @@ pub struct ClientTables {
     pub skilldesc: Vec<SkillDescRow>,
     /// One entry per `objects.txt` row, by class (`model.md` §15).
     pub objects: Vec<ObjectRow>,
+    /// One entry per `missiles` row, by class (the client create,
+    /// `missiles/client.md` §C2–§C4).
+    pub missiles: Vec<super::client_missiles::ClientMissileRow>,
     /// The `Code` byte (+0) of each `shrines.txt` row, by index
     /// (`msg-units.md` §1.3 r3: table `[0x0096D468]`, count
     /// `[0x0096D46C]`).
@@ -1393,6 +1403,10 @@ pub struct ModelInputs {
     /// What the client object functions read beside the model
     /// (`world/objects-client.md` Inputs).
     pub objclient: ObjClientInputs,
+    /// The light quality `[0x0072A348]` ≠ 0 (high): missiles get lights
+    /// (`render/lighting.md` §5, §8 missile row; `missiles/client.md` §C4
+    /// r26). The play app sets it, as the preview draws at quality 2.
+    pub high_light_quality: bool,
     /// The skills tables and formula buffers the passive refresh
     /// evaluates (`client/msg-skills.md` §2 r4); `None`: a passive skill
     /// is a handler error.

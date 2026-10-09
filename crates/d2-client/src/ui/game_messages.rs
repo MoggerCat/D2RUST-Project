@@ -26,7 +26,7 @@ use super::{FontMeasure, SharedRef};
 pub const MESSAGES_PANEL: PanelId = PanelId(0x111);
 
 /// Milliseconds one client frame adds to the expiry clock (module doc).
-pub const MS_PER_FRAME: u32 = 40;
+pub const MS_PER_FRAME: u32 = crate::rules::camera::CLIENT_TICK_MS;
 /// The fill file's dark frame (`hud::fill_frames`).
 const DARK: u32 = 4;
 /// UI states the draw gates read (`ui/panels.md` §2).

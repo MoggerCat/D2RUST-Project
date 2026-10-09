@@ -659,6 +659,7 @@ fn classic_diablo_kill_and_end_of_game() {
     f.players.insert(P2, act4_player(2));
     f.near = vec![P1];
     set(&mut f, P1, SLOT, &[2, 3]);
+    f.client_flags.insert(P1, 0);
     kill_diablo(&mut ctl, &mut f, Some(P1));
     let r1 = f.flags(P1);
     assert!([13, 0, 6, 7].iter().all(|&b| r1.get(SLOT, b)));
@@ -680,7 +681,15 @@ fn classic_diablo_kill_and_end_of_game() {
     ];
     let sent: Vec<_> = f.sent.iter().filter(|m| m.1[0] != 0x28).cloned().collect();
     assert_eq!(sent, want);
-    assert_eq!(f.log, ["unhandled 23 0x538680", "sound 1 75"]);
+    // `0x00538680(client, 4, difficulty 0)`: a classic character's
+    // progression 4 (bits 8–12) at `0x005B4D77`.
+    assert_eq!(
+        f.log,
+        [
+            format!("progression {} 0x0400", P1.0),
+            "sound 1 75".to_owned()
+        ]
+    );
     // The schedule: elapsed = 40 ms × frames since the kill (open
     // question 2), tested at each firing.
     f.log.clear();

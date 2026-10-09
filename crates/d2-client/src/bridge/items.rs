@@ -230,6 +230,10 @@ pub struct ItemArtRow {
     pub inv_h: u8,
     pub inv_file: String,
     pub flippy_file: String,
+    /// The itemtypes `beltable` of the item's type and a 1 x 1 inventory
+    /// size (`inventory-moves.md` §3.3, `seams/item-grids.md` §2.8): what
+    /// the server's belt test reads.
+    pub beltable: bool,
 }
 
 /// Item art rows by code (weapons, armor, misc; the first row of a code).

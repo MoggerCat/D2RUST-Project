@@ -398,6 +398,12 @@ pub fn enter_game<D: ActionEvents, W>(
             .x
             .send(player, &msg::set_skill(0, guid, 0, h.skill, h.item));
     }
+    // Rule 3.1 (e): the quest entry's messages (0x5E, 0x28, 0x29, 0x89).
+    if let Some(quest) = a.sys.hooks.session.join_quest.remove(&player) {
+        for m in &quest {
+            a.sys.hooks.x.send(player, m);
+        }
+    }
     // Rules 3.2–3.7.
     let x = &mut a.sys.hooks.x;
     x.send(player, &msg::unit_ref(0x0B, 0, guid));

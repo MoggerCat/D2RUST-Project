@@ -85,7 +85,8 @@ use d2_native::source::NativeAsset;
 use d2_server::adapters::character::LoadContext;
 use d2_server::adapters::handlers::skills::wired::WiredSkills;
 use d2_server::adapters::handlers::world::{
-    preview_cube_parts, preview_inv_parts, ActionEvents, ActionWorld, Outbox, WiredWorld,
+    preview_cube_parts, preview_inv_parts, ActionEvents, ActionWorld, Outbox, QuestEnter,
+    WiredWorld, WorldHost,
 };
 use d2_server::adapters::session::{load_new_character_with_items, load_save, GameSetup};
 use d2_server::adapters::session_flow::{
@@ -1627,6 +1628,38 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
     let shrines: Vec<Shrines> = decode_all(table("shrines")?).map_err(err)?;
     // `client/stat-lists.md` §3 r3, r6: `notondead`, `noclear` (+0x14 &
     // 0x80, & 0x10) and the colour call's columns.
+    // `missiles/client.md` §C2–§C4: the client create's columns.
+    let missiles: Vec<d2_data::tables::Missiles> = decode_all(table("missiles")?).map_err(err)?;
+    let missiles = missiles
+        .iter()
+        .map(|m| crate::bridge::client_missiles::ClientMissileRow {
+            vel: i32::from(m.vel),
+            vel_lev: i32::from(m.vellev),
+            max_vel: i32::from(m.maxvel),
+            accel: m.accel as i16,
+            range: m.range as i16,
+            lev_range: m.levrange as i16,
+            sub_loop: m.subloop,
+            sub_start: m.substart,
+            sub_stop: m.substop,
+            activate: i32::from(m.activate),
+            init_steps: m.initsteps,
+            anim_len: m.animlen,
+            anim_speed: m.animspeed,
+            light: m.light,
+            rgb: (m.red, m.green, m.blue),
+            can_slow: m.canslow,
+            pierce: m.pierce,
+            last_collide: m.lastcollide,
+            clt_do_func: m.pcltdofunc,
+            loop_anim: m.loopanim != 0,
+            flicker: m.flicker,
+            collide_type: m.collidetype,
+            always_explode: m.alwaysexplode != 0,
+            explosion_missile: m.explosionmissile as i16,
+            clt_hit_func: m.pclthitfunc as i16,
+        })
+        .collect();
     let states: Vec<d2_data::tables::States> = decode_all(table("states")?).map_err(err)?;
     let states = states
         .iter()
@@ -1645,6 +1678,7 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
         objects,
         shrines: shrines.iter().map(|s| s.code).collect(),
         states,
+        missiles,
     })
 }
 
@@ -1666,6 +1700,7 @@ struct GameParts {
     items: ItemTables,
     vendors: VendorTables,
     anim: Option<Arc<AnimData>>,
+    monster_sequences: Option<Arc<d2_sim::skills::sequences::MonsterSequences>>,
     vitals: Option<Arc<VitalsTables>>,
     /// The skill bodies' table data (`ActionHooks::bodies`: pet types,
     /// state groups); `None`: synthetic.
@@ -1699,6 +1734,7 @@ impl GameParts {
             items: t.item_tables()?,
             vendors: t.vendor_tables()?,
             anim: Some(Arc::new(t.anim.clone())),
+            monster_sequences: Some(Arc::new(t.monster_sequences()?)),
             vitals: Some(Arc::new(t.vitals()?)),
             bodies: Some(Arc::new(t.body_tables()?)),
             drops: Some(d.drops.clone()),
@@ -1768,6 +1804,7 @@ pub fn build_with(
     };
     let mut hooks = ActionHooks::new(Arc::new(parts.action), world, Seed::init_low(seed), seams);
     hooks.anim_data = parts.anim;
+    hooks.monster_sequences = parts.monster_sequences;
     // The server's animation names follow the client art's name rules.
     hooks.x.looks = crate::world_view::unit_assets::UnitLooks::live(d.archives.as_ref())
         .ok()
@@ -2096,6 +2133,13 @@ fn loader(
         let rest = &mut s.world.rest;
         rest.quests.insert(player, quests);
         rest.names.insert(player, name[..n].to_vec());
+        // The quest entry `0x00546270` (`world/quests.md` §3: single player
+        // takes `0x005344B0`, mode 0; a new character's stub load calls
+        // mode 1 first): its messages (0x5E, 0x28, 0x29, 0x89) are the
+        // join's rule 3.1 (e), sent after the loader's other messages.
+        let new_character = matches!(character, Character::New | Character::Named(_))
+            || matches!(&character, Character::Save(save, _) if save.body.is_none());
+        quest_entry(s, player, new_character);
         // The point parser reads the staged position (`point_state`); the
         // tick moves it to the path's ([`WorldHost::unit_positions`]).
         s.set_unit(
@@ -2118,6 +2162,47 @@ fn loader(
         );
         Ok(Loaded { player, entry })
     })
+}
+
+/// Runs the join's quest entry on the host's quest control and queues its
+/// messages for the join ([`d2_sim::wiring::action::switch::SessionState::join_quest`]).
+/// An error (the original's fatal assert, for example a game without the
+/// quest tables) is logged and the join goes on.
+fn quest_entry(s: &mut Sim, player: UnitId, new_character: bool) {
+    let modes: &[u8] = if new_character { &[1, 0] } else { &[0] };
+    for &mode in modes {
+        let r = WorldHost::quests(
+            &mut s.world,
+            &mut s.game,
+            &mut s.events,
+            QuestEnter { player, mode },
+        );
+        if let Some(Err(e)) = r {
+            s.events
+                .action
+                .hooks()
+                .x
+                .log
+                .push(format!("join: quest entry mode {mode}: {e}"));
+        }
+    }
+    let sent: Vec<Vec<u8>> = s
+        .world
+        .rest
+        .take_sent()
+        .into_iter()
+        .filter(|(u, _)| *u == player)
+        .map(|(_, b)| b)
+        .collect();
+    if !sent.is_empty() {
+        s.events
+            .action
+            .sys
+            .hooks
+            .session
+            .join_quest
+            .insert(player, sent);
+    }
 }
 
 /// The local client's player and its GUID once the join has run (C→S

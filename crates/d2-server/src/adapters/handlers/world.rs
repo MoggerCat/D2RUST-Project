@@ -32,7 +32,6 @@ mod hireling_host;
 mod item_approach;
 mod item_save;
 mod npc_approach;
-mod sentry_drive;
 mod wired;
 
 #[cfg(test)]
@@ -691,6 +690,23 @@ impl WaypointCall for WaypointOperate {
         };
         data.operate(w, object, &facts, self.player)?;
         Ok(Some(0))
+    }
+}
+
+/// The quest entry `0x00546270(game, player, mode)` (`world/quests.md`
+/// §3): the join's call, mode 0 for a loaded character and mode 1 then 0
+/// for a new one. An error is the original's fatal assert, returned as
+/// text.
+pub struct QuestEnter {
+    pub player: UnitId,
+    pub mode: u8,
+}
+
+impl QuestCall for QuestEnter {
+    type Out = Result<(), String>;
+    fn call<W: QuestWorld>(self, ctl: &mut QuestControl, w: &mut W) -> Self::Out {
+        ctl.player_enters(w, self.player, self.mode)
+            .map_err(|e| e.to_string())
     }
 }
 

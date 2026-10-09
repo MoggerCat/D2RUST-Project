@@ -13,7 +13,7 @@ Stitching session `q-act1-dungeons`, branch `claude/q-act1-dungeons`.
 
 Test: `crates/d2-client/tests/app_maze_level.rs`: Blood Moor → Den → click the stairs; the server player ends in level 9, the maze has ≥ 9 preset rooms, the client follows (level 9, way-back tile in `units`), no rejected message. Did not compile / run before the change (no maze level, no `synthetic_maze`). `app_level_warp` still passes.
 
-## PROVISIONAL (REC-117 in `docs/HANDOFF.md` §7)
+## PROVISIONAL (REC-480 in `docs/HANDOFF.md` §7; was a second REC-117, renumbered by q-fix-prov-rec-ids)
 
 Which maze room carries the exit warp and where the tile sits. The original takes exits from the cells' DS1 warp units (`rooms.md` §9.5.1 `warp_unit`, the door/warp tables are untranscribed). Here: the first room of the level, tile at sub-tile (20, 20). All `// d2rs-own, unverified`.
 

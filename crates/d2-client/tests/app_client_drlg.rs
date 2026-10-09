@@ -475,3 +475,87 @@ fn effect_rows_carry_the_users_client_missile_functions() {
         println!("pCltDoFunc {f}: {n} rows");
     }
 }
+
+// Covers: specs/missiles/client.md §c4-create-tail
+/// The client create on the user's `missiles` rows: missile 287
+/// `denofevillight` (`render/lighting.md` §8: `Light` 10;
+/// `missiles/client.md` §C12: client function 23) created at a point
+/// gets its kind-1 light of radius 10.
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_den_light_missile_creates_from_the_users_rows() {
+    use d2_client::bridge::client_missiles::{create, flag, CreateRecord};
+    let d = app_support::live();
+    let rows = single_player::client_unit_rows(d.archives.as_ref()).unwrap();
+    assert_eq!(rows.missiles[287].clt_do_func, 23);
+    assert_eq!(rows.missiles[287].light, 10);
+    let mut w = ClientWorld::default();
+    let rec = CreateRecord {
+        flags: flag::POSITION,
+        class: 287,
+        x: 100,
+        y: 100,
+        ..CreateRecord::default()
+    };
+    let k = create(&mut w, &rows.missiles, &rec, true).unwrap().unwrap();
+    let (_, light) = w.lights.iter().next().unwrap();
+    assert_eq!((light.owner_guid, light.radius), (k.guid, 80));
+}
+
+// Covers: specs/missiles/client.md §c6-per-update-dispatch-0x004d2c70
+/// The client missile update on the user's rows: the Den light (287,
+/// function 23) never expires; an `arrow` (row 0, function 1) ends
+/// after its frames (`Range`) and its light, if any, dies.
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn client_missiles_update_on_the_users_rows() {
+    use d2_client::bridge::client_missiles::{create, flag, update, CreateRecord};
+    let d = app_support::live();
+    let rows = single_player::client_unit_rows(d.archives.as_ref()).unwrap();
+    let missiles = &rows.missiles;
+    assert_eq!(missiles[0].clt_do_func, 1);
+    let mut w = ClientWorld::default();
+    let rec = |class| CreateRecord {
+        flags: flag::POSITION,
+        class,
+        x: 100,
+        y: 100,
+        ..CreateRecord::default()
+    };
+    let den = create(&mut w, missiles, &rec(287), true).unwrap().unwrap();
+    let arrow = create(&mut w, missiles, &rec(0), true).unwrap().unwrap();
+    let frames = w.objclient.missiles[&arrow].current;
+    assert_eq!(frames, i32::from(missiles[0].range));
+    for n in 1..=frames {
+        update(&mut w, missiles, arrow, true).unwrap();
+        update(&mut w, missiles, den, true).unwrap();
+        assert_eq!(
+            w.objclient.set_c.contains_key(&arrow),
+            n < frames,
+            "update {n}"
+        );
+    }
+    for _ in 0..1000 {
+        update(&mut w, missiles, den, true).unwrap();
+    }
+    assert!(w.objclient.set_c.contains_key(&den));
+}
+
+/// The `pCltDoFunc` ids of the user's `missiles` rows by row count (a
+/// listing for the queue, not a check): `--nocapture` prints them.
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn client_missile_function_counts_on_the_users_rows() {
+    let d = app_support::live();
+    let rows = single_player::client_unit_rows(d.archives.as_ref()).unwrap();
+    let mut n = std::collections::BTreeMap::new();
+    for r in &rows.missiles {
+        *n.entry(r.clt_do_func).or_insert(0usize) += 1;
+    }
+    let mut v: Vec<_> = n.into_iter().collect();
+    v.sort_by_key(|&(f, c)| (std::cmp::Reverse(c), f));
+    for (f, c) in &v {
+        println!("pCltDoFunc {f}: {c}");
+    }
+    assert_eq!(v.iter().map(|(_, c)| c).sum::<usize>(), rows.missiles.len());
+}

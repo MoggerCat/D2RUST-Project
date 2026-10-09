@@ -18,6 +18,7 @@ pub mod bits;
 pub mod chat_end;
 pub mod check;
 pub mod click;
+pub mod client_missiles;
 pub mod client_path;
 pub mod combat;
 pub mod dispatch;
@@ -457,12 +458,19 @@ impl<L: ServerLink> Bridge<L> {
         t.objects = rows.objects;
         t.shrines = rows.shrines;
         t.states = rows.states;
+        t.missiles = rows.missiles;
     }
 
     /// The host's wall-clock seconds `0x00410A80` (`render/lighting.md`
     /// §10 r4).
     pub fn set_wall_seconds(&mut self, f: fn() -> i32) {
         self.inputs.wall_seconds = Some(f);
+    }
+
+    /// The light quality `[0x0072A348]` ≠ 0 (`render/lighting.md` §5):
+    /// client missiles get lights (§8 missile row).
+    pub fn set_high_light_quality(&mut self, high: bool) {
+        self.inputs.high_light_quality = high;
     }
 
     /// The skills tables of the passive refresh (`msg-skills.md` §2 r4).

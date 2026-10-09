@@ -31,7 +31,7 @@ pub use startup::{ProgressStore, VideoHook};
 pub struct ScreenId(pub &'static str);
 
 /// One front-end tick is 40 ms (C0 r1).
-pub const TICK_MS: u64 = 40;
+pub const TICK_MS: u64 = crate::rules::camera::CLIENT_TICK_MS as u64;
 
 /// The sky palette every `0x0043C4F0` screen loads (§F1.6 r1), under
 /// `data\global\palette\sky\`.

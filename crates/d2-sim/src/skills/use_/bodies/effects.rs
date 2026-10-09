@@ -77,16 +77,6 @@ pub enum BodyEffect<U, I, R> {
     /// Pet list add `0x00575D90(game, owner, pet, t, max)` (`sim/pets.md`
     /// §2).
     PetAdd { owner: U, pet: U, t: i32, max: i32 },
-    /// d2rs-own, unverified (q-assassin-gaps, REC-233; no 1.14d callee): a
-    /// trap `m` was laid by srvdo 45 with `skill` at `level` and `shots`
-    /// (the skill's `calc4`), for the host's sentry think.
-    SentryLaid {
-        m: U,
-        owner: U,
-        skill: i32,
-        level: i32,
-        shots: i32,
-    },
     /// Target-node insert after the head of game list `slot`
     /// (`0x005B1900`; the caller tested m +0xD0, slot and the type).
     NodeInsert { m: U, slot: i32 },

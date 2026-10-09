@@ -33,9 +33,6 @@
 //! Not done, because no spec or provider gives it (named, not guessed):
 //! - §8.1 rules 1–2's game record, acts and seeds: the caller builds the
 //!   game before the flow runs (`rng.md` §5.2);
-//! - the refusal's S→C 0xB4 (§8.2 rule 2, direct, `0x0053B260`): the
-//!   refusal is recorded in [`SessionFlow::faults`] and the client is
-//!   removed;
 //! - §8.2 rule 4's act build at the join (`0x0052C210`): d2rs builds the
 //!   acts with the game, so a join into an act without a DRLG fails
 //!   ([`JoinError::NoAct`]);
@@ -129,8 +126,8 @@ pub enum SessionFault {
     CreateRefused(CreateRefusal),
     /// 0x6B without a client record (§8.2 rule 1: log, stop).
     NoClientRecord,
-    /// §8.2 rule 2: the load gave a non-zero result; the client was
-    /// removed (its S→C 0xB4 is not sent, module docs).
+    /// §8.2 rule 2: the load gave a non-zero result; the direct S→C 0xB4
+    /// with the code was sent and the client removed.
     LoadRefused(u32),
     /// The join failed after the load.
     Join(JoinError),
@@ -301,7 +298,7 @@ impl<D: ActionEvents, W> SessionFlow<D, W> {
                 true
             }
             Some(&0x6B) => {
-                self.join(s, client);
+                self.join(s, client, out);
                 true
             }
             Some(&0x6C) => {
@@ -499,7 +496,12 @@ impl<D: ActionEvents, W> SessionFlow<D, W> {
     }
 
     /// C→S 0x6B (module docs). Returns the placed player.
-    pub fn join(&mut self, s: &mut SimGame<D, W>, client: ClientId) -> Option<UnitId> {
+    pub fn join(
+        &mut self,
+        s: &mut SimGame<D, W>,
+        client: ClientId,
+        out: &mut dyn MessageSink,
+    ) -> Option<UnitId> {
         let (Some(id), Some(r)) = (s.sim_client(client), self.requests.get(&client).copied())
         else {
             self.faults.push((client, SessionFault::NoClientRecord));
@@ -514,6 +516,13 @@ impl<D: ActionEvents, W> SessionFlow<D, W> {
         let loaded = match loaded {
             Ok(l) => l,
             Err(code) => {
+                // §8.2 rule 2: S→C 0xB4 (direct, `0x0053B260`) with the
+                // code, then the client is removed (`0x00539DA0`).
+                let mut b = vec![0xB4];
+                b.extend_from_slice(&code.to_le_bytes());
+                if let Err(e) = out.send_direct(client, &b) {
+                    self.faults.push((client, SessionFault::Queue(e)));
+                }
                 // Cannot fail: the client is joined.
                 let _ = s.leave(client);
                 self.requests.remove(&client);

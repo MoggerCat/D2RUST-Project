@@ -59,7 +59,7 @@ pub fn cache_limit(physical: u64) -> u32 {
 }
 /// Duration of one sound tick in ms: one client tick (`render/camera.md`
 /// §9), used only by d2rs's channel-end model ([`SoundSystem`] upkeep).
-pub const TICK_MS: u64 = 40;
+pub const TICK_MS: u64 = crate::rules::camera::CLIENT_TICK_MS as u64;
 /// Distance clamp per axis for distance² (§8.1 r1).
 const AXIS_CLAMP: f32 = 2000.0;
 /// Group base of `event_thunder_*` (§6.4 r2).

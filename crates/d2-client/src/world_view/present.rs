@@ -48,7 +48,9 @@ use crate::audio::driver::SoundRequest;
 use crate::bridge::link::ServerLink;
 use crate::bridge::mirror::{bridge_frame, mirror_units};
 use crate::bridge::output::{dispatch, Output};
+use crate::bridge::world::UnitKey;
 use crate::bridge::{Bridge, BridgeError, BridgeResource, FrameOutputs};
+use crate::controls::click::ClickOut;
 use crate::controls::Bindings;
 use crate::frames::atlas::AtlasPage;
 use crate::ui::original::OriginalUi;
@@ -565,6 +567,20 @@ pub fn audio_request(o: &Output) -> Option<SoundRequest> {
     })
 }
 
+/// The player event sounds of a world click's results (`ClickOut::Sound`,
+/// `0x004CB9C0(P, event)`) as audio requests, in click order.
+pub fn click_sounds(player: Option<UnitKey>, outs: &[ClickOut]) -> Vec<SoundRequest> {
+    let Some(unit) = player else {
+        return Vec::new();
+    };
+    outs.iter()
+        .filter_map(|o| match *o {
+            ClickOut::Sound(event) => Some(SoundRequest::PlayerEvent { unit, event }),
+            _ => None,
+        })
+        .collect()
+}
+
 /// Creates the GPU path once, when the node exists.
 fn init_gpu(mut commands: Commands, wanted: Res<GpuWanted>, mut tried: Local<bool>) -> Result {
     if *tried || !wanted.0 {
@@ -673,6 +689,7 @@ fn ui_input(
     // d2rs-own, unverified: Shift held, for the shift-click to the belt.
     if let (Some(o), Some(keys)) = (ui.original.as_mut(), keys.as_deref()) {
         o.set_shift(keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight));
+        o.set_ctrl(keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight));
     }
     // Keys in `KEY_CODES` order, so one frame's actions are ordered the
     // same on every run.
@@ -1001,7 +1018,7 @@ fn world_view_frame(
                 let at = crate::ui::Point::new(mouse.0, mouse.1);
                 unhandled.extend(focus_releases(&state.click, &unhandled, at));
             }
-            let outs = world_clicks(
+            let (outs, click_outputs) = world_clicks(
                 &mut bridge.0,
                 &mut state.click,
                 view,
@@ -1011,6 +1028,14 @@ fn world_view_frame(
             )?;
             for o in &outs {
                 debug!("world click: {o:?}");
+            }
+            // `seams/bridge-app.md` §2.4: the click's sounds (refusals,
+            // 0x13 "can't use that in town") and the interact's sound
+            // outputs reach the audio layer in click order; the effect
+            // outputs have no consumer yet.
+            if let Some(s) = sounds.as_deref_mut() {
+                s.0.extend(click_sounds(bridge.0.world().local_player, &outs));
+                s.0.extend(click_outputs.iter().filter_map(audio_request));
             }
             let pressed = frame
                 .unhandled
@@ -1406,5 +1431,35 @@ mod order_tests {
                 ["outputs", "player walk", "monster walk"]
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod click_sound_tests {
+    use super::*;
+
+    // Covers: specs/seams/bridge-app.md §2.4
+    #[test]
+    fn a_world_clicks_sounds_become_player_event_requests_in_order() {
+        let p = UnitKey::new(0, 1);
+        let outs = [
+            ClickOut::Sound(0x13),
+            ClickOut::Retarget,
+            ClickOut::Sound(0x1F),
+        ];
+        assert_eq!(
+            click_sounds(Some(p), &outs),
+            vec![
+                SoundRequest::PlayerEvent {
+                    unit: p,
+                    event: 0x13
+                },
+                SoundRequest::PlayerEvent {
+                    unit: p,
+                    event: 0x1F
+                },
+            ]
+        );
+        assert!(click_sounds(None, &outs).is_empty());
     }
 }

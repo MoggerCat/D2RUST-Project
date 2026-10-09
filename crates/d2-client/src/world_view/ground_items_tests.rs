@@ -120,6 +120,7 @@ fn rows() -> ItemArtRows {
             inv_h: 2,
             inv_file: "invcap".into(),
             flippy_file: "flpcap".into(),
+            beltable: false,
         },
     );
     r
@@ -400,6 +401,7 @@ fn gold_rows() -> ItemArtRows {
             inv_h: 1,
             inv_file: "invgld".into(),
             flippy_file: "gold".into(),
+            beltable: false,
         },
     );
     r

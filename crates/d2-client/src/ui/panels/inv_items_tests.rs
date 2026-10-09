@@ -101,6 +101,7 @@ fn ui() -> (ItemsUi, UiFiles) {
         inv_h: h,
         inv_file: f.into(),
         flippy_file: String::new(),
+        beltable: f == "invhp1",
     };
     art.0.insert(*b"hp1 ", row(1, 1, "invhp1"));
     art.0.insert(*b"qui ", row(2, 3, "invqlt"));
@@ -434,6 +435,7 @@ mod belt {
         BeltParts {
             records,
             types: BTreeMap::new(),
+            beltable: [*b"hp1 "].into(),
         }
     }
 
@@ -661,6 +663,47 @@ mod belt {
         let out = u.press(&w, &files, &layout(), Point::new(160, 290));
         assert_eq!(intents(&out), vec![vec![0x63, 7, 0, 0, 0]]);
     }
+
+    // Covers: specs/ui/inventory.md §10 r3
+    #[test]
+    fn a_ctrl_click_never_lifts_a_grid_item() {
+        let (mut u, files) = ui();
+        let w = world(&[(7, mode::STORED, (0, 2, 3, 1), b"hp1 ")], None);
+        // Without Ctrl the click lifts (0x19); with it, no store: nothing.
+        let out = u.press(&w, &files, &layout(), Point::new(160, 290));
+        assert_eq!(intents(&out), vec![vec![0x19, 7, 0, 0, 0]]);
+        u.ctrl = true;
+        let out = u.press(&w, &files, &layout(), Point::new(160, 290));
+        assert!(intents(&out).is_empty());
+    }
+
+    // Covers: specs/seams/item-grids.md §2.8
+    #[test]
+    fn the_belt_test_reads_the_tables_not_a_code_list() {
+        let (mut u, files) = ui();
+        u.shift = true;
+        // A scroll: its type is beltable in the tables (not in the old list).
+        u.art.0.insert(
+            *b"isc ",
+            ItemArtRow {
+                inv_w: 1,
+                inv_h: 1,
+                inv_file: "invisc".into(),
+                flippy_file: String::new(),
+                beltable: true,
+            },
+        );
+        assert!(fits_belt(&u.art, Some(*b"isc ")));
+        assert!(!fits_belt(&u.art, Some(*b"qui ")));
+        assert!(!fits_belt(&u.art, None));
+        let w = world(&[(7, mode::STORED, (0, 2, 3, 1), b"isc ")], None);
+        let out = u.press(&w, &files, &layout(), Point::new(160, 290));
+        assert_eq!(intents(&out), vec![vec![0x63, 7, 0, 0, 0]]);
+        // The same item with a non-beltable type is picked up (0x19).
+        u.art.0.get_mut(b"isc ").unwrap().beltable = false;
+        let out = u.press(&w, &files, &layout(), Point::new(160, 290));
+        assert_ne!(intents(&out), vec![vec![0x63, 7, 0, 0, 0]]);
+    }
 }
 
 fn in_cell(c: i32, r: i32) -> Point {
@@ -852,6 +895,7 @@ fn cap_tints(level: i32, mouse: Point) -> Vec<UiDraw> {
             inv_h: 2,
             inv_file: "invcap".into(),
             flippy_file: String::new(),
+            beltable: false,
         },
     );
     u.tips = Some(crate::ui::item_tip::tests::tips());
@@ -904,6 +948,7 @@ fn grid_items_paint_blue_usable_and_red_refused_tints() {
             inv_h: 1,
             inv_file: "invcap".into(),
             flippy_file: String::new(),
+            beltable: false,
         },
     );
     u.tips = Some(crate::ui::item_tip::tests::tips());
