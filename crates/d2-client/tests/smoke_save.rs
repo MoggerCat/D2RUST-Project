@@ -184,7 +184,7 @@ impl Run {
         })
         .unwrap();
         let (server, saver) =
-            save::share(link, base, Arc::new(Tables::new()), path.into()).unwrap();
+            save::share(link, base, Arc::new(Tables::new()), None, path.into()).unwrap();
         let mut app = App::new();
         app.add_plugins((MinimalPlugins, AssetPlugin::default()))
             .init_asset::<Image>()

@@ -121,6 +121,41 @@ Branch `claude/q-fix-flow-save` (from `claude/q-tick-flow`, merged with
   rigs on `MinimalPlugins` still read wall time (none known to depend on
   it): a follow-up row could give them `ScriptedNow` too.
 
+- `q-fix-save-tool-appearance` (F10) — the play side first: the audit's
+  §2.8 verdict ("rebuilt on every save by `rebuild_appearance`") was
+  wrong: no play-save path rebuilt +0x88..+0xA7, `apply_live` kept the
+  loaded bytes. Now `FileStore` has the game's appearance tables
+  (`save::appearance_tables`, with the image's reference table) and
+  rebuilds the bytes on every save from `WiredWorld::save_equipment`
+  (the server's `equipment` over the inventory desk), the player's weapon
+  class (`composit_weapon_class`) and colour states (`has_state`). The
+  reference table (`0x00744CA8`) is now data
+  (`d2s::appearance::REFERENCE_TYPES`, from the spec's Constants) and
+  `ReferenceSlots::game`; on the real 1.14d install (private data repo,
+  sha256 checked) it gives the reserved slots of the Constants and the
+  §1 r3 anchors incl. the second `ktr` at 243, where the provisional
+  reconstruction put `ktr` at 51 (REC-91 settled by data). Found on the
+  way: d2-sim never writes the weapon in use (+0x1C), so the hand weapon
+  is the left-hand owner — row `q-fix-weapon-in-use` added. The
+  `d2s-tool resave` part is not done: it needs the same weapon-in-use
+  rule and a weapon class without a running game (or the tool running
+  the load through the sim), and its check is the C66 saves.
+
+- `q-fix-weapon-in-use`: `d2-sim` `items/inventory/weapon.rs`:
+  `weapon_link` (`0x0063D1D0`, §11.5 r1) and `weapon_unlink`
+  (`0x0063D2B0`, r2) write inventory +0x1C. Called by the core equip
+  paths (`equip_put`, §4.8 step 5; auto-equip §4.9 step 3; the lent
+  inventory) and by the desk for the moves (`MovePending::stat_link`,
+  `body_leave_effects`) and the equipment rules' `0x0055D970` switch
+  (`EquipWorld::stat_link` / `stat_unlink`). REC-266's
+  `weapon_hand_fallback` is removed. `equip_put` takes the tables.
+  Tests: `items::inventory::tests::weapon_in_use_link_and_unlink`;
+  `play_smoke::the_live_run` now asserts the `sb1 ` in RH (part 5). The
+  items/moves fixture's rest now answers a mouse skill (Attack, every
+  player has one): with a weapon in use the bookkeeping reaches §5.8
+  step 5, which the fixture's empty answer turned into the fatal
+  `NoMouseSkill` (three swap tests).
+
 ## Open
 
 - The save's inventory flag bit 1 clear (`inventory-moves.md` §6.1 r4).

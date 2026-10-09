@@ -315,8 +315,11 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn stat_refresh_unlink(&mut self, u: Owner, b: u32) {
         self.rest.stat_refresh_unlink(u, b)
     }
+    /// The weapon-in-use link `0x0063D1D0` (§11.5 rule 1), then the stat
+    /// link.
     fn stat_link(&mut self, owner: Owner, item: Guid) {
         if let (Some(o), Some(i)) = (self.unit_of(owner), self.item_unit(item)) {
+            self.weapon_link_on(o, i, true);
             self.link_item_stats(o, i);
         }
         self.rest.stat_link(owner, item)
@@ -375,8 +378,11 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
             _ => self.rest.weapon_bookkeeping(owner),
         }
     }
+    /// The body unlink `0x0063D2B0` (§11.5 rule 2: +0x1C), then the stat
+    /// unlink.
     fn body_leave_effects(&mut self, owner: Owner, item: Guid) {
         if let (Some(o), Some(i)) = (self.unit_of(owner), self.item_unit(item)) {
+            self.weapon_link_on(o, i, false);
             self.unlink_item_stats(o, i);
         }
         self.rest.body_leave_effects(owner, item)
