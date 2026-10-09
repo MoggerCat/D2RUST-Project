@@ -28,9 +28,10 @@ route), so this section stands in for the "A done" message.
 |---|---|---|---|
 | 59 | [q-fix-act4-play] De Seis seal on WingN1 | Recorded on 1.14d (seed 1): the seal at (7773, 5155) opens; dummy 131 at **(7770, 5226)** (spot (7734, 5188) + (36, 38)); De Seis (312) at **(7773, 5207)** with five 310 minions at f86; seal mode 2 at f99. 1.14d does not leave it shut (`world/quests-act4.md` §5.4) | `q-fix-pc1eve-deseis-wingn1` |
 | 60 | [q-fix-room-links] town rooms after a waypoint return | Recorded on 1.14d: as d2rs, only near rooms populate (no Gheed / Charsi to f1249, 12 of 24 objects); the old level's units are freed 122 frames after the return (`drlg/rooms.md` §8) | — |
+| 61 | [q-fix-npc-menus] ui 0x11 and Esc | From the binary: ui 17 is the quest-log alert button (Levelsocket / Level, label 3928), closed by its release (then the quest panel opens), by player death, by the conflict gate and by the game-menu open; Esc remembers it, closes it (latch 1 → 0) and the second Esc restores it with latch 0 (d2rs's keep logic matches; d2rs never clears the latch and draws no button). Position table read at run time (REC-1160 settled) (`ui/panels.md` §2 r10, `ui/frontend-options.md` §O1 r2) | `q-fix-pc1eve-questlog-alert` |
 | D1 | Ledger D1, monster creation draw order | Equal on both sides; the frame-2 report comes from `rng_owners.py` attribution (the inline component step is left `other:inline`, the HP roll at `0x00573F8F` owns the unit) (`monsters/init.md` §4.3) | extended `q-fix-tool-rng-creation-draws` |
 
-REC block of this session: 1150–1179 (1150 used).
+REC block of this session: 1150–1179 (1150 open; 1160 used and settled).
 
 ## C — PROVISIONAL points settled by a binary read
 
