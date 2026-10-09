@@ -57,6 +57,21 @@ impl<X: Pending> StatHost for ActionHooks<X> {
             self.removed_lists.push((unit, state, callback.0));
         }
     }
+    /// `0x0063A4A0`(unit, state) (`stat-lists.md` §8.8 rule 1): state in
+    /// range and flag `monstaydeath` for a monster, `plrstaydeath` for any
+    /// other unit.
+    fn stays_on_death(&self, lists: &StatLists, unit: UnitId, state: u32) -> bool {
+        use crate::stats::states::group;
+        let monster = lists
+            .unit_list(unit)
+            .is_some_and(|r| lists.owner_type(r) == crate::stats::lists::owner::MONSTER);
+        let g = if monster {
+            group::MON_STAY_DEATH
+        } else {
+            group::PLR_STAY_DEATH
+        };
+        lists.data().states.has_flag(state, g)
+    }
 }
 
 impl<X: Pending> ActionHooks<X> {
@@ -507,7 +522,9 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     /// Monster mode functions (`units.md` §4.6): the start and event
     /// functions of rules 5–14 ([`crate::wiring::path::monsters`]); the
     /// death start `0x005A6FF0` goes to [`Pending::monster_death_start`]
-    /// with the mode change's target; DT's event functions `0x005A7350` /
+    /// with the mode change's target and the death clean-up
+    /// ([`super::monster_death`]), the DD start `0x005A7390` runs rule 4
+    /// there; DT's event functions `0x005A7350` /
     /// `0x005A72B0` end the death in mode 12 (`intents-events.md` §7.7
     /// rule 3, [`super::unit_update::death_function`]); every other
     /// function keeps the default (started, nothing done).
@@ -517,16 +534,11 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         }
         if address == MONSTER_MODES[0].start {
             let target = self.mode_target;
-            let started = X::monster_death_start(self, sim, unit, target);
-            if started {
-                // The death clean-up's last call (`units.md` §4.6 rule
-                // 1.2): no think or regeneration of a dead monster stays
-                // pending. The treasure gate after it schedules nothing
-                // for the unit, so running it after the host's start
-                // keeps 1.14d's order of effects.
-                ai::cancel_think_and_regen(sim.game, unit);
-            }
-            return started;
+            return self.monster_death(sim, unit, target);
+        }
+        if address == MONSTER_MODES[12].start {
+            self.monster_dead_start(sim, unit);
+            return true;
         }
         super::unit_update::death_function(self, sim, unit, address);
         true
