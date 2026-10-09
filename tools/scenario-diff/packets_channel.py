@@ -32,7 +32,7 @@ def run(r, save, sides, shared_script_error):
     if sides != {"orig", "d2rs"}:
         return None
     code = r.sh([sys.executable, os.path.join(rec, "packets_diff.py"), orig, d2rs,
-                 "--next", str(r.next)], check=False)
+                 "--next", str(r.next)] + r.json_args("packets"), check=False)
     if r.d2rs_input() and shared_script_error(r.d2rs_input()):
         print("[packets] d2rs ran without 'input d2rs' (not in the shared frame form, "
               "which state-dump needs): partial at best")
@@ -64,6 +64,7 @@ def selftest(runner_cls, check, shared_script_error):
     assert "--ticks 20" in dump, dump
     cmp_ = r.log[-1]
     assert "packets_diff.py /tmp/w/orig.packets.jsonl /tmp/w/d2rs.packets.jsonl" in cmp_, cmp_
+    assert "--json /tmp/w/packets.summary.json" in cmp_, cmp_
     assert code == 0  # a dry run's commands "succeed"
     r.log = []
     run(r, "/tmp/w/ScnAma.d2s", {"d2rs"}, shared_script_error)   # one side: no compare

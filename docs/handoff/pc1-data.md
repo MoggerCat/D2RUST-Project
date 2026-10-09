@@ -8,11 +8,14 @@ our measurements (`facts/`, `traces/`). This loop **replaces**
 `pc1-autotest.md` and `pc1-loop.md` while it runs: stop any session
 running those.
 
-**One 1.14d at a time (user rule, 2026-10-09):** when several PC 1
-sessions run in parallel, exactly one of them (named in its prompt) runs
-1.14d (`Game.exe`, `poke.py`, `scenario_diff.py`'s 1.14d side,
-recordings); the others read the binary and list live runs under
-"Live runs for <that session>" in their hand-back file.
+**One `Game.exe` open at a time (user rule, 2026-10-09):** at most one
+1.14d `Game.exe` process may be open on PC 1 at any moment. Any PC 1
+session may run it (directly, through `poke.py`, `scenario_diff.py`'s
+1.14d side or a recorder), but only when none is open: check first
+(`tasklist | findstr /i game.exe`), hold the lock file
+`%TEMP%\d2-game.lock` (create it before starting, delete it once
+`Game.exe` has exited), and wait if the lock exists. Reading the binary
+(Ghidra, `re/`) is not limited.
 
 Effort: speed first, no token limit; stay within PC 1's hardware (one
 `Game.exe` at a time, one cargo build at a time, keep 15 GB disk free).
@@ -316,9 +319,9 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     `d2-sim/src/wiring/inventory/potion.rs`.
 
 
-41. **Control-panel help button `0x004A64C0`** (q-scenes-compare) Step 8 of the UI pass (`ui/panels.md` §5) calls it before the new-stats button; `a4-town-pandemonium-fortress` rows 258–267 draw the text "Help (H)" (CelDrawColor at (714, 403)), `Panel\Levelsocket` frame 0 at (725, 440) and `Panel\Level` frame 0 at (728, 436). Specify when it draws (character level? first game?), its positions and its press / release, for `ui/control-panel.md`.
-42. **Mini panel open at game start (REC-519)** (q-scenes-compare) Every recorded scene has state 0x15 open with no input; name the call that opens it at game entry (and whether a saved setting decides it), for `ui/control-panel.md` §9.
-43. **Shadow pre-test arguments `0x00471620` (REC-511, REC-518)** (q-scenes-compare) The measured shadows fit the §4 box test on the sheared shadow box, and objects need their mode's `BlocksLight`; read the arguments `0x00471620` passes to `0x004709A0` and the object branch, for `render/blend-modes.md` §5 r3.
+42. **Control-panel help button `0x004A64C0`** (q-scenes-compare) Step 8 of the UI pass (`ui/panels.md` §5) calls it before the new-stats button; `a4-town-pandemonium-fortress` rows 258–267 draw the text "Help (H)" (CelDrawColor at (714, 403)), `Panel\Levelsocket` frame 0 at (725, 440) and `Panel\Level` frame 0 at (728, 436). Specify when it draws (character level? first game?), its positions and its press / release, for `ui/control-panel.md`.
+43. **Mini panel open at game start (REC-519)** (q-scenes-compare) Every recorded scene has state 0x15 open with no input; name the call that opens it at game entry (and whether a saved setting decides it), for `ui/control-panel.md` §9.
+44. **Shadow pre-test arguments `0x00471620` (REC-511, REC-518)** (q-scenes-compare) The measured shadows fit the §4 box test on the sheared shadow box, and objects need their mode's `BlocksLight`; read the arguments `0x00471620` passes to `0x004709A0` and the object branch, for `render/blend-modes.md` §5 r3.
 
 ## How to check a behaviour in one command
 
@@ -476,6 +479,8 @@ commands), `--next N`. Exit code: the worst channel's (0 match, 1
 diverged, 2 partial, 3 error). Each comparator also runs alone on two
 files (`py tools/trace-recorder/state_diff.py ORIG D2RS`, `rng_diff.py`,
 `packets_diff.py`).
+
+Every check at once (parallel, 1.14d recordings reused, match % per area, playthrough per act): `python3 tools/scenario-diff/suite.py [--filter GLOB] [--area A] [--md F]` (`scenario-diff.md` §4).
 
 Known limits: the d2rs side has no hover model (a click on a unit is a
 ground click) and no `key` steps headless; the click target can differ
