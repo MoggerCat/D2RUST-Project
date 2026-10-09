@@ -348,6 +348,14 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     unit in mode 17) gets it too. Answer into `combat/hit.md` §7.1.
     d2rs: PROVISIONAL REC-732, set right after the unit seed
     (`d2-client` `app/single_player.rs` loader, `View::set_alignment`).
+- **[q-fix-pc1-proto-items] `0x0059F570` (ACT2Q4 "Jerhyn palace activated") and the Jerhyn AI case**
+    `monsters/ai-bodies.md` §9.9 step 2 row 201 calls `0x0059F570`; no
+    spec gives its body. Recorded (`act-travel-lut-ama.check`,
+    `join-act2-quests-ama.check`): start Jerhyn's first think (frame 24)
+    walks to his own position + (2, 2) with no unit-seed draw, so the
+    "= 0 → idle 40" branch is not what runs for a fresh or act-1-done
+    character. Read `0x0059F570` (and confirm `0x0059F580`'s outputs a,
+    b for these states) into `world/quests-act2.md` §10. d2rs: REC-734.
 - **[q-fix-pc1-proto-items] `0x00625870`: the mod-array test and a key absent from the base array**
     `sim/stat-lists.md` §11 rule 4 was corrected from the recording
     (`packets-town-arrival-ama.check` frame 2: the player update sends
