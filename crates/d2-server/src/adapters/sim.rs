@@ -565,6 +565,21 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
                 f.pos = Pos { x, y };
             }
         }
+        // So does the staged act: the act of the unit's room (an act
+        // change moves the player to another act's room, `waypoints.md`
+        // §11); a unit in no room keeps its act.
+        for u in staged {
+            let act = self
+                .game
+                .lists
+                .unit(u)
+                .and_then(|e| e.room())
+                .and_then(|r| self.game.lists.room(r))
+                .map(|r| r.act);
+            if let (Some(act), Some(f)) = (act, self.units.get_mut(&u)) {
+                f.act = act;
+            }
+        }
         // The gate reads the unit's live mode (a dead player's 0x41).
         let staged: Vec<UnitId> = self.players.keys().copied().collect();
         for u in staged {

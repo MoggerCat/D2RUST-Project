@@ -607,3 +607,86 @@ fn a_death_reaches_the_client_pass_of_its_tick() {
         .unwrap_or_else(|| panic!("the level's 0x1D in {got:02X?}"));
     assert!(dt < stat, "{got:02X?}");
 }
+
+/// The act change on the play path (`flows/act-change.md` §1,
+/// `world/waypoints.md` §11): NPC travel to Lut Gholein (level 40, tile
+/// 0) runs inside the tick's step-4 work; that tick's flush has 0x05,
+/// then 0x03, then 0x53, the new rooms (0x07) and the player's 0x15,
+/// no 0x04, no re-add (0x59 / 0x0B), and the client is in state 5. A
+/// later tick's client pass, the new room ready, sends 0x04 then the
+/// inventory refresh's 0x48 (no join sequence) and the state is 4.
+// Covers: specs/flows/act-change.md §1 r2, §1 r3, §1 r4; specs/world/waypoints.md §11
+#[test]
+fn an_act_change_goes_through_state_5_and_the_client_pass_sends_0x04() {
+    use d2_client::bridge::link::SendQueue;
+    use d2_sim::units::lists::client_state;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    let ms = std::sync::Arc::new(AtomicU32::new(1000));
+    let (mut link, _) =
+        single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+    link.send(SendQueue::System, &single_player::create_request().encode())
+        .unwrap();
+    link.send(SendQueue::System, &[0x6B]).unwrap();
+    for _ in 0..4 {
+        ms.fetch_add(40, Ordering::SeqCst);
+        link.pump().unwrap();
+        link.receive();
+    }
+    let guid = link
+        .with(|l| {
+            let sim = &mut l.host_mut().game;
+            let (p, g) = single_player::local_player(sim).expect("joined");
+            sim.events.action.hooks().act_changes.push((p, 40, 0));
+            g
+        })
+        .unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    assert!(link.pump().unwrap().ticked);
+    let got = link.receive();
+    let ids: Vec<u8> = got.iter().map(|m| m[0]).collect();
+    let at = |id: u8| ids.iter().position(|&i| i == id);
+    let (unload, load, env) = (at(0x05), at(0x03), at(0x53));
+    assert!(
+        unload.is_some() && load.is_some() && env.is_some(),
+        "{ids:02X?}"
+    );
+    assert!(unload < load && load < env, "0x05, 0x03, 0x53: {ids:02X?}");
+    assert!(at(0x07) > env, "the new rooms after 0x53: {ids:02X?}");
+    let g = guid.to_le_bytes();
+    let placed = got
+        .iter()
+        .position(|m| m[0] == 0x15 && m[2..6] == g)
+        .expect("the player's 0x15");
+    assert!(Some(placed) > env, "{ids:02X?}");
+    assert_eq!(at(0x04), None, "no 0x04 from the act change: {ids:02X?}");
+    assert!(
+        at(0x59).is_none() && at(0x0B).is_none(),
+        "no re-add: {ids:02X?}"
+    );
+    assert_eq!(
+        link.with(client_state_of).unwrap(),
+        client_state::CHANGING_ACT
+    );
+    let mut done = None;
+    for tick in 0..10 {
+        ms.fetch_add(40, Ordering::SeqCst);
+        link.pump().unwrap();
+        let ids: Vec<u8> = link.receive().iter().map(|m| m[0]).collect();
+        if let Some(i) = ids.iter().position(|&i| i == 0x04) {
+            assert_eq!(ids.get(i + 1), Some(&0x48), "{ids:02X?}");
+            assert!(!ids.contains(&0x5B), "no join sequence: {ids:02X?}");
+            done = Some(tick);
+            break;
+        }
+    }
+    assert!(done.is_some(), "0x04 from a later client pass");
+    assert_eq!(link.with(client_state_of).unwrap(), client_state::IN_GAME);
+}
+
+/// The local client's state (client +0x04).
+fn client_state_of(l: &mut single_player::Link<StepClock>) -> u32 {
+    let sim = &l.host().game;
+    let c = sim.sim_client(d2_client::bridge::LOCAL_CLIENT).unwrap();
+    sim.game.lists.client(c).unwrap().state
+}

@@ -591,12 +591,29 @@ impl Rig {
                     grid.push(Point::new(gx, gy));
                 }
             }
+            // A ground click must pick no unit (a tall object's art, a
+            // waypoint, reaches far above its feet): the client's own pick.
+            let pred = self
+                .app
+                .world()
+                .resource::<PreviewWalk>()
+                .predict
+                .position()
+                .expect("predicted player");
+            let cam = Camera::new(
+                FrameSize::D2RS,
+                OpenMode::NONE,
+                moving_to_client(pred.0, pred.1),
+                (0, 0),
+            );
+            let w = self.bridge().world();
             let free = grid
                 .into_iter()
                 .filter(|p| {
                     units
                         .iter()
                         .all(|u| (u.x - p.x).abs() > 50 || (u.y - p.y).abs() > 60)
+                        && hover::pick(w, &cam, (p.x, p.y)).is_none()
                 })
                 .min_by_key(|p| (p.x - x).pow(2) + (p.y - y).pow(2))
                 .expect("a free ground point");
