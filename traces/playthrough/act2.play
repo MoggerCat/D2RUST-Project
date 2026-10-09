@@ -59,13 +59,21 @@ milestone radament-present
 
 milestone radament-killed
   use sor
-  deadline 1000
+  deadline 2800
   poke 5 warp 49
   sweep 20 2 300 30 grid
   find ut 1 cl 229
-  poke +2 pos @1:229 @x+3 @y
+  poke +2 goto unit 1:229
   poke +2 stat @1:229 6 0 256
   poke +10 missile 58 @x @y @x+3 @y skill 36 1
+  poke +11 missile 58 @x @y @x-3 @y skill 36 1
+  poke +12 missile 58 @x @y @x @y+3 skill 36 1
+  poke +13 missile 58 @x @y @x @y-3 skill 36 1
+  poke +14 missile 58 @x @y @x+2 @y+2 skill 36 1
+  poke +15 missile 58 @x @y @x-2 @y-2 skill 36 1
+  poke +16 missile 58 @x @y @x+2 @y-2 skill 36 1
+  poke +17 missile 58 @x @y @x-2 @y+2 skill 36 1
+  note Radament is moved by goto (a free cell next to him), not pos: a pos target beside the lair's missile-blocking cells made the one missile die at the first step (wall bits 0x4). goto's cell has one open side, so Fire Bolts go out in all 8 directions
   need ever unit ut 1 cl 229 dead
 
 milestone halls-of-dead-3
