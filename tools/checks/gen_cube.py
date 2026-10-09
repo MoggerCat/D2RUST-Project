@@ -145,7 +145,7 @@ save ScnCube --class ama --expansion {items}
 seed 1234
 ticks 24
 seconds 300
-channels state packets
+channels state packets items
 at 4 send UseGridItem item=@{cube_ref} x={cx} y={cy}
 at 8 send ClickButton button=0x18 p1=0 p2=0
 """
