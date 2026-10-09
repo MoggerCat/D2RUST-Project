@@ -57,6 +57,13 @@ Recipe for area sessions: `docs/handoff/diff-driven.md`; PC 1:
    `tools/depcheck/determinism-allow.txt` with the reason. A feature-aware
    depcheck could drop the entry.
 
+6. **Flaky test seen at wrap-up:** `d2-server::prop_unified_items
+   item_moves_keep_one_place` failed once in the gate of c18ab112 (no
+   Rust change in that commit) and passed 5 runs alone and the full
+   rerun (5,275 passed): a proptest case that fails on some random
+   inputs. Owner: the items / server area (rerun with
+   `PROPTEST_CASES` high to reproduce, then pin the seed).
+
 ## New in this last round
 
 - poke `hop <ref> <x> <y>` (both sides, `poke.md` §1): ≤ 16 sub-tiles
