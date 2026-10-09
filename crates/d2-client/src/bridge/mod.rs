@@ -57,6 +57,7 @@ mod tests;
 #[cfg(test)]
 mod tests_c2cli;
 
+use crate::rules::lighting::records::LightList;
 use d2_proto::transport::SplitError;
 use d2_proto::{FixedMessage, PROTOCOL_VERSION};
 
@@ -537,6 +538,15 @@ impl<L: ServerLink> Bridge<L> {
 
     pub fn world(&self) -> &ClientWorld {
         &self.world
+    }
+
+    /// A drawn frame's light pass (`render/lighting.md` §6.4): `pass` gets
+    /// the model and the client's kept light list (§6.3), taken out of the
+    /// model for the pass and put back after it.
+    pub fn light_frame(&mut self, pass: impl FnOnce(&ClientWorld, &mut LightList)) {
+        let mut lights = std::mem::take(&mut self.world.lights);
+        pass(&self.world, &mut lights);
+        self.world.lights = lights;
     }
 
     /// The client DRLG, writable: a test seam for fixture collision (a

@@ -454,7 +454,9 @@ pub fn add_live_client(app: &mut App, link: DynLink, c: LiveClient) -> anyhow::R
     let palettes = ActPalettes::live(archives.as_ref()).map_err(anyhow::Error::msg)?;
     let tiles = TileAssets::new(Some(archives.source()), Some(palettes.pl2.clone()));
     let lights = crate::world_view::light_sources::load(archives.as_ref())
-        .map_err(|e| warn!("light rows (d2rs-own, unverified): {e}; player light only"))
+        .map_err(|e| {
+            warn!("light rows (d2rs-own, unverified): {e}; level ambients from the environment")
+        })
         .ok();
     let tints = super::missile_art::state_tints(archives.as_ref())
         .map_err(|e| warn!("state tints (d2rs-own, unverified): {e}; no unit tinted"))

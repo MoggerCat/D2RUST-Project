@@ -320,3 +320,41 @@ fn the_session_join_on_the_install() {
     );
     assert!(w.rooms_in_sight.len() >= 2);
 }
+
+// Covers: specs/render/lighting.md §8
+/// The monster light columns the model creates monster lights from
+/// (`MonsterClass::light`, `light_rgb`; §8 monster row), on the user's
+/// install: each `monstats` row carries its `MonStatsEx` row's `Light`
+/// and `light-r/g/b`, and the §8 measured facts hold (100 `monstats2`
+/// rows with `Light` > 0; the fallen shamans' 5 with 230, 168, 255).
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn monster_light_rows_come_from_the_users_monstats2() {
+    use d2_data::tables::{decode_all, Monstats, Monstats2};
+    let d = app_support::live();
+    let a = d.archives.as_ref();
+    let rows = single_player::client_unit_rows(a).unwrap();
+    let set = d2_data::bin::load_from(a, "eng").unwrap();
+    let m1: Vec<Monstats> = decode_all(set.table("monstats").unwrap()).unwrap();
+    let m2: Vec<Monstats2> = decode_all(set.table("monstats2").unwrap()).unwrap();
+    assert_eq!(m2.iter().filter(|r| r.light > 0).count(), 100);
+    let mut checked = 0;
+    for (m, class) in m1.iter().zip(&rows.monsters) {
+        let Some(class) = class else { continue };
+        let x = &m2[usize::from(m.monstatsex)];
+        assert_eq!(
+            (class.light, class.light_rgb),
+            (x.light, (x.light_r, x.light_g, x.light_b))
+        );
+        checked += 1;
+    }
+    assert!(
+        checked > 600,
+        "{checked} monstats rows with a monstats2 row"
+    );
+    assert!(rows
+        .monsters
+        .iter()
+        .flatten()
+        .any(|c| (c.light, c.light_rgb) == (5, (230, 168, 255))));
+}

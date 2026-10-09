@@ -34,6 +34,7 @@ use crate::rules::camera::{shake_offsets, FrameAnchor};
 use crate::rules::draw_order::sky::SkyPasses;
 use crate::rules::draw_order::source::{ordered_source, TileArt, WeatherFrame};
 use crate::rules::draw_order::{FadeClock, NearRooms, OrderedTile, UnitFacts};
+use crate::rules::lighting::records::LightList;
 use crate::rules::lighting::view::{FrameLight, LitRules, LookFeed};
 use crate::rules::{
     Camera, FrameSize, MapTile, OpenMode, OriginalView, Shake, UnitPosition, ViewSource,
@@ -128,6 +129,14 @@ pub trait ViewFeed: ViewSource {
     fn prepare(&mut self, _world: &ClientWorld, _assets: &mut ViewAssets) -> Result<(), ViewError> {
         Ok(())
     }
+
+    /// The drawn frame's light pass (`render/lighting.md` §6.4, once per
+    /// drawn frame after [`Self::prepare`]): `lights` is the client's
+    /// kept light list (`ClientWorld::lights`, §6.3), handed out of the
+    /// world for the pass, which updates its records (positions, radius
+    /// walks, dead records removed, kind-2 caches built and kept). The
+    /// default builds no light map and leaves the list alone.
+    fn light_frame(&mut self, _world: &ClientWorld, _lights: &mut LightList) {}
 
     /// The facts of a room unit the draw order reads (`draw-order.md` §3
     /// r4, §5) that the client model does not hold: unit flags (+0xC4),

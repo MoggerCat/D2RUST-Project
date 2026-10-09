@@ -122,6 +122,9 @@ pub fn assign_player(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
         ..PlayerData::default()
     });
     c.add(w);
+    // Player init (`0x00460BF0`): the player light (`render/lighting.md`
+    // §8 player row).
+    super::lighting::player_light(w, key);
     Ok(())
 }
 
@@ -306,6 +309,11 @@ pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
             apply3(&mut c.unit);
             apply4(&mut c.unit);
             c.add(w);
+            // The monster init's light (`0x004AE210`, `render/lighting.md`
+            // §8 monster row), in the monster's room.
+            if let Some(row) = &class_row {
+                super::lighting::monster_light(w, key, row);
+            }
             // Rule 6.8's assigns owe the passive-state parts of a passive
             // skill (`msg-skills.md` §2 r4), applied on the added unit.
             let fx = w
@@ -439,7 +447,17 @@ pub fn assign_object(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
         shrine: shrine_code,
         ..ObjectData::default()
     });
+    let mode = u.mode;
     c.add(w);
+    // Rule 2's object init `0x004BC720` gives the object its light
+    // (`0x004BC580`, `render/lighting.md` §8 object row: `Lit<mode>` / 2,
+    // kind 2). Without the class's row the light cannot be read: nothing.
+    if let Some(row) = msg.inputs.tables.objects.get(class as usize).copied() {
+        let lit = *row.lit.get(mode as usize).ok_or(HandlerError::Invalid(
+            "0x51: object mode past the eight objects.txt modes",
+        ))?;
+        super::lighting::object_light(w, key, lit, row.rgb);
+    }
     if let Some(code) = shrine_code {
         let e = shrine(code);
         if e.on_mode {

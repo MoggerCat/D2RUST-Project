@@ -1049,6 +1049,12 @@ fn world_view_frame(
     }
     let draws = ui_frame.as_ref().map_or(&[][..], |f| &f.draws[..]);
     state.feed.prepare(bridge.0.world(), &mut state.assets)?;
+    // `render/lighting.md` §6.4: the drawn frame's pass over the client's
+    // kept light list (§6.3), held by the model between frames.
+    let feed = &mut state.feed;
+    bridge
+        .0
+        .light_frame(|w, lights| feed.light_frame(w, lights));
     let placed = match ui_frame {
         Some(_) => placed,
         None => super::feed::camera_at(bridge.0.world(), state.feed.as_ref(), anchor)?,
