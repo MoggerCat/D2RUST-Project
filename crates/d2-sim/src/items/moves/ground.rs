@@ -14,8 +14,12 @@ use crate::items::inventory::pair_location;
 /// "Leave the room": room delete notice, collision freed, room list
 /// (§2.2; idempotent on the provider's side).
 pub fn leave_room<W: MoveWorld>(w: &mut W, item: Guid) {
-    w.room_delete_notice(item);
-    w.free_collision(item);
+    // Announced once: an item whose grid / belt placement already left
+    // the room is not announced again (REC-1403).
+    if w.in_room(item) {
+        w.room_delete_notice(item);
+        w.free_collision(item);
+    }
     w.remove_from_room(item);
 }
 
