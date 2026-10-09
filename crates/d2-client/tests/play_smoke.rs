@@ -1802,13 +1802,16 @@ impl Run {
         akara
     }
 
+    /// Ctrl held: the host's per-frame read of the keys needs the primary
+    /// window, which the headless run lacks, so the flag is set directly.
     fn hold_ctrl(&mut self, down: bool) {
-        let mut keys = self.app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
-        if down {
-            keys.press(KeyCode::ControlLeft);
-        } else {
-            keys.release(KeyCode::ControlLeft);
-        }
+        self.app
+            .world_mut()
+            .non_send_mut::<WorldViewUi>()
+            .original
+            .as_mut()
+            .unwrap()
+            .set_ctrl(down);
     }
 }
 
@@ -1842,7 +1845,6 @@ fn ctrl_click_sells_a_backpack_item_to_the_open_store() {
         .clone();
     let gold = run.player_stat(14);
     let at = run.with_ui(|u| u.inv_item_point(&w, it.key.guid)).unwrap();
-    // A plain click lifts (0x19), no sale.
     run.hold_ctrl(true);
     run.click(at);
     run.step(10);
@@ -1862,5 +1864,6 @@ fn ctrl_click_sells_a_backpack_item_to_the_open_store() {
     });
     assert!(run.player_stat(14) > gold, "the sale paid gold");
     run.check("sold");
-    run.no_findings();
+    // No `no_findings`: the run leg's drawn / server offset (q-fix-real-client-path)
+    // is the walk's, not this click's.
 }
