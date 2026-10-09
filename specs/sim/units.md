@@ -28,17 +28,17 @@
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–155 |
 |   3. Lifecycle | 156–420 |
-|   4. Modes and mode schedules | 421–955 |
-|   5. Event dispatch | 956–970 |
-|   6. Events per kind | 971–1093 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 1094–1115 |
-|   8. Collision line between two units | 1116–1120 |
-| Constants & data dependencies | 1121–1137 |
-| Randomness | 1138–1145 |
-| Edge cases & original bugs | 1146–1166 |
-| Test vectors | 1167–1226 |
-| Provenance | 1227–1313 |
-| Open questions | 1314–1393 |
+|   4. Modes and mode schedules | 421–960 |
+|   5. Event dispatch | 961–975 |
+|   6. Events per kind | 976–1098 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 1099–1120 |
+|   8. Collision line between two units | 1121–1125 |
+| Constants & data dependencies | 1126–1142 |
+| Randomness | 1143–1150 |
+| Edge cases & original bugs | 1151–1171 |
+| Test vectors | 1172–1231 |
+| Provenance | 1232–1318 |
+| Open questions | 1319–1398 |
 <!-- /index -->
 
 ## Summary
@@ -646,6 +646,11 @@ start; `0x005A7C20` never writes it itself.
       - `0x0061AFA0(room, GUID)`: room +0x38 + 4 · (room byte +0x14) :=
         GUID, then byte +0x14 := (byte + 1) & 3: a ring of the room's
         last four dead GUIDs (null room → nothing).
+      - PROVISIONAL: d2rs computes R byte +0x14 of the kill
+        (`0x00621DC0(D, A x, A y)`) between D's and A's path positions
+        in sub-tiles (because `skills/bodies-3.md` §3.8 does not state
+        the coordinates `0x0064FDC0` reads); settled by REC-1090, the d
+        byte of a kill's S→C 0x69 code 8 with both positions known.
    4. U's monstats `deathDmg` (+0x0E bit 4) clear → done. Else by
       `BaseId` (row +0x02; a non-monster takes the last branch):
       - 212 `bonefetish1`: (x, y) = U's position; m =
