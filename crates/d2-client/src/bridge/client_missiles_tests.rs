@@ -337,3 +337,81 @@ fn a_moving_missile_steps_along_its_path_and_ends_after_its_frames() {
         "ended after its frames"
     );
 }
+
+// Covers: specs/missiles/client-bodies.md §b5-do-bodies-animation-steering-timed-effects
+#[test]
+fn function_5_loops_the_fire_frames() {
+    let mut r = row(FN_SUB_LOOP_FIRE);
+    (r.range, r.sub_start, r.sub_stop, r.anim_len, r.anim_speed) = (10, 4, 8, 12, 0);
+    let rows = vec![ClientMissileRow::default(), r];
+    let (mut w, k) = made(&rows);
+    let set = |w: &mut ClientWorld, frame: i32, left: i32| {
+        let m = w.objclient.missiles.get_mut(&k).unwrap();
+        (m.frame, m.current) = (frame, left);
+    };
+    let frame = |w: &ClientWorld| w.objclient.missiles[&k].frame;
+    // f = A − 1 = 3 → frame := (3 + rnd(Z − A)) << 8, one draw on m's
+    // seed (none without a seed: rnd reads 0).
+    set(&mut w, 3 << 8, 9);
+    update(&mut w, &rows, k, true).unwrap();
+    assert_eq!(frame(&w), 3 << 8);
+    // left = A → max(A − 3, 0) << 8.
+    set(&mut w, 6 << 8, 4);
+    update(&mut w, &rows, k, true).unwrap();
+    assert_eq!(frame(&w), 1 << 8);
+    // left < A → max(f − 2, 0) << 8.
+    set(&mut w, 6 << 8, 3);
+    update(&mut w, &rows, k, true).unwrap();
+    assert_eq!(frame(&w), 4 << 8);
+}
+
+// Covers: specs/missiles/client.md §c13-function-bodies-specified-here
+#[test]
+fn function_43_follows_its_owner_and_ends_with_its_death() {
+    let rows = vec![ClientMissileRow::default(), row(FN_FOLLOW_OWNER)];
+    let mut w = ClientWorld::default();
+    let mon = UnitKey::new(super::super::world::MONSTER, 4);
+    let mut u = ClientUnit::new(mon);
+    u.position = Some((120, 130));
+    u.mode = 1;
+    w.units.insert(mon, u);
+    let mut rec = at(100, 100);
+    rec.owner = Some(mon);
+    let k = create(&mut w, &rows, &rec, true).unwrap().unwrap();
+    let left = w.objclient.missiles[&k].current;
+    update(&mut w, &rows, k, true).unwrap();
+    // The owner's position; no countdown.
+    assert_eq!(w.objclient.set_c[&k].position, Some((120, 130)));
+    assert_eq!(w.objclient.missiles[&k].current, left);
+    // A dead owner (monster mode 12): end(none, 0).
+    w.units.get_mut(&mon).unwrap().mode = 12;
+    update(&mut w, &rows, k, true).unwrap();
+    assert!(!w.objclient.set_c.contains_key(&k));
+    // No owner: removed.
+    let (mut w, k) = made(&rows);
+    update(&mut w, &rows, k, true).unwrap();
+    assert!(!w.objclient.set_c.contains_key(&k));
+}
+
+// Covers: specs/missiles/client-bodies.md §b5-do-bodies-animation-steering-timed-effects
+#[test]
+fn functions_60_and_63_turn_around_their_centre() {
+    for f in [FN_ORBIT, FN_ORBIT_EVEN] {
+        let rows = vec![ClientMissileRow::default(), row(f)];
+        let (mut w, k) = made(&rows);
+        w.objclient.missiles.get_mut(&k).unwrap().d28 = 95;
+        w.objclient.missiles.get_mut(&k).unwrap().d2c = 100;
+        update(&mut w, &rows, k, true).unwrap();
+        // (x, y) = (100, 100), centre (95, 100): target (100 + 0, 100 −
+        // 5) on elapsed 0 (60: even elapsed only).
+        assert_eq!(w.objclient.missiles[&k].target_point, (100, 95), "f {f}");
+        w.objclient.missiles.get_mut(&k).unwrap().target_point = (0, 0);
+        update(&mut w, &rows, k, true).unwrap();
+        let t = w.objclient.missiles[&k].target_point;
+        if f == FN_ORBIT {
+            assert_eq!(t, (100, 95));
+        } else {
+            assert_eq!(t, (0, 0), "60 skips odd elapsed");
+        }
+    }
+}

@@ -1,4 +1,4 @@
-// Spec: specs/missiles/client.md (§C1–§C4 the client create `0x004CD540`), specs/missiles/missiles.md (§R2.1 the create record), specs/render/lighting.md (§8 missile row)
+// Spec: specs/missiles/client.md (§C1–§C4 the client create `0x004CD540`; §C6, §C7, §C9, §C10, §C13), specs/missiles/client-bodies.md (§B1, §B5 r1, r3), specs/missiles/missiles.md (§R2.1 the create record), specs/render/lighting.md (§8 missile row)
 //! Client missile creation: the client create `0x004CD540` fills a
 //! client-only type-3 unit in set C (`client/model.md` §2 r1) from a
 //! 0x5C-byte create record ([`CreateRecord`]) and its `missiles` row
@@ -20,7 +20,7 @@
 //! town tests (§C6 r4, §C7 r8: no town flag in the client level rows),
 //! the second pass (§C7 r13), the client hit functions (§C9 r4.3: a
 //! handler error when a row names one), and every client function but
-//! 1, 11 and 23 (the missile is then left as it is). The aim nudge
+//! 1, 5, 11, 23, 43, 60 and 63 (the missile is then left as it is). The aim nudge
 //! (§C2 r8) reads the owner's direction from the record
 //! ([`CreateRecord::owner_dir64`]; none given is a handler error).
 
@@ -161,6 +161,10 @@ pub struct ClientMissile {
     pub pos: (u32, u32),
     pub dir_vec: (i32, i32),
     pub accel_counter: i32,
+    /// Missile data +0x28 / +0x2C (`client-bodies.md` §B1 d28, d2C): set
+    /// by the creator unless a body writes them.
+    pub d28: i32,
+    pub d2c: i32,
 }
 
 /// The path tables of `sim/pathing.md` (the direction-vector `tan`
@@ -516,11 +520,15 @@ fn missile_light(
     );
 }
 
-/// The client functions the model runs (§C12): the default step (1)
-/// and the bodies of §C13 named here.
+/// The client functions the model runs (§C12): the default step (1),
+/// the bodies of §C13 named here and of `client-bodies.md` §B5 r1, r3.
 pub const FN_DEFAULT_STEP: u16 = 1;
 pub const FN_FLAT_AT_END: u16 = 11;
 pub const FN_DEN_LIGHT: u16 = 23;
+pub const FN_SUB_LOOP_FIRE: u16 = 5;
+pub const FN_FOLLOW_OWNER: u16 = 43;
+pub const FN_ORBIT_EVEN: u16 = 60;
+pub const FN_ORBIT: u16 = 63;
 
 /// The per-update dispatch `0x004D2C70` (§C6) of the set-C missile `key`.
 pub fn update(
@@ -567,8 +575,126 @@ pub fn update(
             }
             default_step(w, rows, key, &row, lights)
         }
+        FN_SUB_LOOP_FIRE => {
+            fire_frames(w, key, &row);
+            default_step(w, rows, key, &row, lights)
+        }
+        FN_FOLLOW_OWNER => follow_owner(w, rows, key, lights),
+        FN_ORBIT_EVEN | FN_ORBIT => {
+            let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
+            if row.clt_do_func == FN_ORBIT || (m.total - m.current) % 2 == 0 {
+                orbit(w, key);
+            }
+            default_step(w, rows, key, &row, lights)
+        }
         // f ≤ 0: never stepped (§C6 r5); other functions: not modelled.
         _ => Ok(()),
+    }
+}
+
+/// Function 5 `0x004D3540` (`client-bodies.md` §B5 r1) before its step:
+/// f := frame >> 8, A := `SubStart`, Z := `SubStop`; f = A − 1 → frame
+/// := (f + rnd(Z − A)) << 8; else left = A → frame := max(A − 3, 0) <<
+/// 8; else left < A → frame := max(f − 2, 0) << 8.
+fn fire_frames(w: &mut ClientWorld, key: UnitKey, row: &ClientMissileRow) {
+    let Some(m) = w.objclient.missiles.get(&key).copied() else {
+        return;
+    };
+    let (f, a, z) = (
+        m.frame >> 8,
+        i32::from(row.sub_start),
+        i32::from(row.sub_stop),
+    );
+    let frame = if f == a - 1 {
+        let r = rnd(w, key, z - a);
+        Some((f + r) << 8)
+    } else if m.current == a {
+        Some((a - 3).max(0) << 8)
+    } else if m.current < a {
+        Some((f - 2).max(0) << 8)
+    } else {
+        None
+    };
+    if let (Some(frame), Some(m)) = (frame, w.objclient.missiles.get_mut(&key)) {
+        m.frame = frame;
+    }
+}
+
+/// `rnd(n)` on the missile's unit seed (`client-bodies.md` §B1: n < 1 →
+/// 0, no draw).
+fn rnd(w: &mut ClientWorld, key: UnitKey, n: i32) -> i32 {
+    if n < 1 {
+        return 0;
+    }
+    let Some(u) = w.objclient.set_c.get_mut(&key) else {
+        return 0;
+    };
+    let Some((lo, hi)) = u.seed else {
+        return 0;
+    };
+    let mut seed = Seed::new(lo, hi);
+    let r = seed.roll(n) as i32;
+    u.seed = Some((seed.lo, seed.hi));
+    r
+}
+
+/// Function 43 `0x004D3070` (`client.md` §C13): no owner → remove; an
+/// owner of type ≤ 1 that is dead → end(none, 0); else m takes the
+/// owner's position and advances its animation with wrap; no step, no
+/// countdown.
+fn follow_owner(
+    w: &mut ClientWorld,
+    rows: &[ClientMissileRow],
+    key: UnitKey,
+    lights: bool,
+) -> Result<(), HandlerError> {
+    let owner = w
+        .objclient
+        .missiles
+        .get(&key)
+        .and_then(|m| m.owner)
+        .and_then(|o| w.units.get(&o));
+    let Some(o) = owner else {
+        remove(w, key);
+        return Ok(());
+    };
+    if o.key.unit_type <= MONSTER && o.is_dead() {
+        end(w, rows, key, false, lights)?;
+        return Ok(());
+    }
+    let (ox, oy) = o.cell();
+    if let Some(u) = w.objclient.set_c.get_mut(&key) {
+        u.position = Some((ox, oy));
+    }
+    if let Some(m) = w.objclient.missiles.get_mut(&key) {
+        m.pos = (
+            (u32::from(ox) << 16) | 0x8000,
+            (u32::from(oy) << 16) | 0x8000,
+        );
+        m.frame += m.anim_speed;
+        if m.anim_len > 0 && m.frame >= m.anim_len {
+            m.frame -= m.anim_len;
+        }
+    }
+    Ok(())
+}
+
+/// Functions 60 / 63 (`client-bodies.md` §B5 r3), the orbit: target
+/// point := (x + (y − d2C), y − (x − d28)), a quarter turn around (d28,
+/// d2C), and the path re-built toward it.
+fn orbit(w: &mut ClientWorld, key: UnitKey) {
+    let Some(m) = w.objclient.missiles.get_mut(&key) else {
+        return;
+    };
+    let (x, y) = ((m.pos.0 >> 16) as i32, (m.pos.1 >> 16) as i32);
+    let t = (x + (y - m.d2c), y - (x - m.d28));
+    m.target_point = t;
+    match straight_path(m.pos, t) {
+        Some((vec, dir)) if t != (x, y) => {
+            m.dir_vec = vec;
+            m.direction = dir & 63;
+        }
+        _ => m.dir_vec = (0, 0),
     }
 }
 
