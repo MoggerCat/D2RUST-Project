@@ -273,6 +273,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     fill `own`. Write the answer into `sim/units.md` (or the owner spec)
     and the §2 row of `state-snapshot.md`.
 28. **0x8E flag byte at the join** (q-fix-pc1-proto-items) The join's 0x8E CorpseAssign per corpse of another client's player (`0x0053DFB0` from `0x0052C410`, `sim/intents-events.md` §8.3) is sent with flag byte 1 (assign); the flag source at that call is not read. Needed: the byte `0x0052C410` passes to `0x0053DFB0`.
+34. **Town critters are a client-side spawn from `Levels.txt` C1 / CA1** (q-fix-real-critters-drops; same topic as item 30) The Rogue Encampment chickens (ck, class 149) are not server units: the server's unit lists have none (state snapshots to frame 90, both sides equal at 25 units). 1.14d's client creates them with `0x00466730(class 149, x, y, 1, ..)` (type 1, client set C, GUID from the client counter `[0x00711F30]`), three per group, from return address `0x0046C316`; the caller chain is `0x0046C54D` <- `0x0044C774` (the client room function `0x0044C750`, which also runs the preset pass `0x00466820`). Levels.txt row 1 has `C1` = 149, `CA1` = 30 (the level record dump at `[arg5]` shows 0x95 and 0x1E). Per group the draws are: 3 steps at `0x0046C4AC` on three different `{lo, 666}` seeds, a `roll(0)` via `0x0045C3E0` at `0x0046C516` on the room's client seed, then per chicken one step at `0x0046C257` and one at `0x0046C29C` (x and y). First groups in frame 2 of `a1-town-arrival-ama`: (4827, 4195) (4820, 4198) (4832, 4191) and (4927, 4198) (4939, 4198) (4956, 4195); later rooms (frames 89-95): (4814, 4256) (4827, 4269) (4834, 4275) and (4871, 4242) (4877, 4254) (4849, 4267). Needed (a spec for a new `world/` or `client/` section): the body of the function holding `0x0046C257`-`0x0046C54D`: what makes a group (CA chance? MinGrp / MaxGrp 3 / 3 of the chicken row), the centre point and offset formula from the draws, the seed each step uses, and when the room function runs it (client room entry and exit; the GUIDs 93-95 of the scene need the 190 river-object creations at `0x00466862` before them). Probe: a scratch subclass of `record_state.py` hooking `0x00466730` / `0x00466360` (not committed); the facts are in `docs/handoff/q-fix-real-critters-drops.md`. `population.md` §11.3 (critters are not placed by the server) is confirmed.
 26. **Re-record sim-0009 without input** (q-prov-recording, REC-290): the Wine
     run of the same command equals `traces/sim/tick/sim-0009.json` for ticks
     0–60, then the Windows trace has a client message at tick 61 (drain: a
@@ -292,6 +293,20 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     code 8 copies and whether that monster's target was cleared (an AI
     request) before its death; answer into §7.4 rule 7. d2rs tests
     `monster_death.rs` / `e2e_night_world.rs` now expect the spawn point.
+
+35. **`0x0063E6B0(unit, 0)`: are the action-frame tests skipped?** (REC-700) `0x005A6D50` passes the moving flag r as `0x0063E6B0`'s second argument (`skills/use.md` §5.2 "Monsters"); `skills/bodies-3.md` §5.18 step 3 gives the tests (+0x4E = 0, or no action event in the frames ((cur − speed) >> 8, cur >> 8]) for the argument 1 only. Read: what the function does with 0 (d2rs: no tests, the column by mode). Write the answer into `bodies-3.md` §5.18 step 3.
+36. **Who writes unit +0x4E from a type-0 timer's frame code?** (REC-701) trigger(U) of `0x005A7670` reads +0x4E = 1 (`skills/use.md` §5.2); `sim/units.md` §4.2 schedules event 0 with args (E[i], k) and the field table names only `0x005533D0` (0 at mode start). Read: the writer of +0x4E on the event-0 path of a monster (the unit-type dispatcher or the timer run), and whether a code-0 event writes it. Write the answer into `sim/units.md` §4.2 / §4.6.
+37. **The client's mode-18 leap / whirl: hold, path end, code 0x16** (REC-702..704, `d2-client` `world_view/skill_motion.rs`; measured leap / whirl in `facts/client/anim/a1-cold-plains-*-bar.tsv`) Read: (1) which client code holds the Leap sequence at frame 11 while the motion record lives, and whether Leap Attack (`seqnum` 14) holds at its frame 11 the same way (REC-704); (2) the client whirl path: its step per update (d2rs: class `WalkVelocity` << 12, 0x6000 measured for the barbarian) and the update mode 18 ends on (d2rs: the one whose step reaches the end, `((d << 16) − 1) / step` after the do, `d` by `0x006417F0`; REC-703); (3) the skill mode request's first mode-18 update and code 0x16's record 2 / 3 as unit type / GUID (REC-702). Write the answers into `render/unit-composite.md` §8 or `skills/sequences.md` §3.
+
+38. **Range state mask 0x26 = `meleeonly`?** `range(P,
+  skill)` `0x00645460` (`skills/use.md` §3 r6) tests "state mask 0x26".
+  d2rs (`d2-client` `bridge/combat.rs` `in_melee_only_state`) reads it as
+  `0x0063A130` with the per-flag mask at data +0xCC + 4·0x26, i.e. the
+  `states.txt` flag bit 38 `meleeonly` (`data/fields.tsv`; the
+  `ui/panels-3.md` §24 r1 scheme). Confirm the argument `0x00645460`
+  passes is that flag index (not a data offset or a precomputed group),
+  and write it into `use.md` §3 r6.
+
 ## How to check a behaviour in one command
 
 A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)
@@ -363,6 +378,19 @@ rather than a hand-run recipe.
   another source), the GUID counter (why 93), the client set-up
   (`0x004AE8D0`-like: stats, seed, first frame), and their client-side
   AI / motion (the recorded ck frames walk: WL at tick 8 and on).
+
+39. **Evade's reaction (`combat/damage.md` §7.1 step
+  5.2)**: "state 68 list; s, E as above" — does the evade branch also
+  set E flags |= 4 and make the unit form request (E, mode 13, tA, gA,
+  0) like 5.1, or only the `stsound` sound event 12? d2rs
+  (`wiring/action/reaction.rs`) does the full 5.1 skill form plus the
+  sound. Answer into §7.1 step 5.2.
+40. **Missile damage setup weapon of a monster
+  (`missiles/damage.md` §1 step 6)**: d2rs serves `0x00622830` (a type-1
+  owner with an inventory) with the same seam as the player's attack
+  weapon `0x00623990(owner, 1)` (`Pending::attack_weapon`). Is
+  `0x00622830` the same pick (`sim/units.md` §4.7 "Attack weapon") or
+  plain `0x0063C9B0`? Answer into §1 step 6.
 
 ## Step 5 — spec gaps (107 provisional points no spec states)
 

@@ -132,12 +132,9 @@ impl<R: ViewRules> ViewRules for UnitRules<R> {
             cof: path,
             dir: usize::from(dir.cof_dir),
             dir64: dir.dir64,
-            frame: if art.spin == Some(unit.key) {
-                super::skill_motion::spin_frame(
-                    world.server_ticks,
-                    cof.animation_rate,
-                    usize::from(cof.frames),
-                )
+            frame: if let Some((_, f)) = art.sequence.filter(|(k, _)| *k == unit.key) {
+                // `skills/sequences.md` §3: the sequence frame's drawn frame.
+                f % usize::from(cof.frames.max(1))
             } else if let Some(since) = art
                 .pose_since
                 .filter(|(k, _)| *k == unit.key && matches!(unit.mode, 2 | 6))

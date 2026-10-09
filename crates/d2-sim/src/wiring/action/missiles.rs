@@ -335,17 +335,19 @@ pub fn damage_record(d: &Damage) -> DamageRecord {
 }
 
 impl<X: Pending> MissileCombat for View<'_, X> {
+    /// `missiles/damage.md` §4 on combat's view.
     fn damage_setup(
         &mut self,
         game: &mut Game,
         owner: UnitId,
         origin: Option<UnitId>,
         missile: UnitId,
+        skill: i32,
         level: i32,
-    ) {
-        self.h
-            .x
-            .missile_damage_setup(game, owner, origin, missile, level);
+    ) -> u32 {
+        let t = self.h.tables.clone();
+        let mut w = self.combat(game);
+        crate::missiles::damage::setup(&mut w, &t.skills, owner, origin, missile, skill, level)
     }
     /// `0x0057D9B0(owner, defender, tohit, missile = 1)` (`hit.md` §3).
     fn hit_test(&mut self, game: &mut Game, owner: UnitId, defender: UnitId, tohit: i32) -> bool {

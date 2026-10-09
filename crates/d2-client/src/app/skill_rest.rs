@@ -110,6 +110,7 @@ pub fn skill_row(s: &Skills) -> SkillRow {
     SkillRow {
         anim: s.anim,
         monanim: s.monanim,
+        seqnum: s.seqnum,
         passivestate: s.passivestate,
         maxlvl: s.maxlvl,
         charclass: s.charclass as i8,
