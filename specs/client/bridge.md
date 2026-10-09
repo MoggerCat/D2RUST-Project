@@ -44,15 +44,15 @@
 |   5. Client world model | 183–202 |
 |   6. Dispatch table | 203–254 |
 |   7. Bevy mirror | 255–273 |
-|   8. Frame pacing | 274–300 |
-|   9. Versioning | 301–311 |
-|   10. Client outputs (bridge → UI and audio) | 312–497 |
-| Constants & data dependencies | 498–512 |
-| Randomness | 513–516 |
-| Edge cases & original bugs | 517–525 |
-| Test vectors | 526–556 |
-| Provenance | 557–567 |
-| Open questions | 568–608 |
+|   8. Frame pacing | 274–312 |
+|   9. Versioning | 313–323 |
+|   10. Client outputs (bridge → UI and audio) | 324–509 |
+| Constants & data dependencies | 510–524 |
+| Randomness | 525–528 |
+| Edge cases & original bugs | 529–537 |
+| Test vectors | 538–568 |
+| Provenance | 569–579 |
+| Open questions | 580–620 |
 <!-- /index -->
 
 ## Summary
@@ -297,6 +297,18 @@ receive).
    1.14d drawn pass, `0x0044F28B`). A paused single-player frame (UI
    state 9 or 11 open, `0x0044EFE3`–`0x0044F029`) runs no `pump` and no
    `receive` (so no server tick, no drain) and only the fallback, once.
+   Confirmed 2026-10-09 (pc1-data Step 4 item 2): 1.14d stops the game
+   loop, and the stop is in the client loop pass itself (`0x0044EFA0`,
+   entered through the pointer set at `0x0044F566`), not in the menu
+   code: game type `[0x007A0610]` 0 or 1, `0x00453A90(9)` or
+   `0x00453A90(11)` set, a player unit (`0x00463DD0`) in a room
+   (`0x004646A0`) → update clock `[0x007A0490]` := now, the draw
+   `[0x007A0484]`(0), the sound tick `0x00482C20`, return (`0x0044F029`)
+   before `0x004519C0` and the rest of the pass. Open / multiplayer
+   games skip the check (`0x0044EFC3`).
+   ```
+   if sp && (ui(9) || ui(11)) && player && in_room(player) { clock = now(); draw(); sound_tick(); return }
+   ```
 
 ### 9. Versioning
 

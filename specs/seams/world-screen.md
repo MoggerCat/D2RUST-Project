@@ -168,12 +168,11 @@ the floor rounding are `camera.md`'s RE results.
 
 ## Open questions
 
-1. `0x0045AFF0` (screen → world for a click) is named in
-   `ui/controls.md` §6 r2 but not specified: which origin it inverts
-   (unit origin, as d2rs does, or tile origin, 12 rows apart), whether
-   it subtracts `shiftX`, and its rounding. d2rs's inverse is
-   PROVISIONAL (`bridge::click::screen_to_world`). Needs a spec-writing
-   session on the 1.14d binary.
+1. Answered (re-checked 2026-10-09 against `0x0045AFF0`):
+   `render/camera.md` §4 "Screen → world": the unit origin, minus
+   `shiftX`, with **no −8** on y, then `0x00643510` (floor shifts);
+   perspective first when on. d2rs's `bridge::click::screen_to_world`
+   subtracts 8 from y: q-fix-click-no-minus-8.
 2. The hover model `0x00467A10` (the original hit-tests drawn sprites):
    when specified, §2.5 becomes "the pick reads the drawn cel's
    rectangle", and the d2rs-own box goes.

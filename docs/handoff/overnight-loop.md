@@ -50,3 +50,33 @@ them for PC 1 in `docs/handoff/pc1-data.md` §Step 4 and skip.
    real 1.14d, what is left (M24: remaining work with sizes and
    uncertainty), what waits on PC 1.
 5. Archive finished sessions; disable the hourly check-in.
+
+## Day run 2026-10-09 (from 06:30 UTC, until the work sources are empty)
+
+Same rules as the overnight run (gate, Sonnet by default, at most 8
+sessions, hourly check-in). The 400s are used up; cloud REC blocks move
+to 500..599, ten per session:
+
+| Session | REC block | Model |
+|---|---|---|
+| q-fix-real-unit-seed-order | 500–509 | Opus (RNG order) |
+| q-scenes-compare (merge q-facts-scenes, then compare) | 510–519 | Opus (rendering) |
+| q-fix-server-store-fill | 520–529 | Sonnet |
+| q-fixture-migrate-2 (G4–G7, F1–F3, gate snap-back) | 530–539 | Sonnet |
+| q-fix-client-missiles-rest | 540–549 | Opus (rendering) |
+| q-prov-recording (settle `recording` points under Wine) | 550–559 | Opus |
+| q-prov-data (settle `data` points from the install) | 560–569 | Sonnet |
+| q-prov-recording-2 (the d2-client `recording` points; q-prov-recording takes the rest) | 570–579 | Opus |
+| q-tool-state-diff (per-tick unit state diff; one-command scenario diff) | 580–589 | Opus |
+| q-tool-poke (state injection on both sides; test-install patch variants) | 590–599 | Opus |
+
+Next free cloud id: REC-600. Session cap raised to 10 for the two tooling sessions.
+
+Speed (user, 2026-10-09 08:00): sessions work in parallel with subagents,
+run only the changed crate's tests while iterating and the full gate before
+each push, push every 2–4 fixes, report in one short message per push, and
+send binary-only questions to pc1-data.md instead of stopping.
+
+PC 1 items: sessions add new `pc1-data.md` Step 4 items without a number, as
+"- **[session] title**"; the coordinator numbers them at merge (two
+sessions picking the same next number collided twice on 2026-10-09).

@@ -146,7 +146,7 @@ never committed: `traces/raw/<name>.<side>.trace.jsonl`.
   hex without separators. Integers are JSON numbers (all fit in 2^53).
 - Line 1 is the header; then the records in tick order; the last line
   is the `end` record. Within a tick, records keep the order of the
-  table below (`c2s`, `spawn`, `s2c`, `rng`, `draw`, `unit`, `stats`); within a
+  table below (`c2s`, `spawn`, `poke`, `s2c`, `rng`, `draw`, `unit`, `stats`); within a
   kind, the order the rules give.
 
 Header (`k` = `"header"`):
@@ -170,6 +170,7 @@ Records (`t` = tick, `scenario.md` §4 rule 2):
 |---|---|---|
 | `c2s` | `t`, `i` (step index in the tick, from 0), `b` (bytes) **or** `unresolved` (the reference text) | every step (§4 rule 4) |
 | `spawn` | `t`, `i`, and one of `guid` (the unit the first call returned), `failed` (`true`: none) or `unresolved` | every spawn step (§3.1 rule 3); part of the `c2s` stream |
+| `poke` | `t`, `i`, `d` (directive keyword), `r` (`ok`, `failed`, `unresolved` or `gap`), `guid` (only with `ok` when a unit was created) | every poke step (`tools/poke.md` §3 rule 3); part of the `c2s` stream |
 | `s2c` | `t`, `c` (client id), `b` | every message queued for the client (§4 rule 5) |
 | `rng` | `t`, `before`, `after`: `[lo, hi]` of the game seed | every tick when `rng` is recorded (§4 rule 6) |
 | `draw` | `t`, `n` (draw index in the tick), `before`, `after`, `site` (caller: a 1.14d address `"0x…"` or a d2rs label; never compared) | each game-seed draw, `rng-draws` only |
@@ -224,3 +225,4 @@ that states the bytes are unwritten or clock values, as
 | 1 | 2026-10-06 | Added §Render captures (new area and kind, no bump; its payload carries `capture_format` 1). |
 | 1 | 2026-10-06 | §Render captures payload `capture_format` 2 (raw `frames-raw-2`, `record_frames.py` 0.2.0): `seq`, cursor, level, seeds, light, weather and the optional draw log; images named by `seq`. Readers keep accepting 1. |
 | 1 | 2026-10-06 | Added §Scenario traces: a separate JSON-lines kind with its own version (`scenario-trace` 1); format-1 traces unchanged. |
+| 1 | 2026-10-09 | §Scenario traces: new record `poke` (`tools/poke.md` §3), written only by scenarios with `poke` steps; `scenario-trace` stays 1 (older traces have none). |

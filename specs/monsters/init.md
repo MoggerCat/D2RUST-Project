@@ -29,39 +29,39 @@
 |   1. Entry points | 124–146 |
 |   2. The create request | 147–164 |
 |   3. Placement | 165–173 |
-|   4. Creation sequence after placement (`0x005B2A00`) | 174–232 |
-|   5. Monster type init (`0x00574250`) | 233–250 |
-|   6. Stats and skills (`0x00573CB0`) | 251–290 |
-|   7. Monster level | 291–306 |
-|   8. Base values from monlvl | 307–341 |
-|   9. Player-count bonus (`0x00573930`) | 342–353 |
-|   10. Components (`0x005739D0`) | 354–364 |
-|   11. monprop (`monprop.txt`) | 365–373 |
-|   12. monequip (`0x005D6B60`) | 374–390 |
-|   13. Classic scaling (`0x0063EEF0`) | 391–398 |
-|   14. Normal mods and boss mods | 399–500 |
-|   15. Party minions | 501–505 |
-|   16. Boss spawns | 506–541 |
-|   17. Choosing umods (`0x005A0760`) | 542–585 |
-|   18. Boss minions and umod init (`0x005A2120`) | 586–603 |
-|   19. Umod init functions | 604–690 |
-|   20. Superuniques (`0x005A49B0`) | 691–739 |
-|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 740–754 |
-|   22. Umod callbacks and the type-7 event | 755–806 |
-|   23. Unique names (client) | 807–816 |
-|   24. Monster assign message | 817–868 |
-|   25. Calling the spawn functions outside population (tools) | 869–959 |
-|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 960–1019 |
-|   27. Class reinit (`0x00574370`) | 1020–1065 |
-| Constants & data dependencies | 1066–1087 |
-| Randomness | 1088–1130 |
-| Edge cases & original bugs | 1131–1162 |
-| Test vectors | 1163–1164 |
-|   Synthetic (CI-safe) | 1165–1187 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1188–1218 |
-|   Recorded checks (monster assign 0xAC) | 1219–1231 |
-| Provenance | 1232–1310 |
-| Open questions | 1311–1391 |
+|   4. Creation sequence after placement (`0x005B2A00`) | 174–239 |
+|   5. Monster type init (`0x00574250`) | 240–257 |
+|   6. Stats and skills (`0x00573CB0`) | 258–297 |
+|   7. Monster level | 298–313 |
+|   8. Base values from monlvl | 314–348 |
+|   9. Player-count bonus (`0x00573930`) | 349–360 |
+|   10. Components (`0x005739D0`) | 361–371 |
+|   11. monprop (`monprop.txt`) | 372–380 |
+|   12. monequip (`0x005D6B60`) | 381–397 |
+|   13. Classic scaling (`0x0063EEF0`) | 398–405 |
+|   14. Normal mods and boss mods | 406–507 |
+|   15. Party minions | 508–512 |
+|   16. Boss spawns | 513–548 |
+|   17. Choosing umods (`0x005A0760`) | 549–592 |
+|   18. Boss minions and umod init (`0x005A2120`) | 593–610 |
+|   19. Umod init functions | 611–697 |
+|   20. Superuniques (`0x005A49B0`) | 698–746 |
+|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 747–761 |
+|   22. Umod callbacks and the type-7 event | 762–813 |
+|   23. Unique names (client) | 814–823 |
+|   24. Monster assign message | 824–875 |
+|   25. Calling the spawn functions outside population (tools) | 876–966 |
+|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 967–1026 |
+|   27. Class reinit (`0x00574370`) | 1027–1072 |
+| Constants & data dependencies | 1073–1094 |
+| Randomness | 1095–1137 |
+| Edge cases & original bugs | 1138–1169 |
+| Test vectors | 1170–1171 |
+|   Synthetic (CI-safe) | 1172–1194 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1195–1225 |
+|   Recorded checks (monster assign 0xAC) | 1226–1238 |
+| Provenance | 1239–1317 |
+| Open questions | 1318–1398 |
 <!-- /index -->
 
 ## Summary
@@ -205,7 +205,14 @@ bit 1 ("add") is set. After `0x00574250` returns, in order:
       `0x005A7C20(game, request, 1)` (`sim/units.md` §4.6).
    2. `0x00553160(unit)` ≠ 0 → think restart `0x00573780`
       (`monsters/ai.md` §1.5); else room clean-up `0x00553220`
-      (`sim/intents-events.md` §7.5).
+      (`sim/intents-events.md` §7.5). The gate (unit in EAX) is "the
+      unit has an active room (`0x00620BB0`: for a monster, the path's
+      room) and that room's client count (active room +0x78,
+      `drlg/rooms.md`) is nonzero":
+      `restart := room(unit) ≠ null && room.clients ≠ 0`. A monster
+      added to a room no client sees gets the clean-up instead (no
+      think; it stays asleep until a client arrives, `ai.md` §1.5).
+      Same gate at the second caller `0x00554B4E` (`0x00554A30`).
 2. Hash insert and room queueing (`sim/unit-order.md` §3.1).
 3. Path settings when `0x0063EA40` holds and `0x004638A0(class, 0x13)`
    does not (`sim/units.md` §3.1 step 8).
