@@ -46,7 +46,11 @@
 //! the 0x15 placement after it (the placement's teleport sets the path's
 //! point count to 0, `sim/path-placement.md` §6 r4; whether the client
 //! then walks on to the request's target is OQ2), and the hold until the
-//! target is in the player's room. Used only by the `play` preview; the
+//! target is in the player's room. Measured on a waypoint arrival
+//! (`traces/client/model/client-0002.json`): the 1.14d client stands at
+//! the 0x15 point with the server and never walks to the 0x0D's x + 3,
+//! y + 3, where this module draws it: q-fix-arrival-walkout (warps and
+//! portals not recorded yet, REC-570). Used only by the `play` preview; the
 //! strict path never builds one.
 
 use std::sync::OnceLock;

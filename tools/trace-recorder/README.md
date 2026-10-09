@@ -325,3 +325,19 @@ entry), `footer`. A list dump: `L`, `ext`, `fl`, `st`, `ex`, `ot`, `og`,
 `u`, `par`, `prev`, `next`, `b` (base `[stat, layer, value]`), and for
 extended lists `last`, `setl`, `ow`, `F` (full), `m` (mod keys), `cb`,
 `sb` (state bits).
+
+## record_walk.py: the local player's client path against the server's
+
+`record_walk.py` (0.1.0, raw format `walk-raw-1`) reuses `record_tick.py`'s
+debugger with two hooks only, the server tick `0x52D870` and the in-game
+draw entry `0x44C990` (`render/capture.md` §2), and logs the client player
+(`0x7A6A70`) and the server player (game unit hash, same GUID): path
+16.16 position, mode, path target, index and count, at every tick start
+(`t`) and every draw entry (`fr`), the unit / path pointers when they
+change (`units`), and the camera globals `0x7A520C` / `0x7A5208` /
+`0x7A5214` at the first tick and the first draw entry (`cam0`). Fast under
+Wine (about 1,700 ticks in 4 minutes). `convert_walk.py RAW --id ID --out
+traces/client/model/ID.json` writes the committed trace (area `client`,
+behavior `model`: the camera records and the tick states where either
+path changed, with tick / frame difference counts). `--selftest` checks
+the readers.
