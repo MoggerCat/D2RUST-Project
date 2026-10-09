@@ -9,7 +9,10 @@
   `spawn` normal (GUID 8), `seed-unit`, `object` (GUID 18), `time`,
   `seed-game`, `superunique` (GUID 8), `missile` (GUID 1) all returned
   `ok` with no fault (`traces/pokes/spawn-town.poke`,
-  `missile-superunique.poke`). The comparison with d2rs is REC-590. The d2rs side (§3, §5) is implemented
+  `missile-superunique.poke`); scenario `spawn` kinds `champion`
+  (GUID 8), `random-boss` (GUID 13), `unique` with umods 5, 7 (GUID 17)
+  returned `ok` with minions (`boss-kinds.poke`, monsters/init.md §25
+  forms). The comparison with d2rs is REC-590. The d2rs side (§3, §5) is implemented
   (`d2-sim::poke`, scenario `poke` steps, `scenario-run`, `d2-client
   play --poke`): every directive runs on the synthetic install; `warp`
   to another act runs the act change (§1 table); `item` without item
@@ -32,21 +35,21 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 52–64 |
-| Inputs | 65–71 |
-| Outputs / state changes | 72–80 |
-| Rules | 81–82 |
-|   1. Directives | 83–117 |
-|   2. Poke files | 118–140 |
-|   3. In scenarios | 141–155 |
-|   4. The 1.14d side (`poke.py`) | 156–206 |
-|   5. The d2rs side (`d2-sim::poke`) | 207–221 |
-| Constants & data dependencies | 222–234 |
-| Randomness | 235–241 |
-| Edge cases & original bugs | 242–251 |
-| Test vectors | 252–263 |
-| Provenance | 264–269 |
-| Open questions | 270–290 |
+| Summary | 55–67 |
+| Inputs | 68–74 |
+| Outputs / state changes | 75–83 |
+| Rules | 84–85 |
+|   1. Directives | 86–120 |
+|   2. Poke files | 121–143 |
+|   3. In scenarios | 144–158 |
+|   4. The 1.14d side (`poke.py`) | 159–209 |
+|   5. The d2rs side (`d2-sim::poke`) | 210–224 |
+| Constants & data dependencies | 225–237 |
+| Randomness | 238–244 |
+| Edge cases & original bugs | 245–254 |
+| Test vectors | 255–266 |
+| Provenance | 267–272 |
+| Open questions | 273–293 |
 <!-- /index -->
 
 ## Summary
@@ -94,7 +97,7 @@ cannot run the directive, §4). Results are written as `poke` records
 <!-- rows -->
 | Directive | Arguments | Effect | 1.14d | d2rs |
 |---|---|---|---|---|
-| `object` | `<class> <x> <y> [mode <m>]` | create an object (objects row), mode default 0 | allocator `0x00555230` with type 2, flags 1 (`sim/units.md` §3.1 steps 1–8; `world/objects-2.md` §22 r4: mode is the sixth stack argument) | `View::allocate` with `UnitType::Object` (the allocator path `scenario-run` uses for waypoints) |
+| `object` | `<class> <x> <y> [mode <m>]` | create an object (objects row), mode default 0 | allocator `0x00555230` with type 2, flags 1 (`sim/units.md` §3.1 steps 1–8; `world/objects-2.md` §22 r4: mode is the sixth stack argument) | `View::create_object` (the creation the game's own objects take: population, quests): the allocator with the per-kind init (`world/objects.md` §3: control record, InitFn on the control seed, at the allocation's room and (x, y)) before the add (`sim/units.md` §3.1 steps 7–8); without object state, or a class past the `objects` rows, `View::allocate` |
 | `superunique` | `<row> <x> <y>` | create a superunique (superuniques row) and its minions | entry 4 `0x005A49B0` (`original-hooks-spawn.md` §1, §3) | `monsters::population::preset::superunique` (`population.md` §11.4) |
 | `missile` | `<class> <x> <y> <tx> <ty> [skill <id> <level>] [owner <ref>]` | create a missile at (x, y) aimed at (tx, ty); owner default `@player` | `0x0059FA30` (ECX game, EDX record; `original-hooks.md` §7.1): record +0x00 flags = 0x21 (position given, target absolute), +0x04 owner, +0x08 origin = owner, +0x10 class, +0x14/+0x18 x, y, +0x1C/+0x20 tx, ty, +0x2C skill, +0x30 level (`missiles.md` §R2.1); other fields 0 | `missiles::create::create_missile` with the same flags and fields |
 | `seed-game` | `<lo> <hi>` | set the game seed | write u32 lo, hi at game +0xD0 (`rng.md` §5.2; `original-hooks-spawn.md` Constants) | `ActionHooks.game_seed.set(lo, hi)` |
