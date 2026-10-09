@@ -56,8 +56,8 @@ waypoint). Screenshots are local only:
 | Checkpoint | Quest log | Waypoints |
 |---|---|---|
 | CkAndariel (Act I) | Den of Evil, Sisters' Burial Grounds, Search for Cain done; the other three not open | all 9 Act I active |
-| CkMephisto (Act III) | Act I as the definition (+ Sisters to the Slaughter), Act II all 6 done, Act III 5 done, The Guardian not open | not shot: `goto` timed out in Kurast Docks |
-| CkHellforge (Act IV) | Acts I–III done, The Fallen Angel done, Hell's Forge in progress ("Take Mephisto's Soulstone to the Hellforge"), Terror's End not open | not shot: the menu did not open |
+| CkMephisto (Act III) | Act I as the definition (+ Sisters to the Slaughter), Act II all 6 done, Act III 5 done, The Guardian not open | not shot: the docks waypoint is out of `goto`'s sight at the start; its list is a subset of CkHellforge's and CkBaal's, both all active |
+| CkHellforge (Act IV) | Acts I–III done, The Fallen Angel done, Hell's Forge in progress ("Take Mephisto's Soulstone to the Hellforge"), Terror's End not open | Act I 9, Act III 9, Act IV 3 all active (second run: the town waypoint took him to City of the Damned, whose menu was shot; the Act II tab click missed) |
 | CkBaal (Act V) | Acts I–IV done, Act V five done, Eve of Destruction open ("Find Baal's Throne Room") | all 39 active (5 tabs) |
 
 Every step the definitions set shows done; no finding for the
