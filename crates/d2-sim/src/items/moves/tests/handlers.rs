@@ -417,6 +417,23 @@ fn swap_1h_with_2h() {
     assert_eq!(f.inv().cursor, Some(10));
 }
 
+/// §7.9 step 3: with §4.3 = 7 and no item X in the other hand, the
+/// routine's fatal (not a refusal).
+// Covers: specs/items/inventory-moves.md §7.9 r3
+#[test]
+fn swap_1h_with_2h_without_the_other_hand_is_fatal() {
+    use crate::items::moves::{handle, MoveFatal};
+    let mut f = Fake::new();
+    f.item(10, mode::CURSOR);
+    f.item(11, mode::EQUIPPED);
+    f.inv_mut().body.insert(4, 11);
+    f.k.equip_check = 7;
+    assert_eq!(
+        handle(&mut f, P, &mloc(0x1E, 10, 4)),
+        Some(Err(MoveFatal::Missing))
+    );
+}
+
 // ---- 0x1F
 
 // Covers: specs/items/inventory-moves.md §7.10 text, §7.10 r1, §7.10 r2, §7.10 r3
@@ -529,6 +546,27 @@ fn stack_items() {
     assert_eq!(f.stat(Owner::item(11), 70), 15);
     assert_eq!(f.stat(Owner::item(11), 72), 3);
     assert_eq!(f.sent, vec![vec![0x42, 4, 10, 0, 0, 0]]);
+    assert!(f.logged("free 10"));
+    assert_eq!(f.inv().cursor, None);
+}
+
+/// Two arrow quivers (no durability: `0x00629930` = 0) whose total fits
+/// merge; only the stat-72 step needs durability (PROVISIONAL REC-289).
+// Covers: specs/items/inventory-moves.md §7.12
+#[test]
+fn stack_items_without_durability_merge() {
+    let mut f = Fake::new();
+    f.item(10, mode::CURSOR);
+    f.item(11, mode::STORED).max_stack = 500;
+    f.k.stack = true;
+    f.k.merge = false;
+    f.set_stat(Owner::item(10), 70, 100);
+    f.set_stat(Owner::item(11), 70, 250);
+    f.set_stat(Owner::item(10), 72, 3);
+    f.set_stat(Owner::item(11), 72, 9);
+    assert_eq!(run(&mut f, &m32(0x21, &[10, 11])), res::OK);
+    assert_eq!(f.stat(Owner::item(11), 70), 350);
+    assert_eq!(f.stat(Owner::item(11), 72), 9, "no durability step");
     assert!(f.logged("free 10"));
     assert_eq!(f.inv().cursor, None);
 }
@@ -798,9 +836,13 @@ fn merc_item_gates() {
     f.k.owns = false;
     assert_eq!(run(&mut f, &m16(0x61, 1)), res::OK);
     f.k.owns = true;
-    // Location 0 with no cursor item → 0; bad location → 2.
+    // Location 0 with no cursor item → 0. A hireling without an
+    // inventory → 3 (`0x0054D130`).
     assert_eq!(run(&mut f, &m16(0x61, 0)), res::OK);
-    assert_eq!(run(&mut f, &m16(0x61, 11)), res::BAD);
+    assert_eq!(run(&mut f, &m16(0x61, 1)), res::REFUSED);
+    f.invs.entry(Owner::monster(60)).or_default();
+    // A location outside 1..10 → 3.
+    assert_eq!(run(&mut f, &m16(0x61, 11)), res::REFUSED);
     // Empty hireling slot → 2.
     assert_eq!(run(&mut f, &m16(0x61, 1)), res::BAD);
     f.invs.remove(&me());
@@ -834,6 +876,31 @@ fn merc_take_copies_to_cursor() {
     assert_eq!(f.invs[&m].update, vec![20]);
     assert!(f.invs[&m].body.is_empty());
     assert!(f.logged("stat_refresh_unlink 1:60 0"));
+}
+
+/// §7.23 `0x0054D130`: an item at the location that the unlink does not
+/// return → 2, nothing taken (not fatal).
+// Covers: specs/items/inventory-moves.md §7.23 r3
+#[test]
+fn merc_take_failed_unlink_is_2() {
+    let mut f = Fake::new();
+    let m = Owner::monster(60);
+    f.k.hireling = Some(m);
+    f.units.insert(Owner::item(20), Default::default());
+    f.items.insert(
+        20,
+        super::FItem {
+            mode: mode::EQUIPPED,
+            body_loc: 1,
+            owner: Some(m),
+            ..Default::default()
+        },
+    );
+    // In the slot but not in the hireling's item list.
+    f.invs.entry(m).or_default().body.insert(1, 20);
+    assert_eq!(run(&mut f, &m16(0x61, 1)), res::BAD);
+    assert_eq!(f.inv().cursor, None);
+    assert!(!f.logged("copy 20 -> 500"));
 }
 
 // Covers: specs/items/inventory-moves.md §7.23 r3

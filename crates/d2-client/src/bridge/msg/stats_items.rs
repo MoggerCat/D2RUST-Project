@@ -39,8 +39,11 @@ pub fn local_stat(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerE
         _ => return Err(HandlerError::Invalid("not 0x19..=0x1F")),
     };
     let u = w.units.get_mut(&key).expect("checked above");
-    u.stats.insert(stat, value);
+    let old = u.stats.insert(stat, value).unwrap_or(0);
     hook(u, stat, value);
+    // The player list's value-change callback (`0x004609F0`,
+    // `render/lighting.md` §8 player row).
+    super::lighting::player_light_stat(w, key, stat, old, value);
     Ok(())
 }
 
@@ -53,8 +56,9 @@ pub fn stat_update(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handler
     let key = UnitKey::new(PLAYER, b.u32(1)?);
     let (stat, value) = (u16::from(b.u8(5)?), b.u32(6)? as i32);
     if let Some(u) = w.units.get_mut(&key) {
-        u.stats.insert(stat, value);
+        let old = u.stats.insert(stat, value).unwrap_or(0);
         hook(u, stat, value);
+        super::lighting::player_light_stat(w, key, stat, old, value);
     }
     Ok(())
 }
@@ -343,6 +347,24 @@ pub fn item_action(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handler
         w.room_units.place(key, room);
     }
     super::super::item_lists::refresh(w, key);
+    // `ui/panels-2.md` §20 r7: the placement `0x004C2970` reaches the
+    // Horadric start for the local player's own item in page 3 when its
+    // code is `hst ` or `qf2 ` (the start itself is the UI's).
+    let placement = matches!(action, 0x04 | 0x0B | 0x0C)
+        || (action == 0x15 && header.is_some_and(|h| h.mode == 0));
+    if placement
+        && local.is_some()
+        && owner.is_none_or(|o| Some(o) == local)
+        && header.is_some_and(|h| h.page == 3)
+    {
+        if let Some(code) = super::super::items::item(w, key)
+            .and_then(|i| i.code)
+            .filter(|c| c == b"hst " || c == b"qf2 ")
+        {
+            msg.out
+                .push(crate::bridge::output::Output::HoradricItem { code });
+        }
+    }
     // Rule 5: the cursor of the inventory's unit (a player's
     // `cursor_item`), then the UI cursor refresh (UI state).
     if let Some((c, item)) = write {

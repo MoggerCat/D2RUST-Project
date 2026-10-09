@@ -275,3 +275,53 @@ fn the_weapon_switch_trades_the_hands_with_the_swap_set() {
     assert_eq!(w.data(first).body_loc, 4);
     assert_eq!(w.stats.unit_total(p, MAX, 0), 9);
 }
+
+/// With the equipment rules the desk answers `0x0062A1E0` and
+/// `0x00628480` from the tables (q-fix-items-play): a barbarian holds a
+/// 1-or-2-handed sword beside a shield (`inventory.md` §4.4 r4), and a
+/// quiver-type item is not auto-equipped without a bow (§4.7 r2). Without
+/// the rules both stay the rest's (false).
+// Covers: specs/items/inventory.md §4.4 r4, §4.7 r2
+#[test]
+fn the_rules_answer_one_or_two_handed_and_quivers_from_the_tables() {
+    use crate::items::inventory::{equip, InvWorld};
+    let mut t = inv_tables();
+    // `2hs `: two-handed and `1or2handed` (row 3); `tkf ` a quiver type.
+    t.items[3].twohanded = 1;
+    t.items[3].onetwohanded = 1;
+    let tkni = &mut t.itemtypes[usize::from(T_TKNI)];
+    tkni.quiver = 1;
+    tkni.body = 1;
+    tkni.bodyloc1 = 4;
+    tkni.bodyloc2 = 5;
+    let mut w = World::with_tables(t);
+    let sword = w.ground_item(3, 12, 12);
+    let shield = w.ground_item(4, 12, 13);
+    let knives = w.ground_item(8, 12, 14);
+    let (s, b, k) = (
+        w.unit(sword).unwrap(),
+        w.unit(shield).unwrap(),
+        w.unit(knives).unwrap(),
+    );
+    let p = w.player;
+    for rules in [false, true] {
+        w.state.equip_rules = rules;
+        let (pair, quiver) = w.desk(|d| {
+            let tables = d.tables;
+            (
+                equip::hands_compatible(d, tables, p, Some(s), Some(b)),
+                InvWorld::quiver_kind(d, k),
+            )
+        });
+        assert_eq!((pair, quiver), (rules, rules), "rules {rules}");
+    }
+    // §4.7 r2: no bow in either hand → no location.
+    let me = w.me();
+    let l = w.desk(|d| {
+        let tables = d.tables;
+        d.with_inv(me, |inv, d| {
+            equip::auto_equip_location(inv, d, tables, k, false)
+        })
+    });
+    assert_eq!(l.flatten(), None);
+}

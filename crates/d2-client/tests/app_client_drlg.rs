@@ -426,3 +426,78 @@ fn the_summit_background_draws_from_the_users_archives() {
         .count();
     assert_eq!(opaque, 12, "the mountains opaque, the clouds blended");
 }
+
+// Covers: specs/render/shading.md §6 r1
+/// The `states` rows the model's state messages and colour call read, on
+/// the user's install (`shading.md` §6 r1.1 live rows): seven states have
+/// a `colorpri`, all with a `colorshift`; 90 `blue` 100 / 108 / 150, 215,
+/// 255 and 2 `poison` 95 / 104 / 128, 255, 128.
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn state_colour_rows_come_from_the_users_states() {
+    let d = app_support::live();
+    let rows = single_player::client_unit_rows(d.archives.as_ref()).unwrap();
+    assert_eq!(rows.states.len(), 185);
+    let coloured: Vec<usize> = (0..rows.states.len())
+        .filter(|&s| rows.states[s].colorpri > 0)
+        .collect();
+    assert_eq!(coloured.len(), 7, "{coloured:?}");
+    assert!(coloured.iter().all(|&s| rows.states[s].colorshift != 0));
+    let row = |s: usize| {
+        let r = rows.states[s];
+        (r.colorpri, r.colorshift, r.light_rgb)
+    };
+    assert_eq!(row(90), (100, 108, (150, 215, 255)));
+    assert_eq!(row(2), (95, 104, (128, 255, 128)));
+}
+
+// Covers: specs/missiles/client.md §c13-function-bodies-specified-here
+/// The client update function the effect layer's flat rule reads
+/// (`missiles` `pCltDoFunc`; functions 2 and 11 set flag 0x10000 at the
+/// animation end), on the user's install: the effect rows carry each
+/// row's value, and both functions are in use.
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn effect_rows_carry_the_users_client_missile_functions() {
+    use d2_data::tables::{decode_all, Missiles};
+    let d = app_support::live();
+    let a = d.archives.as_ref();
+    let rows = d2_client::app::missile_art::effect_rows(a).unwrap();
+    let set = d2_data::bin::load_from(a, "eng").unwrap();
+    let table: Vec<Missiles> = decode_all(set.table("missiles").unwrap()).unwrap();
+    assert_eq!(rows.missiles.len(), table.len());
+    for (r, m) in rows.missiles.iter().zip(&table) {
+        assert_eq!(r.clt_do_func, m.pcltdofunc);
+    }
+    for f in [2, 11] {
+        let n = rows.missiles.iter().filter(|r| r.clt_do_func == f).count();
+        assert!(n > 0, "function {f} unused");
+        println!("pCltDoFunc {f}: {n} rows");
+    }
+}
+
+// Covers: specs/missiles/client.md §c4-create-tail
+/// The client create on the user's `missiles` rows: missile 287
+/// `denofevillight` (`render/lighting.md` §8: `Light` 10;
+/// `missiles/client.md` §C12: client function 23) created at a point
+/// gets its kind-1 light of radius 10.
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_den_light_missile_creates_from_the_users_rows() {
+    use d2_client::bridge::client_missiles::{create, flag, CreateRecord};
+    let d = app_support::live();
+    let rows = single_player::client_unit_rows(d.archives.as_ref()).unwrap();
+    assert_eq!(rows.missiles[287].clt_do_func, 23);
+    assert_eq!(rows.missiles[287].light, 10);
+    let mut w = ClientWorld::default();
+    let rec = CreateRecord {
+        flags: flag::POSITION,
+        class: 287,
+        x: 100,
+        y: 100,
+        ..CreateRecord::default()
+    };
+    let k = create(&mut w, &rows.missiles, &rec, true).unwrap().unwrap();
+    let (_, light) = w.lights.iter().next().unwrap();
+    assert_eq!((light.owner_guid, light.radius), (k.guid, 80));
+}

@@ -11,7 +11,9 @@
 //! Default case counts are small so `cargo test` stays fast; set
 //! `PROPTEST_CASES` to hunt harder.
 
-use d2_proto::item_bits::{decode, CodeFacts, IscSave, ItemBits, ItemLookup, Location};
+use d2_proto::item_bits::{
+    decode, CodeFacts, IscSave, ItemBits, ItemBitsError, ItemLookup, Location,
+};
 use d2_sim::items::bitstream::{
     self, clamp, header_flags, prefix_id, write, Isc, Kind, StatEntry, StreamItem, AUTO_OFFSET,
     BUFFER,
@@ -455,7 +457,22 @@ proptest! {
         let t = isc_table();
         match write(&item, &t) {
             Ok((bytes, _)) => {
+                // `bitstream-legacy.md` §3 rule 6.7, edge case 6: the
+                // reader fails a full record whose stream quality is
+                // outside 1–9 (the writer sends it before its rewrite to
+                // 2, §4.3 rule 7) and reads on misaligned; d2rs's reader
+                // reports a read past the end as `Short`. Nothing more is
+                // compared.
+                let full = !item.compact && !item.alt;
+                if full && !(1..=9).contains(&(item.quality & 0xF)) {
+                    match decode(&bytes, &Lookup) {
+                        Ok(d) => prop_assert!(d.failed),
+                        Err(e) => prop_assert!(matches!(e, ItemBitsError::Short(_)), "{e}"),
+                    }
+                    return Ok(());
+                }
                 let d = decode(&bytes, &Lookup).map_err(|e| TestCaseError::fail(format!("{e}")))?;
+                prop_assert!(!d.failed);
                 prop_assert_eq!(d.bits.div_ceil(8), bytes.len());
                 check(&item, &d)?;
             }

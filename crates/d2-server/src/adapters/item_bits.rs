@@ -50,4 +50,8 @@ impl ItemLookup for TablesLookup<'_> {
             save_param_bits: c.save_param_bits,
         })
     }
+
+    fn set_item_rows(&self) -> Option<usize> {
+        Some(self.0.setitems.len())
+    }
 }

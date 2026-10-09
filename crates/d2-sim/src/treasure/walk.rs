@@ -34,7 +34,7 @@ pub struct GameFacts {
     /// game +0x6A (3 = single player).
     pub game_type: u8,
     /// Living players in the game (`0x00535790` before the `players`
-    /// setting). TODO(treasure OQ7): "living" is D2MOO's check.
+    /// setting; "living" = not dead by `0x005541B0`, OQ7).
     pub living_players: i32,
     /// The `players` setting `S`, 0–8.
     pub players_setting: i32,

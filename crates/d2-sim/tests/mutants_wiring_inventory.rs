@@ -198,7 +198,7 @@ fn forward_pending(flag: bool) {
         );
         fwd!(d.rest_pile(m, 36), (), "rest_pile 1:55 36".to_string());
         fwd!(
-            d.book_count_changed(m, 37),
+            d.book_count_changed(m, 0, 37),
             (),
             "book_count_changed 1:55 37".to_string()
         );

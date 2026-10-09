@@ -244,6 +244,10 @@ pub struct ClientUnit {
     pub interact_ms: u32,
     /// +0x44: the animation frame (signed, 8.8 fixed point; §18 rule 1).
     pub frame: i32,
+    /// +0x4C: an object's animation speed (8.8 per update), set by the
+    /// animation set-up (`world/objects-client.md` §25 r8); `None`: no
+    /// set-up ran, the generic step uses `FrameDelta[mode]`.
+    pub speed: Option<i32>,
     /// +0xC8: flag-ex. Bit 0x2000000 := `expansion` ≠ 0 at creation
     /// (§2 rule 6); the other bits are written by the rules that own
     /// them (`world/objects-client.md` §26.2; `msg-units.md` §1.2 r3, r4:
@@ -292,6 +296,7 @@ impl ClientUnit {
             flag_200: false,
             interact_ms: 0,
             frame: 0,
+            speed: None,
             flag_ex: 0,
             flag_4: false,
             hit_class: 0,
@@ -1217,6 +1222,12 @@ pub struct StateRow {
     pub dead_bit_only: bool,
     /// The flag `[0x006CE278]`: state on keeps an existing list.
     pub keep_list: bool,
+    /// `colorpri` (+0x20), `colorshift` (+0x21) and `light-r`,
+    /// `light-g`, `light-b` (+0x22…+0x24): the colour call `0x004D97F0`
+    /// (§3 r6.1, r6.3; `render/shading.md` §6 r1.1).
+    pub colorpri: u8,
+    pub colorshift: u8,
+    pub light_rgb: (u8, u8, u8),
 }
 
 /// One `skilldesc` row as 0x93 reads it (`msg-skills.md` §9 r3).
@@ -1247,6 +1258,11 @@ pub struct UnitRows {
     pub stats: Vec<StatSend>,
     pub objects: Vec<ObjectRow>,
     pub shrines: Vec<u8>,
+    /// One entry per `states` row, by state id (`client/stat-lists.md`
+    /// §3).
+    pub states: Vec<StateRow>,
+    /// One entry per `missiles` row (`missiles/client.md` §C2–§C4).
+    pub missiles: Vec<super::client_missiles::ClientMissileRow>,
 }
 
 impl MonsterClass {
@@ -1289,6 +1305,9 @@ pub struct ClientTables {
     pub skilldesc: Vec<SkillDescRow>,
     /// One entry per `objects.txt` row, by class (`model.md` §15).
     pub objects: Vec<ObjectRow>,
+    /// One entry per `missiles` row, by class (the client create,
+    /// `missiles/client.md` §C2–§C4).
+    pub missiles: Vec<super::client_missiles::ClientMissileRow>,
     /// The `Code` byte (+0) of each `shrines.txt` row, by index
     /// (`msg-units.md` §1.3 r3: table `[0x0096D468]`, count
     /// `[0x0096D46C]`).

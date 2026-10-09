@@ -17,7 +17,7 @@ use d2_server::adapters::character::save::{
 };
 use d2_server::world_data::game::GameTables;
 use d2_server::world_data::tables::{appearance_tables, SaveData};
-use d2_sim::items::bitstream::{write_save, StreamItem};
+use d2_sim::items::bitstream::{write_save, StreamItem, WriteBack};
 use d2_sim::items::inventory::node;
 use d2_sim::units::UnitId;
 use test_fixtures::{install, synth};
@@ -43,6 +43,7 @@ struct Fake {
     flags2: BTreeMap<UnitId, u32>,
     streams: BTreeMap<UnitId, StreamItem>,
     looks: BTreeMap<UnitId, EquippedItem>,
+    write_backs: std::cell::RefCell<Vec<(UnitId, WriteBack)>>,
 }
 
 impl Fake {
@@ -82,6 +83,9 @@ impl SaveItems for Fake {
     }
     fn appearance(&self, item: UnitId) -> Option<EquippedItem> {
         self.looks.get(&item).copied()
+    }
+    fn write_back(&self, item: UnitId, wb: WriteBack) {
+        self.write_backs.borrow_mut().push((item, wb));
     }
 }
 
@@ -162,6 +166,32 @@ fn item_list_skips_unsaved_items_and_appends_children() {
     // The loader's entry length covers the child (§8.1 rule 2).
     use d2s::SaveTables;
     assert_eq!(s.item_entry_len(&e[0].bytes), Ok(e[0].bytes.len()));
+}
+
+/// `items/bitstream.md` Outputs and §2 rule 5: the writer's changes
+/// (item level < 1 → 1, quality outside 1–9 → 2) reach every written
+/// item, the children too, in write order.
+// Covers: specs/items/bitstream.md §2 r5
+#[test]
+fn item_list_hands_back_every_items_write_back() {
+    let (_, t) = synthetic("wb");
+    let s = SaveData::from_fixed(&t.fixed, true).unwrap();
+    let mut f = Fake::default();
+    let mut parent = full(*b"sb1 ", 1);
+    parent.ilvl = 0;
+    f.link(1, 10, node::PAGE, 0, parent);
+    let mut child = full(*b"sb1 ", 0);
+    child.quality = 0;
+    child.ilvl = 9;
+    f.link(10, 20, node::NONE, 0, child);
+    item_list(&f, UnitId(1), &s.items.isc).unwrap();
+    let got: Vec<(u32, i32, u8)> = f
+        .write_backs
+        .borrow()
+        .iter()
+        .map(|(u, w)| (u.0, w.ilvl, w.quality))
+        .collect();
+    assert_eq!(got, [(10, 1, 2), (20, 9, 2)]);
 }
 
 fn base_save(expansion: bool) -> D2s {

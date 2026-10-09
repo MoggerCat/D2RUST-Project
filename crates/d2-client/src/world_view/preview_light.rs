@@ -23,8 +23,6 @@
 //! - the other units' lights sit at their sub-tile `<< 16` (the model
 //!   holds no precise position); the local player's at its predicted
 //!   16.16 position (§6.1);
-//! - the player stat callback's light part runs before each drawn frame,
-//!   not at the stat change ([`player_stats`]).
 
 use crate::bridge::world::ClientWorld;
 use crate::bridge::{ClientUnit, UnitKey};
@@ -286,32 +284,6 @@ pub fn chain_of(tables: &ShadeTables, v: u8) -> ShadeChain {
     }
 }
 
-/// The player stat callback's light part (`0x004609F0`, §8 player row)
-/// on each player's light, from the unit's current stats 89 and 90.
-///
-/// `d2rs-own, unverified`: 1.14d runs it when the stat changes; here it
-/// runs before each drawn frame's §6.4 pass, which is the first reader of
-/// the record (set radius and set color are idempotent for kinds 0 / 1).
-/// The local player's state colour call (`shading.md` §6 r1.1) is not run.
-fn player_stats(world: &ClientWorld, lights: &mut LightList) {
-    use crate::bridge::world::PLAYER;
-    let ids: Vec<_> = lights
-        .iter()
-        .filter(|(_, r)| r.owner_type == u32::from(PLAYER) && !r.lookup_flag)
-        .map(|(id, r)| (id, r.owner_guid))
-        .collect();
-    for (id, guid) in ids {
-        if let Some(u) = world.units.get(&UnitKey::new(PLAYER, guid)) {
-            crate::bridge::msg::lighting::player_light_stats(
-                lights,
-                id,
-                u.stat(STAT_LIGHT_RADIUS),
-                u.stat(STAT_LIGHT_COLOR),
-            );
-        }
-    }
-}
-
 /// The client world as a drawn frame's §6.4 pass reads it: owners through
 /// the model's lookups (`ClientWorld` [`LightRooms`]), the local player at
 /// its predicted 16.16 position, the blocks-light test over the client
@@ -474,10 +446,8 @@ impl PreviewLight {
     /// record's position from its owner, its radius walk (r2), dying
     /// records removed (r4), the contribution by kind (r5), kind-2 caches
     /// built once and kept until a radius change or a new room drops them
-    /// (§6.4 r2, last paragraph). Before that, the player stat callback's
-    /// light part ([`crate::bridge::msg::lighting::player_light_stats`])
-    /// on each player's light. `local_at` is the predicted 16.16 position
-    /// of the local player.
+    /// (§6.4 r2, last paragraph). `local_at` is the predicted 16.16
+    /// position of the local player.
     pub fn refresh(
         &mut self,
         world: &ClientWorld,
@@ -537,7 +507,6 @@ impl PreviewLight {
                 return;
             }
         };
-        player_stats(world, lights);
         let drlg = world.drlg.as_ref().filter(|_| world.local_room().is_some());
         let owners = FrameOwners {
             world,
@@ -720,7 +689,10 @@ mod tests {
         assert_eq!(light.look().light_subtile(unit).unwrap(), (4000, 4000));
         // Stat 89 widens the radius.
         let mut w2 = w.clone();
+        // The stat write runs the player list's callback (`0x004609F0`),
+        // as S→C 0x20 does in the model.
         w2.units.get_mut(&key).unwrap().stats.insert(89, 4);
+        crate::bridge::msg::lighting::player_light_stat(&mut w2, key, 89, 0, 4);
         let mut wide = PreviewLight::default();
         refresh(&mut wide, &mut w2, None, &t);
         let edge = (4000 + 16, 4000);

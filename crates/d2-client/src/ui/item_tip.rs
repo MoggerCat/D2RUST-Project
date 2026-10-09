@@ -419,7 +419,9 @@ impl ItemTips {
 
     /// §3.6: the list a gem / rune of `code` gives through its gems-row
     /// mods block `slot` (`0x0065FEC0` on a temporary list; the mods are
-    /// fixed values, so the roll seed does not matter).
+    /// fixed values, so the roll seed does not matter). The probe is a
+    /// 1.14d expansion item (format 101, `generation.md` §1.2): a format-0
+    /// item would take the legacy property table (`properties.md` §14).
     pub(super) fn filler_list(&self, code: [u8; 4], slot: usize) -> StatList {
         let mut l = StatList::default();
         let Some(record) = self.lookup.find_code(code) else {
@@ -427,7 +429,7 @@ impl ItemTips {
         };
         let mut item = d2_sim::items::Item {
             record,
-            format: 0,
+            format: d2_sim::items::FORMAT_EXPANSION,
             ilvl: 0,
             quality: 2,
             file_index: -1,
@@ -445,6 +447,8 @@ impl ItemTips {
             start_seed: 0,
             name: [0; 16],
             ear_level: 0,
+            realm_data: [0; 2],
+            fatal: None,
             stats: Recorder::default(),
         };
         d2_sim::items::props::apply_socket_filler(&self.lookup, &mut item, slot as u8);
@@ -455,9 +459,12 @@ impl ItemTips {
     }
 
     /// The decoded record of an item stream (`None` when it does not
-    /// decode).
+    /// decode, or decodes as a failed record: no item is made of it,
+    /// `items/bitstream-legacy.md` §3 rule 12).
     pub fn bits(&self, stream: &[u8]) -> Option<ItemBits> {
-        decode(stream, &TablesLookup(&self.lookup)).ok()
+        decode(stream, &TablesLookup(&self.lookup))
+            .ok()
+            .filter(|b| !b.failed)
     }
 
     /// d2rs-own, unverified (REC-121; `0x0062BEB0` is not
@@ -506,9 +513,9 @@ impl ItemTips {
     /// The tip text of the item with last stream `stream`; empty when the
     /// stream does not decode.
     pub fn tip(&self, stream: &[u8], ctx: &TipCtx<'_>) -> TipText {
-        match decode(stream, &TablesLookup(&self.lookup)) {
-            Ok(b) => self.tip_of(&b, ctx),
-            Err(_) => TipText::default(),
+        match self.bits(stream) {
+            Some(b) => self.tip_of(&b, ctx),
+            None => TipText::default(),
         }
     }
 

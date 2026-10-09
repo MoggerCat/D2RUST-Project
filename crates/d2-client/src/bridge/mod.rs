@@ -18,6 +18,7 @@ pub mod bits;
 pub mod chat_end;
 pub mod check;
 pub mod click;
+pub mod client_missiles;
 pub mod client_path;
 pub mod combat;
 pub mod dispatch;
@@ -183,6 +184,13 @@ impl<L: ServerLink> Bridge<L> {
     /// rule 2). Set by the app before each frame.
     pub fn set_paused(&mut self, paused: bool) {
         self.paused = paused;
+    }
+
+    /// A pass held by the app's draw pacing (`specs/tools/facts-render.md`
+    /// §5 r13, `play --dump-draws` only): it counts as a frame and does
+    /// nothing else: no pump, no receive, no update pass.
+    pub fn held_frame(&mut self) {
+        self.world.frames += 1;
     }
 
     /// One bridge frame: pump the server, receive and dispatch every
@@ -449,6 +457,8 @@ impl<L: ServerLink> Bridge<L> {
         t.stats = rows.stats;
         t.objects = rows.objects;
         t.shrines = rows.shrines;
+        t.states = rows.states;
+        t.missiles = rows.missiles;
     }
 
     /// The host's wall-clock seconds `0x00410A80` (`render/lighting.md`

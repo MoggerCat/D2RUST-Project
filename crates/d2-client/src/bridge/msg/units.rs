@@ -447,6 +447,12 @@ pub fn assign_object(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
         shrine: shrine_code,
         ..ObjectData::default()
     });
+    // The object init's animation set-up in the mode byte
+    // (`world/objects-client.md` §25 r8, PROVISIONAL REC-440), on the
+    // unit's client seed. Nothing without rows.
+    if let Some(row) = msg.inputs.objclient.rows.get(class as usize) {
+        crate::bridge::objects::anim_setup(u, row, u.mode)?;
+    }
     let mode = u.mode;
     c.add(w);
     // Rule 2's object init `0x004BC720` gives the object its light

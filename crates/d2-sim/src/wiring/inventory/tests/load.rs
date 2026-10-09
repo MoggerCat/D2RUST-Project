@@ -41,6 +41,15 @@ fn world() -> World {
     w
 }
 
+/// Lets `record` take `n` sockets (synthetic `gemsockets` and the type's
+/// `maxsock` columns; the socket setter clamps to them on read).
+pub(super) fn allow_sockets(t: &mut crate::items::ItemTables, record: usize, n: u8) {
+    t.items[record].gemsockets = n;
+    let ty_ = t.items[record].type_ as usize;
+    let it = &mut t.itemtypes[ty_];
+    (it.maxsock1, it.maxsock25, it.maxsock40) = (n, n, n);
+}
+
 /// A stored item comes back on its page at its cell, in mode 0, with the
 /// record's fields and the load's flags (0x80000 set, 0x2000 clear).
 // Covers: specs/formats/d2s.md §8.2 r3, §8.2 r7
@@ -169,4 +178,85 @@ fn an_item_without_the_runeword_flag_is_not_refreshed() {
     assert!(w.desk(|d| d.place(p, u, (4, 2), false, true)));
     let e = entry_of(&mut w, u);
     assert!(w.desk(|d| d.load_entry(p, &e)).is_ok());
+}
+
+/// `bitstream-legacy.md` §3 rule 12, `d2s.md` §8.2 rule 2: a record that
+/// failed makes no item; the entry is skipped.
+// Covers: specs/items/bitstream-legacy.md §3 r12; specs/formats/d2s.md §8.2 r2
+#[test]
+fn a_failed_record_is_skipped() {
+    let mut w = world();
+    let p = w.player;
+    let k = w.cursor_item(CAP);
+    let u = w.unit(k).unwrap();
+    w.items.get_mut(u).unwrap().inv_page = 0;
+    assert!(w.desk(|d| d.place(p, u, (4, 2), false, true)));
+    let mut e = entry_of(&mut w, u);
+    assert!(w.desk(|d| d.remove(p, u)));
+    w.desk(|d| d.free(u));
+    let before = w.items.len();
+    e.item.failed = true;
+    assert_eq!(
+        w.desk(|d| d.load_entry(p, &e)),
+        Err(LoadFault::RecordFailed)
+    );
+    assert_eq!(w.items.len(), before);
+    assert!(w.state.items_of(p).is_empty());
+}
+
+/// `bitstream.md` §5 rule 2: the trailer's a and b go to item data +0x1C /
+/// +0x20 and are written back; the bit is 1 exactly when +0x20 ≠ 0.
+// Covers: specs/items/bitstream.md §5 r2
+#[test]
+fn the_trailer_values_stay_on_the_item() {
+    let mut w = world();
+    let p = w.player;
+    for (realm, back) in [([7, 9], Some((7, 9))), ([7, 0], None)] {
+        let k = w.cursor_item(CAP);
+        let u = w.unit(k).unwrap();
+        w.items.get_mut(u).unwrap().inv_page = 0;
+        w.items.get_mut(u).unwrap().realm_data = realm;
+        assert!(w.desk(|d| d.place(p, u, (4, 2), false, true)));
+        let e = entry_of(&mut w, u);
+        assert_eq!(e.item.item.save_trailer, back);
+        assert!(w.desk(|d| d.remove(p, u)));
+        w.desk(|d| d.free(u));
+        let n = w.desk(|d| d.load_entry(p, &e)).expect("loaded");
+        let want = back.map_or([0, 0], |(a, b)| [a, b]);
+        assert_eq!(w.items.get(n).unwrap().realm_data, want);
+        assert!(w.desk(|d| d.remove(p, n)));
+        w.desk(|d| d.free(n));
+    }
+}
+
+/// `bitstream-legacy.md` §3 rule 9.5: the socket count goes through the
+/// setter `0x0062BE00`: at least 1, at most min(w × h, 6) and max sockets.
+// Covers: specs/items/bitstream-legacy.md §3 r9
+#[test]
+fn the_socket_count_is_clamped_on_read() {
+    let mut w = world();
+    allow_sockets(&mut w.tables, CAP, 3);
+    let p = w.player;
+    let k = w.cursor_item(CAP);
+    let u = w.unit(k).unwrap();
+    w.items.get_mut(u).unwrap().inv_page = 0;
+    w.items.get_mut(u).unwrap().flags |= flag::SOCKETED;
+    assert!(w.desk(|d| d.place(p, u, (4, 2), false, true)));
+    let e = entry_of(&mut w, u);
+    assert!(w.desk(|d| d.remove(p, u)));
+    w.desk(|d| d.free(u));
+    let cap = {
+        let r = w.tables.item(CAP).unwrap();
+        (i32::from(r.invwidth) * i32::from(r.invheight)).min(6)
+    };
+    let max = crate::items::create::max_sockets_at(&w.tables, CAP, e.item.item.ilvl);
+    assert!(cap.min(max) >= 2, "the fixture cap takes 2 or more sockets");
+    for (v, want) in [(0, 1), (2, 2), (15, cap.min(max))] {
+        let mut e = e.clone();
+        e.item.item.base_sockets = v;
+        let n = w.desk(|d| d.load_entry(p, &e)).expect("loaded");
+        assert_eq!(w.stats.unit_base(n, stat::NUMSOCKETS, 0), want, "v {v}");
+        assert!(w.desk(|d| d.remove(p, n)));
+        w.desk(|d| d.free(n));
+    }
 }

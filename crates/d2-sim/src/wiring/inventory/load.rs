@@ -1,4 +1,4 @@
-// Spec: specs/formats/d2s.md §8.2 rules 2–4, 7 (item list reading)
+// Spec: specs/formats/d2s.md §8.2 rules 2–4, 7 (item list reading); specs/items/bitstream-legacy.md §3 rule 12
 //! A save item entry made an item unit of an owner's inventory:
 //! [`InvDesk::load_entry`]. The record is decoded into a unit
 //! (`Economy::item_from_record`, `0x00558CB0`), its socketed children are
@@ -27,6 +27,10 @@ use crate::units::UnitId;
 pub enum LoadFault {
     /// The unit could not be made from the record.
     NotCreated,
+    /// The record was read but failed (`items/bitstream-legacy.md` §3
+    /// rule 12): no item, the entry is skipped (rule 2); its children are
+    /// read and freed (rule 4).
+    RecordFailed,
     /// The owner has no inventory in the model.
     NoInventory,
     /// Neither the saved place nor a free position took it; the unit is freed.
@@ -68,6 +72,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             return Err(LoadFault::NoInventory);
         }
         let rec = &entry.item;
+        if rec.failed {
+            return Err(LoadFault::RecordFailed);
+        }
         let unit = match self.econ.item_from_record(rec, None) {
             Ok(u) => u,
             Err(e) => {

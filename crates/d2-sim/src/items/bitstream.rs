@@ -73,17 +73,28 @@ pub struct Isc {
 /// zero (`Save Bits` 0: never written, §4.6 rule 4.1).
 pub trait IscTable {
     fn isc(&self, stat: u16) -> Isc;
+    /// The stat has an `itemstatcost` row (the reader ends a list at an id
+    /// without one, `bitstream-legacy.md` §4 rule 1).
+    fn has_row(&self, stat: u16) -> bool {
+        self.isc(stat).save_bits != 0
+    }
 }
 
 impl IscTable for [Isc] {
     fn isc(&self, stat: u16) -> Isc {
         self.get(usize::from(stat)).copied().unwrap_or_default()
     }
+    fn has_row(&self, stat: u16) -> bool {
+        usize::from(stat) < self.len()
+    }
 }
 
 impl IscTable for Vec<Isc> {
     fn isc(&self, stat: u16) -> Isc {
         self.as_slice().isc(stat)
+    }
+    fn has_row(&self, stat: u16) -> bool {
+        self.as_slice().has_row(stat)
     }
 }
 
@@ -396,22 +407,27 @@ pub fn write_into(w: &mut BitWriter, item: &StreamItem, t: &dyn IscTable) -> Wri
 /// 2 and 5, §5; `formats/d2s.md` §8.1 rule 2): the item's own stream
 /// starting with "JM", padded to a whole byte, then each child of
 /// [`StreamItem::children`] as a complete entry of its own (recursively),
-/// each padded to a whole byte. The [`WriteBack`] is the top item's; the
-/// children's write-backs are not returned. Capacity: [`SAVE_BUFFER`].
-pub fn write_save(item: &StreamItem, t: &dyn IscTable) -> Result<(Vec<u8>, WriteBack), Overflow> {
+/// each padded to a whole byte. The write-backs are every written item's
+/// (§2 rule 5: a child goes through the same record writer), in write
+/// order: the item, then each child's own, depth first. Capacity:
+/// [`SAVE_BUFFER`].
+pub fn write_save(
+    item: &StreamItem,
+    t: &dyn IscTable,
+) -> Result<(Vec<u8>, Vec<WriteBack>), Overflow> {
     let mut w = BitWriter::new(SAVE_BUFFER);
     let wb = write_save_into(&mut w, item, t);
     Ok((w.finish()?, wb))
 }
 
 /// [`write_save`] on a caller's writer.
-pub fn write_save_into(w: &mut BitWriter, item: &StreamItem, t: &dyn IscTable) -> WriteBack {
-    let wb = write_mode(w, item, t, true);
+pub fn write_save_into(w: &mut BitWriter, item: &StreamItem, t: &dyn IscTable) -> Vec<WriteBack> {
+    let mut out = vec![write_mode(w, item, t, true)];
     w.pad_to_byte();
     for child in &item.children {
-        write_save_into(w, child, t);
+        out.extend(write_save_into(w, child, t));
     }
-    wb
+    out
 }
 
 /// One item's own stream (§2 rules 1–4), network or save format.

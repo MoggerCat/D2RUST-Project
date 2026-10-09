@@ -187,8 +187,18 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvWorld for InvDesk<'_, '_, H, R> 
     fn two_handed(&self, item: UnitId) -> bool {
         self.is_two_handed(item)
     }
+    /// `0x0062A1E0` on the tables with the equipment rules
+    /// ([`crate::items::inventory::equip::one_or_two_handed_for`],
+    /// PROVISIONAL REC-289); else the rest.
     fn one_or_two_handed(&self, unit: UnitId, item: UnitId) -> bool {
-        self.rest.one_or_two_handed(self.o(unit), self.g(item))
+        match (self.state.equip_rules, self.class_of(item)) {
+            (true, Some(r)) => crate::items::inventory::equip::one_or_two_handed_for(
+                self.tables,
+                r,
+                self.kind_of(unit),
+            ),
+            _ => self.rest.one_or_two_handed(self.o(unit), self.g(item)),
+        }
     }
     /// `0x0062E6F0` ([`InvDesk::ammo_of`]).
     fn ammo_type(&self, item: UnitId) -> Option<i16> {
@@ -217,8 +227,14 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvWorld for InvDesk<'_, '_, H, R> 
     fn has_allowed_location(&self, item: UnitId) -> bool {
         self.rest.has_allowed_location(self.g(item))
     }
+    /// `0x00628480` ≠ 0 with the equipment rules: the primary type's
+    /// itemtypes `quiver` (`items/generation.md` §1.3, as
+    /// [`InvWorld::quiver_type`]); else the rest.
     fn quiver_kind(&self, item: UnitId) -> bool {
-        self.rest.quiver_kind(self.g(item))
+        match (self.state.equip_rules, self.class_of(item)) {
+            (true, Some(r)) => self.tables.itype_of(r).is_some_and(|t| t.quiver != 0),
+            _ => self.rest.quiver_kind(self.g(item)),
+        }
     }
 
     /// `0x0044BE50` (§5.3): the unit's type, 6 (`Owner::NONE`) for a

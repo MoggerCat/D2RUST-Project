@@ -561,3 +561,65 @@ fn units_get_their_lights_at_creation() {
     );
     assert!(m.log.rejected.is_empty(), "{:?}", m.log.rejected);
 }
+
+// Covers: specs/render/shading.md §6 r1
+// Covers: specs/client/stat-lists.md §3 r6
+// Covers: specs/render/lighting.md §8
+#[test]
+fn the_local_players_light_colour_follows_its_states_and_stats() {
+    use super::super::world::StateRow;
+    use crate::rules::lighting::records::LightRecord;
+    // `shading.md` §6 r1.1, live rows: 2 `poison` (colorpri 95,
+    // colorshift 104, light 128, 255, 128), 90 `blue` (100, 108, 150,
+    // 215, 255).
+    let mut m = Model::default();
+    m.inputs.tables.states = vec![StateRow::default(); 91];
+    m.inputs.tables.states[2] = StateRow {
+        colorpri: 95,
+        colorshift: 104,
+        light_rgb: (128, 255, 128),
+        ..StateRow::default()
+    };
+    m.inputs.tables.states[90] = StateRow {
+        colorpri: 100,
+        colorshift: 108,
+        light_rgb: (150, 215, 255),
+        ..StateRow::default()
+    };
+    let mut b = hex("59 01 00 00 00 01 77 65 72 77 65 72 00");
+    b.resize(26, 0);
+    m.recv(&b);
+    m.w.local_player = Some(P1);
+    let light = |m: &Model| -> LightRecord {
+        let id = super::lighting::unit_light(&m.w, P1).unwrap();
+        m.w.lights.get(id).unwrap().clone()
+    };
+    let rgb = |m: &Model| {
+        let l = light(m);
+        (l.r, l.g, l.b)
+    };
+    // 0xA7 state on, 0xA9 state off.
+    m.hex("a7 00 01 00 00 00 02");
+    assert_eq!(rgb(&m), (128, 255, 128));
+    m.hex("a7 00 01 00 00 00 5a");
+    assert_eq!(rgb(&m), (150, 215, 255), "the greater colorpri wins");
+    m.hex("a9 00 01 00 00 00 5a");
+    assert_eq!(rgb(&m), (128, 255, 128));
+    m.hex("a9 00 01 00 00 00 02");
+    assert_eq!(rgb(&m), (255, 255, 255), "no state wins: white");
+    // Stat 90 (0x20) sets the colour when it changes; a later state call
+    // writes over it (the last writer stands).
+    m.hex("20 01 00 00 00 5a 00 00 ff 00");
+    assert_eq!(rgb(&m), (255, 0, 0));
+    m.hex("a7 00 01 00 00 00 02");
+    assert_eq!(rgb(&m), (128, 255, 128));
+    // Stat 89: radius 13 + 3.
+    m.hex("20 01 00 00 00 59 03 00 00 00");
+    assert_eq!(light(&m).radius, 8 * 16);
+    // A state with colorshift 0 runs no colour call.
+    m.w.lights
+        .set_color(super::lighting::unit_light(&m.w, P1).unwrap(), 255, 1, 2, 3);
+    m.hex("a7 00 01 00 00 00 03");
+    assert_eq!(rgb(&m), (1, 2, 3));
+    assert!(m.log.rejected.is_empty(), "{:?}", m.log.rejected);
+}

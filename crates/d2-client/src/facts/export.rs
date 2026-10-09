@@ -17,6 +17,7 @@ use crate::rules::placement;
 use crate::scene::order::pass;
 use crate::scene::{BlendOp, DrawItem, FrameCycle, ItemTag};
 use crate::world_view::weather_view::is_sky_call_path;
+use crate::world_view::UnitCall;
 
 /// What the exporter needs besides the items.
 pub struct ExportContext<'a> {
@@ -29,6 +30,12 @@ pub struct ExportContext<'a> {
     /// Pass 9's calls (`WorldFrame::sky`), written in place of their
     /// pixel and flash items (§5 r10).
     pub sky: &'a [SkyDraw],
+    /// Each drawn unit's cel context direction by GUID
+    /// (`WorldFrame::unit_dirs`, §5 r14).
+    pub unit_dirs: &'a BTreeMap<u32, u8>,
+    /// Cel calls without pixels (`WorldFrame::unit_calls`), sorted by key;
+    /// one row each, merged with the items by key (§5 r15).
+    pub unit_calls: &'a [UnitCall],
 }
 
 /// `draws.tsv` and `sprites.tsv` rows (without the header and column row).
@@ -110,6 +117,58 @@ fn num(v: Option<i32>) -> String {
     v.map_or_else(|| UNKNOWN.to_owned(), |v| v.to_string())
 }
 
+/// §5 r1: the unit draw `0x00471EC0` starts a unit's run outside the
+/// shadow pass; 1.14d's shadow pass calls `CelDrawShadow` with no unit
+/// draw (`a1-town-arrival-ama` rows 97–115). A run after the unit's own
+/// shadow still starts with it. `last_run` is the previous entry's (tag,
+/// shadow) of any kind.
+fn unit_row(
+    tag: ItemTag,
+    shadow: bool,
+    cx: &ExportContext<'_>,
+    last_run: &mut Option<(ItemTag, bool)>,
+    draws: &mut Vec<Vec<String>>,
+) {
+    if let (ItemTag::Unit(guid), false) = (tag, shadow) {
+        if *last_run != Some((tag, false)) {
+            let unit = match (cx.unit_type)(guid) {
+                Some(t) => format!("{t}:{guid}"),
+                None => UNKNOWN.to_owned(),
+            };
+            let mut row = vec![NA.to_owned(); DRAW_COLUMNS.len()];
+            row[1] = "unit".into();
+            for c in [6, 7, 13] {
+                row[c] = UNKNOWN.into();
+            }
+            row[15] = unit;
+            draws.push(row);
+        }
+    }
+    *last_run = Some((tag, shadow));
+}
+
+/// §5 r15: a cel call without pixels (a component file in no archive):
+/// `CelDrawShadow` / `CelDraw`, the file, the context's `dir64` and
+/// frame; nothing measured beside (no cel: no size, no `sprites.tsv`
+/// row).
+fn call_rows(
+    c: &UnitCall,
+    cx: &ExportContext<'_>,
+    last_run: &mut Option<(ItemTag, bool)>,
+    draws: &mut Vec<Vec<String>>,
+) {
+    unit_row(c.tag, c.shadow, cx, last_run, draws);
+    let mut row = vec![NA.to_owned(); DRAW_COLUMNS.len()];
+    row[1] = if c.shadow { "CelDrawShadow" } else { "CelDraw" }.into();
+    row[2] = c.path.as_str().to_owned();
+    row[3] = c.dir64.to_string();
+    row[4] = c.frame.to_string();
+    for cell in &mut row[6..15] {
+        *cell = UNKNOWN.into();
+    }
+    draws.push(row);
+}
+
 /// The rows of one frame's sorted draw list (§5 r1–r7).
 pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, FactsError> {
     let mut draws: Vec<Vec<String>> = Vec::new();
@@ -117,7 +176,16 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
     let mut last: Option<&DrawItem> = None;
     let mut last_tile: Option<(ItemTag, Vec<String>)> = None;
     let mut sky = Some(sky_rows(cx.sky));
+    // The last unit-pass entry (item or call): its tag and whether it
+    // was a shadow (§5 r1 unit rows).
+    let mut last_run: Option<(ItemTag, bool)> = None;
+    let mut calls = cx.unit_calls.iter().peekable();
     for item in items {
+        // §5 r15: the calls without pixels before this item's key.
+        while let Some(c) = calls.next_if(|c| c.key < item.key) {
+            call_rows(c, cx, &mut last_run, &mut draws);
+            last_tile = None;
+        }
         // §5 r10: the pass-9 calls stand where their first drawing is, or
         // before the first later pass when every line is off-screen.
         let call_item = cx
@@ -141,22 +209,13 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
         // §5 r1: the unit draw `0x00471EC0` starts a unit's run outside
         // the shadow pass; 1.14d's shadow pass calls `CelDrawShadow` with
         // no unit draw (`a1-town-arrival-ama` rows 97–115).
-        if let (ItemTag::Unit(guid), false) = (item.tag, item.key.pass() == pass::SHADOWS) {
-            // A run after the unit's own shadow still starts with it.
-            if last.map(|l| (l.tag, l.key.pass() == pass::SHADOWS)) != Some((item.tag, false)) {
-                let unit = match (cx.unit_type)(guid) {
-                    Some(t) => format!("{t}:{guid}"),
-                    None => UNKNOWN.to_owned(),
-                };
-                let mut row = vec![NA.to_owned(); DRAW_COLUMNS.len()];
-                row[1] = "unit".into();
-                for c in [6, 7, 13] {
-                    row[c] = UNKNOWN.into();
-                }
-                row[15] = unit;
-                draws.push(row);
-            }
-        }
+        unit_row(
+            item.tag,
+            item.key.pass() == pass::SHADOWS,
+            cx,
+            &mut last_run,
+            &mut draws,
+        );
         last = Some(item);
         let (key, index) = cx
             .frames
@@ -185,6 +244,12 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
             }
             FramePart::Dir(d) => {
                 row[1] = op(false, item).into();
+                // §5 r14: a unit cel's `dir` is the context's `dir64`, not
+                // the file direction the frame set is keyed by.
+                let d = match item.tag {
+                    ItemTag::Unit(guid) => cx.unit_dirs.get(&guid).copied().unwrap_or(d),
+                    _ => d,
+                };
                 row[3] = d.to_string();
                 row[4] = index.to_string();
                 // §5 r6: a unit shadow is drawn from the unit's own cel
@@ -235,6 +300,9 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
         }
         last_tile = tile_row.then(|| (item.tag, row.clone()));
         draws.push(row);
+    }
+    for c in calls {
+        call_rows(c, cx, &mut last_run, &mut draws);
     }
     if let Some(rows) = sky.take() {
         draws.extend(rows);
@@ -380,6 +448,8 @@ pub fn dump(req: &DumpRequest, d: &DumpFrame<'_>) -> Result<(), FactsError> {
         view_left: d.frame.camera.map(|c| c.view.left),
         unit_type: &unit_type,
         sky: &d.frame.sky,
+        unit_dirs: &d.frame.unit_dirs,
+        unit_calls: &d.frame.unit_calls,
     };
     // §5 r12: the drawer calls without pixels join the items by key.
     let mut all = d.frame.items.clone();

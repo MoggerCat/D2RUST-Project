@@ -609,6 +609,15 @@ impl<R: ViewRules + ?Sized, S: ViewSource + ?Sized> ViewRules for NoCamera<'_, R
         ))
     }
 
+    fn unit_slot_calls(
+        &self,
+        unit: &ClientUnit,
+        pose: &UnitPose,
+        cof: &d2_formats::cof::Cof,
+    ) -> Result<Vec<super::SlotCall>, ViewError> {
+        self.rules.unit_slot_calls(unit, pose, cof)
+    }
+
     fn component_frame(
         &self,
         unit: &ClientUnit,

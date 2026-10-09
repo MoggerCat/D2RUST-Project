@@ -843,6 +843,7 @@ fn world_view_frame(
     mut walk: Option<ResMut<PreviewWalk>>,
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
     mut dump: Option<ResMut<DrawDump>>,
+    mut drawn: Option<ResMut<crate::bridge::mirror::DrawnTick>>,
     mut exit: MessageWriter<AppExit>,
 ) -> Result {
     let tick = bridge.0.world().server_ticks;
@@ -1112,6 +1113,9 @@ fn world_view_frame(
     };
     if !draw {
         return Ok(());
+    }
+    if let Some(d) = drawn.as_deref_mut() {
+        d.0 = tick;
     }
     let draws = ui_frame.as_ref().map_or(&[][..], |f| &f.draws[..]);
     state.feed.prepare(bridge.0.world(), &mut state.assets)?;

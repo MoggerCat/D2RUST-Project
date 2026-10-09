@@ -299,8 +299,23 @@ pub fn component_codes(
         component_token,
         armor,
         base_mode_token(looks, kind, mode),
-        name.weapon_class,
+        layer_weapon_class(layer).unwrap_or(name.weapon_class),
     )
+}
+
+/// The weapon class of a component file name (§6 r1): the COF layer's
+/// own (`weaponClass`, nul-padded in the file), not the unit's §2.1 class.
+/// PROVISIONAL (REC-441, measured: 1.14d's `a1-town-arrival-ama` draws
+/// `amTNhth.cof`'s layers as `AMTRlitTN1ht`, ..., `AMRAlitTNhth`, each
+/// with its layer's class). An empty layer class keeps the unit's.
+fn layer_weapon_class(layer: &CofLayer) -> Option<Code> {
+    let mut c = layer.weapon_class;
+    for b in &mut c {
+        if *b == 0 {
+            *b = b' ';
+        }
+    }
+    (c != *b"    ").then_some(c)
 }
 
 /// One loaded component file: its format, directions `Df` and frames per

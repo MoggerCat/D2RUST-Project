@@ -1,282 +1,285 @@
 rec	handoff_line	tag	title	settle_kind	data_alone_may_settle	duplicated	cited_in_specs_crates	spec_settled_by_pc1_s8
-REC-01	5675	AUTO, no run	Analysis of two existing raw files	unstated	no		0	
-REC-02	5682	AUTO	Join stream and new-character entry (packets + RNG twin)	recording	no		5	q-fix-door-highlight,q-fix-monster-update-steps,q-fix-skill-msg-level
-REC-03	5689	AUTO	Runtime tables not in `dump_tables`	data	yes		0	
-REC-04	5696	AUTO	Tick run over a waypoint walk with the room / unit probes	recording	no		1	
-REC-05	5703	AUTO	Act changes by waypoint: packets and palette frames	recording	no		0	
-REC-06	5710	AUTO	Waypoint object init (town waypoint after travel)	recording	no		0	
-REC-07	5717	MANUAL	Object operation and room population	recording	no		1	
-REC-08	5724	MANUAL	A monster kill with a drop, pick-up and stash	recording	no		1	
-REC-09	5731	MANUAL	Combat core with stats	recording	no		0	q-drop-stale-provisional,q-fix-client-stat-callback,q-fix-dead-flag,q-fix-pet-palette
-REC-10	5738	MANUAL	Hireling session (and resurrect at an NPC)	recording	no		0	
-REC-11	5745	MANUAL	Act I quest session	recording	no		1	
-REC-12	5761	AUTO	Short frames run: first-frame order, settings word, panels, light registry	recording	no		0	
-REC-13	5767	AUTO	The day cycle in one long run	recording	no		0	
-REC-14	5773	AUTO	Frames: shadows, light records, item colormaps (prepared saves)	recording	no		0	
-REC-15	5779	AUTO	World clicks and keys: C→S ids	recording	no		0	
-REC-16	5785	AUTO	Key-configuration panel and text checks	recording	no		0	
-REC-17	5791	AUTO	Inventory, gold, character, stash, control-panel UI frames (prepared saves)	recording	no		0	
-REC-18	5797	AUTO	NPC menus, waypoint panel and talk on arrival	data	yes		0	
-REC-19	5803	AUTO	Sound: request-site map of every UI control, one-shot lengths, async loads	recording	no		4	
-REC-20	5809	AUTO	Sound and music by waypoint, wav dumps, the day change	data	yes		0	
-REC-21	5815	AUTO	x87 control word under each video mode	recording	no		4	
-REC-22	5821	AUTO	The area-5 hook probes	recording	no		0	
-REC-23	5921	MANUAL	Vendors: prices, equip-on-buy, refresh, gamble, copy rebuild	unstated	no		0	
-REC-24	5926	MANUAL	NPC services	recording	no		0	
-REC-25	5931	MANUAL	Cube and the cow portal	recording	no		0	
-REC-26	5936	MANUAL	First waypoint activation	recording	no		0	
-REC-27	5941	MANUAL	Act II run (and the orifice)	recording	no		2	
-REC-28	5946	MANUAL	Act III run	recording	no		0	
-REC-29	5950	MANUAL	Act IV run	recording	no		0	
-REC-30	5955	MANUAL	Act V run and the Act V levels	unstated	no		0	
-REC-31	5960	ASSISTED	Skill, monster and missile bodies, umods	recording	no		0	
-REC-32	5965	MANUAL	Weather, translucent walls, arcane, Den light	recording	no		0	
-REC-33	5970	MANUAL	Audio in fights and the Den, with sound on	recording	no		0	
-REC-34	5974	MANUAL	Save and item round trips (no `--auto`)	recording	no		2	
-REC-35	5826	AUTO	DRLG extra probes: Trees substitution DS1, river units, room-entry returns	recording	no		2	
-REC-36	5833	AUTO	Load a character saved in Act III (client +0x1AC writes)	recording	no		0	
-REC-37	5978	MANUAL	Animation-rate records: IAS / FCR / FHR / FBR / FRW	recording	no		0	
-REC-38	5985	MANUAL	Monster init and umods: uniques, ancient barbarians, warping shrine	recording	no		0	
-REC-39	5992	MANUAL	Necromancer pets and the 0x7A / 0x99 messages	recording	no		0	
-REC-40	5999	MANUAL	Monster AI think logs (acts, Nightmare, freeze / knockback, NPCs)	unstated	no		0	
-REC-41	6006	ASSISTED	Skill use and level hooks	recording	no		0	
-REC-42	6013	MANUAL	Combat on-hit events (knockback, freeze, slow, skill-on-hit, mana)	recording	no		0	
-REC-43	5840	no game	Re-export Ghidra with labels	binary	no		0	
-REC-44	6192		legacy saves, cited by the specs as the capture: `formats/d2s-legacy.md` OQ2 (load one 1.0	recording	no		3	
-REC-45	6020	MANUAL	Baal's portal opening (level 131 to 132)	recording	no		6	
-REC-46	6027	MANUAL	Classic single-player start (C→S 0x67 of a classic character)	recording	no		2	q-fix-create-flags,q-fix-recharge-order,q-skill-fallback
-REC-47	6034	MANUAL	Automap in the play preview (draw modes, header, markers)	recording	no		0	
-REC-50	5912	NO RUN	client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14	binary	no		1	q-fix-create-flags,q-fix-recharge-order,q-skill-fallback
-REC-51	5659	AUTO	client/model.md OQ1 and OQ2, client/msg-ui.md OQ2 (0x10000 per-caller conditions)	recording	no		27	q-fix-monster-modes
-REC-60	5846	AUTO	ui/text.md §15 r6 (scroll window, caret-inside-window case)	recording	no		5	q-fix-d2s-token-ref,q-fix-edit-scroll,q-fix-format-lookups
-REC-61	5854	NO RUN	render/camera.md OQ1 (roof block count	binary	yes		2	
-REC-62	5652	MANUAL	render/camera.md §8 (which missiles / skills reach `0x004D2610`, `0x004D3D30`, `0x004D5310	recording	no		1	q-fix-shake-starts
-REC-80	5752	NO RUN	population.md §6.3, §10.3, §11.5 rule 6	binary	no		9	q-fix-boss-restore-origin
-REC-81	5637	AUTO	population.md §11.4 hcIdx 10 (Radament)	recording	no		2	q-fix-boss-restore-origin
-REC-82	5644	AUTO	ai-bodies-7.md §27 step 12 (aitype 1 / 12)	recording	no		2	q-fix-monster-mode-missile,q-fix-shadowmaster-scan
-REC-90	5861	AUTO	sim/path-placement.md §10 rule 1 (static-path unit passed to `0x00554EA0`)	recording	no		0	q-fix-player-mode-msgs
-REC-91	5868	NO RUN	formats/d2s-appearance.md §1 r2, §1 r3, Open question 3 (reference table `0x00744CA8`)	binary	no		0	q-fix-d2s-token-ref,q-fix-edit-scroll,q-fix-format-lookups
-REC-92	5876	MANUAL	formats/d2s-appearance.md §2 r1, Open question 4 (empty `alternategfx`)	recording	no		0	q-fix-d2s-token-ref,q-fix-edit-scroll,q-fix-format-lookups
-REC-93	5884	MANUAL	audio/triggers-2.md §14 r2 (chest at-once key sound sent twice)	recording	no		2	
-REC-94	5891	MANUAL	world/objects.md §7.1 r3 (interact range `0x00623660`)	recording	no		3	
-REC-95	5666	ASSISTED	sim/intents-events.md §7.4 r3 (0x4C / 0x4D level byte), sim/pathing.md §10 r2 (player skil	recording	no		6	q-fix-door-highlight,q-fix-monster-update-steps,q-fix-player-mode-msgs,q-fix-skill-msg-level
-REC-96	6185	ASSISTED	Level-up stat messages (S→C 0x1D-0x1F, 0x21) around a level-up	recording	no		1	
-REC-99	5905	MANUAL	sim/path-placement.md §12.2 (C→S 0x13 on a warp tile, tile unit creation)	recording	no		10	q-fix-warp-tile-restore
-REC-100	6452		Hireling follow and fight (PROVISIONAL, `d2-server` `handlers/world/hireling_drive.rs`, M2	data	yes		1	
-REC-101	6453		Hire list row text (PROVISIONAL, `app/hire_stats.rs`): the act of the list is not sent; th	unstated	no		1	
-REC-102	6041	MANUAL	items/inventory-moves.md §7.17 (potion use from the belt: item-use spec `0x005BF240` unwri	recording	no		2	
-REC-103	6454		Gold: pile art, drop dialog, server fills (PROVISIONAL, `ui/gold_dialog.rs`, `world_view/g	data	yes		0	
-REC-104	6458		Stash grid and the inventory beside it (PROVISIONAL, `ui/panels/stash_items.rs`, `ui/root.	data	yes		1	
-REC-105	6459		Stash contents are not saved (PROVISIONAL, `app/save.rs`, q-stash): a played character's i	unstated	yes		0	
-REC-106	6447	NO RUN	world/npc.md §2–§3 host seams in the play preview (q-quests)	binary	no		0	
-REC-107	6450	NO RUN	ui/panels.md ui 0x0F quest log draw `0x004A34F0`, open `0x004A3FE0`	binary	no		0	
-REC-108	6460		Monster drop spot (PROVISIONAL, `app/monster_drop.rs`, q-monster-drops): the play host's f	recording	no		2	
-REC-109	6461		Cast target, animation names, line of sight (PROVISIONAL, `app/skill_rest.rs`, `app/anim_n	recording	no		0	
-REC-110	6467		NPC shop panel and store display (PROVISIONAL, `ui/shop_ui.rs`, `d2-server` `handlers/worl	data	yes		0	
-REC-112	6462		Waypoint travel in the preview (PROVISIONAL, `app/single_player.rs`, q-waypoint-travel): t	unstated	no		0	
-REC-113	6463		Identify effect (PROVISIONAL, `d2-sim` `wiring/inventory/identify.rs`, `pending.rs`, q-ide	recording	no		4	
-REC-114	6464		Item tool tip text and identify cursor (PROVISIONAL, `ui/item_tip.rs`, `ui/panels/inv_item	recording	no		0	
-REC-115	6466		Loaded-item placement is d2rs-own (PROVISIONAL, `d2-sim` `wiring/inventory/load.rs`, q-sav	binary	no		3	
-REC-116	6468		Client missiles and overlays (PROVISIONAL, `world_view/missiles.rs`, M22): the real client	recording	no		0	
-REC-117	6455		Town Portal scroll / tome and the portal pair (PROVISIONAL, `d2-sim` `wiring/action/town_p	recording	no		6	q-fix-just-portaled,q-fix-portal-pair,q-fix-tp-use,q-fix-vendor-buy-copy
-REC-119	6469		Horadric Cube in the play preview (PROVISIONAL, `d2-sim` `wiring/inventory/cube_open.rs`, 	data	yes		1	
-REC-120	6472		State-change messages for players (PROVISIONAL, `d2-sim` `wiring/action/state_update.rs`, 	recording	no		0	
-REC-121	6473		Socket filler test and socketed tool tip (PROVISIONAL, `d2-sim` `wiring/inventory/units.rs	recording	no		1	
-REC-122	6474		Act change in the preview (PROVISIONAL, `d2-sim` `wiring/path/act_change.rs`, `d2-server` 	recording	no		0	
-REC-123	6475		NPC menu box is d2rs-own (PROVISIONAL, `ui/npc_menu_ui.rs`, q-npc-menu, M22): the menu ope	unstated	no		0	
-REC-124	6457		Hit reaction `0x0057CEE0` in the preview (PROVISIONAL, `d2-sim` `wiring/action/reaction.rs	recording	no		1	
-REC-125	6476		Summons and pets on the preview host (PROVISIONAL, `d2-sim` `wiring/interaction/summon.rs`	data	yes		0	
-REC-126	6477		Hardcore and the save at death in the play preview (PROVISIONAL, `d2-client` `app/hardcore	recording	no		1	
-REC-127	6478		Game messages in play (PROVISIONAL, `d2-client` `ui/game_messages.rs`, q-messages, M22): t	recording	no		0	
-REC-128	6479		Cain's quest on the wired host and Cain's identify (PROVISIONAL, `d2-sim` `wiring/economy/	recording	no		4	
-REC-129	6480		Quest events in the play host and the synthetic Tower line (PROVISIONAL, `d2-server` `wire	recording	no		2	
-REC-130	6483		Sisters' Burial Grounds in the play preview (PROVISIONAL, `app/synthetic_burial.rs`, q-a1-	data	yes		1	
-REC-131	6494		Imbue on the real inventory (PROVISIONAL, `d2-sim` `wiring/interaction/npc_items.rs`, `d2-	recording	no		0	
-REC-132	6481		Sisters to the Slaughter in the preview (PROVISIONAL, `d2-server` `handlers/world/wired/qu	data	yes		1	
-REC-133	6482		Act II synthetic set (PROVISIONAL, `test-fixtures` `act2.rs`, M22; q-a2-fields): `Drlg::cr	data	yes		0	
-REC-134	6484		Every act in the play-host session (PROVISIONAL, `test-fixtures` `host.rs` / `game.rs` / `	data	yes		0	
-REC-135	6046	MANUAL	items/inventory-moves.md §7.17 (stamina potion `vps`: item-use spec `0x005BF240` unwritten	recording	no		0	
-REC-136	6495		Act II quest hooks in the play host (PROVISIONAL, `d2-server` `wired/quest_events.rs`, `d2	recording	no		2	
-REC-137	6499		Act III town in the play preview (PROVISIONAL, `d2-client` `app/town_npcs.rs`, `single_pla	data	yes		0	
-REC-138	6497		Act III synthetic set and play walk (PROVISIONAL, `test-fixtures` `act3.rs`, M22; q-a3-fie	data	yes		0	
-REC-139	6485		Act III dungeons on a synthetic set (PROVISIONAL, `test-fixtures` `act3.rs`, M22; q-a3-dun	data	yes		0	
-REC-140	6486		Lut Gholein in the play preview (PROVISIONAL, `d2-client` `app/single_player.rs` `ACT2_NPC	data	yes		0	
-REC-141	6487		Corpse and death losses in the play preview (PROVISIONAL, `d2-sim` `items/moves/ground.rs`	recording	no		3	
-REC-142	6500		Act III quest glue in the play preview (PROVISIONAL, `d2-sim` `wiring/economy/quest_object	data	yes		3	
-REC-143	6488		Act IV in the play preview (PROVISIONAL, `d2-client` `app/synthetic_act4.rs` and `app/sing	data	yes		1	
-REC-144	6491		Harrogath in the play preview (PROVISIONAL, `d2-client` `app/single_player.rs` `ACT5_NPCS`	data	yes		0	
-REC-145	6501		Charsi's imbue dialog in the play preview (PROVISIONAL, `d2-client` `ui/imbue_ui.rs`, `ui/	recording	no		0	
-REC-146	6502		Act V synthetic set and play walk (PROVISIONAL, `test-fixtures` `act5.rs`, M22; q-a5-field	data	yes		0	
-REC-147	6498		Act 2 dungeons in the play preview (PROVISIONAL, `d2-client` `synthetic_act2.rs`, `synthet	recording	no		0	
-REC-148	6503		Act V quest hooks in the play host (PROVISIONAL, `d2-server` `wired/quest_events.rs`, `d2-	recording	no		1	
-REC-149	6508		NPC approach in the play preview (PROVISIONAL, `d2-sim` `wiring/interaction`, `d2-server` 	data	yes		0	
-REC-150	6504		Amazon skills in the play preview (PROVISIONAL, `d2-client` `app/weapons.rs`, `skill_rest.	data	yes		1	
-REC-151	6505		Necromancer casts in the play host (PROVISIONAL, `d2-client` `tests/app_necro.rs`; M22; q-	data	yes		0	
-REC-152	6506		Barbarian skills in the play preview (PROVISIONAL, `d2-client` `app/skill_rest.rs`, `app/s	data	yes		1	
-REC-153	6533		Paladin skills in the preview (PROVISIONAL, `d2-sim` `wiring/interaction/body_path.rs`, `d	recording	no		0	
-REC-154	6532		Sorceress skills in the play preview (PROVISIONAL, `d2-sim` `wiring/interaction/skill_room	data	yes		2	
-REC-155	6529		Druid skills in the play host (PROVISIONAL, `d2-client` `app/skill_rest.rs` `sync_shapes`,	data	yes		1	
-REC-156	6534		Assassin skills in the play host (PROVISIONAL, `d2-client` `tests/app_assassin.rs`; M22; q	data	yes		0	
-REC-157	6492		Act 2 / 3 / 5 mercenaries in the play preview (PROVISIONAL, `d2-client` `app/merc_rows.rs`	data	yes		0	
-REC-158	6531		Worn items in combat (PROVISIONAL, d2-client `app/single_player.rs` `Pending::current_weap	recording	no		0	
-REC-161	6511		Worn items feed the wearer; set bonuses (PROVISIONAL, `d2-sim` `wiring/inventory/item_link	data	yes		5	
-REC-162	6493		Gamble windows and repair in the play preview (PROVISIONAL, `d2-client` `app/rest.rs`, `ui	data	yes		0	
-REC-163	6509		Charms and item bonuses in the panel (PROVISIONAL, `d2-sim` `wiring/inventory/item_link.rs	recording	no		2	
-REC-165	6530		Render polish in the play preview (PROVISIONAL, d2-client `world_view/unit_shadow`, `previ	recording	no		0	
-REC-166	6489		Act IV endgame in the play preview (PROVISIONAL, `d2-sim` `wiring/economy/quest_objects.rs	data	yes		2	
-REC-167	6510		Duriel's Lair and the staff hand-in in the play preview (PROVISIONAL, `d2-client` `app/syn	data	yes		3	
-REC-168	6524		Front-end shell (PROVISIONAL, `d2-client` `ui/front_end/`; M22; q-menu-shell): (1) a click	binary	no		6	
-REC-170	6177	MANUAL	Lighting detail: other light sources in the play preview	recording	no		0	
-REC-172	6537		Settings and controls files, Esc-menu Options page (PROVISIONAL, `d2-client` `app/config.r	recording	no		0	
-REC-173	6540		Skill moves in play: Leap, Whirlwind, Dragon Flight (PROVISIONAL, `d2-sim` `wiring/interac	recording	no		0	q-fix-dual-weapon-damage,q-fix-item-type-test,q-fix-moving-skill-do,q-fix-sentry-ai,q-fix-smite-shield
-REC-174	6517		Act II's close in the play preview (PROVISIONAL, `d2-sim` `wiring/path/act_change.rs`, `wi	data	yes		1	q-fix-act-change,q-fix-portal-pair
-REC-175	6490		Act IV to V in the play preview (PROVISIONAL, `d2-sim` `wiring/path/act_change.rs`, `wirin	unstated	no		0	q-fix-act-change,q-fix-portal-pair
-REC-176	6535		Paladin, Necromancer and Assassin skill gaps in the play host (PROVISIONAL, `d2-client` `t	data	yes		1	q-fix-dual-weapon-damage,q-fix-item-type-test,q-fix-moving-skill-do,q-fix-sentry-ai,q-fix-smite-shield
-REC-177	6204		Town and panel gaps (PROVISIONAL, d2rs-own; M22; q-town-gaps): (1) the shop's single-item 	recording	no		1	q-fix-weapon-switch
-REC-178	6525		Front-end host (PROVISIONAL, `app/front_host.rs`, `main.rs`; M22; q-menu-host): (1) `play`	unstated	yes		1	
-REC-179	6541		Main menu (PROVISIONAL, `d2-client` `ui/front_end/screens/main_menu.rs`; M22; q-menu-main)	unstated	no		0	
-REC-180	6523		Character select (PROVISIONAL, `d2-client` `ui/front_end/screens/char_select.rs`; M22; q-m	binary	no		3	
-REC-181	6527		Character create screen (PROVISIONAL, `d2-client` `ui/front_end/screens/create.rs`; M22; q	recording	no		3	
-REC-182	6522		Difficulty box encoding and title colour (PROVISIONAL, `d2-client` `ui/front_end/screens/d	data	yes		0	
-REC-183	6538		Loading screen state machine (PROVISIONAL, `d2-client` `ui/front_end/screens/loading.rs`, 	data	yes		0	q-fix-charselect-wheel,q-fix-esc-menu,q-fix-sp-pause
-REC-184	6528		Configure Controls screen (PROVISIONAL, `d2-client` `ui/front_end/screens/controls.rs`; M2	recording	no		3	
-REC-185	6542		Credits screen (PROVISIONAL, `d2-client` `ui/front_end/screens/credits.rs`; M22; q-menu-cr	recording	yes		1	
-REC-186	6539		Cinematics menu (PROVISIONAL, `d2-client` `ui/front_end/screens/cinematics.rs`; M22; q-men	recording	no		1	
-REC-187	6550		Esc options menu (PROVISIONAL, `d2-client` `ui/options_menu.rs`, `ui/esc_menu.rs`, `app/co	recording	no		0	q-controls-ingame,q-fe-text-widths,q-fix-controls-ingame,q-fix-create-popups,q-fix-esc-menu,q-fix-fe-buttons,q-fix-options-effects,q-options-art
-REC-188	6551		Item bonuses on the original wire (PROVISIONAL; M22; q-item-bonus-wire): S→C 0x1D-0x1F car	recording	no		1	q-fix-client-set-lists
-REC-189	6526		Front-end shared draw (PROVISIONAL, `d2-client` `ui/front_end/mod.rs` `draw()`, `ui/front_	data	yes		2	q-controls-ingame,q-fe-text-widths,q-fix-controls-ingame,q-fix-create-popups,q-fix-esc-menu,q-fix-fe-buttons,q-fix-options-effects,q-options-art
-REC-200	6051	MANUAL	Front end: Game exit target	recording	no		5	
-REC-201	6057	MANUAL	Front end: Control draw order	recording	no		1	
-REC-203	6063	MANUAL	Front end: Character-select OK condition	recording	no		0	
-REC-204	6069	MANUAL	Front end: Mouse wheel on character select	recording	no		0	q-fix-charselect-wheel,q-fix-esc-menu,q-fix-sp-pause
-REC-205	6075	MANUAL	Front end: Dead hardcore figure	recording	no		1	
-REC-206	6081	MANUAL	Front end: Legacy `Save Path` migration	recording	no		1	
-REC-207	6087	MANUAL	Front end: Slot level line text	recording	no		1	
-REC-208	6093	MANUAL	Front end: class names 10097 / 10098	data	yes		1	
-REC-209	6099	MANUAL	Front end: filter argument 2	recording	no		1	
-REC-210	6105	MANUAL	Front end: animation timing	recording	no		0	
-REC-211	6111	MANUAL	Front end: hardcore availability	recording	no		0	q-fix-charselect-wheel,q-fix-esc-menu,q-fix-sp-pause
-REC-212	6117	MANUAL	Front end: Esc menu tree capture	recording	no		1	q-fix-charselect-wheel,q-fix-esc-menu,q-fix-sp-pause
-REC-213	6123	MANUAL	Front end: Options slider float precision	recording	no		0	
-REC-220	6129	MANUAL	Front end: loading-screen art source	data	yes		2	
-REC-221	6135	MANUAL	Front end: act-change loading end tick	recording	no		1	
-REC-222	6141	MANUAL	Front end: keys during loading	recording	no		2	
-REC-223	6147	MANUAL	Front end: screen after an act-start video	recording	no		2	
-REC-225	6153	MANUAL	Front end: credits scroll rate and end	recording	no		1	
-REC-226	6159	MANUAL	Front end: 640×480 frame	recording	no		1	
-REC-228	6165	MANUAL	Front end: disabled cinematics buttons	recording	no		1	
-REC-229	6171	MANUAL	Front end: startup chain, no blizno screen	recording	no		0	q-fix-charselect-wheel,q-fix-esc-menu,q-fix-sp-pause
-REC-230	6512		Level warps in every act (PROVISIONAL, `d2-client` `app/synthetic_chains.rs`, `d2-sim` `wi	data	yes		1	q-fix-level-connections,q-fix-warp-tile-restore
-REC-231	6513		Front-end host hookups (PROVISIONAL, `d2-client` `app/front_host.rs`, `ui/front_end/{mod,s	data	yes		0	q-controls-ingame,q-fe-text-widths,q-fix-controls-ingame,q-fix-create-popups,q-fix-esc-menu,q-fix-fe-buttons,q-fix-options-effects,q-options-art
-REC-232	6553		Skill gaps: Leap landing, Leap Attack, Dragon Talon / Flight kicks, Whirlwind hits (PROVIS	recording	no		0	q-fix-dual-weapon-damage,q-fix-item-type-test,q-fix-moving-skill-do,q-fix-sentry-ai,q-fix-smite-shield,q-skill-sequences
-REC-233	6549		Assassin gaps in the play host (PROVISIONAL, `d2-sim` `wiring/action/mod.rs` `Sentry` + `w	data	yes		1	q-fix-dual-weapon-damage,q-fix-item-type-test,q-fix-moving-skill-do,q-fix-sentry-ai,q-fix-smite-shield
-REC-234	6518		Tyrael's chamber and portal arrival (PROVISIONAL, `d2-client` `synthetic_act2.rs`, `synthe	recording	no		0	q-fix-lair-entrance,q-fix-portal-pair,q-fix-preset-monster-ai,q-fix-quest-items
-REC-235	6557		Quest items in the synthetic game, the Act IV Hellforge flow (PROVISIONAL, `d2-sim` `wirin	binary	no		4	q-fix-lair-entrance,q-fix-portal-pair,q-fix-preset-monster-ai,q-fix-quest-items
-REC-236	6443		Front-end game start and loading (PROVISIONAL, `app/front_start.rs`, `app/loading_overlay.	recording	no		2	
-REC-237	6440		Esc game menu art, layout and strings (PROVISIONAL, `ui/esc_menu.rs`, M22): `controls.md` 	recording	no		0	q-fix-charselect-wheel,q-fix-esc-menu,q-fix-sp-pause
-REC-238	6441		Control-panel tool tip font and globe numbers (PROVISIONAL, `d2-client` `ui/hud_tips.rs`, 	recording	no		0	q-fix-belt-ui,q-fix-gold-prompts,q-fix-hud-popup
-REC-239	6521		Shrine states and the object mouse-over label (PROVISIONAL, `d2-sim` `wiring/action/object	recording	no		2	q-fix-object-label,q-fix-object-overhead,q-fix-shrine-states
-REC-240	6520		Belt labels and tips, stash gold dialogs (PROVISIONAL, `d2-client` `ui/hud_belt.rs`, `ui/g	recording	no		0	q-fix-belt-ui,q-fix-gold-prompts,q-fix-hud-popup
-REC-241	6546		Save gaps (PROVISIONAL, `d2-client` `app/save_gaps.rs`, `d2-sim` `wiring/inventory/load.rs	recording	no		2	q-fix-cube-panel,q-fix-save-gaps,q-fix-stale-runeword,q-fix-weapon-switch
-REC-242	6465		Item tip shapes, set bonuses, shop tip (PROVISIONAL, `ui/item_tip_desc.rs`, `ui/item_tip_s	recording	no		3	q-fix-item-tip-layout,q-fix-item-tip-props
-REC-243	6456		Town Portal gaps (PROVISIONAL, `d2-sim` `wiring/action/town_portal.rs`, `wiring/action/swi	recording	no		1	q-fix-just-portaled,q-fix-portal-pair,q-fix-tp-use,q-fix-vendor-buy-copy
-REC-244	6470		Cube gaps in the play preview (PROVISIONAL, `d2-server` `WiredWorld::start_extra`, `d2-cli	recording	no		0	q-fix-cube-panel,q-fix-save-gaps,q-fix-stale-runeword,q-fix-weapon-switch
-REC-245	6444		Unit state tint, overhead bubbles and the system line source (PROVISIONAL, `d2-client` `wo	recording	no		2	q-fix-preview-light,q-fix-state-tint
-REC-246	6552		Act III / V gaps in the preview (PROVISIONAL, q-act3-act5-gaps, M22, `// d2rs-own, unverif	recording	no		4	q-fix-level-connections,q-fix-quest-item-msg,q-fix-summit-gate,q-fix-warp-tile-unit
-REC-247	6545		Per-block tile light and Levels ambient in the play preview (PROVISIONAL, `d2-client` `wor	data	yes		0	q-fix-preview-light,q-fix-state-tint
-REC-248	6507		Client collision for `line_clear` (PROVISIONAL, `d2-sim` `wiring/interaction/skill_rooms.r	recording	no		1	q-fix-los-direction
-REC-249	6514		Act I's dungeons in the play preview (PROVISIONAL, `d2-client` `app/synthetic_chains.rs`, 	data	yes		0	q-fix-level-connections,q-fix-quest-item-msg,q-fix-summit-gate,q-fix-warp-tile-unit
-REC-250	6543		Blocks-light flags, near-room fills and ambient overrides in the play preview (PROVISIONAL	recording	no		0	q-fe-text-widths,q-fix-cain-caption,q-fix-preview-light
-REC-251	6445		Act videos and repeated same-act 0x03 in the loading flow (PROVISIONAL, `app/front_start.r	recording	no		0	q-controls-ingame,q-fe-text-widths,q-fix-controls-ingame,q-fix-create-popups,q-fix-esc-menu,q-fix-fe-buttons,q-fix-options-effects,q-options-art
-REC-252	6442		Globe numbers and stamina tip (PROVISIONAL, `d2-client` `ui/hud_tips.rs`, M22; q-hud-globe	recording	no		0	q-fix-equip-reqs,q-fix-hud-popup
-REC-253	6560		Equipment rules on in play (PROVISIONAL, `d2-server` `adapters/handlers/items/moves.rs` `I	recording	no		0	q-fix-equip-reqs,q-fix-hud-popup
-REC-254	6519		Duriel's AI from the world and the partnerless portal's free spot (PROVISIONAL, `d2-sim` `	recording	no		3	q-fix-lair-entrance,q-fix-portal-pair,q-fix-preset-monster-ai,q-fix-quest-items
-REC-255	6544		Cain's identify caption (PROVISIONAL, `d2-client` `ui/npc_menu_ui.rs`; M22; q-identify-cai	recording	no		0	q-fe-text-widths,q-fix-cain-caption,q-fix-preview-light
-REC-256	6558		Configure Controls over the game (PROVISIONAL, `d2-client` `ui/controls_host.rs`, `ui/esc_	recording	no		0	q-controls-ingame,q-fe-text-widths,q-fix-controls-ingame,q-fix-create-popups,q-fix-esc-menu,q-fix-fe-buttons,q-fix-options-effects,q-options-art
-REC-257	6562		Esc menu art (PROVISIONAL, `d2-client` `ui/esc_art.rs`; M22; q-options-art; supersedes REC	data	no		0	q-fix-esc-menu
-REC-258	6561		Front-end text widths (PROVISIONAL; M22; q-fe-text-widths): resolves item (1) of REC-231's	data	yes		0	q-fe-text-widths,q-fix-cain-caption,q-fix-preview-light
-REC-259	6515		Act I's fixture tree follows the level links (PROVISIONAL, `d2-client` `app/synthetic_chai	data	yes		0	q-fix-item-type-test,q-fix-level-connections,q-fix-preview-skill-rest,q-fix-quest-items,q-fix-skill-stat-callback
-REC-260	6593		Chest drops in play (PROVISIONAL, `d2-sim` `wiring/action/objects.rs`, `wiring/economy/que	recording	no		3	q-fix-ground-announce,q-fix-quest-items
-REC-261	6516		Act I tree dungeons as maze builds (PROVISIONAL, `d2-client` `app/synthetic_a1_maze.rs`, `	recording	no		0	
-REC-263	6594		Shrine state ends and refusals (PROVISIONAL, `d2-sim` `wiring/action/objects.rs` `ShrineWo	recording	no		3	
-REC-264	6559		UI rectangle primitive and belt key labels (PROVISIONAL, `d2-client` `ui/hud_belt.rs`, `ui	unstated	no		0	
-REC-265	6547		Save: swap set, switch, golem, hireling block, progression (PROVISIONAL, `d2-sim` `skills/	recording	no		0	q-fix-cube-panel,q-fix-save-gaps
-REC-266	6564		Preview skill seams: throw skill and item-granted skills (PROVISIONAL, `d2-server` `adapte	recording	no		1	q-fix-item-type-test,q-fix-level-connections,q-fix-preview-skill-rest,q-fix-quest-items,q-fix-skill-stat-callback
+REC-01	5686	AUTO, no run	Analysis of two existing raw files	unstated	no		0	
+REC-02	5693	AUTO	Join stream and new-character entry (packets + RNG twin)	recording	no		5	q-fix-door-highlight,q-fix-monster-update-steps,q-fix-skill-msg-level
+REC-03	5700	AUTO	Runtime tables not in `dump_tables`	data	yes		0	
+REC-04	5707	AUTO	Tick run over a waypoint walk with the room / unit probes	recording	no		1	
+REC-05	5714	AUTO	Act changes by waypoint: packets and palette frames	recording	no		0	
+REC-06	5721	AUTO	Waypoint object init (town waypoint after travel)	recording	no		0	
+REC-07	5728	MANUAL	Object operation and room population	recording	no		1	
+REC-08	5735	MANUAL	A monster kill with a drop, pick-up and stash	recording	no		1	
+REC-09	5742	MANUAL	Combat core with stats	recording	no		0	q-drop-stale-provisional,q-fix-client-stat-callback,q-fix-dead-flag,q-fix-pet-palette
+REC-10	5749	MANUAL	Hireling session (and resurrect at an NPC)	recording	no		0	
+REC-11	5756	MANUAL	Act I quest session	recording	no		1	
+REC-12	5772	AUTO	Short frames run: first-frame order, settings word, panels, light registry	recording	no		0	
+REC-13	5778	AUTO	The day cycle in one long run	recording	no		0	
+REC-14	5784	AUTO	Frames: shadows, light records, item colormaps (prepared saves)	recording	no		0	
+REC-15	5790	AUTO	World clicks and keys: C→S ids	recording	no		0	
+REC-16	5796	AUTO	Key-configuration panel and text checks	recording	no		0	
+REC-17	5802	AUTO	Inventory, gold, character, stash, control-panel UI frames (prepared saves)	recording	no		0	
+REC-18	5808	AUTO	NPC menus, waypoint panel and talk on arrival	data	yes		0	
+REC-19	5814	AUTO	Sound: request-site map of every UI control, one-shot lengths, async loads	recording	no		4	
+REC-20	5820	AUTO	Sound and music by waypoint, wav dumps, the day change	data	yes		0	
+REC-21	5826	AUTO	x87 control word under each video mode	recording	no		4	
+REC-22	5832	AUTO	The area-5 hook probes	recording	no		0	
+REC-23	5932	MANUAL	Vendors: prices, equip-on-buy, refresh, gamble, copy rebuild	unstated	no		0	
+REC-24	5937	MANUAL	NPC services	recording	no		0	
+REC-25	5942	MANUAL	Cube and the cow portal	recording	no		0	
+REC-26	5947	MANUAL	First waypoint activation	recording	no		0	
+REC-27	5952	MANUAL	Act II run (and the orifice)	recording	no		2	
+REC-28	5957	MANUAL	Act III run	recording	no		0	
+REC-29	5961	MANUAL	Act IV run	recording	no		0	
+REC-30	5966	MANUAL	Act V run and the Act V levels	unstated	no		0	
+REC-31	5971	ASSISTED	Skill, monster and missile bodies, umods	recording	no		0	
+REC-32	5976	MANUAL	Weather, translucent walls, arcane, Den light	recording	no		0	
+REC-33	5981	MANUAL	Audio in fights and the Den, with sound on	recording	no		0	
+REC-34	5985	MANUAL	Save and item round trips (no `--auto`)	recording	no		2	
+REC-35	5837	AUTO	DRLG extra probes: Trees substitution DS1, river units, room-entry returns	recording	no		2	
+REC-36	5844	AUTO	Load a character saved in Act III (client +0x1AC writes)	recording	no		0	
+REC-37	5989	MANUAL	Animation-rate records: IAS / FCR / FHR / FBR / FRW	recording	no		0	
+REC-38	5996	MANUAL	Monster init and umods: uniques, ancient barbarians, warping shrine	recording	no		0	
+REC-39	6003	MANUAL	Necromancer pets and the 0x7A / 0x99 messages	recording	no		0	
+REC-40	6010	MANUAL	Monster AI think logs (acts, Nightmare, freeze / knockback, NPCs)	unstated	no		0	
+REC-41	6017	ASSISTED	Skill use and level hooks	recording	no		0	
+REC-42	6024	MANUAL	Combat on-hit events (knockback, freeze, slow, skill-on-hit, mana)	recording	no		0	
+REC-43	5851	no game	Re-export Ghidra with labels	binary	no		0	
+REC-44	6203		legacy saves, cited by the specs as the capture: `formats/d2s-legacy.md` OQ2 (load one 1.0	recording	no		3	
+REC-45	6031	MANUAL	Baal's portal opening (level 131 to 132)	recording	no		6	
+REC-46	6038	MANUAL	Classic single-player start (C→S 0x67 of a classic character)	recording	no		2	q-fix-create-flags,q-fix-recharge-order,q-skill-fallback
+REC-47	6045	MANUAL	Automap in the play preview (draw modes, header, markers)	recording	no		0	
+REC-50	5923	NO RUN	client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14	binary	no		1	q-fix-create-flags,q-fix-recharge-order,q-skill-fallback
+REC-51	5670	AUTO	client/model.md OQ1 and OQ2, client/msg-ui.md OQ2 (0x10000 per-caller conditions)	recording	no		27	q-fix-monster-modes
+REC-60	5857	AUTO	ui/text.md §15 r6 (scroll window, caret-inside-window case)	recording	no		5	q-fix-d2s-token-ref,q-fix-edit-scroll,q-fix-format-lookups
+REC-61	5865	NO RUN	render/camera.md OQ1 (roof block count	binary	yes		2	
+REC-62	5663	MANUAL	render/camera.md §8 (which missiles / skills reach `0x004D2610`, `0x004D3D30`, `0x004D5310	recording	no		1	q-fix-shake-starts
+REC-80	5763	NO RUN	population.md §6.3, §10.3, §11.5 rule 6	binary	no		9	q-fix-boss-restore-origin
+REC-81	5648	AUTO	population.md §11.4 hcIdx 10 (Radament)	recording	no		2	q-fix-boss-restore-origin
+REC-82	5655	AUTO	ai-bodies-7.md §27 step 12 (aitype 1 / 12)	recording	no		2	q-fix-monster-mode-missile,q-fix-shadowmaster-scan
+REC-90	5872	AUTO	sim/path-placement.md §10 rule 1 (static-path unit passed to `0x00554EA0`)	recording	no		0	q-fix-player-mode-msgs
+REC-91	5879	NO RUN	formats/d2s-appearance.md §1 r2, §1 r3, Open question 3 (reference table `0x00744CA8`)	binary	no		0	q-fix-d2s-token-ref,q-fix-edit-scroll,q-fix-format-lookups
+REC-92	5887	MANUAL	formats/d2s-appearance.md §2 r1, Open question 4 (empty `alternategfx`)	recording	no		0	q-fix-d2s-token-ref,q-fix-edit-scroll,q-fix-format-lookups
+REC-93	5895	MANUAL	audio/triggers-2.md §14 r2 (chest at-once key sound sent twice)	recording	no		2	
+REC-94	5902	MANUAL	world/objects.md §7.1 r3 (interact range `0x00623660`)	recording	no		3	
+REC-95	5677	ASSISTED	sim/intents-events.md §7.4 r3 (0x4C / 0x4D level byte), sim/pathing.md §10 r2 (player skil	recording	no		6	q-fix-door-highlight,q-fix-monster-update-steps,q-fix-player-mode-msgs,q-fix-skill-msg-level
+REC-96	6196	ASSISTED	Level-up stat messages (S→C 0x1D-0x1F, 0x21) around a level-up	recording	no		1	
+REC-99	5916	MANUAL	sim/path-placement.md §12.2 (C→S 0x13 on a warp tile, tile unit creation)	recording	no		10	q-fix-warp-tile-restore
+REC-100	6463		Hireling follow and fight (PROVISIONAL, `d2-server` `handlers/world/hireling_drive.rs`, M2	data	yes		1	
+REC-101	6464		Hire list row text (PROVISIONAL, `app/hire_stats.rs`): the act of the list is not sent; th	unstated	no		1	
+REC-102	6052	MANUAL	items/inventory-moves.md §7.17 (potion use from the belt: item-use spec `0x005BF240` unwri	recording	no		3	
+REC-103	6465		Gold: pile art, drop dialog, server fills (PROVISIONAL, `ui/gold_dialog.rs`, `world_view/g	data	yes		0	
+REC-104	6469		Stash grid and the inventory beside it (PROVISIONAL, `ui/panels/stash_items.rs`, `ui/root.	data	yes		1	
+REC-105	6470		Stash contents are not saved (PROVISIONAL, `app/save.rs`, q-stash): a played character's i	unstated	yes		0	
+REC-106	6458	NO RUN	world/npc.md §2–§3 host seams in the play preview (q-quests)	binary	no		0	
+REC-107	6461	NO RUN	ui/panels.md ui 0x0F quest log draw `0x004A34F0`, open `0x004A3FE0`	binary	no		0	
+REC-108	6471		Monster drop spot (PROVISIONAL, `app/monster_drop.rs`, q-monster-drops): the play host's f	recording	no		2	
+REC-109	6472		Cast target, animation names, line of sight (PROVISIONAL, `app/skill_rest.rs`, `app/anim_n	recording	no		0	
+REC-110	6478		NPC shop panel and store display (PROVISIONAL, `ui/shop_ui.rs`, `d2-server` `handlers/worl	data	yes		0	
+REC-112	6473		Waypoint travel in the preview (PROVISIONAL, `app/single_player.rs`, q-waypoint-travel): t	unstated	no		0	
+REC-113	6474		Identify effect (PROVISIONAL, `d2-sim` `wiring/inventory/identify.rs`, `pending.rs`, q-ide	recording	no		4	
+REC-114	6475		Item tool tip text and identify cursor (PROVISIONAL, `ui/item_tip.rs`, `ui/panels/inv_item	recording	no		0	
+REC-115	6477		Loaded-item placement is d2rs-own (PROVISIONAL, `d2-sim` `wiring/inventory/load.rs`, q-sav	binary	no		3	
+REC-116	6479		Client missiles and overlays (PROVISIONAL, `world_view/missiles.rs`, M22): the real client	recording	no		0	
+REC-117	6466		Town Portal scroll / tome and the portal pair (PROVISIONAL, `d2-sim` `wiring/action/town_p	recording	no		3	q-fix-just-portaled,q-fix-portal-pair,q-fix-tp-use,q-fix-vendor-buy-copy
+REC-119	6480		Horadric Cube in the play preview (PROVISIONAL, `d2-sim` `wiring/inventory/cube_open.rs`, 	data	yes		1	
+REC-120	6483		State-change messages for players (PROVISIONAL, `d2-sim` `wiring/action/state_update.rs`, 	recording	no		0	
+REC-121	6484		Socket filler test and socketed tool tip (PROVISIONAL, `d2-sim` `wiring/inventory/units.rs	recording	no		1	
+REC-122	6485		Act change in the preview (PROVISIONAL, `d2-sim` `wiring/path/act_change.rs`, `d2-server` 	recording	no		0	
+REC-123	6486		NPC menu box is d2rs-own (PROVISIONAL, `ui/npc_menu_ui.rs`, q-npc-menu, M22): the menu ope	unstated	no		0	
+REC-124	6468		Hit reaction `0x0057CEE0` in the preview (PROVISIONAL, `d2-sim` `wiring/action/reaction.rs	recording	no		1	
+REC-125	6487		Summons and pets on the preview host (PROVISIONAL, `d2-sim` `wiring/interaction/summon.rs`	data	yes		0	
+REC-126	6488		Hardcore and the save at death in the play preview (PROVISIONAL, `d2-client` `app/hardcore	recording	no		1	
+REC-127	6489		Game messages in play (PROVISIONAL, `d2-client` `ui/game_messages.rs`, q-messages, M22): t	recording	no		0	
+REC-128	6490		Cain's quest on the wired host and Cain's identify (PROVISIONAL, `d2-sim` `wiring/economy/	recording	no		4	
+REC-129	6491		Quest events in the play host and the synthetic Tower line (PROVISIONAL, `d2-server` `wire	recording	no		2	
+REC-130	6494		Sisters' Burial Grounds in the play preview (PROVISIONAL, `app/synthetic_burial.rs`, q-a1-	data	yes		1	
+REC-131	6505		Imbue on the real inventory (PROVISIONAL, `d2-sim` `wiring/interaction/npc_items.rs`, `d2-	recording	no		0	
+REC-132	6492		Sisters to the Slaughter in the preview (PROVISIONAL, `d2-server` `handlers/world/wired/qu	data	yes		1	
+REC-133	6493		Act II synthetic set (PROVISIONAL, `test-fixtures` `act2.rs`, M22; q-a2-fields): `Drlg::cr	data	yes		0	
+REC-134	6495		Every act in the play-host session (PROVISIONAL, `test-fixtures` `host.rs` / `game.rs` / `	data	yes		0	
+REC-135	6057	MANUAL	items/inventory-moves.md §7.17 (stamina potion `vps`: item-use spec `0x005BF240` unwritten	recording	no		0	
+REC-136	6506		Act II quest hooks in the play host (PROVISIONAL, `d2-server` `wired/quest_events.rs`, `d2	recording	no		2	
+REC-137	6510		Act III town in the play preview (PROVISIONAL, `d2-client` `app/town_npcs.rs`, `single_pla	data	yes		0	
+REC-138	6508		Act III synthetic set and play walk (PROVISIONAL, `test-fixtures` `act3.rs`, M22; q-a3-fie	data	yes		0	
+REC-139	6496		Act III dungeons on a synthetic set (PROVISIONAL, `test-fixtures` `act3.rs`, M22; q-a3-dun	data	yes		0	
+REC-140	6497		Lut Gholein in the play preview (PROVISIONAL, `d2-client` `app/single_player.rs` `ACT2_NPC	data	yes		0	
+REC-141	6498		Corpse and death losses in the play preview (PROVISIONAL, `d2-sim` `items/moves/ground.rs`	recording	no		3	
+REC-142	6511		Act III quest glue in the play preview (PROVISIONAL, `d2-sim` `wiring/economy/quest_object	data	yes		3	
+REC-143	6499		Act IV in the play preview (PROVISIONAL, `d2-client` `app/synthetic_act4.rs` and `app/sing	data	yes		1	
+REC-144	6502		Harrogath in the play preview (PROVISIONAL, `d2-client` `app/single_player.rs` `ACT5_NPCS`	data	yes		0	
+REC-145	6512		Charsi's imbue dialog in the play preview (PROVISIONAL, `d2-client` `ui/imbue_ui.rs`, `ui/	recording	no		0	
+REC-146	6513		Act V synthetic set and play walk (PROVISIONAL, `test-fixtures` `act5.rs`, M22; q-a5-field	data	yes		0	
+REC-147	6509		Act 2 dungeons in the play preview (PROVISIONAL, `d2-client` `synthetic_act2.rs`, `synthet	recording	no		0	
+REC-148	6514		Act V quest hooks in the play host (PROVISIONAL, `d2-server` `wired/quest_events.rs`, `d2-	recording	no		1	
+REC-149	6519		NPC approach in the play preview (PROVISIONAL, `d2-sim` `wiring/interaction`, `d2-server` 	data	yes		0	
+REC-150	6515		Amazon skills in the play preview (PROVISIONAL, `d2-client` `app/weapons.rs`, `skill_rest.	data	yes		1	
+REC-151	6516		Necromancer casts in the play host (PROVISIONAL, `d2-client` `tests/app_necro.rs`; M22; q-	data	yes		0	
+REC-152	6517		Barbarian skills in the play preview (PROVISIONAL, `d2-client` `app/skill_rest.rs`, `app/s	data	yes		1	
+REC-153	6544		Paladin skills in the preview (PROVISIONAL, `d2-sim` `wiring/interaction/body_path.rs`, `d	recording	no		0	
+REC-154	6543		Sorceress skills in the play preview (PROVISIONAL, `d2-sim` `wiring/interaction/skill_room	data	yes		2	
+REC-155	6540		Druid skills in the play host (PROVISIONAL, `d2-client` `app/skill_rest.rs` `sync_shapes`,	data	yes		1	
+REC-156	6545		Assassin skills in the play host (PROVISIONAL, `d2-client` `tests/app_assassin.rs`; M22; q	data	yes		0	
+REC-157	6503		Act 2 / 3 / 5 mercenaries in the play preview (PROVISIONAL, `d2-client` `app/merc_rows.rs`	data	yes		0	
+REC-158	6542		Worn items in combat (PROVISIONAL, d2-client `app/single_player.rs` `Pending::current_weap	recording	no		1	
+REC-161	6522		Worn items feed the wearer; set bonuses (PROVISIONAL, `d2-sim` `wiring/inventory/item_link	data	yes		5	
+REC-162	6504		Gamble windows and repair in the play preview (PROVISIONAL, `d2-client` `app/rest.rs`, `ui	data	yes		0	
+REC-163	6520		Charms and item bonuses in the panel (PROVISIONAL, `d2-sim` `wiring/inventory/item_link.rs	recording	no		2	
+REC-165	6541		Render polish in the play preview (PROVISIONAL, d2-client `world_view/unit_shadow`, `previ	recording	no		0	
+REC-166	6500		Act IV endgame in the play preview (PROVISIONAL, `d2-sim` `wiring/economy/quest_objects.rs	data	yes		2	
+REC-167	6521		Duriel's Lair and the staff hand-in in the play preview (PROVISIONAL, `d2-client` `app/syn	data	yes		3	
+REC-168	6535		Front-end shell (PROVISIONAL, `d2-client` `ui/front_end/`; M22; q-menu-shell): (1) a click	binary	no		6	
+REC-170	6188	MANUAL	Lighting detail: other light sources in the play preview	recording	no		0	
+REC-172	6548		Settings and controls files, Esc-menu Options page (PROVISIONAL, `d2-client` `app/config.r	recording	no		0	
+REC-173	6551		Skill moves in play: Leap, Whirlwind, Dragon Flight (PROVISIONAL, `d2-sim` `wiring/interac	recording	no		0	q-fix-dual-weapon-damage,q-fix-item-type-test,q-fix-moving-skill-do,q-fix-sentry-ai,q-fix-smite-shield
+REC-174	6528		Act II's close in the play preview (PROVISIONAL, `d2-sim` `wiring/path/act_change.rs`, `wi	data	yes		1	q-fix-act-change,q-fix-portal-pair
+REC-175	6501		Act IV to V in the play preview (PROVISIONAL, `d2-sim` `wiring/path/act_change.rs`, `wirin	unstated	no		0	q-fix-act-change,q-fix-portal-pair
+REC-176	6546		Paladin, Necromancer and Assassin skill gaps in the play host (PROVISIONAL, `d2-client` `t	data	yes		0	q-fix-dual-weapon-damage,q-fix-item-type-test,q-fix-moving-skill-do,q-fix-sentry-ai,q-fix-smite-shield
+REC-177	6215		Town and panel gaps (PROVISIONAL, d2rs-own; M22; q-town-gaps): (1) the shop's single-item 	recording	no		1	q-fix-weapon-switch
+REC-178	6536		Front-end host (PROVISIONAL, `app/front_host.rs`, `main.rs`; M22; q-menu-host): (1) `play`	unstated	yes		1	
+REC-179	6552		Main menu (PROVISIONAL, `d2-client` `ui/front_end/screens/main_menu.rs`; M22; q-menu-main)	unstated	no		0	
+REC-180	6534		Character select (PROVISIONAL, `d2-client` `ui/front_end/screens/char_select.rs`; M22; q-m	binary	no		3	
+REC-181	6538		Character create screen (PROVISIONAL, `d2-client` `ui/front_end/screens/create.rs`; M22; q	recording	no		3	
+REC-182	6533		Difficulty box encoding and title colour (PROVISIONAL, `d2-client` `ui/front_end/screens/d	data	yes		0	
+REC-183	6549		Loading screen state machine (PROVISIONAL, `d2-client` `ui/front_end/screens/loading.rs`, 	data	yes		0	q-fix-charselect-wheel,q-fix-esc-menu,q-fix-sp-pause
+REC-184	6539		Configure Controls screen (PROVISIONAL, `d2-client` `ui/front_end/screens/controls.rs`; M2	recording	no		3	
+REC-185	6553		Credits screen (PROVISIONAL, `d2-client` `ui/front_end/screens/credits.rs`; M22; q-menu-cr	recording	yes		1	
+REC-186	6550		Cinematics menu (PROVISIONAL, `d2-client` `ui/front_end/screens/cinematics.rs`; M22; q-men	recording	no		1	
+REC-187	6561		Esc options menu (PROVISIONAL, `d2-client` `ui/options_menu.rs`, `ui/esc_menu.rs`, `app/co	recording	no		0	q-controls-ingame,q-fe-text-widths,q-fix-controls-ingame,q-fix-create-popups,q-fix-esc-menu,q-fix-fe-buttons,q-fix-options-effects,q-options-art
+REC-188	6562		Item bonuses on the original wire (PROVISIONAL; M22; q-item-bonus-wire): S→C 0x1D-0x1F car	recording	no		1	q-fix-client-set-lists
+REC-189	6537		Front-end shared draw (PROVISIONAL, `d2-client` `ui/front_end/mod.rs` `draw()`, `ui/front_	data	yes		2	q-controls-ingame,q-fe-text-widths,q-fix-controls-ingame,q-fix-create-popups,q-fix-esc-menu,q-fix-fe-buttons,q-fix-options-effects,q-options-art
+REC-200	6062	MANUAL	Front end: Game exit target	recording	no		5	
+REC-201	6068	MANUAL	Front end: Control draw order	recording	no		1	
+REC-203	6074	MANUAL	Front end: Character-select OK condition	recording	no		0	
+REC-204	6080	MANUAL	Front end: Mouse wheel on character select	recording	no		0	q-fix-charselect-wheel,q-fix-esc-menu,q-fix-sp-pause
+REC-205	6086	MANUAL	Front end: Dead hardcore figure	recording	no		1	
+REC-206	6092	MANUAL	Front end: Legacy `Save Path` migration	recording	no		1	
+REC-207	6098	MANUAL	Front end: Slot level line text	recording	no		1	
+REC-208	6104	MANUAL	Front end: class names 10097 / 10098	data	yes		1	
+REC-209	6110	MANUAL	Front end: filter argument 2	recording	no		1	
+REC-210	6116	MANUAL	Front end: animation timing	recording	no		0	
+REC-211	6122	MANUAL	Front end: hardcore availability	recording	no		0	q-fix-charselect-wheel,q-fix-esc-menu,q-fix-sp-pause
+REC-212	6128	MANUAL	Front end: Esc menu tree capture	recording	no		1	q-fix-charselect-wheel,q-fix-esc-menu,q-fix-sp-pause
+REC-213	6134	MANUAL	Front end: Options slider float precision	recording	no		0	
+REC-220	6140	MANUAL	Front end: loading-screen art source	data	yes		2	
+REC-221	6146	MANUAL	Front end: act-change loading end tick	recording	no		1	
+REC-222	6152	MANUAL	Front end: keys during loading	recording	no		2	
+REC-223	6158	MANUAL	Front end: screen after an act-start video	recording	no		2	
+REC-225	6164	MANUAL	Front end: credits scroll rate and end	recording	no		1	
+REC-226	6170	MANUAL	Front end: 640×480 frame	recording	no		1	
+REC-228	6176	MANUAL	Front end: disabled cinematics buttons	recording	no		1	
+REC-229	6182	MANUAL	Front end: startup chain, no blizno screen	recording	no		0	q-fix-charselect-wheel,q-fix-esc-menu,q-fix-sp-pause
+REC-230	6523		Level warps in every act (PROVISIONAL, `d2-client` `app/synthetic_chains.rs`, `d2-sim` `wi	data	yes		1	q-fix-level-connections,q-fix-warp-tile-restore
+REC-231	6524		Front-end host hookups (PROVISIONAL, `d2-client` `app/front_host.rs`, `ui/front_end/{mod,s	data	yes		0	q-controls-ingame,q-fe-text-widths,q-fix-controls-ingame,q-fix-create-popups,q-fix-esc-menu,q-fix-fe-buttons,q-fix-options-effects,q-options-art
+REC-232	6564		Skill gaps: Leap landing, Leap Attack, Dragon Talon / Flight kicks, Whirlwind hits (PROVIS	recording	no		0	q-fix-dual-weapon-damage,q-fix-item-type-test,q-fix-moving-skill-do,q-fix-sentry-ai,q-fix-smite-shield,q-skill-sequences
+REC-233	6560		Assassin gaps in the play host (PROVISIONAL, `d2-sim` `wiring/action/mod.rs` `Sentry` + `w	data	yes		1	q-fix-dual-weapon-damage,q-fix-item-type-test,q-fix-moving-skill-do,q-fix-sentry-ai,q-fix-smite-shield
+REC-234	6529		Tyrael's chamber and portal arrival (PROVISIONAL, `d2-client` `synthetic_act2.rs`, `synthe	recording	no		0	q-fix-lair-entrance,q-fix-portal-pair,q-fix-preset-monster-ai,q-fix-quest-items
+REC-235	6568		Quest items in the synthetic game, the Act IV Hellforge flow (PROVISIONAL, `d2-sim` `wirin	binary	no		4	q-fix-lair-entrance,q-fix-portal-pair,q-fix-preset-monster-ai,q-fix-quest-items
+REC-236	6454		Front-end game start and loading (PROVISIONAL, `app/front_start.rs`, `app/loading_overlay.	recording	no		2	
+REC-237	6451		Esc game menu art, layout and strings (PROVISIONAL, `ui/esc_menu.rs`, M22): `controls.md` 	recording	no		0	q-fix-charselect-wheel,q-fix-esc-menu,q-fix-sp-pause
+REC-238	6452		Control-panel tool tip font and globe numbers (PROVISIONAL, `d2-client` `ui/hud_tips.rs`, 	recording	no		0	q-fix-belt-ui,q-fix-gold-prompts,q-fix-hud-popup
+REC-239	6532		Shrine states and the object mouse-over label (PROVISIONAL, `d2-sim` `wiring/action/object	recording	no		2	q-fix-object-label,q-fix-object-overhead,q-fix-shrine-states
+REC-240	6531		Belt labels and tips, stash gold dialogs (PROVISIONAL, `d2-client` `ui/hud_belt.rs`, `ui/g	recording	no		0	q-fix-belt-ui,q-fix-gold-prompts,q-fix-hud-popup
+REC-241	6557		Save gaps (PROVISIONAL, `d2-client` `app/save_gaps.rs`, `d2-sim` `wiring/inventory/load.rs	recording	no		2	q-fix-cube-panel,q-fix-save-gaps,q-fix-stale-runeword,q-fix-weapon-switch
+REC-242	6476		Item tip shapes, set bonuses, shop tip (PROVISIONAL, `ui/item_tip_desc.rs`, `ui/item_tip_s	recording	no		3	q-fix-item-tip-layout,q-fix-item-tip-props
+REC-243	6467		Town Portal gaps (PROVISIONAL, `d2-sim` `wiring/action/town_portal.rs`, `wiring/action/swi	recording	no		1	q-fix-just-portaled,q-fix-portal-pair,q-fix-tp-use,q-fix-vendor-buy-copy
+REC-244	6481		Cube gaps in the play preview (PROVISIONAL, `d2-server` `WiredWorld::start_extra`, `d2-cli	recording	no		0	q-fix-cube-panel,q-fix-save-gaps,q-fix-stale-runeword,q-fix-weapon-switch
+REC-245	6455		Unit state tint, overhead bubbles and the system line source (PROVISIONAL, `d2-client` `wo	recording	no		2	q-fix-preview-light,q-fix-state-tint
+REC-246	6563		Act III / V gaps in the preview (PROVISIONAL, q-act3-act5-gaps, M22, `// d2rs-own, unverif	recording	no		3	q-fix-level-connections,q-fix-quest-item-msg,q-fix-summit-gate,q-fix-warp-tile-unit
+REC-247	6556		Per-block tile light and Levels ambient in the play preview (PROVISIONAL, `d2-client` `wor	data	yes		0	q-fix-preview-light,q-fix-state-tint
+REC-248	6518		Client collision for `line_clear` (PROVISIONAL, `d2-sim` `wiring/interaction/skill_rooms.r	recording	no		1	q-fix-los-direction
+REC-249	6525		Act I's dungeons in the play preview (PROVISIONAL, `d2-client` `app/synthetic_chains.rs`, 	data	yes		0	q-fix-level-connections,q-fix-quest-item-msg,q-fix-summit-gate,q-fix-warp-tile-unit
+REC-250	6554		Blocks-light flags, near-room fills and ambient overrides in the play preview (PROVISIONAL	recording	no		0	q-fe-text-widths,q-fix-cain-caption,q-fix-preview-light
+REC-251	6456		Act videos and repeated same-act 0x03 in the loading flow (PROVISIONAL, `app/front_start.r	recording	no		0	q-controls-ingame,q-fe-text-widths,q-fix-controls-ingame,q-fix-create-popups,q-fix-esc-menu,q-fix-fe-buttons,q-fix-options-effects,q-options-art
+REC-252	6453		Globe numbers and stamina tip (PROVISIONAL, `d2-client` `ui/hud_tips.rs`, M22; q-hud-globe	recording	no		0	q-fix-equip-reqs,q-fix-hud-popup
+REC-253	6571		Equipment rules on in play (PROVISIONAL, `d2-server` `adapters/handlers/items/moves.rs` `I	recording	no		0	q-fix-equip-reqs,q-fix-hud-popup
+REC-254	6530		Duriel's AI from the world and the partnerless portal's free spot (PROVISIONAL, `d2-sim` `	recording	no		3	q-fix-lair-entrance,q-fix-portal-pair,q-fix-preset-monster-ai,q-fix-quest-items
+REC-255	6555		Cain's identify caption (PROVISIONAL, `d2-client` `ui/npc_menu_ui.rs`; M22; q-identify-cai	recording	no		0	q-fe-text-widths,q-fix-cain-caption,q-fix-preview-light
+REC-256	6569		Configure Controls over the game (PROVISIONAL, `d2-client` `ui/controls_host.rs`, `ui/esc_	recording	no		0	q-controls-ingame,q-fe-text-widths,q-fix-controls-ingame,q-fix-create-popups,q-fix-esc-menu,q-fix-fe-buttons,q-fix-options-effects,q-options-art
+REC-257	6573		Esc menu art (PROVISIONAL, `d2-client` `ui/esc_art.rs`; M22; q-options-art; supersedes REC	data	no		0	q-fix-esc-menu
+REC-258	6572		Front-end text widths (PROVISIONAL; M22; q-fe-text-widths): resolves item (1) of REC-231's	data	yes		0	q-fe-text-widths,q-fix-cain-caption,q-fix-preview-light
+REC-259	6526		Act I's fixture tree follows the level links (PROVISIONAL, `d2-client` `app/synthetic_chai	data	yes		0	q-fix-item-type-test,q-fix-level-connections,q-fix-preview-skill-rest,q-fix-quest-items,q-fix-skill-stat-callback
+REC-260	6607		Chest drops in play (PROVISIONAL, `d2-sim` `wiring/action/objects.rs`, `wiring/economy/que	recording	no		3	q-fix-ground-announce,q-fix-quest-items
+REC-261	6527		Act I tree dungeons as maze builds (PROVISIONAL, `d2-client` `app/synthetic_a1_maze.rs`, `	recording	no		0	
+REC-263	6608		Shrine state ends and refusals (PROVISIONAL, `d2-sim` `wiring/action/objects.rs` `ShrineWo	recording	no		3	
+REC-264	6570		UI rectangle primitive and belt key labels (PROVISIONAL, `d2-client` `ui/hud_belt.rs`, `ui	unstated	no		0	
+REC-265	6558		Save: swap set, switch, golem, hireling block, progression (PROVISIONAL, `d2-sim` `skills/	recording	no		0	q-fix-cube-panel,q-fix-save-gaps
+REC-266	6575		Preview skill seams: throw skill and item-granted skills (PROVISIONAL, `d2-server` `adapte	recording	no		1	q-fix-item-type-test,q-fix-level-connections,q-fix-preview-skill-rest,q-fix-quest-items,q-fix-skill-stat-callback
 REC-267	2		Cube transmute animation and open latch (PROVISIONAL, `d2-client` `ui/cube_ui.rs`, `ui/msg	recording	no		0	q-fix-cube-panel,q-fix-save-gaps
-REC-268	6567		Pending-list audit, Shift stat spend and cursor warp (PROVISIONAL, `d2-client` `ui/origina	recording	no		1	
-REC-269	6565		Character panel extras (PROVISIONAL, `d2-client` `ui/char_feed.rs`, `app/hud.rs`; M22; q-c	recording	no		2	
-REC-270	6595		Skill tree panel in play (PROVISIONAL, `d2-client` `ui/skill_tree_ui.rs`, `ui/original.rs`	recording	no		0	
-REC-271	6597		(a) Inventory item tints (PROVISIONAL, `d2-client` `ui/panels/inv_items_tint.rs` `ItemsUi:	recording	no	yes	0	
-REC-272	6566		Preview weather: water floor, passes 4 and 9 (PROVISIONAL, `d2-client` `world_view/weather	recording	no	yes	0	
-REC-273	6568		Model unit facts for the draw order (PROVISIONAL, `d2-client` `world_view/unit_facts.rs`, 	data	yes		2	
-REC-274	6563		Duriel's Charge and Jab in the synthetic Lair (PROVISIONAL, `d2-client` `app/skill_rest.rs	data	yes		0	
-REC-275	6556		Leap arc and Whirlwind spin in the play preview (PROVISIONAL; M22; q-move-anims; REC-275 w	recording	no		3	
-REC-276	6596		Trap missiles in the play host (PROVISIONAL, `d2-sim` `wiring/interaction/skill_use.rs` `U	data	yes		0	
-REC-277	6569		The shop opens on the NPC menu's Trade / Gamble choice (PROVISIONAL, `d2-client` `ui/npc_m	recording	no		12	
-REC-278	6570		Synthetic town smoke data and the town fixes it found (PROVISIONAL, `d2-client`, `d2-sim`,	data	yes		7	
-REC-279	6555		Combat smoke fills (PROVISIONAL; M22; q-smoke-combat; `// d2rs-own, unverified`): (1) **re	data	yes		9	
-REC-280	6572		Warriv in the synthetic Act I town (PROVISIONAL, `d2-client` `app/town_npcs.rs` `ACT1`; M2	data	yes		0	
-REC-281	6599		Item smoke test fills (PROVISIONAL, M22; q-smoke-items; every point `d2rs-own, unverified`	recording	no		8	
-REC-282	6548		Save smoke fills (PROVISIONAL, `d2-client` `app/save_gaps.rs` `seed_new_flags`, `app/save_	recording	no		1	
-REC-286	6554		Visibility predicate inputs in play (PROVISIONAL, `d2-client` `world_view/visibility.rs`, 	recording	no		4	
-REC-287	6600		Inactive room store in play (PROVISIONAL, `d2-sim` `wiring/action/inactive.rs`, `d2-client	data	yes		5	
-REC-288	6573		Arrival walk-outs in the walk prediction (PROVISIONAL, `d2-client` `bridge/predict.rs` `Pr	recording	no		4	
-REC-291	6601		Server saves on the flow's path (PROVISIONAL, `d2-server` `adapters/storage.rs`, `adapters	recording	yes		4	
-REC-300	6209	MANUAL	(R-SWAP-1)	recording	no		0	
-REC-301	6212	MANUAL	(R-SET-1, R-SET-2)	unstated	no		0	
-REC-302	6216	MANUAL	(R-WW-1)	recording	no		0	
-REC-303	6219	MANUAL	(R-CLAW-1)	unstated	no		0	
-REC-304	6222	MANUAL	(R-SENTRY-1)	unstated	no		0	
-REC-305	6225	AUTO	(R-PAUSE-1)	unstated	no		0	
-REC-306	6228	MANUAL	(R-ACT-1)	unstated	no		0	
-REC-307	6231	MANUAL	(R-TYRPORT-1)	unstated	no		0	
-REC-308	6234	AUTO	(R-HCFLAG-1)	recording	no		0	
-REC-309	6237	AUTO] [MANUAL	(R-MSG-1, R-MSG-2, R-MSG-3, R-MSG-4, R-MSG-5)	recording	no		0	
-REC-310	6244	AUTO	(R-EXIT-1)	unstated	no		0	
-REC-311	6247	AUTO	(R-MUPD-1)	unstated	no		0	
-REC-312	6250	MANUAL	(R-DOOR-1)	unstated	no		0	
-REC-313	6253	MANUAL	(R-BELT-1, R-BELT-2, R-BELT-3)	recording	no		0	
-REC-314	6258	MANUAL	(R-HUD-1)	recording	no		0	
-REC-315	6261	AUTO trace + MANUAL screenshot	(R-GOLD-1)	recording	no		0	
-REC-316	6264	MANUAL	(R-LOAD-1)	unstated	no		0	
-REC-317	6267	AUTO] [MANUAL	(R-LVL-1, R-LVL-2)	unstated	yes		0	
-REC-318	6271	ASSISTED	(R-MODE-1)	unstated	no		0	
-REC-319	6274	AUTO	(R-ACTBYTE-1)	unstated	no		0	
-REC-320	6277	AUTO	(R-MIS-1, R-MIS-2)	recording	no		0	
-REC-321	6281	MANUAL	(R-SHAKE-1)	unstated	no		0	
-REC-322	6284	AUTO	(R-NOTICK-1)	recording	no		0	
-REC-323	6287	AUTO] [MANUAL	(R-SHRINE-1, R-SHRINE-2, R-SHRINE-3, R-SHRINE-4)	recording	no		0	
-REC-324	6293	AUTO	(R-DRLG-DIR)	unstated	no		0	
-REC-325	6296	AUTO	(R-WARP-RESTORE)	unstated	no		0	
-REC-326	6299	MANUAL	(R-TINT-1)	unstated	no		0	
-REC-327	6302	MANUAL	(R-WALL-1)	recording	no		0	
-REC-328	6305	AUTO	(R-LIGHTEDGE-1)	unstated	no		0	
-REC-329	6308	MANUAL	(R-BUBBLE-1)	unstated	no		0	
-REC-330	6311	AUTO, optional	(R-SYS4-1)	recording	no		0	
-REC-331	6314	MANUAL	(R-GARG-1)	unstated	no		0	
-REC-332	6317	MANUAL, second client] [MANUAL	(R-TP-1, R-TP-2, R-TP-3, R-TP-4)	unstated	no		0	
-REC-333	6323	MANUAL	(R-CUBE-1, R-CUBE-2)	recording	no		0	
-REC-334	6327	AUTO] [MANUAL	(R-SAVE-1, R-SAVE-2, R-SAVE-3, R-SAVE-4, R-SAVE-5)	unstated	no		0	
-REC-335	6334	AUTO hook, MANUAL placement	(R-LOS-1)	recording	no		0	
-REC-400	6337	AUTO	(R-3E-1) — wire byte layout, top of the list (M22)	unstated	no	yes	7	
-REC-401	6340	MANUAL, second client	(R-JOIN-1)	unstated	no	yes	2	
-REC-402	6343	AUTO hook	(R-CHAT15-1)	recording	no	yes	4	
-REC-404	6367	PC 1, Ghidra read; AUTO hook	(R-SUBFILE-1)	recording	no	yes	5	
-REC-405	6587		Per-client inventory refresh without its item steps (PROVISIONAL, `d2-sim` `wiring/action/	recording	no		2	
-REC-406	6588		The join sequence's 0x8D (PROVISIONAL, `d2-sim` `wiring/action/dispatch.rs` `join_sequence	binary	no		2	
-REC-410	6346	AUTO hook	(R-OVL11-1)	recording	no	yes	2	
-REC-411	6349	AUTO	(R-LAND-1)	recording	no	yes	2	
-REC-412	6352	AUTO hook	(R-HEAL-1)	recording	no	yes	2	
-REC-413	6355	AUTO	(R-CAST-1)	recording	no	yes	1	
-REC-414	6358	AUTO	(R-MISS73-1)	recording	no	yes	4	
-REC-415	6361	PC 1, Ghidra read	(R-CALLERS-1)	binary	no	yes	5	
-REC-416	6364	AUTO	(R-92-1)	unstated	no	yes	2	
-REC-420	6577		Arreat Summit background seed (PROVISIONAL, `d2-client` `world_view/background_view.rs` `s	recording	no		3	
-REC-430	6370	AUTO hook	(R-ANIM-1)	recording	no		1	
-REC-431	6373	AUTO hook	(R-FLOOR-1)	recording	no		0	
-REC-432	6376	AUTO hook	(R-UNITORDER-1)	recording	no		0	
-REC-433	6379	AUTO hook	(R-HITCLASS-1)	recording	no		0	
-REC-434	6382	AUTO hook	(R-FIRSTSIGHT-1)	recording	no		0	
-REC-435	6385	PC 1, Ghidra read; AUTO hook	(R-SKILLSND-1)	recording	no		0	
-REC-436	6388	AUTO hook	(R-GREETMODE-1)	recording	no		0	
-REC-480	5898	MANUAL	drlg/maze.md, drlg/rooms.md §9.5.1 (exit warps of maze levels, q-act1-dungeons)	recording	no		0	
+REC-268	6578		Pending-list audit, Shift stat spend and cursor warp (PROVISIONAL, `d2-client` `ui/origina	recording	no		1	
+REC-269	6576		Character panel extras (PROVISIONAL, `d2-client` `ui/char_feed.rs`, `app/hud.rs`; M22; q-c	recording	no		2	
+REC-270	6609		Skill tree panel in play (PROVISIONAL, `d2-client` `ui/skill_tree_ui.rs`, `ui/original.rs`	recording	no		0	
+REC-271	6611		(a) Inventory item tints (PROVISIONAL, `d2-client` `ui/panels/inv_items_tint.rs` `ItemsUi:	recording	no	yes	0	
+REC-272	6577		Preview weather: water floor, passes 4 and 9 (PROVISIONAL, `d2-client` `world_view/weather	recording	no	yes	0	
+REC-273	6579		Model unit facts for the draw order (PROVISIONAL, `d2-client` `world_view/unit_facts.rs`, 	data	yes		2	
+REC-274	6574		Duriel's Charge and Jab in the synthetic Lair (PROVISIONAL, `d2-client` `app/skill_rest.rs	data	yes		0	
+REC-275	6567		Leap arc and Whirlwind spin in the play preview (PROVISIONAL; M22; q-move-anims; REC-275 w	recording	no		3	
+REC-276	6610		Trap missiles in the play host (PROVISIONAL, `d2-sim` `wiring/interaction/skill_use.rs` `U	data	yes		0	
+REC-277	6580		The shop opens on the NPC menu's Trade / Gamble choice (PROVISIONAL, `d2-client` `ui/npc_m	recording	no		12	
+REC-278	6581		Synthetic town smoke data and the town fixes it found (PROVISIONAL, `d2-client`, `d2-sim`,	data	yes		7	
+REC-279	6566		Combat smoke fills (PROVISIONAL; M22; q-smoke-combat; `// d2rs-own, unverified`): (1) **re	data	yes		9	
+REC-280	6583		Warriv in the synthetic Act I town (PROVISIONAL, `d2-client` `app/town_npcs.rs` `ACT1`; M2	data	yes		0	
+REC-281	6613		Item smoke test fills (PROVISIONAL, M22; q-smoke-items; every point `d2rs-own, unverified`	recording	no		8	
+REC-282	6559		Save smoke fills (PROVISIONAL, `d2-client` `app/save_gaps.rs` `seed_new_flags`, `app/save_	recording	no		1	
+REC-286	6565		Visibility predicate inputs in play (PROVISIONAL, `d2-client` `world_view/visibility.rs`, 	recording	no		4	
+REC-287	6614		Inactive room store in play (PROVISIONAL, `d2-sim` `wiring/action/inactive.rs`, `d2-client	data	yes		5	
+REC-288	6584		Arrival walk-outs in the walk prediction (PROVISIONAL, `d2-client` `bridge/predict.rs` `Pr	recording	no		4	
+REC-289	6585		Item-move fills of q-fix-items-play (PROVISIONAL, M22; `d2-sim` `items/inventory/equip.rs`	recording	no		12	
+REC-291	6615		Server saves on the flow's path (PROVISIONAL, `d2-server` `adapters/storage.rs`, `adapters	recording	yes		4	
+REC-300	6220	MANUAL	(R-SWAP-1)	recording	no		0	
+REC-301	6223	MANUAL	(R-SET-1, R-SET-2)	unstated	no		0	
+REC-302	6227	MANUAL	(R-WW-1)	recording	no		0	
+REC-303	6230	MANUAL	(R-CLAW-1)	unstated	no		0	
+REC-304	6233	MANUAL	(R-SENTRY-1)	unstated	no		0	
+REC-305	6236	AUTO	(R-PAUSE-1)	unstated	no		0	
+REC-306	6239	MANUAL	(R-ACT-1)	unstated	no		0	
+REC-307	6242	MANUAL	(R-TYRPORT-1)	unstated	no		0	
+REC-308	6245	AUTO	(R-HCFLAG-1)	recording	no		0	
+REC-309	6248	AUTO] [MANUAL	(R-MSG-1, R-MSG-2, R-MSG-3, R-MSG-4, R-MSG-5)	recording	no		0	
+REC-310	6255	AUTO	(R-EXIT-1)	unstated	no		0	
+REC-311	6258	AUTO	(R-MUPD-1)	unstated	no		0	
+REC-312	6261	MANUAL	(R-DOOR-1)	unstated	no		0	
+REC-313	6264	MANUAL	(R-BELT-1, R-BELT-2, R-BELT-3)	recording	no		0	
+REC-314	6269	MANUAL	(R-HUD-1)	recording	no		0	
+REC-315	6272	AUTO trace + MANUAL screenshot	(R-GOLD-1)	recording	no		0	
+REC-316	6275	MANUAL	(R-LOAD-1)	unstated	no		0	
+REC-317	6278	AUTO] [MANUAL	(R-LVL-1, R-LVL-2)	unstated	yes		0	
+REC-318	6282	ASSISTED	(R-MODE-1)	unstated	no		0	
+REC-319	6285	AUTO	(R-ACTBYTE-1)	unstated	no		0	
+REC-320	6288	AUTO	(R-MIS-1, R-MIS-2)	recording	no		0	
+REC-321	6292	MANUAL	(R-SHAKE-1)	unstated	no		0	
+REC-322	6295	AUTO	(R-NOTICK-1)	recording	no		0	
+REC-323	6298	AUTO] [MANUAL	(R-SHRINE-1, R-SHRINE-2, R-SHRINE-3, R-SHRINE-4)	recording	no		0	
+REC-324	6304	AUTO	(R-DRLG-DIR)	unstated	no		0	
+REC-325	6307	AUTO	(R-WARP-RESTORE)	unstated	no		0	
+REC-326	6310	MANUAL	(R-TINT-1)	unstated	no		0	
+REC-327	6313	MANUAL	(R-WALL-1)	recording	no		0	
+REC-328	6316	AUTO	(R-LIGHTEDGE-1)	unstated	no		0	
+REC-329	6319	MANUAL	(R-BUBBLE-1)	unstated	no		0	
+REC-330	6322	AUTO, optional	(R-SYS4-1)	recording	no		0	
+REC-331	6325	MANUAL	(R-GARG-1)	unstated	no		0	
+REC-332	6328	MANUAL, second client] [MANUAL	(R-TP-1, R-TP-2, R-TP-3, R-TP-4)	unstated	no		0	
+REC-333	6334	MANUAL	(R-CUBE-1, R-CUBE-2)	recording	no		0	
+REC-334	6338	AUTO] [MANUAL	(R-SAVE-1, R-SAVE-2, R-SAVE-3, R-SAVE-4, R-SAVE-5)	unstated	no		0	
+REC-335	6345	AUTO hook, MANUAL placement	(R-LOS-1)	recording	no		0	
+REC-400	6348	AUTO	(R-3E-1) — wire byte layout, top of the list (M22)	unstated	no	yes	7	
+REC-401	6351	MANUAL, second client	(R-JOIN-1)	unstated	no	yes	2	
+REC-402	6354	AUTO hook	(R-CHAT15-1)	recording	no	yes	4	
+REC-404	6378	PC 1, Ghidra read; AUTO hook	(R-SUBFILE-1)	recording	no	yes	5	
+REC-405	6601		Per-client inventory refresh without its item steps (PROVISIONAL, `d2-sim` `wiring/action/	recording	no		2	
+REC-406	6602		The join sequence's 0x8D (PROVISIONAL, `d2-sim` `wiring/action/dispatch.rs` `join_sequence	binary	no		2	
+REC-410	6357	AUTO hook	(R-OVL11-1)	recording	no	yes	2	
+REC-411	6360	AUTO	(R-LAND-1)	recording	no	yes	2	
+REC-412	6363	AUTO hook	(R-HEAL-1)	recording	no	yes	2	
+REC-413	6366	AUTO	(R-CAST-1)	recording	no	yes	1	
+REC-414	6369	AUTO	(R-MISS73-1)	recording	no	yes	4	
+REC-415	6372	PC 1, Ghidra read	(R-CALLERS-1)	binary	no	yes	5	
+REC-416	6375	AUTO	(R-92-1)	unstated	no	yes	2	
+REC-420	6591		Arreat Summit background seed (PROVISIONAL, `d2-client` `world_view/background_view.rs` `s	recording	no		4	
+REC-430	6381	AUTO hook	(R-ANIM-1)	recording	no		1	
+REC-431	6384	AUTO hook	(R-FLOOR-1)	recording	no		0	
+REC-432	6387	AUTO hook	(R-UNITORDER-1)	recording	no		0	
+REC-433	6390	AUTO hook	(R-HITCLASS-1)	recording	no		0	
+REC-434	6393	AUTO hook	(R-FIRSTSIGHT-1)	recording	no		0	
+REC-435	6396	PC 1, Ghidra read; AUTO hook	(R-SKILLSND-1)	recording	no		0	
+REC-436	6399	AUTO hook	(R-GREETMODE-1)	recording	no		0	
+REC-440	6587		Client object animation set-up (PROVISIONAL, `d2-client` `bridge/objects/mod.rs` `anim_set	recording	no		3	
+REC-441	6588		Component file weapon class from the COF layer (PROVISIONAL, `d2-client` `world_view/unit_	recording	no		2	
+REC-480	5909	MANUAL	drlg/maze.md, drlg/rooms.md §9.5.1 (exit warps of maze levels, q-act1-dungeons)	recording	no		0	

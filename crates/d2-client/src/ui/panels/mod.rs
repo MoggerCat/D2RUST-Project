@@ -273,6 +273,9 @@ pub enum PanelOutput {
     /// (`audio/triggers.md` §11; the site → id map is `client/ui.md`
     /// §B8.1).
     Sound(i32),
+    /// A player event (speech) on the local player (`audio/triggers.md`
+    /// §3; `items/inventory.md` §5.6: 19 `impossible`, 20 `cantuseyet`).
+    PlayerEvent(u16),
 }
 
 /// A string as UTF-16 code units.

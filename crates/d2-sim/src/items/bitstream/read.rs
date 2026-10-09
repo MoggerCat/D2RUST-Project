@@ -28,10 +28,6 @@ pub enum ReadError {
     /// the items table (`vendors-2.md` §7.3 step 3: none).
     #[error("unknown item code {0:?}")]
     UnknownCode([u8; 4]),
-    #[error("stat {0} has no save bits but is in a list")]
-    Unsaved(u16),
-    #[error("save trailer ends with {0:#x}, not 0")]
-    TrailerTail(u32),
     #[error("padding bit {0} is set")]
     Padding(usize),
 }
@@ -74,6 +70,10 @@ pub struct ReadItem {
     /// Combined items index of the code (`ear ` for an ear record).
     pub record: usize,
     pub item: StreamItem,
+    /// The record was read to its end but failed (`bitstream-legacy.md`
+    /// §3 rules 6.7, 8, 12; §4 rule 1): no item is made from it, its
+    /// bytes are used (`d2s.md` §8.2 rule 2: the entry is skipped).
+    pub failed: bool,
 }
 
 /// One save item entry (`d2s.md` §8.1 rule 2): the record, its byte
@@ -134,14 +134,14 @@ fn read_gold(r: &mut BitReader<'_>) -> Result<i32, ReadError> {
     })
 }
 
+/// The trailer (§5 rule 2, `bitstream-legacy.md` §2 rule 2 at the
+/// current version): 1 bit; when 1, a (+0x1C), b (+0x20) and 32 bits
+/// that are read and dropped.
 fn read_trailer(r: &mut BitReader<'_>, it: &mut StreamItem) -> Result<(), ReadError> {
     if r.read(1)? == 1 {
         let a = r.read(32)?;
         let b = r.read(32)?;
-        let z = r.read(32)?;
-        if z != 0 {
-            return Err(ReadError::TrailerTail(z));
-        }
+        r.read(32)?;
         it.save_trailer = Some((a, b));
     }
     Ok(())
@@ -160,18 +160,31 @@ fn prefix_from(p: u32) -> u16 {
 /// One list's stats up to its terminator (§4.6 rule 4 inverted): values
 /// are shifted back by `ValShift` (the low bits are not on the wire);
 /// grouped partners are written without the shift and read the same way.
-fn read_list(r: &mut BitReader<'_>, t: &dyn IscTable) -> Result<Vec<StatEntry>, ReadError> {
+/// `bitstream-legacy.md` §4 rule 1: an id with no `itemstatcost` row ends
+/// the list with no failure (edge case 1: what follows is then misread);
+/// id 0 directly after id 0 fails the record (`failed`) and ends the list.
+fn read_list(
+    r: &mut BitReader<'_>,
+    t: &dyn IscTable,
+    failed: &mut bool,
+) -> Result<Vec<StatEntry>, ReadError> {
     let mut out = Vec::new();
+    let mut last = None;
     loop {
         let s = r.read(9)?;
         if s == TERMINATOR {
             return Ok(out);
         }
         let s = s as u16;
-        let c = t.isc(s);
-        if c.save_bits == 0 {
-            return Err(ReadError::Unsaved(s));
+        if !t.has_row(s) {
+            return Ok(out);
         }
+        if s == 0 && last == Some(0) {
+            *failed = true;
+            return Ok(out);
+        }
+        last = Some(s);
+        let c = t.isc(s);
         match s {
             17 | 48 | 50 | 52 | 54 | 57 => {
                 let v = isc_get(r, c)?;
@@ -285,7 +298,11 @@ pub fn read_save_record(r: &mut BitReader<'_>, t: &ItemTables) -> Result<ReadIte
             b"isc " => 1,
             _ => it.suffix[0],
         };
-        return Ok(ReadItem { record, item: it });
+        return Ok(ReadItem {
+            record,
+            item: it,
+            failed: false,
+        });
     }
     let code = r.read(32)?.to_le_bytes();
     if it.alt {
@@ -297,11 +314,16 @@ pub fn read_save_record(r: &mut BitReader<'_>, t: &ItemTables) -> Result<ReadIte
         it.base_code = code;
         let record = record_of(t, code).ok_or(ReadError::UnknownCode(code))?;
         facts(&mut it, record);
-        return Ok(ReadItem { record, item: it });
+        return Ok(ReadItem {
+            record,
+            item: it,
+            failed: false,
+        });
     }
     it.code = code;
     let record = record_of(t, code).ok_or(ReadError::UnknownCode(code))?;
     facts(&mut it, record);
+    let mut failed = false;
     it.filled = r.read(3)?;
     it.unit28 = r.read(32)?;
     // Spec: vendors-2.md §7.3.1 rule 4: a level below 1 reads as 1.
@@ -323,15 +345,26 @@ pub fn read_save_record(r: &mut BitReader<'_>, t: &ItemTables) -> Result<ReadIte
             it.prefix[0] = prefix_from(r.read(11)?);
             it.suffix[0] = r.read(11)? as u16;
         }
-        5 | 7 => {
+        // `bitstream-legacy.md` §3 rule 8 (v ≥ 0x5D): the `setitems`
+        // row n gives the file index; no row fails the record.
+        5 => {
             let v = r.read(12)?;
-            // A negative file index is written as 0xFFF (§4.3 rule 4).
-            it.file_index = if v == 0xFFF { -1 } else { v as i32 };
-            // §7.3.1 rule 4: a unique's index at or above the
-            // uniqueitems count is −1.
-            if it.quality == 7 && it.file_index >= t.uniques.len() as i32 {
-                it.file_index = -1;
+            if (v as usize) < t.setitems.len() {
+                it.file_index = v as i32;
+            } else {
+                failed = true;
             }
+        }
+        7 => {
+            let v = r.read(12)?;
+            // §7.3.1 rule 4: a unique's index at or above the
+            // uniqueitems count is −1 (a negative index is written as
+            // 0xFFF, §4.3 rule 4).
+            it.file_index = if (v as usize) < t.uniques.len() {
+                v as i32
+            } else {
+                -1
+            };
         }
         6 | 8 => {
             it.rare_prefix = r.read(8)? as u16;
@@ -349,7 +382,7 @@ pub fn read_save_record(r: &mut BitReader<'_>, t: &ItemTables) -> Result<ReadIte
             it.rare_prefix = r.read(8)? as u16;
             it.rare_suffix = r.read(8)? as u16;
         }
-        _ => {
+        2 => {
             if it.kind.charm {
                 let is_prefix = r.read(1)? == 1;
                 let v = r.read(11)?;
@@ -366,6 +399,9 @@ pub fn read_save_record(r: &mut BitReader<'_>, t: &ItemTables) -> Result<ReadIte
                 it.suffix[0] = r.read(5)? as u16;
             }
         }
+        // `bitstream-legacy.md` §3 rule 6.7, edge case 6: any other
+        // quality reads nothing here, fails, and is read on to the end.
+        _ => failed = true,
     }
     it.runeword = if f & hflag::RUNEWORD != 0 {
         r.read(16)? as u16
@@ -412,18 +448,22 @@ pub fn read_save_record(r: &mut BitReader<'_>, t: &ItemTables) -> Result<ReadIte
     if runeword {
         l += 1;
     }
-    it.main = Some(read_list(r, isc)?);
+    it.main = Some(read_list(r, isc, &mut failed)?);
     for c in 0..l {
         if runeword && c == l - 1 {
-            it.runeword_list = Some(read_list(r, isc)?);
+            it.runeword_list = Some(read_list(r, isc, &mut failed)?);
         } else if mask & (1 << c) != 0 || runeword {
-            let list = read_list(r, isc)?;
+            let list = read_list(r, isc, &mut failed)?;
             if mask & (1 << c) != 0 {
                 it.sets[c] = Some(list);
             }
         }
     }
-    Ok(ReadItem { record, item: it })
+    Ok(ReadItem {
+        record,
+        item: it,
+        failed,
+    })
 }
 
 /// Reads one save item entry at `buf[0..]` (`d2s.md` §8.1 rule 2): the
@@ -435,7 +475,10 @@ pub fn read_save_entry(buf: &[u8], t: &ItemTables) -> Result<ReadEntry, ReadErro
     let item = read_save_record(&mut r, t)?;
     let used = r.pos();
     let len = used.div_ceil(8);
-    for at in used..len * 8 {
+    // A failed record stopped inside its data (`bitstream-legacy.md` §4
+    // rule 1): its length is the bytes read, whatever follows.
+    let checked = if item.failed { used } else { len * 8 };
+    for at in used..checked {
         if (buf[at / 8] >> (at % 8)) & 1 != 0 {
             return Err(ReadError::Padding(at));
         }
