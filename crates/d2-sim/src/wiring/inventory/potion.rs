@@ -1,5 +1,6 @@
-// Spec: specs/items/inventory-moves.md §7.17; specs/sim/stat-lists.md §10.1
-//! Potion use from the belt (C→S 0x26, `use_item` / `remove_used` seams).
+// Spec: specs/items/inventory-moves.md §7.11, §7.17; specs/sim/stat-lists.md §9.2, §10.1
+//! Potion use from the belt (C→S 0x26) and the grid (C→S 0x20): the
+//! `use_item` / `remove_used` / `consume_item` seams.
 //!
 //! The item-use spec (`0x005BF240`, `pSpell` table) is unwritten, so the
 //! effect is PROVISIONAL (`docs/HANDOFF.md` §7, REC-102): a
@@ -40,6 +41,8 @@ const STAT_MANA: u16 = 8;
 pub const POTION_FRAMES: i32 = 100;
 /// Page byte shown in the removal message (`inventory-moves.md` §6.4).
 const REMOVED_FLAG: u32 = 0x20;
+/// 0x9C action of the belt removal `0x00561E70` (`0x0053EED0`).
+const BELT_REMOVED_ACTION: u8 = 0x0F;
 
 /// What a potion does.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -145,10 +148,53 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         s.set_state(l, state);
         s.add(h, l, stat, per_tick, 0);
         s.attach(h, u, l, true);
+        // The state goes on with its changed bit and the unit is queued
+        // for update (`0x00639DB0`, `stat-lists.md` §9.2), so the client
+        // pass sends S→C 0xA8. Recorded 2026-10-09: 0xA8 state 100 after
+        // an hp1, 106 after an mp1, with an empty stat stream
+        // (`facts/items/a1-town-potions-low.tsv` n 12, n 31).
+        s.toggle_state(u, state, true);
+        // At full life (mana) the state ends in the same frame: the
+        // changed bit stays, so the client pass sends S→C 0xA9 instead.
+        // Recorded 2026-10-09: an hp1 from the belt at full life and an
+        // mp1 at full mana give 0xA9 100 / 106 and no 0xA8
+        // (`facts/items/a1-town-item-moves.tsv` n 41–43, n 49–51).
+        // PROVISIONAL (REC-740): where 1.14d ends it is unread (entry 3,
+        // `items/use.md` open question 1).
+        let (vital, max) = if state == STATE_HEALTHPOT {
+            (STAT_LIFE, s.max_life(u))
+        } else {
+            (STAT_MANA, s.max_mana(u))
+        };
+        if s.unit_total(u, vital, 0) >= max {
+            s.free_state_list(h, u, state);
+            s.toggle_state(u, state, false);
+        }
+        let r = self.econ.game.lists.queue_update(u);
+        self.note_list(r);
     }
 
-    /// `remove_used` of a belt potion: the removal message (flag 0x20),
-    /// then the item leaves the inventory and is freed (`0x0055E000`).
+    /// `remove_used` of a belt item, `0x00561E70` (`inventory-moves.md`
+    /// §7.17, §7.18 step 3): S→C 0x9C action 0xF with the bit-stream flag
+    /// 0x20, sent now, then the item leaves the belt and is freed
+    /// (`0x0055ED30`). Recorded 2026-10-09 (`facts/items/a1-town-potions-low.tsv`
+    /// n 11, `a1-town-item-moves.tsv` n 42): `3F`, then `9C 0F 14 …` with
+    /// item flags 0x30, in the 0x26's own frame.
+    pub fn remove_belt_item(&mut self, player: Owner, item: Guid) {
+        let Some(u) = self.item_unit(item) else {
+            return;
+        };
+        let Some(p) = self.unit_of(player) else {
+            return;
+        };
+        let _ = self.send_item_world(p, u, BELT_REMOVED_ACTION, REMOVED_FLAG);
+        self.free_item(item);
+    }
+
+    /// The consumption of a stored item `0x0055E000` (`inventory-moves.md`
+    /// §7.11 step 3, §7.18 step 9): the removal message (0x9D action 5,
+    /// flag 0x20) with the stored page, then the item leaves the
+    /// inventory and is freed.
     pub fn remove_used_item(&mut self, player: Owner, item: Guid) {
         let Some(u) = self.item_unit(item) else {
             return;

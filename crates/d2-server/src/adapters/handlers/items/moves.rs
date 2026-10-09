@@ -440,6 +440,10 @@ impl MoveCall for UpdateRun {
         // item messages do not touch the sound slots.
         let sounds = self.sounds(econ.game);
         let mut d = parts.desk(econ);
+        // The items placed on the ground since the last pass: their unit
+        // flag 0x1000 was cleared by the tick's room clean-up (PROVISIONAL,
+        // REC-740: d2rs-own bookkeeping for the pass's place in the tick).
+        let dropped = d.take_dropped();
         let (mut sent, mut fatal) = (Vec::new(), Vec::new());
         let mut announced = Vec::new();
         let mut sounds = sounds.into_iter();
@@ -462,7 +466,12 @@ impl MoveCall for UpdateRun {
             for &u in &r.ground {
                 let guid = d.guid_of(u);
                 if d.unit_exists(Owner::item(guid)) && d.mode(guid) == GROUND {
-                    match sim_moves::announce_item(&d, guid) {
+                    // An item dropped in this tick is announced with
+                    // action 2 (§6.3, unit flag 0x1000; recorded
+                    // 2026-10-09, `facts/items/a1-town-item-moves.tsv`
+                    // n 57–58: a 0x17 drop from the cursor).
+                    let was_dropped = dropped.contains(&u);
+                    match sim_moves::announce_item_as(&d, guid, was_dropped) {
                         Ok(m) => sent.push((r.client, m)),
                         Err(e) => fatal.push((r.client, e)),
                     }
