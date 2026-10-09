@@ -45,6 +45,8 @@ messages.
   per-frame allocation diff (a G6 ledger with unit type / class per
   frame, which `record_rng.py` + the state channel already give).
 
+- **D2 done (object walk `0x00548A50`, for q-fix-npc-interact)**: `world/objects.md` §7.3 rule 4.1–4.4 + recorded stash vector; row `q-fix-pc1night-object-walk`. Same run + queued interaction as the NPC approach (type 2); stop at unit distance 0 (a 1×1 object stops the player 2 sub-tiles away); operate in the stop frame (stash: run from f4, stop and open at f13).
+
 ## C — numbered items
 
 | # | Item | Answer | Rows |
