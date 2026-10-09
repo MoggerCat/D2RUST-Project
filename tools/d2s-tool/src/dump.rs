@@ -36,6 +36,9 @@ fn status_text(s: u16) -> String {
     )
 }
 
+/// `dump --items`: each item's decoded fields and its entry bytes (hex).
+pub static ITEM_DETAIL: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 fn items(out: &mut String, label: &str, list: &[ItemEntry], t: Option<&Tables>) {
     let _ = writeln!(out, "{label}: {} item(s)", list.len());
     for (i, e) in list.iter().enumerate() {
@@ -65,6 +68,11 @@ fn items(out: &mut String, label: &str, list: &[ItemEntry], t: Option<&Tables>) 
                     e.bytes.len(),
                     d.children.len()
                 );
+                if ITEM_DETAIL.load(std::sync::atomic::Ordering::Relaxed) {
+                    let _ = writeln!(out, "      {:?}", d.item);
+                    let hex: String = e.bytes.iter().map(|b| format!("{b:02x}")).collect();
+                    let _ = writeln!(out, "      bytes {hex}");
+                }
             }
             Err(err) => {
                 let _ = writeln!(out, "  [{i}] {} bytes, undecodable: {err}", e.bytes.len());

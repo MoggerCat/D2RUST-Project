@@ -32,7 +32,7 @@
 | Edge cases & original bugs | 359–370 |
 | Test vectors | 371–386 |
 | Provenance | 387–396 |
-| Open questions | 397–432 |
+| Open questions | 397–436 |
 <!-- /index -->
 
 ## Summary
@@ -422,10 +422,14 @@ rule 5, §3), game type 3 (§5.2), the unit snapshot fields (§4). Open:
    from the save (`char save`, original-hooks §5.3: class, act,
    progression, quest and waypoint flags, items all come from the
    `.d2s`; the 0x67 message carries none of them). `d2s-tool` writes
-   quest flags (`--quests`), waypoints, stats, skills and normal
-   identified items only (`--item CODE`); items of another quality,
-   affixes, unique / set / runeword ids and sockets need an item writer
-   for `items/bitstream.md` (tool gap). Until then `char item` lines
-   other than normal items are a gap on the original side.
+   quest flags (`--quests`), waypoints, stats, skills and items
+   (`--item CODE[#Q][@X,Y][:PAGE][/q=QUALITY/idx=ROW/ilvl=N/sock=N/unid/eth/body=L/belt=S]`,
+   2026-10-09: qualities by the creation's own draws, a forced set /
+   unique row, unidentified, sockets up to `gemsockets`, equipped and
+   belt placement; checked byte for byte against a 1.14d re-save,
+   `facts/saves/gear-roundtrip.tsv`). Still a gap: chosen affixes,
+   runewords and socket fillers (children), so `char item` lines with
+   `prefix`, `suffix`, `runeword` or a `socket` place are a gap on the
+   original side.
 4. *Answered*: original-hooks §4 rule 5 (base array: list +0x24, count
    +0x28, for plain and extended lists).
