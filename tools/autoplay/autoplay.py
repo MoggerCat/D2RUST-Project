@@ -300,13 +300,28 @@ class View:
         self.snap = s["snap"]
         self.frame = self.snap["f"]
         self.client = s["client"]
-        self.units = self.snap["units"]
         g = s.get("local")
-        self.me = next((u for u in self.units if u["ut"] == 0 and (g is None or u["g"] == g)), None)
+        self.all_units = self.snap["units"]
+        self.me = next((u for u in self.all_units if u["ut"] == 0 and (g is None or u["g"] == g)), None)
+        # the server lists every level's units: keep the player's level
+        lv = self.me.get("lv") if self.me else None
+        self.units = [u for u in self.all_units if u.get("lv", lv) == lv]
 
     @property
     def pos(self):
         return (self.me["x"], self.me["y"])
+
+    @property
+    def cam(self):
+        """The client camera's player position (sub-tiles, fractional):
+        what the screen is drawn around and the hover pick reads. The
+        server position when no frame was drawn yet."""
+        c = self.client.get("camera")
+        if c and "x16" in c:
+            return (c["x16"] / 65536, c["y16"] / 65536)
+        if c:
+            return (c["x"], c["y"])
+        return self.pos
 
     @property
     def level(self):
@@ -361,6 +376,8 @@ class Bot:
         self.v = None
         self.map = None
         self.known = nav.Known()
+        self.no_fight = bool(plan.get("no_fight"))
+        acts._BOT[0] = self
         self.deadline_s = deadline_s
         self.progress_at = 0
         self.best = None
@@ -459,14 +476,19 @@ class Bot:
             return True
         if v.level in TOWNS:
             return False
-        target = self.nearest_hostile(acts.FIGHT_RADIUS)
+        if self.no_fight:
+            # WORKAROUND (bot only): attacking freezes the client model
+            # (the kill-zombie blocker), so the probe plan never attacks.
+            target = None
+        else:
+            target = self.nearest_hostile(acts.FIGHT_RADIUS)
         if target is not None:
             self.attack(target)
             return True
         item = self.nearest_pickup(acts.PICK_RADIUS)
         if item is not None:
             self.act(f"pick {item['code']} at {item['x']},{item['y']}")
-            self.click(to_screen(*v.pos, item["x"], item["y"]))
+            self.click(to_screen(*v.cam, item["x"], item["y"]))
             self.wait(8)
             return True
         return False
@@ -513,7 +535,7 @@ class Bot:
 
     def attack(self, u):
         v = self.v
-        p = to_screen(*v.pos, u["x"], u["y"])
+        p = to_screen(*v.cam, u["x"], u["y"])
         p = (p[0], p[1] - acts.BODY_LIFT)
         self.act(f"attack cl {u.get('cl')} g {u['g']} hp {u.get('hp')} at {u['x']},{u['y']}")
         button = self.plan.get("attack_button", "L")
@@ -527,9 +549,12 @@ class Bot:
     def leg(self, path, why):
         """One walk click along `path` (sub-tiles), about LEG_REACH ahead."""
         v = self.v
+        if [u for u in v.client["open"] if u not in acts.ALWAYS_OPEN_UI]:
+            self.close_panels()
+            v = self.v
         p = nav.ahead(path, acts.LEG_REACH)
         self.act(f"{why}: walk {v.pos} -> {p} (path {len(path)})")
-        self.click(toward(*v.pos, *p, reach=acts.LEG_REACH + 2), hold=1)
+        self.click(toward(*v.cam, *p, reach=acts.LEG_REACH + 2), hold=1)
         self.wait(acts.WALK_STEP)
 
     def walk_to(self, target, near=3, budget_s=None, fight=True):
@@ -622,7 +647,7 @@ class Bot:
         """Clicks warp tile unit `t`; True when the level changed."""
         lv = self.v.level
         self.act(f"warp tile g {t['g']} cl {t.get('cl')} at {t['x']},{t['y']}")
-        self.click(to_screen(*self.v.pos, t["x"], t["y"]))
+        self.click(to_screen(*self.v.cam, t["x"], t["y"]))
         for _ in range(10):
             self.wait(10)
             if self.look().level != lv:
@@ -650,23 +675,24 @@ class Bot:
         """Walks to the NPC, clicks it, chooses Talk, skips the dialog,
         until `until(view)` (spec §3 r4)."""
         self.say(f"  talk to npc {npc_class} ({what})")
-        for attempt in range(8):
+        attempt = 0
+        self.reset_progress()
+        while attempt < 8:
             v = self.look()
             if until(v):
+                self.close_panels()
                 return
             npcs = v.find(1, npc_class)
             if not npcs:
-                spot = acts.NPC_SPOT.get(npc_class)
-                if spot is None:
-                    raise Stuck(f"npc {npc_class} not in sight and no known spot")
                 self.explore_town(npc_class)
                 continue
             n = npcs[0]
             if dist(v.pos, (n["x"], n["y"])) > 8:
                 self.walk_to((n["x"], n["y"]), near=6, budget_s=40, fight=False)
                 continue
+            attempt += 1
             v = self.look()
-            p = to_screen(*v.pos, n["x"], n["y"])
+            p = to_screen(*v.cam, n["x"], n["y"])
             self.click((p[0], p[1] - acts.BODY_LIFT))
             self.wait(30)
             v = self.look()
@@ -674,11 +700,15 @@ class Bot:
             if menu is None:
                 self.say(f"  no NPC menu after the click (attempt {attempt})")
                 continue
+            self.menus_seen.setdefault(npc_class, [r["kind"] for r in menu["rows"]])
             talk = [r for r in menu["rows"] if r["kind"] and "Talk" in r["kind"]]
             if talk and talk[0]["at"] and not menu["talking"]:
                 self.act("menu Talk")
                 self.click(talk[0]["at"])
                 self.wait(20)
+                v = self.look()
+                if v.client.get("dialog_lines") or v.client.get("topics"):
+                    self.talked.add(npc_class)
             # skip the dialog / topic box: Esc until the menu is down
             for _ in range(30):
                 v = self.look()
@@ -700,8 +730,41 @@ class Bot:
                 break
             v = self.look()
             if until(v):
+                self.close_panels()
                 return
         raise Stuck(f"talking to npc {npc_class} did not {what}")
+
+    talked = set()
+    menus_seen = {}
+
+    def close_panels(self):
+        """Esc until no panel but the mini panel (21) is open and no NPC
+        dialog is up, as a player closes what covers the world."""
+        for _ in range(12):
+            v = self.look()
+            panels = [u for u in v.client["open"] if u not in acts.ALWAYS_OPEN_UI]
+            if not panels and not v.client.get("dialog_lines") and not v.client.get("npc_menu"):
+                return
+            # WORKAROUND (bot only): an NPC talk is left by its cancel
+            # rows, not Esc: Esc closes it without C->S 0x30, and the
+            # server then never answers another NPC (finding esc-npc).
+            t = v.client.get("topics")
+            if t and t.get("cancel") and not v.client.get("dialog_lines"):
+                self.act("topic cancel")
+                self.click(t["cancel"])
+                self.wait(10)
+                continue
+            m = v.client.get("npc_menu")
+            if m and m["rows"] and not m["talking"] and m["rows"][-1]["at"]:
+                self.act("menu cancel")
+                self.click(m["rows"][-1]["at"])
+                self.wait(10)
+                continue
+            self.act(f"close panels {panels}")
+            self.key("esc")
+            self.wait(6)
+        v = self.look()
+        raise Stuck(f"panels {v.client['open']} do not close with Esc")
 
     def explore_town(self, npc_class):
         if not self.explore_step(self.v.level):
@@ -766,6 +829,7 @@ def tool_path(build):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--act", type=int, default=1)
+    ap.add_argument("--plan", default="story", help="story (the act's quests) or probe (no fighting: routes, NPC talks, waypoints)")
     ap.add_argument("--save", help="character save (.d2s); default a fresh character of the act plan's class")
     ap.add_argument("--seed", type=int)
     ap.add_argument("--only", help="run one milestone")
@@ -783,7 +847,7 @@ def main(argv=None):
     except HostError as e:
         print(f"autoplay: {e}", file=sys.stderr)
         return 3
-    plan = acts.plan(a.act)
+    plan = acts.plan(a.act, a.plan)
     work = a.work or os.path.join(REPO, "target", "autoplay", f"act{a.act}-{time.strftime('%Y%m%d-%H%M%S')}")
     os.makedirs(work, exist_ok=True)
     args = ["--save", a.save] if a.save else ["--new", plan["class"], plan["name"]]
