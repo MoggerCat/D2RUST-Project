@@ -482,6 +482,7 @@ POSITIONAL = {
     "seed-unit": [("unit", "ref"), _n("lo"), _n("hi")],
     "time": [_n("period", 0, 5), _n("ticks")],
     "pos": [("unit", "ref"), ("x", "pos"), ("y", "pos")],
+    "hop": [("unit", "ref"), ("x", "pos"), ("y", "pos")],
     "warp": [_n("level")],
     "item": [("code", "code"), ("x", "pos"), ("y", "pos")],
     "stat": [("unit", "ref"), _n("stat", 0, 0xFFFF), _n("layer", 0, 0xFFFF), ("value", "i32")],
@@ -508,7 +509,7 @@ def needs(d, a):
         return room + ["alloc"], []
     if d == "superunique":
         return room + ["superunique"], []
-    if d == "pos":
+    if d in ("pos", "hop"):
         return room + [POS_VIA], []
     if d == "warp":
         return ["warp"], []
@@ -1236,6 +1237,21 @@ class PokeLayer:
         regs, stack = build(name, values, self.forms)
         return self.call(rec, tid, saved, self.forms[name].addr, regs, stack)
 
+    def _pos(self, rec, game, tid, saved, u, path, x, y):
+        """One `pos` of a unit with a dynamic path (path-placement.md §6 r4 / §10)."""
+        room = self._room(rec, game, tid, saved, x, y, rec.read_u32(path + P_ROOM))
+        if not room:
+            return {"r": "failed", "note": "no loaded room holds the point (entry 6 returned 0)"}
+        via = next(n for n in POS_VIA if self.forms[n].form is not None)
+        if via == "teleport":
+            eax = self.invoke(rec, tid, saved, "teleport", path=path, unit=u, room=room, x=x, y=y)
+        else:
+            eax = self.invoke(rec, tid, saved, "place", game=game, unit=u, room=room, x=x, y=y,
+                              exact=POS_EXACT, alt=POS_ALT)
+        r = self._result(rec, via, eax)
+        r["via"] = via
+        return r
+
     def _room(self, rec, game, tid, saved, x, y, from_room=None):
         """Room holding (x, y): entry 6 from the player's room (poke.md §4 rule 5),
         or from `from_room`."""
@@ -1345,26 +1361,30 @@ class PokeLayer:
             eax = self.invoke(rec, tid, saved, "state_set", unit=ptrs["unit"], state=a["state"],
                               on=1 if a["on"] else 0)
             return self._result(rec, "state_set", eax)
-        if d == "pos":        # path-placement.md §6 r4 / §10
+        if d in ("pos", "hop"):  # path-placement.md §6 r4 / §10
             u = ptrs["unit"]
             if rec.read_u32(u + U_TYPE) not in DYNAMIC_PATH_TYPES:
                 return {"r": "failed", "note": "not a unit with a dynamic path (path-placement.md §10 r1)"}
             path = rec.read_u32(u + U_PATH)
             if not path:
                 return {"r": "failed", "note": "the unit has no path"}
-            room = self._room(rec, game, tid, saved, a["x"], a["y"], rec.read_u32(path + P_ROOM))
-            if not room:
-                return {"r": "failed", "note": "no loaded room holds the point (entry 6 returned 0)"}
-            via = next(n for n in POS_VIA if self.forms[n].form is not None)
-            if via == "teleport":
-                eax = self.invoke(rec, tid, saved, "teleport", path=path, unit=u, room=room,
-                                  x=a["x"], y=a["y"])
-            else:
-                eax = self.invoke(rec, tid, saved, "place", game=game, unit=u, room=room, x=a["x"],
-                                  y=a["y"], exact=POS_EXACT, alt=POS_ALT)
-            r = self._result(rec, via, eax)
-            r["via"] = via
-            return r
+            if d == "pos":
+                return self._pos(rec, game, tid, saved, u, path, a["x"], a["y"])
+            # hop (poke.md §1): the first spot of hop_candidates the unit moves to
+            here = lambda: struct.unpack("<HH", rec.read(path + P_X, 2) + rec.read(path + P_Y, 2))  # noqa: E731
+            start = here()
+            dx, dy = a["x"] - start[0], a["y"] - start[1]
+            if abs(dx) <= 1 and abs(dy) <= 1:
+                return {"r": "ok", "note": "already there"}
+            step = (max(-HOP, min(HOP, dx)), max(-HOP, min(HOP, dy)))
+            tries = 0
+            for x, y in hop_candidates(start, step):
+                tries += 1
+                r = self._pos(rec, game, tid, saved, u, path, x, y)
+                if here() != start:
+                    r.update({"r": "ok", "to": [x, y], "tries": tries})
+                    return r
+            return {"r": "failed", "note": f"no free spot among {tries} candidates"}
         if d == "item":       # 0x00558D90(game, request, 0) (items/generation.md §3; objects-2.md §20.7)
             index = self._item_index(rec, a["code"])  # code first, then the room (as d2rs)
             if index < 0:
@@ -1512,6 +1532,25 @@ class PokeLayer:
                 raise PokeFatal(f"game exited during a call, code {ev.u.ExitProcess.dwExitCode:#x}")
             rr.ContinueDebugEvent(ev.dwProcessId, t, status)
             rec.pending = None
+
+
+HOP = 16  # largest move of a `hop` per axis (poke.md §1; d2_sim::poke::HOP)
+HOP_DIRS = ((1, 1), (1, 0), (0, 1), (-1, 0), (0, -1), (-1, -1), (1, -1), (-1, 1))
+
+
+def hop_candidates(start, step):
+    """The spots a `hop` tries, best first (as d2_sim::poke::hop_candidates):
+    rings of radius 0, 2, 4, 7 around the full step, then around the half
+    step, then a sidestep of 8 to either side across the step."""
+    def ring(x, y):
+        return [(x, y)] + [(x + r * dx, y + r * dy) for r in (2, 4, 7) for dx, dy in HOP_DIRS]
+    (fx, fy), (sx, sy) = start, step
+    half = (int(sx / 2), int(sy / 2))  # toward zero, as Rust's `/`
+    sgn = lambda v: (v > 0) - (v < 0)  # noqa: E731
+    px, py = sgn(sy) * 8, -sgn(sx) * 8
+    out = ring(fx + sx, fy + sy) + ring(fx + half[0], fy + half[1]) + [(fx + px, fy + py),
+                                                                      (fx - px, fy - py)]
+    return [(x, y) for x, y in out if x >= 0 and y >= 0 and (x, y) != tuple(start)]
 
 
 def add_options(ap):

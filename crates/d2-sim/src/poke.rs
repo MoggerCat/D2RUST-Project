@@ -114,6 +114,14 @@ pub enum Directive {
         x: Coord,
         y: Coord,
     },
+    /// d2rs-own test aid (`poke.md` §1 `hop`): one move of at most
+    /// [`HOP`] sub-tiles per axis toward (x, y), the first free spot of
+    /// [`hop_candidates`] from the unit's current position.
+    Hop {
+        unit: UnitArg,
+        x: Coord,
+        y: Coord,
+    },
     Warp {
         level: u32,
         tile: Option<u32>,
@@ -174,7 +182,7 @@ pub struct GotoWalk {
 }
 
 /// The directive keywords, in the §1 table order.
-pub const KEYWORDS: [&str; 13] = [
+pub const KEYWORDS: [&str; 14] = [
     "object",
     "superunique",
     "missile",
@@ -182,6 +190,7 @@ pub const KEYWORDS: [&str; 13] = [
     "seed-unit",
     "time",
     "pos",
+    "hop",
     "warp",
     "item",
     "stat",
@@ -201,6 +210,7 @@ impl Directive {
             Self::SeedUnit { .. } => "seed-unit",
             Self::Time { .. } => "time",
             Self::Pos { .. } => "pos",
+            Self::Hop { .. } => "hop",
             Self::Warp { .. } => "warp",
             Self::Item { .. } => "item",
             Self::Stat { .. } => "stat",
@@ -529,6 +539,14 @@ pub fn parse_directive(toks: &[&str]) -> Result<Directive, String> {
                 y: coord(a[2])?,
             }
         }
+        "hop" => {
+            let a = exact(3, "<ref> <x> <y>")?;
+            Directive::Hop {
+                unit: unit_arg(a[0])?,
+                x: coord(a[1])?,
+                y: coord(a[2])?,
+            }
+        }
         "warp" => {
             let usage = "<level> [tile <n>]";
             let (a, rest) = fixed(1, usage)?;
@@ -674,7 +692,7 @@ impl fmt::Display for Directive {
             Self::SeedGame { lo, hi } => write!(f, " {lo} {hi}")?,
             Self::SeedUnit { unit, lo, hi } => write!(f, " {unit} {lo} {hi}")?,
             Self::Time { period, ticks } => write!(f, " {period} {ticks}")?,
-            Self::Pos { unit, x, y } => write!(f, " {unit} {x} {y}")?,
+            Self::Pos { unit, x, y } | Self::Hop { unit, x, y } => write!(f, " {unit} {x} {y}")?,
             Self::Warp { level, tile } => {
                 write!(f, " {level}")?;
                 if let Some(t) = tile {
@@ -977,6 +995,42 @@ pub fn resolve_unit<X: WorldPending>(
     found.ok_or_else(|| u.to_string())
 }
 
+/// Largest move of a `hop` per axis (sub-tiles): a `pos` reaches only the
+/// unit's room and its neighbours (`poke.md` §1 `hop`).
+pub const HOP: i32 = 16;
+
+/// The spots a `hop` from `from` by `step` tries, best first: rings of
+/// radius 0, 2, 4, 7 around the full step, then around the half step, then
+/// a sidestep of 8 to either side across the step.
+pub fn hop_candidates(from: (i32, i32), step: (i32, i32)) -> Vec<(i32, i32)> {
+    const DIRS: [(i32, i32); 8] = [
+        (1, 1),
+        (1, 0),
+        (0, 1),
+        (-1, 0),
+        (0, -1),
+        (-1, -1),
+        (1, -1),
+        (-1, 1),
+    ];
+    let ring = |(x, y): (i32, i32), out: &mut Vec<(i32, i32)>| {
+        out.push((x, y));
+        for r in [2, 4, 7] {
+            out.extend(DIRS.iter().map(|&(dx, dy)| (x + r * dx, y + r * dy)));
+        }
+    };
+    let (fx, fy) = from;
+    let (sx, sy) = step;
+    let mut out = Vec::with_capacity(66);
+    ring((fx + sx, fy + sy), &mut out);
+    ring((fx + sx / 2, fy + sy / 2), &mut out);
+    let (px, py) = (sy.signum() * 8, -sx.signum() * 8);
+    out.push((fx + px, fy + py));
+    out.push((fx - px, fy - py));
+    out.retain(|&(x, y)| x >= 0 && y >= 0 && (x, y) != from);
+    out
+}
+
 /// The room holding (x, y): the room of a point from `near` (the
 /// unit's room and its neighbours, `0x00463740`).
 fn room_near<X: WorldPending>(
@@ -1189,6 +1243,36 @@ fn run<X: WorldPending>(
             };
             sim.lend(|a| a.with(game, |g, v| PathCtx::of(v, g).teleport(u, Some(room), x, y)));
             PokeResult::Ok(None)
+        }
+        Directive::Hop { unit, x, y } => {
+            let u = resolve_unit(*unit, game, sim, env)?;
+            let (tx, ty) = (c(*x, sim)?, c(*y, sim)?);
+            if !sim.action.sys.hooks.path_has(u) {
+                return Ok(PokeResult::Failed);
+            }
+            let from = sim.action.sys.hooks.path_position(u);
+            let (dx, dy) = (tx - from.0, ty - from.1);
+            if dx.abs() <= 1 && dy.abs() <= 1 {
+                return Ok(PokeResult::Ok(None));
+            }
+            let step = (dx.clamp(-HOP, HOP), dy.clamp(-HOP, HOP));
+            for (cx, cy) in hop_candidates(from, step) {
+                let Some(room) = room_near(game, sim, u, cx, cy) else {
+                    continue;
+                };
+                let errors = sim.action.sys.hooks.errors.len();
+                sim.lend(|a| {
+                    a.with(game, |g, v| {
+                        PathCtx::of(v, g).teleport(u, Some(room), cx, cy)
+                    })
+                });
+                if sim.action.sys.hooks.path_position(u) != from {
+                    return Ok(PokeResult::Ok(None));
+                }
+                // a refused spot (blocked): try the next; the refusal is the probe's
+                sim.action.sys.hooks.errors.truncate(errors);
+            }
+            PokeResult::Failed
         }
         Directive::Warp { level, tile } => {
             let player = env.player;
@@ -1578,6 +1662,7 @@ mod tests {
         "seed-unit @wp#1 1 2",
         "time 5 1024",
         "pos @player @x+3 @y",
+        "hop @player 5100 @y-40",
         "warp 3",
         "warp 3 tile 2",
         "item hp1 @x @y",
@@ -1625,6 +1710,21 @@ mod tests {
                 .to_string(),
             "goto preset 107 1:376"
         );
+    }
+
+    // Covers: specs/tools/poke.md §1 r1
+    #[test]
+    fn hop_tries_the_full_step_first_then_the_half_then_a_sidestep() {
+        let c = hop_candidates((100, 100), (16, -16));
+        assert_eq!(c[0], (116, 84), "the full step itself first");
+        assert_eq!(c[1], (118, 86), "then its ring, radius 2 first");
+        assert_eq!(c.len(), 25 + 25 + 2);
+        assert_eq!(c[25], (108, 92), "then the half step");
+        assert_eq!(c[50], (92, 92), "then a sidestep across the step");
+        assert_eq!(c[51], (108, 108));
+        // never the start itself, never a negative coordinate
+        let c = hop_candidates((3, 3), (0, -2));
+        assert!(!c.contains(&(3, 3)) && c.iter().all(|&(x, y)| x >= 0 && y >= 0));
     }
 
     // Covers: specs/tools/poke.md §2 r5
