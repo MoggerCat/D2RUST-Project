@@ -96,7 +96,7 @@ fn a_cursor_item_returns_to_the_cursor() {
     let n = w.desk(|d| d.load_entry(p, &e)).expect("loaded");
     let g = w.units.get(n).unwrap().guid;
     assert_eq!(w.mode(g), 4);
-    assert_eq!(w.desk(|d| d.cursor_of(p)), Some(n));
+    assert_eq!(w.state.cursor_of(p), Some(n));
     assert!(w.state.items_of(p).is_empty());
 }
 
