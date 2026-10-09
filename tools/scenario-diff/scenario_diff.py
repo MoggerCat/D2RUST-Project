@@ -5,6 +5,7 @@ difference per channel (specs/tools/scenario-diff.md).
     python3 tools/scenario-diff/scenario_diff.py traces/checks/<name>.check
         [--channels state,draws] [--work DIR] [--reuse] [--orig-only | --d2rs-only]
         [--next N] [--dry-run] [--reuse-orig] [--json FILE]
+        [--orig-cache [DIR] [--fill-cache]]
     python3 tools/scenario-diff/scenario_diff.py --selftest
 
 Linux (cloud): 1.14d runs under Wine through tools/cloud-game/run.sh
@@ -35,11 +36,13 @@ import send as send_msg  # noqa: E402  (`at … send` lines: the message syntax,
 import rng_channel  # noqa: E402  (the rng channel, scenario-diff.md §3)
 import items_channel  # noqa: E402  (the items channel, scenario-diff.md §3 rule 13)
 import save_channel  # noqa: E402  (the save channel, scenario-diff.md §3 rule 14)
+import orig_cache  # noqa: E402  (the shared 1.14d cache, scenario-diff.md §4)
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, "..", ".."))
 REC = os.path.join(REPO, "tools", "trace-recorder")
+DEFAULT_CACHE = os.path.join(REPO, "traces", "orig-cache")
 FORMAT_LINE = "check 1"
 CHANNELS = ("state", "draws", "rng", "packets", "items", "save")
 WINDOWS = os.name == "nt"
@@ -214,8 +217,11 @@ def shared_script_error(text):
 # --- running ------------------------------------------------------------------
 
 class Runner:
-    def __init__(self, check, work, dry=False, reuse=False, reuse_orig=False):
+    def __init__(self, check, work, dry=False, reuse=False, reuse_orig=False, orig_cache=None):
         self.c, self.work, self.dry, self.reuse = check, work, dry, reuse
+        self.orig_cache = orig_cache   # orig_cache.OrigCache or None (--orig-cache)
+        self.check_text = None         # the check file's text (part of the cache key)
+        self._key_save = None
         self.reuse_orig = reuse_orig   # keep 1.14d outputs only (suite.py's cache)
         self.bin_dir = os.environ.get("D2RS_BIN_DIR") or None
         self.game_dir = os.environ.get("D2_GAME_DIR") or (
@@ -328,6 +334,10 @@ class Runner:
         if (self.reuse or self.reuse_orig) and os.path.exists(out):
             print(f"reuse {out}")
             return
+        key = self.cache_key(script)
+        if key and self.orig_cache.lookup(key, script, out):
+            print(f"orig cache hit ({script}): {out} restored, no 1.14d run")
+            return
         if WINDOWS:
             self.sh([sys.executable] + rec, timeout=c["seconds"] + 120)
         else:
@@ -337,6 +347,27 @@ class Runner:
                     timeout=c["seconds"] + 180, check=False)
         if not self.dry and not os.path.exists(out):
             raise CheckError(f"{script} wrote no {out} (see {self.path('run-' + script.split('.')[0])})")
+        if key and self.orig_cache.fill:
+            cmd = ["tools/trace-recorder/" + script] + [
+                "<Game.exe>" if a == game else (os.path.basename(a) if a == out else a)
+                for a in rec[1:]]
+            ok = self.orig_cache.store(key, script, out, cmd)
+            print(f"orig cache {'filled' if ok else 'NOT filled (not small text)'}: {script}")
+
+    def cache_key(self, script):
+        """The orig cache key of a recorder run, or None (no cache, a dry run, or a
+        recorder the cache does not know). The key save is d2s-tool's `--time 1` one."""
+        if not self.orig_cache or self.dry or script not in orig_cache.RECORDERS:
+            return None
+        if self._key_save is None:
+            ks = self.path("key.d2s")
+            args = ["new", "--name", self.c["char"]] + self.c["save_args"]
+            if "--time" not in self.c["save_args"]:
+                args += ["--time", "1"]
+            self.cargo("d2s-tool", args + ["-o", ks])
+            with open(ks, "rb") as f:
+                self._key_save = f.read()
+        return orig_cache.make_key(self.check_text, self._key_save, self.game_dir, REC, script)
 
     # d2rs ------------------------------------------------------------------
     def orig_input(self):
@@ -828,6 +859,36 @@ def selftest():
         assert not any("record_state" in x for x in r.log) and \
             any("state-dump" in x for x in r.log), r.log
         ok += 1
+        # --orig-cache: fill on a miss, hit on the same key, M08 miss on a changed check
+        gd = os.path.join(td, "game")
+        os.makedirs(gd)
+        with open(os.path.join(gd, "Game.exe"), "wb") as f:
+            f.write(b"exe")
+        os.environ["D2_PRIVATE_REPO"] = os.path.join(td, "none")
+        runs = []
+
+        def fake_sh(argv, timeout=None, check=True, env=None):
+            runs.append(argv)
+            out = argv[len(argv) - 1 - argv[::-1].index("--out") + 1]
+            with open(out, "w") as f:
+                f.write('{"k":"snap","f":1}\n')
+            return 0
+
+        def cached(text, fill, wd):
+            os.makedirs(wd, exist_ok=True)
+            ca = orig_cache.OrigCache(os.path.join(td, "oc"), "a1-town-arrival-ama", fill=fill)
+            rr = Runner(dict(parse(GOOD), poke=[], input={}), wd, orig_cache=ca)
+            rr.game_dir, rr.check_text, rr._key_save, rr.sh = gd, text, b"save", fake_sh
+            rr.recorder("record_state.py", ["--snap-every", "1"], os.path.join(wd, "orig.state.jsonl"))
+            return os.path.join(wd, "orig.state.jsonl")
+
+        cached(GOOD, True, os.path.join(td, "w1"))
+        assert len(runs) == 1                       # miss: recorded and filled
+        o2 = cached(GOOD, False, os.path.join(td, "w2"))
+        assert len(runs) == 1 and os.path.exists(o2)  # hit: no 1.14d run
+        cached(GOOD + "# changed\n", False, os.path.join(td, "w3"))
+        assert len(runs) == 2                       # M08: a changed check misses
+        ok += 1
         # draws_summary: rows aligned by position, i / at / tick never compared, '?' equal
         hdr = "# facts v1\ni\top\tx\tlight\tat\n"
         a_ = os.path.join(td, "a.tsv")
@@ -897,6 +958,13 @@ def main(argv=None):
     ap.add_argument("--dry-run", action="store_true", help="print the commands only")
     ap.add_argument("--reuse-orig", action="store_true",
                     help="reuse the 1.14d outputs already in the work dir; re-run d2rs (suite.py)")
+    ap.add_argument("--orig-cache", nargs="?", const=DEFAULT_CACHE, default=None, metavar="DIR",
+                    help="use the shared cache of recorded 1.14d sides (default "
+                         "traces/orig-cache); a miss records 1.14d as usual (orig_cache.py)")
+    ap.add_argument("--cache-no-read", action="store_true",
+                    help="with --orig-cache: never read it (record 1.14d; --fill-cache refills)")
+    ap.add_argument("--fill-cache", action="store_true",
+                    help="with --orig-cache: store each fresh 1.14d recording in the cache")
     ap.add_argument("--json", default=None, metavar="FILE",
                     help="write the per-channel codes and comparator summaries here (§4)")
     ap.add_argument("--selftest", action="store_true")
@@ -909,14 +977,22 @@ def main(argv=None):
     codes = {}
     try:
         with open(a.check, encoding="utf-8") as f:
-            c = parse(f.read())
+            check_text = f.read()
+        c = parse(check_text)
         if os.path.basename(a.check) != c["name"] + ".check":
             raise CheckError(f"file name must be {c['name']}.check")
         if a.channels:
             c["channels"] = [x for x in a.channels.split(",") if x]
         work = a.work or os.path.join(REPO, "traces", "raw", "check-" + c["name"])
         os.makedirs(work, exist_ok=True)
-        r = Runner(c, work, dry=a.dry_run, reuse=a.reuse, reuse_orig=a.reuse_orig)
+        oc = None
+        if a.orig_cache:
+            oc = orig_cache.OrigCache(a.orig_cache, c["name"], fill=a.fill_cache,
+                                   read=not a.cache_no_read)
+        elif a.fill_cache:
+            ap.error("--fill-cache needs --orig-cache")
+        r = Runner(c, work, dry=a.dry_run, reuse=a.reuse, reuse_orig=a.reuse_orig, orig_cache=oc)
+        r.check_text = check_text
         r.next = a.next
         sides = {"orig", "d2rs"} - ({"d2rs"} if a.orig_only else set()) - (
             {"orig"} if a.d2rs_only else set())

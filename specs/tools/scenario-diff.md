@@ -24,13 +24,13 @@
 |   1. Files | 66–71 |
 |   2. Syntax | 72–143 |
 |   3. Run | 144–508 |
-|   4. Suite | 509–604 |
-| Constants & data dependencies | 605–608 |
-| Randomness | 609–612 |
-| Edge cases & original bugs | 613–636 |
-| Test vectors | 637–659 |
-| Provenance | 660–663 |
-| Open questions | 664–712 |
+|   4. Suite | 509–624 |
+| Constants & data dependencies | 625–628 |
+| Randomness | 629–632 |
+| Edge cases & original bugs | 633–656 |
+| Test vectors | 657–679 |
+| Provenance | 680–683 |
+| Open questions | 684–732 |
 <!-- /index -->
 
 ## Summary
@@ -539,6 +539,26 @@ playthrough's playability next to it.
    recordings, re-runs d2rs and the comparators); otherwise the 1.14d
    outputs and the key are removed and recorded again. The key is written
    after a run that left a 1.14d output.
+3b. **Orig cache** (`orig_cache.py`; `scenario_diff.py` and `suite.py`
+   `--orig-cache [DIR]`, default `traces/orig-cache`; `--fill-cache`): a
+   shared store of the recorded 1.14d side, so a session compares with no
+   Wine run. One entry per check and channel,
+   `<DIR>/<check>/<channel>/cache.json` (format `orig-cache-1`: `key`, the
+   `command` that made it, each file's size and sha256) plus the recorder's
+   text output (state `orig.state.jsonl`, draws `orig.frames.jsonl`, rng
+   `orig.rng.jsonl`, packets `orig.packets.jsonl`; the draws channel's
+   `draws-orig` is derived from the frames file by `facts_render.py` and
+   is rebuilt each run). Key (format `orig-cache-key-1`): sha256 of the check
+   file, of the `--time 1` save (rule 3), of `Game.exe`, of the private
+   repo's `install/manifest.json` (else of `Game.exe` alone, marked
+   `game-exe:`), and of the channel's recorder (its script and, transitively,
+   the same-folder modules it imports). A hit restores the file into the
+   work dir and skips the recorder; any other key, a missing file or a file
+   whose sha256 differs is a miss and records 1.14d as before. `--fill-cache`
+   stores each fresh recording; `--fresh` never reads the cache (it refills
+   it with `--fill-cache`). The cache holds small text only; a file with a
+   PNG signature or a NUL byte, or over 64 MiB, is not stored, and
+   rendered frames go to the private repo, never here (CLAUDE.md rule 1).
 4. Comparator summaries: `state_diff.py`, `rng_diff.py` and
    `packets_diff.py` take `--json FILE` (format `diff-summary-1`:
    `channel`, `code`, `verdict`, `frames_compared`, `frames_equal`,
