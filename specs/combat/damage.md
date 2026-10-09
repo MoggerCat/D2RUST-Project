@@ -37,13 +37,13 @@
 |   7. Reaction and death trigger | 627–732 |
 |   8. Event functions (table `0x007325B0`, 32 entries) | 733–796 |
 |   9. Durability `0x0057D3D0` | 797–818 |
-|   10. Monster melee on a player, end to end | 819–901 |
-| Constants & data dependencies | 902–923 |
-| Randomness | 924–956 |
-| Edge cases & original bugs | 957–991 |
-| Test vectors | 992–1067 |
-| Provenance | 1068–1093 |
-| Open questions | 1094–1143 |
+|   10. Monster melee on a player, end to end | 819–911 |
+| Constants & data dependencies | 912–933 |
+| Randomness | 934–966 |
+| Edge cases & original bugs | 967–1001 |
+| Test vectors | 1002–1077 |
+| Provenance | 1078–1103 |
+| Open questions | 1104–1153 |
 <!-- /index -->
 
 ## Summary
@@ -898,6 +898,16 @@ Draws on the monster's seed per strike: miss 1; hit 1 + 1 (physical) +
 stats. The player's seed draws only for block (shield), dodge / avoid /
 evade passives, the armor durability pick (§9; no armor → none) and
 the get-hit masks (§6.2 steps 5–6).
+
+Monster **missile** on a player (e.g. the quill rat's `spike1`; owner
+`missiles/missiles.md` §R5 step 5 and §R6.1): the hit test `0x0057D9B0`
+draws on the **owner's** seed (missile 1: `armorclass_vs_missile(32)`,
+bonus = missile `tohit(19)`); miss → 1 owner step, missile removed, no
+damage; hit → 1 + 1 (monster crit `0x005A5560` at `0x005AD884`, `Crit`
+≠ 0) owner steps, the damage rolls on the missile's seed (§R6.2 there),
+no `start_combat`, no burn quirk. Recorded 2026-10-09, quill at f46:
+`check-combat-arrow-quillrat` 89 → miss (1 step, life unchanged),
+`check-combat-arrow-kill` 39 → hit, crit 76 (2 steps, 12800 → 12415).
 
 ## Constants & data dependencies
 

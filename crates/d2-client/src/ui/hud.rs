@@ -178,6 +178,7 @@ pub fn skill_button_state(
     at: (i32, i32),
 ) -> u8 {
     let f = tables.flags.get(&skill).copied();
+    // Not usable in game, or not learned.
     let base = if (!tables.flags.is_empty() && !f.is_some_and(|f| f.in_game)) || level <= 0 {
         1
     } else if f.is_some_and(|f| f.aura) {
