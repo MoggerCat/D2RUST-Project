@@ -1,0 +1,13 @@
+check 1
+# Level generation of Durance of Hate Level 1 (level 100): ScnAm3 starts in Kurast Docks,
+# -seed 1234, idle until frame 20, then the level warp (poke `warp 100`,
+# tile 0) on both sides. Compare the level's rooms, presets and populated
+# units, and the draws (record_rng.py with the poke). Area C (level
+# generation). Spec: specs/tools/scenario-diff.md.
+name a3-warp-durance-ama
+save ScnAm3 --class ama --expansion --act 2 --quests acts=2
+seed 1234
+ticks 160
+seconds 900
+channels state rng
+at 20 poke warp 100
