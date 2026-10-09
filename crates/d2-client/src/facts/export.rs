@@ -168,9 +168,13 @@ fn call_rows(
     draws: &mut Vec<Vec<String>>,
 ) {
     unit_row(c.tag, c.shadow, cx, last_run, draws);
+    // §5 r17: the unit draw alone (the body failed the pre-test).
+    let Some(path) = &c.path else {
+        return;
+    };
     let mut row = vec![NA.to_owned(); DRAW_COLUMNS.len()];
     row[1] = if c.shadow { "CelDrawShadow" } else { "CelDraw" }.into();
-    row[2] = c.path.as_str().to_owned();
+    row[2] = path.as_str().to_owned();
     row[3] = c.dir64.to_string();
     row[4] = c.frame.to_string();
     for cell in &mut row[6..15] {

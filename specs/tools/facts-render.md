@@ -26,15 +26,15 @@
 |   2. `draws.tsv` | 90–136 |
 |   3. `frame.tsv` | 137–169 |
 |   4. `sprites.tsv` | 170–189 |
-|   5. d2rs export | 190–313 |
-|   6. Comparison | 314–351 |
-|   7. Requests | 352–363 |
-| Constants & data dependencies | 364–367 |
-| Randomness | 368–371 |
-| Edge cases & original bugs | 372–379 |
-| Test vectors | 380–388 |
-| Provenance | 389–393 |
-| Open questions | 394–408 |
+|   5. d2rs export | 190–318 |
+|   6. Comparison | 319–356 |
+|   7. Requests | 357–368 |
+| Constants & data dependencies | 369–372 |
+| Randomness | 373–376 |
+| Edge cases & original bugs | 377–384 |
+| Test vectors | 385–393 |
+| Provenance | 394–398 |
+| Open questions | 399–413 |
 <!-- /index -->
 
 ## Summary
@@ -310,6 +310,11 @@ composition, through `d2-client` only (game logic untouched).
    left, top, `mode` = its colour (the item's colour row; `?` without
    the colour rows), every other column `-`; one row per rectangle
    (revision 2026-10-09, `a1-panel-cube`: the item tints).
+17. A listed unit whose body fails the COF box pre-test
+   (`render/unit-composite.md` §4, inside the unit draw `0x00471EC0`)
+   is still a unit draw call: its `unit` row at its draw key, no cel row
+   (`WorldFrame::unit_calls` with no file; revision 2026-10-09,
+   `a1-panel-inventory` row 128: the torch 2:9 at X = 920).
 
 ### 6. Comparison
 

@@ -27,24 +27,24 @@ under Xvfb + lavapipe; compare: `d2-client facts-compare SCENE DIR --ignore tick
 8. Inventory family draw order (`ui/panels.md` §9 r1 revision, REC-515 for stash / shop; §9 r6; §12 r3): the mode panel (cube) draws before the inventory (`Panel::draw_before`, routing unchanged); per item its cell tints (one box per cell, row by row) then the item; gold line, gold button, close button after the items; cube buttons after its grid. UI rectangles export as `DrawBox` rows (`facts-render.md` §5 r16). Cube: equal through row 24.
 9. The local player's walk frame counts from the walk request at speed 213 (`sim/units.md` §4.7 step 7 revision, REC-516; run not yet); a point walk keeps the facing from its start to the clicked subtile (`render/unit-composite.md` §3 r1, REC-517).
 10. The export's unit `dir` is keyed by draw slot, not GUID (a torch with GUID 1 overwrote the player's; `facts-render.md` §5 r14). a1-walk-n now equal through the player rows.
+11. A listed unit whose body fails the pre-test still writes its `unit` row (`facts-render.md` §5 r17; the unit draw calls the pre-test inside): a1-panel-inventory past row 128.
 
-## First difference per scene (after fixes 1–10)
+## First difference per scene (after fixes 1–11, staging with q-fix-real-unit-seed-order merged)
 | Scene | First difference |
 |---|---|
-| a1-town-idle-sor | r108 NPC `rc` walk frame 7 vs 1 (NPC path / seed order: q-fix-real-unit-seed-order) |
-| a1-panel-inventory | r111 `rc` walk frame 7 vs 3 (same) |
-| a1-panel-belt-open | r108 torch vs `rc` (NPC position) |
-| a1-panel-character | r109 `wa` NU dir 47 vs WL dir 0 (NPC pose) |
+| a1-town-idle-sor | r110 NPC `wa` WL dir 47 (1.14d) vs 0 (NPC facing) |
+| a1-walk-n | r110 `wa` WL dir 47 vs 0 (same) |
+| a1-panel-inventory | r137–138 an extra `unit` row: d2rs's `wa` (1:7) stands in this cell (NPC position) |
+| a1-panel-character | r109 `wa` NU dir 47 vs WL (NPC pose) |
 | a1-panel-skilltree | r111 `wa` vs `rc` (NPC pose) |
-| a1-panel-automap | r109 `wa` vs `rc` (NPC pose) |
-| a1-panel-esc-menu-wine | r108 `rc` NU at 814,484 vs a torch (NPC position); renamed at the staging merge (PC 1's Windows recording holds `a1-panel-esc-menu`) |
-| a1-panel-cube | r25 the hovered cube's tint: d2rs the hover colour 118 (§3 r2), 1.14d the usable 234 (the cursor rests on the cube since the right click; 1.14d's hover state may follow mouse moves only: settled by a recording that moves the mouse onto the item) |
+| a1-panel-automap | r108 torch vs `rc` (NPC position) |
+| a1-panel-esc-menu-wine | r108 `rc` NU at 814,484 vs a torch (NPC position) |
+| a1-panel-cube | r25 the hovered cube's tint: d2rs 118 (hover, §3 r2), 1.14d 234 (usable): 1.14d's hover state may follow mouse moves only (settled by a recording that moves onto the item) |
 | a2-town-lut-gholein | r115 critter `bg` shadow missing (q-fix-real-town-critters) |
 | a3-town-kurast-docks | r97 pass-9 cel (`at` 0x473bd0, file ?) vs d2rs `rain3.dc6` f1 |
 | a4-town-pandemonium-fortress | r100 object shadow `98` vs `99` (object order) |
 | a5-town-harrogath | r76 monster `6z` NU frame 3 vs 5 (6 frames, rate 32: the monster's animation start, REC-512) |
-| a1-walk-n | r108 NPC `rc` walk frame 0 vs 7 (NPC path, as idle-sor) |
-| a1-walk-s .. nw | frame input tile_origin_x 3–20 px off (walk-s 9933 vs 9936): the chained walks drift |
+| a1-walk-s .. nw | frame input tile_origin_x 1–33 px off (walk-s 9933 vs 9936): the chained walks drift |
 | a1-run-* | tile_origin_x ~90 px off (inherits the walk drift) |
 | a1-cold-plains-monsters | level 3 vs 1: the waypoint walk does not reach the waypoint (walk drift) |
 | a1-town-arrival-ama | skipped (q-fix-real-unit-seed-order) |

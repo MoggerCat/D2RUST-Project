@@ -315,7 +315,13 @@ fn missing_files_are_skipped_with_one_log_line() {
     let calls: Vec<(u8, &str, bool)> = built
         .unit_calls
         .iter()
-        .map(|c| (c.key.sub(), c.path.as_str(), c.shadow))
+        .map(|c| {
+            (
+                c.key.sub(),
+                c.path.as_ref().map_or("", |p| p.as_str()),
+                c.shadow,
+            )
+        })
         .collect();
     assert_eq!(
         calls,

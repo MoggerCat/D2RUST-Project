@@ -672,7 +672,7 @@ fn unit_calls_are_rows_at_their_keys() {
     let call = |pass, sub, shadow| UnitCall {
         key: DrawKey::new(pass, 0, 0, sub).unwrap(),
         tag: ItemTag::Unit(9),
-        path: CanonicalPath::new("x/sh.dcc").unwrap(),
+        path: Some(CanonicalPath::new("x/sh.dcc").unwrap()),
         dir64: 0,
         frame: 6,
         shadow,
@@ -792,4 +792,38 @@ fn ui_rectangles_are_drawbox_rows() {
         ..cx
     };
     assert_eq!(draw_rows(&[item], &cx).unwrap().draws[0][12], "?");
+}
+
+// Covers: specs/tools/facts-render.md §5 r17
+/// A listed unit whose body fails the pre-test is the unit draw call
+/// alone: its `unit` row and no cel row (`a1-panel-inventory` row 128).
+#[test]
+fn a_culled_body_is_its_unit_row_alone() {
+    use crate::scene::order::pass;
+    let s = store();
+    let calls = [crate::world_view::UnitCall {
+        key: DrawKey::new(pass::WALLS_UNITS, 3, 0, 0).unwrap(),
+        tag: ItemTag::Unit(9),
+        path: None,
+        dir64: 0,
+        frame: 0,
+        shadow: false,
+    }];
+    let unit_type = |_: u32| Some(2u8);
+    let cx = ExportContext {
+        frames: &s,
+        view_left: Some(0),
+        unit_type: &unit_type,
+        sky: &[],
+        unit_dirs: &std::collections::BTreeMap::new(),
+        unit_calls: &calls,
+        color_rows: None,
+    };
+    let rows = draw_rows(&[], &cx).unwrap();
+    let ops: Vec<(&str, &str)> = rows
+        .draws
+        .iter()
+        .map(|r| (r[1].as_str(), r[15].as_str()))
+        .collect();
+    assert_eq!(ops, [("unit", "2:9")]);
 }

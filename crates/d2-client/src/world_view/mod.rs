@@ -279,7 +279,9 @@ pub struct SlotCall {
 pub struct UnitCall {
     pub key: DrawKey,
     pub tag: ItemTag,
-    pub path: CanonicalPath,
+    /// The cel file; `None`: the unit draw call alone, its body culled by
+    /// the COF box pre-test (`tools/facts-render.md` §5 r17).
+    pub path: Option<CanonicalPath>,
     /// The cel context's direction ([`UnitPose::dir64`]).
     pub dir64: u8,
     pub frame: usize,
@@ -648,11 +650,26 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
         let body = rules.unit_box_visible(unit, &pose, cof)?;
         let shadow_ok = rules.unit_shadow_box_visible(unit, &pose, cof)?;
         let shadow_at = rules.unit_shadow_key(unit).filter(|_| shadow_ok);
+        let params = rules.unit_params(world, unit, &pose)?;
+        // `draw-order.md` §5 r4: the unit draw `0x00471EC0` is called for
+        // a listed unit whose body then fails the COF box pre-test inside
+        // it (`unit-composite.md` §4): the call alone, no cel
+        // (`a1-panel-inventory` row 128: the torch 2:9 at X = 920).
+        if !body {
+            unit_calls.push(UnitCall {
+                key: DrawKey::new(params.pass, params.major, params.minor, 0)
+                    .map_err(ViewError::Scene)?,
+                tag: params.tag,
+                path: None,
+                dir64: pose.dir64,
+                frame: pose.frame,
+                shadow: false,
+            });
+        }
         if !body && shadow_at.is_none() {
             units_hidden += 1;
             continue;
         }
-        let params = rules.unit_params(world, unit, &pose)?;
         let resolver = UnitResolver {
             rules,
             unit,
@@ -692,7 +709,7 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
                 Ok(UnitCall {
                     key: DrawKey::new(pass, major, minor, c.slot).map_err(ViewError::Scene)?,
                     tag: params.tag,
-                    path: c.path.clone(),
+                    path: Some(c.path.clone()),
                     dir64: pose.dir64,
                     frame: pose.frame,
                     shadow,
