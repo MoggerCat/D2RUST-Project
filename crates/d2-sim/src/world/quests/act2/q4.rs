@@ -312,7 +312,12 @@ fn changed_level<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, arg
             set_bit(w, p, SLOT, 7);
         }
     }
-    if args.a == TOWN {
+    // PROVISIONAL (REC-1405): the old-level-40 handling is skipped when the
+    // new level is the Arcane Sanctuary. Recording a2-warp-arcane-ama shows
+    // the start Jerhyn still present from frame 20 on (as in the other warps
+    // he is removed at the warp frame: a2-warp-maggot-lair-ama); the
+    // disassembly reading is queued in docs/handoff/pc1-data.md Step 4.
+    if args.a == TOWN && args.b != SANCTUARY {
         jerhyn_leaving_town(ctl, w, i);
         quick_remove(ctl, w, i, args.player);
         let f = rec(w, args.player);

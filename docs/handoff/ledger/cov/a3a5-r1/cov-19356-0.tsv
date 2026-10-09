@@ -1,0 +1,16 @@
+coverage-map 1
+monster	134	0	8
+monster	242	0	1
+monster	253	0	1
+monster	264	0	1
+monster	294	0	1
+monster	346	0	1
+monster	347	0	3
+monster	401	0	6
+monster-ai	6174784	401	32
+monster-ai	6189360	253	1
+monster-ai	6189360	264	1
+monster-ai	6190400	294	1
+quest	22	9	1
+level	102	0	1
+state	105	0	23

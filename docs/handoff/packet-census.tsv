@@ -1,0 +1,295 @@
+stream	id	name	state	checks	carried_by	records	equal	diverged	first_equal	first_diverged
+c2s	0x00	-	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x01	Walk	EQUAL	1	walk-town-ama	1	1	0	walk-town-ama@10	-
+c2s	0x02	WalkToUnit	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x03	Run	EQUAL	1	combat-cold-plains-wp	1	1	0	combat-cold-plains-wp@10	-
+c2s	0x04	RunToUnit	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x05	ShiftLeftSkill	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x06	LeftSkillOnUnit	DIVERGED	2	combat-melee-fallen,combat-melee-fallen-msg	9	8	1	combat-melee-fallen-msg@34	combat-melee-fallen@40:bytes[5] 1.14d 21 vs d2rs 19
+c2s	0x07	ShiftLeftSkillOnUnit	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x08	ShiftLeftSkillHold	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x09	LeftSkillOnUnitHold	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x0A	ShiftLeftSkillOnUnitHold	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x0B	Unused0B	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x0C	RightSkill	EQUAL	17	ass-burst-of-speed,ass-fade,ass-fire-blast…	18	18	0	ass-burst-of-speed@20	-
+c2s	0x0D	RightSkillOnUnit	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x0E	ShiftRightSkillOnUnit	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x0F	RightSkillHold	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x10	RightSkillOnUnitHold	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x11	ShiftRightSkillOnUnitHold	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x12	EndInferno	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x13	InteractWithEntity	EQUAL	1	items-vendor-akara-buy	1	1	0	items-vendor-akara-buy@16	-
+c2s	0x14	OverheadChat	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x15	Chat	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x16	PickItem	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x17	DropItem	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x18	InsertItemInBuffer	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x19	RemoveItemFromBuffer	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x1A	EquipItem	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x1B	Swap2HandedItem	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x1C	RemoveBodyItem	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x1D	SwapCursorWithBody	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x1E	Swap1HWith2H	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x1F	SwapCursorBufferItem	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x20	UseGridItem	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x21	StackItems	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x22	UnstackItems	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x23	ItemToBelt	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x24	ItemFromBelt	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x25	SwitchBeltItem	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x26	UseBeltItem	EQUAL	1	combat-potion-midfight	1	1	0	combat-potion-midfight@70	-
+c2s	0x27	UseItemAction	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x28	SocketItem	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x29	ScrollToBook	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x2A	ItemToCube	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x2B	-	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x2C	Unused2C	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x2D	Unused2D	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x2E	Unused2E	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x2F	InitEntityChat	EQUAL	1	items-vendor-akara-buy	2	2	0	items-vendor-akara-buy@17	-
+c2s	0x30	TerminateEntityChat	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x31	QuestMessage	DIVERGED	1	items-vendor-akara-buy	1	0	1	-	items-vendor-akara-buy@17:missing in d2rs
+c2s	0x32	BuyItem	EQUAL	1	items-vendor-akara-buy	1	1	0	items-vendor-akara-buy@24	-
+c2s	0x33	SellItem	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x34	IdentifyWithNpc	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x35	Repair	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x36	HireMerc	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x37	IdentifyGamble	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x38	EntityAction	EQUAL	1	items-vendor-akara-buy	1	1	0	items-vendor-akara-buy@20	-
+c2s	0x39	PurchaseLife	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x3A	AddStatPoint	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x3B	AddSkillPoint	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x3C	SelectSkill	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x3D	HighlightDoor	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x3E	ActivateInifussScroll	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x3F	PlayAudio	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x40	RequestQuestData	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x41	Resurrect	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x42	Unused42	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x43	Unused43	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x44	StaffInOrifice	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x45	ChangeTpLocation	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x46	MercInteract	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x47	MoveMerc	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x48	TurnOffBusyState	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x49	TakeOrCloseWp	EQUAL	1	combat-cold-plains-wp	1	1	0	combat-cold-plains-wp@260	-
+c2s	0x4A	-	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x4B	RequestEntityUpdate	DIVERGED	4	merc-barb-cow,merc-desert-cow,merc-rogue-cow…	4	0	4	-	merc-barb-cow@5:missing in d2rs
+c2s	0x4C	Transmogrify	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x4D	PlayNpcMessage	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x4E	-	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x4F	ClickButton	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x50	DropGold	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x51	BindHotkey	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x52	Unused52	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x53	StaminaOn	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x54	StaminaOff	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x55	-	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x56	-	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x57	-	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x58	QuestCompleted	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x59	MakeEntityMove	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x5A	-	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x5B	-	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x5C	-	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x5D	SquelchHostile	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x5E	PartyAction	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x5F	UpdatePlayerPos	NOT-CARRIED	0		0	0	11	-	combat-cold-plains-wp@93:extra (d2rs only)
+c2s	0x60	SwapWeapons	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x61	MercItem	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x62	ResurrectMerc	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x63	ItemToBeltShift	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x64	-	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x65	-	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x66	WardenResponse	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x67	CreateGame	DIVERGED	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	89	0	89	-	a1-town-arrival-ama@1:bytes[2] 1.14d 69 vs d2rs 0
+c2s	0x68	JoinGame	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x69	LeaveGame	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x6A	Sys6A	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x6B	Sys6B	EQUAL	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	89	89	0	a1-town-arrival-ama@2	-
+c2s	0x6C	UploadSave	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x6D	Ping	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x6E	Sys6E	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x6F	-	NOT-CARRIED	0	-	0	0	0	-	-
+c2s	0x70	Sys70	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x00	GameLoading	EQUAL	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	89	89	0	a1-town-arrival-ama@1	-
+s2c	0x01	GameFlags	EQUAL	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	89	89	0	a1-town-arrival-ama@1	-
+s2c	0x02	LoadSuccessful	EQUAL	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	89	89	0	a1-town-arrival-ama@1	-
+s2c	0x03	LoadAct	EQUAL	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	96	63	0	a1-town-arrival-ama@2	-
+s2c	0x04	LoadComplete	CARRIED-UNPAIRED	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	96	0	0	-	-
+s2c	0x05	UnloadComplete	CARRIED-UNPAIRED	7	act-travel-lut-ama,milestone-act3-entry,milestone-act4-entry…	7	0	0	-	-
+s2c	0x06	GameExit	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x07	MapReveal	DIVERGED	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	1649	738	105	a1-town-arrival-ama@2	a1-warp-catacombs-ama@19:missing in d2rs
+s2c	0x08	MapHide	DIVERGED	69	a1-warp-catacombs-ama,a1-warp-cave-ama,a1-warp-den-ama…	723	136	4	combat-cold-plains-wp@23	milestone-act4-entry@3:missing in d2rs
+s2c	0x09	AssignLevelWarp	EQUAL	50	a1-warp-catacombs-ama,a1-warp-cave-ama,a1-warp-den-ama…	102	33	0	a1-warp-catacombs-ama@21	-
+s2c	0x0A	RemoveUnit	DIVERGED	69	a1-warp-catacombs-ama,a1-warp-cave-ama,a1-warp-den-ama…	2051	471	6	combat-cold-plains-wp@23	a2-warp-maggot-lair-ama@20:id 1.14d 0a vs d2rs 07
+s2c	0x0B	GameHandshake	EQUAL	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	89	65	0	a1-town-arrival-ama@2	-
+s2c	0x0C	MonsterHit	DIVERGED	2	combat-arrow-quillrat,combat-elements	6	0	7	-	combat-arrow-quillrat@42:bytes[2] 1.14d 19 vs d2rs 17
+s2c	0x0D	PlayerStop	DIVERGED	13	combat-arrow-kill,combat-arrow-quillrat,combat-champion-pack…	70	0	55	-	combat-arrow-kill@46:missing in d2rs
+s2c	0x0E	ObjectState	EQUAL	85	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	817	79	0	a1-warp-catacombs-ama@21	-
+s2c	0x0F	PlayerMove	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x10	PlayerToTarget	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x11	ReportKill	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x12	Unknown12	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x13	Unknown13	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x14	Unknown14	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x15	ReassignPlayer	DIVERGED	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	164	63	4	a1-town-arrival-ama@2	merc-barb-cow@5:id 1.14d 15 vs d2rs 67
+s2c	0x16	UnitPositions	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x17	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x18	LifeManaUpdate	DIVERGED	1	combat-potion-midfight	1	0	1	-	combat-potion-midfight@71:missing in d2rs
+s2c	0x19	SmallGoldPickup	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x1A	AddExpByte	DIVERGED	8	combat-arrow-kill,combat-champion-pack,combat-elements…	12	0	8	-	combat-champion-pack@86:id 1.14d 1a vs d2rs 6d
+s2c	0x1B	AddExpWord	CARRIED-UNPAIRED	2	combat-melee-fallen,combat-potion-midfight	2	0	0	-	-
+s2c	0x1C	AddExpDword	EQUAL	24	a5-town-arrival-bar,ass-burst-of-speed,ass-fade…	24	1	0	a5-town-arrival-bar@2	-
+s2c	0x1D	SetStatByte	EQUAL	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	1756	646	0	a1-town-arrival-ama@2	-
+s2c	0x1E	SetStatWord	DIVERGED	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	804	387	1	a1-town-arrival-ama@2	items-vendor-akara-buy@25:missing in d2rs
+s2c	0x1F	SetStatDword	CARRIED-UNPAIRED	1	rng-town-idle-sor	3	0	0	-	-
+s2c	0x20	StatUpdate	CARRIED-UNPAIRED	1	combat-pop-cold-plains	5	0	0	-	-
+s2c	0x21	UpdateItemOSkill	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x22	UpdateItemSkill	DIVERGED	1	items-load-mixed	2	0	1	-	items-load-mixed@2:bytes[2] 1.14d 171 vs d2rs 0
+s2c	0x23	SetSkill	DIVERGED	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	196	126	7	a1-town-arrival-ama@2	dru-fissure@2:id 1.14d 23 vs d2rs 5e
+s2c	0x24	Unknown24	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x25	Unknown25	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x26	Chat	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x27	NpcInfo	DIVERGED	6	items-vendor-akara-buy,merc-barb-cow,merc-desert-cow…	6	0	6	-	items-vendor-akara-buy@16:bytes[10] 1.14d 64 vs d2rs 11
+s2c	0x28	QuestInfo	EQUAL	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	90	65	0	a1-town-arrival-ama@2	-
+s2c	0x29	GameQuestInfo	EQUAL	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	90	65	0	a1-town-arrival-ama@2	-
+s2c	0x2A	NpcTransaction	DIVERGED	1	items-vendor-akara-buy	1	0	1	-	items-vendor-akara-buy@24:bytes[3] 1.14d 3 vs d2rs 0
+s2c	0x2B	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x2C	PlaySound	DIVERGED	12	a3-start-noquest-sor,combat-champion-pack,combat-melee-fallen-msg…	19	0	7	-	a3-start-noquest-sor@24:missing in d2rs
+s2c	0x2D	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x2E	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x2F	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x30	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x31	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x32	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x33	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x34	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x35	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x36	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x37	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x38	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x39	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x3A	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x3B	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x3C	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x3D	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x3E	UpdateItemStats	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x3F	UseStackableItem	EQUAL	1	combat-potion-midfight	1	1	0	combat-potion-midfight@70	-
+s2c	0x40	ItemFlags	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x41	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x42	ClearCursor	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x43	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x44	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x45	Unknown45	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x46	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x47	Relator1	DIVERGED	5	a4-warp-river-ama,combat-potion-midfight,items-vendor-akara-buy…	5	0	3	-	a4-warp-river-ama@137:missing in d2rs
+s2c	0x48	Relator2	CARRIED-UNPAIRED	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	105	0	0	-	-
+s2c	0x49	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x4A	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x4B	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x4C	UnitSkillOnUnit	DIVERGED	8	combat-monster-missiles,combat-pop-cold-plains,milestone-baal-throne…	45	0	25	-	combat-monster-missiles@65:missing in d2rs
+s2c	0x4D	UnitSkillOnPoint	DIVERGED	5	a3-warp-kurast-sewers-ama,ass-shadow-master,milestone-hellforge…	14	6	36	a3-warp-kurast-sewers-ama@23	ass-burst-of-speed@20:extra (d2rs only)
+s2c	0x4E	MercForHire	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x4F	StartMercList	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x50	QuestSpecial	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x51	AssignObject	DIVERGED	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	2582	591	6	a1-warp-catacombs-ama@21	a1-warp-jail-ama@20:id 1.14d 51 vs d2rs 07
+s2c	0x52	QuestLogInfo	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x53	Darkness	EQUAL	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	99	66	0	a1-town-arrival-ama@2	-
+s2c	0x54	Unknown54	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x55	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x56	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x57	NpcEnchants	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x58	OpenUi	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x59	AssignPlayer	EQUAL	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	90	89	0	a1-town-arrival-ama@2	-
+s2c	0x5A	EventMessage	DIVERGED	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	90	0	1	-	combat-pop-cold-plains@228:missing in d2rs
+s2c	0x5B	PlayerJoined	CARRIED-UNPAIRED	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	89	0	0	-	-
+s2c	0x5C	PlayerLeft	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x5D	QuestItemState	DIVERGED	14	a1-warp-den-ama,a2-warp-arcane-ama,a3-warp-durance-ama…	18	4	13	milestone-anya@92	a1-warp-den-ama@20:id 1.14d 5d vs d2rs 07
+s2c	0x5E	GameQuestAvailability	EQUAL	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	89	65	0	a1-town-arrival-ama@2	-
+s2c	0x5F	PortalFlags	EQUAL	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	89	65	0	a1-town-arrival-ama@2	-
+s2c	0x60	TownPortalState	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x61	CanGoToAct	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x62	MakeUnitTargetable	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x63	WaypointMenu	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x64	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x65	PlayerKillCount	CARRIED-UNPAIRED	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	103	0	0	-	-
+s2c	0x66	Unknown66	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x67	MonsterMove	DIVERGED	46	a1-town-arrival-ama,a1-warp-tower-cellar-ama,a2-warp-sewers-ama…	228	103	121	a1-town-arrival-ama@24	a1-warp-tower-cellar-ama@65:missing in d2rs
+s2c	0x68	MonsterMoveToTarget	DIVERGED	19	a5-warp-wsk-ama,combat-champion-pack,combat-elements…	288	127	105	a5-warp-wsk-ama@23	combat-champion-pack@31:bytes[1] 1.14d 25 vs d2rs 23
+s2c	0x69	MonsterState	DIVERGED	8	combat-arrow-kill,combat-champion-pack,combat-elements…	28	0	24	-	combat-arrow-kill@52:bytes[1] 1.14d 19 vs d2rs 17
+s2c	0x6A	Unknown6A	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x6B	MonsterAction	DIVERGED	3	ass-lightning-sentry,combat-cold-plains-wp,dru-grizzly	5	0	2	-	combat-cold-plains-wp@484:missing in d2rs
+s2c	0x6C	MonsterAttack	DIVERGED	16	combat-arrow-kill,combat-arrow-quillrat,combat-champion-pack…	138	2	201	milestone-hellforge@144	combat-arrow-kill@31:bytes[1] 1.14d 19 vs d2rs 17
+s2c	0x6D	MonsterStop	DIVERGED	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	1925	677	281	a1-warp-catacombs-ama@21	a1-warp-tower-cellar-ama@78:missing in d2rs
+s2c	0x6E	Unknown6E	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x6F	Unknown6F	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x70	Unknown70	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x71	Unknown71	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x72	Unknown72	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x73	Unknown73	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x74	PlayerCorpseAssign	CARRIED-UNPAIRED	1	combat-pop-cold-plains	1	0	0	-	-
+s2c	0x75	PlayerPartyInfo	CARRIED-UNPAIRED	1	combat-pop-cold-plains	1	0	0	-	-
+s2c	0x76	PlayerInProximity	EQUAL	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	90	78	0	a1-town-arrival-ama@2	-
+s2c	0x77	TradeAction	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x78	TradeAccepted	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x79	GoldInTrade	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x7A	PetAction	EQUAL	3	ass-lightning-sentry,ass-shadow-master,dru-grizzly	3	3	0	ass-lightning-sentry@27	-
+s2c	0x7B	AssignHotkey	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x7C	UseScroll	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x7D	SetItemState	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x7E	Unknown7E	DIVERGED	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	89	0	63	-	a1-town-arrival-ama@2:bytes[4] 1.14d 9 vs d2rs 0
+s2c	0x7F	AllyPartyInfo	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x80	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x81	AssignMerc	CARRIED-UNPAIRED	5	merc-barb-cow,merc-desert-cow,merc-rogue-cow…	5	0	0	-	-
+s2c	0x82	PortalOwnership	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x83	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x84	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x85	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x86	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x87	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x88	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x89	UniqueEvent	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x8A	NpcWantsInteract	DIVERGED	20	a1-town-arrival-ama,a3-start-noquest-sor,act-travel-lut-ama…	49	42	27	a1-town-arrival-ama@24	act-travel-lut-ama@32:missing in d2rs
+s2c	0x8B	PlayerRelationship	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x8C	RelationshipUpdate	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x8D	AssignPlayerToParty	CARRIED-UNPAIRED	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	89	0	0	-	-
+s2c	0x8E	CorpseAssign	DIVERGED	1	combat-pop-cold-plains	1	0	1	-	combat-pop-cold-plains@251:missing in d2rs
+s2c	0x8F	Pong	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x90	PartyAutomapInfo	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x91	NpcGossipAct	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x92	RemoveItemsDisplay	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x93	Unknown93	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x94	BaseSkillLevels	EQUAL	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	89	78	0	a1-town-arrival-ama@2	-
+s2c	0x95	LifeManaUpdate2	DIVERGED	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	173	64	114	a1-town-arrival-ama@2	ass-burst-of-speed@42:missing in d2rs
+s2c	0x96	WalkVerify	DIVERGED	43	a1-warp-catacombs-ama,a1-warp-cave-ama,a1-warp-den-ama…	45	15	42	a1-warp-catacombs-ama@100	a1-warp-tower-cellar-ama@77:missing in d2rs
+s2c	0x97	WeaponSwitch	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x98	Unknown98	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x99	SkillTriggered	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x9A	Unknown9A	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x9B	Unknown9B	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0x9C	ItemActionWorld	DIVERGED	14	a3-warp-kurast-sewers-ama,combat-arrow-kill,combat-champion-pack…	128	13	10	combat-potion-midfight@70	combat-arrow-kill@38:id 1.14d 9c vs d2rs 69
+s2c	0x9D	ItemActionOwned	DIVERGED	5	ass-shadow-master,combat-melee-fallen,combat-potion-midfight…	17	0	2	-	combat-melee-fallen@2:id 1.14d 9d vs d2rs 23
+s2c	0x9E	MercStatByte	CARRIED-UNPAIRED	5	merc-barb-cow,merc-desert-cow,merc-rogue-cow…	100	0	0	-	-
+s2c	0x9F	MercStatWord	CARRIED-UNPAIRED	5	merc-barb-cow,merc-desert-cow,merc-rogue-cow…	26	0	0	-	-
+s2c	0xA0	MercStatDword	CARRIED-UNPAIRED	4	merc-barb-cow,merc-desert-cow,merc-rogue-cow…	24	0	0	-	-
+s2c	0xA1	MercAddExpByte	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0xA2	MercAddExpWord	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0xA3	UnknownA3	DIVERGED	1	dru-volcano	1	0	1	-	dru-volcano@29:missing in d2rs
+s2c	0xA4	BaalWave	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0xA5	UnknownA5	DIVERGED	2	bar-leap-attack,bar-whirlwind	2	0	2	-	bar-leap-attack@46:id 1.14d a5 vs d2rs a9
+s2c	0xA6	UnknownA6	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0xA7	DelayedState	DIVERGED	11	ass-shadow-master,bar-leap-attack,bar-whirlwind…	17	2	4	dru-hurricane@29	ass-shadow-master@28:id 1.14d a7 vs d2rs ac
+s2c	0xA8	SetState	DIVERGED	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	162	5	5	ass-burst-of-speed@28	ass-shadow-master@56:missing in d2rs
+s2c	0xA9	EndState	DIVERGED	6	bar-leap-attack,bar-whirlwind,combat-elements…	10	1	1	dru-werewolf@54	bar-whirlwind@43:extra (d2rs only)
+s2c	0xAA	AddUnit	DIVERGED	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	1745	697	13	a1-town-arrival-ama@2	ass-burst-of-speed@2:size 1.14d 12 vs d2rs 39
+s2c	0xAB	NpcHeal	DIVERGED	1	combat-elements	4	0	5	-	combat-elements@66:missing in d2rs
+s2c	0xAC	AssignMonster	DIVERGED	89	a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama…	1655	621	38	a1-warp-catacombs-ama@21	act-travel-lut-ama@10:id 1.14d ac vs d2rs 08
+s2c	0xAD	-	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0xAE	WardenRequest	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0xAF	ConnectionInfo	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0xB0	ConnectionTerminated	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0xB1	GamesInfo	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0xB2	GameList	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0xB3	DownloadSave	NOT-CARRIED	0	-	0	0	0	-	-
+s2c	0xB4	ConnectionRefused	NOT-CARRIED	0	-	0	0	0	-	-

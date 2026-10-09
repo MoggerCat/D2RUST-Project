@@ -31,22 +31,22 @@
 |   1. Walk and run requests | 87–234 |
 |   2. Path types | 235–274 |
 |   3. Path compute (`0x00649970(path, unit, town access)`) | 275–341 |
-|   4. Target preparation (flag 0x1000, `0x00648120`) | 342–369 |
-|   5. Toward (type 2, `0x00679C80`) | 370–437 |
-|   6. Straight (type 7, `0x00679ED0`) | 438–447 |
-|   7. A* (type 1, `0x0067B850`) | 448–485 |
-|   8. Velocity, direction vector, facing | 486–591 |
-|   9. Per-tick movement | 592–780 |
-|   10. Messages | 781–843 |
-|   11. Missile paths (`0x00649760`) | 844–896 |
-|   12. Other path types (1.14d-read 2026-10-08) | 897–1110 |
-|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1111–1260 |
-| Constants & data dependencies | 1261–1297 |
-| Randomness | 1298–1308 |
-| Edge cases & original bugs | 1309–1356 |
-| Test vectors | 1357–1395 |
-| Provenance | 1396–1451 |
-| Open questions | 1452–1525 |
+|   4. Target preparation (flag 0x1000, `0x00648120`) | 342–384 |
+|   5. Toward (type 2, `0x00679C80`) | 385–452 |
+|   6. Straight (type 7, `0x00679ED0`) | 453–462 |
+|   7. A* (type 1, `0x0067B850`) | 463–500 |
+|   8. Velocity, direction vector, facing | 501–606 |
+|   9. Per-tick movement | 607–795 |
+|   10. Messages | 796–858 |
+|   11. Missile paths (`0x00649760`) | 859–911 |
+|   12. Other path types (1.14d-read 2026-10-08) | 912–1125 |
+|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1126–1275 |
+| Constants & data dependencies | 1276–1312 |
+| Randomness | 1313–1323 |
+| Edge cases & original bugs | 1324–1371 |
+| Test vectors | 1372–1410 |
+| Provenance | 1411–1466 |
+| Open questions | 1467–1540 |
 <!-- /index -->
 
 ## Summary
@@ -349,19 +349,34 @@ start, target, start room, target room, slack r (step 4), max distance
    3. p1 += step(d1); free → found p1.
    4. d2 ≠ 255: p2 += step(d2); free → found p2.
    5. d0 := `altdir`[o(p0 → start)] first entry (d1, d2 unchanged); repeat.
-3. Found p = start → result 0 with the target (+0x10/+0x12) left at
-   the requested point; else target := p. Player (unit type 0):
-   orthogonal push (rule 4). Result 1. PROVISIONAL (q-diff-combat-a1,
-   REC-753): measured on 1.14d, `traces/checks/combat-random-boss.check`
-   and `combat-elements.check` frame 45: Warriv (class 155) at (4868,
-   4233) walks in radius (type 7, flag 0x1000) to (4869, 4232), a cell a
-   zombie holds; p0's first step lands on the start, and the path target
-   stays (4869, 4232) for the rest of the run (writing the start, as an
-   earlier reading of this rule had it, gives (4868, 4233)). Whether a
-   p1 / p2 probe landing on the start also returns 0, or the start is
-   simply never "free" here and the loop goes on, is
-   `docs/handoff/pc1-data.md` Step 4 "[q-diff-combat-a1] preparation
-   probe at the start".
+3. Found p: target := p; p = start → result 0. Player (unit type 0):
+   orthogonal push (rule 4). Result 1.
+   Read 2026-10-09 (asm `0x00648120`–`0x006482FA`, caller
+   `0x00649B5C`; settles REC-753). "Target" here is the compute
+   record's copy I+0x04 / I+0x06 (a local of `0x00649970`, filled from
+   path +0x10 / +0x12 at `0x00649A5D`), not the path's: rules 2–4
+   never write path +0x10 / +0x12. The only start test is rule 2.1, at
+   the loop head, on p0 alone; no probe is compared with the start
+   before its free test. A free probe is written to I's target first
+   (`0x006482A1` for p0, `0x006482C7` for p1 / p2) and then compared
+   with the start: equal → result 0 with I's target = the start. The
+   free test (`0x0064D910` with the path's pattern +0x28 and move mask
+   +0x2C) runs after §3 step 6 took the mover's own footprint off, so
+   the start is "free" unless the pattern at the start meets another
+   collision (a neighbour's footprint inside the mover's pattern);
+   then the loop goes on and a later p0 = start ends at rule 2.1 with
+   I's target still the request. After the call (§3 steps 8–12):
+   final target +0x18 / +0x1A := I's target whatever the result;
+   result 0 → no path function, count 0, and path +0x10 / +0x12 keep
+   the requested point (they are rewritten only by step 10, when points
+   remain, flag 0x10 clear and no target unit: target := the last
+   point, previous target +0x14 := the old +0x10). So the measured
+   Warriv case (`traces/checks/combat-random-boss.check` frame 45, path
+   target staying (4869, 4232) after p0 steps onto the start) holds for
+   either start outcome; the start-equal case differs from the
+   loop-head exit only in +0x18 (start vs request). With result 1 too,
+   path +0x10 is not the found point until step 10 (and never with
+   flag 0x10 or a target unit).
 4. Push (`0x00648050`): (dx, dy) = target − start; if |dx| < 5, |dy| < 5
    and not both 0: ox = `snap9`[40 + dx + 9·dy], oy = `snap9`[40 + dy +
    9·dx]; c = max(|dx|, |dy|); while c < 5: candidate := target + (ox,

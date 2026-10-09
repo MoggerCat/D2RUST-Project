@@ -96,6 +96,21 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | merc-rogue-cow | state | DIVERGED | 3/120 | frame 4 monster 1:1 class 271, field tx: 1.14d 5145 vs d2rs 4877 | q-scenes-compare |
 | merc-rogue-town-bar | state | PARTIAL | 80/80 | - | - |
 | merc-sorc-cow | state | DIVERGED | 3/120 | frame 4 monster 1:1 class 359, field tx: 1.14d 5147 vs d2rs 4874 | q-scenes-compare |
+| hire-kashya | state | PARTIAL | 90/90 | - | - |
+| hire-greiz | state | PARTIAL | 90/90 | - | - |
+| hire-asheara | state | DIVERGED | 23/90 | frame 24 monster 1:12 class 359 (hireling), field s: unit seed (follow AI draws; tile from frame 64) | q-diff-skills-2 |
+| hire-qual-kehk | state | DIVERGED | 28/90 | frame 29 monster 1:10 class 514, field m: 1.14d 2 vs d2rs 1 (NPC walk; hireling equal) | unrouted |
+| hire-resurrect-kashya | state | DIVERGED | 70/130 | frame 71 monster 1:13 class 271 (hireling after 0x62), field m: 1.14d 2 vs d2rs 1; tile (4890,4222) vs (4894,4223) | q-diff-skills-2 |
+| hire-resurrect-greiz | state | DIVERGED | 69/130 | frame 70 monster 1:22 class 338 (hireling after 0x62), field m: 1.14d 1 vs d2rs 2; tile (5029,5045) vs (5028,5041) | q-diff-skills-2 |
+| hire-resurrect-asheara | state | DIVERGED | 23/130 | frame 24 monster 1:12 class 359 (hireling), field s (as hire-asheara) | q-diff-skills-2 |
+| hire-resurrect-qual-kehk | state | DIVERGED | 28/130 | frame 29 monster 1:10 class 514, field m (as hire-qual-kehk) | unrouted |
+| hire-follow-warp-kashya | state | DIVERGED | 53/200 | frame 54 monster 1:13 class 271 (hireling warp follow), field m: 1.14d 2 vs d2rs 4; tile (5147,4260) vs (5144,4266) | q-diff-skills-2 |
+| hire-follow-waypoint-kashya | state | DIVERGED | 92/330 | frame 93 player 0:1, field m: 1.14d 5 vs d2rs 6 (waypoint travel) | unrouted |
+| hire-items-kashya | state | DIVERGED | 29/90 | frame 30 item 4:1 class 306 (cap): 1.14d present vs d2rs absent | unrouted |
+| merc-levelup-a1 | state | DIVERGED | 3/220 | frame 4 monster 1:1 class 271, field tx: 1.14d 5145 vs d2rs 4877 | q-scenes-compare |
+| merc-levelup-a2 | state | DIVERGED | 3/220 | frame 4 monster 1:1 class 338, field tx: 1.14d 5146 vs d2rs 4876 | q-scenes-compare |
+| merc-levelup-a3 | state | DIVERGED | 3/220 | frame 4 monster 1:1 class 359, field tx: 1.14d 5147 vs d2rs 4874 | q-scenes-compare |
+| merc-levelup-a5 | state | DIVERGED | 3/220 | frame 4 monster 1:1 class 561, field tx: 1.14d 5146 vs d2rs 4874 | q-scenes-compare |
 | milestone-act3-entry | state | PARTIAL | 40/40 | - | - |
 | milestone-act4-entry | state | PARTIAL | 40/40 | - | - |
 | milestone-act5-entry | state | DIVERGED | 25/40 | frame 26 monster 1:5 class 511, field s: 1.14d [2965151781, 1170568116] vs d2rs [2806496122, 414759747] | q-fix-real-unit-seed-order |

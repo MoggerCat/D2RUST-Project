@@ -353,10 +353,6 @@ pub trait Pending {
     fn los_draw(&self, game: &Game, room: RoomId) -> bool {
         false
     }
-    /// Room +0x38..+0x44: the four last-dead units.
-    fn last_dead(&self, game: &Game, room: RoomId) -> [Option<UnitId>; 4] {
-        [None; 4]
-    }
     /// `0x0046C140(class, mode)`: the monster class has the mode.
     fn class_has_mode(&self, class: i32, mode: u8) -> bool {
         false
@@ -698,6 +694,13 @@ pub trait Pending {
     /// `0x005DDC30`.
     fn secondary_target(&mut self, game: &mut Game, unit: UnitId) -> (Option<UnitId>, i32, bool) {
         (None, 0x7FFF_FFFF, false)
+    }
+    /// The scan 6 candidates of `0x005DDC30` before the callback's
+    /// filter (`ai.md` §5.3): the live units hostile to `unit`, in scan
+    /// order; `None` = the host runs the whole search itself
+    /// ([`Self::secondary_target`]).
+    fn secondary_candidates(&mut self, game: &mut Game, unit: UnitId) -> Option<Vec<UnitId>> {
+        None
     }
     /// `0x005DDF20`: the NPC itself when none.
     fn nearest_player(&mut self, game: &mut Game, unit: UnitId) -> (UnitId, bool) {
@@ -1202,13 +1205,17 @@ pub trait Pending {
     fn level_up_event(&mut self, unit: UnitId) {}
 
     /// The monster death start `0x005A6FF0` (mode table, `units.md`
-    /// §4.6) run by the monster mode set with the mode change's
-    /// `target` (`ActionHooks::mode_target`). Its body is not written
-    /// beyond two callees: the drop gate and drop (`treasure.md` §3.1,
+    /// §4.6 rule 1) run by the monster mode set with the mode change's
+    /// `target` (`ActionHooks::mode_target`): mode 0, the death clean-up
+    /// ([`super::monster_death::death_cleanup`]), then the drop gate and
+    /// drop (`treasure.md` §3.1,
     /// `crate::wiring::economy::monster_death_drop`) and the evil-killed
-    /// count `0x00547E50` (`population.md` §13 item 3). A host that holds the
-    /// economy state overrides this. Returns whether the mode started;
-    /// default: started, nothing done (as every other start function).
+    /// count `0x00547E50` (`population.md` §13 item 3). A host that holds
+    /// the economy state overrides this; when it does not call the
+    /// clean-up, the wiring runs it after this returns. The room's
+    /// dead-GUID ring (rule 1.3) is the wiring's. Returns whether the
+    /// mode started; default: started, nothing done (as every other
+    /// start function).
     fn monster_death_start(
         h: &mut ActionHooks<Self>,
         sim: &mut Sim<'_>,

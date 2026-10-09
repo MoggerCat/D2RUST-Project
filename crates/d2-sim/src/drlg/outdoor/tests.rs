@@ -1476,3 +1476,29 @@ fn all_placement_cases() {
     );
     assert_eq!(at(place::place_c, 1, 0), (100, 230));
 }
+
+/// `0x0066BF30` prepends, so the room's list is the reverse of
+/// the pattern file's list (combat-pop-stony-field: waypoint last).
+#[test]
+fn apply_prepends_preset_units() {
+    let mut file = one_cell_file(0x0010_0002, 0, 1);
+    let u = |class, x| PresetUnit {
+        unit_type: 2,
+        class,
+        x,
+        y: 2,
+    };
+    file.units = vec![u(1, 1), u(2, 2), u(3, 3)];
+    let mut r = room();
+    let mut rs = RoomSub {
+        w: 8,
+        h: 8,
+        tile_x: 0,
+        tile_y: 0,
+        room: &mut r,
+    };
+    let g = file.groups[0];
+    tilesub::apply(&mut rs, &file, g, 0, 0, 0);
+    let classes: Vec<u32> = rs.room.units.iter().map(|p| p.class).collect();
+    assert_eq!(classes, [3, 2, 1]);
+}

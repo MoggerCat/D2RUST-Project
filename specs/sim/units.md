@@ -28,17 +28,17 @@
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–155 |
 |   3. Lifecycle | 156–420 |
-|   4. Modes and mode schedules | 421–961 |
-|   5. Event dispatch | 962–976 |
-|   6. Events per kind | 977–1099 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 1100–1121 |
-|   8. Collision line between two units | 1122–1126 |
-| Constants & data dependencies | 1127–1143 |
-| Randomness | 1144–1151 |
-| Edge cases & original bugs | 1152–1172 |
-| Test vectors | 1173–1232 |
-| Provenance | 1233–1319 |
-| Open questions | 1320–1399 |
+|   4. Modes and mode schedules | 421–969 |
+|   5. Event dispatch | 970–984 |
+|   6. Events per kind | 985–1107 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 1108–1129 |
+|   8. Collision line between two units | 1130–1134 |
+| Constants & data dependencies | 1135–1151 |
+| Randomness | 1152–1159 |
+| Edge cases & original bugs | 1160–1180 |
+| Test vectors | 1181–1240 |
+| Provenance | 1241–1327 |
+| Open questions | 1328–1407 |
 <!-- /index -->
 
 ## Summary
@@ -655,6 +655,11 @@ start; `0x005A7C20` never writes it itself.
       - `0x0061AFA0(room, GUID)`: room +0x38 + 4 · (room byte +0x14) :=
         GUID, then byte +0x14 := (byte + 1) & 3: a ring of the room's
         last four dead GUIDs (null room → nothing).
+      - PROVISIONAL: d2rs computes R byte +0x14 of the kill
+        (`0x00621DC0(D, A x, A y)`) between D's and A's path positions
+        in sub-tiles (because `skills/bodies-3.md` §3.8 does not state
+        the coordinates `0x0064FDC0` reads); settled by REC-1090, the d
+        byte of a kill's S→C 0x69 code 8 with both positions known.
    4. U's monstats `deathDmg` (+0x0E bit 4) clear → done. Else by
       `BaseId` (row +0x02; a non-monster takes the last branch):
       - 212 `bonefetish1`: (x, y) = U's position; m =
@@ -914,9 +919,12 @@ The run (mode 3) the same with speed w · p / 100, w = 101 and p = the
 run's velocity percent 100 · `RunVelocity` / `WalkVelocity` (150 for the
 sorceress' 9 / 6: speed 151), c = the run click that changed the mode
 (a walk ↔ run change restarts c): `a1-run-n` … `-nw`, frames 5, 6, 6,
-6, 6, 7, 7, 7 at ticks 150 … 248, c = 140. PROVISIONAL (REC-516): p as
-that ratio (because w = 101 at p = 100 fits no start; settled by a run
-of a class with another RunVelocity / WalkVelocity ratio).
+6, 6, 7, 7, 7 at ticks 150 … 248, c = 140. p is §4.7 step 7's
+max(E(4) + total(67), 25): total(67) = the base 100 plus the run list's
+100 · `RunVelocity` / `WalkVelocity` − 100 (`sim/pathing.md` §8.2), so
+without movement items p is that ratio, truncated (settles REC-516 by
+the rate rule; every 1.14d class has 6 / 9, so no class can show
+another ratio).
 
 Steps 7 and 8 assert (fatal) for types 2 and 3; no 1.14d caller passes
 an object or missile (objects take `0x00624390`'s own branch,

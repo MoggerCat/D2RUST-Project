@@ -134,7 +134,7 @@ fn umod_get_hit<X: Pending>(cv: &mut CombatView<'_, X>, d: UnitId) {
 /// Step 4.7's path: soft, AI state 19, umod mode 4.
 fn soft_reaction<X: Pending>(cv: &mut CombatView<'_, X>, d: UnitId) {
     soft(cv, d);
-    cv.v.h.x.set_monster_ai_state(d, AI_STATE_HIT);
+    cv.v.h.set_monster_ai_state(d, AI_STATE_HIT);
     umod_get_hit(cv, d);
 }
 
@@ -185,7 +185,7 @@ fn monster_hit<X: Pending>(
             || NO_BLOCK_CLASSES.contains(&class)
             || !has_mode(cv, MONSTER_BL)
         {
-            cv.v.h.x.set_monster_ai_state(d, AI_STATE_HIT);
+            cv.v.h.set_monster_ai_state(d, AI_STATE_HIT);
         } else {
             monster_request(cv, d, MONSTER_BL, None);
         }
@@ -437,6 +437,12 @@ pub fn kill<X: Pending>(cv: &mut CombatView<'_, X>, d: UnitId, a: UnitId) {
         return;
     }
     // Step 3.
+    // The death request's direction toward A (`0x00621DC0(D, A x, A y)`),
+    // applied by the mode set's snap `0x006488A0` (`sim/pathing.md` §8.5).
+    let at = cv.v.h.path_position(a);
+    if let Some(dir) = cv.v.path_dir64(d, at) {
+        cv.v.path_snap_direction(d, dir);
+    }
     cv.v.h.x.kill_step(game, KillStep::FaceAttacker, d, a);
     cv.v.h.mode_target = Some(a);
     cv.v.monster_set_mode(game, d, monster_mode::DT);
