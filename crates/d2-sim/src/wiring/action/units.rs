@@ -654,10 +654,10 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
     /// the lent monster world's part (monster data, minion list, owner
     /// link); an object's object data.
     fn free_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
-        let (ty, mode) = sim
+        let (ty, class, mode) = sim
             .units
             .get(unit)
-            .map_or((None, 0), |r| (Some(r.ty), r.mode));
+            .map_or((None, 0, 0), |r| (Some(r.ty), r.class, r.mode));
         // A ground item leaves the clients' rooms: its removal record
         // (REC-281, `ActionHooks::removed_items`), in the room its path
         // was in.
@@ -677,7 +677,7 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
                 }
             }
         }
-        self.path_free(unit, ty, mode);
+        self.path_free(unit, ty, class, mode);
         self.monster_skills.remove(&unit);
         if let Some(ai) = self.ai.as_mut() {
             ai.remove(unit);
