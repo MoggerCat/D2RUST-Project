@@ -23,16 +23,16 @@
 | Outputs / state changes | 54–58 |
 | Rules | 59–60 |
 |   1. Answers (QB-1–QB-20) | 61–239 |
-|   2. Jerhyn's objects and spawns (replaces `quests-act2.md` §6.10) | 240–300 |
-|   3. The staff in the orifice (C→S 0x44, S→C 0x58) | 301–346 |
-|   4. `quests.tsv` addresses not named in part 1 | 347–363 |
-|   5. Helpers the Act II–III quest code calls (QuestWorld seams) | 364–448 |
-| Constants & data dependencies | 449–458 |
-| Randomness | 459–463 |
-| Edge cases & original bugs | 464–482 |
-| Test vectors | 483–501 |
-| Provenance | 502–514 |
-| Open questions | 515–524 |
+|   2. Jerhyn's objects and spawns (replaces `quests-act2.md` §6.10) | 240–301 |
+|   3. The staff in the orifice (C→S 0x44, S→C 0x58) | 302–347 |
+|   4. `quests.tsv` addresses not named in part 1 | 348–364 |
+|   5. Helpers the Act II–III quest code calls (QuestWorld seams) | 365–449 |
+| Constants & data dependencies | 450–459 |
+| Randomness | 460–464 |
+| Edge cases & original bugs | 465–483 |
+| Test vectors | 484–502 |
+| Provenance | 503–515 |
+| Open questions | 516–525 |
 <!-- /index -->
 
 ## Summary
@@ -268,7 +268,8 @@ blocker GUID, +0x3C start Jerhyn's GUID.
    3. If +0x0D = 0 and (game 8.13 or game 9.13 or chain 13 absent, intro
       or state ≥ 2): palace spawn (item 4) with point = the object's (x,
       y) and room = the object's room.
-3. **Event 3, old level 40 (`0x0059F0C0`, before the quick remove).**
+3. **Event 3, old level 40 (`0x0059F0C0`, before the quick remove; not
+   reached when the new level is 74: `quests-act2.md` §6.6).**
    1. +0x0C = 1: unit +0x3C (monster) missing → +0x0C := 0. Present: if
       it has an interact unit (`0x00572DC0` on its monster data +0x30) →
       `0x00573180(game, unit, 0, 1)` (AI spec); else remove it

@@ -439,6 +439,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 
 60. **[q-fix-room-links]** answered → `drlg/rooms.md` §8 (recorded: 1.14d also leaves far town rooms unpopulated; old level freed 122 frames after the return). After a waypoint return to a town, does 1.14d populate only the rooms near the player (far NPCs/objects appear on approach), as d2rs does? Drive town -> waypoint -> back, snapshot units at +50 and +600 frames (`docs/handoff/q-fix-room-links.md`).
 61. **[q-fix-npc-menus] What closes ui 0x11 (UI_QUESTLOG), and Esc with it open** answered → `ui/panels.md` §2 r10, `ui/frontend-options.md` §O1 r2 (from the binary: ui 17 is the quest-log alert button; Esc remembers, closes and restores it with the latch 0; d2rs never clears the latch: `q-fix-pc1eve-questlog-alert`).
+62. **[q-fix-d9-arcane] A2Q4 event 3: old-level-40 handling when the new level is 74** answered → `world/quests-act2.md` §6.6, `quests-act2-2.md` §2 item 3 (binary, `0x0059F0D2`–`0x0059F17C`: the level-74 branch returns on every path, so the old-level-40 block (start-Jerhyn handling, quick remove, 12.0/12.1 test) never runs for a move into 74; level 50 falls through. REC-1405 settled: d2rs (`act2/q4.rs`) is right; its PROVISIONAL comment can go). Recording `a2-warp-arcane-ama` keeps Jerhyn alive to frame 143 on 1.14d, every other warp from Lut Gholein removes him at the warp frame.
 
 ## How to check a behaviour in one command
 
