@@ -458,3 +458,92 @@ fn the_caged_barbarians_are_rescued() {
     );
     assert!(a.rejected().is_empty(), "{:?}", a.rejected());
 }
+
+impl Act5 {
+    /// C→S 0x13: interact with the unit (type, GUID).
+    fn interact(&mut self, ty: u32, guid: u32) {
+        let mut m = vec![0x13];
+        m.extend(ty.to_le_bytes());
+        m.extend(guid.to_le_bytes());
+        self.rig.send(&m);
+        self.rig.step(10);
+    }
+
+    /// C→S 0x31: the NPC's scroll message `msg` ends (`quests.md` §4).
+    fn quest_message(&mut self, npc: u32, msg: u32) {
+        let mut m = vec![0x31];
+        m.extend(npc.to_le_bytes());
+        m.extend(msg.to_le_bytes());
+        self.rig.send(&m);
+        self.rig.step(10);
+    }
+
+    /// Talks to the NPC of `class` in the player's level: walks to it,
+    /// interacts, then sends each scroll message of `msgs`. Its GUID.
+    fn talk(&mut self, class: u32, msgs: &[u32]) -> u32 {
+        let (_, guid, _) = self.find(UnitType::Monster, &[class]);
+        self.interact(1, guid);
+        for &m in msgs {
+            self.quest_message(guid, m);
+        }
+        // C→S 0x30: end of the chat.
+        let mut m = vec![0x30];
+        m.extend(1u32.to_le_bytes());
+        m.extend(guid.to_le_bytes());
+        self.rig.send(&m);
+        self.rig.step(10);
+        guid
+    }
+
+    /// The client model holds an item of `code` owned by the player
+    /// (`bridge::items::local_items`).
+    fn holds(&mut self, code: [u8; 4]) -> bool {
+        let w = self
+            .rig
+            .app
+            .world()
+            .resource::<d2_client::bridge::BridgeResource>()
+            .0
+            .world();
+        d2_client::bridge::items::local_items(w)
+            .iter()
+            .any(|i| i.code == Some(code))
+    }
+}
+
+// Covers: specs/world/quests-act5.md §5.4, §5.6, §5.7
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn anya_is_thawed_and_returns_to_harrogath() {
+    let mut a = Act5::new();
+    // Malah starts the quest and gives the thawing potion.
+    a.talk(513, &[20116, 20127]);
+    assert!(
+        a.holds(*b"ice "),
+        "Malah's potion; chain 33 {:?}",
+        a.chain(33)
+    );
+    // Frozen Anya (object 558) in the Frozen River.
+    a.warp(114);
+    let (_, statue, _) = a.find(UnitType::Object, &[558]);
+    a.interact(2, statue);
+    a.rig.step(60);
+    assert!(
+        a.flag(37, 1),
+        "Anya freed (37.1); chain 33 {:?}",
+        a.chain(33)
+    );
+    assert!(!a.holds(*b"ice "), "the potion is used");
+    // Back in town: Malah's scroll, Anya in town, her item.
+    a.warp(HARROGATH);
+    a.talk(513, &[20132]);
+    assert!(a.holds(*b"tr2 "), "the Scroll of Resistance");
+    a.rig.step(40);
+    a.talk(512, &[20136]);
+    assert!(
+        a.flag(37, 0),
+        "Prison of Ice done (37.0); chain 33 {:?}",
+        a.chain(33)
+    );
+    assert!(a.rejected().is_empty(), "{:?}", a.rejected());
+}
