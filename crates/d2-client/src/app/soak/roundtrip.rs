@@ -94,7 +94,7 @@ pub fn diff_live(before: &Live, after: &Live) -> Vec<Violation> {
     };
     let (sa, sb) = (stats(&before), stats(after));
     for ((ia, va), (ib, vb)) in sa.iter().zip(&sb) {
-        if ia != ib || va != vb {
+        if ia != ib || (va != vb && !regenerated(*ia, *va, *vb)) {
             diff(&mut out, &format!("live.stat{ia}"), &(ia, va), &(ib, vb));
         }
     }
@@ -153,12 +153,9 @@ pub fn diff_live(before: &Live, after: &Live) -> Vec<Violation> {
         &before.gaps.hireling,
         &after.gaps.hireling,
     );
-    diff(
-        &mut out,
-        "live.status",
-        &before.gaps.status,
-        &after.gaps.status,
-    );
+    // The save ORs the game's status bits in (`Live::status_set`).
+    let status = |l: &Live| l.gaps.status.map(|s| s | l.status_set);
+    diff(&mut out, "live.status", &status(&before), &status(after));
     diff(
         &mut out,
         "live.hotkeys",
@@ -169,6 +166,13 @@ pub fn diff_live(before: &Live, after: &Live) -> Vec<Violation> {
     diff(&mut out, "live.map_seed", &before.map_seed, &after.map_seed);
     diff(&mut out, "live.npcs", &before.npcs, &after.npcs);
     out
+}
+
+/// Life and mana (stats 6 and 8) regenerate in the reloaded game's join
+/// frames, before the comparison can pause it: a rise is that, a loss is
+/// a difference (spec §5).
+fn regenerated(id: u16, before: i32, after: i32) -> bool {
+    matches!(id, 6 | 8) && after > before
 }
 
 /// The save without its time stamp and the checksum over it (the second
@@ -198,7 +202,20 @@ pub fn timeless(mut s: D2s) -> D2s {
 
 /// The differences between two saves, field by field (after [`timeless`]).
 pub fn diff_saves(first: &D2s, second: &D2s) -> Vec<Violation> {
-    let (a, b) = (timeless(first.clone()), timeless(second.clone()));
+    let (a, mut b) = (timeless(first.clone()), timeless(second.clone()));
+    // The regeneration of the reload's join frames ([`regenerated`]).
+    if let (Some(d2_formats::d2s::Stats::Bits(x)), Some(d2_formats::d2s::Stats::Bits(y))) = (
+        a.body.as_ref().map(|b| &b.stats),
+        b.body.as_mut().map(|b| &mut b.stats),
+    ) {
+        for e in y.iter_mut() {
+            if let Some(f) = x.iter().find(|f| f.id == e.id && f.layer == e.layer) {
+                if regenerated(e.id, f.value, e.value) {
+                    e.value = f.value;
+                }
+            }
+        }
+    }
     let mut out = Vec::new();
     if a == b {
         return out;

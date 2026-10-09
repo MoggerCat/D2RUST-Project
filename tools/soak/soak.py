@@ -6,6 +6,7 @@
     python3 tools/soak/soak.py run --start town2 --seed 7 --steps 3000 --out OUT
     python3 tools/soak/soak.py reduce OUT/logs/town1-7.log --sig SIG [--out OUT]
     python3 tools/soak/soak.py saves [--out target/soak]
+    python3 tools/soak/soak.py roundtrip [--out target/soak/roundtrip]
     python3 tools/soak/soak.py selftest
 
 `campaign` runs seeded soaks from every start (each act's town, a few
@@ -40,7 +41,10 @@ FORMAT = "soak-log 1"
 # Starts (spec §1 r2): name -> (save args for d2s-tool new, or None for a
 # fresh `--new` character; soak options).
 SAVE_BASE = ["--class", "sor", "--expansion", "--level", "30", "--waypoints", "all",
-             "--stat", "8=128000", "--stat", "9=128000", "--difficulty", "normal"]
+             "--stat", "8=128000", "--stat", "9=128000", "--difficulty", "normal",
+             # fixed seeds and times: the same start gives the same bytes
+             # (the committed repro logs name these saves)
+             "--seed", "1", "--map-seed", "1", "--time", "0x60000000"]
 STARTS = {
     "new-sor": (None, ["--new", "sorceress"]),
     "new-bar": (None, ["--new", "barbarian"]),
@@ -57,6 +61,22 @@ STARTS = {
     "outer-steppes": (SAVE_BASE + ["--quests", "acts=3", "--act", "3"], ["--warp", "104"]),
     "bloody-foothills": (SAVE_BASE + ["--quests", "acts=4", "--act", "4"], ["--warp", "110"]),
 }
+
+
+CHECKPOINTS = os.path.join(REPO, "target", "checkpoints")
+
+
+def checkpoint_starts():
+    """`ck-<name>` for every built checkpoint save
+    (`python3 tools/checkpoints/make.py`, specs/tools/checkpoints.md)."""
+    if not os.path.isdir(CHECKPOINTS):
+        return {}
+    return {"ck-" + f[:-4]: os.path.join(CHECKPOINTS, f)
+            for f in sorted(os.listdir(CHECKPOINTS)) if f.endswith(".d2s")}
+
+
+def all_starts():
+    return list(STARTS) + list(checkpoint_starts())
 
 
 def env():
@@ -91,6 +111,8 @@ def make_save(out, name):
 
 
 def start_args(out, name):
+    if name.startswith("ck-"):
+        return ["--save", checkpoint_starts()[name]]
     save = make_save(out, name)
     _, extra = STARTS[name]
     return (["--save", save] if save else []) + extra
@@ -233,7 +255,7 @@ def campaign(a):
         for line in open(db):
             j = json.loads(line)
             known[j["sig"]] = j
-    names = a.starts.split(",") if a.starts else list(STARTS)
+    names = a.starts.split(",") if a.starts else all_starts()
     end = time.time() + a.minutes * 60
     seed = a.first_seed
     runs = frames = 0
@@ -267,6 +289,33 @@ def campaign(a):
     return 0
 
 
+def roundtrips(a):
+    """Spec §5 at every start and checkpoint: no input, round trips at
+    frames 30 and 80 (two reloads), then the same with random input and
+    round trips every 300 frames. Prints one line per start; exit 1 when
+    any round trip differs."""
+    check_tools()
+    bad = 0
+    for name in all_starts():
+        for label, extra in (("still", ["--rate", "0", "--no-kit", "--steps", "120",
+                                        "--roundtrip-at", "30,80"]),
+                             ("played", ["--seed", str(a.seed), "--steps", "1000",
+                                         "--roundtrip-at", "300,600,900"])):
+            report = os.path.join(a.out, f"rt-{name}-{label}.json")
+            log = os.path.join(a.out, f"rt-{name}-{label}.log")
+            os.makedirs(a.out, exist_ok=True)
+            found, summary = soak_once(start_args(a.out, name) + extra +
+                                       ["--keep-going", "--log-out", log,
+                                        "--save-dir", os.path.join(a.out, f"rt-{name}-{label}")],
+                                       report, a.timeout)
+            rt = [f for f in found if f["kind"] in ("roundtrip", "panic", "crash", "timeout", "setup")]
+            bad += bool(rt)
+            print(f"{name} {label}: {summary.get('roundtrips', 0)} round trip(s), "
+                  f"{len(rt)} difference(s)" + "".join(f"\n  {f['sig']}: {f['detail'][:200]}" for f in rt),
+                  flush=True)
+    return 1 if bad else 0
+
+
 def selftest():
     # ddmin finds the two needed items.
     got = ddmin(list(range(40)), lambda s: 7 in s and 31 in s)
@@ -283,7 +332,8 @@ def main():
     c = sub.add_parser("campaign")
     c.add_argument("--minutes", type=float, default=30)
     c.add_argument("--out", required=True)
-    c.add_argument("--starts", help="comma list (default all): " + ",".join(STARTS))
+    c.add_argument("--starts", help="comma list (default all, with ck-<name> for each built checkpoint): "
+                   + ",".join(STARTS))
     c.add_argument("--steps", type=int, default=3000)
     c.add_argument("--first-seed", type=int, default=1)
     c.add_argument("--timeout", type=int, default=600)
@@ -291,7 +341,7 @@ def main():
     c.add_argument("--roundtrip-every", type=int, default=0,
                    help="a save/load round trip every N frames of each run (spec §5)")
     r = sub.add_parser("run")
-    r.add_argument("--start", required=True, choices=list(STARTS))
+    r.add_argument("--start", required=True, help="a start: " + ",".join(STARTS) + ", ck-<checkpoint>")
     r.add_argument("--seed", type=int, default=1)
     r.add_argument("--steps", type=int, default=3000)
     r.add_argument("--timeout", type=int, default=600)
@@ -303,12 +353,18 @@ def main():
     d.add_argument("--sig", required=True)
     d.add_argument("--out", default=".")
     d.add_argument("--timeout", type=int, default=600)
+    t = sub.add_parser("roundtrip", help="save/load round trips at every start and checkpoint (spec §5)")
+    t.add_argument("--out", default=os.path.join(REPO, "target", "soak", "roundtrip"))
+    t.add_argument("--seed", type=int, default=1)
+    t.add_argument("--timeout", type=int, default=600)
     sub.add_parser("selftest")
     a = ap.parse_args()
     if a.cmd == "selftest":
         return selftest()
     if a.cmd == "campaign":
         return campaign(a)
+    if a.cmd == "roundtrip":
+        return roundtrips(a)
     check_tools()
     if a.cmd == "saves":
         for name in STARTS:
