@@ -63,6 +63,12 @@ pub struct ItemFacts {
     /// (d2rs-own, unverified: q-skill-gaps, REC-176).
     pub shield: bool,
     pub dam: (i32, i32),
+    /// `component` (items), `wclass` / `2handedwclass` and "of type 45
+    /// `weap`", for the COF weapon class (`unit-composite.md` §2.1).
+    pub component: u8,
+    pub wclass: [u8; 4],
+    pub wclass2: [u8; 4],
+    pub weap: bool,
 }
 
 /// A player's hands.
@@ -72,6 +78,9 @@ pub struct Hands {
     pub left: Option<UnitId>,
     /// The weapon in use: the right-hand item with a hand class.
     pub weapon: Option<UnitId>,
+    /// The COF weapon class (`0x0064F380`, `render/unit-composite.md`
+    /// §2.1; the `sequences.md` class index 0–13).
+    pub cof: i32,
 }
 
 /// The copy of the inventory model's weapon facts ([`sync`]).
@@ -94,6 +103,11 @@ impl Weapons {
             body::LEFT_HAND => h.left,
             _ => None,
         }
+    }
+
+    /// The COF weapon class (`0x0064F380`); `hth` (0) without hands.
+    pub fn cof_class(&self, u: UnitId) -> i32 {
+        self.hands.get(&u).map_or(0, |h| h.cof)
     }
 
     /// The hand class of the weapon in use (0 without one).
@@ -180,6 +194,67 @@ fn facts_of(t: &InvTables, record: usize) -> ItemFacts {
         dam: t
             .item(record)
             .map_or((0, 0), |r| (i32::from(r.mindam), i32::from(r.maxdam))),
+        component: t.item(record).map_or(0, |r| r.component),
+        wclass: t.item(record).map_or([0; 4], |r| r.wclass),
+        wclass2: t.item(record).map_or([0; 4], |r| r.wclass2),
+        weap: is_any(t, record, &weap),
+    }
+}
+
+/// The index of a COF weapon class code (`sequences::CLASSES`; trailing
+/// spaces and NULs ignored); unknown → `hth` (0).
+fn class_index(code: &[u8; 4]) -> i32 {
+    let c = code.split(|&b| b == 0 || b == b' ').next().unwrap_or(&[]);
+    d2_sim::skills::sequences::CLASSES
+        .iter()
+        .position(|k| k.as_bytes() == c)
+        .map_or(0, |i| i as i32)
+}
+
+/// The type class `0x00629FE0` of r-dual (`unit-composite.md` §2.1): the
+/// `wclass` in the table `0x007446A0`, else 0.
+fn type_class(f: &ItemFacts) -> i32 {
+    match class_index(&f.wclass) {
+        c @ (1..=7 | 12) => c,
+        _ => 0,
+    }
+}
+
+/// `0x0064F380` for a player outside modes DT / DD (`unit-composite.md`
+/// §2.1): `class` is the player class.
+// PROVISIONAL (q-fix-real-item-type-test): every 1.14d `charstats`
+// weapon class is `hth` (§2.1), so no hand item answers 0; the item
+// validity test is not applied, and the grip is the copy's (REC-158).
+fn cof_class(hands: &Hands, items: &BTreeMap<UnitId, ItemFacts>, class: u32) -> i32 {
+    let fact = |i: Option<UnitId>| i.and_then(|i| items.get(&i).map(|f| (i, f)));
+    let (right, left) = (fact(hands.right), fact(hands.left));
+    let hand = right.filter(|(_, f)| matches!(f.component, 5 | 6)).or(left);
+    let Some((_, h)) = hand.filter(|(_, f)| matches!(f.component, 5 | 6)) else {
+        return 0;
+    };
+    if let (Some((ri, rf)), Some((_, lf))) = (right, left) {
+        if rf.weap && lf.weap {
+            match class {
+                4 => {
+                    // r-dual: A the weapon in use (else the right hand).
+                    let a_id = hands.weapon.unwrap_or(ri);
+                    let (a, b) = if a_id == ri { (rf, lf) } else { (lf, rf) };
+                    return class_index(match (type_class(a), type_class(b)) {
+                        (2, 3) => b"1js ",
+                        (3, 3) => b"1jt ",
+                        (3, 2) => b"1st ",
+                        _ => b"1ss ",
+                    });
+                }
+                6 => return class_index(b"ht2 "),
+                _ => {}
+            }
+        }
+    }
+    if h.grip == 2 {
+        class_index(&h.wclass2)
+    } else {
+        class_index(&h.wclass)
     }
 }
 
@@ -212,6 +287,8 @@ pub fn sync<R, S>(_: &Game, sim: &mut WorldSim<LocalSeams>, world: &mut WiredWor
                 .get(r)
                 .is_some_and(|f| f.class != class::HAND_TO_HAND)
         });
+        let class = sim.action.sys.units.get(owner).map_or(0, |u| u.class);
+        hands.cof = cof_class(&hands, &w.items, class);
         if hands.right.is_some() || hands.left.is_some() {
             w.hands.insert(owner, hands);
         }
@@ -308,6 +385,7 @@ mod tests {
                 right: Some(bow),
                 left: Some(quiver),
                 weapon: Some(bow),
+                ..Hands::default()
             },
         );
         assert_eq!(w.hand_class(p), class::BOW);
@@ -333,6 +411,7 @@ mod tests {
                 right: Some(sword),
                 left: None,
                 weapon: Some(sword),
+                ..Hands::default()
             },
         );
         assert_eq!(seams.current_weapon(p), Some(sword));
@@ -340,5 +419,51 @@ mod tests {
         assert_eq!(seams.item_at(p, body::RIGHT_HAND), Some(sword));
         assert_eq!(seams.wield_type(sword), 1);
         assert_eq!(seams.current_weapon(UnitId(2)), None);
+    }
+
+    // Covers: specs/render/unit-composite.md §2.1
+    #[test]
+    fn the_cof_class_follows_the_hand_items() {
+        let claw = ItemFacts {
+            component: 5,
+            wclass: *b"ht1 ",
+            wclass2: *b"ht1 ",
+            weap: true,
+            grip: 1,
+            ..ItemFacts::default()
+        };
+        let axe = ItemFacts {
+            wclass: *b"1hs ",
+            ..claw.clone()
+        };
+        let buckler = ItemFacts {
+            component: 7,
+            ..ItemFacts::default()
+        };
+        let (a, b) = (UnitId(5), UnitId(6));
+        let both = Hands {
+            right: Some(a),
+            left: Some(b),
+            weapon: Some(a),
+            cof: 0,
+        };
+        let items = |r: &ItemFacts, l: &ItemFacts| BTreeMap::from([(a, r.clone()), (b, l.clone())]);
+        // One claw and a shield: its `wclass`.
+        assert_eq!(cof_class(&both, &items(&claw, &buckler), 6), 12);
+        // Two weapons: the assassin's `ht2`, the barbarian's r-dual
+        // (1hs, 1hs) → `1ss`.
+        assert_eq!(cof_class(&both, &items(&claw, &claw), 6), 13);
+        assert_eq!(cof_class(&both, &items(&axe, &axe), 4), 10);
+        // A two-handed grip: `2handedwclass`.
+        let staff = ItemFacts {
+            wclass: *b"stf ",
+            wclass2: *b"2hs ",
+            grip: 2,
+            ..axe.clone()
+        };
+        let right = Hands { left: None, ..both };
+        assert_eq!(cof_class(&right, &items(&staff, &buckler), 1), 5);
+        // No hand item: the `charstats` class, `hth`.
+        assert_eq!(cof_class(&Hands::default(), &BTreeMap::new(), 6), 0);
     }
 }

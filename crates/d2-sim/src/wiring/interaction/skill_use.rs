@@ -139,33 +139,75 @@ pub struct UseView<'a, X> {
 }
 
 impl<X: Pending + UseRest> UseView<'_, X> {
-    /// The weapon-type test `0x00643F80` of `use_state` rule 5
-    /// (`client/stat-lists.md` §2 r8): the skill's `itypea1` against the
-    /// items at body locations 4 and 5, `etypea1` excluded.
-    // PROVISIONAL (REC-176): the spec names `itypea1` / `etypea1`; the
-    // columns `itypea2`, `itypea3` and `etypea2` are read the same way
-    // (a crossbow satisfies Magic Arrow's `itypea2`), and the hands
-    // combine as "some hand holds a wanted item that is not excluded".
-    // No wanted type (0xFFFF, or 0 of a blank test row) asks nothing.
+    /// The item type test `0x00643F80` of `use_state` test 5 (`use.md`
+    /// §2 "Item type test"): the skill's sets a (`itypea1..3`,
+    /// `etypea1..2`) and b (`itypeb1..3`, `etypeb1..2`) against the items
+    /// at body locations 4 (A) and 5 (B).
+    // PROVISIONAL (q-fix-real-item-type-test): "no inventory → fail"
+    // (rule 2) and the matched item's rules (item flags 0x4000 / 0x100,
+    // the `shoots` ammo test) are not applied: the host's item flags and
+    // `shoots` type are not wired here (`item_shoots` answers false).
     fn weapon_type_ok(&self, u: UnitId, skill: i32) -> bool {
         let Some(r) = self.cv.v.h.tables.skills.skill(skill) else {
-            return true;
+            return false;
         };
-        let set = |v: u16| (v != 0 && v != 0xFFFF).then_some(i32::from(v));
-        let want: Vec<i32> = [r.itypea1, r.itypea2, r.itypea3]
-            .into_iter()
-            .filter_map(set)
-            .collect();
-        let not: Vec<i32> = [r.etypea1, r.etypea2].into_iter().filter_map(set).collect();
-        if want.is_empty() {
+        // i16 columns, ≤ 0 = none.
+        let v = |x: u16| i32::from(x as i16);
+        let a = HandSet {
+            itypes: [v(r.itypea1), v(r.itypea2), v(r.itypea3)],
+            etypes: [v(r.etypea1), v(r.etypea2)],
+        };
+        let b = HandSet {
+            itypes: [v(r.itypeb1), v(r.itypeb2), v(r.itypeb3)],
+            etypes: [v(r.etypeb1), v(r.etypeb2)],
+        };
+        // Rule 1.
+        if a.etypes[0] <= 0 && a.itypes[0] <= 0 {
             return true;
         }
-        [4u8, 5].into_iter().any(|loc| {
-            self.item_at(u, loc).is_some_and(|i| {
-                want.iter().any(|&t| self.item_is(i, t)) && !not.iter().any(|&t| self.item_is(i, t))
-            })
-        })
+        let (mut ha, mut hb) = (self.item_at(u, 4), self.item_at(u, 5));
+        // Rule 3: Left Hand Throw / Swing leave the weapon in use out.
+        if skill == 4 || skill == 5 {
+            let w = self.current_weapon(u);
+            if ha.is_some() && ha == w {
+                ha = None;
+            } else if hb.is_some() && hb == w {
+                hb = None;
+            }
+        }
+        // `hand(s, X, Y)` `0x00643D90`.
+        let hand = |s: &HandSet, x: Option<UnitId>, y: Option<UnitId>| match x {
+            None => {
+                if s.etypes[0] <= 0 && s.itypes[0] <= 0 {
+                    return true;
+                }
+                [45, 46, 67].contains(&a.itypes[0])
+                    && b.itypes[0] <= 0
+                    && !y.is_some_and(|y| self.item_is(y, 45))
+            }
+            Some(x) => {
+                let listed =
+                    |t: &[i32]| t.iter().copied().take_while(|&t| t > 0).collect::<Vec<_>>();
+                if listed(&s.etypes).into_iter().any(|t| self.item_is(x, t)) {
+                    return false;
+                }
+                let want = listed(&s.itypes);
+                want.is_empty() || want.into_iter().any(|t| self.item_is(x, t))
+            }
+        };
+        // Rule 4.
+        if hand(&a, ha, hb) {
+            hand(&b, hb, ha)
+        } else {
+            hand(&b, ha, hb) && hand(&a, hb, ha)
+        }
     }
+}
+
+/// One item-type set of a skill row (`use.md` §2).
+struct HandSet {
+    itypes: [i32; 3],
+    etypes: [i32; 2],
 }
 
 impl<X: Pending + UseRest> ActionSim<X> {
