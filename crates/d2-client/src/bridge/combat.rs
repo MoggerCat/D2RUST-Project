@@ -40,26 +40,46 @@ pub fn row_facts(inputs: &ModelInputs, id: u16) -> Option<SkillRowFacts> {
     })
 }
 
-/// `range(P, skill)` `0x00645460` (`skills/use.md` §3 r6): the row's
-/// `range`, with `both` (3) as h2h. PROVISIONAL (use.md §3 r6): `both`
-/// is rng with a bow or crossbow equipped; the preview player holds no
-/// items (D1), so it reads as h2h; the state-mask 0x26 rule needs the
-/// client states and is not applied.
-pub fn skill_range(row: &SkillRow) -> u8 {
-    match row.range {
+/// `range(P, skill)` `0x00645460` (`skills/use.md` §3 r6) of a player:
+/// the row's `range`; `both` (3) is rng with a bow or crossbow equipped
+/// (`bow`), else h2h; rng (2) with a state of the state-mask group 0x26
+/// (`melee_only`) is h2h.
+pub fn skill_range(row: &SkillRow, bow: bool, melee_only: bool) -> u8 {
+    let r = match row.range {
+        3 if bow => range::RNG,
         3 => range::H2H,
         r @ (range::NONE | range::H2H | range::RNG | range::LOC) => r,
         _ => range::NONE,
+    };
+    if r == range::RNG && melee_only {
+        range::H2H
+    } else {
+        r
     }
 }
 
-/// [`skill_range`] of skill `id`; `NONE` outside the table.
-pub fn range_of(inputs: &ModelInputs, id: u16) -> u8 {
+/// The state-mask test `0x0063A130(U, 0x26)` (`ui/panels-3.md` §24 r1):
+/// U has a state whose `states.txt` row sets `meleeonly` (flag bit 0x26).
+pub fn in_melee_only_state(inputs: &ModelInputs, u: &ClientUnit) -> bool {
+    u.states.iter().any(|&s| {
+        inputs
+            .tables
+            .states
+            .get(usize::from(s))
+            .is_some_and(|r| r.meleeonly)
+    })
+}
+
+/// [`skill_range`] of skill `id` for the player `p`; `NONE` outside the
+/// table. d2rs-own, unverified (preview, D1): the preview player holds no
+/// items, so no bow or crossbow is equipped (`both` reads as h2h).
+pub fn range_of(inputs: &ModelInputs, p: Option<&ClientUnit>, id: u16) -> u8 {
+    let melee_only = p.is_some_and(|u| in_melee_only_state(inputs, u));
     inputs
         .tables
         .skills
         .get(usize::from(id))
-        .map_or(range::NONE, skill_range)
+        .map_or(range::NONE, |r| skill_range(r, false, melee_only))
 }
 
 /// A monster that is a town NPC (`monstats` `npc`).
@@ -246,15 +266,47 @@ mod tests {
         assert_eq!(hover_at(&w, &inputs, (105, 120)), None);
     }
 
+    // Covers: specs/skills/use.md §3 r6
     #[test]
-    fn range_reads_both_as_h2h() {
+    fn range_reads_both_by_the_bow_and_rng_by_the_melee_only_states() {
         let row = |r| SkillRow {
             range: r,
             ..SkillRow::default()
         };
-        assert_eq!(skill_range(&row(1)), range::H2H);
-        assert_eq!(skill_range(&row(2)), range::RNG);
-        assert_eq!(skill_range(&row(3)), range::H2H);
-        assert_eq!(skill_range(&row(9)), range::NONE);
+        assert_eq!(skill_range(&row(1), false, false), range::H2H);
+        assert_eq!(skill_range(&row(2), false, false), range::RNG);
+        assert_eq!(skill_range(&row(3), false, false), range::H2H);
+        assert_eq!(skill_range(&row(3), true, false), range::RNG);
+        assert_eq!(skill_range(&row(4), false, true), range::LOC);
+        assert_eq!(skill_range(&row(9), false, false), range::NONE);
+        // A state of mask group 0x26: rng is h2h (also `both` with a bow).
+        assert_eq!(skill_range(&row(2), false, true), range::H2H);
+        assert_eq!(skill_range(&row(3), true, true), range::H2H);
+        assert_eq!(skill_range(&row(1), false, true), range::H2H);
+    }
+
+    // Covers: specs/skills/use.md §3 r6; specs/ui/panels-3.md §24 r1
+    #[test]
+    fn a_player_in_a_melee_only_state_uses_a_rng_skill_as_h2h() {
+        use crate::bridge::world::StateRow;
+        let mut inputs = ModelInputs::default();
+        inputs.tables.skills = vec![
+            SkillRow::default(),
+            SkillRow {
+                range: range::RNG,
+                ..SkillRow::default()
+            },
+        ];
+        inputs.tables.states = vec![StateRow::default(); 4];
+        inputs.tables.states[3].meleeonly = true;
+        let mut p = ClientUnit::new(UnitKey::new(PLAYER, 1));
+        assert_eq!(range_of(&inputs, Some(&p), 1), range::RNG);
+        // A state outside the group changes nothing.
+        p.states.insert(2);
+        assert_eq!(range_of(&inputs, Some(&p), 1), range::RNG);
+        p.states.insert(3);
+        assert_eq!(range_of(&inputs, Some(&p), 1), range::H2H);
+        assert_eq!(range_of(&inputs, None, 1), range::RNG);
+        assert_eq!(range_of(&inputs, Some(&p), 7), range::NONE);
     }
 }

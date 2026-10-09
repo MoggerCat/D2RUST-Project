@@ -28,6 +28,7 @@ use crate::monsters::init::{self, InitHost as _};
 use crate::monsters::population::{placement, preset, spawn as pop_spawn};
 use crate::units::{RoomId, UnitId, UnitType};
 use crate::wiring::economy::{Economy, GameFields, ItemSpawn};
+use crate::wiring::path::act_change;
 use crate::wiring::path::place::level_warp;
 use crate::wiring::path::PathCtx;
 use crate::wiring::worldgen::dispatch::WorldSim;
@@ -1012,17 +1013,38 @@ fn run<X: WorldPending>(
             };
             // Allocator 0x00555230 with type 2, flags 1 (add), mode as
             // given (default 0), with the monster state lent (an InitFn
-            // may spawn monsters, edge case 2).
-            let req = crate::units::lifecycle::AllocRequest {
-                ty: UnitType::Object,
-                class: *class,
-                room: Some(room),
-                add: true,
-                fixed_guid: None,
-                mode: mode.unwrap_or(0),
-                allied: false,
-            };
-            let u = sim.lend(|a| a.with(game, |g, v| v.allocate(g, &req, x, y)));
+            // may spawn monsters, edge case 2): the creation the game's
+            // own objects go through (`View::create_object`, as the
+            // population and the quests), so the per-kind init
+            // (`objects.md` §3: control record, InitFn) runs on the
+            // allocation's room and (x, y) before `SUNIT_Add`
+            // (`units.md` §3.1 steps 7–8). A game without object state,
+            // a mode beyond a byte or a class past the objects rows: the
+            // bare allocation (the init dispatch's own checks decide).
+            let class = *class;
+            let mode = mode.unwrap_or(0);
+            let u = sim.lend(|a| {
+                a.with(game, |g, v| match u8::try_from(mode) {
+                    Ok(m)
+                        if v.h.objects.is_some()
+                            && class <= u32::from(crate::world::objects::CLASS_BOUND) =>
+                    {
+                        v.create_object(g, room, class, x, y, m)
+                    }
+                    _ => {
+                        let req = crate::units::lifecycle::AllocRequest {
+                            ty: UnitType::Object,
+                            class,
+                            room: Some(room),
+                            add: true,
+                            fixed_guid: None,
+                            mode,
+                            allied: false,
+                        };
+                        v.allocate(g, &req, x, y)
+                    }
+                })
+            });
             created(game, u)
         }
         Directive::Superunique { row, x, y } => {
@@ -1112,15 +1134,18 @@ fn run<X: WorldPending>(
         Directive::Warp { level, tile } => {
             let player = env.player;
             let tile = tile.unwrap_or(0);
+            // `0x0053AEC0` (`waypoints.md` §7 rule 5): the same-act warp,
+            // else the act change `0x0053ACC0` (§11).
             let r = sim.lend(|a| {
                 a.with(game, |g, v| {
                     level_warp(PathCtx::of(v, g), player, *level, tile)
+                        .unwrap_or_else(|| act_change::run(PathCtx::of(v, g), player, *level, tile))
                 })
             });
-            match r {
-                Some(true) => PokeResult::Ok(None),
-                Some(false) => PokeResult::Failed,
-                None => PokeResult::Gap("warp to another act: level_warp has no act change".into()),
+            if r {
+                PokeResult::Ok(None)
+            } else {
+                PokeResult::Failed
             }
         }
         Directive::Item {

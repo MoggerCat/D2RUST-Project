@@ -529,10 +529,9 @@ impl ShopTx {
             e.push(ShopEffect::Sound(0x0F));
         }
         if p.repair_all {
-            // PROVISIONAL (specs/ui/menus.md §4.3; REC-ui-shop-refuse): a
-            // refused repair all leaves no pending transaction.
+            // specs/ui/menus.md §4.3 step 3: a refused repair all only
+            // cancels (0x00487C20) and keeps the pending transaction.
             if now.wrapping_sub(self.last_repair_all) < REPAIR_ALL_REFUSE_MS {
-                self.pending = None;
                 return vec![ShopEffect::Cancel];
             }
         } else if !facts.item_found {
@@ -989,6 +988,20 @@ mod tests {
         assert!(sent(&t.click(&a, &env)).is_empty());
         a.now += 1;
         assert_eq!(sent(&t.click(&a, &env)).len(), 1);
+        // A refused repair all keeps the pending transaction (§4.3 step 3).
+        let mut t = ShopTx::default();
+        a.now = 10_000;
+        assert_eq!(sent(&t.click(&a, &env)).len(), 1);
+        let kept = t.pending;
+        assert!(kept.is_some_and(|p| p.repair_all));
+        let e = t.send_with(0, 11_000, &found(3));
+        assert_eq!(e, vec![ShopEffect::Cancel]);
+        assert_eq!(t.pending, kept);
+        let e = t.send_with(0, 12_000, &found(3));
+        assert!(
+            matches!(e.last(), Some(ShopEffect::Send(_)))
+                || e.iter().any(|x| matches!(x, ShopEffect::Send(_)))
+        );
     }
 
     // Covers: specs/ui/menus.md §4 r2

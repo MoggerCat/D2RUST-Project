@@ -5,11 +5,19 @@
 //! attack-rating block of the left and right skill (`char_details`).
 //! Nothing here decides an outcome; it reads the model and draws.
 //!
-//! PROVISIONAL (REC-269, d2rs-own, unverified): the damage block only
-//! knows the plain weapon-physical `descdam` entries and the
-//! attack-rating `descatt` entries 1 and 2, from the unit's stats
-//! (min / max damage with the percent bonuses; attack rating with the
-//! to-hit percent); other entries draw the skill name only.
+//! The damage value of the weapon-physical `descdam` entries (1, 7, 18,
+//! 19, 20) is `descriptions.md` §2.3 `weapon_phys`, plus the §2.4 stat
+//! elements, then the `SrcDam` scale; the attack rating of `descatt` 1 / 2 is §2.11
+//! `AR` / §4 entry 2 with `attack_rating` (`combat/hit.md` §1). Measured
+//! against 1.14d (REC-269: `facts/client/ui/char-panel-ama-*.tsv`).
+//!
+//! PROVISIONAL (REC-705, d2rs-own, unverified): the skill-side terms
+//! these entries add (`ddam calc1` / `calc2`, `phys_min` / `elem_min`
+//! of the skill, `to_hit(U, id, L)`, the `finishing` charges), the
+//! weapon mastery, `item_normaldamage`, the grip-2 secondary damage and
+//! the dual-wield driver (§2.8) are taken as 0 / not taken: the client
+//! model has no skill-level evaluator or item stat lists here. Other
+//! `descdam` entries draw the skill name only.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -33,6 +41,16 @@ pub struct DescRow {
     pub descdam: u16,
     /// `descatt` (+0x14).
     pub descatt: u16,
+    /// skills `SrcDam` (+0x1A5).
+    pub src_dam: u8,
+}
+
+/// The weapon fields of the damage block (`weapons.txt`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct WeaponRow {
+    /// `StrBonus` / `DexBonus` (`0x00629860` / `0x006298A0`).
+    pub str_bonus: i32,
+    pub dex_bonus: i32,
 }
 
 /// The tables of the character panel's extra inputs (empty without game
@@ -45,6 +63,10 @@ pub struct CharTables {
     pub state_flags: Vec<u16>,
     /// Skill id → its skilldesc fields.
     pub skill_desc: BTreeMap<u16, DescRow>,
+    /// `charstats` `ToHitFactor` per class (`attack_rating`).
+    pub tohit_factor: Vec<i32>,
+    /// `weapons.txt` rows by code.
+    pub weapons: BTreeMap<[u8; 4], WeaponRow>,
 }
 
 /// `strchrskm`: "Damage".
@@ -56,7 +78,80 @@ const STR_NO_NAME: u16 = 5382;
 /// `holyshield` (`panels-3.md` §24 r3).
 const STATE_HOLYSHIELD: u8 = 101;
 
-/// Weapon-physical `descdam` entries this build computes (PROVISIONAL).
+/// Stats read here.
+const STRENGTH: u16 = 0;
+const DEX: u16 = 2;
+const MAXDAMAGE_PERCENT: u16 = 17;
+const MINDAMAGE_PERCENT: u16 = 18;
+const TOHIT: u16 = 19;
+const MINDAMAGE: u16 = 21;
+const MAXDAMAGE: u16 = 22;
+const DAMAGEPERCENT: u16 = 25;
+/// Stat elements of §2.4 rule 1: (min, max, mastery or 0).
+const ELEMENTS: [(u16, u16, u16); 4] = [(48, 49, 329), (50, 51, 330), (54, 55, 331), (52, 53, 0)];
+
+/// The damage of a weapon-physical `descdam` entry (§3 entries 1 / 7):
+/// `weapon_phys(U, …, F0 = 0, S, 128, 0, 0)` with E = 0 (§2.3), stat
+/// elements (§2.4), then × `SrcDam` / 128 when ≠ 128.
+pub fn weapon_damage(
+    stat: &dyn Fn(u16) -> i32,
+    weapon: Option<WeaponRow>,
+    src_dam: i32,
+) -> (i32, i32) {
+    use super::skill_desc_more::{
+        clamp_elements, element_pair, poison_pair, weapon_phys_base, weapon_phys_final,
+    };
+    // §2.3 rule 2: bare hand mindamage + 1, maxdamage + 2.
+    let (b, big_b) = match weapon {
+        None => (stat(MINDAMAGE) + 1, stat(MAXDAMAGE) + 2),
+        Some(_) => (stat(MINDAMAGE), stat(MAXDAMAGE)),
+    };
+    let (mn, mx) = weapon_phys_base(b, big_b, 128, src_dam);
+    // Rule 4.
+    let mut p = stat(DAMAGEPERCENT);
+    match weapon {
+        None => p += stat(STRENGTH),
+        Some(w) => {
+            if w.str_bonus != 0 {
+                p += stat(STRENGTH) * w.str_bonus / 100;
+            }
+            if w.dex_bonus != 0 {
+                p += stat(DEX) * w.dex_bonus / 100;
+            }
+        }
+    }
+    let (mut mn, mut mx) = weapon_phys_final(
+        mn,
+        mx,
+        p,
+        stat(MINDAMAGE_PERCENT),
+        stat(MAXDAMAGE_PERCENT),
+        0,
+        0,
+    );
+    // §2.4: the elements add to the weapon sum; rule 3 clamps the whole.
+    for (lo, hi, m) in ELEMENTS {
+        let (a, b) = element_pair(stat(lo), stat(hi), if m == 0 { 0 } else { stat(m) });
+        mn += a;
+        mx += b;
+    }
+    let (a, b) = poison_pair(
+        stat(57),
+        stat(58),
+        stat(332),
+        stat(101),
+        stat(59),
+        stat(326),
+    );
+    (mn, mx) = clamp_elements(mn + a, mx + b);
+    if src_dam != 128 {
+        mn = pct(mn, src_dam, 128);
+        mx = pct(mx, src_dam, 128);
+    }
+    (mn, mx)
+}
+
+/// Weapon-physical `descdam` entries this build computes.
 fn descdam_known(n: u16) -> bool {
     matches!(n, 1 | 7 | 18 | 19 | 20)
 }
@@ -164,6 +259,7 @@ fn hand(
     row: &DescRow,
     strings: &dyn StringLookup,
     stat: &dyn Fn(u16) -> i32,
+    tohit_factor: i32,
 ) -> HandBlock {
     let name = strings
         .get_id(row.name_id)
@@ -179,13 +275,34 @@ fn hand(
     h.damage = descdam_known(row.descdam);
     if matches!(row.descatt, 1 | 2) {
         h.attack = true;
-        h.v1 = ar_value(stat(19), stat(119));
+        // `attack_rating(U)` `0x00622560` (`combat/hit.md` §1), then P =
+        // `item_tohit_percent(119)` (§2.11 / §4 entry 2).
+        let ar = stat(TOHIT) + 5 * (stat(DEX) - 7) + tohit_factor;
+        h.v1 = ar_value(ar, stat(119));
         h.attack_label = strings
             .get_id(STR_ATTACK)
             .map(|s| lossy(s).replace("%s", &name))
             .unwrap_or_default();
     }
     h
+}
+
+/// The weapon in use `0x0063BEF0` as the client model knows it: the
+/// `weapons.txt` row of the item at body location 4 (right arm), else 5.
+/// d2rs-own, unverified (REC-705): the weapon-switch slot and a shield in
+/// location 4 are not told apart.
+fn weapon_in_use(world: &ClientWorld, key: UnitKey, tables: &CharTables) -> Option<WeaponRow> {
+    use crate::bridge::items::{items, mode};
+    let mine: Vec<_> = items(world)
+        .into_iter()
+        .filter(|i| i.mode == mode::BODY && i.owner == Some(key))
+        .collect();
+    [4u8, 5].iter().find_map(|&loc| {
+        mine.iter()
+            .find(|i| i.body == loc)
+            .and_then(|i| i.code)
+            .and_then(|c| tables.weapons.get(&c).copied())
+    })
 }
 
 /// Draws the damage block (`panels-2.md` §17 r5) for the left then the
@@ -204,13 +321,20 @@ pub fn damage_block(
         return;
     };
     let stat = |id: u16| world.total(key, id, 0);
+    let class = world.units.get(&key).map_or(0, |u| u.class);
+    let tohit_factor = tables
+        .tohit_factor
+        .get(class as usize)
+        .copied()
+        .unwrap_or(0);
+    let weapon = weapon_in_use(world, key, tables);
     let mut once = false;
     for (p, entry) in [(0usize, list.left_entry()), (6, list.right_entry())] {
         let Some(e) = entry else { continue };
         let Some(row) = tables.skill_desc.get(&e.skill) else {
             continue;
         };
-        let h = hand(e.skill, row, strings, &stat);
+        let h = hand(e.skill, row, strings, &stat, tohit_factor);
         for item in char_details::hand_block(&h, p, s, false, &mut once) {
             match item {
                 BlockItem::Text(t) => {
@@ -227,10 +351,7 @@ pub fn damage_block(
                     }
                 }
                 BlockItem::DamageValue { x1, x2, y } => {
-                    // d2rs-own, unverified (REC-269): min / max damage
-                    // with the percent bonuses, no skill modifiers.
-                    let mn = stat(21) + pct(stat(21), stat(18), 100);
-                    let mx = stat(22) + pct(stat(22), stat(17), 100);
+                    let (mn, mx) = weapon_damage(&stat, weapon, i32::from(row.src_dam));
                     let s16 = utf16(&range_text(mn, mx));
                     if let Some(w) = measure.width(1, &s16) {
                         let (small, y) = range_font(w, x1, x2, y);

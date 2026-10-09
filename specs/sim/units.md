@@ -28,17 +28,17 @@
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–136 |
 |   3. Lifecycle | 137–401 |
-|   4. Modes and mode schedules | 402–837 |
-|   5. Event dispatch | 838–852 |
-|   6. Events per kind | 853–975 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 976–997 |
-|   8. Collision line between two units | 998–1002 |
-| Constants & data dependencies | 1003–1019 |
-| Randomness | 1020–1027 |
-| Edge cases & original bugs | 1028–1048 |
-| Test vectors | 1049–1108 |
-| Provenance | 1109–1195 |
-| Open questions | 1196–1275 |
+|   4. Modes and mode schedules | 402–858 |
+|   5. Event dispatch | 859–873 |
+|   6. Events per kind | 874–996 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 997–1018 |
+|   8. Collision line between two units | 1019–1023 |
+| Constants & data dependencies | 1024–1040 |
+| Randomness | 1041–1048 |
+| Edge cases & original bugs | 1049–1069 |
+| Test vectors | 1070–1129 |
+| Provenance | 1130–1216 |
+| Open questions | 1217–1296 |
 <!-- /index -->
 
 ## Summary
@@ -419,6 +419,19 @@ lookup `0x00620F00`; frame count := AnimData frames · 256), cancel
 `0x00553990` (the unit's events of type 0, then type 1, any argument),
 then §4.2. Movement starts set the mode, cancel and schedule §4.4.
 
+PROVISIONAL: the re-init `0x00624390` of a player or monster sets
+action frame := 0, frame := frame bonus · 256, the AnimData record of
+the new mode, frame count +0x48 := its frames · 256 and, for a unit
+with a path, speed +0x4C := the rate `0x00623F50` (§4.7), as the prepare
+step does for a plain animation; the velocity half and the sequence
+loads are left to the mode starts (because no spec writes its player /
+monster branch, and a 1.14d Amazon standing in town after the join
+reads +0x48 = 4096, +0x4C = 80, the AMTNHTH record, with no animated
+start run: REC-590 `poke-fallen-town` state diff); settled by REC-592
+(record_state.py `fr`, `fc`, `sp` across a mode change without an
+animated start: join in town, walk start, a monster's NU after a
+think).
+
 #### 4.2 Animation schedule (events 0 and 1)
 
 Inputs: frame f; speed s and frame count F (+0x3C/+0x34 with a
@@ -783,6 +796,14 @@ Steps, first match wins:
    0..0x7FFF.
 10. Otherwise: speed := D(s, clamp(total(69 `other_animrate`), 15,
     175)).
+
+PROVISIONAL: d2rs computes the monster w of steps 6–7 (monstats +0x36 /
++0x38, `data/fixups.md` §8) at the rate call from AnimData with the
+host's COF composer for (class b, mode 2 / 15), not the fixup's monster
+composer (because the typed monstats rows carry no +0x36 / +0x38);
+settled by REC-593 (a walking town NPC's `sp`, e.g. Charsi 192 in
+`poke-fallen-town-unpinned`, and a run of a monster with `BaseId` ≠ its
+row, in `record_state.py` against `d2-client state-dump`).
 
 Measured (revision 2026-10-09, q-scenes-compare): the local player's
 town walk (mode 6, w = 213, p = 100) is drawn at server tick T with frame

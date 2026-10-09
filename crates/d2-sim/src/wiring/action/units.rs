@@ -194,8 +194,56 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         })
     }
 
-    /// `0x00623F50` (`units.md` §4.3) from the record's speed (+0x0C).
+    /// The animation re-init `0x00624390` of a mode change
+    /// (`units.md` §4.1), for players and monsters: action frame +0x4E
+    /// := 0, frame +0x44 := frame bonus · 256 (`world/objects-client.md`
+    /// §26 r5), the AnimData record of the new mode (`0x00620F00`), its
+    /// frame count +0x48 := frames · 256 and, for a unit with a path,
+    /// the speed +0x4C := the rate `0x00623F50` (`units.md` §4.7).
+    /// Other types: objects run their own branch
+    /// ([`crate::world::objects`]), items and the rest nothing here.
+    // PROVISIONAL (units.md §4.1, REC-592): the player/monster branch of
+    // `0x00624390` is not written in a spec; it is taken to set +0x48 and
+    // +0x4C as the prepare step `0x005533D0` does for a plain animation
+    // (a 1.14d player standing in town reads +0x48 = AnimData frames · 256
+    // and +0x4C = the AnimData speed with no animated start run; the
+    // velocity half of `0x00623F50` and the sequence loads are left to
+    // the mode starts).
+    fn reinit_anim(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
+        let Some(ty) = sim.units.get(unit).map(|r| r.ty) else {
+            return;
+        };
+        if !matches!(ty, UnitType::Player | UnitType::Monster) {
+            return;
+        }
+        let rate = self
+            .path_has(unit)
+            .then(|| UnitHooks::anim_rate(self, sim, unit));
+        let record = UnitHooks::anim_record(self, sim, unit);
+        let bonus = self.x.frame_bonus(unit);
+        let Some(r) = sim.units.get_mut(unit) else {
+            return;
+        };
+        let a = &mut r.anim;
+        a.action_frame = 0;
+        a.frame = bonus.wrapping_mul(256);
+        if let Some(rec) = record {
+            a.frame_count = (rec.frames as i32).wrapping_mul(256);
+        }
+        a.record = record;
+        if let Some(s) = rate {
+            a.speed = s;
+        }
+    }
+
+    /// `0x00623F50` (`units.md` §4.3, §4.7) from the record's speed
+    /// (+0x0C): steps 6 (knockback) and 7 (velocity modes) here, with the
+    /// path provider ([`ActionHooks::movement_rate`]); every other step
+    /// is the host's ([`Pending::anim_rate`]).
     fn anim_rate(&mut self, sim: &Sim<'_>, unit: UnitId) -> i16 {
+        if let Some(v) = self.movement_rate(sim, unit) {
+            return v;
+        }
         let speed = self.anim_lookup(sim, unit).map(|r| r.speed);
         self.x.anim_rate(unit, speed)
     }
@@ -834,7 +882,7 @@ impl<X: Pending> View<'_, X> {
         }
         self.path_place(game, u, x, y);
         if self.h.paths.is_some() {
-            self.monster_added(game, u);
+            self.monster_added(game, u, x, y);
         }
         true
     }
@@ -848,10 +896,10 @@ impl<X: Pending> View<'_, X> {
     /// pairs), gated by `0x00553160(unit)` (step 1.2): the unit has a
     /// room and that active room's client count (+0x78) is nonzero; else
     /// the room clean-up `0x00553220` ([`View::room_cleanup`]) and no
-    /// think. Not a monster: nothing. The request's target point (x, y)
-    /// is not passed: the creation modes' start functions d2rs reaches
-    /// (NU) do not read it.
-    fn monster_added(&mut self, game: &mut Game, u: UnitId) {
+    /// think. Not a monster: nothing. The request's target point is
+    /// (x, y) (step 1.1): the mode set writes it to path +0x10 / +0x12
+    /// (`ai.md` §7.5 rule 2, `0x00648AD0`).
+    fn monster_added(&mut self, game: &mut Game, u: UnitId, x: i32, y: i32) {
         let Some((class, mode)) = self
             .units
             .get(u)
@@ -869,6 +917,12 @@ impl<X: Pending> View<'_, X> {
             .map_or(0, |m| i32::from(m.velocity))
             << 8;
         self.h.path_set_velocity(u, velocity);
+        crate::wiring::path::monsters::stage_request(
+            self.h,
+            u,
+            crate::monsters::ai::ModeTarget::Point(x, y),
+            None,
+        );
         let r = {
             let mut sim = Sim {
                 game: &mut *game,
@@ -878,6 +932,13 @@ impl<X: Pending> View<'_, X> {
             };
             crate::units::modes::monster_set_mode(&mut sim, &mut *self.h, u, mode)
         };
+        // A creation mode the path set-up skips (GH, rule 1) leaves the
+        // staged target unread: it must not reach a later request.
+        if let Some(p) = self.h.paths.as_mut() {
+            if matches!(p.mode_request, Some((v, _)) if v == u) {
+                p.mode_request = None;
+            }
+        }
         if let Err(e) = r {
             self.unit_error(e);
             return;
@@ -955,5 +1016,140 @@ pub fn clear_uninterruptable<X: Pending>(v: &mut View<'_, X>, game: &Game, u: Un
     v.set_state(u, state::UNINTERRUPTABLE as u16, false);
     if game.lists.unit(u).is_some_and(|e| e.ty == UnitType::Player) {
         v.set_state(u, STATE_DEATH_DELAY, false);
+    }
+}
+
+/// Largest speed (`units.md` §4.7: at most 0x7FFF; `data/fixups.md` §8
+/// steps 4, 7: at most 32,767).
+const SPEED_MAX: u32 = 0x7FFF;
+
+/// monstats rows below this take their run base from the walk speed
+/// (`data/fixups.md` §8 step 5).
+const RUN_BASE_ROWS: usize = 410;
+
+impl<X: Pending> ActionHooks<X> {
+    /// `0x00623F50` steps 6 and 7 (`units.md` §4.7): knockback (player
+    /// mode 19, monster mode 13) → w clamped to 0..0x7FFF; a mode with the
+    /// velocity modifier (`pathing.md` §8.1 rule 2) → w · p / 100 (i32,
+    /// truncating; 0 if ≤ 0, at most 0x7FFF). w = `0x006213D0`: player 101
+    /// in mode 3, else 213; monster the run speed (+0x38) in mode 15, else
+    /// the walk speed (+0x36), both `data/fixups.md` §8. `None`: another
+    /// step applies, the unit has no path (step 7: nothing), or there is
+    /// no path provider.
+    // TODO(units.md §4.7 Definitions): (T, C, M) are the unit's own; the
+    // disguise substitution `0x00645270` is not applied here.
+    pub(crate) fn movement_rate(&self, sim: &Sim<'_>, unit: UnitId) -> Option<i16> {
+        use crate::path::walk::velocity::{velocity_percent, VelocityFacts, STAT_VELOCITYPERCENT};
+        let paths = self.paths.as_ref()?;
+        let r = sim.units.get(unit)?;
+        let (ty, class, mode) = (r.ty, r.class, r.mode);
+        let knockback = matches!((ty, mode), (UnitType::Player, 19) | (UnitType::Monster, 13));
+        let w = |h: &Self| -> i32 {
+            match ty {
+                UnitType::Player => {
+                    if mode == 3 {
+                        101
+                    } else {
+                        213
+                    }
+                }
+                _ if mode == 15 => h.monster_run_speed(unit, class as usize) as i32,
+                _ => h.monster_walk_speed(unit, class as usize) as i32,
+            }
+        };
+        if !matches!(ty, UnitType::Player | UnitType::Monster) {
+            return None;
+        }
+        if knockback {
+            return Some(w(self).clamp(0, SPEED_MAX as i32) as i16);
+        }
+        if !self.path_has(unit) {
+            return None;
+        }
+        let [_, _, scale_stat] = paths.tables.animstat[4];
+        let facts = VelocityFacts {
+            ty,
+            class,
+            npc: ty == UnitType::Monster
+                && self
+                    .tables
+                    .combat
+                    .monstats
+                    .get(class as usize)
+                    .is_some_and(|m| m.npc),
+            used_flags: self
+                .used_skill_of(unit)
+                .map(|e| self.x.entry_flags(unit, &e)),
+            item_fastermove: self.x.item_stat(unit, scale_stat as u16, 0),
+            velocitypercent: sim.stats.unit_total(unit, STAT_VELOCITYPERCENT, 0),
+        };
+        let p = velocity_percent(&paths.tables, &facts, mode)?;
+        let v = w(self).wrapping_mul(p) / 100;
+        Some(if v <= 0 { 0 } else { v.min(SPEED_MAX as i32) } as i16)
+    }
+
+    /// The AnimData speed (+0x0C) of monster class `class` in `mode`
+    /// (the COF name of [`Pending::anim_name`]); a missing name or table
+    /// reads the default record's 256 (`data/fixups.md` §8 step 2).
+    fn monster_anim_speed(&self, unit: UnitId, class: usize, mode: u32) -> u32 {
+        let Some(data) = self.anim_data.as_ref() else {
+            return 256;
+        };
+        self.x
+            .anim_name(unit, UnitType::Monster, class as u32, mode)
+            .and_then(|n| {
+                let len = n.iter().position(|&b| b == 0).unwrap_or(n.len());
+                data.record(&n[..len]).ok().map(|r| r.speed)
+            })
+            .unwrap_or(256)
+    }
+
+    /// monstats row `r`'s `BaseId` after the repair of `data/fixups.md`
+    /// §8 step 1 (out of range → `r`).
+    fn monster_base(&self, r: usize) -> usize {
+        let ms = &self.tables.combat.monstats;
+        let b = ms.get(r).map_or(-1, |m| m.baseid as i16);
+        if b < 0 || b as usize >= ms.len() {
+            r
+        } else {
+            b as usize
+        }
+    }
+
+    /// The walk speed monstats +0x36 of row `r` (`data/fixups.md` §8
+    /// steps 1–4).
+    // PROVISIONAL (data/fixups.md §8, REC-593): the COF name of the
+    // lookup is the host's composer ([`Pending::anim_name`]), not the
+    // fixup's own monster composer (token + mode + monstats2 `BaseW`).
+    fn monster_walk_speed(&self, unit: UnitId, r: usize) -> u32 {
+        let ms = &self.tables.combat.monstats;
+        let b = self.monster_base(r);
+        let mut w = self.monster_anim_speed(unit, b, 2);
+        let vel = |i: usize| ms.get(i).map_or(0, |m| m.velocity as i16);
+        if b != r && vel(b) > 0 {
+            w = (i32::from(vel(r)) as u32).wrapping_mul(w) / vel(b) as u32;
+        }
+        w.min(SPEED_MAX)
+    }
+
+    /// The run speed monstats +0x38 of row `r` (`data/fixups.md` §8
+    /// steps 5–7; a base row after `r` reads its compiled +0x36, 0).
+    fn monster_run_speed(&self, unit: UnitId, r: usize) -> u32 {
+        let ms = &self.tables.combat.monstats;
+        let b = self.monster_base(r);
+        let mut run = if r < RUN_BASE_ROWS {
+            if b > r {
+                0
+            } else {
+                (i32::from(self.monster_walk_speed(unit, b) as i16) / 2) as u32
+            }
+        } else {
+            self.monster_anim_speed(unit, b, 15)
+        };
+        let rn = |i: usize| ms.get(i).map_or(0, |m| m.run as i16);
+        if b != r && rn(b) > 0 {
+            run = (i32::from(rn(r)) as u32).wrapping_mul(run) / rn(b) as u32;
+        }
+        run.min(SPEED_MAX)
     }
 }

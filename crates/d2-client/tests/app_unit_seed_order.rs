@@ -140,8 +140,10 @@ fn recorded_full_save() -> Vec<Drawn> {
 
 /// `--auto StubAma` (the 335-byte stub, `d2s-tool new-stub --class ama
 /// --expansion`): the player, then the eight start items, each a unit
-/// seed and an item-seed step (`0x00552E9F`), seq 2349–2402. (Items are
-/// compared without their class.)
+/// seed and an item-seed step (`0x00552E9F`), seq 2349–2402, then after
+/// the act's DRLG the town's objects and monsters, seq 7323–7440: the
+/// same classes as [`recorded_full_save`], each 16 steps later. (Items
+/// are compared without their class.)
 fn recorded_stub() -> Vec<Drawn> {
     let items = [
         (108806926, 4040195123),
@@ -153,6 +155,11 @@ fn recorded_stub() -> Vec<Drawn> {
         (242740622, 1324584008),
         (369906869, 2114917475),
     ];
+    let town = [
+        1222022467, 628920819, 2303219957, 2782325891, 3892453691, 589455960, 1100743764,
+        1864241619, 2931418351, 990265188, 2813298517, 3163509470, 42754933, 2602431189, 980535581,
+        3385903807, 3184650063, 367684955, 1282899071,
+    ];
     let mut v = vec![PLAYER];
     v.extend(items.iter().map(|&(unit, item)| Drawn {
         ty: UnitType::Item,
@@ -160,6 +167,12 @@ fn recorded_stub() -> Vec<Drawn> {
         unit,
         item: Some(item),
     }));
+    v.extend(
+        recorded_full_save()[1..]
+            .iter()
+            .zip(town)
+            .map(|(d, unit)| Drawn { unit, ..*d }),
+    );
     v
 }
 
@@ -230,11 +243,11 @@ fn a_full_save_join_takes_the_recorded_game_seed_steps_in_order() {
 // Covers: specs/sim/units.md §3.1 r4
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
-fn a_new_character_draws_its_seed_before_its_start_items() {
+fn a_new_character_draws_its_seed_before_its_start_items_and_the_town() {
     let ms = Arc::new(AtomicU32::new(1000));
     let new = single_player::new_character("amazon", "StubAma").unwrap();
     let (_app, server) = play_app(&ms, new);
-    // The play host's extra start cube (REC-244, d2rs-own) comes next;
-    // 1.14d's next consumer is the town's first object (1222022467).
+    // No extra start item (REC-244 settled by this recording): the town's
+    // first object takes the step after the eighth item.
     assert_prefix(&consumers(&server), &recorded_stub());
 }
