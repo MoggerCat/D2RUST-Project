@@ -1737,6 +1737,58 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
     })
 }
 
+/// The animation columns of the client monster rows
+/// ([`MonsterClass::anims`], `walk_speed`, `run_speed`): `AnimData.d2`
+/// by the class's composite name per mode (the art's name rules,
+/// [`super::anim_names::anim_key`]) and the fixed-up `monstats` speeds
+/// (`data/fixups.md` §8), from the user's files.
+pub fn client_monster_anims(
+    archives: &crate::assets::game_files::GameFiles,
+    rows: &mut UnitRows,
+) -> Result<(), BuildError> {
+    let anim = match archives.read_native(
+        &CanonicalPath::new(d2_formats::animdata::PATH)
+            .map_err(|e| BuildError::Tables(format!("{}: {e}", d2_formats::animdata::PATH)))?,
+    ) {
+        Some(Ok(NativeAsset::AnimData(a))) => a,
+        Some(Ok(_)) => return Err(BuildError::Tables("AnimData.d2: wrong kind".into())),
+        Some(Err(e)) => return Err(BuildError::Tables(format!("AnimData.d2: {e}"))),
+        None => return Err(BuildError::Tables("AnimData.d2: in no archive".into())),
+    };
+    let bins = d2_data::bin::load_from(archives, d2_data::bin::DEFAULT_LANGUAGE)
+        .map_err(|e| BuildError::Tables(e.to_string()))?;
+    let tables = GameTables::from_loaded(bins, anim.clone())?;
+    let monstats = tables
+        .fixed
+        .table("monstats")
+        .ok_or_else(|| BuildError::Tables("monstats not loaded".into()))?;
+    let looks =
+        crate::world_view::unit_assets::UnitLooks::live(archives).map_err(BuildError::Tables)?;
+    for (class, row) in rows.monsters.iter_mut().enumerate() {
+        let Some(c) = row.as_mut() else {
+            continue;
+        };
+        if class < monstats.count {
+            let r = monstats.record(class);
+            c.walk_speed = u16::from_le_bytes([r[0x36], r[0x37]]);
+            c.run_speed = u16::from_le_bytes([r[0x38], r[0x39]]);
+        }
+        for (mode, a) in c.anims.iter_mut().enumerate() {
+            let key = super::anim_names::anim_key(
+                &looks,
+                d2_sim::units::UnitType::Monster,
+                class as u32,
+                mode as u32,
+            );
+            *a = match key {
+                Some(k) => anim.record(&k).ok().map(|rec| (rec.frames, rec.speed)),
+                None => None,
+            };
+        }
+    }
+    Ok(())
+}
+
 /// A built game and the units the app and tests address. The player
 /// exists only after the join (C→S 0x6B): [`local_player`].
 pub struct LocalGame {

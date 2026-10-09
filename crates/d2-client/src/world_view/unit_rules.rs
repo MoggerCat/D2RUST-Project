@@ -25,7 +25,7 @@
 
 use std::sync::Arc;
 
-use crate::bridge::world::{ClientWorld, OBJECT};
+use crate::bridge::world::{ClientWorld, MONSTER, OBJECT};
 use crate::bridge::ClientUnit;
 use d2_formats::cof::Cof;
 
@@ -60,9 +60,14 @@ impl<R> UnitRules<R> {
         if unit.key.unit_type == OBJECT {
             return frame_index(unit.frame as u32);
         }
+        // Monsters: the model's own frame (`bridge::monster_anim`, measured
+        // against 1.14d for the Act I town NPCs).
+        if unit.key.unit_type == MONSTER && unit.frame_count > 0 {
+            return frame_index(unit.frame as u32);
+        }
         // §3 r2 (measured for players; PROVISIONAL (REC-512) for monsters
-        // and missiles): the draw of tick T has had T − 1 advances of
-        // the 8.8 rate.
+        // without a model frame and for missiles): the draw of tick T has
+        // had T − 1 advances of the 8.8 rate.
         tick_frame(world.server_ticks, frames, rate)
     }
 }

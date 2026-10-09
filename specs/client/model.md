@@ -46,13 +46,13 @@
 |   16. C→S 0x4B after a teleport (the hireling case) | 939–973 |
 |   17. Model writes made by 1.14d UI code | 974–1120 |
 |   18. Audio driver inputs and the client object functions | 1121–1151 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1152–1372 |
-| Constants & data dependencies | 1373–1385 |
-| Randomness | 1386–1401 |
-| Edge cases & original bugs | 1402–1426 |
-| Test vectors | 1427–1484 |
-| Provenance | 1485–1588 |
-| Open questions | 1589–1747 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1152–1380 |
+| Constants & data dependencies | 1381–1393 |
+| Randomness | 1394–1409 |
+| Edge cases & original bugs | 1410–1434 |
+| Test vectors | 1435–1492 |
+| Provenance | 1493–1596 |
+| Open questions | 1597–1755 |
 <!-- /index -->
 
 ## Summary
@@ -1354,6 +1354,14 @@ record pointer, `ret 4`: the §8 r1 flag is not passed).
       1 → flags bit 1 cleared, client-only object 478 at U
       (`0x00466730(478, x, y, 2, 0)`); sounds `0x004C72F0` (state group
       `0x0063A340`), `0x004CB460`, `0x004CAF60` (`audio/`).
+   PROVISIONAL: d2rs runs only the animation part of rule 8 for a
+   monster: anim kind 0 for every mode (step 5's advance, frame += speed,
+   wrapping at the count; kinds 1–3, the end tests and the mode end are
+   not run), and its rate (rule 6, `sim/units.md` §4.7) reads no used
+   skill (the V-skill and A-skill columns never apply) (because the town
+   arrival's NU and WL are kind 0 and no client monster casts there; the
+   recorded Kashya WL and NU frames match);
+   settled by REC-503 (kinds, end tests) and REC-502 (skill columns).
 9. **Seed draws** in rules 1–8 (all on client seeds; their values are
    capture-only, open question 9 and REC-51): blood spray (codes 0x06,
    0x13, `client/stat-lists.md` §3 r6.10, U's seed); attack pick (rule
