@@ -115,6 +115,7 @@ pub mod cmd {
     pub const AUTO_UNEQUIP: u32 = 0x4000;
     pub const INDIRECT_SWAP: u32 = 0x10000;
     pub const SWAP_IN_PAGE: u32 = 0x40000;
+    pub const TO_CURSOR: u32 = 0x100000;
 }
 
 /// Item flags (item data +0x18) used here (`inventory.md` §1.1;

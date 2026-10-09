@@ -7,7 +7,8 @@
 //! inside a box standing on the feet ([`HIT_HALF_WIDTH`],
 //! [`HIT_ABOVE`], [`HIT_BELOW`]). Only monsters, objects and items are
 //! picked (never a player: town players need the rest of the hover
-//! model); a dead monster is skipped. Ties go to the lower unit key.
+//! model); a dead monster and an object whose mode is not `Selectable` (the
+//! "Dummy" under a town NPC, REC-1040) are skipped. Ties go to the lower unit key.
 //! The strict path never calls this ([`super::click::ClickView::pick`]
 //! is `false`).
 
@@ -58,6 +59,15 @@ pub fn pick(world: &ClientWorld, cam: &Camera, mouse: (i32, i32)) -> Option<Unit
             continue;
         }
         let Some(cell) = u.position else { continue };
+        if key.unit_type == 2
+            && world
+                .objclient
+                .selectable
+                .get(u.class as usize)
+                .is_some_and(|s| s[(u.mode & 7) as usize] == 0)
+        {
+            continue;
+        }
         let (fx, fy) = unit_feet(cam, key.unit_type, cell);
         let (dx, dy) = (mouse.0 - fx, mouse.1 - fy);
         if dx.abs() > HIT_HALF_WIDTH || !(-HIT_ABOVE..=HIT_BELOW).contains(&dy) {
@@ -88,5 +98,30 @@ mod feet_tests {
             assert_eq!(unit_feet(&cam, t, (103, 100)), (mx, my - 8), "type {t}");
         }
         assert_eq!(unit_feet(&cam, 0, (103, 100)), (mx, my));
+    }
+
+    // Covers: specs/world/npc.md §2 text
+    #[test]
+    fn a_non_selectable_object_under_an_npc_is_not_picked() {
+        use crate::bridge::world::ClientUnit;
+        use crate::rules::camera::{FrameSize, OpenMode};
+        let at = moving_to_client(100 << 16, 100 << 16);
+        let cam = Camera::new(FrameSize::D2RS, OpenMode::NONE, at, (0, 0));
+        let mut w = ClientWorld::default();
+        let mut npc = ClientUnit::new(UnitKey::new(1, 7));
+        npc.mode = 1;
+        npc.position = Some((103, 100));
+        w.units.insert(npc.key, npc);
+        let mut dummy = ClientUnit::new(UnitKey::new(2, 8));
+        dummy.class = 1;
+        dummy.position = Some((103, 100));
+        w.units.insert(dummy.key, dummy);
+        let (x, y) = unit_feet(&cam, 1, (103, 100));
+        // A static object stands 8 rows above the NPC's feet: nearer.
+        let mouse = (x, y - 8);
+        w.objclient.selectable = vec![[1; 8], [0; 8]];
+        assert_eq!(pick(&w, &cam, mouse), Some(UnitKey::new(1, 7)));
+        w.objclient.selectable = vec![[1; 8], [1; 8]];
+        assert_eq!(pick(&w, &cam, mouse), Some(UnitKey::new(2, 8)));
     }
 }

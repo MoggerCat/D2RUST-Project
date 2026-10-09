@@ -92,6 +92,9 @@ pub struct ActionTables {
     /// `overlay` record count (data tables +0xBC0): the bound of the
     /// 0x11 overlay id (`intents-events.md` §7.3 r2 step 9, inclusive).
     pub overlay_count: i32,
+    /// `monequip.bin` rows (summon equipment `0x005D6B60`,
+    /// `skills/bodies.md` §6.5 step 9).
+    pub monequip: Vec<d2_data::tables::Monequip>,
 }
 
 /// The DRLG side of a game: the acts' DRLGs and their services.
@@ -161,6 +164,14 @@ pub struct HirelingAiFacts {
 
 /// The [`crate::units::hooks::UnitHooks`] of [`ActionSim`]'s unit system
 /// and the state every action adapter shares.
+/// A room's last-dead ring: four (unit, GUID) slots in memory order and
+/// the ring index.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct LastDead {
+    pub slots: [Option<(crate::units::UnitId, u32)>; 4],
+    pub index: u8,
+}
+
 pub struct ActionHooks<X> {
     pub tables: Arc<ActionTables>,
     pub drlg: DrlgWorld,
@@ -285,6 +296,10 @@ pub struct ActionHooks<X> {
     pub monster_world: Option<Box<dyn MonsterWorld<X>>>,
     /// The monster world is taken out for a call.
     monster_world_out: bool,
+    /// Each room's ring of its last four dead monsters (room +0x38..+0x44
+    /// GUIDs, ring index byte +0x14; `0x0061AFA0`, `units.md` §4.6 rule
+    /// 1.3), read by the Fallen's corpse check.
+    pub last_dead: BTreeMap<crate::units::RoomId, LastDead>,
     /// The quest control lent by the host that holds it
     /// ([`objects::QuestObjectHost`]): a quest init, operate or object
     /// event 7 the object module hands back runs on it at once, inside the
@@ -348,6 +363,10 @@ pub struct ActionHooks<X> {
     /// entry and level); a monster without one asks
     /// [`Pending::ai_skill_entry`].
     pub monster_skills: BTreeMap<UnitId, BTreeMap<i32, i32>>,
+    /// A monster's equipped items by body location (its inventory's
+    /// body slots, `monsters/init.md` §12): d2rs-own record of the
+    /// holdings `has_item_at` reads (no monster inventory model here).
+    pub monster_equip: BTreeMap<UnitId, BTreeMap<u8, UnitId>>,
     /// The inactive-unit store (game +0xD8, `units.md` §3.4;
     /// [`inactive`]). `None` (the default): tick step 9 compresses
     /// nothing and the restore is the host's, as before.
@@ -429,6 +448,7 @@ impl<X> ActionHooks<X> {
             monster_request: 0,
             monster_world: None,
             monster_world_out: false,
+            last_dead: BTreeMap::new(),
             quest_host: None,
             quest_host_out: false,
             deferred_inits: None,
@@ -443,6 +463,7 @@ impl<X> ActionHooks<X> {
             skill_lists: BTreeMap::new(),
             pet_lists: BTreeMap::new(),
             monster_skills: BTreeMap::new(),
+            monster_equip: BTreeMap::new(),
             inactive: None,
             fallback_tiles: crate::units::inactive::InactiveStore::default(),
             x,
