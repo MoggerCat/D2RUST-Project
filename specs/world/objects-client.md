@@ -34,17 +34,17 @@
 | Inputs | 62–73 |
 | Outputs / state changes | 74–81 |
 | Rules | 82–83 |
-|   25. Client object function dispatch | 84–190 |
-|   26. The client object functions | 191–389 |
-|   27. Client latches of the zoo and the preloads | 390–400 |
-|   28. What d2rs must model for §25–§27 | 401–413 |
-|   29. Object mouse-over label (`0x00454F30`, unit type 2; REC-239) | 414–492 |
-| Constants & data dependencies | 493–514 |
-| Randomness | 515–528 |
-| Edge cases & original bugs | 529–546 |
-| Test vectors | 547–581 |
-| Provenance | 582–615 |
-| Open questions | 616–631 |
+|   25. Client object function dispatch | 84–220 |
+|   26. The client object functions | 221–419 |
+|   27. Client latches of the zoo and the preloads | 420–430 |
+|   28. What d2rs must model for §25–§27 | 431–443 |
+|   29. Object mouse-over label (`0x00454F30`, unit type 2; REC-239) | 444–522 |
+| Constants & data dependencies | 523–544 |
+| Randomness | 545–558 |
+| Edge cases & original bugs | 559–576 |
+| Test vectors | 577–611 |
+| Provenance | 612–645 |
+| Open questions | 646–661 |
 <!-- /index -->
 
 ## Summary
@@ -187,6 +187,36 @@ server state changes; no S→C message is read here.
    measured: whether `reinit(U)` and `set_mode(U, m)` of §26 also draw a
    speed; d2rs draws nothing there and steps by `FrameDelta[m]` until
    the next set-up.
+9. **Generic step** `0x004BCBB0` (EAX = U; 2026-10-09 read, b2a;
+   call site A, r2). m = U's mode, C = `FrameCnt[m]` (objects +0xD8 +
+   4m, already × 256), f = frame U+0x44, s = speed U+0x4C (i16), row
+   offsets per `data/fields.tsv`:
+   1. C = 0x100 (one frame) → nothing.
+   2. `CycleAnim[m]` = 0 (non-cycling):
+      1. `IsDoor` (+0x13A) ≠ 0 → the door step `0x004BCB20` instead;
+         return.
+      2. f ≥ C − 256 (the last frame reached, tested **before** any
+         advance): class 189 in mode 2 or 3 → write mode m + 1, f :=
+         `Start[m+1]` · 256, `refresh(U)`, `reinit(U)`, return. Mode ≠
+         1 → return (**the frame no longer advances**). Mode 1 → write
+         mode 2; `OrderFlag2` (+0x133) = 1 → U flag +0xC4 |= 0x100000;
+         objects +0x194 (`Parm7`) ≠ 0 → `0x0046C320(U, 0x153 when it is
+         0xFF else 0x97, 4)`; f := `Start2` · 256; `refresh(U)`;
+         `reinit(U)`; `Overlay` ≠ 0 and class ∈ {354, 355, 356, 397,
+         405, 406, 407} → `0x0046F0C0(U, 0, 0x47)`; U flag bit 2 :=
+         `Selectable[2]` (`0x00457460(U, 2, …)`); light from `Red`,
+         `Green`, `Blue` with `Lit2` (`0x004BC580`, `render/lighting.md`
+         §8); `HasCollision2` = 0 and `HasCollision1` ≠ 0 →
+         `0x00623830(U)`; return.
+      3. Else go on to the advance (3).
+   3. **Advance**: class 12 → f −= s; f < 0 → f += C. Class 189 in mode
+      3 → f −= s; f < 0 → write mode 4, f := `Start4` · 256,
+      `refresh(U)`, `reinit(U)`. Every other unit: f += s; f ≥ C →
+      non-cycling: f := C − 256 (clamp); cycling: f := `Start[m]` · 256
+      + (f − C) (one wrap, back to the mode's start frame, not to 0).
+   So a non-cycling mode other than 1 stops on its last frame for good
+   (the clamp step, then no advance); mode 1 turns into mode 2 on the
+   update **after** the clamp, from the end test, not in the clamp step.
 
 ### 26. The client object functions
 
