@@ -52,6 +52,17 @@ arguments after `--` (default `-w -ns`). The script refuses any
 The game is always terminated when the script ends: time limit, Ctrl+C,
 an exception (`finally`), or the debugger process dying (kill-on-exit).
 
+## One game at a time
+
+Only one 1.14d `Game.exe` may run on a machine. Every recorder starts the
+game through `record_rng.CreateProcessW`, which first takes the named mutex
+`Local\d2rs-original-game-1.14d` and holds it until the Python process
+exits. Several sessions or worktrees on one PC therefore queue: the second
+prints `another 1.14d run holds the game lock; waiting`. With the lock
+held, it also waits until no `Game.exe` is running, in case a game was
+started by hand or by an older copy of these tools. The wait gives up
+after one hour. `D2_GAME_LOCK=0` turns the lock off.
+
 ## How it hooks the RNG
 
 1.14d has no single RNG function: the step is inlined at 846 places and

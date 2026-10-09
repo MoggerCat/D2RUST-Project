@@ -193,9 +193,70 @@ def _proto(name, res, *args):
     return f
 
 
-CreateProcessW = _proto("CreateProcessW", W.BOOL, W.LPCWSTR, W.LPWSTR, C.c_void_p,
-                        C.c_void_p, W.BOOL, W.DWORD, C.c_void_p, W.LPCWSTR,
-                        C.POINTER(STARTUPINFOW), C.POINTER(PROCESS_INFORMATION))
+_CreateProcessW = _proto("CreateProcessW", W.BOOL, W.LPCWSTR, W.LPWSTR, C.c_void_p,
+                         C.c_void_p, W.BOOL, W.DWORD, C.c_void_p, W.LPCWSTR,
+                         C.POINTER(STARTUPINFOW), C.POINTER(PROCESS_INFORMATION))
+_CreateMutexW = _proto("CreateMutexW", W.HANDLE, C.c_void_p, W.BOOL, W.LPCWSTR)
+_WaitForSingleObject = _proto("WaitForSingleObject", W.DWORD, W.HANDLE, W.DWORD)
+
+# One 1.14d at a time on this machine (several sessions / worktrees record on
+# one PC; two games under the debugger break each other's runs). Every
+# recorder launches the game through CreateProcessW below, which first takes
+# the named mutex GAME_LOCK_NAME (held until this Python process exits: a
+# recorder runs its games one after the other) and then waits until no
+# Game.exe is running (a game started without the lock: by hand or by an older
+# copy of these tools). D2_GAME_LOCK=0 turns both off.
+GAME_LOCK_NAME = "Local\\d2rs-original-game-1.14d"
+GAME_LOCK_MAX_WAIT = 3600.0
+_game_lock = None
+
+
+def _game_exe_running():
+    import subprocess
+    try:
+        out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq Game.exe", "/NH"],
+                             capture_output=True, text=True, timeout=30).stdout
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return "game.exe" in out.lower()
+
+
+def acquire_game_lock():
+    """Take the one-game-at-a-time lock (idempotent within a process)."""
+    global _game_lock
+    if _game_lock is not None or os.environ.get("D2_GAME_LOCK") == "0":
+        return
+    h = _CreateMutexW(None, False, GAME_LOCK_NAME)
+    if not h:
+        raise winerr("CreateMutexW")
+    start = time.monotonic()
+    noted = False
+    while True:
+        r = _WaitForSingleObject(h, 5000)
+        if r in (0, 0x80):            # WAIT_OBJECT_0, WAIT_ABANDONED (holder died)
+            break
+        if r != 0x102:                # not WAIT_TIMEOUT
+            raise winerr("WaitForSingleObject")
+        if not noted:
+            print("note: another 1.14d run holds the game lock; waiting", file=sys.stderr)
+            noted = True
+        if time.monotonic() - start > GAME_LOCK_MAX_WAIT:
+            raise RuntimeError("game lock: waited %d s" % GAME_LOCK_MAX_WAIT)
+    _game_lock = h
+    noted = False
+    while _game_exe_running():
+        if not noted:
+            print("note: a Game.exe is already running (not ours); waiting for it to exit",
+                  file=sys.stderr)
+            noted = True
+        if time.monotonic() - start > GAME_LOCK_MAX_WAIT:
+            raise RuntimeError("game lock: a Game.exe kept running for %d s" % GAME_LOCK_MAX_WAIT)
+        time.sleep(5)
+
+
+def CreateProcessW(*args):
+    acquire_game_lock()
+    return _CreateProcessW(*args)
 WaitForDebugEvent = _proto("WaitForDebugEvent", W.BOOL, C.POINTER(DEBUG_EVENT), W.DWORD)
 ContinueDebugEvent = _proto("ContinueDebugEvent", W.BOOL, W.DWORD, W.DWORD, W.DWORD)
 ReadProcessMemory = _proto("ReadProcessMemory", W.BOOL, W.HANDLE, C.c_void_p, C.c_void_p,
