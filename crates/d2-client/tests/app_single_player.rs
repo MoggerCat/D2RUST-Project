@@ -817,3 +817,77 @@ fn a_save_in_act_three_to_five_is_placed_at_the_join() {
         assert!(placed, "act {act}: no player after the join");
     }
 }
+
+/// A saved character's hitpoints and mana are the stored values after the
+/// items are placed: the item bonuses raise the maximum, not the current
+/// value (`formats/d2s.md` §9 rules 2 and 4; `items-load-mixed` against
+/// 1.14d, frame 2: mana 14984 of 25856, not the max-rescaled 25856).
+// Covers: specs/formats/d2s.md §9 r4
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn a_loaded_characters_mana_ignores_the_items_bonuses() {
+    use d2_client::bridge::link::SendQueue;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    let dir = std::env::temp_dir().join(format!("d2rs-load-mana-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("Mana.d2s");
+    let args: Vec<String> = [
+        "new",
+        "--name",
+        "Mana",
+        "--class",
+        "ama",
+        "--expansion",
+        "--level",
+        "30",
+        "--item",
+        "cap/body=1/q=magic",
+        "--item",
+        "amu/body=2/q=rare",
+        "--item",
+        "rin/body=6/q=magic",
+        "--item",
+        "rin/body=7/q=rare",
+        "-o",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .chain([path.display().to_string()])
+    .collect();
+    assert_eq!(d2s_tool::cli::run(&args, &mut std::io::sink()).unwrap(), 0);
+    let data = app_support::game_data();
+    let character = single_player::load_character(&data, &path, 0).unwrap();
+    std::fs::remove_dir_all(&dir).unwrap();
+    let ms = std::sync::Arc::new(AtomicU32::new(1000));
+    let (mut link, _) =
+        single_player::start_with(data, DEFAULT_SEED, character.clone(), StepClock(ms.clone()))
+            .unwrap();
+    let req = single_player::create_request_for(&character);
+    link.send(SendQueue::System, &req.encode()).unwrap();
+    link.pump().unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    link.pump().unwrap();
+    link.receive();
+    link.send(SendQueue::System, &[0x6B]).unwrap();
+    for _ in 0..4 {
+        ms.fetch_add(40, Ordering::SeqCst);
+        link.pump().unwrap();
+        link.receive();
+    }
+    let (mana, max) = link
+        .with(|l| {
+            let g = &mut l.host_mut().game;
+            let (p, _) = single_player::local_player(g).expect("joined");
+            let s = &g.events.action.sys.stats;
+            (s.unit_total(p, 8, 0), s.unit_total(p, 9, 0))
+        })
+        .unwrap();
+    assert!(max > 14976 + 256, "the items raise the maximum: {max}");
+    // The stored 14976 plus a few ticks of regeneration (1.14d: 14984 at
+    // frame 2), far below the maximum.
+    assert!(
+        (14976..14976 + 64).contains(&mana),
+        "mana {mana} of {max} after the load"
+    );
+}

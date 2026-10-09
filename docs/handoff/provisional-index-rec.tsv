@@ -61,7 +61,7 @@ REC-93	5907	MANUAL	audio/triggers-2.md §14 r2 (chest at-once key sound sent twi
 REC-94	5914	MANUAL	world/objects.md §7.1 r3 (interact range `0x00623660`)	recording	no		0	
 REC-95	5687	ASSISTED	sim/intents-events.md §7.4 r3 (0x4C / 0x4D level byte), sim/pathing.md §10 r2 (player skil	recording	no		6	q-fix-door-highlight,q-fix-monster-update-steps,q-fix-player-mode-msgs,q-fix-skill-msg-level
 REC-96	6224	ASSISTED	Level-up stat messages (S→C 0x1D-0x1F, 0x21) around a level-up	recording	no		1	
-REC-99	5929	MANUAL	sim/path-placement.md §12.2 (C→S 0x13 on a warp tile, tile unit creation)	recording	no		10	q-fix-warp-tile-restore
+REC-99	5929	MANUAL	sim/path-placement.md §12.2 (C→S 0x13 on a warp tile, tile unit creation)	recording	no		8	q-fix-warp-tile-restore
 REC-100	6505		Hireling follow and fight (PROVISIONAL, `d2-server` `handlers/world/hireling_drive.rs`, M2	data	yes	yes	1	
 REC-101	6506		Hire list row text (settled 2026-10-09, q-fix-hire-list-stats; was PROVISIONAL, `app/hire_	unstated	no	yes	1	
 REC-102	6067	MANUAL	items/inventory-moves.md §7.17 (potion use from the belt: item-use spec `0x005BF240` unwri	recording	no		0	
@@ -89,7 +89,7 @@ REC-125	6551		Summons and pets on the preview host (PROVISIONAL, `d2-sim` `wirin
 REC-126	6552		Hardcore and the save at death in the play preview (PROVISIONAL, `d2-client` `app/hardcore	recording	no		1	
 REC-127	6553		Game messages in play (PROVISIONAL, `d2-client` `ui/game_messages.rs`, q-messages, M22): t	recording	no		0	
 REC-128	6554		Cain's quest on the wired host and Cain's identify (PROVISIONAL, `d2-sim` `wiring/economy/	recording	no		4	
-REC-129	6555		Quest events in the play host and the synthetic Tower line (PROVISIONAL, `d2-server` `wire	recording	no		2	
+REC-129	6555		Quest events in the play host and the synthetic Tower line (PROVISIONAL, `d2-server` `wire	recording	no		3	
 REC-130	6558		Sisters' Burial Grounds in the play preview (PROVISIONAL, `app/synthetic_burial.rs`, q-a1-	data	yes		1	
 REC-131	6569		Imbue on the real inventory (PROVISIONAL, `d2-sim` `wiring/interaction/npc_items.rs`, `d2-	recording	no		0	
 REC-132	6556		Sisters to the Slaughter in the preview (PROVISIONAL, `d2-server` `handlers/world/wired/qu	data	yes		1	
@@ -315,6 +315,6 @@ REC-727	6513		NPC "introduction" topic text (PROVISIONAL, `d2-client` `ui/npc_ta
 REC-728	6515		NPC menu-open greeting sound (PROVISIONAL, `d2-client` `ui/npc_box.rs` `open_npc_menu_with	recording	no		1	
 REC-730	6516		Belt / grid potion use and the cursor drop (PROVISIONAL, `d2-sim` `wiring/inventory/potion	recording	no		1	
 REC-731	6517		Remove callback `0x0056E900` "state off" queues the unit, and the regen tick runs it (PROV	unstated	no		1	
+REC-732	6518		Player alignment at the join (PROVISIONAL, `d2-sim` `wiring/action/units.rs` `View::set_al	recording	no		2	
 REC-740	6538		Item tip anchor (PROVISIONAL, `ui/item_tip.rs` `TipAnchor::at_point`, `draw_tip`; q-fix-ui	unstated	no		1	
 REC-745	6519		Grid drop cell `0x00486BD0` (PROVISIONAL, `d2-client` `ui/panels/inv_items.rs` `grid_drop_	recording	no		1	
-REC-750	6518		Player alignment at the join (PROVISIONAL, `d2-sim` `wiring/action/units.rs` `View::set_al	recording	no		2	
