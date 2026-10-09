@@ -137,12 +137,14 @@ def soak_once(cmd_args, report, timeout):
     return found, summary
 
 
-def run(out, name, seed, steps, timeout):
+def run(out, name, seed, steps, timeout, roundtrip_every=0):
     os.makedirs(os.path.join(out, "logs"), exist_ok=True)
     log = os.path.join(out, "logs", f"{name}-{seed}.log")
     report = os.path.join(out, "logs", f"{name}-{seed}.json")
     args = start_args(out, name) + ["--seed", str(seed), "--steps", str(steps),
                                      "--keep-going", "--log-out", log]
+    if roundtrip_every > 0 and steps > roundtrip_every:
+        args += ["--roundtrip-at", ",".join(str(s) for s in range(roundtrip_every, steps, roundtrip_every))]
     found, summary = soak_once(args, report, timeout)
     return log, found, summary
 
@@ -239,7 +241,7 @@ def campaign(a):
         for name in names:
             if time.time() >= end:
                 break
-            log, found, summary = run(out, name, seed, a.steps, a.timeout)
+            log, found, summary = run(out, name, seed, a.steps, a.timeout, a.roundtrip_every)
             runs += 1
             frames += summary.get("steps", 0)
             new = [f for f in found if f["sig"] not in known]
@@ -286,6 +288,8 @@ def main():
     c.add_argument("--first-seed", type=int, default=1)
     c.add_argument("--timeout", type=int, default=600)
     c.add_argument("--no-reduce", action="store_true")
+    c.add_argument("--roundtrip-every", type=int, default=0,
+                   help="a save/load round trip every N frames of each run (spec §5)")
     r = sub.add_parser("run")
     r.add_argument("--start", required=True, choices=list(STARTS))
     r.add_argument("--seed", type=int, default=1)
