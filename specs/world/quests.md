@@ -36,22 +36,22 @@
 | Inputs | 76–87 |
 | Outputs / state changes | 88–94 |
 | Rules | 95–96 |
-|   1. Quest flag records | 97–297 |
-|   2. Quest control and quest records | 298–404 |
-|   3. Game entry: picking the quest set | 405–452 |
-|   4. Events and dispatch | 453–537 |
-|   5. Quest updater and timers (tick step 8) | 538–559 |
-|   6. Status reporting | 560–741 |
-|   7. NPC dialog hooks | 742–774 |
-|   8. Act transitions, warps and portals | 775–862 |
-|   9. Quest items, rewards and helpers | 863–1055 |
-|   11. Acts II–V | 1056–1072 |
-| Constants & data dependencies | 1073–1087 |
-| Randomness | 1088–1115 |
-| Edge cases & original bugs | 1116–1134 |
-| Test vectors | 1135–1166 |
-| Provenance | 1167–1195 |
-| Open questions | 1196–1268 |
+|   1. Quest flag records | 97–303 |
+|   2. Quest control and quest records | 304–410 |
+|   3. Game entry: picking the quest set | 411–458 |
+|   4. Events and dispatch | 459–543 |
+|   5. Quest updater and timers (tick step 8) | 544–565 |
+|   6. Status reporting | 566–747 |
+|   7. NPC dialog hooks | 748–780 |
+|   8. Act transitions, warps and portals | 781–868 |
+|   9. Quest items, rewards and helpers | 869–1061 |
+|   11. Acts II–V | 1062–1078 |
+| Constants & data dependencies | 1079–1093 |
+| Randomness | 1094–1121 |
+| Edge cases & original bugs | 1122–1140 |
+| Test vectors | 1141–1172 |
+| Provenance | 1173–1201 |
+| Open questions | 1202–1274 |
 <!-- /index -->
 
 ## Summary
@@ -98,8 +98,14 @@ dropped, portals created, stats added (requests to the owning specs).
 
 #### 1.1 Layout
 
-A quest flag record is a 96-byte buffer (`0x0065C430` allocates and
-zeroes 0x60 bytes) used as a bit array. Quest slot q (0..41) owns bits
+A quest flag record is a 96-byte buffer used as a bit array, reached
+through a 0x14-byte header: `0x0065C430` allocates the header (0x14) and
+the buffer (0x60, zeroed), and `0x00410E40` fills the header (+0x00
+buffer pointer, +0x04 bit count 0x300, +0x08…+0x10 zero). Every pointer
+called "record" below (player data +0x10 + 4·d, the game record) is the
+header; the bit functions read the buffer through `[header]` (read
+2026-10-09, PC 1 night D1; the recorder path: `tools/state-snapshot.md`
+field `q`). Quest slot q (0..41) owns bits
 16·q .. 16·q+15, i.e. bytes 2q and 2q+1. Bit n is byte n>>3, mask
 1<<(n&7) (LSB first; `0x00410B10` set, `0x00410B30` test, `0x00410B50`
 clear, mask table `0x006CE268` = 1,2,4,…). Read as little-endian u16,

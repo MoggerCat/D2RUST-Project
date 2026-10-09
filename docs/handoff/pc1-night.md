@@ -45,6 +45,12 @@ messages.
   per-frame allocation diff (a G6 ledger with unit type / class per
   frame, which `record_rng.py` + the state channel already give).
 
+- **D1 done (quest flag record, for q-tool-quest-flags)**:
+  `tools/state-snapshot.md` §2 field `q` (corrected: one indirection was
+  missing) and `world/quests.md` §1.1. Read path: player data P = u32
+  unit +0x14; header H = u32 P +0x10 + 4·(u8 game +0x6D); buffer B = u32
+  H +0x00 (0x60 bytes); slot word = u16 B + 2·slot. No d2rs row (d2rs
+  writes `q` from its own records).
 - **D2 done (object walk `0x00548A50`, for q-fix-npc-interact)**: `world/objects.md` §7.3 rule 4.1–4.4 + recorded stash vector; row `q-fix-pc1night-object-walk`. Same run + queued interaction as the NPC approach (type 2); stop at unit distance 0 (a 1×1 object stops the player 2 sub-tiles away); operate in the stop frame (stash: run from f4, stop and open at f13).
 
 ## C — numbered items
