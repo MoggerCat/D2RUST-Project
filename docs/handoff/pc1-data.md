@@ -236,6 +236,14 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     holder), as offsets read from a server unit, so `record_state.py` can
     fill `own`. Write the answer into `sim/units.md` (or the owner spec)
     and the §2 row of `state-snapshot.md`.
+22. **Re-record sim-0009 without input** (q-prov-recording, REC-290): the Wine
+    run of the same command equals `traces/sim/tick/sim-0009.json` for ticks
+    0–60, then the Windows trace has a client message at tick 61 (drain: a
+    timer on unit (1, 7), player queue) and the player changes rooms at 121,
+    241, 351: the window got input. Run `record_tick.py --auto ScnAma --seed
+    1234 --ticks 600` again with the mouse outside the game window and replace
+    sim-0009. (Item 20 note: under Wine the front end does take X input,
+    `tools/cloud-game/xinput.sh`; in-game NPC menus were not tried.)
 
 ## How to check a behaviour in one command
 

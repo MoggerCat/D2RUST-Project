@@ -466,7 +466,7 @@ fn a_save_from_the_command_line_joins() {
 
 /// The app's C→S 0x67 bytes (`client/model.md` §7 rule 9): the recorded
 /// single-player layout for an expansion character; a classic save sends
-/// bit 2 alone (PROVISIONAL there, REC-46).
+/// bit 2 alone (recorded, REC-46: `facts/join/a1-new-classic-ama.tsv`).
 // Covers: specs/client/model.md §7 r9
 #[test]
 fn the_create_request_has_the_builder_layout() {

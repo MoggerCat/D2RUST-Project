@@ -244,8 +244,8 @@ pub const CREATE_FLAGS_EXPANSION: u32 = create_flags::EXPANSION | 0x4;
 
 /// The 0x67 u32@0x27 of a classic character.
 ///
-/// PROVISIONAL (client/model.md §7 r9; REC-46): bit 2 alone, without the
-/// expansion bit 20.
+/// Bit 2 alone, without the expansion bit 20 (`client/model.md` §7 r9;
+/// recorded, REC-46: `facts/join/a1-new-classic-ama.tsv`).
 pub const CREATE_FLAGS_CLASSIC: u32 = 0x4;
 
 /// The local client's C→S 0x67 for `character` (`client/model.md` §7
