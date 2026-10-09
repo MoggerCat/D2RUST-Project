@@ -1,0 +1,42 @@
+{
+ "channel": "state",
+ "check": "nec-corpse-explosion",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "70",
+  "--auto",
+  "ScnNec",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "4 warp 2",
+  "--poke",
+  "10 spawn 179 @x+4 @y normal",
+  "--input",
+  "frame 20; rclick 544 336"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "48f580c392d6cfacc750ed7bed281b222f6504ace62f3a1e762477f31c336e98",
+   "size": 351437
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "b0b06b37b2f355b73bb0091f7f9436e7bea86371efe42d1a66ace0d9eed39aea",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "cbb103980d71fdf823601c8a19f78a163a2e1a371472d6a6bcaf2073735b64e7",
+  "save": "54fc606dca0f2fd04db60ef70be4f5f70c5506de646a51556f1ebcf40b6875bd"
+ }
+}

@@ -53,6 +53,7 @@ pub mod skill_fallback;
 pub mod skills;
 pub mod state;
 pub mod update;
+pub mod use_state;
 pub mod world;
 
 #[cfg(test)]

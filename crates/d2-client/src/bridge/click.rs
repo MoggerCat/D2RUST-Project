@@ -290,10 +290,25 @@ impl ClickWorld for ModelClick<'_> {
     fn range(&self, skill: SkillRef) -> u8 {
         super::combat::range_of(self.inputs, self.world.local(), skill.id)
     }
-    fn use_state(&self, _skill: SkillRef) -> u32 {
-        // TODO(spec: skills/use.md §2 `0x00647960`): the client use state
-        // is not computed; 0 = usable.
-        0
+    /// The client use state `0x004D9FC0` of P's entry of `skill`
+    /// ([`super::use_state::use_state`]): the hand entry of that id, else
+    /// the native one; no entry → 3.
+    fn use_state(&self, skill: SkillRef) -> u32 {
+        let Some(p) = self.world.local() else {
+            return super::use_state::code::DISABLED;
+        };
+        let Some(list) = p.skills.as_ref() else {
+            return super::use_state::code::DISABLED;
+        };
+        let hand = [list.left, list.right]
+            .into_iter()
+            .flatten()
+            .filter_map(|i| list.entries.get(i))
+            .find(|e| e.skill == skill.id);
+        let e = hand.or_else(|| list.native(skill.id).map(|i| &list.entries[i]));
+        e.map_or(super::use_state::code::DISABLED, |e| {
+            super::use_state::use_state(self.world, self.inputs, p.key, e)
+        })
     }
     fn refusal_sound(&self, _state: u32) -> Option<u16> {
         None
@@ -461,12 +476,15 @@ pub fn apply(
                 b,
             } => outputs.extend(interact::send(world, inputs, a as u16, b)?),
             ClickOut::Code { code, a, b } => {
+                // The C→S leaves only when the mode request returned
+                // non-zero (`skills/sequences.md` local player rule 2).
+                let mut send = true;
                 if let Some((p, req, record)) = skill_request(world, code, a, b) {
                     let sink = Outputs::default();
-                    super::modes::mode_request(world, inputs, p, req, record, &sink)?;
+                    send = super::modes::mode_request(world, inputs, p, req, record, &sink)?;
                     outputs.extend(sink.take());
                 }
-                if let Some(m) = click::code_bytes(code, a, b) {
+                if let Some(m) = click::code_bytes(code, a, b).filter(|_| send) {
                     world.outgoing.push(m);
                 }
             }
@@ -622,6 +640,8 @@ mod tests {
         u.skills = Some(SkillList {
             entries: vec![SkillEntry {
                 skill: click::ATTACK,
+                base: 1,
+                owner: crate::bridge::skills::NATIVE,
                 ..SkillEntry::default()
             }],
             left: Some(0),
@@ -800,6 +820,7 @@ mod tests {
         inputs.tables.skills = vec![SkillRow {
             anim: 7,
             range: 1,
+            ingame: true,
             ..SkillRow::default()
         }];
         // The mouse on the monster's feet.
@@ -846,6 +867,8 @@ mod tests {
             list.entries.push(SkillEntry {
                 skill: 3,
                 mode: 10,
+                base: 1,
+                owner: crate::bridge::skills::NATIVE,
                 ..SkillEntry::default()
             });
             list.right = Some(1);
@@ -858,6 +881,7 @@ mod tests {
             SkillRow {
                 anim: 10,
                 range: 2,
+                ingame: true,
                 ..SkillRow::default()
             },
         ];
@@ -911,6 +935,8 @@ mod tests {
             list.entries.push(SkillEntry {
                 skill: 3,
                 mode: 10,
+                base: 1,
+                owner: crate::bridge::skills::NATIVE,
                 ..SkillEntry::default()
             });
             list.right = Some(1);
@@ -923,6 +949,7 @@ mod tests {
             SkillRow {
                 anim: 10,
                 range: 2,
+                ingame: true,
                 ..SkillRow::default()
             },
         ];

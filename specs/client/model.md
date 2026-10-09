@@ -46,14 +46,14 @@
 |   16. C→S 0x4B after a teleport (the hireling case) | 1154–1188 |
 |   17. Model writes made by 1.14d UI code | 1189–1394 |
 |   18. Audio driver inputs and the client object functions | 1395–1425 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1426–1655 |
-|   20. Player mode steps (`0x00463390`) and the local player's next action | 1656–1816 |
-| Constants & data dependencies | 1817–1829 |
-| Randomness | 1830–1845 |
-| Edge cases & original bugs | 1846–1870 |
-| Test vectors | 1871–1928 |
-| Provenance | 1929–2034 |
-| Open questions | 2035–2240 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1426–1670 |
+|   20. Player mode steps (`0x00463390`) and the local player's next action | 1671–1831 |
+| Constants & data dependencies | 1832–1844 |
+| Randomness | 1845–1860 |
+| Edge cases & original bugs | 1861–1885 |
+| Test vectors | 1886–1943 |
+| Provenance | 1944–2049 |
+| Open questions | 2050–2255 |
 <!-- /index -->
 
 ## Summary
@@ -1575,6 +1575,21 @@ record pointer, `ret 4`: the §8 r1 flag is not passed).
    it (a monster with monstats `Code` `PB`, the turrets and
    `firetower`: then direction := (direction + 0x38) & 0x3F), clears
    the target, then starts.
+
+   PROVISIONAL: the `cltstfunc` bodies are read from their effect on
+   the local player's click (q-fix-skills-4cls; 1.14d under Wine,
+   2026-10-09, checks `traces/checks/{nec,ass}-*.check`: a right click
+   on open ground beside a live cow sends **no** C→S for functions 20
+   (Raise Skeleton, Skeletal Mage), 21 (Corpse / Poison Explosion), 23
+   (Iron Golem), 24 (Revive) and 5 (Psychic Hammer, Dragon Flight), and
+   sends 0x0C for 22 (Bone Prison), 18 (curses), 19 (Teeth) and the
+   rest): 5 returns 0 without a target unit; 20, 21, 24 without a dead
+   monster target; 23 without an item target; every other function
+   returns non-zero (because a click sends only when the request
+   returned non-zero, `skills/sequences.md` local player rule 2, and
+   the use check r9.1 passes for all of these); settled by REC-1641
+   (the table bodies at `0x00727A90` read in a spec-writing session,
+   and a 1.14d check of each function on its target kind).
 8. **Client mode steps** (monster update `0x004B13A0`, §5 r2; a monster
    with state 1 `freeze` runs only while dead; mode ≥ 16 nothing):
    1. Mode record `0x004AF400` {path kind, anim kind, end kind}: class
