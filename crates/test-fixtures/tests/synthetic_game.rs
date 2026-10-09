@@ -1388,42 +1388,38 @@ fn a_stub_starts_a_new_character_before_the_join_sequence() {
     let r = report.unwrap();
     assert!(r.new_character);
     // `intents-events.md` §8.2 rule 7, `d2s-load.md` §8 rules 1, 3: the
-    // fixture paladin's `StartSkill` is empty (-1): no start skill, so no
-    // load 0x23; after the add messages 0x0B, 0x5F with +0x2C and the two
-    // hands (hand 0 = 0).
-    assert_eq!(
-        cs.startskill,
-        u16::MAX,
-        "the fixture paladin has no start skill"
-    );
-    assert_eq!(r.right_skill, None);
+    // load's own 0x23 (hand 0, `StartSkill`, item −1) after the add
+    // messages, then 0x0B, 0x5F with +0x2C and the two hands with item 0.
+    assert_ne!(cs.startskill, 0, "the fixture class has a start skill");
+    assert_eq!(r.right_skill, Some(cs.startskill));
     let g = j.guid.to_le_bytes();
-    let k = [0u8, 0];
+    let k = cs.startskill.to_le_bytes();
     let hand = |h: u8, skill: [u8; 2], item: [u8; 4]| {
         let mut m = vec![0x23, 0, g[0], g[1], g[2], g[3], h, skill[0], skill[1]];
         m.extend(item);
         m
     };
     let flags = initial_portal_flags(&portals).to_le_bytes();
-    let ids: Vec<u8> = j.received.iter().take(8).map(|m| m[0]).collect();
-    assert_eq!(ids, [0x01, 0x00, 0x02, 0x59, 0xAA, 0x76, 0x0B, 0x5F]);
+    let ids: Vec<u8> = j.received.iter().take(9).map(|m| m[0]).collect();
+    assert_eq!(ids, [0x01, 0x00, 0x02, 0x59, 0xAA, 0x76, 0x23, 0x0B, 0x5F]);
+    assert_eq!(j.received[6], hand(0, k, [0xFF; 4]));
     assert_eq!(
-        j.received[7],
+        j.received[8],
         [0x5F, flags[0], flags[1], flags[2], flags[3]]
     );
     // Rules 3.4 and 3.8: the stat messages of the mod array (the start
     // stats' `Saved` base values, `stat-lists.md` §11), before and after
     // the two hands, the same both times; strength among them.
-    let stats: Vec<&Vec<u8>> = j.received[8..]
+    let stats: Vec<&Vec<u8>> = j.received[9..]
         .iter()
         .take_while(|m| (0x1D..=0x1F).contains(&m[0]))
         .collect();
     let n = stats.len();
     assert!(stats.contains(&&vec![0x1D, 0, cs.str]), "{stats:02X?}");
     // `d2s-load.md` §8 r3 (REC-02, `facts/join/a1-new-ama.tsv`): item 0.
-    assert_eq!(j.received[8 + n], hand(1, [0, 0], [0; 4]));
-    assert_eq!(j.received[9 + n], hand(0, k, [0; 4]));
-    let again: Vec<&Vec<u8>> = j.received[10 + n..10 + 2 * n].iter().collect();
+    assert_eq!(j.received[9 + n], hand(1, [0, 0], [0; 4]));
+    assert_eq!(j.received[10 + n], hand(0, k, [0; 4]));
+    let again: Vec<&Vec<u8>> = j.received[11 + n..11 + 2 * n].iter().collect();
     assert_eq!(again, stats);
     // The server player init's native skills (`msg-skills.md` §2 rule 8):
     // skill 0, then the fixture's only `Skill 1`…`Skill 10` id, Attack
@@ -1433,13 +1429,15 @@ fn a_stub_starts_a_new_character_before_the_join_sequence() {
     assert_eq!(list.base_levels(), [(0, 2)]);
     assert_eq!((list.left, list.right), (Some(0), Some(0)));
     assert!(j.received.iter().all(|m| m[0] != 0x94));
-    // No start skill: "has skill" is never asked.
+    // `StartSkill` is not a native skill (it comes with the start items'
+    // stat 107, which has no provider): "has skill" stays unapplied.
     let steps: Vec<_> = r.unapplied.iter().map(|u| u.step).collect();
     assert_eq!(
         steps,
         [
             "new character set-up",
             "start items",
+            "has skill",
             "mouse skills",
             "quest entry"
         ]

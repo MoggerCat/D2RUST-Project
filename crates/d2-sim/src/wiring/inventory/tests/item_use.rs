@@ -169,10 +169,12 @@ fn a_tome_is_charged_only_on_a_made_cast() {
     assert_eq!(w.handle(&msg(0x20, &[t, 10, 10])), Ok(0));
     assert_eq!(w.desk(|d| d.stat(it, QUANTITY)), 2, "a failed cast is free");
     w.hooks.cast = Some((1, true));
-    w.rest.log.clear();
+    w.rest.sent.clear();
     assert_eq!(w.handle(&msg(0x20, &[t, 10, 10])), Ok(0));
     assert_eq!(w.desk(|d| d.stat(it, QUANTITY)), 1);
-    assert_eq!(w.rest.called("send_item_stat"), 1);
+    // The charge goes out as S→C 0x3E (`inventory-moves.md` §7.11 step 3).
+    let stat_msgs: Vec<_> = w.rest.sent.iter().filter(|(_, m)| m[0] == 0x3E).collect();
+    assert_eq!(stat_msgs.len(), 1, "one item stat message for the charge");
     assert!(w.unit(t).is_some(), "a tome stays");
 }
 
