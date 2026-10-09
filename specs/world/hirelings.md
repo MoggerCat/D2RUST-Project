@@ -49,9 +49,9 @@
 | Constants & data dependencies | 816–839 |
 | Randomness | 840–850 |
 | Edge cases & original bugs | 851–902 |
-| Test vectors | 903–953 |
-| Provenance | 954–1010 |
-| Open questions | 1011–1103 |
+| Test vectors | 903–965 |
+| Provenance | 966–1022 |
+| Open questions | 1023–1115 |
 <!-- /index -->
 
 ## Summary
@@ -950,6 +950,18 @@ Pass 2 B):
 | frame 1731 tick: stats twice (after 0xAC / 0xAA and after 0x6D) | 12 = 7, 0 = 40, 2 = 53, 7 = 6 = 0x5100 (81 life), 31 = 47, 13 = 39200, 30 = 57600, 21 = 2, 22 = 4, 39 / 41 / 43 / 45 = 8 | §4 (Id 0 row level 3, L 7, d 4), §13 rule 4 |
 | gold 296 → 136 (S→C 0x1D, frame 1731) | price 160 = 100·(100 + 15·4)/100 | §2 |
 | Save And Exit with the merc alive | S→C 0x7A `7a 00 00 0000 00000000 0d000000` (only the pet GUID @9) | §13 rule 2 |
+
+Restore at the join, recorded 2026-10-09 under Wine
+(`traces/checks/merc-rogue-town-bar.check`, q-diff-skills-2: expansion
+Barbarian level 30, hireling block `Id` 0, name index 21, seed
+0x12345678, experience 39,482; `-seed 1234`, no input):
+
+| Step | Values | Rules |
+|---|---|---|
+| allocation, before game entry populates the town | the hireling is monster GUID 1 (the town NPCs follow from GUID 2); its unit seed is the first unit-seed step after the player's ({108806926, 666}), then stepped 9 times by its monster init (`units.md` §3.1 step 7) to {3077027668, 710430533} at frame 2 | §10 rule 3, `hirelings-2.md` §16 rule 3 |
+| frame 2 | class 271 at the player's sub-tile (4873, 4228), mode 1, level 7, life 0x5100, str 40, dex 53 | §10 rules 5–6, §4 |
+| frame 3 | mode 2 (walk) toward (4877, 4229); seed {3740604328, 1024117406} (4 more steps) | §6 |
+| frames 1–80 | every compared field of every unit and the game seed equal to d2rs | — |
 
 ## Provenance
 

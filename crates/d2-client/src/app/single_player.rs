@@ -183,9 +183,11 @@ pub const DEFAULT_SEED: u32 = 1234;
 /// (game +0x84 := 1): it wins. Otherwise a loaded save whose town byte
 /// for the game's difficulty has 0x80 gives its saved map seed
 /// (`formats/d2s.md` §2.2 rule 8, +0xAB). Otherwise [`DEFAULT_SEED`].
-/// PROVISIONAL (REC-291): 1.14d draws a fresh seed for a new character
-/// (`time_value`, `rng.md` §5.2); d2rs keeps the fixed default so dev
-/// runs and draw dumps stay reproducible. d2rs-own, unverified.
+/// PROVISIONAL (REC-291 -> q-fix-new-char-seed): 1.14d draws a fresh
+/// seed for a new character (`time_value`, `rng.md` §5.2; measured: two
+/// new characters got 0x63a0b0fd and 0x07013cee,
+/// `traces/frontend/frontend-menus/frontend-0005.json`); d2rs keeps the
+/// fixed default so dev runs and draw dumps stay reproducible.
 pub fn game_seed(character: &Character, fixed: Option<u32>) -> u32 {
     if let Some(n) = fixed {
         return n;
@@ -207,6 +209,9 @@ pub fn game_seed(character: &Character, fixed: Option<u32>) -> u32 {
 pub const GAME_TYPE: u8 = 3;
 /// Duriel's Lair (`levels` row 73, act 1).
 pub const DURIELS_LAIR: u32 = 73;
+/// Durance of Hate levels 1 and 2 (`quests.md` §8.2).
+pub const DURANCE_1: u32 = 100;
+pub const DURANCE_2: u32 = 101;
 /// Duriel's `monstats` row.
 pub const DURIEL_CLASS: u32 = 211;
 /// Izual's `monstats` row and the quest chain his death links
@@ -466,7 +471,7 @@ pub enum BuildError {
     Archives { dir: String, message: String },
     /// No game directory given: the game plays only on the user's own
     /// files (`$D2_GAME_DIR`, or `--native DIR`).
-    #[error("no game files: set D2_GAME_DIR to a Diablo II 1.14d install")]
+    #[error("no game files: put d2-client.exe in the Diablo II 1.14d folder (next to d2data.mpq), pass --game-dir <folder>, or set D2_GAME_DIR")]
     NoGameDir,
     #[error("no objects row has operate function 23 and init function 17")]
     NoWaypointObject,
@@ -533,6 +538,14 @@ pub struct LocalSeams {
     /// The Arreat Summit warp check's answer (`Pending::set_summit_open`,
     /// q-act3-act5-gaps); the exits stay closed while it is `true`.
     pub summit_closed: bool,
+    /// The Durance of Hate warp check's answer
+    /// (`Pending::set_durance_open`, q-play-act3); level 100 stays closed
+    /// while it is `true`.
+    pub durance_closed: bool,
+    /// The Golden Bird's +0x00 and the Gidbinn altar's point while Ormus
+    /// may activate it (`Pending::set_act3_npc_answers`, q-play-act3).
+    pub alkor_bird: bool,
+    pub ormus_altar: Option<(i32, i32)>,
     /// The players' hands and the facts of the items in them
     /// ([`super::weapons`], q-amazon).
     pub weapons: super::weapons::Weapons,
@@ -767,7 +780,10 @@ impl Pending for LocalSeams {
                 // unverified, REC-246: the made-up chain has both exits).
                 || (source == d2_sim::world::quests::act5::q5::SUMMIT
                     && matches!(level, 118 | 128)
-                    && self.summit_closed),
+                    && self.summit_closed)
+                // `0x005BBFA0` (`quests.md` §8.2): Durance of Hate 1 waits
+                // for the Compelling Orb, except from Durance 2.
+                || (level == DURANCE_1 && source != DURANCE_2 && self.durance_closed),
         )
     }
     fn set_summit_open(&mut self, open: bool) {
@@ -775,6 +791,35 @@ impl Pending for LocalSeams {
     }
     fn set_lair_open(&mut self, open: bool) {
         self.lair_open = open;
+    }
+    fn set_durance_open(&mut self, open: bool) {
+        self.durance_closed = !open;
+    }
+    fn set_act3_npc_answers(&mut self, alkor_bird: bool, ormus_altar: Option<(i32, i32)>) {
+        self.alkor_bird = alkor_bird;
+        self.ormus_altar = ormus_altar;
+    }
+    /// `0x005BAD20` (`ai-bodies.md` §9.9 alkor): the published answer.
+    fn alkor_bird(&mut self, _: &mut Game) -> bool {
+        self.alkor_bird
+    }
+    /// `0x005BAD40`: queued for the quest control (REC-781, d2rs-own,
+    /// unverified: after the tick, as REC-129); the published answer
+    /// drops at once so the same tick reads it cleared.
+    fn alkor_reset(&mut self, _: &mut Game) {
+        self.alkor_bird = false;
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::AlkorReset);
+    }
+    /// `0x005B9CA0` (§9.9 ormus): the published altar point.
+    fn ormus_altar(&mut self, _: &mut Game) -> Option<(i32, i32)> {
+        self.ormus_altar
+    }
+    /// `0x005B9CD0`: queued as [`Self::alkor_reset`] (REC-781).
+    fn ormus_set_altar_mode(&mut self, _: &mut Game) {
+        self.ormus_altar = None;
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::OrmusAltar);
     }
     /// C→S 0x44 (`quests-act2-2.md` §3.2): queued for the quest control
     /// (REC-167, d2rs-own, unverified: it runs after the tick, not inside
@@ -858,6 +903,9 @@ impl Pending for LocalSeams {
     }
     fn golem_resummon(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, player: UnitId) -> bool {
         skill_events::golem_resummon(h, sim, player)
+    }
+    fn passive_refresh_all(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
+        skill_events::passive_refresh_all(h, sim, unit);
     }
     // d2rs-own, unverified (q-amazon, REC-150): the hand class, the item
     // shoots / stack facts of the skill bodies ([`super::weapons`]).
@@ -1032,10 +1080,13 @@ impl Pending for LocalSeams {
     }
     /// `0x00623660`, the operate entry's interact range (`objects.md`
     /// §7.1 rule 3): no written spec gives its test.
-    // PROVISIONAL (world/objects.md §7.1 r3; REC-94): in range. The
-    // preview client sends C→S 0x13 only on arrival
-    // (`world_view/interact.rs`); the §7.3 r3–r4 approach is
-    // `Pending::object_approach`'s default (operate).
+    /// Measured (REC-94, `facts/objects/objanim-a1-town.tsv` run r3): 1.14d's client polls
+    /// `0x00623660(P, O)` every frame of the walk and sends C→S 0x13 on
+    /// the first frame it returns 1 (waypoint 119 at sub-tile offset
+    /// (4, 3), stash 267 at (3, 1)); both server calls of that 0x13
+    /// (`0x00548B7D`, `0x00584597`) then return 1. So "in range" holds
+    /// for every 0x13 the client sends; the test's own formula is not
+    /// modelled (`docs/handoff/pc1-data.md` Step 4).
     fn object_in_range(&self, _: &Game, _: UnitId, _: UnitId) -> bool {
         true
     }
@@ -1052,6 +1103,20 @@ impl Pending for LocalSeams {
 }
 
 impl WorldPending for LocalSeams {
+    /// `0x00544E80` from special monster creation: queued for the quest
+    /// control (the Golden Bird's boss choice, `quests-act3.md` §6.2).
+    /// PROVISIONAL (REC-780, d2rs-own, unverified): it runs after the tick,
+    /// as the other queued quest events (REC-129), not inside the creation.
+    fn boss_quest_hook(&mut self, boss: UnitId) {
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::BossCreated { unit: boss });
+    }
+    /// `0x00545B50` (`monsters/init.md` §20.1): queued as
+    /// [`Self::boss_quest_hook`] (REC-780).
+    fn quest_preset_boss(&mut self, unit: UnitId) {
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::PresetBoss { unit });
+    }
     /// A host-placed monster of a level's preset list
     /// ([`HOST_MONSTER_PRESET`]): Blood Raven carries chain 2 (`init.md`
     /// §14.3), as her boss mods link it when population creates her.
@@ -1992,6 +2057,13 @@ pub fn build_with(
     )));
     hooks.vitals = parts.vitals;
     hooks.bodies = parts.bodies;
+    // The hireling calls (save restore, join follow, act change;
+    // `hirelings-2.md` §19) run on the wired host, which holds the
+    // hireling lists when the game has `hireling.txt`; without the queue
+    // a saved hireling is never restored (`hirelings.md` §10).
+    if parts.hirelings.is_some() {
+        hooks.hireling_calls = Some(Vec::new());
+    }
     // The client vitals sync (`combat/vitals.md` §5.1): life, mana,
     // stamina and position sent to the client at the end of each tick.
     hooks.enable_vitals_sync();
@@ -2172,7 +2244,7 @@ fn loader(
             v.init_player_seed(p);
             // `combat/hit.md` §7.1: a player is good (2), its state-105
             // list there before its first 0xAA (`intents-events.md`
-            // §7.9 rule 1, recorded). PROVISIONAL (REC-750): the
+            // §7.9 rule 1, recorded). PROVISIONAL (REC-732): the
             // original's call site in the join is not identified.
             v.set_alignment(g, p, 2);
             Some(p)
@@ -2262,9 +2334,22 @@ fn loader(
             }
             Character::Save(save, ctx) => match load_save(s, player, save, ctx) {
                 Ok((mut entry, report)) => {
+                    // The skill section's assigns turn the passive states on
+                    // with their stat lists (`d2s-load.md` §2 "skills",
+                    // before the items).
+                    s.events.action.passive_refresh_all(&mut s.game, player);
                     // q-save-full: the save's items, made on the wired host.
                     let items_ok = super::save_full::join_items(s, player, save);
                     let corpses_ok = super::save_full::join_corpses(s, player, save);
+                    // The saved hireling (`d2s.md` §1 load order: the
+                    // player's items, the corpses, then the hireling,
+                    // `hirelings.md` §10): its roomless allocation draws
+                    // its unit seed before game entry populates the rooms
+                    // (`hirelings-2.md` §16 rule 3), and the monster init
+                    // of that allocation (`units.md` §3.1 step 7, its
+                    // component and stat rolls) needs the lent world.
+                    let (game, world) = (&mut s.game, &mut s.world);
+                    s.events.lend_world(|a| world.hireling_calls(game, a));
                     super::save_gaps::join_gaps(s, player, save);
                     // `d2s.md` §2.4 rules 4–6: the hot keys, their item
                     // indices resolved over the loaded inventory list.

@@ -333,7 +333,7 @@ already carries the list (`sim/intents-events.md` §7.9 rule 1, recorded
 seq 39), and the next frame sends 0xA8 of state 105 (the setter's
 "resend", §3.5 rule 6 `0x0055448A`). The call site inside the load is
 not identified (`docs/handoff/pc1-data.md` Step 4); d2rs sets it right
-after the player's unit seed (PROVISIONAL, REC-750).
+after the player's unit seed (PROVISIONAL, REC-732).
 
 #### 7.2 In melee range `0x00622C40(a, b, extra)`
 

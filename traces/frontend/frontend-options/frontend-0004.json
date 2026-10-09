@@ -1,0 +1,94 @@
+{
+ "area": "frontend",
+ "behavior": "frontend-options",
+ "compare": {
+  "ignore": [],
+  "mode": "exact"
+ },
+ "expected": [
+  {
+   "data": {
+    "label": "town",
+    "launcher_mode": 1,
+    "player_level": 1
+   },
+   "kind": "state",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "walked",
+    "launcher_mode": 1,
+    "player_level": 1
+   },
+   "kind": "state",
+   "tick": 0
+  },
+  {
+   "data": {},
+   "kind": "close",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "c1",
+    "launcher_mode": 0,
+    "player_level": null
+   },
+   "kind": "state",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "town",
+    "launcher_mode": 1,
+    "player_level": 1
+   },
+   "kind": "state",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "walked",
+    "launcher_mode": 1,
+    "player_level": 1
+   },
+   "kind": "state",
+   "tick": 0
+  }
+ ],
+ "format_version": 1,
+ "game_version": "1.14d",
+ "id": "frontend-0004",
+ "inputs": [
+  {
+   "data": {
+    "text": "wait 7; click 400 300; wait 3; click 400 307; wait 4; click 691 555; wait 8; state town; click 500 200; wait 3; state walked; close; wait 0.5; state c1; wait 3; state c2; wait 5; state c3; end"
+   },
+   "kind": "script",
+   "tick": 0
+  }
+ ],
+ "notes": "REC-291: window close (WM_CLOSE posted to the game window) during a single-player game. Run A (events 1-4): launcher mode 0x74C704 is 0 within 0.5 s of the close and the game process exits with code 0 (recorder note) - the program ends, it does not return to the menu; TestSor.d2s rewritten at the close (mtime 08:36:03, sha256 5bc9c0e7... -> b6304e36...). Run B (events 5-6, same script ended by a kill instead of the close): TestSor.d2s untouched (mtime and sha256 unchanged). So 1.14d's window close saves the character and exits the program.",
+ "recorded": {
+  "by": "claude (cloud, Wine)",
+  "command": "tools/cloud-game/run.sh --python --seconds 150 --out RUN -- tools/trace-recorder/autostart.py --menu --game $D2_GAME_DIR/Game.exe --seconds 120 --input SCRIPT (run A: the script; run B: the same script cut at \"state walked; end\"); sha256sum / ls --time-style=full-iso of \"Saved Games/Diablo II/TestSor.d2s\" before and after each run",
+  "date": "2026-10-09",
+  "method": "memory-read",
+  "tool": "trace-recorder menu_trace 0.1.0 / autostart 0.2.0"
+ },
+ "setup": {
+  "band": null,
+  "band_ref": null,
+  "game_args": [
+   "-w",
+   "-ns"
+  ],
+  "menu_mode": true,
+  "size": [
+   800,
+   600
+  ]
+ },
+ "spec": "specs/ui/frontend-options.md"
+}

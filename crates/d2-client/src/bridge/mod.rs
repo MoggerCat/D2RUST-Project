@@ -25,6 +25,7 @@ pub mod critters;
 pub mod dispatch;
 pub mod drlg;
 pub mod hover;
+pub mod inject;
 pub mod intent;
 pub mod item_lists;
 pub mod items;

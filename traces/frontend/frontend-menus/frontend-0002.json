@@ -1,0 +1,490 @@
+{
+ "area": "frontend",
+ "behavior": "frontend-menus",
+ "compare": {
+  "ignore": [],
+  "mode": "exact"
+ },
+ "expected": [
+  {
+   "data": {
+    "diff_px_vs_ref": 1788,
+    "mean_luma_x1000": 26298,
+    "shot": "base"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_370_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_376_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_382_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_388_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_394_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_400_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_406_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_412_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_418_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_424_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_430_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_436_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 1855,
+    "mean_luma_x1000": 27296,
+    "shot": "h_440_110"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 1910,
+    "mean_luma_x1000": 27209,
+    "shot": "h_440_120"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 1845,
+    "mean_luma_x1000": 26821,
+    "shot": "h_440_130"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 1791,
+    "mean_luma_x1000": 26318,
+    "shot": "h_440_140"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 1788,
+    "mean_luma_x1000": 26298,
+    "shot": "h_440_150"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 1788,
+    "mean_luma_x1000": 26298,
+    "shot": "h_440_160"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 1788,
+    "mean_luma_x1000": 26298,
+    "shot": "h_440_170"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 1788,
+    "mean_luma_x1000": 26298,
+    "shot": "h_440_180"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 1788,
+    "mean_luma_x1000": 26298,
+    "shot": "h_440_190"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_440_200"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_440_210"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_440_220"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_440_230"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_440_240"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_440_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_440_260"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_440_270"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_440_280"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_440_290"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_440_300"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_440_310"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_440_320"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_440_330"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_440_340"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "h_442_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 1788,
+    "mean_luma_x1000": 26298,
+    "shot": "h_448_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 1788,
+    "mean_luma_x1000": 26298,
+    "shot": "h_454_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 1788,
+    "mean_luma_x1000": 26298,
+    "shot": "h_460_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 1788,
+    "mean_luma_x1000": 26298,
+    "shot": "h_466_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 1788,
+    "mean_luma_x1000": 26298,
+    "shot": "h_472_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 1788,
+    "mean_luma_x1000": 26298,
+    "shot": "h_478_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 1788,
+    "mean_luma_x1000": 26298,
+    "shot": "h_484_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 2320,
+    "mean_luma_x1000": 38865,
+    "shot": "h_490_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 2320,
+    "mean_luma_x1000": 38865,
+    "shot": "h_496_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 2320,
+    "mean_luma_x1000": 38865,
+    "shot": "h_502_250"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "diff_px_vs_ref": 0,
+    "mean_luma_x1000": 39758,
+    "shot": "walk_paladin_click_during_barbarian_walk_run_c1"
+   },
+   "kind": "band",
+   "tick": 0
+  }
+ ],
+ "format_version": 1,
+ "game_version": "1.14d",
+ "id": "frontend-0002",
+ "inputs": [
+  {
+   "data": {
+    "text": "wait 7; click 400 300; wait 3; click 400 307; wait 4; click 117 500; wait 4; move 50 560; wait 1; shot base; move 370 250; wait 0.4; shot h_370_250; wait 0.3; move 376 250; wait 0.4; shot h_376_250; wait 0.3; move 382 250; wait 0.4; shot h_382_250; wait 0.3; move 388 250; wait 0.4; shot h_388_250; wait 0.3; move 394 250; wait 0.4; shot h_394_250; wait 0.3; move 400 250; wait 0.4; shot h_400_250; wait 0.3; move 406 250; wait 0.4; shot h_406_250; wait 0.3; move 412 250; wait 0.4; shot h_412_250; wait 0.3; move 418 250; wait 0.4; shot h_418_250; wait 0.3; move 424 250; wait 0.4; shot h_424_250; wait 0.3; move 430 250; wait 0.4; shot h_430_250; wait 0.3; move 436 250; wait 0.4; shot h_436_250; wait 0.3; move 442 250; wait 0.4; shot h_442_250; wait 0.3; move 448 250; wait 0.4; shot h_448_250; wait 0.3; move 454 250; wait 0.4; shot h_454_250; wait 0.3; move 460 250; wait 0.4; shot h_460_250; wait 0.3; move 466 250; wait 0.4; shot h_466_250; wait 0.3; move 472 250; wait 0.4; shot h_472_250; wait 0.3; move 478 250; wait 0.4; shot h_478_250; wait 0.3; move 484 250; wait 0.4; shot h_484_250; wait 0.3; move 490 250; wait 0.4; shot h_490_250; wait 0.3; move 496 250; wait 0.4; shot h_496_250; wait 0.3; move 502 250; wait 0.4; shot h_502_250; wait 0.3; move 440 110; wait 0.4; shot h_440_110; wait 0.3; move 440 120; wait 0.4; shot h_440_120; wait 0.3; move 440 130; wait 0.4; shot h_440_130; wait 0.3; move 440 140; wait 0.4; shot h_440_140; wait 0.3; move 440 150; wait 0.4; shot h_440_150; wait 0.3; move 440 160; wait 0.4; shot h_440_160; wait 0.3; move 440 170; wait 0.4; shot h_440_170; wait 0.3; move 440 180; wait 0.4; shot h_440_180; wait 0.3; move 440 190; wait 0.4; shot h_440_190; wait 0.3; move 440 200; wait 0.4; shot h_440_200; wait 0.3; move 440 210; wait 0.4; shot h_440_210; wait 0.3; move 440 220; wait 0.4; shot h_440_220; wait 0.3; move 440 230; wait 0.4; shot h_440_230; wait 0.3; move 440 240; wait 0.4; shot h_440_240; wait 0.3; move 440 250; wait 0.4; shot h_440_250; wait 0.3; move 440 260; wait 0.4; shot h_440_260; wait 0.3; move 440 270; wait 0.4; shot h_440_270; wait 0.3; move 440 280; wait 0.4; shot h_440_280; wait 0.3; move 440 290; wait 0.4; shot h_440_290; wait 0.3; move 440 300; wait 0.4; shot h_440_300; wait 0.3; move 440 310; wait 0.4; shot h_440_310; wait 0.3; move 440 320; wait 0.4; shot h_440_320; wait 0.3; move 440 330; wait 0.4; shot h_440_330; wait 0.3; move 440 340; wait 0.4; shot h_440_340; wait 0.3; wait 2; end"
+   },
+   "kind": "script",
+   "tick": 0
+  }
+ ],
+ "notes": "REC-181: hover hit box of the create-screen heroes, measured by moving the pointer (no click) and testing the hover-text band (texts 197/198, y 60-140): diff_px_vs_ref 0 = the Barbarian text (ref h_442_250); base = no text. Barbarian (control 400,330): hovered for x 370..442, not 448..484 at y 250 (DC6 banu1 frame 0: w 86, ox -39 -> x 361..446); hovered for y 200..340, not 140..190 at x 440 (h 183, oy 51 -> y 198..380). x 490..502 hovers the Paladin (control 521,339; PANU1 w 82, ox -35 -> x 486..567). So the hit box is the DC6 frame-0 box of frontend-menus F3.3 r5, not the 88x184 descriptor (x 400..487, y 147..330). The walk_* shot comes from the frontend-0001 run.",
+ "recorded": {
+  "by": "claude (cloud, Wine)",
+  "command": "tools/cloud-game/run.sh --python --seconds 230 --out RUN -- tools/trace-recorder/autostart.py --menu --game $D2_GAME_DIR/Game.exe --seconds 200 --shots RUN/shots --input \"$(cat SCRIPT)\"; python3 tools/trace-recorder/menu_trace.py --shots RUN/shots --band 300 60 500 140 --band-ref h_442_250 ...",
+  "date": "2026-10-09",
+  "method": "memory-read",
+  "tool": "trace-recorder menu_trace 0.1.0 / autostart 0.2.0"
+ },
+ "setup": {
+  "band": [
+   300,
+   60,
+   500,
+   140
+  ],
+  "band_ref": "h_442_250",
+  "game_args": [
+   "-w",
+   "-ns"
+  ],
+  "menu_mode": true,
+  "size": [
+   800,
+   600
+  ]
+ },
+ "spec": "specs/ui/frontend-menus.md"
+}

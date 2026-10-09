@@ -175,7 +175,10 @@ fn correct(world: &mut ClientWorld, key: UnitKey, x: u16, y: u16) -> Checked {
         // REC-51): the 1.14d client's own position is its own path,
         // stepped by the same path code as the server's (`sim/pathing.md`
         // §3–§7) over the same rooms, so the two end together and rule 8
-        // asks only when they truly part. The play preview's position is
+        // asks only when they truly part. Measured: the two positions are
+        // equal at every tick of walk and run legs into obstacles
+        // (`traces/client/model/client-0001.json`); whether rule 8 skips
+        // the local player or just finds no difference is not recorded. The play preview's position is
         // a straight-line guess that does not see collision: past a wall
         // or around an obstacle it parts from the server's path although
         // the server is right, and C→S 0x5F would make the server walk
