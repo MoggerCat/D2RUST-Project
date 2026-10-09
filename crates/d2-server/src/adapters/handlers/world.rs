@@ -460,6 +460,13 @@ pub trait WorldHost<D> {
     /// Runs after the tick's steps, before its sends are taken (the
     /// quest routes the tick queued, `WiredWorld`).
     fn after_tick(&mut self, game: &mut Game, events: &mut D) {}
+    /// Runs after a session message (C→S 0x67 / 0x6B / 0x70) went
+    /// through the session flow: the unit work its load and game entry
+    /// raised (`WiredWorld`: the hireling calls, i.e. the join follow
+    /// `0x005773D0` that 1.14d runs inside the join placement,
+    /// `hirelings-2.md` §16 rule 3). Its sends stay in the host's outbox
+    /// for the next take.
+    fn session_work(&mut self, game: &mut Game, events: &mut D) {}
     /// The host's millisecond clock (`Intents::set_host_tick`): the
     /// object code's `GetTickCount` input (`objects.md` edge case 9).
     fn host_tick(&mut self, events: &mut D, ms: u32) {}

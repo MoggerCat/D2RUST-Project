@@ -1601,6 +1601,16 @@ pub trait Pending {
     {
         false
     }
+    /// The save load's passive states (`formats/d2s-load.md` §2
+    /// "skills", the assign's passive part): routed to
+    /// [`crate::wiring::interaction::skill_events::passive_refresh_all`]
+    /// by a [`crate::wiring::interaction::UseRest`] value. Default:
+    /// nothing.
+    fn passive_refresh_all(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId)
+    where
+        Self: Sized,
+    {
+    }
     /// The skill part of the monster sequence event 0 `0x005A8670`
     /// (`units.md` §4.6 rule 13, before the animation refresh): E flags,
     /// the moving skill's step and the do `0x0056FC50` by frame code. A
