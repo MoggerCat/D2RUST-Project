@@ -22,15 +22,15 @@
 | Rules | 62–63 |
 |   1. Lookup `0x00663310` | 64–90 |
 |   2. Load `0x00621260` | 91–111 |
-|   3. Frame queries | 112–205 |
-|   4. The table (`sequences.tsv`) | 206–237 |
-|   5. Users in 1.14d | 238–254 |
-| Constants & data dependencies | 255–263 |
-| Randomness | 264–267 |
-| Edge cases & original bugs | 268–287 |
-| Test vectors | 288–302 |
-| Provenance | 303–317 |
-| Open questions | 318–323 |
+|   3. Frame queries | 112–209 |
+|   4. The table (`sequences.tsv`) | 210–241 |
+|   5. Users in 1.14d | 242–258 |
+| Constants & data dependencies | 259–267 |
+| Randomness | 268–271 |
+| Edge cases & original bugs | 272–291 |
+| Test vectors | 292–306 |
+| Provenance | 307–321 |
+| Open questions | 322–327 |
 <!-- /index -->
 
 ## Summary
@@ -180,7 +180,11 @@ and hold:
    Leap and Leap Attack alike (same function, same frame-11 event).
    Monsters: `BaseId` 78 → position 8; 540 → 10, or 12 when
    `0x006417F0` distance < 2.
-4. Landed: Leap continues to its end; Leap Attack takes its target
+4. E flags 0x1101 include bit 1, so machine step 1 also steps the leap
+   path; its arrival sets flag 2 and runs the do. Landed: with flag 2
+   → path end `0x004C8890`, E flags := 0; without → E flags := 0x1000
+   (not for monsters); the sequence then runs to its end. Leap Attack
+   additionally takes its target
    (`0x00644500`); none → +0x48 := 0x400 (four frames left), else the
    strike set-up (`0x00620C10`, `0x00623C20`, sounds).
 
