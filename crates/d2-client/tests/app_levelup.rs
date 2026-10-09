@@ -123,7 +123,7 @@ fn joined() -> (Game, UnitId, u32) {
     link.pump().unwrap();
     link.receive();
     let (p, guid) = link
-        .with(|l| single_player::local_player(&mut l.host_mut().game).expect("joined"))
+        .with(|l| single_player::local_player(&l.host().game).expect("joined"))
         .unwrap();
     let mut g = Game { link, ms };
     // The next ticks populate the town and put the client in game.
