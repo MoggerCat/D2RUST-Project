@@ -1,0 +1,171 @@
+{
+ "area": "frontend",
+ "behavior": "frontend-credits",
+ "compare": {
+  "ignore": [],
+  "mode": "exact"
+ },
+ "expected": [
+  {
+   "data": {
+    "label": "vid1",
+    "launcher_mode": 4,
+    "player_level": null
+   },
+   "kind": "state",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "after1",
+    "launcher_mode": 4,
+    "player_level": null
+   },
+   "kind": "state",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "after2",
+    "launcher_mode": 4,
+    "player_level": null
+   },
+   "kind": "state",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "after3",
+    "launcher_mode": 4,
+    "player_level": null
+   },
+   "kind": "state",
+   "tick": 0
+  },
+  {
+   "data": {
+    "band": 0,
+    "diff_px_vs_ref": 0,
+    "green_px": 0,
+    "mean_luma_x1000": 30160,
+    "red_px": 0,
+    "shot": "after1"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "band": 0,
+    "diff_px_vs_ref": 48570,
+    "green_px": 0,
+    "mean_luma_x1000": 45578,
+    "red_px": 2726,
+    "shot": "after2"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "band": 0,
+    "diff_px_vs_ref": 48313,
+    "green_px": 0,
+    "mean_luma_x1000": 45111,
+    "red_px": 2885,
+    "shot": "after3"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "band": 0,
+    "diff_px_vs_ref": 0,
+    "green_px": 0,
+    "mean_luma_x1000": 30160,
+    "red_px": 0,
+    "shot": "cine"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "band": 0,
+    "diff_px_vs_ref": 0,
+    "green_px": 0,
+    "mean_luma_x1000": 30160,
+    "red_px": 0,
+    "shot": "vid1"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "band": 0,
+    "diff_px_vs_ref": 0,
+    "green_px": 0,
+    "mean_luma_x1000": 30160,
+    "red_px": 0,
+    "shot": "vid2"
+   },
+   "kind": "band",
+   "tick": 0
+  },
+  {
+   "data": {
+    "band": 0,
+    "diff_px_vs_ref": 48021,
+    "green_px": 0,
+    "mean_luma_x1000": 44686,
+    "red_px": 2547,
+    "shot": "vid3"
+   },
+   "kind": "band",
+   "tick": 0
+  }
+ ],
+ "format_version": 1,
+ "game_version": "1.14d",
+ "id": "frontend-0007",
+ "inputs": [
+  {
+   "data": {
+    "text": "wait 7; click 400 300; wait 3; click 469 515; wait 2; shot cine; click 400 163; wait 3; shot vid1; state vid1; char 27; wait 2; shot after1; state after1; click 400 163; wait 3; shot vid2; click 397 470; wait 2; shot after2; state after2; click 400 163; wait 3; shot vid3; char 27; char 27; char 27; wait 2; shot after3; state after3; wait 1; end"
+   },
+   "kind": "script",
+   "tick": 0
+  }
+ ],
+ "notes": "REC-186 (negative): cinematics menu, 'The Sister's Lament' clicked; 3 s later (vid1) the cinematics panel band equals the menu before the click (small diff = pointer/animation): the Bink video does not play visibly under Wine 9 / Xvfb in this container, so the C5 r4 input flush around a video cannot be observed here. Cancel (397,470) leaves to the main menu as expected (after2).",
+ "recorded": {
+  "by": "claude (cloud, Wine)",
+  "command": "tools/cloud-game/run.sh --python --seconds 130 --out RUN -- tools/trace-recorder/autostart.py --menu --game $D2_GAME_DIR/Game.exe --seconds 100 --shots RUN/shots --input SCRIPT; python3 tools/trace-recorder/menu_trace.py --shots RUN/shots --band 240 80 560 500 --band-ref cine ...",
+  "date": "2026-10-09",
+  "method": "memory-read",
+  "tool": "trace-recorder menu_trace 0.4.0 / autostart 0.2.0"
+ },
+ "setup": {
+  "band": [
+   [
+    240,
+    80,
+    560,
+    500
+   ]
+  ],
+  "band_ref": "cine",
+  "game_args": [
+   "-w",
+   "-ns"
+  ],
+  "menu_mode": true,
+  "size": [
+   800,
+   600
+  ]
+ },
+ "spec": "specs/ui/frontend-credits.md"
+}

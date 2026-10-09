@@ -1,0 +1,20 @@
+check 1
+# Tornado past the Fallen: ScnDru (expansion, level 30, every skill at 20, right skill 245),
+# -seed 1234; warp to the Blood Moor (level 2; variant
+# blood-moor-empty: no monster population there) before frame 4, a Fallen
+# (class 19) 4 sub-tiles away along +x (client pixel about 496, 296) before
+# frame 10, then one right click at client pixel (544, 336), past the Fallen (+8, +1), before frame 20's
+# drain (no hover on either side: d2rs' stand-in hover box,
+# bridge::combat::hover_at, misses it). Compares the cast (mode, states, stats), its missiles' or
+# summons' effects and the draws. Area F2 (q-diff-skills-2).
+# Spec: specs/tools/scenario-diff.md.
+name dru-tornado
+save ScnDru --class dru --expansion --level 30 --all-skills 20 --right-skill 245
+seed 1234
+ticks 70
+seconds 300
+channels state
+variant blood-moor-empty
+at 4 poke warp 2
+at 10 poke spawn 19 @x+4 @y normal
+input frame 20; rclick 544 336

@@ -1,14 +1,13 @@
-// Spec: specs/sim/intents-events.md §3.5 rule 6, §7.3 rule 2 step 8, §7.9 rule 1
+// Spec: specs/sim/intents-events.md §3.5 rule 6, §7.3 rule 1 steps 5, 7, §7.3 rule 2 step 8, §7.9 rule 1; specs/sim/stat-lists.md §11 rule 4
 //! The state-change messages `0x005711D0(unit, client)`: for every state
 //! whose state-changed bit is set on the unit (set by the state toggle,
 //! cleared by the room clean-up, §7.5 step 4), S→C 0xA8 SetState when the
 //! unit has it and its stat list has entries, 0xA7 DelayedState when it
 //! has it without entries, 0xA9 EndState when it no longer has it.
 //!
-//! Where it runs: the monster update's step 8 (§7.3 rule 2). For a
-//! player the spec names no step; d2rs sends them in the same per-client
-//! update (PROVISIONAL, REC in `docs/HANDOFF.md` §7), so the local
-//! player sees its own auras and the others' states.
+//! Where it runs: the monster update's step 8 (§7.3 rule 2) and the
+//! player update's step 5 (§7.3 rule 1), followed there by the step-7
+//! stat sends ([`View::player_stat_sends`]).
 
 use crate::units::messages::{self, SendStat};
 use crate::units::{UnitId, UnitType};
@@ -69,6 +68,29 @@ impl<X: Pending> View<'_, X> {
         }
         for m in out {
             self.h.x.send(receiver, &m);
+        }
+    }
+
+    /// §7.3 rule 1 step 7: `0x00625870(U, Q, s, 0x00548520)` for s = 67,
+    /// 68, 12, 0, 2: each base value (layer 0) whose key is present and
+    /// in the mod array (`stat-lists.md` §11 rule 4,
+    /// [`crate::stats::StatLists::single_stat`]), as S→C 0x1D / 0x1E /
+    /// 0x1F.
+    ///
+    /// TODO(intents-events.md §7.3 rule 1 step 7): which unit's stats a
+    /// client gets for another player's update (Q ≠ U) is not stated;
+    /// d2rs sends only the receiver's own (single player: U = Q).
+    pub fn player_stat_sends(&mut self, receiver: UnitId, unit: UnitId) {
+        if receiver != unit {
+            return;
+        }
+        for s in [67, 68, 12, 0, 2] {
+            let Some(v) = self.stats.single_stat(unit, s) else {
+                continue;
+            };
+            if let Some(m) = super::vitals_sync::stat_message(s, v) {
+                self.h.x.send(receiver, &m);
+            }
         }
     }
 

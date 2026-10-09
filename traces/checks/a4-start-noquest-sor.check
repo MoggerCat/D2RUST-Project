@@ -1,0 +1,11 @@
+check 1
+# Act IV start with no quest state (a level-1 sorceress, town byte act IV),
+# idle: the save-start seed and act path (q-prov-data; compare
+# a4-fortress-arrival-ama, which has acts 1-3 done).
+# Spec: specs/tools/scenario-diff.md.
+name a4-start-noquest-sor
+save NoQA4 --class sor --expansion --act 3
+seed 1234
+ticks 30
+seconds 240
+channels state

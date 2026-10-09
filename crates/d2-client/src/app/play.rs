@@ -323,6 +323,9 @@ pub struct PlayConfig {
     /// `--poke` / `--poke-file` (`specs/tools/poke.md` §5 rule 2): pokes
     /// applied on the server thread between frames; empty: none.
     pub pokes: Vec<super::poke::Entry>,
+    /// `--send "<f> <Name> f=v..."` (`specs/tools/scenario-diff.md` §3
+    /// r12): C→S messages injected on the server thread after frame f − 1.
+    pub sends: Vec<super::send::SendEntry>,
 }
 
 #[derive(Resource)]
@@ -355,9 +358,13 @@ pub fn after_run(world: &mut bevy::ecs::world::World) -> Result<bool, BridgeErro
 /// C→S 0x69 ([`Bridge::save_and_exit`]) and runs bridge frames until the
 /// server's 0x05 takes it out of the game (at most 100 frames: the drain
 /// of the next server frame answers it). Returns whether the client is
-/// out of the game. PROVISIONAL (REC-291): the window close of 1.14d
-/// runs the same exit path (`ui/frontend-options.md` §O3, `WM_CLOSE`);
-/// its chain is `flows/save-exit.md` OQ1. d2rs-own, unverified.
+/// out of the game. The window close leaves the same way: measured
+/// (REC-291, `traces/frontend/frontend-options/frontend-0004.json`):
+/// 1.14d's `WM_CLOSE` in a
+/// game rewrites the `.d2s` and ends the program (launcher mode 0 within
+/// 0.5 s, exit code 0; a kill at the same point leaves the file as it
+/// was), so the close saves; its exact chain stays `flows/save-exit.md`
+/// OQ1 (the 0x69 itself is not traced).
 pub fn leave_game<L: crate::bridge::link::ServerLink>(
     bridge: &mut Bridge<L>,
 ) -> Result<bool, BridgeError> {
@@ -569,7 +576,18 @@ pub fn add_live_client(app: &mut App, link: DynLink, c: LiveClient) -> anyhow::R
 }
 
 /// Opens the window and runs the game until it is closed.
-pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
+/// How a game run ended.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PlayEnd {
+    pub exit: AppExit,
+    /// Save and Exit asked in the game: the front end opens at the main
+    /// menu (REC-200). False when the window was closed: the program ends,
+    /// as 1.14d's `WM_CLOSE` does (REC-291,
+    /// `traces/frontend/frontend-options/frontend-0004.json`).
+    pub to_menu: bool,
+}
+
+pub fn run(config: PlayConfig) -> anyhow::Result<PlayEnd> {
     let GameData::Live(live) = config.data.clone();
     let request = config.character.clone();
     // d2rs-own, unverified: the map files sit next to the character save.
@@ -602,7 +620,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     if hardcore {
         link.with(|l| l.host_mut().game.events.action.hooks().x.hardcore = true)?;
     }
-    super::poke::install(&mut link, config.pokes)?;
+    super::send::install(&mut link, config.pokes, config.sends)?;
     // Before the app exists, so not through Bevy's log.
     println!("single player: seed {}", config.seed);
     let mut app = App::new();
@@ -673,6 +691,10 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             .add_systems(Update, exit_after);
     }
     let exit = app.run();
+    let to_menu = app
+        .world()
+        .get_resource::<BridgeResource>()
+        .is_some_and(|b| b.0.world().exit_requested);
     let left = after_run(app.world_mut());
     match (&saver, left) {
         (Some(h), Ok(true)) => println!(
@@ -683,5 +705,5 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         (_, Ok(false)) => eprintln!("play: the server never answered the leave"),
         (_, Err(e)) => eprintln!("play: the leave failed: {e}"),
     }
-    Ok(exit)
+    Ok(PlayEnd { exit, to_menu })
 }
