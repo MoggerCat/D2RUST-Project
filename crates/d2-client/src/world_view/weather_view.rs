@@ -668,6 +668,7 @@ mod tests {
             prepared(&mut view, &mut w, &levels, &mut a, tick);
             let mut frame = view.frame().expect("a level with weather");
             let sky = frame.sky_passes().unwrap();
+            drop(frame);
             let items = view
                 .items(&sky, OpenMode::NONE, a.shades.as_ref(), &a)
                 .unwrap();
@@ -706,6 +707,7 @@ mod tests {
         let mut frame = view.frame().unwrap();
         let sky = frame.sky_passes().unwrap();
         assert_eq!(sky.sky.len(), 1);
+        drop(frame);
         let items = view
             .items(&sky, OpenMode::NONE, a.shades.as_ref(), &a)
             .unwrap();
@@ -744,6 +746,7 @@ mod tests {
         let mut frame = view.frame().unwrap();
         let sky = frame.sky_passes().unwrap();
         assert_eq!(sky.pools.len(), 2);
+        drop(frame);
         let items = view
             .items(&sky, OpenMode::NONE, a.shades.as_ref(), &a)
             .unwrap();
