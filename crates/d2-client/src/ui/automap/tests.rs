@@ -758,15 +758,15 @@ fn records_append_and_chain() {
     assert_eq!(f.append(&r(0, 1)).unwrap(), TABLE_BYTES as u32);
     assert_eq!(u32s(&f.bytes[20..24]), [TABLE_BYTES as u32]);
     let h = u32s(&f.bytes[TABLE_BYTES..TABLE_BYTES + RECORD_HEADER]);
-    assert_eq!(h, [5, 0, 9, 6, 0, 12, 0, 0]);
+    assert_eq!(h, [0, 5, 0, 9, 6, 0, 12, 0]);
     let body = &f.bytes[TABLE_BYTES + RECORD_HEADER..];
     assert_eq!(body.len(), 18);
     assert_eq!(&body[..6], &[1, 0, 1, 0, 2, 0]);
     assert_eq!(&body[6..8], &[3, 0]);
     assert_eq!(&body[8..10], &(-4i16).to_le_bytes());
-    // The second record is linked from the first's eighth u32.
+    // The second record is linked from the first's first u32.
     let second = f.append(&r(0, 2)).unwrap();
-    assert_eq!(u32s(&f.bytes[TABLE_BYTES + 28..TABLE_BYTES + 32]), [second]);
+    assert_eq!(u32s(&f.bytes[TABLE_BYTES..TABLE_BYTES + 4]), [second]);
     let l = f
         .load(
             5,
@@ -825,10 +825,10 @@ fn load_cuts_bad_chains_and_skips_other_acts_units() {
     let mut f = MaFile::default();
     let first = f.append(&r(5, 0)).unwrap() as usize;
     let second = f.append(&r(5, 0)).unwrap();
-    f.bytes[second as usize..second as usize + 4].copy_from_slice(&6u32.to_le_bytes());
+    f.bytes[second as usize + 4..second as usize + 8].copy_from_slice(&6u32.to_le_bytes());
     let l = f.load(5, 9, lim).unwrap();
     assert!(l.cut);
-    assert_eq!(u32s(&f.bytes[first + 28..first + 32]), [0]);
+    assert_eq!(u32s(&f.bytes[first..first + 4]), [0]);
     // The town blob is checked against the town file's count.
     let mut f = MaFile::default();
     let mut big = r(5, 0);
@@ -1168,7 +1168,10 @@ fn fade_vectors() {
     assert_eq!(draw_mode(&v, &b[0], (0, 0), with(0, 0), &f), 5);
     let mut mini = v;
     mini.mini = true;
-    assert_eq!(draw_mode(&mini, &b[0], (0, 0), with(3, 1), &f), 1);
+    // §10 r4: mini honours the act byte too (was 1 for every byte).
+    assert_eq!(draw_mode(&mini, &b[0], (0, 0), with(3, 1), &f), 5);
+    assert_eq!(draw_mode(&mini, &b[0], (0, 0), with(3, 2), &f), 1);
+    assert_eq!(draw_mode(&mini, &b[0], (0, 0), with(3, 0), &f), 1);
     // Clip rectangles.
     let mut o = Options::default();
     assert_eq!(
@@ -1342,6 +1345,7 @@ fn monster(class: u32, interact: bool, disguised: Option<bool>, relation: u8) ->
         disguised,
         relation,
         name: vec![u16::from(b'M')],
+        owner_name: vec![u16::from(b'O')],
     }
 }
 
@@ -1385,6 +1389,7 @@ fn marker_colours() {
         disguised: None,
         relation: 1,
         name: vec![],
+        owner_name: vec![],
     };
     assert_eq!(color(&dead, &c), None);
     let bit21 = MarkerSubject::Monster {
@@ -1395,6 +1400,7 @@ fn marker_colours() {
         disguised: None,
         relation: 1,
         name: vec![],
+        owner_name: vec![],
     };
     assert_eq!(color(&bit21, &c), None);
     let obj = |class, target_level| MarkerSubject::Object {
@@ -1516,11 +1522,34 @@ fn marker_names() {
     };
     let p = u16::from(b'P');
     let mut out = Vec::new();
-    // A party member: cross and name (colour = B3's index 13 ≥ 13 → 0),
-    // top at Y − 10.
+    // A party member: cross and name in colour 2 (an immediate, not the
+    // marker byte), top at Y − 10.
     unit_markers(&[u(player(false, 1, 3))], &c, &mut out);
     assert_eq!(lines(&out), 12);
-    assert_eq!(texts(&out), [(Label::Text(vec![p]), 0, 108, 32)]);
+    assert_eq!(texts(&out), [(Label::Text(vec![p]), 2, 108, 32)]);
+    // A hostile player (B1) is named too, colour 1.
+    out.clear();
+    unit_markers(&[u(player(false, 1, 4))], &c, &mut out);
+    assert_eq!(texts(&out), [(Label::Text(vec![p]), 1, 108, 32)]);
+    // Names off: no name.
+    let mut no_names = c;
+    no_names.names = false;
+    out.clear();
+    unit_markers(&[u(player(false, 1, 4))], &no_names, &mut out);
+    assert!(texts(&out).is_empty());
+    // A disguised monster: the owner's name in colour 1 unless the owner
+    // is in the local party.
+    let o = u16::from(b'O');
+    out.clear();
+    unit_markers(&[u(monster(5, false, Some(false), 0))], &c, &mut out);
+    assert_eq!(texts(&out), [(Label::Text(vec![o]), 1, 108, 32)]);
+    out.clear();
+    unit_markers(&[u(monster(5, false, Some(true), 0))], &c, &mut out);
+    assert!(texts(&out).is_empty());
+    // Independently of the interact name.
+    out.clear();
+    unit_markers(&[u(monster(5, true, Some(false), 0))], &c, &mut out);
+    assert_eq!(texts(&out).iter().map(|t| t.1).collect::<Vec<_>>(), [4, 1]);
     // The local player: no name.
     out.clear();
     unit_markers(&[u(player(true, 1, 3))], &c, &mut out);
@@ -1699,4 +1728,27 @@ fn dead_gate_and_mini_down_follow_their_answers() {
     assert!(unit_dead(DeadKind::Player, 1, 0x1_0000));
     assert!(!unit_dead(DeadKind::Player, 1, 0x2_0000));
     assert!(mini_down(0) && mini_down(1) && !mini_down(2));
+}
+
+// Covers: specs/ui/automap.md §7 r2, §7 r3 (the link is the first u32)
+#[test]
+fn two_records_of_layer_2_link_from_the_first_u32() {
+    let mut f = MaFile::default();
+    let r = |n: i16| MaRecord {
+        layer: 2,
+        town_kind: 0,
+        act2: 9,
+        blobs: [vec![Cell::new(n, 0, 0)], vec![], vec![], vec![]],
+    };
+    f.append(&r(1)).unwrap();
+    f.append(&r(2)).unwrap();
+    assert_eq!(u32s(&f.bytes[8..12]), [400]);
+    assert_eq!(u32s(&f.bytes[400..404]), [400 + 32 + 6]);
+    assert_eq!(u32s(&f.bytes[404..408]), [2]);
+    let lim = CelLimits {
+        maxi: 100,
+        town: [100; 4],
+    };
+    let l = f.load(2, 9, lim).unwrap();
+    assert_eq!(l.trees[0].iter().map(|c| c.cel).collect::<Vec<_>>(), [1, 2]);
 }

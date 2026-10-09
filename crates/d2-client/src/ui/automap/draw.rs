@@ -206,10 +206,15 @@ pub fn draw_mode(
             }
         }
         2 => 1,
-        3 if view.mini => 1,
-        // PROVISIONAL (§10 r4, open question 6; automap-0001): the
-        // player's byte +0x18 is read as-is.
-        3 if matches!(fade.player_byte_18, 0 | 2) => 2,
+        // §10 r4 (0x00459440): v = 3 honours the act byte (unit +0x18) in
+        // both sizes: 0 or 2 -> 1 (mini) / 2 (full); else 5.
+        3 if matches!(fade.player_byte_18, 0 | 2) => {
+            if view.mini {
+                1
+            } else {
+                2
+            }
+        }
         // v = 1 on a town file (edge case 4), v = 3 otherwise, other v.
         _ => 5,
     }
