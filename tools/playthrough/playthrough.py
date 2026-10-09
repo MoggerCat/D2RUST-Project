@@ -24,6 +24,7 @@ import shlex
 import subprocess
 import sys
 import tempfile
+import threading
 
 VERSION = "0.3.0"
 FORMAT = "playthrough 1"
@@ -1015,10 +1016,15 @@ def main(argv=None):
             return worst
         jobs = [(p, c, d) for p in a.play for c in classes for d in diffs]
         cells = []
+        lock = threading.Lock()
 
         def one(job):
             p, c, d = job
             _, _, sm = run_cell(p, texts[p], c, d, client, d2s, base, a.game_dir, only)
+            if a.json:
+                # each finished cell at once, so a long run that stops early keeps its cells
+                with lock, open(a.json + ".cells.jsonl", "a", encoding="utf-8") as f:
+                    f.write(json.dumps(sm) + "\n")
             print(f"  {os.path.basename(p)} {c} {d}: {sm['reached']}/{sm['total']}"
                   + (f", first blocker {sm['first_blocker']['milestone']} ({sm['first_blocker']['kind']})"
                      if sm["first_blocker"] else ""), file=sys.stderr, flush=True)
