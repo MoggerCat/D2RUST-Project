@@ -37,22 +37,22 @@
 | Inputs | 73–81 |
 | Outputs / state changes | 82–93 |
 | Rules | 94–95 |
-|   1. Boundary | 96–111 |
-|   2. Receive path | 112–134 |
-|   3. Server link | 135–153 |
-|   4. Send path (intents) | 154–174 |
-|   5. Client world model | 175–194 |
-|   6. Dispatch table | 195–246 |
-|   7. Bevy mirror | 247–265 |
-|   8. Frame pacing | 266–292 |
-|   9. Versioning | 293–303 |
-|   10. Client outputs (bridge → UI and audio) | 304–488 |
-| Constants & data dependencies | 489–503 |
-| Randomness | 504–507 |
-| Edge cases & original bugs | 508–516 |
-| Test vectors | 517–547 |
-| Provenance | 548–558 |
-| Open questions | 559–599 |
+|   1. Boundary | 96–119 |
+|   2. Receive path | 120–142 |
+|   3. Server link | 143–161 |
+|   4. Send path (intents) | 162–182 |
+|   5. Client world model | 183–202 |
+|   6. Dispatch table | 203–254 |
+|   7. Bevy mirror | 255–273 |
+|   8. Frame pacing | 274–300 |
+|   9. Versioning | 301–311 |
+|   10. Client outputs (bridge → UI and audio) | 312–496 |
+| Constants & data dependencies | 497–511 |
+| Randomness | 512–515 |
+| Edge cases & original bugs | 516–524 |
+| Test vectors | 525–555 |
+| Provenance | 556–566 |
+| Open questions | 567–607 |
 <!-- /index -->
 
 ## Summary
@@ -97,7 +97,15 @@ receive).
 
 1. The bridge contains no game rules. It never decides an outcome, never
    predicts one, and never changes the world model except through a
-   dispatched S→C message (or its own counters, §5 rule 3).
+   dispatched S→C message (or its own counters, §5 rule 3), with one
+   exception: the draw's Y sort of a room's unit list. The sort runs on
+   the client room lists and persists there (`sim/unit-order.md` §5
+   rule 7), so the draw hands each filled room's sorted order back
+   (`Bridge::set_room_order`, refused unless it is a permutation of the
+   list; checked by `bridge::msg::tests_drlg`'s `set_order` tests). The
+   write happens on every frame the fill ran (`seams/bridge-app.md` §2.8).
+   *Revision 2026-10-09 (q-fix-seam-room-order): the exception was code
+   without a spec line.*
 2. Only the bridge talks to the server link. Bevy systems reach the game
    only through the bridge resource (§7): they read the world model and
    call the send path.
