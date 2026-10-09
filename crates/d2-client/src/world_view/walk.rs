@@ -95,6 +95,10 @@ pub fn preview_walk_frame(
             .predict
             .player()
             .and_then(|k| Some((k, walk.predict.facing()?)));
+        art.pose_since = walk
+            .predict
+            .player()
+            .and_then(|k| Some((k, walk.predict.walk_since()?)));
     }
 }
 

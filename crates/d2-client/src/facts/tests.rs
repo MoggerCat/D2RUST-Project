@@ -630,8 +630,10 @@ fn unit_cel_dir_is_the_context_dir64() {
     body.tag = ItemTag::Unit(9);
     let mut other = body;
     other.tag = ItemTag::Unit(8);
+    other.key = DrawKey::new(pass::WALLS_UNITS, 0, 1, 0).unwrap();
     let unit_type = |_: u32| Some(1u8);
-    let dirs = std::collections::BTreeMap::from([(9, 62u8)]);
+    // Keyed by the unit's draw slot (a GUID repeats across unit types).
+    let dirs = std::collections::BTreeMap::from([(body.key.slot(), 62u8)]);
     let cx = ExportContext {
         frames: &s,
         view_left: Some(0),

@@ -32,7 +32,7 @@ pub struct ExportContext<'a> {
     pub sky: &'a [SkyDraw],
     /// Each drawn unit's cel context direction by GUID
     /// (`WorldFrame::unit_dirs`, §5 r14).
-    pub unit_dirs: &'a BTreeMap<u32, u8>,
+    pub unit_dirs: &'a BTreeMap<u64, u8>,
     /// Cel calls without pixels (`WorldFrame::unit_calls`), sorted by key;
     /// one row each, merged with the items by key (§5 r15).
     pub unit_calls: &'a [UnitCall],
@@ -278,7 +278,7 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
                 // §5 r14: a unit cel's `dir` is the context's `dir64`, not
                 // the file direction the frame set is keyed by.
                 let d = match item.tag {
-                    ItemTag::Unit(guid) => cx.unit_dirs.get(&guid).copied().unwrap_or(d),
+                    ItemTag::Unit(_) => cx.unit_dirs.get(&item.key.slot()).copied().unwrap_or(d),
                     _ => d,
                 };
                 row[3] = d.to_string();

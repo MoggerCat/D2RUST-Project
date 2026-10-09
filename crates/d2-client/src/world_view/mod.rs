@@ -531,9 +531,10 @@ pub struct WorldFrame {
     /// by key; not composed. Read by the facts export (§5 r12).
     pub calls: Vec<DrawItem>,
     /// Each drawn unit's cel context direction ([`UnitPose::dir64`]) by
-    /// GUID, for the rendering facts (`specs/tools/facts-render.md` §5
-    /// r14).
-    pub unit_dirs: BTreeMap<u32, u8>,
+    /// its draw slot ([`DrawKey::slot`] of its pass key and of its shadow
+    /// key; a GUID is unique per unit type only), for the rendering facts
+    /// (`specs/tools/facts-render.md` §5 r14).
+    pub unit_dirs: BTreeMap<u64, u8>,
     /// Cel draw calls without pixels (a component file in no archive),
     /// sorted by key; not composed. Read by the facts export (§5 r15).
     pub unit_calls: Vec<UnitCall>,
@@ -680,7 +681,12 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
             items.extend(draws.into_iter().map(|d| d.item));
         }
         items.extend(shadows);
-        unit_dirs.insert(unit.key.guid, pose.dir64);
+        if let Ok(k) = DrawKey::new(params.pass, params.major, params.minor, 0) {
+            unit_dirs.insert(k.slot(), pose.dir64);
+        }
+        if let Some(Ok(k)) = shadow_at.map(|a| DrawKey::new(a.pass, a.major, a.minor, 0)) {
+            unit_dirs.insert(k.slot(), pose.dir64);
+        }
         for c in rules.unit_slot_calls(unit, &pose, cof)? {
             let call = |pass, major, minor, shadow| -> Result<UnitCall, ViewError> {
                 Ok(UnitCall {

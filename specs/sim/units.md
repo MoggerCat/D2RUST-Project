@@ -28,17 +28,17 @@
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–136 |
 |   3. Lifecycle | 137–401 |
-|   4. Modes and mode schedules | 402–827 |
-|   5. Event dispatch | 828–842 |
-|   6. Events per kind | 843–965 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 966–987 |
-|   8. Collision line between two units | 988–992 |
-| Constants & data dependencies | 993–1009 |
-| Randomness | 1010–1017 |
-| Edge cases & original bugs | 1018–1038 |
-| Test vectors | 1039–1098 |
-| Provenance | 1099–1185 |
-| Open questions | 1186–1265 |
+|   4. Modes and mode schedules | 402–837 |
+|   5. Event dispatch | 838–852 |
+|   6. Events per kind | 853–975 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 976–997 |
+|   8. Collision line between two units | 998–1002 |
+| Constants & data dependencies | 1003–1019 |
+| Randomness | 1020–1027 |
+| Edge cases & original bugs | 1028–1048 |
+| Test vectors | 1049–1108 |
+| Provenance | 1109–1195 |
+| Open questions | 1196–1275 |
 <!-- /index -->
 
 ## Summary
@@ -783,6 +783,16 @@ Steps, first match wins:
    0..0x7FFF.
 10. Otherwise: speed := D(s, clamp(total(69 `other_animrate`), 15,
     175)).
+
+Measured (revision 2026-10-09, q-scenes-compare): the local player's
+town walk (mode 6, w = 213, p = 100) is drawn at server tick T with frame
+`((T − c) · 213 >> 8) mod 8`, c = the tick of the walk request that
+started the walk; a new click while still walking keeps c (`a1-walk-n`
+… `-w`, 1.14d frames 0, 3, 7, 3, 6, 2 at ticks 32 … 102, c = 22).
+PROVISIONAL (REC-516): the run (mode 3, w = 101) does not fit c = the
+run click (`a1-run-n` frame 5 at tick 150, run click 140); the d2rs
+client applies the rule to walks only (settled by a run recording from
+a standing start).
 
 Steps 7 and 8 assert (fatal) for types 2 and 3; no 1.14d caller passes
 an object or missile (objects take `0x00624390`'s own branch,

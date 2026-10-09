@@ -26,15 +26,15 @@
 |   2. `draws.tsv` | 90–136 |
 |   3. `frame.tsv` | 137–169 |
 |   4. `sprites.tsv` | 170–189 |
-|   5. d2rs export | 190–312 |
-|   6. Comparison | 313–350 |
-|   7. Requests | 351–362 |
-| Constants & data dependencies | 363–366 |
-| Randomness | 367–370 |
-| Edge cases & original bugs | 371–378 |
-| Test vectors | 379–387 |
-| Provenance | 388–392 |
-| Open questions | 393–407 |
+|   5. d2rs export | 190–313 |
+|   6. Comparison | 314–351 |
+|   7. Requests | 352–363 |
+| Constants & data dependencies | 364–367 |
+| Randomness | 368–371 |
+| Edge cases & original bugs | 372–379 |
+| Test vectors | 380–388 |
+| Provenance | 389–393 |
+| Open questions | 394–408 |
 <!-- /index -->
 
 ## Summary
@@ -290,7 +290,8 @@ composition, through `d2-client` only (game logic untouched).
 14. A unit cel row's `dir` (and its `sprites.tsv` key) is the cel
    context's direction of §2 r3: the unit's `dir64` after the snap of
    `render/unit-composite.md` §3 r4 (`UnitPose::dir64`, kept per drawn
-   unit in `WorldFrame::unit_dirs`), not the file direction of the frame
+   unit in `WorldFrame::unit_dirs` by the unit's draw slot, not by GUID:
+   GUIDs repeat across unit types, revision 2026-10-09), not the file direction of the frame
    set (§6 r3 maps several `dir64` to one file direction). Other cel
    rows keep the frame set's direction.
 15. A composite slot whose component request succeeds but whose file is
