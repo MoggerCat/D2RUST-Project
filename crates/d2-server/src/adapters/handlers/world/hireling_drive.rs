@@ -13,9 +13,8 @@
 //!    (run when farther than [`RUN_FROM`]);
 //! 3. else idle.
 //!
-//! A hireling or summoned pet whose AI control has the owner link (the
-//! hire's or the summon's `0x0058F030`, wired with REC-279) is left to
-//! the real think.
+//! A hireling whose AI control has the owner link (the hire's
+//! `0x0058F030`, wired with REC-279) is left to the real think.
 //!
 //! Everything is integer and drawn from no RNG (determinism). PROVISIONAL:
 //! REC-100 (docs/HANDOFF.md §7): no experience share, no drops, no
@@ -89,8 +88,22 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 })
                 .collect()
         };
-        // The summoned pets (`ActionHooks::pet_lists`, `q-summons`) without
-        // the owner link follow and fight by the same think.
+        // A hireling whose AI control holds its owner link (`hirelings.md`
+        // §3.2 rule 8) is driven by the real Hireable think
+        // (`ai-bodies-6.md` §7, REC-279): the stand-in leaves it.
+        mercs.retain(|&(m, _)| {
+            stand_in_drives(
+                events
+                    .action()
+                    .sys
+                    .hooks
+                    .ai
+                    .as_ref()
+                    .and_then(|s| s.control(m)),
+            )
+        });
+        // The summoned pets (`ActionHooks::pet_lists`, `q-summons`) follow
+        // and fight by the same think.
         let pets: Vec<(UnitId, u32)> = events.action().with(game, |g, v| {
             v.h.pet_lists
                 .iter()
@@ -121,26 +134,17 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 })
                 .collect()
         });
-        mercs.extend(pets.into_iter().filter(|(m, _)| !traps.contains(m)));
-        // A hireling whose AI control holds its owner link (`hirelings.md`
-        // §3.2 rule 8) is driven by the real Hireable think
-        // (`ai-bodies-6.md` §7, REC-279), and a summoned pet with the link
-        // (the summon's `0x0058F030`, `umod-callbacks.md` §1 rule 5) by its
-        // own AI (DruidWolf, Totem, ShadowWarrior, ...; `ai-bodies-6.md`,
-        // `ai-bodies-7.md`): the stand-in leaves both. 1.14d: the
-        // dru-summon-spirit-wolf check's wolf walks on where the stand-in
-        // stopped it.
-        mercs.retain(|&(m, _)| {
-            stand_in_drives(
-                events
-                    .action()
-                    .sys
-                    .hooks
-                    .ai
-                    .as_ref()
-                    .and_then(|s| s.control(m)),
-            )
-        });
+        // A summon gets the owner link at its spawn (`skills/bodies.md`
+        // §6.2 step 6, `0x0058F030`): like a linked hireling it is left to
+        // its own monstats AI (NecroPet, Hydra, Idle, ...), first run by
+        // the spawn's think at F + 25 (§6.2 step 8; q-fix-skills-4cls:
+        // 1.14d keeps a Clay Golem in its `summode` S1 until then).
+        let ai = events.action().sys.hooks.ai.as_ref();
+        let pets: Vec<(UnitId, u32)> = pets
+            .into_iter()
+            .filter(|&(m, _)| !traps.contains(&m) && stand_in_drives(ai.and_then(|s| s.control(m))))
+            .collect();
+        mercs.extend(pets);
         let frame = game.frame;
         if mercs.is_empty() {
             return;

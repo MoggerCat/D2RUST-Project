@@ -1307,6 +1307,21 @@ pub fn select_skill<W: UseWorld>(w: &mut W, t: &SkillTables, u: W::Unit, m: &[u8
         }
     }
     w.set_right_skill(u, e);
+    right_aura_start(w, t, u, &e, l);
+    0
+}
+
+/// The new right skill's aura start of `0x005701B0` (§7, `0x0056FF10`):
+/// an `aura` skill runs its do core once when `immediate`, else switches
+/// its aura state on; then the aura-form schedule. Also run by the save
+/// load's mouse-skill selection (`formats/d2s.md` §2.4 rule 6.3).
+pub fn right_aura_start<W: UseWorld>(
+    w: &mut W,
+    t: &SkillTables,
+    u: W::Unit,
+    e: &SkillEntry,
+    l: i32,
+) {
     if let Some(r) = rec(t, e.skill).filter(|r| r.aura) {
         if r.immediate {
             do_core(w, t, u, e.skill, l, true, false, false);
@@ -1315,5 +1330,4 @@ pub fn select_skill<W: UseWorld>(w: &mut W, t: &SkillTables, u: W::Unit, m: &[u8
         }
         schedule_periodic(w, t, u, e.skill, l, true);
     }
-    0
 }

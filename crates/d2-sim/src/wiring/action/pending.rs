@@ -1641,6 +1641,15 @@ pub trait Pending {
     {
         false
     }
+    /// The save load's right-skill aura start (`formats/d2s.md` §2.4
+    /// rule 6.3): routed to
+    /// [`crate::wiring::interaction::skill_events::right_aura_select`] by
+    /// a [`crate::wiring::interaction::UseRest`] value. Default: nothing.
+    fn right_aura_select(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, player: UnitId)
+    where
+        Self: Sized,
+    {
+    }
     /// The save load's passive states (`formats/d2s-load.md` §2
     /// "skills", the assign's passive part): routed to
     /// [`crate::wiring::interaction::skill_events::passive_refresh_all`]

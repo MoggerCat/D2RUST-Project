@@ -341,3 +341,27 @@ pub fn passive_refresh_all<X: Pending + UseRest>(
         }
     }
 }
+
+/// The save load's right-skill selection (`formats/d2s.md` §2.4 rule
+/// 6.3, `0x005701B0` hand 0): the selected right skill's aura start
+/// ([`crate::skills::use_::right_aura_start`]), so an aura saved on the
+/// right button is on from the join (1.14d `pal-vigor` / `pal-fanaticism`
+/// checks: the aura's stats at frame 2).
+pub fn right_aura_select<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    player: UnitId,
+) {
+    let t = h.tables.clone();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    let Some(e) = UseWorld::right_skill(&w, player) else {
+        return;
+    };
+    let l = skill_level(&w, &t.skills, Some(player), Some(&e), true);
+    crate::skills::use_::right_aura_start(&mut w, &t.skills, player, &e, l);
+}
