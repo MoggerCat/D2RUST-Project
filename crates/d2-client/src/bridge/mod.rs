@@ -44,6 +44,7 @@ pub mod predict;
 pub mod receive;
 pub mod skill_fallback;
 pub mod skills;
+pub mod state;
 pub mod update;
 pub mod world;
 
@@ -554,6 +555,12 @@ impl<L: ServerLink> Bridge<L> {
 
     pub fn world(&self) -> &ClientWorld {
         &self.world
+    }
+
+    /// A drawn frame's camera: the unit origin the client missile
+    /// function 2 reads (`world::UnitOrigin`, `missiles/client.md` §C13).
+    pub fn set_unit_origin(&mut self, cam: &crate::rules::camera::Camera) {
+        self.world.unit_origin = Some(world::UnitOrigin::of(cam));
     }
 
     /// A drawn frame's light pass (`render/lighting.md` §6.4): `pass` gets

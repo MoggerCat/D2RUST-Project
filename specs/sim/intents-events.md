@@ -39,20 +39,20 @@
 | Outputs / state changes | 84–90 |
 | Rules | 91–92 |
 |   1. Loop order (single player) | 93–114 |
-|   2. Client → server | 115–389 |
-|   3. Server → client | 390–626 |
-|   4. d2rs mapping and scope | 627–658 |
-|   5. Machine-readable tables | 659–695 |
-|   6. Exact-match comparison | 696–804 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 805–1255 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1256–1480 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1481–1653 |
-| Constants & data dependencies | 1654–1672 |
-| Randomness | 1673–1678 |
-| Edge cases & original bugs | 1679–1724 |
-| Test vectors | 1725–1811 |
-| Provenance | 1812–1938 |
-| Open questions | 1939–2091 |
+|   2. Client → server | 115–398 |
+|   3. Server → client | 399–635 |
+|   4. d2rs mapping and scope | 636–667 |
+|   5. Machine-readable tables | 668–704 |
+|   6. Exact-match comparison | 705–813 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 814–1289 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1290–1555 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1556–1728 |
+| Constants & data dependencies | 1729–1747 |
+| Randomness | 1748–1753 |
+| Edge cases & original bugs | 1754–1799 |
+| Test vectors | 1800–1886 |
+| Provenance | 1887–2013 |
+| Open questions | 2014–2166 |
 <!-- /index -->
 
 ## Summary
@@ -363,7 +363,16 @@ lock `0x008846A8`; "initialised" = `[0x008846D8]` ≠ 0).
    bytes), u16@0x31 = game +0x8C, u16@0x33 = game +0x28; bytes 0x11–0x30
    are never written (stack contents; d2rs: zero). Then a terminator
    0xB2 with an empty name, u16@0x31 = 0, u16@0x33 = 0xFFFF. The client
-   ignores 0xB2 (§3.4 rule 2).
+   ignores 0xB2 (§3.4 rule 2). Game +0x28 (read 2026-10-09) is the
+   game id from `0x0052C170` at game creation (`0x00530A67`): a
+   process-wide counter (u16 `0x00731000`, initial value 1 in the
+   image) names the next id to try; ids run 1 … 0x400 and wrap to 1;
+   the first id from the counter whose slot (`0x00882D34` + 4·id) is
+   0 is taken (slot := −1) and the counter moves past it; none free →
+   0 and the game is not created. So the first game of a process has
+   id 1, the second 2, and so on. Game +0x8C is the client count: 0 at
+   game init (`0x005379A0`), +1 per client attached (`0x00539BC0`); an
+   attach with +0x8C ≥ 8 is refused (`0x00539A4E`).
 4. **0x6C save upload** (`0x0052DB00` always 1; `0x00538CE0`): the
    client record (none, or table not initialised → nothing): when its
    received count (+0x180) is 0, a buffer of `total` bytes from the
@@ -845,7 +854,8 @@ room-change merge (`sim/pathing.md` §9.8). Part A by type:
 | item | only with unit flag 0x10: mode 3 and unit flag 0x1000 → 0x9C action 2 (`0x0053EC90`), else 0x9C action 0 (`0x0053EC00`) (`items/inventory-moves.md` §6.3) | |
 | other (5) | 0x09 (`0x0053BCD0`: type, GUID, class u8, x, y) | |
 
-Part B by type: player → `0x005489F0`, then a corpse 0x74
+Part B by type: player → `0x005489F0` (another player only: five
+S→C 0x20, `client/msg-stats-items.md` §1 r4.2), then a corpse 0x74
 (`0x0053DA40`) when `0x005541B0(unit)` and `0x00639DF0(unit, 7)` hold,
 else `0x00534F80`;
 `0x00570E30`, `0x005484B0`, `0x00571CD0`, `0x00571620`; monster → its
@@ -856,7 +866,21 @@ class is 291, 417 or 418; item → `0x0055BED0` (§7.3 rule 4); others nothing.
 
 1. **Player** `0x00580860`: `sim/pathing.md` §10 rules 2–3 (0x15, 0x0F,
    0x10) and `items/inventory-moves.md` §6.1 rule 2 (item dispatcher, 0x47,
-   0x48).
+   0x48). Full call order (asm `0x00580860`–`0x005809BE`, read
+   2026-10-09), U = the player, C = the client, Q = C's player:
+   1. Flag-ex bit 0x10000 → `0x00548010(U, C, 1)`; else flag-ex bit
+      0x800 and U ≠ Q → `0x00548010(U, C, 0)`.
+   2. announced = 0 and flag-ex bit 0x1 → `0x00597890(game, U, C, 0)`,
+      `0x0053D370(C, U)`, `0x0053D3C0(C, U, 0)`.
+   3. Unit flag 0x1 → `0x005484B0(game, U, C)` (mode messages).
+   4. `0x00571CD0(U, C)`; unit flag 0x400 → `0x00571740`; 0x100 →
+      `0x00571620`; 0x8000 → `0x00547F70` (each (U, C)).
+   5. Any state-changed bit (`0x00639F20`) → `0x00571580(U, C, 0)` →
+      `0x005711D0(U, C)`: the 0xA7 / 0xA8 / 0xA9 state messages (§7.3
+      rule 2 step 8), so a player's states reach every client here.
+   6. `0x00625A20(U)` ≠ 0 → `0x005715A0(U, C)`.
+   7. The stat sends `0x00625870(U, Q, s, 0x00548520)` for s = 0x43,
+      0x44, 0x0C, 0, 2 in that order.
 2. **Monster** `0x00598220(game, unit, client, announced)`, in order:
    1. Flag-ex (+0xC8) bit 0x10000: S→C 0x15 (`0x0053BC10`: type, GUID,
       x, y, flag 1; the dynamic path's cell, a static path's +0x0C /
@@ -900,10 +924,12 @@ class is 291, 417 or 418; item → `0x0055BED0` (§7.3 rule 4); others nothing.
       S→C **0x11** (`0x0053D850`, 8 bytes): type u8@1 = unit +0x00, GUID
       u32@2, overlay u16@6 = v. d2rs: `units::messages::report_kill`,
       `View::monster_update` step 9, the count from `ActionTables`
-      `overlay_count` (`overlay.bin` records). PROVISIONAL: v is read as
-      the overlay list's base value of stat 178 (`0x00625A50` is not
-      spelled out; an overlay list is not extended, so base and total
-      agree); settled by REC-410.
+      `overlay_count` (`overlay.bin` records). v is the **list total**
+      (2026-10-09, REC-410 settled): `0x00625A50(list, s)` is only
+      `0x00625420(list, s, 0)`, the list total of `sim/stats.md` (full
+      array when the list is extended, else the base array); an overlay
+      list is not extended, so this is its base value of stat 178, as
+      d2rs reads it.
    10. Unit flag 0x800: `0x00597C70(unit, client)`: only when monster
       data +0x5C has bit 1 (`0x00573540(unit, 1)`) and the unit has
       monster data → S→C **0x57** (`0x0053D880`, 14 bytes): GUID u32@1,
@@ -1201,8 +1227,13 @@ or the new room equals the client's room (client +0x1B4, the old room).
    `0x0053D530` and 0x9A → `0x0053D4D0`, with the last argument 1 (so
    they send 0x99 / 0x9A, §7.4 rule 3); 0x9E → `0x0053BEE0`; 0xA1 →
    `0x0053BFD0`; 0xA3 → `0x0053C0E0`; 0xA4 → `0x0053E1A0`; 0xA5 →
-   `0x0053C190`; 0xAB → `0x0053C150` only when `0x00451F30(unit)` is 0,
-   the client has a player and `0x00554200(unit)` holds; other ids
+   `0x0053C190`; 0xAB → `0x0053C150` only when unit flag 0x8000 (the
+   hit flag of §7.3 rule 2 step 7; `0x00451F30(unit, 0x8000)`, +0xC4)
+   is clear, the client has a player P (`0x00537860(client, 0)`) and P
+   may attack the unit, `0x00554200(game, P, unit)` (`combat/hit.md`
+   §7.1; game = P +0x80 by `0x00554010(P)`, which returns with plain
+   `ret`, so the unit pushed before it at `0x00571E14` is the stack
+   argument of `0x00554200` at `0x00571E21`); other ids
    nothing. The record fields are passed through. An empty list (every
    unit in both recordings' joins) sends nothing.
    **Writers** (the only stores to unit +0xEC besides the clears): nine
@@ -1229,10 +1260,13 @@ or the new room equals the client's room (client +0x1B4, the old room).
    `wiring/action/event_records.rs` records; 0x9E is sent at once by the
    hireling code; 0xA1 never runs; 0x23 has no d2rs writer. PROVISIONAL
    (a) 0xA5: the message names the unit the record sits on (the writer's
-   unit); settled by REC-411. (b) 0xAB: sent for every receiver unless
-   the unit is revived (`0x00451F30`, flag 0x80000000); the third test
-   `0x00554200(unit)` (its arguments are not spelled out) is not applied;
-   settled by REC-412. (c) 0x99 / 0x9A: the level byte is the cast level
+   unit); settled by REC-411. (b) 0xAB (REC-412 settled 2026-10-09,
+   rule 2 above): a receiver gets it only when the unit's hit flag
+   0x8000 is clear and its player may attack the unit (hostility
+   `combat/hit.md` §7.1: a monster climbs to its owner, so a player's
+   own hireling or summon and any unit of the same side send nothing);
+   d2rs tests the revived flag 0x80000000 instead and applies no
+   hostility test (q-fix `qfix-a4a-0xab-gate`). (c) 0x99 / 0x9A: the level byte is the cast level
    cut to a byte and w is the cast's `aim` flag (0 / 1); the 16-byte or
    17-byte form is the §3.5 rule 5 choice with flag 1; settled by
    REC-413.
@@ -1330,8 +1364,8 @@ rule 3), drained in a later frame (recorded: after tick 1).
       0x76; (b) skills `0x0056A710` (`0x0056B2AF`) → 0x94
       (`0x0053C5D0` at `0x0056A7B7`); (c) player items `0x0056A7E0`
       (`0x0056B2D3`) → `0x005337F0` (`0x0056A802`) → … → `0x0055C110`:
-      0x22 (`0x0055C216`) and, through `0x00570080`, 0x21
-      (`0x0057017B`); the corpse (`0x0056A830`, `0x0056B2F6`) and, in an
+      0x22 (`0x0055C216`) and the stat callback's 0x21
+      (`0x0055BB4B`); the corpse (`0x0056A830`, `0x0056B2F6`) and, in an
       expansion game only, the hireling's items (`0x0056AC10`,
       `0x0056B32D`, with inventory refresh `0x0055DF00` at `0x0056ACA1`
       on the hireling) run the same item reader; (d) post-load
@@ -1340,8 +1374,20 @@ rule 3), drained in a later frame (recorded: after tick 1).
       conditional): the recorded single 0x23; (e) after the loader,
       `0x00546270` (`0x005344EF`, mode 0): 0x5E (`0x005465FE`), 0x28
       (`0x0054662D`), 0x29 (`0x00544520` at `0x00544578`). 0x22 and
-      0x21 are reachable only through the item calls of (c); their
-      per-item conditions belong to the item and save-load specs.
+      0x21 come only from the item calls of (c), one per item, in the
+      save's item order (read 2026-10-09): **0x22** for each scroll or
+      tome placed on a page ≠ 4 (the placement's item-skill link,
+      `items/inventory.md` §2 rule 6 and §5.5: type `scro` / `book`
+      with a books row; a tome with quantity 0 sends none); the stash
+      sends none. **0x21** (level 0, remove 0) for each linked item
+      carrying stat 97 or 107 at a layer s whose native entry the
+      player lacks (`skills/levels.md` §7.1 step 2; a second item
+      with the same s sends none). The 0x21 of `0x00570080`
+      (`0x0057017B`, base level ≥ 1) is reached from §5.5 step 3 only
+      when the scroll / tome skill is absent; the recorded join's 0x94
+      already lists 217–220, so it is not sent there (the recorded 0x21,
+      `21 00 00 01000000 2400 00 01`, has level 0: the stat-callback
+      form).
       **New character (stub) load**: when the header returns 2 (status
       bit 0, `formats/d2s.md` §9 rule 1), `0x0056B180` calls
       `0x00569F80` (`0x0056B1E2`) instead of (b)–(d)
@@ -1460,11 +1506,40 @@ are zero. Recorded seq 224: `5a 02 04 00000000 00` + "werwer" padded
 with zeros to 40 bytes. The leave 0x5A (code 3) is §2.5 rule 2.
 The join's 0x5B fields are `client/msg-units.md` §8 r3 (the 1.14d
 sender's words); its 0x65 carries the player's kill count (0 at the
-recorded join). PROVISIONAL: with more than one client in state 4, each
-gets the joiner's 0x5B and 0x65, in client-list order, before the 0x5A
-(because this section names `0x0052C410`'s messages but not who gets
-the other players' 0x5B / 0x65; single player has one client, so it
-does not change a single-player join); settled by REC-401.
+recorded join). Who gets what (read 2026-10-09; settles REC-401 and
+REC-406), J = the joiner's client, P(C) = client C's player unit
+(`0x00537860(C, 0)`; J without one is fatal 0x5A1), client list = game
++0x88, link client +0x4A8:
+
+```
+// 0x0052C410(game, J)
+for C in client list:                       // any state
+    if C == J or P(C) is none: continue
+    send to J:  0x5B of P(C)                // 0x0053C940(J, P(C), C)
+    send to C:  0x5B of P(J)                // 0x0053C940(C, P(J), J)
+    for each corpse GUID g of P(C) (pcdata corpse list, 0x0063D570 /
+        0x0063D610; g ≠ −1):
+        send to J: 0x8E CorpseAssign(P(C), unit g)   // 0x0053DFB0
+send to J: 0x5B of P(J)
+// 0x0053FC70(game, J) → 0x0053FB90(game, 1) with EBX = J
+for C in client list with state 4 and P(C):
+    send to J: 0x65 of P(C) (kill count = pcdata +0x34 word 0)
+if J's state ≠ 4 and P(J): send to J: 0x65 of P(J)   // not taken: J is 4
+// 0x0055B620(game, P(J)) → 0x005538D0: every player unit Q of the
+// game's player table (+0x1120, 128 buckets, chain +0xE4) without
+// state 7, bucket order → 0x0055B540(game, Q, P(J)):
+    party bookkeeping 0x0055B140 (J, then Q), then
+    send to J: 0x8D(GUID of Q, party = 0x00554630(Q), −1 = none)
+    then the relation updates 0x0055B3A0 / 0x0055B440 / 0x0053DE50 (not
+    read here; no message from them in the recorded single-player join)
+```
+
+So the other clients get only the joiner's 0x5B (and the 0x5A); the
+joiner gets every other player's 0x5B, its own 0x5B last, one 0x65 per
+in-game player and one 0x8D per player unit. Single player: 0x5B,
+0x65, 0x8D (own GUID, 0xFFFF) to the one client, as recorded. The
+0x5B tail: when the unit is a player, `0x00574F80` runs after the send
+(not read here).
 
 The first 0x48 is the per-client update's inventory refresh: in
 `0x005380D0` the order is removals (`0x0053A770`), unit updates

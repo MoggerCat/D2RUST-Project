@@ -27,18 +27,18 @@
 | Rules | 75–76 |
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–136 |
-|   3. Lifecycle | 137–396 |
-|   4. Modes and mode schedules | 397–822 |
-|   5. Event dispatch | 823–837 |
-|   6. Events per kind | 838–960 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 961–982 |
-|   8. Collision line between two units | 983–987 |
-| Constants & data dependencies | 988–1004 |
-| Randomness | 1005–1012 |
-| Edge cases & original bugs | 1013–1033 |
-| Test vectors | 1034–1093 |
-| Provenance | 1094–1180 |
-| Open questions | 1181–1260 |
+|   3. Lifecycle | 137–401 |
+|   4. Modes and mode schedules | 402–827 |
+|   5. Event dispatch | 828–842 |
+|   6. Events per kind | 843–965 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 966–987 |
+|   8. Collision line between two units | 988–992 |
+| Constants & data dependencies | 993–1009 |
+| Randomness | 1010–1017 |
+| Edge cases & original bugs | 1018–1038 |
+| Test vectors | 1039–1098 |
+| Provenance | 1099–1185 |
+| Open questions | 1186–1265 |
 <!-- /index -->
 
 ## Summary
@@ -238,7 +238,12 @@ fixed GUID):
    step 7; its result is not tested. Then a player in mode 0 or 17, or a
    monster for which `0x0063EA40` holds and `0x004638A0(class, 0x13)`
    does not, gets path settings (`0x00649560(1)`, `0x00649190(5)`,
-   `0x00648C30(0x8000)`; `sim/path-placement.md` §5.3).
+   `0x00648C30(0x8000)`; `sim/path-placement.md` §5.3 rule 3).
+   `0x0063EA40(U)`: U is a monster in mode 0 (DT) or 12 (DD).
+   `0x004638A0(class, 0x13)`: monstats2 flag 19 of the class's
+   monstats2 row (bit array at record +4). The three calls: remove the
+   footprint (force), pattern +0x48 := 5, mask := 0x8000 and restamp
+   (read 2026-10-09).
 9. Flags & 0x1 clear: no `SUNIT_Add` and no path settings; the unit is
    returned as it is after step 7 (seeds drawn, GUID taken, per-kind
    init done), in no room list, hash list or update queue. This is not

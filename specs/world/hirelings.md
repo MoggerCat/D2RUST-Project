@@ -41,17 +41,17 @@
 |   7. Experience and level-up | 455–520 |
 |   8. Death (`0x0057CCB0` → `0x005751A0`) | 521–583 |
 |   9. Revive | 584–621 |
-|   10. Restoring from a save | 622–660 |
-|   11. Items (expansion) | 661–724 |
-|   12. Services (links) | 725–728 |
-|   13. Messages | 729–795 |
-|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 796–802 |
-| Constants & data dependencies | 803–826 |
-| Randomness | 827–837 |
-| Edge cases & original bugs | 838–889 |
-| Test vectors | 890–940 |
-| Provenance | 941–997 |
-| Open questions | 998–1090 |
+|   10. Restoring from a save | 622–667 |
+|   11. Items (expansion) | 668–737 |
+|   12. Services (links) | 738–741 |
+|   13. Messages | 742–808 |
+|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 809–815 |
+| Constants & data dependencies | 816–839 |
+| Randomness | 840–850 |
+| Edge cases & original bugs | 851–902 |
+| Test vectors | 903–953 |
+| Provenance | 954–1010 |
+| Open questions | 1011–1103 |
 <!-- /index -->
 
 ## Summary
@@ -635,9 +635,16 @@ version ≥ 0x5C, `0x00533C70` for older):
    `0x005382B0` when the player has a client, else unit +0x18);
    expansion → always. row = §1.2 rule 2 (Id, 1) (or rule 1 by act and
    difficulty when Id = 0xFFFF); name clamped into the row's range; in the
-   hire list of the NPC record found by `0x00535EA0` (its class argument
-   was not read) the slot of that name gets hired := 1 **only when it is
-   not currently offered**; create the unit (mode 12 if dead, else
+   hire list of the NPC record found by `0x00535EA0(game, row +0x14 =
+   the row's seller NPC class)` (first of the 64 records, 0x44 bytes
+   each, with that class) the slot of that name gets hired := 1 **only
+   when it is not currently offered**. The slot is indexed, not
+   searched: slot (name − row `NameFirst` +0x114) of the list (16-byte
+   slots, `npc.md` §7.1, where slot i holds name first + i); no list
+   yet (record +0x10 = 0) → nothing marked. No record with that class →
+   `0x00535EA0` returns null and `0x005775ED` reads +0x10 of it (crash;
+   a seller class 0 is fatal 0x72 first) (asm `0x005775AF`–`0x00577605`,
+   read 2026-10-09). Then create the unit (mode 12 if dead, else
    1) and init it (§3.2 with saved_id = Id: no offer stats, no
    experience reset).
 4. Pet node seed/name/Id := the saved values (`0x005749B0`).
@@ -682,8 +689,14 @@ allows C:
    slot), clear the slot, refresh the merc's stats (`0x0055C730`), then
    requirements of C on the merc (`inventory.md` §4.2, equipping 0)
    with old's bonuses gone:
-   - pass: old gets item flags 0x10 (`0x00628170`) and 0x20
-     (`0x006280D0`), leaves the merc's inventory, `0x00621000(merc, 1)`;
+   - pass: old gets item flags 0x10 (`0x00628170(old, 0x10, 1)`), its
+     GUID is appended to the merc inventory's update list
+     (`0x0063CC70`, `items/inventory.md` §1 rule 2; old was already
+     unlinked above, there is no second unlink), item flags 0x20
+     (`0x006280D0(old, 0x20, 1)`), then `0x00621000(merc, 1)`: queue the
+     merc for update (`0x0064C040`) and set its flags 2 (+0xC8) |= 0x1
+     (|= 0x2 too for a player) (asm `0x0054D01D`–`0x0054D03E`, read
+     2026-10-09);
      then rule 3, and after C's copy is equipped a **duplicate of old**
      goes to the player (`0x0055A2A0(player)`) and becomes the cursor
      item (`0x0055FB10`). Result 1.

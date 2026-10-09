@@ -78,7 +78,7 @@ fn disabled_button_never_draws_pressed() {
         .draw()
         .iter()
         .filter_map(|d| match d {
-            DrawItem::Art { file, frame, at } if *file == WIDE && at.y == 366 => Some(*frame),
+            DrawItem::Art { file, frame, at } if *file == WIDE2 && at.y == 366 => Some(*frame),
             _ => None,
         })
         .collect();
@@ -99,7 +99,7 @@ fn fire_overlay_follows_the_logo_frame_each_tick() {
             DrawItem::Blend {
                 file, frame, mode, ..
             } => {
-                assert_eq!((file, mode), (r"FrontEnd\FireLeft", 3));
+                assert_eq!((file, mode), (r"FrontEnd\D2logoFireLeft", 3));
                 assert_eq!(frame, base, "same frame index as the base");
                 seen.push(frame);
             }

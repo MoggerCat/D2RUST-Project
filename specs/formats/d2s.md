@@ -50,15 +50,15 @@
 |   5. Waypoint section (80 bytes at 0x279) | 488–493 |
 |   6. NPC flag section (52 bytes at 0x2C9) | 494–550 |
 |   7. Stats and skills | 551–643 |
-|   8. Item sections | 644–833 |
-|   9. Load sequence (`0x0056B180`) | 834–858 |
-|   10. Errors | 859–905 |
-| Constants & data dependencies | 906–925 |
-| Randomness | 926–930 |
-| Edge cases & original bugs | 931–997 |
-| Test vectors | 998–1039 |
-| Provenance | 1040–1133 |
-| Open questions | 1134–1273 |
+|   8. Item sections | 644–846 |
+|   9. Load sequence (`0x0056B180`) | 847–871 |
+|   10. Errors | 872–918 |
+| Constants & data dependencies | 919–938 |
+| Randomness | 939–943 |
+| Edge cases & original bugs | 944–1010 |
+| Test vectors | 1011–1052 |
+| Provenance | 1053–1146 |
+| Open questions | 1147–1286 |
 <!-- /index -->
 
 ## Summary
@@ -717,6 +717,19 @@ them); this list is a measurement, not a constant.
 3. Place the item (`0x00531210`, or `0x00531520` when the flag
    argument of `0x0056A7E0` is set: 1 for the corpse list, 0 for the
    player and hireling lists); placement fails → the item is freed.
+   `0x00531210(game, owner, item, parent)` by the decoded mode (read
+   2026-10-09; result 0 = placed, 0xC = failed): mode > 6, 3 (ground)
+   or 5 → 0xC. Otherwise the mode is first set to 4 (cursor), then:
+   0 stored → `0x00560200(game, owner, GUID, x, y, find free 0, send
+   1, inventory none)` (pushes at `0x0053124F`–`0x0053126A`): the
+   **exact** saved cell (page and x, y from the item); a taken or
+   invalid cell fails, and the item is freed (no free-position
+   fallback); 1 equipped → `0x005606B0(game, owner, GUID, body location
+   of the item (`0x00627D40`), 1, &out)`; 2 belt → `0x0055E9B0(game,
+   owner, GUID, belt slot, 0, &out)`; 4 cursor → owner's cursor := item
+   (`0x0063C180`), `0x0055FB10(game, owner, item)`; 6 socketed → no
+   parent → 0xC, else `0x00562660(game, GUID, parent GUID, &out, 0, 0,
+   0, 0)`. Each call returning 0 → 0xC.
 4. Then its socketed children, as many as the parent's "filled
    sockets" field: each read the same way and inserted into the parent
    (`0x00531210`(child, parent)); with no parent they are read and

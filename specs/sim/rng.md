@@ -209,7 +209,7 @@ sequence was recorded twice per run, identical.
 | Seed | Where | Initial value | Drawn by |
 |---|---|---|---|
 | automap seed, global `0x0096C8C8` | `0x0061FCF0` at table load | `{0, 666}` | automap cell picker `0x0061FFF0` (`roll`), sim-0001 |
-| particle globals `0x00712C4C` / `0x00712C50` | `0x00476290` / `0x00476460` | `time_value(...)` | particle colours and sizes; only in level ids 0x4A and 0x78 |
+| particle globals `0x00712C4C` / `0x00712C50` | `0x00476290` / `0x00476460` | `init_low(time_value(v))`, v = shake start `[0x007B8D10]` / `GetTickCount()` (`render/draw-order-2.md` §12) | particle colours and sizes; only in level ids 0x4A and 0x78 |
 
 Start-up, title, main menu and character screens step no seed (recorded:
 0 draws until game creation; the static call graph agrees). Menus and

@@ -29,15 +29,15 @@
 |   7. Not drawn here | 217–226 |
 |   8. Item graphic (`0x0046EE80(item, x, top)`; answers OQ 2) | 227–283 |
 |   9. Item checks used by the tints (answers OQ 6) | 284–300 |
-|   10. Grid click → C→S message (`0x0048FFE0`) | 301–363 |
-|   11. Gold amount dialog (`0x00454150`) | 364–395 |
-|   B5. `CellGrid` answers (`client/ui.md` §B5) | 396–403 |
-| Constants & data dependencies | 404–413 |
-| Randomness | 414–417 |
-| Edge cases & original bugs | 418–425 |
-| Test vectors | 426–452 |
-| Provenance | 453–467 |
-| Open questions | 468–516 |
+|   10. Grid click → C→S message (`0x0048FFE0`) | 301–370 |
+|   11. Gold amount dialog (`0x00454150`) | 371–402 |
+|   B5. `CellGrid` answers (`client/ui.md` §B5) | 403–410 |
+| Constants & data dependencies | 411–420 |
+| Randomness | 421–424 |
+| Edge cases & original bugs | 425–432 |
+| Test vectors | 433–459 |
+| Provenance | 460–474 |
+| Open questions | 475–523 |
 <!-- /index -->
 
 ## Summary
@@ -342,7 +342,14 @@ u32) and `0x00478700` (u32 + three u32); field order is the layout in
    2. `n` = 0, or `u` none: on page 3 a cursor item that is itself a cube
       is refused (consumed, no message). Else the drop cell from the
       mouse (`0x00486BD0`), placement test there, ready → **0x18** [item,
-      x, y, page].
+      x, y, page]. Drop cell (read 2026-10-09; ECX cursor item, EAX the
+      grid record, stack mouse x, y and the two out pointers, `ret 0x10`;
+      no item → fatal 0x14E8): the §5 r3 cursor-cell formula with the
+      same steps (c, r from the mouse; even w / h use the graphic size
+      `0x004DBEA0` >> 2; w = gridX → gridX >> 1, h = gridY → gridY >> 1;
+      w > 1 → c −= w >> 1, negative → 0; the same for r), but with no
+      "w + c > gridX → return" test: the cell is always written, and an
+      out-of-grid footprint fails the placement test that follows.
    3. `n` = 1 with `u`:
       - stackable onto `u` (`0x0062C850` ≠ 0): ready, inventory mode ≠
         0x0B, page ≠ 2 → **0x21** (cursor, `u`);

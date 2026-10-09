@@ -1,0 +1,22 @@
+# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py game/captures/day/manual/scene3.jsonl --scene a1-npc-shop-gheed --frame 88 --out facts/render; game: 1.14d
+key	value
+seq	88
+tick	803
+w	800
+h	600
+act	0
+level	1
+player_x	8944
+player_y	73008
+tile_origin_x	8544
+tile_origin_y	72728
+unit_origin_x	8544
+unit_origin_y	72724
+open_mode	3
+shift_x	0
+light_quality	0
+rain	1
+snow	0
+draws	183
+index_sha256	fb281076313817bd1757183a4e1721a337a3c5bc7bba96ce8c0032c3d5a16bf6
+palette_sha256	ba83219e51249002d7125a1a5a701d6abea94f04f44d6cfaa42becdfcff23337

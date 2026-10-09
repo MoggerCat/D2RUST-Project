@@ -1,4 +1,4 @@
-// Spec: specs/missiles/client.md (§C1–§C4 the client create `0x004CD540`; §C6, §C7, §C9, §C10, §C13), specs/missiles/client-bodies.md (§B1, §B2, §B3 r2, §B4 4, 6, 25, 49, §B5 r1, r3), specs/missiles/missiles.md (§R2.1 the create record), specs/render/lighting.md (§8 missile row)
+// Spec: specs/missiles/client.md (§C1–§C4 the client create `0x004CD540`; §C6, §C7, §C9, §C10, §C13), specs/missiles/client-bodies.md (§B1, §B2, §B3 r1, r2, §B4 3, 4, 6, 25, 49, §B5 r1–r6), specs/missiles/missiles.md (§R2.1 the create record), specs/render/lighting.md (§8 missile row)
 //! Client missile creation: the client create `0x004CD540` fills a
 //! client-only type-3 unit in set C (`client/model.md` §2 r1) from a
 //! 0x5C-byte create record ([`CreateRecord`]) and its `missiles` row
@@ -7,22 +7,25 @@
 //! count) are kept in [`ClientMissile`] beside the set-C unit.
 //!
 //! Each client update runs [`update`] on every set-C missile (§C6): the
-//! light flicker, the row's client function (bodies 1, 11, 23 here), the
+//! light flicker, the row's client function (here and in `bodies`), the
 //! end `0x004D2D70` ([`end`], §C9) and the default removal (§C10 r1).
 //!
 //! The path is the straight missile path (`missiles.md` §R4.3, §R4.1):
 //! built at the create, stepped by the default step, which ends the
 //! missile on a wall (§C7 r5, r10; PROVISIONAL REC-451: no cell walk).
 //!
-//! Not modelled (each named where it would run): the motion record (§C3
-//! r19, r21; §C7 r3), unit hits (§C7 r12), the init callback (§C4
-//! r27), sounds (r28, §C9 r4.4, r6: audio), the umod callback (r29), the
-//! town tests (§C6 r4, §C7 r8: no town flag in the client level rows),
-//! the second pass (§C7 r13), the client hit functions (§C9 r4.3: read
-//! as returning non-zero, PROVISIONAL REC-452), and every client function but
-//! 1, 4, 5, 6, 8, 11, 23, 25, 43, 49, 60 and 63 (the missile is then left
-//! as it is; 3 needs the missiles calc evaluator `0x0064B7C0`). The aim nudge
-//! (§C2 r8) reads the owner's direction from the record
+//! The motion record (`render/unit-composite.md` §8) is made by the
+//! create (§C3 r19, r21), updated before each dispatch and ends a landed
+//! arc (§C7 r3). The town tests (§C6 r4, §C7 r8) read the active room of
+//! the missile's sub-tile.
+//!
+//! Not modelled (each named where it would run): unit hits (§C7 r12),
+//! the init callback (§C4 r27), sounds (r28, §C9 r4.4, r6: audio), the
+//! umod callback (r29), the second pass (§C7 r13), the client hit
+//! functions (§C9 r4.3: read as returning non-zero, PROVISIONAL
+//! REC-452), and the client functions not listed in [`update_with`]'s
+//! dispatch (the missile is then left as it is). The aim nudge (§C2 r8)
+//! reads the owner's direction from the record
 //! ([`CreateRecord::owner_dir64`]; none given is a handler error).
 
 use std::collections::BTreeMap;
@@ -32,6 +35,10 @@ use d2_sim::rng::Seed;
 use super::dispatch::HandlerError;
 use super::world::{ClientWorld, UnitKey, MISSILE, MONSTER, PLAYER};
 use crate::rules::lighting::records::{unit_light_pos, LightKind, Owner};
+use crate::rules::unit_composite::MotionRecord;
+
+#[path = "client_missiles_bodies.rs"]
+mod bodies;
 
 /// The `missiles` columns the client create reads (§C2–§C4).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -69,10 +76,27 @@ pub struct ClientMissileRow {
     pub always_explode: bool,
     pub explosion_missile: i16,
     pub clt_hit_func: i16,
-    /// `CltSubMissile1`–`3` (i16) and `CltParam1`–`3` (i32)
-    /// (`client-bodies.md` §B1 S1–S3, P1–P3).
+    /// `CltSubMissile1`–`3` (i16) and `CltParam1`–`5` (i32)
+    /// (`client-bodies.md` §B1 S1–S3, P1–P3; `client-bodies-2.md` §B8
+    /// P4, P5).
     pub clt_sub: [i16; 3],
-    pub clt_param: [i32; 3],
+    pub clt_param: [i32; 5],
+    /// `CltCalc1` (+0x84): the offset of its formula in the `misscode`
+    /// buffer (`client-bodies.md` §B4 function 3).
+    pub clt_calc1: u32,
+    /// `Town` (flags bit 10, §C6 r4) and `CltSrcTown` (§C7 r8).
+    pub town: bool,
+    pub clt_src_town: u8,
+    /// `Size` (+0x18A), the missile's unit size (`sim/path-placement.md`
+    /// §3).
+    pub size: u8,
+    /// `RandStart` (the disc's frame offset, `client-bodies.md` §B3 r3).
+    pub rand_start: i32,
+    /// `ProgSound` (i16; function 47, `client-bodies-2.md` §B11).
+    pub prog_sound: i16,
+    /// The server columns `Param1`, `Param2` (+0x38, +0x3C; function 58
+    /// reads `Param1`, `client-bodies-2.md` Edge case 7).
+    pub param: [i32; 2],
 }
 
 /// The create record (`missiles.md` §R2.1, 0x5C bytes) as the client
@@ -111,6 +135,8 @@ pub struct CreateRecord {
     /// (§C2 r8), as the caller reads it from the unit's drawn pose
     /// (`world_view::UnitPose::dir64`); the model holds no client path.
     pub owner_dir64: Option<u8>,
+    /// +0x24 arc height (flag 0x100, §C3 r21).
+    pub arc_height: i32,
 }
 
 /// Record flags (§R2.1).
@@ -170,9 +196,40 @@ pub struct ClientMissile {
     /// by the creator unless a body writes them.
     pub d28: i32,
     pub d2c: i32,
+    /// Missile data +0x04 / +0x06 (`client-bodies.md` §B1 d04, d06; i16):
+    /// written only by client skill functions, 0 otherwise.
+    pub d04: i16,
+    pub d06: i16,
     /// The path new-step flag (path +0x34 bit 3, `client-bodies.md` §B2):
     /// the last path step entered a new sub-tile.
     pub new_step: bool,
+    /// The client motion record (gfx +0x30, `render/unit-composite.md`
+    /// §8): created and restarted by the create (§C3 r19), a timed arc
+    /// with flag 0x100 (r21), updated before each dispatch (§C6).
+    pub motion: MotionRecord,
+}
+
+/// m's sub-tile (the path position, `client-bodies.md` §B1 (x, y)).
+fn cell_of(m: &ClientMissile) -> (i32, i32) {
+    ((m.pos.0 >> 16) as i32, (m.pos.1 >> 16) as i32)
+}
+
+/// Re-path `0x00649970(path, m, 0)` toward m's target point (a target
+/// unit is dropped by the point setter `0x00648AD0`): the straight path
+/// of §R4.3; no point → the direction vector is 0 (no step).
+fn repath(m: &mut ClientMissile) {
+    repath_to(m, m.target_point);
+}
+
+/// Re-path toward `t` (the target unit's position or the target point).
+fn repath_to(m: &mut ClientMissile, t: (i32, i32)) {
+    match straight_path(m.pos, t) {
+        Some((vec, dir)) if t != cell_of(m) => {
+            m.dir_vec = vec;
+            m.direction = dir & 63;
+        }
+        _ => m.dir_vec = (0, 0),
+    }
 }
 
 /// The path tables of `sim/pathing.md` (the direction-vector `tan`
@@ -425,9 +482,14 @@ pub fn create(
             m.current = n as i32;
         }
     }
-    // r21: direction := (tx + ty) & 63 (the timed arc of the motion
-    // record is not modelled).
+    // r19: the motion record created (zeroed) and restarted.
+    m.motion.restart();
+    // r21: the timed arc (height +0x24, n = total frames), one motion
+    // update, direction := (tx + ty) & 63 (path flag 0x40: the facing
+    // stays, `sim/pathing.md` §8.5).
     if rec.flags & flag::ARC != 0 {
+        m.motion.timed_arc(rec.arc_height, m.total);
+        motion_update(&mut m.motion)?;
         m.direction = ((tx + ty) & 63) as u8;
     }
     // r23–r24.
@@ -440,6 +502,29 @@ pub fn create(
     // r26: the light (`render/lighting.md` §8 missile row).
     missile_light(w, key, &row, rec, lights);
     Ok(Some(key))
+}
+
+/// A create made by the client missile `parent` (its bodies, §C9 r4.5):
+/// [`create`] with the record's owner direction, when the record names
+/// none, read as the parent missile's direction.
+///
+/// PROVISIONAL (REC-543): the aim nudge (§C2 r8) reads the owner's
+/// direction `0x00620100`, which the model does not hold (unit
+/// directions live in the view's poses); a child created by a missile
+/// takes its parent's direction instead. Found on the user's rows (a
+/// child with velocity aimed at its own start, `app_client_drlg`
+/// `the_users_client_missiles_run_their_functions`).
+fn create_from(
+    w: &mut ClientWorld,
+    env: &Env,
+    parent: UnitKey,
+    rec: &CreateRecord,
+) -> Result<Option<UnitKey>, HandlerError> {
+    let mut rec = *rec;
+    if rec.owner_dir64.is_none() {
+        rec.owner_dir64 = w.objclient.missiles.get(&parent).map(|m| m.direction);
+    }
+    create(w, env.rows, &rec, env.lights)
 }
 
 /// The room of a point through the client DRLG (`0x00619DA0`).
@@ -542,6 +627,31 @@ pub const FN_SCATTER: u16 = 4;
 pub const FN_MIST: u16 = 25;
 pub const FN_SPAWN_FACING: u16 = 49;
 pub const FN_WALL_MAKER: u16 = 6;
+pub const FN_BLOOD: u16 = 2;
+pub const FN_SUB_AT_STEP: u16 = 3;
+pub const FN_HEIGHT_WINDOW: u16 = 59;
+pub const FN_SPIRIT: u16 = 65;
+pub const FN_GUIDED: u16 = 7;
+pub const FN_METEOR: u16 = 9;
+pub const FN_CURSE_CENTRE: u16 = 17;
+pub const FN_SPEAR_TRAIL: u16 = 18;
+pub const FN_WANDER_MAKER: u16 = 27;
+pub const FN_DIABLO_APPEARS: u16 = 37;
+pub const FN_FRAME_ZERO: u16 = 39;
+pub const FN_JAVELIN_TRAIL: u16 = 46;
+pub const FN_RECYCLER: u16 = 51;
+pub const FN_WAKE_MAKER: u16 = 52;
+pub const FN_MON_BLIZZARD: u16 = 10;
+pub const FN_BLIZZARD: u16 = 13;
+pub const FN_FROZEN_ORB: u16 = 19;
+pub const FN_ORB_NOVA: u16 = 20;
+pub const FN_DISTRACTION: u16 = 44;
+pub const FN_DISTRACTION_FOG: u16 = 45;
+pub const FN_MOLTEN_BOULDER: u16 = 47;
+pub const FN_ERUPTION: u16 = 48;
+pub const FN_TIGER_FURY: u16 = 53;
+pub const FN_CHAOS_ICE: u16 = 58;
+pub const FN_SUC_FIREBALL: u16 = 68;
 
 /// The per-update dispatch `0x004D2C70` (§C6) of the set-C missile `key`.
 pub fn update(
@@ -550,11 +660,45 @@ pub fn update(
     key: UnitKey,
     lights: bool,
 ) -> Result<(), HandlerError> {
+    update_with(
+        w,
+        &Env {
+            rows,
+            lights,
+            skills: None,
+            monsters: &[],
+        },
+        key,
+    )
+}
+
+/// What the client missile code reads beside the model: the `missiles`
+/// rows, the light quality `[0x0072A348]` ≠ 0 (§C4 r26) and the skills
+/// tables with the formula buffers (`ModelInputs::skill_tables`; the
+/// missiles evaluator `0x0064B7C0` and the skill evaluator `0x00646CA0`
+/// of the bodies; `None`: a body that evaluates is a handler error).
+#[derive(Clone, Copy)]
+pub struct Env<'a> {
+    pub rows: &'a [ClientMissileRow],
+    pub lights: bool,
+    pub skills: Option<&'a super::passive::Tables>,
+    /// The client `monstats` rows (`ClientTables::monsters`): monster
+    /// sizes and set-ups for the distance and hostility tests.
+    pub monsters: &'a [Option<super::world::MonsterClass>],
+}
+
+/// [`update`] with the skills tables ([`Env`]).
+pub fn update_with(w: &mut ClientWorld, env: &Env, key: UnitKey) -> Result<(), HandlerError> {
     let Some(class) = w.objclient.set_c.get(&key).map(|u| u.class) else {
         return Ok(());
     };
+    // The motion update runs before the dispatch (§C6,
+    // `render/unit-composite.md` §8).
+    if let Some(m) = w.objclient.missiles.get_mut(&key) {
+        motion_update(&mut m.motion)?;
+    }
     // r1.
-    let Some(row) = rows.get(class as usize).copied() else {
+    let Some(row) = env.rows.get(class as usize).copied() else {
         remove(w, key);
         return Ok(());
     };
@@ -562,9 +706,14 @@ pub fn update(
     if row.flicker != 0 {
         flicker(w, key, &row);
     }
-    // r5 (r3–r4: the room and the town test are not modelled).
+    // r3–r4: a row without `Town` in a town room → default removal.
+    if !row.town && in_town(w, key) {
+        remove(w, key);
+        return Ok(());
+    }
+    // r5.
     match row.clt_do_func {
-        FN_DEFAULT_STEP => default_step(w, rows, key, &row, lights),
+        FN_DEFAULT_STEP => default_step(w, env, key, &row),
         FN_FLAT_AT_END => {
             // §C13 11: at the animation end flag 0x10000 and the light
             // removed; else step. No countdown at the end.
@@ -576,7 +725,7 @@ pub fn update(
                 remove_light(w, key);
                 Ok(())
             } else {
-                default_step(w, rows, key, &row, lights)
+                default_step(w, env, key, &row)
             }
         }
         FN_DEN_LIGHT => {
@@ -586,14 +735,14 @@ pub fn update(
                     m.current = 500;
                 }
             }
-            default_step(w, rows, key, &row, lights)
+            default_step(w, env, key, &row)
         }
-        FN_TRAIL => trail(w, rows, key, &row, lights),
+        FN_TRAIL => trail(w, env, key, &row),
         FN_SCATTER => {
             // §B4 4: scatter(m, P1, P2, P3, S1), then step.
-            let [p1, p2, p3] = row.clt_param;
-            scatter(w, rows, key, p1, p2, p3, i32::from(row.clt_sub[0]), lights)?;
-            default_step(w, rows, key, &row, lights)
+            let [p1, p2, p3, ..] = row.clt_param;
+            scatter(w, env, key, p1, p2, p3, i32::from(row.clt_sub[0]))?;
+            default_step(w, env, key, &row)
         }
         FN_SPAWN_FACING => {
             // §B4 49: no row or S1 < 0 → remove; elapsed mod max(P1, 1)
@@ -605,28 +754,66 @@ pub fn update(
             }
             let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
             if (m.total - m.current) % row.clt_param[0].max(1) == 0 {
-                if let Some(x) = spawn(w, rows, key, s1 as u32, lights)? {
+                if let Some(x) = spawn(w, env, key, s1 as u32)? {
                     if let Some(xm) = w.objclient.missiles.get_mut(&x) {
                         xm.direction = m.direction;
                     }
                 }
             }
-            default_step(w, rows, key, &row, lights)
+            default_step(w, env, key, &row)
         }
-        FN_MIST => mist(w, rows, key, &row, lights),
-        FN_WALL_MAKER => wall_maker(w, rows, key, &row, lights),
+        FN_MIST => mist(w, env, key, &row),
+        FN_WALL_MAKER => wall_maker(w, env, key, &row),
         FN_SUB_LOOP_FIRE => {
             fire_frames(w, key, &row);
-            default_step(w, rows, key, &row, lights)
+            default_step(w, env, key, &row)
         }
-        FN_FOLLOW_OWNER => follow_owner(w, rows, key, lights),
+        FN_FOLLOW_OWNER => follow_owner(w, env, key),
         FN_ORBIT_EVEN | FN_ORBIT => {
             let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
             if row.clt_do_func == FN_ORBIT || (m.total - m.current) % 2 == 0 {
                 orbit(w, key);
             }
-            default_step(w, rows, key, &row, lights)
+            default_step(w, env, key, &row)
         }
+        FN_BLOOD => bodies::blood(w, env, key, &row),
+        FN_SUB_AT_STEP => bodies::sub_at_new_step(w, env, key, &row),
+        FN_HEIGHT_WINDOW => bodies::height_window(w, env, key, &row),
+        FN_SPIRIT => bodies::spirit(w, env, key, &row),
+        FN_GUIDED => bodies::guided(w, env, key, &row),
+        FN_METEOR => bodies::meteor(w, env, key, &row),
+        FN_CURSE_CENTRE => bodies::curse_centre(w, env, key, &row),
+        FN_SPEAR_TRAIL => bodies::spear_trail(w, env, key, &row),
+        FN_WANDER_MAKER => bodies::wander_maker(w, env, key, &row),
+        FN_FRAME_ZERO => bodies::frame_zero(w, env, key, &row),
+        FN_JAVELIN_TRAIL | FN_WAKE_MAKER => bodies::pair_trail(w, env, key, &row),
+        FN_RECYCLER => bodies::recycler(w, env, key, &row),
+        FN_MON_BLIZZARD => bodies::mon_blizzard(w, env, key, &row),
+        FN_BLIZZARD => bodies::blizzard(w, env, key, &row),
+        FN_FROZEN_ORB => bodies::frozen_orb(w, env, key, &row),
+        FN_ORB_NOVA => bodies::orb_nova(w, env, key, &row),
+        FN_DISTRACTION => bodies::distraction(w, env, key, &row),
+        FN_DISTRACTION_FOG => {
+            // `client-bodies-2.md` §B11 45: S1 < 0 → remove; scatter(m,
+            // P1, P2, P3, S1); step.
+            let s1 = row.clt_sub[0];
+            if s1 < 0 {
+                remove(w, key);
+                return Ok(());
+            }
+            let [p1, p2, p3, ..] = row.clt_param;
+            scatter(w, env, key, p1, p2, p3, i32::from(s1))?;
+            default_step(w, env, key, &row)
+        }
+        FN_MOLTEN_BOULDER => bodies::molten_boulder(w, env, key, &row),
+        FN_ERUPTION => bodies::eruption(w, env, key, &row),
+        FN_TIGER_FURY => bodies::tiger_fury(w, env, key, &row),
+        FN_CHAOS_ICE => bodies::chaos_ice(w, env, key, &row),
+        FN_SUC_FIREBALL => bodies::suc_fireball(w, env, key, &row),
+        // §C13 37: frames left 150 → the shake (`render/camera.md` §8,
+        // row `q-fix-shake-starts`), 50 → sound 4,638 (audio); both not
+        // modelled; every branch steps.
+        FN_DIABLO_APPEARS => default_step(w, env, key, &row),
         // f ≤ 0: never stepped (§C6 r5); other functions: not modelled.
         _ => Ok(()),
     }
@@ -642,10 +829,9 @@ pub fn update(
 /// 8. Then step.
 fn trail(
     w: &mut ClientWorld,
-    rows: &[ClientMissileRow],
+    env: &Env,
     key: UnitKey,
     row: &ClientMissileRow,
-    lights: bool,
 ) -> Result<(), HandlerError> {
     let s1 = row.clt_sub[0];
     if s1 < 0 {
@@ -664,8 +850,8 @@ fn trail(
             level: m.level,
             ..CreateRecord::default()
         };
-        if let Some(child) = create(w, rows, &rec, lights)? {
-            let crow = rows.get(s1 as usize).copied().unwrap_or_default();
+        if let Some(child) = create_from(w, env, key, &rec)? {
+            let crow = env.rows.get(s1 as usize).copied().unwrap_or_default();
             let p2 = crow.clt_param[1];
             if p2 > 0 {
                 rnd(w, key, p2);
@@ -677,7 +863,7 @@ fn trail(
             }
         }
     }
-    default_step(w, rows, key, row, lights)
+    default_step(w, env, key, row)
 }
 
 /// Scatter `0x004CE140(m, chance, count, spread, c)` (`client-bodies.md`
@@ -689,15 +875,14 @@ fn trail(
 #[allow(clippy::too_many_arguments)]
 fn scatter(
     w: &mut ClientWorld,
-    rows: &[ClientMissileRow],
+    env: &Env,
     key: UnitKey,
     chance: i32,
     count: i32,
     spread: i32,
     c: i32,
-    lights: bool,
 ) -> Result<(), HandlerError> {
-    if c < 0 || c as usize >= rows.len() {
+    if c < 0 || c as usize >= env.rows.len() {
         return Ok(());
     }
     let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
@@ -720,7 +905,7 @@ fn scatter(
             level: m.level,
             ..CreateRecord::default()
         };
-        create(w, rows, &rec, lights)?;
+        create_from(w, env, key, &rec)?;
     }
     Ok(())
 }
@@ -730,10 +915,9 @@ fn scatter(
 /// none), target (0, 0) absolute.
 fn spawn(
     w: &mut ClientWorld,
-    rows: &[ClientMissileRow],
+    env: &Env,
     key: UnitKey,
     c: u32,
-    lights: bool,
 ) -> Result<Option<UnitKey>, HandlerError> {
     let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
     let Some(owner) = m.owner else {
@@ -748,7 +932,7 @@ fn spawn(
         level: m.level,
         ..CreateRecord::default()
     };
-    create(w, rows, &rec, lights)
+    create_from(w, env, key, &rec)
 }
 
 /// Function 25 `0x004D4DC0` (`client-bodies.md` §B4, `towermist`): S1 <
@@ -758,17 +942,16 @@ fn spawn(
 /// S1, skill, level. Step.
 fn mist(
     w: &mut ClientWorld,
-    rows: &[ClientMissileRow],
+    env: &Env,
     key: UnitKey,
     row: &ClientMissileRow,
-    lights: bool,
 ) -> Result<(), HandlerError> {
     let s1 = row.clt_sub[0];
     if s1 < 0 {
         remove(w, key);
         return Ok(());
     }
-    let [p1, p2, p3] = row.clt_param;
+    let [p1, p2, p3, ..] = row.clt_param;
     let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
     if (m.total - m.current) % p3.max(1) == 0 {
         let (x, y) = ((m.pos.0 >> 16) as i32, (m.pos.1 >> 16) as i32);
@@ -788,9 +971,9 @@ fn mist(
             level: m.level,
             ..CreateRecord::default()
         };
-        create(w, rows, &rec, lights)?;
+        create_from(w, env, key, &rec)?;
     }
-    default_step(w, rows, key, row, lights)
+    default_step(w, env, key, row)
 }
 
 /// Function 6 `0x004D3630` (`client-bodies.md` §B4, `firewallmaker`):
@@ -803,17 +986,16 @@ fn mist(
 /// takes m's precise position. Step.
 fn wall_maker(
     w: &mut ClientWorld,
-    rows: &[ClientMissileRow],
+    env: &Env,
     key: UnitKey,
     row: &ClientMissileRow,
-    lights: bool,
 ) -> Result<(), HandlerError> {
     let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
     if !m.new_step {
-        return default_step(w, rows, key, row, lights);
+        return default_step(w, env, key, row);
     }
     let [s1, s2, s3] = row.clt_sub;
-    if s1 < 0 || s1 as usize >= rows.len() {
+    if s1 < 0 || s1 as usize >= env.rows.len() {
         remove(w, key);
         return Ok(());
     }
@@ -829,7 +1011,7 @@ fn wall_maker(
         level: m.level,
         ..CreateRecord::default()
     };
-    let range = i32::from(rows[s1 as usize].range);
+    let range = i32::from(env.rows[s1 as usize].range);
     if range != 0 {
         rec.flags |= flag::RANGE;
         rec.range = range;
@@ -854,12 +1036,12 @@ fn wall_maker(
     if p1 == 0 || rnd(w, key, p1) != 0 {
         rec.flags |= flag::NO_LIGHT;
     }
-    if let Some(child) = create(w, rows, &rec, lights)? {
+    if let Some(child) = create_from(w, env, key, &rec)? {
         if let Some(cm) = w.objclient.missiles.get_mut(&child) {
             cm.pos = m.pos;
         }
     }
-    default_step(w, rows, key, row, lights)
+    default_step(w, env, key, row)
 }
 
 /// Function 5 `0x004D3540` (`client-bodies.md` §B5 r1) before its step:
@@ -912,12 +1094,7 @@ fn rnd(w: &mut ClientWorld, key: UnitKey, n: i32) -> i32 {
 /// owner of type ≤ 1 that is dead → end(none, 0); else m takes the
 /// owner's position and advances its animation with wrap; no step, no
 /// countdown.
-fn follow_owner(
-    w: &mut ClientWorld,
-    rows: &[ClientMissileRow],
-    key: UnitKey,
-    lights: bool,
-) -> Result<(), HandlerError> {
+fn follow_owner(w: &mut ClientWorld, env: &Env, key: UnitKey) -> Result<(), HandlerError> {
     let owner = w
         .objclient
         .missiles
@@ -929,7 +1106,7 @@ fn follow_owner(
         return Ok(());
     };
     if o.key.unit_type <= MONSTER && o.is_dead() {
-        end(w, rows, key, false, lights)?;
+        end_with(w, env, key, false)?;
         return Ok(());
     }
     let (ox, oy) = o.cell();
@@ -956,16 +1133,9 @@ fn orbit(w: &mut ClientWorld, key: UnitKey) {
     let Some(m) = w.objclient.missiles.get_mut(&key) else {
         return;
     };
-    let (x, y) = ((m.pos.0 >> 16) as i32, (m.pos.1 >> 16) as i32);
-    let t = (x + (y - m.d2c), y - (x - m.d28));
-    m.target_point = t;
-    match straight_path(m.pos, t) {
-        Some((vec, dir)) if t != (x, y) => {
-            m.dir_vec = vec;
-            m.direction = dir & 63;
-        }
-        _ => m.dir_vec = (0, 0),
-    }
+    let (x, y) = cell_of(m);
+    m.target_point = (x + (y - m.d2c), y - (x - m.d28));
+    repath(m);
 }
 
 /// The light flicker `0x004CD1C0` (`render/lighting.md` §8): when the
@@ -997,10 +1167,9 @@ fn flicker(w: &mut ClientWorld, key: UnitKey, row: &ClientMissileRow) {
 /// The default step `0x004D30C0` (§C7) without the path (module doc).
 fn default_step(
     w: &mut ClientWorld,
-    rows: &[ClientMissileRow],
+    env: &Env,
     key: UnitKey,
     row: &ClientMissileRow,
-    lights: bool,
 ) -> Result<(), HandlerError> {
     let Some(m) = w.objclient.missiles.get_mut(&key) else {
         return Ok(());
@@ -1012,6 +1181,13 @@ fn default_step(
         if let Some(u) = w.objclient.set_c.get_mut(&key) {
             u.flag_ex &= !FLAG_EX_NOT_DRAWN;
         }
+    }
+    let m = w.objclient.missiles.get_mut(&key).expect("checked above");
+    // r3: the motion record reports "not moving" (a flag-0x100 arc that
+    // landed) → end(none, 1).
+    if !m.motion.moving() {
+        end_with(w, env, key, true)?;
+        return Ok(());
     }
     let m = w.objclient.missiles.get_mut(&key).expect("checked above");
     // r4.
@@ -1050,14 +1226,31 @@ fn default_step(
     // r6.
     m.current -= 1;
     if m.current < 1 {
-        end(w, rows, key, false, lights)?;
+        end_with(w, env, key, false)?;
         return Ok(());
     }
     // r7.
     if !active {
         return Ok(());
     }
-    // r9 (r8, the town clamp, is not modelled).
+    // r8: `CltSrcTown` T ≠ 0 and (no owner, or the owner's room is a
+    // town room): frames left ≥ T → T, and without `LoopAnim` with
+    // `AnimLen` − T > 0, frame := (`AnimLen` − T) << 8.
+    let t = i32::from(row.clt_src_town);
+    if t != 0 {
+        let owner = w.objclient.missiles.get(&key).and_then(|m| m.owner);
+        if owner.is_none_or(|o| super::modes::in_town(w, o)) {
+            let m = w.objclient.missiles.get_mut(&key).expect("checked above");
+            if m.current >= t {
+                m.current = t;
+                let rest = i32::from(row.anim_len) - t;
+                if !row.loop_anim && rest > 0 {
+                    m.frame = rest << 8;
+                }
+            }
+        }
+    }
+    // r9.
     if row.collide_type == 0 {
         return Ok(());
     }
@@ -1065,7 +1258,7 @@ fn default_step(
     let at = w.objclient.set_c.get(&key).and_then(|u| u.position);
     if let Some((x, y)) = at {
         if collision_word(w, i32::from(x), i32::from(y)) & 5 != 0 {
-            end(w, rows, key, true, lights)?;
+            end_with(w, env, key, true)?;
         }
     }
     // r11–r13: unit hits and the second pass are not modelled.
@@ -1127,10 +1320,26 @@ pub fn end(
     forced: bool,
     lights: bool,
 ) -> Result<Option<UnitKey>, HandlerError> {
+    let env = Env {
+        rows,
+        lights,
+        skills: None,
+        monsters: &[],
+    };
+    end_with(w, &env, key, forced)
+}
+
+/// [`end`] with the skills tables ([`Env`]).
+pub fn end_with(
+    w: &mut ClientWorld,
+    env: &Env,
+    key: UnitKey,
+    forced: bool,
+) -> Result<Option<UnitKey>, HandlerError> {
     let Some(class) = w.objclient.set_c.get(&key).map(|u| u.class) else {
         return Ok(None);
     };
-    let row = rows.get(class as usize).copied().unwrap_or_default();
+    let row = env.rows.get(class as usize).copied().unwrap_or_default();
     let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
     let mut x = None;
     // r3: no unit, not forced, no `AlwaysExplode` → r5.
@@ -1153,8 +1362,16 @@ pub fn end(
                     level: m.level,
                     ..CreateRecord::default()
                 };
-                x = create(w, rows, &rec, lights)?;
+                x = create_from(w, env, key, &rec)?;
                 if let Some(xk) = x {
+                    // X's motion position := m's (x, y, z), done,
+                    // restart. PROVISIONAL (REC-541; Open question 10):
+                    // the getters' values are copied as stored.
+                    if let Some(xm) = w.objclient.missiles.get_mut(&xk) {
+                        xm.motion.pos = m.motion.pos;
+                        xm.motion.done();
+                        xm.motion.restart();
+                    }
                     // X's direction: rnd(64) on X's seed for 146
                     // `spidergoo`, else m's (the motion copy is not
                     // modelled).
@@ -1183,6 +1400,71 @@ pub fn end(
     // r8 (r = 3): m removed from set C.
     super::objects::remove_client_unit(w, key);
     Ok(x)
+}
+
+/// The town test of a missile's room (§C6 r3–r4, `client-bodies.md`
+/// §B5 r2): the active room containing its sub-tile (set-C units are in
+/// no room list), its level a town level (`0x0061AB00`,
+/// `sim/stat-lists.md` OQ2); no client DRLG or no room → not in town.
+fn in_town(w: &ClientWorld, key: UnitKey) -> bool {
+    let Some(m) = w.objclient.missiles.get(&key) else {
+        return false;
+    };
+    let (x, y) = cell_of(m);
+    let (Ok(x), Ok(y)) = (u16::try_from(x), u16::try_from(y)) else {
+        return false;
+    };
+    w.room_at(x, y)
+        .is_some_and(|r| d2_sim::drlg::is_town(u32::from(r.level)))
+}
+
+/// The unit size `0x00620510` (`sim/path-placement.md` §3) of a client
+/// unit the missile code measures: player 2, monster `monstats2`
+/// `SizeX`, missile `Size`, item 1; objects and tiles 0 (the object rows
+/// are not in [`Env`]; no modelled body measures one).
+fn unit_size(env: &Env, w: &ClientWorld, k: UnitKey) -> i32 {
+    use super::world::ITEM;
+    match k.unit_type {
+        PLAYER => 2,
+        MONSTER => w
+            .units
+            .get(&k)
+            .and_then(|u| env.monsters.get(u.class as usize))
+            .and_then(|c| c.as_ref())
+            .map_or(0, |c| i32::from(c.size_x)),
+        MISSILE => w
+            .objclient
+            .set_c
+            .get(&k)
+            .and_then(|u| env.rows.get(u.class as usize))
+            .map_or(0, |r| i32::from(r.size)),
+        ITEM => 1,
+        _ => 0,
+    }
+}
+
+/// The motion update `0x004DA350` of a missile's record
+/// (`render/unit-composite.md` §8 r1–r6); no follow record is made by
+/// the modelled creators, so the linked unit is none.
+fn motion_update(r: &mut MotionRecord) -> Result<(), HandlerError> {
+    r.update(true, None).map_err(|_| {
+        HandlerError::Invalid("render/unit-composite.md §8 r4: a missile follows a non-monster")
+    })
+}
+
+/// One advance of the missile's seed (`client-bodies.md` §B1 "seed
+/// step"): the new low word lo'.
+fn seed_step(w: &mut ClientWorld, key: UnitKey) -> u32 {
+    let Some(u) = w.objclient.set_c.get_mut(&key) else {
+        return 0;
+    };
+    let Some((lo, hi)) = u.seed else {
+        return 0;
+    };
+    let mut seed = Seed::new(lo, hi);
+    let lo = seed.step();
+    u.seed = Some((seed.lo, seed.hi));
+    lo
 }
 
 /// The default removal `0x004CD390` (§C10 r1): the light removed, the
@@ -1217,3 +1499,7 @@ fn remove_light(w: &mut ClientWorld, key: UnitKey) {
 #[cfg(test)]
 #[path = "client_missiles_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "client_missiles_bodies_tests.rs"]
+mod bodies_tests;

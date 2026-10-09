@@ -23,17 +23,17 @@
 | Inputs | 56–62 |
 | Outputs / state changes | 63–68 |
 | Rules | 69–70 |
-|   1. Local player stats: 0x19–0x1F (`0x0045D780`) | 71–114 |
-|   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 115–244 |
-|   3. Other item messages | 245–345 |
-|   4. Hireling stats: 0x9E–0xA2 (`0x0045D540`) | 346–361 |
-|   5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6 | 362–491 |
-| Constants & data dependencies | 492–500 |
-| Randomness | 501–504 |
-| Edge cases & original bugs | 505–524 |
-| Test vectors | 525–563 |
-| Provenance | 564–599 |
-| Open questions | 600–640 |
+|   1. Local player stats: 0x19–0x1F (`0x0045D780`) | 71–136 |
+|   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 137–266 |
+|   3. Other item messages | 267–367 |
+|   4. Hireling stats: 0x9E–0xA2 (`0x0045D540`) | 368–383 |
+|   5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6 | 384–555 |
+| Constants & data dependencies | 556–564 |
+| Randomness | 565–568 |
+| Edge cases & original bugs | 569–588 |
+| Test vectors | 589–627 |
+| Provenance | 628–663 |
+| Open questions | 664–704 |
 <!-- /index -->
 
 Owned ids: 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x3F, 0x42,
@@ -91,9 +91,31 @@ stat-list links, `weapon_set`, the runtime item table (§5). No outputs.
 4. **0x20** StatUpdate (`0x0045D880`): GUID u32@1, stat u8@5, value
    u32@6. Look up (0, GUID) (players only); none → nothing; else set
    (stat, value) and run the hook on that unit. d2rs:
-   `units::messages::stat_update` builds it; no spec names a caller of
-   the sender `0x0053C1D0`, so nothing sends it yet. PROVISIONAL: the
-   layout is the TSV's; settled by REC-415 (a static caller search).
+   `units::messages::stat_update` builds it.
+   1. **Sender** (2026-10-09, REC-415 settled): `0x0053C1D0` (client
+      ECX, id DL = 0x20, GUID, stat u16 (> 0xFE fatal 0x4B8), value;
+      10 bytes) has one caller, the stat sender `0x00548520(U, s, v,
+      R)` (ECX U, EDX s, stack v, R): R's client (`0x005531C0`, none →
+      fatal 0x154); U = R → the own-stat form 0x1D / 0x1E / 0x1F by
+      value size (`0x0053BE40`: < 0xFF byte, < 0xFFFF word, else dword;
+      s ≥ 0xFF fatal 0x3CB); else 0x20 with GUID = U +0x0C (U null →
+      −1). Of its 15 call sites only `0x00548A27` passes U ≠ R; the
+      other 14 (vitals refills `0x0054C0E0`, `0x00578D30`,
+      `0x00585720`; resistances 39/41/43/45 `0x00589FF0`; stat 175
+      `0x0054DA10`) send the own-stat form.
+   2. `0x00548A27` is `0x005489F0(U, client)`, part B of the player add
+      messages (`sim/intents-events.md` §7.2): R = the client's player
+      (`0x00537860(client, 0)`); R = U → nothing; else for s in the
+      −1-terminated list at `0x00731AD8` = 67, 68, 12, 0, 2 (velocity,
+      attack rate, level, strength, dexterity), in that order: 0x20 (U
+      GUID, s, base(U, s, 0)) (`0x006253B0`). So each client gets
+      five 0x20 per other player brought into view, and none for its
+      own player.
+
+   ```
+   player_part_b(U, client): R := player(client)
+     if R != U: for s in [67, 68, 12, 0, 2]: send 0x20(U.guid, s, base(U, s))
+   ```
 5. **Hook** (`0x0045D4B0(stat, unit, value)`; unit null → nothing;
    stats > 12 → nothing; byte table `0x0045D524`, jump table
    `0x0045D514`, read from the image 2026-10-08): stat 6 (life) with
@@ -394,13 +416,19 @@ stat-list links, `weapon_set`, the runtime item table (§5). No outputs.
    flags.
    3. Sender (`0x0053D130(client, item, 1, s, v, param)`, server side;
       d2-sim `units::messages::update_item_stat`): set flag 1, the item's
-      layer-0 base value of s after the change. PROVISIONAL: each sized
-      field takes the narrowest width that holds it (GUID and value: ≤
-      0xFF → 8, ≤ 0xFFFF → 16, else 32, a negative value as its 32-bit
-      two's complement; param: ≤ 0xFF → 8, else 16) and the item moves,
-      vendor and skill-body callers pass param 0 (because no spec read of
-      `0x0053D130`'s width choice exists and the client reads any width);
-      settled by REC-400.
+      layer-0 base value of s after the change. Widths (settled REC-400,
+      read 2026-10-09): ECX = client, EDX = item unit, stack = set flag
+      byte (written as `flag ≠ 0`), stat, value, param u16. GUID and
+      value go through the sized writer `0x0053B0E0`, an unsigned
+      compare: `v < 0x100 → bit 0, 8 bits; v < 0x10000 → bits 1,0, 16
+      bits; else bits 1,1, 32 bits` (a negative value is its 32-bit two's
+      complement, so 32 bits). A null item writes GUID 0xFFFFFFFF
+      (`0x0053D17B`). Param: `param < 0x100 → bit 0, 8 bits; else bit 1,
+      16 bits` (`0x0053D1BD`). The quantity / durability callers (e.g.
+      `0x0055D195`) push param 0; the charged-skill caller `0x0056BEC0`
+      (stat 204) passes value `max << 8 | charges` and param = the layer
+      key. The queued length is always 0x22 (`intents-events.md` §6
+      rule 13).
 2. **0x40** ItemFlags (`0x0045E240` → `0x004C2020`, 13 bytes): GUID
    u32@1, mask u32@5, value u32@9. Item (4, GUID) present → item flags
    (item data +0x18): value ≠ 0 → |= mask, else &= ~mask (`0x006280D0`).
@@ -437,26 +465,62 @@ stat-list links, `weapon_set`, the runtime item table (§5). No outputs.
    (`sim/stat-lists.md`), item flags of the refresh. The gfx calls are
    render (`render/unit-composite.md` reads the model).
 5. **0x92** RemoveItemsDisplay (`0x0045E5B0` → `0x004C23E0`, 6 bytes):
-   type u8@1, GUID u32@2. Unit U with an inventory: for each node in
-   order whose kind is 3 (body), or 1 when `0x0062FF70(item, U)` holds:
-   gfx refresh (`0x0046F950`), the item unlinked (`0x0063D2B0`) and
-   re-added (`0x0063AD90`; none → fatal 0xD5A, another item → fatal
-   0xD5B); kind 3 → its body slot cleared (`0x0063C110`,
-   `0x0063BE30`); the set-item update with remove (`0x00663CC0(U, item,
-   1, 1)` at `0x004C24A9`: the owner's list of that set detached and
-   freed, `client/stat-lists.md` §2 r5); a player
-   (type 0) → `0x0063BEF0(inventory)`; item flag 0x100 clear →
-   `0x006277F0(U, item)`; `0x004C1350`. A node without an item is
-   fatal 0xD4F. Finally `0x0063E0B0(inventory)`. Model: U's inventory
-   and stat links (helpers: `items/inventory.md`).
+   type u8@1, GUID u32@2. Unit U with an inventory I (+0x60):
+   1. **Node order** (2026-10-09, REC-416 settled): the walk is I's item
+      list from its head (I +0x0C, `0x0063B2C0`) by item data +0x64
+      (`0x0063DFA0`), the next item read before the current one is
+      touched: link order (`items/inventory.md` §1.4 r1). The node kind
+      is item data +0x69 (`0x0063E020`).
+   2. For each item whose kind is 3 (body), or 1 when
+      `0x0062FF70(item, U)` holds: gfx refresh (`0x0046F950`); the
+      weapon-GUID fix-up `0x0063D2B0` (`items/inventory.md` §1.4 r1);
+      the item **removed** from I (`0x0063AD90` → `0x0063AAF0`: cells,
+      list, count, node fields, owner stat link; it is not re-added);
+      kind 3 → its body slot cleared (`0x0063C110`, `0x0063BE30`); the
+      set-item update with remove (`0x00663CC0(U, item, 1, 1)` at
+      `0x004C24A9`: the owner's list of that set detached and freed,
+      `client/stat-lists.md` §2 r5); a player (type 0) →
+      `0x0063BEF0(I)`; item flag 0x100 clear → `0x006277F0(U, item)`;
+      `0x004C1350`.
+   3. Asserts 0xD4F (node without an item), 0xD5A (`0x0063AD90`
+      returns none: the item's inventory +0x5C is not I) and 0xD5B
+      (returns another item) cannot fire: the list holds only items of
+      I, and `0x0063AD90` returns its argument or none.
+   4. Then `0x0063E0B0(I)` **empties** I: cursor field +0x20 := 0 (the
+      cursor item itself is not unlinked), weapon GUID +0x1C := −1, and
+      `0x0063AAF0` on the list head until the list is empty (each one
+      also unlinks the item's stats from the owner). So after 0x92 no
+      item of U is in I; the item units stay in the client's tables
+      until their next item record places them again.
+   5. **Sender** (REC-415 settled): 0x92 is built by the 6-byte sender
+      `0x0053B3D0` (client ECX, id DL, u8, u32) with DL = 0x92 at two
+      sites only, both in the player-trade end `0x005678F0(game, P)`
+      (`.\PLAYER\PlrTrade`; callers `0x005679E0` trade cancel,
+      `0x00567B00` trade done, `0x00568640`), run only when P's player
+      data +0x5C (trade record) is set: 0x92 (0, P GUID) to P's own
+      client (`0x00567932`), then to every other client
+      (`0x005538D0` with `0x00566C80`, which skips P's client,
+      `0x00566CAE`); then every item of P's server inventory and its
+      cursor item is removed and freed (`0x0063CC70`, `0x00628170`) and
+      the inventory rebuilt from the trade record (`0x0055FCC0`,
+      `0x00566CC0`), whose item records follow. Player trade is
+      multiplayer (out of scope, `items/inventory.md` §5.4), so d2rs
+      servers never send 0x92; the client handler stays for the
+      contract.
+   Model: every item of U leaves U's inventory and stat links.
    d2rs (`bridge/msg/items.rs::remove_items_display`): the model holds
-   no inventory nodes, so the nodes are U's items by their last record
-   (body mode, or a charm on page 0 that is not broken and has flag
-   0x4000 clear), and the effect is `ItemData::unlinked`: the item's
-   properties stop counting (`bridge/item_lists.rs::attached_to`) until
-   its next record. PROVISIONAL: node order, the fatal 0xD4F / 0xD5A /
-   0xD5B asserts and the set-list detach have no model to run on;
-   settled by REC-416.
+   no inventory nodes; the effect is `ItemData::unlinked` (properties
+   stop counting, `bridge/item_lists.rs::attached_to`) on **every** item
+   owned by U, any mode, until its next record; the order has no
+   observable effect on the model.
+
+   ```
+   remove_items_display(U):
+     for item in I.items (link order, next read first):
+       if kind(item) == 3 or (kind(item) == 1 and active_charm(item, U)):
+         remove(I, item); detach_set(U, item); unlink_stats(U, item)
+     empty(I)   # every remaining item removed, cursor field cleared
+   ```
 6. **0x97** WeaponSwitch (`0x0045EAD0`, 1 byte; id byte ≠ 0x97 is fatal
    0xF46, unreachable): `0x0048A700`: when the `d2exp.mpq` check
    (`0x00408F20`) and the expansion flag `[0x007A04F4]` (`0x0044DCC0`)
