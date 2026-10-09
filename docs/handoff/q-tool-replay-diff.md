@@ -67,16 +67,37 @@ REC ids used: REC-1370, REC-1371.
   `system.replay.town-ama-10k`, `system.replay.bloodmoor-bar-10k`,
   `system.replay.input-fidelity` (DIVERGED).
 
+## Update 19:55 UTC: exact replay (state-dump `--no-own-c2s`)
+
+q-fix-replay-hooks added `state-dump --no-own-c2s` (merged here, 369a81f8).
+replay_diff.py now replays every recorded message but 0x67 / 0x6B and drops
+the bridge's own 0x2F, 0x31, 0x5F (REC-1370 settled). d2rs side re-run on the
+same 1.14d recordings:
+
+| Session | Input channel | State | Player |
+|---|---|---|---|
+| smoke-town-ama | 0/4 windows differ | **no difference, frames 1–139** (PARTIAL only: `own`/`q` one-sided, header gaps) | equal throughout (two 0x01 walks) |
+| town-ama-10k | 0/312 | first frame 4 (item flags, finding 3), rate 9997/9997 | equal to frame 622; then 1384/9378 frames, 5 equal stretches (longest 1561) |
+| bloodmoor-bar-10k | 0/226 | first frame 5 (population, finding 4), rate 9996/9996 | first 61 (GUID offset, finding 4) |
+
+New finding 6 (town NPC wander, act1-town / NPC tracks owner): NPC 1:7
+(Warriv, class 155) has the same unit seed on both sides but its wander path
+target differs at frame 287 (ty 4228 on 1.14d, 4229 on d2rs, mode 2). The
+player's first divergence (frame 623) follows from it: the replayed 0x04
+(run to unit 1:7, repeated every ~6 frames from 600) re-targets to the NPC,
+which is one sub-tile apart by then.
+
+Finding 1 is fixed (by q-fix-replay-hooks); 2, 3, 4 stand unchanged.
+
 ## Open
 
-- REC-1370: the not-replayed id set {0x2F, 0x5F, 0x67, 0x6B}. Measured:
-  0x6B and 0x2F land in the same frames on both sides; 0x5F does not
-  (finding 1). With a state-dump switch the set becomes {0x67}.
+- REC-1370: settled (update above).
 - REC-1371: the host clocks are not aligned (state-dump starts at 1 s,
   steps 40 ms; 1.14d is wall time under the debugger). Not yet seen as a
   cause.
-- autostart.py: `clickunit` posts clicks outside the 800×600 window
-  (`clickunit 2 119` → (928, 316)); routed. In the smoke session that click
+- autostart.py: `clickunit` posted clicks outside the 800×600 window
+  (`clickunit 2 119` → (928, 316)); fixed by q-fix-replay-hooks (refuses
+  off-screen units). The recordings here predate the fix. In the smoke session that click
   became a walk (0x01). In town-ama-10k the waypoint was on screen later:
   1.14d opened it 7 times (0x13 on object 2:10, frames 1615–7117) and
   closed it by walking away (0x49 `0a000000 00000000`, no travel: the
