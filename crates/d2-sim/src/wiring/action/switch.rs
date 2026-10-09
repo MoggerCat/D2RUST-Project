@@ -169,6 +169,11 @@ impl<X: Pending> View<'_, X> {
             // `0x005738D0`: its type-2 (think) and type-3 events cancelled
             // (`sim/units.md` §4.6). Recorded `act-travel-lut-ama.check`:
             // the act-1 town NPCs never think again after the act change.
+            // Same rule: the room has no client left → every monster in
+            // it gets `0x005738D0`, which cancels its AI think (type 2)
+            // and stat regeneration (type 3) events, any argument
+            // (`world/hirelings-2.md` §16 rule 6): town NPCs stop when the
+            // player warps out.
             if r.clients == 0 {
                 for u in game.lists.room_units(r.room) {
                     if game

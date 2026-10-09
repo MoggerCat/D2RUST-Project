@@ -997,7 +997,25 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
             mode: 0,
             allied: false,
         };
-        self.v.add_allocated(self.game, obj, &req, x, y);
+        if !self.v.add_allocated(self.game, obj, &req, x, y) {
+            return;
+        }
+        // `SUNIT_Add`'s object footprint (`path-placement.md` §2.5): the
+        // object state is lent here, so `View::path_place` could not read
+        // the row; stamp it from the lent tables when `HasCollision[mode]`
+        // ≠ 0.
+        let Some(mode) = self.v.units.get(obj).map(|r| r.mode) else {
+            return;
+        };
+        if self.v.h.paths.is_none() {
+            return;
+        }
+        if let Some(o) = self.object_row(obj) {
+            if object_shape(&o).collides_in(mode) {
+                let (room, (px, py)) = (self.room(obj), self.position(obj));
+                apply_object_footprint(&mut self.v.h.drlg, &o, room, px, py, true);
+            }
+        }
     }
     fn staff_tomb_level(&self) -> u32 {
         self.v.h.x.object_staff_tomb()

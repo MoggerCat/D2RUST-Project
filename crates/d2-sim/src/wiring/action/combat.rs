@@ -333,7 +333,23 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
     fn overlay(&mut self, u: UnitId, id: i32) {
         self.v.h.x.overlay(u, id);
     }
+    /// `0x00623F50(unit)` (`skills/bodies.md` §2.6 "anim refresh"):
+    /// the speed (+0x4C) of the unit's current mode recomputed
+    /// ([`ActionHooks::rate_refresh`]: a shape state changes the draw
+    /// identity, a stat fill the rate stats), then the host's hook.
     fn refresh_anim_rate(&mut self, u: UnitId) {
+        let speed = {
+            let sim = Sim {
+                game: &mut *self.game,
+                units: &mut *self.v.units,
+                stats: &mut *self.v.stats,
+                data: self.v.data,
+            };
+            self.v.h.rate_refresh(&sim, u)
+        };
+        if let (Some(s), Some(r)) = (speed, self.v.units.get_mut(u)) {
+            r.anim.speed = s;
+        }
         self.v.h.x.refresh_anim_rate(u);
     }
     fn set_last_attacker(&mut self, d: UnitId, a: UnitId) {

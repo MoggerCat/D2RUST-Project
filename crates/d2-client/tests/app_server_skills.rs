@@ -75,7 +75,7 @@ impl Game {
     /// What §2 rule 8 gives the player from the install's rows: skill 0,
     /// then each `charstats` `Skill 1`…`Skill 10` inside the skills table
     /// (the start skill's validity decides one more 0x23 at the join).
-    fn native_rule(&mut self) -> (Vec<i32>, bool) {
+    fn native_rule(&mut self) -> (Vec<i32>, Option<i32>) {
         self.link
             .with(|l| {
                 let h = l.host_mut().game.events.action.hooks();
@@ -99,7 +99,8 @@ impl Game {
                         ids.push(i32::from(id));
                     }
                 }
-                (ids, usize::from(cs.startskill) < rows)
+                let start = usize::from(cs.startskill) < rows;
+                (ids, start.then_some(i32::from(cs.startskill)))
             })
             .unwrap()
     }
@@ -134,9 +135,21 @@ fn native(skill: i32) -> SkillEntry {
 fn the_server_player_list_holds_its_native_skills_and_a_new_join_sends_no_0x94() {
     let mut g = Game::started();
     let got = g.join();
-    let (ids, start_skill) = g.native_rule();
+    let (ids, start) = g.native_rule();
+    let start_skill = start.is_some();
     let (list, left, right, _) = g.player_skills();
-    let want: Vec<_> = ids.iter().copied().map(native).collect();
+    let mut want: Vec<_> = ids.iter().copied().map(native).collect();
+    // The start items' staff carries the class's `StartSkill` (stat 107,
+    // `generation.md` §10.3 step 3): an entry of level 0 from the item,
+    // after the natives (the recorded new sorceress, REC-530 facts).
+    if let Some(k) = start.filter(|k| !ids.contains(k)) {
+        want.push(SkillEntry {
+            skill: k,
+            base: 0,
+            owner_guid: -1,
+            ..SkillEntry::default()
+        });
+    }
     assert_eq!(
         list, want,
         "skill 0, then the class skills inside the table"
