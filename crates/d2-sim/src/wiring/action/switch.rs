@@ -20,8 +20,8 @@
 //!
 //! Not sent, because no spec gives them (named, not guessed):
 //! - item 0x9C (the item world is not reachable from the action wiring,
-//!   as for §7.1); missile 0x73 (`0x0059FEE0`) is sent with PROVISIONAL
-//!   field sources (REC-414, [`View::missile_add`]);
+//!   as for §7.1); missile 0x73 (`0x0059FEE0`, [`View::missile_add`])
+//!   is sent;
 //! - player part B for another player (`0x005489F0`, `0x005484B0`,
 //!   multiplayer only, §7.9 rule 5) and the inventory messages
 //!   `0x00534F80`; the corpse 0x74 is sent with PROVISIONAL fields
@@ -252,11 +252,9 @@ impl<X: Pending> View<'_, X> {
 
     /// The missile add message 0x73 (`0x0059FEE0`, §7.2 part A,
     /// `missiles/missiles.md` §R2.4): only for a `ClientSend` row, an
-    /// existing owner and a moving path (`0x006486C0(path)` ≠ 0, the
-    /// path velocity).
-    // PROVISIONAL (REC-414): "moving" is read as a non-zero dynamic-path
-    // velocity; the first point is `points[0]` when the path has points;
-    // see [`messages::client_missile`].
+    /// existing owner; sent for any path velocity (R2.4 rule 1). Position
+    /// is the path's cells (`precise >> 16`); the first point is the
+    /// target while the velocity is non-zero, else (0, 0).
     fn missile_add(&mut self, game: &Game, receiver: UnitId, unit: UnitId) {
         let Some(d) = self.h.missiles.as_ref().and_then(|s| s.get(unit)).cloned() else {
             return;
@@ -279,18 +277,15 @@ impl<X: Pending> View<'_, X> {
         let Some(p) = self.h.paths.as_ref().and_then(|p| p.dynamic(unit)) else {
             return;
         };
-        if p.velocity == 0 {
-            return;
-        }
-        let first = if p.point_count > 0 {
-            (u32::from(p.points[0].x), u32::from(p.points[0].y))
+        let first = if p.velocity != 0 {
+            (u32::from(p.target_x), u32::from(p.target_y))
         } else {
             (0, 0)
         };
         let pierce = self.stats.unit_total(unit, 328, 0) as u8;
         let m = messages::client_missile(
             d.class,
-            (p.precise_x, p.precise_y),
+            (p.precise_x >> 16, p.precise_y >> 16),
             first,
             d.current as u16,
             (owner.ty as u8, owner.guid),
@@ -309,6 +304,16 @@ impl<X: Pending> View<'_, X> {
             return;
         };
         let (ty, guid) = (e.ty as u8, e.guid);
+        // Spec: client/msg-stats-items.md §1 r4.1-4.2 (`0x005489F0`): the
+        // unit's five base stats go to every other player's client.
+        if unit != receiver {
+            for s in [67u8, 68, 12, 0, 2] {
+                let v = self.stats.unit_base(unit, u16::from(s), 0);
+                self.h
+                    .x
+                    .send(receiver, &messages::stat_update(guid, s, v as u32));
+            }
+        }
         if self.is_player_corpse(unit) {
             self.h.x.send(receiver, &corpse_assign(guid));
         }

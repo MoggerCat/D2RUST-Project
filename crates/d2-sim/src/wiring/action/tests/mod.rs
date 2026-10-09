@@ -22,6 +22,8 @@ mod objects;
 #[cfg(test)]
 mod player_death;
 #[cfg(test)]
+mod proto_msgs;
+#[cfg(test)]
 mod rooms;
 #[cfg(test)]
 mod sound;
@@ -80,6 +82,8 @@ pub struct TestPending {
     pub skill_start: i32,
     /// What `object_approach` answers (default: operate).
     pub reach: Option<crate::wiring::action::ObjectReach>,
+    /// Defenders `may_attack` denies (default: everyone but oneself).
+    pub peaceful: Vec<UnitId>,
 }
 
 impl Pending for TestPending {
@@ -154,7 +158,7 @@ impl Pending for TestPending {
         self.crossed.get(&unit).cloned().unwrap_or_default()
     }
     fn may_attack(&self, a: UnitId, d: UnitId) -> bool {
-        a != d
+        a != d && !self.peaceful.contains(&d)
     }
     fn class_has_mode(&self, _: i32, mode: u8) -> bool {
         !self.missing_modes.contains(&mode)
