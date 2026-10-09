@@ -84,6 +84,8 @@ pub struct ClientPath {
     run_bonus: i32,
     seed: Seed,
     frame: i32,
+    /// The walk target's size and footprint (a walk to a unit).
+    target: Option<(i32, d2_sim::path::Footprint)>,
 }
 
 impl ClientPath {
@@ -134,6 +136,32 @@ impl ClientPath {
         )
         .ok();
         self.path.is_some()
+    }
+
+    /// The grids the path walks on: `others` (the client grids with the
+    /// footprints of every unit but the local player,
+    /// [`super::client_missiles::stamp_unit_footprints_with`]) with the
+    /// path's own footprint stamped again. PROVISIONAL (REC-546, REC-743):
+    /// the 1.14d client grids carry the units' footprints as they are
+    /// placed and move; the model stamps them once per update at the
+    /// model positions.
+    /// The size and footprint of the walk's target unit in the grids of
+    /// [`Self::set_unit_footprints`] (`None`: a point, or a unit without
+    /// one): the compute lifts it (`sim/pathing.md` §3 step 6) and the
+    /// walk reads its size.
+    pub fn set_target_footprint(&mut self, target: Option<(i32, d2_sim::path::Footprint)>) {
+        self.target = target;
+    }
+
+    pub fn set_unit_footprints(&mut self, drlg: &Drlg, others: &BTreeMap<RoomId, CollisionGrid>) {
+        self.grids = others.clone();
+        if let Some(fp) = self.path.as_ref().map(footprint_of) {
+            let mut rooms = Rooms {
+                drlg,
+                grids: &mut self.grids,
+            };
+            d2_sim::path::footprint::add_footprint(&mut rooms, &fp);
+        }
     }
 
     /// The player mode request (§1.2) of a walk (`run`: mode 3, else 2)
@@ -192,6 +220,7 @@ impl ClientPath {
             speeds,
             own,
             to,
+            target: self.target,
         }
     }
 }
@@ -261,6 +290,7 @@ struct Ctx<'a> {
     speeds: Speeds,
     own: Own,
     to: PathTo,
+    target: Option<(i32, d2_sim::path::Footprint)>,
 }
 
 impl CollisionRooms for Ctx<'_> {
@@ -298,6 +328,17 @@ impl PathWorld for Ctx<'_> {
         d2_sim::drlg::is_town(d.level(d.room(r).level).id)
     }
     fn remove_footprint(&mut self, unit: UnitId, force: bool) -> bool {
+        if unit == TARGET {
+            let Some((_, fp)) = self.target else {
+                return false;
+            };
+            return d2_sim::path::footprint::remove_footprint(
+                &mut self.rooms,
+                &fp,
+                d2_sim::path::RemoveRule::Other,
+                force,
+            );
+        }
         let Some(fp) = self.path.as_ref().filter(|_| unit == ME).map(footprint_of) else {
             return false;
         };
@@ -309,6 +350,12 @@ impl PathWorld for Ctx<'_> {
         )
     }
     fn add_footprint(&mut self, unit: UnitId) {
+        if unit == TARGET {
+            if let Some((_, fp)) = self.target {
+                d2_sim::path::footprint::add_footprint(&mut self.rooms, &fp);
+            }
+            return;
+        }
         if let Some(fp) = self.path.as_ref().filter(|_| unit == ME).map(footprint_of) {
             d2_sim::path::footprint::add_footprint(&mut self.rooms, &fp);
         }
@@ -358,6 +405,13 @@ impl WalkUnits for Ctx<'_> {
         match self.to {
             PathTo::Unit(t, g, _) if t == ty && g == guid => Some(TARGET),
             _ => None,
+        }
+    }
+    fn unit_size(&self, unit: UnitId) -> i32 {
+        match unit {
+            ME => 2,
+            TARGET => self.target.map_or(0, |(size, _)| size),
+            _ => 0,
         }
     }
     fn position(&self, unit: UnitId) -> Point {

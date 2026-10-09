@@ -35,7 +35,11 @@ pub fn room_pass(w: &mut ClientWorld, inputs: &ModelInputs) {
         return;
     }
     // The footprints the placement test reads (PROVISIONAL REC-546).
-    super::client_missiles::stamp_unit_footprints(w, &inputs.tables.monsters);
+    super::client_missiles::stamp_unit_footprints_with(
+        w,
+        &inputs.tables.monsters,
+        &inputs.objclient.rows,
+    );
     for r in rooms {
         let Some(d) = w.drlg.as_ref() else {
             return;

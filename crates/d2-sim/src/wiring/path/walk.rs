@@ -1,4 +1,4 @@
-// Spec: specs/sim/pathing.md §1, §3, §8, §9; specs/sim/path-placement.md §5, §6; specs/sim/units.md §4.1, §4.4, §4.5 (wiring of the walk seams)
+// Spec: specs/sim/pathing.md §1, §3, §8, §9, §9.8; specs/sim/path-placement.md §5, §6; specs/sim/units.md §4.1, §4.4, §4.5 (wiring of the walk seams)
 //! [`PathCtx`]: the one context `path::walk` runs on. It holds the game
 //! (lists, timers, frame), the unit records, stat lists and the action
 //! state (DRLG, path records, tables, [`Pending`]) and implements
@@ -723,6 +723,23 @@ impl<X: Pending> WalkUnits for PathCtx<'_, X> {
     /// The player of a client record (`unit-order.md` §7).
     fn client_player(&self, client: ClientId) -> Option<UnitId> {
         self.game.lists.client(client)?.player
+    }
+    /// The removal `0x00571600` of `unit` to the client's player
+    /// (`pathing.md` §9.8: S→C 0x0A, type and GUID).
+    fn send_unit_removal(&mut self, client: ClientId, unit: UnitId) {
+        let (Some(player), Some(e)) = (self.client_player(client), self.game.lists.unit(unit))
+        else {
+            return;
+        };
+        let m = crate::units::messages::remove_unit(e.ty as u8, e.guid);
+        self.v.h.x.send(player, &m);
+    }
+    /// The add messages `0x00571F90` of `unit` to the client's player
+    /// (`pathing.md` §9.8, `intents-events.md` §7.2).
+    fn send_unit_add(&mut self, client: ClientId, unit: UnitId) {
+        if let Some(player) = self.client_player(client) {
+            self.v.add_messages(self.game, player, unit);
+        }
     }
     /// [`crate::wiring::path::PathState::history`] (players only).
     fn position_history(&mut self, unit: UnitId) -> Option<&mut PositionHistory> {

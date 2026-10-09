@@ -1,4 +1,4 @@
-// Spec: specs/client/model.md (§3 r3, open question 2), specs/sim/pathing.md (§1.2–§1.5, §3–§9, cases M1, D1–D4), specs/ui/controls.md (§6 r7)
+// Spec: specs/client/model.md (§3 r3, open question 2), specs/sim/pathing.md (§1.2–§1.5, §3–§9, cases M1, D1–D4), specs/ui/controls.md (§6 r7), specs/skills/use.md (§1, §3)
 //! Provisional own-walk motion of the local player (first playable
 //! preview, decision D2 in `docs/PLAN.md`).
 //!
@@ -531,6 +531,12 @@ impl Predict {
             .and_then(|p| p.stats.get(&10).copied())
             .unwrap_or(1);
         let own = Own { stamina, moves };
+        self.path
+            .set_unit_footprints(drlg, &world.objclient.other_grids);
+        self.path.set_target_footprint(match walk.to {
+            WalkTo::Unit(k) => world.objclient.footprints.get(&k).copied(),
+            WalkTo::Point(..) => None,
+        });
         if self.path_for != Some((walk, at)) {
             // A re-target while the path moves (no snap since its last
             // step) recomputes from the current precise position, the
@@ -538,9 +544,13 @@ impl Predict {
             // `a1-walk-s`: re-placing at the cell centre drifted 3 px).
             // A walk from rest or after a snap places the path anew.
             let moving_here = self.path_for.is_some_and(|(_, a)| a == at);
-            if !moving_here && !self.path.place(t, drlg, cell.0, cell.1) {
-                self.path_for = None;
-                return false;
+            if !moving_here {
+                if !self.path.place(t, drlg, cell.0, cell.1) {
+                    self.path_for = None;
+                    return false;
+                }
+                self.path
+                    .set_unit_footprints(drlg, &world.objclient.other_grids);
             }
             if !self.path.request(t, drlg, speeds, own, to, walk.run) {
                 // No path: the server's request stands still too.
@@ -681,7 +691,75 @@ impl Predict {
 pub struct WalkTap(
     std::sync::Arc<std::sync::Mutex<Vec<Walk>>>,
     std::sync::Arc<std::sync::atomic::AtomicBool>,
+    std::sync::Arc<std::sync::Mutex<Vec<Approach>>>,
 );
+
+/// A skill on a unit with run allowed (C→S 0x06 / 0x0D and their hold
+/// forms 0x09 / 0x10, `skills/use.md` §1 r5): the side and the target.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Approach {
+    /// `true`: the right skill.
+    pub right: bool,
+    pub target: UnitKey,
+}
+
+/// The [`Approach`] of a C→S message; any other → `None`.
+pub fn approach_of(msg: &[u8]) -> Option<Approach> {
+    let (&id, rest) = msg.split_first()?;
+    let right = match id {
+        0x06 | 0x09 => false,
+        0x0D | 0x10 => true,
+        _ => return None,
+    };
+    if rest.len() != 8 {
+        return None;
+    }
+    let t = u32::from_le_bytes([rest[0], rest[1], rest[2], rest[3]]);
+    let guid = u32::from_le_bytes([rest[4], rest[5], rest[6], rest[7]]);
+    Some(Approach {
+        right,
+        target: UnitKey::new(u8::try_from(t).ok()?, guid),
+    })
+}
+
+/// The walk the server starts for an [`Approach`] (`skills/use.md` §3
+/// r6): an h2h skill (`range` 1, or 3 `both`) out of melee range runs
+/// (mode 3) to the target, whose skill fires on arrival; any other skill
+/// is used where the player stands. `skills`: the `skills` rows by id.
+///
+/// PROVISIONAL (skills/use.md §3 r6; REC-744): `both` reads as h2h (the
+/// model does not hold the equipped weapon's class, so a bow or
+/// crossbow is not seen), the player's melee range is the weapon range
+/// adder 0, and the melee line test (`0x00622C40` step 3) is not run.
+pub fn approach_walk(
+    world: &ClientWorld,
+    skills: &[super::world::SkillRow],
+    a: Approach,
+) -> Option<Walk> {
+    let p = world.local()?;
+    let list = p.skills.as_ref()?;
+    let slot = if a.right { list.right } else { list.left }?;
+    let skill = list.entries.get(slot)?.skill;
+    let range = skills.get(usize::from(skill))?.range;
+    if !matches!(range, 1 | 3) {
+        return None;
+    }
+    let t = world.units.get(&a.target)?;
+    let size = world
+        .objclient
+        .footprints
+        .get(&a.target)
+        .map_or(0, |(s, _)| *s);
+    let d = super::objects::distance(p, 2, t, size);
+    // `0x00622C40` step 3: r = melee range + 1; in range when d ≤ r.
+    if d <= 1 {
+        return None;
+    }
+    Some(Walk {
+        to: WalkTo::Unit(a.target),
+        run: true,
+    })
+}
 
 impl WalkTap {
     /// The walks sent since the last call, in send order.
@@ -691,6 +769,11 @@ impl WalkTap {
 
     fn push(&self, w: Walk) {
         self.0.lock().unwrap_or_else(|e| e.into_inner()).push(w);
+    }
+
+    /// The skill-on-unit messages sent since the last call ([`Approach`]).
+    pub fn take_approaches(&self) -> Vec<Approach> {
+        std::mem::take(&mut *self.2.lock().unwrap_or_else(|e| e.into_inner()))
     }
 
     /// Whether a waypoint travel (C→S 0x49) was sent since the last call.
@@ -705,6 +788,9 @@ impl WalkTap {
     pub fn record(&self, msg: &[u8]) {
         if let Some(w) = walk_of(msg) {
             self.push(w);
+        }
+        if let Some(a) = approach_of(msg) {
+            self.2.lock().unwrap_or_else(|e| e.into_inner()).push(a);
         }
         if msg.first() == Some(&C2S_WAYPOINT) {
             self.1.store(true, std::sync::atomic::Ordering::Relaxed);
@@ -797,7 +883,7 @@ impl<L: super::state::StateSource> super::state::StateSource for PredictLink<L> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bridge::world::ClientUnit;
+    use crate::bridge::world::{ClientUnit, MONSTER};
 
     // Covers: specs/render/unit-composite.md §3 r1
     /// A walk to a point faces the clicked subtile from the walk's start
@@ -859,6 +945,71 @@ mod tests {
         w.units.insert(key, u);
         w.local_player = Some(key);
         (w, key)
+    }
+
+    // Covers: specs/skills/use.md §1 r5
+    #[test]
+    fn approach_of_reads_the_skill_on_unit_codes_with_run() {
+        let unit = |id: u8| [id, 1, 0, 0, 0, 9, 0, 0, 0];
+        let key = UnitKey::new(MONSTER, 9);
+        for (id, right) in [(0x06, false), (0x09, false), (0x0D, true), (0x10, true)] {
+            assert_eq!(
+                approach_of(&unit(id)),
+                Some(Approach { right, target: key }),
+                "{id:#x}"
+            );
+        }
+        // The shift forms do not run; a point skill is no approach.
+        for id in [0x07, 0x0A, 0x0E, 0x11] {
+            assert_eq!(approach_of(&unit(id)), None, "{id:#x}");
+        }
+        assert_eq!(approach_of(&[0x05, 1, 0, 2, 0]), None);
+    }
+
+    // Covers: specs/skills/use.md §3 r6
+    #[test]
+    fn an_h2h_skill_out_of_melee_range_runs_to_the_target() {
+        use crate::bridge::skills::{SkillEntry, SkillList};
+        use crate::bridge::world::SkillRow;
+        let (mut w, p) = world_at(100, 100);
+        let mut list = SkillList::default();
+        list.entries.push(SkillEntry {
+            skill: 0,
+            ..SkillEntry::default()
+        });
+        list.entries.push(SkillEntry {
+            skill: 36,
+            ..SkillEntry::default()
+        });
+        (list.left, list.right) = (Some(0), Some(1));
+        w.units.get_mut(&p).unwrap().skills = Some(list);
+        let m = UnitKey::new(MONSTER, 9);
+        let mut u = ClientUnit::new(m);
+        u.position = Some((106, 100));
+        w.units.insert(m, u);
+        let mut skills = vec![SkillRow::default(); 37];
+        skills[0].range = 1;
+        skills[36].range = 2;
+        let left = Approach {
+            right: false,
+            target: m,
+        };
+        assert_eq!(
+            approach_walk(&w, &skills, left),
+            Some(Walk {
+                to: WalkTo::Unit(m),
+                run: true
+            })
+        );
+        // A ranged skill is used where the player stands.
+        let right = Approach {
+            right: true,
+            ..left
+        };
+        assert_eq!(approach_walk(&w, &skills, right), None);
+        // In melee range (distance 1): no walk.
+        w.units.get_mut(&m).unwrap().position = Some((102, 100));
+        assert_eq!(approach_walk(&w, &skills, left), None);
     }
 
     // Covers: specs/sim/pathing.md §8.1 r2, §8.2, §9.4 r2

@@ -43,7 +43,7 @@ use std::collections::BTreeMap;
 use d2_sim::rng::Seed;
 
 use super::dispatch::HandlerError;
-use super::world::{ClientWorld, UnitKey, MISSILE, MONSTER, PLAYER};
+use super::world::{ClientWorld, UnitKey, MISSILE, MONSTER, OBJECT, PLAYER};
 use crate::rules::lighting::records::{unit_light_pos, LightKind, Owner};
 use crate::rules::unit_composite::MotionRecord;
 use d2_sim::path::collision::{find_room, size_value};
@@ -1537,12 +1537,13 @@ impl CollisionRooms for FootRooms<'_> {
 
 /// The unit footprints of the client grids as the client missiles read
 /// them, rebuilt once per client update before the set-C missile walk:
-/// every living player and monster of the model at its sub-tile, with
+/// every player and monster of the model at its sub-tile, with
 /// its pattern (`sim/path-placement.md` §3: size 0 → 0, 1 and 2 → 1, 3 →
 /// 2, others → 1; a monster that can be in town (`npc` or `inTown`)
 /// without `interact` 1 → 3, 2 → 4; players size 2, monsters `monstats2`
-/// `SizeX`) and footprint mask (player 0x80, monster 0x100; a dying or
-/// dead monster none, `client/msg-units.md` §3 r2), stamped
+/// `SizeX`) and footprint mask (player 0x80, monster 0x100; a monster
+/// added dead the corpse footprint, pattern 5 with mask 0x8000, §5.3 r3;
+/// a dead player none), stamped
 /// (`0x0064EA90`, §5.1) on copies of the rooms' grids.
 ///
 /// PROVISIONAL (REC-546): the 1.14d client stamps these on its grids as
@@ -1551,16 +1552,79 @@ impl CollisionRooms for FootRooms<'_> {
 /// units, `client/model.md` REC-277 (d)), so the missiles read a copy
 /// stamped at the units' model positions once per update.
 pub fn stamp_unit_footprints(w: &mut ClientWorld, monsters: &[Option<super::world::MonsterClass>]) {
+    stamp_unit_footprints_with(w, monsters, &[]);
+}
+
+/// [`stamp_unit_footprints`] with the objects too: each object of the
+/// model in a mode with `HasCollision` gets its `SizeX` × `SizeY` box
+/// with its footprint mask (`sim/path-placement.md` §3, §5.2), as the
+/// object's static path stamps it. The grids with every unit but the
+/// local player are kept too (`ClientObjects::other_grids`, the local
+/// player's own path reads them, [`super::client_path`]).
+pub fn stamp_unit_footprints_with(
+    w: &mut ClientWorld,
+    monsters: &[Option<super::world::MonsterClass>],
+    objects: &[super::objects::ObjClientRow],
+) {
     let Some(d) = w.drlg.as_ref() else {
         w.objclient.unit_grids.clear();
+        w.objclient.other_grids.clear();
+        w.objclient.footprints.clear();
         return;
     };
     let mut rooms = FootRooms {
         drlg: &d.drlg,
         grids: BTreeMap::new(),
     };
+    let mut prints = BTreeMap::new();
     for (k, u) in &w.units {
-        if u.is_dead() {
+        if u.is_dead() || k.unit_type != OBJECT {
+            continue;
+        }
+        let (Some(row), Some((x, y))) = (objects.get(u.class as usize), u.position) else {
+            continue;
+        };
+        if row
+            .has_collision
+            .get(u.mode as usize)
+            .is_none_or(|&c| c == 0)
+        {
+            continue;
+        }
+        let shape = d2_sim::path::ObjectShape {
+            size_x: row.size_x,
+            size_y: row.size_y,
+            is_door: row.is_door != 0,
+            blocks_vis: row.blocks_vis,
+            block_missile: row.block_missile,
+            sub_class: row.sub_class,
+            has_collision: [false; 8],
+        };
+        let (x, y) = (i32::from(x), i32::from(y));
+        let fp = d2_sim::path::Footprint {
+            room: drlg_room_at(&d.drlg, x, y),
+            x,
+            y,
+            shape: d2_sim::path::FootShape::Box {
+                size_x: shape.size_x,
+                size_y: shape.size_y,
+            },
+            mask: shape.foot_mask(),
+        };
+        d2_sim::path::footprint::add_footprint(&mut rooms, &fp);
+        prints.insert(*k, (shape.size_x as i32, fp));
+    }
+    let local = w.local_player;
+    let mut players = Vec::new();
+    for (k, u) in &w.units {
+        // A monster killed in view keeps its footprint (no rule changes
+        // it; the server's grids keep it); one added dead has the corpse
+        // footprint (`msg-units.md` §1.2 r6.4). Dead players: none.
+        if u.is_dead() && k.unit_type != MONSTER {
+            continue;
+        }
+        if Some(*k) == local {
+            players.push((k, u));
             continue;
         }
         let (size, town_npc, mask) = match k.unit_type {
@@ -1576,12 +1640,32 @@ pub fn stamp_unit_footprints(w: &mut ClientWorld, monsters: &[Option<super::worl
         let Some((x, y)) = u.position.map(|(x, y)| (i32::from(x), i32::from(y))) else {
             continue;
         };
-        let pattern = footprint_pattern(size, town_npc);
-        let room = drlg_room_at(&d.drlg, x, y);
-        d2_sim::path::footprint::stamp_pattern(&mut rooms, room, x, y, pattern, mask);
+        let corpse = matches!(&u.kind, super::world::KindData::Monster(m) if m.corpse_footprint);
+        let (pattern, mask) = if corpse {
+            (5, 0x8000)
+        } else {
+            (footprint_pattern(size, town_npc), mask)
+        };
+        let fp = d2_sim::path::Footprint {
+            room: drlg_room_at(&d.drlg, x, y),
+            x,
+            y,
+            shape: d2_sim::path::FootShape::Pattern(pattern),
+            mask,
+        };
+        d2_sim::path::footprint::add_footprint(&mut rooms, &fp);
+        prints.insert(*k, (size, fp));
     }
-    let grids = rooms.grids;
-    w.objclient.unit_grids = grids;
+    let others = rooms.grids.clone();
+    for (_, u) in players {
+        if let Some((x, y)) = u.position.map(|(x, y)| (i32::from(x), i32::from(y))) {
+            let room = drlg_room_at(&d.drlg, x, y);
+            d2_sim::path::footprint::stamp_pattern(&mut rooms, room, x, y, 1, 0x80);
+        }
+    }
+    w.objclient.unit_grids = rooms.grids;
+    w.objclient.other_grids = others;
+    w.objclient.footprints = prints;
 }
 
 /// The footprint pattern of a unit size (`sim/path-placement.md` §3:

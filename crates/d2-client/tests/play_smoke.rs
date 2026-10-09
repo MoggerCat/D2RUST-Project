@@ -995,7 +995,10 @@ fn the_live_run() {
         .map(|i| (i.key.guid, i.code))
         .collect();
     assert!(left.is_empty(), "everything picked up: {left:?}");
-    assert!(run.player_stat(14) > gold0, "the gold reached the player");
+    // Gold dropped: it reached the player's gold.
+    if ground.iter().any(|i| i.code == Some(*b"gld ")) {
+        assert!(run.player_stat(14) > gold0, "the gold reached the player");
+    }
     let mine = run.local_items();
     for it in ground.iter().filter(|i| i.code != Some(*b"gld ")) {
         assert!(

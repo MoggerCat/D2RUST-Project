@@ -82,6 +82,12 @@ pub struct ObjClientRow {
     pub overlay: u8,
     /// `HasCollision0`–`7`.
     pub has_collision: [u8; 8],
+    /// `SizeY` (+0xD4), `BlocksVis`, `BlockMissile`, `SubClass`: the
+    /// footprint box and mask (`sim/path-placement.md` §3).
+    pub size_y: u32,
+    pub blocks_vis: bool,
+    pub block_missile: bool,
+    pub sub_class: u32,
 }
 
 impl ObjClientRow {
@@ -153,6 +159,10 @@ impl ObjClientRow {
                 o.hascollision6,
                 o.hascollision7,
             ],
+            size_y: o.sizey,
+            blocks_vis: o.blocksvis != 0,
+            block_missile: o.blockmissile != 0,
+            sub_class: u32::from(o.subclass),
         }
     }
 
@@ -245,6 +255,13 @@ pub struct ClientObjects {
     /// read them (`super::client_missiles::stamp_unit_footprints`), by
     /// room.
     pub unit_grids: BTreeMap<d2_sim::units::RoomId, d2_sim::drlg::CollisionGrid>,
+    /// The same grids without the local player's footprint (the grids
+    /// the local player's own path walks on, `super::client_path`).
+    pub other_grids: BTreeMap<d2_sim::units::RoomId, d2_sim::drlg::CollisionGrid>,
+    /// The unit size and footprint each unit of the model got in those
+    /// grids (the target of a walk to a unit lifts it, `sim/pathing.md`
+    /// §3 step 6).
+    pub footprints: BTreeMap<UnitKey, (i32, d2_sim::path::Footprint)>,
     /// The client missiles' sound calls not yet handed out
     /// (`super::output::Output::MissileSound`).
     pub missile_sounds: Vec<super::client_missiles::MissileSound>,
@@ -262,6 +279,8 @@ impl Default for ClientObjects {
             missiles: Default::default(),
             just_hit: BTreeMap::new(),
             unit_grids: BTreeMap::new(),
+            other_grids: BTreeMap::new(),
+            footprints: BTreeMap::new(),
             missile_sounds: Vec::new(),
             multishot_guard: Default::default(),
         }

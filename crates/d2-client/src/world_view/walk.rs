@@ -60,9 +60,22 @@ impl PreviewWalk {
     /// One bridge frame: the recorded walks, then a step if the server
     /// ticked since the last frame.
     pub fn frame(&mut self, world: &ClientWorld) {
+        self.frame_with(world, &[]);
+    }
+
+    /// [`Self::frame`] with the `skills` rows: a skill on a unit sent
+    /// since the last frame adds the server's approach run
+    /// ([`crate::bridge::predict::approach_walk`]).
+    pub fn frame_with(&mut self, world: &ClientWorld, skills: &[crate::bridge::world::SkillRow]) {
         let ticked = world.server_ticks != self.seen_ticks;
         self.seen_ticks = world.server_ticks;
-        let walks = self.tap.take();
+        let mut walks = self.tap.take();
+        walks.extend(
+            self.tap
+                .take_approaches()
+                .into_iter()
+                .filter_map(|a| crate::bridge::predict::approach_walk(world, skills, a)),
+        );
         if self.tap.take_waypoint() {
             self.predict.waypoint_sent();
         }
@@ -86,7 +99,7 @@ pub fn preview_walk_frame(
     mut walk: ResMut<PreviewWalk>,
     mut state: ResMut<WorldViewState>,
 ) {
-    walk.frame(bridge.0.world());
+    walk.frame_with(bridge.0.world(), &bridge.0.inputs().tables.skills);
     state.feed.set_local_prediction(walk.local_at());
     if let Some(art) = &walk.art {
         let mut art = art.write().unwrap_or_else(|e| e.into_inner());

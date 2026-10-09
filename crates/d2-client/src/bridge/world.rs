@@ -87,6 +87,10 @@ pub struct MonsterData {
     /// Monster data +0x40, written by S→C 0x98 (`msg-units.md` §7 r9;
     /// −1 for 0xFFFF); `None` until written. Meaning: open question 9.
     pub f40: Option<i32>,
+    /// The corpse footprint (pattern 5, mask 0x8000) of a monster added
+    /// dead (`msg-units.md` §1.2 r6.4: mode 0 or 12 and `monstats2`
+    /// `deadCol` clear).
+    pub corpse_footprint: bool,
     /// Monster data +0x30: the critter AI's think timer T
     /// (`model.md` §5 r6.4; 0 at the create).
     pub think: i32,
@@ -1264,6 +1268,8 @@ pub struct MonsterClass {
     /// `data/fixups.md` §8): w of `sim/units.md` §4.7 steps 6–7.
     pub walk_speed: u16,
     pub run_speed: u16,
+    /// `monstats2` `deadCol` (byte +0x06 bit 3).
+    pub dead_col: bool,
     /// `monstats` `MinGrp` (+0x2F) and `MaxGrp` (+0x30): the critter
     /// group size (`monsters/population.md` §11.7 r2).
     pub min_grp: u8,
@@ -1381,6 +1387,7 @@ impl MonsterClass {
             npc,
             interact,
             size_x: *monstats2.get(0x08)? as i8,
+            dead_col: monstats2.get(0x06)? & 8 != 0,
             setup: None,
             ..MonsterClass::default()
         })

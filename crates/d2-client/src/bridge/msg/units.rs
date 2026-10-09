@@ -220,8 +220,12 @@ pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
         if let Some(s) = &setup {
             setup_stats(u, s, w.difficulty, w.expansion != 0);
         }
-        // Rule 6.4: the mode argument is the 4-bit mode.
+        // Rule 6.4: the mode argument is the 4-bit mode; dead (0 or 12)
+        // without `deadCol`: the corpse footprint.
         u.mode = mode;
+        if matches!(mode, 0 | 12) && !class_row.is_some_and(|c| c.dead_col) {
+            data.corpse_footprint = true;
+        }
         // Rule 6.5 (the frame draw on the unit seed with range +0x48)
         // runs once the unit is added ([`super::super::monster_anim`]).
         // Rule 6.9 (the direction draw) needs `0x0046C140`, which the

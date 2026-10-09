@@ -14,7 +14,7 @@ use d2_sim::drlg::{
 use d2_sim::rng::Seed;
 
 use super::super::drlg::{ClientDrlg, DrlgSource};
-use super::super::world::{ActiveRoom, LevelRow, MonsterClass, UnitKey, MONSTER, PLAYER};
+use super::super::world::{ActiveRoom, KindData, LevelRow, MonsterClass, UnitKey, MONSTER, PLAYER};
 use super::support::{hex, Model};
 
 /// Level 2's rooms (tile rectangles), allocation order.
@@ -1725,10 +1725,17 @@ fn client_missiles_see_the_units_footprints() {
         update_with(&mut m.w, &env, k).unwrap();
     }
     assert_eq!(last, Some((46, 10)));
-    // A dead monster stamps nothing.
+    // A monster killed in view keeps its footprint; one added dead has
+    // the corpse footprint (mask 0x8000, no 0x100).
     m.w.units.get_mut(&UnitKey::new(1, 7)).unwrap().mode = 12;
     stamp_unit_footprints(&mut m.w, &monsters);
+    assert_eq!(stamped(&m, 46, 11) & 0x100, 0x100);
+    if let KindData::Monster(d) = &mut m.w.units.get_mut(&UnitKey::new(1, 7)).unwrap().kind {
+        d.corpse_footprint = true;
+    }
+    stamp_unit_footprints(&mut m.w, &monsters);
     assert_eq!(stamped(&m, 46, 11) & 0x100, 0);
+    assert_eq!(stamped(&m, 46, 11) & 0x8000, 0x8000);
 }
 
 // Covers: specs/missiles/client.md §c9-end-0x004d2d70-m-u-forced

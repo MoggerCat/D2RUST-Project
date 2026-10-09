@@ -32,27 +32,27 @@
 |   2. Unit table | 139–188 |
 |   3. Local player | 189–211 |
 |   4. Receive and the unit message queue | 212–249 |
-|   5. Client update pass | 250–395 |
-|   6. Position check (`0x004804E0`) | 396–439 |
-|   7. Session messages | 440–637 |
-|   8. Mode requests | 638–723 |
-|   9. Room-in-sight messages | 724–758 |
-|   10. Bit reader | 759–773 |
-|   11. Current act and level (join and later) | 774–819 |
-|   12. Client DRLG and the room of a point | 820–861 |
-|   13. Visibility predicate (`0x004DBF20`) | 862–913 |
-|   14. Pet list and the hireling GUID | 914–967 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 968–1057 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 1058–1092 |
-|   17. Model writes made by 1.14d UI code | 1093–1239 |
-|   18. Audio driver inputs and the client object functions | 1240–1270 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1271–1499 |
-| Constants & data dependencies | 1500–1512 |
-| Randomness | 1513–1528 |
-| Edge cases & original bugs | 1529–1553 |
-| Test vectors | 1554–1611 |
-| Provenance | 1612–1715 |
-| Open questions | 1716–1884 |
+|   5. Client update pass | 250–413 |
+|   6. Position check (`0x004804E0`) | 414–457 |
+|   7. Session messages | 458–655 |
+|   8. Mode requests | 656–741 |
+|   9. Room-in-sight messages | 742–776 |
+|   10. Bit reader | 777–791 |
+|   11. Current act and level (join and later) | 792–837 |
+|   12. Client DRLG and the room of a point | 838–879 |
+|   13. Visibility predicate (`0x004DBF20`) | 880–931 |
+|   14. Pet list and the hireling GUID | 932–985 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 986–1075 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 1076–1110 |
+|   17. Model writes made by 1.14d UI code | 1111–1257 |
+|   18. Audio driver inputs and the client object functions | 1258–1288 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1289–1517 |
+| Constants & data dependencies | 1518–1530 |
+| Randomness | 1531–1546 |
+| Edge cases & original bugs | 1547–1571 |
+| Test vectors | 1572–1629 |
+| Provenance | 1630–1733 |
+| Open questions | 1734–1902 |
 <!-- /index -->
 
 ## Summary
@@ -392,6 +392,24 @@ position check of the local player.
       and its walk end (positions of the recorded chickens from tick 8).
       The 0xAC set-up of a critter (r6.3: `0x004AE8D0`, the first frame,
       the light) is not run on set C either (same REC).
+
+      PROVISIONAL (REC-743; d2rs local walk prediction, OQ 2): the
+      local player's client path walks on the client grids with the
+      footprints of every other unit of the model (players and monsters
+      by `sim/path-placement.md` §3, objects by their `SizeX` × `SizeY`
+      box when `HasCollision[mode]`, a monster killed in view keeping its
+      footprint as the server's grids do, one added dead the corpse
+      footprint of `msg-units.md` §1.2 r6.4), stamped once per update at the model
+      positions, and a walk to a unit lifts the target's footprint
+      (`sim/pathing.md` §3 step 6). Needed: the 1.14d client grids'
+      unit footprints over a walk past objects and NPCs.
+      PROVISIONAL (REC-744): a skill on a unit with run allowed (C→S
+      0x06 / 0x0D and the hold forms) is predicted as the server's
+      approach run (`skills/use.md` §3 r6) when the side's skill is h2h
+      (`both` read as h2h) and the target is farther than the melee
+      range 1 (weapon range adder 0, no line test). Needed: the 1.14d
+      client's own handling of the approach (whether its mode machine
+      runs the same request).
 
 ### 6. Position check (`0x004804E0`)
 
