@@ -450,6 +450,7 @@ impl Fx {
             levels: vec![blank::<Levels>(); 150],
             skill_modes: vec![[0; 8]],
             overlay_count: 0,
+            monequip: Vec::new(),
         };
         let hooks = ActionHooks::new(
             Arc::new(tables),

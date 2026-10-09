@@ -468,6 +468,11 @@ pub fn add_live_client(app: &mut App, link: DynLink, c: LiveClient) -> anyhow::R
         .resource_mut::<BridgeResource>()
         .0
         .set_unit_rows(units);
+    let player_anims = single_player::client_player_anims(&data)?;
+    app.world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .set_player_anims(std::sync::Arc::new(player_anims));
     app.world_mut()
         .resource_mut::<BridgeResource>()
         .0

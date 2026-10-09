@@ -34,8 +34,8 @@ pub fn is_identify(code: Option<[u8; 4]>) -> bool {
     matches!(code, Some(c) if &c == b"isc " || &c == b"ibk ")
 }
 
-/// The Town Portal scroll and tome codes (the server's use,
-/// `d2_sim::wiring::inventory::town_portal`).
+/// The Town Portal scroll and tome codes (the server's use: item-use
+/// entry 2, `d2_sim::wiring::inventory::item_use`).
 pub fn is_portal(code: Option<[u8; 4]>) -> bool {
     matches!(code, Some(c) if &c == b"tsc " || &c == b"tbk ")
 }

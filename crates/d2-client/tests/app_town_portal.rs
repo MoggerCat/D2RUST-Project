@@ -1,13 +1,12 @@
-// Spec: specs/world/objects.md (§5.5, §12), specs/skills/bodies-3.md (§4.4), specs/client/model.md (§8 rule 7)
+// Spec: specs/world/objects.md (§5.5, §12), specs/world/objects-2.md (§25, §27), specs/skills/bodies-3.md (§4.4), specs/client/model.md (§8 rule 7)
 //! Town Portal in the app's own synthetic game, headless (task
 //! `q-town-portal`, `docs/handoff/q-town-portal.md`). The player stands in
 //! the Blood Moor of Evil (reached through its warp tile, as `app_level_warp.rs`);
-//! the Town Portal use (`ActionSim::open_town_portal`, what the scroll's
-//! C→S 0x20 ends in) makes the portal pair: the field portal reaches the
-//! client (S→C 0x51), a click on it (C→S 0x13) moves the player to the
-//! town, where the town portal's click brings the player back and removes
-//! the pair. PROVISIONAL (REC-117): the creation, the links, the
-//! removal on the way back from town.
+//! the Town Portal cast (`ActionSim::open_town_portal`, `0x005BE290`,
+//! what the scroll's C→S 0x20 ends in) makes the portal pair: the field
+//! portal reaches the client (S→C 0x51), a click on it (C→S 0x13) moves
+//! the player to the town, where the town portal's click brings the
+//! player back and removes the pair (`objects-2.md` §27.3, §27.4).
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
@@ -219,7 +218,7 @@ fn boot() -> (App, app_support::Server<StepClock>, Arc<AtomicU32>) {
     (app, server, ms)
 }
 
-// Covers: specs/world/objects.md §12 r13; specs/client/msg-units.md §8 r7; specs/sim/intents-events.md §6 r6
+// Covers: specs/world/objects-2.md §27.1 r4, §27.5 r2; specs/world/objects.md §12 r13; specs/client/msg-units.md §8 r7; specs/sim/intents-events.md §6 r6
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn casting_in_town_makes_nothing_and_the_owner_name_arrives() {

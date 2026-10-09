@@ -58,6 +58,18 @@ pub struct Control {
     pub text: Option<String>,
     /// Font of a text control (r6), descriptor [10].
     pub font: u16,
+    /// Text control flags, descriptor [11] (r8: 2 centred, 0x10 right
+    /// aligned, 0x20 no wrap, 1 sets 0x20).
+    pub flags: u16,
+    /// Text control margins mx = [5], my = [6] (r8).
+    pub margin: (i32, i32),
+    /// Colour `k` of the text control's row (r8 a; `ui/text.md` §5).
+    pub color: i32,
+    /// Further rows added to a text control after the first (r8 a), each
+    /// with its own colour.
+    pub more_rows: Vec<TextRow>,
+    /// A button's second label string (flag 0x40, `[+0x270]`, r5); 0 none.
+    pub second_label: u32,
     /// The cel file, relative to `data\global\ui\` (r4, §F1.2); `None`: no art.
     pub art: Option<&'static str>,
     pub action: Action,
@@ -80,6 +92,11 @@ impl Control {
             string_id: 0,
             text: None,
             font: 0,
+            flags: 0,
+            margin: (0, 0),
+            color: 0,
+            more_rows: Vec::new(),
+            second_label: 0,
             art: None,
             action: Action::None,
             seconds: 0,
@@ -131,6 +148,26 @@ impl Control {
         self
     }
 
+    /// A text control's font (r6) and flags (r8).
+    pub fn with_font(mut self, font: u16, flags: u16) -> Self {
+        self.font = font;
+        self.flags = flags;
+        self
+    }
+
+    /// The text of a text control's first row, colour `k` (r8 a).
+    pub fn with_text(mut self, text: impl Into<String>, k: i32) -> Self {
+        self.text = Some(text.into());
+        self.color = k;
+        self
+    }
+
+    /// Whether a text control holds a row to draw: a string id or a text
+    /// (r8: a control nothing was added to draws nothing).
+    pub fn has_text(&self) -> bool {
+        self.string_id != 0 || self.text.as_deref().is_some_and(|t| !t.is_empty())
+    }
+
     /// A timer descriptor (type 8): fires `action` after `seconds` (r7).
     pub fn timer(seconds: u32, action: Action) -> Self {
         let mut c = Self::new(ControlKind::Timer, 0, 0, 0, 0);
@@ -148,6 +185,15 @@ impl Control {
         c.visible = false;
         c
     }
+}
+
+/// One row added to a text control (r8 a): a string id (0: `text`) and its
+/// colour `k`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TextRow {
+    pub string_id: u32,
+    pub text: String,
+    pub color: i32,
 }
 
 /// Virtual-key codes the front end names.
