@@ -214,6 +214,23 @@ fn bit_packed_vitals_read_back_in_the_layout_units() {
     );
 }
 
+// Covers: specs/seams/messages.md §2.4
+#[test]
+fn vitals_dx_dy_round_trip_byte_exact_for_every_target_offset() {
+    // dx = (X - target) & 0xFF for every target offset -128 ..= 127.
+    for off in -128i32..=127 {
+        let (x, t) = (0x131Du16, (0x131Di32 - off) as u16);
+        let (dx, dy) = (x.wrapping_sub(t) as u8, 0x1381u16.wrapping_sub(t) as u8);
+        let m: s2c::LifeManaUpdate =
+            read(&vitals::life_mana_update(1, 2, 3, 4, 5, x, 0x1381, dx, dy));
+        assert_eq!((m.dx, m.dy), (dx, dy), "offset {off}");
+        let m: s2c::LifeManaUpdate2 = read(&vitals::life_mana_update2(1, 2, 3, x, 0x1381, dx, dy));
+        assert_eq!((m.dx, m.dy), (dx, dy), "offset {off}");
+        let m: s2c::WalkVerify = read(&walk::walk_verify(1, x, 0x1381, dx as i8, dy as i8));
+        assert_eq!((m.dx, m.dy), (dx, dy), "offset {off}");
+    }
+}
+
 // Covers: specs/seams/messages.md §2.3
 #[test]
 fn variable_and_choice_builders_agree_with_the_size_rules() {
