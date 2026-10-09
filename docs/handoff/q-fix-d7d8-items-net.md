@@ -1,14 +1,12 @@
 # Hand-back: q-fix-d7d8-items-net (2026-10-09)
 
 ## Done
-- **D7** (ground item flags `if` 524304 vs 524288): `items::create::normal` (the
-  quality-2 routine, `generation.md` §6.1) now leaves item flag 0x10 (identified)
-  set. Evidence: `items-ground-many` recording, poked quality-2 misc items read
-  0x80010 while magic / rare / set / unique read 0x10 clear; the items channel's
-  `items-drop-gold-potion` agrees. **REC-1400, PROVISIONAL**: superior (3) and low
-  (1) quality have no recording, so they were not touched.
-  Result: `items-ground-many` and `items-ground-pokes` are PARTIAL with no
-  difference in 30/30 and 40/40 frames (was DIVERGED at frame 4).
+- **D7** (ground item flags `if` 524304 vs 524288): `items::create::create_item` now sets
+  item flag 0x10 (identified) at allocation, together with 0x80000, as `generation.md` §1.4
+  (staging r6: the item kind's init sets it; only a successful quality routine clears it).
+  First fix was in the normal routine only (REC-1400); moved to allocation after the merge,
+  so qualities 1, 3 and 9 are covered too. No longer provisional. `items-ground-many` and
+  `items-ground-pokes` were PARTIAL with no difference (30/30, 40/40) with the first version.
 - **D8** (S→C 0x27 byte 10, 64 vs 11): the text list reached the wire in
   reverse. The quest records add Akara's lines newest → oldest (chain 37 → 11,
   then chain 1 → 64) but 1.14d sends [64, 11]. `encode_text_list`
