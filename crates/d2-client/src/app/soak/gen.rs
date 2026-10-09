@@ -93,14 +93,18 @@ pub const WP_LEVELS: &[u32] = &[
 /// centre (an isometric sub-tile is 32 × 16 pixels): close enough for a
 /// random click to land on or near a unit.
 pub fn frame_point(world: &ClientWorld, at: (u16, u16)) -> Option<(i32, i32)> {
-    let me = world
-        .local_player
-        .and_then(|k| world.units.get(&k))?
-        .position?;
+    let me = local_cell(world)?;
     let dx = i32::from(at.0) - i32::from(me.0);
     let dy = i32::from(at.1) - i32::from(me.1);
     let (x, y) = (400 + (dx - dy) * 16, 290 + (dx + dy) * 8);
     ((0..800).contains(&x) && (0..550).contains(&y)).then_some((x, y))
+}
+
+/// The local player's cell: its walk prediction's while the client moves
+/// it (`seams/movement-prediction.md` §2.9 r2), else the model's.
+pub fn local_cell(w: &ClientWorld) -> Option<(u16, u16)> {
+    let u = w.local_player.and_then(|k| w.units.get(&k))?;
+    w.predicted(u).map(|p| p.cell()).or(u.position)
 }
 
 /// The generator: one action or none per step.
@@ -128,8 +132,7 @@ impl Gen {
         }
         let r = &mut self.rng;
         let roll = r.below(100);
-        let me = w.local_player.and_then(|k| w.units.get(&k));
-        let my_pos = me.and_then(|u| u.position);
+        let my_pos = local_cell(w);
         let near = |pos: Option<(u16, u16)>, d: i32| match (pos, my_pos) {
             (Some(a), Some(b)) => {
                 (i32::from(a.0) - i32::from(b.0))

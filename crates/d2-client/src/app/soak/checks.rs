@@ -426,7 +426,10 @@ impl Desync {
                     format!("client player {} server {guid}", u.key.guid),
                 );
             }
-            if let (Some((cx, cy)), Some((sx, sy))) = (u.position, s.player_pos) {
+            // The local player's cell is its walk prediction's while the
+            // client moves it (`seams/movement-prediction.md` §2.9 r2).
+            let cell = w.predicted(u).map(|p| p.cell()).or(u.position);
+            if let (Some((cx, cy)), Some((sx, sy))) = (cell, s.player_pos) {
                 let d = (i32::from(cx) - sx).abs().max((i32::from(cy) - sy).abs());
                 if d > 10 {
                     now.insert(
