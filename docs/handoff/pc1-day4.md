@@ -218,3 +218,47 @@ Rows added: `q-fix-pc1d4-oskill-shrine-bonus`,
 REC-1110 also got a rerun under the breakpoint recorder: the drop of
 Warriv's walk reproduces there (WL to tick 55, NU from 56), so it is a
 client-timing effect, not the panel (`client/model.md` §17 r7).
+
+## Round 4 — live recordings (user allowed moving the saves)
+
+- **frontend-character-select: done** (`facts/render/scenes/`, requests
+  row `done b6a5d831`). The save folder was reduced to SceSor and
+  SceAct2–5 for the two runs (the other 95 files moved to a subfolder and
+  moved back right after; 109 entries before and after). The two runs
+  are identical (343 draws).
+- **REC-610, DirectDraw half recorded:** the game thread's x87 control
+  word at every server-tick return is 0x027F (MXCSR 0x1FA0), so the drop
+  math is binary64 under DirectDraw (`items/treasure.md` OQ 5,
+  `ui/control-panel.md`). `-w -d3d` still loads DirectDraw; Direct3D
+  needs full screen (changes the display mode, not run) and Glide has no
+  DLL in this install. Probe `..\d2rs-probes\probe_fpu.py`.
+- **REC-742 recorded:** the town chickens' client walks
+  (`client/model.md` §5 r6.4): only the 2 nearest the player act; diagonal
+  2-sub-tile targets with a one-point path; some walks stop one sub-tile
+  short, after which every think writes a new target with count 0 (stuck
+  in NU). Probe `probe_critters.py`.
+- **REC-900 narrowed by recording** (`skills/sequences.md` §3): the
+  recorder's `px` is path +0x00 and the start is not late; the client
+  path steps in update 0 and is put back to the start twice between
+  updates, so the first point is reached three times. The writer is not
+  `0x004804E0`; a hardware write watch on path +0x00 would name it.
+  Probe `probe_whirl.py` (record_anim plus start / compute / step hooks).
+- **REC-644 measured:** under this PC's ACP 65001,
+  `MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, …)` decodes UTF-8 (lone
+  bytes ≥ 0x80 → U+FFFD), it does not fail (`ui/messages.md`). A live
+  0x26 type 7 with such a byte could not be staged (no S→C injection tool,
+  English tables have none).
+- **Fist of the Heavens bolt count: inconclusive.** RecFist (Paladin 30,
+  skill 121 level 20) on six poked Fallens in the Blood Moor: the client
+  creator `0x00466730` makes the delay missile 233 at frame 55 and no
+  `fistoftheheavensbolt` (234) by frame 260, so either the client bolts
+  come through another creator or the hit found no unit. Not written into
+  the spec. Probe `probe_fist.py`.
+- **REC-178 / 189:** nothing left to record: the new
+  `frontend-main-menu` facts give every button, label glyph and the logo
+  fire (`d2logofire{left,right}.dc6`, mode 3, same frame as the black
+  half) for the cloud's comparison.
+
+Saves made this round (`%USERPROFILE%\Saved Games\Diablo II`): RecWw
+(Barbarian 30, Whirlwind right), RecFist (Paladin 30, Fist of the
+Heavens right), PtBar, Ck{Andariel,Mephisto,Hellforge,Baal}.
