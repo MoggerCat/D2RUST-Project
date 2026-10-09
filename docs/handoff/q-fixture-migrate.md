@@ -29,7 +29,7 @@ all pass, 172 ignored (139 new real-data marks + the existing ones).
 | R1 | The Rogue Encampment had no NPCs: the play build gave the DRLG one `WorldTypes` and the world state a second, fresh one, so population's preset lookup (`act_presets`) never saw a generated room | one `SharedTypes` for both (its documented use) | `single_player.rs` `LevelSource::shared` |
 | R2 | No preset object (stash, waypoint, fires, chests) was ever created: the tick's `populate_objects` called the `WorldPending` default (no-op) instead of the object state, and no code ran the object half of `0x005559A0` | the tick runs `MonsterInit::populate_objects` (object state first); **PROVISIONAL** `View::spawn_preset_objects` (every type-2 preset, mode 0, list order) before the monster pass | `d2-sim` `wiring/worldgen/dispatch.rs`, `wiring/action/warp_tile.rs` |
 | R3 | The real town waypoint stayed in mode 0, so the first click only animated it and no 0x63 menu came: init function 17 (`waypoints.md` §5.1) was implemented but never called; the route fell to `Pending::object_route` (no-op) | init 17 runs inside the object's creation on `ActionHooks::waypoint_init` with the arrival list now owned by the action hooks (the host's 0x49 borrows it) | `d2-sim` `wiring/action/{mod,objects}.rs`, `d2-server` `handlers/world/action.rs` |
-| R4 | The first frame in town panicked: real floor tiles carry 32-row RLE blocks, `shading.md` §4 r3 defines 15 gradient rows, the composer refuses the draw (`GradientArea`) | **PROVISIONAL**: a floor block taller than 15 rows takes the flat branch's map `e[g+9] >> 3` | `world_view/preview_blocks.rs` (+ test `a_32_row_floor_block_takes_the_flat_map`) |
+| R4 | The first frame in town panicked: real floor tiles carry 32-row RLE blocks, `shading.md` §4 r3 defines 15 gradient rows, the composer refuses the draw (`GradientArea`) | found here and fixed in parallel on staging (the gradient block draws its 15 lit rows, `shading.md` §4 r3–r4); the merge keeps staging's rule and drops this branch's provisional flat fallback | `world_view/preview_blocks.rs` (staging) |
 | R5 | Walking out of the first room was fatal 0x591 (`lighting.md` §6.4): the client unit free (S→C 0x0A) left the fire's kind-2 light behind | **PROVISIONAL**: `ClientWorld::remove` removes the unit's light (`0x00464930`, §6.2 r5) | `bridge/world.rs` |
 
 ## 3. `play_smoke` on the real install (all `#[ignore]`, real-data gate)
@@ -52,15 +52,36 @@ finding does not hide the steps after it.
 | q-fix-real-equip-2h (F2) | C→S 0x1A of the new sorceress's staff (`sst`, two-handed) back to the right hand after 0x1C answers 0 and leaves it on the cursor; with an item on the cursor every later attack is ignored (the player stays mode 1) | `the_live_run` (the equip step; run with `SMOKE_DEBUG=1` for the attack trace) | `items/inventory.md` §4.3/§4.6 path in `d2-sim` `items/moves` (body slot state after `remove_body_item`, or `body_location_allowed` on the real `itemtypes`) |
 | q-fix-real-start-belt (F3) | The new sorceress's four `hp1` (charstats item2, count 4) never reach the client model; after save → load they come back in the stored inventory (mode 0), not the belt | `the_live_run` (the save step's item diff) | new character start items (`generation.md` §10.3) / save items (`save_full`) |
 | q-fix-real-preset-objects | R2's object pass is provisional: mode, order, skipped classes unspecified | capture: S→C 0x51 of a 1.14d join in the Rogue Encampment | spec `population.md` §11.1 first pass (local) |
-| q-fix-real-floor-rle-rows | R4: what 1.14d's RLE floor drawer does with rows 15–31 of a 32-row block | a capture of a lit floor tile with a 32-row RLE block | spec `render/shading.md` §4 r3 (local) |
 | q-fix-real-unit-free-light | R5: the client unit free's light removal is not in `model.md` §2 r5 | RE of the client unit free | spec `client/model.md` §2 (local) |
 | q-fix-real-corpse-regen | A killed monster's life keeps regenerating (+16 per few frames) after mode 12; `stat-lists.md` §10.1 has no dead-mode stop | `the_live_run` with `SMOKE_DEBUG=1` (life after the kill) | open question, `sim/stat-lists.md` §10.1 / death events |
+| q-fix-real-front-save | `smoke_frontend`'s Esc-menu Save and Exit on the install writes a file that reads back as checksum error (`difficulty_popup_starts_the_game_on_nightmare`) or "not a character save" (`play_cli_new_and_save_paths`), while `play_smoke`'s server-side save of the same path loads | `cargo nextest run -p d2-client --test smoke_frontend --run-ignored only` (D2_GAME_DIR) | `app/save.rs` / `flows/save-exit.md` |
 | q-fix-real-build-rooms | The play build streams the first room of Cold Plains and Lut Gholein at creation (staging of the old tests, d2rs-own); 1.14d streams rooms around players | — | `single_player::build_with` |
 | q-fix-real-known-wp | A new character knows Cold Plains' waypoint (the loader's staging, `loader(character, cold_plains_wp)`), which 1.14d does not give | — | `single_player::loader` |
 
 ## 5. Real-data run of the migrated tests
 
-RESULTS_PLACEHOLDER
+Command (debug build, 5-minute cap per test, nextest config `slow-timeout = { period = "60s",
+terminate-after = 5 }`):
+`D2_GAME_DIR=$HOME/game cargo nextest run -p d2-client --run-ignored only -E 'kind(test) & not test(/gpu_/)'`
+on `77a1a9bf` (after the staging merge). 177 tests: 110 pass, 65 fail, 2 time out.
+
+- **Migrated tests: 86 of 150 pass on the install** (the class skill tests of amazon, sorceress,
+  necromancer, paladin, druid, assassin, the act travel by NPC, Mephisto's quest, levelling,
+  stamina, HUD, items, gold, the hardcore and death flows, save files, …). The other 27 are the
+  pre-existing game-file tests: 24 pass.
+- The 64 migrated failures, by cause (none is a new engine fault; each group is a test that
+  still carries an invented-world assumption, to rewrite as §6 says):
+
+| Group | Tests | Cause | Next |
+|---|---|---|---|
+| G1 rigs leave town by the Den cave | app_barbarian 10, app_skill_gaps 12, app_assassin_gaps 5, app_move_anims 2, app_play_monster_ai 2, app_town_portal 1 | `Rig::leave_town` expects the cave entrance tile in the model at the join (the invented town bordered it) and then teleports to invented Den coordinates; the rigs also install made-up skill rows | rewrite the rigs: route into the Blood Moor (`test_fixtures::host::route`), the install's skill rows, expected numbers from `skills.bin` |
+| G2 Akara at the join | app_play_quests 4 | Akara's preset room is not active at the join on the real map | walk to her (`play_smoke`'s `approach`) |
+| G3 waypoints and travel | app_a3_a5_waypoints 2, app_act_travel 1, app_waypoint_warp 2, app_play_npc 1, app_town_portal 1 | the tests stage the waypoint unit and its known indexes the old build placed; the real town waypoint appears only after the population | find the preset waypoint as `play_smoke` does |
+| G4 invented counts and streams | app_frame_loop 1, app_single_player 1, app_server_skills 1, app_levelup 1, app_client_drlg 1, seam_drlg_coords 2 | message counts, join streams and skill lists derived from the invented world (e.g. "the join's two 0x23 (no StartSkill on synthetic data)") | expected values from a recorded join (`traces/`), queued; `seam_drlg_coords` and `the_session_join_on_the_install` now get the install's client tables (they failed on fatal 0x668: no skills table) |
+| G5 invented items on the server | smoke_save 5, smoke_frontend 2 | `smoke_save`'s fixture places invented items ("item 0 worn at body location 4" panics on the server thread); `smoke_frontend`'s Esc-menu save reads back as checksum error / bad magic | rewrite the item fixture on real item records; the `smoke_frontend` read-back is a finding (q-fix-real-front-save) to reproduce first |
+| G6 other position assumptions | app_cain_quest, app_level_border, app_town_gaps, app_play_preview, app_server_core, app_play_npc | invented positions (a free spot in the first streamed room, Gheed placed by the build, frames of the invented tile set) | each against the real presets |
+| G7 time | play_smoke `the_live_run` | over the 5-minute cap in a debug build (it passes the cap in release: 166 s for the whole run before the merge) | run the gate in release (`realdata-gate.sh` default) |
+
 
 ## 6. Not done (Wave 1 rest, in order)
 

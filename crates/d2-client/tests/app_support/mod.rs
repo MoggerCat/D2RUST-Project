@@ -83,20 +83,25 @@ pub fn live() -> Arc<single_player::LiveData> {
 /// user's files: skills, class skills, skill tables, unit rows, item
 /// tables, object rows (for tests that wire the app by hand).
 pub fn live_tables(app: &mut bevy::prelude::App) {
-    let d = live();
-    let data = single_player::GameData::Live(d.clone());
-    let a = d.archives.as_ref();
     let mut b = app
         .world_mut()
         .resource_mut::<d2_client::bridge::BridgeResource>();
-    b.0.set_skill_rows(single_player::client_skill_rows(a).unwrap());
-    b.0.set_class_skills(single_player::client_class_skills(a).unwrap());
-    b.0.set_skill_tables(Arc::new(single_player::client_skill_tables(a).unwrap()));
-    b.0.set_unit_rows(single_player::client_unit_rows(a).unwrap());
-    b.0.set_item_tables(Arc::new(d2_client::app::items::TableDecoder(Arc::new(
+    live_bridge_tables(&mut b.0);
+}
+
+/// [`live_tables`] on a bridge without an app.
+pub fn live_bridge_tables<L: ServerLink>(b: &mut d2_client::bridge::Bridge<L>) {
+    let d = live();
+    let data = single_player::GameData::Live(d.clone());
+    let a = d.archives.as_ref();
+    b.set_skill_rows(single_player::client_skill_rows(a).unwrap());
+    b.set_class_skills(single_player::client_class_skills(a).unwrap());
+    b.set_skill_tables(Arc::new(single_player::client_skill_tables(a).unwrap()));
+    b.set_unit_rows(single_player::client_unit_rows(a).unwrap());
+    b.set_item_tables(Arc::new(d2_client::app::items::TableDecoder(Arc::new(
         d.tables.item_tables().unwrap(),
     ))));
-    b.0.set_object_rows(single_player::client_object_rows(&data));
+    b.set_object_rows(single_player::client_object_rows(&data));
 }
 
 /// The `lvlwarp` id (the warp tile unit's class, `levels.md` §10.4) of

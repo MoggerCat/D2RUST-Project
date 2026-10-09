@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use d2_client::app::single_player::{self};
-use d2_client::bridge::world::{ClientTables, SkillRow};
+use d2_client::bridge::world::ClientTables;
 use d2_client::bridge::Bridge;
 use d2_server::seams::Clock;
 use d2_sim::drlg::TileRect;
@@ -203,8 +203,8 @@ fn start() -> (Bridge<Thread>, Arc<AtomicU32>) {
         levels: single_player::client_level_rows(&data),
         ..ClientTables::default()
     });
-    // The synthetic set has no `skills` rows; the join's 0x23 select skill 0.
-    bridge.set_skill_rows(vec![SkillRow::default()]);
+    // The install's client tables: the join selects the real skills.
+    app_support::live_bridge_tables(&mut bridge);
     bridge.send(&single_player::create_request()).unwrap();
     bridge.frame().unwrap();
     for _ in 0..3 {

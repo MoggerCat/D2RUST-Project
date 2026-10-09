@@ -242,6 +242,8 @@ fn the_recorded_join_on_the_install() {
         levels: single_player::client_level_rows(&data),
         ..ClientTables::default()
     });
+    // The install's client tables: the join selects the real skills.
+    app_support::live_bridge_tables(&mut bridge);
     bridge.frame().unwrap();
     bridge.frame().unwrap();
     let w = bridge.world();
@@ -283,6 +285,8 @@ fn the_session_join_on_the_install() {
         levels: single_player::client_level_rows(&data),
         ..ClientTables::default()
     });
+    // The install's client tables: the join selects the real skills.
+    app_support::live_bridge_tables(&mut bridge);
     // The session sequence: 0x67, then 0x6B after the flush with 0x02.
     bridge.send(&single_player::create_request()).unwrap();
     bridge.frame().unwrap();
