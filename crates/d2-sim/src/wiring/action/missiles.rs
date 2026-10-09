@@ -173,9 +173,21 @@ impl<X: Pending> MissilePath for View<'_, X> {
     fn set_acceleration(&mut self, unit: UnitId, accel: i32, max_velocity: i32) {
         self.h.path_set_acceleration(unit, accel, max_velocity);
     }
-    /// `0x006417F0`: not specified (stays [`Pending`]).
+    /// `0x006417F0(missile, target point)` (`missiles.md` §R2.3 step 19,
+    /// `skills/bodies.md` §4): max(|dx|, |dy|) + ⌊min(|dx|, |dy|) / 2⌋
+    /// from the path position to the path target point, with the path
+    /// provider; [`Pending`] without it.
     fn target_distance(&self, unit: UnitId) -> i32 {
-        self.h.x.target_distance(unit)
+        match self.path_target_xy(unit) {
+            Some((tx, ty)) => {
+                let (x, y) = self.h.path_position(unit);
+                crate::path::walk::resync::resync_distance(
+                    crate::path::Point::new(x, y),
+                    crate::path::Point::new(tx, ty),
+                )
+            }
+            None => self.h.x.target_distance(unit),
+        }
     }
     /// Unit step `0x00554CA0` (`pathing.md` §9.3): false when it returns 2.
     fn step(&mut self, game: &mut Game, unit: UnitId) -> bool {
