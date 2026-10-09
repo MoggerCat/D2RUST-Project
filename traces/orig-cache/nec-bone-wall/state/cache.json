@@ -1,6 +1,6 @@
 {
  "channel": "state",
- "check": "nec-clay-golem",
+ "check": "nec-bone-wall",
  "command": [
   "tools/trace-recorder/record_state.py",
   "--game",
@@ -13,8 +13,6 @@
   "ScnNec",
   "--seed",
   "1234",
-  "--difficulty",
-  "normal",
   "--out",
   "orig.state.jsonl",
   "--snap-every",
@@ -28,17 +26,17 @@
  ],
  "files": {
   "orig.state.jsonl": {
-   "sha256": "03f15e940176be3a329b6f901c87b0f7d24aed41691ae6b553bc95106f5d5f7a",
-   "size": 364417
+   "sha256": "dc9f34a68f52da2c2d3f02eb1aac691e233ca31df19cb9b3eae99048d9aae038",
+   "size": 452300
   }
  },
  "format": "orig-cache-1",
  "key": {
-  "check": "75205db09f8833fdfcc2c52907279f3c26501467f3624ea23a56bd9b76e6a38b",
+  "check": "888d10e2d1129ba9ee6304bc20e26e98ddd1a92a4abef087fec7cab163025ac7",
   "format": "orig-cache-key-1",
   "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
   "install": "game-exe:631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
-  "recorder": "ae2fd9a6a9be20f6ae6a27645e4bbc59ef73bdb85071132ab56484bac7ba8ab7",
-  "save": "5eb99257c82f473b30b43b83dd3a032897a9270c9604e8811ec0ed369dca9916"
+  "recorder": "013f9d66a9e517ed1b72b7084b4906fc74aa8edfba7e0c875c3705f8912a33b5",
+  "save": "95989bff8608793c276c1d8100412e32d2d2a87a0cbf560b169fd771ec4babb6"
  }
 }

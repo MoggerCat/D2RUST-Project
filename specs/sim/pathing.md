@@ -36,17 +36,17 @@
 |   6. Straight (type 7, `0x00679ED0`) | 453–462 |
 |   7. A* (type 1, `0x0067B850`) | 463–500 |
 |   8. Velocity, direction vector, facing | 501–613 |
-|   9. Per-tick movement | 614–802 |
-|   10. Messages | 803–865 |
-|   11. Missile paths (`0x00649760`) | 866–918 |
-|   12. Other path types (1.14d-read 2026-10-08) | 919–1132 |
-|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1133–1282 |
-| Constants & data dependencies | 1283–1319 |
-| Randomness | 1320–1330 |
-| Edge cases & original bugs | 1331–1378 |
-| Test vectors | 1379–1417 |
-| Provenance | 1418–1473 |
-| Open questions | 1474–1547 |
+|   9. Per-tick movement | 614–807 |
+|   10. Messages | 808–870 |
+|   11. Missile paths (`0x00649760`) | 871–923 |
+|   12. Other path types (1.14d-read 2026-10-08) | 924–1137 |
+|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1138–1287 |
+| Constants & data dependencies | 1288–1324 |
+| Randomness | 1325–1335 |
+| Edge cases & original bugs | 1336–1383 |
+| Test vectors | 1384–1422 |
+| Provenance | 1423–1478 |
+| Open questions | 1479–1552 |
 <!-- /index -->
 
 ## Summary
@@ -719,7 +719,12 @@ axis Δ − (size1/2 + size2/2) (not below 0), then 2·max + min.
    point 0 = its start cell, keep its exact position on its first tick
    while its facing turns to point 1, then fly straight to point 1:
    frames 30–31, which only Δ = R = (0, 0), index 1 and the §9.4 rule
-   2.5 aim give); settled by a read of `0x00650660` (REC-1391).
+   2.5 aim give; also the charged bolt and blessed hammer of
+   `sor-charged-bolt.check` frame 27 / `pal-blessed-hammer.check` frame
+   31 land exactly on point centres, q-fix-skills-4cls REC-1643), except
+   on the straight missile path (type 4: an Inferno flame flies on past
+   its target point in `sor-inferno.check` frame 45, which a snap would
+   end); settled by a read of `0x00650660` (REC-1391).
 4. If position + Δ is in another cell: distance budget (+0x90) −= 1 when
    > 0 and the type is not 8 or 11; cell walk (rule 9.6.5); blocked →
    Q := the centre of the last free cell, and: "monster re-path" → re-path

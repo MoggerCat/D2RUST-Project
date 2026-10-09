@@ -1642,6 +1642,53 @@ pub trait Pending {
     {
         false
     }
+    /// The Bone Wall maker's `summon_class` (`missiles/bodies-2.md` §33
+    /// step 4, `0x0056E620`): routed to
+    /// [`crate::wiring::interaction::skill_events::missile_summon_class`]
+    /// by a [`crate::wiring::interaction::UseRest`] value. Default: none.
+    fn missile_summon_class(
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
+        owner: UnitId,
+        skill: i32,
+        level: i32,
+    ) -> (i32, i32)
+    where
+        Self: Sized,
+    {
+        (-1, 0)
+    }
+    /// The Bone Wall maker's summon spawn (§33 step 7, flags 0xD).
+    /// Default: none.
+    #[allow(clippy::too_many_arguments)]
+    fn missile_summon_spawn(
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
+        owner: UnitId,
+        class: i32,
+        mode: i32,
+        at: (i32, i32),
+        pet_type: i32,
+    ) -> Option<UnitId>
+    where
+        Self: Sized,
+    {
+        None
+    }
+    /// The Bone Wall maker's piece binding (§33 step 8). Default: nothing.
+    #[allow(clippy::too_many_arguments)]
+    fn missile_bone_wall_piece(
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
+        owner: UnitId,
+        anchor: UnitId,
+        piece: UnitId,
+        skill: i32,
+        level: i32,
+    ) where
+        Self: Sized,
+    {
+    }
     /// The save load's right-skill aura start (`formats/d2s.md` §2.4
     /// rule 6.3): routed to
     /// [`crate::wiring::interaction::skill_events::right_aura_select`] by

@@ -596,7 +596,7 @@ impl LocalSeams {
     /// cow, monstats2 `isAtt` 0, four sub-tiles away); settled by the
     /// scan 5 callback's reading.
     fn nearest_foe(&self, unit: UnitId, range: i32, full_size: bool) -> Option<(UnitId, i32)> {
-        self.nearest_foe_where(unit, range, full_size, |_| true)
+        self.nearest_foe_where(unit, range, full_size, |u| !self.not_att.contains(&u))
     }
 
     /// [`Self::nearest_foe`] among the candidates `keep` accepts.
@@ -618,7 +618,6 @@ impl LocalSeams {
                     && self.player_side(u) != Some(side)
                     && !self.down.contains(&u)
                     && keep(u)
-                    && !self.not_att.contains(&u)
             })
             .map(|(&u, &(_, _, p))| {
                 let d = if full_size {
@@ -992,6 +991,37 @@ impl Pending for LocalSeams {
     }
     fn golem_resummon(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, player: UnitId) -> bool {
         skill_events::golem_resummon(h, sim, player)
+    }
+    fn missile_summon_class(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        owner: UnitId,
+        skill: i32,
+        level: i32,
+    ) -> (i32, i32) {
+        skill_events::missile_summon_class(h, sim, owner, skill, level)
+    }
+    fn missile_summon_spawn(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        owner: UnitId,
+        class: i32,
+        mode: i32,
+        at: (i32, i32),
+        pet_type: i32,
+    ) -> Option<UnitId> {
+        skill_events::missile_summon_spawn(h, sim, owner, class, mode, at, pet_type)
+    }
+    fn missile_bone_wall_piece(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        owner: UnitId,
+        anchor: UnitId,
+        piece: UnitId,
+        skill: i32,
+        level: i32,
+    ) {
+        skill_events::missile_bone_wall_piece(h, sim, owner, anchor, piece, skill, level);
     }
     fn right_aura_select(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, player: UnitId) {
         skill_events::right_aura_select(h, sim, player);
