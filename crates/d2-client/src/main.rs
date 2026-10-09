@@ -516,12 +516,8 @@ fn play(o: Options) -> Result<()> {
             .save_dir
             .clone()
             .unwrap_or_else(d2_client::app::save::default_save_dir);
-        // After a game: character select (§F1.3, REC-200).
-        let entry = if first {
-            Entry::First
-        } else {
-            Entry::AfterGame
-        };
+        // After a game: the main menu (§F1.3, REC-200, recorded).
+        let entry = if first { Entry::First } else { Entry::MainMenu };
         let (host, handles) = front_host(&saves, art, expansion, entry);
         first = false;
         match run_front_end(host) {
