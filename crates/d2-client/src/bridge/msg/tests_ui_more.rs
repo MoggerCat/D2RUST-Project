@@ -361,7 +361,7 @@ fn dialog(class: u32, interact: bool) -> (Model, NpcDialog) {
     (m, d)
 }
 
-// Covers: specs/client/bridge.md §10 r3, r9 (seams/bridge-app.md §2.4)
+// Covers: specs/client/bridge.md §10 r3; specs/client/bridge.md §10 r9
 #[test]
 fn the_dialog_captures_the_menu_facts_at_receive() {
     let mut m = Model::default();

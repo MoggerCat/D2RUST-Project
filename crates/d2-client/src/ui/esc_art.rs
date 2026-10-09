@@ -355,7 +355,7 @@ mod tests {
         }
     }
 
-    // Covers: specs/ui/frontend-options.md §O4 r3
+    // Covers: specs/ui/frontend-options.md §o4-draw-0x0047e3d0-while-ui-9-is-open-from-the-ui-draw-0x00456f46 r3
     #[test]
     fn the_pentagram_steps_when_more_than_50_ms_passed() {
         // 25 Hz draws (40 ms): the first draw steps at once, then every 2nd.

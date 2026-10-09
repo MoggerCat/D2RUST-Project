@@ -131,7 +131,7 @@ pub fn has_room(grid: (i32, i32), taken: &[(i32, i32, i32, i32)], size: (i32, i3
 mod tests {
     use super::*;
 
-    // Covers: specs/items/inventory.md §2.3 (the cube grid, 3 x 4)
+    // Covers: specs/items/inventory.md §2.3
     #[test]
     fn the_cube_has_room_when_a_footprint_is_free() {
         // An empty 3 x 4 grid holds a 2 x 3 item.
@@ -243,7 +243,7 @@ mod tests {
         assert!(!t(0, 99), "an undecodable stream");
     }
 
-    // Covers: specs/ui/inventory.md §10 r4.3
+    // Covers: specs/ui/inventory.md §10 r4
     #[test]
     fn the_spell_kind_is_only_for_scrolls_and_books() {
         let mut isc = full(b"isc ", 2);
