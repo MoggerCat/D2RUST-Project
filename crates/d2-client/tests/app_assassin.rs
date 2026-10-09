@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use d2_client::app::server_thread::ThreadLink;
-use d2_client::app::single_player::{self, GameData, Link, DEFAULT_SEED, PLAYER_CLASS};
+use d2_client::app::single_player::{self, Link, DEFAULT_SEED, PLAYER_CLASS};
 use d2_client::bridge::link::{SendQueue, ServerLink};
 use d2_client::bridge::LOCAL_CLIENT;
 use d2_client::rules::unit_composite::code;
@@ -28,6 +28,8 @@ use d2_sim::stats::StateTable;
 use d2_sim::stats::{StatData, StatLists, StatTable};
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::{UnitId, UnitType};
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -154,8 +156,12 @@ impl Game {
     /// `rows`: (skill id, row); the first is selected on the right button.
     fn joined(rows: Vec<(usize, Skills)>) -> Self {
         let ms = Arc::new(AtomicU32::new(1000));
-        let (link, _) =
-            single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+        let (link, _) = single_player::start(
+            app_support::game_data(),
+            DEFAULT_SEED,
+            StepClock(ms.clone()),
+        )
+        .unwrap();
         let mut g = Self { link, ms };
         let rows2 = rows.clone();
         g.link
@@ -356,6 +362,7 @@ impl Game {
 
 // Covers: specs/skills/bodies.md §8.3, §6.9
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_sentry_trap_is_laid_and_listed_as_a_pet() {
     let mut s = row(0, 45);
     s.summon = 0;
@@ -372,6 +379,7 @@ fn a_sentry_trap_is_laid_and_listed_as_a_pet() {
 
 // Covers: specs/skills/bodies.md §8.21
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn shadow_warrior_summons_the_shadow() {
     let mut s = row(0, 49);
     s.summon = 0;
@@ -388,6 +396,7 @@ fn shadow_warrior_summons_the_shadow() {
 
 // Covers: specs/skills/bodies.md §8.8, §2.14
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn tiger_strike_adds_a_charge_on_a_hit() {
     let mut s = row(23, 34);
     s.aurastate = PGSV[0] as u16;
@@ -406,6 +415,7 @@ fn tiger_strike_adds_a_charge_on_a_hit() {
 
 // Covers: specs/skills/bodies.md §4.3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn burst_of_speed_turns_its_state_on() {
     let mut s = row(0, 18);
     s.aurastate = PGSV[1] as u16;
@@ -419,6 +429,7 @@ fn burst_of_speed_turns_its_state_on() {
 // Covers: specs/skills/bodies.md §2.14, §8.10
 // (asserts the charge and no fault, not the finisher damage)
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_finisher_after_a_charge_runs_without_faults() {
     let charge = row(23, 34);
     let mut charge = charge;
@@ -443,6 +454,7 @@ fn a_finisher_after_a_charge_runs_without_faults() {
 
 // Covers: specs/skills/bodies-2b.md §7.20
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn dragon_flight_moves_the_assassin_to_the_monster() {
     let mut g = Game::joined(vec![(3, row(0, 52))]);
     let (_, guid) = g.monster(500);

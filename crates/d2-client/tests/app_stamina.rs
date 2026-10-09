@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use d2_client::app::server_thread::ThreadLink;
-use d2_client::app::single_player::{self, GameData, Link, DEFAULT_SEED, PLAYER_CLASS};
+use d2_client::app::single_player::{self, Link, DEFAULT_SEED, PLAYER_CLASS};
 use d2_client::bridge::link::{SendQueue, ServerLink};
 use d2_data::bin::BinTable;
 use d2_data::fixup::records::stat_ops;
@@ -15,6 +15,8 @@ use d2_data::tables::{Charstats, Experience, Itemstatcost, Record, Skills};
 use d2_sim::combat::vitals::VitalsTables;
 use d2_sim::stats::{ClassStats, StatData, StatLists, StatTable};
 use d2_sim::units::UnitId;
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -115,8 +117,12 @@ impl Game {
 /// with 100 life, and one class skill (id 1) in the tables.
 fn joined() -> (Game, UnitId, u32) {
     let ms = Arc::new(AtomicU32::new(1000));
-    let (mut link, _) =
-        single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+    let (mut link, _) = single_player::start(
+        app_support::game_data(),
+        DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap();
     link.send(SendQueue::System, &single_player::create_request().encode())
         .unwrap();
     ms.fetch_add(40, Ordering::SeqCst);
@@ -207,6 +213,7 @@ fn sent_stamina(msgs: &[Vec<u8>]) -> Option<u32> {
 
 // Covers: specs/sim/units.md §6.1
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn standing_regenerates_stamina_and_the_client_is_told() {
     let (mut g, p, _) = joined();
     g.set(p, 11, 100 << 8);
@@ -224,6 +231,7 @@ fn standing_regenerates_stamina_and_the_client_is_told() {
 
 // Covers: specs/sim/units.md §6.1
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn full_stamina_is_not_exceeded() {
     let (mut g, p, _) = joined();
     g.set(p, 11, 100 << 8);

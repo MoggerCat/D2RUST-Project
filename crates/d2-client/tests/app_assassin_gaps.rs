@@ -8,6 +8,8 @@
 #[path = "app_skill_gaps/rig.rs"]
 mod rig;
 
+mod app_support;
+
 use std::sync::Arc;
 
 use d2_client::app::weapons::{class, ItemFacts};
@@ -111,6 +113,7 @@ fn plain_attack_row() -> Skills {
 // Covers: specs/skills/bodies.md §2.14, §8.10
 // (the finisher after a charge: extra strike, charge state removed)
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_finisher_spends_the_charge() {
     let mut r = assassin(vec![(CHARGE, charge_skill()), (FINISH, plain_attack_row())]);
     hold(&mut r, true);
@@ -175,6 +178,7 @@ fn claws_strike(both: bool) -> i32 {
 // Covers: specs/skills/bodies.md §8.10
 // (dual claws: the second claw strikes on the next frame event)
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn dual_claws_strike_twice() {
     let one = claws_strike(false);
     let two = claws_strike(true);
@@ -273,6 +277,7 @@ fn shots_left(r: &mut Rig) -> Option<i32> {
 // Covers: specs/monsters/ai-bodies-6.md §14
 // (a trap with no monster in range keeps its shots)
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_trap_without_a_target_holds_its_shots() {
     let mut r = trap_game();
     r.select_right(TRAP);
@@ -287,6 +292,7 @@ fn a_trap_without_a_target_holds_its_shots() {
 // (the trap shoots a monster in range, spends a shot each time, and dies
 // after the last)
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_trap_shoots_in_range_then_dies() {
     let mut r = trap_game();
     r.select_right(TRAP);
@@ -378,6 +384,7 @@ fn missile_trap_game() -> Rig {
 // Covers: specs/skills/bodies.md §5
 // (a laid trap fires its missile: shots drop, the missile flies and hits)
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_lightning_sentry_fires_its_missile() {
     let mut r = missile_trap_game();
     r.select_right(TRAP);

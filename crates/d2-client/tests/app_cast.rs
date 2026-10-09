@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use d2_client::app::server_thread::ThreadLink;
-use d2_client::app::single_player::{self, GameData, Link, DEFAULT_SEED, PLAYER_CLASS};
+use d2_client::app::single_player::{self, Link, DEFAULT_SEED, PLAYER_CLASS};
 use d2_client::bridge::link::{SendQueue, ServerLink};
 use d2_client::bridge::LOCAL_CLIENT;
 use d2_client::rules::unit_composite::code;
@@ -25,6 +25,8 @@ use d2_formats::animdata::{self, AnimData, AnimRecord};
 use d2_server::seams::{Clock, Pos};
 use d2_sim::skills::list::ListOwner;
 use d2_sim::stats::{StatData, StatLists, StatTable};
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -100,8 +102,12 @@ struct Game {
 impl Game {
     fn joined() -> Self {
         let ms = Arc::new(AtomicU32::new(1000));
-        let (link, _) =
-            single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+        let (link, _) = single_player::start(
+            app_support::game_data(),
+            DEFAULT_SEED,
+            StepClock(ms.clone()),
+        )
+        .unwrap();
         let mut g = Self { link, ms };
         g.link
             .with(|l| {
@@ -228,6 +234,7 @@ impl Game {
 
 // Covers: specs/skills/use.md §5
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_right_skill_at_a_point_costs_mana_and_creates_the_missile() {
     let mut g = Game::joined();
     let at = g.player_pos();

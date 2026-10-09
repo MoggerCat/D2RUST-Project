@@ -369,6 +369,28 @@ impl<X: Pending> View<'_, X> {
         let Some(created) = r.and_then(|r| log(self, r)) else {
             return;
         };
+        // Init function 17 (`waypoints.md` §5.1) on the hooks' waypoint
+        // tables and arrival list, inside the creation (rule 6).
+        if created.init == objects::Route::Waypoint && self.h.waypoint_init.is_some() {
+            let level = room.and_then(|r| self.h.drlg.level_id(game, r));
+            let facts = crate::world::waypoints::ObjectFacts {
+                guid,
+                class,
+                mode,
+                room,
+                level,
+                x,
+                y,
+            };
+            self.waypoint_init(game, unit, &facts);
+            let r = with_objects(game, self, |ctl, t, w| {
+                objects::create_rest(ctl, t, w, unit, mode)
+            });
+            if let Some(r) = r {
+                log(self, r);
+            }
+            return;
+        }
         let handed = !matches!(created.init, objects::Route::Here | objects::Route::Null);
         let route = ObjectRoute::Init {
             object: unit,
@@ -390,6 +412,28 @@ impl<X: Pending> View<'_, X> {
         if handed && !now {
             self.object_route(game, route, room, (x, y));
         }
+    }
+
+    /// `0x00547210`, init function 17 (`waypoints.md` §5.1), of the
+    /// object `unit` being created (`facts`: its class, mode, room, level
+    /// and position at the init), on [`ActionHooks::waypoint_init`] and
+    /// [`ActionHooks::arrivals`].
+    fn waypoint_init(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        facts: &crate::world::waypoints::ObjectFacts,
+    ) {
+        let Some(data) = self.h.waypoint_init.clone() else {
+            return;
+        };
+        let mut arrivals = std::mem::take(&mut self.h.arrivals);
+        let mut w = super::waypoints::WaypointView {
+            game,
+            v: View::of(self.units, self.stats, self.data, self.h),
+        };
+        data.init_object(&mut w, &mut arrivals, unit, facts);
+        self.h.arrivals = arrivals;
     }
 
     /// An object of `class` allocated in `room` at (x, y) in `mode`

@@ -20,7 +20,7 @@ use d2_sim::units::{ClientId as SimClient, UnitId};
 use d2_sim::wiring::action::{vitals_sync, ActionSim, ObjectCase, Pending};
 use d2_sim::wiring::economy::GameFields;
 use d2_sim::wiring::worldgen::{WorldPending, WorldSim};
-use d2_sim::world::waypoints::{ArrivalList, WaypointData};
+use d2_sim::world::waypoints::WaypointData;
 
 use super::super::player::{self, HostFacts, Outcome as PlayerOutcome, Run as PlayerRun};
 use super::super::skills::{Call as SkillCall, Handled as SkillHandled, NoSkills, SkillHost};
@@ -146,8 +146,6 @@ pub struct ActionWorld<S = NoSkills> {
     /// Waypoint tables (`WaypointData::new(levels, objects)`); `None`:
     /// 0x49 stays a stub.
     pub waypoints: Option<WaypointData>,
-    /// The object control's arrival list (`waypoints.md` §7.1).
-    pub arrivals: ArrivalList,
     /// Fatal paths met by the handlers, in order.
     pub faults: Vec<WorldFault>,
     /// The skill handlers (`handlers::skills::wired::WiredSkills`).
@@ -165,12 +163,14 @@ where
         call: C,
     ) -> Option<C::Out> {
         let data = self.waypoints.as_ref()?;
-        let arrivals = &mut self.arrivals;
-        Some(
-            events
-                .action()
-                .waypoints(game, |w| call.call(data, arrivals, w)),
-        )
+        // The arrival list is the action hooks' (init function 17 reads
+        // it inside an object's creation, `waypoints.md` §5.1).
+        let mut arrivals = std::mem::take(&mut events.action().hooks().arrivals);
+        let out = events
+            .action()
+            .waypoints(game, |w| call.call(data, &mut arrivals, w));
+        events.action().hooks().arrivals = arrivals;
+        Some(out)
     }
 
     fn unit_positions(&mut self, events: &mut D, units: &[UnitId]) -> Vec<(UnitId, (i32, i32))> {

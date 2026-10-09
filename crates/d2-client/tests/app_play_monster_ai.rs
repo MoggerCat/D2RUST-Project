@@ -17,7 +17,7 @@ use d2_client::app::death::{add_death, DeathScreen};
 use d2_client::app::monster_ai::MonsterAi;
 use d2_client::app::play::{add_client_data, add_game, add_preview, send_create_game_for};
 use d2_client::app::server_thread::ThreadLink;
-use d2_client::app::single_player::{self, BuildError, GameData};
+use d2_client::app::single_player::{self, BuildError};
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::local::{LocalLink, PendingSession};
 use d2_client::bridge::mirror::DynLink;
@@ -41,6 +41,8 @@ use d2_sim::units::hooks::{MonsterInfo, UnitData};
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::UnitType;
 use d2_sim::wiring::action::ActionTables;
+
+mod app_support;
 
 const MONSTER_A1: &[u8; 8] = b"ZOA1HTH\0";
 const MINDAMAGE: u16 = 21;
@@ -177,6 +179,7 @@ fn local_mode(app: &App) -> u32 {
 // Covers: specs/skills/use.md §5.3
 // Covers: specs/combat/vitals.md §4.8
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_monster_next_to_the_player_attacks_until_the_player_dies() {
     attacks_until_the_player_dies(single_player::DEFAULT_SEED);
 }
@@ -186,6 +189,7 @@ fn a_monster_next_to_the_player_attacks_until_the_player_dies() {
 /// 96): the next attacks must still run their do (unit flag 0x40, set by the
 /// first do, is cleared by the Attack start; REC-143).
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_missed_first_attack_is_followed_by_more_attacks() {
     attacks_until_the_player_dies(9);
 }
@@ -196,7 +200,7 @@ fn attacks_until_the_player_dies(seed: u32) {
     let clock = StepClock(ms.clone());
     let spawn_character = character.clone();
     let link = ThreadLink::spawn(move || {
-        let mut g = single_player::build_with(&GameData::Synthetic, seed, spawn_character)?;
+        let mut g = single_player::build_with(&app_support::game_data(), seed, spawn_character)?;
         install_fixtures(&mut g.sim);
         Ok::<_, BuildError>(LocalLink::new(Host::new(
             g.sim,
@@ -215,7 +219,7 @@ fn attacks_until_the_player_dies(seed: u32) {
         .init_resource::<ButtonInput<KeyCode>>();
     add_game(&mut app, dyn_link, false).unwrap();
     send_create_game_for(&mut app, &character).unwrap();
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     let levels = single_player::client_level_rows(&data);
     add_client_data(
         &mut app,
@@ -236,7 +240,11 @@ fn attacks_until_the_player_dies(seed: u32) {
         .world()
         .units
         .iter()
-        .find(|(k, u)| k.unit_type == TILE && u.class == single_player::BLOOD_MOOR_TO_DEN)
+        .find(|(k, u)| {
+            k.unit_type == TILE
+                && u.class
+                    == app_support::warp_id(single_player::BLOOD_MOOR, single_player::DEN_OF_EVIL)
+        })
         .map(|(k, _)| *k)
         .expect("the cave entrance reached the client");
     app.world_mut()
