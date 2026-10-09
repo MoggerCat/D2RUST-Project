@@ -108,6 +108,18 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         use crate::world::objects::shrines::STAMINA_REMOVE;
         for (u, state, cb) in std::mem::take(&mut self.removed_lists) {
             let t = sim.stats.toggle_state(u, state, false);
+            // PROVISIONAL (REC-731): "state off" read as the toggle with
+            // the update-queue insert `0x00639DB0` (`stat-lists.md` §9.2),
+            // so the client pass sends S→C 0xA9. Recorded 2026-10-09: the
+            // `manapot` list freed at full mana (no mana change that tick)
+            // still gives 0xA9 106 the next frame
+            // (`facts/items/a1-town-potions-low.tsv` n 35).
+            if let Err(e) = sim.game.lists.queue_update(u) {
+                self.errors
+                    .push(WiringError::Unit(crate::units::modes::UnitError::Game(
+                        e.into(),
+                    )));
+            }
             if let (Some(d), Some(r)) = (t.disguise, sim.units.get_mut(u)) {
                 if d {
                     r.flags2 |= flags2::DISGUISE;
