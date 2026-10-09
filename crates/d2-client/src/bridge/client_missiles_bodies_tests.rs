@@ -544,3 +544,528 @@ fn hostility_between_client_units() {
     assert!(!h(p, ally) && !h(p, p) && !h(p, q) && !h(foe, foe));
     assert!(h(p, UnitKey::new(ITEM, 5)));
 }
+
+/// A world with a player owner at (100, 100) and one missile of
+/// `rows[1]` it owns at (100, 100).
+fn owned(rows: &[ClientMissileRow]) -> (ClientWorld, UnitKey, UnitKey) {
+    let mut w = ClientWorld::default();
+    let p = UnitKey::new(PLAYER, 1);
+    let mut u = crate::bridge::world::ClientUnit::new(p);
+    u.position = Some((100, 100));
+    w.units.insert(p, u);
+    let mut rec = at(100, 100, 1);
+    rec.owner = Some(p);
+    let k = create(&mut w, rows, &rec, true).unwrap().unwrap();
+    (w, p, k)
+}
+
+/// The set-C missiles of `class` in GUID order (creation order).
+fn kids(w: &ClientWorld, class: u32) -> Vec<UnitKey> {
+    w.objclient
+        .set_c
+        .iter()
+        .filter(|(_, u)| u.class == class)
+        .map(|(c, _)| *c)
+        .collect()
+}
+
+fn cells(w: &ClientWorld, class: u32) -> Vec<(i32, i32)> {
+    kids(w, class)
+        .iter()
+        .map(|c| super::cell_of(&w.objclient.missiles[c]))
+        .collect()
+}
+
+// Covers: specs/missiles/client.md §c13-function-bodies-specified-here
+#[test]
+fn function_39_rewinds_an_owned_missile() {
+    let mut r = row(FN_FRAME_ZERO);
+    r.anim_speed = 0;
+    let rows = vec![ClientMissileRow::default(), r];
+    let (mut w, _, k) = owned(&rows);
+    w.objclient.missiles.get_mut(&k).unwrap().frame = 2 << 8;
+    update(&mut w, &rows, k, true).unwrap();
+    assert_eq!(w.objclient.missiles[&k].frame, 0);
+    // No owner: the frame stays.
+    let mut w = ClientWorld::default();
+    let k = create(&mut w, &rows, &at(100, 100, 1), true)
+        .unwrap()
+        .unwrap();
+    w.objclient.missiles.get_mut(&k).unwrap().frame = 2 << 8;
+    update(&mut w, &rows, k, true).unwrap();
+    assert_eq!(w.objclient.missiles[&k].frame, 2 << 8);
+}
+
+// Covers: specs/missiles/client-bodies.md §b3-shared-create-helpers
+// Covers: specs/missiles/client-bodies.md §b4-do-bodies-emitters
+#[test]
+fn function_17_and_the_disc() {
+    let mut r = row(FN_CURSE_CENTRE);
+    (r.clt_sub, r.clt_param) = ([2, -1, -1], [7, 0, 0, 0, 0]);
+    let mut c = row(FN_DEFAULT_STEP);
+    c.rand_start = 4;
+    let rows = vec![ClientMissileRow::default(), r, c];
+    // The disc r = 3, s = 1, no chance: 29 points, row by row (y outer),
+    // x inner; each frame offset rnd(`RandStart` 4) on m's seed.
+    let (mut w, _, k) = owned(&rows);
+    let mut seed = seeded(&mut w, k, 99);
+    super::bodies::disc(&mut w, &env(&rows), k, 3, 2, 0, 1).unwrap();
+    let got = cells(&w, 2);
+    assert_eq!(got.len(), 29);
+    assert_eq!(&got[..2], &[(100, 97), (98, 98)]);
+    for c in kids(&w, 2) {
+        let f = seed.roll(4) as i32;
+        assert_eq!(w.objclient.missiles[&c].frame, f << 8);
+    }
+    // No owner: nothing.
+    let mut w = ClientWorld::default();
+    let k = create(&mut w, &rows, &at(100, 100, 1), true)
+        .unwrap()
+        .unwrap();
+    super::bodies::disc(&mut w, &env(&rows), k, 3, 2, 0, 1).unwrap();
+    assert!(kids(&w, 2).is_empty());
+    // Function 17: d04 0 → S1; d06 = n = 1: disc r 1, chance 1, s 1 on
+    // elapsed 0, 3, 6 (< P1 7): 5 points each.
+    let (mut w, _, k) = owned(&rows);
+    w.objclient.missiles.get_mut(&k).unwrap().d06 = 1;
+    for _ in 0..8 {
+        update(&mut w, &rows, k, true).unwrap();
+    }
+    assert_eq!(kids(&w, 2).len(), 15);
+    assert_eq!(
+        &cells(&w, 2)[..5],
+        &[(100, 99), (99, 100), (100, 100), (101, 100), (100, 101)]
+    );
+    // d06 ≤ 0: removed.
+    let (mut w, _, k) = owned(&rows);
+    update(&mut w, &rows, k, true).unwrap();
+    assert!(!w.objclient.set_c.contains_key(&k));
+}
+
+// Covers: specs/missiles/client.md §c13-function-bodies-specified-here
+#[test]
+fn function_18_lays_its_trail_with_the_spears_facing_and_height() {
+    let mut r = row(FN_SPEAR_TRAIL);
+    r.clt_sub = [2, -1, -1];
+    let rows = vec![ClientMissileRow::default(), r, row(FN_DEFAULT_STEP)];
+    let (mut w, p, k) = owned(&rows);
+    let m = w.objclient.missiles.get_mut(&k).unwrap();
+    (m.new_step, m.direction) = (true, 21);
+    m.pos.0 += 0x1234;
+    m.motion.vel[2] = 7 << 11;
+    let pos = m.pos;
+    update(&mut w, &rows, k, true).unwrap();
+    let c = w.objclient.missiles[&kids(&w, 2)[0]];
+    assert_eq!((c.direction, c.pos, c.owner), (21, pos, Some(p)));
+    // The child takes m's z after m's motion update of this update.
+    assert_eq!(c.motion.pos, [0, 0, 7 << 11]);
+    // A stopped missile keeps the flag of its last step (§B2 r4): one
+    // more; with the flag clear, none.
+    update(&mut w, &rows, k, true).unwrap();
+    assert_eq!(kids(&w, 2).len(), 2);
+    w.objclient.missiles.get_mut(&k).unwrap().new_step = false;
+    update(&mut w, &rows, k, true).unwrap();
+    assert_eq!(kids(&w, 2).len(), 2);
+}
+
+// Covers: specs/missiles/client-bodies.md §b4-do-bodies-emitters
+// Covers: specs/missiles/client.md §c14-seeds-capture-only
+#[test]
+fn function_27_drops_fire_and_wanders() {
+    let mut r = row(FN_WANDER_MAKER);
+    (r.clt_sub, r.clt_param) = ([2, -1, -1], [1, 0, 0, 0, 0]);
+    let rows = vec![ClientMissileRow::default(), r, row(FN_DEFAULT_STEP)];
+    for want_s in [0u32, 1, 2] {
+        let lo = (1..1000u32)
+            .find(|&lo| Seed::new(lo, 666).step() & 3 == want_s)
+            .unwrap();
+        let (mut w, _, k) = owned(&rows);
+        seeded(&mut w, k, lo);
+        let m = w.objclient.missiles.get_mut(&k).unwrap();
+        (m.d28, m.d2c, m.new_step) = (4, 0, true);
+        update(&mut w, &rows, k, true).unwrap();
+        // The child starts at m's position (flags 0: the origin's).
+        assert_eq!(cells(&w, 2), vec![(100, 100)]);
+        // `client-bodies.md` Test vectors: (4, 0) → s 0 (3, 3), s 2 (3,
+        // −3), s 1 / 3 (4, 0).
+        let d = match want_s {
+            0 => (3, 3),
+            2 => (3, -3),
+            _ => (4, 0),
+        };
+        let m = w.objclient.missiles[&k];
+        assert_eq!((m.d28, m.d2c), d, "s {want_s}");
+        assert_eq!(m.target_point, (100 + d.0, 100 + d.1));
+    }
+}
+
+// Covers: specs/missiles/client-bodies.md §b4-do-bodies-emitters
+#[test]
+fn functions_46_and_52_lay_children_on_both_sides() {
+    let mut r = row(FN_JAVELIN_TRAIL);
+    (r.vel, r.clt_sub, r.clt_param, r.light) = (8, [2, -1, -1], [3, 0, 0, 0, 0], 5);
+    let mut child = row(FN_DEFAULT_STEP);
+    (child.sub_loop, child.sub_start, child.sub_stop) = (1, 1, 2);
+    let rows = vec![ClientMissileRow::default(), r, child];
+    let mut w = ClientWorld::default();
+    let mut rec = at(100, 100, 1);
+    rec.flags |= flag::TARGET_RELATIVE;
+    rec.tx = 10;
+    let k = create(&mut w, &rows, &rec, true).unwrap().unwrap();
+    w.objclient.missiles.get_mut(&k).unwrap().new_step = true;
+    update(&mut w, &rows, k, true).unwrap();
+    // Elapsed 0 < 2: (d28, d2C) = (y − ty, tx − x) = (0, 10); children at
+    // (x, y) aiming at ±(0, 10), loops P1 3 (frames 40 + 3).
+    let m = w.objclient.missiles[&k];
+    assert_eq!((m.d28, m.d2c), (0, 10));
+    let targets: Vec<_> = kids(&w, 2)
+        .iter()
+        .map(|c| {
+            (
+                w.objclient.missiles[c].target_point,
+                w.objclient.missiles[c].total,
+            )
+        })
+        .collect();
+    assert_eq!(targets, vec![((100, 110), 43), ((100, 90), 43)]);
+    // S1 < 0: removed directly, its light left in the list (Edge case 2).
+    r.clt_sub = [-1, -1, -1];
+    let rows = vec![ClientMissileRow::default(), r];
+    let mut w = ClientWorld::default();
+    let k = create(&mut w, &rows, &at(100, 100, 1), true)
+        .unwrap()
+        .unwrap();
+    update(&mut w, &rows, k, true).unwrap();
+    assert!(!w.objclient.set_c.contains_key(&k) && !w.lights.is_empty());
+    // 52: no owner → removed (light too); with one: children from m.
+    let mut r = row(FN_WAKE_MAKER);
+    (r.clt_sub, r.light) = ([2, -1, -1], 5);
+    let rows = vec![ClientMissileRow::default(), r, row(FN_DEFAULT_STEP)];
+    let mut w = ClientWorld::default();
+    let k = create(&mut w, &rows, &at(100, 100, 1), true)
+        .unwrap()
+        .unwrap();
+    update(&mut w, &rows, k, true).unwrap();
+    assert!(!w.objclient.set_c.contains_key(&k) && w.lights.is_empty());
+    let (mut w, _, k) = owned(&rows);
+    let m = w.objclient.missiles.get_mut(&k).unwrap();
+    (m.d28, m.d2c, m.new_step) = (2, -3, true);
+    update(&mut w, &rows, k, true).unwrap();
+    let targets: Vec<_> = kids(&w, 2)
+        .iter()
+        .map(|c| w.objclient.missiles[c].target_point)
+        .collect();
+    assert_eq!(targets, vec![(102, 97), (98, 103)]);
+}
+
+// Covers: specs/missiles/client-bodies-2.md §b11-do-bodies
+#[test]
+fn function_51_bursts_then_hides_its_owner() {
+    let mut r = row(FN_RECYCLER);
+    (r.clt_sub, r.clt_param) = ([2, 3, -1], [0, 1, 2, 3, 0]);
+    let rows = vec![
+        ClientMissileRow::default(),
+        r,
+        row(FN_DEFAULT_STEP),
+        row(FN_DEFAULT_STEP),
+    ];
+    let (mut w, p, k) = owned(&rows);
+    let mut seed = seeded(&mut w, k, 31);
+    update(&mut w, &rows, k, true).unwrap();
+    // Elapsed 0 = P1: S1 at (x, y), then P3 = 2 more at x − 3 + rnd(7),
+    // y − 3 + rnd(7).
+    let mut want = vec![(100, 100)];
+    for _ in 0..2 {
+        let x = 97 + seed.roll(7) as i32;
+        let y = 97 + seed.roll(7) as i32;
+        want.push((x, y));
+    }
+    assert_eq!(cells(&w, 2), want);
+    assert_eq!(w.units[&p].flag_ex & FLAG_EX_NOT_DRAWN, 0);
+    // Elapsed 1 = P2: the owner hidden, S2 from m.
+    update(&mut w, &rows, k, true).unwrap();
+    assert_eq!(w.units[&p].flag_ex & FLAG_EX_NOT_DRAWN, FLAG_EX_NOT_DRAWN);
+    assert_eq!(cells(&w, 3), vec![(100, 100)]);
+}
+
+/// Gives `k` the seed `{lo, 666}`.
+fn seeded(w: &mut ClientWorld, k: UnitKey, lo: u32) -> Seed {
+    w.objclient.set_c.get_mut(&k).unwrap().seed = Some((lo, 666));
+    Seed::new(lo, 666)
+}
+
+// Covers: specs/missiles/client-bodies-2.md §b11-do-bodies
+#[test]
+fn functions_19_and_20_the_orb_and_its_nova() {
+    let mut orb = row(FN_FROZEN_ORB);
+    (orb.clt_sub, orb.clt_param) = ([2, -1, -1], [1, 19, 0, 0, 0]);
+    let rows = vec![ClientMissileRow::default(), orb, row(FN_DEFAULT_STEP)];
+    // Test vectors: d28 5, P2 19 → offset (OX[5], OY[5]) = (26, 14),
+    // d28 := 24; d28 −70 → d = 6.
+    let (mut w, _, k) = owned(&rows);
+    w.objclient.missiles.get_mut(&k).unwrap().d28 = 5;
+    update(&mut w, &rows, k, true).unwrap();
+    let c = w.objclient.missiles[&kids(&w, 2)[0]];
+    assert_eq!(c.target_point, (126, 114));
+    assert_eq!(w.objclient.missiles[&k].d28, 24);
+    let (mut w, _, k) = owned(&rows);
+    w.objclient.missiles.get_mut(&k).unwrap().d28 = -70;
+    update(&mut w, &rows, k, true).unwrap();
+    assert_eq!(w.objclient.missiles[&k].d28, 25);
+    // 20, test vector: (30, 0), P1 6, P2 2.
+    let mut nova = row(FN_ORB_NOVA);
+    nova.clt_param = [6, 2, 0, 0, 0];
+    let rows = vec![ClientMissileRow::default(), nova];
+    let mut w = ClientWorld::default();
+    let k = create(&mut w, &rows, &at(100, 100, 1), true)
+        .unwrap()
+        .unwrap();
+    w.objclient.missiles.get_mut(&k).unwrap().d28 = 30;
+    let mut seen = Vec::new();
+    for _ in 0..5 {
+        update(&mut w, &rows, k, true).unwrap();
+        let m = w.objclient.missiles[&k];
+        seen.push((m.target_point, (m.d28, m.d2c)));
+    }
+    assert_eq!(seen[0], ((115, 115), (15, 15)));
+    assert_eq!(seen[2], ((100, 115), (0, 15)));
+    assert_eq!(seen[4], ((93, 107), (-7, 7)));
+}
+
+// Covers: specs/missiles/client-bodies-2.md §b10-shared-helpers-part-2
+// Covers: specs/missiles/client-bodies-2.md §b11-do-bodies
+#[test]
+fn functions_10_and_13_drop_falling_shards() {
+    let mut mon = row(FN_MON_BLIZZARD);
+    (mon.clt_sub, mon.clt_param) = ([2, -1, -1], [5, 8, 4, 0, 0]);
+    let mut shard = row(FN_DEFAULT_STEP);
+    shard.clt_param = [120, 5, 0, 0, 0];
+    let rows = vec![ClientMissileRow::default(), mon, shard];
+    // Test vector: level 12 → (r, k) = (8, 5): a shard at elapsed 0 and 5.
+    let (mut w, _, k) = owned(&rows);
+    w.objclient.missiles.get_mut(&k).unwrap().level = 12;
+    update(&mut w, &rows, k, true).unwrap();
+    let mut s = Seed::init_low(100);
+    let sx = 100 + 7 - s.roll(14) as i32;
+    let sy = 100 + 7 - s.roll(14) as i32;
+    assert_eq!(cells(&w, 2), vec![(sx, sy)]);
+    assert_eq!(w.objclient.set_c[&k].seed, Some((s.lo, s.hi)), "reseeded");
+    // Fall (test vector: P1 120, P2 5): z 120 ≪, vz −5 ≪, 24 frames.
+    let c = w.objclient.missiles[&kids(&w, 2)[0]];
+    assert_eq!(
+        (c.motion.pos, c.motion.vel),
+        ([0, 0, 120 << 11], [0, 0, -5 << 11])
+    );
+    assert_eq!((c.total, c.current), (24, 24));
+    for _ in 0..5 {
+        update(&mut w, &rows, k, true).unwrap();
+    }
+    assert_eq!(kids(&w, 2).len(), 2, "elapsed 5");
+    // No owner: no shard.
+    let mut w = ClientWorld::default();
+    let k = create(&mut w, &rows, &at(100, 100, 1), true)
+        .unwrap()
+        .unwrap();
+    update(&mut w, &rows, k, true).unwrap();
+    assert!(kids(&w, 2).is_empty());
+    // 13: S1 2 < S2 3 → c := 2 + rnd(2) on m's seed; r = eval(calc1) = 3,
+    // k = eval(calc2) = 2 (skill 0's formulas).
+    let mut bliz = row(FN_BLIZZARD);
+    bliz.clt_sub = [2, 3, -1];
+    let rows = vec![ClientMissileRow::default(), bliz, shard, shard];
+    let mut t = tables();
+    let mut sk = blank::<d2_data::tables::Skills>();
+    (sk.calc1, sk.calc2) = (0, 3);
+    t.skills = vec![sk];
+    t.skills_code = vec![0x07, 3, 0x00, 0x07, 2, 0x00];
+    let e = Env {
+        skills: Some(&t),
+        ..env(&rows)
+    };
+    let (mut w, _, k) = owned(&rows);
+    let mut seed = seeded(&mut w, k, 555);
+    update_with(&mut w, &e, k).unwrap();
+    let c = 2 + seed.roll(2);
+    let mut s = Seed::init_low(100);
+    let sx = 100 + 2 - s.roll(4) as i32;
+    let sy = 100 + 2 - s.roll(4) as i32;
+    assert_eq!(cells(&w, c), vec![(sx, sy)]);
+    // k = 0 → removed.
+    t.skills_code = vec![0x07, 3, 0x00, 0x07, 0, 0x00];
+    let e = Env {
+        skills: Some(&t),
+        ..env(&rows)
+    };
+    let (mut w, _, k) = owned(&rows);
+    update_with(&mut w, &e, k).unwrap();
+    assert!(!w.objclient.set_c.contains_key(&k));
+}
+
+// Covers: specs/missiles/client-bodies-2.md §b11-do-bodies
+#[test]
+fn functions_44_45_53_and_68() {
+    use crate::bridge::skills::{SkillEntry, SkillList};
+    // 44: m keeps to its owner while the owner uses m's skill.
+    let mut d = row(FN_DISTRACTION);
+    d.clt_sub = [2, -1, -1];
+    let rows = vec![ClientMissileRow::default(), d, row(FN_DEFAULT_STEP)];
+    let (mut w, p, k) = owned(&rows);
+    let o = w.units.get_mut(&p).unwrap();
+    o.position = Some((105, 103));
+    o.skills = Some(SkillList {
+        entries: vec![SkillEntry {
+            skill: 0,
+            ..SkillEntry::default()
+        }],
+        current: Some(0),
+        ..SkillList::default()
+    });
+    update(&mut w, &rows, k, true).unwrap();
+    assert_eq!(w.objclient.set_c[&k].position, Some((105, 103)));
+    assert!(w.objclient.missiles[&k].new_step, "a new sub-tile");
+    // The next update spawns S1 from m.
+    update(&mut w, &rows, k, true).unwrap();
+    assert_eq!(cells(&w, 2), vec![(105, 103)]);
+    // Another skill in use: removed directly (its light stays).
+    w.objclient.missiles.get_mut(&k).unwrap().skill = 9;
+    update(&mut w, &rows, k, true).unwrap();
+    assert!(!w.objclient.set_c.contains_key(&k));
+    // 45: S1 < 0 → removed.
+    let mut fog = row(FN_DISTRACTION_FOG);
+    fog.clt_sub = [-1, -1, -1];
+    let rows = vec![ClientMissileRow::default(), fog];
+    let (mut w, _, k) = owned(&rows);
+    update(&mut w, &rows, k, true).unwrap();
+    assert!(!w.objclient.set_c.contains_key(&k));
+    // 53: on a new sub-tile S1 from m, then function 7 (steps).
+    let mut tf = row(FN_TIGER_FURY);
+    tf.clt_sub = [2, -1, -1];
+    let rows = vec![ClientMissileRow::default(), tf, row(FN_DEFAULT_STEP)];
+    let (mut w, _, k) = owned(&rows);
+    w.objclient.missiles.get_mut(&k).unwrap().new_step = true;
+    update_with(&mut w, &env(&rows), k).unwrap();
+    assert_eq!(cells(&w, 2), vec![(100, 100)]);
+    assert_eq!(w.objclient.missiles[&k].current, 39);
+    // 68: S1 0 → removed; else on a new sub-tile S1 with loops P1.
+    let mut sf = row(FN_SUC_FIREBALL);
+    (sf.clt_sub, sf.clt_param) = ([2, -1, -1], [3, 0, 0, 0, 0]);
+    let mut child = row(FN_DEFAULT_STEP);
+    (child.sub_loop, child.sub_start, child.sub_stop) = (1, 1, 2);
+    let rows = vec![ClientMissileRow::default(), sf, child];
+    let (mut w, _, k) = owned(&rows);
+    w.objclient.missiles.get_mut(&k).unwrap().new_step = true;
+    update(&mut w, &rows, k, true).unwrap();
+    let c = w.objclient.missiles[&kids(&w, 2)[0]];
+    assert_eq!(c.total, 43);
+    sf.clt_sub = [0, -1, -1];
+    let rows = vec![ClientMissileRow::default(), sf];
+    let (mut w, _, k) = owned(&rows);
+    update(&mut w, &rows, k, true).unwrap();
+    assert!(!w.objclient.set_c.contains_key(&k));
+}
+
+// Covers: specs/missiles/client-bodies-2.md §b11-do-bodies
+#[test]
+fn function_48_erupts_at_reseeded_points() {
+    let mut r = row(FN_ERUPTION);
+    r.clt_sub = [2, 3, -1];
+    let rows = vec![
+        ClientMissileRow::default(),
+        r,
+        row(FN_DEFAULT_STEP),
+        row(FN_DEFAULT_STEP),
+    ];
+    let mut t = tables();
+    let mut sk = blank::<d2_data::tables::Skills>();
+    (sk.calc1, sk.calc2) = (0, 3);
+    t.skills = vec![sk];
+    t.skills_code = vec![0x07, 3, 0x00, 0x07, 1, 0x00];
+    let e = Env {
+        skills: Some(&t),
+        ..env(&rows)
+    };
+    let (mut w, _, k) = owned(&rows);
+    update_with(&mut w, &e, k).unwrap();
+    // r 3, k 1: reseed(x + 0); P := (x + rnd(4) − 2, y + rnd(4) − 2).
+    let mut s = Seed::init_low(100);
+    let px = 100 + s.roll(4) as i32 - 2;
+    let py = 100 + s.roll(4) as i32 - 2;
+    assert_eq!(cells(&w, 2), vec![(px, py)]);
+    assert_eq!(cells(&w, 3), vec![(px, py)]);
+    assert!(w.objclient.missiles[&kids(&w, 2)[0]].flat, "dead flag");
+    assert!(!w.objclient.missiles[&kids(&w, 3)[0]].flat);
+    // No owner: removed.
+    let mut w = ClientWorld::default();
+    let k = create(&mut w, &rows, &at(100, 100, 1), true)
+        .unwrap()
+        .unwrap();
+    update_with(&mut w, &e, k).unwrap();
+    assert!(!w.objclient.set_c.contains_key(&k));
+}
+
+// Covers: specs/missiles/client-bodies-2.md §b11-do-bodies
+#[test]
+fn function_58_turns_on_its_reseeded_draw() {
+    let mut r = row(FN_CHAOS_ICE);
+    r.param = [1, 0];
+    let rows = vec![ClientMissileRow::default(), r];
+    let mut w = ClientWorld::default();
+    let k = create(&mut w, &rows, &at(100, 100, 1), true)
+        .unwrap()
+        .unwrap();
+    // Test vector: (a, b) = (8, 0): lo' even → (8, −2), odd → (8, 2).
+    let m = w.objclient.missiles.get_mut(&k).unwrap();
+    (m.d28, m.d2c) = (77, 8);
+    update(&mut w, &rows, k, true).unwrap();
+    let mut s = Seed::init_low(77);
+    let even = s.step() & 1 == 0;
+    let dy = if even { -2 } else { 2 };
+    let m = w.objclient.missiles[&k];
+    assert_eq!(m.target_point, (108, 100 + dy));
+    assert_eq!((m.d28, m.d2c), (s.lo as i32, (dy << 16) + 8));
+}
+
+// Covers: specs/missiles/client-bodies-2.md §b11-do-bodies
+#[test]
+fn function_47_keeps_its_bounces_then_lays_fire() {
+    let mut r = row(FN_MOLTEN_BOULDER);
+    (r.prog_sound, r.clt_sub) = (1, [-1, -1, -1]);
+    let rows = vec![ClientMissileRow::default(), r];
+    let (mut w, _, k) = owned(&rows);
+    let m = w.objclient.missiles.get_mut(&k).unwrap();
+    (m.motion.bounces_left, m.new_step) = (3, true);
+    update(&mut w, &rows, k, true).unwrap();
+    // d28 := bounces left; then function 6: S1 < 0 → removed.
+    assert!(!w.objclient.set_c.contains_key(&k));
+    r.clt_sub = [2, -1, -1];
+    let rows = vec![ClientMissileRow::default(), r, row(FN_DEFAULT_STEP)];
+    let (mut w, _, k) = owned(&rows);
+    w.objclient
+        .missiles
+        .get_mut(&k)
+        .unwrap()
+        .motion
+        .bounces_left = 3;
+    update(&mut w, &rows, k, true).unwrap();
+    assert_eq!(w.objclient.missiles[&k].d28, 3);
+}
+
+// Covers: specs/missiles/client.md §c2-create-0x004cd540-start-room-target
+#[test]
+fn a_bodys_child_nudges_by_its_parents_direction() {
+    // Function 27's flags-0 child with velocity aims at its own start:
+    // the nudge reads the owner's direction, here the parent's
+    // (PROVISIONAL REC-543).
+    let mut r = row(FN_WANDER_MAKER);
+    (r.clt_sub, r.clt_param) = ([2, -1, -1], [99, 0, 0, 0, 0]);
+    let mut fire = row(FN_DEFAULT_STEP);
+    fire.vel = 8;
+    let rows = vec![ClientMissileRow::default(), r, fire];
+    let (mut w, _, k) = owned(&rows);
+    let m = w.objclient.missiles.get_mut(&k).unwrap();
+    // Direction 20 → octant 2: (DX, DY) = (−2, 0) from the owner.
+    (m.direction, m.new_step) = (20, true);
+    update(&mut w, &rows, k, true).unwrap();
+    let c = w.objclient.missiles[&kids(&w, 2)[0]];
+    assert_eq!(c.target_point, (98, 100));
+}
