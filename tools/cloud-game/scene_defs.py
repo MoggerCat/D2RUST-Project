@@ -90,3 +90,33 @@ GROUPS["act1out"] = {
     "script": ("waitticks 8; click 768 324; waitticks 13; click 790 276; waitticks 13; click 790 276; waitticks 13; click 768 276; waitticks 13; click 768 276; waitticks 13; click 688 316; waitticks 13; click 576 308; waitticks 13; click 464 292; waitticks 41; click 352 284; waitticks 41; click 230 171; waitticks 81; mark o; waitticks 10; end"),
     "scenes": {"a1-outdoor-cold-plains": ("o", 0)},
 }
+
+# Spell and effect scenes (docs/handoff/q-chk-render-effects.md): a level-30 character of the class
+# with the one skill at level 1 on the left (attacks) or right (auras, buffs) mouse button, the same
+# click path as "fight" (the waypoint, Cold Plains, the Fallen group) with the cast clicked 14 times;
+# tools/cloud-game/prepare_effect_chars.sh makes the characters (name Fx<skill id>)
+# (group, class, skill byte index, skill id, button, scene label)
+FX = (
+    ("fxicebolt", "sor", 3, 39, "l", "ice-bolt"), ("fxfireball", "sor", 11, 47, "l", "fire-ball"),
+    ("fxlightning", "sor", 13, 49, "l", "lightning"), ("fxcharged", "sor", 2, 38, "l", "charged-bolt"),
+    ("fxfrostnova", "sor", 8, 44, "l", "frost-nova"), ("fxnova", "sor", 12, 48, "l", "nova"),
+    ("fxfrozenarmor", "sor", 4, 40, "r", "frozen-armor"),
+    ("fxteeth", "nec", 1, 67, "l", "teeth"), ("fxbonespear", "nec", 18, 84, "l", "bone-spear"),
+    ("fxamplify", "nec", 0, 66, "l", "amplify-damage"),
+    ("fxholybolt", "pal", 5, 101, "l", "holy-bolt"), ("fxmight", "pal", 2, 98, "r", "might-aura"),
+    ("fxbash", "bar", 0, 126, "l", "bash"), ("fxwarcry", "bar", 28, 154, "l", "war-cry"),
+    ("fxhowl", "bar", 4, 130, "l", "howl"),
+    ("fxfirestorm", "dru", 4, 225, "l", "firestorm"), ("fxmolten", "dru", 8, 229, "l", "molten-boulder"),
+    ("fxfiretrauma", "ass", 0, 251, "l", "fire-trauma"), ("fxshockfield", "ass", 5, 256, "l", "shock-field"),
+    ("fxinnersight", "ama", 2, 8, "l", "inner-sight"),
+)
+for _g, _c, _i, _s, _b, _l in FX:
+    _cast = ("click" if _b == "l" else "rclick")
+    GROUPS[_g] = {
+        "char": f"Fx{_s}", "seed": 1234,
+        "script": "waitticks 20; click 700 300; waitticks 60; click 650 300; waitticks 40; click 590 262; waitticks 50; "
+                  "click 207 176; waitticks 80; mark cp; "
+                  + "".join(f"{_cast} 330 190; waitticks 12; {_cast} 300 200; waitticks 13; mark f{i}; " for i in range(1, 15)) + "end",
+        "scenes": {f"fx-{_l}-cast": ("f1", 0), f"fx-{_l}-flight": ("f2", 0), f"fx-{_l}-hit": ("f4", 0),
+                   f"fx-{_l}-later": ("f9", 0)},
+    }
