@@ -1,0 +1,14 @@
+coverage-map 1
+monster	19	0	3
+monster	147	0	1
+monster	150	0	1
+monster	152	0	3
+monster	154	0	1
+monster	155	0	1
+monster-ai	5967056	152	3
+monster-ai	6189360	147	3
+monster-ai	6189360	150	3
+monster-ai	6189360	154	3
+monster-ai	6189360	155	4
+missile	58	0	1
+state	105	0	11
