@@ -736,6 +736,7 @@ fn unpad(data: &[u8], width: u32, height: u32) -> Vec<u8> {
 }
 
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn gpu_node_composes_the_frame_into_the_presented_texture() {
     let adapter = match Gpu::headless() {
         Ok((_, info)) => info,

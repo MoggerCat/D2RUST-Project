@@ -1448,3 +1448,136 @@ fn a_blocked_run_is_drawn_where_the_server_stops() {
         "the drawn player stopped there too: {drawn:?} / {s:?}"
     );
 }
+
+/// One request the sound layer took on the play path: the server tick it
+/// was first seen at, its requested group base, units and start tick.
+#[derive(Debug, Clone)]
+struct Heard {
+    server_tick: u64,
+    base: i32,
+    units: Vec<UnitKey>,
+    start_tick: u32,
+}
+
+#[derive(Resource, Default)]
+struct Listened {
+    handles: std::collections::BTreeSet<u32>,
+    heard: Vec<Heard>,
+}
+
+/// Records every new request of the audio driver after each frame.
+fn listen(
+    audio: Res<d2_client::app::sound::GameAudio>,
+    bridge: Res<BridgeResource>,
+    mut out: ResMut<Listened>,
+) {
+    let Some(driver) = audio.driver.as_ref() else {
+        return;
+    };
+    let d = driver.lock().unwrap();
+    let table = d.system().table();
+    let tick = bridge.0.world().server_ticks;
+    for r in d.system().requests() {
+        if r.handle != 0 && out.handles.insert(r.handle) {
+            out.heard.push(Heard {
+                server_tick: tick,
+                base: table.base(r.id),
+                units: r.units.clone(),
+                start_tick: r.start_tick,
+            });
+        }
+    }
+}
+
+// Covers: specs/audio/triggers.md §5 r2, §10 r2; specs/client/msg-ui.md §16 r4
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_play_path_steps_and_speaks() {
+    let mut run = Run::start();
+    run.app
+        .init_resource::<Listened>()
+        .add_systems(Last, listen);
+    let me = run
+        .app
+        .world()
+        .resource::<BridgeResource>()
+        .0
+        .world()
+        .local_player
+        .expect("the local player");
+    let class = run.app.world().resource::<BridgeResource>().0.world().units[&me].class;
+    // Running to Akara: the sorceress's footsteps (class record 1:
+    // `Footstep` base 2,720, +24 when running, +4 (k − 1) on a material).
+    let akara = run.approach(1, u32::from(d2_sim::world::npc::class::AKARA));
+    run.run_to_unit(akara);
+    let steps: Vec<Heard> = run
+        .app
+        .world()
+        .resource::<Listened>()
+        .heard
+        .iter()
+        .filter(|h| h.units == [me])
+        .cloned()
+        .collect();
+    let table_base = |run: &Run, id: i32| {
+        let audio = run
+            .app
+            .world()
+            .resource::<d2_client::app::sound::GameAudio>();
+        let d = audio.driver.as_ref().unwrap().lock().unwrap();
+        d.system().table().base(id)
+    };
+    assert_eq!(class, 1, "a sorceress");
+    let bases: Vec<i32> = [
+        2720, 2724, 2728, 2732, 2736, 2740, 2744, 2748, 2752, 2756, 2760, 2764,
+    ]
+    .iter()
+    .map(|&id| table_base(&run, id))
+    .collect();
+    let footsteps: Vec<&Heard> = steps.iter().filter(|h| bases.contains(&h.base)).collect();
+    assert!(
+        footsteps.len() >= 4,
+        "the player's footsteps on the way: {steps:?}"
+    );
+    // Interact: the NPC dialog branch speaks on the player, after the walk.
+    let before = run.app.world().resource::<Listened>().heard.len();
+    run.bridge().interact(akara).unwrap();
+    run.until("the NPC menu", 400, |r| {
+        r.app
+            .world()
+            .non_send::<WorldViewUi>()
+            .original
+            .as_ref()
+            .unwrap()
+            .npc_menu()
+            .is_some()
+    });
+    // Akara's text list names the dialog line m (`msg-ui.md` §16 r9, branch
+    // B2: `0x004A10E0(U, m, 1)`); its speech is `npc-speech.tsv`'s sound of
+    // that key (§10 r2), requested on the player with delay 5.
+    let m = run
+        .app
+        .world()
+        .non_send::<WorldViewUi>()
+        .original
+        .as_ref()
+        .unwrap()
+        .npc_text()
+        .expect("the NPC text list")
+        .m();
+    let sound = d2_client::audio::triggers::tables::NpcSpeech::spec().sound(i32::from(m));
+    assert!(sound > 0, "a speech line for text key {m}");
+    let want = table_base(&run, sound);
+    let said: Vec<Heard> = run.app.world().resource::<Listened>().heard[before..]
+        .iter()
+        .filter(|h| h.units == [me] && h.base == want)
+        .cloned()
+        .collect();
+    assert_eq!(said.len(), 1, "Akara's dialog line once: {said:?}");
+    assert!(
+        said[0].start_tick > said[0].server_tick as u32
+            && said[0].start_tick <= said[0].server_tick as u32 + 5,
+        "delay 5 from the sound tick: {said:?}"
+    );
+    run.check("spoke");
+}

@@ -13,6 +13,11 @@
 //! level, day phase, weather and settings of the frame; the variant and
 //! cue draws step the local player's client seed ([`ClientSeed`]).
 //!
+//! The unit sounds (mode sounds, idle voices, footsteps, state, missile and
+//! item sounds, events 12 / 16 / 17) run in the unit pass of
+//! [`crate::audio::unit_feed`] on the frame's model, once
+//! [`SoundDriver::set_unit_rows`] gave it the install's tables.
+//!
 //! Trigger feeds wired, as one ordered request list ([`SoundRequest`]):
 //! the UI sounds (`triggers.md` §11: the click sound of `ui/panels.md`
 //! §10.2 and the sounds of the S→C 0x5D / 0x77 UI outputs), the server
@@ -40,10 +45,16 @@ use crate::audio::triggers::events::{
 };
 use std::collections::BTreeMap;
 
-use crate::audio::triggers::npc::GreetingRecords;
+use crate::audio::triggers::npc::{
+    dialog_line, interact_greeting, set_npc_speech_option, DialogState, GreetMode, GreetingRecords,
+};
 use crate::audio::triggers::objects::object_mode;
+use crate::audio::triggers::tables::NpcSpeech;
 use crate::audio::triggers::tables::ObjectSounds;
-use crate::audio::triggers::{detach_all, ui, Ctx, Globals, TriggerError, Unit, UnitSound};
+use crate::audio::triggers::{
+    detach_all, detach_skill_voices, ui, Ctx, Globals, TriggerError, Unit, UnitSound,
+};
+use crate::audio::unit_feed::{UnitFeed, UnitSoundRows};
 use crate::audio::{CueSource, TriggerQueue};
 use crate::bridge::world::{ClientUnit, ClientWorld, LevelRow, UnitKey, MONSTER};
 use crate::rules::draw_order::weather::ThunderSound;
@@ -51,29 +62,24 @@ use crate::rules::UnitPosition;
 use crate::world_view::model_feed::unit_position;
 use d2_sim::rng::Seed;
 
-/// Trigger feeds not wired, each with the input it lacks (M02).
+/// Trigger feeds not wired, each with the input it lacks (M02). The unit
+/// sounds, events 12 / 16 / 17, state, missile travel and item drop
+/// sounds and the NPC dialog speech are wired (`unit_feed`); what is left:
 pub const PENDING: &[(&str, &str)] = &[
-    (
-        "server sound events 12, 16 (monsters), 17 (§2 r2)",
-        "event 12's `stsound` (open question 4: U's state-68 stat list and the skill row), \
-         the `monsounds` rows and the per-unit sound fields of set S are not held by the \
-         driver",
-    ),
     (
         "event follow-up: overhead text (`0x004A0200`, §2 r3, §3 r7)",
         "the overhead text (`client/ui.md`) is not wired",
     ),
     (
-        "mode sounds, footsteps, idle voices (§4–§6)",
-        "per-unit animation frame / speed, weapon hit class, states, monsounds rows and the \
-         floor material under the unit are not in the client model",
+        "skill start sounds, missile `HitSound` / `ProgSound`, `dosound` / `tgtsound` (§8 r1–r3; REC-435)",
+        "they follow the result of the client start / hit / progressive function, which the \
+         model does not run; no handler starts a skill or missile hit for the sound layer",
     ),
     (
-        "skills, missiles, states, items (§8, §9)",
-        "skill / missile / state / item rows and the S→C messages that start them are not \
-         handled by the client",
+        "item place / use sounds, unique and set drop sounds, gold (§9 r1–r5)",
+        "the item grid actions are the inventory UI's and the item quality is in the item \
+         stream, not in the model's item view; only the base-row cursor / drop sounds are wired",
     ),
-    ("NPC speech (§10)", "no NPC interaction in the client model"),
     (
         "level-entry lines (`environment.md` §4 r2)",
         "the client quest check `0x004A4180` (`world/quests-status.md` §12) needs the 0x5E \
@@ -126,6 +132,13 @@ pub enum SoundRequest {
         mode: u32,
         local_dist: i32,
     },
+    /// The dialog line of 0x28's dialog branch B2 (`0x004A10E0(N, key)`,
+    /// `triggers.md` §10 r2, `client/msg-ui.md` §16 r4.3): N's key and
+    /// class, the dialog text key `m`.
+    NpcDialogLine { npc: UnitKey, class: u32, key: i32 },
+    /// The greeting of 0x28's dialog branch B3 / B6 (`0x004B4FD0`,
+    /// `0x004B66B0`, `triggers.md` §10 r1): N's key and class.
+    NpcGreeting { npc: UnitKey, class: u32 },
     /// A sound request `0x004B9A00(id, U, 0, 0, 0)` (§1 r1): the client
     /// object functions (`world/objects-client.md` §26.18) and the shrine
     /// sound of 0x4D (`client/model.md` §15 rule 4 step 4).
@@ -356,6 +369,8 @@ pub struct SoundDriver {
     /// The frame's predicted local-player position
     /// ([`ModelSoundWorld::local_at`]).
     local_at: Option<(UnitKey, (u32, u32))>,
+    /// The mode the local player is drawn in while the preview walks it.
+    local_mode: Option<(UnitKey, u32)>,
     /// The local player's client seed (§4 r5).
     seed: ClientSeed,
     /// The ambience, rain, music and level-entry machines
@@ -379,6 +394,19 @@ pub struct SoundDriver {
     /// (unit, in set C); a unit gone from the model drops its fields
     /// (§18 rule 2, the unit free).
     unit_sounds: BTreeMap<(UnitKey, bool), UnitSound>,
+    /// The unit pass: mode sounds, idle voices, footsteps, state, missile
+    /// and item sounds ([`UnitFeed`]); inert until
+    /// [`SoundDriver::set_unit_rows`].
+    feed: UnitFeed,
+    /// The dialog line state `[0x0072AE24]` and the remembered line
+    /// (`triggers.md` §10 r2, r3).
+    dialog: DialogState,
+    /// The `NPC Speech` option last seen: the stored value is not applied
+    /// at start (`triggers.md` §10 r6, OQ 7); only a change is (the
+    /// options menu calls the setter).
+    npc_speech_seen: Option<i32>,
+    /// The `npc-speech.tsv` table.
+    npc_speech: &'static NpcSpeech,
 }
 
 impl SoundDriver {
@@ -399,9 +427,20 @@ impl SoundDriver {
             skipped: Vec::new(),
             pending: Vec::new(),
             local_at: None,
+            local_mode: None,
             seed: ClientSeed::default(),
             unit_sounds: BTreeMap::new(),
+            feed: UnitFeed::default(),
+            dialog: DialogState::default(),
+            npc_speech_seen: None,
+            npc_speech: NpcSpeech::spec(),
         }
+    }
+
+    /// The tables the unit sounds read (`unit_feed`). Without them the
+    /// unit sounds are not made.
+    pub fn set_unit_rows(&mut self, rows: std::sync::Arc<UnitSoundRows>) {
+        self.feed.set_rows(rows);
     }
 
     pub fn system(&self) -> &SoundSystem {
@@ -412,6 +451,16 @@ impl SoundDriver {
     /// by the options menu, `sound-table-2.md` §15 r6): in force from the
     /// next sound tick.
     pub fn set_settings(&mut self, s: SoundSettings) {
+        // `NPC Speech`: the first value seen is the stored setting, which
+        // 1.14d does not apply at start (`triggers.md` §10 r6); a later
+        // change is the options menu's setter call (r3).
+        match self.npc_speech_seen {
+            Some(old) if old != s.npc_speech => {
+                set_npc_speech_option(&mut self.dialog, s.npc_speech as u8);
+            }
+            _ => {}
+        }
+        self.npc_speech_seen = Some(s.npc_speech);
         if *self.system.settings() != s {
             self.system.set_settings(s);
         }
@@ -421,6 +470,12 @@ impl SoundDriver {
     /// preview's prediction, 16.16 subtiles); `None`: the model's cell.
     pub fn set_local_prediction(&mut self, at: Option<(UnitKey, (u32, u32))>) {
         self.local_at = at;
+    }
+
+    /// The mode the local player is drawn in (the preview's walk / run,
+    /// REC-51); `None`: the model's mode.
+    pub fn set_local_mode(&mut self, mode: Option<(UnitKey, u32)>) {
+        self.local_mode = mode;
     }
 
     /// The weather the next sound ticks read (`environment.md` §6).
@@ -498,6 +553,8 @@ impl SoundDriver {
                         r,
                         &mut self.unit_sounds,
                         &mut self.greetings,
+                        &self.feed,
+                        (&mut self.dialog, self.npc_speech),
                         &mut self.skipped,
                     )?
                 };
@@ -508,6 +565,27 @@ impl SoundDriver {
         let env_row = levels
             .get(level as usize)
             .and_then(|r| env_row(&self.env_rows, r.sound_env));
+        // The unit pass (`unit_feed`): the frame's mode changes and new
+        // units at its first client update, the idle voices and footsteps
+        // at each.
+        {
+            let mut pw = ModelSoundWorld::new(world);
+            pw.local_at = self.local_at;
+            let updates: Vec<u32> = (0..ticks).map(|i| (now - ticks + i + 1) as u32).collect();
+            let c = updates.first().copied().unwrap_or(now as u32);
+            let material1 = env_row.map_or(0, |r| r.material1);
+            let mut ctx = self.system.with(&mut sw);
+            let mut cx = Ctx::new(&mut ctx, &mut self.globals, c);
+            self.feed.run(
+                &mut cx,
+                world,
+                &|k| pw.position(k),
+                self.local_mode,
+                material1,
+                &updates,
+                &mut self.unit_sounds,
+            )?;
+        }
         let settings = *self.system.settings();
         let player = world.local_player.map(|key| PlayerState {
             key,
@@ -819,12 +897,15 @@ impl EnvHooks for Hooks<'_> {
 }
 
 /// One request (§11, §2 r2–r4, §3).
+#[allow(clippy::too_many_arguments)]
 fn request(
     cx: &mut Ctx,
     world: &ClientWorld,
     r: &SoundRequest,
     unit_sounds: &mut BTreeMap<(UnitKey, bool), UnitSound>,
     greetings: &mut GreetingRecords,
+    feed: &UnitFeed,
+    (dialog, speech): (&mut DialogState, &NpcSpeech),
     skipped: &mut Vec<&'static str>,
 ) -> Result<Vec<Followup>, DriverError> {
     match *r {
@@ -845,6 +926,23 @@ fn request(
         SoundRequest::UnitRequest { id, unit } => {
             cx.unit_request(id, unit);
         }
+        SoundRequest::NpcDialogLine { npc, class, key } => {
+            let record = feed.event_record(world, npc);
+            let u = feed.event_unit(world, npc, class, record.as_ref());
+            dialog_line(cx, dialog, speech, &u, world.local_player, key);
+        }
+        SoundRequest::NpcGreeting { npc, class } => {
+            let record = feed.event_record(world, npc);
+            let u = feed.event_unit(world, npc, class, record.as_ref());
+            let day = u8::try_from(day_phase(world)).unwrap_or(0);
+            match greetings.for_class(class as i32) {
+                // REC-436: mode 0 for the interaction callers.
+                Some(g) => {
+                    interact_greeting(cx, g, &u, world.local_player, GreetMode::Idle, day);
+                }
+                None => detach_skill_voices(cx.s, &u),
+            }
+        }
         SoundRequest::UnitFreed { unit, client_only } => {
             detach_all(cx.s, unit, false);
             unit_sounds.remove(&(unit, client_only));
@@ -852,31 +950,35 @@ fn request(
         SoundRequest::Server {
             unit, class, event, ..
         } => {
-            let u = event_unit(world, unit, class);
-            let skip = match event {
-                12 => Some(SKIP_EVENT_12),
-                16 if unit.unit_type == MONSTER => Some(SKIP_EVENT_16),
-                17 => Some(SKIP_EVENT_17),
-                _ => None,
-            };
-            if let Some(s) = skip {
-                skipped.push(s);
-                return Ok(Vec::new());
+            // Events 12, 16 and 17 read the unit's tables (`unit_feed`);
+            // without them they are skipped and named.
+            if feed.rows().is_none() {
+                let skip = match event {
+                    12 => Some(SKIP_EVENT_12),
+                    16 if unit.unit_type == MONSTER => Some(SKIP_EVENT_16),
+                    17 => Some(SKIP_EVENT_17),
+                    _ => None,
+                };
+                if let Some(s) = skip {
+                    skipped.push(s);
+                    return Ok(Vec::new());
+                }
             }
+            let record = feed.event_record(world, unit);
+            let u = feed.event_unit(world, unit, class, record.as_ref());
             let extra = EventExtra {
                 local: world.local_player,
-                event12_stsound: 0,
+                event12_stsound: if event == 12 {
+                    feed.event12_stsound(world, unit)
+                } else {
+                    0
+                },
                 // Event 18 (§10 r1): U's greeting record by class.
                 greeting: greetings.for_class(class as i32),
                 day_phase: u8::try_from(day_phase(world)).unwrap_or(0),
             };
-            return Ok(server_event(
-                cx,
-                &u,
-                &mut UnitSound::default(),
-                event,
-                extra,
-            )?);
+            let us = unit_sounds.entry((unit, false)).or_default();
+            return Ok(server_event(cx, &u, us, event, extra)?);
         }
         SoundRequest::PlayerEvent { unit, event } => {
             let Some(p) = world.units.get(&unit) else {
@@ -1455,7 +1557,10 @@ mod tests {
         assert!(sw.asked.borrow().is_empty());
         assert!(!sw.blocked(key) && !sw.indoors() && sw.client_seed().is_none());
         assert_eq!(sw.asked.borrow().len(), 3);
-        assert!(PENDING.len() >= 6);
+        assert!(
+            PENDING.len() >= 4,
+            "the not-wired list shrank only with wiring"
+        );
     }
 
     // Covers: specs/audio/sound-table.md §6.4 r2; specs/audio/environment.md §1 r2

@@ -520,10 +520,26 @@ pub fn add_live_client(app: &mut App, link: DynLink, c: LiveClient) -> anyhow::R
     ui::set_shop_prices(app, c.prices);
     super::hire_stats::install_hire_stats(app, hire_rows, true);
     let table = sound::sound_table_live(archives.as_ref()).map_err(anyhow::Error::msg)?;
-    app.insert_resource(GameAudio::new(AudioParts::original(
-        archives.source(),
-        table,
-    )));
+    let audio = GameAudio::new(AudioParts::original(archives.source(), table));
+    // The unit sounds' tables (`audio/unit_feed.rs`): `monsounds`, the
+    // animation of each unit's mode (REC-430).
+    let looks = std::sync::Arc::new(
+        crate::world_view::unit_assets::UnitLooks::live(archives.as_ref())
+            .map_err(anyhow::Error::msg)?,
+    );
+    let unit_rows = crate::audio::unit_feed::UnitSoundRows::live(
+        archives.as_ref(),
+        looks,
+        std::sync::Arc::new(d.tables.anim.clone()),
+    )
+    .map_err(anyhow::Error::msg)?;
+    if let Some(driver) = &audio.driver {
+        driver
+            .lock()
+            .map_err(|_| anyhow::anyhow!("audio state poisoned"))?
+            .set_unit_rows(std::sync::Arc::new(unit_rows));
+    }
+    app.insert_resource(audio);
     add_walk(app, tap, c.speeds);
     super::visibility::add_visibility(app);
     super::loading_overlay::add_loading(app, Some(archives.source()));
