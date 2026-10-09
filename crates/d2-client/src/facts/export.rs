@@ -446,17 +446,30 @@ pub fn files(header: &Header, rows: &Rows, frame: &FrameState) -> [(&'static str
     ]
 }
 
-/// The `--dump-draws DIR --at-tick N` request of `play`.
+/// The `--dump-draws DIR --at-tick N[,M...] [--dump-image]` request of
+/// `play` (§5 r13, r19).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DumpRequest {
     pub dir: std::path::PathBuf,
-    /// The first drawn frame whose server tick is at least this.
-    pub at_tick: u64,
+    /// Per dump, the first drawn frame whose server tick is at least this;
+    /// strictly increasing, at least one.
+    pub at_ticks: Vec<u64>,
+    /// §5 r19: also write the composed frame as `frame.png`.
+    pub image: bool,
     /// The header's `command` (the command line).
     pub command: String,
 }
 
 impl DumpRequest {
+    /// The folder of dump `i` (§5 r19): `dir` itself for a single tick,
+    /// else `dir/tick-<N>`.
+    pub fn dir_for(&self, i: usize) -> std::path::PathBuf {
+        match self.at_ticks.as_slice() {
+            [_] => self.dir.clone(),
+            ticks => self.dir.join(format!("tick-{}", ticks[i])),
+        }
+    }
+
     /// The d2rs header of §1 r1.
     pub fn header(&self) -> Header {
         let v = env!("CARGO_PKG_VERSION");
@@ -479,8 +492,9 @@ pub struct DumpFrame<'a> {
     pub seq: u64,
 }
 
-/// Writes the three files of `d` into `req.dir` (§5).
-pub fn dump(req: &DumpRequest, d: &DumpFrame<'_>) -> Result<(), FactsError> {
+/// Writes the three files of `d` (and with `req.image` the frame's
+/// `frame.png`, §5 r19) into `dir` (§5).
+pub fn dump(req: &DumpRequest, dir: &Path, d: &DumpFrame<'_>) -> Result<(), FactsError> {
     let unit_type = |guid: u32| {
         let mut types = d.world.units.keys().filter(|k| k.guid == guid);
         match (types.next(), types.next()) {
@@ -510,15 +524,16 @@ pub fn dump(req: &DumpRequest, d: &DumpFrame<'_>) -> Result<(), FactsError> {
     );
     // §5 r8: the CPU reference composition onto a copy of the framebuffer.
     let mut cycle = d.cycle.clone();
-    let index = cycle
+    let pixels = cycle
         .compose(
             d.blank_screen,
             &d.frame.items,
             &d.assets.frames,
             &d.assets.maps,
         )
-        .map(sha256_hex)
+        .map(<[u8]>::to_vec)
         .map_err(|e| FactsError::Export(format!("compose: {e}")))?;
+    let index = sha256_hex(&pixels);
     let palette: Vec<u8> = d
         .assets
         .palette
@@ -540,7 +555,36 @@ pub fn dump(req: &DumpRequest, d: &DumpFrame<'_>) -> Result<(), FactsError> {
         index_sha256: Some(index),
         palette_sha256: sha256_hex(&palette),
     };
-    write_dir(&req.dir, &files(&req.header(), &rows, &state))
+    write_dir(dir, &files(&req.header(), &rows, &state))?;
+    if req.image {
+        let png = indexed_png(view.width, view.height, &pixels, &palette)?;
+        let path = dir.join(IMAGE_FILE);
+        std::fs::write(&path, png).map_err(|source| FactsError::Io { path, source })?;
+    }
+    Ok(())
+}
+
+/// §5 r19: the composed frame of `--dump-image`.
+pub const IMAGE_FILE: &str = "frame.png";
+
+/// An 8-bit palettized PNG of `pixels` (the index bytes as they are, the
+/// palette as `PLTE`), the form of `record_frames.py`'s captures.
+pub fn indexed_png(
+    width: u32,
+    height: u32,
+    pixels: &[u8],
+    palette_rgb: &[u8],
+) -> Result<Vec<u8>, FactsError> {
+    let err = |e: png::EncodingError| FactsError::Export(format!("png: {e}"));
+    let mut out = Vec::new();
+    let mut enc = png::Encoder::new(&mut out, width, height);
+    enc.set_color(png::ColorType::Indexed);
+    enc.set_depth(png::BitDepth::Eight);
+    enc.set_palette(palette_rgb.to_vec());
+    let mut w = enc.write_header().map_err(err)?;
+    w.write_image_data(pixels).map_err(err)?;
+    w.finish().map_err(err)?;
+    Ok(out)
 }
 
 fn write_dir(dir: &Path, files: &[(&'static str, String)]) -> Result<(), FactsError> {

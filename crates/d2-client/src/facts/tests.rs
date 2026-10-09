@@ -868,3 +868,33 @@ fn a_ui_cel_writes_its_wrapper_op() {
     let ops: Vec<&str> = rows.draws.iter().map(|r| r[1].as_str()).collect();
     assert_eq!(ops, ["CelDrawEx", "CelDrawColor", "CelDraw"]);
 }
+
+/// §5 r19: `--dump-image` writes the index bytes as they are, with the
+/// palette as `PLTE` (the capture decoder reads them back unchanged).
+#[test]
+fn dump_image_keeps_indices_and_palette() {
+    let palette: Vec<u8> = (0..=255u8).flat_map(|i| [i, 255 - i, i / 2]).collect();
+    let pixels: Vec<u8> = (0..12u8).map(|i| i * 21).collect();
+    let png = export::indexed_png(4, 3, &pixels, &palette).unwrap();
+    let image = crate::verify::capture::decode_png(&png).unwrap();
+    assert_eq!((image.width, image.height), (4, 3));
+    assert_eq!(image.indices, pixels);
+    assert_eq!(image.palette, palette);
+}
+
+/// §5 r19: one tick dumps into DIR, several into DIR/tick-N.
+#[test]
+fn dump_dirs_per_tick() {
+    let req = |at_ticks: Vec<u64>| export::DumpRequest {
+        dir: "d".into(),
+        at_ticks,
+        image: false,
+        command: String::new(),
+    };
+    assert_eq!(req(vec![73]).dir_for(0), Path::new("d"));
+    let r = req(vec![2, 73]);
+    assert_eq!(
+        (r.dir_for(0), r.dir_for(1)),
+        (Path::new("d/tick-2").into(), Path::new("d/tick-73").into())
+    );
+}
