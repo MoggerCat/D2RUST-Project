@@ -101,13 +101,16 @@ pub trait LifecycleHooks: UnitHooks {
     /// `0x00571F40` at removal. Provider: the kind's spec.
     fn free_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}
 
-    /// The monster of `class` allocated beside `near` in its room
-    /// (`npc.md` §7.3 step 7, `hirelings.md` §3.1: the mercenary's
-    /// creation). Provider: the host that owns the path code; `None`
-    /// (the default) leaves the creation to the NPC rest.
+    /// The monster of `class` created near `near`
+    /// (`0x005B23C0(game, near, class, mode, 4, 0)`, `npc.md` §7.3 step
+    /// 7, `hirelings.md` §3.1: the mercenary's creation), its allocation
+    /// drawing `seed` (the game seed, `rng.md` §5.3). Provider: the host
+    /// that owns the path code; `None` (the default) leaves the creation
+    /// to the NPC rest.
     fn spawn_near(
         &mut self,
         sim: &mut Sim<'_>,
+        seed: &mut Seed,
         near: UnitId,
         class: u32,
         mode: u8,
