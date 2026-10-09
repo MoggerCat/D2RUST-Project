@@ -228,6 +228,30 @@ def verdict_of(checks, repo, status, area=""):
 
 # ---------------------------------------------------------------- merge
 
+def quest_slot(act, q):
+    """Quest slot of act (1-5) quest q (world/quests.md §1.9): acts I-IV 8 per act, act V from 35."""
+    return 34 + q if act == 5 else (act - 1) * 8 + q
+
+
+def canon(area):
+    """Alias key so a coverage row finds the entity row of the same thing under another id
+    scheme: level.a1.5.x / level.5-x -> level#5; quest.a2q1-x / quest.slot9-x -> quest#9;
+    monster-ai.x -> monster.ai.x; otherwise the family plus the alphanumerics of the rest."""
+    m = re.match(r"^level\.(?:a\d\.)?(\d+)[.-]", area)
+    if m:
+        return f"level#{int(m.group(1))}"
+    m = re.match(r"^quest\.a(\d)q(\d)\b", area)
+    if m:
+        return f"quest#{quest_slot(int(m.group(1)), int(m.group(2)))}"
+    m = re.match(r"^quest\.slot(\d+)\b", area)
+    if m:
+        return f"quest#{int(m.group(1))}"
+    if area.startswith("monster-ai."):
+        area = "monster.ai." + area[len("monster-ai."):]
+    fam, _, rest = area.partition(".")
+    return fam + "#" + re.sub(r"[^a-z0-9.]", "", rest)
+
+
 def reconcile(r, repo, status):
     """Bring a row in line with its checks; returns what was wrong (empty = consistent).
     last_verdict := the checks' verdict; a row naming a DIVERGED check is DIVERGED;
@@ -271,8 +295,11 @@ def merge(parts, repo, status):
             by_area[r["area"]] = r
             out.append(r)
     cov_applied = 0
+    by_canon = {}
+    for r in out:
+        by_canon.setdefault(canon(r["area"]), r)
     for r in cov_rows:
-        tgt = by_area.get(r["area"])
+        tgt = by_area.get(r["area"]) or by_canon.get(canon(r["area"]))
         if tgt is None:
             by_area[r["area"]] = r
             out.append(r)
@@ -514,11 +541,13 @@ def selftest():
         with open(os.path.join(root, "parts", "a.tsv"), "w") as fh:
             fh.write(hdr + row(area="m.one", specs="specs/sim/a.md §2", checks="c-one", state="EQUAL", size="-")
                      + row(area="net.c2s.0x01", kind="message", checks="c-*", state="EQUAL", size="-")
-                     + row(area="net.c2s.0x02", kind="message", checks="c-one", state="DIVERGED", size="S"))
+                     + row(area="net.c2s.0x02", kind="message", checks="c-one", state="DIVERGED", size="S")
+                     + row(area="level.a1.5.act-1-wilderness-4"))
         with open(os.path.join(root, "parts", "b.tsv"), "w") as fh:
             fh.write(hdr + row(area="m.one", group="h") + row(area="m.bad", state="WRONG", size="Q"))
         with open(os.path.join(root, "parts", "c.tsv"), "w") as fh:
             fh.write(hdr + row(area="m.one", group="coverage", exercised="yes")
+                     + row(area="level.5-dark-wood", group="coverage", exercised="no")
                      + row(area="never.seen", group="coverage", exercised="no"))
         out_tsv, out_md = os.path.join(root, "o.tsv"), os.path.join(root, "o.md")
         import contextlib
@@ -529,7 +558,13 @@ def selftest():
         text = open(out_tsv).read().splitlines()
         assert text[0] == OUT_MAGIC and text[2].split("\t") == COLS
         rows = {ln.split("\t")[0]: dict(zip(COLS, ln.split("\t"))) for ln in text[3:]}
-        assert set(rows) == {"m.one", "net.c2s.0x01", "net.c2s.0x02", "m.bad", "never.seen"}, rows
+        assert set(rows) == {"m.one", "net.c2s.0x01", "net.c2s.0x02", "m.bad", "never.seen",
+                             "level.a1.5.act-1-wilderness-4"}
+        assert rows["level.a1.5.act-1-wilderness-4"]["exercised"] == "no"
+        assert canon("quest.a5q1-siege") == canon("quest.slot35-siege-on-harrogath")
+        assert canon("quest.a2q1-radament") == canon("quest.slot9-radament-s-lair")
+        assert canon("monster-ai.foulcrownest") == canon("monster.ai.foulcrownest")
+        assert canon("missile.fire-arrow") == canon("missile.firearrow"), rows
         assert rows["m.one"]["exercised"] == "yes" and rows["m.one"]["last_verdict"] == "DIVERGED@1"
         assert rows["net.c2s.0x01"]["last_verdict"] == "PARTIAL", rows["net.c2s.0x01"]
         assert rows["net.c2s.0x02"]["last_verdict"] == "DIVERGED@1"

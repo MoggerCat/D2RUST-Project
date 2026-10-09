@@ -7,11 +7,12 @@ from the parts in `docs/handoff/ledger/`). Inputs: the merged ledger,
 108 channel results, suite run 2026-10-09 17:34 UTC at 739dd943), the
 existing tools under `tools/` and `specs/tools/`.
 
-**Merged ledger (6 parts, 2,346 rows):** DIVERGED 150, NOT-IMPLEMENTED 59,
-NO-CHECK 2,137, UNKNOWN 0, **EQUAL 0**. Every spec file (outside
+**Merged ledger (7 parts, 3,890 rows, of which 1,544 coverage-only rows):**
+DIVERGED 176, NOT-IMPLEMENTED 59, NO-CHECK 3,655, UNKNOWN 0, **EQUAL 0**;
+exercised yes 26 / no 2,107 / unknown 1,757. Every spec file (outside
 `specs/tools/`), every check and every message id is named by a row
 (`fidelity-ledger.md` "Not covered by any row" is empty); the exercised
-column waits for the three coverage parts.
+column has the act I–II coverage part; a3a5 and checks are pending.
 
 **Bar (CLAUDE.md rule 10):** an area is done only when a 1.14d check passes.
 Today **no row is EQUAL**: the only full MATCH is `packets-town-arrival-ama`
@@ -132,13 +133,18 @@ addresses the specs lack and possibly for the audio capture.
 | monsters | claude/q-ledger-monsters | 302 | merged |
 | items | claude/q-ledger-items | 135 | merged |
 | integrator | claude/q-fidelity-ledger | 30 | rows for the specs and checks no part named (data layer, format readers, constant tables, continuation specs, 6 checks) |
-| coverage a1a2, a3a5, checks | claude/q-ledger-cov-* | — | pending: second pass fills `exercised` |
+| coverage a1a2 | claude/q-ledger-cov-a1a2 | 2,122 never-exercised rows (act I–II playthrough + classes, 7 classes, normal) | merged: 578 set `exercised = no` on the entity row of the same thing (ids matched through `ledger.py` aliases: level id, quest slot, `monster-ai` → `monster.ai`, alphanumerics); 1,544 added as coverage rows (single monster classes, base items, object rows, monster skills, missiles the parts group) |
+| coverage a3a5, checks | claude/q-ledger-cov-* | — | pending |
 
 `tools/coord/ledger.py --fix` reconciled the parts with checks-status.md
 (last_verdict from the checks; a row naming a DIVERGED check is DIVERGED;
 UNKNOWN with PARTIAL checks is NO-CHECK; a missing size is M): 58 rows.
 
 Known weaknesses of the merged rows (to fix in the parts, not here):
+- Coverage a1a2: objects and NPC rows (478) read 0 on both counters, so they may be
+  **uninstrumented rather than unexercised**; check the coverage-map counters for
+  object operate and NPC topics before trusting `exercised = no` there. An act III–V row
+  is `no` from the act I–II runs until the a3a5 part lands (yes wins in the merge).
 - `needs_pc1 = y` on 795 rows comes from the settling kind `recording`;
   1.14d now runs under Wine in the cloud (`tools/cloud-game/`), so most of
   these need **Wine recording time, not PC 1**. True PC 1 items are RE
