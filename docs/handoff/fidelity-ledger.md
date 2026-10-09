@@ -692,7 +692,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 1363
 - Rows set exercised = yes from the coverage reports' seen lists: 189
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 780
+- Duplicate areas between parts: 788
   - `vendor.drognan`: items.tsv:113 kept, q-chk-act2.tsv:13 dropped
   - `vendor.elzix`: items.tsv:115 kept, q-chk-act2.tsv:14 dropped
   - `vendor.fara`: items.tsv:114 kept, q-chk-act2.tsv:15 dropped
@@ -759,6 +759,14 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `vendor.akara`: items.tsv:111 kept, q-chk-items-vendors.tsv:6 dropped
   - `item.identify`: items.tsv:136 kept, q-fix-d7d8-items-net.tsv:3 dropped
   - `check.a2-warp-arcane`: integrator.tsv:28 kept, q-fix-d9-arcane.tsv:3 dropped
+  - `item.quality.low`: items.tsv:16 kept, q-run-items.tsv:584 dropped
+  - `item.quality.superior`: items.tsv:17 kept, q-run-items.tsv:585 dropped
+  - `item.quality.set`: items.tsv:19 kept, q-run-items.tsv:586 dropped
+  - `item.quality.unique`: items.tsv:18 kept, q-run-items.tsv:587 dropped
+  - `item.affix.magic`: items.tsv:26 kept, q-run-items.tsv:588 dropped
+  - `item.affix.rare`: items.tsv:27 kept, q-run-items.tsv:589 dropped
+  - `item.affix.crafted`: items.tsv:28 kept, q-run-items.tsv:590 dropped
+  - `item.gen.normal-quality`: items.tsv:6 kept, q-run-items.tsv:591 dropped
   - `net.s2c.0x27`: q-fix-d7d8-items-net.tsv:4 kept, q-tool-interact-pokes.tsv:10 dropped
   - `drop.monster`: items.tsv:62 kept, q-tool-items-channel.tsv:3 dropped
   - `item.treasure-tables`: integrator.tsv:16 kept, q-tool-items-channel.tsv:4 dropped
