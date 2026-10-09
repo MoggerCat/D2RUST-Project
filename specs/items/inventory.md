@@ -38,14 +38,14 @@
 |   1. Inventory model | 92–184 |
 |   2. Grid placement | 185–285 |
 |   3. Belt | 286–343 |
-|   4. Equipping | 344–553 |
-|   5. Shared checks | 554–796 |
-| Constants & data dependencies | 797–819 |
-| Randomness | 820–833 |
-| Edge cases & original bugs | 834–882 |
-| Test vectors | 883–937 |
-| Provenance | 938–1002 |
-| Open questions | 1003–1108 |
+|   4. Equipping | 344–562 |
+|   5. Shared checks | 563–805 |
+| Constants & data dependencies | 806–828 |
+| Randomness | 829–842 |
+| Edge cases & original bugs | 843–891 |
+| Test vectors | 892–946 |
+| Provenance | 947–1011 |
+| Open questions | 1012–1117 |
 <!-- /index -->
 
 ## Summary
@@ -383,6 +383,15 @@ description `0x0048D1D0` passes all three (REC-253, read 2026-10-08).
    class (unit +4) equals it → pass; unit type 1 of class 0x230 or 0x231
    (act 5 hirelings, `0x00463900`) with item class 4 (barbarian) → pass;
    no unit or anything else → fail.
+   Revision 2026-10-09 (q-scenes-compare): the 1.14d `itemtypes.bin`
+   holds 0xFF in `class` for an empty cell (the `link8` miss of
+   `data/field-types.md`; 0–6 for the seven classes, e.g. `belt`,
+   `helm`, `wand` 0xFF, `orb ` 1, `h2h ` 6), and 1.14d equips a Sash
+   (`belt`) on a sorceress (`a1-panel-belt-open`: `ctrlpnl_popbelt`
+   drawn). PROVISIONAL (REC-513): the class getter's "7 (none)" is the
+   table's 0xFF, so every class ≥ 7 reads as none (because 1.14d
+   equips classless items; settled by `0x0062C0B0`'s return for 0xFF,
+   PC 1).
 
 **Socket contribution** (`0x0062B450(stat k, &out)`, EBX = item; one
 caller, this check): out := 0. Only when the item's record has `hasinv`

@@ -448,7 +448,13 @@ pub fn enter_game<D: ActionEvents, W>(
     for m in vitals_sync::join_run(a, &s.game, id, (0, 0)) {
         a.sys.hooks.x.send(player, &m);
     }
-    // Rule 4.
+    // Rule 4: the client's act slot is built when empty (`0x0053AFB0`;
+    // only acts 1 and 2 are made at game creation, so a save standing in
+    // Act III–V has none yet).
+    s.game
+        .lists
+        .ensure_act(entry.act)
+        .map_err(|_| JoinError::NoAct(entry.act))?;
     a.sys
         .hooks
         .x

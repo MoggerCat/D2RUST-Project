@@ -249,15 +249,58 @@ pub fn compare(original: &FactSet, d2rs: &FactSet, ignore: &[String]) -> Outcome
     }
 }
 
+/// The 1.14d range of pass 9's draw calls (§6 r5): the particle draw
+/// `0x00473470` up to the weather update `0x00473F50`, pass 9
+/// `0x00473910` between them (`draw-order-2.md` §11.7).
+const PASS9_AT: std::ops::Range<u32> = 0x0047_3470..0x0047_3F50;
+
+/// The d2rs exporter's `at` of a pass-9 row (§5 r10).
+pub const PASS9_TAG: &str = "pass9";
+
+/// Whether a `draws.tsv` row is one of pass 9's calls (§6 r5).
+pub fn is_weather_row(row: &[String]) -> bool {
+    let op = DRAW_COLUMNS
+        .iter()
+        .position(|c| *c == "op")
+        .expect("op column");
+    let at = DRAW_COLUMNS
+        .iter()
+        .position(|c| *c == "at")
+        .expect("at column");
+    if !matches!(row[op].as_str(), "DrawLine" | "DrawBox") {
+        return false;
+    }
+    let at = row[at].as_str();
+    at == PASS9_TAG
+        || at
+            .strip_prefix("0x")
+            .and_then(|h| u32::from_str_radix(h, 16).ok())
+            .is_some_and(|a| PASS9_AT.contains(&a))
+}
+
+impl FactSet {
+    /// `--skip-weather` (§6 r5): drops pass 9's rows.
+    pub fn without_weather(mut self) -> FactSet {
+        self.draws.rows.retain(|r| !is_weather_row(r));
+        self
+    }
+}
+
 /// Reads both directories and compares them (§6). The original's
 /// `sprites.tsv` falls back to `<original>/../../sprites.tsv`.
+/// `skip_weather`: §6 r5.
 pub fn compare_dirs(
     original: &Path,
     d2rs: &Path,
     ignore: &[String],
+    skip_weather: bool,
 ) -> Result<Outcome, FactsError> {
     let fallback = original.join("..").join("..");
-    let o = FactSet::read(original, Some(&fallback))?;
-    let d = FactSet::read(d2rs, None)?;
+    let mut o = FactSet::read(original, Some(&fallback))?;
+    let mut d = FactSet::read(d2rs, None)?;
+    if skip_weather {
+        o = o.without_weather();
+        d = d.without_weather();
+    }
     Ok(compare(&o, &d, ignore))
 }

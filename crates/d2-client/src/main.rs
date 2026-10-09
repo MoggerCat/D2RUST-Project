@@ -596,11 +596,12 @@ fn play_once(
     }
 }
 
-/// `facts-compare ORIGINAL D2RS [--ignore COL,...]` (`facts-render.md`
-/// §6): exit 0 match, 1 diverged, 2 partial, 3 error.
+/// `facts-compare ORIGINAL D2RS [--ignore COL,...] [--skip-weather]`
+/// (`facts-render.md` §6): exit 0 match, 1 diverged, 2 partial, 3 error.
 fn facts_compare(args: &[String]) -> i32 {
     let mut dirs = Vec::new();
     let mut ignore = Vec::new();
+    let mut skip_weather = false;
     let mut it = args.iter();
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -611,14 +612,17 @@ fn facts_compare(args: &[String]) -> i32 {
                     return 3;
                 }
             },
+            "--skip-weather" => skip_weather = true,
             _ => dirs.push(PathBuf::from(a)),
         }
     }
     let [original, d2rs] = &dirs[..] else {
-        eprintln!("usage: d2-client facts-compare ORIGINAL_DIR D2RS_DIR [--ignore COL,...]");
+        eprintln!(
+            "usage: d2-client facts-compare ORIGINAL_DIR D2RS_DIR [--ignore COL,...] [--skip-weather]"
+        );
         return 3;
     };
-    match d2_client::facts::compare::compare_dirs(original, d2rs, &ignore) {
+    match d2_client::facts::compare::compare_dirs(original, d2rs, &ignore, skip_weather) {
         Ok(outcome) => {
             println!("{outcome}");
             outcome.exit_code()
