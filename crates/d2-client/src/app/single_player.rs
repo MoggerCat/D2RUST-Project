@@ -1983,6 +1983,13 @@ pub fn build_with(
     )));
     hooks.vitals = parts.vitals;
     hooks.bodies = parts.bodies;
+    // The hireling calls (save restore, join follow, act change;
+    // `hirelings-2.md` §19) run on the wired host, which holds the
+    // hireling lists when the game has `hireling.txt`; without the queue
+    // a saved hireling is never restored (`hirelings.md` §10).
+    if parts.hirelings.is_some() {
+        hooks.hireling_calls = Some(Vec::new());
+    }
     // The client vitals sync (`combat/vitals.md` §5.1): life, mana,
     // stamina and position sent to the client at the end of each tick.
     hooks.enable_vitals_sync();
@@ -2251,6 +2258,15 @@ fn loader(
                     // q-save-full: the save's items, made on the wired host.
                     let items_ok = super::save_full::join_items(s, player, save);
                     let corpses_ok = super::save_full::join_corpses(s, player, save);
+                    // The saved hireling (`d2s.md` §1 load order: the
+                    // player's items, the corpses, then the hireling,
+                    // `hirelings.md` §10): its roomless allocation draws
+                    // its unit seed before game entry populates the rooms
+                    // (`hirelings-2.md` §16 rule 3), and the monster init
+                    // of that allocation (`units.md` §3.1 step 7, its
+                    // component and stat rolls) needs the lent world.
+                    let (game, world) = (&mut s.game, &mut s.world);
+                    s.events.lend_world(|a| world.hireling_calls(game, a));
                     super::save_gaps::join_gaps(s, player, save);
                     // `d2s.md` §2.4 rules 4–6: the hot keys, their item
                     // indices resolved over the loaded inventory list.
