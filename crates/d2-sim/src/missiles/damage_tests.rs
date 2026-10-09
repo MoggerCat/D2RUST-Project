@@ -70,7 +70,7 @@ fn stepped(n: usize) -> Seed {
     s
 }
 
-// Covers: specs/missiles/damage.md §1 steps 3, 6, 8, §3, Test vectors row 1
+// Covers: specs/missiles/damage.md §1 r3, §1 r6, §1 r8, §3
 #[test]
 fn skill_missile_adds_the_owner_damage_with_one_draw() {
     let t = tables(0, 0, skill_row());
@@ -99,7 +99,7 @@ fn stats_land_on_the_missile() {
     assert_eq!(w.get(missile, 25), 0);
 }
 
-// Covers: specs/missiles/damage.md §1 steps 7, 10, Test vectors row 2
+// Covers: specs/missiles/damage.md §1 r7, §1 r10
 #[test]
 fn origin_sourced_halves_the_origin_damage() {
     let t = tables(0, 0, plain_row(0, 64));
@@ -121,7 +121,7 @@ fn origin_sourced_halves_the_origin_damage() {
     assert_eq!(w.units[owner].seed, stepped(0), "no owner draw");
 }
 
-// Covers: specs/missiles/damage.md §2, Edge case 1
+// Covers: specs/missiles/damage.md §2, §edge-cases-original-bugs r1
 #[test]
 fn fire_missile_keeps_only_the_owner_firelength() {
     let t = tables(1, 25, skill_row());
@@ -159,7 +159,7 @@ fn bonus_draws_once_per_nonzero_source() {
     assert_eq!(w.units[owner].seed, stepped(2));
 }
 
-// Covers: specs/missiles/damage.md §1 step 3 (SrcDamage 255 = none), step 8 (clamp)
+// Covers: specs/missiles/damage.md §1 r3, §1 r8
 #[test]
 fn srcdamage_255_makes_a_skill_missile_unsourced() {
     let mut row = skill_row();
