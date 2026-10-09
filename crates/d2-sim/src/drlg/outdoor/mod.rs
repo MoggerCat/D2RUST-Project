@@ -34,6 +34,7 @@ pub mod acts;
 pub mod grid;
 pub mod jungle;
 pub mod kurast;
+pub mod path_floor;
 pub mod place;
 pub mod rooms;
 pub mod tilesub;
