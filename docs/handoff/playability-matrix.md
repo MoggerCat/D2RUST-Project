@@ -57,6 +57,55 @@ The q-tool-checkpoints saves were not used: no interface had landed yet.
 | 1 (classes.play) | 2/5 `main-skill-kill` | 2/4 `main-skill-kill` | 2/5 `main-skill-kill` | 1/4 `main-skill-kill` | 3/4 `main-skill-kill` | 4/6 `cast-then-walk` | 3/6 `main-skill-kill` |
 | 2 (act2.play) | 11/15 `town-start` | 11/15 `town-start` | 11/15 `town-start` | 11/15 `town-start` | 11/15 `town-start` | - | - |
 
+## Acts III–V (q-fix-pt-sweep, 2026-10-09)
+
+Branch `claude/q-fix-pt-sweep` @ the commit that adds this section (with
+`claude/q-fix-boss-damage` @ ffbd7886 merged). All 63 cells ran (7
+classes × 3 difficulties × 3 acts). Command (about 2 h with `--jobs 3`):
+
+    D2_GAME_DIR=/home/user/game python3 tools/playthrough/playthrough.py \
+      traces/playthrough/act3.play traces/playthrough/act4.play traces/playthrough/act5.play \
+      --class all --difficulty all --jobs 3 --json m.json --markdown m.md
+
+The sweep milestones that missed their target (`flayer-jungle-decoy`,
+`hellforge`, `hephasto-present`, `frozen-anya`, `nihlathak-*`,
+`baal-throne`) now `goto preset` it (REC-1081), so the cells below
+measure the game, not the sweep.
+
+#### Normal
+
+| act (file) | ama | sor | nec | pal | bar | dru | ass |
+|---|---|---|---|---|---|---|---|
+| 3 (act3.play) | 15/15 | 15/15 | 15/15 | 15/15 | 15/15 | 15/15 | 15/15 |
+| 4 (act4.play) | 10/12 `diablo-present` | 10/12 `diablo-present` | 10/12 `diablo-present` | 10/12 `diablo-present` | 10/12 `diablo-present` | 10/12 `diablo-present` | 10/12 `diablo-present` |
+| 5 (act5.play) | 13/13 | 13/13 | 13/13 | 13/13 | 13/13 | 13/13 | 13/13 |
+
+#### Nightmare
+
+| act (file) | ama | sor | nec | pal | bar | dru | ass |
+|---|---|---|---|---|---|---|---|
+| 3 (act3.play) | 15/15 | 15/15 | 15/15 | 15/15 | 15/15 | 15/15 | 15/15 |
+| 4 (act4.play) | 10/12 `diablo-present` | 10/12 `diablo-present` | 10/12 `diablo-present` | 10/12 `diablo-present` | 10/12 `diablo-present` | 10/12 `diablo-present` | 10/12 `diablo-present` |
+| 5 (act5.play) | 12/13 `nihlathak-killed` | 13/13 | 12/13 `nihlathak-killed` | 12/13 `nihlathak-killed` | 12/13 `nihlathak-killed` | 12/13 `nihlathak-killed` | 13/13 |
+
+#### Hell
+
+| act (file) | ama | sor | nec | pal | bar | dru | ass |
+|---|---|---|---|---|---|---|---|
+| 3 (act3.play) | 14/15 `council-killed` | 14/15 `council-killed` | 14/15 `council-killed` | 14/15 `council-killed` | 14/15 `council-killed` | 14/15 `council-killed` | 14/15 `council-killed` |
+| 4 (act4.play) | 10/12 `diablo-present` | 10/12 `diablo-present` | 10/12 `diablo-present` | 10/12 `diablo-present` | 10/12 `diablo-present` | 10/12 `diablo-present` | 10/12 `diablo-present` |
+| 5 (act5.play) | 12/13 `nihlathak-killed` | 13/13 | 12/13 `nihlathak-killed` | 12/13 `nihlathak-killed` | 12/13 `nihlathak-killed` | 12/13 `nihlathak-killed` | 13/13 |
+
+| File, milestone | Cells | Evidence | Route |
+|---|---|---|---|
+| act4 `diablo-present`, `diablo-killed` | 21/21 | Diablo (cl 243) is not in the level: he appears only after the five seals open, which no milestone does | `q-a4-endgame` (`docs/handoff/build-queue.tsv`); the milestone needs a seals poke or step first |
+| act3 `council-killed` | 7/7 on Hell only | the Council member (cl 345) never reaches a death mode within 1000 frames on Hell (Normal and Nightmare pass) | boss damage / Hell resists: `q-fix-boss-damage` |
+| act5 `nihlathak-killed` | 5/7 on Nightmare and Hell (not sor, ass) | Nihlathak (cl 526) not killed by the poked Fire Bolt 10 frames after the 256-hp stat poke | boss damage: `q-fix-boss-damage`; the sorceress and assassin pass, so likely a class damage-type vs resist seam |
+
+`python3 tools/coord/route.py` could not route the two `stuck` rows (no
+predicate-to-owner rule); the Diablo row routes to the monster-init
+session and is owned by the Act IV endgame session.
+
 ## Distinct blockers
 
 | File, milestone | Cells | Evidence | Row |
@@ -84,8 +133,8 @@ So far no blocker depends on the difficulty.
 
 ## Left
 
-- Run acts III–V, act4-blockers, milestones-a3-baal and the 5 missing
-  act2 cells in the matrix (command above).
+- Run act4-blockers, milestones-a3-baal and the 5 missing act2 cells
+  in the matrix (command above); Acts III–V ran (section above).
 - Use q-tool-checkpoints' saves (now in staging): a checkpoint name,
   `traces/checkpoints/<name>.checkpoint`, built with `python3
   tools/checkpoints/make.py <name>`. In Python, `make.parse()` then

@@ -61,7 +61,7 @@ milestone frozen-anya
   deadline 1000
   note frozen Anya is object 558 (fana) from dummy 460; monster 527 exists only after the thaw (population.md 11 item 3)
   poke 5 warp 114
-  sweep 20 2 400 40 grid
+  poke 20 goto preset 114 2:558
   need ever player lv == 114
   need unit ut 2 cl 558 lv 114 seen
 
@@ -69,7 +69,7 @@ milestone nihlathak-present
   use sor
   deadline 1000
   poke 5 warp 124
-  sweep 20 2 400 40 grid
+  poke 20 goto preset 124 1:526
   need ever player lv == 124
   need unit ut 1 cl 526 lv 124 seen
 
@@ -77,15 +77,10 @@ milestone nihlathak-killed
   use sor
   deadline 1000
   poke 5 warp 124
-  sweep 20 2 400 40 grid
-  find ut 1 cl 526
-  # Nihlathak stands in his 10-minion group (hcIdx 60, population.md
-  # §11.4) and the sweep ends in a blocked spot, where a missile dies at
-  # birth: he is moved to open ground south of the group (absolute level
-  # 124 sub-tiles) and the bolt starts 8 sub-tiles beyond him.
-  poke +2 pos @1:526 12705 5032
-  poke +2 stat @1:526 6 0 256
-  poke +10 missile 58 12705 5040 12705 5032 skill 36 1
+  poke 20 goto preset 124 1:526
+  poke 100 pos @1:526 @x+3 @y
+  poke 100 stat @1:526 6 0 256
+  poke 110 missile 58 @x @y @x+3 @y skill 36 1
   need ever unit ut 1 cl 526 killed
 
 milestone arreat-summit
@@ -116,7 +111,7 @@ milestone baal-throne
   use sor
   deadline 1000
   poke 5 warp 131
-  sweep 20 2 400 40
+  poke 20 goto preset 131 1:543
   need ever player lv == 131
   need unit ut 1 cl 543 lv 131 seen
 

@@ -56,6 +56,16 @@ impl DrlgWorld {
         Some(f(drlg, &mut svc))
     }
 
+    /// `0x0061ABF0` without allocating the level (an absent level has no
+    /// rooms): the act's populated-room count of `level`.
+    pub fn populated_rooms(&self, act: u8, level: u32) -> u32 {
+        self.dungeon
+            .acts
+            .get(usize::from(act))
+            .and_then(|d| d.as_ref())
+            .map_or(0, |d| d.populated_room_count_if_present(level))
+    }
+
     /// `0x0061AEB0`: the Act II DRLG's staff-tomb level (+0x94), the true
     /// tomb (`quests-act2.md` §8.1); `None` while the act has no DRLG.
     pub fn staff_tomb(&self, act: u8) -> Option<u32> {
