@@ -460,6 +460,8 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
   (flags 0, spread -1), the dummy init `0x005B...` (init 49 / 50) or a
   think; `monsters/init.md` §4 lists none.
 
+- [q-fix-room-links] After a waypoint return to a town, does 1.14d populate only the rooms near the player (far NPCs/objects appear on approach), as d2rs does? Drive town -> waypoint -> back, snapshot units at +50 and +600 frames (`docs/handoff/q-fix-room-links.md`).
+
 ## How to check a behaviour in one command
 
 A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)

@@ -155,11 +155,15 @@ impl<X: WorldPending> MonsterInit for WorldHost<'_, X> {
     /// Both keys name the unit's GUID (`0x00451F50`: unit +0x0C,
     /// `population.md` §10.2 step 3).
     ///
-    /// PROVISIONAL (umod-callbacks.md §1 r5, REC-892): what the restart
-    /// `0x005DD230` does for f1 / f2 ≠ 0 is not stated; nothing is done
-    /// for them here.
+    /// f2 ≠ 0 → control flags |= 0x2, f1 ≠ 0 → |= 0x1 (`0x005DD230(C,
+    /// bit, 1)`: a zero flag leaves its bit as it was; no AI restart),
+    /// whether or not the owner lookup succeeds (`umod-callbacks.md` §1
+    /// rule 5).
     fn set_owner_data(&mut self, unit: UnitId, owner: OwnerKey, a: i32, b: i32, c: i32) {
         let (OwnerKey::Guid(o) | OwnerKey::DataOf(o)) = owner;
+        if let Some(ctl) = self.v.h.ai.as_mut().and_then(|s| s.control_mut(unit)) {
+            ctl.flags |= (if c != 0 { 0x2 } else { 0 }) | (if b != 0 { 0x1 } else { 0 });
+        }
         let guid = self.game.lists.unit(o).map(|e| e.guid);
         let ty = u8::try_from(a)
             .ok()

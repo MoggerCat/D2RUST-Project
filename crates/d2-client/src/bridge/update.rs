@@ -1,4 +1,4 @@
-// Spec: specs/client/model.md (§4 rules 5–6, §5, §5 rules 6.1 and 6.4), specs/drlg/rooms.md (§4.6 rule 1, last paragraph), specs/world/objects-client.md (§25 r2–r3, §28 r2), specs/render/lighting.md (§9.2 r1, §10 r5)
+// Spec: specs/skills/sequences.md (client mode machine), specs/client/model.md (§4 rules 5–6, §5, §5 rules 6.1 and 6.4), specs/drlg/rooms.md (§4.6 rule 1, last paragraph), specs/world/objects-client.md (§25 r2–r3, §28 r2), specs/render/lighting.md (§9.2 r1, §10 r5)
 //! The client update pass: in a frame whose pump ran a server tick, while
 //! `in_game`, each unit's queue is drained in the 1.14d unit order and
 //! every queued message goes to its unit handler. Before an object's
@@ -12,9 +12,11 @@
 //! The mode machines themselves run inside the queued messages' mode
 //! requests ([`super::modes`], `model.md` §8). The other per-type unit
 //! updates that run before each drain (player `0x00463390`, monster
-//! `0x004B13A0`, missile, item) change no model field:
-//! PROVISIONAL (client/model.md OQ 1, OQ 2; REC-51): no client-side mode
-//! steps, no client seed draws in the animation and no local walk
+//! `0x004B13A0`, missile, item) change no model field, except the
+//! monster anim step ([`super::monster_anim`]) and the player's mode end
+//! ([`super::player_anim`]):
+//! PROVISIONAL (client/model.md OQ 1, OQ 2; REC-51): no other client-side
+//! mode steps, no client seed draws in the animation and no local walk
 //! prediction (the local player follows the server position).
 
 use super::dispatch::{Dispatch, Handle, HandlerError, UnitMessage};
@@ -90,6 +92,12 @@ pub fn update_pass(
         // r8.5), before the drain.
         if key.unit_type == MONSTER {
             super::monster_anim::step(world, key);
+        }
+        // The player update `0x00463390`'s mode end (an attack, cast or
+        // hit animation over → neutral), before the drain
+        // (`skills/sequences.md` client mode machine; REC-1000).
+        if key.unit_type == super::world::PLAYER {
+            super::player_anim::step(world, inputs, key);
         }
         // Looked up again: an earlier unit's messages or its own update
         // may have removed it (§5 rule 2).
