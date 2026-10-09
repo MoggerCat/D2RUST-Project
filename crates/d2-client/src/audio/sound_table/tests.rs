@@ -2655,3 +2655,25 @@ fn device_occlusion_product_is_exact() {
     assert_eq!(device_occluded(200, 0.05), 189);
     assert_eq!(device_occluded(255, 0.0), 255);
 }
+
+// Covers: specs/tools/facts-render.md §5 r20
+/// The request log keeps every call at the entry, rejected ones included,
+/// with its arguments as given; off, it records nothing.
+#[test]
+fn request_log_keeps_every_call() {
+    let mut sys = system(rows(4));
+    let mut w = World::new();
+    sys.request(&mut w, 1, None, 0, 0, 0);
+    assert!(sys.take_request_log().is_empty());
+    sys.log_requests(true);
+    sys.request(&mut w, 0, None, 0, 0, 0);
+    sys.request(&mut w, 1, Some(MONSTER), 3, FLAG_EXACT, 5);
+    let log = sys.take_request_log();
+    assert_eq!(
+        log.iter()
+            .map(|c| (c.id, c.unit, c.delay, c.flags, c.offset))
+            .collect::<Vec<_>>(),
+        vec![(0, None, 0, 0, 0), (1, Some(MONSTER), 3, FLAG_EXACT, 5)]
+    );
+    assert!(sys.take_request_log().is_empty());
+}
