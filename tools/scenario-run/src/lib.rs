@@ -863,6 +863,14 @@ pub fn run(s: &Scenario, data: &Data) -> Result<RunOutput, RunError> {
                     poke::PokeResult::Unresolved(u) => {
                         notes.push(format!("tick {t} step {i}: poke {d}: unresolved {u}"))
                     }
+                    poke::PokeResult::Pending => {
+                        // a scenario step runs once: a `goto` walk needs
+                        // a runner that steps it every tick (poke.md §6)
+                        notes.push(format!(
+                            "tick {t} step {i}: poke {d}: gap: goto walks in state-dump and play only"
+                        ));
+                        gaps.push(format!("poke {} at {t}", d.keyword()));
+                    }
                     poke::PokeResult::Gap(why) => {
                         let why = match (d, &items) {
                             (poke::Directive::Item { .. }, Err(e)) => {
