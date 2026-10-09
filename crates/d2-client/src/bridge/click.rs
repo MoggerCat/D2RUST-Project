@@ -145,14 +145,14 @@ impl ModelClick<'_> {
 
 /// Screen → world subtile (`0x0045AFF0`): the inverse of the unit draw
 /// (`render/camera.md` §4) and of the static projection (§2).
-/// PROVISIONAL (ui/controls.md §6 r2: `0x0045AFF0` is named, not
-/// specified; controls-0001): screen (sx, sy) → client (sx + cx_u −
-/// shift_x, sy + cy_u − 8) → subtile ((px + 2·py) / 32, (2·py − px) / 32)
-/// floored.
+/// PROVISIONAL (ui/controls.md §6 r2, REC-514: measured on the
+/// `a1-walk-*` scenes): screen (sx, sy) → client (sx + cx_u − shift_x,
+/// sy + cy_u − 4) → subtile ((px + 2·py) / 32, (2·py − px) / 32)
+/// floored: the unit draw's inverse (`sy + cy_u − 8`) four rows down.
 pub fn screen_to_world(cam: &Camera, sx: i32, sy: i32) -> (i32, i32) {
     let p = ClientPos {
         x: sx + cam.unit.x - cam.view.shift_x,
-        y: sy + cam.unit.y - 8,
+        y: sy + cam.unit.y - 4,
     };
     (
         (p.x + 2 * p.y).div_euclid(32),
@@ -509,6 +509,25 @@ pub fn held_repeat_at(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Covers: specs/ui/controls.md §6 r2
+    /// `a1-walk-n` (1.14d): the player at client (10320, 72816), a click
+    /// at (400, 184) walks to subtile (4868, 4222), the preparation's
+    /// probe of the blocked (4867, 4222): the click maps to (4867, 4222).
+    #[test]
+    fn a_click_maps_to_the_rounded_subtile() {
+        let cam = Camera::new(
+            FrameSize::D2RS,
+            OpenMode::NONE,
+            ClientPos { x: 10320, y: 72816 },
+            (0, 0),
+        );
+        assert_eq!(screen_to_world(&cam, 400, 184), (4867, 4222));
+        // The player's draw point (400, 292) picks its own subtile.
+        assert_eq!(screen_to_world(&cam, 400, 292), (4873, 4228));
+        // M08: the unit draw's plain inverse picked the blocked (4866, 4221).
+        assert_ne!(screen_to_world(&cam, 400, 184 - 4), (4867, 4222));
+    }
     use crate::bridge::predict::{walk_of, Walk, WalkTo};
     use crate::bridge::skills::{SkillEntry, SkillList};
     use crate::bridge::world::ClientUnit;

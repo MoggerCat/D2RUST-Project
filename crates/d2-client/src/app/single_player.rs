@@ -1745,6 +1745,9 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
             ],
             c_hit_par: [m.chitpar1 as i32, m.chitpar2 as i32, m.chitpar3 as i32],
             hit_sub1_server: m.hitsubmissile1 as i16,
+            travel_sound: m.travelsound as i16,
+            hit_sound: m.hitsound as i16,
+            no_multishot: m.nomultishot,
         })
         .collect();
     let states: Vec<d2_data::tables::States> = decode_all(table("states")?).map_err(err)?;

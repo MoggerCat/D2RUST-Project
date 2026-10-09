@@ -1,0 +1,22 @@
+# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py /home/user/D2RUST-Project/traces/raw/20261009-051832-frames.jsonl --scene a1-walk-nw --frame 69 --tile-light unknown --out /home/user/D2RUST-Project/facts/render; game: 1.14d
+key	value
+seq	69
+tick	130
+w	800
+h	600
+act	0
+level	1
+player_x	10376
+player_y	72828
+tile_origin_x	9976
+tile_origin_y	72548
+unit_origin_x	9976
+unit_origin_y	72544
+open_mode	0
+shift_x	0
+light_quality	0
+rain	1
+snow	0
+draws	268
+index_sha256	382b0d3f04e33684d9bc07662c79b9ba3d0667553e0ce77ee9b5ff3dcf589df2
+palette_sha256	ba83219e51249002d7125a1a5a701d6abea94f04f44d6cfaa42becdfcff23337

@@ -143,6 +143,16 @@ pub enum SoundRequest {
     /// object functions (`world/objects-client.md` §26.18) and the shrine
     /// sound of 0x4D (`client/model.md` §15 rule 4 step 4).
     UnitRequest { id: i32, unit: UnitKey },
+    /// `0x004CA900(U, id)` then the stop `0x004BA840` of the handle it
+    /// finds (`missiles/client.md` §C4 r28: the missile owner's request
+    /// in sound 314's group).
+    GroupStop { unit: UnitKey, id: i32 },
+    /// `0x004CA900(U, id)` then the detach `0x004BA790(h, U, 0)` of the
+    /// handle it finds (`missiles/client.md` §C9 r6: the missile's travel
+    /// sound). PROVISIONAL (REC-548): the force argument is not stated;
+    /// read as 0 (a looping travel sound stops when the missile was its
+    /// last unit).
+    GroupDetach { unit: UnitKey, id: i32 },
 }
 
 /// A rule part the driver skipped (its input is not held), named.
@@ -925,6 +935,16 @@ fn request(
         }
         SoundRequest::UnitRequest { id, unit } => {
             cx.unit_request(id, unit);
+        }
+        SoundRequest::GroupStop { unit, id } => {
+            if let Some(h) = crate::audio::triggers::first_in_group(cx.s, unit, id) {
+                cx.s.stop_handle(h);
+            }
+        }
+        SoundRequest::GroupDetach { unit, id } => {
+            if let Some(h) = crate::audio::triggers::first_in_group(cx.s, unit, id) {
+                cx.s.detach(h, unit, false);
+            }
         }
         SoundRequest::NpcDialogLine { npc, class, key } => {
             let record = feed.event_record(world, npc);
