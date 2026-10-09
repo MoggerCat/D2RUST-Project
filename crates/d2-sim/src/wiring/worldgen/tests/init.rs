@@ -248,7 +248,7 @@ fn a_lent_world_spawns_like_population() {
     assert_eq!(run(true), direct);
 }
 
-// Covers: specs/monsters/population.md §13 r3 (`0x00547E50` from the death start)
+// Covers: specs/monsters/population.md §13 r3
 #[test]
 fn death_counts_in_the_region_unless_flag_2_or_aligned() {
     use crate::wiring::action::MonsterWorld;
@@ -279,7 +279,7 @@ fn death_counts_in_the_region_unless_flag_2_or_aligned() {
     assert_eq!(killed(&fx), 1);
 }
 
-// Covers: specs/world/quests.md §4.6 (`0x00545CD0`: the level row's `Quest` chain at monster creation)
+// Covers: specs/world/quests.md §4.6
 #[test]
 fn creation_links_the_level_quest_chain() {
     let chains = |quest: u8| {
