@@ -1,0 +1,11 @@
+check 1
+# Rogue Encampment arrival, idle, the packets channel (specs/tools/packets-trace.md):
+# every C->S message the server takes and every S->C message it queues, per frame,
+# 1.14d (record_packets.py) against d2rs (state-dump --packets).
+# Same start as a1-town-arrival-ama: ScnAma, -seed 1234, no input.
+name packets-town-arrival-ama
+save ScnAma --class ama --expansion
+seed 1234
+ticks 40
+seconds 240
+channels packets

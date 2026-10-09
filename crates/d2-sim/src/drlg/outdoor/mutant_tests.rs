@@ -190,7 +190,16 @@ impl LevelTypes for Hooks {
         false
     }
 
-    fn warp_unit(&mut self, _: &mut Drlg, _: DrlgRoomId, wx: i32, wy: i32, cell: u32) {
+    fn warp_unit(
+        &mut self,
+        _: &mut Drlg,
+        _: &DrlgData,
+        _: DrlgRoomId,
+        _: u32,
+        wx: i32,
+        wy: i32,
+        cell: u32,
+    ) {
         self.warps.push((wx, wy, cell));
     }
 }
@@ -230,7 +239,7 @@ fn adapter_dispatches_by_drlg_type() {
     assert_eq!(types.room_grids(&mut drlg, &data, r), Ok(marker_grids()));
     types.free_room_tiles(&mut drlg, r);
     types.door_unit(&mut drlg, &data, r, 3, 4, 5, 9);
-    types.warp_unit(&mut drlg, r, 6, 7, 8);
+    types.warp_unit(&mut drlg, &data, r, 10, 6, 7, 8);
     types.reset_level(&mut drlg, l5);
     assert_eq!(types.last_error, None);
     assert_eq!(hooks.inits, [5]);

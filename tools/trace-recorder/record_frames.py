@@ -999,6 +999,8 @@ def main():
                           a.ticks, img_dir, max(1, a.every or 1), a.max_frames, a.allow_any_size,
                           max(0, a.draws_every), a.draws_light, fe)
     r.auto = auto
+    if auto and auto.has_frames():
+        auto.attach(r)  # `frame F` input steps at the tick-return stop of F - 1
     layer = poke.PokeLayer.from_args(a)
     if layer:
         layer.attach(r)  # arms 0x0052FD1E; {"k":"poke",...} records land in the frames file
