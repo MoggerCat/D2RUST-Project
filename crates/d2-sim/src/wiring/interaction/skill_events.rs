@@ -286,3 +286,38 @@ pub fn golem_resummon<X: Pending + UseRest>(
         &mut w, &t.skills, &ct, player, IRON_GOLEM, l, None,
     ) == 1
 }
+
+/// The save load's skill section (`formats/d2s-load.md` §2 "skills":
+/// `0x0056A710` → `0x0056DEB0` → assign `0x00647280`,
+/// `client/msg-skills.md` §2 rules 1–2, 4): every loaded entry whose
+/// skill has a `passivestate` p > 0 gets state p on and its passive
+/// stat list refreshed (`0x00646D60`), in list order (the masteries,
+/// Increased Stamina, Iron Skin, ... count from the join on).
+pub fn passive_refresh_all<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    unit: UnitId,
+) {
+    let t = h.tables.clone();
+    let entries = h
+        .skill_lists
+        .get(&unit)
+        .map(|l| l.view())
+        .unwrap_or_default();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    for e in entries {
+        let p = t
+            .skills
+            .skill(e.skill)
+            .map_or(-1, |r| i32::from(r.passivestate as i16));
+        if let Ok(p @ 1..) = u16::try_from(p) {
+            w.cv.v.set_state(unit, p, true);
+            crate::skills::use_::bodies::BodyWorld::passive_state_apply(&mut w, unit, &e);
+        }
+    }
+}

@@ -32,13 +32,13 @@
 |   8. Chain operations | 333–440 |
 |   9. States | 441–479 |
 |   10. Timer event handlers | 480–567 |
-|   11. Mod array and stat messages | 568–585 |
-| Constants & data dependencies | 586–597 |
-| Randomness | 598–601 |
-| Edge cases & original bugs | 602–625 |
-| Test vectors | 626–662 |
-| Provenance | 663–686 |
-| Open questions | 687–717 |
+|   11. Mod array and stat messages | 568–595 |
+| Constants & data dependencies | 596–607 |
+| Randomness | 608–611 |
+| Edge cases & original bugs | 612–635 |
+| Test vectors | 636–672 |
+| Provenance | 673–696 |
+| Open questions | 697–727 |
 <!-- /index -->
 
 ## Summary
@@ -579,9 +579,19 @@ clears through the list's remove callback (§8.2.6).
    the room update queue (`tick.md` §3 step 6, `0x00553220`), after the
    flush of the same tick.
 4. Single stats: `0x00625870`(unit, client, stat, sender) sends the
-   base value (layer 0) when the key is not in the mod array and is
+   base value (layer 0) when the key **is** in the mod array and is
    present in the base array; used for 67, 68, 12, 0, 2 by `0x00580860`.
    Sender arguments: (ECX unit, EDX stat, value, client).
+   Corrected 2026-10-09 from the recording (the earlier text said "not
+   in the mod array"): `traces/checks/packets-town-arrival-ama.check`,
+   frame 2, the player's update after its join (ScnAma, full save):
+   0xA8 of state 105, then `1d 0c 01`, `1d 00 14`, `1d 02 19` (12, 0,
+   2: keys the load inserted, still in the array, since the same frame
+   ends with their mod flush, rule 2) and nothing for 67 / 68 (base 100
+   from the load, `formats/d2s.md` §9 rule 4, never in the array: not
+   `Saved`). Whether an array key absent from the base array sends 0
+   is not settled (`docs/handoff/pc1-data.md` Step 4); d2rs sends
+   nothing.
 
 ## Constants & data dependencies
 

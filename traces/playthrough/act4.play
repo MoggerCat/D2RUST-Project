@@ -47,7 +47,7 @@ milestone izual-present
   use sor
   deadline 1000
   poke 5 warp 105
-  sweep 20 2 800 80
+  sweep 20 2 400 40
   need ever player lv == 105
   need unit ut 1 cl 256 lv 105 seen
 
@@ -55,9 +55,10 @@ milestone izual-killed
   use sor
   deadline 1000
   poke 5 warp 105
-  sweep 20 2 800 80
+  sweep 20 2 400 40
   find ut 1 cl 256
   poke +2 pos @1:256 @x+3 @y
+  note q-prov-data: the Fire Bolt poke vanishes in the frame it is created in the Plains of Despair (open)
   poke +2 stat @1:256 6 0 256
   poke +10 missile 58 @x @y @x+3 @y skill 36 1
   need ever unit ut 1 cl 256 killed

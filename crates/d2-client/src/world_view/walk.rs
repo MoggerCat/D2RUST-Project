@@ -86,6 +86,10 @@ pub fn preview_walk_frame(
     mut walk: ResMut<PreviewWalk>,
     mut state: ResMut<WorldViewState>,
 ) {
+    // `msg-units.md` §3 r2: the living monsters' footprints for the
+    // client path (REC-706: at their model positions).
+    let others = other_units(bridge.0.world(), &bridge.0.inputs().tables.monsters);
+    walk.predict.set_others(others);
     walk.frame(bridge.0.world());
     state.feed.set_local_prediction(walk.local_at());
     if let Some(art) = &walk.art {
@@ -107,6 +111,31 @@ pub fn preview_walk_frame(
             .player()
             .and_then(|k| Some((k, walk.predict.walk_since()?, speed)));
     }
+}
+
+/// The model's monsters not dying or dead (mode 0, 12) with a cell and a
+/// `monstats2` row: their footprint inputs (`msg-units.md` §3 r2).
+pub fn other_units(
+    world: &ClientWorld,
+    classes: &[Option<crate::bridge::world::MonsterClass>],
+) -> Vec<crate::bridge::client_path::OtherUnit> {
+    world
+        .units
+        .values()
+        .filter(|u| u.key.unit_type == crate::bridge::world::MONSTER && !matches!(u.mode, 0 | 12))
+        .filter_map(|u| {
+            let (x, y) = u.position?;
+            let c = classes.get(u.class as usize)?.as_ref()?;
+            Some(crate::bridge::client_path::OtherUnit {
+                x,
+                y,
+                size_x: c.size_x,
+                npc: c.npc,
+                in_town: c.in_town,
+                interact: c.interact,
+            })
+        })
+        .collect()
 }
 
 /// Adds `walk` and [`preview_walk_frame`] (after the bridge frame, before
