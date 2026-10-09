@@ -31,18 +31,18 @@
 |   4. Vertex polygon (`0x0067D050`, `0x0067CE20`; D2MOO `DRLGVER_CreateVertices`) | 322–346 |
 |   5. Preset primitives on the grids | 347–404 |
 |   6. Borders (`0x00675850`, D2MOO `PlaceAct1245OutdoorBorders`) | 405–459 |
-|   7. Act I (`0x006807F0`, D2MOO `OutWild`) | 460–627 |
-|   8. Act II (`0x0067F980`, D2MOO `OutDesr`) | 628–672 |
-|   9. Act III | 673–740 |
-|   10. Act IV (`0x0067E890`) | 741–752 |
-|   11. Act V (`0x0067E600`) | 753–844 |
-|   12. Rooms | 845–880 |
-| Constants & data dependencies | 881–903 |
-| Randomness | 904–926 |
-| Edge cases & original bugs | 927–948 |
-| Test vectors | 949–1125 |
-| Provenance | 1126–1166 |
-| Open questions | 1167–1264 |
+|   7. Act I (`0x006807F0`, D2MOO `OutWild`) | 460–647 |
+|   8. Act II (`0x0067F980`, D2MOO `OutDesr`) | 648–692 |
+|   9. Act III | 693–760 |
+|   10. Act IV (`0x0067E890`) | 761–772 |
+|   11. Act V (`0x0067E600`) | 773–864 |
+|   12. Rooms | 865–900 |
+| Constants & data dependencies | 901–923 |
+| Randomness | 924–946 |
+| Edge cases & original bugs | 947–968 |
+| Test vectors | 969–1145 |
+| Provenance | 1146–1186 |
+| Open questions | 1187–1284 |
 <!-- /index -->
 
 ## Summary
@@ -611,6 +611,26 @@ s ≠ 0 → floor cell (X − 1, Y − 1) of the room := (s << 8) | 0x82
 (overwrite, grid op 3). Reads come from the path grid only, so the visit
 order does not change the result. (Earlier text named `0x006F2860`,
 which holds ASCII text.)
+
+The segment draw (`0x0067C8E0`, thickness 2), measured (1.14d under
+Wine, 2026-10-09, q-fix-seed-order: the path grid read before and after
+each call, 1,437 segments of levels 2 and 3, `-seed` 1234, 99, 5, 777,
+4242, all equal to this rule): the segment runs between consecutive
+vertices of one path list (tile coordinates − grid origin); the major
+axis is the longer of |dx|, |dy|; for n = 0..major (both ends drawn)
+the major coordinate is A + sign·n and the minor one A + sign·k with k
+= 0 at n = 0, else (n·minor − 1) div major (the minor coordinate moves
+only when the error strictly exceeds the major length: (1, 12) → (4, 2)
+steps at y 8 and 5, not at y 2); the cells set are (x, y) and the next
+one on the minor axis: (x + 1, y) for a y-major segment, (x, y + 1) for
+an x-major one, whatever the signs; cells outside the grid are skipped.
+PROVISIONAL: a tie |dx| = |dy| is y-major (no measured segment had one;
+REC-1120); settled by a probe of a diagonal segment.
+Measured effect (Blood Moor room (1032, 848), `-seed` 1234): the path
+floor makes the Trees group at (3, 1) fail its fixed test
+(`outdoor-tilesub.md` §4.3), so the room seed takes one more (x, y)
+pair; without the path floor the room seeds, the population of the
+first rooms and every later unit differ (`combat-pop-blood-moor`).
 
 #### 7.6 River (`0x0067FE90`) and bridge (`0x0067FD20`)
 
