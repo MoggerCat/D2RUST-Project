@@ -168,7 +168,6 @@ fn cancel_sends_0x30_and_turns_ui_8_off() {
 // Esc (and Space) with the NPC menu up: the box consumes the key and runs
 // p1, the interaction ends (C->S 0x30), and the game menu stays shut.
 // Covers: specs/ui/panels-3.md §28 r2
-// Covers: specs/ui/frontend-options.md §O1 r2
 #[test]
 fn esc_ends_the_interaction_and_does_not_open_the_game_menu() {
     for key in [Action::GameMenu, Action::ClearScreen] {
