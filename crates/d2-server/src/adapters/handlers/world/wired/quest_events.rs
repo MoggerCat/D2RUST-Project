@@ -28,10 +28,6 @@ const MEPHISTO: u16 = d2_sim::world::quests::act3::npc::MEPHISTO;
 /// base id is the class here, as `quests-act4.md` §4).
 const DIABLO: u16 = 243;
 const HEPHASTO: u16 = d2_sim::world::quests::act4::q3::HEPHASTO_BASE;
-/// The three Ancients' classes (`monstats.txt` 540–542, `quests-act5-2.md`
-/// §7.6: superuniques 43–45 spawned by the statues).
-const ANCIENTS: std::ops::RangeInclusive<u16> = 540..=542;
-
 impl<R: TradeRest, S> WiredWorld<R, S> {
     /// Runs the queued quest events and the level changes since the last
     /// tick on the quest control.
@@ -178,13 +174,8 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                             Some(HEPHASTO) => {
                                 q.add_link(w, victim, 24, None);
                             }
-                            // PROVISIONAL (REC-795, d2rs-own, unverified):
-                            // the Ancients reach A5Q5's kill "through their
-                            // superunique link" (`quests-act5-2.md` §7.6),
-                            // which no spec places; linked by class here.
-                            Some(c) if ANCIENTS.contains(&c) => {
-                                q.add_link(w, victim, 35, None);
-                            }
+                            // The Ancients' chain-35 link is made at creation
+                            // (`quests-act5-2.md` §7.6; the superunique path).
                             _ => {}
                         }
                         q.monster_killed(w, victim, killer);
