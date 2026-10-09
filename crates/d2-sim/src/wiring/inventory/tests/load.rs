@@ -82,6 +82,24 @@ fn a_stored_item_returns_to_its_cell() {
     assert!(w.state.errors.is_empty());
 }
 
+/// A cursor item (mode 4) goes back to the owner's cursor, whatever its
+/// saved cell (`d2s.md` §8.2 r3, `0x0063C180`; q-fix-soak-cursor-reload).
+// Covers: specs/formats/d2s.md §8.2 r3
+#[test]
+fn a_cursor_item_returns_to_the_cursor() {
+    let mut w = world();
+    let p = w.player;
+    let k = w.cursor_item(CAP);
+    let u = w.unit(k).unwrap();
+    let e = entry_of(&mut w, u);
+    w.desk(|d| d.free(u));
+    let n = w.desk(|d| d.load_entry(p, &e)).expect("loaded");
+    let g = w.units.get(n).unwrap().guid;
+    assert_eq!(w.mode(g), 4);
+    assert_eq!(w.desk(|d| d.cursor_of(p)), Some(n));
+    assert!(w.state.items_of(p).is_empty());
+}
+
 /// The saved cell is taken: the item is freed (`d2s.md` §8.2 rule 3,
 /// `0x00531210` mode 0: exact cell, no free-position fallback).
 // Covers: specs/formats/d2s.md §8.2 r3

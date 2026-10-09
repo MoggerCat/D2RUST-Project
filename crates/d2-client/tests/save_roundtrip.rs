@@ -92,10 +92,10 @@ fn every_act_town_round_trips() {
 
 /// After seeded random play (soak §1: item moves, panels, keys,
 /// waypoints), two round trips: what the reload brings back is what was
-/// saved. Known break: an item saved on the cursor comes back in the
-/// inventory (q-fix-soak-cursor-reload).
+/// saved (an item saved on the cursor comes back on it,
+/// q-fix-soak-cursor-reload).
 #[test]
-#[ignore = "known bug q-fix-soak-cursor-reload: repro"]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn random_play_round_trips() {
     for seed in 1..=3 {
         let mut s = new("sorceress");
