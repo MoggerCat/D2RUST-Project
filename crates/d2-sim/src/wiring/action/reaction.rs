@@ -134,7 +134,7 @@ fn umod_get_hit<X: Pending>(cv: &mut CombatView<'_, X>, d: UnitId) {
 /// Step 4.7's path: soft, AI state 19, umod mode 4.
 fn soft_reaction<X: Pending>(cv: &mut CombatView<'_, X>, d: UnitId) {
     soft(cv, d);
-    cv.v.h.x.set_monster_ai_state(d, AI_STATE_HIT);
+    cv.v.h.set_monster_ai_state(d, AI_STATE_HIT);
     umod_get_hit(cv, d);
 }
 
@@ -185,7 +185,7 @@ fn monster_hit<X: Pending>(
             || NO_BLOCK_CLASSES.contains(&class)
             || !has_mode(cv, MONSTER_BL)
         {
-            cv.v.h.x.set_monster_ai_state(d, AI_STATE_HIT);
+            cv.v.h.set_monster_ai_state(d, AI_STATE_HIT);
         } else {
             monster_request(cv, d, MONSTER_BL, None);
         }
