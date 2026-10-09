@@ -308,9 +308,10 @@ impl<X: Pending> ActionHooks<X> {
     }
 
     /// The velocity half of `0x00623F50` (`pathing.md` §8.1) for a
-    /// monster in its current mode, run by the animation prepare of every
-    /// monster mode set: a mode with the velocity modifier (or knockback)
-    /// sets the path velocity, any other mode leaves it.
+    /// monster or a player in its current mode, run by the animation
+    /// prepare of every mode set: a mode with the velocity modifier (or
+    /// knockback) sets the path velocity, any other mode leaves it (a
+    /// player's Whirlwind: mode 18 with entry flag 1, base · p / 100).
     pub(crate) fn monster_mode_velocity(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         let Some(p) = self.paths.as_ref() else {
             return;
@@ -318,7 +319,7 @@ impl<X: Pending> ActionHooks<X> {
         let Some(r) = sim.units.get(unit) else {
             return;
         };
-        if r.ty != UnitType::Monster {
+        if !matches!(r.ty, UnitType::Monster | UnitType::Player) {
             return;
         }
         let mode = r.mode;

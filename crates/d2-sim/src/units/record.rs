@@ -88,6 +88,10 @@ pub struct Anim {
     pub action_frame: u8,
     /// +0x50.
     pub record: Option<AnimRecord>,
+    /// The AnimData speed (+0x0C) of the record at +0x50: the s of the
+    /// rate `0x00623F50` in a sequence mode, which looks up no record of
+    /// its own (`skills/sequences.md` §2).
+    pub record_speed: Option<u32>,
 }
 
 /// The interact info of a player unit: +0x64 GUID, +0x68 unit type,

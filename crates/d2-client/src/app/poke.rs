@@ -20,6 +20,7 @@
 
 use std::collections::BTreeSet;
 
+use d2_server::adapters::handlers::world::WorldHost;
 use d2_sim::poke::{self, PokeFile, PokeOp};
 use d2_sim::units::lists::client_state;
 
@@ -176,7 +177,13 @@ pub fn apply_now(s: &mut Sim, op: &PokeOp) -> poke::PokeResult {
         waypoint_classes: &waypoints,
         items: Some(&s.world.tables),
     };
-    poke::apply_op(&mut s.game, &mut s.events, &env, op)
+    let r = poke::apply_op(&mut s.game, &mut s.events, &env, op);
+    // The unit work the directive raised runs inside it in 1.14d: a
+    // `warp`'s pet follow `0x005754B0` (inside the level warp
+    // `0x0053AEC0`, `hirelings.md` §6 rule 1), so the hireling stands at
+    // the player before the next frame's events.
+    s.world.session_work(&mut s.game, &mut s.events);
+    r
 }
 
 /// The keyword a `poke` record names (`d`): the directive's, or `spawn`.

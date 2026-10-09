@@ -107,6 +107,24 @@ pub trait UnitHooks: StatHost {
     /// The path-velocity half of `0x00623F50` (`sim/pathing.md` §8.1),
     /// run right after [`UnitHooks::anim_rate`]. Provider: path spec.
     fn anim_velocity(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}
+    /// The AnimData speed (+0x0C) of the record [`Self::anim_record`]
+    /// gives. Default: none.
+    fn anim_speed(&mut self, sim: &Sim<'_>, unit: UnitId) -> Option<u32> {
+        None
+    }
+    /// The rate `0x00623F50` of a unit in a sequence mode
+    /// (`skills/sequences.md` §2: path or not; s = `stored` speed, the
+    /// record of the previous mode): (speed +0x4C, sequence speed +0x3C
+    /// when the cast or attack branch writes it). Default: none (the
+    /// speed stays).
+    fn sequence_rate(
+        &mut self,
+        sim: &Sim<'_>,
+        unit: UnitId,
+        stored: Option<u32>,
+    ) -> Option<(i16, Option<i32>)> {
+        None
+    }
 
     /// `0x00623B10`: the frame bonus (start index of §4.2).
     fn frame_bonus(&mut self, sim: &Sim<'_>, unit: UnitId) -> i32 {

@@ -65,6 +65,21 @@ impl<X: Pending> ActionHooks<X> {
     /// class and mode, looked up by §4; a name the file lacks gets the
     /// default record (§3). `None` when no table is loaded, the unit has
     /// no record, or the composer gives no name.
+    /// The flags (+0x0C) of the unit's current skill entry: its list
+    /// entry's when the unit has a skill list (where the skill bodies
+    /// write them, `UseView::set_entry_flags`: Whirlwind's and Leap's
+    /// phases), else the host's ([`Pending::entry_flags`]). `None`: no
+    /// skill in use.
+    pub(crate) fn used_entry_flags(&self, unit: UnitId) -> Option<u32> {
+        let e = self.used_skill_of(unit)?;
+        let listed = self.skill_lists.get(&unit).and_then(|l| {
+            l.find(e.skill, e.owner_guid)
+                .and_then(|i| l.entries.get(i))
+                .map(|le| le.flags)
+        });
+        Some(listed.unwrap_or_else(|| self.x.entry_flags(unit, &e)))
+    }
+
     /// The draw identity `0x00645270` (`render/unit-composite.md` §1.1)
     /// of `unit`'s (type, class, mode +0x10): its own unless flag-ex bit 3
     /// ([`flags2::DISGUISE`]) is set; then the first state of
@@ -130,9 +145,9 @@ impl<X: Pending> ActionHooks<X> {
 
     /// Steps 3–5 and 8–10 of `0x00623F50` (`units.md` §4.7, through
     /// [`crate::units::anim_rate::anim_rate`]) on the draw identity, with
-    /// `record` the AnimData record of that identity (s = its speed;
-    /// its frames · 256 are the +0x48 the were-form speed reads, the
-    /// record the mode start stores). Steps 6–7 are
+    /// s the AnimData speed of the unit's record and `frame_count` the
+    /// +0x48 the were-form speed reads: (speed +0x4C, sequence speed
+    /// +0x3C when the cast or attack branch writes it). Steps 6–7 are
     /// [`Self::movement_rate`]'s; a velocity mode without the path
     /// provider, or a type other than player and monster, is `None` (the
     /// host's [`Pending::anim_rate`]). The item/skill getter
@@ -144,9 +159,9 @@ impl<X: Pending> ActionHooks<X> {
         &self,
         sim: &Sim<'_>,
         unit: UnitId,
-        record: &d2_formats::animdata::AnimRecord,
+        s: i32,
         frame_count: i32,
-    ) -> Option<i16> {
+    ) -> Option<(i16, Option<i32>)> {
         use crate::units::anim_rate::{anim_rate, mode_row, Rate, RateInput};
         let r = sim.units.get(unit)?;
         let (ty, class, mode) = self.draw_identity(sim, unit)?;
@@ -184,7 +199,7 @@ impl<X: Pending> ActionHooks<X> {
             t,
             c: class,
             m: mode,
-            s: record.speed as i32,
+            s,
             item: [total(93), total(99), total(105), total(102), total(96)],
             velocitypercent: total(67),
             attackrate: total(68),
@@ -200,7 +215,9 @@ impl<X: Pending> ActionHooks<X> {
             were_speed,
         };
         match anim_rate(&input) {
-            Ok(Rate::Set { speed, .. }) => Some(speed as i16),
+            Ok(Rate::Set {
+                speed, seq_speed, ..
+            }) => Some((speed as i16, seq_speed)),
             _ => None,
         }
     }
@@ -216,7 +233,8 @@ impl<X: Pending> ActionHooks<X> {
         }
         let record = self.anim_lookup(sim, unit)?;
         let fc = sim.units.get(unit)?.anim.frame_count;
-        self.spec_anim_rate(sim, unit, &record, fc)
+        self.spec_anim_rate(sim, unit, record.speed as i32, fc)
+            .map(|(v, _)| v)
     }
 
     fn anim_lookup(
@@ -441,13 +459,33 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         let record = self.anim_lookup(sim, unit);
         // The mode start stores the new record and its frame count before
         // the rate reads +0x48.
-        if let Some(v) = record.as_ref().and_then(|r| {
+        if let Some((v, _)) = record.as_ref().and_then(|r| {
             let fc = (r.frames as i32).wrapping_mul(256);
-            self.spec_anim_rate(sim, unit, r, fc)
+            self.spec_anim_rate(sim, unit, r.speed as i32, fc)
         }) {
             return v;
         }
         self.x.anim_rate(unit, record.map(|r| r.speed))
+    }
+
+    fn anim_speed(&mut self, sim: &Sim<'_>, unit: UnitId) -> Option<u32> {
+        self.anim_lookup(sim, unit).map(|r| r.speed)
+    }
+
+    /// `skills/sequences.md` §2: the rate of a sequence mode on the
+    /// record the previous mode stored (`stored`, its speed); the
+    /// velocity branch (step 7, with the path provider) first.
+    fn sequence_rate(
+        &mut self,
+        sim: &Sim<'_>,
+        unit: UnitId,
+        stored: Option<u32>,
+    ) -> Option<(i16, Option<i32>)> {
+        if let Some(v) = self.movement_rate(sim, unit) {
+            return Some((v, None));
+        }
+        let fc = sim.units.get(unit)?.anim.frame_count;
+        self.spec_anim_rate(sim, unit, stored? as i32, fc)
     }
 
     /// The velocity half of `0x00623F50` for monsters with the path
@@ -1320,9 +1358,7 @@ impl<X: Pending> ActionHooks<X> {
                     .monstats
                     .get(class as usize)
                     .is_some_and(|m| m.npc),
-            used_flags: self
-                .used_skill_of(unit)
-                .map(|e| self.x.entry_flags(unit, &e)),
+            used_flags: self.used_entry_flags(unit),
             // The item/skill getter `0x00625500` is the unit total
             // (`sim/stats.md`): Burst of Speed's state list counts.
             item_fastermove: sim.stats.unit_total(unit, scale_stat as u16, 0),

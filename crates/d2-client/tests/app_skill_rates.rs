@@ -66,6 +66,30 @@ fn save(name: &[u8], class: u8, stats: [(u16, i32); 10], right: i32) -> Characte
 /// The player's (mode, frame count, speed) by frame, after `warp 2`
 /// before frame 4 and a right click at (330, 300) before frame 20.
 fn player_rates(character: Character, ticks: u32) -> Vec<(u32, String)> {
+    player_fields(
+        character,
+        ticks,
+        &[],
+        "frame 20; rclick 330 300",
+        &["m", "fc", "sp"],
+    )
+}
+
+/// The player's `fields` by frame after `warp 2` before frame 4, the
+/// further `pokes` and the shared `input`.
+fn player_fields(
+    character: Character,
+    ticks: u32,
+    pokes: &[&str],
+    input: &str,
+    fields: &[&str],
+) -> Vec<(u32, String)> {
+    let mut all = vec![d2_client::app::poke::parse_poke_arg("4 warp 2").unwrap()];
+    all.extend(
+        pokes
+            .iter()
+            .map(|p| d2_client::app::poke::parse_poke_arg(p).unwrap()),
+    );
     let args = DumpArgs {
         save: None,
         seed: Some(1234),
@@ -75,10 +99,8 @@ fn player_rates(character: Character, ticks: u32) -> Vec<(u32, String)> {
         out: "unused".into(),
         game_dir: None,
         date: Some("2026-10-09".into()),
-        pokes: vec![d2_client::app::poke::parse_poke_arg("4 warp 2").unwrap()],
-        input: Some(
-            d2_client::world_view::input_script::parse("frame 20; rclick 330 300").unwrap(),
-        ),
+        pokes: all,
+        input: Some(d2_client::world_view::input_script::parse(input).unwrap()),
         packets: None,
         rng: None,
         sends: Vec::new(),
@@ -109,10 +131,8 @@ fn player_rates(character: Character, ticks: u32) -> Vec<(u32, String)> {
                 let at = p.find(&format!(r#""{k}":"#)).unwrap() + k.len() + 3;
                 p[at..].split([',', '}']).next().unwrap().to_string()
             };
-            (
-                f,
-                format!("m={} fc={} sp={}", field("m"), field("fc"), field("sp")),
-            )
+            let text: Vec<String> = fields.iter().map(|k| format!("{k}={}", field(k))).collect();
+            (f, text.join(" "))
         })
         .collect()
 }
@@ -168,4 +188,34 @@ fn burst_of_speed_raises_the_neutral_rate() {
     // 1.14d: the cast at 256; the neutral after it at 194.
     assert_eq!(at(&r, 35), "m=10 fc=4352 sp=256");
     assert_eq!(at(&r, 36), "m=1 fc=2048 sp=194");
+}
+
+// Covers: specs/skills/bodies-2b.md §8.10
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn whirlwind_moves_at_the_velocity_its_refresh_sets() {
+    let stats = [
+        (0, 30),
+        (1, 10),
+        (2, 20),
+        (3, 25),
+        (6, 28928),
+        (7, 28928),
+        (8, 9984),
+        (9, 9984),
+        (10, 30976),
+        (11, 30976),
+    ];
+    let r = player_fields(
+        save(b"ScnBar", 4, stats, 151),
+        22,
+        &["10 spawn 179 @x+4 @y normal"],
+        "frame 20; rclick 544 336",
+        &["m", "x", "xf", "yf", "sp"],
+    );
+    // 1.14d: the start's walk velocity becomes base · 143 / 100 in the
+    // aura fill's anim refresh (mode 18, entry flag 1), speed 304; the
+    // first step lands at frame 22.
+    assert_eq!(at(&r, 21), "m=18 x=5143 xf=32768 yf=32768 sp=304");
+    assert_eq!(at(&r, 22), "m=18 x=5144 xf=2119 yf=28650 sp=304");
 }

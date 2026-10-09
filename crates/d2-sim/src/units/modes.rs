@@ -142,7 +142,27 @@ pub fn prepare_animation<H: UnitHooks>(
     } else {
         None
     };
-    let rate = if sequence.is_none() && hooks.has_path(sim, unit) {
+    if let Some(mut seq) = sequence {
+        // `sequences.md` §2: the rate runs (path or not) on the record the
+        // previous mode left; no AnimData lookup, +0x48 from the list.
+        let stored = sim.units.get(unit).and_then(|r| r.anim.record_speed);
+        let rate = hooks.sequence_rate(sim, unit, stored);
+        if hooks.has_path(sim, unit) {
+            hooks.anim_velocity(sim, unit);
+        }
+        let a = &mut record_mut(sim, unit)?.anim;
+        a.action_frame = 0;
+        if let Some((speed, seq_speed)) = rate {
+            a.speed = speed;
+            if let Some(q) = seq_speed {
+                seq.speed = q;
+            }
+        }
+        a.frame_count = seq.frame_count;
+        a.sequence = Some(seq);
+        return Ok(());
+    }
+    let rate = if hooks.has_path(sim, unit) {
         let r = hooks.anim_rate(sim, unit);
         hooks.anim_velocity(sim, unit);
         Some(r)
@@ -150,20 +170,17 @@ pub fn prepare_animation<H: UnitHooks>(
         None
     };
     let record = hooks.anim_record(sim, unit);
+    let record_speed = record.and_then(|_| hooks.anim_speed(sim, unit));
     let a = &mut record_mut(sim, unit)?.anim;
     a.action_frame = 0;
-    if let Some(seq) = sequence {
-        a.frame_count = seq.frame_count;
-        a.sequence = Some(seq);
-    } else {
-        a.sequence = None;
-        a.frame = 0;
-        if let Some(r) = rate {
-            a.speed = r;
-        }
+    a.sequence = None;
+    a.frame = 0;
+    if let Some(r) = rate {
+        a.speed = r;
     }
     a.record = record;
-    if let (None, Some(r)) = (&a.sequence, record) {
+    a.record_speed = record_speed;
+    if let Some(r) = record {
         a.frame_count = (r.frames as i32).wrapping_mul(256);
     }
     Ok(())

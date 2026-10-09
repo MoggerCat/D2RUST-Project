@@ -339,13 +339,17 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
     /// identity, a stat fill the rate stats), then the host's hook.
     fn refresh_anim_rate(&mut self, u: UnitId) {
         let speed = {
-            let sim = Sim {
+            let mut sim = Sim {
                 game: &mut *self.game,
                 units: &mut *self.v.units,
                 stats: &mut *self.v.stats,
                 data: self.v.data,
             };
-            self.v.h.rate_refresh(&sim, u)
+            let speed = self.v.h.rate_refresh(&sim, u);
+            // §4.7 step 7 also writes the path velocity (Whirlwind:
+            // its start's walk velocity becomes base · p / 100 here).
+            self.v.h.monster_mode_velocity(&mut sim, u);
+            speed
         };
         if let (Some(s), Some(r)) = (speed, self.v.units.get_mut(u)) {
             r.anim.speed = s;
