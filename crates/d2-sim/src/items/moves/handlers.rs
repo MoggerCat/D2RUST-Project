@@ -336,6 +336,20 @@ pub fn to_cursor<W: MoveWorld>(w: &mut W, p: Owner, item: Guid) -> Result<Outcom
     Ok(Outcome::DONE)
 }
 
+/// The save load's cursor placement (`formats/d2s.md` §8.2 rule 3, mode 4:
+/// the owner's cursor := the item, `0x0063C180`, then `0x0055FB10`: mode 4,
+/// command flag 0x100000 = the 0x9C action 0x12, update list, owner
+/// refresh). No cell is looked up and nothing is unlinked (the item was
+/// never in a list).
+pub fn load_to_cursor<W: MoveWorld>(w: &mut W, p: Owner, item: Guid) {
+    w.set_cursor(p, Some(item));
+    w.set_mode(item, mode::CURSOR);
+    w.set_page(item, page::NONE);
+    add_cmd(w, item, cmd::TO_CURSOR);
+    w.update_list_add(p, item);
+    owner_refresh(w, p);
+}
+
 // ------------------------------------------------------------------ 0x1A
 
 /// 0x1A EquipItem `0x0054AD90` (§7.5).
