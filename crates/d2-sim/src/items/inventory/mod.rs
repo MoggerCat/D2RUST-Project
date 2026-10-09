@@ -29,6 +29,7 @@ pub mod equip;
 pub mod grid;
 pub mod levelreq;
 pub mod tables;
+pub mod weapon;
 
 #[cfg(test)]
 mod tests;

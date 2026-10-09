@@ -141,6 +141,21 @@ Branch `claude/q-fix-flow-save` (from `claude/q-tick-flow`, merged with
   rule and a weapon class without a running game (or the tool running
   the load through the sim), and its check is the C66 saves.
 
+- `q-fix-weapon-in-use`: `d2-sim` `items/inventory/weapon.rs`:
+  `weapon_link` (`0x0063D1D0`, §11.5 r1) and `weapon_unlink`
+  (`0x0063D2B0`, r2) write inventory +0x1C. Called by the core equip
+  paths (`equip_put`, §4.8 step 5; auto-equip §4.9 step 3; the lent
+  inventory) and by the desk for the moves (`MovePending::stat_link`,
+  `body_leave_effects`) and the equipment rules' `0x0055D970` switch
+  (`EquipWorld::stat_link` / `stat_unlink`). REC-266's
+  `weapon_hand_fallback` is removed. `equip_put` takes the tables.
+  Tests: `items::inventory::tests::weapon_in_use_link_and_unlink`;
+  `play_smoke::the_live_run` now asserts the `sb1 ` in RH (part 5). The
+  items/moves fixture's rest now answers a mouse skill (Attack, every
+  player has one): with a weapon in use the bookkeeping reaches §5.8
+  step 5, which the fixture's empty answer turned into the fatal
+  `NoMouseSkill` (three swap tests).
+
 ## Open
 
 - The save's inventory flag bit 1 clear (`inventory-moves.md` §6.1 r4).
