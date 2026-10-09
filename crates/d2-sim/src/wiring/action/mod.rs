@@ -302,6 +302,9 @@ pub struct ActionHooks<X> {
     /// The quest host is running a route: routes it raises are queued and
     /// run right after it.
     quest_host_out: bool,
+    /// The preset paths the quest map-AI stores keep (`quests-act5.md`
+    /// §5.8 "Map-AI stores"); a handle is the index + 1.
+    pub map_ai_paths: Vec<Vec<crate::monsters::ai::MapNode>>,
     /// Objects allocated by [`View::allocate`] whose per-kind init waits
     /// for the allocation's game-seed step to be written back (`None`
     /// outside such an allocation).
@@ -443,6 +446,7 @@ impl<X> ActionHooks<X> {
             monster_world_out: false,
             quest_host: None,
             quest_host_out: false,
+            map_ai_paths: Vec::new(),
             deferred_inits: None,
             alloc_rooms: Vec::new(),
             paths: None,
