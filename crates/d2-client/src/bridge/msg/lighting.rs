@@ -389,23 +389,6 @@ pub fn player_light(w: &mut ClientWorld, key: UnitKey) {
     replace_unit_light(w, key, sources::player_light(local));
 }
 
-/// The player stat callback's light part (`0x004609F0`, §8 player row):
-/// stat 89 `item_lightradius` sets the radius (§6.2 r2: `r` ≤ 0 does
-/// nothing) to 13 + its value; stat 90 `item_lightcolor` sets R, G, B (0
-/// → white). `stat89` / `stat90` are the unit's current values.
-pub fn player_light_stats(
-    lights: &mut crate::rules::lighting::records::LightList,
-    id: crate::rules::lighting::records::LightId,
-    stat89: i32,
-    stat90: i32,
-) {
-    // A player light is kind 0 or 1: setting the same radius again
-    // changes nothing (§6.2 r2 frees only a kind-2 cache).
-    lights.set_radius(id, sources::player_light_radius(stat89));
-    let (red, green, blue) = sources::player_light_color(stat90 as u32);
-    lights.set_color(id, sources::SOURCE_INTENSITY, red, green, blue);
-}
-
 /// The monster light (`0x004AE210` → `0x004AE2EE`, §8 monster row) of a
 /// created monster: kind 0, radius `max(L_c, Light)`, 3 in level 8 (the
 /// monster's room's level) with client quest byte 1 set and `Align` ∉
@@ -427,5 +410,76 @@ pub fn monster_light(w: &mut ClientWorld, key: UnitKey, class: &super::super::wo
     };
     if let Some(req) = sources::monster_light(&input) {
         replace_unit_light(w, key, req);
+    }
+}
+
+/// Whether the colour call's light part can change anything for `key`:
+/// the local player with a light (`render/shading.md` §6 r1.1).
+pub fn colour_call_lights(w: &ClientWorld, key: UnitKey) -> bool {
+    w.local_player == Some(key) && unit_light(w, key).is_some()
+}
+
+/// The colour call's light part (`0x004D97F0`, `render/shading.md` §6
+/// r1.1, run by state on / off for a state with `colorshift` ≠ 0,
+/// `client/stat-lists.md` §3 r6.1, r6.3): for the local player with a
+/// light, R, G, B (§6.2 r4) := the winning state's `light-r`, `light-g`,
+/// `light-b`, or white when no state wins. Over the on states by id, a
+/// state wins when its `colorpri` is greater than the best so far (which
+/// starts at 0): `colorpri` 0 never wins, ties keep the lowest id. An on
+/// state without a `states` row is a handler error (the tables are an
+/// input).
+pub fn state_colour_light(
+    w: &mut ClientWorld,
+    rows: &[super::super::world::StateRow],
+    key: UnitKey,
+) -> Result<(), super::super::dispatch::HandlerError> {
+    if !colour_call_lights(w, key) {
+        return Ok(());
+    }
+    let id = unit_light(w, key).expect("checked above");
+    let mut best = None;
+    let mut pri = 0;
+    for &s in &w.units[&key].states {
+        let row = rows
+            .get(usize::from(s))
+            .ok_or(super::super::dispatch::HandlerError::Invalid(
+                "render/shading.md §6 r1.1: no states row for an on state",
+            ))?;
+        if row.colorpri > pri {
+            pri = row.colorpri;
+            best = Some(row.light_rgb);
+        }
+    }
+    let (r, g, b) = best.unwrap_or((255, 255, 255));
+    let i = w
+        .lights
+        .get(id)
+        .map_or(sources::SOURCE_INTENSITY, |rec| rec.i);
+    w.lights.set_color(id, i, r, g, b);
+    Ok(())
+}
+
+/// The player stat callback's light part (`0x004609F0`, §8 player row;
+/// `sim/stat-lists.md` §7.1: run when the stat's value changes): stat
+/// 89 `item_lightradius` sets the player's light radius (§6.2 r2) to the
+/// new value plus 13; stat 90 `item_lightcolor` sets its R, G, B (0 →
+/// white). Other stats, other units, a player without a light or an
+/// unchanged value: nothing.
+pub fn player_light_stat(w: &mut ClientWorld, key: UnitKey, stat: u16, old: i32, new: i32) {
+    if key.unit_type != super::super::world::PLAYER || old == new || !matches!(stat, 89 | 90) {
+        return;
+    }
+    let Some(id) = unit_light(w, key) else {
+        return;
+    };
+    if stat == 89 {
+        w.lights.set_radius(id, sources::player_light_radius(new));
+    } else {
+        let (r, g, b) = sources::player_light_color(new as u32);
+        let i = w
+            .lights
+            .get(id)
+            .map_or(sources::SOURCE_INTENSITY, |rec| rec.i);
+        w.lights.set_color(id, i, r, g, b);
     }
 }

@@ -133,7 +133,7 @@ use super::skill_rest::SkillStore;
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
 use crate::bridge::world::{
-    LevelRow, MonsterClass, MonsterSetup, ObjectRow, SkillRow, StatSend, UnitRows,
+    LevelRow, MonsterClass, MonsterSetup, ObjectRow, SkillRow, StatSend, StateRow, UnitRows,
 };
 use crate::bridge::LOCAL_CLIENT;
 
@@ -1625,12 +1625,26 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
         })
         .collect();
     let shrines: Vec<Shrines> = decode_all(table("shrines")?).map_err(err)?;
+    // `client/stat-lists.md` §3 r3, r6: `notondead`, `noclear` (+0x14 &
+    // 0x80, & 0x10) and the colour call's columns.
+    let states: Vec<d2_data::tables::States> = decode_all(table("states")?).map_err(err)?;
+    let states = states
+        .iter()
+        .map(|s| StateRow {
+            dead_bit_only: s.notondead,
+            keep_list: s.noclear,
+            colorpri: s.colorpri,
+            colorshift: s.colorshift,
+            light_rgb: (s.light_r, s.light_g, s.light_b),
+        })
+        .collect();
     Ok(UnitRows {
         monsters,
         monster_skill_bonus,
         stats,
         objects,
         shrines: shrines.iter().map(|s| s.code).collect(),
+        states,
     })
 }
 
