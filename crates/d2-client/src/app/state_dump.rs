@@ -367,14 +367,13 @@ pub fn dump<W: Write>(
     let mut last_frame = 0i32;
     let mut pending = game.pokes;
     let mut walking: Vec<(Entry, GotoWalk)> = Vec::new();
-    let mut input = match game.input {
-        Some(s) => Some(
-            Headless::new(s)
-                .map_err(anyhow::Error::msg)?
-                .with_prediction(tap, speeds),
-        ),
-        None => None,
-    };
+    // The client part follows the server's walk and point as the play
+    // preview does, with or without an input script (REC-1385).
+    let mut input = Some(
+        Headless::new(game.input.unwrap_or_default())
+            .map_err(anyhow::Error::msg)?
+            .with_prediction(tap, speeds),
+    );
     let mut input_notes = Vec::new();
     let mut to_send = game.sends;
     let mut send_notes = Vec::new();
@@ -402,6 +401,7 @@ pub fn dump<W: Write>(
                 eprintln!("input: {l}");
                 input_notes.push(format!("input: {l}"));
             }
+            h.sync_local(&mut bridge);
         }
         if let Some(p) = packets.as_mut() {
             p.drain()?;

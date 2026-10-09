@@ -25,14 +25,14 @@
 | Rules | 67–68 |
 |   1. Format `state-1` (JSON lines, key `k`) | 69–87 |
 |   2. Unit fields | 88–127 |
-|   3. Snapshot point and frame | 128–141 |
-|   4. Comparison | 142–168 |
-| Constants & data dependencies | 169–172 |
-| Randomness | 173–176 |
-| Edge cases & original bugs | 177–195 |
-| Test vectors | 196–205 |
-| Provenance | 206–210 |
-| Open questions | 211–216 |
+|   3. Snapshot point and frame | 128–164 |
+|   4. Comparison | 165–191 |
+| Constants & data dependencies | 192–195 |
+| Randomness | 196–199 |
+| Edge cases & original bugs | 200–218 |
+| Test vectors | 219–228 |
+| Provenance | 229–233 |
+| Open questions | 234–239 |
 <!-- /index -->
 
 ## Summary
@@ -138,6 +138,29 @@ Unit = the unit record; path = unit +0x2C.
    frame) for runs whose game starts differ.
 3. A writer may snapshot every frame or every n-th; it records only the
    first game that ticks (single player).
+4. **The d2rs client part in a run.** The 1.14d client part runs in the
+   same process; its local player stands at the server player's point
+   at every position check of the run, whether the server moved it by a
+   walk the client asked for or by a `pos` poke (`poke.md` §1), so the
+   check after the vitals messages 0x95 / 0x96 finds no difference and
+   no C→S 0x5F follows. Measured (REC-1385, 2026-10-09, cloud under
+   Wine, the client unit's path read at every tick end and the check
+   `0x004804E0`'s arguments logged): `milestone-anya` (client player
+   at the poked point from the poke's tick on; the first check at the
+   0x96 of tick 66 has the same point, no 0x5F in 111 ticks) and
+   `combat-cold-plains-wp` (the client runs from tick 11, mode 3, and
+   stops at tick 34 where the server player stops; the 0x96 at tick 92
+   finds no difference). The d2rs writer therefore runs the play
+   preview's walk prediction and its room recache without an input
+   script (`Headless::sync_local`), so the position check takes the
+   server's point instead of sending 0x5F that would walk the player
+   back (before: the d2rs player turned from mode 5 to 1 (`milestone-*`)
+   or from 5 to 6 (`combat-cold-plains-wp`) at the first 0x96 after a
+   server-side move; first divergences D3 of the ledger). PROVISIONAL
+   (REC-1385): the 1.14d code that moves the client player after a
+   `pos` poke is not found (no S→C message, no call of `0x00650BE0`,
+   `0x00650910` or `0x004654C0` in that window); the model reproduces
+   the observed positions, not the mechanism.
 
 ### 4. Comparison
 

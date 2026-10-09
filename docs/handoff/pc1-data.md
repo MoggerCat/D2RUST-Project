@@ -461,6 +461,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
   think; `monsters/init.md` §4 lists none.
 
 - [q-fix-room-links] After a waypoint return to a town, does 1.14d populate only the rooms near the player (far NPCs/objects appear on approach), as d2rs does? Drive town -> waypoint -> back, snapshot units at +50 and +600 frames (`docs/handoff/q-fix-room-links.md`).
+- [q-fix-d3-player-mode] What moves the 1.14d client player's path to the server player's point after a `pos` poke (and after a server walk the client asked for by `poke msg`) with no S→C message, no call of `0x00650BE0` / `0x00650910` / `0x004654C0` in that window? Ghidra xref of the writers of the dynamic path x (+0x02) / y (+0x06) of a client unit, or a hardware write watch on the client path x in the recorder on Windows (`docs/handoff/q-fix-d3-player-mode.md`; REC-1385).
 
 ## How to check a behaviour in one command
 
