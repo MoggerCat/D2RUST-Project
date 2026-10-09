@@ -53,7 +53,7 @@
 | Edge cases & original bugs | 1737–1761 |
 | Test vectors | 1762–1819 |
 | Provenance | 1820–1925 |
-| Open questions | 1926–2105 |
+| Open questions | 1926–2121 |
 <!-- /index -->
 
 ## Summary
@@ -1996,6 +1996,22 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    the monster's own client path, which d2rs's model positions only
    sample); settled by REC-706 (a recording of the 1.14d client grid
    under a walking NPC).
+   *Recorded, REC-706* (2026-10-09, PC 1, Windows; scratch poll probe
+   with no breakpoints, ScnAma `-seed 1234`, 46 distinct samples 30–50
+   ms apart while Warriv (class 155) walks (4866, 4235) → (4870, 4231),
+   mode 2 from t 7.44 s to 9.16 s, one sub-tile per server path step):
+   the client grid of his room (sub-tile rect (4840, 4200, 40, 40), read
+   room +0x20 → header, masks at header +0x20) holds mask 0x100 on
+   exactly the plus pattern (centre and its 4 neighbours) around the
+   sub-tile **containing the client path position** (path +0x00 / +0x04
+   >> 16) in every sample, idle and walking; the five cells move in the
+   same sample in which the position crosses into the next sub-tile
+   (e.g. 4866.99 → 4867.10), never with the server's target (path
+   +0x10, one sub-tile ahead). No other cell near him carries 0x100. So
+   d2rs's choice (re-stamp at the client path position before each
+   step) matches when the model position is the client path position
+   and the stamp follows each sub-tile change; the pattern for Warriv is
+   the plus (`sim/path-placement.md` §3).
    *Answered, stamina* (2026-10-09, static read): the 1.14d client never
    drains stamina. The run drain `0x0057F240` has one caller, the server
    path event `0x00580C20`; in client code stat 10 is written only by
