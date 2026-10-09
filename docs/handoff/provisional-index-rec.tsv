@@ -221,7 +221,7 @@ REC-282	6572		Save smoke fills (PROVISIONAL, `d2-client` `app/save_gaps.rs` `see
 REC-286	6578		Visibility predicate inputs in play (PROVISIONAL, `d2-client` `world_view/visibility.rs`, 	recording	no		4	
 REC-287	6634		Inactive room store in play (PROVISIONAL, `d2-sim` `wiring/action/inactive.rs`, `d2-client	data	yes		5	
 REC-288	6597		Arrival walk-outs in the walk prediction (PROVISIONAL, `d2-client` `bridge/predict.rs` `Pr	recording	no		4	
-REC-289	6598		Item-move fills of q-fix-items-play (PROVISIONAL, M22; `d2-sim` `items/inventory/equip.rs`	recording	no		12	
+REC-289	6598		Item-move fills of q-fix-items-play (PROVISIONAL, M22; `d2-sim` `items/inventory/equip.rs`	recording	no		11	
 REC-291	6635		Server saves on the flow's path (PROVISIONAL, `d2-server` `adapters/storage.rs`, `adapters	recording	yes		4	
 REC-300	6227	MANUAL	(R-SWAP-1)	recording	no		0	
 REC-301	6230	MANUAL	(R-SET-1, R-SET-2)	unstated	no		0	
@@ -259,18 +259,18 @@ REC-332	6335	MANUAL, second client] [MANUAL	(R-TP-1, R-TP-2, R-TP-3, R-TP-4)	uns
 REC-333	6341	MANUAL	(R-CUBE-1, R-CUBE-2)	recording	no		0	
 REC-334	6345	AUTO] [MANUAL	(R-SAVE-1, R-SAVE-2, R-SAVE-3, R-SAVE-4, R-SAVE-5)	unstated	no		0	
 REC-335	6352	AUTO hook, MANUAL placement	(R-LOS-1)	recording	no		0	
-REC-400	6355	AUTO	(R-3E-1) — wire byte layout, top of the list (M22)	unstated	no	yes	6	
+REC-400	6355	AUTO	(R-3E-1) — wire byte layout, top of the list (M22)	unstated	no	yes	1	
 REC-401	6358	MANUAL, second client	(R-JOIN-1)	unstated	no	yes	1	
 REC-402	6361	AUTO hook	(R-CHAT15-1)	recording	no	yes	4	
 REC-404	6391	PC 1, Ghidra read; AUTO hook	(R-SUBFILE-1)	recording	no	yes	5	
 REC-405	6621		Per-client inventory refresh without its item steps (PROVISIONAL, `d2-sim` `wiring/action/	recording	no		2	
-REC-406	6622		The join sequence's 0x8D (PROVISIONAL, `d2-sim` `wiring/action/dispatch.rs` `join_sequence	binary	no		2	
-REC-410	6364	AUTO hook	(R-OVL11-1)	recording	no	yes	1	
+REC-406	6622		The join sequence's 0x8D (PROVISIONAL, `d2-sim` `wiring/action/dispatch.rs` `join_sequence	binary	no		1	
+REC-410	6364	AUTO hook	(R-OVL11-1)	recording	no	yes	0	
 REC-411	6367	AUTO	(R-LAND-1)	recording	no	yes	2	
 REC-412	6370	AUTO hook	(R-HEAL-1)	recording	no	yes	2	
 REC-413	6373	AUTO	(R-CAST-1)	recording	no	yes	1	
 REC-414	6376	AUTO	(R-MISS73-1)	recording	no	yes	3	
-REC-415	6379	PC 1, Ghidra read	(R-CALLERS-1)	binary	no	yes	3	
+REC-415	6379	PC 1, Ghidra read	(R-CALLERS-1)	binary	no	yes	2	
 REC-416	6382	AUTO	(R-92-1)	unstated	no	yes	1	
 REC-420	6611		Arreat Summit background seed (PROVISIONAL, `d2-client` `world_view/background_view.rs` `s	recording	no		4	
 REC-430	6394	AUTO hook	(R-ANIM-1)	recording	no		1	
@@ -286,7 +286,7 @@ REC-442	6602		The think-restart gate after a monster's creation (PROVISIONAL, `d
 REC-450	6610		Den of Evil light create record (PROVISIONAL, `d2-client` `bridge/msg/lighting.rs` `den_li	recording	no		1	
 REC-451	6609		Client missile path step without the cell walk (PROVISIONAL, `d2-client` `bridge/client_mi	recording	no		3	
 REC-452	6608		Client hit functions read as non-zero (PROVISIONAL, `d2-client` `bridge/client_missiles.rs	unstated	no		2	
-REC-460	6385	MANUAL	(R-SKPT-1)	unstated	no	yes	1	
+REC-460	6385	MANUAL	(R-SKPT-1)	unstated	no	yes	0	
 REC-461	6388		(R-SENTRY-1)	recording	no	yes	1	
 REC-480	5914	MANUAL	drlg/maze.md, drlg/rooms.md §9.5.1 (exit warps of maze levels, q-act1-dungeons)	recording	no		0	
 REC-540	6607		Timed arc flags and vz (PROVISIONAL, `d2-client` `rules/unit_composite.rs` `MotionRecord::	recording	no		2	

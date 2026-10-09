@@ -133,8 +133,9 @@ pub fn stat_update(guid: u32, stat: u8, value: u32) -> [u8; 10] {
 /// S→C 0x93 (`0x0053C6F0`, 8 bytes, `client/msg-skills.md` §9): player
 /// GUID u32@1, bonus u8@5 (signed on the client, 0x80 = +128), element
 /// u8@6 (0 = any), page u8@7 (4 = any).
-// PROVISIONAL (REC-415): no spec names a caller of `0x0053C6F0`, so no
-// d2rs code sends it; settled by the static caller search on PC 1.
+// Settled by `specs/client/msg-skills.md` §9 r6: 1.14d never sends 0x93
+// (the sender `0x0053C6F0` has no caller), so no d2rs code calls this
+// builder; it exists for the contract test only.
 pub fn skill_bonus(guid: u32, bonus: u8, element: u8, page: u8) -> [u8; 8] {
     let mut m = [0u8; 8];
     m[0] = 0x93;
@@ -438,9 +439,9 @@ pub fn unit_states(
 /// The width field of S→C 0x3E (`client/msg-stats-items.md` §5 r1): 1 bit
 /// a; a = 0 → 8 bits; else 1 bit b, then 16 (b = 0) or 32 bits.
 ///
-/// PROVISIONAL (`client/msg-stats-items.md` §5 r1.3; REC-400): the
+/// Settled by `client/msg-stats-items.md` §5 r1.3 (`0x0053B0E0`): the
 /// sender picks the narrowest width that holds the value (≤ 0xFF → 8,
-/// ≤ 0xFFFF → 16, else 32); no spec gives `0x0053D130`'s choice.
+/// ≤ 0xFFFF → 16, else 32).
 fn write_sized(w: &mut BitWriter, v: u32) {
     if v <= 0xFF {
         w.write(0, 1);
@@ -462,9 +463,9 @@ fn write_sized(w: &mut BitWriter, v: u32) {
 /// (sized), set flag 1, stat 9 bits, value (sized, two's complement for a
 /// negative value), param (1 bit c: 8 (c = 0) or 16 bits).
 ///
-/// PROVISIONAL (`client/msg-stats-items.md` §5 r1.3; REC-400): widths are
-/// the narrowest that hold the field ([`write_sized`]); the param is 8
-/// bits when it is ≤ 0xFF.
+/// Settled by `client/msg-stats-items.md` §5 r1.3 (`0x0053D130`): widths
+/// are the narrowest that hold the field ([`write_sized`]); the param is
+/// 8 bits when it is ≤ 0xFF.
 pub fn update_item_stat(guid: u32, stat: u16, value: i32, param: u16) -> Vec<u8> {
     let mut w = BitWriter::new();
     write_sized(&mut w, guid);
@@ -586,6 +587,81 @@ pub fn npc_enchants(guid: u32, name_seed: u16, umods: [u8; 3], flag4: bool) -> [
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Covers: specs/client/msg-skills.md §9 r1
+    #[test]
+    fn skill_bonus_layout() {
+        assert_eq!(skill_bonus(1, 0x80, 0, 4), [0x93, 1, 0, 0, 0, 0x80, 0, 4]);
+    }
+
+    // Covers: specs/client/msg-stats-items.md §5 r1
+    #[test]
+    fn update_item_stat_widths_match_the_sender() {
+        // LSB-first bit packer, written out independently of BitWriter.
+        let pack = |fields: &[(u32, u32)]| {
+            let mut bytes = vec![0u8; 16];
+            let mut at = 0usize;
+            for &(v, n) in fields {
+                for i in 0..n {
+                    if (v >> i) & 1 == 1 {
+                        bytes[at / 8] |= 1 << (at % 8);
+                    }
+                    at += 1;
+                }
+            }
+            bytes.truncate(at.div_ceil(8));
+            let mut out = vec![0x3E, (2 + bytes.len()) as u8];
+            out.extend(bytes);
+            out
+        };
+        // 0x100 → 16 bits (1, 0); 0xFF → 8 bits (0); param 0 → 8 bits.
+        assert_eq!(
+            update_item_stat(0x100, 70, 0xFF, 0),
+            pack(&[
+                (1, 1),
+                (0, 1),
+                (0x100, 16),
+                (1, 1),
+                (70, 9),
+                (0, 1),
+                (0xFF, 8),
+                (0, 1),
+                (0, 8)
+            ])
+        );
+        // 0x10000 → 32 bits (1, 1); negative value = 32-bit two's complement.
+        assert_eq!(
+            update_item_stat(0x1_0000, 9, -1, 0x100),
+            pack(&[
+                (1, 1),
+                (1, 1),
+                (0x1_0000, 32),
+                (1, 1),
+                (9, 9),
+                (1, 1),
+                (1, 1),
+                (u32::MAX, 32),
+                (1, 1),
+                (0x100, 16)
+            ])
+        );
+        // 0xFFFF stays 16 bits.
+        assert_eq!(
+            update_item_stat(0xFFFF, 1, 0xFFFF, 0xFF),
+            pack(&[
+                (1, 1),
+                (0, 1),
+                (0xFFFF, 16),
+                (1, 1),
+                (1, 9),
+                (1, 1),
+                (0, 1),
+                (0xFFFF, 16),
+                (0, 1),
+                (0xFF, 8)
+            ])
+        );
+    }
 
     // Covers: specs/sim/intents-events.md §7.9 r1
     #[test]
