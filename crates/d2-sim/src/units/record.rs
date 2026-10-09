@@ -71,6 +71,9 @@ pub struct Sequence {
     pub pos: i32,
     /// Event byte per frame index.
     pub events: Vec<u8>,
+    /// Drawn frame per frame index (record +3): the frame setup
+    /// `0x00621210` stores it ·256 in +0x44. Empty: +0x44 is left alone.
+    pub drawn: Vec<u8>,
 }
 
 /// Animation fields (+0x30 … +0x50).
