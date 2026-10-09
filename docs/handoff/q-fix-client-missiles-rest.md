@@ -47,3 +47,29 @@ functions 1/4/5/6/8/11/23/25/43/49/60/63). REC block 540–549.
   hooks, the second pass (§C7 r13).
 - Screen shakes of functions 12, 29, 31, 36, 37, 38, 54, 66: the row
   `q-fix-shake-starts` (REC-62).
+
+## Provisional points (REC 540–545)
+
+REC-540 (timed arc flags / vz), REC-541 (motion getter shifts), REC-542
+(hostility parts the model lacks), REC-543 (a body's child takes its
+parent's direction for the aim nudge), REC-544 (unit flags 0x4 / 0x8; no
+unit footprints on the client grid), REC-545 (client state 86 expiry).
+REC-451 resolved, REC-452 narrowed. Spec gaps: `missiles/client.md` Open
+questions 9–11 (PC 1 Step 4 item 24); `client-bodies-2.md` OQ1 flag 27
+answered from `data/fields.tsv`.
+
+## Gate and real data
+
+Each push: `cargo fmt --check`; `cargo clippy -p d2-sim -p d2-server -p
+d2-client -p test-fixtures --all-targets -- -D warnings`; `cargo nextest
+run` on those crates (7479 passed after the staging-7 merge);
+`tools/coverage.py --check`, `--selftest`; `tools/spec_index.py
+--check`; `tools/methods.py check`. Real install (`D2_GAME_DIR` from
+`tools/cloud-game/fetch.sh`): `cargo test -p d2-client --test
+app_client_drlg client_missile -- --ignored`, 4 passed.
+
+Disk: the d2-client integration test binaries outgrow the cloud disk
+allowance; build with `CARGO_INCREMENTAL=0
+CARGO_PROFILE_DEV_STRIP=symbols CARGO_PROFILE_TEST_STRIP=symbols` (and
+`CARGO_PROFILE_{DEV,TEST}_DEBUG=0`), and delete the private repo clone
+once the install is assembled.
