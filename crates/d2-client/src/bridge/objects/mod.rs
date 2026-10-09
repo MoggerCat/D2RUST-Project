@@ -82,6 +82,28 @@ pub struct ObjClientRow {
     pub overlay: u8,
     /// `HasCollision0`–`7`.
     pub has_collision: [u8; 8],
+    /// `SizeY` (+0xD4), `BlocksVis`, `BlockMissile`, `SubClass`: with
+    /// `SizeX` and `IsDoor`, the footprint box and mask
+    /// (`sim/path-placement.md` §3) the client path sees.
+    pub size_y: u32,
+    pub blocks_vis: u8,
+    pub block_missile: u8,
+    pub sub_class: u8,
+}
+
+impl ObjClientRow {
+    /// The footprint inputs of the row (`sim/path-placement.md` §3).
+    pub fn shape(&self) -> d2_sim::path::ObjectShape {
+        d2_sim::path::ObjectShape {
+            size_x: self.size_x,
+            size_y: self.size_y,
+            is_door: self.is_door != 0,
+            blocks_vis: self.blocks_vis != 0,
+            block_missile: self.block_missile != 0,
+            sub_class: u32::from(self.sub_class),
+            has_collision: self.has_collision.map(|c| c != 0),
+        }
+    }
 }
 
 impl ObjClientRow {
@@ -153,6 +175,10 @@ impl ObjClientRow {
                 o.hascollision6,
                 o.hascollision7,
             ],
+            size_y: o.sizey,
+            blocks_vis: o.blocksvis,
+            block_missile: o.blockmissile,
+            sub_class: o.subclass,
         }
     }
 

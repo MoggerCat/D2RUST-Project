@@ -105,6 +105,12 @@ pub struct OtherUnit {
     pub npc: bool,
     pub in_town: bool,
     pub interact: bool,
+    /// An object: its sizeX × sizeY box and table mask
+    /// (`sim/path-placement.md` §3) in place of the monster pattern.
+    /// PROVISIONAL (REC-1565): the 1.14d client stamps an object's
+    /// footprint where its `HasCollision[mode]` is set, as the server's
+    /// add does (`path-placement.md` §2.5).
+    pub object: Option<d2_sim::path::ObjectShape>,
 }
 
 /// A client monster's footprint mask (`msg-units.md` §3 r2).
@@ -126,19 +132,34 @@ impl ClientPath {
             let Some(room) = room_at(drlg, x, y) else {
                 continue;
             };
-            let shape = UnitShape::Monster(MonsterShape {
-                size_x: i32::from(u.size_x),
-                npc: u.npc,
-                in_town: u.in_town,
-                interact: u.interact,
-                ..MonsterShape::default()
-            });
+            let (shape, mask) = match u.object {
+                Some(o) => (
+                    FootShape::Box {
+                        size_x: o.size_x,
+                        size_y: o.size_y,
+                    },
+                    o.foot_mask(),
+                ),
+                None => {
+                    let shape = UnitShape::Monster(MonsterShape {
+                        size_x: i32::from(u.size_x),
+                        npc: u.npc,
+                        in_town: u.in_town,
+                        interact: u.interact,
+                        ..MonsterShape::default()
+                    });
+                    (
+                        FootShape::Pattern(pattern_of_size(t, i32::from(u.size_x), &shape)),
+                        MONSTER_FOOTPRINT,
+                    )
+                }
+            };
             let fp = Footprint {
                 room: Some(room),
                 x,
                 y,
-                shape: FootShape::Pattern(pattern_of_size(t, i32::from(u.size_x), &shape)),
-                mask: MONSTER_FOOTPRINT,
+                shape,
+                mask,
             };
             add_footprint(&mut rooms, &fp);
             self.others.push(fp);

@@ -88,7 +88,11 @@ pub fn preview_walk_frame(
 ) {
     // `msg-units.md` §3 r2: the living monsters' footprints for the
     // client path (REC-706: at their model positions).
-    let others = other_units(bridge.0.world(), &bridge.0.inputs().tables.monsters);
+    let mut others = other_units(bridge.0.world(), &bridge.0.inputs().tables.monsters);
+    others.extend(other_objects(
+        bridge.0.world(),
+        &bridge.0.inputs().objclient.rows,
+    ));
     walk.predict.set_others(others);
     walk.frame(bridge.0.world());
     state.feed.set_local_prediction(walk.local_at());
@@ -133,7 +137,37 @@ pub fn other_units(
                 npc: c.npc,
                 in_town: c.in_town,
                 interact: c.interact,
+                object: None,
             })
+        })
+        .collect()
+}
+
+/// The model's objects whose `HasCollision` of their mode is set, with a
+/// cell and an `objects` row: the client path's object footprints
+/// (PROVISIONAL REC-1565, [`crate::bridge::client_path::OtherUnit::object`]).
+pub fn other_objects(
+    world: &ClientWorld,
+    rows: &[crate::bridge::objects::ObjClientRow],
+) -> Vec<crate::bridge::client_path::OtherUnit> {
+    world
+        .units
+        .values()
+        .filter(|u| u.key.unit_type == crate::bridge::world::OBJECT)
+        .filter_map(|u| {
+            let (x, y) = u.position?;
+            let shape = rows.get(u.class as usize)?.shape();
+            shape
+                .collides_in(u.mode)
+                .then_some(crate::bridge::client_path::OtherUnit {
+                    x,
+                    y,
+                    size_x: shape.size_x as i8,
+                    npc: false,
+                    in_town: false,
+                    interact: false,
+                    object: Some(shape),
+                })
         })
         .collect()
 }

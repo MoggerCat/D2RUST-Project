@@ -2060,3 +2060,66 @@ fn the_client_path_stops_short_of_a_monster_footprint() {
         "the NPC's footprint stops the walk"
     );
 }
+
+// PROVISIONAL REC-1565: the client path sees the model's objects whose
+// `HasCollision` of their mode is set (`sim/path-placement.md` §2.5, §3),
+// so a walk onto a town torch (objects class 37) stops short of it, as
+// the server's does.
+#[test]
+#[ignore = "needs the D2 install (D2_GAME_DIR)"]
+fn the_client_path_stops_short_of_an_object_footprint() {
+    use d2_client::bridge::client_path::{ClientPath, Own, PathTo};
+    use d2_client::bridge::predict::{MoveStats, Speeds};
+    let mut run = Run::start();
+    run.step(4);
+    let bridge = run.bridge();
+    let world = bridge.world();
+    let objects =
+        d2_client::world_view::walk::other_objects(world, &bridge.inputs().objclient.rows);
+    let me = world.local_cell().expect("the player's cell");
+    let torch = *objects
+        .iter()
+        .filter(|u| u.object.is_some_and(|o| (o.size_x, o.size_y) == (1, 1)))
+        .min_by_key(|u| {
+            (i32::from(u.x) - i32::from(me.0)).abs() + (i32::from(u.y) - i32::from(me.1)).abs()
+        })
+        .expect("a 1 × 1 object with collision in the model");
+    let drlg = &world.drlg.as_ref().expect("the client DRLG").drlg;
+    let t = d2_sim::path::tables::PathTables::spec().unwrap();
+    let speeds = Speeds { walk: 6, run: 9 };
+    let own = Own {
+        stamina: 0x6400,
+        moves: MoveStats::CREATION,
+    };
+    let end = |stamp: bool| {
+        let mut p = ClientPath::default();
+        assert!(p.place(&t, drlg, me.0, me.1), "the player's room is active");
+        if stamp {
+            p.stamp_others(&t, drlg, &objects);
+        }
+        let to = PathTo::Point(torch.x, torch.y);
+        if !p.request(&t, drlg, speeds, own, to, false) {
+            return me;
+        }
+        for _ in 0..400 {
+            if stamp {
+                p.stamp_others(&t, drlg, &objects);
+            }
+            if !p.tick(&t, drlg, speeds, own, Some(to)) {
+                break;
+            }
+        }
+        let (x, y) = p.position().unwrap();
+        ((x >> 16) as u16, (y >> 16) as u16)
+    };
+    assert_eq!(
+        end(false),
+        (torch.x, torch.y),
+        "no footprint: the walk ends on the object"
+    );
+    assert_ne!(
+        end(true),
+        (torch.x, torch.y),
+        "the object's footprint stops the walk"
+    );
+}
