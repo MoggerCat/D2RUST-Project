@@ -33,8 +33,8 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
     /// The save-format view of `u` (`items/bitstream.md` §5): the stream
     /// view at its own page with unit +0x28 (the unit record's init seed,
     /// `units.md` §2) and the items of its own inventory as children, in
-    /// list order (§2 rule 5). The trailer values are not named (Open
-    /// question 3): none.
+    /// list order (§2 rule 5). The trailer is the item's +0x1C / +0x20
+    /// (§5 rule 2).
     pub fn save_view(&self, u: UnitId) -> Option<StreamItem> {
         let page = self.state.items.get(&u)?.page;
         let mut v = self.stream_item(self.guid_of(u), 0, page)?;
@@ -53,11 +53,34 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         Some(v)
     }
 
+    /// The units of [`Self::save_view`] in its write order: `u`, then each
+    /// child's own, depth first (the units that have a view).
+    fn save_units(&self, u: UnitId) -> Vec<UnitId> {
+        let has_view = self.state.items.get(&u).is_some_and(|d| {
+            self.econ.units.get(u).is_some()
+                && self.stream_item(self.guid_of(u), 0, d.page).is_some()
+        });
+        if !has_view {
+            return Vec::new();
+        }
+        let mut out = vec![u];
+        if let Some(inv) = self.state.inventories.get(&u) {
+            for &c in inv.items() {
+                out.extend(self.save_units(c));
+            }
+        }
+        out
+    }
+
     /// One child record of §7.3 step 5 / `d2s.md` §8.2 rule 4: read as
     /// step 3 with no room (failure → none; the copy and the children read
     /// so far stay), mode 4, socketed into `parent`, flags 0x80000 /
-    /// 0x2000, command flag 0x1 cleared. `parent` has an inventory.
+    /// 0x2000, command flag 0x1 cleared. `parent` has an inventory. A
+    /// failed record (`bitstream-legacy.md` §3 rule 12) makes no item.
     pub(crate) fn insert_filler(&mut self, parent: UnitId, rec: &read::ReadItem) -> Option<UnitId> {
+        if rec.failed {
+            return None;
+        }
         let cg = self.guid_of(parent);
         let child = match self.econ.item_from_record(rec, None) {
             Ok(c) => c,
@@ -128,12 +151,23 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         // not fit has length 0 and step 3's read fails.
         let view = self.save_view(src)?;
         let mut w = BitWriter::new(COPY_BUFFER);
-        bitstream::write_save_into(&mut w, &view, &self.econ.tables.isc);
+        let wbs = bitstream::write_save_into(&mut w, &view, &self.econ.tables.isc);
         let bytes = w.finish().unwrap_or_default();
+        // `bitstream.md` Outputs: the writer's changes (item level < 1 →
+        // 1, quality outside 1–9 → 2) stay on the source and each child
+        // (§2 rule 5), in write order.
+        for (u, wb) in self.save_units(src).into_iter().zip(wbs) {
+            if let Some(it) = self.econ.items.get_mut(u) {
+                it.ilvl = wb.ilvl;
+                it.quality = wb.quality;
+            }
+        }
         // 3. The first record: class from the code, the unit allocated at
         // the record's mode and decoded; flags 0x80000 / 0x2000; timers.
         let mut r = read::BitReader::new(&bytes);
-        let first = read::read_save_record(&mut r, self.econ.tables).ok()?;
+        let first = read::read_save_record(&mut r, self.econ.tables)
+            .ok()
+            .filter(|f| !f.failed)?;
         let copy = match self.econ.item_from_record(&first, room) {
             Ok(c) => c,
             Err(e) => {

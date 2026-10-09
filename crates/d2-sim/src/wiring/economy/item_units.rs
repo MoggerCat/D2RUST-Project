@@ -93,6 +93,8 @@ pub(super) fn swap_stats<A, B>(i: Item<A>, stats: B) -> (Item<B>, A) {
         start_seed,
         name,
         ear_level,
+        realm_data,
+        fatal,
         stats: old,
     } = i;
     let item = Item {
@@ -115,6 +117,8 @@ pub(super) fn swap_stats<A, B>(i: Item<A>, stats: B) -> (Item<B>, A) {
         start_seed,
         name,
         ear_level,
+        realm_data,
+        fatal,
         stats,
     };
     (item, old)

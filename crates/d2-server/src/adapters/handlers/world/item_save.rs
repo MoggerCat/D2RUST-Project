@@ -42,8 +42,12 @@ impl<R, S> WiredWorld<R, S> {
         };
         let out = self.with_economy(game, events, |econ, _| {
             let isc = econ.tables.isc.clone();
-            let d = inv.desk(econ);
-            item_list(&d, player, &isc).map_err(|e| e.to_string())
+            let mut d = inv.desk(econ);
+            let out = item_list(&d, player, &isc).map_err(|e| e.to_string());
+            // `items/bitstream.md` Outputs: the writer's changes stay on
+            // the items (every later save and message sees them).
+            d.apply_write_backs();
+            out
         });
         self.inventory = Some(inv);
         out
@@ -166,5 +170,6 @@ fn fault(f: &LoadFault) -> &'static str {
         LoadFault::NoInventory => "the owner has no inventory",
         LoadFault::NoRoom => "no place for the item (freed)",
         LoadFault::StaleRuneword => "runeword flag without a matching runeword (freed)",
+        LoadFault::RecordFailed => "the record failed to read (entry skipped)",
     }
 }

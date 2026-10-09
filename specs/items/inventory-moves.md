@@ -16,12 +16,12 @@
 | Summary | 27–33 |
 | Rules | 34–35 |
 |   6. Deferred item messages | 36–129 |
-|   7. Intents | 130–686 |
-|   8. Pickup from the ground | 687–868 |
-|   9. Drop to the ground | 869–916 |
-|   10. Gold | 917–956 |
-|   11. Message layouts | 957–986 |
-|   12. Corpse take-back (`0x0057FB70` → `0x00562F30`) | 987–1114 |
+|   7. Intents | 130–691 |
+|   8. Pickup from the ground | 692–873 |
+|   9. Drop to the ground | 874–921 |
+|   10. Gold | 922–961 |
+|   11. Message layouts | 962–991 |
+|   12. Corpse take-back (`0x0057FB70` → `0x00562F30`) | 992–1119 |
 <!-- /index -->
 
 ## Summary
@@ -379,6 +379,11 @@ src, src freed (`0x00557FD0`: the unit is taken off any player's
 inventory list or cursor still holding it, then freed by `0x00555600`
 (`sim/units.md` §3.2); nothing else, `world/cube.md` §8 "Exact" rule 1). Then dst command flag 0x100 (0x9C action
 0xA), update list, refresh. (Different classes never pass `inventory.md` §4.5.)
+PROVISIONAL: `0x00629930(src)` is read as gating only the stat-72 step
+(as §8.1's auto-stack), so items without durability (quivers, keys)
+merge too (because the sentence above leaves its scope open); settled by
+a read of `0x0055E590`'s branch or a recording of two arrow quivers
+merged with 0x21 (REC-289).
 
 #### 7.13 0x22 UnstackItems (`0x0054B380`)
 

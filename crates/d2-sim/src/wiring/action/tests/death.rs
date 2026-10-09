@@ -534,6 +534,122 @@ fn the_gate_stops_the_drop() {
     }
 }
 
+/// Find Item (`treasure.md` §3.6): no gate, so a corpse whose gate
+/// refuses (unit flag 0x20000) still drops; the walk draws on the
+/// corpse's unit seed (`roll(1)` of the gold pick) with the caster as R,
+/// and the item is created and placed as a death drop's.
+// Covers: specs/items/treasure.md §3.6
+#[test]
+fn find_item_drops_from_the_corpse_without_the_gate() {
+    let mut fx = Fx::new();
+    let (mut d, p, mon) = drop_setup(&mut fx);
+    fx.sim.sys.units.get_mut(mon).unwrap().flags |= 0x20000;
+    let mut want_mon = fx.sim.sys.units.get(mon).unwrap().seed;
+    want_mon.roll(1);
+    let out = {
+        let s = &mut fx.sim.sys;
+        let mut sim = Sim {
+            game: &mut fx.game,
+            units: &mut s.units,
+            stats: &mut s.stats,
+            data: &s.data,
+        };
+        crate::wiring::economy::find_item_drop(&mut s.hooks, &mut sim, &mut d, &mut Here, mon, p)
+    };
+    assert!(d.failures.is_empty() && d.errors.is_empty());
+    assert_eq!(out.len(), 1);
+    assert_eq!(d.placed.len(), 1);
+    assert!(fx.stat(out[0], GOLD_STAT) > 0);
+    assert_eq!(fx.sim.sys.units.get(mon).unwrap().seed, want_mon);
+    fx.assert_clean();
+}
+
+/// `treasure.md` §7 step 2 (`0x00555DEC`): a monster at the east edge of
+/// room A whose start (x + 2, y + 3) lies in room B: the free-spot search
+/// gets the monster's room A, never the start lookup's B; the start-spot
+/// fill ([`crate::wiring::economy::StartSpot`]) keeps the start in B.
+// Covers: specs/items/treasure.md §7 r2
+#[test]
+fn the_free_spot_search_gets_the_monsters_room() {
+    let mut fx = Fx::new();
+    let (mut d, p, _) = drop_setup(&mut fx);
+    let mon = fx.spawn(UnitType::Monster, 0, fx.a, 38, 10);
+    fx.stats(mon, &[(LEVEL_STAT, 3)]);
+    let (a, b) = (fx.a, fx.b);
+    let run = |fx: &mut Fx, d: &mut DeathDrops, mon: UnitId, start_spot: bool| {
+        let s = &mut fx.sim.sys;
+        let mut sim = Sim {
+            game: &mut fx.game,
+            units: &mut s.units,
+            stats: &mut s.stats,
+            data: &s.data,
+        };
+        if start_spot {
+            monster_death_drop(
+                &mut s.hooks,
+                &mut sim,
+                d,
+                &mut crate::wiring::economy::StartSpot,
+                mon,
+                Some(p),
+            )
+        } else {
+            monster_death_drop(&mut s.hooks, &mut sim, d, &mut Here, mon, Some(p))
+        }
+    };
+    assert_eq!(run(&mut fx, &mut d, mon, false).len(), 1);
+    assert_eq!(
+        d.placed[0].1,
+        DropSpot {
+            room: Some(a),
+            x: 40,
+            y: 13
+        }
+    );
+    let mon2 = fx.spawn(UnitType::Monster, 0, fx.a, 38, 10);
+    fx.stats(mon2, &[(LEVEL_STAT, 3)]);
+    assert_eq!(run(&mut fx, &mut d, mon2, true).len(), 1);
+    assert_eq!(
+        d.placed[1].1,
+        DropSpot {
+            room: Some(b),
+            x: 40,
+            y: 13
+        }
+    );
+}
+
+/// `treasure.md` §5.4 step 2: the player count `0x00535790` counts the
+/// players not dead (`0x005541B0`: mode 0 or 17, flag 0x10000); the
+/// `players` command `0x00535780` ignores values above 8.
+// Covers: specs/items/treasure.md §5.4 r2
+#[test]
+fn living_players_and_the_players_setting() {
+    let mut fx = Fx::new();
+    let (mut d, p, _) = drop_setup(&mut fx);
+    let q = fx.spawn(UnitType::Player, 1, fx.a, 12, 12);
+    let count = |fx: &mut Fx| {
+        let s = &mut fx.sim.sys;
+        let sim = Sim {
+            game: &mut fx.game,
+            units: &mut s.units,
+            stats: &mut s.stats,
+            data: &s.data,
+        };
+        crate::wiring::economy::death::living_players(&sim)
+    };
+    for (u, mode) in [(p, 1), (q, 1)] {
+        fx.sim.sys.units.get_mut(u).unwrap().mode = mode;
+    }
+    assert_eq!(count(&mut fx), 2);
+    fx.sim.sys.units.get_mut(q).unwrap().mode = 17;
+    assert_eq!(count(&mut fx), 1);
+    d.set_players(8);
+    assert_eq!(d.players_setting, 8);
+    d.set_players(9);
+    assert_eq!(d.players_setting, 8);
+}
+
 /// The drop fixture with the path provider on and the synthetic
 /// walk-back field (`path::search` tests: vectors F1–F3) loaded.
 fn drop_setup_paths(fx: &mut Fx) -> (DeathDrops, UnitId, UnitId) {

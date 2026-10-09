@@ -4,6 +4,7 @@
 mod affixes;
 mod cov_items;
 mod create;
+mod format0;
 mod gaps_affixes;
 mod gaps_generation;
 mod gaps_props;

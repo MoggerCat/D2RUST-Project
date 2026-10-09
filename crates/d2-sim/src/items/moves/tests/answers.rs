@@ -347,6 +347,8 @@ fn use_grid_item_quest_items() {
     assert_eq!(run(&mut f, &m32(0x20, &[10, 100, 100])), Ok(res::OK));
     assert_eq!(f.stat(me(), 5), 1);
     assert!(f.logged("quest_flag 9 5 false") && f.logged("consume_item 10"));
+    // `0x005458E0(player, 8)`.
+    assert!(f.logged("quest_used 8"));
     // Flag clear → sound only.
     let mut f = quest_item(b"ass ");
     assert_eq!(run(&mut f, &m32(0x20, &[10, 100, 100])), Ok(res::OK));
@@ -356,11 +358,13 @@ fn use_grid_item_quest_items() {
     f.k.quest_flags.insert((20, 5));
     assert_eq!(run(&mut f, &m32(0x20, &[10, 100, 100])), Ok(res::OK));
     assert_eq!(f.stat(me(), 7), 0x1400);
+    assert!(f.logged("quest_used 18"));
     // `tr2`: (37, 8) set and (37, 7) clear → (37, 7) set.
     let mut f = quest_item(b"tr2 ");
     f.k.quest_flags.insert((37, 8));
     assert_eq!(run(&mut f, &m32(0x20, &[10, 100, 100])), Ok(res::OK));
     assert!(f.logged("quest_flag 37 7 true") && f.logged("tr2"));
+    assert!(f.logged("quest_used 33"));
     // `toa`: skills and stats reset.
     let mut f = quest_item(b"toa ");
     assert_eq!(run(&mut f, &m32(0x20, &[10, 100, 100])), Ok(res::OK));

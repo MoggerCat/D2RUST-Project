@@ -1,8 +1,9 @@
 // Spec: specs/items/affixes.md
 //! Magic affix ids and slots (§1), the affix level (§2), the magic affix
 //! roller and its fit tests (§3–§4), rare names (§5) and the magic, rare,
-//! crafted, tempered, charm and automagic routines (§6–§11). All draws
-//! use the item seed.
+//! crafted, tempered, charm and automagic routines (§6–§11), with the
+//! format-0 roller, rare names, rare and crafted routines (§12). All
+//! draws use the item seed.
 
 use super::create::{class_skill_mods, max_sockets};
 use super::props::apply_affix;
@@ -117,8 +118,9 @@ fn item_class<S>(t: &ItemTables, item: &Item<S>) -> u8 {
 }
 
 /// Magic affix roller (`0x005C1560`, §3; wrappers `0x005C18E0`,
-/// `0x005C1940`). `preferred` is 1-based within the part (≤ 0 none);
-/// `group` ≠ 0 selects the automagic part. Returns the affix id or 0.
+/// `0x005C1940`, which send a format-0 item to §12.1). `preferred` is
+/// 1-based within the part (≤ 0 none); `group` ≠ 0 selects the automagic
+/// part. Returns the affix id or 0.
 #[allow(clippy::too_many_arguments)]
 pub fn roll_affix<S: ItemStats>(
     t: &ItemTables,
@@ -130,7 +132,19 @@ pub fn roll_affix<S: ItemStats>(
     preferred: i32,
     group: i32,
 ) -> u16 {
-    // TODO(items affixes.md OQ 2): format-0 roller `0x005C12F0` unspecified.
+    if item.format < 1 {
+        // §12.1: the wrappers drop the group, so a format-0 call with a
+        // group rolls a plain prefix.
+        return roll_affix_legacy(
+            t,
+            item,
+            spawnable,
+            force,
+            assign,
+            prefix || group != 0,
+            preferred,
+        );
+    }
     let which = if group != 0 {
         Part::Auto
     } else if prefix {
@@ -204,6 +218,63 @@ pub fn roll_affix<S: ItemStats>(
     pick
 }
 
+/// Magic affix roller, format 0 (`0x005C12F0`, §12.1): alvl = the item
+/// level plus 2, filter by spawnable, version, `level` and fit only, an
+/// unweighted pick, and a preferred row that replaces the pick only when
+/// listed.
+fn roll_affix_legacy<S: ItemStats>(
+    t: &ItemTables,
+    item: &mut Item<S>,
+    spawnable: bool,
+    force: bool,
+    assign: bool,
+    prefix: bool,
+    preferred: i32,
+) -> u16 {
+    let (first, len) = part(t, if prefix { Part::Prefix } else { Part::Suffix });
+    if item.item_seed.step() & 1 == 0 && !force {
+        return 0;
+    }
+    let a = item.item_level().wrapping_add(2).clamp(1, 99);
+    // (combined index, row index in the magic array)
+    let mut cands: Vec<usize> = Vec::new();
+    for i in first..first + len {
+        if cands.len() >= MAX_CANDIDATES {
+            break;
+        }
+        let row = &t.magic[i];
+        if (!spawnable || row.spawnable != 0)
+            && (row.version < 100 || item.format >= 100)
+            && row.level <= a
+            && magic_fits(t, item, row)
+        {
+            cands.push(i);
+        }
+    }
+    if cands.is_empty() {
+        return 0;
+    }
+    let r = item.item_seed.roll_range(0, cands.len() as i32) as usize;
+    let row = cands[r];
+    // Step 6: the preferred row replaces the pick when listed; else the id
+    // becomes −1 (returned as 0) while candidate r's row stays.
+    let id: i64 = if preferred > 0 {
+        let want = first as i64 + i64::from(preferred) - 1;
+        if cands.iter().any(|&c| c as i64 == want) {
+            want
+        } else {
+            -1
+        }
+    } else {
+        row as i64
+    };
+    if assign {
+        let assigned = if id >= 0 { id as usize } else { row };
+        apply_affix(t, item, (assigned + 1) as u16);
+    }
+    (id + 1) as u16
+}
+
 /// Rare affix fits (`0x0065E710`, §4.3).
 fn rare_fits<S>(t: &ItemTables, item: &Item<S>, i: usize) -> bool {
     let row = &t.rare[i];
@@ -213,7 +284,9 @@ fn rare_fits<S>(t: &ItemTables, item: &Item<S>, i: usize) -> bool {
         && any_type(t, item.record, &row.itype)
 }
 
-/// Rare name pick (`0x005C1AB0`, §5): a rare id or 0.
+/// Rare name pick (`0x005C1AB0`, §5): a rare id or 0. Format 0 takes
+/// `0x005C19A0` (§12.2), whose logic is the same: this function serves
+/// both.
 pub fn rare_name<S>(t: &ItemTables, item: &mut Item<S>, prefix: bool) -> u16 {
     let (first, len) = if prefix {
         (t.n_rare_suffix, t.rare.len() - t.n_rare_suffix)
@@ -272,10 +345,14 @@ fn interleaved_props<S: ItemStats>(t: &ItemTables, item: &mut Item<S>) {
     }
 }
 
-/// Rare item (`0x005C21A0` → `0x005C1BF0`, §7).
+/// Rare item (`0x005C21A0` → `0x005C1BF0`, §7; format 0 →
+/// `0x005C1E80`, §12.3).
 pub fn rare<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, rq: &ItemRequest) -> bool {
     if t.itype_of(item.record).is_none_or(|it| it.rare == 0) {
         return false;
+    }
+    if item.format < 1 {
+        return rare_legacy(t, item, rq);
     }
     let rp = rare_name(t, item, true);
     let rs = rare_name(t, item, false);
@@ -336,7 +413,78 @@ pub fn rare<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, rq: &ItemRequest) 
     true
 }
 
-/// Crafted item (`0x005C21D0`, §8).
+/// The taken test of §8 step 3.2: a filled slot of the kind (empty ones
+/// skipped) holds `a` or an affix of `a`'s group. `a`'s group is read
+/// without a record test (edge case 3): `a` = 0 with a filled slot is
+/// [`Fatal::NullAffixGroup`].
+fn taken(t: &ItemTables, slots: [u16; 3], a: u16) -> Result<bool, Fatal> {
+    let filled: Vec<u16> = slots.iter().copied().filter(|&x| x != 0).collect();
+    if filled.is_empty() {
+        return Ok(false);
+    }
+    // Edge case 3: the group of id 0 is read from address 0x5C.
+    let g = affix(t, a).ok_or(Fatal::NullAffixGroup)?.group;
+    Ok(filled
+        .iter()
+        .any(|&x| x == a || affix(t, x).is_some_and(|r| r.group == g)))
+}
+
+/// Rare item, format 0 (`0x005C1E80`, §12.3): count 4–6 (jewels 3–4),
+/// the kind step on every pass, no preferences, up to 252 tries per pass
+/// with the §8 taken test.
+fn rare_legacy<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, rq: &ItemRequest) -> bool {
+    let rp = rare_name(t, item, true);
+    let rs = rare_name(t, item, false);
+    if rp == 0 || rs == 0 {
+        return false;
+    }
+    item.rare_prefix = rp;
+    item.rare_suffix = rs;
+    let jewel = t
+        .item(item.record)
+        .is_some_and(|r| r.type_ == ty::JEWL as i16);
+    let n = if jewel {
+        item.item_seed.roll_range(3, 2)
+    } else {
+        item.item_seed.roll_range(4, 3)
+    };
+    let (mut np, mut ns) = (0usize, 0usize);
+    for _ in 0..n {
+        let lo = item.item_seed.step();
+        let suffix = np == 3 || (ns != 3 && lo & 1 == 1);
+        for _ in 0..CRAFTED_TRIES {
+            let a = roll_affix(t, item, true, true, false, !suffix, 0, 0);
+            if a == 0 {
+                break;
+            }
+            let slots = if suffix { item.suffix } else { item.prefix };
+            // `a` ≠ 0 has a record, so the group read cannot fail.
+            if !taken(t, slots, a).unwrap_or(true) {
+                if suffix {
+                    item.suffix[ns] = a;
+                    ns += 1;
+                } else {
+                    item.prefix[np] = a;
+                    np += 1;
+                }
+                break;
+            }
+            // All 252 taken: slot P (S) := 0, not advanced (it is
+            // still empty here).
+        }
+    }
+    if np == 0 && ns == 0 {
+        return false;
+    }
+    item.flags &= !flag::IDENTIFIED;
+    interleaved_props(t, item);
+    class_skill_mods(t, item, rq);
+    true
+}
+
+/// Crafted item (`0x005C21D0`, §8; format 0, §12.4: the same routine
+/// with §12.2 names and the §12.1 roller, both reached through the
+/// format dispatch of [`rare_name`] and [`roll_affix`]).
 pub fn crafted<S: ItemStats>(
     t: &ItemTables,
     item: &mut Item<S>,
@@ -366,17 +514,7 @@ pub fn crafted<S: ItemStats>(
         for _ in 0..CRAFTED_TRIES {
             let a = roll_affix(t, item, true, true, false, !suffix, pref, 0);
             let slots = if suffix { item.suffix } else { item.prefix };
-            let filled: Vec<u16> = slots.iter().copied().filter(|&x| x != 0).collect();
-            let taken = if filled.is_empty() {
-                false
-            } else {
-                // Edge case 3: the group of id 0 is read from address 0x5C.
-                let g = affix(t, a).ok_or(Fatal::NullAffixGroup)?.group;
-                filled
-                    .iter()
-                    .any(|&x| x == a || affix(t, x).is_some_and(|r| r.group == g))
-            };
-            if !taken {
+            if !taken(t, slots, a)? {
                 stored = Some(a);
                 break;
             }

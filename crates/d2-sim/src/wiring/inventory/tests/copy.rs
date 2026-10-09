@@ -132,6 +132,7 @@ fn a_stream_over_the_buffer_copies_nothing() {
 #[test]
 fn children_and_the_fillers_argument() {
     let mut w = world();
+    super::load::allow_sockets(&mut w.tables, SWORD, 2);
     let s = w.cursor_item(SWORD);
     let su = w.unit(s).unwrap();
     w.items.get_mut(su).unwrap().flags |= 0x800;
@@ -302,4 +303,29 @@ fn copy_list_entries_raise_base_damage_and_set_poison_count() {
     };
     assert_eq!(get(&mut w, 17), 40);
     assert_eq!(get(&mut w, 326), 1, "poison_count := 1 beside stat 57");
+}
+
+/// `bitstream.md` Outputs, §2 rule 5: the copy's save stream changes the
+/// source and its children like any save (item level < 1 → 1, quality
+/// outside 1–9 → 2).
+// Covers: specs/items/bitstream.md §2 r5, §4.1 r8, §4.3 r7
+#[test]
+fn the_copy_stream_writes_back_to_the_source_and_its_children() {
+    let mut w = world();
+    let s = w.cursor_item(SWORD);
+    let su = w.unit(s).unwrap();
+    w.items.get_mut(su).unwrap().ilvl = 0;
+    w.state.add_inventory(su, UnitKind::Item, s);
+    let k = w.ground_item(KEY, 22, 21);
+    let ku = w.unit(k).unwrap();
+    w.desk(|d| {
+        let mut inv = d.state.inventories.remove(&su).unwrap();
+        inv.link(d, ku, None);
+        d.state.inventories.insert(su, inv);
+    });
+    w.items.get_mut(ku).unwrap().quality = 0;
+    w.items.get_mut(ku).unwrap().ilvl = 4;
+    w.desk(|d| d.copy_of(su, false)).expect("copied");
+    let (a, b) = (w.items.get(su).unwrap(), w.items.get(ku).unwrap());
+    assert_eq!((a.ilvl, b.ilvl, b.quality), (1, 4, 2));
 }

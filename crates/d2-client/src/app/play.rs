@@ -497,6 +497,11 @@ pub fn add_live_client(app: &mut App, link: DynLink, c: LiveClient) -> anyhow::R
         }
         Err(e) => warn!("item tips (d2rs-own, unverified): {e}; no tool tips"),
     }
+    // The equip-box click's §4.3 tables (`ui::panels::inv_items` `equip`).
+    match d2_sim::items::inventory::InvTables::from_fixed(&d.tables.fixed) {
+        Ok(t) => item_parts.inv_tables = Some(std::sync::Arc::new(t)),
+        Err(e) => warn!("inventory tables: {e}; equipment boxes take no clicks"),
+    }
     super::items::add_items(app, archives.source(), item_parts);
     let effects = super::missile_art::effect_rows(archives.as_ref()).map_err(anyhow::Error::msg)?;
     super::missile_art::add_missiles(app, archives.source(), effects);

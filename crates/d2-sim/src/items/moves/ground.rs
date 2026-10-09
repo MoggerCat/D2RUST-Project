@@ -453,11 +453,11 @@ fn book_onto_tome<W: MoveWorld>(w: &mut W, player: Owner, p: Guid) -> Result<boo
         w.send_item_stat(player, t, stat::QUANTITY);
         w.set_stat(po, stat::QUANTITY, qt.wrapping_add(qp).wrapping_sub(m));
         w.send_item_stat(player, p, stat::QUANTITY);
-        w.book_count_changed(player, m.wrapping_sub(qt));
+        w.book_count_changed(player, t, m.wrapping_sub(qt));
     } else {
         w.set_stat(to, stat::QUANTITY, qt.wrapping_add(qp));
         w.send_item_stat(player, t, stat::QUANTITY);
-        w.book_count_changed(player, qp);
+        w.book_count_changed(player, t, qp);
         consume_picked(w, player, p);
     }
     Ok(true)
@@ -500,7 +500,7 @@ fn auto_stack<W: MoveWorld>(w: &mut W, player: Owner, p: Guid) -> bool {
             w.send_item_stat(player, d, stat::QUANTITY);
             w.set_stat(po, stat::QUANTITY, 0);
             if books(w, d) {
-                w.book_count_changed(player, q);
+                w.book_count_changed(player, d, q);
             }
             consume_picked(w, player, p);
             return true;
@@ -509,7 +509,7 @@ fn auto_stack<W: MoveWorld>(w: &mut W, player: Owner, p: Guid) -> bool {
         w.send_item_stat(player, d, stat::QUANTITY);
         w.set_stat(po, stat::QUANTITY, q.wrapping_add(qd).wrapping_sub(m));
         if books(w, d) {
-            w.book_count_changed(player, m.wrapping_sub(qd));
+            w.book_count_changed(player, d, m.wrapping_sub(qd));
         }
     }
     false

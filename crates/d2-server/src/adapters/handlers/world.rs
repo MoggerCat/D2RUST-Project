@@ -1241,5 +1241,7 @@ pub fn preview_inv_parts(tables: InvTables) -> InvParts {
     // PROVISIONAL (REC-161, d2rs-own, unverified): worn items feed the
     // wearer's stats, set bonuses included (`wiring/inventory/item_link.rs`).
     parts.state.link_item_stats = true;
+    // The item-move effects (gold rest pile, 0x5D) on the desk.
+    parts.state.move_effects = true;
     parts
 }
