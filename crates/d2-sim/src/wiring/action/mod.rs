@@ -164,6 +164,14 @@ pub struct HirelingAiFacts {
 
 /// The [`crate::units::hooks::UnitHooks`] of [`ActionSim`]'s unit system
 /// and the state every action adapter shares.
+/// A room's last-dead ring: four (unit, GUID) slots in memory order and
+/// the ring index.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct LastDead {
+    pub slots: [Option<(crate::units::UnitId, u32)>; 4],
+    pub index: u8,
+}
+
 pub struct ActionHooks<X> {
     pub tables: Arc<ActionTables>,
     pub drlg: DrlgWorld,
@@ -288,6 +296,10 @@ pub struct ActionHooks<X> {
     pub monster_world: Option<Box<dyn MonsterWorld<X>>>,
     /// The monster world is taken out for a call.
     monster_world_out: bool,
+    /// Each room's ring of its last four dead monsters (room +0x38..+0x44
+    /// GUIDs, ring index byte +0x14; `0x0061AFA0`, `units.md` §4.6 rule
+    /// 1.3), read by the Fallen's corpse check.
+    pub last_dead: BTreeMap<crate::units::RoomId, LastDead>,
     /// The quest control lent by the host that holds it
     /// ([`objects::QuestObjectHost`]): a quest init, operate or object
     /// event 7 the object module hands back runs on it at once, inside the
@@ -436,6 +448,7 @@ impl<X> ActionHooks<X> {
             monster_request: 0,
             monster_world: None,
             monster_world_out: false,
+            last_dead: BTreeMap::new(),
             quest_host: None,
             quest_host_out: false,
             deferred_inits: None,
