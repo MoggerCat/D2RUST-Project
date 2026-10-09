@@ -22,7 +22,7 @@ fn add(fx: &mut Fx, receiver: UnitId, unit: UnitId) -> Vec<Vec<u8>> {
 /// §7.2 part B (`0x005489F0`): another player's base velocity, attack
 /// rate, level, strength and dexterity (stats 67, 68, 12, 0, 2) go first
 /// as 0x20; the receiver's own part B has none.
-// Covers: specs/client/msg-stats-items.md §1 r4.1-4.2
+// Covers: specs/client/msg-stats-items.md §1 r4
 #[test]
 fn player_part_b_sends_the_five_0x20_stats_to_others_only() {
     let mut fx = Fx::new();
@@ -48,7 +48,7 @@ fn player_part_b_sends_the_five_0x20_stats_to_others_only() {
 /// `missiles.md` §R2.4 rules 1-9: the position is the path's cells
 /// (`precise >> 16`), the first point is the target while the velocity is
 /// non-zero (else 0, 0), and the message is sent for velocity 0 too.
-// Covers: specs/missiles/missiles.md R2.4
+// Covers: specs/missiles/missiles.md §r2-4-client-message
 #[test]
 fn client_missile_0x73_field_sources() {
     for (velocity, first) in [(5u32, (300u32, 400u32)), (0, (0, 0))] {

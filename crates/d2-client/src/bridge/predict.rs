@@ -1100,7 +1100,7 @@ mod tests {
         assert_eq!(walked, 6 * 0x1000);
     }
 
-    // Covers: specs/seams/movement-prediction.md §2.5 r3; specs/client/model.md OQ2
+    // Covers: specs/seams/movement-prediction.md §2.5 r3; specs/client/model.md §6
     #[test]
     fn a_raw_stamina_below_256_walks_on_the_client() {
         // Server raw stamina 100 reaches the model as 0x96 stamina

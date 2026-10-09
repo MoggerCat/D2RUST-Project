@@ -158,7 +158,7 @@ fn cast_at(fx: &mut Fx, p: UnitId, at: (i32, i32), base: i32) -> i32 {
     fx.sim.skill_use(game, |w| do_skill(w, &t, p, 0, base))
 }
 
-// Covers: specs/sim/pets.md §10 "Resync", §4, edge case 5
+// Covers: specs/sim/pets.md §10, §4
 #[test]
 fn a_lower_skill_level_resyncs_the_maximum_and_trims_the_list() {
     use crate::skills::use_::bodies::BodyWorld;

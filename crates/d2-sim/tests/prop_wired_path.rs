@@ -291,11 +291,16 @@ fn host(s: &Setup) -> Host {
         let p = fx
             .sim
             .action
-            .with(&mut fx.game, |g, v| v.allocate(g, &req, x, y))
+            .with(&mut fx.game, |g, v| {
+                // Players start in mode 0; the player mode starts are
+                // not run here: neutral, set before `SUNIT_Add` so the
+                // dead-body path settings do not apply (as the action
+                // fixture does).
+                let u = v.allocate_unadded(g, &req)?;
+                v.units.get_mut(u).unwrap().mode = 1;
+                v.add_allocated(g, u, &req, x, y).then_some(u)
+            })
             .expect("allocated");
-        // Players start in mode 0; the player mode starts are not run
-        // here: neutral (as the action fixture does).
-        fx.sim.action.sys.units.get_mut(p).unwrap().mode = 1;
         fx.sim.action.with(&mut fx.game, |_, v| {
             v.set_base(p, STAT_VELOCITY, 100);
             v.set_base(p, STAT_STAMINA, s.stamina);

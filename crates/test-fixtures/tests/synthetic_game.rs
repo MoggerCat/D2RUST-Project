@@ -1062,7 +1062,7 @@ fn leave_needs_state_4() {
     assert_eq!(faults(&host), []);
 }
 
-// Covers: specs/sim/intents-events.md §8.2 r3.1 (c), §8.2 r3.5
+// Covers: specs/sim/intents-events.md §8.2 r3, §8.2 r3
 #[test]
 fn loader_item_skill_messages_follow_the_add_messages() {
     use d2_sim::units::messages as m;

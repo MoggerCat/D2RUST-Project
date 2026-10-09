@@ -125,7 +125,7 @@ fn a_reward_the_inventory_takes_is_returned_identified() {
     fx.assert_clean();
 }
 
-// Covers: specs/world/quests.md §9.1 (drop paragraph)
+// Covers: specs/world/quests.md §9.1
 #[test]
 fn a_reward_with_no_free_spot_stays_unplaced() {
     let mut fx = Fx::new();
