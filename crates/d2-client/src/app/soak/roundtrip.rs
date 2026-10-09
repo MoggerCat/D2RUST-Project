@@ -172,10 +172,17 @@ pub fn diff_live(before: &Live, after: &Live) -> Vec<Violation> {
 }
 
 /// The save without its time stamp and the checksum over it (the second
-/// save is a later one), and with the load-cleared 0x2000 item flag.
+/// save is a later one), with the load-cleared 0x2000 item flag, and with
+/// stamina at its maximum (a load fills it, `d2s-load.md` §9 r4).
 pub fn timeless(mut s: D2s) -> D2s {
     s.header.save_time = 0;
     s.header.checksum = 0;
+    if let Some(d2_formats::d2s::Stats::Bits(v)) = s.body.as_mut().map(|b| &mut b.stats) {
+        let max = v.iter().find(|e| e.id == 11 && e.layer == 0).map(|e| e.value);
+        if let (Some(m), Some(st)) = (max, v.iter_mut().find(|e| e.id == 10 && e.layer == 0)) {
+            st.value = m;
+        }
+    }
     if let Some(b) = &mut s.body {
         for e in &mut b.items {
             if e.bytes.len() > 3 {
