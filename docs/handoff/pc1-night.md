@@ -57,6 +57,8 @@ messages.
 
 | # | Item | Answer | Rows |
 |---|---|---|---|
+| 63 | [q-fix-ass-traps] 0x005DC970 filter (REC-1270) | Binary: full filter order; state 146 tested on the candidate only; no distance test without it, so the recorded distance-1 refusal is not the filter (likely the line test, follow-up open); two argument orders fixed (`monsters/ai.md` §5.3) | `q-fix-pc1night-sentry-scan` |
+| 64 | [q-fix-ass-traps] 0x005DD510 order (REC-1271) | Binary: no main → the alternative at any distance, before the > 5 test; hp never read; the cow is no candidate (no `isAtt`) (`monsters/ai.md` §5.3) | `q-fix-pc1night-sentry-scan` |
 | 62 | [q-fix-d9-arcane] A2Q4 event 3 with new level 74 | From the binary (`0x0059F0D2`–`0x0059F17C`): the level-74 branch returns on every path, so the old-level-40 block never runs for a move into 74; level 50 falls through. REC-1405 settled, d2rs right (`world/quests-act2.md` §6.6, `quests-act2-2.md` §2 item 3) | — |
 
 ## E — REC-1150 and binary-settleable PROVISIONALs

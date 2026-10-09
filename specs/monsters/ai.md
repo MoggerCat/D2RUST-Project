@@ -32,17 +32,17 @@
 |   2. Think dispatch `0x005B1740` | 283–422 |
 |   3. AI control and AI tables | 423–594 |
 |   4. AI parameters | 595–613 |
-|   5. Target selection | 614–772 |
-|   6. Distances and line tests | 773–787 |
-|   7. Tactics helpers | 788–1027 |
-|   8. AI commands and minions | 1028–1054 |
-|   10. The catalogue `ai-functions.tsv` | 1055–1075 |
-| Constants & data dependencies | 1076–1099 |
-| Randomness | 1100–1121 |
-| Edge cases & original bugs | 1122–1163 |
-| Test vectors | 1164–1252 |
-| Provenance | 1253–1313 |
-| Open questions | 1314–1417 |
+|   5. Target selection | 614–808 |
+|   6. Distances and line tests | 809–823 |
+|   7. Tactics helpers | 824–1063 |
+|   8. AI commands and minions | 1064–1090 |
+|   10. The catalogue `ai-functions.tsv` | 1091–1111 |
+| Constants & data dependencies | 1112–1135 |
+| Randomness | 1136–1157 |
+| Edge cases & original bugs | 1158–1199 |
+| Test vectors | 1200–1288 |
+| Provenance | 1289–1349 |
+| Open questions | 1350–1453 |
 <!-- /index -->
 
 ## Summary
@@ -714,7 +714,7 @@ a, next, prev}; unit +0xD0 = its slot, 11 = none):
 
 | 1.14d | D2MOO | Does |
 |---|---|---|
-| `0x005DD510` | `sub_6FCF27B0` | alternative-target choice: never for players or without an alternative; take it if no main target; refuse if the alternative is farther than 5; else trial path toward the main target, keep main if a path exists; else scan 7 for something closer than 20 |
+| `0x005DD510` | `sub_6FCF27B0` | alternative-target choice `(unit; &main, &main d, alt, alt d)` → 1 = take the alternative, 0 = keep main (main / main d may be rewritten). Order (1.14d-confirmed `0x005DD510`–`0x005DD601`, read 2026-10-09, PC 1 night; settles REC-1271): (1) the unit is a player → 0; (2) no alternative → 0; (3) **no main target → 1, whatever the alternative's distance**; (4) alt d > 5 (signed) → 0; (5) trial path toward main on the unit's path record (settings saved, target := main, path type 2, `0x00649970(path, unit, 0)`, settings restored); the path has points (`0x00648780` ≠ 0) → 0; (6) scan 7 (§5.4) with context {0, 0x7FFFFFFF, main}: found and its d < 20 → main := it, main d := d, return 0; else → 1. No draws; no life test (an hp-0 unit is judged like any other) |
 | `0x005DDC30` | `sub_6FCF2CC0` | target search for "good" shooters and secondary picks: forced target, else scan 6 + `0x005DD510`; returns target, distance (0x7FFFFFFF if none), melee flag |
 | `0x005DDF20` | `sub_6FCCFD70` | nearest interacting player within 15 for NPCs (scan 2, callback D2MOO `sub_6FCCFDE0`); "close" when distance < 4; returns the NPC itself when none. Callback `0x005DDE80(game, npc, C, ctx)` (1.14d-confirmed, settles REC-500): C not a player → skip; d := full-size distance `0x005DC380(npc, C)` (the NPC's size subtracted, §6); d > 15 → skip (so ≤ 15 is in); NPC without monstats flag `interact` (byte +0xD & 2, mask `0x006CE26C` = 2, flag bit 9) → take C; with it → take C only if the quest active-cycler test `0x00544590(game, C, npc)` holds and d < best. Taking C writes (C, d) and **returns C, which stops the scan** (§5.4), so the first qualifying player in scan-1 order wins and there are no ties |
 
@@ -722,18 +722,54 @@ a, next, prev}; unit +0xD0 = its slot, 11 = none):
 2026-10-09, pc1-data Step 4 item 3). Context {main, main d, alt, alt d},
 started {0, 0x7FFFFFFF, 0, 0x7FFFFFFF}. For each candidate C:
 
-1. Filter `0x005DC970` (scanner and C each a player or monster, neither
-   dead `0x005541B0`, C's room not in town `0x0061AB00`, C has unit flag
-   4 `0x00451F30(C, 4)`; C with state 146 (`0x00639DF0(C, 0x92)`): a
-   player C is skipped when `roll(100)` on C's seed (`0x0045C390`) < 80
-   and the scanner is not in melee range of it, a monster C is skipped
-   when in melee range; then `0x00554200(C)`) fails → skip.
-2. d := full-size distance (§6 `0x005DC380`); d ≥ 49 (0x31) → skip.
+1. Filter `0x005DC970(game, scanner, C)` → 1 = keep; tests in this
+   order, the first failure skips C (1.14d-confirmed
+   `0x005DC970`–`0x005DCA1D`, read 2026-10-09, PC 1 night; settles
+   REC-1270):
+   1. scanner present and a player or monster (type 0 / 1); C the same;
+   2. C not dead, then the scanner not dead (`0x005541B0`: flag-ex bit
+      +0xC6 & 1, mode 0, or mode 12 for a monster / 17 for a player; no
+      life test, so an hp-0 unit in a living mode passes);
+   3. C's room not in town (`0x00620BB0`, `0x0061AB00`);
+   4. C has unit flag 4 (`0x00451F30(C, 4)`, +0xC4 & 4). A monster gets
+      it at creation only when its monstats2 `isAtt` is set (`0x00573CB0`
+      at `0x00574141`–`0x0057414E`); a class without `isAtt` (e.g.
+      `cow`, the traps) is never a scan 6 candidate;
+   5. only when **C** has state 146 `invis` (`0x00639DF0(C, 0x92)`; the
+      scanner's states are not read): a player C draws `roll(100)` on
+      C's own unit seed (+0x20, `0x0045C390`); draw < 80 and the scanner
+      not in melee range of C (`0x00622C40(scanner, C, 0)`) → skip (draw
+      ≥ 80, or in range → go on). A monster C (no draw): in melee range
+      `0x00622C40(scanner, C, 0)` → skip. Without state 146 nothing in
+      this step runs: no melee test, no draw, no distance;
+   6. hostility `0x00554200(game, scanner, C)` (`combat/hit.md` §7.1)
+      = 0 → skip.
+
+   No step reads a distance except the state-146 melee test, so for a
+   C without state 146 the filter cannot tell distance 1 from 2.
+2. d := `0x005DC380(C, scanner)`: the full-size distance with **C's**
+   size subtracted (§6; a = C). d ≥ 49 (`cmp d, 0x30; jg`) → skip.
 3. Class t := 14 for a player, the monstats byte +0x4E (`nThreat`) for
    a monster (`0x005DC920`). t ≥ 2 competes for main, else for alt; d
-   not below that slot's distance → skip.
-4. Line test `0x00622AA0(scanner, C, 4)` blocked → skip; else the slot
-   := (C, d). The callback always returns 0 (whole scan).
+   not below that slot's distance (signed) → skip (ties keep the
+   earlier candidate in scan order).
+4. Line test `0x00622AA0(C, scanner, 4)` (a = C: C's room, C's end
+   pulled first, `render/draw-order-2.md` §15.1) blocked → skip; else
+   the slot := (C, d). The callback always returns 0 (whole scan).
+
+Against the q-fix-ass-traps recordings (Lightning Sentry, `ai-bodies-6.md`
+§14): the hp-0 poked `cow` 6 away was never a candidate (no `isAtt` →
+no unit flag 4, step 1.4), so `0x005DD510`'s order is not what refused
+it (with no main and a candidate alternative, step 3 takes it at any
+distance). The Fallen (`isAtt` 1, `threat` 10 → main) refused at
+distance 1 but taken at 2 is **not** explained by steps 1–3: the only
+distance-dependent test left in the scan is step 4's line, whose ends
+are pulled by the Fallen's size 2 (the sentry's size is 0), so at a
+diagonal 1 the Fallen's end lands on the far side of the sentry and the
+cells tested differ from those at 2. Whether that cell carries
+collision bit 4, or the refusal lies after the scan (the think's
+`0x005DEAD0` / the skill), needs the recorded dx, dy and the collision
+grid at both points (open, REC-1270 follow-up).
 
 So `0x005DDC30` sees targets closer than 49; each caller applies its
 own distance gate (the Hireable think: E < 25, `ai-bodies-6.md` §7
