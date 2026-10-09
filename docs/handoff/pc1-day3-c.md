@@ -251,3 +251,16 @@ The harness should test class and position, not GUID.
     `q-fix-p6-loading-preload-draws`.
   - **Pixels:** PrintWindow returns black at every loading draw, the control included, so the pixels
     prove nothing. A full-screen pixel check of a played video remains open.
+
+- **[prov-data] Hratli's unit seed two steps at creation: answered** (`monsters/init.md` §4.2 new;
+  `world/quests-act3-2.md` §11.7 r3; the item's §3.3 pointer was wrong, that section covers Alkor).
+  - **Not the dummy code:** the spawn wrapper `0x005B2F20`, inits 49 / 50 and the first think draw
+    nothing.
+  - **The two steps come from normal creation:** `0x005B2A00` → `0x00555230` → `0x00573CB0`:
+    1. components `0x005739D0` (one roll; only TR has a choice);
+    2. HP `0x0045C3E0` at `0x00573F8F` (`roll(1)`).
+  - **Numeric check:** (4040195123, 666) → (3284026841, 1685134555) → (3975998680, 1369742535),
+    which equals the recording. Meshif 264 (a DS1 preset) gets the same two steps through the same
+    path.
+  - **d2rs differs:** the quest host's `spawn_monster` is a bare allocate:
+    `q-fix-p3-quest-spawn-creation`. It is related to `q-fix-p3-quest-superunique-spawn`.
