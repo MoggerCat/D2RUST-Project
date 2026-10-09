@@ -244,6 +244,10 @@ pub struct ClientUnit {
     pub interact_ms: u32,
     /// +0x44: the animation frame (signed, 8.8 fixed point; §18 rule 1).
     pub frame: i32,
+    /// The precise path position (16.16 sub-tiles) of a walking monster,
+    /// written by the client track ([`super::motion`]); the draw uses it
+    /// while its cell is `position`. `None`: the cell centre.
+    pub precise: Option<(u32, u32)>,
     /// +0x48: the animation's frame count (8.8), written by a monster's
     /// mode set ([`super::monster_anim::mode_set`]); 0 otherwise.
     pub frame_count: i32,
@@ -299,6 +303,7 @@ impl ClientUnit {
             flag_200: false,
             interact_ms: 0,
             frame: 0,
+            precise: None,
             frame_count: 0,
             speed: None,
             flag_ex: 0,
