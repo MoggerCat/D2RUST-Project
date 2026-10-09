@@ -1,4 +1,4 @@
-// Spec: specs/render/unit-composite.md (§5, §8, §9), specs/render/blend-modes.md (§4), specs/render/draw-order.md (§3 r4), specs/render/camera.md (§2, §4), specs/missiles/missiles.md (R4.1), specs/client/msg-units.md (§4), specs/sim/intents-events.md (§7.6 r1)
+// Spec: specs/render/unit-composite.md (§5, §8, §9), specs/render/blend-modes.md (§4), specs/render/draw-order.md (§3 r4), specs/render/camera.md (§2, §4), specs/missiles/missiles.md (R4.1), specs/missiles/client.md (§C4, §C13), specs/client/msg-units.md (§4), specs/sim/intents-events.md (§7.6 r1)
 //! Client missiles and cast overlays in the play preview's world view: the
 //! skill messages S→C 0x4C / 0x4D (mode request codes 0x16 / 0x15, kept
 //! as the unit's `last_mode_request`) start a client missile, which flies
@@ -16,9 +16,15 @@
 //!   (`blend-modes.md` §4);
 //! - the draw order: a missile in the unit list of its cell, an overlay
 //!   with its host unit ([`Missiles::keyed`], `draw-order.md` §3 r4,
-//!   `unit-composite.md` §5).
+//!   `unit-composite.md` §5); a missile of `CltDoFunc` 2 or 11 past its
+//!   animation end is flat (flag 0x10000, `missiles/client.md` §C13) and
+//!   files in its cell's shadow list ([`flat_at_end`]); a missile the
+//!   sight test hides is not drawn (`draw-order.md` §5 r3).
 //!
 //! d2rs-own, unverified (decision D1, the preview's fills; REC-116):
+//! - a flat missile appends after its cell's shadow entries (it is in no
+//!   room unit list); the effect's lifetime stays the layer's own (the
+//!   §C13 functions 2 and 11 keep the missile at its end; not modelled);
 //! - which missile and when: the skill's `cltmissile` at the unit's cast
 //!   request, with no delay to the action frame (the client skill start
 //!   `0x004C6F40` is not specified, `model.md` OQ 1);
@@ -91,6 +97,10 @@ pub struct MissileRow {
     pub explosion: u16,
     /// `Trans` (`+0x18D`): the draw mode (`blend-modes.md` §4).
     pub trans: u8,
+    /// `pCltDoFunc` (+0x08): the client update function
+    /// (`missiles/client.md` §C13); 2 and 11 make the missile flat at its
+    /// animation end.
+    pub clt_do_func: u16,
 }
 
 /// One `overlay` row as the client reads it. d2rs-own, unverified.
@@ -148,6 +158,7 @@ impl EffectRows {
                     offset: (m.xoffset as i16, m.yoffset as i16, m.zoffset as i16),
                     explosion: if m.explosion { m.explosionmissile } else { 0 },
                     trans: m.trans,
+                    clt_do_func: m.pcltdofunc,
                 })
                 .collect(),
             overlays: overlays
@@ -211,6 +222,27 @@ struct Fx {
     /// The `missiles` row of a missile effect (a flight or its
     /// explosion); `None` for a cast overlay.
     missile: Option<u16>,
+    /// `CltDoFunc` and `AnimLen` of the missile row (0 for overlays).
+    clt_do_func: u16,
+    anim_len: u32,
+}
+
+impl Fx {
+    /// Unit flag 0x10000 of the client missile ([`flat_at_end`]) at this
+    /// effect's age.
+    fn flat(&self, age: u64) -> bool {
+        flat_at_end(self.clt_do_func, self.anim_len, self.art.rate, age)
+    }
+}
+
+/// Whether a client missile has unit flag 0x10000 at `age` ticks
+/// (`missiles/client.md` §C13): functions 2 (blood) and 11 set it at the
+/// animation end (`0x006217C0`, §C4 r4: frame + speed ≥ length, frame =
+/// age · speed in 8.8, length `AnimLen` << 8); a flat missile files as a
+/// flat unit (`draw-order.md` §3 r4).
+pub fn flat_at_end(clt_do_func: u16, anim_len: u32, rate: u32, age: u64) -> bool {
+    matches!(clt_do_func, 2 | 11)
+        && (age + 1).saturating_mul(u64::from(rate)) >= u64::from(anim_len) << 8
 }
 
 /// A file made resident: its archive path, directions and frames.
@@ -249,6 +281,9 @@ enum Join {
     /// A missile: a room unit filed in the unit list of its cell
     /// (`draw-order.md` §3 r4), at client position `at`.
     Cell { at: ClientPos },
+    /// A flat missile (unit flag 0x10000): filed in its cell's shadow
+    /// list (§3 r4), drawn in the shadow pass after the cell's entries.
+    Flat { at: ClientPos },
 }
 
 /// The effect layer of the world view: the rows (handed in by the app),
@@ -420,6 +455,8 @@ impl Missiles {
                     owner: key,
                     id,
                     missile: None,
+                    clt_do_func: 0,
+                    anim_len: 0,
                 });
             }
         }
@@ -460,6 +497,7 @@ impl Missiles {
         // d2rs-own, unverified (module doc): `Vel` · 4096 per tick.
         let speed = i64::from(row.vel) * 4096;
         let (life, explosion) = (u64::from(row.range.max(1)), row.explosion);
+        let (clt_do_func, anim_len) = (row.clt_do_func, row.anim_len);
         let id = self.fresh_id();
         self.live.push(Fx {
             art,
@@ -473,6 +511,8 @@ impl Missiles {
             owner: key,
             id,
             missile: Some(missile),
+            clt_do_func,
+            anim_len,
         });
     }
 
@@ -520,6 +560,7 @@ impl Missiles {
         for (id, at, owner) in booms {
             if let Some((art, row)) = self.missile_art(id) {
                 let life = Self::ticks_of(row.anim_len, art.rate);
+                let (clt_do_func, anim_len) = (row.clt_do_func, row.anim_len);
                 let fid = self.fresh_id();
                 self.live.push(Fx {
                     art,
@@ -533,6 +574,8 @@ impl Missiles {
                     owner,
                     id: fid,
                     missile: Some(id),
+                    clt_do_func,
+                    anim_len,
                 });
             }
         }
@@ -651,6 +694,9 @@ impl Missiles {
             };
             let join = match (fx.art.pre_draw, fx.follow) {
                 (Some(back), Some(host)) => Join::Host { host, back },
+                _ if fx.flat(age) => Join::Flat {
+                    at: moving_to_client(at.0, at.1),
+                },
                 _ => Join::Cell {
                     at: moving_to_client(at.0, at.1),
                 },
@@ -728,6 +774,15 @@ impl Missiles {
                     };
                     let sub = if back { 0 } else { u8::MAX };
                     (DrawKey::new(k.pass, k.major, k.minor, sub), back)
+                }
+                Join::Flat { at } => {
+                    let Some(ci) = grid.cell(tile_of(at.x, at.y)) else {
+                        continue;
+                    };
+                    // d2rs-own, unverified: the effect is in no room unit
+                    // list, so it appends after the cell's shadow entries.
+                    let key = DrawKey::new(pass::SHADOWS, ci as u32, DrawKey::MINOR_MAX, u8::MAX);
+                    (key, false)
                 }
                 Join::Cell { at } => {
                     let Some(ci) = grid.cell(tile_of(at.x, at.y)) else {

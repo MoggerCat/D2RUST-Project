@@ -450,3 +450,28 @@ fn state_colour_rows_come_from_the_users_states() {
     assert_eq!(row(90), (100, 108, (150, 215, 255)));
     assert_eq!(row(2), (95, 104, (128, 255, 128)));
 }
+
+// Covers: specs/missiles/client.md §c13-function-bodies-specified-here
+/// The client update function the effect layer's flat rule reads
+/// (`missiles` `pCltDoFunc`; functions 2 and 11 set flag 0x10000 at the
+/// animation end), on the user's install: the effect rows carry each
+/// row's value, and both functions are in use.
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn effect_rows_carry_the_users_client_missile_functions() {
+    use d2_data::tables::{decode_all, Missiles};
+    let d = app_support::live();
+    let a = d.archives.as_ref();
+    let rows = d2_client::app::missile_art::effect_rows(a).unwrap();
+    let set = d2_data::bin::load_from(a, "eng").unwrap();
+    let table: Vec<Missiles> = decode_all(set.table("missiles").unwrap()).unwrap();
+    assert_eq!(rows.missiles.len(), table.len());
+    for (r, m) in rows.missiles.iter().zip(&table) {
+        assert_eq!(r.clt_do_func, m.pcltdofunc);
+    }
+    for f in [2, 11] {
+        let n = rows.missiles.iter().filter(|r| r.clt_do_func == f).count();
+        assert!(n > 0, "function {f} unused");
+        println!("pCltDoFunc {f}: {n} rows");
+    }
+}

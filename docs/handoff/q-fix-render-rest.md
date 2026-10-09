@@ -15,6 +15,7 @@ open by `q-fix-render-light` (commits `8699e293`, `31c7ab27`),
 | 4. level background 120 | draw-order-2.md §12 l2 r1–r3 | `world_view::background_view`: `Backgrounds::pass1` for level 120, `summit01` / `cloud01` DC6 from the archives, light byte + `cel_ops` (modes 5 / 3), pass-1 keys; `order_grid` refuses only level 74 now. PROVISIONAL REC-420 (time seed). | `background_view_tests` (the §12 vector), `open_mode_3_and_level_backgrounds`; install: `app_client_drlg` `the_summit_background_draws_from_the_users_archives` |
 | 5. missiles sight-tested | draw-order.md §5 r3; draw-order-2.md §15 | `missiles::missile_hidden`: a missile effect hidden by the feed's sight test (probe missile unit on its sub-tile, `missiles` `Size`) is not drawn. | `tests_drlg` `missiles_take_the_sight_test` |
 | `q-fix-render-player-light-colour` (audit F9) | shading.md §6 r1.1; stat-lists.md §3 r6.1, r6.3; lighting.md §8 player row; sim/stat-lists.md §7.1 | The model loads the user's `states` rows (`UnitRows::states`: `notondead`, `noclear`, `colorpri`, `colorshift`, `light-r/g/b`); state on (0xA7 / 0xA8) and 0xA9 state off run the colour call's light part for a state with `colorshift` ≠ 0 (local player with a light: the winning state's light colour, white with none); the stat 89 / 90 callback runs at the model's player stat writes (0x19–0x1F, 0x20) when the value changes, no longer per drawn frame. 0x7C's scroll clear stays the bit-and-list path (no colour call). | `tests_units` `the_local_players_light_colour_follows_its_states_and_stats`; install: `app_client_drlg` `state_colour_rows_come_from_the_users_states` |
+| `q-fix-render-missile-flat` | missiles/client.md §C4 r4, §C13 (functions 2, 11); draw-order.md §3 r4 | `MissileRow::clt_do_func` (`pCltDoFunc`); an effect of function 2 or 11 at its animation end (frame + speed ≥ `AnimLen` << 8) is flat (unit flag 0x10000) and files in its cell's shadow list (pass 5, after the cell's entries, d2rs-own: it is in no room unit list). Lifetime unchanged (the §C13 "stays" is not modelled). | `missiles_tests` `flat_missiles_file_in_their_cells_shadow_list`; install: `app_client_drlg` `effect_rows_carry_the_users_client_missile_functions` (6 rows of function 2, 16 of 11) |
 | 6. pick camera shake | seams/world-screen.md §2.6 | `ClickView::shake` from the frame anchor: the world click inverts the shaken camera. | `click` `the_pick_inverts_the_shaken_camera` |
 
 Changed expectations (spec-driven): `tests_ui_more::record_outputs` (the
@@ -28,8 +29,8 @@ missile units, so no missile lights).
 
 - **3. Den lights** (`q-fix-render-den-lights`): needs client missile
   creation (missile 287); the model has none, so the row stays written.
-- **5. flat missiles** (`q-fix-render-missile-flat`): unit flag 0x10000
-  lives on the client missile unit.
+- **5. flat missiles**: done in the effect layer (row above); the real
+  flag on a model missile unit waits for client missile creation.
 - **Level 74 stars** (`q-fix-render-arcane-stars`): §12 r3 names no
   initial `last`.
 - The stat 89 / 90 callback runs at the model's player stat messages;
