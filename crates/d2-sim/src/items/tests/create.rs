@@ -312,7 +312,7 @@ fn pipeline_seeds_and_flags() {
     assert_eq!(c.item.ilvl, 1);
     assert_eq!(c.item.start_seed, start);
     assert_eq!(c.item.init_seed, unit.lo);
-    assert_eq!(c.item.flags, flag::INIT | flag::INSTORE);
+    assert_eq!(c.item.flags, flag::INIT | flag::INSTORE | flag::IDENTIFIED);
     assert_eq!(c.item.inv_page, 0xFF);
     assert_eq!(c.item.quality, q::NORMAL);
     assert_eq!(c.event3_at, None);
