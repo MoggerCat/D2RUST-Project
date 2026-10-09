@@ -28,16 +28,16 @@
 |   L5 When loading draws happen (single player) | 166–179 |
 |   L6 Between draws | 180–189 |
 |   L7 End: the first game frame (`0x0044C990` → `0x004547B0`) | 190–208 |
-|   L8 Input during loading | 209–228 |
-|   L9 Act change (S→C 0x05, 0x03, …, 0x04) | 229–252 |
-|   L10 Act-start cinematics (hooks only) | 253–279 |
-|   L11 Sounds (deferred) | 280–286 |
-| Constants & data dependencies | 287–303 |
-| Randomness | 304–307 |
-| Edge cases & original bugs | 308–323 |
-| Test vectors | 324–343 |
-| Provenance | 344–367 |
-| Open questions | 368–382 |
+|   L8 Input during loading | 209–235 |
+|   L9 Act change (S→C 0x05, 0x03, …, 0x04) | 236–259 |
+|   L10 Act-start cinematics (hooks only) | 260–286 |
+|   L11 Sounds (deferred) | 287–293 |
+| Constants & data dependencies | 294–310 |
+| Randomness | 311–314 |
+| Edge cases & original bugs | 315–330 |
+| Test vectors | 331–350 |
+| Provenance | 351–375 |
+| Open questions | 376–388 |
 <!-- /index -->
 
 ## Summary
@@ -217,10 +217,17 @@ The third caller, the room-graphics preload `0x00470070`, draws only when `[0x00
    `0x00456D42`), run by S→C 0x01 (`client/model.md` §7 rule 2), so during the join (after 0x01) and
    during an act change (mode stays 1) bound commands are dispatched. Before 0x01 (the first loading
    draw) the mode is 0 and keys do nothing.
-3. Esc (command 56, `0x004690B0`) is the one key with a visible effect: it can open ui 9, which enables
-   the paused path of L6 rule 1 (b). PROVISIONAL: d2rs ignores every key while the loading screen shows
-   (because no loading-specific key exists, there is no cancel, and the Esc-menu path during loading is
-   unobserved); settled by REC-222.
+3. Esc (command 56, `0x004690B0`) is the one key with a visible effect. During an act change it opens
+   ui 9 (`[0x007A27E4]` = 1), and the server stops ticking while the menu is open (L6 rule 1 (b)), so
+   0x04 does not come and the load waits for the menu to close. Measured (REC-222, settled 2026-10-09,
+   PC 1 Windows, ScnAma `-seed 1234`, `poke 50 warp 40`, Esc posted at the first loading draw after frame
+   10): the key-down handler `0x0046A840` and `0x004690B0` ran at server frame 49 with ui 9 = 0. Ui 9 read
+   1 from the next loading draw on. The server ran one more tick (frame 50) and then none in the
+   following 50 s, and the loading draws stopped with it. A skill hotkey (F1) posted at the same point
+   reached `0x0046A840`, and the load went on (ticks continued). At game start, Esc posted at the first
+   loading draw (before 0x01, key mode 0) reached neither handler, and the game started normally. So
+   d2rs must dispatch bound keys during an act-change load (key mode 1), with Esc opening the menu and
+   pausing the load, and ignore keys only before 0x01.
 4. No cancel: nothing returns to the front end from the loading screen; a refused load ends through S→C
    0xB4 (`client/model.md` §7 rule 8).
 
@@ -364,6 +371,7 @@ progress-bar branch `0x004566A9`–`0x0045676A`), release `0x004547B0`, flag rea
 used.
 2026-10-08 (REC-251): 0x03 handler `0x0045C8E0` → `0x0044E100` (no act compare; `0x0061AFD0`, `0x006194A0`,
 `0x004565E0`), post-video `0x0047F1D0` → `0x0044BA20`.
+- 2026-10-09 (pc1-day3-c, REC-222): keys during loading measured on Windows with a scratch debugger probe (breakpoints `0x004565E0` loading draw, `0x0046A840` key-down, `0x004690B0` Esc command, server tick entry; key posted from the first loading-draw stop), L8 rule 3.
 
 ## Open questions
 
@@ -373,9 +381,7 @@ used.
 - **REC-221** Act-change end. Capture: single player, waypoint Rogue Encampment → Lut Gholein; record
   S→C packets with tick numbers and screenshots per client frame. Settles L9.3: the tick of 0x04 after
   the 0x49 drain, and the presented sequence (world, frame 0, black, Act II world).
-- **REC-222** Keys during loading. Capture: press Esc (and one skill hotkey) between the first loading
-  draw and the first game frame, at game start and at an act change; hook `0x004690B0` and log ui 9,
-  and whether the server ticks. Settles L8.3 (ignore all keys vs dispatch).
+- **REC-222** Keys during loading: *settled 2026-10-09* (L8 rule 3).
 - **REC-223** After an act-start video. Capture: a first-time Warriv travel (Act I → II) with video
   enabled; screenshot the frame after the video ends and before the world appears. Settles L10.2
   (black vs the loading frame).

@@ -11,6 +11,7 @@
 
 pub mod anim_names;
 pub mod automap;
+pub mod autoplay_host;
 pub mod config;
 pub mod death;
 pub mod front_host;

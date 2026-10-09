@@ -34,13 +34,13 @@
 |   3. The d2rs log | 123–142 |
 |   4. The 1.14d recorder (`record_rng.py --frames`) | 143–179 |
 |   5. Comparison (`rng_diff.py`) | 180–204 |
-|   6. The `rng` channel of `scenario-diff` | 205–223 |
-| Constants & data dependencies | 224–227 |
-| Randomness | 228–231 |
-| Edge cases & original bugs | 232–241 |
-| Test vectors | 242–251 |
-| Provenance | 252–256 |
-| Open questions | 257–293 |
+|   6. The `rng` channel of `scenario-diff` | 205–226 |
+| Constants & data dependencies | 227–230 |
+| Randomness | 231–234 |
+| Edge cases & original bugs | 235–244 |
+| Test vectors | 245–254 |
+| Provenance | 255–259 |
+| Open questions | 260–296 |
 <!-- /index -->
 
 ## Summary
@@ -210,13 +210,16 @@ and exit code (§5). Neither game changes (§3 rule 2).
    d2rs.rng.jsonl`; then `rng_diff.py`.
 2. A check with an `input orig` / `input d2rs` line runs that input on
    1.14d only: the verdict is at best partial.
-3. A check with `at ... poke` lines records 1.14d with `rng_poke.py
-   --frames` instead: `record_rng.py` unchanged plus `poke.py`'s layer at
-   the tick-return stop `0x0052FD1E` (the pokes of frame F run at the
-   return of frame F − 1, as in `record_state.py`) and a `frame_end`
-   record per frame, which `rng_diff.py` skips; d2rs takes the same
-   `--poke` lines. A shared frame-anchored `input` is not compared
-   (partial): `record_rng.py` does not run it.
+3. `at ... poke`, `at ... send` and a shared frame-anchored `input` run
+   on both sides: `record_rng.py --frames` stops at the tick return
+   `0x0052FD1E` (pokes, the send layer's frame, `frame F` input steps)
+   and, with sends, at the drain call `0x0044F136` (`--send`,
+   `tools/original-hooks.md` §1 rule 4), as `record_packets.py`; d2rs
+   `state-dump` takes the same `--poke` / `--send` / `--input`. Measured
+   2026-10-09 under Wine: `items-vendor-akara-buy` (4 pokes ok, 4 sends
+   EAX 1) and `walk-town-ama` (`frame 10` click posted at the stop of
+   frame 9) record and compare (first divergence unchanged: frame 2,
+   unit 1:1, draw #12).
 4. The channel records with `--skip-inline drlg` (§4 r6: nothing
    compared is lost, the verdict is not downgraded) and the default
    `--emulate on` (§4 r7).

@@ -202,7 +202,7 @@ chest (a route to one, or a poke that runs the object init).
 
 `traces/checks/a1-warp-den-ama.check` (ScnAma, seed 1234, poke `warp 8`
 at frame 20, 160 ticks; channels state and rng, the 1.14d rng side by
-`tools/trace-recorder/rng_poke.py`). Each line: the first divergence and
+`record_rng.py --poke`). Each line: the first divergence and
 what moved it.
 
 1. Frame 20, torch 2:18 and tile 5:1 seeds swapped: the first walk of
