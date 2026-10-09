@@ -1,0 +1,22 @@
+# facts v1; tool: trace-recorder facts_render 0.3.0; command: py tools/trace-recorder/facts_render.py game/captures/day4/fe1.jsonl --shot char-create --scene frontend-character-create --out facts/render; game: 1.14d
+key	value
+seq	2
+tick	?
+w	800
+h	600
+act	-
+level	-
+player_x	-
+player_y	-
+tile_origin_x	-
+tile_origin_y	-
+unit_origin_x	-
+unit_origin_y	-
+open_mode	-
+shift_x	-
+light_quality	-
+rain	-
+snow	-
+draws	168
+index_sha256	05fc4307645fe9047b818971fd674e18b066b38e762a09ec3be16680645d4f13
+palette_sha256	fb00af855cf4055aa489f41cf20537f5bf4ce27416ced2f7028092f6074db1c3

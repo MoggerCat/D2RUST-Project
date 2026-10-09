@@ -11,6 +11,7 @@ Tools for the coordinator and the cloud sessions merging into
 | `sync.sh` | every session, every 20 minutes | merge staging into the current branch, auto-resolving the mechanical conflicts |
 | `route.py` | coordinator, sessions | first-difference report → spec section, crate module, owner session |
 | `union.py` | `sync.sh`, by hand | resolve append-only conflicts (both sides) or spec-index conflicts |
+| `ledger.py` | q-fidelity-ledger, coordinator after merges | validate `docs/handoff/ledger/*.tsv` parts (`--check`), merge them into `docs/handoff/fidelity-ledger.tsv` + `.md` |
 | `renum.py` | by hand during a merge | renumber an id only on lines the merge brings in |
 
 ## realdata.py

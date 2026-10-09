@@ -597,7 +597,9 @@ pub fn apply(rs: &mut RoomSub<'_>, file: &SubFile, g: SubGroup, x: i32, y: i32, 
             let mut nu = *u;
             nu.x = 5 * x + u.x - bx0;
             nu.y = 5 * y + u.y - by0;
-            rs.room.units.push(nu);
+            // `0x0066BF30` prepends: the list ends up in reverse of the
+            // file list (measured: check combat-pop-stony-field).
+            rs.room.units.insert(0, nu);
         }
     }
 }

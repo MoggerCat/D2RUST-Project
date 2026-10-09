@@ -39,20 +39,20 @@
 | Outputs / state changes | 84–90 |
 | Rules | 91–92 |
 |   1. Loop order (single player) | 93–114 |
-|   2. Client → server | 115–398 |
-|   3. Server → client | 399–635 |
-|   4. d2rs mapping and scope | 636–667 |
-|   5. Machine-readable tables | 668–704 |
-|   6. Exact-match comparison | 705–813 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 814–1315 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1316–1626 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1627–1799 |
-| Constants & data dependencies | 1800–1818 |
-| Randomness | 1819–1824 |
-| Edge cases & original bugs | 1825–1870 |
-| Test vectors | 1871–1957 |
-| Provenance | 1958–2084 |
-| Open questions | 2085–2237 |
+|   2. Client → server | 115–399 |
+|   3. Server → client | 400–636 |
+|   4. d2rs mapping and scope | 637–668 |
+|   5. Machine-readable tables | 669–705 |
+|   6. Exact-match comparison | 706–814 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 815–1343 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1344–1688 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1689–1861 |
+| Constants & data dependencies | 1862–1880 |
+| Randomness | 1881–1886 |
+| Edge cases & original bugs | 1887–1932 |
+| Test vectors | 1933–2019 |
+| Provenance | 2020–2146 |
+| Open questions | 2147–2299 |
 <!-- /index -->
 
 ## Summary
@@ -279,10 +279,11 @@ of them has a consequence in 1.14d; d2rs keeps them as a diagnostic only.
    `0x0054A3F0`; §9 rule 3; corrected 2026-10-08 for
    `docs/handoff/impl-umods-cs-handlers.md`, which found "else 2" here);
    name = cstr after it (≤ 16). 0x15 (`0x0054A5D0`): msg strlen < 256 and
-   strlen + 4 < size, else rejected. PROVISIONAL: the rejection returns 2
-   and a msg without a NUL in the message is rejected (because the
-   result code of this rejection is not written; 0x14's strlen ≥ 256
-   returns 2); settled by REC-402.
+   strlen + 4 < size, else **2** (both tests jump to the `mov eax, 2`
+   exit `0x0054A910`, from `0x0054A640` / `0x0054A64C`). The strlen
+   (`0x00413750` at `0x0054A636`) is unbounded, so a msg with no NUL
+   before the message end measures ≥ size − 3 and is rejected
+   (1.14d-read 2026-10-09, settles REC-402).
 7. 0x3C: u32 at +1, bit 31 = left hand, bits 0–30 = skill id, must be <
    the skills count (data +0xBA0); item u32 at +5. 0x51: u32 at +1: bits
    0–14 skill (> count → unbind, −1), bit 15 left hand, bits 16–31 slot
@@ -1201,6 +1202,28 @@ or the new room equals the client's room (client +0x1B4, the old room).
       NPCs' pending frame-24 think (idle 20 from the frame-4 home think,
       `monsters/ai-bodies.md` §9.9) is cancelled, so their unit seeds do
       not change (`traces/checks/a4-warp-plains-ama.check`).
+      Membership is by sight, not by standing: room +0x78 counts the
+      clients whose current room's adjacency array holds the room; it
+      is incremented only by `0x0061A660` (`0x0061A6EF`), called only
+      from rule 2.2's join (`0x0053A937`), and decremented only by
+      `0x0061A700` (from this leave, `0x0053AA05`, and `0x0053AB80`)
+      (`drlg/rooms.md` §7 rule 1). So a plain walk that moves the
+      player into a neighbouring room cancels the thinks of every
+      monster in the rooms that drop out of the 3 × 3. Second example
+      (2026-10-09, `combat-cold-plains-wp.check`, seed 1234, settles
+      REC-754): the Rogue Encampment's rooms are 8 × 8 tiles (40 × 40
+      sub-tiles; the join's 0x07 tile corners for this seed, recorded
+      in `packets-town-arrival-ama.check`: x 960, 968, 976 × y 832,
+      840, 848, spawn room (968, 840) = sub-tiles x 4840–4879, y
+      4200–4239). The player runs from (4873, 4228) to (4884, 4221) and
+      crosses x = 4880 into room (976, 840); the column x 960 (sub-tiles
+      4800–4839) leaves its set. Charsi (4834, 4217) is in room (960,
+      840) and Gheed (4836, 4278) in (960, 848): both rooms lose their
+      only client, their pending idle-20 thinks (due at frame 24) are
+      cancelled, and nothing schedules another while the player stands
+      there (no draw, no move through frame 120, as recorded). Same
+      mechanism as the warp example; row `q-fix-p3-room-empty-think`
+      covers it.
    3. **S→C 0x08** (`0x0053BC90`, the only sender of 0x08, same layout
       as 0x07: L's tile x u16@1, tile y u16@3, level id u8@5).
    4. Then, if L is the client's room (the old room): the player update
@@ -1284,9 +1307,14 @@ or the new room equals the client's room (client +0x1B4, the old room).
    0xA4, 0xA5 (the landing message) and 0xAB (the life-fraction update of
    `sim/stat-lists.md` §10.1, `UnitHooks::send_life_fraction`) as
    `wiring/action/event_records.rs` records; 0x9E is sent at once by the
-   hireling code; 0xA1 never runs; 0x23 has no d2rs writer. PROVISIONAL
-   (a) 0xA5: the message names the unit the record sits on (the writer's
-   unit); settled by REC-411. (b) 0xAB (REC-412 settled 2026-10-09,
+   hireling code; 0xA1 never runs; 0x23 has no d2rs writer. (a) 0xA5
+   names the unit the record sits on (1.14d-read 2026-10-09, settles
+   REC-411): the writer `0x00571B70` turns state 18 off on the unit
+   (`0x00639DB0(unit, 18, 0)`), then stores the unit's own type (+8,
+   6 for none) and GUID (+0xC, −1 for none) and EDX as u16 (+0x10);
+   the send (`0x00571E3F`–`0x00571E4D`) passes those three to
+   `0x0053C190`, which writes `A5 type:u8 GUID:u32 value:u16` (8
+   bytes). (b) 0xAB (REC-412 settled 2026-10-09,
    rule 2 above): a receiver gets it only when the unit's hit flag
    0x8000 is clear and its player may attack the unit (hostility
    `combat/hit.md` §7.1: a monster climbs to its owner, so a player's
@@ -1547,6 +1575,40 @@ next tick, `sim/tick.md` §4).
       DRLG seed made from the same N both start at {N, 666}, so draws on
       the two seeds at the same step count have equal values; tell them
       apart by owner (`tools/rng-trace.md` owners), not by value.
+9. **The player's frame-2 update: alignment resend and stats 12, 0, 2**
+   (2026-10-09, asm of `0x005543B0`, `0x00639E30`, `0x0064C040`,
+   `0x00554850`, `0x00580860`, `0x00625870`; the last four of the 126
+   join messages, `facts/join/a1-new-sor.tsv` n 86–89, and
+   `traces/checks/packets-town-arrival-ama.check` frame 2). Chain:
+   1. Rule 3.1's load allocates P (`0x00555230`, no room) → player init
+      `0x005348C0` → `0x005543B0(P, 2, 1)` at `0x0053495A`
+      (`combat/hit.md` §7.1; v = 2). P has no state-105 list yet, so the
+      state toggle `0x00639DB0(P, 105, 1)` (`0x00554460`) sets bit 105
+      and its changed bit; then stat 172 := 2 and the resend
+      `0x00639E30(P, 105, 1)` at `0x0055448A` sets the changed bit
+      again. Both end in the queue insert `0x0064C040(P)`, which tests
+      P's room (`0x00620BB0`) first: none → nothing queued, unit flag
+      0x2000 stays clear.
+   2. Nothing clears the bit before frame 2: the only clearer is the
+      room clean-up `0x00553220` (§3.5 rule 6), which runs on queued
+      units only.
+   3. Game entry (rule 5): the placement `0x00554850` for type 0
+      (`0x005548BE`: path placement `0x00649D00`, `0x00534AD0`; not the
+      monster branch, whose `0x00553220` at `0x00554924` P never
+      reaches) ends with the hash insert `0x00553060` and, P now having
+      a room, `0x0064C040(P)` at `0x005549F3`: P is queued in the spawn
+      room. This is the call that queues P for frame 2.
+   4. Frame 2, the first per-client update with the client in state 3
+      (§8.3): the spawn room's queue gives P's update `0x00580860` (§7.3
+      rule 1): step 5 (changed bit set, `0x00639F20`) → **0xA8** of
+      state 105 (`a8 00 01000000 0b 69 ac fc 0f`); step 7 → the single
+      stat sends `0x00625870(P, P, s, 0x00548520)` for 67, 68, 12, 0,
+      2: only keys in P's mod array send (`sim/stat-lists.md` §11 rule
+      4), so **0x1D** 12, 0, 2 (the save's `Saved` stats the load
+      inserted) and nothing for 67 / 68. Then the tick's clean-up
+      clears the changed bits and the mod array.
+   A death corpse takes the same steps 1 and 4 (its allocation has flag
+   1, so `SUNIT_Add` queues it there): `combat/hit.md` §7.1.
 
 #### 8.3 First tick after the join
 

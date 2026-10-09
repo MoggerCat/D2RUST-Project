@@ -1,0 +1,39 @@
+{
+ "channel": "draws",
+ "check": "draws-town-arrival-ama",
+ "command": [
+  "tools/trace-recorder/record_frames.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "600",
+  "--ticks",
+  "76",
+  "--auto",
+  "ScnAma",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.frames.jsonl",
+  "--every",
+  "1",
+  "--draws-every",
+  "1",
+  "--no-save"
+ ],
+ "files": {
+  "orig.frames.jsonl": {
+   "sha256": "fabce5e62b0f546c296a7396948fb4e01a4c3f4707b9a41291babe1b7ea5ea78",
+   "size": 2796390
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "4f57b14c4f51efda7a6360f0ee94d13203725e9b9fcf364fb3ca021bf0b0213a",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "b708d1499f0efb2f70f75b6ea56840ddf44e2581fd0681743ed7426a4545d528",
+  "save": "c098d7905cb83f92fe70f1b392b1e08faf1dd04e1f6d9e100a0ca523eaafb1bd"
+ }
+}

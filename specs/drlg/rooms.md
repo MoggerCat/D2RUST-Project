@@ -33,16 +33,16 @@
 |   4. Status and activation | 207–396 |
 |   5. Active room creation (`0x006422A0`, `0x00619890`) | 397–430 |
 |   6. Adjacency array order (owner of `unit-order.md` §9) | 431–446 |
-|   7. Room clients and the inactivity counter | 447–467 |
-|   8. Deactivation (tick step 9) | 468–585 |
-|   9. Room tile grid | 586–1229 |
-|   10. Collision map from tiles | 1230–1316 |
-| Constants & data dependencies | 1317–1331 |
-| Randomness | 1332–1349 |
-| Edge cases & original bugs | 1350–1367 |
-| Test vectors | 1368–1418 |
-| Provenance | 1419–1470 |
-| Open questions | 1471–1593 |
+|   7. Room clients and the inactivity counter | 447–471 |
+|   8. Deactivation (tick step 9) | 472–605 |
+|   9. Room tile grid | 606–1249 |
+|   10. Collision map from tiles | 1250–1336 |
+| Constants & data dependencies | 1337–1351 |
+| Randomness | 1352–1369 |
+| Edge cases & original bugs | 1370–1387 |
+| Test vectors | 1388–1438 |
+| Provenance | 1439–1490 |
+| Open questions | 1491–1613 |
 <!-- /index -->
 
 ## Summary
@@ -454,7 +454,11 @@ A populated room that is removed and built again starts with flag bit 0:
    new room's adjacency array as it stands after that change's builds, and
    removed from rooms of the old array missing from the new one. Later
    changes of the array (other clients' activations, removals) do not
-   update membership.
+   update membership. So +0x78 counts the clients that can see the room
+   (it is in their current room's array), not those standing in it; the
+   add is called only from the room switch's join (`0x0053A8E0`), the
+   remove from its leave (`0x0053A9B0`) and `0x0053AB80`. The monster
+   think cancel at count 0 is `sim/intents-events.md` §7.8 rule 3.2.
 2. **Inactivity counter** (`0x0061A790`, room +0x0C; tick open question
    4): each call sets it to 0 if the client count is non-zero, else adds
    1; returns the new value. Its only caller is tick step 9
@@ -582,6 +586,22 @@ A populated room that is removed and built again starts with flag bit 0:
    tile (class = lvlwarp `Id` of the vis slot), deactivate and
    reactivate → one type-5 unit of that class at the same sub-tile, GUID
    ≠ the old one, created in the restore step (not the preset step).
+
+*Recorded, a waypoint round trip* (2026-10-09, PC 1, Windows;
+`record_state.py --auto CkAndariel --seed 1 --ticks 1250`, `--poke "5 pos
+@player 5684 5796"`, `--send` InteractWithEntity type 2 id 11 at 20,
+TakeOrCloseWp wp 11 level 3 at 30, InteractWithEntity type 2 id 25 at 600,
+TakeOrCloseWp wp 25 level 1 at 610; the player then stands at the Rogue
+Encampment waypoint): before leaving (f25) the town lists 14 monsters (NPC
+classes 147, 148, 150, 152, 154, 155, 179, 265) and 24 objects; after the
+return (f615 to the end, f1249) only the rooms near the waypoint are
+populated: NPC classes 148, 150, 152, 155, 179, 265, **no Gheed (147) and
+no Charsi (154)**, and 12 town objects (classes 36, 37, 78 among the
+missing ones). The Cold Plains units stay in the unit lists after the
+return (17 monsters, 12 objects) and are gone at **f732, 122 frames after
+the return** (the old level's rooms reach the §7 inactivity limit and are
+deactivated here). So the far town rooms stay unpopulated until a client
+comes near, as d2rs does (`docs/handoff/q-fix-room-links.md`).
 
 ### 9. Room tile grid
 

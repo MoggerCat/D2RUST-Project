@@ -592,6 +592,7 @@ fn setting_a_mode() {
         speed: 256,
         pos: 0,
         events: vec![0, 1, 0, 0, 0],
+        drawn: Vec::new(),
     };
     sys.hooks.sequence = Some(seq.clone());
     for (u, mode, loaded) in [

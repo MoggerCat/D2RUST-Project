@@ -28,16 +28,16 @@
 | Inputs | 55–62 |
 | Outputs / state changes | 63–74 |
 | Rules | 75–76 |
-|   1. Objective file `playthrough 1` | 77–118 |
-|   2. Predicates | 119–142 |
-|   3. Verdict per milestone | 143–158 |
-|   4. Class × difficulty matrix | 159–226 |
-| Constants & data dependencies | 227–232 |
-| Randomness | 233–237 |
-| Edge cases & original bugs | 238–245 |
-| Test vectors | 246–253 |
-| Provenance | 254–265 |
-| Open questions | 266–289 |
+|   1. Objective file `playthrough 1` | 77–135 |
+|   2. Predicates | 136–159 |
+|   3. Verdict per milestone | 160–175 |
+|   4. Class × difficulty matrix | 176–243 |
+| Constants & data dependencies | 244–249 |
+| Randomness | 250–254 |
+| Edge cases & original bugs | 255–274 |
+| Test vectors | 275–284 |
+| Provenance | 285–296 |
+| Open questions | 297–328 |
 <!-- /index -->
 
 ## Summary
@@ -96,10 +96,13 @@ hide the ones after it.
    serpentine. The player walks to each target with `hop @player x y`
    pokes (`tools/poke.md` §1), one every `every` frames, ceil(d / 16) + 1
    per leg (d the distance between targets): a hop moves at most 16
-   sub-tiles per axis from where the player stands, to the first free
-   spot of a ring around the step (q-play-act5's walk,
+   sub-tiles per axis from where the player stands, to the first spot
+   of a ring around the step that `pos` accepts (q-play-act5's walk,
    `tests/play_act5.rs`); a blocked hop leaves the player there and the
-   next tries again. The run is extended to the sweep's last hop + 10
+   next tries again. `pos` is the exact teleport (`sim/path-placement.md`
+   §10 with exact 1, §6 rule 4: no free-point search, no collision
+   test), so a sweep can leave the player on a wall or missile-barrier
+   cell (Edge case 3). The run is extended to the sweep's last hop + 10
    frames. A sweep exists because units only exist in active rooms near
    a player. A refused `pos` is expected and is not a blocker.
 r.
@@ -115,6 +118,20 @@ r.
    (`poke.md` §6): the walk to the target. Its record is written when
    it lands (GUID = the target's, so `g @pI` names the target) or fails
    (a refused poke: `stuck`).
+7. **Kill setups** (2026-10-09). A milestone that kills a unit with
+   `pos` + `stat … 6 0 256` + a `missile` poke needs free floor on the
+   whole bolt line, the creation cell included: a missile is removed
+   **without** a hit on the first run whose collision word under it has
+   bit 0x1 (wall) or 0x4 (missile barrier) (`missiles/missiles.md` R4
+   step 6, Edge case 3 there), and `pos` places the target and the
+   player on any cell (rule 4). The target's life then needs one hit of
+   total ≥ 1 (`combat/damage.md` §5.2 steps 11 and 14). Setups:
+   `andariel-killed` puts Andariel at `@x-3` and aims the bolt there
+   (the Catacombs 4 arrival, seed 1, has a wall within 2 sub-tiles to
+   the east and open floor west); `radament-killed` must start the bolt
+   on a free cell next to Radament (`goto unit 1:229`, a free point,
+   rule 6) and aim at Radament's own position, which needs a
+   unit-position coordinate in `poke.md` §1 rule 1 (not there yet).
 
 ### 2. Predicates
 
@@ -242,6 +259,18 @@ pokes and input (`state-snapshot.md` test vector 5).
    against 1.14d.
 2. `pos` across the outdoor grid can land the player in a neighbouring
    level. That is why sweep milestones test `ever player lv`.
+3. A unit `pos`-ed onto a wall cell stays there and acts (a boss keeps
+   attacking: monster mode 4 is `A1`, MonMode.txt; get-hit is 3), and a
+   bolt aimed through that cell vanishes on its first run with no
+   damage. d2rs runs 2026-10-09 (`state-dump`, seed 1, sor save of
+   `act1.play` / `act2.play`): Catacombs 4 arrival (22593, 9598): a
+   `spawn` at `@x+3` is refused; a Fire Bolt to `@x+3` or `@x+10 @y+10`
+   is gone by the next frame with or without Andariel there; to
+   `@x-10` it flies 8+ frames. Sewers level 3 after the grid sweep
+   (player at (7713, 8153) when Radament (7772, 8128) first appears,
+   f531): bolts created within 2 sub-tiles of the player in any of 4
+   directions are gone before the first snapshot, one created at
+   `@x+5 @y+5` or at Radament's spawn cell flies.
 
 ## Test vectors
 
@@ -250,6 +279,8 @@ pokes and input (`state-snapshot.md` test vector 5).
 | `--selftest`: synthetic state file (header, 3 snaps, a spawn poke) | town → `wrong-level`; kill → `reached` at f3; revived unit → `stuck` "1 alive"; `unresolved` spawn → `missing-unit`; `ever` holds at f1; spiral and grid sweep points; exit codes 0 / 1 |
 | `--selftest`: a fixed 96-byte record (slot 1 = 0x2002, slot 6 = 1, slot 41 = 0x8000) as `q` | `quest_bit` set for 1.1, 1.13, 6.0, 41.15, clear for 1.0, 41.14, 0.0, 7.0; `quest 42 0`, `quest 1 16`, `quest 1 0 on` and wrong arity rejected; `quest 6 0 set` stuck with "quest 6.0 clear", `ever` reached at f2; no `q` → stuck "no 'q'"; `need ever quest …` parsed |
 | `act1.play` on the 1.14d install, 2026-10-09 | 12/14 reached; `kill-zombie` and `andariel-killed` stuck (see Open questions 1–2) |
+| d2rs `state-dump`, seed 1, `act1.play` sor save: `5 warp 37`, `30 pos @1:156 @x-3 @y`, `30 stat @1:156 6 0 256`, `40 missile 58 @x @y @x-3 @y skill 36 1` | Andariel hp 0, mode 0 at f42 (2026-10-09; the same with `@x+3`: hp 256 to f200, no hit) |
+| same with `20 superunique 10 @x-6 @y`, then the pos / stat / missile on `@1:229` | Radament hp 0, mode 0 at f42 |
 
 ## Provenance
 
@@ -269,12 +300,20 @@ install's tables with `mpq-tool extract`.
    Frost Nova (right click; mode 0 and hp 0 at f50). At f65 it is back
    in mode 5 / 1 with hp 0 and stays alive. This looks like a d2rs death
    bug. Not compared with 1.14d.
-2. `andariel-killed`: Andariel, moved next to the player with hp set to
-   1, never takes damage. The right click (Frost Nova) in Catacombs 4
-   gives player mode 2 (walk) or 1, not cast mode 10, even though the
-   same save casts in the Blood Moor. A `missile` poke (Fire Bolt) was
-   also tried and did not hit. It is still open whether this is the
-   headless input or the game.
+2. *Answered* (2026-10-09, missile poke): `andariel-killed` and
+   `radament-killed` (Radament at hp 256 "in mode 4" to f1000) are
+   setup faults, not damage faults: the bolt dies on a wall or barrier
+   cell before it reaches the boss (§1 rule 7, Edge case 3), and mode 4
+   is the boss attacking the player. Nothing in the bosses resists it:
+   Normal Andariel `ResFi` −50, Radament no fire resist, both hpregen 0
+   (`DamageRegen` 0; Radament's unique umod 2 also zeroes it), and the
+   1-point life dies to any hit (`combat/damage.md` §5.2, test
+   vectors). With the bolt on open floor both die at f42 in d2rs; on
+   this build they then return to mode 4 / 1 with hp 0 (Open question
+   1, the death clean-up). Still open: the right click (Frost Nova) in
+   Catacombs 4 gives player mode 2 (walk) or 1, not cast mode 10, even
+   though the same save casts in the Blood Moor (headless input or
+   game).
 3. *Answered* (2026-10-09): the player's quest record is `q` in
    `state-1` and the `quest` predicate (§2 r4) reads it; `act1.play` has
    `den-of-evil-done`, `andariel-done` and `act2-open`. Open: those three

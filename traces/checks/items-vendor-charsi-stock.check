@@ -1,0 +1,19 @@
+check 1
+# The items channel on charsi-stock's store fill (store, trade): the NPC flow of
+# items-vendor-akara-stock (0x13 interact, 0x2F chat, 0x38 action 1;
+# world/vendors.md §3-§5) with the player poked towards the NPC in steps
+# (each point inside a room already active). NPC position from the 1.14d
+# town recording (pc1-data.md q-diff-combat-a1). Authored by q-chk-items-vendors.
+name items-vendor-charsi-stock
+save ScnBuy --class ama --expansion --gold 5000
+seed 1234
+ticks 30
+seconds 300
+channels items
+at 4 poke pos @player 4860 4224
+at 7 poke pos @player 4848 4220
+at 10 poke pos @player 4840 4218
+at 13 poke pos @player 4838 4218
+at 16 send InteractWithEntity type=1 id=@1:154
+at 18 send InitEntityChat id=@1:154
+at 20 send EntityAction action=1 npc=@1:154 item=0

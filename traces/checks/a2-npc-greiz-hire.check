@@ -1,0 +1,14 @@
+check 1
+# Greiz (198) hires a Rogue-class mercenary of act 2 (0x36 after the hire list 0x38 action 3).
+name a2-npc-greiz-hire
+save ScnAm2 --class ama --expansion --gold 10000 --act 1 --quests acts=1
+seed 1234
+ticks 60
+seconds 600
+channels state packets
+at 4 poke goto unit 1:198
+at 14 send InteractWithEntity type=1 id=@1:198
+at 16 send InitEntityChat id=@1:198
+at 18 send EntityAction action=3 npc=@1:198 item=0
+at 24 send HireMerc npc=@1:198 merc=0
+at 30 send TerminateEntityChat id=@1:198
