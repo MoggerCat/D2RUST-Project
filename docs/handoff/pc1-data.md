@@ -476,6 +476,8 @@ diverged, 2 partial, 3 error). Each comparator also runs alone on two
 files (`py tools/trace-recorder/state_diff.py ORIG D2RS`, `rng_diff.py`,
 `packets_diff.py`).
 
+Every check at once (parallel, 1.14d recordings reused, match % per area, playthrough per act): `python3 tools/scenario-diff/suite.py [--filter GLOB] [--area A] [--md F]` (`scenario-diff.md` §4).
+
 Known limits: the d2rs side has no hover model (a click on a unit is a
 ground click) and no `key` steps headless; the click target can differ
 by a sub-tile (`scenario-diff.md` OQ 3); 1.14d draws a timing-dependent

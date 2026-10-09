@@ -12,6 +12,9 @@ fetch.sh, prepare_saves.sh).
    `channels state` (add `rng`, `packets`, `draws` when the area needs them).
 2. Run: `python3 tools/scenario-diff/scenario_diff.py traces/checks/<name>.check`
    (PC 1: `py tools\scenario-diff\scenario_diff.py ...`).
+   All checks at once, with a match % per area and the playability per act:
+   `python3 tools/scenario-diff/suite.py [--area <area>] [--md F]` (1.14d recordings
+   reused while the check, save and Game.exe are unchanged; `scenario-diff.md` §4).
 3. Read the first divergence of the first channel that diverges, state first
    (`FIRST DIVERGENCE: frame N <unit> field K: 1.14d A vs d2rs B`); then
    `rng` (the draw and its d2rs site) tells which code took the wrong step.
