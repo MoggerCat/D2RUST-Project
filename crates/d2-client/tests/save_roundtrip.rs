@@ -92,10 +92,10 @@ fn every_act_town_round_trips() {
 
 /// After seeded random play (soak §1: item moves, panels, keys,
 /// waypoints), two round trips: what the reload brings back is what was
-/// saved. Known break: an item saved on the cursor comes back in the
-/// inventory (q-fix-soak-cursor-reload).
+/// saved (an item saved on the cursor comes back on it,
+/// q-fix-soak-cursor-reload).
 #[test]
-#[ignore = "known bug q-fix-soak-cursor-reload: repro"]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn random_play_round_trips() {
     for seed in 1..=3 {
         let mut s = new("sorceress");
@@ -106,10 +106,9 @@ fn random_play_round_trips() {
 }
 
 /// A new character's belt potions reach the client model (soak §3 r8).
-/// Known break: the server's belt items never reach the model
-/// (q-fix-soak-belt-model).
+/// Settled (q-fix-items-shop): the join's belt records reach the model.
 #[test]
-#[ignore = "known bug q-fix-soak-belt-model: repro"]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_new_characters_belt_is_in_the_model() {
     let f = run(&args(new("sorceress"), 1, 120, &[], 0), &["desync"]);
     assert!(f.is_empty(), "{f:?}");

@@ -116,7 +116,7 @@ struct Hooks {
     grids: Vec<DrlgRoomId>,
     freed: Vec<DrlgRoomId>,
     doors: Vec<(i32, i32, u32, u32)>,
-    warps: Vec<(i32, i32, u32)>,
+    warps: Vec<(i32, i32, u32, u32)>,
 }
 
 fn marker_unit() -> PresetUnit {
@@ -190,17 +190,19 @@ impl LevelTypes for Hooks {
         false
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn warp_unit(
         &mut self,
         _: &mut Drlg,
         _: &DrlgData,
         _: DrlgRoomId,
-        _: u32,
         wx: i32,
         wy: i32,
         cell: u32,
-    ) {
-        self.warps.push((wx, wy, cell));
+        orientation: u32,
+    ) -> Result<bool, DrlgError> {
+        self.warps.push((wx, wy, cell, orientation));
+        Ok(true)
     }
 }
 
@@ -239,7 +241,7 @@ fn adapter_dispatches_by_drlg_type() {
     assert_eq!(types.room_grids(&mut drlg, &data, r), Ok(marker_grids()));
     types.free_room_tiles(&mut drlg, r);
     types.door_unit(&mut drlg, &data, r, 3, 4, 5, 9);
-    types.warp_unit(&mut drlg, &data, r, 10, 6, 7, 8);
+    assert_eq!(types.warp_unit(&mut drlg, &data, r, 6, 7, 8, 11), Ok(true));
     types.reset_level(&mut drlg, l5);
     assert_eq!(types.last_error, None);
     assert_eq!(hooks.inits, [5]);
@@ -247,7 +249,7 @@ fn adapter_dispatches_by_drlg_type() {
     assert_eq!(hooks.grids, [r]);
     assert_eq!(hooks.freed, [r]);
     assert_eq!(hooks.doors, [(3, 4, 5, 9)]);
-    assert_eq!(hooks.warps, [(6, 7, 8)]);
+    assert_eq!(hooks.warps, [(6, 7, 8, 11)]);
     assert_eq!(hooks.resets, [5]);
 }
 
@@ -1875,7 +1877,8 @@ fn apply_reads_the_variant_box() {
         [(803, 904, 0x800_0000), (804, 905, 0x800_0000 | 3)]
     );
     let units: Vec<_> = room.units.iter().map(|u| (u.class, u.x, u.y)).collect();
-    assert_eq!(units, [(1, 17, 27), (3, 24, 29)]);
+    // Prepended (`0x0066BF30`, measured): reverse of the file list.
+    assert_eq!(units, [(3, 24, 29), (1, 17, 27)]);
 }
 
 // ---- vertex.rs: the vertex polygon (§4) -------------------------------------

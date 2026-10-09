@@ -18,7 +18,7 @@ use std::any::Any;
 
 use crate::game::Game;
 use crate::monsters::init::{self, MonsterData};
-use crate::monsters::population::placement;
+use crate::monsters::population::{placement, preset};
 use crate::units::hooks::Sim;
 use crate::units::UnitId;
 
@@ -141,6 +141,29 @@ impl<X: WorldPending> MonsterWorld<X> for WorldState {
             })
         });
         Some(placed.unit())
+    }
+
+    /// `0x0054E600` through population's preset spawn
+    /// ([`preset::preset_spawn`]); population's state lent elsewhere:
+    /// `None`.
+    fn spawn_preset(
+        &mut self,
+        sim: &mut Sim<'_>,
+        h: &mut ActionHooks<X>,
+        room: crate::units::RoomId,
+        x: i32,
+        y: i32,
+        class: i32,
+        mode: u8,
+    ) -> Option<Option<UnitId>> {
+        if self.pop_lent {
+            return None;
+        }
+        let made = h.as_world_holder(|h| {
+            let mut wh = host(sim, h, self);
+            wh.population(|cx| preset::preset_spawn(cx, room, class, x, y, mode))
+        });
+        Some(made)
     }
 
     fn into_any(self: Box<Self>) -> Box<dyn Any> {

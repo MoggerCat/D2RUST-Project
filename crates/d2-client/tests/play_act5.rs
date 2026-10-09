@@ -569,3 +569,171 @@ fn nihlathak_waits_in_the_halls_of_vaught() {
     let (_, guid, at) = a.find(UnitType::Monster, &[526]);
     assert!(a.client_has(1, guid), "the client sees Nihlathak at {at:?}");
 }
+
+impl Act5 {
+    /// The player's save flags (`d2s.md` §2.2 rule 5: progression bits
+    /// 8–12), as the quest control keeps them.
+    fn save_flags(&mut self) -> Option<u16> {
+        self.rig
+            .with(|sim, p| sim.world.rest.save_flags.get(&p).copied())
+    }
+
+    /// Kills every living monster of `classes` within `r` of `at`.
+    fn clear_around(&mut self, at: (i32, i32), r: i32, skip: &[u32]) -> usize {
+        let all: Vec<_> = self.rig.with(|sim, _| {
+            sim.game
+                .lists
+                .units_of_type(UnitType::Monster)
+                .into_iter()
+                .filter_map(|u| {
+                    let rec = sim.events.action.sys.units.get(u)?;
+                    let alive = !matches!(rec.mode, 0 | 12);
+                    alive.then(|| (u, rec.class, sim.game.lists.unit(u).map_or(0, |e| e.guid)))
+                })
+                .collect()
+        });
+        let mut n = 0;
+        for (u, class, guid) in all {
+            if skip.contains(&class) {
+                continue;
+            }
+            let pos = self
+                .rig
+                .with(move |sim, _| sim.events.action.sys.hooks.path_position(u));
+            if test_fixtures::host::cheb(pos, at) > r {
+                continue;
+            }
+            self.kill(u, guid);
+            n += 1;
+        }
+        n
+    }
+}
+
+// Covers: specs/world/quests-act5-2.md §6.6
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn nihlathaks_death_completes_the_betrayal() {
+    let mut a = Act5::new();
+    // Anya freed first (38.1 needs 37.0 or 37.1).
+    a.talk(513, &[20116, 20127]);
+    a.warp(114);
+    let (_, statue, _) = a.find(UnitType::Object, &[558]);
+    a.interact(2, statue);
+    a.rig.step(60);
+    assert!(a.flag(37, 1), "Anya freed");
+    a.warp(124);
+    let (n, guid, _) = a.find(UnitType::Monster, &[526]);
+    a.kill(n, guid);
+    a.rig.step(40);
+    assert!(
+        a.flag(38, 1),
+        "Betrayal reward pending (38.1); chain 34 {:?}",
+        a.chain(34)
+    );
+    assert!(a.rejected().is_empty(), "{:?}", a.rejected());
+}
+
+// Covers: specs/world/quests-act5-2.md §7.4, §7.6, §7.7
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_ancients_fall_on_arreat_summit() {
+    let mut a = Act5::new();
+    a.warp(120);
+    let (_, altar, at) = a.find(UnitType::Object, &[546]);
+    a.interact(2, altar);
+    // The altar's scroll ends (C→S 0x31 20002 from no NPC).
+    a.quest_message(0, 20002);
+    a.rig.step(80);
+    let mut killed = 0;
+    for _ in 0..30 {
+        let ancients = a.units(UnitType::Monster, &[540, 541, 542]);
+        let alive: Vec<_> = ancients.into_iter().filter(|e| !a.dead(e.0)).collect();
+        if alive.is_empty() && killed >= 3 {
+            break;
+        }
+        for (u, g, _) in alive {
+            a.kill(u, g);
+            killed += 1;
+        }
+        a.rig.step(40);
+        let _ = at;
+    }
+    assert!(
+        killed >= 3,
+        "three Ancients spawned and killed; chain 35 {:?}",
+        a.chain(35)
+    );
+    assert!(
+        a.flag(39, 0),
+        "Rite of Passage done (39.0); chain 35 {:?}",
+        a.chain(35)
+    );
+    assert!(a.rejected().is_empty(), "{:?}", a.rejected());
+}
+
+// Covers: specs/monsters/ai-bodies-5.md §20; specs/world/quests-act5-2.md §8.5, §8.8
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn baal_falls_and_the_game_is_finished() {
+    let mut a = Act5::new();
+    a.warp(131);
+    let (_, _, throne) = a.find(UnitType::Monster, &[543]);
+    // Five waves: clear each one as Baal sends it, until he leaves the
+    // throne for the Worldstone Chamber (the portal opens).
+    let mut open = false;
+    for _ in 0..80 {
+        a.strengthen();
+        a.clear_around(throne, 70, &[543, 559]);
+        a.rig.step(50);
+        let baal = a.units(UnitType::Monster, &[543, 559]);
+        if baal.is_empty() {
+            open = true;
+            break;
+        }
+    }
+    assert!(open, "Baal left the throne; chain 36 {:?}", a.chain(36));
+    let (_, portal, _) = a.find(UnitType::Object, &[563]);
+    a.interact(2, portal);
+    for _ in 0..100 {
+        if a.rig.level() == Some(132) {
+            break;
+        }
+        a.rig.step(1);
+    }
+    assert_eq!(
+        a.rig.level(),
+        Some(132),
+        "the portal takes the player to the Worldstone Chamber"
+    );
+    a.rig.step(20);
+    let (baal, guid, _) = a.find(UnitType::Monster, &[544]);
+    a.kill(baal, guid);
+    a.rig.step(80);
+    assert!(
+        a.flag(40, 0),
+        "Eve of Destruction done (40.0); chain 36 {:?}",
+        a.chain(36)
+    );
+    let flags = a.save_flags().unwrap_or(0);
+    assert_ne!(flags & 0x0F00, 0, "progression raised: {flags:#x}");
+    // Tyrael appears; his chat ends with the last portal.
+    let (_, tyrael, _) = a.find(UnitType::Monster, &[521]);
+    a.interact(1, tyrael);
+    let mut m = vec![0x30];
+    m.extend(1u32.to_le_bytes());
+    m.extend(tyrael.to_le_bytes());
+    a.rig.send(&m);
+    a.rig.step(20);
+    let (_, last, _) = a.find(UnitType::Object, &[565]);
+    a.interact(2, last);
+    for _ in 0..100 {
+        if a.rig.level() == Some(HARROGATH) {
+            break;
+        }
+        a.rig.step(1);
+    }
+    assert_eq!(a.rig.level(), Some(HARROGATH), "the last portal goes home");
+    assert!(a.flag(40, 10), "game finished (40.10)");
+    assert!(a.rejected().is_empty(), "{:?}", a.rejected());
+}

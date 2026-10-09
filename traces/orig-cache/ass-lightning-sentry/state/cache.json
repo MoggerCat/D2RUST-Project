@@ -1,0 +1,40 @@
+{
+ "channel": "state",
+ "check": "ass-lightning-sentry",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "70",
+  "--auto",
+  "ScnAss",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "4 warp 2",
+  "--input",
+  "frame 20; rclick 330 300"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "32736375635f480c52d698726747581f443100617431508f48bc033cc274adb1",
+   "size": 347912
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "7ccfc3142b29ec2d8eed568a203c51ad70d0e5923145e9b6cab00d452631d8ee",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "d17b28e1be3895583ff39a43aac26b3c4208f0b03c10fcfa86e86bc21d5a1790",
+  "save": "8172f9b66f793484527c1e19defdb32efed3336267af0d045872a0a691011444"
+ }
+}

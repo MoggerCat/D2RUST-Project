@@ -1,0 +1,18 @@
+check 1
+# Area B (q-diff-combat-a1): Cold Plains by waypoint, then the Act I
+# outdoor population and its monsters' approach and attacks on a level 1
+# amazon (no player attack). Input as C->S messages (poke `msg`,
+# specs/tools/poke.md §1): run (0x03) from the arrival point next to the
+# Rogue Encampment waypoint (GUID 10 at 4899, 4209 for seed 1234), then
+# 0x49 to Cold Plains (level 3) after frame 250 (the 0x49 handler's
+# hostile delay refuses while the host clock is below 10 s,
+# world/waypoints.md §6.1; d2rs state-dump's clock starts at 1 s).
+# Spec: specs/tools/scenario-diff.md.
+name combat-cold-plains-wp
+save ScnAma --class ama --expansion --waypoints 0,1
+seed 1234
+ticks 520
+seconds 1200
+channels state
+at 10 poke msg 0x03 4895 4215
+at 260 poke msg 0x49 10 3

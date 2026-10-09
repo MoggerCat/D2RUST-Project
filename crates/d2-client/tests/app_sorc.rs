@@ -1,414 +1,175 @@
 // Spec: specs/skills/bodies.md (§4.3, §8.4, §8.12), specs/skills/bodies-2.md (§3.2), specs/skills/bodies-2b.md (§6.2, §6.3, §6.5), specs/skills/use.md §5
-//! The Sorceress's skills cast on the play host, headless, on the
-//! synthetic single-player game: C→S 0x0C (the right skill at a point) →
-//! the server's skill use → the body's effect (missiles, states, the
-//! teleport). One test per skill; rows are test-local (the synthetic game
-//! has no `skills`, `missiles` or `states` tables).
-
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
-
-use d2_client::app::server_thread::ThreadLink;
-use d2_client::app::single_player::{self, Link, DEFAULT_SEED, PLAYER_CLASS};
-use d2_client::bridge::link::{SendQueue, ServerLink};
-use d2_client::bridge::LOCAL_CLIENT;
-use d2_client::rules::unit_composite::code;
-use d2_client::world_view::unit_assets::UnitLooks;
-use d2_data::bin::BinTable;
-use d2_data::fixup::maps;
-use d2_data::fixup::records::stat_ops;
-use d2_data::tables::{
-    Charstats, Itemstatcost, Levels, Missiles, Monstats, Monstats2, Record, Skills, States,
-};
-use d2_formats::animdata::{self, AnimData, AnimRecord};
-use d2_server::seams::{Clock, Pos};
-use d2_sim::skills::list::ListOwner;
-use d2_sim::stats::states::StateTable;
-use d2_sim::stats::{StatData, StatLists, StatTable};
-use d2_sim::wiring::path::{place, PathCtx};
+//! The Sorceress's skills cast on the play host, headless, on the user's
+//! install (`real_rig`; q-fixture-migrate): a new sorceress leaves the
+//! camp (Fire Wall and Teleport refuse in town), learns the skill, and
+//! C→S 0x0C casts it at a point → the server's skill use → the body's
+//! effect (missiles, states, the teleport). One test per skill. Skill
+//! ids come from the install's `skills.txt` by name; costs, states,
+//! missile links and counts from the same rows.
 
 mod app_support;
+mod real_rig;
 
-struct StepClock(Arc<AtomicU32>);
+use std::collections::BTreeSet;
 
-impl Clock for StepClock {
-    fn now_ms(&mut self) -> u32 {
-        self.0.load(Ordering::SeqCst)
-    }
-}
+use d2_client::bridge::BridgeResource;
+use d2_data::bin::TableFiles;
+use d2_sim::units::UnitType;
+use real_rig::{skill_row, Rig};
 
-/// Real 1.14d skill ids of the Sorceress's starting row.
-const FIRE_BOLT: usize = 36;
-const CHARGED_BOLT: usize = 38;
-const FROZEN_ARMOR: usize = 40;
-const ICE_BOLT: usize = 45;
-const NOVA: usize = 48;
-const FIRE_WALL: usize = 51;
-const ENCHANT: usize = 52;
-const TELEPORT: usize = 54;
-const METEOR: usize = 56;
-const BLIZZARD: usize = 59;
-const SORC_SKILLS: [u16; 10] = [36, 38, 45, 40, 54, 48, 59, 51, 56, 52];
-/// A state id that is a valid row of the synthetic `states` table.
-const STATE: u16 = 20;
-const MANA: i32 = 100 << 8;
-
-/// The sorceress casting: 8 frames at speed 256, the missile event (2)
-/// on frame 4 (`animdata.md` §2).
-fn anim_data() -> AnimData {
-    let mut a = AnimData {
-        buckets: vec![Vec::new(); animdata::BUCKETS],
+/// The install's `skills.txt` row of the skill called `name`: its
+/// `(Id, Param1)`.
+fn txt_row(name: &str) -> (usize, i32) {
+    let d = app_support::live();
+    let (_, bytes) = d
+        .archives
+        .read_excel("skills.txt")
+        .expect("skills.txt reads")
+        .expect("the install has skills.txt");
+    let text = String::from_utf8_lossy(&bytes).into_owned();
+    let mut lines = text.lines();
+    let head: Vec<&str> = lines.next().expect("header").split('\t').collect();
+    let col = |n: &str| {
+        head.iter()
+            .position(|h| *h == n)
+            .unwrap_or_else(|| panic!("{n}"))
     };
-    let mut events = [0u8; animdata::EVENTS];
-    events[4] = 2;
-    let name = *b"SOSCHTH\0";
-    a.buckets[animdata::hash(&name[..7])].push(AnimRecord {
-        name,
-        frames: 8,
-        speed: 256,
-        events,
-    });
-    a
-}
-
-/// The unit tables of the name rules: every class token `SO`, mode 10
-/// token `SC`.
-fn looks() -> UnitLooks {
-    let mut modes = vec![code(b"NU"); 20];
-    modes[10] = code(b"SC");
-    UnitLooks {
-        player_tokens: vec![code(b"SO"); 7],
-        player_modes: modes,
-        ..UnitLooks::default()
-    }
-}
-
-/// A synthetic itemstatcost (359 stats, no ops, fixed up) and a
-/// `states` table of 160 blank rows.
-fn stat_data() -> Arc<StatData> {
-    let (n, size) = (359, Itemstatcost::SIZE);
-    let mut records = vec![0u8; n * size];
-    for (s, r) in records.chunks_mut(size).enumerate() {
-        for o in [0x32, 0x48, 0x4A, 0x56, 0x58, 0x5A, 0x5C] {
-            r[o..o + 2].copy_from_slice(&0xFFFFu16.to_le_bytes());
+    let (c_name, c_id, c_p1) = (col("skill"), col("Id"), col("Param1"));
+    for l in lines {
+        let f: Vec<&str> = l.split('\t').collect();
+        if f.get(c_name) == Some(&name) {
+            let id = f[c_id].parse().expect("Id");
+            return (id, f[c_p1].parse().unwrap_or(0));
         }
-        r[0..2].copy_from_slice(&(s as u16).to_le_bytes());
     }
-    let mut t = BinTable {
-        name: "itemstatcost".into(),
-        source: "synthetic".into(),
-        count: n,
-        record_size: size,
-        records,
-    };
-    stat_ops(&mut t);
-    let states = BinTable {
-        name: "states".into(),
-        source: "synthetic".into(),
-        count: 160,
-        record_size: States::SIZE,
-        records: vec![0u8; 160 * States::SIZE],
-    };
-    Arc::new(StatData {
-        stats: StatTable::from_fixed(&t).expect("itemstatcost"),
-        states: StateTable::new(&states, &maps::states(&states)).expect("states"),
-        ..StatData::default()
-    })
+    panic!("no skills.txt row called {name}");
 }
 
-/// Formula constants: `f(v)` is the offset of `push i16 v; end`.
-struct Code(Vec<u8>);
-
-impl Code {
-    fn f(&mut self, v: i16) -> u32 {
-        let at = self.0.len() as u32;
-        self.0.push(0x08);
-        self.0.extend(v.to_le_bytes());
-        self.0.push(0x00);
-        at
-    }
+/// The install's skill id of `name`.
+fn skill(name: &str) -> usize {
+    txt_row(name).0
 }
 
-/// A blank skills row: every formula "none", every state / stat / missile
-/// reference invalid (the shape of the tables' own blank rows).
-fn blank_row() -> Skills {
-    let mut r = Skills::decode(&[0u8; Skills::SIZE]);
-    for f in [
-        &mut r.auralencalc,
-        &mut r.aurarangecalc,
-        &mut r.aurastatcalc1,
-        &mut r.calc1,
-        &mut r.calc2,
-        &mut r.calc3,
-        &mut r.calc4,
-        &mut r.petmax,
-        &mut r.skpoints,
-        &mut r.tohitcalc,
-        &mut r.dmgsympercalc,
-        &mut r.edmgsympercalc,
-        &mut r.elensympercalc,
-    ] {
-        *f = 0xFFFF_FFFF;
-    }
-    for s in [
-        &mut r.srvmissile,
-        &mut r.srvmissilea,
-        &mut r.srvmissileb,
-        &mut r.srvmissilec,
-        &mut r.aurastate,
-        &mut r.auratargetstate,
-        &mut r.srvoverlay,
-        &mut r.aurastat1,
-        &mut r.aurastat2,
-        &mut r.auraevent1,
-        &mut r.auraevent2,
-        &mut r.auraevent3,
-    ] {
-        *s = 0xFFFF;
-    }
-    r.skilldesc = 0xFFFF;
-    r.charclass = 0xFF;
-    r.reqskill1 = 0xFFFF;
-    r.reqskill2 = 0xFFFF;
-    r.reqskill3 = 0xFFFF;
-    r.itypea1 = 0xFFFF;
-    r.anim = 10;
-    r.range = 2;
-    r.mana = 5;
-    r.manashift = 7;
-    r.minmana = 1;
-    r.intown = true;
-    r.usemanaondo = true;
+/// A new sorceress with `names` learned, out of town and strengthened
+/// (`Rig::strengthen`).
+fn game(names: &[&str]) -> Rig {
+    let ids: Vec<usize> = names.iter().map(|n| skill(n)).collect();
+    let mut r = Rig::new("sorceress", &ids);
+    r.leave_town();
+    r.strengthen();
     r
 }
 
-/// The sorceress rows (`skills.txt` shape: `srvdofunc` / `srvmissile*` /
-/// `aurastate`), test-local. Missile 1 is the generic flying missile.
-// d2rs-own, unverified: the column values are the 1.14d skills.txt shape
-// as the bodies' specs read them (functions.tsv), not a checked table.
-fn rows(code: &mut Code) -> Vec<Skills> {
-    let mut v = vec![Skills::decode(&[0u8; Skills::SIZE]); 64];
-    let mut set = |id: usize, f: &dyn Fn(&mut Skills)| {
-        let mut r = blank_row();
-        f(&mut r);
-        v[id] = r;
+/// What a cast showed over its frames.
+struct Cast {
+    /// The most missiles alive at once.
+    most: usize,
+    /// The largest one-frame fall of the mana in the cast, and the
+    /// largest one-frame rise at rest before it (regeneration), 1/256.
+    drop: i32,
+    regen: i32,
+    /// The modes the client's local player was in.
+    client_modes: BTreeSet<u32>,
+    /// The state bits the client's local player had.
+    client_states: BTreeSet<u8>,
+    /// Whether a message with the byte 0x4D reached the client during the
+    /// cast (the old rigs' loose S→C 0x4D check).
+    saw_4d: bool,
+}
+
+/// The client model's local player: its mode and state bits.
+fn client_player(r: &Rig) -> Option<(u32, BTreeSet<u8>)> {
+    let w = r.app.world().resource::<BridgeResource>().0.world();
+    let u = w.units.get(&w.local_player?)?;
+    Some((u.mode, u.states.clone()))
+}
+
+/// Makes `id` the right skill and casts it at the point 6 sub-tiles east
+/// (C→S 0x0C), then runs `frames` frames.
+fn cast(r: &mut Rig, id: usize, frames: usize) -> Cast {
+    r.select_right(id);
+    // Regeneration at rest, from half mana: the cast's fall is the cost
+    // less what a frame regenerates.
+    r.with(|sim, p| {
+        sim.events
+            .action
+            .with(&mut sim.game, |_, v| v.set_base(p, 8, 50 << 8));
+    });
+    let mut regen = 0;
+    let mut prev = r.mana();
+    for _ in 0..10 {
+        r.step(1);
+        let m = r.mana();
+        regen = regen.max(m - prev);
+        prev = m;
+    }
+    let mark = r.s2c_mark();
+    r.right_click_point(6, 0);
+    let mut c = Cast {
+        most: 0,
+        drop: 0,
+        regen,
+        client_modes: BTreeSet::new(),
+        client_states: BTreeSet::new(),
+        saw_4d: false,
     };
-    set(FIRE_BOLT, &|r| r.srvmissile = 1);
-    set(ICE_BOLT, &|r| r.srvmissile = 1);
-    let three = code.f(3);
-    set(CHARGED_BOLT, &|r| {
-        r.srvdofunc = 17;
-        r.srvmissilea = 1;
-        r.calc1 = three;
-    });
-    let dur = code.f(250);
-    set(FROZEN_ARMOR, &|r| {
-        r.srvdofunc = 18;
-        r.aurastate = STATE;
-        r.auralencalc = dur;
-    });
-    set(ENCHANT, &|r| {
-        r.srvdofunc = 25;
-        r.aurastate = STATE + 1;
-        r.auralencalc = dur;
-    });
-    set(TELEPORT, &|r| r.srvdofunc = 27);
-    set(NOVA, &|r| {
-        r.srvdofunc = 22;
-        r.srvmissilea = 1;
-    });
-    set(BLIZZARD, &|r| {
-        r.srvdofunc = 28;
-        r.srvmissilea = 1;
-    });
-    set(METEOR, &|r| {
-        r.srvdofunc = 28;
-        r.srvmissilea = 1;
-    });
-    set(FIRE_WALL, &|r| {
-        r.srvdofunc = 24;
-        r.srvmissilea = 1;
-    });
-    v
-}
-
-struct Game {
-    link: ThreadLink<Link<StepClock>>,
-    ms: Arc<AtomicU32>,
-}
-
-impl Game {
-    /// A joined game whose right skill is `right`.
-    fn joined(right: usize) -> Self {
-        let ms = Arc::new(AtomicU32::new(1000));
-        let (link, _) = single_player::start(
-            app_support::game_data(),
-            DEFAULT_SEED,
-            StepClock(ms.clone()),
-        )
-        .unwrap();
-        let mut g = Self { link, ms };
-        g.link
-            .with(|l| {
-                let h = l.host_mut().game.events.action.hooks();
-                let mut t = (*h.tables).clone();
-                let mut code = Code(Vec::new());
-                t.skills.skills = rows(&mut code);
-                t.skills.skills_code = code.0;
-                t.skills.level_cap = d2_sim::skills::LEVEL_CAP_114D;
-                t.skills.stat_count = 359;
-                // levels.txt: the Blood Moor (2) allows teleporting, the
-                // camp (1) does not.
-                let mut lv = vec![Levels::decode(&[0u8; Levels::SIZE]); 3];
-                lv[2].teleport = 1;
-                t.levels = lv;
-                let mut m = Missiles::decode(&[0u8; Missiles::SIZE]);
-                m.range = 20;
-                m.vel = 16;
-                m.maxvel = 16;
-                m.town = true;
-                m.srctown = true;
-                m.dmgsympercalc = 0xFFFF_FFFF;
-                m.edmgsympercalc = 0xFFFF_FFFF;
-                t.missiles = vec![Missiles::decode(&[0u8; Missiles::SIZE]), m];
-                t.skills.missiles = t.missiles.clone();
-                h.tables = Arc::new(t);
-                h.anim_data = Some(Arc::new(anim_data()));
-                h.x.looks = Some(Arc::new(looks()));
-                l.host_mut().game.events.action.sys.stats = StatLists::new(stat_data());
-            })
-            .unwrap();
-        let req = single_player::create_request();
-        g.link.send(SendQueue::System, &req.encode()).unwrap();
-        g.ticks(1);
-        g.link.send(SendQueue::System, &[0x6B]).unwrap();
-        g.ticks(3);
-        g.link
-            .with(move |l| {
-                let sim = &mut l.host_mut().game;
-                let p = sim.player_of(LOCAL_CLIENT).expect("joined");
-                let h = &mut sim.events.action.sys.hooks;
-                let mut t = (*h.tables).clone();
-                let mut c = Charstats::decode(&[0u8; Charstats::SIZE]);
-                c.walkvelocity = 6;
-                c.runvelocity = 9;
-                t.combat.charstats = (0..7).map(|_| c.clone()).collect();
-                t.combat.monstats = vec![Monstats::decode(&[0u8; Monstats::SIZE])];
-                t.combat.monstats2 = vec![Monstats2::decode(&[0u8; Monstats2::SIZE])];
-                h.tables = Arc::new(t);
-                let rows = h.tables.skills.skills.clone();
-                let list = h.skill_lists.entry(p).or_default();
-                // The join ran the native skills on the synthetic `charstats`
-                // (`client/msg-skills.md` §2 rule 8); this game's class skills
-                // are the fixture's.
-                *list = Default::default();
-                list.init_player(
-                    &rows,
-                    ListOwner::player(PLAYER_CLASS as i32),
-                    Some(&SORC_SKILLS),
-                )
-                .unwrap();
-                let i = list.view().iter().position(|e| e.skill == right as i32);
-                list.right = i;
-                sim.events.action.with(&mut sim.game, |_, v| {
-                    v.set_base(p, 9, MANA);
-                    v.set_base(p, 8, MANA);
-                });
-                // Out of the camp: Fire Wall and Teleport refuse in town.
-                let warped = sim.events.action.with(&mut sim.game, |g, v| {
-                    place::level_warp(PathCtx::of(v, g), p, 2, 0)
-                });
-                assert_eq!(warped, Some(true), "the Blood Moor");
-            })
-            .unwrap();
-        g
-    }
-
-    fn ticks(&mut self, n: usize) -> Vec<Vec<u8>> {
-        let mut got = Vec::new();
-        for _ in 0..n {
-            self.link.pump().unwrap();
-            self.ms.fetch_add(40, Ordering::SeqCst);
-            self.link.pump().unwrap();
-            got.extend(self.link.receive());
+    for _ in 0..frames {
+        r.step(1);
+        c.most = c
+            .most
+            .max(r.with(|sim, _| sim.game.lists.units_of_type(UnitType::Missile).len()));
+        let m = r.mana();
+        c.drop = c.drop.max(prev - m);
+        prev = m;
+        if let Some((m, s)) = client_player(r) {
+            c.client_modes.insert(m);
+            c.client_states.extend(s);
         }
-        got
     }
-
-    fn player_pos(&mut self) -> Pos {
-        self.link
-            .with(|l| {
-                let s = &mut l.host_mut().game;
-                let p = s.player_of(LOCAL_CLIENT).unwrap();
-                let (x, y) = s.events.action.hooks().path_position(p);
-                Pos { x, y }
-            })
-            .unwrap()
-    }
-
-    fn mana(&mut self) -> i32 {
-        self.link
-            .with(|l| {
-                let s = &mut l.host_mut().game;
-                let p = s.player_of(LOCAL_CLIENT).unwrap();
-                s.events.action.with(&mut s.game, |_, v| v.stat(p, 8))
-            })
-            .unwrap()
-    }
-
-    fn has_state(&mut self, state: u16) -> bool {
-        self.link
-            .with(move |l| {
-                let s = &mut l.host_mut().game;
-                let p = s.player_of(LOCAL_CLIENT).unwrap();
-                s.events.action.sys.stats.has_state(p, u32::from(state))
-            })
-            .unwrap()
-    }
-
-    fn errors(&mut self) -> String {
-        self.link
-            .with(|l| {
-                let h = l.host_mut().game.events.action.hooks();
-                format!("{:?} {:?}", h.errors, h.x.skills.log)
-            })
-            .unwrap()
-    }
-
-    /// Cast the right skill at the point 6 subtiles east and run `n`
-    /// ticks; the most missiles alive at once, and every S→C message.
-    fn cast(&mut self, n: usize) -> (usize, Vec<Vec<u8>>) {
-        let at = self.player_pos();
-        let mut msg = vec![0x0C];
-        msg.extend(((at.x + 6) as u16).to_le_bytes());
-        msg.extend((at.y as u16).to_le_bytes());
-        self.link.send(SendQueue::Game, &msg).unwrap();
-        let (mut got, mut most) = (Vec::new(), 0);
-        for _ in 0..n {
-            got.extend(self.ticks(1));
-            most = most.max(
-                self.link
-                    .with(|l| {
-                        let h = l.host_mut().game.events.action.hooks();
-                        h.missiles.as_ref().map_or(0, |m| m.missiles().count())
-                    })
-                    .unwrap(),
-            );
-        }
-        (most, got)
-    }
+    c.saw_4d = r.s2c_contains_since(mark, 0x4D);
+    c
 }
+
+/// The mana a cast of `id` at skill level 1 costs (`use.md` §2 step 6:
+/// `(mana + max(L − 1, 0) × lvlmana) << manashift`, 1/256 mana).
+fn cost(id: usize) -> i32 {
+    let row = skill_row(id);
+    i32::from(row.mana) << row.manashift
+}
+
+/// The cast paid `cost`: one frame fell by it less that frame's
+/// regeneration.
+fn paid(c: &Cast, cost: i32) -> bool {
+    (cost - c.regen..=cost).contains(&c.drop)
+}
+
+/// How long a cast runs here: past the animation and the missile's life.
+const FRAMES: usize = 60;
 
 // Covers: specs/skills/use.md §5
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn fire_bolt_and_ice_bolt_cost_mana_and_fly() {
-    for id in [FIRE_BOLT, ICE_BOLT] {
-        let mut g = Game::joined(id);
-        let (most, got) = g.cast(12);
-        assert!(g.mana() < MANA, "{id}: mana; {}", g.errors());
-        assert!(most > 0, "{id}: missile; {}", g.errors());
-        assert!(got.iter().any(|m| m.contains(&0x4D)), "{id}: 0x4D");
+    for name in ["Fire Bolt", "Ice Bolt"] {
+        let id = skill(name);
+        let row = skill_row(id);
+        let mut r = game(&[name]);
+        let c = cast(&mut r, id, FRAMES);
+        let e = r.errors();
+        assert!(
+            paid(&c, cost(id)),
+            "{name}: mana; drop {} cost {} regen {}; {e}",
+            c.drop,
+            cost(id),
+            c.regen
+        );
+        assert!(c.most > 0, "{name}: missile; {e}");
+        assert!(c.saw_4d, "{name}: 0x4D");
+        assert!(
+            c.client_modes.contains(&u32::from(row.anim)),
+            "{name}: the cast mode reaches the client: {:?}; {e}",
+            c.client_modes
+        );
     }
 }
 
@@ -416,23 +177,41 @@ fn fire_bolt_and_ice_bolt_cost_mana_and_fly() {
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn charged_bolt_makes_its_bolts() {
-    let mut g = Game::joined(CHARGED_BOLT);
-    let (most, _) = g.cast(12);
-    assert!(g.mana() < MANA, "mana; {}", g.errors());
-    assert!(most >= 3, "three bolts, got {most}; {}", g.errors());
+    let (id, bolts) = txt_row("Charged Bolt");
+    let mut r = game(&["Charged Bolt"]);
+    let c = cast(&mut r, id, FRAMES);
+    let e = r.errors();
+    assert!(
+        paid(&c, cost(id)),
+        "mana; drop {} cost {} regen {}; {e}",
+        c.drop,
+        cost(id),
+        c.regen
+    );
+    // `calc1` = `min(24, ln12)`; `ln12` is Param1 at level 1.
+    assert!(
+        c.most >= bolts as usize,
+        "{bolts} bolts, got {}; {e}",
+        c.most
+    );
 }
 
 // Covers: specs/skills/bodies.md §4.3
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn frozen_armor_sets_its_state() {
-    let mut g = Game::joined(FROZEN_ARMOR);
-    let (_, got) = g.cast(12);
-    assert!(g.has_state(STATE), "state; {}", g.errors());
+    let id = skill("Frozen Armor");
+    let state = skill_row(id).aurastate;
+    let mut r = game(&["Frozen Armor"]);
+    let me = r.player();
+    let c = cast(&mut r, id, FRAMES);
+    let e = r.errors();
+    assert!(r.state_on(me, state), "state; {e}");
     // q-states-auras: the toggle reaches the client (S→C 0xA8, the state).
     assert!(
-        got.iter().any(|m| m.contains(&0xA8)),
-        "0xA8 reaches the client: {got:?}"
+        c.client_states.contains(&(state as u8)),
+        "the state reaches the client: {:?}; {e}",
+        c.client_states
     );
 }
 
@@ -440,22 +219,26 @@ fn frozen_armor_sets_its_state() {
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn enchant_sets_its_state() {
-    let mut g = Game::joined(ENCHANT);
-    g.cast(12);
-    assert!(g.has_state(STATE + 1), "state; {}", g.errors());
+    let id = skill("Enchant");
+    let state = skill_row(id).aurastate;
+    let mut r = game(&["Enchant"]);
+    let me = r.player();
+    cast(&mut r, id, FRAMES);
+    assert!(r.state_on(me, state), "state; {}", r.errors());
 }
 
 // Covers: specs/skills/bodies-2b.md §6.5
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn teleport_moves_the_caster() {
-    let mut g = Game::joined(TELEPORT);
-    let from = g.player_pos();
-    g.cast(12);
-    let to = g.player_pos();
-    assert_ne!((from.x, from.y), (to.x, to.y), "moved; {}", g.errors());
+    let id = skill("Teleport");
+    let mut r = game(&["Teleport"]);
+    let from = r.pos();
+    cast(&mut r, id, FRAMES);
+    let to = r.pos();
+    assert_ne!(from, to, "moved; {}", r.errors());
     assert!(
-        from.x.abs_diff(to.x) <= 8,
+        from.0.abs_diff(to.0) <= 8,
         "to the point, not across the map"
     );
 }
@@ -464,19 +247,22 @@ fn teleport_moves_the_caster() {
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn nova_makes_a_ring() {
-    let mut g = Game::joined(NOVA);
-    let (most, _) = g.cast(12);
-    assert!(most >= 8, "ring, got {most}; {}", g.errors());
+    let id = skill("Nova");
+    let mut r = game(&["Nova"]);
+    let c = cast(&mut r, id, FRAMES);
+    // `bodies.md` §6.7: the ring is 64 missiles.
+    assert!(c.most >= 64, "ring, got {}; {}", c.most, r.errors());
 }
 
 // Covers: specs/skills/bodies.md §8.12
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn blizzard_and_meteor_make_a_missile_at_the_point() {
-    for id in [BLIZZARD, METEOR] {
-        let mut g = Game::joined(id);
-        let (most, _) = g.cast(12);
-        assert!(most > 0, "{id}: missile; {}", g.errors());
+    for name in ["Blizzard", "Meteor"] {
+        let id = skill(name);
+        let mut r = game(&[name]);
+        let c = cast(&mut r, id, FRAMES);
+        assert!(c.most > 0, "{name}: missile; {}", r.errors());
     }
 }
 
@@ -484,7 +270,16 @@ fn blizzard_and_meteor_make_a_missile_at_the_point() {
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn fire_wall_makes_its_wall() {
-    let mut g = Game::joined(FIRE_WALL);
-    let (most, _) = g.cast(12);
-    assert!(most >= 2, "wall, got {most}; {}", g.errors());
+    let id = skill("Fire Wall");
+    let row = skill_row(id);
+    let mut r = game(&["Fire Wall"]);
+    let c = cast(&mut r, id, FRAMES);
+    // Two side missiles, plus the centre one when `srvmissileb` is set.
+    let want = 2 + usize::from(row.srvmissileb != 0xFFFF);
+    assert!(
+        c.most >= want,
+        "wall of {want}, got {}; {}",
+        c.most,
+        r.errors()
+    );
 }

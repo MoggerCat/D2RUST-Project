@@ -455,7 +455,37 @@ impl<X: Pending> ActionHooks<X> {
         if self.point_count(unit) == 0 {
             return false;
         }
-        self.plain_mode(sim, unit, mode)
+        let started = self.plain_mode(sim, unit, mode);
+        self.apply_speed_bonus(sim, unit);
+        started
+    }
+
+    /// The set-up's speed bonus (P +0x10, `ai.md` §7.5 rule 4.4; the AI's
+    /// velocity request speed, e.g. the Fallen's escape 50) as a
+    /// temporary stat-67 list like the player's run list (`pathing.md`
+    /// §8.2), read by the velocity rule (§8.1 rule 2) and the rate
+    /// (`units.md` §4.7 step 7).
+    // PROVISIONAL (ai.md §7.5 rule 4.4, REC-1111): the spec stores P
+    // +0x10 := v and names no reader. 1.14d's Fallen flees at velocity
+    // and speed ×(75 + 50) / 75 of its walk (speed 192 → 320, check
+    // combat-melee-fallen, unit 20 from f48), which is stat 67 raised by
+    // v for the mode. Settled by a recording of another speed bonus.
+    fn apply_speed_bonus(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
+        let Some(speed) = self
+            .paths
+            .as_ref()
+            .and_then(|p| p.setup.get(&unit))
+            .map(|s| s.speed)
+            .filter(|&v| v != 0)
+        else {
+            return;
+        };
+        {
+            let mut v = View::of(sim.units, sim.stats, sim.data, self);
+            let mut c = PathCtx::of(&mut v, sim.game);
+            WalkUnits::attach_run_stats(&mut c, unit, speed);
+        }
+        self.monster_mode_velocity(sim, unit);
     }
 
     /// GH start `0x005A7580` (rule 6).

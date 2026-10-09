@@ -74,7 +74,7 @@ def compact(res):
     out = {}
     for a in res["acts"]:
         fb = a.get("first_blocker")
-        out[str(a["act"])] = {
+        out[row_key(a)] = {
             "reached": a["reached"], "total": a["total"], "consecutive": a["consecutive"],
             "first_blocker": None if not fb else f"{fb['milestone']} ({fb['kind']}) f{fb['frame']}: {fb['evidence']}",
             "milestones": {m["name"]: m["status"] for m in a.get("milestones", [])},
@@ -97,7 +97,7 @@ def read_previous(path):
 def diff(prev, cur):
     """Milestones gained / lost per act: [(act, name, old, new)]."""
     gained, lost = [], []
-    for act in sorted(set(prev) | set(cur), key=lambda a: int(a) if a.isdigit() else 99):
+    for act in sorted(set(prev) | set(cur), key=act_order):
         pm = prev.get(act, {}).get("milestones", {})
         cm = cur.get(act, {}).get("milestones", {})
         for name in sorted(set(pm) | set(cm)):
@@ -109,6 +109,18 @@ def diff(prev, cur):
     return gained, lost
 
 
+def row_key(a):
+    """The row of one objective file: "N" for `actN.play`, else "N/<stem>"
+    (several files can share an act: classes.play, act4-forge.play, ...)."""
+    stem = os.path.basename(a.get("play") or "").removesuffix(".play")
+    return str(a["act"]) if stem in ("", f"act{a['act']}") else f"{a['act']}/{stem}"
+
+
+def act_order(k):
+    act, _, stem = k.partition("/")
+    return (int(act) if act.isdigit() else 99, stem)
+
+
 def cell(s):
     s = (s or "none").replace("|", "\\|").replace("\n", " ")
     return s if len(s) <= 200 else s[:197] + "..."
@@ -117,7 +129,7 @@ def cell(s):
 def render(cur, prev, history, sha, subj, when):
     gained, lost = diff(prev, cur)
     tot = sum(a["reached"] for a in cur.values()), sum(a["total"] for a in cur.values())
-    acts = sorted(cur, key=lambda a: int(a) if a.isdigit() else 99)
+    acts = sorted(cur, key=act_order)
     history = ([{"head": sha[:8], "time": when, "reached": tot[0], "total": tot[1],
                  "per_act": {a: cur[a]["reached"] for a in acts}, "gained": len(gained), "lost": len(lost)}]
                + history)[:HISTORY_MAX]
@@ -208,6 +220,14 @@ def selftest():
     assert "**lost**: act 1 `a`" in t2 and "since `11111111`" in t2.lower() and "e\\|x" in t2
     open(out, "w").write(t2)
     assert len(read_previous(out)[1]) == 2
+    # two objective files of one act are two rows, neither hides the other
+    two = res({1: {"a": "reached"}})
+    two["acts"][0]["play"] = "traces/playthrough/act1.play"
+    two["acts"].append(dict(res({1: {"k": "stuck"}})["acts"][0], play="traces/playthrough/classes.play"))
+    rows = compact(two)
+    assert sorted(rows) == ["1", "1/classes"], rows
+    t3 = render(rows, {}, [], "3" * 40, "s", "t")[0]
+    assert "| 1 | 1/1 |" in t3 and "| 1/classes | 0/1 |" in t3 and "total: 1/2" in t3, t3
     print("playtable selftest: ok")
     return 0
 

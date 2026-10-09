@@ -524,6 +524,7 @@ pub fn monster_set_mode<H: UnitHooks>(
         .map(|r| r.start)
         .filter(|&s| s != 0)
         .unwrap_or(MONSTER_MODE_FALLBACK);
+    let dead = sim.units.is_dead(unit);
     let started = if start == MONSTER_NEUTRAL_START {
         monster_neutral(sim, hooks, unit)?;
         true
@@ -531,6 +532,12 @@ pub fn monster_set_mode<H: UnitHooks>(
         hooks.monster_mode_function(sim, unit, start)
     };
     if !started {
+        // §4.6 "What keeps a dead monster dead": a start that refuses a
+        // request other than 0 or 12 on a dead unit leaves its mode as is
+        // (`0x005A7C20` returns 1); no neutral start.
+        if dead && mode != monster_mode::DT && mode != monster_mode::DD {
+            return Ok(());
+        }
         monster_neutral(sim, hooks, unit)?;
     }
     record_mut(sim, unit)?.flags |= flags::MODE_CHANGING;

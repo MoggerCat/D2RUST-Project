@@ -1,0 +1,11 @@
+check 1
+# Act 5 NPC interaction (q-chk-act5): walk next to class 511 (poke goto), talk (C->S 0x13 type 1).
+# Compares the unit table after the talk (mode, state); the menu/store contents are the packets channel (open).
+name a5-npc-larzuk
+save ScnAm5 --class ama --expansion --act 4 --quests acts=4 --waypoints all
+seed 1234
+ticks 190
+seconds 300
+channels state
+at 4 poke goto preset 109 1:511
+at 150 poke msg 0x13 1 @1:511

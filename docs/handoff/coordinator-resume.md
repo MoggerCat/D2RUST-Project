@@ -1,10 +1,53 @@
 # Coordinator resume — playable-build loop (2026-10-08)
 
+## Coordinator run 2026-10-09 evening (session_01KcnkwCTXbuv5ZbToEUpBSj)
+
+Merged onto integ-local (gate r1): q-diff-skills-2 (room-cancel rule done twice: both tests kept), q-play-act5 (0x005B2F20 quest spawn done twice: kept `MonsterWorld::spawn_at`, dropped `place_monster`), q-diff-combat-a1 (poke `goto` + `msg` both kept; `Schedule::run_due` takes the link), q-prov-recording-2 (kept staging's bridge/objects GUID counter), q-fixture-migrate-2, coord-resume-2, q-fix-server-store-fill, q-tool-soak; then local-pc1-test (docs) and local-pc1-play (45-file merge, its own gate).
+
+Fix sessions launched 17:05 UTC (each branch carries `docs/handoff/<branch>-task.md` with its brief and the session rules; REC blocks from 1000):
+
+| Branch | Session | Model | REC | Area |
+|---|---|---|---|---|
+| q-fix-input-lock | session_01JQwtFjADMhRsW7QNGqCiie | Opus | 1000–1009 | cast/attack input lock (#1) |
+| q-fix-client-crash | session_01RdQgHcwijQxkvdvx6nPuAW | Opus | 1010–1019 | geom.rs:197 crash; walk desync / re-target |
+| q-fix-boss-damage | session_01QjgkBNuhD5xisApMttxSB8 | Opus | 1020–1029 | Andariel never dies, Radament at 256 hp |
+| q-fix-items-shop | session_01BBQcb5iXAv9CoWsyhDqVge | Sonnet | 1030–1039 | shop "no room", belt after load, monster items 0x00573B20 |
+| q-fix-npc-menus | session_01VzxhMLTVzSSr24GoMX684d | Sonnet | 1040–1049 | Natalya, Halbu, Nihlathak; Esc in quest log |
+| q-fix-a1-den-wp | session_011nm8wnAZ8dXwKuehwW9a8D | Sonnet | 1050–1059 | Den of Evil flag; Cold Plains waypoint (+15,+5) |
+| q-fix-class-rows | session_017Zjk6EsU1ooMqhtmpz54ih | Sonnet | 1060–1069 | q-fix-pt-whirlwind / right-aura / pet-warp-follow / blessed-hammer |
+| q-fix-depcheck | session_01Bw9umZerDFScSEkXWhvchg | Sonnet | 1070–1079 | rng_trace thread_local behind a feature |
+| q-fix-pt-sweep | session_01BU2ZCAxsiRDowTgb9cTSki | Sonnet | 1080–1089 | sweep hops ≤16 + fallback ring, goto cells; A3–V matrix |
+
+| q-fix-monster-death | session_01Paf5PKDcW6k9hvqKunfebM | Opus | 1090–1099 | dead monsters stand up (p4-death-cleanup), drop spot |
+| q-fix-player-hit | session_01U91VHQHBy7Xp4uXJjJ3AC4 | Sonnet | 1100–1109 | player never a missile target (c6), owner flags (c7) |
+| q-fix-monster-ai | session_01URviZERs7KxnRnDD9NkMyi | Sonnet | 1110–1119 | Fallen / Quill Rat AI (c2, c3), Fallen think seed step |
+| q-fix-seed-order | session_01JhQc4nNShp9YNmxNXpqAdx | Opus | 1120–1129 | unit seed order, Blood Moor population, rng creation draws |
+| q-fix-save-input | session_01TU8gxrozxP5xiyq7rEDW1L | Sonnet | 1130–1139 | belt key send, save item seed, 0x67 byte 18, cursor reload |
+| q-fix-room-links | session_016xcFMkKoz6pTSqDuPJRwm3 | Sonnet | 1140–1149 | town objects after WP return, static/drop room links |
+| q-fix-act2-play | session_01NaR6yMxmEgnEfm3Fj9DK3D | Sonnet | 1150–1159 | Act II playthrough blockers |
+| q-fix-act4-play | session_013J2Srxix169AQQjRUYSHvj | Sonnet | 1160–1169 | Act IV playthrough blockers |
+| q-fix-act5-play | session_015YNGBGrwtHjFyby4tCDZR6 | Sonnet | 1170–1179 | Act V: Ancients link, quest superuniques, milestones |
+| q-fix-check-triage | session_01B2eB5Q2V444GgPtPfrhLNK | Sonnet | 1180–1189 | all 88 scenario-diff checks vs 1.14d → checks-status.md |
+| q-fix-difficulty-a1a2 | session_01LiMn42LTayZFyizFKwHzQo | Sonnet | 1200–1209 | Nightmare / Hell, Acts I–II |
+
+Batch 2 launched 17:29 UTC; q-fix-realdata-baseline (REC 1190–1199) session_01Hv1NPtDa5KwdQ56KbYdTYm launched 17:41 at the user's request (21 sessions). Next free REC block: 1210.
+pc1-data Step 4: last number 46.
+
+Batch 3 (18:26): q-fix-walk-desync session_01SmXQjNbmuwrAcHdGGdY7fX (Opus, 1250–1259), q-fix-combat-live session_013Aj8xnHTby4sRadoeyKHak (Opus, 1260–1269), q-fix-ass-traps session_0123WwcEy3qXFnfJsqURpxsi (1270–1279). Finished sessions decline new tasks sent by message (correct: only the user tasks a session), so follow-ups are new sessions.
+Ledger (18:16–19:40): q-fidelity-ledger session_01ENnbtJPdyvJmmtjyKpQDjE (integrator, 1210–1219) + parts q-ledger-{monsters,skills,items,world,systems,cov-a1a2,cov-a3a5,cov-checks} (1220–1240). First integration 18:27: 2,346 rows, 0 EQUAL; plan docs/handoff/fidelity-gaps.md.
+Gate runner r3: session_01WumjNRLowcWLo1n3DJnVQZ on claude/integ-r3.
+Batch 4, the fidelity plan (18:37; setup via tools/coord/session-setup.sh): tools q-tool-interact-pokes session_01WKpCfE6vHz4HrQsgznopNL (Opus 1300), q-tool-items-channel session_01PJJbnQxwKwk6BgNzQSkkpz (Opus 1310), q-tool-packet-census session_01K56sZtRYfTDZr2A2356A95 (1320), q-tool-check-gen session_014P11TGAfmP8RraWcsN9tp3 (1330), q-tool-save-channel session_01KSKVDeGUJaPG2PyAePq9ko (1340), q-tool-state-parity session_01DEUSY7oJHXwD8aDDiEoLdx (1350), q-tool-audio-diff session_012c8zEdVpBAdLPVCjkqVtd1 (Opus 1360), q-tool-replay-diff session_01KbqmMNij8e5ZHCnr8B4W9D (Opus 1370); first divergences q-fix-d2-town-mode session_014XSy26s5WMQF94mwoUPYTN (1380), q-fix-d3-player-mode session_013uRZQoU2qyyyAN9kXX1k4P (1385), q-fix-d4-placement session_01G7biCHueWrd4Gx3xWLKuCo (Opus 1390), q-fix-d5-draws session_016g1KAFkfyLaNiHRLnDdQTi (1395), q-fix-d7d8-items-net session_01FQeNHDpvmC1iJ4WaBhq1Ls (1400), q-fix-d9-arcane session_01PiW2Vmtpi6rFQYKDXYusfH (1405), q-fix-d11-stony-objects session_01M4cpf7AoSy4LMHGXdZMu4k (1410); D1 = q-fix-seed-order, D6 = q-fix-save-input, D10 = q-fix-class-rows; checks q-chk-skills-4cls session_011qYYhcR5dBxWieLZMBvadQ (1415), q-chk-monsters session_01FZzgDWPkY7nWwSTkxcPpb4 (1420), q-chk-levels session_01Afuzh1WyJpYdSf6bEy1d7u (1425), q-chk-render-world session_01JLwmdPJf2esFpLWBPAuuS6 (1430), q-chk-render-ui session_01BAR2XLGz3j1Q9ZF3MtBBAp (1435). Next free REC block: 1440.
+Batch 5 (18:43; user raised the ceiling to 100 sessions): q-chk-act1..act5 (1460–1509), q-chk-objects (1510), q-chk-hirelings (1515), q-chk-skills-bda (1520), q-chk-items-drops/-vendors/-cube (1525/1530/1535), q-chk-render-dungeons (1540), q-chk-render-effects (1545), q-chk-frontend (1550), q-fix-rd-act3 (1555), q-fix-rd-act5 (1560), q-fix-rd-misc (1565), q-chk-difficulty-a3a5 (1570), q-chk-soak (1575); also q-fix-a4-deseis (1440), q-fix-ui-blend (1445), gate runner r4 session_01VTxUj6RFWwRDUd4AWmpbvs on claude/integ-r4. Next free REC block: 1580. PC 1 prompt: docs/handoff/pc1-prompt-2026-10-09.md (branch claude/local-pc1-eve).
+
 ## State at pause (2026-10-09 ~15:50 UTC, end of the day run)
 
 The user paused every session to continue later. Each session was told to
 push and write its hand-back `docs/handoff/<branch>.md` (done / in
 progress / next / open RECs / repro commands). Read those first.
+
+**Unmerged at pause (staging 018587d2):** these wrapped branches conflict with staging and hold final fixes; merge them first:
+q-diff-combat-a1 (killed monsters stay dead, 069d6bcf+), q-play-act5, q-diff-skills-2, q-prov-recording-2, q-fixture-migrate-2.
+Also: d2-server prop_unified_items item_moves_keep_one_place fails on rare random seeds (real item-move bug, items owner). Fixed late: shop buy, belt potions, town objects after a waypoint, Esc in NPC talk, CI depcheck. New blocker: throne Baal stuck in mode 10 after Decrepify (no S3mv; PC 1 item).
 
 **Goal set by the user:** "99% playable": the whole game can be played
 start to finish with the 1.14d experience (exact match stays the bar,

@@ -32,3 +32,14 @@ Open on the packets channel:
   (`properties.md` §5 r9, `roll(c - c/8)`: r 58 vs 56 with equal final item seeds, so the order of the rolls inside
   the item differs); pc1-data Step 4 item 27.
 - frame 24/25: the gold 0x1E goes out in the tick in d2rs, after the flush in 1.14d (stat messages of the client pass).
+
+## Hand-back (wrap-up)
+
+Done: store fill, Ctrl-click sell, newchar hands, town TP, session-flow, exit target, front-save, Den entrance, hp/mana restore, belt mode on load,
+state-snapshot item/affix extension, 0x1B trade-window fix, vendor buy on the install (see "Area G" above), item file index 0, 0x2000/0x20 clear.
+In progress: nothing half-done in the branch.
+Open rows: monster item creation `0x00573B20` (monequip) is a no-op seam, so monequip monsters get no items (coordinator row, not started);
+Real-install stack-click (0x21) test needs two stacks; area-G checks beyond the buy (sell, repair, gamble, identify, sockets, stash, cube, pickup/drop) unwritten.
+Open divergences of `items-vendor-akara-buy`: see "Area G". `items-ground-many`: identified flag 0x10 of normal items.
+PC 1 items (unnumbered, in pc1-data Step 4): property roll order of a magic item; identified flag 0x10 of normal items.
+Repro: `python3 tools/scenario-diff/scenario_diff.py traces/checks/items-vendor-akara-buy.check` (and `items-ground-many.check`), D2_GAME_DIR=/home/user/game.
