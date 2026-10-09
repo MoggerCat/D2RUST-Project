@@ -1,0 +1,13 @@
+check 1
+# Items at the load (area G, items): an Amazon holding equipped magic,
+# rare, set and unique items, a socketed and an ethereal one, belt
+# potions, stacks, a cube and a stash item. Idle for 60 ticks: the state
+# channel compares every item unit (class, mode, place, quality, stats)
+# and the player's item-fed stats frame by frame.
+# Spec: specs/tools/scenario-diff.md.
+name items-load-mixed
+save ItmMix --class ama --expansion --level 30 --item cap/body=1/q=magic --item amu/body=2/q=rare --item lea/body=3/q=superior/sock=2 --item ssd/body=4/q=unique/idx=1 --item buc/body=5/eth --item rin/body=6/q=magic --item rin/body=7/q=rare --item hp1/belt=0 --item hp2/belt=1 --item mp1/belt=4 --item tbk@0,0 --item tsc#5@2,0 --item key#12@3,0 --item box:3 --item jav#30@0,2 --item r01@1,2 --item hp3@0,4:4
+seed 1234
+ticks 60
+seconds 240
+channels state
