@@ -1312,6 +1312,10 @@ pub struct StateRow {
     pub colorpri: u8,
     pub colorshift: u8,
     pub light_rgb: (u8, u8, u8),
+    /// `meleeonly` (`states.txt` flag bit 38 = 0x26, `data/fields.tsv`):
+    /// the state is in the state-mask group 0x26 that `range(P, skill)`
+    /// tests (`skills/use.md` §3 r6).
+    pub meleeonly: bool,
 }
 
 /// One `skilldesc` row as 0x93 reads it (`msg-skills.md` §9 r3).
@@ -1415,6 +1419,8 @@ pub struct SkillRow {
     pub anim: u8,
     /// +0x11 `monanim`.
     pub monanim: u8,
+    /// +0x13 `seqnum` (`skills/sequences.md` §1 rule 2).
+    pub seqnum: u8,
     /// +0x94 `passivestate` (read signed; > 0 = a passive state).
     pub passivestate: u16,
     /// `maxlvl` (u16 at 300, read signed).

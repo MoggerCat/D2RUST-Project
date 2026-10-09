@@ -78,6 +78,10 @@ pub struct UnitLooks {
     pub monsters: BTreeMap<u32, MonsterRow>,
     /// `objects` `Token` by row.
     pub objects: BTreeMap<u32, Code>,
+    /// `objects` `BlocksLight0`–`7` by row: an object casts its composite
+    /// shadow only in a mode whose value is ≠ 0 (`blend-modes.md` §5 r3
+    /// revision, REC-518). A row not here casts it.
+    pub object_blocks_light: BTreeMap<u32, [u8; 8]>,
     /// The shape states' draw identity (`unit-composite.md` §1.1).
     pub shapes: super::disguise::Disguise,
 }
@@ -147,10 +151,30 @@ impl UnitLooks {
                 .collect(),
             mode_bits: monstats2_modes(&read_table::<Monstats>(source)?, &monstats2),
         };
-        let objects = read_table::<Objects>(source)?
+        let object_rows = read_table::<Objects>(source)?;
+        let objects = object_rows
             .iter()
             .enumerate()
             .map(|(i, o)| (i as u32, code4([o.token[0], o.token[1], 0, 0])))
+            .collect();
+        let object_blocks_light = object_rows
+            .iter()
+            .enumerate()
+            .map(|(i, o)| {
+                (
+                    i as u32,
+                    [
+                        o.blockslight0,
+                        o.blockslight1,
+                        o.blockslight2,
+                        o.blockslight3,
+                        o.blockslight4,
+                        o.blockslight5,
+                        o.blockslight6,
+                        o.blockslight7,
+                    ],
+                )
+            })
             .collect();
         Ok(UnitLooks {
             player_tokens: read_table::<Plrtype>(source)?
@@ -175,6 +199,7 @@ impl UnitLooks {
                 .collect(),
             monsters,
             objects,
+            object_blocks_light,
             shapes,
         })
     }
@@ -345,13 +370,15 @@ pub struct UnitArt {
     /// The local player's predicted facing `dir64` (`Predict::facing`),
     /// set with [`Self::pose_mode`]. d2rs-own, unverified.
     pub pose_dir: Option<(UnitKey, u8)>,
+    /// The unit in mode 18 and the sequence frame it draws
+    /// (`world_view::skill_motion`, `skills/sequences.md` §3: the drawn
+    /// mode goes in [`Self::pose_mode`]).
+    pub sequence: Option<(UnitKey, usize)>,
     /// The server tick the local player's predicted walk started on
     /// (`Predict::walk_since`): its walk frames count from there
     /// (`sim/units.md` §4.7 step 7 revision, REC-516).
-    pub pose_since: Option<(UnitKey, u64)>,
-    /// The unit whose frames loop from Whirlwind's restart frame
-    /// (`world_view::skill_motion`). d2rs-own, unverified.
-    pub spin: Option<UnitKey>,
+    /// With the animation speed (8.8 per tick) of the predicted mode.
+    pub pose_since: Option<(UnitKey, u64, u64)>,
     /// The model facing of every unit (module doc), by
     /// [`Self::observe_facing`].
     pub facing: BTreeMap<UnitKey, Facing>,

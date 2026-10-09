@@ -1,4 +1,4 @@
-// Spec: specs/client/model.md (§8 rules 1–6, §15 rule 3, §18 rule 1–2, open questions 1–2), specs/audio/triggers-2.md (§20 r3)
+// Spec: specs/client/model.md (§8 rules 1–6, §15 rule 3, §18 rule 1–2, §19 r3–r4, open questions 1–2), specs/audio/triggers-2.md (§20 r3)
 //! The client mode machines: the mode request `0x00480C10(code, U,
 //! record, 1)` that ends every unit-handler message of `msg-units.md` §4
 //! (§8 rule 1), dispatched by U's type:
@@ -13,7 +13,8 @@
 //!   fatal 0x39C;
 //! - item `0x004C1B80` (§8 rule 6): code 2 → mode := r1, flag 0x2 :=
 //!   (r0 ≠ 0);
-//! - monster `0x004AFF60`: open question 1, see [`monster_mode`];
+//! - monster `0x004AFF60` (§19 rules 3–4): the mode column of the
+//!   dispatch, see [`monster`];
 //! - missile: nothing.
 //!
 //! Every request is also kept as `last_mode_request` (§8 rule 3).
@@ -85,22 +86,7 @@ pub fn mode_request(
             item(w, key, code, record);
             Ok(())
         }
-        MONSTER => {
-            let m = match code {
-                0x15 | 0x16 => skill_mode(inputs, record[0], MONSTER),
-                _ => monster_mode(code),
-            };
-            if let Some(m) = m {
-                super::monster_anim::mode_set(w, inputs, key, m);
-            }
-            // The tail (`model.md` §19 r6) of a pathed request (a
-            // record and a code other than 0x13, 0x15, 0x16, §19 r3):
-            // stat 67 from r4.
-            if !matches!(code, 0x13 | 0x15 | 0x16) {
-                super::monster_anim::velocity_tail(w, inputs, key, record[4]);
-            }
-            Ok(())
-        }
+        MONSTER => monster(w, inputs, key, code, record),
         _ => Ok(()),
     }
 }
@@ -351,18 +337,139 @@ pub fn skill_mode(inputs: &ModelInputs, skill: i32, unit_type: u8) -> Option<u32
     (m < count).then_some(u32::from(m))
 }
 
-/// The monster machine `0x004AFF60` (open question 1).
+/// Monster modes of the machine (`client/model.md` §19).
+pub mod monster_mode {
+    pub const DEATH: u32 = 0;
+    pub const NEUTRAL: u32 = 1;
+    pub const WALK: u32 = 2;
+    pub const GET_HIT: u32 = 3;
+    pub const ATTACK1: u32 = 4;
+    pub const ATTACK2: u32 = 5;
+    pub const BLOCK: u32 = 6;
+    pub const CAST: u32 = 7;
+    pub const SKILL1: u32 = 8;
+    pub const SKILL2: u32 = 9;
+    pub const SKILL3: u32 = 10;
+    pub const SKILL4: u32 = 11;
+    pub const DEAD: u32 = 12;
+    pub const KNOCKBACK: u32 = 13;
+    pub const SEQUENCE: u32 = 14;
+    pub const RUN: u32 = 15;
+}
+
+/// The mode table `0x006DA4D8` (`client/model.md` §19 r4 "T") of the
+/// point and unit groups: the mode their code sets.
+pub fn monster_table_mode(code: u8) -> Option<u32> {
+    use monster_mode as m;
+    Some(match code {
+        0x04 | 0x05 => m::CAST,
+        0x0A | 0x0B => m::ATTACK1,
+        0x0C | 0x0D => m::SKILL1,
+        0x0E | 0x0F => m::SKILL2,
+        0x10 | 0x11 => m::ATTACK2,
+        0x1A | 0x1B => m::SKILL3,
+        0x1C | 0x1D => m::SKILL4,
+        _ => return None,
+    })
+}
+
+/// The neutral fallback "F" `0x004AE1D0` (§19 r4): a monster in mode
+/// 1…15 other than 12 is set to mode 1; any other mode: nothing.
+fn neutral_fallback(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey) {
+    let mode = w.units.get(&key).expect("checked by the caller").mode;
+    if (1..=15).contains(&mode) && mode != monster_mode::DEAD {
+        super::monster_anim::mode_set(w, inputs, key, monster_mode::NEUTRAL);
+    }
+}
+
+/// The monster machine `0x004AFF60` (`client/model.md` §19 rules 3–4),
+/// mode column: the class gate of the head (a class outside `monstats`
+/// or without a `monstats2` row: no switch), then the dispatch by code.
+/// The path, light, overlay and stat effects of the rows belong to their
+/// own seams; NPC busy (monster data +0x28 bit 0) and the BaseId cases
+/// (`iceglobe`, `vulture1`, the rule 5 death switch) read fields the
+/// model does not hold and are not taken here.
 ///
-/// PROVISIONAL (client/model.md OQ 1; REC-51): a client monster changes
-/// mode only as the S→C messages state: the request code is the one the
-/// server's mode table `0x006E1D90` (`sim/intents-events.md` §7.4 rule 1)
-/// sends for a mode, so the mode is the first mode of that table (in
-/// mode order) whose to-point or to-unit code is `code` (codes 12 / 13,
-/// shared by S1 and SQ, read as S1); a code no mode sends changes
-/// nothing. No client-side mode steps and no client seed draws.
-pub fn monster_mode(code: u8) -> Option<u32> {
-    MODE_ROWS
-        .iter()
-        .position(|r| r.code_to_point == code || r.code_to_unit == code)
-        .map(|m| m as u32)
+/// PROVISIONAL (client/model.md OQ 1; REC-51): the client path helpers
+/// (`0x00480780` to a unit, `0x004804A0` to a point) succeed when their
+/// target is there (the model holds no client path record), as the
+/// player machine's; and the "class has mode 2" test of code 7
+/// (`0x0046C140`) reads as true (the client tables hold no monstats2
+/// mode bits).
+fn monster(
+    w: &mut ClientWorld,
+    inputs: &ModelInputs,
+    key: UnitKey,
+    code: u8,
+    r: [i32; 7],
+) -> Result<(), HandlerError> {
+    use monster_mode as m;
+    // §19 r3 class gate.
+    let class = w.units[&key].class;
+    if !inputs
+        .tables
+        .monsters
+        .get(class as usize)
+        .is_some_and(|c| c.is_some())
+    {
+        return Ok(());
+    }
+    // The mode set restarts the unit's animation (`monster_anim`).
+    let set = |w: &mut ClientWorld, mode: u32| {
+        super::monster_anim::mode_set(w, inputs, key, mode);
+    };
+    match code {
+        // Path to the unit (r0 type, r1 GUID): an absent unit → F.
+        0x00 | 0x18 => {
+            let target = UnitKey::new(r[0] as u8, r[1] as u32);
+            if w.units.contains_key(&target) {
+                set(w, if code == 0x00 { m::WALK } else { m::RUN });
+            } else {
+                neutral_fallback(w, inputs, key);
+            }
+        }
+        0x01 | 0x17 => set(w, if code == 0x01 { m::WALK } else { m::RUN }),
+        0x04 | 0x0B | 0x0C | 0x0E | 0x11 | 0x1A | 0x1C | 0x05 | 0x0A | 0x0D | 0x0F | 0x10
+        | 0x1B | 0x1D => set(w, monster_table_mode(code).expect("table code")),
+        0x06 => set(w, m::GET_HIT),
+        0x07 => {
+            // Position check (§6, kind 0), then within 1 sub-tile of
+            // (r0, r1) → F; else walk (state 143 `attached` → F).
+            let (x, y) = ((r[0] & 0xFFFF) as u16, (r[1] & 0xFFFF) as u16);
+            check(w, inputs, key, x, y, 0, 0, 0)?;
+            let u = &w.units[&key];
+            let (cx, cy) = u.cell();
+            let near = (i32::from(cx) - i32::from(x)).abs() <= 1
+                && (i32::from(cy) - i32::from(y)).abs() <= 1;
+            if near || u.states.contains(&143) {
+                neutral_fallback(w, inputs, key);
+            } else {
+                set(w, m::WALK);
+            }
+        }
+        // Rule 5 default D0.
+        0x08 => set(w, m::DEATH),
+        // `msg-units.md` §4 r6.2: mode := 0xC.
+        0x09 => set(w, m::DEAD),
+        0x12 => set(w, m::BLOCK),
+        // No mode change (the KB mode comes with 0x14).
+        0x13 => {}
+        0x14 => set(w, m::KNOCKBACK),
+        // The skill entry's mode; 0xE (sequence) sets no mode.
+        0x15 | 0x16 => {
+            if let Some(mode) = skill_mode(inputs, r[0], MONSTER) {
+                if mode != m::SEQUENCE {
+                    set(w, mode);
+                }
+            }
+        }
+        // 0x02, 0x03, 0x19 and unknown codes.
+        _ => neutral_fallback(w, inputs, key),
+    }
+    // The tail (`model.md` §19 r6) of a pathed request (a record and a
+    // code other than 0x13, 0x15, 0x16, §19 r3): stat 67 from r4.
+    if !matches!(code, 0x13 | 0x15 | 0x16) {
+        super::monster_anim::velocity_tail(w, inputs, key, r[4]);
+    }
+    Ok(())
 }

@@ -352,7 +352,15 @@ pub fn game_entry<X: Pending>(c: PathCtx<'_, X>, player: UnitId, act: u8) -> boo
         let r = crate::path::place::game_entry(cv, host, lv, player, act);
         let placed = log(cv, r).unwrap_or(false);
         if placed {
-            if let Some(q) = cv.0.borrow_mut().v.h.hireling_calls.as_mut() {
+            let mut sh = cv.0.borrow_mut();
+            // The player's unit record carries the entry act from the join
+            // on (+0x18; measured on 1.14d by `a4-fortress-arrival-ama`:
+            // act 3 at frame 2 for an Act IV start). The writer is not in
+            // a spec yet (`waypoints.md` §11 r15 is the act change's).
+            if let Some(r) = sh.v.units.get_mut(player) {
+                r.act = act;
+            }
+            if let Some(q) = sh.v.h.hireling_calls.as_mut() {
                 q.push(HirelingCall::JoinFollow(player));
             }
         }

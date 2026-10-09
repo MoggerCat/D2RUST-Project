@@ -44,6 +44,8 @@ mod passive_tests;
 pub mod poke;
 pub mod predict;
 pub mod receive;
+#[cfg(feature = "rng-trace")]
+pub mod rng_trace;
 pub mod skill_fallback;
 pub mod skills;
 pub mod state;

@@ -26,19 +26,19 @@
 | Outputs / state changes | 69–74 |
 | Rules | 75–76 |
 |   1. Unit kinds | 77–96 |
-|   2. Unit record | 97–136 |
-|   3. Lifecycle | 137–401 |
-|   4. Modes and mode schedules | 402–858 |
-|   5. Event dispatch | 859–873 |
-|   6. Events per kind | 874–996 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 997–1018 |
-|   8. Collision line between two units | 1019–1023 |
-| Constants & data dependencies | 1024–1040 |
-| Randomness | 1041–1048 |
-| Edge cases & original bugs | 1049–1069 |
-| Test vectors | 1070–1129 |
-| Provenance | 1130–1216 |
-| Open questions | 1217–1296 |
+|   2. Unit record | 97–155 |
+|   3. Lifecycle | 156–420 |
+|   4. Modes and mode schedules | 421–952 |
+|   5. Event dispatch | 953–967 |
+|   6. Events per kind | 968–1090 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 1091–1112 |
+|   8. Collision line between two units | 1113–1117 |
+| Constants & data dependencies | 1118–1134 |
+| Randomness | 1135–1142 |
+| Edge cases & original bugs | 1143–1163 |
+| Test vectors | 1164–1223 |
+| Provenance | 1224–1310 |
+| Open questions | 1311–1390 |
 <!-- /index -->
 
 ## Summary
@@ -116,23 +116,42 @@ offset seen in the 1.14d code named in the last column):
 | +0x44 | current frame, 8.8 fixed point | 0 at mode start (`0x005533D0`); frame·256 after §4.2 | `0x00553AF1` |
 | +0x48 | frame count, 8.8 (animation frames · 256) | set at mode start | `0x005533D0` |
 | +0x4C | animation speed (i16, 1/256 frame per tick) | §4.3 | `0x00623F50` |
-| +0x4E | action frame (u8) | 0 at mode start | `0x005533D0` |
+| +0x4E | action frame (u8): last event byte 1–4 crossed by the latest frame advance | 0 at mode start; frame advance (§4.2) | `0x005533D0`, `0x00623E00`, `0x00621210` |
 | +0x50 | AnimData record | `formats/animdata.md` §5 | `0x00620F00` |
 | +0x5C | stat list | `sim/stat-lists.md` | `0x00625480` |
 | +0x60 | inventory | — | `0x00620F00` |
 | +0x64, +0x68, +0x6C | interact info: GUID, type, active (get `0x00554100`, set `0x00554120` ignored while active, reset `0x00554190` → GUID −1, type 6, inactive; `world/npc.md`, `world/cube.md`) | **0, 0, 0 at allocation** (the 0xF4-byte record is zeroed by `0x00620290`; `0x00555230` and the seed calls it makes, `0x00552DF0`, `0x00552EE0`, write none of the three), so a fresh unit reads as inactive with (type 0, GUID 0), not the reset values | `0x00620290`, `0x00555230` |
 | +0x74 | quest chain | 0 at allocation, freed at removal | `0x005552FD`, `0x00555644` |
 | +0x80 | game | — | `0x005552B0` |
+| +0x94, +0x98 | source-unit link: owner type, owner GUID (valid while +0xC8 bit 0x400) | "Owner links" below; `skills/bodies.md` §6.20 | `0x00621C30`, `0x00552FD0` |
 | +0xA4 | hover text | event 6 (§6) | `0x00580B70` |
 | +0xAC | combat list | own entries dropped at every mode set | `0x0057C980` |
 | +0xC4 | flags | bit 0x1 changed (set by every mode set), 0x2 tile, 0x10 new, not yet announced to clients (every allocation; cleared with 0x1 by the room clean-up `0x00553220`; `items/inventory-moves.md` §6.3; D2MOO `INITSEEDSET`), 0x40 cleared by attack-mode starts, 0x100 hover freed, 0x2000 queued (`unit-order.md` §6), 0x10000 dead, 0x80000 monster mode changing | `0x00555230`, `0x00624690`, `0x0057FED8`, `0x005541B8`, `0x005A7C20` |
-| +0xC8 | flags 2 | 0x2000000 expansion (game +0x70 ≠ 0), 0x4000000 server unit (every allocation) | `0x005552B6` |
+| +0xC8 | flags 2 | 0x400 source-unit link set (+0x94/+0x98), 0x2000000 expansion (game +0x70 ≠ 0), 0x4000000 server unit (every allocation) | `0x005552B6` |
 | +0xD0 | node index: target-node list slot 0–9 (`monsters/ai.md` §5.2), 11 = in no list | 11 at allocation | `0x00555339` |
 | +0xDC | timer list head | `unit-order.md` §8 | `0x00553980` |
 | +0xE0, +0xE4, +0xE8 | update, hash, room links | `unit-order.md` | — |
 
 "Dead" (`0x005541B0`): a null unit, flag 0x10000, a player in mode 0 or
 17, a monster in mode 0 or 12, or any unit of another type.
+
+**Owner links** (2026-10-09, pc1-data Step 4 item 21; the `own` field of
+`tools/state-snapshot.md` §2). Three separate links, each 1.14d-confirmed:
+
+1. Monster owner (pet, summon, minion, hireling, pack leader):
+   `0x0058F0D0(U)`: U a monster with monster data (+0x14) and AI control
+   C (monster data +0x28, `monsters/ai.md` §3.1) whose +0x28 (game) ≠ 0
+   → the unit of type u32 C +0x30, GUID u32 C +0x2C (`0x00552F60`); else
+   none. A released pack has GUID −1 (§4.6 step 3.1), which resolves to
+   none.
+2. Source-unit link (missiles; also any unit given one by a skill):
+   `0x00552FD0(U)`: +0xC8 bit 0x400 → the unit of type u32 +0x94, GUID
+   u32 +0x98; else none. Written only by `0x00621C30` / `0x00621CE0`
+   (`skills/bodies.md` §6.20).
+3. Item holder: item data (+0x14) +0x5C inventory (0 when no inventory holds it)
+   → inventory +0x08 owner unit (`items/inventory.md`
+   §1.1). Distinct from item data +0x0C, the owner-player GUID read by
+   `0x00629F20` (−1 none; §6.5 event 3, §3.3 compress).
 
 ### 3. Lifecycle
 
@@ -466,6 +485,26 @@ reads the byte before the event array: AnimData +0x0F):
 | `0x00553C70` | frames (p ≤ 0: nothing at all) | f − cur − p | (f − c)·256 |
 | `0x00553DC0` | start frame | p | (f − p)·256 |
 
+**Frame advance and +0x4E** (REC-701, 2026-10-09). The only writer of
++0x4E on a monster's event-0 path is the frame advance `0x00623E00(U)`,
+called by the event-0 function itself (`0x005A7670` at `0x005A76E9`,
+`0x005A7701`, `0x005A7734`; also `0x005A8670` SQ, client `0x00463390`,
+`0x004B1280`). The timer's args (E[i], k) are not read by `0x005A7670`
+and nothing on the timer run writes +0x4E. Rule:
+
+1. +0x4E := 0.
+2. No sequence (+0x30 = 0): j = cur >> 8, + 1 when speed ≥ 256; cur
+   += speed. While cur ≥ F: every j < F >> 8 with E[j] ∈ 1..4 (j < 144)
+   sets +0x4E := E[j]; cur −= F; j = 0; cur += 256·b (frame bonus).
+   Then every j ≤ cur >> 8 likewise. So +0x4E ends as the last action
+   byte in the frames crossed this advance, else 0.
+3. Sequence (+0x30 ≠ 0): flags +0xC4 &= ~0x4000; seq pos +0x38 += +0x3C
+   (wrapping at +0x34); +0x48 −= +0x3C; `0x00621210(old pos)` reads the
+   sequence frame: +0x44 := frame·256, +0x40 := mode, +0x4E := its
+   event byte; mode changed → +0xC4 |= 0x4000.
+
+`0x006218D0(U, i)` (set +0x4E from E[i] when 1–4) has no callers.
+
 Speed 0 gives event 1 at f + 1 in all forms. Callers: `0x00553B10` from
 `0x0056E210`; `0x00553C70` from skills `0x005C8CA0`, `0x005C8E30`,
 `0x005D68A0`, `0x005D69D0`; `0x00553DC0` from skills `0x005CF900` (3),
@@ -548,7 +587,7 @@ record or function: fallback `0x005A7B30`.
 | 15 RN | `0x005A7550` | `0x005A84F0` | — | yes | always |
 
 Event 0 and event 1 for a monster (`0x005A7BA0`, `0x005A7BE0`) call the
-current mode's event-0 / event-1 function. Neutral start `0x005A73E0`
+current mode's event-0 / event-1 function. The A-family event 0 `0x005A7670` ignores the schedule args; its +0x4E test reads the byte its own frame advance `0x00623E00` just wrote (§4.2 "Frame advance and +0x4E"; trigger rule `skills/use.md` §5.2). Neutral start `0x005A73E0`
 sets mode 1 and, unless the unit has a type-2 timer with expire > f
 (`0x005415A0`: smallest positive expire of its type-2 timers, 0 if
 none), schedules event 2: f + 45 with state 21, else f + `aidel`
@@ -655,6 +694,58 @@ start; `0x005A7C20` never writes it itself.
 
 Draws: only the bonefetish branch (U's seed, one `roll`, plus the
 missile creation's own); the siege-beast skill use per its spec.
+
+**What keeps a dead monster dead** (2026-10-09, read from `0x005A7C20`,
+`0x005541B0`, `0x005A73E0`, `0x005A75C0`, `0x005A7F80`, `0x005B1740`;
+the playthrough's "returns to mode 1 with hp 0" question):
+
+- *Sequence.* The kill requests mode 0 through the mode set
+   `0x005A7C20` → DT start (rule 1): mode 0, the death clean-up, the
+   treasure gate. DT schedules its animation events (mode table:
+   schedules = yes). DT event 0 sets mode 12 at once (every monster but
+   BaseId 78, which waits for the animation end); otherwise DT event 1
+   at the animation end sets mode 12 (rule 3). Mode 12 is set by the
+   plain mode set `0x00553570`, never by a request, and DD schedules
+   nothing (mode table: schedules = no), so no event of U runs after
+   it unless something else schedules one.
+- *Why the AI stops.* There is **no** dead test in the think: the
+   class event handler `0x005A7F80` drops a type-2 event only for a
+   frozen **live** unit (`0x005541B0` = 0), and the think body
+   `0x005B1740` runs whatever AI the control names. What stops it is
+   that no think exists: the death clean-up's `0x005738D0(game, U)`
+   cancels U's type-2 (think) and type-3 events (rule 1.2, last call),
+   and none of the type-2 schedulers runs for a dead U afterwards:
+   `0x00573780` returns for mode 0 or 12 (`monsters/ai.md` §1.2); the
+   freeze end `0x0057B170` does nothing for a dead unit (`ai.md` §1.1);
+   the neutral start `0x005A73E0`, the knockback end and every AI
+   tactic run only from a mode start or a think, which a dead U no
+   longer gets; the damage path refuses a dead defender
+   (`combat/damage.md` §5.2, `0x005541B0`).
+- *A mode request to a dead monster.* `0x005A7C20` does **not** refuse
+   it. With U dead (`0x005541B0`(U) = 1: U null, flag 0x10000 (+0xC6
+   bit 0), or a monster in mode 0 or 12): it skips the path stop
+   `0x00649400`; for a mode ≠ 3 it still writes the path target and
+   runs the movement set-up; then it runs the requested mode's start:
+   - a start that returns 0 (WL / RN with no path point, a GH class
+     without mode 3, A/S with a moving mode and no point): skill
+     cleared, then, because the requested mode is not 0 or 12 and U is
+     dead, `0x005A7C20` **returns 1 with the mode unchanged**;
+   - GH start: U in mode 0 or 12 → returns 1, mode unchanged (rule 6);
+   - the NU start `0x005A73E0` sets **mode 1** and schedules a think
+     (f + `aidel`, 0 → 15); the attack / skill start `0x005A75C0`
+     (modes 4, 5, 7, 8, 9) sets its mode whenever it does not return 0
+     (rule 7); the other starts as their rules state. So a mode-1 or attack request on a dead monster
+     *does* bring it out of mode 12 with hp 0; 1.14d never makes one,
+     because of the previous point.
+   A request for mode 0 or 12 on a dead unit runs DT start / DD start
+   again (DD start skips the clean-up when U is in mode 0, rule 4).
+- *The symptom's shape.* A think left pending at death fires
+   `aidel` frames later (15 for the Act I monsters, `ai.md` §1.3); the
+   AI's first idle (`0x005DE080`, `ai.md` §1.2: "if the anim mode is
+   not neutral, first a mode change to neutral") requests mode 1 →
+   point 3 → mode 1 with hp 0. So a death start without the
+   `0x005738D0` cancel shows exactly "mode 1, hp 0, about 15 frames
+   after death".
 
 **The other start and event functions** (1.14d-read 2026-10-08,
 `0x005A7490`–`0x005A7891`, `0x005A8490`–`0x005A872F`). Same calling
@@ -810,10 +901,13 @@ town walk (mode 6, w = 213, p = 100) is drawn at server tick T with frame
 `((T − c) · 213 >> 8) mod 8`, c = the tick of the walk request that
 started the walk; a new click while still walking keeps c (`a1-walk-n`
 … `-w`, 1.14d frames 0, 3, 7, 3, 6, 2 at ticks 32 … 102, c = 22).
-PROVISIONAL (REC-516): the run (mode 3, w = 101) does not fit c = the
-run click (`a1-run-n` frame 5 at tick 150, run click 140); the d2rs
-client applies the rule to walks only (settled by a run recording from
-a standing start).
+The run (mode 3) the same with speed w · p / 100, w = 101 and p = the
+run's velocity percent 100 · `RunVelocity` / `WalkVelocity` (150 for the
+sorceress' 9 / 6: speed 151), c = the run click that changed the mode
+(a walk ↔ run change restarts c): `a1-run-n` … `-nw`, frames 5, 6, 6,
+6, 6, 7, 7, 7 at ticks 150 … 248, c = 140. PROVISIONAL (REC-516): p as
+that ratio (because w = 101 at p = 100 fits no start; settled by a run
+of a class with another RunVelocity / WalkVelocity ratio).
 
 Steps 7 and 8 assert (fatal) for types 2 and 3; no 1.14d caller passes
 an object or missile (objects take `0x00624390`'s own branch,

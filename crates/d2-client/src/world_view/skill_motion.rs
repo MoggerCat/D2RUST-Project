@@ -1,30 +1,37 @@
-// Spec: specs/render/unit-composite.md (§8 "Creators" site 0x004C8726, timed arc 0x004DA5B0), specs/skills/bodies-2b.md (§8.10, §8.11)
-//! The client motion of skill moves in the play preview (REC-275):
-//! Leap's arc and Whirlwind's spin.
+// Spec: specs/render/unit-composite.md (§8 "Creators" site 0x004C8726, timed arc 0x004DA5B0), specs/skills/sequences.md (§1, §3, §4), specs/skills/bodies-2b.md (§8.10, §8.11)
+//! The client motion of skill moves in the play preview (REC-275,
+//! measured 2026-10-09: `facts/client/anim/a1-cold-plains-leap-bar.tsv`,
+//! `a1-cold-plains-whirlwind-bar.tsv`): Leap's arc and Whirlwind's spin.
 //!
-//! - **Leap arc** (`unit-composite.md` §8): `0x004C8670(unit, point)` gives
-//!   the unit a motion record whose timed arc (`0x004DA5B0`, height 0)
-//!   lifts the draw by `oz` pixels and lands it after `n` updates. The
-//!   record is stepped once per server tick with the spec's
-//!   [`MotionRecord::update`]; the draw adds `(ox, oy + oz)`
+//! The skill's mode request puts the local player in mode 18 (SQ): the
+//! client plays the skill's sequence (`sequences.md` §1, §3; `seqnum` of
+//! the skills row, weapon class `hth` as the composite draws a preview
+//! player), one sequence frame per client update (speed 256), drawing
+//! each frame's mode and frame ([`SkillMotion::drawn`]). The client skill
+//! do is the update where the sequence crosses its first event byte 1.
+//!
+//! - **Leap arc** (`unit-composite.md` §8): at the do (Leap: frame 5),
+//!   `0x004C8670(unit, point)` gives the unit a motion record whose timed
+//!   arc (`0x004DA5B0`, height 0) lifts the draw by `oz` pixels. The
+//!   record is stepped once per client update from the update after the
+//!   do ([`MotionRecord::update`]); the draw adds `(ox, oy + oz)`
 //!   ([`MotionRecord::draw_offset`], fed through `ViewSource::unit_offset`).
-//! - **Whirlwind spin** (`bodies-2b.md` §8.11 step 4.1): the server runs the
-//!   player's animation again from frame 3 on each do; the view loops the
-//!   skill's mode from frame 3 ([`spin_frame`]).
-//!
-//! Recorded 2026-10-09 (`facts/client/anim/a1-cold-plains-leap-bar.tsv`):
-//! the path speed `s` is the run velocity (9 for the barbarian) and `n`
-//! one less than the quotient, as here. Which client event starts the
-//! arc differs: 1.14d creates the record at the Leap sequence's frame-5
-//! event (the 6th update of mode 18), not at the request, and the whirl
-//! lasts while mode 18 holds with the sequence's frames: PROVISIONAL
-//! (REC-275), fix queued as `q-fix-skill-motion`.
+//!   While the record lives the sequence holds frame 11
+//!   ([`LEAP_HOLD_FRAME`]); it resumes at the landing and the mode ends
+//!   after the last frame.
+//! - **Whirlwind spin**: the sequence (`seqnum` 10: A1 0, 1, 2, 3, 3, 4,
+//!   5, 6) loops over its last four frames ([`SPIN_LOOP`]) while the unit
+//!   stays in mode 18, i.e. while its path runs: from the do (frame 3) the
+//!   unit moves one walk step a client update and leaves mode 18 at the
+//!   update that reaches the path's end ([`whirl_updates`]).
 
 use std::collections::BTreeMap;
 
 use bevy::prelude::*;
+use d2_sim::skills::sequences::{self, SeqFrame};
 
 use crate::bridge::mirror::bridge_frame;
+use crate::bridge::predict::Speeds;
 use crate::bridge::world::{ClientWorld, ModeRequest, SkillRow, UnitKey};
 use crate::bridge::BridgeResource;
 use crate::rules::unit_composite::{motion, MotionRecord};
@@ -38,9 +45,25 @@ const WHIRLWIND: i16 = 76;
 const LEAP: i16 = 77;
 const LEAP_ATTACK: i16 = 78;
 
-/// Frame where Whirlwind's repeated animation restarts
-/// (`bodies-2b.md` §8.11 step 4.1, `0x00553DC0(game, unit, 3)`).
-pub const SPIN_FIRST_FRAME: usize = 3;
+/// The COF weapon class the sequence is looked up with
+/// (`sequences.md` §1 rule 4): `hth`, the class the composite draws a
+/// preview player with (`unit_assets` weapon class; d2rs-own, unverified,
+/// D1).
+const PREVIEW_CLASS: usize = 0;
+
+/// The sequence speed: 8.8 frames a client update (`sequences.md` §2
+/// step 2: +0x3C := 256; measured `s` 256 in mode 18 in both facts files).
+pub const SEQ_SPEED: u32 = 256;
+
+/// The Leap sequence frame held while the unit is airborne
+/// (`a1-cold-plains-leap-bar.tsv`: `f` 2816 from the 11th update of mode
+/// 18 until the record is done).
+pub const LEAP_HOLD_FRAME: usize = 11;
+
+/// Whirlwind's loop: the last four sequence frames (A1 3, 4, 5, 6;
+/// `a1-cold-plains-whirlwind-bar.tsv`: `f` 1536 → 768 → 1024 → 1280 →
+/// 1536).
+pub const SPIN_LOOP: usize = 4;
 
 /// `g` of `0x004C8726`: `-270·d + 8,462` for `d < 27`, else
 /// `-72·d + 1,224` (table `0x006DAE70`), at least 500.
@@ -73,16 +96,16 @@ pub fn timed_arc(rec: &mut MotionRecord, height: i32, n: i32) {
 }
 
 /// The leap's motion record (`0x004C8726`): `d` the distance to the point
-/// in sub-tiles (at least 1), `s` the unit's path speed (`velocity >> 8`).
-/// `None` when `s` is 0 (no record is created).
+/// in sub-tiles (at least 1), `s` the unit's path speed (the class run
+/// velocity, measured 9 for the barbarian). `None` when `s` is 0 (no
+/// record is created).
 pub fn leap_record(d: i32, s: i32) -> Option<MotionRecord> {
     if s == 0 {
         return None;
     }
     let d = d.max(1);
-    // `n := (d << 16) / (s << 12)`, "-1 when > 1": one less when above 1
-    // (measured 2026-10-09: d 8, s 9 -> n 13; d 11 -> n 18;
-    // `facts/client/anim/a1-cold-plains-leap-bar.tsv`).
+    // `n := (d << 16) / (s << 12)`, one less when above 1 (measured:
+    // d 8 → q 14, n 13; d 11 → q 19, n 18).
     let q = (i64::from(d) << 16) / (i64::from(s) << 12);
     let n = if q > 1 { q - 1 } else { q } as i32;
     let mut rec = MotionRecord::default();
@@ -92,18 +115,147 @@ pub fn leap_record(d: i32, s: i32) -> Option<MotionRecord> {
     Some(rec)
 }
 
-/// Whirlwind's drawn frame: the skill mode's frames `3..frames` looped
-/// (`ticks` advanced at the 8.8 animation `rate`); a mode of 3 frames or
-/// fewer loops from its first frame.
-pub fn spin_frame(ticks: u64, rate: u32, frames: usize) -> usize {
-    let frames = frames.max(1);
-    let first = if frames > SPIN_FIRST_FRAME {
-        SPIN_FIRST_FRAME
-    } else {
-        0
-    };
-    let span = (frames - first) as u64;
-    first + ((ticks.wrapping_mul(u64::from(rate)) >> 8) % span) as usize
+/// The mode-18 updates of a whirl from its do (the do's own update
+/// included): the path of `d` sub-tiles (`0x006417F0`) at `walk << 12`
+/// a client update; the update whose step reaches the end shows the next
+/// mode, so `((d << 16) − 1) / step`, at least 1 (measured: d 8 → 21,
+/// d 14 → 37 at step 0x6000; with the 3 updates before the do, 24 and
+/// 40). PROVISIONAL (REC-703): the step is the class walk velocity (the
+/// barbarian's 6 gives the measured 0x6000) and the length is the
+/// `0x006417F0` metric (the path's own length is Euclidean); a length
+/// that is an exact multiple of the step is not measured.
+pub fn whirl_updates(d: i32, walk: i32) -> u32 {
+    if walk <= 0 {
+        return 1;
+    }
+    let len = i64::from(d.max(0)) << 16;
+    let step = i64::from(walk) << 12;
+    (((len - 1).max(0)) / step).max(1) as u32
+}
+
+/// Which motion a sequence run drives.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Kind {
+    Leap,
+    Whirl,
+}
+
+/// The local player's mode-18 run: its sequence position, the do, and the
+/// leap record or the whirl path.
+#[derive(Debug, Clone)]
+pub struct SeqRun {
+    kind: Kind,
+    frames: &'static [SeqFrame],
+    /// The sequence frame drawn now (one per update at [`SEQ_SPEED`]).
+    pos: usize,
+    /// The skill's point (sub-tiles).
+    target: (i32, i32),
+    /// The do ran (first event byte 1 crossed).
+    done_do: bool,
+    /// The leap record. The do's update makes it `pending`; it shows the
+    /// update after, unstepped, and is stepped from the one after that
+    /// (the leap facts: no record at frame 5, `mn` 13 / `oz` 0 at frame 6,
+    /// 12 / −20 at frame 7).
+    leap: Option<MotionRecord>,
+    pending: Option<MotionRecord>,
+    /// Whirl: mode-18 updates left after the do's.
+    path_left: Option<u32>,
+}
+
+impl SeqRun {
+    /// A run of `frames` toward `target`, at frame 0 (the request's update).
+    fn new(kind: Kind, frames: &'static [SeqFrame], target: (i32, i32)) -> Self {
+        Self {
+            kind,
+            frames,
+            pos: 0,
+            target,
+            done_do: false,
+            leap: None,
+            pending: None,
+            path_left: None,
+        }
+    }
+
+    /// A Leap / Leap Attack run.
+    pub fn leap(frames: &'static [SeqFrame], target: (i32, i32)) -> Self {
+        Self::new(Kind::Leap, frames, target)
+    }
+
+    /// A Whirlwind run.
+    pub fn whirl(frames: &'static [SeqFrame], target: (i32, i32)) -> Self {
+        Self::new(Kind::Whirl, frames, target)
+    }
+
+    /// The sequence frame drawn now: (mode, frame).
+    pub fn drawn(&self) -> (u32, usize) {
+        let f = self.frames[self.pos.min(self.frames.len() - 1)];
+        (u32::from(f.mode), usize::from(f.frame))
+    }
+
+    /// The live leap record.
+    pub fn record(&self) -> Option<&MotionRecord> {
+        self.leap.as_ref()
+    }
+
+    /// One client update; `at` the unit's cell (the do measures from it),
+    /// `speeds` the class speeds. `false` when the unit left mode 18.
+    pub fn update(&mut self, at: (i32, i32), speeds: Option<Speeds>) -> bool {
+        // The leap record: stepped from the update after the do; done
+        // (flag 1, the update after ticks 0) is the landing.
+        if let Some(rec) = &mut self.leap {
+            if rec.update(false, None).is_err() || rec.flags & motion::DONE != 0 {
+                self.leap = None;
+            }
+        }
+        if let Some(rec) = self.pending.take() {
+            self.leap = Some(rec);
+        }
+        // The whirl path: the update that reaches its end leaves mode 18.
+        if let Some(n) = &mut self.path_left {
+            *n = n.saturating_sub(1);
+            if *n == 0 {
+                return false;
+            }
+        }
+        let hold = self.kind == Kind::Leap && self.pos == LEAP_HOLD_FRAME && self.leap.is_some();
+        if hold {
+            return true;
+        }
+        let step = (SEQ_SPEED >> 8) as usize;
+        let from = self.pos;
+        let mut next = from + step;
+        if next >= self.frames.len() {
+            match self.kind {
+                Kind::Leap => return false,
+                Kind::Whirl => next = self.frames.len().saturating_sub(SPIN_LOOP),
+            }
+        }
+        self.pos = next;
+        // `sequences.md` §3 frame range: the event bytes of the frames
+        // crossed, (from, next].
+        let crossed = (from + 1..=next).any(|i| self.frames.get(i).is_some_and(|f| f.event == 1));
+        if crossed && !self.done_do {
+            self.done_do = true;
+            self.skill_do(at, speeds);
+        }
+        true
+    }
+
+    /// The client skill do.
+    fn skill_do(&mut self, at: (i32, i32), speeds: Option<Speeds>) {
+        let d = distance(at, self.target);
+        match self.kind {
+            Kind::Leap => {
+                let s = speeds.map_or(0, |s| i32::from(s.run));
+                self.pending = leap_record(d, s);
+            }
+            Kind::Whirl => {
+                let w = speeds.map_or(0, |s| i32::from(s.walk));
+                self.path_left = Some(whirl_updates(d, w));
+            }
+        }
+    }
 }
 
 /// What the local player's skill move shows now.
@@ -112,15 +264,14 @@ pub struct SkillMotion {
     /// The request the last start was made for.
     seen: Option<(UnitKey, ModeRequest)>,
     seen_ticks: u64,
-    leaps: BTreeMap<UnitKey, MotionRecord>,
-    /// Whirlwind: ticks left and the skill's mode.
-    spins: BTreeMap<UnitKey, (i32, u32)>,
+    runs: BTreeMap<UnitKey, SeqRun>,
 }
 
 /// The sub-tile a skill mode request aims at: code 0x15 a point
 /// (record 2, 3), code 0x16 a unit (type, GUID) and its cell. The skill is
-/// record 0 (`bridge::modes::skill_mode`). Record 2, 3 of code 0x16 is
-/// d2rs-own, unverified (PROVISIONAL, REC-275).
+/// record 0 (`bridge::modes::skill_mode`). PROVISIONAL (REC-702): record
+/// 2, 3 of code 0x16 read as unit type / GUID (only point leaps and
+/// whirls are recorded).
 fn request_point(world: &ClientWorld, r: &ModeRequest) -> Option<(i32, i32)> {
     match r.code {
         0x15 => Some((r.record[2], r.record[3])),
@@ -140,124 +291,117 @@ fn distance(a: (i32, i32), b: (i32, i32)) -> i32 {
 }
 
 impl SkillMotion {
-    /// One bridge frame. `row_of` is the client skills table, `speed` the
-    /// unit's path speed (`velocity >> 8`; d2rs-own, unverified: the run
-    /// velocity), `ticked` whether the server ticked. `cell` is the local
-    /// player's own path cell when the client walks it
+    /// One bridge frame. `row_of` is the client skills table, `speeds`
+    /// the class's charstats speeds. `cell` is the local player's own
+    /// path cell when the client walks it
     /// ([`crate::bridge::predict::Predict::cell`]); the model's position
-    /// otherwise.
+    /// otherwise. Each server tick is one client update.
     pub fn frame(
         &mut self,
         world: &ClientWorld,
         row_of: impl Fn(u16) -> Option<SkillRow>,
-        speed: i32,
+        speeds: Option<Speeds>,
         cell: Option<(u16, u16)>,
     ) {
-        let ticked = world.server_ticks != self.seen_ticks;
+        let updates = world.server_ticks.saturating_sub(self.seen_ticks);
         self.seen_ticks = world.server_ticks;
         let Some(local) = world.local() else {
-            self.leaps.clear();
-            self.spins.clear();
+            self.runs.clear();
             return;
         };
         let key = local.key;
+        // `0x004C8670` measures from the client unit's position, its own
+        // path cell (`unit-composite.md` §8, creator `0x004C8726`): the
+        // server sends a walking player nothing (`sim/pathing.md` §10
+        // rule 2), so the model's position is the last placement.
+        let at = cell
+            .or(local.position)
+            .map(|c| (i32::from(c.0), i32::from(c.1)));
+        if let Some(at) = at {
+            for _ in 0..updates.min(1024) {
+                self.runs.retain(|_, run| run.update(at, speeds));
+            }
+        }
         let req = local.last_mode_request;
         if self.seen != req.map(|r| (key, r)) {
             self.seen = req.map(|r| (key, r));
-            // `0x004C8670` measures from the client unit's position, its
-            // own path cell (`unit-composite.md` §8, creator
-            // `0x004C8726`): the server sends a walking player nothing
-            // (`sim/pathing.md` §10 rule 2), so the model's position is
-            // the last placement.
-            if let (Some(r), Some(at)) = (req, cell.or(local.position)) {
-                self.start(
-                    world,
-                    &row_of,
-                    key,
-                    &r,
-                    (i32::from(at.0), i32::from(at.1)),
-                    speed,
-                );
+            self.runs.remove(&key);
+            if let Some(r) = req {
+                self.start(world, &row_of, key, &r);
             }
-        }
-        if ticked {
-            self.leaps
-                .retain(|_, rec| rec.update(false, None).is_ok() && rec.flags & motion::DONE == 0);
-            self.spins.retain(|_, (n, _)| {
-                *n -= 1;
-                *n > 0
-            });
         }
     }
 
+    /// The skill mode request: mode 18 from sequence frame 0 on this
+    /// update (PROVISIONAL, REC-702: the request's update is the first of
+    /// mode 18; the facts show frame 0 the first update in mode 18).
     fn start(
         &mut self,
         world: &ClientWorld,
         row_of: &impl Fn(u16) -> Option<SkillRow>,
         key: UnitKey,
         r: &ModeRequest,
-        at: (i32, i32),
-        speed: i32,
     ) {
-        self.leaps.remove(&key);
-        self.spins.remove(&key);
         let Some(row) = u16::try_from(r.record[0]).ok().and_then(row_of) else {
             return;
         };
         let Some(to) = request_point(world, r) else {
             return;
         };
-        let d = distance(at, to);
-        match row.srvdofunc {
-            LEAP | LEAP_ATTACK => {
-                if let Some(rec) = leap_record(d, speed) {
-                    self.leaps.insert(key, rec);
-                }
-            }
-            WHIRLWIND if speed > 0 => {
-                let n = ((i64::from(d.max(1)) << 16) / (i64::from(speed) << 12)).max(1);
-                self.spins.insert(key, (n as i32, u32::from(row.anim)));
-            }
-            _ => {}
-        }
+        let Some(frames) = sequences::lookup(row.seqnum, PREVIEW_CLASS).filter(|f| !f.is_empty())
+        else {
+            return;
+        };
+        let run = match row.srvdofunc {
+            // PROVISIONAL (REC-704): Leap Attack takes Leap's do (its
+            // first event, frame 5) and hold (frame 11); only Leap is
+            // recorded.
+            LEAP | LEAP_ATTACK => SeqRun::leap(frames, to),
+            WHIRLWIND => SeqRun::whirl(frames, to),
+            _ => return,
+        };
+        self.runs.insert(key, run);
     }
 
     /// The draw offsets `(ox, oy + oz)` of the units in an arc.
     pub fn offsets(&self) -> BTreeMap<UnitKey, (i32, i32)> {
-        self.leaps
+        self.runs
             .iter()
-            .map(|(k, r)| (*k, r.draw_offset()))
+            .filter_map(|(k, r)| Some((*k, r.record()?.draw_offset())))
             .collect()
     }
 
-    /// The unit whirling now and the mode it shows.
-    pub fn spinning(&self) -> Option<(UnitKey, u32)> {
-        self.spins.iter().next().map(|(k, (_, m))| (*k, *m))
+    /// The unit in mode 18 now and the sequence frame it draws: (unit,
+    /// drawn mode, drawn frame).
+    pub fn drawn(&self) -> Option<(UnitKey, u32, usize)> {
+        self.runs.iter().next().map(|(k, r)| {
+            let (m, f) = r.drawn();
+            (*k, m, f)
+        })
     }
 }
 
 /// Steps [`SkillMotion`] after the walk prediction and hands the offsets
-/// to the feed and the spin to the unit art.
+/// to the feed and the drawn sequence frame to the unit art.
 pub fn skill_motion_frame(
     bridge: Res<BridgeResource>,
     walk: Res<PreviewWalk>,
     mut motion: ResMut<SkillMotion>,
     mut state: ResMut<WorldViewState>,
 ) {
-    let speed = walk.speeds.map_or(0, |s| i32::from(s.run));
     let world = bridge.0.world();
     let cell = walk
         .predict
         .cell()
         .filter(|_| walk.predict.player() == world.local().map(|u| u.key));
-    motion.frame(world, |id| bridge.0.skill_row(id), speed, cell);
+    motion.frame(world, |id| bridge.0.skill_row(id), walk.speeds, cell);
     state.feed.set_motion_offsets(motion.offsets());
     if let Some(art) = &walk.art {
         let mut art = art.write().unwrap_or_else(|e| e.into_inner());
-        let spin = motion.spinning();
-        art.spin = spin.map(|(k, _)| k);
-        if let Some(pose) = spin {
-            art.pose_mode = Some(pose);
+        let drawn = motion.drawn();
+        art.sequence = drawn.map(|(k, _, f)| (k, f));
+        if let Some((k, m, _)) = drawn {
+            art.pose_mode = Some((k, m));
         }
     }
 }
@@ -277,52 +421,4 @@ pub fn add_skill_motion(app: &mut App) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    // Covers: specs/render/unit-composite.md §8 r1, §8 r2, §8 r6
-    #[test]
-    fn gravity_follows_the_two_branches_and_the_floor() {
-        assert_eq!(leap_gravity(10), 5762);
-        assert_eq!(leap_gravity(26), 8462 - 270 * 26);
-        assert_eq!(leap_gravity(27), 500);
-        assert_eq!(leap_gravity(100), 500);
-    }
-
-    // Covers: specs/render/unit-composite.md §8 r1, §8 r2, §8 r6
-    #[test]
-    fn timed_arc_starts_at_the_height_and_lands_after_n_updates() {
-        let mut r = MotionRecord::default();
-        timed_arc(&mut r, 0, 4);
-        assert_eq!(r.acc[2], -0x1000);
-        assert_eq!(r.ticks_left, 4);
-        // vz = -az·n²/2 / n = 0x1000·16/2/4.
-        assert_eq!(r.vel[2], 0x1000 * 4 / 2);
-        let mut rec = r;
-        let mut oz = Vec::new();
-        for _ in 0..6 {
-            rec.update(false, None).unwrap();
-            oz.push(rec.offset[2]);
-        }
-        assert_eq!(rec.flags & motion::DONE, motion::DONE);
-        assert!(oz.iter().any(|&z| z < 0), "the unit rises: {oz:?}");
-    }
-
-    // Covers: specs/render/unit-composite.md §8 r1, §8 r2, §8 r6
-    #[test]
-    fn leap_record_needs_a_speed() {
-        assert_eq!(leap_record(10, 0), None);
-        let r = leap_record(10, 6).unwrap();
-        // (10 << 16) / (6 << 12) = 26, minus one.
-        assert_eq!(r.ticks_left, 25);
-        assert_eq!(r.acc[2], -5762);
-    }
-
-    // Covers: specs/skills/bodies-2b.md §8.11
-    #[test]
-    fn spin_loops_from_frame_three() {
-        let f: Vec<usize> = (0..8).map(|t| spin_frame(t, 256, 6)).collect();
-        assert_eq!(f, [3, 4, 5, 3, 4, 5, 3, 4]);
-        assert_eq!(spin_frame(5, 256, 2), 1);
-    }
-}
+mod tests;

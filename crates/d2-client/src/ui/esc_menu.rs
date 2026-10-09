@@ -93,6 +93,7 @@ pub(crate) fn push_fill(out: &mut dyn UiDrawSink, file: u32, frame: u32, r: Rect
                 at: Point::new(x, y),
                 clip: Rect::new(x, y, cw as u16, ch as u16),
                 look: crate::ui::CelLook::PLAIN,
+                call: crate::ui::draw::CelCall::Draw,
             }));
             x += w;
         }

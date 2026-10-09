@@ -434,10 +434,17 @@ impl ConfigureControls {
                 if self.editing && row == self.selected && slot == self.column && blink_hidden {
                     continue;
                 }
-                let (id, name) = match self.table.key_of(mr.cmd, slot) {
-                    UNBOUND => (3762, String::new()),
-                    vk => (0, vk_name(vk)),
-                };
+                // The long name `0x00469DE0` (`control-panel.md` §5 r13):
+                // a string id the host resolves, or the key's low byte.
+                let (id, name) =
+                    match crate::controls::key_names::long_name(self.table.key_of(mr.cmd, slot)) {
+                        crate::controls::key_names::KeyName::Id(id) => {
+                            (u32::from(id), String::new())
+                        }
+                        crate::controls::key_names::KeyName::Unit(u) => {
+                            (0, String::from_utf16_lossy(&[u]))
+                        }
+                    };
                 out.push(text(id, &name, x, y, self.key_color(row, slot)));
             }
         }

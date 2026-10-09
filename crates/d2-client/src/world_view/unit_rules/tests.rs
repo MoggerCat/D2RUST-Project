@@ -404,9 +404,12 @@ fn units_face_their_walk_target_and_keep_the_facing() {
     assert_eq!(dir(&world, &remote), 10);
 }
 
-// Covers: specs/skills/bodies-2b.md §8.11
+// Covers: specs/skills/sequences.md §3
+/// A unit in mode 18 draws its sequence frame, whatever the tick
+/// (`facts/client/anim/a1-cold-plains-whirlwind-bar.tsv`: the whirl draws
+/// A1 0, 1, 2, 3, 3, 4, 5, 6, 3 on consecutive updates).
 #[test]
-fn a_spinning_unit_loops_its_frames_from_frame_three() {
+fn a_unit_in_a_sequence_draws_the_sequence_frame() {
     let mut src = MemorySource::default();
     src.insert(
         "data\\global\\chars\\QA\\cof\\QAQNhth.cof",
@@ -426,11 +429,16 @@ fn a_spinning_unit_loops_its_frames_from_frame_three() {
             .unwrap()
             .frame
     };
-    rules.art.write().unwrap().spin = Some(local.key);
-    for t in 0..12u64 {
-        world.server_ticks = t;
-        assert!(frame(&world) >= 3, "tick {t} frame {}", frame(&world));
+    world.server_ticks = 3;
+    let plain = frame(&world);
+    for (t, f) in [0, 1, 2, 3, 3, 4, 5, 6, 3].into_iter().enumerate() {
+        world.server_ticks = 40 + t as u64;
+        rules.art.write().unwrap().sequence = Some((local.key, f));
+        assert_eq!(frame(&world), f, "update {t}");
     }
+    rules.art.write().unwrap().sequence = None;
+    world.server_ticks = 3;
+    assert_eq!(frame(&world), plain, "the plain frame again");
 }
 
 // Covers: specs/render/unit-composite.md §3 r2
@@ -466,9 +474,43 @@ fn tick_frame_has_one_advance_less_than_the_tick() {
 #[test]
 fn the_walk_frame_counts_from_the_walk_start() {
     for (tick, frame) in [(32, 0), (46, 3), (60, 7), (74, 3), (88, 6), (102, 2)] {
-        assert_eq!(super::walk_frame(tick, 22, 8), frame, "tick {tick}");
+        assert_eq!(super::walk_frame(tick, 22, 8, 213), frame, "tick {tick}");
     }
     // M08: the server-tick clock (rate 256) gives other frames.
     assert_ne!(super::tick_frame(46, 8, 256), 3);
-    assert_eq!(super::walk_frame(22, 22, 8), 0);
+    assert_eq!(super::walk_frame(22, 22, 8, 213), 0);
+    // The run (`a1-run-*`): speed 151 from the first run click, tick 140;
+    // 1.14d frames 5, 6, 6, 6, 6, 7, 7, 7 at ticks 150 … 248.
+    let speeds = crate::bridge::predict::Speeds { walk: 6, run: 9 };
+    assert_eq!(super::player_run_speed(Some(speeds)), 151);
+    for (tick, frame) in [
+        (150, 5),
+        (164, 6),
+        (178, 6),
+        (192, 6),
+        (206, 6),
+        (220, 7),
+        (234, 7),
+        (248, 7),
+    ] {
+        assert_eq!(super::walk_frame(tick, 140, 8, 151), frame, "tick {tick}");
+    }
+    // M08: the spec's w = 101 at p = 100 gives other frames.
+    assert_ne!(super::walk_frame(150, 140, 8, 101), 5);
+}
+
+// Covers: specs/render/blend-modes.md §5 r3
+/// Fortress braziers #1 (`98`, BlocksLight 1) and #2 (`99`, BlocksLight
+/// 0): only #1 casts its shadow (`a4-town-pandemonium-fortress`).
+#[test]
+fn an_object_casts_its_shadow_only_where_it_blocks_light() {
+    let mut l = looks();
+    l.object_blocks_light.insert(408, [1, 1, 1, 1, 0, 0, 0, 0]);
+    l.object_blocks_light.insert(409, [0; 8]);
+    assert!(super::object_casts_shadow(&l, 408, 0));
+    assert!(!super::object_casts_shadow(&l, 409, 0));
+    assert!(!super::object_casts_shadow(&l, 408, 4));
+    assert!(!super::object_casts_shadow(&l, 408, 99));
+    // No row: as before.
+    assert!(super::object_casts_shadow(&l, 7, 0));
 }

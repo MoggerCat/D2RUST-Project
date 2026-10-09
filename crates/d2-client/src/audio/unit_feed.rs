@@ -20,16 +20,15 @@
 //!
 //! PROVISIONAL guesses, each with what settles it (M25):
 //!
-//! - **REC-430** (frame, frame count, speed of a player or monster): the
-//!   client model does not advance them (`world_view` says the sim owns
-//!   animation). The pass starts f at 0 on every mode change and adds the
-//!   `AnimData` speed per client update, wrapping at the frame count F
-//!   (frames × 256), for the animation `<token><mode><weapon class>` of
-//!   the unit's COF. Recorded 2026-10-09
-//!   (`facts/client/anim/a1-town-walk-ama.tsv`): f := 0 at a mode change
-//!   and the wrap are right; the speed is the `sim/units.md` §4.7 rate,
-//!   a player's footstep reads f before the advance and a monster first
-//!   seen starts at rnd(F): fix queued as `q-fix-client-anim-rate`.
+//! - **REC-430** settled (Wine recording, `facts/client/anim/
+//!   a1-town-walk-ama.tsv`): f := 0 at a mode change, wrapping at F
+//!   (frames × 256); the speed is the rate of `sim/units.md` §4.7 (a
+//!   monster from the client model, `bridge::monster_anim`, which also
+//!   rolls a new monster's first frame; a player through
+//!   [`player_rate`]); a monster's update advances f before its
+//!   footstep, a player's footstep reads f before the advance. A monster
+//!   the model does not animate (no 0xAC set-up: synthetic fixtures)
+//!   keeps the raw AnimData speed from f = 0.
 //! - **REC-431** (floor material k): the DT1 tile flags under the unit
 //!   need the client room tile lists; k is the `soundenviron` `Material
 //!   1` default (`footstep_material`, `Floor::NotFound`). Settles: a
@@ -286,6 +285,40 @@ impl UnitSoundRows {
     }
 }
 
+/// A player's animation speed +0x4C (`sim/units.md` §4.7, through
+/// `d2_sim::units::anim_rate`): draw type 0, the AnimData speed `s`, the
+/// unit's totals of stats 67–69, w = 101 in mode 3 (run) else 213 (step
+/// 6), the mode row's V column as the velocity-mode test (`pathing.md`
+/// §8.1 r2). Recorded: the amazon's TW at 213 (AnimData 256).
+fn player_rate(world: &ClientWorld, key: UnitKey, u: &ClientUnit, s: i32) -> i32 {
+    use d2_sim::units::anim_rate::{anim_rate, mode_row, Rate, RateInput};
+    let m = u.mode;
+    // A model player without a base stat reads the creation base 100
+    // under its lists, as the walk prediction (`bridge::predict`).
+    let total = |stat: u16| {
+        let base = if u.stats.contains_key(&stat) { 0 } else { 100 };
+        base + world.total(key, stat, 0)
+    };
+    let i = RateInput {
+        applies: true,
+        t: 0,
+        c: u.class,
+        m,
+        s,
+        velocitypercent: total(67),
+        attackrate: total(68),
+        other_animrate: total(69),
+        has_path: true,
+        w: if m == 3 { 101 } else { 213 },
+        velocity_mode: mode_row(0, u.class, m).v,
+        ..RateInput::default()
+    };
+    match anim_rate(&i) {
+        Ok(Rate::Set { speed, .. }) => speed,
+        _ => s,
+    }
+}
+
 /// What the pass remembers of a unit between frames.
 #[derive(Clone, Debug, Default)]
 struct Track {
@@ -493,12 +526,26 @@ impl UnitFeed {
             // Advance the remembered state (the animation restarts with a
             // new mode, REC-430).
             if first || mode_changed {
-                let mut shown = u.clone();
-                shown.mode = mode;
-                let (f, s) = rows.animation(&shown).unwrap_or((0, 0));
-                t.frame = 0;
-                t.frame_count = f;
-                t.speed = s;
+                if key.unit_type == MONSTER && u.frame_count > 0 && u.mode == mode {
+                    // The model's own animation (`bridge::monster_anim`):
+                    // the §4.7 rate and, for a monster first seen, the
+                    // first frame rolled on its seed (`msg-units.md`
+                    // §1.2 r6.5).
+                    t.frame = u.frame as u32;
+                    t.frame_count = u.frame_count as u32;
+                    t.speed = u.speed.unwrap_or(0);
+                } else {
+                    let mut shown = u.clone();
+                    shown.mode = mode;
+                    let (f, s) = rows.animation(&shown).unwrap_or((0, 0));
+                    t.frame = 0;
+                    t.frame_count = f;
+                    t.speed = if key.unit_type == PLAYER {
+                        player_rate(world, key, &shown, s)
+                    } else {
+                        s
+                    };
+                }
             }
             t.mode = mode;
             t.states = u.states.clone();
@@ -584,18 +631,25 @@ impl UnitFeed {
             if !matches!(p.key.unit_type, PLAYER | MONSTER) {
                 continue;
             }
-            // Per client update (REC-430): advance f, then the idle voice
-            // and the footstep.
+            // Per client update (recorded, REC-430 settled): a monster's
+            // update advances f before its idle voice and footstep; a
+            // player's footstep (`0x004CAF60` from `0x00463390`) reads f
+            // before that update's advance.
             for &c in updates {
                 cx.c = c;
                 let t = self.tracks.entry(p.key).or_default();
+                let before = t.frame;
                 if t.frame_count > 0 {
                     t.frame = (t.frame as i32).wrapping_add(t.speed) as u32;
                     if t.frame >= t.frame_count {
                         t.frame %= t.frame_count;
                     }
                 }
-                u.frame = t.frame;
+                u.frame = if p.key.unit_type == PLAYER {
+                    before
+                } else {
+                    t.frame
+                };
                 let us = unit_sounds.entry((p.key, false)).or_default();
                 if p.key.unit_type == MONSTER {
                     neutral(cx, &u, us);
@@ -655,5 +709,35 @@ fn item_sound(cx: &mut Ctx, p: &Planned) {
             }
         }
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod rate_tests {
+    use super::*;
+
+    // Covers: specs/sim/units.md §4.7
+    #[test]
+    fn a_players_town_walk_steps_at_213_as_recorded() {
+        // facts/client/anim/a1-town-walk-ama.tsv (Wine, REC-430): the
+        // amazon's TW (mode 6, AnimData 256, F 2048) from its mode set:
+        // f = 0, 213, 426, 639, …, 1917, then 82 (wrap); TN (mode 5,
+        // AnimData speed 80) at 80.
+        let key = UnitKey::new(PLAYER, 1);
+        let mut u = ClientUnit::new(key);
+        u.mode = 6;
+        let mut w = ClientWorld::default();
+        w.units.insert(key, u.clone());
+        let s = player_rate(&w, key, &u, 256);
+        assert_eq!(s, 213);
+        let (mut f, mut seen) = (0i32, vec![0]);
+        for _ in 0..10 {
+            f = (f + s) % 2048;
+            seen.push(f);
+        }
+        assert_eq!(&seen[..4], &[0, 213, 426, 639]);
+        assert_eq!(&seen[9..], &[1917, 82]);
+        u.mode = 5;
+        assert_eq!(player_rate(&w, key, &u, 80), 80);
     }
 }

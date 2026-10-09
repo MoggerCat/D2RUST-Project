@@ -29,15 +29,15 @@
 |   B2. Path new-step flag (path +0x34 bit 3) | 94–116 |
 |   B3. Shared create helpers | 117–159 |
 |   B4. Do bodies: emitters | 160–180 |
-|   B5. Do bodies: animation, steering, timed effects | 181–235 |
-|   B6. Client hit table `0x0072A508` | 236–275 |
-|   B7. Hit bodies | 276–296 |
-| Constants & data dependencies | 297–314 |
-| Randomness | 315–320 |
-| Edge cases & original bugs | 321–345 |
-| Test vectors | 346–362 |
-| Provenance | 363–382 |
-| Open questions | 383–390 |
+|   B5. Do bodies: animation, steering, timed effects | 181–236 |
+|   B6. Client hit table `0x0072A508` | 237–276 |
+|   B7. Hit bodies | 277–297 |
+| Constants & data dependencies | 298–315 |
+| Randomness | 316–321 |
+| Edge cases & original bugs | 322–346 |
+| Test vectors | 347–363 |
+| Provenance | 364–383 |
+| Open questions | 384–391 |
 <!-- /index -->
 
 ## Summary
@@ -231,7 +231,8 @@ trunc rounds toward 0.
    3. elapsed = a − 2: sound, `audio/triggers-2.md` §16.
    Then step. The falling child reaches height 0 after a frames.
 6. **59** `0x004D7FC0` (570–573 `world stone chip`): z := m's motion z
-   (`0x004DA150`). −d28 ≤ z ≤ d2C → step; else remove.
+   `>> 11` (`0x004DA150`, 1/32 subtile). −d28 ≤ z ≤ d2C → step
+   (`0x004D30C0`); else remove (`0x004CD390`).
 
 ### B6. Client hit table `0x0072A508`
 

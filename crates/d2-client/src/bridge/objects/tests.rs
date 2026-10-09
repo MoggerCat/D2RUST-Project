@@ -723,12 +723,14 @@ fn generic_step_one_frame_and_door() {
     object_update(&mut w, &i, S, &mut Vec::new()).unwrap();
     assert_eq!(obj(&w).frame, 50);
     obj_mut(&mut w).frame = 0;
-    // IsDoor, non-cycling: the door step (PROVISIONAL, REC-725), not this one.
+    // IsDoor, non-cycling: the door step (§25 r9.2.1), see the door tests.
     i.objclient.rows[0].frame_cnt = [4 * 256; 8];
     i.objclient.rows[0].cycle_anim[0] = 0;
     i.objclient.rows[0].is_door = 1;
+    i.objclient.rows[0].frame_delta = [0x100; 8];
+    obj_mut(&mut w).mode = 1;
     object_update(&mut w, &i, S, &mut Vec::new()).unwrap();
-    assert_eq!(obj(&w).frame, 0);
+    assert_eq!(obj(&w).frame, 0x100);
 }
 
 // Covers: specs/world/objects-client.md §25 r9
@@ -1067,4 +1069,55 @@ fn raw_frame_counts_are_fixed_up_once() {
     );
     let end = fixed.frame_cnt[0] as i32 - 256;
     assert_eq!(end >> 8, 0);
+}
+
+// Covers: specs/world/objects-client.md §25 r9
+#[test]
+fn door_step_opens_clamps_then_finishes_in_mode_2() {
+    let mut w = world((0, 0));
+    let mut i = inputs(0, 0);
+    let r = &mut i.objclient.rows[0];
+    r.frame_cnt = [4 * 256; 8];
+    r.frame_delta = [0x100; 8];
+    r.is_door = 1;
+    r.start[2] = 2;
+    r.selectable[2] = 1;
+    obj_mut(&mut w).mode = 1;
+    let mut out = Vec::new();
+    for want in [0x100, 0x200, 0x300] {
+        object_update(&mut w, &i, S, &mut out).unwrap();
+        assert_eq!((obj(&w).mode, obj(&w).frame), (1, want));
+    }
+    // End = FrameCnt − 256 = 0x300: the next update finishes.
+    assert!(!out
+        .iter()
+        .any(|o| matches!(o, Output::ObjectFx(ObjFx::Collision { .. }))));
+    object_update(&mut w, &i, S, &mut out).unwrap();
+    assert_eq!(obj(&w).mode, 2);
+    assert!(out
+        .iter()
+        .any(|o| matches!(o, Output::ObjectFx(ObjFx::Collision { .. }))));
+    assert_eq!(obj(&w).flag_2, Some(true));
+}
+
+// Covers: specs/world/objects-client.md §25 r9
+#[test]
+fn door_step_closes_backwards_then_returns_to_mode_0() {
+    let mut w = world((0, 0));
+    let mut i = inputs(0, 0);
+    let r = &mut i.objclient.rows[0];
+    r.frame_cnt = [4 * 256; 8];
+    r.frame_delta = [0x100; 8];
+    r.is_door = 1;
+    obj_mut(&mut w).mode = 3;
+    obj_mut(&mut w).frame = 0x180;
+    for want in [0x80, 0] {
+        object_update(&mut w, &i, S, &mut Vec::new()).unwrap();
+        assert_eq!((obj(&w).mode, obj(&w).frame), (3, want));
+    }
+    object_update(&mut w, &i, S, &mut Vec::new()).unwrap();
+    assert_eq!(obj(&w).mode, 0);
+    // Any other mode is fatal (0x155).
+    obj_mut(&mut w).mode = 4;
+    assert!(object_update(&mut w, &i, S, &mut Vec::new()).is_err());
 }

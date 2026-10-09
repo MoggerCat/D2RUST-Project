@@ -91,7 +91,8 @@ Unit = the unit record; path = unit +0x2C.
 | `lv` | level id of the unit's room | room (dynamic path +0x1C, static path +0x00) +0x10 → DRLG room +0x58 → level +0x1D0 | `drlg/rooms.md` §1, `drlg/levels.md` |
 | `hp`, `hpx`, `mp`, `mpx`, `st`, `stx` | stats 6, 7, 8, 9, 10, 11 layer 0, raw (8.8) | full array of the extended list at unit +0x5C (`tools/original-hooks.md` §4 r3); absent key → 0; no list → field absent | `sim/stat-lists.md` §1, `sim/stats.md` §2 |
 | `str`, `ene`, `dex`, `vit`, `lvl` | stats 0, 1, 2, 3, 12 layer 0 | base array of the list at unit +0x5C (`tools/original-hooks.md` §4 r5); absent key → 0; no list → absent | `sim/stat-lists.md` §1 |
-| `own` | owner GUID | **no 1.14d source in a spec**: not written by the 1.14d side (gap; `docs/handoff/pc1-data.md` Step 4 item 21) | — |
+| `own` | owner GUID | type 1 (pet, summon, minion, hireling): AI control (monster data +0x28; 0 → absent) with u32 control +0x28 ≠ 0 → u32 control +0x2C (absent when 0xFFFFFFFF, a released pack); type 3: u32 unit +0x98 when u32 unit +0xC8 bit 0x400, else absent; type 4: item data +0x5C inventory → u32 inventory +0x08 owner unit → u32 +0x0C (absent when either is 0, e.g. on the ground); types 0, 2, 5: absent | `sim/units.md` §2 (owner links), `monsters/ai.md` §3.1, `skills/bodies.md` §6.20, `items/inventory.md` §1.1 |
+| `q` | the player's quest flag record of the game's difficulty: `[slot, word]` for each slot 0–41 whose u16 word is non-zero, slots ascending (bit b of the word = bit b of the slot) | type 0: the record pointer at player data (`0x006221A0(player)`) +0x10 + 4·d, d = u8 game +0x6D; the u16 at record + 2·slot. Other types: absent. Written by d2rs only (from the host's per-player quest records, `HOST_FIELDS`); the 1.14d recorder does not read it yet, so the comparator reports it as not compared | `world/quests.md` §1.1, §1.4 |
 
 1. Which units: every unit of the server's unit lists (`sim/unit-order.md`
    §2 rule 4: the five per-type hash tables and the tile list), so
@@ -183,6 +184,6 @@ the §2 table; nothing here is a new 1.14d fact.
 
 ## Open questions
 
-1. The owner of a unit (a pet's or a missile's owner, an item's
-   container) has no 1.14d address in a spec; queued as
-   `docs/handoff/pc1-data.md` Step 4 item 21.
+1. ~~The owner of a unit has no 1.14d address in a spec.~~ Answered
+   2026-10-09 (pc1-data Step 4 item 21): §2 `own` row, offsets owned by
+   `sim/units.md` §2 "Owner links".

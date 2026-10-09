@@ -34,17 +34,17 @@
 | Inputs | 62–73 |
 | Outputs / state changes | 74–81 |
 | Rules | 82–83 |
-|   25. Client object function dispatch | 84–224 |
-|   26. The client object functions | 225–423 |
-|   27. Client latches of the zoo and the preloads | 424–434 |
-|   28. What d2rs must model for §25–§27 | 435–447 |
-|   29. Object mouse-over label (`0x00454F30`, unit type 2; REC-239) | 448–526 |
-| Constants & data dependencies | 527–548 |
-| Randomness | 549–562 |
-| Edge cases & original bugs | 563–580 |
-| Test vectors | 581–615 |
-| Provenance | 616–649 |
-| Open questions | 650–665 |
+|   25. Client object function dispatch | 84–239 |
+|   26. The client object functions | 240–438 |
+|   27. Client latches of the zoo and the preloads | 439–449 |
+|   28. What d2rs must model for §25–§27 | 450–462 |
+|   29. Object mouse-over label (`0x00454F30`, unit type 2; REC-239) | 463–541 |
+| Constants & data dependencies | 542–563 |
+| Randomness | 564–577 |
+| Edge cases & original bugs | 578–595 |
+| Test vectors | 596–630 |
+| Provenance | 631–664 |
+| Open questions | 665–680 |
 <!-- /index -->
 
 ## Summary
@@ -198,7 +198,22 @@ server state changes; no S→C message is read here.
    1. C = 0x100 (one frame) → nothing.
    2. `CycleAnim[m]` = 0 (non-cycling):
       1. `IsDoor` (+0x13A) ≠ 0 → the door step `0x004BCB20` instead;
-         return.
+         return. **Door step** (ESI = U; 2026-10-09 read, REC-725 settled),
+         E = `End(m)`:
+         - m = 1 (opening): f = E → finish; else f := min(f + s, E)
+           (the update that reaches E only clamps; the finish is the
+           next update).
+         - m = 3 (closing, runs backwards): f ≤ 0 → finish; s > f → f :=
+           0; else f −= s.
+         - any other mode → fatal 0x155.
+         - **Finish** `0x004BCA90`: m = 3 → write mode 0, f := `Start0`
+           raw; m = 1 → free the footprint `0x00623830(U)` (no
+           `HasCollision` test), write mode 2, f := `Start2` raw; (other
+           m → fatal 0x11F); then `refresh(U)`, `reinit(U)`, U+0xC4 bit
+           0x2 := `Selectable[new mode]` ≠ 0. No sound call, no light,
+           no `OrderFlag2` / `Parm7` / overlay work (those are the
+           generic mode-1 finish of 2 only). Closing does not re-add
+           collision here.
       2. f ≥ C − 256 (the last frame reached, tested **before** any
          advance): class 189 in mode 2 or 3 → write mode m + 1, f :=
          `Start[m+1]` · 256, `refresh(U)`, `reinit(U)`, return. Mode ≠

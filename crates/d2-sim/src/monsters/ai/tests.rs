@@ -915,8 +915,9 @@ impl AiSummons for Fake {
     fn rescue_portal(&mut self, _: &mut Game, _: UnitId) -> Option<Option<UnitId>> {
         self.y.portal
     }
-    fn npc_wants_interact(&mut self, _: &mut Game, _: UnitId, _: UnitId) {
+    fn npc_wants_interact(&mut self, _: &mut Game, _: UnitId, _: UnitId) -> bool {
         self.log.push("0x8a".into());
+        true
     }
     fn path_has_points_no_target(&mut self, _: &mut Game, _: UnitId) -> bool {
         self.y.path_points
