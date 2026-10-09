@@ -614,6 +614,7 @@ fn kurast_docks_arrival_and_every_town_npc_talks() {
         npc::ASHEARA,
         npc::HRATLI,
         npc::MESHIF2,
+        npc::NATALYA,
     ] {
         let msgs = p.talk(class);
         eprintln!("NPC {class}: quest messages {msgs:?}");
