@@ -391,6 +391,7 @@ fn install_fixtures(sim: &mut single_player::Sim, learned: &[usize]) {
         combat,
         levels: vec![blank(); 150],
         skill_modes: vec![[0; 8]],
+        overlay_count: 0,
     });
     s.hooks.anim_data = Some(Arc::new(anim_data()));
     let modes = [

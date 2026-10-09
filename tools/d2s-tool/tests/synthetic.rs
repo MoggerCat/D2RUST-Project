@@ -508,3 +508,43 @@ fn resave_clears_instore_and_resets_appearance() {
         RoundTrip::Same(_)
     ));
 }
+
+/// `set` on a save with an equipped item rebuilds the appearance bytes
+/// from the items (§2.8 r1, r3; `d2s-appearance.md` §4): the `sb1 ` in
+/// the right hand draws as token 4, the first slot after `lit` / `med` /
+/// `hvy`. This fixture's `blad` type is not under `weap`, so the load's
+/// body link never makes it the weapon in use (`quests-act3-2.md` §11.5
+/// r1) and it is the left-hand owner by its component (§4 r1): LH.
+/// Nothing else changes; no note.
+// Covers: specs/formats/d2s.md §2.8 r1, §2.8 r3; specs/formats/d2s-appearance.md §4 r1
+#[test]
+fn resave_rebuilds_the_appearance_of_an_equipped_weapon() {
+    use d2_formats::d2s::appearance::part;
+    use d2_sim::items::bitstream::read::read_save_entry;
+    use d2_sim::items::bitstream::write_save;
+    use d2s_tool::save::resave;
+    let t = tables();
+    let mut e = edits();
+    e.items = vec!["sb1".parse().unwrap()];
+    let mut s = new_save(&e, t).unwrap();
+    {
+        // The sword put in the right hand (mode 1, body location 4).
+        let b = s.body.as_mut().unwrap();
+        let r = read_save_entry(&b.items[0].bytes, &t.items).unwrap();
+        let mut v = r.item.item;
+        v.mode = 1;
+        v.body_loc = 4;
+        v.page = 0xFF;
+        v.x = 0;
+        v.y = 0;
+        let (bytes, _) = write_save(&v, &t.items.isc).unwrap();
+        b.items[0] = d2s::ItemEntry { bytes };
+        s.header.components = d2s::STUB_COMPONENTS;
+    }
+    let notes = resave(&mut s, t).unwrap();
+    assert!(notes.is_empty(), "{notes:?}");
+    let mut want = [0xFF; 16];
+    want[part::LH] = 4;
+    assert_eq!(s.header.components, want);
+    assert_eq!(s.header.colours, [0xFF; 16]);
+}

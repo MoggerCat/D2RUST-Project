@@ -230,6 +230,125 @@ fn monster_update_sends_npc_enchants() {
     assert_eq!(fx.sim.hooks().x.sent, []);
 }
 
+/// `intents-events.md` §7.9 rule 2: the 0x99 / 0x9A / 0xA5 / 0xAB records
+/// carry the unit they sit on; 0xAB is not sent for a revived unit; the
+/// 0x99 record of a target absent from the receiver's rooms is the
+/// 17-byte 0x9A (`0x0053D530` with flag 1, §3.5 rule 5).
+// Covers: specs/sim/intents-events.md §7.9 r2, §3.5 r5
+#[test]
+fn pending_skill_event_records_0x99_0x9a_0xa5_0xab() {
+    use crate::wiring::action::event_records::{
+        landing, npc_heal, skill_event_on_point, skill_event_on_unit, EventRecord,
+    };
+    let (mut fx, _, [(p, c), _]) = setup();
+    fx.sim.hooks().enable_paths().expect("embedded tables");
+    let a = fx.a;
+    let m = fx.spawn(UnitType::Monster, 0, a, 25, 25);
+    let reset = |fx: &mut Fx, flags: u32| {
+        let r = fx.sim.sys.units.get_mut(m).unwrap();
+        r.flags = flags;
+        r.flags2 = 0;
+    };
+    reset(&mut fx, 0);
+    let g = guid(&fx, m);
+    let recs = &mut fx.sim.sys.hooks.event_records;
+    // The target (0, 0xDEAD) does not exist: the 16-byte 0x99 form.
+    recs.push(
+        m,
+        EventRecord::CastOnUnit {
+            skill: 54,
+            level: 3,
+            target: (0, 0xDEAD),
+            w: 1,
+        },
+    );
+    recs.push(
+        m,
+        EventRecord::CastOnPoint {
+            skill: 54,
+            level: 3,
+            x: 30,
+            y: 31,
+            w: 0,
+        },
+    );
+    recs.push(m, EventRecord::Landing { skill: 96 });
+    recs.push(m, EventRecord::NpcHeal { life: 0x30 });
+    fx.sim.send_unit_update(&mut fx.game, c, m);
+    let want = [
+        skill_event_on_unit(1, g, 54, 3, 0, 0xDEAD, 1).to_vec(),
+        skill_event_on_point(1, g, 54, 3, 30, 31, 0).to_vec(),
+        landing(1, g, 96).to_vec(),
+        npc_heal(1, g, 0x30).to_vec(),
+    ];
+    assert_eq!(want[0][0], 0x99);
+    assert_eq!(want[1][0], 0x9A);
+    let got: Vec<_> = std::mem::take(&mut fx.sim.hooks().x.sent)
+        .into_iter()
+        .map(|(to, b)| {
+            assert_eq!(to, p);
+            b
+        })
+        .collect();
+    assert_eq!(got, want);
+    // A revived unit (flag 0x80000000): no 0xAB; the others are sent.
+    reset(&mut fx, 0x8000_0000);
+    fx.sim.send_unit_update(&mut fx.game, c, m);
+    let got: Vec<_> = std::mem::take(&mut fx.sim.hooks().x.sent)
+        .into_iter()
+        .map(|(_, b)| b[0])
+        .collect();
+    assert_eq!(got, [0x99, 0x9A, 0xA5]);
+}
+
+/// `intents-events.md` §7.3 rule 2 step 9: a unit whose list has the
+/// remove-overlay flag sends 0x11 with the overlay list's stat 178 when
+/// it is in 0..=the overlay count (inclusive); otherwise nothing.
+// Covers: specs/sim/intents-events.md §7.3 r2
+#[test]
+fn monster_update_sends_the_overlay_0x11() {
+    use crate::stats::lists::{flag, owner};
+    let (mut fx, _, [(p, c), _]) = setup();
+    fx.sim.hooks().enable_paths().expect("embedded tables");
+    let a = fx.a;
+    let m = fx.spawn(UnitType::Monster, 0, a, 25, 25);
+    let count = 200;
+    Arc::make_mut(&mut fx.sim.sys.hooks.tables).overlay_count = count;
+    {
+        let r = fx.sim.sys.units.get_mut(m).unwrap();
+        r.flags = 0;
+        r.flags2 = 0;
+    }
+    let g = guid(&fx, m);
+    let want = |v: u16| {
+        let b = g.to_le_bytes();
+        [0x11, 1, b[0], b[1], b[2], b[3], v as u8, (v >> 8) as u8]
+    };
+    let o = fx.sim.sys.stats.alloc(flag::OVERLAY, 0, owner::MONSTER, g);
+    let l = fx.sim.sys.stats.unit_list(m).expect("monster stat list");
+    for (v, sent) in [(7, true), (count, true), (count + 1, false), (-1, false)] {
+        fx.sim
+            .sys
+            .stats
+            .set(&mut fx.sim.sys.hooks, o, 178, v, 0, None);
+        fx.sim.sys.stats.attach(&mut fx.sim.sys.hooks, m, o, true);
+        fx.sim.sys.stats.set_flags(l, flag::REMOVE_OVERLAY, true);
+        fx.sim.send_unit_update(&mut fx.game, c, m);
+        let got = std::mem::take(&mut fx.sim.hooks().x.sent);
+        if sent {
+            let w = want(v as u16);
+            assert_eq!(crate::units::messages::report_kill(1, g, v as u16), w);
+            assert_eq!(got, [(p, w.to_vec())], "overlay {v}");
+        } else {
+            assert_eq!(got, [], "overlay {v}");
+        }
+    }
+    // No remove-overlay flag: nothing.
+    fx.sim.sys.stats.set_flags(l, flag::REMOVE_OVERLAY, false);
+    fx.sim.send_unit_update(&mut fx.game, c, m);
+    assert_eq!(fx.sim.hooks().x.sent, []);
+}
+
 /// `intents-events.md` §7.9 rule 2: a unit's pending event records go to
 /// each client's player in list order in the per-client update (monster
 /// step 3; an object's update always, last) and the room clean-up frees

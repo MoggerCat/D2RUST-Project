@@ -24,7 +24,7 @@ Play path finding (M23): the model's local-player mode stays 1 while the
 preview walks it, so no footstep played; the driver now reads the drawn
 mode (`set_local_mode`, from `PreviewWalk`).
 
-## Provisional (REC-407 … REC-413, `docs/HANDOFF.md` §5 and the REC list)
+## Provisional (REC-430 … REC-436, `docs/HANDOFF.md` §5 and the REC list)
 
 407 animation f / F / s, 408 floor material, 409 unit order, 410 weapon
 hit class, 411 first-sight sounds, 412 skill start / missile hit /

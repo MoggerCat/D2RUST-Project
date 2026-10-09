@@ -509,7 +509,7 @@ pub fn add_live_client(app: &mut App, link: DynLink, c: LiveClient) -> anyhow::R
     let table = sound::sound_table_live(archives.as_ref()).map_err(anyhow::Error::msg)?;
     let audio = GameAudio::new(AudioParts::original(archives.source(), table));
     // The unit sounds' tables (`audio/unit_feed.rs`): `monsounds`, the
-    // animation of each unit's mode (REC-407).
+    // animation of each unit's mode (REC-430).
     let looks = std::sync::Arc::new(
         crate::world_view::unit_assets::UnitLooks::live(archives.as_ref())
             .map_err(anyhow::Error::msg)?,

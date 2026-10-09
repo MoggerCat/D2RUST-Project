@@ -7,7 +7,6 @@
 
 use bevy::prelude::*;
 
-use crate::bridge::mirror::{bridge_frame, mirror_units};
 use crate::bridge::motion::MonsterMotion;
 use crate::bridge::BridgeResource;
 
@@ -22,11 +21,11 @@ pub fn monster_walk_frame(mut bridge: ResMut<BridgeResource>, mut walk: ResMut<M
 
 /// Adds [`MonsterWalk`] and [`monster_walk_frame`].
 pub fn add_monster_walk(app: &mut App) {
+    super::present::configure_preview_order(app);
     app.init_resource::<MonsterWalk>().add_systems(
         PreUpdate,
         monster_walk_frame
-            .after(bridge_frame)
-            .before(mirror_units)
+            .in_set(super::present::PreviewOrder::MonsterWalk)
             .run_if(resource_exists::<BridgeResource>),
     );
 }

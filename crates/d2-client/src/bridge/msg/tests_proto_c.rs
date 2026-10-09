@@ -979,6 +979,14 @@ fn skill_events_0x99_0x9a_one_layout() {
             f14: w,
         }
         .encode();
+        // The d2-sim record's sender (`event_records`, §3.5 rule 5 flag 1).
+        assert_eq!(
+            d2_sim::wiring::action::event_records::skill_event_on_unit(
+                ty, guid, skill, level, tt, target, w
+            )
+            .to_vec(),
+            b.to_vec()
+        );
         let mut m = Model::default();
         m.put(UnitKey::new(ty, guid));
         m.put(UnitKey::new(tt, target));
@@ -1005,6 +1013,13 @@ fn skill_events_0x99_0x9a_one_layout() {
             f15: w,
         }
         .encode();
+        assert_eq!(
+            d2_sim::wiring::action::event_records::skill_event_on_point(
+                ty, guid, c[1], level, x, y, w
+            )
+            .to_vec(),
+            b.to_vec()
+        );
         let mut m = Model::default();
         m.put(UnitKey::new(ty, guid));
         m.recv(&b);

@@ -1012,6 +1012,10 @@ fn skill_npc_baal_0xa3_0xa4_0xa5_0xab_one_layout() {
             skill: 1,
         };
         let b = g.encode();
+        assert_eq!(
+            d2_sim::wiring::action::event_records::landing(MONSTER, guid, 1).to_vec(),
+            b.to_vec()
+        );
         assert_eq!(parse(&b).unwrap(), S2c::UnknownA5(g));
         one_size(&b);
         m.out.clear();
@@ -1035,6 +1039,10 @@ fn skill_npc_baal_0xa3_0xa4_0xa5_0xab_one_layout() {
             life,
         };
         let b = g.encode();
+        assert_eq!(
+            d2_sim::wiring::action::event_records::npc_heal(MONSTER, guid, life).to_vec(),
+            b.to_vec()
+        );
         assert_eq!(parse(&b).unwrap(), S2c::NpcHeal(g));
         one_size(&b);
         m.recv(&b);
@@ -1173,4 +1181,163 @@ fn session_0xae_0xb4_one_layout() {
         let s = split_server_buffer(&buf).unwrap();
         assert_eq!((s.messages.len(), s.discarded.len()), (1, 2));
     }
+}
+
+// Covers: specs/client/msg-units.md §7 r6; specs/missiles/missiles.md §r2-4-client-message; specs/sim/intents-events.md §7.2
+#[test]
+fn client_missile_0x73_one_layout() {
+    for (i, g) in sweep(24).enumerate() {
+        let (class, pos, first) = (g as u16, (g, g.rotate_left(7)), (g ^ 5, g.rotate_left(13)));
+        let (frame, owner, level, pierce) = (
+            U16S[i % 5],
+            (U8S[i % 5], g.rotate_left(3)),
+            U8S[(i + 1) % 5],
+            U8S[(i + 2) % 5],
+        );
+        let sim =
+            d2_sim::units::messages::client_missile(class, pos, first, frame, owner, level, pierce);
+        let p = gen::Unknown73 {
+            class,
+            f7: pos.0,
+            f11: pos.1,
+            f15: first.0,
+            f19: first.1,
+            f23: frame,
+            source_type: owner.0,
+            source: owner.1,
+            f30: level,
+            f31: pierce,
+        };
+        let b = p.encode();
+        // Bytes 1–4 are not written by the sender and not read.
+        assert_eq!(sim.to_vec(), b.to_vec());
+        assert_eq!(parse(&b).unwrap(), S2c::Unknown73(p));
+        one_size(&b);
+        let mut m = Model::default();
+        m.put(UnitKey::new(PLAYER, 1));
+        m.w.local_player = Some(UnitKey::new(PLAYER, 1));
+        m.recv(&b);
+        assert_eq!(
+            m.out,
+            [Output::ClientMissile {
+                owner: Some(UnitKey::new(PLAYER, 1)),
+                class,
+                f07: pos.0,
+                f0b: pos.1,
+                f0f: first.0,
+                f13: first.1,
+                f17: frame,
+                source: UnitKey::new(owner.0, owner.1),
+                f1e: level,
+                f1f: pierce,
+            }]
+        );
+        assert!(m.log.rejected.is_empty(), "{:?}", m.rejected());
+    }
+}
+
+// Covers: specs/client/msg-skills.md §9 r1
+#[test]
+fn skill_bonus_0x93_one_layout() {
+    let guid = 7;
+    for (bonus, element, page) in [(1u8, 0u8, 4u8), (0x7F, 3, 0), (0x80, 0, 4), (0xFF, 1, 2)] {
+        let sim = d2_sim::units::messages::skill_bonus(guid, bonus, element, page);
+        let p = gen::Unknown93 {
+            guid,
+            bonus,
+            element,
+            page,
+        };
+        let b = p.encode();
+        assert_eq!(sim.to_vec(), b.to_vec());
+        assert_eq!(parse(&b).unwrap(), S2c::Unknown93(p));
+        one_size(&b);
+        // The client reads the same fields: a player without a skill list
+        // is the fatal 0x96D after the bonus 0 test (0x96B).
+        let mut m = Model::default();
+        m.put(UnitKey::new(PLAYER, guid));
+        m.recv(&b);
+        assert_eq!(
+            m.rejected(),
+            [(0x93, "fatal assert 0x96D".to_string())],
+            "bonus {bonus}"
+        );
+    }
+    let mut m = Model::default();
+    m.put(UnitKey::new(PLAYER, guid));
+    m.recv(&d2_sim::units::messages::skill_bonus(guid, 0, 0, 4));
+    assert_eq!(m.rejected(), [(0x93, "fatal assert 0x96B".to_string())]);
+}
+
+// Covers: specs/client/msg-stats-items.md §5 r5; specs/client/stat-lists.md §2 r4
+#[test]
+fn remove_items_display_0x92_unlinks_the_owners_body_items() {
+    use super::super::item_lists::ItemProp;
+    let t = isc_table();
+    let p1 = UnitKey::new(PLAYER, 1);
+    let prop = ItemProp {
+        stat: 9,
+        layer: 0,
+        value: 20,
+    };
+    let mut m = Model::default();
+    m.put(p1).kind = KindData::Player(PlayerData::default());
+    m.put(UnitKey::new(PLAYER, 2)).kind = KindData::Player(PlayerData::default());
+    m.w.local_player = Some(p1);
+    // (guid, owner, mode, body, page): P1's two body items, P1's grid
+    // item, another player's body item.
+    let rows: [(u32, u32, u32, u8, u8); 4] = [
+        (10, 1, 1, 4, 0xFF),
+        (11, 1, 1, 5, 0xFF),
+        (12, 1, 0, 0, 0),
+        (13, 2, 1, 4, 0xFF),
+    ];
+    let record = |m: &mut Model, (guid, owner, mode, body, page): (u32, u32, u32, u8, u8)| {
+        let it = stream_item(mode, body, 0, 0, page, None);
+        let (bits, _) = bitstream::write(&it, &t).unwrap();
+        let b = item_owned(0x14, 0, guid, 0, owner, &bits).unwrap();
+        m.recv(&b);
+        assert!(m.log.rejected.is_empty(), "{:?}", m.rejected());
+        let KindData::Item(d) = &mut m.w.units.get_mut(&UnitKey::new(ITEM, guid)).unwrap().kind
+        else {
+            panic!("item data");
+        };
+        d.props = vec![prop];
+    };
+    for r in rows {
+        record(&mut m, r);
+    }
+    let total = |m: &Model, p: u32| m.w.item_lists_total(UnitKey::new(PLAYER, p), 9, 0);
+    // Body items count; the grid item is not attached.
+    assert_eq!((total(&m, 1), total(&m, 2)), (40, 20));
+    // The bytes: d2-proto encode against the client handler.
+    let p = gen::RemoveItemsDisplay {
+        type_: PLAYER,
+        guid: 1,
+    };
+    let b = p.encode();
+    assert_eq!(parse(&b).unwrap(), S2c::RemoveItemsDisplay(p));
+    one_size(&b);
+    m.recv(&b);
+    assert!(m.log.rejected.is_empty(), "{:?}", m.rejected());
+    // P1's body items are unlinked; P2's are not; no unit leaves S.
+    assert_eq!((total(&m, 1), total(&m, 2)), (0, 20));
+    assert_eq!(m.w.units.len(), 6);
+    let unlinked = |m: &Model, g: u32| match &m.w.units[&UnitKey::new(ITEM, g)].kind {
+        KindData::Item(d) => d.unlinked,
+        _ => panic!("item data"),
+    };
+    assert_eq!(
+        [10, 11, 12, 13].map(|g| unlinked(&m, g)),
+        [true, true, false, false]
+    );
+    // The next record about an item re-adds it.
+    record(&mut m, rows[0]);
+    assert_eq!(total(&m, 1), 20);
+    // An absent unit and a non-inventory type change nothing; a wrong
+    // size is invalid.
+    m.recv(&[0x92, PLAYER, 9, 0, 0, 0]);
+    m.recv(&[0x92, 2, 1, 0, 0, 0]);
+    assert!(m.log.rejected.is_empty(), "{:?}", m.rejected());
+    assert_eq!(total(&m, 1), 20);
 }

@@ -314,7 +314,7 @@ fn a_new_swarm_requests_its_init_voice() {
     let mut d = driver();
     let w = world(5, swarm);
     d.frame(&w, &[], &[]).unwrap();
-    // `Init` 1,913 on the first sight (REC-411).
+    // `Init` 1,913 on the first sight (REC-434).
     let got = cues(&d, M);
     assert!(got.iter().any(|c| c.base == base(&d, 1913)), "{got:?}");
 }
@@ -348,7 +348,7 @@ fn a_walking_zombie_steps_in_time_with_its_walk_animation() {
     let mut w = world(1, zombie);
     d.frame(&w, &[], &[]).unwrap();
     w.units.get_mut(&M).unwrap().mode = 2;
-    // F and s of the walk animation (AnimData, REC-407): FsCnt 2 steps
+    // F and s of the walk animation (AnimData, REC-430): FsCnt 2 steps
     // per cycle, one every F / 2 / s updates.
     let (frames, speed) = real().rows.animation(&w.units[&M]).expect("WL animation");
     let rec = real().rows.record(zombie, 0, 0).unwrap();
@@ -356,7 +356,7 @@ fn a_walking_zombie_steps_in_time_with_its_walk_animation() {
     let (n, s) = (rec.fscnt, speed);
     let (f_all, step) = (frames as i32, (frames / n) as i32);
     // The rule of `triggers.md` §5 r3, r4 written out for f = j · s mod F
-    // (REC-407: f = 0 at the mode set): dist = distance to a multiple of
+    // (REC-430: f = 0 at the mode set): dist = distance to a multiple of
     // `step` (FsOff 0); fires on a strict local minimum; no step within
     // ⌊2 · period / 3⌋ of the last one (period = F / (n · s)).
     let period = frames / (n * s as u32);

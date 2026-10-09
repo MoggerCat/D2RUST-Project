@@ -131,3 +131,21 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 6. UI spec gaps from `docs/handoff/q-ui-audit.md`: menu-box window
    handlers 0x0E/1, drop cell `0x00486BD0`, gamble flag (panels-2 §14
    r11 vs menus §4.2), waypoint level names.
+7. **Callers of three S→C senders (q-fix-proto-rest, REC-415)**: the static
+   callers of `0x0053C1D0` (0x20 StatUpdate), `0x0053C6F0` (0x93 skill
+   bonus by element and page) and `0x0053E1C0` (0xA6; the spec found none)
+   and `0x0053B3D0`'s 0x92 call site: when each runs and with which
+   values. The d2-sim builders and the client handlers exist and are
+   contract-tested; only the call sites are missing. Answer into
+   `client/msg-stats-items.md` §1 r4 / §5 r5 / r7 and `client/msg-skills.md`
+   §9.
+8. **Argument form of `0x00554200(unit)` at the 0xAB case of
+   `0x00571CD0`** (REC-412) and the base-or-total read of stat 178 in
+   `0x00625A50` (REC-410): `sim/intents-events.md` §7.9 r2 and §7.3 r2
+   step 9.
+9. **Field sources of S→C 0x73 in `0x0059FEE0`** (REC-414): which missile
+   fields fill the two u32 positions, the first path point and the level
+   byte; `missiles/missiles.md` R2.4.
+10. **Node order and asserts of the client 0x92 handler `0x004C23E0`**
+    (REC-416): the order of the inventory nodes it walks and what `0x0063E0B0`
+    does at its end; `client/msg-stats-items.md` §5 r5.

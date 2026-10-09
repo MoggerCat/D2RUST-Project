@@ -114,6 +114,11 @@ impl Screen {
         }
     }
 
+    /// The whole screen as a rectangle (the clip of a full-screen draw).
+    pub fn rect(&self) -> Rect {
+        Rect::new(0, 0, self.w as u16, self.h as u16)
+    }
+
     pub fn res2(&self) -> bool {
         self.res_mode == 2
     }

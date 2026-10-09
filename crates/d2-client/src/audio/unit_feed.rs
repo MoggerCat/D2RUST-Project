@@ -20,31 +20,31 @@
 //!
 //! PROVISIONAL guesses, each with what settles it (M25):
 //!
-//! - **REC-407** (frame, frame count, speed of a player or monster): the
+//! - **REC-430** (frame, frame count, speed of a player or monster): the
 //!   client model does not advance them (`world_view` says the sim owns
 //!   animation). The pass starts f at 0 on every mode change and adds the
 //!   `AnimData` speed per client update, wrapping at the frame count F
 //!   (frames × 256), for the animation `<token><mode><weapon class>` of
 //!   the unit's COF. Settles: a recording of +0x44 / +0x48 / +0x4C per
 //!   update of a walking monster (`client/audio.md` §B7 hook).
-//! - **REC-408** (floor material k): the DT1 tile flags under the unit
+//! - **REC-431** (floor material k): the DT1 tile flags under the unit
 //!   need the client room tile lists; k is the `soundenviron` `Material
 //!   1` default (`footstep_material`, `Floor::NotFound`). Settles: a
 //!   footstep request log on a stone floor (e.g. the Cathedral).
-//! - **REC-409** (order of units in one update): ascending unit key; the
+//! - **REC-432** (order of units in one update): ascending unit key; the
 //!   original walks the room unit lists. Settles: a request log of two
 //!   monsters idling in one update.
-//! - **REC-410** (weapon hit class of a player): the right-hand body item
+//! - **REC-433** (weapon hit class of a player): the right-hand body item
 //!   (body location 4) by its code in `weapons` `hit class`; the weapon
 //!   swap slots and a 2nd-hand weapon are not read. Settles: a swing
 //!   request log with a bow and a sword.
-//! - **REC-411** (the first sight of a unit): a monster seen for the
+//! - **REC-434** (the first sight of a unit): a monster seen for the
 //!   first time plays `Init` and the sounds of the states it already has;
 //!   an item first seen dropping (mode 5) plays the drop sound. The
 //!   original runs them at the creation call the model does not
 //!   distinguish from a level load. Settles: a request log of a level
 //!   entry.
-//! - **REC-412** (missile `HitSound`, skill start sounds, `ProgSound`):
+//! - **REC-435** (missile `HitSound`, skill start sounds, `ProgSound`):
 //!   they need the result of the client hit / start / progressive
 //!   function, which the model does not run; not requested. Settles:
 //!   the missile client functions in the model.
@@ -135,7 +135,7 @@ impl std::fmt::Debug for UnitSoundRows {
 
 impl UnitSoundRows {
     /// The rows of the install behind `archives`; `looks` and `anim` give
-    /// the animation (frames, speed) of a unit's mode (REC-407).
+    /// the animation (frames, speed) of a unit's mode (REC-430).
     pub fn live(
         archives: &dyn TableFiles,
         looks: Arc<UnitLooks>,
@@ -267,7 +267,7 @@ impl UnitSoundRows {
     }
 
     /// The (frame count F, speed) of the animation of `u` in its mode, as
-    /// the 8.8 values the footstep rule reads (REC-407).
+    /// the 8.8 values the footstep rule reads (REC-430).
     pub fn animation(&self, u: &ClientUnit) -> Option<(u32, i32)> {
         let (looks, anim) = (self.looks.as_ref()?, self.anim.as_ref()?);
         let name = unit_cof(looks, u)?.short().to_ascii_uppercase();
@@ -287,7 +287,7 @@ impl UnitSoundRows {
 #[derive(Clone, Debug, Default)]
 struct Track {
     mode: u32,
-    /// +0x44 / +0x48 / +0x4C (REC-407).
+    /// +0x44 / +0x48 / +0x4C (REC-430).
     frame: u32,
     frame_count: u32,
     speed: i32,
@@ -410,7 +410,7 @@ impl UnitFeed {
             .into_iter()
             .map(|v| (v.key, v))
             .collect();
-        // REC-410: the right-hand body item of the local player.
+        // REC-433: the right-hand body item of the local player.
         let local_weapon = local.and_then(|p| {
             item_views
                 .values()
@@ -488,7 +488,7 @@ impl UnitFeed {
                 _ => {}
             }
             // Advance the remembered state (the animation restarts with a
-            // new mode, REC-407).
+            // new mode, REC-430).
             if first || mode_changed {
                 let mut shown = u.clone();
                 shown.mode = mode;
@@ -581,7 +581,7 @@ impl UnitFeed {
             if !matches!(p.key.unit_type, PLAYER | MONSTER) {
                 continue;
             }
-            // Per client update (REC-407): advance f, then the idle voice
+            // Per client update (REC-430): advance f, then the idle voice
             // and the footstep.
             for &c in updates {
                 cx.c = c;
@@ -600,7 +600,7 @@ impl UnitFeed {
                 if footstep_called(p.key.unit_type, cu.class as i32, mode)
                     && !(p.key.unit_type == PLAYER && cu.class >= 7)
                 {
-                    // REC-408.
+                    // REC-431.
                     let k = footstep_material(material1, Floor::NotFound);
                     footstep(cx, &u, us, k)?;
                 }
@@ -623,7 +623,7 @@ fn effective_mode(u: &ClientUnit, drawn: Option<(UnitKey, u32)>) -> u32 {
 }
 
 /// The item sounds of a mode change (§9 r1, r2): the cursor pickup and the
-/// drop (REC-411 for a first sight).
+/// drop (REC-434 for a first sight).
 fn item_sound(cx: &mut Ctx, p: &Planned) {
     let Some((row, mode)) = p.item else {
         return;

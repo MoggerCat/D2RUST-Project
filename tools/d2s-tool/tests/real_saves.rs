@@ -51,3 +51,58 @@ fn real_saves_round_trip() {
         bad.join("\n")
     );
 }
+
+/// The appearance bytes of every save the game wrote are what the tool's
+/// rebuild from the save's own items gives (`d2s.md` §2.8 r1, r3;
+/// `d2s-appearance.md`): `resave`'s path (`save::appearance_of`), the
+/// weapon in use from the load's body links and the weapon class of
+/// REC-291 (5) checked against the game's own bytes.
+// Covers: specs/formats/d2s.md §2.8 r1, §2.8 r3
+#[test]
+#[ignore = "needs original game files in D2_GAME_DIR and saves in D2_SAVE_DIR"]
+fn real_saves_appearance_rebuilds_to_the_files_bytes() {
+    let Some(saves) = std::env::var_os("D2_SAVE_DIR").map(PathBuf::from) else {
+        eprintln!("D2_SAVE_DIR is not set: skipping");
+        return;
+    };
+    let game = std::env::var_os("D2_GAME_DIR").expect("D2_GAME_DIR must name the game folder");
+    let t = Tables::load_dir(&PathBuf::from(game)).unwrap_or_else(|e| panic!("{e:#}"));
+    let mut bad = Vec::new();
+    let mut n = 0;
+    for f in std::fs::read_dir(&saves)
+        .unwrap()
+        .filter_map(|e| e.ok().map(|e| e.path()))
+    {
+        if !f.extension().is_some_and(|x| x.eq_ignore_ascii_case("d2s")) {
+            continue;
+        }
+        let bytes = std::fs::read(&f).unwrap();
+        let opts = read_options(&bytes, None);
+        let Ok(save) = d2_formats::d2s::read(&bytes, &opts, &t) else {
+            continue;
+        };
+        let Some(body) = &save.body else {
+            continue;
+        };
+        n += 1;
+        match d2s_tool::save::appearance_of(&body.items, &t) {
+            Ok((eq, a)) => {
+                let mut h = save.header.clone();
+                h.rebuild_appearance(&eq, &a);
+                if (h.components, h.colours) != (save.header.components, save.header.colours) {
+                    bad.push(format!(
+                        "{}: {:02X?} {:02X?} != file {:02X?} {:02X?}",
+                        f.display(),
+                        h.components,
+                        h.colours,
+                        save.header.components,
+                        save.header.colours
+                    ));
+                }
+            }
+            Err(e) => bad.push(format!("{}: {e}", f.display())),
+        }
+    }
+    assert!(n > 0, "no full save in {}", saves.display());
+    assert!(bad.is_empty(), "{} of {n}:\n{}", bad.len(), bad.join("\n"));
+}

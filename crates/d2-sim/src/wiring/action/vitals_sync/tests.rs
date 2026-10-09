@@ -116,26 +116,77 @@ fn life_prediction_reads_the_healthpot_list() {
     assert_eq!(got[0][0], 0x18);
 }
 
-// Covers: specs/combat/vitals.md §3
+/// The messages one tick sent to `p`, in send order.
+fn tick_sent(f: &mut Fx, p: UnitId) -> Vec<Vec<u8>> {
+    f.sim.sys.hooks.x.sent.clear();
+    crate::tick::tick(&mut f.game, &mut f.sim);
+    f.sim
+        .sys
+        .hooks
+        .x
+        .sent
+        .iter()
+        .filter(|(u, _)| *u == p)
+        .map(|(_, m)| m.clone())
+        .collect()
+}
+
+// Changed expectation (q-fix-flow-server, `sim/tick.md` §6 rule 5,
+// `stat-lists.md` §11 rules 2–3): the stat messages are the per-client
+// update's flush of the changed-stat array, in key order, every tick the
+// key is in the array (step 6 empties it); no longer a diff against a
+// per-client cache at the flush's vitals sync, which sends none.
+// Covers: specs/sim/tick.md §6 r5; specs/sim/stat-lists.md §11 r2, §11 r3
 #[test]
-fn changed_mod_stats_follow_as_stat_messages_once() {
+fn changed_mod_stats_flush_in_the_per_client_update_once() {
     let (mut f, p, c) = fx();
     f.sim.sys.hooks.enable_vitals_sync();
-    // The first run sends whatever is nonzero; settle it.
-    run_fx(&mut f, c, false).unwrap();
-    assert_eq!(run_fx(&mut f, c, false).unwrap(), Vec::<Vec<u8>>::new());
-    // Level 1 -> 2, 5 stat points, 300 strength: byte, byte, word messages.
+    // The fixture's stats are in the array: the first tick flushes them.
+    tick_sent(&mut f, p);
+    assert_eq!(tick_sent(&mut f, p), Vec::<Vec<u8>>::new());
+    // Level 1 -> 2, 5 stat points, 300 strength: byte, byte, word
+    // messages, in key order (stats 0, 4, 12).
     f.stats(p, &[(12, 2), (4, 5), (stat::STRENGTH, 300)]);
-    let got = run_fx(&mut f, c, false).unwrap();
-    for m in [
-        vec![0x1D, 12, 2],
-        vec![0x1D, 4, 5],
-        vec![0x1E, 0, 0x2C, 0x01],
-    ] {
-        assert!(got.contains(&m), "{m:02X?} in {got:02X?}");
-    }
-    // Sent once: unchanged values are not repeated.
-    assert_eq!(run_fx(&mut f, c, false).unwrap(), Vec::<Vec<u8>>::new());
+    let got = tick_sent(&mut f, p);
+    assert_eq!(
+        got,
+        [
+            vec![0x1E, 0, 0x2C, 0x01],
+            vec![0x1D, 4, 5],
+            vec![0x1D, 12, 2],
+        ]
+    );
+    // The vitals sync sends no stat message of its own.
+    f.stats(p, &[(12, 3)]);
+    f.game.lists.client_mut(c).unwrap().update_count = 20;
+    let sync = run_fx(&mut f, c, false).unwrap();
+    assert!(
+        !sync.iter().any(|m| matches!(m[0], 0x1D..=0x1F)),
+        "{sync:02X?}"
+    );
+    // Step 6 emptied the array: sent once.
+    assert_eq!(tick_sent(&mut f, p), [vec![0x1D, 12, 3]]);
+    assert_eq!(tick_sent(&mut f, p), Vec::<Vec<u8>>::new());
+}
+
+// The flag-ex bit 21 refresh (`intents-events.md` §8.3): S→C 0x48 after
+// the stat messages, once (step 6 clears the bit).
+// Covers: specs/sim/tick.md §6 r5; specs/items/inventory.md §5.7 r8
+#[test]
+fn flag_ex_bit_21_sends_the_inventory_refresh_after_the_stats() {
+    let (mut f, p, _) = fx();
+    tick_sent(&mut f, p);
+    f.stats(p, &[(12, 2)]);
+    f.sim.sys.units.get_mut(p).unwrap().flags2 |= crate::wiring::action::INVENTORY_REFRESH_EX;
+    let guid = f.sim.sys.units.get(p).unwrap().guid.to_le_bytes();
+    let got = tick_sent(&mut f, p);
+    let at = got.iter().position(|m| m[0] == 0x48).expect("0x48");
+    assert_eq!(
+        got[at],
+        [0x48, 0, 0, guid[0], guid[1], guid[2], guid[3], 0, 0, 0, 0]
+    );
+    assert!(got[..at].contains(&vec![0x1D, 12, 2]), "{got:02X?}");
+    assert!(!tick_sent(&mut f, p).iter().any(|m| m[0] == 0x48));
 }
 
 // Covers: specs/items/inventory.md §5.7 r2

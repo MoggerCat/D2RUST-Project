@@ -71,7 +71,7 @@ pub const PENDING: &[(&str, &str)] = &[
         "the overhead text (`client/ui.md`) is not wired",
     ),
     (
-        "skill start sounds, missile `HitSound` / `ProgSound`, `dosound` / `tgtsound` (§8 r1–r3; REC-412)",
+        "skill start sounds, missile `HitSound` / `ProgSound`, `dosound` / `tgtsound` (§8 r1–r3; REC-435)",
         "they follow the result of the client start / hit / progressive function, which the \
          model does not run; no handler starts a skill or missile hit for the sound layer",
     ),
@@ -935,7 +935,7 @@ fn request(
             let u = feed.event_unit(world, npc, class, record.as_ref());
             let day = u8::try_from(day_phase(world)).unwrap_or(0);
             match greetings.for_class(class as i32) {
-                // REC-413: mode 0 for the interaction callers.
+                // REC-436: mode 0 for the interaction callers.
                 Some(g) => {
                     interact_greeting(cx, g, &u, world.local_player, GreetMode::Idle, day);
                 }

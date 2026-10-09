@@ -33,7 +33,6 @@ use super::original::FontMeasure;
 use super::panel::StringLookup;
 use super::panels::UiFiles;
 use super::text::TextOpts;
-use super::FRAME;
 
 /// Text colour indexes (`ÿc` codes, `ui/text.md` §5).
 pub mod color {
@@ -740,7 +739,7 @@ pub fn draw_tip(
                 block_w: Some(w),
                 mode: 5,
             },
-            clip: FRAME,
+            clip: Rect::new(0, 0, screen.0 as u16, screen.1 as u16),
         }));
     }
 }

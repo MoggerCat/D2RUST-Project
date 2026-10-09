@@ -37,9 +37,6 @@ const STAT_GOLD: u16 = 14;
 pub struct SyncState {
     /// A new client's cache starts all 0 (§5.2).
     pub caches: BTreeMap<ClientId, SyncCache>,
-    /// Per client: the watched stats last sent as stat messages
-    /// ([`stat_changes`]), by stat.
-    pub stats: BTreeMap<ClientId, BTreeMap<i32, i32>>,
 }
 
 impl<X> ActionHooks<X> {
@@ -146,57 +143,20 @@ pub fn run<X>(
             e.update_count = 0;
         }
     }
-    let mut messages = r.messages;
-    messages.extend(stat_changes(sim, client, unit));
-    Some(messages)
+    Some(r.messages)
 }
 
-/// The stats whose changes follow as stat messages: the attributes (0-3),
-/// stat and skill points (4, 5), the maxima (7, 9, 11), level (12), the
-/// stash gold (15, a `Saved` stat of the changed-stat array,
-/// `stat-lists.md` §11 rule 1, with no message of its own), next-level
-/// experience (30), defense (31) and the resists (39-46). Life, mana,
-/// stamina, gold and experience have their own messages above.
-const WATCHED: [u16; 21] = [
-    0, 1, 2, 3, 4, 5, 7, 9, 11, 12, 15, 30, 31, 39, 40, 41, 42, 43, 44, 45, 46,
-];
-
-/// The watched base values of `unit`, by stat. The item bonuses are not
-/// sent: the client sums the lists of its equipped items itself
-/// (`client/stat-lists.md` §2; `d2-client` `bridge::item_lists`).
-fn watched<X>(sim: &ActionSim<X>, unit: UnitId) -> BTreeMap<i32, i32> {
-    WATCHED
+/// The stat messages of the changed-stat array flush `0x006258D0` with
+/// sender `0x00548520` (`stat-lists.md` §11 rule 2): one stat message
+/// per (key, base value) of `StatLists::mod_values`, in key order; the
+/// key's layer is not sent. A stat id above 0xFE sends nothing (1.14d
+/// `Saved` stats are 0–15). Sent by the per-client update
+/// (`tick.md` §6 rule 5), not by this sync.
+pub fn mod_stat_messages(values: &[(i32, i32)]) -> Vec<Vec<u8>> {
+    values
         .iter()
-        .map(|&s| (i32::from(s), sim.sys.stats.unit_base(unit, s, 0)))
+        .filter_map(|&(k, v)| stat_message(crate::stats::key_stat(k), v))
         .collect()
-}
-
-/// The watched stats of `unit` that changed since the last send to
-/// `client`, as stat messages (`0x0053BE40`, `intents-events.md` §3.5
-/// rule 7), in stat order.
-// PROVISIONAL (combat/vitals.md §3 step 7; settled by REC-96): the original sends a changed
-// stat from the unit's client update, from the changed-stat array
-// (`stat-lists.md` §11); d2rs keeps no pending array across the tick's
-// room clean-up, so the changes are found against a per-client cache at
-// the tick's sync. Level, stat points, skill points, attributes and the
-// maxima reach the client at the end of the tick that changed them;
-// settled by a recording of 0x1D-0x1F around a level-up.
-pub fn stat_changes<X>(sim: &mut ActionSim<X>, client: ClientId, unit: UnitId) -> Vec<Vec<u8>> {
-    let now = watched(sim, unit);
-    let Some(state) = sim.sys.hooks.sync.as_mut() else {
-        return Vec::new();
-    };
-    let sent = state.stats.entry(client).or_default();
-    let mut out = Vec::new();
-    for (k, v) in now {
-        // A stat the client never heard of is 0 there.
-        if sent.get(&k).copied().unwrap_or(0) == v {
-            continue;
-        }
-        sent.insert(k, v);
-        out.extend(stat_message(k as u16, v));
-    }
-    out
 }
 
 /// `0x0053BE40(client, s, v)`: 0x1D below 0xFF, 0x1E below 0xFFFF, else
@@ -233,12 +193,6 @@ pub fn join_run<X>(
         return Vec::new();
     }
     let now = current(sim, game, unit, staged);
-    // The join sends the saved stats whole (`session::create_game` stat
-    // messages): the in-game stat cache starts from them.
-    let mods = watched(sim, unit);
-    if let Some(s) = sim.sys.hooks.sync.as_mut() {
-        s.stats.insert(client, mods);
-    }
     let mut scratch = SyncCache::default();
     let cache = match sim.sys.hooks.sync.as_mut() {
         Some(s) => s.caches.entry(client).or_default(),
