@@ -8,11 +8,20 @@
 # Charsi 154, Gheed 147, Warriv 155, Zombie 5, Andariel 156,
 # Blood Raven 267, Griswold 365, The Smith 402, Countess base class 45;
 # waypoint object 119, cairn stones 17-22.
+# Quests (specs/world/quests.md §1.9; done = bit 0 of the slot): Den of
+# Evil slot 1 (Akara msg 76 with 1.1), Andariel slot 6 (Warriv msg 183
+# with 6.1), Act I completed slot 7 (Warriv's travel to Lut Gholein with
+# 6.0). The three quest milestones need an NPC talk, which the headless
+# input cannot do yet (no hover pick, playthrough.md Open question 3):
+# expected blockers with the quest bit clear.
 playthrough 1
 act 1
 
 save ama --name PtAma --class ama --expansion
 save sor --name PtSor --class sor --expansion --level 30 --skill 8=20 --right-skill 44 --stat 8=128000 --stat 9=128000 --waypoints all --quests acts=1
+save den --name PtDen --class ama --expansion --quests 1.1
+save andy --name PtAndy --class sor --expansion --level 30 --waypoints all --quests 6.1
+save east --name PtEast --class sor --expansion --level 30 --waypoints all --quests 6.0
 
 milestone town-start
   use ama
@@ -53,6 +62,17 @@ milestone den-of-evil
   poke 5 warp 8
   need player lv == 8
   need unit ut 1 lv 8 count >= 5
+
+milestone den-of-evil-done
+  use den
+  deadline 1000
+  sweep 20 2 100 20
+  find ut 1 cl 148
+  poke +2 pos @1:148 @x+3 @y
+  input frame +10; click 448 324
+  note save with 1.1 (Den cleared, reward pending); talking to Akara (msg 76) sets 1.0. The click at Akara (player x+3) walks: no hover pick
+  need quest 1 1 set
+  need ever quest 1 0 set
 
 milestone cold-plains-wp
   use ama
@@ -113,8 +133,28 @@ milestone andariel-killed
   poke 5 warp 37
   poke 30 pos @1:156 @x+3 @y
   poke 30 stat @1:156 6 0 256
-  input frame 40; rclick 350 300
-  need unit ut 1 cl 156 dead
+  poke 40 missile 58 @x @y @x+3 @y skill 36 1
+  note the headless right click walks instead of casting (spec Open question 2): a Fire Bolt missile poke
+  need ever unit ut 1 cl 156 killed
+
+milestone andariel-done
+  use andy
+  deadline 200
+  poke 5 pos @1:155 @x+3 @y
+  input frame 10; click 448 324
+  note save with 6.1 (Andariel dead, reward pending); talking to Warriv (msg 183) sets 6.0. The click at Warriv walks: no hover pick
+  need unit ut 1 cl 155 present
+  need ever quest 6 0 set
+
+milestone act2-open
+  use east
+  deadline 300
+  poke 5 pos @1:155 @x+3 @y
+  input frame 10; click 448 324
+  note save with 6.0; Warriv's travel ("Go east", world/npc.md §8.3) moves the player to Lut Gholein (40) and sets 7.0, 7.13. Needs the NPC menu: not reachable headless yet
+  need ever player act == 1
+  need ever player lv == 40
+  need ever quest 7 0 set
 
 milestone to-act2
   use sor

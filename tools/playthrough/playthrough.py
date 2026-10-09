@@ -25,7 +25,7 @@ import subprocess
 import sys
 import tempfile
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 FORMAT = "playthrough 1"
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -210,10 +210,18 @@ def _rel(base, d):
 
 def parse_pred(text, where):
     """`player <field> <op> <n>` | `player moved >= <n>` |
-    `unit <filters> present|absent|dead|count <op> <n>` (spec §2)."""
+    `unit <filters> present|absent|dead|count <op> <n>` |
+    `quest <slot> <bit> set|clear` (spec §2)."""
     t = text.split()
     if not t:
         raise PlayError(f"{where}: empty predicate")
+    if t[0] == "quest":
+        if len(t) != 4 or t[3] not in ("set", "clear"):
+            raise PlayError(f"{where}: quest <slot> <bit> set|clear")
+        slot, bit = _int(t[1], where), _int(t[2], where)
+        if not (0 <= slot <= 41 and 0 <= bit <= 15):
+            raise PlayError(f"{where}: quest slot 0-41, bit 0-15")
+        return {"kind": "quest", "slot": slot, "bit": bit, "want": t[3] == "set", "src": text}
     if t[0] == "player":
         if len(t) != 4 or t[2] not in OPS:
             raise PlayError(f"{where}: player <field> <op> <n>")
@@ -237,7 +245,7 @@ def parse_pred(text, where):
             return {"kind": "unit", "filter": filt, "test": "count", "op": rest[1],
                     "value": _int(rest[2], where), "src": text}
         raise PlayError(f"{where}: unit [ut|cl|lv|g V]... present|absent|seen|dead|killed|count <op> <n>")
-    raise PlayError(f"{where}: predicate must start with player or unit")
+    raise PlayError(f"{where}: predicate must start with player, unit or quest")
 
 
 # ------------------------------------------------------------- state file
@@ -278,6 +286,15 @@ def player_of(snap):
     return None
 
 
+def quest_bit(q, slot, bit):
+    """Bit `bit` of quest slot `slot` in a player's `q` (state-snapshot.md
+    §2: [slot, word] for the non-zero slots; a slot not listed is 0)."""
+    for s_, word in q:
+        if s_ == slot:
+            return bool(word >> bit & 1)
+    return False
+
+
 def _cmp(a, op, b):
     return {"==": a == b, "!=": a != b, ">=": a >= b, "<=": a <= b, ">": a > b, "<": a < b}[op]
 
@@ -305,6 +322,14 @@ def poke_guids(pokes):
 def eval_pred(pred, snaps, idx, guids, first_player=None):
     """Evaluates `pred` at snaps[idx]. Returns (ok, evidence)."""
     snap = snaps[idx]
+    if pred["kind"] == "quest":
+        p = player_of(snap)
+        if p is None:
+            return False, "no player unit"
+        if "q" not in p:
+            return False, "player has no 'q' (no quest record in the state file)"
+        on = quest_bit(p["q"], pred["slot"], pred["bit"])
+        return on == pred["want"], f"quest {pred['slot']}.{pred['bit']} {'set' if on else 'clear'}"
     if pred["kind"] == "player":
         p = player_of(snap)
         if p is None:
@@ -558,6 +583,36 @@ def report(play, results, path):
     return 0
 
 
+def summary(play, results, path):
+    """One act's line of the `--all` table and of `--json` (spec Outputs):
+    act, reached / total, furthest consecutive, first blocker."""
+    consecutive = 0
+    for _, r in results:
+        if r["status"] != "reached":
+            break
+        consecutive += 1
+    first = next(((m, r) for m, r in results if r["status"] != "reached"), None)
+    fb = None
+    if first:
+        m, r = first
+        fb = {"milestone": m["name"], "kind": r["status"], "frame": r["frame"],
+              "evidence": r["evidence"], "command": m.get("cmd")}
+    return {"play": path, "act": play["act"], "reached": sum(1 for _, r in results if r["status"] == "reached"),
+            "total": len(results), "consecutive": consecutive, "first_blocker": fb}
+
+
+def print_table(rows):
+    print(f"{'act':>3}  {'reached':>7}  {'consec':>6}  first blocker")
+    for s in rows:
+        fb = s["first_blocker"]
+        if fb:
+            ev = fb["evidence"] if len(fb["evidence"]) <= 160 else fb["evidence"][:157] + "..."
+            b = f"{fb['milestone']} ({fb['kind']}) f{fb['frame']}: {ev}"
+        else:
+            b = "none"
+        print(f"{s['act']:>3}  {s['reached']:>3}/{s['total']:<3}  {s['consecutive']:>3}/{s['total']:<2}  {b}")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("play", nargs="*", help="objective files (traces/playthrough/actN.play)")
@@ -565,13 +620,18 @@ def main(argv=None):
     ap.add_argument("--work", help="work dir (default: a temp dir under target/playthrough)")
     ap.add_argument("--game-dir", default=os.environ.get("D2_GAME_DIR"))
     ap.add_argument("--build", action="store_true", help="cargo build --release d2-client and d2s-tool first")
+    ap.add_argument("--all", action="store_true", help="every traces/playthrough/act*.play, then a per-act table")
     ap.add_argument("--json", help="also write the results as JSON here")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
     if a.selftest:
         return selftest()
+    if a.all:
+        d = os.path.join(REPO, "traces", "playthrough")
+        a.play += sorted(os.path.join(d, f) for f in os.listdir(d)
+                         if f.startswith("act") and f.endswith(".play"))
     if not a.play:
-        ap.error("an objective file is needed")
+        ap.error("an objective file is needed (or --all)")
     try:
         client, d2s = tool_paths(a)
         worst = 0
@@ -593,8 +653,11 @@ def main(argv=None):
                 print(f"  {m['name']}: {r['status']}", file=sys.stderr)
             worst = max(worst, report(play, results, path))
             print(f"work dir: {work}")
-            all_json.append({"play": path, "act": play["act"], "milestones": [
-                {"name": m["name"], "command": m.get("cmd"), **r} for m, r in results]})
+            all_json.append(dict(summary(play, results, path), milestones=[
+                {"name": m["name"], "command": m.get("cmd"), **r} for m, r in results]))
+        if len(all_json) > 1 or a.all:
+            print()
+            print_table(all_json)
         if a.json:
             with open(a.json, "w", encoding="utf-8") as f:
                 json.dump({"format": "playthrough-result-1", "tool": f"playthrough.py {VERSION}",
@@ -712,12 +775,57 @@ milestone walk
         raise AssertionError("missing file read")
     except OSError:
         pass
+    # the per-act summary: consecutive count and first blocker keys
+    sm = summary(play, [(town, {"status": "reached", "frame": 1, "evidence": ""}),
+                        (kill, {"status": "stuck", "frame": 9, "evidence": "e"}),
+                        (walk, {"status": "reached", "frame": 2, "evidence": ""})], "p")
+    assert (sm["act"], sm["reached"], sm["total"], sm["consecutive"]) == (1, 2, 3, 1), sm
+    assert {k: sm["first_blocker"][k] for k in ("milestone", "kind", "frame", "evidence")} == \
+        {"milestone": "kill", "kind": "stuck", "frame": 9, "evidence": "e"}, sm
     # ever: held at some snapshot, not at the deadline
     ev = dict(town, need=[dict(parse_pred("player lv == 1", "t"), ever=True, src="ever player lv == 1")])
     r = evaluate(ev, snaps, pokes)
     assert r["status"] == "reached" and "at f1" in r["evidence"], r
     ev["need"][0]["ever"] = False
     assert evaluate(ev, snaps, pokes)["status"] == "wrong-level"
+    # quest: bit b of slot s in the player's `q` ([slot, word], non-zero
+    # slots only), as a fixed 96-byte record would hold it
+    rec = bytearray(96)
+    rec[2:4] = (0x2002).to_bytes(2, "little")   # slot 1: bits 1, 13
+    rec[12:14] = (0x0001).to_bytes(2, "little")  # slot 6: bit 0
+    rec[82:84] = (0x8000).to_bytes(2, "little")  # slot 41: bit 15
+    q = [[k, int.from_bytes(rec[2 * k:2 * k + 2], "little")] for k in range(42)
+         if rec[2 * k:2 * k + 2] != b"\0\0"]
+    assert q == [[1, 0x2002], [6, 1], [41, 0x8000]], q
+    for slot, bit, on in ((1, 1, True), (1, 13, True), (1, 0, False), (6, 0, True), (41, 15, True),
+                          (41, 14, False), (0, 0, False), (7, 0, False)):
+        assert quest_bit(q, slot, bit) is on, (slot, bit)
+    qp = parse_pred("quest 6 0 set", "t")
+    assert (qp["kind"], qp["slot"], qp["bit"], qp["want"]) == ("quest", 6, 0, True), qp
+    assert parse_pred("quest 41 15 clear", "t")["want"] is False
+    for bad in ("quest 42 0 set", "quest 1 16 set", "quest 1 0 on", "quest 1 set", "quest -1 0 set",
+                "quest 1 0 set x"):
+        try:
+            parse_pred(bad, "t")
+        except PlayError:
+            continue
+        raise AssertionError(f"accepted: {bad!r}")
+    qsn = [snap(1, [dict(pl(1), q=[])]), snap(2, [dict(pl(1), q=q)]), snap(3, [dict(pl(1), q=[[1, 0x2002]])])]
+    qm = dict(town, need=[parse_pred("quest 6 0 set", "t")])
+    r = evaluate(qm, qsn, [])
+    assert r["status"] == "stuck" and "quest 6.0 clear" in r["evidence"], r
+    qm["need"] = [dict(parse_pred("quest 6 0 set", "t"), ever=True)]
+    r = evaluate(qm, qsn, [])
+    assert r["status"] == "reached" and "at f2" in r["evidence"], r
+    qm["need"] = [parse_pred("quest 1 0 clear", "t"), parse_pred("quest 1 1 set", "t")]
+    assert evaluate(qm, qsn, [])["status"] == "reached"
+    r = evaluate(qm, [snap(1, [pl(1)])], [])
+    assert r["status"] == "stuck" and "no 'q'" in r["evidence"], r
+    qplay = parse_play("playthrough 1\nsave a --x\nmilestone a\n use a\n deadline 2\n"
+                       " need ever quest 7 0 set\n need quest 1 13 clear\n", "q")
+    qa, qb = qplay["milestones"][0]["need"]
+    assert qa["ever"] and (qa["slot"], qa["bit"], qa["want"]) == (7, 0, True), qa
+    assert not qb["ever"] and (qb["slot"], qb["bit"], qb["want"]) == (1, 13, False), qb
     # sweep: serpentine grid around the centre, back to it, absolute
     sw = sweep_pokes(10, 2, 60, 30, 1000, 2000)
     assert len(sw) == 25 and sw[0] == "10 pos @player 1030 2000", sw[0]

@@ -1,0 +1,26 @@
+check 1
+# Placement target for the playthrough harness (pc1-day3-c round 2, 2026-10-09):
+# Nihlathak (monster 526) in the Halls of Vaught (level 124), NihlS.ds1, superunique spawned at dummy object 462.
+# The player warps there before frame 4, then is moved along a path with
+# pos pokes every 3 frames, 10 sub-tiles apart, until the target's room is active.
+# 1.14d (PC 1, Windows, -seed 1234): ut 1 cl 526: GUID 66 at (12706, 5391), mode 1; created when its room
+# is populated (the player's room becomes adjacent), not at level load.
+# Table: docs/handoff/pc1-day3-c.md "Round 2 — placement". Spec: specs/tools/scenario-diff.md.
+name milestone-nihlathak
+save MilBaal --class sor --expansion --act 4
+seed 1234
+ticks 75
+seconds 240
+channels state
+at 4 poke warp 124
+at 12 poke pos @player 12726 5234
+at 15 poke pos @player 12726 5244
+at 18 poke pos @player 12725 5255
+at 21 poke pos @player 12724 5266
+at 24 poke pos @player 12724 5276
+at 27 poke pos @player 12723 5287
+at 30 poke pos @player 12723 5297
+at 33 poke pos @player 12722 5308
+at 36 poke pos @player 12721 5319
+at 39 poke pos @player 12721 5329
+at 42 poke pos @player 12720 5340

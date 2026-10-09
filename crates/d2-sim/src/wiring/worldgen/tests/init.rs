@@ -186,6 +186,15 @@ fn init_host_state_reaches_the_action_systems() {
     assert_eq!(info.difficulty, 2);
     assert_eq!(fx.sim.world.pop_info.difficulty, 2);
     assert_eq!(fx.sim.action.sys.hooks.ai_info.difficulty, 2);
-    // The alignment value goes to its pending provider (`0x005543B0`).
+    // The alignment value goes to its pending provider (`0x005543B0`)
+    // and into the unit's state-105 list (stat 172; `combat/hit.md`
+    // §7.1), which the monster's 0xAA sends.
     assert_eq!(fx.sim.action.sys.hooks.x.log, [format!("align {} 1", u.0)]);
+    let st = &fx.sim.action.sys.stats;
+    let l = st
+        .unit_list(u)
+        .and_then(|r| st.list_of_state(r, 105))
+        .expect("state-105 list");
+    assert_eq!(st.base(l, 172, 0), 1);
+    assert!(st.has_state(u, 105));
 }

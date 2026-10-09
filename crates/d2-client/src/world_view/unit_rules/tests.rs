@@ -474,11 +474,29 @@ fn tick_frame_has_one_advance_less_than_the_tick() {
 #[test]
 fn the_walk_frame_counts_from_the_walk_start() {
     for (tick, frame) in [(32, 0), (46, 3), (60, 7), (74, 3), (88, 6), (102, 2)] {
-        assert_eq!(super::walk_frame(tick, 22, 8), frame, "tick {tick}");
+        assert_eq!(super::walk_frame(tick, 22, 8, 213), frame, "tick {tick}");
     }
     // M08: the server-tick clock (rate 256) gives other frames.
     assert_ne!(super::tick_frame(46, 8, 256), 3);
-    assert_eq!(super::walk_frame(22, 22, 8), 0);
+    assert_eq!(super::walk_frame(22, 22, 8, 213), 0);
+    // The run (`a1-run-*`): speed 151 from the first run click, tick 140;
+    // 1.14d frames 5, 6, 6, 6, 6, 7, 7, 7 at ticks 150 … 248.
+    let speeds = crate::bridge::predict::Speeds { walk: 6, run: 9 };
+    assert_eq!(super::player_run_speed(Some(speeds)), 151);
+    for (tick, frame) in [
+        (150, 5),
+        (164, 6),
+        (178, 6),
+        (192, 6),
+        (206, 6),
+        (220, 7),
+        (234, 7),
+        (248, 7),
+    ] {
+        assert_eq!(super::walk_frame(tick, 140, 8, 151), frame, "tick {tick}");
+    }
+    // M08: the spec's w = 101 at p = 100 gives other frames.
+    assert_ne!(super::walk_frame(150, 140, 8, 101), 5);
 }
 
 // Covers: specs/render/blend-modes.md §5 r3
