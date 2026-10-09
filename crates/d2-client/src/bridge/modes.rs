@@ -173,8 +173,10 @@ fn player(
         u.path_stopped = true;
     }
     let (x, y) = (r[0] as u16, r[1] as u16);
+    // The mode set `0x00624690` with the animation restart the client
+    // player update ends the mode by ([`super::player_anim`]).
     let set = |w: &mut ClientWorld, m: u32| {
-        w.units.get_mut(&key).expect("present").mode = m;
+        super::player_anim::mode_set(w, inputs, key, m);
     };
     let hit = |w: &mut ClientWorld| {
         w.units.get_mut(&key).expect("present").hit_class = r[2] as u32;
