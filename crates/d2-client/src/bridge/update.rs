@@ -129,7 +129,7 @@ pub fn update_pass(
         log.rejected.push(Rejected { id: 0, error });
     }
     // `render/lighting.md` §9.2 r1, §10 r5: once per client update.
-    if let Err(error) = lighting_update(world, &inputs.tables.levels) {
+    if let Err(error) = lighting_update(world, inputs) {
         log.rejected.push(Rejected { id: 0, error });
     }
     move_freed(world, outputs);

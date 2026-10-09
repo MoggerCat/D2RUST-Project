@@ -29,18 +29,24 @@ pub(crate) fn periods() -> Result<PeriodTables, HandlerError> {
 /// level id (0 when none):
 /// 1. the scripted overrides (`0x0046BEB0`, §10 r5): the darkness step
 ///    (§10 r3, base = the room ambient without override, §3.1 r2–r3),
-///    then the Den and levels 107/108 counters;
-/// 2. the environment record (`0x0061BFC0`, §9.2 r1).
+///    then the Den and levels 107/108 counters; the Den counter passing
+///    29 places the Den lights in every loaded level-8 room
+///    (`0x0046B0D0`, [`den_lights`]);
+/// 2. the Den lights of level-8 rooms loaded since the last update once
+///    the Den flag is set (`0x0046BE60`);
+/// 3. the environment record (`0x0061BFC0`, §9.2 r1).
 ///
 /// The spec places `0x0046BEB0` at `0x0044C7B0` and does not order
 /// `0x0061BFC0` against it or the unit walk; neither reads the other's
-/// state. The Den lights the Den counter starts at 30 (§10 r1:
-/// client missile 287, two player-seed draws per try) are not placed:
-/// the bridge has no client missile creation yet.
+/// state. d2rs-own, unverified: `0x0046BE60` runs at the room load
+/// (`0x0044C77D`); here the rooms loaded since the previous client
+/// update get their lights in this update's lighting part (nothing reads
+/// the lights in between).
 pub fn lighting_update(
     w: &mut ClientWorld,
-    levels: &[super::super::world::LevelRow],
+    inputs: &super::super::world::ModelInputs,
 ) -> Result<(), HandlerError> {
+    let levels = &inputs.tables.levels;
     let level = w.player_level().map_or(0, u32::from);
     if w.overrides.darkness.is_some() {
         let defs = levels
@@ -55,10 +61,88 @@ pub fn lighting_update(
         };
         w.overrides.update_darkness(base, level);
     }
-    // TODO(spec: render/lighting.md §10 r1): the Den lights of a `true`.
-    let _den_lights = w.overrides.update_counters();
+    let loaded = std::mem::take(&mut w.rooms_loaded);
+    if w.overrides.update_counters() {
+        // `0x0046B0D0`: every loaded level-8 room.
+        let rooms: Vec<_> = w
+            .active_rooms
+            .iter()
+            .flatten()
+            .filter(|r| u32::from(r.level) == LEVEL_DEN_OF_EVIL)
+            .copied()
+            .collect();
+        for r in rooms {
+            den_lights(w, inputs, &r)?;
+        }
+    } else {
+        // `0x0046BE60`: a level-8 room loaded once the flag is set.
+        for room in loaded {
+            let Some(r) = w
+                .active_rooms
+                .iter()
+                .flatten()
+                .find(|r| r.room == room)
+                .copied()
+            else {
+                continue;
+            };
+            if w.overrides.room_load_gets_den_lights(u32::from(r.level)) {
+                den_lights(w, inputs, &r)?;
+            }
+        }
+    }
     if let Some(env) = w.environment.as_mut() {
         env.update(&periods()?, level);
+    }
+    Ok(())
+}
+
+/// The level whose rooms get Den lights (§10 r1).
+const LEVEL_DEN_OF_EVIL: u32 = crate::rules::lighting::overrides::LEVEL_DEN_OF_EVIL;
+
+/// The Den lights of one room (`0x0046AF70`, §10 r1): up to 25 tries
+/// until 3 are placed, each try two steps of the local player unit's
+/// seed (x = room x + rnd(w), y = room y + rnd(h)); a point whose
+/// collision point test with mask 5 is 0 becomes client missile 287
+/// `denofevillight` ([`super::super::client_missiles::create`]). No local
+/// player or seed: nothing (the draws need the seed).
+///
+/// PROVISIONAL (REC-450): the create record is flags 1 (start at the
+/// point), class 287, no owner, origin, target, skill or level; §10 r1
+/// names only the missile. A point in no room of the client DRLG tests
+/// as blocked (the point test's no-room answer, §4 r2).
+pub fn den_lights(
+    w: &mut ClientWorld,
+    inputs: &super::super::world::ModelInputs,
+    room: &super::super::world::ActiveRoom,
+) -> Result<(), HandlerError> {
+    use super::super::client_missiles::{create, flag, CreateRecord};
+    use crate::rules::lighting::overrides::{den_light_points, DEN_LIGHT_MISSILE};
+    let Some(key) = w.local_player else {
+        return Ok(());
+    };
+    let Some((lo, hi)) = w.units.get(&key).and_then(|u| u.seed) else {
+        return Ok(());
+    };
+    let mut seed = d2_sim::rng::Seed::new(lo, hi);
+    let drlg = w.drlg.as_ref();
+    let points = den_light_points((room.x0, room.y0, room.w, room.h), &mut seed, |x, y| {
+        drlg.and_then(|d| d.drlg.collision_at(x, y))
+            .map_or(0x27, u32::from)
+            & 5
+    });
+    if let Some(u) = w.units.get_mut(&key) {
+        u.seed = Some((seed.lo, seed.hi));
+    }
+    for (x, y) in points {
+        let rec = CreateRecord {
+            flags: flag::POSITION,
+            class: DEN_LIGHT_MISSILE,
+            x,
+            y,
+            ..CreateRecord::default()
+        };
+        create(w, &inputs.tables.missiles, &rec, inputs.high_light_quality)?;
     }
     Ok(())
 }

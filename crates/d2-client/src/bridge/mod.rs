@@ -467,6 +467,12 @@ impl<L: ServerLink> Bridge<L> {
         self.inputs.wall_seconds = Some(f);
     }
 
+    /// The light quality `[0x0072A348]` ≠ 0 (`render/lighting.md` §5):
+    /// client missiles get lights (§8 missile row).
+    pub fn set_high_light_quality(&mut self, high: bool) {
+        self.inputs.high_light_quality = high;
+    }
+
     /// The skills tables of the passive refresh (`msg-skills.md` §2 r4).
     pub fn set_skill_tables(&mut self, tables: std::sync::Arc<d2_sim::skills::SkillTables>) {
         self.inputs.skill_tables = Some(tables);
