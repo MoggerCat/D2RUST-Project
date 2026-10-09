@@ -852,6 +852,7 @@ pub fn inv_tables(
         ],
         equiv,
         books: Vec::new(),
+        item_use: Default::default(),
     }
 }
 

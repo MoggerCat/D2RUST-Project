@@ -19,6 +19,7 @@ use d2_formats::d2s::{Body, D2s, Golem, Hireling, ItemEntry, Slot};
 use d2_server::adapters::handlers::player::HotKey;
 use d2_server::adapters::handlers::world::HirelingBlock;
 use d2_server::adapters::session::HotKey as SessionHotKey;
+use d2_server::adapters::session::{PlayerRecord, SkillHand};
 use d2_sim::skills::list::SkillList;
 use d2_sim::units::UnitId;
 use d2_sim::wiring::economy::QuestRest;
@@ -326,6 +327,32 @@ pub fn loaded_hotkeys(slots: &[Slot; 16], guids: &[u32]) -> [SessionHotKey; 16] 
     })
 }
 
+/// A loaded save's player record (`formats/d2s-load.md` §8 rules 1–2):
+/// +0x2C `portal_flags`, and the mouse pair `[left, right]` as decoded
+/// (§2.4 rule 4) and resolved (rule 6.1: an item index to the GUID at
+/// that 1-based position of `guids`, past the end or none → −1) into
+/// hand 0 (right, +0x70 / +0x78) and hand 1 (left, +0x74 / +0x7C), what
+/// the join's 0x23 pair sends whether or not the skill was selected
+/// (rule 6.4).
+pub fn loaded_record(mouse: &[Slot], guids: &[u32], portal_flags: u32) -> PlayerRecord {
+    let hand = |s: Option<&Slot>| {
+        let (skill, _, item) = s.copied().unwrap_or(Slot::NONE).decode();
+        let item = usize::try_from(item)
+            .ok()
+            .and_then(|i| i.checked_sub(1))
+            .and_then(|i| guids.get(i).copied())
+            .unwrap_or(u32::MAX);
+        SkillHand {
+            skill: skill as u16,
+            item,
+        }
+    };
+    PlayerRecord {
+        portal_flags,
+        hands: [hand(mouse.get(1)), hand(mouse.first())],
+    }
+}
+
 /// The item index is the 1-based position of the owner item's GUID in
 /// `guids` (the inventory list in link order); a native skill and an
 /// unknown GUID give 0. No left skill is the all-zero pair.
@@ -399,5 +426,42 @@ fn select_mouse_skills(s: &mut Sim, player: UnitId, mouse: &[Slot]) {
     let guids = s.world.item_guids(player);
     if let Some(list) = s.events.action.hooks().skill_lists.get_mut(&player) {
         select_mouse(list, mouse, &guids);
+    }
+}
+
+#[cfg(test)]
+mod record_tests {
+    use super::*;
+
+    // Covers: specs/formats/d2s-load.md §8 r2; specs/formats/d2s.md §2.4 r6
+    #[test]
+    fn a_loaded_record_sends_the_decoded_mouse_pair() {
+        // The fresh saves' pair (`00 00 00 00` twice, §2.4 r7): skill 0,
+        // item −1 in both hands; recorded `23 00 01000000 01 0000
+        // ffffffff` then `... 00 0000 ffffffff`.
+        let r = loaded_record(&[Slot::default(); 2], &[7, 8], 1);
+        assert_eq!(r.portal_flags, 1);
+        let none = SkillHand {
+            skill: 0,
+            item: u32::MAX,
+        };
+        assert_eq!(r.hands, [none, none]);
+        // Right = hand 0, left = hand 1; index 2 → the second GUID, past
+        // the end → −1, 0xFFFF → skill −1.
+        let left = Slot { code: 36, item: 2 };
+        let right = Slot { code: 49, item: 3 };
+        let r = loaded_record(&[left, right], &[7, 8], 0);
+        assert_eq!(
+            r.hands,
+            [
+                SkillHand {
+                    skill: 49,
+                    item: u32::MAX
+                },
+                SkillHand { skill: 36, item: 8 },
+            ]
+        );
+        let r = loaded_record(&[Slot::NONE, Slot::NONE], &[], 0);
+        assert_eq!(r.hands[0].skill, 0xFFFF);
     }
 }

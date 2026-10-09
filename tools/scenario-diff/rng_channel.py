@@ -26,7 +26,9 @@ def run(r, save, sides):
               "input (rng-trace.md §6 r3)")
         return 2
     if "orig" in sides:
-        r.recorder("record_rng.py", ["--frames"], orig)
+        # the DRLG inline sites are left unhooked: their draws are always
+        # other:drlg, never compared (rng-trace.md §6 r4)
+        r.recorder("record_rng.py", ["--frames", "--skip-inline", "drlg"], orig)
     if "d2rs" in sides and not (r.reuse and os.path.exists(d2rs)):
         args = ["state-dump"] + r.d2rs_common(save) + [
             "--ticks", str(c["ticks"]), "--out", r.path("d2rs.rng-state.jsonl"), "--rng", d2rs]
@@ -60,6 +62,7 @@ def selftest(runner_cls, check):
     rec = next(x for x in r.log if "record_rng.py" in x)
     assert "--ticks 20" in rec and "--auto ScnAma --seed 1234" in rec, rec
     assert "--out /tmp/w/orig.rng.jsonl" in rec and "--frames" in rec, rec
+    assert "--skip-inline drlg" in rec, rec
     dump = next(x for x in r.log if "state-dump" in x)
     assert "--features rng-trace" in dump and "--rng /tmp/w/d2rs.rng.jsonl" in dump, dump
     assert "--seed 1234" in dump and "--ticks 20" in dump, dump
