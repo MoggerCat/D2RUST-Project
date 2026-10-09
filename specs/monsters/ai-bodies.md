@@ -14,7 +14,7 @@
 |---|---|
 | Summary | 20–26 |
 | Rules | 27–28 |
-|   9. Per-AI behaviours | 29–930 |
+|   9. Per-AI behaviours | 29–935 |
 <!-- /index -->
 
 ## Summary
@@ -192,8 +192,12 @@ Draw order: up to 1 (step 1) + 1 (step 3) + 1 (step 4) + 1 (5) + 1 (6)
    - f44 A2 ends → mode 1; 19 → 3 (`0x005A68E0`); think at 44 + 15 = 59.
    - f46 the quill reaches the player and is removed; one rat-seed step
      → {1069704589, 1707661690} (`lo' % 100` = 89), player hp unchanged
-     (PROVISIONAL REC-826: the drawing call of a monster missile that
-     reaches the player without damage is not read here).
+     — the quill's to-hit test **missed**: `spike1` has `ToHit`, so the
+     hit handler draws once on the owner's (rat's) seed
+     (`0x0057D9B0` at `0x005AE06F`, `missiles/missiles.md` §R5 step 5),
+     89 ≥ chance → removed, no damage (REC-826 settled 2026-10-09; in
+     `check-combat-arrow-kill` the same quill draws 39 < chance → hit,
+     plus the monster-crit draw, two steps, player 12800 → 12415).
    - f54 arrow 2 reaches the rat → AI state 19.
    - f59 think: step 3 (state 19) → A2, **no draw** (seed unchanged
      46–63); f64 quill 2 created → {3163442939, 446165621}; it
@@ -202,9 +206,10 @@ Draw order: up to 1 (step 1) + 1 (step 3) + 1 (step 4) + 1 (5) + 1 (6)
    f59 reaches step 5 and draws {4094205064, …} → `lo'` 1069704589,
    89 ≥ 35 → escape 2 started → walk to (5149, 4269), mode 2. The
    d2rs quill also flies past the player at f46 without the rat-seed
-   step; with that step its f59 draw would be 39 ≥ 35, still an escape,
-   so the AI state alone decides the frame-59 mode
-   (q-fix-c3-quillrat-choice). 1.14d-confirmed except REC-826.
+   step (the player lacks unit flags 0x0C, q-fix-c6-player-flags); with
+   that step its f59 draw would be 39 ≥ 35, still an escape, so the AI
+   state alone decides the frame-59 mode (q-fix-c3-quillrat-choice).
+   1.14d-confirmed.
 
 #### 9.8 CorruptLancer (36) `0x005F5D50`
 
