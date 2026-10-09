@@ -181,6 +181,13 @@ pub fn server_check(sim: &Sim) -> (Vec<Violation>, ServerView) {
                 let (Some(room), lroom) = (p.room(), e.room()) else {
                     continue;
                 };
+                // A static-path unit out of every room list (an item
+                // picked up, an object freed from its room) keeps the
+                // path's room: the room-list remove `0x0064C370` does not
+                // touch the path (`sim/unit-order.md` §5 rule 3; REC-1140).
+                if lroom.is_none() && matches!(ty, UnitType::Item | UnitType::Object) {
+                    continue;
+                }
                 let mode = sys.units.get(id).map_or(u32::MAX, |r| r.mode);
                 if lroom != Some(room) {
                     out.push(v(

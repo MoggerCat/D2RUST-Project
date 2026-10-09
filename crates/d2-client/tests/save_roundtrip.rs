@@ -106,10 +106,9 @@ fn random_play_round_trips() {
 }
 
 /// A new character's belt potions reach the client model (soak §3 r8).
-/// Known break: the server's belt items never reach the model
-/// (q-fix-soak-belt-model).
+/// Settled (q-fix-items-shop): the join's belt records reach the model.
 #[test]
-#[ignore = "known bug q-fix-soak-belt-model: repro"]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_new_characters_belt_is_in_the_model() {
     let f = run(&args(new("sorceress"), 1, 120, &[], 0), &["desync"]);
     assert!(f.is_empty(), "{f:?}");

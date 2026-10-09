@@ -585,6 +585,7 @@ struct ClientData {
     class_skills: Vec<[u16; 10]>,
     skill_tables: d2_sim::skills::SkillTables,
     units: crate::bridge::world::UnitRows,
+    player_anims: super::anim_names::ClientPlayerAnims,
 }
 
 impl ClientData {
@@ -603,6 +604,7 @@ impl ClientData {
                 single_player::client_monster_anims(archives, &mut u)?;
                 u
             },
+            player_anims: single_player::client_player_anims(data)?,
         })
     }
 
@@ -614,6 +616,7 @@ impl ClientData {
         b.set_class_skills(self.class_skills);
         b.set_skill_tables(Arc::new(self.skill_tables));
         b.set_unit_rows(self.units);
+        b.set_player_anims(Arc::new(self.player_anims));
         b.set_high_light_quality(true);
     }
 }
