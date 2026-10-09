@@ -1,0 +1,27 @@
+# cast-firebolt with a target: a fallen (monstats 19) is spawned next to
+# the character, Fire Bolt (skill 36) is selected as the right skill and
+# cast at the fallen by reference (scenario.md §3 rule 3), twice. In town
+# the cast may be refused: that is behaviour compared too.
+scenario 1
+name poke-firebolt
+game 1.14d
+seed 0x00001234
+init 644409375         # game +0x7C (tools/original-hooks.md §2): the DRLG seed
+difficulty normal
+expansion yes
+end 120
+
+char save ScnSor     # the save the original side loads (handoff §3)
+char class 1
+char area 0 1
+char at default
+char skill 36 1
+
+record s2c rng units stats
+snapshot every 5
+
+at 1 spawn 19 @x+4 @y normal
+at 2 poke seed-unit @1:19 0x12345678 666
+at 5 msg SelectSkill skill=36 left=0 item=0xFFFFFFFF
+at 10 msg RightSkillOnUnit type=1 id=@1:19
+at 60 msg RightSkillOnUnit type=1 id=@1:19

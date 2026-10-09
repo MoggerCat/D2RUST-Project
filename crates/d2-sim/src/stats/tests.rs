@@ -585,6 +585,22 @@ fn overlay_removal() {
     assert!(lists.is_live(o));
 }
 
+// Covers: specs/sim/intents-events.md §7.3 r2
+#[test]
+fn overlay_to_send_is_list_total() {
+    let mut log = Log::default();
+    let mut lists = StatLists::new(data());
+    let p = player(&mut lists, &mut log);
+    assert_eq!(lists.overlay_to_send(P), None);
+    let o = lists.alloc(flag::OVERLAY, 0, owner::PLAYER, 1);
+    lists.set(&mut log, o, 178, 7, 0, None);
+    lists.attach(&mut log, P, o, true);
+    assert_eq!(lists.overlay_to_send(P), None);
+    lists.set_flags(p, flag::REMOVE_OVERLAY, true);
+    assert_eq!(lists.overlay_to_send(P), Some(7));
+    assert_eq!(lists.overlay_to_send(P), Some(lists.total(o, 178, 0)));
+}
+
 // Covers: specs/sim/stat-lists.md §9.1, §9.2
 #[test]
 fn state_toggles_and_groups() {
