@@ -26,8 +26,7 @@
 //!   multiplayer only, §7.9 rule 5) and the inventory messages
 //!   `0x00534F80`; the corpse 0x74 is sent with PROVISIONAL fields
 //!   ([`corpse_assign`], REC-279);
-//! - the leave side's `0x005738D0` (monsters of a room without clients)
-//!   and rule 4's portal-flag record update (`0x0061AE30`).
+//! - rule 4's portal-flag record update (`0x0061AE30`).
 
 use std::collections::BTreeMap;
 
@@ -164,6 +163,23 @@ impl<X: Pending> View<'_, X> {
                 if e.ty != UnitType::Missile {
                     let msg = messages::remove_unit(e.ty as u8, e.guid);
                     self.h.x.send(player, &msg);
+                }
+            }
+            // Rule 3.2: the room has no client left → every monster in
+            // it gets `0x005738D0`, which cancels its AI think (type 2)
+            // and stat regeneration (type 3) events, any argument
+            // (`world/hirelings-2.md` §16 rule 6): town NPCs stop when the
+            // player warps out.
+            if r.clients == 0 {
+                for u in game.lists.room_units(r.room) {
+                    if game
+                        .lists
+                        .unit(u)
+                        .is_some_and(|e| e.ty == UnitType::Monster)
+                    {
+                        game.timers.cancel_unit_events(u, 2, None);
+                        game.timers.cancel_unit_events(u, 3, None);
+                    }
                 }
             }
             let hide = messages::map_hide(r.tile_x as u16, r.tile_y as u16, r.level as u8);

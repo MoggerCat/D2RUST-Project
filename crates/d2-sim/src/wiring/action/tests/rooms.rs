@@ -355,3 +355,56 @@ fn quest_event_3_runs_in_the_level_change() {
     fx.tick();
     assert_eq!(log.borrow().len(), 1);
 }
+
+// Covers: specs/sim/intents-events.md §7.8 r3
+#[test]
+fn a_room_left_without_clients_cancels_its_monsters_thinks_and_regeneration() {
+    // A, B, C in a row (A's array {A, B}, C's {B, C}). Monster M in A and
+    // N in B, each with an AI think (type 2) and a regeneration event
+    // (type 3) far ahead, and M an event of another type (5). The player
+    // walks A → C: A has no client left (its monsters get `0x005738D0`:
+    // types 2 and 3 cancelled, any argument); B keeps the client.
+    let mut fx = Fx::with_rooms(&[
+        (LEVEL, TileRect::new(0, 0, 8, 8)),
+        (LEVEL, TileRect::new(8, 0, 8, 8)),
+        (LEVEL, TileRect::new(16, 0, 8, 8)),
+    ]);
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 10, 10);
+    fx.game
+        .lists
+        .add_client(Some(p), None, client_state::JOINING);
+    fx.tick();
+    let room_at = |fx: &Fx, x: i32| {
+        act_rooms(fx)
+            .into_iter()
+            .find(|&r| fx.sim.sys.hooks.drlg.subtiles(&fx.game, r).map(|t| t.x) == Some(x))
+            .expect("room active")
+    };
+    let (b, c) = (room_at(&fx, 40), room_at(&fx, 80));
+    let m = fx.spawn(UnitType::Monster, 0, a, 12, 12);
+    let n = fx.spawn(UnitType::Monster, 0, b, 50, 12);
+    for u in [m, n] {
+        for (event, arg1) in [(2, 0), (3, 7)] {
+            fx.game
+                .schedule_event(u, event, 500, None, arg1, 0)
+                .unwrap();
+        }
+    }
+    fx.game.schedule_event(m, 5, 500, None, 0, 0).unwrap();
+    let events = |fx: &Fx, u: UnitId| -> Vec<u8> {
+        let t = &fx.game.timers;
+        t.unit_timers(u)
+            .into_iter()
+            .filter_map(|id| t.event(id))
+            .map(|e| e.0)
+            .collect()
+    };
+    fx.game.lists.change_room(p, c).unwrap();
+    fx.tick();
+    assert_eq!(events(&fx, m), [5]);
+    let mut kept = events(&fx, n);
+    kept.sort_unstable();
+    assert_eq!(kept, [2, 3]);
+    fx.assert_clean();
+}
