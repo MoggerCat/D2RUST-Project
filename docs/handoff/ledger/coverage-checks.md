@@ -5,21 +5,22 @@ counters of a d2-sim built with `--features coverage-map`; the tables are the
 install's (Patch_D2 > d2exp > d2data excel). Runs merged:
 
 - `checks`: 6,646 events
+- `soak`: 13,155 events
 
 ## Summary
 
 | Category | Distinct exercised | In the tables | Reachable, never exercised (ranked below) |
 |---|---|---|---|
 | Skills started or done (srvst / srvdo) | 21 | 357 | 257 |
-| Monster classes created | 97 | 391 | 336 |
-| Monster AI (monstats AI column of the classes whose AI function ran) | 26 | 146 | 61 |
-| Objects operated (objects row, operate function) | 0 | 431 | 431 |
-| Items created (base item, quality) | 54 | 659 | 554 |
-| NPC interactions (interact, menu action, quest message) | 1 | 47 | 46 |
-| Quest flags set (slot.bit) | 7 | 35 | 28 |
-| Levels entered | 24 | 136 | 112 |
+| Monster classes created | 144 | 391 | 298 |
+| Monster AI (monstats AI column of the classes whose AI function ran) | 34 | 146 | 55 |
+| Objects operated (objects row, operate function) | 19 | 431 | 419 |
+| Items created (base item, quality) | 59 | 659 | 550 |
+| NPC interactions (interact, menu action, quest message) | 20 | 47 | 37 |
+| Quest flags set (slot.bit) | 10 | 35 | 25 |
+| Levels entered | 33 | 136 | 103 |
 | Missiles created | 22 | 684 | 154 |
-| States applied | 26 | 185 | 92 |
+| States applied | 29 | 185 | 91 |
 
 "In the tables" counts every row (monsters: the classes a level can spawn,
 with minions; objects: rows with an operate function). "Reachable" gaps are
@@ -34,7 +35,7 @@ Gap ranking: player skills: the first level of the act a character of the skill'
 
 | Id | Name | Count | Runs |
 |---|---|---|---|
-| 0 | Attack (start 10, do 10) | 20 | checks |
+| 0 | Attack (start 11, do 11) | 22 | checks, soak |
 | 143 | Leap Attack (start 1, do 18) | 19 | checks |
 | 149 | Battle Orders (start 0, do 1) | 1 | checks |
 | 151 | Whirlwind (start 1, do 23) | 24 | checks |
@@ -91,67 +92,96 @@ Gap ranking: player skills: the first level of the act a character of the skill'
 
 Gap ranking: earliest level whose Levels.txt mon/nmon/umon columns name the class (minions and spawns inherit their parent's).
 
-<details><summary>Exercised (97)</summary>
+<details><summary>Exercised (144)</summary>
 
 | Id | Name | Count | Runs |
 |---|---|---|---|
 | 0 | skeleton1 | 11 | checks |
 | 3 | skeleton4 | 35 | checks |
-| 5 | zombie1 | 95 | checks |
-| 6 | zombie2 | 3 | checks |
-| 11 | bighead2 | 8 | checks |
+| 5 | zombie1 | 127 | checks, soak |
+| 6 | zombie2 | 21 | checks, soak |
+| 11 | bighead2 | 12 | checks, soak |
 | 15 | foulcrow1 | 7 | checks |
-| 19 | fallen1 | 121 | checks |
-| 20 | fallen2 | 18 | checks |
+| 18 | foulcrow4 | 39 | soak |
+| 19 | fallen1 | 207 | checks, soak |
+| 20 | fallen2 | 67 | checks, soak |
 | 21 | fallen3 | 7 | checks |
-| 22 | fallen4 | 17 | checks |
+| 22 | fallen4 | 32 | checks, soak |
+| 24 | brute2 | 11 | soak |
+| 25 | brute3 | 13 | soak |
 | 28 | brute1 | 14 | checks |
+| 31 | sandraider3 | 21 | soak |
 | 38 | wraith1 | 2 | checks |
-| 40 | wraith3 | 4 | checks |
+| 40 | wraith3 | 54 | checks, soak |
 | 43 | corruptrogue1 | 4 | checks |
-| 56 | goatman4 | 4 | checks |
-| 58 | fallenshaman1 | 15 | checks |
-| 61 | fallenshaman4 | 4 | checks |
-| 63 | quillrat1 | 60 | checks |
+| 46 | corruptrogue4 | 12 | soak |
+| 48 | baboon1 | 7 | soak |
+| 50 | baboon3 | 35 | soak |
+| 51 | baboon4 | 2 | soak |
+| 53 | goatman1 | 18 | soak |
+| 56 | goatman4 | 34 | checks, soak |
+| 58 | fallenshaman1 | 32 | checks, soak |
+| 59 | fallenshaman2 | 7 | soak |
+| 61 | fallenshaman4 | 7 | checks, soak |
+| 63 | quillrat1 | 74 | checks, soak |
+| 66 | quillrat4 | 14 | soak |
 | 68 | sandmaggot1 | 1 | checks |
 | 69 | sandmaggot2 | 1 | checks |
+| 78 | sandleaper1 | 14 | soak |
+| 79 | sandleaper2 | 11 | soak |
+| 82 | sandleaper5 | 54 | soak |
+| 83 | pantherwoman1 | 6 | soak |
+| 84 | pantherwoman2 | 6 | soak |
+| 91 | scarab1 | 28 | soak |
 | 96 | mummy1 | 8 | checks |
 | 99 | mummy4 | 23 | checks |
 | 103 | unraveler3 | 6 | checks |
+| 111 | vulture2 | 4 | soak |
+| 112 | vulture3 | 4 | soak |
+| 113 | vulture4 | 5 | soak |
+| 114 | mosquito1 | 18 | soak |
 | 115 | mosquito2 | 3 | checks |
-| 131 | vampire1 | 5 | checks |
+| 131 | vampire1 | 20 | checks, soak |
 | 141 | fetish1 | 11 | checks |
-| 147 | gheed | 59 | checks |
-| 148 | akara | 4 | checks |
-| 150 | kashya | 59 | checks |
-| 152 | rogue1 | 189 | checks |
-| 154 | charsi | 59 | checks |
-| 155 | warriv1 | 59 | checks |
+| 142 | fetish2 | 30 | soak |
+| 143 | fetish3 | 10 | soak |
+| 147 | gheed | 71 | checks, soak |
+| 148 | akara | 15 | checks, soak |
+| 150 | kashya | 77 | checks, soak |
+| 152 | rogue1 | 270 | checks, soak |
+| 154 | charsi | 74 | checks, soak |
+| 155 | warriv1 | 77 | checks, soak |
 | 160 | cr_archer1 | 1 | checks |
-| 165 | cr_lancer1 | 2 | checks |
+| 161 | cr_archer2 | 8 | soak |
+| 165 | cr_lancer1 | 8 | checks, soak |
 | 173 | sk_archer4 | 3 | checks |
-| 175 | warriv2 | 7 | checks |
-| 179 | cow | 16 | checks |
+| 174 | sk_archer5 | 49 | soak |
+| 175 | warriv2 | 12 | checks, soak |
+| 179 | cow | 53 | checks, soak |
+| 186 | blunderbore1 | 6 | soak |
 | 188 | blunderbore3 | 5 | checks |
-| 195 | act2male | 7 | checks |
-| 196 | act2female | 7 | checks |
+| 195 | act2male | 21 | checks, soak |
+| 196 | act2female | 21 | checks, soak |
 | 198 | greiz | 1 | checks |
-| 201 | jerhyn | 7 | checks |
+| 201 | jerhyn | 12 | checks, soak |
 | 215 | bonefetish4 | 4 | checks |
 | 216 | bonefetish5 | 7 | checks |
-| 246 | cain4 | 6 | checks |
-| 253 | hratli | 9 | checks |
+| 235 | zealot1 | 2 | soak |
+| 246 | cain4 | 10 | checks, soak |
+| 253 | hratli | 14 | checks, soak |
+| 255 | ormus | 2 | soak |
 | 256 | izual | 1 | checks |
-| 257 | halbu | 6 | checks |
+| 257 | halbu | 10 | checks, soak |
 | 260 | tentacle3 | 4 | checks |
 | 263 | tentaclehead3 | 2 | checks |
-| 264 | meshif2 | 9 | checks |
+| 264 | meshif2 | 15 | checks, soak |
 | 271 | roguehire | 2 | checks |
 | 273 | gargoyletrap | 3 | checks |
-| 294 | act3male | 9 | checks |
-| 298 | vilemother1 | 5 | checks |
+| 280 | fetishshaman3 | 4 | soak |
+| 294 | act3male | 17 | checks, soak |
+| 298 | vilemother1 | 14 | checks, soak |
 | 300 | vilemother3 | 54 | checks |
-| 307 | regurgitator1 | 17 | checks |
+| 307 | regurgitator1 | 23 | checks, soak |
 | 311 | doomknight2 | 64 | checks |
 | 338 | act2hire | 1 | checks |
 | 345 | councilmember1 | 4 | checks |
@@ -159,45 +189,62 @@ Gap ranking: earliest level whose Levels.txt mon/nmon/umon columns name the clas
 | 359 | act3hire | 1 | checks |
 | 361 | megademon2 | 56 | checks |
 | 362 | megademon3 | 43 | checks |
-| 367 | tyrael2 | 6 | checks |
-| 405 | jamella | 6 | checks |
+| 367 | tyrael2 | 10 | checks, soak |
+| 373 | slinger1 | 8 | soak |
+| 386 | skmage_fire4 | 61 | soak |
+| 388 | skmage_ltng2 | 4 | soak |
+| 397 | fetishblow2 | 56 | soak |
+| 398 | fetishblow3 | 42 | soak |
+| 405 | jamella | 10 | checks, soak |
 | 408 | malachai | 3 | checks |
 | 409 | hephasto | 2 | checks |
 | 412 | lightningsentry | 1 | checks |
 | 418 | shadowmaster | 1 | checks |
 | 428 | druidbear | 1 | checks |
+| 433 | barricadedoor2 | 4 | soak |
+| 435 | barricadetower | 16 | soak |
 | 436 | reanimatedhorde1 | 13 | checks |
 | 438 | reanimatedhorde3 | 13 | checks |
 | 440 | reanimatedhorde5 | 17 | checks |
+| 442 | siegebeast2 | 11 | soak |
 | 447 | snowyeti2 | 9 | checks |
 | 449 | snowyeti4 | 7 | checks |
+| 453 | minion1 | 23 | soak |
 | 458 | minion6 | 16 | checks |
 | 471 | succubus3 | 8 | checks |
 | 472 | succubus4 | 13 | checks |
 | 473 | succubus5 | 14 | checks |
 | 475 | succubuswitch2 | 4 | checks |
 | 476 | succubuswitch3 | 84 | checks |
+| 493 | imp2 | 38 | soak |
+| 495 | imp4 | 67 | soak |
+| 499 | catapult3 | 2 | soak |
 | 501 | frozenhorror1 | 7 | checks |
 | 507 | bloodlord2 | 8 | checks |
 | 510 | bloodlord5 | 22 | checks |
-| 511 | larzuk | 11 | checks |
-| 513 | malah | 11 | checks |
+| 511 | larzuk | 16 | checks, soak |
+| 513 | malah | 16 | checks, soak |
+| 515 | qual-kehk | 1 | soak |
+| 517 | catapultspotter2 | 8 | soak |
+| 520 | cain6 | 1 | soak |
+| 522 | act5barb1 | 2 | soak |
+| 524 | barricadewall1 | 4 | soak |
 | 526 | nihlathakboss | 1 | checks |
+| 529 | deathmauler1 | 12 | soak |
 | 543 | baalthrone | 2 | checks |
 | 544 | baalcrab | 1 | checks |
 | 545 | baaltaunt | 1 | checks |
 | 547 | putriddefiler2 | 7 | checks |
 | 548 | putriddefiler3 | 1 | checks |
 | 561 | act5hire2 | 1 | checks |
-| 567 | injuredbarb1 | 22 | checks |
-| 568 | injuredbarb2 | 11 | checks |
-| 569 | injuredbarb3 | 22 | checks |
+| 567 | injuredbarb1 | 32 | checks, soak |
+| 568 | injuredbarb2 | 16 | checks, soak |
+| 569 | injuredbarb3 | 32 | checks, soak |
 
 </details>
 
-**Never exercised: 336.** First 25 by likelihood:
+**Never exercised: 298.** First 25 by likelihood:
 
-- 53 goatman1: first in level 4 Stony Field (act 1), in 1 level(s)
 - 206 crownest1: first in level 4 Stony Field (act 1), in 1 level(s)
 - 44 corruptrogue2: first in level 5 Dark Wood (act 1), in 3 level(s)
 - 64 quillrat2: first in level 5 Dark Wood (act 1), in 1 level(s)
@@ -205,10 +252,7 @@ Gap ranking: earliest level whose Levels.txt mon/nmon/umon columns name the clas
 - 170 sk_archer1: first in level 5 Dark Wood (act 1), in 4 level(s)
 - 1 skeleton2: first in level 6 Black Marsh (act 1), in 2 level(s)
 - 16 foulcrow2: first in level 6 Black Marsh (act 1), in 1 level(s)
-- 24 brute2: first in level 6 Black Marsh (act 1), in 3 level(s)
 - 54 goatman2: first in level 6 Black Marsh (act 1), in 2 level(s)
-- 59 fallenshaman2: first in level 6 Black Marsh (act 1), in 2 level(s)
-- 161 cr_archer2: first in level 6 Black Marsh (act 1), in 3 level(s)
 - 207 crownest2: first in level 6 Black Marsh (act 1), in 1 level(s)
 - 45 corruptrogue3: first in level 7 Tamoe Highland (act 1), in 4 level(s)
 - 65 quillrat3: first in level 7 Tamoe Highland (act 1), in 1 level(s)
@@ -221,14 +265,18 @@ Gap ranking: earliest level whose Levels.txt mon/nmon/umon columns name the clas
 - 55 goatman3: first in level 21 Tower Cellar Level 1 (act 1), in 5 level(s)
 - 13 bighead4: first in level 26 Monastery Gate (act 1), in 1 level(s)
 - 387 skmage_ltng1: first in level 26 Monastery Gate (act 1), in 1 level(s)
-- 25 brute3: first in level 27 Outer Cloister (act 1), in 1 level(s)
-- … and 311 more (`--json` lists all)
+- 60 fallenshaman3: first in level 27 Outer Cloister (act 1), in 2 level(s)
+- 57 goatman5: first in level 28 Barracks (act 1), in 4 level(s)
+- 172 sk_archer3: first in level 28 Barracks (act 1), in 4 level(s)
+- 384 skmage_fire2: first in level 28 Barracks (act 1), in 3 level(s)
+- 39 wraith2: first in level 29 Jail Level 1 (act 1), in 4 level(s)
+- … and 273 more (`--json` lists all)
 
 ## Monster AI (monstats AI column of the classes whose AI function ran)
 
 Gap ranking: earliest spawn rank of a monster with that AI.
 
-<details><summary>Exercised (26)</summary>
+<details><summary>Exercised (34)</summary>
 
 | Id | Name | Count | Runs |
 |---|---|---|---|
@@ -236,36 +284,43 @@ Gap ranking: earliest spawn rank of a monster with that AI.
 | 0 | Ancient | 8 |  |
 | 0 | AssassinSentry | 2 |  |
 | 0 | BaalCrab | 6 |  |
-| 0 | BaalTentacle | 22 |  |
+| 0 | BaalTentacle | 50 |  |
 | 0 | BaalThrone | 2 |  |
-| 0 | BloodLord | 29 |  |
+| 0 | BloodLord | 278 |  |
 | 0 | Brute | 16 |  |
 | 0 | Buffy | 3 |  |
+| 0 | Catapult | 8 |  |
+| 0 | CatapultSpotter | 51 |  |
 | 0 | CycleOfLife | 2 |  |
-| 0 | Fallen | 510 |  |
-| 0 | FallenShaman | 40 |  |
+| 0 | Fallen | 659 |  |
+| 0 | FallenShaman | 46 |  |
 | 0 | Hireable | 52 |  |
-| 0 | Idle | 247 |  |
+| 0 | Idle | 858 |  |
 | 0 | Izual | 1 |  |
 | 0 | Megademon | 42 |  |
 | 0 | Minion | 1 |  |
-| 0 | Npc | 617 |  |
-| 0 | NpcStationary | 9 |  |
-| 0 | QuillRat | 39 |  |
+| 0 | Npc | 6,307 |  |
+| 0 | NpcBarb | 8 |  |
+| 0 | NpcStationary | 433 |  |
+| 0 | QuillRat | 83 |  |
+| 0 | Regurgitator | 8 |  |
+| 0 | SandLeaper | 50 |  |
+| 0 | Scarab | 3 |  |
 | 0 | ShadowWarrior | 1 |  |
+| 0 | SkeletonMage | 464 |  |
 | 0 | SuccubusWitch | 30 |  |
 | 0 | Tentacle | 48 |  |
 | 0 | TentacleHead | 24 |  |
-| 0 | Towner | 32 |  |
+| 0 | Towner | 1,767 |  |
 | 0 | VileMother | 6 |  |
+| 0 | Zombie | 26 |  |
 
 </details>
 
-Distinct AI function addresses run: 26.
+Distinct AI function addresses run: 33.
 
-**Never exercised: 61.** First 25 by likelihood:
+**Never exercised: 55.** First 25 by likelihood:
 
-- Zombie: first in level 2 Blood Moor (act 1)
 - CorruptLancer: first in level 3 Cold Plains (act 1)
 - CorruptRogue: first in level 3 Cold Plains (act 1)
 - BloodHawk: first in level 4 Stony Field (act 1)
@@ -274,7 +329,6 @@ Distinct AI function addresses run: 26.
 - Goatman: first in level 4 Stony Field (act 1)
 - Skeleton: first in level 4 Stony Field (act 1)
 - SkeletonBow: first in level 5 Dark Wood (act 1)
-- SkeletonMage: first in level 7 Tamoe Highland (act 1)
 - Bighead: first in level 10 Underground Passage Level 1 (act 1)
 - Wraith: first in level 21 Tower Cellar Level 1 (act 1)
 - Fetish: first in level 34 Catacombs Level 1 (act 1)
@@ -282,30 +336,51 @@ Distinct AI function addresses run: 26.
 - Vampire: first in level 36 Catacombs Level 3 (act 1)
 - PantherJavelin: first in level 41 Rocky Waste (act 2)
 - PantherWoman: first in level 41 Rocky Waste (act 2)
-- SandLeaper: first in level 41 Rocky Waste (act 2)
-- Scarab: first in level 41 Rocky Waste (act 2)
 - Vulture: first in level 41 Rocky Waste (act 2)
 - MaggotEgg: first in level 43 Far Oasis (act 2)
 - MaggotLarva: first in level 43 Far Oasis (act 2)
 - SandMaggot: first in level 43 Far Oasis (act 2)
 - Swarm: first in level 43 Far Oasis (act 2)
 - SandRaider: first in level 44 Lost City (act 2)
-- … and 36 more (`--json` lists all)
+- ClawViper: first in level 45 Valley of Snakes (act 2)
+- GreaterMummy: first in level 45 Valley of Snakes (act 2)
+- Mummy: first in level 45 Valley of Snakes (act 2)
+- Baboon: first in level 51 Harem Level 2 (act 2)
+- … and 30 more (`--json` lists all)
 
 ## Objects operated (objects row, operate function)
 
 Gap ranking: operate function commonness (chests, doors, shrines, wells, waypoints, portals first), then row.
 
-<details><summary>Exercised (0)</summary>
+<details><summary>Exercised (19)</summary>
 
 | Id | Name | Count | Runs |
 |---|---|---|---|
+| 36 | Dummy | 1 | soak |
+| 37 | Dummy | 18 | soak |
+| 39 | fire | 1 | soak |
+| 117 | Dummy | 4 | soak |
+| 119 | Waypoint | 10 | soak |
+| 237 | Waypoint | 27 | soak |
+| 285 | dummy | 3 | soak |
+| 286 | Dummy | 2 | soak |
+| 288 | Waypoint | 10 | soak |
+| 370 | Dummy | 1 | soak |
+| 372 | BoneChest | 2 | soak |
+| 374 | Dummy | 1 | soak |
+| 378 | Dummy | 5 | soak |
+| 385 | Dummy | 2 | soak |
+| 400 | Dummy | 4 | soak |
+| 402 | Waypoint | 3 | soak |
+| 436 | ettr | 1 | soak |
+| 441 | eflg | 1 | soak |
+| 442 | chan | 1 | soak |
 
 </details>
 
-Operate functions run: . Never run: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73.
+Operate functions run: 0 (11), 3 (2), 11 (5), 13 (18), 14 (11), 23 (50). Never run: 1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 15, 16, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73.
 
-**Never exercised: 431.** First 25 by likelihood:
+**Never exercised: 419.** First 25 by likelihood:
 
 - 1 Casket (operate fn 1)
 - 3 Casket (operate fn 1)
@@ -332,19 +407,18 @@ Operate functions run: . Never run: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 1
 - 147 chest (operate fn 4)
 - 148 chest (operate fn 4)
 - 176 chest (operate fn 4)
-- … and 406 more (`--json` lists all)
+- … and 394 more (`--json` lists all)
 
 ## Items created (base item, quality)
 
 Gap ranking: base item level (level column: potions, scrolls, keys and gems are level 0); quest items after (+1000); non-spawnable rows not listed.
 
-Distinct base items created: 54 of 659. Qualities: normal 82, superior 5, magic 47, set 1, rare 13, unique 6. Never: low, crafted, tempered.
+Distinct base items created: 59 of 659. Qualities: low 54, normal 421, superior 9, magic 81, set 1, rare 15, unique 6. Never: crafted, tempered.
 
-Most created: Wand (29), Short Staff (22), Scepter (12), Lesser Healing Potion (6), gold (5), Cap/hat (5), Short Sword (4), Town Portal Book (4), Town Portal Scroll (4), Stamina Potion (3), Identify Book (3), amulet (3), ring (3), Skeleton Key (3), Lesser Mana Potion (3), Buckler (2), Leather Armor (2), Antidote Potion (2), Thawing Potion (2), Identify Scroll (2), Gloves(L) (2), Hand Axe (1), Double Axe (1), Long Sword  (1), Bastard Sword (1).
+Most created: Lesser Healing Potion (75), Town Portal Scroll (60), Lesser Mana Potion (55), Identify Scroll (32), Cap/hat (31), Buckler (30), Town Portal Book (30), Hand Axe (29), Wand (29), ring (29), Sash(L) (27), Horadric Cube (27), Rejuv Potion (26), Short Staff (24), Scepter (12), gold (10), Short Sword (4), Stamina Potion (3), Identify Book (3), amulet (3), Skeleton Key (3), Leather Armor (2), Antidote Potion (2), Thawing Potion (2), Gloves(L) (2).
 
-**Never exercised: 554.** First 25 by likelihood:
+**Never exercised: 550.** First 25 by likelihood:
 
-- 526 Arrows `aqv` (level 0)
 - 528 Bolts `cqv` (level 0)
 - 557 Chipped Amethyst `gcv` (level 0)
 - 558 Flawed Amethyst `gfv` (level 0)
@@ -369,35 +443,49 @@ Most created: Wand (29), Short Staff (22), Scepter (12), Lesser Healing Potion (
 - 578 Flawed Ruby `gfr` (level 0)
 - 579 Ruby `gsr` (level 0)
 - 580 Flawless Ruby `glr` (level 0)
-- … and 529 more (`--json` lists all)
+- 581 Perfect Ruby `gpr` (level 0)
+- … and 525 more (`--json` lists all)
 
 ## NPC interactions (interact, menu action, quest message)
 
 Gap ranking: npc=1 interact=1 monstats rows in monstats order (act I NPCs first: the rows follow the acts).
 
-<details><summary>Exercised (1)</summary>
+<details><summary>Exercised (20)</summary>
 
 | Id | Name | Count | Runs |
 |---|---|---|---|
-| 148 | akara | 4 | checks |
+| 5 | zombie1 | 1 | soak |
+| 147 | gheed | 3 | soak |
+| 148 | akara | 17 | checks, soak |
+| 150 | kashya | 9 | soak |
+| 152 | rogue1 | 7 | soak |
+| 154 | charsi | 1 | soak |
+| 155 | warriv1 | 8 | soak |
+| 175 | warriv2 | 13 | soak |
+| 179 | cow | 13 | soak |
+| 196 | act2female | 19 | soak |
+| 201 | jerhyn | 15 | soak |
+| 253 | hratli | 10 | soak |
+| 264 | meshif2 | 9 | soak |
+| 294 | act3male | 13 | soak |
+| 307 | regurgitator1 | 1 | soak |
+| 388 | skmage_ltng2 | 25 | soak |
+| 453 | minion1 | 3 | soak |
+| 513 | malah | 5 | soak |
+| 567 | injuredbarb1 | 3 | soak |
+| 569 | injuredbarb3 | 3 | soak |
 
 </details>
 
-**Never exercised: 46.** First 25 by likelihood:
+**Never exercised: 37.** First 25 by likelihood:
 
 - 146 cain1
-- 147 gheed
-- 150 kashya
-- 154 charsi
-- 155 warriv1
-- 175 warriv2
 - 176 atma
 - 177 drognan
 - 178 fara
 - 198 greiz
 - 199 elzix
 - 200 geglash
-- 201 jerhyn
 - 202 lysander
 - 210 meshif1
 - 244 cain2
@@ -405,12 +493,18 @@ Gap ranking: npc=1 interact=1 monstats rows in monstats order (act I NPCs first:
 - 246 cain4
 - 251 tyrael1
 - 252 asheara
-- 253 hratli
 - 254 alkor
 - 255 ormus
 - 257 halbu
-- 264 meshif2
-- … and 21 more (`--json` lists all)
+- 265 cain5
+- 266 navi
+- 297 natalya
+- 331 act2guard2
+- 367 tyrael2
+- 377 act2guard4
+- 378 act2guard5
+- 405 jamella
+- … and 12 more (`--json` lists all)
 
 ## Quest flags set (slot.bit)
 
@@ -418,32 +512,32 @@ Gap ranking: quest slot = story order.
 
 | Slot | Quest | Flag sets | Bits set |
 |---|---|---|---|
+| 0 | Warriv gossip | 2 | 0 |
 | 1 | Den of Evil | 1 | 4 |
 | 6 | Sisters to the Slaughter | 1 | 3 |
-| 12 | Arcane Sanctuary | 1 | 5 |
-| 18 | Khalim's Will | 8 | 15 |
+| 8 | Act II intro | 4 | 0, 13 |
+| 12 | Arcane Sanctuary | 3 | 5 |
+| 16 | Act III intro | 5 | 0, 13 |
+| 18 | Khalim's Will | 17 | 15 |
 | 21 | The Blackened Temple | 1 | 3 |
-| 22 | The Guardian | 9 | 8, 13 |
+| 22 | The Guardian | 18 | 8, 13 |
 | 37 | Prison of Ice | 4 | 3, 14 |
 
 Touched but never completed (bit 0 never set): 1 Den of Evil, 6 Sisters to the Slaughter, 12 Arcane Sanctuary, 18 Khalim's Will, 21 The Blackened Temple, 22 The Guardian, 37 Prison of Ice.
 
-**Never exercised: 28.** First 25 by likelihood:
+**Never exercised: 25.** First 25 by likelihood:
 
-- slot 0 Warriv gossip
 - slot 2 Sisters' Burial Grounds
 - slot 3 Tools of the Trade
 - slot 4 Search for Cain
 - slot 5 The Forgotten Tower
 - slot 7 Act I completed
-- slot 8 Act II intro
 - slot 9 Radament's Lair
 - slot 10 The Horadric Staff
 - slot 11 Tainted Sun
 - slot 13 The Summoner
 - slot 14 The Seven Tombs
 - slot 15 Act II completed
-- slot 16 Act III intro
 - slot 17 Lam Esen's Tome
 - slot 19 Blade of the Old Religion
 - slot 20 The Golden Bird
@@ -455,33 +549,44 @@ Touched but never completed (bit 0 never set): 1 Den of Evil, 6 Sisters to the S
 - slot 28 Act IV completed
 - slot 35 Siege on Harrogath
 - slot 36 Rescue on Mount Arreat
-- … and 3 more (`--json` lists all)
+- slot 38 Betrayal of Harrogath
+- slot 39 Rite of Passage
+- slot 40 Eve of Destruction
 
 ## Levels entered
 
 Gap ranking: act, then Levels.txt order (the order a player walks into them).
 
-<details><summary>Exercised (24)</summary>
+<details><summary>Exercised (33)</summary>
 
 | Id | Name | Count | Runs |
 |---|---|---|---|
-| 2 | Blood Moor | 35 | checks |
-| 3 | Cold Plains | 2 | checks |
-| 4 | Stony Field | 1 | checks |
+| 1 | Rogue Encampment | 4 | soak |
+| 2 | Blood Moor | 37 | checks, soak |
+| 3 | Cold Plains | 4 | checks, soak |
+| 4 | Stony Field | 4 | checks, soak |
 | 8 | Den of Evil | 1 | checks |
 | 9 | Cave Level 1 | 1 | checks |
 | 21 | Tower Cellar Level 1 | 1 | checks |
 | 29 | Jail Level 1 | 1 | checks |
 | 34 | Catacombs Level 1 | 1 | checks |
+| 41 | Rocky Waste | 2 | soak |
 | 47 | Sewers Level 1 | 1 | checks |
+| 52 | Palace Cellar Level 1  | 3 | soak |
 | 62 | Maggot Lair Level 1 | 1 | checks |
 | 66 | Tal Rasha's Tomb | 1 | checks |
-| 74 | Arcane Sanctuary | 1 | checks |
+| 74 | Arcane Sanctuary | 3 | checks, soak |
+| 76 | Spider Forest | 2 | soak |
+| 78 | Flayer Jungle | 2 | soak |
+| 79 | Lower Kurast | 2 | soak |
+| 80 | Kurast Bazaar | 1 | soak |
 | 88 | Flayer Dungeon Level 1 | 1 | checks |
 | 92 | Sewers Level 1 | 1 | checks |
 | 100 | Durance of Hate Level 1 | 1 | checks |
+| 104 | Outer Steppes | 2 | soak |
 | 105 | Plains of Despair | 1 | checks |
 | 107 | River of Flame | 1 | checks |
+| 110 | Bloody Foothills | 2 | soak |
 | 113 | Crystalized Cavern Level 1 | 1 | checks |
 | 114 | Cellar of Pity | 1 | checks |
 | 122 | Halls of Anguish | 1 | checks |
@@ -492,9 +597,8 @@ Gap ranking: act, then Levels.txt order (the order a player walks into them).
 
 </details>
 
-**Never exercised: 112.** First 25 by likelihood:
+**Never exercised: 103.** First 25 by likelihood:
 
-- 1 Rogue Encampment (act 1)
 - 5 Dark Wood (act 1)
 - 6 Black Marsh (act 1)
 - 7 Tamoe Highland (act 1)
@@ -519,7 +623,8 @@ Gap ranking: act, then Levels.txt order (the order a player walks into them).
 - 30 Jail Level 2 (act 1)
 - 31 Jail Level 3 (act 1)
 - 32 Inner Cloister (act 1)
-- … and 87 more (`--json` lists all)
+- 33 Cathedral (act 1)
+- … and 78 more (`--json` lists all)
 
 ## Missiles created
 
@@ -587,14 +692,16 @@ Gap ranking: rank of the earliest skill (srvmissile, a-c) or monster mode missil
 
 Gap ranking: rank of the earliest skill whose aurastate / auratargetstate / passivestate it is.
 
-<details><summary>Exercised (26)</summary>
+<details><summary>Exercised (29)</summary>
 
 | Id | Name | Count | Runs |
 |---|---|---|---|
 | 2 | poison | 1 | checks |
+| 7 | playerbody | 3 | soak |
 | 18 | skill_move | 2 | checks |
 | 32 | battleorders | 1 | checks |
 | 54 | uninterruptable | 2 | checks |
+| 71 | firemastery | 1 | soak |
 | 74 | swordmastery | 4 | checks |
 | 75 | axemastery | 4 | checks |
 | 76 | macemastery | 4 | checks |
@@ -606,8 +713,9 @@ Gap ranking: rank of the earliest skill whose aurastate / auratargetstate / pass
 | 82 | increasedspeed | 4 | checks |
 | 83 | naturalresistance | 4 | checks |
 | 98 | sourceunit | 1 | checks |
-| 100 | healthpot | 2 | checks |
-| 105 | alignment | 1,707 | checks |
+| 100 | healthpot | 20 | checks, soak |
+| 105 | alignment | 3,061 | checks, soak |
+| 106 | manapot | 5 | soak |
 | 119 | shadowwarrior | 1 | checks |
 | 121 | skilldelay | 5 | checks |
 | 139 | wolf | 1 | checks |
@@ -620,7 +728,7 @@ Gap ranking: rank of the earliest skill whose aurastate / auratargetstate / pass
 
 </details>
 
-**Never exercised: 92.** First 25 by likelihood:
+**Never exercised: 91.** First 25 by likelihood:
 
 - 3 resistfire (rank 0)
 - 9 amplifydamage (rank 0)
@@ -647,5 +755,5 @@ Gap ranking: rank of the earliest skill whose aurastate / auratargetstate / pass
 - 65 dodge (rank 5)
 - 125 progressive_fire (rank 5)
 - 140 bear (rank 5)
-- … and 67 more (`--json` lists all)
+- … and 66 more (`--json` lists all)
 

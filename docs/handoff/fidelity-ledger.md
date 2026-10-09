@@ -8,14 +8,14 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 
 | Group | Rows | DIVERGED | NOT-IMPLEMENTED | NO-CHECK | UNKNOWN | EQUAL | S | M | L | Session-hours left | Needs PC 1 | Exercised yes / no / ? |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| coverage | 1673 | 113 | 0 | 1560 | 0 | 0 | 1544 | 129 | 0 | 1030–4120 | 0 | 160 / 1082 / 431 |
+| coverage | 1758 | 113 | 0 | 1560 | 85 | 0 | 1544 | 214 | 0 | 1200–4800 | 0 | 274 / 1484 / 0 |
 | integrator | 30 | 3 | 0 | 27 | 0 | 0 | 9 | 18 | 3 | 64.5–162+ | 0 | 2 / 0 / 28 |
 | items | 135 | 10 | 0 | 125 | 0 | 0 | 21 | 114 | 0 | 238.5–954 | 117 | 0 / 0 / 135 |
-| monsters | 302 | 42 | 0 | 260 | 0 | 0 | 0 | 302 | 0 | 604–2416 | 4 | 64 / 45 / 193 |
-| skills | 588 | 28 | 0 | 560 | 0 | 0 | 185 | 403 | 0 | 898.5–3594 | 6 | 77 / 310 / 201 |
+| monsters | 302 | 42 | 0 | 260 | 0 | 0 | 0 | 302 | 0 | 604–2416 | 4 | 69 / 42 / 191 |
+| skills | 588 | 28 | 0 | 560 | 0 | 0 | 185 | 403 | 0 | 898.5–3594 | 6 | 80 / 309 / 199 |
 | systems | 906 | 63 | 59 | 784 | 0 | 0 | 267 | 639 | 0 | 1411.5–5646 | 292 | 0 / 0 / 906 |
-| world | 385 | 30 | 0 | 355 | 0 | 0 | 0 | 385 | 0 | 770–3080 | 376 | 51 / 159 / 175 |
-| **all** | 4019 | 289 | 59 | 3671 | 0 | 0 | 2026 | 1990 | 3 | 5017–19972+ | 795 | 354 / 1596 / 2069 |
+| world | 385 | 30 | 0 | 355 | 0 | 0 | 0 | 385 | 0 | 770–3080 | 376 | 62 / 149 / 174 |
+| **all** | 4104 | 289 | 59 | 3671 | 85 | 0 | 2026 | 2075 | 3 | 5187–20652+ | 795 | 487 / 1984 / 1633 |
 
 ## By family
 
@@ -28,7 +28,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `audio` | 2 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 |
 | `check` | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 |
 | `client` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
-| `cov` | 129 | 113 | 0 | 16 | 0 | 0 | 6 | 0 | 129 | 0 | 0 | 10 |
+| `cov` | 214 | 113 | 0 | 16 | 85 | 0 | 6 | 0 | 214 | 0 | 0 | 10 |
 | `cube` | 14 | 0 | 0 | 14 | 0 | 0 | 0 | 10 | 4 | 0 | 4 | 0 |
 | `data` | 3 | 0 | 0 | 3 | 0 | 0 | 0 | 2 | 1 | 0 | 0 | 0 |
 | `drlg` | 7 | 4 | 0 | 3 | 0 | 0 | 0 | 0 | 7 | 0 | 6 | 0 |
@@ -631,14 +631,14 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `item.set-item` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 |
 | `item.treasure-tables` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
 | `item.unique` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 |
-| `level` | 136 | 12 | 0 | 124 | 0 | 0 | 0 | 4 | 132 | 0 | 132 | 97 |
+| `level` | 136 | 12 | 0 | 124 | 0 | 0 | 0 | 4 | 132 | 0 | 132 | 90 |
 | `missile` | 299 | 8 | 0 | 291 | 0 | 0 | 0 | 117 | 182 | 0 | 0 | 149 |
-| `monster` | 640 | 42 | 0 | 598 | 0 | 0 | 2 | 337 | 302 | 1 | 4 | 345 |
+| `monster` | 640 | 42 | 0 | 598 | 0 | 0 | 2 | 337 | 302 | 1 | 4 | 313 |
 | `net.c2s` | 113 | 2 | 20 | 91 | 0 | 0 | 0 | 86 | 27 | 0 | 27 | 0 |
 | `net.s2c` | 182 | 1 | 23 | 158 | 0 | 0 | 0 | 181 | 1 | 0 | 1 | 0 |
 | `npc` | 47 | 1 | 0 | 46 | 0 | 0 | 0 | 4 | 43 | 0 | 43 | 47 |
-| `object` | 523 | 0 | 0 | 523 | 0 | 0 | 0 | 431 | 92 | 0 | 92 | 0 |
-| `quest` | 51 | 6 | 0 | 45 | 0 | 0 | 0 | 8 | 43 | 0 | 41 | 31 |
+| `object` | 523 | 0 | 0 | 523 | 0 | 0 | 0 | 431 | 92 | 0 | 92 | 431 |
+| `quest` | 51 | 6 | 0 | 45 | 0 | 0 | 0 | 8 | 43 | 0 | 41 | 28 |
 | `render` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
 | `shrine` | 23 | 0 | 0 | 23 | 0 | 0 | 0 | 0 | 23 | 0 | 23 | 0 |
 | `sim` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -653,7 +653,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `skill.pal` | 30 | 0 | 0 | 30 | 0 | 0 | 0 | 0 | 30 | 0 | 0 | 29 |
 | `skill.sequences` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
 | `skill.sor` | 30 | 0 | 0 | 30 | 0 | 0 | 0 | 0 | 30 | 0 | 0 | 28 |
-| `state` | 184 | 0 | 0 | 184 | 0 | 0 | 0 | 184 | 0 | 0 | 0 | 92 |
+| `state` | 184 | 0 | 0 | 184 | 0 | 0 | 0 | 184 | 0 | 0 | 0 | 91 |
 | `system.act` | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
 | `system.audio` | 47 | 0 | 0 | 47 | 0 | 0 | 0 | 0 | 47 | 0 | 22 | 0 |
 | `system.client` | 86 | 0 | 0 | 86 | 0 | 0 | 0 | 0 | 86 | 0 | 36 | 0 |
@@ -686,9 +686,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 
 ## Merge notes
 
-- Coverage rows applied to entity rows (exercised): 657
-- Rows set exercised = yes from the coverage reports' seen lists: 154
-- Coverage categories that read 0 in every report (may be uninstrumented): object; rows set from no to ?: 431
+- Coverage rows applied to entity rows (exercised): 672
+- Rows set exercised = yes from the coverage reports' seen lists: 190
+- Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
 - Duplicate areas between parts: 28
   - `net.c2s.0x16`: items.tsv:74 kept, systems.tsv:25 dropped
   - `net.c2s.0x17`: items.tsv:75 kept, systems.tsv:26 dropped
@@ -744,47 +744,47 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `cov.missile.7` | system | DIVERGED | M | DIVERGED@5 | yes | 0 | n | - | - | exercised by checks; count 6; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.0` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 11; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.103` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 6; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.11` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 8; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.11` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 12; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.115` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 3; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.131` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 5; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.131` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 20; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.141` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 11; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.147` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 59; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.148` | system | DIVERGED | M | DIVERGED@16 | yes | 0 | n | - | - | exercised by checks; count 4; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.147` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 71; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.148` | system | DIVERGED | M | DIVERGED@16 | yes | 0 | n | - | - | exercised by checks+soak; count 15; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.15` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | - | - | exercised by checks; count 7; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.150` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 59; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.152` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 189; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.154` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 59; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.155` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 59; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.150` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 77; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.152` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 270; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.154` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 74; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.155` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 77; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.160` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.165` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | - | - | exercised by checks; count 2; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.165` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | - | - | exercised by checks+soak; count 8; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.173` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 3; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.175` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 7; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.179` | system | DIVERGED | M | DIVERGED@20 | yes | 0 | n | - | - | exercised by checks; count 16; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.175` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 12; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.179` | system | DIVERGED | M | DIVERGED@20 | yes | 0 | n | - | - | exercised by checks+soak; count 53; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.188` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 5; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.19` | system | DIVERGED | M | DIVERGED@1 | yes | 0 | n | - | - | exercised by checks; count 121; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.195` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 7; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.196` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 7; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.19` | system | DIVERGED | M | DIVERGED@1 | yes | 0 | n | - | - | exercised by checks+soak; count 207; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.195` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 21; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.196` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 21; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.198` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.20` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | - | - | exercised by checks; count 18; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.201` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 7; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.20` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | - | - | exercised by checks+soak; count 67; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.201` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 12; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.21` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 7; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.215` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 4; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.216` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 7; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.22` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 17; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.246` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 6; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.253` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 9; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.257` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 6; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.22` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 32; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.246` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 10; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.253` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 14; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.257` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 10; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.260` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 4; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.263` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 2; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.264` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 9; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.264` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 15; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.271` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | - | - | exercised by checks; count 2; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.273` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 3; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.28` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 14; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.294` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 9; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.298` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | - | - | exercised by checks; count 5; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.294` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 17; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.298` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | - | - | exercised by checks+soak; count 14; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.3` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 35; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.300` | system | DIVERGED | M | DIVERGED@61 | yes | 0 | n | - | - | exercised by checks; count 54; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.307` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | - | - | exercised by checks; count 17; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.307` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | - | - | exercised by checks+soak; count 23; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.311` | system | DIVERGED | M | DIVERGED@61 | yes | 0 | n | - | - | exercised by checks; count 64; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.338` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | - | - | exercised by checks; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.345` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 4; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
@@ -792,10 +792,10 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `cov.monster.359` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | - | - | exercised by checks; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.361` | system | DIVERGED | M | DIVERGED@61 | yes | 0 | n | - | - | exercised by checks; count 56; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.362` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | - | - | exercised by checks; count 43; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.367` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 6; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.367` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 10; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.38` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 2; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.40` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 4; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.405` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 6; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.40` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 54; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.405` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 10; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.408` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 3; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.409` | system | DIVERGED | M | DIVERGED@61 | yes | 0 | n | - | - | exercised by checks; count 2; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.418` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | - | - | exercised by checks; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
@@ -811,48 +811,48 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `cov.monster.473` | system | DIVERGED | M | DIVERGED@67 | yes | 0 | n | - | - | exercised by checks; count 14; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.475` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 4; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.476` | system | DIVERGED | M | DIVERGED@50 | yes | 0 | n | - | - | exercised by checks; count 84; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.5` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 95; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.5` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 127; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.501` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 7; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.507` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 8; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.510` | system | DIVERGED | M | DIVERGED@50 | yes | 0 | n | - | - | exercised by checks; count 22; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.511` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 11; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.513` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 11; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.511` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 16; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.513` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 16; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.543` | system | DIVERGED | M | DIVERGED@50 | yes | 0 | n | - | - | exercised by checks; count 2; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.545` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.56` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 4; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.56` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 34; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.561` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | - | - | exercised by checks; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.567` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 22; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.568` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 11; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.569` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 22; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.58` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | - | - | exercised by checks; count 15; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.6` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 3; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.61` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 4; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.63` | system | DIVERGED | M | DIVERGED@5 | yes | 0 | n | - | - | exercised by checks; count 60; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.567` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 32; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.568` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 16; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.569` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 32; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.58` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | - | - | exercised by checks+soak; count 32; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.6` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 21; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.61` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks+soak; count 7; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.63` | system | DIVERGED | M | DIVERGED@5 | yes | 0 | n | - | - | exercised by checks+soak; count 74; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: checks list was truncated by the part] [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.68` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.69` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.96` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 8; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.99` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 23; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.npc-topic.148` | system | DIVERGED | M | DIVERGED@16 | yes | 0 | n | - | - | exercised by checks; count 4; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.npc-topic.148` | system | DIVERGED | M | DIVERGED@16 | yes | 0 | n | - | - | exercised by checks+soak; count 17; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.skill.160` | system | DIVERGED | M | DIVERGED@5 | yes | 0 | n | - | - | exercised by checks; count 5; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.skill.176` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | exercised by checks; count 822; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.skill.335` | system | DIVERGED | M | DIVERGED@61 | yes | 0 | n | - | - | exercised by checks; count 18; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.skill.336` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | - | - | exercised by checks; count 4; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.item.never-exercised` | system | NO-CHECK | M | - | no | 0 | n | - | - | 554 entries; ranked list in coverage-checks.md |
-| `cov.level.never-exercised` | system | NO-CHECK | M | - | no | 0 | n | - | - | 112 entries; ranked list in coverage-checks.md |
+| `cov.item.never-exercised` | system | NO-CHECK | M | - | no | 0 | n | - | - | 550 entries; ranked list in coverage-checks.md |
+| `cov.level.never-exercised` | system | NO-CHECK | M | - | no | 0 | n | - | - | 103 entries; ranked list in coverage-checks.md |
 | `cov.missile.235` | system | NO-CHECK | M | PARTIAL | yes | 0 | n | - | - | exercised by checks; count 64; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> NO-CHECK: its checks are PARTIAL] |
 | `cov.missile.237` | system | NO-CHECK | M | PARTIAL | yes | 0 | n | - | - | exercised by checks; count 64; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> NO-CHECK: its checks are PARTIAL] |
 | `cov.missile.461` | system | NO-CHECK | M | PARTIAL | yes | 0 | n | - | - | exercised by checks; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> NO-CHECK: its checks are PARTIAL] |
 | `cov.missile.462` | system | NO-CHECK | M | PARTIAL | yes | 0 | n | - | - | exercised by checks; count 7; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> NO-CHECK: its checks are PARTIAL] |
 | `cov.missile.never-exercised` | system | NO-CHECK | M | - | no | 0 | n | - | - | 154 entries; ranked list in coverage-checks.md |
-| `cov.monster-ai.never-exercised` | system | NO-CHECK | M | - | no | 0 | n | - | - | 61 entries; ranked list in coverage-checks.md |
+| `cov.monster-ai.never-exercised` | system | NO-CHECK | M | - | no | 0 | n | - | - | 55 entries; ranked list in coverage-checks.md |
 | `cov.monster.412` | system | NO-CHECK | M | PARTIAL | yes | 0 | n | - | - | exercised by checks; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> NO-CHECK: its checks are PARTIAL] |
 | `cov.monster.428` | system | NO-CHECK | M | PARTIAL | yes | 0 | n | - | - | exercised by checks; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> NO-CHECK: its checks are PARTIAL] |
-| `cov.monster.never-exercised` | system | NO-CHECK | M | - | no | 0 | n | - | - | 336 entries; ranked list in coverage-checks.md |
-| `cov.npc-topic.never-exercised` | system | NO-CHECK | M | - | no | 0 | n | - | - | 46 entries; ranked list in coverage-checks.md |
-| `cov.object.never-exercised` | system | NO-CHECK | M | - | no | 0 | n | - | - | 431 entries; ranked list in coverage-checks.md |
-| `cov.quest.never-exercised` | system | NO-CHECK | M | - | no | 0 | n | - | - | 28 entries; ranked list in coverage-checks.md |
+| `cov.monster.never-exercised` | system | NO-CHECK | M | - | no | 0 | n | - | - | 298 entries; ranked list in coverage-checks.md |
+| `cov.npc-topic.never-exercised` | system | NO-CHECK | M | - | no | 0 | n | - | - | 37 entries; ranked list in coverage-checks.md |
+| `cov.object.never-exercised` | system | NO-CHECK | M | - | no | 0 | n | - | - | 419 entries; ranked list in coverage-checks.md |
+| `cov.quest.never-exercised` | system | NO-CHECK | M | - | no | 0 | n | - | - | 25 entries; ranked list in coverage-checks.md |
 | `cov.skill.never-exercised` | system | NO-CHECK | M | - | no | 0 | n | - | - | 257 entries; ranked list in coverage-checks.md |
-| `cov.state.never-exercised` | system | NO-CHECK | M | - | no | 0 | n | - | - | 92 entries; ranked list in coverage-checks.md |
+| `cov.state.never-exercised` | system | NO-CHECK | M | - | no | 0 | n | - | - | 91 entries; ranked list in coverage-checks.md |
 | `item.0-hax` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never created (any quality) in run a1a2 |
 | `item.100-9bt` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never created (any quality) in run a1a2 |
 | `item.101-9ga` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never created (any quality) in run a1a2 |
@@ -1565,9 +1565,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.arach6` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.arach7` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.baaltaunt` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.baboon1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.baboon3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.baboon4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.baboon1` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.baboon3` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.baboon4` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.baboon5` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.baboon6` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.baboon7` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
@@ -1591,7 +1591,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.bloodlord5` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.bloodlord6` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.bloodlord7` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.blunderbore1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.blunderbore1` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.blunderbore3` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.blunderbore4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.blunderbore5` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
@@ -1601,8 +1601,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.bonefetish5` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.bonefetish6` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.bonefetish7` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.brute2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.brute3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.brute2` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.brute3` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.brute4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.brute5` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.cantor1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
@@ -1618,10 +1618,10 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.clawviper9` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.corruptrogue1` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.corruptrogue2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.corruptrogue4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.corruptrogue4` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.corruptrogue5` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.corruptrogue6` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.cr-archer2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.cr-archer2` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.cr-archer4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.cr-archer5` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.cr-archer6` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
@@ -1634,7 +1634,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.cr-lancer8` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.crownest1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.crownest2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.deathmauler1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.deathmauler1` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.deathmauler2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.deathmauler3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.deathmauler4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
@@ -1656,19 +1656,19 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.fallenshaman7` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.fallenshaman8` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.fetish1` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.fetish2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.fetish3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.fetish2` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.fetish3` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.fetish4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.fetish6` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.fetish8` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.fetishblow2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.fetishblow3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.fetishblow2` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.fetishblow3` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.fetishblow4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.fetishblow6` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.fetishblow7` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.fetishblow8` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.fetishshaman2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.fetishshaman3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.fetishshaman3` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.fetishshaman4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.fetishshaman6` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.fetishshaman8` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
@@ -1679,7 +1679,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.fingermage5` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.foulcrow1` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.foulcrow2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.foulcrow4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.foulcrow4` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.foulcrow5` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.frogdemon1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.frogdemon2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
@@ -1694,9 +1694,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.goatman9` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.hellbovine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.imp1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.imp2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.imp2` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.imp3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.imp4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.imp4` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.imp5` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.imp6` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.imp7` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
@@ -1719,7 +1719,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.megademon4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.megademon5` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.megademon6` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.minion1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.minion1` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.minion10` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.minion11` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.minion2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
@@ -1729,7 +1729,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.minion6` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.minion7` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.minion9` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.mosquito1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.mosquito1` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.mosquito2` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.mosquito4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.mummy2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
@@ -1751,7 +1751,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.putriddefiler4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.quillrat2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.quillrat3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.quillrat4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.quillrat4` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.quillrat6` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.quillrat7` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.quillrat8` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
@@ -1767,7 +1767,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.regurgitator4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.sandleaper3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.sandleaper4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.sandleaper5` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.sandleaper5` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.sandleaper6` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.sandleaper7` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.sandmaggot2` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
@@ -1779,7 +1779,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.sandraider1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.sandraider10` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.sandraider2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.sandraider3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.sandraider3` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.sandraider4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.sandraider7` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.sandraider9` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
@@ -1789,12 +1789,12 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.scarab7` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.scarab8` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.siegebeast1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.siegebeast2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.siegebeast2` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.siegebeast3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.sk-archer10` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.sk-archer2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.sk-archer4` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.sk-archer5` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.sk-archer5` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.sk-archer6` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.sk-archer7` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.sk-archer9` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
@@ -1803,11 +1803,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.skeleton7` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.skmage-cold5` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.skmage-fire1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.skmage-fire4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.skmage-fire4` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.skmage-fire5` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.skmage-fire6` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.skmage-ltng1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.skmage-ltng2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.skmage-ltng2` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.skmage-ltng4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.skmage-ltng5` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.skmage-ltng6` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
@@ -1869,8 +1869,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.vilemother4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.vilemother5` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.vulture1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.vulture3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.vulture4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.vulture3` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.vulture4` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.vulture5` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.willowisp1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.willowisp3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
@@ -1883,7 +1883,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.wraith6` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.wraith7` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.wraith8` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `monster.zealot1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `monster.zealot1` | entity | NO-CHECK | S | - | yes | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.zealot2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.zealot3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `monster.zealot4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
@@ -1894,437 +1894,437 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `npc.ancientstatue2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `npc.ancientstatue3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `npc.drehyaiced` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
-| `object.1-casket` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.100-duriel-s-lair` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.101-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.102-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.104-armorstand` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.105-armorstand` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.106-weaponrack` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.107-weaponrack` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.108-malus` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.109-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.11-barrel` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.111-well` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.113-well` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.115-well` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.116-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.117-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.118-well` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.119-waypoint` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.120-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.123-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.124-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.125-hidden-stash` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.126-skull-pile` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.127-hidden-stash` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.128-hidden-stash` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.129-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.13-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.130-well` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.132-well` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.133-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.134-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.135-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.136-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.137-well` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.138-well` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.139-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.14-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.140-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.141-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.142-jug` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.143-jug` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.144-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.145-waypoint` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.146-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.147-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.148-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.149-taintedsunaltar` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.15-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.150-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.151-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.152-orifice` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.154-corpse` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.155-hidden-stash` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.156-waypoint` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.157-waypoint` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.158-skeleton` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.159-hidden-stash` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.16-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.160-fire` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.161-fire` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.162-fire` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.163-hiding-spot` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.164-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.165-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.166-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.167-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.168-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.169-hollow-log` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.17-stonealpha` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.170-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.171-skeleton` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.172-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.173-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.174-loose-rock` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.175-loose-boulder` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.176-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.177-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.178-guardcorpse` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.179-bookshelf` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.18-stonebeta` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.180-bookshelf` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.181-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.182-coffin` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.183-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.184-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.185-stash` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.186-stash` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.187-stash` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.188-stash` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.19-stonegamma` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.190-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.191-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.192-teleport-pad` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.193-lamtome` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.194-stair` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.195-stair` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.196-a-trap` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.197-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.198-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.199-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.2-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.20-stonedelta` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.200-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.201-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.202-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.203-stash` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.204-stash` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.205-stash` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.206-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.207-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.208-basket` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.209-basket` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.21-stonelambda` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.210-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.211-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.212-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.213-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.214-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.215-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.216-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.217-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.222-pillar` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.223-cocoon` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.224-cocoon` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.225-skullpile` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.226-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.229-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.23-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.230-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.231-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.232-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.233-pillar` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.236-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.237-waypoint` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.238-waypoint` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.239-body` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.24-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.240-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.241-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.242-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.243-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.244-ratnest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.246-ratnest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.247-bed` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.248-bed` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.249-manashrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.25-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.250-a-trap` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.252-gidbinn` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.256-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.257-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.258-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.259-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.26-gibbet` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.260-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.261-a-trap` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.262-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.263-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.264-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.265-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.266-goo-pile` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.267-bank` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.268-wirt-s-body` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.269-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.27-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.270-corpse` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.271-corpse` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.272-corpse` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.273-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.274-hidden-stash` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.275-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.276-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.277-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.278-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.279-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.28-holeanim` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.280-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.281-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.282-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.283-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.284-sarcophagus` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.285-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.286-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.287-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.288-waypoint` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.289-bed` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.29-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.290-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.291-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.292-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.293-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.294-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.295-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.296-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.297-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.298-portal` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.299-magic-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.3-casket` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.30-inifuss` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.300-magic-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.301-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.302-manashrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.303-magic-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.304-teleportation-pad` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.305-teleportation-pad` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.306-teleportation-pad` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.314-dead-guard` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.315-dead-guard` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.316-dead-guard` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.317-dead-guard` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.319-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.320-manashrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.321-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.322-well` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.323-waypoint` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.324-waypoint` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.325-magic-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.326-dead-body` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.329-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.330-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.331-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.332-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.333-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.334-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.335-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.336-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.337-steeg-stone` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.338-guild-vault` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.339-trophy-case` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.340-message-board` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.341-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.342-portal` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.343-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.344-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.354-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.355-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.356-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.357-tome` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.358-fire` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.359-fire` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.360-rockpile` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.361-magic-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.362-basket` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.363-hungskeleton` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.364-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.365-casket` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.366-sewer-stairs` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.367-sewer-lever` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.37-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.372-bonechest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.373-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.374-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.376-hellforge` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.377-guild-portal` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.38-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.380-trappedsoul` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.381-trappedsoul` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.383-trappedsoul` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.384-trappedsoul` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.385-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.386-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.387-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.388-casket` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.389-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.390-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.391-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.392-seal` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.393-seal` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.394-seal` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.395-seal` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.396-seal` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.397-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.398-waypoint` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.4-largeurn` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.400-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.402-waypoint` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.403-fire` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.404-compellingorb` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.405-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.406-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.407-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.408-siege-control` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.413-chestr` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.414-shrine3wilderness` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.415-shrine2wilderness` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.416-hiddenstash` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.418-barrel-wilderness` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.419-barrel-wilderness` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.420-woodchestl` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.421-shrine3wilderness` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.422-manashrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.423-healthshrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.424-burialchestl` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.425-burialchestr` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.426-well` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.427-shrine2wilderness` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.428-shrine2wilderness` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.429-waypoint` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.430-chestl` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.431-woodchestr` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.432-chestsl` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.433-chestsr` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.443-jar1` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.444-jar2` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.445-jar3` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.448-animated-skulland-rockpile` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.449-gate` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.450-pileofskullsandrocks` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.454-explodingchest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.455-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.46-crate` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.463-hidden-stash` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.464-healthshrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.465-manashrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.466-evilurn` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.467-icecavejar1` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.468-icecavejar2` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.469-icecavejar3` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.47-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.470-icecavejar4` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.471-icecavejar4` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.472-icecaveshrine2` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.474-ancient-statue-3` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.475-ancient-statue-1` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.476-ancient-statue-2` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.477-deadbarbarian` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.479-icecaveshrine2` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.483-manashrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.484-healthshrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.485-tomb1` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.486-tomb2` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.487-tomb3` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.488-magic-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.491-manashrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.492-healthshrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.493-well` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.494-waypoint` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.495-magic-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.496-waypoint` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.497-magic-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.498-well` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.499-magic-shrine2` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.5-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.50-casket` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.500-object1` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.501-woodchestl` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.502-woodchestr` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.503-magic-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.504-woodchest2l` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.505-woodchest2r` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.508-pene` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.509-magic-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.51-casket` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.511-waypoint` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.512-magic-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.513-well` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.516-object1` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.517-object2` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.518-mrbox` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.519-well` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.52-urn` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.520-magic-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.521-healthshrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.522-manashrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.524-tomb1l` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.525-tomb2l` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.526-tomb3l` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.529-tomb1` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.53-casket` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.530-tomb1l` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.531-tomb2` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.532-tomb2l` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.533-tomb3` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.534-tomb3l` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.535-mrbox` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.539-waypoint` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.54-roguecorpse` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.540-deadperson` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.541-groundtomb` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.544-groundtombl` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.545-deadperson2` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.546-ancientsaltar` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.547-to-the-worldstone-keep-level-1` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.548-eweaponrackr` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.549-eweaponrackl` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.55-roguecorpse` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.550-earmorstandr` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.551-earmorstandl` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.556-deadperson2` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.558-fana` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.56-roguecorpse` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.561-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.563-the-worldstone-chamber` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.564-glacial-caves-level-1` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.565-strlastcinematic` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.566-harrogath` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.569-throne-of-destruction` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.57-corpseonstick` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.58-corpseonstick` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.59-portal` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.6-chest` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.60-portal` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.62-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.63-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.64-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.7-barrel` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.74-trappdoor` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.75-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.77-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.79-casket` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.8-towertome` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.80-obelisk` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.81-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.83-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.84-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.85-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.86-dummy` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.87-chest3` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.88-chest3` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.89-sarcophagus` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.9-urn` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.90-obelisk` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.91-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.92-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.93-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.94-largeurn` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.95-largeurn` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.96-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.97-shrine` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.98-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
-| `object.99-door` | entity | NO-CHECK | S | - | ? | 0 | n | - | - | never operated in run a1a2 (operate function not hit) [ledger.py: its coverage counter read 0 in every run: may be uninstrumented] |
+| `object.1-casket` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.100-duriel-s-lair` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.101-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.102-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.104-armorstand` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.105-armorstand` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.106-weaponrack` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.107-weaponrack` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.108-malus` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.109-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.11-barrel` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.111-well` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.113-well` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.115-well` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.116-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.117-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.118-well` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.119-waypoint` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.120-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.123-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.124-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.125-hidden-stash` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.126-skull-pile` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.127-hidden-stash` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.128-hidden-stash` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.129-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.13-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.130-well` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.132-well` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.133-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.134-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.135-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.136-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.137-well` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.138-well` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.139-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.14-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.140-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.141-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.142-jug` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.143-jug` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.144-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.145-waypoint` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.146-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.147-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.148-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.149-taintedsunaltar` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.15-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.150-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.151-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.152-orifice` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.154-corpse` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.155-hidden-stash` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.156-waypoint` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.157-waypoint` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.158-skeleton` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.159-hidden-stash` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.16-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.160-fire` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.161-fire` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.162-fire` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.163-hiding-spot` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.164-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.165-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.166-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.167-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.168-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.169-hollow-log` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.17-stonealpha` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.170-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.171-skeleton` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.172-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.173-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.174-loose-rock` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.175-loose-boulder` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.176-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.177-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.178-guardcorpse` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.179-bookshelf` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.18-stonebeta` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.180-bookshelf` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.181-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.182-coffin` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.183-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.184-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.185-stash` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.186-stash` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.187-stash` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.188-stash` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.19-stonegamma` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.190-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.191-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.192-teleport-pad` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.193-lamtome` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.194-stair` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.195-stair` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.196-a-trap` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.197-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.198-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.199-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.2-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.20-stonedelta` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.200-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.201-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.202-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.203-stash` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.204-stash` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.205-stash` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.206-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.207-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.208-basket` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.209-basket` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.21-stonelambda` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.210-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.211-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.212-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.213-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.214-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.215-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.216-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.217-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.222-pillar` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.223-cocoon` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.224-cocoon` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.225-skullpile` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.226-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.229-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.23-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.230-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.231-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.232-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.233-pillar` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.236-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.237-waypoint` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.238-waypoint` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.239-body` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.24-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.240-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.241-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.242-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.243-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.244-ratnest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.246-ratnest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.247-bed` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.248-bed` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.249-manashrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.25-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.250-a-trap` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.252-gidbinn` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.256-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.257-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.258-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.259-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.26-gibbet` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.260-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.261-a-trap` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.262-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.263-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.264-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.265-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.266-goo-pile` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.267-bank` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.268-wirt-s-body` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.269-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.27-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.270-corpse` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.271-corpse` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.272-corpse` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.273-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.274-hidden-stash` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.275-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.276-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.277-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.278-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.279-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.28-holeanim` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.280-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.281-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.282-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.283-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.284-sarcophagus` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.285-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.286-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.287-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.288-waypoint` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.289-bed` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.29-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.290-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.291-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.292-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.293-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.294-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.295-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.296-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.297-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.298-portal` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.299-magic-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.3-casket` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.30-inifuss` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.300-magic-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.301-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.302-manashrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.303-magic-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.304-teleportation-pad` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.305-teleportation-pad` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.306-teleportation-pad` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.314-dead-guard` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.315-dead-guard` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.316-dead-guard` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.317-dead-guard` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.319-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.320-manashrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.321-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.322-well` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.323-waypoint` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.324-waypoint` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.325-magic-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.326-dead-body` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.329-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.330-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.331-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.332-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.333-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.334-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.335-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.336-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.337-steeg-stone` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.338-guild-vault` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.339-trophy-case` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.340-message-board` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.341-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.342-portal` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.343-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.344-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.354-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.355-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.356-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.357-tome` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.358-fire` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.359-fire` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.360-rockpile` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.361-magic-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.362-basket` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.363-hungskeleton` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.364-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.365-casket` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.366-sewer-stairs` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.367-sewer-lever` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.37-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.372-bonechest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.373-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.374-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.376-hellforge` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.377-guild-portal` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.38-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.380-trappedsoul` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.381-trappedsoul` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.383-trappedsoul` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.384-trappedsoul` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.385-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.386-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.387-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.388-casket` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.389-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.390-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.391-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.392-seal` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.393-seal` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.394-seal` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.395-seal` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.396-seal` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.397-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.398-waypoint` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.4-largeurn` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.400-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.402-waypoint` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.403-fire` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.404-compellingorb` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.405-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.406-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.407-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.408-siege-control` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.413-chestr` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.414-shrine3wilderness` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.415-shrine2wilderness` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.416-hiddenstash` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.418-barrel-wilderness` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.419-barrel-wilderness` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.420-woodchestl` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.421-shrine3wilderness` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.422-manashrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.423-healthshrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.424-burialchestl` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.425-burialchestr` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.426-well` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.427-shrine2wilderness` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.428-shrine2wilderness` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.429-waypoint` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.430-chestl` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.431-woodchestr` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.432-chestsl` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.433-chestsr` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.443-jar1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.444-jar2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.445-jar3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.448-animated-skulland-rockpile` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.449-gate` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.450-pileofskullsandrocks` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.454-explodingchest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.455-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.46-crate` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.463-hidden-stash` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.464-healthshrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.465-manashrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.466-evilurn` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.467-icecavejar1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.468-icecavejar2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.469-icecavejar3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.47-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.470-icecavejar4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.471-icecavejar4` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.472-icecaveshrine2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.474-ancient-statue-3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.475-ancient-statue-1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.476-ancient-statue-2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.477-deadbarbarian` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.479-icecaveshrine2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.483-manashrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.484-healthshrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.485-tomb1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.486-tomb2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.487-tomb3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.488-magic-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.491-manashrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.492-healthshrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.493-well` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.494-waypoint` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.495-magic-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.496-waypoint` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.497-magic-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.498-well` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.499-magic-shrine2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.5-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.50-casket` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.500-object1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.501-woodchestl` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.502-woodchestr` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.503-magic-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.504-woodchest2l` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.505-woodchest2r` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.508-pene` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.509-magic-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.51-casket` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.511-waypoint` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.512-magic-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.513-well` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.516-object1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.517-object2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.518-mrbox` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.519-well` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.52-urn` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.520-magic-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.521-healthshrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.522-manashrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.524-tomb1l` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.525-tomb2l` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.526-tomb3l` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.529-tomb1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.53-casket` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.530-tomb1l` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.531-tomb2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.532-tomb2l` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.533-tomb3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.534-tomb3l` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.535-mrbox` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.539-waypoint` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.54-roguecorpse` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.540-deadperson` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.541-groundtomb` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.544-groundtombl` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.545-deadperson2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.546-ancientsaltar` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.547-to-the-worldstone-keep-level-1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.548-eweaponrackr` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.549-eweaponrackl` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.55-roguecorpse` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.550-earmorstandr` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.551-earmorstandl` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.556-deadperson2` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.558-fana` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.56-roguecorpse` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.561-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.563-the-worldstone-chamber` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.564-glacial-caves-level-1` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.565-strlastcinematic` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.566-harrogath` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.569-throne-of-destruction` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.57-corpseonstick` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.58-corpseonstick` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.59-portal` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.6-chest` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.60-portal` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.62-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.63-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.64-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.7-barrel` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.74-trappdoor` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.75-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.77-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.79-casket` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.8-towertome` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.80-obelisk` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.81-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.83-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.84-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.85-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.86-dummy` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.87-chest3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.88-chest3` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.89-sarcophagus` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.9-urn` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.90-obelisk` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.91-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.92-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.93-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.94-largeurn` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.95-largeurn` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.96-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.97-shrine` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.98-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
+| `object.99-door` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never operated in run a1a2 (operate function not hit) |
 | `quest.done1-den-of-evil` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `quest.done12-arcane-sanctuary` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `quest.done13-the-summoner` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
@@ -2397,6 +2397,91 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.monster.vampiremissile` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `skill.monster.zakarumheal` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `skill.monster.zakarumlightning` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `cov.monster.111` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 4; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.112` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 4; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.113` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 5; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.114` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 18; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.142` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 30; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.143` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 10; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.161` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 8; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.174` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 49; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.18` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 39; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.186` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 6; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.235` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 2; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.24` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 11; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.25` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 13; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.255` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 2; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.280` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 4; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.31` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 21; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.373` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 8; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.386` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 61; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.388` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 4; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.397` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 56; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.398` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 42; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.433` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 4; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.435` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 16; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.442` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 11; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.453` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 23; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.46` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 12; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.48` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 7; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.493` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 38; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.495` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 67; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.499` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 2; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.50` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 35; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.51` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 2; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.515` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.517` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 8; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.520` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.522` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 2; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.524` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 4; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.529` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 12; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.53` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 18; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.59` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 7; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.66` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 14; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.78` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 14; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.79` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 11; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.82` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 54; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.83` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 6; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.84` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 6; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.monster.91` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 28; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.npc-topic.147` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 3; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.npc-topic.150` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 9; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.npc-topic.152` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 7; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.npc-topic.154` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.npc-topic.155` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 8; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.npc-topic.175` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 13; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.npc-topic.179` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 13; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.npc-topic.196` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 19; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.npc-topic.201` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 15; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.npc-topic.253` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 10; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.npc-topic.264` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 9; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.npc-topic.294` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 13; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.npc-topic.307` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.npc-topic.388` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 25; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.npc-topic.453` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 3; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.npc-topic.5` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.npc-topic.513` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 5; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.npc-topic.567` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 3; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.npc-topic.569` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 3; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.object.117` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 4; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.object.119` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 10; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.object.237` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 27; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.object.285` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 3; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.object.286` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 2; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.object.288` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 10; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.object.36` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.object.37` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 18; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.object.370` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.object.372` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 2; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.object.374` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.object.378` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 5; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.object.385` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 2; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.object.39` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.object.400` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 4; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.object.402` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 3; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.object.436` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.object.441` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
+| `cov.object.442` | system | UNKNOWN | M | - | yes | 0 | n | - | - | exercised by soak; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] |
 
 ## integrator
 
@@ -2602,7 +2687,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.ai.putriddefiler` | system | DIVERGED | M | DIVERGED@2 | no | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.quillrat` | system | DIVERGED | M | DIVERGED@1 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.reanimatedhorde` | system | DIVERGED | M | DIVERGED@2 | no | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
-| `monster.ai.regurgitator` | system | DIVERGED | M | DIVERGED@2 | no | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
+| `monster.ai.regurgitator` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.sandmaggot` | system | DIVERGED | M | DIVERGED@2 | no | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.sandraider` | system | DIVERGED | M | DIVERGED@2 | no | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.scarab` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
@@ -2640,8 +2725,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.ai.bonewall` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.brute` | system | NO-CHECK | M | - | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.buffy` | system | NO-CHECK | M | - | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
-| `monster.ai.catapult` | system | NO-CHECK | M | - | no | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
-| `monster.ai.catapultspotter` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
+| `monster.ai.catapult` | system | NO-CHECK | M | - | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
+| `monster.ai.catapultspotter` | system | NO-CHECK | M | - | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.clawviper` | system | NO-CHECK | M | - | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.clawviperex` | system | NO-CHECK | M | - | no | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.cycleoflife` | system | NO-CHECK | M | - | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
@@ -2682,7 +2767,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.ai.nihlathak` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.none` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.npc` | system | NO-CHECK | M | - | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
-| `monster.ai.npcbarb` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
+| `monster.ai.npcbarb` | system | NO-CHECK | M | - | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.npcoutoftown` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.npcstationary` | system | NO-CHECK | M | - | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.oblivionknight` | system | NO-CHECK | M | - | no | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
@@ -2700,7 +2785,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.ai.shadowwarrior` | system | NO-CHECK | M | - | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.siegebeast` | system | NO-CHECK | M | - | no | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.siegetower` | system | NO-CHECK | M | - | no | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
-| `monster.ai.skeletonmage` | system | NO-CHECK | M | - | no | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
+| `monster.ai.skeletonmage` | system | NO-CHECK | M | - | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.smith` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.spirit` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.suicideminion` | system | NO-CHECK | M | - | no | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
@@ -3345,7 +3430,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `state.feralrage` | content | NO-CHECK | S | - | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
 | `state.fetishaura` | content | NO-CHECK | S | - | ? | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
 | `state.fingermagecurse` | content | NO-CHECK | S | - | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
-| `state.firemastery` | content | NO-CHECK | S | - | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
+| `state.firemastery` | content | NO-CHECK | S | - | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
 | `state.freeze` | content | NO-CHECK | S | - | ? | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
 | `state.frenzy` | content | NO-CHECK | S | - | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
 | `state.frozenarmor` | content | NO-CHECK | S | - | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
@@ -3378,7 +3463,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `state.lightningmastery` | content | NO-CHECK | S | - | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
 | `state.lowerresist` | content | NO-CHECK | S | - | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
 | `state.macemastery` | content | NO-CHECK | S | - | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
-| `state.manapot` | content | NO-CHECK | S | - | ? | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
+| `state.manapot` | content | NO-CHECK | S | - | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
 | `state.maul` | content | NO-CHECK | S | - | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
 | `state.meditation` | content | NO-CHECK | S | - | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
 | `state.might` | content | NO-CHECK | S | - | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
@@ -3394,7 +3479,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `state.passive-resistltng` | content | NO-CHECK | S | - | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
 | `state.penetrate` | content | NO-CHECK | S | - | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
 | `state.pierce` | content | NO-CHECK | S | - | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
-| `state.playerbody` | content | NO-CHECK | S | - | ? | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
+| `state.playerbody` | content | NO-CHECK | S | - | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
 | `state.poison` | content | NO-CHECK | S | - | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
 | `state.polearmmastery` | content | NO-CHECK | S | - | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
 | `state.prayer` | content | NO-CHECK | S | - | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | state table row (grouped: all states share the set/clear state path); flags from states.txt; no check compares per state |
@@ -4464,7 +4549,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `level.a2.49.act-2-sewer-1-c` | entity | NO-CHECK | M | - | yes | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | DRLG kind maze; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a2.50.act-2-harem` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/preset.md,specs/drlg/rooms.md | DRLG kind preset; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a2.51.act-2-corrupt-harem-1` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | DRLG kind maze; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `level.a2.52.act-2-basement-1` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | DRLG kind maze; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
+| `level.a2.52.act-2-basement-1` | entity | NO-CHECK | M | - | yes | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | DRLG kind maze; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a2.53.act-2-basement-2` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | DRLG kind maze; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a2.54.act-2-basement-3` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | DRLG kind maze; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a2.55.act-2-tomb-1-a` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | DRLG kind maze; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
@@ -4490,11 +4575,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `level.a3.100.act-3-mephisto-1` | entity | NO-CHECK | M | - | yes | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | DRLG kind maze; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a3.101.act-3-mephisto-2` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | DRLG kind maze; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a3.102.act-3-mephisto-3` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/preset.md,specs/drlg/rooms.md | DRLG kind preset; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `level.a3.76.act-3-jungle-1` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
+| `level.a3.76.act-3-jungle-1` | entity | NO-CHECK | M | - | yes | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a3.77.act-3-jungle-2` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `level.a3.78.act-3-jungle-3` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `level.a3.79.act-3-kurast-1` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `level.a3.80.act-3-kurast-2` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
+| `level.a3.78.act-3-jungle-3` | entity | NO-CHECK | M | - | yes | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
+| `level.a3.79.act-3-kurast-1` | entity | NO-CHECK | M | - | yes | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
+| `level.a3.80.act-3-kurast-2` | entity | NO-CHECK | M | - | yes | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a3.81.act-3-kurast-3` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a3.82.act-3-kurast-4` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a3.83.act-3-travincal` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
@@ -4513,12 +4598,12 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `level.a3.97.act-3-temple-4` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/preset.md,specs/drlg/rooms.md | DRLG kind preset; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a3.98.act-3-temple-5` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/preset.md,specs/drlg/rooms.md | DRLG kind preset; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a3.99.act-3-temple-6` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/preset.md,specs/drlg/rooms.md | DRLG kind preset; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `level.a4.104.act-4-mesa-1` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
+| `level.a4.104.act-4-mesa-1` | entity | NO-CHECK | M | - | yes | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a4.105.act-4-mesa-2` | entity | NO-CHECK | M | - | yes | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a4.106.act-4-mesa-3` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a4.107.act-4-lava-1` | entity | NO-CHECK | M | - | yes | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | DRLG kind maze; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a4.108.act-4-diablo-1` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `level.a5.110.act-5-siege-1` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
+| `level.a5.110.act-5-siege-1` | entity | NO-CHECK | M | - | yes | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a5.111.act-5-barricade-1` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a5.112.act-5-barricade-2` | entity | NO-CHECK | M | - | no | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a5.113.act-5-ice-cave-1` | entity | NO-CHECK | M | - | yes | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | DRLG kind maze; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
@@ -4675,7 +4760,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `object.preset.580.specialchest` | entity | NO-CHECK | M | - | ? | 20 | y | - | specs/world/object-population.md | preset function SpecialChest; only - rows share it; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `object.preset.581.presetchest` | entity | NO-CHECK | M | - | ? | 20 | y | - | specs/world/object-population.md | preset function PresetChest; only - rows share it; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `object.preset.582.arcanesymbol` | entity | NO-CHECK | M | - | ? | 20 | y | - | specs/world/object-population.md | preset function ArcaneSymbol; only - rows share it; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `quest.a1q0-warriv-gossip` | entity | NO-CHECK | M | - | no | 36 | y | claude/q-fix-pc1-day3-a-r2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act1.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
+| `quest.a1q0-warriv-gossip` | entity | NO-CHECK | M | - | yes | 36 | y | claude/q-fix-pc1-day3-a-r2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act1.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a1q1-den-of-evil` | entity | NO-CHECK | M | - | yes | 36 | y | claude/q-fix-pc1-day3-a-r2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act1.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a1q2-sisters-burial-grounds` | entity | NO-CHECK | M | - | yes | 36 | y | claude/q-fix-pc1-day3-a-r2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act1.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a1q3-tools-of-the-trade` | entity | NO-CHECK | M | - | no | 36 | y | claude/q-fix-pc1-day3-a-r2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act1.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
@@ -4683,7 +4768,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `quest.a1q5-the-forgotten-tower` | entity | NO-CHECK | M | - | yes | 36 | y | claude/q-fix-pc1-day3-a-r2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act1.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a1q6-sisters-to-the-slaughter` | entity | NO-CHECK | M | - | yes | 36 | y | claude/q-fix-pc1-day3-a-r2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act1.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a1q7-flavie` | entity | NO-CHECK | M | - | no | 36 | y | claude/q-fix-pc1-day3-a-r2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act1.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `quest.a2q0-jerhyn-gossip` | entity | NO-CHECK | M | - | no | 36 | y | claude/q-prov-recording-2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act2.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
+| `quest.a2q0-jerhyn-gossip` | entity | NO-CHECK | M | - | yes | 36 | y | claude/q-prov-recording-2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act2.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a2q1-radament-s-lair` | entity | NO-CHECK | M | - | no | 36 | y | claude/q-prov-recording-2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act2.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a2q2-the-horadric-staff` | entity | NO-CHECK | M | - | no | 36 | y | claude/q-prov-recording-2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act2.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a2q3-tainted-sun` | entity | NO-CHECK | M | - | no | 36 | y | claude/q-prov-recording-2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act2.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
@@ -4691,8 +4776,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `quest.a2q5-the-summoner` | entity | NO-CHECK | M | - | yes | 36 | y | claude/q-prov-recording-2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act2.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a2q6-the-seven-tombs` | entity | NO-CHECK | M | - | yes | 36 | y | claude/q-prov-recording-2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act2.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a2q7-guard-gossip` | entity | NO-CHECK | M | - | no | 36 | y | claude/q-prov-recording-2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act2.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `quest.a2q8-guard-gossip` | entity | NO-CHECK | M | - | no | 36 | y | claude/q-prov-recording-2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act2.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `quest.a3q0-hratli-gossip` | entity | NO-CHECK | M | - | ? | 36 | y | claude/q-play-act3 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act3.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
+| `quest.a2q8-guard-gossip` | entity | NO-CHECK | M | - | yes | 36 | y | claude/q-prov-recording-2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act2.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
+| `quest.a3q0-hratli-gossip` | entity | NO-CHECK | M | - | yes | 36 | y | claude/q-play-act3 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act3.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a3q1-lam-esen-s-tome` | entity | NO-CHECK | M | - | no | 36 | y | claude/q-play-act3 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act3.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a3q2-khalim-s-will` | entity | NO-CHECK | M | - | yes | 36 | y | claude/q-play-act3 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act3.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a3q3-blade-of-the-old-religion` | entity | NO-CHECK | M | - | no | 36 | y | claude/q-play-act3 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act3.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |

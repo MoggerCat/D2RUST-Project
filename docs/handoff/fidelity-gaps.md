@@ -7,10 +7,10 @@ from the parts in `docs/handoff/ledger/`). Inputs: the merged ledger,
 108 channel results, suite run 2026-10-09 17:34 UTC at 739dd943), the
 existing tools under `tools/` and `specs/tools/`.
 
-**Merged ledger (7 parts, 3,890 rows, of which 1,544 coverage-only rows):**
-DIVERGED 176, NOT-IMPLEMENTED 59, NO-CHECK 3,655, UNKNOWN 0, **EQUAL 0**;
-exercised yes 127 / no 1,629 / unknown 2,134 (yes from the coverage reports' seen
-lists; object and NPC rows are `?`: their counters read 0, see §4). Every spec file (outside
+**Merged ledger (8 parts, 4,104 rows, of which about 1,650 coverage-only rows):**
+DIVERGED 289, NOT-IMPLEMENTED 59, NO-CHECK 3,671, UNKNOWN 85, **EQUAL 0**;
+exercised yes 487 / no 1,984 / unknown 1,633 (yes from the coverage reports' seen
+lists: act I–II playthrough, the checks' d2rs side, soak). Every spec file (outside
 `specs/tools/`), every check and every message id is named by a row
 (`fidelity-ledger.md` "Not covered by any row" is empty); the exercised
 column has the act I–II coverage part; a3a5 and checks are pending.
@@ -97,7 +97,6 @@ counted as compared in part, not as unchecked (§2).
 | `audio-diff` | decoded PCM per voice and mixed, trigger tick | identical decoded samples, identical ticks | L | `system.audio.*` (47) |
 | `replay-diff` | a recorded 1.14d input stream replayed on d2rs | state per frame over long runs | M–L | long-horizon drift in every system |
 | `two-client-recorder` | two 1.14d clients in one game (TCP/IP) | packets + state | L | multiplayer-only message ids; deferred (Phases 7+) |
-| coverage-map: object operate / NPC topic counters (fix) | the `object` and `npc-topic` counters read 0 in the a1a2 run although the playthrough walks through towns and waypoints: likely not instrumented (or never called on the paths runs take) | counters vs a run that certainly operates a waypoint / talks | S | the `exercised` column of 431 object and 47 NPC rows (now `?`) |
 | state-field parity (extension) | the fields one side lacks | turns 39 PARTIAL into MATCH/DIVERGED | M | every state check |
 
 ## 5. Ordered plan (tranches)
@@ -136,7 +135,7 @@ addresses the specs lack and possibly for the audio capture.
 | items | claude/q-ledger-items | 135 | merged |
 | integrator | claude/q-fidelity-ledger | 30 | rows for the specs and checks no part named (data layer, format readers, constant tables, continuation specs, 6 checks) |
 | coverage a1a2 | claude/q-ledger-cov-a1a2 | 2,122 never-exercised rows (act I–II playthrough + classes, 7 classes, normal) | merged: 578 set `exercised = no` on the entity row of the same thing (ids matched through `ledger.py` aliases: level id, quest slot, `monster-ai` → `monster.ai`, alphanumerics); 1,544 added as coverage rows (single monster classes, base items, object rows, monster skills, missiles the parts group) |
-| coverage checks | claude/q-ledger-cov-checks | 198 rows (`cov.<category>.<id>`: what the d2rs side of the checks exercised, with those checks' verdicts) | merged: matched to entity rows by level id / quest slot / table row id; its `checks` lists were truncated (`...(+N)`), cut to the named checks by the integrator; unmatched rows (single monster classes, states, missiles) stay as coverage rows and carry their checks' verdicts, so DIVERGED counts include them |
+| coverage checks | claude/q-ledger-cov-checks | 308 rows (`cov.<category>.<id>`: what the d2rs side of 87 checks and a soak run exercised; rng channel not run) | merged: matched to entity rows by level id / quest slot / table row id; its `checks` lists were truncated (`...(+N)`), cut to the named checks by the integrator; unmatched rows (single monster classes, states, missiles) stay as coverage rows and carry their checks' verdicts, so DIVERGED counts include them |
 | coverage a3a5 | claude/q-ledger-cov-a3a5 | — | pending (no tsv on the branch at 19:06) |
 
 `tools/coord/ledger.py --fix` reconciled the parts with checks-status.md
@@ -144,16 +143,11 @@ addresses the specs lack and possibly for the audio capture.
 UNKNOWN with PARTIAL checks is NO-CHECK; a missing size is M): 58 rows.
 
 Known weaknesses of the merged rows (to fix in the parts, not here):
-- Coverage a1a2: objects and NPC rows (478) read 0 on both counters, so they may be
-  **uninstrumented rather than unexercised**: `ledger.py` sets them to `?` with a note
-  (tool fix in §4).
-- The coverage TSVs list only never-exercised rows; `ledger.py` takes `yes` from the
-  report JSON's seen lists (`coverage-*.json`, matched by level id, quest slot, AI name,
-  table row id in `source_1.14d`, name). Spot check: Blood Moor, Fallen AI, Jab, Den of
-  Evil, missile firebolt → yes; skill Fire Bolt → no (the sorceress profile's main skill
-  is Frost Nova; the firebolt missiles are the Fallen Shamans'); Rogue Encampment
-  waypoint → ? (object counter 0). An act III–V row
-  is `no` from the act I–II runs until the a3a5 part lands (yes wins in the merge).
+- Coverage a1a2: objects and NPC topics read 0 in the act I–II playthrough. The
+  coverage-checks part's soak run shows both counters work (waypoints operated,
+  Akara / Kashya / Gheed talked to), so the zeros are real: **the playthrough never
+  operates an object or talks to an NPC** (§3 `interact-pokes`, playthrough `talk`).
+  An act III–V row is `no` from the act I–II runs until the a3a5 part lands (yes wins).
 - `needs_pc1 = y` on 795 rows comes from the settling kind `recording`;
   1.14d now runs under Wine in the cloud (`tools/cloud-game/`), so most of
   these need **Wine recording time, not PC 1**. True PC 1 items are RE
