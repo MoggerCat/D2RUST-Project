@@ -18,20 +18,26 @@
 //! - [`ClientPath::tick`] is the player event 0 step (§9.2) of one tick.
 //!
 //! The player's footprint is stamped on a private copy of the grids it
-//! touches (the model's DRLG is not written); other units' footprints are
-//! not in the client grids (the model stamps none).
+//! touches (the model's DRLG is not written); so are the living
+//! monsters' footprints (`msg-units.md` §3 r2: a client monster gets
+//! footprint mask 0x100), at their model positions, before each request
+//! and step ([`ClientPath::stamp_others`]).
 //!
 //! d2rs-own, unverified. PROVISIONAL (`client/model.md` OQ2; REC-51,
 //! REC-277): that the 1.14d client step `0x00463390` runs these functions
 //! with these inputs (the unit's stats read as: velocity percent and
 //! stat 96 from the model ([`Own`]) plus the run bonus, stamina from the
-//! model, no state, no used skill, no drain), and that client units
-//! leave no footprints on the client grid.
+//! model, no state, no used skill, no drain), and that a walking
+//! monster's footprint stands at its model position (REC-706; settled by
+//! a recording of the 1.14d client grid under a walking NPC).
 
 use std::collections::BTreeMap;
 
 use d2_sim::drlg::{CollisionGrid, Drlg, TileRect};
-use d2_sim::path::record::{alloc_dynamic_path, DynamicKind, DynamicPath};
+use d2_sim::path::footprint::{add_footprint, remove_footprint, FootShape, Footprint, RemoveRule};
+use d2_sim::path::record::{
+    alloc_dynamic_path, pattern_of_size, DynamicKind, DynamicPath, MonsterShape, UnitShape,
+};
 use d2_sim::path::tables::PathTables;
 use d2_sim::path::walk::request::mode;
 use d2_sim::path::walk::velocity::{STAT_FASTERMOVE, STAT_VELOCITYPERCENT};
@@ -75,9 +81,61 @@ pub struct ClientPath {
     run_bonus: i32,
     seed: Seed,
     frame: i32,
+    /// The other units' footprints stamped on the private grids.
+    others: Vec<Footprint>,
 }
 
+/// A monster of the model for [`ClientPath::stamp_others`]: its sub-tile
+/// and the `monstats` / `monstats2` columns of its footprint pattern
+/// (`sim/path-placement.md` §3).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OtherUnit {
+    pub x: u16,
+    pub y: u16,
+    pub size_x: i8,
+    pub npc: bool,
+    pub in_town: bool,
+    pub interact: bool,
+}
+
+/// A client monster's footprint mask (`msg-units.md` §3 r2).
+const MONSTER_FOOTPRINT: u16 = 0x100;
+
 impl ClientPath {
+    /// Stamps `units` on the private grids in place of the last ones
+    /// (`msg-units.md` §3 r2; pattern `sim/path-placement.md` §3).
+    pub fn stamp_others(&mut self, t: &PathTables, drlg: &Drlg, units: &[OtherUnit]) {
+        let mut rooms = Rooms {
+            drlg,
+            grids: &mut self.grids,
+        };
+        for fp in self.others.drain(..) {
+            remove_footprint(&mut rooms, &fp, RemoveRule::Other, true);
+        }
+        for u in units {
+            let (x, y) = (i32::from(u.x), i32::from(u.y));
+            let Some(room) = room_at(drlg, x, y) else {
+                continue;
+            };
+            let shape = UnitShape::Monster(MonsterShape {
+                size_x: i32::from(u.size_x),
+                npc: u.npc,
+                in_town: u.in_town,
+                interact: u.interact,
+                ..MonsterShape::default()
+            });
+            let fp = Footprint {
+                room: Some(room),
+                x,
+                y,
+                shape: FootShape::Pattern(pattern_of_size(t, i32::from(u.size_x), &shape)),
+                mask: MONSTER_FOOTPRINT,
+            };
+            add_footprint(&mut rooms, &fp);
+            self.others.push(fp);
+        }
+    }
+
     /// The path's precise (16.16) position; `None` without a path.
     pub fn position(&self) -> Option<(u32, u32)> {
         self.path.as_ref().map(|p| (p.precise_x, p.precise_y))
@@ -103,6 +161,7 @@ impl ClientPath {
     /// holds the point (no path).
     pub fn place(&mut self, t: &PathTables, drlg: &Drlg, x: u16, y: u16) -> bool {
         self.grids.clear();
+        self.others.clear();
         self.path = None;
         self.mode = mode::NEUTRAL;
         let (x, y) = (i32::from(x), i32::from(y));

@@ -1727,10 +1727,21 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    PROVISIONAL (play preview, path step): with a client DRLG the
    prediction steps the player's own path with the server's path code
    (`sim/pathing.md` §1.2 request, §3–§7 compute, §9.2 step) over the
-   client grids, the player's footprint on a private copy and no other
-   unit's footprint (because the 1.14d client runs the same path code
-   over the same rooms, so its walk stops where the server's does);
-   settled by REC-277 (d) with REC-51.
+   client grids, the player's footprint on a private copy (because the
+   1.14d client runs the same path code over the same rooms, so its walk
+   stops where the server's does); settled by REC-277 (d) with REC-51.
+   *Revision (2026-10-09, q-scenes-compare):* "no other unit's
+   footprint" was wrong: the 1.14d client stamps footprint mask 0x100
+   for each monster not dying or dead (`client/msg-units.md` §3 r2), and
+   `a1-walk-se` / `a1-walk-nw` stop short of Warriv's sub-tiles.
+   PROVISIONAL (play preview, other units): the private grids also carry
+   each living model monster's footprint (pattern of
+   `sim/path-placement.md` §3 from its `monstats2` size, NPC, in-town
+   and interact columns; mask 0x100), re-stamped at the model positions
+   before each request and step (because the client's footprint follows
+   the monster's own client path, which d2rs's model positions only
+   sample); settled by REC-706 (a recording of the 1.14d client grid
+   under a walking NPC).
    *Answered, stamina* (2026-10-09, static read): the 1.14d client never
    drains stamina. The run drain `0x0057F240` has one caller, the server
    path event `0x00580C20`; in client code stat 10 is written only by

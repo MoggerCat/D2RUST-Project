@@ -31,17 +31,18 @@ under Xvfb + lavapipe; compare: `d2-client facts-compare SCENE DIR --ignore tick
 12. An object casts its composite shadow only where its mode's `BlocksLight` ≠ 0 (`blend-modes.md` §5 r3 revision, REC-518): a4 equal through the world (row 248).
 13. A click while walking re-targets from the precise position (`sim/pathing.md` §1.5, already specified; `Predict::path_step`): walk-s, ne, sw, e match every frame input.
 14. Control panel: UI cels export their 1.14d wrapper (`facts-render.md` §5 r18: orbs `CelDrawEx`, skill icons / glyphs `CelDrawColor`); the stamina bar is the rectangle (`control-panel.md` §4 r2); the new-stats / new-skills buttons after the skill icons (§1 r3); the mini panel open from the start (§9 revision, REC-519). a4 equal through row 257; next: the help button `0x004A64C0` ("Help (H)" + levelsocket, unspecified: `pc1-data.md` Step 4 item 41).
+15. The client path sees the model's living monsters as footprints, mask 0x100 (`client/model.md` open question 2 revision, REC-706; `ClientPath::stamp_others`): walk-n, s, ne, e reach the critter / NPC rows; walk-se / nw match when d2rs's Warriv stands where 1.14d's does (NPC position: q-fix-real-unit-seed-order); runs drift ~50 px (was 90–240).
 
-## First difference per scene (after fixes 1–14)
+## First difference per scene (after fixes 1–15)
 | Scene | First difference |
 |---|---|
 | a1-town-idle-sor, a1-walk-n, a1-walk-s | r110 NPC `wa` WL dir 47 vs 0: d2rs's `wa` already stands on its walk target (4866, 4235), 1.14d's still walks east past it (NPC path node: q-fix-real-unit-seed-order) |
 | a1-walk-e | r100 `wa` shadow before the player's (NPC position) |
 | a1-walk-ne | r112 critter `ck` shadow missing (q-fix-real-town-critters) |
 | a1-walk-sw | r102 torch vs `rc` (NPC position) |
-| a1-walk-w | tile_origin_y 72532 vs 72529 |
-| a1-walk-se, -nw | tile_origin_x 22 / 33 px off (the agent saw no straight-walk fit: an obstacle or a hovered NPC) |
-| a1-run-* | tile_origin_x ~90–240 px off: the run (mode 3) is not fitted yet (REC-516) |
+| a1-walk-w | tile_origin_y 72533 vs 72532 (1 px) |
+| a1-walk-se, -nw | tile_origin 9992 vs 10012 / 9950 vs 9976: the walk bends round Warriv, who stands elsewhere in d2rs (NPC position) |
+| a1-run-* | tile_origin ~50 px off (inherits the walk drift and NPC positions) |
 | a1-panel-inventory | r137–138 an extra `unit` row: d2rs's `wa` (1:7) stands in this cell (NPC position) |
 | a1-panel-character, -skilltree | r109–111 `wa` NU / WL (NPC pose) |
 | a1-panel-automap, -esc-menu-wine | r108 torch vs `rc` (NPC position) |
