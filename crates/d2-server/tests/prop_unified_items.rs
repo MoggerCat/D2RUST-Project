@@ -1801,7 +1801,9 @@ fn check_state(h: &mut Host, quirk: Option<u8>) -> Result<BTreeMap<UnitId, Place
     let inv = h.inv();
     // 4. No inventory or item data refers to a freed unit.
     for (&owner, i) in &inv.state.inventories {
-        if owner != h.player && !live.contains(&owner) {
+        // An NPC holds its store on an inventory (q-fix-server-store-fill):
+        // the owner must still be a unit of the game, not only an item.
+        if owner != h.player && !live.contains(&owner) && s.game.lists.unit(owner).is_none() {
             return Err(format!("inventory of freed {owner:?}"));
         }
         for it in i.items().iter().chain(i.cursor().iter()) {
