@@ -35,8 +35,9 @@ under Xvfb + lavapipe; compare: `d2-client facts-compare SCENE DIR --ignore tick
 16. The grid hover tint and item tip follow the §5 hover state, not the raw mouse (`ui/inventory.md` §3 r2, already specified); a use press clears that state until the next move or press, and a release does not re-track it (§5 r4, PROVISIONAL REC-707). a1-panel-cube is now equal except the cursor row 73, which animates on wall-clock time (`facts-render.md` edge cases: known divergence).
 17. `--skip-weather` also drops pass 4's environment-pool cels: 1.14d `CelDraw` rows from the pool draw [`0x00473A70`, `0x00473C00`), and d2rs rows exported with `at` = `pools` (`facts-render.md` §6 r5 revision, PROVISIONAL REC-708). Their spawns draw on the player seed, which the wall-clock cursor steps (`panels-3.md` §23 r8). a3 now reaches its NPC rows.
 18. q-fix-p6-shadow-pretest (REC-511 settled, `blend-modes.md` §5 r3a): the shadow box test keeps the left-bound shift `d` but its y bounds are the whole COF box. It runs at the shadow position: a motion record's height `oz` counts half on both axes (`unit_shadow_offset`, `SkillMotion::shadow_offsets`). The REC-511 / REC-518 PROVISIONAL markers are dropped. Scene sweep unchanged (no recorded shadow near the bottom edge).
+19. q-fix-p6-help-button (`ui/control-panel.md` §11, PC 1 item 42): state 0x22 opens at game entry with the mini panel. The button draws first in step 8: caption string 4177 + ` (%s)` key names (command 6, slot 1 then 0) in font 1 at (W − 58 − w/2, H − 197); `Levelsocket` at (W − 75, H − 160); `Level` at (W − 72, H − 164), frame 1 while pressed. It hides while 4, 3, 1, 0x0C, 0x17 or 0x19 is open. Its press / release run ahead of the mini-panel row; the release closes 0x22, toggles 0x21 and sets the `Help Menu` cache (no registry in d2rs: absent at every start). a4 is now equal except the cursor row 278 (wall clock).
 
-## First difference per scene (after fixes 1–18)
+## First difference per scene (after fixes 1–19)
 | Scene | First difference |
 |---|---|
 | a1-town-idle-sor, a1-walk-n, a1-walk-s | r110 NPC `wa` WL dir 47 vs 0: d2rs's `wa` already stands on its walk target (4866, 4235), 1.14d's still walks east past it (NPC path node: q-fix-real-unit-seed-order) |
@@ -52,7 +53,7 @@ under Xvfb + lavapipe; compare: `d2-client facts-compare SCENE DIR --ignore tick
 | a1-panel-cube | r73 the cursor only (wall-clock animation, known divergence) |
 | a2-town-lut-gholein | r115 critter `bg` shadow missing (q-fix-real-town-critters) |
 | a3-town-kurast-docks | r103 `m3` WL shadow dir 14 (NPC facing: q-fix-real-unit-seed-order) |
-| a4-town-pandemonium-fortress | r258 the help button `0x004A64C0` ("Help (H)", `levelsocket`, `level` at 725, 440): not specified (`pc1-data.md` Step 4 item 41) |
+| a4-town-pandemonium-fortress | r278 the cursor only (wall-clock animation, known divergence) |
 | a5-town-harrogath | r76 monster `6z` NU frame 3 vs 5. Every a5 monster's start frame differs (7i 1/0, 7j 0/1): `msg-units.md` §1.2 r6.5 draws it on the unit seed, the room seed stepped once per unit add, so the Act V add order or room seeds differ (a1's NPCs match; unit seed order) |
 | a1-cold-plains-monsters | level 3 vs 1: the waypoint walk does not reach the waypoint (walk / run drift) |
 | a1-town-arrival-ama | skipped (q-fix-real-unit-seed-order) |
