@@ -28,7 +28,7 @@ code. Spec-role tool: the addresses it hooks are documented in
 | `autostart.py` | Unattended start for every `record_*.py`: `--auto CHAR [--seed N] [--input SCRIPT]` starts a single-player game with that expansion character (no player at the keyboard), optionally with a fixed map / game seed, then plays a scripted input (clicks, keys, screenshots) into the window; `--try CHAR` runs it alone; `--selftest` |
 | `check_drlg_acts.py` | Checks the `dumpdrlg` records of an `--auto` run against `specs/drlg/levels.md` §3–§4 (rules D1–D7); `--perturb N`; `--selftest` |
 | `dump_tables.py` | Launches `game/Game.exe` under the debugger, stops when the excel load and its fix-ups have finished, writes every loaded table and the runtime maps it knows to `traces/raw/<time>-tables/` (gitignored); compared by `data-tool dump-compare` |
-| `poke.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick hook plus the tick return `0x0052FD1E`): runs poke directives (`specs/tools/poke.md`) between two server ticks, calling the game's own creation functions or writing the state field; `--poke-file FILE` (ticks relative to F0), `--poke "F D ..."` (absolute frame); writes `traces/raw/<time>-poke.jsonl` (format `poke-raw-1`, gitignored); `PokeLayer` / `add_options` for other recorders; `--selftest` |
+| `poke.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick hook plus the tick return `0x0052FD1E`): runs poke directives (`specs/tools/poke.md`) between two server ticks, calling the game's own creation functions or writing the state field; `--poke-file FILE` (ticks relative to F0), `--poke "F D ..."` (absolute frame), `--forms FILE` (call forms, `CALL_FORMS`); writes `traces/raw/<time>-poke.jsonl` (format `poke-raw-1`, gitignored); `PokeLayer` / `add_options` for other recorders; `--selftest` |
 
 ## Use
 
@@ -377,34 +377,91 @@ reached state 4 (client list game +0x88, state +0x04;
 `original-hooks.md` §1 rule 5), or `--start-frame F0`. Calls follow
 `original-hooks-spawn.md` §5: one RWX scratch page with an INT3 return
 trap at +0, the full thread context (FPU and SSE included) saved, the
-arguments written above the return address, ECX / EDX set, EIP = the
-entry; at the trap the next call starts again from the saved context, and
-after the last one the saved context is restored and the hook's byte is
-stepped over as for any INT3. Debug events of other threads during a call
-go to the recorder's own handler.
+arguments written above the return address, the registers of the
+function's call form set (any of EAX, EBX, ECX, EDX, ESI, EDI; the others
+keep the saved values), EIP = the entry; at the trap the next call starts
+again from the saved context, and after the last one the saved context is
+restored and the hook's byte is stepped over as for any INT3. Debug events
+of other threads during a call go to the recorder's own handler.
 
-| Directive | 1.14d |
+| Directive | 1.14d (`CALL_FORMS` names) |
 |---|---|
-| `object` | allocator `0x00555230` (ECX 2, EDX class; x, y, game, room, 1, mode, 0) |
-| `superunique` | `0x005A49B0` (ECX game, EDX room; x, y, row) |
-| `missile` | `0x0059FA30` (ECX game, EDX = a 0x5C-byte record in the scratch page: flags 0x21, owner, origin = owner, class, x, y, tx, ty, skill, level) |
-| `spawn` | `normal`: entry 1 `0x005B2F20` (mode 1, spread −1, flags 0); `champion`: entry 1 then entry 5 `0x005A48C0` with the umod; `random-boss`: entry 3 `0x005A43E0` (champion allowed 1); `unique` with umods: gap |
+| `object` | `alloc` `0x00555230` (ECX 2, EDX class; x, y, game, room, 1, mode, 0) |
+| `superunique` | `superunique` `0x005A49B0` (ECX game, EDX room; x, y, row) |
+| `missile` | `missile` `0x0059FA30` (ECX game, EDX = a 0x5C-byte record in the scratch page: flags 0x21, owner, origin = owner, class, x, y, tx, ty, skill, level) |
+| `spawn` | `scenario.md` §3.1 sequences. `normal`: `spawn` entry 1 `0x005B2F20` (mode 1, spread −1, flags 0); `random-boss`: `random_boss` `0x005A43E0` (no list, champion allowed, no warp check), then `champion_minions` `0x0054E1E0` (ESI boss, EDI game; cl 0, class); `champion`: `boss_spawn` `0x005A09E0` (EDI game, EBX class; room, cl 0, x, y, GUID −1, warp 0), `champion_mark` `0x005A48C0` with the umod, `champion_minions`; `unique`: `boss_spawn`, the umods appended to monster data (unit +0x14) +0x1C while fewer than 9, then `boss_minions` `0x005A2120` (ECX 3, EDX cl 0, EAX 6; game, boss, 1). Forms: `monsters/init.md` §25.1, §25.3 |
 | `seed-game`, `seed-unit`, `time` | field writes: game +0xD0; unit +0x20/+0x24; environment record +0x00 / +0x08 of the player's act |
 | `freeze` | the debugger sleeps at the stop |
-| `pos`, `warp`, `item`, `stat`, `state` | gap (`poke.md` Open questions) |
+| `pos` | `teleport` `0x00650BE0`(unit path, room, x, y), else `place` `0x00554EA0`(game, unit, room, x, y, exact 1, alt 0); room by entry 6 from the unit's room; only unit types 0, 1, 3. Gap until a form is filled (item 22 (a)) |
+| `warp` | `warp` `0x0053AEC0`(game, player, level, tile; tile default 0). Gap (item 22 (b)) |
+| `item` | index = the first combined items record whose code (+0x80) matches (array header `0x0096CA58`: count, records; 424-byte records; `items/treasure.md` §9.1, `data/loading.md` §6–§9; no `0x00633640` call); then `item_create` `0x00558D90`(game, request, 0) with a 0x84-byte request at scratch +0x200: unit 0, game, ilvl (default 1), item, mode 3, x, y, room (entry 6), init flags 1, format (game +0x78), quality (0 or 1–8), rest 0. Gap (item 22 (c)) |
+| `stat` | `stat_set` `0x00627260`(unit, stat, value, layer); a unit with +0x5C = 0 → `failed`. Gap (item 22 (d)) |
+| `state` | `state_set` `0x00639DB0`(unit, state, 1/0): toggle and update-queue insert. Gap (item 22 (d)) |
 
-The room for `object`, `superunique` and `spawn` comes from entry 6
+The room for `object`, `superunique`, `spawn` and `item` comes from entry 6
 `0x00463740` (ECX = the player's room, EDX = x; y); 0 gives `failed`.
 References (`@player`, `@<type>[:<class>][#n]`, `<type>/<guid>`, `@x±N`,
 `@y±N`) are resolved on the hash lists at the stop; `@wp` is a gap.
+
+### Call forms (`CALL_FORMS`, `FIELDS`, `--forms`)
+
+Every function a directive calls is one entry of `CALL_FORMS` in
+`poke.py`: `Fn(address, argument names, result, cited spec, pc1-data
+item, form)`. The argument names are what `poke.py` supplies (e.g.
+`warp`: `game`, `player`, `level`, `tile`); the form says where each goes:
+
+```python
+Form(regs={"ecx": "game", "edx": "player"}, stack=["level", "tile"], ret=8, result="bool")
+```
+
+`regs` maps EAX/EBX/ECX/EDX/ESI/EDI to an argument; `stack` lists the
+stack arguments, first at [ESP+4]; either may hold a literal int the spec
+names; each argument is placed exactly once; `ret` is the callee's `ret N`
+(0 or 4 × stack count; the call does not need it); `result` is what EAX
+means when the entry leaves it open (`unit`: created unit, 0 = failed;
+`bool`: 0 = failed; `none`: ignored). `form=None` is a gap: every
+directive calling that function returns `gap` naming the function, its
+address and its pc1-data item. `FIELDS` holds the record offsets and table
+addresses the directives read (item format, items array, umod list); None
+there is a gap too.
+
+Gaps today: `teleport`, `place` (`pos`), `warp`, `item_create`, `stat_set`,
+`state_set` (`docs/handoff/pc1-data.md` Step 4 item 22 (a)–(d)). The spawn
+kinds' functions (item 22 (e)) are already stated in `monsters/init.md`
+§25.1 and filled.
+
+PC 1, for each answered function:
+
+1. Write the form into the owning spec (e.g. `world/waypoints.md` §7 r5)
+   and remove its gap row in `specs/tools/poke.md` §1.
+2. Try it without editing `poke.py`: a `--forms` file,
+   ```json
+   {"format": "poke-forms-1",
+    "forms": {"warp": {"regs": {"ecx": "game", "edx": "player"}, "stack": ["level", "tile"], "ret": 8}},
+    "fields": {}}
+   ```
+   (`null` for a form sets it back to a gap; `fields` overrides `FIELDS`
+   entries) and run
+   `py tools/trace-recorder/poke.py --forms forms.json --auto ScnAma --seed 1234 --poke "400 warp 2"`;
+   check the `poke` record (`r`, `eax`) and the game state. A form that
+   names an unknown register or argument, or places one twice, stops the
+   run before the game starts.
+3. Copy the form into its `CALL_FORMS` entry (replace `None`, cite the
+   spec section in `cite`), run `py tools/trace-recorder/poke.py --selftest`
+   (it validates every form; the fake-process checks use their own forms,
+   so they stay green), then run the directive on 1.14d once more without
+   `--forms` and commit.
+
 Options: `--seconds`, `--after N` (stop N frames after the last poke,
 default 50), `--snap-every N` and `--tick-records` (keep `record_tick`
 snapshots / all its hooks; default off), `--out`, the autostart options.
 
 Raw format `poke-raw-1` (JSON lines, key `k`): `header` (format, tool,
 date, `Game.exe` SHA-256, args), `poke_file` (path, SHA-256, start frame,
-steps), `game`, `tick` (as `tick-raw-1`), `poke_f0` (F0 and how it was
+steps, the `--forms` file path and SHA-256, the forms and fields in
+force), `game`, `tick` (as `tick-raw-1`), `poke_f0` (F0 and how it was
 found), `poke` (one per directive: `f` = the frame the poke precedes,
 `frame` = game +0xA8 at the stop, `t` for poke-file lines, `i` (index in
 the stop), `d`, `r` (`ok`, `failed`, `unresolved`, `gap`), `guid` and
-`eax` for a created unit, `args` as resolved, `note`, `src`), `footer`.
+`eax` for a created unit, `via` for `pos` (`teleport` / `place`), `args`
+as resolved, `note`, `src`), `footer`.
