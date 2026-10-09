@@ -57,6 +57,10 @@ pub trait QuestInventory<H> {
     /// `0x005440A0` (`quests.md` §9.2): the item leaves the player (the
     /// client is told) and is freed.
     fn delete(&mut self, econ: &mut Economy<'_, H>, player: UnitId, item: UnitId);
+    /// The GUIDs on the player's inventory update list (inventory +0x2C,
+    /// `items/inventory.md` §1 rule 2); `0x00597A20` reads it
+    /// (`vendors-2.md` §10.1 rule 6).
+    fn update_guids(&self, player: UnitId) -> Vec<u32>;
 }
 
 /// [`QuestInventory`] on the inventory wiring: an [`InvDesk`] over the
@@ -108,6 +112,12 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> QuestInventory<H> for QuestInv<'_, 
     }
     fn cursor_of(&self, player: UnitId) -> Option<UnitId> {
         self.state.cursor_of(player)
+    }
+    fn update_guids(&self, player: UnitId) -> Vec<u32> {
+        self.state
+            .of(player)
+            .map(|i| i.update_list().to_vec())
+            .unwrap_or_default()
     }
     /// `quests-act3-2.md` §11.5: the item at body location 5, then 4, of
     /// item type `weap` whose GUID is the inventory's weapon GUID.

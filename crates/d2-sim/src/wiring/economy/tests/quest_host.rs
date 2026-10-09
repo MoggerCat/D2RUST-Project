@@ -23,6 +23,7 @@ struct Inv {
     place: bool,
     log: Vec<String>,
     drops: Vec<(UnitId, Spot)>,
+    update: Vec<u32>,
 }
 
 impl<H> QuestInventory<H> for Inv {
@@ -41,6 +42,9 @@ impl<H> QuestInventory<H> for Inv {
     }
     fn items_of(&self, _: UnitId) -> Vec<UnitId> {
         Vec::new()
+    }
+    fn update_guids(&self, _: UnitId) -> Vec<u32> {
+        self.update.clone()
     }
     fn cursor_of(&self, _: UnitId) -> Option<UnitId> {
         None
@@ -119,6 +123,26 @@ fn a_reward_the_inventory_takes_is_returned_identified() {
     assert_ne!(it.flags & flag::IDENTIFIED, 0);
     assert!(rest.log.is_empty(), "{:?}", rest.log);
     fx.assert_clean();
+}
+
+// Covers: specs/world/quests.md §9.1
+#[test]
+fn a_reward_with_no_free_spot_stays_unplaced() {
+    let mut fx = Fx::new();
+    let a = fx.a;
+    // Far outside every room: the 100-ring search accepts nothing.
+    let p = fx.spawn(UnitType::Player, 0, a, 100_000, 100_000);
+    let mut rest = Rest::new();
+    let mut inv = Inv::default();
+    let item = host(&mut fx, &mut rest, Some(&mut inv), None, |w| {
+        w.reward_item(p, *b"cap ", 0, 2, true)
+    })
+    .expect("returned");
+    // No drop message, not freed, in no room.
+    assert!(inv.drops.is_empty());
+    assert!(fx.sim.sys.hooks.items.get(item).is_some());
+    assert!(fx.sim.sys.units.get(item).is_some());
+    assert_eq!(fx.game.lists.unit(item).and_then(|u| u.room()), None);
 }
 
 // Covers: specs/world/quests.md §9.1; specs/world/quests-helpers.md §1
@@ -215,11 +239,41 @@ fn the_trade_cancel_button_follows_the_dispatch() {
     assert_eq!(run(&mut fx, &mut rest, None, 6), [vec![0x77, 0x0C]]);
     // Rule 5: an interaction with a non-player → 0x77 0x0D.
     assert_eq!(run(&mut fx, &mut rest, Some((1, 5)), 6), [vec![0x77, 0x0D]]);
-    // Rule 5: the partner gone → 0x77 0x0C (`0x00597A20` read as 0).
+    // Rule 5: the partner gone, `0x00597A20` = 0 → 0x77 0x0C.
     assert_eq!(
         run(&mut fx, &mut rest, Some((0, 0xDEAD)), 6),
         [vec![0x77, 0x0C]]
     );
+    // Rule 6: flags 2 bit 0x800000 (or 0x400000) → nothing sent.
+    for bit in [0x80_0000, 0x40_0000] {
+        fx.sim.sys.units.get_mut(p).unwrap().flags2 |= bit;
+        assert!(run(&mut fx, &mut rest, Some((0, 0xDEAD)), 6).is_empty());
+        fx.sim.sys.units.get_mut(p).unwrap().flags2 &= !bit;
+    }
+    assert_eq!(
+        run(&mut fx, &mut rest, Some((0, 0xDEAD)), 6),
+        [vec![0x77, 0x0C]]
+    );
+    // Rule 6: a live item on the inventory update list → nothing sent; a
+    // dead GUID does not count.
+    let mut inv = Inv {
+        place: true,
+        ..Inv::default()
+    };
+    let item = host(&mut fx, &mut rest, Some(&mut inv), None, |w| {
+        w.reward_item(p, *b"cap ", 0, 2, true)
+    })
+    .expect("item");
+    let ig = fx.sim.sys.units.get(item).unwrap().guid;
+    fx.sim.sys.units.get_mut(p).unwrap().interact.set(0, 0xDEAD);
+    for (guid, sent) in [(ig, 0), (0x7777_7777, 1)] {
+        inv.update = vec![guid];
+        rest.sent.clear();
+        host(&mut fx, &mut rest, Some(&mut inv), None, |w| {
+            w.trade_button(p, 6)
+        });
+        assert_eq!(rest.sent.len(), sent);
+    }
     // §10.3: button 6 with the partner → nothing.
     assert!(run(&mut fx, &mut rest, Some((0, q_guid)), 6).is_empty());
     assert!(rest.log.is_empty(), "{:?}", rest.log);

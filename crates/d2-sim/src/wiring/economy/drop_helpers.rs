@@ -3,8 +3,8 @@
 //! wiring's units, stats and DRLG: armor `0x005594C0` and weapon
 //! `0x00559630` (§20.1, §20.2: room seed, area level − 1), gold
 //! `0x00559300` (§20.3), by source unit `0x00559A30` (§20.4: the unit
-//! seed, the unit's level) and the code drop `0x00585970` (no written
-//! body: PROVISIONAL, [`code_drop`]).
+//! seed, the unit's level) and the code drop `0x00585970` (§20.7,
+//! [`code_drop`]).
 //!
 //! The class picks are [`crate::treasure::class_pick`]; the item is a
 //! real item unit created by `0x00558D90` ([`Economy::create_item`]) in
@@ -299,16 +299,13 @@ pub fn source_drop<X: Pending, F: FreeSpot>(
     (create_at(h, sim, d, spots, room, pos, Some(u), rq), l)
 }
 
-/// `0x00585970(game, U, code, quality)`: the code drop `C(code)`
+/// `0x00585970(game, U, code, quality)` (§20.7): the code drop `C(code)`
 /// (`objects.md` §8) and the quest gold piles (`quests-act2.md` §1.3,
-/// `quests-act3.md`).
-///
-/// PROVISIONAL (objects.md §8 "Code drop"; REC-none): no spec states the
-/// body; read as `0x00559A30` (§20.4) with the code argument as the drop
-/// code: U's level (rule 2), the code's items index (no draw; not an
-/// items code → fatal 0x9EA), U's position and floor search, request
-/// unit U, ilvl L, the quality argument. Settled by a capture of a chest
-/// opening (items created, their ilvl and the seeds stepped).
+/// `quests-act3.md`). An unknown code gives none (no fatal); the floor
+/// search from U's position comes first, then the level is read
+/// (`0x00558200(U, 0)`, neither draws); the request carries U, the level,
+/// the item, spawn mode 3, init flags 1, the game's format and `quality`,
+/// every other field 0. No draw, no request-out copy.
 #[allow(clippy::too_many_arguments)]
 pub fn code_drop<X: Pending, F: FreeSpot>(
     h: &mut ActionHooks<X>,
@@ -323,5 +320,14 @@ pub fn code_drop<X: Pending, F: FreeSpot>(
     if code == 0 {
         return None;
     }
-    source_drop(h, sim, d, levels, spots, u, code, quality, -1, false).0
+    let id = d.picks.find_code(code.to_le_bytes())? as i32;
+    let room = sim.game.lists.unit(u).and_then(|e| e.room());
+    let pos = h.path_position(u);
+    let rq = ItemRequest {
+        ilvl: source_level(h, sim, levels, u),
+        item: id,
+        quality,
+        ..ItemRequest::default()
+    };
+    create_at(h, sim, d, spots, room, pos, Some(u), rq)
 }

@@ -162,26 +162,18 @@ pub fn set_item_state(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
     Ok(())
 }
 
-/// 0x92 RemoveItemsDisplay (§5 r5): type u8@1, GUID u32@2. Only a unit
-/// with an inventory changes: for each node, in order, of kind 3 (body)
-/// or kind 1 when the item is an active inventory item (`0x0062FF70`:
-/// not broken, flag 0x4000 clear, a charm, page 0; `items/inventory.md`
-/// §5.6), the item is unlinked and re-added (its place in the node list
-/// moves to the end; the item unit stays in S), a body node's slot is
-/// cleared, the set-item update with remove detaches the owner's set
-/// list and the item's stat list is detached unless item flag 0x100 is
-/// set (already detached). In the model that is
+/// 0x92 RemoveItemsDisplay (§5 r5.1-5.4, REC-416 settled): type u8@1,
+/// GUID u32@2. Only a unit with an inventory changes: `0x004C23E0` then
+/// `0x0063E0B0` remove every item of the inventory (any node kind: body,
+/// grid, belt; the item units stay in S) and the item's stat list is
+/// detached unless item flag 0x100 is set (already detached). The nodes
+/// are the item units whose last record names U as owner (a 0x9C item
+/// belongs to the local player), `store` items excluded. In the model
+/// that is
 /// [`ItemData::unlinked`](super::super::world::ItemData::unlinked): the
 /// item's properties stop counting until its next record re-adds it.
 /// The gfx refreshes, `0x0063BEF0`, the requirement refresh `0x004C1350`
 /// and the final `0x0063E0B0(inventory)` write no model field.
-// PROVISIONAL (REC-416; `client/msg-stats-items.md` OQ 3): the model
-// holds no inventory nodes, so the nodes are the item units whose last
-// record names U as owner (a 0x9C item belongs to the local player), in
-// GUID order, and a "unit with an inventory" is a player or monster in S;
-// the node order and the fatal 0xD4F / 0xD5A / 0xD5B asserts have no
-// model to run on; settled by a join / trade recording with items (the
-// 0x92 bytes and the 0x9D that follows) and a Ghidra read of 0x0062E410.
 pub fn remove_items_display(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
     if msg.bytes.len() != 6 {
         return Err(HandlerError::Invalid("0x92 is 6 bytes"));
@@ -197,22 +189,7 @@ pub fn remove_items_display(w: &mut ClientWorld, msg: &Message<'_>) -> Result<()
         .copied()
         .filter(|&k| k.unit_type == ITEM)
         .filter(|&k| {
-            super::super::items::item(w, k).is_some_and(|v| {
-                if v.store || v.owner != Some(unit) {
-                    return false;
-                }
-                match v.mode {
-                    super::super::items::mode::BODY => true,
-                    // `0x0062FF70`: not broken (flag 0x100), flag 0x4000
-                    // clear, a charm, page 0.
-                    super::super::items::mode::STORED => {
-                        v.page == 0
-                            && matches!(&w.units[&k].kind,
-                                KindData::Item(d) if d.charm && d.flags & 0x4100 == 0)
-                    }
-                    _ => false,
-                }
-            })
+            super::super::items::item(w, k).is_some_and(|v| !v.store && v.owner == Some(unit))
         })
         .collect();
     for k in nodes {

@@ -10,7 +10,9 @@
 //! and from [`Pending`] otherwise (the module doc of [`super`]).
 
 use crate::game::Game;
-use crate::path::footprint::{add_footprint, remove_footprint, set_foot_mask};
+use crate::path::footprint::{
+    add_footprint, make_corpse_footprint, remove_footprint, set_foot_mask,
+};
 use crate::path::record::{alloc_dynamic_path, TargetUnit};
 use crate::path::{
     DynamicKind, FootShape, Footprint, MonsterShape, RemoveRule, StaticPath, UnitPath, UnitShape,
@@ -310,9 +312,9 @@ impl<X: Pending> View<'_, X> {
     /// The three dynamic allocations pass `set0x10` = 0 (§2.5).
     // The monster calls after the allocation (`0x005735A0`, then
     // `0x00573780`; `init.md` §4.1) run in [`View::add_allocated`]
-    // (`monster_added`). PROVISIONAL (path-placement.md §2.5): the corpse
-    // path settings of `units.md` §3.1 step 8 (player mode 0 / 17,
-    // monsters with `0x0063EA40`) have no rules: not run here.
+    // (`monster_added`). The corpse path settings of `units.md` §3.1
+    // step 8 run at the end (player mode 0 / 17, monster mode 0 / 12
+    // without monstats2 `deadCol`).
     pub fn path_place(&mut self, game: &Game, unit: UnitId, x: i32, y: i32) {
         if self.h.paths.is_none() {
             self.h.x.place(unit, x, y);
@@ -331,6 +333,27 @@ impl<X: Pending> View<'_, X> {
                 _ => None,
             },
             _ => None,
+        };
+        // `units.md` §3.1 step 8: `0x0063EA40` and not monstats2 flag 19
+        // (`deadCol`, `0x004638A0(class, 0x13)`).
+        let dead_body = match ty {
+            UnitType::Player => matches!(mode, 0 | 17),
+            UnitType::Monster => {
+                matches!(mode, 0 | 12)
+                    && !self
+                        .units
+                        .get(unit)
+                        .and_then(|r| self.h.tables.combat.monstats.get(r.class as usize))
+                        .and_then(|m| {
+                            self.h
+                                .tables
+                                .combat
+                                .monstats2
+                                .get(usize::from(m.monstatsex))
+                        })
+                        .is_some_and(|m2| m2.deadcol)
+            }
+            _ => false,
         };
         let h = &mut *self.h;
         let p = h.paths.as_mut().expect("checked above");
@@ -359,6 +382,11 @@ impl<X: Pending> View<'_, X> {
             _ => return,
         };
         p.records.insert(unit, rec);
+        if dead_body {
+            if let Some(d) = p.dynamic_mut(unit) {
+                make_corpse_footprint(&mut h.drlg, d);
+            }
+        }
     }
 
     /// The unit's footprint and removal rule (`0x00649400` /

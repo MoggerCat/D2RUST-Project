@@ -791,7 +791,21 @@ fn source_and_code_drops_use_the_unit_seed_and_level() {
         .expect("a gold item");
     assert_eq!(fx.sim.sys.units.get(o).unwrap().seed, seed);
     assert_eq!(fx.sim.hooks().items.get(item).unwrap().ilvl, 1);
-    // An unknown code: fatal 0x9EA, nothing created.
+    // A code that is not an items code (§20.7 rule 1): nothing created, no
+    // error, no draw.
+    let n = fx.sim.hooks().object_drops.as_ref().unwrap().placed.len();
+    let none = fx
+        .sim
+        .objects(&mut fx.game, |_, _, w| {
+            crate::world::objects::ChestWorld::code_drop(w, o, 0x2020_2020)
+        })
+        .flatten();
+    assert_eq!(none, None);
+    assert_eq!(fx.sim.sys.units.get(o).unwrap().seed, seed);
+    let d = fx.sim.hooks().object_drops.as_ref().unwrap();
+    assert!(d.pick_errors.is_empty());
+    assert_eq!(d.placed.len(), n);
+    // An unknown code through the unit drop (§20.4): fatal 0x9EA, nothing created.
     fx.sim.objects(&mut fx.game, |_, _, w| {
         crate::world::objects::ChestWorld::drop_item_code(w, o, 0x2020_2020)
     });
