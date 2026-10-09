@@ -243,12 +243,12 @@ rather than a hand-run recipe.
     register form of the champion / boss minions call `0x0054E1E0`
     (`scenario.md` §3.1, `population.md` §6.4); `poke.py` writes them as
     gaps until then (`normal` runs).
-23. **Poke and variant runs** (REC-590, REC-591): run
-    `traces/scenarios/poke-spawn-town.scenario` on 1.14d (`poke.py`) and
-    d2rs and compare; build `traces/variants/only-fallen` with
-    `data-tool variant build` and confirm 1.14d loads it
-    (`dump_tables.py --game <variant>/Game.exe` + `data-tool
-    dump-compare`). Commands in "Set up any state for a check" below.
+23. **Poke runs on Windows** (REC-590): the cloud ran every runnable
+    directive on 1.14d under Wine (`specs/tools/poke.md` Status) and
+    settled the variant load (REC-591, `tools/test-variants.md` Status).
+    Left: run `traces/pokes/spawn-town.poke` once on PC 1 with a
+    screenshot (Wine screenshots are blank). Commands in "Set up any
+    state for a check" below.
 
 ## Step 5 — spec gaps (107 provisional points no spec states)
 

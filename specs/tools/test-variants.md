@@ -1,7 +1,12 @@
 # Spec: Tools — Test variants (a patched copy of the install for one check)
 
-- **Status:** draft: format and build are ours; the 1.14d load of a
-  variant is not yet run (REC-591).
+- **Status:** implemented and checked on 1.14d (REC-591, 2026-10-09,
+  cloud under Wine): `traces/variants/only-fallen` built from the real
+  install patches `levels.bin` only; 1.14d loads the variant
+  (`dump_tables.py --game <variant>/Game.exe`) and `data-tool
+  dump-compare` of that dump against d2rs reading the same variant gives
+  70 tables identical, 0 differ; against the base install only `levels`
+  differs (18 bytes: the 9 patched cells).
 - **Target version:** 1.14d (the install the variant is built from).
 - **Crate/module:** `data-tool variant` (`tools/data-tool/src/variant.rs`)
 - **Related specs:** `data/patch-layers.md` (the `d2stack` / `d2patch`
@@ -123,7 +128,7 @@ None.
 | synthetic install, one `set` on `monstats` | variant `patch_d2.mpq` reads the new `monstats.bin`; every other block byte-identical | `data-tool` tests |
 | same, the hash slot taken by a new name | found by the §5 probe | synthetic |
 | empty stack | variant equal to base, note printed | synthetic |
-| real install, `traces/variants/only-fallen` | 1.14d and d2rs load it; `dump_tables.py` + `data-tool dump-compare` on the variant match | REC-591 (not run yet) |
+| real install, `traces/variants/only-fallen` | 1.14d and d2rs load it; `dump_tables.py` + `data-tool dump-compare` on the variant match | REC-591: 70 identical, 0 differ |
 
 ## Provenance
 
@@ -132,6 +137,5 @@ d2rs-own tool. Archive facts from `formats/mpq.md`; load order from
 
 ## Open questions
 
-1. Does 1.14d's archive layer accept a block appended after the base
-   archive's end with the header's archive size updated (`mpq.md` §1)?
-   Settled by REC-591.
+1. *Answered* (REC-591): 1.14d's archive layer reads a block appended
+   after the base archive's end with the rewritten tables (Status).
