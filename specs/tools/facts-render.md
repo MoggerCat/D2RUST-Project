@@ -26,15 +26,15 @@
 |   2. `draws.tsv` | 90–133 |
 |   3. `frame.tsv` | 134–166 |
 |   4. `sprites.tsv` | 167–182 |
-|   5. d2rs export | 183–261 |
-|   6. Comparison | 262–284 |
-|   7. Requests | 285–296 |
-| Constants & data dependencies | 297–300 |
-| Randomness | 301–304 |
-| Edge cases & original bugs | 305–312 |
-| Test vectors | 313–321 |
-| Provenance | 322–326 |
-| Open questions | 327–341 |
+|   5. d2rs export | 183–274 |
+|   6. Comparison | 275–297 |
+|   7. Requests | 298–309 |
+| Constants & data dependencies | 310–313 |
+| Randomness | 314–317 |
+| Edge cases & original bugs | 318–325 |
+| Test vectors | 326–334 |
+| Provenance | 335–339 |
+| Open questions | 340–354 |
 <!-- /index -->
 
 ## Summary
@@ -212,6 +212,14 @@ composition, through `d2-client` only (game logic untouched).
 6. `w h xoff yoff` of a cel row and its `sprites.tsv` row: the frame
    store's frame, with `yoff` converted to §4 r1's meaning (a DCC frame
    box keeps its top row: `yoff = y_off + h − 1`).
+   A unit shadow (shadow pass) is drawn by 1.14d from the unit's own cel
+   (`CelDrawShadow`, `blend-modes.md` §5); d2rs composes it from a derived
+   `#shadow` set of sheared frames. Its row names the unit's cel file
+   (no `#shadow`) and that cel's `w h xoff yoff`; its `x`, `y` are `?`
+   (the sheared image's position is not inverted to the call's X, Y).
+   The shadow pass writes no `unit` row: 1.14d's has no unit draw
+   `0x00471EC0` (`a1-town-arrival-ama` rows 97–115); a unit's run outside
+   it starts with its `unit` row even right after its own shadow.
 7. Columns d2rs does not measure are `?`: the cel `mode`, `light`, `pal`
    (d2rs keeps a shade chain and blend op, not the call's arguments:
    REC-297), the tile `tile`, `mode` and `light`, the unit `light`, and in
@@ -258,6 +266,11 @@ composition, through `d2-client` only (game logic untouched).
    runs), delivered once per new server tick. Scenes match by place, not
    by timing: a script waits until the walk is over before the dumped
    tick.
+13. `--dump-draws --at-tick N` dumps server tick N itself: the bridge
+   is paced to the draws (`DrawnTick`), so it runs no frame past a server
+   tick the world view has not drawn yet (a draw waiting on the GPU's
+   previous frame would otherwise skip a tick: the dump of N = 73 landed
+   on 74 on a slow software GPU).
 
 ### 6. Comparison
 

@@ -1,5 +1,6 @@
 // Spec: specs/items/bitstream.md
 // Spec: specs/formats/d2s.md
+// Spec: specs/items/bitstream-legacy.md §3 r6, §3 r8, §3 r12, §4 r1 (the reader's failures at the current version)
 //! Reader of the item bit stream carried by S→C 0x9C (from byte 8) and
 //! 0x9D (from byte 13): the client's and the conformance harness's side of
 //! `d2_sim::items::bitstream` (the server's writer).
@@ -67,8 +68,14 @@ pub struct CodeFacts {
 pub trait ItemLookup {
     /// Facts of an item code; `None`: unknown code (a decode error).
     fn code(&self, code: [u8; 4]) -> Option<CodeFacts>;
-    /// Save columns of a stat; `None`: no row (a decode error).
+    /// Save columns of a stat; `None`: no row (the list ends there,
+    /// `bitstream-legacy.md` §4 rule 1).
     fn isc(&self, stat: u16) -> Option<IscSave>;
+    /// The `setitems` row count (`bitstream-legacy.md` §3 rule 8: a set
+    /// record naming no row fails); `None`: not known, no test.
+    fn set_item_rows(&self) -> Option<usize> {
+        None
+    }
 }
 
 /// Why a stream did not decode.
@@ -80,8 +87,6 @@ pub enum ItemBitsError {
     UnknownCode([u8; 4]),
     #[error("stat {0} has no itemstatcost row")]
     UnknownStat(u16),
-    #[error("stat {0} has no save bits but is on the wire")]
-    Unsaved(u16),
     #[error("{0} bits left after the record (more than the padding)")]
     Trailing(usize),
     #[error("padding bit {0} is set")]
@@ -89,9 +94,6 @@ pub enum ItemBitsError {
     /// Save format: the 16 bits before the flags are not 0x4D4A (§2 rule 2).
     #[error("save marker is {0:#06x}, not 0x4D4A (\"JM\")")]
     BadMarker(u32),
-    /// Save format: the trailer's third 32-bit value is not 0 (§5 rule 2).
-    #[error("save trailer ends with {0:#x}, not 0")]
-    TrailerTail(u32),
 }
 
 /// LSB-first bit reader (§1 rule 1).
@@ -221,8 +223,13 @@ pub struct ItemBits {
     /// Full record, save format: unit +0x28 (§4.1 rule 7).
     pub save_unit28: Option<u32>,
     /// Trailer (§5 rule 2) when its bit is 1: the two 32-bit values (the
-    /// third must be 0). `None`: bit 0, or no trailer (network, alt-code).
+    /// third is read and dropped). `None`: bit 0, or no trailer (network,
+    /// alt-code).
     pub save_trailer: Option<(u32, u32)>,
+    /// The record was read to where the reader stops but failed
+    /// (`bitstream-legacy.md` §3 rules 6.7, 8, 12; §4 rule 1): the
+    /// decoder `0x0062E430` makes no item of it.
+    pub failed: bool,
 }
 
 /// One save-format item entry (`d2s.md` §8.1 rule 2, §8.2 rule 4).
@@ -291,18 +298,31 @@ pub fn partners(s: u16) -> &'static [u16] {
     }
 }
 
-fn read_list(r: &mut BitReader<'_>, t: &dyn ItemLookup) -> Result<Vec<Stat>, ItemBitsError> {
+/// One list (`bitstream-legacy.md` §4 rule 1): an id with no
+/// `itemstatcost` row ends it with no failure (edge case 1: what follows is
+/// then misread); id 0 directly after id 0 fails the record and ends it.
+/// A row with `Save Bits` 0 reads 0 bits (§4 rule 6).
+fn read_list(
+    r: &mut BitReader<'_>,
+    t: &dyn ItemLookup,
+    failed: &mut bool,
+) -> Result<Vec<Stat>, ItemBitsError> {
     let mut out = Vec::new();
+    let mut last = None;
     loop {
         let s = r.read(9)?;
         if s == TERMINATOR {
             return Ok(out);
         }
         let s = s as u16;
-        let c = t.isc(s).ok_or(ItemBitsError::UnknownStat(s))?;
-        if c.save_bits == 0 {
-            return Err(ItemBitsError::Unsaved(s));
+        let Some(c) = t.isc(s) else {
+            return Ok(out);
+        };
+        if s == 0 && last == Some(0) {
+            *failed = true;
+            return Ok(out);
         }
+        last = Some(s);
         match s {
             17 | 48 | 50 | 52 | 54 | 57 => {
                 out.push(read_isc(r, t, s, 0)?);
@@ -357,6 +377,11 @@ pub fn decode(stream: &[u8], t: &dyn ItemLookup) -> Result<ItemBits, ItemBitsErr
     let it = decode_record(&mut r, t)?;
     let used = r.pos();
     let total = stream.len() * 8;
+    // A failed record stopped inside its data (§4 rule 1): what follows
+    // is not checked.
+    if it.failed {
+        return Ok(it);
+    }
     if total - used >= 8 {
         return Err(ItemBitsError::Trailing(total - used));
     }
@@ -392,7 +417,8 @@ pub fn save_entry_len(buf: &[u8], t: &dyn ItemLookup) -> Result<SaveEntry, ItemB
     let item = decode_save_record(&mut r, t)?;
     let used = r.pos();
     let len = used.div_ceil(8);
-    for at in used..len * 8 {
+    let checked = if item.failed { used } else { len * 8 };
+    for at in used..checked {
         if (buf[at / 8] >> (at % 8)) & 1 != 0 {
             return Err(ItemBitsError::Padding(at));
         }
@@ -419,15 +445,13 @@ fn shift(e: ItemBitsError, bytes: usize) -> ItemBitsError {
     }
 }
 
-/// Save trailer (§5 rule 2).
+/// Save trailer (§5 rule 2; `bitstream-legacy.md` §2 rule 2 at the
+/// current version): a, b, then 32 bits read and dropped.
 fn read_trailer(r: &mut BitReader<'_>, it: &mut ItemBits) -> Result<(), ItemBitsError> {
     if r.read(1)? == 1 {
         let a = r.read(32)?;
         let b = r.read(32)?;
-        let z = r.read(32)?;
-        if z != 0 {
-            return Err(ItemBitsError::TrailerTail(z));
-        }
+        r.read(32)?;
         it.save_trailer = Some((a, b));
     }
     Ok(())
@@ -502,7 +526,12 @@ fn read_record(
         }
         5 | 7 => {
             if shown {
-                q.file_index = Some(r.read(12)?);
+                let n = r.read(12)?;
+                q.file_index = Some(n);
+                // `bitstream-legacy.md` §3 rule 8: no `setitems` row fails.
+                if it.quality == 5 && t.set_item_rows().is_some_and(|rows| n as usize >= rows) {
+                    it.failed = true;
+                }
             }
         }
         6 | 8 => {
@@ -527,7 +556,7 @@ fn read_record(
                 q.rare_names = Some((r.read(8)? as u8, r.read(8)? as u8));
             }
         }
-        _ => {
+        2 => {
             if facts.charm && shown {
                 let is_prefix = r.read(1)? == 1;
                 q.charm = Some((is_prefix, r.read(11)? as u16));
@@ -539,9 +568,11 @@ fn read_record(
                 q.spell = Some(r.read(5)? as u8);
             }
         }
+        // `bitstream-legacy.md` §3 rule 6.7: any other quality reads
+        // nothing here and fails; the record is read on to its end (the
+        // writer never sends one, §4.3 rule 7).
+        _ => it.failed = true,
     }
-    // A quality outside 1–9 is rewritten to 2 by the writer and its
-    // lists' stats skipped (§4.3 rule 7): the reader sees terminators.
     if f & hflag::RUNEWORD != 0 {
         it.runeword = Some(r.read(16)? as u16);
     }
@@ -583,15 +614,17 @@ fn read_record(
     if runeword {
         l += 1;
     }
-    it.lists.push(Some(read_list(r, t)?));
+    let mut failed = it.failed;
+    it.lists.push(Some(read_list(r, t, &mut failed)?));
     for c in 0..l {
         let present = runeword || mask & (1 << c) != 0;
         it.lists.push(if present {
-            Some(read_list(r, t)?)
+            Some(read_list(r, t, &mut failed)?)
         } else {
             None
         });
     }
+    it.failed = failed;
     it.bits = r.pos();
     Ok(it)
 }

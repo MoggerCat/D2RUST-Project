@@ -117,6 +117,12 @@ pub struct InvState {
     /// on when its rest answers the equipment seams (the skill list,
     /// player data mouse slots, stat links).
     pub equip_rules: bool,
+    /// The item-move effects run on the desk in place of the [`InvRest`]
+    /// calls (q-fix-items-movepending-host-wiring): the gold rest pile
+    /// (`inventory-moves.md` §10.1) and the quest-chain notice 0x5D
+    /// (§7.11 step 4). Off (the default): those
+    /// calls go to the rest, as before.
+    pub move_effects: bool,
     /// An item moved onto a body slot attaches its stat list to the
     /// wearer, and its leaving detaches it, with the set-item update and
     /// the set bonuses ([`item_link`]). PROVISIONAL (REC-161): the stat
@@ -125,7 +131,8 @@ pub struct InvState {
     /// calls go to the rest, as before.
     pub link_item_stats: bool,
     /// Town Portal scroll / tome uses of the call, taken by the host
-    /// ([`InvDesk::take_portal_requests`], REC-117).
+    /// ([`InvDesk::take_portal_requests`]; `items/use.md` §4, the cast of
+    /// `world/objects-2.md` §27.1 past its town refusal).
     pub portal_requests: Vec<UnitId>,
     /// The walks to a ground item the pick-ups of the call asked for
     /// (§7.1 step 2, `0x00548A50`: player, item, cursor flag), taken by

@@ -133,7 +133,7 @@ use super::skill_rest::SkillStore;
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
 use crate::bridge::world::{
-    LevelRow, MonsterClass, MonsterSetup, ObjectRow, SkillRow, StatSend, UnitRows,
+    LevelRow, MonsterClass, MonsterSetup, ObjectRow, SkillRow, StatSend, StateRow, UnitRows,
 };
 use crate::bridge::LOCAL_CLIENT;
 
@@ -1356,10 +1356,26 @@ pub fn client_drlg_source(data: &GameData) -> DrlgSource {
 }
 
 /// The `objects.txt` rows of the client object update
-/// (`world/objects-client.md` §28 r1): the live table.
+/// (`world/objects-client.md` §28 r1): the live table **after its load
+/// fix-up** (`data/fixups.md` §13 r2: `FrameCnt0`–`7` in 1/256 frames, as
+/// §5's `End(m)` reads them). The raw `.bin` rows hold whole frames: a
+/// one-frame mode would clamp at −255 and its frame (`+0x44 >> 8`) read
+/// 0xFFFFFF (scene `a1-town-arrival-ama`: every frame dropped).
 pub fn client_object_rows(data: &GameData) -> Vec<crate::bridge::objects::ObjClientRow> {
     let GameData::Live(d) = data;
-    crate::bridge::objects::ObjClientRow::rows(&d.waypoints.objects)
+    let fixed: Option<Vec<Objects>> = d
+        .tables
+        .fixed
+        .table("objects")
+        .and_then(|t| decode_all(t).ok());
+    match fixed {
+        Some(rows) => crate::bridge::objects::ObjClientRow::rows(&rows),
+        // No fixed table: §13 r2 on the raw rows.
+        None => crate::bridge::objects::ObjClientRow::rows(&d.waypoints.objects)
+            .into_iter()
+            .map(crate::bridge::objects::ObjClientRow::frame_counts_fixed)
+            .collect(),
+    }
 }
 
 /// The `objects.txt` `Name` of each class, for the mouse-over label
@@ -1552,6 +1568,7 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
     let monstats_table = table("monstats")?;
     let monstats: Vec<Monstats> = decode_all(monstats_table).map_err(err)?;
     let monstats2 = table("monstats2")?;
+    let monstats2_rows: Vec<d2_data::tables::Monstats2> = decode_all(monstats2).map_err(err)?;
     let monsters = monstats
         .iter()
         .enumerate()
@@ -1563,6 +1580,10 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
             let m2 = monstats2.record(link as usize);
             let mut c = MonsterClass::from_record(m2, m.npc, m.interact)?;
             c.setup = Some(monster_setup(m, monstats_table.record(i), m2));
+            if let Some(x) = monstats2_rows.get(link as usize) {
+                c.light = x.light;
+                c.light_rgb = (x.light_r, x.light_g, x.light_b);
+            }
             Some(c)
         })
         .collect();
@@ -1604,12 +1625,26 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
         })
         .collect();
     let shrines: Vec<Shrines> = decode_all(table("shrines")?).map_err(err)?;
+    // `client/stat-lists.md` §3 r3, r6: `notondead`, `noclear` (+0x14 &
+    // 0x80, & 0x10) and the colour call's columns.
+    let states: Vec<d2_data::tables::States> = decode_all(table("states")?).map_err(err)?;
+    let states = states
+        .iter()
+        .map(|s| StateRow {
+            dead_bit_only: s.notondead,
+            keep_list: s.noclear,
+            colorpri: s.colorpri,
+            colorshift: s.colorshift,
+            light_rgb: (s.light_r, s.light_g, s.light_b),
+        })
+        .collect();
     Ok(UnitRows {
         monsters,
         monster_skill_bonus,
         stats,
         objects,
         shrines: shrines.iter().map(|s| s.code).collect(),
+        states,
     })
 }
 

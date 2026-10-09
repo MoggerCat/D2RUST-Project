@@ -8,7 +8,9 @@
 
 use d2_data::fixup::maps::EquivMatrix;
 use d2_data::fixup::FixedSet;
-use d2_data::tables::{decode_all, Armor, Belts, Inventory, Itemtypes, Misc, Record, Weapons};
+use d2_data::tables::{
+    decode_all, Armor, Belts, Books, Inventory, Itemtypes, Misc, Record, Weapons,
+};
 
 use crate::items::tables::TableError;
 
@@ -40,6 +42,10 @@ pub struct InvItemRec {
     pub maxstack: u32,
     /// `2handed` (`0x006289C0`, §4.7).
     pub twohanded: u8,
+    /// `1or2handed` (read by `0x0062A1E0`, §4.4 step 4).
+    pub onetwohanded: u8,
+    /// `pSpell` (+0x94): the item-use entry (`items/use.md` §1 step 2.2).
+    pub pspell: u32,
     /// `levelreq` (`0x006335F0`, §4.8).
     pub levelreq: u8,
     /// `mindam` / `maxdam` (+0xFE / +0xFF): a shield's smite damage
@@ -47,7 +53,9 @@ pub struct InvItemRec {
     pub mindam: u8,
     pub maxdam: u8,
     /// `wclass` / `2handedwclass` (weapons +0xC0 / +0xC4): COF weapon
-    /// class codes (`render/unit-composite.md` §2.1).
+    /// class codes (`render/unit-composite.md` §2.1); `wclass` is also the
+    /// hand class `0x00623C60` reads (`bow `, `xbw `, …;
+    /// `world/vendors.md` §7.1.1).
     pub wclass: [u8; 4],
     pub wclass2: [u8; 4],
 }
@@ -72,6 +80,8 @@ macro_rules! inv_item_rec {
                     stackable: r.stackable,
                     maxstack: r.maxstack,
                     twohanded: r.f_2handed,
+                    onetwohanded: r.f_1or2handed,
+                    pspell: r.pspell,
                     levelreq: r.levelreq,
                     mindam: r.mindam,
                     maxdam: r.maxdam,
@@ -83,6 +93,27 @@ macro_rules! inv_item_rec {
     )*};
 }
 inv_item_rec!(Weapons, Armor, Misc);
+
+/// A `books` row (`items/use.md` §1 step 2.1, `inventory-moves.md`
+/// §7.18 step 6): the use entry and the scroll / tome skills.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub struct InvBookRec {
+    /// `pSpell` (+0x04).
+    pub pspell: u32,
+    /// `scrollskill` (+0x08), `bookskill` (+0x0C): skill ids.
+    pub scrollskill: i32,
+    pub bookskill: i32,
+}
+
+impl From<&Books> for InvBookRec {
+    fn from(r: &Books) -> Self {
+        InvBookRec {
+            pspell: r.pspell,
+            scrollskill: r.scrollskill as i32,
+            bookskill: r.bookskill as i32,
+        }
+    }
+}
 
 /// The itemtypes columns used here (§1, §3, §4).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -123,6 +154,8 @@ pub struct InvTables {
     pub itemtypes: Vec<InvTypeRec>,
     /// Itemtypes equivalence (`data/runtime-maps.md` §2).
     pub equiv: EquivMatrix,
+    /// `books` rows (`items/use.md` §1); empty: no row.
+    pub books: Vec<InvBookRec>,
 }
 
 fn typed<T: Record>(f: &FixedSet) -> Result<Vec<T>, TableError> {
@@ -148,6 +181,7 @@ impl InvTables {
             items,
             itemtypes: typed::<Itemtypes>(f)?.iter().map(Into::into).collect(),
             equiv: f.itemtypes_equiv.clone(),
+            books: typed::<Books>(f)?.iter().map(Into::into).collect(),
         })
     }
 

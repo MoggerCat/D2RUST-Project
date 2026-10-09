@@ -3,7 +3,9 @@
 //! rune, unique, set), the dispatcher, the property functions
 //! (`property-functions.tsv`, mirrored in [`FUNCS`] and checked against
 //! the TSV by a test), socket fillers, runewords, set bonuses and craft
-//! property lists. All value draws use the item seed (§4.1).
+//! property lists. All value draws use the item seed (§4.1). A format-0
+//! item's records go to the legacy table instead (§14,
+//! [`super::props_legacy`]).
 
 use super::create::{apply_ethereal, has_durability, max_sockets};
 use super::tables::{ItemTables, PropRec};
@@ -93,6 +95,10 @@ pub struct PropCtx<'o> {
     pub mode: u8,
     pub list: ListKey,
     pub owner: Option<&'o mut dyn ItemStats>,
+    /// The dispatcher's extra unit (§2: second argument) when it is an
+    /// item: the socketed item of a rune's mode 5 (§9 rule 2); read by the
+    /// legacy function `0x0065D270` (§14).
+    pub extra: Option<&'o mut dyn ItemStats>,
 }
 
 impl PropCtx<'_> {
@@ -102,6 +108,7 @@ impl PropCtx<'_> {
             mode,
             list: ListKey::ITEM,
             owner: None,
+            extra: None,
         }
     }
 }
@@ -116,13 +123,31 @@ pub fn roll_value(seed: &mut Seed, min: i32, max: i32) -> i32 {
     (seed.roll(hi.wrapping_sub(lo).wrapping_add(1)) as i32).wrapping_add(lo)
 }
 
-/// Runs one property record through the dispatcher (§3).
+/// Runs one property record through the wrapper `0x0065FE10`: the
+/// dispatcher (§3), or for a format-0 item in every mode except 6 the
+/// legacy table (§14). A legacy fatal is kept in [`Item::fatal`] and
+/// stops every later record.
 pub fn apply_property<S: ItemStats>(
     t: &ItemTables,
     item: &mut Item<S>,
     ctx: &mut PropCtx,
     rec: &PropRec,
 ) {
+    if item.fatal.is_some() {
+        return;
+    }
+    if item.format < 1 && ctx.mode != mode::RUNEWORD {
+        // §14: n is the wrapper's sixth argument, 0 for affixes (§12.1 of
+        // `affixes.md`), §11 and §12.
+        // PROVISIONAL (M22; REC-289): the other callers' value is not in
+        // the spec; 0 here too. Craft lists (mode 7) take this path as
+        // §14 names §12 among the wrapper's callers (§2 says mode 7 calls
+        // the dispatcher directly; `pc1-data.md` Step 4 item 12).
+        if let Err(e) = super::props_legacy::apply(t, item, ctx, rec, 0) {
+            item.fatal = Some(e);
+        }
+        return;
+    }
     let Some(row) = usize::try_from(rec.code)
         .ok()
         .and_then(|c| t.properties.get(c))
@@ -180,7 +205,13 @@ fn add_stat<S: ItemStats>(
 /// Functions 18 and 19 (Open question 5): the owner-or-item list of §4.2,
 /// written with the plain list set: no `valshift`, no itemstatcost range
 /// test, no stat-58 rule, and a value 0 is set like any other.
-fn set_raw<S: ItemStats>(item: &mut Item<S>, ctx: &mut PropCtx, id: u16, layer: u16, v: i32) {
+pub(super) fn set_raw<S: ItemStats>(
+    item: &mut Item<S>,
+    ctx: &mut PropCtx,
+    id: u16,
+    layer: u16,
+    v: i32,
+) {
     let key = ctx.list;
     let target: &mut dyn ItemStats = match ctx.owner.as_deref_mut() {
         Some(o) => o,
@@ -190,7 +221,7 @@ fn set_raw<S: ItemStats>(item: &mut Item<S>, ctx: &mut PropCtx, id: u16, layer: 
 }
 
 /// §4.3: base reset for a slot's stat.
-fn base_reset<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, id: u16) {
+pub(super) fn base_reset<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, id: u16) {
     let Some(r) = t.item(item.record).cloned() else {
         return;
     };
@@ -310,6 +341,15 @@ fn damage<S: ItemStats>(
     v
 }
 
+/// The skill of functions 11 and 19 (§5 r4, r9; §14 `0x0065E170`):
+/// `param`, or 0 when it is outside the skills table.
+pub(super) fn skill_or_zero(t: &ItemTables, param: i32) -> usize {
+    usize::try_from(param)
+        .ok()
+        .filter(|&s| s < t.skills.len())
+        .unwrap_or(0)
+}
+
 /// One property function (§5). Returns the function's value.
 #[allow(clippy::too_many_arguments)]
 fn call<S: ItemStats>(
@@ -350,16 +390,14 @@ fn call<S: ItemStats>(
             v
         }
         11 => {
-            let Some(sk) = usize::try_from(rec.param)
-                .ok()
-                .and_then(|s| t.skills.get(s))
-                .copied()
-            else {
+            // §5 r4: `param` outside the skills table → skill 0.
+            let skill = skill_or_zero(t, rec.param);
+            let Some(sk) = t.skills.get(skill).copied() else {
                 return 0;
             };
             let chance = if rec.min < 1 { 5 } else { rec.min };
             let level = skill_level(ilvl, sk.reqlevel, sk.maxlvl, rec.max);
-            let layer = (rec.param as u16)
+            let layer = (skill as u16)
                 .wrapping_mul(64)
                 .wrapping_add((level & 63) as u16);
             add_stat(t, item, ctx, set, id, layer, chance)
@@ -418,39 +456,7 @@ fn call<S: ItemStats>(
             set_raw(item, ctx, id, 0, p + (b * 1024 + a) * 4);
             b
         }
-        19 => {
-            let Some(sk) = usize::try_from(rec.param)
-                .ok()
-                .and_then(|s| t.skills.get(s))
-                .copied()
-            else {
-                return 0;
-            };
-            let level = skill_level(ilvl, sk.reqlevel, sk.maxlvl, rec.max);
-            let mut c = rec.min;
-            if c == 0 {
-                c = 5;
-            } else if c < 0 {
-                c = -c + (-c * level) / 8;
-            }
-            if c <= 1 {
-                c = 1;
-            } else if c > 254 {
-                c = 255;
-            }
-            let r = item.item_seed.roll(c - c / 8) as i32;
-            let layer =
-                ((rec.param as u32) << t.stat_shift).wrapping_add(level as u32 & t.stat_mask);
-            // OQ 5: as function 18.
-            set_raw(
-                item,
-                ctx,
-                id,
-                layer as u16,
-                c * 256 + ((r + c / 8 + 1) & 0xFF),
-            );
-            c
-        }
+        19 => charges(t, item, ctx, rec, id),
         20 => {
             if t.valshift.len() > usize::from(stat::INDESTRUCTIBLE) {
                 add_stat(t, item, ctx, false, stat::INDESTRUCTIBLE, 0, 1);
@@ -485,6 +491,46 @@ fn call<S: ItemStats>(
             add_stat(t, item, ctx, set, id, layer, v)
         }
     }
+}
+
+/// Function 19 (§5 rule 9; also the legacy `0x0065DBC0`, §14): charges
+/// of skill `param` into stat `id`. Returns c (0: no skills row).
+pub(super) fn charges<S: ItemStats>(
+    t: &ItemTables,
+    item: &mut Item<S>,
+    ctx: &mut PropCtx,
+    rec: &PropRec,
+    id: u16,
+) -> i32 {
+    let ilvl = item.item_level();
+    // §5 r9: an invalid `param` → skill 0.
+    let skill = skill_or_zero(t, rec.param);
+    let Some(sk) = t.skills.get(skill).copied() else {
+        return 0;
+    };
+    let level = skill_level(ilvl, sk.reqlevel, sk.maxlvl, rec.max);
+    let mut c = rec.min;
+    if c == 0 {
+        c = 5;
+    } else if c < 0 {
+        c = -c + (-c * level) / 8;
+    }
+    if c <= 1 {
+        c = 1;
+    } else if c > 254 {
+        c = 255;
+    }
+    let r = item.item_seed.roll(c - c / 8) as i32;
+    let layer = ((skill as u32) << t.stat_shift).wrapping_add(level as u32 & t.stat_mask);
+    // OQ 5: as function 18.
+    set_raw(
+        item,
+        ctx,
+        id,
+        layer as u16,
+        c * 256 + ((r + c / 8 + 1) & 0xFF),
+    );
+    c
 }
 
 /// Function 14 (§5 rule 6): sockets, set directly on the item.
@@ -562,7 +608,8 @@ pub fn apply_unique<S: ItemStats>(t: &ItemTables, item: &mut Item<S>) {
     }
 }
 
-/// Mode 4: the setitems row = file index (§8.1).
+/// Mode 4: the setitems row = file index (§8.1). A format-0 item runs
+/// only `prop1`–`prop2` and no partial records (§2, `0x0065FF6C`).
 pub fn apply_set_item<S: ItemStats>(t: &ItemTables, item: &mut Item<S>) {
     let Some(r) = usize::try_from(item.file_index)
         .ok()
@@ -572,8 +619,12 @@ pub fn apply_set_item<S: ItemStats>(t: &ItemTables, item: &mut Item<S>) {
     };
     let (props, aprops, add_func) = (r.props, r.aprops, r.add_func);
     let mut ctx = PropCtx::item(mode::SET);
-    for rec in props.iter().filter(|r| r.code >= 0) {
+    let n_props = if item.format < 1 { 2 } else { props.len() };
+    for rec in props.iter().take(n_props).filter(|r| r.code >= 0) {
         apply_property(t, item, &mut ctx, rec);
+    }
+    if item.format < 1 {
+        return;
     }
     for (k, rec) in aprops.iter().enumerate() {
         if rec.code < 0 {
@@ -596,6 +647,17 @@ pub fn apply_set_item<S: ItemStats>(t: &ItemTables, item: &mut Item<S>) {
 /// own list. A quality-5 filler of another type is not specified
 /// (OQ 2): nothing happens.
 pub fn apply_socket_filler<S: ItemStats>(t: &ItemTables, filler: &mut Item<S>, apply_type: u8) {
+    apply_socket_filler_into(t, filler, apply_type, None);
+}
+
+/// [`apply_socket_filler`] with the socketed item's stats: a rune's
+/// mode 5 passes it as the extra unit (§9 rule 2).
+pub fn apply_socket_filler_into<S: ItemStats>(
+    t: &ItemTables,
+    filler: &mut Item<S>,
+    apply_type: u8,
+    socketed: Option<&mut dyn ItemStats>,
+) {
     let m = if t.is_type(filler.record, ty::GEM as i16) {
         mode::GEM
     } else if t.is_type(filler.record, ty::RUNE as i16) {
@@ -616,7 +678,13 @@ pub fn apply_socket_filler<S: ItemStats>(t: &ItemTables, filler: &mut Item<S>, a
     let Some(block) = gem.mods.get(usize::from(apply_type)).copied() else {
         return;
     };
-    run_until_none(t, filler, &mut PropCtx::item(m), &block);
+    let mut ctx = PropCtx {
+        mode: m,
+        list: ListKey::ITEM,
+        owner: None,
+        extra: if m == mode::RUNE { socketed } else { None },
+    };
+    run_until_none(t, filler, &mut ctx, &block);
 }
 
 /// §10.1: the first runes row the item and its fillers (items combined
@@ -680,12 +748,17 @@ pub fn runeword_row(
     })
 }
 
-/// §10.2: activates runes row `row` on the item. `ladder` is game +0x74.
-/// Returns whether the runeword properties ran; the caller then re-runs
-/// the replenish timers ([`super::replenish_timer`]).
+/// §10.2: activates runes row `row` with the filler just inserted as I
+/// (`filler`: its item seed draws every §4.1 roll, its items row every
+/// §4.3 reset) and the socketed item's stats as O (`socketed`: its
+/// state-171 list, flags 0x40, receives the stats). `ladder` is game
+/// +0x74. Returns whether the runeword properties ran; the caller then
+/// sets item flag 0x4000000 ([`flag::RUNEWORD`]) on the socketed item
+/// and re-runs its replenish timers ([`super::replenish_timer`]).
 pub fn activate_runeword<S: ItemStats>(
     t: &ItemTables,
-    item: &mut Item<S>,
+    filler: &mut Item<S>,
+    socketed: &mut dyn ItemStats,
     row: usize,
     ladder: bool,
 ) -> bool {
@@ -699,17 +772,17 @@ pub fn activate_runeword<S: ItemStats>(
         state: STATE_RUNEWORD,
         flags: LIST_FLAGS,
     };
-    if item.stats.has_list(key) {
+    if socketed.has_list(key) {
         return false;
     }
     let props = w.props;
-    item.flags |= flag::RUNEWORD;
     let mut ctx = PropCtx {
         mode: mode::RUNEWORD,
         list: key,
-        owner: None,
+        owner: Some(socketed),
+        extra: None,
     };
-    run_until_none(t, item, &mut ctx, &props);
+    run_until_none(t, filler, &mut ctx, &props);
     true
 }
 
@@ -752,6 +825,7 @@ pub fn set_bonuses<S: ItemStats>(
         mode: mode::SET,
         list,
         owner: Some(owner),
+        extra: None,
     };
     for rec in partial.iter().take(take).filter(|r| r.code >= 0) {
         apply_property(t, item, &mut ctx, rec);

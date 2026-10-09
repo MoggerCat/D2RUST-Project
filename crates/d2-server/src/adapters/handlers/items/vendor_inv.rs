@@ -12,16 +12,23 @@
 //! `in_inventory`, `equipped_items` (grid 0, §1.2), `place_in_backpack`
 //! (§2.4), `remove_stored` (§1.4 unlink, then the free), `copy_item`
 //! (§7.3, `InvDesk::copy_of`), `take_from_cursor` (`0x0055EEA0`,
-//! `InvDesk::take_cursor`, PROVISIONAL REC-278). Still the rest's
-//! (no written rule for the routine): `unequip` (`0x00560CD0` by item), `can_belt` / `put_in_belt`
-//! (`0x0055E9B0`'s arguments here), `equip_ammo` (Open question 3),
-//! `find_tome`, `add_to_tome`, `find_partial_stack`, `lower_book_skill`.
+//! `InvDesk::take_cursor`, PROVISIONAL REC-278), and the buy / sell
+//! seams of §7.1 r7–r9 and §7.2 r7 / r9 (q-fix-items-play): `find_tome`
+//! (`0x0055F640`), `add_to_tome` (`0x0055F6E0`, PROVISIONAL REC-289),
+//! `find_partial_stack` (`0x00577700`), `can_belt` (`0x00628BA0`),
+//! `put_in_belt` (`0x0055E9B0` with find), `equip_ammo` (the equip try
+//! of §7.1.1), `lower_book_skill` (`0x00576E40`), `unequip`
+//! (`0x00560CD0` by item), `has_filled_sockets` (`0x0055F590`) and the
+//! price's socket list (§9.2 rule 6).
 //!
 //! A host without inventory parts sees an empty inventory: nothing is
 //! owned, placement fails (the inventory wiring's reading for a unit
 //! without an inventory, `inventory.md` §5).
 
-use d2_sim::items::moves::{deferred, MoveUnits};
+use d2_sim::items::inventory::{ty::WEAP, InvWorld};
+use d2_sim::items::moves::{
+    deferred, ground, handlers, stat as istat, InventoryOps, MovePending, MoveUnits, Owner,
+};
 use d2_sim::rng::Seed;
 use d2_sim::units::lifecycle::LifecycleHooks;
 use d2_sim::units::UnitId;
@@ -217,12 +224,6 @@ where
     fn set_item_page(&mut self, item: UnitId, page: u8) {
         self.inner.set_item_page(item, page)
     }
-    fn has_filled_sockets(&self, item: UnitId) -> bool {
-        self.inner.has_filled_sockets(item)
-    }
-    fn price_item(&self, item: UnitId) -> Option<PriceItem> {
-        self.inner.price_item(item)
-    }
     fn recharge(&mut self, item: UnitId) {
         self.inner.recharge(item)
     }
@@ -282,23 +283,126 @@ where
     fn equipped_items(&self, player: UnitId) -> Vec<UnitId> {
         self.state().map_or_else(Vec::new, |s| s.body_items(player))
     }
-    fn find_tome(&self, player: UnitId, scroll: UnitId) -> Option<(UnitId, i32)> {
-        self.inner.find_tome(player, scroll)
+    /// `0x0055F640` (§7.1 rule 7): the first page-0 tome (type 18) whose
+    /// spell is the scroll's and whose quantity is below its max stack,
+    /// with its free space (the "tome for P" test of `inventory-moves.md`
+    /// §8.1 step 4, [`ground::tome_for`]).
+    fn find_tome(&mut self, player: UnitId, scroll: UnitId) -> Option<(UnitId, i32)> {
+        if self.inv.is_none() {
+            return self.inner.find_tome(player, scroll);
+        }
+        self.with_desk(|d| {
+            let p = d.owner_of(player)?;
+            let t = ground::tome_for(d, p, d.guid_of(scroll))?;
+            let free = d.max_stack(t) - d.stat(Owner::item(t), istat::QUANTITY);
+            Some((d.item_unit(t)?, free))
+        })
+        .flatten()
     }
+    /// `0x0055F6E0` (§7.1 rule 7): tome quantity += k.
+    ///
+    /// PROVISIONAL (REC-289): its announcement is read as the one scroll
+    /// onto a tome of `inventory-moves.md` §7.20 does: S→C 0x3E for stat
+    /// 70 and `0x0055C070(k)` (the tome's skill count).
     fn add_to_tome(&mut self, tome: UnitId, k: i32) {
-        self.inner.add_to_tome(tome, k)
+        if self.inv.is_none() {
+            return self.inner.add_to_tome(tome, k);
+        }
+        self.with_desk(|d| {
+            let g = d.guid_of(tome);
+            let o = Owner::item(g);
+            let q = d.stat(o, istat::QUANTITY);
+            d.set_stat(o, istat::QUANTITY, q.wrapping_add(k));
+            let Some(player) = d.item_owner(g) else {
+                return;
+            };
+            d.send_item_stat(player, g, istat::QUANTITY);
+            d.book_count_changed(player, g, k);
+        });
     }
-    fn find_partial_stack(&self, player: UnitId, item: UnitId) -> Option<(UnitId, i32)> {
-        self.inner.find_partial_stack(player, item)
+    /// `0x00577700` (§7.1 rule 8): a stack of the same item on the player
+    /// (`inventory.md` §4.5) below its max stack, the equipped items
+    /// first (location order), then page 0 (grid list order), with its
+    /// free space.
+    fn find_partial_stack(&mut self, player: UnitId, item: UnitId) -> Option<(UnitId, i32)> {
+        if self.inv.is_none() {
+            return self.inner.find_partial_stack(player, item);
+        }
+        self.with_desk(|d| {
+            let p = d.owner_of(player)?;
+            let g = d.guid_of(item);
+            let mut cands = d.body_items(p);
+            cands.extend(d.page_items(p, 0));
+            cands.into_iter().find_map(|c| {
+                let free = d.max_stack(c) - d.stat(Owner::item(c), istat::QUANTITY);
+                (c != g && d.stack_test(g, c) && free > 0).then(|| Some((d.item_unit(c)?, free)))?
+            })
+        })
+        .flatten()
     }
-    fn can_belt(&self, player: UnitId, item: UnitId) -> bool {
-        self.inner.can_belt(player, item)
+    /// `0x00628BA0`: the auto-belt gate, true for every item
+    /// (`inventory.md` §3 rule 6, original bug reproduced).
+    fn can_belt(&mut self, player: UnitId, item: UnitId) -> bool {
+        if self.inv.is_none() {
+            return self.inner.can_belt(player, item);
+        }
+        true
     }
+    /// `0x0055E9B0` with find ≠ 0 (§7.1 rule 9.6, `inventory-moves.md`
+    /// §7.14): `inventory.md` §3.5 picks the slot, then the 0x23 body.
     fn put_in_belt(&mut self, player: UnitId, item: UnitId) -> bool {
-        self.inner.put_in_belt(player, item)
+        if self.inv.is_none() {
+            return self.inner.put_in_belt(player, item);
+        }
+        self.with_desk(|d| {
+            let Some(p) = d.owner_of(player) else {
+                return false;
+            };
+            let g = d.guid_of(item);
+            let Some(slot) = d.belt_free_slot(p, g) else {
+                return false;
+            };
+            handlers::to_belt(d, p, g, u32::from(slot)) == d2_sim::items::moves::Outcome::DONE
+        })
+        .unwrap_or(false)
     }
+    /// The equip try of §7.1.1 (`0x00577D18`–`0x00577D9A`): by the weapon
+    /// in use W (`0x0063BEF0`) and the hand class h, then
+    /// `inventory.md` §4.9 (skip 0).
     fn equip_ammo(&mut self, player: UnitId, item: UnitId) -> bool {
-        self.inner.equip_ammo(player, item)
+        if self.inv.is_none() {
+            return self.inner.equip_ammo(player, item);
+        }
+        self.with_desk(|d| {
+            let Some(p) = d.owner_of(player) else {
+                return false;
+            };
+            let g = d.guid_of(item);
+            let code = d.code(g);
+            let quiver = |c: &[u8; 4]| c == b"cqv " || c == b"aqv ";
+            let wclass = |w: u32| {
+                d.item(d.item_unit(w)?)
+                    .and_then(|r| d.tables.item(r.record))
+                    .map(|r| r.wclass)
+            };
+            let try_it = match d.weapon_in_use(p) {
+                None => !quiver(&code),
+                Some(w) => {
+                    let h = wclass(w);
+                    if d.is_type(g, WEAP as u16) {
+                        false
+                    } else if &code == b"cqv " {
+                        h == Some(*b"xbw ")
+                    } else if &code == b"aqv " {
+                        h == Some(*b"bow ")
+                    } else {
+                        true
+                    }
+                }
+            };
+            try_it && d.equip_picked(p, g)
+        })
+        .unwrap_or(false)
     }
     /// §7.1 rule 9.7 "auto-place (`0x00560200`)": `inventory.md` §2.4
     /// with a free position and "send" (the recorded purchase's copy
@@ -316,8 +420,13 @@ where
         self.with_desk(|d| d.take_cursor(player, item))
             .unwrap_or(false)
     }
+    /// `0x00576E40` (§7.2 rule 9) on the equipment rules
+    /// ([`InvDesk::run_item_skill_remove`]).
     fn lower_book_skill(&mut self, player: UnitId, item: UnitId, n: i32) {
-        self.inner.lower_book_skill(player, item, n)
+        if self.inv.is_none() {
+            return self.inner.lower_book_skill(player, item, n);
+        }
+        self.with_desk(|d| d.run_item_skill_remove(player, item, n));
     }
     /// §7.2 rule 9, mode 0 (`0x00579963`–`0x0057998F`): the item's
     /// stored page (+0x47) := its page (+0x45), S→C 0x9D action 5 with
@@ -338,7 +447,53 @@ where
             d.free(item);
         });
     }
+    /// `0x00560CD0` by item (§7.2 rule 9, other modes): the 0x1C body
+    /// (`inventory-moves.md` §7.7) at the item's body location; true when
+    /// the item left the body.
     fn unequip(&mut self, player: UnitId, item: UnitId) -> bool {
-        self.inner.unequip(player, item)
+        if self.inv.is_none() {
+            return self.inner.unequip(player, item);
+        }
+        self.with_desk(|d| {
+            let Some(p) = d.owner_of(player) else {
+                return false;
+            };
+            let g = d.guid_of(item);
+            if d.mode(g) != 1 {
+                return false;
+            }
+            let loc = d.body_loc(g);
+            let ok = matches!(handlers::remove_body_item(d, p, u16::from(loc)), Ok(0));
+            ok && d.mode(g) != 1
+        })
+        .unwrap_or(false)
+    }
+    /// `0x0055F590`: the item's own inventory holds a filler.
+    fn has_filled_sockets(&self, item: UnitId) -> bool {
+        match self.state() {
+            Some(s) => s
+                .inventories
+                .get(&item)
+                .is_some_and(|i| !i.items().is_empty()),
+            None => self.inner.has_filled_sockets(item),
+        }
+    }
+    /// §9.2 rule 6's sockets: the records of the items of the item's own
+    /// inventory, list order (`0x006292F0`), from the inventory model.
+    fn price_item(&self, item: UnitId) -> Option<PriceItem> {
+        let mut p = self.inner.price_item(item)?;
+        if let Some(s) = self.state() {
+            p.sockets = s
+                .inventories
+                .get(&item)
+                .map(|i| {
+                    i.items()
+                        .iter()
+                        .filter_map(|f| s.items.get(f).map(|d| d.record))
+                        .collect()
+                })
+                .unwrap_or_default();
+        }
+        Some(p)
     }
 }

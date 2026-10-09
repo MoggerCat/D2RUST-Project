@@ -64,6 +64,7 @@ fn rows() -> EffectRows {
                 offset: (0, 0, 0),
                 explosion: 2,
                 trans: 1,
+                clt_do_func: 0,
             },
             MissileRow {
                 cel_file: "boom".into(),
@@ -439,4 +440,41 @@ fn missiles_join_their_cell_and_overlays_their_host() {
     );
     assert_ne!(got[2].2, ItemTag::Unit(9));
     assert_eq!(got[3], (5, 0, ItemTag::Unit(9)));
+}
+
+// Covers: specs/missiles/client.md §c13-function-bodies-specified-here
+// Covers: specs/render/draw-order.md §3 r4
+#[test]
+fn flat_missiles_file_in_their_cells_shadow_list() {
+    use crate::rules::camera::{moving_to_client, FrameSize, OpenMode};
+    use crate::rules::draw_order::{tile_of, DrawGrid};
+    // Functions 2 and 11 set flag 0x10000 at the animation end: frame +
+    // speed ≥ length (§C4 r4), frame = age · speed.
+    assert!(!flat_at_end(11, 3, 256, 1));
+    assert!(flat_at_end(11, 3, 256, 2));
+    assert!(!flat_at_end(2, 4, 128, 6));
+    assert!(flat_at_end(2, 4, 128, 7));
+    assert!(!flat_at_end(1, 3, 256, 99), "other functions never");
+    // A flat missile goes to its cell's shadow list (pass 5), after the
+    // cell's entries; not into the unit list.
+    let at = moving_to_client(cell_centre((100, 100)).0, cell_centre((100, 100)).1);
+    let camera = Camera::new(FrameSize::D2RS, OpenMode::NONE, at, (0, 0));
+    let grid = DrawGrid::of_camera(&camera);
+    let ci = grid.cell(tile_of(at.x, at.y)).unwrap() as u32;
+    let draw = MissileDraw {
+        id: 1,
+        item: DrawItem::new(crate::scene::FrameId(0), 0, 0),
+        join: Join::Flat { at },
+    };
+    let keyed = Missiles::keyed(&[draw], &BTreeMap::new(), &grid, |_| None);
+    assert_eq!(
+        keyed
+            .iter()
+            .map(|(d, b)| (d.item.key, *b))
+            .collect::<Vec<_>>(),
+        vec![(
+            DrawKey::new(pass::SHADOWS, ci, DrawKey::MINOR_MAX, 255).unwrap(),
+            false
+        )]
+    );
 }

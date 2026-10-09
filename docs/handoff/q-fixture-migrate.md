@@ -82,8 +82,8 @@ on `77a1a9bf` (after the staging merge). 177 tests: 110 pass, 65 fail, 2 time ou
 | Group | Tests | Cause | Next |
 |---|---|---|---|
 | G1 rigs leave town by the Den cave (**done**, 26 / 33 pass) | app_barbarian 10, app_skill_gaps 12, app_assassin_gaps 5, app_move_anims 2, app_play_monster_ai 2, app_town_portal 1 | `Rig::leave_town` expects the cave entrance tile in the model at the join (the invented town bordered it) and then teleports to invented Den coordinates; the rigs also install made-up skill rows | rewrite the rigs: route into the Blood Moor (`test_fixtures::host::route`), the install's skill rows, expected numbers from `skills.bin` |
-| G2 Akara at the join | app_play_quests 4 | Akara's preset room is not active at the join on the real map | walk to her (`play_smoke`'s `approach`) |
-| G3 waypoints and travel | app_a3_a5_waypoints 2, app_act_travel 1, app_waypoint_warp 2, app_play_npc 1, app_town_portal 1 | the tests stage the waypoint unit and its known indexes the old build placed; the real town waypoint appears only after the population | find the preset waypoint as `play_smoke` does |
+| G2 Akara at the join (**done**, 4 / 4 pass) | app_play_quests 4 | Akara's preset room is not active at the join on the real map | walk to her (`play_smoke`'s `approach`) |
+| G3 waypoints and travel (**done**, 7 / 7 pass) | app_a3_a5_waypoints 2, app_act_travel 1, app_waypoint_warp 2, app_play_npc 1, app_town_portal 1 | the tests stage the waypoint unit and its known indexes the old build placed; the real town waypoint appears only after the population | find the preset waypoint as `play_smoke` does |
 | G4 invented counts and streams | app_frame_loop 1, app_single_player 1, app_server_skills 1, app_levelup 1, app_client_drlg 1, seam_drlg_coords 2 | message counts, join streams and skill lists derived from the invented world (e.g. "the join's two 0x23 (no StartSkill on synthetic data)") | expected values from a recorded join (`traces/`), queued; `seam_drlg_coords` and `the_session_join_on_the_install` now get the install's client tables (they failed on fatal 0x668: no skills table) |
 | G5 invented items on the server | smoke_save 5, smoke_frontend 2 | `smoke_save`'s fixture places invented items ("item 0 worn at body location 4" panics on the server thread); `smoke_frontend`'s Esc-menu save reads back as checksum error / bad magic | rewrite the item fixture on real item records; the `smoke_frontend` read-back is a finding (q-fix-real-front-save) to reproduce first |
 | G6 other position assumptions | app_cain_quest, app_level_border, app_town_gaps, app_play_preview, app_server_core, app_play_npc | invented positions (a free spot in the first streamed room, Gheed placed by the build, frames of the invented tile set) | each against the real presets |
@@ -111,6 +111,20 @@ q-fix-real-leap-attack (1), q-fix-real-sentry (2). What the rewrite learned from
   "Tiger Strike without a claw is refused" became the `use.md` vector "bare-handed passes"; the
   dual-claw strike is Dragon Claw; the trap is Charged Bolt / Lightning Sentry with the shots of
   its own row (read after laying, never typed in).
+
+**G2 and G3 after the rewrite.** `app_play_quests` and `app_play_npc` run on `add_live_client`
+(the install's UI, tables and art) with a shared server handle; the invented UI files, class
+numbers and the injected skill list are gone. Shared helpers in `tests/app_support`:
+`approach` (walk the player's town room by room until the preset places the unit, then to it;
+`test_fixtures::host::route_near`), `operate_town_waypoint` (the town's waypoint by its
+`objects` operate function 23, run to, operated), `waypoints()` (the install's waypoint map).
+Expected values come from the data or the server: waypoint indexes from `levels` `Waypoint`;
+the waypoint menu's rows are the act's waypoint levels in index order, known as the server's
+record says; the "unbuilt level" test takes the first Act I waypoint level the game has not
+built at the join (on the install Stony Field is built at creation with the outdoor levels, so
+the old fixed choice no longer held). Run: `cargo nextest run -p d2-client --test app_play_quests
+--test app_play_npc --test app_waypoint_warp --test app_act_travel --test app_a3_a5_waypoints
+--run-ignored only` (D2_GAME_DIR): 11 / 11 pass.
 
 ## 6. Not done (Wave 1 rest, in order)
 

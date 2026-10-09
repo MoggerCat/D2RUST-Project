@@ -17,7 +17,7 @@ use d2_server::adapters::character::save::{
 };
 use d2_server::world_data::game::GameTables;
 use d2_server::world_data::tables::{appearance_tables, SaveData};
-use d2_sim::items::bitstream::{write_save, StreamItem};
+use d2_sim::items::bitstream::{write_save, StreamItem, WriteBack};
 use d2_sim::items::inventory::node;
 use d2_sim::units::UnitId;
 use test_fixtures::{install, synth};
@@ -43,6 +43,7 @@ struct Fake {
     flags2: BTreeMap<UnitId, u32>,
     streams: BTreeMap<UnitId, StreamItem>,
     looks: BTreeMap<UnitId, EquippedItem>,
+    write_backs: std::cell::RefCell<Vec<(UnitId, WriteBack)>>,
 }
 
 impl Fake {
@@ -82,6 +83,9 @@ impl SaveItems for Fake {
     }
     fn appearance(&self, item: UnitId) -> Option<EquippedItem> {
         self.looks.get(&item).copied()
+    }
+    fn write_back(&self, item: UnitId, wb: WriteBack) {
+        self.write_backs.borrow_mut().push((item, wb));
     }
 }
 
@@ -164,6 +168,32 @@ fn item_list_skips_unsaved_items_and_appends_children() {
     assert_eq!(s.item_entry_len(&e[0].bytes), Ok(e[0].bytes.len()));
 }
 
+/// `items/bitstream.md` Outputs and §2 rule 5: the writer's changes
+/// (item level < 1 → 1, quality outside 1–9 → 2) reach every written
+/// item, the children too, in write order.
+// Covers: specs/items/bitstream.md §2 r5
+#[test]
+fn item_list_hands_back_every_items_write_back() {
+    let (_, t) = synthetic("wb");
+    let s = SaveData::from_fixed(&t.fixed, true).unwrap();
+    let mut f = Fake::default();
+    let mut parent = full(*b"sb1 ", 1);
+    parent.ilvl = 0;
+    f.link(1, 10, node::PAGE, 0, parent);
+    let mut child = full(*b"sb1 ", 0);
+    child.quality = 0;
+    child.ilvl = 9;
+    f.link(10, 20, node::NONE, 0, child);
+    item_list(&f, UnitId(1), &s.items.isc).unwrap();
+    let got: Vec<(u32, i32, u8)> = f
+        .write_backs
+        .borrow()
+        .iter()
+        .map(|(u, w)| (u.0, w.ilvl, w.quality))
+        .collect();
+    assert_eq!(got, [(10, 1, 2), (20, 9, 2)]);
+}
+
 fn base_save(expansion: bool) -> D2s {
     let mut h = Header::default();
     h.set_name(b"Merc").unwrap();
@@ -194,7 +224,7 @@ fn base_save(expansion: bool) -> D2s {
 fn hireling_items_round_trip_through_the_loader() {
     let (_, t) = synthetic("jf");
     let s = SaveData::from_fixed(&t.fixed, true).unwrap();
-    let a = appearance_tables(&t.fixed, &ReferenceSlots::v1_14d()).unwrap();
+    let a = appearance_tables(&t.fixed, &slots_1_14d()).unwrap();
     let id = s
         .hirelings
         .rows
@@ -273,7 +303,7 @@ fn hireling_items_round_trip_through_the_loader() {
 fn rebuild_fills_the_appearance_from_the_equipped_items() {
     let (_, t) = synthetic("look");
     let s = SaveData::from_fixed(&t.fixed, true).unwrap();
-    let mut a = appearance_tables(&t.fixed, &ReferenceSlots::v1_14d()).unwrap();
+    let mut a = appearance_tables(&t.fixed, &slots_1_14d()).unwrap();
     // The synthetic `armtype` tokens are upper case (`LIT`), so no entry
     // holds them; with the 1.14d tokens the armour `ar1` (no armour
     // columns: `armtype` row 0 for all six parts) takes entry 1 (`lit`).
@@ -340,7 +370,7 @@ fn live() -> GameTables {
 #[ignore = "needs the game files (D2_GAME_DIR)"]
 fn token_positions_on_the_users_install() {
     let t = live();
-    let a = appearance_tables(&t.fixed, &ReferenceSlots::v1_14d()).unwrap();
+    let a = appearance_tables(&t.fixed, &slots_1_14d()).unwrap();
     let at = |c: &[u8; 4]| a.tokens.lookup(*c, *c);
     for (c, v) in [
         (b"hax ", 4),
@@ -366,7 +396,7 @@ fn token_positions_on_the_users_install() {
 
 /// The reference table of the image (`ReferenceSlots::game`, the
 /// Constants' slot types) under the 1.14d itemtypes: the reserved slots
-/// the Constants state (equal to `ReferenceSlots::v1_14d`), and the
+/// the Constants state ([`slots_1_14d`]), and the
 /// second `ktr` at 243 (edge case 4).
 // Covers: specs/formats/d2s-appearance.md §1 r2, §1 r3
 #[test]
@@ -387,9 +417,30 @@ fn the_image_reference_table_on_the_users_install() {
         assert_eq!(class(i), want, "slot {i}");
     }
     // The slots from the image's types equal the Constants' summary.
-    assert_eq!(ReferenceSlots::game(&m), ReferenceSlots::v1_14d());
+    assert_eq!(ReferenceSlots::game(&m), slots_1_14d());
     let a = appearance_tables(&t.fixed, &ReferenceSlots::game(&m)).unwrap();
     // The katar's second copy (edge case 4); the lookup returns 45.
     assert_eq!(a.tokens.entry(243).unwrap().0, *b"ktr ");
     assert_eq!(a.tokens.lookup(*b"ktr ", *b"ktr "), 45);
+}
+
+/// The slot classes the Constants of `formats/d2s-appearance.md` state
+/// for the 1.14d reference table (`0x00744CA8` under the 1.14d is-a
+/// relation): `weap` 43–116, 130–133, 135–234; `armo` 4–42, 118–121,
+/// 124–129, 134, 235–255; the rest neither. The expected value of
+/// `ReferenceSlots::game` on the user's tables, and the slots the
+/// synthetic tables' tests use.
+fn slots_1_14d() -> ReferenceSlots {
+    let mut s = ReferenceSlots::none();
+    for r in [43..=116, 130..=133, 135..=234] {
+        for slot in &mut s.0[r] {
+            slot.weap = true;
+        }
+    }
+    for r in [4..=42, 118..=121, 124..=129, 134..=134, 235..=255] {
+        for slot in &mut s.0[r] {
+            slot.armo = true;
+        }
+    }
+    s
 }

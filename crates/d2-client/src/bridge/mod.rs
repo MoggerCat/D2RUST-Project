@@ -57,6 +57,7 @@ mod tests;
 #[cfg(test)]
 mod tests_c2cli;
 
+use crate::rules::lighting::records::LightList;
 use d2_proto::transport::SplitError;
 use d2_proto::{FixedMessage, PROTOCOL_VERSION};
 
@@ -182,6 +183,13 @@ impl<L: ServerLink> Bridge<L> {
     /// rule 2). Set by the app before each frame.
     pub fn set_paused(&mut self, paused: bool) {
         self.paused = paused;
+    }
+
+    /// A pass held by the app's draw pacing (`specs/tools/facts-render.md`
+    /// §5 r13, `play --dump-draws` only): it counts as a frame and does
+    /// nothing else: no pump, no receive, no update pass.
+    pub fn held_frame(&mut self) {
+        self.world.frames += 1;
     }
 
     /// One bridge frame: pump the server, receive and dispatch every
@@ -448,6 +456,7 @@ impl<L: ServerLink> Bridge<L> {
         t.stats = rows.stats;
         t.objects = rows.objects;
         t.shrines = rows.shrines;
+        t.states = rows.states;
     }
 
     /// The host's wall-clock seconds `0x00410A80` (`render/lighting.md`
@@ -537,6 +546,15 @@ impl<L: ServerLink> Bridge<L> {
 
     pub fn world(&self) -> &ClientWorld {
         &self.world
+    }
+
+    /// A drawn frame's light pass (`render/lighting.md` §6.4): `pass` gets
+    /// the model and the client's kept light list (§6.3), taken out of the
+    /// model for the pass and put back after it.
+    pub fn light_frame(&mut self, pass: impl FnOnce(&ClientWorld, &mut LightList)) {
+        let mut lights = std::mem::take(&mut self.world.lights);
+        pass(&self.world, &mut lights);
+        self.world.lights = lights;
     }
 
     /// The client DRLG, writable: a test seam for fixture collision (a

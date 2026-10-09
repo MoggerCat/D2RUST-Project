@@ -30,6 +30,7 @@ pub mod output;
 pub mod pool;
 pub mod sound_table;
 pub mod triggers;
+pub mod unit_feed;
 
 #[cfg(test)]
 mod tests;

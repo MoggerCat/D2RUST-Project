@@ -46,7 +46,7 @@ pub fn path_op<X: Pending>(
 /// point when the target unit is none) and the skill message 0x4D sends
 /// (`pathing.md` §10 rule 2: target x, y = the path target). Charge's run
 /// (mode 3) computes its path to it. Unit targets are the mode start's.
-// PROVISIONAL (use.md §4, REC-440): the point-form start `0x0057FE90` is
+// PROVISIONAL (use.md §4, REC-460): the point-form start `0x0057FE90` is
 // read as writing the point with `0x00648AD0`, since `0x0056D2C0` (Leap,
 // Whirlwind, the `lineofsight` test) and the 0x4D builder read only the
 // path's +0x10 / +0x12; settled by the 0x4D bytes another client gets

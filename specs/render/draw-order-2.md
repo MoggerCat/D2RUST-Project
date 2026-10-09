@@ -32,7 +32,7 @@
 | Edge cases & original bugs | 520–536 |
 | Test vectors | 537–558 |
 | Provenance | 559–590 |
-| Open questions | 591–650 |
+| Open questions | 591–660 |
 <!-- /index -->
 
 ## Summary
@@ -647,3 +647,13 @@ Encampment): splash ripples on the river, drop lines.
 11. *Answered* (W7): phase, length, countdown, `last_s`, `last_b` are 0
     at program start and never reset, so the rain cycle continues across
     games (§11.1).
+12. (Added 2026-10-09, `q-fix-render-rest`; blocks level 74 in d2rs.)
+    §12 r3's star tick `last`: its global, its value before the first
+    call of `0x00476290` (a `.bss` 0, or a write in the first-call branch
+    of r1), and whether the r3 test runs on the first call. Also §12's
+    two "seed := time value": the argument of `time_value`
+    (`sim/rng.md` §5.1) and the seed form (`init_low(x)` or the raw word)
+    for `[0x00712C4C]` and `[0x00712C50]` (d2rs reads `init_low(
+    time_value(0))`, PROVISIONAL REC-420). Settled by an asm read of
+    `0x00476290` / `0x00476460`'s first-call branches (local queue,
+    `docs/HANDOFF.md` §5 entry 103).

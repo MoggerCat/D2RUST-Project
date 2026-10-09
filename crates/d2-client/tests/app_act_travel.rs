@@ -67,6 +67,7 @@ fn travel(via_queue: bool) {
     .unwrap();
     let server = Arc::new(Mutex::new(link));
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
@@ -108,7 +109,12 @@ fn travel(via_queue: bool) {
         let (p, _) = single_player::local_player(&l.host().game).unwrap();
         let g = &mut l.host_mut().game;
         let wp = g.events.action.hooks().waypoints.entry(p).or_default();
-        wp.get_mut(0).set(9).unwrap();
+        // Lut Gholein's index (`levels` `Waypoint`).
+        let i = app_support::waypoints()
+            .map
+            .index_of_level(single_player::ACT2_TOWN)
+            .unwrap();
+        wp.get_mut(0).set(u32::from(i)).unwrap();
     });
     if via_queue {
         app_support::with(&server, |l| {
@@ -122,26 +128,10 @@ fn travel(via_queue: bool) {
         });
     }
     // Operate the town waypoint (C→S 0x13), then take it to Act II
-    // (C→S 0x49 [GUID][level]).
-    let wp: UnitKey = app
-        .world()
-        .resource::<BridgeResource>()
-        .0
-        .world()
-        .units
-        .iter()
-        .find(|(k, _)| k.unit_type == 2)
-        .map(|(k, _)| *k)
-        .expect("the town waypoint");
-    app.world_mut()
-        .resource_mut::<BridgeResource>()
-        .0
-        .interact(wp)
-        .unwrap();
-    for _ in 0..10 {
-        step(&mut app);
-    }
+    // (C→S 0x49 [GUID][level]). The queued act change (an NPC's) needs no waypoint; the waypoint
+    // path walks to the town's waypoint and operates it first.
     if !via_queue {
+        let wp: UnitKey = app_support::operate_town_waypoint(&mut app, &server, &ms);
         let mut m = vec![0x49];
         m.extend_from_slice(&wp.guid.to_le_bytes());
         m.extend_from_slice(&single_player::ACT2_TOWN.to_le_bytes());

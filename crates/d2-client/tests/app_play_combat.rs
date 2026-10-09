@@ -93,6 +93,7 @@ fn a_monster_walks_and_a_left_click_on_it_attacks() {
         sent: sent.clone(),
     };
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
@@ -204,6 +205,7 @@ fn a_monster_walks_and_a_left_click_on_it_attacks() {
         mouse,
         game_menu_open: false,
         pick: false,
+        shake: (0, 0),
     };
     sent.lock().unwrap().clear();
     let mut st = ClickState::default();

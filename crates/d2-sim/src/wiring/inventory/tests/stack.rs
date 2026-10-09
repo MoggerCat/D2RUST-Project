@@ -80,17 +80,21 @@ fn stack_merge_frees_the_source() {
     assert!(w.state.errors.is_empty());
 }
 
-/// §7.12: keys have no durability → no merge (both quantities stay), dst
-/// is still marked (0x9C action 0xA). src = dst → 3; different classes
-/// fail §4.5 → 0. §7.13: 0x22 on an owned item → 3 (X1), on another → 1.
+/// §7.12: keys have no durability (`0x00629930` = 0); PROVISIONAL
+/// (REC-289) that gates only the stat-72 step, so they merge: dst := 7,
+/// src freed, dst marked (0x9C action 0xA). src = dst → 3; different
+/// classes fail §4.5 → 0. §7.13: 0x22 on an owned item → 3 (X1), on
+/// another → 1.
 #[test]
-fn stack_without_merge_and_unstack() {
+fn stack_without_durability_and_unstack() {
     let mut w = World::new();
     let (dst, src) = pair(&mut w, KEY, 3, 4);
     assert_eq!(w.handle(&msg(0x21, &[src, src])), Ok(3));
     assert_eq!(w.handle(&msg(0x21, &[src, dst])), Ok(0));
-    assert_eq!((qty(&w, dst), qty(&w, src)), (3, 4));
+    assert_eq!(qty(&w, dst), 7);
+    assert_eq!(w.unit(src), None, "the source is freed");
     assert_eq!(item_msgs(&w.drain()), [(0x9C, 0x0A, dst)]);
+    let src = w.cursor_item(KEY);
     let other = w.ground_item(KNIFE, 12, 12);
     assert_eq!(w.handle(&msg(0x21, &[src, other])), Ok(1), "not owned");
     assert_eq!(w.handle(&msg(0x22, &[dst])), Ok(3));

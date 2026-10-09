@@ -216,6 +216,7 @@ fn the_play_preview_draws_walks_and_opens_the_character_panel() {
     .unwrap();
     let source = Arc::new(files());
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();

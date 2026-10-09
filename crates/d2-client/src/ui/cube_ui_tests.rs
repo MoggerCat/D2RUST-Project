@@ -198,19 +198,25 @@ fn frames(u: &OriginalUi, root: &UiRoot, w: &ClientWorld, tick: u64) -> Vec<u32>
         .collect()
 }
 
-// Covers: specs/ui/panels.md §12 r4
+// Covers: specs/ui/panels.md §12 r4; specs/ui/panels-2.md §20 r7
 #[test]
 fn the_transmute_animation_plays_frames_0_to_29_on_the_70ms_steps() {
+    use crate::bridge::output::Output;
     let (mut u, mut root) = ui();
     let w = alive_world();
     open_cube(&mut u, &mut root, &w);
-    // No animation before the transmute button is released.
     assert!(frames(&u, &root, &w, 100).is_empty());
     let s = Screen::R800;
     let trans = Point::new(s.sx() + 160, s.h + s.sy() - 200);
-    // Released at tick 0 (stamp 0 ms).
+    // The transmute button starts nothing (a gem transmute shows none).
     click(&mut u, &mut root, &w, trans);
     assert_eq!(root.take_intents().len(), 1);
+    assert!(frames(&u, &root, &w, 101).is_empty());
+    // An `hst ` arrives in page 3 (`0x0048A540`): the client quest
+    // record lacks 10.11, so it is set and the animation starts at the
+    // next draw (tick 0, stamp 0 ms).
+    u.apply_output(&Output::HoradricItem { code: *b"hst " }, &w)
+        .unwrap();
     // 40 ms frames: a step needs more than 70 ms, so every second frame.
     let mut seen = Vec::new();
     for t in 0..80u64 {
@@ -224,4 +230,8 @@ fn the_transmute_animation_plays_frames_0_to_29_on_the_70ms_steps() {
     assert_eq!(seen, (0..30).collect::<Vec<u32>>());
     // Stopped after frame 29: nothing drawn (frame 30 never).
     assert!(frames(&u, &root, &w, 200).is_empty());
+    // 10.11 is now set in the client copy: a second `hst ` plays nothing.
+    u.apply_output(&Output::HoradricItem { code: *b"hst " }, &w)
+        .unwrap();
+    assert!(frames(&u, &root, &w, 300).is_empty());
 }

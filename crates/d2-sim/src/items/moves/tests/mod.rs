@@ -790,7 +790,7 @@ impl MovePending for Fake {
     fn merge_allowed(&self, _src: Guid) -> bool {
         self.k.merge
     }
-    fn book_count_changed(&mut self, _p: Owner, n: i32) {
+    fn book_count_changed(&mut self, _p: Owner, _book: Guid, n: i32) {
         self.note(format!("book {n}"));
     }
     fn use_item(&mut self, _p: Owner, target: Owner, item: Guid) -> bool {
@@ -860,8 +860,8 @@ impl MovePending for Fake {
             self.k.quest_flags.remove(&(q, f));
         }
     }
-    fn quest_item_used(&mut self, _p: Owner) {
-        self.note("quest_used".into());
+    fn quest_item_used(&mut self, _p: Owner, chain: u8) {
+        self.note(format!("quest_used {chain}"));
     }
     fn quest_tr2_used(&mut self, _p: Owner) {
         self.note("tr2".into());

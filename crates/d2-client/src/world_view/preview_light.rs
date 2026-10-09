@@ -1,28 +1,28 @@
-// Spec: specs/render/lighting.md (§1–§3, §6.4 r5, §7.2–§7.4, §9, §11 r1–r4, §8 player row), specs/render/shading.md (§3)
+// Spec: specs/render/lighting.md (§1–§3, §6.4, §7.2–§7.4, §9, §10 r1, §11 r1–r4, §8 player row), specs/render/shading.md (§3)
 //! The play preview's lighting (stitch-lighting; replaces the D1
 //! full-bright fill of [`super::preview`] unless `D2RS_FULLBRIGHT=1`).
 //!
 //! Per drawn frame ([`PreviewLight::refresh`]): the 48 × 48 light map
 //! around the local player (§1), the ambient fill from the act
-//! environment the bridge steps per client update (§3, §9.2 r1), the
-//! player's light record (radius 13 plus stat 89, §8) and the other
-//! units' records by kind (§6.4 r5); then the cel light value of a unit
-//! (§11 r1) and of a tile ([`tile_chain`]) is read from it, and shaded through the act's PL2
+//! environment the bridge steps per client update (§3, §9.2 r1), then
+//! §6.4 over the client's kept light list (`ClientWorld::lights`, §6.3:
+//! records the model's unit code created, §8), contributing by kind
+//! (r5); then the cel light value of a unit (§11 r1) and of a tile
+//! ([`tile_chain`]) is read from it, and shaded through the act's PL2
 //! tables.
 //!
 //! `d2rs-own, unverified`:
 //! - a tile's whole-tile shade is one flat value (the cell at its centre
 //!   sub-tile); its blocks take the gradients of [`super::preview_blocks`];
-//! - the ambient of a room is the scripted override (§10, quest byte 1 read
-//!   as 0), else the level's `Levels.txt` ambient when it has a colour,
-//!   else the environment's; the near rooms fill their rectangles (§3 r3);
-//! - the other lights are those of [`super::light_sources`];
+//! - the ambient of a room is the scripted override (§10, client quest
+//!   byte 1 from the last S→C 0x5E), else the level's `Levels.txt`
+//!   ambient when it has a colour, else the environment's; the near rooms
+//!   fill their rectangles (§3 r3);
 //! - the blocks-light flags (§4) and the kind-2 caches (§7.4 r1) come
-//!   from the client DRLG collision (`collision_at`, mask 0x22); each
-//!   record contributes by its §8 kind (§6.4 r5);
-//! - the other units' lights sit at their sub-tile's `8·s + 4` (the model
-//!   holds no precise position); the local player's at `(P >> 13) + 4` of
-//!   its predicted 16.16 position (§6.1).
+//!   from the client DRLG collision (`collision_at`, mask 0x22);
+//! - the other units' lights sit at their sub-tile `<< 16` (the model
+//!   holds no precise position); the local player's at its predicted
+//!   16.16 position (§6.1);
 
 use crate::bridge::world::ClientWorld;
 use crate::bridge::{ClientUnit, UnitKey};
@@ -32,8 +32,9 @@ use crate::rules::lighting::contribute;
 use crate::rules::lighting::draws::MATERIAL_UNLIT;
 use crate::rules::lighting::environment::{Ambient as EnvAmbient, Environment, PeriodTables};
 use crate::rules::lighting::map::{Ambient, AmbientScene, LightMap, NearRoom};
-use crate::rules::lighting::records::{LightKind, LightList};
-use crate::rules::lighting::sources::{player_light_color, player_light_radius};
+use crate::rules::lighting::records::{
+    LightKind, LightList, LightRooms, LightWorld, Owner, RoomId,
+};
 use crate::rules::lighting::view::{ComponentLook, FrameLight, LookFeed};
 use crate::rules::shading::ShadeTables;
 use crate::scene::ShadeChain;
@@ -127,6 +128,8 @@ pub struct PreviewLight {
     /// The monster / missile light columns ([`super::light_sources`]);
     /// objects from the `objects` rows. `None`: only the player's light.
     pub sources: Option<std::sync::Arc<super::light_sources::LightRows>>,
+    /// The last refresh's failure ([`Self::error`]).
+    error: Option<String>,
 }
 
 /// The ambient of a level (§3.1 r2): its `Levels.txt` `Intensity`, `Red`,
@@ -281,32 +284,109 @@ pub fn chain_of(tables: &ShadeTables, v: u8) -> ShadeChain {
     }
 }
 
+/// The client world as a drawn frame's §6.4 pass reads it: owners through
+/// the model's lookups (`ClientWorld` [`LightRooms`]), the local player at
+/// its predicted 16.16 position, the blocks-light test over the client
+/// DRLG collision (§4, mask 0x22).
+///
+/// `d2rs-own, unverified`: the model holds no 16.16 position of other
+/// units, so their position is their sub-tile `<< 16` (the static-path
+/// form of §6.1).
+struct FrameOwners<'a> {
+    world: &'a ClientWorld,
+    local: Option<(UnitKey, (u32, u32))>,
+    drlg: Option<&'a d2_sim::drlg::Drlg>,
+}
+
+impl FrameOwners<'_> {
+    /// §4: the blocks-light flag of sub-tile `(x, y)`; with no client DRLG
+    /// (or no player room) nothing blocks.
+    fn blocks(&self, x: i32, y: i32) -> bool {
+        self.drlg
+            .is_some_and(|d| blocks_light(d.collision_at(x, y)))
+    }
+}
+
+impl LightRooms for FrameOwners<'_> {
+    fn owner_position(&self, owner: &Owner) -> Option<(i32, i32)> {
+        let u = self.world.light_owner(owner)?;
+        if let Some((key, (x, y))) = self.local {
+            if key == u.key && !owner.client_only {
+                return Some((x as i32, y as i32));
+            }
+        }
+        let (x, y) = u.cell();
+        Some((i32::from(x) << 16, i32::from(y) << 16))
+    }
+
+    fn owner_subtile(&self, owner: &Owner) -> Option<(i32, i32)> {
+        self.world.owner_subtile(owner)
+    }
+
+    fn owner_room(&self, owner: &Owner) -> Option<RoomId> {
+        self.world.owner_room(owner)
+    }
+
+    fn cell_room(&self, room: RoomId, x: i32, y: i32) -> Option<RoomId> {
+        self.world.cell_room(room, x, y)
+    }
+}
+
+impl LightWorld for FrameOwners<'_> {
+    fn is_local_player(&self, owner: &Owner) -> bool {
+        !owner.client_only
+            && self
+                .world
+                .local_player
+                .is_some_and(|k| u32::from(k.unit_type) == owner.unit_type && k.guid == owner.guid)
+    }
+
+    fn owner_blocks(&self, _: &Owner, x: i32, y: i32) -> bool {
+        self.blocks(x, y)
+    }
+}
+
 impl PreviewLight {
     /// The ambient of a room of `level` (§3.1): the scripted override
     /// (§10) when it has a colour, else the level's own, else the act's
     /// `env`.
-    fn room_ambient(&self, world: &ClientWorld, level: u32, env: Ambient) -> Ambient {
-        // d2rs-own, unverified (REC-250): client quest byte 1 is not held,
-        // read as 0 (the Den of Evil glow stays off).
-        let o = world.overrides.ambient(level, 0);
+    fn room_ambient(
+        &self,
+        world: &ClientWorld,
+        level: u32,
+        env: Ambient,
+    ) -> Result<Ambient, String> {
+        // §10 r1: client quest byte 1, read only in level 8 while the Den
+        // flag is 0; no 0x5E yet there is fatal 0x60 in 1.14d.
+        let quest = if level == crate::rules::lighting::overrides::LEVEL_DEN_OF_EVIL
+            && !world.overrides.den_flag
+        {
+            world
+                .client_quest_byte(1)
+                .ok_or("fatal 0x60: client quest byte 1 read before any S→C 0x5E")?
+        } else {
+            0
+        };
+        let o = world.overrides.ambient(level, quest);
         if o.r != 0 || o.g != 0 || o.b != 0 {
-            return Ambient {
+            return Ok(Ambient {
                 i: o.i,
                 r: o.r,
                 g: o.g,
                 b: o.b,
-            };
+            });
         }
-        self.sources
+        Ok(self
+            .sources
             .as_ref()
             .and_then(|s| level_ambient(&s.levels, level))
-            .unwrap_or(env)
+            .unwrap_or(env))
     }
 
     /// The ambient input of §3: the player room's ambient and the near
     /// list (its adjacency array, `rooms.md` §6), each with its own level
     /// ambient and sub-tile rectangle.
-    fn scene(&self, world: &ClientWorld, env: Ambient, level: u32) -> AmbientScene {
+    fn scene(&self, world: &ClientWorld, env: Ambient, level: u32) -> Result<AmbientScene, String> {
         let mut near = Vec::new();
         if let (Some(own), Some(drlg), Some(active)) = (
             world.local_room(),
@@ -319,15 +399,15 @@ impl PreviewLight {
                 };
                 near.push(NearRoom {
                     rect: (r.x0, r.y0, r.w, r.h),
-                    ambient: self.room_ambient(world, u32::from(r.level), env),
+                    ambient: self.room_ambient(world, u32::from(r.level), env)?,
                     is_player_room: id == own.room,
                 });
             }
         }
-        AmbientScene {
-            player_ambient: self.room_ambient(world, level, env),
+        Ok(AmbientScene {
+            player_ambient: self.room_ambient(world, level, env)?,
             near,
-        }
+        })
     }
 
     pub fn new() -> Self {
@@ -360,11 +440,18 @@ impl PreviewLight {
         &self.look
     }
 
-    /// Rebuilds the frame's light (once per drawn frame, before the build).
-    /// `local_at` is the predicted 16.16 position of the local player.
+    /// The frame's light (once per drawn frame, before the build;
+    /// `lighting.md` §2): the ambient fill (§3), the blocks-light flags
+    /// (§4), then §6.4 over the client's kept list `lights` (§6.3): each
+    /// record's position from its owner, its radius walk (r2), dying
+    /// records removed (r4), the contribution by kind (r5), kind-2 caches
+    /// built once and kept until a radius change or a new room drops them
+    /// (§6.4 r2, last paragraph). `local_at` is the predicted 16.16
+    /// position of the local player.
     pub fn refresh(
         &mut self,
         world: &ClientWorld,
+        lights: &mut LightList,
         local_at: Option<(UnitKey, (u32, u32))>,
         tables: Option<&ShadeTables>,
     ) {
@@ -377,14 +464,12 @@ impl PreviewLight {
         let Some(player) = world.local() else {
             return;
         };
-        let (at, at8) = match local_at {
-            Some((key, (x, y))) if key == player.key => (subtile_of(x, y), light_pos_of(x, y)),
-            _ => {
-                let at = player
-                    .position
-                    .map_or((0, 0), |(x, y)| (i32::from(x), i32::from(y)));
-                (at, (8 * at.0 + 4, 8 * at.1 + 4))
-            }
+        let local_at = local_at.filter(|(key, _)| *key == player.key);
+        let at = match local_at {
+            Some((_, (x, y))) => subtile_of(x, y),
+            None => player
+                .position
+                .map_or((0, 0), |(x, y)| (i32::from(x), i32::from(y))),
         };
         self.look.local = Some((player.key, at));
         let level = world.player_level().map_or(0, u32::from);
@@ -415,31 +500,37 @@ impl PreviewLight {
             g: a.g,
             b: a.b,
         };
-        let scene = self.scene(world, ambient, level);
-        let radius = player_light_radius(player.stat(STAT_LIGHT_RADIUS)).max(1);
-        let rgb = player_light_color(player.stat(STAT_LIGHT_COLOR) as u32);
-        // §8 player row: kind 0 for the local player.
-        let mut lights = vec![SourceLight {
-            at: at8,
-            radius,
-            rgb,
-            kind: LightKind::Shadowed,
-            owner: at,
-        }];
-        if let Some(rows) = &self.sources {
-            lights.extend(rows.lights(world));
-        }
+        let scene = match self.scene(world, ambient, level) {
+            Ok(scene) => scene,
+            Err(e) => {
+                self.error = Some(e);
+                return;
+            }
+        };
         let drlg = world.drlg.as_ref().filter(|_| world.local_room().is_some());
-        let map = build_map_eighths(
-            at,
-            &scene,
-            |x, y| drlg.is_some_and(|d| blocks_light(d.drlg.collision_at(x, y))),
-            &lights,
-        );
+        let owners = FrameOwners {
+            world,
+            local: local_at,
+            drlg: drlg.map(|d| &d.drlg),
+        };
+        let mut map = LightMap::new(at);
+        map.fill_ambient(Some(&scene));
+        map.fill_blocks(&|x, y| owners.blocks(x, y));
+        // A fatal case of 1.14d (§6.4, §7.4) stops the list walk; the map
+        // keeps what the records before it gave.
+        self.error = lights
+            .frame(&mut map, QUALITY, &owners)
+            .err()
+            .map(|e| e.to_string());
         self.frame = Some(FrameLight {
             tables: *tables,
             map,
         });
+    }
+
+    /// The last refresh's failure (a 1.14d fatal case), if any.
+    pub fn error(&self) -> Option<&str> {
+        self.error.as_deref()
     }
 
     /// The per-block shades of a tile (§11 r2–r4, `shading.md` §4); empty
@@ -495,6 +586,29 @@ mod tests {
         let pl2 =
             d2_formats::palette::Pl2::parse(&super::super::tile_assets::tests::pl2()).unwrap();
         ShadeTables::push(&mut MapTable::new(), &pl2)
+    }
+
+    /// A drawn frame's light pass over the model's kept list, as
+    /// `present.rs` runs it (`Bridge::light_frame`).
+    fn refresh(
+        l: &mut PreviewLight,
+        w: &mut ClientWorld,
+        at: Option<(UnitKey, (u32, u32))>,
+        t: &ShadeTables,
+    ) {
+        let mut lights = std::mem::take(&mut w.lights);
+        l.refresh(w, &mut lights, at, Some(t));
+        w.lights = lights;
+    }
+
+    /// The local player as 0x59 leaves it: its light record (§8 player
+    /// row) in the model's list.
+    fn local_player(w: &mut ClientWorld, key: UnitKey, at: (u16, u16)) {
+        let mut u = ClientUnit::new(key);
+        u.position = Some(at);
+        w.units.insert(key, u);
+        w.local_player = Some(key);
+        crate::bridge::msg::lighting::player_light(w, key);
     }
 
     fn dark() -> Ambient {
@@ -562,13 +676,10 @@ mod tests {
     fn refresh_lights_the_player_and_darkens_far_cells() {
         let mut w = ClientWorld::default();
         let key = UnitKey::new(PLAYER, 1);
-        let mut u = ClientUnit::new(key);
-        u.position = Some((4000, 4000));
-        w.units.insert(key, u);
-        w.local_player = Some(key);
+        local_player(&mut w, key, (4000, 4000));
         let t = tables();
         let mut light = PreviewLight::default();
-        light.refresh(&w, None, Some(&t));
+        refresh(&mut light, &mut w, None, &t);
         let f = light.frame().expect("frame light");
         let at = f.map.read(8 * 4000, 8 * 4000).i;
         let far = f.map.read(8 * (4000 + 20), 8 * 4000).i;
@@ -578,9 +689,12 @@ mod tests {
         assert_eq!(light.look().light_subtile(unit).unwrap(), (4000, 4000));
         // Stat 89 widens the radius.
         let mut w2 = w.clone();
+        // The stat write runs the player list's callback (`0x004609F0`),
+        // as S→C 0x20 does in the model.
         w2.units.get_mut(&key).unwrap().stats.insert(89, 4);
+        crate::bridge::msg::lighting::player_light_stat(&mut w2, key, 89, 0, 4);
         let mut wide = PreviewLight::default();
-        wide.refresh(&w2, None, Some(&t));
+        refresh(&mut wide, &mut w2, None, &t);
         let edge = (4000 + 16, 4000);
         assert!(
             wide.frame().unwrap().map.read(8 * edge.0, 8 * edge.1).i
@@ -607,17 +721,15 @@ mod tests {
         assert_eq!(light_pos_of((100 << 16) + 0xC000, 100 << 16), (810, 804));
         let mut w = ClientWorld::default();
         let key = UnitKey::new(PLAYER, 1);
-        let mut u = ClientUnit::new(key);
-        u.position = Some((100, 100));
-        w.units.insert(key, u);
-        w.local_player = Some(key);
+        local_player(&mut w, key, (100, 100));
         let t = tables();
-        let map = |x16: u32| {
+        let mut map = |x16: u32| {
             let mut l = PreviewLight::default();
-            l.refresh(&w, Some((key, (x16, 100 << 16))), Some(&t));
+            refresh(&mut l, &mut w, Some((key, (x16, 100 << 16))), &t);
             l.frame().unwrap().map.clone()
         };
-        let (whole, frac) = (map(100 << 16), map((100 << 16) + 0xC000));
+        let whole = map(100 << 16);
+        let frac = map((100 << 16) + 0xC000);
         // §7.1 r4: cell 110's corner 880 is 76 (whole) or 70 (frac) away,
         // cell 90's corner 720 is 84 or 90: the light moved right.
         let i = |m: &LightMap, sx: i32| m.read(8 * sx, 8 * 100).i;
@@ -631,14 +743,11 @@ mod tests {
     fn a_new_environment_record_reaches_the_ambient() {
         let mut w = ClientWorld::default();
         let key = UnitKey::new(PLAYER, 1);
-        let mut u = ClientUnit::new(key);
-        u.position = Some((4000, 4000));
-        w.units.insert(key, u);
-        w.local_player = Some(key);
+        local_player(&mut w, key, (4000, 4000));
         let t = tables();
         let far = (8 * 4000 + 8 * 40, 8 * 4000);
         let mut light = PreviewLight::default();
-        light.refresh(&w, None, Some(&t));
+        refresh(&mut light, &mut w, None, &t);
         assert_eq!(light.frame().unwrap().map.read(far.0, far.1).i, 128);
         // Noon (90 degrees, index 2): §9.3 r4 gives 255.
         let periods = PeriodTables::builtin().unwrap();
@@ -648,7 +757,7 @@ mod tests {
         // build reads the record, it no longer steps it.
         env.update(&periods, 0);
         w.environment = Some(env);
-        light.refresh(&w, None, Some(&t));
+        refresh(&mut light, &mut w, None, &t);
         assert_eq!(light.frame().unwrap().map.read(far.0, far.1).i, 255);
     }
 
@@ -686,10 +795,7 @@ mod tests {
     fn drawn_frames_do_not_step_the_environment() {
         let mut w = ClientWorld::default();
         let key = UnitKey::new(PLAYER, 1);
-        let mut u = ClientUnit::new(key);
-        u.position = Some((4000, 4000));
-        w.units.insert(key, u);
-        w.local_player = Some(key);
+        local_player(&mut w, key, (4000, 4000));
         let t = tables();
         let far = (8 * 4000 + 8 * 40, 8 * 4000);
         let periods = PeriodTables::builtin().unwrap();
@@ -707,7 +813,7 @@ mod tests {
         }
         assert_ne!(stepped.ambient().i, env.ambient().i);
         for _ in 0..200 {
-            light.refresh(&w, None, Some(&t));
+            refresh(&mut light, &mut w, None, &t);
             assert_eq!(
                 light.frame().unwrap().map.read(far.0, far.1).i,
                 env.ambient().i
@@ -720,24 +826,20 @@ mod tests {
     fn the_levels_ambient_replaces_the_environments_when_it_has_a_colour() {
         let mut w = ClientWorld::default();
         let key = UnitKey::new(PLAYER, 1);
-        let mut u = ClientUnit::new(key);
-        u.position = Some((4000, 4000));
-        w.units.insert(key, u);
-        w.local_player = Some(key);
+        local_player(&mut w, key, (4000, 4000));
         let t = tables();
         let far = (8 * 4000 + 8 * 40, 8 * 4000);
         let mut plain = PreviewLight::default();
-        plain.refresh(&w, None, Some(&t));
+        refresh(&mut plain, &mut w, None, &t);
         // Level 0 (no room): the row's own ambient needs a colour.
         let rows = super::super::light_sources::LightRows {
             levels: vec![(99, 255, 255, 255)],
-            ..Default::default()
         };
         let mut lit = PreviewLight {
             sources: Some(std::sync::Arc::new(rows)),
             ..PreviewLight::default()
         };
-        lit.refresh(&w, None, Some(&t));
+        refresh(&mut lit, &mut w, None, &t);
         assert_eq!(lit.frame().unwrap().map.read(far.0, far.1).i, 99);
         assert_ne!(plain.frame().unwrap().map.read(far.0, far.1).i, 99);
     }
@@ -745,13 +847,10 @@ mod tests {
     // Covers: specs/render/lighting.md §8
     #[test]
     fn a_monster_light_lights_its_surroundings() {
-        use crate::bridge::world::MONSTER;
+        use crate::bridge::world::{MonsterClass, MONSTER};
         let mut w = ClientWorld::default();
         let key = UnitKey::new(PLAYER, 1);
-        let mut u = ClientUnit::new(key);
-        u.position = Some((4000, 4000));
-        w.units.insert(key, u);
-        w.local_player = Some(key);
+        local_player(&mut w, key, (4000, 4000));
         let mk = UnitKey::new(MONSTER, 9);
         let mut m = ClientUnit::new(mk);
         m.class = 0;
@@ -761,18 +860,118 @@ mod tests {
         let t = tables();
         let probe = (8 * 4000, 8 * 4018);
         let mut plain = PreviewLight::default();
-        plain.refresh(&w, None, Some(&t));
+        refresh(&mut plain, &mut w, None, &t);
         let dark = plain.frame().unwrap().map.read(probe.0, probe.1).i;
-        let rows = super::super::light_sources::LightRows {
-            monsters: vec![(6, (255, 255, 255))],
-            ..Default::default()
+        // The monster init's light (0xAC, `monstats2` `Light` 6).
+        let class = MonsterClass {
+            light: 6,
+            light_rgb: (255, 255, 255),
+            ..MonsterClass::default()
         };
-        let mut lit = PreviewLight {
-            sources: Some(std::sync::Arc::new(rows)),
-            ..PreviewLight::default()
-        };
-        lit.refresh(&w, None, Some(&t));
+        crate::bridge::msg::lighting::monster_light(&mut w, mk, &class);
+        let mut lit = PreviewLight::default();
+        refresh(&mut lit, &mut w, None, &t);
         assert!(lit.frame().unwrap().map.read(probe.0, probe.1).i > dark);
+    }
+
+    // Covers: specs/render/lighting.md §6.4 r2, §6.4 r4, §7.4
+    #[test]
+    fn the_kept_list_walks_radii_keeps_caches_and_drops_the_dead() {
+        use crate::bridge::drlg::DrlgRoomId;
+        use crate::bridge::world::OBJECT;
+        use crate::rules::lighting::records::LightKind;
+        let mut w = ClientWorld::default();
+        let key = UnitKey::new(PLAYER, 1);
+        local_player(&mut w, key, (4000, 4000));
+        // A torch (kind 2) in room 1, `Lit` 12: radius 6.
+        let ok = UnitKey::new(OBJECT, 5);
+        let mut o = ClientUnit::new(ok);
+        o.position = Some((4004, 4000));
+        w.units.insert(ok, o);
+        w.room_units.place(ok, Some(DrlgRoomId(1)));
+        crate::bridge::msg::lighting::object_light(&mut w, ok, 12, (255, 255, 255));
+        let torch = crate::bridge::msg::lighting::unit_light(&w, ok).unwrap();
+        let t = tables();
+        let mut light = PreviewLight::default();
+        refresh(&mut light, &mut w, None, &t);
+        assert_eq!(light.error(), None);
+        let rec = w.lights.get(torch).unwrap();
+        assert!(rec.cache_valid && rec.radius == 48);
+        // §7.4 r1: built once and kept; a mark in the cache survives the
+        // next frame (no rebuild).
+        w.lights.get_mut(torch).unwrap().cache[0] = 12_345;
+        refresh(&mut light, &mut w, None, &t);
+        assert_eq!(w.lights.get(torch).unwrap().cache[0], 12_345);
+        // A mode with `Lit` 16 sets the target 8 (§8 object row): the
+        // radius walks there by 8 per drawn frame (§6.4 r2) and each step
+        // drops the cache (rebuilt for the frame).
+        crate::bridge::msg::lighting::object_light(&mut w, ok, 16, (255, 255, 255));
+        refresh(&mut light, &mut w, None, &t);
+        let rec = w.lights.get(torch).unwrap();
+        assert_eq!((rec.radius, rec.target), (56, 64));
+        assert!(rec.cache_valid && rec.cache[0] != 12_345);
+        refresh(&mut light, &mut w, None, &t);
+        refresh(&mut light, &mut w, None, &t);
+        assert_eq!(w.lights.get(torch).unwrap().radius, 64);
+        // A dying light (§6.2 r6) shrinks by 8 per frame and is removed
+        // once below 1 (§6.4 r4).
+        let dying = w
+            .lights
+            .create(
+                None,
+                (8 * 4002 + 4, 8 * 4000 + 4),
+                LightKind::Plain,
+                2,
+                255,
+                1,
+                2,
+                3,
+            )
+            .unwrap();
+        w.lights.die(dying).unwrap();
+        refresh(&mut light, &mut w, None, &t);
+        assert_eq!(w.lights.get(dying).map(|r| r.radius), Some(8));
+        refresh(&mut light, &mut w, None, &t);
+        assert!(w.lights.get(dying).is_none());
+    }
+
+    // Covers: specs/render/lighting.md §10 r1
+    #[test]
+    fn the_den_glow_reads_the_clients_quest_byte() {
+        use crate::bridge::drlg::DrlgRoomId;
+        use crate::bridge::world::ActiveRoom;
+        let mut w = ClientWorld::default();
+        let key = UnitKey::new(PLAYER, 1);
+        local_player(&mut w, key, (4000, 4000));
+        // The local player in a room of level 8, Den flag 0, counter −1.
+        w.active_rooms = Some(vec![ActiveRoom {
+            x0: 3900,
+            y0: 3900,
+            w: 200,
+            h: 200,
+            level: 8,
+            room: DrlgRoomId(1),
+        }]);
+        w.room_units.place(key, Some(DrlgRoomId(1)));
+        let t = tables();
+        let far = (8 * 4000 + 8 * 40, 8 * 4000);
+        let mut light = PreviewLight::default();
+        // No 0x5E yet: 1.14d is fatal 0x60; no light map.
+        refresh(&mut light, &mut w, None, &t);
+        assert!(light.frame().is_none());
+        assert!(light.error().unwrap().contains("0x60"));
+        // Quest byte 1 = 0: no glow, the act ambient.
+        let mut a = [0u8; 37];
+        w.quest_availability = Some(a);
+        refresh(&mut light, &mut w, None, &t);
+        let plain = light.frame().unwrap().map.read(far.0, far.1);
+        assert_ne!((plain.r, plain.g, plain.b), (255, 64, 48));
+        // Set: the red glow, I = 80 while the Den counter is −1.
+        a[1] = 1;
+        w.quest_availability = Some(a);
+        refresh(&mut light, &mut w, None, &t);
+        let glow = light.frame().unwrap().map.read(far.0, far.1);
+        assert_eq!((glow.i, glow.r, glow.g, glow.b), (80, 255, 64, 48));
     }
 
     // Covers: specs/render/lighting.md §3
@@ -787,7 +986,7 @@ mod tests {
             fullbright: true,
             ..PreviewLight::default()
         };
-        light.refresh(&w, None, Some(&t));
+        refresh(&mut light, &mut w, None, &t);
         assert!(light.frame().is_none());
         assert!(light
             .tile_chain(TileKind::Wall, &Dt1Facts::default(), (1, 1))
@@ -802,26 +1001,15 @@ mod tests {
         use crate::world_view::preview::Preview;
         let mut w = ClientWorld::default();
         let key = UnitKey::new(PLAYER, 1);
-        let mut u = ClientUnit::new(key);
-        u.position = Some((900, 900));
-        w.units.insert(key, u);
-        w.local_player = Some(key);
+        local_player(&mut w, key, (900, 900));
         let t = tables();
         let mut feed = ModelFeed::<NoFeed>::default().with_preview(Preview::default());
         assert!(feed.light(&w).unwrap().is_none(), "before the first frame");
-        feed.preview
-            .as_mut()
-            .unwrap()
-            .light
-            .refresh(&w, None, Some(&t));
+        refresh(&mut feed.preview.as_mut().unwrap().light, &mut w, None, &t);
         let l = feed.light(&w).unwrap().expect("lit");
         assert!(l.light.map.read(8 * 900, 8 * 900).i > l.light.map.read(8 * 940, 8 * 900).i);
         feed.preview.as_mut().unwrap().light.fullbright = true;
-        feed.preview
-            .as_mut()
-            .unwrap()
-            .light
-            .refresh(&w, None, Some(&t));
+        refresh(&mut feed.preview.as_mut().unwrap().light, &mut w, None, &t);
         assert!(feed.light(&w).unwrap().is_none());
     }
 }

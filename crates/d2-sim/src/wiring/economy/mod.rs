@@ -62,7 +62,7 @@ mod tests;
 
 pub use chest_drop::{object_chest_drop, NoSpot, StartSpot};
 pub use cube_items::{CubeRest, EconomyCube};
-pub use death::{monster_death_drop, DeathDrops, DropTables, FreeSpot};
+pub use death::{find_item_drop, monster_death_drop, DeathDrops, DropTables, FreeSpot};
 pub use game_fields::GameFields;
 pub use item_stats::{find_list, StatCtx, UnitStats};
 pub use item_units::{Economy, ItemScope, ItemSpawn, ItemStore};

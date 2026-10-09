@@ -48,6 +48,8 @@ pub struct ItemDrops<'e, 'a, H, P> {
     pub placed: Vec<(UnitId, DropSpot)>,
     /// Creations that returned no item, with the reason.
     pub failures: Vec<EconomyError>,
+    /// The dropper U: request +0x00 (§7 step 4); none → no source unit.
+    pub unit: Option<UnitId>,
 }
 
 impl<'e, 'a, H, P> ItemDrops<'e, 'a, H, P> {
@@ -57,15 +59,20 @@ impl<'e, 'a, H, P> ItemDrops<'e, 'a, H, P> {
             placer,
             placed: Vec::new(),
             failures: Vec::new(),
+            unit: None,
         }
+    }
+
+    /// With the dropper U (§7 step 4: request +0x00 := U).
+    pub fn with_unit(mut self, unit: UnitId) -> Self {
+        self.unit = Some(unit);
+        self
     }
 }
 
 /// The drop request of §7 step 4 as an items request
-/// (`generation.md` Inputs).
-///
-/// TODO(treasure.md §7 step 4): the request's source unit (offset 0x00)
-/// is not listed for drops; left none.
+/// (`generation.md` Inputs); the source unit (+0x00) is the sink's
+/// ([`ItemDrops::unit`]).
 pub fn drop_request(req: &DropRequest<DropSpot>) -> (ItemRequest, ItemSpawn) {
     let rq = ItemRequest {
         ilvl: req.item_level,
@@ -94,6 +101,7 @@ impl<H: LifecycleHooks, P: DropPlacer<H>> DropSink for ItemDrops<'_, '_, H, P> {
 
     fn create(&mut self, req: DropRequest<DropSpot>) -> Option<UnitId> {
         let (mut rq, spawn) = drop_request(&req);
+        rq.unit = self.unit.and_then(|u| self.econ.request_unit(u, None));
         match self.econ.create_item(&mut rq, false, spawn) {
             Ok(u) => {
                 // PROVISIONAL (REC-281, d2rs-own, unverified): a low or

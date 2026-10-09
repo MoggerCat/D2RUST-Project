@@ -170,7 +170,7 @@ impl MonsterSequences {
     /// `0x00663310` for a monster of `class` using `skill` (§1 rules 2,
     /// 3, 5): the slot whose `Skill<i+1>` is the skill gives the
     /// sequence s; s ≤ 0 or no slot → none; else `monseq` record s.
-    // PROVISIONAL (sequences.md §1 rule 5, REC-441): `0x00659E30(s)` is
+    // PROVISIONAL (sequences.md §1 rule 5, REC-461): `0x00659E30(s)` is
     // read as the frame list of the `monseq` rows of sequence s (their
     // 6-byte rows have §3's frame layout: +2 mode, +3 frame, +5 event),
     // length and count = their number; settled by a read of `0x00659E30`

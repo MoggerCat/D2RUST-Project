@@ -35,11 +35,14 @@ pub fn quest_log(_: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerEr
     Ok(())
 }
 
-/// 0x5E GameQuestAvailability (§14): 37 bytes @1.
-pub fn quest_availability(_: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
+/// 0x5E GameQuestAvailability (§14): 37 bytes @1. The client keeps
+/// them (r2, `[0x007C0EA4]`) for client quest byte reads
+/// ([`ClientWorld::client_quest_byte`], `render/lighting.md` §10 r1).
+pub fn quest_availability(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
     len(msg, 38, "0x5E is 38 bytes")?;
     let mut bytes = [0u8; 37];
     bytes.copy_from_slice(&msg.bytes[1..]);
+    w.quest_availability = Some(bytes);
     msg.out.push(Output::QuestAvailability { bytes });
     Ok(())
 }

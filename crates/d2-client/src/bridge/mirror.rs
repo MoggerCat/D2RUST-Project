@@ -61,24 +61,47 @@ impl Plugin for BridgePlugin {
 
 /// A scripted host clock (`world/objects-client.md` §25 r6: "headless
 /// tests and replays pass a scripted value"): when present,
-/// [`bridge_frame`] gives the bridge this value instead of the real time.
-#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ScriptedNow(pub u32);
+/// [`bridge_frame`] gives the bridge the clock's value (wrapping
+/// milliseconds) instead of the real time. A headless rig shares its step
+/// clock (the server's) here, so nothing it does depends on wall time.
+#[derive(Resource, Debug, Clone, Default)]
+pub struct ScriptedClock(pub std::sync::Arc<std::sync::atomic::AtomicU32>);
+
+impl ScriptedClock {
+    /// The clock's value now.
+    pub fn now(&self) -> u32 {
+        self.0.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
+/// The last server tick the world view drew, when the app paces the
+/// bridge to its draws (`play --dump-draws`, `specs/tools/facts-render.md`
+/// §5 r13): while the bridge's tick is newer, [`bridge_frame`] runs a
+/// held frame ([`Bridge::held_frame`]), so every server tick is drawn
+/// once and none is skipped while the GPU still holds the previous frame.
+#[derive(Resource, Debug, Clone, Copy, Default)]
+pub struct DrawnTick(pub u64);
 
 /// One bridge frame (§8 rule 1), then its outputs are handed over (§10
 /// rule 4). Errors go to Bevy's error handler.
 pub fn bridge_frame(
     mut bridge: ResMut<BridgeResource>,
     mut outputs: ResMut<FrameOutputs>,
-    scripted: Option<Res<ScriptedNow>>,
+    scripted: Option<Res<ScriptedClock>>,
     time: Option<Res<Time<Real>>>,
+    drawn: Option<Res<DrawnTick>>,
 ) -> Result {
+    if drawn.is_some_and(|d| bridge.0.world().server_ticks > d.0) {
+        bridge.0.held_frame();
+        outputs.0 = bridge.0.take_outputs();
+        return Ok(());
+    }
     // The host clock as `GetTickCount` (`world/objects-client.md` §25 r6):
-    // a scripted value when the app sets one ([`ScriptedNow`]), else
+    // a scripted value when the app sets one ([`ScriptedClock`]), else
     // wrapping milliseconds since the app started. An app with neither
     // keeps the value it set.
-    if let Some(now) = scripted {
-        bridge.0.set_now(now.0);
+    if let Some(clock) = scripted {
+        bridge.0.set_now(clock.now());
     } else if let Some(time) = time {
         bridge.0.set_now(time.elapsed().as_millis() as u32);
     }
