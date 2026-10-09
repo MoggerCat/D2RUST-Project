@@ -7,6 +7,8 @@
 #[cfg(test)]
 mod ai;
 #[cfg(test)]
+mod ai_scan;
+#[cfg(test)]
 mod combat;
 #[cfg(test)]
 mod death;
