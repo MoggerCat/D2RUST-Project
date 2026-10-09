@@ -341,6 +341,10 @@ fn audio_frame(
         // The listener is where the player is drawn (`seams/bridge-app.md`
         // §2.7).
         d.set_local_prediction(walk.as_deref().and_then(PreviewWalk::local_at));
+        d.set_local_mode(
+            walk.as_deref()
+                .and_then(|w| Some((w.predict.player()?, w.predict.mode()?))),
+        );
         d.frame(
             world,
             &bridge.0.inputs().tables.levels,

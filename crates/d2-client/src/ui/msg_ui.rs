@@ -340,10 +340,42 @@ impl OriginalUi {
             .then_some(u32::from(self.more.merc_7c0dd0));
         self.open_npc_menu_with(d.guid, d.class, level, n);
         match dialog_case(self.msg.ui_7c0c68, self.npc_text.as_ref(), d)? {
-            Some(case) => self.dialog_answer = Some((Box::new(d.clone()), case)),
+            Some(case) => {
+                self.npc_speech(d, case);
+                self.dialog_answer = Some((Box::new(d.clone()), case));
+            }
             None => self.skip(skip::NPC_DIALOG_M),
         }
         Ok(())
+    }
+
+    /// The speech of 0x28's dialog branch (`client/msg-ui.md` §16 r4.3, in
+    /// the order of the table): B2 plays the dialog line of `m`
+    /// (`0x004A10E0(U, m, 1)`), B3 and B6 the NPC's greeting
+    /// (`0x004B4FD0`, `0x004B66B0`; `triggers.md` §10 r1); B0, B1, B4 and B5
+    /// make none. B3 holds when m2 (`0x00661440`) is not 0xFFFF.
+    fn npc_speech(&mut self, d: &NpcDialog, case: DialogCase) {
+        let request = match case {
+            DialogCase::B2 { m } => SoundRequest::NpcDialogLine {
+                npc: d.unit,
+                class: d.class,
+                key: m as i32,
+            },
+            DialogCase::Rest => {
+                let m2 = self.npc_text.as_ref().map_or(0xFFFF, NpcTextList::m2);
+                let b3 = m2 != 0xFFFF;
+                let b5 = d.f4b1a10.is_some_and(|v| v != 0);
+                if !b3 && !(d.interact && !b5) {
+                    return;
+                }
+                SoundRequest::NpcGreeting {
+                    npc: d.unit,
+                    class: d.class,
+                }
+            }
+            DialogCase::B0 | DialogCase::B1 => return,
+        };
+        self.outcome.sounds.push(request);
     }
 
     fn skip(&mut self, what: &'static str) {
