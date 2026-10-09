@@ -967,6 +967,37 @@ impl<X: Pending> AiActs for View<'_, X> {
 /// and the target-node slot (+0xD0) are real (`units.md` §2); everything
 /// else keeps the narrow default of [`AiSummons`] until its owner wires it.
 impl<X: Pending> AiSummons for View<'_, X> {
+    /// Path +0x18 / +0x1A of the unit's dynamic path (`0x00648A20` /
+    /// `0x00648A30`); no dynamic path: (0, 0).
+    fn path_final_point(&self, unit: UnitId) -> (i32, i32) {
+        let p = self.h.paths.as_ref().and_then(|p| p.dynamic(unit));
+        p.map_or((0, 0), |d| {
+            let f = d.final_target();
+            (f.x, f.y)
+        })
+    }
+    /// Path +0x10 / +0x12 of the unit's dynamic path; none: (0, 0).
+    fn path_target_point(&self, unit: UnitId) -> (i32, i32) {
+        let p = self.h.paths.as_ref().and_then(|p| p.dynamic(unit));
+        p.map_or((0, 0), |d| {
+            let t = d.target();
+            (t.x, t.y)
+        })
+    }
+    /// `0x0061B130` → `0x0066CE30` (`drlg/levels.md` §11.4), as the
+    /// population view's: the room holding the point among `room` and its
+    /// adjacency array; none (or no room) → 0; that room's record at the
+    /// point → its index; no record → −1.
+    fn coord_index(&self, game: &Game, room: Option<RoomId>, x: i32, y: i32) -> i32 {
+        let Some(at) = room.and_then(|r| self.h.drlg.find_room(game, r, x, y)) else {
+            return 0;
+        };
+        self.h
+            .drlg
+            .drlg_room(game, at)
+            .and_then(|(d, r)| d.coord_at(r, x, y))
+            .map_or(-1, |c| c.index as i32)
+    }
     /// The Act V prisoner AI's hooks (`quests-act5.md` §4.10): the reads
     /// from the quest control's published states
     /// ([`Pending::quest_rescue`]); the calls with an effect queued for

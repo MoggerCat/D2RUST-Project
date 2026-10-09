@@ -702,12 +702,13 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
             self.error(WiringError::Unit(e.into()));
         }
     }
-    /// `tick.md` §5.4: the unit's timers of `kind` with that arg1.
+    /// `0x00540E60` (`tick.md` §5.4): the unit's timers of `kind` with
+    /// that arg1; argument 0 = any argument (`sim/stat-lists.md` monster
+    /// regeneration step 3; `monsters/ai.md`: `0x00540E60(2, 0)` cancels
+    /// every think).
     fn delete_timers(&mut self, u: UnitId, kind: u8, arg1: i32) {
-        self.cv
-            .game
-            .timers
-            .cancel_unit_events(u, kind, Some(arg1 as u32));
+        let arg = (arg1 != 0).then_some(arg1 as u32);
+        self.cv.game.timers.cancel_unit_events(u, kind, arg);
     }
 
     fn has_state_list(&self, u: UnitId, state: u16) -> bool {

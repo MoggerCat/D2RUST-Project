@@ -32,17 +32,17 @@
 |   2. Think dispatch `0x005B1740` | 283–422 |
 |   3. AI control and AI tables | 423–594 |
 |   4. AI parameters | 595–613 |
-|   5. Target selection | 614–789 |
-|   6. Distances and line tests | 790–804 |
-|   7. Tactics helpers | 805–1044 |
-|   8. AI commands and minions | 1045–1071 |
-|   10. The catalogue `ai-functions.tsv` | 1072–1092 |
-| Constants & data dependencies | 1093–1116 |
-| Randomness | 1117–1138 |
-| Edge cases & original bugs | 1139–1180 |
-| Test vectors | 1181–1269 |
-| Provenance | 1270–1330 |
-| Open questions | 1331–1434 |
+|   5. Target selection | 614–797 |
+|   6. Distances and line tests | 798–812 |
+|   7. Tactics helpers | 813–1052 |
+|   8. AI commands and minions | 1053–1079 |
+|   10. The catalogue `ai-functions.tsv` | 1080–1100 |
+| Constants & data dependencies | 1101–1124 |
+| Randomness | 1125–1146 |
+| Edge cases & original bugs | 1147–1188 |
+| Test vectors | 1189–1277 |
+| Provenance | 1278–1338 |
+| Open questions | 1339–1442 |
 <!-- /index -->
 
 ## Summary
@@ -751,6 +751,14 @@ e.g. a cow) takes the alternative at once in d2rs; the spec's
 order of those two rules is unread (an idle cow poked next to a trap was
 not shot by 1.14d in a one-off run on 2026-10-09, check file not kept; the cow
 had hp 0, so the dead test may be the cause instead). Not applied.
+PROVISIONAL (REC-1642): the scan 5 callback `0x005DCA70` (§5.2 step 4,
+the not-evil search) skips a candidate without unit flag 4 (+0xC4,
+monstats2 `isAtt`, `monsters/init.md`) like rule 1 here (because
+1.14d's pets never take the poked cow, class 179, `isAtt` 0, neutral
+alignment, four sub-tiles away: a Clay Golem and a Valkyrie in
+`nec-clay-golem.check` / `ama-valkyrie.check` follow and wander for
+50 frames, q-fix-skills-4cls 2026-10-09); settled by reading
+`0x005DCA70`.
 
 So `0x005DDC30` sees targets closer than 49; each caller applies its
 own distance gate (the Hireable think: E < 25, `ai-bodies-6.md` §7
