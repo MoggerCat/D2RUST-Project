@@ -1693,6 +1693,7 @@ struct GameParts {
     items: ItemTables,
     vendors: VendorTables,
     anim: Option<Arc<AnimData>>,
+    monster_sequences: Option<Arc<d2_sim::skills::sequences::MonsterSequences>>,
     vitals: Option<Arc<VitalsTables>>,
     /// The skill bodies' table data (`ActionHooks::bodies`: pet types,
     /// state groups); `None`: synthetic.
@@ -1726,6 +1727,7 @@ impl GameParts {
             items: t.item_tables()?,
             vendors: t.vendor_tables()?,
             anim: Some(Arc::new(t.anim.clone())),
+            monster_sequences: Some(Arc::new(t.monster_sequences()?)),
             vitals: Some(Arc::new(t.vitals()?)),
             bodies: Some(Arc::new(t.body_tables()?)),
             drops: Some(d.drops.clone()),
@@ -1795,6 +1797,7 @@ pub fn build_with(
     };
     let mut hooks = ActionHooks::new(Arc::new(parts.action), world, Seed::init_low(seed), seams);
     hooks.anim_data = parts.anim;
+    hooks.monster_sequences = parts.monster_sequences;
     // The server's animation names follow the client art's name rules.
     hooks.x.looks = crate::world_view::unit_assets::UnitLooks::live(d.archives.as_ref())
         .ok()

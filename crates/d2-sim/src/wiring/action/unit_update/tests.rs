@@ -176,6 +176,7 @@ fn anim_complete_reads_frame_speed_and_count() {
     a.sequence = Some(crate::units::record::Sequence {
         frame_count: 0,
         speed: 0,
+        pos: 0,
         events: Vec::new(),
     });
     a.frame_count = 0;

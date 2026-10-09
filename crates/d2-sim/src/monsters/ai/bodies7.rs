@@ -583,7 +583,7 @@ pub fn blade_creeper<W: AiHost + ?Sized>(
     let lvl = cx.world.skill_level(u, s1, true).unwrap_or(0);
     // 2.
     if param(cx, u, 0) < 0 {
-        let life = cx.world.skill_calc(u, s1, calc4, lvl);
+        let life = cx.world.skill_calc(game, u, s1, calc4, lvl);
         set_param(cx, u, 0, frame.wrapping_add(life));
     }
     // 3.
@@ -1031,7 +1031,7 @@ fn shadow_skill<W: AiHost + ?Sized>(
         use_skill(game, cx, u, m, id, ModeTarget::Unit(t));
         let lvl = cx.world.skill_level(u, id, false).unwrap_or(0).max(1);
         let delay = skill_row(cx, id).map_or(0, |r| r.delay);
-        let d = cx.world.skill_calc(u, id, delay, lvl);
+        let d = cx.world.skill_calc(game, u, id, delay, lvl);
         set_param(cx, u, 0, game.frame.wrapping_add(18).wrapping_add(d / 3));
     } else {
         run_to(game, cx, u, Some(t), 0);

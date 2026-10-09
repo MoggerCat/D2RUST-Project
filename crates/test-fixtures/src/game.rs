@@ -148,6 +148,21 @@ impl GameData {
         })
     }
 
+    /// The monsters' skill sequences (`skills/sequences.md` §1 rule 5);
+    /// a set without `monseq` (a synthetic install) has no lists.
+    pub fn monster_sequences(
+        &self,
+    ) -> Result<d2_sim::skills::sequences::MonsterSequences, GameError> {
+        let monseq = match self.fixed.table("monseq") {
+            Some(_) => self.rows::<d2_data::tables::Monseq>()?,
+            None => Vec::new(),
+        };
+        Ok(d2_sim::skills::sequences::MonsterSequences::from_tables(
+            self.table("monstats")?,
+            &monseq,
+        ))
+    }
+
     /// The object code's tables (`objects`, `shrines`, `levels`).
     pub fn object_tables(&self) -> Result<d2_sim::world::objects::ObjectTables, GameError> {
         Ok(d2_sim::world::objects::ObjectTables {
@@ -357,6 +372,7 @@ impl GameData {
             x,
         );
         hooks.anim_data = Some(Arc::new(self.anim.clone()));
+        hooks.monster_sequences = Some(Arc::new(self.monster_sequences()?));
         hooks.vitals = Some(Arc::new(self.vitals()?));
         hooks.enable_paths().map_err(|e| err("paths", e))?;
         let info = GameInfo {

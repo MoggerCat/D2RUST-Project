@@ -137,12 +137,16 @@ fn distance(a: (i32, i32), b: (i32, i32)) -> i32 {
 impl SkillMotion {
     /// One bridge frame. `row_of` is the client skills table, `speed` the
     /// unit's path speed (`velocity >> 8`; d2rs-own, unverified: the run
-    /// velocity), `ticked` whether the server ticked.
+    /// velocity), `ticked` whether the server ticked. `cell` is the local
+    /// player's own path cell when the client walks it
+    /// ([`crate::bridge::predict::Predict::cell`]); the model's position
+    /// otherwise.
     pub fn frame(
         &mut self,
         world: &ClientWorld,
         row_of: impl Fn(u16) -> Option<SkillRow>,
         speed: i32,
+        cell: Option<(u16, u16)>,
     ) {
         let ticked = world.server_ticks != self.seen_ticks;
         self.seen_ticks = world.server_ticks;
@@ -155,7 +159,12 @@ impl SkillMotion {
         let req = local.last_mode_request;
         if self.seen != req.map(|r| (key, r)) {
             self.seen = req.map(|r| (key, r));
-            if let (Some(r), Some(at)) = (req, local.position) {
+            // `0x004C8670` measures from the client unit's position, its
+            // own path cell (`unit-composite.md` §8, creator
+            // `0x004C8726`): the server sends a walking player nothing
+            // (`sim/pathing.md` §10 rule 2), so the model's position is
+            // the last placement.
+            if let (Some(r), Some(at)) = (req, cell.or(local.position)) {
                 self.start(
                     world,
                     &row_of,
@@ -231,7 +240,12 @@ pub fn skill_motion_frame(
     mut state: ResMut<WorldViewState>,
 ) {
     let speed = walk.speeds.map_or(0, |s| i32::from(s.run));
-    motion.frame(bridge.0.world(), |id| bridge.0.skill_row(id), speed);
+    let world = bridge.0.world();
+    let cell = walk
+        .predict
+        .cell()
+        .filter(|_| walk.predict.player() == world.local().map(|u| u.key));
+    motion.frame(world, |id| bridge.0.skill_row(id), speed, cell);
     state.feed.set_motion_offsets(motion.offsets());
     if let Some(art) = &walk.art {
         let mut art = art.write().unwrap_or_else(|e| e.into_inner());

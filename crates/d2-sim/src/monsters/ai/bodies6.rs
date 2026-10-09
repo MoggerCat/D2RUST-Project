@@ -1398,7 +1398,7 @@ pub(super) fn sentry_charges<W: AiHost + ?Sized>(
             return true;
         }
         let lvl = cx.world.skill_level(u, s1, true).unwrap_or(0);
-        c = cx.world.skill_calc(u, s1, calc, lvl);
+        c = cx.world.skill_calc(game, u, s1, calc, lvl);
         set_param(cx, u, 1, c);
     }
     // 3.
@@ -2123,7 +2123,7 @@ pub fn cycle_of_life<W: AiHost + ?Sized>(
             if let Some(lvl) = cx.world.skill_level(u, s1, true) {
                 let n = cx
                     .world
-                    .skill_calc(u, s1, row.aurarangecalc, lvl)
+                    .skill_calc(game, u, s1, row.aurarangecalc, lvl)
                     .clamp(5, 50);
                 k = cx.world.corpse_find(game, u, n);
                 if let Some(kk) = k {
