@@ -29,22 +29,22 @@
 | Outputs / state changes | 80–93 |
 | Rules | 94–95 |
 |   R1. Data the server keeps per missile | 96–140 |
-|   R2. Creation | 141–322 |
-|   R3. Per-tick dispatch | 323–352 |
-|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 353–483 |
-|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 484–536 |
-|   R6. Damage stage (missile-owned part) | 537–657 |
-|   R7. Lifetime and expiry | 658–711 |
-|   R8. Pierce | 712–738 |
-|   R9. Server-do and server-hit catalogues | 739–969 |
-|   R10. Behaviour of the recorded missiles | 970–1004 |
-|   R11. `missiles.txt` columns and their server use | 1005–1052 |
-| Constants & data dependencies | 1053–1079 |
-| Randomness | 1080–1112 |
-| Edge cases & original bugs | 1113–1139 |
-| Test vectors | 1140–1222 |
-| Provenance | 1223–1275 |
-| Open questions | 1276–1357 |
+|   R2. Creation | 141–331 |
+|   R3. Per-tick dispatch | 332–361 |
+|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 362–492 |
+|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 493–545 |
+|   R6. Damage stage (missile-owned part) | 546–666 |
+|   R7. Lifetime and expiry | 667–720 |
+|   R8. Pierce | 721–747 |
+|   R9. Server-do and server-hit catalogues | 748–978 |
+|   R10. Behaviour of the recorded missiles | 979–1013 |
+|   R11. `missiles.txt` columns and their server use | 1014–1061 |
+| Constants & data dependencies | 1062–1088 |
+| Randomness | 1089–1121 |
+| Edge cases & original bugs | 1122–1148 |
+| Test vectors | 1149–1231 |
+| Provenance | 1232–1284 |
+| Open questions | 1285–1366 |
 <!-- /index -->
 
 ## Summary
@@ -319,6 +319,15 @@ frame, owner type and GUID, level, pierce_idx. Its only caller is skill
 code `0x00571F90`. No other missile-creation message is sent by
 `0x0059FA30`; the client builds its own missiles from skill and attack
 messages (`intents-events.md`; open question 5).
+
+d2rs: `units::messages::client_missile` (the field roles are the client
+reader's, `client/msg-units.md` §7 r6) from `View::missile_add` when a
+missile is added to a room's client (`intents-events.md` §7.2 part A).
+PROVISIONAL: the two u32 positions are the path's 16.16 position, the
+optional first point is `points[0]` (cell) when the path has points and a
+non-zero velocity (`0x006486C0`), the frame is the missile data's current
+frame, the level its level cut to a byte, the pierce index stat 328;
+settled by REC-414.
 
 ### R3. Per-tick dispatch
 

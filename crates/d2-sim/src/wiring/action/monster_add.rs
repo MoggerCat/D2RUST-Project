@@ -219,7 +219,7 @@ impl<X: Pending> View<'_, X> {
         let states = self.unit_states_message(UnitType::Monster as u8, guid, unit);
         self.h.x.send(receiver, &states);
         // `0x00571CD0` (§7.2 part A, §7.9 rule 2).
-        self.send_event_records(receiver, unit);
+        self.send_event_records(game, receiver, unit);
         // Part B. Without the path provider no monster has a path record
         // (rule 4's fatal would be logged for every add), so the mode
         // message needs the provider, as [`View::monster_update`] does.

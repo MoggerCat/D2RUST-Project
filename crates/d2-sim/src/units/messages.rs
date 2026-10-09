@@ -116,6 +116,82 @@ pub fn update_oskill(
     m
 }
 
+/// S→C 0x20 StatUpdate (`0x0053C1D0`, 10 bytes, `client/msg-stats-items.md`
+/// §1 r4): player GUID u32@1, stat u8@5, value u32@6.
+// PROVISIONAL (REC-415): no spec names a caller of `0x0053C1D0`, so no
+// d2rs code sends it; the builder is the TSV layout; settled by the
+// static caller search on PC 1 (`docs/handoff/pc1-data.md` Step 4).
+pub fn stat_update(guid: u32, stat: u8, value: u32) -> [u8; 10] {
+    let mut m = [0u8; 10];
+    m[0] = 0x20;
+    m[1..5].copy_from_slice(&guid.to_le_bytes());
+    m[5] = stat;
+    m[6..10].copy_from_slice(&value.to_le_bytes());
+    m
+}
+
+/// S→C 0x93 (`0x0053C6F0`, 8 bytes, `client/msg-skills.md` §9): player
+/// GUID u32@1, bonus u8@5 (signed on the client, 0x80 = +128), element
+/// u8@6 (0 = any), page u8@7 (4 = any).
+// PROVISIONAL (REC-415): no spec names a caller of `0x0053C6F0`, so no
+// d2rs code sends it; settled by the static caller search on PC 1.
+pub fn skill_bonus(guid: u32, bonus: u8, element: u8, page: u8) -> [u8; 8] {
+    let mut m = [0u8; 8];
+    m[0] = 0x93;
+    m[1..5].copy_from_slice(&guid.to_le_bytes());
+    m[5] = bonus;
+    m[6] = element;
+    m[7] = page;
+    m
+}
+
+/// S→C 0x73 (`0x0059FEE0`, 32 bytes, `missiles/missiles.md` §R2.4;
+/// the field roles are the client reader's, `client/msg-units.md` §7
+/// r6): class u16@5, x u32@7, y u32@0xB, the path's first point x u32@0xF
+/// and y u32@0x13 (0 when none), the current frame u16@0x17, owner type
+/// u8@0x19 and GUID u32@0x1A, level u8@0x1E, pierce index u8@0x1F;
+/// bytes 1–4 are not written.
+// PROVISIONAL (REC-414): which unit fields fill the u32 positions
+// (read as the path's 16.16 position and the first point's cell), and
+// that the level is the missile data's level cut to a byte; the spec
+// names the fields but not their units; settled by a 1.14d recording of
+// a `ClientSend` missile's add message.
+#[allow(clippy::too_many_arguments)]
+pub fn client_missile(
+    class: u16,
+    pos: (u32, u32),
+    first: (u32, u32),
+    frame: u16,
+    owner: (u8, u32),
+    level: u8,
+    pierce: u8,
+) -> [u8; 32] {
+    let mut m = [0u8; 32];
+    m[0] = 0x73;
+    m[5..7].copy_from_slice(&class.to_le_bytes());
+    m[7..11].copy_from_slice(&pos.0.to_le_bytes());
+    m[11..15].copy_from_slice(&pos.1.to_le_bytes());
+    m[15..19].copy_from_slice(&first.0.to_le_bytes());
+    m[19..23].copy_from_slice(&first.1.to_le_bytes());
+    m[23..25].copy_from_slice(&frame.to_le_bytes());
+    m[25] = owner.0;
+    m[26..30].copy_from_slice(&owner.1.to_le_bytes());
+    m[30] = level;
+    m[31] = pierce;
+    m
+}
+
+/// S→C 0x11 (`0x0053D850`, `intents-events.md` §7.3 r2 step 9): unit
+/// type u8@1, GUID u32@2, overlay id u16@6.
+pub fn report_kill(unit_type: u8, guid: u32, overlay: u16) -> [u8; 8] {
+    let mut b = [0u8; 8];
+    b[0] = 0x11;
+    b[1] = unit_type;
+    b[2..6].copy_from_slice(&guid.to_le_bytes());
+    b[6..8].copy_from_slice(&overlay.to_le_bytes());
+    b
+}
+
 /// S→C 0x0A RemoveUnit (`0x00571600` → `0x0053BDA0`, §7.8 rule 3.1):
 /// type u8@1, GUID u32@2.
 pub fn remove_unit(unit_type: u8, guid: u32) -> [u8; 6] {
