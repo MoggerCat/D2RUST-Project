@@ -1,4 +1,4 @@
-// Spec: specs/world/quests.md §9.1; specs/items/generation.md §10.1, §10.2; specs/items/inventory.md §2.4, §5.5; specs/items/inventory-moves.md §9.1; specs/world/quests-act5.md open question 2; specs/world/vendors.md "Stat readers"
+// Spec: specs/world/quests.md §9.1; specs/items/generation.md §10.1, §10.2; specs/items/inventory.md §2.4, §5.5; specs/items/inventory-moves.md §9.1, §10.2; specs/world/quests-act5.md open question 2; specs/world/vendors.md "Stat readers"
 //! The quest reward `0x005466B0` (`quests.md` §9.1) on the host's
 //! inventory model: the item created from its code (`0x00633640`,
 //! `0x00559CE0`), its durability filled, placed in the player's inventory
@@ -61,6 +61,13 @@ pub trait QuestInventory<H> {
     /// `items/inventory.md` §1 rule 2); `0x00597A20` reads it
     /// (`vendors-2.md` §10.1 rule 6).
     fn update_guids(&self, player: UnitId) -> Vec<u32>;
+    /// `0x0055B030`: a gold pile of `amount` at `unit` (`inventory-moves.md`
+    /// §10.2, one pile). False: the model has no gold piles (the caller
+    /// keeps the rest's answer).
+    fn gold_pile(&mut self, econ: &mut Economy<'_, H>, unit: UnitId, amount: i32) -> bool {
+        let _ = (econ, unit, amount);
+        false
+    }
 }
 
 /// [`QuestInventory`] on the inventory wiring: an [`InvDesk`] over the
@@ -143,6 +150,17 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> QuestInventory<H> for QuestInv<'_, 
     }
     fn delete(&mut self, econ: &mut Economy<'_, H>, player: UnitId, item: UnitId) {
         InvDesk::new(econ, self.tables, self.state, self.rest).delete_held_item(player, item);
+    }
+    /// `0x0055B030` as one pile of §10.2 ([`ground::gold_piles`], max 1),
+    /// as the gold pickup's rest pile (`inventory-moves.md` §10.1).
+    fn gold_pile(&mut self, econ: &mut Economy<'_, H>, unit: UnitId, amount: i32) -> bool {
+        let mut d = InvDesk::new(econ, self.tables, self.state, self.rest);
+        let Some(o) = d.owner_of(unit) else {
+            return false;
+        };
+        ground::gold_piles(&mut d, o, amount, 1);
+        d.sync_out();
+        true
     }
 }
 

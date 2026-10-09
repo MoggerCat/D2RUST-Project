@@ -47,7 +47,7 @@ REC-45	6045	MANUAL	Baal's portal opening (level 131 to 132)	recording	no		5
 REC-46	6053	MANUAL	Classic single-player start (C→S 0x67 of a classic character)	recording	no		0	q-fix-create-flags,q-fix-recharge-order,q-skill-fallback
 REC-47	6061	MANUAL	Automap in the play preview (draw modes, header, markers)	recording	no		0	
 REC-50	5937	NO RUN	client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14	binary	no		1	q-fix-create-flags,q-fix-recharge-order,q-skill-fallback
-REC-51	5679	AUTO	client/model.md OQ1 and OQ2, client/msg-ui.md OQ2 (0x10000 per-caller conditions)	recording	no		27	q-fix-monster-modes
+REC-51	5679	AUTO	client/model.md OQ1 and OQ2, client/msg-ui.md OQ2 (0x10000 per-caller conditions)	recording	no		28	q-fix-monster-modes
 REC-60	5870	AUTO	ui/text.md §15 r6 (scroll window, caret-inside-window case)	recording	no		5	q-fix-d2s-token-ref,q-fix-edit-scroll,q-fix-format-lookups
 REC-61	5878	NO RUN	render/camera.md OQ1 (roof block count	binary	yes		2	
 REC-62	5672	MANUAL	render/camera.md §8 (which missiles / skills reach `0x004D2610`, `0x004D3D30`, `0x004D5310	recording	no		0	q-fix-shake-starts
@@ -212,7 +212,7 @@ REC-273	6653		Model unit facts for the draw order (PROVISIONAL, `d2-client` `wor
 REC-274	6644		Duriel's Charge and Jab in the synthetic Lair (PROVISIONAL, `d2-client` `app/skill_rest.rs	data	yes		0	
 REC-275	6633		Leap arc and Whirlwind spin in the play preview (PROVISIONAL; M22; q-move-anims; REC-275 w	recording	no	yes	0	
 REC-276	6701		Trap missiles in the play host (PROVISIONAL, `d2-sim` `wiring/interaction/skill_use.rs` `U	data	yes		0	
-REC-277	6654		The shop opens on the NPC menu's Trade / Gamble choice (PROVISIONAL, `d2-client` `ui/npc_m	recording	no		12	
+REC-277	6654		The shop opens on the NPC menu's Trade / Gamble choice (PROVISIONAL, `d2-client` `ui/npc_m	recording	no		13	
 REC-278	6656		Synthetic town smoke data and the town fixes it found (PROVISIONAL, `d2-client`, `d2-sim`,	data	yes		6	
 REC-279	6632		Combat smoke fills (PROVISIONAL; M22; q-smoke-combat; `// d2rs-own, unverified`): (1) **re	data	yes	yes	6	
 REC-280	6657		Warriv in the synthetic Act I town (PROVISIONAL, `d2-client` `app/town_npcs.rs` `ACT1`; M2	data	yes		0	
@@ -295,16 +295,16 @@ REC-542	6676		Hostility between client units (PROVISIONAL, `d2-client` `bridge/c
 REC-543	6675		Owner direction of a missile body's child (PROVISIONAL, `d2-client` `bridge/client_missile	recording	no		2	
 REC-544	6674		Unit flags 0x4 / 0x8 of client units (PROVISIONAL, `d2-client` `bridge/client_missiles.rs`	unstated	no		1	
 REC-545	6673		Client state 86 of a missile hit (PROVISIONAL, `d2-client` `bridge/client_missiles.rs` `en	recording	no		2	
-REC-546	6672		Unit footprints for the client missiles (PROVISIONAL, `d2-client` `bridge/client_missiles.	recording	no		3	
+REC-546	6672		Unit footprints for the client missiles (PROVISIONAL, `d2-client` `bridge/client_missiles.	recording	no		5	
 REC-547	6671		A client hit body the model cannot run (PROVISIONAL, `d2-client` `bridge/client_missiles.r	unstated	no		1	
 REC-548	6670		Travel sound detach force (PROVISIONAL, `d2-client` `audio/driver.rs` `SoundRequest::Group	unstated	no		1	
 REC-549	6669		Umod 29's client hook target (PROVISIONAL, `d2-client` `bridge/client_missiles.rs` `umod_m	recording	no		1	
 REC-570	6661		Warp and Town Portal arrival walk-outs (follows REC-288; `d2-client` `bridge/predict.rs` `	unstated	no		3	
 REC-576	6705		Cloud recording round 2026-10-09 (q-prov-recording-2, items lane) for the d2-client PROVIS	recording	no		0	
-REC-592	6709		Animation re-init of a player / monster mode change (PROVISIONAL, `d2-sim` `wiring/action/	recording	no		2	
-REC-593	6710		Monster walk / run speed at the animation rate (PROVISIONAL, `d2-sim` `wiring/action/units	recording	no		2	
-REC-602	6708		Client run end on stamina 0 (the scale is settled: `bridge/predict.rs` is faithful and sta	recording	no		1	
-REC-655	6711		Poke call forms of `pos`, `warp`, `item`, `stat`, `state` (PROVISIONAL, `tools/trace-recor	recording	no		0	
+REC-592	6718		Animation re-init of a player / monster mode change (PROVISIONAL, `d2-sim` `wiring/action/	recording	no		2	
+REC-593	6719		Monster walk / run speed at the animation rate (PROVISIONAL, `d2-sim` `wiring/action/units	recording	no		2	
+REC-602	6717		Client run end on stamina 0 (the scale is settled: `bridge/predict.rs` is faithful and sta	recording	no		1	
+REC-655	6720		Poke call forms of `pos`, `warp`, `item`, `stat`, `state` (PROVISIONAL, `tools/trace-recor	recording	no		0	
 REC-720	6510		HUD skill-button icon state (settled 2026-10-09, q-fix-b41-skill-button-state; was PROVISI	unstated	no		0	
 REC-721	6511		Placement tint scope (PROVISIONAL, `d2-client` `ui/panels/inv_items_tint.rs` `draw_placeme	recording	no		1	
 REC-722	6512		Skill tree icon remap `k` (PROVISIONAL, `d2-client` `ui/panels/skilltree.rs` `icon_remap`;	recording	no		0	
@@ -318,3 +318,12 @@ REC-731	6519		Remove callback `0x0056E900` "state off" queues the unit, and the 
 REC-732	6520		Player alignment at the join (PROVISIONAL, `d2-sim` `wiring/action/units.rs` `View::set_al	recording	no		2	
 REC-740	6540		Item tip anchor (PROVISIONAL, `ui/item_tip.rs` `TipAnchor::at_point`, `draw_tip`; q-fix-ui	unstated	no		1	
 REC-745	6521		Grid drop cell `0x00486BD0` (PROVISIONAL, `d2-client` `ui/panels/inv_items.rs` `grid_drop_	recording	no		1	
+REC-790	6708		Act V removals on the wired host (PROVISIONAL, `d2-sim` `wiring/economy/quest_host.rs`, M2	data	yes		6	
+REC-791	6709		Nihlathak killed in town (PROVISIONAL, `quest_host.rs` `kill_in_town`, M22): `0x00589340` 	unstated	no		1	
+REC-792	6710		Scroll of Resistance stat send (PROVISIONAL, `quest_host.rs` `add_resist_list`, M22): the 	unstated	no		1	
+REC-793	6711		Baal's gold piles (PROVISIONAL, `quest_host.rs` `drop_gold_amount`, `quest_reward.rs` `Que	unstated	no		2	
+REC-795	6712		The Ancients' chain-35 link (PROVISIONAL, `d2-server` `wired/quest_events.rs`, M22; q-play	binary	no		1	
+REC-796	6713		Tyrael's spawn after the tick (PROVISIONAL, `d2-sim` `wiring/action/missiles.rs` `spawn_ty	unstated	no		0	
+REC-797	6714		The player's act byte at the join (PROVISIONAL, `d2-server` `adapters/session.rs`, M22): u	recording	no		1	
+REC-798	6715		Quest monster spawn without the spread (PROVISIONAL, `d2-sim` `wiring/economy/quest_host.r	unstated	no		1	
+REC-799	6716		The prisoner AI's quest hooks after the tick (PROVISIONAL, `d2-sim` `wiring/action/ai.rs` 	recording	no		0	

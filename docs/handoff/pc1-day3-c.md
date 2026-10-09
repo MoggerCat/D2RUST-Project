@@ -220,3 +220,15 @@ The harness should test class and position, not GUID.
     through a downgrade helper (`0x00557250`), or just before superior / set / unique.
   - **Check:** `ignore if fi` was removed from `items-ground-many.check`.
   - **d2rs differs on both points:** `q-fix-p5-item-new-flag-file-index`.
+
+- **[prov-data] Monster think in a room with no clients: answered** (`monsters/ai.md` §1.5 r3, §2.1;
+  `ai-bodies.md` §9.9).
+  - **Where the test is:** none of `0x005A7F80`, `0x005B1740`, `0x005E7130` or the map AI tests the
+    room's clients. The test is in the room-leave `0x0053A9B0`, at `0x0053AA0A` (room +0x78 = 0 after
+    the client is removed).
+  - **What it does:** for every monster in the room, `0x005738D0` deletes the type-2 think and the
+    type-3 regen events. Nothing is rescheduled and no RNG is drawn. A client entering the room
+    restarts the think through `0x0053A8E0` → `0x00573780`.
+  - **Effect in the trace:** the Fortress NPCs' frame-24 think is cancelled at the frame-6 warp, so
+    their seeds stay unchanged.
+  - **d2rs differs:** `q-fix-p3-room-empty-think`.
