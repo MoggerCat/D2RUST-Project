@@ -6,7 +6,7 @@ check 1
 # with 100000 gold (price vs. gold: vendors.md §9.1). Compares the hire result,
 # the created hireling (hirelings.md §3, §4) and the 0x81/0x9E stat messages'
 # state, then 60 frames of its follow AI. The player is poked next to the seller
-# (poke goto unit 1:252).
+# (poke goto unit 1:252; 8 steps, so the NPC flow starts at frame 14).
 # Spec: specs/tools/scenario-diff.md.
 name hire-asheara
 save ScnHi3 --class bar --expansion --level 30 --gold 100000 --act 2
@@ -15,6 +15,6 @@ ticks 90
 seconds 400
 channels state
 at 4 poke goto unit 1:252
-at 8 send InteractWithEntity type=1 id=@1:252
-at 10 send InitEntityChat id=@1:252
-at 14 send HireMerc npc=@1:252 merc=1040
+at 14 send InteractWithEntity type=1 id=@1:252
+at 16 send InitEntityChat id=@1:252
+at 20 send HireMerc npc=@1:252 merc=1040

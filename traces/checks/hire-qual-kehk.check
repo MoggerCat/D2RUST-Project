@@ -2,7 +2,7 @@ check 1
 # Act V hire (q-chk-hirelings, REC-1515): hire from the Act 5 seller (npc 515) through the
 # client's NPC flow, one C->S message per frame: 0x13 interact (world/npc.md §2),
 # 0x2F chat open (§3), 0x36 hire (§7.3) of the first name of the seller's row
-# (string id 22751; an offered=0 slot is accepted). Level-30 expansion Barbarian
+# (string id 10850: MercX101, patchstring.tbl 850 + 10000, as the 0x4E offers show; an offered=0 slot is accepted). Level-30 expansion Barbarian
 # with 100000 gold (price vs. gold: vendors.md §9.1). Compares the hire result,
 # the created hireling (hirelings.md §3, §4) and the 0x81/0x9E stat messages'
 # state, then 60 frames of its follow AI. The player is poked next to the seller
@@ -17,4 +17,4 @@ channels state
 at 4 poke goto unit 1:515
 at 8 send InteractWithEntity type=1 id=@1:515
 at 10 send InitEntityChat id=@1:515
-at 14 send HireMerc npc=@1:515 merc=22751
+at 14 send HireMerc npc=@1:515 merc=10850
