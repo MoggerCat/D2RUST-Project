@@ -50,8 +50,10 @@ fn stack_over_the_max_fills_dst() {
 
 /// §7.12 merge branch: throwing knives have durability (`0x00629930`:
 /// durability 20, a stat list, stat 152 < 1): src's lower stat 72 lowers
-/// dst's (stat 72 `durability`), dst := q_s + q_d, cursor cleared, S→C 0x42 for src, src
-/// freed (its unit is gone); dst 0x9C action 0xA.
+/// dst's (stat 72 `durability`), dst := q_s + q_d, cursor cleared, S→C 0x42
+/// naming the player (recorded `42 00 <player>`,
+/// `facts/items/a1-town-item-moves.tsv`), src freed (its unit is gone);
+/// dst 0x9C action 0xA.
 #[test]
 fn stack_merge_frees_the_source() {
     let mut w = World::new();
@@ -65,9 +67,9 @@ fn stack_merge_frees_the_source() {
     assert_eq!(w.inventory().cursor(), None);
     assert_eq!(w.unit(src), None, "freed");
     assert!(!w.state.items.contains_key(&su));
-    let mut clear = vec![0x42, 4];
-    clear.extend_from_slice(&src.to_le_bytes());
     let me = w.me();
+    let mut clear = vec![0x42, me.ty];
+    clear.extend_from_slice(&me.guid.to_le_bytes());
     assert_eq!(
         w.rest.sent,
         [

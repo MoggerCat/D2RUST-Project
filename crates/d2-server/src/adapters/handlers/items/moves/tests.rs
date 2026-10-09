@@ -1355,9 +1355,10 @@ fn socket_item() {
 }
 
 /// 0x29 (§7.20): a cursor scroll into a stored tome of the same spell:
-/// tome quantity +1, announced (S→C 0x3E), the scroll freed (not
-/// consumed one by one: seam default) and the cursor cleared; nothing
-/// else is sent. A second scroll of another spell → the original's fatal assert
+/// tome quantity +1, the scroll freed (not consumed one by one: seam
+/// default) and the cursor cleared with S→C 0x42 naming the player, then
+/// the tome announced (0x3E); nothing else is sent (the recorded order:
+/// `facts/items/a1-town-item-moves.tsv` frame 191). A second scroll of another spell → the original's fatal assert
 /// (line 0x149C): result 3 and a recorded fault.
 // Covers: specs/items/inventory-moves.md §7.20
 #[test]
@@ -1373,7 +1374,10 @@ fn scroll_to_book_and_its_fatal() {
         t.frame(&msg(0x29, &[s, book])),
         (
             Done,
-            vec![update_item_stat(book, stat::QUANTITY, q0 + 1, 0)]
+            vec![
+                vec![0x42, 0, 1, 0, 0, 0],
+                update_item_stat(book, stat::QUANTITY, q0 + 1, 0)
+            ]
         )
     );
     assert_eq!(t.stat(bu, stat::QUANTITY), q0 + 1);

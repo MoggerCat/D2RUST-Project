@@ -25,8 +25,6 @@ G2	REC-289	crates/d2-server/src/adapters/handlers/items/vendor_inv.rs:17
 G2	REC-289	crates/d2-server/src/adapters/handlers/items/vendor_inv.rs:304
 G2	REC-281	crates/d2-server/src/adapters/handlers/world/item_approach.rs:10
 G2	REC-289	crates/d2-sim/src/items/inventory/equip.rs:153
-G2	REC-289	crates/d2-sim/src/items/moves/handlers.rs:986
-G2	REC-289	crates/d2-sim/src/items/moves/tests/handlers.rs:554
 G2	REC-289	crates/d2-sim/src/items/props.rs:142
 G2	REC-289	crates/d2-sim/src/items/props_legacy.rs:309
 G2	REC-281	crates/d2-sim/src/wiring/action/dispatch.rs:251
@@ -42,14 +40,11 @@ G2	REC-113	crates/d2-sim/src/wiring/inventory/pending.rs:510
 G2	REC-102	crates/d2-sim/src/wiring/inventory/potion.rs:5
 G2	REC-177	crates/d2-sim/src/wiring/inventory/swap.rs:5
 G2	REC-163	crates/d2-sim/src/wiring/inventory/tests/equip.rs:217
-G2	REC-289	crates/d2-sim/src/wiring/inventory/tests/stack.rs:83
 G2	REC-289	crates/d2-sim/src/wiring/inventory/town_portal.rs:21
 G2	REC-121	crates/d2-sim/src/wiring/inventory/units.rs:226
-G2	REC-289	specs/items/inventory-moves.md:382
 G2	REC-34	specs/items/properties.md:595
 G2	REC-34	specs/world/quests.md:1117
 G3	REC-117	crates/d2-client/tests/app_town_portal.rs:9
-G3	-	crates/d2-sim/src/wiring/action/switch.rs:460
 G3	REC-117	crates/d2-sim/src/wiring/action/town_portal.rs:12
 G3	REC-243	crates/d2-sim/src/wiring/action/town_portal.rs:23
 G3	REC-117	crates/d2-sim/src/wiring/action/town_portal.rs:192
