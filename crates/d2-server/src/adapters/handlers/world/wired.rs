@@ -121,6 +121,9 @@ pub struct WiredWorld<R, S = NoSkills> {
     /// What the inventory rules queued during vendor calls (receiving
     /// unit, bytes), sent after the rest's messages ([`WorldHost::take_sent`]).
     pub(super) inv_sent: Vec<(UnitId, Vec<u8>)>,
+    /// The store items a purchase took, their 0x9C action 12 sent with
+    /// the next tick's unit work (`vendors.md` §7.1 rule 10: "next frame").
+    pub(super) taken_sent: Vec<(UnitId, Vec<u8>)>,
     /// The messages the systems sent so far, in production order
     /// ([`Self::collect_sent`]; `seams/sim-server.md` §2.2,
     /// `sim/intents-events.md` §1 r3).
@@ -200,6 +203,7 @@ impl<R, S> WiredWorld<R, S> {
             interact_classes: Vec::new(),
             now,
             inv_sent: Vec::new(),
+            taken_sent: Vec::new(),
             outbox: Vec::new(),
             item_queued: Vec::new(),
             arriving: false,
@@ -410,6 +414,9 @@ fn flush_taken<X: Pending, R: TradeRest>(
     let mut d = parts.desk(&mut *desk.econ);
     for item in taken {
         let _ = d.send_item_world(player, item, STORE_TAKEN_ACTION, 0);
+        // The taken unit is gone from the unit list in the same tick
+        // (1.14d, `items-vendor-akara-buy` frame 24).
+        d.free(item);
     }
     inv_take_sent(&mut d)
         .into_iter()
@@ -612,6 +619,8 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
         Self: WorldHost<D>,
         D::X: Outbox,
     {
+        self.inv_sent.append(&mut self.taken_sent);
+        self.collect_sent(events);
         self.arrivals(game, events);
         self.collect_sent(events);
         self.item_arrivals(game, events);
@@ -952,13 +961,15 @@ where
             let mut inv = inv;
             let mut w = InvVendors::new(inner, inv.as_deref_mut());
             let out = call.call(tables, &mut records, &mut w);
-            let mut sent = std::mem::take(&mut w.sent);
+            let sent = std::mem::take(&mut w.sent);
             drop(w);
             desk.state.vendors = records;
-            sent.extend(flush_taken(desk, inv));
-            (out, sent)
+            let taken = flush_taken(desk, inv);
+            ((out, taken), sent)
         });
         self.inv_sent.extend(sent);
+        self.taken_sent.extend(out.1);
+        let out = out.0;
         Some(out)
     }
 
