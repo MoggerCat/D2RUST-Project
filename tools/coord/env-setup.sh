@@ -10,6 +10,7 @@
 # Each step logs "== env-setup: ..." and failures do not stop later steps.
 TOOLCHAIN=1.99.0            # keep in step with rust-toolchain.toml
 WINPY_VER=3.12.7
+NEXTEST_VER=0.9.148       # prebuilt release (1 s); falls back to cargo install (~5 min)
 WINPY_SHA=149dd298e0b7a82250ca019471770fff079874088a4e8501ca20922d7df3a6ac
 step() { echo "== env-setup: $*"; }
 export DEBIAN_FRONTEND=noninteractive
@@ -29,7 +30,9 @@ command -v rustup >/dev/null 2>&1 || { curl --proto '=https' --tlsv1.2 -sSf http
 rustup toolchain list | grep -q "^$TOOLCHAIN" || rustup toolchain install "$TOOLCHAIN" --profile minimal -c clippy -c rustfmt >/dev/null \
   || step "WARN toolchain install failed"
 
-step "cargo-nextest"
+step "cargo-nextest $NEXTEST_VER"
+command -v cargo-nextest >/dev/null 2>&1 || curl -sSfL "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-$NEXTEST_VER/cargo-nextest-$NEXTEST_VER-x86_64-unknown-linux-gnu.tar.gz" \
+  | tar zxf - -C "$HOME/.cargo/bin" 2>/dev/null
 command -v cargo-nextest >/dev/null 2>&1 || cargo +"$TOOLCHAIN" install cargo-nextest --locked -q || step "WARN nextest failed"
 
 step "Windows Python $WINPY_VER under Wine"
