@@ -87,6 +87,12 @@ pub struct MonsterData {
     /// Monster data +0x40, written by S→C 0x98 (`msg-units.md` §7 r9;
     /// −1 for 0xFFFF); `None` until written. Meaning: open question 9.
     pub f40: Option<i32>,
+    /// Monster data +0x30: the critter AI's think timer T
+    /// (`model.md` §5 r6.4; 0 at the create).
+    pub think: i32,
+    /// T as the first critter AI call read it (the `think0` record of
+    /// `record_client_creations.py`); `None` before that call.
+    pub first_think: Option<i32>,
 }
 
 /// The last item message an item unit received (`msg-stats-items.md` §2
@@ -1258,6 +1264,10 @@ pub struct MonsterClass {
     /// `data/fixups.md` §8): w of `sim/units.md` §4.7 steps 6–7.
     pub walk_speed: u16,
     pub run_speed: u16,
+    /// `monstats` `MinGrp` (+0x2F) and `MaxGrp` (+0x30): the critter
+    /// group size (`monsters/population.md` §11.7 r2).
+    pub min_grp: u8,
+    pub max_grp: u8,
 }
 
 /// The `monstats` / `monstats2` columns of the monster set-up
@@ -1450,6 +1460,28 @@ pub struct SkillRow {
     pub flags: u32,
 }
 
+/// The `Levels.txt` critter columns (`monsters/population.md` §11.7 r1):
+/// `cmon1`–`4` (+0xCC, i16; negative = empty), `cpct1`–`4` (+0xD4, i16)
+/// and the amounts as the pass reads them: slot 0 is +0xDC (where all
+/// four `camt` columns are parsed, so `camt4` wins), slots 1–3 read
+/// +0xDE…+0xE2, always 0. The default has every slot empty.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Critters {
+    pub cmon: [i16; 4],
+    pub cpct: [i16; 4],
+    pub camt: [u16; 4],
+}
+
+impl Default for Critters {
+    fn default() -> Self {
+        Self {
+            cmon: [-1; 4],
+            cpct: [0; 4],
+            camt: [0; 4],
+        }
+    }
+}
+
 /// The `Levels.txt` fields the client reads of the player's level
 /// (§11 rules 3–4; `audio/environment.md` §1 r2).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -1469,6 +1501,9 @@ pub struct LevelRow {
     pub rain: bool,
     /// `Mud` (+0x06, `render/draw-order-2.md` §11.5).
     pub mud: bool,
+    /// The critter columns of the client room pass
+    /// (`monsters/population.md` §11.7 r1).
+    pub critters: Critters,
     /// The level's `leveldefs` `Intensity`, `Red`, `Green`, `Blue`
     /// (`render/lighting.md` §3.1 r2; the darkness base of §10 r3).
     pub ambient: crate::rules::lighting::environment::Ambient,

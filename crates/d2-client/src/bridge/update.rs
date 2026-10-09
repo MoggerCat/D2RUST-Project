@@ -1,4 +1,4 @@
-// Spec: specs/client/model.md (§4 rules 5–6, §5), specs/drlg/rooms.md (§4.6 rule 1, last paragraph), specs/world/objects-client.md (§25 r2–r3, §28 r2), specs/render/lighting.md (§9.2 r1, §10 r5)
+// Spec: specs/client/model.md (§4 rules 5–6, §5, §5 rules 6.1 and 6.4), specs/drlg/rooms.md (§4.6 rule 1, last paragraph), specs/world/objects-client.md (§25 r2–r3, §28 r2), specs/render/lighting.md (§9.2 r1, §10 r5)
 //! The client update pass: in a frame whose pump ran a server tick, while
 //! `in_game`, each unit's queue is drained in the 1.14d unit order and
 //! every queued message goes to its unit handler. Before an object's
@@ -36,6 +36,9 @@ pub fn update_pass(
     outputs: &mut Vec<Output>,
 ) -> usize {
     let mut applied = 0;
+    // §5 r6.1: the room pass `0x0044C750` runs first (critters and
+    // client presets of the rooms not yet populated).
+    super::critters::room_pass(world, inputs);
     let order = update_order(&world.units);
     // §5 rule 3: S missiles first, then the C missiles
     // (`missiles/client.md` §C6) and the C objects; then the other S
@@ -129,8 +132,10 @@ pub fn update_pass(
         c_missiles(world, inputs, log, outputs);
         c_objects(world, inputs, log, outputs);
     }
-    // TODO(spec: model.md §5 rule 3): the C monsters walk last; their
-    // update and `0x0046D780` are Phase 6, so it runs nothing yet.
+    // §5 r3: the C monsters walk last; each runs the critter AI
+    // `0x0046D780` (r6.4). Their per-unit monster update (the anim step)
+    // is not run on set C.
+    super::critters::c_monsters(world, inputs);
     if let Err(error) = drlg_update(world) {
         // Not a message: recorded under the client update's own id 0.
         // A DRLG error is a fatal error of the original's code.
