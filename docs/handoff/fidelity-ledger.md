@@ -680,7 +680,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 Every area of 1.14d must be a row; these names appear in no row yet (an empty list is the goal).
 
 - Spec files named by no row: 0
-- Checks named by no row: 1: `sor-frost-nova-twice`
+- Checks named by no row: 2: `ass-lightning-sentry-hit`, `sor-frost-nova-twice`
 - Message ids with no `net.*` row: 0
 
 ## Merge notes
