@@ -371,6 +371,18 @@ impl SkillMotion {
             .collect()
     }
 
+    /// The shadow offsets `(ox + oz / 2, oy + oz / 2)` of the units in an
+    /// arc (`blend-modes.md` §5 r3: half the height on both axes).
+    pub fn shadow_offsets(&self) -> BTreeMap<UnitKey, (i32, i32)> {
+        self.runs
+            .iter()
+            .filter_map(|(k, r)| {
+                let [ox, oy, oz] = r.record()?.offset;
+                Some((*k, (ox.wrapping_add(oz / 2), oy.wrapping_add(oz / 2))))
+            })
+            .collect()
+    }
+
     /// The unit in mode 18 now and the sequence frame it draws: (unit,
     /// drawn mode, drawn frame).
     pub fn drawn(&self) -> Option<(UnitKey, u32, usize)> {
@@ -396,6 +408,9 @@ pub fn skill_motion_frame(
         .filter(|_| walk.predict.player() == world.local().map(|u| u.key));
     motion.frame(world, |id| bridge.0.skill_row(id), walk.speeds, cell);
     state.feed.set_motion_offsets(motion.offsets());
+    state
+        .feed
+        .set_motion_shadow_offsets(motion.shadow_offsets());
     if let Some(art) = &walk.art {
         let mut art = art.write().unwrap_or_else(|e| e.into_inner());
         let drawn = motion.drawn();

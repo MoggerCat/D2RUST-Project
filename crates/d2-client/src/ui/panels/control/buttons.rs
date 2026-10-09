@@ -1,6 +1,7 @@
 // Spec: specs/ui/control-panel.md
-//! §6 the run / walk and menu buttons, §7 the skill buttons and §8 the
-//! new-stats and new-skills buttons of the control panel.
+//! §6 the run / walk and menu buttons, §7 the skill buttons, §8 the
+//! new-stats and new-skills buttons and §11 the help button of the
+//! control panel.
 
 use super::globes::Tip;
 use crate::ui::messages::LineDraw;
@@ -546,6 +547,111 @@ impl NewButtons {
     }
 }
 
+/// The help button's state (§11, ui state 0x22): it opens at game entry
+/// (`0x00456970`, §11 r1) beside the mini panel.
+pub const UI_HELP_BUTTON: u8 = 0x22;
+/// The help screen (§11 r5: toggled by the release).
+pub const UI_HELP_SCREEN: u8 = 0x21;
+
+/// §11 r3: the states that hide the button (hidden flag `[0x007BEF08]`).
+pub const HELP_HIDING: [u8; 6] = [4, 3, 1, 0x0C, 0x17, 0x19];
+
+/// The help button's globals (§11): pressed `[0x007BEF04]`, hidden at the
+/// last draw `[0x007BEF08]` and the `Help Menu` cache `[0x00722310]`.
+/// d2rs-own: there is no registry, so the value is absent (0) at every
+/// start and the cache lives as long as the HUD.
+#[derive(Clone, Debug, Default)]
+pub struct HelpButton {
+    pub pressed: bool,
+    pub hidden: std::cell::Cell<bool>,
+    pub setting: u32,
+}
+
+/// What the help button draws (§11 r3) for its caption width `text_w`
+/// (width A): the caption's left / top, the socket and the button.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct HelpDraw {
+    pub caption: (i32, i32),
+    pub socket: ButtonCel,
+    pub button: ButtonCel,
+}
+
+impl HelpButton {
+    /// §11 r3 with state 0x22 open: `None` when hidden (one of
+    /// [`HELP_HIDING`] open; the flag is kept for r4 / r5) or when the
+    /// setting is ≠ 0 (the original then closes 0x22; in d2rs the setting
+    /// only becomes ≠ 0 through r5 / r6, which close it already).
+    pub fn draw(&self, w: i32, h: i32, open: &dyn Fn(u8) -> bool, text_w: i32) -> Option<HelpDraw> {
+        let hidden = HELP_HIDING.iter().any(|&u| open(u));
+        self.hidden.set(hidden);
+        if hidden || self.setting != 0 {
+            return None;
+        }
+        Some(HelpDraw {
+            caption: (w - 58 - text_w / 2, h - 197),
+            socket: ButtonCel {
+                frame: 0,
+                x: w - 75,
+                y: h - 160,
+            },
+            button: ButtonCel {
+                frame: u32::from(self.pressed),
+                x: w - 72,
+                y: h - 164,
+            },
+        })
+    }
+
+    /// §11 r4, r5: the hit box W − 75 ≤ x ≤ W − 40, H − 196 ≤ y ≤ H − 160
+    /// (inclusive), at the current mouse.
+    pub fn hit(w: i32, h: i32, x: i32, y: i32) -> bool {
+        (w - 75..=w - 40).contains(&x) && (h - 196..=h - 160).contains(&y)
+    }
+
+    /// §11 r4 press: a hit sets pressed and is consumed (no sound, no
+    /// cursor press); a miss or a hidden button is not.
+    pub fn press(&mut self, w: i32, h: i32, mouse: (i32, i32)) -> bool {
+        if self.hidden.get() || !Self::hit(w, h, mouse.0, mouse.1) {
+            return false;
+        }
+        self.pressed = true;
+        true
+    }
+
+    /// §11 r5 release (pressed not checked): a hit closes 0x22, toggles
+    /// the help screen 0x21, sets `Help Menu` and the cache to 1, clears
+    /// pressed; `None` (not consumed) on a miss, pressed then stays.
+    pub fn release(&mut self, w: i32, h: i32, mouse: (i32, i32)) -> Option<[PanelOutput; 2]> {
+        if self.hidden.get() || !Self::hit(w, h, mouse.0, mouse.1) {
+            return None;
+        }
+        self.setting = 1;
+        self.pressed = false;
+        Some([
+            PanelOutput::SetUi {
+                ui: UI_HELP_BUTTON,
+                mode: 1,
+                jump: false,
+            },
+            PanelOutput::SetUi {
+                ui: UI_HELP_SCREEN,
+                mode: 2,
+                jump: false,
+            },
+        ])
+    }
+}
+
+/// §11 r3 caption: string 4177 ("Help") then, for command 6 (`CfgHelp`)
+/// slot 1 then slot 0 when bound, ` (%s)` (4178) with the key's name.
+pub fn help_caption(keys: [Option<Vec<u16>>; 2], strings: &dyn Fn(u16) -> Vec<u16>) -> Vec<u16> {
+    let mut text = strings(4177);
+    for k in [&keys[1], &keys[0]].into_iter().flatten() {
+        text.extend(fmt_s(&strings(4178), &[k]));
+    }
+    text
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1035,5 +1141,78 @@ mod tests {
         };
         let (eff, c) = b.release(&e800(0), NewBtn::Stats, 0, 0, (220, 570), true);
         assert!(eff.is_empty() && !c && b.stats_pressed);
+    }
+
+    // Covers: specs/ui/control-panel.md §11 r3, §11 r4, §11 r5
+    #[test]
+    fn the_help_button_draws_at_the_recorded_places_and_opens_help_once() {
+        // `a4-town-pandemonium-fortress` rows 258–267 (800 × 600, H bound
+        // only): caption at y 403, socket (725, 440), button (728, 436).
+        let mut b = HelpButton::default();
+        let none = |_: u8| false;
+        let d = b.draw(800, 600, &none, 56).unwrap();
+        assert_eq!(d.caption, (714, 403));
+        assert_eq!((d.socket.x, d.socket.y, d.socket.frame), (725, 440, 0));
+        assert_eq!((d.button.x, d.button.y, d.button.frame), (728, 436, 0));
+        // Hidden while the inventory is open; a hidden button takes no
+        // press.
+        assert!(b.draw(800, 600, &|u| u == 1, 56).is_none());
+        assert!(!b.press(800, 600, (740, 420)));
+        b.draw(800, 600, &none, 56);
+        // The hit box edges (inclusive).
+        assert!(HelpButton::hit(800, 600, 725, 404) && HelpButton::hit(800, 600, 760, 440));
+        assert!(!HelpButton::hit(800, 600, 724, 420) && !HelpButton::hit(800, 600, 761, 420));
+        assert!(!HelpButton::hit(800, 600, 740, 403) && !HelpButton::hit(800, 600, 740, 441));
+        assert!(b.press(800, 600, (740, 420)));
+        assert_eq!(b.draw(800, 600, &none, 56).unwrap().button.frame, 1);
+        // A release elsewhere does nothing; pressed stays.
+        assert!(b.release(800, 600, (100, 100)).is_none());
+        assert!(b.pressed);
+        let out = b.release(800, 600, (740, 420)).unwrap();
+        assert!(matches!(
+            out[0],
+            PanelOutput::SetUi {
+                ui: 0x22,
+                mode: 1,
+                ..
+            }
+        ));
+        assert!(matches!(
+            out[1],
+            PanelOutput::SetUi {
+                ui: 0x21,
+                mode: 2,
+                ..
+            }
+        ));
+        assert!(!b.pressed);
+        assert!(b.draw(800, 600, &none, 56).is_none(), "the setting is set");
+        // 640 × 480: y 283, (565, 320), (568, 316).
+        let d = HelpButton::default().draw(640, 480, &none, 0).unwrap();
+        assert_eq!(
+            (d.caption.1, d.socket.x, d.socket.y, d.button.x, d.button.y),
+            (283, 565, 320, 568, 316)
+        );
+    }
+
+    // Covers: specs/ui/control-panel.md §11 r3
+    #[test]
+    fn the_help_caption_names_slot_one_then_slot_zero() {
+        let s = |id: u16| -> Vec<u16> {
+            match id {
+                4177 => "Help",
+                4178 => " (%s)",
+                _ => "",
+            }
+            .encode_utf16()
+            .collect()
+        };
+        let u = |t: &str| t.encode_utf16().collect::<Vec<u16>>();
+        assert_eq!(help_caption([Some(u("H")), None], &s), u("Help (H)"));
+        assert_eq!(
+            help_caption([Some(u("H")), Some(u("F1"))], &s),
+            u("Help (F1) (H)")
+        );
+        assert_eq!(help_caption([None, None], &s), u("Help"));
     }
 }

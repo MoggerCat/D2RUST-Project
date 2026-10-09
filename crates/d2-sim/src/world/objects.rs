@@ -691,7 +691,12 @@ fn run_init<W: ObjectWorld>(
     x: i32,
     y: i32,
 ) -> Result<(), ObjectError> {
-    let level = w.level(obj).unwrap_or(0);
+    // The level of the init record's room: §3 runs before the unit is
+    // added to the world, so the unit has no room of its own yet.
+    let level = room
+        .and_then(|r| w.room_level(r))
+        .or_else(|| w.level(obj))
+        .unwrap_or(0);
     match n {
         1 => init_shrine(ctl, t, obj, level),
         2 => {

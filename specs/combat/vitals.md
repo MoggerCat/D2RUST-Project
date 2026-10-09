@@ -30,14 +30,14 @@
 |   1. Creation values | 73–103 |
 |   2. Spending stat points (message 0x3A) | 104–156 |
 |   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 157–178 |
-|   4. Experience | 179–475 |
-|   5. Client vitals sync (`0x00548760`) | 476–614 |
-| Constants & data dependencies | 615–631 |
-| Randomness | 632–635 |
-| Edge cases & original bugs | 636–647 |
-| Test vectors | 648–668 |
-| Provenance | 669–704 |
-| Open questions | 705–741 |
+|   4. Experience | 179–478 |
+|   5. Client vitals sync (`0x00548760`) | 479–617 |
+| Constants & data dependencies | 618–634 |
+| Randomness | 635–638 |
+| Edge cases & original bugs | 639–650 |
+| Test vectors | 651–671 |
+| Provenance | 672–707 |
+| Open questions | 708–744 |
 <!-- /index -->
 
 ## Summary
@@ -420,7 +420,10 @@ earlier corpse keeps its own stat 13.
 
 Who starts them: `combat/damage.md` §7.1 rule 5.4 (the only mode-0
 request); `sim/units.md` §4.5 table `0x006E1740` row 0 (unit form only)
-and the event-1 DT → DD change. Both take ECX game, EDX P; stack mode,
+and the event-1 DT → DD change. Nothing else does: life 0 alone is not
+a death (recorded `traces/checks/death-town-ama.check`: stat 6 poked to
+0 at frame 10, the player stays in TN with 0 life for 110 frames, no
+regeneration). Both take ECX game, EDX P; stack mode,
 target unit K (resolved by `0x00580A70`).
 
 1. **DT start** `0x00580EC0`:
