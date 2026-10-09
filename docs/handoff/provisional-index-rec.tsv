@@ -299,10 +299,14 @@ REC-546	6636		Unit footprints for the client missiles (PROVISIONAL, `d2-client` 
 REC-547	6635		A client hit body the model cannot run (PROVISIONAL, `d2-client` `bridge/client_missiles.r	unstated	no		1	
 REC-548	6634		Travel sound detach force (PROVISIONAL, `d2-client` `audio/driver.rs` `SoundRequest::Group	unstated	no		2	
 REC-549	6633		Umod 29's client hook target (PROVISIONAL, `d2-client` `bridge/client_missiles.rs` `umod_m	recording	no		1	
-REC-592	6673		Animation re-init of a player / monster mode change (PROVISIONAL, `d2-sim` `wiring/action/	recording	no		2	
-REC-593	6674		Monster walk / run speed at the animation rate (PROVISIONAL, `d2-sim` `wiring/action/units	recording	no		2	
-REC-602	6671		Client run end on stamina 0 (the scale is settled: `bridge/predict.rs` is faithful and sta	recording	no	yes	1	
+REC-592	6677		Animation re-init of a player / monster mode change (PROVISIONAL, `d2-sim` `wiring/action/	recording	no		2	
+REC-593	6678		Monster walk / run speed at the animation rate (PROVISIONAL, `d2-sim` `wiring/action/units	recording	no		2	
+REC-602	6675		Client run end on stamina 0 (the scale is settled: `bridge/predict.rs` is faithful and sta	recording	no	yes	1	
 REC-724	6493		Preview `use_state` (PROVISIONAL, `app/skill_rest.rs`; q-fix-preview-use-state): tests 1-4	unstated	no		1	
 REC-725	6494		Object door step (PROVISIONAL, `bridge/objects/mod.rs`; q-fix-object-generic-step): `IsDoo	binary	no		2	
 REC-727	6495		NPC "introduction" topic text (PROVISIONAL, `d2-client` `ui/npc_talk.rs` `topic_text`; q-f	unstated	no		1	
 REC-728	6496		NPC menu-open greeting sound (PROVISIONAL, `d2-client` `ui/npc_box.rs` `open_npc_menu_with	recording	no		2	
+REC-790	6671		Act V removals on the wired host (PROVISIONAL, `d2-sim` `wiring/economy/quest_host.rs`, M2	data	yes		6	
+REC-791	6672		Nihlathak killed in town (PROVISIONAL, `quest_host.rs` `kill_in_town`, M22): `0x00589340` 	unstated	no		1	
+REC-792	6673		Scroll of Resistance stat send (PROVISIONAL, `quest_host.rs` `add_resist_list`, M22): the 	unstated	no		1	
+REC-793	6674		Baal's gold piles (PROVISIONAL, `quest_host.rs` `drop_gold_amount`, `quest_reward.rs` `Que	unstated	no		2	
