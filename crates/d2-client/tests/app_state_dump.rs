@@ -14,6 +14,16 @@ fn run(character: Character, ticks: u32, every: u32) -> Vec<u8> {
 }
 
 fn run_with(character: Character, ticks: u32, every: u32, pokes: &[&str]) -> Vec<u8> {
+    run_sends(character, ticks, every, pokes, &[])
+}
+
+fn run_sends(
+    character: Character,
+    ticks: u32,
+    every: u32,
+    pokes: &[&str],
+    sends: &[&str],
+) -> Vec<u8> {
     let args = DumpArgs {
         save: None,
         seed: Some(1234),
@@ -28,6 +38,10 @@ fn run_with(character: Character, ticks: u32, every: u32, pokes: &[&str]) -> Vec
             .map(|p| d2_client::app::poke::parse_poke_arg(p).unwrap())
             .collect(),
         input: None,
+        sends: sends
+            .iter()
+            .map(|s| d2_client::app::send::parse_send_arg(s).unwrap())
+            .collect(),
         packets: None,
         rng: None,
     };
@@ -221,5 +235,55 @@ fn the_fallen_leader_shouts_on_the_recorded_frames() {
         modes[1..],
         [(41, 9), (65, 1), (90, 9), (114, 1), (129, 5)],
         "{modes:?}"
+    );
+}
+
+// Covers: specs/tools/scenario-diff.md §3 r12; specs/tools/scenario.md §3 r3, §3 r5, §4 r2
+// (state-dump --send: after frame f − 1's snapshot, through the bridge, no duplicate filter)
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn a_send_is_injected_before_its_frame_and_an_unresolved_one_sends_nothing() {
+    let sends = [
+        "4 Walk x=@x+5 y=@y",
+        "4 InteractWithEntity type=1 id=@1:9999",
+    ];
+    let a = run_sends(scn_ama(), 8, 1, &[], &sends);
+    assert_eq!(
+        a,
+        run_sends(scn_ama(), 8, 1, &[], &sends),
+        "two runs differ"
+    );
+    let text = String::from_utf8(a).unwrap();
+    let lines: Vec<&str> = text.lines().collect();
+    // header, snaps 1..3, two send lines, snaps 4..8, footer
+    assert_eq!(lines.len(), 1 + 8 + 2 + 1, "{text}");
+    assert!(
+        lines[3].starts_with(r#"{"k":"snap","f":3,"#),
+        "{}",
+        lines[3]
+    );
+    assert!(
+        lines[4].starts_with(r#"{"k":"send","f":4,"frame":3,"i":0,"r":"ok","bytes":"01"#),
+        "{}",
+        lines[4]
+    );
+    assert!(
+        lines[4].ends_with(r#","src":"Walk x=@x+5 y=@y"}"#),
+        "{}",
+        lines[4]
+    );
+    assert_eq!(
+        lines[5],
+        r#"{"k":"send","f":4,"frame":3,"i":1,"r":"unresolved","note":"@1:9999: no such unit","src":"InteractWithEntity type=1 id=@1:9999"}"#
+    );
+    assert!(
+        lines[6].starts_with(r#"{"k":"snap","f":4,"#),
+        "{}",
+        lines[6]
+    );
+    assert!(
+        lines[11].contains(r#""send: {\"k\":\"send\",\"f\":4"#),
+        "{}",
+        lines[11]
     );
 }

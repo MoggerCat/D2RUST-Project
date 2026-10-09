@@ -317,6 +317,26 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     and whether the unit is queued for update by the toggle
     (`0x00639DB0`) or by the entry itself. d2rs: PROVISIONAL REC-730 in
     `d2-sim/src/wiring/inventory/potion.rs`.
+45. **Melee on a fallen from the shared script** (q-fix-b-headless-unit-click-keys;
+    `specs/tools/scenario-diff.md` §2 r4.5, §3 r8.5):
+    `py tools\scenario-diff\scenario_diff.py traces\checks\combat-melee-fallen.check --orig-only`.
+    Look for: the footer notes `autostart: frame 39: clickunit 1 19 368 300
+    posted at the stop of frame 38` and `frame 40: click 368 300 posted at
+    the stop of frame 39` (the hover frame); in the state the player in
+    mode 7 from frame 40 to 54 and fallen GUID 21's `hp` 256 -> 0 at frame
+    46 (Wine and d2rs both do this); in `orig.packets.jsonl` a C->S
+    `06 01000000 15000000` (left skill on the fallen), not a walk (0x01 /
+    0x03) — only once `record_packets.py` applies `frame` input
+    (`AutoStart.attach`; today it notes "they never run here"). Then run
+    without `--orig-only` (both sides) and record the first difference.
+46. **A belt potion mid-fight from the shared script** (same row):
+    `py tools\scenario-diff\scenario_diff.py traces\checks\combat-potion-midfight.check --orig-only`.
+    Look for: the footer note `autostart: frame 70: key 49 posted at the
+    stop of frame 69`; in the state the player's `hp` 2560 -> 2640 at
+    frame 70, +80 a frame, and item GUID 2 (slot 0) gone (Wine: so); in
+    `orig.packets.jsonl` (once it takes `frame` input) the join's S->C
+    0x9C action 0x0E for the two hp1 (d2rs sends none: its load leaves
+    belt items in mode 4) and a C->S `26 02000000 00000000 00000000`.
 - **[q-fix-pc1-proto-items] Where the join sets the player's alignment (state 105, stat 172 = 2)**
     `combat/hit.md` §7.1 says players carry it, and the recording shows
     it in the player's first 0xAA (`packets-town-arrival-ama.check` seq
@@ -374,9 +394,9 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     takes and the rat's position.
 
 
-42. **Control-panel help button `0x004A64C0`** (q-scenes-compare) Step 8 of the UI pass (`ui/panels.md` §5) calls it before the new-stats button; `a4-town-pandemonium-fortress` rows 258–267 draw the text "Help (H)" (CelDrawColor at (714, 403)), `Panel\Levelsocket` frame 0 at (725, 440) and `Panel\Level` frame 0 at (728, 436). Specify when it draws (character level? first game?), its positions and its press / release, for `ui/control-panel.md`.
-43. **Mini panel open at game start (REC-519)** (q-scenes-compare) Every recorded scene has state 0x15 open with no input; name the call that opens it at game entry (and whether a saved setting decides it), for `ui/control-panel.md` §9.
-44. **Shadow pre-test arguments `0x00471620` (REC-511, REC-518)** (q-scenes-compare) The measured shadows fit the §4 box test on the sheared shadow box, and objects need their mode's `BlocksLight`; read the arguments `0x00471620` passes to `0x004709A0` and the object branch, for `render/blend-modes.md` §5 r3.
+42. **Control-panel help button `0x004A64C0`** answered → see `docs/handoff/pc1-day3-c.md`. (q-scenes-compare) Step 8 of the UI pass (`ui/panels.md` §5) calls it before the new-stats button; `a4-town-pandemonium-fortress` rows 258–267 draw the text "Help (H)" (CelDrawColor at (714, 403)), `Panel\Levelsocket` frame 0 at (725, 440) and `Panel\Level` frame 0 at (728, 436). Specify when it draws (character level? first game?), its positions and its press / release, for `ui/control-panel.md`.
+43. **Mini panel open at game start (REC-519)** answered → see `docs/handoff/pc1-day3-c.md`. (q-scenes-compare) Every recorded scene has state 0x15 open with no input; name the call that opens it at game entry (and whether a saved setting decides it), for `ui/control-panel.md` §9.
+44. **Shadow pre-test arguments `0x00471620` (REC-511, REC-518)** answered → see `docs/handoff/pc1-day3-c.md`. (q-scenes-compare) The measured shadows fit the §4 box test on the sheared shadow box, and objects need their mode's `BlocksLight`; read the arguments `0x00471620` passes to `0x004709A0` and the object branch, for `render/blend-modes.md` §5 r3.
 
 ## How to check a behaviour in one command
 
