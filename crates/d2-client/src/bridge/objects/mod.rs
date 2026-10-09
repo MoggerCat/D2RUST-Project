@@ -82,6 +82,10 @@ pub struct ObjClientRow {
     pub overlay: u8,
     /// `HasCollision0`–`7`.
     pub has_collision: [u8; 8],
+    /// The footprint inputs of `sim/path-placement.md` §3 (`SizeX` ×
+    /// `SizeY`, the mask from `IsDoor`, `BlocksVis`, `BlockMissile`,
+    /// `SubClass`; `HasCollision0..7`), as the server reads them.
+    pub shape: d2_sim::path::record::ObjectShape,
 }
 
 impl ObjClientRow {
@@ -153,6 +157,7 @@ impl ObjClientRow {
                 o.hascollision6,
                 o.hascollision7,
             ],
+            shape: d2_sim::wiring::action::objects::object_shape(o),
         }
     }
 
@@ -843,6 +848,16 @@ pub fn distance_at(a: (u16, u16), size_a: i32, b: (u16, u16), size_b: i32) -> i3
         (i32::from(bx), i32::from(by)),
         size_b,
     )
+}
+
+/// The unit distance `0x00641530` (`sim/pathing.md` §9.5) between cells
+/// with sizes (`sim/path-placement.md` §3); no path tables: far.
+pub fn unit_distance_at(a: (u16, u16), size_a: i32, b: (u16, u16), size_b: i32) -> i32 {
+    let Some(t) = super::predict::path_tables() else {
+        return i32::MAX;
+    };
+    let p = |(x, y): (u16, u16)| d2_sim::path::coords::Point::new(i32::from(x), i32::from(y));
+    d2_sim::path::walk::geom::unit_distance(t, p(a), size_a, p(b), size_b)
 }
 
 /// The distance of an [`ObjSound::Mode`] without a local player (or with
