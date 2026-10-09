@@ -315,7 +315,9 @@ pub fn dump<W: Write>(
         )?),
         None => None,
     };
-    let (fields, mut gaps) = link.with(|l| state::coverage_world(&l.host().game.events))?;
+    let (mut fields, mut gaps) = link.with(|l| state::coverage_world(&l.host().game.events))?;
+    // `q`: the players' quest records, kept by the app's rest (StateSource below)
+    fields.extend(state::HOST_FIELDS.iter().map(|k| (*k).to_owned()));
     gaps.extend(RUN_GAPS.iter().map(|g| (*g).to_owned()));
     let header = state::Header {
         side: "d2rs".into(),
@@ -439,13 +441,22 @@ fn run_due_pokes<W: Write>(
 }
 
 /// The server thread's snapshot, taken on the server thread between two
-/// frames (`state-snapshot.md` §3 r1).
+/// frames (`state-snapshot.md` §3 r1), with each player's `q`: the quest
+/// record of the game's difficulty from the rest's per-player quests
+/// (`AppRest::quests`, `world/quests.md` §1.4). Reads only.
 impl<C: Clock + Send + 'static> StateSource for ThreadLink<Link<C>> {
     type Error = super::server_thread::ThreadStopped;
     fn state_snapshot(&mut self) -> Result<state::StateSnapshot, Self::Error> {
         self.with(|l| {
             let sim = &l.host().game;
-            state::snapshot_world(&sim.game, &sim.events)
+            let mut s = state::snapshot_world(&sim.game, &sim.events);
+            let d = usize::from(state::difficulty_world(&sim.events)).min(2);
+            for (id, q) in &sim.world.rest.quests {
+                if let Some(e) = sim.game.lists.unit(*id) {
+                    s.set_quests(e.guid, state::quest_words(&q.flags[d]));
+                }
+            }
+            s
         })
     }
 }
