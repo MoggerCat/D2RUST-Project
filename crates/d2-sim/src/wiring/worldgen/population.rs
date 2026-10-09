@@ -29,7 +29,7 @@ fn coord_rect(c: &CoordRec) -> CoordRect {
 
 impl<X: WorldPending> WorldHost<'_, X> {
     /// The act and DRLG room of an active room.
-    fn drlg_room(&self, room: RoomId) -> Option<(u8, DrlgRoomId)> {
+    pub(super) fn drlg_room(&self, room: RoomId) -> Option<(u8, DrlgRoomId)> {
         let act = self.game.lists.room(room)?.act;
         let d = self.v.h.drlg.dungeon.acts.get(usize::from(act))?.as_ref()?;
         Some((act, d.drlg_room_of(room)?))

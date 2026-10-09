@@ -247,6 +247,12 @@ impl Presets {
     }
 
     /// The room's preset units, head first (room +0x5C).
+    /// `0x00666120`'s source side: the path of the room's preset unit
+    /// `index`, moved out (the preset keeps none).
+    pub fn take_unit_path(&mut self, room: DrlgRoomId, index: usize) -> Option<Vec<PathPoint>> {
+        self.rooms.get_mut(&room)?.units.get_mut(index)?.path.take()
+    }
+
     pub fn room_units(&self, room: DrlgRoomId) -> &[PresetUnit] {
         self.rooms.get(&room).map_or(&[], |r| r.units.as_slice())
     }

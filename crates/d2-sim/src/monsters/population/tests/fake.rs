@@ -290,6 +290,9 @@ impl MonsterInit for Fake {
         self.log.push(format!("object {class} {x} {y}"));
     }
 
+    fn move_preset_path(&mut self, unit: UnitId, _room: RoomId, index: usize) {
+        self.log.push(format!("path {} {index}", unit.0));
+    }
     fn preset_created(&mut self, unit: UnitId, preset: &PresetUnit) {
         self.log
             .push(format!("preset {} {}", unit.0, preset.has_data));

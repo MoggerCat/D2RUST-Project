@@ -114,6 +114,11 @@ impl WorldTypes {
         self.presets.get(&act)
     }
 
+    /// [`Self::act_presets`], mutable.
+    pub fn act_presets_mut(&mut self, act: u8) -> Option<&mut Presets> {
+        self.presets.get_mut(&act)
+    }
+
     /// The outdoor state of an act, if any.
     pub fn act_outdoor(&self, act: u8) -> Option<&Outdoor> {
         self.outdoor.get(&act)

@@ -172,6 +172,21 @@ impl<X: Pending> View<'_, X> {
     /// §7.8 rule 2.3: every monster of the room gets `0x00573780`
     /// ([`ai::client_entered_room`]). No AI store: nothing.
     fn wake_room_monsters(&mut self, game: &mut Game, room: RoomId) {
+        self.with_ai(game, |game, cx| ai::client_entered_room(game, cx, room));
+    }
+
+    /// The think restart `0x00573780` of one monster
+    /// ([`ai::update_ai_callback`]). No AI store: nothing.
+    pub(super) fn think_restart(&mut self, game: &mut Game, unit: UnitId) {
+        self.with_ai(game, |game, cx| ai::update_ai_callback(game, cx, unit));
+    }
+
+    /// Runs `f` with the lent AI store on this view. No AI store: nothing.
+    fn with_ai(
+        &mut self,
+        game: &mut Game,
+        f: impl FnOnce(&mut Game, &mut ai::Ctx<'_, View<'_, X>>),
+    ) {
         let Some(mut store) = self.h.ai.take() else {
             return;
         };
@@ -192,7 +207,7 @@ impl<X: Pending> View<'_, X> {
                 store: &mut store,
                 world: &mut v,
             };
-            ai::client_entered_room(game, &mut cx, room);
+            f(game, &mut cx);
         }
         self.h.ai = Some(store);
     }

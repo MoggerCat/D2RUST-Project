@@ -247,6 +247,49 @@ phase, after the tick alignment), `q-fix-render-real-player-pose` (arrival
 direction 0 vs 4, 8 component shadows vs 1), `q-fix-render-real-npc-pose`
 (NPC modes / directions, missing `ck` draws, unit draw count).
 
+## Round 5 (2026-10-09): object animation, player pose, NPC pose
+
+`a1-town-arrival-ama`, d2rs `play --dump-draws --at-tick 73` vs the
+1.14d recording, `facts-compare --ignore tick`.
+
+1. **Tick alignment** (d2rs side): the world view skipped drawing tick
+   73 while the GPU held the previous frame, so the dump took tick 74.
+   `DrawnTick` paces the bridge to the draws in dump mode
+   (`facts-render.md` §5 r13). The dump is now tick 73 exactly.
+2. **Object frame phase** (REC-440, `objects-client.md` §25 r8): the
+   client runs the `objects.md` §4 set-up (speed roll on the object's
+   client seed) at 0x51 and at every 0x0E code-3 mode change. Fitted on
+   the recording: N2 125 and RB 124 are the first draws, the three
+   torches (191, 188, 199) the second, starting one tick later. Every
+   object frame of ticks 13, 73 and 113 matches.
+3. **Player pose** (REC-441, `unit-composite.md` §6 r4–r5;
+   `facts-render.md` §5 r14–r15):
+   - component files take the COF layer's weapon class;
+   - the `dir` column is the context's dir64;
+   - a slot whose file is in no archive (`AMSHlitTN1ht`) is still a cel
+     call.
+
+   Rows 100–107 and 158–166 match.
+4. **NPC pose** (d2-sim):
+   - the preset path moves to the monster's map AI (`ai.md` OQ 8);
+   - the monster branch of `SUNIT_Add` (`init.md` §4.1: velocity,
+     creation mode set, think restart; REC-442 for the `0x00553160`
+     gate) now runs;
+   - population runs the type init before the add (it cancelled the
+     first think).
+
+   Town NPCs now think and walk their DS1 paths. Not yet equal to
+   1.14d:
+   - rc picks node 1, where 1.14d picks node 2;
+   - rc starts walking at frame 40, against about f 32 in 1.14d.
+
+   The unit seed order differs from game start on (row
+   q-fix-real-unit-seed-order). The ck critters are missing
+   (q-fix-real-town-critters).
+5. First difference now: `draws.tsv` row 108, column `file`. 1.14d
+   draws the torch shadow (`totrlitonhth.dcc`, frame 12), d2rs draws
+   rc's shadow (`rctrlitwlhth.dcc`, frame 1).
+
 ## What the recorders need from Windows, and the Wine plan
 
 Read: `tools/trace-recorder/README.md`, `record_rng.py` (the Win32 base),

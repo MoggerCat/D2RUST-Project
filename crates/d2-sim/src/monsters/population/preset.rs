@@ -313,13 +313,16 @@ pub fn place_presets<H: PopHost + ?Sized>(cx: &mut Ctx<'_, H>, room: RoomId) {
         return;
     }
     let b = cx.host.room_box(room);
-    for p in cx.host.preset_units(room) {
+    for (index, p) in cx.host.preset_units(room).into_iter().enumerate() {
         if p.unit_type != 1 || p.done {
             continue;
         }
         // `0x00555910` → `0x005557D0` → `0x0054E600`.
         let (x, y) = (p.x + b.x, p.y + b.y);
         if let Some(u) = preset_spawn(cx, room, p.class, x, y, p.mode) {
+            if p.has_data {
+                cx.host.move_preset_path(u, room, index);
+            }
             cx.host.preset_created(u, &p);
             cx.host.set_unit_flags(u, 0x300_0000);
         }
