@@ -103,8 +103,10 @@ naming a unit the model does not hold is refused (rule 1.5).
    grid's list; the item data's inventory not the one listing it; a mode
    that does not match the place (body 1, belt 2, page 0, cursor 4;
    socketed 6 allowed anywhere).
-5. **Model:** a new unhandled, dropped, rejected or discarded S→C message
-   in the bridge's receive log (`bridge.md` §6).
+5. **Model:** a new unhandled, rejected or discarded S→C message in the
+   bridge's receive log (`bridge.md` §6). A dropped one (a unit message
+   for a unit the model lacks at receive) is not a finding: 1.14d drops
+   it too (`client/model.md` §4 r6).
 6. **Hang:** 250 frames without a server tick while the game is not
    paused (UI state 9 or 11 open, `bridge.md` §8 r5). A run that does not
    exit in its wall-time limit is a `timeout` (`soak.py`), a run that dies

@@ -480,7 +480,7 @@ impl Rig {
     }
 
     /// The model's receive log (`bridge.md` §6): every unhandled,
-    /// dropped, rejected and discarded S→C message so far, as (signature,
+    /// rejected and discarded S→C message so far, as (signature,
     /// detail) with a running count per signature.
     fn model_log(&self) -> std::collections::BTreeMap<String, (u64, String)> {
         let l = self.app.world().resource::<BridgeResource>().0.log();
@@ -491,12 +491,9 @@ impl Rig {
                 (*n, format!("{n} unhandled S→C 0x{id:02X}")),
             );
         }
-        for (id, n) in &l.dropped {
-            m.insert(
-                format!("model:dropped:{id:02X}"),
-                (*n, format!("{n} dropped S→C 0x{id:02X}")),
-            );
-        }
+        // `dropped` (a unit message for a unit the model lacks at
+        // receive) is the original's own rule (`client/model.md` §4 r6),
+        // not a finding.
         for r in &l.rejected {
             // The error's variant, not its numbers.
             let what: String = format!("{:?}", r.error)

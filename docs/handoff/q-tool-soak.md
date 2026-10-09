@@ -64,7 +64,6 @@ python3 tools/soak/soak.py reduce target/soak/camp/logs/town1-3.log --sig room:o
 Withdrawn (tool errors, fixed in the tool): the player-position desync
 (the check read the model's placement cell, not the walk prediction the
 client moves the local player by, `seams/movement-prediction.md` §2.9
-r2); the hang during the Esc menu (the single-player pause).
-
-Open: `model:dropped:6D` / `model:dropped:67` after a reload (being
-reduced, see the latest report to the coordinator).
+r2); the hang during the Esc menu (the single-player pause); dropped
+S→C 0x6D / 0x67 / 0x6B (a unit message for a unit the model lacks at
+receive: 1.14d drops it too, `client/model.md` §4 r6).
