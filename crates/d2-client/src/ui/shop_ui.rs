@@ -217,41 +217,27 @@ fn footprint(sh: &super::Shared, it: &ItemView) -> (i32, i32) {
         })
 }
 
-/// The store items of the open trade on `page`, packed row by row into
-/// the grid in arrival order (d2rs-own, unverified, REC-162: the preview
-/// has no NPC grid model, so the server's positions are not used).
+/// The store items of the open trade on `page`, at the cells the stream
+/// gave them (`seams/item-grids.md` §2.9): the server placed them in the
+/// NPC's grid (`vendors.md` §3.1 r4) and the client draws and hit-tests
+/// them there, without repacking. An item whose footprint leaves the
+/// grid is not drawn or hit.
 fn page_items(sh: &super::Shared, world: &ClientWorld, st: &ShopState, page: u8) -> Vec<ItemView> {
     let mut list: Vec<ItemView> = items::store_items(world)
         .into_iter()
         .filter(|i| i.store_seq > st.floor && i.page == page)
         .collect();
     list.sort_by_key(|i| i.store_seq);
-    let (cols, rows) = (i32::from(GRID.0), i32::from(GRID.1));
-    let mut used = [[false; GRID.0 as usize]; GRID.1 as usize];
-    for it in &mut list {
-        let (w, h) = footprint(sh, it);
-        let spot = (0..rows)
-            .flat_map(|y| (0..cols).map(move |x| (x, y)))
-            .find(|&(x, y)| {
-                x + w <= cols
-                    && y + h <= rows
-                    && (y..y + h).all(|r| (x..x + w).all(|c| !used[r as usize][c as usize]))
-            });
-        let Some((x, y)) = spot else {
-            // No room: parked off the grid, not drawn or hit.
-            it.x = u16::MAX;
-            it.y = u16::MAX;
-            continue;
-        };
-        for r in y..y + h {
-            for c in x..x + w {
-                used[r as usize][c as usize] = true;
-            }
-        }
-        it.x = x as u16;
-        it.y = y as u16;
-    }
-    list.retain(|i| i.x < u16::from(GRID.0));
+    in_grid(list, |i| footprint(sh, i))
+}
+
+/// The items whose footprint (`size`) lies inside the store grid, left at
+/// their stream cells.
+fn in_grid(mut list: Vec<ItemView>, size: impl Fn(&ItemView) -> (i32, i32)) -> Vec<ItemView> {
+    list.retain(|i| {
+        let (w, h) = size(i);
+        i32::from(i.x) + w <= i32::from(GRID.0) && i32::from(i.y) + h <= i32::from(GRID.1)
+    });
     list
 }
 
@@ -907,4 +893,40 @@ fn nearest_trader(world: &ClientWorld) -> Option<(u32, u32)> {
         .filter(|u| u.key.unit_type == MONSTER && trades(u.class))
         .min_by_key(|u| d(u))
         .map(|u| (u.key.guid, u.class))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::bridge::world::UnitKey;
+
+    fn at(guid: u32, x: u16, y: u16) -> ItemView {
+        ItemView {
+            key: UnitKey::new(4, guid),
+            code: Some(*b"hp1 "),
+            flags: 0,
+            mode: 0,
+            body: 0,
+            page: 1,
+            x,
+            y,
+            owner: None,
+            store: true,
+            store_seq: guid,
+            gold: None,
+        }
+    }
+
+    // Covers: specs/seams/item-grids.md §2.9
+    #[test]
+    fn store_items_stay_at_the_servers_cells() {
+        // The sim placed these with gaps (first free spot, 2 x 3 items);
+        // the shop must not pack them to the top-left.
+        let list = vec![at(1, 4, 0), at(2, 0, 5), at(3, 9, 9), at(4, 9, 8)];
+        let size = |i: &ItemView| if i.key.guid == 4 { (2, 3) } else { (1, 1) };
+        let kept = in_grid(list, size);
+        let cells: Vec<_> = kept.iter().map(|i| (i.key.guid, i.x, i.y)).collect();
+        // Guid 4 (2 x 3 at (9, 8)) leaves the grid and is not drawn.
+        assert_eq!(cells, vec![(1, 4, 0), (2, 0, 5), (3, 9, 9)]);
+    }
 }

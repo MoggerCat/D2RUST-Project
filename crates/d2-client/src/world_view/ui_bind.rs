@@ -16,6 +16,7 @@ use crate::assets::path::CanonicalPath;
 use crate::assets::path::{read_dc6, read_font_table};
 use crate::bridge::click::ClickView;
 use crate::bridge::link::ServerLink;
+use crate::bridge::output::Output;
 use crate::bridge::{Bridge, BridgeError};
 use crate::composite::ComponentFrame;
 use crate::controls::click::{ClickOut, ClickState, Kind};
@@ -701,7 +702,8 @@ pub fn run_ui_with<L: ServerLink>(
 /// kind at the event position (left up at the current mouse), in event
 /// order; then the held repeat (kinds 1 and 4); then the per-pass latch
 /// is cleared (`0x00462920`). Returns what the UI layer applies (sounds,
-/// hover calls, the pending record).
+/// hover calls, the pending record) and the interact outputs (object
+/// sounds, effects) the click produced.
 ///
 /// `mods` is the §4.3 r1 word (`RunMods::word`; 0 without the play
 /// preview's bindings) and `local_at` the local player's position the
@@ -714,8 +716,9 @@ pub fn world_clicks<L: ServerLink>(
     unhandled: &[UiEvent],
     mods: u32,
     local_at: Option<(u32, u32)>,
-) -> Result<Vec<ClickOut>, BridgeError> {
+) -> Result<(Vec<ClickOut>, Vec<Output>), BridgeError> {
     let mut rest = Vec::new();
+    let mut outputs = Vec::new();
     for e in unhandled {
         let (kind, at) = match *e {
             UiEvent::Press {
@@ -742,13 +745,15 @@ pub fn world_clicks<L: ServerLink>(
             Some(p) if view.pick => ClickView { mouse: p, ..view },
             _ => view,
         };
-        let (r, _) = bridge.world_click_at(st, view, kind, at, mods, local_at)?;
+        let (r, o) = bridge.world_click_at(st, view, kind, at, mods, local_at)?;
         rest.extend(r);
+        outputs.extend(o);
     }
-    let (r, _) = bridge.click_repeat_at(st, view, mods, local_at)?;
+    let (r, o) = bridge.click_repeat_at(st, view, mods, local_at)?;
     rest.extend(r);
+    outputs.extend(o);
     st.end_pass();
-    Ok(rest)
+    Ok((rest, outputs))
 }
 
 #[cfg(test)]

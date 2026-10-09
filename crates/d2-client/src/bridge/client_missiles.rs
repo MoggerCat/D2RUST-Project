@@ -1,4 +1,4 @@
-// Spec: specs/missiles/client.md (§C1–§C4 the client create `0x004CD540`), specs/missiles/missiles.md (§R2.1 the create record), specs/render/lighting.md (§8 missile row)
+// Spec: specs/missiles/client.md (§C1–§C4 the client create `0x004CD540`; §C6, §C7, §C9, §C10, §C13), specs/missiles/client-bodies.md (§B1, §B5 r1, r3), specs/missiles/missiles.md (§R2.1 the create record), specs/render/lighting.md (§8 missile row)
 //! Client missile creation: the client create `0x004CD540` fills a
 //! client-only type-3 unit in set C (`client/model.md` §2 r1) from a
 //! 0x5C-byte create record ([`CreateRecord`]) and its `missiles` row
@@ -10,15 +10,17 @@
 //! light flicker, the row's client function (bodies 1, 11, 23 here), the
 //! end `0x004D2D70` ([`end`], §C9) and the default removal (§C10 r1).
 //!
-//! Not modelled (each named where it would run): the path and the motion
-//! record (§C3 r14–r15, r17, r19, r21; §C7 r3, r5, r10, r12: the model
-//! has no path for set-C units, so a missile does not move and finds no
-//! wall or unit; velocity and target are kept), the init callback (§C4
+//! The path is the straight missile path (`missiles.md` §R4.3, §R4.1):
+//! built at the create, stepped by the default step, which ends the
+//! missile on a wall (§C7 r5, r10; PROVISIONAL REC-451: no cell walk).
+//!
+//! Not modelled (each named where it would run): the motion record (§C3
+//! r19, r21; §C7 r3), unit hits (§C7 r12), the init callback (§C4
 //! r27), sounds (r28, §C9 r4.4, r6: audio), the umod callback (r29), the
 //! town tests (§C6 r4, §C7 r8: no town flag in the client level rows),
 //! the second pass (§C7 r13), the client hit functions (§C9 r4.3: a
 //! handler error when a row names one), and every client function but
-//! 1, 11 and 23 (the missile is then left as it is). The aim nudge
+//! 1, 5, 11, 23, 43, 60 and 63 (the missile is then left as it is). The aim nudge
 //! (§C2 r8) reads the owner's direction from the record
 //! ([`CreateRecord::owner_dir64`]; none given is a handler error).
 
@@ -153,6 +155,44 @@ pub struct ClientMissile {
     pub pierce: u32,
     /// Unit flag 0x10000 (set by functions 2 and 11, §C13).
     pub flat: bool,
+    /// The path's precise position (16.16 sub-tiles), direction vector
+    /// (path +0x6A, +0x6E; 0 when the path has no point) and
+    /// acceleration counter (+0x8C) (`missiles.md` §R4.1, §R4.3).
+    pub pos: (u32, u32),
+    pub dir_vec: (i32, i32),
+    pub accel_counter: i32,
+    /// Missile data +0x28 / +0x2C (`client-bodies.md` §B1 d28, d2C): set
+    /// by the creator unless a body writes them.
+    pub d28: i32,
+    pub d2c: i32,
+}
+
+/// The path tables of `sim/pathing.md` (the direction-vector `tan`
+/// table, §8.3).
+fn path_tables() -> Option<&'static d2_sim::path::tables::PathTables> {
+    static T: std::sync::OnceLock<Option<d2_sim::path::tables::PathTables>> =
+        std::sync::OnceLock::new();
+    T.get_or_init(|| d2_sim::path::tables::PathTables::spec().ok())
+        .as_ref()
+}
+
+/// The straight missile path compute (`missiles.md` §R4.3, type 4,
+/// `0x006492F0`) from the precise start `pos` toward the target point
+/// (cell centre): no point when the target is 100 or more away on an
+/// axis or has a 0 coordinate; else the direction vector and direction
+/// of `sim/pathing.md` §8.3 (§8.4 r2).
+fn straight_path(pos: (u32, u32), target: (i32, i32)) -> Option<((i32, i32), u8)> {
+    let (sx, sy) = ((pos.0 >> 16) as i32, (pos.1 >> 16) as i32);
+    if (target.0 - sx).abs() > 99 || (target.1 - sy).abs() > 99 || target.0 == 0 || target.1 == 0 {
+        return None;
+    }
+    let centre = |c: i32| ((c as u32) << 16) | 0x8000;
+    let t = path_tables()?;
+    Some(d2_sim::path::walk::geom::direction_vector(
+        t,
+        pos,
+        (centre(target.0), centre(target.1)),
+    ))
 }
 
 /// The client missiles of set C, by key.
@@ -326,10 +366,30 @@ pub fn create(
     } else {
         row.activate
     };
-    // r15 (the path itself is not modelled): velocity and target.
+    // r15: velocity, target; v ≠ 0 → the path built toward the target
+    // (§R4.3: a target unit's position, else the point).
     m.target_unit = target;
     m.target_point = (tx, ty);
     m.velocity = v;
+    m.pos = (((x as u32) << 16) | 0x8000, ((y as u32) << 16) | 0x8000);
+    if v != 0 {
+        let aim = match target.and_then(|t| w.units.get(&t)) {
+            Some(t) => {
+                let (ax, ay) = t.cell();
+                (i32::from(ax), i32::from(ay))
+            }
+            None => (tx, ty),
+        };
+        if aim == (x, y) {
+            // `pathing.md` §8.4 r1: the point is the position (and the
+            // last): vectors and velocity 0.
+            m.velocity = 0;
+        } else if let Some((vec, dir)) = straight_path(m.pos, aim) {
+            m.dir_vec = vec;
+            // `pathing.md` §8.5: a missile without path flag 0x40 faces d.
+            m.direction = dir & 63;
+        }
+    }
     // r17.
     if row.last_collide {
         m.last_collided = rec.owner;
@@ -460,11 +520,15 @@ fn missile_light(
     );
 }
 
-/// The client functions the model runs (§C12): the default step (1)
-/// and the bodies of §C13 named here.
+/// The client functions the model runs (§C12): the default step (1),
+/// the bodies of §C13 named here and of `client-bodies.md` §B5 r1, r3.
 pub const FN_DEFAULT_STEP: u16 = 1;
 pub const FN_FLAT_AT_END: u16 = 11;
 pub const FN_DEN_LIGHT: u16 = 23;
+pub const FN_SUB_LOOP_FIRE: u16 = 5;
+pub const FN_FOLLOW_OWNER: u16 = 43;
+pub const FN_ORBIT_EVEN: u16 = 60;
+pub const FN_ORBIT: u16 = 63;
 
 /// The per-update dispatch `0x004D2C70` (§C6) of the set-C missile `key`.
 pub fn update(
@@ -511,8 +575,126 @@ pub fn update(
             }
             default_step(w, rows, key, &row, lights)
         }
+        FN_SUB_LOOP_FIRE => {
+            fire_frames(w, key, &row);
+            default_step(w, rows, key, &row, lights)
+        }
+        FN_FOLLOW_OWNER => follow_owner(w, rows, key, lights),
+        FN_ORBIT_EVEN | FN_ORBIT => {
+            let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
+            if row.clt_do_func == FN_ORBIT || (m.total - m.current) % 2 == 0 {
+                orbit(w, key);
+            }
+            default_step(w, rows, key, &row, lights)
+        }
         // f ≤ 0: never stepped (§C6 r5); other functions: not modelled.
         _ => Ok(()),
+    }
+}
+
+/// Function 5 `0x004D3540` (`client-bodies.md` §B5 r1) before its step:
+/// f := frame >> 8, A := `SubStart`, Z := `SubStop`; f = A − 1 → frame
+/// := (f + rnd(Z − A)) << 8; else left = A → frame := max(A − 3, 0) <<
+/// 8; else left < A → frame := max(f − 2, 0) << 8.
+fn fire_frames(w: &mut ClientWorld, key: UnitKey, row: &ClientMissileRow) {
+    let Some(m) = w.objclient.missiles.get(&key).copied() else {
+        return;
+    };
+    let (f, a, z) = (
+        m.frame >> 8,
+        i32::from(row.sub_start),
+        i32::from(row.sub_stop),
+    );
+    let frame = if f == a - 1 {
+        let r = rnd(w, key, z - a);
+        Some((f + r) << 8)
+    } else if m.current == a {
+        Some((a - 3).max(0) << 8)
+    } else if m.current < a {
+        Some((f - 2).max(0) << 8)
+    } else {
+        None
+    };
+    if let (Some(frame), Some(m)) = (frame, w.objclient.missiles.get_mut(&key)) {
+        m.frame = frame;
+    }
+}
+
+/// `rnd(n)` on the missile's unit seed (`client-bodies.md` §B1: n < 1 →
+/// 0, no draw).
+fn rnd(w: &mut ClientWorld, key: UnitKey, n: i32) -> i32 {
+    if n < 1 {
+        return 0;
+    }
+    let Some(u) = w.objclient.set_c.get_mut(&key) else {
+        return 0;
+    };
+    let Some((lo, hi)) = u.seed else {
+        return 0;
+    };
+    let mut seed = Seed::new(lo, hi);
+    let r = seed.roll(n) as i32;
+    u.seed = Some((seed.lo, seed.hi));
+    r
+}
+
+/// Function 43 `0x004D3070` (`client.md` §C13): no owner → remove; an
+/// owner of type ≤ 1 that is dead → end(none, 0); else m takes the
+/// owner's position and advances its animation with wrap; no step, no
+/// countdown.
+fn follow_owner(
+    w: &mut ClientWorld,
+    rows: &[ClientMissileRow],
+    key: UnitKey,
+    lights: bool,
+) -> Result<(), HandlerError> {
+    let owner = w
+        .objclient
+        .missiles
+        .get(&key)
+        .and_then(|m| m.owner)
+        .and_then(|o| w.units.get(&o));
+    let Some(o) = owner else {
+        remove(w, key);
+        return Ok(());
+    };
+    if o.key.unit_type <= MONSTER && o.is_dead() {
+        end(w, rows, key, false, lights)?;
+        return Ok(());
+    }
+    let (ox, oy) = o.cell();
+    if let Some(u) = w.objclient.set_c.get_mut(&key) {
+        u.position = Some((ox, oy));
+    }
+    if let Some(m) = w.objclient.missiles.get_mut(&key) {
+        m.pos = (
+            (u32::from(ox) << 16) | 0x8000,
+            (u32::from(oy) << 16) | 0x8000,
+        );
+        m.frame += m.anim_speed;
+        if m.anim_len > 0 && m.frame >= m.anim_len {
+            m.frame -= m.anim_len;
+        }
+    }
+    Ok(())
+}
+
+/// Functions 60 / 63 (`client-bodies.md` §B5 r3), the orbit: target
+/// point := (x + (y − d2C), y − (x − d28)), a quarter turn around (d28,
+/// d2C), and the path re-built toward it.
+fn orbit(w: &mut ClientWorld, key: UnitKey) {
+    let Some(m) = w.objclient.missiles.get_mut(&key) else {
+        return;
+    };
+    let (x, y) = ((m.pos.0 >> 16) as i32, (m.pos.1 >> 16) as i32);
+    let t = (x + (y - m.d2c), y - (x - m.d28));
+    m.target_point = t;
+    match straight_path(m.pos, t) {
+        Some((vec, dir)) if t != (x, y) => {
+            m.dir_vec = vec;
+            m.direction = dir & 63;
+        }
+        _ => m.dir_vec = (0, 0),
     }
 }
 
@@ -582,13 +764,83 @@ fn default_step(
             }
         }
     }
+    // r5: one path step.
+    if m.velocity != 0 {
+        path_step(m);
+        let cell = (m.pos.0 >> 16, m.pos.1 >> 16);
+        if let (Some(u), Ok(cx), Ok(cy)) = (
+            w.objclient.set_c.get_mut(&key),
+            u16::try_from(cell.0),
+            u16::try_from(cell.1),
+        ) {
+            u.position = Some((cx, cy));
+        }
+    }
+    let m = w.objclient.missiles.get_mut(&key).expect("checked above");
     // r6.
     m.current -= 1;
     if m.current < 1 {
         end(w, rows, key, false, lights)?;
+        return Ok(());
     }
-    // r7–r12: the town clamp, walls and units need the path.
+    // r7.
+    if !active {
+        return Ok(());
+    }
+    // r9 (r8, the town clamp, is not modelled).
+    if row.collide_type == 0 {
+        return Ok(());
+    }
+    // r10: the collision word under the missile; & 5 → end(none, 1).
+    let at = w.objclient.set_c.get(&key).and_then(|u| u.position);
+    if let Some((x, y)) = at {
+        if collision_word(w, i32::from(x), i32::from(y)) & 5 != 0 {
+            end(w, rows, key, true, lights)?;
+        }
+    }
+    // r11–r13: unit hits and the second pass are not modelled.
     Ok(())
+}
+
+/// One path step of a missile (`missiles.md` §R4.1; `sim/pathing.md`
+/// §9.4 rule 2.1, base 0x400): the acceleration counter, then the
+/// position += ((velocity × 0x400) >> 6) × direction vector >> 12.
+///
+/// PROVISIONAL (REC-451): the step's cell walk (§9.4 rules 2.3–2.4, the
+/// footprint move of a missile) is not run; the position moves by the
+/// step vector and the wall test of §C7 r10 reads the cell it lands on.
+fn path_step(m: &mut ClientMissile) {
+    if m.dir_vec == (0, 0) {
+        return;
+    }
+    if m.accel != 0 {
+        m.accel_counter += 1;
+        if m.accel_counter > 4 {
+            m.velocity = (m.velocity + i32::from(m.accel)).clamp(0, m.max_vel);
+            if m.velocity == m.max_vel {
+                m.accel = 0;
+            }
+            m.accel_counter = 0;
+        }
+    }
+    let k = 0x400i32.wrapping_mul(m.velocity) >> 6;
+    let vx = k.wrapping_mul(m.dir_vec.0) >> 12;
+    let vy = k.wrapping_mul(m.dir_vec.1) >> 12;
+    m.pos = (
+        m.pos.0.wrapping_add_signed(vx),
+        m.pos.1.wrapping_add_signed(vy),
+    );
+}
+
+/// The collision word under a sub-tile (`0x00648EB0`) from the client
+/// DRLG. PROVISIONAL (REC-451): a sub-tile in no room reads 0x27 (the
+/// point test's no-room answer, `render/lighting.md` §4 r2); no client
+/// DRLG reads 0.
+fn collision_word(w: &ClientWorld, x: i32, y: i32) -> u32 {
+    match w.drlg.as_ref() {
+        Some(d) => d.drlg.collision_at(x, y).map_or(0x27, u32::from),
+        None => 0,
+    }
 }
 
 /// The end `0x004D2D70(m, none, forced)` (§C9) of a missile that hit no

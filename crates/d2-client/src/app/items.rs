@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use bevy::prelude::*;
 use d2_data::bin::TableFiles;
-use d2_data::tables::{decode_all, Armor, Inventory, Misc, Record, Weapons};
+use d2_data::tables::{decode_all, Armor, Inventory, Itemtypes, Misc, Record, Weapons};
 
 use crate::assets::path::FileSource;
 use crate::bridge::items::{ItemArtRow, ItemArtRows};
@@ -85,7 +85,7 @@ fn add_rows<T: Record>(
 }
 
 macro_rules! art {
-    ($r:expr) => {
+    ($r:expr, $t:expr) => {
         (
             $r.code,
             ItemArtRow {
@@ -93,6 +93,11 @@ macro_rules! art {
                 inv_h: $r.invheight,
                 inv_file: text(&$r.invfile),
                 flippy_file: text(&$r.flippyfile),
+                beltable: $t
+                    .get(usize::from($r.type_))
+                    .is_some_and(|t| t.beltable != 0)
+                    && $r.invwidth == 1
+                    && $r.invheight == 1,
             },
         )
     };
@@ -102,18 +107,27 @@ macro_rules! art {
 pub fn item_parts(archives: &dyn TableFiles) -> Result<ItemParts, String> {
     let set = d2_data::bin::load_from(archives, "eng").map_err(|e| e.to_string())?;
     let mut rows = BTreeMap::new();
-    add_rows::<Weapons>(&set, &mut rows, |r| art!(r))?;
-    add_rows::<Armor>(&set, &mut rows, |r| art!(r))?;
-    add_rows::<Misc>(&set, &mut rows, |r| art!(r))?;
+    let types: Vec<Itemtypes> =
+        decode_all(set.table(Itemtypes::TABLE).ok_or("itemtypes not loaded")?)
+            .map_err(|e| e.to_string())?;
+    add_rows::<Weapons>(&set, &mut rows, |r| art!(r, types))?;
+    add_rows::<Armor>(&set, &mut rows, |r| art!(r, types))?;
+    add_rows::<Misc>(&set, &mut rows, |r| art!(r, types))?;
     let table = set.table("inventory").ok_or("inventory not loaded")?;
     let inventory: Vec<Inventory> = decode_all(table).map_err(|e| e.to_string())?;
+    let mut belts = belt_parts(&set).unwrap_or_else(|e| {
+        warn!("belt (d2rs-own, unverified): {e}; no belt row");
+        BeltParts::default()
+    });
+    belts.beltable = rows
+        .iter()
+        .filter(|(_, r)| r.beltable)
+        .map(|(c, _)| *c)
+        .collect();
     Ok(ItemParts {
         art: ItemArtRows(rows),
         inventory,
-        belts: belt_parts(&set).unwrap_or_else(|e| {
-            warn!("belt (d2rs-own, unverified): {e}; no belt row");
-            BeltParts::default()
-        }),
+        belts,
         tips: None,
         frame_sizes: BTreeMap::new(),
         inv_tables: None,
@@ -149,7 +163,11 @@ fn belt_parts(set: &d2_data::bin::BinSet) -> Result<BeltParts, String> {
     // `belt` 0 is also the default of non-belts: only belt items matter,
     // and the host looks up the worn item at body location 8.
     let types = armor.iter().map(|r| (r.code, r.belt)).collect();
-    Ok(BeltParts { records, types })
+    Ok(BeltParts {
+        records,
+        types,
+        beltable: Default::default(),
+    })
 }
 
 /// Hands the item parts to the world view's ground items (with `source`
@@ -266,6 +284,7 @@ mod tests {
             inv_h: 4,
             inv_file: f.into(),
             flippy_file: String::new(),
+            beltable: false,
         };
         let art = ItemArtRows(BTreeMap::from([
             (*b"sst ", row("invSST")),

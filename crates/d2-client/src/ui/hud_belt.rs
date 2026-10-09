@@ -9,9 +9,8 @@
 //! - the belt type is read from the worn belt's `armor` row (`belt`
 //!   column), default type 2 without one;
 //! - the resolution index of `belts.bin` is 0 below mode 2, else 1;
-//! - every belt item counts as usable, nothing is blocked (the cursor
-//!   item's fit is the tables' `beltable`,
-//!   [`super::panels::inv_items::fits_belt`], `seams/item-grids.md` §2.8);
+//! - every belt item counts as usable, nothing is blocked; the cursor
+//!   item fits a belt (`BeltParts::beltable`, from the tables);
 //! - the key labels are the play bindings' key names for the belt slot
 //!   actions ([`HudBelt::set_keys`], REC-264): the first bound key; an
 //!   unbound slot has no label; the default `1`–`4` until bindings are
@@ -32,7 +31,7 @@ use crate::ui::panels::control::belt::{
     hover_text, record_index, BeltDraw, BeltEffect, BeltItem, BeltRecord, BeltSlot8, BeltState,
     CursorInfo, CursorItem, HoverText, MoveGates, SlotInfo, FONT_AFTER_BELT,
 };
-use crate::ui::panels::inv_items::{fits_belt, ItemsUi};
+use crate::ui::panels::inv_items::ItemsUi;
 use crate::ui::panels::UiFiles;
 
 /// The popped belt rows' art.
@@ -45,6 +44,9 @@ pub struct BeltParts {
     pub records: Vec<BeltRecord>,
     /// Item code → `belts` row (`armor.txt` `belt`).
     pub types: BTreeMap<[u8; 4], u8>,
+    /// Item codes that fit a belt box: the type's itemtypes `beltable` and
+    /// a 1 x 1 size (`seams/item-grids.md` §2.8).
+    pub beltable: std::collections::BTreeSet<[u8; 4]>,
 }
 
 /// The belt of the HUD: the rule state and the tables.
@@ -55,9 +57,6 @@ pub struct HudBelt {
     /// The key name of each belt slot's action: `None` = not set yet
     /// (the default label), `Some(None)` = unbound.
     pub keys: Option<[Option<String>; 4]>,
-    /// The client's inventory tables (the cursor item's `beltable`,
-    /// [`fits_belt`]); none: nothing fits.
-    pub tables: Option<std::sync::Arc<d2_sim::items::inventory::InvTables>>,
 }
 
 fn belt_view(world: &ClientWorld) -> BTreeMap<u16, crate::bridge::items::ItemView> {
@@ -106,7 +105,7 @@ impl HudBelt {
             mode: 0,
             item: items::cursor_item(world).map(|c| CursorItem {
                 guid: c.key.guid,
-                fits_belt: fits_belt(self.tables.as_deref(), c.code),
+                fits_belt: c.code.is_some_and(|k| self.parts.beltable.contains(&k)),
                 swap_ok: true,
                 blocked: false,
                 put_sound: 0,

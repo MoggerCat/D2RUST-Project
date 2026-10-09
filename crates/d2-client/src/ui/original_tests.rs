@@ -120,6 +120,7 @@ fn a_belt_release_without_a_belt_press_does_not_click() {
     u.ui.set_belt_parts(hud_belt::BeltParts {
         records,
         types: BTreeMap::new(),
+        beltable: [*b"hp1 "].into(),
     });
     let mut w = item_world(&[(7, mode::BELT, (0, 0, 0, 0), b"hp1 ")], None);
     let me = w.local_player.unwrap();
@@ -1359,6 +1360,7 @@ mod grid_hover {
             inv_h: h,
             inv_file: f.into(),
             flippy_file: String::new(),
+            beltable: false,
         };
         art.0.insert(*b"qui ", row(2, 3, "invqlt"));
         art.0.insert(*b"gem2", row(2, 2, "invgem2"));
@@ -1868,6 +1870,7 @@ mod hud_small {
         u.ui.set_belt_parts(hud_belt::BeltParts {
             records: Vec::new(),
             types: BTreeMap::from([(*b"lbl ", 0)]),
+            beltable: Default::default(),
         });
         u.ui.shared.borrow_mut().hud.belt.state.extra_boxes = true;
         mini_open(&mut u);

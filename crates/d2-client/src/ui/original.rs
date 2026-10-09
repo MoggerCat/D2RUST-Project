@@ -525,7 +525,10 @@ impl OriginalUi {
         root.open(game_messages::MESSAGES_PANEL)?;
         root.add(Box::new(overhead_ui::OverheadUi { sh: sh.clone() }))?;
         root.open(overhead_ui::OVERHEAD_PANEL)?;
-        root.add(Box::new(esc_menu::EscMenuUi { sh: sh.clone() }))?;
+        root.add(Box::new(esc_menu::EscMenuUi {
+            sh: sh.clone(),
+            pent: Default::default(),
+        }))?;
         // Step 10 and the cursor draw: over the control panel overlays
         // (step 7–8) and every panel (`panels.md` §5, `panels-3.md` §23 r9).
         root.add(Box::new(TopUi { sh: sh.clone() }))?;
@@ -656,9 +659,7 @@ impl OriginalUi {
 
     /// The inventory tables of the equip-box click (`inv_items` `equip`).
     pub fn set_inv_tables(&mut self, t: std::sync::Arc<d2_sim::items::inventory::InvTables>) {
-        let mut sh = self.shared.borrow_mut();
-        sh.hud.belt.tables = Some(t.clone());
-        sh.items.inv_tables = Some(t);
+        self.shared.borrow_mut().items.inv_tables = Some(t);
     }
 
     /// Shift is held (set by the host each frame, `inv_items`).

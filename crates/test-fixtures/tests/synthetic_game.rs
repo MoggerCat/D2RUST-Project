@@ -764,9 +764,9 @@ fn session_refusals_stop_the_sequence() {
     assert_eq!(host.game.sim_client(CLIENT), None);
     // The accepted 0x67's creation messages were buffered, but the client
     // left the game's list before the flush, which walks that list
-    // (`intents-events.md` §3.2 rule 3): nothing arrives (the refusal's
-    // 0xB4, a direct send, is a named gap).
-    assert_eq!(host.receive(CLIENT), Vec::<Vec<u8>>::new());
+    // (`intents-events.md` §3.2 rule 3): only the refusal's direct S→C
+    // 0xB4 with the load result arrives (§8.2 rule 2).
+    assert_eq!(host.receive(CLIENT), vec![vec![0xB4, 0x18, 0, 0, 0]]);
 }
 
 // Covers: specs/sim/intents-events.md §2.5 r1

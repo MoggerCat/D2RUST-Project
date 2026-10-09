@@ -46,8 +46,6 @@ const SPAWN_FLAGS: u32 = 0x0300_0000;
 /// +0x34).
 const BOSS_SEALS: [(i32, i32, u32, u8); 3] =
     [(-12, -52, 13, 36), (-39, 33, 14, 37), (32, 16, 15, 38)];
-/// `0x00538680` (open question 9).
-const ACT_ACCESS: u32 = 0x0053_8680;
 
 /// Quest extra data (record +0x18, 0x4C bytes, §5.1).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -688,8 +686,8 @@ fn kill<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: EventA
 }
 
 /// Credit `0x005B4D20`: 26.13, 26.0, reset_progress(26); classic: 26.6,
-/// 26.7 and `0x00538680(client, 4, difficulty)` (open question 9:
-/// reported); +0x1C += 1.
+/// 26.7 and `0x00538680(client, 4, difficulty)` (`0x005B4D77`,
+/// `quests-act1-rest.md` §5: save progression raised); +0x1C += 1.
 fn credit<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, p: UnitId) {
     late::set(w, p, SLOT, bit::PRIMARY_GOAL_DONE);
     late::set(w, p, SLOT, bit::REWARD_GRANTED);
@@ -697,7 +695,8 @@ fn credit<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, p: UnitId)
     if !w.expansion() {
         late::set(w, p, SLOT, 6);
         late::set(w, p, SLOT, 7);
-        w.unhandled(CHAIN, ACT_ACCESS);
+        let d = w.difficulty();
+        super::super::raise_progression(w, p, 4, d);
     }
     let x = x2(ctl, i);
     x.credited = x.credited.wrapping_add(1);
