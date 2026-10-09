@@ -29,22 +29,22 @@
 | Outputs / state changes | 80–93 |
 | Rules | 94–95 |
 |   R1. Data the server keeps per missile | 96–140 |
-|   R2. Creation | 141–356 |
-|   R3. Per-tick dispatch | 357–386 |
-|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 387–517 |
-|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 518–570 |
-|   R6. Damage stage (missile-owned part) | 571–691 |
-|   R7. Lifetime and expiry | 692–745 |
-|   R8. Pierce | 746–772 |
-|   R9. Server-do and server-hit catalogues | 773–1003 |
-|   R10. Behaviour of the recorded missiles | 1004–1038 |
-|   R11. `missiles.txt` columns and their server use | 1039–1086 |
-| Constants & data dependencies | 1087–1113 |
-| Randomness | 1114–1146 |
-| Edge cases & original bugs | 1147–1173 |
-| Test vectors | 1174–1256 |
-| Provenance | 1257–1309 |
-| Open questions | 1310–1391 |
+|   R2. Creation | 141–358 |
+|   R3. Per-tick dispatch | 359–388 |
+|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 389–519 |
+|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 520–572 |
+|   R6. Damage stage (missile-owned part) | 573–693 |
+|   R7. Lifetime and expiry | 694–747 |
+|   R8. Pierce | 748–774 |
+|   R9. Server-do and server-hit catalogues | 775–1005 |
+|   R10. Behaviour of the recorded missiles | 1006–1040 |
+|   R11. `missiles.txt` columns and their server use | 1041–1088 |
+| Constants & data dependencies | 1089–1115 |
+| Randomness | 1116–1148 |
+| Edge cases & original bugs | 1149–1175 |
+| Test vectors | 1176–1258 |
+| Provenance | 1259–1311 |
+| Open questions | 1312–1393 |
 <!-- /index -->
 
 ## Summary
@@ -273,7 +273,9 @@ question 6).
     flags 0x60000 (`sim/pathing.md` §2; `pathtype_flags` row 4 =
     393216): that is where path flag 0x40000 comes from, so
     `0x00649970` takes its first branch to the missile path compute
-    (§R4.3), never the walking path functions.
+    (§R4.3), never the walking path functions. That branch
+    (`0x006499AE`–`0x006499C2`: `0x00649760` with EAX = path, then
+    return) never reads the town-access argument (read 2026-10-09).
 17. Last-collided unit := owner (`0x0064A400`; only when `LastCollide`,
     §R5.1). With `LastCollide` the missile never hits its owner first.
 18. Path acceleration = `Accel` (signed); maximum velocity =

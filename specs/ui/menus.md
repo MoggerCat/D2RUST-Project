@@ -22,15 +22,15 @@
 | Outputs / state changes | 58–65 |
 | Rules | 66–67 |
 |   1. Waypoint menu input (ui 0x14) | 68–124 |
-|   2. NPC menu box | 125–200 |
-|   3. Hire list (`0x004B5C60`, NPC option "hire") | 201–253 |
-|   4. Shop transactions | 254–343 |
-| Constants & data dependencies | 344–351 |
-| Randomness | 352–355 |
-| Edge cases & original bugs | 356–367 |
-| Test vectors | 368–379 |
-| Provenance | 380–396 |
-| Open questions | 397–412 |
+|   2. NPC menu box | 125–233 |
+|   3. Hire list (`0x004B5C60`, NPC option "hire") | 234–286 |
+|   4. Shop transactions | 287–376 |
+| Constants & data dependencies | 377–384 |
+| Randomness | 385–388 |
+| Edge cases & original bugs | 389–400 |
+| Test vectors | 401–412 |
+| Provenance | 413–429 |
+| Open questions | 430–445 |
 <!-- /index -->
 
 ## Summary
@@ -197,6 +197,39 @@ menus: its client sender is `client/model.md` §7 rule 9.
    confirmation of transaction..."), height 15, font 1, color 0, not
    selectable; deadline `[0x007C0D53]` = now + 60,000 ms. A second one
    while one exists is fatal.
+8. **Input** (read 2026-10-09): `0x004B7EB0` registers the menu-box
+   window handlers on the game window: the 14 entries of `0x007273F0`
+   and the one wheel entry of `0x007273E4` (the 0x0E and 1 are the
+   entry counts passed to `0x00451DB0`). The gold box shares them;
+   the event table, the 80 ms creation guard, the child-control offers,
+   the outside click (p1 runs), the Esc / Space entries and WM_CHAR are
+   `ui/panels-3.md` §28 r2. The item parts, box b, mouse (mx, my):
+   1. **Item hit** (`0x004B7180`): the first item i with selectable =
+      1 and b.x + 15 < mx < b.x + w − 15 and e − 11 < my < e + 4,
+      where e = b.y + the heights of items 0 … i (item i's pen y,
+      rule 5); none → −1. Not-selectable items never hit.
+   2. **Re-pick** (`0x004B7200`, on mouse down, and on mouse move
+      when no control takes it): selected +0x44 := pressed item +0x48
+      := the hit (−1 too, so moving off the items clears the
+      selection); changed and ≠ −1 → click sound `0x004B9A00(1, 0, 0,
+      0)`. Mouse move inside the 80 ms guard does nothing.
+   3. **Mouse up** (`0x004B72E0`) with the box pressed, after the
+      guard: when the hit equals +0x48 and lies in 0 … count − 1, the
+      selected item's handler (+0x170) runs; it returning non-zero
+      ends the handler there (the box may be gone); every other case
+      sets pressed := 0.
+   4. **Step** (`0x004B7100(d)`, arrows with no control taking them
+      and the wheel; Up 0x26 and Right 0x27 d = −1, Down 0x28 and
+      Left 0x25 d = +1 (as compiled); wheel delta / 120 > 0 → −1, else
+      +1): only with
+      more than one selectable item: from the selected index add d,
+      wrapping ≥ count → 0 and < 0 → count − 1, until a selectable item;
+      click sound as r2; selected := it.
+   5. **Enter** (`0x004B79D0`): consumed; nothing until the box was
+      drawn 5 times (+0x54 ≥ 5) or when Enter is one of command 38's
+      keys (`0x004B7970`). A selected item in range: its handler runs
+      when present, and a return of 1 calls `0x00453AE0`. No selection:
+      the first selectable item becomes selected (no handler call).
 
 ### 3. Hire list (`0x004B5C60`, NPC option "hire")
 

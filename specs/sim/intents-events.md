@@ -44,15 +44,15 @@
 |   4. d2rs mapping and scope | 627–658 |
 |   5. Machine-readable tables | 659–695 |
 |   6. Exact-match comparison | 696–804 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 805–1266 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1267–1530 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1531–1703 |
-| Constants & data dependencies | 1704–1722 |
-| Randomness | 1723–1728 |
-| Edge cases & original bugs | 1729–1774 |
-| Test vectors | 1775–1861 |
-| Provenance | 1862–1988 |
-| Open questions | 1989–2141 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 805–1280 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1281–1544 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1545–1717 |
+| Constants & data dependencies | 1718–1736 |
+| Randomness | 1737–1742 |
+| Edge cases & original bugs | 1743–1788 |
+| Test vectors | 1789–1875 |
+| Provenance | 1876–2002 |
+| Open questions | 2003–2155 |
 <!-- /index -->
 
 ## Summary
@@ -857,7 +857,21 @@ class is 291, 417 or 418; item → `0x0055BED0` (§7.3 rule 4); others nothing.
 
 1. **Player** `0x00580860`: `sim/pathing.md` §10 rules 2–3 (0x15, 0x0F,
    0x10) and `items/inventory-moves.md` §6.1 rule 2 (item dispatcher, 0x47,
-   0x48).
+   0x48). Full call order (asm `0x00580860`–`0x005809BE`, read
+   2026-10-09), U = the player, C = the client, Q = C's player:
+   1. Flag-ex bit 0x10000 → `0x00548010(U, C, 1)`; else flag-ex bit
+      0x800 and U ≠ Q → `0x00548010(U, C, 0)`.
+   2. announced = 0 and flag-ex bit 0x1 → `0x00597890(game, U, C, 0)`,
+      `0x0053D370(C, U)`, `0x0053D3C0(C, U, 0)`.
+   3. Unit flag 0x1 → `0x005484B0(game, U, C)` (mode messages).
+   4. `0x00571CD0(U, C)`; unit flag 0x400 → `0x00571740`; 0x100 →
+      `0x00571620`; 0x8000 → `0x00547F70` (each (U, C)).
+   5. Any state-changed bit (`0x00639F20`) → `0x00571580(U, C, 0)` →
+      `0x005711D0(U, C)`: the 0xA7 / 0xA8 / 0xA9 state messages (§7.3
+      rule 2 step 8), so a player's states reach every client here.
+   6. `0x00625A20(U)` ≠ 0 → `0x005715A0(U, C)`.
+   7. The stat sends `0x00625870(U, Q, s, 0x00548520)` for s = 0x43,
+      0x44, 0x0C, 0, 2 in that order.
 2. **Monster** `0x00598220(game, unit, client, announced)`, in order:
    1. Flag-ex (+0xC8) bit 0x10000: S→C 0x15 (`0x0053BC10`: type, GUID,
       x, y, flag 1; the dynamic path's cell, a static path's +0x0C /

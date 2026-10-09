@@ -29,22 +29,22 @@
 |   2. Screen message list (`0x0049E3A0(text, color)`) | 102–140 |
 |   3. Chat line formats (0x26, `client/msg-ui.md` §4 r3) | 141–196 |
 |   4. Recipe scroll text (0x26 type 7) | 197–212 |
-|   5. Overhead text | 213–277 |
-|   6. NPC text list `[0x007BF250]` (0x27 type 1) | 278–336 |
-|   7. Dialog panel (`0x004A1320`, `0x004A10E0`) | 337–451 |
-|   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 452–464 |
-|   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 465–481 |
-|   10. Other 0x50 codes (UI effects) | 482–517 |
-|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 518–599 |
-|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 600–606 |
-|   13. NPC intro table `0x00726850` (0x91) | 607–635 |
-|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 636–652 |
-| Constants & data dependencies | 653–670 |
-| Randomness | 671–675 |
-| Edge cases & original bugs | 676–696 |
-| Test vectors | 697–719 |
-| Provenance | 720–750 |
-| Open questions | 751–776 |
+|   5. Overhead text | 213–281 |
+|   6. NPC text list `[0x007BF250]` (0x27 type 1) | 282–346 |
+|   7. Dialog panel (`0x004A1320`, `0x004A10E0`) | 347–486 |
+|   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 487–499 |
+|   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 500–516 |
+|   10. Other 0x50 codes (UI effects) | 517–552 |
+|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 553–634 |
+|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 635–641 |
+|   13. NPC intro table `0x00726850` (0x91) | 642–674 |
+|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 675–691 |
+| Constants & data dependencies | 692–709 |
+| Randomness | 710–714 |
+| Edge cases & original bugs | 715–735 |
+| Test vectors | 736–758 |
+| Provenance | 759–789 |
+| Open questions | 790–815 |
 <!-- /index -->
 
 ## Summary
@@ -263,8 +263,12 @@ stops at a `ÿc` that ends the string.
    candidate is (x + m·dx, y + m·dy) with size **400 × 280** (not the
    bubble's); it must satisfy x' ≥ 0, x' + 400 ≤ W, y' ≥ 0, y' + 280 ≤
    H and intersect none of slots 0…n − 1; the first such candidate is
-   stored in slot n and becomes the bubble's rectangle (accept). None →
-   refuse. (The table looks like four (x, y) pairs but each entry is
+   stored in slot n and becomes the bubble's rectangle (accept); the
+   caller (`0x004A0A00` → `0x0049D9A0`) reads only its left / top, so
+   the bubble is drawn at the candidate's origin with its own size
+   while the slot keeps the 400 × 280 rectangle. n > 15 → refuse
+   without a test. None → refuse. (The table looks like four (x, y)
+   pairs but each entry is
    used for both axes, so only (+, +) and (−, −) moves are tried, each
    twice: reproduce.)
 6. **Bubble draw** (`0x0049D9A0` → `0x0049D8E0(box, x, y)`): open mode
@@ -328,11 +332,17 @@ stops at a `ÿc` that ends the string.
    modulo; count 0 → index 0); each draw is stored in +0x0D. A draw i
    is kept when i ≥ 2, the text record (15 bytes at +5 + 15 i) has the
    player's class at +0x0B (or 7 = any), and either its byte +2 is 0 or
-   `0x0065C310([0x007C0D43], u32 +7, 0)` equals u32 +3; a kept draw on
-   the list `0x00725CB0` with text id 0xFF is replaced by 2 when game
-   quest 12 bit 13 is set (`0x0065C310([0x007C0D47], 12, 13)` = 1).
-   After 10 rejected draws, +0x0D := 2. Other text record fields: §Open
-   questions 4.
+   `0x0065C310([0x007C0D43], u32 +7, 0)` equals u32 +3. `0x00725CB0`
+   is not a list but a text-record array: the records of intro entry 15
+   (class 201, act index 1, 10 records; read from the 1.14d image). Only
+   on the quest path (byte +2 ≠ 0 and the test passed), when the entry's
+   records pointer is `0x00725CB0` and the kept record's u16 +0 = 0xFF
+   (in stock data only record 2, text 255) and game quest 12 bit 13 is
+   set (`0x0065C310([0x007C0D47], 12, 13)` = 1): +0x0D := 2 — the same
+   value it already holds, so the rule has no visible effect with stock
+   data; the function's return value is unused by both callers
+   (`0x004B17A0`, `0x004B3E10`). After 10 rejected draws, +0x0D := 2.
+   Other text record fields: §Open questions 4.
 
 ### 7. Dialog panel (`0x004A1320`, `0x004A10E0`)
 
@@ -374,6 +384,26 @@ stops at a `ÿc` that ends the string.
    next line). The first line is the scroll speed: when all its units
    are < 0x80, speed := `atol` of it, else speed := 8; it is never
    shown. An empty text gives no lines. Line width ≥ 308 only logs.
+   Chunk reader in detail (authored):
+
+   ```
+   while *t != 0:                       # checked only between chunks
+       n := 0
+       while n < 100 and *t != LF: line[n++] := *t++   # no NUL test
+       if n < 100 and *t == LF: t++     # LF after exactly 100 units stays
+       first chunk only: speed from it, then read one more chunk the same way
+       append line (as a NUL-terminated string)
+   ```
+
+   So a text ending in LF has no trailing empty line; a line of exactly
+   100 units followed by LF is followed by one empty line (the LF starts
+   the next chunk); the speed is not written for an empty text (the
+   panel's speed field keeps the pool memory's value, `0x004A05E0`
+   does not set it). PROVISIONAL (REC-643): a text whose last line has
+   no LF, or that is only the speed line, makes the reader copy past the
+   terminating NUL until an LF or 100 units (the copy has no NUL test);
+   what the stock strings end with is unchecked (needs a string-table
+   scan of the dialog ids).
 3. **Scroll** (`0x0049D5A0`, per draw, font 8). Panel fields: lines +0,
    count +4, position p +8 (1/1024 pixel), speed +0x0C, t_last +0x1A,
    t_start +0x1E, step +0x22, acc +0x26, same u16 +0x2A. With t =
@@ -424,10 +454,15 @@ stops at a `ÿc` that ends the string.
      `[0x007BF1C4]` := 0 if it was 1, else a unit dialog runs
      `0x004B3D10(GUID)`; `0x00453AE0`; `[0x007BF20A]` := 0; mouse
      window off; handlers unregistered; R = 0.
-   - In the same pass: a dead or absent local player (`0x00463DF0`), or
-     a unit dialog whose unit is present in mode 12, sends C→S 0x30
-     [1][GUID] (unit dialog only, then `0x004B3830`) and runs
-     `0x004A0880`.
+   - Then, still inside the same guarded block and after the step above
+     (`0x004A0E70`, so it sees `[0x007BF20A]` as the step left it): a
+     dead or absent local player (`0x00463DF0`), or `[0x007BF20A]` ≠ 0
+     and the unit `0x00463990([0x007BF202])` is present in mode 12 →
+     with `[0x007BF20A]` ≠ 0: C→S 0x30 (`0x004786A0(GUID)`) and
+     `0x004B3830`; then `0x004A0880` (unit dialog: `0x004B3D10`, else
+     `0x0049F960`; `0x00453AE0`; `[0x007BF20A]` := 0); then the skip
+     handlers are unregistered if registered (`[0x007BF27C]` = 1 → 0,
+     `0x004F59A0(7)` / `0x00451E10`). R keeps the step's value.
    Then a drawn timed box adds 1 to R (§8 r2). If R = 0 and
    `[0x007BF1C0]` = 1: `[0x007BF1FA]` := `[0x007BF20A]` := 0,
    `[0x007BF1BC]` := 1, `[0x007BF1C0]` := 0, handlers unregistered if
@@ -616,13 +651,17 @@ overlay rules of `render/unit-composite.md`. The sounds are
    (`0x004B32F0`, from `0x00453DE0`) clears +0x11 and +0x12 of all; the
    NPC menu open (r3) clears it.
 3. **Menu open** (`0x004B66B0(arg 0)`, first open of a talk, after the
-   menu is built): the first entry whose class = the NPC's class (none →
-   no greeting): if +0x12 = 1: +0x12 := 0 and the greeting mode := 2
-   ("return"); then only if +0x15 = 1: +0x15 := 0, the greeting
-   (`0x004E0590(NPC, mode)`, `audio/triggers.md` §10 r1) is requested
-   (skill voices detached first), handle `[0x007C0DB8]`; with mode 2,
-   C→S **0x4D** [class u16] (`0x004785B0`, `sim/client-messages.tsv`:
-   clears the player's intro bit) and `[0x007C0DB4]` := 1. With +0x12
+   menu is built): mode := 0 (the plain greeting); the first entry
+   whose class = the NPC's class: if +0x12 = 1: +0x12 := 0 and mode :=
+   2 ("return"); then +0x15 ≠ 1 → done; else +0x15 := 0. No entry for
+   the class → straight on with mode 0 (no +0x15 gate; `0x004B68EE`).
+   Then the greeting `0x004E0590(NPC, mode)` (`audio/triggers.md` §10
+   r1); if it gives a sound: skill voices detached (`0x004CB190`), it
+   plays on the local player (`0x004B9A00`), handle `[0x007C0DB8]`;
+   mode 2 → C→S **0x4D** [class u16] (`0x004785B0`,
+   `sim/client-messages.tsv`: clears the player's intro bit) and
+   `[0x007C0DB4]` := 1; mode 0 → `[0x007C0DB8]` := 0 again (the plain
+   greeting's handle is not kept). No sound → nothing sent. With +0x12
    set but +0x15 clear, the flag is cleared and nothing plays or is
    sent.
 4. +0x15 is re-armed for all entries when the local player leaves town
