@@ -1,6 +1,6 @@
 # Handoff: d2rs vs 1.14d scene compares — `claude/q-scenes-compare`
 
-Cloud session, 2026-10-09. REC block 510–519 (all used: 510–519).
+Cloud session, 2026-10-09. REC blocks 510–519 (all used) and 706–719 (706–708 used; 709–719 free).
 Facts: `facts/render/scenes/*` (q-facts-scenes, Wine). d2rs: dev build,
 `d2-client play --save S.d2s --seed 1234 --dump-draws DIR --at-tick T [--input SCRIPT]`
 under Xvfb + lavapipe; compare: `d2-client facts-compare SCENE DIR --ignore tick,index_sha256 --skip-weather`.
@@ -57,6 +57,29 @@ under Xvfb + lavapipe; compare: `d2-client facts-compare SCENE DIR --ignore tick
 | a5-town-harrogath | r76 monster `6z` NU frame 3 vs 5. Every a5 monster's start frame differs (7i 1/0, 7j 0/1): `msg-units.md` §1.2 r6.5 draws it on the unit seed, the room seed stepped once per unit add, so the Act V add order or room seeds differ (a1's NPCs match; unit seed order) |
 | a1-cold-plains-monsters | level 3 vs 1: the waypoint walk does not reach the waypoint (walk / run drift) |
 | a1-town-arrival-ama | skipped (q-fix-real-unit-seed-order) |
+
+## Status at wrap-up (2026-10-09)
+- **Done:** fixes 1–19 above, including the two rows the coordinator assigned: `q-fix-p6-shadow-pretest` (fix 18) and `q-fix-p6-help-button` (fix 19). Nothing is in progress and the branch is clean.
+- **Equal except the wall-clock cursor:** a1-panel-cube, a4-town-pandemonium-fortress.
+- **Open rows, all owned elsewhere:** NPC / critter position, pose and facing rows (Act I town session, q-fix-real-unit-seed-order, q-fix-real-town-critters); the a5 monster start frames (unit seed order, sent to the Act V session). The walk / run drift and a1-cold-plains-monsters follow the NPC positions; re-sweep once those land.
+- **Open RECs:**
+  - REC-510: the pass-9 call sites (§6 r5).
+  - REC-512: the clock of monsters without a model frame, and of missiles.
+  - REC-513: the itemtypes class 0xFF.
+  - REC-514: click → sub-tile.
+  - REC-515: the stash / shop draw order.
+  - REC-516: the walk / run frame start.
+  - REC-517: the point-walk facing.
+  - REC-706: client monster footprints.
+  - REC-707: the hover state after a use press.
+  - REC-708: the pool cel call site.
+  - REC-511, REC-518 and REC-519 are settled (PC 1, `pc1-day3-c.md`).
+- **PC 1 items** (`pc1-data.md` Step 4, unnumbered): "[q-scenes-compare] Client footprints of walking monsters (REC-706)" and "[q-scenes-compare] Hover state after a use press (REC-707)".
+- **Repro:**
+  - Build `target/debug/d2-client`.
+  - Run: `DISPLAY=:98 WGPU_BACKEND=vulkan D2_GAME_DIR=<install> target/debug/d2-client play --save SceSor.d2s --seed 1234 --dump-draws /tmp/d --at-tick T --input "<wait-step script>"`.
+  - Compare: `target/debug/d2-client facts-compare facts/render/scenes/<scene> /tmp/d --ignore tick,index_sha256 --skip-weather`.
+  - Schedules and T: "How to run a scene" above. The towns use T 42 (a1–a3) or 43 (a4, a5) with no input.
 
 ## Notes
 - `app_single_player::the_session_flow_creates_the_game_then_loads_the_character_at_the_join` (ignored, real data) fails with and without fix 3 (0x23 count 3 vs 2): not caused by this branch.
