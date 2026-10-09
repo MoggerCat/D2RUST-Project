@@ -193,3 +193,164 @@ pub fn walk_into<C: Clock + Send + 'static>(
     }
     assert_eq!(server_level(server), Some(to), "walked into level {to}");
 }
+
+/// The server unit of type `ty` (1 monster, else object) and class
+/// `class` nearest to the local player: its GUID and position.
+pub fn server_unit<C: Clock + Send + 'static>(
+    server: &Server<C>,
+    ty: u8,
+    class: u32,
+) -> Option<(u32, (i32, i32))> {
+    with(server, move |l| {
+        let g = &mut l.host_mut().game;
+        let (p, _) = single_player::local_player(g)?;
+        let at = g.events.action.hooks().path_position(p);
+        let st = match ty {
+            1 => d2_sim::units::UnitType::Monster,
+            _ => d2_sim::units::UnitType::Object,
+        };
+        let units: Vec<UnitId> = g
+            .game
+            .lists
+            .units_of_type(st)
+            .into_iter()
+            .filter(|&u| {
+                g.events
+                    .action
+                    .sys
+                    .units
+                    .get(u)
+                    .is_some_and(|r| r.class == class)
+            })
+            .collect();
+        units
+            .into_iter()
+            .map(|u| {
+                let guid = g.game.lists.unit(u).map_or(0, |e| e.guid);
+                (guid, g.events.action.hooks().path_position(u))
+            })
+            .min_by_key(|&(_, q)| test_fixtures::host::cheb(at, q))
+    })
+}
+
+/// The server player's position.
+pub fn server_pos<C: Clock + Send + 'static>(server: &Server<C>) -> (i32, i32) {
+    with(server, |l| {
+        let g = &mut l.host_mut().game;
+        let (p, _) = single_player::local_player(g).expect("joined");
+        g.events.action.hooks().path_position(p)
+    })
+}
+
+/// Run legs (C→S 0x03 through the app's bridge) inside the Rogue
+/// Encampment toward `goal` (`test_fixtures::host::route_near`, within
+/// `reach` sub-tiles), each until the player stops.
+pub fn walk_town_to<C: Clock + Send + 'static>(
+    app: &mut bevy::prelude::App,
+    server: &Server<C>,
+    ms: &std::sync::atomic::AtomicU32,
+    goal: (i32, i32),
+    reach: i32,
+) {
+    use std::sync::atomic::Ordering;
+    let step = |app: &mut bevy::prelude::App| {
+        app.update();
+        ms.fetch_add(40, Ordering::SeqCst);
+    };
+    let moving = |server: &Server<C>| {
+        with(server, |l| {
+            let g = &l.host().game;
+            let (p, _) = single_player::local_player(g)?;
+            g.events.action.sys.units.get(p).map(|u| u.mode)
+        })
+        .is_some_and(|m| test_fixtures::host::MOVING.contains(&m))
+    };
+    let start = server_pos(server);
+    let legs = with(server, move |l| {
+        let g = &mut l.host_mut().game;
+        let d = g.events.action.hooks().drlg.dungeon.acts[0]
+            .as_ref()
+            .expect("Act I");
+        let town = d
+            .find_level(single_player::ACT1_TOWN)
+            .map(|l| d.level(l).rect)
+            .expect("the Rogue Encampment");
+        test_fixtures::host::route_near(d, start, town, goal, reach, 12)
+    });
+    for (x, y) in legs {
+        let mut m = vec![0x03];
+        m.extend_from_slice(&(x as u16).to_le_bytes());
+        m.extend_from_slice(&(y as u16).to_le_bytes());
+        app.world_mut()
+            .resource_mut::<d2_client::bridge::BridgeResource>()
+            .0
+            .send_bytes(&m)
+            .unwrap();
+        step(app);
+        step(app);
+        for _ in 0..400 {
+            if !moving(server) {
+                break;
+            }
+            step(app);
+        }
+    }
+    for _ in 0..4 {
+        step(app);
+    }
+}
+
+/// Walks the Rogue Encampment until the server unit of type `ty` and
+/// class `class` stands within 10 sub-tiles of the player and the client
+/// model holds it: toward it once the server has it, else through the
+/// town's rooms nearest first (a preset is placed when the player brings
+/// its room into play). Its GUID.
+pub fn approach<C: Clock + Send + 'static>(
+    app: &mut bevy::prelude::App,
+    server: &Server<C>,
+    ms: &std::sync::atomic::AtomicU32,
+    ty: u8,
+    class: u32,
+) -> u32 {
+    let in_model = |app: &bevy::prelude::App, guid: u32| {
+        app.world()
+            .resource::<d2_client::bridge::BridgeResource>()
+            .0
+            .world()
+            .units
+            .keys()
+            .any(|k| k.unit_type == ty && k.guid == guid)
+    };
+    let p = server_pos(server);
+    let mut rooms: Vec<(i32, i32)> = with(server, |l| {
+        let g = &mut l.host_mut().game;
+        let d = g.events.action.hooks().drlg.dungeon.acts[0]
+            .as_ref()
+            .expect("Act I");
+        let town = d.find_level(single_player::ACT1_TOWN).expect("town");
+        d.level_rooms(town)
+            .into_iter()
+            .map(|r| {
+                let t = d.room(r).rect;
+                ((t.x * 2 + t.w) * 5 / 2, (t.y * 2 + t.h) * 5 / 2)
+            })
+            .collect()
+    });
+    rooms.sort_by_key(|&c| test_fixtures::host::cheb(c, p));
+    let mut rooms = rooms.into_iter();
+    for _ in 0..40 {
+        match server_unit(server, ty, class) {
+            Some((guid, at)) => {
+                if test_fixtures::host::cheb(server_pos(server), at) <= 10 && in_model(app, guid) {
+                    return guid;
+                }
+                walk_town_to(app, server, ms, at, 4);
+            }
+            None => {
+                let Some(c) = rooms.next() else { break };
+                walk_town_to(app, server, ms, c, 4);
+            }
+        }
+    }
+    panic!("unit {ty}/{class} not reached");
+}
