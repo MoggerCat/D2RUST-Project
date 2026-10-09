@@ -210,19 +210,19 @@ REC-271	6630		(a) Inventory item tints (PROVISIONAL, `d2-client` `ui/panels/inv_
 REC-272	6590		Preview weather: water floor, passes 4 and 9 (PROVISIONAL, `d2-client` `world_view/weather	recording	no	yes	0	
 REC-273	6592		Model unit facts for the draw order (PROVISIONAL, `d2-client` `world_view/unit_facts.rs`, 	data	yes		2	
 REC-274	6587		Duriel's Charge and Jab in the synthetic Lair (PROVISIONAL, `d2-client` `app/skill_rest.rs	data	yes		0	
-REC-275	6580		Leap arc and Whirlwind spin in the play preview (PROVISIONAL; M22; q-move-anims; REC-275 w	recording	no		3	
+REC-275	6580		Leap arc and Whirlwind spin in the play preview (PROVISIONAL; M22; q-move-anims; REC-275 w	recording	no		2	
 REC-276	6629		Trap missiles in the play host (PROVISIONAL, `d2-sim` `wiring/interaction/skill_use.rs` `U	data	yes		0	
 REC-277	6593		The shop opens on the NPC menu's Trade / Gamble choice (PROVISIONAL, `d2-client` `ui/npc_m	recording	no		11	
 REC-278	6595		Synthetic town smoke data and the town fixes it found (PROVISIONAL, `d2-client`, `d2-sim`,	data	yes		6	
 REC-279	6579		Combat smoke fills (PROVISIONAL; M22; q-smoke-combat; `// d2rs-own, unverified`): (1) **re	data	yes		9	
 REC-280	6597		Warriv in the synthetic Act I town (PROVISIONAL, `d2-client` `app/town_npcs.rs` `ACT1`; M2	data	yes		0	
-REC-281	6632		Item smoke test fills (PROVISIONAL, M22; q-smoke-items; every point `d2rs-own, unverified`	recording	no		8	
+REC-281	6632		Item smoke test fills (PROVISIONAL, M22; q-smoke-items; every point `d2rs-own, unverified`	recording	no		7	
 REC-282	6571		Save smoke fills (PROVISIONAL, `d2-client` `app/save_gaps.rs` `seed_new_flags`, `app/save_	recording	no		1	
 REC-286	6577		Visibility predicate inputs in play (PROVISIONAL, `d2-client` `world_view/visibility.rs`, 	recording	no		2	
-REC-287	6633		Inactive room store in play (PROVISIONAL, `d2-sim` `wiring/action/inactive.rs`, `d2-client	data	yes		5	
+REC-287	6634		Inactive room store in play (PROVISIONAL, `d2-sim` `wiring/action/inactive.rs`, `d2-client	data	yes		5	
 REC-288	6598		Arrival walk-outs in the walk prediction (PROVISIONAL, `d2-client` `bridge/predict.rs` `Pr	recording	no		5	
 REC-289	6601		Item-move fills of q-fix-items-play (PROVISIONAL, M22; `d2-sim` `items/inventory/equip.rs`	recording	no		12	
-REC-291	6634		Server saves on the flow's path (PROVISIONAL, `d2-server` `adapters/storage.rs`, `adapters	recording	yes		4	
+REC-291	6635		Server saves on the flow's path (PROVISIONAL, `d2-server` `adapters/storage.rs`, `adapters	recording	yes		4	
 REC-300	6226	MANUAL	(R-SWAP-1)	recording	no		0	
 REC-301	6229	MANUAL	(R-SET-1, R-SET-2)	unstated	no		0	
 REC-302	6233	MANUAL	(R-WW-1)	recording	no		0	
@@ -290,3 +290,4 @@ REC-460	6384	MANUAL	(R-SKPT-1)	unstated	no	yes	1
 REC-461	6387		(R-SENTRY-1)	recording	no	yes	1	
 REC-480	5914	MANUAL	drlg/maze.md, drlg/rooms.md §9.5.1 (exit warps of maze levels, q-act1-dungeons)	recording	no		0	
 REC-570	6600		Warp and Town Portal arrival walk-outs (follows REC-288; `d2-client` `bridge/predict.rs` `	unstated	no		1	
+REC-576	6633		Cloud recording round 2026-10-09 (q-prov-recording-2, items lane) for the d2-client PROVIS	recording	no		0	
