@@ -132,8 +132,10 @@ def compare(orig, d2rs):
     notes.append(f"save time (+0x30, wall clock, normalised): 1.14d {t[0]}, d2rs {t[1]}")
     a, b = normalised(orig), normalised(d2rs)
     n = min(len(a), len(b))
-    # the checksum follows from the other bytes (each file's own was verified above)
-    offs = [i for i in range(n) if a[i] != b[i] and not SUM_AT <= i < SUM_AT + 4]
+    # the checksum follows from the other bytes (each file's own was verified above); so does
+    # the size field when the lengths differ (reported as sizes)
+    offs = [i for i in range(n) if a[i] != b[i] and not SUM_AT <= i < SUM_AT + 4
+            and not (SIZE_AT <= i < SIZE_AT + 4 and len(a) != len(b))]
     if len(a) != len(b):
         offs += list(range(n, max(len(a), len(b))))
     first = None

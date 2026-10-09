@@ -15,4 +15,4 @@ channels save
 at 4 poke seed-game 0x00001234 666
 at 4 poke item hp1 @x+2 @y
 at 4 poke item gld @x+2 @y+3
-input frame 9; move 400 300; frame 10; clickunit 4 *
+input frame 9; move 400 300; frame 10; clickunit 4 *; frame 40; move 400 300; frame 41; clickunit 4 *; frame 70; move 400 300; frame 71; clickunit 4 *
