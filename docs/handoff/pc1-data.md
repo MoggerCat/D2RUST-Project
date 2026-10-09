@@ -8,6 +8,15 @@ our measurements (`facts/`, `traces/`). This loop **replaces**
 `pc1-autotest.md` and `pc1-loop.md` while it runs: stop any session
 running those.
 
+**One `Game.exe` open at a time (user rule, 2026-10-09):** at most one
+1.14d `Game.exe` process may be open on PC 1 at any moment. Any PC 1
+session may run it (directly, through `poke.py`, `scenario_diff.py`'s
+1.14d side or a recorder), but only when none is open: check first
+(`tasklist | findstr /i game.exe`), hold the lock file
+`%TEMP%\d2-game.lock` (create it before starting, delete it once
+`Game.exe` has exited), and wait if the lock exists. Reading the binary
+(Ghidra, `re/`) is not limited.
+
 Effort: speed first, no token limit; stay within PC 1's hardware (one
 `Game.exe` at a time, one cargo build at a time, keep 15 GB disk free).
 Subagents (up to 6) for analysis and writing only; the main session runs
@@ -294,19 +303,21 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     code 8 copies and whether that monster's target was cleared (an AI
     request) before its death; answer into §7.4 rule 7. d2rs tests
     `monster_death.rs` / `e2e_night_world.rs` now expect the spawn point.
+- **[q-fix-real-item-replay-belt-use] Potion use: what entry 3 does to the state (`items/use.md` §3, `0x005BE3F0`)**
+    The spec is silent (open question 1); d2rs now does what the
+    recording shows (`facts/items/a1-town-potions-low.tsv` n 9–31,
+    `a1-town-item-moves.tsv` n 40–51): a potion used from the grid (0x20)
+    is drunk by U and consumed (0x9D action 5, flag 0x20), not refused; the
+    state (100 / 106) goes on with an **empty** stat stream in 0xA8
+    (`ff 01`: either its per-tick stats are not on the state list, or they
+    have no send bits); at full life / mana the state ends in the same
+    frame (0xA9, no 0xA8). Read entry 3 and answer into `items/use.md`:
+    which list it attaches (stats, length: 170 frames at 10 of 50 life,
+    51 frames for an mp1 at 1 mana), what ends it when the vital is full,
+    and whether the unit is queued for update by the toggle
+    (`0x00639DB0`) or by the entry itself. d2rs: PROVISIONAL REC-730 in
+    `d2-sim/src/wiring/inventory/potion.rs`.
 
-35. **`0x0063E6B0(unit, 0)`: are the action-frame tests skipped?** (REC-700) `0x005A6D50` passes the moving flag r as `0x0063E6B0`'s second argument (`skills/use.md` §5.2 "Monsters"); `skills/bodies-3.md` §5.18 step 3 gives the tests (+0x4E = 0, or no action event in the frames ((cur − speed) >> 8, cur >> 8]) for the argument 1 only. Read: what the function does with 0 (d2rs: no tests, the column by mode). Write the answer into `bodies-3.md` §5.18 step 3.
-36. **Who writes unit +0x4E from a type-0 timer's frame code?** (REC-701) trigger(U) of `0x005A7670` reads +0x4E = 1 (`skills/use.md` §5.2); `sim/units.md` §4.2 schedules event 0 with args (E[i], k) and the field table names only `0x005533D0` (0 at mode start). Read: the writer of +0x4E on the event-0 path of a monster (the unit-type dispatcher or the timer run), and whether a code-0 event writes it. Write the answer into `sim/units.md` §4.2 / §4.6.
-37. **The client's mode-18 leap / whirl: hold, path end, code 0x16** (REC-702..704, `d2-client` `world_view/skill_motion.rs`; measured leap / whirl in `facts/client/anim/a1-cold-plains-*-bar.tsv`) Read: (1) which client code holds the Leap sequence at frame 11 while the motion record lives, and whether Leap Attack (`seqnum` 14) holds at its frame 11 the same way (REC-704); (2) the client whirl path: its step per update (d2rs: class `WalkVelocity` << 12, 0x6000 measured for the barbarian) and the update mode 18 ends on (d2rs: the one whose step reaches the end, `((d << 16) − 1) / step` after the do, `d` by `0x006417F0`; REC-703); (3) the skill mode request's first mode-18 update and code 0x16's record 2 / 3 as unit type / GUID (REC-702). Write the answers into `render/unit-composite.md` §8 or `skills/sequences.md` §3.
-
-38. **Range state mask 0x26 = `meleeonly`?** `range(P,
-  skill)` `0x00645460` (`skills/use.md` §3 r6) tests "state mask 0x26".
-  d2rs (`d2-client` `bridge/combat.rs` `in_melee_only_state`) reads it as
-  `0x0063A130` with the per-flag mask at data +0xCC + 4·0x26, i.e. the
-  `states.txt` flag bit 38 `meleeonly` (`data/fields.tsv`; the
-  `ui/panels-3.md` §24 r1 scheme). Confirm the argument `0x00645460`
-  passes is that flag index (not a data offset or a precomputed group),
-  and write it into `use.md` §3 r6.
 
 ## How to check a behaviour in one command
 
@@ -349,7 +360,9 @@ rather than a hand-run recipe.
     (not yet run on 1.14d). Each form can be tried first with
     `poke.py --forms FILE` (README "Call forms") before it goes into
     `CALL_FORMS`.
-23. **Poke runs on Windows** (REC-590): the cloud ran every runnable
+
+23. **Poke runs on Windows** (REC-590) — answered → see `docs/handoff/pc1-day3-a.md`. The cloud ran every runnable
+23. **Poke runs on Windows** (REC-590; answered → see `docs/handoff/pc1-day3-c.md`): the cloud ran every runnable
     directive on 1.14d under Wine (`specs/tools/poke.md` Status) and
     settled the variant load (REC-591, `tools/test-variants.md` Status).
     Left: run `traces/pokes/spawn-town.poke` once on PC 1 with a
@@ -654,6 +667,12 @@ Then the rest:
   - REC-670: local input path for mode 18; answered → see docs/handoff/pc1-day3-b.md
   - REC-671: whirl end rule; answered → see docs/handoff/pc1-day3-b.md
   - REC-680: Blood Golem life share. answered → see docs/handoff/pc1-day3-b.md
+  - REC-660: client GUIDs 2–92 (needs a runtime count); answered → see `docs/handoff/pc1-day3-a.md`;
+  - REC-661: critter think-timer start; answered → see `docs/handoff/pc1-day3-a.md`;
+  - REC-665: mode request to own position;
+  - REC-670: local input path for mode 18;
+  - REC-671: whirl end rule;
+  - REC-680: Blood Golem life share.
 - Not traced: the other critter handlers (rat, bat).
 
 **New q-fix rows (build-queue.tsv)**

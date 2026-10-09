@@ -72,6 +72,18 @@ impl<R> UnitRules<R> {
     }
 }
 
+/// `blend-modes.md` §5 r3 revision (PROVISIONAL, REC-518): object
+/// `class` in `mode` casts its composite shadow when its `BlocksLight` of
+/// that mode is ≠ 0; a class without a row casts it.
+pub fn object_casts_shadow(looks: &UnitLooks, class: u32, mode: u32) -> bool {
+    looks.object_blocks_light.get(&class).is_none_or(|b| {
+        usize::try_from(mode)
+            .ok()
+            .and_then(|m| b.get(m))
+            .is_some_and(|&v| v != 0)
+    })
+}
+
 /// The player's walk speed (`sim/units.md` §4.7 step 7: w = 213 for a
 /// player not running, p = 100 without item / skill velocity).
 pub const PLAYER_WALK_SPEED: u64 = 213;
@@ -177,6 +189,12 @@ impl<R: ViewRules> ViewRules for UnitRules<R> {
         let (Some(at), Some(cof)) = (at, assets.cofs.get(&pose.cof)) else {
             return Ok(Vec::new());
         };
+        // `blend-modes.md` §5 r3 revision (PROVISIONAL, REC-518): an
+        // object casts the shadow only when its mode's BlocksLight ≠ 0.
+        if unit.key.unit_type == OBJECT && !object_casts_shadow(&self.looks, unit.class, unit.mode)
+        {
+            return Ok(Vec::new());
+        }
         super::unit_shadow::draws(cof, unit.key.guid, at, draws, assets)
     }
 

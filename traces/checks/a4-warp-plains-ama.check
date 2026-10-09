@@ -1,0 +1,12 @@
+check 1
+# Warp from the Pandemonium Fortress to the Plains of Despair (level 105,
+# Izual's area) at frame 6: ScnAm4, -seed 1234, no input. Both sides take
+# the same poke (poke.md warp; REC-655 ran it on 1.14d). Area: Act IV
+# playthrough (q-prov-data). Spec: specs/tools/scenario-diff.md.
+name a4-warp-plains-ama
+save ScnAm4 --class ama --expansion --act 3 --quests acts=3
+seed 1234
+ticks 80
+seconds 300
+channels state
+at 6 poke warp 105
