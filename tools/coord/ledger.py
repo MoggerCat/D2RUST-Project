@@ -238,9 +238,12 @@ def canon(area):
     """Alias key so a coverage row finds the entity row of the same thing under another id
     scheme: level.a1.5.x / level.5-x -> level#5; quest.a2q1-x / quest.slot9-x -> quest#9;
     monster-ai.x -> monster.ai.x; otherwise the family plus the alphanumerics of the rest."""
-    m = re.match(r"^cov\.(level|quest)\.(\d+)$", area)
+    m = re.match(r"^cov\.(level|quest)\.(\d+)(?:-.*)?$", area)
     if m:
         return f"{m.group(1)}#{int(m.group(2))}"
+    m = re.match(r"^cov\.monster-ai\.([a-z0-9]+)(?:-.*)?$", area)
+    if m:
+        return canon("monster.ai." + m.group(1))
     m = re.match(r"^level\.(?:a\d\.)?(\d+)[.-]", area)
     if m:
         return f"level#{int(m.group(1))}"
@@ -370,7 +373,7 @@ def merge(parts, repo, status, coverage=(set(), set())):
             by_src.setdefault((m.group(1).lower(), int(m.group(2))), r)
     for r in cov_rows:
         tgt = by_area.get(r["area"]) or by_canon.get(canon(r["area"]))
-        m = re.match(r"^cov\.(skill|state|monster)\.(\d+)$", r["area"])
+        m = re.match(r"^cov\.(skill|state|monster)\.(\d+)(?:-.*)?$", r["area"])
         if tgt is None and m:
             tgt = by_src.get(({"skill": "skills", "state": "states", "monster": "monstats"}[m.group(1)],
                               int(m.group(2))))
@@ -655,7 +658,8 @@ def selftest():
         assert canon("quest.a2q1-radament") == canon("quest.slot9-radament-s-lair")
         assert canon("monster-ai.foulcrownest") == canon("monster.ai.foulcrownest")
         assert canon("missile.fire-arrow") == canon("missile.firearrow")
-        assert canon("cov.level.5") == canon("level.5-dark-wood"), rows
+        assert canon("cov.level.5") == canon("level.5-dark-wood") == canon("cov.level.5-dark-wood")
+        assert canon("cov.monster-ai.baboon-baboon") == canon("monster.ai.baboon"), rows
         assert rows["m.one"]["exercised"] == "yes" and rows["m.one"]["last_verdict"] == "DIVERGED@1"
         assert rows["net.c2s.0x01"]["last_verdict"] == "PARTIAL", rows["net.c2s.0x01"]
         assert rows["net.c2s.0x02"]["last_verdict"] == "DIVERGED@1"

@@ -7,13 +7,14 @@ from the parts in `docs/handoff/ledger/`). Inputs: the merged ledger,
 108 channel results, suite run 2026-10-09 17:34 UTC at 739dd943), the
 existing tools under `tools/` and `specs/tools/`.
 
-**Merged ledger (8 parts, 4,104 rows, of which 1,758 coverage-only rows):**
-DIVERGED 289, NOT-IMPLEMENTED 59, NO-CHECK 3,671, UNKNOWN 85, **EQUAL 0**;
-exercised yes 487 / no 1,984 / unknown 1,633 (yes from the coverage reports' seen
-lists: act I–II playthrough, the checks' d2rs side, soak). Every spec file (outside
+**Merged ledger (9 parts, 4,148 rows, of which 1,802 coverage-only rows):**
+DIVERGED 289, NOT-IMPLEMENTED 59, NO-CHECK 3,671, UNKNOWN 129, **EQUAL 0**;
+exercised yes 553 / no 1,962 / unknown 1,633 (yes from the coverage reports' seen
+lists: act I–II playthrough, the first act III playthrough cells, the checks' d2rs
+side, soak). Every spec file (outside
 `specs/tools/`), every check and every message id is named by a row
 (`fidelity-ledger.md` "Not covered by any row" is empty); the exercised
-column has the act I–II coverage part; a3a5 and checks are pending.
+column has every coverage part, but act III–V is only partly run (§6, rerun R1).
 
 **Bar (CLAUDE.md rule 10):** an area is done only when a 1.14d check passes.
 Today **no row is EQUAL**: the only full MATCH is `packets-town-arrival-ama`
@@ -136,7 +137,7 @@ addresses the specs lack and possibly for the audio capture.
 | integrator | claude/q-fidelity-ledger | 30 | rows for the specs and checks no part named (data layer, format readers, constant tables, continuation specs, 6 checks) |
 | coverage a1a2 | claude/q-ledger-cov-a1a2 | 2,122 never-exercised rows (act I–II playthrough + classes, 7 classes, normal) | merged: 578 set `exercised = no` on the entity row of the same thing (ids matched through `ledger.py` aliases: level id, quest slot, `monster-ai` → `monster.ai`, alphanumerics); 1,544 added as coverage rows (single monster classes, base items, object rows, monster skills, missiles the parts group) |
 | coverage checks | claude/q-ledger-cov-checks | 308 rows (`cov.<category>.<id>`: what the d2rs side of 87 checks and a soak run exercised; rng channel not run) | merged: matched to entity rows by level id / quest slot / table row id; its `checks` lists were truncated (`...(+N)`), cut to the named checks by the integrator; unmatched rows (single monster classes, states, missiles) stay as coverage rows and carry their checks' verdicts, so DIVERGED counts include them |
-| coverage a3a5 | claude/q-ledger-cov-a3a5 | — | pending (no tsv on the branch at 19:06) |
+| coverage a3a5 | claude/q-ledger-cov-a3a5 (4572febb) | 2,296 rows, PARTIAL: the matrix reached only the first act III cells | merged: only its 67 `yes` rows (its `no` is not evidence, dropped); ids lowercased and matched by level id, monstats row, AI name |
 
 `tools/coord/ledger.py --fix` reconciled the parts with checks-status.md
 (last_verdict from the checks; a row naming a DIVERGED check is DIVERGED;
@@ -147,7 +148,18 @@ Known weaknesses of the merged rows (to fix in the parts, not here):
   coverage-checks part's soak run shows both counters work (waypoints operated,
   Akara / Kashya / Gheed talked to), so the zeros are real: **the playthrough never
   operates an object or talks to an NPC** (§3 `interact-pokes`, playthrough `talk`).
-  An act III–V row is `no` from the act I–II runs until the a3a5 part lands (yes wins).
+  An act III–V row reads `no` only because the act I–II runs never reach it; the
+  a3a5 run stopped after the first act III cells, so act III–V `exercised` is weak
+  until rerun R1.
+
+**Reruns queued** (cloud, no PC 1):
+- **R1** coverage a3a5 with fewer cells: `D2_GAME_DIR=/home/user/game python3
+  tools/playthrough/playthrough.py traces/playthrough/act3.play act4.play act5.play
+  --class sor,pal --difficulty normal --jobs 4` with the `coverage-map` d2-sim build and
+  `D2_COVERAGE_DIR`, then `report.py --json` into `docs/handoff/ledger/coverage-a3a5.json`
+  and rerun `ledger.py --fix` (≈ 1.5–2 h wall clock).
+- **R2** the checks' `rng` channel in the coverage-checks run (not run; 87 of 88 checks
+  gave counters).
 - `needs_pc1 = y` on 795 rows comes from the settling kind `recording`;
   1.14d now runs under Wine in the cloud (`tools/cloud-game/`), so most of
   these need **Wine recording time, not PC 1**. True PC 1 items are RE
@@ -157,4 +169,4 @@ Known weaknesses of the merged rows (to fix in the parts, not here):
   `packets-town-arrival-ama`: the systems part's heuristic; treat as NO-CHECK.
 - The monsters part matched checks by monster name (over-matches generic
   names); sizes are coarse (most rows M), so the ledger's hour totals
-  (3,980–15,822+) count shared code paths many times: use §5.
+  (5,275–21,004+) count shared code paths many times: use §5.
