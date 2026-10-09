@@ -171,9 +171,11 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         self.open_cube_desk(player, cube)
     }
     fn consume_item(&mut self, player: Owner, item: Guid) {
-        // PROVISIONAL (REC-113): a used identify scroll leaves the grid;
-        // a used Town Portal scroll too (`items/use.md` §4: the caller's
-        // consumption, `inventory-moves.md` §7.11 step 3).
+        // A used identify scroll leaves the grid; a used Town Portal
+        // scroll too (`items/use.md` §4: the caller's consumption,
+        // `inventory-moves.md` §7.11 step 3). Recorded (REC-113, REC-117):
+        // 0x9D action 5 with removal flag 0x20 for both
+        // (`facts/items/a1-town-identify.tsv`, `a1-town-portal-cold-plains.tsv`).
         if (self.item_unit(item).is_some()
             && super::identify::IDENTIFY_CODES.contains(&self.code(item)))
             || self.is_portal_scroll(item)
@@ -507,7 +509,8 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         if target == player && self.use_potion(player, item) {
             return true;
         }
-        // PROVISIONAL (REC-113): identify scrolls and tomes on an item.
+        // Identify scrolls and tomes on an item (recorded, REC-113:
+        // `facts/items/a1-town-identify.tsv`).
         if self.use_identify(player, target, item) {
             return true;
         }
