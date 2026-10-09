@@ -57,6 +57,18 @@ pub struct SkillStore {
     /// The players in a shapeshift form (werewolf / werebear), refreshed
     /// by [`sync_shapes`] (q-druid).
     pub shifted: std::collections::BTreeSet<UnitId>,
+    /// The `InGame` / `aura` / `passive` flags of every `skills` row,
+    /// copied by [`sync_shapes`] (the `use_state` tests 1, 3, 4 read them);
+    /// empty until the first sync.
+    pub flags: Vec<SkillFlagsRow>,
+}
+
+/// One `skills` row's flags for `use_state` (`use.md` §2 tests 1, 3, 4).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SkillFlagsRow {
+    pub in_game: bool,
+    pub aura: bool,
+    pub passive: bool,
 }
 
 /// The players whose state is the `aurastate` of a `srvdofunc` 116 skill
@@ -78,6 +90,18 @@ pub fn sync_shapes(game: &Game, sim: &mut d2_sim::wiring::worldgen::WorldSim<Loc
         .filter(|&u| forms.iter().any(|&s| sim.action.sys.stats.has_state(u, s)))
         .collect();
     sim.action.sys.hooks.x.skills.shifted = shifted;
+    if sim.action.sys.hooks.x.skills.flags.len() != hooks.skills.skills.len() {
+        sim.action.sys.hooks.x.skills.flags = hooks
+            .skills
+            .skills
+            .iter()
+            .map(|r| SkillFlagsRow {
+                in_game: r.ingame,
+                aura: r.aura,
+                passive: r.passive,
+            })
+            .collect();
+    }
 }
 
 /// The `skills` fields of the list operations (`client/msg-skills.md`
@@ -93,6 +117,7 @@ pub fn skill_row(s: &Skills) -> SkillRow {
         enhanceable: s.enhanceable,
         skilldesc: s.skilldesc,
         etype: s.etype,
+        seqinput: s.seqinput,
         range: s.range,
         flags: crate::bridge::combat::skill_flags(s),
     }
@@ -117,7 +142,6 @@ impl SkillStore {
 }
 
 impl LocalSeams {
-        seqinput: s.seqinput,
     fn note(&mut self, s: String) {
         self.skills.log.push(s);
     }
@@ -249,15 +273,32 @@ impl UseRest for LocalSeams {
     fn set_attack_param4(&mut self, u: UnitId, v: i32) {
         self.skills.unit_mut(u).attack_param4 = v;
     }
-    // PROVISIONAL (skills/use.md §2: `0x00647960`'s parts are listed, not
-    // their order): an entry with a level is usable, one without is
-    // `NoLevel`; mana, quantity, shape, cooldown are not checked here.
-    // d2rs-own, unverified.
+    // `skills/use.md` §2 (`0x00647960`), first failure wins: (1) record
+    // missing or `InGame` clear → 3; (2) level 0 → 7; (3) `aura` → 6; (4)
+    // `passive` → 5. PROVISIONAL (REC-724): tests 5–10 (item test, mana,
+    // shape, start stat, charges, cooldown) are not run here (no item,
+    // mana or cooldown provider on this seam), so the rest is "usable".
+    // Before the first [`sync_shapes`] the flag table is empty and only the
+    // level test runs. d2rs-own, unverified.
     fn use_state(&mut self, _: UnitId, e: &SkillEntry) -> UseState {
-        if e.base + e.level_bonus > 0 {
-            UseState::Usable
-        } else {
-            UseState::NoLevel
+        if !self.skills.flags.is_empty() {
+            let f = usize::try_from(e.skill)
+                .ok()
+                .and_then(|i| self.skills.flags.get(i));
+            if !f.is_some_and(|f| f.in_game) {
+                return UseState::Disabled;
+            }
+        }
+        if e.base + e.level_bonus <= 0 {
+            return UseState::NoLevel;
+        }
+        let f = usize::try_from(e.skill)
+            .ok()
+            .and_then(|i| self.skills.flags.get(i));
+        match f {
+            Some(f) if f.aura => UseState::Aura,
+            Some(f) if f.passive => UseState::Passive,
+            _ => UseState::Usable,
         }
     }
     // d2rs-own, unverified: the player has the state of a Werewolf /
@@ -372,12 +413,14 @@ impl UseRest for LocalSeams {
 }
 
 /// The skill-point calls (`levels.md` §6.4).
-// PROVISIONAL (skills/levels.md §6.4): `0x0056C700` and the spend
-// `0x00570080` need the player's stat list (stat 5), which this seam
-// cannot reach: no skill is a class skill, so 0x3B is refused with code 3
-// before any spend. d2rs-own, unverified.
+// `0x0056C700` and the spend `0x00570080` (`levels.md` §6.4 r2, r4) run in
+// the server's `World` (`LearnUnits::is_class_skill` ORs this seam with the
+// `skills` row's `charclass` against the player's class; `add_skill_level`
+// takes stat 5 and adds the level), so this seam adds nothing: `false`
+// leaves the table test as the only one.
 impl LearnRest for LocalSeams {
     fn is_class_skill(&self, _: UnitId, _: i32) -> bool {
+        // The table test is the server `World`'s (see above).
         false
     }
     fn add_skill_level(&mut self, u: UnitId, skill: i32, cost: i32) {
@@ -385,5 +428,66 @@ impl LearnRest for LocalSeams {
     }
     fn after_skill_point(&mut self, u: UnitId) {
         self.note(format!("after skill point {}", u.0));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn entry(skill: i32, base: i32) -> SkillEntry {
+        SkillEntry {
+            skill,
+            base,
+            level_bonus: 0,
+            owner_guid: -1,
+            charges: 0,
+            has_charges: false,
+        }
+    }
+
+    fn seams() -> LocalSeams {
+        let mut s = LocalSeams::default();
+        s.skills.flags = vec![
+            SkillFlagsRow {
+                in_game: true,
+                aura: false,
+                passive: false,
+            }, // 0 plain
+            SkillFlagsRow {
+                in_game: true,
+                aura: false,
+                passive: true,
+            }, // 1 passive
+            SkillFlagsRow {
+                in_game: true,
+                aura: true,
+                passive: false,
+            }, // 2 aura
+            SkillFlagsRow {
+                in_game: false,
+                aura: false,
+                passive: false,
+            }, // 3 not in game
+        ];
+        s
+    }
+
+    // Covers: specs/skills/use.md §2 (use_state table, tests 1–4)
+    #[test]
+    fn use_state_order() {
+        let mut s = seams();
+        let u = UnitId(1);
+        assert_eq!(s.use_state(u, &entry(0, 1)), UseState::Usable);
+        assert_eq!(s.use_state(u, &entry(0, 0)), UseState::NoLevel);
+        // passive with a level: 5; aura: 6
+        assert_eq!(s.use_state(u, &entry(1, 1)), UseState::Passive);
+        assert_eq!(s.use_state(u, &entry(2, 1)), UseState::Aura);
+        // level 0 is tested before aura / passive
+        assert_eq!(s.use_state(u, &entry(1, 0)), UseState::NoLevel);
+        // InGame clear and no level → 3 (InGame first)
+        assert_eq!(s.use_state(u, &entry(3, 0)), UseState::Disabled);
+        // a missing record → 3
+        assert_eq!(s.use_state(u, &entry(99, 1)), UseState::Disabled);
     }
 }

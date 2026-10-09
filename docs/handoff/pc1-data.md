@@ -377,3 +377,5 @@ Then the rest:
   `q-fix-ui-npc-talk-facts`, `q-fix-render-bg-seed`.
 - **Closures (no code change, tests only):** `q-fix-proto-vitals-dx-sign`,
   `q-fix-proto-state-param-sign`, `q-fix-seam-stamina-scale`.
+- **[q-fix-pc1-client-ui] door step 0x004BCB20** Specify the object door step (REC-725): what it does per update for an `IsDoor` non-cycling mode (frame advance, mode change, collision / sound calls), for `world/objects-client.md` §25 r9.2.1.
+- **[q-fix-pc1-client-ui] NPC introduction handler 0x004B41E0** Read which text record the "introduction" topic plays (REC-727; d2rs plays record 0 of the intro entry) and whether it sets +0x11 or the talk flag like "gossip" (`messages.md` §6 r3 / OQ4).

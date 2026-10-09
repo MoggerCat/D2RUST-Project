@@ -72,6 +72,16 @@ pub struct ObjClientRow {
     pub lit: [u8; 8],
     /// `Red`, `Green`, `Blue`.
     pub rgb: (u8, u8, u8),
+    /// `IsDoor` (+0x13A): a non-cycling mode steps by the door step.
+    pub is_door: u8,
+    /// `OrderFlag2` (+0x133).
+    pub order_flag2: u8,
+    /// `Parm7` (+0x194): the sound of the mode 1 → 2 turn.
+    pub parm7: u32,
+    /// `Overlay` (+0x1B5).
+    pub overlay: u8,
+    /// `HasCollision0`–`7`.
+    pub has_collision: [u8; 8],
 }
 
 impl ObjClientRow {
@@ -129,6 +139,20 @@ impl ObjClientRow {
                 o.lit0, o.lit1, o.lit2, o.lit3, o.lit4, o.lit5, o.lit6, o.lit7,
             ],
             rgb: (o.red, o.green, o.blue),
+            is_door: o.isdoor,
+            order_flag2: o.orderflag2,
+            parm7: o.parm7,
+            overlay: o.overlay,
+            has_collision: [
+                o.hascollision0,
+                o.hascollision1,
+                o.hascollision2,
+                o.hascollision3,
+                o.hascollision4,
+                o.hascollision5,
+                o.hascollision6,
+                o.hascollision7,
+            ],
         }
     }
 
@@ -272,6 +296,13 @@ pub enum ObjFx {
     /// The client skill start `0x004C6EB0(P, R)` (`render/lighting.md`
     /// §8 r3).
     SkillStart { player: UnitKey, record: [i32; 7] },
+    /// U flag `+0xC4 |= bits` (`OrderFlag2`: 0x100000, generic step
+    /// `world/objects-client.md` §25 r9.2.2).
+    FlagOr { unit: ObjUnit, bits: u32 },
+    /// The `Parm7` sound call `0x0046C320(U, id, 4)` (§25 r9.2.2).
+    Parm7Sound { unit: ObjUnit, id: u32 },
+    /// The collision call `0x00623830(U)` (§25 r9.2.2).
+    Collision { unit: ObjUnit },
 }
 
 /// The context of one client object call: the model, the inputs, the
@@ -464,41 +495,106 @@ fn row_of(
         ))
 }
 
-/// The generic object step `0x004BCBB0` (`render/lighting.md` §8;
-/// `world/objects-client.md` §26.6: frame += speed, a non-cycling mode
-/// clamps at its last frame).
+/// The classes whose `Overlay` the end of mode 1 creates (§25 r9.2.2).
+const END_OVERLAY_CLASSES: [u32; 7] = [354, 355, 356, 397, 405, 406, 407];
+
+/// The generic object step `0x004BCBB0` (`world/objects-client.md` §25
+/// r9; `render/lighting.md` §8). The speed is U's own (+0x4C,
+/// [`anim_setup`]); a unit without one (no setup ran) steps by the
+/// class's `FrameDelta[mode]`.
 ///
-/// The speed is U's own (+0x4C, [`anim_setup`]); a unit without one
-/// (no setup ran) steps by the class's `FrameDelta[mode]`.
-/// PROVISIONAL (objects-client.md §26.16; REC-45): a cycling mode wraps (frame − `FrameCnt`, modulo); a mode
-/// with `FrameCnt` 0 does not advance; and the end of a non-cycling mode
-/// 1 sets mode 2 (`set_mode`, then the graphics refresh), the transition
-/// §26.2, §26.7 and §26.16 name.
-/// TODO(spec: render/lighting.md §8): the `Lit2` light of the generic
-/// step is not made here.
+/// PROVISIONAL (REC-725): the door step `0x004BCB20` (`IsDoor` ≠ 0,
+/// non-cycling) is not specified; such a unit is left as it is.
 pub fn generic_step(cx: &mut Cx<'_>) -> Result<(), HandlerError> {
     let m = cx.u()?.mode;
-    let cnt = frame_cnt(&cx.row, m)? as i32;
-    if cnt <= 0 {
+    let cnt = frame_cnt(&cx.row, m)?;
+    if cnt == 0x100 {
         return Ok(());
     }
     let i = m as usize;
     let delta = i32::from(cx.row.frame_delta[i]);
+    let class = cx.u()?.class;
+    if cx.row.cycle_anim[i] == 0 {
+        if cx.row.is_door != 0 {
+            return Ok(());
+        }
+        let f = cx.u()?.frame;
+        if f >= (cnt as i32).wrapping_sub(256) {
+            if class == 189 && matches!(m, 2 | 3) {
+                let n = m + 1;
+                cx.u()?.mode = n;
+                cx.refresh()?;
+                cx.reinit()?;
+                cx.u()?.frame = i32::from(cx.row.start[n as usize]) * 256;
+                return Ok(());
+            }
+            if m != 1 {
+                return Ok(());
+            }
+            return end_of_mode_1(cx, class);
+        }
+    }
+    let start = i32::from(cx.row.start[i]) * 256;
     let cycle = cx.row.cycle_anim[i] != 0;
     let u = cx.u()?;
     let speed = u.speed.unwrap_or(delta);
-    u.frame = u.frame.wrapping_add(speed);
-    if u.frame < cnt {
-        return Ok(());
+    let c = cnt as i32;
+    if class == 12 {
+        u.frame = u.frame.wrapping_sub(speed);
+        if u.frame < 0 {
+            u.frame = u.frame.wrapping_add(c);
+        }
+    } else if class == 189 && m == 3 {
+        u.frame = u.frame.wrapping_sub(speed);
+        if u.frame < 0 {
+            u.mode = 4;
+            cx.refresh()?;
+            cx.reinit()?;
+            cx.u()?.frame = i32::from(cx.row.start[4]) * 256;
+        }
+    } else {
+        u.frame = u.frame.wrapping_add(speed);
+        if u.frame >= c {
+            u.frame = if cycle {
+                start.wrapping_add(u.frame.wrapping_sub(c))
+            } else {
+                c.wrapping_sub(256)
+            };
+        }
     }
-    if cycle {
-        u.frame = u.frame.rem_euclid(cnt);
-        return Ok(());
+    Ok(())
+}
+
+/// §25 r9.2.2, mode 1: the update after the clamp turns it into mode 2.
+fn end_of_mode_1(cx: &mut Cx<'_>, class: u32) -> Result<(), HandlerError> {
+    let unit = cx.unit;
+    cx.u()?.mode = 2;
+    if cx.row.order_flag2 == 1 {
+        cx.fx(ObjFx::FlagOr {
+            unit,
+            bits: 0x10_0000,
+        });
     }
-    u.frame = cnt.wrapping_sub(256);
-    if m == 1 {
-        cx.set_mode(2)?;
-        cx.refresh()?;
+    if cx.row.parm7 != 0 {
+        let id = if cx.row.parm7 == 0xFF { 0x153 } else { 0x97 };
+        cx.fx(ObjFx::Parm7Sound { unit, id });
+    }
+    cx.u()?.frame = i32::from(cx.row.start[2]) * 256;
+    cx.refresh()?;
+    cx.reinit()?;
+    cx.u()?.frame = i32::from(cx.row.start[2]) * 256;
+    if cx.row.overlay != 0 && END_OVERLAY_CLASSES.contains(&class) {
+        cx.fx(ObjFx::OverlayRemove {
+            unit,
+            overlay: 0x47,
+        });
+    }
+    let sel = cx.row.selectable[2] != 0;
+    cx.u()?.flag_2 = Some(sel);
+    let (lit, rgb) = (cx.row.lit[2], cx.row.rgb);
+    cx.fx(ObjFx::Light { unit, lit, rgb });
+    if cx.row.has_collision[2] == 0 && cx.row.has_collision[1] != 0 {
+        cx.fx(ObjFx::Collision { unit });
     }
     Ok(())
 }

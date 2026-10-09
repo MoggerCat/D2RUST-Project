@@ -425,7 +425,10 @@ pub fn add_live_client(app: &mut App, link: DynLink, c: LiveClient) -> anyhow::R
     let object_rows = single_player::client_object_rows(&data);
     let object_names = single_player::client_object_names(&data);
     let automap_source = super::automap::live_source(&d.tables).map_err(anyhow::Error::msg)?;
-    let hire_rows = d.tables.hire_rows().map_err(anyhow::Error::msg)?;
+    let hire_rows = d2_sim::world::hirelings::HirelingRows::from_table(
+        d.tables.table("hireling").map_err(anyhow::Error::msg)?,
+    )
+    .map_err(|e| anyhow::anyhow!("hireling: {e}"))?;
     let (link, tap) = predict_link(link);
     add_game(app, link, c.gpu)?;
     send_create_game_flags(app, c.request, c.start_flags)?;
@@ -531,7 +534,7 @@ pub fn add_live_client(app: &mut App, link: DynLink, c: LiveClient) -> anyhow::R
     ui::set_waypoint_map(app, waypoint_map);
     ui::set_level_names(app, level_names);
     ui::set_shop_prices(app, c.prices);
-    super::hire_stats::install_hire_stats(app, hire_rows, true);
+    super::hire_stats::install_hire_stats(app, hire_rows, true, c.request.difficulty());
     let table = sound::sound_table_live(archives.as_ref()).map_err(anyhow::Error::msg)?;
     let audio = GameAudio::new(AudioParts::original(archives.source(), table));
     // The unit sounds' tables (`audio/unit_feed.rs`): `monsounds`, the
