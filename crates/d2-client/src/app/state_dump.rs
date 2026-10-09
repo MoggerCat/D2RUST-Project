@@ -47,7 +47,7 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use anyhow::{bail, Context, Result};
 use d2_server::seams::Clock;
@@ -386,6 +386,35 @@ pub fn dump<W: Write>(
     };
     writeln!(out, "{}", header.to_json_line())?;
 
+    // `poke.md` §5 rule 4: the frames with an `operate` / `talk` run at the
+    // tick end (the 1.14d hook's point), after that frame's snapshot.
+    let (tick_end_entries, rest) = pokes::split_tick_end(game.pokes).map_err(anyhow::Error::msg)?;
+    let tick_end = Arc::new(Mutex::new(TickEndOut::default()));
+    if !tick_end_entries.is_empty() {
+        tick_end.lock().unwrap_or_else(|e| e.into_inner()).pending = tick_end_entries.len();
+        let shared = tick_end.clone();
+        let mut entries = tick_end_entries;
+        link.with(move |l| {
+            l.set_tick_end(Box::new(move |h| {
+                let frame = h.game.game.frame;
+                let (due, later): (Vec<Entry>, Vec<Entry>) = std::mem::take(&mut entries)
+                    .into_iter()
+                    .partition(|e| pokes::due_after(e.when, None).is_some_and(|f| frame >= f));
+                entries = later;
+                if due.is_empty() {
+                    return;
+                }
+                let mut out = shared.lock().unwrap_or_else(|e| e.into_inner());
+                out.snapshot = Some((frame, snapshot_host(h)));
+                for (i, e) in due.iter().enumerate() {
+                    let When::Frame(f) = e.when else { continue };
+                    let r = pokes::apply_on_host(h, &e.op);
+                    out.lines.push(pokes::record_line(f, i, &e.op, &r));
+                }
+                out.pending = entries.len();
+            }))
+        })?;
+    }
     let link = PredictLink::new(link);
     let tap = link.tap();
     let mut bridge = Bridge::new(link)?;
@@ -399,7 +428,7 @@ pub fn dump<W: Write>(
     let mut first = true;
     // The frame the last tick ran (0: none yet) and the pokes still to run.
     let mut last_frame = 0i32;
-    let mut pending = game.pokes;
+    let mut pending = rest;
     let mut walking: Vec<(Entry, GotoWalk)> = Vec::new();
     let mut input = match game.input {
         Some(s) => Some(
@@ -464,7 +493,19 @@ pub fn dump<W: Write>(
         }
         idle = 0;
         ran += 1;
-        let s = bridge.state_snapshot()?;
+        // The tick-end pokes' records, and the snapshot taken before them.
+        let held = {
+            let mut t = tick_end.lock().unwrap_or_else(|e| e.into_inner());
+            for line in t.lines.drain(..) {
+                eprintln!("poke: at the tick end: {line}");
+                writeln!(out, "{line}")?;
+            }
+            t.snapshot.take()
+        };
+        let s = match held {
+            Some((_, s)) => s,
+            None => bridge.state_snapshot()?,
+        };
         last_frame = s.frame;
         if s.frame.rem_euclid(every as i32) == 0 {
             writeln!(out, "{}", s.to_json_line())?;
@@ -490,6 +531,11 @@ pub fn dump<W: Write>(
     if let Some(n) = input.as_ref().map(Headless::pending).filter(|&n| n > 0) {
         eprintln!("input: {n} step(s) not reached in {ran} ticks");
         notes.push(format!("input: {n} step(s) not reached"));
+    }
+    let unreached = tick_end.lock().map_or(0, |t| t.pending);
+    if unreached > 0 {
+        eprintln!("poke: {unreached} tick-end poke(s) not reached in {ran} ticks");
+        notes.push(format!("poke not reached: {unreached} tick-end poke(s)"));
     }
     for e in &pending {
         eprintln!("poke: not reached in {ran} ticks: {:?} {}", e.when, e.op);
@@ -588,21 +634,36 @@ fn run_due_sends<W: Write>(
 impl<C: Clock + Send + 'static> StateSource for ThreadLink<Link<C>> {
     type Error = super::server_thread::ThreadStopped;
     fn state_snapshot(&mut self) -> Result<state::StateSnapshot, Self::Error> {
-        self.with(|l| {
-            let sim = &l.host().game;
-            let mut s = state::snapshot_world(&sim.game, &sim.events);
-            if let Some(inv) = sim.world.inventory.as_ref() {
-                overlay_item_places(&mut s, &inv.state);
-            }
-            let d = usize::from(state::difficulty_world(&sim.events)).min(2);
-            for (id, q) in &sim.world.rest.quests {
-                if let Some(e) = sim.game.lists.unit(*id) {
-                    s.set_quests(e.guid, state::quest_words(&q.flags[d]));
-                }
-            }
-            s
-        })
+        self.with(|l| snapshot_host(l.host()))
     }
+}
+
+/// What the tick-end hook hands back to the dump loop: the poke records
+/// written at the tick end, the snapshot of that frame taken before them
+/// (1.14d `record_state.py` snapshots at the same hook before its pokes),
+/// and how many tick-end pokes are still to run.
+#[derive(Default)]
+struct TickEndOut {
+    lines: Vec<String>,
+    snapshot: Option<(i32, state::StateSnapshot)>,
+    pending: usize,
+}
+
+/// The snapshot of the host's game (the [`StateSource`] above, and the
+/// tick-end hook's).
+fn snapshot_host<C: Clock>(h: &pokes::ServerHost<C>) -> state::StateSnapshot {
+    let sim = &h.game;
+    let mut s = state::snapshot_world(&sim.game, &sim.events);
+    if let Some(inv) = sim.world.inventory.as_ref() {
+        overlay_item_places(&mut s, &inv.state);
+    }
+    let d = usize::from(state::difficulty_world(&sim.events)).min(2);
+    for (id, q) in &sim.world.rest.quests {
+        if let Some(e) = sim.game.lists.unit(*id) {
+            s.set_quests(e.guid, state::quest_words(&q.flags[d]));
+        }
+    }
+    s
 }
 
 /// An item in an inventory has a static path on 1.14d whose x, y are its
