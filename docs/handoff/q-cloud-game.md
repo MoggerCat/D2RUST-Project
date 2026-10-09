@@ -227,6 +227,26 @@ first drawn frame was tick 8,569, player still idle at arrival;
   in order"), and `play` panics at `app/play.rs:557` after the dump's exit.
   → `q-fix-render-real-frames-dropped`.
 
+### Round 4 — the four q-fix-render-real fixes (coordinator order)
+
+| Fix | Commit | Cause | Effect on `a1-town-arrival-ama` |
+|---|---|---|---|
+| frames dropped | `8e901eb9` | a floor block shade shortened to the lit rows (`shading.md` §4 floors r3–r4) no longer matched its block in `tile_draws` | the d2rs dump lands on tick 73–75 (was 8,569) |
+| floor range | `efff1b93` | 1.14d calls the floor / wall drawer for tiles with no pixel in the frame; d2rs dropped them | 102 = 102 floor positions (the x = −80 column) |
+| floor variant | `bae084ce` | `preset.md` §3.2 step 4 (client only): the first 0x07 generates the town and streams its 35 rooms in list order; measured with `tools/cloud-game/probe_room_builds.py` | client room order equal to 1.14d's; 102 / 102 floor tiles equal (was 36); floor room order equal |
+| town units | `6bde0318` | staging brings the 25 units into the model; the client object rows then took raw `FrameCnt` (no `fixups.md` §13 ×256): a 1-frame object clamped at −255, frame 0xFFFFFF, every frame dropped | frames drawn with the units |
+| exporter | `d63b91c9` | unit shadows: no unit row in the shadow pass, the cel's file and size instead of the derived `#shadow` frame | shadow rows comparable |
+
+Also `03062e4b`: staging's `app_frame_loop` GPU test reads the install once an adapter exists; it is now `#[ignore = REAL_DATA]` (coordinator's request).
+
+**Now** (`facts-compare --ignore tick`, d2rs tick 74, 1.14d tick 73): equal
+through row 96 (every frame input d2rs measures, `StartDraw`, all 96 floor
+rows); first difference **row 97, column frame**: object `n2` shadow frame
+5 (1.14d) vs 6 (d2rs). Queued: `q-fix-render-real-object-anim` (object frame
+phase, after the tick alignment), `q-fix-render-real-player-pose` (arrival
+direction 0 vs 4, 8 component shadows vs 1), `q-fix-render-real-npc-pose`
+(NPC modes / directions, missing `ck` draws, unit draw count).
+
 ## What the recorders need from Windows, and the Wine plan
 
 Read: `tools/trace-recorder/README.md`, `record_rng.py` (the Win32 base),
