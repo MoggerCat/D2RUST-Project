@@ -217,7 +217,7 @@ what moved it.
    `LevelMin`. Fixed: the level of the init record's room.
 3. Frame 24, town NPC seeds: 1.14d stops the town NPCs' thinks once no
    client sees their room; d2rs keeps them (map AI draws at 24, 32).
-   Measured, no spec: `q-fix-real-npc-sleep-no-client`.
+   Measured: `q-fix-real-npc-sleep-no-client`, a duplicate of `q-fix-p3-room-empty-think` (`ai.md` §1.5 r3, another session).
 
 4. `a1-warp-cave-ama` (Cave Level 1, `warp 9`), frame 21: a berserker
    champion (1:8, umod 39) at hitpoints −6144 vs 3072. 1.14d reads maxhp

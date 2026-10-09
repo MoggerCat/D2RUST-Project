@@ -36,20 +36,20 @@
 |   3. File path | 174–190 |
 |   4. Groups and variants | 191–233 |
 |   5. Requests | 234–310 |
-|   6. Sound tick | 311–559 |
-|   7. Starting on a channel | 560–642 |
-|   8. Volume and pan | 643–778 |
-|   9. Settings | 779–798 |
-|   10. Sample cache | 799–847 |
-|   11. Live data (1.14d) | 848–864 |
-|   12. Edge cases kept | 865–880 |
-|   13. d2rs mapping | 881–891 |
-| Constants & data dependencies | 892–899 |
-| Randomness | 900–910 |
-| Edge cases & original bugs | 911–915 |
-| Test vectors | 916–960 |
-| Provenance | 961–1005 |
-| Open questions | 1006–1093 |
+|   6. Sound tick | 311–567 |
+|   7. Starting on a channel | 568–650 |
+|   8. Volume and pan | 651–786 |
+|   9. Settings | 787–806 |
+|   10. Sample cache | 807–855 |
+|   11. Live data (1.14d) | 856–872 |
+|   12. Edge cases kept | 873–888 |
+|   13. d2rs mapping | 889–899 |
+| Constants & data dependencies | 900–907 |
+| Randomness | 908–918 |
+| Edge cases & original bugs | 919–923 |
+| Test vectors | 924–968 |
+| Provenance | 969–1014 |
+| Open questions | 1015–1102 |
 <!-- /index -->
 
 ## Summary
@@ -536,6 +536,14 @@ At the end of the update, if the tick advanced:
    end tick fits that model (and by how much it jitters) is open
    question 12 (Needs recording).
    PROVISIONAL: a one-shot ends in the first upkeep at which elapsed ticks × 40 ms ≥ the sample's duration (because it is the reading the spec gives as most plausible and the implementation's choice); settled by REC-19.
+   Measured (2026-10-09, pc1-day3-c, REC-576 (3); Windows, sound on, `-w`, a debugger probe with
+   breakpoints only at the start `0x004E01B0` (ECX = request) and the natural-end store `0x004DF8D2`
+   (EAX = request, the slot's voice data size +0x18), so the client ran at full speed; ScnAma walking
+   in the Rogue Encampment for 60 s): 73 footstep one-shots (ids 2768–2771, 16-bit mono at 22,050 Hz,
+   6,423–8,916 frames). End tick − start tick = ceil(frames / 882) + k, with k = +1 in 48 cases, +2 in
+   24, +0 in 1. The wall-clock end comes 30–125 ms after the sample's duration (the 50 ms service
+   thread wake plus the next sound tick). The original's offset is wall-clock dependent and not exact
+   in ticks; the closest deterministic model is ceil(frames / 882) + 1 (the mode in every id).
 4. **Device side of the natural end** (ST-4 remainder, `0x005153C0`,
    `0x005155D0`, `0x00515180`, `0x00515300`, `0x00516250`). Each
    in-memory voice is a looping DirectSound buffer of 0x20000 bytes
@@ -1002,6 +1010,7 @@ service thread `0x00516250`; gain writer `0x00515CE0` and its 15 call
 sites, fade `0x00515F50`, front-end stream `0x00514780`, `0x00514840`,
 `0x00514930`; async reads `0x0040A620`, `0x0040A390`, `0x0040A7F0`,
 `0x0041AAD0`. Seed users: `audio/sound-table-2.md` Provenance.
+- 2026-10-09 (pc1-day3-c, REC-576 (3) / OQ 12): one-shot start / natural-end ticks recorded on Windows with sound (scratch probe, two breakpoints), §6.6 r3.
 
 ## Open questions
 
@@ -1056,7 +1065,7 @@ sites, fade `0x00515F50`, front-end stream `0x00514780`, `0x00514840`,
     load latency); settled by REC-19 (async loads).
 11. Answered (§12 r2): −2³¹ from `cvttsd2si`, then wrapping integer
     steps; silent at the device.
-12. Needs recording (ST-4, §6.6 r3): the sound tick at which one-shots
+12. *Recorded (2026-10-09, §6.6 r3)*: footsteps end at ceil(frames / 882) + 1 ticks (mode; +2 in a third of starts, rarely +0); `Async Only` (OQ 13) not recorded yet. Original question (ST-4, §6.6 r3): the sound tick at which one-shots
     end. Record, for a set of known one-shots (e.g. `cursor_pass` 1,124
     frames, footsteps, `item_pickup`), the tick of the `0x004E01B0`
     start and the tick of the `0x004DF890` natural end (hook the store of
@@ -1068,7 +1077,7 @@ sites, fade `0x00515F50`, front-end stream `0x00514780`, `0x00514840`,
     PROVISIONAL: end tick = start tick + ceil(frames / 882) (because
     the device plays 882 frames per 40 ms tick); settled by REC-19
     (one-shot lengths).
-13. Needs recording (ST-7, §10 r6): for `Async Only` sounds, the tick of
+13. (Observation 2026-10-09, pc1-day3-c: breakpoints at the async issue `0x00482AFC`, the pending check `0x00482BE1` and the collect `0x00482BF0`, 60 s of Rogue Encampment walking with sound on: none was hit, so no `Async Only` read started in that play; a run that starts an unloaded `Async Only` id is still needed.) Needs recording (ST-7, §10 r6): for `Async Only` sounds, the tick of
     the first start attempt (async read started, `0x00482AE4` path) and
     of the collecting preload pass (`0x00482BF0`, T); settles whether the
     read is always finished by the next pass at T ≡ 0 (mod 25). Binary

@@ -276,3 +276,56 @@ spawn.
     (4801 at f103, …).
 - The d2rs side runs with the same command without `--orig-only`; it
   needs the d2-client from that branch (the cloud runs it).
+
+### Items 45 and 46: both sides (pc1-data Step 4)
+- Run with `scenario_diff.py <check> --reuse`: the 1.14d side is item 5's
+  recording; d2rs is the staging d2-client built on PC 1.
+- **combat-melee-fallen: the melee itself matches.**
+  - Both sides: player mode 7 at f40; the nearest Fallen (1.14d 21,
+    d2rs 19) is killed by the one swing (mode 0, hp 0 at f46, mode 12 at
+    f66); the player is back to mode 1 at f55.
+  - The leader's f41 choice still differs (A2 vs S2, the known
+    `q-fix-c2-fallen-s2-choice`), and the pack's modes follow from it.
+- **combat-potion-midfight: d2rs never drinks.**
+  - 1.14d sends C→S `26 02000000 …` in frame 69's input phase, and the
+    player's hp rises 80 a frame from f70.
+  - d2rs sends no C→S message after the join and its hp stays 2560 →
+    `q-fix-b45-belt-key-no-send`.
+  - d2rs also takes no Fallen damage (known: `q-fix-c1-monster-melee-rule`).
+- **First difference in both checks:**
+  - state, f2: save-loaded items have seed [1, 666] in d2rs, the real
+    seed in 1.14d → `q-fix-b45-save-item-seed`;
+  - packets, f1: C→S 0x67 byte 18 is 0 in 1.14d and 4 (the class) in
+    d2rs → `q-fix-b45-createxgame-byte18`.
+  - Then the Blood Moor warp population (known:
+    `q-fix-b-bloodmoor-warp-population`).
+
+### [q-fix-b-monster-combat] Quill Rat at frame 59 (answered)
+- **Correction:** my earlier note ("the rat is placed elsewhere") was
+  wrong. In 1.14d the rat is at the poke point (5147, 4267), exactly as in
+  d2rs. The arrows (missile class 0) reach it at f41–42 and f53–54 and do
+  0 damage, because ScnAma has no bow.
+- **1.14d rat lines, f30–64** (from
+  `traces/raw/check-combat-arrow-quillrat/orig.state.jsonl`, the
+  `record_state.py` output; every row x 5147, y 4267, hp 1280):
+
+  | Frames | Mode | Seed s |
+  |---|---|---|
+  | 30 | 1 | [21370634, 838424606] |
+  | 31–35 | 5 | [2409280208, 8913528] (think, 1 draw) |
+  | 36–43 | 5 | [4094205064, 1004892389] (quill 1 created at f36) |
+  | 44–45 | 1 | same |
+  | 46–58 | 1 | [1069704589, 1707661690] (quill 1's to-hit at the player at f46: a miss, 1 owner step, REC-826) |
+  | 59–63 | **5** | **[1069704589, 1707661690], unchanged** |
+  | 64 | 5 | [3163442939, 446165621] (quill 2 created) |
+
+- **Answer:** the f59 think takes A2 with no draw on the rat's seed (the
+  same seed from f46 to f63). That is `monsters/ai-bodies.md` §9.7 r8 step
+  3: AI state 3 / 19 → A2, no draw. The arrow that reached the rat at
+  f54 set state 19 even with 0 damage (a hit with no get-hit mode), and
+  the 0x005A68E0 rule turns 19 into 3 when the next non-neutral mode is
+  left.
+- So the cloud's draw count is right: no extra draws make P(35) pass,
+  because 1.14d takes no draw there. d2rs walks because it never stores
+  the AI state (`q-fix-c3-quillrat-choice`). The arrows **do** cause it:
+  they set the state. A run without arrows would differ in 1.14d too.

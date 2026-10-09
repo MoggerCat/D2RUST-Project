@@ -42,6 +42,14 @@ milestone main-skill-kill
   note the class's main skill (right) at the Quill Rat, five casts 30 frames apart; the Quill Rat is set to 1 hp so one hit kills on every difficulty (Hell monsters have thousands of hp)
   need unit ut 1 g @p1 dead
 
+milestone cast-then-walk
+  use main
+  deadline 160
+  poke 5 warp 2
+  input frame 40; rclick 448 324; frame 100; click 300 300
+  note one cast of the main skill, then a walk click 60 frames later (the cast is over by then)
+  need player moved >= 3 since 99
+
 milestone summon-cast
   only class ama,nec,dru,ass
   use summon
