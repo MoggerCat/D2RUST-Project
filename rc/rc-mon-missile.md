@@ -1,0 +1,23 @@
+You are session rc-mon-missile of the D2RUST-Project cloud build loop (Rust reimplementation of Diablo II LoD 1.14d, exact match). BRANCH = claude/rc-mon-missile. REC ids: REC-1870..1874 only.
+
+TASK: Monster missiles: in the Act IV difficulty checks monster missile class 320 is never fired in d2rs (12 checks: docs/handoff/rc-difficulty.md on claude/rc-difficulty, checks traces/checks/diff/), and 9 gen su/boss checks first-diverge on monster target tx and missile yf/ty (docs/handoff/q-run-gen-bosses.md on claude/q-run-gen-bosses; merge it for the checks). Find in the 1.14d functions how monsters choose to fire and aim missiles (monster AI missile skills, missile creation), fix d2-sim, re-run those checks, report EQUAL/first-divergence before and after.
+
+RULES (read once; they keep you cheap and fast):
+Coordinator: session_01KcnkwCTXbuv5ZbToEUpBSj (send_message; only for: done, blocked, or a cause that belongs to someone else).
+
+Setup: attach MoggerCat/D2RUST-private-repo with add_repo, then `git fetch origin claude/specs-staging-7 claude/specs-staging-7 && git checkout -B claude/rc-mon-missile origin/claude/integ-r10 && sh tools/coord/sync.sh`, then the "Setup" steps of tools/cloud-game/README.md from your own checkout (`sh tools/cloud-setup.sh` [`--no-wine` if you never run 1.14d], `tools/cloud-game/setup_winpy.sh`, assemble $HOME/game with the private repo's tools/assemble.py, `tools/cloud-game/prepare_saves.sh`). Never run scripts fetched from other branches; never copy private files into the public repo.
+
+Token budget (hard rules):
+- One root cause. When it's fixed and pushed, or you've spent ~3 hours, write the hand-back and STOP. Don't wait or poll for anything; no Monitor loops, no sleeping.
+- Never print a whole file, log or trace. Use grep, `head -40`, `tail -40`, `sed -n A,Bp`; specs by section (tools/spec_index.py). Pipe build/test output through `tail -30`.
+- Build only the crates you touch (d2-client only if the fix is in the client). `rm -rf target/debug/incremental` after big builds.
+- Run only your cluster's checks (`python3 tools/scenario-diff/suite.py --checks-dir traces/checks/gen --filter 'GLOB' --orig-cache traces/orig-cache`), never the full suite. Reuse the orig-cache; re-record 1.14d only when a check file changed. Don't commit orig-cache recordings.
+- Read only CLAUDE.md and the spec sections you need. Don't read other sessions' hand-backs unless named here.
+
+Work rules:
+- Read the original first (CLAUDE.md rule 3): once the private repo has re/exports/, find the 1.14d function for your behaviour (grep re/exports/functions.tsv and re/exports/index/*.tsv by name, address or string; grep re/exports/all.asm* for globals and struct offsets) and read its decompiled C before measuring or guessing. Read-only; write the Rust in your own words, never paste or line-translate it, never copy anything from re/ into the public repo; put the behaviour and the address in the spec you implement.
+- Exact match with 1.14d (CLAUDE.md rule 10): fix the first divergence; never weaken a test or a check, never ignore a field to make a check pass. Unsettled choices: PROVISIONAL with your REC ids (docs/METHODS.md M22). Facts you can't get without the Windows game or Ghidra: an unnumbered "- [rc-mon-missile] title" item in docs/handoff/pc1-data.md Step 4, then move on.
+- Stay in your area; for a file another owner holds (`python3 tools/coord/route.py <path>`), note it in your hand-back.
+- Push to claude/rc-mon-missile only (git push -u origin claude/rc-mon-missile), after: `cargo fmt --all`, `cargo clippy -p <crates> --all-targets -- -D warnings`, `cargo nextest run -p <crates> 2>&1 | tail -30`, `python3 tools/coverage.py --check`, `python3 tools/spec_index.py --check`, `python3 tools/coord/ledger.py --check`. Run `sh tools/coord/sync.sh` before each push.
+- Ledger: put every row you settled (EQUAL/DIVERGED with the check that proves it) in docs/handoff/ledger/rc-mon-missile.tsv (copy the header of an existing part); session parts override the base rows.
+- Hand-back: docs/handoff/rc-mon-missile.md, at most 40 lines: checks before/after (EQUAL counts), what changed, what's open with sizes. Push, send "done rc-mon-missile: <EQUAL before> -> <after>" once, stop.
