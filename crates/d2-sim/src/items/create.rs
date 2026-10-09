@@ -397,6 +397,12 @@ pub fn normal<S: ItemStats>(
     item: &mut Item<S>,
     rq: &ItemRequest,
 ) -> Result<(), Fatal> {
+    // PROVISIONAL (REC-1400, generation.md §6.1): 1.14d recording
+    // `items-ground-many`: poked quality-2 items read flags 0x80010 while
+    // magic / rare / set / unique read 0x10 clear, so the normal routine
+    // leaves flag 0x10 (identified) set. Superior and low quality: no
+    // recording yet.
+    item.flags |= flag::IDENTIFIED;
     let is = |x: u16| t.is_type(item.record, x as i16);
     let (charm, body, play, scro, book) = (
         is(ty::CHAR),
