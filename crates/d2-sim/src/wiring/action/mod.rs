@@ -77,18 +77,6 @@ pub use objects::{
 };
 pub use pending::{KillStep, NoPending, Pending, QuestEvent, SkillEvent};
 
-/// A laid trap (d2rs-own, unverified; REC-233): the skill that laid it, its
-/// level and the shots left.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Sentry {
-    pub owner: UnitId,
-    pub skill: i32,
-    pub level: i32,
-    pub shots: i32,
-    /// The frame of the next possible shot.
-    pub next: i32,
-}
-
 /// The tables the action modules read (typed `d2_data` records).
 #[derive(Debug, Clone)]
 pub struct ActionTables {
@@ -258,6 +246,10 @@ pub struct ActionHooks<X> {
     /// COF name. `None`: no record for any unit (as before the table is
     /// given).
     pub anim_data: Option<Arc<AnimData>>,
+    /// The monsters' skill sequences (`skills/sequences.md` §1 rules 2
+    /// and 5: monstats slot sequences and `monseq`), loaded for a monster
+    /// in mode 14. `None`: a monster's mode 14 plays its AnimData record.
+    pub monster_sequences: Option<Arc<crate::skills::sequences::MonsterSequences>>,
     /// `experience.txt` / `charstats.txt` of the experience on a kill
     /// (`combat/vitals.md` §4). `None`: no experience is given.
     pub vitals: Option<Arc<VitalsTables>>,
@@ -334,9 +326,13 @@ pub struct ActionHooks<X> {
     /// The players' pet lists (player data +0x44, `sim/pets.md` §1),
     /// created on a player's first summon ([`crate::wiring::interaction::summon`]).
     pub pet_lists: BTreeMap<UnitId, crate::player::pets::PetLists>,
-    /// The laid traps (d2rs-own, unverified; q-assassin-gaps, REC-233):
-    /// the host's sentry think shoots and spends their shots.
-    pub sentries: BTreeMap<UnitId, Sentry>,
+    /// The skill entries a summon's `set_skill` (`skills/bodies.md` §6.5
+    /// step 6, `0x0056DEB0`: the entry of the skill with owner −1, added
+    /// when missing, base level := v) gives a monster: skill id → base
+    /// level. The AI reads them (`monsters/ai-bodies-6.md` §14 `Skill1`
+    /// entry and level); a monster without one asks
+    /// [`Pending::ai_skill_entry`].
+    pub monster_skills: BTreeMap<UnitId, BTreeMap<i32, i32>>,
     /// The inactive-unit store (game +0xD8, `units.md` §3.4;
     /// [`inactive`]). `None` (the default): tick step 9 compresses
     /// nothing and the restore is the host's, as before.
@@ -404,6 +400,7 @@ impl<X> ActionHooks<X> {
             act_changes: Vec::new(),
             removed_items: Vec::new(),
             anim_data: None,
+            monster_sequences: None,
             vitals: None,
             mode_target: None,
             monster_request: 0,
@@ -422,7 +419,7 @@ impl<X> ActionHooks<X> {
             session: switch::SessionState::default(),
             skill_lists: BTreeMap::new(),
             pet_lists: BTreeMap::new(),
-            sentries: BTreeMap::new(),
+            monster_skills: BTreeMap::new(),
             inactive: None,
             x,
             orphan_seed: Seed::init(),

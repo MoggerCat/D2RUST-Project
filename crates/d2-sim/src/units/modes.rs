@@ -109,10 +109,10 @@ pub fn set_mode<H: UnitHooks>(
     Ok(())
 }
 
-/// Prepare animation `0x005533D0` (§4.1).
-///
-/// TODO(units.md §4.1): the frame count is read as set from the AnimData
-/// record in both branches (the sentence lists it after them).
+/// Prepare animation `0x005533D0` (§4.1). The frame count +0x48: the
+/// sequence's count · 256 in the sequence branch (`skills/sequences.md`
+/// §2 step 2; that branch leaves it, `0x0055341A`–`0x0055343B`), the
+/// AnimData record's frames · 256 otherwise.
 pub fn prepare_animation<H: UnitHooks>(
     sim: &mut Sim<'_>,
     hooks: &mut H,
@@ -139,8 +139,9 @@ pub fn prepare_animation<H: UnitHooks>(
     let record = hooks.anim_record(sim, unit);
     let a = &mut record_mut(sim, unit)?.anim;
     a.action_frame = 0;
-    if sequence.is_some() {
-        a.sequence = sequence;
+    if let Some(seq) = sequence {
+        a.frame_count = seq.frame_count;
+        a.sequence = Some(seq);
     } else {
         a.sequence = None;
         a.frame = 0;
@@ -149,7 +150,7 @@ pub fn prepare_animation<H: UnitHooks>(
         }
     }
     a.record = record;
-    if let Some(r) = record {
+    if let (None, Some(r)) = (&a.sequence, record) {
         a.frame_count = (r.frames as i32).wrapping_mul(256);
     }
     Ok(())

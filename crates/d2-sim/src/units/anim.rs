@@ -1,8 +1,10 @@
-// Spec: specs/sim/units.md §4.2, §4.4
+// Spec: specs/sim/units.md §4.2, §4.4; specs/skills/sequences.md §3
 //! Mode schedules: the animation schedule of events 0 and 1 (§4.2, the
 //! main form `0x005539B0` and the variants `0x00553B10`, `0x00553C70`,
 //! `0x00553DC0`) as a pure function of its inputs, and its application
-//! to the timer queue; the every-tick movement event (§4.4).
+//! to the timer queue; the every-tick movement event (§4.4); the
+//! sequence branch of the frame advance `0x00623E00`
+//! ([`advance_sequence`]).
 
 use thiserror::Error;
 
@@ -289,4 +291,39 @@ pub fn every_tick_movement(game: &mut Game, unit: UnitId) -> Result<(), GameErro
         .schedule_every_tick(owner, u32::from(event::MODE_CHANGE), None, 0, 0)
         .map_err(GameError::from)?;
     Ok(())
+}
+
+/// The sequence branch of the frame advance `0x00623E00`
+/// (`skills/sequences.md` §3): +0x4E := 0; p = +0x38 + +0x3C, minus
+/// +0x34 once when ≥ +0x34; +0x38 := p; +0x48 −= +0x3C; then the frame
+/// setup with b = the old +0x38 stores in +0x4E the event byte of frame
+/// p (p = b), else the last non-zero event byte of frames (b >> 8) + 1 …
+/// p >> 8 (0 when none or the range is empty). False (nothing done)
+/// without a sequence. The drawn mode and frame (+0x40, +0x44) are not
+/// kept: the sequence holds only the event bytes.
+pub fn advance_sequence(anim: &mut Anim) -> bool {
+    let Some(seq) = anim.sequence.as_mut() else {
+        return false;
+    };
+    let old = seq.pos;
+    let mut p = old.wrapping_add(seq.speed);
+    if p >= seq.frame_count {
+        p = p.wrapping_sub(seq.frame_count);
+    }
+    seq.pos = p;
+    anim.frame_count = anim.frame_count.wrapping_sub(seq.speed);
+    let byte = |i: i32| {
+        usize::try_from(i)
+            .ok()
+            .and_then(|i| seq.events.get(i))
+            .copied()
+            .unwrap_or(0)
+    };
+    let (a, b) = (p >> 8, old >> 8);
+    anim.action_frame = if p == old {
+        byte(a)
+    } else {
+        (b + 1..=a).rev().map(byte).find(|&e| e != 0).unwrap_or(0)
+    };
+    true
 }

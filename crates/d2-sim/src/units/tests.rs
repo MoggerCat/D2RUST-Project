@@ -1370,3 +1370,55 @@ fn expire_minus_one_becomes_every_tick_without_callback() {
     game.timers.cancel_unit_events_with_callback(m, 2, cb);
     assert!(pending(&game, m).contains(&(2, -1, 11, 22)));
 }
+
+// ---- the frame advance's sequence branch (`skills/sequences.md` §3) ------------
+
+// Covers: specs/skills/sequences.md §3
+#[test]
+fn the_sequence_advance_counts_down_and_reads_the_crossed_event_bytes() {
+    use super::anim::advance_sequence;
+    use super::record::{Anim, Sequence};
+    let mut a = Anim {
+        sequence: Some(Sequence {
+            frame_count: 4 * 256,
+            speed: 256,
+            pos: 0,
+            events: vec![0, 0, 1, 0],
+        }),
+        frame_count: 4 * 256,
+        action_frame: 9,
+        ..Anim::default()
+    };
+    let mut seen = Vec::new();
+    for _ in 0..4 {
+        assert!(advance_sequence(&mut a));
+        seen.push((
+            a.sequence.as_ref().unwrap().pos,
+            a.frame_count,
+            a.action_frame,
+        ));
+    }
+    // +0x38 wraps once past +0x34; +0x48 counts down to 0 (complete);
+    // +0x4E is the event byte of the frame crossed into.
+    assert_eq!(
+        seen,
+        vec![(256, 768, 0), (512, 512, 1), (768, 256, 0), (0, 0, 0)]
+    );
+    // A step of 0 (p = b) reads that frame's byte; a step over several
+    // frames reads the last non-zero byte crossed.
+    let seq = a.sequence.as_mut().unwrap();
+    seq.pos = 2 * 256;
+    seq.speed = 0;
+    advance_sequence(&mut a);
+    assert_eq!(a.action_frame, 1);
+    let seq = a.sequence.as_mut().unwrap();
+    seq.pos = 0;
+    seq.speed = 3 * 256;
+    advance_sequence(&mut a);
+    assert_eq!(a.action_frame, 1);
+    // No sequence: nothing.
+    a.sequence = None;
+    a.action_frame = 7;
+    assert!(!advance_sequence(&mut a));
+    assert_eq!(a.action_frame, 7);
+}

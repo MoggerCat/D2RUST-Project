@@ -1,4 +1,4 @@
-// Spec: specs/skills/use.md §1–§7; specs/skills/bodies.md (BodyWorld); specs/missiles/missiles.md §R2; specs/sim/units.md §4.1; specs/sim/tick.md §5.2–§5.4; specs/sim/stat-lists.md §4, §8.1, §9.2
+// Spec: specs/skills/use.md §1–§7; specs/skills/bodies.md (BodyWorld); specs/missiles/missiles.md §R2; specs/sim/units.md §4.1, §4.2; specs/sim/tick.md §5.2–§5.4; specs/sim/stat-lists.md §4, §8.1, §9.2
 //! Skill use → missiles, combat and the timers: the seams of
 //! [`crate::skills::use_`] on the action wiring's providers.
 //!
@@ -33,6 +33,7 @@ use crate::skills::use_::{
 use crate::skills::{KickItems, ManaUnits, SkillEntry, SkillUnits};
 use crate::stats::lists::{ListId, RemoveCallback};
 use crate::tick::events::event;
+use crate::units::anim::{self, Form};
 use crate::units::{RoomId, UnitId, UnitType};
 use crate::wiring::action::combat::CombatView;
 use crate::wiring::action::{ActionSim, Pending, View, WiringError};
@@ -259,6 +260,16 @@ impl<X: Pending + UseRest> UseView<'_, X> {
     }
     fn error(&mut self, e: WiringError) {
         self.cv.v.h.errors.push(e);
+    }
+    /// A §4.2 variant (`sim/units.md`) on the unit's own animation
+    /// fields: cancel its type-0 / type-1 events, reschedule, set +0x44.
+    fn anim_variant(&mut self, u: UnitId, form: Form) {
+        let Some(rec) = self.cv.v.units.get_mut(u) else {
+            return;
+        };
+        if let Err(e) = anim::run(self.cv.game, u, &mut rec.anim, form) {
+            self.error(WiringError::Unit(e.into()));
+        }
     }
 }
 
@@ -1284,14 +1295,18 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     fn skill_sequence(&self, u: UnitId) -> Option<Vec<[u8; 6]>> {
         self.x().skill_sequence(u)
     }
+    /// `0x0056E210` → `0x00553B10` (`sim/units.md` §4.2 variants).
     fn anim_rewind(&mut self, u: UnitId, p: i32) {
-        self.xm().anim_rewind(u, p);
+        self.anim_variant(u, Form::Percent(p));
     }
+    /// `0x00553C70` (`sim/units.md` §4.2 variants).
     fn anim_restart(&mut self, u: UnitId, v: i32) {
-        self.xm().anim_restart(u, v);
+        self.anim_variant(u, Form::Frames(v));
     }
+    /// `0x00553DC0` (`sim/units.md` §4.2 variants): Leap's and Leap
+    /// Attack's frame-10 rewind, Whirlwind's frame 3.
     fn anim_from(&mut self, u: UnitId, f: i32) {
-        self.xm().anim_from(u, f);
+        self.anim_variant(u, Form::StartFrame(f));
     }
     /// `0x00620BB0`.
     fn unit_room(&self, u: UnitId) -> Option<RoomId> {

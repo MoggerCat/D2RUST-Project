@@ -1,4 +1,4 @@
-// Spec: specs/skills/bodies-2.md (Charge, §5.4), specs/skills/bodies-2b.md (Blessed Hammer, §6.9), specs/sim/pathing.md (§2, §3, §8.1)
+// Spec: specs/skills/bodies-2.md (Charge, §5.4), specs/skills/bodies-2b.md (Blessed Hammer, §6.9), specs/sim/pathing.md (§2, §3, §8.1, §10, §13.2), specs/skills/use.md (§4)
 //! The path operations the skill bodies make on a unit's path
 //! ([`PathOp`]), on the path provider of the action wiring: velocity,
 //! target point and unit, path type, step counts, the two masks and the
@@ -40,20 +40,24 @@ pub fn path_op<X: Pending>(
     Some(0)
 }
 
-/// A skill whose mode is the run (3) used at a point (Charge): the
-/// path's target point `0x00648AD0` (`pathing.md` §8.1), so the start's
-/// compute has a goal. Other modes and unit targets are the mode
-/// start's.
-// d2rs-own, unverified: where a skill mode's point target reaches the
-// path is not specified (`use.md` §4); the run is the only mode taken.
-pub fn run_to_point<X: Pending>(
+/// A skill mode started at a point: the path's target point `0x00648AD0`
+/// (target unit := none), the point every skill reads back through the
+/// target position `0x0056D2C0` (`pathing.md` §13.2: the path's target
+/// point when the target unit is none) and the skill message 0x4D sends
+/// (`pathing.md` §10 rule 2: target x, y = the path target). Charge's run
+/// (mode 3) computes its path to it. Unit targets are the mode start's.
+// PROVISIONAL (use.md §4, REC-440): the point-form start `0x0057FE90` is
+// read as writing the point with `0x00648AD0`, since `0x0056D2C0` (Leap,
+// Whirlwind, the `lineofsight` test) and the 0x4D builder read only the
+// path's +0x10 / +0x12; settled by the 0x4D bytes another client gets
+// for a Leap at a point (R-SKPT-1).
+pub fn point_target<X: Pending>(
     v: &mut View<'_, X>,
     unit: UnitId,
-    mode: u32,
     target: crate::skills::use_::ModeTarget<UnitId>,
 ) {
     use crate::skills::use_::ModeTarget;
-    if let (3, ModeTarget::Point(x, y)) = (mode, target) {
+    if let ModeTarget::Point(x, y) = target {
         v.h.path_set_target_point(unit, x, y);
     }
 }

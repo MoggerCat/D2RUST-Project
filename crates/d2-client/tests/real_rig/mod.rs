@@ -24,6 +24,7 @@ use d2_client::app::single_player::{self, BuildError, Link};
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::local::{LocalLink, PendingSession};
 use d2_client::bridge::mirror::DynLink;
+use d2_client::bridge::predict::WalkTap;
 use d2_client::bridge::BridgeResource;
 use d2_client::world_view::tile_assets::TileAssets;
 use d2_data::tables::Skills;
@@ -83,6 +84,9 @@ pub struct Rig {
     pub app: App,
     pub ms: Arc<AtomicU32>,
     pub link: Arc<Mutex<ThreadLink<Link<StepClock>>>>,
+    /// The walks the rig sends, as the play app's `PredictLink` records
+    /// its own: hand it to `add_walk` so the client walks them too.
+    pub tap: WalkTap,
 }
 
 impl Rig {
@@ -129,7 +133,12 @@ impl Rig {
         );
         add_preview(&mut app, levels, TileAssets::default());
         crate::app_support::live_tables(&mut app);
-        let mut r = Rig { app, ms, link };
+        let mut r = Rig {
+            app,
+            ms,
+            link,
+            tap: WalkTap::default(),
+        };
         while r.joined().is_none() {
             r.step(1);
         }
@@ -182,6 +191,7 @@ impl Rig {
     }
 
     fn send(&mut self, msg: &[u8]) {
+        self.tap.record(msg);
         self.link
             .lock()
             .unwrap()

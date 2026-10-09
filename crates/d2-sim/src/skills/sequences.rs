@@ -1,9 +1,13 @@
-// Spec: specs/skills/sequences.md
-//! Player skill sequences: the table `0x007483B8` (§4, compiled from
+// Spec: specs/skills/sequences.md; specs/data/callbacks.md §4
+//! Skill sequences: the player table `0x007483B8` (§4, compiled from
 //! `specs/skills/sequences.tsv`, 23 sequences × 14 COF weapon classes)
-//! and its lookup `0x00663310` for a player (§1 rule 4).
+//! and its lookup `0x00663310` for a player (§1 rule 4); the monsters'
+//! `monseq` sequences ([`MonsterSequences`], §1 rules 2 and 5).
 
 use std::sync::OnceLock;
+
+use d2_data::bin::BinTable;
+use d2_data::tables::Monseq;
 
 /// The table as dumped from the 1.14d image (§4).
 pub const SEQUENCES_TSV: &str = include_str!("../../../../specs/skills/sequences.tsv");
@@ -121,6 +125,74 @@ pub fn lookup(seqnum: u8, class: usize) -> Option<&'static [SeqFrame]> {
     table().get(usize::from(seqnum))?.get(class)?.as_deref()
 }
 
+/// `DiabPrison`: no sequence for a monster (§1 rule 2).
+const DIAB_PRISON: i32 = 199;
+
+/// The monsters' sequences (§1 rules 2 and 5): per monstats row the slot
+/// sequences of its `Skill1`…`Skill8` (`data/callbacks.md` §4: the
+/// skill u16 at 368 + 2i, the sequence u16 at 392 + 2i written by the
+/// `Sk<i>mode` callback, 0xFFFF none) and the `monseq` frame lists by
+/// sequence index.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct MonsterSequences {
+    /// Per monstats row: (skill, sequence) of slots 0–7, both i16.
+    pub slots: Vec<[(i16, i16); 8]>,
+    /// The frames of each `monseq` sequence, in row order.
+    pub lists: Vec<Vec<SeqFrame>>,
+}
+
+impl MonsterSequences {
+    /// From the fixed-up `monstats` table and the `monseq` rows.
+    pub fn from_tables(monstats: &BinTable, monseq: &[Monseq]) -> Self {
+        let i16_at = |r: &[u8], o: usize| {
+            r.get(o..o + 2)
+                .map_or(-1, |b| i16::from_le_bytes([b[0], b[1]]))
+        };
+        let slots = monstats
+            .iter()
+            .map(|r| std::array::from_fn(|i| (i16_at(r, 368 + 2 * i), i16_at(r, 392 + 2 * i))))
+            .collect();
+        let mut lists: Vec<Vec<SeqFrame>> = Vec::new();
+        for m in monseq {
+            let k = usize::from(m.sequence);
+            if lists.len() <= k {
+                lists.resize_with(k + 1, Vec::new);
+            }
+            lists[k].push(SeqFrame {
+                mode: m.mode,
+                frame: m.frame,
+                event: m.event,
+            });
+        }
+        Self { slots, lists }
+    }
+
+    /// `0x00663310` for a monster of `class` using `skill` (§1 rules 2,
+    /// 3, 5): the slot whose `Skill<i+1>` is the skill gives the
+    /// sequence s; s ≤ 0 or no slot → none; else `monseq` record s.
+    // PROVISIONAL (sequences.md §1 rule 5, REC-441): `0x00659E30(s)` is
+    // read as the frame list of the `monseq` rows of sequence s (their
+    // 6-byte rows have §3's frame layout: +2 mode, +3 frame, +5 event),
+    // length and count = their number; settled by a read of `0x00659E30`
+    // or a Lightning Sentry recording (R-SENTRY-1: its shot ticks).
+    pub fn lookup(&self, class: usize, skill: i32) -> Option<&[SeqFrame]> {
+        if skill == DIAB_PRISON {
+            return None;
+        }
+        let s = self
+            .slots
+            .get(class)?
+            .iter()
+            .find(|&&(k, _)| i32::from(k) == skill)
+            .map_or(0, |&(_, s)| s);
+        if s <= 0 {
+            return None;
+        }
+        let list = self.lists.get(usize::try_from(s).ok()?)?;
+        (!list.is_empty()).then_some(list.as_slice())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -160,5 +232,80 @@ mod tests {
     fn a_wrong_count_is_an_error() {
         let bad = "seqnum\tclasses\tcount\tframes\tevents\tlist_va\n13\thth\t2\tS1.0\t\t0x1";
         assert!(parse(bad).unwrap_err().contains("count"));
+    }
+
+    // Covers: specs/skills/sequences.md §1 r2, §1 r3, §1 r5
+    #[test]
+    fn a_monster_takes_the_monseq_list_of_its_skill_slot() {
+        let f = |frame, event| SeqFrame {
+            mode: 9,
+            frame,
+            event,
+        };
+        let m = MonsterSequences {
+            // Class 0: slot 1 is skill 306 with sequence 2; slot 0 skill
+            // 5 without one; slot 2 skill 199 (DiabPrison) with 2.
+            slots: vec![[
+                (5, -1),
+                (306, 2),
+                (199, 2),
+                (7, 0),
+                (-1, -1),
+                (-1, -1),
+                (-1, -1),
+                (-1, -1),
+            ]],
+            lists: vec![vec![f(0, 0)], Vec::new(), vec![f(0, 0), f(1, 1)]],
+        };
+        assert_eq!(m.lookup(0, 306), Some(&[f(0, 0), f(1, 1)][..]));
+        // No sequence on the slot (−1), sequence 0, DiabPrison, a skill
+        // in no slot, a class past the table: none.
+        assert_eq!(m.lookup(0, 5), None);
+        assert_eq!(m.lookup(0, 7), None);
+        assert_eq!(m.lookup(0, 199), None);
+        assert_eq!(m.lookup(0, 8), None);
+        assert_eq!(m.lookup(1, 306), None);
+        // An empty list: none.
+        let mut e = m.clone();
+        e.slots[0][1].1 = 1;
+        assert_eq!(e.lookup(0, 306), None);
+    }
+
+    // Covers: specs/skills/sequences.md §1 r5
+    #[test]
+    fn monster_sequences_read_the_slots_and_group_the_rows() {
+        use d2_data::bin::BinTable;
+        // Two monstats rows: Skill1 at 368, its sequence at 392.
+        let mut row = vec![0u8; 408];
+        row[368..370].copy_from_slice(&306i16.to_le_bytes());
+        row[392..394].copy_from_slice(&1i16.to_le_bytes());
+        for i in 1..8 {
+            row[368 + 2 * i..370 + 2 * i].copy_from_slice(&(-1i16).to_le_bytes());
+            row[392 + 2 * i..394 + 2 * i].copy_from_slice(&(-1i16).to_le_bytes());
+        }
+        let t = BinTable {
+            name: "monstats".into(),
+            source: String::new(),
+            count: 2,
+            record_size: 408,
+            records: [row.clone(), row].concat(),
+        };
+        let rows =
+            [(0, 1, 0, 0), (1, 9, 0, 0), (1, 9, 1, 2)].map(|(sequence, mode, frame, event)| {
+                Monseq {
+                    sequence,
+                    mode,
+                    frame,
+                    dir: 0,
+                    event,
+                }
+            });
+        let m = MonsterSequences::from_tables(&t, &rows);
+        assert_eq!(m.slots.len(), 2);
+        assert_eq!(m.slots[1][0], (306, 1));
+        assert_eq!(m.slots[1][7], (-1, -1));
+        assert_eq!(m.lists.len(), 2);
+        let ev: Vec<u8> = m.lookup(1, 306).unwrap().iter().map(|f| f.event).collect();
+        assert_eq!(ev, vec![0, 2]);
     }
 }
