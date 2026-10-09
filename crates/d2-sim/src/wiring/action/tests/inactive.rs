@@ -149,3 +149,112 @@ fn a_kept_portal_is_placed_again() {
     assert_eq!(fx.game.lists.unit(p).and_then(|e| e.room()), Some(a));
     assert_ne!(fx.sim.sys.units.get(p).unwrap().flags & 0x10, 0);
 }
+
+/// The town round trip (q-fix-pc1-proto-items): the preset pass
+/// (`0x005559A0` → `0x005557D0`) gives every unit it creates unit flags
+/// 0x3000000 (`population.md` §11.1), so in a level without
+/// `SaveMonsters` a preset object (a waypoint, a stash; their objects
+/// rows have `Restore` 1) is `S` (flag 0x2000000) and stored when its
+/// room is freed (§3.3),
+/// and a warp tile is stored as always; the room's restore re-creates
+/// both at their places, as new units with the flags (§3.4 rule 4.3,
+/// `rooms.md` §8 rule 6). Before the fix the preset object had no flags,
+/// was freed without a record and never came back.
+// Covers: specs/sim/units.md §3.3 text, §3.4 r4; specs/monsters/population.md §11.1; specs/drlg/rooms.md §8 r6
+#[test]
+fn preset_objects_and_tiles_come_back_after_their_room_is_freed() {
+    use crate::drlg::PresetUnit;
+    use crate::world::objects::ObjectTables;
+    use d2_data::tables::{Levels, Objects};
+    use std::collections::BTreeMap;
+    use std::sync::Arc;
+
+    const WAYPOINT: u32 = 0;
+    const STASH: u32 = 1;
+    const TILE: u32 = 3;
+    let preset = |unit_type, class, x, y| PresetUnit {
+        unit_type,
+        class,
+        x,
+        y,
+    };
+    let mut presets = BTreeMap::new();
+    presets.insert(
+        (0, 0),
+        vec![
+            preset(2, WAYPOINT, 20, 20),
+            preset(2, STASH, 12, 26),
+            preset(5, TILE, 30, 10),
+        ],
+    );
+    let mut fx = Fx::with_presets(
+        &[
+            (LEVEL, TileRect::new(0, 0, 8, 8)),
+            (LEVEL, TileRect::new(8, 0, 8, 8)),
+        ],
+        presets,
+    );
+    // objects rows with `Restore` 1 (the 1.14d waypoint and stash rows
+    // come back in the live run, `test-fixtures/tests/town_round_trip.rs`);
+    // no leveldefs, so `SaveMonsters` is the seam's answer (0).
+    let row = |operatefn| {
+        let mut o: Objects = crate::skills::fake::blank();
+        o.operatefn = operatefn;
+        o.restore = 1;
+        o
+    };
+    fx.sim.create_objects(Arc::new(ObjectTables {
+        objects: vec![row(23), row(0)],
+        shrines: Vec::new(),
+        levels: vec![crate::skills::fake::blank::<Levels>(); 150],
+        objgroup: Vec::new(),
+        leveldefs: Vec::new(),
+    }));
+    fx.sim.hooks().enable_inactive_store();
+    let a = fx.a;
+    let units_of = |fx: &Fx| {
+        let mut v: Vec<(UnitType, u32, (i32, i32), u32)> = fx
+            .game
+            .lists
+            .room_units(a)
+            .into_iter()
+            .map(|u| {
+                let ty = fx.game.lists.unit(u).unwrap().ty;
+                let r = fx.sim.sys.units.get(u).unwrap();
+                (
+                    ty,
+                    r.class,
+                    fx.sim.sys.hooks.path_position(u),
+                    r.flags & 0x300_0000,
+                )
+            })
+            .collect();
+        v.sort_by_key(|e| (e.0 as u8, e.1, e.2));
+        v
+    };
+    let made = fx.sim.with(&mut fx.game, |g, v| v.spawn_preset_units(g, a));
+    assert_eq!(made, 3);
+    let before = units_of(&fx);
+    assert_eq!(
+        before,
+        vec![
+            (UnitType::Object, WAYPOINT, (20, 20), 0x300_0000),
+            (UnitType::Object, STASH, (12, 26), 0x300_0000),
+            (UnitType::Tile, TILE, (30, 10), 0x300_0000),
+        ]
+    );
+    // Tick step 9 frees the room: every unit compressed.
+    let mut g = std::mem::take(&mut fx.game);
+    for u in g.lists.room_units(a) {
+        fx.sim.compress_unit(&mut g, u);
+    }
+    fx.game = g;
+    assert!(fx.game.lists.room_units(a).is_empty());
+    assert_eq!(node(&fx)[0].others.len(), 3, "three records");
+    // The room's next population restores them.
+    let mut g = std::mem::take(&mut fx.game);
+    assert!(fx.sim.restore(&mut g, a));
+    fx.game = g;
+    assert_eq!(units_of(&fx), before);
+    fx.assert_clean();
+}
