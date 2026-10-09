@@ -12,11 +12,7 @@
 use crate::app::config::Settings;
 use crate::ui::geom::Point;
 
-/// The frame is 800 × 600 (one logical size, `client/ui.md` §A5).
-pub const W: i32 = 800;
-pub const H: i32 = 600;
-/// h = W / 2.
-pub const HALF: i32 = W / 2;
+use crate::ui::layout::Screen;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum MenuId {
@@ -243,8 +239,10 @@ pub fn value_from_pos(row: Row, p: i64) -> i64 {
 }
 
 /// The menu's state.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct OptionsMenu {
+    /// W and H of §O4: the play frame (800 × 600 or 640 × 480).
+    pub screen: Screen,
     pub menu: MenuId,
     pub selected: usize,
     pub settings: Settings,
@@ -256,7 +254,28 @@ pub struct OptionsMenu {
     pub events: Vec<MenuEvent>,
 }
 
+impl Default for OptionsMenu {
+    fn default() -> Self {
+        Self {
+            screen: Screen::R800,
+            menu: MenuId::default(),
+            selected: 0,
+            settings: Settings::default(),
+            changed: false,
+            dragging: false,
+            latch: false,
+            last_ptr: None,
+            events: Vec::new(),
+        }
+    }
+}
+
 impl OptionsMenu {
+    /// `h = W / 2` of §O4 r4 (400 at 800 × 600, 320 at 640 × 480).
+    pub fn half(&self) -> i32 {
+        self.screen.w / 2
+    }
+
     /// Open on the Game menu, Return to Game selected (§O1 r2).
     pub fn open(&mut self) {
         self.go(MenuId::Game);
@@ -396,7 +415,7 @@ impl OptionsMenu {
 
     /// y of the menu's top (`y0`).
     pub fn y0(&self) -> i32 {
-        (H - 80) / 2 - (self.pitch() * self.n()) / 2
+        (self.screen.h - 80) / 2 - (self.pitch() * self.n()) / 2
     }
 
     pub fn y_top(&self, i: usize) -> i32 {
@@ -428,7 +447,7 @@ impl OptionsMenu {
 
     /// The row under the pointer (`0x0047D520`, y only; §O5 r2).
     pub fn row_at(&self, y: i32) -> Option<usize> {
-        let mid = (H - 80) / 2;
+        let mid = (self.screen.h - 80) / 2;
         let half = self.pitch() * self.n() / 2;
         if !(mid - half < y && y < mid + half) {
             return None;
@@ -540,11 +559,11 @@ impl OptionsMenu {
         let Kind::Slider { n, .. } = self.rows()[i].kind else {
             return;
         };
-        if !self.latch && !(HALF - 59 < p.x && p.x < HALF + 230) {
+        if !self.latch && !(self.half() - 59 < p.x && p.x < self.half() + 230) {
             return;
         }
         let n = i64::from(n);
-        let x0 = HALF - 48;
+        let x0 = self.half() - 48;
         let pos = if p.x < x0 {
             0
         } else if p.x > x0 + 265 {
