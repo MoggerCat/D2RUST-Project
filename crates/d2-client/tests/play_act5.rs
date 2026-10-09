@@ -626,7 +626,11 @@ fn nihlathaks_death_completes_the_betrayal() {
     let (n, guid, _) = a.find(UnitType::Monster, &[526]);
     a.kill(n, guid);
     a.rig.step(40);
-    assert!(a.flag(38, 1), "Betrayal reward pending (38.1); chain 34 {:?}", a.chain(34));
+    assert!(
+        a.flag(38, 1),
+        "Betrayal reward pending (38.1); chain 34 {:?}",
+        a.chain(34)
+    );
     assert!(a.rejected().is_empty(), "{:?}", a.rejected());
 }
 
@@ -655,8 +659,16 @@ fn the_ancients_fall_on_arreat_summit() {
         a.rig.step(40);
         let _ = at;
     }
-    assert!(killed >= 3, "three Ancients spawned and killed; chain 35 {:?}", a.chain(35));
-    assert!(a.flag(39, 0), "Rite of Passage done (39.0); chain 35 {:?}", a.chain(35));
+    assert!(
+        killed >= 3,
+        "three Ancients spawned and killed; chain 35 {:?}",
+        a.chain(35)
+    );
+    assert!(
+        a.flag(39, 0),
+        "Rite of Passage done (39.0); chain 35 {:?}",
+        a.chain(35)
+    );
     assert!(a.rejected().is_empty(), "{:?}", a.rejected());
 }
 
@@ -689,12 +701,20 @@ fn baal_falls_and_the_game_is_finished() {
         }
         a.rig.step(1);
     }
-    assert_eq!(a.rig.level(), Some(132), "the portal takes the player to the Worldstone Chamber");
+    assert_eq!(
+        a.rig.level(),
+        Some(132),
+        "the portal takes the player to the Worldstone Chamber"
+    );
     a.rig.step(20);
     let (baal, guid, _) = a.find(UnitType::Monster, &[544]);
     a.kill(baal, guid);
     a.rig.step(80);
-    assert!(a.flag(40, 0), "Eve of Destruction done (40.0); chain 36 {:?}", a.chain(36));
+    assert!(
+        a.flag(40, 0),
+        "Eve of Destruction done (40.0); chain 36 {:?}",
+        a.chain(36)
+    );
     let flags = a.save_flags().unwrap_or(0);
     assert_ne!(flags & 0x0F00, 0, "progression raised: {flags:#x}");
     // Tyrael appears; his chat ends with the last portal.
