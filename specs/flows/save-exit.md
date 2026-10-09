@@ -82,8 +82,9 @@ Owner: `sim/intents-events.md` §2.5 r2, in this order:
 1. 0x05: `in_game` := false, `unloaded` := true (`client/model.md` §7
    r6). 0x06: `exit_requested` := true (§7 r7). 0xB0: `connected` := 0
    (§7 r10).
-2. Then the front end: PROVISIONAL character select
-   (`ui/frontend-menus.md` §F1.3 last row; settled by REC-200).
+2. Then the front end: the main menu (recorded 2026-10-09, REC-200:
+   `ui/frontend-menus.md` §F1.3 last row; d2rs still opens character
+   select → `q-fix-real-exit-target`).
 
 ### 5. Load
 

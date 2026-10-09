@@ -457,10 +457,12 @@ impl<X: Pending> View<'_, X> {
                 .portal_owner(unit)
                 .or_else(|| self.portal_owner_from_links(game, unit))
             {
-                // PROVISIONAL (intents-events.md §7.2, §6 rule 6): u32@21 is
-                // this portal's GUID and u32@25 its pair's (−1: none), as
-                // the client handler reads them (`client/msg-units.md`
-                // rule 7); settled by a town-portal join capture.
+                // u32@21 is this portal's GUID and u32@25 its pair's (−1:
+                // none), as the client handler reads them (`client/msg-
+                // units.md` rule 7; intents-events.md §7.2, §6 rule 6).
+                // Recorded (REC-117): the field portal's 0x82 carries
+                // (0x22, 0x23), the town portal's (0x23, 0x22)
+                // (`facts/items/a1-town-portal-cold-plains.tsv`).
                 let m = messages::portal_ownership(owner, &name, guid, portal2);
                 self.h.x.send(receiver, &m);
             }
