@@ -30,6 +30,7 @@ pub mod hirelings;
 pub mod inactive;
 pub mod missiles;
 pub mod monster_add;
+pub mod monster_death;
 pub mod monsters;
 pub mod objects;
 pub mod pending;
@@ -92,6 +93,9 @@ pub struct ActionTables {
     /// `overlay` record count (data tables +0xBC0): the bound of the
     /// 0x11 overlay id (`intents-events.md` §7.3 r2 step 9, inclusive).
     pub overlay_count: i32,
+    /// `monequip.bin` rows (summon equipment `0x005D6B60`,
+    /// `skills/bodies.md` §6.5 step 9).
+    pub monequip: Vec<d2_data::tables::Monequip>,
 }
 
 /// The DRLG side of a game: the acts' DRLGs and their services.
@@ -274,6 +278,9 @@ pub struct ActionHooks<X> {
     /// player's DT start (`0x00580A70`'s unit target, [`death`]): the
     /// host that starts it sets it.
     pub mode_target: Option<UnitId>,
+    /// The unit whose death clean-up ran in the DT start running now
+    /// ([`monster_death::death_cleanup`]).
+    pub death_cleaned: Option<UnitId>,
     /// The mode of the monster mode change running now (the record's
     /// mode, `units.md` §4.6), for the start functions that read it (the
     /// attack / skill start `0x005A75C0`, rule 7).
@@ -348,6 +355,10 @@ pub struct ActionHooks<X> {
     /// entry and level); a monster without one asks
     /// [`Pending::ai_skill_entry`].
     pub monster_skills: BTreeMap<UnitId, BTreeMap<i32, i32>>,
+    /// A monster's equipped items by body location (its inventory's
+    /// body slots, `monsters/init.md` §12): d2rs-own record of the
+    /// holdings `has_item_at` reads (no monster inventory model here).
+    pub monster_equip: BTreeMap<UnitId, BTreeMap<u8, UnitId>>,
     /// The inactive-unit store (game +0xD8, `units.md` §3.4;
     /// [`inactive`]). `None` (the default): tick step 9 compresses
     /// nothing and the restore is the host's, as before.
@@ -426,6 +437,7 @@ impl<X> ActionHooks<X> {
             monster_sequences: None,
             vitals: None,
             mode_target: None,
+            death_cleaned: None,
             monster_request: 0,
             monster_world: None,
             monster_world_out: false,
@@ -443,6 +455,7 @@ impl<X> ActionHooks<X> {
             skill_lists: BTreeMap::new(),
             pet_lists: BTreeMap::new(),
             monster_skills: BTreeMap::new(),
+            monster_equip: BTreeMap::new(),
             inactive: None,
             fallback_tiles: crate::units::inactive::InactiveStore::default(),
             x,

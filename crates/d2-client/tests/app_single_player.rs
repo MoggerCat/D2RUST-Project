@@ -485,14 +485,16 @@ fn the_create_request_has_the_builder_layout() {
     assert_eq!(b[0x25..0x27], [0, 0]);
     assert_eq!(b[0x27..0x2B], 0x0010_0004u32.to_le_bytes());
     assert_eq!(b[0x2B..0x2E], [0, 0, 0]);
-    // A save's class and name; its status bit 5 picks the flags.
+    // A save's name, class byte 0 (REC-1130: 1.14d leaves the builder's
+    // class at 0 for an existing character; the server reads the save's
+    // class); its status bit 5 picks the flags.
     for (status, flags) in [(0x20u16, 0x0010_0004u32), (0, CREATE_FLAGS_CLASSIC)] {
         let save = d2_formats::d2s::D2s::new_stub(b"Necro", 2, status, 1).unwrap();
         let r = single_player::create_request_for(&Character::Save(
             Box::new(save),
             LoadContext::default(),
         ));
-        assert_eq!((r.class, &r.char_name[..6]), (2, &b"Necro\0"[..]));
+        assert_eq!((r.class, &r.char_name[..6]), (0, &b"Necro\0"[..]));
         assert_eq!(r.flags, flags, "status {status:#x}");
     }
 }

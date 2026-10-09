@@ -24,6 +24,10 @@ pub struct MonsterAi {
     targets: BTreeMap<UnitId, UnitId>,
     /// The current skill (`Pending::set_current_skill`).
     current: BTreeMap<UnitId, i32>,
+    /// A summoned monster's skill entries' base levels (`0x0056DEB0`,
+    /// `skills/bodies.md` §6.5 step 6), mirrored from the sim each frame
+    /// (`sync_seams`); a monster without one uses level 1.
+    levels: BTreeMap<UnitId, BTreeMap<i32, i32>>,
     /// The modes each class has (monstats2 `mDT`…`mRN`, bit = mode).
     pub modes: Vec<u16>,
 }
@@ -49,6 +53,11 @@ impl MonsterAi {
             modes,
             ..Self::default()
         }
+    }
+
+    /// Replace the mirrored summon skill levels.
+    pub fn set_levels(&mut self, levels: BTreeMap<UnitId, BTreeMap<i32, i32>>) {
+        self.levels = levels;
     }
 
     /// `0x0046C140(class, mode)`: the class has the mode.
@@ -94,7 +103,12 @@ impl MonsterAi {
         let &skill = self.current.get(&unit)?;
         Some(SkillEntry {
             skill,
-            base: 1,
+            base: self
+                .levels
+                .get(&unit)
+                .and_then(|m| m.get(&skill))
+                .copied()
+                .unwrap_or(1),
             level_bonus: 0,
             owner_guid: -1,
             charges: 0,

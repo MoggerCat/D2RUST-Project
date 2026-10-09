@@ -182,7 +182,7 @@ pub fn item_level<H>(econ: &Economy<'_, H>, unit: UnitId) -> Option<i32> {
 /// PROVISIONAL (vendors.md "Stat readers"; REC-none): "no base-array
 /// entry" is read as base stat 73 = 0 (the stat lists keep no empty
 /// entries apart).
-fn max_durability<H>(econ: &Economy<'_, H>, item: UnitId) -> i32 {
+pub(super) fn max_durability<H>(econ: &Economy<'_, H>, item: UnitId) -> i32 {
     if econ.stats.unit_base(item, stat::MAXDURABILITY, 0) == 0 {
         return 0;
     }

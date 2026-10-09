@@ -516,7 +516,12 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
             stats: &mut *self.econ.stats,
             data: self.econ.data,
         };
-        if let Some(u) = self.econ.hooks.spawn_near(&mut sim, near, class, mode) {
+        let seed = &mut self.econ.fields.seed;
+        if let Some(u) = self
+            .econ
+            .hooks
+            .spawn_near(&mut sim, seed, near, class, mode)
+        {
             return Some(u);
         }
         self.rest.spawn_mercenary(near, class, mode)

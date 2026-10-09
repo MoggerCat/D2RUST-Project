@@ -63,10 +63,13 @@ milestone radament-killed
   poke 5 warp 49
   sweep 20 2 300 30 grid
   find ut 1 cl 229
-  poke +2 pos @1:229 @x+3 @y
-  poke +2 stat @1:229 6 0 256
-  poke +10 missile 58 @x @y @x+3 @y skill 36 1
+  poke +2 goto unit 229
+  poke +40 pos @1:229 @x+2 @y
+  poke +40 stat @1:229 6 0 256
+  poke +48 missile 58 @x @y @x+2 @y skill 36 1
+  note goto first: the sweep's last hop leaves the player in a wall block (collision 0x5 all around), so Radament placed at @x+3 was out of the bolt's reach; @x+2, not +3: a Returned minion on Radament's sub-tile takes the bolt (q-fix-boss-damage)
   need ever unit ut 1 cl 229 dead
+  need unit ut 1 cl 229 dead
 
 milestone halls-of-dead-3
   use sor
@@ -94,7 +97,7 @@ milestone summoner-present
   use sor
   deadline 1000
   poke 5 warp 74
-  sweep 20 1 1000 10 cross
+  poke 20 goto preset 74 1:250
   need ever player lv == 74
   need unit ut 1 cl 250 lv 74 seen
 
@@ -102,11 +105,10 @@ milestone summoner-killed
   use sor
   deadline 1000
   poke 5 warp 74
-  sweep 20 1 1000 10 cross
-  find ut 1 cl 250
-  poke +2 pos @1:250 @x+3 @y
-  poke +2 stat @1:250 6 0 256
-  poke +10 missile 58 @x @y @x+3 @y skill 36 1
+  poke 20 goto preset 74 1:250
+  poke 100 pos @1:250 @x+2 @y
+  poke 100 stat @1:250 6 0 256
+  poke 110 missile 58 @x @y @x+2 @y skill 36 1
   need ever unit ut 1 cl 250 dead
 
 milestone tal-rasha-tomb

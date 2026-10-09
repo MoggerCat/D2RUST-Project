@@ -1,0 +1,39 @@
+{
+ "channel": "rng",
+ "check": "a3-warp-kurast-sewers-ama",
+ "command": [
+  "tools/trace-recorder/record_rng.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "900",
+  "--ticks",
+  "160",
+  "--auto",
+  "ScnAm3",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.rng.jsonl",
+  "--frames",
+  "--skip-inline",
+  "drlg",
+  "--poke",
+  "20 warp 92"
+ ],
+ "files": {
+  "orig.rng.jsonl": {
+   "sha256": "abcf6bcd5f7e4a67c166c4aa765415a8604fa3ae98beb256bd0d63b74427c708",
+   "size": 2471876
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "89cd9e19c20fda96417ea9721c34e7d74a8fad9ddb130efe3f3e907a9825332f",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "b90b38bda97d62a35f2977ddf72fb8dcfd3ca7278a0a06e37f37f00090fd283f",
+  "save": "162feeda99dba3863626f49614928844687e4b2eb2618576ec9ea3f4e1addba6"
+ }
+}

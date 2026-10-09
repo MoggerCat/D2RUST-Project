@@ -1,0 +1,105 @@
+check 1
+# replay-diff session (specs/tools/replay-diff.md): 10,000 frames of fighting
+# in the Blood Moor, CmbBar (level 3 barbarian, short sword), seed 1234:
+# warped to the Blood Moor (level 2) before frame 4; game and player unit
+# seeds fixed before frame 30 (as combat-melee-fallen); a fallen party
+# (monstats 19) spawned next to the player every 1,000 frames. The input
+# attacks the nearest fallen (clickunit 1 19, four times 22 frames apart),
+# loots (clickunit 4 *) and walks on (run on). 1.14d plays the input; d2rs
+# gets the C->S messages 1.14d sent, frame by frame. Input generated once by
+# a fixed LCG (seed 1371).
+name bloodmoor-bar-10k
+save CmbBar --class bar --expansion --level 3 --item ssd/body=4
+seed 1234
+ticks 10000
+seconds 7000
+at 4 poke warp 2
+at 30 poke seed-game 0x00001234 666
+at 30 poke seed-unit @player 0x00000055 666
+at 30 poke spawn 19 @x+3 @y normal
+at 1000 poke spawn 19 @x+3 @y normal
+at 2000 poke spawn 19 @x+3 @y normal
+at 3000 poke spawn 19 @x+3 @y normal
+at 4000 poke spawn 19 @x+3 @y normal
+at 5000 poke spawn 19 @x+3 @y normal
+at 6000 poke spawn 19 @x+3 @y normal
+at 7000 poke spawn 19 @x+3 @y normal
+at 8000 poke spawn 19 @x+3 @y normal
+at 9000 poke spawn 19 @x+3 @y normal
+input frame 40; key R; frame 60; clickunit 1 19; frame 82; clickunit 1 19; frame 104; clickunit 1 19
+input+ frame 126; clickunit 1 19; frame 148; clickunit 1 19; frame 170; clickunit 1 19; frame 192; clickunit 1 19
+input+ frame 214; clickunit 1 19; frame 236; clickunit 1 19; frame 258; clickunit 1 19; frame 280; clickunit 1 19
+input+ frame 302; clickunit 1 19; frame 324; clickunit 4 *; frame 384; clickunit 4 *; frame 444; click 301 353
+input+ frame 508; click 239 397; frame 571; clickunit 1 19; frame 593; clickunit 1 19; frame 615; clickunit 1 19
+input+ frame 637; clickunit 1 19; frame 659; clickunit 1 19; frame 681; clickunit 1 19; frame 703; clickunit 1 19
+input+ frame 725; clickunit 1 19; frame 747; clickunit 1 19; frame 769; clickunit 1 19; frame 791; clickunit 1 19
+input+ frame 813; clickunit 1 19; frame 835; clickunit 4 *; frame 895; clickunit 4 *; frame 955; click 464 402
+input+ frame 1013; click 374 140; frame 1070; clickunit 1 19; frame 1092; clickunit 1 19; frame 1114; clickunit 1 19
+input+ frame 1136; clickunit 1 19; frame 1158; clickunit 1 19; frame 1180; clickunit 1 19; frame 1202; clickunit 1 19
+input+ frame 1224; clickunit 1 19; frame 1246; clickunit 1 19; frame 1268; clickunit 1 19; frame 1290; clickunit 1 19
+input+ frame 1312; clickunit 1 19; frame 1334; clickunit 4 *; frame 1394; clickunit 4 *; frame 1454; click 204 398
+input+ frame 1514; click 575 203; frame 1581; clickunit 1 19; frame 1603; clickunit 1 19; frame 1625; clickunit 1 19
+input+ frame 1647; clickunit 1 19; frame 1669; clickunit 1 19; frame 1691; clickunit 1 19; frame 1713; clickunit 1 19
+input+ frame 1735; clickunit 1 19; frame 1757; clickunit 1 19; frame 1779; clickunit 1 19; frame 1801; clickunit 1 19
+input+ frame 1823; clickunit 1 19; frame 1845; clickunit 4 *; frame 1905; clickunit 4 *; frame 1965; click 361 383
+input+ frame 2019; click 578 228; frame 2080; clickunit 1 19; frame 2102; clickunit 1 19; frame 2124; clickunit 1 19
+input+ frame 2146; clickunit 1 19; frame 2168; clickunit 1 19; frame 2190; clickunit 1 19; frame 2212; clickunit 1 19
+input+ frame 2234; clickunit 1 19; frame 2256; clickunit 1 19; frame 2278; clickunit 1 19; frame 2300; clickunit 1 19
+input+ frame 2322; clickunit 1 19; frame 2344; clickunit 4 *; frame 2404; clickunit 4 *; frame 2464; click 530 423
+input+ frame 2552; click 502 331; frame 2607; clickunit 1 19; frame 2629; clickunit 1 19; frame 2651; clickunit 1 19
+input+ frame 2673; clickunit 1 19; frame 2695; clickunit 1 19; frame 2717; clickunit 1 19; frame 2739; clickunit 1 19
+input+ frame 2761; clickunit 1 19; frame 2783; clickunit 1 19; frame 2805; clickunit 1 19; frame 2827; clickunit 1 19
+input+ frame 2849; clickunit 1 19; frame 2871; clickunit 4 *; frame 2931; clickunit 4 *; frame 2991; click 610 293
+input+ frame 3065; click 250 360; frame 3130; clickunit 1 19; frame 3152; clickunit 1 19; frame 3174; clickunit 1 19
+input+ frame 3196; clickunit 1 19; frame 3218; clickunit 1 19; frame 3240; clickunit 1 19; frame 3262; clickunit 1 19
+input+ frame 3284; clickunit 1 19; frame 3306; clickunit 1 19; frame 3328; clickunit 1 19; frame 3350; clickunit 1 19
+input+ frame 3372; clickunit 1 19; frame 3394; clickunit 4 *; frame 3454; clickunit 4 *; frame 3514; click 605 192
+input+ frame 3566; click 549 304; frame 3649; clickunit 1 19; frame 3671; clickunit 1 19; frame 3693; clickunit 1 19
+input+ frame 3715; clickunit 1 19; frame 3737; clickunit 1 19; frame 3759; clickunit 1 19; frame 3781; clickunit 1 19
+input+ frame 3803; clickunit 1 19; frame 3825; clickunit 1 19; frame 3847; clickunit 1 19; frame 3869; clickunit 1 19
+input+ frame 3891; clickunit 1 19; frame 3913; clickunit 4 *; frame 3973; clickunit 4 *; frame 4033; click 551 239
+input+ frame 4111; click 456 411; frame 4172; clickunit 1 19; frame 4194; clickunit 1 19; frame 4216; clickunit 1 19
+input+ frame 4238; clickunit 1 19; frame 4260; clickunit 1 19; frame 4282; clickunit 1 19; frame 4304; clickunit 1 19
+input+ frame 4326; clickunit 1 19; frame 4348; clickunit 1 19; frame 4370; clickunit 1 19; frame 4392; clickunit 1 19
+input+ frame 4414; clickunit 1 19; frame 4436; clickunit 4 *; frame 4496; clickunit 4 *; frame 4556; click 407 398
+input+ frame 4644; click 268 356; frame 4731; clickunit 1 19; frame 4753; clickunit 1 19; frame 4775; clickunit 1 19
+input+ frame 4797; clickunit 1 19; frame 4819; clickunit 1 19; frame 4841; clickunit 1 19; frame 4863; clickunit 1 19
+input+ frame 4885; clickunit 1 19; frame 4907; clickunit 1 19; frame 4929; clickunit 1 19; frame 4951; clickunit 1 19
+input+ frame 4973; clickunit 1 19; frame 4995; clickunit 4 *; frame 5055; clickunit 4 *; frame 5115; click 304 158
+input+ frame 5165; click 528 252; frame 5222; clickunit 1 19; frame 5244; clickunit 1 19; frame 5266; clickunit 1 19
+input+ frame 5288; clickunit 1 19; frame 5310; clickunit 1 19; frame 5332; clickunit 1 19; frame 5354; clickunit 1 19
+input+ frame 5376; clickunit 1 19; frame 5398; clickunit 1 19; frame 5420; clickunit 1 19; frame 5442; clickunit 1 19
+input+ frame 5464; clickunit 1 19; frame 5486; clickunit 4 *; frame 5546; clickunit 4 *; frame 5606; click 118 309
+input+ frame 5666; click 519 389; frame 5741; clickunit 1 19; frame 5763; clickunit 1 19; frame 5785; clickunit 1 19
+input+ frame 5807; clickunit 1 19; frame 5829; clickunit 1 19; frame 5851; clickunit 1 19; frame 5873; clickunit 1 19
+input+ frame 5895; clickunit 1 19; frame 5917; clickunit 1 19; frame 5939; clickunit 1 19; frame 5961; clickunit 1 19
+input+ frame 5983; clickunit 1 19; frame 6005; clickunit 4 *; frame 6065; clickunit 4 *; frame 6125; click 454 195
+input+ frame 6211; click 344 198; frame 6288; clickunit 1 19; frame 6310; clickunit 1 19; frame 6332; clickunit 1 19
+input+ frame 6354; clickunit 1 19; frame 6376; clickunit 1 19; frame 6398; clickunit 1 19; frame 6420; clickunit 1 19
+input+ frame 6442; clickunit 1 19; frame 6464; clickunit 1 19; frame 6486; clickunit 1 19; frame 6508; clickunit 1 19
+input+ frame 6530; clickunit 1 19; frame 6552; clickunit 4 *; frame 6612; clickunit 4 *; frame 6672; click 136 281
+input+ frame 6744; click 335 432; frame 6807; clickunit 1 19; frame 6829; clickunit 1 19; frame 6851; clickunit 1 19
+input+ frame 6873; clickunit 1 19; frame 6895; clickunit 1 19; frame 6917; clickunit 1 19; frame 6939; clickunit 1 19
+input+ frame 6961; clickunit 1 19; frame 6983; clickunit 1 19; frame 7005; clickunit 1 19; frame 7027; clickunit 1 19
+input+ frame 7049; clickunit 1 19; frame 7071; clickunit 4 *; frame 7131; clickunit 4 *; frame 7191; click 453 164
+input+ frame 7273; click 701 292; frame 7354; clickunit 1 19; frame 7376; clickunit 1 19; frame 7398; clickunit 1 19
+input+ frame 7420; clickunit 1 19; frame 7442; clickunit 1 19; frame 7464; clickunit 1 19; frame 7486; clickunit 1 19
+input+ frame 7508; clickunit 1 19; frame 7530; clickunit 1 19; frame 7552; clickunit 1 19; frame 7574; clickunit 1 19
+input+ frame 7596; clickunit 1 19; frame 7618; clickunit 4 *; frame 7678; clickunit 4 *; frame 7738; click 314 378
+input+ frame 7798; click 256 352; frame 7865; clickunit 1 19; frame 7887; clickunit 1 19; frame 7909; clickunit 1 19
+input+ frame 7931; clickunit 1 19; frame 7953; clickunit 1 19; frame 7975; clickunit 1 19; frame 7997; clickunit 1 19
+input+ frame 8019; clickunit 1 19; frame 8041; clickunit 1 19; frame 8063; clickunit 1 19; frame 8085; clickunit 1 19
+input+ frame 8107; clickunit 1 19; frame 8129; clickunit 4 *; frame 8189; clickunit 4 *; frame 8249; click 237 353
+input+ frame 8311; click 516 153; frame 8364; clickunit 1 19; frame 8386; clickunit 1 19; frame 8408; clickunit 1 19
+input+ frame 8430; clickunit 1 19; frame 8452; clickunit 1 19; frame 8474; clickunit 1 19; frame 8496; clickunit 1 19
+input+ frame 8518; clickunit 1 19; frame 8540; clickunit 1 19; frame 8562; clickunit 1 19; frame 8584; clickunit 1 19
+input+ frame 8606; clickunit 1 19; frame 8628; clickunit 4 *; frame 8688; clickunit 4 *; frame 8748; click 296 224
+input+ frame 8828; click 290 160; frame 8899; clickunit 1 19; frame 8921; clickunit 1 19; frame 8943; clickunit 1 19
+input+ frame 8965; clickunit 1 19; frame 8987; clickunit 1 19; frame 9009; clickunit 1 19; frame 9031; clickunit 1 19
+input+ frame 9053; clickunit 1 19; frame 9075; clickunit 1 19; frame 9097; clickunit 1 19; frame 9119; clickunit 1 19
+input+ frame 9141; clickunit 1 19; frame 9163; clickunit 4 *; frame 9223; clickunit 4 *; frame 9283; click 139 378
+input+ frame 9357; click 510 408; frame 9430; clickunit 1 19; frame 9452; clickunit 1 19; frame 9474; clickunit 1 19
+input+ frame 9496; clickunit 1 19; frame 9518; clickunit 1 19; frame 9540; clickunit 1 19; frame 9562; clickunit 1 19
+input+ frame 9584; clickunit 1 19; frame 9606; clickunit 1 19; frame 9628; clickunit 1 19; frame 9650; clickunit 1 19
+input+ frame 9672; clickunit 1 19; frame 9694; clickunit 4 *; frame 9754; clickunit 4 *; frame 9814; click 605 388
+input+ frame 9882; click 427 401

@@ -32,17 +32,17 @@
 |   2. Think dispatch `0x005B1740` | 283–422 |
 |   3. AI control and AI tables | 423–594 |
 |   4. AI parameters | 595–613 |
-|   5. Target selection | 614–772 |
-|   6. Distances and line tests | 773–787 |
-|   7. Tactics helpers | 788–1027 |
-|   8. AI commands and minions | 1028–1054 |
-|   10. The catalogue `ai-functions.tsv` | 1055–1075 |
-| Constants & data dependencies | 1076–1099 |
-| Randomness | 1100–1121 |
-| Edge cases & original bugs | 1122–1163 |
-| Test vectors | 1164–1252 |
-| Provenance | 1253–1313 |
-| Open questions | 1314–1417 |
+|   5. Target selection | 614–789 |
+|   6. Distances and line tests | 790–804 |
+|   7. Tactics helpers | 805–1044 |
+|   8. AI commands and minions | 1045–1071 |
+|   10. The catalogue `ai-functions.tsv` | 1072–1092 |
+| Constants & data dependencies | 1093–1116 |
+| Randomness | 1117–1138 |
+| Edge cases & original bugs | 1139–1180 |
+| Test vectors | 1181–1269 |
+| Provenance | 1270–1330 |
+| Open questions | 1331–1434 |
 <!-- /index -->
 
 ## Summary
@@ -734,6 +734,23 @@ started {0, 0x7FFFFFFF, 0, 0x7FFFFFFF}. For each candidate C:
    not below that slot's distance → skip.
 4. Line test `0x00622AA0(scanner, C, 4)` blocked → skip; else the slot
    := (C, d). The callback always returns 0 (whole scan).
+
+PROVISIONAL (REC-1270): rule 1's "monster C in melee range → skip" holds
+for every monster C, not only one with state 146 (as d2rs reads it: C in
+the scanner's melee range, `0x00622C40` step 3 without the line, d ≤ 0 or
+d ≤ `MeleeRng` + 1, is skipped). 1.14d measured (`ass-lightning-sentry-kill`
+and its probes, Fallen packs, Lightning Sentry `MeleeRng` 0): of three
+Fallen the one at distance 1 (dx 1, dy 0) is never the trap's target
+while one at distance 2–3 is, in three placements; the trap fires at it
+once the nearer one has moved off. Settled by: a run that puts a monster
+of another class on the trap (a state-146 test) or reads `0x005DC970`
+(PC 1 item "[q-fix-ass-traps] 0x005DC970 melee-range rule").
+PROVISIONAL (REC-1271): a main-less scan (only `nThreat` < 2 candidates,
+e.g. a cow) takes the alternative at once in d2rs; the spec's
+`0x005DD510` row also refuses an alternative farther than 5, and the
+order of those two rules is unread (an idle cow poked next to a trap was
+not shot by 1.14d in a one-off run on 2026-10-09, check file not kept; the cow
+had hp 0, so the dead test may be the cause instead). Not applied.
 
 So `0x005DDC30` sees targets closer than 49; each caller applies its
 own distance gate (the Hireable think: E < 25, `ai-bodies-6.md` §7

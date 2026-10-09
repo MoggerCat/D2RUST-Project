@@ -1,0 +1,19 @@
+check 1
+# Act I hireling follows through a waypoint (q-chk-hirelings, REC-1518): hire from Kashya
+# (hire-kashya.check), the player is poked next to the Rogue Encampment waypoint (GUID 10 for seed 1234) at frame 30, and
+# C->S 0x49 to Cold Plains (level 3) goes after frame 260 (the 0x49 handler's hostile delay,
+# world/waypoints.md §6.1, as combat-cold-plains-wp.check). The hireling follows the player into the new level
+# (hirelings.md §6 rule 4; the 0x7A/0x81 removal and add, the stats resent).
+# Spec: specs/tools/scenario-diff.md.
+name hire-follow-waypoint-kashya
+save ScnHrW --class bar --expansion --level 30 --gold 100000 --waypoints 0,1
+seed 1234
+ticks 330
+seconds 1200
+channels state
+at 4 poke goto unit 1:150
+at 8 send InteractWithEntity type=1 id=@1:150
+at 10 send InitEntityChat id=@1:150
+at 14 send HireMerc npc=@1:150 merc=3411
+at 30 poke pos @player 4895 4215
+at 260 poke msg 0x49 10 3

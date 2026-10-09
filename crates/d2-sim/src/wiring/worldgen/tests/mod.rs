@@ -86,6 +86,9 @@ impl Pending for TestPending {
     fn class_has_mode(&self, _: i32, _: u8) -> bool {
         true
     }
+    fn monster_quest_chain(&mut self, unit: UnitId, chain: u32) {
+        self.log.push(format!("chain {} {chain}", unit.0));
+    }
 }
 
 impl WorldPending for TestPending {
@@ -402,6 +405,7 @@ fn action_tables() -> ActionTables {
         levels: levels(),
         skill_modes: vec![[0; 8]],
         overlay_count: 0,
+        monequip: Vec::new(),
     }
 }
 

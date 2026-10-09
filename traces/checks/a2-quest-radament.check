@@ -1,0 +1,25 @@
+check 1
+# Quest 9 Radament's Lair (quests-act2.md s3): Atma msg 304, warp to Sewers 3 (49),
+# kill Radament by poke, Atma msg 334; packets carry the 0x5D flag words.
+name a2-quest-radament
+save ScnAm2 --class ama --expansion --act 1 --quests acts=1
+seed 1234
+ticks 180
+seconds 600
+channels state packets
+at 4 poke goto unit 1:176
+at 14 send InteractWithEntity type=1 id=@1:176
+at 16 send InitEntityChat id=@1:176
+at 18 send QuestMessage npc=@1:176 msg=304
+at 20 send TerminateEntityChat id=@1:176
+at 60 poke warp 49
+at 80 poke goto unit 1:229
+at 92 poke pos @1:229 @x+3 @y
+at 94 poke stat @1:229 6 0 256
+at 96 poke missile 58 @x @y @x+3 @y
+at 136 poke warp 40
+at 138 poke goto unit 1:176
+at 142 send InteractWithEntity type=1 id=@1:176
+at 144 send InitEntityChat id=@1:176
+at 146 send QuestMessage npc=@1:176 msg=334
+at 148 send TerminateEntityChat id=@1:176
