@@ -12,14 +12,15 @@ re-run. REC block 770–779 (none used yet).
 | `merc-rogue-town-bar` | saved Act I rogue restored at the join, idle in town, 80 frames | **equal** in every compared field (PARTIAL only for the snapshot's own gaps) |
 | `bar-battle-orders`, `dru-hurricane`, `dru-werewolf`, `dru-grizzly`, `ass-fade`, `ass-burst-of-speed`, `ass-lightning-sentry` | warp to the Blood Moor (variant `blood-moor-empty`), one right-click cast at frame 20, no target | **equal** in every compared field for 70 frames |
 | `ass-shadow-master` | same | frame 28: the shadow's six items (monequip `0x005D6B60` → item creation `0x00573B20`) are not made in d2rs: no monster item creation exists (the `InitHost::create_equip_item` seam is a no-op), so game seed, life and mana differ |
-| `bar-war-cry`, `bar-whirlwind`, `bar-leap-attack`, `dru-tornado`, `dru-fissure`, `dru-volcano`, `ass-fire-blast`, `ass-mind-blast` | same, with a cow (class 179, AI Idle: no draws) at (+4, 0) as the target | 1.14d recorded |
-| `merc-rogue-cow`, `merc-desert-cow`, `merc-sorc-cow`, `merc-barb-cow` | a hireling of each act follows the warp and fights the cow | new |
+| `bar-war-cry`, `bar-whirlwind`, `bar-leap-attack`, `dru-tornado`, `dru-fissure`, `dru-volcano`, `ass-fire-blast`, `ass-mind-blast` | same, with a Fallen at (+4, 0) as the target (the variant gives fallen1 the Idle AI: killable, no draws) | being re-run |
+| `merc-rogue-fallen`, `merc-desert-fallen`, `merc-sorc-fallen`, `merc-barb-fallen` | a hireling of each act follows the warp and fights the idle Fallen | being re-run |
 
 Layout of the skill checks: `at 4 poke warp 2` (arrival at the Den of
 Evil entrance tile, 5143, 4263), `at 10 poke spawn 179 @x+4 @y normal`
-(an idle cow keeps monster AI, area B, out of the comparison),
+(the variant's idle Fallen keeps monster AI, area B, out of the comparison;
+a `cow`, class 179, looked idle too but is a neutral critter without life),
 `input frame 20; rclick X Y` with X, Y = 544, 336 (directional: the
-point (+8, +1), past the cow) or 330, 300 (self casts, away from it).
+point (+8, +1), past the Fallen) or 330, 300 (self casts, away from it).
 Both keep the click off d2rs' stand-in hover box
 (`bridge::combat::hover_at`, which picks a monster up to 4 sub-tiles
 down-right of the click and turns the cast into a unit cast, C→S 0x0D).
@@ -65,7 +66,7 @@ down-right of the click and turns the cast into a unit cast, C→S 0x0D).
   class 63 placed at other points, then the classes differ) and the
   Fallen AI out of town (one unit-seed step short per think): area B,
   sent to q-diff-combat-a1 (2026-10-09). The skill checks avoid both
-  (variant, idle cow).
+  (variant, idle Fallen).
 - `scenario-diff.md` §3 r8.2 says the headless click has no hover pick;
   the code falls back to `combat::hover_at` (other areas' attack checks
   rely on it). Not changed.

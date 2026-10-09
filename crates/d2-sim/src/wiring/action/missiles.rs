@@ -173,9 +173,19 @@ impl<X: Pending> MissilePath for View<'_, X> {
     fn set_acceleration(&mut self, unit: UnitId, accel: i32, max_velocity: i32) {
         self.h.path_set_acceleration(unit, accel, max_velocity);
     }
-    /// `0x006417F0`: not specified (stays [`Pending`]).
+    /// `0x006417F0(unit, tx, ty)` (`skills/bodies.md` §6.13,
+    /// `sim/pathing.md`): max(|dx|, |dy|) + min(|dx|, |dy|) / 2 from the
+    /// missile's path position to its path target point (`missiles.md`
+    /// §R2.3 step 19, a `lob` missile's frames). Without the path
+    /// provider: [`Pending::target_distance`].
     fn target_distance(&self, unit: UnitId) -> i32 {
-        self.h.x.target_distance(unit)
+        let Some(d) = self.h.paths.as_ref().and_then(|p| p.dynamic(unit)) else {
+            return self.h.x.target_distance(unit);
+        };
+        let (x, y) = self.h.path_position(unit);
+        let dx = (i32::from(d.target_x) - x).abs();
+        let dy = (i32::from(d.target_y) - y).abs();
+        dx.max(dy) + dx.min(dy) / 2
     }
     /// Unit step `0x00554CA0` (`pathing.md` §9.3): false when it returns 2.
     fn step(&mut self, game: &mut Game, unit: UnitId) -> bool {

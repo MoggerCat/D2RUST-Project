@@ -1,0 +1,8 @@
+d2patch 1
+# fallen1 (monstats #19) with the Idle AI (monai row 1: idle 200, no
+# draws, specs/monsters/ai-bodies.md section 9.2), so a poked Fallen is a
+# killable target whose AI stays out of a skill check. Old value: the
+# 1.14d install (data-tool excel-dir, 2026-10-09).
+
+table monstats
+set #19 [fallen1] AI Fallen -> Idle
