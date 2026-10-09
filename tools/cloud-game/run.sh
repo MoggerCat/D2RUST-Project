@@ -57,6 +57,16 @@ export WINEPREFIX="${WINEPREFIX:-$HOME/.wine-d2}"
 export WINEDEBUG="${WINEDEBUG:--all}"
 export WINEDLLOVERRIDES="${WINEDLLOVERRIDES:-mscoree,mshtml=}"   # no Mono/Gecko prompts
 display="${D2_DISPLAY:-:99}"
+
+# One run per Wine prefix at a time: every run ends with `wineserver -k`,
+# which kills any other run sharing the prefix (and its display). Wait for
+# the prefix lock (fd 9 stays open until this script exits).
+mkdir -p "$WINEPREFIX"
+exec 9>"$WINEPREFIX/.run.lock"
+if ! flock -n 9; then
+  echo "run.sh: waiting for another run on $WINEPREFIX" >&2
+  flock 9
+fi
 export DISPLAY="$display"
 
 # Virtual display. 1024x768x24: the game's -w window (800x600) fits.
