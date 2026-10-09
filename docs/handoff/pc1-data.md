@@ -206,6 +206,15 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     fill `own`. Write the answer into `sim/units.md` (or the owner spec)
     and the §2 row of `state-snapshot.md`.
 
+- **[q-fix-pc1-combat] Range state mask 0x26 = `meleeonly`?** `range(P,
+  skill)` `0x00645460` (`skills/use.md` §3 r6) tests "state mask 0x26".
+  d2rs (`d2-client` `bridge/combat.rs` `in_melee_only_state`) reads it as
+  `0x0063A130` with the per-flag mask at data +0xCC + 4·0x26, i.e. the
+  `states.txt` flag bit 38 `meleeonly` (`data/fields.tsv`; the
+  `ui/panels-3.md` §24 r1 scheme). Confirm the argument `0x00645460`
+  passes is that flag index (not a data offset or a precomputed group),
+  and write it into `use.md` §3 r6.
+
 ## How to check a behaviour in one command
 
 A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)

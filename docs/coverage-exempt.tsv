@@ -386,7 +386,7 @@ specs/monsters/population.md	§1 r2	caller list
 specs/monsters/population.md	§14 r3	pointer to AI and skills callers
 specs/monsters/population.md	§14 r5	pointer (MonSpcWalk read by AI only)
 specs/monsters/population.md	§14 r6	pointer to the missiles spec
-specs/monsters/ai.md	§5.3	table of helper addresses
+specs/monsters/ai.md	§5.3 text	table of helper addresses
 specs/monsters/ai.md	§5.1 text	callers and setters (pointers)
 specs/sim/rng.md	§3 r6	calling convention (registers), no behaviour
 specs/sim/rng.md	§7 text	seed map; each system spec owns its draws
