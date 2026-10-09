@@ -39,13 +39,13 @@
 |   2. Act V records | 171–198 |
 |   3. A5Q1 Siege on Harrogath (chain 31, slot 35) | 199–285 |
 |   4. A5Q2 Rescue on Mount Arreat (chain 32, slot 36) | 286–410 |
-|   5. A5Q3 Prison of Ice (chain 33, slot 37) | 411–654 |
-| Constants & data dependencies | 655–672 |
-| Randomness | 673–682 |
-| Edge cases & original bugs | 683–717 |
-| Test vectors | 718–732 |
-| Provenance | 733–757 |
-| Open questions | 758–825 |
+|   5. A5Q3 Prison of Ice (chain 33, slot 37) | 411–645 |
+| Constants & data dependencies | 646–663 |
+| Randomness | 664–673 |
+| Edge cases & original bugs | 674–708 |
+| Test vectors | 709–723 |
+| Provenance | 724–748 |
+| Open questions | 749–816 |
 <!-- /index -->
 
 ## Summary
@@ -587,15 +587,6 @@ its unit (GUID +0x94 / +0x9C, type 1) exists, the copy has +4 ≠ 0 and
 +0x10C / +0x10D is clear: apply it (`0x00666120(copy, 0x0058F000(unit))`)
 and set +0x10C / +0x10D. The spawn sites of §5.9 apply the stored copy
 the same way ("map AI applied once").
-
-PROVISIONAL (REC-1697): d2rs runs the store right after the preset
-object's allocation (its quest init included, so init 71's Larzuk and a
-town NPC spawned there already exist and take the record at once), in
-the first preset walk (`population.md` §11.1); the record is the
-preset's DS1 path (`drlg/preset.md` §5 step 10) as map-AI nodes, moved
-out of the preset; an empty path stores nothing. Settled by:
-`milestone-act5-entry` frame 26 (Larzuk's Npc map-AI draw `lo' % 100`
-at `0x5e70a5`) and a PC 1 read of `0x00555910` around `0x00545C90`.
 
 #### 5.9 Town NPCs and cleanup
 

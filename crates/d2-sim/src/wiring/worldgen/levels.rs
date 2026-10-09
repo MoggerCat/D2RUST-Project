@@ -372,15 +372,6 @@ impl LevelTypes for WorldTypes {
     /// The room's preset units: a preset room's list (`preset.md` §9), or
     /// the units an outdoor room's substitution added
     /// (`outdoor-tilesub.md`, [`crate::drlg::outdoor::OutdoorRoom::units`]).
-    fn take_preset_path(
-        &mut self,
-        drlg: &Drlg,
-        room: DrlgRoomId,
-        index: usize,
-    ) -> Option<Vec<crate::drlg::preset::PathPoint>> {
-        self.presets.get_mut(&drlg.act)?.take_unit_path(room, index)
-    }
-
     fn preset_units(&self, drlg: &Drlg, room: DrlgRoomId) -> Vec<PresetUnit> {
         if let Some(p) = self.presets.get(&drlg.act) {
             if p.room(room).is_ok() {
@@ -565,15 +556,6 @@ impl LevelTypes for SharedTypes {
 
     fn preset_units(&self, drlg: &Drlg, room: DrlgRoomId) -> Vec<PresetUnit> {
         self.0.borrow().preset_units(drlg, room)
-    }
-
-    fn take_preset_path(
-        &mut self,
-        drlg: &Drlg,
-        room: DrlgRoomId,
-        index: usize,
-    ) -> Option<Vec<crate::drlg::preset::PathPoint>> {
-        self.0.borrow_mut().take_preset_path(drlg, room, index)
     }
 
     fn client_presets(&self, drlg: &Drlg, room: DrlgRoomId) -> Vec<ClientPreset> {

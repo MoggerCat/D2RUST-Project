@@ -146,11 +146,6 @@ pub enum ObjectRoute {
     Operate(Dispatch),
     /// A quest or not-covered object timer event.
     Event { object: UnitId, run: EventRun },
-    /// The map-AI store `0x00545C90` (`quests-act5.md` §5.8): preset
-    /// object `object` of a store class (459, 461, 543) was placed with
-    /// a path, kept as map-AI record `record`
-    /// ([`super::ActionHooks::map_ai_records`]).
-    MapAi { object: UnitId, record: u32 },
     /// A preset class whose handler is not covered (§6).
     Preset {
         room: RoomId,
@@ -311,7 +306,6 @@ impl<X: Pending> View<'_, X> {
                 object,
                 run: EventRun::Quest,
             } => Some(object),
-            ObjectRoute::MapAi { object, .. } => Some(object),
             _ => None,
         };
         let class = object

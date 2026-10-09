@@ -263,16 +263,6 @@ pub fn run<W: QuestWorld>(
             quests::object_event(ctl, w, object, c.class);
             QuestObjectRun::Ran
         }
-        // `0x00545C90` (`quests-act5.md` §5.8): the store by object class.
-        ObjectRoute::MapAi { record, .. } => {
-            match c.class {
-                459 => act5::q3::store_map_ai(ctl, w, false, record),
-                461 => act5::q3::store_map_ai(ctl, w, true, record),
-                543 => act5::q1::larzuk_map_ai(ctl, w, record),
-                _ => {}
-            }
-            QuestObjectRun::Ran
-        }
         r => QuestObjectRun::HandBack(r),
     }
 }

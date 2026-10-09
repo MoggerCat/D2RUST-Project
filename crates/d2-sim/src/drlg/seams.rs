@@ -73,18 +73,6 @@ pub trait LevelTypes {
         Vec::new()
     }
 
-    /// `0x00666120`'s source side for a preset unit of the room's list
-    /// (`drlg/preset.md` §5 step 10): its path points (action, x, y),
-    /// moved out (the preset keeps none). `None` without a path.
-    fn take_preset_path(
-        &mut self,
-        drlg: &Drlg,
-        room: DrlgRoomId,
-        index: usize,
-    ) -> Option<Vec<super::preset::PathPoint>> {
-        None
-    }
-
     /// The client presets of a room (`client/model.md` §5 r6.2,
     /// `0x00466820`): its preset units whose flag word (+0x1C) has bit 0
     /// set, in list order, room-relative.
