@@ -1818,7 +1818,7 @@ impl Run {
 /// Ctrl-click on a backpack item with the shop open sells it (0x33 to the
 /// open store's NPC, `ui/inventory.md` §10 r3.3): the install's server
 /// answers, the item leaves the player's backpack and the gold rises.
-// Covers: specs/ui/inventory.md §10 r3.3; specs/world/vendors.md §7.2
+// Covers: specs/ui/inventory.md §10 r3; specs/world/vendors.md §7.2
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn ctrl_click_sells_a_backpack_item_to_the_open_store() {
