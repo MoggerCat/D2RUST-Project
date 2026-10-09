@@ -3,7 +3,8 @@
 - **Status:** draft: the check-file format and the run; the `state`
   channel runs on both sides, `draws` reuses the rendering-facts tools,
   `packets` runs on both sides (`tools/packets-trace.md`), `rng` runs on
-  both sides (`tools/rng-trace.md`); one shared input script drives
+  both sides (`tools/rng-trace.md`), `save` compares the written `.d2s`
+  (§3 rule 13); one shared input script drives
   both sides at the same server frames (§2 rule 4, §3 rule 8).
 - **Target version:** 1.14d (the original side); the format is d2rs-own.
 - **Crate/module:** `tools/scenario-diff/scenario_diff.py`.
@@ -15,20 +16,20 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 34–42 |
-| Inputs | 43–49 |
-| Outputs / state changes | 50–60 |
-| Rules | 61–62 |
-|   1. Files | 63–68 |
-|   2. Syntax | 69–140 |
-|   3. Run | 141–395 |
-|   4. Suite | 396–491 |
-| Constants & data dependencies | 492–495 |
-| Randomness | 496–499 |
-| Edge cases & original bugs | 500–518 |
-| Test vectors | 519–535 |
-| Provenance | 536–539 |
-| Open questions | 540–579 |
+| Summary | 35–43 |
+| Inputs | 44–50 |
+| Outputs / state changes | 51–62 |
+| Rules | 63–64 |
+|   1. Files | 65–70 |
+|   2. Syntax | 71–142 |
+|   3. Run | 143–451 |
+|   4. Suite | 452–547 |
+| Constants & data dependencies | 548–551 |
+| Randomness | 552–555 |
+| Edge cases & original bugs | 556–574 |
+| Test vectors | 575–595 |
+| Provenance | 596–599 |
+| Open questions | 600–639 |
 <!-- /index -->
 
 ## Summary
@@ -53,7 +54,8 @@ state first. It is the default way to compare a behaviour with 1.14d.
   side's files (`orig.state.jsonl`, `d2rs.state.jsonl`, frames, draws),
   the Wine run folders.
 - The 1.14d save folder gets `<Char>.d2s` (the run uses `-nosave`, so the
-  game never writes it back).
+  game never writes it back; the `save` channel runs without it and
+  restores the file, §3 rule 13).
 - stdout: per channel the comparator's report; a summary line per
   channel. Exit code: the worst channel's (0 match, 1 diverged,
   2 partial, 3 error).
@@ -83,7 +85,7 @@ state first. It is the default way to compare a behaviour with 1.14d.
 | `ticks <n>` | yes | snapshots / ticks recorded on both sides |
 | `seconds <n>` | no (300) | 1.14d wall-clock limit per recorder run |
 | `difficulty normal\|nightmare\|hell` | no (normal) | d2rs `--difficulty` |
-| `channels <ch>...` | no (`state`) | from `state`, `draws`, `rng`, `packets` |
+| `channels <ch>...` | no (`state`) | from `state`, `draws`, `rng`, `packets`, `save` |
 | `draws-at <tick>` | with `draws` | the server tick whose frame is compared (≤ `ticks`; 1.14d's last drawn tick at or before it, §3 rule 7.2) |
 | `input <script>` | no | the shared input script of rule 4, given to both sides (excludes the two lines below) |
 | `input orig <script>` | no | `autostart.py` input script (seconds, client pixels) |
@@ -393,6 +395,60 @@ state first. It is the default way to compare a behaviour with 1.14d.
     `D2_GAME_DIR`). Used to take a system out of a check (a level with
     no monster population, `traces/variants/blood-moor-empty`).
 
+13. **save** (`channels save`; `tools/scenario-diff/save_channel.py`;
+    work dir files in brackets): the `.d2s` each side writes when the
+    check ends, compared byte for byte (`formats/d2s.md`).
+    1. The end is Save and Exit on both sides at the same frame: the
+       one-byte C→S 0x69 (`flows/save-exit.md` §1 r2, §2) injected as a
+       last `at <ticks + 1> send hex 69`, so both servers run the leave
+       (and with it the character writer) in the drain before the tick
+       of frame `ticks + 1`. Both sides therefore run `ticks + 1` ticks;
+       the snapshots of the run [`orig.save-run.jsonl`,
+       `d2rs.save-run.jsonl`] are not compared (that is the `state`
+       channel's job). The check's `at … poke`, `at … send` and shared
+       `input` lines apply as for every channel.
+    2. 1.14d: `record_state.py --write-save --save-watch <file>`. The
+       game runs without `-nosave` (§5.4 of `tools/original-hooks.md`),
+       so its server writes `<Char>.d2s` into its save folder (the
+       Wine prefix's `Saved Games/Diablo II`, or `D2_SAVE_DIR`); the
+       recorder ends 2 s after that file changed (a Save and Exit ends
+       the game's ticks, so no tick limit can follow) and the file is
+       copied to [`orig.saved.d2s`]. A file equal to the start save is an
+       error (Save and Exit did not run). Whatever the run does, the
+       start save is copied back into the folder afterwards, so the
+       next channel starts from the same character.
+    3. d2rs: `d2-client state-dump … --save-out <file> --send
+       "<ticks + 1> hex 69"` [`d2rs.saved.d2s`]: the server's character
+       writer of `play` (`app::save::FileStore`: the loaded save with
+       the live values laid over it) is installed with that path, the
+       leave of 0x69 runs it, and the dump ends when the client left the
+       game. The start save is never written.
+    4. Compare (`save_channel.py`): each file must have the magic, a
+       size field equal to its length and a checksum equal to the one
+       recomputed over the file with +0x0C = 0 (`formats/d2s.md` §3); a
+       1.14d file that fails is an error (code 3), a d2rs file that
+       fails is a difference. The save time at +0x30 (`time(NULL)` at the
+       write, a wall-clock host input; `formats/d2s.md` §2.1) is zeroed
+       in both and each checksum recomputed; no other byte is masked.
+       The first byte that differs (the checksum itself is not reported:
+       it follows from the others) is printed with its region: a header
+       field, the quest, waypoint or NPC section, or the variable
+       section of the nearest marker (`gf`, `if`, `JM`, `jf`, `kf`; a
+       label found by the first occurrence of each marker in order, not
+       a parse), both sides' four bytes there, the number of bytes that
+       differ and the sizes. Exit 0 equal, 1 different, 3 error;
+       `--json` writes `diff-summary-1` (`rows_compared` = bytes of the
+       longer file, `rows_equal` = bytes equal) [`save.summary.json`].
+       `py tools/scenario-diff/save_channel.py ORIG.d2s D2RS.d2s`
+       compares two files; `--selftest` needs no game.
+    5. What the compare cannot see: the file is the character's state at
+       the leave, so anything the two servers hold differently at that
+       frame (life regenerating a tick earlier or later, an item a tick
+       earlier on the cursor) is a real difference of the game state and
+       shows here as in the `state` channel; the layer-by-layer cause is
+       found with the `state` channel of the same check, which has the
+       same pokes and input.
+
 ### 4. Suite
 
 `tools/scenario-diff/suite.py`: every check (or `--filter GLOB` on the
@@ -528,6 +584,10 @@ None in the tool. Both games run on `seed`.
 | `suite.py --selftest` | discovery by glob and area, slowest first; the cache key misses on a change of the check, the save or Game.exe; the 1.14d outputs and key removed, d2rs' kept; a prefix copy hard-links the bulk and copies `*.reg` and saves, no lock; the rng build before the plain one; match % per channel (draws by rows), area and overall; playthrough acts from the `--all` keys or from milestones; text and Markdown tables |
 | comparators' `--selftest` (`--json`) | `state_diff`, `rng_diff`, `packets_diff`: the summary counts the frames with a difference and names the first; a match has every frame equal and no first |
 | `autostart.py --selftest` | `frame` / framed `hold` parsing and rejections; at simulated tick-return stops the click, hold press, key and move are posted at the stop of F − 1, the hold's release at the stop of F + N − 1; a late stop runs the step there |
+| `--selftest` (save) | the dry run issues `record_state.py --ticks <ticks+1> --write-save --save-watch <save folder>/<Char>.d2s --send '<ticks+1> hex 69'` (after the check's own sends) and `state-dump --ticks <ticks+1> --save-out <work>/d2rs.saved.d2s --send '<ticks+1> hex 69'`, then the compare; a one-side run issues no compare |
+| `save_channel.py --selftest` | on synthetic files: two saves that differ only in the save time are equal; a changed level byte is reported at 0x2B in `header level`, not at the checksum; a longer item section is reported with both sizes; a file whose checksum does not match its bytes is a difference; an empty or non-save d2rs file is a difference and the same 1.14d file an error; the `--json` summary counts bytes |
+| d2rs unit test (`app::state_dump`) | `--save-out FILE` parses into `DumpArgs.save_out` |
+| `record_state.py --selftest` | `--write-save` drops `-nosave` from the game arguments, `--save-watch FILE` is parsed |
 | `--selftest` (send) | `at … send` lines parse to the canonical message (fields in layout order, hex lower case); a missing or unknown message, a missing field, a byte that is not two hex digits, frame 0, a chat row and a misspelt step are rejected; the dry run passes `--send '<frame> <message>'` after the pokes to `record_state.py`, `state-dump`, `record_frames.py` and `play`; the packets channel passes pokes and sends to both sides |
 | `send.py --selftest` | `msg Walk x=10 y=20` → `01 0a 00 14 00`, `SelectSkill skill=36 left=0 item=0xFFFFFFFF` → `3c 24 00 00 00 ff ff ff ff` (`tools/scenario.md` test vectors), the recorded 0x32 of `world/vendors.md` §7.1 rule 10; references in GUID order and unresolved ones; the strict errors; the call layout ([ESP] = S, size, 1, S+0x10; ESP = saved − 16; EIP `0x0052AE50`); on a fake process: steps due at the first stop after tick f − 1, EAX 0 → `dropped`, the state-4 gate |
 | d2rs unit tests (`app::send`, `conformance::scenario::script`) | `--send` parsing and encoding as scenario steps (same vectors), the canonical text, the `send` record lines, the strict errors |

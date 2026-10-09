@@ -33,13 +33,14 @@ import packets_channel  # noqa: E402  (the packets channel, scenario-diff.md §3
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "trace-recorder"))
 import send as send_msg  # noqa: E402  (`at … send` lines: the message syntax, scenario.md §3)
 import rng_channel  # noqa: E402  (the rng channel, scenario-diff.md §3)
+import save_channel  # noqa: E402  (the save channel, scenario-diff.md §3 rule 13)
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, "..", ".."))
 REC = os.path.join(REPO, "tools", "trace-recorder")
 FORMAT_LINE = "check 1"
-CHANNELS = ("state", "draws", "rng", "packets")
+CHANNELS = ("state", "draws", "rng", "packets", "save")
 WINDOWS = os.name == "nt"
 
 
@@ -310,13 +311,17 @@ class Runner:
         return out
 
     # 1.14d -----------------------------------------------------------------
-    def recorder(self, script, args, out):
-        """Run one recorder on 1.14d with the check's start and input."""
+    def recorder(self, script, args, out, ticks=None, sends=()):
+        """Run one recorder on 1.14d with the check's start and input.
+        `ticks`: a tick limit other than the check's; `sends`: (frame, text)
+        messages after the check's own (the save channel's Save and Exit)."""
         c = self.c
         game = os.path.join(self.game_dir, "Game.exe")
         rec = [os.path.join(REC, script), "--game", game, "--seconds", str(c["seconds"]),
-               "--ticks", str(c["ticks"]), "--auto", c["char"], "--seed", str(c["seed"]),
+               "--ticks", str(ticks or c["ticks"]), "--auto", c["char"], "--seed", str(c["seed"]),
                "--out", out] + args + self.poke_args() + self.send_args()
+        for frame, text in sends:
+            rec += ["--send", f"{frame} {text}"]
         if self.orig_input():
             rec += ["--input", self.orig_input()]
         if (self.reuse or self.reuse_orig) and os.path.exists(out):
@@ -788,6 +793,8 @@ def selftest():
     ok += packets_channel.selftest(Runner, parse(GOOD), shared_script_error)
     # rng: record_rng.py --frames, state-dump --rng (rng-trace feature), rng_diff.py
     ok += rng_channel.selftest(Runner, parse(GOOD))
+    # save: record_state.py --write-save + Save and Exit send, state-dump --save-out, byte compare
+    ok += save_channel.selftest(Runner, parse(GOOD), shared_script_error)
     # D2RS_BIN_DIR (suite.py): prebuilt binaries, no cargo; --reuse-orig keeps 1.14d only
     old = os.environ.get("D2RS_BIN_DIR")
     os.environ["D2RS_BIN_DIR"] = "/b"
@@ -925,6 +932,9 @@ def main(argv=None):
                 codes[ch] = packets_channel.run(r, save, sides, shared_script_error)
             elif ch == "rng":
                 codes[ch] = rng_channel.run(r, save, sides)
+            elif ch == "save":
+                r.shared_error = shared_script_error
+                codes[ch] = save_channel.run(r, save, sides)
             else:
                 codes[ch] = r.not_available(ch)
     except (CheckError, OSError, subprocess.TimeoutExpired) as e:
