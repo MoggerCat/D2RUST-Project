@@ -517,7 +517,16 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         }
         if address == MONSTER_MODES[0].start {
             let target = self.mode_target;
-            return X::monster_death_start(self, sim, unit, target);
+            let started = X::monster_death_start(self, sim, unit, target);
+            if started {
+                // The death clean-up's last call (`units.md` §4.6 rule
+                // 1.2): no think or regeneration of a dead monster stays
+                // pending. The treasure gate after it schedules nothing
+                // for the unit, so running it after the host's start
+                // keeps 1.14d's order of effects.
+                ai::cancel_think_and_regen(sim.game, unit);
+            }
+            return started;
         }
         super::unit_update::death_function(self, sim, unit, address);
         true

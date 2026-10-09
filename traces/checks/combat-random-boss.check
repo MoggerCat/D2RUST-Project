@@ -1,0 +1,22 @@
+check 1
+# Area B (q-diff-combat-a1): a random boss quill rat (monstats 63) with
+# its minions and a normal zombie (monstats 5) poked in the Blood Moor (warp 2 at frame 4;
+# town allows no combat); low-level Fire Bolts (skill 36 level 1) hit both several
+# times: hit reactions and the get-hit roll, then a kill with the drop.
+# Spec: specs/tools/scenario-diff.md.
+name combat-random-boss
+save ScnAma --class ama --expansion
+seed 1234
+ticks 186
+seconds 360
+channels state
+at 4 poke warp 2
+at 30 poke seed-game 0x00001234 666
+at 30 poke seed-unit @player 0x00000055 666
+at 30 poke spawn 63 @x+5 @y-4 random-boss
+at 31 poke spawn 5 @x-4 @y+4 normal
+at 38 poke missile 58 @x @y @x+5 @y-4 skill 36 1
+at 46 poke missile 58 @x @y @x-4 @y+4 skill 36 1
+at 58 poke missile 58 @x @y @x-4 @y+4 skill 36 1
+at 70 poke missile 58 @x @y @x+5 @y-4 skill 36 1
+at 86 poke missile 58 @x @y @x-4 @y+4 skill 36 40

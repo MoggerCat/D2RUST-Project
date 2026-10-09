@@ -1,0 +1,27 @@
+check 1
+# Area B (q-diff-combat-a1): the player's melee attack. Blood Moor (warp 2
+# at frame 4; town allows no combat), seeds pinned and a fallen
+# (monstats 19, normal; its party gets GUIDs 19 and up after the level's
+# own monsters) poked 3 sub-tiles east at frame 30; from frame 34 the
+# player's left skill (attack, skill 0) on GUID 19 every 20 frames as
+# C->S 0x06 (poke `msg`, specs/tools/poke.md §1): approach, swing,
+# to-hit roll, damage, hit reaction or block, the fallen's counterattack
+# and flee, death and drop. Spec: specs/tools/scenario-diff.md.
+name combat-melee-fallen-msg
+save ScnAma --class ama --expansion
+seed 1234
+ticks 260
+seconds 600
+channels state
+at 4 poke warp 2
+at 30 poke seed-game 0x00001234 666
+at 30 poke seed-unit @player 0x00000055 666
+at 30 poke spawn 19 @x+3 @y normal
+at 34 poke msg 0x06 1 19
+at 54 poke msg 0x06 1 19
+at 74 poke msg 0x06 1 19
+at 94 poke msg 0x06 1 19
+at 114 poke msg 0x06 1 19
+at 134 poke msg 0x06 1 19
+at 154 poke msg 0x06 1 19
+at 174 poke msg 0x06 1 19

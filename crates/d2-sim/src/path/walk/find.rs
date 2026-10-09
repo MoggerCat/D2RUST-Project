@@ -310,11 +310,18 @@ pub fn prepare<W: PathWorld + ?Sized>(
         }
         d0 = t.altdir[octant(p0, start)][0] as u8;
     };
-    info.target = found;
-    path.put_target(found);
+    // PROVISIONAL (§4 rule 3, q-diff-combat-a1 REC-753): a found point
+    // equal to the start returns 0 with the target unchanged. Measured on
+    // 1.14d (Warriv's straight walk-in-radius onto a cell a zombie holds:
+    // p0's first step lands on the start; +0x10/+0x12 keep the request's
+    // point). Whether a p1 / p2 probe at the start does the same or keeps
+    // searching is `pc1-data.md` Step 4 "[q-diff-combat-a1] preparation
+    // probe at the start".
     if found == start {
         return Ok(false);
     }
+    info.target = found;
+    path.put_target(found);
     if owner_ty == UnitType::Player {
         push(t, w, path, info);
     }
