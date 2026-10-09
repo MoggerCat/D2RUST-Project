@@ -331,6 +331,24 @@ pub fn anim_record(r: &d2_formats::animdata::AnimRecord) -> AnimRecord {
 }
 
 impl<X: Pending> UnitHooks for ActionHooks<X> {
+    /// Monster death by regeneration (`stat-lists.md` §10.1 step 6): the
+    /// kill `0x0057CCB0` with the poison / open-wounds owner, then the
+    /// death events `0x005C0C30`.
+    // PROVISIONAL (stat-lists.md §10.1 step 6, REC-1260): "the death
+    // events" read as `damage.md` §5.2 step 15's pair, killed (10) on the
+    // unit then kill (9) on the killer, with no damage record; settled by
+    // a 1.14d trace of a poison kill with an item kill event.
+    fn monster_death(&mut self, sim: &mut Sim<'_>, unit: UnitId, killer: Option<UnitId>) {
+        use crate::combat::{EV_KILL, EV_KILLED};
+        let mut v = View::of(sim.units, sim.stats, sim.data, self);
+        let mut cv = v.combat(sim.game);
+        super::reaction::kill_by(&mut cv, unit, killer);
+        cv.fire_unit_event(EV_KILLED, Some(unit), killer, None);
+        if let Some(k) = killer {
+            cv.fire_unit_event(EV_KILL, Some(k), Some(unit), None);
+        }
+    }
+
     /// Runs the queued remove callbacks of the lists the expiry walk
     /// freed (`stat-lists.md` §8.2 rule 6, `skills/bodies.md` §2.8).
     // PROVISIONAL (REC-263; d2rs-own, unverified): the bodies of the shrine
