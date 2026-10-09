@@ -462,6 +462,14 @@ pub fn add_live_client(app: &mut App, link: DynLink, c: LiveClient) -> anyhow::R
         .map_err(|e| warn!("state tints (d2rs-own, unverified): {e}; no unit tinted"))
         .ok();
     add_preview_tinted(app, level_rows, tiles, lights, tints);
+    // Pass 1's level background (`draw-order-2.md` §12; the summit's
+    // time seed is PROVISIONAL REC-420, `background_view`).
+    if let Some(mut state) = app.world_mut().get_resource_mut::<WorldViewState>() {
+        state.background_view = Some(crate::world_view::background_view::BackgroundView::new(
+            archives.source(),
+            Some(crate::world_view::background_view::summit_seed_now()),
+        ));
+    }
     match crate::world_view::unit_facts::load(archives.as_ref()) {
         Ok(t) => {
             if let Some(mut state) = app.world_mut().get_resource_mut::<WorldViewState>() {

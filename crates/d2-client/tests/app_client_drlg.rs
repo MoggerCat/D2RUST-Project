@@ -358,3 +358,70 @@ fn monster_light_rows_come_from_the_users_monstats2() {
         .flatten()
         .any(|c| (c.light, c.light_rgb) == (5, (230, 168, 255))));
 }
+
+// Covers: specs/render/draw-order-2.md §12 l2 r2
+// Covers: specs/render/draw-order-2.md §12 l2 r3
+/// The Arreat Summit background on the user's archives: `summit01` and
+/// `cloud01` load and give the 12 mountain cels (resolution mode 2) and
+/// the 10 clouds' 20 cels, in pass 1, the clouds in draw mode 3 through
+/// the act V tables.
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_summit_background_draws_from_the_users_archives() {
+    use d2_client::bridge::drlg::DrlgRoomId;
+    use d2_client::bridge::world::{ActiveRoom, ClientUnit, UnitKey};
+    use d2_client::rules::camera::{Camera, ClientPos, FrameSize};
+    use d2_client::rules::shading::ShadeTables;
+    use d2_client::scene::{order::pass, BlendOp};
+    use d2_client::world_view::background_view::BackgroundView;
+    use d2_client::world_view::{ViewAssets, WorldFrame};
+    use d2_sim::rng::Seed;
+    let d = app_support::live();
+    let pl2 = d
+        .archives
+        .source()
+        .read_file(r"data\global\palette\act5\pal.pl2")
+        .expect("act V pal.pl2")
+        .unwrap();
+    let mut assets = ViewAssets::from_pl2(&pl2).unwrap();
+    let pl2 = d2_formats::palette::Pl2::parse(&pl2).unwrap();
+    assets.shades = Some(ShadeTables::push(&mut assets.maps, &pl2));
+    let mut w = ClientWorld::default();
+    let p = UnitKey::new(0, 1);
+    let mut u = ClientUnit::new(p);
+    u.position = Some((5000, 5000));
+    w.units.insert(p, u);
+    w.local_player = Some(p);
+    w.active_rooms = Some(vec![ActiveRoom {
+        x0: 4900,
+        y0: 4900,
+        w: 200,
+        h: 200,
+        level: 120,
+        room: DrlgRoomId(1),
+    }]);
+    w.room_units.place(p, Some(DrlgRoomId(1)));
+    let mut frame = WorldFrame {
+        camera: Some(Camera::new(
+            FrameSize::D2RS,
+            OpenMode::NONE,
+            ClientPos { x: 0, y: 0 },
+            (0, 0),
+        )),
+        ..WorldFrame::default()
+    };
+    let mut v = BackgroundView::new(d.archives.source(), Some(Seed::new(7, 666)));
+    let log = v.add_to_frame(&w, 0, 10_063 + 2_056, &mut assets, &mut frame);
+    assert!(log.is_empty(), "{log:?}");
+    assert_eq!(frame.items.len(), 12 + 20);
+    assert!(frame
+        .items
+        .iter()
+        .all(|i| i.key.pass() == pass::LEVEL_BACKGROUND));
+    let opaque = frame
+        .items
+        .iter()
+        .filter(|i| i.blend == BlendOp::Opaque)
+        .count();
+    assert_eq!(opaque, 12, "the mountains opaque, the clouds blended");
+}

@@ -29,6 +29,7 @@
 //! reads the model.
 
 pub mod automap_view;
+pub mod background_view;
 pub mod corpse_click;
 pub mod disguise;
 pub mod feed;
