@@ -190,14 +190,29 @@ def load_status(root, path=None):
         if cells[2] == "DIVERGED":
             m = re.search(r"(?:frame|tick) (\d+)", cells[4])
             frame = int(m.group(1)) if m else None
-        st[cells[0]].append((cells[1], cells[2], frame))
+        st[cells[0]].append((cells[1], cells[2], frame, cells[4]))
     return dict(st), (f"{label} ({run})" if run else label)
 
 
-def verdict_of(checks, repo, status):
-    """Worst verdict over the row's checks: DIVERGED@first > PARTIAL > MATCH; '-' if none ran."""
+def verdict_of(checks, repo, status, area=""):
+    """Worst verdict over the row's checks: DIVERGED@first > PARTIAL > MATCH; '-' if none ran.
+    A message row (net.c2s.0xNN / net.s2c.0xNN) reads only the packets channel, and a
+    packets divergence counts against it only when the first differing message is that
+    id in that direction; one at another message leaves it compared up to there (PARTIAL)."""
     names = sorted({k for c in checks for k in repo.checks if fnmatch_name(c, k)})
-    res = [v for n in names for v in status.get(n, [])]
+    res = [v[:3] for n in names for v in status.get(n, [])]
+    m = re.match(r"^net\.(c2s|s2c)\.0x([0-9a-f]{2})$", area)
+    if m:
+        res = []
+        for n in names:
+            for ch, v, f, first in status.get(n, []):
+                if ch != "packets":
+                    continue
+                if v == "DIVERGED":
+                    hit = re.search(r"stream (c2s|s2c) .*\(id 0x([0-9A-Fa-f]{2})\)", first)
+                    if not (hit and hit.group(1) == m.group(1) and hit.group(2).lower() == m.group(2)):
+                        v = "PARTIAL"
+                res.append((ch, v, f))
     if not res:
         return "-"
     div = [f for _, v, f in res if v == "DIVERGED"]
@@ -244,7 +259,7 @@ def merge(parts, repo, status):
     disagree = []
     if status:
         for r in out:
-            v = verdict_of(split_list(r["checks"]), repo, status)
+            v = verdict_of(split_list(r["checks"]), repo, status, r["area"])
             if v != "-" or r["last_verdict"] in ("", "-"):
                 r["last_verdict"] = v
             v = r["last_verdict"]
@@ -341,8 +356,10 @@ def render_md(rows, notes, inputs, status_label):
     for c in notes["conflicts"]:
         a(f"  - {c}")
     a(f"- Rows whose state disagrees with their checks: {len(notes['disagree'])}")
-    for c in notes["disagree"]:
+    for c in notes["disagree"][:60]:
         a(f"  - {c}")
+    if len(notes["disagree"]) > 60:
+        a(f"  - … and {len(notes['disagree']) - 60} more (rerun with the tsv to list them)")
     a("")
     for g in groups:
         rs = [r for r in rows if r["group"] == g]
@@ -428,10 +445,12 @@ def selftest():
             fh.write("Suite run 2026-01-01 00:00 UTC at abc: `x`.\n"
                      "| c-one | state | DIVERGED | 4/10 | frame 5 game, field seed | o |\n"
                      "| c-one | rng | DIVERGED | 1/3 | frame 2, unit | o |\n"
-                     "| c-two | state | MATCH | 10/10 | - | - |\n")
+                     "| c-one | packets | DIVERGED | 0/3 | frame 1 stream c2s #0 bytes[18]: 0 vs 4 (id 0x02) | o |\n"
+                     "| c-two | packets | MATCH | 10/10 | - | - |\n")
         with open(os.path.join(root, "parts", "a.tsv"), "w") as fh:
             fh.write(hdr + row(area="m.one", specs="specs/sim/a.md §2", checks="c-one", state="EQUAL", size="-")
-                     + row(area="net.c2s.0x01", kind="message", checks="c-t*", state="EQUAL", size="-"))
+                     + row(area="net.c2s.0x01", kind="message", checks="c-*", state="EQUAL", size="-")
+                     + row(area="net.c2s.0x02", kind="message", checks="c-one", state="DIVERGED", size="S"))
         with open(os.path.join(root, "parts", "b.tsv"), "w") as fh:
             fh.write(hdr + row(area="m.one", group="h") + row(area="m.bad", state="WRONG", size="Q"))
         with open(os.path.join(root, "parts", "c.tsv"), "w") as fh:
@@ -446,13 +465,14 @@ def selftest():
         text = open(out_tsv).read().splitlines()
         assert text[0] == OUT_MAGIC and text[2].split("\t") == COLS
         rows = {ln.split("\t")[0]: dict(zip(COLS, ln.split("\t"))) for ln in text[3:]}
-        assert set(rows) == {"m.one", "net.c2s.0x01", "m.bad", "never.seen"}, rows
-        assert rows["m.one"]["exercised"] == "yes" and rows["m.one"]["last_verdict"] == "DIVERGED@2"
-        assert rows["net.c2s.0x01"]["last_verdict"] == "MATCH"
+        assert set(rows) == {"m.one", "net.c2s.0x01", "net.c2s.0x02", "m.bad", "never.seen"}, rows
+        assert rows["m.one"]["exercised"] == "yes" and rows["m.one"]["last_verdict"] == "DIVERGED@1"
+        assert rows["net.c2s.0x01"]["last_verdict"] == "PARTIAL", rows["net.c2s.0x01"]
+        assert rows["net.c2s.0x02"]["last_verdict"] == "DIVERGED@1"
         md = open(out_md).read()
-        assert "`m.one`: EQUAL but checks say DIVERGED@2" in md
+        assert "`m.one`: EQUAL but checks say DIVERGED@1" in md
         assert "`m.one`: a.tsv:3 kept, b.tsv:3 dropped" in md
-        assert "`specs/sim/b.md`" in md and "`orphan`" in md and "`net.c2s.0x02`" in md
+        assert "`specs/sim/b.md`" in md and "`orphan`" in md and "`net.c2s.0x02`" not in md.split("no `net.*` row")[1].split("\n")[0]
         assert "`specs/sim/a.md`" not in md.split("Spec files named by no row")[1].split("\n")[0]
         # bad row reported; fixed parts pass --check once the outputs are current
         _, e = read_part(os.path.join(root, "parts", "b.tsv"))
