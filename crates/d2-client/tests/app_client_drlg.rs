@@ -540,3 +540,22 @@ fn client_missiles_update_on_the_users_rows() {
     }
     assert!(w.objclient.set_c.contains_key(&den));
 }
+
+/// The `pCltDoFunc` ids of the user's `missiles` rows by row count (a
+/// listing for the queue, not a check): `--nocapture` prints them.
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn client_missile_function_counts_on_the_users_rows() {
+    let d = app_support::live();
+    let rows = single_player::client_unit_rows(d.archives.as_ref()).unwrap();
+    let mut n = std::collections::BTreeMap::new();
+    for r in &rows.missiles {
+        *n.entry(r.clt_do_func).or_insert(0usize) += 1;
+    }
+    let mut v: Vec<_> = n.into_iter().collect();
+    v.sort_by_key(|&(f, c)| (std::cmp::Reverse(c), f));
+    for (f, c) in &v {
+        println!("pCltDoFunc {f}: {c}");
+    }
+    assert_eq!(v.iter().map(|(_, c)| c).sum::<usize>(), rows.missiles.len());
+}
