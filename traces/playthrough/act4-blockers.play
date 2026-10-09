@@ -20,7 +20,7 @@ milestone hephasto
   use a4
   deadline 3500
   poke 5 warp 107
-  sweep 20 2 1200 60
+  poke 20 goto preset 107 1:409
   need ever player lv == 107
   need unit ut 1 cl 409 lv 107 seen
 
@@ -28,7 +28,7 @@ milestone hellforge
   use a4
   deadline 3500
   poke 5 warp 107
-  sweep 20 2 1200 60
+  poke 20 goto preset 107 2:376
   need ever player lv == 107
   need unit ut 2 cl 376,377 seen
 

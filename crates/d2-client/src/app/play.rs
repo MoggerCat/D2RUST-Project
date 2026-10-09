@@ -323,6 +323,10 @@ pub struct PlayConfig {
     /// `--sound-log FILE` (`specs/tools/facts-render.md` §5 r20): every
     /// sound request call written to FILE.
     pub sound_log: Option<std::path::PathBuf>,
+    /// `--audio-dump FILE [--audio-ticks N]` (`specs/tools/audio-diff.md`
+    /// §3): the audio engine runs without a device, driven tick by tick by
+    /// the dump; exit once the server tick reaches N.
+    pub audio_dump: Option<(std::path::PathBuf, Option<u64>)>,
     /// `--poke` / `--poke-file` (`specs/tools/poke.md` §5 rule 2): pokes
     /// applied on the server thread between frames; empty: none.
     pub pokes: Vec<super::poke::Entry>,
@@ -687,7 +691,13 @@ pub fn run(config: PlayConfig) -> anyhow::Result<PlayEnd> {
             gpu: true,
         },
     )?;
-    sound::add_output(&mut app);
+    match &config.audio_dump {
+        // No device: the dump mixes (audio-diff.md §3 rule 3).
+        Some((path, until)) => {
+            app.insert_resource(super::audio_dump::AudioDump::create(path, *until)?);
+        }
+        None => sound::add_output(&mut app),
+    }
     if let Some(steps) = config.input {
         app.insert_resource(crate::world_view::input_script::InputScript::new(steps));
     }
