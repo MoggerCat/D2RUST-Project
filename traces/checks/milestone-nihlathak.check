@@ -1,6 +1,6 @@
 check 1
 # Placement target for the playthrough harness (pc1-day3-c round 2, 2026-10-09):
-# Nihlathak (monster 526) in the Halls of Vaught (level 124), NihlN.ds1.
+# Nihlathak (monster 526) in the Halls of Vaught (level 124), NihlS.ds1, superunique spawned at dummy object 462.
 # The player warps there before frame 4, then is moved along a path with
 # pos pokes every 3 frames, 10 sub-tiles apart, until the target's room is active.
 # 1.14d (PC 1, Windows, -seed 1234): ut 1 cl 526: GUID 66 at (12706, 5391), mode 1; created when its room

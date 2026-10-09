@@ -1,6 +1,6 @@
 check 1
 # Placement target for the playthrough harness (pc1-day3-c round 2, 2026-10-09):
-# frozen Anya (object 558) in the Frozen River (level 114), RiverIce03.ds1.
+# frozen Anya (object 558) in the Frozen River (level 114), RiverIce04.ds1, code spawn from dummy object 460.
 # The player warps there before frame 4, then is moved along a path with
 # pos pokes every 3 frames, 10 sub-tiles apart, until the target's room is active.
 # 1.14d (PC 1, Windows, -seed 1234): ut 2 cl 558: GUID 72 at (10056, 6551), mode 0; no monster 512 / 527; created when its room

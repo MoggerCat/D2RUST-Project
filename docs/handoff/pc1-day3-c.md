@@ -136,8 +136,8 @@ positions come from the extracted DS1 files. Level origin = level rect × 5.
 | Izual | 105 Plains of Despair (rect 1064, 912, 64×80) | (1112, 960), lvlprest 822 `Act4/Mesa/Mid08X08Izual.ds1`, type-1 preset id 13 at (18, 18) | (5578, 4818) = room origin + (18, 18) | monster 256, GUID 91, mode 1 | on approach (room activation); first seen at Chebyshev 57 in a 30-step sweep |
 | Hellforge | 107 River of Flame (maze, rect 1500, 1120, 144×192) | (1532, 1248) in the Forge E block (1524..1548, 1240..1264), lvlprest 854 `Act4/Lava/ForgeE.ds1` | (7661, 6255) | object 376, GUID 106, mode 0 | on approach: frame 89, the player in room (1540, 1248) next to it, Chebyshev 77 |
 | Hephasto | 107 | same room; ForgeE type-1 preset id 27 at (65, 60) → (7685, 6260) | (7672, 6270) | monster 409 (superunique 41), GUID 81, mode 1 | on approach, the same frame as the forge, Chebyshev 66 |
-| Anya (frozen) | 114 Frozen River (rect 2000, 1300, 64×64) | (2008, 1308), lvlprest 1038 (RiverIce01..04 by seed; this seed's matches RiverIce03, whose type-1 id 46 is at (50, 58)) | (10056, 6551) | object 558 `fana`, GUID 72, mode 0; **no** monster 512 / 527 | on approach, Chebyshev 30 (10-step path) |
-| Nihlathak | 124 Halls of Vaught (rect 2500, 1000, 84×84) | (2540, 1072), lvlprest 864, `NihlN.ds1` (type-1 id 49 at (207, 393)) | (12706, 5391) | monster 526, GUID 66, mode 1 | on approach; first seen at Chebyshev 51 in a 30-step sweep |
+| Anya (frozen) | 114 Frozen River (rect 2000, 1300, 64×64) | (2008, 1308), lvlprest 1038, `RiverIce04.ds1` (one of 01..04 by seed); spawned by code from dummy object 460 (type 2 id 54) at (56, 51); type-1 id 46 is Frozenstein, not Anya | (10056, 6551) | object 558 `fana`, GUID 72, mode 0; **no** monster 512 / 527 | on approach, Chebyshev 30 (10-step path) |
+| Nihlathak | 124 Halls of Vaught (rect 2500, 1000, 84×84) | (2540, 1072), lvlprest 864, `NihlS.ds1`; superunique spawned by code at dummy object 462 (type 2 id 56) at (206, 391); type-1 id 49 is a champion place | (12706, 5391) | monster 526, GUID 66, mode 1 | on approach; first seen at Chebyshev 51 in a 30-step sweep |
 | Baal (throne) | 131 Throne of Destruction (rect 3000, 1000, 40×52) | (3016, 1000), lvlprest 1086 `wthrone.ds1`, type-1 id 28 at (90, 11) | (15090, 5011) = level origin + (90, 11) | monster 543, GUID 53, mode 1 | on approach, Chebyshev 60 (from the south entrance at (15103, 5213)) |
 | Worldstone Chamber portal | 131 | same room | (15090, 5005) | object 563, GUID 71, mode 1 | on approach with Baal, Chebyshev 66; present with no quest progress |
 
@@ -155,7 +155,7 @@ Recording notes:
   `0x00463740`), so a blind sweep stalls in mazes and voids. Use the room
   dump to plan a path through rooms.
 - A frozen-Anya monster is never created at this point. Only the object
-  exists.
+  exists; monster 527 appears at the thaw.
 
 Check files (1.14d side recorded with `scenario_diff.py <check> --orig-only`):
 `traces/checks/milestone-{izual,hellforge,hephasto,anya,nihlathak,baal-throne,worldstone-portal}.check`.
@@ -175,3 +175,25 @@ taken. The values for the check files' own paths:
 | milestone-worldstone-portal | 71 | f 52 | (15100, 5070) | 65 |
 
 The harness should test class and position, not GUID.
+
+**Placement rule (owner spec `specs/monsters/population.md` §11.8, with addresses):**
+- **Izual, Baal (throne):** DS1 type-1 presets. The id maps through monpreset
+  to a monstats row (`0x005559A0` → `0x0054E600`), and the unit lands exactly
+  on the DS1 point.
+- **Hephasto:** a superunique from a preset (`0x005A49B0`). `AutoPos` 1 picks
+  a random point in the room box (`0x005A09E0` → `0x0054DC40`); the DS1 point
+  only chooses the room.
+- **Hellforge, Worldstone portal:** DS1 type-2 object presets
+  (objpreset[3][42] = 376, objpreset[4][147] = 563).
+  - The portal's init `0x0058E670` gives mode 1 only to the first creation
+    in a game.
+  - It warps only after the BaalToStairs AI reaches it (`0x0058E600`).
+- **Frozen Anya:** code spawn. Dummy object 460's init `0x0058A5B0`
+  schedules an event 25 frames later, which creates object 558 through
+  `0x0058A500`.
+- **Nihlathak:** code spawn of superunique 60. Dummy object 462's init
+  `0x0058A6C0` → `0x0054E600` → `0x005A49B0`, then the minions.
+- **d2rs:** the same for six targets. Nihlathak differs: `q-fix-p3-quest-superunique-spawn`.
+  The quest helper `preset_superunique_spawn` only allocates the unit and
+  skips the superunique path: placement search, mods, minions. The Act III
+  council uses the same helper.
