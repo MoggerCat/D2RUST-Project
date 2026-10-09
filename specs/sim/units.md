@@ -28,17 +28,17 @@
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–155 |
 |   3. Lifecycle | 156–453 |
-|   4. Modes and mode schedules | 454–993 |
-|   5. Event dispatch | 994–1008 |
-|   6. Events per kind | 1009–1131 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 1132–1153 |
-|   8. Collision line between two units | 1154–1158 |
-| Constants & data dependencies | 1159–1175 |
-| Randomness | 1176–1183 |
-| Edge cases & original bugs | 1184–1204 |
-| Test vectors | 1205–1264 |
-| Provenance | 1265–1351 |
-| Open questions | 1352–1431 |
+|   4. Modes and mode schedules | 454–995 |
+|   5. Event dispatch | 996–1010 |
+|   6. Events per kind | 1011–1133 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 1134–1155 |
+|   8. Collision line between two units | 1156–1160 |
+| Constants & data dependencies | 1161–1177 |
+| Randomness | 1178–1185 |
+| Edge cases & original bugs | 1186–1206 |
+| Test vectors | 1207–1266 |
+| Provenance | 1267–1353 |
+| Open questions | 1354–1433 |
 <!-- /index -->
 
 ## Summary
@@ -646,7 +646,9 @@ start; `0x005A7C20` never writes it itself.
       class's monstats2 flag 0x13 (`0x004638A0(class, 0x13)`) clear →
       dead-body footprint `0x00649F70(U, 1)` (`skills/bodies-3.md`
       §3.9); `0x006488A0(path, R byte +0x14)`; `0x005738D0(game, U)`.
-   3. Treasure gate `0x005A6830(game, R, 0)` (`items/treasure.md` §3.1);
+   3. Treasure gate `0x005A6830(game, R, 0)` (`items/treasure.md` §3.1;
+      the drop is created and announced in this same frame,
+      `items/treasure.md` §3.7);
       evil-killed counter `0x00547E50` (`monsters/population.md`);
       `0x0061AFA0(U's room, U's GUID)`.
    3.1. Helpers of steps 1.2–1.3 (read 2026-10-08):

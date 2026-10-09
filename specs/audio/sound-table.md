@@ -36,20 +36,20 @@
 |   3. File path | 174–190 |
 |   4. Groups and variants | 191–233 |
 |   5. Requests | 234–310 |
-|   6. Sound tick | 311–567 |
-|   7. Starting on a channel | 568–650 |
-|   8. Volume and pan | 651–786 |
-|   9. Settings | 787–806 |
-|   10. Sample cache | 807–855 |
-|   11. Live data (1.14d) | 856–872 |
-|   12. Edge cases kept | 873–888 |
-|   13. d2rs mapping | 889–899 |
-| Constants & data dependencies | 900–907 |
-| Randomness | 908–918 |
-| Edge cases & original bugs | 919–923 |
-| Test vectors | 924–968 |
-| Provenance | 969–1014 |
-| Open questions | 1015–1102 |
+|   6. Sound tick | 311–601 |
+|   7. Starting on a channel | 602–684 |
+|   8. Volume and pan | 685–820 |
+|   9. Settings | 821–840 |
+|   10. Sample cache | 841–889 |
+|   11. Live data (1.14d) | 890–906 |
+|   12. Edge cases kept | 907–922 |
+|   13. d2rs mapping | 923–933 |
+| Constants & data dependencies | 934–941 |
+| Randomness | 942–952 |
+| Edge cases & original bugs | 953–957 |
+| Test vectors | 958–1002 |
+| Provenance | 1003–1048 |
+| Open questions | 1049–1136 |
 <!-- /index -->
 
 ## Summary
@@ -334,6 +334,40 @@ The second call site (`0x0044F01D`, answers open question 4) is the
 with a room (`0x004646A0`). Then the loop only draws and runs one sound
 tick per loop pass, with no client update. So while paused, T keeps
 advancing once per loop pass (frame rate, not 40 ms); C does not.
+
+**First tick and the start-tick stamp** (1.14d-confirmed, read
+2026-10-09, PC 1 late; answers the audio-diff "T 0 vs T 1" difference):
+
+1. T := 0 at sound init (`0x00482260`, store `0x00482293`), run once per
+   game by the client game-run handler `0x0044F360` (`0x0044F4DB`)
+   before its loop; nothing else writes T except the `+= 1` at
+   `0x00482C5A`.
+2. A request stamps start tick (+0x34) := T + delay when it is made
+   (`0x004B9A00`: T read at `0x004B9A2D`, store `0x004B9A90`). T does
+   not move between sound ticks, so every request made after sound tick
+   k − 1 and before sound tick k (receive, client update, draw, the
+   environment / preload calls inside tick k) carries k (+ delay), and
+   with delay 0 is started by tick k's request update (§6.3 r3, now = k)
+   with that tick as its start tick.
+3. The first sound tick is the first pass of `0x0044EFA0` that runs a
+   client update (`0x0044F2B5` needs one: in single player a pass where
+   the server ticked and `in_game` `[0x007A061C]` is set,
+   `client/model.md` §5 r1). `in_game` is set by S→C 0x04, which the
+   single-player server sends in its frame 2 (recorded, packet trace
+   `combat-melee-fallen`); the receive `0x0044C6E0` of that same pass
+   runs before the `in_game` test. So the pass that receives frame 2's
+   0x04 runs tick **T = 0**; every sound requested in it (the join's
+   0x5A screen message below, the local player's level song and
+   ambience started inside the tick by `0x004DCAA0` / `0x004E42E0`,
+   the player of frame 1's 0x59 already existing) starts at T 0. No
+   sound tick runs in the earlier passes (frame 1's packets, `in_game`
+   still 0).
+4. The `cursor\windowopen.wav` at T 0 is sound 6 `cursor_switch`
+   (`audio/triggers.md` §11) from the screen-message add
+   (`ui/messages.md` §2 r3, request at `0x0049E585`) of the join's own
+   S→C 0x5A code 2 (`client/msg-ui.md` §19 r3: the local player's own
+   name → an empty line is added, `0x0049F365`–`0x0049F36E`, still
+   requesting the sound). No panel opens; no unit; delay 0.
 
 #### 6.2 Order
 

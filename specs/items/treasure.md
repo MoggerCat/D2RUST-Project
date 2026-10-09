@@ -33,19 +33,19 @@
 | Rules | 86–87 |
 |   1. TC runtime form (load step 46) | 88–216 |
 |   2. TC by id and level (`0x00654E00`) | 217–223 |
-|   3. Monster drop | 224–293 |
-|   4. Chest drop (`0x00585B90`) | 294–320 |
-|   5. The TC walk (`0x0055A6D0`) | 321–427 |
-|   6. Drop quality (`0x00558640`) | 428–459 |
-|   7. Creation inputs and placement (`0x0055A550`) | 460–496 |
-|   8. Gold amount | 497–512 |
-|   9. Quest drop helper (`0x00559A30`) | 513–598 |
-| Constants & data dependencies | 599–628 |
-| Randomness | 629–650 |
-| Edge cases & original bugs | 651–674 |
-| Test vectors | 675–704 |
-| Provenance | 705–729 |
-| Open questions | 730–907 |
+|   3. Monster drop | 224–344 |
+|   4. Chest drop (`0x00585B90`) | 345–371 |
+|   5. The TC walk (`0x0055A6D0`) | 372–478 |
+|   6. Drop quality (`0x00558640`) | 479–510 |
+|   7. Creation inputs and placement (`0x0055A550`) | 511–547 |
+|   8. Gold amount | 548–563 |
+|   9. Quest drop helper (`0x00559A30`) | 564–649 |
+| Constants & data dependencies | 650–679 |
+| Randomness | 680–701 |
+| Edge cases & original bugs | 702–725 |
+| Test vectors | 726–755 |
+| Provenance | 756–780 |
+| Open questions | 781–958 |
 <!-- /index -->
 
 ## Summary
@@ -290,6 +290,57 @@ drop.
 The Find Item skill (`0x005D8780`) calls §3.2 with the corpse as `U`, the
 caster as `R` and `F` = 1, skipping §3.1. It computes a value 1–4 from a
 second `roll(100)` that `0x005A8000` ignores.
+
+#### 3.7 Drop timing (1.14d-confirmed, read 2026-10-09, PC 1 late)
+
+A monster's drop is rolled, created and announced in the **same frame**
+as its death mode, with no deferral:
+
+1. The kill requests mode 0 through the mode set `0x005A7C20`, which
+   runs the DT start `0x005A6FF0` at once (`sim/units.md` §4.6 rule 1,
+   "What keeps a dead monster dead"). Inside that one call: set mode 0
+   (`0x00553570`: unit flag 0x1, U queued for update `0x0064C040`), the
+   death clean-up, then the gate §3.1 (`0x005A6830`) → §3.2–§3.5 → the
+   walk §5 → each item through §7 (`0x0055A550` → `0x00558D90`, spawn
+   mode 3). The kill itself runs in tick step 4 (timer events,
+   `sim/tick.md` §3), from the attacker's hit.
+2. The item's allocation adds it to the world inside `0x00558D90`
+   (`0x00554850`, `sim/path-placement.md` §2.5): room list insert, then
+   queue for update (`0x005549F3` → `0x0064C040`) with unit flag 0x10
+   (not yet announced) set.
+3. Step 5 of the same tick (client pass `0x0052D440` → per-client
+   update `0x005380D0` → `0x0053A620`, `sim/intents-events.md` §7.1)
+   walks the rooms' update queues: the monster's mode message (unit flag
+   0x1, S→C 0x69 code 8, §7.4 there) and the item's add message
+   (S→C 0x9C action 0, §7 rule 5) both go out in this frame's batch.
+   Within one room the item (queued later) comes first (`sim/unit-order.md`
+   §6 rule 5); in another room, room-array order decides.
+4. There is no mode-end or next-update drop: DT event 0 / event 1
+   (`0x005A7350`, `0x005A72B0`) only set mode 12.
+
+Recorded (`traces/orig-cache/combat-kill-fallen`, state channel,
+1.14d under Wine): the poked fallen is in mode 0 with hp 0 at frame 36,
+and its gold is in mode 3 in the frame-36 snapshot too. The S→C 0x9C
+of the `items-drop-monster-kill` check is at frame 36 (ledger
+`q-tool-items-channel`).
+
+d2rs (read 2026-10-09): the same path runs in one call
+(`reaction::kill` → `monster_set_mode(DT)` → `Pending::monster_death_start`
+→ `app/monster_drop.rs` `death_start` → `monster_death_drop`), and the
+server's item pass `handlers::items::moves::update_pass` runs after
+`d2_sim::tick::tick` in the same `SimGame::tick` (`adapters/sim.rs`),
+so a d2rs drop is in the frame of its own death. The one-frame lag
+the item checks see is the **death's**: in a d2rs run of the same
+check (`d2-client state-dump`, build of 2026-10-09) the fallen stays in
+mode 1 at (5146, 4266) while the 1.14d fallen walks (mode 2 from frame
+31) to (5145, 4265), so the first Fire Bolt reaches it one frame later
+and the 0x69 code 8 is at frame 37 instead of 36. Cause: the monster's
+AI / population divergence (the check diverges at frame 5 on the
+warp's seeds, `checks-status.md`), not the drop. PROVISIONAL (REC-1453):
+the `items-drops-nor-*` lags are assumed to be the same death lag;
+settled by pairing each check's 0x69 code 8 frame with its first 0x9C
+frame on both sides (a drop frame ≠ death frame on either side would
+refute it).
 
 ### 4. Chest drop (`0x00585B90`)
 

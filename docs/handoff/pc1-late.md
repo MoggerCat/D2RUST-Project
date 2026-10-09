@@ -94,6 +94,47 @@ messages.
   `world/npc.md` test vector). d2rs `radius_point`
   (`monsters/ai/tactics.rs:490-513`) uses a rounded D2MOO formula. Row
   `q-fix-pc1late-walk-radius`.
+- **D done (items timing and flags, for q-chk-items-drops /
+  q-fix-npc-interact)**:
+  - **D1 drop frame** (`items/treasure.md` §3.7 new; `sim/units.md` §4.6
+    rule 1 step 3 points there): 1.14d rolls, creates and sends a
+    monster's drop **in the death frame**: the kill's mode-0 request
+    `0x005A7C20` runs the death start `0x005A6FF0` (mode 0, clean-up,
+    treasure gate `0x005A6830`, TC walk, `0x0055A550` → `0x00558D90`);
+    the item is added and queued inside `0x00554850` (`0x005549F3` →
+    `0x0064C040`), so the same tick's client pass sends 0x69 and 0x9C
+    action 0 together; mode end only sets mode 12. Recorded
+    (`combat-kill-fallen`): fallen mode 0 and its gold mode 3 in the
+    same frame-36 snapshot. d2rs does the same synchronously
+    (`reaction::kill` → `death_start` → `monster_death_drop`, then
+    `update_pass` in the same tick): **the one-frame lag is the death,
+    not the drop** — in a local d2rs run the fallen stands at (5146,
+    4266) instead of walking to (5145, 4265) from frame 31 (the check's
+    earlier AI divergence, seeds differ from frame 5), so the Fire Bolt
+    hits it one frame later (0x69 code 8 at 37 vs 36). No drop-path row.
+    PROVISIONAL REC-1453: the `items-drops-nor-*` lags are the same death
+    lag; settled by pairing each check's 0x69 code 8 frame with its first
+    0x9C on both sides. (Side note: that d2rs `state-dump` run sent no
+    0x9C at all; d2rs sets item flag 0x10 on low / normal drops,
+    `wiring/economy/treasure_items.rs` ~108, PROVISIONAL REC-281.)
+  - **D2 gamble list** (`world/vendors.md` §5.1 step 7 "Exact"): mode 0
+    on the NPC's page-0 grid via `0x00560200` (find-free, then mode := 0
+    at `0x00560364`), flag 0x10 cleared; `00 12` = mode 0, x 9, y 0 (the
+    first item, a ring); d2rs's `place_in_gamble` is a no-op (mode 4,
+    (0, 0), `10 00`). Row `q-fix-pc1late-gamble-place`.
+- **F2 done (audio from the binary, for q-fix-audio)**
+  (`audio/sound-table.md` §6.1 "First tick and the start-tick stamp"
+  r1–r4; `client/msg-ui.md` §19 r3): the first sound tick runs with **T
+  0** (T := 0 at sound init `0x00482293`, += 1 only at the tick's end
+  `0x00482C5A`; start tick = T + delay when requested); it is the first
+  loop pass with a client update after S→C 0x04 sets `in_game` (server
+  frame 2), so the song and ambience start at T 0. d2rs ticks from
+  frame 1 (`audio/driver.rs:529`): row `q-fix-pc1late-audio-first-tick`.
+  `cursor\windowopen.wav` = sound 6 `cursor_switch`, requested by every
+  screen-message add (`0x0049E585`); at T 0 it is the join's own S→C
+  0x5A code 2, which adds an empty line (`0x0049EB10`). d2rs drops the
+  add's sound and never consumes EventText: row
+  `q-fix-pc1late-screen-message-sound`.
 
 ## C — numbered items
 
