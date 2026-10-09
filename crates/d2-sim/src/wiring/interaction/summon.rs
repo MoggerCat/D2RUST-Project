@@ -8,9 +8,9 @@
 //!
 //! d2rs-own, unverified (preview): a summon is placed on the aimed point
 //! itself (the original's spread search `0x005B2F20` is a path-spec
-//! seam); the lists' resync `0x00575900` is a no-op, so a list keeps the
-//! maximum its last add set; a pet that dies or vanishes leaves its
-//! list on the next [`UseView::pet_sweep`].
+//! seam); a pet that dies or vanishes leaves its list on the next
+//! [`UseView::pet_sweep`]. The lists' maxima resync `0x00575900`
+//! ([`UseView::resync_pet_maxima`]) runs the skills' `petmax` calcs.
 //! PROVISIONAL (pets.md OQ4): the add record's +0x10 / +0x14 stay 0.
 
 use crate::game::Game;
@@ -137,9 +137,10 @@ impl<X: Pending + UseRest> PetWorld for PetView<'_, '_, X> {
     fn request_death_mode(&mut self, u: UnitId, target: Option<UnitId>) {
         Pending::mode_request(self.u.xm(), u, DEATH_REQUEST, target);
     }
-    // PROVISIONAL (pets.md OQ2): the resync `0x00575900` needs the
-    // player's skill formulas; the maximum of the last add stands.
-    fn resync(&mut self, _: UnitId) {}
+    /// `0x00575900` (`sim/pets.md` §10 "Resync", OQ2 answered).
+    fn resync(&mut self, player: UnitId) {
+        self.u.resync_pet_maxima(player);
+    }
     fn players(&self) -> Vec<UnitId> {
         self.u.cv.game.lists.units_of_type(UnitType::Player)
     }
@@ -154,6 +155,45 @@ impl<X: Pending + UseRest> PetWorld for PetView<'_, '_, X> {
 }
 
 impl<X: Pending + UseRest> UseView<'_, X> {
+    /// The pet-maximum resync `0x00575900(game, player)` (`sim/pets.md`
+    /// §10): [`crate::skills::use_::bodies::pet_resync`] over the
+    /// player's skill list with `pettype` `basemax` and
+    /// [`pets::set_max`]. A player without pet lists is left alone.
+    pub(super) fn resync_pet_maxima(&mut self, player: UnitId) {
+        if !self.cv.v.h.pet_lists.contains_key(&player) {
+            return;
+        }
+        let t = self.cv.v.h.tables.clone();
+        let base: Vec<i16> = self
+            .cv
+            .v
+            .h
+            .bodies
+            .as_deref()
+            .map(|b| b.pettype_basemax.clone())
+            .unwrap_or_default();
+        let basemax = |pt: i32| {
+            usize::try_from(pt)
+                .ok()
+                .and_then(|i| base.get(i))
+                .map(|&b| i32::from(b))
+        };
+        crate::skills::use_::bodies::pet_resync(
+            self,
+            &t.skills,
+            player,
+            &basemax,
+            &mut |w, pt, v| {
+                if let Err(err) = pets::set_max(&mut PetView { u: w }, player, pt, v) {
+                    w.cv.v
+                        .h
+                        .errors
+                        .push(crate::wiring::action::WiringError::Pet(err));
+                }
+            },
+        );
+    }
+
     /// `0x005B2F20` on the allocator: a monster of `class` in `room` at
     /// the subtile `at`, in mode `mode` (module docs).
     pub(super) fn alloc_monster(

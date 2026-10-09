@@ -122,6 +122,9 @@ fn baal_gold_hell() {
     );
     f.party.insert(P2, vec![P2, p3]);
     f.a5_created = Some(UnitId(0x99));
+    for p in [P1, P2, p3] {
+        f.client_flags.insert(p, 0x20);
+    }
     let mut seed = ctl.seed;
     let (r1, r2) = (seed.step() % 1500, seed.step() % 1500);
     kill_baal(&mut ctl, &mut f, Some(P1));
@@ -135,9 +138,10 @@ fn baal_gold_hell() {
     assert_eq!(
         f.log,
         [
-            "progression 1 5 2",
-            "progression 2 5 2",
-            "progression 3 5 2",
+            // n = 5 * 2 + 5 = 15 for an expansion character (bit 5).
+            "progression 1 0x0f20",
+            "progression 2 0x0f20",
+            "progression 3 0x0f20",
             "sound 1 83",
             "sound 2 83",
             "sound 3 83",
@@ -415,13 +419,14 @@ fn game_start_join_and_leave() {
         let (mut ctl, _) = control();
         let mut f = fake();
         f.p(P1).quests.flags[0].set(40, b);
+        f.client_flags.insert(P1, 0x20);
         call(
             &mut ctl,
             &mut f,
             ev(event::PLAYER_STARTED_GAME, Some(P1), 0, 0),
         );
         assert!(f.flags(P1).get(40, 10));
-        assert_eq!(f.log, ["progression 1 5 0"]);
+        assert_eq!(f.log, ["progression 1 0x0520"]);
     }
     // Join: 40.0 → 40.10.
     let (mut ctl, _) = control();

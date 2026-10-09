@@ -22,7 +22,7 @@ use super::msg::lighting::{lighting_update, object_light_of};
 use super::objects::{self, ObjFx, ObjUnit};
 use super::output::{move_freed, Output, Outputs};
 use super::receive::{ReceiveLog, Rejected};
-use super::world::{update_order, ClientWorld, ModelInputs, OBJECT};
+use super::world::{update_order, ClientWorld, ModelInputs, MONSTER, OBJECT};
 
 /// Drains every unit's queue (§5 rules 2–4). Returns the number of
 /// messages applied. A handler error is recorded as a rejection; the
@@ -83,6 +83,11 @@ pub fn update_pass(
             apply_object_lights(world, &outputs[start..]);
             move_freed(world, outputs);
         }
+        // The monster update `0x004B13A0`'s anim step (`model.md` §19
+        // r8.5), before the drain.
+        if key.unit_type == MONSTER {
+            super::monster_anim::step(world, key);
+        }
         // Looked up again: an earlier unit's messages or its own update
         // may have removed it (§5 rule 2).
         let Some(unit) = world.units.get_mut(&key) else {
@@ -135,6 +140,8 @@ pub fn update_pass(
     if let Err(error) = lighting_update(world, inputs) {
         log.rejected.push(Rejected { id: 0, error });
     }
+    // The Den lights' creates (`render/lighting.md` §10 r5).
+    missile_sounds(world, outputs);
     move_freed(world, outputs);
     applied
 }
@@ -167,7 +174,20 @@ fn c_missiles(
             log.rejected.push(Rejected { id: 0, error });
         }
     }
+    missile_sounds(world, outputs);
     move_freed(world, outputs);
+}
+
+/// The client missiles' sound calls (`audio/triggers.md` §8 r3) in
+/// update order, before the frees of the same walk.
+fn missile_sounds(world: &mut ClientWorld, outputs: &mut Vec<Output>) {
+    outputs.extend(
+        world
+            .objclient
+            .missile_sounds
+            .drain(..)
+            .map(Output::MissileSound),
+    );
 }
 
 fn c_objects(

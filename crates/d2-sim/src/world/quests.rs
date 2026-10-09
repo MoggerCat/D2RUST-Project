@@ -1185,12 +1185,6 @@ pub trait QuestWorld {
         let (x, y) = self.unit_xy(at).unwrap_or((0, 0));
         self.create_missile(at, 0, 1, class, x, y)
     }
-    /// `0x00538680(client, act, difficulty)`: character progression
-    /// (save spec; `quests-act5-2.md` open question 2).
-    fn character_progression(&mut self, player: UnitId, act: u8, difficulty: u8) {
-        let _ = (player, act, difficulty);
-        self.unhandled(0xFE, 0x0053_8680);
-    }
     /// `0x0055B030`: a gold pile of `amount` at the unit.
     fn drop_gold_amount(&mut self, at: UnitId, amount: u32) {
         let _ = (at, amount);

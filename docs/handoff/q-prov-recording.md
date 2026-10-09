@@ -132,6 +132,24 @@ queue entry) and the player then changes rooms at ticks 121, 241, 351; the Wine 
 The PC 1 window received input (likely the mouse over the window): **re-record sim-0009 on PC 1
 with the mouse outside the window**; until then REC-290 ticks are equal over 60 ticks only.
 
+### Blocker tools (2026-10-09, coordinator's order)
+
+1. **d2s-tool item writer** (`--item …/q=/idx=/ilvl=/sock=/unid/eth/body=/belt=`; `dump --items`):
+   checked byte for byte against 1.14d's own re-save (`facts/saves/gear-roundtrip.tsv`, 14 of 15
+   equal, the 15th gets the game's 0x4000 "requirements not met" flag; `tools/d2s-tool/tests/item_roundtrip.rs`).
+   Found on the way: 1.14d writes an equipped item's x as its body location; it cuts sockets to
+   `gemsockets`; it drops an item equipped at a location its base does not fit.
+2. **Item creation on the d2rs side** (q-tool-poke: "b", the character layer belongs to scenario-run):
+   `scenario-run run --save-dir DIR` now loads `char save <name>.d2s` on the d2rs side through
+   `d2_server::adapters::session::load_save`, so both sides start from the same save; steps the
+   scenario host cannot apply are gaps. Today: `header`, `quests`, `npc fields`, `items`, `item
+   indices`, `quest entry` are unapplied, because the host is `ActionWorld`; the items need
+   `WiredWorld::load_items` (the play app's host). Next: run the scenario host on `WiredWorld`.
+3. **Pokes in `record_packets.py`** (0.2.0, `--poke` / `--poke-file`, at its 0x0052FD1E hook): the
+   first poke run on 1.14d: `spawn 19` next to the player in Cold Plains works (5 of 10, the others'
+   spots taken). G4 then gave REC-108: drops land beside the death point →
+   `q-fix-real-monster-drop-spot`.
+
 ## Where the rest is blocked (2026-10-09, end of this session)
 
 Remaining `recording` rows after the runs above: see the last

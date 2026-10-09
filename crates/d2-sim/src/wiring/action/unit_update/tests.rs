@@ -429,6 +429,20 @@ fn target(fx: &mut Fx, u: UnitId, t: UnitId, ty: UnitType) {
     d.target_y = 0x0567;
 }
 
+fn path_target(fx: &mut Fx, u: UnitId, t: (u16, u16)) {
+    let d = fx
+        .sim
+        .hooks()
+        .paths
+        .as_mut()
+        .unwrap()
+        .dynamic_mut(u)
+        .unwrap();
+    d.target_unit = None;
+    d.target_x = t.0;
+    d.target_y = t.1;
+}
+
 fn changed(fx: &mut Fx, u: UnitId, mode: u32) {
     let r = fx.sim.sys.units.get_mut(u).unwrap();
     r.mode = mode;
@@ -528,6 +542,7 @@ fn monster_hit_life_byte() {
 /// PROVISIONAL (pathing.md §10 r2; REC-95): a player entering a skill
 /// mode (A1) with a used skill sends 0x4C on its path's target unit, to
 /// its own client too; a walk mode still sends nothing to it.
+/// Block sends the 0x0D stop row.
 // Covers: specs/sim/pathing.md §10 r2; specs/sim/intents-events.md §3.5 r5
 #[test]
 fn a_player_attacking_a_monster_sends_0x4c() {
@@ -551,12 +566,71 @@ fn a_player_attacking_a_monster_sends_0x4c() {
     fx.tick();
     let want = skill_message::skill_on_point(0, guid(&fx, p), 0, 2, 0x1234, 0x0567, 0);
     assert_eq!(sent(&mut fx), vec![(p, want.to_vec())]);
-    // Neutral, block: nothing.
-    for mode in [1, 9] {
+    // Neutral: nothing to the own client (pathing.md §10 r2 table).
+    changed(&mut fx, p, 1);
+    fx.tick();
+    assert_eq!(sent(&mut fx), vec![], "mode 1");
+    // Block (BL 9): 0x0D code 0x12 to every client, own included.
+    changed(&mut fx, p, 9);
+    fx.tick();
+    let g = guid(&fx, p).to_le_bytes();
+    let want = vec![0x0D, 0, g[0], g[1], g[2], g[3], 0x12, 10, 0, 10, 0, 0, 0];
+    assert_eq!(sent(&mut fx), vec![(p, want)], "mode 9");
+}
+
+/// `pathing.md` §10 r2 table: NU / TN (other clients only), GH / BL / DD
+/// (every client) 0x0D, DT (0x0D, then the own stat 175 message) and KB
+/// (0x0F code 0x14 with byte 11 = unit byte +0xB0).
+// Covers: specs/sim/pathing.md §10 r2
+#[test]
+fn player_stop_rows_reach_every_client_or_only_the_others() {
+    let (mut fx, p, _) = setup();
+    let a = fx.a;
+    let q = fx.spawn(UnitType::Player, 1, a, 12, 10);
+    fx.game
+        .lists
+        .add_client(Some(q), None, client_state::IN_GAME);
+    fx.tick();
+    sent(&mut fx);
+    let g = guid(&fx, p).to_le_bytes();
+    // The per-client order is the client list's; compare per client.
+    let by_client = |mut v: Vec<(UnitId, Vec<u8>)>| {
+        v.sort_by_key(|(u, _)| u.0);
+        v
+    };
+    let stop = |code: u8| vec![0x0D, 0, g[0], g[1], g[2], g[3], code, 10, 0, 10, 0, 0, 0];
+    // NU 1 and TN 5: code 7 to the other client only.
+    for mode in [1, 5] {
         changed(&mut fx, p, mode);
         fx.tick();
-        assert_eq!(sent(&mut fx), vec![], "mode {mode}");
+        assert_eq!(by_client(sent(&mut fx)), vec![(q, stop(7))], "mode {mode}");
     }
+    // GH 4, BL 9: every client.
+    for (mode, code) in [(4, 6), (9, 0x12)] {
+        changed(&mut fx, p, mode);
+        fx.tick();
+        assert_eq!(
+            by_client(sent(&mut fx)),
+            vec![(p, stop(code)), (q, stop(code))],
+            "mode {mode}"
+        );
+    }
+    // KB 19: 0x0F code 0x14, target x, y, byte +0xB0, x, y.
+    path_target(&mut fx, p, (0x1234, 0x0567));
+    changed(&mut fx, p, 19);
+    fx.tick();
+    let kb = vec![
+        0x0F, 0, g[0], g[1], g[2], g[3], 0x14, 0x34, 0x12, 0x67, 0x05, 0, 10, 0, 10, 0,
+    ];
+    assert_eq!(by_client(sent(&mut fx)), vec![(p, kb.clone()), (q, kb)]);
+    // DT 0 (stat 175 = 300): 0x0D code 8 to both, then the own 0x1E.
+    fx.stats(p, &[(175, 300)]);
+    changed(&mut fx, p, 0);
+    fx.tick();
+    assert_eq!(
+        by_client(sent(&mut fx)),
+        vec![(p, stop(8)), (p, vec![0x1E, 175, 0x2C, 0x01]), (q, stop(8)),]
+    );
 }
 
 /// §3.5 rule 6: a state toggled on a unit reaches the client as 0xA7

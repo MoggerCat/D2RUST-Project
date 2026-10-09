@@ -1090,6 +1090,7 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         self.xm().buff_refresh(u);
     }
     fn skill_resync(&mut self, u: UnitId) {
+        self.resync_pet_maxima(u);
         self.xm().skill_resync(u);
     }
     /// `0x00646D60`: the passive state's stat list ([`bodies::passive`]),

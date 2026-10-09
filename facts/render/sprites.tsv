@@ -1,4 +1,4 @@
-# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py --merge-sprites sprites-7e9e8b2a.tsv sprites-fc2d9290.tsv --out /home/user/D2RUST-Project/facts/render; game: 1.14d
+# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py --merge-sprites /tmp/s2/a.tsv /tmp/s2/b.tsv --out /tmp/s2/out; game: 1.14d
 file	dir	frame	w	h	xoff	yoff
 data/global/chars/am/hd/amhdlittn1ht.dcc	0	6	9	18	-9	-50
 data/global/chars/am/hd/amhdlittn1ht.dcc	47	0	15	15	-10	-46
