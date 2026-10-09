@@ -38,20 +38,20 @@
 |   C4. Create — tail | 188–215 |
 |   C5. Callers | 216–227 |
 |   C6. Per-update dispatch `0x004D2C70` | 228–245 |
-|   C7. Default step `0x004D30C0` (function 1) | 246–297 |
-|   C8. Client collide table `0x0072A350` | 298–318 |
-|   C9. End `0x004D2D70(m, U, forced)` | 319–361 |
-|   C10. Removal and lifetime | 362–374 |
-|   C11. `InitSteps` and `ExplosionMissile` | 375–385 |
-|   C12. Client function table `0x0072A398` | 386–472 |
-|   C13. Function bodies specified here | 473–528 |
-|   C14. Seeds (capture-only) | 529–575 |
-| Constants & data dependencies | 576–597 |
-| Randomness | 598–601 |
-| Edge cases & original bugs | 602–621 |
-| Test vectors | 622–637 |
-| Provenance | 638–654 |
-| Open questions | 655–715 |
+|   C7. Default step `0x004D30C0` (function 1) | 246–301 |
+|   C8. Client collide table `0x0072A350` | 302–322 |
+|   C9. End `0x004D2D70(m, U, forced)` | 323–378 |
+|   C10. Removal and lifetime | 379–391 |
+|   C11. `InitSteps` and `ExplosionMissile` | 392–402 |
+|   C12. Client function table `0x0072A398` | 403–489 |
+|   C13. Function bodies specified here | 490–545 |
+|   C14. Seeds (capture-only) | 546–592 |
+| Constants & data dependencies | 593–614 |
+| Randomness | 615–618 |
+| Edge cases & original bugs | 619–638 |
+| Test vectors | 639–654 |
+| Provenance | 655–671 |
+| Open questions | 672–719 |
 <!-- /index -->
 
 ## Summary
@@ -250,9 +250,13 @@ No row → return. One pass:
 1. active := frames left ≤ activate frame.
 2. active and elapsed (`missiles.md` §R1.4) > `InitSteps` → flag-ex &=
    ~0x40000 (drawn from now on).
-3. Motion record reports "not moving" (`0x004DA6B0`: done and not
-   restarted, i.e. a flag-0x100 arc that landed) → end(none, 1)
-   (§C9); return.
+3. Motion record reports "not moving" (`0x004DA6B0`: flag 1 set and
+   flag 8 clear) → end(none, 1) (§C9); return. The create restarts
+   every missile's record (flag 8) and the flag-0x100 arc ORs flag 2
+   onto it (`render/unit-composite.md` §8), so a landed create arc does
+   **not** end the missile here: it holds at x = y = 0 until frames
+   left runs out (r6). Only a record made later without a restart (flag
+   8 clear) can end it here.
 4. active → animation:
    - `LoopAnim` = 0: advance unless at the end (`0x006217C0`: frame +
      speed ≥ length); at the end the frame holds.
@@ -338,7 +342,14 @@ Callers: the default step (none, 1), (none, 0), (U, 0); function 2
    1. `NextHit` and U: U gets state 86 for `NextDelay` frames (a state
       list `0x006251F0(0, 2, NextDelay, U type, U GUID)`, state 86,
       end callback `0x004CD380`, attached `0x00626E10`, state on
-      `0x00639DB0`).
+      `0x00639DB0`). `NextDelay` is a count, not a frame: the list
+      has flag 2 (NEWLENGTH) and the only client expiry walk is
+      `0x00627460(U, 0)` at the start of U's own per-unit update
+      `0x00480810` (`client/model.md` §5 r2; before the motion update
+      `0x004DA350` and the type update): with frame 0 each NEWLENGTH
+      list's expire −= 1 and a list at ≤ 0 is freed
+      (`sim/stat-lists.md` §10.4), so state 86 goes in U's
+      `NextDelay`-th update after the hit (1.14d asm 2026-10-09).
    2. U's client event hooks of kind 0 (`0x004DC210(0, U, m, 0)`: list
       U+0x90).
    3. h := `pCltHitFunc` (i16): 0 < h < `[0x0072A504]` (81) and entry h
@@ -348,13 +359,19 @@ Callers: the default step (none, 1), (none, 0), (U, 0); function 2
    4. `HitSound` ≥ 0 → request on m (`audio/triggers.md` §8 r3).
    5. E := `ExplosionMissile` (i16) ≥ 0 → X := `0x004CDBA0(m, E, 0, 0,
       m's skill, m's level)` (flags 0x20: target (0, 0) absolute). X
-      made: X's motion position := m's motion (x, y, z) (`0x004DA110`,
-      `0x004DA130`, `0x004DA150` → `0x004DA1D0`), done (`0x004DA640`),
+      made: X's motion position := m's motion (x, y, z) `>> 11` then `<<
+      11` (getters `0x004DA110`, `0x004DA130`, `0x004DA150` shift, the
+      setter `0x004DA1D0` shifts back: m's position with the low 11
+      bits cleared), done (`0x004DA640`),
       restart (`0x004DA690`); X class 146 `spidergoo` → direction :=
       rnd(64) on X's seed; else X direction := m's direction
       (`0x006487F0` → `0x00648820`).
 5. U given and `CollideKill` = 0 → return none (X stays made).
-6. `TravelSound` ≥ 0 → stop it (`0x004CA900` → `0x004BA790`).
+6. `TravelSound` ≥ 0 → stop it (`0x004CA900`(m, sound): the first
+   handle on m's sound list +0x78 whose sound id (`0x004B9CA0`) lies in
+   [s, s + c), s := `0x00481890`(sound), c := the byte
+   `0x004818C0`(s)); found → `0x004BA790`(h, m, force 0),
+   `push 0` at `0x004D3006`).
 7. m's light → remove (`0x00621150` → `0x00474470`).
 8. r & 1 (r = 3) → remove m: flag 0x200000 → set C (`0x00465F00`), else
    set S (`0x00465EE0`). Return X.
@@ -684,31 +701,18 @@ the owners named there. §C14 r9: the body reads listed in
    and a Fissure cast (shard / crack positions from the re-seeded
    missile seed, §B10 r3, function 48); a Frozen Orb (bolt directions
    d28 += 19 mod 64 per frame, 16 novas at the end).
-9. Timed arc `0x004DA5B0` (`render/unit-composite.md` §8): does "flag
-   2" set flag 2 (keeping the restart's flag 8 of §C3 r19) or store
-   flags := 2? §C7 r3 ("a flag-0x100 arc that landed") reads only with
-   the store. Is the vz division by `n` or by the clamped ticks max(n,
-   1), and is az·n² halved before the subtraction? PROVISIONAL: flags :=
-   2, ticks, halved first (because the landing rule of §C7 r3 needs flag
-   8 cleared); settled by REC-540 (PC 1 Step 4 item 24: the asm of
-   `0x004DA5B0`).
-10. §C9 r4.5 copies m's motion position to X through the getters
-    `0x004DA110` / `0x004DA130` / `0x004DA150` and the setter
-    `0x004DA1D0`, which shifts its arguments `<< 11`
-    (`render/unit-composite.md` §8): do the getters return the stored
-    16.16 value (then X's position is m's << 11) or `>> 11`? Also the
-    reader of function 59 (`client-bodies.md` §B5 r6). PROVISIONAL: the
-    stored values are copied as they are and function 59 reads the
-    stored z (because no shift is stated); settled by REC-541 (PC 1 Step
-    4 item 24).
-11. §C9 r4.1: the state list of state 86 is made by `0x006251F0(0, 2,
-    NextDelay, U type, U GUID)`; is `NextDelay` the list's expire frame
-    (+0x18, `sim/stat-lists.md` §10.4) as an absolute client frame, or
-    a count from now, and which client pass removes it? PROVISIONAL: a
-    count of client updates, removed before the set-C missile walk
-    (because the column is a delay); settled by REC-545 (PC 1 Step 4
-    item 24).
-12. §C9 r6 detaches the travel sound with `0x004BA790(h, U, force)`:
-    which force? PROVISIONAL: 0 (because a looping travel sound then
-    stops with its last unit, as the unit free does); settled by REC-548
-    (PC 1 Step 4 item 24).
+9. *Answered (static, 2026-10-09; REC-540):* `0x004DA5B0` ORs flag 2
+   (the create's flag 8 stays), divides vz by the clamped ticks and
+   halves az·t² first (C division) (`render/unit-composite.md` §8). So
+   a landed create arc does not end the missile through §C7 r3 (flag 8
+   set); §C7 r3 is corrected.
+10. *Answered (static, 2026-10-09; REC-541):* the getters `0x004DA110` /
+    `0x004DA130` / `0x004DA150` return the stored value `>> 11`; the
+    unshifted getters are `0x004DA170` / `0x004DA190` / `0x004DA1B0`.
+    §C9 r4.5: X's position is m's with the low 11 bits cleared;
+    function 59 compares z `>> 11` (`client-bodies.md` §B5 r6).
+11. *Answered (static, 2026-10-09; REC-545):* `NextDelay` is a count of
+    U's own client updates (`0x00627460(U, 0)` at the start of
+    `0x00480810`), §C9 r4.1.
+12. *Answered (static, 2026-10-09; REC-548):* force 0 (`0x004D3006`),
+    §C9 r6.

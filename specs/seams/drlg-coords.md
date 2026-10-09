@@ -158,7 +158,7 @@ the same order (`drlg/*` Randomness sections).
 | Input / seed | Expected output | Source (trace id) |
 |---|---|---|
 | 0x03 act 0 seed 0x103888C4, 0x07 (0x3A0, 0x388) level 1, 0x15 (4673, 4548) | client room of origin tile (928, 904), level 1, holds the player | `20261006-022633` (`app_client_drlg::the_recorded_join_on_the_install`) |
-| synthetic app game, seed 1234 | §2.2–§2.5 after the join and on every frame of a walk from the town into the Blood Moor | `seam_drlg_coords.rs` |
+| the install, default seed | §2.2–§2.5 after the join and on every frame of a walk from the town into the Blood Moor, the local player relinked by the play mode's per-frame path step (`walk_room::preview_walk_room`, after the bridge frame) as the play app does | `seam_drlg_coords.rs` |
 
 ## Provenance
 

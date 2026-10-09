@@ -4,6 +4,14 @@
 //!
 //! Every game object that needs randomness owns a [`Seed`]. Seeds are value
 //! types: copying one copies the generator (spec, edge case 4).
+//!
+//! With the `rng-trace` feature every draw is also offered to the debug
+//! log of `crate::debug::rng_trace` (`specs/tools/rng-trace.md`), which
+//! records it only while an export has started it on this thread; the
+//! values and states are the same either way.
+
+#[cfg(feature = "rng-trace")]
+use crate::debug::rng_trace as trace;
 
 /// Step multiplier (spec §2).
 pub const K: u32 = 0x6AC6_90C5;
@@ -52,7 +60,18 @@ impl Seed {
 
     /// One step (spec §2): `v = lo·K + hi`, state becomes
     /// `{v mod 2^32, v >> 32}`. Returns the new low word.
+    #[cfg_attr(feature = "rng-trace", track_caller)]
     pub fn step(&mut self) -> u32 {
+        #[cfg(feature = "rng-trace")]
+        let before = *self;
+        let lo = self.raw_step();
+        #[cfg(feature = "rng-trace")]
+        trace::draw(self, trace::Op::Step, before, lo);
+        lo
+    }
+
+    /// The step itself, unrecorded (the helpers record one draw each).
+    fn raw_step(&mut self) -> u32 {
         let v = u64::from(self.lo) * u64::from(K) + u64::from(self.hi);
         // Truncations are the rule: low and high halves of v.
         self.lo = v as u32;
@@ -62,6 +81,7 @@ impl Seed {
 
     /// A child seed derived from this one (spec §5): one step, then
     /// `init_low(lo')` on the child.
+    #[cfg_attr(feature = "rng-trace", track_caller)]
     pub fn derive(&mut self) -> Seed {
         Seed::init_low(self.step())
     }
@@ -69,33 +89,62 @@ impl Seed {
     /// `roll(n)` (spec §3): a value in `[0, n)`. `n < 1` (signed) returns 0
     /// **without stepping**. Otherwise one step and `lo' mod n` (unsigned;
     /// equal to the original's power-of-two mask branch, spec §3.3).
+    #[cfg_attr(feature = "rng-trace", track_caller)]
     pub fn roll(&mut self, n: i32) -> u32 {
+        #[cfg(feature = "rng-trace")]
+        let before = *self;
+        let r = self.raw_roll(n);
+        #[cfg(feature = "rng-trace")]
+        trace::draw(self, trace::Op::Roll(n), before, r);
+        r
+    }
+
+    fn raw_roll(&mut self, n: i32) -> u32 {
         if n < 1 {
             return 0;
         }
-        self.step() % n.unsigned_abs()
+        self.raw_step() % n.unsigned_abs()
     }
 
     /// `mask(n)` (spec §3): one step, `lo' & (n−1)`. No range check:
     /// `n = 0` gives `lo'`, a non-power-of-two gives the biased mask
     /// (edge case 2).
+    #[cfg_attr(feature = "rng-trace", track_caller)]
     pub fn mask(&mut self, n: u32) -> u32 {
-        self.step() & n.wrapping_sub(1)
+        #[cfg(feature = "rng-trace")]
+        let before = *self;
+        let r = self.raw_step() & n.wrapping_sub(1);
+        #[cfg(feature = "rng-trace")]
+        trace::draw(self, trace::Op::Mask(n), before, r);
+        r
     }
 
     /// `mask_range(min, n)` (spec §3): one step, `(lo' & (n−1)) + min`,
     /// wrapping 32-bit arithmetic read as i32.
+    #[cfg_attr(feature = "rng-trace", track_caller)]
     pub fn mask_range(&mut self, min: i32, n: u32) -> i32 {
-        (self.mask(n) as i32).wrapping_add(min)
+        #[cfg(feature = "rng-trace")]
+        let before = *self;
+        let r = ((self.raw_step() & n.wrapping_sub(1)) as i32).wrapping_add(min);
+        #[cfg(feature = "rng-trace")]
+        trace::draw(self, trace::Op::MaskRange(min, n), before, r as u32);
+        r
     }
 
     /// `roll_range(min, n)` (spec §3): `n < 1` returns `min` without
     /// stepping, else `roll(n) + min` (wrapping, read as i32).
+    #[cfg_attr(feature = "rng-trace", track_caller)]
     pub fn roll_range(&mut self, min: i32, n: i32) -> i32 {
-        if n < 1 {
-            return min;
-        }
-        (self.roll(n) as i32).wrapping_add(min)
+        #[cfg(feature = "rng-trace")]
+        let before = *self;
+        let r = if n < 1 {
+            min
+        } else {
+            (self.raw_roll(n) as i32).wrapping_add(min)
+        };
+        #[cfg(feature = "rng-trace")]
+        trace::draw(self, trace::Op::RollRange(min, n), before, r as u32);
+        r
     }
 }
 

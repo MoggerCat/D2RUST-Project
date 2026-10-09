@@ -12,6 +12,7 @@
 pub mod click;
 #[cfg(test)]
 mod click_tests;
+pub mod key_names;
 pub mod keymap;
 mod names;
 pub mod original;

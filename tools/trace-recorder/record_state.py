@@ -558,6 +558,8 @@ def main():
     r = make_recorder(rt)(os.path.abspath(a.game), gargs, out, a.seconds, a.ticks,
                           a.snap_every, " ".join(sys.argv))
     r.auto = auto
+    if auto and auto.has_frames():
+        auto.attach(r)  # `frame F` input steps at the tick-return stop of F - 1 (after the snapshot)
     if layer:
         layer.attach(r, before=False)  # snapshot of frame f - 1 first, then the pokes of f
     try:

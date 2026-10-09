@@ -34,15 +34,15 @@
 |   4. AI parameters | 555–573 |
 |   5. Target selection | 574–732 |
 |   6. Distances and line tests | 733–747 |
-|   7. Tactics helpers | 748–940 |
-|   8. AI commands and minions | 941–965 |
-|   10. The catalogue `ai-functions.tsv` | 966–986 |
-| Constants & data dependencies | 987–1010 |
-| Randomness | 1011–1032 |
-| Edge cases & original bugs | 1033–1074 |
-| Test vectors | 1075–1163 |
-| Provenance | 1164–1220 |
-| Open questions | 1221–1324 |
+|   7. Tactics helpers | 748–942 |
+|   8. AI commands and minions | 943–967 |
+|   10. The catalogue `ai-functions.tsv` | 968–988 |
+| Constants & data dependencies | 989–1012 |
+| Randomness | 1013–1034 |
+| Edge cases & original bugs | 1035–1076 |
+| Test vectors | 1077–1165 |
+| Provenance | 1166–1222 |
+| Open questions | 1223–1326 |
 <!-- /index -->
 
 ## Summary
@@ -676,7 +676,7 @@ a, next, prev}; unit +0xD0 = its slot, 11 = none):
 |---|---|---|
 | `0x005DD510` | `sub_6FCF27B0` | alternative-target choice: never for players or without an alternative; take it if no main target; refuse if the alternative is farther than 5; else trial path toward the main target, keep main if a path exists; else scan 7 for something closer than 20 |
 | `0x005DDC30` | `sub_6FCF2CC0` | target search for "good" shooters and secondary picks: forced target, else scan 6 + `0x005DD510`; returns target, distance (0x7FFFFFFF if none), melee flag |
-| `0x005DDF20` | `sub_6FCCFD70` | nearest interacting player within 15 for NPCs (scan 2, callback D2MOO `sub_6FCCFDE0`); "close" when distance < 4; returns the NPC itself when none. PROVISIONAL: the callback's distance is the no-size distance `0x005DC530` between the two positions, "within" is ≤ 15, a tie keeps the first found (because the callback is unread in 1.14d; Warriv's recorded arrival walks fit it); settled by REC-500 |
+| `0x005DDF20` | `sub_6FCCFD70` | nearest interacting player within 15 for NPCs (scan 2, callback D2MOO `sub_6FCCFDE0`); "close" when distance < 4; returns the NPC itself when none. Callback `0x005DDE80(game, npc, C, ctx)` (1.14d-confirmed, settles REC-500): C not a player → skip; d := full-size distance `0x005DC380(npc, C)` (the NPC's size subtracted, §6); d > 15 → skip (so ≤ 15 is in); NPC without monstats flag `interact` (byte +0xD & 2, mask `0x006CE26C` = 2, flag bit 9) → take C; with it → take C only if the quest active-cycler test `0x00544590(game, C, npc)` holds and d < best. Taking C writes (C, d) and **returns C, which stops the scan** (§5.4), so the first qualifying player in scan-1 order wins and there are no ties |
 
 **Scan 6 callback `0x005DCBD0`** (the search window of `0x005DDC30`;
 2026-10-09, pc1-data Step 4 item 3). Context {main, main d, alt, alt d},
@@ -811,15 +811,17 @@ flag 4 → delete thinks; flag 1 → set control flag 0x40; flag 2 → draw
 | `0x005DEFE0(t, n, del)` | `D2GAME_AICORE_Escape` | unit or t = 0 → return 0, nothing done; if n > 5 velocity request steps n; walk to (own x + sign(own x − t.x)·n, own y + sign(own y − t.y)·n), step 1, flags del ? 4 : 0 | none |
 | `0x005DF140(t, n, del)` | `sub_6FCD06D0` | same, running | none |
 | `0x005DF7D0(t, n, del)` | `sub_6FCD0E80` ("circle n") | one step: low byte of `lo'` < 128 → velocity method 5, else 6, with steps n; then walk toward t, step 1, flags del ? 4 : 0 | one |
-| `0x005DE6D0(t, a, b)` → `0x005DE4E0` | `AITACTICS_WalkInRadiusToTarget` | walk to the point that brings the distance to t toward b by at most a. PROVISIONAL: dist = no-size distance, k = min(a, dist − b), no walk when k ≤ 0 or dist = 0; point = own + Δ·k / dist per axis, rounded to nearest (halves away from zero); mode 2, path step count 1, with the staged velocity request (because the geometry is D2MOO's and unread in 1.14d; it reproduces Warriv's three recorded arrival walks, `-seed 1234`: (4866, 4235)→(4868, 4233) with (3, 2), →(4869, 4232) with (2, 2), →(4870, 4231) with (1, 2), player at (4873, 4228)); settled by REC-501 | none |
+| `0x005DE6D0(t, a, b)` → `0x005DE4E0` | `AITACTICS_WalkInRadiusToTarget` | walk to the point that brings the distance to t toward b by at most a. `0x005DE4E0(game, U, t, mode 2, a, b)`, 1.14d-confirmed (settles REC-501): d := full-size distance `0x005DC380(U, t)`; s := −1 if d < b else +1; k := min(\|d − b\|, a). ax = \|t.x − U.x\|, ay = \|t.y − U.y\|, n := max(ax + ay, k); if n > 0: kx := ax·k / n, ky := ay·k / n (truncated), then **while kx + ky < k: kx += 1, ky += 1** (both, so the sum may pass k). Point = (U.x + sign(t.x − U.x)·kx·s, U.y + sign(t.y − U.y)·ky·s) (sign 0 on an equal axis). No early exit: k = 0, or t on U's position, gives U's own position and the request is still made. Request: `0x005A7E60(U, 2, rec)`, path step count 1 (`0x00649070(path, 1)`), coordinates into the record, `0x005A7C20(game, rec, 1)`; the result is not read. Warriv's recorded arrival walks (`-seed 1234`, player at (4873, 4228)): (4866, 4235)→(4868, 4233) with (3, 2), →(4869, 4232) with (2, 2), →(4870, 4231) with (1, 2). PROVISIONAL: what the mode request does with a target equal to U's own position (§7.5 path compute, unread for this case); settled by REC-665 | none |
 | `0x005DF680(t, n)` | `AITACTICS_RunCloseToTargetUnit` ("run near t n") | 15 (2 with the velocity reset if state 60), point near t, 1, no flags; returns the mode-change result | as wander, around t, n as a byte |
 | `0x005DEF30(x, y)` | `WalkToTargetCoordinatesNoSteps` | 2, coordinates, 0, no flags; returns the mode-change result | none |
 
 All draws are from the moving unit's seed (unit +0x20). 1.14d-confirmed
 for `0x005DEB60`, `0x005DE200`, `0x005DF7D0`, `0x005DEFE0`, `0x005DF140`,
 `0x005DED40`, `0x005DF680`, `0x005DEF30`, `0x005DED90`, `0x005DEDE0`,
-`0x005DEE50`; the walk-in-radius geometry is
-D2MOO's.
+`0x005DEE50`, `0x005DE4E0`.
+```
+k = min(|d - b|, a); kx, ky = ax*k/n, ay*k/n; while kx+ky < k { kx += 1; ky += 1 }; p = U + sign(t - U)*(kx, ky)*s
+```
 
 #### 7.3 Velocity request
 

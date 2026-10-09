@@ -78,6 +78,8 @@ fn layout() -> InvLayout {
         top: 20,
         w: 58,
         h: 87,
+        right: 67,
+        bottom: 106,
     };
     InvLayout {
         grid: GridRecord {
@@ -978,6 +980,8 @@ fn cap_tints(level: i32, mouse: Point) -> Vec<UiDraw> {
         top: 40,
         w: 58,
         h: 18,
+        right: 87,
+        bottom: 57,
     };
     let mut out: Vec<UiDraw> = Vec::new();
     u.draw_tints(&w, &l, mouse, &mut out);
@@ -1113,4 +1117,116 @@ fn each_item_tints_its_cells_row_by_row_then_draws() {
     let mut old = Vec::new();
     u.draw_tints(&w, &l, Point::new(0, 0), &mut old);
     assert_eq!(tiles(&old, TINTS[2]).len(), 5);
+}
+
+// Covers: specs/ui/inventory.md §5 r3
+#[test]
+fn the_kept_cursor_cell_survives_an_overhanging_mouse_move() {
+    // Record 16 of the spec vector: left 419, top 315, 29 x 29 cells,
+    // 10 x 4; a 2 x 3 item with a 56 x 84 graphic on the cursor.
+    let (mut u, files) = ui();
+    u.frame_sizes.insert("invqlt".into(), (56, 84));
+    let g = GridRecord {
+        grid_x: 10,
+        grid_y: 4,
+        left: 419,
+        right: 709,
+        top: 315,
+        bottom: 431,
+        cell_w: 29,
+        cell_h: 29,
+    };
+    let w = world(&[(9, mode::CURSOR, (0, 0, 0, 0), b"qui ")], Some(9));
+    u.track_hover(&w, &files, &g, 0, Point::new(500, 340));
+    assert_eq!(u.hover.get().cursor_cell, (2, 0));
+    // c = (14 - 419 + 700) / 29 = 10 -> 9; 2 + 9 > 10: no change.
+    u.track_hover(&w, &files, &g, 0, Point::new(700, 340));
+    assert_eq!(u.hover.get().cursor_cell, (2, 0));
+}
+
+// Covers: specs/ui/inventory.md §4 r3
+#[test]
+fn the_placement_tint_covers_the_footprint_and_marks_a_blocked_one() {
+    let (mut u, files) = ui();
+    u.tint_colors = Some(TINTS);
+    let g = layout().grid;
+    // A 1 x 1 cursor item over the empty cell (4, 1): tint 1 (fits).
+    let w = world(&[(9, mode::CURSOR, (0, 0, 0, 0), b"hp1 ")], Some(9));
+    let at = in_cell(4, 1);
+    u.track_hover(&w, &files, &g, 0, at);
+    let mut out = Vec::new();
+    u.draw_placement_tint(&w, &files, &g, 0, at, 600, &mut out);
+    assert_eq!(
+        tiles(&out, TINTS[1]),
+        vec![(100 + 4 * 29, 200 + 29, 29, 29)]
+    );
+    // Over an item: a swap candidate, tint 3 over that item.
+    let w = world(
+        &[
+            (9, mode::CURSOR, (0, 0, 0, 0), b"hp1 "),
+            (7, mode::STORED, (0, 4, 1, 1), b"hp1 "),
+        ],
+        Some(9),
+    );
+    let mut out = Vec::new();
+    u.draw_placement_tint(&w, &files, &g, 0, at, 600, &mut out);
+    assert_eq!(
+        tiles(&out, TINTS[3]),
+        vec![(100 + 4 * 29, 200 + 29, 29, 29)]
+    );
+    // Not with the mouse in the bottom strip (screen_h - 0x27).
+    let mut out = Vec::new();
+    u.draw_placement_tint(&w, &files, &g, 0, at, 240, &mut out);
+    assert!(out.is_empty());
+}
+
+// Covers: specs/ui/inventory.md §10 r4
+#[test]
+fn a_cursor_item_over_the_cube_with_room_sends_0x2a() {
+    let (u, files) = ui();
+    let w = world(
+        &[
+            (9, mode::CURSOR, (0, 0, 0, 0), b"hp1 "),
+            (6, mode::STORED, (0, 4, 1, 1), b"box "),
+        ],
+        Some(9),
+    );
+    let out = u.press(&w, &files, &layout(), in_cell(4, 1));
+    assert_eq!(
+        intents(&out),
+        vec![[&[0x2Au8][..], &9u32.to_le_bytes(), &6u32.to_le_bytes()].concat()]
+    );
+}
+
+// Covers: specs/ui/inventory.md §10 r3
+#[test]
+fn a_ctrl_click_with_the_store_open_sells_with_0x33() {
+    let (mut u, files) = ui();
+    u.tips = Some(crate::ui::item_tip::tests::tips());
+    u.ctrl = true;
+    u.store_npc = Some(0x55);
+    let w = world(&[(7, mode::STORED, (0, 2, 3, 1), b"cap ")], None);
+    let out = u.press(&w, &files, &layout(), Point::new(160, 290));
+    let got = intents(&out);
+    assert_eq!(got.len(), 1);
+    assert_eq!(got[0][0], 0x33);
+    assert_eq!(&got[0][1..5], &0x55u32.to_le_bytes());
+    assert_eq!(&got[0][5..9], &7u32.to_le_bytes());
+}
+
+// Covers: specs/ui/panels-3.md §29 r1
+#[test]
+fn an_equipment_box_includes_its_right_and_bottom_edges() {
+    let (u, files) = ui();
+    let w = world(&[(8, mode::BODY, (3, 0, 0, 0), b"qui ")], None);
+    // The torso box: left 10, right 67, top 20, bottom 106, inclusive.
+    for (p, hit) in [
+        (Point::new(67, 106), true),
+        (Point::new(10, 20), true),
+        (Point::new(68, 106), false),
+        (Point::new(67, 107), false),
+    ] {
+        assert_eq!(super::equip_loc(&layout(), p).is_some(), hit, "{p:?}");
+    }
+    let _ = (u, files, w);
 }

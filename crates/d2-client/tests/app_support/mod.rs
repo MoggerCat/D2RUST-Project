@@ -104,18 +104,125 @@ pub fn live_bridge_tables<L: ServerLink>(b: &mut d2_client::bridge::Bridge<L>) {
     b.set_object_rows(single_player::client_object_rows(&data));
 }
 
-/// The `lvlwarp` id (the warp tile unit's class, `levels.md` §10.4) of
-/// the warp from level `from` to level `to`: the install's `levels` row
-/// of `from`, the `Warp` of the `Vis` slot that names `to`.
-pub fn warp_id(from: u32, to: u32) -> u32 {
+/// The `lvlwarp` ids (the warp tile units' classes, `levels.md` §10.4)
+/// of the warps from level `from` to level `to`: the install's `levels`
+/// row of `from`, the `Warp` of every `Vis` slot that names `to`. A level
+/// can have several (the Blood Moor's four ways into the Den of Evil,
+/// `levels.md` §12.5: the stamp placed decides which tile exists).
+pub fn warp_ids(from: u32, to: u32) -> Vec<u32> {
     let d = live();
     let l = &d.levels.drlg.levels[from as usize];
-    let slot = l
+    let ids: Vec<u32> = l
         .vis
         .iter()
-        .position(|&v| v == to)
-        .unwrap_or_else(|| panic!("level {from} has no way to level {to}"));
-    u32::try_from(l.warp[slot]).expect("a warp id")
+        .zip(&l.warp)
+        .filter(|&(&v, &w)| v == to && w >= 0)
+        .map(|(_, &w)| w as u32)
+        .collect();
+    assert!(!ids.is_empty(), "level {from} has no way to level {to}");
+    ids
+}
+
+/// The world sub-tile position of the warp tile preset of act 0's level
+/// `level` whose class is in `classes` (`sim/path-placement.md` §12.1: the
+/// room's tile origin x 5 + the preset's position), once the level's room
+/// holds it.
+pub fn warp_preset_spot<C: Clock + Send + 'static>(
+    server: &Server<C>,
+    level: u32,
+    classes: &[u32],
+) -> Option<(i32, i32)> {
+    let classes = classes.to_vec();
+    with(server, move |l| {
+        let g = &mut l.host_mut().game;
+        let h = g.events.action.hooks();
+        let mut found = None;
+        h.drlg.with_act(0, &mut g.game.lists, |d, svc| {
+            let lv = d.find_level(level)?;
+            for r in d.level_rooms(lv) {
+                let rect = d.room(r).rect;
+                for p in svc.types.preset_units(d, r) {
+                    if p.unit_type == 5 && classes.contains(&p.class) {
+                        found = Some((rect.x * 5 + p.x, rect.y * 5 + p.y));
+                    }
+                }
+            }
+            Some(())
+        });
+        found
+    })
+}
+
+/// Run legs (C→S 0x03) inside level `level` of act 0 toward `goal`
+/// (sub-tiles) until the server player is within `reach` sub-tiles of it,
+/// re-planning over the rooms that activate on the way.
+pub fn walk_toward<C: Clock + Send + 'static>(
+    app: &mut bevy::prelude::App,
+    server: &Server<C>,
+    ms: &std::sync::atomic::AtomicU32,
+    level: u32,
+    goal: (i32, i32),
+    reach: i32,
+) {
+    use std::sync::atomic::Ordering;
+    let step = |app: &mut bevy::prelude::App| {
+        app.update();
+        ms.fetch_add(40, Ordering::SeqCst);
+    };
+    let at = |server: &Server<C>| {
+        with(server, |l| {
+            let g = &mut l.host_mut().game;
+            let (p, _) = single_player::local_player(g).expect("joined");
+            g.events.action.hooks().path_position(p)
+        })
+    };
+    let near = |p: (i32, i32)| (p.0 - goal.0).abs() <= reach && (p.1 - goal.1).abs() <= reach;
+    for _ in 0..40 {
+        if near(at(server)) {
+            return;
+        }
+        let legs = with(server, move |l| {
+            let g = &mut l.host_mut().game;
+            let (p, _) = single_player::local_player(g).expect("joined");
+            let h = g.events.action.hooks();
+            let start = h.path_position(p);
+            let d = h.drlg.dungeon.acts[0].as_ref().expect("Act I");
+            let area = d.level(d.find_level(level).expect("level allocated")).rect;
+            test_fixtures::host::route_near(d, start, area, goal, reach, 12)
+        });
+        if legs.is_empty() {
+            step(app);
+            continue;
+        }
+        for (x, y) in legs {
+            let mut m = vec![0x03];
+            m.extend_from_slice(&(x as u16).to_le_bytes());
+            m.extend_from_slice(&(y as u16).to_le_bytes());
+            app.world_mut()
+                .resource_mut::<d2_client::bridge::BridgeResource>()
+                .0
+                .send_bytes(&m)
+                .unwrap();
+            step(app);
+            step(app);
+            for _ in 0..400 {
+                let moving = with(server, |l| {
+                    let g = &l.host().game;
+                    let (p, _) = single_player::local_player(g)?;
+                    g.events.action.sys.units.get(p).map(|u| u.mode)
+                })
+                .is_some_and(|m| test_fixtures::host::MOVING.contains(&m));
+                if !moving {
+                    break;
+                }
+                step(app);
+            }
+            if near(at(server)) {
+                break;
+            }
+        }
+    }
+    assert!(near(at(server)), "walked to {goal:?}, at {:?}", at(server));
 }
 
 /// The centre of the NPC menu box's selectable row `i` (the spec box sits

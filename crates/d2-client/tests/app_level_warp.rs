@@ -90,8 +90,12 @@ fn clicking_the_cave_entrance_takes_the_player_to_the_den_of_evil() {
             .player_level()
     };
     assert_eq!(level(&app), Some(single_player::ACT1_TOWN as u16));
-    // The Den's cave entrance lies in the Blood Moor: the player walks
-    // out of the town by the route over the server's collision.
+    // The Blood Moor's cave entrance is a tile unit once the player is
+    // near its room (the server sends the units of the rooms near the
+    // player): walk there. Which of the four `lvlwarp` ids into the Den
+    // of Evil exists depends on the stamp the level placed
+    // (`drlg/levels.md` §12.5).
+    let dens = app_support::warp_ids(single_player::BLOOD_MOOR, single_player::DEN_OF_EVIL);
     app_support::walk_into(
         &mut app,
         &server,
@@ -99,11 +103,15 @@ fn clicking_the_cave_entrance_takes_the_player_to_the_den_of_evil() {
         single_player::ACT1_TOWN,
         single_player::BLOOD_MOOR,
     );
-    // The server places the entrance's tile when the player brings its
-    // room into play: walk the Blood Moor's rooms nearest first until the
-    // tile stands within reach and the client model holds it.
-    let want = app_support::warp_id(single_player::BLOOD_MOOR, single_player::DEN_OF_EVIL);
-    app_support::approach_tile(&mut app, &server, &ms, want);
+    for _ in 0..30 {
+        step(&mut app);
+    }
+    let spot = app_support::warp_preset_spot(&server, single_player::BLOOD_MOOR, &dens);
+    let spot = spot.expect("the Den entrance's preset in the Blood Moor");
+    app_support::walk_toward(&mut app, &server, &ms, single_player::BLOOD_MOOR, spot, 12);
+    for _ in 0..30 {
+        step(&mut app);
+    }
     // The cave entrance is a tile unit of the client's model.
     let tile = |app: &App| {
         app.world()
@@ -112,14 +120,7 @@ fn clicking_the_cave_entrance_takes_the_player_to_the_den_of_evil() {
             .world()
             .units
             .iter()
-            .find(|(k, u)| {
-                k.unit_type == TILE
-                    && u.class
-                        == app_support::warp_id(
-                            single_player::BLOOD_MOOR,
-                            single_player::DEN_OF_EVIL,
-                        )
-            })
+            .find(|(k, u)| k.unit_type == TILE && dens.contains(&u.class))
             .map(|(k, _)| *k)
     };
     let entrance: UnitKey = tile(&app).expect("the Blood Moor's cave entrance reached the client");
@@ -145,8 +146,8 @@ fn clicking_the_cave_entrance_takes_the_player_to_the_den_of_evil() {
     assert!(b.log().rejected.is_empty(), "{:?}", b.log().rejected);
     assert!(
         b.world().units.iter().any(|(k, u)| k.unit_type == TILE
-            && u.class
-                == app_support::warp_id(single_player::DEN_OF_EVIL, single_player::BLOOD_MOOR)),
+            && app_support::warp_ids(single_player::DEN_OF_EVIL, single_player::BLOOD_MOOR)
+                .contains(&u.class)),
         "the Den's way back is in the client's model"
     );
 }

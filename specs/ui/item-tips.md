@@ -65,7 +65,7 @@ all 28 `descfunc` shapes.
 | local player P | unit | `0x00463DD0` / `0x00463DE0` (`client/model.md`) |
 | inventory mode | int | `[0x007BCBF0]` (`ui/panels.md` §9 r1; 1–9 = NPC store states) |
 | store-item flag | int | `[0x00721E38]` = 1 when the hovered item is the player's own (set by `0x004873A0`, `0x004889D0`); 0 for a store item |
-| gamble store | int | `[0x007C0DB0]` ≠ 0 (`0x004B3500`, `ui/menus.md` §4); always 0 in 1.14d (every write stores 0, `ui/menus.md` §4.2 r2), so this input is 0 |
+| gamble store | int | `[0x007C0DB0]` ≠ 0 (`0x004B3500`, `ui/menus.md` §4): 1 in a store window opened by the Gamble option (`ui/menus.md` §4.2 r2) |
 | anchors | int | `[0x00721E3C]` x, `[0x00721E40]` top, `[0x00721E48]` bottom (`ui/inventory.md` §5 r1) |
 | tables | | items, itemtypes, itemstatcost, charstats, skills/skilldesc, sets/setitems, uniqueitems, affixes, gems, monstats, montype, string tables |
 
