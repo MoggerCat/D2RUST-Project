@@ -24,6 +24,8 @@ use d2_server::seams::{Clock, Pos};
 use d2_sim::skills::list::ListOwner;
 
 mod app_support;
+mod real_rig;
+use real_rig::Rig;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -257,22 +259,23 @@ fn an_out_of_range_walk_resyncs_the_client_with_0x15() {
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_left_skill_on_a_far_monster_runs_the_server_player_to_it() {
-    let mut g = Game::joined();
-    let near = monster_at(&mut g, 12);
-    let start = g.player_pos().unwrap();
+    // A real Blood Moor zombie 12 sub-tiles east of a sorceress who left
+    // the town (the left skill is skill 0, Attack).
+    let mut r = Rig::new("sorceress", &[]);
+    r.leave_town();
+    r.strengthen();
+    let start = r.pos();
+    let m = r.spawn_monster(12);
+    let guid = r.with(move |sim, _| sim.game.lists.unit(m).map(|e| e.guid).expect("zombie"));
     let mut msg = vec![0x06, 1, 0, 0, 0];
-    msg.extend(near.to_le_bytes());
-    g.link.send(SendQueue::Game, &msg).unwrap();
-    g.ticks(20);
-    let (log, end) = (
-        g.link
-            .with(|l| l.host_mut().game.events.action.hooks().x.skills.log.clone())
-            .unwrap(),
-        g.player_pos().unwrap(),
-    );
+    msg.extend(guid.to_le_bytes());
+    r.send_for_fate(&msg);
+    r.step(20);
+    let end = r.pos();
+    let log = r.with(|sim, _| sim.events.action.hooks().x.skills.log.clone());
     assert!(log.iter().all(|l| !l.starts_with("run to")), "{log:?}");
     assert!(
-        end.x > start.x,
+        end.0 > start.0,
         "the player ran toward it: {start:?} → {end:?}"
     );
 }

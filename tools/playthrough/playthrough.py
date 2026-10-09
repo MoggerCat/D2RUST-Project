@@ -720,7 +720,8 @@ def find_probe(m, pokes, save, client, work, game_dir):
     returns the first frame at which a unit matching the filter is
     present, or a blocker verdict when none ever is."""
     probe = os.path.join(work, f"{m['name']}.find.jsonl")
-    cmd = [client, "state-dump", "--save", save, "--seed", str(m["seed"]), "--ticks", str(m["ticks"]),
+    ticks = m.get("run_ticks", m["ticks"])  # the whole sweep (spec §1 r4), not just the deadline
+    cmd = [client, "state-dump", "--save", save, "--seed", str(m["seed"]), "--ticks", str(ticks),
            "--out", probe, "--date", "2026-01-01"] + _flags(m, pokes)
     m["cmd"] = " ".join(shlex.quote(c) for c in cmd)
     r = subprocess.run(cmd, capture_output=True, text=True, env=_env(game_dir), timeout=900)

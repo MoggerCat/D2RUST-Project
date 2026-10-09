@@ -142,18 +142,28 @@ impl<X: WorldPending> TickHooks for WorldSim<X> {
         self.population(game, |cx| room::ambient(cx, r));
     }
     /// Step 3 `0x005559A0` (`population.md` §11.1).
+    /// The DRLG room hands its preset list out once (`0x0066BFA0`,
+    /// `rooms.md` §8 rule 6): a later call places nothing. The first
+    /// walk's warp tiles come before the monster walk (`rooms.md` §8 rule
+    /// 6 "First spawn").
     fn spawn_presets(&mut self, game: &mut Game, r: RoomId) {
-        // The first walk: every non-monster preset (objects, warp tiles)
-        // in list order (`drlg/rooms.md` §6 "First spawn";
-        // `View::spawn_preset_units`), then the monster walk. With the
-        // world state lent to the action hooks: a quest object's init runs
-        // inside its allocation and may allocate a monster (Larzuk, the
-        // caged barbarians, `quests-act5.md` §3.8, §4.7), whose type init
-        // needs the monster world.
-        self.with(game, |g, v| {
-            v.spawn_preset_units(g, r);
+        let taken = self.host(game, |h| {
+            let WorldHost { game, v, .. } = h;
+            v.take_presets(game, r)
         });
-        self.population(game, |cx| preset::place_presets(cx, r));
+        if taken {
+            // The first walk: every non-monster preset (objects, warp tiles)
+            // in list order (`drlg/rooms.md` §6 "First spawn";
+            // `View::spawn_preset_units`), then the monster walk. With the
+            // world state lent to the action hooks: a quest object's init
+            // runs inside its allocation and may allocate a monster
+            // (Larzuk, the caged barbarians, `quests-act5.md` §3.8, §4.7),
+            // whose type init needs the monster world.
+            self.with(game, |g, v| {
+                v.spawn_preset_units(g, r);
+            });
+            self.population(game, |cx| preset::place_presets(cx, r));
+        }
         self.host(game, |h| {
             let created = {
                 let WorldHost { game, v, .. } = &mut *h;
@@ -176,13 +186,13 @@ impl<X: WorldPending> TickHooks for WorldSim<X> {
         if !self.lend(|a| a.restore(game, r)) {
             self.host(game, |h| {
                 h.v.h.x.restore_inactive_units(r);
-                // PROVISIONAL (REC-230): without the inactive store a
-                // reactivated room has lost its warp tile units (they left
-                // the room with its deactivation); allocate them again
-                // from the room's presets (idempotent).
-                // d2rs-own, unverified.
+                // PROVISIONAL (REC-230): without the inactive store the
+                // room's warp tiles were stored and freed on their own at
+                // its deactivation; they come back after the host's
+                // monsters and items, as the store's other records do
+                // (`rooms.md` §8 rule 6). d2rs-own, unverified.
                 let WorldHost { game, v, .. } = h;
-                v.spawn_warp_tiles(game, r);
+                v.restore_fallback_tiles(game, r);
             });
         }
     }

@@ -13,6 +13,7 @@
 //! | [`apply`], [`apply_op`], [`apply_line`] | resolve the references on the current state and run the directive on a [`WorldSim`] game (§5) |
 //! | [`spawn_monster`] | the call sequences of a `spawn` step (`scenario.md` §3.1 rule 2) |
 //! | [`GotoTarget`], [`GotoWalk`], [`goto_step`] | the `goto` walk, one step per tick (§6) |
+//! | [`msg_values`] | `msg`: its values with the references resolved (§5 rule 3; the bytes are the host side's, `d2-client::app::poke`) |
 //!
 //! References (`scenario.md` §3 rule 3, §1 rule 1 here) are resolved by
 //! [`apply`] on the state it is called on: the callers call it between
@@ -69,6 +70,16 @@ pub enum UnitArg {
     Waypoint(u32),
     /// `<type>/<guid>`.
     Guid { ty: u8, guid: u32 },
+}
+
+/// A value of `msg` (§1 `msg`): a number, the player's position ± N, or
+/// a unit (its GUID).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MsgArg {
+    Num(u32),
+    /// `@x±N` / `@y±N` (never [`Coord::Num`]).
+    Pos(Coord),
+    Unit(UnitArg),
 }
 
 /// One directive (§1 rule 2 table; optional arguments `None` when not
@@ -153,6 +164,12 @@ pub enum Directive {
         seconds: u32,
     },
     Goto(GotoTarget),
+    /// One C→S game message through the local client's sender (§1 `msg`):
+    /// the id's fields in layout order.
+    Msg {
+        id: u8,
+        args: Vec<MsgArg>,
+    },
 }
 
 /// The target of a `goto` (§6 rule 1).
@@ -185,7 +202,7 @@ pub struct GotoWalk {
 }
 
 /// The directive keywords, in the §1 table order.
-pub const KEYWORDS: [&str; 14] = [
+pub const KEYWORDS: [&str; 15] = [
     "object",
     "superunique",
     "missile",
@@ -200,6 +217,7 @@ pub const KEYWORDS: [&str; 14] = [
     "state",
     "freeze",
     "goto",
+    "msg",
 ];
 
 impl Directive {
@@ -220,6 +238,7 @@ impl Directive {
             Self::State { .. } => "state",
             Self::Freeze { .. } => "freeze",
             Self::Goto(_) => "goto",
+            Self::Msg { .. } => "msg",
         }
     }
 }
@@ -419,6 +438,29 @@ impl fmt::Display for UnitArg {
             Self::Guid { ty, guid } => write!(f, "{ty}/{guid}"),
         }
     }
+}
+
+impl fmt::Display for MsgArg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Num(v) => write!(f, "{v}"),
+            Self::Pos(c) => c.fmt(f),
+            Self::Unit(u) => u.fmt(f),
+        }
+    }
+}
+
+/// One `msg` value token: `@x±N` / `@y±N`, a unit reference, or a
+/// number (u32). Which values the id takes is the host side's check
+/// (§5 rule 3: the layouts are transport knowledge, not the sim's).
+fn msg_arg(t: &str) -> Result<MsgArg, String> {
+    if t.starts_with("@x") || t.starts_with("@y") {
+        return coord(t).map(MsgArg::Pos);
+    }
+    if t.starts_with('@') || t.contains('/') {
+        return unit_arg(t).map(MsgArg::Unit);
+    }
+    num(t).map(MsgArg::Num)
 }
 
 // ---- directives -----------------------------------------------------------
@@ -652,6 +694,17 @@ pub fn parse_directive(toks: &[&str]) -> Result<Directive, String> {
                 class: ranged(class, 0, 0xFFFF, "class")?,
             })
         }
+        "msg" => {
+            let Some((id, vals)) = args.split_first() else {
+                return Err("`msg` needs an id: `msg <id> <value>...`".into());
+            };
+            let id = ranged(id, 1, 0x70, "msg id")? as u8;
+            let args = vals
+                .iter()
+                .map(|t| msg_arg(t))
+                .collect::<Result<Vec<_>, _>>()?;
+            Directive::Msg { id, args }
+        }
         k => {
             return Err(format!(
                 "unknown directive {k:?}: one of {}",
@@ -744,6 +797,12 @@ impl fmt::Display for Directive {
                 Some(l) => write!(f, " preset {l} {}:{}", t.ty, t.class)?,
                 None => write!(f, " unit {}:{}", t.ty, t.class)?,
             },
+            Self::Msg { id, args } => {
+                write!(f, " {id}")?;
+                for a in args {
+                    write!(f, " {a}")?;
+                }
+            }
         }
         Ok(())
     }
@@ -894,6 +953,9 @@ pub enum PokeResult {
     Ok(Option<u32>),
     /// The game's own function refused (placement, class check, no room).
     Failed,
+    /// `failed` with why (the record's `note`), e.g. `msg` dropped by the
+    /// client sender's duplicate filter.
+    FailedWith(String),
     /// A reference matched no unit: the reference as written.
     Unresolved(String),
     /// This side cannot run the directive: why.
@@ -908,7 +970,7 @@ impl PokeResult {
     pub fn code(&self) -> &'static str {
         match self {
             Self::Ok(_) => "ok",
-            Self::Failed => "failed",
+            Self::Failed | Self::FailedWith(_) => "failed",
             Self::Unresolved(_) => "unresolved",
             Self::Gap(_) => "gap",
             Self::Pending => "pending",
@@ -1160,6 +1222,39 @@ pub fn apply_line<X: WorldPending>(
     let toks: Vec<&str> = line.split_ascii_whitespace().collect();
     let op = parse_op(&toks)?;
     Ok(apply_op(game, sim, env, &op))
+}
+
+/// The `gap` note of `msg` where the runner has no host (§5 rule 3).
+pub const MSG_GAP: &str = "msg needs the host's client queue";
+
+/// The values of a `msg` directive with its references resolved on the
+/// current state (§5 rule 3): positions from the player's path, units
+/// as their GUID. `Err`: the reference that matched no unit.
+pub fn msg_values<X: WorldPending>(
+    game: &Game,
+    sim: &WorldSim<X>,
+    env: &Env<'_>,
+    args: &[MsgArg],
+) -> Result<Vec<i64>, String> {
+    msg_values_with(args, |a| match a {
+        MsgArg::Num(v) => Ok(i64::from(v)),
+        MsgArg::Pos(c) => resolve_coord(c, sim, env).map(i64::from),
+        MsgArg::Unit(u) => {
+            let id = resolve_unit(u, game, sim, env)?;
+            guid_of(game, id)
+                .map(i64::from)
+                .ok_or_else(|| u.to_string())
+        }
+    })
+}
+
+/// [`msg_values`] with the references resolved by `resolve` (a position
+/// to its sub-tile, a unit to its GUID; `Err` the reference).
+pub fn msg_values_with(
+    args: &[MsgArg],
+    resolve: impl FnMut(MsgArg) -> Result<i64, String>,
+) -> Result<Vec<i64>, String> {
+    args.iter().copied().map(resolve).collect()
 }
 
 fn run<X: WorldPending>(
@@ -1423,6 +1518,9 @@ fn run<X: WorldPending>(
         }
         Directive::Freeze { .. } => PokeResult::Ok(None),
         Directive::Goto(t) => goto_step(game, sim, env, t, &mut GotoWalk::default()),
+        // §5 rule 3: the message goes through the host's client sender;
+        // a runner without one cannot run it.
+        Directive::Msg { .. } => PokeResult::Gap(MSG_GAP.into()),
     })
 }
 
@@ -1759,6 +1857,10 @@ mod tests {
         "state @player 1 on",
         "state 1/9 2 off",
         "freeze 3",
+        "msg 1 @x+2 @y",
+        "msg 6 1 @1",
+        "msg 60 36 1 4294967295",
+        "msg 96",
     ];
 
     // Covers: specs/tools/poke.md §1 r1, §1 r2, §3 r2
@@ -1843,6 +1945,12 @@ mod tests {
             ("goto preset 2", "goto unit"),
             ("goto here 5", "goto unit"),
             ("goto unit 1:x", "bad number"),
+            ("msg", "needs an id"),
+            ("msg 0 1", "msg id 0"),
+            ("msg 0x71", "msg id 113"),
+            ("msg 0x01 @z 1", "a unit is"),
+            ("msg 0x01 -1 2", "bad number"),
+            ("msg 0x01 @x+0 2", "zero offset"),
             ("", "empty"),
         ] {
             let e = parse_directive_text(line).unwrap_err();
@@ -1888,11 +1996,47 @@ mod tests {
         }
     }
 
+    // Covers: specs/tools/poke.md §5 r3
+    #[test]
+    fn msg_references_resolve_to_positions_and_guids() {
+        // Player at (100, 200); `@1` (the first monster) has GUID 42.
+        let resolve = |a: MsgArg| match a {
+            MsgArg::Num(v) => Ok(i64::from(v)),
+            MsgArg::Pos(Coord::X(d)) => Ok(100 + i64::from(d)),
+            MsgArg::Pos(Coord::Y(d)) => Ok(200 + i64::from(d)),
+            MsgArg::Pos(Coord::Num(_)) => unreachable!(),
+            MsgArg::Unit(UnitArg::Nth { ty: 1, .. }) => Ok(42),
+            MsgArg::Unit(u) => Err(u.to_string()),
+        };
+        let values = |line: &str| {
+            let Directive::Msg { args, .. } = parse_directive_text(line).unwrap() else {
+                panic!("{line}");
+            };
+            msg_values_with(&args, resolve)
+        };
+        assert_eq!(values("msg 0x01 @x+2 @y-201").unwrap(), [102, -1]);
+        assert_eq!(values("msg 0x06 0x1 @1").unwrap(), [1, 42]);
+        assert_eq!(values("msg 0x60").unwrap(), [] as [i64; 0]);
+        assert_eq!(values("msg 0x06 1 @3").unwrap_err(), "@3");
+        // The token decides the kind: position, unit, number.
+        assert_eq!(
+            parse_directive_text("msg 2 1 1/77 ").unwrap(),
+            Directive::Msg {
+                id: 2,
+                args: vec![
+                    MsgArg::Num(1),
+                    MsgArg::Unit(UnitArg::Guid { ty: 1, guid: 77 })
+                ],
+            }
+        );
+    }
+
     #[test]
     fn results_name_their_code() {
         assert_eq!(PokeResult::Ok(Some(3)).code(), "ok");
         assert_eq!(PokeResult::Ok(Some(3)).guid(), Some(3));
         assert_eq!(PokeResult::Failed.code(), "failed");
+        assert_eq!(PokeResult::FailedWith("x".into()).code(), "failed");
         assert_eq!(PokeResult::Unresolved("@1".into()).code(), "unresolved");
         assert_eq!(PokeResult::Gap("x".into()).guid(), None);
     }

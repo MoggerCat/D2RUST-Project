@@ -23,6 +23,11 @@
   tables is a d2rs gap. `goto` (§6, 2026-10-09) is ours: a walk built
   from `warp` and the placement; first runs on both sides are in the
   Test vectors.
+  tables is a d2rs gap. `msg` (one C→S message through the local
+  client's sender, 2026-10-09) is implemented on both sides
+  (`poke.py` selftest; d2-sim unit tests); its 1.14d run and the
+  d2rs `state-dump` run on the real install are unverified (Test
+  vectors).
 - **Target version:** 1.14d (the original side); the format is d2rs-own.
 - **Crate/module:** `d2-sim::poke` (directives, parser, d2rs apply);
   `conformance::scenario` (`poke` steps); `tools/scenario-run`;
@@ -35,28 +40,30 @@
   hash lists), `sim/units.md` §3.1 (allocator), `missiles/missiles.md`
   §R2 (missile record), `sim/rng.md` §4–§5 (seeds),
   `render/lighting.md` §9.1 (environment record),
+  `sim/intents-events.md` §2.1 (client sender, duplicate filter),
+  `sim/client-messages.tsv` (`msg` layouts),
   `world/waypoints.md` §7, §11 (warps), `tools/test-variants.md`
   (patched installs: what a poke cannot set).
 
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 62–74 |
-| Inputs | 75–81 |
-| Outputs / state changes | 82–90 |
-| Rules | 91–92 |
-|   1. Directives | 93–129 |
-|   2. Poke files | 130–152 |
-|   3. In scenarios | 153–167 |
-|   4. The 1.14d side (`poke.py`) | 168–216 |
-|   5. The d2rs side (`d2-sim::poke`) | 217–231 |
-|   6. `goto`: walking to a target | 232–311 |
-| Constants & data dependencies | 312–324 |
-| Randomness | 325–331 |
-| Edge cases & original bugs | 332–341 |
-| Test vectors | 342–357 |
-| Provenance | 358–363 |
-| Open questions | 364–371 |
+| Summary | 69–81 |
+| Inputs | 82–88 |
+| Outputs / state changes | 89–97 |
+| Rules | 98–99 |
+|   1. Directives | 100–137 |
+|   2. Poke files | 138–160 |
+|   3. In scenarios | 161–175 |
+|   4. The 1.14d side (`poke.py`) | 176–232 |
+|   5. The d2rs side (`d2-sim::poke`) | 233–265 |
+|   6. `goto`: walking to a target | 266–345 |
+| Constants & data dependencies | 346–359 |
+| Randomness | 360–366 |
+| Edge cases & original bugs | 367–387 |
+| Test vectors | 388–409 |
+| Provenance | 410–415 |
+| Open questions | 416–423 |
 <!-- /index -->
 
 ## Summary
@@ -118,6 +125,7 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
 | `state` | `<ref> <state> on\|off` | set or clear a state | `0x00639DB0` (stack: unit, s, 1/0; `ret 0xC`; `stat-lists.md` §9.2) | `toggle_state` + `set_state_changed` (`stat-lists.md` §9.2 toggle with update-queue insert) |
 | `freeze` | `<seconds>` | hold the game between ticks for wall time (screenshots, a human look) | the debugger keeps the thread stopped at the hook (§4 rule 2) | no-op, `ok` (the runner owns the clock) |
 | `goto` | `unit [<type>:]<class>` \| `preset <level> [<type>:]<class>` | move the player onto a free cell next to a unit of that type (default 1, monster) and class; `preset`: the level's preset of that type and class, found as the unit its room creates, after a warp to the level when the player is elsewhere (§6) | a multi-tick walk (§6) of `warp` (`0x0053AEC0`) and placement `0x00554EA0` with exact 0 (`path-placement.md` §10: free point §7, mask 0x1C09) | the same walk: `level_warp` / `act_change::run`, then `wiring::path::place::place_unit` with exact `false` |
+| `msg` | `<id> <value>...` | one C→S game message (id 0x01..0x70) sent as the local client's, drained in the next frame: the values fill the id's fields in the order of the `layout` column of `sim/client-messages.tsv`; each is a number, `@x±N` / `@y±N` (the player's position) or a `<ref>` (its GUID). Bytes: the id, then each field little-endian at its offset (`uN` / `bitN`: into the u32 at the offset), `transport_size` bytes. Only ids with a fixed size whose layout has integer fields only (`u8`, `u16`, `u32`, `uN`, `bitN`); bytes the layout does not list (e.g. 0x49 bytes 7–8, which the server ignores) are written 0 on both sides; another id, a wrong count or a number too big for its field is an error (§2 rule 5); a resolved reference that does not fit its field is `unresolved` | the client sender `0x00478350` with the bytes (§4 rule 9); `ok` | `Host::send_game` for client 0 (§5 rule 3): `ok`, or `failed` with the reason |
 
 3. Monsters keep the scenario `spawn` step (`scenario.md` §3.1); a poke
    file writes it as `spawn <class> <x> <y> <kind> [umod <id>...]` with
@@ -213,6 +221,14 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
    combined items array (`items/treasure.md` §9.1: header `0x0096CA58`,
    count, records; code at record +0x80, `data/loading.md` §6–§9), not
    through `0x00633640`.
+9. **`msg`:** `CALL_FORMS` entry `send`: the client game-message
+   sender `0x00478350`, EDI = size, [ESP+4] = message
+   (`sim/intents-events.md` §2.1 rule 1; EAX ignored). The bytes are
+   written at scratch +0x300 (after the item request at +0x200,
+   0x84 bytes; a message is < 0x200 bytes). Unit references give the
+   GUID at unit +0x0C, positions the player's path x / y ± N. The
+   result is `ok`: whether the sender's duplicate filter dropped the
+   message is not visible here (Edge cases 4).
 
 ### 5. The d2rs side (`d2-sim::poke`)
 
@@ -228,6 +244,24 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
    1.14d counterpart is `record_state.py --poke`, whose pokes run after
    that stop's snapshot; `tools/scenario-diff.md` §3 rule 5). Both resolve references on the state after tick
    t − 1 (`scenario.md` §3 rule 3).
+3. `msg` is not applied to the game. `d2-sim::poke` parses its
+   values by their form and resolves them on the state after tick
+   t − 1 (`msg_values`); the layouts are transport knowledge, which
+   `d2-sim` does not hold (`tools/depcheck`: no `d2-proto`), so the
+   `d2-client` poke module checks the line against the id's layout at
+   parse time (`--poke`, `--poke-file`; §2 rule 5) and builds the bytes
+   from the `d2-proto` tables. The caller passes them to the host's
+   client sender for client 0 (`Host::send_game`, the model of `0x00478350` with its
+   duplicate filter, `sim/intents-events.md` §2.1 rule 1), so the
+   next frame's drain handles them as the client's own. Result `ok`
+   when the sender queued them; `failed` with note `duplicate filter`
+   when the filter dropped them; `failed` with the sender's error when
+   it refused them. The `d2-client` callers (`play --poke`,
+   `state-dump --poke`) have the host; a runner without one
+   (`d2-sim::poke::apply`, scenario `poke` steps, `scenario-run`)
+   returns `gap` with note `msg needs the host's client queue`
+   without the layout check (scenarios write messages as their own
+   `msg` steps, `scenario.md`).
 
 ### 6. `goto`: walking to a target
 
@@ -318,6 +352,7 @@ records both sides keep.
 | `0x005A49B0` | superunique (ECX game, EDX room; x, y, row) | `original-hooks-spawn.md` §1 |
 | `0x0059FA30` | missile creator (ECX game, EDX record) | `original-hooks.md` §7.1 |
 | `0x00463740` | room of a point | `original-hooks-spawn.md` §1 |
+| `0x00478350` | client game-message sender (EDI size, [ESP+4] message; duplicate filter) | `sim/intents-events.md` §2.1 rule 1 |
 | game +0xD0, unit +0x20/+0x24 | game seed, unit seed | `sim/rng.md` §5 |
 | game +0xBC, act +0x04, env +0x00/+0x08 | environment record period, ticks | `render/lighting.md` §9.1 |
 | game +0xA8, +0x1120 | frame, hash lists | `original-hooks.md` §3–§4 |
@@ -338,6 +373,17 @@ same on both sides.
    them too (`sim/units.md` §3.1 step 7.5).
 3. `superunique` refuses a second spawn of a row without `Stacks`
    (`original-hooks-spawn.md` §1 rule 2): `failed`.
+4. `msg` passes the client sender's duplicate filter
+   (`sim/intents-events.md` §2.1 rule 1): a message byte-identical to
+   the last one sent, less than its window after it (50 ms for ids
+   0x05–0x0A and 0x0C–0x11, never for 0x3A, 200 ms for the others), is
+   dropped. The filter's clock is wall time on 1.14d and the step clock
+   on d2rs `state-dump` (40 ms per frame); 1.14d under Wine runs slower
+   than real time, so d2rs is the stricter side. A check therefore never
+   repeats a byte-identical `msg` within 5 frames (two in one frame
+   included). The client's own sends share the filter's stored copy on
+   both sides. Only d2rs reports a dropped message (`failed`,
+   `duplicate filter`); 1.14d reports `ok`.
 
 ## Test vectors
 
@@ -353,6 +399,12 @@ same on both sides.
 | `traces/checks/poke-fallen-town.check` (ScnAma, seed 1234; frame 4: `spawn 19 @x+3 @y+3 normal`, `seed-unit @1:19 0x12345678 666`), 1.14d against d2rs, 54 frames | both pokes `ok`; the same party (GUIDs 8–11, same class, positions, mode 1 for all 50 ticks) and the poked seed equal | REC-590, run 2026-10-09 (cloud, Wine): equal as stated; differs: minion seeds and every creation hp, because d2rs's game seed is one step behind 1.14d from frame 2 (the joining player's unit seed: 1.14d {lo of one game-seed step, 666}, d2rs {1, 666}), a join finding outside this spec |
 | same check with the seeds pinned first (`seed-game 0x1234 666`, `seed-unit @player 0x55 666`, then the spawn) | the party and the game seed equal for 50 ticks | REC-590, 2026-10-09: equal (the party's every compared field and the game seed, frames 4–54); left: fields d2rs's snapshot does not fill (monster `tx`/`ty`, player `fc`/`sp`), outside this spec |
 | `traces/checks/poke-fallen-town-unpinned.check` (no seed pins) on b0850e52 (join seed fix, staging 9aa0b329; path target, fc/sp, walk speed) | every unit and the game seed equal for 54 frames | REC-590, 2026-10-09 (cloud, Wine): no difference in any compared field of any unit or the game seed, frames 1–54; verdict PARTIAL only for the snapshot's own gaps (owner, headless client) |
+| `msg 0x01 @x+2 @y`, player at (5000, 4000) | bytes `01 8A 13 A0 0F` | synthetic (`d2-sim::poke` tests with a fake resolver, `d2-client` poke tests, `poke.py --selftest` on a fake process) |
+| `msg 0x06 1 @1`, the first monster's GUID 5 | bytes `06 01 00 00 00 05 00 00 00`; 1.14d: `0x00478350` with EDI = 9, [ESP+4] = scratch +0x300 | synthetic (as above) |
+| `msg 0x3C 36 1 0xFFFFFFFF`; `msg 0x51 5 1 3 7`; `msg 0x60` | `3C 24 00 00 80 FF FF FF FF`; `51 05 80 03 00 07 00 00 00`; `60` | synthetic (as above) |
+| the ids `msg` takes | 01–13, 16–2A, 2D–49, 4B–4D, 4F–54, 58, 59, 5D–63, 69–6B, 6D, 6E, 70 (from `client-messages.tsv`; both sides check the same list) | synthetic (`MSG_IDS` in both tests) |
+| `msg` with no id, id 0 or 0x71, 0x14 (no fixed size), a wrong count, 65536 in a `u16`, 2 in a `bitN` | an error naming the line | synthetic |
+| `state-dump --poke "4 msg 0x01 @x+5 @y"` twice (ScnAma, seed 1234) | first `ok`, second `failed` `duplicate filter`; the player has walked east by frame 12 | `d2-client` `app_state_dump` (real data, `#[ignore]`): unverified until the real-data gate runs it |
 | `traces/checks/poke-firebolt.check`: as above, then before frame 8 `missile 58 @x @y @x+3 @y+3 skill 36 1` (Fire Bolt, owner the player) | missile created on both sides, game seed after it equal, the target's hp equal | REC-590, 2026-10-09: missile `ok` (GUID 1) on both, game seed equal every frame after it, leader hp 1024 on both (no damage in town on either side); missiles are not in `state-snapshot.md` records. Damage outside town needs `warp` on 1.14d (form stated, REC-655) |
 
 ## Provenance

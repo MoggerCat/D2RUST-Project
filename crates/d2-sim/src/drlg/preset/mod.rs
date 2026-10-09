@@ -257,6 +257,19 @@ impl Presets {
         self.rooms.get(&room).map_or(&[], |r| r.units.as_slice())
     }
 
+    /// `0x0066BF30`: prepends a unit to a preset room's list (the warp
+    /// tile preset, `sim/path-placement.md` §12.1 rule 3). `false`: not a
+    /// preset room of this act.
+    pub fn prepend_room_unit(&mut self, room: DrlgRoomId, unit: PresetUnit) -> bool {
+        match self.rooms.get_mut(&room) {
+            Some(r) => {
+                r.units.insert(0, unit);
+                true
+            }
+            None => false,
+        }
+    }
+
     /// [`super::LevelTypes::preset_units`]: the seam view of the room's
     /// preset units, in list order.
     pub fn preset_units(&self, room: DrlgRoomId) -> Vec<super::PresetUnit> {

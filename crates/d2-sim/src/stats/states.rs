@@ -43,6 +43,10 @@ pub struct StateTable {
     bitsets: Vec<u32>,
     /// `srvactivefunc` (u16 +0x36) by state.
     srvactivefunc: Vec<u16>,
+    /// (state, `gfxtype` +0x2D, `gfxclass` +0x2E) of the states whose
+    /// `gfxtype` is 1 or 2, ascending: the draw identity's list
+    /// (`render/unit-composite.md` §1.1).
+    gfx: Vec<(u32, u8, u16)>,
 }
 
 impl StateTable {
@@ -55,6 +59,12 @@ impl StateTable {
             words: maps.words,
             bitsets: maps.bitsets.clone(),
             srvactivefunc: rows.iter().map(|r| r.srvactivefunc).collect(),
+            gfx: rows
+                .iter()
+                .enumerate()
+                .filter(|(_, r)| matches!(r.gfxtype, 1 | 2))
+                .map(|(s, r)| (s as u32, r.gfxtype, r.gfxclass))
+                .collect(),
         })
     }
 
@@ -76,6 +86,17 @@ impl StateTable {
 
     fn bitset(&self, g: usize) -> &[u32] {
         &self.bitsets[g * self.words..(g + 1) * self.words]
+    }
+
+    /// The states of the draw identity substitution `0x00645270`
+    /// (`render/unit-composite.md` §1.1): (state, `gfxtype`, `gfxclass`)
+    /// for `gfxtype` 1 or 2.
+    // PROVISIONAL (unit-composite.md §1.1, REC-155): the load-time list
+    // (data tables +0x17C) is read in ascending state id; 1.14d's order
+    // is not stated (only 139 `wolf` and 140 `bear` can be on together
+    // with another, and the two exclude each other).
+    pub fn gfx_states(&self) -> &[(u32, u8, u16)] {
+        &self.gfx
     }
 
     /// `srvactivefunc` of a state.
@@ -211,6 +232,7 @@ impl StateTable {
             words,
             bitsets,
             srvactivefunc: vec![0; count],
+            gfx: Vec::new(),
         }
     }
 

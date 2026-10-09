@@ -14,7 +14,8 @@ pub const BACKGROUND_CLASSIC: &str = r"FrontEnd\gameselectscreen";
 pub const WIDE: &str = r"FrontEnd\WideButtonBlank";
 pub const NARROW: &str = r"FrontEnd\NarrowButtonBlank";
 pub const SHORT: &str = r"CharSelect\ShortButtonBlank";
-/// The Battle.net button's art (§F1.4 r3 row 17, `d2exp.mpq`).
+/// The Battle.net button's art (§F1.4 r3 row 17, descriptor 17, global
+/// `0x00779754`, `d2exp.mpq`).
 pub const WIDE2: &str = r"FrontEnd\WideButtonBlank02";
 /// Logo halves (§F1.5 r1): the black base cel (the fire overlay is drawn
 /// additively over it by the host). File names: §F1.5 r1.
@@ -22,7 +23,7 @@ pub const LOGO_LEFT: &str = r"FrontEnd\D2logoBlackLeft";
 pub const LOGO_RIGHT: &str = r"FrontEnd\D2logoBlackRight";
 /// "v %d.%d%c" with 1, 14, 'd' (r4).
 pub const VERSION_TEXT: &str = "v 1.14d";
-/// Font16 (descriptor 0x115). // d2rs-own, unverified: font id.
+/// Font16 (descriptor 0x115, record `0x007089C4`, r4).
 const VERSION_FONT: u16 = 1;
 
 /// Button string ids (r3).
@@ -44,14 +45,14 @@ fn button(
     string: u32,
     action: Action,
 ) -> Control {
-    let mut c = Control::new(ControlKind::Button, x, y, w, h)
+    // The multiplayer buttons (Phase 7+) have no action here but stay
+    // enabled: r2 disables them only when `0x004FAC90` ≠ 0, and the 1.14d
+    // screenshot draws them as enabled buttons (a disabled one would draw
+    // with mode 1, §F1.1 r4). A click on them does nothing.
+    Control::new(ControlKind::Button, x, y, w, h)
         .with_art(art)
         .with_string(string)
-        .with_action(action);
-    if action == Action::None {
-        c.enabled = false;
-    }
-    c
+        .with_action(action)
 }
 
 /// Frame to draw for a resting, pressed or disabled button (r3 art, §F1.1
@@ -125,10 +126,10 @@ impl Screen for MainMenu {
             )
             .with_hotkey(vk::ESC),
             {
-                let mut t = Control::new(ControlKind::Text, 0, 599, 200, 40);
-                t.font = VERSION_FONT;
-                t.text = Some(VERSION_TEXT.to_string());
-                t
+                // r4: (0, 599) 200 × 40, flags 2 (centred), colour 0.
+                Control::new(ControlKind::Text, 0, 599, 200, 40)
+                    .with_font(VERSION_FONT, 2)
+                    .with_text(VERSION_TEXT, 0)
             },
         ]
     }

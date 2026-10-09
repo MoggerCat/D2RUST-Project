@@ -1,0 +1,19 @@
+check 1
+# Area B (q-diff-combat-a1): monster missiles on the player. Blood Moor
+# (warp 2 at frame 4; town allows no combat), seeds pinned, a quill rat
+# (monstats 63, normal) poked 6 sub-tiles east and a fallen shaman (58,
+# normal) 6 west at frame 30; no input. Their ranged AI (approach to
+# range, shoot, flee), the missiles' flight and hits, the player's hit
+# reactions and life loss; the shaman's fire. Spec:
+# specs/tools/scenario-diff.md.
+name combat-monster-missiles
+save ScnAma --class ama --expansion
+seed 1234
+ticks 260
+seconds 600
+channels state
+at 4 poke warp 2
+at 30 poke seed-game 0x00001234 666
+at 30 poke seed-unit @player 0x00000055 666
+at 30 poke spawn 63 @x+6 @y normal
+at 31 poke spawn 58 @x-6 @y normal
