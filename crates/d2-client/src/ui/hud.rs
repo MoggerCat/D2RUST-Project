@@ -38,8 +38,8 @@ use crate::ui::layout::Screen;
 use crate::ui::panel::{ClientIntent, Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
 use crate::ui::panels::control::belt::BeltColor;
 use crate::ui::panels::control::buttons::{
-    draw_800, menu_button, run_button, skill_icon_file, skill_icon_pos, BtnEffect, BtnEnv,
-    ButtonCel, NewBtn, NewButtons, SkillSide,
+    draw_800, menu_button, run_button, skill_icon_file, skill_icon_pos, skill_icon_state,
+    BtnEffect, BtnEnv, ButtonCel, NewBtn, NewButtons, SkillSide,
 };
 use crate::ui::panels::control::globes::{
     exp_bar, life_globe, mana_globe, stamina_bar, ExpIn, GlobeDraw, GlobeFile, GlobeSmoothing,
@@ -148,6 +148,48 @@ pub struct HudTables {
     pub experience: Vec<[u32; 7]>,
     /// The states with flag bit 24 (`stambarblue`, §4 r2).
     pub stambarblue: Vec<u8>,
+    /// Skill id → the `skills` flags the button state reads (§7 r2).
+    pub flags: BTreeMap<u16, SkillButtonFlags>,
+}
+
+/// The `skills` row flags of the skill button state (§7 r2, `use.md` §2).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SkillButtonFlags {
+    pub in_game: bool,
+    pub aura: bool,
+    pub passive: bool,
+    /// `InTown` (flags bit 8).
+    pub in_town: bool,
+}
+
+/// The state `k` of a skill button icon (`control-panel.md` §7 r2,
+/// `0x004A8D30`): the use state u (`0x004D9FC0`) 0 -> 0, aura -> 4, any
+/// other -> 1; then 1 when the record lacks `InTown` and P stands in town.
+/// PROVISIONAL (REC-724): u runs the level, `InGame`, aura and passive
+/// tests of `skills/use.md` §2 only (no mana, item or cooldown provider on
+/// this seam), as `app/skill_rest.rs` `use_state`. Before the flag table
+/// is filled only the level test runs.
+pub fn skill_button_state(
+    tables: &HudTables,
+    skill: u16,
+    level: i32,
+    in_town: bool,
+    mouse: (i32, i32),
+    at: (i32, i32),
+) -> u8 {
+    let f = tables.flags.get(&skill).copied();
+    // Not usable in game, or not learned.
+    let base = if (!tables.flags.is_empty() && !f.is_some_and(|f| f.in_game)) || level <= 0 {
+        1
+    } else if f.is_some_and(|f| f.aura) {
+        4
+    } else if f.is_some_and(|f| f.passive) {
+        1
+    } else {
+        0
+    };
+    let lacks_in_town = f.is_some_and(|f| !f.in_town);
+    skill_icon_state(base, lacks_in_town, in_town, mouse, at)
 }
 
 impl HudTables {
@@ -350,18 +392,22 @@ impl HudUi {
         tables: &HudTables,
         skill: u16,
         at: (i32, i32),
+        k: u8,
     ) -> Option<UiDraw> {
-        // PROVISIONAL (REC-720): `control-panel.md` §7 r2 draws the icon with
-        // the colored cel draw and the state of `0x004A8D30` as `k`; that
-        // routine is not specified, so `image` gives the plain draw (k 0).
+        // `control-panel.md` §7 r2: the colored cel draw with the state of
+        // `0x004A8D30` as `k` (REC-720).
         let (class, cel) = *tables.icons.get(&skill)?;
         let name = skill_icon_file(if class > 6 { 7 } else { class }).to_ascii_lowercase();
         // The skill buttons' icons are the colour (palette) cel draw
         // (`a4-town-pandemonium-fortress` rows 69–70: `CelDrawColor`).
-        with_call(
+        let mut d = with_call(
             image(files, &name, u32::from(cel), at.0, at.1, screen_clip()),
             crate::ui::draw::CelCall::Color,
-        )
+        );
+        if let Some(UiDraw::Image(r)) = &mut d {
+            r.look.remap = crate::ui::Remap::Palette(i32::from(k));
+        }
+        d
     }
 }
 
@@ -497,7 +543,16 @@ impl Panel for HudUi {
         ] {
             if let Some(e) = entry {
                 let at = skill_icon_pos(side, w, h);
-                out.extend_one(HudUi::icon_draw(files, &hud.tables, e.skill, at));
+                let town = unit.is_some_and(|u| crate::bridge::modes::in_town(world, u.key));
+                let k = skill_button_state(
+                    &hud.tables,
+                    e.skill,
+                    e.base + e.level_bonus,
+                    town,
+                    mouse,
+                    at,
+                );
+                out.extend_one(HudUi::icon_draw(files, &hud.tables, e.skill, at, k));
             }
         }
         // §8 r1 new-stats / new-skills buttons: step 8 of the UI pass, after
@@ -596,7 +651,8 @@ impl Panel for HudUi {
         // The skill select panel (state 3, d2rs-own, unverified).
         if sh.states.is_open(UI_SKILL_SELECT) {
             for (skill, at) in select_icons(world, hud.select_left, w, h) {
-                out.extend_one(HudUi::icon_draw(files, &hud.tables, skill, at));
+                // The select panel is d2rs-own: k 0.
+                out.extend_one(HudUi::icon_draw(files, &hud.tables, skill, at, 0));
             }
         }
     }
@@ -847,4 +903,50 @@ pub fn preview_set(
         });
     }
     None
+}
+
+#[cfg(test)]
+mod skill_button_tests {
+    use super::*;
+
+    fn tables() -> HudTables {
+        let mut t = HudTables::default();
+        let row = |aura, passive, in_town| SkillButtonFlags {
+            in_game: true,
+            aura,
+            passive,
+            in_town,
+        };
+        t.flags.insert(1, row(false, false, true)); // usable, InTown
+        t.flags.insert(2, row(true, false, true)); // aura
+        t.flags.insert(3, row(false, true, true)); // passive
+        t.flags.insert(4, row(false, false, false)); // usable, no InTown
+        t.flags.insert(5, SkillButtonFlags::default()); // InGame clear
+        t
+    }
+
+    fn k(t: &HudTables, skill: u16, level: i32, town: bool) -> u8 {
+        skill_button_state(t, skill, level, town, (0, 0), (117, 600))
+    }
+
+    // Covers: specs/ui/control-panel.md §7 r2
+    #[test]
+    fn the_button_state_is_0_usable_4_aura_1_otherwise() {
+        let t = tables();
+        assert_eq!(k(&t, 1, 3, false), 0, "usable");
+        assert_eq!(k(&t, 2, 3, false), 4, "aura");
+        assert_eq!(k(&t, 1, 0, false), 1, "no level");
+        assert_eq!(k(&t, 3, 3, false), 1, "passive");
+        assert_eq!(k(&t, 5, 3, false), 1, "InGame clear");
+    }
+
+    // Covers: specs/ui/control-panel.md §7 r2
+    #[test]
+    fn a_skill_without_in_town_is_1_in_town() {
+        let t = tables();
+        assert_eq!(k(&t, 4, 3, true), 1);
+        assert_eq!(k(&t, 4, 3, false), 0);
+        assert_eq!(k(&t, 1, 3, true), 0, "with InTown");
+        assert_eq!(k(&t, 2, 3, true), 4, "an aura with InTown");
+    }
 }

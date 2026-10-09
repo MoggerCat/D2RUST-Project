@@ -143,18 +143,17 @@ impl<X: WorldPending> TickHooks for WorldSim<X> {
     }
     /// Step 3 `0x005559A0` (`population.md` §11.1).
     fn spawn_presets(&mut self, game: &mut Game, r: RoomId) {
-        // The first pass: the object presets (PROVISIONAL,
-        // q-fix-real-preset-objects; `View::spawn_preset_objects`).
+        // The first walk: every non-monster preset (objects, warp tiles)
+        // in list order (`drlg/rooms.md` §6 "First spawn";
+        // `View::spawn_preset_units`), then the monster walk.
         self.host(game, |h| {
             let WorldHost { game, v, .. } = h;
-            v.spawn_preset_objects(game, r);
+            v.spawn_preset_units(game, r);
         });
         self.population(game, |cx| preset::place_presets(cx, r));
-        // PROVISIONAL (REC-99): the warp tile units of the room's presets.
         self.host(game, |h| {
             let created = {
                 let WorldHost { game, v, .. } = &mut *h;
-                v.spawn_warp_tiles(game, r);
                 v.spawn_host_objects(game, r);
                 // PROVISIONAL (REC-130): the monsters a level types
                 // provider lists for the host (`HOST_MONSTER_PRESET`).

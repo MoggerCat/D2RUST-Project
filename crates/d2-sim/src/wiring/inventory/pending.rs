@@ -184,7 +184,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
             // A used quest item (`inventory-moves.md` §7.11 step 4; REC-246).
             || (self.item_unit(item).is_some()
                 && matches!(&self.code(item), b"ass " | b"xyz " | b"tr2 "))
-            // A potion drunk from the grid (REC-102; recorded 2026-10-09,
+            // A potion drunk from the grid (recorded 2026-10-09,
             // `facts/items/a1-town-potions-low.tsv` n 30).
             || (self.item_unit(item).is_some()
                 && super::potion::classify(self.code(item)).is_some())
@@ -511,7 +511,8 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         if self.use_entry(item).is_some() {
             return self.dispatch_use(player, item, target, 0, 0);
         }
-        // PROVISIONAL (REC-102): potions on the player.
+        // Potions on the player (`items/use.md` §3.1; `vps`, `rvs`,
+        // `rvl`: REC-135, d2rs-own).
         if target == player && self.use_potion(player, item) {
             return true;
         }

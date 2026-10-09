@@ -25,6 +25,22 @@ use crate::wiring::action::{ActionHooks, Pending, View, WiringError};
 pub type MonsterVelocity = (i32, bool);
 
 impl<X: Pending> ActionHooks<X> {
+    /// The objects.txt shape of an object class for the footprint
+    /// (`path-placement.md` §3, §5.2); `None` for another unit type or
+    /// without the object state.
+    pub(crate) fn object_footprint_shape(
+        &self,
+        ty: Option<UnitType>,
+        class: u32,
+    ) -> Option<crate::path::ObjectShape> {
+        if ty != Some(UnitType::Object) {
+            return None;
+        }
+        let st = self.objects.as_ref()?;
+        let o = st.tables.object(u16::try_from(class).ok()?).ok()?;
+        Some(crate::wiring::action::objects::object_shape(o))
+    }
+
     /// Position in sub-tiles (§2.1): the path's; a unit without a path
     /// reads (0, 0).
     pub fn path_position(&self, unit: UnitId) -> (i32, i32) {
@@ -128,7 +144,8 @@ impl<X: Pending> ActionHooks<X> {
     /// §3.2 footprint removal `0x00649F50` for types 0–3). Removal clears
     /// the footprint with force (`path-placement.md` §5.3 rule 4), so the
     /// §5.2 mode conditions do not apply.
-    pub(crate) fn path_free(&mut self, unit: UnitId, ty: Option<UnitType>, mode: u32) {
+    pub(crate) fn path_free(&mut self, unit: UnitId, ty: Option<UnitType>, class: u32, mode: u32) {
+        let object = self.object_footprint_shape(ty, class);
         let Some(p) = self.paths.as_mut() else {
             return;
         };
@@ -136,7 +153,7 @@ impl<X: Pending> ActionHooks<X> {
             ty,
             Some(UnitType::Player | UnitType::Monster | UnitType::Object | UnitType::Missile)
         ) {
-            if let Some((fp, _)) = footprint_of(p.record(unit), ty, mode, None) {
+            if let Some((fp, _)) = footprint_of(p.record(unit), ty, mode, object) {
                 remove_footprint(&mut self.drlg, &fp, RemoveRule::Other, true);
             }
         }
@@ -355,6 +372,9 @@ impl<X: Pending> View<'_, X> {
             }
             _ => false,
         };
+        let object = self
+            .h
+            .object_footprint_shape(Some(ty), self.units.get(unit).map_or(0, |r| r.class));
         let h = &mut *self.h;
         let p = h.paths.as_mut().expect("checked above");
         let rec = match (ty, kind) {
@@ -372,8 +392,12 @@ impl<X: Pending> View<'_, X> {
                 let mut s = StaticPath::default();
                 s.set(room, x, y);
                 let rec = UnitPath::Static(s);
-                if let Some((fp, _)) = footprint_of(Some(&rec), Some(ty), mode, None) {
-                    add_footprint(&mut h.drlg, &fp);
+                // `SUNIT_Add` (§2.5): an object's footprint only when
+                // `HasCollision[mode]` is set.
+                if ty != UnitType::Object || object.is_some_and(|o| o.collides_in(mode)) {
+                    if let Some((fp, _)) = footprint_of(Some(&rec), Some(ty), mode, object) {
+                        add_footprint(&mut h.drlg, &fp);
+                    }
                 }
                 rec
             }
@@ -394,7 +418,8 @@ impl<X: Pending> View<'_, X> {
     pub(crate) fn path_footprint(&self, unit: UnitId) -> Option<(Footprint, RemoveRule)> {
         let r = self.units.get(unit)?;
         let p = self.h.paths.as_ref()?;
-        footprint_of(p.record(unit), Some(r.ty), r.mode, None)
+        let object = self.h.object_footprint_shape(Some(r.ty), r.class);
+        footprint_of(p.record(unit), Some(r.ty), r.mode, object)
     }
 
     /// Footprint add `0x00649400` at the unit's stored position.

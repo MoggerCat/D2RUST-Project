@@ -392,9 +392,11 @@ fn base_writes() {
     lists.merge(&mut log, p, src);
     assert_eq!((lists.base(p, 0, 0), lists.base(p, 2, 0)), (32, 7));
     assert_eq!(lists.mod_values(P)[0], (key(0, 0), 32));
-    assert_eq!(lists.single_stat(P, 12), None);
-    lists.clear_mods(P);
+    // §11 r4 (recorded, packets-town-arrival-ama seq 106-108): sent only
+    // while the key is in the mod array.
     assert_eq!(lists.single_stat(P, 12), Some(10));
+    lists.clear_mods(P);
+    assert_eq!(lists.single_stat(P, 12), None);
     lists.remove_all(&mut log, src);
     assert!(lists.base_entries(src).is_empty());
 }

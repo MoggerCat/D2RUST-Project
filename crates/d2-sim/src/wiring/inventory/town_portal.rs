@@ -1,4 +1,4 @@
-// Spec: specs/items/use.md §1–§4; specs/world/objects-2.md §27.1; specs/items/inventory-moves.md §7.11, §7.18
+// Spec: specs/items/use.md §1–§4 (§3.1: wiring/inventory/potion.rs); specs/world/objects-2.md §27.1; specs/items/inventory-moves.md §7.11, §7.18
 //! The item-use dispatcher `0x005BF240` on the inventory model (the
 //! `use_item_at` / `use_item` seams) and the Town Portal entry.
 //!
@@ -14,7 +14,9 @@
 //! a tome's charge) is the caller's (`inventory-moves.md` §7.11 step 3,
 //! §7.18 step 9), paid only for a 1.
 //!
-//! The other entries keep their earlier answers: potions (REC-102) and
+//! Entry 3 (healing and mana potions) is the body of §3.1
+//! ([`InvDesk::use_entry3`]). The other entries keep their earlier
+//! answers: stamina (REC-135) and rejuvenation (d2rs-own) potions and
 //! identify (REC-113) on `use_item`, everything else on the rest
 //! (`items/use.md` open question 1: their bodies are unwritten).
 //!
@@ -36,6 +38,8 @@ pub mod entry {
     pub const IDENTIFY: u32 = 1;
     /// Town Portal (`tsc`, `tbk`).
     pub const TOWN_PORTAL: u32 = 2;
+    /// Healing and mana potions (`hp1`–`hp5`, `mp1`–`mp5`).
+    pub const POTION: u32 = 3;
     /// The table's size `[0x0074178C]`.
     pub const COUNT: u32 = 31;
 }
@@ -93,6 +97,10 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         self.set_item_flags(item, f | ARMED);
         let r = match n {
             entry::TOWN_PORTAL => self.cast_town_portal(player),
+            // §3.1: U drinks it, whatever the target.
+            entry::POTION => self
+                .unit_of(player)
+                .is_some_and(|u| self.use_entry3(u, item)),
             _ => self.use_unwritten(player, item, target, x, y),
         };
         if !r {
@@ -103,16 +111,12 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
     }
 
     /// The entries whose bodies are unwritten (`items/use.md` open
-    /// question 1): the earlier answers (REC-102 potions, REC-113
-    /// identify on a target, the rest).
+    /// question 1): the earlier answers (REC-135 stamina and the d2rs-own
+    /// rejuvenation potions, REC-113 identify on a target, the rest).
     fn use_unwritten(&mut self, player: Owner, item: Guid, target: Owner, x: i32, y: i32) -> bool {
         if target == Owner::item(item) {
-            // A potion used from the grid (0x20) is drunk by U, the player
-            // (PROVISIONAL, REC-730: entry 3's body `0x005BE3F0` is
-            // unwritten). Recorded 2026-10-09: an mp1 right-clicked in the
-            // inventory is used (`facts/items/a1-town-potions-low.tsv`
-            // n 28–31: 0x3F, 0x9D action 5 with flag 0x20, next frame
-            // 0xA8 state 106).
+            // A potion used from the grid (0x20) is drunk by U, the
+            // player, as entry 3 is (§3.1 reads only U and I).
             if self.use_potion(player, item) {
                 return true;
             }

@@ -169,8 +169,8 @@ pub fn player_corpse_assign(w: &mut ClientWorld, msg: &Message<'_>) -> Result<()
     // holds no inventory nodes, so the body items are the item units
     // whose last item record (0x9C / 0x9D) names P as owner with stream
     // header mode 1 (body; header peek of `ItemHeader`), in GUID order;
-    // settled by a Ghidra read of 0x0062E410 plus a join / trade packet
-    // recording with items (HIGH-PRIORITY CAPTURE: wire byte layout).
+    // OQ 3 is answered (2026-10-08: `0x0062E410` is the save-0 record
+    // peek), the inventory nodes are queued as `q-fix-client-item-oq3`.
     let body: Vec<UnitKey> = w
         .units
         .values()

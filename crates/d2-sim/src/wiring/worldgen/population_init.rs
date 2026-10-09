@@ -74,7 +74,11 @@ impl<X: WorldPending> MonsterInit for WorldHost<'_, X> {
         self.v.h.x.set_coord_record(unit, rect, room, x, y);
     }
 
+    /// `0x005543B0`: the unit's state-105 list
+    /// ([`crate::wiring::action::View::set_alignment`]),
+    /// then the host's copy.
     fn set_alignment(&mut self, unit: UnitId, align: u8) {
+        self.v.set_alignment(self.game, unit, align);
         self.v.h.x.set_alignment(unit, align);
     }
 

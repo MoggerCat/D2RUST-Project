@@ -486,6 +486,16 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
     if let Some(u) = sim.action.sys.units.get_mut(player) {
         u.mode = 1;
     }
+    // The join step after the player's allocation (`units.md` §6.1), as
+    // the play host's join (`d2_server::adapters::session`): neutral mode
+    // start, the regeneration event 3 every frame (life, stamina, mana;
+    // `stat-lists.md` §10.1) and the refresh event 11.
+    sim.action
+        .sys
+        .with(&mut game, |s, hooks| {
+            d2_sim::units::modes::player_join(s, hooks, player)
+        })
+        .map_err(|e| build_err(format!("player join: {e:?}")))?;
     let vitals = d.vitals().map_err(b)?;
     {
         let sys = &mut sim.action.sys;
