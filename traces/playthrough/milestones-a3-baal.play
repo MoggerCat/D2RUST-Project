@@ -1,0 +1,62 @@
+# Act-entry milestones III, IV, V and Baal's chamber for
+# tools/playthrough/playthrough.py (spec: specs/tools/playthrough.md).
+# Every target was measured on 1.14d (PC 1, Windows, -seed 1234, 2026-10-09;
+# docs/handoff/pc1-day3-c.md "Milestones"; the same runs are the
+# traces/checks/milestone-*.check files). Each milestone starts in the previous
+# act's town (town byte, d2s-tool --act) and warps before frame 4, as 1.14d
+# gates neither the load nor the warp on quests. Ids: levels.txt Lut Gholein 40,
+# Kurast Docks 75, Pandemonium Fortress 103, Harrogath 109, The Worldstone
+# Chamber 132; monstats Baal (chamber) 544.
+playthrough 1
+act 3
+
+save a2 --name MilA3 --class sor --expansion --act 1
+save a3 --name MilA4 --class sor --expansion --act 2
+save a4 --name MilA5 --class sor --expansion --act 3
+save a5 --name MilBaal --class sor --expansion --act 4
+
+milestone act3-entry
+  use a2
+  seed 1234
+  deadline 40
+  poke 4 warp 75
+  need player lv == 75
+  need player act == 2
+  need player x == 5118
+  need player y == 5168
+  need player m == 5
+
+milestone act4-entry
+  use a3
+  seed 1234
+  deadline 40
+  poke 4 warp 103
+  need player lv == 103
+  need player act == 3
+  need player x == 5048
+  need player y == 5043
+  need player m == 5
+
+milestone act5-entry
+  use a4
+  seed 1234
+  deadline 40
+  poke 4 warp 109
+  need player lv == 109
+  need player act == 4
+  need player x == 5098
+  need player y == 5023
+  need player m == 5
+
+milestone baal-chamber
+  use a5
+  seed 1234
+  deadline 40
+  poke 4 warp 132
+  note 1.14d: Baal is monster GUID 8 at (15135, 5920), mode 1, monster level 60, hp 6779904 (1/256), from frame 4
+  need player lv == 132
+  need player act == 4
+  need player x == 15173
+  need player y == 5888
+  need unit ut 1 cl 544 lv 132 present
+  need unit ut 1 cl 544 lv 132 count == 1

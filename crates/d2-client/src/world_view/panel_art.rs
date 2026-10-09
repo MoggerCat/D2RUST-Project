@@ -400,6 +400,7 @@ mod tests {
             at: Point::new(x, y),
             clip: FRAME,
             look: crate::ui::CelLook::PLAIN,
+            call: crate::ui::draw::CelCall::Draw,
         }
     }
 

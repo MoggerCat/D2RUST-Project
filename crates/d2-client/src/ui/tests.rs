@@ -558,6 +558,7 @@ fn widgets_emit_requests_and_hit_by_rect() {
                 at: Point::new(1, 1),
                 clip: FRAME,
                 look: crate::ui::CelLook::PLAIN,
+                call: crate::ui::draw::CelCall::Draw,
             }),
             UiDraw::Text(TextRequest {
                 text: vec![0x48, 0x69],
