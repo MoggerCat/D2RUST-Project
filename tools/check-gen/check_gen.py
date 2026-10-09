@@ -414,7 +414,7 @@ def fam_itemq(ctx):
             for j, code in enumerate(codes):
                 dy = 2 * (j // 5)
                 lines.append(f"at 4 poke item {code} @x+{2 + 2 * (j % 5)} "
-                             + (f"@y+{dy}" if dy else "@y") + f" quality {q} ilvl 85")
+                             + (f"@y+{dy}" if dy else "@y") + f" quality {qn} ilvl 85")
             c = Check(f"gen-itemq-{qn}-{si}", "itemq", f"quality {q} {qn}, seed set {si}",
                       f"{len(codes)} items at quality {qn} (game seed 0x{lo:X} {hi})",
                       "ScnAma --class ama --expansion", 20, 240, "items", lines,

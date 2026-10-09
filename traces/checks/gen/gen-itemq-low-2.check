@@ -10,23 +10,23 @@ ticks 20
 seconds 240
 channels items
 at 4 poke seed-game 0x00005A5A 4242
-at 4 poke item hax @x+2 @y quality 1 ilvl 85
-at 4 poke item clm @x+4 @y quality 1 ilvl 85
-at 4 poke item wst @x+6 @y quality 1 ilvl 85
-at 4 poke item 9ga @x+8 @y quality 1 ilvl 85
-at 4 poke item 9kr @x+10 @y quality 1 ilvl 85
-at 4 poke item 8sw @x+2 @y+2 quality 1 ilvl 85
-at 4 poke item 7la @x+4 @y+2 quality 1 ilvl 85
-at 4 poke item 7gd @x+6 @y+2 quality 1 ilvl 85
-at 4 poke item 6s7 @x+8 @y+2 quality 1 ilvl 85
-at 4 poke item amb @x+10 @y+2 quality 1 ilvl 85
-at 4 poke item lgl @x+2 @y+4 quality 1 ilvl 85
-at 4 poke item xlt @x+4 @y+4 quality 1 ilvl 85
-at 4 poke item dr4 @x+6 @y+4 quality 1 ilvl 85
-at 4 poke item ucl @x+8 @y+4 quality 1 ilvl 85
-at 4 poke item dr6 @x+10 @y+4 quality 1 ilvl 85
-at 4 poke item pae @x+2 @y+6 quality 1 ilvl 85
-at 4 poke item rin @x+4 @y+6 quality 1 ilvl 85
-at 4 poke item amu @x+6 @y+6 quality 1 ilvl 85
-at 4 poke item cm1 @x+8 @y+6 quality 1 ilvl 85
-at 4 poke item jew @x+10 @y+6 quality 1 ilvl 85
+at 4 poke item hax @x+2 @y quality low ilvl 85
+at 4 poke item clm @x+4 @y quality low ilvl 85
+at 4 poke item wst @x+6 @y quality low ilvl 85
+at 4 poke item 9ga @x+8 @y quality low ilvl 85
+at 4 poke item 9kr @x+10 @y quality low ilvl 85
+at 4 poke item 8sw @x+2 @y+2 quality low ilvl 85
+at 4 poke item 7la @x+4 @y+2 quality low ilvl 85
+at 4 poke item 7gd @x+6 @y+2 quality low ilvl 85
+at 4 poke item 6s7 @x+8 @y+2 quality low ilvl 85
+at 4 poke item amb @x+10 @y+2 quality low ilvl 85
+at 4 poke item lgl @x+2 @y+4 quality low ilvl 85
+at 4 poke item xlt @x+4 @y+4 quality low ilvl 85
+at 4 poke item dr4 @x+6 @y+4 quality low ilvl 85
+at 4 poke item ucl @x+8 @y+4 quality low ilvl 85
+at 4 poke item dr6 @x+10 @y+4 quality low ilvl 85
+at 4 poke item pae @x+2 @y+6 quality low ilvl 85
+at 4 poke item rin @x+4 @y+6 quality low ilvl 85
+at 4 poke item amu @x+6 @y+6 quality low ilvl 85
+at 4 poke item cm1 @x+8 @y+6 quality low ilvl 85
+at 4 poke item jew @x+10 @y+6 quality low ilvl 85
