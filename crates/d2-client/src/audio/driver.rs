@@ -554,7 +554,7 @@ impl SoundDriver {
                         &mut self.unit_sounds,
                         &mut self.greetings,
                         &self.feed,
-                        (&mut self.dialog, &self.npc_speech),
+                        (&mut self.dialog, self.npc_speech),
                         &mut self.skipped,
                     )?
                 };
@@ -897,6 +897,7 @@ impl EnvHooks for Hooks<'_> {
 }
 
 /// One request (§11, §2 r2–r4, §3).
+#[allow(clippy::too_many_arguments)]
 fn request(
     cx: &mut Ctx,
     world: &ClientWorld,
