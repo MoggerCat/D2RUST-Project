@@ -244,6 +244,9 @@ pub struct ClientUnit {
     pub interact_ms: u32,
     /// +0x44: the animation frame (signed, 8.8 fixed point; §18 rule 1).
     pub frame: i32,
+    /// +0x48: the animation's frame count (8.8), written by a monster's
+    /// mode set ([`super::monster_anim::mode_set`]); 0 otherwise.
+    pub frame_count: i32,
     /// +0x4C: an object's animation speed (8.8 per update), set by the
     /// animation set-up (`world/objects-client.md` §25 r8); `None`: no
     /// set-up ran, the generic step uses `FrameDelta[mode]`.
@@ -296,6 +299,7 @@ impl ClientUnit {
             flag_200: false,
             interact_ms: 0,
             frame: 0,
+            frame_count: 0,
             speed: None,
             flag_ex: 0,
             flag_4: false,
@@ -575,6 +579,37 @@ impl LocalWalk {
     }
 }
 
+/// What the client reads of the last drawn frame's camera
+/// (`render/camera.md` §1, §4): the origin getters `0x0045AFC0` = cx_u −
+/// shiftX and `0x0045AFD0` = cy_u − 8, the display width `[0x007A5220]`
+/// = W and the play height `[0x007A521C]` = H − 40.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct UnitOrigin {
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub play_height: i32,
+}
+
+impl UnitOrigin {
+    /// The getters of `cam` (§4).
+    pub fn of(cam: &crate::rules::camera::Camera) -> Self {
+        UnitOrigin {
+            x: cam.unit.x - cam.view.shift_x,
+            y: cam.unit.y - 8,
+            width: cam.size.width,
+            play_height: cam.size.play_height(),
+        }
+    }
+}
+
+/// A screen shake started by a model rule (`render/camera.md` §8).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ShakeStart {
+    pub shake: crate::rules::camera::Shake,
+    pub start_tick: u64,
+}
+
 /// The client world model.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ClientWorld {
@@ -654,6 +689,15 @@ pub struct ClientWorld {
     /// callback (`rooms.md` §5 rule 9) runs over it for every new active
     /// room.
     pub lights: LightList,
+    /// The unit origin of the last drawn frame (`render/camera.md` §3,
+    /// §4), read by the client missile function 2
+    /// (`missiles/client.md` §C13); set by the play app on each drawn
+    /// frame (`Bridge::set_unit_origin`), `None` before the first.
+    pub unit_origin: Option<UnitOrigin>,
+    /// The running screen shake (`render/camera.md` §8: one at a time,
+    /// `0x00476A80` restarts it), started on server tick `start_tick` (the
+    /// d2rs time base, §9); `None` before the first.
+    pub shake: Option<ShakeStart>,
     /// `[0x007A0498]`: client updates that ran the DRLG part
     /// (`rooms.md` §4.6, last paragraph: += 1 first, level free on every
     /// multiple of 13).
@@ -825,6 +869,18 @@ impl ClientWorld {
     /// no client DRLG, no local player or an unplaced one.
     pub fn local_room(&self) -> Option<&ActiveRoom> {
         self.unit_room(self.local_player?)
+    }
+
+    /// `0x00476A80(A, t1, t2, t3)` (`render/camera.md` §8): a shake with
+    /// peak A, attack t1, sustain t2 and release t3 (ms) starts now,
+    /// replacing a running one; t2 = 0 starts nothing.
+    pub fn start_shake(&mut self, peak: u32, attack: u32, sustain: u32, release: u32) {
+        if let Some(shake) = crate::rules::camera::Shake::start(peak, attack, sustain, release) {
+            self.shake = Some(ShakeStart {
+                shake,
+                start_tick: self.server_ticks,
+            });
+        }
     }
 
     /// Room of a point (`0x00465420`, §2 rule 7, §12 rule 2) for a point
@@ -1170,10 +1226,29 @@ pub struct MonsterClass {
     /// monster light (`render/lighting.md` §8 monster row).
     pub light: u8,
     pub light_rgb: (u8, u8, u8),
+    /// `monstats2` `SizeX` (+0x08, signed): the monster's unit size
+    /// (`sim/path-placement.md` §3).
+    pub size_x: i8,
+    /// `monstats` flag 27 `noaura` (flags +12 bit 27, `data/fields.tsv`;
+    /// the client search's skip test, `missiles/client-bodies-2.md` §B9
+    /// r3).
+    pub no_aura: bool,
+    /// `monstats` flag 10 `inTown` (with `npc`: the monster can be in
+    /// town, the footprint pattern of `sim/path-placement.md` §3).
+    pub in_town: bool,
     /// The columns of the monster set-up `0x004AE8D0` (`msg-units.md`
     /// §1.2 r6); `None`: the tables do not give them (the set-up's table
     /// parts are not run).
     pub setup: Option<MonsterSetup>,
+    /// The AnimData record (frames, speed) of the class's composite name
+    /// in each monster mode 0–15 (`formats/animdata.md` §5, the default
+    /// record when the name has none); `None`: no name (the mode set
+    /// leaves the frame count and speed at 0).
+    pub anims: [Option<(u32, u32)>; 16],
+    /// `monstats` walk and run speeds (+0x36, +0x38 after
+    /// `data/fixups.md` §8): w of `sim/units.md` §4.7 steps 6–7.
+    pub walk_speed: u16,
+    pub run_speed: u16,
 }
 
 /// The `monstats` / `monstats2` columns of the monster set-up
@@ -1282,6 +1357,7 @@ impl MonsterClass {
             components,
             npc,
             interact,
+            size_x: *monstats2.get(0x08)? as i8,
             setup: None,
             ..MonsterClass::default()
         })

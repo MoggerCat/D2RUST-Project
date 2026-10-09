@@ -566,6 +566,14 @@ pub fn audio_request(o: &Output) -> Option<SoundRequest> {
             id: sound as i32,
             unit: player,
         },
+        &Output::MissileSound(m) => {
+            use crate::bridge::client_missiles::MissileSound as M;
+            match m {
+                M::Request { id, missile } => SoundRequest::UnitRequest { id, unit: missile },
+                M::StopOwnerGroup { owner, id } => SoundRequest::GroupStop { unit: owner, id },
+                M::DetachTravel { missile, id } => SoundRequest::GroupDetach { unit: missile, id },
+            }
+        }
         _ => return None,
     })
 }
@@ -788,6 +796,26 @@ fn script_input(
         ui.queue.0.extend(events);
         ui.cursor = script.cursor();
     }
+    // `key` steps: the window's key press path (`ui_input`), bound
+    // action first, then the typed character.
+    let codes: Vec<KeyCode> = script
+        .take_keys()
+        .into_iter()
+        .filter_map(|k| {
+            edge::KEY_CODES
+                .iter()
+                .find(|(_, e)| *e == k)
+                .map(|(c, _)| *c)
+        })
+        .collect();
+    if codes.is_empty() {
+        return;
+    }
+    if let Some(bindings) = &ui.bindings {
+        let actions = edge::key_actions(bindings, &codes);
+        ui.queue.0.extend(actions);
+    }
+    ui.queue.0.extend(edge::key_chars(&codes));
 }
 
 /// The world releases of a lost focus (`ui/controls.md` §4.3 r3): left
@@ -1161,6 +1189,11 @@ fn world_view_frame(
         Some(_) => placed,
         None => super::feed::camera_at(bridge.0.world(), state.feed.as_ref(), anchor)?,
     };
+    // `missiles/client.md` §C13 function 2 reads the drawn frame's unit
+    // origin (`render/camera.md` §4) at the next client update.
+    if let (true, Some((cam, _))) = (draw, placed.as_ref()) {
+        bridge.0.set_unit_origin(cam);
+    }
     let built = build_frame_placed(
         bridge.0.world(),
         draws,

@@ -15,13 +15,13 @@
 |---|---|
 | Summary | 27–33 |
 | Rules | 34–35 |
-|   6. Deferred item messages | 36–129 |
-|   7. Intents | 130–691 |
-|   8. Pickup from the ground | 692–873 |
-|   9. Drop to the ground | 874–921 |
-|   10. Gold | 922–961 |
-|   11. Message layouts | 962–991 |
-|   12. Corpse take-back (`0x0057FB70` → `0x00562F30`) | 992–1119 |
+|   6. Deferred item messages | 36–135 |
+|   7. Intents | 136–705 |
+|   8. Pickup from the ground | 706–887 |
+|   9. Drop to the ground | 888–935 |
+|   10. Gold | 936–975 |
+|   11. Message layouts | 976–1005 |
+|   12. Corpse take-back (`0x0057FB70` → `0x00562F30`) | 1006–1133 |
 <!-- /index -->
 
 ## Summary
@@ -91,6 +91,12 @@ the walk passes the bit-stream flag argument 0 (§11), except the 0x7D
 rows, whose state = item flags & the row's flag (`0x006280A0`).
 Only the store checks end the walk for every client (item +0xC8 bit 2
 or 4 set: 0x38 / 0x39 to the trading client, nothing to others, done).
+The store sends (`0x0053EF30` → `0x0053EAE0`, action 0x0B for 0x38
+with the "unidentified gamble" bit, 0x0C for 0x39 with the item shown
+at its stored page) never skip an item: the stream is built into a
+0xF4-byte area and a size (stream + 8) ≥ 0xFD is fatal 0x78C; a client
+without a player is fatal 0x77B (read 2026-10-09). There is no
+"encode failed" outcome in 1.14d.
 Columns: `order`; `test` (`cmd` = command flags, `item` = item flags);
 `flags` (any of); `to` (`owner` = only the owner's client, `all` = every
 client that processes this player; `owner|mode1` = owner, or item mode
@@ -374,16 +380,17 @@ S→C 0x3E, `0x0053D130`), both books (type 18) → `0x0055C070(m − q_d)`,
 dst item flag 0x8; else (when `0x00629930(src)`) dst stat 72 (`durability`, live `itemstatcost` row 72) lowered
 to src's if src's is lower (0x3E; throwing weapons keep the worse
 durability), dst := q_s + q_d
-(0x3E), both books → `0x0055C070(q_s)`, cursor := none, S→C 0x42 for
-src, src freed (`0x00557FD0`: the unit is taken off any player's
+(0x3E), both books → `0x0055C070(q_s)`, cursor := none, S→C 0x42
+naming the player (`42 00 <player GUID>`: the cursor owner, recorded
+2026-10-09, `facts/items/a1-town-item-moves.tsv`), src freed (`0x00557FD0`: the unit is taken off any player's
 inventory list or cursor still holding it, then freed by `0x00555600`
 (`sim/units.md` §3.2); nothing else, `world/cube.md` §8 "Exact" rule 1). Then dst command flag 0x100 (0x9C action
 0xA), update list, refresh. (Different classes never pass `inventory.md` §4.5.)
-PROVISIONAL: `0x00629930(src)` is read as gating only the stat-72 step
-(as §8.1's auto-stack), so items without durability (quivers, keys)
-merge too (because the sentence above leaves its scope open); settled by
-a read of `0x0055E590`'s branch or a recording of two arrow quivers
-merged with 0x21 (REC-289).
+`0x00629930(src)` gates only the stat-72 step (as §8.1's auto-stack):
+items without durability merge too. Recorded 2026-10-09 (REC-289,
+`facts/items/a1-town-item-moves.tsv`): keys 3 + 4 and arrow quivers
+30 + 40 merged with 0x21 send one 0x3E (quantity), `42 00 <player>`,
+and next update 0x9C action 0xA for dst; the source is gone.
 
 #### 7.13 0x22 UnstackItems (`0x0054B380`)
 
@@ -516,7 +523,10 @@ or type ≠ 18 → out 1; book and scroll spell (`0x00627F80`) differ →
 fatal assert (line 0x149C); book quantity (stat 70) ≥ max stack → 0.
 Scroll consumed: unless `0x0055EEA0` (scroll is a stack it decrements),
 it is removed from its room and freed, cursor := none. Book stat 70 += 1;
-S→C 0x3E for stat 70; `0x0055C070(1)`. Result 0.
+S→C 0x3E for stat 70; `0x0055C070(1)`. Result 0. Recorded 2026-10-09
+(`facts/items/a1-town-item-moves.tsv`, a cursor `tsc` onto a `tbk` of
+5): `42 00 <player GUID>` (the cursor clear), the tome's 0x3E, then the
+0x22 of skill 220 with quantity 6; no 0x9C / 0x9D.
 
 #### 7.21 0x4C — `world/cube.md` §10 (not the cube).
 
@@ -536,8 +546,12 @@ gold − pile gold (`0x00530EA0`). Result 0.
 1. Classic game → 3. Busy and trading → 3.
 2. Ends with 0 (no effect) unless: the player has no used skill (`0x00620250`(player): skill list +0x10,
    `skills/levels.md`; register argument pushed at `0x0054D47A`), the player is alive (`0x005541B0` = 0), a hireling
-   exists (`0x00574EC0(7, 0)`), it is alive, and it belongs to the player
-   (`0x0065A590`).
+   exists (`0x00574EC0(7, 0)`), it is alive, and it is near the player
+   (`0x0065A590(hireling, player)`, pushed at `0x0054D4B6`: 1 when the
+   hireling's room is in the room list `0x00619790` of the **player's**
+   room; either room missing → 0; a null first / second argument is
+   fatal 0x18 / 0x19. The 0x4B test, `sim/intents-events.md` §9 rule 10,
+   is the same function with (player, unit)).
 3. No player inventory → 3. Cursor item C present: C's items `quest` = 0
    → `0x0054D230` (give to the hireling; result ignored), 0. No cursor:
    location (u16 @1) ≠ 0 → `0x0054D130` (take from the hireling) and its

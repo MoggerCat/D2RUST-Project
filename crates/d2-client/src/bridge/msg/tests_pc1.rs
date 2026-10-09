@@ -42,7 +42,7 @@ fn party_info_unknown_guid_and_corpse_holder_do_nothing() {
 
 // Covers: specs/client/msg-units.md §8 r10
 #[test]
-fn party_info_pet_pass_sets_palette_provisional() {
+fn party_info_pet_pass_sets_palette() {
     let mut m = Model::default();
     m.w.local_player = Some(UnitKey::new(PLAYER, 1));
     m.w.roster.push(RosterRecord {
@@ -68,7 +68,39 @@ fn party_info_pet_pass_sets_palette_provisional() {
             .iter()
             .map(|(k, v)| (k.guid, *v))
             .collect::<Vec<_>>(),
-        [(20, 0), (21, 1)]
+        [(20, 1), (21, 0)]
+    );
+
+    // The owner has a roster record in the local player's party
+    // (+0x22 equal and not 0xFFFF): t = 1; another party: t = 0.
+    m.w.pet_palette.clear();
+    for (guid, party) in [(2u32, 5u16), (3, 6)] {
+        m.w.roster.push(RosterRecord {
+            guid,
+            f22: party,
+            ..RosterRecord::default()
+        });
+    }
+    m.w.pets[1].owner = 3;
+    m.w.roster[0].f22 = 5;
+    m.hex("75 01 00 00 00 05 00 02 00 00 00 01 00");
+    assert_eq!(m.w.pet_palette[&UnitKey::new(MONSTER, 21)], 0);
+    m.w.pets[1].owner = 2;
+    m.hex("75 01 00 00 00 05 00 02 00 00 00 01 00");
+    assert_eq!(m.w.pet_palette[&UnitKey::new(MONSTER, 21)], 1);
+
+    // No local player: every record reads 0; type 5 is not written.
+    m.w.pet_palette.clear();
+    m.w.local_player = None;
+    m.w.pets.push(pet(24, 1, 5));
+    m.put(UnitKey::new(MONSTER, 24));
+    m.hex("75 01 00 00 00 05 00 02 00 00 00 01 00");
+    assert_eq!(
+        m.w.pet_palette
+            .iter()
+            .map(|(k, v)| (k.guid, *v))
+            .collect::<Vec<_>>(),
+        [(20, 0), (21, 0)]
     );
 }
 

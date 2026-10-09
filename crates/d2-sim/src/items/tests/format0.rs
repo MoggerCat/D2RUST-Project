@@ -925,13 +925,20 @@ fn f0_legacy_property_table() {
     for (r, code) in [
         (rec(195, 1, 50, -50), 0x444),
         (rec(195, 4, 1, 2), 0x44C),
+        // Unsigned compare: a negative param is fatal too, no stat set.
+        (rec(195, -1, 1, 2), 0x44C),
         (rec(195, 1, -300, 2), 0x44D),
         (rec(195, 1, 1, 900), 0x44E),
     ] {
         let mut it = f0(ring, 1);
         ap(&t, &mut it, 0, r);
         assert_eq!(it.fatal, Some(Fatal::LegacyByTime(code)));
+        assert_eq!(l(&it, 268), 0);
     }
+    // param 3 still sets.
+    let mut it = f0(ring, 1);
+    ap(&t, &mut it, 0, rec(195, 3, 1, 2));
+    assert_eq!(l(&it, 268), (((2 + 256) << 10 | (1 + 256)) * 4) + 3);
     // `0x0065E2D0`: stat 83 with layer 0–4, 5, 6.
     let mut it = f0(ring, 1);
     ap(&t, &mut it, 0, rec(69, 0, 4, 4));
@@ -1090,4 +1097,21 @@ fn f0_code_242_reaches_the_runes_socketed_item() {
     apply_socket_filler_into(&t, &mut gm, 0, Some(&mut other));
     assert_eq!((gm.stats.base(72, 0), gm.stats.base(73, 0)), (0, 0));
     assert_eq!(other.base(72, 0), 7);
+}
+
+/// §2: mode 7 (craft list) goes through the wrapper, so a format-0 item
+/// takes §14 there; mode 6 calls the dispatcher directly.
+// Covers: specs/items/properties.md §2
+#[test]
+fn f0_craft_mode_goes_through_the_legacy_table() {
+    let mut t = tables268();
+    t.properties[0] = prop1(1, 50);
+    let ring = push_item(&mut t, item_rec(RING, b"rin "));
+    let l = |it: &Item<FakeStats>, id| it.stats.item_list(id, 0);
+    let mut it = f0(ring, 1);
+    ap(&t, &mut it, mode::CRAFT, rec(0, 0, 5, 5));
+    assert_eq!((l(&it, 31), l(&it, 50)), (5, 0));
+    let mut it = f0(ring, 1);
+    ap(&t, &mut it, mode::RUNEWORD, rec(0, 0, 5, 5));
+    assert_eq!((l(&it, 31), l(&it, 50)), (0, 5));
 }

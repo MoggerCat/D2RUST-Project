@@ -22,7 +22,7 @@ use super::msg::lighting::{lighting_update, object_light_of};
 use super::objects::{self, ObjFx, ObjUnit};
 use super::output::{move_freed, Output, Outputs};
 use super::receive::{ReceiveLog, Rejected};
-use super::world::{update_order, ClientWorld, ModelInputs, OBJECT};
+use super::world::{update_order, ClientWorld, ModelInputs, MONSTER, OBJECT};
 
 /// Drains every unit's queue (§5 rules 2–4). Returns the number of
 /// messages applied. A handler error is recorded as a rejection; the
@@ -83,6 +83,11 @@ pub fn update_pass(
             apply_object_lights(world, &outputs[start..]);
             move_freed(world, outputs);
         }
+        // The monster update `0x004B13A0`'s anim step (`model.md` §19
+        // r8.5), before the drain.
+        if key.unit_type == MONSTER {
+            super::monster_anim::step(world, key);
+        }
         // Looked up again: an earlier unit's messages or its own update
         // may have removed it (§5 rule 2).
         let Some(unit) = world.units.get_mut(&key) else {
@@ -135,6 +140,8 @@ pub fn update_pass(
     if let Err(error) = lighting_update(world, inputs) {
         log.rejected.push(Rejected { id: 0, error });
     }
+    // The Den lights' creates (`render/lighting.md` §10 r5).
+    missile_sounds(world, outputs);
     move_freed(world, outputs);
     applied
 }
@@ -150,18 +157,37 @@ fn c_missiles(
     log: &mut ReceiveLog,
     outputs: &mut Vec<Output>,
 ) {
+    // `missiles/client.md` §C9 r4.1: the client's state-86 lists count
+    // down first (PROVISIONAL REC-545).
+    super::client_missiles::tick_just_hit(world);
+    // PROVISIONAL REC-546: the unit footprints the missiles read.
+    super::client_missiles::stamp_unit_footprints(world, &inputs.tables.monsters);
     for key in objects::c_order(world, super::world::MISSILE) {
-        let r = super::client_missiles::update(
-            world,
-            &inputs.tables.missiles,
-            key,
-            inputs.high_light_quality,
-        );
+        let env = super::client_missiles::Env {
+            rows: &inputs.tables.missiles,
+            lights: inputs.high_light_quality,
+            skills: inputs.skill_tables.as_deref(),
+            monsters: &inputs.tables.monsters,
+        };
+        let r = super::client_missiles::update_with(world, &env, key);
         if let Err(error) = r {
             log.rejected.push(Rejected { id: 0, error });
         }
     }
+    missile_sounds(world, outputs);
     move_freed(world, outputs);
+}
+
+/// The client missiles' sound calls (`audio/triggers.md` §8 r3) in
+/// update order, before the frees of the same walk.
+fn missile_sounds(world: &mut ClientWorld, outputs: &mut Vec<Output>) {
+    outputs.extend(
+        world
+            .objclient
+            .missile_sounds
+            .drain(..)
+            .map(Output::MissileSound),
+    );
 }
 
 fn c_objects(

@@ -222,10 +222,11 @@ pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
         }
         // Rule 6.4: the mode argument is the 4-bit mode.
         u.mode = mode;
-        // Rules 6.5 and 6.9 (the frame draw on the unit seed with range
-        // +0x48 and the direction draw) need the mode's animation frame
-        // count and `0x0046C140`, which the client tables do not hold:
-        // not run (`docs/handoff/impl-c-client.md` §4).
+        // Rule 6.5 (the frame draw on the unit seed with range +0x48)
+        // runs once the unit is added ([`super::super::monster_anim`]).
+        // Rule 6.9 (the direction draw) needs `0x0046C140`, which the
+        // client tables do not hold: not run
+        // (`docs/handoff/impl-c-client.md` §4).
         if let Some(s) = &setup {
             setup_flags(u, s);
         }
@@ -309,6 +310,11 @@ pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
             apply3(&mut c.unit);
             apply4(&mut c.unit);
             c.add(w);
+            // Rules 6.4–6.5: the mode set's animation part (frame 0, the
+            // mode's count, the rate), then the first frame drawn from the
+            // unit seed.
+            super::super::monster_anim::mode_set(w, msg.inputs, key, mode);
+            super::super::monster_anim::first_frame(w, key);
             // The monster init's light (`0x004AE210`, `render/lighting.md`
             // §8 monster row), in the monster's room.
             if let Some(row) = &class_row {

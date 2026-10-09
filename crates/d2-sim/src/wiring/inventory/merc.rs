@@ -38,15 +38,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         self.owner_of(p)
     }
 
-    /// `0x0065A590` (`inventory-moves.md` §7.23 rule 2): the room test of
-    /// `intents-events.md` §9 rule 10 (the player's room is in the
-    /// hireling's room's room list: its adjacency array, the room itself
-    /// included). `None`: no lists lent.
-    ///
-    /// PROVISIONAL (inventory-moves.md §7.23 r2; REC-none): §7.23 names
-    /// the call "belongs to the player"; the same address is the 0x4B
-    /// room test (`0x0065A590` → `0x00619790`), whose argument order is
-    /// read here as (player, hireling) as there.
+    /// `0x0065A590(hireling, player)` (`inventory-moves.md` §7.23 rule 2):
+    /// scans the PLAYER's room list (its adjacency array, the room itself
+    /// included) for the hireling's room. `None`: no lists lent.
     pub(crate) fn lent_owns_hireling(&self, player: Owner, merc: Owner) -> Option<bool> {
         self.state.hirelings.as_ref()?;
         let l = &self.econ.game.lists;
@@ -58,7 +52,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         let (Some(pr), Some(mr)) = (room(player), room(merc)) else {
             return Some(false);
         };
-        Some(l.room(mr).is_some_and(|r| r.adjacent.contains(&pr)))
+        Some(l.room(pr).is_some_and(|r| r.adjacent.contains(&mr)))
     }
 
     /// `0x0054CED0(game, player, merc, item)` (`hirelings.md` §11) on the
@@ -202,13 +196,25 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> HirelingItems for MercItems<'_, '_,
             MoveUnits::set_item_flags(self.d, item, f | flag);
         }
     }
-    /// PROVISIONAL (hirelings.md §11 r4; REC-none): rule 4's unlink at
-    /// its start already took old out of the merc's inventory; "leaves
-    /// the merc's inventory" is read as that unlink, no second call.
-    fn leave_inventory(&mut self, _unit: Owner, _item: Guid) {}
-    /// TODO(spec: hirelings.md §11 r4): `0x00621000(unit, 1)` has no
-    /// written body; nothing runs.
-    fn call_00621000(&mut self, _unit: Owner, _arg: u32) {}
+    /// `0x0063CC70` (`hirelings.md` §11 r4, `items/inventory.md` §1 r2):
+    /// old's GUID goes onto the merc inventory's update list; old was
+    /// already unlinked at the start of rule 4, no second unlink.
+    fn leave_inventory(&mut self, unit: Owner, item: Guid) {
+        InventoryOps::update_list_add(self.d, unit, item);
+    }
+    /// `0x00621000(unit, 1)` (`hirelings.md` §11 r4): queue the unit for
+    /// update (`0x0064C040`) and set its flags 2 (+0xC8) |= 0x1 (|= 0x2
+    /// too for a player); with 0 only bit 0 is cleared.
+    fn call_00621000(&mut self, unit: Owner, arg: u32) {
+        let v = MoveUnits::update_bits(self.d, unit);
+        if arg == 0 {
+            MoveUnits::set_update_bits(self.d, unit, v & !1);
+            return;
+        }
+        MovePending::queue_update(self.d, unit);
+        let bits = if unit.is_player() { 0x3 } else { 0x1 };
+        MoveUnits::set_update_bits(self.d, unit, v | bits);
+    }
     /// `0x0063C180` then `0x0055FB10` (`inventory-moves.md` §7.23 take);
     /// `0x0055FB10` with none is not called (no item for the seam).
     fn become_cursor(&mut self, player: Owner, item: Option<Guid>) {

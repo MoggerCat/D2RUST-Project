@@ -187,7 +187,8 @@ fn flow_table() {
         );
     }
 
-    // In-game exit → character select (PROVISIONAL, REC-168).
+    // The character select's re-entry trigger (the in-game exit itself opens
+    // the main menu: REC-200, `smoke_frontend`).
     let (mut f, ..) = started(true, true, Some(0x22));
     f.trigger(Trigger::GameExit);
     assert_eq!(id(&f), CHAR_SELECT);

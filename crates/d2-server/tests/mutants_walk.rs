@@ -429,7 +429,11 @@ fn the_wired_host_routes_walk_to_the_path_provider() {
         y: 10,
     };
     assert_eq!(sent[0], vec![(1, want.encode().to_vec())]);
-    assert!(sent[1..].iter().all(Vec::is_empty), "{sent:?}");
+    // The 14th tick's neutral mode (row NU, `pathing.md` §10 r2): 0x0D
+    // code 7 at the stop cell to client 1 only.
+    let stop = d2_sim::path::walk::messages::player_stop(0, guid, 7, 31, 10, 0, 0);
+    assert!(sent[1..13].iter().all(Vec::is_empty), "{sent:?}");
+    assert_eq!(sent[13], vec![(1, stop.to_vec())]);
     assert!(fx.sim.world.action.faults.is_empty());
     assert!(fx.sim.events.hooks().errors.is_empty());
 }

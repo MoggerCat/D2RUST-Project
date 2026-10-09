@@ -677,6 +677,21 @@ impl OriginalUi {
         self.shared.borrow_mut().items.ctrl = ctrl;
     }
 
+    /// The centre of the backpack cell the player's page-0 item `guid`
+    /// starts at (tests).
+    pub fn inv_item_point(&self, world: &ClientWorld, guid: u32) -> Option<Point> {
+        let sh = self.shared.borrow();
+        let class = Facts::of(world).class;
+        let l = sh.items.layout(class, &sh.config.screen)?;
+        let it = crate::bridge::items::local_items(world)
+            .into_iter()
+            .find(|i| {
+                i.key.guid == guid && i.mode == crate::bridge::items::mode::STORED && i.page == 0
+            })?;
+        let (x, y, w, h) = l.grid.cell(i32::from(it.x), i32::from(it.y));
+        Some(Point::new(x + w / 2, y + h / 2))
+    }
+
     /// Measured item graphic frame sizes by `invfile` (lower case).
     pub fn set_item_frame_sizes(&mut self, sizes: BTreeMap<String, (u32, u32)>) {
         self.shared.borrow_mut().items.frame_sizes = sizes;
@@ -1190,15 +1205,18 @@ impl Panel for InventoryUi {
             gold_pressed: sh.gold.buttons.inv_pressed,
             ..self.panel
         };
-        panel.draw(&sh.tables, &sh.env(), gold, out);
+        panel.draw_art(&sh.tables, &sh.env(), out);
         let class = Facts::of(ctx.world).class;
         // §9.4: the empty equipment slots' pictures, under the items.
         sh.items
             .draw_equip_backgrounds(ctx.world, &sh.tables.files, class, &sh.config.screen, out);
         if let Some(l) = sh.items.layout(class, &sh.config.screen) {
-            sh.items.draw_tints(ctx.world, &l, sh.mouse, out);
-            sh.items.draw_panel(ctx.world, &sh.tables.files, &l, out);
+            sh.items
+                .draw_items(ctx.world, &sh.tables.files, &l, sh.mouse, out);
         }
+        // §9 r6: the gold line, gold button and close button after the
+        // items (`a1-panel-cube` rows 41–45).
+        panel.draw_tail(&sh.tables, &sh.env(), gold, out);
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {

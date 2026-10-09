@@ -216,9 +216,9 @@ pub struct HotKey {
 impl HotKey {
     /// An unbound slot.
     ///
-    /// PROVISIONAL (intents-events.md §8.2 r3.6; REC-02): a brand-new
-    /// character's client record holds skill −1 in all 16 slots, so the
-    /// join sends no 0x7B.
+    /// A brand-new character's client record holds skill −1 in all 16
+    /// slots, so the join sends no 0x7B (`intents-events.md` §8.2 r3.6;
+    /// recorded, REC-02: `facts/join/a1-new-ama.tsv`, `a1-new-sor.tsv`).
     pub const UNBOUND: HotKey = HotKey {
         skill: -1,
         left: false,

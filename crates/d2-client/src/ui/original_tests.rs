@@ -1408,7 +1408,11 @@ mod grid_hover {
     fn a_stash_press_over_the_last_column_places_at_the_kept_cell() {
         use crate::ui::states::id;
         let mut u = grid_ui(&[id::STASH]);
-        let w = cursor_world(b"gem2");
+        // The cell arithmetic above is the expansion stash (record 28,
+        // top 142); the classic stash (record 24) is at top 333 on the
+        // install (q-prov-data), so the game here is an expansion game.
+        let mut w = cursor_world(b"gem2");
+        w.expansion = 1;
         u.send(&w, UiEvent::CursorMoved(Point::new(290, 239)));
         u.click(&w, Point::new(319, 239));
         let want = ClientIntent::from_message(&crate::bridge::items::insert(9, 4, 2, 4));

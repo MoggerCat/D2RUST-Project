@@ -22,6 +22,8 @@ mod objects;
 #[cfg(test)]
 mod player_death;
 #[cfg(test)]
+mod proto_msgs;
+#[cfg(test)]
 mod rooms;
 #[cfg(test)]
 mod sound;
@@ -80,6 +82,8 @@ pub struct TestPending {
     pub skill_start: i32,
     /// What `object_approach` answers (default: operate).
     pub reach: Option<crate::wiring::action::ObjectReach>,
+    /// Defenders `may_attack` denies (default: everyone but oneself).
+    pub peaceful: Vec<UnitId>,
 }
 
 impl Pending for TestPending {
@@ -154,7 +158,7 @@ impl Pending for TestPending {
         self.crossed.get(&unit).cloned().unwrap_or_default()
     }
     fn may_attack(&self, a: UnitId, d: UnitId) -> bool {
-        a != d
+        a != d && !self.peaceful.contains(&d)
     }
     fn class_has_mode(&self, _: i32, mode: u8) -> bool {
         !self.missing_modes.contains(&mode)
@@ -472,6 +476,19 @@ impl Fx {
         }
     }
 
+    /// A new client record (no player) added to `room`'s client array
+    /// (`rooms.md` §7, `0x0061A660`): the room's client count becomes
+    /// nonzero.
+    pub fn add_room_client(&mut self, room: RoomId) {
+        let c = self.game.lists.add_client(None, Some(room), 0);
+        let act = self.game.lists.room(room).expect("room").act;
+        let d = self.sim.hooks().drlg.dungeon.acts[usize::from(act)]
+            .as_mut()
+            .expect("act");
+        let id = d.drlg_room_of(room).expect("active room");
+        d.add_room_client(id, c);
+    }
+
     /// Allocates a unit (`units.md` §3.1) in `room` at (x, y).
     pub fn spawn(&mut self, ty: UnitType, class: u32, room: RoomId, x: i32, y: i32) -> UnitId {
         let req = AllocRequest {
@@ -485,13 +502,19 @@ impl Fx {
         };
         let u = self
             .sim
-            .with(&mut self.game, |g, v| v.allocate(g, &req, x, y))
+            .with(&mut self.game, |g, v| {
+                if ty != UnitType::Player {
+                    return v.allocate(g, &req, x, y);
+                }
+                // Players start in mode 0 (death, `units.md` §2 "dead");
+                // the player mode starts are not run here: neutral, set
+                // before `SUNIT_Add` so the dead-body path settings
+                // (`units.md` §3.1 step 8) do not apply.
+                let u = v.allocate_unadded(g, &req)?;
+                v.units.get_mut(u).unwrap().mode = 1;
+                v.add_allocated(g, u, &req, x, y).then_some(u)
+            })
             .expect("allocated");
-        if ty == UnitType::Player {
-            // Players start in mode 0 (death, `units.md` §2 "dead"); the
-            // player mode starts are not run here: neutral.
-            self.sim.sys.units.get_mut(u).unwrap().mode = 1;
-        }
         u
     }
 

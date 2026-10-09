@@ -8,7 +8,8 @@
 
 use super::super::late::{self, flags, set};
 use super::super::{
-    bit, event, EventArgs, GuidList, QuestControl, QuestFlags, QuestRecord, QuestWorld, TextList,
+    bit, event, raise_progression, EventArgs, GuidList, QuestControl, QuestFlags, QuestRecord,
+    QuestWorld, TextList,
 };
 use crate::units::{RoomId, UnitId};
 
@@ -123,7 +124,7 @@ pub fn callback<W: QuestWorld>(
             if f.get(SLOT, bit::REWARD_GRANTED) || f.get(SLOT, bit::COMPLETED_BEFORE) {
                 set(w, p, SLOT, 10);
                 let d = w.difficulty();
-                w.character_progression(p, PROGRESSION_ACT, d);
+                raise_progression(w, p, PROGRESSION_ACT, d);
             } else if f.get(SLOT, bit::REWARD_PENDING) {
             } else if f.get(SLOT, bit::LEAVE_TOWN) {
                 late::status_silent(ctl, i, 1);
@@ -343,7 +344,7 @@ fn baal_credits<W: QuestWorld>(
             {
                 set(w, p, SLOT, bit::PRIMARY_GOAL_DONE);
                 set(w, p, SLOT, bit::REWARD_GRANTED);
-                w.character_progression(p, PROGRESSION_ACT, d);
+                raise_progression(w, p, PROGRESSION_ACT, d);
                 x(ctl, i).credited += 1;
             }
         }
@@ -360,7 +361,7 @@ fn baal_credits<W: QuestWorld>(
                 {
                     set(w, m, SLOT, bit::REWARD_GRANTED);
                     set(w, m, SLOT, bit::PRIMARY_GOAL_DONE);
-                    w.character_progression(m, PROGRESSION_ACT, d);
+                    raise_progression(w, m, PROGRESSION_ACT, d);
                 }
             }
         }

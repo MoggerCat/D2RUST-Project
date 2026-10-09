@@ -26,16 +26,16 @@
 |   2. 0x0A RemoveUnit (`0x0045CC10`) | 261–270 |
 |   3. 0x15 ReassignPlayer (`0x0045D160`) | 271–313 |
 |   4. Queued movement and action messages | 314–401 |
-|   5. Local player vitals: 0x18, 0x95, 0x96 | 402–423 |
-|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 424–454 |
-|   7. Other unit messages (general handlers, act at receive) | 455–590 |
-|   8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB) | 591–741 |
-| Constants & data dependencies | 742–753 |
-| Randomness | 754–761 |
-| Edge cases & original bugs | 762–784 |
-| Test vectors | 785–835 |
-| Provenance | 836–887 |
-| Open questions | 888–933 |
+|   5. Local player vitals: 0x18, 0x95, 0x96 | 402–432 |
+|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 433–463 |
+|   7. Other unit messages (general handlers, act at receive) | 464–599 |
+|   8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB) | 600–750 |
+| Constants & data dependencies | 751–762 |
+| Randomness | 763–770 |
+| Edge cases & original bugs | 771–793 |
+| Test vectors | 794–844 |
+| Provenance | 845–896 |
+| Open questions | 897–942 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
@@ -417,6 +417,15 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
 3. Then `check(local player, x, y, 0, tx, ty)` (`client/model.md` §6)
    with tx := (x + sdx) & 0xFFFF, ty := (y + sdy) & 0xFFFF, where sdx =
    dx − 0x100 if dx > 0x80 else dx (so 0x80 is +128), the same for dy.
+   The server sends dx = (X − path target x) & 0xFF (`combat/vitals.md`
+   §5.2, `0x00548760` at `0x0054882C`–`0x00548844`: X byte minus path
+   +0x10 byte), so (tx, ty) = 2·(x, y) − target: the path target
+   **reflected through the server point**, not the target. The client
+   adds, it does not subtract (`0x0045DC50` at `0x0045DCA7` / `0x0045DCAC`;
+   `0x0045DB20` the same); both reads 1.14d-confirmed. Effect in
+   `client/model.md` §6 r5: a local player lagging behind the server
+   point (on the side away from the target) is accepted, one ahead of it
+   toward the target is corrected.
 4. 0x18 and 0x95 only: if life ≠ 0 and the local player's mode is 0x11
    (dead): `0x00480E70` and `0x004647D0` (leave the dead mode; Phase 6
    player modes, `client/model.md` open question 1).

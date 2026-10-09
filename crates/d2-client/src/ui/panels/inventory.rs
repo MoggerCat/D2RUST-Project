@@ -271,8 +271,27 @@ impl InventoryPanel {
         gold: Option<i32>,
         out: &mut dyn UiDrawSink,
     ) {
+        self.draw_art(t, env, out);
+        self.draw_tail(t, env, gold, out);
+    }
+
+    /// The panel art alone (§9.3), drawn before the equipment slots and
+    /// the items (§9 r4, r6).
+    pub fn draw_art(&self, t: &PanelTables, env: &PanelEnv, out: &mut dyn UiDrawSink) {
         let cenv = env.cond(self.close_pressed, &no_extra);
         emit_static_draws(t, PANEL, &cenv, None, &|r| r.item.starts_with("art"), out);
+    }
+
+    /// §9 r6: after the grid and the equipped items, the gold line and
+    /// gold button, then the close button.
+    pub fn draw_tail(
+        &self,
+        t: &PanelTables,
+        env: &PanelEnv,
+        gold: Option<i32>,
+        out: &mut dyn UiDrawSink,
+    ) {
+        let cenv = env.cond(self.close_pressed, &no_extra);
         super::inv_gold::draw_inventory_gold(t, env, self.gold_pressed, gold, out);
         emit_static_draws(t, PANEL, &cenv, None, &|r| r.item == "close", out);
     }

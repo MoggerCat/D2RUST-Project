@@ -2425,6 +2425,7 @@ dependencies = [
  "d2-server",
  "d2-sim",
  "d2-verify",
+ "d2s-tool",
  "image",
  "png",
  "proptest",
@@ -2564,6 +2565,8 @@ dependencies = [
  "d2-data",
  "d2-formats",
  "d2-proto",
+ "serde_json",
+ "sha2",
  "test-fixtures",
 ]
 

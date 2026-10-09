@@ -91,9 +91,11 @@ discarded (`intents-events.md` §3.3).
 0x18 / 0x95 carry life, mana, stamina as stat total >> 8 and the client
 stores them << 8 (`combat/vitals.md` §5.4, `client/msg-units.md` §5 rule
 2). dx, dy must mean the same direction on both sides: the server's
-(X − path target) & 0xFF (`combat/vitals.md` §5.4) and the client's
-target X + sdx (`client/msg-units.md` §5 rule 3) disagree in sign; see
-open question 1.
+(X − path target) & 0xFF (`combat/vitals.md` §5.2) and the client's
+(X + sdx, Y + sdy) (`client/msg-units.md` §5 rule 3) are both the 1.14d
+reads (`0x00548760`, `0x0045DC50` / `0x0045DB20`): the client's point is
+the path target reflected through (X, Y), not the target. A round trip
+keeps dx, dy byte-exact; the client never recovers the target.
 
 ### 2.5 Join order
 
@@ -148,8 +150,5 @@ Ghidra, no recording. Every layout is the TSVs'.
 
 ## Open questions
 
-1. The sign of dx / dy in 0x18 / 0x95 / 0x96: `combat/vitals.md` §5.4
-   says the server sends X − target; `client/msg-units.md` §5 rule 3 has
-   the client rebuild the target as X + dx. One of the two specs is
-   wrong for 1.14d; settled by a Ghidra read of `0x00548760` and
-   `0x0045DB20` or a recording with a walking player.
+1. (Settled, §2.4.) The sign of dx / dy in 0x18 / 0x95 / 0x96: both
+   owner specs match 1.14d; the client point is 2·X − target.

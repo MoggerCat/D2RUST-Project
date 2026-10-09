@@ -44,15 +44,15 @@
 |   5. Client world model | 183–202 |
 |   6. Dispatch table | 203–254 |
 |   7. Bevy mirror | 255–273 |
-|   8. Frame pacing | 274–300 |
-|   9. Versioning | 301–311 |
-|   10. Client outputs (bridge → UI and audio) | 312–497 |
-| Constants & data dependencies | 498–512 |
-| Randomness | 513–516 |
-| Edge cases & original bugs | 517–525 |
-| Test vectors | 526–556 |
-| Provenance | 557–567 |
-| Open questions | 568–608 |
+|   8. Frame pacing | 274–312 |
+|   9. Versioning | 313–323 |
+|   10. Client outputs (bridge → UI and audio) | 324–510 |
+| Constants & data dependencies | 511–525 |
+| Randomness | 526–529 |
+| Edge cases & original bugs | 530–538 |
+| Test vectors | 539–569 |
+| Provenance | 570–580 |
+| Open questions | 581–621 |
 <!-- /index -->
 
 ## Summary
@@ -297,6 +297,18 @@ receive).
    1.14d drawn pass, `0x0044F28B`). A paused single-player frame (UI
    state 9 or 11 open, `0x0044EFE3`–`0x0044F029`) runs no `pump` and no
    `receive` (so no server tick, no drain) and only the fallback, once.
+   Confirmed 2026-10-09 (pc1-data Step 4 item 2): 1.14d stops the game
+   loop, and the stop is in the client loop pass itself (`0x0044EFA0`,
+   entered through the pointer set at `0x0044F566`), not in the menu
+   code: game type `[0x007A0610]` 0 or 1, `0x00453A90(9)` or
+   `0x00453A90(11)` set, a player unit (`0x00463DD0`) in a room
+   (`0x004646A0`) → update clock `[0x007A0490]` := now, the draw
+   `[0x007A0484]`(0), the sound tick `0x00482C20`, return (`0x0044F029`)
+   before `0x004519C0` and the rest of the pass. Open / multiplayer
+   games skip the check (`0x0044EFC3`).
+   ```
+   if sp && (ui(9) || ui(11)) && player && in_room(player) { clock = now(); draw(); sound_tick(); return }
+   ```
 
 ### 9. Versioning
 
@@ -494,6 +506,7 @@ model state: 1.14d's handler calls a UI or sound function directly
 | `ObjectSound` | the call (mode sound: unit key, set S or C, class, mode; request: id, unit; player event: player key, event) | update | audio | `world/objects-client.md` §25 r2, §26, §28 r3; `client/model.md` §8 rule 7 |
 | `ObjectFx` | the call (graphics refresh, graphics load, overlay create / remove, object light, client skill start) with the values read | update | effects | `world/objects-client.md` §26, §28 r3; `render/overlay.md` §5; `render/lighting.md` open question 11 |
 | `HoradricItem` | item code 4 bytes | 0x9C (actions 0x04, 0x0B, 0x0C; 0x15 with header mode 0: an `hst ` / `qf2 ` placed in the local player's page 3) | UI | `ui/panels-2.md` §20 r7 |
+| `MissileSound` | the call (request: sound id, missile key; owner group stop: owner key, sound id 314; travel detach: missile key, sound id) | update | audio | `missiles/client.md` §C4 r28, §C9 r4.4, r6; `audio/triggers.md` §8 r3 |
 
 ## Constants & data dependencies
 

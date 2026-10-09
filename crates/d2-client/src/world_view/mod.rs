@@ -346,6 +346,18 @@ pub trait ViewRules {
         Ok(true)
     }
 
+    /// `render/blend-modes.md` §5 r3 revision: whether the shadow of
+    /// `unit` passes its own pre-test (the sheared box). The default (no
+    /// camera) passes every unit.
+    fn unit_shadow_box_visible(
+        &self,
+        _unit: &ClientUnit,
+        _pose: &UnitPose,
+        _cof: &Cof,
+    ) -> Result<bool, ViewError> {
+        Ok(true)
+    }
+
     /// The unit's shadow draws (`render/blend-modes.md` §5 r1–r3), keyed
     /// at the shadow pass slot `at` (`draw-order.md` §6 r3; `None` until
     /// `OriginalView` fills it from the frame's draw order), from the
@@ -630,7 +642,12 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
             .cofs
             .get(&pose.cof)
             .ok_or_else(|| ViewError::CofMissing(pose.cof.clone()))?;
-        if !rules.unit_box_visible(unit, &pose, cof)? {
+        // `blend-modes.md` §5 r3 revision (PROVISIONAL, REC-511): the
+        // body's COF box pre-test does not cull the unit's shadow.
+        let body = rules.unit_box_visible(unit, &pose, cof)?;
+        let shadow_ok = rules.unit_shadow_box_visible(unit, &pose, cof)?;
+        let shadow_at = rules.unit_shadow_key(unit).filter(|_| shadow_ok);
+        if !body && shadow_at.is_none() {
             units_hidden += 1;
             continue;
         }
@@ -654,11 +671,16 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
             guid: unit.key.guid,
             error,
         })?;
-        let shadows = rules.unit_shadows(world, unit, &pose, None, &draws, assets)?;
-        items.extend(draws.into_iter().map(|d| d.item));
+        let shadows = if shadow_ok {
+            rules.unit_shadows(world, unit, &pose, None, &draws, assets)?
+        } else {
+            Vec::new()
+        };
+        if body {
+            items.extend(draws.into_iter().map(|d| d.item));
+        }
         items.extend(shadows);
         unit_dirs.insert(unit.key.guid, pose.dir64);
-        let shadow_at = rules.unit_shadow_key(unit);
         for c in rules.unit_slot_calls(unit, &pose, cof)? {
             let call = |pass, major, minor, shadow| -> Result<UnitCall, ViewError> {
                 Ok(UnitCall {
@@ -670,12 +692,18 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
                     shadow,
                 })
             };
-            unit_calls.push(call(params.pass, params.major, params.minor, false)?);
+            if body {
+                unit_calls.push(call(params.pass, params.major, params.minor, false)?);
+            }
             if let (Some(at), true) = (shadow_at, cof.layers[c.layer].shadow != 0) {
                 unit_calls.push(call(at.pass, at.major, at.minor, true)?);
             }
         }
-        units_drawn += 1;
+        if body {
+            units_drawn += 1;
+        } else {
+            units_hidden += 1;
+        }
     }
 
     ui_bind::ui_items(ui, rules, assets, &mut items)?;

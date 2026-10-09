@@ -24,15 +24,15 @@
 | Outputs / state changes | 63–69 |
 | Rules | 70–71 |
 |   1. Files | 72–81 |
-|   2. Script syntax | 82–175 |
-|   3. Typed messages and references | 176–231 |
-|   4. Run model | 232–290 |
-|   5. Comparison | 291–321 |
-|   6. Masks | 322–356 |
-| Edge cases & original bugs | 357–368 |
-| Test vectors | 369–384 |
-| Provenance | 385–394 |
-| Open questions | 395–430 |
+|   2. Script syntax | 82–180 |
+|   3. Typed messages and references | 181–236 |
+|   4. Run model | 237–295 |
+|   5. Comparison | 296–326 |
+|   6. Masks | 327–361 |
+| Edge cases & original bugs | 362–373 |
+| Test vectors | 374–389 |
+| Provenance | 390–399 |
+| Open questions | 400–439 |
 <!-- /index -->
 
 ## Summary
@@ -104,7 +104,7 @@ except the cited masks (§6); what the original-side runner needs from
    hex digits) and hex steps (two lower-case hex digits per byte).
    Parsing the canonical form gives the same scenario.
 
-Header (each line once, all required):
+Header (each line once, all required except `variant`):
 
 | Line | Meaning |
 |---|---|
@@ -115,6 +115,7 @@ Header (each line once, all required):
 | `difficulty normal\|nightmare\|hell` | game difficulty |
 | `expansion yes\|no` | LoD game |
 | `end <tick>` | last tick run, 0 ≤ tick ≤ 1,000,000 |
+| `variant <name>` | optional: the test variant install both sides run on (`tools/test-variants.md` §4 rule 3); absent = the base install |
 
 Character: `char save <name>` and/or inline `char` lines; at least
 one. `<name>` is a character name (2–15 letters, `_` or `-`, starting
@@ -122,7 +123,10 @@ with a letter): the save `<save dir><name>.d2s` the original side loads
 (original-hooks §5.3–§5.4). Inline lines describe the same character
 for a runner without a save loader (d2rs, until `formats/d2s.md`
 exists); that they match the save is the script author's claim, which
-a run checks only through the comparison.
+a run checks only through the comparison. The d2rs runner given
+`--save-dir DIR` (2026-10-09) also loads `DIR/<name>.d2s` after the
+inline set-up (`formats/d2s-load.md` through `d2-server`'s `load_save`);
+each load step its host cannot apply is written as a gap.
 
 | Line | Once | Default | Meaning |
 |---|---|---|---|
@@ -172,6 +176,7 @@ Steps:
 | `at <tick> hex <byte>...` | a raw C→S message: 1 to 516 bytes, two hex digits each |
 | `at <tick> msg <Name> <field>=<value>...` | a typed C→S message (§3) |
 | `at <tick> spawn <class> <x> <y> <kind> [umod <id>...]` | a monster spawned by the server (§3.1) |
+| `at <tick> poke <directive> <arg>...` | a state change made directly, not through a message (`tools/poke.md` §1, §3) |
 
 ### 3. Typed messages and references
 
@@ -299,8 +304,8 @@ so in its trace header's `gaps` (FORMAT.md) instead of approximating.
    `rng-draws` when both list it. A requested stream missing on a side
    is reported as not compared.
 3. **Order.** Tick by tick from 0; within a tick the streams in the
-   order `c2s`, `spawn`, `s2c`, `rng`, `draw`, `unit`, `stats` (`spawn`
-   belongs to the `c2s` stream); within a stream
+   order `c2s`, `spawn`, `poke`, `s2c`, `rng`, `draw`, `unit`, `stats`
+   (`spawn` and `poke` belong to the `c2s` stream); within a stream
    record by record. The first difference ends the comparison.
 4. **Records.** A record present on one side only is a difference
    (`missing` / `extra`). `s2c`: client, then length, then the bytes
@@ -420,10 +425,14 @@ rule 5, §3), game type 3 (§5.2), the unit snapshot fields (§4). Open:
    from the save (`char save`, original-hooks §5.3: class, act,
    progression, quest and waypoint flags, items all come from the
    `.d2s`; the 0x67 message carries none of them). `d2s-tool` writes
-   quest flags (`--quests`), waypoints, stats, skills and normal
-   identified items only (`--item CODE`); items of another quality,
-   affixes, unique / set / runeword ids and sockets need an item writer
-   for `items/bitstream.md` (tool gap). Until then `char item` lines
-   other than normal items are a gap on the original side.
+   quest flags (`--quests`), waypoints, stats, skills and items
+   (`--item CODE[#Q][@X,Y][:PAGE][/q=QUALITY/idx=ROW/ilvl=N/sock=N/unid/eth/body=L/belt=S]`,
+   2026-10-09: qualities by the creation's own draws, a forced set /
+   unique row, unidentified, sockets up to `gemsockets`, equipped and
+   belt placement; checked byte for byte against a 1.14d re-save,
+   `facts/saves/gear-roundtrip.tsv`). Still a gap: chosen affixes,
+   runewords and socket fillers (children), so `char item` lines with
+   `prefix`, `suffix`, `runeword` or a `socket` place are a gap on the
+   original side.
 4. *Answered*: original-hooks §4 rule 5 (base array: list +0x24, count
    +0x28, for plain and extended lists).

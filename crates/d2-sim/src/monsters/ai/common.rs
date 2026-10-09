@@ -252,7 +252,7 @@ pub(super) fn radius<W: AiHost + ?Sized>(
     b: i32,
 ) -> bool {
     let t = t.expect("walk in radius of target 0 (ai.md §2.3)");
-    cx.world.walk_in_radius(game, u, t, a, b)
+    walk_in_radius(game, cx, u, t, a, b)
 }
 
 /// The pack scan (`ai-bodies-2.md` §2, scan 1, callback `0x005B0D00`):

@@ -40,8 +40,9 @@ use d2_server::transport::{Classified, Queue, ServerQueues};
 use d2_sim::combat::vitals::init_player_stats;
 use d2_sim::drlg::{act_of_level, DrlgError};
 use d2_sim::game::Game;
-use d2_sim::monsters::init::{self, GameInfo, InitHost};
-use d2_sim::monsters::population::{placement, spawn as pop_spawn};
+use d2_sim::items::ItemTables;
+use d2_sim::monsters::init::GameInfo;
+use d2_sim::poke;
 use d2_sim::rng::Seed;
 use d2_sim::skills::SkillEntry;
 use d2_sim::stats::lists::NoHost;
@@ -98,6 +99,11 @@ pub enum DataKind {
 pub struct Data {
     pub game: GameData,
     pub kind: DataKind,
+    /// `--save-dir`: the folder holding `char save <name>.d2s`. When the
+    /// file is there the d2rs side loads it too (`d2-server` `load_save`),
+    /// so both sides start from the same save; else the inline `char`
+    /// lines stand for it.
+    pub save_dir: Option<std::path::PathBuf>,
 }
 
 impl Data {
@@ -108,6 +114,7 @@ impl Data {
         Ok(Self {
             game: GameData::from_install(&i).map_err(|e| RunError::Data(e.to_string()))?,
             kind: DataKind::Synthetic,
+            save_dir: None,
         })
     }
 
@@ -120,6 +127,7 @@ impl Data {
         Ok(Self {
             game: GameData::load(bins, &set).map_err(|e| data(e.to_string()))?,
             kind: DataKind::Live,
+            save_dir: None,
         })
     }
 
@@ -188,6 +196,9 @@ struct Built {
     server: DispatchServer<Sim, ProtoSizes, NoSession>,
     player: UnitId,
     waypoint_classes: BTreeSet<u32>,
+    /// The item tables `poke item` creates from (`None`: they did not
+    /// load; the poke is then a gap).
+    items: Result<ItemTables, String>,
     gaps: Vec<String>,
 }
 
@@ -510,7 +521,8 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
             c.quests.len()
         ));
     }
-    if !c.items.is_empty() {
+    let save_loaded = matches!((&data.save_dir, &s.save), (Some(d), Some(n)) if d.join(format!("{n}.d2s")).is_file());
+    if !c.items.is_empty() && !save_loaded {
         gaps.push(format!(
             "char item: {} item(s) not created (TODO(spec: item creation from a code and inventory placement))",
             c.items.len()
@@ -541,6 +553,16 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
             data: Some(PlayerData { last_accept: 0 }),
         },
     );
+    // `char save` with `--save-dir`: the save's own load on the action
+    // wiring (character stats, skills, items), as the original side.
+    if let (Some(dir), Some(name)) = (&data.save_dir, &s.save) {
+        let path = dir.join(format!("{name}.d2s"));
+        if path.is_file() {
+            load_char_save(&mut g, player, &path, s, &data.game, &mut gaps)?;
+        } else {
+            gaps.push(format!("char save {name}: {} not found", path.display()));
+        }
+    }
     for (unit, x, y) in placed {
         g.set_unit(
             unit,
@@ -555,59 +577,77 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
         server: DispatchServer::new(g, ProtoSizes, NoSession),
         player,
         waypoint_classes,
+        items: ItemTables::from_fixed(&d.fixed).map_err(|e| e.to_string()),
         gaps,
     })
 }
 
-/// A spawn step (`scenario.md` §3.1 rule 2) at (x, y); the GUID of the
-/// unit the first call returned.
-fn spawn(sim: &mut Sim, sp: &Spawn, x: i32, y: i32) -> Option<u32> {
-    let game = &mut sim.game;
-    let ev = &mut sim.events;
-    // The active room that holds the point.
-    let room = game.lists.active_rooms(0).into_iter().find(|&r| {
-        ev.action
-            .sys
-            .hooks
-            .drlg
-            .subtiles(game, r)
-            .is_some_and(|s| x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h)
-    })?;
-    let class = i32::try_from(sp.class).ok()?;
-    let unit = match sp.kind {
-        SpawnKind::Normal => ev.population(game, |cx| {
-            placement::place_at(cx, room, None, x, y, class, 1, -1, 0).unit()
-        })?,
-        SpawnKind::RandomBoss => ev.population(game, |cx| {
-            let b = pop_spawn::random_boss(cx, room, None, class, true, x, y, false)?;
-            pop_spawn::champion_minions(cx, None, b, class);
-            Some(b)
-        })?,
-        SpawnKind::Champion => {
-            let b = ev.population(game, |cx| {
-                pop_spawn::boss_spawn(cx, room, None, x, y, None, class, false)
-            })?;
-            let umod = sp.umods[0];
-            ev.init(game, |cx, h| init::champion_pack_member(cx, h, b, umod));
-            ev.population(game, |cx| pop_spawn::champion_minions(cx, None, b, class));
-            b
-        }
-        SpawnKind::Unique => {
-            let b = ev.population(game, |cx| {
-                pop_spawn::boss_spawn(cx, room, None, x, y, None, class, false)
-            })?;
-            ev.init(game, |_, h| {
-                for &u in &sp.umods {
-                    h.monsters().entry(b).push_umod(u);
-                }
-            });
-            ev.population(game, |cx| {
-                pop_spawn::boss_minions_and_init(cx, b, 3, 6, None)
-            });
-            b
-        }
+/// Loads `path` (`formats/d2s.md`, `d2s::read` with the scenario's game)
+/// onto `player` through `d2_server::adapters::session::load_save`; each
+/// step the scenario host has no provider for is a gap.
+fn load_char_save(
+    g: &mut Sim,
+    player: UnitId,
+    path: &Path,
+    s: &Scenario,
+    game: &GameData,
+    gaps: &mut Vec<String>,
+) -> Result<(), RunError> {
+    use d2_formats::d2s;
+    let bad = |e: String| RunError::Data(format!("{}: {e}", path.display()));
+    let bytes = std::fs::read(path).map_err(|e| bad(e.to_string()))?;
+    let expansion = s.expansion;
+    let tables = d2_server::world_data::tables::SaveData::from_fixed(&game.fixed, expansion)
+        .map_err(|e| bad(e.to_string()))?;
+    let name: Vec<u8> = bytes
+        .get(0x14..0x24)
+        .map(|n| n.iter().copied().take_while(|&c| c != 0).collect())
+        .unwrap_or_default();
+    let opts = d2s::ReadOptions {
+        expansion,
+        game: Some(d2s::GameContext {
+            client_name: name,
+            expansion,
+            hardcore: bytes.get(0x24).is_some_and(|b| b & 0x04 != 0),
+            difficulty: s.difficulty.index(),
+        }),
     };
-    game.lists.unit(unit).map(|e| e.guid)
+    let save = d2s::read(&bytes, &opts, &tables).map_err(|e| bad(format!("{e:?}")))?;
+    let ctx = d2_server::adapters::character::LoadContext {
+        difficulty: s.difficulty.index(),
+        map_seed_applies: false,
+    };
+    let (_, report) = d2_server::adapters::session::load_save(g, player, &save, &ctx)
+        .map_err(|e| bad(format!("load: {e:?}")))?;
+    for u in report.unapplied {
+        gaps.push(format!(
+            "char save: load step {:?} not applied (no provider in the scenario host)",
+            u.step
+        ));
+    }
+    Ok(())
+}
+
+/// A spawn step (`scenario.md` §3.1 rule 2) at (x, y) in act 0; the
+/// GUID of the unit the first call returned (`d2_sim::poke::spawn_monster`).
+fn spawn(sim: &mut Sim, sp: &Spawn, x: i32, y: i32) -> Option<u32> {
+    let kind = match sp.kind {
+        SpawnKind::Normal => poke::SpawnKind::Normal,
+        SpawnKind::RandomBoss => poke::SpawnKind::RandomBoss,
+        SpawnKind::Champion => poke::SpawnKind::Champion,
+        SpawnKind::Unique => poke::SpawnKind::Unique,
+    };
+    let unit = poke::spawn_monster(
+        &mut sim.game,
+        &mut sim.events,
+        0,
+        sp.class,
+        x,
+        y,
+        kind,
+        &sp.umods,
+    )?;
+    sim.game.lists.unit(unit).map(|e| e.guid)
 }
 
 /// The raw value of (stat, layer 0) in the unit's full stat array, 0
@@ -655,6 +695,7 @@ pub fn run(s: &Scenario, data: &Data) -> Result<RunOutput, RunError> {
         mut server,
         player,
         waypoint_classes,
+        items,
         mut gaps,
     } = build(s, data)?;
     let mut notes = Vec::new();
@@ -676,9 +717,11 @@ pub fn run(s: &Scenario, data: &Data) -> Result<RunOutput, RunError> {
         [g.lo, g.hi]
     };
     for t in 0..=s.end {
-        // (a) Resolve and inject the steps of tick t; spawns run here.
+        // (a) Resolve and inject the steps of tick t; spawns and pokes
+        // run here, in script order (`poke.md` §3 rule 1).
         let before = seed(&server);
         let mut i = 0;
+        let mut step_records = Vec::new();
         while let Some(step) = steps.next_if(|st| st.tick == t) {
             let view = View {
                 sim: &server.game,
@@ -702,7 +745,44 @@ pub fn run(s: &Scenario, data: &Data) -> Result<RunOutput, RunError> {
                         Err(u.reference)
                     }
                 };
-                records.push(Record::Spawn { t, i, guid });
+                step_records.push(Record::Spawn { t, i, guid });
+                i += 1;
+                continue;
+            }
+            if let StepMsg::Poke(d) = &step.msg {
+                let env = poke::Env {
+                    player,
+                    waypoint_classes: &waypoint_classes,
+                    items: items.as_ref().ok(),
+                };
+                let g = &mut server.game;
+                let r = poke::apply(&mut g.game, &mut g.events, &env, d);
+                match &r {
+                    poke::PokeResult::Ok(_) => {}
+                    poke::PokeResult::Failed => {
+                        notes.push(format!("tick {t} step {i}: poke {d}: failed"))
+                    }
+                    poke::PokeResult::Unresolved(u) => {
+                        notes.push(format!("tick {t} step {i}: poke {d}: unresolved {u}"))
+                    }
+                    poke::PokeResult::Gap(why) => {
+                        let why = match (d, &items) {
+                            (poke::Directive::Item { .. }, Err(e)) => {
+                                format!("{why} (item tables: {e})")
+                            }
+                            _ => why.clone(),
+                        };
+                        notes.push(format!("tick {t} step {i}: poke {d}: gap: {why}"));
+                        gaps.push(format!("poke {} at {t}", d.keyword()));
+                    }
+                }
+                step_records.push(Record::Poke {
+                    t,
+                    i,
+                    d: d.keyword().into(),
+                    r: r.code().into(),
+                    guid: r.guid(),
+                });
                 i += 1;
                 continue;
             }
@@ -715,7 +795,7 @@ pub fn run(s: &Scenario, data: &Data) -> Result<RunOutput, RunError> {
                         )),
                         Err(e) => notes.push(format!("tick {t} step {i}: {e}")),
                     }
-                    records.push(Record::C2s {
+                    step_records.push(Record::C2s {
                         t,
                         i,
                         bytes: Ok(bytes),
@@ -723,7 +803,7 @@ pub fn run(s: &Scenario, data: &Data) -> Result<RunOutput, RunError> {
                 }
                 Err(u) => {
                     notes.push(format!("tick {t} step {i}: unresolved: {}", u.why));
-                    records.push(Record::C2s {
+                    step_records.push(Record::C2s {
                         t,
                         i,
                         bytes: Err(u.reference),
@@ -732,6 +812,10 @@ pub fn run(s: &Scenario, data: &Data) -> Result<RunOutput, RunError> {
             }
             i += 1;
         }
+        // Within a tick the records go `c2s`, `spawn`, `poke`
+        // (FORMAT.md; `scenario.md` §5 rule 3), each in step order.
+        step_records.sort_by_key(Record::order);
+        records.extend(step_records);
         // The dispatcher's range checks read the staged unit facts
         // (`SimGame::set_unit`, `intents-events.md` §2.4 rules 3–4):
         // staged from the sim's own units before the drain, as

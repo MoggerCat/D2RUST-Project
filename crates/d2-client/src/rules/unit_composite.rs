@@ -646,6 +646,19 @@ pub fn cof_box_visible(cof: &Cof, x: i32, y: i32, w: u32, h: u32) -> bool {
         && i64::from(cof.y_min) + y < h - 1
 }
 
+/// `blend-modes.md` §5 r3 revision (PROVISIONAL, REC-511): the §4 test
+/// on the sheared shadow box at the shadow position (`x`, `y`): `d` rows
+/// of `⌊(y_max − y_min) / 2⌋`, each one pixel left of the one below.
+pub fn shadow_box_visible(cof: &Cof, x: i32, y: i32, w: u32, h: u32) -> bool {
+    let (x, y) = (i64::from(x), i64::from(y));
+    let (w, h) = (i64::from(w), i64::from(h));
+    let d = (i64::from(cof.y_max) - i64::from(cof.y_min)) / 2;
+    i64::from(cof.x_min) - d + x < w - 1
+        && i64::from(cof.x_max) + x >= 0
+        && i64::from(cof.y_max) + y >= 0
+        && i64::from(cof.y_max) - d + y < h - 1
+}
+
 // ---------------------------------------------------------------------------
 // §5.1 component request, §6 file.
 
@@ -1105,6 +1118,7 @@ pub mod motion {
     pub const DONE: i32 = 1;
     pub const TIMED: i32 = 2;
     pub const BOUNCE: i32 = 4;
+    pub const RESTARTED: i32 = 8;
     pub const FOLLOW: i32 = 0x10;
     pub const FROM_BELOW: i32 = 0x20;
 }
@@ -1242,6 +1256,45 @@ impl MotionRecord {
             (self.pos[2] >> 11).wrapping_neg(),
         ];
         Ok(())
+    }
+
+    /// Restart `0x004DA690`: clears flag 1, sets flag 8 (§8).
+    pub fn restart(&mut self) {
+        self.flags = (self.flags & !motion::DONE) | motion::RESTARTED;
+    }
+
+    /// Done `0x004DA640`: sets flag 1 (§8).
+    pub fn done(&mut self) {
+        self.flags |= motion::DONE;
+    }
+
+    /// `0x004DA6B0` (§8): "still moving" unless flag 1 is set and flag 8
+    /// clear.
+    pub fn moving(&self) -> bool {
+        !(self.flags & motion::DONE != 0 && self.flags & motion::RESTARTED == 0)
+    }
+
+    /// Timed arc `0x004DA5B0(h, n)` (§8): flag 2, ticks := max(n, 1), x =
+    /// y = 0, z := h ≪, vx = vy = 0, az := −0x1000 when 0, vz := (−h·2048
+    /// − az·n²/2) / n (C division).
+    ///
+    /// PROVISIONAL (REC-540; `missiles/client.md` Open question 9): "flag
+    /// 2" is read as flags := 2 (the arc drops flag 8, so a landed arc reports
+    /// "not moving", `missiles/client.md` §C7 r3); n in the division is
+    /// max(n, 1); az·n² is divided by 2 before the subtraction.
+    pub fn timed_arc(&mut self, h: i32, n: i32) {
+        let n = n.max(1);
+        self.flags = motion::TIMED;
+        self.ticks_left = n;
+        self.pos = [0, 0, h.wrapping_shl(11)];
+        self.vel[0] = 0;
+        self.vel[1] = 0;
+        if self.acc[2] == 0 {
+            self.acc[2] = -0x1000;
+        }
+        let az = self.acc[2];
+        let fall = az.wrapping_mul(n).wrapping_mul(n) / 2;
+        self.vel[2] = h.wrapping_mul(-2048).wrapping_sub(fall) / n;
     }
 
     /// The draw's addition `(ox, oy + oz)` (§8).

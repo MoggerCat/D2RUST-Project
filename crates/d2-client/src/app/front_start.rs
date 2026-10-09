@@ -60,11 +60,11 @@ pub fn registry(save_dir: &Path, handles: &StartHandles) -> Registry {
 pub enum Entry {
     /// The first entry of the process: start-up chain and trademark (C1).
     First,
-    /// A later entry: the main menu.
+    /// A later entry, and back from a game (Save and Exit, or its window
+    /// closed): the main menu, with no start-up chain or trademark
+    /// (§F1.3 "in game" row; recorded under Wine, REC-200, q-fix-real-
+    /// exit-target).
     MainMenu,
-    /// Back from a game (Save and Exit, or its window closed): character
-    /// select (§F1.3 "in game" row, PROVISIONAL REC-200).
-    AfterGame,
 }
 
 /// The front-end host `play` runs: every screen wired to `save_dir`
@@ -87,11 +87,8 @@ pub fn front_host(
         Box::new(DirSaves(save_dir.to_path_buf())),
         reg,
     );
-    let mut host = FrontHost::with_front(front, art, entry == Entry::First)
+    let host = FrontHost::with_front(front, art, entry == Entry::First)
         .with_stub_writer(handles.created.clone(), save_dir.to_path_buf());
-    if entry == Entry::AfterGame {
-        host.front.trigger(crate::ui::front_end::Trigger::GameExit);
-    }
     (host, handles)
 }
 

@@ -16,8 +16,8 @@ use super::{
 use crate::rng::Seed;
 use crate::units::{RoomId, UnitId};
 use crate::world::quests::{
-    bit, event, flags_of, npc, EventArgs, QuestControl, QuestError, QuestFlags, QuestWorld,
-    TextList,
+    bit, event, flags_of, npc, raise_progression, EventArgs, QuestControl, QuestError, QuestFlags,
+    QuestWorld, TextList,
 };
 
 const CHAIN: u8 = 13;
@@ -832,7 +832,7 @@ fn portal_grant<W: QuestWorld>(w: &mut W, p: UnitId) {
     set_bit(w, p, SLOT, bit::PRIMARY_GOAL_DONE);
     set_bit(w, p, SLOT, bit::LEAVE_TOWN);
     let d = w.difficulty();
-    w.character_progression(p, PROGRESSION_STEP, d);
+    raise_progression(w, p, PROGRESSION_STEP, d);
 }
 
 /// `0x0059C9F0`: players lacking 14.0, 14.3, 14.4 get 14.14 and

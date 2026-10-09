@@ -1189,8 +1189,7 @@ impl<X: Pending> ChestWorld for ObjectView<'_, X> {
         self.v.h.object_drops = Some(d);
         out
     }
-    /// `0x00585970(game, object, code, 0)` ([`drop_helpers::code_drop`],
-    /// PROVISIONAL there).
+    /// `0x00585970(game, object, code, 0)` ([`drop_helpers::code_drop`], §20.7).
     fn code_drop(&mut self, object: UnitId, code: u32) -> Option<UnitId> {
         self.with_drops(|h, sim, d, levels, spots| {
             drop_helpers::code_drop(h, sim, d, levels, spots, object, code, 0)

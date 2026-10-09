@@ -160,6 +160,10 @@ pub struct ItemsUi {
     /// item never lifts it (`inventory.md` §10 r3.3; the sell itself is
     /// the shop panel's).
     pub ctrl: bool,
+    /// The GUID of the open store's NPC (`vendors.md` §7.2 rule 2; set by
+    /// the shop when it opens, cleared when it closes): a Ctrl-click on a
+    /// grid item sells it to this NPC (0x33, `inventory.md` §10 r3.3).
+    pub store_npc: Option<u32>,
     /// The item tool tips' data (`inv_items_tip`); none: no tips.
     pub tips: Option<super::super::item_tip::ItemTips>,
     /// The inventory tables of the equip check (`items/inventory.md`
@@ -292,28 +296,60 @@ impl ItemsUi {
         layout: &InvLayout,
         out: &mut dyn UiDrawSink,
     ) {
+        for it in items::local_items(world) {
+            if let Some(d) = self.item_draw(world, files, layout, &it) {
+                out.push(d);
+            }
+        }
+    }
+
+    /// `inventory.md` §3 r2–r3, §6: per item, its tints then its graphic
+    /// (`a1-panel-cube` rows 25–40: four cell boxes, the cube; four, the
+    /// cap; ...), grid items and equipped items in the list order.
+    pub fn draw_items(
+        &self,
+        world: &ClientWorld,
+        files: &UiFiles,
+        layout: &InvLayout,
+        mouse: Point,
+        out: &mut dyn UiDrawSink,
+    ) {
+        for it in items::local_items(world) {
+            for d in self.item_tints(world, layout, mouse, &it) {
+                out.push(d);
+            }
+            if let Some(d) = self.item_draw(world, files, layout, &it) {
+                out.push(d);
+            }
+        }
+    }
+
+    /// One item's graphic in the panel (§3 r1, §6 r2, §8 r4).
+    fn item_draw(
+        &self,
+        world: &ClientWorld,
+        files: &UiFiles,
+        layout: &InvLayout,
+        it: &ItemView,
+    ) -> Option<UiDraw> {
         let g = &layout.grid;
         let cell = (i32::from(g.cell_w), i32::from(g.cell_h));
-        for it in items::local_items(world) {
-            let Some(a) = self.art(files, &it, cell) else {
-                continue;
-            };
-            let top_left = match it.mode {
-                mode::STORED if it.page == 0 => {
-                    let (x, y, _, _) = g.cell(i32::from(it.x), i32::from(it.y));
-                    Point::new(x, y)
+        let a = self.art(files, it, cell)?;
+        let top_left = match it.mode {
+            mode::STORED if it.page == 0 => {
+                let (x, y, _, _) = g.cell(i32::from(it.x), i32::from(it.y));
+                Point::new(x, y)
+            }
+            mode::BODY if (1..=10).contains(&it.body) => {
+                let b = layout.equip[usize::from(it.body)];
+                if b.w == 0 || b.h == 0 {
+                    return None;
                 }
-                mode::BODY if (1..=10).contains(&it.body) => {
-                    let b = layout.equip[usize::from(it.body)];
-                    if b.w == 0 || b.h == 0 {
-                        continue;
-                    }
-                    equip_draw_point(it.body, b, cell, (a.w, a.h), false)
-                }
-                _ => continue,
-            };
-            out.push(self.item_cel(world, &it, a.file, top_left.x, top_left.y + a.gh));
-        }
+                equip_draw_point(it.body, b, cell, (a.w, a.h), false)
+            }
+            _ => return None,
+        };
+        Some(self.item_cel(world, it, a.file, top_left.x, top_left.y + a.gh))
     }
 
     /// An item's graphic with its frame's top-left at (`left`, `top`)
@@ -542,7 +578,9 @@ impl ItemsUi {
             book_kind: tips
                 .zip(stream_of(i))
                 .and_then(|(t, s)| facts::book_kind(t, s)),
-            sellable: false,
+            sellable: tips
+                .zip(i.code)
+                .is_some_and(|(t, code)| facts::GridInfo::sellable(t, code)),
             fits_belt: fits_belt(&self.art, i.code),
         };
         // The cube's grid (`inventory.bin` record 9: 3 x 4) and what lies
@@ -628,7 +666,7 @@ impl ItemsUi {
             page,
             shift: self.shift,
             ctrl: self.ctrl,
-            store_open: false,
+            store_open: self.store_npc.is_some(),
             overlap_item: overlap.first().map(|i| iref(i)),
             overlap_count: overlap.len() as u32,
             cube_under_footprint: overlap
@@ -683,8 +721,22 @@ impl ItemsUi {
                     cube,
                 }))
             }
-            // The sell needs the open store's NPC (`vendors.md` §8): the
-            // shop panel's own sell stays the way to sell.
+            // `inventory.md` §10 r3.3: 0x33 with the open store's NPC, the
+            // item's mode and the price the client shows (not read by the
+            // server, `vendors.md` §7.2; d2rs-own: 0).
+            GridMsg::Sell { item } => {
+                let npc = self.store_npc?;
+                let item_mode = all
+                    .iter()
+                    .find(|i| i.key.guid == item)
+                    .map_or(0, |i| u16::from(i.mode));
+                Some(ClientIntent::from_message(&d2_proto::client::SellItem {
+                    npc,
+                    item,
+                    item_mode,
+                    client_price: 0,
+                }))
+            }
             _ => None,
         }
     }

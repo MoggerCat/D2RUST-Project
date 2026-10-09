@@ -768,23 +768,54 @@ fn life_mana_update_0x18_one_layout() {
 
 // Covers: specs/combat/vitals.md §5.2; specs/client/msg-units.md §5 r3; specs/client/model.md §6 r5
 #[test]
-#[ignore = "q-fix-proto-vitals-dx-sign: vitals.md §5.2 sends dx = X − target, msg-units.md §5 r3 reads target = X + dx"]
-fn life_mana_update_0x18_dx_is_the_path_target_offset() {
-    // The local player (mode 1) is at (100, 100); the server's point is
-    // (104, 100), 4 sub-tiles off (past the tolerance), and its path
-    // target is (100, 100): the client stands on the target, so the
-    // check (model.md §6 r5, d2 < d1) keeps its position. dx per the
-    // producer (`vitals.md` §5.2, `wiring/action/vitals_sync.rs`):
-    // (X − target) & 0xFF = 4; the client reads target := X + dx = 108
-    // and corrects instead.
+fn life_mana_update_0x18_dx_mirrors_the_path_target() {
+    // 1.14d by design (`client/msg-units.md` §5 r3, `seams/messages.md`
+    // §2.4): the server sends dx = (X - target) & 0xFF and the client
+    // forms the check point X + dx, the target reflected through the
+    // server point.
+    let dx_of = |x: u16, t: u16| x.wrapping_sub(t) as u8;
+    // (a) The local player (mode 1) at (100, 100); the server's point
+    // (104, 100) is past the tolerance, its target (100, 100): dx 4,
+    // point (108, 100), d2 >= d1 -> corrected (the 0x5F goes out).
     let mut r = Rig::new();
     let k = r.local(1);
-    let u = r.m.w.units.get_mut(&k).unwrap();
-    u.position = Some((100, 100));
+    r.m.w.units.get_mut(&k).unwrap().position = Some((100, 100));
     let (x, y, tx, ty) = (104u16, 100u16, 100u16, 100u16);
-    let dx = x.wrapping_sub(tx) as u8;
-    let dy = y.wrapping_sub(ty) as u8;
-    r.recv(&life_mana_update(0x40, 0x40, 0x40, 1, 1, x, y, dx, dy));
+    assert_eq!(dx_of(x, tx), 4);
+    r.recv(&life_mana_update(
+        0x40,
+        0x40,
+        0x40,
+        1,
+        1,
+        x,
+        y,
+        dx_of(x, tx),
+        dx_of(y, ty),
+    ));
+    assert!(
+        r.m.w.outgoing.iter().any(|m| m.first() == Some(&0x5F)),
+        "{:02x?}",
+        r.m.w.outgoing
+    );
+    // (b) Server (96, 100), target (90, 100): dx 6, point (102, 100),
+    // d2 < d1 -> the position is kept (nothing goes out).
+    let mut r = Rig::new();
+    let k = r.local(1);
+    r.m.w.units.get_mut(&k).unwrap().position = Some((100, 100));
+    let (x, y, tx, ty) = (96u16, 100u16, 90u16, 100u16);
+    assert_eq!(dx_of(x, tx), 6);
+    r.recv(&life_mana_update(
+        0x40,
+        0x40,
+        0x40,
+        1,
+        1,
+        x,
+        y,
+        dx_of(x, tx),
+        dx_of(y, ty),
+    ));
     assert!(r.m.w.outgoing.is_empty(), "{:02x?}", r.m.w.outgoing);
 }
 

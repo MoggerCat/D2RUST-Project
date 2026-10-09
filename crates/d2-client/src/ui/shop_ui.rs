@@ -506,6 +506,13 @@ fn item_name(sh: &super::Shared, world: &ClientWorld, it: &ItemView) -> Option<V
 }
 
 impl Panel for ShopUi {
+    /// `ui/panels.md` §9 r1 revision: drawn before the inventory.
+    fn draw_before(&self) -> Option<PanelId> {
+        Some(PanelId(u16::from(
+            crate::ui::panels::inventory::UI_INVENTORY,
+        )))
+    }
+
     fn id(&self) -> PanelId {
         PanelId(u16::from(UI_SHOP))
     }
@@ -742,6 +749,7 @@ impl OriginalUi {
         // it draws the inventory family itself (ui 1 stays off, ui 8 on).
         // d2rs-own: a refused open (the gate) leaves the shop state up
         // and `shop_poll` closes it again.
+        self.shared.borrow_mut().items.store_npc = Some(npc_guid);
         let _ = self.set_ui(u32::from(id::NPC_SHOP), 0, false);
     }
 
@@ -896,6 +904,7 @@ impl OriginalUi {
             {
                 let mut st = self.shop.borrow_mut();
                 st.open = None;
+                self.shared.borrow_mut().items.store_npc = None;
                 st.repair_mode = false;
                 st.floor = world.store_serial;
                 st.closed = true;

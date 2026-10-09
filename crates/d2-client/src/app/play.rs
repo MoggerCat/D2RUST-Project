@@ -320,6 +320,9 @@ pub struct PlayConfig {
     /// `--input SCRIPT` (`specs/tools/facts-render.md` §5 r11): scripted
     /// pointer input in place of the window's.
     pub input: Option<Vec<crate::world_view::input_script::Step>>,
+    /// `--poke` / `--poke-file` (`specs/tools/poke.md` §5 rule 2): pokes
+    /// applied on the server thread between frames; empty: none.
+    pub pokes: Vec<super::poke::Entry>,
 }
 
 #[derive(Resource)]
@@ -446,7 +449,8 @@ pub fn add_live_client(app: &mut App, link: DynLink, c: LiveClient) -> anyhow::R
         bridge.0.set_class_skills(class_skills);
         bridge.0.set_skill_tables(std::sync::Arc::new(skill_tables));
     }
-    let units = single_player::client_unit_rows(archives.as_ref())?;
+    let mut units = single_player::client_unit_rows(archives.as_ref())?;
+    single_player::client_monster_anims(archives.as_ref(), &mut units)?;
     app.world_mut()
         .resource_mut::<BridgeResource>()
         .0
@@ -595,6 +599,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     if hardcore {
         link.with(|l| l.host_mut().game.events.action.hooks().x.hardcore = true)?;
     }
+    super::poke::install(&mut link, config.pokes)?;
     // Before the app exists, so not through Bevy's log.
     println!("single player: seed {}", config.seed);
     let mut app = App::new();
