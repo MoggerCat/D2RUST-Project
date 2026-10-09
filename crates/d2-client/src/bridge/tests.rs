@@ -1293,3 +1293,16 @@ fn a_paused_frame_runs_no_pump_and_only_the_skill_fallback() {
     assert_eq!(pumps(&link), 2);
     assert!(!b.world.in_game);
 }
+
+#[test]
+fn own_c2s_ids_can_be_dropped() {
+    // Spec: specs/tools/scenario-diff.md §3 rule 13 (`state-dump --no-own-c2s`).
+    let (mut b, link) = bridge();
+    b.set_drop_own(vec![0x5F]);
+    b.world_mut().outgoing.push(vec![0x5F, 9, 0x13, 0x84, 0x10]);
+    b.world_mut().outgoing.push(vec![0x6B]);
+    assert_eq!(b.send_outgoing().unwrap(), 2);
+    assert_eq!(sent(&link), vec![(SendQueue::System, vec![0x6B])]);
+    assert_eq!(b.take_dropped(), vec![vec![0x5F, 9, 0x13, 0x84, 0x10]]);
+    assert!(b.take_dropped().is_empty());
+}

@@ -82,6 +82,7 @@ fn player_rates(character: Character, ticks: u32) -> Vec<(u32, String)> {
         packets: None,
         rng: None,
         sends: Vec::new(),
+        no_own_c2s: Vec::new(),
     };
     let mut game = DumpGame::resolve(&args, app_support::game_data(), None).unwrap();
     game.character = character;

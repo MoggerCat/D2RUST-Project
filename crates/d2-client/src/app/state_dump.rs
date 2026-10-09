@@ -109,6 +109,8 @@ pub struct DumpArgs {
     pub input: Option<Vec<input_script::Step>>,
     /// `--send "<f> <Name|hex> ..."` (repeatable): scripted C→S messages.
     pub sends: Vec<SendEntry>,
+    /// `--no-own-c2s <id>[,<id>]`: C→S ids the bridge's own sends drop.
+    pub no_own_c2s: Vec<u8>,
     /// `--packets FILE`: also record the packets (`specs/tools/packets-trace.md`).
     pub packets: Option<PathBuf>,
     /// `--rng FILE`: also record every RNG draw ([`super::rng_dump`];
@@ -130,6 +132,7 @@ pub fn parse_args(args: &[String]) -> Result<DumpArgs> {
         pokes: Vec::new(),
         input: None,
         sends: Vec::new(),
+        no_own_c2s: Vec::new(),
         packets: None,
         rng: None,
     };
@@ -158,6 +161,19 @@ pub fn parse_args(args: &[String]) -> Result<DumpArgs> {
             "--send" => a
                 .sends
                 .push(sends::parse_send_arg(value()?).map_err(anyhow::Error::msg)?),
+            "--no-own-c2s" => {
+                for part in value()?.split(',') {
+                    let t = part.trim();
+                    let id = match t.strip_prefix("0x") {
+                        Some(h) => u8::from_str_radix(h, 16),
+                        None => t.parse::<u8>(),
+                    }
+                    .with_context(|| format!("--no-own-c2s {t}: a message id (0-255, 0x hex)"))?;
+                    if !a.no_own_c2s.contains(&id) {
+                        a.no_own_c2s.push(id);
+                    }
+                }
+            }
             "--input" => {
                 let steps = input_script::parse(value()?)
                     .and_then(|s| Headless::new(s.clone()).map(|_| s))
@@ -229,6 +245,8 @@ pub struct DumpGame {
     pub input: Option<Vec<input_script::Step>>,
     /// The `--send` entries, in command-line order.
     pub sends: Vec<SendEntry>,
+    /// `--no-own-c2s` ids.
+    pub no_own_c2s: Vec<u8>,
     /// `--packets FILE` ([`super::packet_dump`]).
     pub packets: Option<PathBuf>,
     /// `--rng FILE` ([`super::rng_dump`]).
@@ -268,6 +286,7 @@ impl DumpGame {
             pokes: args.pokes.clone(),
             input: args.input.clone(),
             sends: args.sends.clone(),
+            no_own_c2s: args.no_own_c2s.clone(),
             packets: args.packets.clone(),
             rng: args.rng.clone(),
         })
@@ -361,6 +380,7 @@ pub fn dump<W: Write>(
         request.flags = f;
     }
     bridge.send(&request)?;
+    bridge.set_drop_own(game.no_own_c2s.clone());
     let (mut ran, mut snaps, mut idle) = (0u32, 0u64, 0u32);
     let mut first = true;
     // The frame the last tick ran (0: none yet) and the pokes still to run.
@@ -397,6 +417,16 @@ pub fn dump<W: Write>(
             super::perf::record_bridge_frame(t0, report.ticked);
         }
         bridge.take_outputs();
+        for m in bridge.take_dropped() {
+            let hex: Vec<String> = m.iter().map(|b| format!("{b:02x}")).collect();
+            let line = format!(
+                "own c2s dropped: frame {}: {}",
+                last_frame + 1,
+                hex.join(" ")
+            );
+            eprintln!("{line}");
+            send_notes.push(line);
+        }
         if let Some(h) = input.as_mut() {
             for l in h.after_frame(&mut bridge, report.ticked)? {
                 eprintln!("input: {l}");
@@ -680,6 +710,8 @@ mod tests {
             "2026-10-09",
             "--packets",
             "p.jsonl",
+            "--no-own-c2s",
+            "0x5f,3,0x5f",
             "--poke",
             "4 spawn 19 @x+3 @y+3 normal",
             "--poke",
@@ -715,6 +747,7 @@ mod tests {
                 pokes,
                 input: Some(input_script::parse("frame 10; click 600 300").unwrap()),
                 sends,
+                no_own_c2s: vec![0x5f, 0x03],
                 packets: Some("p.jsonl".into()),
                 rng: None,
             }
