@@ -212,3 +212,22 @@ spawn.
   quill hits the player at f46 (12800 → 12415).
 - The d2rs side is not run here; the check runs both sides with
   `scenario_diff.py`.
+
+### REC-815 / REC-816 (whirl details)
+- **REC-816 settled:** the mode change at update N is machine step 5
+  (`0x006217C0`: +0x30 ≠ 0 and +0x48 < 1 → `0x004611F0`), not a server
+  message.
+  - The 213 in the facts is the speed +0x4C. It is written by the
+    velocity branch of the rate function `0x00623F50` (selected in
+    `0x006214A0`: a V-skill mode with E-flags bit 0).
+  - +0x3C stays 256. The facts columns `f` / `F` / `s` are +0x44 / +0x48
+    / +0x4C.
+  - Spec: `skills/sequences.md` §3 Whirlwind r3.
+- **REC-815 narrowed, still PROVISIONAL as REC-900:** the 2-update
+  delay before the first path step is not in `0x00463390`, `0x004C9120`
+  or `0x00650840`. Every gate passes from update 1, and a failing gate
+  would end the path. So either the start runs after the click (the
+  target not ready yet), or the recorder's `px` is not path +0x00. The
+  anim recorder tools are not in this tree, so the second is unchecked.
+  N still uses the measured a.
+- No new rows. d2rs needs only `q-fix-b-whirl-end-rule`.
