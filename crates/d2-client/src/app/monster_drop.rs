@@ -34,6 +34,9 @@ pub fn death_start<X: Pending>(
     if modes::set_mode(sim, h, unit, MODE_DT).is_err() {
         return false;
     }
+    // Step 1.2's footprint (`units.md` §4.6): the corpse stops blocking
+    // (the Act V cage doors, `quests-act5.md` §4.7).
+    d2_sim::wiring::action::View::of(sim.units, sim.stats, sim.data, h).death_footprint(unit);
     if let Some(mut d) = h.object_drops.take() {
         monster_death_drop(h, sim, &mut d, &mut StartSpot, unit, target);
         h.object_drops = Some(d);

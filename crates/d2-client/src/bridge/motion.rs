@@ -12,10 +12,15 @@
 //!   server's mode table (walk 1 / 0, run 23 / 24 to a point / a unit,
 //!   `sim/intents-events.md` §7.4) gets a track from its cell toward the
 //!   request's point, or the target unit's cell;
-//! - each server tick the track steps in a straight line by the path
-//!   velocity × 16 in 16.16 sub-tiles (`sim/pathing.md` §9.4 r2.1, base
-//!   0x400, as [`super::predict::Speeds::step`]) and writes the reached
-//!   cell to the model, so hover, clicks and the draw follow. The
+//! - from the tick after the request (the server path's first step) the
+//!   track steps each server tick by the velocity vector of
+//!   `sim/pathing.md` §9.4 r2.1 ((m · direction vector) >> 12 per axis,
+//!   the §8.3 direction vector toward the goal, m = path velocity ·
+//!   0x400 >> 6), starting at the cell centre; toward a point it stops
+//!   where the next step would pass the goal's centre (no snap); it
+//!   writes the reached cell and the precise position to the model, so
+//!   hover, clicks and the draw follow (measured against the 1.14d state
+//!   and draws of the Rogue Encampment NPCs). The
 //!   message's velocity field is stat 67 `velocitypercent`, not a path
 //!   velocity (`seams/movement-prediction.md` §2.4 r3): the path velocity
 //!   is the server's own computation (`sim/pathing.md` §8.1 r2,
@@ -125,6 +130,13 @@ struct Track {
     step: i64,
     /// The cell last written to the model.
     cell: (u16, u16),
+    /// Made in this frame's refresh: the server path moves first on the
+    /// tick after the request (`sim/pathing.md` §9.4, event 0 of the
+    /// next tick), so a new track does not step yet.
+    fresh: bool,
+    /// The unit's request count when the track was made (a new request,
+    /// even one equal to the last, starts a fresh track).
+    requests: u32,
 }
 
 /// The tracks of the walking monsters (module doc).
@@ -174,6 +186,9 @@ impl MonsterMotion {
         if ticked {
             self.step(world);
         }
+        for t in self.tracks.values_mut() {
+            t.fresh = false;
+        }
     }
 
     fn refresh(&mut self, world: &ClientWorld, monsters: &[Option<MonsterClass>]) {
@@ -189,19 +204,26 @@ impl MonsterMotion {
                 continue;
             };
             let step = monster_step(monsters, u.class, u.mode, r.record[4]);
-            let keep = self
-                .tracks
-                .get(key)
-                .filter(|t| t.request == r && t.cell == cell)
+            let old = self.tracks.get(key);
+            let keep = old
+                .filter(|t| t.request == r && t.cell == cell && t.requests == u.mode_requests)
                 .copied();
+            // Only a new request waits for the next tick; a track remade
+            // from a placement steps at once.
+            let fresh = old.is_none_or(|t| t.requests != u.mode_requests);
             next.insert(
                 *key,
                 keep.unwrap_or(Track {
                     request: r,
                     goal,
+                    // A walk starts at the cell centre (recorded: Warriv's
+                    // x fraction 32016 at the end of a walk, 32768 on the
+                    // tick of the next request).
                     at: centre(cell),
                     step,
                     cell,
+                    fresh,
+                    requests: u.mode_requests,
                 }),
             );
         }
@@ -210,6 +232,9 @@ impl MonsterMotion {
 
     fn step(&mut self, world: &mut ClientWorld) {
         for (key, t) in self.tracks.iter_mut() {
+            if t.fresh {
+                continue;
+            }
             let goal = match t.goal {
                 Goal::Point(x, y) => Some((x, y)),
                 Goal::Unit(u) => world.units.get(&u).and_then(|u| u.position),
@@ -228,15 +253,45 @@ impl MonsterMotion {
             } else {
                 len
             };
-            let s = t.step.min(room);
-            t.at = (t.at.0 + dx * s / len, t.at.1 + dy * s / len);
+            // `sim/pathing.md` §9.4 r2.1: the velocity vector is (m ·
+            // direction vector) >> 12 per axis, the direction vector of
+            // §8.3 toward the goal (a straight line: no client path).
+            let Some(tables) = super::predict::path_tables() else {
+                continue;
+            };
+            let ((vx, vy), _) = d2_sim::path::walk::geom::direction_vector(
+                tables,
+                (t.at.0 as u32, t.at.1 as u32),
+                (gx as u32, gy as u32),
+            );
+            let (mx, my) = (
+                (t.step * i64::from(vx)) >> 12,
+                (t.step * i64::from(vy)) >> 12,
+            );
+            let reach = mx.abs().max(my.abs());
+            t.at = match t.goal {
+                // A point: full steps while the next one does not pass
+                // the goal's centre; then the path stops where it is (no
+                // snap: recorded Warriv at rest 376 short of the centre
+                // on both axes, (32392, 33144)).
+                Goal::Point(..) if dx.abs() < mx.abs() && dy.abs() < my.abs() => t.at,
+                Goal::Point(..) if dx == 0 && dy == 0 => t.at,
+                Goal::Point(..) => (t.at.0 + mx, t.at.1 + my),
+                // A unit: one sub-tile short of it.
+                Goal::Unit(_) if room == 0 => t.at,
+                Goal::Unit(_) if room <= reach => {
+                    (t.at.0 + dx * room / len, t.at.1 + dy * room / len)
+                }
+                Goal::Unit(_) => (t.at.0 + mx, t.at.1 + my),
+            };
             let cell = ((t.at.0 >> 16) as u16, (t.at.1 >> 16) as u16);
-            if cell != t.cell {
-                if let Some(u) = world.units.get_mut(key) {
+            if let Some(u) = world.units.get_mut(key) {
+                u.precise = Some((t.at.0 as u32, t.at.1 as u32));
+                if cell != t.cell {
                     u.position = Some(cell);
                 }
-                t.cell = cell;
             }
+            t.cell = cell;
         }
     }
 }
@@ -345,5 +400,50 @@ mod tests {
         tick(&mut m, &mut w);
         assert_eq!(m.walking(), 0);
         assert_eq!(w.units[&k].position, Some((51, 100)));
+    }
+
+    // Covers: specs/sim/pathing.md §9.4
+    #[test]
+    fn a_diagonal_npc_walk_follows_the_recorded_server_positions() {
+        // Warriv's second walk at the Rogue Encampment arrival (1.14d
+        // state, Wine): from the centre of (4868, 4233) toward (4869, 4232)
+        // at monstats Velocity 3 (npc) and 75 %: 6516 per axis a tick from
+        // the tick after the request, resting at (4869 + 32392, 4232 +
+        // 33144) in 16.16, 376 short of the centre.
+        let rows = vec![Some(MonsterClass {
+            npc: true,
+            setup: Some(MonsterSetup {
+                velocity: 3,
+                ..Default::default()
+            }),
+            ..Default::default()
+        })];
+        let mut w = ClientWorld::default();
+        let k = UnitKey::new(MONSTER, 7);
+        monster(
+            &mut w,
+            7,
+            (4868, 4233),
+            mode::WL,
+            request(1, 4869, 4232, 75),
+        );
+        w.units.get_mut(&k).unwrap().mode_requests = 1;
+        let mut m = MonsterMotion::default();
+        w.server_ticks += 1;
+        m.frame(&mut w, &rows); // the request's tick: no step yet
+        let p = |w: &ClientWorld| w.units[&k].precise.unwrap();
+        let x0 = (4868u32 << 16) | 0x8000;
+        let y0 = (4233u32 << 16) | 0x8000;
+        assert_eq!(w.units[&k].precise, None);
+        for n in 1..=10u32 {
+            w.server_ticks += 1;
+            m.frame(&mut w, &rows);
+            assert_eq!(p(&w), (x0 + 6516 * n, y0 - 6516 * n), "step {n}");
+        }
+        assert_eq!(p(&w), ((4869 << 16) + 32392, (4232 << 16) + 33144));
+        w.server_ticks += 1;
+        m.frame(&mut w, &rows);
+        assert_eq!(p(&w), ((4869 << 16) + 32392, (4232 << 16) + 33144));
+        assert_eq!(w.units[&k].position, Some((4869, 4232)));
     }
 }

@@ -21,14 +21,14 @@
 | Rules | 61–62 |
 |   1. Files | 63–68 |
 |   2. Syntax | 69–140 |
-|   3. Run | 141–391 |
-|   4. Suite | 392–487 |
-| Constants & data dependencies | 488–491 |
-| Randomness | 492–495 |
-| Edge cases & original bugs | 496–514 |
-| Test vectors | 515–531 |
-| Provenance | 532–535 |
-| Open questions | 536–575 |
+|   3. Run | 141–395 |
+|   4. Suite | 396–491 |
+| Constants & data dependencies | 492–495 |
+| Randomness | 496–499 |
+| Edge cases & original bugs | 500–518 |
+| Test vectors | 519–535 |
+| Provenance | 536–539 |
+| Open questions | 540–579 |
 <!-- /index -->
 
 ## Summary
@@ -352,7 +352,11 @@ state first. It is the default way to compare a behaviour with 1.14d.
        the host's transport send (`Host::send_system`: the classifier and
        the queues, never the duplicate filter, `tools/scenario.md` §4
        rule 2 (a)). Before the local client is in state 4 nothing is
-       sent (unresolved `@player`), as on 1.14d.
+       sent (unresolved `@player`), as on 1.14d. `play --send` (the
+       draws channel) runs the same injection from the server thread's
+       before-pump hook, after that hook's pokes (`app::send::install`),
+       so the drawn frame has the messages too; it prints the records on
+       stderr.
     3. Each side writes one record per message into its output, between
        the snapshots of frames f − 1 and f: `{"k":"send","f","frame","i",
        "r","bytes"?,"eax"? (1.14d),"note"?,"src"}`, `r` = `ok` (queued),
@@ -524,7 +528,7 @@ None in the tool. Both games run on `seed`.
 | `suite.py --selftest` | discovery by glob and area, slowest first; the cache key misses on a change of the check, the save or Game.exe; the 1.14d outputs and key removed, d2rs' kept; a prefix copy hard-links the bulk and copies `*.reg` and saves, no lock; the rng build before the plain one; match % per channel (draws by rows), area and overall; playthrough acts from the `--all` keys or from milestones; text and Markdown tables |
 | comparators' `--selftest` (`--json`) | `state_diff`, `rng_diff`, `packets_diff`: the summary counts the frames with a difference and names the first; a match has every frame equal and no first |
 | `autostart.py --selftest` | `frame` / framed `hold` parsing and rejections; at simulated tick-return stops the click, hold press, key and move are posted at the stop of F − 1, the hold's release at the stop of F + N − 1; a late stop runs the step there |
-| `--selftest` (send) | `at … send` lines parse to the canonical message (fields in layout order, hex lower case); a missing or unknown message, a missing field, a byte that is not two hex digits, frame 0, a chat row and a misspelt step are rejected; the dry run passes `--send '<frame> <message>'` after the pokes to `record_state.py`, `state-dump` and `record_frames.py`, never to `play`; the packets channel passes pokes and sends to both sides |
+| `--selftest` (send) | `at … send` lines parse to the canonical message (fields in layout order, hex lower case); a missing or unknown message, a missing field, a byte that is not two hex digits, frame 0, a chat row and a misspelt step are rejected; the dry run passes `--send '<frame> <message>'` after the pokes to `record_state.py`, `state-dump`, `record_frames.py` and `play`; the packets channel passes pokes and sends to both sides |
 | `send.py --selftest` | `msg Walk x=10 y=20` → `01 0a 00 14 00`, `SelectSkill skill=36 left=0 item=0xFFFFFFFF` → `3c 24 00 00 00 ff ff ff ff` (`tools/scenario.md` test vectors), the recorded 0x32 of `world/vendors.md` §7.1 rule 10; references in GUID order and unresolved ones; the strict errors; the call layout ([ESP] = S, size, 1, S+0x10; ESP = saved − 16; EIP `0x0052AE50`); on a fake process: steps due at the first stop after tick f − 1, EAX 0 → `dropped`, the state-4 gate |
 | d2rs unit tests (`app::send`, `conformance::scenario::script`) | `--send` parsing and encoding as scenario steps (same vectors), the canonical text, the `send` record lines, the strict errors |
 | d2rs unit tests (`world_view::input_script`, `app::state_dump`) | the same parse and rejections; `Headless` events at frame F − 1, the hold release at F + N − 1, a late frame noted; `state-dump --input` refuses `wait`, `key` and a script not starting with `frame` |

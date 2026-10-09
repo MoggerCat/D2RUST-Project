@@ -257,7 +257,16 @@ const PASS9_AT: std::ops::Range<u32> = 0x0047_3470..0x0047_3F50;
 /// The d2rs exporter's `at` of a pass-9 row (§5 r10).
 pub const PASS9_TAG: &str = "pass9";
 
-/// Whether a `draws.tsv` row is one of pass 9's calls (§6 r5).
+/// The 1.14d range of pass 4's pool draw (§6 r5 revision): the
+/// environment pools `0x00473A70` up to their pass entry `0x00473C00`
+/// (`draw-order-2.md` §11.6).
+const POOLS_AT: std::ops::Range<u32> = 0x0047_3A70..0x0047_3C00;
+
+/// The d2rs exporter's `at` of a pass-4 pool cel (§5 r10).
+pub const POOLS_TAG: &str = "pools";
+
+/// Whether a `draws.tsv` row is one of pass 9's calls or a pass-4 pool
+/// cel (§6 r5 and its revision).
 pub fn is_weather_row(row: &[String]) -> bool {
     let op = DRAW_COLUMNS
         .iter()
@@ -267,15 +276,15 @@ pub fn is_weather_row(row: &[String]) -> bool {
         .iter()
         .position(|c| *c == "at")
         .expect("at column");
-    if !matches!(row[op].as_str(), "DrawLine" | "DrawBox") {
-        return false;
-    }
     let at = row[at].as_str();
-    at == PASS9_TAG
-        || at
-            .strip_prefix("0x")
-            .and_then(|h| u32::from_str_radix(h, 16).ok())
-            .is_some_and(|a| PASS9_AT.contains(&a))
+    let addr = at
+        .strip_prefix("0x")
+        .and_then(|h| u32::from_str_radix(h, 16).ok());
+    match row[op].as_str() {
+        "DrawLine" | "DrawBox" => at == PASS9_TAG || addr.is_some_and(|a| PASS9_AT.contains(&a)),
+        "CelDraw" => at == POOLS_TAG || addr.is_some_and(|a| POOLS_AT.contains(&a)),
+        _ => false,
+    }
 }
 
 impl FactSet {

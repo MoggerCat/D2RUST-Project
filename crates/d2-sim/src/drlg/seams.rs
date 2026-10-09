@@ -1,4 +1,4 @@
-// Spec: specs/drlg/levels.md, specs/drlg/rooms.md
+// Spec: specs/drlg/levels.md, specs/drlg/rooms.md, specs/client/model.md (§5 rule 6.2)
 //! The traits the DRLG needs from systems other specs own, and the
 //! bundle of services a room build uses.
 //!
@@ -70,6 +70,13 @@ pub trait LevelTypes {
 
     /// The preset units of a room (`levels.md` §10.4 reads type-2 units).
     fn preset_units(&self, drlg: &Drlg, room: DrlgRoomId) -> Vec<PresetUnit> {
+        Vec::new()
+    }
+
+    /// The client presets of a room (`client/model.md` §5 r6.2,
+    /// `0x00466820`): its preset units whose flag word (+0x1C) has bit 0
+    /// set, in list order, room-relative.
+    fn client_presets(&self, drlg: &Drlg, room: DrlgRoomId) -> Vec<ClientPreset> {
         Vec::new()
     }
 
@@ -148,6 +155,17 @@ impl LevelTypes for NoLevelTypes {}
 pub struct PresetUnit {
     pub unit_type: u32,
     pub class: u32,
+    pub x: i32,
+    pub y: i32,
+}
+
+/// A client preset (`client/model.md` §5 r6.2): the creator's type,
+/// class, mode and room-relative sub-tile position.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ClientPreset {
+    pub unit_type: u32,
+    pub class: i32,
+    pub mode: u32,
     pub x: i32,
     pub y: i32,
 }

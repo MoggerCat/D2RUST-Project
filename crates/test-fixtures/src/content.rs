@@ -314,7 +314,7 @@ fn classes(t: &mut TableSet) {
                 ("StrAllSkills", "strAllSkills"),
                 (
                     "StartSkill",
-                    ["Shoot", "Firebolt", "Summon Wisp", "", "", "", ""][i],
+                    ["Shoot", "Firebolt", "Summon Wisp", "Shoot", "", "", ""][i],
                 ),
                 ("Skill 1", "Attack"),
                 ("item1", "sb1"),

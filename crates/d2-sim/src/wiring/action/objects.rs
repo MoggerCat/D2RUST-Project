@@ -1584,3 +1584,15 @@ impl<X: Pending> MiscWorld for ObjectView<'_, X> {
         changed
     }
 }
+
+impl<X> super::ActionHooks<X> {
+    /// An object between allocation steps 7 and 8 (`units.md` §3.1 r7,
+    /// its init running): the allocation's point and room argument
+    /// (r7.2), which the 1.14d init reads as the object's position and
+    /// room before `SUNIT_Add`. `None` outside such an allocation.
+    pub fn object_alloc_spot(&self, unit: UnitId) -> Option<(i32, i32, Option<RoomId>)> {
+        let (_, room) = *self.alloc_rooms.iter().rev().find(|&&(u, _)| u == unit)?;
+        let (x, y) = self.objects.as_ref()?.alloc_at?;
+        Some((x, y, room))
+    }
+}
