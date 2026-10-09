@@ -228,21 +228,6 @@ impl<X> ActionHooks<X> {
 }
 
 impl<X: Pending> ActionHooks<X> {
-    /// `0x0061AFA0(room, GUID)` (`units.md` §4.6 rule 1.3): the unit's
-    /// room ring takes its GUID at the ring index, then the index steps
-    /// (mod 4); a unit without a room changes nothing.
-    pub fn push_last_dead(&mut self, game: &crate::game::Game, unit: UnitId) {
-        let Some(e) = game.lists.unit(unit) else {
-            return;
-        };
-        let (Some(room), guid) = (e.room(), e.guid) else {
-            return;
-        };
-        let ring = self.last_dead.entry(room).or_default();
-        ring.slots[usize::from(ring.index)] = Some((unit, guid));
-        ring.index = (ring.index + 1) & 3;
-    }
-
     /// `0x005734C0(unit, v)`: the monster data's `dwAiState` (+0x54,
     /// `monsters/ai.md` §3 "AI state"); a unit without monster data in
     /// the lent world asks [`Pending::set_monster_ai_state`].

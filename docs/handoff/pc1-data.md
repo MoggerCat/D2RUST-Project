@@ -870,3 +870,5 @@ Then the rest:
   `q-fix-p6-npc-intro-record`.
 - **Tools:** `q-fix-p3-state-own`.
 - **Withdrawn:** `q-fix-shop-gamble-flag-dead`.
+
+- [q-fix-d9-arcane] Quest A2Q4 event 3 (`0x0059F0C0`): is the old-level-40 handling (start-Jerhyn removal, quick remove) skipped when the new level is 74? Recording `a2-warp-arcane-ama` keeps Jerhyn (class 201, 1:1) alive to frame 143 on 1.14d, every other warp from Lut Gholein removes him at the warp frame. d2rs skips the whole `a == 40` block for `b == 74` (REC-1405, PROVISIONAL); read the branch structure and fix `specs/world/quests-act2.md` §6.6 / `quests-act2-2.md` §2 item 3.

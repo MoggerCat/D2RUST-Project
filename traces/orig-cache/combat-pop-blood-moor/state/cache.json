@@ -1,0 +1,38 @@
+{
+ "channel": "state",
+ "check": "combat-pop-blood-moor",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "900",
+  "--ticks",
+  "400",
+  "--auto",
+  "ScnAma",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "4 warp 2"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "2b967f118a9f8cba594cb121f3b82f418afb56e7efaf2ab03d58da5e044ecc78",
+   "size": 2054697
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "16d6e99b2c3dea77e82d13ddd2e0f5bb06ee9cc9d75bbdd208f3ef256e26ed06",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "d17b28e1be3895583ff39a43aac26b3c4208f0b03c10fcfa86e86bc21d5a1790",
+  "save": "c098d7905cb83f92fe70f1b392b1e08faf1dd04e1f6d9e100a0ca523eaafb1bd"
+ }
+}
