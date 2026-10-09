@@ -57,6 +57,8 @@ pub struct Fake {
     pub flags: BTreeMap<UnitId, u32>,
     pub rooms: BTreeMap<UnitId, RoomId>,
     pub levels: BTreeMap<UnitId, u32>,
+    /// Level id of a room (`room_level`).
+    pub room_levels: BTreeMap<RoomId, u32>,
     pub positions: BTreeMap<UnitId, (i32, i32)>,
     /// Players that pass the key test.
     pub keys: BTreeSet<UnitId>,
@@ -154,6 +156,9 @@ impl ObjectWorld for Fake {
     }
     fn level(&self, unit: UnitId) -> Option<u32> {
         self.levels.get(&unit).copied()
+    }
+    fn room_level(&self, room: RoomId) -> Option<u32> {
+        self.room_levels.get(&room).copied()
     }
     fn position(&self, unit: UnitId) -> (i32, i32) {
         self.positions.get(&unit).copied().unwrap_or((0, 0))
