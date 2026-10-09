@@ -69,8 +69,57 @@ REC block REC-815..829. Items from the PC1-B prompt (2026-10-09).
     queued server mode message. N is the same either way; a whirl whose
     arrival is not on a multiple of 4 would decide it.
 
+## Item 41 — skill button state `0x004A8D30` (answered, round 2)
+
+- `0x004A8D30(P, skill)` runs the use check `0x004D9FC0(P, skill)` → u.
+  The state is 0 when u = 0 (usable), 4 when u = 6 (aura), and 1 for any
+  other u.
+- The caller `0x00496BE0` (`0x00496C24`–`0x00496C42`) forces state 1
+  when the skills.txt row lacks `InTown` (byte +5 & `[0x006CE268]`, mask
+  1) and P's room is a town.
+- Spec: `ui/control-panel.md` §7 r2 (REC-720 settled).
+- d2rs differs (it draws the plain cel): new row
+  `q-fix-b41-skill-button-state`.
+
 ## Left / next
 
 - Pending: any new Step 4 items tagged `[combat-a1]`, `[skills-1]` or
   `[skills-2]`, or about damage, monster AI, missiles or skills (none
   existed at the start of this session).
+
+## Round 2 — combat basics on 1.14d (scenario-diff)
+
+No tagged items existed, so the combat checks ran. Both are under
+`traces/checks/`. They run in the Blood Moor (`poke warp 2` at frame 4)
+because 1.14d's Rogue Encampment allows no combat: a first town run
+showed idle Fallens and no damage. Seeds are fixed at frame 30, then the
+spawn.
+
+- **combat-fallen-hits-player** (Fallen party 2 sub-tiles away, 200
+  ticks).
+  - 1.14d: Fallens attack (mode 4) at 70 / 91 / 130 / 151; player hp
+    12800 → 12321 at frame 77, then 11866, 11397, 11039, 10560.
+  - d2rs: the same attack modes at 70 and 91, but **the player never
+    loses life** → `q-fix-b-monster-melee-no-damage`.
+  - The leader's think at frame 41: 1.14d S2 (mode 9), d2rs A2 (mode 5)
+    → `q-fix-b-fallen-leader-mode-41`.
+- **combat-arrow-quillrat** (Quill Rat 4,4 away, five arrows from frame
+  38).
+  - Both sides: the rat shoots a quill at 31 / 36. The arrows miss on
+    both sides; the aim point is the spawn offset, and the rat is placed
+    elsewhere.
+  - Frame 59: 1.14d shoots again (A2, quill hits the player at 102, hp
+    12800 → 12352); d2rs walks → `q-fix-b-quillrat-shoot`. No missile
+    kill was reached.
+- **First state difference in both:** the Blood Moor population right
+  after the warp (frames 4–5): a monster class, a missing Quill Rat,
+  positions, an object seed, the game seed →
+  `q-fix-b-bloodmoor-warp-population`. Because of it the full diff
+  reports thousands of differences; the comparisons above follow the
+  poked units and the player only.
+- **Not run:** the player's melee hit on a Fallen and a potion drunk
+  mid-fight. The d2rs headless side has no unit click (no hover pick)
+  and no key steps (`scenario-diff.md` §3 r8.2), so neither can be
+  compared → tool row `q-fix-b-headless-unit-click-keys`.
+- The 1.14d and d2rs state files are in `traces/raw/check-*/`
+  (gitignored) on PC 1.
