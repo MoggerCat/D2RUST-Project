@@ -67,6 +67,10 @@ impl Eq for ItemTablesRef {}
 /// Decodes the last record of item `key` into its kind data. Called
 /// after each 0x9C / 0x9D record is stored.
 pub fn refresh(w: &mut ClientWorld, key: UnitKey) {
+    // A new record re-adds an item 0x92 unlinked.
+    if let Some(KindData::Item(d)) = w.units.get_mut(&key).map(|u| &mut u.kind) {
+        d.unlinked = false;
+    }
     let Some(t) = w.item_tables.0.clone() else {
         return;
     };
@@ -87,7 +91,7 @@ pub fn attached_to(w: &ClientWorld, key: UnitKey) -> Option<UnitKey> {
     let KindData::Item(d) = &w.units.get(&key)?.kind else {
         return None;
     };
-    if d.props.is_empty() || d.flags & 0x4000 != 0 {
+    if d.props.is_empty() || d.flags & 0x4000 != 0 || d.unlinked {
         return None;
     }
     let v = items::item(w, key)?;

@@ -581,6 +581,7 @@ fn game_creation_then_the_real_join() {
     let states = vec![0xAA, 0, g[0], g[1], g[2], g[3], 8, 0xFF];
     let level = fx.sim().events.action.sys.stats.unit_total(p, 12, 0) as u16;
     let proximity = vec![0x76, 0, g[0], g[1], g[2], g[3]];
+    let relator2 = vec![0x48, 0, 0, g[0], g[1], g[2], g[3], 0, 0, 0, 0];
     assert_eq!(
         fx.joined,
         vec![
@@ -608,9 +609,13 @@ fn game_creation_then_the_real_join() {
                 m
             },
             vec![0x04],
-            // The join sequence (§8.3): 0x5B, 0x65, the join 0x5A.
+            // q-fix-flow-server (`sim/tick.md` §6 rule 4): the
+            // inventory refresh's 0x48, then the join sequence (§8.3):
+            // 0x5B, 0x65, 0x8D, the join 0x5A.
+            relator2,
             msg::player_joined(fx.guid(p), CLASS as u8, &name(), level, 0xFFFF),
             msg::player_kill_count(fx.guid(p), 0).to_vec(),
+            vec![0x8D, g[0], g[1], g[2], g[3], 0xFF, 0xFF],
             msg::player_event(2, &name()).to_vec(),
         ],
         "{:02x?}",

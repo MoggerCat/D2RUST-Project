@@ -807,3 +807,41 @@ fn controls_table_bindings_keep_esc_on_the_game_menu() {
     let b = table_to_bindings(&BindingTable::defaults());
     assert_eq!(b.inputs(Act::GameMenu), &[Key::Escape]);
 }
+
+/// The paused pass on the play path (`flows/client-frame.md` §1 r2,
+/// `client/bridge.md` §8 r5): with the Esc menu (UI state 9) open the
+/// client runs no server frame, so the game's frame counter stands
+/// still; closed again, it ticks on.
+// Covers: specs/flows/client-frame.md §1 r2; specs/client/bridge.md §8 r5
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_esc_menu_pauses_the_single_player_game() {
+    let dir = temp_dir("pause");
+    let cfg = dir.join("cfg");
+    std::env::set_var("D2RS_CONFIG_DIR", &cfg);
+    let mut f = Front::open(&dir, Entry::First);
+    to_main_menu(&mut f);
+    f.click_trigger(Trigger::SinglePlayer);
+    create(&mut f, Class::Sorceress, "Pauser");
+    let (g, c) = f.choice();
+    let mut game = Game::start(resolve(&dir, g, &c).unwrap());
+    let frame = |game: &Game| app_support::with(&game.server, |l| l.host().game.game.frame);
+    let start = frame(&game);
+    for _ in 0..5 {
+        game.frame();
+    }
+    assert!(frame(&game) > start, "the game ticks");
+    game.press(KeyCode::Escape);
+    assert!(game.menu_open());
+    let paused = frame(&game);
+    for _ in 0..10 {
+        game.frame();
+    }
+    assert_eq!(frame(&game), paused, "no server frame while paused");
+    game.press(KeyCode::Escape);
+    assert!(!game.menu_open());
+    for _ in 0..5 {
+        game.frame();
+    }
+    assert!(frame(&game) > paused, "the game ticks again");
+}

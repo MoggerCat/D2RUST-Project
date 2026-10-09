@@ -87,6 +87,7 @@ fn install_fixtures(sim: &mut single_player::Sim) {
         combat,
         levels: vec![Record::decode(&vec![0u8; d2_data::tables::Levels::SIZE]); 150],
         skill_modes: vec![[0; 8]],
+        overlay_count: 0,
     });
     s.data = UnitData {
         monsters: vec![

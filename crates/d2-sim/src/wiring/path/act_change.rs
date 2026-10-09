@@ -1,32 +1,42 @@
-// Spec: specs/world/waypoints.md §7 rule 5 and open question 1 (message order of a cross-act travel); specs/sim/path-placement.md §11
-//! The act change of a level warp (`0x0053AEC0` → `0x00537340` +
-//! `0x0053ACC0`, D2MOO `LEVEL_ChangeAct`), for a player whose destination
-//! level is in another act.
+// Spec: specs/world/waypoints.md §11; specs/flows/act-change.md §1; specs/sim/path-placement.md §7, §11
+//! The act change `0x0053ACC0` (D2MOO `LEVEL_ChangeAct`) of a level warp
+//! (`0x0053AEC0` → `0x00537340` + `0x0053ACC0`) for a player whose
+//! destination level is in another act, in the order of
+//! `waypoints.md` §11 steps 1–19: client state 5, spawn and free point,
+//! leave the old room, enter the new one, the client's room switch to
+//! none (the old act's removals), S→C 0x05, the unit's act, S→C 0x03
+//! then 0x53, the room switch to the new room (0x07 and its units), the
+//! player's update (0x15) and room-change messages, the pets follow.
+//! S→C 0x04 is the next tick's client pass's, when the new room is ready
+//! (`sim/tick.md` §6 rule 4). The player stays the client's local player:
+//! it is not re-added.
 //!
-//! The messages follow the recording of `waypoints.md` open question 1:
-//! the old act's removals (S→C 0x0A / 0x08, the client's room switch to
-//! no room), 0x05 UnloadComplete, 0x03 LoadAct (the new act's init seed,
-//! its town, the object seed), then the placement in the new act (the
-//! room switch's 0x07 joins and the unit adds, 0x15 / 0x0D).
-//!
-//! PROVISIONAL (d2rs-own, unverified; REC in `docs/HANDOFF.md` §7): the
-//! S→C 0x53 (darkness) and 0x5D between 0x03 and the room adds are not
-//! sent, the quest-change argument (`arg` 0 / 5 of `NpcWorld::act_change`)
-//! is read as the spawn tile index 0, and `0x0053ACC0`'s other steps
-//! (owner spec missing, `impl-world-rest.md` G8) are not run.
+//! Not run here (TODO(waypoints.md §11)): step 1's arena flag test (the
+//! single-player arena flags never have bit value 2), step 6's classic
+//! pet drop and step 7's disguise check (owners: `hirelings.md` §6 r4,
+//! `vitals.md` §4.8), step 10's removal to the old room's other clients
+//! (none in single player).
 
 use crate::drlg::act_of_level;
+use crate::path::place::level_spawn_point;
+use crate::path::place_seams::CollisionView;
+use crate::path::search::free_point_step;
+use crate::units::lists::client_state;
 use crate::units::UnitId;
 use crate::wiring::action::Pending;
 
 use super::place::{log, with_shared};
 use super::walk::PathCtx;
 
+/// Step 9's free-point mask (`0x0064E7E0(R, &(x, y), size, 0x1C89, 5)`).
+const ACT_CHANGE_MASK: u32 = 0x1C89;
+/// Step 9's search step.
+const ACT_CHANGE_STEP: i32 = 5;
+/// Flag-ex 0x10000: S→C 0x15 at the unit's update (step 18).
+const REASSIGN_EX: u32 = 0x1_0000;
+
 /// S→C 0x05 UnloadComplete.
 const UNLOAD_COMPLETE: u8 = 0x05;
-
-/// S→C 0x04 LoadComplete.
-const LOAD_COMPLETE: u8 = 0x04;
 
 /// S→C 0x03 LoadAct (`sim/server-messages.tsv`: act u8 @1, init seed
 /// u32 @2, town level u16 @6, object seed u32 @8).
@@ -52,13 +62,27 @@ fn leave_room<X: Pending>(c: &mut PathCtx<'_, X>, player: UnitId) {
     }
 }
 
-/// Moves `player` to `level` (another act than its room's) with
-/// `tile_index`: `true` when the player was placed. A destination act
-/// without a DRLG, or no spawn room, leaves the player where it is
-/// (nothing is sent in the first case; the second is logged by the
-/// placement, after the act messages).
+/// The act change `0x0053ACC0` (`waypoints.md` §11 steps 1–19) of
+/// `player` to `level` with `tile_index`: `true` when the player was moved.
+/// The client goes to state 5 (step 4); 0x04 is not sent here: the next
+/// tick's client pass sends it when the new room is ready
+/// (`flows/act-change.md` §1 r4, `sim/tick.md` §6 rule 4).
 pub fn run<X: Pending>(mut c: PathCtx<'_, X>, player: UnitId, level: u32, tile_index: u32) -> bool {
     let act = act_of_level(level);
+    // Step 2: the player's own act is a fatal assert (0x19F) in 1.14d;
+    // its only caller never asks for it.
+    let old_act = c
+        .game
+        .lists
+        .unit(player)
+        .and_then(|u| u.room())
+        .and_then(|r| c.game.lists.room(r))
+        .map(|r| r.act);
+    if old_act == Some(act) {
+        return false;
+    }
+    // Step 3: d2rs builds every act's DRLG with the dungeon; an act
+    // without one cannot be entered (nothing changes, nothing is sent).
     let Some(init_seed) =
         c.v.h
             .drlg
@@ -75,77 +99,85 @@ pub fn run<X: Pending>(mut c: PathCtx<'_, X>, player: UnitId, level: u32, tile_i
         .get(usize::from(act))
         .copied()
         .unwrap_or_default();
-    // The old act's removals: the client leaves every room it had.
     let client = c
         .game
         .lists
         .clients()
         .into_iter()
         .find(|&k| c.game.lists.client(k).and_then(|e| e.player) == Some(player));
-    if let Some(client) = client {
-        c.v.room_switch(c.game, client, None);
+    // Step 4.
+    if let Some(e) = client.and_then(|k| c.game.lists.client_mut(k)) {
+        e.state = client_state::CHANGING_ACT;
     }
-    // The unit leaves the old act's room (`0x0053ACC0`): without this the
-    // placement's room recache keeps the old room whenever the new act's
-    // point lies inside its rectangle (acts share tile coordinates).
-    // d2rs-own, unverified.
-    leave_room(&mut c, player);
-    c.v.h.x.send(player, &[UNLOAD_COMPLETE]);
-    c.v.h
-        .x
-        .send(player, &load_act(act, init_seed, town as u16, obj_seed));
-    let placed = with_shared(PathCtx::of(&mut c.v, c.game), |cv, host, lv| {
-        let r = crate::path::place::level_warp_place(cv, host, lv, player, act, level, tile_index);
-        log(cv, r).unwrap_or(false)
+    // Steps 8–9: the spawn search (`0x0061B060`), then the free point
+    // from it (`0x0064E7E0`, mask 0x1C89, step 5). Failing, steps 3–7
+    // stay done and nothing is sent (the client stays in state 5).
+    let spawn = with_shared(PathCtx::of(&mut c.v, c.game), |cv, _, lv| {
+        let size = cv.unit_size(player);
+        let r = level_spawn_point(cv, lv, Some(act), level, tile_index, size);
+        let (room, mut p) = log(cv, r)??;
+        let r = free_point_step(
+            cv,
+            Some(room),
+            &mut p,
+            size,
+            ACT_CHANGE_MASK,
+            ACT_CHANGE_STEP,
+        );
+        log(cv, r)?.map(|room| (room, p))
     });
-    // The old act's removals included the player's own unit (it was
-    // still in the old room): the new act re-adds it, at the placed point,
-    // as the game entry does (`intents-events.md` §8 rule 3.1).
-    // d2rs-own, unverified.
-    if !placed {
+    let Some((room, p)) = spawn else {
         return false;
+    };
+    // Step 10: the old room left (footprint cleared, off its unit list,
+    // path room none). Its room-change messages go to O's other clients
+    // only: none in single player (TODO(waypoints.md §11 step 10):
+    // multiplayer).
+    leave_room(&mut c, player);
+    // Step 11: into R at the step-9 point, queued for update.
+    c.teleport(player, Some(room), p.x, p.y);
+    let _ = c.game.lists.queue_update(player);
+    // Step 12: the old act's removals.
+    if let Some(k) = client {
+        c.v.room_switch(c.game, k, None);
     }
-    // The unit record's act (+0x18) follows the player: the monster AI's
-    // "same act" target test (`ai.md` §5.2 step 5.1) reads it. d2rs-own,
-    // unverified (REC-174).
+    // Step 13.
+    c.v.h.x.send(player, &[UNLOAD_COMPLETE]);
+    // Step 14: d2rs keeps no client act of its own: the client's act is
+    // its room's, which step 17 sets.
+    // Step 15.
     if let Some(r) = c.v.units.get_mut(player) {
         r.act = act;
     }
-    let (px, py) = c.v.h.path_position(player);
-    if let Some(r) = c.v.units.get(player) {
-        let (guid, class) = (r.guid, r.class);
-        let name =
-            c.v.h
-                .session
-                .names
-                .get(&player)
-                .copied()
-                .unwrap_or_default();
-        let m = crate::wiring::action::switch::assign_player(
-            guid,
-            class as u8,
-            &name,
-            px as u16,
-            py as u16,
-        );
-        c.v.h.x.send(player, &m);
-        c.v.player_part_b(c.game, player, player);
-        // The handshake 0x0B makes it the local player again.
-        let g = guid.to_le_bytes();
-        c.v.h.x.send(player, &[0x0B, 0, g[0], g[1], g[2], g[3]]);
-        // The re-added unit has no stats on the client: its vitals sync
-        // caches start again (`combat/vitals.md` §5.2, a new client's
-        // cache is all 0), so the next sync sends the life message and
-        // every watched stat. d2rs-own, unverified (q-smoke-town, REC-278;
-        // goes with the re-add above).
-        if let (Some(client), Some(s)) = (client, c.v.h.sync.as_mut()) {
-            s.caches.remove(&client);
-            s.stats.remove(&client);
+    // Step 16: 0x03 then 0x53 (the act's environment record, created at
+    // the act's first use, `render/lighting.md` §9.1).
+    c.v.h
+        .x
+        .send(player, &load_act(act, init_seed, town as u16, obj_seed));
+    let env = c.game.lists.act_mut(act).map(|r| {
+        if !r.built {
+            r.built = true;
+            r.environment = crate::world::environment::Environment::CREATED;
         }
+        r.environment
+    });
+    if let Some(env) = env {
+        c.v.h.x.send(player, &env.message());
     }
-    // LoadComplete: the client is in the game again (needs the placed
-    // local player). d2rs-own, unverified: the recording shows none, the
-    // client's `in_game` needs it.
-    c.v.h.x.send(player, &[LOAD_COMPLETE]);
+    // Step 17: the new act's rooms and their units.
+    if let Some(k) = client {
+        c.v.room_switch(c.game, k, Some(room));
+    }
+    // Step 18: S→C 0x15 at the update (flag-ex 0x10000).
+    let _ = c.game.lists.queue_update(player);
+    if let Some(r) = c.v.units.get_mut(player) {
+        r.flags2 |= REASSIGN_EX;
+    }
+    c.room_change_messages(player);
+    let _ = c.game.lists.queue_update(player);
+    // Step 19: pets follow (`hirelings.md` §6 rule 1), the host's.
+    if let Some(q) = c.v.h.pet_follows.as_mut() {
+        q.push(player);
+    }
     true
 }

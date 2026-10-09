@@ -58,7 +58,7 @@ use super::ui;
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::mirror::DynLink;
 use crate::bridge::predict::{PredictLink, WalkTap};
-use crate::bridge::world::{ClientTables, LevelRow};
+use crate::bridge::world::LevelRow;
 use crate::bridge::{Bridge, BridgeError, BridgePlugin, BridgeResource};
 use crate::world_view::node::NodeRuns;
 use crate::world_view::object_label::ObjectLabels;
@@ -153,10 +153,7 @@ pub fn add_client_data(app: &mut App, drlg: DrlgSource, levels: Vec<LevelRow>) {
     let world = app.world_mut();
     let mut bridge = world.resource_mut::<BridgeResource>();
     bridge.0.set_drlg_source(Some(drlg));
-    bridge.0.set_tables(ClientTables {
-        levels: levels.clone(),
-        ..ClientTables::default()
-    });
+    bridge.0.set_levels(levels.clone());
     let mut state = world.resource_mut::<WorldViewState>();
     state.feed = Box::new(ModelFeed {
         levels: Some(levels),
@@ -541,12 +538,12 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     if hardcore {
         save_base.header.status |= d2_formats::d2s::status::HARDCORE;
     }
+    let save_tables: std::sync::Arc<dyn d2_formats::d2s::SaveTables + Send + Sync> =
+        std::sync::Arc::new(live.save.clone());
     // `d2s.md` §2.8: the server's saves rebuild the appearance bytes.
     let appearance = Some(std::sync::Arc::new(
         save::appearance_tables(&live.tables.fixed).map_err(anyhow::Error::msg)?,
     ));
-    let save_tables: std::sync::Arc<dyn d2_formats::d2s::SaveTables + Send + Sync> =
-        std::sync::Arc::new(live.save.clone());
     let (mut link, started) = single_player::start_with(
         config.data,
         config.seed,

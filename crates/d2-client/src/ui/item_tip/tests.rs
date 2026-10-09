@@ -435,6 +435,39 @@ fn a_compact_stream_decodes_to_its_name() {
 }
 
 #[test]
+fn the_box_stays_on_the_640_screen_and_clips_to_it() {
+    let lines = tips().lines_of(&magic_cap(hflag::IDENTIFIED));
+    let files = UiFiles::new(&[]);
+    for (w, h) in [(640, 480), (800, 600)] {
+        let mut out: Vec<UiDraw> = Vec::new();
+        draw_tip(
+            &lines,
+            Point::new(w - 10, 5),
+            (w, h),
+            None,
+            &files,
+            &mut out,
+        );
+        let texts: Vec<&TextRequest> = out
+            .iter()
+            .filter_map(|d| match d {
+                UiDraw::Text(t) => Some(t),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(texts.len(), lines.len());
+        for t in &texts {
+            let TextOpts::Draw { block_w, .. } = t.opts else {
+                panic!("draw call");
+            };
+            assert!(t.at.x >= 0 && t.at.x + block_w.unwrap() <= w, "{:?}", t.at);
+            assert!(t.at.y >= 0 && t.at.y <= h);
+            assert_eq!(t.clip, crate::ui::Rect::new(0, 0, w as u16, h as u16));
+        }
+    }
+}
+
+#[test]
 fn the_box_has_one_centered_line_per_row_and_stays_on_screen() {
     let lines = tips().lines_of(&magic_cap(hflag::IDENTIFIED));
     let files = UiFiles::new(&[]);

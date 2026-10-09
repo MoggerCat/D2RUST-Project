@@ -69,7 +69,7 @@ use crate::units::record::Units;
 use crate::units::UnitId;
 use crate::world::waypoints::{ArrivalList, WaypointData, WaypointRecords};
 
-pub use dispatch::ActionSim;
+pub use dispatch::{ActionSim, INVENTORY_REFRESH_EX};
 pub use hirelings::HirelingCall;
 pub use monsters::MonsterWorld;
 pub use objects::{
@@ -101,6 +101,9 @@ pub struct ActionTables {
     pub levels: Vec<Levels>,
     /// `Sk1mode..Sk8mode` per monstats row ([`crate::monsters::ai::skill_modes`]).
     pub skill_modes: Vec<[u8; 8]>,
+    /// `overlay` record count (data tables +0xBC0): the bound of the
+    /// 0x11 overlay id (`intents-events.md` §7.3 r2 step 9, inclusive).
+    pub overlay_count: i32,
 }
 
 /// The DRLG side of a game: the acts' DRLGs and their services.

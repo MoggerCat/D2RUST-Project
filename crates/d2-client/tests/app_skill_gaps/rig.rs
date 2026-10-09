@@ -274,6 +274,7 @@ fn install_fixtures(sim: &mut single_player::Sim, cfg: Cfg) {
         combat,
         levels: vec![blank(); 150],
         skill_modes: vec![[0; 8]],
+        overlay_count: 0,
     });
     s.hooks.bodies = Some(Arc::new(d2_sim::skills::use_::bodies::BodyTables {
         stats: vec![d2_sim::skills::use_::bodies::BodyStat::default(); 359],

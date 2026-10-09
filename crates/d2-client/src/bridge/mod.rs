@@ -111,6 +111,8 @@ pub struct FrameReport {
     pub answered: usize,
     /// UI and sound outputs the frame's handlers made (spec §10).
     pub outputs: usize,
+    /// A paused frame (spec §8 rule 5): no pump, no receive.
+    pub paused: bool,
 }
 
 /// The bridge: a server link, the client world model and the dispatch
@@ -123,6 +125,8 @@ pub struct Bridge<L> {
     log: ReceiveLog,
     /// The frame's UI and sound outputs, in order (spec §10 rule 1).
     outputs: Vec<Output>,
+    /// UI state 9 or 11 is open ([`Bridge::set_paused`]).
+    paused: bool,
 }
 
 impl<L: ServerLink> Bridge<L> {
@@ -148,6 +152,7 @@ impl<L: ServerLink> Bridge<L> {
             inputs: ModelInputs::default(),
             log: ReceiveLog::default(),
             outputs: Vec::new(),
+            paused: false,
         })
     }
 
@@ -172,14 +177,43 @@ impl<L: ServerLink> Bridge<L> {
         Ok(self.link.send(queue, msg)?)
     }
 
+    /// Whether the single-player game is paused: UI state 9 (the Esc
+    /// menu) or 11 is open (spec §8 rule 5, `flows/client-frame.md` §1
+    /// rule 2). Set by the app before each frame.
+    pub fn set_paused(&mut self, paused: bool) {
+        self.paused = paused;
+    }
+
     /// One bridge frame: pump the server, receive and dispatch every
     /// delivered chunk (spec §8 rule 1), then, if the server ticked and
     /// the model is in game, the update pass (`model.md` §5 rule 1), and
     /// the C→S messages the model answered with. A refused chunk ends the
     /// frame with an error; chunks after it in the same receive are not
     /// processed (a fatal assert in 1.14d). The frame's outputs wait in
-    /// the bridge for [`Self::take_outputs`] (spec §10 rule 4).
+    /// the bridge for [`Self::take_outputs`] (spec §10 rule 4). A paused
+    /// frame ([`Self::set_paused`]) runs only the skill fallback.
     pub fn frame(&mut self) -> Result<FrameReport, BridgeError> {
+        // A paused pass (spec §8 rule 5, `flows/client-frame.md` §1 rule
+        // 2: UI state 9 or 11, the local player in a room): no pump (no
+        // server frame), no receive, no update pass; only the skill
+        // fallback, once. The pass still counts as a frame.
+        // After Save and Exit the passes run until the server's answer
+        // (`flows/save-exit.md` §1 r3): no pause holds them.
+        if self.paused
+            && !self.world.exit_requested
+            && self.world.local().is_some_and(|u| u.position.is_some())
+        {
+            self.world.frames += 1;
+            let before = self.log.rejected.len();
+            if let Err(error) = skill_fallback::skill_fallback(&mut self.world, &self.inputs) {
+                self.log.rejected.push(receive::Rejected { id: 0, error });
+            }
+            return Ok(FrameReport {
+                paused: true,
+                rejected: self.log.rejected.len() - before,
+                ..FrameReport::default()
+            });
+        }
         // A dialog-reply slot the UI layer did not answer after the last
         // frame's outputs carries no message (`msg-ui.md` §16 r4.3: no
         // case was handed back, so no C→S 0x31).
@@ -396,6 +430,12 @@ impl<L: ServerLink> Bridge<L> {
     /// The tables the message rules read (`msg-units.md` Inputs).
     pub fn set_tables(&mut self, tables: ClientTables) {
         self.inputs.tables = tables;
+    }
+
+    /// The `Levels.txt` rows (`model.md` §11 rule 4); the other tables
+    /// stay (the skill rows bound earlier survive).
+    pub fn set_levels(&mut self, levels: Vec<world::LevelRow>) {
+        self.inputs.tables.levels = levels;
     }
 
     /// The unit-message rows (`msg-units.md` §1.2 r7, §1.3 r3,

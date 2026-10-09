@@ -32,14 +32,14 @@
 |   6. 0x23 SetSkill (`0x0045DE10`) | 284–290 |
 |   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 291–334 |
 |   8. 0xA3 skill do (`0x0045D5E0`) | 335–348 |
-|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 349–377 |
-|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 378–392 |
-| Constants & data dependencies | 393–404 |
-| Randomness | 405–408 |
-| Edge cases & original bugs | 409–418 |
-| Test vectors | 419–444 |
-| Provenance | 445–470 |
-| Open questions | 471–505 |
+|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 349–382 |
+|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 383–397 |
+| Constants & data dependencies | 398–409 |
+| Randomness | 410–413 |
+| Edge cases & original bugs | 414–423 |
+| Test vectors | 424–449 |
+| Provenance | 450–475 |
+| Open questions | 476–510 |
 <!-- /index -->
 
 Owned ids: 0x21, 0x22, 0x23, 0x94, 0x99, 0x9A, 0xA3; §9–§10: 0x93, 0xA5.
@@ -374,6 +374,11 @@ level on a unit, toward a unit (0x99, the 16-byte form) or a point
    refreshed (§2 rule 4).
 5. Model: the entries' level bonus and the passive-state lists. No
    output.
+
+d2rs: `units::messages::skill_bonus` builds the message; no caller of
+`0x0053C6F0` is named by any spec, so nothing sends it yet. PROVISIONAL:
+the layout is the TSV's; the senders (an item or shrine bonus?) are
+unknown; settled by REC-415 (a static caller search of `0x0053C6F0`).
 
 ### 10. 0xA5 skill end on a unit (`0x0045D6A0`)
 

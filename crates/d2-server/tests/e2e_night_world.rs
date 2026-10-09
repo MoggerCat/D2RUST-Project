@@ -575,6 +575,7 @@ impl Fx {
             combat: combat(),
             levels: levels(),
             skill_modes: vec![[0; 8]],
+            overlay_count: 0,
         };
         let book = Book::default();
         let gold_tables = gold_item_tables();

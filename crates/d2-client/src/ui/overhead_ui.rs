@@ -28,7 +28,6 @@ use crate::ui::messages::overhead::{
 use crate::ui::messages::FONT_CHAT;
 use crate::ui::panel::{Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
 use crate::ui::text::TextOpts;
-use crate::ui::FRAME;
 
 /// The adapter's id: not a UI state, open for good.
 pub const OVERHEAD_PANEL: PanelId = PanelId(0x112);
@@ -133,6 +132,7 @@ impl Panel for OverheadUi {
             return;
         }
         let (w, h) = (sh.config.screen.w, sh.config.screen.h);
+        let clip = sh.config.screen.rect();
         let open_mode = sh.states.open_mode().get();
         let anchor = sh.bubbles.anchor;
         let Some(cam) = camera(ctx.world, anchor, open_mode) else {
@@ -195,7 +195,7 @@ impl Panel for OverheadUi {
                             color: u16::try_from(l.color).unwrap_or(0),
                         },
                         opts: TextOpts::default(),
-                        clip: FRAME,
+                        clip,
                     }));
                 }
             }
@@ -246,8 +246,12 @@ mod tests {
     };
 
     fn setup() -> (OriginalUi, UiRoot, ClientWorld) {
+        setup_at(Screen::R800)
+    }
+
+    fn setup_at(screen: Screen) -> (OriginalUi, UiRoot, ClientWorld) {
         let config = UiConfig {
-            screen: Screen::R800,
+            screen,
             expansion_installed: true,
         };
         let ui = OriginalUi::new(config, None).unwrap();
@@ -360,6 +364,31 @@ mod tests {
         assert_eq!(texts(&root, &w, past + 1).len(), 1, "the freeing frame");
         assert!(!ui.shared.borrow().bubbles.contains(shrine));
         assert!(texts(&root, &w, past + 2).is_empty());
+    }
+
+    // Covers: specs/ui/messages.md §5 r3
+    #[test]
+    fn a_bubble_is_clipped_to_the_screen_at_640_and_800() {
+        for screen in [Screen::R800, Screen::R640] {
+            let (mut ui, root, w) = setup_at(screen);
+            ui.apply_output(&chat5(ME, "hi"), &w).unwrap();
+            let ctx = UiCtx {
+                tick: 1,
+                world: &w,
+                strings: &crate::ui::NoStrings,
+            };
+            let mut out: Vec<UiDraw> = Vec::new();
+            root.draw(&ctx, &mut out);
+            let clips: Vec<_> = out
+                .iter()
+                .filter_map(|d| match d {
+                    UiDraw::Text(t) => Some(t.clip),
+                    _ => None,
+                })
+                .collect();
+            assert!(!clips.is_empty(), "{screen:?}");
+            assert!(clips.iter().all(|c| *c == screen.rect()), "{screen:?}");
+        }
     }
 
     // Covers: specs/client/msg-ui.md §21

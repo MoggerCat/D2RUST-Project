@@ -127,6 +127,7 @@ fn install_fixtures(sim: &mut single_player::Sim) {
         combat,
         levels: vec![blank(); 150],
         skill_modes: vec![[0; 8]],
+        overlay_count: 0,
     });
     s.hooks.anim_data = Some(Arc::new(anim_data()));
     // The server's animation names follow the client art's name rules
