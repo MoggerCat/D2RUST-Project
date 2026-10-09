@@ -103,6 +103,13 @@ pub trait ViewSource {
     /// `rules::unit_composite::unit_offset`).
     fn unit_offset(&self, unit: &ClientUnit, pose: &UnitPose) -> Result<(i32, i32), String>;
 
+    /// The shadow's extra offset (`blend-modes.md` §5 r3): `(ox + oz / 2,
+    /// oy + oz / 2)` of the motion record plus the object offsets. The
+    /// default is [`Self::unit_offset`] (equal without a height `oz`).
+    fn unit_shadow_offset(&self, unit: &ClientUnit, pose: &UnitPose) -> Result<(i32, i32), String> {
+        self.unit_offset(unit, pose)
+    }
+
     /// The tiles of the frame, each with its list and draw key. A feed
     /// with the §9 map-tile feed of `draw-order.md` is wrapped in
     /// `draw_order::source::OrderedSource`, which answers this; a source
@@ -439,9 +446,9 @@ impl<R: ViewRules + ?Sized, S: ViewSource + ?Sized> ViewRules for OriginalView<'
         ))
     }
 
-    /// `blend-modes.md` §5 r3 revision (PROVISIONAL, REC-511): the box
-    /// test on the sheared shadow box at the shadow position (2 pixels
-    /// left of the body's; `oz` = 0 assumed), types 0–2.
+    /// `blend-modes.md` §5 r3a (REC-511): the shadow's own box test at
+    /// the shadow position (2 pixels left, `oz / 2` on both axes), types
+    /// 0–2.
     fn unit_shadow_box_visible(
         &self,
         unit: &ClientUnit,
@@ -458,8 +465,8 @@ impl<R: ViewRules + ?Sized, S: ViewSource + ?Sized> ViewRules for OriginalView<'
             .client();
         let extra = self
             .source
-            .unit_offset(unit, pose)
-            .map_err(|m| unresolved("unit offset", CAMERA, m))?;
+            .unit_shadow_offset(unit, pose)
+            .map_err(|m| unresolved("unit shadow offset", CAMERA, m))?;
         let (x, y) = self.camera.unit_draw(at, extra);
         let size = self.camera.size;
         Ok(shadow_box_visible(
