@@ -12,13 +12,15 @@ traces/playthrough/act1.play names.
 from collections import deque
 
 # Bot tuning (spec §3).
+IGNORED_CLICKS = 12     # clicks in a row that send nothing
 STUCK_SECONDS = 60      # no progress toward the objective for this long
 MAX_DEATHS = 3          # deaths without reaching the milestone
 FIGHT_RADIUS = 14       # sub-tiles: hostiles nearer than this are fought
 PICK_RADIUS = 8         # sub-tiles: potions / gold nearer are picked
 ATTACK_HOLD = 12        # passes the attack click is held
 WALK_STEP = 8           # passes between walk clicks
-LEG_SECONDS = 25        # one room-to-room leg
+LEG_REACH = 10          # sub-tiles ahead along the path per walk click
+REMAP_EVERY = 3         # walk legs between map reads
 BODY_LIFT = 24          # px above the feet: where a unit's body is clicked
 
 PICKUP_CODES = ("gld", "hp", "mp", "rv")
@@ -106,13 +108,8 @@ def kill_one(bot):
         v = bot.look()
         if bot.survive():
             continue
-        bot.refresh_map()
-        here = bot.map.room_at(v.pos, v.level)
-        path = bot.explore_path(here)
-        if path is None:
+        if not bot.explore_step(v.level):
             raise_stuck("no unexplored room left and nothing killed")
-        bot.note_progress(-len(bot.visited))
-        bot.follow(path)
 
 
 _killed = {}
@@ -142,19 +139,14 @@ def clear_level(bot, level, done):
             return
         if bot.survive():
             continue
-        bot.refresh_map()
-        here = bot.map.room_at(v.pos, v.level)
-        path = bot.explore_path(here)
-        if path is None:
-            # every room visited: look for what is left alive in sight
+        if not bot.explore_step(level):
+            # every room seen: walk to what is left alive in sight
             alive = [u for u in v.monsters() if v.alive(u) and "own" not in u]
             if alive:
                 u = min(alive, key=lambda u: abs(u["x"] - v.pos[0]) + abs(u["y"] - v.pos[1]))
                 bot.walk_to((u["x"], u["y"]), near=5, budget_s=30)
                 continue
             raise_stuck(f"level {level} explored, quest step not done")
-        bot.note_progress(-len(bot.visited))
-        bot.follow(path)
 
 
 def hunt(bot, level, cls, done):
@@ -179,13 +171,8 @@ def hunt(bot, level, cls, done):
             continue
         if bot.survive():
             continue
-        bot.refresh_map()
-        here = bot.map.room_at(v.pos, v.level)
-        path = bot.explore_path(here)
-        if path is None:
+        if not bot.explore_step(level):
             raise_stuck(f"monster {cls} not found in level {level}")
-        bot.note_progress(-len(bot.visited))
-        bot.follow(path)
 
 
 def to_town_and_talk(bot, npc, until, what):
@@ -216,13 +203,8 @@ def touch_waypoint(bot, level):
             continue
         if bot.survive():
             continue
-        bot.refresh_map()
-        here = bot.map.room_at(v.pos, v.level)
-        path = bot.explore_path(here)
-        if path is None:
+        if not bot.explore_step(level):
             raise_stuck(f"no waypoint found in level {level}")
-        bot.note_progress(-len(bot.visited))
-        bot.follow(path)
 
 
 WAYPOINT_OBJECTS = {119, 145, 156, 157, 237, 238, 288, 323, 324, 398, 402, 429, 494, 496, 511, 539}

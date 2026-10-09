@@ -29,6 +29,7 @@ from collections import deque
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import acts  # noqa: E402
+import nav  # noqa: E402
 
 VERSION = "0.1.0"
 RESULT_FORMAT = "autoplay-result-1"
@@ -105,6 +106,7 @@ class Map:
         self.act = m["act"]
         self.levels = {l["id"]: l for l in m["levels"]}
         self.rooms = {}
+        self._adj = None
         for l in m["levels"]:
             for r in l["rooms"]:
                 self.rooms[r["id"]] = r
@@ -141,17 +143,24 @@ class Map:
         return best[1] if best else None
 
     def edges(self, r, blocked=frozenset()):
-        """(next room, kind) pairs: 'near' for touching rooms, 'warp' for
-        a warp link."""
+        """(next room, kind) pairs: 'near' for rooms whose rects share an
+        edge (the DRLG's near lists exist only for active rooms), 'warp'
+        for a warp link."""
+        if self._adj is None:
+            self._adj = {}
+            rs = list(self.rooms.values())
+            for i, a in enumerate(rs):
+                for b in rs[i + 1:]:
+                    if touching(a, b):
+                        self._adj.setdefault(a["id"], []).append(b["id"])
+                        self._adj.setdefault(b["id"], []).append(a["id"])
         out = []
         for w in r.get("warps") or []:
-            if w["to"] in self.rooms:
+            if w["to"] in self.rooms and (r["id"], w["to"]) not in blocked:
                 out.append((self.rooms[w["to"]], "warp"))
-        for n in r.get("near") or []:
-            if n in self.rooms and n != r["id"] and (r["id"], n) not in blocked:
-                nr = self.rooms[n]
-                if touching(r, nr):
-                    out.append((nr, "near"))
+        for n in self._adj.get(r["id"], []):
+            if (r["id"], n) not in blocked:
+                out.append((self.rooms[n], "near"))
         return out
 
     def route(self, start, goal, blocked=frozenset()):
@@ -347,8 +356,7 @@ class Bot:
         self.deaths = 0
         self.v = None
         self.map = None
-        self.blocked = set()
-        self.visited = set()
+        self.known = nav.Known()
         self.deadline_s = deadline_s
         self.progress_at = 0
         self.best = None
@@ -361,10 +369,31 @@ class Bot:
     def click(self, p, button="L", hold=2):
         x, y = clamp_screen(p)
         self.act(f"click {button} {x} {y}")
+        before = self.sent_total()
         self.h.cmd(f"press {button} {x} {y}")
         self.h.step(hold)
         self.h.cmd(f"release {button} {x} {y}")
         self.h.step(1)
+        self.check_ignored(before)
+
+    def sent_total(self):
+        return sum(self.h.state()["client"]["sent"].values())
+
+    def check_ignored(self, before):
+        """A run of clicks that send the server nothing: the client
+        refuses the player's input (spec §3 r5)."""
+        if self.sent_total() != before:
+            self.ignored = 0
+            return
+        self.ignored += 1
+        if self.ignored >= acts.IGNORED_CLICKS:
+            v = self.look()
+            cm = (v.client.get("player") or {}).get("mode")
+            raise Stuck(f"the client ignores input: {self.ignored} clicks in a row sent nothing "
+                        f"(client model mode {cm}, server mode {v.me.get('m')}, "
+                        f"open ui {v.client['open']})")
+
+    ignored = 0
 
     def key(self, k):
         self.act(f"key {k}")
@@ -378,15 +407,11 @@ class Bot:
         self.v = View(self.h.state())
         if self.v.me is None:
             raise Stuck("no local player in the state")
-        if self.v.level is not None and self.v.level not in TOWNS:
-            pass
-        r = self.map.room_at(self.v.pos, self.v.level) if self.map else None
-        if r is not None and Map.inside(r, self.v.pos):
-            self.visited.add(r["id"])
         return self.v
 
     def refresh_map(self):
         self.map = self.h.map()
+        self.known.merge(self.map)
 
     # ---- progress / stuck
 
@@ -492,29 +517,45 @@ class Bot:
 
     # ---- walking
 
+    def space(self, levels):
+        return nav.Space(self.map, self.known, set(levels))
+
+    def leg(self, path, why):
+        """One walk click along `path` (sub-tiles), about LEG_REACH ahead."""
+        v = self.v
+        p = nav.ahead(path, acts.LEG_REACH)
+        self.act(f"{why}: walk {v.pos} -> {p} (path {len(path)})")
+        self.click(toward(*v.pos, *p, reach=acts.LEG_REACH + 2), hold=1)
+        self.wait(acts.WALK_STEP)
+
     def walk_to(self, target, near=3, budget_s=None, fight=True):
-        """Walks to world sub-tile `target` by clicks (spec §3 r2)."""
+        """Walks to world sub-tile `target` by clicks along a planned path
+        (spec §3 r2). False when the budget ran out."""
         self.reset_progress()
         start = self.v.frame
+        n = 0
         while True:
             v = self.look()
             if fight and self.survive():
                 continue
-            d = dist(v.pos, target)
-            if d <= near:
+            if dist(v.pos, target) <= near:
                 return True
-            self.note_progress(d)
             if budget_s and v.frame - start > budget_s * TICKS_PER_SECOND:
                 return False
-            self.act(f"walk to {target} from {v.pos}")
-            self.click(toward(*v.pos, *target), hold=1)
-            self.wait(acts.WALK_STEP)
+            if n % acts.REMAP_EVERY == 0:
+                self.refresh_map()
+            n += 1
+            path = nav.path_to_point(self.space([v.level]), v.pos, target, near=max(near - 1, 0))
+            if path is None:
+                raise Stuck(f"no path from {v.pos} to {target} in level {v.level}")
+            self.note_progress(len(path))
+            self.leg(path, f"to {target}")
 
     def goto_level(self, level):
-        """Walks (and warps) until the player is in `level`."""
+        """Walks (and takes warps) until the player is in `level`."""
         self.say(f"  goto level {level}")
         self.reset_progress()
-        tries = 0
+        tried_tiles = set()
         while True:
             v = self.look()
             if v.level == level:
@@ -522,74 +563,82 @@ class Bot:
             if self.survive():
                 continue
             self.refresh_map()
-            here = self.map.room_at(v.pos, v.level)
-            if here is None:
-                raise Stuck(f"player room not in the map (level {v.level})")
-            path = self.map.route(here, lambda r: r["level"] == level, frozenset(self.blocked))
-            if path is None:
-                # the target level is not allocated yet: head for the
-                # levels.txt neighbour toward it (acts.LEVEL_ROUTE)
-                nxt = acts.next_level(v.level, level, self.map.level_graph())
-                if nxt is None or nxt == level:
-                    raise Stuck(f"no route from level {v.level} to {level} in the map")
-                path = self.map.route(here, lambda r: r["level"] == nxt, frozenset(self.blocked))
+            m = self.map
+            nxt = acts.next_level(v.level, level, m.level_graph())
+            if nxt is None:
+                raise Stuck(f"no level route from {v.level} to {level}")
+            here_rooms = [r for r in m.rooms.values() if r["level"] == v.level]
+            nxt_rooms = [r for r in m.rooms.values() if r["level"] == nxt]
+            border = [r for r in nxt_rooms if any(touching(r, h) for h in here_rooms)]
+            if border:
+                path = nav.path_to_rooms(self.space([v.level, nxt]), v.pos, border)
                 if path is None:
-                    path = self.explore_path(here)
-                    if path is None:
-                        raise Stuck(f"no route from level {v.level} toward {nxt}/{level}")
-            self.note_progress(len(path) * 100 + dist(v.pos, Map.centre(path[-1][0])) / 100)
-            self.follow(path)
-            tries += 1
+                    raise Stuck(f"no walkable border from level {v.level} into {nxt}")
+                self.note_progress(len(path))
+                self.leg(path, f"to level {nxt}")
+                continue
+            # a warp: the warp tile in sight, else the room holding the
+            # link to `nxt`, else the level's warp-room centres
+            tiles = [u for u in v.units if u["ut"] == 5 and "x" in u and u["g"] not in tried_tiles]
+            if tiles:
+                t = min(tiles, key=lambda u: dist(v.pos, (u["x"], u["y"])))
+                if dist(v.pos, (t["x"], t["y"])) > 4:
+                    path = nav.path_to_point(self.space([v.level]), v.pos, (t["x"], t["y"]), near=2)
+                    if path is not None:
+                        self.note_progress(len(path))
+                        self.leg(path, f"to warp tile {t['g']}")
+                        continue
+                if self.take_tile(t) and self.look().level != nxt and self.v.level != v.level:
+                    self.say(f"  tile {t['g']} led to level {self.v.level}, not {nxt}: going back")
+                    tried_tiles.add(t["g"])
+                elif self.v.level == v.level:
+                    tried_tiles.add(t["g"])
+                continue
+            links = [r for r in here_rooms for w in r.get("warps") or []
+                     if m.rooms.get(w["to"], {}).get("level") == nxt]
+            if not links:
+                cs = m.levels[v.level].get("warp_centres") or []
+                links = [m.room_at(tuple(c), v.level) for c in cs]
+                links = [r for r in links if r is not None and r["id"] not in self.warp_rooms_seen]
+            if not links:
+                raise Stuck(f"level {v.level}: no border, warp link or warp room toward {nxt}")
+            target = min(links, key=lambda r: dist(v.pos, Map.centre(r)))
+            if Map.inside(target, v.pos):
+                self.warp_rooms_seen.add(target["id"])
+                continue
+            path = nav.path_to_rooms(self.space([v.level]), v.pos, [target])
+            if path is None:
+                raise Stuck(f"no path to the warp room {target['id']} in level {v.level}")
+            self.note_progress(len(path))
+            self.leg(path, f"to warp room {target['id']}")
 
-    def explore_path(self, here):
-        """Path to the nearest unvisited room of the current level."""
-        lv = here["level"]
-        return self.map.route(here, lambda r: r["level"] == lv and r["id"] not in self.visited
-                              and r["id"] != here["id"], frozenset(self.blocked))
+    warp_rooms_seen = set()
 
-    def follow(self, path):
-        """One leg along a room path: the next room's crossing point, or
-        the warp tile when the next edge is a warp."""
-        v = self.v
-        if len(path) < 2:
-            self.walk_to(Map.centre(path[0][0]), near=4, budget_s=10)
-            return
-        cur, _ = path[0]
-        nxt, kind = path[1]
-        if kind == "warp":
-            self.take_warp(cur, nxt)
-            return
-        goal = crossing_point(cur, nxt)
-        before = self.map.room_at(v.pos, v.level)["id"]
-        ok = self.walk_to(goal, near=3, budget_s=acts.LEG_SECONDS)
-        if not ok:
-            now = self.map.room_at(self.v.pos, self.v.level)["id"]
-            if now == before:
-                self.say(f"  edge {cur['id']}->{nxt['id']} blocked at {self.v.pos}")
-                self.blocked.add((cur["id"], nxt["id"]))
-
-    def take_warp(self, room, target_room):
-        """Clicks the warp tile (unit type 5) in `room`."""
+    def take_tile(self, t):
+        """Clicks warp tile unit `t`; True when the level changed."""
         lv = self.v.level
-        for _ in range(6):
-            v = self.look()
-            tiles = [u for u in v.units if u["ut"] == 5 and "x" in u and Map.inside(room, (u["x"], u["y"]), pad=4)]
-            if not tiles:
-                tiles = [u for u in v.units if u["ut"] == 5 and "x" in u and dist(v.pos, (u["x"], u["y"])) < 40]
-            if not tiles:
-                self.walk_to(Map.centre(room), near=4, budget_s=20)
-                continue
-            t = min(tiles, key=lambda u: dist(v.pos, (u["x"], u["y"])))
-            if dist(v.pos, (t["x"], t["y"])) > 12:
-                self.walk_to((t["x"], t["y"]), near=6, budget_s=20)
-                continue
-            self.act(f"warp tile cl {t.get('cl')} at {t['x']},{t['y']}")
-            self.click(to_screen(*v.pos, t["x"], t["y"]))
-            self.wait(40)
+        self.act(f"warp tile g {t['g']} cl {t.get('cl')} at {t['x']},{t['y']}")
+        self.click(to_screen(*self.v.pos, t["x"], t["y"]))
+        for _ in range(10):
+            self.wait(10)
             if self.look().level != lv:
-                return
-        self.say(f"  warp in room {room['id']} not taken")
-        self.blocked.add((room["id"], target_room["id"]))
+                return True
+        return False
+
+    def explore_step(self, level):
+        """One leg toward the nearest room of `level` not seen yet (its
+        collision never read). False when every room has been seen."""
+        v = self.look()
+        self.refresh_map()
+        unseen = [r for r in self.map.rooms.values() if r["level"] == level and r["id"] not in self.known.cells]
+        if not unseen:
+            return False
+        path = nav.path_to_rooms(self.space([level]), v.pos, unseen)
+        if path is None:
+            return False
+        self.note_progress(-len(self.known.cells) * 1000 + len(path))
+        self.leg(path, "explore")
+        return True
 
     # ---- town
 
@@ -651,15 +700,8 @@ class Bot:
         raise Stuck(f"talking to npc {npc_class} did not {what}")
 
     def explore_town(self, npc_class):
-        v = self.look()
-        spot = acts.NPC_SPOT.get(npc_class)
-        self.refresh_map()
-        here = self.map.room_at(v.pos, v.level)
-        path = self.explore_path(here)
-        if path is None:
-            raise Stuck(f"npc {npc_class} not found in town")
-        self.follow(path)
-        _ = spot
+        if not self.explore_step(self.v.level):
+            raise Stuck(f"npc {npc_class} not found: the whole level is seen")
 
     # ---- the plan
 

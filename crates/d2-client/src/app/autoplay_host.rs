@@ -23,7 +23,6 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::{bail, Context, Result};
 use bevy::prelude::*;
-use d2_server::seams::Clock;
 use serde_json::{json, Value};
 
 use super::play::{add_live_client, LiveClient};
@@ -47,14 +46,20 @@ pub const FORMAT: &str = "autoplay-1";
 /// The server thread, shared between the app's link and the reads.
 type Server = Arc<Mutex<ThreadLink<Link<StepClock>>>>;
 
-/// The app's link: the shared server thread.
-struct SharedLink(Server);
+/// The C→S message ids the client sent, with counts (diagnostics).
+type SentLog = Arc<Mutex<std::collections::BTreeMap<u8, u32>>>;
+
+/// The app's link: the shared server thread, counting the C→S ids.
+struct SharedLink(Server, SentLog);
 
 impl ServerLink for SharedLink {
     fn protocol_version(&self) -> u32 {
         self.0.lock().expect("server lock").protocol_version()
     }
     fn send(&mut self, queue: SendQueue, msg: &[u8]) -> Result<Sent, LinkError> {
+        if let Some(&id) = msg.first() {
+            *self.1.lock().expect("sent lock").entry(id).or_default() += 1;
+        }
         self.0.lock().expect("server lock").send(queue, msg)
     }
     fn pump(&mut self) -> Result<Pumped, LinkError> {
@@ -127,7 +132,8 @@ pub enum Command {
 /// Parses one command line.
 pub fn parse_command(line: &str) -> Result<Command, String> {
     let w: Vec<&str> = line.split_whitespace().collect();
-    let num = |s: &str| -> Result<i32, String> { s.parse().map_err(|_| format!("`{s}`: not a number")) };
+    let num =
+        |s: &str| -> Result<i32, String> { s.parse().map_err(|_| format!("`{s}`: not a number")) };
     let point = |x: &str, y: &str| -> Result<Point, String> {
         let (x, y) = (num(x)?, num(y)?);
         if !(0..800).contains(&x) || !(0..600).contains(&y) {
@@ -164,6 +170,11 @@ pub struct Host {
     server: Server,
     ms: Arc<AtomicU32>,
     passes: u64,
+    sent: SentLog,
+    /// Keys pressed since the last pass: held down for the next pass in
+    /// the raw key state the window's input plugin keeps (the death and
+    /// hardcore screens read it), released after it.
+    keys: Vec<KeyCode>,
 }
 
 impl Host {
@@ -190,8 +201,7 @@ impl Host {
         let character = start.character;
         let seed = single_player::game_seed(&character, args.seed);
         let hardcore = start.hardcore
-            || super::save::base_save(&character).header.status
-                & d2_formats::d2s::status::HARDCORE
+            || super::save::base_save(&character).header.status & d2_formats::d2s::status::HARDCORE
                 != 0;
         let GameData::Live(live) = data.clone();
         let ms = Arc::new(AtomicU32::new(START_MS));
@@ -202,14 +212,16 @@ impl Host {
             link.with(|l| l.host_mut().game.events.action.hooks().x.hardcore = true)?;
         }
         let server: Server = Arc::new(Mutex::new(link));
+        let sent = SentLog::default();
         let mut app = App::new();
         app.insert_resource(crate::bridge::mirror::ScriptedClock(ms.clone()));
         app.add_plugins((MinimalPlugins, AssetPlugin::default()))
             .init_asset::<Image>()
-            .init_resource::<ButtonInput<MouseButton>>();
+            .init_resource::<ButtonInput<MouseButton>>()
+            .init_resource::<ButtonInput<KeyCode>>();
         add_live_client(
             &mut app,
-            Box::new(SharedLink(server.clone())),
+            Box::new(SharedLink(server.clone(), sent.clone())),
             LiveClient {
                 data: &live,
                 request: &character,
@@ -237,6 +249,8 @@ impl Host {
             server,
             ms,
             passes: 0,
+            sent,
+            keys: Vec::new(),
         };
         for _ in 0..2000 {
             if host.local_player().is_some() {
@@ -262,7 +276,21 @@ impl Host {
     /// N client passes, the clock 40 ms after each (one server tick).
     pub fn step(&mut self, n: u32) {
         for _ in 0..n {
+            let keys = std::mem::take(&mut self.keys);
+            {
+                let mut input = self.app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+                input.clear();
+                for &k in &keys {
+                    input.press(k);
+                }
+            }
             self.app.update();
+            {
+                let mut input = self.app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+                for &k in &keys {
+                    input.release(k);
+                }
+            }
             self.ms.fetch_add(STEP_MS, Ordering::SeqCst);
             self.passes += 1;
         }
@@ -293,6 +321,7 @@ impl Host {
             .map(|(c, _)| *c)
             .take(1)
             .collect();
+        self.keys.extend(codes.iter().copied());
         let mut ui = self.ui();
         if let Some(b) = ui.bindings.clone() {
             let mode = ui.original.as_ref().map_or(1, |o| o.key_mode());
@@ -309,7 +338,9 @@ impl Host {
         match c {
             Command::Step(n) => {
                 self.step(n);
-                Ok(Some(json!({"k": "ok", "cmd": "step", "passes": self.passes})))
+                Ok(Some(
+                    json!({"k": "ok", "cmd": "step", "passes": self.passes}),
+                ))
             }
             Command::Move(p) => {
                 self.pointer(p, None);
@@ -385,18 +416,18 @@ impl Host {
             .collect();
         let belt: Vec<Value> = items::belt(w)
             .values()
-            .map(|i| json!({"slot": i.x, "code": String::from_utf8_lossy(&i.code).trim_end()}))
+            .map(|i| json!({"slot": i.x, "code": code_str(i.code)}))
             .collect();
         let ground: Vec<Value> = items::ground_items(w)
             .iter()
             .map(|i| {
-                json!({"g": i.key.guid, "code": String::from_utf8_lossy(&i.code).trim_end(),
+                json!({"g": i.key.guid, "code": code_str(i.code),
                        "x": i.x, "y": i.y, "gold": i.gold})
             })
             .collect();
-        let me = w.local().map(|p| {
-            json!({"g": p.key.guid, "pos": p.position.map(|(x, y)| [x, y]), "mode": p.mode})
-        });
+        let me = w.local().map(
+            |p| json!({"g": p.key.guid, "pos": p.position.map(|(x, y)| [x, y]), "mode": p.mode}),
+        );
         Ok(json!({
             "k": "state",
             "format": FORMAT,
@@ -414,6 +445,8 @@ impl Host {
                 "belt": belt,
                 "ground": ground,
                 "exit_requested": w.exit_requested,
+                "sent": self.sent.lock().expect("sent lock").iter()
+                    .map(|(k, v)| (format!("{k:02X}"), *v)).collect::<std::collections::BTreeMap<_, _>>(),
             },
             "snap": snap,
         }))
@@ -429,7 +462,7 @@ impl Host {
             .with(|l| {
                 let sim = &mut l.host_mut().game;
                 let (p, _) = single_player::local_player(sim)?;
-                let act = sim.game.lists.unit(p)?.act;
+                let act = sim.events.action.sys.units.get(p)?.act;
                 let g = &mut sim.events;
                 g.action
                     .hooks()
@@ -445,7 +478,13 @@ impl Host {
                                 .map(|r| {
                                     let room = d.room(r);
                                     let t = room.rect;
+                                    let grid = room.active().map(|a| {
+                                        let c = &a.collision;
+                                        let cells: String = c.masks.iter().map(|&m| grid_char(m)).collect();
+                                        json!({"rect": [c.rect.x, c.rect.y, c.rect.w, c.rect.h], "cells": cells})
+                                    });
                                     json!({
+                                        "grid": grid,
                                         "id": r.0,
                                         "rect": [t.x * 5, t.y * 5, t.w * 5, t.h * 5],
                                         "near": room.near().map(|n| n.iter().map(|x| x.0).collect::<Vec<_>>()),
@@ -474,6 +513,26 @@ impl Host {
     }
 }
 
+/// One sub-tile of a `map` grid (§2 r2): `#` blocks a walking player
+/// (the player move mask 0x1C09 without the door bit), `D` a door, `.`
+/// free.
+fn grid_char(mask: u16) -> char {
+    use d2_sim::drlg::collision::bits;
+    if mask & bits::DOOR != 0 {
+        'D'
+    } else if mask & (0x1C09 & !bits::DOOR) != 0 {
+        '#'
+    } else {
+        '.'
+    }
+}
+
+/// An item code as text (`"hp1"`), empty when absent.
+fn code_str(code: Option<[u8; 4]>) -> String {
+    code.map(|c| String::from_utf8_lossy(&c).trim_end().to_owned())
+        .unwrap_or_default()
+}
+
 /// `d2-client autoplay-host ...`: starts the game, prints the hello line
 /// and serves commands until `quit` or the end of stdin.
 pub fn serve(args: &[String]) -> Result<()> {
@@ -481,7 +540,11 @@ pub fn serve(args: &[String]) -> Result<()> {
     let mut host = Host::start(&a)?;
     let stdout = std::io::stdout();
     let mut out = stdout.lock();
-    writeln!(out, "{}", json!({"k": "hello", "format": FORMAT, "passes": host.passes}))?;
+    writeln!(
+        out,
+        "{}",
+        json!({"k": "hello", "format": FORMAT, "passes": host.passes})
+    )?;
     out.flush()?;
     for line in std::io::stdin().lock().lines() {
         let line = line?;
@@ -520,7 +583,10 @@ mod tests {
         assert_eq!(parse_command("step 5"), Ok(Command::Step(5)));
         assert_eq!(
             parse_command("press L 400 300"),
-            Ok(Command::Press(PointerButton::Left, Point { x: 400, y: 300 }))
+            Ok(Command::Press(
+                PointerButton::Left,
+                Point { x: 400, y: 300 }
+            ))
         );
         assert_eq!(
             parse_command("release r 1 2"),
@@ -529,7 +595,14 @@ mod tests {
         assert_eq!(parse_command("key 1"), Ok(Command::Key(0x31)));
         assert_eq!(parse_command("key esc"), Ok(Command::Key(0x1B)));
         assert_eq!(parse_command("state"), Ok(Command::State));
-        for bad in ["step", "step -1", "press X 1 2", "move 800 0", "key nope", "fly"] {
+        for bad in [
+            "step",
+            "step -1",
+            "press X 1 2",
+            "move 800 0",
+            "key nope",
+            "fly",
+        ] {
             assert!(parse_command(bad).is_err(), "{bad}");
         }
     }
