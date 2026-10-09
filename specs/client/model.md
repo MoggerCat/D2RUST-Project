@@ -324,14 +324,27 @@ position check of the local player.
       room at (x, y), §12 r5). Other types → `0x00465FD0(GUID, class,
       x, y, type, mode)` with flags |= 0x600000. The chickens of the Act 1
       arrival (GUIDs 93–95, `docs/handoff/pc1-data.md` Step 4 item 30)
-      are the 92nd–94th creations of the process. PROVISIONAL
-      (REC-660): which earlier creations (client missiles, client DS1
-      presets, other rooms' critters) take GUIDs 2–92 is not traced.
+      are the 92nd–94th creations of the process. Counted on 1.14d
+      (REC-660 settled 2026-10-09, `traces/client/a1-arrival-creations-ama.jsonl`,
+      `tools/trace-recorder/record_client_creations.py`, ScnAma seed
+      1234): the counter does not move in the front end; all 205
+      creations of the arrival come in the room pass of server frame 2,
+      room by room, each room's critters (r6.1, return `0x0046C316` in
+      `0x0046C1A0`, class 149, type 1, mode argument 0) before its
+      client presets (r6.2, return `0x00466862`, type 2, objects 40 /
+      41 / 42 River1–3 and 65 "invisible river sound1"): critters
+      2–7, presets 8–89, critters 90–95, presets 96–121, critters
+      122–124, presets 125–206. So GUIDs 2–92 are 9 chickens of the
+      two earlier rooms' critter passes and 82 river presets; no client
+      missile is created before the arrival chickens. A critter whose
+      10 tries all fail takes no GUID (`0x0046C1A0` calls the creator
+      only after a free point).
    4. **Critter AI** `0x0046D780(U)` (from `0x00463CC0`, once per update
       pass, after U's per-unit step). T = monster data +0x30 (think
-      timer, `0x004AE110`; starts 0, PROVISIONAL REC-661: not traced
-      through `0x004AE8D0`). `idle` = `0x0046CB40`: code 7 request at
-      U's own position (`0x004AFF60`, §19: |Δ| ≤ 1 → neutral fallback).
+      timer, `0x004AE110`; starts 0: every critter of the arrival reads
+      T = 0 at its first AI call, in the client update that created
+      it (frame 2); REC-661 settled 2026-10-09, same trace, `think0`
+      records). `idle` = `0x0046CB40`: code 7 request at U's own position (`0x004AFF60`, §19: |Δ| ≤ 1 → neutral fallback).
       `step(d, code, r4)` = `0x0046C960`: two draws of U's seed (+0x20),
       x' = x ± d by bit 0 of the first, y' = y ± d by the second, then
       request `code` with {x', y', 0, path type, r4, path byte}.

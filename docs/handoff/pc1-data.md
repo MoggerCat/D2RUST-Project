@@ -666,8 +666,8 @@ Then the rest:
 - 23: run `traces/pokes/spawn-town.poke` with a screenshot (not asked in
   this run).
 - Still PROVISIONAL:
-  - REC-660: client GUIDs 2–92 (needs a runtime count);
-  - REC-661: critter think-timer start;
+  - REC-660: client GUIDs 2–92 (needs a runtime count); answered → see `docs/handoff/pc1-day3-a.md`;
+  - REC-661: critter think-timer start; answered → see `docs/handoff/pc1-day3-a.md`;
   - REC-665: mode request to own position;
   - REC-670: local input path for mode 18;
   - REC-671: whirl end rule;
