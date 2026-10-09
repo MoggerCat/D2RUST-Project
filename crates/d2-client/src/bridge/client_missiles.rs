@@ -18,8 +18,8 @@
 //! r19, r21; §C7 r3), unit hits (§C7 r12), the init callback (§C4
 //! r27), sounds (r28, §C9 r4.4, r6: audio), the umod callback (r29), the
 //! town tests (§C6 r4, §C7 r8: no town flag in the client level rows),
-//! the second pass (§C7 r13), the client hit functions (§C9 r4.3: a
-//! handler error when a row names one), and every client function but
+//! the second pass (§C7 r13), the client hit functions (§C9 r4.3: read
+//! as returning non-zero, PROVISIONAL REC-452), and every client function but
 //! 1, 4, 5, 8, 11, 23, 25, 43, 49, 60 and 63 (the missile is then left
 //! as it is; 3 needs the missiles calc evaluator `0x0064B7C0`). The aim nudge
 //! (§C2 r8) reads the owner's direction from the record
@@ -1064,12 +1064,11 @@ pub fn end(
     let mut x = None;
     // r3: no unit, not forced, no `AlwaysExplode` → r5.
     if forced || row.always_explode {
-        // r4.3.
-        if row.clt_hit_func > 0 && row.clt_hit_func < 81 {
-            return Err(HandlerError::Invalid(
-                "missiles/client.md §C9 r4.3: client hit functions are not modelled",
-            ));
-        }
+        // r4.3: PROVISIONAL (REC-452): the client hit functions
+        // (`client-bodies.md` §B6–§B7) are not modelled; a row that names
+        // one ends as if the function returned non-zero (the end goes on:
+        // explosion, light, removal), so the missile does not stay.
+        let _hit_func = row.clt_hit_func;
         // r4.5: `0x004CDBA0(m, E, 0, 0, skill, level)`: flags 0x20, the
         // owner m's owner (none → none), origin m.
         if row.explosion_missile >= 0 {
