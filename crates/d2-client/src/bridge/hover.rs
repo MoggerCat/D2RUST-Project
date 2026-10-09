@@ -109,6 +109,7 @@ mod feet_tests {
         let cam = Camera::new(FrameSize::D2RS, OpenMode::NONE, at, (0, 0));
         let mut w = ClientWorld::default();
         let mut npc = ClientUnit::new(UnitKey::new(1, 7));
+        npc.mode = 1;
         npc.position = Some((103, 100));
         w.units.insert(npc.key, npc);
         let mut dummy = ClientUnit::new(UnitKey::new(2, 8));
