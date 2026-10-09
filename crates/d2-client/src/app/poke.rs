@@ -37,7 +37,7 @@ use super::single_player::{local_player, Link, Sim};
 use crate::bridge::link::LOCAL_CLIENT;
 
 /// When an entry runs.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum When {
     /// Absolute server frame f: runs when `Game.frame` ≥ f − 1.
     Frame(i32),
@@ -96,6 +96,36 @@ pub fn due_after(when: When, anchor: Option<i32>) -> Option<i32> {
         When::Frame(f) => Some(f - 1),
         When::Tick(t) => anchor.map(|a| a.saturating_add(i32::try_from(t).unwrap_or(i32::MAX))),
     }
+}
+
+/// Splits `state-dump`'s `--poke` entries (`poke.md` §5 rule 4): every
+/// entry of a frame that holds an `operate` or `talk` runs at the tick
+/// end (first), in order; the others (second) between frames. A `goto` in
+/// such a frame is an error (its walk runs between frames).
+pub fn split_tick_end(entries: Vec<Entry>) -> Result<(Vec<Entry>, Vec<Entry>), String> {
+    let interact = |e: &Entry| {
+        matches!(
+            e.op,
+            PokeOp::Directive(Directive::Operate { .. } | Directive::Talk { .. })
+        )
+    };
+    let frames: BTreeSet<When> = entries
+        .iter()
+        .filter(|e| interact(e))
+        .map(|e| e.when)
+        .collect();
+    let (at_end, rest): (Vec<Entry>, Vec<Entry>) =
+        entries.into_iter().partition(|e| frames.contains(&e.when));
+    if let Some(g) = at_end
+        .iter()
+        .find(|e| matches!(e.op, PokeOp::Directive(Directive::Goto(_))))
+    {
+        return Err(format!(
+            "--poke {:?} {}: a goto cannot share its frame with operate / talk",
+            g.when, g.op
+        ));
+    }
+    Ok((at_end, rest))
 }
 
 /// The pending pokes of a game.
@@ -239,14 +269,31 @@ pub fn goto_now(s: &mut Sim, t: GotoTarget, mut walk: GotoWalk) -> (poke::PokeRe
 /// on, `failed` "duplicate filter" when its filter dropped them,
 /// `failed` with the error when the sender refused them.
 pub fn apply_on_link<C: d2_server::seams::Clock>(l: &mut Link<C>, op: &PokeOp) -> poke::PokeResult {
+    apply_on_host(l.host_mut(), op)
+}
+
+/// The host of the app's link.
+pub type ServerHost<C> = d2_server::host::Host<
+    Sim,
+    d2_server::adapters::ProtoSizes,
+    crate::bridge::local::PendingSession,
+    C,
+>;
+
+/// [`apply_on_link`] on the link's host: the form a tick-end hook
+/// (`LocalLink::set_tick_end`, `poke.md` §5 rule 4) calls.
+pub fn apply_on_host<C: d2_server::seams::Clock>(
+    h: &mut ServerHost<C>,
+    op: &PokeOp,
+) -> poke::PokeResult {
     if let PokeOp::Directive(d @ (Directive::Operate { .. } | Directive::Talk { .. })) = op {
-        return interact_on_link(l, d);
+        return interact_on_host(h, d);
     }
     let PokeOp::Directive(poke::Directive::Msg { id, args }) = op else {
-        return apply_now(&mut l.host_mut().game, op);
+        return apply_now(&mut h.game, op);
     };
     let bytes = {
-        let s = &l.host().game;
+        let s = &h.game;
         let Some((player, _)) = local_player(s) else {
             return poke::PokeResult::Unresolved("@player".into());
         };
@@ -263,7 +310,7 @@ pub fn apply_on_link<C: d2_server::seams::Clock>(l: &mut Link<C>, op: &PokeOp) -
             Err(reference) => return poke::PokeResult::Unresolved(reference),
         }
     };
-    match l.host_mut().send_game(LOCAL_CLIENT, &bytes) {
+    match h.send_game(LOCAL_CLIENT, &bytes) {
         Ok(Some(_)) => poke::PokeResult::Ok(None),
         Ok(None) => poke::PokeResult::FailedWith("duplicate filter".into()),
         Err(e) => poke::PokeResult::FailedWith(e.to_string()),
@@ -275,12 +322,12 @@ pub fn apply_on_link<C: d2_server::seams::Clock>(l: &mut Link<C>, op: &PokeOp) -
 /// the server's dispatcher now (`Host::dispatch_now`), in order. `ok`
 /// with the target's GUID when every call returned 0; else `failed`
 /// naming the first id whose result was not 0, and no later call runs.
-pub fn interact_on_link<C: d2_server::seams::Clock>(
-    l: &mut Link<C>,
+pub fn interact_on_host<C: d2_server::seams::Clock>(
+    h: &mut ServerHost<C>,
     d: &Directive,
 ) -> poke::PokeResult {
     let (guid, calls) = {
-        let s = &l.host().game;
+        let s = &h.game;
         let Some((player, _)) = local_player(s) else {
             return poke::PokeResult::Unresolved("@player".into());
         };
@@ -301,7 +348,7 @@ pub fn interact_on_link<C: d2_server::seams::Clock>(
             Ok(b) => b,
             Err(e) => return poke::PokeResult::FailedWith(e),
         };
-        match l.host_mut().dispatch_now(LOCAL_CLIENT, &bytes) {
+        match h.dispatch_now(LOCAL_CLIENT, &bytes) {
             Some(d2_server::seams::ResultCode::Done) => {}
             Some(code) => {
                 return poke::PokeResult::FailedWith(format!(
@@ -595,6 +642,28 @@ mod tests {
                 .join(" "),
             MSG_IDS
         );
+    }
+
+    // Covers: specs/tools/poke.md §5 r4
+    #[test]
+    fn frames_with_operate_or_talk_run_at_the_tick_end() {
+        let e = |s: &str| parse_poke_arg(s).unwrap();
+        let (end, rest) = split_tick_end(vec![
+            e("4 pos @player 1 2"),
+            e("7 pos @player 3 4"),
+            e("7 talk @1:148"),
+            e("9 operate @2:267"),
+            e("12 time 2 0"),
+        ])
+        .unwrap();
+        let text = |v: &[Entry]| v.iter().map(|e| e.op.to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            text(&end),
+            ["pos @player 3 4", "talk @1:148", "operate @2:267"]
+        );
+        assert_eq!(text(&rest), ["pos @player 1 2", "time 2 0"]);
+        let err = split_tick_end(vec![e("5 goto unit 148"), e("5 talk @1:148")]).unwrap_err();
+        assert!(err.contains("goto"), "{err}");
     }
 
     // Covers: specs/tools/poke.md §1 r2, §5 r4

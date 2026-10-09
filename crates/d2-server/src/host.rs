@@ -305,6 +305,17 @@ where
     /// `intents-events.md` §1 rule 1): drain → tick driver → flush if a
     /// tick ran. The clock is read once.
     pub fn frame(&mut self) -> Result<FrameReport, HostError> {
+        self.frame_with(|_| {})
+    }
+
+    /// [`Self::frame`] with `at_tick_end` run after the tick and before
+    /// its flush, when a tick ran: the point of the 1.14d tick-return
+    /// hook `0x0052FD1E` where pokes run (`tools/poke.md` §4 rules 1–2,
+    /// §5 rule 4). Not run in a frame without a tick.
+    pub fn frame_with(
+        &mut self,
+        at_tick_end: impl FnOnce(&mut Self),
+    ) -> Result<FrameReport, HostError> {
         let now = self.clock.now_ms();
         self.game.set_host_tick(now);
         // tools/perf: wall-clock timing of the parts, off unless enabled.
@@ -325,6 +336,11 @@ where
             self.game.tick(&mut self.buffers);
             if self.packets.is_some() {
                 self.note_tap();
+            }
+            // Before the `tick_end` record: the 1.14d recorder writes it
+            // at the 0x0052FD1E stop after the pokes run there.
+            at_tick_end(self);
+            if self.packets.is_some() {
                 let frame = self.game.frame();
                 self.note(PacketEvent::TickEnd { frame });
             }

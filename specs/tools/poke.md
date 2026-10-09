@@ -59,14 +59,14 @@
 |   2. Poke files | 143–165 |
 |   3. In scenarios | 166–180 |
 |   4. The 1.14d side (`poke.py`) | 181–254 |
-|   5. The d2rs side (`d2-sim::poke`) | 255–298 |
-|   6. `goto`: walking to a target | 299–373 |
-| Constants & data dependencies | 374–389 |
-| Randomness | 390–396 |
-| Edge cases & original bugs | 397–424 |
-| Test vectors | 425–448 |
-| Provenance | 449–454 |
-| Open questions | 455–462 |
+|   5. The d2rs side (`d2-sim::poke`) | 255–312 |
+|   6. `goto`: walking to a target | 313–387 |
+| Constants & data dependencies | 388–403 |
+| Randomness | 404–410 |
+| Edge cases & original bugs | 411–438 |
+| Test vectors | 439–465 |
+| Provenance | 466–471 |
+| Open questions | 472–479 |
 <!-- /index -->
 
 ## Summary
@@ -291,10 +291,24 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
    `msg` encoder and runs it through `Host::dispatch_now` for client 0:
    the dispatcher (`d2-server::dispatch`, the model of `0x0054D750`)
    called at once, outside the queues (no sender, no duplicate filter),
-   its S→C replies going to the client's buffers as in a drain, so the
-   client reads them at the next flush on both sides. Results as §4
-   rule 10. A runner without a host returns `gap` with note `operate /
-   talk need the host's dispatcher`.
+   its S→C replies going to the client's buffers as in a drain. Results
+   as §4 rule 10. A runner without a host returns `gap` with note
+   `operate / talk need the host's dispatcher`.
+5. **Tick end.** The 1.14d hook (§4 rule 1) stops inside the frame,
+   after the tick and before that frame's flush, so a handler's replies
+   leave in the same frame's buffer (first run: `interact-talk-akara`,
+   0x27 / 0x29 / 0x28 flushed in frame 15 on 1.14d, 16 on d2rs between
+   frames). `state-dump` therefore runs every poke of a frame that
+   holds an `operate` or `talk` at the same point: a tick-end hook of
+   the link (`Host::frame_with`, after the tick, before the flush), in
+   file order, after taking that frame's snapshot there (as
+   `record_state.py` snapshots before its pokes, §5 rule 2). A `goto`
+   in such a frame is an error (its walk runs between frames). Other
+   frames keep the between-frames point; a directive there whose path
+   queues an S→C message at once would show the same one-frame shift in
+   the packets channel. `play --poke` runs every poke
+   between frames: its `operate` / `talk` replies reach the client one
+   frame later than on 1.14d (a play aid, not a comparison).
 
 ### 6. `goto`: walking to a target
 
@@ -441,6 +455,9 @@ same on both sides.
 | `talk @1:148 trade hire quest:92 close`, Akara GUID 12, player GUID 1 | dispatcher calls with `13 01000000 0c000000`, `2f 00000000 0c000000`, `38 01000000 0c000000 00000000`, `38 03000000 0c000000 01000000`, `31 0c000000 5c00 0000`, `30 00000000 0c000000`, in order; `operate @wp` on waypoint GUID 18: `13 02000000 12000000` | synthetic (`d2-sim::poke` and `d2-client` poke tests, `poke.py --selftest` on a fake process: `0x0054D750` with ECX game, EDX player, stack scratch +0x300, size) |
 | `operate` / `talk` whose second call returns 1 | `failed` "0x2f returned 1", no third call | synthetic (`poke.py --selftest`) |
 | `operate`, `talk` malformed: no ref, an extra argument, an unknown choice, `quest:65536` | an error naming the line | synthetic |
+| `traces/checks/interact-operate-waypoint.check` (ScnAma, seed 1234; `pos` next to the town waypoint, then before frame 10 `operate @2:119`), 30 frames | `ok` on both (GUID 10, codes [0]); state and packets equal | 2026-10-09 (cloud, Wine; d2rs tick-end point, §5 rule 5): `ok` GUID 10 on both; state no difference in any compared field (PARTIAL only for the snapshot's own gaps); packets MATCH (S→C 0x63 queued and flushed in frame 9 on both) |
+| `traces/checks/interact-talk-akara.check` (ScnAma, seed 1234; poked next to Akara, before frame 16 `talk @1:148 trade`), 30 frames | `ok` on both (GUID 12, codes [0, 0, 0]); state and packets equal | 2026-10-09: `ok` GUID 12 on both, codes [0, 0, 0]; state no difference; packets: first difference frame 15, S→C 0x27 NpcInfo bytes 10 and 14 (the text list, `world/quests.md` §7.1: 1.14d `40 … 0b`, d2rs `0b … 40`), a d2rs NPC text-list divergence outside this spec (the id already diverges in `items-vendor-akara-buy`); the 1.14d client then sends 0x2F and 0x31 in frame 16 (its own reaction to 0x27) |
+| `traces/checks/interact-operate-stash.check` (ScnAma, seed 1234; before frame 4 `operate @2:267` from the start, 7 sub-tiles from the stash) | `ok` on both (GUID 17); the player runs to the stash, which opens (S→C 0x77 at frame 13) | 2026-10-09: `ok` GUID 17 on both; 1.14d runs the player to (4868, 4229) and opens the stash at frame 13; d2rs does not move (frame 4, player mode 3 vs 5): its 0x13 object case uses the play preview's reach and never starts the walk of `world/objects.md` §7.3 rule 4 (the same with the 0x13 sent through the client queue), a d2rs gap outside this spec |
 | the ids `msg` takes | 01–13, 16–2A, 2D–49, 4B–4D, 4F–54, 58, 59, 5D–63, 69–6B, 6D, 6E, 70 (from `client-messages.tsv`; both sides check the same list) | synthetic (`MSG_IDS` in both tests) |
 | `msg` with no id, id 0 or 0x71, 0x14 (no fixed size), a wrong count, 65536 in a `u16`, 2 in a `bitN` | an error naming the line | synthetic |
 | `state-dump --poke "4 msg 0x01 @x+5 @y"` twice (ScnAma, seed 1234) | first `ok`, second `failed` `duplicate filter`; the player has walked east by frame 12 | `d2-client` `app_state_dump` (real data, `#[ignore]`): unverified until the real-data gate runs it |
