@@ -324,6 +324,22 @@ def sound_compare(orig, d2rs, T):
     return o, d, None, f"equal: {len(o)} calls"
 
 
+def sound_sets(o, d):
+    """Order aside: per tick, the calls only one side made (multisets); a line naming the
+    first tick that differs and the counts."""
+    from collections import Counter
+    co, cd = Counter(o), Counter(d)
+    key = lambda r: tuple(-1 if x is None else x for x in r)  # noqa: E731
+    only_o, only_d = sorted((co - cd).elements(), key=key), sorted((cd - co).elements(), key=key)
+    if not only_o and not only_d:
+        return "same calls per tick (order aside)"
+    first = min(r[0] for r in only_o + only_d)
+    fo = [fmt_sound(r) for r in only_o if r[0] == first][:3]
+    fd = [fmt_sound(r) for r in only_d if r[0] == first][:3]
+    return (f"order aside: {len(only_o)} calls only in 1.14d, {len(only_d)} only in d2rs; first at tick {first}: "
+            f"1.14d only [{'; '.join(fo) or '-'}], d2rs only [{'; '.join(fd) or '-'}]")
+
+
 def fmt_sound(r):
     unit = "-" if r[2] is None else f"{r[2]}:{r[3]}"
     extra = "" if r[4:] == (0, 0, 0) else f" d{r[4]} f{r[5]} o{r[6]}"
@@ -535,7 +551,7 @@ def sound_html(r):
         rows.append(f"<tr{cls}><td class=\"num\">{k}</td><td>{e(a)}</td><td>{e(b)}</td></tr>")
     more = max(len(o), len(d)) - hi
     return (f'<p><b>Sounds</b> (request calls up to tick {r["tick"]}; 1.14d {len(o)}, d2rs {len(d)}): '
-            f'{e(sd["text"])}</p><table class="small"><thead><tr><th>#</th><th>1.14d</th><th>d2rs</th></tr>'
+            f'{e(sd["text"])}<br><span class="meta">{e(sound_sets(o, d))}</span></p><table class="small"><thead><tr><th>#</th><th>1.14d</th><th>d2rs</th></tr>'
             f'</thead><tbody>{"".join(rows)}</tbody></table>'
             + (f'<p class="meta">{more} more calls not shown</p>' if more > 0 else ""))
 
