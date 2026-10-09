@@ -141,7 +141,10 @@ again from it, compare the full state (header, stats, skills, waypoints,
 quests, mercenary, items with their bytes and places: inventory, stash,
 cube, belt, body, corpse) and the `.d2s` bytes of a second save made
 right after the reload (save time and checksum excluded; `d2s.md` §8.2
-rule 7's load-cleared 0x2000 flag is the spec's, not a difference).
+rule 7's load-cleared 0x2000 flag and `d2s-load.md` §9 r4's full stamina
+after a load are the spec's, not differences). Life and mana (stats 6
+and 8) regenerate during the reloaded game's join frames, before the
+comparison can pause it: a rise compares equal, a loss is a difference.
 
 ## Constants & data dependencies
 
