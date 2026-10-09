@@ -317,7 +317,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     and whether the unit is queued for update by the toggle
     (`0x00639DB0`) or by the entry itself. d2rs: PROVISIONAL REC-730 in
     `d2-sim/src/wiring/inventory/potion.rs`.
-45. **Melee on a fallen from the shared script** (q-fix-b-headless-unit-click-keys;
+45. **Melee on a fallen from the shared script** answered → see docs/handoff/pc1-day3-b.md. (q-fix-b-headless-unit-click-keys;
     `specs/tools/scenario-diff.md` §2 r4.5, §3 r8.5):
     `py tools\scenario-diff\scenario_diff.py traces\checks\combat-melee-fallen.check --orig-only`.
     Look for: the footer notes `autostart: frame 39: clickunit 1 19 368 300
@@ -329,7 +329,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     0x03) — only once `record_packets.py` applies `frame` input
     (`AutoStart.attach`; today it notes "they never run here"). Then run
     without `--orig-only` (both sides) and record the first difference.
-46. **A belt potion mid-fight from the shared script** (same row):
+46. **A belt potion mid-fight from the shared script** answered → see docs/handoff/pc1-day3-b.md. (same row):
     `py tools\scenario-diff\scenario_diff.py traces\checks\combat-potion-midfight.check --orig-only`.
     Look for: the footer note `autostart: frame 70: key 49 posted at the
     stop of frame 69`; in the state the player's `hp` 2560 -> 2640 at

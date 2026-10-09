@@ -281,6 +281,10 @@ class Host:
         return Map(self.cmd("map", record=False))
 
     def close(self):
+        if self.p.poll() is not None:
+            self.log.close()
+            self.err.close()
+            return
         try:
             self.p.stdin.write("quit\n")
             self.p.stdin.flush()
@@ -555,6 +559,13 @@ class Bot:
             self.close_panels()
             v = self.v
         p = nav.ahead(path, acts.LEG_REACH)
+        # a click on a monster attacks it: aim the walk click beside any
+        # monster near the point (an earlier path point)
+        mons = [(u["x"], u["y"]) for u in v.monsters() if v.alive(u)]
+        i = min(len(path) - 1, acts.LEG_REACH)
+        while i > 1 and any(cheb(path[i], m) <= 2 for m in mons):
+            i -= 1
+        p = path[i]
         self.act(f"{why}: walk {v.pos} -> {p} (path {len(path)})")
         self.click(toward(*v.cam, *p, reach=acts.LEG_REACH + 2), hold=1)
         self.wait(acts.WALK_STEP)
@@ -797,7 +808,9 @@ class Bot:
                     raise Stuck(f"{m.name}: steps ran but the milestone is not reached")
                 self.say(f"{m.name}: reached at frame {v.frame} (level {v.level})")
                 results.append({"name": m.name, "reached": True, "frame": v.frame})
-            except Stuck as e:
+            except (Stuck, HostError) as e:
+                if isinstance(e, HostError):
+                    e.reason = f"host failure: {e}"
                 v = self.v
                 stuck = {
                     "milestone": m.name,
@@ -886,6 +899,11 @@ def main(argv=None):
             stuck["state"] = host.state()
         except Exception as e:  # noqa: BLE001 - the host may be gone
             stuck["state"] = f"unavailable: {e}"
+        crash = os.path.join(os.path.dirname(client), "d2rs-crash.log")
+        if os.path.exists(crash) and os.path.getmtime(crash) >= t_start:
+            import shutil
+            shutil.copy(crash, os.path.join(work, "d2rs-crash.log"))
+            stuck["crash_log"] = os.path.join(work, "d2rs-crash.log")
         with open(os.path.join(work, "stuck.json"), "w") as f:
             json.dump(stuck, f, indent=1)
     host.close()

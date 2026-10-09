@@ -325,12 +325,12 @@ def act1_probe():
         Milestone("blood-moor", "walk into Blood Moor (2)", lambda v: v.level == 2, lambda b: b.goto_level(2)),
         Milestone("cold-plains", "walk into Cold Plains (3)", lambda v: v.level == 3, lambda b: b.goto_level(3)),
         Milestone("cold-plains-wp", "Cold Plains (3) waypoint menu", lambda v: _wp_taken.get(3), lambda b: _take_wp(b, 3)),
+        Milestone("stony-field", "walk into Stony Field (4)", lambda v: v.level == 4, lambda b: b.goto_level(4)),
+        Milestone("burial-grounds", "walk into Burial Grounds (17)", lambda v: v.level == 17, lambda b: b.goto_level(17)),
         Milestone("wp-to-town", "waypoint travel Cold Plains -> Rogue Encampment", lambda v: v.level == 1 and _wp_taken.get(3),
                   lambda b: _wp_travel(b, 1)),
         Milestone("wp-to-cold-plains", "waypoint travel Rogue Encampment -> Cold Plains", lambda v: v.level == 3 and _wp_taken.get("back"),
                   lambda b: (_wp_travel(b, 3), _wp_taken.__setitem__("back", True))),
-        Milestone("stony-field", "walk into Stony Field (4)", lambda v: v.level == 4, lambda b: b.goto_level(4)),
-        Milestone("burial-grounds", "walk into Burial Grounds (17)", lambda v: v.level == 17, lambda b: b.goto_level(17)),
     ]
     return {"class": "amazon", "name": "AutoProbe", "no_fight": True, "milestones": m}
 
