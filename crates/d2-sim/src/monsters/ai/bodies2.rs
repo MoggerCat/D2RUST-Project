@@ -526,7 +526,7 @@ pub fn vulture<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: Unit
     // 2.
     if room_of(game, t) != room_of(game, u) && far {
         if pv < 1 {
-            cx.world.walk_in_radius(game, u, t, 9, 0);
+            walk_in_radius(game, cx, u, t, 9, 0);
             return;
         }
         if land(game, cx, u) {
@@ -621,7 +621,7 @@ pub fn vulture<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: Unit
     if roll(cx, u, 100) < cx.aip(p, 4) {
         circle(game, cx, u, Some(t), 6, false);
     } else {
-        cx.world.walk_in_radius(game, u, t, 9, 0);
+        walk_in_radius(game, cx, u, t, 9, 0);
     }
     set_param(cx, u, 0, 0);
     wait(game, cx, u, 12);

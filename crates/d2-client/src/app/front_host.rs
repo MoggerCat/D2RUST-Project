@@ -25,7 +25,7 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use d2_formats::dc6::Dc6;
 use d2_formats::font::FontTable;
-use d2_formats::palette::Palette;
+use d2_formats::palette::{Palette, Pl2};
 
 use crate::assets::path::FileSource;
 use crate::ui::front_end::glyphs::text_quads;
@@ -62,6 +62,8 @@ impl SaveFolder for DirSaves {
 pub struct FrontArt {
     source: Arc<dyn FileSource>,
     palette: Option<Palette>,
+    /// The sky `pal.pl2`: its additive table is draw mode 3's blend.
+    pl2: Option<Arc<Pl2>>,
     cache: HashMap<&'static str, Option<Dc6>>,
     fonts: HashMap<u16, Option<(FontTable, Dc6)>>,
     /// UTF-16 text of a string id (button labels); `None`: labels blank.
@@ -74,9 +76,15 @@ impl FrontArt {
             .read_file(SKY_PALETTE[0])
             .and_then(Result::ok)
             .and_then(|b| Palette::parse(&b).ok());
+        let pl2 = source
+            .read_file(SKY_PALETTE[1])
+            .and_then(Result::ok)
+            .and_then(|b| Pl2::parse(&b).ok())
+            .map(Arc::new);
         Self {
             source,
             palette,
+            pl2,
             cache: HashMap::new(),
             fonts: HashMap::new(),
             strings: None,
@@ -123,19 +131,71 @@ impl FrontArt {
     }
 }
 
+/// The frame being composed: RGBA plus the palette index drawn at each pixel
+/// (`None`: an RGB draw of the preview's own, or the black background).
+struct Canvas {
+    px: Vec<u8>,
+    dst: Vec<Option<u8>>,
+}
+
+impl Canvas {
+    fn rgb(&mut self, x: i32, y: i32, rgb: [u8; 3]) {
+        if (0..WIDTH as i32).contains(&x) && (0..HEIGHT as i32).contains(&y) {
+            let n = (y as u32 * WIDTH + x as u32) as usize;
+            self.dst[n] = None;
+            self.px[n * 4..n * 4 + 3].copy_from_slice(&rgb);
+        }
+    }
+
+    /// Draws palette index `src`; with `add` (draw mode 3) the pixel becomes
+    /// `ADD[256·d + s]` over the index `d` already there (`render/blend-modes.md`
+    /// §1 and §2: row = destination), else the saturating channel sum.
+    fn index(&mut self, x: i32, y: i32, src: u8, pal: &Palette, add: Option<&Pl2>) {
+        if !((0..WIDTH as i32).contains(&x) && (0..HEIGHT as i32).contains(&y)) {
+            return;
+        }
+        let n = (y as u32 * WIDTH + x as u32) as usize;
+        let c = |i: u8| {
+            let c = pal.colors[usize::from(i)];
+            [c.r, c.g, c.b]
+        };
+        match add {
+            None => {
+                self.dst[n] = Some(src);
+                self.px[n * 4..n * 4 + 3].copy_from_slice(&c(src));
+            }
+            Some(pl2) => {
+                // The black background is index 0 until something is drawn.
+                let d =
+                    self.dst[n].or_else(|| (self.px[n * 4..n * 4 + 3] == [0, 0, 0]).then_some(0));
+                match d {
+                    Some(d) => {
+                        let r = pl2.additive_blend[usize::from(d)][usize::from(src)];
+                        self.dst[n] = Some(r);
+                        self.px[n * 4..n * 4 + 3].copy_from_slice(&c(r));
+                    }
+                    None => {
+                        self.dst[n] = None;
+                        let s = c(src);
+                        for (d, s) in self.px[n * 4..n * 4 + 3].iter_mut().zip(s) {
+                            *d = d.saturating_add(s);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Composes the draw items into 800×600 RGBA (opaque black background).
 pub fn compose(items: &[DrawItem], art: Option<&mut FrontArt>) -> Vec<u8> {
     let mut px = vec![0u8; (WIDTH * HEIGHT * 4) as usize];
     for p in px.as_chunks_mut::<4>().0 {
         p[3] = 255;
     }
-    let mut plot = |x: i32, y: i32, rgb: [u8; 3], additive: bool| {
-        if (0..WIDTH as i32).contains(&x) && (0..HEIGHT as i32).contains(&y) {
-            let i = ((y as u32 * WIDTH + x as u32) * 4) as usize;
-            for (d, s) in px[i..i + 3].iter_mut().zip(rgb) {
-                *d = if additive { d.saturating_add(s) } else { s };
-            }
-        }
+    let mut cv = Canvas {
+        px,
+        dst: vec![None; (WIDTH * HEIGHT) as usize],
     };
     let mut art = art;
     for it in items {
@@ -151,13 +211,14 @@ pub fn compose(items: &[DrawItem], art: Option<&mut FrontArt>) -> Vec<u8> {
                 let Some(f) = dc6.frames.get(*frame as usize) else {
                     continue;
                 };
-                let top = at.y - f.height as i32 + 1;
+                // The frame's offsets add to the position (`sprite-placement.md` §2).
+                let top = at.y + f.offset_y - f.height as i32 + 1;
                 for row in 0..f.height {
                     for col in 0..f.width {
                         let idx = f.pixels[(row * f.width + col) as usize];
                         if idx != 0 {
-                            let c = pal.colors[usize::from(idx)];
-                            plot(at.x + col as i32, top + row as i32, [c.r, c.g, c.b], false);
+                            let (x, y) = (at.x + f.offset_x + col as i32, top + row as i32);
+                            cv.index(x, y, idx, &pal, None);
                         }
                     }
                 }
@@ -166,23 +227,23 @@ pub fn compose(items: &[DrawItem], art: Option<&mut FrontArt>) -> Vec<u8> {
             DrawItem::Rect { at, w, h } => {
                 for y in at.y..at.y + h {
                     for x in at.x..at.x + w {
-                        plot(x, y, [8, 8, 12], false);
+                        cv.rgb(x, y, [8, 8, 12]);
                     }
                 }
             }
             DrawItem::Border { at, w, h } => {
                 for x in at.x..at.x + w {
-                    plot(x, at.y, [120, 100, 60], false);
-                    plot(x, at.y + h - 1, [120, 100, 60], false);
+                    cv.rgb(x, at.y, [120, 100, 60]);
+                    cv.rgb(x, at.y + h - 1, [120, 100, 60]);
                 }
                 for y in at.y..at.y + h {
-                    plot(at.x, y, [120, 100, 60], false);
-                    plot(at.x + w - 1, y, [120, 100, 60], false);
+                    cv.rgb(at.x, y, [120, 100, 60]);
+                    cv.rgb(at.x + w - 1, y, [120, 100, 60]);
                 }
             }
-            // PROVISIONAL (REC-189): draw mode 3 is the additive blend of
-            // §F1.5 r2 (per-channel `min(255, d + s)`, the spec's fit of the
-            // PL2 table); the frame's offsets add to the position
+            // Draw mode 3 is the sky PL2's additive table in index space
+            // (`blend-modes.md` §1; settled on the install by q-prov-data,
+            // the channel sum matches that table for ~10 % of pairs); the frame's offsets add to the position
             // (`sprite-placement.md` §2). Other modes draw opaque.
             DrawItem::Blend {
                 file,
@@ -196,6 +257,7 @@ pub fn compose(items: &[DrawItem], art: Option<&mut FrontArt>) -> Vec<u8> {
                 let Some(pal) = a.palette.clone() else {
                     continue;
                 };
+                let pl2 = a.pl2.clone(); // an Arc: the table is 440 KB
                 let Some(dc6) = a.dc6(file) else { continue };
                 let Some(f) = dc6.frames.get(*frame as usize) else {
                     continue;
@@ -205,9 +267,14 @@ pub fn compose(items: &[DrawItem], art: Option<&mut FrontArt>) -> Vec<u8> {
                     for col in 0..f.width {
                         let idx = f.pixels[(row * f.width + col) as usize];
                         if idx != 0 {
-                            let c = pal.colors[usize::from(idx)];
                             let (x, y) = (at.x + f.offset_x + col as i32, top + row as i32);
-                            plot(x, y, [c.r, c.g, c.b], *mode == 3);
+                            cv.index(
+                                x,
+                                y,
+                                idx,
+                                &pal,
+                                (*mode == 3).then_some(pl2.as_deref()).flatten(),
+                            );
                         }
                     }
                 }
@@ -245,13 +312,7 @@ pub fn compose(items: &[DrawItem], art: Option<&mut FrontArt>) -> Vec<u8> {
                         for col in 0..f.width {
                             let idx = f.pixels[(row * f.width + col) as usize];
                             if idx != 0 {
-                                let c = pal.colors[usize::from(idx)];
-                                plot(
-                                    q.at.x + col as i32,
-                                    top + row as i32,
-                                    [c.r, c.g, c.b],
-                                    false,
-                                );
+                                cv.index(q.at.x + col as i32, top + row as i32, idx, &pal, None);
                             }
                         }
                     }
@@ -259,7 +320,7 @@ pub fn compose(items: &[DrawItem], art: Option<&mut FrontArt>) -> Vec<u8> {
             }
         }
     }
-    px
+    cv.px
 }
 
 /// The front end in the app (a non-send resource: screens are not `Send`).

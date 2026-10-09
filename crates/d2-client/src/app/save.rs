@@ -581,9 +581,10 @@ pub fn request_save_and_exit<L: ServerLink>(
 /// The client's end of the game (`flows/save-exit.md` §4 r1): the
 /// server's 0x05 took the client out of the game (`in_game` false) and
 /// the exit is asked (0x06, or the Save and Exit send): the app closes.
-/// PROVISIONAL (`ui/frontend-menus.md` §F1.3, REC-200): the original
-/// returns to character select; `play` has no front end around the game
-/// yet, so it ends.
+/// The original returns to the main menu (`ui/frontend-menus.md` §F1.3,
+/// REC-200, recorded); `main.rs`'s `play` loop reopens the front end at
+/// `Entry::MainMenu`, and this system only ends the app for the headless
+/// runs.
 pub fn end_of_game(
     bridge: Option<bevy::prelude::Res<crate::bridge::BridgeResource>>,
     mut exit: MessageWriter<AppExit>,

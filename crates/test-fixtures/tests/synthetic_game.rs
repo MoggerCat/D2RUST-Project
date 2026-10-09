@@ -1372,10 +1372,9 @@ fn a_stub_starts_a_new_character_before_the_join_sequence() {
         .collect();
     let n = stats.len();
     assert!(stats.contains(&&vec![0x1D, 0, cs.str]), "{stats:02X?}");
-    // PROVISIONAL (`d2s-load.md` §8 r3, REC-02): d2rs sends item −1, not
-    // the static reading's 0.
-    assert_eq!(j.received[9 + n], hand(1, [0, 0], [0xFF; 4]));
-    assert_eq!(j.received[10 + n], hand(0, k, [0xFF; 4]));
+    // `d2s-load.md` §8 r3 (REC-02, `facts/join/a1-new-ama.tsv`): item 0.
+    assert_eq!(j.received[9 + n], hand(1, [0, 0], [0; 4]));
+    assert_eq!(j.received[10 + n], hand(0, k, [0; 4]));
     let again: Vec<&Vec<u8>> = j.received[11 + n..11 + 2 * n].iter().collect();
     assert_eq!(again, stats);
     // The server player init's native skills (`msg-skills.md` §2 rule 8):

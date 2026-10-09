@@ -23,19 +23,19 @@
 |   1. Frame size and play area | 71–92 |
 |   2. World coordinates → client pixels | 93–117 |
 |   3. Camera origins (once per drawn frame) | 118–133 |
-|   4. Units | 134–152 |
-|   5. Panel shift for floors | 153–158 |
-|   6. Tiles | 159–198 |
-|   7. View culling | 199–249 |
-|   8. Screen shake | 250–327 |
-|   9. Time base: no interpolation | 328–402 |
-|   10. What d2rs hooks get | 403–411 |
-| Constants & data dependencies | 412–418 |
-| Randomness | 419–426 |
-| Edge cases & original bugs | 427–436 |
-| Test vectors | 437–461 |
-| Provenance | 462–491 |
-| Open questions | 492–594 |
+|   4. Units | 134–169 |
+|   5. Panel shift for floors | 170–175 |
+|   6. Tiles | 176–215 |
+|   7. View culling | 216–266 |
+|   8. Screen shake | 267–344 |
+|   9. Time base: no interpolation | 345–419 |
+|   10. What d2rs hooks get | 420–428 |
+| Constants & data dependencies | 429–435 |
+| Randomness | 436–443 |
+| Edge cases & original bugs | 444–453 |
+| Test vectors | 454–478 |
+| Provenance | 479–508 |
+| Open questions | 509–611 |
 <!-- /index -->
 
 ## Summary
@@ -149,6 +149,23 @@ Y = py + oy − cy_u + 8
 
 So the local player (offsets 0, no shake) is drawn at
 `(W / 2 + shiftX, H / 2 − 8)`: (400, 292) at 800 × 600, mode 0.
+
+**Screen → world** (`0x0045AFF0(&x, &y)`, the click mapping of
+`ui/controls.md` §6 r2): from screen `(sx, sy)`:
+
+1. Perspective on (`0x004F51D0` ≠ 0; never on GDI) first:
+   `sy' = sy + trunc(−sy / 40)` (`imul 0x99999999`, `sar 4`, sign
+   fix: C signed division), then `sx' = sx + (40 − sy' / 4) × (sx −
+   W / 2) / (W / 2)` (C signed divisions). Off: unchanged.
+2. Client: `px = sx' + cx_u − shiftX` (`[0x007A520C]` −
+   `[0x007A5214]`), `py = sy' + cy_u` (`[0x007A5208]`, **no −8**: not
+   the exact inverse of the unit draw above, which uses `cy_u − 8`).
+3. Subtile (`0x00643510`): `x = (px + 2·py) >> 5`, `y = (2·py − px)
+   >> 5` (arithmetic shifts, i.e. floor).
+
+So a click on the local player's drawn foot point (400, 292) maps to
+client `(P_x, P_y + 8)`, +½ subtile on both world axes before the
+floor.
 
 ### 5. Panel shift for floors
 

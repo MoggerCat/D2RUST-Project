@@ -1,0 +1,18 @@
+d2patch 1
+# Blood Moor (levels #2): fallen1 is the only class in the Normal (mon),
+# Nightmare/Hell (nmon) and champion/unique (umon) lists. The old values
+# are the 1.14d base per specs/monsters/population.md Test vectors
+# ("levels 2 Blood Moor"); confirm with `data-tool patch check` on the
+# real install. An empty cell compiles to -1, which ends the list
+# (specs/data/fixups.md section 11), so each list holds fallen1 alone.
+
+table levels
+set #2 [Act 1 - Wilderness 1] mon1 zombie1 -> fallen1
+set #2 [Act 1 - Wilderness 1] mon2 fallen1 -> []
+set #2 [Act 1 - Wilderness 1] mon3 quillrat1 -> []
+set #2 [Act 1 - Wilderness 1] nmon1 zombie1 -> fallen1
+set #2 [Act 1 - Wilderness 1] nmon2 fallen1 -> []
+set #2 [Act 1 - Wilderness 1] nmon3 quillrat1 -> []
+set #2 [Act 1 - Wilderness 1] umon1 zombie1 -> fallen1
+set #2 [Act 1 - Wilderness 1] umon2 fallen1 -> []
+set #2 [Act 1 - Wilderness 1] umon3 quillrat1 -> []

@@ -244,8 +244,8 @@ pub const CREATE_FLAGS_EXPANSION: u32 = create_flags::EXPANSION | 0x4;
 
 /// The 0x67 u32@0x27 of a classic character.
 ///
-/// PROVISIONAL (client/model.md §7 r9; REC-46): bit 2 alone, without the
-/// expansion bit 20.
+/// Bit 2 alone, without the expansion bit 20 (`client/model.md` §7 r9;
+/// recorded, REC-46: `facts/join/a1-new-classic-ama.tsv`).
 pub const CREATE_FLAGS_CLASSIC: u32 = 0x4;
 
 /// The local client's C→S 0x67 for `character` (`client/model.md` §7
@@ -1598,6 +1598,8 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
             let m2 = monstats2.record(link as usize);
             let mut c = MonsterClass::from_record(m2, m.npc, m.interact)?;
             c.setup = Some(monster_setup(m, monstats_table.record(i), m2));
+            c.no_aura = m.noaura;
+            c.in_town = m.intown;
             if let Some(x) = monstats2_rows.get(link as usize) {
                 c.light = x.light;
                 c.light_rgb = (x.light_r, x.light_g, x.light_b);
@@ -1680,7 +1682,34 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
                 m.cltsubmissile2 as i16,
                 m.cltsubmissile3 as i16,
             ],
-            clt_param: [m.cltparam1 as i32, m.cltparam2 as i32, m.cltparam3 as i32],
+            clt_param: [
+                m.cltparam1 as i32,
+                m.cltparam2 as i32,
+                m.cltparam3 as i32,
+                m.cltparam4 as i32,
+                m.cltparam5 as i32,
+            ],
+            clt_calc1: m.cltcalc1,
+            town: m.town,
+            clt_src_town: m.cltsrctown,
+            size: m.size,
+            rand_start: m.randstart as i32,
+            prog_sound: m.progsound as i16,
+            param: [m.param1 as i32, m.param2 as i32],
+            client_col: m.clientcol != 0,
+            collide_kill: m.collidekill != 0,
+            collide_friend: m.collidefriend != 0,
+            next_hit: m.nexthit != 0,
+            next_delay: m.nextdelay,
+            can_destroy: m.candestroy,
+            clt_hit_sub: [
+                m.clthitsubmissile1 as i16,
+                m.clthitsubmissile2 as i16,
+                m.clthitsubmissile3 as i16,
+                m.clthitsubmissile4 as i16,
+            ],
+            c_hit_par: [m.chitpar1 as i32, m.chitpar2 as i32, m.chitpar3 as i32],
+            hit_sub1_server: m.hitsubmissile1 as i16,
         })
         .collect();
     let states: Vec<d2_data::tables::States> = decode_all(table("states")?).map_err(err)?;
@@ -2008,11 +2037,14 @@ fn loader(
             mode: 1,
             allied: true,
         };
-        let Some(player) = s
-            .events
-            .action
-            .with(&mut s.game, |g, v| v.allocate(g, &req, 0, 0))
-        else {
+        let Some(player) = s.events.action.with(&mut s.game, |g, v| {
+            // `units.md` §3.1 r4.1: the load draws the player's unit
+            // seed (`0x00552DF0`) right after the allocation, before
+            // the save's or the start items and the act's DRLG.
+            let p = v.allocate(g, &req, 0, 0)?;
+            v.init_player_seed(p);
+            Some(p)
+        }) else {
             s.events
                 .action
                 .hooks()

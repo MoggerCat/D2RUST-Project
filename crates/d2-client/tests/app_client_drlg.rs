@@ -572,27 +572,36 @@ fn client_missile_function_counts_on_the_users_rows() {
 }
 
 // Covers: specs/missiles/client.md §c12-client-function-table-0x0072a398
-/// Every user `missiles` row whose client function the model runs (1,
-/// 4, 5, 6, 8, 11, 23, 25, 43, 49, 60, 63): created at a point with a
-/// player owner and a target 6 sub-tiles east, then 60 client updates
-/// of every client missile; no handler error.
+/// Every user `missiles` row whose client function the model runs
+/// ([`RUN`]): created at a point with a player owner and a target 6
+/// sub-tiles east, then 60 client updates of every client missile with
+/// the user's skills tables and a drawn frame's unit origin around the
+/// start; no handler error, and every function has a user row made.
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_users_client_missiles_run_their_functions() {
-    use d2_client::bridge::client_missiles::{create, flag, update, CreateRecord};
-    use d2_client::bridge::world::{ClientUnit, UnitKey};
+    use d2_client::bridge::client_missiles::{create, flag, update_with, CreateRecord, Env};
+    use d2_client::bridge::world::{ClientUnit, UnitKey, UnitOrigin};
     let d = app_support::live();
     let rows = single_player::client_unit_rows(d.archives.as_ref()).unwrap();
+    let skills = single_player::client_skill_tables(d.archives.as_ref()).unwrap();
     let missiles = &rows.missiles;
-    let run = [1u16, 4, 5, 6, 8, 11, 23, 25, 43, 49, 60, 63];
     let mut w = ClientWorld::default();
     let p = UnitKey::new(0, 1);
     let mut u = ClientUnit::new(p);
     u.position = Some((100, 100));
     w.units.insert(p, u);
-    let mut made = 0;
+    // The camera on (100, 100): client pixel (0, 1600) (`camera.md` §2),
+    // 800 × 600, mode 0 (§3, §4).
+    w.unit_origin = Some(UnitOrigin {
+        x: -400,
+        y: 1600 - 300 + 16 - 8,
+        width: 800,
+        play_height: 560,
+    });
+    let mut made = std::collections::BTreeMap::new();
     for (class, row) in missiles.iter().enumerate() {
-        if !run.contains(&row.clt_do_func) {
+        if !RUN.contains(&row.clt_do_func) {
             continue;
         }
         let rec = CreateRecord {
@@ -606,14 +615,28 @@ fn the_users_client_missiles_run_their_functions() {
             ..CreateRecord::default()
         };
         if create(&mut w, missiles, &rec, true).unwrap().is_some() {
-            made += 1;
+            *made.entry(row.clt_do_func).or_insert(0) += 1;
         }
     }
-    assert!(made > 500, "{made}");
+    assert_eq!(made.keys().copied().collect::<Vec<_>>(), RUN.to_vec());
+    assert!(made.values().sum::<i32>() > 550, "{made:?}");
+    let env = Env {
+        rows: missiles,
+        lights: true,
+        skills: Some(&skills),
+        monsters: &rows.monsters,
+    };
     for _ in 0..60 {
         let keys: Vec<_> = w.objclient.missiles.keys().copied().collect();
         for k in keys {
-            update(&mut w, missiles, k, true).unwrap();
+            update_with(&mut w, &env, k).unwrap();
         }
     }
 }
+
+/// The client functions the model runs (`missiles/client.md` §C12), in
+/// order.
+const RUN: [u16; 37] = [
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 17, 18, 19, 20, 23, 25, 27, 37, 39, 43, 44, 45, 46, 47,
+    48, 49, 51, 52, 53, 58, 59, 60, 63, 65, 68,
+];

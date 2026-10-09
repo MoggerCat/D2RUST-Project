@@ -32,17 +32,17 @@
 |   2. Think dispatch `0x005B1740` | 246–382 |
 |   3. AI control and AI tables | 383–554 |
 |   4. AI parameters | 555–573 |
-|   5. Target selection | 574–705 |
-|   6. Distances and line tests | 706–720 |
-|   7. Tactics helpers | 721–913 |
-|   8. AI commands and minions | 914–938 |
-|   10. The catalogue `ai-functions.tsv` | 939–959 |
-| Constants & data dependencies | 960–983 |
-| Randomness | 984–1005 |
-| Edge cases & original bugs | 1006–1047 |
-| Test vectors | 1048–1136 |
-| Provenance | 1137–1193 |
-| Open questions | 1194–1297 |
+|   5. Target selection | 574–732 |
+|   6. Distances and line tests | 733–747 |
+|   7. Tactics helpers | 748–940 |
+|   8. AI commands and minions | 941–965 |
+|   10. The catalogue `ai-functions.tsv` | 966–986 |
+| Constants & data dependencies | 987–1010 |
+| Randomness | 1011–1032 |
+| Edge cases & original bugs | 1033–1074 |
+| Test vectors | 1075–1163 |
+| Provenance | 1164–1220 |
+| Open questions | 1221–1324 |
 <!-- /index -->
 
 ## Summary
@@ -676,7 +676,34 @@ a, next, prev}; unit +0xD0 = its slot, 11 = none):
 |---|---|---|
 | `0x005DD510` | `sub_6FCF27B0` | alternative-target choice: never for players or without an alternative; take it if no main target; refuse if the alternative is farther than 5; else trial path toward the main target, keep main if a path exists; else scan 7 for something closer than 20 |
 | `0x005DDC30` | `sub_6FCF2CC0` | target search for "good" shooters and secondary picks: forced target, else scan 6 + `0x005DD510`; returns target, distance (0x7FFFFFFF if none), melee flag |
-| `0x005DDF20` | `sub_6FCCFD70` | nearest interacting player within 15 for NPCs (scan 2, callback D2MOO `sub_6FCCFDE0`); "close" when distance < 4; returns the NPC itself when none |
+| `0x005DDF20` | `sub_6FCCFD70` | nearest interacting player within 15 for NPCs (scan 2, callback D2MOO `sub_6FCCFDE0`); "close" when distance < 4; returns the NPC itself when none. PROVISIONAL: the callback's distance is the no-size distance `0x005DC530` between the two positions, "within" is ≤ 15, a tie keeps the first found (because the callback is unread in 1.14d; Warriv's recorded arrival walks fit it); settled by REC-500 |
+
+**Scan 6 callback `0x005DCBD0`** (the search window of `0x005DDC30`;
+2026-10-09, pc1-data Step 4 item 3). Context {main, main d, alt, alt d},
+started {0, 0x7FFFFFFF, 0, 0x7FFFFFFF}. For each candidate C:
+
+1. Filter `0x005DC970` (scanner and C each a player or monster, neither
+   dead `0x005541B0`, C's room not in town `0x0061AB00`, C has unit flag
+   4 `0x00451F30(C, 4)`; C with state 146 (`0x00639DF0(C, 0x92)`): a
+   player C is skipped when `roll(100)` on C's seed (`0x0045C390`) < 80
+   and the scanner is not in melee range of it, a monster C is skipped
+   when in melee range; then `0x00554200(C)`) fails → skip.
+2. d := full-size distance (§6 `0x005DC380`); d ≥ 49 (0x31) → skip.
+3. Class t := 14 for a player, the monstats byte +0x4E (`nThreat`) for
+   a monster (`0x005DC920`). t ≥ 2 competes for main, else for alt; d
+   not below that slot's distance → skip.
+4. Line test `0x00622AA0(scanner, C, 4)` blocked → skip; else the slot
+   := (C, d). The callback always returns 0 (whole scan).
+
+So `0x005DDC30` sees targets closer than 49; each caller applies its
+own distance gate (the Hireable think: E < 25, `ai-bodies-6.md` §7
+step 8, `0x005E55A3` `cmp [E], 0x19; jae`). The hireling's effective
+engage range is therefore full-size distance < 25 — neither the 20 of
+REC-100 nor the 35 of REC-279 (35 is the not-evil §5.2 step 4 scan 5
+radius, a different search).
+```
+best = scan6(unit, d < 49); best = alt_choice(best); if best && dist(best) < 25 { hireling_attack(best) }
+```
 
 #### 5.4 Room scans `0x005DD0B0`
 
@@ -724,7 +751,7 @@ All distances are in tiles (subtile coordinates of `sim/units.md`):
 
 | 1.14d | D2MOO | Effect |
 |---|---|---|
-| `0x005DDF90(mode, target)` | `AITACTICS_ChangeModeAndTargetUnit` | mode change with a target unit; request flag 1; the path step count is not set |
+| `0x005DDF90(mode, target)` | `AITACTICS_ChangeModeAndTargetUnit` | mode change with a target unit; request flag 1; the path step count is not set; no skill is set, so the builder's clear leaves the used skill entry (`0x00620250`) **none** for the whole mode (a plain A1 / A2 has no skill entry: every reader of the used entry takes its "none" branch, e.g. `skills/bodies.md` §-rules "no used skill entry → 0", `sim/units.md` attack weapon → D; Attack (skill 0) is **not** substituted; 2026-10-09 read of `0x005DDF90` → `0x005A7E60` → `0x00620210(U, 0)` → `0x00643990`: list +0x10 := 0) |
 | `0x005DDFC0(mode, x, y)` | `…ChangeModeAndTargetCoordinates` | mode change at coordinates; request flag 1; the path step count is not set (like `0x005DE490`) |
 | `0x005DE000(skill, target, x, y)` | `AITACTICS_UseSequenceSkill` | skill id in range: mode 14 (sequence), current skill := skill, path step 1, no fallback |
 | `0x005DEAD0(mode, skill, target, x, y)` | `AITACTICS_UseSkill` | mode < 16: current skill := the unit's skill entry with that id and owner −1 (`0x006439B0`, 0 when none; `0x00620210`), unit flag 0x40, path step 1; request with target unit, point (x, y) and flag 0; returns 1 when the mode change succeeds; else idle 10 and returns 0. Mode ≥ 16: nothing, returns 0 |
@@ -784,7 +811,7 @@ flag 4 → delete thinks; flag 1 → set control flag 0x40; flag 2 → draw
 | `0x005DEFE0(t, n, del)` | `D2GAME_AICORE_Escape` | unit or t = 0 → return 0, nothing done; if n > 5 velocity request steps n; walk to (own x + sign(own x − t.x)·n, own y + sign(own y − t.y)·n), step 1, flags del ? 4 : 0 | none |
 | `0x005DF140(t, n, del)` | `sub_6FCD06D0` | same, running | none |
 | `0x005DF7D0(t, n, del)` | `sub_6FCD0E80` ("circle n") | one step: low byte of `lo'` < 128 → velocity method 5, else 6, with steps n; then walk toward t, step 1, flags del ? 4 : 0 | one |
-| `0x005DE6D0(t, a, b)` → `0x005DE4E0` | `AITACTICS_WalkInRadiusToTarget` | walk to the point that brings the distance to t toward b by at most a | none |
+| `0x005DE6D0(t, a, b)` → `0x005DE4E0` | `AITACTICS_WalkInRadiusToTarget` | walk to the point that brings the distance to t toward b by at most a. PROVISIONAL: dist = no-size distance, k = min(a, dist − b), no walk when k ≤ 0 or dist = 0; point = own + Δ·k / dist per axis, rounded to nearest (halves away from zero); mode 2, path step count 1, with the staged velocity request (because the geometry is D2MOO's and unread in 1.14d; it reproduces Warriv's three recorded arrival walks, `-seed 1234`: (4866, 4235)→(4868, 4233) with (3, 2), →(4869, 4232) with (2, 2), →(4870, 4231) with (1, 2), player at (4873, 4228)); settled by REC-501 | none |
 | `0x005DF680(t, n)` | `AITACTICS_RunCloseToTargetUnit` ("run near t n") | 15 (2 with the velocity reset if state 60), point near t, 1, no flags; returns the mode-change result | as wander, around t, n as a byte |
 | `0x005DEF30(x, y)` | `WalkToTargetCoordinatesNoSteps` | 2, coordinates, 0, no flags; returns the mode-change result | none |
 

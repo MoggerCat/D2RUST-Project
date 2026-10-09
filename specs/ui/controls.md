@@ -24,18 +24,18 @@
 | Rules | 70–71 |
 |   1. Binding table | 72–90 |
 |   2. Key files | 91–123 |
-|   3. Commands and default keys | 124–227 |
-|   4. Dispatch | 228–297 |
-|   5. Key-config screen assignment | 298–313 |
-|   6. World clicks (left / right button; answers OQ 2 in part) | 314–629 |
-|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 630–671 |
-|   B4. Original-defaults check (`client/ui.md` §B4) | 672–697 |
-| Constants & data dependencies | 698–704 |
-| Randomness | 705–708 |
-| Edge cases & original bugs | 709–721 |
-| Test vectors | 722–749 |
-| Provenance | 750–768 |
-| Open questions | 769–816 |
+|   3. Commands and default keys | 124–231 |
+|   4. Dispatch | 232–301 |
+|   5. Key-config screen assignment | 302–317 |
+|   6. World clicks (left / right button; answers OQ 2 in part) | 318–637 |
+|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 638–679 |
+|   B4. Original-defaults check (`client/ui.md` §B4) | 680–705 |
+| Constants & data dependencies | 706–712 |
+| Randomness | 713–716 |
+| Edge cases & original bugs | 717–729 |
+| Test vectors | 730–757 |
+| Provenance | 758–776 |
+| Open questions | 777–824 |
 <!-- /index -->
 
 ## Summary
@@ -221,7 +221,11 @@ for 56); `key1`, `key2` (default key of slot 1 / slot 0 as
 of the command's two entries in the default table: entries 2p (slot 1)
 and 2p + 1 (slot 0), **except command 1** (Inventory), whose slot-0
 entry (`B`) is entry 2p and slot-1 entry (`I`) is 2p + 1: measured on
-`Game.exe` 0x312220, 2026-10-09, the first real-data run); `menu_classic`, `menu_exp` (row in the §3.3
+`Game.exe` 0x312220, 2026-10-09, the first real-data run; the order
+matters only for the bytes: `default.key` and a saved `.key` copy the
+table as is, while the first-match lookups (§4.1 r2, §5 r3) cannot tell
+the two orders apart, because no two default entries share a key (§2.3
+refuses a `.key` with a duplicate)); `menu_classic`, `menu_exp` (row in the §3.3
 tables, `-` = not listed). Generated from the 1.14d binary; the §B4
 check reads it.
 
@@ -357,8 +361,12 @@ check reads it.
    - 0 left down (`0x004629A0`): skill := P's left skill (`0x00620190`).
      If `0x00464600(P, skill)` = 0 (P holds a cursor item or is not a
      player; or P's mode is 0, 4, 7–12, 17 or 19; or mode 13 with class
-     3, mode 14 with class 6, modes 15–16 with classes 4–6; mode 18 as
-     `0x004645B0(skill)` decides): cursor state 6 → `0x00453EC0` (C→S
+     3, mode 14 with class 6, modes 15–16 with classes 4–6; mode 18
+     (sequence) as `0x004645B0` decides, which ignores the clicked
+     skill: P's used skill entry (skill list +0x10, `0x006439A0`) none
+     → act; its row's `anim` (+0x10) ≠ 18 → act; its `seqinput`
+     (+0x16) 0 or 255 → 0; else act iff P's frame event index (unit
+     +0x38 >> 8) ≥ `seqinput`): cursor state 6 → `0x00453EC0` (C→S
      **0x27** with the cursor unit's GUID in both fields); cursor state 8
      → C→S **0x4C** [−1]; then, holding a cursor item → C→S **0x17**
      [item GUID] (drop it, `DropItem`), returns 0. Else flags |= 0x80 and

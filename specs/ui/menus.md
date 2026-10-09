@@ -22,15 +22,15 @@
 | Outputs / state changes | 58–65 |
 | Rules | 66–67 |
 |   1. Waypoint menu input (ui 0x14) | 68–124 |
-|   2. NPC menu box | 125–200 |
-|   3. Hire list (`0x004B5C60`, NPC option "hire") | 201–243 |
-|   4. Shop transactions | 244–323 |
-| Constants & data dependencies | 324–331 |
-| Randomness | 332–335 |
-| Edge cases & original bugs | 336–347 |
-| Test vectors | 348–359 |
-| Provenance | 360–376 |
-| Open questions | 377–392 |
+|   2. NPC menu box | 125–233 |
+|   3. Hire list (`0x004B5C60`, NPC option "hire") | 234–286 |
+|   4. Shop transactions | 287–376 |
+| Constants & data dependencies | 377–384 |
+| Randomness | 385–388 |
+| Edge cases & original bugs | 389–400 |
+| Test vectors | 401–412 |
+| Provenance | 413–429 |
+| Open questions | 430–445 |
 <!-- /index -->
 
 ## Summary
@@ -197,6 +197,39 @@ menus: its client sender is `client/model.md` §7 rule 9.
    confirmation of transaction..."), height 15, font 1, color 0, not
    selectable; deadline `[0x007C0D53]` = now + 60,000 ms. A second one
    while one exists is fatal.
+8. **Input** (read 2026-10-09): `0x004B7EB0` registers the menu-box
+   window handlers on the game window: the 14 entries of `0x007273F0`
+   and the one wheel entry of `0x007273E4` (the 0x0E and 1 are the
+   entry counts passed to `0x00451DB0`). The gold box shares them;
+   the event table, the 80 ms creation guard, the child-control offers,
+   the outside click (p1 runs), the Esc / Space entries and WM_CHAR are
+   `ui/panels-3.md` §28 r2. The item parts, box b, mouse (mx, my):
+   1. **Item hit** (`0x004B7180`): the first item i with selectable =
+      1 and b.x + 15 < mx < b.x + w − 15 and e − 11 < my < e + 4,
+      where e = b.y + the heights of items 0 … i (item i's pen y,
+      rule 5); none → −1. Not-selectable items never hit.
+   2. **Re-pick** (`0x004B7200`, on mouse down, and on mouse move
+      when no control takes it): selected +0x44 := pressed item +0x48
+      := the hit (−1 too, so moving off the items clears the
+      selection); changed and ≠ −1 → click sound `0x004B9A00(1, 0, 0,
+      0)`. Mouse move inside the 80 ms guard does nothing.
+   3. **Mouse up** (`0x004B72E0`) with the box pressed, after the
+      guard: when the hit equals +0x48 and lies in 0 … count − 1, the
+      selected item's handler (+0x170) runs; it returning non-zero
+      ends the handler there (the box may be gone); every other case
+      sets pressed := 0.
+   4. **Step** (`0x004B7100(d)`, arrows with no control taking them
+      and the wheel; Up 0x26 and Right 0x27 d = −1, Down 0x28 and
+      Left 0x25 d = +1 (as compiled); wheel delta / 120 > 0 → −1, else
+      +1): only with
+      more than one selectable item: from the selected index add d,
+      wrapping ≥ count → 0 and < 0 → count − 1, until a selectable item;
+      click sound as r2; selected := it.
+   5. **Enter** (`0x004B79D0`): consumed; nothing until the box was
+      drawn 5 times (+0x54 ≥ 5) or when Enter is one of command 38's
+      keys (`0x004B7970`). A selected item in range: its handler runs
+      when present, and a return of 1 calls `0x00453AE0`. No selection:
+      the first selectable item becomes selected (no handler call).
 
 ### 3. Hire list (`0x004B5C60`, NPC option "hire")
 
@@ -229,7 +262,17 @@ menus: its client sender is `client/model.md` §7 rule 9.
 5. **Row text** (`0x004B5E3B`–`0x004B6300`, answers OQ 1). The list
    widget first gets `0x004B7C00(widget, 0x23, 0x1E)`. Per used record:
    the hireling's stats for the player's difficulty and game type
-   (`0x00663750`, `0x006637F0`; fails → the builder stops). Left text =
+   (`0x00663750`, `0x006637F0`; fails → the builder stops). Exact
+   arguments (2026-10-09 read, `0x004B5E6A`–`0x004B5EA7`): act0 :=
+   `0x00663750(expansion [0x007A04F4], class 0, record u16 @0)`, i.e.
+   the `Act` − 1 of the first `hireling` row of the game's version
+   whose `NameFirst`…`NameLast` holds the name (`world/hirelings.md`
+   §1.2 r3); then `0x006637F0(expansion, local player
+   `0x00463DD0`, seed = record u32 @4, act0, difficulty = the game's
+   difficulty byte `[0x007A060C]` (`0x0044DCD0`), out)`, the same
+   routine and inputs as the server's offer (`world/hirelings.md` §2),
+   so every shown value (Level word 1, Life word 2, Def word 7, Cost
+   word 5) is computable on the client. Left text =
    the name (record u16 @0; 0x421 → string 11021) + `space` `dash`
    `space` (3995, 3996, 3995), then four fields, each = the label (cut
    to 20 units) + `colon` (3997) + `space` + the value as `%2u` + two
@@ -256,7 +299,11 @@ menus: its client sender is `client/model.md` §7 rule 9.
 2. **Kind and price** `[0x007C0D7F]` (cost `0x0062FDC0(player, item,
    difficulty, quest flags, c, t)`, `world/vendors.md` §9):
    - a1 ≠ 1 (store item): refused while the player has a cursor item;
-     kind 1 (buy), t = 2 in a gamble shop (`[0x007C0DB0]` ≠ 0), else 0;
+     kind 1 (buy), t = 0 (the "t = 2 when `[0x007C0DB0]` ≠ 0" branch is
+     dead: every write of `[0x007C0DB0]` stores 0, `panels-2.md` §14
+     r11; read 2026-10-09, writes `0x004B6FD7`, `0x004B703D`,
+     `0x004B70B1`, `0x004B70D7` all with EBX = 0, no indexed write
+     reaches it: the word array at `0x007C0D9A` stops at 9 entries);
    - a1 = 1 (player item), by `c`: 147, 148, 177, 199, 202, 252, 254,
      255, 405, 512, 513, 514 → sell (t = 1); 154, 178, 253, 257, 511 →
      with the repair button on (`0x00489860`): repair (kind 3, t = 3) if
@@ -271,15 +318,21 @@ menus: its client sender is `client/model.md` §7 rule 9.
      the confirm dialog `0x004B2F50` (§Open questions 2).
 3. **Send** (`0x004B2650(1, flags)`; cancel `0x00487C20` without a
    pending transaction): kind 1 → 0x32, 2 → 0x33, 3 → 0x35 (click sound
-   0x0F), other → cancel. Repair all: refused within 2,000 ms of the
-   previous one (`[0x007C0E48]`). A missing item (`0x00463990(GUID, 4)`)
-   aborts: pending := 0, no message. 17 bytes (`0x00478700`): [id][NPC
+   0x0F), other → menu state 3 and cancel. Repair all: refused within
+   2,000 ms of the previous one (`[0x007C0E48]`); a refusal only calls
+   `0x00487C20` (which resets the cursor-mode globals when
+   `[0x007BCBF0]` = 5) and returns — pending `[0x007C0DE0]`, menu state
+   and `[0x007C0E48]` stay as they were; an accepted repair all sets
+   `[0x007C0E48]` := now (`0x004B2650` body, GetTickCount compare at
+   the `0x00489870() ≠ 0` branch). A missing item (`0x00463990(GUID, 4)`)
+   aborts: menu state 3, `0x0048A630`, `[0x007C0DE9]` := now,
+   `[0x007C0DED]` += 1, pending := 0, no message. 17 bytes (`0x00478700`): [id][NPC
    GUID u32 @1][item GUID u32 @5][u32 @9][u32 @13]; `m` = the item's
    mode (unit +0x10, low 16 bits):
 
    | Msg | u32 @9 | u32 @13 |
    |---|---|---|
-   | 0x32 buy | `m << 16`, bitwise OR 2 in a gamble shop, OR 0x80000000 when `flags` bit 2 is set and the item's `items.txt` record (`0x006335F0`) byte +0x1A5 ≠ 0 | price |
+   | 0x32 buy | `m << 16` (the OR 2 of `[0x007C0DB0]` ≠ 0 is dead, as rule 2), OR 0x80000000 when `flags` bit 2 is set and the item's `items.txt` record (`0x006335F0`) byte +0x1A5 ≠ 0 | price |
    | 0x33 sell | `m` | price |
    | 0x35 one item | `m` | the item's stat 72 (durability) value, not a price |
    | 0x35 repair all | 0 | 0x80000000 (item GUID 0) |

@@ -489,9 +489,21 @@ fn event_text_cuts_the_name_and_code_0x12_sets_the_eclipse() {
     assert_eq!(cut[0x17], 0, "cut to 15 characters");
     assert_eq!(cut[0x16], b'o');
     assert_eq!(*local_name, None);
-    // Code 0x12 without a client act: no environment change.
+    // Code 0x12 without a client act: no environment change; the screen
+    // shake (6, 4000, 10000, 4000) starts on the current server tick
+    // (r3, `render/camera.md` §8 first row).
+    assert!(m.w.shake.is_none());
+    m.w.server_ticks = 12;
     m.recv(&bytes("5a 12", 40));
     assert!(m.w.environment.is_none());
+    let s = m.w.shake.unwrap();
+    assert_eq!(
+        (s.shake, s.start_tick),
+        (
+            crate::rules::camera::Shake::start(6, 4000, 10000, 4000).unwrap(),
+            12
+        )
+    );
 }
 
 // Covers: specs/client/msg-ui.md §20 r1, §20 r2, §21 r1, §21 r2, §22 r1, §22 r2
