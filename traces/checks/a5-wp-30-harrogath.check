@@ -1,0 +1,11 @@
+check 1
+# Act 5 waypoint 30 (Harrogath, object 429): open it, travel to Rigid Highlands (wp 31, level 111).
+name a5-wp-30-harrogath
+save ScnAm5 --class ama --expansion --act 4 --quests acts=4 --waypoints all
+seed 1234
+ticks 220
+seconds 300
+channels state
+at 4 poke goto preset 109 2:429
+at 150 poke msg 0x13 2 @2:429
+at 170 send TakeOrCloseWp wp=31 level=111

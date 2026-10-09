@@ -228,47 +228,6 @@ impl<X> ActionHooks<X> {
 }
 
 impl<X: Pending> ActionHooks<X> {
-    /// The DT start's direction snap (`units.md` §4.6 rule 1.2:
-    /// `0x006488A0(path, R byte +0x14)`, direction := new direction :=
-    /// d & 63). The kill's request byte (`damage.md` §7.2 step 3) is the
-    /// direction from the unit toward the killer (`0x00621DC0`), else
-    /// the current direction (`0x006487F0`).
-    pub fn death_face(&mut self, unit: UnitId, killer: Option<UnitId>) {
-        let at = killer.map(|k| self.path_position(k));
-        let from = self.path_position(unit);
-        let Some(paths) = self.paths.as_mut() else {
-            return;
-        };
-        let d = at.map(|at| {
-            crate::path::walk::geom::direction_vector(
-                &paths.tables,
-                (from.0 as u32, from.1 as u32),
-                (at.0 as u32, at.1 as u32),
-            )
-            .1
-        });
-        if let Some(p) = paths.dynamic_mut(unit) {
-            let d = d.unwrap_or(p.direction) & 63;
-            p.direction = d;
-            p.new_direction = d;
-        }
-    }
-
-    /// `0x0061AFA0(room, GUID)` (`units.md` §4.6 rule 1.3): the unit's
-    /// room ring takes its GUID at the ring index, then the index steps
-    /// (mod 4); a unit without a room changes nothing.
-    pub fn push_last_dead(&mut self, game: &crate::game::Game, unit: UnitId) {
-        let Some(e) = game.lists.unit(unit) else {
-            return;
-        };
-        let (Some(room), guid) = (e.room(), e.guid) else {
-            return;
-        };
-        let ring = self.last_dead.entry(room).or_default();
-        ring.slots[usize::from(ring.index)] = Some((unit, guid));
-        ring.index = (ring.index + 1) & 3;
-    }
-
     /// `0x005734C0(unit, v)`: the monster data's `dwAiState` (+0x54,
     /// `monsters/ai.md` §3 "AI state"); a unit without monster data in
     /// the lent world asks [`Pending::set_monster_ai_state`].

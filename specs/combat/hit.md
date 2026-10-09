@@ -25,13 +25,13 @@
 |   4. Melee result flags | 195–219 |
 |   5. Block chance | 220–242 |
 |   6. Block, weapon block, dodge, avoid, evade | 243–300 |
-|   7. Hostility and melee range | 301–389 |
-| Constants & data dependencies | 390–406 |
-| Randomness | 407–418 |
-| Edge cases & original bugs | 419–439 |
-| Test vectors | 440–464 |
-| Provenance | 465–490 |
-| Open questions | 491–512 |
+|   7. Hostility and melee range | 301–398 |
+| Constants & data dependencies | 399–415 |
+| Randomness | 416–427 |
+| Edge cases & original bugs | 428–448 |
+| Test vectors | 449–473 |
+| Provenance | 474–499 |
+| Open questions | 500–521 |
 <!-- /index -->
 
 ## Summary
@@ -352,7 +352,16 @@ in a room (frame 2), whose update sends the 0xA8
 (`a8 00 01000000 0b 69 ac fc 0f`, the s2c record #66 of frame 2 in
 `traces/checks/packets-town-arrival-ama.check`, run 2026-10-09 on
 Windows). d2rs sets the list after the seed (no draw, so equal) but
-sends no 0xA8 at frame 2: row `q-fix-p5-alignment-resend`.
+sends no 0xA8 at frame 2: row `q-fix-p5-alignment-resend`. The queue
+inserts of the setter (`0x00639DB0`, and `0x00639E30` →
+`0x0064C040`) find no room and queue nothing; the player is queued by
+the game entry's placement, and its frame-2 update sends the 0xA8 and
+the stat sends 12, 0, 2: `sim/intents-events.md` §8.2 rule 9 owns that
+chain. `0x005348C0` has no branch: every type-0 allocation runs it, so
+a **death corpse** (`combat/vitals.md` §4.7 r1.3, `0x00555230` type 0,
+mode 17) gets `0x005543B0(C, 2, 1)` too, inside its allocation, before
+its mode 17 and its state 7 (r1.4), with the same changed bit and
+queueing.
 
 #### 7.2 In melee range `0x00622C40(a, b, extra)`
 

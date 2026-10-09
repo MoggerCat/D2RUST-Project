@@ -541,7 +541,7 @@ fn ear_named_flag_copy() {
         .unwrap();
         assert_eq!(
             c.item.flags,
-            base | flag::INSTORE | named,
+            base | flag::INSTORE | flag::IDENTIFIED | named,
             "hardcore {hc:?}"
         );
         assert_eq!(c.item.ear_level, 12);
