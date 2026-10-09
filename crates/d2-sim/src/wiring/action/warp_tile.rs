@@ -180,16 +180,82 @@ impl<X: Pending> View<'_, X> {
             return 0;
         };
         let mut n = 0;
-        for p in &units {
+        for (index, p) in units.iter().enumerate() {
             let at = (origin.x + p.x, origin.y + p.y);
             let made = match p.unit_type {
-                OBJECT_PRESET => self.spawn_object_preset(game, room, at, p.class),
+                OBJECT_PRESET => {
+                    let made = self.spawn_object_preset(game, room, at, p.class);
+                    if made {
+                        self.store_preset_map_ai(game, room, at, p.class, index);
+                    }
+                    made
+                }
                 TILE_PRESET => self.spawn_tile_preset(game, room, at, p.class),
                 _ => false,
             };
             n += usize::from(made);
         }
         n
+    }
+
+    /// The map-AI store `0x00545C90` after a preset object's placement
+    /// (`0x00555910`, `quests-act5.md` §5.8): for object classes 459,
+    /// 461 and 543 the preset's path (`drlg/preset.md` §5 step 10, moved
+    /// out of the preset) becomes a map-AI record, handed to the quest
+    /// routes ([`ObjectRoute::MapAi`]) with the object just placed at
+    /// `at`.
+    ///
+    /// PROVISIONAL (`quests-act5.md` §5.8; REC-1697): the store runs
+    /// after the object's allocation (its quest init included, so init
+    /// 71's Larzuk exists and takes the nodes here); a preset whose path
+    /// is empty stores nothing.
+    fn store_preset_map_ai(
+        &mut self,
+        game: &mut Game,
+        room: RoomId,
+        at: (i32, i32),
+        class: u32,
+        index: usize,
+    ) {
+        if !matches!(class, 459 | 461 | 543) {
+            return;
+        }
+        let Some(object) = game.lists.room_units(room).into_iter().rev().find(|&u| {
+            game.lists.unit(u).is_some_and(|e| e.ty == UnitType::Object)
+                && self.units.get(u).is_some_and(|r| r.class == class)
+                && self.h.path_position(u) == at
+        }) else {
+            return;
+        };
+        let Some(act) = game.lists.room(room).map(|r| r.act) else {
+            return;
+        };
+        let path = self.h.drlg.with_act(act, &mut game.lists, |d, svc| {
+            let r = d.drlg_room_of(room)?;
+            svc.types.take_preset_path(d, r, index)
+        });
+        let Some(Some(path)) = path else {
+            return;
+        };
+        if path.is_empty() {
+            return;
+        }
+        self.h.map_ai_records.push(
+            path.iter()
+                .map(|p| crate::monsters::ai::MapNode {
+                    action: p.action as i32,
+                    x: p.x,
+                    y: p.y,
+                })
+                .collect(),
+        );
+        let record = self.h.map_ai_records.len() as u32;
+        self.object_route(
+            game,
+            super::ObjectRoute::MapAi { object, record },
+            Some(room),
+            at,
+        );
     }
 
     /// `0x005557D0(game, room, 5, class, x, y, mode, flags)` → `0x00555230`

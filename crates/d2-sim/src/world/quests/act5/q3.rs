@@ -667,6 +667,37 @@ fn apply_map_ai<W: QuestWorld>(
     }
 }
 
+/// Map-AI stores `0x0058AD80` (object 459, Anya) and `0x0058AE10`
+/// (object 461, Nihlathak), from `0x00545C90` (§5.8): chain 33 and a
+/// record (`map_ai` ≠ 0): +0x104 / +0x108 := it; then, when that NPC is
+/// in town (+0x91 / +0x93) and its unit (GUID +0x94 / +0x9C) exists, the
+/// record is applied once ([`apply_map_ai`]).
+pub fn store_map_ai<W: QuestWorld>(
+    ctl: &mut QuestControl,
+    w: &mut W,
+    nihlathak: bool,
+    map_ai: u32,
+) {
+    let Some(i) = ctl.find(CHAIN) else { return };
+    if map_ai == 0 {
+        return;
+    }
+    let e = x(ctl, i);
+    let (in_town, guid) = if nihlathak {
+        e.nihlathak_map_ai = map_ai;
+        (e.nihlathak_in_town, e.nihlathak_guid)
+    } else {
+        e.anya_map_ai = map_ai;
+        (e.anya_in_town, e.anya_guid)
+    };
+    if !in_town {
+        return;
+    }
+    if let Some((u, _)) = w.monster_by_guid(guid) {
+        apply_map_ai(ctl, w, i, u, nihlathak);
+    }
+}
+
 /// The thaw timer `0x0058AAB0` (§5.6; edge case 5).
 fn thaw<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize) -> bool {
     if x(ctl, i).thawed_spawned {

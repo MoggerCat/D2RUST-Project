@@ -923,6 +923,32 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     /// population when the monster world is lent; else the plain
     /// allocation (PROVISIONAL, REC-128: spread and flags not applied).
     #[allow(clippy::too_many_arguments)]
+    /// `0x0058F000` + `0x00666120`: map-AI record `map_ai` of the action
+    /// hooks ([`crate::wiring::action::ActionHooks::map_ai_records`],
+    /// handle = index + 1) moved to the unit's AI control +0x38 (the
+    /// Npc map-AI nodes, `monsters/ai.md` §9.9). False when the record
+    /// has no nodes (+4 = 0) or the unit has no AI control; a handle the
+    /// hooks do not hold: the rest's.
+    fn apply_map_ai(&mut self, unit: UnitId, map_ai: u32) -> bool {
+        let h = &mut *self.inner.econ.hooks;
+        let Some(nodes) = (map_ai as usize)
+            .checked_sub(1)
+            .and_then(|i| h.map_ai_records.get(i))
+        else {
+            return self.inner.apply_map_ai(unit, map_ai);
+        };
+        if nodes.is_empty() {
+            return false;
+        }
+        let nodes = nodes.clone();
+        match h.ai.as_mut().and_then(|a| a.control_mut(unit)) {
+            Some(c) => {
+                c.map_ai = Some(nodes);
+                true
+            }
+            None => false,
+        }
+    }
     fn spawn_monster_flags(
         &mut self,
         room: RoomId,

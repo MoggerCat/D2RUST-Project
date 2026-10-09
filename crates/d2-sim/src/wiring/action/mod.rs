@@ -21,6 +21,7 @@
 //! an adapter only maps one seam call to the provider's call.
 
 pub mod ai;
+pub mod ai_scan;
 pub mod combat;
 pub mod death;
 pub mod dispatch;
@@ -172,6 +173,15 @@ pub struct ActionHooks<X> {
     pub missiles: Option<MissileStore>,
     /// Lent to the AI code during a think (`None` then).
     pub ai: Option<AiStore>,
+    /// The map-AI records the preset object placement stored for the
+    /// quests (`quests-act5.md` §3.8, §5.8, `0x00545C90`): a preset
+    /// object's path as map-AI nodes; record handle = index + 1
+    /// ([`objects::ObjectRoute::MapAi`]).
+    pub map_ai_records: Vec<Vec<crate::monsters::ai::MapNode>>,
+    /// The +0x24 word of the coordinate records monsters hold as their
+    /// vision record (monster data +0x50, `monsters/ai.md` §5.2 steps 2
+    /// and 7), by record identity; absent = 0.
+    pub vision_seen: BTreeMap<crate::monsters::init::VisionRecord, u32>,
     /// Game fields the AI reads (game +0x6A, +0x74, +0x6D).
     pub ai_info: GameInfo,
     /// Combat lists (unit +0xAC, `damage.md` §3 step 3), first = newest.
@@ -441,6 +451,8 @@ impl<X> ActionHooks<X> {
             monster_request: 0,
             monster_world: None,
             monster_world_out: false,
+            map_ai_records: Vec::new(),
+            vision_seen: BTreeMap::new(),
             quest_host: None,
             quest_host_out: false,
             deferred_inits: None,

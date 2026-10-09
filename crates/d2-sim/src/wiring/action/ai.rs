@@ -156,11 +156,30 @@ impl<X: Pending> AiUnits for View<'_, X> {
     fn is_boss(&self, unit: UnitId) -> bool {
         self.h.x.is_boss(unit)
     }
+    /// Monster data +0x50 (the coordinate record of `population.md`
+    /// §9.6 step 3) and its +0x24 word: a monster of the lent monster
+    /// world reads [`super::ActionHooks::vision_seen`]; other units ask
+    /// [`Pending`].
     fn vision_seen(&self, unit: UnitId) -> Option<u32> {
-        self.h.x.vision_seen(unit)
+        match self.h.monster_data(unit) {
+            Some(m) => m
+                .vision
+                .map(|r| self.h.vision_seen.get(&r).copied().unwrap_or(0)),
+            None => self.h.x.vision_seen(unit),
+        }
     }
+    /// §5.2 step 7 on the record: +0x24 := 1.
+    ///
+    /// PROVISIONAL (`ai.md` §5.2 step 7 "vision +0x24 := (it was 0)";
+    /// REC-1698): the word is set to 1 and never cleared.
     fn mark_seen(&mut self, unit: UnitId) {
-        self.h.x.mark_seen(unit);
+        match self.h.monster_data(unit).map(|m| m.vision) {
+            Some(Some(r)) => {
+                self.h.vision_seen.insert(r, 1);
+            }
+            Some(None) => {}
+            None => self.h.x.mark_seen(unit),
+        }
     }
     fn ai_reset(&mut self, unit: UnitId) {
         self.h.x.ai_reset(unit);
@@ -463,8 +482,9 @@ impl<X: Pending> AiTargets for View<'_, X> {
     ) -> bool {
         self.h.x.choose_alternative(game, unit, main, alt)
     }
+    /// `0x005DDC30` on the wired units ([`super::ai_scan`]).
     fn secondary_target(&mut self, game: &mut Game, unit: UnitId) -> (Option<UnitId>, i32, bool) {
-        self.h.x.secondary_target(game, unit)
+        self.secondary_search(game, unit)
     }
     /// `0x005DDF20` (`ai.md` §5.3): scan 2 (mode 1, §5.4: the client
     /// players of the unit's room's near-room list, own room included, in
