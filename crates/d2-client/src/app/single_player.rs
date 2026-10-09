@@ -1627,6 +1627,32 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
     let shrines: Vec<Shrines> = decode_all(table("shrines")?).map_err(err)?;
     // `client/stat-lists.md` §3 r3, r6: `notondead`, `noclear` (+0x14 &
     // 0x80, & 0x10) and the colour call's columns.
+    // `missiles/client.md` §C2–§C4: the client create's columns.
+    let missiles: Vec<d2_data::tables::Missiles> = decode_all(table("missiles")?).map_err(err)?;
+    let missiles = missiles
+        .iter()
+        .map(|m| crate::bridge::client_missiles::ClientMissileRow {
+            vel: i32::from(m.vel),
+            vel_lev: i32::from(m.vellev),
+            max_vel: i32::from(m.maxvel),
+            accel: m.accel as i16,
+            range: m.range as i16,
+            lev_range: m.levrange as i16,
+            sub_loop: m.subloop,
+            sub_start: m.substart,
+            sub_stop: m.substop,
+            activate: i32::from(m.activate),
+            init_steps: m.initsteps,
+            anim_len: m.animlen,
+            anim_speed: m.animspeed,
+            light: m.light,
+            rgb: (m.red, m.green, m.blue),
+            can_slow: m.canslow,
+            pierce: m.pierce,
+            last_collide: m.lastcollide,
+            clt_do_func: m.pcltdofunc,
+        })
+        .collect();
     let states: Vec<d2_data::tables::States> = decode_all(table("states")?).map_err(err)?;
     let states = states
         .iter()
@@ -1645,6 +1671,7 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
         objects,
         shrines: shrines.iter().map(|s| s.code).collect(),
         states,
+        missiles,
     })
 }
 
