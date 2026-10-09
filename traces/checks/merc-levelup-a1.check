@@ -1,0 +1,16 @@
+check 1
+# Act 1 hireling level-up (q-chk-hirelings, REC-1517): as merc-*-cow.check, but the hireling is
+# saved one experience point below level 12 (experience.txt: 112725; 100,000 gives level 11), so the first share of the
+# cow's experience (hirelings.md §7.1-§7.3, 2*gain; the level stats §4, the stats resent §13 rule 4,
+# the speech 0x27 string 0xD7C, unit event 12) levels it up. Warp to the Blood Moor before frame 4 (the
+# hireling follows), an idle cow (class 179) 6 sub-tiles along +x before frame 10.
+# Spec: specs/tools/scenario-diff.md.
+name merc-levelup-a1
+save ScnBar --class bar --expansion --level 30 --merc 0,3,0x12345678,112724
+seed 1234
+ticks 220
+seconds 500
+channels state
+variant blood-moor-empty
+at 4 poke warp 2
+at 10 poke spawn 179 @x+6 @y normal

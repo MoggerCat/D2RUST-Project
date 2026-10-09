@@ -72,6 +72,7 @@ fn dump(ticks: u32) -> String {
         input: None,
         packets: None,
         rng: None,
+        save_out: None,
     };
     let mut game = DumpGame::resolve(&args, app_support::game_data(), None).unwrap();
     game.character = scn_bar();
