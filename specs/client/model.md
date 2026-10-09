@@ -32,27 +32,27 @@
 |   2. Unit table | 139–188 |
 |   3. Local player | 189–211 |
 |   4. Receive and the unit message queue | 212–249 |
-|   5. Client update pass | 250–370 |
-|   6. Position check (`0x004804E0`) | 371–414 |
-|   7. Session messages | 415–590 |
-|   8. Mode requests | 591–676 |
-|   9. Room-in-sight messages | 677–711 |
-|   10. Bit reader | 712–726 |
-|   11. Current act and level (join and later) | 727–772 |
-|   12. Client DRLG and the room of a point | 773–814 |
-|   13. Visibility predicate (`0x004DBF20`) | 815–866 |
-|   14. Pet list and the hireling GUID | 867–920 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 921–1010 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 1011–1045 |
-|   17. Model writes made by 1.14d UI code | 1046–1192 |
-|   18. Audio driver inputs and the client object functions | 1193–1223 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1224–1452 |
-| Constants & data dependencies | 1453–1465 |
-| Randomness | 1466–1481 |
-| Edge cases & original bugs | 1482–1506 |
-| Test vectors | 1507–1564 |
-| Provenance | 1565–1668 |
-| Open questions | 1669–1827 |
+|   5. Client update pass | 250–383 |
+|   6. Position check (`0x004804E0`) | 384–427 |
+|   7. Session messages | 428–625 |
+|   8. Mode requests | 626–711 |
+|   9. Room-in-sight messages | 712–746 |
+|   10. Bit reader | 747–761 |
+|   11. Current act and level (join and later) | 762–807 |
+|   12. Client DRLG and the room of a point | 808–849 |
+|   13. Visibility predicate (`0x004DBF20`) | 850–901 |
+|   14. Pet list and the hireling GUID | 902–955 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 956–1045 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 1046–1080 |
+|   17. Model writes made by 1.14d UI code | 1081–1227 |
+|   18. Audio driver inputs and the client object functions | 1228–1258 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1259–1487 |
+| Constants & data dependencies | 1488–1500 |
+| Randomness | 1501–1516 |
+| Edge cases & original bugs | 1517–1541 |
+| Test vectors | 1542–1599 |
+| Provenance | 1600–1703 |
+| Open questions | 1704–1862 |
 <!-- /index -->
 
 ## Summary
@@ -324,14 +324,27 @@ position check of the local player.
       room at (x, y), §12 r5). Other types → `0x00465FD0(GUID, class,
       x, y, type, mode)` with flags |= 0x600000. The chickens of the Act 1
       arrival (GUIDs 93–95, `docs/handoff/pc1-data.md` Step 4 item 30)
-      are the 92nd–94th creations of the process. PROVISIONAL
-      (REC-660): which earlier creations (client missiles, client DS1
-      presets, other rooms' critters) take GUIDs 2–92 is not traced.
+      are the 92nd–94th creations of the process. Counted on 1.14d
+      (REC-660 settled 2026-10-09, `traces/client/a1-arrival-creations-ama.jsonl`,
+      `tools/trace-recorder/record_client_creations.py`, ScnAma seed
+      1234): the counter does not move in the front end; all 205
+      creations of the arrival come in the room pass of server frame 2,
+      room by room, each room's critters (r6.1, return `0x0046C316` in
+      `0x0046C1A0`, class 149, type 1, mode argument 0) before its
+      client presets (r6.2, return `0x00466862`, type 2, objects 40 /
+      41 / 42 River1–3 and 65 "invisible river sound1"): critters
+      2–7, presets 8–89, critters 90–95, presets 96–121, critters
+      122–124, presets 125–206. So GUIDs 2–92 are 9 chickens of the
+      two earlier rooms' critter passes and 82 river presets; no client
+      missile is created before the arrival chickens. A critter whose
+      10 tries all fail takes no GUID (`0x0046C1A0` calls the creator
+      only after a free point).
    4. **Critter AI** `0x0046D780(U)` (from `0x00463CC0`, once per update
       pass, after U's per-unit step). T = monster data +0x30 (think
-      timer, `0x004AE110`; starts 0, PROVISIONAL REC-661: not traced
-      through `0x004AE8D0`). `idle` = `0x0046CB40`: code 7 request at
-      U's own position (`0x004AFF60`, §19: |Δ| ≤ 1 → neutral fallback).
+      timer, `0x004AE110`; starts 0: every critter of the arrival reads
+      T = 0 at its first AI call, in the client update that created
+      it (frame 2); REC-661 settled 2026-10-09, same trace, `think0`
+      records). `idle` = `0x0046CB40`: code 7 request at U's own position (`0x004AFF60`, §19: |Δ| ≤ 1 → neutral fallback).
       `step(d, code, r4)` = `0x0046C960`: two draws of U's seed (+0x20),
       x' = x ± d by bit 0 of the first, y' = y ± d by the second, then
       request `code` with {x', y', 0, path type, r4, path byte}.
@@ -501,16 +514,38 @@ position check of the local player.
    | Bytes | Value | Single player (recorded seq 1, both recordings) |
    |---|---|---|
    | @0 | 0x67 | |
-   | @1 | game name `0x007A05DC`, copied up to its NUL (`0x004135D0`); the bytes after the NUL keep stack contents | empty (byte 1 = 0) |
+   | @1 | game name `0x007A05DC`, copied up to its NUL (`0x004135D0`); bytes after the NUL through @0x10 unwritten (below) | empty (byte 1 = 0) |
    | @0x11 | game type: `[0x007A0610]` 0 → 3, 6 → 1, 8 → 2, else 0 | 3 (type 0) |
    | @0x12 | class: `0x0047AA20()` (`[0x00712F00]`) when `[0x00712EFC]` bit 8, else byte `[0x007A0522]` | the selected character's class |
    | @0x13 | template: C +0x20D | 0 |
    | @0x14 | difficulty: C +0x210 (0–2; read as such by `0x0044CF20`) | 0 (Normal) |
-   | @0x15 | character name `0x007A05C4`, copied up to its NUL | the character |
+   | @0x15 | character name `0x007A05C4`, copied up to its NUL; bytes after the NUL through @0x24 unwritten (below) | the character |
    | @0x25 | u16 C +0x207 (the server never reads it, `sim/intents-events.md` §2.5) | 0 |
    | @0x27 | u32 C +0x209; when it is 0 the builder first stores 4 \| 0x100000 there | 0x00100004 |
    | @0x2B, @0x2C | C +0x20E, C +0x20F (passed, never read by the server) | 0, 0 |
    | @0x2D | language id `0x00525150()` (0–13; the server refuses > 14) | 0 |
+
+   **Unwritten bytes** (2026-10-09, from the asm and three Windows
+   recordings). The message is a 0x30-byte local of the
+   builder (`[ebp-0x30]`, `sub esp, 0x30`, never cleared); `0x004135D0`
+   copies each name through its NUL and writes nothing after it, and
+   no other store touches @2–@0x10 or the character-name tail. Those
+   bytes are whatever the earlier callees of `0x0044F360` (the
+   `0x004F59A0` / `0x00451DB0` string calls, `0x004680B0`,
+   `0x00451F10`, `0x00483310`, `0x00475DF0`, the
+   `GetVersionExA`-style import `[0x006CC1F8]`) left at that depth. In
+   the recordings: @2–3 `45 00`; u32@4 a heap / data pointer that
+   differs every run (`0x007405FA`, `0x001F0310`, `0x001006E8`); u32@8
+   `0x0000020C`; u32@0x0C `0x0044C520` (a callback address,
+   `0x0044C520` has no direct caller); @0x10 `5C`; character-name tail
+   (with a 6–7-letter name) `20 C5 44 00 F0 F9 19 00 00`: `0x0044C520`
+   again and a stack address `0x0019F9F0`. Under Wine the same bytes
+   are non-zero with other values. They are process memory, not game
+   state: the server reads both names as C strings within 16 bytes
+   (`sim/intents-events.md` §2.5 rule 1, cstr16@1 / cstr16@0x15) and
+   reads none of these bytes, so no rule can reproduce them. d2rs
+   writes zeros; the packets channel masks them (`tools/scenario.md`
+   §6 rule 4, `scenario-masks-c2s.tsv`).
 
    d2rs: the app builds these bytes from its own state: name empty, type
    3, the character's class and name, template 0, the chosen difficulty,

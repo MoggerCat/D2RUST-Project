@@ -72,7 +72,7 @@ export DISPLAY="$display"
 # Virtual display. 1024x768x24: the game's -w window (800x600) fits.
 xvfb_pid=""
 if ! xdpyinfo >/dev/null 2>&1; then
-  Xvfb "$display" -screen 0 1024x768x24 -nolisten tcp >"$out/xvfb.txt" 2>&1 &
+  Xvfb "$display" -screen 0 1024x768x24 -nolisten tcp >"$out/xvfb.txt" 2>&1 9>&- &
   xvfb_pid=$!
   for _ in $(seq 50); do xdpyinfo >/dev/null 2>&1 && break; sleep 0.1; done
 fi
@@ -88,9 +88,12 @@ if [ ! -f "$WINEPREFIX/system.reg" ]; then
   wineserver -w
 fi
 
-# Screenshots in the background at the requested times.
+# Screenshots in the background at the requested times. Neither this
+# subshell nor its `sleep` keeps the prefix lock (fd 9): a sleep left
+# running after the run held the lock for up to --seconds (seen 2026-10-09).
 t0=$(date +%s.%N)
 (
+  exec 9>&-
   IFS=, ; first=1
   for s in $shots; do
     now=$(date +%s.%N)
@@ -123,7 +126,7 @@ else
   code=$?
 fi
 t1=$(date +%s.%N)
-kill "$shot_pid" 2>/dev/null; wait "$shot_pid" 2>/dev/null
+pkill -P "$shot_pid" 2>/dev/null; kill "$shot_pid" 2>/dev/null; wait "$shot_pid" 2>/dev/null
 echo "$code" >"$out/exit.txt"
 
 python3 - "$out/run.json" "$exe" "$code" "$t0" "$t1" "${args[@]}" <<'PY'

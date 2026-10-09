@@ -1,0 +1,14 @@
+check 1
+# Rogue Encampment arrival of the scene sorceress, idle, RNG and packets
+# channels: where Warriv's (unit 1:7) map-AI draws (specs/monsters/ai-bodies.md
+# §9.9 "Path node choice") first differ, and whether S->C 0x8A 01 07000000
+# (the quest active test passed, world/quests.md §6.4) is sent. The scene
+# compare (docs/handoff/q-scenes-compare.md) differs at its r110.
+# Save as tools/cloud-game/prepare_scene_chars.sh makes SceSor; seed 1234,
+# no input.
+name rng-town-idle-sor
+save SceSor --class sor --expansion --map-seed 1 --time 1700000000 --skill 0=1 --left-skill 36 --gold 500 --waypoints all --stat 6=102400 --stat 7=102400 --item box@0,0 --item cap@4,0 --item lgl@6,0 --item lbl@8,0 --item cap@0,0:4 --item lgl@2,0:4 --item cap@0,0:3
+seed 1234
+ticks 120
+seconds 300
+channels rng packets

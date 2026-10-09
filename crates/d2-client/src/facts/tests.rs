@@ -290,6 +290,7 @@ fn export_rows_invert_placement_and_merge_tile_blocks() {
         unit_dirs: &std::collections::BTreeMap::new(),
         unit_calls: &[],
         color_rows: None,
+        ui_calls: &[],
     };
     let rows = draw_rows(&[floor, floor_block, unit, ui], &cx).unwrap();
     let cols: Vec<String> = rows.draws.iter().map(|r| r[..8].join(" ")).collect();
@@ -434,6 +435,7 @@ fn sky_calls_replace_their_pixel_items() {
         unit_dirs: &std::collections::BTreeMap::new(),
         unit_calls: &[],
         color_rows: None,
+        ui_calls: &[],
     };
     // Item rows by op; call rows with x, y and mode.
     let rows = |items: &[DrawItem]| -> Vec<String> {
@@ -511,6 +513,7 @@ fn block_frames_of_one_tile_are_one_row() {
         unit_dirs: &std::collections::BTreeMap::new(),
         unit_calls: &[],
         color_rows: None,
+        ui_calls: &[],
     };
     let rows = draw_rows(
         &[
@@ -597,6 +600,7 @@ fn unit_shadows_name_the_cel_and_write_no_unit_row() {
         unit_dirs: &std::collections::BTreeMap::new(),
         unit_calls: &[],
         color_rows: None,
+        ui_calls: &[],
     };
     let rows = draw_rows(&[shadow, body], &cx).unwrap();
     let cols: Vec<String> = rows.draws.iter().map(|r| r[..12].join(" ")).collect();
@@ -642,6 +646,7 @@ fn unit_cel_dir_is_the_context_dir64() {
         unit_dirs: &dirs,
         unit_calls: &[],
         color_rows: None,
+        ui_calls: &[],
     };
     let rows = draw_rows(&[body, other], &cx).unwrap();
     let dirs: Vec<&str> = rows
@@ -690,6 +695,7 @@ fn unit_calls_are_rows_at_their_keys() {
         unit_dirs: &std::collections::BTreeMap::new(),
         unit_calls: &calls,
         color_rows: None,
+        ui_calls: &[],
     };
     let rows = draw_rows(&[body], &cx).unwrap();
     let cols: Vec<String> = rows.draws.iter().map(|r| r[..12].join(" ")).collect();
@@ -774,6 +780,7 @@ fn ui_rectangles_are_drawbox_rows() {
         unit_dirs: &std::collections::BTreeMap::new(),
         unit_calls: &[],
         color_rows: Some(MapId(10)),
+        ui_calls: &[],
     };
     let mut next = item;
     next.x = 227;
@@ -818,6 +825,7 @@ fn a_culled_body_is_its_unit_row_alone() {
         unit_dirs: &std::collections::BTreeMap::new(),
         unit_calls: &calls,
         color_rows: None,
+        ui_calls: &[],
     };
     let rows = draw_rows(&[], &cx).unwrap();
     let ops: Vec<(&str, &str)> = rows
@@ -826,4 +834,37 @@ fn a_culled_body_is_its_unit_row_alone() {
         .map(|r| (r[1].as_str(), r[15].as_str()))
         .collect();
     assert_eq!(ops, [("unit", "2:9")]);
+}
+
+// Covers: specs/tools/facts-render.md §5 r18
+/// A UI cel's op is its 1.14d wrapper (`WorldFrame::ui_calls` by the
+/// item's UI index); a UI cel with no entry, and every world cel, stay
+/// `CelDraw`.
+#[test]
+fn a_ui_cel_writes_its_wrapper_op() {
+    use crate::scene::order::pass;
+    use crate::scene::FrameId;
+    use crate::ui::draw::CelCall;
+    let s = store();
+    let ui = |i: u32, x: i32| {
+        let mut it = DrawItem::new(FrameId(1), x, 60);
+        it.key = DrawKey::new(pass::UI, 0, i, 0).unwrap();
+        it.tag = ItemTag::Ui(i);
+        it
+    };
+    let unit_type = |_: u32| None;
+    let calls = [CelCall::Ex, CelCall::Color];
+    let cx = ExportContext {
+        frames: &s,
+        view_left: Some(0),
+        unit_type: &unit_type,
+        sky: &[],
+        unit_dirs: &std::collections::BTreeMap::new(),
+        unit_calls: &[],
+        color_rows: None,
+        ui_calls: &calls,
+    };
+    let rows = draw_rows(&[ui(0, 10), ui(1, 20), ui(2, 30)], &cx).unwrap();
+    let ops: Vec<&str> = rows.draws.iter().map(|r| r[1].as_str()).collect();
+    assert_eq!(ops, ["CelDrawEx", "CelDrawColor", "CelDraw"]);
 }

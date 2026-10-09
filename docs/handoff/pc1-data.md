@@ -8,6 +8,15 @@ our measurements (`facts/`, `traces/`). This loop **replaces**
 `pc1-autotest.md` and `pc1-loop.md` while it runs: stop any session
 running those.
 
+**One `Game.exe` open at a time (user rule, 2026-10-09):** at most one
+1.14d `Game.exe` process may be open on PC 1 at any moment. Any PC 1
+session may run it (directly, through `poke.py`, `scenario_diff.py`'s
+1.14d side or a recorder), but only when none is open: check first
+(`tasklist | findstr /i game.exe`), hold the lock file
+`%TEMP%\d2-game.lock` (create it before starting, delete it once
+`Game.exe` has exited), and wait if the lock exists. Reading the binary
+(Ghidra, `re/`) is not limited.
+
 Effort: speed first, no token limit; stay within PC 1's hardware (one
 `Game.exe` at a time, one cargo build at a time, keep 15 GB disk free).
 Subagents (up to 6) for analysis and writing only; the main session runs
@@ -320,18 +329,10 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     d2rs: PROVISIONAL REC-750, set right after the unit seed
     (`d2-client` `app/single_player.rs` loader, `View::set_alignment`).
 
-35. **`0x0063E6B0(unit, 0)`: are the action-frame tests skipped?** (REC-700) `0x005A6D50` passes the moving flag r as `0x0063E6B0`'s second argument (`skills/use.md` §5.2 "Monsters"); `skills/bodies-3.md` §5.18 step 3 gives the tests (+0x4E = 0, or no action event in the frames ((cur − speed) >> 8, cur >> 8]) for the argument 1 only. Read: what the function does with 0 (d2rs: no tests, the column by mode). Write the answer into `bodies-3.md` §5.18 step 3.
-36. **Who writes unit +0x4E from a type-0 timer's frame code?** (REC-701) trigger(U) of `0x005A7670` reads +0x4E = 1 (`skills/use.md` §5.2); `sim/units.md` §4.2 schedules event 0 with args (E[i], k) and the field table names only `0x005533D0` (0 at mode start). Read: the writer of +0x4E on the event-0 path of a monster (the unit-type dispatcher or the timer run), and whether a code-0 event writes it. Write the answer into `sim/units.md` §4.2 / §4.6.
-37. **The client's mode-18 leap / whirl: hold, path end, code 0x16** (REC-702..704, `d2-client` `world_view/skill_motion.rs`; measured leap / whirl in `facts/client/anim/a1-cold-plains-*-bar.tsv`) Read: (1) which client code holds the Leap sequence at frame 11 while the motion record lives, and whether Leap Attack (`seqnum` 14) holds at its frame 11 the same way (REC-704); (2) the client whirl path: its step per update (d2rs: class `WalkVelocity` << 12, 0x6000 measured for the barbarian) and the update mode 18 ends on (d2rs: the one whose step reaches the end, `((d << 16) − 1) / step` after the do, `d` by `0x006417F0`; REC-703); (3) the skill mode request's first mode-18 update and code 0x16's record 2 / 3 as unit type / GUID (REC-702). Write the answers into `render/unit-composite.md` §8 or `skills/sequences.md` §3.
 
-38. **Range state mask 0x26 = `meleeonly`?** `range(P,
-  skill)` `0x00645460` (`skills/use.md` §3 r6) tests "state mask 0x26".
-  d2rs (`d2-client` `bridge/combat.rs` `in_melee_only_state`) reads it as
-  `0x0063A130` with the per-flag mask at data +0xCC + 4·0x26, i.e. the
-  `states.txt` flag bit 38 `meleeonly` (`data/fields.tsv`; the
-  `ui/panels-3.md` §24 r1 scheme). Confirm the argument `0x00645460`
-  passes is that flag index (not a data offset or a precomputed group),
-  and write it into `use.md` §3 r6.
+42. **Control-panel help button `0x004A64C0`** (q-scenes-compare) Step 8 of the UI pass (`ui/panels.md` §5) calls it before the new-stats button; `a4-town-pandemonium-fortress` rows 258–267 draw the text "Help (H)" (CelDrawColor at (714, 403)), `Panel\Levelsocket` frame 0 at (725, 440) and `Panel\Level` frame 0 at (728, 436). Specify when it draws (character level? first game?), its positions and its press / release, for `ui/control-panel.md`.
+43. **Mini panel open at game start (REC-519)** (q-scenes-compare) Every recorded scene has state 0x15 open with no input; name the call that opens it at game entry (and whether a saved setting decides it), for `ui/control-panel.md` §9.
+44. **Shadow pre-test arguments `0x00471620` (REC-511, REC-518)** (q-scenes-compare) The measured shadows fit the §4 box test on the sheared shadow box, and objects need their mode's `BlocksLight`; read the arguments `0x00471620` passes to `0x004709A0` and the object branch, for `render/blend-modes.md` §5 r3.
 
 ## How to check a behaviour in one command
 
@@ -355,8 +356,6 @@ compare alone with `py tools/trace-recorder/state_diff.py ORIG D2RS`.
 For a new behaviour, add a `.check` file (copy `a1-town-arrival-ama.check`)
 rather than a hand-run recipe.
 
-22. **Poke call forms** (q-tool-poke, `specs/tools/poke.md` Open
-    questions 1–4; until answered these directives are gaps on 1.14d):
 22. **Poke call forms** (q-tool-poke): (a)–(d) *answered* 2026-10-09
     from the asm into the owning specs and `poke.py` `CALL_FORMS`; first
     1.14d run of the five directives is REC-655 (HANDOFF §7). Was
@@ -376,7 +375,9 @@ rather than a hand-run recipe.
     (not yet run on 1.14d). Each form can be tried first with
     `poke.py --forms FILE` (README "Call forms") before it goes into
     `CALL_FORMS`.
-23. **Poke runs on Windows** (REC-590): the cloud ran every runnable
+
+23. **Poke runs on Windows** (REC-590) — answered → see `docs/handoff/pc1-day3-a.md`. The cloud ran every runnable
+23. **Poke runs on Windows** (REC-590; answered → see `docs/handoff/pc1-day3-c.md`): the cloud ran every runnable
     directive on 1.14d under Wine (`specs/tools/poke.md` Status) and
     settled the variant load (REC-591, `tools/test-variants.md` Status).
     Left: run `traces/pokes/spawn-town.poke` once on PC 1 with a
@@ -489,6 +490,8 @@ commands), `--next N`. Exit code: the worst channel's (0 match, 1
 diverged, 2 partial, 3 error). Each comparator also runs alone on two
 files (`py tools/trace-recorder/state_diff.py ORIG D2RS`, `rng_diff.py`,
 `packets_diff.py`).
+
+Every check at once (parallel, 1.14d recordings reused, match % per area, playthrough per act): `python3 tools/scenario-diff/suite.py [--filter GLOB] [--area A] [--md F]` (`scenario-diff.md` §4).
 
 Known limits: the d2rs side has no hover model (a click on a unit is a
 ground click) and no `key` steps headless; the click target can differ
@@ -677,6 +680,12 @@ Then the rest:
 - Still PROVISIONAL:
   - REC-660: client GUIDs 2–92 (needs a runtime count);
   - REC-661: critter think-timer start;
+  - REC-665: mode request to own position; answered → see docs/handoff/pc1-day3-b.md
+  - REC-670: local input path for mode 18; answered → see docs/handoff/pc1-day3-b.md
+  - REC-671: whirl end rule; answered → see docs/handoff/pc1-day3-b.md
+  - REC-680: Blood Golem life share. answered → see docs/handoff/pc1-day3-b.md
+  - REC-660: client GUIDs 2–92 (needs a runtime count); answered → see `docs/handoff/pc1-day3-a.md`;
+  - REC-661: critter think-timer start; answered → see `docs/handoff/pc1-day3-a.md`;
   - REC-665: mode request to own position;
   - REC-670: local input path for mode 18;
   - REC-671: whirl end rule;

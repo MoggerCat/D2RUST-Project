@@ -1931,6 +1931,74 @@ mod hud_small {
         assert!(frames(&u, &w).contains(&2), "{:?}", frames(&u, &w));
     }
 
+    // `a4-town-pandemonium-fortress` (1.14d) rows 249–270: the globes'
+    // row window is `CelDrawEx`, the skill icons `CelDrawColor`; the
+    // stamina bar the rectangle (colour = the palette's nearest gold,
+    // mode 2); the skill icons before the new-stats / new-skills buttons;
+    // the mini panel open from the start (REC-519).
+    // Covers: specs/ui/control-panel.md §1 r3, §4 r2, §9
+    #[test]
+    fn the_control_panel_draws_in_the_recorded_order_and_calls() {
+        use crate::ui::draw::CelCall;
+        let mut w = world(AMAZON, 1, true);
+        let key = w.local_player.unwrap();
+        let unit = w.units.get_mut(&key).unwrap();
+        unit.stats.insert(10, 80 << 8);
+        unit.stats.insert(11, 80 << 8);
+        for (stat, v) in [(6, 50), (7, 50), (8, 20), (9, 20)] {
+            unit.stats.insert(stat, v << 8);
+        }
+        let mut u = ui(Some(areas()), true);
+        assert!(u.ui.is_open(0x15), "the mini panel is open from the start");
+        let mut colors = [d2_formats::palette::Rgb::default(); 256];
+        colors[109] = d2_formats::palette::Rgb {
+            r: 244,
+            g: 192,
+            b: 76,
+        };
+        u.ui.set_palette(&d2_formats::palette::Palette { colors });
+        let ctx = UiCtx {
+            tick: 0,
+            world: &w,
+            strings: &NoStrings,
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        u.root.draw(&ctx, &mut out);
+        let files = u.ui.files();
+        let named: Vec<(String, CelCall)> = out
+            .iter()
+            .filter_map(|d| match d {
+                UiDraw::Image(i) => Some((files.name(i.image.file)?.to_string(), i.call)),
+                _ => None,
+            })
+            .collect();
+        let call_of = |n: &str| named.iter().find(|(f, _)| f == n).map(|(_, c)| *c);
+        assert_eq!(call_of("panel\\hlthmana"), Some(CelCall::Ex));
+        assert_eq!(call_of("panel\\overlap"), Some(CelCall::Draw));
+        let stamina: Vec<(i32, i32, u8, u8)> = out
+            .iter()
+            .filter_map(|d| match d {
+                UiDraw::Rect(r) if r.mode == 2 => Some((r.x0, r.y0, r.color, r.mode)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(stamina, vec![(273, 573, 109, 2)]);
+        assert!(
+            !named.iter().any(|(f, _)| f == hud::FILL_FILE),
+            "no fill cel"
+        );
+        let pos = |n: &str| named.iter().position(|(f, _)| f == n);
+        let (mini, menu) = (pos("panel\\minipanel_s"), pos("panel\\menubutton"));
+        assert!(mini.is_some() && menu < mini);
+        if let (Some(icon), Some(level)) = (
+            named.iter().position(|(f, _)| f.contains("skillicon")),
+            pos("panel\\level"),
+        ) {
+            assert!(icon < level, "the skill icons before the level buttons");
+            assert_eq!(named[icon].1, CelCall::Color);
+        }
+    }
+
     // The life text toggle is stored at once (§3 r5) and read at start.
     // Covers: specs/ui/control-panel.md §3 r5
     #[test]

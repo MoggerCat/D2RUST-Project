@@ -175,6 +175,7 @@ fn ui_image() -> UiDraw {
         at: Point::new(0, 0),
         clip: crate::ui::Rect::new(0, 0, 800, 600),
         look: crate::ui::CelLook::PLAIN,
+        call: crate::ui::draw::CelCall::Draw,
     })
 }
 
