@@ -480,3 +480,19 @@ fn the_walk_frame_counts_from_the_walk_start() {
     assert_ne!(super::tick_frame(46, 8, 256), 3);
     assert_eq!(super::walk_frame(22, 22, 8), 0);
 }
+
+// Covers: specs/render/blend-modes.md §5 r3
+/// Fortress braziers #1 (`98`, BlocksLight 1) and #2 (`99`, BlocksLight
+/// 0): only #1 casts its shadow (`a4-town-pandemonium-fortress`).
+#[test]
+fn an_object_casts_its_shadow_only_where_it_blocks_light() {
+    let mut l = looks();
+    l.object_blocks_light.insert(408, [1, 1, 1, 1, 0, 0, 0, 0]);
+    l.object_blocks_light.insert(409, [0; 8]);
+    assert!(super::object_casts_shadow(&l, 408, 0));
+    assert!(!super::object_casts_shadow(&l, 409, 0));
+    assert!(!super::object_casts_shadow(&l, 408, 4));
+    assert!(!super::object_casts_shadow(&l, 408, 99));
+    // No row: as before.
+    assert!(super::object_casts_shadow(&l, 7, 0));
+}

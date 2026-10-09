@@ -8,6 +8,15 @@ our measurements (`facts/`, `traces/`). This loop **replaces**
 `pc1-autotest.md` and `pc1-loop.md` while it runs: stop any session
 running those.
 
+**One `Game.exe` open at a time (user rule, 2026-10-09):** at most one
+1.14d `Game.exe` process may be open on PC 1 at any moment. Any PC 1
+session may run it (directly, through `poke.py`, `scenario_diff.py`'s
+1.14d side or a recorder), but only when none is open: check first
+(`tasklist | findstr /i game.exe`), hold the lock file
+`%TEMP%\d2-game.lock` (create it before starting, delete it once
+`Game.exe` has exited), and wait if the lock exists. Reading the binary
+(Ghidra, `re/`) is not limited.
+
 Effort: speed first, no token limit; stay within PC 1's hardware (one
 `Game.exe` at a time, one cargo build at a time, keep 15 GB disk free).
 Subagents (up to 6) for analysis and writing only; the main session runs
@@ -273,8 +282,69 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     holder), as offsets read from a server unit, so `record_state.py` can
     fill `own`. Write the answer into `sim/units.md` (or the owner spec)
     and the §2 row of `state-snapshot.md`.
-22. **Poke call forms** (q-tool-poke, `specs/tools/poke.md` Open
-    questions 1–4; until answered these directives are gaps on 1.14d):
+28. **0x8E flag byte at the join** (q-fix-pc1-proto-items) The join's 0x8E CorpseAssign per corpse of another client's player (`0x0053DFB0` from `0x0052C410`, `sim/intents-events.md` §8.3) is sent with flag byte 1 (assign); the flag source at that call is not read. Needed: the byte `0x0052C410` passes to `0x0053DFB0`.
+34. **Town critters are a client-side spawn from `Levels.txt` C1 / CA1** (q-fix-real-critters-drops; same topic as item 30) The Rogue Encampment chickens (ck, class 149) are not server units: the server's unit lists have none (state snapshots to frame 90, both sides equal at 25 units). 1.14d's client creates them with `0x00466730(class 149, x, y, 1, ..)` (type 1, client set C, GUID from the client counter `[0x00711F30]`), three per group, from return address `0x0046C316`; the caller chain is `0x0046C54D` <- `0x0044C774` (the client room function `0x0044C750`, which also runs the preset pass `0x00466820`). Levels.txt row 1 has `C1` = 149, `CA1` = 30 (the level record dump at `[arg5]` shows 0x95 and 0x1E). Per group the draws are: 3 steps at `0x0046C4AC` on three different `{lo, 666}` seeds, a `roll(0)` via `0x0045C3E0` at `0x0046C516` on the room's client seed, then per chicken one step at `0x0046C257` and one at `0x0046C29C` (x and y). First groups in frame 2 of `a1-town-arrival-ama`: (4827, 4195) (4820, 4198) (4832, 4191) and (4927, 4198) (4939, 4198) (4956, 4195); later rooms (frames 89-95): (4814, 4256) (4827, 4269) (4834, 4275) and (4871, 4242) (4877, 4254) (4849, 4267). Needed (a spec for a new `world/` or `client/` section): the body of the function holding `0x0046C257`-`0x0046C54D`: what makes a group (CA chance? MinGrp / MaxGrp 3 / 3 of the chicken row), the centre point and offset formula from the draws, the seed each step uses, and when the room function runs it (client room entry and exit; the GUIDs 93-95 of the scene need the 190 river-object creations at `0x00466862` before them). Probe: a scratch subclass of `record_state.py` hooking `0x00466730` / `0x00466360` (not committed); the facts are in `docs/handoff/q-fix-real-critters-drops.md`. `population.md` §11.3 (critters are not placed by the server) is confirmed.
+26. **Re-record sim-0009 without input** (q-prov-recording, REC-290): the Wine
+    run of the same command equals `traces/sim/tick/sim-0009.json` for ticks
+    0–60, then the Windows trace has a client message at tick 61 (drain: a
+    timer on unit (1, 7), player queue) and the player changes rooms at 121,
+    241, 351: the window got input. Run `record_tick.py --auto ScnAma --seed
+    1234 --ticks 600` again with the mouse outside the game window and replace
+    sim-0009. (Item 20 note: under Wine the front end does take X input,
+    `tools/cloud-game/xinput.sh`; in-game NPC menus were not tried.)
+
+29. **Monster path target at the death message** (q-tool-poke, REC-594): 1.14d state
+    snapshots read an idle spawned monster's path target (+0x10/+0x12) as
+    its spawn point (`monsters/init.md` §4.1 step 1.1; check
+    `traces/checks/poke-fallen-town.check`), so d2rs now writes it there;
+    but `sim/intents-events.md` §7.4 rule 7 says the 0x69 code-8 target
+    is (0, 0) "when the path never had a target", from the recorded
+    `69 1b000000 08 0000 0000 38 06` (frame 2882). Read which field 0x69
+    code 8 copies and whether that monster's target was cleared (an AI
+    request) before its death; answer into §7.4 rule 7. d2rs tests
+    `monster_death.rs` / `e2e_night_world.rs` now expect the spawn point.
+- **[q-fix-real-item-replay-belt-use] Potion use: what entry 3 does to the state (`items/use.md` §3, `0x005BE3F0`)**
+    The spec is silent (open question 1); d2rs now does what the
+    recording shows (`facts/items/a1-town-potions-low.tsv` n 9–31,
+    `a1-town-item-moves.tsv` n 40–51): a potion used from the grid (0x20)
+    is drunk by U and consumed (0x9D action 5, flag 0x20), not refused; the
+    state (100 / 106) goes on with an **empty** stat stream in 0xA8
+    (`ff 01`: either its per-tick stats are not on the state list, or they
+    have no send bits); at full life / mana the state ends in the same
+    frame (0xA9, no 0xA8). Read entry 3 and answer into `items/use.md`:
+    which list it attaches (stats, length: 170 frames at 10 of 50 life,
+    51 frames for an mp1 at 1 mana), what ends it when the vital is full,
+    and whether the unit is queued for update by the toggle
+    (`0x00639DB0`) or by the entry itself. d2rs: PROVISIONAL REC-730 in
+    `d2-sim/src/wiring/inventory/potion.rs`.
+
+
+## How to check a behaviour in one command
+
+A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)
+names the save, seed, ticks and input. One command builds the save with
+`d2s-tool`, runs 1.14d with the recorders and d2rs with the same save and
+seed, and prints the first difference per channel (game state first):
+
+```
+py tools/scenario-diff/scenario_diff.py traces/checks/a1-town-arrival-ama.check
+py tools/scenario-diff/scenario_diff.py <check> --orig-only        # only record 1.14d
+py tools/scenario-diff/scenario_diff.py <check> --reuse            # re-compare what is in the work dir
+```
+
+On PC 1 the recorders run with `py` directly (no Wine); the 1.14d save is
+copied to `%USERPROFILE%\Saved Games\Diablo II` (`D2_SAVE_DIR` overrides).
+The state channel's report starts with `FIRST DIVERGENCE: frame N <unit>
+field K: 1.14d A vs d2rs B`, then the next 20, then the first frame per
+field; read the state report before any draw list. Two snapshot files
+compare alone with `py tools/trace-recorder/state_diff.py ORIG D2RS`.
+For a new behaviour, add a `.check` file (copy `a1-town-arrival-ama.check`)
+rather than a hand-run recipe.
+
+22. **Poke call forms** (q-tool-poke): (a)–(d) *answered* 2026-10-09
+    from the asm into the owning specs and `poke.py` `CALL_FORMS`; first
+    1.14d run of the five directives is REC-655 (HANDOFF §7). Was
+    (`specs/tools/poke.md` Open questions 1–4):
     register / stack form and `ret` of (a) `0x00554EA0(game, unit, room,
     x, y, exact, alt)` or the teleport path `0x00650BE0` (`pos`,
     `path-placement.md` §10 / §6 r4); (b) the level warp
@@ -290,7 +360,9 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     (not yet run on 1.14d). Each form can be tried first with
     `poke.py --forms FILE` (README "Call forms") before it goes into
     `CALL_FORMS`.
-23. **Poke runs on Windows** (REC-590): the cloud ran every runnable
+
+23. **Poke runs on Windows** (REC-590) — answered → see `docs/handoff/pc1-day3-a.md`. The cloud ran every runnable
+23. **Poke runs on Windows** (REC-590; answered → see `docs/handoff/pc1-day3-c.md`): the cloud ran every runnable
     directive on 1.14d under Wine (`specs/tools/poke.md` Status) and
     settled the variant load (REC-591, `tools/test-variants.md` Status).
     Left: run `traces/pokes/spawn-town.poke` once on PC 1 with a
@@ -538,3 +610,83 @@ Then the rest:
 31. **Door step 0x004BCB20** (q-fix-pc1-client-ui) Specify the object door step (REC-725): what it does per update for an `IsDoor` non-cycling mode (frame advance, mode change, collision / sound calls), for `world/objects-client.md` §25 r9.2.1.
 32. **NPC introduction handler 0x004B41E0** (q-fix-pc1-client-ui) Read which text record the "introduction" topic plays (REC-727; d2rs plays record 0 of the intro entry) and whether it sets +0x11 or the talk flag like "gossip" (`messages.md` §6 r3 / OQ4).
 33. **Gamble buy 0x32 u32@9** (q-fix-pc1-client-ui) menus.md §4.2 r2 says `[0x007C0DB0]` is only ever written with 0, so a buy in a Gamble window would send transaction 0; the server read (vendors.md §7.1 rule 2) accepts a gamble item only with transaction 2. Record or read what a real Gamble buy sends (C→S 0x32 u32@9) so q-fix-shop-gamble-flag-dead can be settled either way (REC-729; the click env keeps the OR 2 meanwhile).
+41. **Skill button state 0x004A8D30** (q-fix-pc1-client-ui) Specify the icon state (0, 1 or 4) the control panel's skill buttons pass as the colored cel draw's `k` (REC-720; `control-panel.md` §7 r2: which conditions give 4, and the town / flag bit `[0x006CE268]` rule). d2rs draws the button icons with k 0.
+
+## Hand-back — PC 1 day 2, 2026-10-09 (branch `claude/local-pc1-day2`)
+
+**Done** (items 21–40; answers in the owner specs with addresses):
+- 22: poke call forms for pos / warp / item / stat / state are in
+  `poke.py` `CALL_FORMS` and the specs. Run once on 1.14d (PC 1): all
+  five returned `ok` with no fault (REC-655; the level after `warp 2` was
+  not logged).
+- 30 / 34: town critters are client-made from the Levels.txt `cmon` /
+  `cpct` columns, rolled on the client room seed, in a room pass before
+  the unit update. Original bug: all four `camt` fields parse into one
+  field. Client GUID counter: pre-increment from a .data 1, never reset.
+  The critter AI walks 30% of the time. Specs: `client/model.md` §5 r6,
+  `monsters/population.md` §11.7.
+- 27: the nearest-player scan uses the full-size distance ≤ 15, the first
+  qualifying player wins, and the `interact` quest gate applies. Walk in
+  radius: own geometry, no early exit (REC-500 / 501 settled; d2rs
+  differs).
+- 21: owner links for a pet / hireling (AI control +0x2C / +0x30), a
+  missile (+0x94 / +0x98 while +0xC8 bit 0x400 is set) and an item
+  (inventory +0x08). Written to `sim/units.md` and `state-snapshot.md`
+  §2.
+- 29: 0x69 code 8 sends the path **end** (last path point, or (0, 0)),
+  not the path target (REC-594 settled; d2rs and its tests differ).
+- 35–40:
+  - action-frame tests skipped with argument 0 (REC-700, matches);
+  - only the frame advance writes +0x4E (REC-701, d2rs differs);
+  - client leap / whirl machine (REC-702 / 704 match; REC-703 step
+    matches, end rule open as REC-671);
+  - meleeonly mask applies only to `both` → rng;
+  - Evade only plays a sound;
+  - a monster's missile weapon is the plain first weapon.
+- 24: client timed arc ORs flag 2, the vz division form; motion getters
+  return value >> 11 (REC-540 / 541 / 545 / 548 settled).
+- 25: potion entry 3 body. 170 / 51 frames are the fill time at
+  calc1·256·class factor / len; the regen tick frees the list when full
+  (REC-102 settled).
+- 28: the 0x8E join flag is the constant 1 (d2rs matches).
+- 31: door step for opening / closing. 32: introduction record by class
+  (Malah / Nihlathak / Qual-Kehk special cases), sets +0x11 like gossip.
+- 33: a gamble buy sends t = 2. The handlers at `0x004B3D40` /
+  `0x004B42B0` write the flag 1 / 0 (the earlier static export missed
+  them). **`q-fix-shop-gamble-flag-dead` is withdrawn**; d2rs's OR 2 is
+  right.
+- 26: `traces/sim/tick/sim-0009.json` re-recorded with the mouse outside
+  the window. The player stays in its arrival room (the old run changed
+  rooms at 121 / 241 / 351); `convert_tick --check` reports 0 errors.
+
+**Left**
+- 23: run `traces/pokes/spawn-town.poke` with a screenshot (not asked in
+  this run).
+- Still PROVISIONAL:
+  - REC-660: client GUIDs 2–92 (needs a runtime count);
+  - REC-661: critter think-timer start;
+  - REC-665: mode request to own position; answered → see docs/handoff/pc1-day3-b.md
+  - REC-670: local input path for mode 18; answered → see docs/handoff/pc1-day3-b.md
+  - REC-671: whirl end rule; answered → see docs/handoff/pc1-day3-b.md
+  - REC-680: Blood Golem life share. answered → see docs/handoff/pc1-day3-b.md
+  - REC-660: client GUIDs 2–92 (needs a runtime count); answered → see `docs/handoff/pc1-day3-a.md`;
+  - REC-661: critter think-timer start; answered → see `docs/handoff/pc1-day3-a.md`;
+  - REC-665: mode request to own position;
+  - REC-670: local input path for mode 18;
+  - REC-671: whirl end rule;
+  - REC-680: Blood Golem life share.
+- Not traced: the other critter handlers (rat, bat).
+
+**New q-fix rows (build-queue.tsv)**
+- **Combat:** `q-fix-p4-mon-frame-code`, `q-fix-p4-mon-missile-weapon`,
+  `q-fix-p4-evade-sound-only`, `q-fix-p4-range-meleeonly`,
+  `q-fix-p4-whirl-end`.
+- **AI and world:** `q-fix-p3-npc-nearest-player`,
+  `q-fix-p3-walk-in-radius`, `q-fix-p3-death-path-end`,
+  `q-fix-real-town-critters` (now concrete), `q-fix-real-client-guid-start`,
+  `q-fix-real-critter-ai`.
+- **Items, missiles, UI:** `q-fix-p5-potion-entry3`, `q-fix-p5-timed-arc-or`,
+  `q-fix-p5-motion-getters-shift`, `q-fix-p6-object-door-step`,
+  `q-fix-p6-npc-intro-record`.
+- **Tools:** `q-fix-p3-state-own`.
+- **Withdrawn:** `q-fix-shop-gamble-flag-dead`.

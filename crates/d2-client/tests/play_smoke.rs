@@ -1924,3 +1924,49 @@ fn a_town_portal_scroll_used_in_town_is_refused_without_cost() {
         "the scroll stays"
     );
 }
+
+/// A click while walking re-targets the walk from the precise position
+/// (`sim/pathing.md` §1.5: "the fraction is kept"): the predicted
+/// position moves at most one walk step per server tick across the
+/// re-target (`a1-walk-s`: re-placing the path at the cell centre jumped
+/// it by up to half a sub-tile and drifted the camera 3 px).
+// Covers: specs/sim/pathing.md §1.5
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn a_retarget_while_walking_keeps_the_precise_position() {
+    let mut run = Run::start();
+    let precise = |run: &Run| {
+        run.app
+            .world()
+            .resource::<d2_client::world_view::walk::PreviewWalk>()
+            .predict
+            .position()
+            .map(|(x, y)| (i64::from(x), i64::from(y)))
+            .expect("a prediction")
+    };
+    // The clicks of `a1-walk-*`: through the UI, so the prediction walks.
+    run.click(Point::new(600, 284));
+    run.step(10);
+    let last = precise(&run);
+    // The click's own two frames (two ticks), then two more ticks.
+    run.click(Point::new(400, 384));
+    let p2 = precise(&run);
+    run.step(1);
+    let p3 = precise(&run);
+    run.step(1);
+    let p4 = precise(&run);
+    let v = (p4.0 - p3.0, p4.1 - p3.1);
+    assert!(v != (0, 0), "the re-targeted walk moves");
+    assert!(p2 != last, "the click's frames walk");
+    assert_eq!((p3.0 - v.0, p3.1 - v.1), p2, "one velocity from p2 on");
+    // Where the re-targeted path's first step left from: the precise
+    // position, not the centre of its sub-tile (the old re-placement
+    // gave p2 = centre + v on both axes).
+    let from = (p2.0 - v.0, p2.1 - v.1);
+    let centre = |c: i64| (c & !0xFFFF) | 0x8000;
+    assert_ne!(
+        from,
+        (centre(from.0), centre(from.1)),
+        "the re-target restarted at a sub-tile centre"
+    );
+}

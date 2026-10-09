@@ -5,9 +5,9 @@
 //! mapping onto [`Settings`]. No drawing here: [`super::esc_menu`] draws
 //! and routes events; this module only decides.
 //!
-//! d2rs-own, unverified: the Window Mode row of the Video menu (the
-//! 1.14d menu has none); an expansion install is assumed (exp-only rows
-//! are present).
+//! The Video menu has no Window Mode row (§O8: `Game.exe` has none; the
+//! window mode lives in `settings.toml` only). An expansion install is
+//! assumed (exp-only rows are present).
 
 use crate::app::config::Settings;
 use crate::ui::geom::Point;
@@ -55,7 +55,6 @@ pub enum Row {
     Bias3d,
     NpcSpeech,
     Resolution,
-    WindowMode,
     LightQuality,
     BlendShadow,
     Perspective,
@@ -132,12 +131,6 @@ const VIDEO: &[RowDef] = &[
         Kind::Choice(2),
         "Resolution",
         &["640x480", "800x600"],
-    ),
-    def(
-        Row::WindowMode,
-        Kind::Choice(3),
-        "Window Mode",
-        &["Windowed", "Borderless", "Fullscreen"],
     ),
     def(
         Row::LightQuality,
@@ -360,10 +353,6 @@ impl OptionsMenu {
             Row::Eax => i64::from(s.mixer == 2),
             Row::NpcSpeech => s.npc_speech.into(),
             Row::Resolution => s.resolution.into(),
-            Row::WindowMode => crate::app::config::WindowMode::ALL
-                .iter()
-                .position(|m| *m == s.window_mode)
-                .unwrap_or(0) as i64,
             Row::LightQuality => s.light_quality.into(),
             Row::BlendShadow => s.blended_shadows.into(),
             // Shown Off: d2rs has no 3D renderer path (§O8).
@@ -388,9 +377,6 @@ impl OptionsMenu {
             }
             Row::NpcSpeech => self.settings.npc_speech = v as u8,
             Row::Resolution => self.settings.resolution = v as u8,
-            Row::WindowMode => {
-                self.settings.window_mode = crate::app::config::WindowMode::ALL[v as usize];
-            }
             Row::LightQuality => self.settings.light_quality = v as u8,
             Row::BlendShadow => self.settings.blended_shadows = v as u8,
             Row::MapMode => self.settings.automap_mode = v as u8,
