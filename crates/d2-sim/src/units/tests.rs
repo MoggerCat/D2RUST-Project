@@ -1482,7 +1482,7 @@ fn the_sequence_advance_counts_down_and_reads_the_crossed_event_bytes() {
     assert_eq!(a.action_frame, 7);
 }
 
-// Covers: specs/skills/sequences.md §3 (frame setup stores the drawn frame ·256)
+// Covers: specs/skills/sequences.md §3
 #[test]
 fn the_sequence_advance_stores_the_drawn_frame() {
     use super::anim::advance_sequence;
