@@ -26,15 +26,15 @@
 |   2. `draws.tsv` | 90–136 |
 |   3. `frame.tsv` | 137–169 |
 |   4. `sprites.tsv` | 170–189 |
-|   5. d2rs export | 190–326 |
-|   6. Comparison | 327–364 |
-|   7. Requests | 365–376 |
-| Constants & data dependencies | 377–380 |
-| Randomness | 381–384 |
-| Edge cases & original bugs | 385–392 |
-| Test vectors | 393–401 |
-| Provenance | 402–406 |
-| Open questions | 407–421 |
+|   5. d2rs export | 190–327 |
+|   6. Comparison | 328–377 |
+|   7. Requests | 378–389 |
+| Constants & data dependencies | 390–393 |
+| Randomness | 394–397 |
+| Edge cases & original bugs | 398–405 |
+| Test vectors | 406–414 |
+| Provenance | 415–419 |
+| Open questions | 420–434 |
 <!-- /index -->
 
 ## Summary
@@ -251,7 +251,8 @@ composition, through `d2-client` only (game logic untouched).
    with (those items write no row): `DrawLine` for a line, `DrawBox` for
    the flash (`DrawRectangle` `0x004F6300`), `x`, `y` = x0, y0 and `mode`
    = the color (`blend-modes.md` §8 r1–r2), `at` = `pass9` (§6 r5),
-   every other column `-`. The
+   every other column `-`. A pass-4 pool cel (§11.6) is a cel row as
+   any other, with `at` = `pools` (§6 r5 revision). The
    rows stand where the first such item is, else (every pixel
    off-screen) before the first item of a later pass, else at the end.
    Other primitives (`DrawBox`, `DrawBoxAlpha`, `Util*`) are written only
@@ -361,6 +362,18 @@ The original's `sprites.tsv` is `<original dir>/sprites.tsv`, else
    measured so far are `0x0047368E` (rain lines) and `0x00473585`
    (snow lines, Harrogath), both in the particle draw; settled by a
    scene recorded with the lightning flash (REC-510).
+   *Revision (2026-10-09, q-scenes-compare):* pass 4's environment
+   pools (`draw-order-2.md` §11.6: the splash and bubble cels,
+   `0x00473C00` → `0x00473A70`) are left out too: on the 1.14d side a
+   `CelDraw` row whose `at` is in [`0x00473A70`, `0x00473C00`), on the
+   d2rs side a row whose `at` is `pools` (§5 r10). Their spawns draw on
+   the local player's seed (§11.5), which the idle cursor steps once per
+   drawn frame on wall-clock time (`ui/panels-3.md` §23 r8), so they
+   are no more reproducible than the rain (`a3-town-kurast-docks` rows
+   97–99: three cels at `0x00473BD0`, d2rs's other splashes).
+   PROVISIONAL (REC-708): `0x00473BD0` is the pool draw's only call
+   site; settled by a recording of a water floor in the rain with the
+   call sites of every pool cel.
 
 ### 7. Requests
 

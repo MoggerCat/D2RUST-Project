@@ -522,6 +522,17 @@ impl<X: Pending> MissileHooks for View<'_, X> {
 /// grids, unit records, and the area hit on the combat view. The area
 /// scan has no provider here ([`Pending::missile_area_units`]).
 impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
+    /// `0x005444B0(game, id)`: the quest control's published answer
+    /// ([`Pending::quest_not_intro`]).
+    fn quest_test(&self, _game: &Game, id: i32) -> bool {
+        u8::try_from(id).is_ok_and(|c| self.h.x.quest_not_intro(c))
+    }
+    /// `0x0058E920`: queued for the quest control with the missile's
+    /// position ([`Pending::missile_spawn_tyrael`]).
+    fn spawn_tyrael(&mut self, _game: &mut Game, room: Option<RoomId>, missile: UnitId) {
+        let (x, y) = self.h.path_position(missile);
+        self.h.x.missile_spawn_tyrael(room, missile, x, y);
+    }
     /// `0x0064B7C0` (`skills/levels.md` `eval_missile`).
     fn missile_calc(
         &mut self,

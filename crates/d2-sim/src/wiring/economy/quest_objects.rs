@@ -469,8 +469,16 @@ fn init<W: QuestWorld>(
         7 => act1::q4::gibbet_init(ctl, w, object),
         9 => act1::q4::tree_init(ctl, w, object),
         15 => act1::malus_init(ctl, w, object),
-        18 => act2::q4::start_jerhyn_init(ctl, w, object),
-        19 => act2::q4::palace_jerhyn_init(ctl, w, object),
+        18 => {
+            if let Some(at) = at {
+                act2::q4::start_jerhyn_init(ctl, w, at);
+            }
+        }
+        19 => {
+            if let Some(at) = at {
+                act2::q4::palace_jerhyn_init(ctl, w, object, at);
+            }
+        }
         20 => act2::q3::altar_init(ctl, w, object),
         21 => act2::q6::orifice_init(ctl, w, object),
         29 => act2::q4::portal_init(ctl, w, object),

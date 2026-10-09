@@ -189,6 +189,9 @@ impl Rig {
             .init_resource::<ButtonInput<MouseButton>>()
             .init_resource::<ButtonInput<KeyCode>>();
         add_game(&mut app, dyn_link, false).unwrap();
+        // The client tables before the join's messages (the 0x23 hand
+        // selects need the skill rows).
+        crate::app_support::live_tables(&mut app);
         send_create_game_for(&mut app, &character).unwrap();
         let data = crate::app_support::game_data();
         let levels = single_player::client_level_rows(&data);
@@ -198,7 +201,6 @@ impl Rig {
             levels.clone(),
         );
         add_preview(&mut app, levels, TileAssets::default());
-        crate::app_support::live_tables(&mut app);
         // The client walks what the rig sends (the play app's own-walk
         // prediction), so its C→S 0x5F reports the position the player
         // really has; without it the client stays at the spawn point and
@@ -290,7 +292,7 @@ impl Rig {
             .unwrap()
     }
 
-    fn send(&mut self, msg: &[u8]) {
+    pub fn send(&mut self, msg: &[u8]) {
         self.tap.record(msg);
         self.link
             .lock()
@@ -303,7 +305,7 @@ impl Rig {
         self.with(|sim, p| sim.events.action.sys.hooks.path_position(p))
     }
 
-    fn mode(&mut self) -> u32 {
+    pub fn mode(&mut self) -> u32 {
         self.with(|sim, p| sim.events.action.sys.units.get(p).map_or(0, |u| u.mode))
     }
 

@@ -253,6 +253,21 @@ impl WorldViewUi {
             focus_lost: false,
         }
     }
+
+    /// The cursor position last reported to the UI (the click view's
+    /// mouse).
+    pub fn cursor(&self) -> Option<FramePos> {
+        self.cursor
+    }
+
+    /// Sets the cursor position a headless driver reported with its own
+    /// `CursorMoved` (`app::autoplay_host`, the window's `ui_input` path).
+    pub fn set_cursor(&mut self, at: FramePos) {
+        self.cursor = Some(at);
+        if let FramePos::Inside(p) = at {
+            self.last_at = p;
+        }
+    }
 }
 
 /// Sound requests for the audio frame, in order: the bridge outputs'

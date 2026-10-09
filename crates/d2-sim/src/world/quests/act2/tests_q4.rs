@@ -423,7 +423,12 @@ fn jerhyn_palace_spawn_from_the_blocker() {
 fn palace_init(ctl: &mut QuestControl, f: &mut Fake) {
     f.objects.insert(PALACE_OBJ, (0x54, 122, 0));
     f.pos.insert(PALACE_OBJ, (100, 200, R9));
-    q4::palace_jerhyn_init(ctl, f, PALACE_OBJ);
+    let at = crate::world::quests::act3::InitPoint {
+        room: R9,
+        x: 100,
+        y: 200,
+    };
+    q4::palace_jerhyn_init(ctl, f, PALACE_OBJ, at);
 }
 
 // Covers: specs/world/quests-act2-2.md §2 r2, §2 r4
@@ -512,8 +517,14 @@ fn jerhyn_palace_init() {
 fn jerhyn_start_init() {
     let start = |ctl: &mut QuestControl, f: &mut Fake| {
         f.objects.insert(START_OBJ, (0x53, 121, 0));
-        f.pos.insert(START_OBJ, (30, 40, R9));
-        q4::start_jerhyn_init(ctl, f, START_OBJ);
+        // The init runs before the object is placed: only the InitFn
+        // record's room and point (`sim/units.md` §3.1 r7.2).
+        let at = crate::world::quests::act3::InitPoint {
+            room: R9,
+            x: 30,
+            y: 40,
+        };
+        q4::start_jerhyn_init(ctl, f, at);
     };
     // Chain 13 not-intro state 0, no game 8.13 / 12.13: free spot (size 2,
     // sixth argument 10), Jerhyn there; +0x0C := 1, +0x3C := his GUID.

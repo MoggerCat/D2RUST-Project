@@ -1,4 +1,4 @@
-// Spec: specs/world/objects-client.md (§25–§28), specs/client/model.md (§2 rule 1, §5 rules 2–3, §8 rule 7, §18), specs/render/lighting.md (open question 11), specs/render/overlay.md (§5)
+// Spec: specs/world/objects-client.md (§25–§28), specs/client/model.md (§2 rule 1, §5 rules 2–3, §5 rule 6.3, §8 rule 7, §18), specs/render/lighting.md (open question 11), specs/render/overlay.md (§5)
 //! The client side of objects: the per-object client update `0x004BDFF0`
 //! (the generic step `0x004BCBB0`, then the object's `ClientFn` and the
 //! mode sound call, call site A), the second `ClientFn` call of a C
@@ -226,12 +226,14 @@ impl Latches {
 }
 
 /// Set C and the object latches (`model.md` §2 rule 1; §27).
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ClientObjects {
     /// Set C: the client-only units (unit flag 0x200000), by key.
     pub set_c: BTreeMap<UnitKey, ClientUnit>,
     pub latches: Latches,
-    /// The client GUID counter `[0x00711F30]` of `0x00466730`.
+    /// The client GUID counter `[0x00711F30]` of `0x00466730`: the last
+    /// GUID given (`model.md` §5 r6.3: .data initial value 1, never
+    /// reset; [`create_client_unit`]).
     pub next_guid: u32,
     /// The missile fields of the set-C missiles
     /// (`super::client_missiles`, `missiles/client.md` §C1).
@@ -249,6 +251,21 @@ pub struct ClientObjects {
     /// Monster type flag 0x80 (+0x16) while the umod 29 hook makes its
     /// copies (`monsters/umod-callbacks.md` §28.2).
     pub multishot_guard: std::collections::BTreeSet<UnitKey>,
+}
+
+impl Default for ClientObjects {
+    fn default() -> Self {
+        Self {
+            set_c: BTreeMap::new(),
+            latches: Latches::default(),
+            next_guid: 1,
+            missiles: Default::default(),
+            just_hit: BTreeMap::new(),
+            unit_grids: BTreeMap::new(),
+            missile_sounds: Vec::new(),
+            multishot_guard: Default::default(),
+        }
+    }
 }
 
 /// A unit and the set it is in.
@@ -698,9 +715,8 @@ pub fn object_update(
 
 /// Call site B (§25 r3; `model.md` §5 rule 3): after a C unit's update,
 /// a type-2 unit still in set C runs the dispatch once more, result
-/// ignored.
-/// TODO(spec: client/model.md §5 rule 3): type 1 runs `0x0046D780`
-/// (not specified).
+/// ignored. (Type 1 runs the critter AI `0x0046D780` in the C monsters'
+/// walk, [`super::critters::c_monsters`].)
 pub fn site_b(
     w: &mut ClientWorld,
     inputs: &ModelInputs,
@@ -748,9 +764,9 @@ pub fn c_order(w: &ClientWorld, unit_type: u8) -> Vec<UnitKey> {
 /// 6. Returns its key; `None` when the create fails (the point is in no
 /// room of the client DRLG).
 ///
-/// PROVISIONAL (objects-client.md §26.17; REC-objclient-1): the counter
-/// starts at 0 and the new GUID is the counter's value before a += 1
-/// (the counter's start and step are not specified).
+/// The GUID is the counter + 1 (−1 wraps to 0), stored back before the
+/// create (`model.md` §5 r6.3): the first client GUID is 2, and a failed
+/// create still uses its GUID.
 pub fn create_client_unit(
     w: &mut ClientWorld,
     unit_type: u8,
@@ -758,8 +774,8 @@ pub fn create_client_unit(
     x: u16,
     y: u16,
 ) -> Option<UnitKey> {
-    let guid = w.objclient.next_guid;
-    w.objclient.next_guid = guid.wrapping_add(1);
+    let guid = w.objclient.next_guid.wrapping_add(1);
+    w.objclient.next_guid = guid;
     let key = UnitKey::new(unit_type, guid);
     let mut u = ClientUnit::new(key);
     u.class = class;
