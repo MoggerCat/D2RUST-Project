@@ -60,6 +60,15 @@ fix 1 + the join check).
 With the talk sent (`--send` 0x13 / 0x2F / 0x31 183) d2rs sets 6.0. Owner of the click / hover pick:
 input (`bridge/click.rs`, q-fix-input-lock) or the .play files could use sends.
 
+## Checks run before push
+
+`cargo fmt --all`; `cargo clippy -p d2-client --all-targets -- -D warnings` clean;
+`cargo nextest run -p d2-client --lib`: 2274 passed. The d2-client integration-test binaries
+(`crates/d2-client/tests/*`) could not be linked in this container (disk allowance: "No space left on
+device" with 14 GB free); clippy `--all-targets` type-checked them. Run `cargo nextest run -p d2-client`
+on a machine with room before merging. `record_state.py --selftest`, `coverage.py --check`,
+`spec_index.py --check` pass.
+
 ## Repro
 
 ```sh
