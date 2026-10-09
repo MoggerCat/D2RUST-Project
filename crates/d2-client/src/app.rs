@@ -27,6 +27,7 @@ pub mod npc_seams;
 pub mod palette;
 pub mod play;
 pub mod play_start;
+pub mod poke;
 pub mod rest;
 pub mod save;
 pub mod save_full;
