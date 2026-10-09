@@ -208,7 +208,7 @@ what moved it.
 1. Frame 20, torch 2:18 and tile 5:1 seeds swapped: the first walk of
    `0x005559A0` creates objects and warp tiles in one list-order pass
    before the monsters (`drlg/rooms.md` §8 rule 6); d2rs made objects
-   first and tiles after the monsters. Fixed (`spawn_preset_first_pass`).
+   first and tiles after the monsters. Fixed (`spawn_preset_units`; the same fix landed on staging).
 2. Frame 21, game seed (object 2:21 class 55 misplaced; d2rs corpse 56 +
    flies 103 extra): the shrine pick ran 8 tries in d2rs, 1 in 1.14d
    (`0x0054F7D4` one step), because the init read the level from the
