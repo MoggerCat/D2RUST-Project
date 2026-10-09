@@ -88,6 +88,8 @@ pub struct TestPending {
     pub peaceful: Vec<UnitId>,
     /// What `object_quest_record` answers (the portal's quest gate).
     pub quest_record: bool,
+    /// Unit sizes `0x00620510` (default 1).
+    pub sizes: BTreeMap<UnitId, i32>,
 }
 
 impl Pending for TestPending {
@@ -134,8 +136,8 @@ impl Pending for TestPending {
     fn place(&mut self, unit: UnitId, x: i32, y: i32) {
         self.pos.insert(unit, (x, y));
     }
-    fn size(&self, _: UnitId) -> i32 {
-        1
+    fn size(&self, u: UnitId) -> i32 {
+        self.sizes.get(&u).copied().unwrap_or(1)
     }
     fn has_path(&self, _: UnitId) -> bool {
         true

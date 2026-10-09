@@ -31,14 +31,14 @@
 |   7. Value-change notification | 296–332 |
 |   8. Chain operations | 333–440 |
 |   9. States | 441–479 |
-|   10. Timer event handlers | 480–567 |
-|   11. Mod array and stat messages | 568–605 |
-| Constants & data dependencies | 606–617 |
-| Randomness | 618–621 |
-| Edge cases & original bugs | 622–645 |
-| Test vectors | 646–682 |
-| Provenance | 683–706 |
-| Open questions | 707–737 |
+|   10. Timer event handlers | 480–572 |
+|   11. Mod array and stat messages | 573–610 |
+| Constants & data dependencies | 611–622 |
+| Randomness | 623–626 |
+| Edge cases & original bugs | 627–650 |
+| Test vectors | 651–687 |
+| Provenance | 688–711 |
+| Open questions | 712–742 |
 <!-- /index -->
 
 ## Summary
@@ -529,6 +529,11 @@ the states-count test or the queue insert leaves it).
    `0x00552F60`); unit +0xB0 := 0. With state 54 (`uninterruptable`):
    state 92 (`death_delay`) on, stop. Else `0x0057CCB0`(game, unit,
    killer) and the death events `0x005C0C30` (monster spec).
+   PROVISIONAL: the death events are `combat/damage.md` §5.2 step 15's
+   pair, killed (10) on the unit then kill (9) on the killer, with no
+   damage record (because the kill on a lethal hit fires that pair and
+   this step names no ids); settled by a 1.14d trace of a poison kill
+   with an item kill event (REC-1260).
 
 #### 10.2 Event 5, active state (`0x0056D790`, players and monsters)
 
