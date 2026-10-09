@@ -81,6 +81,13 @@ pub fn flash_size(frame: FrameSize, mode: OpenMode) -> (u32, u32) {
     (w.max(0) as u32, h.max(0) as u32)
 }
 
+/// Whether a frame-set path is one of pass 9's call drawings (a line
+/// pixel or the flash rectangle): the facts export writes the calls of
+/// [`super::WorldFrame::sky`] in their place.
+pub fn is_sky_call_path(path: &str) -> bool {
+    path == PIXEL_PATH || path.starts_with("d2rs/weather/flash/")
+}
+
 fn flash_key(frame: FrameSize, mode: OpenMode) -> FrameSetKey {
     let (w, h) = flash_size(frame, mode);
     FrameSetKey::new(format!("d2rs/weather/flash/{w}x{h}"), FramePart::Tile(0)).expect("canonical")

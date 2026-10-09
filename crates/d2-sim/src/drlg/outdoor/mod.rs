@@ -553,6 +553,10 @@ impl OutdoorTypes<'_> {
 }
 
 impl LevelTypes for OutdoorTypes<'_> {
+    fn automap_streams(&self, drlg: &Drlg, l: LevelIdx) -> bool {
+        !Self::is_outdoor(drlg, l) && self.others.automap_streams(drlg, l)
+    }
+
     fn create_act_levels(&mut self, drlg: &mut Drlg, data: &DrlgData) -> Result<(), DrlgError> {
         let mut alloc = NonOutdoor {
             others: &mut *self.others,

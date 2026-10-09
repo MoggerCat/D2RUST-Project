@@ -317,6 +317,9 @@ pub struct PlayConfig {
     /// `--dump-draws DIR --at-tick N` (`specs/tools/facts-render.md` §5):
     /// write one frame's rendering facts, then exit.
     pub dump: Option<crate::facts::export::DumpRequest>,
+    /// `--input SCRIPT` (`specs/tools/facts-render.md` §5 r11): scripted
+    /// pointer input in place of the window's.
+    pub input: Option<Vec<crate::world_view::input_script::Step>>,
 }
 
 #[derive(Resource)]
@@ -605,6 +608,9 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         },
     )?;
     sound::add_output(&mut app);
+    if let Some(steps) = config.input {
+        app.insert_resource(crate::world_view::input_script::InputScript::new(steps));
+    }
     if let Some(request) = config.dump {
         app.insert_resource(crate::world_view::present::DrawDump::new(request));
     }
