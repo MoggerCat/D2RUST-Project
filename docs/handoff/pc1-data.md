@@ -488,6 +488,15 @@ rather than a hand-run recipe.
   `0x00622830` the same pick (`sim/units.md` §4.7 "Attack weapon") or
   plain `0x0063C9B0`? Answer into §1 step 6.
 
+- **[q-play-act5] join act byte**: which 1.14d function writes the
+  player unit's act (+0x18) on a join into a save's act? The recording
+  `traces/checks/a5-town-arrival-bar.check` shows 4 from frame 2 (a
+  barbarian saved in Act V); `sim/units.md` §2 names only the allocation
+  (`0x005552ED`, the allocation room's act; the player is allocated in no
+  room) and the act change (`0x0053AE4E`). d2rs writes it at the join's
+  act step (rule 4, REC-797). Answer into `sim/units.md` §2 and
+  `sim/intents-events.md` §8.2.
+
 ## How to check a behaviour in one command
 
 A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)
