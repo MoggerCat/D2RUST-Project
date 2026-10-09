@@ -2,6 +2,14 @@ check 1
 # Ground items, many classes and qualities (area G, drops): seeds fixed, then at frame 4 forty items made through the game's own creation path;
 # the item seeds, classes and places are compared frame by frame (equal item seeds mean the same RNG draws).
 # Spec: specs/tools/scenario-diff.md, specs/tools/poke.md.
+# Result (2026-10-09, 36 items made on both sides): quality, item level,
+# affix ids (magic, rare, auto), item seeds, start seed and the item stat
+# lists are EQUAL on every item. Two fields differ for every poked item and
+# are ignored here until the binary question is answered
+# (docs/handoff/pc1-data.md Step 4 item 26): item flag 0x2000 (1.14d clear,
+# d2rs set per generation.md §3 step 5) and the file index of items without
+# one (1.14d 0, d2rs -1).
+ignore if fi
 name items-ground-many
 save ScnAma --class ama --expansion
 seed 1234

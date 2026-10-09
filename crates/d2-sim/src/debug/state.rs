@@ -27,7 +27,7 @@ use std::fmt::Write as _;
 use crate::game::Game;
 use crate::path::record::{DynamicPath, StaticPath};
 use crate::path::UnitPath;
-use crate::stats::{key, ListId, StatLists};
+use crate::stats::{key, key_layer, key_stat, ListId, StatLists};
 use crate::units::dispatch::UnitSystem;
 use crate::units::{UnitId, UnitType};
 use crate::wiring::action::ActionHooks;
@@ -37,9 +37,10 @@ use crate::wiring::worldgen::WorldSim;
 pub const FORMAT: &str = "state-1";
 
 /// Every unit key of §2, in table order (the comparison order).
-pub const FIELDS: [&str; 29] = [
+pub const FIELDS: [&str; 41] = [
     "ut", "g", "cl", "m", "x", "y", "xf", "yf", "tx", "ty", "d", "fr", "fc", "sp", "s", "act",
-    "lv", "hp", "hpx", "mp", "mpx", "st", "stx", "str", "ene", "dex", "vit", "lvl", "own",
+    "lv", "hp", "hpx", "mp", "mpx", "st", "stx", "str", "ene", "dex", "vit", "lvl", "own", "iq",
+    "if", "fi", "il", "aa", "pf", "sf", "rp", "rs", "ik", "ss", "is",
 ];
 
 /// The keys whose values need the path provider (path +0x00 … +0x64, and
@@ -99,6 +100,24 @@ pub struct UnitState {
     pub lvl: Option<i32>,
     /// Owner GUID.
     pub own: Option<u32>,
+    /// Item data (§2, items only): quality +0x00, flags +0x18, file index
+    /// +0x28, item level +0x2C, auto affix +0x36, magic prefixes +0x38…,
+    /// suffixes +0x3E…, rare prefix / suffix +0x32 / +0x34, item seed
+    /// +0x04, start seed +0x10.
+    pub iq: Option<u8>,
+    pub ifl: Option<u32>,
+    pub fi: Option<i32>,
+    pub il: Option<i32>,
+    pub aa: Option<u16>,
+    pub pf: Option<[u16; 3]>,
+    pub sf: Option<[u16; 3]>,
+    pub rp: Option<u16>,
+    pub rs: Option<u16>,
+    pub ik: Option<[u32; 2]>,
+    pub ss: Option<u32>,
+    /// The item's stat list base array: `[stat, layer, value]` in key
+    /// order.
+    pub is: Option<Vec<[i32; 3]>>,
 }
 
 /// One snapshot (§1 rule 2): the state after tick `frame` (§3).
@@ -174,6 +193,33 @@ fn unit_json(o: &mut String, u: &UnitState) {
     num(o, "vit", u.vit);
     num(o, "lvl", u.lvl);
     num(o, "own", u.own);
+    num(o, "iq", u.iq);
+    num(o, "if", u.ifl);
+    num(o, "fi", u.fi);
+    num(o, "il", u.il);
+    num(o, "aa", u.aa);
+    if let Some([a, b, c]) = u.pf {
+        let _ = write!(o, ",\"pf\":[{a},{b},{c}]");
+    }
+    if let Some([a, b, c]) = u.sf {
+        let _ = write!(o, ",\"sf\":[{a},{b},{c}]");
+    }
+    num(o, "rp", u.rp);
+    num(o, "rs", u.rs);
+    if let Some([lo, hi]) = u.ik {
+        let _ = write!(o, ",\"ik\":[{lo},{hi}]");
+    }
+    num(o, "ss", u.ss);
+    if let Some(list) = &u.is {
+        o.push_str(",\"is\":[");
+        for (i, [s, l, v]) in list.iter().enumerate() {
+            if i > 0 {
+                o.push(',');
+            }
+            let _ = write!(o, "[{s},{l},{v}]");
+        }
+        o.push(']');
+    }
     o.push('}');
 }
 
@@ -345,6 +391,34 @@ fn unit_state<X>(
     }
     if let Some(l) = sys.stats.unit_list(id).filter(|&l| sys.stats.is_live(l)) {
         stats(&mut u, &sys.stats, l);
+    }
+    if ty == UnitType::Item {
+        if let Some(it) = sys.hooks.items.get(id) {
+            u.iq = Some(it.quality);
+            u.ifl = Some(it.flags);
+            u.fi = Some(it.file_index);
+            u.il = Some(it.ilvl);
+            u.aa = Some(it.auto_affix);
+            u.pf = Some(it.prefix);
+            u.sf = Some(it.suffix);
+            u.rp = Some(it.rare_prefix);
+            u.rs = Some(it.rare_suffix);
+            u.ik = Some([it.item_seed.lo, it.item_seed.hi]);
+            u.ss = Some(it.start_seed);
+            let list = sys
+                .stats
+                .unit_list(id)
+                .filter(|&l| sys.stats.is_live(l))
+                .map(|l| {
+                    sys.stats
+                        .base_entries(l)
+                        .into_iter()
+                        .map(|(k, v)| [i32::from(key_stat(k)), i32::from(key_layer(k)), v])
+                        .collect()
+                })
+                .unwrap_or_default();
+            u.is = Some(list);
+        }
     }
     u
 }

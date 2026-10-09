@@ -46,6 +46,18 @@ fn full_unit() -> UnitState {
         vit: Some(26),
         lvl: Some(27),
         own: Some(28),
+        iq: Some(29),
+        ifl: Some(30),
+        fi: Some(-31),
+        il: Some(32),
+        aa: Some(33),
+        pf: Some([34, 35, 36]),
+        sf: Some([37, 38, 39]),
+        rp: Some(40),
+        rs: Some(41),
+        ik: Some([42, 4_000_000_001]),
+        ss: Some(43),
+        is: Some(vec![[44, 0, 45], [46, 1, -47]]),
     }
 }
 
@@ -63,7 +75,9 @@ fn a_snap_line_has_every_key_in_table_order() {
             r#"{"k":"snap","f":3,"seed":[1234,666],"units":[{"ut":1,"g":7,"cl":2,"m":3,"#,
             r#""x":4,"y":5,"xf":6,"yf":7,"tx":8,"ty":9,"d":10,"fr":-11,"fc":12,"sp":-13,"#,
             r#""s":[14,4000000000],"act":15,"lv":16,"hp":17,"hpx":18,"mp":19,"mpx":20,"#,
-            r#""st":21,"stx":22,"str":23,"ene":24,"dex":25,"vit":26,"lvl":27,"own":28}]}"#
+            r#""st":21,"stx":22,"str":23,"ene":24,"dex":25,"vit":26,"lvl":27,"own":28,"#,
+            r#""iq":29,"if":30,"fi":-31,"il":32,"aa":33,"pf":[34,35,36],"sf":[37,38,39],"#,
+            r#""rp":40,"rs":41,"ik":[42,4000000001],"ss":43,"is":[[44,0,45],[46,1,-47]]}]}"#
         )
     );
     // The key order of the line is the spec's table.
