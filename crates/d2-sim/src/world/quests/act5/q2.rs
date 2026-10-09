@@ -626,6 +626,39 @@ pub fn group_count<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, b: UnitId) 
     }
 }
 
+/// [`group_count`] for the barbarian with GUID `bg` (the prisoner AI
+/// removes the unit in the same call, so a host that runs the hook after
+/// the AI step passes the GUID).
+pub fn group_count_guid(ctl: &mut QuestControl, bg: u32) {
+    let Some(i) = ctl.find(CHAIN) else { return };
+    if !ctl.records[i].not_intro {
+        return;
+    }
+    let e = x(ctl, i);
+    if let Some(g) = group_of(e, bg) {
+        count(e, g);
+    }
+}
+
+/// Every spawned barbarian's (GUID, [`group_counting`], the group's
+/// portal GUID when spawned): what the prisoner AI's reads see.
+pub fn barbarian_states(ctl: &QuestControl) -> Vec<(u32, bool, Option<u32>)> {
+    let Some(r) = ctl.record(CHAIN) else {
+        return Vec::new();
+    };
+    let e = &r.extra.a5.q2;
+    let mut v = Vec::new();
+    for g in 0..3 {
+        for &b in &e.barbarians[g] {
+            if b != 0 {
+                let portal = e.portal_spawned[g].then_some(e.portal_guid[g]);
+                v.push((b, r.not_intro && e.counter[g] != 0, portal));
+            }
+        }
+    }
+    v
+}
+
 /// `0x00588D60` (prisoner AI `0x005EE3DB`, §4.10): B's group portal,
 /// when spawned and the unit exists.
 pub fn group_portal<W: QuestWorld>(ctl: &QuestControl, w: &mut W, b: UnitId) -> Option<UnitId> {

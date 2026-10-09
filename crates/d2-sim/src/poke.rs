@@ -12,14 +12,16 @@
 //! | [`PokeFile`] | a `poke 1` file (§2) |
 //! | [`apply`], [`apply_op`], [`apply_line`] | resolve the references on the current state and run the directive on a [`WorldSim`] game (§5) |
 //! | [`spawn_monster`] | the call sequences of a `spawn` step (`scenario.md` §3.1 rule 2) |
+//! | [`GotoTarget`], [`GotoWalk`], [`goto_step`] | the `goto` walk, one step per tick (§6) |
 //!
 //! References (`scenario.md` §3 rule 3, §1 rule 1 here) are resolved by
 //! [`apply`] on the state it is called on: the callers call it between
 //! ticks t − 1 and t (§5 rule 2), so that is the state after tick t − 1.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt;
 
+use crate::drlg::DrlgRoomId;
 use crate::game::Game;
 use crate::items::{ItemGame, ItemRequest, ItemTables};
 use crate::missiles::param_flags as pf;
@@ -29,7 +31,7 @@ use crate::monsters::population::{placement, preset, spawn as pop_spawn};
 use crate::units::{RoomId, UnitId, UnitType};
 use crate::wiring::economy::{Economy, GameFields, ItemSpawn};
 use crate::wiring::path::act_change;
-use crate::wiring::path::place::level_warp;
+use crate::wiring::path::place::{level_warp, place_unit};
 use crate::wiring::path::PathCtx;
 use crate::wiring::worldgen::dispatch::WorldSim;
 use crate::wiring::worldgen::WorldPending;
@@ -147,6 +149,36 @@ pub enum Directive {
     Freeze {
         seconds: u32,
     },
+    Goto(GotoTarget),
+}
+
+/// The target of a `goto` (§6 rule 1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct GotoTarget {
+    /// `preset <level>`: the goal level; `None` for `unit` (the player's
+    /// level at the first step).
+    pub preset: Option<u32>,
+    /// Unit type: 1 monster or 2 object.
+    pub ty: u8,
+    /// Class (`monstats` / `objects` row).
+    pub class: u32,
+}
+
+/// Steps after which a `goto` walk ends `failed` (§6 rule 3.4).
+pub const GOTO_MAX_STEPS: u32 = 400;
+
+/// The state a runner keeps between the steps of one `goto` (§6 rule 2).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct GotoWalk {
+    /// The goal level, fixed at the first step.
+    pub goal: Option<u32>,
+    /// DRLG rooms seen: (level id, tile x, tile y).
+    pub seen: BTreeSet<(u32, i32, i32)>,
+    /// DRLG rooms the player cannot stand in (no free cell, or the
+    /// placement refused or landed elsewhere): the search avoids them.
+    pub blocked: BTreeSet<(u32, i32, i32)>,
+    /// Steps run so far.
+    pub steps: u32,
 }
 
 /// The directive keywords, in the §1 table order.
@@ -164,6 +196,7 @@ pub const KEYWORDS: [&str; 13] = [
     "stat",
     "state",
     "freeze",
+    "goto",
 ];
 
 impl Directive {
@@ -183,6 +216,7 @@ impl Directive {
             Self::Stat { .. } => "stat",
             Self::State { .. } => "state",
             Self::Freeze { .. } => "freeze",
+            Self::Goto(_) => "goto",
         }
     }
 }
@@ -591,6 +625,23 @@ pub fn parse_directive(toks: &[&str]) -> Result<Directive, String> {
                 seconds: ranged(a[0], 0, 3600, "seconds")?,
             }
         }
+        "goto" => {
+            let usage = "unit [<type>:]<class> | preset <level> [<type>:]<class>";
+            let (preset, id) = match args {
+                ["unit", id] => (None, *id),
+                ["preset", lv, id] => (Some(ranged(lv, 0, 0xFFFF, "level id")?), *id),
+                _ => return Err(format!("`goto {usage}`")),
+            };
+            let (ty, class) = match id.split_once(':') {
+                Some((t, c)) => (ranged(t, 1, 2, "goto unit type (1 monster, 2 object)")?, c),
+                None => (1, id),
+            };
+            Directive::Goto(GotoTarget {
+                preset,
+                ty: ty as u8,
+                class: ranged(class, 0, 0xFFFF, "class")?,
+            })
+        }
         k => {
             return Err(format!(
                 "unknown directive {k:?}: one of {}",
@@ -673,6 +724,10 @@ impl fmt::Display for Directive {
                 write!(f, " {unit} {state} {}", if *on { "on" } else { "off" })?
             }
             Self::Freeze { seconds } => write!(f, " {seconds}")?,
+            Self::Goto(t) => match t.preset {
+                Some(l) => write!(f, " preset {l} {}:{}", t.ty, t.class)?,
+                None => write!(f, " unit {}:{}", t.ty, t.class)?,
+            },
         }
         Ok(())
     }
@@ -827,6 +882,9 @@ pub enum PokeResult {
     Unresolved(String),
     /// This side cannot run the directive: why.
     Gap(String),
+    /// A `goto` step that did not land yet (§6 rule 3.3): run the next
+    /// step after the next tick.
+    Pending,
 }
 
 impl PokeResult {
@@ -837,6 +895,7 @@ impl PokeResult {
             Self::Failed => "failed",
             Self::Unresolved(_) => "unresolved",
             Self::Gap(_) => "gap",
+            Self::Pending => "pending",
         }
     }
 
@@ -1294,7 +1353,173 @@ fn run<X: WorldPending>(
             }
         }
         Directive::Freeze { .. } => PokeResult::Ok(None),
+        Directive::Goto(t) => goto_step(game, sim, env, t, &mut GotoWalk::default()),
     })
+}
+
+/// The level id of the room holding unit `u`.
+fn unit_level<X: WorldPending>(game: &Game, sim: &WorldSim<X>, u: UnitId) -> Option<u32> {
+    let room = game.lists.unit(u)?.room()?;
+    sim.action.sys.hooks.drlg.level_id(game, room)
+}
+
+/// One step of a `goto` walk (§6 rule 3): `Pending` until the target is
+/// found and the player placed next to it (`Ok` with the target's GUID)
+/// or the walk ends `Failed`. `walk` is the state the runner keeps
+/// between steps (a fresh one for a new `goto`).
+pub fn goto_step<X: WorldPending>(
+    game: &mut Game,
+    sim: &mut WorldSim<X>,
+    env: &Env<'_>,
+    t: &GotoTarget,
+    walk: &mut GotoWalk,
+) -> PokeResult {
+    let player = env.player;
+    walk.steps += 1;
+    if walk.steps > GOTO_MAX_STEPS {
+        return PokeResult::Failed;
+    }
+    let Some(here) = unit_level(game, sim, player) else {
+        return PokeResult::Failed;
+    };
+    let goal = *walk.goal.get_or_insert(t.preset.unwrap_or(here));
+    // Rule 3.1: the warp to a preset's level, at the first step only.
+    if walk.steps == 1 && here != goal {
+        let warp = Directive::Warp {
+            level: goal,
+            tile: None,
+        };
+        return match apply(game, sim, env, &warp) {
+            PokeResult::Ok(_) => PokeResult::Pending,
+            _ => PokeResult::Failed,
+        };
+    }
+    // Rule 3.2: the first unit of the target's type and class in the goal
+    // level, ascending GUID.
+    let ty = UnitType::ALL[usize::from(t.ty)];
+    let mut found: Vec<(u32, UnitId)> = game
+        .lists
+        .units_of_type(ty)
+        .into_iter()
+        .filter(|&u| {
+            sim.action
+                .sys
+                .units
+                .get(u)
+                .is_some_and(|r| r.class == t.class)
+        })
+        .filter(|&u| unit_level(game, sim, u) == Some(goal))
+        .filter_map(|u| guid_of(game, u).map(|g| (g, u)))
+        .collect();
+    found.sort_unstable();
+    if let Some(&(guid, target)) = found.first() {
+        let Some(room) = game.lists.unit(target).and_then(|e| e.room()) else {
+            return PokeResult::Failed;
+        };
+        let (x, y) = sim.action.sys.hooks.path_position(target);
+        let placed = sim.lend(|a| {
+            a.with(game, |g, v| {
+                place_unit(PathCtx::of(v, g), player, Some(room), x, y, false, false)
+            })
+        });
+        return if placed {
+            PokeResult::Ok(Some(guid))
+        } else {
+            PokeResult::Failed
+        };
+    }
+    // Rule 3.3: mark what is seen, then one hop towards the nearest room
+    // of the goal level not seen.
+    let Some(room) = game.lists.unit(player).and_then(|e| e.room()) else {
+        return PokeResult::Failed;
+    };
+    let hop = {
+        let Some((d, cur)) = sim.action.sys.hooks.drlg.drlg_room(game, room) else {
+            return PokeResult::Failed;
+        };
+        let key = |r: DrlgRoomId| {
+            let dr = d.room(r);
+            (d.level(dr.level).id, dr.rect.x, dr.rect.y)
+        };
+        let near = |r: DrlgRoomId| d.room(r).near().unwrap_or(&[]).to_vec();
+        walk.seen.insert(key(cur));
+        for n in near(cur) {
+            if d.room(n).active().is_some() {
+                walk.seen.insert(key(n));
+            }
+        }
+        // Breadth first over the near arrays, in their stored order.
+        let mut parent: BTreeMap<DrlgRoomId, DrlgRoomId> = BTreeMap::new();
+        let mut queue = VecDeque::from([cur]);
+        let mut done = BTreeSet::from([cur]);
+        let mut goal_room = None;
+        while let Some(r) = queue.pop_front() {
+            let (lv, _, _) = key(r);
+            if lv == goal && !walk.seen.contains(&key(r)) {
+                goal_room = Some(r);
+                break;
+            }
+            for n in near(r) {
+                if !walk.blocked.contains(&key(n)) && done.insert(n) {
+                    parent.insert(n, r);
+                    queue.push_back(n);
+                }
+            }
+        }
+        let Some(mut h) = goal_room else {
+            return PokeResult::Failed;
+        };
+        while let Some(&p) = parent.get(&h) {
+            if p == cur {
+                break;
+            }
+            h = p;
+        }
+        let Some(a) = d.room(h).active() else {
+            return PokeResult::Failed;
+        };
+        // The free cell of H nearest its centre (first found on a tie).
+        let r = a.subtiles;
+        let (cx, cy) = (r.x + r.w / 2, r.y + r.h / 2);
+        let mut best: Option<(i64, i32, i32)> = None;
+        for y in r.y..r.y + r.h {
+            for x in r.x..r.x + r.w {
+                let free = a
+                    .collision
+                    .get(x, y)
+                    .is_some_and(|m| m & crate::path::collision::masks::PLAYER_MOVE == 0);
+                let d2 = i64::from(x - cx).pow(2) + i64::from(y - cy).pow(2);
+                if free && best.is_none_or(|(b, _, _)| d2 < b) {
+                    best = Some((d2, x, y));
+                }
+            }
+        }
+        (key(h), a.id, best.map(|(_, x, y)| (x, y)))
+    };
+    let (hkey, hroom, cell) = hop;
+    let Some((x, y)) = cell else {
+        walk.seen.insert(hkey);
+        walk.blocked.insert(hkey);
+        return PokeResult::Pending;
+    };
+    let placed = sim.lend(|a| {
+        a.with(game, |g, v| {
+            place_unit(PathCtx::of(v, g), player, Some(hroom), x, y, false, false)
+        })
+    });
+    // A refused hop, or one that left the player outside H, marks H seen
+    // (rule 3.3).
+    let landed = placed
+        && game
+            .lists
+            .unit(player)
+            .and_then(|e| e.room())
+            .is_some_and(|r| r == hroom);
+    if !landed {
+        walk.blocked.insert(hkey);
+        walk.seen.insert(hkey);
+    }
+    PokeResult::Pending
 }
 
 /// Item creation `0x00558D90` with spawn mode 3 (ground), init flags 1,
@@ -1424,6 +1649,8 @@ mod tests {
     /// One line of every directive, with every optional argument and
     /// every reference form.
     const ALL: &[&str] = &[
+        "goto unit 1:156",
+        "goto preset 107 2:376",
         "object 119 100 200",
         "object 119 @x+5 @y-3 mode 1",
         "superunique 3 @x @y+10",
@@ -1472,6 +1699,17 @@ mod tests {
                 .to_string(),
             "item rin 1 2 quality magic ilvl 5"
         );
+        // `goto`: the type defaults to 1 and is written out.
+        assert_eq!(
+            parse_directive_text("goto unit 5").unwrap().to_string(),
+            "goto unit 1:5"
+        );
+        assert_eq!(
+            parse_directive_text("goto preset 107 376")
+                .unwrap()
+                .to_string(),
+            "goto preset 107 1:376"
+        );
     }
 
     // Covers: specs/tools/poke.md §1 r1
@@ -1514,6 +1752,10 @@ mod tests {
             ("warp 3 tile", "warp <level>"),
             ("missile 1 2 3 4 5 skill 1", "unexpected"),
             ("freeze 3601", "seconds"),
+            ("goto unit 3:5", "goto unit type"),
+            ("goto preset 2", "goto unit"),
+            ("goto here 5", "goto unit"),
+            ("goto unit 1:x", "bad number"),
             ("", "empty"),
         ] {
             let e = parse_directive_text(line).unwrap_err();

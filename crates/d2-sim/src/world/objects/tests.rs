@@ -417,6 +417,27 @@ fn shrine_init_any_row_vector() {
     assert_eq!(ctl.seed, c);
 }
 
+// Covers: specs/world/objects.md §3 r6, §5.1 r3
+#[test]
+fn init_reads_the_level_of_the_init_room() {
+    // §3 runs before the unit joins the world: the unit has no level of
+    // its own, the init record's room has level 2. Shrine class 2 ({2, 4},
+    // LevelMin 1 and 2 here) passes on the first try: one draw, not eight.
+    let mut t = tables();
+    t.objects[SHRINE3 as usize].parm0 = 1;
+    t.shrines[2].levelmin = 1;
+    t.shrines[4].levelmin = 2;
+    let mut ctl = control(&t, Seed::new(1542758918, 666));
+    let mut f = fake(0, 2);
+    f.levels.clear();
+    f.room_levels.insert(RoomId(1), 2);
+    let mut c = ctl.seed;
+    run_create(&mut ctl, &t, &mut f, SHRINE3, 0).unwrap();
+    c.roll(2);
+    assert_eq!(ctl.seed, c, "one shrine draw");
+    assert_eq!(ctl.get(O).unwrap().interact, 2);
+}
+
 // Covers: specs/world/objects.md §5.1 r1, §5.1 r3, §5.1 r4, §edge-cases-original-bugs r4
 #[test]
 fn shrine_pick_rules_and_remap() {

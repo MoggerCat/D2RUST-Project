@@ -1,0 +1,13 @@
+check 1
+# Level generation of the Den of Evil (level 8): ScnAma, -seed 1234, idle
+# in town until frame 20, then the level warp (poke `warp 8`, tile 0) on
+# both sides (poke.md warp; the call form also measured from a waypoint
+# warp, facts/calls/warp-0x53aec0.jsonl). Compare rooms, presets and the
+# populated units from the arrival on, and the draws (record_rng.py with the poke). Spec: specs/tools/scenario-diff.md.
+name a1-warp-den-ama
+save ScnAma --class ama --expansion
+seed 1234
+ticks 160
+seconds 900
+channels state rng
+at 20 poke warp 8

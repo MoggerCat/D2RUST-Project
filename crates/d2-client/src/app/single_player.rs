@@ -538,6 +538,14 @@ pub struct LocalSeams {
     /// The Arreat Summit warp check's answer (`Pending::set_summit_open`,
     /// q-act3-act5-gaps); the exits stay closed while it is `true`.
     pub summit_closed: bool,
+    /// The quest records' not-intro bytes by chain, published by the quest
+    /// control once per tick (`Pending::publish_not_intro`): the not-intro
+    /// test `0x005444B0` of population and the missile bodies.
+    pub not_intro: BTreeMap<u8, bool>,
+    /// The caged barbarians' group states by GUID (counting, portal
+    /// GUID), published by the quest control once per tick
+    /// (`Pending::publish_rescue`).
+    pub rescue: BTreeMap<u32, (bool, Option<u32>)>,
     /// The Durance of Hate warp check's answer
     /// (`Pending::set_durance_open`, q-play-act3); level 100 stays closed
     /// while it is `true`.
@@ -789,6 +797,41 @@ impl Pending for LocalSeams {
     fn set_summit_open(&mut self, open: bool) {
         self.summit_closed = !open;
     }
+    /// `0x005444B0` (`quests.md` §2.3): no record with the chain → true.
+    fn quest_not_intro(&self, chain: u8) -> bool {
+        self.not_intro.get(&chain).copied().unwrap_or(true)
+    }
+    fn publish_not_intro(&mut self, records: &[(u8, bool)]) {
+        self.not_intro = records.iter().copied().collect();
+    }
+    /// d2rs-own, unverified (REC-799): the prisoner AI's hooks with an
+    /// effect run on the quest control after the tick.
+    fn queue_quest_event(&mut self, e: d2_sim::wiring::action::QuestEvent) {
+        self.quest_events.push(e);
+    }
+    fn quest_rescue(&self, guid: u32) -> (bool, Option<u32>) {
+        self.rescue.get(&guid).copied().unwrap_or((false, None))
+    }
+    fn publish_rescue(&mut self, barbarians: &[(u32, bool, Option<u32>)]) {
+        self.rescue = barbarians.iter().map(|&(g, c, p)| (g, (c, p))).collect();
+    }
+    /// d2rs-own, unverified (REC-796): Tyrael's spawn runs on the quest
+    /// control after the tick, not inside the missile body.
+    fn missile_spawn_tyrael(
+        &mut self,
+        room: Option<d2_sim::units::RoomId>,
+        missile: UnitId,
+        x: i32,
+        y: i32,
+    ) {
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::SpawnTyrael {
+                room,
+                missile,
+                x,
+                y,
+            });
+    }
     fn set_lair_open(&mut self, open: bool) {
         self.lair_open = open;
     }
@@ -900,6 +943,9 @@ impl Pending for LocalSeams {
         moving: bool,
     ) {
         skill_events::monster_attack_strike(h, sim, unit, moving);
+    }
+    fn monster_mode_damage(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId, mode: u32) {
+        skill_events::monster_mode_damage(h, sim, unit, mode);
     }
     fn golem_resummon(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, player: UnitId) -> bool {
         skill_events::golem_resummon(h, sim, player)
@@ -1103,6 +1149,11 @@ impl Pending for LocalSeams {
 }
 
 impl WorldPending for LocalSeams {
+    /// `0x005444B0` (population's preset swaps, `population.md` §11.3):
+    /// the quest control's published answer.
+    fn quest_flag(&self, flag: u8) -> bool {
+        Pending::quest_not_intro(self, flag)
+    }
     /// `0x00544E80` from special monster creation: queued for the quest
     /// control (the Golden Bird's boss choice, `quests-act3.md` §6.2).
     /// PROVISIONAL (REC-780, d2rs-own, unverified): it runs after the tick,
@@ -1542,6 +1593,11 @@ pub fn client_level_rows(data: &GameData) -> Vec<LevelRow> {
                     b: d.blue,
                 }
             }),
+            critters: crate::bridge::world::Critters {
+                cmon: [l.cmon1, l.cmon2, l.cmon3, l.cmon4].map(|c| c as i16),
+                cpct: [l.cpct1, l.cpct2, l.cpct3, l.cpct4].map(|c| c as i16),
+                camt: [l.camt4, 0, 0, 0],
+            },
             pal: l.pal,
             act: l.act,
             blank_screen: l.blankscreen != 0,
@@ -1723,6 +1779,8 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
             let mut c = MonsterClass::from_record(m2, m.npc, m.interact)?;
             c.setup = Some(monster_setup(m, monstats_table.record(i), m2));
             c.no_aura = m.noaura;
+            c.min_grp = m.mingrp;
+            c.max_grp = m.maxgrp;
             c.in_town = m.intown;
             if let Some(x) = monstats2_rows.get(link as usize) {
                 c.light = x.light;

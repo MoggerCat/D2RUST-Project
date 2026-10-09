@@ -198,6 +198,33 @@ impl NpcMenuUi {
     /// Events while the talk runs: the dialog's skip input (§7 r7: a
     /// button down skips, a right button up is only consumed), else the
     /// topic box.
+    /// Esc / Space (command 56 / 38) during an NPC interaction
+    /// (`panels-3.md` §28 r2: the box's Esc entries consume the key and run
+    /// p1; `controls.md` §3 command 56 does nothing while `0x004B34A0`):
+    /// the dialog text skips (`SkipEvent::Key`), the topic box cancels (the
+    /// talk's end, C→S 0x30), the menu box (npc_box) ends the interaction. Always
+    /// consumed, so the game menu does not open. PROVISIONAL (REC-746): the
+    /// box ignores the key until it was drawn more than 4 times (+0x54);
+    /// that guard is not modelled.
+    pub(super) fn esc_key(&mut self, guid: u32, ctx: &UiCtx) -> bool {
+        let talk = self.st.borrow().talk.active;
+        if talk && self.st.borrow().talk.dialog.panel.is_some() {
+            let t = now(ctx.world);
+            let out = self
+                .st
+                .borrow_mut()
+                .talk
+                .dialog
+                .skip_event(SkipEvent::Key, t);
+            self.dialog_effects(out.effects);
+        } else if talk && self.st.borrow().talk.topic.is_some() {
+            self.topic_chosen(TopicHandler::Cancel, guid, ctx);
+        } else {
+            return false;
+        }
+        true
+    }
+
     pub(super) fn talk_event(&mut self, e: UiEvent, guid: u32, ctx: &UiCtx) -> UiResponse {
         if !self.st.borrow().talk.active {
             return UiResponse::Ignored;

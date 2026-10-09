@@ -175,7 +175,23 @@ pub fn sync_oskills(
         match native {
             None if n > 0 => {
                 sl.list.set_base(rows, lo, s as i32, 0);
-                sent.push((u, update_oskill(0, false, u.guid, s as u16, 0, 0).to_vec()));
+                // Bonus u8@10 = `bonus_level` of the new entry (base 0, no
+                // +0x2C bonus), read after the store (`levels.md` §7.1
+                // "Step 2's 0x21"). PROVISIONAL (REC-862): state 134
+                // (shrine skill, +2) is not staged here, so a skill shrine
+                // active while the item is worn is not counted; settled by
+                // reading the unit's states into the stage.
+                let bonus = d2_sim::skills::bonus_level_of(
+                    &st.tables.skills,
+                    (s as i32, 0, 0),
+                    Some(sl.class),
+                    false,
+                    |stat, layer| total(sl, stat, i32::from(layer)),
+                );
+                sent.push((
+                    u,
+                    update_oskill(0, false, u.guid, s as u16, 0, bonus as u8).to_vec(),
+                ));
             }
             Some(i) if n <= 0 && sl.list.entries[i].base == 0 => {
                 for left in [true, false] {

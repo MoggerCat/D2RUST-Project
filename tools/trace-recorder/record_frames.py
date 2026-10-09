@@ -48,6 +48,9 @@ END_SCENE_BYTES = b"\x55\x8B\xEC\x83\xEC\x10"
 IN_GAME_RET = 0x44CB4F            # return address of the call at 0x44CB4A in 0x44C990
 FRAME_START = 0x44C990            # in-game draw entry (capture.md §2)
 FRAME_START_BYTES = b"\x55\x8B\xEC\x83\xEC\x1C"
+SOUND_REQUEST = 0x4B9A00          # sound request entry (audio/triggers.md §1 r1, Checks "request log")
+SOUND_REQUEST_BYTES = b"\x55\x8B\xEC\x83\xEC\x18"
+SOUND_TICK = 0x7BC9BC
 CEL_LOADED = 0x478946             # cel-file loader 0x4788B0 after the load (capture.md §3.6)
 CEL_LOADED_BYTES = b"\x8B\x45\xFC"
 UNIT_DRAW = 0x471EC0              # one unit draw: ECX unit, EDX light, stack px, py, a3, a4 (§3.5)
@@ -740,6 +743,15 @@ def make_recorder(rt):
                 self.capture(ctx)
             elif addr == FRAME_START:
                 self.frame_start(ctx)
+            elif addr == SOUND_REQUEST:
+                # ECX = id, EDX = unit (0: none), stack: delay, flags, offset (facts-render.md §5 r20)
+                unit = ctx.Edx
+                rec = {"k": "sound", "f": self.frame, "sound_tick": self.u32(SOUND_TICK),
+                       "id": struct.unpack("<i", struct.pack("<I", ctx.Ecx & 0xFFFFFFFF))[0],
+                       "unit": [self.u32(unit), self.u32(unit + 0xC)] if unit else None,
+                       "delay": self.u32(ctx.Esp + 4), "flags": self.u32(ctx.Esp + 8),
+                       "offset": self.u32(ctx.Esp + 12), "ret": f"{self.u32(ctx.Esp):#x}"}
+                self.emit(rec)
             elif addr == CEL_LOADED:
                 path = self.read(ctx.Ebp - 0x108, 0x104).split(b"\0")[0].decode("latin-1")
                 self.emit({"k": "celfile", "ptr": f"{self.u32(ctx.Ebp - 4):#x}", "path": path})
@@ -947,6 +959,10 @@ def main():
     ap.add_argument("--draws-light", action="store_true",
                     help="with --draws-every: store tile light arrays in full, not as digests")
     ap.add_argument("--no-save", action="store_true", help="hashes and state only, no PNG files")
+    ap.add_argument("--sounds", action="store_true",
+                    help="log every sound request call (0x4B9A00) as {\"k\": \"sound\"} records (facts-render.md §5 r20)")
+    ap.add_argument("--img-dir", default=None,
+                    help="PNG folder (default game/captures/<time>); tools/sidebyside puts it outside the repo")
     ap.add_argument("--allow-any-size", action="store_true", help="also capture at 640x480")
     ap.add_argument("--out", default=None, help="output file (default traces/raw/<time>-frames.jsonl)")
     ap.add_argument("--selftest", action="store_true", help="check the PNG writer and the readers, exit")
@@ -986,7 +1002,7 @@ def main():
     import record_tick as rt  # noqa: E402  (the shared tick recorder; Windows only; not modified)
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     out = a.out or os.path.join(repo, "traces", "raw", stamp + "-frames.jsonl")
-    img_dir = None if a.no_save else os.path.join(repo, "game", "captures", stamp)
+    img_dir = None if a.no_save else (a.img_dir or os.path.join(repo, "game", "captures", stamp))
     if img_dir:
         os.makedirs(img_dir, exist_ok=True)
     # keep only the base recorder's tick hook, add ours (draw hooks: verified, armed per frame)
@@ -996,6 +1012,8 @@ def main():
                  COMP_PATH_DC6: COMP_PATH_DC6_BYTES, **{d: b"\x55\x8B\xEC" for d in DRAWS}}
     if fe is not None:
         rt.EXPECT[D2WIN_LOAD] = D2WIN_LOAD_BYTES
+    if a.sounds:
+        rt.EXPECT[SOUND_REQUEST] = SOUND_REQUEST_BYTES
     rt.FORMAT, rt.TOOL = FORMAT, TOOL
     r = make_recorder(rt)(os.path.abspath(a.game), gargs, out, a.seconds,
                           a.ticks, img_dir, max(1, a.every or 1), a.max_frames, a.allow_any_size,

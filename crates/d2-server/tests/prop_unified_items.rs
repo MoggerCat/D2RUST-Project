@@ -776,9 +776,11 @@ impl VendorRest for Rest {
         self.store.remove(&item);
     }
     /// `0x005766D0`: removed from the grid, then re-added to the trade
-    /// inventory (`vendors.md` §7.1 rule 12): it stays the store's.
+    /// inventory (`vendors.md` §7.1 rule 12); the host frees the unit after
+    /// its 0x9C action 12 (1.14d, `items-vendor-akara-buy` frame 24), so it
+    /// leaves the store's list.
     fn take_from_store(&mut self, _: u16, item: UnitId) {
-        self.store.insert(item);
+        self.store.remove(&item);
     }
     fn place_in_gamble(&mut self, _: u16, _: u32, item: UnitId) -> bool {
         self.store.insert(item);

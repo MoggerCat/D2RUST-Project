@@ -1,0 +1,13 @@
+check 1
+# Level generation of Jail Level 1 (level 29): ScnAma starts in the Rogue Encampment,
+# -seed 1234, idle until frame 20, then the level warp (poke `warp 29`,
+# tile 0) on both sides. Compare the level's rooms, presets and populated
+# units, and the draws (record_rng.py with the poke). Area C (level
+# generation). Spec: specs/tools/scenario-diff.md.
+name a1-warp-jail-ama
+save ScnAma --class ama --expansion
+seed 1234
+ticks 160
+seconds 900
+channels state rng
+at 20 poke warp 29

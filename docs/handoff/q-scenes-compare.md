@@ -1,6 +1,6 @@
 # Handoff: d2rs vs 1.14d scene compares — `claude/q-scenes-compare`
 
-Cloud session, 2026-10-09. REC block 510–519 (all used: 510–519).
+Cloud session, 2026-10-09. REC blocks 510–519 (all used) and 706–719 (706–708 used; 709–719 free).
 Facts: `facts/render/scenes/*` (q-facts-scenes, Wine). d2rs: dev build,
 `d2-client play --save S.d2s --seed 1234 --dump-draws DIR --at-tick T [--input SCRIPT]`
 under Xvfb + lavapipe; compare: `d2-client facts-compare SCENE DIR --ignore tick,index_sha256 --skip-weather`.
@@ -31,27 +31,55 @@ under Xvfb + lavapipe; compare: `d2-client facts-compare SCENE DIR --ignore tick
 12. An object casts its composite shadow only where its mode's `BlocksLight` ≠ 0 (`blend-modes.md` §5 r3 revision, REC-518): a4 equal through the world (row 248).
 13. A click while walking re-targets from the precise position (`sim/pathing.md` §1.5, already specified; `Predict::path_step`): walk-s, ne, sw, e match every frame input.
 14. Control panel: UI cels export their 1.14d wrapper (`facts-render.md` §5 r18: orbs `CelDrawEx`, skill icons / glyphs `CelDrawColor`); the stamina bar is the rectangle (`control-panel.md` §4 r2); the new-stats / new-skills buttons after the skill icons (§1 r3); the mini panel open from the start (§9 revision, REC-519). a4 equal through row 257; next: the help button `0x004A64C0` ("Help (H)" + levelsocket, unspecified: `pc1-data.md` Step 4 item 41).
+15. The client path sees the model's living monsters as footprints, mask 0x100 (`client/model.md` open question 2 revision, REC-706; `ClientPath::stamp_others`): walk-n, s, ne, e reach the critter / NPC rows; walk-se / nw match when d2rs's Warriv stands where 1.14d's does (NPC position: q-fix-real-unit-seed-order); runs drift ~50 px (was 90–240).
+16. The grid hover tint and item tip follow the §5 hover state, not the raw mouse (`ui/inventory.md` §3 r2, already specified); a use press clears that state until the next move or press, and a release does not re-track it (§5 r4, PROVISIONAL REC-707). a1-panel-cube is now equal except the cursor row 73, which animates on wall-clock time (`facts-render.md` edge cases: known divergence).
+17. `--skip-weather` also drops pass 4's environment-pool cels: 1.14d `CelDraw` rows from the pool draw [`0x00473A70`, `0x00473C00`), and d2rs rows exported with `at` = `pools` (`facts-render.md` §6 r5 revision, PROVISIONAL REC-708). Their spawns draw on the player seed, which the wall-clock cursor steps (`panels-3.md` §23 r8). a3 now reaches its NPC rows.
+18. q-fix-p6-shadow-pretest (REC-511 settled, `blend-modes.md` §5 r3a): the shadow box test keeps the left-bound shift `d` but its y bounds are the whole COF box. It runs at the shadow position: a motion record's height `oz` counts half on both axes (`unit_shadow_offset`, `SkillMotion::shadow_offsets`). The REC-511 / REC-518 PROVISIONAL markers are dropped. Scene sweep unchanged (no recorded shadow near the bottom edge).
+19. q-fix-p6-help-button (`ui/control-panel.md` §11, PC 1 item 42): state 0x22 opens at game entry with the mini panel. The button draws first in step 8: caption string 4177 + ` (%s)` key names (command 6, slot 1 then 0) in font 1 at (W − 58 − w/2, H − 197); `Levelsocket` at (W − 75, H − 160); `Level` at (W − 72, H − 164), frame 1 while pressed. It hides while 4, 3, 1, 0x0C, 0x17 or 0x19 is open. Its press / release run ahead of the mini-panel row; the release closes 0x22, toggles 0x21 and sets the `Help Menu` cache (no registry in d2rs: absent at every start). a4 is now equal except the cursor row 278 (wall clock).
 
-## First difference per scene (after fixes 1–14)
+## First difference per scene (after fixes 1–19)
 | Scene | First difference |
 |---|---|
 | a1-town-idle-sor, a1-walk-n, a1-walk-s | r110 NPC `wa` WL dir 47 vs 0: d2rs's `wa` already stands on its walk target (4866, 4235), 1.14d's still walks east past it (NPC path node: q-fix-real-unit-seed-order) |
 | a1-walk-e | r100 `wa` shadow before the player's (NPC position) |
 | a1-walk-ne | r112 critter `ck` shadow missing (q-fix-real-town-critters) |
 | a1-walk-sw | r102 torch vs `rc` (NPC position) |
-| a1-walk-w | tile_origin_y 72532 vs 72529 |
-| a1-walk-se, -nw | tile_origin_x 22 / 33 px off (the agent saw no straight-walk fit: an obstacle or a hovered NPC) |
-| a1-run-* | tile_origin_x ~90–240 px off: the run (mode 3) is not fitted yet (REC-516) |
-| a1-panel-inventory | r137–138 an extra `unit` row: d2rs's `wa` (1:7) stands in this cell (NPC position) |
+| a1-walk-w | tile_origin_y 72533 vs 72532 (1 px) |
+| a1-walk-se, -nw | tile_origin 9992 vs 10012 / 9950 vs 9976: the walk bends round Warriv, who stands elsewhere in d2rs (NPC position) |
+| a1-run-* | tile_origin ~50 px off. The run legs away from Warriv match 1.14d exactly (run-e Δ 91,17, run-w −77,0), so run speed and start are right; the error comes from walk-se / nw and run-n, which pass Warriv (NPC position) |
+| a1-panel-inventory | r168 `rc` WL y (NPC position) |
 | a1-panel-character, -skilltree | r109–111 `wa` NU / WL (NPC pose) |
 | a1-panel-automap, -esc-menu-wine | r108 torch vs `rc` (NPC position) |
-| a1-panel-cube | r25 the hovered cube's tint: d2rs 118 (hover, §3 r2), 1.14d 234 (usable): 1.14d's hover state may follow mouse moves only |
+| a1-panel-cube | r73 the cursor only (wall-clock animation, known divergence) |
 | a2-town-lut-gholein | r115 critter `bg` shadow missing (q-fix-real-town-critters) |
-| a3-town-kurast-docks | r97 pass-9 cel (`at` 0x473bd0, file ?) vs d2rs `rain3.dc6` f1 |
-| a4-town-pandemonium-fortress | r258 the help button `0x004A64C0` ("Help (H)", `levelsocket`, `level` at 725, 440): not specified (`pc1-data.md` Step 4 item 41) |
-| a5-town-harrogath | r76 monster `6z` NU frame 3 vs 5 (6 frames, rate 32: the monster's animation start, REC-512) |
+| a3-town-kurast-docks | r103 `m3` WL shadow dir 14 (NPC facing: q-fix-real-unit-seed-order) |
+| a4-town-pandemonium-fortress | r278 the cursor only (wall-clock animation, known divergence) |
+| a5-town-harrogath | r76 monster `6z` NU frame 3 vs 5. Every a5 monster's start frame differs (7i 1/0, 7j 0/1): `msg-units.md` §1.2 r6.5 draws it on the unit seed, the room seed stepped once per unit add, so the Act V add order or room seeds differ (a1's NPCs match; unit seed order) |
 | a1-cold-plains-monsters | level 3 vs 1: the waypoint walk does not reach the waypoint (walk / run drift) |
 | a1-town-arrival-ama | skipped (q-fix-real-unit-seed-order) |
+
+## Status at wrap-up (2026-10-09)
+- **Done:** fixes 1–19 above, including the two rows the coordinator assigned: `q-fix-p6-shadow-pretest` (fix 18) and `q-fix-p6-help-button` (fix 19). Nothing is in progress and the branch is clean.
+- **Equal except the wall-clock cursor:** a1-panel-cube, a4-town-pandemonium-fortress.
+- **Open rows, all owned elsewhere:** NPC / critter position, pose and facing rows (Act I town session, q-fix-real-unit-seed-order, q-fix-real-town-critters); the a5 monster start frames (unit seed order, sent to the Act V session). The walk / run drift and a1-cold-plains-monsters follow the NPC positions; re-sweep once those land.
+- **Open RECs:**
+  - REC-510: the pass-9 call sites (§6 r5).
+  - REC-512: the clock of monsters without a model frame, and of missiles.
+  - REC-513: the itemtypes class 0xFF.
+  - REC-514: click → sub-tile.
+  - REC-515: the stash / shop draw order.
+  - REC-516: the walk / run frame start.
+  - REC-517: the point-walk facing.
+  - REC-706: client monster footprints.
+  - REC-707: the hover state after a use press.
+  - REC-708: the pool cel call site.
+  - REC-511, REC-518 and REC-519 are settled (PC 1, `pc1-day3-c.md`).
+- **PC 1 items** (`pc1-data.md` Step 4, unnumbered): "[q-scenes-compare] Client footprints of walking monsters (REC-706)" and "[q-scenes-compare] Hover state after a use press (REC-707)".
+- **Repro:**
+  - Build `target/debug/d2-client`.
+  - Run: `DISPLAY=:98 WGPU_BACKEND=vulkan D2_GAME_DIR=<install> target/debug/d2-client play --save SceSor.d2s --seed 1234 --dump-draws /tmp/d --at-tick T --input "<wait-step script>"`.
+  - Compare: `target/debug/d2-client facts-compare facts/render/scenes/<scene> /tmp/d --ignore tick,index_sha256 --skip-weather`.
+  - Schedules and T: "How to run a scene" above. The towns use T 42 (a1–a3) or 43 (a4, a5) with no input.
 
 ## Notes
 - `app_single_player::the_session_flow_creates_the_game_then_loads_the_character_at_the_join` (ignored, real data) fails with and without fix 3 (0x23 count 3 vs 2): not caused by this branch.

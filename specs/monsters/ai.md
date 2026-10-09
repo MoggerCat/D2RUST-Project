@@ -28,21 +28,21 @@
 | Inputs | 72–83 |
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
-|   1. Think scheduling | 97–247 |
-|   2. Think dispatch `0x005B1740` | 248–384 |
-|   3. AI control and AI tables | 385–556 |
-|   4. AI parameters | 557–575 |
-|   5. Target selection | 576–734 |
-|   6. Distances and line tests | 735–749 |
-|   7. Tactics helpers | 750–984 |
-|   8. AI commands and minions | 985–1011 |
-|   10. The catalogue `ai-functions.tsv` | 1012–1032 |
-| Constants & data dependencies | 1033–1056 |
-| Randomness | 1057–1078 |
-| Edge cases & original bugs | 1079–1120 |
-| Test vectors | 1121–1209 |
-| Provenance | 1210–1266 |
-| Open questions | 1267–1370 |
+|   1. Think scheduling | 97–282 |
+|   2. Think dispatch `0x005B1740` | 283–422 |
+|   3. AI control and AI tables | 423–594 |
+|   4. AI parameters | 595–613 |
+|   5. Target selection | 614–772 |
+|   6. Distances and line tests | 773–787 |
+|   7. Tactics helpers | 788–1027 |
+|   8. AI commands and minions | 1028–1054 |
+|   10. The catalogue `ai-functions.tsv` | 1055–1075 |
+| Constants & data dependencies | 1076–1099 |
+| Randomness | 1100–1121 |
+| Edge cases & original bugs | 1122–1163 |
+| Test vectors | 1164–1252 |
+| Provenance | 1253–1313 |
+| Open questions | 1314–1417 |
 <!-- /index -->
 
 ## Summary
@@ -221,6 +221,41 @@ So a monster that walks or runs re-thinks the frame its path ends.
    `0x0053A8E0`), every monster in that room's unit list gets
    `0x00573780` (+2 if neutral). Recorded: all 61 "step clients"
    schedules are +2.
+3. **Last client leaves a room: the think is cancelled.** The room
+   leave `0x0053A9B0` (`sim/intents-events.md` §7.8 rule 3) removes the
+   client (`0x0061A700`), then tests the room's client count
+   (`cmp [room + 0x78], 0` at `0x0053AA0A`); when it is 0, every unit of
+   the room's unit list (room +0x74, next +0xE8) of type 1 gets
+   `0x005738D0(game, unit)` (call at `0x0053AA2A`): delete the unit's
+   type-2 events (AI think) and then its type-3 events (stat
+   regeneration), any argument (`0x00540E60(2, 0)`, `0x00540E60(3, 0)`).
+   Nothing is scheduled in their place, and nothing is drawn. The
+   monster has no pending think until a client enters its room again
+   (rule 2: +2 if neutral). The same "no client, no think" holds at
+   creation (`init.md` §4.1, gate `0x00553160`: `room.clients ≠ 0`, else
+   clean-up and no think), so a monster in a room no client sees never
+   thinks from a timer.
+   - The test is in the room leave only. The think path has none: the
+     class handler `0x005A7F80` (freeze gate only, §1.1), the runner
+     `0x00541060` (`sim/tick.md` §5.5), the dispatch `0x005B1740` (§2)
+     and the Npc AI `0x005E7130` (`ai-bodies.md` §9.9) never read room
+     +0x78. A think that is still pending runs normally.
+   - Only types 2 and 3 are cancelled. Mode events (types 0 and 1) stay,
+     so a monster that is mid-mode when the last client leaves still
+     reaches its mode end, and the mode end can schedule or run a think
+     (§1.3, §1.4). This is a static reading; no recording has it. An
+     idle monster has no mode end to wait for, so it stops thinking.
+   - Recorded (`traces/checks/a4-warp-plains-ama.check`, ScnAm4,
+     `-seed 1234`): the warp at frame 6 takes the client out of every
+     Pandemonium Fortress room. The Fortress NPCs (classes 405, 257,
+     246) had think +20 pending from their frame-4 home think
+     (`ai-bodies.md` §9.9 step 1). That think is cancelled, so there is
+     no frame-24 think and no map-AI draw. Their unit seeds do not
+     change from frame 6 to frame 80. With a client in the level, the
+     same think runs (`a4-fortress-arrival-ama` matches).
+   Provenance: 2026-10-09 (pc1-day3-c, read in `0x0053A9B0`,
+   `0x005738D0`, `0x00540E60`, `0x0053A8E0`, `0x005A7F80`,
+   `0x00541060`, `0x005B1740`, `0x005E7130`; q-prov-data).
 
 #### 1.6 AI reset (event type 10)
 
@@ -273,7 +308,10 @@ If either record is missing nothing runs. Otherwise:
    unit, record). A bad code pointer is a fatal assert.
 
 1.14d-confirmed (`0x005B1740`). The 1.14d handler does not test state
-54 (D2MOO only warns).
+54 (D2MOO only warns). It does not test the room's client count either
+(room +0x78). A monster in a room with no client has no think to
+dispatch, because the room leave cancelled it (§1.5 rule 3); 2026-10-09
+(pc1-day3-c, read in `0x005B1740`).
 
 #### 2.2 Precheck A `0x005B10E0`: stun, doors, leash
 
@@ -963,13 +1001,18 @@ Rules 4–7 (1.14d-read 2026-10-08, gaps MV4–MV7 of
    §1.3). Mode 1 has no schedule flag, so nothing else is scheduled;
    the unit never enters walk and no event 0 / mode end (§1.4) runs.
    Message: the compute's flags |= 1 makes the update pass send the
-   neutral mode message (`sim/intents-events.md` §7.4: S→C 0x67, code
-   7, at U's cell) to each client of U's rooms; no 0x68. Draws: none
+   neutral mode message to each client of U's rooms: `0x00597E20`
+   with mode 1 (current skill already none, so not the skill branch)
+   takes the mode-1 case (`0x00598067`–`0x005980B0`) and sends **S→C
+   0x6D** (`0x0053BB70`: GUID, U's cell x, y, life byte
+   `0x005A5650(U)`), then stat 328 += 1, and returns before any 0x67 /
+   0x68 (`sim/intents-events.md` §7.4 rule 5; 1.14d-read 2026-10-09,
+   corrects the earlier "0x67 code 7"). Draws: none
    (the point, the request, both computes and the neutral start draw
    nothing). Next think: f + `aidel` (15 for the Act 1 classes of the
    recordings) unless the AI body schedules or deletes thinks itself.
    ```
-   point == U.cell: type 13 -> 0 pts -> type 15 -> 0 pts; WL start 0 -> NU; think f + aidel; 0x67 code 7
+   point == U.cell: type 13 -> 0 pts -> type 15 -> 0 pts; WL start 0 -> NU; think f + aidel; 0x6D, stat 328 += 1
    ```
 9. **Mode damage** (1.14d-read 2026-10-09, `0x005A7D34`–`0x005A7D39`):
    after rule 4 (`0x005A63F0` returns at `0x005A7D34`), still inside
@@ -1263,6 +1306,10 @@ Other recorded checks:
 - Recordings: `traces/raw/20261006-015554-tick.jsonl`,
   `-021854-tick.jsonl`, `-022304-tick.jsonl` (`tick-raw-1`); counts by
   a script over `hin`, `set`, `ex`, `cancel` records (Test vectors).
+- 2026-10-09 (pc1-day3-c, read in `0x0053A9B0`, `0x005738D0`,
+  `0x00540E60`, `0x005B1740`, `0x005E7130`): §1.5 rule 3. When the last
+  client leaves a room, the think is cancelled. Evidence:
+  `traces/checks/a4-warp-plains-ama.check`.
 
 ## Open questions
 

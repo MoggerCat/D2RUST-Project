@@ -26,15 +26,15 @@
 |   2. `draws.tsv` | 90–136 |
 |   3. `frame.tsv` | 137–169 |
 |   4. `sprites.tsv` | 170–189 |
-|   5. d2rs export | 190–326 |
-|   6. Comparison | 327–364 |
-|   7. Requests | 365–376 |
-| Constants & data dependencies | 377–380 |
-| Randomness | 381–384 |
-| Edge cases & original bugs | 385–392 |
-| Test vectors | 393–401 |
-| Provenance | 402–406 |
-| Open questions | 407–421 |
+|   5. d2rs export | 190–351 |
+|   6. Comparison | 352–401 |
+|   7. Requests | 402–413 |
+| Constants & data dependencies | 414–417 |
+| Randomness | 418–421 |
+| Edge cases & original bugs | 422–429 |
+| Test vectors | 430–438 |
+| Provenance | 439–443 |
+| Open questions | 444–458 |
 <!-- /index -->
 
 ## Summary
@@ -251,7 +251,8 @@ composition, through `d2-client` only (game logic untouched).
    with (those items write no row): `DrawLine` for a line, `DrawBox` for
    the flash (`DrawRectangle` `0x004F6300`), `x`, `y` = x0, y0 and `mode`
    = the color (`blend-modes.md` §8 r1–r2), `at` = `pass9` (§6 r5),
-   every other column `-`. The
+   every other column `-`. A pass-4 pool cel (§11.6) is a cel row as
+   any other, with `at` = `pools` (§6 r5 revision). The
    rows stand where the first such item is, else (every pixel
    off-screen) before the first item of a later pass, else at the end.
    Other primitives (`DrawBox`, `DrawBoxAlpha`, `Util*`) are written only
@@ -323,6 +324,30 @@ composition, through `d2-client` only (game logic untouched).
    automap cels export as `CelDraw`), else `CelDraw` (revision
    2026-10-09, measured: the wrapper names of the recorded scenes'
    `ui/`, `font`, `spells` and `automap` cels). World cels keep r3.
+19. `--at-tick N,M,...` (strictly increasing) dumps several frames in
+   one run, each the first drawn frame at or after its tick (r13), into
+   `DIR/tick-<N>`; one tick keeps `DIR` itself. `--dump-image` also
+   writes the composed index frame of r8 as `frame.png`: an 8-bit
+   palettized PNG, the index bytes as they are, the frame palette as
+   `PLTE` (the form of `record_frames.py`'s captures), so a pixel view
+   compares indices, not converted colours. The image is rendered game
+   art: it is written only where the caller points `DIR`
+   (`tools/sidebyside/build.py` points it outside the repository,
+   CLAUDE.md rule 1), never under `facts/` (revision 2026-10-09,
+   q-tool-side-by-side).
+20. `play --sound-log FILE` writes every call of the sound request entry
+   (`audio/triggers.md` §1 r1: 1.14d `0x004B9A00`; d2rs
+   `SoundSystem::request`) at its entry, rejected calls (id < 1, volume
+   0) included, in call order: a `# sound-log v1` line, a column row,
+   then `tick sound_tick id unit_type guid delay flags offset` per call
+   (`-` for no unit). `tick` is the server tick of the audio frame that
+   made the call, `sound_tick` the sound tick (`0x007BC9BC`). The 1.14d
+   side is `record_frames.py --sounds`: a `{"k": "sound"}` record per
+   entry hit with the recorder's frame, `[0x007BC9BC]`, ECX, EDX's type
+   (+0x00) and GUID (+0x0C), the three stack words and the return
+   address (`audio/triggers.md` Checks, "request log"). The two logs
+   compare as the sequence of (tick, id, unit, delay, flags, offset)
+   (revision 2026-10-09, q-tool-side-by-side).
 
 ### 6. Comparison
 
@@ -361,6 +386,18 @@ The original's `sprites.tsv` is `<original dir>/sprites.tsv`, else
    measured so far are `0x0047368E` (rain lines) and `0x00473585`
    (snow lines, Harrogath), both in the particle draw; settled by a
    scene recorded with the lightning flash (REC-510).
+   *Revision (2026-10-09, q-scenes-compare):* pass 4's environment
+   pools (`draw-order-2.md` §11.6: the splash and bubble cels,
+   `0x00473C00` → `0x00473A70`) are left out too: on the 1.14d side a
+   `CelDraw` row whose `at` is in [`0x00473A70`, `0x00473C00`), on the
+   d2rs side a row whose `at` is `pools` (§5 r10). Their spawns draw on
+   the local player's seed (§11.5), which the idle cursor steps once per
+   drawn frame on wall-clock time (`ui/panels-3.md` §23 r8), so they
+   are no more reproducible than the rain (`a3-town-kurast-docks` rows
+   97–99: three cels at `0x00473BD0`, d2rs's other splashes).
+   PROVISIONAL (REC-708): `0x00473BD0` is the pool draw's only call
+   site; settled by a recording of a water floor in the rain with the
+   call sites of every pool cel.
 
 ### 7. Requests
 

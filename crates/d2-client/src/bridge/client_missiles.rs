@@ -1576,18 +1576,57 @@ pub fn stamp_unit_footprints(w: &mut ClientWorld, monsters: &[Option<super::worl
         let Some((x, y)) = u.position.map(|(x, y)| (i32::from(x), i32::from(y))) else {
             continue;
         };
-        let pattern = match (size, town_npc) {
-            (0, _) => 0,
-            (3, false) => 2,
-            (3, true) => 4,
-            (_, true) => 3,
-            _ => 1,
-        };
+        let pattern = footprint_pattern(size, town_npc);
         let room = drlg_room_at(&d.drlg, x, y);
         d2_sim::path::footprint::stamp_pattern(&mut rooms, room, x, y, pattern, mask);
     }
     let grids = rooms.grids;
     w.objclient.unit_grids = grids;
+}
+
+/// The footprint pattern of a unit size (`sim/path-placement.md` §3:
+/// size 0 → 0, 1 and 2 → 1, 3 → 2, others → 1; a monster that can be
+/// in town without `interact`: 3 → 4, others but 0 → 3).
+pub fn footprint_pattern(size: i32, town_npc: bool) -> u32 {
+    match (size, town_npc) {
+        (0, _) => 0,
+        (3, false) => 2,
+        (3, true) => 4,
+        (_, true) => 3,
+        _ => 1,
+    }
+}
+
+/// `0x0064D9B0(room, x, y, size, mask)` over the client DRLG with the
+/// unit footprints ([`stamp_unit_footprints`]): `room` is the active
+/// room record the query starts from. No client DRLG → 0.
+pub fn size_query(w: &ClientWorld, room: RoomId, x: i32, y: i32, size: i32, mask: u16) -> u16 {
+    w.drlg.as_ref().map_or(0, |d| {
+        size_value(
+            &MissileRooms(&d.drlg, &w.objclient.unit_grids),
+            Some(room),
+            x,
+            y,
+            size,
+            mask,
+        )
+    })
+}
+
+/// Stamps one unit footprint (pattern of `sim/path-placement.md` §3,
+/// footprint mask) at (x, y) on the footprint grids, as a new unit's
+/// placement does (PROVISIONAL REC-546, as [`stamp_unit_footprints`]).
+pub fn stamp_footprint(w: &mut ClientWorld, x: i32, y: i32, pattern: u32, mask: u16) {
+    let Some(d) = w.drlg.as_ref() else {
+        return;
+    };
+    let mut rooms = FootRooms {
+        drlg: &d.drlg,
+        grids: std::mem::take(&mut w.objclient.unit_grids),
+    };
+    let room = drlg_room_at(&d.drlg, x, y);
+    d2_sim::path::footprint::stamp_pattern(&mut rooms, room, x, y, pattern, mask);
+    w.objclient.unit_grids = rooms.grids;
 }
 
 /// The active room of the client act whose sub-tile rect holds (x, y)

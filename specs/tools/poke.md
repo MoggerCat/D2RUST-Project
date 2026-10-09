@@ -20,7 +20,9 @@
   (`d2-sim::poke`, scenario `poke` steps, `scenario-run`, `d2-client
   play --poke`): every directive runs on the synthetic install; `warp`
   to another act runs the act change (§1 table); `item` without item
-  tables is a d2rs gap.
+  tables is a d2rs gap. `goto` (§6, 2026-10-09) is ours: a walk built
+  from `warp` and the placement; first runs on both sides are in the
+  Test vectors.
 - **Target version:** 1.14d (the original side); the format is d2rs-own.
 - **Crate/module:** `d2-sim::poke` (directives, parser, d2rs apply);
   `conformance::scenario` (`poke` steps); `tools/scenario-run`;
@@ -39,21 +41,22 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 59–71 |
-| Inputs | 72–78 |
-| Outputs / state changes | 79–87 |
-| Rules | 88–89 |
-|   1. Directives | 90–125 |
-|   2. Poke files | 126–148 |
-|   3. In scenarios | 149–163 |
-|   4. The 1.14d side (`poke.py`) | 164–212 |
-|   5. The d2rs side (`d2-sim::poke`) | 213–227 |
-| Constants & data dependencies | 228–240 |
-| Randomness | 241–247 |
-| Edge cases & original bugs | 248–257 |
-| Test vectors | 258–269 |
-| Provenance | 270–275 |
-| Open questions | 276–283 |
+| Summary | 62–74 |
+| Inputs | 75–81 |
+| Outputs / state changes | 82–90 |
+| Rules | 91–92 |
+|   1. Directives | 93–129 |
+|   2. Poke files | 130–152 |
+|   3. In scenarios | 153–167 |
+|   4. The 1.14d side (`poke.py`) | 168–216 |
+|   5. The d2rs side (`d2-sim::poke`) | 217–231 |
+|   6. `goto`: walking to a target | 232–306 |
+| Constants & data dependencies | 307–319 |
+| Randomness | 320–326 |
+| Edge cases & original bugs | 327–336 |
+| Test vectors | 337–351 |
+| Provenance | 352–357 |
+| Open questions | 358–365 |
 <!-- /index -->
 
 ## Summary
@@ -82,8 +85,8 @@ The directive's state change, made between ticks t − 1 and t (§2 rule
 5). Each directive yields a **result**: `ok` (with the GUID of a unit it
 created), `failed` (the game's own function refused: placement, class
 check), `unresolved` (a reference matched no unit) or `gap` (this side
-cannot run the directive, §4). Results are written as `poke` records
-(§3 rule 3).
+cannot run the directive, §4); `goto` also has `pending` between its
+steps (§6). Results are written as `poke` records (§3 rule 3).
 
 ## Rules
 
@@ -114,6 +117,7 @@ cannot run the directive, §4). Results are written as `poke` records
 | `stat` | `<ref> <stat> <layer> <i32>` | set a base stat | `0x00627260` (stack: unit, s, value, layer; `ret 0x10`; `sim/stat-lists.md` §5 r2) | `StatLists::unit_set` (`stat-lists.md` §5 r2) |
 | `state` | `<ref> <state> on\|off` | set or clear a state | `0x00639DB0` (stack: unit, s, 1/0; `ret 0xC`; `stat-lists.md` §9.2) | `toggle_state` + `set_state_changed` (`stat-lists.md` §9.2 toggle with update-queue insert) |
 | `freeze` | `<seconds>` | hold the game between ticks for wall time (screenshots, a human look) | the debugger keeps the thread stopped at the hook (§4 rule 2) | no-op, `ok` (the runner owns the clock) |
+| `goto` | `unit [<type>:]<class>` \| `preset <level> [<type>:]<class>` | move the player onto a free cell next to a unit of that type (default 1, monster) and class; `preset`: the level's preset of that type and class, found as the unit its room creates, after a warp to the level when the player is elsewhere (§6) | a multi-tick walk (§6) of `warp` (`0x0053AEC0`) and placement `0x00554EA0` with exact 0 (`path-placement.md` §10: free point §7, mask 0x1C09) | the same walk: `level_warp` / `act_change::run`, then `wiring::path::place::place_unit` with exact `false` |
 
 3. Monsters keep the scenario `spawn` step (`scenario.md` §3.1); a poke
    file writes it as `spawn <class> <x> <y> <kind> [umod <id>...]` with
@@ -156,7 +160,7 @@ cannot run the directive, §4). Results are written as `poke` records
 3. Each poke step writes a `poke` record (`traces/FORMAT.md`
    §Scenario traces): `t`, `i`, `d` (the directive keyword) and `r`
    (`ok`, `failed`, `unresolved`, `gap`), plus `guid` when `ok` created a
-   unit. It belongs to the `c2s` stream (compared there, after `spawn`
+   unit (`goto`: the target's GUID, and `steps`, §6 rule 4). It belongs to the `c2s` stream (compared there, after `spawn`
    in the order of `scenario.md` §5 rule 3).
 4. A `gap` result on either side is also listed in that side's header
    `gaps` (`poke <d> at <t>`), so the verdict is at best `partial`.
@@ -225,6 +229,81 @@ cannot run the directive, §4). Results are written as `poke` records
    that stop's snapshot; `tools/scenario-diff.md` §3 rule 5). Both resolve references on the state after tick
    t − 1 (`scenario.md` §3 rule 3).
 
+### 6. `goto`: walking to a target
+
+A target outside the player's active rooms does not exist yet as a unit
+(rooms are populated when they become active), and a far room cannot be
+entered by a placement (it needs an active room). So `goto` is a walk
+that runs one **step** per tick, at the poke point (§2 rule 4), until
+it lands, using only the warp and the placement of §1 and the room
+records both sides keep.
+
+1. **Target.** `<type>:<class>`: unit type (1 monster, 2 object; other
+   types are refused by the parser) and class (the `monstats` /
+   `objects` row of the created unit; a superunique preset is the
+   `monstats` row its unit has). `<class>` alone is type 1. The goal
+   level G: `preset` names it; `unit` takes the player's level at the
+   first step.
+2. **State** kept by the runner between steps: the target, G, the set
+   of DRLG rooms **seen** and the set of rooms **blocked** (both by
+   level id and tile origin), the step count.
+   A new `goto` starts with an empty set; one `goto` runs at a time.
+3. **A step:**
+   1. `preset` and the player's level is not G: at the first step,
+      `warp G` (§1, tile 0); refused → `failed`. Later steps: no warp
+      (the walk left G through a free-point search; it goes on from
+      there).
+   2. **Found:** the first unit, in ascending GUID order over the
+      server's unit lists, with the target's type and class whose room's
+      level is G. Then place the player (placement with exact 0, alt 0)
+      in that unit's room at the unit's position: the free-point search
+      (§7 of `path-placement.md`, the player's size and mask 0x1C09)
+      picks the cell, so a blocked cell (an object, lava) moves the
+      player to the nearest free cell around it. Placed → `ok`, with
+      the target's GUID as the result's GUID (a later `g @pI` names it);
+      not placed → `failed`.
+   3. **Not found:** add to the seen set the player's DRLG room and
+      every room of its near array that has an active room (their
+      units exist now). Then a breadth-first search over near arrays
+      (each room's array in its stored order, never entering a blocked
+      room) from the player's DRLG room finds the first room of level G
+      not seen. None → `failed`
+      ("explored, n rooms seen"). Else the first room H on the way to
+      it (a member of the player's room's near array): H without an
+      active room → `failed`. The hop's cell: among H's cells (its
+      collision grid, row by row from the top-left) whose mask has none
+      of the player's move bits 0x1C09, the one nearest the centre of
+      H's sub-tile rectangle (cx = x + w / 2, cy = y + h / 2, integer
+      division; squared distance; the first found on a tie). Such a
+      cell, not the centre, is the target because a centre on lava
+      would send the free-point search back to the island the player
+      stands on (River of Flame, level 107). H without a free cell is
+      marked seen and blocked (no placement). Else place the player in
+      H's active room at that cell, exact 0. A refused placement, or one
+      that leaves the player outside H, marks H seen and blocked.
+      The step's result is `pending`.
+   4. After 400 steps the walk ends `failed` ("step limit").
+4. **Records.** A pending step writes nothing; the last step writes the
+   directive's one `poke` record, with `f` / `t` of that last step and
+   `steps` = the number of steps. A run that ends while a `goto` is
+   pending writes it as `failed` ("not finished").
+5. **Not a comparison point.** The walk enters rooms, so it activates
+   and populates them, and each side does that in its own order of
+   seeds; the state after a `goto` is a start for a session, not a
+   state the two sides are expected to agree on. Checks that compare
+   start from saves and the other directives.
+6. **Data.** 1.14d: the player's room (dynamic path +0x1C) → +0x10 DRLG
+   room; DRLG room +0x08 near array of DRLG rooms, +0x2C its count,
+   +0x30 active room (0: none), +0x34 / +0x38 tile x, y, +0x58 level →
+   level +0x1D0 id (`drlg/rooms.md` §1, `drlg/levels.md`); active room
+   +0x4C sub-tile x, y, w, h, +0x20 collision record (+0x00 x0, +0x04
+   y0, +0x08 width, +0x0C height, +0x20 the u16 masks, index
+   (y − y0) · width + (x − x0); `drlg/rooms.md` §10.3 and Open question
+   11, `items/treasure.md` §8); a unit's room: dynamic path +0x1C, static
+   path +0x00 (`tools/state-snapshot.md` §2). d2rs: `Drlg::room`,
+   `DrlgRoom::near` / `active`, `ActiveRoom::{id, subtiles}`,
+   `Drlg::drlg_room_of`.
+
 ## Constants & data dependencies
 
 | Address / field | Use | Owner |
@@ -261,6 +340,9 @@ same on both sides.
 |---|---|---|
 | each malformed line (unknown directive, missing / extra argument, value out of range, tick out of order, wrong version) | an error naming the line | synthetic (`d2-sim::poke` tests) |
 | every directive parsed and written | the canonical text; parsing it again gives the same directive | synthetic |
+| `goto unit 5` / `goto preset 2 2:119` / `goto preset 107 376` parsed and written | canonical `goto unit 1:5`, `goto preset 2 2:119`, `goto preset 107 1:376`; `goto unit 3:5`, `goto preset 2`, `goto here 5` errors | synthetic (`d2-sim::poke` tests, `poke.py --selftest`) |
+| `goto` on a synthetic walk: target in the player's near rooms; target two rooms away; no target | `ok` with the target's GUID in 1 step; `pending`, `pending`, `ok`; `failed` "explored" | synthetic (`d2-sim::poke` tests; `poke.py --selftest` on a fake game) |
+| checkpoint `a4-hellforge` (`traces/checkpoints/`), seed 1: `5 warp 107`, `20 goto preset 107 2:376` | lands next to the Hellforge | 2026-10-09: d2rs (`state-dump`) and 1.14d under Wine (`record_state.py`): `ok` after 50 steps at f69 on both, the player at (7779, 6133), the forge at (7781, 6135), Hephasto at (7810, 6143) on both (GUIDs differ: forge 94 / 96) |
 | `traces/scenarios/poke-spawn-town.scenario` twice on the synthetic install | byte-identical traces | synthetic |
 | `traces/checks/poke-fallen-town.check` (ScnAma, seed 1234; frame 4: `spawn 19 @x+3 @y+3 normal`, `seed-unit @1:19 0x12345678 666`), 1.14d against d2rs, 54 frames | both pokes `ok`; the same party (GUIDs 8–11, same class, positions, mode 1 for all 50 ticks) and the poked seed equal | REC-590, run 2026-10-09 (cloud, Wine): equal as stated; differs: minion seeds and every creation hp, because d2rs's game seed is one step behind 1.14d from frame 2 (the joining player's unit seed: 1.14d {lo of one game-seed step, 666}, d2rs {1, 666}), a join finding outside this spec |
 | same check with the seeds pinned first (`seed-game 0x1234 666`, `seed-unit @player 0x55 666`, then the spawn) | the party and the game seed equal for 50 ticks | REC-590, 2026-10-09: equal (the party's every compared field and the game seed, frames 4–54); left: fields d2rs's snapshot does not fill (monster `tx`/`ty`, player `fc`/`sp`), outside this spec |

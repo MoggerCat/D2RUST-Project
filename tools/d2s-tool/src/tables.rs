@@ -38,6 +38,9 @@ pub struct Tables {
     /// Every waypoint index a `levels` row carries (`world/waypoints.md`
     /// §1 rule 1; 255 = none), ascending, without duplicates.
     pub waypoint_indices: Vec<u8>,
+    /// The waypoint index of each `levels` row (row = level id; 255 =
+    /// none; `world/waypoints.md` §1 rule 1: read directly).
+    pub level_waypoint: Vec<u8>,
 }
 
 fn typed<T: Record>(f: &FixedSet) -> Result<Vec<T>> {
@@ -82,10 +85,14 @@ impl Tables {
                 signed: r.csvsigned,
             })
             .collect();
-        let mut waypoint_indices: Vec<u8> = typed::<Levels>(&fixed)
+        let level_waypoint: Vec<u8> = typed::<Levels>(&fixed)
             .context("levels")?
             .iter()
             .map(|r| r.waypoint)
+            .collect();
+        let mut waypoint_indices: Vec<u8> = level_waypoint
+            .iter()
+            .copied()
             .filter(|&w| w != 255)
             .collect();
         waypoint_indices.sort_unstable();
@@ -97,6 +104,7 @@ impl Tables {
             vitals,
             isc_save,
             waypoint_indices,
+            level_waypoint,
         })
     }
 

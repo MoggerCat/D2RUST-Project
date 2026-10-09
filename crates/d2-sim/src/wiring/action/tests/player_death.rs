@@ -130,8 +130,9 @@ fn the_corpse_start_queues_the_owner_for_the_hireling_host() {
     assert_eq!(fx.sim.hooks().owner_deaths, Some(vec![p]));
 }
 
-/// A player with no life starts DT once (the penalties run, every
-/// player is told with 0x0D code 8); the ENDANIM turns it into DD (the
+/// A player whose death was requested starts DT once (the penalties
+/// run, every player is told with 0x0D code 8); no life alone starts
+/// nothing; the ENDANIM turns it into DD (the
 /// corpse is allocated with state 7 and its owner, code 9 sent once); a
 /// player with life is left alone.
 // Covers: specs/combat/vitals.md §4.8
@@ -145,6 +146,11 @@ fn a_player_with_no_life_dies_and_leaves_a_corpse() {
     // Alive: nothing; a player that never had life is left alone.
     assert!(fx.sim.deaths_of(&mut fx.game, &all).is_empty());
     fx.stats(p, &[(6, 0)]);
+    // No life alone starts nothing (recorded `death-town-ama.check`: the
+    // player stays in TN at 0 life); the lethal hit's request does.
+    assert!(fx.sim.deaths_of(&mut fx.game, &all).is_empty());
+    assert_eq!(fx.sim.sys.units.get(p).unwrap().mode, 1);
+    fx.sim.start_death(&mut fx.game, p);
     let guid = fx.sim.sys.units.get(p).unwrap().guid;
     let changed = fx.sim.deaths_of(&mut fx.game, &all);
     assert_eq!(changed, [p]);

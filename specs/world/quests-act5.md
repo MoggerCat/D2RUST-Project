@@ -45,7 +45,7 @@
 | Edge cases & original bugs | 674–708 |
 | Test vectors | 709–723 |
 | Provenance | 724–748 |
-| Open questions | 749–801 |
+| Open questions | 749–811 |
 <!-- /index -->
 
 ## Summary
@@ -798,3 +798,13 @@ other Act V part-1 quest code draws.
    the rescue portals, the rune reward, Anya's thaw, the scroll and
    Anya's item draw.~~ Needs recording: R-PQ-13
    (`docs/handoff/pc2-rec-pc2-quests.md`, = HANDOFF §5 S9-A3 Act V).
+8. Wired host (`d2-sim` `wiring/economy/quest_host.rs`, REC-790, REC-791, REC-792):
+   PROVISIONAL: "kill in place" (§1.1), Anya leaving town (§5.9) and the
+   thawed statue leaving its room (§5.6) remove the unit at once with
+   S→C 0x0A to every player (the mode 12 set, its animation and a unit
+   kept outside any room are not modelled) (REC-790); "killed in town"
+   `0x00589340` runs stat 6 := 0, the mode 12 change, the room refresh
+   and unit flags |= 1, without the path free and the AI event 2
+   deletion (REC-791); the scroll's resistance list sends each of the
+   four stats with the written value, in id order (REC-792). Settled by
+   R-PQ-13 (`docs/handoff/pc2-rec-pc2-quests.md`).

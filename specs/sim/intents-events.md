@@ -44,15 +44,15 @@
 |   4. d2rs mapping and scope | 636–667 |
 |   5. Machine-readable tables | 668–704 |
 |   6. Exact-match comparison | 705–813 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 814–1304 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1305–1611 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1612–1784 |
-| Constants & data dependencies | 1785–1803 |
-| Randomness | 1804–1809 |
-| Edge cases & original bugs | 1810–1855 |
-| Test vectors | 1856–1942 |
-| Provenance | 1943–2069 |
-| Open questions | 2070–2222 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 814–1315 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1316–1626 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1627–1799 |
+| Constants & data dependencies | 1800–1818 |
+| Randomness | 1819–1824 |
+| Edge cases & original bugs | 1825–1870 |
+| Test vectors | 1871–1957 |
+| Provenance | 1958–2084 |
+| Open questions | 2085–2237 |
 <!-- /index -->
 
 ## Summary
@@ -1189,7 +1189,18 @@ or the new room equals the client's room (client +0x1B4, the old room).
       `0x0053BDA0`: type u8@1, GUID u32@2; a missile, type 3, gets
       nothing).
    2. The client is removed from L's client list (`0x0061A700`); if L
-      has no client left: every monster in L gets `0x005738D0`.
+      has no client left (room +0x78 = 0): every monster (type 1) in L's
+      unit list (+0x74, next +0xE8) gets `0x005738D0`, which cancels its
+      type-2 (think) and type-3 events (`0x00540E60(2, 0)`, `(3, 0)`)
+      and schedules nothing (2026-10-09, re-read `0x0053A9B0`,
+      `0x005738D0`). Such a monster does not think again until a client
+      joins its room (rule 2.3: `0x00573780`, a think at f + 2). There
+      is no room-client test in the think path itself (`0x005A7F80`,
+      `0x005B1740`); this cancel is the only gate. Example: after a
+      same-act warp out of the Pandemonium Fortress at frame 6, its
+      NPCs' pending frame-24 think (idle 20 from the frame-4 home think,
+      `monsters/ai-bodies.md` §9.9) is cancelled, so their unit seeds do
+      not change (`traces/checks/a4-warp-plains-ama.check`).
    3. **S→C 0x08** (`0x0053BC90`, the only sender of 0x08, same layout
       as 0x07: L's tile x u16@1, tile y u16@3, level id u8@5).
    4. Then, if L is the client's room (the old room): the player update
@@ -1463,7 +1474,11 @@ rule 3), drained in a later frame (recorded: after tick 1).
    (`sim/path-placement.md` §11, §13): S→C 0x07 for the spawn room; the
    room switch (§7.8, through `0x005381F0`; old room none: 0x07 and add
    messages for every room of the spawn room's adjacency array);
-   placement (`0x00554850`); S→C 0x15; **S→C 0x7E** (`0x0053DB70`, 5
+   placement (`0x00554850`, which also writes the player's act +0x18
+   and act record +0x1C from the spawn room's level, `0x0055489C`,
+   `sim/units.md` §2; settles REC-797, 2026-10-09: this is the 1.14d
+   writer for a join into any act; nothing between rule 4 and here reads
+   +0x18, so writing it at rule 4 with the same value is equivalent); S→C 0x15; **S→C 0x7E** (`0x0053DB70`, 5
    bytes, Edge cases); followers and `0x005773D0` (`sim/path-placement.md`
    §13 rule 4).
 6. Client state := 3; unlock, log.

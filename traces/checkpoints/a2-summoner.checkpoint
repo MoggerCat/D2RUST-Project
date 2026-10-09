@@ -1,0 +1,58 @@
+# Checkpoint definition (specs/tools/checkpoints.md); tools/checkpoints/make.py
+# builds the save with d2s-tool. Ids are rows of the 1.14d tables
+# (levels, monstats, objects), as the traces/playthrough/act*.play
+# comments name them. Gear and stats are our choice for the point.
+# Arcane Sanctuary is level 74, the Summoner monstats 250. Radament +1 skill point.
+# 12.0 (Arcane Sanctuary) is set by Horazon's journal; set here so the Canyon portal logic sees it done.
+checkpoint 1
+name CkSummoner
+title Summoner: Arcane Sanctuary (Act II, quest 13)
+class sor
+level 28
+expansion
+difficulty normal
+act 1
+stat 0 40   # strength
+stat 1 70   # energy
+stat 2 35   # dexterity
+stat 3 70   # vitality
+stat 4 0     # unspent stat points
+stat 5 0     # unspent skill points
+stat 6 47872   # life 187 (x256)
+stat 7 47872
+stat 8 40704   # mana 159
+stat 9 40704
+stat 10 41216   # stamina 161
+stat 11 41216
+skill 0 4   # fb (skill 36)
+skill 3 4   # ib (skill 39)
+skill 4 1   # fa (skill 40)
+skill 6 4   # static (skill 42)
+skill 7 1   # tk (skill 43)
+skill 8 8   # nova (skill 44)
+skill 9 5   # blast (skill 45)
+skill 1 1   # warmth (skill 37)
+skill 18 1   # tele (skill 54)
+right-skill 45
+left-skill 36
+gold 140000
+quests 1.0 2.0 4.0 6.0 acts=1 9.0 11.0 12.0
+waypoints lv=1 lv=3 lv=4 lv=5 lv=6 lv=27 lv=29 lv=32 lv=35 lv=40 lv=48 lv=42 lv=57 lv=43 lv=44 lv=52 lv=74
+item hlm/body=1
+item stu/body=3
+item cst/body=4
+item vgl/body=10
+item vbt/body=9
+item vbl/body=8
+item rin/body=6
+item rin/body=7
+item amu/body=2
+item hp4/belt=0
+item hp4/belt=1
+item mp4/belt=2
+item mp4/belt=3
+item rvs/belt=4
+item rvs/belt=5
+start 5 warp 74
+start 20 goto unit 250
+need player lv 74
