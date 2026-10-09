@@ -175,3 +175,20 @@ or waypoints, as of the last pull (2026-10-09). Staging is polled every
     at death fires `aidel` (15) frames later, idles, requests neutral,
     and gets mode 1 with hp 0: exactly the symptom. Row
     `q-fix-p4-death-cleanup`.
+- **Item 3 — right click: cast or walk.** `specs/ui/controls.md` §6
+  rules 4–11 already held the full decision. The new rule 12 sums it
+  up for the right button as a truth table: skill = the right skill,
+  rng = `range(P, skill)`, U after the re-pick, hostility.
+  - Ground with rng ≠ 1 → use check → C→S 0x0C. A failed check sends
+    nothing; Attack with no mana falls through to a walk.
+  - Ground with h2h → walk.
+  - Hostile monster with rng 0 / 2 → 0x0D. With rng 1 / 4 → 0x0D in
+    melee range, else walk to the unit.
+  - Stand Still forces 0x0C.
+  - A dead monster, or an object without `TargetItem`, counts as ground.
+  `d2-client` `controls/click.rs` follows this order, so a build where
+  every right click walks has rng resolving to 1 (range lookup / `both`
+  resolution) or a right skill of Attack (id 0). In `Patch_D2` Fire
+  Bolt and Frost Nova are range `none`, so on the ground they must send
+  0x0C. No q-fix row: the skills-2 session is bisecting the regression,
+  and this rule is the check for its fix.
