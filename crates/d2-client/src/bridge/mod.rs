@@ -432,6 +432,12 @@ impl<L: ServerLink> Bridge<L> {
         self.inputs.tables = tables;
     }
 
+    /// The `Levels.txt` rows (`model.md` §11 rule 4); the other tables
+    /// stay (the skill rows bound earlier survive).
+    pub fn set_levels(&mut self, levels: Vec<world::LevelRow>) {
+        self.inputs.tables.levels = levels;
+    }
+
     /// The unit-message rows (`msg-units.md` §1.2 r7, §1.3 r3,
     /// `model.md` §15 r1): `monstats` / `monstats2`, `itemstatcost` send
     /// columns, `objects.txt` and `shrines.txt`; the other tables stay.

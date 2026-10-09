@@ -24,18 +24,18 @@
 | Rules | 70–71 |
 |   1. Binding table | 72–90 |
 |   2. Key files | 91–123 |
-|   3. Commands and default keys | 124–225 |
-|   4. Dispatch | 226–295 |
-|   5. Key-config screen assignment | 296–311 |
-|   6. World clicks (left / right button; answers OQ 2 in part) | 312–627 |
-|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 628–669 |
-|   B4. Original-defaults check (`client/ui.md` §B4) | 670–692 |
-| Constants & data dependencies | 693–699 |
-| Randomness | 700–703 |
-| Edge cases & original bugs | 704–716 |
-| Test vectors | 717–744 |
-| Provenance | 745–763 |
-| Open questions | 764–811 |
+|   3. Commands and default keys | 124–227 |
+|   4. Dispatch | 228–297 |
+|   5. Key-config screen assignment | 298–313 |
+|   6. World clicks (left / right button; answers OQ 2 in part) | 314–629 |
+|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 630–671 |
+|   B4. Original-defaults check (`client/ui.md` §B4) | 672–697 |
+| Constants & data dependencies | 698–704 |
+| Randomness | 705–708 |
+| Edge cases & original bugs | 709–721 |
+| Test vectors | 722–749 |
+| Provenance | 750–768 |
+| Open questions | 769–816 |
 <!-- /index -->
 
 ## Summary
@@ -219,7 +219,9 @@ for 56); `key1`, `key2` (default key of slot 1 / slot 0 as
 `0xNNN:Name`, `-` = none); `down`, `up` (handler addresses of
 `0x00712698`, `-` = none); `full_ok` (the M2 flag); `file_pos` (position
 of the command's two entries in the default table: entries 2p (slot 1)
-and 2p + 1 (slot 0)); `menu_classic`, `menu_exp` (row in the §3.3
+and 2p + 1 (slot 0), **except command 1** (Inventory), whose slot-0
+entry (`B`) is entry 2p and slot-1 entry (`I`) is 2p + 1: measured on
+`Game.exe` 0x312220, 2026-10-09, the first real-data run); `menu_classic`, `menu_exp` (row in the §3.3
 tables, `-` = not listed). Generated from the 1.14d binary; the §B4
 check reads it.
 
@@ -676,13 +678,16 @@ to the portable `Key` names; our `Action` names are the `string_key`
 column of `key-commands.tsv` (command 56: `GameMenu`). Runnable check:
 
 1. Unit (CI): build the 1140-byte table from `key-commands.tsv` (entries
-   in `file_pos` order, slot 1 then slot 0; i32 cmd, u16 key or 0xFFFF,
+   in `file_pos` order, slot 1 then slot 0 (command 1 slot 0 then slot 1,
+   §3.4); i32 cmd, u16 key or 0xFFFF,
    i32 slot) and compare with the preset's bindings.
 2. Game file (`#[ignore]`, `D2_GAME_DIR`): the same 1140 bytes equal
    `Game.exe` bytes at file offset 0x312220 (`.data` raw offset 0x305000
    + 0xD220; SHA-256
    `a711045f3efb1de993c3890c6dbf1f7dad5750df857370cfe1fb0f1d1241cfdd`).
-   Measured 2026-10-07: equal; the install's `default.key` equals header
+   Measured 2026-10-09 on the real install: equal once command 1's pair
+   is in slot-0-first order (the 2026-10-07 "equal" was written before
+   any real run and could not hold); the install's `default.key` equals header
    + table, and the 16 character `.key` files of the test machine equal
    version + table.
 
