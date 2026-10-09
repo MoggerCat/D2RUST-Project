@@ -40,18 +40,18 @@
 |   C6. Per-update dispatch `0x004D2C70` | 228–245 |
 |   C7. Default step `0x004D30C0` (function 1) | 246–301 |
 |   C8. Client collide table `0x0072A350` | 302–322 |
-|   C9. End `0x004D2D70(m, U, forced)` | 323–367 |
-|   C10. Removal and lifetime | 368–380 |
-|   C11. `InitSteps` and `ExplosionMissile` | 381–391 |
-|   C12. Client function table `0x0072A398` | 392–478 |
-|   C13. Function bodies specified here | 479–534 |
-|   C14. Seeds (capture-only) | 535–581 |
-| Constants & data dependencies | 582–603 |
-| Randomness | 604–607 |
-| Edge cases & original bugs | 608–627 |
-| Test vectors | 628–643 |
-| Provenance | 644–660 |
-| Open questions | 661–721 |
+|   C9. End `0x004D2D70(m, U, forced)` | 323–374 |
+|   C10. Removal and lifetime | 375–387 |
+|   C11. `InitSteps` and `ExplosionMissile` | 388–398 |
+|   C12. Client function table `0x0072A398` | 399–485 |
+|   C13. Function bodies specified here | 486–541 |
+|   C14. Seeds (capture-only) | 542–588 |
+| Constants & data dependencies | 589–610 |
+| Randomness | 611–614 |
+| Edge cases & original bugs | 615–634 |
+| Test vectors | 635–650 |
+| Provenance | 651–667 |
+| Open questions | 668–728 |
 <!-- /index -->
 
 ## Summary
@@ -342,7 +342,14 @@ Callers: the default step (none, 1), (none, 0), (U, 0); function 2
    1. `NextHit` and U: U gets state 86 for `NextDelay` frames (a state
       list `0x006251F0(0, 2, NextDelay, U type, U GUID)`, state 86,
       end callback `0x004CD380`, attached `0x00626E10`, state on
-      `0x00639DB0`).
+      `0x00639DB0`). `NextDelay` is a count, not a frame: the list
+      has flag 2 (NEWLENGTH) and the only client expiry walk is
+      `0x00627460(U, 0)` at the start of U's own per-unit update
+      `0x00480810` (`client/model.md` §5 r2; before the motion update
+      `0x004DA350` and the type update): with frame 0 each NEWLENGTH
+      list's expire −= 1 and a list at ≤ 0 is freed
+      (`sim/stat-lists.md` §10.4), so state 86 goes in U's
+      `NextDelay`-th update after the hit (1.14d asm 2026-10-09).
    2. U's client event hooks of kind 0 (`0x004DC210(0, U, m, 0)`: list
       U+0x90).
    3. h := `pCltHitFunc` (i16): 0 < h < `[0x0072A504]` (81) and entry h
