@@ -796,6 +796,37 @@ impl OriginalUi {
             .collect()
     }
 
+    /// The shown page's store items as (GUID, x, y, w, h): the stream's
+    /// cell and the footprint (tests).
+    pub fn store_item_cells(&self, world: &ClientWorld) -> Vec<(u32, i32, i32, i32, i32)> {
+        let sh = self.shared.borrow();
+        let st = self.shop.borrow();
+        if st.open.is_none() {
+            return Vec::new();
+        }
+        let (_, page) = tabs_of(world, &st);
+        page_items(&sh, world, &st, page)
+            .iter()
+            .map(|i| {
+                let (w, h) = footprint(&sh, i);
+                (i.key.guid, i32::from(i.x), i32::from(i.y), w, h)
+            })
+            .collect()
+    }
+
+    /// The store item the shop's hit test finds at grid cell (x, y)
+    /// (`item_at` at the cell's centre; tests).
+    pub fn store_item_at_cell(&self, world: &ClientWorld, x: i32, y: i32) -> Option<u32> {
+        let sh = self.shared.borrow();
+        let st = self.shop.borrow();
+        st.open?;
+        let g = grid_record(&sh);
+        let (_, page) = tabs_of(world, &st);
+        let list = page_items(&sh, world, &st, page);
+        let (l, t, w, h) = g.cell(x, y);
+        item_at(&sh, &g, &list, Point::new(l + w / 2, t + h / 2)).map(|i| i.key.guid)
+    }
+
     /// The centre of store grid cell (x, y) on screen (tests).
     pub fn store_cell_point(&self, x: i32, y: i32) -> Point {
         let g = grid_record(&self.shared.borrow());

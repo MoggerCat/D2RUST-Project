@@ -1738,3 +1738,50 @@ fn the_play_path_steps_and_speaks() {
     );
     run.check("spoke");
 }
+
+/// Known bug (q-fix-seam-store-grid; not run by the real-data gate):
+/// the shop draws and hits each store item at the cells the server put
+/// it in (`seams/item-grids.md` §2.9), so every cell of an item's
+/// footprint finds its GUID and no two items share a cell. On the
+/// install every store item comes at cell (0, 0): the play host's NPC
+/// grid placement `0x00560200` (`vendors.md` §3.1 r4) is a stub
+/// (`AppRest::place_in_store`), and the store fill (`store::open` in
+/// the interaction wiring) does not reach the inventory model whose x /
+/// y the 0x9C stream carries.
+// Covers: specs/seams/item-grids.md §2.9
+#[test]
+#[ignore = "known bug: store items placed at cell 0, 0 (no NPC grid placement on the server)"]
+fn the_shop_finds_each_store_item_at_its_server_cells() {
+    let mut run = Run::start();
+    run.open_menu(u32::from(d2_sim::world::npc::class::AKARA));
+    let rows: Vec<Option<OptionKind>> = run
+        .with_ui(|u| u.npc_menu())
+        .unwrap()
+        .rows
+        .iter()
+        .map(|r| r.kind)
+        .collect();
+    let p = app_support::npc_menu_row(&run.app, menu_row_index(&rows, Some(OptionKind::Trade)));
+    run.click(p);
+    run.step(10);
+    assert!(run.ui_open(0x0C));
+    let w = run
+        .app
+        .world()
+        .resource::<BridgeResource>()
+        .0
+        .world()
+        .clone();
+    let cells = run.with_ui(|u| u.store_item_cells(&w));
+    eprintln!("store cells: {cells:?}");
+    assert!(cells.len() > 1, "{cells:?}");
+    let mut taken = std::collections::BTreeSet::new();
+    for &(g, x, y, cw, ch) in &cells {
+        for cy in y..y + ch {
+            for cx in x..x + cw {
+                assert!(taken.insert((cx, cy)), "cell ({cx}, {cy}) twice: {cells:?}");
+                assert_eq!(run.with_ui(|u| u.store_item_at_cell(&w, cx, cy)), Some(g));
+            }
+        }
+    }
+}
