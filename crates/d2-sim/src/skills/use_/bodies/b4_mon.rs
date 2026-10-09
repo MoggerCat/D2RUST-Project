@@ -1,4 +1,4 @@
-// Spec: specs/skills/bodies-3.md §4, §5
+// Spec: specs/skills/bodies-3.md §4, §5; specs/missiles/missiles.md §R2.2 (monster mode missile, quill volley)
 //! Batch 4 bodies, first part (`bodies-3.md` §4–§5): the monster skill
 //! slots used by several skills (Inferno channels, teleport, scrolls,
 //! hireling missiles, nests, corpse cyclers, family bolts, heals,
@@ -1065,12 +1065,24 @@ pub fn quick_strike_start<W: BodyWorld>(
 /// The monstats missile of the unit's mode `0x0063E6B0(unit, 1)` (§5.18
 /// step 3).
 pub fn mode_missile<W: BodyWorld>(w: &W, ct: &CombatTables, u: W::Unit) -> i32 {
-    if w.action_frame(u) == 0 {
-        return -1;
-    }
-    let (cur, speed) = (w.anim_frame(u), w.anim_speed(u));
-    if !w.action_event_between(u, cur.wrapping_sub(speed) >> 8, cur >> 8) {
-        return -1;
+    mode_missile_of(w, ct, u, true)
+}
+
+/// `0x0063E6B0(unit, check)`: with `check` the action-frame tests of
+/// §5.18 step 3 come first; the column by mode follows.
+// PROVISIONAL (missiles.md §R2.2, REC-700): `bodies-3.md` §5.18 step 3
+// states the tests for the argument 1 only; with 0 (the monster attack
+// event of a non-moving mode, `skills/use.md` §5.2) they are skipped
+// here. d2rs-own, unverified.
+pub fn mode_missile_of<W: BodyWorld>(w: &W, ct: &CombatTables, u: W::Unit, check: bool) -> i32 {
+    if check {
+        if w.action_frame(u) == 0 {
+            return -1;
+        }
+        let (cur, speed) = (w.anim_frame(u), w.anim_speed(u));
+        if !w.action_event_between(u, cur.wrapping_sub(speed) >> 8, cur >> 8) {
+            return -1;
+        }
     }
     let Some(ms) = ct.monstats(w.class_id(u)) else {
         return -1;
@@ -1087,6 +1099,83 @@ pub fn mode_missile<W: BodyWorld>(w: &W, ct: &CombatTables, u: W::Unit) -> i32 {
         _ => return -1,
     };
     s16(col)
+}
+
+/// Monster mode missile `0x005A6D50(game, unit, moving)` (`missiles.md`
+/// §R2.2): m := the mode missile ([`mode_missile_of`] with the moving
+/// flag as its argument); m < 0 → 0 (the caller's melee fallback). Level
+/// `MonsterSkillBonus`(d) + 1, or a hireling's (unit flag 0x200) total
+/// stat 12; created straight with skill 0, no offsets or aim, take ammo
+/// 1; a missile made → the quill volley. Returns 1.
+pub fn monster_mode_missile<W: BodyWorld>(
+    w: &mut W,
+    ct: &CombatTables,
+    u: W::Unit,
+    moving: bool,
+) -> i32 {
+    let m = mode_missile_of(w, ct, u, moving);
+    if m < 0 {
+        return 0;
+    }
+    let lvl = if w.unit_flags(u) & HIRELING != 0 {
+        w.stat(u, LEVEL, 0)
+    } else {
+        let d = w.combat().difficulty();
+        ct.difficulty(d)
+            .map_or(0, |r| r.monsterskillbonus as i32)
+            .wrapping_add(1)
+    };
+    if skill_missile_unit(w, m, u, 0, lvl, (0, 0), (0, 0), true, false).is_some() {
+        quill_volley(w, ct, u, m);
+    }
+    1
+}
+
+/// Unit flag 0x200 (+0xC4 bit 9): a hireling.
+const HIRELING: u32 = 0x200;
+/// Stat 12 (`level`).
+const LEVEL: u16 = 12;
+/// `quillrat1`'s `BaseId`.
+const QUILLRAT: i32 = 63;
+/// The low word of the volley's local seed.
+const VOLLEY_SEED_LO: u32 = 0x5345_4953;
+
+/// Quill volley `0x005A6B70(game, unit)` (`missiles.md` §R2.2 step 4):
+/// `aip3` extra spikes of class `m` at level 1 around the target, on a
+/// local seed {0x53454953, GUID} (no game draw). Only for `BaseId` 63.
+fn quill_volley<W: BodyWorld>(w: &mut W, ct: &CombatTables, u: W::Unit, m: i32) {
+    if base_id(w, ct, u) != QUILLRAT {
+        return;
+    }
+    let saved = w.target(u);
+    let (x, y) = match saved {
+        Some(t) => w.position(t),
+        None => w.target_position(u).unwrap_or((0, 0)),
+    };
+    w.path_op(u, PathOp::TargetUnit(None));
+    let g = guid(w, u);
+    let mut seed = crate::rng::Seed::new(VOLLEY_SEED_LO, g);
+    let d = w.combat().difficulty();
+    let n = ct.monstats(w.class_id(u)).map_or(0, |r| {
+        let v = match d {
+            0 => r.aip3,
+            1 => r.aip3_n,
+            _ => r.aip3_h,
+        };
+        i32::from(v as i16)
+    });
+    let (mut sx, mut sy) = (5, 5);
+    for _ in 0..n {
+        if seed.step() & 1 != 0 {
+            sx = -sx;
+        }
+        if seed.step() & 1 != 0 {
+            sy = -sy;
+        }
+        w.path_op(u, PathOp::TargetPoint(x + sx, y + sy));
+        skill_missile_unit(w, m, u, 0, 1, (0, 0), (0, 0), false, false);
+    }
+    w.path_op(u, PathOp::TargetUnit(saved));
 }
 
 /// srvdo 92 Quick Strike `0x005CBF90` (§5.18).

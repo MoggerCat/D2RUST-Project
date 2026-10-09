@@ -752,16 +752,6 @@ pub trait Pending {
     fn set_current_skill(&mut self, unit: UnitId, skill: i32) -> bool {
         false
     }
-    /// Missile damage setup `0x0059F900` (skills spec).
-    fn missile_damage_setup(
-        &mut self,
-        game: &mut Game,
-        owner: UnitId,
-        origin: Option<UnitId>,
-        missile: UnitId,
-        level: i32,
-    ) {
-    }
     /// A missile parameter record's init callback with an id no spec
     /// names (the specified ones run in `missiles::init_cb`, §R2.3 step
     /// 21).
@@ -874,9 +864,24 @@ pub trait Pending {
         false
     }
 
-    /// Reaction `0x0057CEE0` (`damage.md` §7.1, call level only; its mode
-    /// changes and the kill `0x0057CCB0` are not specified in full).
+    /// Reaction `0x0057CEE0` (`damage.md` §7.1) steps 1–2 (the town rule
+    /// and the hit class store); steps 3–5 run in
+    /// [`super::reaction::reaction`].
     fn reaction(&mut self, a: UnitId, d: UnitId, record: &mut crate::combat::DamageRecord) {}
+    /// AI state setter `0x005734C0(unit, v)` (monster data `dwAiState`,
+    /// `monsters/ai.md` §3 "AI state"); read back by [`Self::ai_state`].
+    fn set_monster_ai_state(&mut self, unit: UnitId, v: u32) {}
+    /// A player mode request (`0x005809D0` / `0x00580A70`, re-entry 0)
+    /// on a host without the path provider. Default: nothing.
+    fn player_mode_request(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        skill: Option<u16>,
+        mode: u32,
+        target: crate::path::walk::request::WalkTarget,
+    ) {
+    }
     /// Overlay `0x00621E40`.
     fn overlay(&mut self, unit: UnitId, id: i32) {}
     /// `0x00623F50` animation rate refresh.
@@ -952,6 +957,19 @@ pub trait Pending {
     }
     /// `0x00535D10` / `0x00535E20`.
     fn dual_wield_switch(&mut self, a: UnitId, offhand: bool, on: bool) {}
+    /// Attack weapon `0x00623990(unit, 1)` (`sim/units.md` §4.7) and a
+    /// monster's `0x00622830` (`missiles/damage.md` §1 step 6). Default:
+    /// [`Self::weapon`].
+    fn attack_weapon(&self, unit: UnitId) -> Option<UnitId> {
+        self.weapon(unit)
+    }
+    /// `0x006289C0`: items `2handed` ≠ 0. Default: false.
+    fn item_two_handed(&self, item: UnitId) -> bool {
+        false
+    }
+    /// Dual-wield stat toggle `0x00623C80(unit, 1)` (`sim/units.md`
+    /// §4.7). Default: nothing.
+    fn dual_wield_toggle(&mut self, unit: UnitId) {}
 
     // ---- objects, interaction, messages (waypoints seam) ---------------
 
@@ -1591,6 +1609,34 @@ pub trait Pending {
     /// Default: nothing.
     fn monster_sequence_frame(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId)
     where
+        Self: Sized,
+    {
+    }
+    /// The used-skill branch of the monster attack-family event 0
+    /// `0x005A7670` (`skills/use.md` §5.2 "Monsters", before the
+    /// animation refresh): a moving skill's step and the do `0x0056FC50`
+    /// on every event. A [`crate::wiring::interaction::UseRest`] value
+    /// routes it to
+    /// [`crate::wiring::interaction::skill_events::monster_attack_skill`].
+    /// Default: nothing.
+    fn monster_attack_skill(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId)
+    where
+        Self: Sized,
+    {
+    }
+    /// The strike of the monster attack-family event 0 `0x005A7670` with
+    /// no used skill (`skills/use.md` §5.2 "Monsters"): the mode missile
+    /// `0x005A6D50` (`moving`: its argument), else the melee set-up and
+    /// `apply_melee` on the path target unit. A
+    /// [`crate::wiring::interaction::UseRest`] value routes it to
+    /// [`crate::wiring::interaction::skill_events::monster_attack_strike`].
+    /// Default: nothing.
+    fn monster_attack_strike(
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
+        unit: UnitId,
+        moving: bool,
+    ) where
         Self: Sized,
     {
     }

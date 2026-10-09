@@ -626,14 +626,36 @@ impl<X: Pending> ActionHooks<X> {
         }
     }
 
-    /// Attack-family event 0 `0x005A7670` (`skills/use.md` §5.2: "monsters
-    /// branch", Open question 6).
-    // PROVISIONAL (skills/use.md OQ6; REC-111): the sequence frame's skill
-    // part (the do by frame code, unit +0x4E = 1 or 2 or 4), then the
-    // animation refresh. The spec says the test reads +0x4E = 1.
+    /// Attack-family event 0 `0x005A7670` (modes 4, 5, 7, 8, 9;
+    /// `skills/use.md` §5.2 "Monsters"). With a used skill: its branch
+    /// ([`Pending::monster_attack_skill`]: a moving skill's step, the do
+    /// on every event with no frame-code test), then the animation
+    /// refresh. Without one: r := the mode moves (`0x005A6B10`); moving →
+    /// step, refresh, animation complete → done (2), trigger(U) false →
+    /// done; then (r = 0, or a moving mode at its trigger frame) the
+    /// strike ([`Pending::monster_attack_strike`]: the mode missile, else
+    /// the melee on the path target), with no refresh.
     fn monster_attack_event0(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
-        X::monster_sequence_frame(self, sim, unit);
-        self.x.refresh_animation(sim.game, unit);
+        if self.used_skill_of(unit).is_some() {
+            X::monster_attack_skill(self, sim, unit);
+            self.x.refresh_animation(sim.game, unit);
+            return;
+        }
+        let Some(mode) = sim.units.get(unit).map(|r| r.mode) else {
+            return;
+        };
+        let moving = monster_moves(sim, unit, mode);
+        if moving {
+            let _ = self.monster_step(sim, unit);
+            self.x.refresh_animation(sim.game, unit);
+            if self.monster_anim_complete(sim, unit) {
+                return;
+            }
+            if !crate::wiring::interaction::skill_events::monster_trigger(sim.units, unit) {
+                return;
+            }
+        }
+        X::monster_attack_strike(self, sim, unit, moving);
     }
 
     /// S3 event 0 `0x005A74A0` (rule 11): step (result ignored),

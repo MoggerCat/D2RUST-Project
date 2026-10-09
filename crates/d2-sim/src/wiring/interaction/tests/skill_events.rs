@@ -1,4 +1,4 @@
-// Spec: specs/skills/use.md §7; specs/sim/stat-lists.md §10.2, §10.3; specs/sim/tick.md §5.5, §5.6
+// Spec: specs/skills/use.md §5.2, §7; specs/sim/stat-lists.md §10.2, §10.3; specs/sim/tick.md §5.5, §5.6
 //! The skill timer events through the combined dispatcher: a timer of
 //! type 5, 8 or 9 on the real queue runs the unit dispatch
 //! (`stat-lists.md` §10.2, §10.3), whose hooks hand it to the skill use
@@ -182,5 +182,37 @@ fn active_state_event_calls_the_aura_states_server_do_function() {
     fx.frame();
     assert_eq!(srvdo_count(&fx, ACTIVE_DO), 1);
     assert_eq!(fx.sim.sys.hooks.x.log.len(), 1);
+    fx.assert_clean();
+}
+
+// Covers: specs/skills/use.md §5.2
+#[test]
+fn monster_attack_event0_runs_the_used_skills_do_on_every_event() {
+    // `use.md` §5.2 "Monsters" `0x005A7670`: a monster in A2 with a used
+    // (not moving) skill runs the do `0x0056FC50` on each attack-family
+    // event 0, whatever the frame code (+0x4E 3, 2, and unchanged by a
+    // code-0 event): three events, three server-do calls.
+    let mut fx = Fx::with(aura_stats(), aura_skills());
+    let m = fx.spawn(UnitType::Monster, 10, 10);
+    fx.sim.sys.units.get_mut(m).unwrap().mode = 5;
+    fx.sim.sys.hooks.x.used.insert(m, entry(AURA));
+    fx.sim.sys.hooks.x.skills.insert(m, vec![entry(AURA)]);
+    for (i, code) in [3u32, 2, 0].into_iter().enumerate() {
+        fx.game
+            .schedule_event(
+                m,
+                u32::from(event::MODE_CHANGE),
+                1 + i as i32,
+                None,
+                code,
+                0,
+            )
+            .unwrap();
+    }
+    for _ in 0..3 {
+        fx.frame();
+    }
+    assert_eq!(srvdo_count(&fx, AURA_DO), 3);
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().anim.action_frame, 2);
     fx.assert_clean();
 }
