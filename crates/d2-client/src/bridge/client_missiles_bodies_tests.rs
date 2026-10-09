@@ -1069,3 +1069,217 @@ fn a_bodys_child_nudges_by_its_parents_direction() {
     let c = w.objclient.missiles[&kids(&w, 2)[0]];
     assert_eq!(c.target_point, (98, 100));
 }
+
+// Covers: specs/render/camera.md §8
+// Covers: specs/missiles/client.md §c13-function-bodies-specified-here
+#[test]
+fn client_functions_start_their_shakes() {
+    use crate::rules::camera::Shake;
+    let shake = |w: &ClientWorld| w.shake.map(|s| (s.shake, s.start_tick));
+    let s = |a, b, c, d| Shake::start(a, b, c, d).unwrap();
+    // 29, test vector: missile 307 (P1 25, P2 7), owner present: elapsed
+    // 90 → (8, 2000, 3000, 2000); 89 and 91 none.
+    let mut r = row(29);
+    (r.range, r.clt_param) = (200, [25, 7, 0, 0, 0]);
+    let rows = vec![ClientMissileRow::default(), r];
+    let (mut w, _, k) = owned(&rows);
+    w.server_ticks = 7;
+    for _ in 0..90 {
+        update(&mut w, &rows, k, true).unwrap();
+    }
+    assert_eq!(shake(&w), None, "elapsed 89");
+    update(&mut w, &rows, k, true).unwrap();
+    assert_eq!(shake(&w), Some((s(8, 2000, 3000, 2000), 7)));
+    w.shake = None;
+    update(&mut w, &rows, k, true).unwrap();
+    assert_eq!(shake(&w), None, "elapsed 91");
+    // 12 at elapsed 0 by the formula (P1 5, P2 4: q 1 → (5, 1000, 2000,
+    // 1000)); P2 0 → removed.
+    let mut r = row(12);
+    r.clt_param = [5, 4, 0, 0, 0];
+    let rows = vec![ClientMissileRow::default(), r];
+    let (mut w, _, k) = owned(&rows);
+    update(&mut w, &rows, k, true).unwrap();
+    assert_eq!(shake(&w), Some((s(5, 1000, 2000, 1000), 0)));
+    r.clt_param = [5, 0, 0, 0, 0];
+    let rows = vec![ClientMissileRow::default(), r];
+    let (mut w, _, k) = owned(&rows);
+    update(&mut w, &rows, k, true).unwrap();
+    assert!(!w.objclient.set_c.contains_key(&k) && w.shake.is_none());
+    // 31 / 37 at frames left 150, 36 at 325, 54 at elapsed 5, 38 at
+    // elapsed 10 with its object.
+    for (f, left, want) in [
+        (31, 150, s(25, 0, 4000, 0)),
+        (37, 150, s(25, 0, 4000, 0)),
+        (36, 325, s(20, 0, 6000, 0)),
+    ] {
+        let rows = vec![ClientMissileRow::default(), row(f)];
+        let (mut w, _, k) = owned(&rows);
+        w.objclient.missiles.get_mut(&k).unwrap().current = left + 1;
+        update(&mut w, &rows, k, true).unwrap();
+        assert_eq!(shake(&w), None, "f {f}");
+        update(&mut w, &rows, k, true).unwrap();
+        assert_eq!(shake(&w).map(|x| x.0), Some(want), "f {f}");
+    }
+    let rows = vec![ClientMissileRow::default(), row(54)];
+    let (mut w, _, k) = owned(&rows);
+    for _ in 0..6 {
+        update(&mut w, &rows, k, true).unwrap();
+    }
+    assert_eq!(shake(&w).map(|x| x.0), Some(s(3, 600, 4000, 3000)));
+    let rows = vec![ClientMissileRow::default(), row(38)];
+    let (mut w, _, k) = owned(&rows);
+    for _ in 0..11 {
+        update(&mut w, &rows, k, true).unwrap();
+    }
+    assert_eq!(shake(&w), None, "no object (d28 0)");
+    let (mut w, _, k) = owned(&rows);
+    let obj = UnitKey::new(crate::bridge::world::OBJECT, 4);
+    w.units
+        .insert(obj, crate::bridge::world::ClientUnit::new(obj));
+    w.objclient.missiles.get_mut(&k).unwrap().d28 = 4;
+    for _ in 0..11 {
+        update(&mut w, &rows, k, true).unwrap();
+    }
+    assert_eq!(shake(&w).map(|x| x.0), Some(s(4, 80, 80, 400)));
+}
+
+// Covers: specs/render/camera.md §8
+#[test]
+fn rule_w_shakes_in_the_worldstone_levels() {
+    use crate::bridge::drlg::DrlgRoomId;
+    use crate::bridge::world::ActiveRoom;
+    let rows = vec![ClientMissileRow::default(), row(66)];
+    let world_in = |level: u16| {
+        let (mut w, p, k) = owned(&rows);
+        w.active_rooms = Some(vec![ActiveRoom {
+            x0: 90,
+            y0: 90,
+            w: 20,
+            h: 20,
+            level,
+            room: DrlgRoomId(1),
+        }]);
+        w.room_units.place(p, Some(DrlgRoomId(1)));
+        (w, k)
+    };
+    // Test vector: level 131, d28 0 → the shake, d28 := 1, no seed step
+    // before the start test (then one step for the mod-10 test).
+    let (mut w, k) = world_in(131);
+    let mut seed = seeded(&mut w, k, 40);
+    update(&mut w, &rows, k, true).unwrap();
+    assert_eq!(
+        w.shake.map(|s| s.shake),
+        crate::rules::camera::Shake::start(6, 2000, 3000, 2000)
+    );
+    assert_eq!(w.objclient.missiles[&k].d28, 1);
+    let lo = seed.step();
+    if lo.is_multiple_of(10) {
+        seed.step();
+        seed.step();
+    }
+    assert_eq!(w.objclient.set_c[&k].seed, Some((seed.lo, seed.hi)));
+    // Level 130: the default function, no shake.
+    let (mut w, k) = world_in(130);
+    update(&mut w, &rows, k, true).unwrap();
+    assert!(!w.objclient.set_c.contains_key(&k) && w.shake.is_none());
+}
+
+// Covers: specs/missiles/client.md §c4-create-tail
+// Covers: specs/missiles/client.md §c9-end-0x004d2d70-m-u-forced
+// Covers: specs/audio/triggers.md §8 r3
+#[test]
+fn missile_sounds_at_the_create_and_the_end() {
+    let mut r = row(FN_DEFAULT_STEP);
+    (r.travel_sound, r.hit_sound, r.explosion_missile) = (5, 7, -1);
+    let rows = vec![ClientMissileRow::default(), r];
+    let (mut w, p, k) = owned(&rows);
+    // §C4 r28: the travel sound on m, then the owner's sound-314 group
+    // stop.
+    assert_eq!(
+        w.objclient.missile_sounds,
+        vec![
+            MissileSound::Request { id: 5, missile: k },
+            MissileSound::StopOwnerGroup { owner: p, id: 314 },
+        ]
+    );
+    w.objclient.missile_sounds.clear();
+    // §C9 r4.4 the hit sound, r6 the travel sound detached.
+    end(&mut w, &rows, k, true, true).unwrap();
+    assert_eq!(
+        w.objclient.missile_sounds,
+        vec![
+            MissileSound::Request { id: 7, missile: k },
+            MissileSound::DetachTravel { missile: k, id: 5 },
+        ]
+    );
+    // No owner, travel sound 0, hit sound −1: none.
+    let mut r = row(FN_DEFAULT_STEP);
+    (r.travel_sound, r.hit_sound, r.explosion_missile) = (0, -1, -1);
+    let rows = vec![ClientMissileRow::default(), r];
+    let mut w = ClientWorld::default();
+    let k = create(&mut w, &rows, &at(100, 100, 1), true)
+        .unwrap()
+        .unwrap();
+    end(&mut w, &rows, k, true, true).unwrap();
+    assert_eq!(
+        w.objclient.missile_sounds,
+        vec![MissileSound::DetachTravel { missile: k, id: 0 }]
+    );
+}
+
+// Covers: specs/monsters/umod-callbacks.md §28.2
+// Covers: specs/missiles/client.md §c4-create-tail
+#[test]
+fn a_multishot_unique_monster_doubles_its_client_missiles() {
+    use crate::bridge::world::{ClientUnit, KindData, MonsterData, MONSTER};
+    let mut r = row(FN_DEFAULT_STEP);
+    r.vel = 8;
+    let mut no_ms = r;
+    no_ms.no_multishot = true;
+    let rows = vec![ClientMissileRow::default(), r, no_ms];
+    let world_with = |flags: u8| {
+        let mut w = ClientWorld::default();
+        let o = UnitKey::new(MONSTER, 3);
+        let mut u = ClientUnit::new(o);
+        u.position = Some((100, 100));
+        u.kind = KindData::Monster(Box::new(MonsterData {
+            flags,
+            umods: [5, 29, 0, 0, 0, 0, 0, 0, 0],
+            ..MonsterData::default()
+        }));
+        w.units.insert(o, u);
+        (w, o)
+    };
+    let shot = |class: u32, o: UnitKey| CreateRecord {
+        flags: flag::POSITION | flag::TARGET_ABSOLUTE,
+        owner: Some(o),
+        class,
+        x: 100,
+        y: 100,
+        tx: 110,
+        ty: 104,
+        ..CreateRecord::default()
+    };
+    // Unique (flag 8): two copies at (tx − sy, ty + sx), (tx + sy, ty −
+    // sx), (sx, sy) = signs of (100 − 110, 100 − 104) = (−1, −1); the
+    // copies run the hook too but the guard stops them.
+    let (mut w, o) = world_with(8);
+    create(&mut w, &rows, &shot(1, o), true).unwrap().unwrap();
+    let mut targets: Vec<_> = w
+        .objclient
+        .missiles
+        .values()
+        .map(|m| m.target_point)
+        .collect();
+    targets.sort();
+    assert_eq!(targets, vec![(109, 105), (110, 104), (111, 103)]);
+    assert!(w.objclient.multishot_guard.is_empty());
+    // Not unique, or `NoMultiShot`: none.
+    let (mut w, o) = world_with(0);
+    create(&mut w, &rows, &shot(1, o), true).unwrap().unwrap();
+    assert_eq!(w.objclient.missiles.len(), 1);
+    let (mut w, o) = world_with(8);
+    create(&mut w, &rows, &shot(2, o), true).unwrap().unwrap();
+    assert_eq!(w.objclient.missiles.len(), 1);
+}

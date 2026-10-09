@@ -2645,3 +2645,23 @@ fn sound_init_sets_the_idle_gap_to_90() {
     assert_eq!(g.last_idle_any, 0);
     assert_eq!(g.speech_id, 0);
 }
+
+// Covers: specs/audio/triggers-2.md §19 r3
+#[test]
+fn the_group_walk_finds_the_first_handle_newest_first() {
+    use super::first_in_group;
+    let mut f = Fake::default();
+    f.bases.insert(314, 312);
+    f.bases.insert(313, 312);
+    f.bases.insert(312, 312);
+    f.sizes.insert(312, 3);
+    // Newest first: handle 4 (id 313) before handle 2 (id 314); handle 9
+    // (id 315) is past the group.
+    f.unit_reqs.insert(M, vec![(9, 315), (4, 313), (2, 314)]);
+    assert_eq!(first_in_group(&f, M, 314), Some(4));
+    f.unit_reqs.insert(M, vec![(9, 315)]);
+    assert_eq!(first_in_group(&f, M, 314), None);
+    f.unit_reqs.insert(M, vec![(4, 313)]);
+    f.off = true;
+    assert_eq!(first_in_group(&f, M, 314), None);
+}

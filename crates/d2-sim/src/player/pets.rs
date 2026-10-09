@@ -347,8 +347,8 @@ pub fn append<W: PetWorld>(
     // Rule 1.
     if e.max == 0 {
         w.resync(player);
-        // TODO(pets.md OQ2): the resync's effect is unknown; an entry that
-        // vanished is read as still 0 (narrowest reading).
+        // The resync may have set this entry's maximum (§10); read it
+        // again; an entry that vanished reads as 0.
         let max = entry(w, player, t).map_or(0, |e| e.max);
         if max == 0 {
             dismiss(w, pet_guid)?;

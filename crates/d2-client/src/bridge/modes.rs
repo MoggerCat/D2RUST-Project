@@ -91,7 +91,13 @@ pub fn mode_request(
                 _ => monster_mode(code),
             };
             if let Some(m) = m {
-                w.units.get_mut(&key).expect("present").mode = m;
+                super::monster_anim::mode_set(w, inputs, key, m);
+            }
+            // The tail (`model.md` §19 r6) of a pathed request (a
+            // record and a code other than 0x13, 0x15, 0x16, §19 r3):
+            // stat 67 from r4.
+            if !matches!(code, 0x13 | 0x15 | 0x16) {
+                super::monster_anim::velocity_tail(w, inputs, key, record[4]);
             }
             Ok(())
         }

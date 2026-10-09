@@ -1,0 +1,22 @@
+# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py /home/user/D2RUST-Project/traces/raw/20261009-051207-frames.jsonl --scene a1-town-idle-sor --frame 25 --tile-light unknown --out /home/user/D2RUST-Project/facts/render; game: 1.14d
+key	value
+seq	25
+tick	42
+w	800
+h	600
+act	0
+level	1
+player_x	10320
+player_y	72816
+tile_origin_x	9920
+tile_origin_y	72536
+unit_origin_x	9920
+unit_origin_y	72532
+open_mode	0
+shift_x	0
+light_quality	0
+rain	1
+snow	0
+draws	245
+index_sha256	760155128a67d1501f330e80f22847d73963dfc5a217003e2e6d7a6bf2a7a214
+palette_sha256	ba83219e51249002d7125a1a5a701d6abea94f04f44d6cfaa42becdfcff23337

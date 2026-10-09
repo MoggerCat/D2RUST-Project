@@ -5,6 +5,7 @@ Step 3):
 
     py tools/trace-recorder/facts_render.py CAPTURE.jsonl --scene NAME [--frame SEQ] [--out facts/render]
     py tools/trace-recorder/facts_render.py CAPTURE.jsonl --shot NAME [--scene NAME]   # record_frames --front-end
+    py tools/trace-recorder/facts_render.py --merge-sprites A.tsv B.tsv ... [--out facts/render]
     py tools/trace-recorder/facts_render.py --selftest
 
 - <out>/scenes/<scene>/draws.tsv: every draw call of the chosen frame, in order (§2);
@@ -42,6 +43,7 @@ FORMATS = ("frames-raw-2", "frames-raw-3")
 TILE_OPS = {"FloorTileDraw", "TileDrawLit", "TileDrawTrans", "ShadowTileDraw"}
 RECT_OPS = {"UtilDiamond", "UtilRect"}
 NA, UNK = "-", "?"
+NO_TILE_LIGHT = False   # --tile-light unknown: the 768-byte read is not reproducible (q-facts-scenes.md)
 
 # facts-render.md §2-§4 (the columns d2-client facts-compare reads)
 DRAW_COLS = ["i", "op", "file", "dir", "frame", "tile", "x", "y", "w", "h", "xoff", "yoff",
@@ -115,11 +117,11 @@ def draw_row(i, d, celfiles, compfiles, sprites):
                  tile=(".".join(str(t[k]) for k in ("orient", "main", "sub", "rarity"))
                        if all(k in t for k in ("orient", "main", "sub", "rarity")) else UNK))
         if op == "FloorTileDraw":  # light grid, X, Y, world x, world y, alpha, open mode, data
-            r.update(x=val(a[1]), y=val(a[2]), light=d.get("light") or UNK)
+            r.update(x=val(a[1]), y=val(a[2]), light=UNK if NO_TILE_LIGHT else d.get("light") or UNK)
         else:  # X, Y, light, open mode (+ alpha for TileDrawTrans); shadow: no light
             r.update(x=val(a[0]), y=val(a[1]))
             if op != "ShadowTileDraw":
-                r["light"] = d.get("light") or UNK
+                r["light"] = UNK if NO_TILE_LIGHT else d.get("light") or UNK
             if op == "TileDrawTrans":
                 r["mode"] = val(a[4] if len(a) > 4 else None)
     elif "cel" in d:  # §2 r3: cel context, X, Y, ...
@@ -223,6 +225,29 @@ def read_sprites(path):
                 row = line.split("\t")
                 rows[(row[0], int(row[1]), int(row[2]))] = row
     return rows
+
+
+def merge_sprites(paths, out_path):
+    """Union of several sprites.tsv files into out_path (exit 1 on a conflicting key)."""
+    merged, conflicts = {}, []
+    try:
+        for p in paths:
+            if not os.path.exists(p):
+                raise FactsError(f"{p}: no such file")
+            for key, row in read_sprites(p).items():
+                old = merged.setdefault(key, row)
+                if old != row:
+                    conflicts.append(f"{key}: {old} vs {row} ({p})")
+    except (FactsError, OSError, ValueError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        sys.exit(1)
+    if conflicts:
+        for c in conflicts:
+            print(f"error: conflicting sprite row {c}", file=sys.stderr)
+        sys.exit(1)
+    header = f"# facts v1; tool: {TOOL}; command: {command_line()}; game: 1.14d"
+    write_tsv(out_path, header, SPRITE_COLS, sorted(merged.values(), key=sort_key))
+    print(f"sprites.tsv {len(merged)} rows from {len(paths)} files")
 
 
 def build(f, celfiles, compfiles, old_sprites):
@@ -354,9 +379,26 @@ def selftest():
     assert (fr["seq"], fr["w"], fr["draws"], fr["index_sha256"]) == ("2", "800", "2", "c" * 64), fr
     assert [k for k, _ in frame_rows(g, d3, None)] == FRAME_KEYS
     assert dict(frame_rows(dict(g, in_game=True), d3, None))["level"] == "?"   # in game, unread: `?`
+    # --merge-sprites: a union of two files; a key with two rows is reported, nothing written
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        hdr = "# facts v1; selftest"
+        a_p, b_p, out = (os.path.join(tmp, n) for n in ("a.tsv", "b.tsv", "out.tsv"))
+        write_tsv(a_p, hdr, SPRITE_COLS, [sprites[0]])
+        write_tsv(b_p, hdr, SPRITE_COLS, sprites)
+        merge_sprites([a_p, b_p], out)
+        assert list(read_sprites(out).values()) == sprites, read_sprites(out)
+        bad = list(sprites[0][:3]) + ["99"] + list(sprites[0][4:])
+        write_tsv(b_p, hdr, SPRITE_COLS, [bad])
+        os.remove(out)
+        try:
+            merge_sprites([a_p, b_p], out)
+            raise AssertionError("conflicting merge passed")
+        except SystemExit as e:
+            assert e.code == 1 and not os.path.exists(out)
     print("selftest ok: rows of every draw kind follow facts-render.md §2-§4; front-end frames (`-` game "
           "keys, tick `?`, chosen by shot); "
-          f"{len(cases)} source fields each change exactly their cell; a sprite conflict is reported")
+          f"{len(cases)} source fields each change exactly their cell; a sprite conflict is reported (build and --merge-sprites)")
 
 
 def main():
@@ -369,10 +411,21 @@ def main():
     ap.add_argument("--out", default=os.path.join(REPO, "facts", "render"))
     ap.add_argument("--images", default=os.path.join(REPO, "game", "captures"),
                     help="PNG root, used only when a frame lacks its digests")
+    ap.add_argument("--tile-light", choices=("digest", "unknown"), default="digest",
+                    help="tile rows' light column: the recorder's digest, or `?` (the 768-byte floor light "
+                         "read differs between two runs of the same scene: bytes the game does not set)")
+    ap.add_argument("--merge-sprites", nargs="+", metavar="SPRITES_TSV",
+                    help="write <out>/sprites.tsv as the union of these sprites.tsv files (§4; a key with two "
+                         "different rows is a conflict): joins the sprite tables of two branches' recordings")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
+    global NO_TILE_LIGHT
+    NO_TILE_LIGHT = a.tile_light == "unknown"
     if a.selftest:
         selftest()
+        return
+    if a.merge_sprites:
+        merge_sprites(a.merge_sprites, os.path.join(a.out, "sprites.tsv"))
         return
     a.scene = a.scene or a.shot
     if not a.capture or not a.scene:

@@ -236,6 +236,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     holder), as offsets read from a server unit, so `record_state.py` can
     fill `own`. Write the answer into `sim/units.md` (or the owner spec)
     and the §2 row of `state-snapshot.md`.
+28. **0x8E flag byte at the join** (q-fix-pc1-proto-items) The join's 0x8E CorpseAssign per corpse of another client's player (`0x0053DFB0` from `0x0052C410`, `sim/intents-events.md` §8.3) is sent with flag byte 1 (assign); the flag source at that call is not read. Needed: the byte `0x0052C410` passes to `0x0053DFB0`.
 26. **Re-record sim-0009 without input** (q-prov-recording, REC-290): the Wine
     run of the same command equals `traces/sim/tick/sim-0009.json` for ticks
     0–60, then the Windows trace has a client message at tick 61 (drain: a
@@ -245,7 +246,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     sim-0009. (Item 20 note: under Wine the front end does take X input,
     `tools/cloud-game/xinput.sh`; in-game NPC menus were not tried.)
 
-28. **Monster path target at the death message** (q-tool-poke, REC-594): 1.14d state
+29. **Monster path target at the death message** (q-tool-poke, REC-594): 1.14d state
     snapshots read an idle spawned monster's path target (+0x10/+0x12) as
     its spawn point (`monsters/init.md` §4.1 step 1.1; check
     `traces/checks/poke-fallen-town.check`), so d2rs now writes it there;

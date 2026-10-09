@@ -1,0 +1,22 @@
+# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py /home/user/D2RUST-Project/traces/raw/20261009-024514-frames.jsonl --scene a2-town-lut-gholein --frame 25 --tile-light unknown --out /home/user/D2RUST-Project/facts/render; game: 1.14d
+key	value
+seq	25
+tick	42
+w	800
+h	600
+act	1
+level	40
+player_x	-800
+player_y	82856
+tile_origin_x	-1200
+tile_origin_y	82576
+unit_origin_x	-1200
+unit_origin_y	82572
+open_mode	0
+shift_x	0
+light_quality	0
+rain	0
+snow	0
+draws	274
+index_sha256	bde942750d3cf7c1890ab3469820703e1ffe9bb26da74d1df43e558884815330
+palette_sha256	8c0f435a5781d166f63a4cf7df801e3af434a29cc72a66b862494724df1145fc

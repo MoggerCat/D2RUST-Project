@@ -12,6 +12,7 @@ use d2_data::tables::{
     decode_all, Armor, Belts, Books, Inventory, Itemtypes, Misc, Record, Weapons,
 };
 
+use super::equip::CLASS_NONE;
 use crate::items::tables::TableError;
 
 /// An `inventory.bin` record: the grid size (§1.3).
@@ -137,7 +138,33 @@ impl From<&Itemtypes> for InvTypeRec {
             bodyloc2: r.bodyloc2,
             beltable: r.beltable,
             quiver: r.quiver,
-            class: r.class,
+            class: type_class(r.class),
+        }
+    }
+}
+
+/// `inventory.md` §4.2 step 7 revision (PROVISIONAL, REC-513): the
+/// bin's `class` of an empty cell is 0xFF (`link8` miss); the class
+/// getter's "none" is 7, so every value ≥ 7 is none.
+pub fn type_class(raw: u8) -> u8 {
+    if raw >= CLASS_NONE {
+        CLASS_NONE
+    } else {
+        raw
+    }
+}
+
+#[cfg(test)]
+mod type_class_tests {
+    use super::*;
+
+    // Covers: specs/items/inventory.md §4.2
+    /// The 1.14d `itemtypes.bin` values: `abow` 0, `orb ` 1, `h2h ` 6,
+    /// `belt` / `helm` / `wand` 0xFF (none).
+    #[test]
+    fn the_empty_class_cell_is_none() {
+        for (raw, class) in [(0, 0), (1, 1), (6, 6), (0xFF, CLASS_NONE), (7, CLASS_NONE)] {
+            assert_eq!(type_class(raw), class, "{raw:#x}");
         }
     }
 }
