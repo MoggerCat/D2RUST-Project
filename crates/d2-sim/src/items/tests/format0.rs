@@ -1091,3 +1091,20 @@ fn f0_code_242_reaches_the_runes_socketed_item() {
     assert_eq!((gm.stats.base(72, 0), gm.stats.base(73, 0)), (0, 0));
     assert_eq!(other.base(72, 0), 7);
 }
+
+/// §2: mode 7 (craft list) goes through the wrapper, so a format-0 item
+/// takes §14 there; mode 6 calls the dispatcher directly.
+// Covers: specs/items/properties.md §2
+#[test]
+fn f0_craft_mode_goes_through_the_legacy_table() {
+    let mut t = tables268();
+    t.properties[0] = prop1(1, 50);
+    let ring = push_item(&mut t, item_rec(RING, b"rin "));
+    let l = |it: &Item<FakeStats>, id| it.stats.item_list(id, 0);
+    let mut it = f0(ring, 1);
+    ap(&t, &mut it, mode::CRAFT, rec(0, 0, 5, 5));
+    assert_eq!((l(&it, 31), l(&it, 50)), (5, 0));
+    let mut it = f0(ring, 1);
+    ap(&t, &mut it, mode::RUNEWORD, rec(0, 0, 5, 5));
+    assert_eq!((l(&it, 31), l(&it, 50)), (0, 5));
+}

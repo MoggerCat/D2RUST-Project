@@ -1694,6 +1694,19 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
             rand_start: m.randstart as i32,
             prog_sound: m.progsound as i16,
             param: [m.param1 as i32, m.param2 as i32],
+            client_col: m.clientcol != 0,
+            collide_kill: m.collidekill != 0,
+            collide_friend: m.collidefriend != 0,
+            next_hit: m.nexthit != 0,
+            next_delay: m.nextdelay,
+            can_destroy: m.candestroy,
+            clt_hit_sub: [
+                m.clthitsubmissile1 as i16,
+                m.clthitsubmissile2 as i16,
+                m.clthitsubmissile3 as i16,
+                m.clthitsubmissile4 as i16,
+            ],
+            c_hit_par: [m.chitpar1 as i32, m.chitpar2 as i32, m.chitpar3 as i32],
         })
         .collect();
     let states: Vec<d2_data::tables::States> = decode_all(table("states")?).map_err(err)?;
