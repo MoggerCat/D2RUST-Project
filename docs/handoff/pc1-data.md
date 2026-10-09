@@ -334,6 +334,18 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 43. **Mini panel open at game start (REC-519)** (q-scenes-compare) Every recorded scene has state 0x15 open with no input; name the call that opens it at game entry (and whether a saved setting decides it), for `ui/control-panel.md` §9.
 44. **Shadow pre-test arguments `0x00471620` (REC-511, REC-518)** (q-scenes-compare) The measured shadows fit the §4 box test on the sheared shadow box, and objects need their mode's `BlocksLight`; read the arguments `0x00471620` passes to `0x004709A0` and the object branch, for `render/blend-modes.md` §5 r3.
 
+- [prov-data] **Hratli's unit seed two steps at creation** (q-prov-data,
+  `world/quests-act3-2.md` §3.3, `monsters/init.md` §4): in the Act III
+  town (`a3-start-noquest-sor`, level-1 sorceress, town byte act III,
+  seed 1234) Hratli (class 253), spawned by his dummy's init through
+  `0x005B2F20(game, room, x, y, 253, mode 1, -1, 0)`, has the unit seed
+  [3975998680, 1369742535] at frame 2: the fresh draw (4040195123, 666)
+  stepped **twice**. d2rs has it unstepped, and so do the NPCs made by
+  presets (294, 264), which match 1.14d. Find the two draws on Hratli's
+  own seed between the allocation and frame 2: a spawn-wrapper step
+  (flags 0, spread -1), the dummy init `0x005B...` (init 49 / 50) or a
+  think; `monsters/init.md` §4 lists none.
+
 ## How to check a behaviour in one command
 
 A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)
