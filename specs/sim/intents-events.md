@@ -45,14 +45,14 @@
 |   5. Machine-readable tables | 668–704 |
 |   6. Exact-match comparison | 705–813 |
 |   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 814–1315 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1316–1622 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1623–1795 |
-| Constants & data dependencies | 1796–1814 |
-| Randomness | 1815–1820 |
-| Edge cases & original bugs | 1821–1866 |
-| Test vectors | 1867–1953 |
-| Provenance | 1954–2080 |
-| Open questions | 2081–2233 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1316–1626 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1627–1799 |
+| Constants & data dependencies | 1800–1818 |
+| Randomness | 1819–1824 |
+| Edge cases & original bugs | 1825–1870 |
+| Test vectors | 1871–1957 |
+| Provenance | 1958–2084 |
+| Open questions | 2085–2237 |
 <!-- /index -->
 
 ## Summary
@@ -1474,7 +1474,11 @@ rule 3), drained in a later frame (recorded: after tick 1).
    (`sim/path-placement.md` §11, §13): S→C 0x07 for the spawn room; the
    room switch (§7.8, through `0x005381F0`; old room none: 0x07 and add
    messages for every room of the spawn room's adjacency array);
-   placement (`0x00554850`); S→C 0x15; **S→C 0x7E** (`0x0053DB70`, 5
+   placement (`0x00554850`, which also writes the player's act +0x18
+   and act record +0x1C from the spawn room's level, `0x0055489C`,
+   `sim/units.md` §2; settles REC-797, 2026-10-09: this is the 1.14d
+   writer for a join into any act; nothing between rule 4 and here reads
+   +0x18, so writing it at rule 4 with the same value is equivalent); S→C 0x15; **S→C 0x7E** (`0x0053DB70`, 5
    bytes, Edge cases); followers and `0x005773D0` (`sim/path-placement.md`
    §13 rule 4).
 6. Client state := 3; unlock, log.
