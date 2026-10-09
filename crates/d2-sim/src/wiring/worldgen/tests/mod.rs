@@ -402,6 +402,7 @@ fn action_tables() -> ActionTables {
         levels: levels(),
         skill_modes: vec![[0; 8]],
         overlay_count: 0,
+        monequip: Vec::new(),
     }
 }
 
