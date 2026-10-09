@@ -5,9 +5,7 @@ name: Windows build
 # no game files (CLAUDE.md hard rule 1).
 on:
   push:
-    # claude/q-tool-windows-build: temporary, to prove the workflow before
-    # it reaches staging (workflow_dispatch needs the file on main).
-    branches: [claude/specs-staging-7, main, claude/q-tool-windows-build]
+    branches: [claude/specs-staging-7, main]
   workflow_dispatch:
 
 env:

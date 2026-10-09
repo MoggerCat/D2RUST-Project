@@ -41,18 +41,18 @@
 |   11. Current act and level (join and later) | 774–819 |
 |   12. Client DRLG and the room of a point | 820–861 |
 |   13. Visibility predicate (`0x004DBF20`) | 862–913 |
-|   14. Pet list and the hireling GUID | 914–967 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 968–1057 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 1058–1092 |
-|   17. Model writes made by 1.14d UI code | 1093–1239 |
-|   18. Audio driver inputs and the client object functions | 1240–1270 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1271–1499 |
-| Constants & data dependencies | 1500–1512 |
-| Randomness | 1513–1528 |
-| Edge cases & original bugs | 1529–1553 |
-| Test vectors | 1554–1611 |
-| Provenance | 1612–1715 |
-| Open questions | 1716–1895 |
+|   14. Pet list and the hireling GUID | 914–978 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 979–1068 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 1069–1103 |
+|   17. Model writes made by 1.14d UI code | 1104–1250 |
+|   18. Audio driver inputs and the client object functions | 1251–1281 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1282–1510 |
+| Constants & data dependencies | 1511–1523 |
+| Randomness | 1524–1539 |
+| Edge cases & original bugs | 1540–1564 |
+| Test vectors | 1565–1622 |
+| Provenance | 1623–1727 |
+| Open questions | 1728–1907 |
 <!-- /index -->
 
 ## Summary
@@ -954,8 +954,19 @@ player is in", the input of `render/composition.md` §3 step 2
    path `0x00465C60` ≠ 0), `0x0048A990` (`0x0048AA74`) and
    `0x00493A00` (`0x00493A0A`, a 0x2E-pixel bar); the UI owners of
    those draws take the value 100. The model stores +0x1C = 100 and
-   never changes it. REC-10 (0x81 bytes of a hireling) still confirms
-   the 0x81 field writes.
+   never changes it. **Recorded hire (REC-10, REC-576 (4), 2026-10-09,
+   PC 1 Windows, pc1-day3-c):** `record_packets.py --auto MilHire --seed
+   1234` (quest word 2 bit 0, 5000 gold; Kashya → Hire → first row):
+   the hire list 0x4E entries are `4E <u16 id> <u32 seed>` (first:
+   `4e 530d 083bd951`); C→S 0x36 `36 03000000 530d0000` (Kashya GUID 3,
+   id 0x0D53) at server frame 367; in the same frame S→C 0x81
+   `81 07 0f01 01000000 0d000000 083bd951 530d0000`: type 7, class 271,
+   owner GUID 1, pet GUID 13, u32@0xC = 0x51D93B08 (the list entry's
+   seed) and u32@0x10 = 0x00000D53 (the hire id), so +0x24 := seed,
+   +0x28 := id. **No 0x7A** is sent: 0x81 alone makes the record (rule 2
+   inside it). The hireling's S→C 0xAC (GUID 13, class 0x010F) follows
+   at frame 368, so at the 0x81 the monster is not yet in S and the
+   hireling setup runs at the 0xAC create from the record (`0x00478E40`).
 4. **Hireling GUID** (`0x00478F20(player, 7, any = 1)`, the call of
    `msg-units.md` §1.2 rule 2 and §2 rule 2): no player → −1; else the
    first record in list order with type 7 and owner GUID = the player's
@@ -1712,6 +1723,7 @@ end table `0x004B15E0`, `0x004AF6A0` (table `0x004AF858`),
 its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
 `0x0047AA30`, `0x0047AA20`; the recorded C→S 0x67 is seq 1 of
 `20261006-022633-packets.jsonl`.
+- 2026-10-09 (pc1-day3-c, REC-10 / REC-576 (4)): a scripted Kashya hire recorded with `record_packets.py` on Windows; §14 rule 3.
 
 ## Open questions
 

@@ -1,4 +1,4 @@
-// Spec: specs/skills/use.md §5.2 (players; monsters `0x005A7670`), §7; specs/missiles/missiles.md §R2.2; specs/combat/damage.md §5.1; specs/sim/stat-lists.md §10.2, §10.3; specs/sim/units.md §4.6 r7, r10, r13, §5, §6.1
+// Spec: specs/skills/use.md §5.2 (players; monsters `0x005A7670`), §7; specs/missiles/missiles.md §R2.2; specs/combat/damage.md §5.1; specs/sim/stat-lists.md §10.2, §10.3; specs/sim/units.md §4.6 r7, r10, r13, §5, §6.1; specs/skills/bodies-2.md §2.1 (mode damage of the mode set)
 //! The skill timer events of the unit dispatch on the skill use
 //! pipeline: event 5 (active state), 8 (periodic skills and auras) and 9
 //! (item auras) reach [`crate::skills::use_`] through [`UseView`].
@@ -26,7 +26,7 @@
 use crate::combat::apply_melee;
 use crate::skills::levels::skill_level;
 use crate::skills::use_::bodies::b4_mon::monster_mode_missile;
-use crate::skills::use_::bodies::{melee_setup, BodyWorld};
+use crate::skills::use_::bodies::{melee_setup, mode_damage, BodyWorld};
 use crate::skills::use_::{
     active_state_event, attack_frame_event, do_skill, item_aura_event, periodic_event, start,
     UseWorld, FLAG_MISSILE_FIRED, SKILL_ARRIVED, SKILL_MOVING,
@@ -253,6 +253,26 @@ pub fn monster_attack_strike<X: Pending + UseRest>(
     if let Some(tg) = crate::wiring::path::monsters::path_target(&*w.cv.v.h, unit) {
         apply_melee(w.combat(), &ct, unit, tg);
     }
+}
+
+/// The monster mode damage `0x005A4F50(unit, mode)` of the mode set
+/// `0x005A7C20` (`skills/bodies-2.md` §2.1, `umod-callbacks.md` §2 rule
+/// 1), on the unit's base list (flag 1).
+pub fn monster_mode_damage<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    unit: UnitId,
+    mode: u32,
+) {
+    let t = h.tables.clone();
+    let ct = h.tables.combat.clone();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    mode_damage(&mut w, &t.skills, &ct, unit, mode as i32);
 }
 
 /// The join's Iron Golem re-summon (`formats/d2s-load.md` §3 step 2,

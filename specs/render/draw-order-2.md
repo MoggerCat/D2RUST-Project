@@ -21,18 +21,18 @@
 | Inputs | 49–59 |
 | Outputs / state changes | 60–65 |
 | Rules | 66–67 |
-|   11. Weather (passes 4 and 9; water floors) | 68–344 |
-|   12. Level backgrounds (pass 1) | 345–398 |
-|   13. Pass 8 (`0x00475B20`) | 399–407 |
-|   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 408–433 |
-|   15. Sight test (`draw-order.md` §5 r3) | 434–480 |
-|   16. Line test (`0x0064E260`) | 481–510 |
-| Constants & data dependencies | 511–521 |
-| Randomness | 522–533 |
-| Edge cases & original bugs | 534–550 |
-| Test vectors | 551–572 |
-| Provenance | 573–604 |
-| Open questions | 605–680 |
+|   11. Weather (passes 4 and 9; water floors) | 68–349 |
+|   12. Level backgrounds (pass 1) | 350–403 |
+|   13. Pass 8 (`0x00475B20`) | 404–412 |
+|   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 413–438 |
+|   15. Sight test (`draw-order.md` §5 r3) | 439–485 |
+|   16. Line test (`0x0064E260`) | 486–515 |
+| Constants & data dependencies | 516–526 |
+| Randomness | 527–538 |
+| Edge cases & original bugs | 539–555 |
+| Test vectors | 556–577 |
+| Provenance | 578–610 |
+| Open questions | 611–686 |
 <!-- /index -->
 
 ## Summary
@@ -259,6 +259,11 @@ through `D2GFX_DrawCelContext` with light −1 (unlit), draw mode 3
    255, draw mode 5 over (`L`, 0)–(`R`, `H` − 47) (`blend-modes.md` §8),
    and the pass ends (no particles that frame). Below 10 the pass goes
    on to r3: the particles draw, with no flash.
+   Measured value (2026-10-09, pc1-day3-c, REC-576 (6)): read with no breakpoints on Windows
+   (`-w -ns`, ScnAma in the Rogue Encampment, polled every 250 ms for 30 s), `[0x007BB390]` is 0 in
+   the menus, 30–44 during the first ~10 s after the arrival, then 21–26 (25 in 50 of 72 samples).
+   Under the trace-recorder debugger it reads 0–12 because the hooks slow the client. So in normal
+   play the gate is always met and the flash draws; a fixed 25 gives the same result.
 3. Else, when rain is on in the level and the particle pool is live,
    draw the particles (`0x00473470`), only when the low-quality setting is
    0; records in slot order, tested against [`L`, `R`) × [0, `H` − 47)
@@ -601,6 +606,7 @@ store to `0x007A8A20` anywhere in `all.asm`; section layout from the PE
 header. Level lists from
 `patch_d2` `levels.txt`. Rain seen in run 2 (`20261006-141725`, Rogue
 Encampment): splash ripples on the river, drop lines.
+- 2026-10-09 (pc1-day3-c, REC-576 (6)): `[0x007BB390]` polled with no breakpoints on Windows (scratch probe on `autostart.py`'s hook-free debugger), §11.7 r2.
 
 ## Open questions
 

@@ -231,6 +231,18 @@ fn skill_motion_runs_a_requested_leap() {
         m.frame(&world, rows, Some(BARBARIAN), None);
         drawn.push(m.drawn().map(|d| d.2));
         lifted.push(m.offsets().get(&key).map(|o| o.1));
+        // `blend-modes.md` §5 r3: the shadow takes half the height on
+        // both axes where the body takes all of it in y.
+        let (body, shadow) = (
+            m.offsets().get(&key).copied(),
+            m.shadow_offsets().get(&key).copied(),
+        );
+        if let (Some(b), Some(sh)) = (body, shadow) {
+            let r = *m.runs.get(&key).unwrap().record().unwrap();
+            let [ox, oy, oz] = r.offset;
+            assert_eq!(b, (ox, oy + oz));
+            assert_eq!(sh, (ox + oz / 2, oy + oz / 2));
+        }
     }
     assert_eq!(&drawn[..6], &[1, 2, 3, 4, 5, 6].map(Some));
     assert_eq!(lifted[4], None, "no record before frame 5");
@@ -238,4 +250,5 @@ fn skill_motion_runs_a_requested_leap() {
     assert_eq!(lifted[6], Some(-20));
     assert_eq!(drawn.last(), Some(&None), "the mode ended");
     assert!(m.offsets().is_empty());
+    assert!(m.shadow_offsets().is_empty());
 }
