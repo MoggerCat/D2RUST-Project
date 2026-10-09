@@ -210,7 +210,11 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     the code → index lookup `0x00633640` (`item`, `items/generation.md`
     §3); (d) `0x00627260(unit, s, value, layer)` and `0x00639DB0(unit,
     s, on)` (`stat`, `state`, `stat-lists.md` §5 r2, §9.2). Answer into
-    the owning specs; then delete the gap rows in `poke.md` §1.
+    the owning specs; then delete the gap rows in `poke.md` §1. (e) For
+    scenario `spawn` kinds `champion` / `random-boss` on 1.14d: the
+    register form of the champion / boss minions call `0x0054E1E0`
+    (`scenario.md` §3.1, `population.md` §6.4); `poke.py` writes them as
+    gaps until then (`normal` runs).
 22. **Poke and variant runs** (REC-590, REC-591): run
     `traces/scenarios/poke-spawn-town.scenario` on 1.14d (`poke.py`) and
     d2rs and compare; build `traces/variants/only-fallen` with
