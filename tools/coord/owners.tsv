@@ -3,8 +3,8 @@
 # From the coordinator's list, 2026-10-09 14:28 UTC; rows from 17:06 UTC (fifth coordinator, session_01KcnkwCTXbuv5ZbToEUpBSj) appended; the coordinator keeps it current.
 area	paths	session	branch
 act1-town, seed order, client critters, NPC tracks	specs/sim/rng.md,specs/sim/unit-order.md,specs/monsters/population.md,crates/d2-sim/src/rng	session_01BQSDGiWHKAbHXoWk7HThvM	claude/q-fix-real-unit-seed-order
-act1-combat, monster death, dead units	specs/combat/vitals.md,specs/combat/events.md	session_01JYSLguvvisuJdpwNdAbRNK	claude/q-diff-combat-a1
-monster melee/AI combat	specs/monsters/,specs/combat/	session_019dnJCaEadJxjbHBUyvL71q	claude/q-fix-b-monster-combat
+act1-combat, monster death, dead units	specs/combat/vitals.md,specs/combat/events.md	session_01LASMZmABMy5PBwvU9dr5gV	claude/q-fix-monster-ai-2
+monster melee/AI combat	specs/monsters/,specs/combat/	session_01LASMZmABMy5PBwvU9dr5gV	claude/q-fix-monster-ai-2
 skills (whirl, leap, golem, local skill start)	specs/skills/	session_01JgxXxatN1VrQKgmTJ828uK	claude/q-diff-skills-1
 skills cast/right-click, client missiles, hireling	specs/skills/use.md,specs/missiles/,specs/world/hirelings,specs/client/msg-skills.md,specs/sim/client-messages.tsv#0x01,specs/sim/client-messages.tsv#0x05,specs/sim/client-messages.tsv#0x06,specs/sim/client-messages.tsv#0x07,specs/sim/client-messages.tsv#0x08,specs/sim/client-messages.tsv#0x09,specs/sim/client-messages.tsv#0x0A,specs/sim/client-messages.tsv#0x0B,specs/sim/client-messages.tsv#0x0C,specs/sim/client-messages.tsv#0x0D,specs/sim/client-messages.tsv#0x0E,specs/sim/client-messages.tsv#0x0F,specs/sim/client-messages.tsv#0x10,specs/sim/client-messages.tsv#0x11,specs/sim/client-messages.tsv#0x12	session_012CW5dsXr7CfrvY7guLFsV6	claude/q-diff-skills-2
 act2, front-end menus	specs/world/quests-act2,specs/ui/frontend-,specs/ui/menus.md	session_01LJoA4uZCEu15W4JQGZRyAV	claude/q-prov-recording-2
