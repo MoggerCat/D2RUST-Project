@@ -92,6 +92,9 @@ pub struct ActionTables {
     /// `overlay` record count (data tables +0xBC0): the bound of the
     /// 0x11 overlay id (`intents-events.md` §7.3 r2 step 9, inclusive).
     pub overlay_count: i32,
+    /// `monequip.bin` rows (summon equipment `0x005D6B60`,
+    /// `skills/bodies.md` §6.5 step 9).
+    pub monequip: Vec<d2_data::tables::Monequip>,
 }
 
 /// The DRLG side of a game: the acts' DRLGs and their services.
@@ -333,6 +336,10 @@ pub struct ActionHooks<X> {
     /// entry and level); a monster without one asks
     /// [`Pending::ai_skill_entry`].
     pub monster_skills: BTreeMap<UnitId, BTreeMap<i32, i32>>,
+    /// A monster's equipped items by body location (its inventory's
+    /// body slots, `monsters/init.md` §12): d2rs-own record of the
+    /// holdings `has_item_at` reads (no monster inventory model here).
+    pub monster_equip: BTreeMap<UnitId, BTreeMap<u8, UnitId>>,
     /// The inactive-unit store (game +0xD8, `units.md` §3.4;
     /// [`inactive`]). `None` (the default): tick step 9 compresses
     /// nothing and the restore is the host's, as before.
@@ -420,6 +427,7 @@ impl<X> ActionHooks<X> {
             skill_lists: BTreeMap::new(),
             pet_lists: BTreeMap::new(),
             monster_skills: BTreeMap::new(),
+            monster_equip: BTreeMap::new(),
             inactive: None,
             x,
             orphan_seed: Seed::init(),
