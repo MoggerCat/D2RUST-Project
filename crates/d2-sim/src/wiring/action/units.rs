@@ -845,13 +845,12 @@ impl<X: Pending> View<'_, X> {
     /// `0x005A7C20` of the creation mode, whose start function
     /// schedules the first think, `ai.md` §1.3), then the think restart
     /// `0x00573780` (`ai.md` §1.5 r1: the recorded "+aidel, cancel, +2"
-    /// pairs). Not a monster: nothing.
-    ///
-    /// PROVISIONAL (REC-442): the gate `0x00553160(unit)` of step 1.2
-    /// (else the room clean-up `0x00553220`) is not specified; d2rs
-    /// always restarts the think, as every recorded creation did. The
-    /// request's target point (x, y) is not passed: the creation modes'
-    /// start functions d2rs reaches (NU) do not read it.
+    /// pairs), gated by `0x00553160(unit)` (step 1.2): the unit has a
+    /// room and that active room's client count (+0x78) is nonzero; else
+    /// the room clean-up `0x00553220` ([`View::room_cleanup`]) and no
+    /// think. Not a monster: nothing. The request's target point (x, y)
+    /// is not passed: the creation modes' start functions d2rs reaches
+    /// (NU) do not read it.
     fn monster_added(&mut self, game: &mut Game, u: UnitId) {
         let Some((class, mode)) = self
             .units
@@ -883,7 +882,24 @@ impl<X: Pending> View<'_, X> {
             self.unit_error(e);
             return;
         }
-        self.think_restart(game, u);
+        if self.room_has_clients(game, u) {
+            self.think_restart(game, u);
+        } else {
+            self.room_cleanup(u);
+        }
+    }
+
+    /// `0x00553160(unit)` (`monsters/init.md` §4.1 step 1.2): the unit's
+    /// room exists and its active room's client count is nonzero.
+    fn room_has_clients(&self, game: &Game, u: UnitId) -> bool {
+        let Some(room) = game.lists.unit(u).and_then(|e| e.room()) else {
+            return false;
+        };
+        self.h
+            .drlg
+            .drlg_room(game, room)
+            .and_then(|(d, id)| d.active_room(id))
+            .is_some_and(|a| !a.clients.is_empty())
     }
 
     /// The allocation room of a unit between steps 7 and 8 (`units.md`

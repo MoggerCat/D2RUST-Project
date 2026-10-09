@@ -171,7 +171,7 @@ pub fn skeleton_bow<W: AiHost + ?Sized>(
             // asserted, not handled.
             let tt = t.expect("SkeletonBow think without a target (ai.md §2.3)");
             let (a, b) = (cx.aip(p, 4), cx.aip(p, 5));
-            cx.world.walk_in_radius(game, u, tt, a, b);
+            walk_in_radius(game, cx, u, tt, a, b);
         } else {
             idle(game, cx, u, 20);
         }

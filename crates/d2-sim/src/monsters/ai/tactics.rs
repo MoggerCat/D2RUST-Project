@@ -468,6 +468,49 @@ pub fn walk_to_point<W: AiHost + ?Sized>(
     move_to(game, cx, unit, ModeTarget::Point(x, y), mode::WALK, 1, 0)
 }
 
+/// "walk in radius of t (a, b)" `0x005DE6D0` → `0x005DE4E0` (§7.2):
+/// the host's walk with the unit's staged velocity request (§7.3), which
+/// the walk's mode request consumes as [`super::request_mode`] does.
+pub fn walk_in_radius<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    unit: UnitId,
+    t: UnitId,
+    a: i32,
+    b: i32,
+) -> bool {
+    let mut v = cx.store.get(unit).map(|e| e.velocity).unwrap_or_default();
+    let ok = cx.world.walk_in_radius(game, unit, t, a, b, &mut v);
+    if let Some(e) = cx.store.units.get_mut(&unit) {
+        e.velocity = v;
+    }
+    ok
+}
+
+/// The point `0x005DE4E0` walks to: from the unit at `u` toward `t` by
+/// k = min(a, dist − b) of the no-size distance dist, each axis
+/// `u + Δ·k / dist` rounded to the nearest (halves away from zero);
+/// `None` when k ≤ 0 or dist = 0.
+/// PROVISIONAL (§7.2, REC-501): the geometry is D2MOO's and unread in
+/// 1.14d; this reading reproduces the three recorded walks of Warriv at
+/// the Rogue Encampment arrival (`-seed 1234`, player at (4873, 4228)):
+/// from (4866, 4235) with (a, b) = (3, 2) to (4868, 4233); from
+/// (4868, 4233) with (2, 2) to (4869, 4232); from (4869, 4232) with
+/// (1, 2) to (4870, 4231). Settled by `pc1-data.md` Step 4 "walk in
+/// radius geometry".
+pub fn radius_point(u: (i32, i32), t: (i32, i32), a: i32, b: i32) -> Option<(i32, i32)> {
+    let dist = distance_no_size(u, t);
+    let k = a.min(dist - b);
+    if dist == 0 || k <= 0 {
+        return None;
+    }
+    let step = |d: i32| {
+        let n = d * k;
+        (2 * n + n.signum() * dist) / (2 * dist)
+    };
+    Some((u.0 + step(t.0 - u.0), u.1 + step(t.1 - u.1)))
+}
+
 /// `0x005DEF30` `WalkToTargetCoordinatesNoSteps` ("walk step 0", §7.2):
 /// mode 2 at (x, y), step 0, no flags; the mode-change result.
 pub fn walk_step0<W: AiHost + ?Sized>(

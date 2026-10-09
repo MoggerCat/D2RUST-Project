@@ -257,6 +257,14 @@ rather than a hand-run recipe.
     other points that session lists there. Answer into
     `render/unit-composite.md` §8 and the client missile specs.
 
+- **[q-fix-real-unit-seed-order] NPC nearest player and walk in radius**
+  (REC-500, REC-501, `specs/monsters/ai.md` §5.3, §7.2): read the scan-2
+  callback of `0x005DDF20` (distance function, `<` or `≤ 15`, ties) and
+  `0x005DE4E0` (target point geometry, rounding, path step count,
+  failure when the point is the unit's own). d2rs reads: no-size
+  distance ≤ 15; point = own + Δ·min(a, dist − b) / dist rounded to
+  nearest; it matches Warriv's three recorded arrival walks.
+
 ## Step 5 — spec gaps (107 provisional points no spec states)
 
 `docs/handoff/provisional-index.tsv` rows with `settle_kind` = `unstated`
