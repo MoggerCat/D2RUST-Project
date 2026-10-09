@@ -22,15 +22,15 @@
 | Outputs / state changes | 52–63 |
 | Rules | 64–65 |
 |   1. Files | 66–71 |
-|   2. Syntax | 72–143 |
-|   3. Run | 144–508 |
-|   4. Suite | 509–624 |
-| Constants & data dependencies | 625–628 |
-| Randomness | 629–632 |
-| Edge cases & original bugs | 633–656 |
-| Test vectors | 657–679 |
-| Provenance | 680–683 |
-| Open questions | 684–732 |
+|   2. Syntax | 72–144 |
+|   3. Run | 145–524 |
+|   4. Suite | 525–640 |
+| Constants & data dependencies | 641–644 |
+| Randomness | 645–648 |
+| Edge cases & original bugs | 649–672 |
+| Test vectors | 673–695 |
+| Provenance | 696–699 |
+| Open questions | 700–748 |
 <!-- /index -->
 
 ## Summary
@@ -112,7 +112,8 @@ state first. It is the default way to compare a behaviour with 1.14d.
       step waits for the release and applies with it.
    4. `key K` (a letter or digit, ESC, TAB, ENTER, SPACE, SHIFT, CTRL,
       ALT, F1–F12 or a number: the Windows virtual-key code): key down
-      and up in one pass. On d2rs `state-dump` only the keys of §3 rule
+      and up in one pass. `key ESC` with no panel open opens the
+      single-player menu, which pauses 1.14d (no tick after it). On d2rs `state-dump` only the keys of §3 rule
       8.2 run; any other is refused before the run.
    5. `clickunit T C[,C..]|* [DX DY]` / `rclickunit ...` (T the unit
       type 0–5; C one or more classes, decimal or `0x` hex, up to 8, or
@@ -505,6 +506,21 @@ state first. It is the default way to compare a behaviour with 1.14d.
        shows here as in the `state` channel; the layer-by-layer cause is
        found with the `state` channel of the same check, which has the
        same pokes and input.
+
+15. **replaying recorded C→S** (`state-dump --no-own-c2s <id>[,<id>]`,
+    ids decimal or `0x` hex, repeatable): the bridge's own C→S messages
+    (the model's answers, `ui/controls.md` world clicks: `bridge::Bridge::
+    send_outgoing`) with these ids are dropped instead of sent; `--send`
+    and the `--input` clicks' dispatch are untouched except that a click's
+    own-origin message with a listed id is dropped too. Each drop writes
+    one footer note `own c2s dropped: frame F: <hex bytes>` (F: the frame
+    after the previous snapshot's) and a stderr line. Use: replaying
+    1.14d's recorded C→S with `--send` and no `--input` leaves the bridge
+    without a walk prediction for the local player, so
+    `bridge/check.rs` `correct()` would send its own 0x5F and the server
+    would walk the player back (measured ScnAma seed 1234: 0x01 replayed
+    at frame 10, d2rs 0x5F `5f 09 13 84 10` at frame 86, none on 1.14d);
+    `--no-own-c2s 0x5F` removes it. Default: nothing dropped.
 
 ### 4. Suite
 

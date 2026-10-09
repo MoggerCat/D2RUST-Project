@@ -1,0 +1,18 @@
+check 1
+# `operate` (specs/tools/poke.md §1, §4 rule 10, §5 rule 4): the Rogue
+# Encampment waypoint (objects 119, at (4899, 4209) in this town), ScnAma,
+# -seed 1234, no input. The player is poked next to it (each point inside a
+# room already active), then before frame 10 one `operate @2:119`: the
+# server's dispatcher run at once with 0x13 {2, waypoint GUID} on both
+# sides (world/waypoints.md §5.2: the waypoint bit, the menu). Frames
+# 10-30 compare the state and the S->C replies.
+# Spec: specs/tools/scenario-diff.md.
+name interact-operate-waypoint
+save ScnAma --class ama --expansion
+seed 1234
+ticks 30
+seconds 300
+channels state packets
+at 4 poke pos @player 4888 4220
+at 7 poke pos @player 4896 4213
+at 10 poke operate @2:119
