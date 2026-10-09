@@ -19,13 +19,18 @@ functions 1/4/5/6/8/11/23/25/43/49/60/63). REC block 540–549.
 | town tests | missiles/client.md §C6 r3–r4, §C7 r8 | the active room of the missile's sub-tile, its level a town level; `CltSrcTown` clamp with the owner's room. | `town_rooms_remove_missiles_without_town_and_clamp_src_town` |
 | function 7 (guided) | client-bodies.md §B5 r2; ui/controls.md §6 r9.7 | town removal, stale target drop (d28 bit 0), dead / not hostile target ignored, re-path toward T every k updates at distance 4…24 (`objects::distance_at` with the unit sizes of `sim/path-placement.md` §3). `combat::hostile_between` (PROVISIONAL REC-542: relation flags, `alSel` / `noSel`, pets not in the model; alignment by set-up `Align`). | `function_7_steers_toward_a_hostile_living_target_in_range`, `hostility_between_client_units` |
 | function 9 (meteor centre) | client-bodies.md §B5 r5 | the skill evaluator on the skill's `calc1`, light radius growth, S1 / S2 children with their motion position and velocity; the sound at elapsed a − 2 is not modelled. | `function_9_drops_its_meteor_and_grows_its_light` |
-| real install | — | `app_client_drlg` `the_users_client_missiles_run_their_functions` runs every user row of functions 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 23, 25, 43, 49, 59, 60, 63, 65 for 60 updates with the user's skills tables and a drawn frame's origin; every function has a row made. | install: 4 passed |
+| two-row functions | client-bodies.md §B3 r3, §B4 17, 27, 46, 52; client-bodies-2.md §B11 51; client.md §C13 18, 37, 39 | 17 (curse centre: d04 / d06, the disc helper with `RandStart`), 18 (bone spear trail: facing, precise position, motion z), 27 (fire wall maker: flags-0 child, wander on one seed step), 37 (steps; its shake and sound not modelled), 39 (rewind when owned), 46 / 52 (pairs at ±(d28, d2C); 46 removes directly, light left: Edge case 2), 51 (burst on P1 with P3 extras, owner hidden on P2). `ClientMissile::d04` / `d06`, `ClientMissileRow::rand_start`. | `function_17_and_the_disc`, `function_18_lays_its_trail_with_the_spears_facing_and_height`, `function_27_drops_fire_and_wanders`, `function_39_rewinds_an_owned_missile`, `functions_46_and_52_lay_children_on_both_sides`, `function_51_bursts_then_hides_its_owner` |
+| §B11 single-row bodies | client-bodies-2.md §B10 r3, §B11 10, 13, 19, 20, 44, 45, 47, 48, 53, 58, 68 | 19 / 20 (orb tables OX / OY, quarter-step nova), 10 / 13 (class pick, reseeded shard, point test mask 4, fall), 44 (follows the owner while it uses m's skill; direct removal), 45 (scatter), 47 (d28 := bounces left, then 6), 48 (reseeded eruption points, mask 0x45, dead flag), 53 (child then function 7), 58 (reseeded wander), 68 (loops P1). `ClientMissileRow::prog_sound`, `param` (server `Param1`–`2`). | `functions_19_and_20_the_orb_and_its_nova`, `functions_10_and_13_drop_falling_shards`, `functions_44_45_53_and_68`, `function_48_erupts_at_reseeded_points`, `function_58_turns_on_its_reseeded_draw`, `function_47_keeps_its_bounces_then_lays_fire` |
+| body children's owner direction | missiles/client.md §C2 r8 | `create_from`: a child made by a missile body takes the parent's direction for the aim nudge (the model holds no unit direction). PROVISIONAL REC-543; found by the install run (a handler error on a user row). | `a_bodys_child_nudges_by_its_parents_direction` |
+| real install | — | `app_client_drlg` `the_users_client_missiles_run_their_functions` runs every user row of the 37 functions of its `RUN` list (1–11, 13, 17–20, 23, 25, 27, 37, 39, 43–49, 51–53, 58–60, 63, 65, 68) for 60 updates with the user's skills tables and a drawn frame's origin; every function has a row made. | install: 4 passed |
 
 ## Not done
 
-- Functions with one or two live rows not yet run (§B4 17, 27, 46, 52;
-  §B11; §C13 18, 37, 38, 39, 66; the open bodies of §C12 wait on the
-  spec).
+- Functions 15 (needs the owner's target `0x004648F0`), 50 and 57 (need
+  the owner's client target position `0x004C52E0`: the model holds no
+  client path for units), 38 and 66 (call the open helpers `0x004D19D0`
+  / `0x004D2520`), 29 (open helpers); the open bodies of §C12 wait on
+  the spec.
 - Unit hits (§C7 r12), the client hit functions (§B6–§B7, REC-452),
   the §9.4 cell walk (REC-451), missile sounds (audio).
 - Screen shakes of functions 12, 29, 31, 36, 37, 38, 54, 66: the row
