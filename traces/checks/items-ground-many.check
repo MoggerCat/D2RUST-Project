@@ -9,14 +9,14 @@ ticks 30
 seconds 240
 channels state
 at 4 poke seed-game 0x00001234 666
-at 4 poke item hax @x+2 @y+0 quality magic ilvl 20
-at 4 poke item 2ax @x+3 @y+0 quality rare ilvl 35
-at 4 poke item bsw @x+4 @y+0 quality unique ilvl 40
-at 4 poke item lsd @x+5 @y+0 quality set ilvl 40
-at 4 poke item glv @x+6 @y+0 quality rare ilvl 50
-at 4 poke item jav @x+7 @y+0 quality magic ilvl 60
-at 4 poke item 9ar @x+8 @y+0 quality unique ilvl 75
-at 4 poke item ful @x+9 @y+0 quality magic ilvl 30
+at 4 poke item hax @x+2 @y quality magic ilvl 20
+at 4 poke item 2ax @x+3 @y quality rare ilvl 35
+at 4 poke item bsw @x+4 @y quality unique ilvl 40
+at 4 poke item lsd @x+5 @y quality set ilvl 40
+at 4 poke item glv @x+6 @y quality rare ilvl 50
+at 4 poke item jav @x+7 @y quality magic ilvl 60
+at 4 poke item 9ar @x+8 @y quality unique ilvl 75
+at 4 poke item ful @x+9 @y quality magic ilvl 30
 at 4 poke item plt @x+2 @y+2 quality rare ilvl 55
 at 4 poke item lg2 @x+3 @y+2 quality set ilvl 40
 at 4 poke item rin @x+4 @y+2 quality rare ilvl 60
