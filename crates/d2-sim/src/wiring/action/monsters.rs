@@ -77,6 +77,18 @@ pub trait MonsterWorld<X> {
         let _ = level;
         None
     }
+    /// `0x00547E50` from the death start `0x005A6FF0` (`population.md`
+    /// §13 item 3): the dying monster's region kill count; `alignment`
+    /// is its alignment. Default: nothing.
+    fn count_death(&mut self, unit: UnitId, alignment: u8) {
+        let _ = (unit, alignment);
+    }
+    /// Level 8's region for the Den of Evil quest (`quests-act1.md`
+    /// §10.4 event 8): (evil spawned, evil killed, rooms visited).
+    /// Default: no region.
+    fn den_counts(&self) -> Option<(u32, u32, u32)> {
+        None
+    }
     /// Class reinit `0x00574370(game, unit, class, mode)` (`init.md`
     /// §27). Default: nothing (false).
     fn reinit(
