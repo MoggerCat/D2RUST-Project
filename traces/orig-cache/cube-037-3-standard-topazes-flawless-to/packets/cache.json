@@ -1,6 +1,6 @@
 {
  "channel": "packets",
- "check": "cube-021-2-arrows-bolts",
+ "check": "cube-037-3-standard-topazes-flawless-to",
  "command": [
   "tools/trace-recorder/record_packets.py",
   "--game",
@@ -22,17 +22,17 @@
  ],
  "files": {
   "orig.packets.jsonl": {
-   "sha256": "f404675075e355dfcfb09ce61717b27169068351dd5173827dc478761ee3f0ce",
-   "size": 45332
+   "sha256": "aa8522ec546d7440474cfc635aad610193483c1ae408a84032de3b70c32e4a2b",
+   "size": 47396
   }
  },
  "format": "orig-cache-1",
  "key": {
-  "check": "5f36f61362caadb91c992294f460967f170436b78f87965963ddbc7b1119b48a",
+  "check": "8c638a6a44434ef57fa43c393fcc3853c09f456803fba140bf248a5e5cb40d08",
   "format": "orig-cache-key-1",
   "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
   "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
   "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
-  "save": "a7109ccc36c0d60bacca64326c96bc96646156bf0d2548ba7d412023b38c6ccb"
+  "save": "21513fe0deabf6207b9a0f0400701c1194055263c6c0e80dffda046e57dcbfbd"
  }
 }
