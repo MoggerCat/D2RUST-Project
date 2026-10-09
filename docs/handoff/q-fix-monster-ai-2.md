@@ -1,5 +1,7 @@
 # Handoff: q-fix-monster-ai-2 (`claude/q-fix-monster-ai-2`)
 
+Re-verified on bfff6fa3 (after the specs-staging-7 sync and the fix): items 1 and 3a still equal for 160/160 frames.
+
 Monster AI / combat owner after q-fix-monster-ai, q-diff-combat-a1 and
 q-fix-b-monster-combat (their `tools/coord/owners.tsv` rows now point
 here). REC block 1660–1669: none used (no new PROVISIONAL point).
