@@ -209,6 +209,10 @@ pub struct Session {
     pub notes: Vec<String>,
     /// The act the game was created in (0 for [`Self::new`]).
     pub act: u8,
+    /// The player's position after each walk leg, in order (a walk back
+    /// retraces it: players path greedily, `pathing.md` §5–§6, so a
+    /// straight leg back can stop behind an obstacle the way out avoided).
+    pub trail: Vec<(i32, i32)>,
 }
 
 impl Session {
@@ -366,6 +370,7 @@ impl Session {
             transcript: Vec::new(),
             notes: Vec::new(),
             act,
+            trail: Vec::new(),
         };
         // The position the allocation gave (the path placement may move
         // it off the requested point).
@@ -501,6 +506,8 @@ impl Session {
             !MOVING.contains(&self.mode()),
             "the player stopped within {LEG_FRAMES} frames"
         );
+        let p = self.pos();
+        self.trail.push(p);
         self.assert_clean("walk leg");
     }
 
@@ -516,6 +523,9 @@ impl Session {
                 }
                 let p = self.pos();
                 let before = cheb(p, g);
+                if before == 0 {
+                    break;
+                }
                 let t = (
                     p.0 + (g.0 - p.0).clamp(-LEG, LEG),
                     p.1 + (g.1 - p.1).clamp(-LEG, LEG),

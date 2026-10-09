@@ -201,16 +201,12 @@ fn dcc_every_file_decodes() {
     assert_eq!(names.len(), 21_717);
 }
 
-// dt1.md Status: all 254 live `.dt1` files parse and decode (the 6
-// version-4 leftovers excepted); block formats 0x0001 (226,996), 0x1001
-// (110,259), 0x2005 (15,712). Header: minor version 6 in 1.14d.
-// 254 = 260 − 6 from the case-sensitive `mpq-tool formats` (4 files
-// counted twice); measured case-insensitively 256 DT1 files (spec session
-// 6b8dc11), so 250 live + 6 version-4; this sweep printed 250 live on two
-// PCs (`local-buddy-2026-10-06.md` G1). The block-format counts include
-// the 4 duplicates too, but their corrected values were not recorded:
-// unconfirmed until the next local run prints them.
-// Intended claim (unconfirmed until the first local run): specs/formats/dt1.md §file-header-276-bytes, §tile-header-96-bytes-each-consecutive, §block-header-20-bytes-each-at-the-tile-s-block-headers-offset, §block-pixels
+// dt1.md Status: all 256 live `.dt1` files (names case-insensitive) are
+// read: 250 decode, 6 version-4 leftovers are refused; block formats
+// 0x0001 (226,996), 0x1001 (108,905), 0x2005 (15,712). Header: minor
+// version 6 in 1.14d. First real-data run 2026-10-08 (q-realdata-run):
+// this sweep and `mpq-tool formats` both measure these counts.
+// Covers: specs/formats/dt1.md §file-header-276-bytes, §tile-header-96-bytes-each-consecutive, §block-header-20-bytes-each-at-the-tile-s-block-headers-offset, §block-pixels
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn dt1_every_live_file_decodes() {
@@ -246,15 +242,15 @@ fn dt1_every_live_file_decodes() {
     assert_eq!(live, 250);
     assert_eq!(v4.len(), 6);
     let want: BTreeMap<u16, usize> =
-        [(0x0001, 226_996), (0x1001, 110_259), (0x2005, 15_712)].into();
+        [(0x0001, 226_996), (0x1001, 108_905), (0x2005, 15_712)].into();
     assert_eq!(formats, want);
 }
 
-// ds1.md Status: all 2,456 `.ds1` files parse; versions seen 3, 8, 12, 13,
-// 15, 16, 17, 18 (1,997 at v18). Counted by the case-sensitive
-// `mpq-tool formats`; this sweep printed 2,372 (1,926 at v18) on two PCs.
-// Not changed until the fixed `mpq-tool formats` re-derives the count.
-// Intended claim (unconfirmed until the first local run): specs/formats/ds1.md §rules
+// ds1.md Status: all 2,372 `.ds1` files parse (names case-insensitive);
+// versions seen 3, 8, 12, 13, 15, 16, 17, 18 (1,926 at v18). First
+// real-data run 2026-10-08 (q-realdata-run): this sweep and
+// `mpq-tool formats` both measure these counts.
+// Covers: specs/formats/ds1.md §rules
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn ds1_every_file_parses() {
@@ -273,10 +269,10 @@ fn ds1_every_file_parses() {
         *versions.entry(ds1.version).or_default() += 1;
     }
     println!("ds1: {} files, versions {versions:?}", names.len());
-    assert_eq!(names.len(), 2_456);
+    assert_eq!(names.len(), 2_372);
     let seen: Vec<u32> = versions.keys().copied().collect();
     assert_eq!(seen, [3, 8, 12, 13, 15, 16, 17, 18]);
-    assert_eq!(versions[&18], 1_997);
+    assert_eq!(versions[&18], 1_926);
 }
 
 // cof.md Status: all 3,605 live `.cof` files parse, every version byte is

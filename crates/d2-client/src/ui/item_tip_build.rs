@@ -327,6 +327,9 @@ pub struct ItemText {
     pub maxstack: u32,
     pub wclass: [u8; 4],
     pub wclass2: [u8; 4],
+    /// `InvTrans` (items `+0x142`): the inventory picture's palette file
+    /// `t` (`render/shading.md` §6 r4).
+    pub inv_trans: u8,
 }
 
 /// One build: the item, its tables and the context.

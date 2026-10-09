@@ -194,7 +194,7 @@ fn base_save(expansion: bool) -> D2s {
 fn hireling_items_round_trip_through_the_loader() {
     let (_, t) = synthetic("jf");
     let s = SaveData::from_fixed(&t.fixed, true).unwrap();
-    let a = appearance_tables(&t.fixed, &ReferenceSlots::provisional_1_14d()).unwrap();
+    let a = appearance_tables(&t.fixed, &ReferenceSlots::v1_14d()).unwrap();
     let id = s
         .hirelings
         .rows
@@ -273,7 +273,7 @@ fn hireling_items_round_trip_through_the_loader() {
 fn rebuild_fills_the_appearance_from_the_equipped_items() {
     let (_, t) = synthetic("look");
     let s = SaveData::from_fixed(&t.fixed, true).unwrap();
-    let mut a = appearance_tables(&t.fixed, &ReferenceSlots::provisional_1_14d()).unwrap();
+    let mut a = appearance_tables(&t.fixed, &ReferenceSlots::v1_14d()).unwrap();
     // The synthetic `armtype` tokens are upper case (`LIT`), so no entry
     // holds them; with the 1.14d tokens the armour `ar1` (no armour
     // columns: `armtype` row 0 for all six parts) takes entry 1 (`lit`).
@@ -340,7 +340,7 @@ fn live() -> GameTables {
 #[ignore = "needs the game files (D2_GAME_DIR)"]
 fn token_positions_on_the_users_install() {
     let t = live();
-    let a = appearance_tables(&t.fixed, &ReferenceSlots::provisional_1_14d()).unwrap();
+    let a = appearance_tables(&t.fixed, &ReferenceSlots::v1_14d()).unwrap();
     let at = |c: &[u8; 4]| a.tokens.lookup(*c, *c);
     for (c, v) in [
         (b"hax ", 4),
@@ -360,4 +360,36 @@ fn token_positions_on_the_users_install() {
     // `sst` draws as `bst` (Test vectors).
     assert_eq!(a.tokens.lookup(*b"bst ", *b"sst "), 0x25);
     assert_eq!(a.tokens.entry(0).unwrap().0, [0; 4]);
+    // Edge case 4: a second `ktr` above n, never returned (OQ3 answer).
+    assert_eq!(a.tokens.entry(243).unwrap().0, *b"ktr ");
+}
+
+/// The reference table of the image (`ReferenceSlots::game`, the
+/// Constants' slot types) under the 1.14d itemtypes: the reserved slots
+/// the Constants state (equal to `ReferenceSlots::v1_14d`), and the
+/// second `ktr` at 243 (edge case 4).
+// Covers: specs/formats/d2s-appearance.md §1 r2, §1 r3
+#[test]
+#[ignore = "needs the game files (D2_GAME_DIR)"]
+fn the_image_reference_table_on_the_users_install() {
+    use d2_formats::d2s::appearance::{ty, IsA};
+    let t = live();
+    let eq = &t.fixed.itemtypes_equiv;
+    let m = IsA::from_fn(eq.n, |i, j| eq.get(i, j));
+    let types = d2_formats::d2s::appearance::reference_types();
+    let class = |i: usize| (m.is_a(types[i], ty::WEAP), m.is_a(types[i], ty::ARMO));
+    for i in 0..256 {
+        let want = match i {
+            43..=116 | 130..=133 | 135..=234 => (true, false),
+            4..=42 | 118..=121 | 124..=129 | 134 | 235..=255 => (false, true),
+            _ => (false, false),
+        };
+        assert_eq!(class(i), want, "slot {i}");
+    }
+    // The slots from the image's types equal the Constants' summary.
+    assert_eq!(ReferenceSlots::game(&m), ReferenceSlots::v1_14d());
+    let a = appearance_tables(&t.fixed, &ReferenceSlots::game(&m)).unwrap();
+    // The katar's second copy (edge case 4); the lookup returns 45.
+    assert_eq!(a.tokens.entry(243).unwrap().0, *b"ktr ");
+    assert_eq!(a.tokens.lookup(*b"ktr ", *b"ktr "), 45);
 }

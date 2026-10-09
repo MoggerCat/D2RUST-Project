@@ -176,6 +176,10 @@ fn tips_with(items: ItemTables) -> ItemTips {
         montype: Vec::new(),
         monstats: Vec::new(),
         gem_letters: Vec::new(),
+        prefix_color: vec![0xFF],
+        suffix_color: vec![0xFF],
+        set_inv_color: vec![0xFF],
+        unique_inv_color: vec![0xFF],
         strings: Arc::new(strs),
     }
 }
@@ -636,4 +640,43 @@ fn an_alt_code_record_shows_a_white_base_name() {
         got(&tips().lines_of(&b)),
         pairs(&[("Cap", color::WHITE), ("Unidentified", color::RED)])
     );
+}
+
+// Covers: specs/render/shading.md §6 r4
+// Covers: specs/ui/inventory.md §8 r4
+#[test]
+fn the_inventory_colour_follows_invtrans_and_the_quality_source() {
+    let mut t = tips();
+    let identified = hflag::IDENTIFIED;
+    // No colour anywhere: no map.
+    assert_eq!(t.inv_color_of(&magic_cap(identified)), None);
+    // `InvTrans` 6 (invgrey); the prefix's transformcolor 9, then the
+    // suffix's 4, which is read first (affix id 1 = row 0).
+    t.codes.get_mut(b"cap ").unwrap().inv_trans = 6;
+    t.prefix_color[0] = 9;
+    assert_eq!(t.inv_color_of(&magic_cap(identified)), Some((6, 9)));
+    t.suffix_color[0] = 4;
+    assert_eq!(t.inv_color_of(&magic_cap(identified)), Some((6, 4)));
+    // Files 3 and 4 are never selected.
+    t.codes.get_mut(b"cap ").unwrap().inv_trans = 3;
+    assert_eq!(t.inv_color_of(&magic_cap(identified)), None);
+    t.codes.get_mut(b"cap ").unwrap().inv_trans = 8;
+    assert_eq!(t.inv_color_of(&magic_cap(identified)), Some((8, 4)));
+    // The suffix's 21 is the first hit (0xFF alone means none): no map.
+    t.suffix_color[0] = 21;
+    assert_eq!(t.inv_color_of(&magic_cap(identified)), None);
+    // Unique / set: the row's invtransform.
+    let mut u = ItemBits {
+        flags: identified,
+        code: *b"cap ",
+        quality: 7,
+        ..ItemBits::default()
+    };
+    u.quality_fields.file_index = Some(0);
+    assert_eq!(t.inv_color_of(&u), None);
+    t.unique_inv_color[0] = 2;
+    assert_eq!(t.inv_color_of(&u), Some((8, 2)));
+    u.quality = 5;
+    t.set_inv_color[0] = 17;
+    assert_eq!(t.inv_color_of(&u), Some((8, 17)));
 }
