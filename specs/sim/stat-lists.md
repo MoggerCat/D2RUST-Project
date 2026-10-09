@@ -38,7 +38,7 @@
 | Edge cases & original bugs | 598–621 |
 | Test vectors | 622–658 |
 | Provenance | 659–682 |
-| Open questions | 683–712 |
+| Open questions | 683–713 |
 <!-- /index -->
 
 ## Summary
@@ -686,10 +686,11 @@ replaces it under the same comparison.
    product (24-, 53- or 64-bit) decides the float32 result in rare cases;
    settle with a recording of max-life changes (`check_stats.py`
    compares the nested set) or by reading the FPU control word at the
-   call.~~ → PC 2 recording list. PROVISIONAL: 53-bit precision (because
-   `Game.exe` sets it once at start-up, as `combat/vitals.md` and
-   `sim/pathing.md` take it); settled by REC-21 (control word) and a
-   `check_stats.py` max-life recording.
+   call.~~ → PC 2 recording list. 53-bit precision: settled for Game.exe
+   2026-10-09 by the CRT start-up read (`items/treasure.md` OQ5:
+   `0x0068E70A`, PC = 53, never changed by game code). PROVISIONAL
+   (REC-610) only for a video runtime DLL changing it; a
+   `check_stats.py` max-life recording confirms.
 2. Answered (2026-10-07): `0x0061AB00(room)` (§10.1 step 4) is "room in a town": the
    room's level id (`0x0066BAB0`) is 1, 40, 75, 103 or 109 (`0x006426A0`,
    byte table `0x006426C8`); null room → 0. Also used by the unit find

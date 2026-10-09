@@ -33,14 +33,14 @@ fn game_dir() -> Result<PathBuf> {
     ))
 }
 
-fn print(findings: &[Finding]) {
+pub(crate) fn print(findings: &[Finding]) {
     for f in findings {
         println!("{f}");
     }
 }
 
 /// Parses the stack and its layers (paths relative to the stack file).
-fn stack(path: &str) -> Result<(Vec<Layer>, Vec<Finding>)> {
+pub(crate) fn stack(path: &str) -> Result<(Vec<Layer>, Vec<Finding>)> {
     let bytes = std::fs::read(path).with_context(|| format!("reading {path}"))?;
     let dir = Path::new(path).parent().unwrap_or(Path::new("")).to_owned();
     Ok(load_stack(path, &bytes, &mut |p| {
@@ -48,7 +48,7 @@ fn stack(path: &str) -> Result<(Vec<Layer>, Vec<Finding>)> {
     }))
 }
 
-fn base(set: &ArchiveSet) -> std::result::Result<PatchData, Vec<Finding>> {
+pub(crate) fn base(set: &ArchiveSet) -> std::result::Result<PatchData, Vec<Finding>> {
     let mut read = |f: &str| read_excel(set, f).map_err(|e| e.to_string());
     PatchData::from_base(&patch::rules(), &mut read)
 }

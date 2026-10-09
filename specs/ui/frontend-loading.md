@@ -23,21 +23,21 @@
 | Rules | 79–82 |
 |   L1 Save fields the front end reads (`0x00439840`, `0x00439780`) | 83–98 |
 |   L2 Enable rules | 99–124 |
-|   L3 Art and palette (`0x00456550`) | 125–140 |
-|   L4 One loading draw (`0x004565E0(step)`) | 141–164 |
-|   L5 When loading draws happen (single player) | 165–178 |
-|   L6 Between draws | 179–188 |
-|   L7 End: the first game frame (`0x0044C990` → `0x004547B0`) | 189–207 |
-|   L8 Input during loading | 208–227 |
-|   L9 Act change (S→C 0x05, 0x03, …, 0x04) | 228–251 |
-|   L10 Act-start cinematics (hooks only) | 252–278 |
-|   L11 Sounds (deferred) | 279–285 |
-| Constants & data dependencies | 286–302 |
-| Randomness | 303–306 |
-| Edge cases & original bugs | 307–322 |
-| Test vectors | 323–342 |
-| Provenance | 343–366 |
-| Open questions | 367–381 |
+|   L3 Art and palette (`0x00456550`) | 125–141 |
+|   L4 One loading draw (`0x004565E0(step)`) | 142–165 |
+|   L5 When loading draws happen (single player) | 166–179 |
+|   L6 Between draws | 180–189 |
+|   L7 End: the first game frame (`0x0044C990` → `0x004547B0`) | 190–208 |
+|   L8 Input during loading | 209–228 |
+|   L9 Act change (S→C 0x05, 0x03, …, 0x04) | 229–252 |
+|   L10 Act-start cinematics (hooks only) | 253–279 |
+|   L11 Sounds (deferred) | 280–286 |
+| Constants & data dependencies | 287–303 |
+| Randomness | 304–307 |
+| Edge cases & original bugs | 308–323 |
+| Test vectors | 324–343 |
+| Provenance | 344–367 |
+| Open questions | 368–382 |
 <!-- /index -->
 
 ## Summary
@@ -127,8 +127,9 @@ With p and E from L1 and connection mode 0 (single player, `[0x007795EC]`):
 1. Path: language id 0 (ENG) → `DATA\GLOBAL\UI\Loading\Loadingscreen` (format `0x006D6528`); any other
    language → `DATA\LOCAL\UI\LoadingScreen` (`0x006D6544`). Both resolve to DC6 files in `d2data.mpq`
    (`data\global\ui\Loading\loadingscreen.dc6`, `data\local\UI\loadingscreen.dc6`, 666,014 bytes each,
-   same headers, different pixels). PROVISIONAL: the d2data copy is the one used (because `Patch_D2.mpq`
-   has no listfile and was not probed by name); settled by REC-220.
+   same headers, different pixels). **Settled** (2026-10-09, q-prov-data, REC-220): the d2data copy is the one used;
+   `Patch_D2.mpq` probed by name has neither path, so no override exists, and the two d2data files read
+   with identical headers (`mpq-tool extract` of both names).
 2. DC6 header (d2data): version 6, 1 direction, **10 frames**, every frame 256 × 256, offset (0, 0),
    bottom-up rows (flip 0).
 3. Before the load, `0x00454740` loads and sets the palette `DATA\GLOBAL\Palette\Loading\pal.dat` /

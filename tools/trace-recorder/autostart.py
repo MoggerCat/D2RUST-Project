@@ -31,7 +31,14 @@ uses are listed here and in the README ("autostart.py").
    WM_xBUTTONDOWN/UP with client coordinates, WM_KEYDOWN/UP), so the
    window may be in the background.
 
-Recorders take `--auto CHAR [--seed N] [--input SCRIPT]`; standalone:
+5. `--menu SCRIPT` (instead of `--auto`): the menu is not left by force;
+   SCRIPT (the same commands; `waitlevel` and `goto` excepted) is played
+   into the front end from launch, e.g. to create a character in the
+   game's own create screen (the new-character stub path). Once the
+   player stands in a level the `--input` script runs as with `--auto`.
+
+Recorders take `--auto CHAR [--seed N] [--input SCRIPT]` or `--menu
+SCRIPT [--seed N] [--input SCRIPT]`; standalone:
 
   py tools/trace-recorder/autostart.py --try ScnAma --seed 1234     # start, report, kill
   py tools/trace-recorder/autostart.py --selftest                     # no game needed
@@ -41,7 +48,10 @@ a level: `wait S`, `move X Y`, `click X Y`, `rclick X Y`, `hold X Y S`
 (left button down S seconds), `waitticks N` (wait N server ticks of the recorder, not seconds),
 `mark NAME` (note `autostart: mark NAME ticks=N` in the recording's notes), `key K [S]` (K: a letter or digit, or
 ESC, TAB, ENTER, SPACE, SHIFT, CTRL, ALT, F1..F12, or a number), `shot
-NAME` (PNG of the client area into the shot directory), `end` (stop the
+NAME` (PNG of the client area into the shot directory), `goto T C[,C..]
+[S DX DY]` (walk to the nearest unit of type T and one of the classes C,
+−1 = any class, and click it), `units T` (log GUID, class, client and
+screen point of every client unit of type T), `end` (stop the
 recording; the game is killed). X, Y are client pixels (800x600 window).
 """
 
@@ -61,7 +71,7 @@ if os.name == "nt":
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-TOOL = "trace-recorder autostart 0.1.0"
+TOOL = "trace-recorder autostart 0.2.0"
 GAME_MODE = 0x74C704      # launcher mode: 4 menu, 1 client
 MENU_LOOP = 0x72DDD4      # menu message-loop flag
 NEXT_MODE = 0x7795E8      # mode the menu routine returns
@@ -140,7 +150,7 @@ def vk_code(k):
 SCRIPT_OPS = {"wait": (1, 1), "move": (2, 2), "click": (2, 2), "rclick": (2, 2), "hold": (3, 3),
               "key": (1, 2), "text": (1, 99), "shot": (0, 1), "waitlevel": (1, 2),
               "goto": (2, 5), "dumpdrlg": (0, 1), "waitticks": (1, 1), "mark": (1, 1), "clickunit": (2, 4), "rclickunit": (2, 4),
-              "end": (0, 0)}
+              "units": (1, 1), "end": (0, 0)}
 
 
 def parse_script(text):
@@ -165,7 +175,7 @@ def parse_script(text):
             a = [int(a[0], 0), a[1]] + [int(x, 0) for x in a[2:]]
         elif op == "goto":
             a = ([int(a[0], 0), tuple(int(c, 0) for c in a[1].split(","))]
-                 + [float(x) for x in a[2:]])
+                 + [float(x) for x in a[2:3]] + [int(x, 0) for x in a[3:]])
         elif op not in ("shot", "dumpdrlg", "mark"):
             a = [float(x) if "." in x else int(x, 0) for x in a]
         out.append((op, a))
@@ -256,9 +266,10 @@ def drlg_dump(mem, label=""):
 def nearest(mem, utype, cls):
     best = None
     for u in units_of(mem, utype):
-        if cls is not None and mem.read_u32(u + U_CLASS) not in cls:
+        # class -1 (goto) or None (clickunit `*`): any class; None also keeps living monsters only
+        if cls is not None and -1 not in cls and mem.read_u32(u + U_CLASS) not in cls:
             continue
-        if cls is None and mem.read_u32(u + 0x10) in (0, 12):   # any class: only living monsters (mode 0 death, 12 dead)
+        if cls is None and mem.read_u32(u + 0x10) in (0, 12):   # mode 0 death, 12 dead
             continue
         s = screen_of(mem, u)
         if s is None:
@@ -275,9 +286,16 @@ class AutoStart:
     from its debug loop (the recorder has read_u32, write and h_process);
     poll returns True when the script has ended the recording."""
 
-    def __init__(self, after=DEFAULT_AFTER, script="", shot_dir=None, log=None, clock=None):
+    def __init__(self, after=DEFAULT_AFTER, script="", shot_dir=None, log=None, clock=None,
+                 menu=""):
         self.after = after
         self.script = parse_script(script)
+        self.menu = parse_script(menu)    # --menu: played from launch, no forced start
+        for op, _ in self.menu:
+            if op in ("waitlevel", "goto", "dumpdrlg"):
+                raise ValueError(f"menu script: {op} needs a level")
+        self.menu_runner = None
+        self.menu_wake = 0.0
         self.shot_dir = shot_dir
         self.sink = None          # the recorder's notes list (footer), found on the first poll
         self._log = log or (lambda s: print(s, flush=True))
@@ -308,6 +326,19 @@ class AutoStart:
             return self.done
         self.next_poll = now + 0.05
         el = now - self.t0
+        if self.menu and self.arrived_at is None:
+            if self.menu_runner is None:
+                self.log("autostart: menu script started")
+                self.menu_runner = self.run(mem, self.menu)
+                self.menu_wake = now
+            while now >= self.menu_wake:
+                try:
+                    self.menu_wake = now + next(self.menu_runner)
+                except StopIteration:
+                    self.menu_wake = float("inf")
+            if self.done:
+                return True
+            self.forced_at = el    # never forced: arrival is checked below
         if self.forced_at is None:
             if el >= self.after:
                 try:
@@ -362,9 +393,9 @@ class AutoStart:
         yield 0.25     # held across at least one game frame (a click shorter than a frame can be lost)
         self.send(mem, up, 0, lparam(x, y))
 
-    def run(self, mem):
+    def run(self, mem, script=None):
         """The script as a generator: each yield is the seconds to wait."""
-        for op, a in self.script:
+        for op, a in (self.script if script is None else script):
             self.played.append((round(self.clock() - self.t0, 2), op, a))
             if op == "wait":
                 yield a[0]
@@ -429,6 +460,12 @@ class AutoStart:
                     dx, dy = (a[2], a[3]) if len(a) == 4 else (0, -8)
                     self.log(f"autostart: {op} {a[0]}:{a[1]} clicks ({x + dx}, {y + dy})")
                     yield from self.click(mem, x + dx, y + dy, op == "rclickunit")
+            elif op == "units":
+                rows = []
+                for u in units_of(mem, a[0]):
+                    rows.append([mem.read_u32(u + 0x0C), mem.read_u32(u + U_CLASS),
+                                 client_px(mem, u), screen_of(mem, u)])
+                self.log(f"autostart: units {a[0]} " + json.dumps(rows, separators=(",", ":")))
             elif op == "dumpdrlg":
                 rec = drlg_dump(mem, a[0] if a else "")
                 self.dumps.append(rec)
@@ -489,15 +526,25 @@ def add_options(ap):
     g.add_argument("--seed", type=int, default=None, help="with --auto: map / game seed (-seed N)")
     g.add_argument("--auto-after", type=float, default=DEFAULT_AFTER,
                    help=f"seconds in the menu before leaving it (default {DEFAULT_AFTER})")
-    g.add_argument("--input", default="", help="with --auto: input script (autostart.py doc)")
+    g.add_argument("--input", default="", help="with --auto / --menu: input script (autostart.py doc)")
+    g.add_argument("--menu", default="", metavar="SCRIPT",
+                   help="instead of --auto: play SCRIPT into the front end from launch "
+                        "(no forced start), then --input once in a level")
     g.add_argument("--shots", default=None, help="directory for the script's `shot` PNGs")
 
 
 def setup(a, game_args_list):
     """(game arguments, AutoStart or None) from parsed options."""
+    if getattr(a, "menu", "") and a.auto:
+        raise SystemExit("--menu and --auto exclude each other")
+    if getattr(a, "menu", ""):
+        args = list(game_args_list)
+        if a.seed is not None:
+            args += ["-seed", str(int(a.seed))]
+        return args, AutoStart(None, a.input, a.shots, menu=a.menu)
     if not a.auto:
         if a.seed is not None or a.input:
-            raise SystemExit("--seed / --input need --auto CHAR")
+            raise SystemExit("--seed / --input need --auto CHAR or --menu SCRIPT")
         return game_args_list, None
     return game_args(a.auto, a.seed, game_args_list), AutoStart(a.auto_after, a.input, a.shots)
 

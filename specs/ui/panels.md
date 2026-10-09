@@ -43,16 +43,16 @@
 |   10. Skill tree (ui 4, right; `0x004AC690`) | 536–599 |
 |   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 600–635 |
 |   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 636–688 |
-|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 689–741 |
-|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 742–747 |
-|   15. Event → intent summary | 748–775 |
-|   16. Machine tables | 776–810 |
-| Constants & data dependencies | 811–831 |
-| Randomness | 832–836 |
-| Edge cases & original bugs | 837–857 |
-| Test vectors | 858–898 |
-| Provenance | 899–943 |
-| Open questions | 944–1035 |
+|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 689–746 |
+|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 747–752 |
+|   15. Event → intent summary | 753–780 |
+|   16. Machine tables | 781–815 |
+| Constants & data dependencies | 816–836 |
+| Randomness | 837–841 |
+| Edge cases & original bugs | 842–862 |
+| Test vectors | 863–903 |
+| Provenance | 904–948 |
+| Open questions | 949–1040 |
 <!-- /index -->
 
 ## Summary
@@ -725,7 +725,12 @@ after both.
    mouse down, `ui/menus.md` §1.2; an unknown row can never be pressed,
    the row hit skips it); then 3 if the row's level is the current
    level (the second icon draw, frame 0). Text = level name
-   (`0x00453E70(level)`).
+   (`0x00453E70(level)`, read 2026-10-09, ECX = level): no `levels`
+   record (`0x0061DB70`) → string 5389; level 8 → 5048 when client
+   quest byte 1 (`0x004B92E0(0, 1)`) ≠ 0, else 5047; else the row's wide
+   `LevelName` copy at `levels` +0x16E (`data/fixups.md` §11). The same
+   function as the portal label (`world/objects-client.md` §29 r3.1),
+   without that label's multiplayer owner suffix.
 6. Title: `waypointsheader` (3990) if any other waypoint is known
    (`[0x007BF08E]`), else `nowaypoints` (3991), Font16, color 0, at
    x = `sx + 160 − width / 2`, y = `48 − sy`.

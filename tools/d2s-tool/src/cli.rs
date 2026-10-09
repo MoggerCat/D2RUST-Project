@@ -37,7 +37,8 @@ edit flags:
   --waypoints none|all|LIST    LIST: comma-separated [diff:]INDEX
   --difficulty-unlocked normal|nightmare|hell   progression bits (d2s.md §2.2 rule 5.4)
   --act A --difficulty D       town byte: act 0..4 of difficulty D (default 0, normal)
-  --item CODE[@X,Y][:PAGE]     a normal identified item (page 0 inventory, 3 cube, 4 stash); repeatable
+  --item CODE[#Q][@X,Y][:PAGE] a normal identified item (page 0 inventory, 3 cube, 4 stash;
+                               #Q: quantity Q); repeatable
   --seed S                     game seed the items' seeds derive from (default 1)
   --map-seed S                 header map seed (new: default = the time)
   --time T                     create/save time (new: default now; set: save time)

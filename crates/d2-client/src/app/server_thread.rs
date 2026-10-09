@@ -35,11 +35,15 @@ impl From<ThreadStopped> for LinkError {
 
 type Job<L> = Box<dyn FnOnce(&mut L) + Send>;
 
+/// A hook the thread runs on the link before each pump.
+type Hook<L> = Box<dyn FnMut(&mut L) + Send>;
+
 enum Request<L> {
     Send(SendQueue, Vec<u8>),
     Pump,
     Receive,
     Run(Job<L>),
+    BeforePump(Hook<L>),
 }
 
 enum Answer {
@@ -121,6 +125,20 @@ impl<L: ServerLink + 'static> ThreadLink<L> {
         }
     }
 
+    /// Installs `f`, run on the link inside the thread before every pump
+    /// (replacing an earlier one): between server frames, before the
+    /// next frame's drain and tick (`play --poke`, `specs/tools/poke.md`
+    /// §5 rule 2).
+    pub fn set_before_pump<F>(&mut self, f: F) -> Result<(), ThreadStopped>
+    where
+        F: FnMut(&mut L) + Send + 'static,
+    {
+        match self.call(Request::BeforePump(Box::new(f)))? {
+            Answer::Ran => Ok(()),
+            _ => Err(stopped("hook answer")),
+        }
+    }
+
     fn call(&mut self, req: Request<L>) -> Result<Answer, ThreadStopped> {
         let tx = self.requests.as_ref().ok_or_else(|| stopped("closed"))?;
         tx.send(req).map_err(|_| stopped("request"))?;
@@ -139,10 +157,20 @@ fn stopped(at: &str) -> ThreadStopped {
 /// The thread's loop: one answer per request, in order, until the
 /// [`ThreadLink`] is dropped.
 fn serve<L: ServerLink>(link: &mut L, requests: Receiver<Request<L>>, answers: Sender<Answer>) {
+    let mut hook: Option<Hook<L>> = None;
     for req in requests {
         let answer = match req {
             Request::Send(queue, msg) => Answer::Sent(link.send(queue, &msg)),
-            Request::Pump => Answer::Pumped(link.pump()),
+            Request::Pump => {
+                if let Some(h) = hook.as_mut() {
+                    h(link);
+                }
+                Answer::Pumped(link.pump())
+            }
+            Request::BeforePump(h) => {
+                hook = Some(h);
+                Answer::Ran
+            }
             Request::Receive => Answer::Received(link.receive()),
             Request::Run(job) => {
                 job(link);

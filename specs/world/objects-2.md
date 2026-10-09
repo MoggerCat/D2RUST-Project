@@ -24,22 +24,22 @@
 |   16. Operate functions, part 2 | 66–193 |
 |   17. Small init functions | 194–220 |
 |   18. Object events 0, 3, 8, 9, 10 | 221–288 |
-|   19. Obelisk completion (C→S 0x44, `0x00585240`) | 289–335 |
-|   20. Item drop helpers (open question 13) | 336–455 |
-|   21. Curable-state removal (`0x00578C20`, open question 15) | 456–468 |
-|   22. Object allocation modes (open question 8) | 469–517 |
-|   23. Client side of S→C 0x0E and 0x4D (open question 4) | 518–535 |
-|   24. Guards and corner cases of part 1 (read 2026-10-07) | 536–577 |
-|   25. Portal pair creation (`0x0056D130`, `0x0056CF40`) | 578–674 |
-|   26. Shrine state lists and shrine texts (REC-239, read 2026-10-08) | 675–768 |
-|   27. Town Portal cast and the life of the pair (`0x005BE290`; REC-117, REC-243, read 2026-10-08) | 769–902 |
-|   28. A chest opened in play (REC-260, read 2026-10-08) | 903–980 |
-| Constants & data dependencies | 981–984 |
-| Randomness | 985–1007 |
-| Edge cases & original bugs | 1008–1045 |
-| Test vectors | 1046–1092 |
-| Provenance | 1093–1151 |
-| Open questions | 1152–1155 |
+|   19. Obelisk completion (C→S 0x44, `0x00585240`) | 289–336 |
+|   20. Item drop helpers (open question 13) | 337–456 |
+|   21. Curable-state removal (`0x00578C20`, open question 15) | 457–469 |
+|   22. Object allocation modes (open question 8) | 470–518 |
+|   23. Client side of S→C 0x0E and 0x4D (open question 4) | 519–536 |
+|   24. Guards and corner cases of part 1 (read 2026-10-07) | 537–578 |
+|   25. Portal pair creation (`0x0056D130`, `0x0056CF40`) | 579–675 |
+|   26. Shrine state lists and shrine texts (REC-239, read 2026-10-08) | 676–769 |
+|   27. Town Portal cast and the life of the pair (`0x005BE290`; REC-117, REC-243, read 2026-10-08) | 770–903 |
+|   28. A chest opened in play (REC-260, read 2026-10-08) | 904–981 |
+| Constants & data dependencies | 982–985 |
+| Randomness | 986–1008 |
+| Edge cases & original bugs | 1009–1046 |
+| Test vectors | 1047–1093 |
+| Provenance | 1094–1152 |
+| Open questions | 1153–1156 |
 <!-- /index -->
 
 ## Summary
@@ -297,7 +297,8 @@ object other than class 152 takes this branch.
 
 1. Action 3, object class ≠ 152: the item comes off P's cursor
    (`0x0055EEA0(game, P, item)`, items spec); failure → S→C 0x58 result
-   4, stop. Then P's interact is cleared (`0x00554190`, §16.3 rule 2).
+   4, stop, return 1 (`0x0058538C`–`0x0058539D`: every exit of
+   `0x005852E0` returns 1). Then P's interact is cleared (`0x00554190`, §16.3 rule 2).
 2. b := **power-up** (`0x00585240(game, s)`, P in EDI), s := byte +0x122
    of the item's items record (`subtype`, `data/fields.tsv` seq 62):
    1. s ≥ the table count (dword `0x00732FAC` = 21; signed compare) →

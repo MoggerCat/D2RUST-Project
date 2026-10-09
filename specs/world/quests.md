@@ -44,14 +44,14 @@
 |   6. Status reporting | 501–610 |
 |   7. NPC dialog hooks | 611–643 |
 |   8. Act transitions, warps and portals | 644–731 |
-|   9. Quest items, rewards and helpers | 732–914 |
-|   11. Acts II–V | 915–931 |
-| Constants & data dependencies | 932–946 |
-| Randomness | 947–974 |
-| Edge cases & original bugs | 975–993 |
-| Test vectors | 994–1025 |
-| Provenance | 1026–1054 |
-| Open questions | 1055–1125 |
+|   9. Quest items, rewards and helpers | 732–924 |
+|   11. Acts II–V | 925–941 |
+| Constants & data dependencies | 942–956 |
+| Randomness | 957–984 |
+| Edge cases & original bugs | 985–1003 |
+| Test vectors | 1004–1035 |
+| Provenance | 1036–1064 |
+| Open questions | 1065–1137 |
 <!-- /index -->
 
 ## Summary
@@ -743,6 +743,16 @@ the inventory (`0x00560200`); on success identify it unless identified
 and return it; else if droppable: drop it at a free spot near the player
 (`0x00545340`, size 1, mask 0x3E01, radius 5 (unused: `0x00545340` never reads this sixth argument, `[ebp+0x14]`; the search runs to the limit), limit 100) and return it;
 else free it and return none.
+The drop (read 2026-10-09, `0x00546780`–`0x005467B5`): the start point
+is the player's path position (`0x00620870`), the room the player's
+room (`0x00620BB0`); the search writes the found point and its room,
+and when it accepts nothing it sets the out room to none and leaves
+the point as passed. Then `0x00558AA0(game, 0, item, room, x, y)`: room
+none → **nothing** (the item is neither placed nor freed, in no room,
+and §9.1 still returns it); else place at (x, y) in room, unit flags
+|= 0x1002, mode 3, page 0xFF, flags |= 0x2000000, item data (+0x14)
++0x24 := `0x00558A10()`; the second argument is 0, so
+`0x00543DB0` is not run.
 
 #### 9.2 Deleting a quest item
 
@@ -1068,8 +1078,10 @@ item and path-placement specs).
    game start with a breakpoint on `0x00546270`.~~ **Answered**
    (2026-10-07): §3 "Which caller runs" (`0x005345A0`, `0x005344B0`,
    `0x0056A072`): mode 0; a new-character stub gets mode 1 then mode 0.
-   The doubled 0x5E / 0x28 / 0x29 of a new character's first game is a
-   code reading: recording R-PQ-3 (`docs/handoff/pc2-rec-pc2-quests.md`).
+   The doubled 0x5E / 0x28 / 0x29 of a new character's first game is
+   recorded (R-PQ-3, 2026-10-09, Wine): a character made in the create
+   screen gets each twice in frame 1, a loaded save once
+   (`facts/join/a1-new-ama.tsv`, `a1-save-ScnAma.tsv`).
 5. (Answered: `quests-act1-rest.md` §7: bytes 13–14 are confirmed never
    written by `0x00593CB0`; d2rs writes 0 and exact-match comparison
    masks them.)

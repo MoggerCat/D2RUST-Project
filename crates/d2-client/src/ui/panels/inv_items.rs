@@ -160,6 +160,10 @@ pub struct ItemsUi {
     /// item never lifts it (`inventory.md` §10 r3.3; the sell itself is
     /// the shop panel's).
     pub ctrl: bool,
+    /// The GUID of the open store's NPC (`vendors.md` §7.2 rule 2; set by
+    /// the shop when it opens, cleared when it closes): a Ctrl-click on a
+    /// grid item sells it to this NPC (0x33, `inventory.md` §10 r3.3).
+    pub store_npc: Option<u32>,
     /// The item tool tips' data (`inv_items_tip`); none: no tips.
     pub tips: Option<super::super::item_tip::ItemTips>,
     /// The inventory tables of the equip check (`items/inventory.md`
@@ -542,7 +546,9 @@ impl ItemsUi {
             book_kind: tips
                 .zip(stream_of(i))
                 .and_then(|(t, s)| facts::book_kind(t, s)),
-            sellable: false,
+            sellable: tips
+                .zip(i.code)
+                .is_some_and(|(t, code)| facts::GridInfo::sellable(t, code)),
             fits_belt: fits_belt(&self.art, i.code),
         };
         // The cube's grid (`inventory.bin` record 9: 3 x 4) and what lies
@@ -628,7 +634,7 @@ impl ItemsUi {
             page,
             shift: self.shift,
             ctrl: self.ctrl,
-            store_open: false,
+            store_open: self.store_npc.is_some(),
             overlap_item: overlap.first().map(|i| iref(i)),
             overlap_count: overlap.len() as u32,
             cube_under_footprint: overlap
@@ -683,8 +689,22 @@ impl ItemsUi {
                     cube,
                 }))
             }
-            // The sell needs the open store's NPC (`vendors.md` §8): the
-            // shop panel's own sell stays the way to sell.
+            // `inventory.md` §10 r3.3: 0x33 with the open store's NPC, the
+            // item's mode and the price the client shows (not read by the
+            // server, `vendors.md` §7.2; d2rs-own: 0).
+            GridMsg::Sell { item } => {
+                let npc = self.store_npc?;
+                let item_mode = all
+                    .iter()
+                    .find(|i| i.key.guid == item)
+                    .map_or(0, |i| u16::from(i.mode));
+                Some(ClientIntent::from_message(&d2_proto::client::SellItem {
+                    npc,
+                    item,
+                    item_mode,
+                    client_price: 0,
+                }))
+            }
             _ => None,
         }
     }

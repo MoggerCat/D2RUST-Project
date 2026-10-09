@@ -1,0 +1,22 @@
+# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py game/captures/day/manual/scene5.jsonl --scene a1-blood-moor-monsters --frame 100 --out facts/render; game: 1.14d
+key	value
+seq	100
+tick	928
+w	800
+h	600
+act	0
+level	2
+player_x	12323
+player_y	75349
+tile_origin_x	11923
+tile_origin_y	75069
+unit_origin_x	11923
+unit_origin_y	75065
+open_mode	0
+shift_x	0
+light_quality	0
+rain	1
+snow	0
+draws	1312
+index_sha256	78113e543317878e7001410443e15cefa11979f4854fa6d3084ee5d81b9225ec
+palette_sha256	ba83219e51249002d7125a1a5a701d6abea94f04f44d6cfaa42becdfcff23337

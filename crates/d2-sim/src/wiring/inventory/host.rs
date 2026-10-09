@@ -100,6 +100,38 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         .unwrap_or(false)
     }
 
+    /// The NPC grid placement of a store item (`0x00560200`, `world/vendors.md`
+    /// §3.1 rule 4): the NPC's inventory (made on first use, `0x0063ABD0`,
+    /// the monster record by page, `inventory.md` §1.3) takes the item on
+    /// its store page at the first free position; no send (the store
+    /// stream is the trade open's 0x9C action 11, `vendors.md` §4 step 3).
+    /// False when the page has no room.
+    pub fn store_place(&mut self, npc: UnitId, item: UnitId) -> bool {
+        if let (Some(kind), Some(r)) = (self.kind_of(npc), self.econ.units.get(npc)) {
+            self.state.add_inventory(npc, kind, r.guid);
+        }
+        self.place(npc, item, (0, 0), true, false)
+    }
+
+    /// Unlinks a store item from the NPC inventory that holds it (a
+    /// monster-owned inventory; `0x0063AAF0`, §1.4 rule 1), for the take
+    /// of a purchase and the removal of a store clear (`vendors.md` §6
+    /// rule 4, §7.1 rule 10). False when no NPC inventory holds it.
+    pub fn store_unlink(&mut self, item: UnitId) -> bool {
+        let holder = self
+            .state
+            .inventories
+            .iter()
+            .find(|(_, i)| {
+                matches!(
+                    i.owner_kind,
+                    crate::items::inventory::UnitKind::Monster { .. }
+                ) && i.items().contains(&item)
+            })
+            .map(|(&u, _)| u);
+        holder.is_some_and(|npc| self.remove(npc, item))
+    }
+
     /// Unlinks `item` from the owner's inventory (`0x0063AAF0`, §1.4 rule
     /// 1). False when it is not there.
     pub fn remove(&mut self, owner: UnitId, item: UnitId) -> bool {

@@ -133,6 +133,54 @@ pub fn hostile(world: &ClientWorld, inputs: &ModelInputs, u: UnitKey) -> bool {
         .is_none_or(|s| s.align != 1)
 }
 
+/// The hostility test `0x00465C60(P, U)` (§6 r9.7) between any two
+/// client units, as the client missile code calls it
+/// (`missiles/client.md` §C8, §C9 r2.5; `client-bodies.md` §B5 r2).
+///
+/// Followed: P's room in town → 1 (the dead-player and pet clauses need
+/// the party and `TargetPet` reads the model lacks); P = U → 0; a player
+/// P and an object or item U → 1. PROVISIONAL (REC-542; d2rs-own,
+/// unverified, as [`hostile`]): the player-player relation flags
+/// (`0x004DC440`, flag 8) read "not hostile" (single player: no other
+/// player), the `monstats2` `alSel` / `noSel` clauses are not run, and
+/// the alignment test `0x00650D70` reads players and monsters whose
+/// set-up `Align` is 1 as one side, every other monster as the other;
+/// units of other types are not hostile.
+pub fn hostile_between(
+    world: &ClientWorld,
+    monsters: &[Option<super::world::MonsterClass>],
+    p: UnitKey,
+    u: UnitKey,
+) -> bool {
+    use super::world::{ITEM, OBJECT, PLAYER};
+    if super::modes::in_town(world, p) {
+        return true;
+    }
+    if p == u {
+        return false;
+    }
+    if p.unit_type == PLAYER && u.unit_type == PLAYER {
+        return false;
+    }
+    if p.unit_type == PLAYER && matches!(u.unit_type, OBJECT | ITEM) {
+        return true;
+    }
+    let side = |k: UnitKey| match k.unit_type {
+        PLAYER => Some(true),
+        MONSTER => Some(
+            world
+                .units
+                .get(&k)
+                .and_then(|unit| monsters.get(unit.class as usize))
+                .and_then(|c| c.as_ref())
+                .and_then(|c| c.setup.as_ref())
+                .is_some_and(|s| s.align == 1),
+        ),
+        _ => None,
+    };
+    matches!((side(p), side(u)), (Some(a), Some(b)) if a != b)
+}
+
 /// The melee-range test `0x00622C40(P, U, moving)` (§6 r9.3).
 ///
 /// d2rs-own, unverified (D1): the client holds no melee-range rule, so

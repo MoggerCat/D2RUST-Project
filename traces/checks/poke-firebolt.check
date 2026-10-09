@@ -1,0 +1,19 @@
+check 1
+# Fire Bolt at a poked fallen, without input: seeds fixed and a fallen
+# party spawned as in poke-fallen-town, then before frame 8 a Fire Bolt
+# missile (missiles row 58, skill 36 level 1, owner the player) created
+# at the player and aimed at the fallen leader 3,3 sub-tiles away
+# (specs/tools/poke.md §1 `missile`: 1.14d 0x0059FA30 flags 0x21; d2rs
+# create_missile). Compare the missile (type 3) and the party's hp and
+# seeds frame by frame: flight, hit, damage and the draws they make.
+# Spec: specs/tools/scenario-diff.md.
+name poke-firebolt
+save ScnAma --class ama --expansion
+seed 1234
+ticks 60
+seconds 240
+channels state
+at 4 poke seed-game 0x00001234 666
+at 4 poke seed-unit @player 0x00000055 666
+at 4 poke spawn 19 @x+3 @y+3 normal
+at 8 poke missile 58 @x @y @x+3 @y+3 skill 36 1

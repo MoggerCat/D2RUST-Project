@@ -290,6 +290,8 @@ pub enum StepMsg {
     },
     /// Not a message: a monster spawned by the server (§3.1).
     Spawn(Spawn),
+    /// Not a message: a state change made directly (`tools/poke.md` §3).
+    Poke(d2_sim::poke::Directive),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -310,6 +312,9 @@ pub struct Scenario {
     pub difficulty: Difficulty,
     pub expansion: bool,
     pub end: u32,
+    /// `variant <name>`: the test variant install both sides run on
+    /// (`tools/test-variants.md` §4 rule 3); `None`: the base install.
+    pub variant: Option<String>,
     /// `char save <name>`: the save the original side loads.
     pub save: Option<String>,
     /// The inline character (what d2rs builds until a save loader exists).
@@ -360,6 +365,9 @@ impl Scenario {
             if self.expansion { "yes" } else { "no" }
         ));
         line(format!("end {}", self.end));
+        if let Some(v) = &self.variant {
+            line(format!("variant {v}"));
+        }
         if let Some(n) = &self.save {
             line(format!("char save {n}"));
         }
@@ -465,6 +473,9 @@ impl Scenario {
                             let _ = write!(l, " {u}");
                         }
                     }
+                }
+                StepMsg::Poke(d) => {
+                    let _ = write!(l, "poke {d}");
                 }
                 StepMsg::Typed { id, fields } => {
                     let _ = write!(l, "msg {}", message(*id).name);
@@ -647,6 +658,12 @@ pub fn encode(msg: &StepMsg, w: &dyn World) -> Result<Vec<u8>, Unresolved> {
                 why: "a spawn step is not a message".into(),
             })
         }
+        StepMsg::Poke(_) => {
+            return Err(Unresolved {
+                reference: "poke".into(),
+                why: "a poke step is not a message".into(),
+            })
+        }
     };
     let m = message(id);
     // Checked at parse time.
@@ -701,6 +718,7 @@ struct Parser {
     difficulty: Option<Difficulty>,
     expansion: Option<bool>,
     end: Option<u32>,
+    variant: Option<String>,
     save: Option<String>,
     class: Option<u8>,
     level: Option<u8>,
@@ -905,6 +923,18 @@ impl Parser {
                 want(1)?;
                 once(&mut self.end, ranged(rest[0], 0, MAX_END, "end")?, "end")
             }
+            "variant" => {
+                want(1)?;
+                let n = rest[0];
+                if n.is_empty()
+                    || !n
+                        .bytes()
+                        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+                {
+                    return Err(format!("variant {n:?} is not [a-z0-9-]+"));
+                }
+                once(&mut self.variant, n.to_owned(), "variant")
+            }
             "char" => self.char_line(line, rest),
             "record" => {
                 if rest.is_empty() {
@@ -980,7 +1010,8 @@ impl Parser {
                     }
                     "msg" => typed(&rest[2..])?,
                     "spawn" => spawn(&rest[2..])?,
-                    k => return Err(format!("unknown step kind {k:?}: hex, msg or spawn")),
+                    "poke" => StepMsg::Poke(d2_sim::poke::parse_directive(&rest[2..])?),
+                    k => return Err(format!("unknown step kind {k:?}: hex, msg, spawn or poke")),
                 };
                 self.steps.push((line, Step { tick, msg }));
                 Ok(())
@@ -1177,6 +1208,7 @@ impl Parser {
             difficulty,
             expansion,
             end,
+            variant: self.variant,
             save: self.save,
             character,
             record,
@@ -1537,6 +1569,57 @@ mod tests {
             ("char quest 41 1\n", "quest index"),
         ] {
             let e = steps(bad).unwrap_err();
+            assert!(e.message.contains(needle), "{bad:?}: {e}");
+        }
+    }
+
+    // Covers: specs/tools/poke.md §3 r1, §3 r2
+    #[test]
+    fn poke_steps_and_the_variant_line_round_trip() {
+        let s = steps(concat!(
+            "variant no-ambient\n",
+            "at 1 spawn 19 @x+3 @y normal\n",
+            "at 1 poke seed-unit @1:19 0x10 2\n",
+            "at 2 msg Walk x=@x y=@y\n",
+            "at 2 poke missile 7 @x @y @x+10 @y owner @player skill 36 1\n",
+            "at 3 poke item hp1 @x @y ilvl 5 quality magic\n",
+        ))
+        .unwrap();
+        assert_eq!(s.variant.as_deref(), Some("no-ambient"));
+        let text = s.to_text();
+        assert_eq!(Scenario::parse(&text).unwrap(), s, "{text}");
+        assert!(
+            text.contains("end 10\nvariant no-ambient\nchar class"),
+            "{text}"
+        );
+        assert!(text.contains("at 1 poke seed-unit @1:19 16 2\n"), "{text}");
+        assert!(
+            text.contains("at 2 poke missile 7 @x @y @x+10 @y skill 36 1 owner @player\n"),
+            "{text}"
+        );
+        assert!(
+            text.contains("at 3 poke item hp1 @x @y quality magic ilvl 5\n"),
+            "{text}"
+        );
+        assert!(encode(&s.steps[1].msg, &W).is_err());
+        // The variant is part of the canonical text, so of the digest.
+        let base = steps("").unwrap();
+        assert_ne!(
+            base.sha256(),
+            steps("variant no-ambient\n").unwrap().sha256()
+        );
+        assert_eq!(base.variant, None);
+        for (bad, needle) in [
+            ("at 1 poke\n", "empty directive"),
+            ("at 1 poke teleport 1 2\n", "unknown directive"),
+            ("at 1 poke time 7 0\n", "period 7"),
+            ("at 1 poke time 1\n", "takes 2"),
+            ("at 1 poke object 1 2 3 4\n", "unexpected"),
+            ("variant A\n", "variant"),
+            ("variant a\nvariant b\n", "given twice"),
+        ] {
+            let e = steps(bad).unwrap_err();
+            assert_eq!(e.line, 11 + bad.matches('\n').count() - 1, "{bad:?}: {e}");
             assert!(e.message.contains(needle), "{bad:?}: {e}");
         }
     }

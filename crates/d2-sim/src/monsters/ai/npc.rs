@@ -196,7 +196,7 @@ pub fn npc_interaction_think<W: AiHost + ?Sized>(
     if !home_check(game, cx, u, 16) {
         set_velocity(cx, u, 1, 0, 0);
         let (a, b) = if d < 5 { (d - 2, 2) } else { (3, 2) };
-        cx.world.walk_in_radius(game, u, pl, a, b);
+        walk_in_radius(game, cx, u, pl, a, b);
     }
     true
 }
