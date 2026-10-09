@@ -32,8 +32,9 @@ under Xvfb + lavapipe; compare: `d2-client facts-compare SCENE DIR --ignore tick
 13. A click while walking re-targets from the precise position (`sim/pathing.md` §1.5, already specified; `Predict::path_step`): walk-s, ne, sw, e match every frame input.
 14. Control panel: UI cels export their 1.14d wrapper (`facts-render.md` §5 r18: orbs `CelDrawEx`, skill icons / glyphs `CelDrawColor`); the stamina bar is the rectangle (`control-panel.md` §4 r2); the new-stats / new-skills buttons after the skill icons (§1 r3); the mini panel open from the start (§9 revision, REC-519). a4 equal through row 257; next: the help button `0x004A64C0` ("Help (H)" + levelsocket, unspecified: `pc1-data.md` Step 4 item 41).
 15. The client path sees the model's living monsters as footprints, mask 0x100 (`client/model.md` open question 2 revision, REC-706; `ClientPath::stamp_others`): walk-n, s, ne, e reach the critter / NPC rows; walk-se / nw match when d2rs's Warriv stands where 1.14d's does (NPC position: q-fix-real-unit-seed-order); runs drift ~50 px (was 90–240).
+16. The grid hover tint and item tip follow the §5 hover state, not the raw mouse (`ui/inventory.md` §3 r2, already specified); a use press clears that state until the next move or press, and a release does not re-track it (§5 r4, PROVISIONAL REC-707). a1-panel-cube is now equal except the cursor row 73, which animates on wall-clock time (`facts-render.md` edge cases: known divergence).
 
-## First difference per scene (after fixes 1–15)
+## First difference per scene (after fixes 1–16)
 | Scene | First difference |
 |---|---|
 | a1-town-idle-sor, a1-walk-n, a1-walk-s | r110 NPC `wa` WL dir 47 vs 0: d2rs's `wa` already stands on its walk target (4866, 4235), 1.14d's still walks east past it (NPC path node: q-fix-real-unit-seed-order) |
@@ -42,11 +43,11 @@ under Xvfb + lavapipe; compare: `d2-client facts-compare SCENE DIR --ignore tick
 | a1-walk-sw | r102 torch vs `rc` (NPC position) |
 | a1-walk-w | tile_origin_y 72533 vs 72532 (1 px) |
 | a1-walk-se, -nw | tile_origin 9992 vs 10012 / 9950 vs 9976: the walk bends round Warriv, who stands elsewhere in d2rs (NPC position) |
-| a1-run-* | tile_origin ~50 px off (inherits the walk drift and NPC positions) |
-| a1-panel-inventory | r137–138 an extra `unit` row: d2rs's `wa` (1:7) stands in this cell (NPC position) |
+| a1-run-* | tile_origin ~50 px off. The run legs away from Warriv match 1.14d exactly (run-e Δ 91,17, run-w −77,0), so run speed and start are right; the error comes from walk-se / nw and run-n, which pass Warriv (NPC position) |
+| a1-panel-inventory | r168 `rc` WL y (NPC position) |
 | a1-panel-character, -skilltree | r109–111 `wa` NU / WL (NPC pose) |
 | a1-panel-automap, -esc-menu-wine | r108 torch vs `rc` (NPC position) |
-| a1-panel-cube | r25 the hovered cube's tint: d2rs 118 (hover, §3 r2), 1.14d 234 (usable): 1.14d's hover state may follow mouse moves only |
+| a1-panel-cube | r73 the cursor only (wall-clock animation, known divergence) |
 | a2-town-lut-gholein | r115 critter `bg` shadow missing (q-fix-real-town-critters) |
 | a3-town-kurast-docks | r97 pass-9 cel (`at` 0x473bd0, file ?) vs d2rs `rain3.dc6` f1 |
 | a4-town-pandemonium-fortress | r258 the help button `0x004A64C0` ("Help (H)", `levelsocket`, `level` at 725, 440): not specified (`pc1-data.md` Step 4 item 41) |
