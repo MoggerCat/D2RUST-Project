@@ -243,6 +243,13 @@ impl<X: Pending> ActionSim<X> {
                 s.hooks.x.send(to, &add);
                 s.hooks.x.send(to, &dead);
             }
+            // Announced here: the client pass that follows in the same
+            // tick (this pass runs at the end of step 4) sends it no add
+            // messages of its own (unit flag 0x10, `intents-events.md`
+            // §7.1 rule 2.1), which would re-create it out of mode 17.
+            if let Some(r) = s.units.get_mut(c) {
+                r.flags &= !crate::units::record::flags::SEED_SET;
+            }
         }
         changed
     }

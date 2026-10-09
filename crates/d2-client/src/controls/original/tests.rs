@@ -19,15 +19,19 @@ fn addr(s: &str) -> u32 {
 }
 
 /// The 1140-byte table built from the TSV: entries in `file_pos` order,
-/// slot 1 then slot 0 (§B4 r1).
+/// slot 1 then slot 0 (§B4 r1), except command 1 (slot 0 first).
 fn table_from_tsv() -> Vec<u8> {
     let mut entries = vec![(0i32, 0u16, 0i32); TABLE_LEN];
     for row in TSV.lines().skip(1) {
         let c: Vec<&str> = row.split('\t').collect();
         let cmd: i32 = c[0].parse().unwrap();
         let p: usize = c[8].parse().unwrap();
-        entries[2 * p] = (cmd, key_of_name(c[3]), 1);
-        entries[2 * p + 1] = (cmd, key_of_name(c[4]), 0);
+        let one = (cmd, key_of_name(c[3]), 1);
+        let zero = (cmd, key_of_name(c[4]), 0);
+        // command 1: slot 0 first (§3.4, measured on Game.exe)
+        let (first, second) = if cmd == 1 { (zero, one) } else { (one, zero) };
+        entries[2 * p] = first;
+        entries[2 * p + 1] = second;
     }
     let mut out = Vec::new();
     for (cmd, key, slot) in entries {

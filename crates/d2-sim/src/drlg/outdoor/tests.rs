@@ -1141,6 +1141,40 @@ fn border_substitution_bord_types() {
     );
 }
 
+// Covers: specs/drlg/outdoor-tilesub.md §2.3
+#[test]
+fn border_substitution_stamps_draw_no_build_list_roll() {
+    // A row that replaces the first shuffled cell with preset 12 (style
+    // 8, base 4) through its one variant: the stamp draws nothing and
+    // leaves the build list as it was (recorded, Blood Moor and Cold
+    // Plains); file 0 (PROVISIONAL, REC-404), here for a 3-file preset.
+    let mut e = Env::new(4, 6, 6);
+    e.od.presets[12].files = 3;
+    e.od.subs.push(SubRow {
+        type_: 1,
+        file: b"b".to_vec(),
+        bord_type: 0,
+        grid_size: 1,
+        ..SubRow::default()
+    });
+    let mut f = one_cell_file(0, 0, 1);
+    // Variant 0 at x offset (0 + 1)·(w + 1) = 2.
+    f.walls[0].set(2, 0, (9 << 8) | 1);
+    e.subs.0.insert(b"b".to_vec(), f);
+    let s0 = e.seed();
+    e.gen().border_sub(BorderCtx::wild(1, 4)).unwrap();
+    // roll(1 group), 36 shuffle pairs, roll(1) variant: no fourth kind.
+    assert_eq!(e.seed(), stepped(s0, 1 + 72 + 1));
+    assert!(e.info.build_list.is_empty());
+    let hit = e.info.sub_hits[0];
+    let (x, y) = (hit.x, hit.y);
+    assert_eq!(e.info.grids[0].get(x, y), 12);
+    assert_eq!(
+        e.info.grids[2].get(x, y) & cell::FILE_MASK,
+        (tilesub::SUB_STAMP_FILE as u32) << 16
+    );
+}
+
 #[test]
 fn act5_style_map() {
     assert_eq!(tilesub::style_map(49, 5, false), Ok(919));

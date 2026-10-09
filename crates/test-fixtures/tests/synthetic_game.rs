@@ -902,15 +902,21 @@ fn join_and_leave_send_the_roster_messages() {
     let guid = host.game.game.lists.unit(p).unwrap().guid;
     let level = host.game.events.action.sys.stats.unit_total(p, 12, 0) as u16;
     let at = got.iter().position(|m| m == &[0x04]).expect("0x04");
+    // q-fix-flow-server (`sim/tick.md` §6 rule 4, `intents-events.md`
+    // §8.3): the state-3 inventory refresh's 0x48 after 0x04, and the
+    // join's 0x8D between 0x65 and 0x5A.
+    let g = guid.to_le_bytes();
     assert_eq!(
-        got[at + 1..at + 4],
+        got[at + 1..at + 6],
         [
+            vec![0x48, 0, 0, g[0], g[1], g[2], g[3], 0, 0, 0, 0],
             msg::player_joined(guid, CLASS as u8, &name(), level, 0xFFFF),
             msg::player_kill_count(guid, 0).to_vec(),
+            msg::assign_player_to_party(guid, msg::NO_PARTY).to_vec(),
             msg::player_event(2, &name()).to_vec(),
         ]
     );
-    assert_eq!(&got[at + 1][8..14], b"werwer");
+    assert_eq!(&got[at + 2][8..14], b"werwer");
 
     // A second client in game (state 4) watches the first leave.
     let other: ClientId = 1;
