@@ -1,0 +1,16 @@
+check 1
+# Milestone target for the playthrough harness (pc1-day3-c, 2026-10-09):
+# entering Act V (Harrogath, level 109) from Act IV.
+# A level-1 sorceress (no quests: 1.14d gates neither the town-byte load nor
+# this warp on quest state) stands in the town of act index 3 and is
+# warped (poke warp, waypoints.md §7 r5) to level 109 before frame 4.
+# 1.14d (PC 1, Windows): see docs/handoff/pc1-day3-c.md "Milestones" for the
+# arrival frame, position and unit counts this check must reproduce.
+# Spec: specs/tools/scenario-diff.md.
+name milestone-act5-entry
+save MilA5 --class sor --expansion --act 3
+seed 1234
+ticks 40
+seconds 240
+channels state
+at 4 poke warp 109

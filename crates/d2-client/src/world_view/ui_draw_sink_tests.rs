@@ -287,6 +287,7 @@ fn cel(s: &Setup, name: &str, x: i32, y: i32, look: CelLook) -> UiDraw {
         at: Point::new(x, y),
         clip: FRAME,
         look,
+        call: crate::ui::draw::CelCall::Draw,
     })
 }
 

@@ -108,6 +108,18 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         use crate::world::objects::shrines::STAMINA_REMOVE;
         for (u, state, cb) in std::mem::take(&mut self.removed_lists) {
             let t = sim.stats.toggle_state(u, state, false);
+            // PROVISIONAL (REC-731): "state off" read as the toggle with
+            // the update-queue insert `0x00639DB0` (`stat-lists.md` §9.2),
+            // so the client pass sends S→C 0xA9. Recorded 2026-10-09: the
+            // `manapot` list freed at full mana (no mana change that tick)
+            // still gives 0xA9 106 the next frame
+            // (`facts/items/a1-town-potions-low.tsv` n 35).
+            if let Err(e) = sim.game.lists.queue_update(u) {
+                self.errors
+                    .push(WiringError::Unit(crate::units::modes::UnitError::Game(
+                        e.into(),
+                    )));
+            }
             if let (Some(d), Some(r)) = (t.disguise, sim.units.get_mut(u)) {
                 if d {
                     r.flags2 |= flags2::DISGUISE;
@@ -654,10 +666,10 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
     /// the lent monster world's part (monster data, minion list, owner
     /// link); an object's object data.
     fn free_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
-        let (ty, mode) = sim
+        let (ty, class, mode) = sim
             .units
             .get(unit)
-            .map_or((None, 0), |r| (Some(r.ty), r.mode));
+            .map_or((None, 0, 0), |r| (Some(r.ty), r.class, r.mode));
         // A ground item leaves the clients' rooms: its removal record
         // (REC-281, `ActionHooks::removed_items`), in the room its path
         // was in.
@@ -677,7 +689,7 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
                 }
             }
         }
-        self.path_free(unit, ty, mode);
+        self.path_free(unit, ty, class, mode);
         self.monster_skills.remove(&unit);
         if let Some(ai) = self.ai.as_mut() {
             ai.remove(unit);
@@ -780,6 +792,32 @@ impl<X: Pending> View<'_, X> {
         self.stats.set_state(l, u32::from(s));
         self.stats.attach(&mut *self.h, u, l, true);
         Some(l)
+    }
+
+    /// Alignment `0x005543B0(unit, a, ..)` (`skills/bodies-2.md` §2.22,
+    /// `hirelings.md` §3.2 rule 2): stat 172 (`alignment`) := `a` in the
+    /// unit's state-105 (`alignment`) list, allocated with flags 0 when
+    /// missing (`stat-lists.md` §2), the state on, its state-changed bit
+    /// set again (`0x0055448A`, `intents-events.md` §3.5 rule 6 "resend")
+    /// and the unit queued for update. The game's allied mark follows a
+    /// good (2) alignment. `a` > 2 is the original's fatal assertion:
+    /// nothing here.
+    pub fn set_alignment(&mut self, game: &mut Game, u: UnitId, a: u8) {
+        const STATE: u16 = crate::combat::range::STATE_ALIGNMENT;
+        if a > 2 || self.units.get(u).is_none() {
+            return;
+        }
+        let Some(l) = self
+            .state_list(u, STATE)
+            .or_else(|| self.create_state_list(u, STATE, None, 0))
+        else {
+            return;
+        };
+        self.set_list_stat(l, crate::combat::range::STAT_ALIGNMENT, i32::from(a));
+        self.set_state(u, STATE, true);
+        self.stats.set_state_changed(u, u32::from(STATE), true);
+        game.lists.set_allied(u, a == 2);
+        let _ = game.lists.queue_update(u);
     }
 
     /// Hireling test `0x0063EE90`: a monster of a hireling class

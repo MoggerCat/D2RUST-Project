@@ -100,6 +100,7 @@ pub(crate) fn tables() -> InvTables {
         itemtypes,
         equiv: equiv(),
         books: Vec::new(),
+        item_use: Default::default(),
     }
 }
 

@@ -39,16 +39,16 @@
 |   8. Spawn point in a coordinate rectangle (`0x0054DC40`) | 469–504 |
 |   9. Placement search and creation call (`0x005B2A00`) | 505–619 |
 |   10. Party minions (monstats minion columns, `0x005B2830`) | 620–671 |
-|   11. Preset monsters (DS1 presets) | 672–815 |
-|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 816–840 |
-|   13. Region bookkeeping | 841–873 |
-|   14. Other table-driven and AI spawns | 874–898 |
-| Constants & data dependencies | 899–969 |
-| Randomness | 970–1013 |
-| Edge cases & original bugs | 1014–1054 |
-| Test vectors | 1055–1126 |
-| Provenance | 1127–1150 |
-| Open questions | 1151–1209 |
+|   11. Preset monsters (DS1 presets) | 672–931 |
+|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 932–956 |
+|   13. Region bookkeeping | 957–989 |
+|   14. Other table-driven and AI spawns | 990–1014 |
+| Constants & data dependencies | 1015–1085 |
+| Randomness | 1086–1129 |
+| Edge cases & original bugs | 1130–1170 |
+| Test vectors | 1171–1242 |
+| Provenance | 1243–1271 |
+| Open questions | 1272–1330 |
 <!-- /index -->
 
 ## Summary
@@ -704,7 +704,9 @@ Let M = monstats count and S = superuniques count.
    level 110 are not placed.
 2. `0x0054E490`: class 434 (prisondoor) → x − 1, and mode 12 (dead)
    unless quest flag 0x20 is set. Classes with the monstats2 `critter`
-   flag (index 13) are **not placed**. Flags = 8 if `neverCount`, else 0.
+   flag (index 13) are **not placed** (the client makes critters from
+   Levels.txt `cmon`, §11.7; a DS1 preset with its flag bit 0 set is
+   made by the client instead, `client/model.md` §5 r6.2). Flags = 8 if `neverCount`, else 0.
    §9 with r = −1; on failure, unless the class is in the no-retry set
    {229 radament, 284–288 maggotqueen1–5, 392–393 window1–2}
    (`0x0054E3A0`, table `0x0054E3E0`), again with r = 4.
@@ -812,6 +814,120 @@ row:
    `Level` (+0xAA) ≤ L `MonLvl1Ex` (+0x16) + 1. Stop at the first invalid
    or too-high class and return the last accepted one; the input class if
    none was accepted.
+
+#### 11.7 Client-made critters (Levels.txt `cmon`, `0x0046C460`)
+
+Read 2026-10-09 from the 1.14d disassembly. The server never places a
+critter (§11.3 r2); the **client** makes them, once per client active
+room, from the Levels.txt critter columns (not from DS1 presets). When
+the pass runs, the GUIDs and the set-up: `client/model.md` §5 rule 6.
+
+1. **Columns** (levels record, 1.14d parser table at `0x0061D7xx`–
+   `0x0061D94F`): `cmon1`–`4` +0xCC (i16 monstats ids, an empty cell is
+   negative), `cpct1`–`4` +0xD4 (i16 percent), `camt1`–`4` → **all four
+   are parsed into +0xDC** (each field record carries offset 0xDC; the
+   last, `camt4`, wins). So the amount of slot 0 is `camt4` and slots
+   1–3 read +0xDE/+0xE0/+0xE2, which are always 0 (original bug, also in
+   1.10f). 1.14d data: every `camt` cell is empty, so the multiplier is
+   never applied. Act 1 town: `cmon1` = chicken (149), `cpct1` = 30.
+2. **Pass** `0x0046C460(room)`; R = the room's seed (active room +0x6C,
+   `drlg/rooms.md` §2), `rand(n)` = `0x0045C3E0` (n < 1 → 0, **no
+   draw**; else one step, then `lo & (n − 1)` for a power of two, else
+   `lo % n`), `pct()` = one step, `lo % 100` (unsigned):
+
+   ```text
+   L = levels[level_of(room)]                     // 0x0061A1B0, 0x0061DB70
+   for i in 0..4:
+       c = L.cmon[i]; if c < 0: return             // first empty slot ends
+       if pct(R) >= L.cpct[i]: continue            // drawn for every slot
+       m = monstats[c]                              // invalid c → null record
+       n = rand(R, m.MaxGrp - m.MinGrp) + m.MinGrp  // +0x30, +0x2F (u8)
+       if L.camt[i] != 0: n *= L.camt[i]            // +0xDC + 2i
+       repeat n times: place_critter(room, c)
+   ```
+
+   `rand(MaxGrp − MinGrp)` gives MinGrp … MaxGrp − 1: MaxGrp itself is
+   never reached unless MaxGrp = MinGrp (then n = MinGrp, no draw).
+   chicken 3/3 → always 3; rat 4/4 → 4; bat 1/3 → 1 or 2.
+3. **place_critter** `0x0046C1A0(room, c)`: (x0, y0, w, h) = the room's
+   subtile rect (`0x00619730`); size = `monstats2` `SizeX` (+0x08) of
+   c's row (c or its `monstats2` row invalid → nothing). Up to 10 tries:
+
+   ```text
+   x = x0 + rand(R, w - 1); y = y0 + rand(R, h - 1)   // x drawn first
+   if size_query(room, x, y, size, 0x3F11) == 0:       // 0x0064D9B0
+       create_client_unit(class c, x, y, type 1, 0)    // 0x00466730
+       return
+   // 10 occupied points → this critter is skipped
+   ```
+
+   The creation steps one more room seed (the unit seed at a point,
+   `client/model.md` §12 r5), so per critter R advances x, y (per try)
+   then 1. Critter AI: `client/model.md` §5 rule 6.4.
+
+#### 11.8 Act IV / V bosses and quest objects (worked placements)
+
+Read 2026-10-09 from the 1.14d disassembly; DS1 records parsed from the
+1.14d archives, monpreset rows from Patch_D2 `monpreset.bin` (229 rows;
+act ranges `data/runtime-maps.md` §8). No rule here is new: each row
+chains rules owned elsewhere. Every unit below is made in the room step
+when its room is populated (§1; `drlg/preset.md` §9 moves the preset to
+its room), never at level load.
+
+1. **Preset id → class** (`drlg/preset.md` §5.3, at DS1 load). A DS1
+   type-1 id is act-relative: row = monpreset first[DS1 act] + id, then
+   kind 1 → monstats `place`, kind 2 → M + `place` (superunique), kind 0
+   → M + S + `place` (monplace; §11.5). `0x00659B80(kind, index)` is the
+   same map for code callers (kind 0 → index + S + M, 2 → index + M, else
+   index). The rows used here (DS1 act field 3 = Act IV, 4 = Act V):
+
+   | Act | id | Row | monpreset | Class space |
+   |---|---|---|---|---|
+   | IV | 13 | 158 | izual | monstats 256 |
+   | IV | 27 | 172 | The Feature Creep | superunique 41 (`hephasto` 409) |
+   | V | 28 | 201 | baalthrone | monstats 543 |
+   | V | 46 | 219 | Frozenstein | superunique 59 (`snowyeti4`) |
+   | V | 49 | 222 | place_champion | monplace 3 → §11.5 id 3 (a champion) |
+
+   Other Act IV superunique ids: 15–21 → superuniques 32–38. Act V: 6 →
+   42 (Siege Boss), 27 → 48, 34–46 → 46, 47, 49–59. Superunique 60
+   (Nihlathak Boss) and 61–65 (Baal's waves) have **no** monpreset row:
+   only code reaches them (item 3; `monsters/ai-bodies-5.md` §20).
+2. **Objects** are DS1 type 2, mode 0, class = objpreset[act][id]
+   (`drlg/preset-tables.tsv`); the first pass of `0x005559A0` creates
+   them through `0x00555910` → `0x005557D0` → `0x00555230(…, 1, mode,
+   0)` (class 573 → nothing; > 573 → `0x0054F490`, `world/objects.md`
+   §6). The object's init runs inside that allocation (`world/objects.md`
+   §3), so a monster an init makes exists before the room's monster pass.
+   An init may overwrite the mode.
+3. **Per target** (sub-tile points; "map" = the preset map origin × 5):
+
+   | Target | How | Point | Mode |
+   |---|---|---|---|
+   | Izual 256 (level 105, `Mid08X08Izual.ds1`) | preset: id 13 → §11.3 (`0x005559A0` → `0x0054E600` → `0x0054E490` → §9 r −1, then r 4) | DS1 (18, 18) + map, exact when free | DS1 type 1 → 1 |
+   | Hephasto 409 (107, `ForgeE.ds1`) | superunique-from-preset: id 27 → `0x0054E600` → `0x005A49B0(su 41)`. `AutoPos` = 1 → x = y = 0 → §6.3 step 1 → §8 without cl and without warp check: a random point in the **room's** sub-tile box (left = room x + 1, w = room width − 1; same for y), up to 20 tries on the active room seed. The DS1 point (65, 60) only picks the room. `Stacks` 0 → once per game (game +0x1D30 bit 41) | room (1532, 1248) tiles: x ∈ 7661…7699, y ∈ 6241…6279 | 1 (`0x005A09E0` always) |
+   | Hellforge 376 (107, `ForgeE.ds1`) | preset object: type 2 id 42 → objpreset[3][42] = 376; init 48 `0x005B5A20` (`world/quests-act4.md` §4.6): chain 24 not-intro → mode := record +0x00 (0 until the soulstone), else mode 3 | DS1 (41, 55) + map, exact | 0 |
+   | Frozenstein 59 (114, `RiverIce01–04.ds1`) | superunique-from-preset: id 46; `AutoPos` 0 → §6.3 step 3 at the DS1 point (§9 r −1, then r 5); `MinGrp`/`MaxGrp` 5/6 + difficulty minions (§11.4 r5) | DS1 point + map | 1 |
+   | Frozen Anya 558 `fana` (114) | code spawn: type 2 id 54 → objpreset[4][54] = **460** (dummy "Anya outside town"); init 67 `0x0058A5B0` → object event 7 at frame + 25 → `0x0058A500`: object 558 at the dummy's point, `0x00555230(2, 558, x, y, …, 1, 0, 0)` (`world/quests-act5.md` §5.6). No monster: 527 (`drehyaiced`) appears only at the thaw, 512 only in town | the dummy's point, exact | 0 |
+   | Nihlathak 526 (124, `NihlE/N/S/W.ds1`) | code spawn: type 2 id 56 → objpreset[4][56] = **462** (dummy "Nihlathak in his temple"); init 69 `0x0058A6C0`: chain 33 extra +0x88 = 1 and +0x92 = 0 → `0x0054E600(0x00659B80(2, datatables +0xB58 = 60), x, y, mode 1)` → `0x005A49B0(su 60)`: `AutoPos` 0 → §9 at the dummy's point; hcIdx 60 minions (§11.4 r6). The type-1 id 49 of these files is place_champion (a champion, §11.5), not Nihlathak. +0x88 is set on entering levels 121–124 while state < 5 (`world/quests-act5.md` §5.5 r3), at game start with 37.0 / 37.15 (§5.10) or by town cleanup (§5.9) | the dummy's point | 1 |
+   | Baal 543 `baalthrone` (131, `wthrone.ds1`) | preset: id 28 → §11.3 | DS1 (90, 11) + map, exact | 1 |
+   | Worldstone Chamber portal 563 (131, `wthrone.ds1`) | preset object: type 2 id 147 → objpreset[4][147] = 563; init 75 `0x0058E670`: mode := chain 36 extra +0x94 (1 from the record's init), then +0x94 := 2, so only the first creation in a game gets 1 (`world/quests-act5-2.md` §8.8) | DS1 (90, 5) + map, exact | 1 |
+
+4. **The portal's opening** does not change its mode. Operate 70
+   (`0x0058E6A0`) warps from level 131 to 132 only while chain 36 extra
+   +0x86 = 1; `0x0058E600` sets it when the BaalToStairs body (AI 138,
+   `0x005EF620`) comes within `aip1` of object 563
+   (`monsters/ai-bodies-5.md` §19). The throne waves are
+   `monsters/ai-bodies-5.md` §20.
+5. **Measured** (PC 1, `-seed 1234`, `record_state` snapshots, first
+   seen at Chebyshev distance 30–77 from the player): Izual (5578, 4818)
+   = DS1 point; Hellforge (7661, 6255) = map (7620, 6200) + (41, 55);
+   Hephasto (7672, 6270) inside room (7660, 6240, 40, 40), DS1 point
+   (7685, 6260); `fana` (10056, 6551) = map (10000, 6500) + `RiverIce04`
+   dummy 460 (56, 51) (the file follows from this match); Nihlathak
+   (12706, 5391) = map (12500, 5000) + `NihlS` dummy 462 (206, 391); Baal
+   (15090, 5011) and the portal (15090, 5005) = map (15000, 5000) +
+   (90, 11) / (90, 5). Modes as in the table.
 
 ### 12. Ambient (wandering) spawns (`0x0054F060(game, room)`)
 
@@ -1147,6 +1263,11 @@ unique with 3 minions), and placement points.
 - Recordings `traces/raw/20261006-015554-tick.jsonl`,
   `20261006-021854-tick.jsonl`, `20261006-022304-tick.jsonl` (hin/rin/
   ract per step): §1.3 and the group-size rows.
+- §11.8: monpreset rows from Patch_D2 `data\global\excel\monpreset.bin`
+  and DS1 unit lists (`Mid08X08Izual`, `ForgeE`, `RiverIce01–04`,
+  `NihlE/N/S/W`, `wthrone`), parsed by scratch scripts on 2026-10-09;
+  positions measured on PC 1 (`-seed 1234`, `record_state` snapshots),
+  every target matching its rule.
 
 ## Open questions
 

@@ -129,7 +129,7 @@ pub const POPUP_BOX_MODE: u8 = 2;
 /// at the bottom − 3 for Font16. Without the font's measure: the text at
 /// the call point, no box. The too-tall font swap (step 3) and the one
 /// slot per frame are not applied.
-pub(super) fn push_popup(
+pub(crate) fn push_popup(
     text: Vec<u16>,
     at: Point,
     color: u16,

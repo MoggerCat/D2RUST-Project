@@ -5,7 +5,9 @@
   rows), `0x007325B0` (event functions), `0x00732B90` (durability
   weights). D2MOO (1.10f) used to name functions; every difference found
   is listed (Provenance). §7 (hit reaction, death) is checked only at the
-  call level. No trace check yet (Open questions 1–3).
+  call level. The monster-melee-on-a-player path (§10) is checked
+  against a 1.14d recording, roll by roll (Test vectors "Recorded",
+  2026-10-09); the rest has no trace check yet (Open questions 1–3).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::combat::damage`
 - **Related specs:** `combat/hit.md` (result flags, to-hit, block);
@@ -21,26 +23,27 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 46–58 |
-| Inputs | 59–71 |
-| Outputs / state changes | 72–79 |
-| Rules | 80–81 |
-|   0. Shared integer helpers | 82–104 |
-|   1. Damage record | 105–138 |
-|   2. Pipeline | 139–153 |
-|   3. Rolling: `start_combat` = `0x0057DBF0` | 154–299 |
-|   4. Totals and resistances: `totals` = `0x0057C1E0` | 300–401 |
-|   5. Application | 402–592 |
-|   6. Hit class and hit recovery | 593–623 |
-|   7. Reaction and death trigger | 624–725 |
-|   8. Event functions (table `0x007325B0`, 32 entries) | 726–789 |
-|   9. Durability `0x0057D3D0` | 790–811 |
-| Constants & data dependencies | 812–833 |
-| Randomness | 834–866 |
-| Edge cases & original bugs | 867–901 |
-| Test vectors | 902–934 |
-| Provenance | 935–960 |
-| Open questions | 961–1010 |
+| Summary | 49–61 |
+| Inputs | 62–74 |
+| Outputs / state changes | 75–82 |
+| Rules | 83–84 |
+|   0. Shared integer helpers | 85–107 |
+|   1. Damage record | 108–141 |
+|   2. Pipeline | 142–156 |
+|   3. Rolling: `start_combat` = `0x0057DBF0` | 157–302 |
+|   4. Totals and resistances: `totals` = `0x0057C1E0` | 303–404 |
+|   5. Application | 405–595 |
+|   6. Hit class and hit recovery | 596–626 |
+|   7. Reaction and death trigger | 627–732 |
+|   8. Event functions (table `0x007325B0`, 32 entries) | 733–796 |
+|   9. Durability `0x0057D3D0` | 797–818 |
+|   10. Monster melee on a player, end to end | 819–911 |
+| Constants & data dependencies | 912–933 |
+| Randomness | 934–966 |
+| Edge cases & original bugs | 967–1001 |
+| Test vectors | 1002–1077 |
+| Provenance | 1078–1103 |
+| Open questions | 1104–1153 |
 <!-- /index -->
 
 ## Summary
@@ -670,7 +673,11 @@ except inside the get-hit test (§6.2).
       form request (E, mode 13, tA, gA, 0). Return.
    2. F has 0x200 (evade): state 68 (`evade`) list; s, E as above;
       skill `stsound` (+0xFC, i16) > 0 → sound event 12 (`0x00553380(D,
-      12, D)`, `audio/triggers.md`). Return.
+      12, D)`, `audio/triggers.md`). Return. **Only** the sound: no E
+      flags write and no unit form request (asm `0x0057D206`–`0x0057D26D`:
+      list `0x006256B0(D, 0x44)`, s = stat 0x15E, E `0x006439F0`, row
+      `0x0045C4B0`, `stsound` test, `0x00553380`, return; 2026-10-09).
+      E none or row none → return.
    3. F has 0x10 or 0x8000 (block / weapon block): F has 0x4000 →
       return. frame − stat 95 (`lastblockframe`) > `item_fasterblockrate`
       (102) / 8 (toward zero) + 15 → point form (no skill, mode 9 `BL`,
@@ -809,6 +816,99 @@ game and never in a classic game. Draw (owner seed, inline `lo′ mod
 100`); `r < chance` → durability − 1 and the rest of the item rules
 (items spec).
 
+### 10. Monster melee on a player, end to end
+
+The whole path of a plain monster melee hit (no used skill, e.g. a
+Fallen's A1 or A2) from the mode request to the player's life, in
+engine order. Each step names its owner; this section owns the order
+and the recorded check (Test vectors, "Recorded").
+
+1. **Mode request** (AI, `monsters/ai.md` §7.1): mode set `0x005A7C20`
+   with mode m = 4 (A1) or 5 (A2). For every m ≠ 3 (GH), after the path
+   set-up (`monsters/ai.md` §7.5 rules 2–5, `0x005A63F0` at
+   `0x005A7D2F`) and **before** umod mode 0 (`0x005A4350` at
+   `0x005A7D42`) and the start function: **mode damage**
+   `0x005A4F50(unit, m)` at `0x005A7D39` (`skills/bodies-2.md` §2.1)
+   rewrites the base list's `tohit(19)`, `mindamage(21)`,
+   `maxdamage(22)` (and element stats) from the row of m: 5 → A2, 7 / 8
+   → S1, any other (4, and 1 at creation) → A1. Values:
+   - **level scaling**: `pct(monlvl DM, A1MinD, 100)`,
+     `pct(monlvl DM, A1MaxD, 100)`, `pct(monlvl TH, A1TH, 100)` at the
+     unit's `level(12)` (`L-` columns when game +0x6A or +0x74 ≠ 0;
+     `monsters/init.md` §8.1); `noRatio` → the raw columns;
+   - **difficulty**: the monstats `(N)` / `(H)` columns and the monlvl
+     column of difficulty d (game +0x6D); expansion: + trunc(v × mult /
+     128) with mult from `monster_playercount(100)` (0 for one player);
+     classic, d ≠ 0, `Align` ≠ 1: min, max × 10 / 12, to-hit × 10 / 15.
+   Draws only for element slots whose `El{i}Mode` = m with 0 <
+   `El{i}Pct` < 100 (unit seed). The A-start `0x005A75C0`
+   (`sim/units.md` §4.6 rule 7) then sets the mode.
+2. **Strike** at the mode's action frame: event 0 `0x005A7670`, branch
+   without a used skill (`skills/use.md` §5.2 "Monsters"): no mode
+   missile (`MissA1`/`MissA2` empty) → melee set-up `0x005A5490`
+   (`skills/bodies-2.md` §2.13 "Monster pre-hit": T' = `target(game,
+   unit)`, zeroed record) and then, in the same event,
+   `apply_melee(game, unit, path target)` (§5.1). Roll and application
+   happen on one frame.
+3. **Hit** `melee_result` (`combat/hit.md` §4): range `1 + 2` for a
+   monster; `hit_test` monster terms (`combat/hit.md` §3.2): `AR =
+   tohit(19) + 5 × dexterity(2)` (monsters: dex 0), `pctAR =
+   item_tohit_percent(119)`; `def = defense(player) +
+   armorclass_vs_hth(33)` = `armorclass(31) + dex / 4` + armor percents;
+   `chance = clamp(2 × factor × alvl / (alvl + dlvl), 5, 95)`; one draw
+   on the **monster's** seed, `lo′ mod 100 < chance`. Then block
+   (`combat/hit.md` §5–§6, the player's seed; no shield → chance 0, no
+   draw) and dodge / avoid (player passives; none → no draw); get-hit
+   flag 4 unless state 54.
+4. **Roll** `start_combat` (§3): `bonuses` (§3.2) with no weapon (a
+   monster's `0x00535BC0` is none): `min = max(mindamage, 1) << 8`,
+   `max = max(maxdamage, 2) << 8`, `pct += strength(0)` (0); `physical
+   = min + roll(max − min)` (monster seed). Elements, drains, poison
+   draw only when their stats are set (§3.3; `max << 8 ≥ 8`); the burn
+   quirk `roll(1)` always draws (§3.1 step 10); monster crit (§3.1 step
+   13) draws when `monstats.Crit` ≠ 0, `r < Crit` doubles every damage
+   field. Will-die test (§3 step 2.3).
+5. **Totals** (§4): damage percent 100 (monster → player, §4.2); row 0
+   physical: `v −= normal_damage_reduction(34) << 8` (flat DR), then
+   `v × (100 − r) / 100` with r = player `damageresist(36)` capped 50
+   (DR %; no difficulty penalty for stat 36, §4.5 step 3); elements by
+   their resists with the difficulty penalty; leech rows run (attacker
+   monster). Total (+0x4C) = sum (§4.4 step 6).
+6. **Life** (§5.2 steps 7–14): `physical = min(physical, life)`; `life
+   −= total` in 1/256 points; `< 256` → 0. No hireling or hp-regen work
+   for a player defender.
+7. **Reaction** (§7.1 step 5): flags 1 | 4. Get-hit test (§6.2) with
+   `M = max life`: the test true (total below the class threshold) →
+   **soft**: the player is queued for update and gets unit flag 0x8000,
+   mode unchanged; false → point form mode 4 (`GH`, `x = total`), the
+   player's get-hit animation (its length by faster hit recovery is the
+   player animation rule, `sim/units.md`). Block (flag 0x10) → mode 9
+   (`BL`) when `frame − lastblockframe(95) > item_fasterblockrate / 8 +
+   15`.
+8. **Messages** (`sim/intents-events.md` §7.3 rule 1 step 4): unit flag
+   0x8000 → `0x00547F70` → S→C **0x0D** (`0x0053B4B0`, 13 bytes:
+   type 0, GUID, 0x13, x, y, hit class (unit +0xB0, §7.1 step 2), life
+   percent `0x00621F20`). Life itself reaches the client through the
+   life sync (`combat/vitals.md` §5.3: 0x95 once the change since the
+   last sent life is ≥ 10 % of max). A GH mode sends the player mode
+   message instead (unit flag 0x1).
+
+Draws on the monster's seed per strike: miss 1; hit 1 + 1 (physical) +
+1 (burn quirk) + 1 (crit, `Crit` ≠ 0) + element / drain rolls of set
+stats. The player's seed draws only for block (shield), dodge / avoid /
+evade passives, the armor durability pick (§9; no armor → none) and
+the get-hit masks (§6.2 steps 5–6).
+
+Monster **missile** on a player (e.g. the quill rat's `spike1`; owner
+`missiles/missiles.md` §R5 step 5 and §R6.1): the hit test `0x0057D9B0`
+draws on the **owner's** seed (missile 1: `armorclass_vs_missile(32)`,
+bonus = missile `tohit(19)`); miss → 1 owner step, missile removed, no
+damage; hit → 1 + 1 (monster crit `0x005A5560` at `0x005AD884`, `Crit`
+≠ 0) owner steps, the damage rolls on the missile's seed (§R6.2 there),
+no `start_combat`, no burn quirk. Recorded 2026-10-09, quill at f46:
+`check-combat-arrow-quillrat` 89 → miss (1 step, life unchanged),
+`check-combat-arrow-kill` 39 → hit, crit 76 (2 steps, 12800 → 12415).
+
 ## Constants & data dependencies
 
 | Item | Value |
@@ -928,6 +1028,49 @@ Synthetic (CI-safe):
 | crushing blow on a normal monster, life 25600, damage resist 0, players 1 | x = 6400 |
 | open wounds, attacker level 20, monster | ow = 18 × 5 + 126 = 216; h = 256 |
 | open wounds, level 70, player defender, missile | 45 × 10 + 15 × 81 + 126 = 1791; +40 = 1831; /4 = 457; /2 = 228 |
+
+Recorded (§10; `traces/raw/check-combat-fallen-hits-player/
+orig.state.jsonl`, check `traces/checks/combat-fallen-hits-player.check`):
+1.14d, ScnAma (Amazon level 1, no items: `armorclass` 0, dex 25 → def 6,
+no block, no armor durability pick, life 12800 = M), Blood Moor Normal,
+expansion, one player; a fallen1 party (monstats 19; GUIDs 19, 20, 21)
+poked at frame 30. fallen1 Normal: `A1MinD` 51, `A1MaxD` 101, `A1TH`
+101, A2 the same, `Crit` 5, `El1Pct` empty (no fire roll), level 1.
+Seeds are the snapshot unit seed (lo, hi) of the frame the mode started
+(after the start's own draws) and of the hit frame; the steps between
+them are `tools/trace-recorder/d2rng.py` `step`:
+
+| Hit frame | Fallen (mode, start) | Seed at start | Draw 1 `lo′ mod 100` | Draw 2 `roll(256)` = `lo′ & 255` | Draw 3 burn `roll(1)` | Draw 4 crit `mod 100` (< 5?) | Physical | Player life |
+|---|---|---|---|---|---|---|---|---|
+| 77 | 21 (A1, 70) | 2500281817, 685907116 | 25 hit | 1698023647 & 255 = 223 | 0 | 68 no | 256 + 223 = 479 | 12800 → 12321 |
+| 98 | 20 (A1, 91) | 2686906702, 557886531 | 29 hit | 2253558215 & 255 = 199 | 0 | 7 no | 455 | → 11866 |
+| 124 | 20 (A2, 116) | 2976444768, 790087745 | 25 hit | 3146423253 & 255 = 213 | 0 | 76 no | 469 | → 11397 |
+| 137 | 19 (A2, 129) | 3662132598, 1067771371 | 45 hit | 1104800614 & 255 = 102 | 0 | 27 no | 358 | → 11039 |
+| 137 | 21 (A1, 130) | 3277392918, 1209584854 | 92 miss | — | — | — | — | (1 step only) |
+| 158 | 20 (A1, 151) | 4274727917, 709079844 | 65 miss | — | — | — | — | unchanged |
+| 172 | 19 (A2, 164) | 3533759791, 1701973489 | 96 miss | — | — | — | — | unchanged |
+| 173 | 21 (A2, 165) | 3740231532, 902428276 | 20 hit | 3976525535 & 255 = 223 | 0 | 55 no | 479 | → 10560 |
+
+Every hit is exactly 4 steps of the attacker's seed and every miss 1
+(the end seeds in the snapshot match). What the record fixes:
+
+- the draw order hit → physical → burn `roll(1)` → monster crit (§3.1
+  steps 4, 10, 13): with crit before burn the 124 hit would crit (3 <
+  5) and deal 938;
+- min = 256, max = 512: `mindamage` 1, `maxdamage` 2 after mode damage
+  (pct(monlvl `L-DM` level 1, 51 / 101, 100) with `L-DM` 1 or 2, then
+  the 1 / 2 floors of §3.2); no other range reproduces all five rolls;
+- no DR, no resist, damage percent 100, no regeneration between hits:
+  life drops by the physical roll exactly;
+- hit chance 46 … 65 (hits at r = 20 … 45, misses at r = 65, 92, 96):
+  `chance = 100 × T / (T + 6)` (alvl = dlvl = 1) → to-hit T ∈ 6 … 11,
+  i.e. pct(`L-TH` level 1, 101, 100) ∈ 6 … 11 (PROVISIONAL REC-817:
+  the exact monlvl `L-TH` value was not read; any value in the bracket
+  reproduces this record);
+- reaction: the player's seed (85, 666) and mode 5 never change, so the
+  get-hit test passed its size test without a mask draw (total < M /
+  div: 358 … 479 < 12800 / div → div ≤ 16, i.e. hit class not
+  `2hss`/`club`/`2hsl`) and every hit was soft: no GH.
 
 Real 1.14d data (`#[ignore]`): the resistance rows of §4.3 equal
 `itemstatcost` ids by name; `difficultylevels.bin` values above.

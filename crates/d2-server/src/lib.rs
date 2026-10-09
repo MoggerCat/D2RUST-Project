@@ -9,6 +9,7 @@ pub mod adapters;
 pub mod buffers;
 pub mod dispatch;
 pub mod host;
+pub mod packets;
 pub mod seams;
 pub mod transport;
 pub mod world_data;

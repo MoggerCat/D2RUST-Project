@@ -554,13 +554,14 @@ impl Drlg {
         &mut self,
         svc: &mut Services<'_>,
         id: DrlgRoomId,
+        t: u32,
         wx: i32,
         wy: i32,
         v: u32,
     ) {
         let sub = cell::sub(v);
         if sub == 0 || sub == 4 {
-            svc.types.warp_unit(self, id, wx, wy, v);
+            svc.types.warp_unit(self, svc.data, id, t, wx, wy, v);
         }
         // TODO(rooms.md §9.5 "Warp tiles"): chaining to the room's warp
         // entry and the LitVersion extra record need the cell → warp entry
@@ -644,7 +645,7 @@ impl Drlg {
                 return Ok(());
             }
             if is_exit(t) {
-                svc.types.warp_unit(self, id, wx, wy, v);
+                svc.types.warp_unit(self, svc.data, id, t, wx, wy, v);
                 self.floor_warp_tiles(id);
                 return Ok(());
             }
@@ -676,7 +677,7 @@ impl Drlg {
             let tile = self.choose_tile(id, t, main, sub)?;
             self.add_wall(svc, id, x, y, v, t, tile)?;
             if is_exit(t) && level_id != 133 {
-                self.wall_warp_tiles(svc, id, wx, wy, v);
+                self.wall_warp_tiles(svc, id, t, wx, wy, v);
             }
         }
         // 7.
@@ -785,7 +786,7 @@ impl Drlg {
                         // stated for §9.5.1 step 6 only; applied here too.
                         let level_id = self.level(self.room(id).level).id;
                         if is_exit(t) && level_id != 133 {
-                            self.wall_warp_tiles(svc, id, wx, wy, v);
+                            self.wall_warp_tiles(svc, id, t, wx, wy, v);
                         }
                     }
                 }

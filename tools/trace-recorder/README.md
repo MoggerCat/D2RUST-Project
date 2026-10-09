@@ -13,7 +13,10 @@ code. Spec-role tool: the addresses it hooks are documented in
 | `check_rng.py` | Recomputes every recorded event from its own seed-before with `d2rng.py`; exit 1 on any mismatch |
 | `convert_rng.py` | Splits a raw file into seed chains and writes chosen chains as `traces/sim/rng/sim-NNNN.json` |
 | `d2rng.py` | The RNG rule from the spec (step and the five helpers), used by the two above |
-| `record_packets.py` | Launches `game/Game.exe` under the debugger, logs every client→server message at the server's queue read and dispatch (with result), every server→client message as queued and every flushed buffer, with tick markers and the frame number; writes `traces/raw/<time>-packets.jsonl` (gitignored). Spec: `specs/sim/intents-events.md` |
+| `rng_owners.py` | Owner post-pass of a `record_rng.py --frames` file: `game`, `unit T:G` or `other:…` on every draw and seed write (`specs/tools/rng-trace.md` §2); `--selftest` |
+| `rng_diff.py` | Compares a 1.14d and a d2rs (`d2-client state-dump --rng`) RNG recording: per frame, per owner, draw by draw; first divergence, next N, the game seed's draws in order, per-owner summary; exit 0/1/2/3 as `state_diff.py`; `--selftest`. Spec: `specs/tools/rng-trace.md` |
+| `record_packets.py` | Launches `game/Game.exe` under the debugger, logs every client→server message at the server's queue read and dispatch (with result), every server→client message as queued and every flushed buffer, with tick markers and the frame number; `--ticks N` ends after tick N's flush; writes `traces/raw/<time>-packets.jsonl` (gitignored; format `packets-raw-1`). Specs: `specs/sim/intents-events.md`, `specs/tools/packets-trace.md` |
+| `packets_diff.py` | Compares a 1.14d packets recording with a d2rs one (`d2-client state-dump --packets`): per frame the C→S, S→C and flushed-buffer streams record by record (id, size, bytes; `scenario-masks.tsv` masks; transport rows excluded); first divergence with context, next N, summary; exit 0/1/2/3; `--selftest`. Spec: `specs/tools/packets-trace.md` |
 | `path_tables.py` | Checks `specs/sim/path-tables.tsv` against the reference `Game.exe` file image (no process); `--write` regenerates it, `--perturb N` must report row N, `--selftest` perturbs every row. Spec: `specs/sim/pathing.md` |
 | `check_packets.py` | Checks a packets recording against `specs/sim/intents-events.md` and its two TSVs (rules R1–R7); `--perturb N` must report seq N; `--selftest` runs a synthetic trace and every single-byte perturbation |
 | `record_tick.py` | Launches `game/Game.exe` under the debugger, logs each server tick and its step markers, every timer event scheduled, cancelled and run, every unit/room/update-queue list change, and list snapshots every 25 frames; writes `traces/raw/<time>-tick.jsonl` (gitignored). Specs: `specs/sim/tick.md`, `specs/sim/unit-order.md` |
@@ -28,7 +31,12 @@ code. Spec-role tool: the addresses it hooks are documented in
 | `autostart.py` | Unattended start for every `record_*.py`: `--auto CHAR [--seed N] [--input SCRIPT]` starts a single-player game with that expansion character (no player at the keyboard), optionally with a fixed map / game seed, then plays a scripted input (clicks, keys, screenshots) into the window; `--try CHAR` runs it alone; `--selftest` |
 | `check_drlg_acts.py` | Checks the `dumpdrlg` records of an `--auto` run against `specs/drlg/levels.md` §3–§4 (rules D1–D7); `--perturb N`; `--selftest` |
 | `dump_tables.py` | Launches `game/Game.exe` under the debugger, stops when the excel load and its fix-ups have finished, writes every loaded table and the runtime maps it knows to `traces/raw/<time>-tables/` (gitignored); compared by `data-tool dump-compare` |
+| `record_objanim.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick hook only): every call of the animation re-init `0x00624390` on an object (client or server) with seed, mode, frame and speed before / after and the caller addresses on the stack, the client object init `0x004BC720` and 0x0E mode change `0x004BCF60`; `--steps` the generic step `0x004BCBB0` (mode changes, wraps), `--range` the interact range test `0x00623660` (result) and the C→S 0x13 object case `0x00548B00`; format `objanim-raw-1`; `--selftest`. Specs: `world/objects.md` §4, §7, `world/objects-client.md` §25 |
+| `objanim_facts.py` | Turns `record_objanim.py` recordings into `facts/objects/*.tsv` (measurements only); `--selftest` |
 | `poke.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick hook plus the tick return `0x0052FD1E`): runs poke directives (`specs/tools/poke.md`) between two server ticks, calling the game's own creation functions or writing the state field; `--poke-file FILE` (ticks relative to F0), `--poke "F D ..."` (absolute frame), `--forms FILE` (call forms, `CALL_FORMS`); writes `traces/raw/<time>-poke.jsonl` (format `poke-raw-1`, gitignored); `PokeLayer` / `add_options` for other recorders; `--selftest` |
+| `record_anim.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick hook only): per client unit update (`0x00480810`) the player / monster mode, frame +0x44, frame count +0x48, speed +0x4C, event +0x4E, footstep stamp +0x84, path position and motion record (flags, ticks left, ox / oy / oz); every footstep call (`0x004CAF60`) and leap start (`0x004C8670`); `--arm-level N` arms the hooks only in level N; writes `traces/raw/<time>-anim.jsonl` (format `anim-raw-1`). Specs: `client/model.md` §5, `render/unit-composite.md` §8, `audio/triggers.md` §5 |
+| `anim_facts.py` | Turns one `record_anim.py` recording into `facts/client/anim/<name>.tsv` (format `anim-facts-1`): the chosen units' update, footstep and leap rows; `--selftest` |
+| `panel_text.py` | Reads the text one `record_frames.py` frame draws (glyph `CelDrawColor` draws grouped by pen y, Latin glyph frame = character) into `facts/client/ui/<name>.tsv` (format `panel-text-1`); `--selftest` |
 
 ## Use
 
@@ -48,6 +56,21 @@ arguments after `--` (default `-w -ns`). The script refuses any
 
 The game is always terminated when the script ends: time limit, Ctrl+C,
 an exception (`finally`), or the debugger process dying (kill-on-exit).
+
+## One game at a time
+
+Only one 1.14d `Game.exe` may run on a machine. Every recorder starts the
+game through `record_rng.CreateProcessW`, which first takes the named mutex
+`Local\d2rs-original-game-1.14d` and holds it until the Python process
+exits. Several sessions or worktrees on one PC therefore queue: the second
+prints `another 1.14d run holds the game lock; waiting`. With the lock
+held, it also waits until no `Game.exe` is running, in case a game was
+started by hand or by an older copy of these tools. The wait gives up
+after one hour. It also follows the file rule in `docs/handoff/pc1-data.md`:
+it creates `%TEMP%\d2-game.lock` exclusively, waits while another holder
+has it, and deletes it at exit. A lock file older than 15 minutes with no
+`Game.exe` running is treated as left behind and removed. `D2_GAME_LOCK=0`
+turns all of it off.
 
 ## How it hooks the RNG
 
@@ -76,6 +99,27 @@ thread can run through a breakpoint that is temporarily removed.
 Cost: every inline draw is about six debug events. With all hooks the
 game runs far slower (entering Act 1 takes over 40 s instead of ~2 s);
 `--no-inline` is near full speed.
+
+### Frames and owners (`--frames`, version 0.2.0)
+
+```
+py tools/trace-recorder/record_rng.py --frames --ticks 40 --auto ScnAma --seed 1234 --seconds 240
+py tools/trace-recorder/rng_diff.py traces/raw/<time>-rng.jsonl traces/raw/<name>.d2rs.rng.jsonl
+```
+
+`--frames` also hooks the tick entry `0x0052D870` (ECX = game; the first
+game that ticks), writes a `tick` record per tick (`f` = game +0xA8 + 1,
+the game seed at game +0xD0, every unit of the five server hash lists
+with its seed at unit +0x20), puts `frame` (0 before the first tick) on
+every record and, on helper / setter records, an owner hint (`game_seed`
+or `unit` "T:G" when seed address − 0x20 is a server unit); after the run
+`rng_owners.py` adds `owner` to every record. `--ticks N` stops at the
+entry of tick N + 1. `--skip-inline drlg` (or `LO-HI,…`) leaves the
+DRLG inline sites unhooked (faster; those draws are missing). The run
+prints its speed. Measured under Wine (2026-10-09, `ScnAma`, seed 1234,
+all 846 inline sites): arrival at 58 s, 40 ticks recorded by 63 s;
+16,152 records, 103,471 debug events (1,643/s). Details and the
+comparison: `specs/tools/rng-trace.md`.
 
 ## Raw format (`rng-raw-1`, JSON lines)
 
@@ -164,7 +208,7 @@ recording after S seconds, default 120), `goto TYPE CLASS[,CLASS…] [S
 [DX DY]]` (walk toward the nearest unit of set S `0x7A5E70` with that
 type and class by clicking toward it, wait until the player stands
 still, click it at its draw point + (DX, DY), default (0, −8); screen
-position from `render/camera.md` §2–§4), `dumpdrlg [LABEL]` (log the
+position from `render/camera.md` §2–§4), `dumpdrlg [LABEL]` (with LABEL `rooms<id>` it also lists that level's DRLG rooms: tile rect, type, lvlprest index, preset units; log the
 client act's DRLG and level list, `drlg/levels.md` §1 offsets: act no,
 init seed, DRLG seed, `dwStartSeed`, tombs, jungle bit, per level id,
 DRLG type, flags, rooms, rect, level type, seed, jungle fields, warp
@@ -172,6 +216,23 @@ centre count), `end` (stops the recording; the game is killed as
 always). Every log line also goes to the recorder's footer notes.
 Arrival takes about 6.3 s after launch (about 23 s with `record_rng.py`
 inline hooks).
+
+Frame-anchored steps (the shared input form of
+`specs/tools/scenario-diff.md` §2 rule 4, which d2rs `state-dump --input`
+and `play --input` also take): `frame F` waits for the tick-return stop
+`0x0052FD1E` of game frame F − 1 (game +0xA8); the steps after it are
+posted while the game is stopped there, so the window takes them before
+frame F's drain. After a `frame` step, `click` / `rclick` / `key` post
+all their messages at once and `hold X Y N` holds N frames (the release
+posted at the stop of frame F + N − 1). The stop is the one `poke.py`
+uses (`AutoStart.attach` arms it only when nobody did): `record_state.py`,
+`record_frames.py` and `poke.py` attach it when the script has a `frame`
+step; other recorders never reach it (a note says so). Each posted step
+is a footer note `autostart: frame F: <step> posted at the stop of frame
+S` (S > F − 1: late, noted). Measured 2026-10-09 under Wine:
+`record_state.py --auto ScnAma --seed 1234 --ticks 60 --input "frame 10;
+click 600 300"` twice: identical snapshots; the player walks (mode 6,
+target (4880, 4223)) from frame 10 and stops at frame 32.
 
 Proved: a click at (600, 300) walks the player; `goto 2 119` opens the
 Rogue Encampment waypoint; with `TestSor` (expansion, `d2s-tool new
@@ -353,6 +414,21 @@ entry), `footer`. A list dump: `L`, `ext`, `fl`, `st`, `ex`, `ot`, `og`,
 extended lists `last`, `setl`, `ow`, `F` (full), `m` (mod keys), `cb`,
 `sb` (state bits).
 
+## record_walk.py: the local player's client path against the server's
+
+`record_walk.py` (0.1.0, raw format `walk-raw-1`) reuses `record_tick.py`'s
+debugger with two hooks only, the server tick `0x52D870` and the in-game
+draw entry `0x44C990` (`render/capture.md` §2), and logs the client player
+(`0x7A6A70`) and the server player (game unit hash, same GUID): path
+16.16 position, mode, path target, index and count, at every tick start
+(`t`) and every draw entry (`fr`), the unit / path pointers when they
+change (`units`), and the camera globals `0x7A520C` / `0x7A5208` /
+`0x7A5214` at the first tick and the first draw entry (`cam0`). Fast under
+Wine (about 1,700 ticks in 4 minutes). `convert_walk.py RAW --id ID --out
+traces/client/model/ID.json` writes the committed trace (area `client`,
+behavior `model`: the camera records and the tick states where either
+path changed, with tick / frame difference counts). `--selftest` checks
+the readers.
 ## record_state.py: game-state snapshots
 
 ```
@@ -416,11 +492,11 @@ of other threads during a call go to the recorder's own handler.
 | `spawn` | `scenario.md` §3.1 sequences. `normal`: `spawn` entry 1 `0x005B2F20` (mode 1, spread −1, flags 0); `random-boss`: `random_boss` `0x005A43E0` (no list, champion allowed, no warp check), then `champion_minions` `0x0054E1E0` (ESI boss, EDI game; cl 0, class); `champion`: `boss_spawn` `0x005A09E0` (EDI game, EBX class; room, cl 0, x, y, GUID −1, warp 0), `champion_mark` `0x005A48C0` with the umod, `champion_minions`; `unique`: `boss_spawn`, the umods appended to monster data (unit +0x14) +0x1C while fewer than 9, then `boss_minions` `0x005A2120` (ECX 3, EDX cl 0, EAX 6; game, boss, 1). Forms: `monsters/init.md` §25.1, §25.3 |
 | `seed-game`, `seed-unit`, `time` | field writes: game +0xD0; unit +0x20/+0x24; environment record +0x00 / +0x08 of the player's act |
 | `freeze` | the debugger sleeps at the stop |
-| `pos` | `teleport` `0x00650BE0`(unit path, room, x, y), else `place` `0x00554EA0`(game, unit, room, x, y, exact 1, alt 0); room by entry 6 from the unit's room; only unit types 0, 1, 3. Gap until a form is filled (item 22 (a)) |
-| `warp` | `warp` `0x0053AEC0`(game, player, level, tile; tile default 0). Gap (item 22 (b)) |
-| `item` | index = the first combined items record whose code (+0x80) matches (array header `0x0096CA58`: count, records; 424-byte records; `items/treasure.md` §9.1, `data/loading.md` §6–§9; no `0x00633640` call); then `item_create` `0x00558D90`(game, request, 0) with a 0x84-byte request at scratch +0x200: unit 0, game, ilvl (default 1), item, mode 3, x, y, room (entry 6), init flags 1, format (game +0x78), quality (0 or 1–8), rest 0. Gap (item 22 (c)) |
-| `stat` | `stat_set` `0x00627260`(unit, stat, value, layer); a unit with +0x5C = 0 → `failed`. Gap (item 22 (d)) |
-| `state` | `state_set` `0x00639DB0`(unit, state, 1/0): toggle and update-queue insert. Gap (item 22 (d)) |
+| `pos` | `teleport` `0x00650BE0` (stack: unit path, unit, room, x, y; `ret 0x14`; 1/0), else `place` `0x00554EA0` (ECX game, EDX unit; room, x, y, exact 1, alt 0; `ret 0x14`; 1/0); room by entry 6 from the unit's room; only unit types 0, 1, 3. Forms: `path-placement.md` §6 r4, §10 |
+| `warp` | `warp` `0x0053AEC0` (ECX game, EDX player; level, tile, default 0; `ret 8`; EAX not a status, result `ok`). Form: `waypoints.md` §7 r5 |
+| `item` | index = the first combined items record whose code (+0x80) matches (array header `0x0096CA58`: count, records; 424-byte records; `items/treasure.md` §9.1, `data/loading.md` §6–§9; no `0x00633640` call); then `item_create` `0x00558D90` (ECX game, EDX request; use seed 0; `ret 4`; EAX the item) with a 0x84-byte request at scratch +0x200: unit 0, game, ilvl (default 1), item, mode 3, x, y, room (entry 6), init flags 1, format (game +0x78), quality (0 or 1–8), rest 0. Form: `items/generation.md` §3 |
+| `stat` | `stat_set` `0x00627260` (stack: unit, stat, value, layer; `ret 0x10`); a unit with +0x5C = 0 → `failed`. Form: `stat-lists.md` §5 r2 |
+| `state` | `state_set` `0x00639DB0` (stack: unit, state, 1/0; `ret 0xC`): toggle and update-queue insert. Form: `stat-lists.md` §9.2 |
 
 The room for `object`, `superunique`, `spawn` and `item` comes from entry 6
 `0x00463740` (ECX = the player's room, EDX = x; y); 0 gives `failed`.
@@ -435,7 +511,7 @@ item, form)`. The argument names are what `poke.py` supplies (e.g.
 `warp`: `game`, `player`, `level`, `tile`); the form says where each goes:
 
 ```python
-Form(regs={"ecx": "game", "edx": "player"}, stack=["level", "tile"], ret=8, result="bool")
+Form(regs={"ecx": "game", "edx": "player"}, stack=["level", "tile"], ret=8, result="none")
 ```
 
 `regs` maps EAX/EBX/ECX/EDX/ESI/EDI to an argument; `stack` lists the
@@ -449,10 +525,10 @@ address and its pc1-data item. `FIELDS` holds the record offsets and table
 addresses the directives read (item format, items array, umod list); None
 there is a gap too.
 
-Gaps today: `teleport`, `place` (`pos`), `warp`, `item_create`, `stat_set`,
-`state_set` (`docs/handoff/pc1-data.md` Step 4 item 22 (a)–(d)). The spawn
-kinds' functions (item 22 (e)) are already stated in `monsters/init.md`
-§25.1 and filled.
+Every entry has its form: `teleport`, `place` (`pos`), `warp`,
+`item_create`, `stat_set`, `state_set` from `docs/handoff/pc1-data.md`
+Step 4 item 22 (a)–(d) (read from the asm, not yet run on 1.14d); the
+spawn kinds' functions (item 22 (e)) from `monsters/init.md` §25.1.
 
 PC 1, for each answered function:
 

@@ -390,6 +390,9 @@ pub fn player_regen<H: UnitHooks>(
         if hp > m {
             hp = m;
             sim.stats.free_state_list(hooks, unit, state::HEALTHPOT);
+            // The list's remove callback (`0x0056E900`: the state off)
+            // runs with the free (`stat-lists.md` §8.2 rule 6).
+            hooks.lists_expired(sim, unit);
         }
         if hp < 256 {
             hp = 256;
@@ -471,6 +474,7 @@ fn mana_regen<H: UnitHooks>(
     i = i.wrapping_add(sim.stats.unit_total(unit, stat::MANARECOVERY, 0));
     if v >= m && i > 0 {
         sim.stats.free_state_list(hooks, unit, state::MANAPOT);
+        hooks.lists_expired(sim, unit);
     }
     i = i.min(m.wrapping_sub(v));
     i = i.max(v.wrapping_neg());

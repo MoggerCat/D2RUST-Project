@@ -16,7 +16,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
 
 use d2_data::bin::BinTable;
-use d2_data::fixup::maps::{EquivMatrix, StateMaps};
+use d2_data::fixup::maps::EquivMatrix;
 use d2_data::fixup::records::stat_ops;
 use d2_data::tables::{Itemratio, Itemstatcost, Itemtypes, Record, States};
 use d2_sim::combat::CombatTables;
@@ -118,17 +118,20 @@ pub(crate) fn stat_data() -> Arc<StatData> {
         records,
     };
     stat_ops(&mut t);
+    // 200 empty states: the potion states 100 / 106 exist
+    // (`items/use.md` §3.1 step 1).
     let states = BinTable {
         name: "states".into(),
         source: "synthetic".into(),
-        count: 0,
+        count: 200,
         record_size: States::SIZE,
-        records: Vec::new(),
+        records: vec![0; 200 * States::SIZE],
     };
+    let maps = d2_data::fixup::maps::states(&states);
     Arc::new(StatData {
         stats: StatTable::from_fixed(&t).expect("itemstatcost"),
         classes: vec![ClassStats::default(); 7],
-        states: StateTable::new(&states, &StateMaps::default()).expect("states"),
+        states: StateTable::new(&states, &maps).expect("states"),
         damage_regen: vec![0; 8],
         aurastate: vec![0; 8],
         rescale_precision: d2_sim::stats::DEFAULT_RESCALE_PRECISION,
@@ -248,12 +251,22 @@ fn inv_tables() -> InvTables {
                     b"hp1 " => 3,
                     _ => 0,
                 },
+                // The live `hp1` use fields (`items/use.md` §3.1): state
+                // 100, stat 74, `calc1` 30 at 0, `len` 192 at 3.
+                use_state: if &r.0 == b"hp1 " { 100 } else { 0 },
+                use_stat: [if &r.0 == b"hp1 " { 74 } else { -1 }, -1, -1],
+                use_calc: [0, u32::MAX, u32::MAX],
+                use_len: 3,
                 ..InvItemRec::default()
             })
             .collect(),
         itemtypes,
         equiv: equiv(),
         books: Vec::new(),
+        item_use: d2_sim::items::inventory::ItemUseTables {
+            code: vec![0x07, 30, 0x00, 0x08, 192, 0, 0x00],
+            maxstat: Vec::new(),
+        },
     }
 }
 
@@ -1005,6 +1018,33 @@ fn drop_item_to_the_ground() {
     assert_eq!(t.rest.take_log(), [format!("quest_item_dropped {k}")]);
 }
 
+/// 0x17 with the ground announcement on (the play host's
+/// `announce_ground`): the dropped item is announced in the drop's own
+/// frame with 0x9C action 2 (§6.3: unit flag 0x1000, set by §9.1 step 3,
+/// read before the room clean-up clears it), then nothing more. An item
+/// placed on the ground without a drop is announced with action 0.
+/// Recorded 2026-10-09: `facts/items/a1-town-item-moves.tsv` n 57–58
+/// (C→S 0x17, S→C `9C 02 …` one frame later in 1.14d's numbering).
+// Covers: specs/items/inventory-moves.md §6.3, §9.1
+#[test]
+fn a_drop_is_announced_with_action_2() {
+    let mut t = setup();
+    let k = t.cursor_item(KEY);
+    let room = t.room;
+    t.rest.with(|r| {
+        r.room_at = true;
+        r.spot = Some(Spot { room, x: 13, y: 12 });
+    });
+    t.sim().announce_ground = true;
+    let (code, bytes) = t.frame(&msg(0x17, &[k]));
+    assert_eq!(code, Done);
+    assert_eq!(t.mode(k), 3);
+    assert_eq!(bytes, [x9c(0x02, k)]);
+    assert_eq!(t.idle(), NO_BYTES);
+    let g = t.ground_item(KEY, 14, 12);
+    assert_eq!(t.idle(), [x9c(0x00, g)]);
+}
+
 // ---- 0x18, 0x19: grid ------------------------------------------------------------------
 
 /// 0x19 (§7.4): a stored key to the cursor: mode 4, stored page 0 →
@@ -1253,10 +1293,13 @@ fn belt_moves() {
 /// 0x26 (§7.17): a belt potion used on the player. The dispatcher arms
 /// it (item flag 0x4, `items/use.md` §1 step 5), so the targeting reset
 /// after the use (`inventory.md` §5.3) clears it with S→C 0x3F before the
-/// removal message (0x9D action 5, flag 0x20). PROVISIONAL (REC-102):
-/// the host applies the potion itself; the rest's `use_item` is not
-/// asked.
-// Covers: specs/items/inventory-moves.md §7.17
+/// belt removal `0x00561E70` (0x9C action 0xF, bit-stream flag 0x20;
+/// recorded 2026-10-09, `facts/items/a1-town-potions-low.tsv` n 10–11).
+/// The host runs the potion itself (`items/use.md` §3.1); the rest's
+/// `use_item` is not asked. The `healthpot` state goes on, so the pass
+/// sends S→C 0xA8 state 100 with the recorded bytes `a8 00 <guid> 0a 64
+/// ff 01` (n 12).
+// Covers: specs/items/inventory-moves.md §7.17; specs/items/use.md §3.1
 #[test]
 fn use_belt_item() {
     let mut t = setup();
@@ -1267,9 +1310,16 @@ fn use_belt_item() {
     let mut reset = vec![0x3F, 0xFF];
     reset.extend_from_slice(&a.to_le_bytes());
     reset.extend_from_slice(&[0xFF, 0xFF]);
-    assert_eq!(bytes.len(), 2);
+    assert_eq!(bytes.len(), 3, "{bytes:02x?}");
     assert_eq!(bytes[0], reset);
-    assert_eq!(&bytes[1][..2], &[0x9D, 0x05]);
+    assert_eq!(&bytes[1][..2], &[0x9C, 0x0F]);
+    // The stream (cut off here; its removal flag 0x20 is checked in
+    // `d2_sim::wiring::inventory::tests::belt`) follows the header.
+    assert_eq!(bytes[1], x9c(0x0F, a));
+    let mut a8 = vec![0xA8, 0x00];
+    a8.extend_from_slice(&t.pguid().to_le_bytes());
+    a8.extend_from_slice(&[0x0A, 0x64, 0xFF, 0x01]);
+    assert_eq!(bytes[2], a8);
     assert!(t.rest.take_log().is_empty());
 }
 

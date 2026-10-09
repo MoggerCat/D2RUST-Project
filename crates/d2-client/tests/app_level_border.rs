@@ -178,38 +178,26 @@ fn walking_east_out_of_the_town_the_map_follows_into_the_blood_moor() {
     };
     assert_eq!(level(&app), Some(single_player::ACT1_TOWN as u16));
     let start = server_player(&server).expect("player placed");
-    // The town room spans sub-tiles x 80..120; the Blood Moor's 120..160.
-    assert!((80..120).contains(&start.0), "{start:?}");
-    let target = (140u16, start.1 as u16);
-    // The synthetic set has no `charstats` rows and no vitals tables, so
-    // its player cannot move (velocity 0, `pathing.md` §8.1 r2): stage
-    // what a 1.14d install gives (WalkVelocity 6, RunVelocity 9; stat 67
-    // velocitypercent 100 from creation, `combat/vitals.md` §1).
-    app_support::with(&server, |l| {
-        let (p, _) = single_player::local_player(&l.host().game).unwrap();
-        let g = &mut l.host_mut().game;
-        let hooks = g.events.action.hooks();
-        let mut t = (*hooks.tables).clone();
-        use d2_data::tables::{Charstats, Record};
-        let mut row = Charstats::decode(&[0u8; Charstats::SIZE]);
-        row.walkvelocity = 6;
-        row.runvelocity = 9;
-        t.combat.charstats = vec![row; 7];
-        hooks.tables = Arc::new(t);
-        let game = &mut g.game;
-        g.events.action.with(game, |_, v| v.set_base(p, 67, 100));
+    // The install's town is the level rect the player stands in; the
+    // route to the Blood Moor runs over the server's collision
+    // (`test_fixtures::host::route`), each leg a walk intent (C→S 0x03).
+    let rect = app_support::with(&server, |l| {
+        let h = l.host_mut().game.events.action.hooks();
+        let d = h.drlg.dungeon.acts[0].as_ref().expect("Act I");
+        let town = d.find_level(single_player::ACT1_TOWN).expect("the town");
+        d.level(town).rect
     });
-    app.world_mut()
-        .resource_mut::<BridgeResource>()
-        .0
-        .send(&d2_proto::client::Walk {
-            x: target.0,
-            y: target.1,
-        })
-        .unwrap();
-    while server_player(&server).map(|s| s.0) != Some(i32::from(target.0)) {
-        step(&mut app);
-    }
+    assert!(
+        (rect.x * 5..(rect.x + rect.w) * 5).contains(&start.0),
+        "{start:?} is in the town {rect:?}"
+    );
+    app_support::walk_into(
+        &mut app,
+        &server,
+        &ms,
+        single_player::ACT1_TOWN,
+        single_player::BLOOD_MOOR,
+    );
     for _ in 0..10 {
         step(&mut app);
     }

@@ -1,0 +1,118 @@
+# Act IV objectives for tools/playthrough/playthrough.py (spec:
+# specs/tools/playthrough.md). Crude, as act1.play: pokes (warp, pos,
+# stat, missile) jump between milestones; each milestone is its own
+# state-dump run. A boss kill is a Fire Bolt `missile` poke at the boss
+# (moved next to the player, life set to 1): the headless right click
+# walks instead of casting (spec Open question 2). A boss outside the
+# start's active rooms is found by a sweep (`find`) first.
+# Quests: specs/world/quests-act4.md (slots 25 The Fallen Angel,
+# 26 Terror's End, 27 Hell's Forge, 28 Act IV completed (expansion);
+# quests.md §1.3).
+# Ids from the 1.14d tables (levels.txt rows, monstats rows, objects.txt
+# rows): Pandemonium Fortress 103, Outer Steppes 104, Plains of Despair
+# 105, City of the Damned 106, River of Flame 107, Chaos Sanctum 108,
+# Harrogath 109; Diablo 243, Deckard Cain (Act IV) 246, Izual 256,
+# Halbu 257, Tyrael (Act IV) 367, Jamella 405, Hephasto 409; Hellforge
+# 376, Chaos Sanctum seals 392-396, waypoint objects 119,145,156,157,
+# 237,238,288,323,324,398,402,429,494,496,511,539.
+playthrough 1
+act 4
+
+# Act IV town (town byte act 3), Acts I-III done (acts=3: slots 7, 15, 23 bit 0).
+save sor --name PtSorD --class sor --expansion --level 50 --skill 8=20 --right-skill 44 --stat 8=128000 --stat 9=128000 --waypoints all --quests acts=3 --act 3 --difficulty normal
+
+milestone town-start
+  use sor
+  deadline 40
+  note NPCs outside the start's active rooms are left out (as act1 Akara)
+  need player lv == 103
+  need player act == 3
+  need unit ut 1 cl 246,257,367,405 count >= 2
+
+milestone town-wp
+  use sor
+  deadline 1000
+  sweep 20 2 300 30
+  need ever player lv == 103
+  need unit ut 2 cl 119,145,156,157,237,238,288,323,324,398,402,429,494,496,511,539 lv 103 seen
+
+milestone outer-steppes
+  use sor
+  deadline 80
+  poke 5 warp 104
+  need player lv == 104
+  need unit ut 1 lv 104 count >= 3
+
+milestone izual-present
+  use sor
+  deadline 1000
+  poke 5 warp 105
+  sweep 20 2 800 80
+  need ever player lv == 105
+  need unit ut 1 cl 256 lv 105 seen
+
+milestone izual-killed
+  use sor
+  deadline 1000
+  poke 5 warp 105
+  sweep 20 2 800 80
+  find ut 1 cl 256
+  poke +2 pos @1:256 @x+3 @y
+  poke +2 stat @1:256 6 0 256
+  poke +10 missile 58 @x @y @x+3 @y skill 36 1
+  need ever unit ut 1 cl 256 killed
+
+milestone city-of-the-damned
+  use sor
+  deadline 80
+  poke 5 warp 106
+  need player lv == 106
+  need unit ut 1 lv 106 count >= 3
+
+milestone hellforge
+  use sor
+  deadline 1000
+  poke 5 warp 107
+  sweep 20 2 800 80
+  need ever player lv == 107
+  need unit ut 2 cl 376 lv 107 seen
+
+milestone hephasto-present
+  use sor
+  deadline 1000
+  poke 5 warp 107
+  sweep 20 2 800 80
+  need ever player lv == 107
+  need unit ut 1 cl 409 lv 107 seen
+
+milestone chaos-sanctum-seals
+  use sor
+  deadline 1000
+  poke 5 warp 108
+  sweep 20 2 400 40
+  need ever player lv == 108
+  need unit ut 2 cl 392,393,394,395,396 lv 108 seen
+
+milestone diablo-present
+  use sor
+  deadline 80
+  note Diablo appears only after the five seals are opened (not poked here)
+  poke 5 warp 108
+  need player lv == 108
+  need unit ut 1 cl 243 present
+
+milestone diablo-killed
+  use sor
+  deadline 200
+  poke 5 warp 108
+  poke 30 pos @1:243 @x+3 @y
+  poke 30 stat @1:243 6 0 256
+  poke 40 missile 58 @x @y @x+3 @y skill 36 1
+  need ever unit ut 1 cl 243 killed
+
+milestone to-act5
+  use sor
+  deadline 100
+  poke 5 warp 109
+  need player lv == 109
+  need player act == 4

@@ -29,39 +29,39 @@
 |   1. Entry points | 124–146 |
 |   2. The create request | 147–164 |
 |   3. Placement | 165–173 |
-|   4. Creation sequence after placement (`0x005B2A00`) | 174–239 |
-|   5. Monster type init (`0x00574250`) | 240–257 |
-|   6. Stats and skills (`0x00573CB0`) | 258–297 |
-|   7. Monster level | 298–313 |
-|   8. Base values from monlvl | 314–348 |
-|   9. Player-count bonus (`0x00573930`) | 349–360 |
-|   10. Components (`0x005739D0`) | 361–371 |
-|   11. monprop (`monprop.txt`) | 372–380 |
-|   12. monequip (`0x005D6B60`) | 381–397 |
-|   13. Classic scaling (`0x0063EEF0`) | 398–405 |
-|   14. Normal mods and boss mods | 406–507 |
-|   15. Party minions | 508–512 |
-|   16. Boss spawns | 513–548 |
-|   17. Choosing umods (`0x005A0760`) | 549–592 |
-|   18. Boss minions and umod init (`0x005A2120`) | 593–610 |
-|   19. Umod init functions | 611–697 |
-|   20. Superuniques (`0x005A49B0`) | 698–746 |
-|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 747–761 |
-|   22. Umod callbacks and the type-7 event | 762–813 |
-|   23. Unique names (client) | 814–823 |
-|   24. Monster assign message | 824–875 |
-|   25. Calling the spawn functions outside population (tools) | 876–966 |
-|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 967–1026 |
-|   27. Class reinit (`0x00574370`) | 1027–1072 |
-| Constants & data dependencies | 1073–1094 |
-| Randomness | 1095–1137 |
-| Edge cases & original bugs | 1138–1169 |
-| Test vectors | 1170–1171 |
-|   Synthetic (CI-safe) | 1172–1194 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1195–1225 |
-|   Recorded checks (monster assign 0xAC) | 1226–1238 |
-| Provenance | 1239–1328 |
-| Open questions | 1329–1409 |
+|   4. Creation sequence after placement (`0x005B2A00`) | 174–243 |
+|   5. Monster type init (`0x00574250`) | 244–261 |
+|   6. Stats and skills (`0x00573CB0`) | 262–301 |
+|   7. Monster level | 302–317 |
+|   8. Base values from monlvl | 318–352 |
+|   9. Player-count bonus (`0x00573930`) | 353–364 |
+|   10. Components (`0x005739D0`) | 365–375 |
+|   11. monprop (`monprop.txt`) | 376–384 |
+|   12. monequip (`0x005D6B60`) | 385–401 |
+|   13. Classic scaling (`0x0063EEF0`) | 402–409 |
+|   14. Normal mods and boss mods | 410–511 |
+|   15. Party minions | 512–516 |
+|   16. Boss spawns | 517–552 |
+|   17. Choosing umods (`0x005A0760`) | 553–596 |
+|   18. Boss minions and umod init (`0x005A2120`) | 597–614 |
+|   19. Umod init functions | 615–701 |
+|   20. Superuniques (`0x005A49B0`) | 702–750 |
+|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 751–765 |
+|   22. Umod callbacks and the type-7 event | 766–817 |
+|   23. Unique names (client) | 818–827 |
+|   24. Monster assign message | 828–879 |
+|   25. Calling the spawn functions outside population (tools) | 880–970 |
+|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 971–1030 |
+|   27. Class reinit (`0x00574370`) | 1031–1076 |
+| Constants & data dependencies | 1077–1098 |
+| Randomness | 1099–1141 |
+| Edge cases & original bugs | 1142–1173 |
+| Test vectors | 1174–1175 |
+|   Synthetic (CI-safe) | 1176–1198 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1199–1229 |
+|   Recorded checks (monster assign 0xAC) | 1230–1242 |
+| Provenance | 1243–1332 |
+| Open questions | 1333–1413 |
 <!-- /index -->
 
 ## Summary
@@ -202,7 +202,11 @@ bit 1 ("add") is set. After `0x00574250` returns, in order:
       `0x00623F50` (`sim/units.md` §4.7), then a mode-change request
       for the unit's current mode (+0x10 = the creation mode;
       `0x005A7E60`) with target point (x, y), run through the mode set
-      `0x005A7C20(game, request, 1)` (`sim/units.md` §4.6).
+      `0x005A7C20(game, request, 1)` (`sim/units.md` §4.6). This
+      leaves (x, y) as the path target +0x10 / +0x12 (state-snapshot
+      `tx`, `ty`); the death message 0x69 code 8 does not send it but
+      the path end (last path point, (0, 0) at point count 0;
+      `sim/intents-events.md` §7.4 rule 7).
    2. `0x00553160(unit)` ≠ 0 → think restart `0x00573780`
       (`monsters/ai.md` §1.5); else room clean-up `0x00553220`
       (`sim/intents-events.md` §7.5). The gate (unit in EAX) is "the

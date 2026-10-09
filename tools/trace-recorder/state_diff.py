@@ -4,7 +4,7 @@ first frame it differs (specs/tools/state-snapshot.md §4).
 
     python3 state_diff.py ORIG.state.jsonl D2RS.state.jsonl [--next 20]
         [--ignore FIELD,...] [--types 0,1,...] [--frame-offset K]
-        [--from F] [--to F] [--perturb FRAME:TYPE:GUID:FIELD]
+        [--from F] [--to F] [--perturb FRAME:TYPE:GUID:FIELD] [--json FILE]
     python3 state_diff.py --selftest
 
 Exit codes: 0 MATCH, 1 DIVERGED, 2 PARTIAL, 3 error.
@@ -104,13 +104,13 @@ def compare(a, b, ignore=(), types=None, frame_offset=0, lo=None, hi=None, pertu
             hit[pk] = 0
     divs, total = [], 0
     first_by_field, count_by_field = {}, {}
-    bad_frames = set()
     units_compared = 0
+    div_frames = set()  # frames with at least one difference (summary(): match %)
 
     def add(d):
         nonlocal total
         total += 1
-        bad_frames.add(d["f"])
+        div_frames.add(d["f"])
         name = d["field"]
         count_by_field[name] = count_by_field.get(name, 0) + 1
         if name not in first_by_field:
@@ -144,7 +144,7 @@ def compare(a, b, ignore=(), types=None, frame_offset=0, lo=None, hi=None, pertu
     return {"divs": divs, "total": total, "first_by_field": first_by_field,
             "count_by_field": count_by_field, "frames": frames, "fields": fields,
             "one_sided": one_sided, "units_compared": units_compared,
-            "clean_frames": len([f for f in frames if f not in bad_frames])}
+            "div_frames": sorted(div_frames)}
 
 
 def where(d):
@@ -192,9 +192,6 @@ def report(r, ha, hb, out=sys.stdout):
     fr = r["frames"]
     w(f"\nframes compared: {len(fr)} ({fr[0]}..{fr[-1]}), unit records compared: "
       f"{r['units_compared']}, fields: {' '.join(r['fields'])}\n")
-    if fr:
-        w(f"frames with zero divergence: {r['clean_frames']}/{len(fr)} "
-          f"({100 * r['clean_frames'] // len(fr)}%)\n")
     if r["one_sided"]:
         w(f"not compared (one side only): {' '.join(r['one_sided'])}\n")
     for side, h in (("1.14d", ha), ("d2rs", hb)):
@@ -210,6 +207,32 @@ def report(r, ha, hb, out=sys.stdout):
         verdict, code = "MATCH", 0
         w(f"\n{verdict}\n")
     return code
+
+
+def summary(r, code):
+    """The machine-readable summary (`--json FILE`, format diff-summary-1;
+    specs/tools/scenario-diff.md §4): frames compared, frames whose every
+    compared field is equal, the verdict and the first divergence."""
+    fr = r["frames"]
+    first = None
+    if r["divs"]:
+        d = r["divs"][0]
+        first = {"frame": d["f"], "text": f"{where(d)}, field {d['field']}: "
+                                          f"1.14d {d['exp']} vs d2rs {d['got']}"}
+    return {"format": "diff-summary-1", "channel": "state", "tool": "state_diff.py",
+            "code": code, "verdict": VERDICTS[code], "frames_compared": len(fr),
+            "frames_equal": len(fr) - len(r["div_frames"]),
+            "frame_range": [fr[0], fr[-1]] if fr else None,
+            "differences": r["total"], "first": first}
+
+
+VERDICTS = {0: "MATCH", 1: "DIVERGED", 2: "PARTIAL", 3: "ERROR"}
+
+
+def write_json(path, obj):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, indent=1)
+        f.write("\n")
 
 
 def parse_perturb(s):
@@ -297,6 +320,16 @@ def selftest():
     b = clone_file(a)
     assert not compare(a, b, perturb=(1, 2, 7, "m"), types={0, 1})["divs"]
     ok += 2
+    # summary (--json): frames equal = frames without any difference
+    b = clone_file(a)
+    r = compare(a, b, perturb=(2, 1, 3, "hp"))
+    sm = summary(r, report(r, a[0], b[0], sink))
+    assert (sm["frames_compared"], sm["frames_equal"], sm["verdict"]) == (3, 2, "DIVERGED"), sm
+    assert sm["first"]["frame"] == 2 and "field hp" in sm["first"]["text"], sm
+    r = compare(a, clone_file(a))
+    sm = summary(r, report(r, a[0], a[0], sink))
+    assert (sm["frames_equal"], sm["first"], sm["code"]) == (3, None, 0), sm
+    ok += 2
     # no common frame: error
     try:
         compare(a, clone_file(a), lo=10)
@@ -322,6 +355,8 @@ def main(argv=None):
     ap.add_argument("--from", dest="lo", type=int, default=None)
     ap.add_argument("--to", dest="hi", type=int, default=None)
     ap.add_argument("--perturb", default=None, help="FRAME:TYPE:GUID:FIELD (self-test aid)")
+    ap.add_argument("--json", default=None, metavar="FILE",
+                    help="also write a machine-readable summary (diff-summary-1) here")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
     if a.selftest:
@@ -336,8 +371,14 @@ def main(argv=None):
                     perturb=parse_perturb(a.perturb) if a.perturb else None, limit=a.next)
     except (StateError, OSError, KeyError, ValueError) as e:
         print(f"error: {e}", file=sys.stderr)
+        if a.json:
+            write_json(a.json, {"format": "diff-summary-1", "channel": "state", "code": 3,
+                                "verdict": "ERROR", "error": str(e)})
         return 3
-    return report(r, fa[0], fb[0])
+    code = report(r, fa[0], fb[0])
+    if a.json:
+        write_json(a.json, summary(r, code))
+    return code
 
 
 if __name__ == "__main__":

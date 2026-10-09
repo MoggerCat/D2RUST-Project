@@ -88,7 +88,9 @@ use d2_server::adapters::handlers::world::{
     preview_cube_parts, preview_inv_parts, ActionEvents, ActionWorld, Outbox, QuestEnter,
     WiredWorld, WorldHost,
 };
-use d2_server::adapters::session::{load_new_character_with_items, load_save, GameSetup};
+use d2_server::adapters::session::{
+    initial_portal_flags, load_new_character_with_items, load_save, GameSetup,
+};
 use d2_server::adapters::session_flow::{
     create_flags, CharacterLoader, CreateGame, Loaded, SessionFlow,
 };
@@ -181,9 +183,11 @@ pub const DEFAULT_SEED: u32 = 1234;
 /// (game +0x84 := 1): it wins. Otherwise a loaded save whose town byte
 /// for the game's difficulty has 0x80 gives its saved map seed
 /// (`formats/d2s.md` §2.2 rule 8, +0xAB). Otherwise [`DEFAULT_SEED`].
-/// PROVISIONAL (REC-291): 1.14d draws a fresh seed for a new character
-/// (`time_value`, `rng.md` §5.2); d2rs keeps the fixed default so dev
-/// runs and draw dumps stay reproducible. d2rs-own, unverified.
+/// PROVISIONAL (REC-291 -> q-fix-new-char-seed): 1.14d draws a fresh
+/// seed for a new character (`time_value`, `rng.md` §5.2; measured: two
+/// new characters got 0x63a0b0fd and 0x07013cee,
+/// `traces/frontend/frontend-menus/frontend-0005.json`); d2rs keeps the
+/// fixed default so dev runs and draw dumps stay reproducible.
 pub fn game_seed(character: &Character, fixed: Option<u32>) -> u32 {
     if let Some(n) = fixed {
         return n;
@@ -1030,10 +1034,13 @@ impl Pending for LocalSeams {
     }
     /// `0x00623660`, the operate entry's interact range (`objects.md`
     /// §7.1 rule 3): no written spec gives its test.
-    // PROVISIONAL (world/objects.md §7.1 r3; REC-94): in range. The
-    // preview client sends C→S 0x13 only on arrival
-    // (`world_view/interact.rs`); the §7.3 r3–r4 approach is
-    // `Pending::object_approach`'s default (operate).
+    /// Measured (REC-94, `facts/objects/objanim-a1-town.tsv` run r3): 1.14d's client polls
+    /// `0x00623660(P, O)` every frame of the walk and sends C→S 0x13 on
+    /// the first frame it returns 1 (waypoint 119 at sub-tile offset
+    /// (4, 3), stash 267 at (3, 1)); both server calls of that 0x13
+    /// (`0x00548B7D`, `0x00584597`) then return 1. So "in range" holds
+    /// for every 0x13 the client sends; the test's own formula is not
+    /// modelled (`docs/handoff/pc1-data.md` Step 4).
     fn object_in_range(&self, _: &Game, _: UnitId, _: UnitId) -> bool {
         true
     }
@@ -2161,6 +2168,11 @@ fn loader(
             // the save's or the start items and the act's DRLG.
             let p = v.allocate(g, &req, 0, 0)?;
             v.init_player_seed(p);
+            // `combat/hit.md` §7.1: a player is good (2), its state-105
+            // list there before its first 0xAA (`intents-events.md`
+            // §7.9 rule 1, recorded). PROVISIONAL (REC-750): the
+            // original's call site in the join is not identified.
+            v.set_alignment(g, p, 2);
             Some(p)
         }) else {
             s.events
@@ -2258,6 +2270,17 @@ fn loader(
                         &save.header.hotkeys,
                         &s.world.item_guids(player),
                     );
+                    // `d2s-load.md` §8 rules 1–2: a full save's record
+                    // (the join's 0x5F and 0x23 pair, `intents-events.md`
+                    // §8.2 rules 3.3, 3.7). A stub's is the loader's.
+                    if entry.record.is_none() {
+                        let portals = s.events.action.sys.hooks.drlg.data.portal_levels();
+                        entry.record = Some(super::save_gaps::loaded_record(
+                            &save.header.mouse[..2],
+                            &s.world.item_guids(player),
+                            initial_portal_flags(&portals),
+                        ));
+                    }
                     let log = &mut s.events.action.hooks().x.log;
                     log.extend(
                         report

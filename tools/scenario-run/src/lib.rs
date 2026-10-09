@@ -486,6 +486,16 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
     if let Some(u) = sim.action.sys.units.get_mut(player) {
         u.mode = 1;
     }
+    // The join step after the player's allocation (`units.md` §6.1), as
+    // the play host's join (`d2_server::adapters::session`): neutral mode
+    // start, the regeneration event 3 every frame (life, stamina, mana;
+    // `stat-lists.md` §10.1) and the refresh event 11.
+    sim.action
+        .sys
+        .with(&mut game, |s, hooks| {
+            d2_sim::units::modes::player_join(s, hooks, player)
+        })
+        .map_err(|e| build_err(format!("player join: {e:?}")))?;
     let vitals = d.vitals().map_err(b)?;
     {
         let sys = &mut sim.action.sys;
@@ -590,6 +600,11 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
     );
     world.inventory = Some(preview_inv_parts(inv));
     let mut g: Sim = SimGame::with_world(game, sim, world);
+    // Ground items are announced by the update pass as the play app's
+    // host does (`inventory-moves.md` §6.3, §9.1 step 4): a drop from the
+    // cursor sends 0x9C action 2 (recorded 2026-10-09,
+    // `facts/items/a1-town-item-moves.tsv` n 57–58).
+    g.announce_ground = true;
     g.join(CLIENT, Some(player), None, client_state::IN_GAME)
         .map_err(|e| build_err(format!("join: {e}")))?;
     g.set_player(

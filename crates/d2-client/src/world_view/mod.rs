@@ -532,6 +532,10 @@ pub struct WorldFrame {
     /// ([`TileDraw::is_call_only`]), as items with an empty clip, sorted
     /// by key; not composed. Read by the facts export (§5 r12).
     pub calls: Vec<DrawItem>,
+    /// The 1.14d cel wrapper of each UI draw, by its index in the frame's
+    /// UI list (the items' `ItemTag::Ui`): glyphs of a text are
+    /// `CelDrawColor` (`tools/facts-render.md` §5 r18).
+    pub ui_calls: Vec<crate::ui::draw::CelCall>,
     /// Each drawn unit's cel context direction ([`UnitPose::dir64`]) by
     /// its draw slot ([`DrawKey::slot`] of its pass key and of its shadow
     /// key; a GUID is unique per unit type only), for the rendering facts
@@ -730,6 +734,14 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
     }
 
     ui_bind::ui_items(ui, rules, assets, &mut items)?;
+    let ui_calls = ui
+        .iter()
+        .map(|d| match d {
+            crate::ui::UiDraw::Image(r) => r.call,
+            crate::ui::UiDraw::Text(_) => crate::ui::draw::CelCall::Color,
+            crate::ui::UiDraw::Rect(_) => crate::ui::draw::CelCall::Draw,
+        })
+        .collect();
 
     scene::order(&mut items);
     Ok(WorldFrame {
@@ -743,6 +755,7 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
             calls
         },
         unit_dirs,
+        ui_calls,
         unit_calls: {
             unit_calls.sort_by_key(|c| c.key);
             unit_calls

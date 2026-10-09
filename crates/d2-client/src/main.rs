@@ -11,7 +11,7 @@
 //!                        (pokes, specs/tools/poke.md §5: F is the absolute
 //!                        server frame; file ticks are relative to the join)
 //!   d2-client facts-compare ORIGINAL_DIR D2RS_DIR [--ignore COL,...]
-//!   d2-client state-dump --save FILE.d2s [--seed N] [--difficulty D] --ticks T [--every n] --out FILE [--game-dir DIR] [--date YYYY-MM-DD] [--poke "F DIRECTIVE ARGS"]...
+//!   d2-client state-dump --save FILE.d2s [--seed N] [--difficulty D] --ticks T [--every n] --out FILE [--game-dir DIR] [--date YYYY-MM-DD] [--poke "F DIRECTIVE ARGS"]... [--packets FILE]
 //!
 //! `play` (the default) opens a window running the local single-player game: the
 //! in-process server (`d2-server` host over the wired `d2-sim`) pumped
@@ -480,9 +480,10 @@ fn select_data(
     Ok((data, dir, origin))
 }
 
-/// `play`: the front end (main menu) first, then the game; the game's window
-/// closing returns to character select. `--new`, `--save` and `--frames` skip
-/// the front end (a shortcut straight into the game).
+/// `play`: the front end (main menu) first, then the game; Save and Exit
+/// returns to the main menu (REC-200), the game's window closing ends the
+/// program (REC-291). `--new`, `--save` and `--frames` skip the front end
+/// (a shortcut straight into the game).
 fn play(o: Options) -> Result<()> {
     use d2_client::app::front_host::{run_front_end, FrontArt};
     use d2_client::app::front_start::{front_host, Entry, StartChoice};
@@ -493,7 +494,7 @@ fn play(o: Options) -> Result<()> {
     }
     if o.save.is_some() || o.new.is_some() || o.frames.is_some() || o.dump_draws.is_some() {
         let (data, dir, origin) = select_data(&o)?;
-        return play_once(&o, data, dir, origin, None, None);
+        return play_once(&o, data, dir, origin, None, None).map(|_| ());
     }
     let mut first = true;
     loop {
@@ -524,12 +525,16 @@ fn play(o: Options) -> Result<()> {
             Outcome::Exit => return Ok(()),
             Outcome::GameLoad(g) => {
                 let choice = StartChoice::resolve(g, &handles, &saves);
-                play_once(&o, data, dir, origin, g.difficulty, choice)?
+                if !play_once(&o, data, dir, origin, g.difficulty, choice)? {
+                    return Ok(());
+                }
             }
         }
     }
 }
 
+/// One game; `Ok(true)`: back to the front end (Save and Exit), `Ok(false)`:
+/// the program ends (the window closed).
 fn play_once(
     o: &Options,
     data: d2_client::app::single_player::GameData,
@@ -537,7 +542,7 @@ fn play_once(
     origin: String,
     menu_difficulty: Option<u8>,
     choice: Option<d2_client::app::front_start::StartChoice>,
-) -> Result<()> {
+) -> Result<bool> {
     use d2_client::app::{play, single_player};
     let single_player::GameData::Live(d) = &data;
     println!(
@@ -586,8 +591,8 @@ fn play_once(
         input: o.input.clone(),
         pokes: o.pokes.clone(),
     })?;
-    match result {
-        bevy::app::AppExit::Success => Ok(()),
+    match result.exit {
+        bevy::app::AppExit::Success => Ok(result.to_menu),
         bevy::app::AppExit::Error(code) => bail!("play exited with code {code}"),
     }
 }

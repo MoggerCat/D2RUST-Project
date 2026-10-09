@@ -40,7 +40,7 @@ sys.dont_write_bytecode = True  # no __pycache__ next to the scripts
 import autostart  # noqa: E402  (unattended start, input script; imports on any OS)
 import poke  # noqa: E402  (--poke / --poke-file: state injection, specs/tools/poke.md §2 rule 6)
 
-TOOL = "trace-recorder record_state 0.1.0"
+TOOL = "trace-recorder record_state 0.2.0"
 FORMAT = "state-1"
 SIDE = "orig"
 
@@ -59,6 +59,13 @@ BUCKETS = 128
 U_TYPE, U_CLASS, U_GUID, U_MODE, U_ACT, U_SEED, U_PATH = 0x00, 0x04, 0x0C, 0x10, 0x18, 0x20, 0x2C
 U_CUR, U_FC, U_SPEED, U_LIST, U_HASH_NEXT = 0x44, 0x48, 0x4C, 0x5C, 0xE4
 UNIT_BYTES = 0xE8         # one read covers every field above
+# owner links (state-snapshot.md §2 `own`: units.md §2, monsters/ai.md §3.1,
+# skills/bodies.md §6.20, items/inventory.md §1.1)
+U_DATA, U_MIS_OWNER, U_FLAGS2 = 0x14, 0x98, 0xC8
+MIS_OWNED = 0x400         # unit +0xC8 bit: the missile has an owner at +0x98
+MD_CONTROL, CTL_GAME, CTL_OWNER = 0x28, 0x28, 0x2C   # monster data -> AI control
+ID_INV, INV_OWNER = 0x5C, 0x08                       # item data -> inventory -> owner unit
+NO_OWNER = 0xFFFFFFFF
 # paths (path-placement.md §2.1-§2.3)
 DYNAMIC, STATIC = (0, 1, 3), (2, 4, 5)
 DP_XF, DP_X, DP_YF, DP_Y, DP_TX, DP_TY, DP_ROOM, DP_DIR = 0x00, 0x02, 0x04, 0x06, 0x10, 0x12, 0x1C, 0x64
@@ -76,10 +83,11 @@ WALK_LIMIT = 100000       # per list: a longer chain is a broken link
 
 FULL_STATS = (("hp", 6), ("hpx", 7), ("mp", 8), ("mpx", 9), ("st", 10), ("stx", 11))
 BASE_STATS = (("str", 0), ("ene", 1), ("dex", 2), ("vit", 3), ("lvl", 12))
-# state-snapshot.md §2 table order, `own` excluded (no 1.14d source)
+# state-snapshot.md §2 table order
 FIELDS = ["ut", "g", "cl", "m", "x", "y", "xf", "yf", "tx", "ty", "d", "fr", "fc", "sp", "s",
-          "act", "lv", "hp", "hpx", "mp", "mpx", "st", "stx", "str", "ene", "dex", "vit", "lvl"]
-GAPS = ["own: no 1.14d address in a spec (pc1-data.md Step 4 item 21)"]
+          "act", "lv", "hp", "hpx", "mp", "mpx", "st", "stx", "str", "ene", "dex", "vit", "lvl",
+          "own"]
+GAPS = []
 
 
 # --- the snapshot reader (pure: takes read(addr, n) -> bytes) ----------------
@@ -175,6 +183,7 @@ class StateReader:
             lv = self.level_of(room)
             if lv is not None:
                 self.put(rec, ua, "lv", lv[0], *lv[1])
+        self.owner(rec, ua, ut, g32)
         sl = g32(U_LIST)
         if sl:
             h = self.read(sl, SL_PLAIN_BYTES)
@@ -200,6 +209,31 @@ class StateReader:
             else:
                 self.note("hp..stx absent: unit +0x5C list is not extended")
         return rec
+
+    def owner(self, rec, ua, ut, g32):
+        """`own` (state-snapshot.md §2): a monster's AI-control owner, a
+        missile's owner, an item's inventory owner; absent otherwise."""
+        try:
+            if ut == 1:
+                data = g32(U_DATA)
+                ctl = self.u32(data + MD_CONTROL) if data else 0
+                if ctl and self.u32(ctl + CTL_GAME):
+                    o = self.u32(ctl + CTL_OWNER)
+                    if o != NO_OWNER:
+                        self.put(rec, ua, "own", o, (ua + U_DATA, 4), (data + MD_CONTROL, 4),
+                                 (ctl + CTL_OWNER, 4))
+            elif ut == 3:
+                if g32(U_FLAGS2) & MIS_OWNED:
+                    self.put(rec, ua, "own", g32(U_MIS_OWNER), (ua + U_MIS_OWNER, 4))
+            elif ut == 4:
+                data = g32(U_DATA)
+                inv = self.u32(data + ID_INV) if data else 0
+                ou = self.u32(inv + INV_OWNER) if inv else 0
+                if ou:
+                    self.put(rec, ua, "own", self.u32(ou + U_GUID), (ua + U_DATA, 4),
+                             (data + ID_INV, 4), (inv + INV_OWNER, 4), (ou + U_GUID, 4))
+        except OSError:
+            self.note("own absent: unreadable owner link")
 
     def units_of(self, game):
         """[(type of the list, unit address)] in walk order: 5 hash tables, then tiles."""
@@ -393,6 +427,13 @@ def build_world():
     unit(M2, 1, 4, 5, 12, 0, (5, 6), (-1, 0, -3))
     dyn(M2, 0x341000, 1, 5901, 2, 5701, 3, 4, rooms[2], 60)          # level absent (R3)
     link(hb(1, 3), M1, M2)                                           # M2: no stat list
+    # M1: a pet of GUID 77 (AI control with a game); M2: a released pack (owner -1)
+    m.put(M1 + U_DATA, "<I", 0x333000)
+    m.put(0x333000 + MD_CONTROL, "<I", 0x334000)
+    m.put(0x334000 + CTL_GAME, "<II", game, 77)
+    m.put(M2 + U_DATA, "<I", 0x343000)
+    m.put(0x343000 + MD_CONTROL, "<I", 0x344000)
+    m.put(0x344000 + CTL_GAME, "<II", game, NO_OWNER)
     # object: static path in R1
     O = 0x350000
     unit(O, 2, 3, 2, 0, 0, (7, 8), (0, 0, 0))
@@ -412,11 +453,18 @@ def build_world():
     unit(I2, 4, 11, 26, 0, 0, (11, 12), (0, 0, 0))
     stat(I2, 0x372000, EXTENDED, [(0, 0, 3)], [(7, 0, 9)])
     link(hb(4, 0), I1, I2)
+    # I2 sits in the player's inventory; I1 (ground) has item data but no inventory
+    m.put(I2 + U_DATA, "<I", 0x373000)
+    m.put(0x373000 + ID_INV, "<I", 0x374000)
+    m.put(0x374000 + INV_OWNER, "<I", P)
+    m.put(I1 + U_DATA, "<I", 0x363000)
     # missile: dynamic path in R1
     X = 0x380000
     unit(X, 3, 2, 10, 0, 0, (13, 14), (2, 3, 128))
     dyn(X, 0x381000, 0x10, 5820, 0x20, 5620, 5900, 5700, rooms[0], 63)
     link(hb(3, 64), X)
+    m.put(X + U_FLAGS2, "<I", MIS_OWNED)                             # owned missile of GUID 1
+    m.put(X + U_MIS_OWNER, "<I", 1)
     # tile list: one tile, static path in R2
     T = 0x390000
     unit(T, 5, 1, 0, 0, 0, (15, 16), (0, 0, 0))
@@ -436,14 +484,15 @@ EXPECTED = [
     {"ut": 1, "g": 4, "cl": 5, "m": 12, "x": 5901, "y": 5701, "xf": 1, "yf": 2, "tx": 3, "ty": 4,
      "d": 60, "fr": -1, "fc": 0, "sp": -3, "s": [5, 6], "act": 0},
     {"ut": 1, "g": 9, "cl": 5, "m": 2, "x": 5900, "y": 5700, "xf": 0, "yf": 0xFFFF, "tx": 0, "ty": 0,
-     "d": 7, "fr": 0, "fc": 3328, "sp": 256, "s": [3, 4], "act": 0, "lv": 2, "str": 0, "ene": 0,
-     "dex": 0, "vit": 0, "lvl": 2, "hp": 768, "hpx": 0, "mp": 0, "mpx": 0, "st": 0, "stx": 0},
+     "d": 7, "fr": 0, "fc": 3328, "sp": 256, "s": [3, 4], "act": 0, "lv": 2, "own": 77, "str": 0,
+     "ene": 0, "dex": 0, "vit": 0, "lvl": 2, "hp": 768, "hpx": 0, "mp": 0, "mpx": 0, "st": 0,
+     "stx": 0},
     {"ut": 2, "g": 3, "cl": 2, "m": 0, "x": 5850, "y": 5650, "d": 2, "fr": 0, "fc": 0, "sp": 0,
      "s": [7, 8], "act": 0, "lv": 2, "str": 0, "ene": 0, "dex": 0, "vit": 1, "lvl": 0},
     {"ut": 3, "g": 2, "cl": 10, "m": 0, "x": 5820, "y": 5620, "xf": 0x10, "yf": 0x20, "tx": 5900,
-     "ty": 5700, "d": 63, "fr": 2, "fc": 3, "sp": 128, "s": [13, 14], "act": 0, "lv": 2},
+     "ty": 5700, "d": 63, "fr": 2, "fc": 3, "sp": 128, "s": [13, 14], "act": 0, "lv": 2, "own": 1},
     {"ut": 4, "g": 11, "cl": 26, "m": 0, "fr": 0, "fc": 0, "sp": 0, "s": [11, 12], "act": 0,
-     "str": 3, "ene": 0, "dex": 0, "vit": 0, "lvl": 0, "hp": 0, "hpx": 9, "mp": 0, "mpx": 0, "st": 0,
+     "own": 1, "str": 3, "ene": 0, "dex": 0, "vit": 0, "lvl": 0, "hp": 0, "hpx": 9, "mp": 0, "mpx": 0, "st": 0,
      "stx": 0},
     {"ut": 4, "g": 12, "cl": 25, "m": 3, "x": 5801, "y": 5601, "d": 0, "fr": 0, "fc": 0, "sp": 0,
      "s": [9, 10], "act": 0, "str": 0, "ene": 0, "dex": 0, "vit": 0, "lvl": 0, "hp": 0, "hpx": 0,
@@ -482,6 +531,8 @@ def selftest():
             flip = TYPE_FLIP[old]
         elif tu:  # a high type byte: no unit type 0-5, so the position fields go too
             want = want | {(tu[0], k) for k in POS_KEYS if k in base[tu[0]]}
+        if tu and "own" in base[tu[0]]:  # the owner link read depends on the unit type
+            want = want | {(tu[0], "own")}
         m.b[a] = flip
         s2, a2 = StateReader(m.read).snapshot(game)
         m.b[a] = old
@@ -558,6 +609,8 @@ def main():
     r = make_recorder(rt)(os.path.abspath(a.game), gargs, out, a.seconds, a.ticks,
                           a.snap_every, " ".join(sys.argv))
     r.auto = auto
+    if auto and auto.has_frames():
+        auto.attach(r)  # `frame F` input steps at the tick-return stop of F - 1 (after the snapshot)
     if layer:
         layer.attach(r, before=False)  # snapshot of frame f - 1 first, then the pokes of f
     try:

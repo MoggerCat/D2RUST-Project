@@ -197,3 +197,36 @@ pub fn vk_to_key(vk: u16) -> Option<Key> {
 pub fn key_to_vk(k: Key) -> Option<u16> {
     (0u16..=0x104).find(|&vk| vk_to_key(vk) == Some(k))
 }
+
+/// Whether the key command of `action` runs in key mode `mode`
+/// (`ui/controls.md` §4.1 r4–r5): mode 1 all, mode 0 none, mode 2 the
+/// commands with the M2 flag. Actions that are no command, and Esc
+/// (command 56), always run (PROVISIONAL, REC-726: the play's panel and
+/// chat closes go through them).
+pub fn runs_in_key_mode(action: Act, mode: u8) -> bool {
+    if mode == 1 || action == Act::GameMenu {
+        return true;
+    }
+    match (0..super::original::COMMAND_COUNT as i32).find(|&c| action_of_cmd(c) == Some(action)) {
+        None => true,
+        Some(c) => mode == 2 && super::original::COMMANDS[c as usize].full_ok,
+    }
+}
+
+#[cfg(test)]
+mod mode_tests {
+    use super::*;
+
+    // Covers: specs/ui/controls.md §4.1 r4
+    #[test]
+    fn key_modes_gate_commands_by_the_m2_flag() {
+        // Cmd 1 (inventory) has no M2 flag; cmd 45 (minimap) and 5 (chat) do.
+        assert!(runs_in_key_mode(Act::ToggleInventory, 1));
+        assert!(!runs_in_key_mode(Act::ToggleInventory, 0));
+        assert!(!runs_in_key_mode(Act::ToggleInventory, 2));
+        assert!(runs_in_key_mode(Act::ToggleMinimap, 2));
+        assert!(!runs_in_key_mode(Act::ToggleMinimap, 0));
+        assert!(runs_in_key_mode(Act::GameMenu, 0));
+        assert!(runs_in_key_mode(Act::ChatSend, 0));
+    }
+}
