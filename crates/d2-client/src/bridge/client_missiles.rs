@@ -848,10 +848,10 @@ pub fn update_with(w: &mut ClientWorld, env: &Env, key: UnitKey) -> Result<(), H
         FN_TIGER_FURY => bodies::tiger_fury(w, env, key, &row),
         FN_CHAOS_ICE => bodies::chaos_ice(w, env, key, &row),
         FN_SUC_FIREBALL => bodies::suc_fireball(w, env, key, &row),
-        // §C13 37: frames left 150 → the shake (`render/camera.md` §8,
-        // row `q-fix-shake-starts`), 50 → sound 4,638 (audio); both not
-        // modelled; every branch steps.
-        FN_DIABLO_APPEARS => default_step(w, env, key, &row),
+        // The shake starts of `render/camera.md` §8, then the step.
+        12 | 29 | 31 | 36 | FN_DIABLO_APPEARS | 38 | 54 => bodies::shaker(w, env, key, &row),
+        // Rule W.
+        66 => bodies::worldstone_shake(w, key),
         // f ≤ 0: never stepped (§C6 r5); other functions: not modelled.
         _ => Ok(()),
     }
