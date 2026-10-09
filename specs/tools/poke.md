@@ -12,7 +12,8 @@
   `missile-superunique.poke`). The comparison with d2rs is REC-590. The d2rs side (§3, §5) is implemented
   (`d2-sim::poke`, scenario `poke` steps, `scenario-run`, `d2-client
   play --poke`): every directive runs on the synthetic install; `warp`
-  to another act and `item` without item tables are d2rs gaps.
+  to another act runs the act change (§1 table); `item` without item
+  tables is a d2rs gap.
 - **Target version:** 1.14d (the original side); the format is d2rs-own.
 - **Crate/module:** `d2-sim::poke` (directives, parser, d2rs apply);
   `conformance::scenario` (`poke` steps); `tools/scenario-run`;
@@ -31,21 +32,21 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 51–63 |
-| Inputs | 64–70 |
-| Outputs / state changes | 71–79 |
-| Rules | 80–81 |
-|   1. Directives | 82–116 |
-|   2. Poke files | 117–139 |
-|   3. In scenarios | 140–154 |
-|   4. The 1.14d side (`poke.py`) | 155–178 |
-|   5. The d2rs side (`d2-sim::poke`) | 179–193 |
-| Constants & data dependencies | 194–206 |
-| Randomness | 207–213 |
-| Edge cases & original bugs | 214–223 |
-| Test vectors | 224–234 |
-| Provenance | 235–240 |
-| Open questions | 241–261 |
+| Summary | 52–64 |
+| Inputs | 65–71 |
+| Outputs / state changes | 72–80 |
+| Rules | 81–82 |
+|   1. Directives | 83–117 |
+|   2. Poke files | 118–140 |
+|   3. In scenarios | 141–155 |
+|   4. The 1.14d side (`poke.py`) | 156–179 |
+|   5. The d2rs side (`d2-sim::poke`) | 180–194 |
+| Constants & data dependencies | 195–207 |
+| Randomness | 208–214 |
+| Edge cases & original bugs | 215–224 |
+| Test vectors | 225–235 |
+| Provenance | 236–241 |
+| Open questions | 242–262 |
 <!-- /index -->
 
 ## Summary
@@ -100,7 +101,7 @@ cannot run the directive, §4). Results are written as `poke` records
 | `seed-unit` | `<ref> <lo> <hi>` | set a unit's seed | write u32 lo, hi at unit +0x20, +0x24 (`rng.md` §5.3; `original-hooks.md` §4) | the unit record's `seed.set(lo, hi)` |
 | `time` | `<period 0..5> <ticks>` | set the time of day of the player's act | write the environment record (act +0x04; acts at game +0xBC + 4·act): +0x00 period, +0x08 ticks (`render/lighting.md` §9.1) | `ActEntry.environment` `period`, `ticks` |
 | `pos` | `<ref> <x> <y>` | teleport a unit | gap (Open question 1) | `WalkCtx::teleport` (`path-placement.md` §6 r4 teleport path) |
-| `warp` | `<level> [tile <n>]` | move the player to a level (tile index default 0) | gap (Open question 2) | `wiring::path::place::level_warp` (`path-placement.md` §11); another act: gap (`level_warp` returns `None` across acts) |
+| `warp` | `<level> [tile <n>]` | move the player to a level (tile index default 0) | gap (Open question 2) | `wiring::path::place::level_warp` (`path-placement.md` §11); another act: the act change `wiring::path::act_change::run` (`world/waypoints.md` §11 steps 1–19, `flows/act-change.md` §1; step 3 builds the act's DRLG when missing), as waypoint travel to another act; the client's 0x04 follows on the next tick's client pass |
 | `item` | `<code> <x> <y> [quality <q>] [ilvl <n>]` | create an item on the ground | gap (Open question 3) | `ItemUnits::create_item` (spawn mode ground) then `items::moves::ground::ground_place` |
 | `stat` | `<ref> <stat> <layer> <i32>` | set a base stat | gap (Open question 4) | `StatLists::unit_set` (`stat-lists.md` §5 r2) |
 | `state` | `<ref> <state> on\|off` | set or clear a state | gap (Open question 4) | `toggle_state` + `set_state_changed` (`stat-lists.md` §9.2 toggle with update-queue insert) |

@@ -246,6 +246,16 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     sim-0009. (Item 20 note: under Wine the front end does take X input,
     `tools/cloud-game/xinput.sh`; in-game NPC menus were not tried.)
 
+28. **Monster path target at the death message** (q-tool-poke, REC-594): 1.14d state
+    snapshots read an idle spawned monster's path target (+0x10/+0x12) as
+    its spawn point (`monsters/init.md` §4.1 step 1.1; check
+    `traces/checks/poke-fallen-town.check`), so d2rs now writes it there;
+    but `sim/intents-events.md` §7.4 rule 7 says the 0x69 code-8 target
+    is (0, 0) "when the path never had a target", from the recorded
+    `69 1b000000 08 0000 0000 38 06` (frame 2882). Read which field 0x69
+    code 8 copies and whether that monster's target was cleared (an AI
+    request) before its death; answer into §7.4 rule 7. d2rs tests
+    `monster_death.rs` / `e2e_night_world.rs` now expect the spawn point.
 ## How to check a behaviour in one command
 
 A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)
