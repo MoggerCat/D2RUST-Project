@@ -132,6 +132,12 @@ impl UnitHooks for Probe {
     fn monster_mode_bookkeeping(&mut self, _: &mut Sim<'_>, _: UnitId, mode: u32) {
         self.push(format!("book {mode}"));
     }
+    fn monster_mode_damage(&mut self, sim: &mut Sim<'_>, unit: UnitId, mode: u32) {
+        if self.log_umods {
+            let cur = sim.units.get(unit).map(|r| r.mode);
+            self.push(format!("damage {mode} cur {cur:?}"));
+        }
+    }
     fn monster_class_record(
         &mut self,
         _: &Sim<'_>,
@@ -1749,5 +1755,33 @@ fn umod_mode_1_site_runs_for_every_mode_after_the_start_and_before_the_cancel() 
                 .any(|p| (p.0 == 0 || p.0 == 1) && (p.1 == 150 || p.1 == 151)),
             "mode {mode}"
         );
+    }
+}
+
+// Covers: specs/monsters/umod-callbacks.md §2 r1; specs/skills/bodies-2.md §2.1
+#[test]
+fn the_mode_set_rewrites_mode_damage_after_the_bookkeeping_before_umod_0() {
+    // `0x005A7C20`: bookkeeping, mode damage `0x005A4F50(unit, mode)`
+    // with the old mode still set, umod mode 0, then the start; none of
+    // the three for GH (3).
+    for mode in [0u32, 1, 3, 4, 5, 8] {
+        let (mut game, mut sys) = animated();
+        let m = spawn(&mut game, &mut sys, UnitType::Monster, 1, 1);
+        if mode != 1 {
+            sys.hooks.start_mode = Some(mode);
+        }
+        sys.hooks.log_umods = true;
+        sys.hooks.log.clear();
+        sys.with(&mut game, |sim, h| modes::monster_set_mode(sim, h, m, mode))
+            .expect("set");
+        let log = &sys.hooks.log;
+        let pos = |p: &str| log.iter().position(|l| l.starts_with(p));
+        let damage = pos("damage ");
+        assert_eq!(damage.is_some(), mode != 3, "mode {mode}: {log:?}");
+        if let Some(d) = damage {
+            assert_eq!(log[d], format!("damage {mode} cur Some(1)"));
+            assert!(pos("book ").unwrap() < d, "mode {mode}: {log:?}");
+            assert!(d < pos("umods 0").unwrap(), "mode {mode}: {log:?}");
+        }
     }
 }

@@ -1,0 +1,11 @@
+check 1
+# Act travel (world/waypoints.md §11, flows/act-change.md §1): ScnAma in the
+# Rogue Encampment, warped to Lut Gholein (level 40) at frame 10 by the warp
+# poke (the act change of waypoint travel), then idle; state channel.
+name act-travel-lut-ama
+save ScnAma --class ama --expansion
+seed 1234
+ticks 80
+seconds 240
+channels state
+at 10 poke warp 40

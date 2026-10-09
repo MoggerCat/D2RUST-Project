@@ -377,6 +377,19 @@ impl Host {
         let world = self.app.world();
         let w = &world.resource::<BridgeResource>().0.world().clone();
         let ui = world.non_send::<WorldViewUi>();
+        // The drawn frame's camera anchor: the local player's position the
+        // world view and the hover pick read (the walk prediction).
+        let camera = world
+            .get_resource::<crate::world_view::WorldViewState>()
+            .and_then(|s| s.anchor)
+            .map(|a| match a.player {
+                crate::rules::camera::UnitPosition::Moving { x16, y16 } => {
+                    json!({"x16": x16, "y16": y16, "x": x16 >> 16, "y": y16 >> 16, "shake": [a.shake.0, a.shake.1]})
+                }
+                crate::rules::camera::UnitPosition::Static { sx, sy } => {
+                    json!({"x": sx, "y": sy, "shake": [a.shake.0, a.shake.1]})
+                }
+            });
         let o = ui.original.as_ref();
         let open: Vec<u8> = (0u8..0x30)
             .filter(|&i| o.is_some_and(|o| o.is_open(i)))
@@ -436,6 +449,7 @@ impl Host {
             "local": local,
             "client": {
                 "player": me,
+                "camera": camera,
                 "act": w.act.as_ref().map(|a| format!("{a:?}")),
                 "open": open,
                 "npc_menu": npc,
