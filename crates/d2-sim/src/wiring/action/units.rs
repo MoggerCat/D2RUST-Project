@@ -34,6 +34,9 @@ use super::{ActionHooks, Pending, SkillEvent, View, WiringError};
 
 /// The client status word's dead bit (`formats/d2s.md` §2.3).
 pub const STATUS_DEAD: u16 = 0x08;
+/// The spread of the mercenary's creation `0x005B23C0(…, 4, 0)`
+/// (`npc.md` §7.3 step 7).
+const HIRE_SPREAD: i32 = 4;
 
 /// Stat-list state of `justhit` (`missiles.md` §R5 step 6.1).
 pub const STATE_JUSTHIT: u16 = 86;
@@ -800,30 +803,53 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
         }
     }
 
-    /// The mercenary's creation (`npc.md` §7.3 step 7): a monster of
-    /// `class` in the room of `near`, a few subtiles beside it.
-    // d2rs-own, unverified: the offset (+2, +2) stands in for the
-    // placement `hirelings.md` §3.1 leaves to the path code's free-spot
-    // search; the allocation's path part validates the spot.
+    /// The mercenary's creation (`npc.md` §7.3 step 7, `hirelings.md`
+    /// §3.1): `0x005B23C0(game, near, class, mode, 4, 0)`, the placement
+    /// and creation of `population.md` §9 around `near`'s path position
+    /// in its room (spread 4: rings 3 … 12 on the active-room seed),
+    /// with the call's game seed lent to the hooks for the allocation's
+    /// unit-seed step (`rng.md` §5.3). `None` when nothing was placed.
+    /// Without the lent monster world: a plain allocation at (+2, +2)
+    /// from the point (d2rs-own, unverified: hosts with no population
+    /// state).
     fn spawn_near(
         &mut self,
         sim: &mut Sim<'_>,
+        seed: &mut Seed,
         near: UnitId,
         class: u32,
         mode: u8,
     ) -> Option<UnitId> {
         let room = sim.game.lists.unit(near)?.room()?;
         let (x, y) = self.path_position(near);
-        let req = AllocRequest {
-            ty: UnitType::Monster,
-            class,
-            room: Some(room),
-            add: true,
-            fixed_guid: None,
-            mode: u32::from(mode),
-            allied: false,
+        self.game_seed = *seed;
+        let placed = self
+            .with_monster_world(|w, h| {
+                w.spawn_at(sim, h, room, x, y, class as i32, mode, HIRE_SPREAD, 0)
+            })
+            .flatten();
+        let u = match placed {
+            Some(placed) => placed,
+            None => {
+                let req = AllocRequest {
+                    ty: UnitType::Monster,
+                    class,
+                    room: Some(room),
+                    add: true,
+                    fixed_guid: None,
+                    mode: u32::from(mode),
+                    allied: false,
+                };
+                View::of(sim.units, sim.stats, sim.data, self).allocate(
+                    sim.game,
+                    &req,
+                    x + 2,
+                    y + 2,
+                )
+            }
         };
-        View::of(sim.units, sim.stats, sim.data, self).allocate(sim.game, &req, x + 2, y + 2)
+        *seed = self.game_seed;
+        u
     }
 
     /// The minion owner of the unit's AI control record (owner data
