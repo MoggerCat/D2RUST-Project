@@ -232,3 +232,35 @@ The harness should test class and position, not GUID.
   - **Effect in the trace:** the Fortress NPCs' frame-24 think is cancelled at the frame-6 warp, so
     their seeds stay unchanged.
   - **d2rs differs:** `q-fix-p3-room-empty-think`.
+
+- **REC-223, the screen after an act-start video: settled from the call sequence** (`ui/frontend-loading.md` L10
+  rule 2, L5; edge case 8 corrected).
+  - **Run:** a first-time Warriv travel with a save whose quest word 6 bit 0 is set and word 7 is
+    clear, so the server sends 0x61 id 2. Windowed, sound on.
+  - **Video:** `0x00482EF0` ran (id 2 in ECX) at frame 296 and returned at once; Bink doesn't seem to
+    play in `-w`. Then 8 loading draws, then the first game frame at frame 296. So the loading frame
+    **is** redrawn after the video.
+  - **Who redraws it:** the room-graphics preload `0x00470070` (call `0x004700DD`, one draw per room
+    except k & 0x1F = 0). It runs from the S→C 0x04 handler `0x0045C9A0` through `0x00470B10`, which
+    holds `[0x007A8920]` = 1 for that pass only. The address is referenced only by bytes Ghidra had
+    not disassembled, so the spec had called this path dead. The no-video control (`warp 40`) shows
+    the same 8 preload draws, after the one 0x03 draw.
+  - **New PROVISIONAL:** the redrawn frames don't reload the Loading palette, so after a played video
+    they may show the palette the video player left.
+  - **d2rs differs:** it makes no preload draws and shows black after a video:
+    `q-fix-p6-loading-preload-draws`.
+  - **Pixels:** PrintWindow returns black at every loading draw, the control included, so the pixels
+    prove nothing. A full-screen pixel check of a played video remains open.
+
+- **[prov-data] Hratli's unit seed two steps at creation: answered** (`monsters/init.md` §4.2 new;
+  `world/quests-act3-2.md` §11.7 r3; the item's §3.3 pointer was wrong, that section covers Alkor).
+  - **Not the dummy code:** the spawn wrapper `0x005B2F20`, inits 49 / 50 and the first think draw
+    nothing.
+  - **The two steps come from normal creation:** `0x005B2A00` → `0x00555230` → `0x00573CB0`:
+    1. components `0x005739D0` (one roll; only TR has a choice);
+    2. HP `0x0045C3E0` at `0x00573F8F` (`roll(1)`).
+  - **Numeric check:** (4040195123, 666) → (3284026841, 1685134555) → (3975998680, 1369742535),
+    which equals the recording. Meshif 264 (a DS1 preset) gets the same two steps through the same
+    path.
+  - **d2rs differs:** the quest host's `spawn_monster` is a bare allocate:
+    `q-fix-p3-quest-spawn-creation`. It is related to `q-fix-p3-quest-superunique-spawn`.

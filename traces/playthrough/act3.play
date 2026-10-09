@@ -16,7 +16,7 @@
 # 102, Pandemonium Fortress 103; Deckard Cain (Act III) 245, Asheara 252,
 # Hratli 253, Alkor 254, Ormus 255, Meshif (Act III) 264, Natalya 297,
 # High Council 345,346,347, Mephisto 242; Lam Esen's tome 193, Gidbinn
-# altar 251, waypoint objects 119,145,156,157,237,238,288,323,324,398,
+# altar 251, Gidbinn decoy 252, waypoint objects 119,145,156,157,237,238,288,323,324,398,
 # 402,429,494,496,511,539.
 playthrough 1
 act 3
@@ -53,13 +53,24 @@ milestone spider-cavern
   need player lv == 85
   need unit ut 1 lv 85 count >= 3
 
-milestone flayer-jungle-altar
+# The Gidbinn altar (251, DS1 id 96) is a Kurast Docks object (docktown3,
+# Ormus' map AI walks to it, quests-act3.md §5.7); the Flayer Jungle
+# holds the Gidbinn decoy (252, DS1 id 97 of the Pygmy clearings' second
+# files, outdoor-act3-act5.md §3).
+milestone docks-gidbinn-altar
   use sor
   deadline 1000
+  sweep 20 2 300 30
+  need ever player lv == 75
+  need unit ut 2 cl 251 lv 75 seen
+
+milestone flayer-jungle-decoy
+  use sor
+  deadline 3000
   poke 5 warp 78
-  sweep 20 2 800 80
+  sweep 20 2 1200 40
   need ever player lv == 78
-  need unit ut 2 cl 251 lv 78 seen
+  need unit ut 2 cl 252 lv 78 seen
 
 milestone flayer-dungeon-3
   use sor
