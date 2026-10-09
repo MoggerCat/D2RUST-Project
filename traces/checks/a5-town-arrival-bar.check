@@ -1,0 +1,10 @@
+check 1
+# Harrogath arrival, idle (q-play-act5): a level-75 barbarian with Acts
+# I-IV done, saved in Act V; -seed 1234, no input. The units Harrogath
+# holds at the join (NPCs, waypoint, objects) and their first frames.
+name a5-town-arrival-bar
+save ScnA5Bar --class bar --expansion --level 75 --quests acts=4 --waypoints all --act 4
+seed 1234
+ticks 40
+seconds 300
+channels state

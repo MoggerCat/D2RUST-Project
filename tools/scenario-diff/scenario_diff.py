@@ -248,7 +248,7 @@ class Runner:
 
     def send_args(self):
         """--send "<frame> <message>" per `at … send` line, file order (every 1.14d
-        recorder but record_rng.py, d2rs state-dump; scenario-diff.md §3 rule 10)."""
+        recorder, d2rs state-dump and play; scenario-diff.md §3 rule 12)."""
         out = []
         for _, frame, text in self.c["send"]:
             out += ["--send", f"{frame} {text}"]
@@ -343,11 +343,11 @@ class Runner:
         return self.c["input"].get("shared") or self.c["input"].get("d2rs")
 
     def d2rs_common(self, save, play=False):
-        """The d2rs options both commands share; `state-dump` also takes the
-        sends, `play` (play=True) does not (§3 rule 10)."""
+        """The d2rs options both commands share (`state-dump` and `play`:
+        pokes, then sends, §3 rule 12)."""
         c = self.c
         a = ["--save", save, "--seed", str(c["seed"]), "--difficulty", c["difficulty"]]
-        return a + self.poke_args() + ([] if play else self.send_args())
+        return a + self.poke_args() + self.send_args()
 
     # channels --------------------------------------------------------------
     def state(self, save, sides):
@@ -433,10 +433,6 @@ class Runner:
             return None
         code = self.sh([exe, "facts-compare", os.path.join(scene_o, "scenes", "s"), scene_d,
                         "--ignore", "tick"], check=False, timeout=300)
-        if c["send"]:
-            # `play` takes no --send (§3 rule 10): d2rs drew without the messages
-            print("[draws] d2rs play ran without the 'at … send' messages: partial at best")
-            code = max(code, 2) if code != 1 else 1
         if not self.dry:
             sm = draws_summary(os.path.join(scene_o, "scenes", "s", "draws.tsv"),
                                os.path.join(scene_d, "draws.tsv"), code, at)
@@ -700,7 +696,7 @@ def selftest():
     assert not any("facts-compare" in x or "record_frames" in x for x in r.log)
     ok += 1
     # `at … send` lines (§2, §3 rule 10): canonical text, --send to every 1.14d
-    # recorder and to state-dump, not to play (draws partial), rng not compared
+    # recorder (record_rng.py included), to state-dump and to play (draws)
     cs = parse(GOOD + "at 6 send InteractWithEntity id=@1:148 type=1\n"
                "at 6 send hex 2f 00 00 00 00 0C 00 00 00\n")
     assert cs["send"] == [(12, 6, "InteractWithEntity type=1 id=@1:148"),
@@ -721,7 +717,7 @@ def selftest():
     for what in ("record_state.py", "state-dump", "record_frames.py"):
         line = next(x for x in r.log if what in x)
         assert sq in line and line.index(poke) < line.index(sq), (what, line)
-    assert "--send" not in next(x for x in r.log if " play " in x)
+    assert sq in next(x for x in r.log if " play " in x)  # play takes the sends too
     # variant: built next to the base install, then both sides run on it
     cv = parse(GOOD + "variant only-fallen\n")
     r = Runner(cv, "/tmp/w", dry=True)
@@ -927,11 +923,6 @@ def main(argv=None):
                 codes[ch] = r.draws(save, sides)
             elif ch == "packets":
                 codes[ch] = packets_channel.run(r, save, sides, shared_script_error)
-            elif ch == "rng" and c["send"]:
-                # record_rng.py takes no --send (§3 rule 10)
-                print("[rng] not compared: record_rng.py takes no --send "
-                      "(scenario-diff.md §3 rule 10)")
-                codes[ch] = 2
             elif ch == "rng":
                 codes[ch] = rng_channel.run(r, save, sides)
             else:

@@ -113,6 +113,64 @@ impl script::World for View<'_> {
     }
 }
 
+/// The pending sends of a `play` run: due once frame f − 1 has run (the
+/// state the host stands at before its next pump), in the order given.
+#[derive(Debug, Default)]
+pub struct SendSchedule {
+    pending: Vec<SendEntry>,
+    done: usize,
+}
+
+impl SendSchedule {
+    pub fn new(entries: Vec<SendEntry>) -> Self {
+        Self {
+            pending: entries,
+            done: 0,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.pending.is_empty()
+    }
+
+    /// Injects every due entry (`scenario-diff.md` §3 r12) and prints its
+    /// record line.
+    pub fn run_due<C: Clock>(&mut self, l: &mut Link<C>) {
+        if self.pending.is_empty() {
+            return;
+        }
+        let frame = l.host().game.game.frame;
+        let (due, later): (Vec<SendEntry>, Vec<SendEntry>) = std::mem::take(&mut self.pending)
+            .into_iter()
+            .partition(|e| frame >= e.frame - 1);
+        self.pending = later;
+        for e in due {
+            let r = inject_now(l, &e.msg);
+            let src = script::message_text(&e.msg).unwrap_or_default();
+            eprintln!("{}", record_line(e.frame, self.done, &src, &r));
+            self.done += 1;
+        }
+    }
+}
+
+/// `play --poke` / `--send`: one hook before every host frame, pokes first,
+/// then sends (as `state-dump` orders them after the snapshot of f − 1).
+pub fn install<C: Clock + Send + 'static>(
+    link: &mut ThreadLink<Link<C>>,
+    pokes: Vec<super::poke::Entry>,
+    sends: Vec<SendEntry>,
+) -> Result<(), ThreadStopped> {
+    if pokes.is_empty() && sends.is_empty() {
+        return Ok(());
+    }
+    let mut pokes = super::poke::Schedule::new(pokes);
+    let mut sends = SendSchedule::new(sends);
+    link.set_before_pump(move |l: &mut Link<C>| {
+        pokes.run_due(&mut l.host_mut().game);
+        sends.run_due(l);
+    })
+}
+
 /// Resolves and injects `msg` on the server now (between two frames).
 /// Before the local client is in game (state 4, `original-hooks.md` §1
 /// rule 5) nothing is sent: the 1.14d side does not inject before it.

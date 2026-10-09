@@ -734,7 +734,12 @@ impl OriginalUi {
         self.cursor_event(e, world);
         if let Some(p) = e.at() {
             self.shared.borrow_mut().mouse = p;
-            self.track_grid_hover(world, p);
+            // d2rs-own (PROVISIONAL, REC-707): a move or a press tracks
+            // the hover; a release does not, so a use press's cleared
+            // hover holds until the mouse moves (`a1-panel-cube` row 25).
+            if matches!(e, UiEvent::CursorMoved(_) | UiEvent::Press { .. }) {
+                self.track_grid_hover(world, p);
+            }
         }
     }
 

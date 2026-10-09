@@ -54,6 +54,11 @@ from ctypes import wintypes as W
 
 import x86emu
 
+if __name__ == "__main__":
+    # poke.py / send.py import `record_rng` for the Win32 definitions: give them
+    # this module, not a second copy whose ctypes classes differ
+    sys.modules.setdefault("record_rng", sys.modules[__name__])
+
 TOOL = "trace-recorder 0.3.0"
 RAW_FORMAT = "rng-raw-1"
 GAME_EXE_SHA256 = "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf"
@@ -418,6 +423,8 @@ def find_inline_sites(exe_bytes):
 
 class Recorder:
     auto = None  # autostart.AutoStart (unattended start, input script)
+    poke_layer = None  # poke.PokeLayer (--poke), run at the tick return 0x0052FD1E
+    send_layer = None  # send.SendLayer (--send), injected at the drain call 0x0044F136
     frames = False   # --frames: tick markers, frame and owner hints (rng-trace.md §4)
     max_ticks = 0    # --ticks N: stop at the entry of tick N + 1
     skip_ranges = ()  # --skip-inline: [lo, hi) code ranges whose inline sites are not hooked
@@ -542,6 +549,8 @@ class Recorder:
         self.counts[key] = self.counts.get(key, 0) + 1
 
     def emit(self, rec):
+        if "type" not in rec and "k" in rec:  # poke.py / send.py records name their kind `k`
+            rec = dict(rec, type=rec["k"])
         rec["seq"] = self.seq
         rec["ms"] = round((time.perf_counter() - self.t0) * 1000, 1)
         self.seq += 1
@@ -583,6 +592,11 @@ class Recorder:
                 self.finish_trace(tid, st, None, "interrupted")
         roles = set(self.roles.get(addr, ()))
         trace = None
+        if "tickret" in roles:
+            self.on_tick_return(tid, ctx)
+        if "drain" in roles and self.send_layer is not None:
+            # original-hooks.md §1 rule 4: injects and restores this thread's context
+            self.send_layer.on_drain_call(self, tid)
         if "tick" in roles:
             self.on_tick(ctx)
         if "ret" in roles:
@@ -624,6 +638,20 @@ class Recorder:
                               "emu": emu if trace is None else None}
         self.thaw(tid)
         self.freeze_others()
+
+    def on_tick_return(self, tid, ctx):
+        """The tick return 0x0052FD1E (ESI = game, game +0xA8 = the frame
+        that ran): the pokes due after it, the send layer's frame, and the
+        `frame F` input steps (as record_packets.py)."""
+        import poke
+        game = ctx.Esi
+        frame = struct.unpack("<i", self.read(game + poke.G_FRAME, 4))[0]
+        if self.poke_layer is not None:
+            self.poke_layer.on_tick_return(self, game, frame, tid, ctx)
+        if self.send_layer is not None:
+            self.send_layer.on_tick_return(self, game)
+        if self.auto is not None and self.auto.has_frames():
+            self.auto.on_tick_return(self, frame)
 
     def end_stepping(self, tid):
         """An emulated hit that arrived while this thread was still being
@@ -968,6 +996,17 @@ class Recorder:
             if self.read(TICK, 3) != TICK_BYTES:
                 raise RuntimeError(f"unexpected code at {TICK:#x}: not the 1.14d Game.exe?")
             self.add_role(TICK, "tick")
+        if (self.poke_layer is not None or self.send_layer is not None
+                or (self.auto is not None and self.auto.has_frames())):
+            import poke
+            if self.read(poke.TICK_RET, len(poke.TICK_RET_BYTES)) != poke.TICK_RET_BYTES:
+                raise RuntimeError("unexpected code at 0x0052FD1E: not the 1.14d Game.exe?")
+            self.add_role(poke.TICK_RET, "tickret")
+        if self.send_layer is not None:
+            import send
+            if self.read(send.DRAIN_CALL, len(send.DRAIN_CALL_BYTES)) != send.DRAIN_CALL_BYTES:
+                raise RuntimeError("unexpected code at 0x0044F136: not the 1.14d Game.exe?")
+            self.add_role(send.DRAIN_CALL, "drain")
         n_inline = 0
         if self.with_inline:
             for a in self.inline_sites:
@@ -1172,6 +1211,10 @@ def main():
     ap.add_argument("game_args", nargs="*", default=["-w", "-ns"],
                     help="Game.exe arguments (default: -w -ns)")
     autostart.add_options(ap)
+    import poke  # --poke / --poke-file (specs/tools/poke.md §2 rule 6)
+    import send  # --send (specs/tools/scenario-diff.md §2 `at … send`)
+    poke.add_options(ap)
+    send.add_options(ap)
     a = ap.parse_args()
     if a.ticks and not a.frames:
         ap.error("--ticks needs --frames")
@@ -1184,6 +1227,13 @@ def main():
     r.frames, r.max_ticks = a.frames, a.ticks
     r.skip_ranges = parse_ranges(a.skip_inline)
     r.emulate = a.emulate
+    r.poke_layer = poke.PokeLayer.from_args(a)
+    r.send_layer = send.SendLayer.from_args(a)
+    for what, layer in (("pokes", r.poke_layer), ("sends", r.send_layer)):
+        if layer is not None:
+            r.notes.append(f"{what}: {len(layer.pending())} directive(s)")
+    if (r.poke_layer is not None or r.send_layer is not None) and not a.frames:
+        ap.error("--poke / --send need --frames (frame-anchored)")
     t0 = time.perf_counter()
     try:
         counts = r.run()
