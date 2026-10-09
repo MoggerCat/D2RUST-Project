@@ -170,6 +170,7 @@ impl ViewRules for Fuzz {
             cof: path(if g & 0x8 != 0 { RANDOM_COF } else { COF }),
             dir: ((g >> 4) % 3) as usize,
             frame: ((g >> 6) % 3) as usize,
+            dir64: 0,
         }))
     }
 

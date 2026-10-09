@@ -284,6 +284,8 @@ fn export_rows_invert_placement_and_merge_tile_blocks() {
         view_left: Some(5),
         unit_type: &unit_type,
         sky: &[],
+        unit_dirs: &std::collections::BTreeMap::new(),
+        unit_calls: &[],
     };
     let rows = draw_rows(&[floor, floor_block, unit, ui], &cx).unwrap();
     let cols: Vec<String> = rows.draws.iter().map(|r| r[..8].join(" ")).collect();
@@ -425,6 +427,8 @@ fn sky_calls_replace_their_pixel_items() {
         view_left: None,
         unit_type: &unit_type,
         sky: &sky,
+        unit_dirs: &std::collections::BTreeMap::new(),
+        unit_calls: &[],
     };
     // Item rows by op; call rows with x, y and mode.
     let rows = |items: &[DrawItem]| -> Vec<String> {
@@ -499,6 +503,8 @@ fn block_frames_of_one_tile_are_one_row() {
         view_left: Some(0),
         unit_type: &unit_type,
         sky: &[],
+        unit_dirs: &std::collections::BTreeMap::new(),
+        unit_calls: &[],
     };
     let rows = draw_rows(
         &[
@@ -556,6 +562,8 @@ fn unit_shadows_name_the_cel_and_write_no_unit_row() {
         view_left: Some(0),
         unit_type: &unit_type,
         sky: &[],
+        unit_dirs: &std::collections::BTreeMap::new(),
+        unit_calls: &[],
     };
     let rows = draw_rows(&[shadow, body], &cx).unwrap();
     let cols: Vec<String> = rows.draws.iter().map(|r| r[..12].join(" ")).collect();
@@ -574,4 +582,91 @@ fn unit_shadows_name_the_cel_and_write_no_unit_row() {
         rows.sprites,
         [vec!["x/unit.dcc", "3", "0", "2", "5", "3", "-2"]]
     );
+}
+
+/// §5 r14: a unit cel's `dir` (and its `sprites.tsv` key) is the cel
+/// context's `dir64` (`WorldFrame::unit_dirs`), not the file direction
+/// of its frame set; a cel of no drawn unit keeps the file direction.
+#[test]
+fn unit_cel_dir_is_the_context_dir64() {
+    use crate::scene::order::pass;
+    use crate::scene::FrameId;
+    let s = store();
+    let mut body = DrawItem::new(FrameId(1), 50, 60);
+    body.key = DrawKey::new(pass::WALLS_UNITS, 0, 0, 0).unwrap();
+    body.tag = ItemTag::Unit(9);
+    let mut other = body;
+    other.tag = ItemTag::Unit(8);
+    let unit_type = |_: u32| Some(1u8);
+    let dirs = std::collections::BTreeMap::from([(9, 62u8)]);
+    let cx = ExportContext {
+        frames: &s,
+        view_left: Some(0),
+        unit_type: &unit_type,
+        sky: &[],
+        unit_dirs: &dirs,
+        unit_calls: &[],
+    };
+    let rows = draw_rows(&[body, other], &cx).unwrap();
+    let dirs: Vec<&str> = rows
+        .draws
+        .iter()
+        .filter(|r| r[1] == "CelDraw")
+        .map(|r| r[3].as_str())
+        .collect();
+    assert_eq!(dirs, ["62", "3"]);
+    assert_eq!(rows.sprites[0][1], "3");
+    assert_eq!(rows.sprites[1][1], "62");
+}
+
+/// §5 r15: a cel call without pixels (a component file in no archive) is
+/// a row at its key: the unit's run starts with its unit row even when
+/// the call comes first; the shadow call writes no unit row; neither has
+/// a size or a `sprites.tsv` row.
+#[test]
+fn unit_calls_are_rows_at_their_keys() {
+    use crate::assets::path::CanonicalPath;
+    use crate::scene::order::pass;
+    use crate::scene::FrameId;
+    use crate::world_view::UnitCall;
+    let s = store();
+    let mut body = DrawItem::new(FrameId(1), 50, 60);
+    body.key = DrawKey::new(pass::WALLS_UNITS, 0, 0, 1).unwrap();
+    body.tag = ItemTag::Unit(9);
+    let call = |pass, sub, shadow| UnitCall {
+        key: DrawKey::new(pass, 0, 0, sub).unwrap(),
+        tag: ItemTag::Unit(9),
+        path: CanonicalPath::new("x/sh.dcc").unwrap(),
+        dir64: 0,
+        frame: 6,
+        shadow,
+    };
+    let calls = [
+        call(pass::SHADOWS, 0, true),
+        call(pass::WALLS_UNITS, 0, false),
+    ];
+    let unit_type = |_: u32| Some(0u8);
+    let cx = ExportContext {
+        frames: &s,
+        view_left: Some(0),
+        unit_type: &unit_type,
+        sky: &[],
+        unit_dirs: &std::collections::BTreeMap::new(),
+        unit_calls: &calls,
+    };
+    let rows = draw_rows(&[body], &cx).unwrap();
+    let cols: Vec<String> = rows.draws.iter().map(|r| r[..12].join(" ")).collect();
+    assert_eq!(
+        cols,
+        [
+            "0 CelDrawShadow x/sh.dcc 0 6 - ? ? ? ? ? ?",
+            "1 unit - - - - ? ? - - - -",
+            "2 CelDraw x/sh.dcc 0 6 - ? ? ? ? ? ?",
+            &format!(
+                "3 CelDraw x/unit.dcc 3 0 - {} {} 2 5 3 -2",
+                rows.draws[3][6], rows.draws[3][7]
+            ),
+        ]
+    );
+    assert_eq!(rows.sprites.len(), 1);
 }
