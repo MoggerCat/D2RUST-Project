@@ -2,6 +2,7 @@
 use super::*;
 use crate::ui::item_tip_build::{pfx, tid, PriceText, SetCtx, TipUnit};
 use crate::ui::item_tip_desc::sid;
+use crate::ui::UiDraw;
 use d2_data::fixup::maps::EquivMatrix;
 use d2_data::tables::Itemtypes;
 use d2_proto::item_bits::hflag;
@@ -434,69 +435,119 @@ fn a_compact_stream_decodes_to_its_name() {
     assert!(tips().lines(&[1, 2]).is_empty(), "garbage gives no tip");
 }
 
-#[test]
-fn the_box_stays_on_the_640_screen_and_clips_to_it() {
-    let lines = tips().lines_of(&magic_cap(hflag::IDENTIFIED));
-    let files = UiFiles::new(&[]);
-    for (w, h) in [(640, 480), (800, 600)] {
-        let mut out: Vec<UiDraw> = Vec::new();
-        draw_tip(
-            &lines,
-            Point::new(w - 10, 5),
-            (w, h),
-            None,
-            &files,
-            &mut out,
-        );
-        let texts: Vec<&TextRequest> = out
-            .iter()
-            .filter_map(|d| match d {
-                UiDraw::Text(t) => Some(t),
-                _ => None,
-            })
-            .collect();
-        assert_eq!(texts.len(), lines.len());
-        for t in &texts {
-            let TextOpts::Draw { block_w, .. } = t.opts else {
-                panic!("draw call");
-            };
-            assert!(t.at.x >= 0 && t.at.x + block_w.unwrap() <= w, "{:?}", t.at);
-            assert!(t.at.y >= 0 && t.at.y <= h);
-            assert_eq!(t.clip, crate::ui::Rect::new(0, 0, w as u16, h as u16));
-        }
-    }
+/// A 256-record font of advance `adv` and height 10 (the pop-up
+/// measures only widths and the height).
+fn flat_font() -> FontMeasure {
+    use d2_formats::font::{FontTable, Glyph};
+    let glyphs = (0..256u16)
+        .map(|i| Glyph {
+            code: 255 - i,
+            unknown1: 0,
+            width: 6,
+            height: 10,
+            unknown2: 1,
+            unknown3: 0,
+            frame: i,
+            unknown5: 0,
+        })
+        .collect();
+    let mut m = FontMeasure::default();
+    m.insert(
+        FONT,
+        FontTable {
+            version: 1,
+            unknown: 0,
+            count: 256,
+            height: 10,
+            width: 0,
+            glyphs,
+        },
+    );
+    m
 }
 
+// Covers: specs/ui/item-tips.md §2 r4
 #[test]
-fn the_box_has_one_centered_line_per_row_and_stays_on_screen() {
+fn the_tip_is_one_popup_text_bottom_line_first() {
     let lines = tips().lines_of(&magic_cap(hflag::IDENTIFIED));
+    assert!(lines.len() > 1);
     let files = UiFiles::new(&[]);
     let mut out: Vec<UiDraw> = Vec::new();
     draw_tip(
         &lines,
-        Point::new(790, 5),
+        Point::new(300, 200),
         (800, 600),
         None,
         &files,
         &mut out,
     );
-    let texts: Vec<&TextRequest> = out
+    let texts: Vec<&crate::ui::TextRequest> = out
         .iter()
         .filter_map(|d| match d {
             UiDraw::Text(t) => Some(t),
             _ => None,
         })
         .collect();
-    assert_eq!(texts.len(), lines.len());
-    for t in &texts {
-        let TextOpts::Draw { block_w, .. } = t.opts else {
-            panic!("draw call");
+    assert_eq!(texts.len(), 1, "one pop-up text, not a draw per line");
+    // The last (top) line of the text is the item name; lines are
+    // separated by LF with the bottom line first.
+    let shown = String::from_utf16_lossy(&texts[0].text);
+    let rows: Vec<&str> = shown.split('\n').collect();
+    assert_eq!(rows.len(), lines.len());
+    assert!(
+        rows.last().unwrap().ends_with(&text(&lines[0])),
+        "{shown:?}"
+    );
+}
+
+// Covers: specs/ui/item-tips.md §2 r4
+#[test]
+fn the_popup_sits_above_the_item_unless_it_does_not_fit() {
+    let lines = tips().lines_of(&magic_cap(hflag::IDENTIFIED));
+    let fonts = flat_font();
+    let at = |top: i32| {
+        let mut out: Vec<UiDraw> = Vec::new();
+        let a = TipAnchor {
+            x: 400,
+            top,
+            bottom: top + 56,
         };
-        let w = block_w.unwrap();
-        assert!(t.at.x >= 0 && t.at.x + w <= 800, "{:?}", t.at);
-        assert!(t.at.y >= 0 && t.at.y <= 600);
-    }
-    assert_eq!(texts[0].style.color, color::BLUE);
+        draw_tip_at(&lines, a, (800, 600), Some(&fonts), &mut out);
+        out
+    };
+    let rect = |out: &[UiDraw]| match &out[0] {
+        UiDraw::Rect(r) => (r.x0, r.y0, r.x1, r.y1),
+        other => panic!("{other:?}"),
+    };
+    // The box height of n lines of height 10 (text.md §6: 16 / 10 of the
+    // font height per line).
+    let h = 16 * lines.len() as i32;
+    // Room above: y = top, the box bottom at top + 2 (text.md §8).
+    let (_, y0, _, y1) = rect(&at(300));
+    assert_eq!((y0, y1), (300 + 2 - h, 300 + 2), "above the item");
+    // No room (top − H ≤ 0): y = bottom + H, the box below the item.
+    let (_, y0, _, y1) = rect(&at(5));
+    assert_eq!((y0, y1), (5 + 56 + h + 2 - h, 5 + 56 + h + 2), "below it");
+}
+
+// Covers: specs/ui/inventory.md §5 r1
+#[test]
+fn the_anchor_is_the_cell_rectangle_of_the_item() {
+    // Grid at (418, 313), 29 × 29 cells, an item at (2, 1) of 2 × 3 cells.
+    let a = TipAnchor::of_cell((418, 313), (29, 29), (2, 1), (2, 3));
+    assert_eq!(
+        a,
+        TipAnchor {
+            x: 418 + 58 + 29,
+            top: 313 + 29,
+            bottom: 313 + 29 * 4
+        }
+    );
+}
+
+#[test]
+fn an_empty_tip_draws_nothing() {
+    let files = UiFiles::new(&[]);
     let mut none: Vec<UiDraw> = Vec::new();
     draw_tip(&[], Point::new(1, 1), (800, 600), None, &files, &mut none);
     assert!(none.is_empty());

@@ -180,6 +180,8 @@ pub fn tick_through_timers<H: TickHooks + ?Sized>(game: &mut Game, hooks: &mut H
     // Step 0. The debug trap switch on game +0x1DC8 is never set in
     // normal play and is not modelled.
     game.frame = game.frame.wrapping_add(1);
+    #[cfg(feature = "rng-trace")]
+    crate::debug::rng_trace::mark_frame(game.frame);
     environment(game, hooks);
     // Step 2 (frame-rate statistics) is wall-clock only (§8).
     room_pass(game, hooks);

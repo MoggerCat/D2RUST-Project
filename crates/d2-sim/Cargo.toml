@@ -37,3 +37,7 @@ harness = false
 # Exposes the synthetic fixtures of the unit tests to `benches/` (criterion);
 # never enabled in a normal build.
 bench-fixtures = []
+# The RNG draw log of `debug::rng_trace` (specs/tools/rng-trace.md): only
+# the debug export turns it on (`d2-client state-dump --rng`); never in a
+# normal build.
+rng-trace = []

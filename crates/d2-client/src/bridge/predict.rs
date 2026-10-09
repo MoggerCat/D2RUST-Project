@@ -755,6 +755,22 @@ impl<L: ServerLink> ServerLink for PredictLink<L> {
     }
 }
 
+/// Pokes pass through (`state-dump` runs its bridge on a [`PredictLink`]).
+impl<L: super::poke::PokeTarget> super::poke::PokeTarget for PredictLink<L> {
+    type Error = L::Error;
+    fn poke(&mut self, op: &d2_sim::poke::PokeOp) -> Result<d2_sim::poke::PokeResult, L::Error> {
+        self.inner.poke(op)
+    }
+}
+
+/// Snapshots pass through (`state-dump`).
+impl<L: super::state::StateSource> super::state::StateSource for PredictLink<L> {
+    type Error = L::Error;
+    fn state_snapshot(&mut self) -> Result<d2_sim::debug::state::StateSnapshot, L::Error> {
+        self.inner.state_snapshot()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
