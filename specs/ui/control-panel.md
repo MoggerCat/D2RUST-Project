@@ -39,7 +39,7 @@
 | Edge cases & original bugs | 849–861 |
 | Test vectors | 862–905 |
 | Provenance | 906–943 |
-| Open questions | 944–994 |
+| Open questions | 944–1001 |
 <!-- /index -->
 
 ## Summary
@@ -953,6 +953,13 @@ sites) for ui 0x15 / 0x22. Measured: scene
    |Δ| ≤ 200000 they differ in 48,562 cases (exhaustive, Python
    binary64). PROVISIONAL (REC-610) only for a video runtime DLL
    changing PC on the game thread.
+   *Recorded, REC-610 DirectDraw half* (2026-10-09, PC 1, Windows 10,
+   Intel HD 630, windowed `-w`, modules DDRAW.dll + dxgi.dll): the x87
+   control word of the game thread at every server-tick return
+   (`0x0052FD1E`, 63 and 103 ticks in two runs) is **0x027F** (PC = 53,
+   RC = nearest, all masked), MXCSR 0x1FA0; `-w -d3d` still loads only
+   DirectDraw (windowed 1.14d runs DirectDraw), so Direct3D (full
+   screen) and Glide (no glide DLL in this install) stay open.
    ```
    shown = start + trunc_f64((e1 as f64 / d as f64) * delta as f64)
    ```
