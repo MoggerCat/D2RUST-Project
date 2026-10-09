@@ -15,11 +15,7 @@
 //!   actions ([`HudBelt::set_keys`], REC-264): the first bound key; an
 //!   unbound slot has no label; the default `1`–`4` until bindings are
 //!   set; no cut to width 28 (§5 r4); not the string ids 4049 / 4050;
-//! - the hover text's name N and stat lines S (§5 r8) come from the item
-//!   tool tip ([`crate::ui::item_tip`]), not the `0x0048C060` /
-//!   `0x004E6410` strings: N is the tip's first line, S its other lines,
-//!   last first, each followed by an LF (drawn bottom-up, `ui/text.md`
-//!   §7, they read top-down as in the tip); no shop price;
+//! - the hover text has no shop price (§5 r8 step 4);
 //! - the highlight rectangles ([`BeltDraw::Box`]) take the palette's
 //!   nearest colours from the inventory's tint colours (the same four
 //!   triples).
@@ -29,7 +25,7 @@ use std::collections::BTreeMap;
 use crate::bridge::items::{self, mode};
 use crate::bridge::world::ClientWorld;
 use crate::ui::draw::{RectRequest, UiDraw, UiDrawSink};
-use crate::ui::item_tip::{ItemTips, TipLine};
+use crate::ui::item_tip::ItemTips;
 use crate::ui::panel::ClientIntent;
 use crate::ui::panels::control::belt::{
     hover_text, record_index, BeltDraw, BeltEffect, BeltItem, BeltRecord, BeltSlot8, BeltState,
@@ -37,19 +33,6 @@ use crate::ui::panels::control::belt::{
 };
 use crate::ui::panels::inv_items::{fits_belt, ItemsUi};
 use crate::ui::panels::UiFiles;
-
-/// The name N and stat lines S of an item tip (module doc): the first
-/// line, then the others last first, each with an LF after it. None for an
-/// empty tip.
-fn tip_parts(lines: &[TipLine]) -> Option<(Vec<u16>, Vec<u16>)> {
-    let (name, rest) = lines.split_first()?;
-    let mut stats = Vec::new();
-    for l in rest.iter().rev() {
-        stats.extend_from_slice(&l.text);
-        stats.push(0x0A);
-    }
-    Some((name.text.clone(), stats))
-}
 
 /// The popped belt rows' art.
 pub const POPBELT: &str = "panel\\ctrlpnl_popbelt";
@@ -197,6 +180,13 @@ impl HudBelt {
             })
             .collect();
         draws.extend(self.state.slot_draws(&rec, &slots));
+        // §5 r5: the cursor-item highlight, after every slot (over the
+        // items).
+        let occupied = |i: usize| slot_item(i).is_some();
+        draws.extend(
+            self.state
+                .cursor_highlight(&rec, gates.state_1f_open, &cursor, &occupied),
+        );
         draws
     }
 
@@ -271,8 +261,8 @@ impl HudBelt {
         let stream = items::stream(world, v.key)?;
         let me = crate::ui::item_tip_world::WorldUnit::local(world);
         let ctx = crate::ui::item_tip_world::hover_ctx(tips, world, me.as_ref(), v);
-        let lines = tips.tip_lines(stream, &ctx);
-        let (name, stats) = tip_parts(&lines)?;
+        // §5 r8 steps 1–2: N `0x0048C060`, S `0x004E6410`.
+        let (name, stats) = tips.name_and_properties(stream, &ctx)?;
         let item = BeltItem {
             guid: v.key.guid,
             usable: true,

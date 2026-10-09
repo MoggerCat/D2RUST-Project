@@ -105,6 +105,26 @@ pub fn inv_layout(r: &d2_data::tables::Inventory) -> InvLayout {
     }
 }
 
+/// The ten equipment rectangles of an `inventory.bin` row (`panels.md`
+/// §9.2), the empty-slot pictures' anchors (§9.4: left, bottom).
+pub fn equip_rects(r: &d2_data::tables::Inventory) -> super::inventory::EquipRects {
+    use super::inventory::BinRect;
+    let b =
+        |l: u32, rt: u32, t: u32, bt: u32| BinRect::new(l as i32, rt as i32, t as i32, bt as i32);
+    super::inventory::EquipRects {
+        r_arm: b(r.rarmleft, r.rarmright, r.rarmtop, r.rarmbottom),
+        torso: b(r.torsoleft, r.torsoright, r.torsotop, r.torsobottom),
+        l_arm: b(r.larmleft, r.larmright, r.larmtop, r.larmbottom),
+        head: b(r.headleft, r.headright, r.headtop, r.headbottom),
+        neck: b(r.neckleft, r.neckright, r.necktop, r.neckbottom),
+        r_hand: b(r.rhandleft, r.rhandright, r.rhandtop, r.rhandbottom),
+        l_hand: b(r.lhandleft, r.lhandright, r.lhandtop, r.lhandbottom),
+        belt: b(r.beltleft, r.beltright, r.belttop, r.beltbottom),
+        feet: b(r.feetleft, r.feetright, r.feettop, r.feetbottom),
+        gloves: b(r.glovesleft, r.glovesright, r.glovestop, r.glovesbottom),
+    }
+}
+
 /// d2rs-own, unverified: the grid of the spec's measured record 0 (640)
 /// / 16 (800) (`panels.md` §Test vectors) when no `inventory.bin` rows
 /// are set; no equipment boxes.
@@ -150,6 +170,12 @@ pub struct ItemsUi {
     /// the original; updated on each mouse event over an open grid
     /// ([`ItemsUi::track_hover`]) and read by the grid click (§10 r4).
     pub hover: std::cell::Cell<HoverState>,
+    /// The equipment rectangles by `inventory.bin` record (§9.4 empty-slot
+    /// pictures); `None`: none drawn.
+    pub equip_rects: Option<Vec<super::inventory::EquipRects>>,
+    /// The two-handed weapon codes (`weapons` `2handed`; d2rs-own,
+    /// unverified stand-in for `0x0063D340` = 2).
+    pub two_handed: std::collections::BTreeSet<[u8; 4]>,
 }
 
 /// Item flag 0x400000: ethereal (`ui/inventory.md` §8 r4).
@@ -234,6 +260,41 @@ impl ItemsUi {
             None => (w * cell.0, h * cell.1),
         };
         Some(Art { file, w, h, gw, gh })
+    }
+
+    /// The empty equipment-slot pictures (`panels.md` §9.4) of the local
+    /// player's record: a body location with no item, a hand also not
+    /// covered by a two-handed weapon in the other hand.
+    pub fn draw_equip_backgrounds(
+        &self,
+        world: &ClientWorld,
+        files: &UiFiles,
+        class: Option<u32>,
+        screen: &Screen,
+        out: &mut dyn UiDrawSink,
+    ) {
+        use super::inventory::{body_loc, equip_backgrounds, EquipState};
+        let Some(r) = class.and_then(|c| super::super::original::inventory_record(c, screen))
+        else {
+            return;
+        };
+        let Some(rects) = self.equip_rects.as_ref().and_then(|v| v.get(r)) else {
+            return;
+        };
+        let mut eq = EquipState::default();
+        for i in items::local_items(world) {
+            if i.mode != mode::BODY || !(1..=10).contains(&i.body) {
+                continue;
+            }
+            eq.occupied[usize::from(i.body)] = true;
+            let two = i.code.is_some_and(|c| self.two_handed.contains(&c));
+            match i.body {
+                body_loc::RIGHT_HAND => eq.right_two_handed = two,
+                body_loc::LEFT_HAND => eq.left_two_handed = two,
+                _ => {}
+            }
+        }
+        equip_backgrounds(rects, &eq, &|f| files.id(f), out);
     }
 
     /// The grid items of page 0 (§3 r1) and the equipped items (§6 r2) of

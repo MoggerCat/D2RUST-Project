@@ -35,7 +35,7 @@ use crate::ui::states::id;
 use crate::ui::PointerButton;
 
 /// `strClose` (`panels.md` §8 r1) and the tool tips' font.
-const STR_CLOSE: u16 = 4144;
+pub(super) const STR_CLOSE: u16 = 4144;
 const TIP_FONT: u16 = 1;
 
 /// `menu\horadric` (31 frames), registered with the panel files.

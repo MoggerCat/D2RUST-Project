@@ -982,7 +982,16 @@ fn world_view_frame(
                     .corpse_clicks
                     .take_clicks(&mut bridge.0, cam.as_ref(), &frame.unhandled)?;
             let unhandled = state.ground_items.take_clicks(&mut bridge.0, &unhandled)?;
-            crate::bridge::belt::send_keys(&mut bridge.0, &frame.unhandled)?;
+            // `ui/controls.md` §7 r2–r3: Shift (the hireling feed) and ui 9.
+            let belt_facts = ui
+                .original
+                .as_ref()
+                .map(|o| crate::bridge::belt::KeyFacts {
+                    shift: o.shift_held(),
+                    ui9_open: o.is_open(9),
+                })
+                .unwrap_or_default();
+            crate::bridge::belt::send_keys(&mut bridge.0, &frame.unhandled, belt_facts)?;
             // The input reset `0x0044DA40` (`client/msg-ui.md` §2 r2.2):
             // held := 0 before this pass's clicks.
             if ui.original.as_mut().is_some_and(|o| o.take_input_reset()) {

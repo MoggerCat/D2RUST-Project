@@ -470,6 +470,22 @@ mod belt {
             "{:?}",
             String::from_utf16_lossy(&t.text)
         );
+        // §5 r8: the short text, not the item tool tip: `Prefix(S, 3)`
+        // then `Prefix(N, 0)` of the name and the property lines.
+        let stream = crate::bridge::items::stream(
+            &w,
+            w.units.keys().copied().find(|k| k.unit_type == 4).unwrap(),
+        )
+        .unwrap();
+        let full: Vec<String> = tips
+            .lines(stream)
+            .iter()
+            .map(|l| String::from_utf16_lossy(&l.text))
+            .collect();
+        // The tool tip's requirement line is not part of it; a plain cap
+        // has no property lines, so T is the name alone.
+        assert_eq!(full, ["Cap", "Required Level: 3"]);
+        assert_eq!(String::from_utf16_lossy(&t.text), "\u{ff}c0Cap");
         // An item on the cursor hides it (§5 r8).
         let w = compact(world(
             &[
@@ -544,6 +560,43 @@ mod belt {
             .collect();
         assert_eq!(boxes, vec![(461, 562, 29, 29, BeltColor::Green)]);
         assert_eq!(b.state.hover_item, Some(7));
+    }
+
+    // With a worn belt of type 0 and an item on the cursor, the popped
+    // belt's hovered box is outlined: empty and the item fits a belt →
+    // green; occupied (a swap possible) → yellow; drawn after the slots.
+    // Covers: specs/ui/control-panel.md §5 r5
+    #[test]
+    fn the_cursor_item_highlights_the_hovered_belt_box() {
+        use crate::ui::panels::control::belt::{BeltColor, BeltDraw};
+        let boxes = parts().records[2].boxes.clone();
+        let mut b = HudBelt {
+            parts: BeltParts {
+                records: vec![BeltRecord { boxes }; 14],
+                types: BTreeMap::from([(*b"lbl ", 0)]),
+            },
+            ..Default::default()
+        };
+        let w = world(
+            &[
+                (6, mode::BODY, (8, 0, 0, 0), b"lbl "),
+                (7, mode::BELT, (0, 1, 0, 0), b"hp1 "),
+                (9, mode::CURSOR, (0, 0, 0, 0), b"hp1 "),
+            ],
+            Some(9),
+        );
+        let last_box = |d: &[BeltDraw]| match d.last() {
+            Some(BeltDraw::Box { rect, color }) => Some((rect.x, rect.y, rect.w, *color)),
+            _ => None,
+        };
+        let d = b.draw_list(&w, (800, 600), false, (440, 570), true);
+        assert_eq!(last_box(&d), Some((430, 562, 29, BeltColor::Green)));
+        let d = b.draw_list(&w, (800, 600), false, (470, 570), true);
+        assert_eq!(last_box(&d), Some((461, 562, 29, BeltColor::Yellow)));
+        // Without a cursor item: no outline on the empty box.
+        let w = world(&[(6, mode::BODY, (8, 0, 0, 0), b"lbl ")], None);
+        let d = b.draw_list(&w, (800, 600), false, (440, 570), true);
+        assert_eq!(last_box(&d), None);
     }
 
     // Covers: specs/ui/control-panel.md §5 r4

@@ -54,6 +54,19 @@ impl Panel for StashUi {
         panel.draw(&sh.tables, &env, ctx.strings, STASH_CAP, GOLD_MAX_FONT, out);
         let g = sh.items.stash_grid(env.exp, &sh.config.screen);
         sh.items.draw_stash(ctx.world, &sh.tables.files, &g, out);
+        // `panels-2.md` §20 r1: in the inclusive close rectangle,
+        // `strClose` queued at (X + 12 − w / 2, Y − 35), pop-up text in
+        // font 1, centre 0 (as the cube's tips, §20 r3).
+        let s = sh.config.screen;
+        if crate::ui::panels::stash_cube::stash_close_hover(&s, env.exp, sh.mouse) {
+            if let Some(t) = ctx.strings.get_id(super::cube_ui::STR_CLOSE) {
+                let fonts = sh.fonts.as_ref();
+                let w = fonts.and_then(|f| f.width_a(1, t)).unwrap_or(0);
+                let (x, y) = crate::ui::panels::stash_cube::stash_close_pos(&s, env.exp);
+                let at = Point::new(x + 12 - w / 2, y - 35);
+                super::hud_tips::push_popup(t.to_vec(), at, 0, false, (s.w, s.h), fonts, out);
+            }
+        }
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {

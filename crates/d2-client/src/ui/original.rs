@@ -113,25 +113,24 @@ pub const PENDING: &[(&str, &str)] = &[
          `original_tests.rs::stash_gold_withdraw_and_deposit_send_0x4f`)",
     ),
     (
-        "inventory tints (translucency) and empty-slot pictures (§9.4, `inventory.md` §2–§6)",
+        "inventory tints (translucency) (`inventory.md` §2–§6)",
         "the equipped and grid item tints and the hover tint are painted by \
          `ItemsUi::draw_tints` as opaque `hudfill` tiles (REC-271: the UI sprite path has no \
-         A2 blend); the shooter / quiver and cursor-item tints are not read and the \
-         empty-slot pictures (§9.4 table) are not drawn",
+         A2 blend); the shooter / quiver and cursor-item tints are not read",
     ),
     (
         "skill tree hover description and the no-points message (§10.5, §10.7)",
-        "icons, level numbers, the flag mask and the point spend (C→S 0x3B) are wired \
-         ([`skill_tree_ui`]); the point cost is 1 (`skpoints` formula not evaluated, \
-         REC-270); the tab tool tips, the free-points box and the no-points message are \
-         not wired",
+        "icons, level numbers, the flag mask, the point spend (C→S 0x3B), the free-points \
+         number and the tab / close tool tips are wired ([`skill_tree_ui`], `SkillTreeUi`); \
+         the point cost is 1 (`skpoints` formula not evaluated, REC-270); the hover \
+         description and the no-points message are not wired",
     ),
     (
-        "waypoint menu panel (ui 0x14, §13 r2–r7): tab gates",
+        "waypoint menu panel (ui 0x14, §13 r2–r7): row names",
         "the panel is installed and covered (`waypoint_ui`; \
-         `app_play_npc.rs::clicking_the_waypoint_walks_there_and_interacts`; the row and tab \
-         text come from the string table by id); the tab gates read the client quest flags \
-         (`msg-ui.md` open question 4, tab 0 only): every act tab is shown (d2rs-own)",
+         `app_play_npc.rs::clicking_the_waypoint_walks_there_and_interacts`); the tabs read \
+         the client quest flags (`menus.md` §1.4, §13.3); the row text is the `levels` \
+         `LevelName` key through the string table (`0x00453E70` not specified, d2rs-own)",
     ),
     (
         "hotkeys for other states (escape menu, chat, automap, party; the quest log, ToggleQuests, is \
@@ -601,6 +600,25 @@ impl OriginalUi {
         self.shared.borrow_mut().items.layouts = Some(layouts);
     }
 
+    /// The equipment rectangles by `inventory.bin` record and the
+    /// two-handed weapon codes: the empty equipment-slot pictures
+    /// (`panels.md` §9.4). Call before handing the files to the art
+    /// loader (the pictures' files are registered here).
+    pub fn set_equip_rects(
+        &mut self,
+        rects: Vec<super::panels::inventory::EquipRects>,
+        two_handed: std::collections::BTreeSet<[u8; 4]>,
+    ) {
+        let mut sh = self.shared.borrow_mut();
+        if !rects.is_empty() {
+            for f in super::panels::inventory::background_files() {
+                sh.tables.files.add(f);
+            }
+        }
+        sh.items.equip_rects = Some(rects);
+        sh.items.two_handed = two_handed;
+    }
+
     /// The `belts.bin` records and the belts' types (`hud_belt`).
     pub fn set_belt_parts(&mut self, parts: hud_belt::BeltParts) {
         self.shared.borrow_mut().hud.belt.parts = parts;
@@ -635,6 +653,11 @@ impl OriginalUi {
     /// Shift is held (set by the host each frame, `inv_items`).
     pub fn set_shift(&mut self, shift: bool) {
         self.shared.borrow_mut().items.shift = shift;
+    }
+
+    /// Whether Shift was held at the last [`Self::set_shift`].
+    pub fn shift_held(&self) -> bool {
+        self.shared.borrow().items.shift
     }
 
     /// Measured item graphic frame sizes by `invfile` (lower case).
@@ -1144,6 +1167,9 @@ impl Panel for InventoryUi {
         };
         panel.draw(&sh.tables, &sh.env(), gold, out);
         let class = Facts::of(ctx.world).class;
+        // §9.4: the empty equipment slots' pictures, under the items.
+        sh.items
+            .draw_equip_backgrounds(ctx.world, &sh.tables.files, class, &sh.config.screen, out);
         if let Some(l) = sh.items.layout(class, &sh.config.screen) {
             sh.items.draw_tints(ctx.world, &l, sh.mouse, out);
             sh.items.draw_panel(ctx.world, &sh.tables.files, &l, out);
@@ -1266,25 +1292,87 @@ fn class_u8(class: Option<u32>) -> Option<u8> {
     class.and_then(|c| u8::try_from(c).ok()).filter(|&c| c < 7)
 }
 
-/// Skill tree (ui 4, §10): back art per class and tab, tabs, close.
+/// Skill tree (ui 4, §10): back art per class and tab, tabs, close, the
+/// free-points number and the close / tab tool tips (`panels-2.md` §19).
 struct SkillTreeUi {
     sh: SharedRef,
     panel: SkillTreePanel,
 }
+
+/// The `uninterruptable` state: the free-points number in colour 1
+/// (`panels-2.md` §19 r3).
+const STATE_UNINTERRUPTABLE: u8 = 54;
 
 impl Panel for SkillTreeUi {
     fn id(&self) -> PanelId {
         PanelId(u16::from(UI_SKILLTREE))
     }
 
+    /// The right half above the control panel: the tab-1 band reaches
+    /// y = H − 49 (§10 r2), past the inventory area's bottom; the press
+    /// and release handlers decide what they consume.
     fn rect(&self) -> Rect {
-        self.sh.borrow().right_area().unwrap_or(EMPTY)
+        let sh = self.sh.borrow();
+        if sh.right_area().is_none() {
+            return EMPTY;
+        }
+        let s = sh.config.screen;
+        Rect::new(s.w / 2, 0, (s.w - s.w / 2) as u16, (s.h - 47) as u16)
     }
 
     fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let sh = self.sh.borrow();
         let view = ModelSkillTree::of(&sh, ctx.world);
-        self.panel.draw(&sh.tables, &sh.env(), &view, sh.mouse, out);
+        let uninterruptable = ctx
+            .world
+            .local()
+            .is_some_and(|u| u.states.contains(&STATE_UNINTERRUPTABLE));
+        self.panel.draw_with_points(
+            &sh.tables,
+            &sh.env(),
+            &view,
+            sh.mouse,
+            Some(uninterruptable),
+            out,
+        );
+        let s = sh.config.screen;
+        let tab = self.panel.tab;
+        // §19 r5: `strClose` queued (the pop-up text) in the close
+        // rectangle.
+        if let Some(class) = view.class() {
+            if super::panels::skilltree::close_hit(&s, class, tab, sh.mouse) {
+                if let (Some(at), Some(t)) = (
+                    super::panels::skilltree::close_tool_tip_at(&s, class, tab),
+                    ctx.strings.get_id(cube_ui::STR_CLOSE),
+                ) {
+                    let fonts = sh.fonts.as_ref();
+                    hud_tips::push_popup(t.to_vec(), at, 0, true, (s.w, s.h), fonts, out);
+                }
+            }
+        }
+        // §19 r4: the tab tool tip, at once: the rectangle (colour (0, 0,
+        // 0) nearest: palette index 0, mode 6) and the text, Font16,
+        // left-aligned.
+        if let Some(tip) = super::panels::skilltree::tab_tool_tip(&s, tab, sh.mouse) {
+            if let Some(t) = ctx.strings.get_id(tip.string) {
+                let (x0, y0, x1, y1) = tip.rect;
+                out.push(super::draw::UiDraw::Rect(super::draw::RectRequest {
+                    x0,
+                    y0,
+                    x1,
+                    y1,
+                    color: 0,
+                    mode: 6,
+                }));
+                out.push(text(
+                    t.to_vec(),
+                    tip.text_at.x,
+                    tip.text_at.y,
+                    super::panels::skilltree::FONT16,
+                    0,
+                ));
+            }
+        }
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {
@@ -1298,23 +1386,32 @@ impl Panel for SkillTreeUi {
         let mut sh = self.sh.borrow_mut();
         let env = sh.env();
         let view = ModelSkillTree::of(&sh, ctx.world);
-        match left(e) {
+        let s = sh.config.screen;
+        let input = |at: Point| super::panels::skilltree::InputCtx {
+            over_belt: sh
+                .hud
+                .belt
+                .over(ctx.world, (s.w, s.h), s.res2(), (at.x, at.y)),
+            has_player: ctx.world.local().is_some(),
+        };
+        let consumed = match left(e) {
             Some((true, at)) => {
-                let out = self.panel.mouse_down(&env, &view, at);
-                sh.outputs.extend(out);
-                UiResponse::Consumed
+                let d = self.panel.mouse_down_ctx(&env, &view, at, input(at));
+                sh.outputs.extend(d.out);
+                d.consumed
             }
             Some((false, at)) => {
-                let r = self.panel.mouse_up(&env, &view, at);
+                let r = self.panel.mouse_up_ctx(&env, &view, at, input(at));
                 sh.outputs.extend(r.out);
                 // §10.8: x ≤ W / 2 is not consumed.
-                if r.consumed {
-                    UiResponse::Consumed
-                } else {
-                    UiResponse::Ignored
-                }
+                r.consumed
             }
-            None => UiResponse::Consumed,
+            None => true,
+        };
+        if consumed {
+            UiResponse::Consumed
+        } else {
+            UiResponse::Ignored
         }
     }
 }
@@ -1529,35 +1626,8 @@ pub fn name_line(
 
 impl CharacterUi {
     /// Art and close button only (no fonts or no local player).
-    fn draw_static(&self, sh: &Shared, out: &mut dyn UiDrawSink) {
-        let env = sh.env();
-        let t = &sh.tables;
-        // Draw rows in file order: the close rows with the close
-        // button's pressed flag; rows needing panel words (stat points)
-        // do not apply without them.
-        for r in t.rows(CHARACTER) {
-            if r.kind != RowKind::Draw {
-                continue;
-            }
-            let pressed = r.item == "close" && self.panel.close_pressed;
-            let cond = env.cond(pressed, &no_extra);
-            let one = |x: &super::layout::LayoutRow| std::ptr::eq(x, r);
-            emit_static_draws(t, CHARACTER, &cond, None, &one, out);
-        }
-    }
-}
-
-impl Panel for CharacterUi {
-    fn id(&self) -> PanelId {
-        PanelId(u16::from(UI_CHARACTER))
-    }
-
-    /// §4.4: x in [`sx`, `W / 2 − 1`], y in [`sy`, `H + sy − 49`].
-    fn rect(&self) -> Rect {
-        character::area(&self.sh.borrow().config.screen)
-    }
-
-    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+    /// The panel without the close tip (`Panel::draw`).
+    fn draw_panel(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let sh = self.sh.borrow();
         let expansion = ctx.world.expansion != 0;
         let penalties = match (&sh.resist_penalties, expansion) {
@@ -1603,6 +1673,50 @@ impl Panel for CharacterUi {
             );
         }
         name_line(name, &env.screen, fonts, out);
+    }
+
+    fn draw_static(&self, sh: &Shared, out: &mut dyn UiDrawSink) {
+        let env = sh.env();
+        let t = &sh.tables;
+        // Draw rows in file order: the close rows with the close
+        // button's pressed flag; rows needing panel words (stat points)
+        // do not apply without them.
+        for r in t.rows(CHARACTER) {
+            if r.kind != RowKind::Draw {
+                continue;
+            }
+            let pressed = r.item == "close" && self.panel.close_pressed;
+            let cond = env.cond(pressed, &no_extra);
+            let one = |x: &super::layout::LayoutRow| std::ptr::eq(x, r);
+            emit_static_draws(t, CHARACTER, &cond, None, &one, out);
+        }
+    }
+}
+
+impl Panel for CharacterUi {
+    fn id(&self) -> PanelId {
+        PanelId(u16::from(UI_CHARACTER))
+    }
+
+    /// §4.4: x in [`sx`, `W / 2 − 1`], y in [`sy`, `H + sy − 49`].
+    fn rect(&self) -> Rect {
+        character::area(&self.sh.borrow().config.screen)
+    }
+
+    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+        self.draw_panel(ctx, out);
+        // §8 r2: `strClose` at (sx + 143, H + sy − 95) while the mouse is
+        // in the close rectangle, as the pop-up text. d2rs-own,
+        // unverified: centred (the x is the button's middle; the call's
+        // centre flag is not in the spec).
+        let sh = self.sh.borrow();
+        let s = sh.config.screen;
+        let over = super::panels::character::close_rect(&sh.tables, &s)
+            .is_some_and(|r| r.contains(sh.mouse));
+        if let (true, Some(t)) = (over, ctx.strings.get_id(cube_ui::STR_CLOSE)) {
+            let at = Point::new(s.sx() + 143, s.h + s.sy() - 95);
+            hud_tips::push_popup(t.to_vec(), at, 0, true, (s.w, s.h), sh.fonts.as_ref(), out);
+        }
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {

@@ -472,35 +472,55 @@ impl ItemTips {
         })
     }
 
-    /// The tip text of `ui/item-tips.md` (§1) of decoded item `b` with
-    /// `ctx`.
-    pub fn tip_of(&self, b: &ItemBits, ctx: &TipCtx<'_>) -> TipText {
+    /// The item the builder reads for decoded record `b`.
+    fn as_built(b: &ItemBits) -> std::borrow::Cow<'_, ItemBits> {
+        use std::borrow::Cow;
         // `bitstream.md` §4.1 r4 reader: an alt-code record is the base
         // code's item with item level 1 and quality 1; the flags lose
         // 0x2000000 and 0x80000 (edge case 9: a gamble item shows its
         // normal-tier base).
         if let Some(code) = b.base_code {
-            let b = ItemBits {
+            return Cow::Owned(ItemBits {
                 code,
                 ilvl: 1,
                 quality: 1,
                 flags: b.flags & !(d2_proto::item_bits::hflag::ALT_CODE | 0x8_0000),
                 ..b.clone()
-            };
-            return Build::new(self, &b, ctx).tip();
+            });
         }
         // PROVISIONAL (REC-242): a compact record carries no quality
         // (`bitstream.md` §3) and the client's quality for it is not
         // specified; read as normal (2), the only quality whose name
         // branch a compact item can take (§5 r3.2).
         if b.flags & d2_proto::item_bits::hflag::COMPACT != 0 && b.quality == 0 {
-            let b = ItemBits {
+            return Cow::Owned(ItemBits {
                 quality: 2,
                 ..b.clone()
-            };
-            return Build::new(self, &b, ctx).tip();
+            });
         }
-        Build::new(self, b, ctx).tip()
+        Cow::Borrowed(b)
+    }
+
+    /// The tip text of `ui/item-tips.md` (§1) of decoded item `b` with
+    /// `ctx`.
+    pub fn tip_of(&self, b: &ItemBits, ctx: &TipCtx<'_>) -> TipText {
+        Build::new(self, &Self::as_built(b), ctx).tip()
+    }
+
+    /// The two parts of the belt's hover text (`ui/control-panel.md` §5
+    /// r8) of the item with last stream `stream`: the client item name
+    /// (`0x0048C060`, §5) and its property lines (`0x004E6410(I, 0x100,
+    /// 1, 0)`, §6: multi-line, no label). `None` when the stream does not
+    /// decode.
+    pub fn name_and_properties(
+        &self,
+        stream: &[u8],
+        ctx: &TipCtx<'_>,
+    ) -> Option<(Vec<u16>, Vec<u16>)> {
+        let b = decode(stream, &TablesLookup(&self.lookup)).ok()?;
+        let b = Self::as_built(&b);
+        let build = Build::new(self, &b, ctx);
+        Some((build.name(), build.own_props()))
     }
 
     /// The tip text of the item with last stream `stream`; empty when the
