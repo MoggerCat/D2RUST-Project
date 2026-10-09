@@ -29,16 +29,16 @@
 | Outputs / state changes | 64–72 |
 | Rules | 73–74 |
 |   1. Directives | 75–109 |
-|   2. Poke files | 110–126 |
-|   3. In scenarios | 127–141 |
-|   4. The 1.14d side (`poke.py`) | 142–165 |
-|   5. The d2rs side (`d2-sim::poke`) | 166–177 |
-| Constants & data dependencies | 178–190 |
-| Randomness | 191–197 |
-| Edge cases & original bugs | 198–207 |
-| Test vectors | 208–216 |
-| Provenance | 217–222 |
-| Open questions | 223–243 |
+|   2. Poke files | 110–132 |
+|   3. In scenarios | 133–147 |
+|   4. The 1.14d side (`poke.py`) | 148–171 |
+|   5. The d2rs side (`d2-sim::poke`) | 172–183 |
+| Constants & data dependencies | 184–196 |
+| Randomness | 197–203 |
+| Edge cases & original bugs | 204–213 |
+| Test vectors | 214–222 |
+| Provenance | 223–228 |
+| Open questions | 229–249 |
 <!-- /index -->
 
 ## Summary
@@ -123,6 +123,12 @@ cannot run the directive, §4). Results are written as `poke` records
    drained.
 5. Unknown keywords, missing or extra arguments and out-of-range values
    are errors naming the line; nothing is defaulted beyond §1.
+6. **Absolute form** (command lines and `.check` files of
+   `tools/scenario-diff.md` §2): `--poke "<f> <directive> <args>..."`,
+   repeatable, where f is the absolute server frame (game +0xA8). It is
+   applied after frame f − 1 returned and before frame f's drain: on
+   1.14d at the `0x0052FD1E` hit whose game +0xA8 = f − 1. Directives
+   and results are those of §1; the record carries `f` instead of `t`.
 
 ### 3. In scenarios
 
