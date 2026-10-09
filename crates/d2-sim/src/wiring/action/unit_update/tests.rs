@@ -79,9 +79,36 @@ fn sent(fx: &mut Fx) -> Vec<(UnitId, Vec<u8>)> {
     std::mem::take(&mut fx.sim.hooks().x.sent)
 }
 
+/// The death clean-up's direction snap (`units.md` §4.6 rule 1.2,
+/// `0x006488A0` with the kill's R byte +0x14): 1.14d, Blood Moor
+/// (`traces/checks/combat-kill-fallen.check`, state channel): a fallen
+/// walking with d = 0 is killed at (5145, 4265) by the player at
+/// (5143, 4263) and has d = 32 from frame 36 on, through mode 12. The
+/// same (−2, −2) geometry here.
+// Covers: specs/sim/units.md §4.6 r1
+#[test]
+fn the_dead_monster_faces_its_killer() {
+    let mut fx = Fx::new();
+    let h = fx.sim.hooks();
+    h.enable_paths().expect("embedded tables");
+    h.anim_data = Some(Arc::new(anim_data()));
+    h.x.names.insert((UnitType::Monster, 0), *DEATH);
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 1, a, 10, 10);
+    let m = fx.spawn(UnitType::Monster, 0, a, 12, 12);
+    assert_eq!(path(&mut fx, m).direction, 0);
+    kill_now(&mut fx, m, p);
+    for _ in 0..30 {
+        fx.tick();
+    }
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().mode, 12);
+    assert_eq!(path(&mut fx, m).direction, 32);
+    fx.assert_clean();
+}
+
 /// §7.4 rule 7 / §7.7 rule 3: the kill sets mode 0 with flag 0x1, so the
 /// next client pass sends 0x69 code 8 at the path target with d = the
-/// path direction and e = unit +0xB0 (0 here: [`Pending::unit_b0`]'s
+/// path direction (snapped toward the killer by the death clean-up) and e = unit +0xB0 (0 here: [`Pending::unit_b0`]'s
 /// default); the clean-up then clears flag 0x1 and nothing more is sent
 /// until event 1 of the DT animation (§4.2: f + 24 for 24 frames at
 /// speed 256) sets mode 12, whose message (code 9, the unit's cell,
@@ -110,7 +137,10 @@ fn kill_sends_code_8_then_the_death_end_code_9() {
     fx.tick();
     let mut want = vec![0x69];
     want.extend(g.to_le_bytes());
-    want.extend([0x08, 0x95, 0x12, 0x55, 0x15, 0x38, 0x00]);
+    // d: the death clean-up snapped the path direction (0x38 before) to
+    // the kill's direction toward the killer (`units.md` §4.6 rule 1.2,
+    // `0x006488A0`; `damage.md` §7.2 rule 3): from (13, 10) to (10, 10).
+    want.extend([0x08, 0x95, 0x12, 0x55, 0x15, 0x17, 0x00]);
     assert_eq!(sent(&mut fx), vec![(p, want)]);
     assert_eq!(
         fx.sim.sys.units.get(m).unwrap().flags & (flags::CHANGED | flags::MODE_CHANGING),
@@ -131,7 +161,7 @@ fn kill_sends_code_8_then_the_death_end_code_9() {
     want.push(0x09);
     want.extend((d.x() as u16).to_le_bytes());
     want.extend((d.y() as u16).to_le_bytes());
-    want.extend([0x38, 0x00]);
+    want.extend([0x17, 0x00]);
     assert_eq!(sent(&mut fx), vec![(p, want)]);
     for _ in 0..30 {
         fx.tick();
@@ -178,6 +208,7 @@ fn anim_complete_reads_frame_speed_and_count() {
         speed: 0,
         pos: 0,
         events: Vec::new(),
+        drawn: Vec::new(),
     });
     a.frame_count = 0;
     assert!(anim_complete(&a));

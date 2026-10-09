@@ -24,29 +24,29 @@
 |   F1.4 Main menu (`0x004336C0`) | 240–268 |
 |   F1.5 Title animation (logo fire) | 269–300 |
 |   F1.6 Palette and sounds | 301–323 |
-|   F2.1 Save folder (`0x00407050`) | 324–347 |
-|   F2.2 Scan and entry filter (`0x00438F70`, `0x0043C8A0`, `0x00438AD0`) | 348–374 |
-|   F2.3 Sort order (`0x00438AD0`) | 375–380 |
-|   F2.4 Layout (`0x0043AE30`, draw `0x004380F0`) | 381–406 |
-|   F2.5 Selection, scrolling and keys | 407–451 |
-|   F2.6 OK / Enter (`0x00439840`) | 452–464 |
-|   F2.7 Other buttons | 465–489 |
-|   F2.8 Difficulty box (`0x00439780`) | 490–509 |
-|   F2.9 Control records and art | 510–546 |
-|   F3.1 Character-create screen build (`0x00435580`) | 547–582 |
-|   F3.2 Class line-up (positions, creation order) | 583–598 |
-|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 599–659 |
-|   F3.4 Name entry (edit box, descriptor 204) | 660–674 |
-|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 675–698 |
-|   F3.6 OK / Cancel behaviour and the new save | 699–733 |
-|   F3.7 Sounds (deferred) | 734–738 |
-|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 739–769 |
-| Constants & data dependencies | 770–806 |
-| Randomness | 807–810 |
-| Edge cases & original bugs | 811–842 |
-| Test vectors | 843–876 |
-| Provenance | 877–922 |
-| Open questions | 923–967 |
+|   F2.1 Save folder (`0x00407050`) | 324–348 |
+|   F2.2 Scan and entry filter (`0x00438F70`, `0x0043C8A0`, `0x00438AD0`) | 349–375 |
+|   F2.3 Sort order (`0x00438AD0`) | 376–381 |
+|   F2.4 Layout (`0x0043AE30`, draw `0x004380F0`) | 382–407 |
+|   F2.5 Selection, scrolling and keys | 408–452 |
+|   F2.6 OK / Enter (`0x00439840`) | 453–465 |
+|   F2.7 Other buttons | 466–490 |
+|   F2.8 Difficulty box (`0x00439780`) | 491–510 |
+|   F2.9 Control records and art | 511–547 |
+|   F3.1 Character-create screen build (`0x00435580`) | 548–583 |
+|   F3.2 Class line-up (positions, creation order) | 584–599 |
+|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 600–660 |
+|   F3.4 Name entry (edit box, descriptor 204) | 661–675 |
+|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 676–699 |
+|   F3.6 OK / Cancel behaviour and the new save | 700–734 |
+|   F3.7 Sounds (deferred) | 735–739 |
+|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 740–770 |
+| Constants & data dependencies | 771–807 |
+| Randomness | 808–811 |
+| Edge cases & original bugs | 812–843 |
+| Test vectors | 844–877 |
+| Provenance | 878–923 |
+| Open questions | 924–968 |
 <!-- /index -->
 
 ## Summary
@@ -328,14 +328,15 @@ the pop-up layer; record layout in §F2.9).
    `0x00414B00`), value `NewSavePath` (string).
 2. `NewSavePath` missing (`GetLastError() == 2`): read the legacy value `Save Path`, drop one trailing `\`;
    if it names an existing directory, the default path is computed (rule 3) and `0x00406DE0` decides between
-   them: result 1 → keep the legacy path, else → the default path with a trailing `\`. The choice is written
-   back as `NewSavePath` (`0x00415070`). `0x00406DE0` returns 1 when the legacy folder holds
+   them: result 1 → keep the legacy path (not written back: the branch `0x00407130`–`0x00407140` jumps past
+   the write to the copy at `0x00407199`), else → the default path with a trailing `\`, written back as
+   `NewSavePath` (`0x00415070` at `0x00407186`). `0x00406DE0` returns 1 when the legacy folder holds
    entries other than `.` / `..`. Recorded 2026-10-09 (REC-206, Wine registry, no `NewSavePath`,
    `Save Path` = `C:\legacyA\` holding one `.d2s`, then = an empty `C:\legacyB\`; Single Player
    clicked): with the save the character select lists the legacy folder's character; with the empty
    folder it lists the default folder's and `NewSavePath` = the default path with a trailing `\`.
-   PROVISIONAL (new, REC-206): in the legacy case no `NewSavePath` value was found afterwards (HKCU,
-   HKLM), against "written back" above; to read in `0x00415070` (PC 1).
+   In the legacy case no `NewSavePath` value was found afterwards (HKCU, HKLM): the asm agrees (1.14d-read
+   2026-10-09, settles REC-206), so `NewSavePath` stays unset and the legacy rule runs again next start.
 3. The path read does not exist (`GetFileAttributesA` = −1) or is empty → default path
    (`0x00406D30`): `SHGetKnownFolderPath(FOLDERID_SavedGames {4C5C32FF-BB9D-43B0-B5B4-2D72E54EAAA4})` +
    `Diablo II` (`0x004067D0`); if that API is missing or fails, `SHGetFolderPathA(CSIDL_PERSONAL)` +

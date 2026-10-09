@@ -1,0 +1,22 @@
+# facts v1; tool: trace-recorder facts_render 0.3.0; command: py tools/trace-recorder/facts_render.py game/captures/day4/night.jsonl --scene a1-blood-moor-night --frame 22 --out facts/render; game: 1.14d
+key	value
+seq	22
+tick	130
+w	800
+h	600
+act	0
+level	2
+player_x	14080
+player_y	75256
+tile_origin_x	13680
+tile_origin_y	74976
+unit_origin_x	13680
+unit_origin_y	74972
+open_mode	0
+shift_x	0
+light_quality	2
+rain	1
+snow	0
+draws	234
+index_sha256	5f9388b158309bd718ffc89dce04c542fb7f8d7bbdb7bfb8afae527ddc14fd42
+palette_sha256	ba83219e51249002d7125a1a5a701d6abea94f04f44d6cfaa42becdfcff23337

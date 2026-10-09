@@ -1,0 +1,15 @@
+check 1
+# replay-diff smoke (specs/tools/replay-diff.md): 300 frames in the Rogue
+# Encampment, ScnAma, seed 1234; walks, the waypoint (object class 119)
+# clicked, walks away. Proves the pipeline end to end in a few
+# minutes; the long sessions are town-ama-10k and bloodmoor-bar-10k.
+name smoke-town-ama
+save ScnAma --class ama --expansion
+seed 1234
+ticks 300
+seconds 900
+input frame 10; click 700 200
+input+ frame 60; clickunit 2 119
+input+ frame 140; click 700 420
+input+ frame 160; click 250 330
+input+ frame 230; click 520 200

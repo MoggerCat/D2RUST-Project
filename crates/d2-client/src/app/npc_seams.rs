@@ -135,11 +135,16 @@ mod tests {
 /// (`client/msg-ui.md` §5 r2.1, §16 r9; `0x00661480` itself is not
 /// specified, so this is its inverse: d2rs-own, unverified). At most 7
 /// entries (the client build asserts at 8).
+///
+/// PROVISIONAL (REC-1401): the entries go out in reverse of the order the
+/// quest records added them (`quests.md` §7.1 walks newest → oldest). The
+/// 1.14d recording `items-vendor-akara-buy` sends Akara's list as
+/// [64 (chain 1), 11 (chain 37)] where the records add 11 first.
 pub fn encode_text_list(list: &[(u16, u32)]) -> [u8; 34] {
     let mut out = [0u8; 34];
     let n = list.len().min(7);
     out[0] = n as u8;
-    for (k, &(string, kind)) in list.iter().take(n).enumerate() {
+    for (k, &(string, kind)) in list.iter().rev().take(n).enumerate() {
         out[2 + 4 * k] = kind as u8;
         out[4 + 4 * k..6 + 4 * k].copy_from_slice(&string.to_le_bytes());
     }
@@ -152,7 +157,7 @@ mod encode_tests {
 
     #[test]
     fn the_list_round_trips_through_the_client_layout() {
-        let b = encode_text_list(&[(64, 0), (300, 2)]);
+        let b = encode_text_list(&[(300, 2), (64, 0)]);
         assert_eq!(b[0], 2);
         assert_eq!((b[2], u16::from_le_bytes([b[4], b[5]])), (0, 64));
         assert_eq!((b[6], u16::from_le_bytes([b[8], b[9]])), (2, 300));

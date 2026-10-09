@@ -13,7 +13,15 @@
 use d2_sim::skills::sequences::CLASSES;
 use d2_sim::units::UnitType;
 
-use crate::bridge::world::{ClientUnit, UnitKey};
+use std::collections::BTreeMap;
+use std::sync::Arc;
+
+use d2_formats::animdata::AnimData;
+use d2_sim::items::inventory::tables::InvTables;
+
+use super::weapons::ItemFacts;
+use crate::bridge::player_anim::{PlayerAnim, PlayerAnims};
+use crate::bridge::world::{ClientUnit, ClientWorld, UnitKey};
 use crate::rules::unit_composite::{code, CofName, CompositeKind};
 use crate::world_view::unit_assets::{unit_cof, UnitLooks};
 
@@ -53,6 +61,53 @@ pub fn anim_key(
 // d2rs-own, unverified.
 pub fn anim_rate(speed: Option<u32>) -> i16 {
     speed.map_or(0, |s| s as i16)
+}
+
+/// The client player update's animation lookup
+/// ([`crate::bridge::player_anim::PlayerAnims`]): the AnimData record of
+/// [`anim_key`] for a model player, its weapon class from the items the
+/// model shows on its body locations 4 and 5 (their last 0x9C / 0x9D
+/// records), resolved as the server's ([`super::weapons::cof_class_of`]).
+#[derive(Debug)]
+pub struct ClientPlayerAnims {
+    looks: Arc<UnitLooks>,
+    anim: Arc<AnimData>,
+    /// [`super::weapons::facts_of`] of each items-table row, by code.
+    items: BTreeMap<[u8; 4], ItemFacts>,
+}
+
+impl ClientPlayerAnims {
+    pub fn new(looks: Arc<UnitLooks>, anim: Arc<AnimData>, tables: &InvTables) -> Self {
+        let items = (0..)
+            .map_while(|r| tables.item(r).map(|i| (r, i.code)))
+            .map(|(r, code)| (code, super::weapons::facts_of(tables, r)))
+            .collect();
+        Self { looks, anim, items }
+    }
+}
+
+impl PlayerAnims for ClientPlayerAnims {
+    fn anim(&self, w: &ClientWorld, key: UnitKey, mode: u32) -> Option<PlayerAnim> {
+        let class = w.units.get(&key)?.class;
+        let held = |loc: u8| {
+            crate::bridge::items::items(w)
+                .into_iter()
+                .find(|i| {
+                    i.owner == Some(key)
+                        && i.mode == crate::bridge::items::mode::BODY
+                        && i.body == loc
+                })
+                .and_then(|i| self.items.get(&i.code?).cloned())
+        };
+        let weapon = super::weapons::cof_class_of(held(4), held(5), class);
+        let name = anim_key(&self.looks, UnitType::Player, class, mode, weapon)?;
+        let r = self.anim.record(&name).ok()?;
+        Some(PlayerAnim {
+            frames: r.frames,
+            speed: i32::from(r.speed as i16),
+            weapon,
+        })
+    }
 }
 
 #[cfg(test)]

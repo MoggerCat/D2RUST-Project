@@ -69,9 +69,11 @@ fn dump(ticks: u32) -> String {
         date: Some("2026-10-09".into()),
         pokes: Vec::new(),
         sends: Vec::new(),
+        no_own_c2s: Vec::new(),
         input: None,
         packets: None,
         rng: None,
+        save_out: None,
     };
     let mut game = DumpGame::resolve(&args, app_support::game_data(), None).unwrap();
     game.character = scn_bar();

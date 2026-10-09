@@ -305,3 +305,88 @@ fn attack_event0_with_a_used_skill_runs_its_branch_on_every_event() {
     assert_eq!(logged(&fx, "attack skill", m).len(), 3);
     assert!(logged(&fx, "attack strike", m).is_empty());
 }
+
+/// A monster world holding only monster data (the AI-state tests).
+struct DataWorld(std::collections::BTreeMap<UnitId, crate::monsters::init::MonsterData>);
+
+impl<X> crate::wiring::action::monsters::MonsterWorld<X> for DataWorld {
+    fn type_init(
+        &mut self,
+        _: &mut crate::units::hooks::Sim<'_>,
+        _: &mut ActionHooks<X>,
+        _: UnitId,
+    ) {
+    }
+    fn umods(
+        &mut self,
+        _: &mut crate::units::hooks::Sim<'_>,
+        _: &mut ActionHooks<X>,
+        _: UnitId,
+        _: Option<UnitId>,
+        _: u8,
+    ) {
+    }
+    fn assign_umod(
+        &mut self,
+        _: &mut crate::units::hooks::Sim<'_>,
+        _: &mut ActionHooks<X>,
+        _: UnitId,
+        _: u8,
+    ) {
+    }
+    fn forget(&mut self, _: UnitId) {}
+    fn monster(&self, unit: UnitId) -> Option<&crate::monsters::init::MonsterData> {
+        self.0.get(&unit)
+    }
+    fn monster_mut(&mut self, unit: UnitId) -> Option<&mut crate::monsters::init::MonsterData> {
+        self.0.get_mut(&unit)
+    }
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
+    }
+}
+
+fn ai_state_of(fx: &mut Fx, m: UnitId) -> u32 {
+    fx.sim.hooks().monster_data(m).unwrap().ai_state
+}
+
+fn leave(fx: &mut Fx, m: UnitId, from: u8, state: u32) {
+    fx.sim.hooks().set_monster_ai_state(m, state);
+    fx.sim.sys.units.get_mut(m).unwrap().mode = u32::from(from);
+    fx.game.frame += 1;
+    let ok = fx.sim.with(&mut fx.game, |g, v| {
+        v.change_mode(g, m, mode::NEUTRAL, ModeTarget::Unit(m))
+    });
+    assert!(ok);
+}
+
+#[test]
+fn ai_state_is_stored_and_follows_the_mode_set() {
+    // `ai.md` §3 "AI state": the monster data's `dwAiState` (0 at
+    // creation); `0x005734C0` stores a value (a soft hit: 19) and the
+    // monster mode set `0x005A7C20` applies `0x005A68E0` to the mode it
+    // leaves: not for mode 1; state ≥ 16 → state − 16; 13 leaving mode 3
+    // stays; else the state becomes that mode.
+    let mut fx = Fx::new();
+    let m = monster(&mut fx);
+    let world = DataWorld([(m, Default::default())].into_iter().collect());
+    fx.sim.sys.hooks.monster_world = Some(Box::new(world));
+    assert_eq!(ai_state_of(&mut fx, m), 0);
+    fx.sim.hooks().set_monster_ai_state(m, 19);
+    assert_eq!(ai_state_of(&mut fx, m), 19);
+    // 19 leaving A2 (mode 5) → 3.
+    leave(&mut fx, m, mode::ATTACK2, 19);
+    assert_eq!(ai_state_of(&mut fx, m), 3);
+    // 0 leaving A2 → 5.
+    leave(&mut fx, m, mode::ATTACK2, 0);
+    assert_eq!(ai_state_of(&mut fx, m), 5);
+    // Leaving mode 1: unchanged.
+    leave(&mut fx, m, mode::NEUTRAL, 19);
+    assert_eq!(ai_state_of(&mut fx, m), 19);
+    // 13 leaving mode 3 stays 13; leaving mode 4 it becomes 4.
+    leave(&mut fx, m, mode::GETHIT, 13);
+    assert_eq!(ai_state_of(&mut fx, m), 13);
+    leave(&mut fx, m, mode::ATTACK1, 13);
+    assert_eq!(ai_state_of(&mut fx, m), 4);
+    fx.assert_clean();
+}

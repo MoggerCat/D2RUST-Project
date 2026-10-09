@@ -43,6 +43,7 @@ pub mod output;
 pub mod passive;
 #[cfg(test)]
 mod passive_tests;
+pub mod player_anim;
 pub mod poke;
 pub mod predict;
 pub mod receive;
@@ -136,6 +137,11 @@ pub struct Bridge<L> {
     outputs: Vec<Output>,
     /// UI state 9 or 11 is open ([`Bridge::set_paused`]).
     paused: bool,
+    /// C→S ids the model's own sends drop instead of sending (tool use:
+    /// `state-dump --no-own-c2s`); empty in play.
+    drop_own: Vec<u8>,
+    /// The messages dropped so far, taken by [`Bridge::take_dropped`].
+    dropped: Vec<Vec<u8>>,
 }
 
 impl<L: ServerLink> Bridge<L> {
@@ -162,6 +168,8 @@ impl<L: ServerLink> Bridge<L> {
             log: ReceiveLog::default(),
             outputs: Vec::new(),
             paused: false,
+            drop_own: Vec::new(),
+            dropped: Vec::new(),
         })
     }
 
@@ -326,9 +334,24 @@ impl<L: ServerLink> Bridge<L> {
             .unwrap_or(self.world.outgoing.len());
         let out: Vec<Vec<u8>> = self.world.outgoing.drain(..n).collect();
         for m in &out {
+            if m.first().is_some_and(|id| self.drop_own.contains(id)) {
+                self.dropped.push(m.clone());
+                continue;
+            }
             self.send_bytes(m)?;
         }
         Ok(out.len())
+    }
+
+    /// Makes the model's own C→S messages with these ids be dropped
+    /// instead of sent (not scripted injects).
+    pub fn set_drop_own(&mut self, ids: Vec<u8>) {
+        self.drop_own = ids;
+    }
+
+    /// The model's own messages dropped since the last call.
+    pub fn take_dropped(&mut self) -> Vec<Vec<u8>> {
+        std::mem::take(&mut self.dropped)
     }
 
     /// One world click (`ui/controls.md` §6 r1–r2, [`click`]): the
@@ -485,6 +508,12 @@ impl<L: ServerLink> Bridge<L> {
         self.inputs.skill_tables = Some(tables);
     }
 
+    /// The players' animation lookup of the client player update
+    /// ([`player_anim`]).
+    pub fn set_player_anims(&mut self, anims: std::sync::Arc<dyn player_anim::PlayerAnims>) {
+        self.inputs.player_anims = Some(anims);
+    }
+
     /// The `skills` rows of the client skill list (`msg-skills.md`
     /// Inputs); the other tables stay.
     pub fn set_skill_rows(&mut self, rows: Vec<world::SkillRow>) {
@@ -513,6 +542,7 @@ impl<L: ServerLink> Bridge<L> {
     /// The `objects.txt` rows the client object update reads
     /// (`world/objects-client.md` §28 r1); empty: no object update.
     pub fn set_object_rows(&mut self, rows: Vec<objects::ObjClientRow>) {
+        self.world.objclient.selectable = rows.iter().map(|r| r.selectable).collect();
         self.inputs.objclient.rows = rows;
     }
 
