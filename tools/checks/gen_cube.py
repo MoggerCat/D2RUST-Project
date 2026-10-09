@@ -146,7 +146,7 @@ seed 1234
 ticks 24
 seconds 300
 channels state packets items
-at 4 send UseGridItem item=@{cube_ref} x={cx} y={cy}
+at 4 send UseGridItem item=@{cube_ref} x=@x y=@y
 at 8 send ClickButton button=0x18 p1=0 p2=0
 """
 
@@ -157,7 +157,7 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--only", default="")
     ap.add_argument("--list", action="store_true")
-    ap.add_argument("--cube-ref", default="4", help="GUID reference of the cube item")
+    ap.add_argument("--cube-ref", default="1", help="GUID reference of the cube item")
     a = ap.parse_args()
     items = Items(a.excel)
     only = {int(x) for x in a.only.split(",") if x}

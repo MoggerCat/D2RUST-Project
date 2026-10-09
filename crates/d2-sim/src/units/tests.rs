@@ -1442,6 +1442,7 @@ fn the_sequence_advance_counts_down_and_reads_the_crossed_event_bytes() {
             speed: 256,
             pos: 0,
             events: vec![0, 0, 1, 0],
+            drawn: Vec::new(),
         }),
         frame_count: 4 * 256,
         action_frame: 9,
@@ -1479,6 +1480,31 @@ fn the_sequence_advance_counts_down_and_reads_the_crossed_event_bytes() {
     a.action_frame = 7;
     assert!(!advance_sequence(&mut a));
     assert_eq!(a.action_frame, 7);
+}
+
+// Covers: specs/skills/sequences.md §3
+#[test]
+fn the_sequence_advance_stores_the_drawn_frame() {
+    use super::anim::advance_sequence;
+    use super::record::{Anim, Sequence};
+    let mut a = Anim {
+        sequence: Some(Sequence {
+            frame_count: 3 * 256,
+            speed: 256,
+            pos: 0,
+            events: vec![0, 0, 0],
+            drawn: vec![0, 5, 9],
+        }),
+        frame_count: 3 * 256,
+        ..Anim::default()
+    };
+    let mut seen = Vec::new();
+    for _ in 0..3 {
+        advance_sequence(&mut a);
+        seen.push(a.frame);
+    }
+    // Frame 1, frame 2, then the wrap to frame 0.
+    assert_eq!(seen, vec![5 << 8, 9 << 8, 0]);
 }
 
 // Covers: specs/sim/units.md §4.1

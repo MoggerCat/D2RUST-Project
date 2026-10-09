@@ -130,6 +130,17 @@ impl<X: Pending> View<'_, X> {
         Some(i32::from(d))
     }
 
+    /// `0x006488A0(path, d)` (`sim/pathing.md` §8.5): the snap, direction
+    /// := new direction := d & 63. `None` without the path provider or
+    /// a dynamic record.
+    pub(crate) fn path_snap_direction(&mut self, unit: UnitId, d: i32) -> Option<()> {
+        let p = self.h.paths.as_mut()?;
+        let r = p.dynamic_mut(unit)?;
+        r.direction = (d & 63) as u8;
+        r.new_direction = r.direction;
+        Some(())
+    }
+
     /// Path point i := (x, y) (+0x9C array, `skills/bodies-4.md` §2.4);
     /// an index outside the array is not written.
     pub(crate) fn path_set_point(&mut self, unit: UnitId, i: i32, at: (u16, u16)) -> Option<()> {

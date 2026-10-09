@@ -15,7 +15,7 @@
 //!   d2-client autoplay-host (--save FILE.d2s | --new CLASS NAME) [--seed N] [--difficulty D] [--game-dir DIR]
 //!                        (the headless play client on a stdin/stdout line protocol,
 //!                        specs/tools/autoplay.md; tools/autoplay/ drives it)
-//!   d2-client state-dump --save FILE.d2s [--seed N] [--difficulty D] --ticks T [--every n] --out FILE [--game-dir DIR] [--date YYYY-MM-DD] [--poke "F DIRECTIVE ARGS"]... [--send "F NAME FIELD=VALUE..." | --send "F hex BYTES..."]... [--input SCRIPT] [--packets FILE]
+//!   d2-client state-dump --save FILE.d2s [--seed N] [--difficulty D] --ticks T [--every n] --out FILE [--game-dir DIR] [--date YYYY-MM-DD] [--poke "F DIRECTIVE ARGS"]... [--send "F NAME FIELD=VALUE..." | --send "F hex BYTES..."]... [--input SCRIPT] [--no-own-c2s ID[,ID]] [--packets FILE]
 //!
 //! `play` (the default) opens a window running the local single-player game: the
 //! in-process server (`d2-server` host over the wired `d2-sim`) pumped

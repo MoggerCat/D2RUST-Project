@@ -173,9 +173,21 @@ impl<X: Pending> MissilePath for View<'_, X> {
     fn set_acceleration(&mut self, unit: UnitId, accel: i32, max_velocity: i32) {
         self.h.path_set_acceleration(unit, accel, max_velocity);
     }
-    /// `0x006417F0`: not specified (stays [`Pending`]).
+    /// `0x006417F0(missile, target point)` (`missiles.md` §R2.3 step 19,
+    /// `skills/bodies.md` §4): max(|dx|, |dy|) + ⌊min(|dx|, |dy|) / 2⌋
+    /// from the path position to the path target point, with the path
+    /// provider; [`Pending`] without it.
     fn target_distance(&self, unit: UnitId) -> i32 {
-        self.h.x.target_distance(unit)
+        match self.path_target_xy(unit) {
+            Some((tx, ty)) => {
+                let (x, y) = self.h.path_position(unit);
+                crate::path::walk::resync::resync_distance(
+                    crate::path::Point::new(x, y),
+                    crate::path::Point::new(tx, ty),
+                )
+            }
+            None => self.h.x.target_distance(unit),
+        }
     }
     /// Unit step `0x00554CA0` (`pathing.md` §9.3): false when it returns 2.
     fn step(&mut self, game: &mut Game, unit: UnitId) -> bool {
@@ -275,12 +287,17 @@ impl<X: Pending> MissileRooms for View<'_, X> {
             }
         }
     }
-    /// The units on (x, y), searched in `room` and its adjacency array.
-    ///
-    /// TODO(missiles.md §R4 step 9): the search order of `0x00641CB0` is
-    /// not specified; rooms in adjacency order (the room first), units in
-    /// room-list order.
-    fn units_at(&self, game: &Game, room: RoomId, x: i32, y: i32) -> Vec<UnitId> {
+    /// `0x00641CB0(room, x, y, accept, arg, r)` without the accept call
+    /// (`sim/path-placement.md` §4 rule 6): `r` outside 1..3 finds none;
+    /// the room and its adjacency array (the room first), units in
+    /// room-list order; players in mode 0 / 17 and monsters in mode 0 /
+    /// 12 are skipped, objects, items and tiles never found; a unit of
+    /// size `s` (> 3 counts 3, ≤ 0 skipped) is found when the query
+    /// shape of size `r` overlaps its shape (rule 5's table).
+    fn units_at(&self, game: &Game, room: RoomId, x: i32, y: i32, r: i32) -> Vec<UnitId> {
+        if !(1..=3).contains(&r) {
+            return Vec::new();
+        }
         let adjacent = game
             .lists
             .room(room)
@@ -289,7 +306,31 @@ impl<X: Pending> MissileRooms for View<'_, X> {
         std::iter::once(room)
             .chain(adjacent.into_iter().filter(|&r| r != room))
             .flat_map(|r| game.lists.room_units(r))
-            .filter(|&u| self.h.path_position(u) == (x, y))
+            .filter(|&u| {
+                let Some(rec) = self.units.get(u) else {
+                    return false;
+                };
+                match rec.ty {
+                    UnitType::Player if matches!(rec.mode, 0 | 17) => return false,
+                    UnitType::Monster if matches!(rec.mode, 0 | 12) => return false,
+                    UnitType::Player | UnitType::Monster | UnitType::Missile => {}
+                    _ => return false,
+                }
+                let s = self.path_size(u).min(3);
+                if s <= 0 {
+                    return false;
+                }
+                let (ux, uy) = self.h.path_position(u);
+                let (dx, dy) = ((x - ux).abs(), (y - uy).abs());
+                match (r, s) {
+                    (1, 1) => dx == 0 && dy == 0,
+                    (1, 2) | (2, 1) => dx + dy <= 1,
+                    (1, 3) | (3, 1) => dx <= 1 && dy <= 1,
+                    (2, 2) => dx + dy <= 2,
+                    (2, 3) | (3, 2) => (dx <= 2 && dy <= 1) || (dx <= 1 && dy <= 2),
+                    _ => dx <= 2 && dy <= 2,
+                }
+            })
             .collect()
     }
 }
