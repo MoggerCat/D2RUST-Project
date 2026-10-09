@@ -554,6 +554,11 @@ impl Drlg {
     ) -> Result<Option<DrlgRoomId>, DrlgError> {
         let l = self.get_or_alloc_level(svc.data, svc.types, level_id)?;
         let hint = hint.filter(|&h| self.try_room(h).is_some_and(|r| r.level == l));
+        // `0x00642C30` generates a roomless level (`levels.md` §8.1); with
+        // the services at hand, with `preset.md` §3.2 step 4.
+        if self.level(l).first_room.is_none() {
+            self.generate_level_svc(svc, l)?;
+        }
         self.room_at(svc.data, svc.types, x, y, hint, Some(l))
     }
 

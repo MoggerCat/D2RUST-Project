@@ -349,8 +349,55 @@ impl Drlg {
         Ok(())
     }
 
-    /// Level generation `0x006424A0` (§5).
+    /// Level generation `0x006424A0` (§5), without `preset.md` §3.2
+    /// step 4 (it needs the room services: [`Drlg::generate_level_svc`]).
     pub fn generate_level(
+        &mut self,
+        data: &DrlgData,
+        types: &mut dyn LevelTypes,
+        idx: LevelIdx,
+    ) -> Result<(), DrlgError> {
+        self.generate_rooms(data, types, idx)?;
+        self.generate_finish(data, idx)
+    }
+
+    /// Level generation `0x006424A0` (§5) with `preset.md` §3.2 step 4
+    /// (generic branch): on a DRLG with the automap callback (the client
+    /// copy, `on_client`) and a level whose type says so
+    /// ([`LevelTypes::automap_streams`]), the type generator then
+    /// generates the level's Vis levels that have no rooms and streams
+    /// every room of the level in list order (`rooms.md` §4.3: their seed
+    /// resets and tile draws), before §5.3–§5.4. Measured (1.14d under
+    /// Wine, `-seed 1234`, ScnAma): the client's first S→C 0x07 generates
+    /// the Rogue Encampment and builds its 35 rooms in level-list order,
+    /// called from `0x006424A0` via the lookup `0x00642C30`
+    /// (`tools/cloud-game/probe_room_builds.py`).
+    pub fn generate_level_svc(
+        &mut self,
+        svc: &mut Services<'_>,
+        idx: LevelIdx,
+    ) -> Result<(), DrlgError> {
+        self.generate_rooms(svc.data, svc.types, idx)?;
+        if self.on_client && svc.types.automap_streams(self, idx) {
+            let id = self.level(idx).id;
+            for vis in self.vis_array(svc.data, id)? {
+                if vis == 0 {
+                    continue;
+                }
+                let v = self.get_or_alloc_level(svc.data, svc.types, vis)?;
+                if self.level(v).first_room.is_none() {
+                    self.generate_level_svc(svc, v)?;
+                }
+            }
+            for r in self.level_rooms(idx) {
+                self.stream_room(svc, r)?;
+            }
+        }
+        self.generate_finish(svc.data, idx)
+    }
+
+    /// §5 rules 1–2: the seed reset and the type generator.
+    fn generate_rooms(
         &mut self,
         data: &DrlgData,
         types: &mut dyn LevelTypes,
@@ -361,6 +408,12 @@ impl Drlg {
         if matches!(self.level(idx).drlg_type, 1..=3) {
             types.generate(self, data, idx)?;
         }
+        Ok(())
+    }
+
+    /// §5 rules 3–4: populated-room memory and warp-room centres.
+    fn generate_finish(&mut self, data: &DrlgData, idx: LevelIdx) -> Result<(), DrlgError> {
+        let id = self.level(idx).id;
         // §5.3: populated-room memory.
         if let Some(mem) = self.level(idx).populated_memory.clone() {
             for (i, r) in self.level_rooms(idx).into_iter().enumerate() {
@@ -760,7 +813,7 @@ impl Drlg {
     ) -> Result<SpawnPoint, DrlgError> {
         let l = self.get_or_alloc_level(svc.data, svc.types, level_id)?;
         if self.level(l).first_room.is_none() {
-            self.generate_level(svc.data, svc.types, l)?;
+            self.generate_level_svc(svc, l)?;
         }
         let mut pos: Option<(i32, i32)> = None;
         let room;

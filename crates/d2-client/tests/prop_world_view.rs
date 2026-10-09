@@ -455,6 +455,10 @@ proptest! {
             });
             let bridge = Bridge::with_dispatch(link, d).unwrap();
             let mut app = App::new();
+            // A fixed host clock (`objects-client.md` §25 r6): no wall time.
+            app.insert_resource(d2_client::bridge::mirror::ScriptedClock(std::sync::Arc::new(
+                std::sync::atomic::AtomicU32::new(1000),
+            )));
             app.add_plugins(MinimalPlugins)
                 .add_plugins(BridgePlugin)
                 .insert_resource(BridgeResource(bridge));

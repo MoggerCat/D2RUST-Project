@@ -120,6 +120,11 @@ pub struct ItemData {
     pub props: Vec<super::item_lists::ItemProp>,
     /// The item is a charm (type `char`).
     pub charm: bool,
+    /// S→C 0x92 took the item out of its owner's body slot and detached
+    /// its stat list (`msg-stats-items.md` §5 r5); the next 0x9C / 0x9D
+    /// record about the item re-adds it (`item_lists::refresh` clears
+    /// this).
+    pub unlinked: bool,
 }
 
 impl ItemData {
