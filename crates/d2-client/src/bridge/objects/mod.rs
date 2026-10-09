@@ -212,6 +212,9 @@ pub struct ClientObjects {
     /// The missile fields of the set-C missiles
     /// (`super::client_missiles`, `missiles/client.md` §C1).
     pub missiles: super::client_missiles::ClientMissiles,
+    /// The client's state-86 (`justhit`) lists of the client missile end
+    /// (`missiles/client.md` §C9 r4.1): the unit and its frames left.
+    pub just_hit: BTreeMap<UnitKey, i32>,
 }
 
 /// A unit and the set it is in.
