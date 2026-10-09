@@ -355,8 +355,6 @@ impl Screen for CreditsScreen {
     }
 
     fn overlay(&mut self, _now_ms: u64, adv: &dyn Fn(u16, &[u16]) -> i32) -> Vec<DrawItem> {
-        // d2rs-own, unverified: the colour `k` of a row is not carried by
-        // `DrawItem::Text` yet (REC-231).
         self.visible_rows(&|t| adv(FONT, t))
             .into_iter()
             .map(|r| DrawItem::Text {
@@ -365,6 +363,8 @@ impl Screen for CreditsScreen {
                 text: String::from_utf16_lossy(&r.text),
                 font: FONT,
                 at: Point::new(r.x, r.y),
+                color: r.k,
+                boxed: None,
             })
             .collect()
     }

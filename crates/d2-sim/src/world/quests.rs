@@ -519,6 +519,20 @@ pub trait QuestWorld {
     ) -> Option<(i32, i32)>;
     /// `0x0056D130`: a portal object of `class` to `level` at (x, y).
     fn create_portal(&mut self, player: UnitId, x: i32, y: i32, class: u16, level: u32) -> bool;
+    /// Tyrael's `0x0056D130` call (`quests-act2.md` §8.11): the same
+    /// with chain 13's +0x3C = 1 during the call, so the arrival hook
+    /// `0x0059DFD0` places the far end (`world/objects-2.md` §25 rule 11).
+    /// Default: [`QuestWorld::create_portal`].
+    fn create_tyrael_portal(
+        &mut self,
+        player: UnitId,
+        x: i32,
+        y: i32,
+        class: u16,
+        level: u32,
+    ) -> bool {
+        self.create_portal(player, x, y, class, level)
+    }
     /// Schedule object timer event 7 (QUESTFN) at `frame` (tick).
     fn schedule_quest_event(&mut self, object: UnitId, frame: i32);
     /// An object's mode (+0x10); 0 when there is no object (§10.5).
