@@ -34,17 +34,17 @@
 |   7. Dialog panel (`0x004A1320`, `0x004A10E0`) | 337–451 |
 |   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 452–464 |
 |   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 465–481 |
-|   10. Other 0x50 codes (UI effects) | 482–516 |
-|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 517–598 |
-|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 599–605 |
-|   13. NPC intro table `0x00726850` (0x91) | 606–634 |
-|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 635–651 |
-| Constants & data dependencies | 652–669 |
-| Randomness | 670–674 |
-| Edge cases & original bugs | 675–695 |
-| Test vectors | 696–718 |
-| Provenance | 719–749 |
-| Open questions | 750–775 |
+|   10. Other 0x50 codes (UI effects) | 482–517 |
+|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 518–599 |
+|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 600–606 |
+|   13. NPC intro table `0x00726850` (0x91) | 607–635 |
+|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 636–652 |
+| Constants & data dependencies | 653–670 |
+| Randomness | 671–675 |
+| Edge cases & original bugs | 676–696 |
+| Test vectors | 697–719 |
+| Provenance | 720–750 |
+| Open questions | 751–776 |
 <!-- /index -->
 
 ## Summary
@@ -500,11 +500,12 @@ stops at a `ÿc` that ends the string.
 2. `0x0049FBA0(a)` first draws the plain scroll (`0x0049FA10`) and
    loads `UI\menu\scroin2` / `UI\menu\scroin3` once (`[0x007BF270]`,
    `[0x007BF26C]`); with a = 0 nothing more. Stones (a = 1, font 5
-   during the call): an animation counter `[0x007BF247]` steps once per
-   > 50 ms of `GetTickCount` (`[0x007BF243]`; reset to 0 when that time
-   is 0); stone i (0–4) with symbol s = u16 `[0x007BF098 + 2i]` (s ≥ 6 →
-   skipped, s = 5 fatal 0x1673) starts when the counter passes
-   `0x00722F08`[i] = (0, 12, 24, 36, 48): f = counter − start; draw mode
+   during the call): an animation counter `[0x007BF247]` with time
+   `[0x007BF243]`: time = 0 → time := now, counter := 0; else now >
+   time + 50 (unsigned compare) → time := now, counter += 1; stone i
+   (0–4) with symbol s = u16 `[0x007BF098 + 2i]` (s ≥ 6 → skipped, s =
+   5 fatal 0x1673) is drawn when `0x00722F08`[i] < counter (strict; so
+   f ≥ 1), `0x00722F08` = (0, 12, 24, 36, 48): f = counter − start; draw mode
    m = 0 for f < 5, 1 for f < 10, 2 for f < 15, else 5 (f = 1 also
    requests UI sound 2671 `shrine_portal`; blend modes:
    `render/blend-modes.md` §1):

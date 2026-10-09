@@ -278,7 +278,7 @@ client update of the missile; "elapsed" = `0x0064A3B0`
 |---|---|---|---|
 | 9 `0x004D39C0` | 101 `meteorcenter` (2,438 `sorceress_meteor_impact`), 133, 564 (no `ProgSound`) | (`CltSubMissile1` ≥ 0 and the missile's skill row exists, else only the default `0x004CD390`) elapsed = max(P1, 1) − 2: first the missile's first attached request (unit +0x78 list head, `0x004CA990`) is detached with force (part 1 §1 r3), then `ProgSound` > 0 → request | the missile |
 | 29 `0x004D5310` → `0x004CE850` | 307 `andycontrol0` | elapsed > 10, `CltSubMissile1` S > 0, and elapsed = 315 → S's `ProgSound` > 0 (310 `andycolumnfirebase`: 451 `andariel_fire_end`) | the missile's owner (`0x004639D0`) |
-| 47 `0x004D5950` | 452 `moltenboulder` (2,416 `sorceress_fireball_1`) | `ProgSound` > 0, a = missile data +0x28 (`0x0064A730`), b = the missile's client motion record +0x40 (`0x004DA320`); a ≠ 0 and a ≠ b → request; then data +0x28 := b | the missile |
+| 47 `0x004D5950` | 452 `moltenboulder` (2,416 `sorceress_fireball_1`) | `ProgSound` > 0, a = missile data +0x28 (`0x0064A730`), b = the missile's client motion record +0x40 (`0x004DA320`); a ≠ 0 and a ≠ b → request; then data +0x28 := b (`0x0064A710` at `0x004D59C5`), inside the `ProgSound` > 0 branch: `ProgSound` ≤ 0 skips the update too (`jle 0x004D59CB`; 2026-10-09 read) | the missile |
 | 51 `0x004D5DD0` | 498 `recycler delay` (2,458 `necromancer_corpseexp_1`), 540 (none) | `CltSubMissile2` ≥ 0, elapsed = P2 and the owner exists: owner flag-ex \|= 0x40000, client missile `CltSubMissile2` created (flags 0x2000); created and `ProgSound` > 0 → request | the **new** missile |
 
 All requests have delay 0. Correction to `audio/triggers.md` §8 r3:

@@ -42,16 +42,16 @@
 |   8. Death (`0x0057CCB0` → `0x005751A0`) | 521–583 |
 |   9. Revive | 584–621 |
 |   10. Restoring from a save | 622–660 |
-|   11. Items (expansion) | 661–724 |
-|   12. Services (links) | 725–728 |
-|   13. Messages | 729–795 |
-|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 796–802 |
-| Constants & data dependencies | 803–826 |
-| Randomness | 827–837 |
-| Edge cases & original bugs | 838–889 |
-| Test vectors | 890–940 |
-| Provenance | 941–997 |
-| Open questions | 998–1090 |
+|   11. Items (expansion) | 661–730 |
+|   12. Services (links) | 731–734 |
+|   13. Messages | 735–801 |
+|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 802–808 |
+| Constants & data dependencies | 809–832 |
+| Randomness | 833–843 |
+| Edge cases & original bugs | 844–895 |
+| Test vectors | 896–946 |
+| Provenance | 947–1003 |
+| Open questions | 1004–1096 |
 <!-- /index -->
 
 ## Summary
@@ -682,8 +682,14 @@ allows C:
    slot), clear the slot, refresh the merc's stats (`0x0055C730`), then
    requirements of C on the merc (`inventory.md` §4.2, equipping 0)
    with old's bonuses gone:
-   - pass: old gets item flags 0x10 (`0x00628170`) and 0x20
-     (`0x006280D0`), leaves the merc's inventory, `0x00621000(merc, 1)`;
+   - pass: old gets item flags 0x10 (`0x00628170(old, 0x10, 1)`), its
+     GUID is appended to the merc inventory's update list
+     (`0x0063CC70`, `items/inventory.md` §1 rule 2; old was already
+     unlinked above, there is no second unlink), item flags 0x20
+     (`0x006280D0(old, 0x20, 1)`), then `0x00621000(merc, 1)`: queue the
+     merc for update (`0x0064C040`) and set its flags 2 (+0xC8) |= 0x1
+     (|= 0x2 too for a player) (asm `0x0054D01D`–`0x0054D03E`, read
+     2026-10-09);
      then rule 3, and after C's copy is equipped a **duplicate of old**
      goes to the player (`0x0055A2A0(player)`) and becomes the cursor
      item (`0x0055FB10`). Result 1.

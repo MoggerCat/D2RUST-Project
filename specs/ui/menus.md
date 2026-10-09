@@ -23,14 +23,14 @@
 | Rules | 66–67 |
 |   1. Waypoint menu input (ui 0x14) | 68–124 |
 |   2. NPC menu box | 125–200 |
-|   3. Hire list (`0x004B5C60`, NPC option "hire") | 201–243 |
-|   4. Shop transactions | 244–329 |
-| Constants & data dependencies | 330–337 |
-| Randomness | 338–341 |
-| Edge cases & original bugs | 342–353 |
-| Test vectors | 354–365 |
-| Provenance | 366–382 |
-| Open questions | 383–398 |
+|   3. Hire list (`0x004B5C60`, NPC option "hire") | 201–253 |
+|   4. Shop transactions | 254–343 |
+| Constants & data dependencies | 344–351 |
+| Randomness | 352–355 |
+| Edge cases & original bugs | 356–367 |
+| Test vectors | 368–379 |
+| Provenance | 380–396 |
+| Open questions | 397–412 |
 <!-- /index -->
 
 ## Summary
@@ -229,7 +229,17 @@ menus: its client sender is `client/model.md` §7 rule 9.
 5. **Row text** (`0x004B5E3B`–`0x004B6300`, answers OQ 1). The list
    widget first gets `0x004B7C00(widget, 0x23, 0x1E)`. Per used record:
    the hireling's stats for the player's difficulty and game type
-   (`0x00663750`, `0x006637F0`; fails → the builder stops). Left text =
+   (`0x00663750`, `0x006637F0`; fails → the builder stops). Exact
+   arguments (2026-10-09 read, `0x004B5E6A`–`0x004B5EA7`): act0 :=
+   `0x00663750(expansion [0x007A04F4], class 0, record u16 @0)`, i.e.
+   the `Act` − 1 of the first `hireling` row of the game's version
+   whose `NameFirst`…`NameLast` holds the name (`world/hirelings.md`
+   §1.2 r3); then `0x006637F0(expansion, local player
+   `0x00463DD0`, seed = record u32 @4, act0, difficulty = the game's
+   difficulty byte `[0x007A060C]` (`0x0044DCD0`), out)`, the same
+   routine and inputs as the server's offer (`world/hirelings.md` §2),
+   so every shown value (Level word 1, Life word 2, Def word 7, Cost
+   word 5) is computable on the client. Left text =
    the name (record u16 @0; 0x421 → string 11021) + `space` `dash`
    `space` (3995, 3996, 3995), then four fields, each = the label (cut
    to 20 units) + `colon` (3997) + `space` + the value as `%2u` + two
@@ -256,7 +266,11 @@ menus: its client sender is `client/model.md` §7 rule 9.
 2. **Kind and price** `[0x007C0D7F]` (cost `0x0062FDC0(player, item,
    difficulty, quest flags, c, t)`, `world/vendors.md` §9):
    - a1 ≠ 1 (store item): refused while the player has a cursor item;
-     kind 1 (buy), t = 2 in a gamble shop (`[0x007C0DB0]` ≠ 0), else 0;
+     kind 1 (buy), t = 0 (the "t = 2 when `[0x007C0DB0]` ≠ 0" branch is
+     dead: every write of `[0x007C0DB0]` stores 0, `panels-2.md` §14
+     r11; read 2026-10-09, writes `0x004B6FD7`, `0x004B703D`,
+     `0x004B70B1`, `0x004B70D7` all with EBX = 0, no indexed write
+     reaches it: the word array at `0x007C0D9A` stops at 9 entries);
    - a1 = 1 (player item), by `c`: 147, 148, 177, 199, 202, 252, 254,
      255, 405, 512, 513, 514 → sell (t = 1); 154, 178, 253, 257, 511 →
      with the repair button on (`0x00489860`): repair (kind 3, t = 3) if
@@ -285,7 +299,7 @@ menus: its client sender is `client/model.md` §7 rule 9.
 
    | Msg | u32 @9 | u32 @13 |
    |---|---|---|
-   | 0x32 buy | `m << 16`, bitwise OR 2 in a gamble shop, OR 0x80000000 when `flags` bit 2 is set and the item's `items.txt` record (`0x006335F0`) byte +0x1A5 ≠ 0 | price |
+   | 0x32 buy | `m << 16` (the OR 2 of `[0x007C0DB0]` ≠ 0 is dead, as rule 2), OR 0x80000000 when `flags` bit 2 is set and the item's `items.txt` record (`0x006335F0`) byte +0x1A5 ≠ 0 | price |
    | 0x33 sell | `m` | price |
    | 0x35 one item | `m` | the item's stat 72 (durability) value, not a price |
    | 0x35 repair all | 0 | 0x80000000 (item GUID 0) |

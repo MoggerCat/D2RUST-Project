@@ -23,7 +23,7 @@
 | Rules | 39–40 |
 |   7.3 Item copy (`0x0055A2A0`, ECX game, EDX source S, owner, fillers) | 41–116 |
 |   7.3.1 Fields the decoder rebuilds (Open question 8) | 117–170 |
-|   10. C→S 0x4F buttons (`0x0054C7C0` → `0x00568060`; answers `ui/panels.md` OQ 6) | 171–294 |
+|   10. C→S 0x4F buttons (`0x0054C7C0` → `0x00568060`; answers `ui/panels.md` OQ 6) | 171–295 |
 <!-- /index -->
 
 ## Summary
@@ -202,8 +202,9 @@ type +0x68, active byte +0x6C). Results: `sim/intents-events.md`
    this rule and, after its checks, do nothing.
 6. `0x00597A20(game, U)` (also used by §10.3 rows 2, 3, 4, 8; read
    2026-10-09): 1 when U's flags 2 (+0xC8) has bit 0x400000 or
-   0x800000; else 1 when any node of U's inventory GUID list
-   (inventory +0x2C, `0x0063CBB0`; node GUID +0, next +4) names an
+   0x800000; else 1 when any GUID of U's inventory update list
+   (inventory +0x2C, `0x0063CBB0`, `items/inventory.md` §1 rule 2;
+   node GUID +0, next +4) names an
    existing item unit (`0x00552F60(game, 4, GUID)`); else 0. A null U
    skips the flag test and then reads U +0x60 (crash; every caller
    passes a live player). A player with neither (no flag, empty list)

@@ -31,14 +31,14 @@
 |   6. Run / walk and menu buttons | 460–480 |
 |   7. Skill buttons | 481–503 |
 |   8. New-stats and new-skills buttons | 504–552 |
-|   9. Mini panel (state 0x15) | 553–613 |
-|   10. Control panel mouse input | 614–654 |
-| Constants & data dependencies | 655–666 |
-| Randomness | 667–670 |
-| Edge cases & original bugs | 671–683 |
-| Test vectors | 684–716 |
-| Provenance | 717–740 |
-| Open questions | 741–791 |
+|   9. Mini panel (state 0x15) | 553–618 |
+|   10. Control panel mouse input | 619–659 |
+| Constants & data dependencies | 660–671 |
+| Randomness | 672–675 |
+| Edge cases & original bugs | 676–688 |
+| Test vectors | 689–721 |
+| Provenance | 722–745 |
+| Open questions | 746–796 |
 <!-- /index -->
 
 ## Summary
@@ -599,7 +599,12 @@ draw mode 5 unless a rule says otherwise.
 7. **Press** (`0x0047EF30`, no cursor item, `[0x007BC970]` = 0): region
    as r6 with o = (−118 when the belt has extra rows and a row count >
    1) + (−118 when `[0x007BC968]`) + (119 when `[0x007BC96C]`); button i
-   (strict x test): f = 7, or P a living player and (state 9 closed, or
+   (strict x test against the button x table `[0x007BC898 + 4i]`, the
+   positions of the layout last drawn — only the draw `0x0047F710`
+   calls the builder `0x0047E8B0`, so press, release (r8) and tool tips
+   (r6) all test the last drawn layout, whatever o is; before the
+   first draw the table is zero; no button under x → nothing, not
+   consumed): f = 7, or P a living player and (state 9 closed, or
    i ≥ 4 single / i ≥ 5 multi) → pressed i := 1; in every case UI sound
    4, the press latch `[0x007BC97C]` := 1, consumed.
 8. **Release** (`0x0047ED90`, only with the latch; latch := 0; no cursor
