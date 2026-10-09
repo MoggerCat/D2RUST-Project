@@ -32,27 +32,27 @@
 | Outputs / state changes | 91–95 |
 | Rules | 96–97 |
 |   1. Screen layout model | 98–134 |
-|   2. UI states and the open/close call | 135–259 |
-|   3. The conflict gate (`0x00453910`) | 260–293 |
-|   4. Slots, open mode and the view shift | 294–351 |
-|   5. UI pass order (`0x00456EE0`) | 352–391 |
-|   6. 800 × 600 border and control panel art (`0x00499450`) | 392–412 |
-|   7. Shared panel parts | 413–430 |
-|   8. Character panel (ui 2, left; `0x004A7D00`) | 431–533 |
-|   9. Inventory panel family (`0x0048EDF0`) | 534–601 |
-|   10. Skill tree (ui 4, right; `0x004AC690`) | 602–665 |
-|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 666–701 |
-|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 702–757 |
-|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 758–815 |
-|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 816–821 |
-|   15. Event → intent summary | 822–849 |
-|   16. Machine tables | 850–884 |
-| Constants & data dependencies | 885–905 |
-| Randomness | 906–910 |
-| Edge cases & original bugs | 911–931 |
-| Test vectors | 932–972 |
-| Provenance | 973–1017 |
-| Open questions | 1018–1109 |
+|   2. UI states and the open/close call | 135–263 |
+|   3. The conflict gate (`0x00453910`) | 264–297 |
+|   4. Slots, open mode and the view shift | 298–355 |
+|   5. UI pass order (`0x00456EE0`) | 356–395 |
+|   6. 800 × 600 border and control panel art (`0x00499450`) | 396–416 |
+|   7. Shared panel parts | 417–434 |
+|   8. Character panel (ui 2, left; `0x004A7D00`) | 435–537 |
+|   9. Inventory panel family (`0x0048EDF0`) | 538–605 |
+|   10. Skill tree (ui 4, right; `0x004AC690`) | 606–669 |
+|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 670–705 |
+|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 706–761 |
+|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 762–819 |
+|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 820–825 |
+|   15. Event → intent summary | 826–853 |
+|   16. Machine tables | 854–888 |
+| Constants & data dependencies | 889–909 |
+| Randomness | 910–914 |
+| Edge cases & original bugs | 915–935 |
+| Test vectors | 936–976 |
+| Provenance | 977–1021 |
+| Open questions | 1022–1113 |
 <!-- /index -->
 
 ## Summary
@@ -218,9 +218,13 @@ cursor position (cursor jump, §4.3), UI `DrawItem`s, C→S messages (§15).
       `0x004A2900()` of the 20-byte table `0x007241C0` (x0, x1, y0, y1,
       label y; y values + H − 480), x + (W − 640)/2 in open mode 2; the
       row depends on the open mode, the resolution (`0x004F5160`) and
-      ui 2 / 6. PROVISIONAL: the table's image values (rows 0 and 2 =
-      x 40–75, all y 0; rows 1 and 3 all 0) look unfilled, so the
-      on-screen position is unread; settled by REC-1160.
+      ui 2 / 6. The image values (rows 0 and 2 = x 40–75, all y 0; rows 1 and 3
+      all 0) are filled at run time. *Read from memory, REC-1160*
+      (2026-10-09, PC 1, ScnAma in game at 800 × 600, a no-breakpoint
+      poll of `0x007241C0`): (x0, x1, y0, y1, label y) = row 0 (40, 75,
+      340, 375, 337), row 1 (360, 395, 340, 375, 337), row 2 (40, 75,
+      285, 320, 282), row 3 (360, 395, 285, 320, 282); the y values get +
+      H − 480 (+120 at 800 × 600) when drawn.
     - **Hooks**: open `0x00455720` registers the window handlers of
       table `0x006D615C` (4 entries); close `0x00455AE0` unregisters
       them and calls `0x004A3000` (latch 1 → 0). No other side effect.
