@@ -1,0 +1,38 @@
+{
+ "channel": "packets",
+ "check": "cube-015-3-standard-gems-1-socketed-wea",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "24",
+  "--auto",
+  "ScnCube",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--send",
+  "4 UseGridItem item=@1 x=@x y=@y",
+  "--send",
+  "8 ClickButton button=24 p1=0 p2=0"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "efb152b2c562b06711f3ad42516def2b3c063d281ef7b2cbb7e0e7f5d33632fd",
+   "size": 47473
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "5324351023ca8d7165b95b80c25e3a94f7aef9010fad52a7864e02847ac80e7f",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "8627e4007cd14b9b9f35b4d8a431ca33c92305eebe0340d929c969f0b25739dc"
+ }
+}

@@ -1,0 +1,38 @@
+{
+ "channel": "packets",
+ "check": "cube-014-3-amulets-ring",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "24",
+  "--auto",
+  "ScnCube",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--send",
+  "4 UseGridItem item=@1 x=@x y=@y",
+  "--send",
+  "8 ClickButton button=24 p1=0 p2=0"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "a1168f328ff19731a70b414c140260b700ec3d72ffc4e6c943a7e465cb791f18",
+   "size": 46656
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "fe60f0c1df303ae9517b2b39989f40b93ebe396057ae9b75f84e4dddb5a6c5c1",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "c5c65a122efff7b7b5ac76059af7f20fafe4156db3781d8aa8b0a403e6dc3791"
+ }
+}
