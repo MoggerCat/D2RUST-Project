@@ -307,6 +307,10 @@ pub struct AudioEngine {
     policy: Box<dyn VoicePolicy + Send>,
     log: VoiceLog,
     errors: Vec<AudioError>,
+    /// Voices as they started, with their trigger tick, kept only when
+    /// [`record_starts`](Self::record_starts) asked for them (audio-diff's
+    /// dump, `specs/tools/audio-diff.md` §3).
+    started: Option<Vec<(u32, Voice)>>,
 }
 
 impl AudioEngine {
@@ -325,7 +329,26 @@ impl AudioEngine {
             policy,
             log: VoiceLog::default(),
             errors: Vec::new(),
+            started: None,
         }
+    }
+
+    /// Keep every started voice for [`take_started`](Self::take_started).
+    pub fn record_starts(&mut self, on: bool) {
+        if on {
+            self.started.get_or_insert_with(Vec::new);
+        } else {
+            self.started = None;
+        }
+    }
+
+    /// The voices started since the last call, in start order, each with
+    /// its trigger tick (empty unless [`record_starts`](Self::record_starts)).
+    pub fn take_started(&mut self) -> Vec<(u32, Voice)> {
+        self.started
+            .as_mut()
+            .map(std::mem::take)
+            .unwrap_or_default()
     }
 
     pub fn queue_mut(&mut self) -> &mut TriggerQueue {
@@ -442,8 +465,11 @@ impl AudioEngine {
             }
         }
         self.log.push(record(&file, false));
-        self.voices
-            .push(Voice::new(id, file, sound, t.params, gains));
+        let voice = Voice::new(id, file, sound, t.params, gains);
+        if let Some(started) = &mut self.started {
+            started.push((t.tick, voice.clone()));
+        }
+        self.voices.push(voice);
     }
 
     /// Stopping a voice that is not playing (ended, never started) logs

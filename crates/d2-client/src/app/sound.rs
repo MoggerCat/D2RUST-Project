@@ -344,6 +344,8 @@ fn audio_frame(
     config: Option<Res<ConfigRes>>,
     link: Option<Res<SoundLink>>,
     mut log: Option<ResMut<SoundLog>>,
+    mut dump: Option<ResMut<super::audio_dump::AudioDump>>,
+    mut exit: MessageWriter<AppExit>,
 ) -> std::result::Result<(), BevyError> {
     let audio = &mut *audio;
     let weather = link.as_deref().map(|l| {
@@ -430,7 +432,27 @@ fn audio_frame(
                 tick
             }
         };
-        engine.present(presented).map_err(AudioFrameError::from)?;
+        match dump.as_deref_mut() {
+            // `specs/tools/audio-diff.md` §3: the dump presents each tick
+            // and mixes its frames (no device).
+            Some(d) => {
+                let records = d
+                    .stepper
+                    .advance(&mut engine, presented)
+                    .map_err(AudioFrameError::from)?;
+                if let Err(e) = d.write(&records, world.server_ticks) {
+                    warn!("audio dump: {e}");
+                }
+                if d.until.is_some_and(|n| world.server_ticks >= n) {
+                    info!(
+                        "play: audio dump reached server tick {}",
+                        world.server_ticks
+                    );
+                    exit.write(AppExit::Success);
+                }
+            }
+            None => engine.present(presented).map_err(AudioFrameError::from)?,
+        }
         (presented, engine.take_errors())
     };
     drop(driver);

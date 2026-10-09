@@ -462,6 +462,8 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 
 - [q-fix-room-links] After a waypoint return to a town, does 1.14d populate only the rooms near the player (far NPCs/objects appear on approach), as d2rs does? Drive town -> waypoint -> back, snapshot units at +50 and +600 frames (`docs/handoff/q-fix-room-links.md`).
 
+- [q-tool-audio-diff] REC-1363: does 1.14d send the same DirectSound calls on Windows as under Wine? On PC 1 run `py tools/audio-diff/record_audio.py --auto ScnAma --seed 1234 --ticks 250 --out traces/raw/audio-town-win.jsonl --blob-dir game/captures/audio-town-win` (game with sound, no `-ns`), then `py tools/audio-diff/audio_diff.py voices traces/raw/audio-town-win.jsonl game/captures/audio-town-win game/captures/audio-town-win-v` and compare `orig.voices.jsonl` (tick, buffer, channels, dev_vol, dev_pan, sha256 of each voice's first `bytes`) with the cloud run of `traces/audio/audio-town-ambience-ama.check` (`specs/tools/audio-diff.md` Open questions 1). Expected: same voices, ticks, device integers; refill-write ticks may differ.
+
 ## How to check a behaviour in one command
 
 A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)
