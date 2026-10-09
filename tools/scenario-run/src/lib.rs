@@ -590,6 +590,11 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
     );
     world.inventory = Some(preview_inv_parts(inv));
     let mut g: Sim = SimGame::with_world(game, sim, world);
+    // Ground items are announced by the update pass as the play app's
+    // host does (`inventory-moves.md` §6.3, §9.1 step 4): a drop from the
+    // cursor sends 0x9C action 2 (recorded 2026-10-09,
+    // `facts/items/a1-town-item-moves.tsv` n 57–58).
+    g.announce_ground = true;
     g.join(CLIENT, Some(player), None, client_state::IN_GAME)
         .map_err(|e| build_err(format!("join: {e}")))?;
     g.set_player(
