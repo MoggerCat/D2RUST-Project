@@ -70,6 +70,11 @@ pub mod pass {
     pub const SCREEN_FADE: u32 = 10;
     /// Everything after the world draw `0x00476BC0`.
     pub const UI: u32 = 11;
+    /// The UI pass's majors (`ui/panels.md` §5): the automap of step 3
+    /// draws before every panel draw of steps 4–10.
+    pub const UI_AUTOMAP_MAJOR: u32 = 0;
+    /// The panels' draws (the UI root's list, in emission order).
+    pub const UI_PANELS_MAJOR: u32 = 1;
 }
 
 /// Sorts items by key, stably: ties keep build order (§A6). The compositor

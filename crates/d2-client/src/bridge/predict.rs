@@ -53,8 +53,9 @@ use std::sync::OnceLock;
 
 use d2_sim::path::tables::PathTables;
 use d2_sim::path::walk::geom::direction_vector;
+use d2_sim::path::walk::velocity::{STAT_FASTERMOVE, STAT_VELOCITYPERCENT, VELOCITY_PERCENT_FLOOR};
 
-use super::client_path::{ClientPath, PathTo};
+use super::client_path::{ClientPath, Own, PathTo};
 use super::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use super::world::{ClientWorld, UnitKey, PLAYER};
 
@@ -67,7 +68,7 @@ pub fn facing(from: (u32, u32), to: (u32, u32)) -> Option<u8> {
     if from == to {
         return None;
     }
-    let tables = tables()?;
+    let tables = path_tables()?;
     // d2rs-own, unverified: `0x0064FC60` takes the 32-bit `127 × l`, which
     // wraps past about 258 sub-tiles and then indexes the `tan` table out
     // of range; the original only aims at near path points, but the model
@@ -92,7 +93,7 @@ pub fn facing(from: (u32, u32), to: (u32, u32)) -> Option<u8> {
 
 /// The spec path tables (`path-tables.tsv`); `None` when they do not
 /// parse.
-fn tables() -> Option<&'static PathTables> {
+pub(crate) fn path_tables() -> Option<&'static PathTables> {
     static TABLES: OnceLock<Option<PathTables>> = OnceLock::new();
     TABLES.get_or_init(|| PathTables::spec().ok()).as_ref()
 }
@@ -119,17 +120,71 @@ impl Speeds {
     /// with p = 100 walking and 100 + (100 · `RunVelocity` / `WalkVelocity`
     /// − 100) running (§8.2; the run list is skipped when `WalkVelocity`
     /// is 0); §9.4 r2.1 with base 0x400: step = velocity · 16 (case M1:
-    /// velocity 0x600 moves 0x6000 a tick). Stats 67 / 96 from items and
-    /// skills are not in the client model and are read as their creation
-    /// values (d2rs-own, unverified).
+    /// velocity 0x600 moves 0x6000 a tick). Stats 67 / 96 at their
+    /// creation values ([`Self::step_with`]).
     pub fn step(self, run: bool) -> i64 {
+        self.step_with(run, MoveStats::CREATION)
+    }
+
+    /// [`Self::step`] with the player's stats 67 / 96 `s`
+    /// (`sim/pathing.md` §8.1 r2): p = max(f + stat 67 + run bonus, 25),
+    /// f = base · raw / (base + raw) of animstat row 4 over stat 96 (0
+    /// without it).
+    pub fn step_with(self, run: bool, s: MoveStats) -> i64 {
         let walk = i64::from(self.walk);
-        let p = if run && walk != 0 {
-            100 + (100 * i64::from(self.run) / walk - 100)
+        let bonus = if run && walk != 0 {
+            100 * i64::from(self.run) / walk - 100
         } else {
-            100
+            0
         };
+        let f = match path_tables() {
+            Some(t) if s.faster != 0 => {
+                let b = i64::from(t.animstat[4][1]);
+                b * i64::from(s.faster) / (b + i64::from(s.faster))
+            }
+            _ => 0,
+        };
+        let p = (f + i64::from(s.percent) + bonus).max(i64::from(VELOCITY_PERCENT_FLOOR));
         (walk * 256 * p / 100) * 16
+    }
+}
+
+/// The local player's velocity stats the prediction reads from the model
+/// (`seams/movement-prediction.md` §2.6 r2): stat 67 `velocitypercent`
+/// total outside the run list (the path adds the run list itself, as
+/// the server's does, `sim/pathing.md` §8.2) and stat 96
+/// `item_fastermovevelocity` total (§8.1 r2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MoveStats {
+    pub percent: i32,
+    pub faster: i32,
+}
+
+impl MoveStats {
+    /// A player's creation values (`client/msg-units.md` §1.1 r3: stat
+    /// 67 := 100; no items).
+    pub const CREATION: MoveStats = MoveStats {
+        percent: 100,
+        faster: 0,
+    };
+
+    /// The local player's stats 67 and 96 (`client/stat-lists.md` §1 r3
+    /// `total`). A model unit without its base stat 67 (no creation
+    /// values: synthetic fixtures) reads the creation base 100 under its
+    /// lists. No local player: [`Self::CREATION`].
+    pub fn of_local(world: &ClientWorld) -> Self {
+        let Some(p) = world.local() else {
+            return Self::CREATION;
+        };
+        let base = if p.stats.contains_key(&STAT_VELOCITYPERCENT) {
+            0
+        } else {
+            Self::CREATION.percent
+        };
+        MoveStats {
+            percent: base + world.total(p.key, STAT_VELOCITYPERCENT, 0),
+            faster: world.total(p.key, STAT_FASTERMOVE, 0),
+        }
     }
 }
 
@@ -389,10 +444,11 @@ impl Predict {
         self.exhausted = world
             .local()
             .is_some_and(|p| p.stats.get(&10).is_some_and(|s| *s == 0));
-        if self.path_step(world, speeds, walk, target) {
+        let moves = MoveStats::of_local(world);
+        if self.path_step(world, speeds, moves, walk, target) {
             return;
         }
-        let step = speeds.step(walk.run && !self.exhausted);
+        let step = speeds.step_with(walk.run && !self.exhausted, moves);
         let dist = isqrt(dx.unsigned_abs().pow(2) + dy.unsigned_abs().pow(2)) as i64;
         if dist <= step || step <= 0 {
             if step > 0 {
@@ -414,10 +470,11 @@ impl Predict {
         &mut self,
         world: &ClientWorld,
         speeds: Speeds,
+        moves: MoveStats,
         walk: Walk,
         target: (u16, u16),
     ) -> bool {
-        let (Some(at), Some(cell), Some(t)) = (self.at, self.cell(), tables()) else {
+        let (Some(at), Some(cell), Some(t)) = (self.at, self.cell(), path_tables()) else {
             return false;
         };
         let Some(drlg) = world.drlg.as_ref().map(|d| &d.drlg) else {
@@ -437,19 +494,20 @@ impl Predict {
             .local()
             .and_then(|p| p.stats.get(&10).copied())
             .unwrap_or(1);
+        let own = Own { stamina, moves };
         if self.path_for != Some((walk, at)) {
             if !self.path.place(t, drlg, cell.0, cell.1) {
                 self.path_for = None;
                 return false;
             }
-            if !self.path.request(t, drlg, speeds, stamina, to, walk.run) {
+            if !self.path.request(t, drlg, speeds, own, to, walk.run) {
                 // No path: the server's request stands still too.
                 self.walk = None;
                 self.path_for = None;
                 return true;
             }
         }
-        let moving = self.path.tick(t, drlg, speeds, stamina, Some(to));
+        let moving = self.path.tick(t, drlg, speeds, own, Some(to));
         if let Some((x, y)) = self.path.position() {
             let now = (i64::from(x), i64::from(y));
             if let Some(d) = facing((at.0 as u32, at.1 as u32), (x, y)) {

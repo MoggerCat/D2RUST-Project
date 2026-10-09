@@ -252,10 +252,18 @@ fn run(class: u32) -> Run {
         None => fx.notes.push("pick-up: no ground item in reach".into()),
     }
 
-    // 7. Back to the town waypoint, then 0x49 to the Cold Plains.
+    // 7. Back to the town waypoint, then 0x49 to the Cold Plains. The
+    // walk retraces the way out (the positions after each leg since the
+    // start), then heads for the start: players path greedily
+    // (`pathing.md` §5–§6: a ray, a 73-step greedy walk, A* only within
+    // 18 sub-tiles), so a straight leg back stops behind the palisade
+    // the way out went round (first real-data run, q-realdata-run).
+    let mut back: Vec<(i32, i32)> = fx.trail.iter().rev().copied().collect();
+    back.dedup();
     let (wp_at, range, start) = (fx.wp_at, waypoint_range(class), fx.start);
+    back.push(start);
     fx.walk(
-        &[start],
+        &back,
         move |f| {
             let p = f.pos();
             (p.0 - wp_at.0).abs() <= range && (p.1 - wp_at.1).abs() <= range

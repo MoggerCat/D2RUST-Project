@@ -28,7 +28,7 @@ use std::collections::BTreeMap;
 
 use d2_proto::client::{RemoveBodyItem, SwapCursorBufferItem, SwapCursorWithBody};
 
-use super::super::draw::UiDrawSink;
+use super::super::draw::{CelLook, Remap, UiDraw, UiDrawSink, DRAW_MODE_OPAQUE};
 use super::super::geom::Point;
 use super::super::inv_grid::HoverState;
 use super::super::inv_grid::{
@@ -142,11 +142,20 @@ pub struct ItemsUi {
     pub tips: Option<super::super::item_tip::ItemTips>,
     /// The used item of the identify cursor (cursor state 6, `inv_items_tip`).
     pub identify: std::cell::Cell<Option<u32>>,
+    /// The five tint palette indices of `inventory.md` §2 r1 (the act
+    /// palette's nearest entries, [`super::super::inv_grid::tint_indices`]);
+    /// `None` (no palette given): no tint is drawn.
+    pub tint_colors: Option<[u8; 5]>,
     /// The hover state of §5 (`0x00487000`): one for every grid, as in
     /// the original; updated on each mouse event over an open grid
     /// ([`ItemsUi::track_hover`]) and read by the grid click (§10 r4).
     pub hover: std::cell::Cell<HoverState>,
 }
+
+/// Item flag 0x400000: ethereal (`ui/inventory.md` §8 r4).
+pub const ETHEREAL: u32 = 0x0040_0000;
+/// The draw mode of an ethereal item graphic (§8 r4): 50 % alpha.
+pub const ETHEREAL_MODE: u8 = 1;
 
 /// d2rs-own, unverified: whether an item code is a belt-able potion
 /// (`hp1`–`hp5`, `mp1`–`mp5`, `rvs`, `rvl`, `vps`, `yps`, `wms`, the
@@ -257,7 +266,7 @@ impl ItemsUi {
                 }
                 _ => continue,
             };
-            out.push(cel(a.file, 0, top_left.x, top_left.y + a.gh));
+            out.push(self.item_cel(world, &it, a.file, top_left.x, top_left.y + a.gh));
         }
     }
 
@@ -265,14 +274,53 @@ impl ItemsUi {
     /// (the belt box, `control-panel.md` §5 r4); nothing without art.
     pub fn draw_at(
         &self,
+        world: &ClientWorld,
         files: &UiFiles,
         item: &ItemView,
         (left, top): (i32, i32),
         out: &mut dyn UiDrawSink,
     ) {
         if let Some(a) = self.art(files, item, (29, 29)) {
-            out.push(cel(a.file, 0, left, top + a.gh));
+            out.push(self.item_cel(world, item, a.file, left, top + a.gh));
         }
+    }
+
+    /// How an item graphic is written (`ui/inventory.md` §8 r4): draw mode
+    /// 1 for an ethereal item (flag 0x400000), else 5; the remap is the
+    /// item's inventory colour ([`super::super::item_tip::ItemTips::inv_color`]),
+    /// none without the tips or a map.
+    pub fn item_look(&self, world: &ClientWorld, it: &ItemView) -> CelLook {
+        let remap = self
+            .tips
+            .as_ref()
+            .zip(items::stream(world, it.key))
+            .and_then(|(t, s)| t.inv_color(s))
+            .map_or(Remap::None, |(t, c)| Remap::ItemColor { t, c });
+        CelLook {
+            mode: if it.flags & ETHEREAL != 0 {
+                ETHEREAL_MODE
+            } else {
+                DRAW_MODE_OPAQUE
+            },
+            remap,
+        }
+    }
+
+    /// The cel draw `0x004F6480` of an item graphic at (x, y) with its
+    /// [`Self::item_look`].
+    pub(crate) fn item_cel(
+        &self,
+        world: &ClientWorld,
+        it: &ItemView,
+        file: u32,
+        x: i32,
+        y: i32,
+    ) -> UiDraw {
+        let mut d = cel(file, 0, x, y);
+        if let UiDraw::Image(i) = &mut d {
+            i.look = self.item_look(world, it);
+        }
+        d
     }
 
     /// The cursor item (`panels-3.md` §23 r9): its graphic with the
@@ -300,7 +348,7 @@ impl ItemsUi {
         };
         let x = mouse.x - (a.gw as u32 / 2) as i32;
         let y = mouse.y - (a.gh as u32 / 2) as i32;
-        out.push(cel(a.file, 0, x, y + a.gh));
+        out.push(self.item_cel(world, &it, a.file, x, y + a.gh));
     }
 
     /// Left mouse down in the inventory panel: the grid click (§10) or an
@@ -488,7 +536,13 @@ impl ItemsUi {
             ready: true,
             own_player: true,
             own_inventory_context: true,
-            inventory_mode: if page == 4 { 0x0C } else { 0 },
+            // `ui/inventory.md` §4 r1: the stash grid in mode 0x0C, the
+            // cube grid (page 3) in mode 0x0E.
+            inventory_mode: match page {
+                4 => 0x0C,
+                3 => 0x0E,
+                _ => 0,
+            },
             page,
             shift: self.shift,
             ctrl: false,

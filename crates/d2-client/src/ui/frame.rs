@@ -84,6 +84,22 @@ impl Presentation {
         )
     }
 
+    /// The offset (physical pixels, x right, y up) from the window's
+    /// centre to the centre of the presented image placed with its
+    /// top-left at ([`Self::left`], [`Self::top`]): what a sprite centred
+    /// on the window must move by so the image sits where
+    /// [`Self::to_frame`] maps the cursor (`seams/bridge-app.md` §2.7).
+    /// Non-zero (a half pixel) only with an odd leftover width or height.
+    pub fn centre_offset(&self) -> (f32, f32) {
+        let s = self.scale as f32;
+        let cx = self.left as f32 + f32::from(FRAME_W) * s / 2.0;
+        let cy = self.top as f32 + f32::from(FRAME_H) * s / 2.0;
+        (
+            cx - self.window_w as f32 / 2.0,
+            self.window_h as f32 / 2.0 - cy,
+        )
+    }
+
     /// Maps a window pixel (physical, top-left origin) to the frame.
     pub fn to_frame(&self, x: i64, y: i64) -> FramePos {
         let s = i64::from(self.scale);

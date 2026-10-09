@@ -1109,7 +1109,10 @@ fn charsi_repairs_one_item_and_repair_all_answers() {
     let f = fx.step(&[repair(cg, 0)]);
     assert_eq!(f.codes, [(0x35, Some(ResultCode::Done))]);
     let after = fx.stat(player, GOLD);
-    assert_eq!(f.received, [tx(1, 2, u32::MAX, after)], "repaired");
+    // S→C 0x3E (`world/vendors.md`: the restored durability, stat 72)
+    // ahead of the 0x2A.
+    let stat = d2_sim::units::messages::update_item_stat(cg, DURABILITY, 12, 0);
+    assert_eq!(f.received, [stat, tx(1, 2, u32::MAX, after)], "repaired");
     assert_eq!(fx.stat(cap, DURABILITY), 12, "restored to the maximum");
     assert!(after < before, "the repair was charged");
 

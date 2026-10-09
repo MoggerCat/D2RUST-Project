@@ -144,7 +144,7 @@ fn a_ground_item_draws_its_flippy_at_its_subtile() {
     populate(&mut w, &[(5, 3, (102, 100), b"cap ")]);
     let mut g = GroundItems::new(source(), rows());
     let mut a = assets();
-    let mut frame = WorldFrame::default();
+    let mut frame = framed(&w);
     let feed = ModelFeed::<NoFeed>::default();
     let log = g.add_to_frame(&w, &feed, &mut a, &mut frame);
     assert!(log.is_empty(), "{log:?}");
@@ -165,6 +165,32 @@ fn a_ground_item_draws_its_flippy_at_its_subtile() {
     assert_eq!(g.hit(433, 301), None);
 }
 
+// Covers: specs/seams/world-screen.md §2.6
+#[test]
+fn a_ground_item_moves_with_the_frames_shaken_camera() {
+    use crate::rules::camera::{ClientPos, FrameSize, OpenMode};
+    let mut w = ClientWorld::default();
+    populate(&mut w, &[(5, 3, (102, 100), b"cap ")]);
+    let mut g = GroundItems::new(source(), rows());
+    let mut a = assets();
+    let feed = ModelFeed::<NoFeed>::default();
+    // The player at client (0, 1608) (as above), a running shake (3, −2).
+    let player = ClientPos { x: 0, y: 1608 };
+    let plain = Camera::new(FrameSize::D2RS, OpenMode::NONE, player, (0, 0));
+    let shaken = Camera::new(FrameSize::D2RS, OpenMode::NONE, player, (3, -2));
+    let mut frame = WorldFrame {
+        camera: Some(shaken),
+        ..WorldFrame::default()
+    };
+    let log = g.add_to_frame(&w, &feed, &mut a, &mut frame);
+    assert!(log.is_empty(), "{log:?}");
+    let d = frame.items[0];
+    // The tiles move by the unit origin's change; so does the item.
+    let (dx, dy) = (shaken.unit.x - plain.unit.x, shaken.unit.y - plain.unit.y);
+    assert_ne!((dx, dy), (0, 0));
+    assert_eq!((d.x, d.y), (432 - dx, 298 - dy));
+}
+
 // Covers: specs/render/unit-composite.md §9
 #[test]
 fn no_rows_or_missing_art_draw_nothing_and_never_fail() {
@@ -174,7 +200,7 @@ fn no_rows_or_missing_art_draw_nothing_and_never_fail() {
         &[(5, 3, (102, 100), b"cap "), (6, 0, (1, 1), b"cap ")],
     );
     let feed = ModelFeed::<NoFeed>::default();
-    let mut frame = WorldFrame::default();
+    let mut frame = framed(&w);
     let mut a = assets();
     // The default: no rows, no source.
     let log = GroundItems::default().add_to_frame(&w, &feed, &mut a, &mut frame);
@@ -188,8 +214,19 @@ fn no_rows_or_missing_art_draw_nothing_and_never_fail() {
     // No local player: no camera, nothing drawn.
     let mut g = GroundItems::new(source(), rows());
     w.local_player = None;
+    let mut frame = framed(&w);
     assert!(g.add_to_frame(&w, &feed, &mut a, &mut frame).is_empty());
     assert!(frame.items.is_empty());
+}
+
+/// A built frame of `w`: its one camera (`seams/world-screen.md` §2.2),
+/// `None` without a local player.
+fn framed(w: &ClientWorld) -> WorldFrame {
+    let mut feed = ModelFeed::<NoFeed>::default();
+    WorldFrame {
+        camera: crate::world_view::frame_camera(w, &mut feed).unwrap(),
+        ..WorldFrame::default()
+    }
 }
 
 #[derive(Clone, Default)]
@@ -227,7 +264,7 @@ fn scene(items: &[Fixture<'_>]) -> (Bridge<RecordingLink>, RecordingLink, Ground
     let mut b = Bridge::with_dispatch(link.clone(), Dispatch::empty()).unwrap();
     populate(b.world_mut(), items);
     let mut g = GroundItems::new(source(), rows());
-    let mut frame = WorldFrame::default();
+    let mut frame = framed(b.world());
     let feed = ModelFeed::<NoFeed>::default();
     g.add_to_frame(b.world(), &feed, &mut assets(), &mut frame);
     (b, link, g)
@@ -380,7 +417,7 @@ fn a_gold_pile_draws_the_direction_of_its_amount_class() {
     put_gold(&mut w, 9, (98, 98), 6000);
     let mut g = GroundItems::new(Arc::new(src), gold_rows());
     let mut a = assets();
-    let mut frame = WorldFrame::default();
+    let mut frame = framed(&w);
     let feed = ModelFeed::<NoFeed>::default();
     let log = g.add_to_frame(&w, &feed, &mut a, &mut frame);
     assert!(log.is_empty(), "{log:?}");
@@ -456,7 +493,7 @@ fn ground_items_take_their_slot_from_the_draw_order() {
     let mut g = GroundItems::new(source(), rows());
     let mut a = assets();
     let feed = ModelFeed::<NoFeed>::default();
-    g.add_to_frame(&w, &feed, &mut a, &mut WorldFrame::default());
+    g.add_to_frame(&w, &feed, &mut a, &mut framed(&w));
     // Item 5 flat in the shadow list of cell 40 (pass 5); item 6
     // dropping (mode 5) in the unit list of cell 41 (pass 6); item 7
     // hidden by the sight test (not drawn).
@@ -476,7 +513,7 @@ fn ground_items_take_their_slot_from_the_draw_order() {
             (UnitKey::new(ITEM, 6), UnitSlot::Drawn(dropping)),
             (UnitKey::new(ITEM, 7), UnitSlot::NotDrawn),
         ])),
-        ..WorldFrame::default()
+        ..framed(&w)
     };
     g.add_to_frame(&w, &feed, &mut a, &mut frame);
     let keys: Vec<_> = frame.items.iter().map(|d| (d.tag, d.key)).collect();

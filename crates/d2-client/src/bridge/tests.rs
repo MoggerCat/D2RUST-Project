@@ -1191,3 +1191,40 @@ fn skill_fallback_runs_only_in_a_tick_frame() {
     assert_eq!(r.rejected, 0);
     assert_eq!(left(&b), Some(0), "tick frame: the level-0 hand fell back");
 }
+
+/// Save and Exit (`flows/save-exit.md` §1 r2): C→S 0x69 on the system
+/// queue and `exit_requested`; the client stays in game until the
+/// server's 0x05 (§4 r1). `play::leave_game` (the window close) sends it
+/// for a client still in game and runs frames until the 0x05.
+// Covers: specs/flows/save-exit.md §1 r2, §4 r1
+#[test]
+fn save_and_exit_sends_0x69_and_waits_for_the_server() {
+    let (mut b, link) = bridge();
+    b.world.in_game = true;
+    b.save_and_exit().unwrap();
+    assert_eq!(sent(&link), [(SendQueue::System, vec![0x69])]);
+    assert!(b.world.exit_requested && b.world.in_game);
+    link.deliver(false, &[&[0x05], &[0x06]]);
+    b.frame().unwrap();
+    assert!(!b.world.in_game && b.world.unloaded && b.world.exit_requested);
+
+    // The window close: one 0x69, frames until the 0x05.
+    let (mut b, link) = bridge();
+    b.world.in_game = true;
+    link.deliver(false, &[]);
+    link.deliver(false, &[&[0x05], &[0x06]]);
+    assert!(crate::app::play::leave_game(&mut b).unwrap());
+    assert_eq!(sent(&link), [(SendQueue::System, vec![0x69])]);
+    assert_eq!(
+        link.script()
+            .events
+            .iter()
+            .filter(|e| **e == Event::Pump)
+            .count(),
+        2
+    );
+    // M08: a client already out of the game sends nothing.
+    let (mut b, link) = bridge();
+    assert!(crate::app::play::leave_game(&mut b).unwrap());
+    assert!(sent(&link).is_empty());
+}

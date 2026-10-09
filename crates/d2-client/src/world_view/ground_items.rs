@@ -265,9 +265,9 @@ impl GroundItems {
     }
 
     /// Loads the art ([`Self::ensure`]) and adds the ground items to a
-    /// built `frame` (re-sorted by key), under the camera of `feed`
-    /// (`camera.md` §3, no shake). No local player, or open mode 3 (no
-    /// world): nothing. Never fails the frame; returns log lines.
+    /// built `frame` (re-sorted by key), under the frame's one camera
+    /// (`frame.camera`, `seams/world-screen.md` §2.2, §2.6). No camera, or
+    /// open mode 3 (no world): nothing. Never fails the frame; returns log lines.
     pub fn add_to_frame<F: ViewFeed + ?Sized>(
         &mut self,
         world: &ClientWorld,
@@ -281,9 +281,12 @@ impl GroundItems {
         }
         let mut log = self.ensure(world, assets);
         let camera = match (feed.player(world), feed.open_mode(world)) {
-            (Ok(Some(p)), Ok(mode)) if mode.get() != NO_WORLD_MODE => {
-                Camera::new(FrameSize::play(), mode, p.client(), (0, 0))
-            }
+            // The frame's one camera, shake included
+            // (`seams/world-screen.md` §2.6); a frame built without one:
+            // the player's, unshaken.
+            (Ok(Some(p)), Ok(mode)) if mode.get() != NO_WORLD_MODE => frame
+                .camera
+                .unwrap_or_else(|| Camera::new(FrameSize::play(), mode, p.client(), (0, 0))),
             (Err(e), _) | (_, Err(e)) => {
                 log.push(format!("ground items: no camera: {e}"));
                 return log;

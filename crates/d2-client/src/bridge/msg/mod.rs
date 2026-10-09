@@ -45,6 +45,16 @@ mod tests_outputs;
 #[cfg(test)]
 mod tests_pc1;
 #[cfg(test)]
+mod tests_proto_a;
+#[cfg(test)]
+mod tests_proto_b;
+#[cfg(test)]
+mod tests_proto_c;
+#[cfg(test)]
+mod tests_proto_d;
+#[cfg(test)]
+mod tests_proto_e;
+#[cfg(test)]
 mod tests_stats_items;
 #[cfg(test)]
 mod tests_ui_more;

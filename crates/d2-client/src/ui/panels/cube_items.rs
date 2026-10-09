@@ -14,7 +14,7 @@ use super::super::geom::Point;
 use super::super::inv_grid::GridRecord;
 use super::super::layout::Screen;
 use super::inv_items::ItemsUi;
-use super::{cel, PanelOutput, UiFiles};
+use super::{PanelOutput, UiFiles};
 use crate::bridge::items::{self, mode};
 use crate::bridge::world::ClientWorld;
 
@@ -90,7 +90,7 @@ impl ItemsUi {
                 continue;
             };
             let (x, y, _, _) = g.cell(i32::from(it.x), i32::from(it.y));
-            out.push(cel(a.file, 0, x, y + a.gh));
+            out.push(self.item_cel(world, &it, a.file, x, y + a.gh));
         }
     }
 

@@ -355,11 +355,7 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
             });
         };
         match map.near_rooms(world, levels.as_deref(), |u| {
-            let mut f = preview::unit_facts(world, u);
-            if let Some(t) = unit_tables.as_ref() {
-                unit_facts::fill_model(&mut f, u, t)?;
-            }
-            Ok(f)
+            preview_facts(world, u, unit_tables.as_ref())
         }) {
             Ok(Some(near)) => {
                 if weather.is_none() {
@@ -377,11 +373,7 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
 
     fn unit_facts(&self, world: &ClientWorld, unit: &ClientUnit) -> Result<UnitFacts, ViewError> {
         if self.preview.is_some() {
-            let mut f = preview::unit_facts(world, unit);
-            if let Some(t) = &self.unit_tables {
-                unit_facts::fill_model(&mut f, unit, t)?;
-            }
-            return Ok(f);
+            return preview_facts(world, unit, self.unit_tables.as_ref());
         }
         if let Some(t) = &self.unit_tables {
             return unit_facts::model_facts(world, unit, t, self.levels.as_deref());
@@ -476,6 +468,26 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
             None => self.inner.tile_art(tile, assets),
         }
     }
+}
+
+/// The preview's facts of a unit ([`preview::unit_facts`]); with the
+/// unit tables, the model's facts and the sight test of
+/// `draw-order-2.md` §15 ([`unit_facts::sight_gate`]). Where the test
+/// cannot run (no local player, room or level yet), the preview's
+/// "visible" stays (`d2rs-own, unverified`, D1).
+fn preview_facts(
+    world: &ClientWorld,
+    unit: &ClientUnit,
+    tables: Option<&UnitFactTables>,
+) -> Result<UnitFacts, ViewError> {
+    let mut f = preview::unit_facts(world, unit);
+    if let Some(t) = tables {
+        unit_facts::fill_model(&mut f, unit, t)?;
+        if let Some(hidden) = unit_facts::sight_gate(world, unit, t) {
+            f.sight_hidden = Some(hidden);
+        }
+    }
+    Ok(f)
 }
 
 #[cfg(test)]

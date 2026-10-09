@@ -301,7 +301,7 @@ fn position_check_vectors() {
     u.position = Some((100, 100));
     w.units.insert(P1, u);
     w.local_player = Some(P1);
-    w.set_local_walk(Some((108, 100)));
+    w.set_local_walk(Some(((108 << 16) | 0x8000, (100 << 16) | 0x8000)), None);
     assert_eq!(
         check(&mut w, &none, P1, 104, 100, 0, 0, 0).unwrap(),
         Checked::Followed
@@ -545,6 +545,7 @@ fn levels() -> Vec<LevelRow> {
         draw_edges: false,
         rain: false,
         mud: false,
+        ambient: Default::default(),
     };
     (v[40].pal, v[40].act) = (1, 1);
     // A level whose `Pal` differs from its `Act` (as 125–127, 133–136).

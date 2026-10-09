@@ -837,9 +837,17 @@ mod tests {
         assert_eq!(WalkVerify::decode(&top), Ok(m));
     }
 
+    /// A value wider than its field is cut to the field's low bits
+    /// (`combat/vitals.md` §5.4), the neighbours untouched.
     #[test]
-    #[should_panic(expected = "does not fit in 15 bits")]
-    fn packed_put_rejects_wide_values() {
-        packed_put(&mut [0; 9], 8, 15, 0x8000);
+    fn packed_put_cuts_wide_values() {
+        let mut b = [0; 9];
+        packed_put(&mut b, 8, 15, 0x8000 | 0x1234);
+        assert_eq!(packed_get(&b, 8, 15), 0x1234);
+        assert_eq!((b[0], b[2] & 0x80, b[3]), (0, 0, 0));
+        let mut b = [0; 9];
+        packed_put(&mut b, 8, 15, u32::MAX);
+        assert_eq!(packed_get(&b, 8, 15), 0x7FFF);
+        assert_eq!((b[0], b[2] & 0x80, b[3]), (0, 0, 0));
     }
 }

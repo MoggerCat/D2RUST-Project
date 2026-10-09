@@ -278,12 +278,18 @@ fn check_item(t: &ItemTables, it: &Item<Stats>, expansion: bool) -> Result<(), S
     }
     // affixes.md §1, §3 step 4: slots hold ids of their part, the row
     // fits the item, and no two affixes share a group.
+    // §1 rule 4: suffix slot 0 of a `scro` / `book` item holds a `books`
+    // row index, not an affix id.
+    let books_slot = [i32::from(ty::SCRO), i32::from(ty::BOOK)].contains(&i32::from(rec.type_));
     let mut groups = Vec::new();
-    for (slots, lo, hi) in [
-        (&it.prefix, t.n_suffix, t.first_auto()),
-        (&it.suffix, 0, t.n_suffix),
+    for (slots, lo, hi, part) in [
+        (&it.prefix, t.n_suffix, t.first_auto(), 0),
+        (&it.suffix, 0, t.n_suffix, 1),
     ] {
-        for &id in slots.iter().filter(|&&id| id != 0) {
+        for (k, &id) in slots.iter().enumerate() {
+            if id == 0 || (books_slot && part == 1 && k == 0) {
+                continue;
+            }
             let i = usize::from(id) - 1;
             if !(lo..hi).contains(&i) {
                 return Err(format!("affix {id} outside its part"));
@@ -356,7 +362,13 @@ fn check_item(t: &ItemTables, it: &Item<Stats>, expansion: bool) -> Result<(), S
 /// this crash on crafted ilvl-1 requests. Those are counted and printed,
 /// not failed; whether 1.14d really crashes there
 /// is a spec question (`docs/handoff/triage-game-findings.md`).
-// Claim once the first local run passes (note §1): specs/items/generation.md §3 r1
+/// Two more cases the specs state, counted and not failed: an ear request
+/// without a player unit fails (§9 step 5; the sweep's requests have
+/// none), and suffix slot 0 of `scro` / `book` items is a `books` index
+/// (`affixes.md` §1 rule 4), skipped by [`check_item`]. The first cloud
+/// real-data run (q-realdata-run, 2026-10-08) reported exactly these 560:
+/// ears 160, `ibk` 160, `isc` 160, `0sc` 80.
+// Covers: specs/items/generation.md §3 r1
 #[test]
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn sweep_create_every_item_every_quality() {
@@ -365,6 +377,7 @@ fn sweep_create_every_item_every_quality() {
     let mut created = 0usize;
     // affixes.md Edge case 3 crashes, by (expansion, difficulty, ilvl).
     let mut null_group: BTreeMap<(bool, u8, i32), usize> = BTreeMap::new();
+    let mut ears = 0usize;
     let mut s = 0u32;
     for (i, rec) in t.items.iter().enumerate() {
         for expansion in [true, false] {
@@ -387,6 +400,11 @@ fn sweep_create_every_item_every_quality() {
                             {
                                 *null_group.entry((expansion, difficulty, ilvl)).or_default() += 1;
                             }
+                            // §9 step 5: an unforced ear needs a player
+                            // request unit; the sweep's request has none.
+                            Err(CreateError::NotPlayer) if rec.type_ == ty::PLAY as _ => {
+                                ears += 1;
+                            }
                             Err(e) => failures.push(format!("{at}: {e}")),
                             Ok(_) if !expansion && rec.version >= 100 => {
                                 failures.push(format!("{at}: created in a classic game"))
@@ -407,6 +425,7 @@ fn sweep_create_every_item_every_quality() {
         "crafted requests ending in affixes.md Edge case 3 (expansion, difficulty, ilvl) → count: {} total {null_group:?}",
         null_group.values().sum::<usize>()
     );
+    eprintln!("ear requests without a player (§9 step 5): {ears}");
     assert!(created > 0);
     assert!(
         failures.is_empty(),

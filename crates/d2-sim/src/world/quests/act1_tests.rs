@@ -1669,13 +1669,13 @@ fn act1_intro_first_talk() {
     assert!(act1::active_fn(&ctl, &mut f, i, P1, npc::AKARA, f0));
     // Message 11 (or 12) from Akara sets the intro bit; no refresh.
     say(&mut ctl, &mut f, AKARA_U, 11);
-    assert!(f.players[&P1].quests.intro[0].contains(&npc::AKARA));
+    assert!(f.players[&P1].quests.heard(0, npc::AKARA));
     assert!(f.sent.is_empty());
     assert!(text(&mut ctl, &mut f, 37, AKARA_U).is_empty());
     assert!(!act1::active_fn(&ctl, &mut f, i, P1, npc::AKARA, f0));
     // Kashya's 11 is not hers.
     say(&mut ctl, &mut f, KASHYA_U, 11);
-    assert!(!f.players[&P1].quests.intro[0].contains(&npc::KASHYA));
+    assert!(!f.players[&P1].quests.heard(0, npc::KASHYA));
 }
 
 // Covers: specs/world/quests.md §8.1

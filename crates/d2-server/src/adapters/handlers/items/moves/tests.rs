@@ -32,6 +32,7 @@ use d2_sim::stats::{ClassStats, StatData, StatTable, StateTable};
 use d2_sim::units::hooks::UnitData;
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::lists::client_state;
+use d2_sim::units::messages::update_item_stat;
 use d2_sim::units::{RoomId, UnitType};
 use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables};
 use d2_sim::wiring::economy::{GameFields, ItemSpawn};
@@ -341,9 +342,6 @@ impl MovePending for MRest {
     }
     fn send(&mut self, player: Owner, bytes: Vec<u8>) {
         self.with(|r| r.sent.push((player, bytes)));
-    }
-    fn send_item_stat(&mut self, _: Owner, item: Guid, stat: u16) {
-        self.log(format!("send_item_stat {item} {stat}"));
     }
 }
 
@@ -1173,7 +1171,7 @@ fn use_grid_item() {
 }
 
 /// 0x21 (§7.12): keys over the max stack (12): dst := 12, src := 3, both
-/// announced (0x3E seam, logged), dst 0x9C action 0xA (row 9). 0x22
+/// announced (S→C 0x3E), dst 0x9C action 0xA (row 9). 0x22
 /// (§7.13) on an owned item → 3 (X1).
 // Covers: specs/items/inventory-moves.md §7.12, §7.13
 #[test]
@@ -1191,14 +1189,15 @@ fn stack_and_unstack_items() {
         (t.stat(du, stat::QUANTITY), t.stat(su, stat::QUANTITY)),
         (12, 3)
     );
-    assert_eq!(
-        t.rest.take_log(),
-        [
-            format!("send_item_stat {dst} 70"),
-            format!("send_item_stat {src} 70")
-        ]
-    );
-    assert_eq!(bytes, t.pass(&[x9c(0x0A, dst)]));
+    // Both announced by S→C 0x3E (`units::messages::update_item_stat`,
+    // the new base quantities) ahead of the update pass's 0x9C.
+    assert_eq!(t.rest.take_log(), Vec::<String>::new());
+    let mut want = vec![
+        update_item_stat(dst, stat::QUANTITY, 12, 0),
+        update_item_stat(src, stat::QUANTITY, 3, 0),
+    ];
+    want.extend(t.pass(&[x9c(0x0A, dst)]));
+    assert_eq!(bytes, want);
     assert_eq!(t.frame(&msg(0x21, &[src, src])), (Malformed, NO_BYTES));
     assert_eq!(t.frame(&msg(0x22, &[dst])), (Malformed, NO_BYTES));
 }
@@ -1322,9 +1321,9 @@ fn socket_item() {
 }
 
 /// 0x29 (§7.20): a cursor scroll into a stored tome of the same spell:
-/// tome quantity +1, announced (0x3E seam), the scroll freed (not
-/// consumed one by one: seam default) and the cursor cleared; nothing is
-/// sent. A second scroll of another spell → the original's fatal assert
+/// tome quantity +1, announced (S→C 0x3E), the scroll freed (not
+/// consumed one by one: seam default) and the cursor cleared; nothing
+/// else is sent. A second scroll of another spell → the original's fatal assert
 /// (line 0x149C): result 3 and a recorded fault.
 // Covers: specs/items/inventory-moves.md §7.20
 #[test]
@@ -1336,11 +1335,17 @@ fn scroll_to_book_and_its_fatal() {
     let q0 = t.stat(bu, stat::QUANTITY);
     let s = t.cursor_item(SCROLL);
     t.rest.take_log();
-    assert_eq!(t.frame(&msg(0x29, &[s, book])), (Done, NO_BYTES));
+    assert_eq!(
+        t.frame(&msg(0x29, &[s, book])),
+        (
+            Done,
+            vec![update_item_stat(book, stat::QUANTITY, q0 + 1, 0)]
+        )
+    );
     assert_eq!(t.stat(bu, stat::QUANTITY), q0 + 1);
     assert_eq!(t.unit(s), None, "freed");
     assert_eq!(t.inventory().cursor(), None);
-    assert_eq!(t.rest.take_log(), [format!("send_item_stat {book} 70")]);
+    assert_eq!(t.rest.take_log(), Vec::<String>::new());
 
     let s2 = t.cursor_item(SCROLL);
     // The spell is item data +0x3E (suffix slot 0, `queries::spell_of`).

@@ -290,6 +290,11 @@ pub struct ClientEntry {
     pub room: Option<RoomId>,
     /// Client counter +0x1B0, +1 per per-client update.
     pub update_count: u32,
+    /// The bits the game set in the client status word (+0x0A,
+    /// `formats/d2s.md` §2.3) since the join: the bit setter `0x00538650`
+    /// (0x08, dead) and `0x00538680` (bits 8–12). The loaded word itself
+    /// is the save's; a save ORs these into it (no code clears a bit).
+    pub status_set: u16,
     /// Client list link (+0x4A8).
     next: Option<ClientId>,
 }
@@ -903,6 +908,7 @@ impl UnitLists {
             player,
             room,
             update_count: 0,
+            status_set: 0,
             next: self.client_head,
         }));
         self.client_head = Some(id);
@@ -934,6 +940,17 @@ impl UnitLists {
 
     pub fn client_mut(&mut self, id: ClientId) -> Option<&mut ClientEntry> {
         self.clients.get_mut(id.0)
+    }
+
+    /// The bit setter `0x00538650(client, bits, 1)` on the client of
+    /// `player` (`formats/d2s.md` §2.3): `bits` set in its status word
+    /// ([`ClientEntry::status_set`]). A player without a client: nothing.
+    pub fn set_player_status(&mut self, player: UnitId, bits: u16) {
+        for c in self.clients() {
+            if let Some(e) = self.client_mut(c).filter(|e| e.player == Some(player)) {
+                e.status_set |= bits;
+            }
+        }
     }
 
     /// Head of the client list (newest client first, §7.3).

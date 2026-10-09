@@ -5,14 +5,17 @@
 //! user's archives on demand; the marker lines are drawn as one-pixel
 //! cels of the line's palette index.
 //!
+//! Each cel draws in its §10 r4 mode `m` through the act's blend tables
+//! (`blend-modes.md` §1: 0/1/2 → the 25/50/75 % alpha tables, 5 opaque),
+//! unlit; the lines are opaque (`blend-modes.md` §8 r1). The pass is the
+//! UI pass's step 3 (`ui/panels.md` §5 r3, `draw-order.md` OQ14): after
+//! every world pass, before every panel draw.
+//!
 //! d2rs-own, unverified (decision D1; automap-0001, automap-0002):
-//! - every cel draws opaque (the fade draw modes of §10 r4 need the
-//!   blend tables of `blend-modes.md` §1, which the preview does not
-//!   push for the UI);
+//! - without the act's shade tables (no feed loaded them) a cel draws
+//!   opaque, whatever its mode;
 //! - the header and name texts (§11 r7, §13) are not drawn (no text path
 //!   for them yet); only the cells and the unit markers;
-//! - the pass runs between the world and the panels (pass 9, below the
-//!   UI pass), not at "UI pass step 3" of `ui/panels.md` §5 r3;
 //! - the local player is the only marker unit (the near rooms' unit
 //!   lists are not turned into markers); the player's byte +0x18 is 0;
 //! - a file no archive holds is logged once and its cels are not drawn.
@@ -23,7 +26,8 @@ use std::sync::Arc;
 use crate::assets::path::{CanonicalPath, FileSource};
 use crate::bridge::world::ClientWorld;
 use crate::frames::{FramePart, FrameSet, FrameSetKey, IndexFrame};
-use crate::rules::camera::{moving_to_client, FrameSize, OpenMode};
+use crate::rules::blend::cel_ops;
+use crate::rules::camera::{ClientPos, FrameSize, OpenMode};
 use crate::rules::placement::draw_position;
 use crate::scene::order::pass;
 use crate::scene::{BlendOp, DrawItem, DrawKey, ItemTag, Rect, ShadeChain};
@@ -35,6 +39,9 @@ use crate::ui::automap::session::AutomapSession;
 use crate::ui::automap::{FrameFacts, PassInput};
 
 use super::{ViewAssets, WorldFrame};
+
+/// The light byte of an unlit cel draw (`shading.md` §3).
+const UNLIT: u8 = 0xFF;
 
 /// The frame set of the one-pixel line cels (not an archive path).
 const PIXEL_PATH: &str = "d2rs/preview/automap-pixel";
@@ -128,13 +135,17 @@ impl AutomapView {
     }
 
     /// Runs the draw pass of `session` for `world` and adds the draws to
-    /// `frame` (re-sorted by key). Closed automap, no local player or no
-    /// act: nothing. Never fails the frame; returns log lines.
+    /// `frame` (re-sorted by key), under the frame's one camera
+    /// (`frame.camera`, `seams/world-screen.md` §2.2) with the local
+    /// player's marker at `player`, the frame's one player position
+    /// (§2.4). Closed automap, open mode 3, no local player, no camera or
+    /// no act: nothing. Never fails the frame; returns log lines.
     pub fn add_to_frame(
         &mut self,
         session: &mut AutomapSession,
         world: &ClientWorld,
         open_mode: OpenMode,
+        player_at: ClientPos,
         assets: &mut ViewAssets,
         frame: &mut WorldFrame,
     ) -> Vec<String> {
@@ -143,15 +154,14 @@ impl AutomapView {
         let Some(player) = world.local() else {
             return log;
         };
-        if !session.open || world.act.is_none() {
+        let Some(cam) = frame.camera else {
+            return log;
+        };
+        // §10 r1: state 0x0A open and open mode ≠ 3.
+        if !session.open || world.act.is_none() || open_mode.get() == 3 {
             return log;
         }
-        let pos = player.position.unwrap_or((0, 0));
-        let at = moving_to_client(
-            (u32::from(pos.0) << 16) | 0x8000,
-            (u32::from(pos.1) << 16) | 0x8000,
-        );
-        let cam = crate::rules::camera::Camera::new(FrameSize::play(), open_mode, at, (0, 0));
+        let at = player_at;
         let facts = FrameFacts {
             width: FrameSize::play().width,
             height: FrameSize::play().height,
@@ -208,7 +218,7 @@ impl AutomapView {
         };
         let mut minor = 0u32;
         let mut push = |frame: &mut WorldFrame, mut d: DrawItem| {
-            if let Ok(k) = DrawKey::new(pass::UNIDENTIFIED_9, 0, minor, 0) {
+            if let Ok(k) = DrawKey::new(pass::UI, pass::UI_AUTOMAP_MAJOR, minor, 0) {
                 d.key = k;
                 d.tag = ItemTag::None;
                 minor += 1;
@@ -223,7 +233,7 @@ impl AutomapView {
                     x,
                     y,
                     clip,
-                    ..
+                    mode,
                 } => {
                     let Some(key) = self.file_key(*file, mini, assets, &mut log) else {
                         continue;
@@ -238,8 +248,7 @@ impl AutomapView {
                     let (px, py) = draw_position(image, *x, *y);
                     let mut item = DrawItem::new(id, px, py);
                     item.clip = rect(clip);
-                    item.shade = ShadeChain::EMPTY;
-                    item.blend = BlendOp::Opaque;
+                    (item.shade, item.blend) = cel_blend(assets, *mode);
                     push(frame, item);
                 }
                 AutomapDraw::Line { from, to, color } => {
@@ -259,6 +268,16 @@ impl AutomapView {
         crate::scene::order(&mut frame.items);
         self.last = draws;
         log
+    }
+}
+
+/// The shade chain and blend op of an automap cel in draw mode `mode`
+/// (§10 r4; `blend-modes.md` §1, §2), unlit (light byte 0xFF). Without the
+/// act's shade tables: opaque (module doc).
+fn cel_blend(assets: &ViewAssets, mode: u8) -> (ShadeChain, BlendOp) {
+    match &assets.shades {
+        Some(t) => cel_ops(t, mode, None, UNLIT),
+        None => (ShadeChain::EMPTY, BlendOp::Opaque),
     }
 }
 

@@ -124,3 +124,74 @@ fn without_prediction_the_pick_camera_is_the_draw_camera() {
     let draw = frame_camera(&w, &mut feed).unwrap().unwrap();
     assert_eq!(camera_for(&w, 0), Some(draw));
 }
+
+// Covers: specs/seams/world-screen.md §2.2
+// Covers: specs/seams/world-screen.md §2.4
+#[test]
+fn with_a_prediction_every_camera_of_the_frame_is_the_draw_camera() {
+    use d2_client::world_view::{camera_at, frame_anchor};
+    let w = world_at((100, 100));
+    let mut feed = ModelFeed::<NoFeed>::default().with_preview(Preview::default());
+    feed.set_local_prediction(Some((ME, (centre(103), centre(100)))));
+    let draw = frame_camera(&w, &mut feed).unwrap().unwrap();
+    // The pick / label / corpse / automap camera: the frame's anchor
+    // under the frame's open mode, the draw camera exactly.
+    let anchor = frame_anchor(&w, &mut feed).unwrap();
+    let (pick, _) = camera_at(&w, &feed, anchor).unwrap().unwrap();
+    assert_eq!(pick, draw);
+    // It stands on the predicted sub-tile, not the model cell.
+    assert_ne!(camera_for(&w, 0), Some(draw));
+    let at = moving_to_client(centre(103), centre(100));
+    assert_eq!(draw.unit_draw(at, (0, 0)), (400, 292));
+}
+
+// Covers: specs/seams/movement-prediction.md §2.9 r1
+#[test]
+fn with_a_prediction_every_camera_is_the_draw_camera() {
+    // Model (100, 100), the walk prediction three sub-tiles on: the draw,
+    // the pick / hover / label camera and the local position all read
+    // the prediction.
+    let mut w = world_at((100, 100));
+    let own = (centre(103), centre(100));
+    w.set_local_walk(Some(own), Some(2));
+    let mut feed = ModelFeed::<NoFeed>::default().with_preview(Preview::default());
+    feed.set_local_prediction(Some((ME, own)));
+    let draw = frame_camera(&w, &mut feed).unwrap().unwrap();
+    assert_eq!(camera_for(&w, 0), Some(draw));
+    assert_eq!(w.local_position(), Some(own));
+    assert_eq!(w.local_cell(), Some((103, 100)));
+    // A placement since the prediction was recorded wins.
+    w.units.get_mut(&ME).unwrap().position = Some((90, 90));
+    assert_eq!(w.local_cell(), Some((90, 90)));
+}
+
+// Covers: specs/seams/world-screen.md §2.5
+#[test]
+fn a_units_pick_anchor_is_its_draw_anchor() {
+    use d2_client::bridge::hover::unit_feet as feet;
+    use d2_client::bridge::world::{ITEM, MONSTER, OBJECT};
+    let cam = Camera::new(
+        FrameSize::D2RS,
+        OpenMode::NONE,
+        ClientPos { x: 0, y: 0 },
+        (0, 0),
+    );
+    // The spec vector: an object at (7, 3) with the player at client
+    // (0, 0) is drawn (and picked) at (464, 372).
+    assert_eq!(feet(&cam, OBJECT, (7, 3)), (464, 372));
+    for cell in [(7u16, 3u16), (100, 90), (0, 0)] {
+        let (sx, sy) = (i32::from(cell.0), i32::from(cell.1));
+        for ty in [OBJECT, ITEM] {
+            assert_eq!(
+                feet(&cam, ty, cell),
+                cam.unit_draw(static_to_client(sx, sy), (0, 0))
+            );
+        }
+        for ty in [PLAYER, MONSTER] {
+            assert_eq!(
+                feet(&cam, ty, cell),
+                cam.unit_draw(moving_to_client(centre(sx), centre(sy)), (0, 0))
+            );
+        }
+    }
+}
