@@ -340,6 +340,22 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         }
     }
 
+    /// `0x00648730` on the unit's dynamic path record
+    /// (`crate::wiring::path::monsters::stop_path`).
+    fn stop_path_now(&mut self, unit: UnitId) -> bool {
+        crate::wiring::path::monsters::stop_path(self, unit).is_some()
+    }
+
+    /// AI param 0 of the unit's AI control (`ai.md` §3: `0x0058EC00(unit,
+    /// 1, v)`); false while the store is lent or the unit has no AI.
+    fn set_ai_param0(&mut self, unit: UnitId, v: i32) -> bool {
+        self.ai
+            .as_mut()
+            .and_then(|a| a.control_mut(unit))
+            .map(|c| c.params[0] = v)
+            .is_some()
+    }
+
     /// `0x0061AB00` on the unit's room.
     fn room_flag(&mut self, sim: &Sim<'_>, unit: UnitId) -> bool {
         sim.game
