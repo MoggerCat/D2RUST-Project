@@ -1,4 +1,4 @@
-// Spec: specs/missiles/client.md (§C1–§C4 the client create `0x004CD540`; §C6, §C7, §C9, §C10, §C13), specs/missiles/client-bodies.md (§B1, §B5 r1, r3), specs/missiles/missiles.md (§R2.1 the create record), specs/render/lighting.md (§8 missile row)
+// Spec: specs/missiles/client.md (§C1–§C4 the client create `0x004CD540`; §C6, §C7, §C9, §C10, §C13), specs/missiles/client-bodies.md (§B1, §B2, §B3 r2, §B4 4, 25, 49, §B5 r1, r3), specs/missiles/missiles.md (§R2.1 the create record), specs/render/lighting.md (§8 missile row)
 //! Client missile creation: the client create `0x004CD540` fills a
 //! client-only type-3 unit in set C (`client/model.md` §2 r1) from a
 //! 0x5C-byte create record ([`CreateRecord`]) and its `missiles` row
@@ -20,7 +20,8 @@
 //! town tests (§C6 r4, §C7 r8: no town flag in the client level rows),
 //! the second pass (§C7 r13), the client hit functions (§C9 r4.3: a
 //! handler error when a row names one), and every client function but
-//! 1, 5, 8, 11, 23, 43, 60 and 63 (the missile is then left as it is). The aim nudge
+//! 1, 4, 5, 8, 11, 23, 25, 43, 49, 60 and 63 (the missile is then left
+//! as it is; 3 needs the missiles calc evaluator `0x0064B7C0`). The aim nudge
 //! (§C2 r8) reads the owner's direction from the record
 //! ([`CreateRecord::owner_dir64`]; none given is a handler error).
 
@@ -537,6 +538,9 @@ pub const FN_FOLLOW_OWNER: u16 = 43;
 pub const FN_ORBIT_EVEN: u16 = 60;
 pub const FN_ORBIT: u16 = 63;
 pub const FN_TRAIL: u16 = 8;
+pub const FN_SCATTER: u16 = 4;
+pub const FN_MIST: u16 = 25;
+pub const FN_SPAWN_FACING: u16 = 49;
 
 /// The per-update dispatch `0x004D2C70` (§C6) of the set-C missile `key`.
 pub fn update(
@@ -584,6 +588,31 @@ pub fn update(
             default_step(w, rows, key, &row, lights)
         }
         FN_TRAIL => trail(w, rows, key, &row, lights),
+        FN_SCATTER => {
+            // §B4 4: scatter(m, P1, P2, P3, S1), then step.
+            let [p1, p2, p3] = row.clt_param;
+            scatter(w, rows, key, p1, p2, p3, i32::from(row.clt_sub[0]), lights)?;
+            default_step(w, rows, key, &row, lights)
+        }
+        FN_SPAWN_FACING => {
+            // §B4 49: no row or S1 < 0 → remove; elapsed mod max(P1, 1)
+            // = 0 → spawn facing(m, S1); step.
+            let s1 = row.clt_sub[0];
+            if s1 < 0 {
+                remove(w, key);
+                return Ok(());
+            }
+            let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
+            if (m.total - m.current) % row.clt_param[0].max(1) == 0 {
+                if let Some(x) = spawn(w, rows, key, s1 as u32, lights)? {
+                    if let Some(xm) = w.objclient.missiles.get_mut(&x) {
+                        xm.direction = m.direction;
+                    }
+                }
+            }
+            default_step(w, rows, key, &row, lights)
+        }
+        FN_MIST => mist(w, rows, key, &row, lights),
         FN_SUB_LOOP_FIRE => {
             fire_frames(w, key, &row);
             default_step(w, rows, key, &row, lights)
@@ -645,6 +674,119 @@ fn trail(
                 c.frame = frame;
             }
         }
+    }
+    default_step(w, rows, key, row, lights)
+}
+
+/// Scatter `0x004CE140(m, chance, count, spread, c)` (`client-bodies.md`
+/// §B3 r2): c out of range → nothing; frames left ≠ 0 and rnd(chance) ≠
+/// 0 → nothing (left 0: no draw); else `count` creates (flags 0x20,
+/// owner O, origin m, class c, m's skill and level), each aimed at (x +
+/// dx + σ(dx)·spread, y + dy + σ(dy)·spread), dx, dy := rnd(2·spread) −
+/// spread, σ(v) = −1 for v < 0, else +1.
+#[allow(clippy::too_many_arguments)]
+fn scatter(
+    w: &mut ClientWorld,
+    rows: &[ClientMissileRow],
+    key: UnitKey,
+    chance: i32,
+    count: i32,
+    spread: i32,
+    c: i32,
+    lights: bool,
+) -> Result<(), HandlerError> {
+    if c < 0 || c as usize >= rows.len() {
+        return Ok(());
+    }
+    let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
+    if m.current != 0 && rnd(w, key, chance) != 0 {
+        return Ok(());
+    }
+    let (x, y) = ((m.pos.0 >> 16) as i32, (m.pos.1 >> 16) as i32);
+    let sigma = |v: i32| if v < 0 { -1 } else { 1 };
+    for _ in 0..count {
+        let dx = rnd(w, key, 2 * spread) - spread;
+        let dy = rnd(w, key, 2 * spread) - spread;
+        let rec = CreateRecord {
+            flags: flag::TARGET_ABSOLUTE,
+            owner: m.owner,
+            origin: Some(key),
+            class: c as u32,
+            tx: x + dx + sigma(dx) * spread,
+            ty: y + dy + sigma(dy) * spread,
+            skill: m.skill,
+            level: m.level,
+            ..CreateRecord::default()
+        };
+        create(w, rows, &rec, lights)?;
+    }
+    Ok(())
+}
+
+/// spawn(c) `0x004CDBA0(m, c, 0, 0, skill, level)` (`client-bodies.md`
+/// §B1, `client.md` §C5): flags 0x20, origin m, owner m's owner (none →
+/// none), target (0, 0) absolute.
+fn spawn(
+    w: &mut ClientWorld,
+    rows: &[ClientMissileRow],
+    key: UnitKey,
+    c: u32,
+    lights: bool,
+) -> Result<Option<UnitKey>, HandlerError> {
+    let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
+    let Some(owner) = m.owner else {
+        return Ok(None);
+    };
+    let rec = CreateRecord {
+        flags: flag::TARGET_ABSOLUTE,
+        owner: Some(owner),
+        origin: Some(key),
+        class: c,
+        skill: m.skill,
+        level: m.level,
+        ..CreateRecord::default()
+    };
+    create(w, rows, &rec, lights)
+}
+
+/// Function 25 `0x004D4DC0` (`client-bodies.md` §B4, `towermist`): S1 <
+/// 0 → remove; elapsed mod max(P3, 1) = 0 → u, v := rnd(2·P1 + 1) − P1,
+/// sx, sy := x / y + rnd(2·P2 + 1) − P2 (in this order); a create with
+/// flags 0x21, owner O, start (sx, sy), target (sx + u, sy + v), class
+/// S1, skill, level. Step.
+fn mist(
+    w: &mut ClientWorld,
+    rows: &[ClientMissileRow],
+    key: UnitKey,
+    row: &ClientMissileRow,
+    lights: bool,
+) -> Result<(), HandlerError> {
+    let s1 = row.clt_sub[0];
+    if s1 < 0 {
+        remove(w, key);
+        return Ok(());
+    }
+    let [p1, p2, p3] = row.clt_param;
+    let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
+    if (m.total - m.current) % p3.max(1) == 0 {
+        let (x, y) = ((m.pos.0 >> 16) as i32, (m.pos.1 >> 16) as i32);
+        let u = rnd(w, key, 2 * p1 + 1) - p1;
+        let v = rnd(w, key, 2 * p1 + 1) - p1;
+        let sx = x + rnd(w, key, 2 * p2 + 1) - p2;
+        let sy = y + rnd(w, key, 2 * p2 + 1) - p2;
+        let rec = CreateRecord {
+            flags: flag::POSITION | flag::TARGET_ABSOLUTE,
+            owner: m.owner,
+            class: s1 as u32,
+            x: sx,
+            y: sy,
+            tx: sx + u,
+            ty: sy + v,
+            skill: m.skill,
+            level: m.level,
+            ..CreateRecord::default()
+        };
+        create(w, rows, &rec, lights)?;
     }
     default_step(w, rows, key, row, lights)
 }
