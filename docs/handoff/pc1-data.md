@@ -317,6 +317,26 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     and whether the unit is queued for update by the toggle
     (`0x00639DB0`) or by the entry itself. d2rs: PROVISIONAL REC-730 in
     `d2-sim/src/wiring/inventory/potion.rs`.
+45. **Melee on a fallen from the shared script** (q-fix-b-headless-unit-click-keys;
+    `specs/tools/scenario-diff.md` §2 r4.5, §3 r8.5):
+    `py tools\scenario-diff\scenario_diff.py traces\checks\combat-melee-fallen.check --orig-only`.
+    Look for: the footer notes `autostart: frame 39: clickunit 1 19 368 300
+    posted at the stop of frame 38` and `frame 40: click 368 300 posted at
+    the stop of frame 39` (the hover frame); in the state the player in
+    mode 7 from frame 40 to 54 and fallen GUID 21's `hp` 256 -> 0 at frame
+    46 (Wine and d2rs both do this); in `orig.packets.jsonl` a C->S
+    `06 01000000 15000000` (left skill on the fallen), not a walk (0x01 /
+    0x03) — only once `record_packets.py` applies `frame` input
+    (`AutoStart.attach`; today it notes "they never run here"). Then run
+    without `--orig-only` (both sides) and record the first difference.
+46. **A belt potion mid-fight from the shared script** (same row):
+    `py tools\scenario-diff\scenario_diff.py traces\checks\combat-potion-midfight.check --orig-only`.
+    Look for: the footer note `autostart: frame 70: key 49 posted at the
+    stop of frame 69`; in the state the player's `hp` 2560 -> 2640 at
+    frame 70, +80 a frame, and item GUID 2 (slot 0) gone (Wine: so); in
+    `orig.packets.jsonl` (once it takes `frame` input) the join's S->C
+    0x9C action 0x0E for the two hp1 (d2rs sends none: its load leaves
+    belt items in mode 4) and a C->S `26 02000000 00000000 00000000`.
 - **[q-fix-pc1-proto-items] Where the join sets the player's alignment (state 105, stat 172 = 2)**
     `combat/hit.md` §7.1 says players carry it, and the recording shows
     it in the player's first 0xAA (`packets-town-arrival-ama.check` seq
@@ -326,13 +346,71 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     `0x005543B0(player, 2, v)` call: where it runs relative to the unit
     seed and the stats, its v argument, and whether a corpse (player
     unit in mode 17) gets it too. Answer into `combat/hit.md` §7.1.
-    d2rs: PROVISIONAL REC-750, set right after the unit seed
+    d2rs: PROVISIONAL REC-732, set right after the unit seed
     (`d2-client` `app/single_player.rs` loader, `View::set_alignment`).
+- **[q-fix-pc1-proto-items] `0x00625870`: the mod-array test and a key absent from the base array**
+    `sim/stat-lists.md` §11 rule 4 was corrected from the recording
+    (`packets-town-arrival-ama.check` frame 2: the player update sends
+    12, 0, 2, keys in the mod array, and not 67 / 68, base 100 outside
+    it): the single-stat send runs when the key **is** in the mod array.
+    Read `0x00625870` to confirm the test's sense and say what it sends
+    for a key in the array but absent from the base array (0, as the
+    flush `0x006258D0` does, or nothing; d2rs: nothing). Answer into
+    §11 rule 4.
+- **[q-fix-b-monster-combat] Zero-length walk: which mode message (REC-890)**
+    `monsters/ai.md` §7.5 rule 8 says the neutral start after a
+    zero-length walk sends S→C 0x67 code 7 at U's cell; the builder's
+    owner spec `sim/intents-events.md` §7.4 rule 5 sends mode 1 as 0x6D
+    (GUID, cell, life byte; stat 328 += 1) and stops. d2rs sends 0x6D (test
+    `a_zero_length_walk_goes_neutral_and_sends_code_7`). Read which one
+    `0x00597E20` sends for that update and fix the other rule.
+- **[q-fix-b-monster-combat] Monster base list: owner and attach reset (REC-891)**
+    `monsters/init.md` §6 step 12 (`0x006251F0` + `0x00626E10`, the
+    flag-1 list at `0x0057407D`) gives no owner type / GUID, expire or
+    attach `reset`. d2rs: flags 1, expire 0, owner = the monster, reset = 1
+    (a DYNAMIC list would keep `mindamage` / `maxdamage` / `tohit` out of
+    the totals). Read the arguments; answer into init §6 step 12.
+- **[q-fix-b-monster-combat] Owner data f1 / f2 (REC-892)**
+    `0x0058F030(game, u, GUID, type, f1, f2)`: `umod-callbacks.md` §1
+    rule 5 says f1 / f2 ≠ 0 "restart the AI" (`0x005DD230`);
+    `sim/units.md` (`0x0058F530`) reads as control flags |= 0x2, |= 0x1.
+    d2rs writes the minion owner (+0x2C / +0x30) and nothing for f1 / f2
+    (the Fallen leader `SetBoss`, `BossXfer` call is (GUID, 1, 1, 1)).
+    State what `0x005DD230` does with each flag.
+- **[q-fix-b-monster-combat] Quill Rat at frame 59 (q-fix-b-quillrat-shoot)**
+    d2rs (`traces/checks/combat-arrow-quillrat.check`, staging + this
+    branch): the rat is placed exactly at the poke point (5147, 4267),
+    4,4 from the player at (5143, 4263); its think at 31 has D = 6, no
+    command, C = 0, P(aip2 35) passes (lo' 8) → A2; one more draw on its
+    seed before 59 (the quill); at 59 the draw gives 89 → escape (walk).
+    The same run without the arrows is identical, so the arrows do not
+    cause it. No number of extra draws between 31 and 59 makes P(35)
+    pass (0 → 64, 2 → 39), so 1.14d took A2 by another branch (D ≤ 3
+    after a failed escape, AI state 3/19, a command) or from another
+    position: PC1-B notes the 1.14d rat "is placed elsewhere". Please
+    commit (or paste here) the 1.14d rat lines of
+    `traces/raw/check-combat-arrow-quillrat/orig.state.jsonl` for frames
+    30–64 (x, y, m, s), or answer which §9.7 step the 1.14d think at 59
+    takes and the rat's position.
 
 
-42. **Control-panel help button `0x004A64C0`** (q-scenes-compare) Step 8 of the UI pass (`ui/panels.md` §5) calls it before the new-stats button; `a4-town-pandemonium-fortress` rows 258–267 draw the text "Help (H)" (CelDrawColor at (714, 403)), `Panel\Levelsocket` frame 0 at (725, 440) and `Panel\Level` frame 0 at (728, 436). Specify when it draws (character level? first game?), its positions and its press / release, for `ui/control-panel.md`.
-43. **Mini panel open at game start (REC-519)** (q-scenes-compare) Every recorded scene has state 0x15 open with no input; name the call that opens it at game entry (and whether a saved setting decides it), for `ui/control-panel.md` §9.
-44. **Shadow pre-test arguments `0x00471620` (REC-511, REC-518)** (q-scenes-compare) The measured shadows fit the §4 box test on the sheared shadow box, and objects need their mode's `BlocksLight`; read the arguments `0x00471620` passes to `0x004709A0` and the object branch, for `render/blend-modes.md` §5 r3.
+42. **Control-panel help button `0x004A64C0`** answered → see `docs/handoff/pc1-day3-c.md`. (q-scenes-compare) Step 8 of the UI pass (`ui/panels.md` §5) calls it before the new-stats button; `a4-town-pandemonium-fortress` rows 258–267 draw the text "Help (H)" (CelDrawColor at (714, 403)), `Panel\Levelsocket` frame 0 at (725, 440) and `Panel\Level` frame 0 at (728, 436). Specify when it draws (character level? first game?), its positions and its press / release, for `ui/control-panel.md`.
+43. **Mini panel open at game start (REC-519)** answered → see `docs/handoff/pc1-day3-c.md`. (q-scenes-compare) Every recorded scene has state 0x15 open with no input; name the call that opens it at game entry (and whether a saved setting decides it), for `ui/control-panel.md` §9.
+44. **Shadow pre-test arguments `0x00471620` (REC-511, REC-518)** answered → see `docs/handoff/pc1-day3-c.md`. (q-scenes-compare) The measured shadows fit the §4 box test on the sheared shadow box, and objects need their mode's `BlocksLight`; read the arguments `0x00471620` passes to `0x004709A0` and the object branch, for `render/blend-modes.md` §5 r3.
+- **[q-scenes-compare] Client footprints of walking monsters (REC-706)** The 1.14d client stamps mask 0x100 for each living monster (`client/msg-units.md` §3 r2); d2rs re-stamps it at the model position before each client path step. Record the client collision grid (mask 0x100 cells) around Warriv in the Rogue Encampment for 30 ticks while he walks, with the unit's client path position each tick, for `client/model.md` open question 2.
+- **[q-scenes-compare] Hover state after a use press (REC-707)** `a1-panel-cube` (right click on the cube, no move after) draws the cube with tint 2 and no tip, so `0x007BCBF4` / `0x007BCBE4` are 0 after the press. Name the callers of the hover handler `0x00487000` (move, press, release?) and which code clears the two globals after a right-click use (C→S 0x20), for `ui/inventory.md` §5 r4.
+
+- [prov-data] **Hratli's unit seed two steps at creation** answered → see `docs/handoff/pc1-day3-c.md`. (q-prov-data,
+  `world/quests-act3-2.md` §3.3, `monsters/init.md` §4): in the Act III
+  town (`a3-start-noquest-sor`, level-1 sorceress, town byte act III,
+  seed 1234) Hratli (class 253), spawned by his dummy's init through
+  `0x005B2F20(game, room, x, y, 253, mode 1, -1, 0)`, has the unit seed
+  [3975998680, 1369742535] at frame 2: the fresh draw (4040195123, 666)
+  stepped **twice**. d2rs has it unstepped, and so do the NPCs made by
+  presets (294, 264), which match 1.14d. Find the two draws on Hratli's
+  own seed between the allocation and frame 2: a spawn-wrapper step
+  (flags 0, spread -1), the dummy init `0x005B...` (init 49 / 50) or a
+  think; `monsters/init.md` §4 lists none.
 
 ## How to check a behaviour in one command
 
@@ -459,6 +537,15 @@ rather than a hand-run recipe.
   `0x00622830` the same pick (`sim/units.md` §4.7 "Attack weapon") or
   plain `0x0063C9B0`? Answer into §1 step 6.
 
+- **[q-play-act5] join act byte**: which 1.14d function writes the
+  player unit's act (+0x18) on a join into a save's act? The recording
+  `traces/checks/a5-town-arrival-bar.check` shows 4 from frame 2 (a
+  barbarian saved in Act V); `sim/units.md` §2 names only the allocation
+  (`0x005552ED`, the allocation room's act; the player is allocated in no
+  room) and the act change (`0x0053AE4E`). d2rs writes it at the join's
+  act step (rule 4, REC-797). Answer into `sim/units.md` §2 and
+  `sim/intents-events.md` §8.2.
+
 ## How to check a behaviour in one command
 
 A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)
@@ -509,6 +596,31 @@ before it; `rng` and `packets` with pokes or frame input are partial on
 1.14d. For a new behaviour, add a `.check` file (copy the example of the
 channel) rather than a hand-run recipe, and paste the report's first
 lines into the `q-fix-*` row.
+26. **Item flag 0x2000 and the default file index of a poked item** answered → see `docs/handoff/pc1-day3-c.md`. (area G, `traces/checks/items-ground-many.check`, 2026-10-09): 36 items made with the poke `item` (`poke.py` request: `0x00558D90`, spawn mode 3, force 0, use seed 0) have, on 1.14d, item flags 0x80000 only (0x2000 clear) and item data +0x28 = 0 for items with no unique / set / superior index; d2rs sets 0x2000 (`generation.md` §3 step 5, "not forced") and file index −1 (`quality.md` §1 "Clear"). The recorded kill drops carry 0x2000 in their 0x9C flags (`facts/items/a1-cold-plains-poke-kills.tsv`: 0x00A02010), so the poke request differs from the treasure request in something that clears it. Read in the creation function `0x00558D90`: what clears 0x2000 (and with which request field or caller state), and what writes the file index of a normal / magic / rare item (0 or −1, and when). Answer into `items/generation.md` §3 and `items/quality.md` §1; then drop `ignore if fi` from the check.
+
+- [prov-data] **Monster think in a room with no clients** — answered → see `docs/handoff/pc1-day3-a.md` and `docs/handoff/pc1-day3-c.md` (same answer; fix row `q-fix-p3-room-empty-think`, `q-fix-p3-leave-cancels-thinks` is its duplicate) (q-prov-data,
+  `monsters/ai.md` §1.5, §2, `ai-bodies.md` §9.9 Map AI): after the
+  player warps away (same act, `a4-warp-plains-ama`, warp 105 at frame
+  6), the Fortress NPCs (classes 405, 257, 246; Npc AI `0x005E7130`)
+  think at frame 24 (idle 20 from the frame-4 home think). d2rs runs
+  the map AI (`lo' % 100` and `roll(count)`, 2 draws each) and their
+  seeds change; 1.14d's seeds never change from frame 6 to frame 80.
+  Read `0x005A7F80` / `0x005B1740` / `0x005E7130` for a room-client test
+  (active room +0x78 = 0) that skips the think or the map AI, and what
+  it schedules instead. The same think with a client in the level
+  matches (`a4-fortress-arrival-ama`). Evidence: `traces/checks/a4-warp-plains-ama.check`.
+
+- **[q-fix-real-unit-seed-order] Client NPC stops a walk the server makes**
+  (`client/model.md` §19 r4 "NPC busy", monster data +0x28 bit 0):
+  scenes-compare's panel run (SceSor, `-seed 1234`, inventory open at
+  tick 22, an item taken to the cursor at 52, put down at 62): the 1.14d
+  server walks Warriv (1:7) from tick 56 to 67 (state recording), but
+  the 1.14d client draws him in NU from tick 56 (frame 0.5·(t − 56)), so
+  the client ignored the 0x67 at 56. Without the panel input the client
+  walks it. Read who sets the client's NPC-busy bit (+0x28 bit 0; only
+  its clear, §17 r1.7, is specified) or what else makes the client's
+  walk dispatch fall back to neutral here. Blocks a1-panel-character /
+  skilltree / automap / esc-menu-wine (Warriv NU frame) in d2rs.
 
 ## Step 5 — spec gaps (107 provisional points no spec states)
 

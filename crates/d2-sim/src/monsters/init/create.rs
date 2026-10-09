@@ -172,10 +172,10 @@ pub fn stats_and_skills<H: InitHost + ?Sized>(
     }
     // Step 7.
     let base = stats_by_level(m, cx.tables.monlvl, info.l_flag(), d, level);
-    // Step 8.
-    let rolled = seed(h, unit).roll_range(
-        base.min_hp,
-        base.max_hp.wrapping_sub(base.min_hp).wrapping_add(1),
+    // Step 8: minHP + roll(maxHP − minHP + 1), the plain roll helper
+    // (`0x0045C3E0`, the draw 1.14d records at `0x00573F8F`).
+    let rolled = base.min_hp.wrapping_add(
+        seed(h, unit).roll(base.max_hp.wrapping_sub(base.min_hp).wrapping_add(1)) as i32,
     );
     let mut hp = rolled.wrapping_add(pct(rolled, bonus.hp, 100));
     if hp >= 0x80_0000 {

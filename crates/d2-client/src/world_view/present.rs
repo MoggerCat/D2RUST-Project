@@ -253,6 +253,21 @@ impl WorldViewUi {
             focus_lost: false,
         }
     }
+
+    /// The cursor position last reported to the UI (the click view's
+    /// mouse).
+    pub fn cursor(&self) -> Option<FramePos> {
+        self.cursor
+    }
+
+    /// Sets the cursor position a headless driver reported with its own
+    /// `CursorMoved` (`app::autoplay_host`, the window's `ui_input` path).
+    pub fn set_cursor(&mut self, at: FramePos) {
+        self.cursor = Some(at);
+        if let FramePos::Inside(p) = at {
+            self.last_at = p;
+        }
+    }
 }
 
 /// Sound requests for the audio frame, in order: the bridge outputs'
@@ -792,7 +807,18 @@ fn script_input(
         return;
     }
     *last = tick;
-    let events = script.events(tick);
+    // `clickunit` steps: the unit's screen point from the model camera
+    // (open mode 0, no shake; d2rs-own, unverified: the drawn frame's
+    // camera may follow the walk prediction).
+    let world = bridge.0.world();
+    let cam = super::input_script::script_camera(world, None);
+    let events = script.events_with(tick, &mut |sel| match &cam {
+        Some(c) => super::input_script::unit_point(world, c, sel),
+        None => Err("no local player".into()),
+    });
+    for n in script.take_notes() {
+        warn!("play --input: {n}");
+    }
     if !events.is_empty() {
         ui.queue.0.extend(events);
         ui.cursor = script.cursor();

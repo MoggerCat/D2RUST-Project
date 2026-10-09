@@ -218,3 +218,31 @@ or waypoints, as of the last pull (2026-10-09). Staging is polled every
 - **Item 5 (round 3).** No Step 4 items with `[seed-order]`,
   `[recording-2]`, `[proto-items]`, `[q-fix-pc1-day3-a-r2]` or
   `[prov-data]` on staging yet; polling every 30 minutes.
+
+## Later (2026-10-09 evening)
+
+- **[prov-data] Monster think in a room with no clients.** The gate is
+  not in the think path: `0x005A7F80` and `0x005B1740` have no room
+  test. It is the room leave `0x0053A9B0`: when the leaving client was
+  the room's last (room +0x78 = 0), every monster in the room gets
+  `0x005738D0`, which cancels its thinks (type 2) and type-3 events and
+  schedules nothing. The next think comes only when a client joins the
+  room again (`0x00573780`, f + 2). So after the frame-6 warp, the
+  Fortress NPCs' frame-24 think is gone and their seeds stay put, as
+  1.14d shows. Written into `specs/sim/intents-events.md` §7.8 rule 3.2.
+  d2rs's `wiring/action/switch.rs` leaves the cancel out (its doc lists
+  it as unspecified). Row `q-fix-p3-leave-cancels-thinks`, a duplicate of PC1-C's `q-fix-p3-room-empty-think` (same answer, `docs/handoff/pc1-day3-c.md`); the row is marked so.
+- **Live runs, done** (Windows, release build of staging at 17:38, the
+  recorders' own lock):
+  - `packets-town-arrival-ama.check`: the c2s stream is now equal (28
+    masked bytes of C→S 0x67 skipped), so `q-fix-tool-c2s-masks` works.
+    New first divergence: frame 2, s2c #66, 1.14d 0xA8 (state 105
+    `alignment`, player 1) where d2rs sends the next 0xAC. Read from the
+    asm: the setter `0x005543B0(P, 2, 1)` runs in the player-unit init
+    `0x005348C0` at the allocation, and its resend marks state 105
+    changed until frame 2's sends. That settles REC-732 (call site and
+    v = 2) in `combat/hit.md` §7.1. d2rs doesn't send it: row
+    `q-fix-p5-alignment-resend`.
+  - `a1-town-arrival-ama.check` (state, 40 frames): no difference in
+    any compared field. PARTIAL only for d2rs's known gaps (`own`, `q`).
+    Warriv still matches after `q-fix-p3-npc-interact-gate`.

@@ -2419,6 +2419,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "bevy",
+ "conformance",
  "criterion",
  "d2-convert",
  "d2-data",

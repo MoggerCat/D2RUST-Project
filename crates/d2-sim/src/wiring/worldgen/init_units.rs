@@ -213,6 +213,10 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
         self.v.h.x.monster_quest_chain(unit, chain);
     }
 
+    fn quest_preset_boss(&mut self, unit: UnitId) {
+        self.v.h.x.quest_preset_boss(unit);
+    }
+
     /// `0x0058F030(game, boss, boss GUID, 1, 1, 0)`.
     fn boss_owner_data(&mut self, unit: UnitId) {
         self.v
@@ -260,6 +264,24 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
                 .errors
                 .push(WorldgenError::Wiring(WiringError::Unit(e)));
         }
+    }
+
+    /// `init.md` §6 step 12: the monster base list, the only list with
+    /// flag 1 (`stat-lists.md` §2, `0x0057407D`), allocated
+    /// (`0x006251F0`) and attached to the unit (`0x00626E10`). The mode
+    /// damage `0x005A4F50` (`skills/bodies-2.md` §2.1) and the umod
+    /// callbacks write into it.
+    ///
+    /// PROVISIONAL (init.md §6 step 12, REC-891): the call's owner and
+    /// attach `reset` are not stated; owner = the monster, reset = 1 (a
+    /// DYNAMIC list would keep `mindamage` / `maxdamage` / `tohit` out of
+    /// the unit's totals, and 1.14d monsters hit with them).
+    fn post_extra_list(&mut self, unit: UnitId) {
+        let Some((ty, guid)) = self.v.units.get(unit).map(|r| (r.ty, r.guid)) else {
+            return;
+        };
+        let l = self.v.stats.alloc(1, 0, ty.index() as u32, guid);
+        self.v.stats.attach(&mut *self.v.h, unit, l, true);
     }
 
     /// State toggle (`stat-lists.md` §9.2).

@@ -273,6 +273,11 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         self.monster_path_setup(sim, unit, mode);
     }
 
+    /// `0x005A4F50` ([`Pending::monster_mode_damage`]).
+    fn monster_mode_damage(&mut self, sim: &mut Sim<'_>, unit: UnitId, mode: u32) {
+        X::monster_mode_damage(self, sim, unit, mode);
+    }
+
     /// `0x00623B10` (`units.md` §4.3).
     fn frame_bonus(&mut self, _: &Sim<'_>, unit: UnitId) -> i32 {
         self.x.frame_bonus(unit)
@@ -338,6 +343,22 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         if let Some(list) = self.combat_lists.get_mut(&unit) {
             list.retain(|c| c.attacker != id);
         }
+    }
+
+    /// `0x00648730` on the unit's dynamic path record
+    /// (`crate::wiring::path::monsters::stop_path`).
+    fn stop_path_now(&mut self, unit: UnitId) -> bool {
+        crate::wiring::path::monsters::stop_path(self, unit).is_some()
+    }
+
+    /// AI param 0 of the unit's AI control (`ai.md` §3: `0x0058EC00(unit,
+    /// 1, v)`); false while the store is lent or the unit has no AI.
+    fn set_ai_param0(&mut self, unit: UnitId, v: i32) -> bool {
+        self.ai
+            .as_mut()
+            .and_then(|a| a.control_mut(unit))
+            .map(|c| c.params[0] = v)
+            .is_some()
     }
 
     /// `0x0061AB00` on the unit's room.

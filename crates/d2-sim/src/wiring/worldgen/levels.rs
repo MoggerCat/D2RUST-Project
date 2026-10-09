@@ -20,7 +20,8 @@ use crate::drlg::maze::{Maze, MazeError};
 use crate::drlg::outdoor::{Outdoor, OutdoorData, OutdoorError, SubFiles, DRLG_OUTDOOR};
 use crate::drlg::preset::{Ds1Cache, Ds1Source, PresetCtx, PresetData, PresetError, Presets};
 use crate::drlg::{
-    Drlg, DrlgData, DrlgError, DrlgRoomId, LevelIdx, LevelTypes, PresetUnit, RoomGrids,
+    ClientPreset, Drlg, DrlgData, DrlgError, DrlgRoomId, LevelIdx, LevelTypes, PresetUnit,
+    RoomGrids,
 };
 
 use super::maze_presets::MazeToPreset;
@@ -382,6 +383,16 @@ impl LevelTypes for WorldTypes {
             .unwrap_or_default()
     }
 
+    /// The client presets (`client/model.md` §5 r6.2): a preset room's
+    /// units with flag bit 0. An outdoor room's substitution units carry
+    /// no flag word in the model, so none of them is a client preset.
+    fn client_presets(&self, drlg: &Drlg, room: DrlgRoomId) -> Vec<ClientPreset> {
+        self.presets
+            .get(&drlg.act)
+            .map(|p| p.client_presets(room))
+            .unwrap_or_default()
+    }
+
     /// Grid init (`rooms.md` §9.2 step 3c): outdoor `0x0067D2D0`
     /// (`outdoor.md` §12.2), preset `0x006667D0` (`preset.md` §9–§10).
     fn room_grids(
@@ -592,6 +603,10 @@ impl LevelTypes for SharedTypes {
 
     fn preset_units(&self, drlg: &Drlg, room: DrlgRoomId) -> Vec<PresetUnit> {
         self.0.borrow().preset_units(drlg, room)
+    }
+
+    fn client_presets(&self, drlg: &Drlg, room: DrlgRoomId) -> Vec<ClientPreset> {
+        self.0.borrow().client_presets(drlg, room)
     }
 
     fn room_grids(

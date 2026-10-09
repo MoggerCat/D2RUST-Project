@@ -23,6 +23,10 @@ d2-server.workspace = true
 d2-sim.workspace = true
 d2-data.workspace = true
 d2-verify.workspace = true
+# `state-dump --send` (`bridge::inject`, `app::send`): the scenario
+# scripts' message parser, encoder and references (`specs/tools/scenario.md`
+# §3), shared with `tools/scenario-run`. Its dependencies are all above.
+conformance.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
 # PNG output for the CPU reference renderer and verification images. Same

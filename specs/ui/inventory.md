@@ -24,20 +24,20 @@
 |   2. Tint colours | 90–117 |
 |   3. Grid items (`0x00483FF0`) | 118–143 |
 |   4. Placement tint (cursor item over a grid) | 144–160 |
-|   5. Hover state (`0x00487000`) | 161–186 |
-|   6. Equipment boxes (`0x004845A0`) | 187–216 |
-|   7. Not drawn here | 217–226 |
-|   8. Item graphic (`0x0046EE80(item, x, top)`; answers OQ 2) | 227–283 |
-|   9. Item checks used by the tints (answers OQ 6) | 284–300 |
-|   10. Grid click → C→S message (`0x0048FFE0`) | 301–370 |
-|   11. Gold amount dialog (`0x00454150`) | 371–402 |
-|   B5. `CellGrid` answers (`client/ui.md` §B5) | 403–410 |
-| Constants & data dependencies | 411–420 |
-| Randomness | 421–424 |
-| Edge cases & original bugs | 425–432 |
-| Test vectors | 433–459 |
-| Provenance | 460–474 |
-| Open questions | 475–523 |
+|   5. Hover state (`0x00487000`) | 161–196 |
+|   6. Equipment boxes (`0x004845A0`) | 197–226 |
+|   7. Not drawn here | 227–236 |
+|   8. Item graphic (`0x0046EE80(item, x, top)`; answers OQ 2) | 237–293 |
+|   9. Item checks used by the tints (answers OQ 6) | 294–310 |
+|   10. Grid click → C→S message (`0x0048FFE0`) | 311–380 |
+|   11. Gold amount dialog (`0x00454150`) | 381–412 |
+|   B5. `CellGrid` answers (`client/ui.md` §B5) | 413–420 |
+| Constants & data dependencies | 421–430 |
+| Randomness | 431–434 |
+| Edge cases & original bugs | 435–442 |
+| Test vectors | 443–469 |
+| Provenance | 470–484 |
+| Open questions | 485–533 |
 <!-- /index -->
 
 ## Summary
@@ -183,6 +183,16 @@ anchor, `0x007BCC20` hovered body location).
    cell and hover flags keep their previous values); the same for h, r,
    gridY. Then cursor cell := (c, r), hover-in-grid `[0x007BCBE4]` := 1,
    hovered item and last hovered := 0.
+4. PROVISIONAL (q-scenes-compare, REC-707): the handler runs on a mouse
+   move or a button press over a grid, not on a release; a right press
+   that uses a grid item (C→S 0x20) then clears the hovered item and
+   hover-in-grid (as `ui/panels-3.md` §29 r1 step 4 does for an
+   equipment press), so until the next move the used item draws its §3
+   r3 tint and has no tip (because `a1-panel-cube`, a right click on the
+   cube with no move after it, draws the cube with tint 2 and no tip;
+   `a1-npc-shop-tooltip`, a move over an item, draws tint 1); settled by
+   REC-707 (the callers of `0x00487000` and what clears `0x007BCBF4`
+   after a use press).
 
 ### 6. Equipment boxes (`0x004845A0`)
 
