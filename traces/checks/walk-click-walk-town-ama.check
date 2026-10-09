@@ -1,0 +1,20 @@
+check 1
+# A walk in the Rogue Encampment re-targeted by a second click while the
+# player still walks (seams/movement-prediction.md §2.1, §2.9;
+# sim/pathing.md §1.5): ScnAma, -seed 1234; frame 10 a left click at
+# (600, 300) (east), frame 18 a left click at (250, 420) (south-west)
+# while the first walk runs, frame 30 a left click at (650, 180)
+# (north-east, a reversal) while the second runs. Compare the player's mode, path target and
+# position frame by frame. Spec: specs/tools/scenario-diff.md §2 rule 4.
+name walk-click-walk-town-ama
+save ScnAma --class ama --expansion
+seed 1234
+ticks 70
+seconds 240
+channels state
+input frame 10; click 600 300; frame 18; click 250 420; frame 30; click 650 180
+# as walk-town-ama: the game seed order (seed, s, the monsters'
+# seed-driven tx/ty/hp) and the player's fc / sp are outside the walk.
+# The walk itself: state_diff.py ... --types 0 (Warriv's walk, class
+# 155, differs from frame 24: NPC position, not the player's walk).
+ignore seed s fc sp

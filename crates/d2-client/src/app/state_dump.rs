@@ -114,6 +114,10 @@ pub struct DumpArgs {
     /// `--rng FILE`: also record every RNG draw ([`super::rng_dump`];
     /// needs the `rng-trace` feature).
     pub rng: Option<PathBuf>,
+    /// `--save-out FILE`: install the character writer of `play` with this
+    /// path, so a `--send "<f> hex 69"` (Save and Exit) writes the `.d2s`
+    /// there (the `save` channel of `specs/tools/scenario-diff.md`).
+    pub save_out: Option<PathBuf>,
 }
 
 /// Parses the options after `state-dump`.
@@ -132,6 +136,7 @@ pub fn parse_args(args: &[String]) -> Result<DumpArgs> {
         sends: Vec::new(),
         packets: None,
         rng: None,
+        save_out: None,
     };
     let (mut ticks, mut out) = (None, None);
     let mut it = args.iter();
@@ -152,6 +157,7 @@ pub fn parse_args(args: &[String]) -> Result<DumpArgs> {
             "--game-dir" => a.game_dir = Some(PathBuf::from(value()?)),
             "--packets" => a.packets = Some(PathBuf::from(value()?)),
             "--rng" => a.rng = Some(PathBuf::from(value()?)),
+            "--save-out" => a.save_out = Some(PathBuf::from(value()?)),
             "--poke" => a
                 .pokes
                 .push(pokes::parse_poke_arg(value()?).map_err(anyhow::Error::msg)?),
@@ -233,6 +239,9 @@ pub struct DumpGame {
     pub packets: Option<PathBuf>,
     /// `--rng FILE` ([`super::rng_dump`]).
     pub rng: Option<PathBuf>,
+    /// `--save-out FILE`: where the server's character writer puts the
+    /// `.d2s` (`play`'s [`super::save::FileStore`]).
+    pub save_out: Option<PathBuf>,
 }
 
 impl DumpGame {
@@ -270,6 +279,7 @@ impl DumpGame {
             sends: args.sends.clone(),
             packets: args.packets.clone(),
             rng: args.rng.clone(),
+            save_out: args.save_out.clone(),
         })
     }
 }
@@ -316,6 +326,26 @@ pub fn dump<W: Write>(
     let ms = Arc::new(AtomicU32::new(START_MS));
     let client_data = ClientData::of(&game.data)?;
     let speeds = single_player::walk_speeds(&game.data, &game.character)?;
+    // `play`'s character writer (`play::run`), for a `--send "<f> hex 69"`.
+    let store = match &game.save_out {
+        Some(path) => {
+            let GameData::Live(live) = &game.data;
+            let mut base = super::save::base_save(&game.character);
+            if game.hardcore {
+                base.header.status |= d2_formats::d2s::status::HARDCORE;
+            }
+            Some(super::save::FileStore {
+                path: path.clone(),
+                base,
+                tables: Arc::new(live.save.clone()),
+                appearance: Some(Arc::new(
+                    super::save::appearance_tables(&live.tables.fixed)
+                        .map_err(anyhow::Error::msg)?,
+                )),
+            })
+        }
+        None => None,
+    };
     let mut rng = match &game.rng {
         Some(p) => Some(super::rng_dump::RngDump::create(p, info, game.seed)?),
         None => None,
@@ -329,6 +359,10 @@ pub fn dump<W: Write>(
     )?;
     if game.hardcore {
         link.with(|l| l.host_mut().game.events.action.hooks().x.hardcore = true)?;
+    }
+    let saving = store.is_some();
+    if let Some(store) = store {
+        link.with(move |l| l.host_mut().game.set_storage(Box::new(store)))?;
     }
     let mut packets = match &game.packets {
         Some(p) => Some(super::packet_dump::PacketDump::create(
@@ -378,6 +412,7 @@ pub fn dump<W: Write>(
     let mut input_notes = Vec::new();
     let mut to_send = game.sends;
     let mut send_notes = Vec::new();
+    let (mut joined, mut notes_left) = (false, None::<u32>);
     while ran < ticks {
         run_due_pokes(&mut bridge, &mut pending, &mut walking, last_frame, out)?;
         if let Some(h) = input.as_mut() {
@@ -397,6 +432,17 @@ pub fn dump<W: Write>(
             super::perf::record_bridge_frame(t0, report.ticked);
         }
         bridge.take_outputs();
+        // Save and Exit (C→S 0x69) took the client out of the game: the
+        // server wrote the file in its leave (`flows/save-exit.md` §2 r2).
+        if saving {
+            let in_game = bridge.world().in_game;
+            if in_game {
+                joined = true;
+            } else if joined {
+                notes_left = Some(ran);
+                break;
+            }
+        }
         if let Some(h) = input.as_mut() {
             for l in h.after_frame(&mut bridge, report.ticked)? {
                 eprintln!("input: {l}");
@@ -428,6 +474,9 @@ pub fn dump<W: Write>(
     let mut notes = vec![format!(
         "{ran} server ticks, clock {STEP_MS} ms per step from {START_MS} ms, every {every}"
     )];
+    if let Some(n) = notes_left {
+        notes.push(format!("left the game after {n} ticks (Save and Exit)"));
+    }
     notes.extend(input_notes);
     notes.extend(send_notes);
     for e in &to_send {
@@ -585,6 +634,7 @@ struct ClientData {
     class_skills: Vec<[u16; 10]>,
     skill_tables: d2_sim::skills::SkillTables,
     units: crate::bridge::world::UnitRows,
+    player_anims: super::anim_names::ClientPlayerAnims,
 }
 
 impl ClientData {
@@ -603,6 +653,7 @@ impl ClientData {
                 single_player::client_monster_anims(archives, &mut u)?;
                 u
             },
+            player_anims: single_player::client_player_anims(data)?,
         })
     }
 
@@ -614,6 +665,7 @@ impl ClientData {
         b.set_class_skills(self.class_skills);
         b.set_skill_tables(Arc::new(self.skill_tables));
         b.set_unit_rows(self.units);
+        b.set_player_anims(Arc::new(self.player_anims));
         b.set_high_light_quality(true);
     }
 }
@@ -677,6 +729,8 @@ mod tests {
             "2026-10-09",
             "--packets",
             "p.jsonl",
+            "--save-out",
+            "out.d2s",
             "--poke",
             "4 spawn 19 @x+3 @y+3 normal",
             "--poke",
@@ -714,6 +768,7 @@ mod tests {
                 sends,
                 packets: Some("p.jsonl".into()),
                 rng: None,
+                save_out: Some("out.d2s".into()),
             }
         );
         assert!(parse_args(&args(&[

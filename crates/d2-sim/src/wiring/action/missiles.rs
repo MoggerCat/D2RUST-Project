@@ -368,9 +368,6 @@ impl<X: Pending> MissileCombat for View<'_, X> {
     /// then `apply(game, owner, unit, missile = 1, record)` (`damage.md`
     /// §5.2) and the reaction (§7.1). No owner: nothing (`0x005AD730`).
     ///
-    /// TODO(missiles.md §R6.1): the `avoid` / `block` arguments of the
-    /// block/dodge call `0x0057DFB0` and the hit flags made from missile
-    /// data flags 1 and 2 are not stated; neither is applied here.
     fn apply_damage(
         &mut self,
         game: &mut Game,
@@ -450,8 +447,39 @@ impl<X: Pending> View<'_, X> {
             merge_hit_class(rec, u32::from(row.hitclass));
         }
         rec.pierce_pct = View::stat(self, missile, PIERCE_PERCENT_STAT);
+        let data_flags = self
+            .h
+            .missiles
+            .as_ref()
+            .and_then(|s| s.get(missile))
+            .map_or(0, |d| d.flags);
         let mut w = self.combat(game);
-        combat::apply(&mut w, &t.combat, owner, unit, true, rec);
+        // `0x005AD730` order (`missiles.md` §R6.1): block/dodge on the
+        // unit's seed (avoid 1, block = physical != 0), the hit-class
+        // merge above, the monster crit on the owner's seed, then apply
+        // only while the hit bit stands, and the reaction always.
+        let b = combat::block_or_dodge(&mut w, &t.combat, owner, unit, true, rec.physical != 0);
+        rec.result |= match b {
+            combat::BlockResult::Avoid => result::AVOID,
+            combat::BlockResult::Dodge => result::DODGE,
+            combat::BlockResult::WeaponBlock => result::WEAPON_BLOCK,
+            combat::BlockResult::Block => result::BLOCK,
+            combat::BlockResult::Evade | combat::BlockResult::None => 0,
+        };
+        if b != combat::BlockResult::None {
+            rec.result &= !result::HIT;
+        }
+        combat::monster_crit(&mut w, &t.combat, owner, unit, rec);
+        // Step 5: missile data flags 1, 2 → hit flags 0x20, 0x80.
+        if data_flags & 1 != 0 {
+            rec.hit_flags |= 0x20;
+        }
+        if data_flags & 2 != 0 {
+            rec.hit_flags |= 0x80;
+        }
+        if rec.result & result::HIT != 0 {
+            combat::apply(&mut w, &t.combat, owner, unit, true, rec);
+        }
         crate::combat::CombatWorld::reaction(&mut w, owner, unit, rec);
     }
 
@@ -461,10 +489,6 @@ impl<X: Pending> View<'_, X> {
     /// soft-hit, the knockback roll on the missile's seed) or-ed into a
     /// copy of the record, then the damage part of `0x005ADCD0`. The
     /// caller has checked the owner.
-    ///
-    /// TODO(missiles.md §R6.1): as in `apply_damage`
-    /// here, the block/dodge arguments and the hit flags from missile
-    /// data flags 1, 2 are not stated and not applied.
     pub fn missile_record_hit(
         &mut self,
         game: &mut Game,

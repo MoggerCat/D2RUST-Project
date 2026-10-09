@@ -31,19 +31,19 @@
 | Outputs / state changes | 73–80 |
 | Rules | 81–82 |
 |   1. Conventions | 83–114 |
-|   2. Shared helpers | 115–529 |
-|   3. Start functions (srvst) | 530–620 |
-|   4. Do functions (srvdo) | 621–817 |
-|   5. `srvmissile` path | 818–833 |
-|   6. Shared helpers, batch 2 | 834–1172 |
-|   7. Start functions (srvst), batch 2 | 1173–1239 |
-|   8. Do functions (srvdo), batch 2 | 1240–1658 |
-| Constants & data dependencies | 1659–1705 |
-| Randomness | 1706–1724 |
-| Edge cases & original bugs | 1725–1774 |
-| Test vectors | 1775–1795 |
-| Provenance | 1796–1833 |
-| Open questions | 1834–1859 |
+|   2. Shared helpers | 115–534 |
+|   3. Start functions (srvst) | 535–625 |
+|   4. Do functions (srvdo) | 626–822 |
+|   5. `srvmissile` path | 823–838 |
+|   6. Shared helpers, batch 2 | 839–1177 |
+|   7. Start functions (srvst), batch 2 | 1178–1244 |
+|   8. Do functions (srvdo), batch 2 | 1245–1663 |
+| Constants & data dependencies | 1664–1710 |
+| Randomness | 1711–1729 |
+| Edge cases & original bugs | 1730–1779 |
+| Test vectors | 1780–1800 |
+| Provenance | 1801–1838 |
+| Open questions | 1839–1864 |
 <!-- /index -->
 
 ## Summary
@@ -258,7 +258,12 @@ stack list.
   handlers of (1, state) (§2.13). If the unit is alive (`0x005541B0` = 0)
   or the state is not "stay on death" for it (`0x0063A4A0`): state off;
   anim refresh; passive refresh `0x00646F20(unit)`; a player also gets
-  the pet-maximum resync `0x00575900(game, unit)` (§2.17).
+  the pet-maximum resync `0x00575900(game, unit)` (§2.17). "State off"
+  is `0x00639DB0(unit, state, 0)` (`0x0056E92D`–`0x0056E931`): the
+  toggle **with** the update-queue insert (`sim/stat-lists.md` §9.2), so
+  the unit is queued and the next client pass sends its S→C 0xA9; the
+  anim refresh is `0x00623F50(unit)` (1.14d-read 2026-10-09, settles
+  REC-731).
 - **Self aura** `0x005CEC50`: state off; has 85 (`nomanaregen`) → 85
   off; re-enable passive states `0x0056DFA0` (for each skill entry with
   a `passivestate` > 0: state on, `0x00646D60(unit, entry)`); clamp

@@ -32,21 +32,21 @@
 | Outputs / state changes | 77–84 |
 | Rules | 85–86 |
 |   1. NPC control and records | 87–141 |
-|   2. Starting an interaction (C→S 0x13) | 142–216 |
-|   3. Chat open and close (C→S 0x2F, 0x30) | 217–237 |
-|   4. Menu actions (C→S 0x38) | 238–275 |
-|   5. Healing on chat open | 276–303 |
-|   6. Cain identify (C→S 0x34) | 304–332 |
-|   7. Mercenaries | 333–455 |
-|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 456–535 |
-|   9. S→C 0x2A NPC transaction (15 bytes) | 536–569 |
-|   10. Dead code in 1.14d (no caller, no pointer reference) | 570–581 |
-| Constants & data dependencies | 582–594 |
-| Randomness | 595–607 |
-| Edge cases & original bugs | 608–683 |
-| Test vectors | 684–706 |
-| Provenance | 707–751 |
-| Open questions | 752–810 |
+|   2. Starting an interaction (C→S 0x13) | 142–235 |
+|   3. Chat open and close (C→S 0x2F, 0x30) | 236–274 |
+|   4. Menu actions (C→S 0x38) | 275–333 |
+|   5. Healing on chat open | 334–361 |
+|   6. Cain identify (C→S 0x34) | 362–390 |
+|   7. Mercenaries | 391–513 |
+|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 514–593 |
+|   9. S→C 0x2A NPC transaction (15 bytes) | 594–627 |
+|   10. Dead code in 1.14d (no caller, no pointer reference) | 628–639 |
+| Constants & data dependencies | 640–652 |
+| Randomness | 653–665 |
+| Edge cases & original bugs | 666–741 |
+| Test vectors | 742–764 |
+| Provenance | 765–815 |
+| Open questions | 816–874 |
 <!-- /index -->
 
 ## Summary
@@ -214,6 +214,25 @@ the results 1 below are internal only):
 Recorded order in one frame: 0x27, 0x29, 0x28 (frames 746, 798, 1464,
 1720, 1751, 3570).
 
+**Call forms** (2026-10-09, static asm; used by `tools/poke.md` §4
+rule 10). All run on the game thread and return with the stack popped
+by the callee.
+
+| Function | Registers | Stack from [ESP+4] | `ret` | EAX | Proof |
+|---|---|---|---|---|---|
+| handler `0x0054AA90` (every C→S handler, `sim/intents-events.md` §2.3) | ECX game, EDX player | message (id byte first), size | 8 | handler code 0..3 | `0x0054AA93` reads [EBP+0xC] = size, `0x0054AAA6` [EBP+8] = message; `0x0054AA98` keeps EDX; `ret 8` at `0x0054AACB` |
+| interact `0x00548B00` | ECX player, EDX unit type (0..5, `ja` past 5 → 1) | GUID, flag (0x13 passes 0; ≠ 0 stores −2 as the queued action, rule 3.2), game | 0xC | 0 done or walking, 1 missing / distance > 50, 3 object mode ≥ 8 or object vanished | `0x0054AABE`–`0x0054AAC4` (push game, 0, GUID; ECX := player; EDX = type from @1); `0x00548B0A` EBX := ECX; `0x00548B12` jump table `0x00548E8C` on EDX; [EBP+0x10] = game at `0x00548B1C`; `ret 0xC` at `0x00548DDC` |
+| start wrapper `0x00573020` | ECX game, EDX player | NPC unit, interaction block (rule 2 of the start: the u32 at monster data +0x30), 0 | 0xC | not set (the wrapper drops `0x00572C10`'s EAX) | call site `0x00548DC0`–`0x00548DCF` (push 0, push block from `0x00535E80`, push NPC; EDX := player, ECX := game) |
+| start `0x00572C10` | EAX NPC unit, EBX player | game, interaction block, the wrapper's third word | 0xC | 0 (1 only for an NPC without `interact`) | `0x00573023`–`0x00573032` (wrapper moves stack → EAX, EBX := EDX, pushes ECX); `0x00572C1B` EDI := EAX; `ret 0xC` at `0x00572C78`, `0x00572D92` |
+
+The type 1 case runs at `0x00548CE8`; NPC lookup is `0x00552F60` with
+ECX = game, EDX = 1, [ESP+4] = GUID (`0x00548CE8`–`0x00548CF6`). The
+distance in rule 3 is the value saved at `0x00548D0F`; the ≤ 6 branch
+is `0x00548D78`, the free test `0x00548DAC`, the path stop
+`0x00548DBB`. Calling the start wrapper directly skips rules 1–3 (no
+distance test, the NPC's path and AI param 0 untouched), so the NPC
+keeps its own AI and may walk off while the node exists.
+
 ### 3. Chat open and close (C→S 0x2F, 0x30)
 
 Both handlers (`0x0054B930`, `0x0054B9F0`): size 9 else 3; the NPC is
@@ -223,10 +242,13 @@ the unit with GUID u32 @5 (bytes 1–4 are not read), looked up in the
 monster with an interaction list → 3; NPC in another act than the player
 (`0x00548A80`) → 2.
 
-- **0x2F**: player position within 50 subtiles of the NPC on both axes
-  (`0x00548EF0`) else its result (1); then `0x00572E60`: the player's
+- **0x2F**: player position within **10** subtiles of the NPC on both
+  axes (`0x00548EF0`, threshold EBX := 0xA at `0x0054B9AD`; NPC x / y
+  from `0x0045ADF0` / `0x0045AE20`, player from its own path; r2
+  2026-10-09, earlier text said 50, which is the 0x38 range) else its
+  result (1); then `0x00572E60`: the player's
   node in state 0 goes to state 1 and the heal hook runs (§5). Other
-  states: nothing.
+  states, or no node for the player: nothing, result 0.
 - **0x30** (`0x00572F20`, no distance test): quest event dispatch
   `0x00543D50` (`quests.md` §4.2), then the player's node:
   - state ≥ 1: unlink and free it; if the player's interact type is 1,
@@ -234,6 +256,21 @@ monster with an interaction list → 3; NPC in another act than the player
     the list is now empty: drop the player's gamble list at this NPC
     (`0x00537190`, `vendors.md` §5.4);
   - state 0: unlink, reset as above, free; the gamble list is kept.
+
+**Call forms** (2026-10-09, static asm). Handlers: ECX game, EDX player,
+[ESP+4] message, [ESP+8] size, `ret 8` (`0x0054B934` size, `0x0054B94C`
+message, `0x0054B939` / `0x0054B9F9` EDX kept, `ret 8` at `0x0054B9E4`,
+`0x0054BA8C`); EAX 0 done, 1 NPC missing or (0x2F) out of range,
+2 other act, 3 bad size / no interaction block. The inner functions
+take ECX game, EDX player, [ESP+4] NPC unit, [ESP+8] interaction block
+(the u32 at monster data +0x30, read at `0x0054B9CA` / `0x0054BA62`),
+`ret 8`, no result: `0x00572E60` (state 0 → 1 at `0x00572E85`, then the
+heal hook `0x00578E70(NPC)` with ECX / EDX unchanged) and `0x00572F20`
+(quest dispatch `0x00543D50(NPC)` first at `0x00572F31`). Calling the
+inner functions skips the act and (0x2F) distance tests and needs a
+non-null block (a null block faults at `0x00572E66` / `0x00572F39`).
+Neither reads anything the client sets: the S→C replies go to the
+player's own client.
 
 ### 4. Menu actions (C→S 0x38)
 
@@ -256,6 +293,27 @@ has exactly 1 node. No 0x2A is sent by this handler.
 
 Any other NPC / action pair: nothing. Nihlathak has no trade action
 although a store is cached for him (`vendors.md` §1).
+
+**Call forms** (2026-10-09, static asm). Handler `0x0054BCA0`: as §3
+(ECX game, EDX player, [ESP+4] message, [ESP+8] size, `ret 8` at
+`0x0054BCF9`). Its unit check `0x00548F80` takes EAX = NPC GUID, EDX =
+unit type 1, ECX = game, EDI = player, [ESP+4] = range 0x32
+(`0x0054BCCF`–`0x0054BCD8`), `ret 4`: 1 when no such monster, 2 when it
+is in another act, else the per-axis test `0x00548EF0` with range 50
+(0 within |dx|, |dy| ≤ 50, else 1). The handler returns that value when
+non-zero, else the action's result. Action `0x00579D60`: ECX game, EDX
+player, [ESP+4] action, [ESP+8] NPC GUID, [ESP+12] item GUID
+(`0x0054BCE1`–`0x0054BCEF`; `0x00579D79` ESI := player, `0x00579D81`
+EDI := game, NPC looked up as a monster at `0x00579D83`), `ret 0xC`
+(`0x00579F8E`); EAX 0, or 3 when an item service's item check
+`0x00578610` fails (`0x00579F7B`). Trade and gamble (actions 1, 2):
+`0x00572EA0` (ECX NPC, EDX player, no stack) moves the player's node
+1 → 2 only when it is in state 1 (`0x00572ECC`), but the trade open
+`0x00579430` (ECX game, EDX player, stack NPC, single, gamble flag;
+`0x00579E86`–`0x00579E94`) follows with no test of its result, so it
+runs with the node in any state or with no node for the player (what
+it needs: `vendors.md` §4). The client's order is 0x13, 0x2F, then
+0x38 (node in state 1).
 
 Client senders (confirmed 2026-10-07 in the 1.14d client code, relay
 from `ui/menus.md` §2 rule 2): the NPC menu builder `0x004B4830` sends
@@ -748,6 +806,12 @@ records in row order; the 43 table entries (`vendors.tsv`) attach.
   `0x004B1E80`, `0x004786A0`, server `0x0054BBD0`; `data/fields.tsv`
   `monstats` flag bits; D2MOO `AiGeneral.h` (AI control +0x14 =
   `dwAiParam[0]`) as a map.
+- Call forms (§2–§4, 2026-10-09, for `tools/poke.md` §4 rule 10): the
+  register and stack use of `0x0054AA90`, `0x00548B00`, `0x00573020`,
+  `0x00572C10`, `0x0054B930`, `0x0054B9F0`, `0x00572E60`, `0x00572F20`,
+  `0x0054BCA0`, `0x00548F80`, `0x00548EF0`, `0x00579D60`,
+  `0x00572EA0`, read from `all.asm` at the addresses cited in each
+  table; the 0x2F range 10 at `0x0054B9AD` corrects §3 (was 50).
 
 ## Open questions
 

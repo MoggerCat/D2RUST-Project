@@ -43,6 +43,7 @@ pub mod output;
 pub mod passive;
 #[cfg(test)]
 mod passive_tests;
+pub mod player_anim;
 pub mod poke;
 pub mod predict;
 pub mod receive;
@@ -485,6 +486,12 @@ impl<L: ServerLink> Bridge<L> {
         self.inputs.skill_tables = Some(tables);
     }
 
+    /// The players' animation lookup of the client player update
+    /// ([`player_anim`]).
+    pub fn set_player_anims(&mut self, anims: std::sync::Arc<dyn player_anim::PlayerAnims>) {
+        self.inputs.player_anims = Some(anims);
+    }
+
     /// The `skills` rows of the client skill list (`msg-skills.md`
     /// Inputs); the other tables stay.
     pub fn set_skill_rows(&mut self, rows: Vec<world::SkillRow>) {
@@ -513,6 +520,7 @@ impl<L: ServerLink> Bridge<L> {
     /// The `objects.txt` rows the client object update reads
     /// (`world/objects-client.md` §28 r1); empty: no object update.
     pub fn set_object_rows(&mut self, rows: Vec<objects::ObjClientRow>) {
+        self.world.objclient.selectable = rows.iter().map(|r| r.selectable).collect();
         self.inputs.objclient.rows = rows;
     }
 
