@@ -36,7 +36,7 @@
 | Edge cases & original bugs | 260–296 |
 | Test vectors | 297–314 |
 | Provenance | 315–335 |
-| Open questions | 336–346 |
+| Open questions | 336–350 |
 <!-- /index -->
 
 ## Summary
@@ -337,7 +337,11 @@ not used (flag names marked as D2MOO hints only).
 
 1. Names of monstats flag 27 (search skip) and monstats2 flag 11 (hit
    52): D2MOO `noAura` / `large` by index; confirm against the
-   `monstats` / `monstats2` column order (`data/fields.tsv`).
+   `monstats` / `monstats2` column order (`data/fields.tsv`). *Flag 27
+   answered from `data/fields.tsv`:* the monstats flag word +12 bit 27
+   is `noaura` (bit 9 is `interact`, the `0x00457490(class, 9)` of
+   `client/msg-ui.md`); monstats2 flag 11 still open (which flag word
+   `0x004638A0` reads).
 2. Writers of d28 / d2C for functions 15, 19, 20, 50, 57, 58 and hits
    13, 16, 26 (client skill functions, `client/msg-skills.md` §7): not
    traced per row (`client-bodies.md` Open question 1).

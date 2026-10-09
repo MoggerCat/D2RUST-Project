@@ -25,6 +25,7 @@ functions 1/4/5/6/8/11/23/25/43/49/60/63). REC block 540–549.
 | cell walk (REC-451 resolved) | sim/pathing.md §9.4, §9.6; sim/path-placement.md §4, §6 r3; missiles.md §R4 r6; client.md §C7 r5, r10 | The default step's path step is the §9.4 movement with the §9.6 cell walk: steps halved to ≤ 0x10000, each cell change a missile move (`d2_sim::path::footprint::missile_move` over the client DRLG, read only: a missile's footprint mask is 0) with the §C8 move mask, refused on 0x1 / 0x4 (Q := the last free cell's centre), up to 10 saved steps, the new-step flag only on an unrefused walk with a saved step; set position stops the path when the cell has no room; §C7 r10 reads the cached collided mask (velocity 0: the size query with all bits). `ClientMissile::room`, `collided`, `steps`, `step_count`, `stopped`. A WALL-only cell (0x1) no longer stops a `CollideType` 3 missile (only 0x4 or no room): the wall fixtures now stamp WALL with the missile barrier. | `tests_drlg` `a_fast_client_missile_walks_its_cells_and_stops_before_a_thin_wall`, `a_still_client_missile_reads_the_wall_under_it`, `a_client_missile_ends_on_a_wall_of_the_client_drlg` (fixture: real wall bits) |
 | unit hits | client.md §C7 r11–r12, §C8, §C9 r2, r4.1, r5, r8; sim/path-placement.md §4 r6 | the unit at a point over the room adjacency and room unit lists with the collide tests (common test, hostility, alignment, `CanDestroy`), on each saved step when the word has a unit bit; the end with a unit: NextHit / LastCollide / flag / hostility gates, pierce (r = 2 keeps m), state 86 (`ClientObjects::just_hit`, counted down per client update), `CollideKill`. PROVISIONAL REC-544 (flags 0x4 / 0x8; and: no unit footprints are stamped on the client grid, so in play the search is not reached yet), REC-545 (state 86 expiry; `client.md` Open question 11). | `a_client_missile_hits_the_monster_on_its_walk`, `piercing_and_next_hit_on_a_client_missile` |
 | hit functions | client-bodies.md §B3 r4, §B7; client-bodies-2.md §B10 r4, r6, §B12 | `bridge/client_missiles_hits.rs`: 1 (fire disc), 2 (ring), 3, 10 (no model overlays), 14 (seeded shard pattern, facing), 18 (meteor), 19, 24 (returns 0 on a unit), 28 (ring of 8), 29, 30 (orb novas), 31, 44, 52 (rocks; a unit hit is a handler error until OQ1), 54, 55, 56. REC-452 narrowed to 9, 12, 13, 16, 25, 26, 53 and the open ones. | `client_missiles::hits_tests` (7) |
+| client unit search, hits 13, 16, 25, 26 | client-bodies-2.md §B9, §B10 r1, §B12 | `search` (C's room adjacency, town skip, room unit lists, squared distance, the filter of §B9 with hostility, the line walk `0x0064E260` over the client DRLG, state 86), next-GUID pick, bolt to each; 13 (lock / retarget), 16 (chain to the next GUID), 25 (skip `noaura`: monstats flag 27 read from `data/fields.tsv`, `MonsterClass::no_aura`; `client-bodies-2.md` OQ1 part answered), 26 (V by (d28, d2C), no cap). Filter bits the model cannot test are handler errors. | `tests_drlg` `hit_16_chains_to_the_next_guid_in_range`, `hits_25_and_26_bolt_the_units_in_range`, `hit_13_retargets_the_lowest_guid` |
 | real install | — | `app_client_drlg` `the_users_client_missiles_run_their_functions` runs every user row of the 37 functions of its `RUN` list (1–11, 13, 17–20, 23, 25, 27, 37, 39, 43–49, 51–53, 58–60, 63, 65, 68) for 60 updates with the user's skills tables and a drawn frame's origin; every function has a row made. | install: 4 passed |
 
 ## Not done
@@ -34,9 +35,12 @@ functions 1/4/5/6/8/11/23/25/43/49/60/63). REC block 540–549.
   client path for units), 38 and 66 (call the open helpers `0x004D19D0`
   / `0x004D2520`), 29 (open helpers); the open bodies of §C12 wait on
   the spec.
-- Hit functions 9, 12, 13, 16, 25, 26 (need the client unit search §B9
-  and the line walk `0x0064E260`), 53 (`0x004DA340` unspecified); the
-  open ones of §B6 (REC-452).
+- Hit functions 9 (ally / demon / undead tests the model lacks), 12
+  (fire patch), 53 (`0x004DA340` unspecified), 52 with a unit (monstats2
+  flag 11, `client-bodies-2.md` OQ1); the open ones of §B6 (REC-452).
+- A handler error in a missile's end (an untestable filter bit, hit 52
+  on a unit) leaves the missile in place, erroring on each later update
+  (the countdown has already passed 0).
 - Unit footprints on the client grid (REC-277 / REC-544): without them
   the unit search of §C7 r12 is not reached in play.
 - Missile sounds (audio), the init and umod callbacks, the client event

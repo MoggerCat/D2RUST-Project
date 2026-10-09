@@ -121,6 +121,9 @@ pub struct ClientMissileRow {
     /// functions' H1–H4 and c1–c3 (`client-bodies.md` §B1).
     pub clt_hit_sub: [i16; 4],
     pub c_hit_par: [i32; 3],
+    /// The server column `HitSubMissile1` (i16; hit 26 gates on it,
+    /// `client-bodies-2.md` Edge case 3).
+    pub hit_sub1_server: i16,
 }
 
 /// The create record (`missiles.md` §R2.1, 0x5C bytes) as the client
