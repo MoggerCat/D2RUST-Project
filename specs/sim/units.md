@@ -27,18 +27,18 @@
 | Rules | 75–76 |
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–155 |
-|   3. Lifecycle | 156–420 |
-|   4. Modes and mode schedules | 421–969 |
-|   5. Event dispatch | 970–984 |
-|   6. Events per kind | 985–1107 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 1108–1129 |
-|   8. Collision line between two units | 1130–1134 |
-| Constants & data dependencies | 1135–1151 |
-| Randomness | 1152–1159 |
-| Edge cases & original bugs | 1160–1180 |
-| Test vectors | 1181–1240 |
-| Provenance | 1241–1327 |
-| Open questions | 1328–1407 |
+|   3. Lifecycle | 156–453 |
+|   4. Modes and mode schedules | 454–995 |
+|   5. Event dispatch | 996–1010 |
+|   6. Events per kind | 1011–1133 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 1134–1155 |
+|   8. Collision line between two units | 1156–1160 |
+| Constants & data dependencies | 1161–1177 |
+| Randomness | 1178–1185 |
+| Edge cases & original bugs | 1186–1206 |
+| Test vectors | 1207–1266 |
+| Provenance | 1267–1353 |
+| Open questions | 1354–1433 |
 <!-- /index -->
 
 ## Summary
@@ -183,9 +183,42 @@ fixed GUID):
       save, no items) the town's first object takes the next step
       (108806926, seq 7270), with `StubAma` (stub) the first of the eight
       start items does (unit 108806926, item 4040195123, seq 2352–2355).
-      The call site inside the load is not identified; the order is.
+      Call site (static, 2026-10-09): the player setup `0x00569F20`
+      (`0x00569F53`, game +0xD0 as parent), called by the full save's
+      header read `0x0056A090` right after its type-0 allocation
+      (`0x0056A22C` → `0x0056A23B`) and by the new-character start
+      `0x00569F80` (`0x00569FB3`); legacy saves use the twin `0x00532520`
+      (`0x0053254E`) from `0x00532590` / `0x00532690`.
       The death corpse draws its seed the same way after its allocation
-      (`combat/vitals.md` §4.7 r1.4).
+      (`combat/vitals.md` §4.7 r1.4; `0x0057F7E5`), and so does a save's
+      corpse (`0x0056A830`, `0x0056A95E`; legacy `0x00533850`,
+      `0x005338D8`). These six and the allocator are the only callers of
+      `0x00552DF0` (`rng.md` §5.6 G6).
+   4.2. Allocator callers by type (2026-10-09, ECX at each of the 69
+      calls; each type 1–5 call is one game-seed step, type 4 two;
+      the owner spec of each caller says when it runs):
+      1. Type 0 (no step here; r4.1): `0x00532590`, `0x00532690`,
+         `0x00533850`, `0x00569F80`, `0x0056A090`, `0x0056A830`,
+         `0x0057F700`.
+      2. Type 1 monster: hireling create `0x005774F0`
+         (`world/hirelings.md`), ambient / spread spawn `0x005B2A00`
+         (`monsters/population.md`), and every monster of the generic
+         `0x005557D0` (type in EBX; from `0x00555910` spawn, the presets
+         `0x005559A0` and the inactive restore `0x00542B40`).
+      3. Type 2 object: object population and object functions
+         `0x0054F0D0`, `0x0054F180`, `0x0054F430`, `0x00550380`–
+         `0x00552200` (`world/object-population.md`, `world/objects.md`);
+         monster-population objects `0x0054DF80`, `0x0054E490`; portals
+         `0x0056CF40`, `0x0056D130`; shrine / object code `0x00582380`;
+         quest code `0x005888D0`, `0x005891D0`, `0x0058A500`,
+         `0x0058A820`, `0x0058C9A0`, `0x0058D7D0`, `0x005943B0`,
+         `0x005944F0`, `0x0059B710`, `0x0059D870` (class 100),
+         `0x005B45E0`, `0x005B6AD0`, `0x005BD390` (`world/quests*.md`);
+         plus `0x005557D0` presets.
+      4. Type 3 missile: only `0x0059FA30` (`missiles/missiles.md` §R2.3).
+      5. Type 4 item: `0x00558CB0` (from a record: saves, copies),
+         `0x00558D90` (every drop / created item), `0x005557D0`.
+      6. Type 5 tile: only through `0x005557D0` (preset warps).
 5. Flags |= 0x10; node index := 11.
 6. GUID: a monster with flags bit 2 takes the fixed GUID; every other
    unit draws one (`0x00552EE0`, `unit-order.md` §1.3).
@@ -565,15 +598,6 @@ prepared (`0x005533D0`), cancel 0/1, then, if the record of the mode the
 unit is now in has its schedule flag: every-tick (§4.4) when
 `0x005A6B10` says the mode moves, else §4.2.
 
-PROVISIONAL: the result of `0x005A7C20` for a live unit is 1 when the
-requested mode's start returned non-zero and 0 when the neutral start
-ran in its place (so the AI's failure branches of `monsters/ai.md` §7.2
-run after a walk with no path point) (because the 1.14d recording
-`merc-rogue-cow` frame 33 shows the hireling's wander to a point one
-sub-tile away followed, with no draw between, by the escape of
-`monsters/ai-bodies-6.md` §7 step 11); settled by a read of
-`0x005A7C20`'s return path (REC-1390).
-
 Mode table (`0x005A78A0`): 16-byte records {start, event-0 function,
 event-1 function, schedule flag} at `0x006E2260` + 16·mode; classes
 243–418, 543 and 544–709 with a set byte +0x1A5 in their monstats row
@@ -622,7 +646,9 @@ start; `0x005A7C20` never writes it itself.
       class's monstats2 flag 0x13 (`0x004638A0(class, 0x13)`) clear →
       dead-body footprint `0x00649F70(U, 1)` (`skills/bodies-3.md`
       §3.9); `0x006488A0(path, R byte +0x14)`; `0x005738D0(game, U)`.
-   3. Treasure gate `0x005A6830(game, R, 0)` (`items/treasure.md` §3.1);
+   3. Treasure gate `0x005A6830(game, R, 0)` (`items/treasure.md` §3.1;
+      the drop is created and announced in this same frame,
+      `items/treasure.md` §3.7);
       evil-killed counter `0x00547E50` (`monsters/population.md`);
       `0x0061AFA0(U's room, U's GUID)`.
    3.1. Helpers of steps 1.2–1.3 (read 2026-10-08):

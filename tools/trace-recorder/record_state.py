@@ -74,7 +74,8 @@ MD_CONTROL, CTL_GAME, CTL_OWNER = 0x28, 0x28, 0x2C   # monster data -> AI contro
 ID_INV, INV_OWNER = 0x5C, 0x08                       # item data -> inventory -> owner unit
 NO_OWNER = 0xFFFFFFFF
 # `q` (state-snapshot.md §2; world/quests.md §1.1, §1.4): unit +0x14 = player data, +0x10 + 4*d =
-# the quest flag record of difficulty d (game +0x6D, u8), 42 u16 words
+# the bit-buffer header of difficulty d (game +0x6D, u8); header +0x00 = the buffer of 42 u16 words
+# (header +0x04 = bit count 0x300; reading the header itself gives a pointer and 0x300, PC 1 late C)
 G_DIFFICULTY, PD_QUESTS, Q_SLOTS = 0x6D, 0x10, 42
 # item data (items/bitstream.md Inputs: quality +0x00, item seed +0x04, start seed +0x10, flags
 # +0x18, file index +0x28, item level +0x2C, auto affix +0x36, magic prefixes +0x38, suffixes
@@ -268,7 +269,10 @@ class StateReader:
             if not data or d > 2:
                 return
             pa = (data + PD_QUESTS + 4 * d, 4)
-            recp = self.u32(pa[0])
+            hdr = self.u32(pa[0])
+            if not hdr:
+                return
+            recp = self.u32(hdr)
             if not recp:
                 return
             bufp = self.u32(recp)
@@ -276,8 +280,7 @@ class StateReader:
                 return
             words = struct.unpack("<%dH" % Q_SLOTS, self.read(bufp, 2 * Q_SLOTS))
             self.put(rec, ua, "q", [[i, w] for i, w in enumerate(words) if w],
-                     (ua + U_DATA, 4), (self.game + G_DIFFICULTY, 1), pa, (recp, 4),
-                     (bufp, 2 * Q_SLOTS))
+                     (ua + U_DATA, 4), (self.game + G_DIFFICULTY, 1), pa, (hdr, 4), (recp, 2 * Q_SLOTS))
         except OSError:
             self.note("q absent: unreadable quest record link")
 
@@ -536,8 +539,8 @@ def build_world():
     m.put(P + U_DATA, "<I", 0x3A0000)
     m.put(game + G_DIFFICULTY, "<B", 1)
     for dd in range(3):
-        m.put(0x3A0000 + PD_QUESTS + 4 * dd, "<I", 0x3B0000 + 0x100 * dd)
-        m.put(0x3B0000 + 0x100 * dd, "<II", 0x3C0000 + 0x100 * dd, 0x300)
+        m.put(0x3A0000 + PD_QUESTS + 4 * dd, "<I", 0x3A8000 + 0x20 * dd)  # header
+        m.put(0x3A8000 + 0x20 * dd, "<II", 0x3B0000 + 0x100 * dd, 0x300)  # buffer, bit count
         for i in range(Q_SLOTS):
             m.put(0x3C0000 + 0x100 * dd + 2 * i, "<H", 0)
     m.put(0x3C0100, "<H", 0x2001)

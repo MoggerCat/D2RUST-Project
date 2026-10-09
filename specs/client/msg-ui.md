@@ -45,16 +45,16 @@
 |   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 665–791 |
 |   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 792–804 |
 |   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 805–815 |
-|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 816–835 |
-|   20. 0x61 act video (`0x0045E660`) | 836–843 |
-|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 844–851 |
-|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 852–861 |
-| Constants & data dependencies | 862–873 |
-| Randomness | 874–878 |
-| Edge cases & original bugs | 879–895 |
-| Test vectors | 896–943 |
-| Provenance | 944–1011 |
-| Open questions | 1012–1147 |
+|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 816–837 |
+|   20. 0x61 act video (`0x0045E660`) | 838–845 |
+|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 846–853 |
+|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 854–863 |
+| Constants & data dependencies | 864–875 |
+| Randomness | 876–880 |
+| Edge cases & original bugs | 881–897 |
+| Test vectors | 898–945 |
+| Provenance | 946–1013 |
+| Open questions | 1014–1149 |
 <!-- /index -->
 
 Owned ids: 0x26, 0x27, 0x29, 0x4E, 0x4F, 0x50, 0x52, 0x58, 0x5D, 0x5E,
@@ -827,7 +827,9 @@ layer.
    `0x0049E3A0`): codes 0–5, 0xD build a text line (built length ≥ 0x104
    → fatal 0x114C, 0x1152, 0x115C, 0x116A, 0x1178, 0x1184, 0x117E);
    code 2 with the local player's own name builds no text (the empty
-   buffer goes to `0x0049E3A0`); codes 6, 8–11,
+   buffer goes to `0x0049E3A0`, `0x0049F365`–`0x0049F36E`, color u8@2;
+   the add still requests UI sound 6, the join's `cursor\windowopen.wav`
+   at sound tick 0, `audio/sound-table.md` §6.1 r4); codes 6, 8–11,
    0xF, 0x10, 0x11 other forms; 7 → `0x0049E8F0` / `0x0049E5C0`; 0x12
    also a screen shake (`0x00476A80(6, 4000, 10000, 4000)`,
    `render/camera.md` §8) and sound 4640 (`audio/triggers.md`); codes
