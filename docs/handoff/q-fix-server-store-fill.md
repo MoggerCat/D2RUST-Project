@@ -7,3 +7,10 @@
 - Ctrl-click sell: `inv_items` sends 0x33 (`GridInfo::sellable`: `quest` column and type 39; the 0x1000 flag is not in the stream, the server refuses it; `store_npc` set by `open_shop`, cleared at close). Real install: `play_smoke::ctrl_click_sells_a_backpack_item_to_the_open_store` passes (0x33 sent, no 0x19, item leaves the backpack, gold rises).
 - Left: a real-install stack-click test (0x21) needs two stacks of one item in the backpack; the starting character has none.
 - Finding: `Run` tests that call `no_findings` fail on `q-fix-real-client-path` (run leg drawn (4929, 4209) vs server (4924, 4209)); not from this branch.
+
+## Rows from q-prov-recording (same session)
+
+- `q-fix-real-newchar-hand-item`: done. A new character's two join hands carry item 0 (`PlayerRecord::new_character`); `d2s-load.md` §8 r3 PROVISIONAL replaced by the recording; `play_smoke::the_play_path_steps_and_speaks` (real install) still walks.
+- `q-fix-real-tp-town-cast`: done. A town cast makes nothing (`create_town_portal` returns none in a town; `last_field_level` removed; REC-243 (1) settled in HANDOFF); the item path already refused it: real install `play_smoke::a_town_portal_scroll_used_in_town_is_refused_without_cost` (3F/7C bytes, no 0x22, scroll stays); `app_town_portal` test renamed and follows.
+- `q-fix-real-potion-effect`: not done, binary-only: `pc1-data.md` Step 4 item 25.
+- `the_session_flow_creates_the_game_...`: the test was stale, not the code. The install joins a new sorceress with three 0x23 (select before 0x0B, then the two hands after 0x5F) as `facts/join/a1-new-sor.tsv`; the unapplied steps are new character set-up / has skill / mouse skills / quest entry. Expectations follow the recording.

@@ -222,7 +222,7 @@ fn boot() -> (App, app_support::Server<StepClock>, Arc<AtomicU32>) {
 // Covers: specs/world/objects.md §12 r13; specs/client/msg-units.md §8 r7; specs/sim/intents-events.md §6 r6
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
-fn casting_in_town_opens_to_the_last_field_level_and_the_owner_name_arrives() {
+fn casting_in_town_makes_nothing_and_the_owner_name_arrives() {
     let (mut app, server, ms) = boot();
     let mut steps = 0;
     let mut step = |app: &mut App| {
@@ -256,8 +256,8 @@ fn casting_in_town_opens_to_the_last_field_level_and_the_owner_name_arrives() {
         })
     };
 
-    // A cast in town before any field cast makes nothing.
-    assert!(!cast(&server), "no field level yet");
+    // A cast in town makes nothing (`use.md` §4; recorded, REC-243).
+    assert!(!cast(&server), "refused in town");
     assert_eq!(server_portals(&server), 0);
 
     // Into the Blood Moor, cast there: the owner name rides with the
@@ -301,9 +301,10 @@ fn casting_in_town_opens_to_the_last_field_level_and_the_owner_name_arrives() {
         step(&mut app);
     }
 
-    // A cast in town: the pair leads back to the Blood Moor.
-    assert!(cast(&server), "a pair to the last field level");
-    assert_eq!(server_portals(&server), 2, "the old pair was replaced");
+    // A cast in town after a field cast still makes nothing: the field
+    // pair stays as it was (q-fix-real-tp-town-cast).
+    assert!(!cast(&server), "refused in town with a pair open");
+    assert_eq!(server_portals(&server), 2, "the pair is untouched");
     for _ in 0..10 {
         step(&mut app);
     }
