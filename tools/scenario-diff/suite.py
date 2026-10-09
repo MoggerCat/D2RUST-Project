@@ -3,7 +3,7 @@ in parallel, a match % per check, area and overall, and the playthrough's
 playability per act next to it (specs/tools/scenario-diff.md §4).
 
     python3 tools/scenario-diff/suite.py [--filter GLOB] [--area A[,B]] [--workers N]
-        [--fresh] [--no-checks] [--no-playthrough] [--json F] [--md F]
+        [--orig-cache [DIR] [--fill-cache]] [--fresh] [--no-checks] [--no-playthrough] [--json F] [--md F]
         [--no-build] [--auto-after S] [--dry-run]
     python3 tools/scenario-diff/suite.py --selftest
 
@@ -265,6 +265,10 @@ def run_check(job, k, opts, game_sha, log):
             argv.append("--reuse-orig")
         if opts.dry_run:
             argv.append("--dry-run")
+        if getattr(opts, "orig_cache", None):
+            argv += ["--orig-cache", opts.orig_cache] + (
+                (["--fill-cache"] if opts.fill_cache else []) +
+                (["--cache-no-read"] if opts.fresh else []))
         log(f"[w{k}] {name}: {'reuse 1.14d' if reuse else 'record 1.14d'}")
         res_path = os.path.join(work, "result.json")
         if os.path.exists(res_path):
@@ -276,6 +280,9 @@ def run_check(job, k, opts, game_sha, log):
             r = subprocess.run(argv, cwd=REPO, env=env, stdout=lf, stderr=subprocess.STDOUT,
                                timeout=limit)
         rec["exit"] = r.returncode
+        if getattr(opts, "orig_cache", None):
+            with open(os.path.join(work, "suite.log"), encoding="utf-8", errors="replace") as lf:
+                rec["orig_cache_hits"] = lf.read().count("orig cache hit")
         try:
             with open(res_path, encoding="utf-8") as f:
                 res = json.load(f)
@@ -541,6 +548,11 @@ def main(argv=None):
     ap.add_argument("--filter", default=None, help="glob on the check name")
     ap.add_argument("--area", default=None, help="areas (first dash token of the name), comma list")
     ap.add_argument("--workers", type=int, default=max(1, min((os.cpu_count() or 2) - 1, 3)))
+    ap.add_argument("--orig-cache", nargs="?", const=sd.DEFAULT_CACHE, default=None, metavar="DIR",
+                    help="use the shared 1.14d cache (default traces/orig-cache; a miss records "
+                         "1.14d as usual; orig_cache.py)")
+    ap.add_argument("--fill-cache", action="store_true",
+                    help="with --orig-cache: store fresh 1.14d recordings in the cache")
     ap.add_argument("--fresh", action="store_true", help="record 1.14d again (no reuse)")
     ap.add_argument("--no-checks", action="store_true")
     ap.add_argument("--no-playthrough", action="store_true")
