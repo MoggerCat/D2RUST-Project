@@ -3,7 +3,8 @@
 - **Status:** draft: the check-file format and the run; the `state`
   channel runs on both sides, `draws` reuses the rendering-facts tools,
   `packets` runs on both sides (`tools/packets-trace.md`), `rng` runs on
-  both sides (`tools/rng-trace.md`); one shared input script drives
+  both sides (`tools/rng-trace.md`), `items` compares the items both
+  sides' packet recordings show created (§3 rule 13); one shared input script drives
   both sides at the same server frames (§2 rule 4, §3 rule 8).
 - **Target version:** 1.14d (the original side); the format is d2rs-own.
 - **Crate/module:** `tools/scenario-diff/scenario_diff.py`.
@@ -15,20 +16,20 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 34–42 |
-| Inputs | 43–49 |
-| Outputs / state changes | 50–60 |
-| Rules | 61–62 |
-|   1. Files | 63–68 |
-|   2. Syntax | 69–140 |
-|   3. Run | 141–395 |
-|   4. Suite | 396–491 |
-| Constants & data dependencies | 492–495 |
-| Randomness | 496–499 |
-| Edge cases & original bugs | 500–518 |
-| Test vectors | 519–535 |
-| Provenance | 536–539 |
-| Open questions | 540–579 |
+| Summary | 35–43 |
+| Inputs | 44–50 |
+| Outputs / state changes | 51–61 |
+| Rules | 62–63 |
+|   1. Files | 64–69 |
+|   2. Syntax | 70–141 |
+|   3. Run | 142–452 |
+|   4. Suite | 453–548 |
+| Constants & data dependencies | 549–552 |
+| Randomness | 553–556 |
+| Edge cases & original bugs | 557–580 |
+| Test vectors | 581–599 |
+| Provenance | 600–603 |
+| Open questions | 604–652 |
 <!-- /index -->
 
 ## Summary
@@ -83,7 +84,7 @@ state first. It is the default way to compare a behaviour with 1.14d.
 | `ticks <n>` | yes | snapshots / ticks recorded on both sides |
 | `seconds <n>` | no (300) | 1.14d wall-clock limit per recorder run |
 | `difficulty normal\|nightmare\|hell` | no (normal) | d2rs `--difficulty` |
-| `channels <ch>...` | no (`state`) | from `state`, `draws`, `rng`, `packets` |
+| `channels <ch>...` | no (`state`) | from `state`, `draws`, `rng`, `packets`, `items` |
 | `draws-at <tick>` | with `draws` | the server tick whose frame is compared (≤ `ticks`; 1.14d's last drawn tick at or before it, §3 rule 7.2) |
 | `input <script>` | no | the shared input script of rule 4, given to both sides (excludes the two lines below) |
 | `input orig <script>` | no | `autostart.py` input script (seconds, client pixels) |
@@ -392,6 +393,62 @@ state first. It is the default way to compare a behaviour with 1.14d.
     every step (d2s-tool's tables, the 1.14d recorders' `--game`, d2rs'
     `D2_GAME_DIR`). Used to take a system out of a check (a level with
     no monster population, `traces/variants/blood-moor-empty`).
+13. **items** (`tools/scenario-diff/items_channel.py`, comparator
+    `items_diff.py`; work dir files in brackets): the two recordings of
+    the packets channel (rule 9, same commands, same pokes, sends and
+    input) [`orig.packets.jsonl`, `d2rs.packets.jsonl`], recorded once
+    when a check asks for both channels; then `items_diff.py
+    orig.packets.jsonl d2rs.packets.jsonl --list --next N`, whose exit
+    code is the channel's. The hook is the S→C queue the packets
+    recorders already pin (`tools/packets-trace.md` §2: 1.14d
+    `0x0053B280`, d2rs `ClientBuffers::queue`; direct sends too), not
+    the item-creation function: every item the game creates for a
+    client's view (drop, store fill, gamble list, cube output, quest
+    item, the save's items at join) reaches the client as S→C 0x9C /
+    0x9D (`items/inventory-moves.md` §11, `items/item-actions.tsv`).
+    1. **Created item.** In each recording, the `s2c` stream of the
+       packets windows (`tools/packets-trace.md` §3 rule 1: window,
+       then record order) is read for messages 0x9C / 0x9D of at least
+       8 bytes; the first one carrying a given item GUID (bytes 4–7;
+       −1 skipped) creates the item; later messages of that GUID
+       (pick-up, moves, stat updates) are not this channel's. The item
+       is (index in creation order, window = creation frame, id,
+       action = the creating event, category byte 3, for 0x9D the owner
+       type byte 8 and owner GUID 9–12, the bit stream from byte 8 of
+       0x9C / 13 of 0x9D, `items/bitstream.md`).
+    2. **Range.** Items whose creation frame is ≤ the smaller last
+       complete window of the two sides; different last windows (or a
+       side without a complete tick) make the result partial; no item
+       on either side is partial too (nothing compared).
+    3. **Comparison**, item k of 1.14d with item k of d2rs, first
+       difference reported: creation frame, id, action, category, owner
+       type, then an owner of type 4 by the owner's creation index (the
+       socket fillers of 0x9D action 0x13), then the bit stream byte for
+       byte (lengths last). An item on one side only is `missing in
+       d2rs` / `missing in 1.14d`. The GUID and a non-item owner's GUID
+       are not compared here (the packets channel compares those bytes;
+       the two sides' GUIDs are offset when the party differs, §3 rule
+       8.5); the size byte 2 follows from the stream length.
+    4. **Report.** Both item lists (`--list`: per index, side, frame,
+       id, action, the item code read from the stream head, GUID, stream
+       length), the first divergence and the next N, each with both
+       items, the stream bytes ±4 around the first differing byte and
+       the head field holding the first differing bit (flags, version,
+       mode, x / y or body / x / y / page, code: `items/bitstream.md`
+       §2–§4.1; past the code, its bit offset). `--json`: diff-summary-1
+       with `frames_compared` = items compared (the larger count),
+       `frames_equal` = items without a difference, plus `items_orig`,
+       `items_d2rs`.
+    5. First runs (2026-10-09, 1.14d under Wine, recorders of rule 9):
+       `items-vendor-akara-stock` (Akara's store, frame 20): 41 items on
+       both sides, same order, codes, frame and action 0x0B; 39 streams
+       identical, items #7 and #12 (wands) differ only in the charged
+       skill (stat 204, param 4289: current charges 67 = max on 1.14d,
+       65 and 64 on d2rs). `items-drop-gold-potion` (6 poked ground
+       items, frame 4): same order, frame, action 0x00, positions and gold
+       amounts; every stream lacks flag 0x10 (identified) on d2rs.
+       `items-drop-monster-kill`: 1.14d drops gold at frame 36, d2rs a
+       stamina potion (`vps`) at frame 37.
 
 ### 4. Suite
 
@@ -515,6 +572,11 @@ None in the tool. Both games run on `seed`.
    capture stopped at tick 5, exit 1, no message). Give a parallel run
    its own `WINEPREFIX` (a `cp -al` copy of `~/.wine-d2` costs no disk)
    and `D2_DISPLAY`; the save goes to that prefix (rule 1).
+4. The items channel sees an item only when the server sends it to the
+   client (§3 rule 13): an item created and freed in one frame, or
+   created outside the client's view (no 0x9C), is not compared; a
+   GUID the game frees and gives again to a later item counts once (the
+   later item is read as a message of the first).
 
 ## Test vectors
 
@@ -527,6 +589,8 @@ None in the tool. Both games run on `seed`.
 | `--selftest` (input) | a shared `input` line reaches `record_state.py`, `state-dump`, `record_frames.py` and `play` as `--input '<script>'`; a script not starting with `frame`, with `wait` / `shot`, a frame 0 or going back, a `hold` without N or non-integer arguments, and a shared line next to `input orig` are rejected; an `input d2rs` in play's tick form goes to `play` only |
 | `suite.py --selftest` | discovery by glob and area, slowest first; the cache key misses on a change of the check, the save or Game.exe; the 1.14d outputs and key removed, d2rs' kept; a prefix copy hard-links the bulk and copies `*.reg` and saves, no lock; the rng build before the plain one; match % per channel (draws by rows), area and overall; playthrough acts from the `--all` keys or from milestones; text and Markdown tables |
 | comparators' `--selftest` (`--json`) | `state_diff`, `rng_diff`, `packets_diff`: the summary counts the frames with a difference and names the first; a match has every frame equal and no first |
+| `items_diff.py --selftest` | items in creation order from synthetic recordings (a later message of a GUID is no creation; a 0x9D filler's owner by index); GUIDs offset by 2 on one side match; every stream byte perturbed is found at its item and byte, a changed code named `code`; a changed action, frame, filler owner and a missing item are reported; fewer ticks on one side and no item at all are partial; the summary counts items |
+| `--selftest` (items) | with `packets` and `items` one 1.14d recording and one `state-dump --packets` serve both; `items` alone records them; the comparator gets both files and `--json <work>/items.summary.json` |
 | `autostart.py --selftest` | `frame` / framed `hold` parsing and rejections; at simulated tick-return stops the click, hold press, key and move are posted at the stop of F − 1, the hold's release at the stop of F + N − 1; a late stop runs the step there |
 | `--selftest` (send) | `at … send` lines parse to the canonical message (fields in layout order, hex lower case); a missing or unknown message, a missing field, a byte that is not two hex digits, frame 0, a chat row and a misspelt step are rejected; the dry run passes `--send '<frame> <message>'` after the pokes to `record_state.py`, `state-dump`, `record_frames.py` and `play`; the packets channel passes pokes and sends to both sides |
 | `send.py --selftest` | `msg Walk x=10 y=20` → `01 0a 00 14 00`, `SelectSkill skill=36 left=0 item=0xFFFFFFFF` → `3c 24 00 00 00 ff ff ff ff` (`tools/scenario.md` test vectors), the recorded 0x32 of `world/vendors.md` §7.1 rule 10; references in GUID order and unresolved ones; the strict errors; the call layout ([ESP] = S, size, 1, S+0x10; ESP = saved − 16; EIP `0x0052AE50`); on a fake process: steps due at the first stop after tick f − 1, EAX 0 → `dropped`, the state-4 gate |
@@ -576,3 +640,12 @@ d2rs-own tool; no 1.14d fact.
    the local player; only the world keys of §3 rule 8.2. The 1.14d
    side of `combat-melee-fallen` / `combat-potion-midfight` settles the
    pick and the keys (`docs/HANDOFF.md` §5).
+5. PROVISIONAL REC-1310: the items channel reads the created items from
+   S→C 0x9C / 0x9D (§3 rule 13) rather than from a hook at the 1.14d
+   item-creation function (`0x00558D90` and its family,
+   `items/generation.md`): the queue hook is already pinned on both
+   sides and carries the exact bit stream. A creation hook would also
+   see items the client is never sent (edge case 4) and the creating
+   call (drop / store / gamble / cube / quest) directly instead of the
+   message action; it needs the d2rs creation path to write the same
+   record.
