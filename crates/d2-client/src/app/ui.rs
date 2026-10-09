@@ -35,9 +35,12 @@ use crate::world_view::panel_art::{PanelArtLoader, PanelArtRules, SharedTextColo
 use crate::world_view::ui_bind::{TextAssetLoader, TextColors};
 use crate::world_view::unit_assets::{SharedUnitArt, UnitArtLoader, UnitLooks};
 use crate::world_view::unit_rules::UnitRules;
+use crate::world_view::ViewError;
 use crate::world_view::{UiSounds, Unspecified, WorldViewState, WorldViewUi};
 
 use super::palette::ActPalettes;
+use crate::rules::shading::ShadeTables;
+use d2_formats::palette::Pl2;
 
 /// What the play mode's UI reads from the install.
 pub struct UiParts {
@@ -168,6 +171,7 @@ pub fn add_original_ui_with(
     app.insert_resource(TextColorMaps {
         shared: text.clone(),
         by_act: [None; 5],
+        shade_by_act: [None; 5],
         shown: None,
     })
     .add_systems(
@@ -195,6 +199,10 @@ pub fn add_original_ui_with(
 pub struct TextColorMaps {
     pub shared: SharedTextColors,
     by_act: [Option<TextColors>; 5],
+    /// The act's blend tables (`render/blend-modes.md` §1), pushed once per
+    /// act: the front-end UI path has no tile feed to push them, and a UI
+    /// cel of draw mode 2 reads them (`ui_cel_ops`).
+    shade_by_act: [Option<ShadeTables>; 5],
     shown: Option<u8>,
 }
 
@@ -220,6 +228,20 @@ pub fn push_text_colors(
             c
         }
     };
+    let shades = match maps.shade_by_act[i] {
+        Some(t) => t,
+        None => {
+            let pl2 = Pl2::parse(palettes.of(act)).map_err(|e| ViewError::Unresolved {
+                what: "UI blend tables",
+                spec: "render/blend-modes.md",
+                message: format!("act {act} pal.pl2: {e}"),
+            })?;
+            let t = ShadeTables::push(&mut state.assets.maps, &pl2);
+            maps.shade_by_act[i] = Some(t);
+            t
+        }
+    };
+    state.assets.shades = Some(shades);
     *maps.shared.write().unwrap_or_else(|e| e.into_inner()) = Some(colors);
     maps.shown = Some(act);
     Ok(())

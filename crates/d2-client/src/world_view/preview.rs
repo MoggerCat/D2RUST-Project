@@ -249,7 +249,12 @@ impl Preview {
         if let Err(m) = self.tiles.ensure_shades(self.act, &mut assets.maps) {
             self.log_once(m);
         }
-        assets.shades = self.tiles.shades(self.act).copied();
+        // The act's tables when the tiles hold them; else the UI path's
+        // (`app::ui::push_text_colors`) stay: the UI rectangles of draw
+        // mode 2 read them (`blend-modes.md` §1).
+        if let Some(t) = self.tiles.shades(self.act).copied() {
+            assets.shades = Some(t);
+        }
         ensure_skip(assets)?;
         for m in self.tiles.ensure(entries, assets) {
             self.log_once(m);
