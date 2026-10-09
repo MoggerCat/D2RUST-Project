@@ -299,7 +299,17 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> EquipWorld for InvDesk<'_, '_, H, R
         let o = self.owner_or_none(u);
         self.rest.set_skill_quantity(o, skill, q)
     }
+    /// `0x00570080`, the skill-point spend (`skills/levels.md` §6.4 step
+    /// 4): cost 1 (`skpoints` is empty in every 1.14d row); base
+    /// `newskills` (5) below the cost → nothing; else stat 5 −= 1 and the
+    /// level is added (the rest's skill list). §5.5 step 3 adds the
+    /// quantity to stat 5 first, so a learned scroll skill nets 0.
     fn learn_skill(&mut self, u: UnitId, skill: i32) {
+        const NEWSKILLS: u16 = 5;
+        if self.econ.stats.unit_base(u, NEWSKILLS, 0) < 1 {
+            return;
+        }
+        self.add_unit_stat(u, NEWSKILLS, -1);
         let o = self.owner_or_none(u);
         self.rest.learn_skill(o, skill)
     }

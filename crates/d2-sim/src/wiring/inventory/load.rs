@@ -140,12 +140,13 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         }
         let at_saved_place = match saved_mode {
             mode::EQUIPPED => self.equip_from_cursor(o, g, it.body_loc, true).0,
+            // `0x0055E9B0(game, owner, GUID, belt slot, 0, &out)` (`d2s.md`
+            // §8.2 rule 3): the 0x23 body at slot x (`inventory-moves.md`
+            // §7.14: link, mode 2, page 0xFF, command flag 0x400, the update
+            // list), as the start items' belt placement.
             mode::BELT => {
-                let placed = self.belt_place(o, g, it.x as u32);
-                if placed {
-                    self.set_mode(g, mode::BELT);
-                }
-                placed
+                crate::items::moves::handlers::to_belt(self, o, g, it.x as u32)
+                    == crate::items::moves::Outcome::DONE
             }
             _ if stale => false,
             _ => self.place(owner, unit, (it.x, it.y), false, true),

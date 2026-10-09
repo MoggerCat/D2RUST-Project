@@ -94,8 +94,39 @@ Branch `claude/q-fix-pc1-day3-a-r2`, from `claude/specs-staging-7`
   expected blockers with the bit clear until an NPC-interaction input or
   poke exists. Real-install run: see "Real-data run" below.
 
+## 4. q-fix-real-join-missing-msgs (coordinator's follow-up row, not in the build queue)
+
+`app_frame_loop` (real data) compared the client's applied join messages
+with `facts/join/a1-new-sor.tsv`: 115 of 127. The missing ones were not
+0x0E (those were all sent). Diffing the two sequences id by id gave:
+
+| Missing | Cause | Fix |
+|---|---|---|
+| 4 × 0x9C action 0x0E (belt potions) | the start items' belt placement only did the slot placement, not the rest of `0x0055E9B0` (`inventory-moves.md` §7.14: link, mode 2, page 0xFF, command flag 0x400, update list) | `WiredStart::place_belt` runs `handlers::to_belt` (as the vendor's auto-belt); the save loader's belt branch likewise (`d2s.md` §8.2 rule 3 names the same call) |
+| 2 × 0x22 (scroll counts) | the inventory desk asked the rest for books `scrollskill` / `bookskill`, which the play host never answers: no scroll or tome ever linked its skill | `EquipWorld::book_skill` reads the desk's own books table (`inventory.md` §5.5 step 1) |
+| 1 × 0x21 (staff `StartSkill` o-skill) | the start items ran on a bare desk without the players' skill lists lent | start items run with `lend_skills` / `return_skills` like every wired item call; the o-skill sync runs right after the equip so 0x21 precedes the 0x22s as recorded; 0x21 byte 10 = `bonus_level` (`levels.md` §7.1, new `skills::bonus_level_of`, shared with `bonus_level`) |
+| stat 5 drift on load (found by `smoke_save`) | §5.5 step 3 adds q to `newskills` and the learn `0x00570080` is the skill-point spend (`levels.md` §6.4 step 4: −1); d2rs's learn did not spend | the desk's `learn_skill` spends 1 (`skpoints` empty in every row) before adding |
+| 0x8F (pong) | transport: d2rs's link sends no 0x6D (`client/model.md` §7 r11.4) | left out of the test's recorded count |
+| 0xA8 + 3 × 0x1D at frame 2 | the player has no alignment state 105; no spec names the setter | **open**: PC 1 question in `pc1-data.md` Step 4 |
+
+Now 122 of 126; `app_frame_loop` stays red until the alignment question
+is answered (the test's later `(handled, queued)` counts will need
+updating then). New real-data test
+`app_single_player::the_start_items_messages_follow_the_recorded_join`:
+the join's 0x21, 0x22 × 2, 0x9D, 0x9C × 6 equal the recording byte for
+byte under `scenario-masks.tsv` (passes). `app_items` updated: the new
+character's belt holds four potions, so every column is ready.
+
+Real-data d2-client integration run (`--ignored`, cloud, no GPU): see the
+comparison with the previous commit below.
+
 ## PROVISIONAL
 
+- **REC-862** (`d2-server` `items/moves/preview_skills.rs`
+  `sync_oskills`): the 0x21 bonus (`bonus_level`) is computed without
+  state 134 (skill shrine, +2), which the skill stage does not carry; a
+  skill shrine active while an o-skill item is worn is not counted.
+  Settled by staging the unit's states with its list.
 - **REC-860** (`crates/d2-sim/src/world/quests.rs`
   `QuestControl::npc_wants_interact`, `world/quests.md` §6.4 step 4): the
   act is `unit_act(player)`, not the act byte of the player's client
