@@ -8,6 +8,7 @@
 //!   d2-client cpu-render [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out FILE]
 //!   d2-client play       ... --dump-draws DIR [--at-tick N] [--input SCRIPT]
 //!   d2-client facts-compare ORIGINAL_DIR D2RS_DIR [--ignore COL,...]
+//!   d2-client state-dump --save FILE.d2s [--seed N] [--difficulty D] --ticks T [--every n] --out FILE [--game-dir DIR] [--date YYYY-MM-DD]
 //!
 //! `play` (the default) opens a window running the local single-player game: the
 //! in-process server (`d2-server` host over the wired `d2-sim`) pumped
@@ -45,6 +46,9 @@
 //! pointer (`facts-render.md` §5 r11).
 //! `facts-compare` reports the first difference between a 1.14d scene's
 //! facts and a d2rs dump (§6): exit 0 match, 1 diverged, 2 partial, 3 error.
+//! `state-dump` runs the game `play --save X --seed N` builds, headless, for
+//! T server ticks and writes one `state-1` game-state snapshot per tick
+//! (`specs/tools/state-snapshot.md`; `--game-dir` or $D2_GAME_DIR).
 //!
 //! Game files are read from $D2_GAME_DIR. Output images go under the
 //! gitignored `game/` folder by default; they contain game graphics and must
@@ -606,15 +610,32 @@ fn facts_compare(args: &[String]) -> i32 {
     }
 }
 
+/// `state-dump ...` (`specs/tools/state-snapshot.md`): the game-state
+/// snapshots of a headless `play` run.
+fn state_dump(args: &[String]) -> Result<()> {
+    use d2_client::app::state_dump;
+    let a = state_dump::parse_args(args)?;
+    let command = std::env::args().collect::<Vec<_>>().join(" ");
+    let r = state_dump::run(&a, &command)?;
+    println!(
+        "state-dump: {} ticks, {} snapshots -> {}",
+        r.ticks,
+        r.snaps,
+        a.out.display()
+    );
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("facts-compare") => std::process::exit(facts_compare(&args[1..])),
+        Some("state-dump") => state_dump(&args[1..]),
         Some("cpu-render") => cpu_render(parse_options(&args[1..])?),
         Some("verify") => verify(parse_options(&args[1..])?),
         Some("play") | None => play(parse_options(args.get(1..).unwrap_or(&[]))?),
         Some("view") => view(parse_options(&args[1..])?),
-        _ => bail!("usage: d2-client [view|verify|cpu-render|play|facts-compare] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq] [--dump-draws DIR [--at-tick N]] [--res 800x600|640x480] [--input SCRIPT]"),
+        _ => bail!("usage: d2-client [view|verify|cpu-render|play|facts-compare|state-dump] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq] [--dump-draws DIR [--at-tick N]] [--res 800x600|640x480] [--input SCRIPT]"),
     }
 }
 

@@ -35,6 +35,7 @@ pub mod server_thread;
 pub mod single_player;
 pub mod skill_rest;
 pub mod sound;
+pub mod state_dump;
 pub mod strings;
 pub mod ui;
 pub mod visibility;
