@@ -609,10 +609,11 @@ impl<C: Clock + Send + 'static> StateSource for ThreadLink<Link<C>> {
 /// place (the cell of a page, the belt slot, the body location) and whose
 /// direction is 0 (`items-load-mixed` against 1.14d, frame 2; `state-
 /// snapshot.md` §2). d2rs keeps the place in the inventory model, not in
-/// a path record, so the export reads it there.
+/// a path record, so the export reads it there, also for an item that just
+/// left the ground (its ground path is stale; REC-1402).
 fn overlay_item_places(snap: &mut state::StateSnapshot, inv: &d2_sim::wiring::inventory::InvState) {
     use d2_sim::items::moves::mode;
-    for u in snap.units.iter_mut().filter(|u| u.ut == 4 && u.x.is_none()) {
+    for u in snap.units.iter_mut().filter(|u| u.ut == 4) {
         let placed = inv.items.values().find(|d| {
             d.guid == u.g && matches!(d.mode, mode::STORED | mode::EQUIPPED | mode::BELT)
         });
@@ -620,6 +621,8 @@ fn overlay_item_places(snap: &mut state::StateSnapshot, inv: &d2_sim::wiring::in
             u.x = u32::try_from(d.x).ok();
             u.y = u32::try_from(d.y).ok();
             u.d = Some(0);
+            // The static path's room is 0: no `lv` (state-snapshot.md §6 r1).
+            u.lv = None;
         }
     }
 }
