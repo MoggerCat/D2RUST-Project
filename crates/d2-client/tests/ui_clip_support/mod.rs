@@ -4,14 +4,14 @@
 
 use d2_client::bridge::world::ClientWorld;
 use d2_client::ui::draw::ImageRef;
-use d2_client::ui::imbue_ui::Imbue;
 use d2_client::ui::layout::Screen;
 use d2_client::ui::original::controls_host::ControlsHost;
 use d2_client::ui::widget::{FrameImage, Widget};
 use d2_client::ui::{NoStrings, Rect, UiCtx, UiDraw, WidgetId};
 
-/// Every draw of the widget, the imbue dialog and the controls screen is
-/// clipped to the whole screen of the play frame.
+/// Every draw of the widget and the controls screen is clipped to the
+/// whole screen of the play frame (the item-socket dialog that replaced
+/// `imbue_ui` clips to the configured screen: `npc_talk` tests).
 pub fn clips_are_the_screen(screen: Screen) {
     assert_eq!(Screen::play(), screen);
     let w = ClientWorld::default();
@@ -32,7 +32,6 @@ pub fn clips_are_the_screen(screen: Screen) {
         [UiDraw::Image(i)] => assert_eq!(i.clip, screen.rect()),
         other => panic!("{other:?}"),
     }
-    Imbue::new(9).draw(&ctx, &mut out);
     ControlsHost::open(true, None).draw(&ctx, Some(0), &mut out);
     assert!(out.len() > 3, "{} draws", out.len());
     let mut seen = [0usize; 2];

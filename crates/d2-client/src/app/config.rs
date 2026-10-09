@@ -72,6 +72,10 @@ pub struct Settings {
     pub automap_centers: u8,
     pub automap_party: u8,
     pub automap_party_names: u8,
+    /// `Show HP Text` / `Show MP Text` (`ui/control-panel.md` §3 r5: the
+    /// control panel's globe text toggles, stored at once).
+    pub show_hp_text: u8,
+    pub show_mp_text: u8,
 }
 
 impl Default for Settings {
@@ -94,12 +98,14 @@ impl Default for Settings {
             automap_centers: 1,
             automap_party: 1,
             automap_party_names: 1,
+            show_hp_text: 0,
+            show_mp_text: 0,
         }
     }
 }
 
 /// The integer keys: `(section, key, min, max)`, §O7 r2 order.
-pub const INT_KEYS: [(&str, &str, i64, i64); 16] = [
+pub const INT_KEYS: [(&str, &str, i64, i64); 18] = [
     ("audio", "master_volume", 0, 100),
     ("audio", "music_volume", 0, 100),
     ("audio", "mixer", 0, 2),
@@ -116,6 +122,8 @@ pub const INT_KEYS: [(&str, &str, i64, i64); 16] = [
     ("automap", "centers", 0, 1),
     ("automap", "party", 0, 1),
     ("automap", "party_names", 0, 1),
+    ("hud", "show_hp_text", 0, 1),
+    ("hud", "show_mp_text", 0, 1),
 ];
 
 impl Settings {
@@ -146,7 +154,9 @@ impl Settings {
             12 => self.automap_fade.into(),
             13 => self.automap_centers.into(),
             14 => self.automap_party.into(),
-            _ => self.automap_party_names.into(),
+            15 => self.automap_party_names.into(),
+            16 => self.show_hp_text.into(),
+            _ => self.show_mp_text.into(),
         }
     }
 
@@ -168,7 +178,9 @@ impl Settings {
             12 => self.automap_fade = v as u8,
             13 => self.automap_centers = v as u8,
             14 => self.automap_party = v as u8,
-            _ => self.automap_party_names = v as u8,
+            15 => self.automap_party_names = v as u8,
+            16 => self.show_hp_text = v as u8,
+            _ => self.show_mp_text = v as u8,
         }
     }
 }
@@ -221,7 +233,7 @@ pub fn parse_settings(text: &str) -> Result<Settings, ConfigError> {
     for (k, item) in doc.as_table().iter() {
         match k {
             "version" => version = item.as_integer(),
-            "audio" | "video" | "automap" => {
+            "audio" | "video" | "automap" | "hud" => {
                 let t = item
                     .as_table_like()
                     .ok_or_else(|| bad(format!("[{k}] must be a table")))?;

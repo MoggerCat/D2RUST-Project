@@ -9,6 +9,9 @@ use super::panel::{ClientIntent, Panel, PanelId, UiCtx, UiEvent, UiInput, UiResp
 use crate::bridge::link::ServerLink;
 use crate::bridge::{Bridge, BridgeError};
 
+/// The states that draw the inventory family (`ui/panels.md` §5 step 5).
+pub const INVENTORY_FAMILY: [u8; 8] = [1, 0x0C, 0x0E, 0x17, 0x19, 0x1A, 0x1C, 0x1D];
+
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum UiError {
     #[error("panel {0:?} added twice")]
@@ -154,11 +157,10 @@ impl UiRoot {
             let id = s.panel.id().0;
             if usize::from(id) < super::layout::UI_STATE_COUNT {
                 s.open = states.is_open(id as u8);
-                // d2rs-own, unverified (q-stash, PROVISIONAL): the right
-                // half shows the inventory beside the stash; the gate
-                // refuses opening ui 1 while the stash is open
-                // (`panels.md` §Test vectors), so it is drawn with it.
-                if id == 1 && (states.is_open(0x19) || states.is_open(0x1A)) {
+                // `panels.md` §5 step 5: the inventory family is drawn
+                // while any of ui 1, 0x0C (shop), 0x0E (anvil), 0x17
+                // (trade), 0x19 (stash), 0x1A (cube), 0x1C, 0x1D is open.
+                if id == 1 && INVENTORY_FAMILY.iter().any(|&u| states.is_open(u)) {
                     s.open = true;
                 }
             }

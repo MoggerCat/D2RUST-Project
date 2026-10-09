@@ -35,9 +35,13 @@ impl Panel for StashUi {
         PanelId(u16::from(UI_STASH))
     }
 
+    /// The left half above the control panel, plus the inventory close
+    /// rectangle the stash / cube mouse handlers test first (`panels.md`
+    /// §11 r7, `panels-2.md` §20 r1–r3): the frame above the control
+    /// panel, and [`Self::event`] lets every other point go on.
     fn rect(&self) -> Rect {
         let s = self.sh.borrow().config.screen;
-        Rect::new(0, 0, (s.w / 2 + 1) as u16, (s.h - 48) as u16)
+        Rect::new(0, 0, s.w as u16, (s.h - 48) as u16)
     }
 
     fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
@@ -50,6 +54,19 @@ impl Panel for StashUi {
         panel.draw(&sh.tables, &env, ctx.strings, STASH_CAP, GOLD_MAX_FONT, out);
         let g = sh.items.stash_grid(env.exp, &sh.config.screen);
         sh.items.draw_stash(ctx.world, &sh.tables.files, &g, out);
+        // `panels-2.md` §20 r1: in the inclusive close rectangle,
+        // `strClose` queued at (X + 12 − w / 2, Y − 35), pop-up text in
+        // font 1, centre 0 (as the cube's tips, §20 r3).
+        let s = sh.config.screen;
+        if crate::ui::panels::stash_cube::stash_close_hover(&s, env.exp, sh.mouse) {
+            if let Some(t) = ctx.strings.get_id(super::cube_ui::STR_CLOSE) {
+                let fonts = sh.fonts.as_ref();
+                let w = fonts.and_then(|f| f.width_a(1, t)).unwrap_or(0);
+                let (x, y) = crate::ui::panels::stash_cube::stash_close_pos(&s, env.exp);
+                let at = Point::new(x + 12 - w / 2, y - 35);
+                super::hud_tips::push_popup(t.to_vec(), at, 0, false, (s.w, s.h), fonts, out);
+            }
+        }
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {
@@ -71,9 +88,17 @@ impl Panel for StashUi {
         let mut sh = self.sh.borrow_mut();
         let s = sh.config.screen;
         let exp = sh.env().exp;
+        // `0x00486E10`: the inventory close rectangle (the belt popup
+        // covering it is not tested: d2rs-own, the popup is the HUD's).
+        let in_inv_close = crate::ui::panels::inventory::close_rect(&sh.tables, &s)
+            .is_some_and(|r| r.contains(at));
+        let left = Rect::new(0, 0, (s.w / 2 + 1) as u16, (s.h - 48) as u16);
+        if !in_inv_close && !left.contains(at) {
+            return UiResponse::Ignored;
+        }
         let ptr = Pointer {
             at,
-            in_inv_close: false,
+            in_inv_close,
             cursor_item: items::cursor_item(ctx.world).is_some(),
         };
         let eff = if down {

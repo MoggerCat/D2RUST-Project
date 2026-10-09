@@ -68,6 +68,12 @@ impl NpcMenus {
         &self.records
     }
 
+    /// Record `i`, to edit (the build's caption counts, `ui/menus.md`
+    /// §2.3).
+    pub fn record_mut(&mut self, i: usize) -> Option<&mut NpcMenuRecord> {
+        self.records.get_mut(i)
+    }
+
     /// Applies `f` to every record of npc class `npc` (an npc class may
     /// have more than one record, e.g. 257; the edits of §14.2 are applied
     /// to each of them).

@@ -49,7 +49,7 @@ pub struct GameMessages {
 
 /// Font metrics from the loaded tables; without them a line is not
 /// wrapped and a unit is 8 pixels wide.
-pub(super) struct Measure<'a>(pub(super) Option<&'a FontMeasure>);
+pub(crate) struct Measure<'a>(pub(crate) Option<&'a FontMeasure>);
 
 impl Metrics for Measure<'_> {
     fn wrap(&self, font: u16, text: &[u16], max: i32) -> Vec<Vec<u16>> {

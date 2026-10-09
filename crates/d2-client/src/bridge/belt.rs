@@ -29,14 +29,28 @@ pub fn column(e: &UiEvent) -> Option<u8> {
     .map(|c| c as u8)
 }
 
+/// The UI facts a belt key reads besides the model (§7 r2, r3).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct KeyFacts {
+    /// Shift held (`GetAsyncKeyState(VK_SHIFT) & 0x8000`): the hireling
+    /// feed.
+    pub shift: bool,
+    /// Ui 9 (the game menu) is open.
+    pub ui9_open: bool,
+}
+
 /// The C→S 0x26 bytes of a belt key on column `c`, if the key acts.
 ///
 /// d2rs-own, unverified: the item-table facts of §7 r3 (`quest`,
 /// `unique`, `useable`) and the busy test `0x004C2240` are not in the
 /// client model; a belt item is taken as useable, not a quest or unique
-/// item, and not busy. Shift is not part of `UiEvent`: never held. Ui 9
-/// is not tracked here: taken as closed.
-pub fn key_message(w: &ClientWorld, c: u8) -> Option<Vec<u8>> {
+/// item, and not busy. The game-exit flag of the §7 r1 gate is not in
+/// the model (never set while the play loop runs).
+pub fn key_message(w: &ClientWorld, c: u8, f: KeyFacts) -> Option<Vec<u8>> {
+    // §7 r1: no local player, or the local player dead (mode 0x11).
+    if w.local().is_none_or(|p| p.mode == 0x11) {
+        return None;
+    }
     // §7 r2: only when the column-ready byte is 1.
     if !w.belt_ready.get(usize::from(c)).copied().unwrap_or(false) {
         return None;
@@ -44,9 +58,9 @@ pub fn key_message(w: &ClientWorld, c: u8) -> Option<Vec<u8>> {
     let item = items::belt(w).get(&u16::from(c)).map(|i| i.key.guid);
     let facts = BeltUseFacts {
         expansion: w.expansion != 0,
-        shift: false,
+        shift: f.shift,
         cursor_item: items::cursor_item(w).is_some(),
-        ui9_open: false,
+        ui9_open: f.ui9_open,
         item,
         passes_quest_unique: true,
         useable: true,
@@ -67,10 +81,11 @@ pub fn key_message(w: &ClientWorld, c: u8) -> Option<Vec<u8>> {
 pub fn send_keys<L: ServerLink>(
     bridge: &mut Bridge<L>,
     events: &[UiEvent],
+    f: KeyFacts,
 ) -> Result<usize, BridgeError> {
     let mut n = 0;
     for c in events.iter().filter_map(column) {
-        if let Some(m) = key_message(bridge.world(), c) {
+        if let Some(m) = key_message(bridge.world(), c, f) {
             bridge.send_bytes(&m)?;
             n += 1;
         }
@@ -119,15 +134,47 @@ mod tests {
     #[test]
     fn a_ready_column_with_a_belt_item_sends_0x26() {
         let mut w = world();
-        assert_eq!(key_message(&w, 1), None, "column 1 not ready");
+        let none = KeyFacts::default();
+        assert_eq!(key_message(&w, 1, none), None, "column 1 not ready");
         w.belt_ready[1] = true;
         assert_eq!(
-            key_message(&w, 1),
+            key_message(&w, 1, none),
             Some(vec![0x26, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
         );
         w.belt_ready[0] = true;
-        assert_eq!(key_message(&w, 0), None, "slot 0 is empty");
+        assert_eq!(key_message(&w, 0, none), None, "slot 0 is empty");
         let ev = UiEvent::Action(ActionId(Action::BeltSlot2.index() as u16));
         assert_eq!(column(&ev), Some(1));
+    }
+
+    // Shift feeds the hireling: the shift word 0x8000 in an expansion
+    // game, 0 in a classic one; ui 9 open or a dead player: nothing.
+    // Covers: specs/ui/controls.md §7 r1, §7 r2, §7 r3
+    #[test]
+    fn shift_ui9_and_death_gate_the_belt_key() {
+        let mut w = world();
+        w.belt_ready[1] = true;
+        let shift = KeyFacts {
+            shift: true,
+            ui9_open: false,
+        };
+        assert_eq!(
+            key_message(&w, 1, shift),
+            Some(vec![0x26, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+            "classic game: shift := 0"
+        );
+        w.expansion = 1;
+        assert_eq!(
+            key_message(&w, 1, shift),
+            Some(vec![0x26, 9, 0, 0, 0, 0, 0x80, 0, 0, 0, 0, 0, 0])
+        );
+        let menu = KeyFacts {
+            shift: false,
+            ui9_open: true,
+        };
+        assert_eq!(key_message(&w, 1, menu), None, "ui 9 open");
+        let p = w.local_player.unwrap();
+        w.units.get_mut(&p).unwrap().mode = 0x11;
+        assert_eq!(key_message(&w, 1, KeyFacts::default()), None, "dead");
     }
 }

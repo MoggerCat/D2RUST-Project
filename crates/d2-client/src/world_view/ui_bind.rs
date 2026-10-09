@@ -661,6 +661,7 @@ pub fn run_ui_with<L: ServerLink>(
         // The flags the delivered S→C outputs set since the last event
         // (S→C 0x63 opens ui 0x14), mirrored before routing.
         if let Some(o) = original.as_deref_mut() {
+            o.npc_menu_poll(world, root, strings);
             o.shop_poll(world, root);
             o.cube_poll(world, root)?;
             // The close hooks of the outputs delivered since the last pass.

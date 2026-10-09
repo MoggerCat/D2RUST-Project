@@ -88,7 +88,7 @@ pub fn quest_info(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerE
         f4b1a10: Some(crate::bridge::output::f4b1a10(class)),
         cursor_item,
         level: w.local().map_or(1, |u| w.base(u.key, 12, 0)),
-        unidentified: crate::ui::npc_menu_ui::unidentified_count(w),
+        unidentified: crate::ui::original::npc_box::unidentified_count(w),
         expansion: w.expansion != 0,
         npc_monsters,
     })));

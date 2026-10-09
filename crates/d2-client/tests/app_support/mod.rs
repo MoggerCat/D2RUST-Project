@@ -118,6 +118,41 @@ pub fn warp_id(from: u32, to: u32) -> u32 {
     u32::try_from(l.warp[slot]).expect("a warp id")
 }
 
+/// The centre of the NPC menu box's selectable row `i` (the spec box sits
+/// above the NPC, `ui/menus.md` §2.4–§2.6; `OriginalUi::npc_menu_row_point`).
+pub fn npc_menu_row(app: &bevy::prelude::App, i: usize) -> d2_client::ui::Point {
+    app.world()
+        .non_send::<d2_client::world_view::WorldViewUi>()
+        .original
+        .as_ref()
+        .expect("the original UI")
+        .npc_menu_row_point(i)
+        .unwrap_or_else(|| panic!("the NPC menu box has a row {i}"))
+}
+
+/// The NPC menu's selectable row count, 0 when no box is up.
+pub fn npc_menu_len(app: &bevy::prelude::App) -> usize {
+    app.world()
+        .non_send::<d2_client::world_view::WorldViewUi>()
+        .original
+        .as_ref()
+        .expect("the original UI")
+        .npc_menu()
+        .filter(|m| !m.talking)
+        .map_or(0, |m| m.rows.len())
+}
+
+/// The centre of the talk topic box's cancel (`ui/messages.md` §6 r3).
+pub fn npc_topic_cancel(app: &bevy::prelude::App) -> d2_client::ui::Point {
+    app.world()
+        .non_send::<d2_client::world_view::WorldViewUi>()
+        .original
+        .as_ref()
+        .expect("the original UI")
+        .npc_topic_cancel_point()
+        .expect("the talk topic box is up")
+}
+
 /// The server player's level (`None` before the join).
 pub fn server_level<C: Clock + Send + 'static>(server: &Server<C>) -> Option<u32> {
     with(server, |l| {

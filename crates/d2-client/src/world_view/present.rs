@@ -502,6 +502,9 @@ pub fn deliver_with<L: ServerLink>(
 /// The automap's frame facts (`ui/automap.md` §9): the d2rs frame, the
 /// open mode, the unit origin of the frame's one camera
 /// (`seams/world-screen.md` §2.2); no camera: origin (0, 0).
+/// UI state 0x0A: the automap shown (`ui/automap.md` §8 r2).
+const AUTOMAP_STATE: u8 = 0x0A;
+
 fn automap_facts(
     camera: Option<&crate::rules::camera::Camera>,
     open_mode: u8,
@@ -1005,7 +1008,16 @@ fn world_view_frame(
                     .corpse_clicks
                     .take_clicks(&mut bridge.0, cam.as_ref(), &frame.unhandled)?;
             let unhandled = state.ground_items.take_clicks(&mut bridge.0, &unhandled)?;
-            crate::bridge::belt::send_keys(&mut bridge.0, &frame.unhandled)?;
+            // `ui/controls.md` §7 r2–r3: Shift (the hireling feed) and ui 9.
+            let belt_facts = ui
+                .original
+                .as_ref()
+                .map(|o| crate::bridge::belt::KeyFacts {
+                    shift: o.shift_held(),
+                    ui9_open: o.is_open(9),
+                })
+                .unwrap_or_default();
+            crate::bridge::belt::send_keys(&mut bridge.0, &frame.unhandled, belt_facts)?;
             // The input reset `0x0044DA40` (`client/msg-ui.md` §2 r2.2):
             // held := 0 before this pass's clicks.
             if ui.original.as_mut().is_some_and(|o| o.take_input_reset()) {
@@ -1058,9 +1070,23 @@ fn world_view_frame(
             // `ui/automap.md` §8 r2: the toggle command no panel took.
             let toggle = crate::controls::Action::ToggleAutomap.index() as u16;
             if let Some(a) = state.automap.as_mut() {
-                for e in &frame.unhandled {
-                    if *e == UiEvent::Action(crate::ui::ActionId(toggle)) {
-                        a.toggle(&automap_facts(cam.as_ref(), view.open_mode));
+                let tabs = frame
+                    .unhandled
+                    .iter()
+                    .filter(|e| **e == UiEvent::Action(crate::ui::ActionId(toggle)))
+                    .count();
+                match ui.original.as_mut() {
+                    // The command toggles UI state 0x0A, like the
+                    // mini-panel Automap button (`control-panel.md` §9 r5).
+                    Some(o) => {
+                        for _ in 0..tabs {
+                            o.set_ui(u32::from(AUTOMAP_STATE), 2, false)?;
+                        }
+                    }
+                    None => {
+                        for _ in 0..tabs {
+                            a.toggle(&automap_facts(cam.as_ref(), view.open_mode));
+                        }
                     }
                 }
                 // `ui/controls.md` §3 cmds 8–11, 45 (`ui/automap.md` §8
@@ -1089,9 +1115,14 @@ fn world_view_frame(
                 }
                 // Space with nothing to close (`panels.md` §2 r9):
                 // `0x00457640(0)`, then the close-all with the automap.
-                if ui.original.as_mut().is_some_and(|o| o.take_clear_automap()) {
-                    a.map.cleared(&f);
-                    if a.open {
+                if let Some(o) = ui.original.as_mut() {
+                    if o.take_clear_automap() {
+                        a.map.cleared(&f);
+                        o.set_ui(u32::from(AUTOMAP_STATE), 1, false)?;
+                    }
+                    // The shown automap follows UI state 0x0A, whoever set
+                    // it (§8 r2: closing re-centres with force 0).
+                    if o.is_open(AUTOMAP_STATE) != a.open {
                         a.toggle(&f);
                     }
                 }

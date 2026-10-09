@@ -527,11 +527,9 @@ impl Run {
     }
 }
 
-/// The NPC menu row of `kind`, clicked (`npc_menu_ui.rs`: the box is
-/// centred, a quarter down the 800 × 600 frame, rows of 20).
-fn menu_row_point(rows: &[Option<OptionKind>], kind: Option<OptionKind>) -> Point {
-    let k = rows.iter().position(|r| *r == kind).expect("the row") as i32;
-    Point::new((800 - 200) / 2 + 20, 600 / 4 + 20 * (k + 1) + 10)
+/// The NPC menu row of `kind`: its index among the box's selectable rows.
+fn menu_row_index(rows: &[Option<OptionKind>], kind: Option<OptionKind>) -> usize {
+    rows.iter().position(|r| *r == kind).expect("the row")
 }
 
 #[test]
@@ -579,7 +577,10 @@ fn the_scripted_play_run() {
         .map(|r| r.kind)
         .collect();
     eprintln!("Akara's menu: {rows:?}");
-    run.click(menu_row_point(&rows, Some(OptionKind::Trade)));
+    // The box is the spec box above Akara (`menus.md` §2.6), as ui 8.
+    assert!(run.ui_open(8), "the menu is ui 8 (panels-2.md §14)");
+    let p = app_support::npc_menu_row(&run.app, menu_row_index(&rows, Some(OptionKind::Trade)));
+    run.click(p);
     run.step(10);
     run.check("trade with Akara");
     {
@@ -632,6 +633,162 @@ fn the_scripted_play_run() {
         .map(|(k, u)| (k.unit_type, u.class))
         .collect();
     eprintln!("units in the field: {units:?}");
+    run.no_findings();
+}
+
+impl Run {
+    fn with_ui<R>(&self, f: impl FnOnce(&d2_client::ui::original::OriginalUi) -> R) -> R {
+        f(self
+            .app
+            .world()
+            .non_send::<WorldViewUi>()
+            .original
+            .as_ref()
+            .unwrap())
+    }
+
+    /// Runs to the town NPC of `class`, interacts and waits for its built
+    /// menu box (S→C 0x28, ui 8).
+    fn open_menu(&mut self, class: u32) -> UnitKey {
+        let key = self.approach(1, class);
+        self.run_to_unit(key);
+        self.bridge().interact(key).unwrap();
+        self.until("the NPC menu box", 400, |r| {
+            r.with_ui(|u| u.npc_menu().is_some_and(|m| !m.rows.is_empty()))
+        });
+        key
+    }
+
+    fn sent_any(&self, f: impl Fn(&[u8]) -> bool) -> bool {
+        self.wire.lock().unwrap().sent.iter().any(|m| f(m))
+    }
+}
+
+// The spec NPC UI on the user's install (q-fix-ui-play-wiring; the
+// synthetic town smoke tests were removed by q-fixture-migrate): Akara's
+// menu box carries the string table's captions above her (ui 8), Talk
+// opens the topic box and its cancel builds the menu again (Akara's flag
+// 1), a left click on a store item opens the confirm dialog and No sends
+// nothing, the shop's close ends the interaction; Kashya's build sends the
+// hire-list request C→S 0x38 [3][NPC][player].
+// Covers: specs/ui/menus.md §2 r2, §2 r6, §4 r4, §4 r5; specs/ui/messages.md §6 r3; specs/ui/panels-2.md §14 r8, §14 r9; specs/ui/item-tips.md §11 r2, §11 r3
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_spec_npc_ui_on_the_install() {
+    let mut run = Run::start();
+    let akara = run.open_menu(u32::from(d2_sim::world::npc::class::AKARA));
+    assert!(run.ui_open(8), "ui 8");
+    let (rect, items) = run.with_ui(|u| u.npc_menu_box()).expect("the box");
+    let texts: Vec<String> = items
+        .iter()
+        .map(|(t, _)| String::from_utf16_lossy(t))
+        .collect();
+    eprintln!("Akara's box {rect:?}: {texts:?}");
+    // The selectable captions come from the install's string table.
+    assert!(
+        texts[1..].iter().all(|t| !t.is_empty()),
+        "captions: {texts:?}"
+    );
+    run.check("Akara's menu");
+
+    // Talk: the topic box (caption, introduction?, gossip, …, cancel).
+    let p = app_support::npc_menu_row(&run.app, 0);
+    run.click(p);
+    run.step(2);
+    let topics = run.with_ui(|u| u.npc_topics()).expect("the topic box");
+    let topics: Vec<String> = topics.iter().map(|t| String::from_utf16_lossy(t)).collect();
+    eprintln!("Akara's topics: {topics:?}");
+    assert!(topics.len() >= 3 && topics.iter().all(|t| !t.is_empty()));
+    let p = app_support::npc_topic_cancel(&run.app);
+    run.click(p);
+    run.step(3);
+    assert_eq!(app_support::npc_menu_len(&run.app), 3, "the menu again");
+    run.check("talk");
+
+    // Trade; a left click on a store item asks first; No sends nothing.
+    let rows: Vec<Option<OptionKind>> = run
+        .with_ui(|u| u.npc_menu())
+        .unwrap()
+        .rows
+        .iter()
+        .map(|r| r.kind)
+        .collect();
+    let p = app_support::npc_menu_row(&run.app, menu_row_index(&rows, Some(OptionKind::Trade)));
+    run.click(p);
+    run.step(10);
+    assert!(run.ui_open(0x0C) && !run.ui_open(1) && run.ui_open(8));
+    let w = run
+        .app
+        .world()
+        .resource::<BridgeResource>()
+        .0
+        .world()
+        .clone();
+    let (guid, it) = d2_client::bridge::items::store_items(&w)
+        .into_iter()
+        .find_map(|i| {
+            run.with_ui(|u| u.store_item_point(&w, i.key.guid))
+                .map(|p| (i.key.guid, p))
+        })
+        .expect("a store item on the shown page");
+    // The store item's tip carries the store context (`item-tips.md`
+    // §11 r2–r3): its top line is `Cost: ` and the price.
+    let tip = run.with_ui(|u| u.store_tip_lines(&w, guid));
+    eprintln!("store tip: {tip:?}");
+    assert!(
+        tip.first().is_some_and(|l| l.starts_with("Cost: ")),
+        "{tip:?}"
+    );
+    run.click(it);
+    run.step(2);
+    let (kind, confirm) = run
+        .with_ui(|u| u.shop_state().confirm())
+        .expect("the confirm dialog");
+    let confirm: Vec<String> = confirm
+        .iter()
+        .map(|t| String::from_utf16_lossy(t))
+        .collect();
+    eprintln!("confirm {kind:?}: {confirm:?}");
+    assert_eq!(kind, d2_client::ui::panels::shop::TxKind::Buy);
+    let no = run.with_ui(|u| u.shop_confirm_point(false)).unwrap();
+    run.click(no);
+    run.step(4);
+    assert!(!run.sent_any(|m| m[0] == 0x32), "No buys nothing");
+    run.app
+        .world_mut()
+        .non_send_mut::<WorldViewUi>()
+        .original
+        .as_mut()
+        .unwrap()
+        .set_ui(0x0C, 1, false)
+        .unwrap();
+    run.step(10);
+    assert!(run.sent_any(|m| m.len() == 9 && m[0] == 0x30 && m[5..9] == akara.guid.to_le_bytes()));
+    assert!(!run.ui_open(8), "the shop's close ended the interaction");
+    run.check("shop");
+
+    // Kashya's build sends the hire-list request.
+    let kashya = run.open_menu(u32::from(d2_sim::world::npc::class::KASHYA));
+    let player = run
+        .app
+        .world()
+        .resource::<BridgeResource>()
+        .0
+        .world()
+        .local()
+        .unwrap()
+        .key
+        .guid;
+    let mut want = vec![0x38, 3, 0, 0, 0];
+    want.extend_from_slice(&kashya.guid.to_le_bytes());
+    want.extend_from_slice(&player.to_le_bytes());
+    assert!(run.sent_any(|m| m == want.as_slice()), "C→S 0x38 action 3");
+    let n = app_support::npc_menu_len(&run.app);
+    let p = app_support::npc_menu_row(&run.app, n - 1);
+    run.click(p);
+    run.step(4);
+    assert!(!run.ui_open(8));
+    run.check("Kashya");
     run.no_findings();
 }
 
@@ -1580,4 +1737,51 @@ fn the_play_path_steps_and_speaks() {
         "delay 5 from the sound tick: {said:?}"
     );
     run.check("spoke");
+}
+
+/// Known bug (q-fix-seam-store-grid; not run by the real-data gate):
+/// the shop draws and hits each store item at the cells the server put
+/// it in (`seams/item-grids.md` §2.9), so every cell of an item's
+/// footprint finds its GUID and no two items share a cell. On the
+/// install every store item comes at cell (0, 0): the play host's NPC
+/// grid placement `0x00560200` (`vendors.md` §3.1 r4) is a stub
+/// (`AppRest::place_in_store`), and the store fill (`store::open` in
+/// the interaction wiring) does not reach the inventory model whose x /
+/// y the 0x9C stream carries.
+// Covers: specs/seams/item-grids.md §2.9
+#[test]
+#[ignore = "known bug: store items placed at cell 0, 0 (no NPC grid placement on the server)"]
+fn the_shop_finds_each_store_item_at_its_server_cells() {
+    let mut run = Run::start();
+    run.open_menu(u32::from(d2_sim::world::npc::class::AKARA));
+    let rows: Vec<Option<OptionKind>> = run
+        .with_ui(|u| u.npc_menu())
+        .unwrap()
+        .rows
+        .iter()
+        .map(|r| r.kind)
+        .collect();
+    let p = app_support::npc_menu_row(&run.app, menu_row_index(&rows, Some(OptionKind::Trade)));
+    run.click(p);
+    run.step(10);
+    assert!(run.ui_open(0x0C));
+    let w = run
+        .app
+        .world()
+        .resource::<BridgeResource>()
+        .0
+        .world()
+        .clone();
+    let cells = run.with_ui(|u| u.store_item_cells(&w));
+    eprintln!("store cells: {cells:?}");
+    assert!(cells.len() > 1, "{cells:?}");
+    let mut taken = std::collections::BTreeSet::new();
+    for &(g, x, y, cw, ch) in &cells {
+        for cy in y..y + ch {
+            for cx in x..x + cw {
+                assert!(taken.insert((cx, cy)), "cell ({cx}, {cy}) twice: {cells:?}");
+                assert_eq!(run.with_ui(|u| u.store_item_at_cell(&w, cx, cy)), Some(g));
+            }
+        }
+    }
 }

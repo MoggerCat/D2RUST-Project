@@ -1012,16 +1012,16 @@ fn gamble_window_lists_prices_and_buys() {
         root.forward(&mut fx.bridge).unwrap()
     };
 
-    // The menu: Gheed's Gamble row (the box is centred, a quarter down;
-    // its rows start one row below the top).
-    ui.open_npc_menu(ng, u32::from(class::GHEED), 12);
+    // The menu: Gheed's Gamble row of the spec box.
+    ui.open_npc_menu(ng, u32::from(class::GHEED), 12, fx.bridge.world());
+    ui.npc_menu_poll(fx.bridge.world(), &mut root, &strings);
     let menu = ui.npc_menu().expect("Gheed's menu");
     let k = menu
         .rows
         .iter()
         .position(|r| r.kind == Some(OptionKind::Gamble))
         .expect("a Gamble row");
-    let at = Point::new(400, 150 + 20 + 20 * k as i32 + 5);
+    let at = ui.npc_menu_row_point(k).expect("the Gamble row");
     assert_eq!(
         click(&mut fx, &mut ui, &mut root, PointerButton::Left, at),
         1
@@ -1205,7 +1205,9 @@ fn the_repair_button_then_an_item_click_repairs_that_item() {
     ui.install(&mut root).unwrap();
     ui.open_shop(ng, u32::from(class::CHARSI));
     ui.shop_poll(fx.bridge.world(), &mut root);
-    assert!(ui.is_open(0x0C) && ui.is_open(0x01));
+    // The shop is the full-slot ui 0x0C; ui 1 stays off and the
+    // inventory family is drawn under it (`panels.md` §4.1, §5 step 5).
+    assert!(ui.is_open(0x0C) && !ui.is_open(0x01));
     let click = |ui: &mut OriginalUi, root: &mut UiRoot, fx: &Fx, at: Point| {
         let strings = NoStrings;
         let w = fx.bridge.world();

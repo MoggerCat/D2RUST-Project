@@ -1435,6 +1435,23 @@ pub fn client_waypoint_map(data: &GameData) -> d2_sim::world::waypoints::Waypoin
     d2_sim::world::waypoints::WaypointMap::new(&data.tables().levels)
 }
 
+/// The `levels` `LevelName` keys by level id (row index), the waypoint
+/// rows' text keys ([`crate::ui::original::OriginalUi::set_level_names`]).
+pub fn client_level_names(data: &GameData) -> Vec<String> {
+    data.tables()
+        .levels
+        .iter()
+        .map(|l| {
+            let n = l
+                .levelname
+                .iter()
+                .position(|&b| b == 0)
+                .unwrap_or(l.levelname.len());
+            String::from_utf8_lossy(&l.levelname[..n]).into_owned()
+        })
+        .collect()
+}
+
 /// `difficultylevels` `ResistPenalty` per row (difficulty), from the
 /// user's `.bin` set: the expansion resist penalty of the character
 /// panel (`ui/panels.md` §8.9, `0x00611D30`; `panels-2.md` §24 r2), for

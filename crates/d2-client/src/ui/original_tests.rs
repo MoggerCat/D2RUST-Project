@@ -60,13 +60,21 @@ fn inv_area_rect_has_an_inclusive_bottom() {
 
 // An expansion game's waypoint tabs step by 64 over five tabs: a press
 // at (300, 80) at 800 × 600 (x' = 220, y' = 20) selects tab 3 (`menus.md`
-// test vector), drawn as `expwaygatetabs` frame 2t = 6.
+// test vector), drawn as `expwaygatetabs` frame 2t = 6. The click walks
+// down the setter's quest records (§1.4), so the client holds records 7,
+// 15, 23, 26 and 28 bit 0 (S→C 0x29).
 // Covers: specs/ui/menus.md §1 r3
 // Covers: specs/ui/panels.md §13 r3
 #[test]
 fn expansion_waypoint_tab_click_uses_five_tabs() {
     let mut u = ui(Some(areas()), true);
     let w = world(AMAZON, 1, true);
+    let mut quest = [0u8; 96];
+    for q in [7usize, 15, 23, 26, 28] {
+        quest[2 * q] |= 1;
+    }
+    u.ui.apply_output(&Output::QuestFlags { record: quest }, &w)
+        .unwrap();
     let record = [2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     u.ui.apply_output(&Output::WaypointMenu { guid: 0x0A, record }, &w)
         .unwrap();
@@ -232,7 +240,7 @@ fn panel_images(v: &[(String, u32, i32, i32)], prefix: &str) -> Vec<(u32, i32, i
 // Covers: specs/ui/panels.md §5, §6 r1, §6 r2
 // Covers: specs/ui/panels-3.md §23 r9
 // (the cursor item and the step-10 tips in the last panel, after the HUD
-// of step 7)
+// of step 7; the HUD (step 7) before the NPC menu family (step 9))
 #[test]
 fn install_mirrors_the_flags_and_keeps_the_border_open() {
     let u = ui(Some(areas()), true);
@@ -240,9 +248,8 @@ fn install_mirrors_the_flags_and_keeps_the_border_open() {
         u.root.open_panels(),
         vec![
             BORDER_PANEL,
-            crate::ui::hire_list::HIRE_PANEL,
-            crate::ui::npc_menu_ui::NPC_MENU_PANEL,
             hud::HUD_PANEL,
+            crate::ui::hire_list::HIRE_PANEL,
             crate::ui::original::gold_dialog::GOLD_PANEL,
             crate::ui::original::game_messages::MESSAGES_PANEL,
             crate::ui::original::overhead_ui::OVERHEAD_PANEL,
@@ -284,9 +291,8 @@ fn hotkeys_toggle_their_state_with_the_specs_jump() {
         vec![
             PanelId(1),
             BORDER_PANEL,
-            crate::ui::hire_list::HIRE_PANEL,
-            crate::ui::npc_menu_ui::NPC_MENU_PANEL,
             hud::HUD_PANEL,
+            crate::ui::hire_list::HIRE_PANEL,
             crate::ui::original::gold_dialog::GOLD_PANEL,
             crate::ui::original::game_messages::MESSAGES_PANEL,
             crate::ui::original::overhead_ui::OVERHEAD_PANEL,
@@ -309,9 +315,8 @@ fn hotkeys_toggle_their_state_with_the_specs_jump() {
         u.root.open_panels(),
         vec![
             BORDER_PANEL,
-            crate::ui::hire_list::HIRE_PANEL,
-            crate::ui::npc_menu_ui::NPC_MENU_PANEL,
             hud::HUD_PANEL,
+            crate::ui::hire_list::HIRE_PANEL,
             crate::ui::original::gold_dialog::GOLD_PANEL,
             crate::ui::original::game_messages::MESSAGES_PANEL,
             crate::ui::original::overhead_ui::OVERHEAD_PANEL,
@@ -1477,6 +1482,7 @@ mod close_hooks {
             record: Default::default(),
             current: 1,
             seq: 1,
+            tab: 0,
         };
         let w = alive();
         let mut u = ui(Some(areas()), true);
@@ -1538,5 +1544,592 @@ mod key_commands {
         assert!(u.ui.is_open(0x18));
         u.key(&w, Action::ToggleMessageLog);
         assert!(!u.ui.is_open(0x18));
+    }
+}
+
+/// The centre of the inventory close rectangle (`panels.md` §9.3).
+fn inv_close_point(u: &Ui) -> Point {
+    let r = crate::ui::panels::inventory::close_rect(&u.ui.shared.borrow().tables, &Screen::R800)
+        .expect("the close row");
+    Point::new(r.x + r.w as i32 / 2, r.y + r.h as i32 / 2)
+}
+
+/// S→C 0x77 `code` (0x10 stash, 0x15 cube) delivered and mirrored.
+fn open_by_0x77(u: &mut Ui, w: &ClientWorld, code: u8) {
+    u.ui.apply_output(
+        &crate::bridge::output::Output::TradeAction {
+            code,
+            dead_or_absent: false,
+        },
+        w,
+    )
+    .unwrap();
+    let e = UiEvent::Press {
+        button: PointerButton::Right,
+        at: Point::new(0, 0),
+    };
+    u.ui.after_event(&mut u.root, e, Routed::Unhandled).unwrap();
+    u.root.take_intents();
+}
+
+// The inventory close button with the stash up is the stash's (§11 r7,
+// `panels-2.md` §20 r1): press sets the inventory close flag (sound 4),
+// the release closes ui 0x19 alone and its hook sends one 0x4F 0x12; ui 1
+// is never touched and the open mode returns to 0.
+// Covers: specs/ui/panels.md §11 r7; specs/ui/panels-2.md §20 r1
+#[test]
+fn the_inventory_close_button_closes_the_stash() {
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    open_by_0x77(&mut u, &w, 0x10);
+    assert!(u.ui.is_open(0x19) && !u.ui.is_open(UI_INVENTORY));
+    let p = inv_close_point(&u);
+    u.ui.take_outcome();
+    u.click(&w, p);
+    assert!(!u.ui.is_open(0x19), "the stash closed");
+    assert!(!u.ui.is_open(UI_INVENTORY));
+    assert_eq!(u.ui.open_mode().get(), 0);
+    assert_eq!(
+        u.root.take_intents(),
+        vec![ClientIntent(vec![0x4F, 0x12, 0, 0, 0, 0, 0])]
+    );
+    assert!(u
+        .ui
+        .take_outcome()
+        .sounds
+        .contains(&crate::audio::driver::SoundRequest::Ui(4)));
+}
+
+// The same for the cube (§20 r2–r3): one 0x4F 0x17 through the close hook.
+// Covers: specs/ui/panels-2.md §20 r2, §20 r3
+#[test]
+fn the_inventory_close_button_closes_the_cube() {
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    open_by_0x77(&mut u, &w, 0x15);
+    assert!(u.ui.is_open(0x1A));
+    let p = inv_close_point(&u);
+    u.click(&w, p);
+    assert!(!u.ui.is_open(0x1A), "the cube closed");
+    assert!(!u.ui.is_open(UI_INVENTORY));
+    let sent = u.root.take_intents();
+    assert_eq!(
+        sent.iter().filter(|i| i.0[..2] == [0x4F, 0x17]).count(),
+        1,
+        "{sent:?}"
+    );
+}
+
+/// The waypoint menu on the play path (`menus.md` §1, `panels.md` §13).
+mod waypoint_play {
+    use super::*;
+
+    /// Client quest flags (S→C 0x29) with bit 0 of each record set.
+    fn quest(records: &[usize]) -> Output {
+        let mut record = [0u8; 96];
+        for &q in records {
+            record[2 * q] |= 1;
+        }
+        Output::QuestFlags { record }
+    }
+
+    fn open(u: &mut Ui, tab: u8) {
+        u.ui.shared.borrow_mut().waypoint_open = Some(WaypointOpen {
+            guid: 0x0A,
+            record: Default::default(),
+            current: 1,
+            seq: 1,
+            tab,
+        });
+        u.ui.set_ui(0x14, 0, false).unwrap();
+        u.ui.sync_root(&mut u.root);
+    }
+
+    fn tabs(u: &Ui, w: &ClientWorld) -> Vec<u32> {
+        panel_images(&u.images(w), "menu\\expwaygatetabs")
+            .into_iter()
+            .map(|(f, ..)| f)
+            .collect()
+    }
+
+    // The open's tab (§2 r2.3 of msg-ui) is the menu's current tab:
+    // frame 2t; the drawn tabs test records 7 / 15 / 23 / 26 (§13.3), so
+    // with only record 7 tab 1 draws its frame 3 and tabs 3, 4 none.
+    // Covers: specs/ui/panels.md §13 r3
+    #[test]
+    fn the_menu_opens_on_the_open_tab_and_draws_the_gated_tabs() {
+        let w = world(AMAZON, 1, true);
+        let mut u = ui(Some(areas()), true);
+        u.ui.apply_output(&quest(&[7, 15]), &w).unwrap();
+        open(&mut u, 2);
+        let t = tabs(&u, &w);
+        assert!(t.contains(&4), "{t:?}");
+        assert!(t.contains(&1) && t.contains(&3), "{t:?}");
+        assert!(!t.contains(&7) && !t.contains(&9), "{t:?}");
+    }
+
+    // A tab click past the quest gate walks down to the last reachable
+    // tab (§1.4): with record 7 only, tab 3 opens as tab 1.
+    // Covers: specs/ui/menus.md §1 r4
+    #[test]
+    fn a_gated_tab_click_walks_down_the_quest_records() {
+        let w = world(AMAZON, 1, true);
+        let mut u = ui(Some(areas()), true);
+        u.ui.apply_output(&quest(&[7]), &w).unwrap();
+        open(&mut u, 0);
+        u.send(
+            &w,
+            UiEvent::Press {
+                button: PointerButton::Left,
+                at: Point::new(300, 80),
+            },
+        );
+        let t = tabs(&u, &w);
+        assert!(t.contains(&2), "{t:?}");
+        assert!(!t.contains(&6), "{t:?}");
+    }
+
+    // A press outside the left half closes the menu with one latched
+    // C→S 0x49 level 0 (§1.2, §1.5); the press reaches the menu, not the
+    // world.
+    // Covers: specs/ui/menus.md §1 r2, §1 r5
+    #[test]
+    fn a_press_outside_the_left_half_closes_with_one_0x49() {
+        let mut w = world(AMAZON, 1, true);
+        let p = w.local_player.unwrap();
+        w.units.get_mut(&p).unwrap().position = Some((100, 100));
+        let mut u = ui(Some(areas()), true);
+        open(&mut u, 0);
+        let r = u.send(
+            &w,
+            UiEvent::Press {
+                button: PointerButton::Left,
+                at: Point::new(600, 200),
+            },
+        );
+        assert_eq!(r, Routed::Panel(PanelId(0x14)));
+        let want =
+            ClientIntent::from_message(&d2_proto::client::TakeOrCloseWp { wp: 0x0A, level: 0 });
+        assert_eq!(u.root.take_intents(), vec![want]);
+        assert!(!u.ui.is_open(0x14));
+    }
+
+    // The close button's hover draws the filled rectangle (colour 0,
+    // mode 2) around the "Cancel" tip (§13.4): at 800 × 600 the area is
+    // (353, 447) 36 × 34.
+    // Covers: specs/ui/panels.md §13 r4
+    #[test]
+    fn the_close_hover_draws_the_filled_rectangle() {
+        let w = world(AMAZON, 1, true);
+        let mut u = ui(Some(areas()), true);
+        open(&mut u, 0);
+        let rects = |u: &Ui| -> Vec<(i32, i32, u8, u8)> {
+            let ctx = UiCtx {
+                tick: 0,
+                world: &w,
+                strings: &NoStrings,
+            };
+            let mut out: Vec<UiDraw> = Vec::new();
+            u.root.draw(&ctx, &mut out);
+            out.iter()
+                .filter_map(|d| match d {
+                    UiDraw::Rect(r) if r.y0 == 430 => Some((r.x0, r.y1, r.color, r.mode)),
+                    _ => None,
+                })
+                .collect()
+        };
+        assert!(rects(&u).is_empty());
+        u.send(&w, UiEvent::CursorMoved(Point::new(370, 460)));
+        // No font bound: the tip's half width is 0.
+        assert_eq!(rects(&u), vec![(367, 447, 0, 2)]);
+    }
+}
+
+/// The control panel's small items on the play path (`control-panel.md`
+/// §3–§9).
+mod hud_small {
+    use super::*;
+    use crate::controls::{Action as Act, Bindings, Key};
+    use crate::ui::StringLookup;
+
+    /// The mini panel open at 800 × 600, single player: layout 2 buttons
+    /// at x 326 + 21 i, y H − 50 (§9 r4); function f = i, + 1 from i = 3.
+    fn mini_open(u: &mut Ui) {
+        u.ui.set_ui(0x15, 0, false).unwrap();
+        u.ui.sync_root(&mut u.root);
+    }
+
+    /// The press point of mini-panel button i (inside x_i < x < x_i + 20,
+    /// H − 69 < y < H − 47).
+    fn button(i: i32) -> Point {
+        Point::new(326 + 21 * i + 10, 540)
+    }
+
+    struct Strs(Vec<(u16, Vec<u16>)>);
+    impl Strs {
+        fn new(v: &[(u16, &str)]) -> Self {
+            Strs(
+                v.iter()
+                    .map(|(k, t)| (*k, t.encode_utf16().collect()))
+                    .collect(),
+            )
+        }
+    }
+    impl StringLookup for Strs {
+        fn get(&self, _: &str) -> Option<&[u16]> {
+            None
+        }
+        fn get_id(&self, id: u16) -> Option<&[u16]> {
+            self.0
+                .iter()
+                .find(|(k, _)| *k == id)
+                .map(|(_, t)| t.as_slice())
+        }
+    }
+
+    fn texts(u: &Ui, w: &ClientWorld, strings: &dyn StringLookup) -> Vec<String> {
+        let ctx = UiCtx {
+            tick: 0,
+            world: w,
+            strings,
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        u.root.draw(&ctx, &mut out);
+        out.iter()
+            .filter_map(|d| match d {
+                UiDraw::Text(t) => Some(String::from_utf16_lossy(&t.text)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    // The Quest Log button (f 6, i 5) runs `0x004A3FE0(0)`: the quest log
+    // opens and asks for the quest data, as the Q key does.
+    // Covers: specs/ui/control-panel.md §9 r5, §9 r8
+    #[test]
+    fn the_quest_log_button_opens_the_quest_log() {
+        let w = world(AMAZON, 1, true);
+        let mut u = ui(Some(areas()), true);
+        mini_open(&mut u);
+        u.click(&w, button(5));
+        assert!(u.ui.is_open(0x0F));
+        assert_eq!(
+            u.root.take_intents(),
+            vec![quest_log_ui::request_quest_data()]
+        );
+    }
+
+    // The Automap button (f 4, i 3) toggles UI state 0x0A, the state the
+    // shown automap follows (`ui/automap.md` §8 r2).
+    // Covers: specs/ui/control-panel.md §9 r5
+    #[test]
+    fn the_automap_button_toggles_state_0x0a() {
+        let w = world(AMAZON, 1, true);
+        let mut u = ui(Some(areas()), true);
+        mini_open(&mut u);
+        u.click(&w, button(3));
+        assert!(u.ui.is_open(0x0A));
+    }
+
+    // Hovering a button shows its string and ` (%s)` with its binding's
+    // key (§9 r6); the run button's tip adds the Run key (§6 r1).
+    // Covers: specs/ui/control-panel.md §9 r6, §6 r1
+    #[test]
+    fn the_mini_panel_and_run_tips_name_their_keys() {
+        let w = world(AMAZON, 1, true);
+        let mut u = ui(Some(areas()), true);
+        let mut b = Bindings::empty();
+        b.set(Act::ToggleQuests, &[Key::Q]);
+        b.set(Act::ToggleRun, &[Key::R]);
+        u.ui.set_belt_keys(&b);
+        mini_open(&mut u);
+        let s = Strs::new(&[(4175, "Quest Log"), (4178, " (%s)"), (4179, "Run")]);
+        u.send(&w, UiEvent::CursorMoved(button(5)));
+        let want = format!("Quest Log ({})", Key::Q.name());
+        assert!(texts(&u, &w, &s).contains(&want), "{:?}", texts(&u, &w, &s));
+        // §6 r1: the run rectangle x W/2 − 145…W/2 − 128, y H − 28…H − 8.
+        u.send(&w, UiEvent::CursorMoved(Point::new(262, 580)));
+        let want = format!("Run ({})", Key::R.name());
+        assert!(texts(&u, &w, &s).contains(&want), "{:?}", texts(&u, &w, &s));
+    }
+
+    // A belt with extra rows and more than one row blocks the right side
+    // (§9 r2): layout 1, the art at (W/2 − 205, H − 47); the buttons
+    // move to x0 = W/2 − 202 (§9 r4, r7: offset −118).
+    // Covers: specs/ui/control-panel.md §9 r2, §9 r3, §9 r7
+    #[test]
+    fn a_belt_with_extra_rows_moves_the_mini_panel_left() {
+        use crate::bridge::items::mode;
+        use crate::ui::panels::inv_items::tests::world as item_world;
+        // A worn belt of `belts` type 0 (3 rows, §5 r7) whose extra rows
+        // were shown (`[0x007BEFA0]` = 1, §5 r3).
+        let mut w = item_world(&[(7, mode::BODY, (8, 0, 0, 0), b"lbl ")], None);
+        let me = w.local_player.unwrap();
+        w.units.get_mut(&me).unwrap().mode = 1;
+        let mut u = ui(Some(areas()), true);
+        u.ui.set_belt_parts(hud_belt::BeltParts {
+            records: Vec::new(),
+            types: BTreeMap::from([(*b"lbl ", 0)]),
+            beltable: Default::default(),
+        });
+        u.ui.shared.borrow_mut().hud.belt.state.extra_boxes = true;
+        mini_open(&mut u);
+        let art: Vec<(i32, i32)> = panel_images(&u.images(&w), "panel\\minipanel_s")
+            .into_iter()
+            .map(|(_, x, y)| (x, y))
+            .collect();
+        assert_eq!(art, vec![(195, 553)]);
+        // Button 5 (Quest Log) at x0 = 198: x 303 … 323.
+        u.click(&w, Point::new(198 + 105 + 10, 540));
+        assert!(u.ui.is_open(0x0F));
+    }
+
+    // A state with flag bit 24 (`stambarblue`) draws the stamina bar blue
+    // (§4 r2: fill frame 2).
+    // Covers: specs/ui/control-panel.md §4 r2
+    #[test]
+    fn a_stambarblue_state_draws_the_stamina_bar_blue() {
+        let mut w = world(AMAZON, 1, true);
+        let key = w.local_player.unwrap();
+        let unit = w.units.get_mut(&key).unwrap();
+        unit.stats.insert(10, 40 << 8);
+        unit.stats.insert(11, 80 << 8);
+        let mut u = ui(Some(areas()), true);
+        let frames = |u: &Ui, w: &ClientWorld| -> Vec<u32> {
+            panel_images(&u.images(w), hud::FILL_FILE)
+                .into_iter()
+                .map(|(f, ..)| f)
+                .collect()
+        };
+        assert!(!frames(&u, &w).contains(&2));
+        u.ui.set_hud_tables(hud::HudTables {
+            stambarblue: vec![0x3A],
+            ..Default::default()
+        });
+        w.units.get_mut(&key).unwrap().states.insert(0x3A);
+        assert!(frames(&u, &w).contains(&2), "{:?}", frames(&u, &w));
+    }
+
+    // The life text toggle is stored at once (§3 r5) and read at start.
+    // Covers: specs/ui/control-panel.md §3 r5
+    #[test]
+    fn the_globe_text_toggles_are_stored_and_read_back() {
+        let w = world(AMAZON, 1, true);
+        let mut u = ui(Some(areas()), true);
+        u.click(&w, Point::new(50, 560));
+        let s = u.ui.take_settings_change().expect("stored at once");
+        assert_eq!((s.show_hp_text, s.show_mp_text), (1, 0));
+        let mut v = ui(Some(areas()), true);
+        v.ui.set_settings(s);
+        assert!(v.ui.shared.borrow().hud.input.show_hp);
+        assert!(!v.ui.shared.borrow().hud.input.show_mp);
+    }
+}
+
+/// The skill tree's band, number and tool tips on the play path
+/// (`panels.md` §10, `panels-2.md` §19).
+mod skill_tree_play {
+    use super::*;
+    use crate::ui::StringLookup;
+
+    struct Strs(Vec<(u16, Vec<u16>)>);
+    impl StringLookup for Strs {
+        fn get(&self, _: &str) -> Option<&[u16]> {
+            None
+        }
+        fn get_id(&self, id: u16) -> Option<&[u16]> {
+            self.0
+                .iter()
+                .find(|(k, _)| *k == id)
+                .map(|(_, t)| t.as_slice())
+        }
+    }
+
+    fn strs() -> Strs {
+        Strs(
+            [(4144, "Close"), (4224, "Tree A"), (4225, "Tree B")]
+                .into_iter()
+                .map(|(k, t)| (k, t.encode_utf16().collect()))
+                .collect(),
+        )
+    }
+
+    fn draws(u: &Ui, w: &ClientWorld) -> Vec<UiDraw> {
+        let s = strs();
+        let ctx = UiCtx {
+            tick: 0,
+            world: w,
+            strings: &s,
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        u.root.draw(&ctx, &mut out);
+        out
+    }
+
+    fn texts(d: &[UiDraw]) -> Vec<(String, i32, i32)> {
+        d.iter()
+            .filter_map(|d| match d {
+                UiDraw::Text(t) => Some((String::from_utf16_lossy(&t.text), t.at.x, t.at.y)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn tab_frames(u: &Ui, w: &ClientWorld) -> Vec<u32> {
+        panel_images(&u.images(w), "spells\\skltree_a_back")[4..]
+            .iter()
+            .map(|a| a.0)
+            .collect()
+    }
+
+    // The tab-1 band reaches y = H − 49 (§10 r2): at 800 × 600 a press at
+    // (700, 530), below the inventory area's bottom (501), selects tab 1.
+    // Covers: specs/ui/panels.md §10 r2
+    #[test]
+    fn the_tab_1_band_reaches_above_the_control_panel() {
+        let mut u = ui(Some(areas()), true);
+        let w = world(AMAZON, 1, true);
+        u.key(&w, Action::ToggleSkillTree);
+        let _ = u.images(&w);
+        u.click(&w, Point::new(700, 200));
+        assert_eq!(tab_frames(&u, &w), vec![12, 13, 14, 15]);
+        let r = u.click(&w, Point::new(700, 530));
+        assert_eq!(r.0, Routed::Panel(PanelId(4)));
+        assert_eq!(tab_frames(&u, &w), vec![4, 5, 6, 7]);
+        // Below y = H − 48 the press is the control panel's, not the
+        // tree's.
+        let r = u.click(&w, Point::new(700, 560));
+        assert_ne!(r.0, Routed::Panel(PanelId(4)));
+    }
+
+    // With free skill points the number is drawn at (W − sx − 52, H + sy −
+    // 400) = (668, 140), colour 0 (`panels-2.md` §19 r3).
+    // Covers: specs/ui/panels-2.md §19 r3
+    #[test]
+    fn the_free_points_number_is_drawn() {
+        let mut u = ui(Some(areas()), true);
+        let mut w = world(AMAZON, 1, true);
+        u.key(&w, Action::ToggleSkillTree);
+        assert!(!texts(&draws(&u, &w)).iter().any(|t| t.0 == "3"));
+        let key = w.local_player.unwrap();
+        w.units.get_mut(&key).unwrap().stats.insert(5, 3);
+        assert!(texts(&draws(&u, &w)).contains(&("3".into(), 668, 140)));
+    }
+
+    // Tab 1 current, the mouse in tab 2's band: the black mode-6
+    // rectangle (W − sx − 89, T + 5)–(W − sx + 1, T + 25) and string 4225
+    // at (W − sx − 89, T + 20), T = H + sy − 264 = 276 (§19 r4). In the
+    // close rectangle (amazon tab 1: X 571, Y 477) `strClose` is queued at
+    // (X + 15, H + sy − 98) (§19 r5).
+    // Covers: specs/ui/panels-2.md §19 r4, §19 r5
+    #[test]
+    fn the_tab_and_close_tool_tips() {
+        let mut u = ui(Some(areas()), true);
+        let w = world(AMAZON, 1, true);
+        u.key(&w, Action::ToggleSkillTree);
+        u.send(&w, UiEvent::CursorMoved(Point::new(700, 300)));
+        let d = draws(&u, &w);
+        let rects: Vec<_> = d
+            .iter()
+            .filter_map(|d| match d {
+                UiDraw::Rect(r) => Some((r.x0, r.y0, r.x1, r.y1, r.color, r.mode)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(rects, vec![(631, 281, 721, 301, 0, 6)]);
+        assert!(texts(&d).contains(&("Tree B".into(), 631, 296)));
+        u.send(&w, UiEvent::CursorMoved(Point::new(580, 460)));
+        assert!(texts(&draws(&u, &w)).contains(&("Close".into(), 586, 442)));
+    }
+
+    // The character panel's close button tip: `strClose` at (sx + 143,
+    // H + sy − 95) = (223, 445) while the mouse is in [sx + 128, sx +
+    // 160] × [H + sy − 92, H + sy − 60] (`panels.md` §8 r2).
+    // Covers: specs/ui/panels.md §8 r2
+    #[test]
+    fn the_character_close_tip() {
+        let mut u = ui(Some(areas()), true);
+        let w = world(AMAZON, 1, true);
+        u.key(&w, Action::ToggleCharacter);
+        u.send(&w, UiEvent::CursorMoved(Point::new(150, 300)));
+        assert!(!texts(&draws(&u, &w)).iter().any(|t| t.0 == "Close"));
+        u.send(&w, UiEvent::CursorMoved(Point::new(220, 460)));
+        assert!(texts(&draws(&u, &w)).contains(&("Close".into(), 223, 445)));
+    }
+
+    // The stash close button tip: in [X, X + 40] × [Y − 35, Y + 5] (X =
+    // sx + 272, Y = H + sy − 64 in an expansion game) `strClose` at (X +
+    // 12 − w / 2, Y − 35); no font bound: w = 0, (364, 441)
+    // (`panels-2.md` §20 r1).
+    // Covers: specs/ui/panels.md §11 r4; specs/ui/panels-2.md §20 r1
+    #[test]
+    fn the_stash_close_tip() {
+        let mut u = ui(Some(areas()), true);
+        let w = world(AMAZON, 1, true);
+        u.ui.set_ui(0x19, 0, false).unwrap();
+        u.ui.sync_root(&mut u.root);
+        u.send(&w, UiEvent::CursorMoved(Point::new(360, 460)));
+        assert!(texts(&draws(&u, &w)).contains(&("Close".into(), 364, 441)));
+    }
+}
+
+/// The inventory's empty equipment-slot pictures on the play path
+/// (`panels.md` §9.4).
+mod equip_backgrounds_play {
+    use super::*;
+    use crate::bridge::items::mode;
+    use crate::ui::panels::inv_items::tests::world as item_world;
+    use crate::ui::panels::inventory::{BinRect, EquipRects};
+
+    fn rects() -> EquipRects {
+        EquipRects {
+            torso: BinRect::new(631, 688, 152, 238),
+            r_arm: BinRect::new(518, 574, 132, 245),
+            l_arm: BinRect::new(744, 800, 132, 245),
+            ..EquipRects::default()
+        }
+    }
+
+    fn pictures(u: &Ui, w: &ClientWorld, file: &str) -> Vec<(i32, i32)> {
+        panel_images(&u.images(w), file)
+            .into_iter()
+            .map(|(_, x, y)| (x, y))
+            .collect()
+    }
+
+    // With nothing worn the torso picture is drawn at (left + 2, bottom −
+    // 2) and both hands' at (left, bottom − 2); a worn armour hides its
+    // slot's; a two-handed weapon in the right hand hides both hands'.
+    // Covers: specs/ui/panels.md §9 r4
+    #[test]
+    fn empty_slots_get_their_pictures() {
+        let mut u = ui(Some(areas()), true);
+        let r = inventory_record(AMAZON, &Screen::R800).unwrap();
+        let mut all = vec![EquipRects::default(); r + 1];
+        all[r] = rects();
+        u.ui.set_equip_rects(all);
+        u.ui.set_inv_tables(std::sync::Arc::new(
+            crate::ui::panels::inv_items::equip::tests::tables(),
+        ));
+        let mut w = item_world(&[], None);
+        let me = w.local_player.unwrap();
+        w.units.get_mut(&me).unwrap().mode = 1;
+        u.key(&w, Action::ToggleInventory);
+        assert_eq!(pictures(&u, &w, "panel\\inv_armor"), vec![(633, 236)]);
+        assert_eq!(
+            pictures(&u, &w, "panel\\inv_weapons"),
+            vec![(744, 243), (518, 243)]
+        );
+        let mut w = item_world(
+            &[
+                (5, mode::BODY, (3, 0, 0, 0), b"qui "),
+                (6, mode::BODY, (4, 0, 0, 0), b"2hs "),
+            ],
+            None,
+        );
+        let me = w.local_player.unwrap();
+        w.units.get_mut(&me).unwrap().mode = 1;
+        assert!(pictures(&u, &w, "panel\\inv_armor").is_empty());
+        assert!(pictures(&u, &w, "panel\\inv_weapons").is_empty());
     }
 }

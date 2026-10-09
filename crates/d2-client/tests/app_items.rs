@@ -115,9 +115,10 @@ fn item_messages_fill_the_model_and_the_belt_key_and_pickup_reach_the_server() {
     // 1 is not ready and sends nothing.
     let keys =
         [Action::BeltSlot3, Action::BeltSlot1].map(|a| UiEvent::Action(ActionId(a.index() as u16)));
-    assert_eq!(belt::send_keys(&mut bridge, &keys).unwrap(), 1);
+    let no_ui = belt::KeyFacts::default();
+    assert_eq!(belt::send_keys(&mut bridge, &keys, no_ui).unwrap(), 1);
     assert_eq!(
-        belt::key_message(bridge.world(), 2),
+        belt::key_message(bridge.world(), 2, no_ui),
         Some(vec![0x26, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     );
     // The pick-up intent of the ground item is a valid C→S message.

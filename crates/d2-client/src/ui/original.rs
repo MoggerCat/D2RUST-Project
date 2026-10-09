@@ -113,25 +113,24 @@ pub const PENDING: &[(&str, &str)] = &[
          `original_tests.rs::stash_gold_withdraw_and_deposit_send_0x4f`)",
     ),
     (
-        "inventory tints (translucency) and empty-slot pictures (§9.4, `inventory.md` §2–§6)",
+        "inventory tints (translucency) (`inventory.md` §2–§6)",
         "the equipped and grid item tints and the hover tint are painted by \
          `ItemsUi::draw_tints` as opaque `hudfill` tiles (REC-271: the UI sprite path has no \
-         A2 blend); the shooter / quiver and cursor-item tints are not read and the \
-         empty-slot pictures (§9.4 table) are not drawn",
+         A2 blend); the shooter / quiver and cursor-item tints are not read",
     ),
     (
         "skill tree hover description and the no-points message (§10.5, §10.7)",
-        "icons, level numbers, the flag mask and the point spend (C→S 0x3B) are wired \
-         ([`skill_tree_ui`]); the point cost is 1 (`skpoints` formula not evaluated, \
-         REC-270); the tab tool tips, the free-points box and the no-points message are \
-         not wired",
+        "icons, level numbers, the flag mask, the point spend (C→S 0x3B), the free-points \
+         number and the tab / close tool tips are wired ([`skill_tree_ui`], `SkillTreeUi`); \
+         the point cost is 1 (`skpoints` formula not evaluated, REC-270); the hover \
+         description and the no-points message are not wired",
     ),
     (
-        "waypoint menu panel (ui 0x14, §13 r2–r7): tab gates",
+        "waypoint menu panel (ui 0x14, §13 r2–r7): row names",
         "the panel is installed and covered (`waypoint_ui`; \
-         `app_play_npc.rs::clicking_the_waypoint_walks_there_and_interacts`; the row and tab \
-         text come from the string table by id); the tab gates read the client quest flags \
-         (`msg-ui.md` open question 4, tab 0 only): every act tab is shown (d2rs-own)",
+         `app_play_npc.rs::clicking_the_waypoint_walks_there_and_interacts`); the tabs read \
+         the client quest flags (`menus.md` §1.4, §13.3); the row text is the `levels` \
+         `LevelName` key through the string table (`0x00453E70` not specified, d2rs-own)",
     ),
     (
         "hotkeys for other states (escape menu, chat, automap, party; the quest log, ToggleQuests, is \
@@ -275,6 +274,16 @@ struct Shared {
     cube_opened: bool,
     /// The transmute animation (`panels.md` §12 r4, [`cube_ui`]).
     cube_anim: std::cell::Cell<super::panels::stash_cube::HoradricAnim>,
+    /// The mouse cursor machine (`panels-3.md` §23), drawn last by
+    /// [`TopUi`], and the local copy of the client seed its step draws on.
+    cursor: RefCell<super::cursor::Cursor>,
+    cursor_seed: std::cell::Cell<Option<u64>>,
+    /// The client quest flags `[0x007C0D43]` (S→C 0x29), as the waypoint
+    /// tab gates read them (`ui/menus.md` §1.4, `panels.md` §13.3).
+    client_quest: [u8; 96],
+    /// `levels` `LevelName` keys by level id (the waypoint rows' text,
+    /// `waypoint_ui`).
+    level_names: Vec<String>,
     /// `0x0048A540` ran (an `hst ` / `qf2 ` arrived in page 3): the
     /// animation starts at the cube's next draw.
     horadric_start: std::cell::Cell<bool>,
@@ -347,8 +356,8 @@ pub struct OriginalUi {
     pub(super) hire: super::hire_list::SharedHire,
     /// The NPC shop (`shop_ui`, `panels-2.md` §14 r4).
     shop: shop_ui::SharedShop,
-    /// The NPC menu (`ui/npc_menu_ui.rs`, `menus.md` §2).
-    pub(super) npcm: super::npc_menu_ui::SharedNpcMenu,
+    /// The NPC menu (`npc_box`, `menus.md` §2).
+    pub(super) npcm: npc_box::SharedNpcMenu,
     /// The C→S messages of the close hooks (`panels.md` §2 r6) not yet
     /// handed to the root ([`Self::flush_hooks`]).
     hook_intents: Vec<super::ClientIntent>,
@@ -387,6 +396,8 @@ impl OriginalUi {
         tables.files.extend(esc_art::esc_files());
         tables.files.extend(quest_log_ui::quest_files());
         tables.files.extend(cube_ui::cube_files());
+        tables.files.extend(npc_talk::socket_files());
+        tables.files.extend(cursor_files());
         tables.files.extend(skill_tree_ui::icon_files());
         let shared = Shared {
             tables,
@@ -421,6 +432,16 @@ impl OriginalUi {
             bubbles: Default::default(),
             cube_opened: false,
             cube_anim: Default::default(),
+            // §23 r3: init with adj 0 (the only caller passes 0).
+            cursor: RefCell::new(super::cursor::Cursor::init(
+                0,
+                config.screen.w,
+                config.screen.h,
+                0,
+            )),
+            cursor_seed: std::cell::Cell::new(None),
+            client_quest: [0; 96],
+            level_names: Vec::new(),
             horadric_start: Default::default(),
         };
         Ok(Self {
@@ -442,10 +463,33 @@ impl OriginalUi {
     /// control panel (step 7).
     pub fn install(&self, root: &mut UiRoot) -> Result<(), UiError> {
         let sh = &self.shared;
+        // `panels.md` §5 (draw order = add order; the root routes the
+        // last-added first): step 4 the quest log (ui 0x0F), step 5 the
+        // inventory family, step 6 skill tree, character and waypoint,
+        // step 7 the border and control panel with the HUD overlays, step
+        // 9 the NPC menu family (ui 8: menu box, hire box) and ui 0x0E. The
+        // Esc menu (step 1) stays above: its input routing is coupled to
+        // the add order (q-fix-ui-input).
+        root.add(Box::new(quest_log_ui::QuestLogUi {
+            sh: sh.clone(),
+            log: Default::default(),
+        }))?;
         root.add(Box::new(InventoryUi {
             sh: sh.clone(),
             shop: self.shop.clone(),
             panel: InventoryPanel::default(),
+        }))?;
+        root.add(Box::new(stash_ui::StashUi {
+            sh: sh.clone(),
+            input: Default::default(),
+        }))?;
+        root.add(Box::new(shop_ui::ShopUi {
+            sh: sh.clone(),
+            st: self.shop.clone(),
+        }))?;
+        root.add(Box::new(cube_ui::CubeUi {
+            sh: sh.clone(),
+            input: Default::default(),
         }))?;
         root.add(Box::new(SkillTreeUi {
             sh: sh.clone(),
@@ -460,33 +504,22 @@ impl OriginalUi {
             panel: Default::default(),
             seq: 0,
         }))?;
-        root.add(Box::new(quest_log_ui::QuestLogUi {
-            sh: sh.clone(),
-            log: Default::default(),
-        }))?;
-        root.add(Box::new(stash_ui::StashUi {
-            sh: sh.clone(),
-            input: Default::default(),
-        }))?;
-        root.add(Box::new(shop_ui::ShopUi {
-            sh: sh.clone(),
-            st: self.shop.clone(),
-        }))?;
-        root.add(Box::new(cube_ui::CubeUi {
-            sh: sh.clone(),
-            input: Default::default(),
-        }))?;
         root.add(Box::new(BorderUi { sh: sh.clone() }))?;
+        root.add(Box::new(hud::HudUi { sh: sh.clone() }))?;
         root.add(Box::new(super::hire_list::HireListUi {
             st: self.hire.clone(),
         }))?;
         root.open(super::hire_list::HIRE_PANEL)?;
-        root.add(Box::new(super::npc_menu_ui::NpcMenuUi {
+        root.add(Box::new(npc_box::NpcMenuUi {
+            sh: sh.clone(),
+            shop: self.shop.clone(),
             st: self.npcm.clone(),
             hire: self.hire.clone(),
         }))?;
-        root.open(super::npc_menu_ui::NPC_MENU_PANEL)?;
-        root.add(Box::new(hud::HudUi { sh: sh.clone() }))?;
+        root.add(Box::new(npc_talk::SocketUi {
+            sh: sh.clone(),
+            st: self.npcm.clone(),
+        }))?;
         root.add(Box::new(gold_dialog::GoldDialogUi { sh: sh.clone() }))?;
         root.add(Box::new(game_messages::MessagesUi { sh: sh.clone() }))?;
         root.open(game_messages::MESSAGES_PANEL)?;
@@ -506,7 +539,12 @@ impl OriginalUi {
         root.open(gold_dialog::GOLD_PANEL)?;
         root.sync_states(&sh.borrow().states);
         let sc = sh.borrow().config.screen;
-        self.hire.borrow_mut().screen = (sc.w, sc.h);
+        {
+            let shr = sh.borrow();
+            let mut h = self.hire.borrow_mut();
+            h.screen = (sc.w, sc.h);
+            h.fonts = shr.fonts.clone();
+        }
         self.npcm.borrow_mut().screen = (sc.w, sc.h);
         Ok(())
     }
@@ -522,6 +560,7 @@ impl OriginalUi {
     /// DC6 the frame's assets must then hold
     /// ([`crate::world_view::ui_bind::TextAssetLoader`]).
     pub fn set_fonts(&mut self, fonts: FontMeasure) {
+        self.hire.borrow_mut().fonts = Some(fonts.clone());
         self.shared.borrow_mut().fonts = Some(fonts);
     }
 
@@ -572,6 +611,21 @@ impl OriginalUi {
         self.shared.borrow_mut().items.layouts = Some(layouts);
     }
 
+    /// The equipment rectangles by `inventory.bin` record: the empty
+    /// equipment-slot pictures (`panels.md` §9.4; a hand's two-handed test
+    /// reads the inventory tables, [`Self::set_inv_tables`]). Call before
+    /// handing the files to the art loader (the pictures' files are
+    /// registered here).
+    pub fn set_equip_rects(&mut self, rects: Vec<super::panels::inventory::EquipRects>) {
+        let mut sh = self.shared.borrow_mut();
+        if !rects.is_empty() {
+            for f in super::panels::inventory::background_files() {
+                sh.tables.files.add(f);
+            }
+        }
+        sh.items.equip_rects = Some(rects);
+    }
+
     /// The `belts.bin` records and the belts' types (`hud_belt`).
     pub fn set_belt_parts(&mut self, parts: hud_belt::BeltParts) {
         self.shared.borrow_mut().hud.belt.parts = parts;
@@ -591,8 +645,11 @@ impl OriginalUi {
     }
 
     /// The belt key labels follow the play bindings (`hud_belt`, REC-264).
+    /// The run and mini-panel tips' key names too (`hud::key_names`).
     pub fn set_belt_keys(&mut self, b: &crate::controls::Bindings) {
-        self.shared.borrow_mut().hud.belt.set_keys(b);
+        let mut sh = self.shared.borrow_mut();
+        sh.hud.belt.set_keys(b);
+        sh.hud.bindings = Some(b.clone());
     }
 
     /// The item tool tips' tables and strings (`item_tip`).
@@ -608,6 +665,11 @@ impl OriginalUi {
     /// Shift is held (set by the host each frame, `inv_items`).
     pub fn set_shift(&mut self, shift: bool) {
         self.shared.borrow_mut().items.shift = shift;
+    }
+
+    /// Whether Shift was held at the last [`Self::set_shift`].
+    pub fn shift_held(&self) -> bool {
+        self.shared.borrow().items.shift
     }
 
     /// Ctrl is held (set by the host each frame, `inv_items`).
@@ -633,6 +695,7 @@ impl OriginalUi {
     /// Reads the model facts of the next event (call before routing it).
     pub fn before_event(&mut self, e: UiEvent, world: &ClientWorld) {
         self.refresh_facts(world);
+        self.cursor_event(e, world);
         if let Some(p) = e.at() {
             self.shared.borrow_mut().mouse = p;
             self.track_grid_hover(world, p);
@@ -956,8 +1019,13 @@ impl OriginalUi {
     }
 
     /// The settings the Esc menu's Options page shows (`app::config`).
+    /// The control panel's text toggles are read from them at start
+    /// (`control-panel.md` §3 r5, `0x004967F0`).
     pub fn set_settings(&mut self, s: crate::app::config::Settings) {
-        self.shared.borrow_mut().esc.menu.set_settings(s);
+        let mut sh = self.shared.borrow_mut();
+        sh.esc.menu.set_settings(s);
+        sh.hud.input.show_hp = s.show_hp_text != 0;
+        sh.hud.input.show_mp = s.show_mp_text != 0;
     }
 
     /// The settings after a change on the Options page, once per change.
@@ -1124,6 +1192,9 @@ impl Panel for InventoryUi {
         };
         panel.draw(&sh.tables, &sh.env(), gold, out);
         let class = Facts::of(ctx.world).class;
+        // §9.4: the empty equipment slots' pictures, under the items.
+        sh.items
+            .draw_equip_backgrounds(ctx.world, &sh.tables.files, class, &sh.config.screen, out);
         if let Some(l) = sh.items.layout(class, &sh.config.screen) {
             sh.items.draw_tints(ctx.world, &l, sh.mouse, out);
             sh.items.draw_panel(ctx.world, &sh.tables.files, &l, out);
@@ -1157,12 +1228,15 @@ impl Panel for InventoryUi {
                 self.panel.press(&sh.tables, &s, at);
                 let class = Facts::of(ctx.world).class;
                 if let Some(l) = sh.items.layout(class, &s) {
-                    // The shop's repair button is down: repair, not pick up.
+                    // With the shop up a player item is sold or repaired
+                    // (`menus.md` §4.5 grid / body-location callers), not
+                    // picked up.
                     let under = sh.items.item_under(ctx.world, &l.grid, &l, at);
-                    let taken = shop_ui::ShopUi::repair_click(
+                    let taken = shop_ui::ShopUi::player_item_click(
                         &mut sh,
                         &mut self.shop.borrow_mut(),
                         ctx.world,
+                        ctx.strings,
                         under.as_ref(),
                     );
                     if taken {
@@ -1243,25 +1317,87 @@ fn class_u8(class: Option<u32>) -> Option<u8> {
     class.and_then(|c| u8::try_from(c).ok()).filter(|&c| c < 7)
 }
 
-/// Skill tree (ui 4, §10): back art per class and tab, tabs, close.
+/// Skill tree (ui 4, §10): back art per class and tab, tabs, close, the
+/// free-points number and the close / tab tool tips (`panels-2.md` §19).
 struct SkillTreeUi {
     sh: SharedRef,
     panel: SkillTreePanel,
 }
+
+/// The `uninterruptable` state: the free-points number in colour 1
+/// (`panels-2.md` §19 r3).
+const STATE_UNINTERRUPTABLE: u8 = 54;
 
 impl Panel for SkillTreeUi {
     fn id(&self) -> PanelId {
         PanelId(u16::from(UI_SKILLTREE))
     }
 
+    /// The right half above the control panel: the tab-1 band reaches
+    /// y = H − 49 (§10 r2), past the inventory area's bottom; the press
+    /// and release handlers decide what they consume.
     fn rect(&self) -> Rect {
-        self.sh.borrow().right_area().unwrap_or(EMPTY)
+        let sh = self.sh.borrow();
+        if sh.right_area().is_none() {
+            return EMPTY;
+        }
+        let s = sh.config.screen;
+        Rect::new(s.w / 2, 0, (s.w - s.w / 2) as u16, (s.h - 47) as u16)
     }
 
     fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let sh = self.sh.borrow();
         let view = ModelSkillTree::of(&sh, ctx.world);
-        self.panel.draw(&sh.tables, &sh.env(), &view, sh.mouse, out);
+        let uninterruptable = ctx
+            .world
+            .local()
+            .is_some_and(|u| u.states.contains(&STATE_UNINTERRUPTABLE));
+        self.panel.draw_with_points(
+            &sh.tables,
+            &sh.env(),
+            &view,
+            sh.mouse,
+            Some(uninterruptable),
+            out,
+        );
+        let s = sh.config.screen;
+        let tab = self.panel.tab;
+        // §19 r5: `strClose` queued (the pop-up text) in the close
+        // rectangle.
+        if let Some(class) = view.class() {
+            if super::panels::skilltree::close_hit(&s, class, tab, sh.mouse) {
+                if let (Some(at), Some(t)) = (
+                    super::panels::skilltree::close_tool_tip_at(&s, class, tab),
+                    ctx.strings.get_id(cube_ui::STR_CLOSE),
+                ) {
+                    let fonts = sh.fonts.as_ref();
+                    hud_tips::push_popup(t.to_vec(), at, 0, true, (s.w, s.h), fonts, out);
+                }
+            }
+        }
+        // §19 r4: the tab tool tip, at once: the rectangle (colour (0, 0,
+        // 0) nearest: palette index 0, mode 6) and the text, Font16,
+        // left-aligned.
+        if let Some(tip) = super::panels::skilltree::tab_tool_tip(&s, tab, sh.mouse) {
+            if let Some(t) = ctx.strings.get_id(tip.string) {
+                let (x0, y0, x1, y1) = tip.rect;
+                out.push(super::draw::UiDraw::Rect(super::draw::RectRequest {
+                    x0,
+                    y0,
+                    x1,
+                    y1,
+                    color: 0,
+                    mode: 6,
+                }));
+                out.push(text(
+                    t.to_vec(),
+                    tip.text_at.x,
+                    tip.text_at.y,
+                    super::panels::skilltree::FONT16,
+                    0,
+                ));
+            }
+        }
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {
@@ -1275,23 +1411,32 @@ impl Panel for SkillTreeUi {
         let mut sh = self.sh.borrow_mut();
         let env = sh.env();
         let view = ModelSkillTree::of(&sh, ctx.world);
-        match left(e) {
+        let s = sh.config.screen;
+        let input = |at: Point| super::panels::skilltree::InputCtx {
+            over_belt: sh
+                .hud
+                .belt
+                .over(ctx.world, (s.w, s.h), s.res2(), (at.x, at.y)),
+            has_player: ctx.world.local().is_some(),
+        };
+        let consumed = match left(e) {
             Some((true, at)) => {
-                let out = self.panel.mouse_down(&env, &view, at);
-                sh.outputs.extend(out);
-                UiResponse::Consumed
+                let d = self.panel.mouse_down_ctx(&env, &view, at, input(at));
+                sh.outputs.extend(d.out);
+                d.consumed
             }
             Some((false, at)) => {
-                let r = self.panel.mouse_up(&env, &view, at);
+                let r = self.panel.mouse_up_ctx(&env, &view, at, input(at));
                 sh.outputs.extend(r.out);
                 // §10.8: x ≤ W / 2 is not consumed.
-                if r.consumed {
-                    UiResponse::Consumed
-                } else {
-                    UiResponse::Ignored
-                }
+                r.consumed
             }
-            None => UiResponse::Consumed,
+            None => true,
+        };
+        if consumed {
+            UiResponse::Consumed
+        } else {
+            UiResponse::Ignored
         }
     }
 }
@@ -1506,35 +1651,8 @@ pub fn name_line(
 
 impl CharacterUi {
     /// Art and close button only (no fonts or no local player).
-    fn draw_static(&self, sh: &Shared, out: &mut dyn UiDrawSink) {
-        let env = sh.env();
-        let t = &sh.tables;
-        // Draw rows in file order: the close rows with the close
-        // button's pressed flag; rows needing panel words (stat points)
-        // do not apply without them.
-        for r in t.rows(CHARACTER) {
-            if r.kind != RowKind::Draw {
-                continue;
-            }
-            let pressed = r.item == "close" && self.panel.close_pressed;
-            let cond = env.cond(pressed, &no_extra);
-            let one = |x: &super::layout::LayoutRow| std::ptr::eq(x, r);
-            emit_static_draws(t, CHARACTER, &cond, None, &one, out);
-        }
-    }
-}
-
-impl Panel for CharacterUi {
-    fn id(&self) -> PanelId {
-        PanelId(u16::from(UI_CHARACTER))
-    }
-
-    /// §4.4: x in [`sx`, `W / 2 − 1`], y in [`sy`, `H + sy − 49`].
-    fn rect(&self) -> Rect {
-        character::area(&self.sh.borrow().config.screen)
-    }
-
-    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+    /// The panel without the close tip (`Panel::draw`).
+    fn draw_panel(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let sh = self.sh.borrow();
         let expansion = ctx.world.expansion != 0;
         let penalties = match (&sh.resist_penalties, expansion) {
@@ -1580,6 +1698,50 @@ impl Panel for CharacterUi {
             );
         }
         name_line(name, &env.screen, fonts, out);
+    }
+
+    fn draw_static(&self, sh: &Shared, out: &mut dyn UiDrawSink) {
+        let env = sh.env();
+        let t = &sh.tables;
+        // Draw rows in file order: the close rows with the close
+        // button's pressed flag; rows needing panel words (stat points)
+        // do not apply without them.
+        for r in t.rows(CHARACTER) {
+            if r.kind != RowKind::Draw {
+                continue;
+            }
+            let pressed = r.item == "close" && self.panel.close_pressed;
+            let cond = env.cond(pressed, &no_extra);
+            let one = |x: &super::layout::LayoutRow| std::ptr::eq(x, r);
+            emit_static_draws(t, CHARACTER, &cond, None, &one, out);
+        }
+    }
+}
+
+impl Panel for CharacterUi {
+    fn id(&self) -> PanelId {
+        PanelId(u16::from(UI_CHARACTER))
+    }
+
+    /// §4.4: x in [`sx`, `W / 2 − 1`], y in [`sy`, `H + sy − 49`].
+    fn rect(&self) -> Rect {
+        character::area(&self.sh.borrow().config.screen)
+    }
+
+    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+        self.draw_panel(ctx, out);
+        // §8 r2: `strClose` at (sx + 143, H + sy − 95) while the mouse is
+        // in the close rectangle, as the pop-up text. d2rs-own,
+        // unverified: centred (the x is the button's middle; the call's
+        // centre flag is not in the spec).
+        let sh = self.sh.borrow();
+        let s = sh.config.screen;
+        let over = super::panels::character::close_rect(&sh.tables, &s)
+            .is_some_and(|r| r.contains(sh.mouse));
+        if let (true, Some(t)) = (over, ctx.strings.get_id(cube_ui::STR_CLOSE)) {
+            let at = Point::new(s.sx() + 143, s.h + s.sy() - 95);
+            hud_tips::push_popup(t.to_vec(), at, 0, true, (s.w, s.h), sh.fonts.as_ref(), out);
+        }
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {
@@ -1680,8 +1842,13 @@ impl Panel for TopUi {
                 out,
             );
         }
-        // The item tool tip over everything (`item_tip`).
-        if sh.states.is_open(UI_INVENTORY) {
+        // The item tool tip over everything (`item_tip`), while the
+        // inventory family is drawn (`panels.md` §5 step 5: with the stash,
+        // the cube or the shop too, not only flag 1).
+        let family = super::root::INVENTORY_FAMILY
+            .iter()
+            .any(|&u| sh.states.is_open(u));
+        if family {
             let class = Facts::of(ctx.world).class;
             let lines = sh.items.hover_lines(
                 ctx.world,
@@ -1700,9 +1867,9 @@ impl Panel for TopUi {
                 out,
             );
         }
-        // The cursor item last (`panels-3.md` §23 r9).
-        sh.items
-            .draw_cursor(ctx.world, &sh.tables.files, (29, 29), sh.mouse, out);
+        // The cursor last: the item's graphic or the type's cel
+        // (`panels-3.md` §23 r9–r11, `cursor_ui`).
+        cursor_ui::draw(&sh, ctx, out);
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {
@@ -1738,8 +1905,15 @@ pub mod hud_tips;
 
 #[path = "cube_ui.rs"]
 pub(super) mod cube_ui;
+#[path = "cursor_ui.rs"]
+pub mod cursor_ui;
 #[path = "msg_ui.rs"]
 pub mod msg_ui;
+#[path = "npc_box.rs"]
+pub mod npc_box;
+#[path = "npc_talk.rs"]
+pub mod npc_talk;
+use cursor_ui::cursor_files;
 #[path = "quest_log_ui.rs"]
 pub mod quest_log_ui;
 #[cfg(test)]

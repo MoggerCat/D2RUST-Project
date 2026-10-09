@@ -228,7 +228,10 @@ impl OriginalUi {
             Output::HireListReset => self.hire.borrow_mut().reset(),
             Output::HireOffer { name, seed } => self.hire.borrow_mut().offer(name, seed),
             Output::MercRevive { state, value } => self.merc_revive(state, value),
-            Output::QuestFlags { record } => self.more.client_quest = record,
+            Output::QuestFlags { record } => {
+                self.more.client_quest = record;
+                self.shared.borrow_mut().client_quest = record;
+            }
             Output::HoradricItem { code } => self.horadric_item(code),
             Output::OverheadClear { unit } => {
                 self.more.overhead.remove(&unit);

@@ -302,12 +302,32 @@ impl SkillTreePanel {
         mouse: Point,
         out: &mut dyn UiDrawSink,
     ) {
+        self.draw_with_points(t, env, view, mouse, None, out);
+    }
+
+    /// [`Self::draw`] with the free-points number (`panels-2.md` §19 r3,
+    /// r6: after the background, before the icons) when `uninterruptable`
+    /// is given (the player's state 54).
+    pub fn draw_with_points(
+        &self,
+        t: &PanelTables,
+        env: &PanelEnv,
+        view: &dyn SkillTreeView,
+        mouse: Point,
+        uninterruptable: Option<bool>,
+        out: &mut dyn UiDrawSink,
+    ) {
         self.drawn.set(true);
         let tab = self.tab;
         let extra = move |c: Cond| matches!(c, Cond::Tab(n) if n == tab);
         let cond = env.cond(false, &extra);
         let class = view.class();
         emit_static_draws(t, PanelKey::Ui(UI_SKILLTREE), &cond, class, &|_| true, out);
+        if let Some((n, at, font, color)) =
+            uninterruptable.and_then(|u| self.free_points_number(&env.screen, view, u))
+        {
+            out.push(text(utf16(&n), at.x, at.y, font, color));
+        }
         for icon in self.icons(&env.screen, view, mouse) {
             out.push(icon.image);
             if let Some(l) = icon.level {

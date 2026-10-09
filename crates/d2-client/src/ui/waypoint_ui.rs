@@ -7,9 +7,16 @@
 //! release leaves as C→S 0x49 through the root (the client decides
 //! nothing: the server validates and warps, `world/waypoints.md` §6–§7).
 //!
-//! Preview fills (d2rs-own, unverified): the client quest flags are not
-//! in the model, so every act tab opens (the quest gate is skipped); the row and tab text needs the string table by
-//! id (`ctx.strings`, the string tables in play).
+//! The tabs read the client quest flags (`[0x007C0D43]`, S→C 0x29): the
+//! open's tab and a tab click walk down the setter's records 7 / 15 / 23
+//! / 28 (`menus.md` §1.4), the drawn tabs test 7 / 15 / 23 / 26 (§13.3,
+//! reproduced). A press anywhere above the control panel reaches the
+//! menu, so one outside the left half closes it (§1.2). The close
+//! button's hover draws the filled rectangle and "Cancel" (§13 r4).
+//!
+//! d2rs-own, unverified: the row text is the `levels` `LevelName` key
+//! looked up in the string table (`0x00453E70` is not specified yet,
+//! `q-ui-audit.md` spec gaps).
 
 use d2_sim::world::waypoints::{WaypointMap, WaypointRecord};
 
@@ -35,6 +42,9 @@ pub struct WaypointOpen {
     pub current: u32,
     /// Bumped by every 0x63, so the panel resets its latches.
     pub seq: u32,
+    /// The tab the open chose (`client/msg-ui.md` §2 r2.3: the act of the
+    /// player's level, walked down through the quest gates).
+    pub tab: u8,
 }
 
 /// The record's known bits over the level map (`0x00660E00`,
@@ -90,17 +100,18 @@ pub fn hit_rows(rows: &[WpRow]) -> WpRows {
 
 struct View {
     rows: Vec<WpRow>,
+    quest: [u8; 96],
 }
 
 impl WaypointView for View {
     fn rows(&self, _tab: u8) -> &[WpRow] {
         &self.rows
     }
-    /// d2rs-own, unverified (q-act-travel): every act tab is shown; the
-    /// original's gate reads the client quest flags (`msg-ui.md` OQ 4).
-    /// The rows of an act with no known waypoint have nothing to click.
-    fn tab_reachable(&self, _tab: u8) -> bool {
-        true
+    fn tab_reachable(&self, tab: u8) -> bool {
+        // `panels.md` §13.3: the draw reads 26 for tab 4, not the setter's 28.
+        crate::ui::panels::waypoint::TAB_DRAW_QUEST_RECORD
+            .get(usize::from(tab))
+            .is_some_and(|&r| crate::bridge::objects::quest_bit(&self.quest, r as u8, 0))
     }
     fn any_other_known(&self) -> bool {
         self.rows.iter().any(|r| r.known && !r.current)
@@ -122,6 +133,14 @@ pub(super) struct WaypointUi {
     pub(super) seq: u32,
 }
 
+/// The panel state a new 0x63 starts from: its guid and the open's tab.
+fn fresh_panel(open: &WaypointOpen) -> WaypointPanel {
+    let mut panel = WaypointPanel::new();
+    panel.guid = open.guid;
+    panel.tab = open.tab;
+    panel
+}
+
 impl WaypointUi {
     /// The open record and its rows, the panel reset on a new 0x63.
     fn sync(&mut self) -> Option<Vec<WpRow>> {
@@ -129,8 +148,7 @@ impl WaypointUi {
         let open = sh.waypoint_open?;
         if open.seq != self.seq {
             self.seq = open.seq;
-            self.panel = WaypointPanel::new();
-            self.panel.guid = open.guid;
+            self.panel = fresh_panel(&open);
         }
         Some(rows_of(sh.waypoint_map.as_ref(), &open, self.panel.tab))
     }
@@ -141,11 +159,10 @@ impl Panel for WaypointUi {
         PanelId(u16::from(UI_WAYPOINT))
     }
 
-    /// The left half above the control panel: `mouse_down` takes every
-    /// press inside it (§1.2).
+    /// The whole screen: `mouse_down` closes on a press outside the left
+    /// half and takes every press above the control panel (§1.2).
     fn rect(&self) -> Rect {
-        let s = self.sh.borrow().config.screen;
-        Rect::new(0, 0, (s.w / 2 + 1) as u16, (s.h - 48) as u16)
+        self.sh.borrow().config.screen.rect()
     }
 
     fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
@@ -153,8 +170,27 @@ impl Panel for WaypointUi {
         let Some(open) = sh.waypoint_open else {
             return;
         };
+        // A 0x63 no event has synced yet draws from its fresh state.
+        let fresh;
+        let panel = if open.seq != self.seq {
+            fresh = fresh_panel(&open);
+            &fresh
+        } else {
+            &self.panel
+        };
+        let mut rows = rows_of(sh.waypoint_map.as_ref(), &open, panel.tab);
+        for r in &mut rows {
+            if let Some(t) = sh
+                .level_names
+                .get(usize::from(r.level))
+                .and_then(|k| ctx.strings.get(k))
+            {
+                r.name = t.to_vec();
+            }
+        }
         let view = View {
-            rows: rows_of(sh.waypoint_map.as_ref(), &open, self.panel.tab),
+            rows,
+            quest: sh.client_quest,
         };
         // The title is centred on its width (§13 r6): drawn with the
         // fonts bound, else not at all.
@@ -162,8 +198,34 @@ impl Panel for WaypointUi {
             Some(f) => f,
             None => &NoMeasure,
         };
-        self.panel
-            .draw(&sh.tables, &sh.env(), &view, ctx.strings, measure, out);
+        panel.draw(&sh.tables, &sh.env(), &view, ctx.strings, measure, out);
+        // §13 r4, after the rows: the close hover's filled rectangle and
+        // the "Cancel" tip, `s` = half its width A.
+        let s = sh.config.screen;
+        if let Some(h) = crate::ui::panels::waypoint::close_hover(&s, sh.mouse) {
+            let text = ctx
+                .strings
+                .get_id(h.tooltip)
+                .map(<[u16]>::to_vec)
+                .unwrap_or_default();
+            let half = measure.width(1, &text).unwrap_or(0) / 2;
+            let (sx, sy) = (s.sx(), s.sy());
+            out.push(crate::ui::UiDraw::Rect(crate::ui::draw::RectRequest {
+                x0: sx + 287 - half,
+                y0: 370 - sy,
+                x1: sx + 294 + half,
+                y1: 387 - sy,
+                color: 0,
+                mode: 2,
+            }));
+            out.push(crate::ui::panels::text(
+                text,
+                sx + 292 - half,
+                h.tooltip_y,
+                1,
+                0,
+            ));
+        }
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {
@@ -189,11 +251,11 @@ impl Panel for WaypointUi {
         let mut sh = self.sh.borrow_mut();
         // The tab hit steps by the game's tab count (`menus.md` §1.3).
         let env = WpEnv::new(&sh.config.screen, sh.env().exp);
-        // d2rs-own, unverified: no client quest flags, every act tab
-        // opens (the server checks the destination's bit on C→S 0x49).
+        // §1.4: a tab click walks down the setter's quest records.
+        let quest = sh.client_quest;
+        let gate = |r: u32| crate::bridge::objects::quest_bit(&quest, r as u8, 0);
         let (effects, consumed) = if press {
-            self.panel
-                .mouse_down(&env, at.x, at.y, &hit, false, &|_| true)
+            self.panel.mouse_down(&env, at.x, at.y, &hit, false, &gate)
         } else {
             self.panel.mouse_up(&env, at.x, at.y, &hit, false)
         };
@@ -217,6 +279,11 @@ impl OriginalUi {
     /// flags a delivered output set outside an event.
     pub fn sync_root(&self, root: &mut UiRoot) {
         root.sync_states(&self.shared.borrow().states);
+    }
+
+    /// The `levels` `LevelName` keys by level id, the rows' text.
+    pub fn set_level_names(&mut self, names: Vec<String>) {
+        self.shared.borrow_mut().level_names = names;
     }
 
     /// The levels' waypoint indexes the menu's rows read (`levels`

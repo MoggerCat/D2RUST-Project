@@ -100,6 +100,16 @@ pub fn add_original_ui(app: &mut App, parts: UiParts) -> Result<(), OriginalUiEr
     add_original_ui_with(app, parts, looks)
 }
 
+/// The `levels` `LevelName` keys for the waypoint rows
+/// ([`OriginalUi::set_level_names`]); nothing without the original UI.
+pub fn set_level_names(app: &mut App, names: Vec<String>) {
+    if let Some(mut ui) = app.world_mut().get_non_send_mut::<WorldViewUi>() {
+        if let Some(o) = ui.original.as_mut() {
+            o.set_level_names(names);
+        }
+    }
+}
+
 /// The levels' waypoint indexes for the installed waypoint menu
 /// ([`OriginalUi::set_waypoint_map`]); nothing without the original UI.
 pub fn set_waypoint_map(app: &mut App, map: d2_sim::world::waypoints::WaypointMap) {

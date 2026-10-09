@@ -198,6 +198,17 @@ fn background_shown(loc: u8, eq: &EquipState) -> bool {
     }
 }
 
+/// The files of the empty equipment-slot backgrounds (§9.4), each once.
+pub fn background_files() -> Vec<&'static str> {
+    let mut v: Vec<&'static str> = Vec::new();
+    for (_, file, ..) in BACKGROUNDS {
+        if !v.contains(&file) {
+            v.push(file);
+        }
+    }
+    v
+}
+
 /// The empty equipment-slot backgrounds (§9.4) in table order: cel draws
 /// at (slot `left` + dx, slot `bottom` + dy). `file_id` names the
 /// `panel\inv_*` files (lower case, no extension); a file it does not
