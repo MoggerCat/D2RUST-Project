@@ -36,14 +36,13 @@ use bevy::render::gpu_readback::{Readback, ReadbackComplete};
 use bevy::window::ExitCondition;
 use d2_client::app::play::{add_game, send_create_game};
 use d2_client::app::server_thread::ThreadLink;
-use d2_client::app::single_player::{self, GameData, Link, Started, COLD_PLAINS, DEFAULT_SEED};
+use d2_client::app::single_player::{self, GameData, Link, Started, DEFAULT_SEED};
 use d2_client::app::sound::{AudioParts, GameAudio, SoundTable};
 use d2_client::assets::path::{CanonicalPath, MemorySource};
 use d2_client::audio::{
     Cue, CueSource, Sound, SoundId, Trigger, TriggerQueue, TriggerSource, VoiceKind, VoiceParams,
     WavDecoder,
 };
-use d2_client::bridge::link::Sent;
 use d2_client::bridge::world::ClientWorld;
 use d2_client::bridge::{BridgeResource, ClientUnit};
 use d2_client::composite::{ComponentFrame, ComponentRequest, CompositeError, UnitParams};
@@ -65,7 +64,6 @@ use d2_client::world_view::{
 };
 use d2_formats::font::{FontTable, Glyph};
 use d2_formats::palette::{Palette, Rgb};
-use d2_proto::client::TakeOrCloseWp;
 use d2_server::seams::Clock;
 use d2_sim::rng::Seed;
 
@@ -156,62 +154,17 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // 0x04 (`tick.md` §6 rule 6).
     ms.fetch_add(40, Ordering::SeqCst);
     app.update();
-    let (player, player_guid) = app_support::local_player(&server).expect("joined");
+    let (_player, player_guid) = app_support::local_player(&server).expect("joined");
     let b = &bridge(&app).0;
     assert_eq!((b.world().frames, b.world().server_ticks), (3, 2));
     assert!(b.world().in_game, "0x04 received");
     assert_eq!(b.world().local_player.map(|k| k.guid), Some(player_guid));
     let joined = (b.log().handled + b.log().queued) as usize;
 
-    // The waypoint menu of the player open (staged as the bridge's
-    // end-to-end test does), then an intent sent between frames 3 and 4
-    // is drained by frame 4's pump: the waypoint travel to Cold Plains
-    // (0x07 of the destination room, the arrival 0x0D, `waypoints.md`
-    // §7), then tick 3's room switch (§7.8: 0x07 for Cold Plains, the
-    // town's leave: 0x0A for the waypoint, 0x08, the player update's
-    // 0x15). The 0x0D is a unit-handler message (`client/msg-units.md`
-    // §4) for the local player, known from 0x59. The world view composes
-    // the model of tick 3 on the CPU (no render world).
-    // The town's waypoint: the install's preset (`objects` operate
-    // function 23, `waypoints.md` §5.1), placed by the room population.
-    let rows = app_support::live().waypoints.objects.clone();
-    let wp = app_support::with(&server, move |l| {
-        let g = &mut l.host_mut().game;
-        g.game
-            .lists
-            .units_of_type(d2_sim::units::UnitType::Object)
-            .into_iter()
-            .find(|&u| {
-                g.events.action.sys.units.get(u).is_some_and(|r| {
-                    rows.get(r.class as usize)
-                        .is_some_and(|o| o.operatefn == 23)
-                })
-            })
-            .and_then(|u| g.game.lists.unit(u).map(|e| e.guid))
-            .expect("the town's waypoint")
-    });
-    app_support::with(&server, move |l| {
-        l.host_mut()
-            .game
-            .events
-            .action
-            .sys
-            .units
-            .get_mut(player)
-            .expect("player record")
-            .interact
-            .set(2, wp);
-    });
-    let sent = app
-        .world_mut()
-        .resource_mut::<BridgeResource>()
-        .0
-        .send(&TakeOrCloseWp {
-            wp,
-            level: COLD_PLAINS as u16,
-        })
-        .unwrap();
-    assert_eq!(sent, Sent::Queued);
+    // Frame 4: tick 3 sends nothing new. (The waypoint travel this frame
+    // once staged is covered on the real town by `app_waypoint_warp.rs`:
+    // the recorded new character knows only the town's waypoint and stands
+    // far from it, `waypoints.md` §6.3 r2.)
     ms.fetch_add(40, Ordering::SeqCst);
     app.update();
     let b = &bridge(&app).0;
@@ -231,27 +184,10 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         .filter(|(frame, id, _)| frame.is_none_or(|f| f <= 2) && *id != 0x8F)
         .count();
     assert_eq!(joined, recorded);
-    // Plus two for the Blood Moor room bordering the synthetic town: its
-    // 0x07 at the join and its 0x08 when the travel leaves the town.
-    // Plus two for that room's cave entrance (a tile unit): its 0x09 at
-    // the join and its removal when the travel leaves the town.
-    // Plus two for the Black Marsh tile (`q-a1-tower`): 32. Kashya's
-    // three joined (two handled, her 0x6D queued) and the Burial Grounds
-    // tile's two (`q-a1-bloodraven`): 37, 3. Plus the two of Cold Plains's
-    // own warp tile, the waypoint's destination (`q-levels-warps-all`,
-    // d2rs-own): 39, 3. Gheed's and Charsi's (three handled and one queued
-    // each, `q-town-gaps`): 45, 5.
-    // (q-a1-vis-links: the Black Marsh and Burial Grounds tiles left the
-    // Blood Moor, so their four are gone: 41, 5.)
-    // Warriv's (q-smoke-travel, REC-280), as Gheed's and Charsi's: 44, 6.
-    // (q-smoke-town: plus the join's S→C 0x95, its 16 stat messages and
-    // the start cube's 0x9C, all handled: 62, 6.)
-    // (q-fix-proto: the join sequence's 0x5B, 0x65 and 0x5A, handled:
-    // 65, 6.)
-    // (q-fix-flow-server: the first tick's eight stat messages, the two
-    // 0x48 and the 0x8D (its no-op, `client/msg-units.md` §8 r11), all
-    // handled, as `joined` above: 76, 6.)
-    assert_eq!((b.log().handled, b.log().queued), (76, 6));
+    // Nothing else arrives by frame 4: handled + queued is the join's
+    // count (the recorded 126 of REC-530).
+    assert_eq!((b.log().handled + b.log().queued) as usize, recorded);
+
     assert!(b.log().unowned.is_empty(), "{:?}", b.log().unowned);
     assert!(b.log().dropped.is_empty(), "{:?}", b.log().dropped);
     let sight: Vec<_> = b
@@ -260,23 +196,16 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
         .iter()
         .map(|r| (r.show, r.level, r.x, r.y))
         .collect();
-    // Cold Plains's warp tile leads to level 17, the Burial Grounds
-    // (`q-a1-vis-links`, d2rs-own; it led to level 13 before the tree
-    // followed the 1.14d links): its room joins the sight list like the
-    // Blood Moor's.
-    assert_eq!(
-        sight,
-        [
-            (true, 1, 16, 0),
-            (true, 1, 16, 0),
-            (true, 2, 24, 0),
-            (true, 3, 0, 0),
-            (true, 3, 0, 0),
-            (true, 17, 0, 24),
-            (false, 1, 16, 0),
-            (false, 2, 24, 0)
-        ]
-    );
+    // The rooms of the recorded join (REC-530), in the recorded order.
+    let recorded_rooms: Vec<_> = app_support::recorded_rooms()
+        .into_iter()
+        .map(|(show, level, x, y)| (show, u32::from(level), u32::from(x), u32::from(y)))
+        .collect();
+    let sight: Vec<_> = sight
+        .into_iter()
+        .map(|(s, l, x, y)| (s, u32::from(l), u32::from(x), u32::from(y)))
+        .collect();
+    assert_eq!(sight, recorded_rooms);
     assert!(b.log().rejected.is_empty() && b.log().discarded.is_empty());
     assert_eq!(
         stats(&app),
@@ -287,10 +216,12 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
             // The local player: placeable, but the placeholder rules
             // (`world_view::Unspecified`) draw nothing for it.
             units_drawn: 0,
-            // Plus Cold Plains's warp tile (`q-levels-warps-all`). Plus
-            // the start cube in the inventory (q-smoke-town, REC-244): an
-            // item unit of the model with no pose.
-            units_hidden: 3,
+            // The units of the recorded join, none drawn by the placeholder
+            // rules: 17 objects (0x51), 7 NPCs (0xAC) and 8 0xAA units of
+            // `facts/join/a1-new-sor.tsv` (REC-530) = 32. PROVISIONAL
+            // REC-1705: the split is d2rs-measured (the recording gives the
+            // message counts, not the model's unit kinds).
+            units_hidden: 32,
             ui_sent: 0,
             ui_unhandled: 0,
             gpu: false,
@@ -328,11 +259,12 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // game, so the queued 0x0D (one more with Kashya) were drained by the
     // update pass.
     let log = bridge(&app).0.log();
-    // (q-a1-vis-links: 6, not 5: the Burial Grounds, now Cold Plains's
-    // neighbour, are built and populated during the 300 ticks, and one
-    // more 0x0D of theirs is queued and drained.)
-    // Warriv's queued message (q-smoke-travel, REC-280), drained: 7, 7.
-    assert_eq!((log.queued, log.drained), (7, 7));
+    // Every queued message is drained: the join's 18 (REC-530) plus the
+    // unit messages of the 300 ticks on the real town (32 in all, d2rs-
+    // measured, PROVISIONAL REC-1706: the recording ends at the first
+    // tick).
+    assert_eq!(log.queued, log.drained);
+    assert!(log.queued >= 18, "{}", log.queued);
     assert!(log.dropped.is_empty());
     let w = bridge(&app).0.world();
     assert!(w.in_game);
