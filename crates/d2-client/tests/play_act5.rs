@@ -547,3 +547,25 @@ fn anya_is_thawed_and_returns_to_harrogath() {
     );
     assert!(a.rejected().is_empty(), "{:?}", a.rejected());
 }
+
+// Covers: specs/monsters/population.md §11.3; specs/world/quests-act5-2.md §8.8
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn baal_sits_on_his_throne() {
+    let mut a = Act5::new();
+    a.warp(131);
+    let (_, guid, at) = a.find(UnitType::Monster, &[543]);
+    assert!(a.client_has(1, guid), "the client sees Baal at {at:?}");
+    let portal = a.units(UnitType::Object, &[563]);
+    assert!(!portal.is_empty(), "the Worldstone Chamber portal");
+}
+
+// Covers: specs/world/quests-act5.md §5.5 r3, §5.9; specs/monsters/population.md §11.4
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn nihlathak_waits_in_the_halls_of_vaught() {
+    let mut a = Act5::new();
+    a.warp(124);
+    let (_, guid, at) = a.find(UnitType::Monster, &[526]);
+    assert!(a.client_has(1, guid), "the client sees Nihlathak at {at:?}");
+}
