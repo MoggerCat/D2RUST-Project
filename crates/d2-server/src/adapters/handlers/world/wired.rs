@@ -408,6 +408,8 @@ fn flush_taken<X: Pending, R: TradeRest>(
     inv: Option<&mut InvParts>,
 ) -> Vec<(UnitId, Vec<u8>)> {
     let taken = std::mem::take(&mut desk.state.taken);
+    // A freed unit is no longer shown in the store.
+    desk.state.shown.retain(|u| !taken.contains(u));
     let (Some(parts), Some(player)) = (inv, desk.state.shown_player) else {
         return Vec::new();
     };
