@@ -674,3 +674,68 @@ fn set_state_message_layout() {
     assert_eq!(m[..8], [0xA8, 1, 4, 3, 2, 1, 10, 9]);
     assert_eq!(m.len(), 10);
 }
+
+/// `ai.md` §7.5 rule 8 (REC-665): a walk-in-radius request whose point is
+/// the monster's own cell is still made. Type 13 finds no path, the retry
+/// leaves type 15 with 0 points, the staged velocity request is consumed,
+/// the WL start fails into neutral (mode 1, think at f + `aidel`), no draw
+/// is made, and the next client pass sends one mode message at the cell.
+// Covers: specs/monsters/ai.md §7.5 r8, §7.2
+#[test]
+fn a_zero_length_walk_goes_neutral_and_sends_code_7() {
+    use crate::monsters::ai::seams::AiModes;
+    use crate::monsters::ai::VelocityRequest;
+    use crate::path::record::path_types;
+    use crate::tick::events::event;
+    let (mut fx, p, m) = setup();
+    fx.game.timers.cancel_unit_events(m, event::AI_THINK, None);
+    let at = fx.sim.hooks().path_position(m);
+    let seed = fx.sim.sys.units.get(m).unwrap().seed;
+    let f = fx.game.frame;
+    let mut v = VelocityRequest {
+        method: 0,
+        speed: 40,
+        steps: 0,
+    };
+    // The result is not read (`ai.md` §7.2 row `0x005DE6D0`).
+    fx.sim.with(&mut fx.game, |g, view| {
+        AiModes::walk_in_radius(view, g, m, m, 3, 0, &mut v)
+    });
+    assert_eq!(v, VelocityRequest::default());
+    assert_eq!(fx.sim.hooks().paths.as_ref().unwrap().mode_velocity, None);
+    let d = path(&mut fx, m);
+    assert_eq!((d.path_type, d.point_count), (path_types::WALL_FOLLOW, 0));
+    assert_eq!(
+        (i32::from(d.target_x), i32::from(d.target_y), d.target_unit),
+        (at.0, at.1, None)
+    );
+    assert_eq!(d.repath_budget, 20);
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().mode, 1);
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().seed, seed);
+    let thinks: Vec<_> = fx
+        .timers(m)
+        .into_iter()
+        .filter(|&(e, _)| e == event::AI_THINK)
+        .collect();
+    assert_eq!(thinks, [(event::AI_THINK, f + 15)]);
+    fx.tick();
+    // PROVISIONAL (ai.md §7.5 r8 vs intents-events.md §7.4 r5, REC-890):
+    // §7.5 r8 names 0x67 code 7; the builder's owner spec §7.4 r5 sends
+    // mode 1 as 0x6D at the cell. One mode message either way.
+    let all = sent(&mut fx);
+    assert!(!all.iter().any(|(_, b)| b[0] == 0x68), "{all:?}");
+    let msgs: Vec<_> = all
+        .into_iter()
+        .filter(|(_, b)| (0x67..=0x6D).contains(&b[0]))
+        .collect();
+    assert_eq!(msgs.len(), 1, "{msgs:?}");
+    let (to, b) = &msgs[0];
+    assert_eq!(*to, p);
+    assert_eq!(b[0], 0x6D);
+    assert_eq!(b[1..5], guid(&fx, m).to_le_bytes());
+    assert_eq!(
+        (u16::from_le_bytes([b[5], b[6]]), u16::from_le_bytes([b[7], b[8]])),
+        (at.0 as u16, at.1 as u16)
+    );
+    assert_eq!(fx.sim.hooks().errors, vec![]);
+}

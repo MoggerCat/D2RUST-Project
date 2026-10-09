@@ -901,6 +901,9 @@ impl Pending for LocalSeams {
     ) {
         skill_events::monster_attack_strike(h, sim, unit, moving);
     }
+    fn monster_mode_damage(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId, mode: u32) {
+        skill_events::monster_mode_damage(h, sim, unit, mode);
+    }
     fn golem_resummon(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, player: UnitId) -> bool {
         skill_events::golem_resummon(h, sim, player)
     }
