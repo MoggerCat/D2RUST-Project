@@ -182,7 +182,7 @@ pub struct GotoWalk {
 }
 
 /// The directive keywords, in the §1 table order.
-pub const KEYWORDS: [&str; 13] = [
+pub const KEYWORDS: [&str; 14] = [
     "object",
     "superunique",
     "missile",
