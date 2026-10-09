@@ -460,6 +460,10 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     /// the requested mode is kept for the start function.
     fn monster_mode_bookkeeping(&mut self, sim: &mut Sim<'_>, unit: UnitId, mode: u32) {
         self.monster_request = mode;
+        let left = sim.units.get(unit).map(|r| r.mode);
+        if let Some(m) = left {
+            self.leave_monster_mode(unit, m);
+        }
         self.monster_path_setup(sim, unit, mode);
     }
 
@@ -525,6 +529,7 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
                 // for the unit, so running it after the host's start
                 // keeps 1.14d's order of effects.
                 ai::cancel_think_and_regen(sim.game, unit);
+                self.push_last_dead(sim.game, unit);
             }
             return started;
         }
@@ -774,6 +779,14 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
     fn init_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId, req: &AllocRequest) {
         // The init's room is the allocation's (r7.2) until step 8.
         self.alloc_rooms.push((unit, req.room));
+        if req.ty == UnitType::Player {
+            // Player type init `0x005348C0`: unit flags |= 0x0E first
+            // (`units.md` §1 row 0), so the missile target filter
+            // (`missiles.md` §R4.2) accepts the player.
+            if let Some(r) = sim.units.get_mut(unit) {
+                r.flags |= 0x0E;
+            }
+        }
         if req.ty == UnitType::Monster {
             self.with_monster_world(|w, h| w.type_init(sim, h, unit));
         } else if req.ty == UnitType::Object {
