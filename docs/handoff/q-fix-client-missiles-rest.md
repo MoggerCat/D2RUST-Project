@@ -26,34 +26,32 @@ functions 1/4/5/6/8/11/23/25/43/49/60/63). REC block 540–549.
 | unit hits | client.md §C7 r11–r12, §C8, §C9 r2, r4.1, r5, r8; sim/path-placement.md §4 r6 | the unit at a point over the room adjacency and room unit lists with the collide tests (common test, hostility, alignment, `CanDestroy`), on each saved step when the word has a unit bit; the end with a unit: NextHit / LastCollide / flag / hostility gates, pierce (r = 2 keeps m), state 86 (`ClientObjects::just_hit`, counted down per client update), `CollideKill`. PROVISIONAL REC-544 (flags 0x4 / 0x8; and: no unit footprints are stamped on the client grid, so in play the search is not reached yet), REC-545 (state 86 expiry; `client.md` Open question 11). | `a_client_missile_hits_the_monster_on_its_walk`, `piercing_and_next_hit_on_a_client_missile` |
 | hit functions | client-bodies.md §B3 r4, §B7; client-bodies-2.md §B10 r4, r6, §B12 | `bridge/client_missiles_hits.rs`: 1 (fire disc), 2 (ring), 3, 10 (no model overlays), 14 (seeded shard pattern, facing), 18 (meteor), 19, 24 (returns 0 on a unit), 28 (ring of 8), 29, 30 (orb novas), 31, 44, 52 (rocks; a unit hit is a handler error until OQ1), 54, 55, 56. REC-452 narrowed to 9, 12, 13, 16, 25, 26, 53 and the open ones. | `client_missiles::hits_tests` (7) |
 | client unit search, hits 13, 16, 25, 26 | client-bodies-2.md §B9, §B10 r1, §B12 | `search` (C's room adjacency, town skip, room unit lists, squared distance, the filter of §B9 with hostility, the line walk `0x0064E260` over the client DRLG, state 86), next-GUID pick, bolt to each; 13 (lock / retarget), 16 (chain to the next GUID), 25 (skip `noaura`: monstats flag 27 read from `data/fields.tsv`, `MonsterClass::no_aura`; `client-bodies-2.md` OQ1 part answered), 26 (V by (d28, d2C), no cap). Filter bits the model cannot test are handler errors. | `tests_drlg` `hit_16_chains_to_the_next_guid_in_range`, `hits_25_and_26_bolt_the_units_in_range`, `hit_13_retargets_the_lowest_guid` |
+| unit footprints (REC-546) | sim/path-placement.md §3, §5.1; sim/pathing.md §13.3 r5; client/msg-units.md §3 r2 | `stamp_unit_footprints` each client update: living players and monsters stamped on grid copies read only by the missiles. | `tests_drlg` `client_missiles_see_the_units_footprints` |
+| error in a hit body (REC-547) | client.md §C9 r7–r8 | the error is reported and the missile removed (light dies), not left to fail each update. | `a_hit_body_the_model_cannot_run_still_ends_the_missile` |
+| screen shakes (q-fix-shake-starts) | render/camera.md §8 (rows, rule W); client/msg-ui.md §19 r3 | `ClientWorld::shake` (`start_shake`, one running shake on the server tick), read by `ModelFeed::shake`; started by S→C 0x5A code 0x12 and client functions 12, 29, 31, 36, 37, 38, 54 (`bodies::shaker`) and 66 (rule W, `worldstone_shake`; its `0x004D2520` call open). Not done: the skill 301 client do (no client skill-do layer). The feed's PROVISIONAL note is gone; the per-frame player-seed draws stay REC-62. | `client_functions_start_their_shakes`, `rule_w_shakes_in_the_worldstone_levels`, `tests_ui_more` `event_text_cuts_the_name_and_code_0x12_sets_the_eclipse`, `model_feed` `the_shake_is_the_models` |
 | real install | — | `app_client_drlg` `the_users_client_missiles_run_their_functions` runs every user row of the 37 functions of its `RUN` list (1–11, 13, 17–20, 23, 25, 27, 37, 39, 43–49, 51–53, 58–60, 63, 65, 68) for 60 updates with the user's skills tables and a drawn frame's origin; every function has a row made. | install: 4 passed |
 
 ## Not done
 
 - Functions 15 (needs the owner's target `0x004648F0`), 50 and 57 (need
   the owner's client target position `0x004C52E0`: the model holds no
-  client path for units), 38 and 66 (call the open helpers `0x004D19D0`
-  / `0x004D2520`), 29 (open helpers); the open bodies of §C12 wait on
-  the spec.
+  client path for units); the open helpers of 29, 38, 66 (`0x004CE850`,
+  `0x004CE530`, `0x004CECC0`, `0x004D19D0`, `0x004D2520`) and the open
+  parts of 31, 36, 54; the open bodies of §C12 wait on the spec.
 - Hit functions 9 (ally / demon / undead tests the model lacks), 12
   (fire patch), 53 (`0x004DA340` unspecified), 52 with a unit (monstats2
   flag 11, `client-bodies-2.md` OQ1); the open ones of §B6 (REC-452).
-- A handler error in a missile's end (an untestable filter bit, hit 52
-  on a unit) leaves the missile in place, erroring on each later update
-  (the countdown has already passed 0).
-- Unit footprints on the client grid (REC-277 / REC-544): without them
-  the unit search of §C7 r12 is not reached in play.
 - Missile sounds (audio), the init and umod callbacks, the client event
   hooks, the second pass (§C7 r13).
-- Screen shakes of functions 12, 29, 31, 36, 37, 38, 54, 66: the row
-  `q-fix-shake-starts` (REC-62).
+- The skill 301 shake (client skill do, not in the model).
 
 ## Provisional points (REC 540–545)
 
 REC-540 (timed arc flags / vz), REC-541 (motion getter shifts), REC-542
 (hostility parts the model lacks), REC-543 (a body's child takes its
-parent's direction for the aim nudge), REC-544 (unit flags 0x4 / 0x8; no
-unit footprints on the client grid), REC-545 (client state 86 expiry).
+parent's direction for the aim nudge), REC-544 (unit flags 0x4 / 0x8), REC-545 (client state 86 expiry), REC-546
+(unit footprints on grid copies for the missiles), REC-547 (a hit body
+error still ends the missile).
 REC-451 resolved, REC-452 narrowed. Spec gaps: `missiles/client.md` Open
 questions 9–11 (PC 1 Step 4 item 24); `client-bodies-2.md` OQ1 flag 27
 answered from `data/fields.tsv`.

@@ -236,7 +236,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     holder), as offsets read from a server unit, so `record_state.py` can
     fill `own`. Write the answer into `sim/units.md` (or the owner spec)
     and the §2 row of `state-snapshot.md`.
-22. **Re-record sim-0009 without input** (q-prov-recording, REC-290): the Wine
+26. **Re-record sim-0009 without input** (q-prov-recording, REC-290): the Wine
     run of the same command equals `traces/sim/tick/sim-0009.json` for ticks
     0–60, then the Windows trace has a client message at tick 61 (drain: a
     timer on unit (1, 7), player queue) and the player changes rooms at 121,
@@ -296,6 +296,14 @@ rather than a hand-run recipe.
     other points that session lists there. Answer into
     `render/unit-composite.md` §8 and the client missile specs.
 25. **Potion state length and the end-when-full rule** (`q-fix-real-potion-effect`, REC-102): item-use entry 3 body (`0x005BE3F0`, `items/use.md` §3 OQ 1). Recording: hp1 at 10/50 life, state 100 from 0xA8 to 0xA9 = 170 frames, mp1 at 1 mana 51 frames (mana full), hp1 at full life ends the next frame; `misc.txt` says `len` 192 / `calc1` 30 (hp1) and `len` 128 / `calc1` 20 (mp1), so the rule that gives 170 and 51 is not `len`. Answer into `items/use.md` §3; then `wiring/inventory/potion.rs` loses its PROVISIONAL.
+
+27. **NPC nearest player and walk in radius** (q-fix-real-unit-seed-order)
+  (REC-500, REC-501, `specs/monsters/ai.md` §5.3, §7.2): read the scan-2
+  callback of `0x005DDF20` (distance function, `<` or `≤ 15`, ties) and
+  `0x005DE4E0` (target point geometry, rounding, path step count,
+  failure when the point is the unit's own). d2rs reads: no-size
+  distance ≤ 15; point = own + Δ·min(a, dist − b) / dist rounded to
+  nearest; it matches Warriv's three recorded arrival walks.
 
 ## Step 5 — spec gaps (107 provisional points no spec states)
 

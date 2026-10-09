@@ -765,7 +765,14 @@ fn line_clear(w: &ClientWorld, c: UnitKey, v: UnitKey) -> bool {
         d2_sim::path::coords::Point::new(i32::from(x), i32::from(y))
     };
     let room = d.drlg.active_room(cr).map(|a| a.id);
-    !d2_sim::path::line::line_test(&super::MissileRooms(&d.drlg), room, p(cu), p(vu), 4).blocked()
+    !d2_sim::path::line::line_test(
+        &super::MissileRooms(&d.drlg, &w.objclient.unit_grids),
+        room,
+        p(cu),
+        p(vu),
+        4,
+    )
+    .blocked()
 }
 
 /// The next-GUID pick `0x004C5EB0(C, x, y, r, mask, g)` (§B9): mask :=

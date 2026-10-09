@@ -1645,3 +1645,111 @@ fn hit_13_retargets_the_lowest_guid() {
     end_with(&mut m.w, &env, k, Some(UnitKey::new(1, 5)), false).unwrap();
     assert!(!m.w.objclient.set_c.contains_key(&k));
 }
+
+// Covers: specs/sim/path-placement.md §5.1
+// Covers: specs/missiles/client.md §c7-default-step-0x004d30c0-function-1
+#[test]
+fn client_missiles_see_the_units_footprints() {
+    use crate::bridge::client_missiles::{
+        create, flag, stamp_unit_footprints, update_with, ClientMissileRow, CreateRecord, Env,
+    };
+    use crate::bridge::world::UnitKey;
+    let mut m = model();
+    m.inputs.tables.monsters[0] = Some(MonsterClass {
+        size_x: 2,
+        ..MonsterClass::default()
+    });
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    m.recv(&assign_monster(7, 46, 12));
+    let monsters = m.inputs.tables.monsters.clone();
+    stamp_unit_footprints(&mut m.w, &monsters);
+    // The monster (size 2: pattern 1, the plus) stamps 0x100 on its plus,
+    // with the NO_PATH marker on its cell; the local player 0x80. The
+    // model's own grid is untouched.
+    let stamped = |m: &Model, x: i32, y: i32| {
+        let d = &m.w.drlg.as_ref().unwrap().drlg;
+        let r = d
+            .active_rooms()
+            .into_iter()
+            .find(|&(_, r)| d.active_room(r).is_some_and(|a| a.subtiles.contains(x, y)))
+            .unwrap()
+            .0;
+        m.w.objclient.unit_grids[&r].get(x, y).unwrap()
+    };
+    assert_eq!(stamped(&m, 46, 11) & 0x100, 0x100);
+    assert_eq!(stamped(&m, 46, 12) & 0x1100, 0x1100);
+    assert_eq!(stamped(&m, 46, 6) & 0x80, 0x80);
+    assert_eq!(
+        m.w.drlg
+            .as_ref()
+            .unwrap()
+            .drlg
+            .collision_at(46, 11)
+            .unwrap()
+            & 0x100,
+        0
+    );
+    // A missile flying south ends on the monster when its walk enters the
+    // plus, at (46, 11).
+    let p = m.w.local_player.unwrap();
+    let rows = vec![ClientMissileRow {
+        vel: 16,
+        range: 40,
+        collide_type: 3,
+        client_col: true,
+        collide_kill: true,
+        size: 1,
+        clt_do_func: 1,
+        ..ClientMissileRow::default()
+    }];
+    let env = Env {
+        rows: &rows,
+        lights: true,
+        skills: None,
+        monsters: &monsters,
+    };
+    let rec = CreateRecord {
+        flags: flag::POSITION | flag::TARGET_RELATIVE,
+        owner: Some(p),
+        x: 46,
+        y: 8,
+        ty: 10,
+        ..CreateRecord::default()
+    };
+    let k = create(&mut m.w, &rows, &rec, true).unwrap().unwrap();
+    let mut last = None;
+    while m.w.objclient.set_c.contains_key(&k) {
+        last = m.w.objclient.set_c[&k].position;
+        update_with(&mut m.w, &env, k).unwrap();
+    }
+    assert_eq!(last, Some((46, 10)));
+    // A dead monster stamps nothing.
+    m.w.units.get_mut(&UnitKey::new(1, 7)).unwrap().mode = 12;
+    stamp_unit_footprints(&mut m.w, &monsters);
+    assert_eq!(stamped(&m, 46, 11) & 0x100, 0);
+}
+
+// Covers: specs/missiles/client.md §c9-end-0x004d2d70-m-u-forced
+#[test]
+fn a_hit_body_the_model_cannot_run_still_ends_the_missile() {
+    use crate::bridge::client_missiles::{end_with, ClientMissileRow, Env};
+    use crate::bridge::world::UnitKey;
+    let (mut m, k, mut rows, t) = search_model(52, 0);
+    rows[1] = ClientMissileRow {
+        light: 3,
+        ..rows[1]
+    };
+    let monsters = m.inputs.tables.monsters.clone();
+    let env = Env {
+        rows: &rows,
+        lights: true,
+        skills: Some(&t),
+        monsters: &monsters,
+    };
+    // Hit 52 on a monster reads a monstats2 flag the model lacks: the
+    // error is reported and the missile is gone (no update loop on it).
+    assert!(end_with(&mut m.w, &env, k, Some(UnitKey::new(1, 7)), false).is_err());
+    assert!(!m.w.objclient.set_c.contains_key(&k));
+}
